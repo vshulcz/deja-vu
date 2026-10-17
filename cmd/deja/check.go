@@ -22,6 +22,11 @@ func runCheck(dir string, args []string, stdin io.Reader, stdout io.Writer) erro
 // nothing in the plan to look for" and "there is no index to look in" (#2564).
 // Findings keep stdout to themselves, so a measurement run parses it unchanged.
 func runCheckTo(dir string, args []string, stdin io.Reader, stdout, stderr io.Writer) error {
+	if len(args) > 1 && args[0] == "-" {
+		// The '-' it asks for is there; saying it is missing hid the real
+		// problem, the argument after it (#5077).
+		return fmt.Errorf("check takes only '-', got an extra %q", args[1])
+	}
 	if len(args) != 1 || args[0] != "-" {
 		return fmt.Errorf("check needs '-' to read a plan from stdin")
 	}

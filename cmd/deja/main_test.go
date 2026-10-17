@@ -154,6 +154,15 @@ func TestCompletionScripts(t *testing.T) {
 			t.Fatalf("run(%q) succeeded, want error", args)
 		}
 	}
+	// A second argument is named, not reported as a missing shell (#5077).
+	if _, err := captureRun(t, "completion", "bash", "extra"); err == nil ||
+		err.Error() != `completion takes one shell, got "bash" and "extra"` {
+		t.Fatalf("run completion bash extra: %v", err)
+	}
+	if _, err := captureRun(t, "completion"); err == nil ||
+		!strings.Contains(err.Error(), "completion needs bash, zsh, fish, or powershell") {
+		t.Fatalf("run completion: %v", err)
+	}
 	powershell, err := captureRun(t, "completion", "powershell")
 	if err != nil {
 		t.Fatalf("run completion powershell: %v", err)

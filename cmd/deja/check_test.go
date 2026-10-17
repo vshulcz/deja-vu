@@ -71,7 +71,7 @@ func TestRunCheckRequiresDash(t *testing.T) {
 	for _, args := range [][]string{
 		nil,
 		{"PLAN.md"},
-		{"-", "extra"},
+		{"PLAN.md", "extra"},
 	} {
 		var out bytes.Buffer
 		err := runCheck(
@@ -89,5 +89,26 @@ func TestRunCheckRequiresDash(t *testing.T) {
 		if out.Len() != 0 {
 			t.Fatalf("args %v produced output %q", args, out.String())
 		}
+	}
+}
+
+// Given the '-' it asks for plus one more argument, check used to say the '-'
+// was missing (#5077). It names the extra argument instead.
+func TestRunCheckNamesAnExtraArgument(t *testing.T) {
+	var out bytes.Buffer
+	err := runCheck(
+		filepath.Join(t.TempDir(), "index.db"),
+		[]string{"-", "extra"},
+		strings.NewReader("1. Run timeout around deploy_probe"),
+		&out,
+	)
+	if err == nil {
+		t.Fatal("check - extra returned no usage error")
+	}
+	if want := `check takes only '-', got an extra "extra"`; err.Error() != want {
+		t.Fatalf("check - extra error = %q, want %q", err, want)
+	}
+	if out.Len() != 0 {
+		t.Fatalf("check - extra produced output %q", out.String())
 	}
 }

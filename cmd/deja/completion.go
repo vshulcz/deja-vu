@@ -10,6 +10,10 @@ import (
 
 // runCompletion writes a shell-specific script so the binary stays dependency-free.
 func runCompletion(args []string) error {
+	if len(args) > 1 {
+		// One shell was given; "needs bash, ..." read as if none was (#5077).
+		return fmt.Errorf("completion takes one shell, got %q and %q", args[0], args[1])
+	}
 	if len(args) != 1 {
 		return fmt.Errorf("completion needs bash, zsh, fish, or powershell")
 	}
