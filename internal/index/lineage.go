@@ -186,14 +186,18 @@ func wholeTurns(s model.Session) map[string]bool {
 func turnKey(role string, ms int64) string { return role + "\x00" + strconv.FormatInt(ms, 10) }
 
 // wholeHolds reports whether any of the whole askers holds other's last record
-// that is a turn rather than harness noise. A read that fails answers no.
+// that is a turn rather than harness noise. File changes are passed over: an
+// opencode session's diff store is filed after its turns at the file's mtime,
+// and the store a whole asker is read off carries no diff. A read that fails
+// answers no.
 func wholeHolds(dir string, m Manifest, wholes []map[string]bool, other SessionMeta) bool {
 	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), other.Harness+":"+other.ID)
 	if err != nil {
 		return false
 	}
 	for i := len(recs) - 1; i >= 0; i-- {
-		if afterForkNoise(recs[i]) {
+		switch r := recs[i]; {
+		case afterForkNoise(r), r.Role == roleEdit, r.Role == roleWrote, r.Role == roleFiles:
 			continue
 		}
 		k := turnKey(recs[i].Role, recs[i].Time.UnixMilli())

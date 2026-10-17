@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -43,6 +44,16 @@ create table part(id text, message_id text, data text);
 ` + session("ses_source", "s") + session("ses_sibling", "b") + `
 insert into message values('bu2', 'ses_sibling', 1792271300000, '{"role":"user"}');
 insert into part values('bpu2', 'bu2', '{"type":"text","text":"the sibling went on with token wombatzeal"}');`)
+	// The source edited a file: the index files its diff store after its
+	// turns, and the fork's own store carries no diff.
+	diffs := filepath.Join(filepath.Dir(db), "storage", "session_diff")
+	if err := os.MkdirAll(diffs, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	diff := `[{"file": "up.go", "status": "modified", "additions": 1, "deletions": 1, "patch": "--- a/up.go\n+++ b/up.go\n@@ -1,1 +1,1 @@\n-retries := 3\n+retries := 5\n"}]`
+	if err := os.WriteFile(filepath.Join(diffs, "ses_source.json"), []byte(diff), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	dir := index.DefaultDir()
 	if err := index.Ensure(dir, "", true, io.Discard); err != nil {
 		t.Fatal(err)

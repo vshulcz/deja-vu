@@ -256,9 +256,27 @@ var liveWholes = struct {
 	m map[string]model.Session
 }{m: map[string]model.Session{}}
 
+// lineageOnly is what LineageWhole reads of a session: every message's role
+// and time, and the text up to the turn it opens on. A fork of a long session
+// is tens of MB whole.
+func lineageOnly(s model.Session) model.Session {
+	out := model.Session{ID: s.ID, Harness: s.Harness, Kind: s.Kind, Parent: s.Parent, Messages: make([]model.Message, len(s.Messages))}
+	opened := false
+	for i, m := range s.Messages {
+		out.Messages[i] = model.Message{Role: m.Role, Time: m.Time}
+		if !opened {
+			out.Messages[i].Text = m.Text
+			opened = index.SessionOpening(model.Session{Harness: s.Harness, Messages: out.Messages[:i+1]}) != 0
+		}
+	}
+	return out
+}
+
 func liveWhole(id string) (model.Session, bool) {
+	// Keyed on the store too: the id is only unique inside one.
+	key := sources.OpencodeDB() + "\x00" + id
 	liveWholes.Lock()
-	w, ok := liveWholes.m[id]
+	w, ok := liveWholes.m[key]
 	liveWholes.Unlock()
 	if ok {
 		return w, true
@@ -267,11 +285,12 @@ func liveWhole(id string) (model.Session, bool) {
 	if !ok {
 		return w, false
 	}
+	w = lineageOnly(w)
 	liveWholes.Lock()
 	if len(liveWholes.m) >= liveSessionsMax {
 		clear(liveWholes.m)
 	}
-	liveWholes.m[id] = w
+	liveWholes.m[key] = w
 	liveWholes.Unlock()
 	return w, true
 }
