@@ -141,3 +141,35 @@ func TestHasSession(t *testing.T) {
 		t.Error("the empty id is found")
 	}
 }
+
+// An asker read off its store in full leaves out only the indexed sessions
+// whose last turn it holds: the copy it was forked from, not the sibling or
+// the source that went on past it (#5129).
+func TestLineageWholeLeavesOutOnlyWhatTheAskerHolds(t *testing.T) {
+	dir := lineageStore(t)
+	at := time.Date(2026, 10, 2, 7, 0, 0, 0, time.UTC)
+	turn := func(role, text string, i int) model.Message {
+		return model.Message{Role: role, Text: text, Time: at.Add(time.Duration(i) * time.Second)}
+	}
+	opening := []model.Message{
+		turn("user", "the retry loop spins forever", 0),
+		turn("assistant", "the backoff never resets", 1),
+	}
+	// A fork of c: holds c's end, not a's or d's.
+	w := model.Session{Harness: "claude", ID: "w", Kind: "fork", Messages: append(append([]model.Message{}, opening...),
+		model.Message{Role: "user", Text: "untimed, not a turn"},
+		turn("user", "what about a circuit breaker", 7))}
+	if got, want := lineageKeys(LineageWhole(dir, map[string]bool{"w": true}, w)), []string{"c", "w"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("lineage of a whole fork of c = %v, want %v", got, want)
+	}
+	// A fork of a holds a's end, and with it c's.
+	wa := model.Session{Harness: "claude", ID: "wa", Messages: append(append([]model.Message{}, opening...),
+		turn("user", "reset it on success", 2), turn("user", "now add a test", 8))}
+	if got, want := lineageKeys(LineageWhole(dir, map[string]bool{"wa": true}, wa)), []string{"a", "c", "wa"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("lineage of a whole fork of a = %v, want %v", got, want)
+	}
+	// A whole session that is not the asker says nothing about the asker.
+	if got, want := lineageKeys(LineageWhole(dir, map[string]bool{"u": true}, wa)), []string{"u"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("lineage of u with an unrelated whole = %v, want %v", got, want)
+	}
+}
