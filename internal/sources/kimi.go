@@ -197,12 +197,23 @@ var kimiDialect = toolDialect{
 	editTools: map[string]bool{"Edit": true, "Write": true},
 }
 
-// kimiState is the slice of state.json deja cares about.
+// kimiState is the slice of state.json deja cares about. Kimi Code 2.x
+// renamed workDir to cwd and stamps in epoch milliseconds where 0.x wrote
+// ISO strings (#5143).
 type kimiState struct {
 	Title     string `json:"title"`
 	WorkDir   string `json:"workDir"`
-	CreatedAt string `json:"createdAt"`
-	UpdatedAt string `json:"updatedAt"`
+	CWD       string `json:"cwd"`
+	CreatedAt any    `json:"createdAt"`
+	UpdatedAt any    `json:"updatedAt"`
+}
+
+// dir is the directory the session ran in, under either name.
+func (st kimiState) dir() string {
+	if st.WorkDir != "" {
+		return st.WorkDir
+	}
+	return st.CWD
 }
 
 // kimiPersonsOrigin reports whether a message's origin says a person wrote it:
@@ -238,7 +249,28 @@ func KimiSessionDir(path string) string {
 		return ""
 	}
 	st, _ := kimiSessionState(path)
-	return st.WorkDir
+	return st.dir()
+}
+
+// KimiForkSource is the session a Kimi Code session was forked from, by id:
+// 2.x /fork copies a session into a new one and records the source as
+// forkedFrom in the copy's state.json. Empty when the id is not a fork or not
+// in the store.
+func KimiForkSource(id string) string {
+	id = strings.TrimSpace(id)
+	if !strings.HasPrefix(id, "session_") || strings.ContainsAny(id, `/\*?[`) {
+		return ""
+	}
+	matches, _ := filepath.Glob(filepath.Join(KimiRoot(), "sessions", "*", id, "state.json"))
+	for _, m := range matches {
+		var st struct {
+			ForkedFrom string `json:"forkedFrom"`
+		}
+		if b, err := os.ReadFile(m); err == nil && json.Unmarshal(b, &st) == nil && st.ForkedFrom != "" {
+			return st.ForkedFrom
+		}
+	}
+	return ""
 }
 
 // kimiExit is the footer kimi-code's Bash tool writes on a non-zero exit,
@@ -299,7 +331,7 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 	btw := false
 	if st, ok := kimiSessionState(path); ok {
 		s.Title = strings.TrimSpace(st.Title)
-		s.Project = projectName(st.WorkDir)
+		s.Project = projectName(st.dir())
 		if !child {
 			s.Touch(parseTimeAny(st.CreatedAt))
 			s.Touch(parseTimeAny(st.UpdatedAt))
@@ -598,7 +630,17 @@ func kimiStreamEvent(line []byte) int {
 	return kimiStreamOther
 }
 
-// kimiText joins the text parts of an append_message content array.
+// kimiHookResultPart reports whether a text part is one hook's output as
+// Kimi wraps it. 2.x hands those to the model as parts of the person's own
+// message, ahead of what was typed and under origin user, where 0.28 gave them
+// a message of their own (#5144). What a person types is a part of its own.
+func kimiHookResultPart(t string) bool {
+	t = strings.TrimSpace(t)
+	return strings.HasPrefix(t, "<hook_result") && strings.HasSuffix(t, "</hook_result>")
+}
+
+// kimiText joins the text parts of an append_message content array, less the
+// hooks' output.
 func kimiText(v any) string {
 	parts, ok := v.([]any)
 	if !ok {
@@ -613,7 +655,7 @@ func kimiText(v any) string {
 		if !ok || p["type"] != "text" {
 			continue
 		}
-		if t, _ := p["text"].(string); t != "" {
+		if t, _ := p["text"].(string); t != "" && !kimiHookResultPart(t) {
 			if b.Len() > 0 {
 				b.WriteString("\n")
 			}
