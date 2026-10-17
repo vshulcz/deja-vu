@@ -235,7 +235,7 @@ test("on 2.x the sessions it stamped end with the turn and at cleanup", async ()
     await events.push({ type: "session.execution.started", data: { sessionID: "s1" } })
     assert.equal(ended().length, 0, "a turn starting ended the session")
     await events.push({ type: "session.execution.succeeded", data: { sessionID: "s1" } })
-    assert.deepEqual(ended(), ['hook-session-end {"session_id":"s1"}'])
+    assert.deepEqual(ended(), ['hook-session-end ' + JSON.stringify({ session_id: "s1", cwd: dir })])
     await hooks.session.context[0]({
       sessionID: "s2",
       system: [],
@@ -244,7 +244,7 @@ test("on 2.x the sessions it stamped end with the turn and at cleanup", async ()
     rmSync(calls, { force: true })
     await cleanup()
     // s1's turn already ended it; the cleanup ends only what is still live.
-    assert.deepEqual(ended(), ['hook-session-end {"session_id":"s2"}'])
+    assert.deepEqual(ended(), ['hook-session-end ' + JSON.stringify({ session_id: "s2", cwd: dir })])
     assert.equal(events.open(), false, "the subscription outlived the plugin")
   })
 })

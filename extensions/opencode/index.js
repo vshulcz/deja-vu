@@ -178,7 +178,7 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
     recalled.set(key, extra)
     if (recalled.size > 1000) recalled.delete(recalled.keys().next().value)
   }
-  const endSession = (id) => ask(["hook-session-end"], JSON.stringify({ session_id: id }), 5000)
+  const endSession = (id) => ask(["hook-session-end"], JSON.stringify({ session_id: id, cwd }), 5000)
   // The session that spawned each one, asked of opencode once. A task
   // sub-agent's digest and recall led with its parent, which is live and
   // asking through it (#4548).

@@ -31,7 +31,7 @@ func TestPluginHostsNameTheProjectWhenASessionEnds(t *testing.T) {
 		"deepseek (dsh)": dshAutoJS("/bin/deja"),
 	}
 	// The packages shipped outside `deja install` make the same call.
-	for _, rel := range []string{"dsh/index.js", "openclaw/index.mjs", "hermes/__init__.py", "pi/index.ts"} {
+	for _, rel := range []string{"opencode/index.js", "dsh/index.js", "openclaw/index.mjs", "hermes/__init__.py", "pi/index.ts"} {
 		b, err := os.ReadFile(filepath.Join("..", "..", "extensions", rel))
 		if err != nil {
 			t.Fatal(err)

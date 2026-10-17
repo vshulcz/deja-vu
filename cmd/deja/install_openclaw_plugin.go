@@ -820,7 +820,7 @@ export default {
       "session_end",
       async (event, ctx) => {
         const id = event?.sessionId || ctx?.sessionId || event?.sessionKey || ctx?.sessionKey || "";
-        if (id) ask(["hook-session-end"], { session_id: id, cwd: where(ctx).cwd });
+        if (id) ask(["hook-session-end"], { session_id: id, cwd: ctx?.workspaceDir || seen.get(ctx?.sessionKey || "")?.dir || process.cwd() });
       },
       { timeoutMs: 5000 },
     );

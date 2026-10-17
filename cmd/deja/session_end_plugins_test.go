@@ -59,6 +59,30 @@ func endedSessions(calls []pluginCall) []string {
 	return out
 }
 
+// endsNameTheContextCwd checks every hook-session-end in a run names a
+// directory, and the one the run's hook-context had when there was one: the
+// end refreshes the start digest cached under that exact string (#5121).
+func endsNameTheContextCwd(t *testing.T, calls []pluginCall) {
+	t.Helper()
+	starts := map[string]bool{}
+	for _, c := range calls {
+		if cwd, _ := c.input["cwd"].(string); strings.HasPrefix(c.args, "hook-context") && cwd != "" {
+			starts[cwd] = true
+		}
+	}
+	for _, c := range calls {
+		if !strings.HasPrefix(c.args, "hook-session-end") {
+			continue
+		}
+		cwd, _ := c.input["cwd"].(string)
+		if cwd == "" {
+			t.Errorf("hook-session-end without its project: %v", c.input)
+		} else if len(starts) > 0 && !starts[cwd] {
+			t.Errorf("hook-session-end names %q, hook-context had %v", cwd, starts)
+		}
+	}
+}
+
 // runNodeDriver writes the plugin source and a driver beside it and runs the
 // driver with node, stripping types when the plugin is TypeScript.
 func runNodeDriver(t *testing.T, name, src, driver string) string {
@@ -117,6 +141,8 @@ const ctxFor = (id) => ({ ui, sessionManager: { getSessionId: () => id } });
 for (const f of handlers.before_agent_start) await f({ prompt: "hello" }, ctxFor("PI-1"));
 for (const f of handlers.session_shutdown) await f({ type: "session_shutdown", reason: "new", targetSessionFile: "/x/next.jsonl" }, ctxFor("PI-2"));
 `)
+			endsNameTheContextCwd(t, calls())
+
 			if got := endedSessions(calls()); len(got) != 1 || got[0] != "PI-1" {
 				t.Errorf("hook-session-end ran for %v, want the session that ended, PI-1", got)
 			}
@@ -140,6 +166,8 @@ for (const f of handlers.before_agent_start) await f({}, ctxFor("OMP-1"));
 for (const f of handlers.session_switch) await f({ type: "session_switch", reason: "new", previousSessionFile: "/x/one.jsonl" }, ctxFor("OMP-2"));
 for (const f of handlers.session_shutdown) await f({ type: "session_shutdown" }, ctxFor("OMP-2"));
 `)
+	endsNameTheContextCwd(t, calls())
+
 	if got := endedSessions(calls()); strings.Join(got, ",") != "OMP-1,OMP-2" {
 		t.Errorf("hook-session-end ran for %v, want OMP-1 at the switch and OMP-2 at exit", got)
 	}
@@ -157,6 +185,8 @@ plugin.register({ on: (name, fn) => { handlers[name] = fn } });
 const ctx = { sessionKey: "agent:main:main", sessionId: "OC-1", agentId: "main" };
 await handlers.session_end({ sessionId: "OC-1", sessionKey: "agent:main:main", messageCount: 2, reason: "shutdown", sessionFile: "/x/OC-1.jsonl" }, ctx);
 `)
+	endsNameTheContextCwd(t, calls())
+
 	if got := endedSessions(calls()); len(got) != 1 || got[0] != "OC-1" {
 		t.Errorf("hook-session-end ran for %v, want OC-1", got)
 	}
@@ -174,6 +204,8 @@ if (!plugin.manifest.capabilities.includes("hooks")) throw new Error("hooks capa
 plugin.setup({ registerMessageBuilder() {}, registerRule() {}, registerCommand() {} }, { session: { sessionId: "1791369007452_agxq3" } });
 await plugin.hooks.afterRun({ snapshot: { agentId: "a", status: "completed", iteration: 1, messages: [] }, result: {} });
 `)
+	endsNameTheContextCwd(t, calls())
+
 	if got := endedSessions(calls()); len(got) != 1 || got[0] != "1791369007452_agxq3" {
 		t.Errorf("hook-session-end ran for %v, want the session setup was given", got)
 	}
@@ -199,6 +231,8 @@ for (const f of handlers["session/disposed"]) f({ id: "session-A" });
 `)
 	// The live stamp is under the bare uuid hook-context was given; an end
 	// naming "session-A" matched no stamp and left it (stand on 0.1.1-rc.2).
+	endsNameTheContextCwd(t, calls())
+
 	if got := endedSessions(calls()); strings.Join(got, ",") != "A,B" {
 		t.Errorf("hook-session-end ran for %v, want A at its disposal and B at exit, prefix stripped", got)
 	}
@@ -223,6 +257,8 @@ for (const f of disposers) await f();
 	if strings.TrimSpace(out) != `{"action":"done"}` {
 		t.Errorf("agent.end answered %q, want Amp's default {\"action\":\"done\"}", out)
 	}
+	endsNameTheContextCwd(t, calls())
+
 	if got := endedSessions(calls()); len(got) < 1 || got[0] != "T-1" {
 		t.Errorf("hook-session-end ran for %v, want T-1", got)
 	}
@@ -261,6 +297,8 @@ func TestHermesPluginEndsTheSessionOnFinalize(t *testing.T) {
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("plugin: %v\n%s", err, out)
 	}
+	endsNameTheContextCwd(t, calls())
+
 	if got := endedSessions(calls()); len(got) != 1 || got[0] != "20261007_132227_1adb27" {
 		t.Errorf("hook-session-end ran for %v, want the finalized session once", got)
 	}

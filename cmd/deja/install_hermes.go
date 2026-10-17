@@ -312,7 +312,7 @@ def finalize(session_id=None, **kwargs):
     # this one now rather than twenty minutes from now (#4210).
     if not session_id:
         return None
-    _deja(["hook-session-end"], json.dumps({"session_id": session_id, "cwd": os.getenv("TERMINAL_CWD") or os.getcwd()}), timeout=3)
+    _deja(["hook-session-end"], json.dumps({"session_id": session_id, "cwd": os.getcwd()}), timeout=3)
     return None
 
 
