@@ -228,9 +228,22 @@ func liveSessionIDs(dir string) map[string]bool {
 
 // liveLineage is the live sessions and every session that counts as one of
 // them: a sub-agent a live session spawned is being written too, under an id
-// no hook stamps, since its hooks fire under the parent's (#4547).
+// no hook stamps, since its hooks fire under the parent's (#4547). A live
+// session the index does not hold yet is read off its own store, as
+// askerLineage does: a fork's first turn comes before any build has seen it,
+// and MCP answered it with its source (#5129).
 func liveLineage(dir string) map[string]bool {
-	return index.Lineage(dir, liveSessionIDs(dir))
+	ids := liveSessionIDs(dir)
+	var heads []model.Session
+	for id := range ids {
+		if isSpawnedReader(id) || index.HasSession(dir, id) {
+			continue
+		}
+		if h, ok := askerHead(id, ""); ok {
+			heads = append(heads, h)
+		}
+	}
+	return index.Lineage(dir, ids, heads...)
 }
 
 // askerLineage is the session a hook speaks for and every session that counts
