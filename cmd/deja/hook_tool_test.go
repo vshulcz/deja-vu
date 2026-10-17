@@ -271,6 +271,42 @@ func TestToolHookReadsTheFileFromAnApplyPatch(t *testing.T) {
 	}
 }
 
+// Codex without an apply_patch tool of its own (a provider model with no Codex
+// metadata) edits by running apply_patch in its shell, and 0.149 sends that to
+// PreToolUse as tool_name Bash with the heredoc in command. The file line has
+// to fire there as it does for the apply_patch tool.
+func TestToolHookReadsTheFileFromAShellApplyPatch(t *testing.T) {
+	tmp := hermeticEnv(t)
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+	for i := 0; i < 6; i++ {
+		id := "s" + string(rune('0'+i))
+		writeClaudeFixture(t, filepath.Join(root, "alpha", id+".jsonl"), id, []string{
+			`{"type":"user","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"edit"}}`,
+			`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"text","text":"We settled on config.go loading the sentinel before any read."},{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"/work/alpha/config.go","old_string":"a","new_string":"b"}}]}}`,
+		})
+	}
+	if _, err := captureRun(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLAUDE_PROJECT_DIR", "/work/alpha")
+	run := func(cmd string) string {
+		b, _ := json.Marshal(map[string]any{
+			"hook_event_name": "PreToolUse", "tool_name": "Bash",
+			"tool_input": map[string]any{"command": cmd}, "session_id": "now", "cwd": "/work/alpha",
+		})
+		return toolHookRun(t, string(b))
+	}
+	out := run("apply_patch <<'EOF'\n*** Begin Patch\n*** Update File: config.go\n@@\n+x\n*** End Patch\nEOF")
+	if !strings.Contains(out, "config.go has been worked on in 6 sessions") {
+		t.Fatalf("shell apply_patch on a file with history got no file line: %q", out)
+	}
+	// A command that only prints a patch header is not an edit.
+	if got := run("printf '*** Update File: config.go\\n'"); got != "" {
+		t.Errorf("a command that is not apply_patch spoke: %q", got)
+	}
+}
+
 // The file line carries the prior decision, not just a pointer to it: a
 // measured A/B showed a bare "deja blame has the history" changed nothing an
 // agent did, while the same moment carrying the decision drove reuse. When a
