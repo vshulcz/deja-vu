@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A session still in a SQLite store's write-ahead log is indexed on the next pass. deja decided whether a Hermes, opencode, goose, Grok, Zed or other SQLite store changed from the database file alone, which SQLite touches only at a checkpoint, so a session that just ended could be missing from the next session's recall while `deja index` said it was up to date. The `-wal` beside the store now counts too.
+
 ## [0.22.2] - 2026-10-17
 
 deja now reads Windsurf / Devin Desktop: Cascade's encrypted conversation

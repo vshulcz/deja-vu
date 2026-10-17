@@ -804,6 +804,13 @@ type FileState struct {
 	CWDMTime      int64  `json:"cwd_mtime,omitempty"`
 	LastUpdated   int64  `json:"last_updated,omitempty"`
 	Redactions    int    `json:"redactions,omitempty"`
+	// WALSize and WALMTime are the SQLite write-ahead log beside a store.
+	// A write lands there and reaches the database file only at a
+	// checkpoint, which Hermes runs every 50 writes of one process, so a
+	// session could sit in the log while the file's own size and mtime
+	// said nothing moved.
+	WALSize  int64 `json:"wal_size,omitempty"`
+	WALMTime int64 `json:"wal_mtime,omitempty"`
 	// Kept marks a transcript its agent deleted and the index kept on
 	// purpose. Without it the listing came up one short on every run, the
 	// index never read as fresh, and every search served stale while a

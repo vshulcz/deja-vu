@@ -5323,7 +5323,8 @@ func wholeSession(p string, s model.Session) (model.Session, bool) {
 func sameFile(a, b FileState) bool {
 	return a.Path == b.Path && a.Size == b.Size && a.MTime == b.MTime &&
 		a.MetadataSize == b.MetadataSize && a.MetadataMTime == b.MetadataMTime &&
-		a.CWDSize == b.CWDSize && a.CWDMTime == b.CWDMTime
+		a.CWDSize == b.CWDSize && a.CWDMTime == b.CWDMTime &&
+		a.WALSize == b.WALSize && a.WALMTime == b.WALMTime
 }
 
 // kindForPath returns the registry FileKind whose Match accepts p.
@@ -5766,6 +5767,14 @@ func walkFileState(p string, fi os.FileInfo, old map[string]FileState) FileState
 		if cwd, err := os.Lstat(filepath.Join(filepath.Dir(filepath.Dir(p)), ".cwd")); err == nil && cwd.Mode()&os.ModeSymlink == 0 && !cwd.IsDir() {
 			fs.CWDSize = cwd.Size()
 			fs.CWDMTime = cwd.ModTime().UnixNano()
+		}
+	}
+	// A transcript is never a SQLite store, and skipping it keeps the walk
+	// to one stat per file on the stores with thousands of them.
+	if !strings.HasSuffix(p, ".jsonl") {
+		if wal, err := os.Lstat(p + "-wal"); err == nil && wal.Mode().IsRegular() {
+			fs.WALSize = wal.Size()
+			fs.WALMTime = wal.ModTime().UnixNano()
 		}
 	}
 	return fs
