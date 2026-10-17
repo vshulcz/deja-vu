@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -233,20 +235,32 @@ func withoutSubagentRuns(ss []model.Session) []model.Session {
 	return out
 }
 
-// codexThreadHasDigest reports whether a Codex thread starting now already
-// carries a start digest. Codex keeps the context a hook added in the thread
-// and replays it on resume, so every `codex resume` put the same digest in
-// front of the model once more, and a fork, which copies its source's history,
-// one more again (#4550). Claude Code drops the old one on resume and is not
-// asked. Read off what deja told the thread, or the thread it was forked from:
-// a thread whose ledger rows have rotated out gets one more, which is the old
-// behaviour.
-func codexThreadHasDigest(dir, source, sessionID, transcript string) bool {
+// threadHasDigest reports whether a session starting now already carries a
+// start digest. Codex keeps the context a hook added in the thread and replays
+// it on resume, so every `codex resume` put the same digest in front of the
+// model once more, and a fork, which copies its source's history, one more
+// again (#4550). For Codex that is read off what deja told the thread, or the
+// thread it was forked from: a thread whose ledger rows have rotated out gets
+// one more, which is the old behaviour.
+//
+// Claude Code did not replay it on 2.1.287 and does from 2.1.300 on: the answer
+// is stored as an attachment in the transcript and resent on resume (#5122).
+// There the transcript says, so an older client that never stored one, or a
+// session compacted since, still gets its digest. Every Claude-format host
+// reads as "claude" here; one that stored the record without replaying it
+// would lose its resume digest, and none is known to.
+func threadHasDigest(dir, source, sessionID, transcript string) bool {
 	if transcript == "" || sessionID == "" || source == "compact" || source == "clear" {
 		return false
 	}
 	head, err := sources.TranscriptHead(transcript, sessionID)
-	if err != nil || head.Harness != "codex" {
+	if err != nil {
+		return false
+	}
+	if head.Harness == "claude" {
+		return source == "resume" && claudeTranscriptHoldsDigest(transcript)
+	}
+	if head.Harness != "codex" {
 		return false
 	}
 	told := func(id string) bool { return len(alreadyInjected(dir, sessionStartKeyPrefix+id)) > 0 }
@@ -254,6 +268,40 @@ func codexThreadHasDigest(dir, source, sessionID, transcript string) bool {
 		return true
 	}
 	return head.Kind == "fork" && head.Parent != "" && told(head.Parent)
+}
+
+// claudeTranscriptHoldsDigest reports whether a Claude Code transcript holds a
+// deja start digest the client will send again: a SessionStart attachment
+// carrying a recall block, after the last compaction boundary.
+func claudeTranscriptHoldsDigest(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = f.Close() }()
+	r := bufio.NewReaderSize(f, 64<<10)
+	held := false
+	for {
+		line, err := r.ReadSlice('\n')
+		if errors.Is(err, bufio.ErrBufferFull) {
+			// A record's type and hook name sit at its front, so the first
+			// 64 KiB of a long line is enough to tell; the rest is skipped.
+			line = append([]byte(nil), line...)
+			for errors.Is(err, bufio.ErrBufferFull) {
+				_, err = r.ReadSlice('\n')
+			}
+		}
+		switch {
+		case bytes.Contains(line, []byte(`"compact_boundary"`)):
+			held = false
+		case bytes.Contains(line, []byte(`"hook_additional_context"`)) &&
+			bytes.Contains(line, []byte(`"hookEvent":"SessionStart"`)) && bytes.Contains(line, []byte(`deja-recall`)):
+			held = true
+		}
+		if err != nil {
+			return held
+		}
+	}
 }
 
 // sessionHadDigest reports whether this session has already had its one
@@ -650,7 +698,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 	if input.Source == "fork" {
 		return nil
 	}
-	if codexThreadHasDigest(dir, input.Source, input.SessionID, input.TranscriptPath) {
+	if threadHasDigest(dir, input.Source, input.SessionID, input.TranscriptPath) {
 		return nil
 	}
 	input.WorkspaceRoots = adoptGrokRoots(input.WorkspaceRoots, input.WorkspaceRoot)

@@ -11,7 +11,8 @@ import (
 // Codex keeps the context a hook added in the thread, and resuming it replays
 // that into the next request: every `codex resume` put the same start digest in
 // front of the model once more, two after one resume and three after a fork
-// (#4550). Claude Code does not replay it, so a Claude resume still gets one.
+// (#4550). A Claude transcript that holds no digest still gets one on resume
+// (#5122 covers the one that does).
 func TestCodexResumeGetsNoSecondDigest(t *testing.T) {
 	dir, fork := forkStore(t, false)
 	codex := filepath.Join(os.Getenv("DEJA_CODEX_ROOT"), "sessions", "2026", "10", "02")
@@ -46,7 +47,7 @@ func TestCodexResumeGetsNoSecondDigest(t *testing.T) {
 	if out := run("prior-x", "resume", prior, "/w/q"); !strings.Contains(out, "deja-recall") {
 		t.Errorf("a resumed codex session that never had a digest got none:\n%s", out)
 	}
-	// Claude Code drops the old one on resume, so it is given a fresh one.
+	// A Claude transcript holding no digest is given one.
 	claude := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-w-p", fork+".jsonl")
 	if out := run(fork, "startup", claude, "/w/p"); !strings.Contains(out, "deja-recall") {
 		t.Fatalf("the claude session got no digest at startup:\n%s", out)
