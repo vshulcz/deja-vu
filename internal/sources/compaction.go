@@ -682,6 +682,7 @@ func TranscriptHead(path, nativeSessionID string) (model.Session, error) {
 // id: Copilot's hooks name the session and not its file, and its records do
 // not say which harness wrote them.
 func CopilotSessionHead(id string) (model.Session, error) {
+	id = strings.TrimSpace(id)
 	p := CopilotSessionFile(id)
 	if p == "" {
 		return model.Session{}, os.ErrNotExist
