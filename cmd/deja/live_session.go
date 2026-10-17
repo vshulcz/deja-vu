@@ -89,13 +89,29 @@ func endSessionLive(dir, id string) {
 // omp, prime-agent, Senpi, gjc, OpenClaw, Hermes, Cline and dsh run when their
 // host says a session is over. It says nothing back — none of them reads a
 // reply to it — and it runs even with recall off: clearing a stamp never hands
-// anyone anything. With recall on it also refreshes the project's start digest.
+// anyone anything. With recall on, and a project in the payload or the
+// environment, it also refreshes that project's start digest. The plugins send
+// a bare session id, so for them it does not yet.
 func runHookSessionEnd(dir string, stdin io.Reader) {
 	var input precompactHookInput
 	_ = json.Unmarshal(readHookPayload(stdin, hookStdinWait), &input)
 	input.adopt()
 	endSessionLive(dir, input.SessionID)
-	refreshDigestAfterSession(dir, hookProjectPath(input.CWD, input.WorkspaceRoots))
+	refreshDigestAfterSession(dir, sessionEndProject(input))
+}
+
+// sessionEndProject is the project a SessionEnd payload is about: what it
+// names, else the directory the host exported, the way hookCWD reads it for
+// the session start. Never the process's own directory: a plugin host sends a
+// bare session id and spawns the hook wherever it happens to be.
+func sessionEndProject(input precompactHookInput) string {
+	if p := hookProjectPath(input.CWD, input.WorkspaceRoots); p != "" {
+		return p
+	}
+	if p := os.Getenv("CLAUDE_PROJECT_DIR"); p != "" {
+		return p
+	}
+	return os.Getenv("DEVIN_PROJECT_DIR")
 }
 
 // refreshDigestAfterSession rebuilds the project's cached start digest once a
