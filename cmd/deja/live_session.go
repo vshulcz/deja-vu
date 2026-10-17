@@ -89,12 +89,29 @@ func endSessionLive(dir, id string) {
 // omp, prime-agent, Senpi, gjc, OpenClaw, Hermes, Cline and dsh run when their
 // host says a session is over. It says nothing back — none of them reads a
 // reply to it — and it runs even with recall off: clearing a stamp never hands
-// anyone anything.
+// anyone anything. With recall on it also refreshes the project's start digest.
 func runHookSessionEnd(dir string, stdin io.Reader) {
 	var input precompactHookInput
 	_ = json.Unmarshal(readHookPayload(stdin, hookStdinWait), &input)
 	input.adopt()
 	endSessionLive(dir, input.SessionID)
+	refreshDigestAfterSession(dir, hookProjectPath(input.CWD, input.WorkspaceRoots))
+}
+
+// refreshDigestAfterSession rebuilds the project's cached start digest once a
+// session there is over. The cache is served whatever its age, and its only
+// other refresh runs at a session start, before that session has written
+// anything, so the next session read a snapshot without the one that just
+// ended (#5119). Detached, like every refresh: the host is closing.
+func refreshDigestAfterSession(dir, cwd string) {
+	if dir == "" || strings.TrimSpace(cwd) == "" || recallIsOff() {
+		return
+	}
+	// No cache means the next start builds the digest itself.
+	if _, err := os.Stat(hookCachePath(dir, cwd)); err != nil {
+		return
+	}
+	requestHookRefresh(dir, cwd)
 }
 
 // runHookMCPCall is Copilot CLI's preMcpToolCall hook: it stamps the session
