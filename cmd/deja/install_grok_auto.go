@@ -48,11 +48,38 @@ func grokHooksPath() string {
 }
 
 func installGrokAuto(exe string, uninstall bool) (installResult, error) {
-	exe = hookExeFor(exe, uninstall)
-	path := grokHooksPath()
-	old, err := readConfig(path)
+	path, old, next, remove, err := grokHooksUpdate(hookExeFor(exe, uninstall), uninstall)
 	if err != nil {
 		return installResult{}, err
+	}
+	if remove {
+		if err := os.Remove(path); err != nil {
+			return installResult{}, err
+		}
+		// And the hooks directory deja made for it (#3698).
+		pruneCreatedDir(filepath.Dir(path))
+		return installResult{Path: path, Action: "removed"}, nil
+	}
+	if next == nil {
+		return installResult{Path: path, Action: "unchanged"}, nil
+	}
+	if !uninstall {
+		noteCreatedDirs(filepath.Dir(path))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return installResult{}, err
+		}
+	}
+	a, err := writeIfChanged(path, old, next)
+	return installResult{Path: path, Action: a}, err
+}
+
+// grokHooksUpdate is installGrokAuto without the write: remove says the file
+// goes, and next is nil when there is nothing to write.
+func grokHooksUpdate(exe string, uninstall bool) (path string, old, next []byte, remove bool, err error) {
+	path = grokHooksPath()
+	old, err = readConfig(path)
+	if err != nil {
+		return path, nil, nil, false, err
 	}
 	var root map[string]any
 	if len(bytes.TrimSpace(old)) == 0 {
@@ -62,17 +89,13 @@ func installGrokAuto(exe string, uninstall bool) (installResult, error) {
 			// A file deja cannot read is still one the uninstall has to take,
 			// or grok keeps calling a binary wired nowhere else — the contract
 			// TestUninstallStillTakesAHookFileTheInstallWouldRefuse pins.
-			if rerr := os.Remove(path); rerr != nil {
-				return installResult{}, rerr
-			}
-			pruneCreatedDir(filepath.Dir(path))
-			return installResult{Path: path, Action: "removed"}, nil
+			return path, old, nil, true, nil
 		}
-		return installResult{}, configParseError(path, err)
+		return path, old, nil, false, configParseError(path, err)
 	}
 	if uninstall {
 		if len(old) == 0 {
-			return installResult{Path: path, Action: "unchanged"}, nil
+			return path, old, nil, false, nil
 		}
 		// Install merged deja's entries beside the reader's own; uninstall
 		// removed the file whole and took theirs with it (#3219). deja's
@@ -88,19 +111,13 @@ func installGrokAuto(exe string, uninstall bool) (installResult, error) {
 			delete(root, "hooks")
 		}
 		if len(root) == 0 {
-			if err := os.Remove(path); err != nil {
-				return installResult{}, err
-			}
-			// And the hooks directory deja made for it (#3698).
-			pruneCreatedDir(filepath.Dir(path))
-			return installResult{Path: path, Action: "removed"}, nil
+			return path, old, nil, true, nil
 		}
 		next, err := marshalConfigLike(old, root)
 		if err != nil {
-			return installResult{}, err
+			return path, old, nil, false, err
 		}
-		a, err := writeIfChanged(path, old, append(next, '\n'))
-		return installResult{Path: path, Action: a}, err
+		return path, old, append(next, '\n'), false, nil
 	}
 	// No matcher. Grok's own docs name the session sources `startup` and
 	// `resume`, but 1.0.5 sends `new` for a fresh session and `load` for a
@@ -130,15 +147,9 @@ func installGrokAuto(exe string, uninstall bool) (installResult, error) {
 	// recall can answer with it now rather than twenty minutes from now. Grok
 	// bounds a SessionEnd hook at 1.5 s by default, which this fits in.
 	root = updateClaudeHook(root, "SessionEnd", hookRun(exe, "hook-session-end"), "", false)
-	next, err := marshalConfigLike(old, root)
+	next, err = marshalConfigLike(old, root)
 	if err != nil {
-		return installResult{}, err
+		return path, old, nil, false, err
 	}
-	next = append(next, '\n')
-	noteCreatedDirs(filepath.Dir(path))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return installResult{}, err
-	}
-	a, err := writeIfChanged(path, old, next)
-	return installResult{Path: path, Action: a}, err
+	return path, old, append(next, '\n'), false, nil
 }

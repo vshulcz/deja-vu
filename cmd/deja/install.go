@@ -910,11 +910,14 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		if err := readableStrictJSON(probe...); err != nil {
 			return installResult{}, err
 		}
-		base, err := installGrok(exe, uninstall)
-		if err != nil {
-			return installResult{}, err
+		if !uninstall {
+			if err := grokPreflight(exe, true); err != nil {
+				return installResult{}, err
+			}
 		}
-		hooks, err := installGrokAuto(exe, uninstall)
+		// Both config.toml halves first, so a config.toml deja cannot write
+		// is refused before the other files are touched.
+		config, err := installGrokConfig(exe, uninstall)
 		if err != nil {
 			return installResult{}, err
 		}
@@ -922,10 +925,17 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		if err != nil {
 			return installResult{}, err
 		}
-		// Every half in one result, in the order they run: the config and
-		// settings writes reached nobody while the first result was dropped
-		// (#3220, the #3185 shape).
-		return wroteAll(base, hooks, status), nil
+		user, err := installGrokUserSettings(exe, uninstall)
+		if err != nil {
+			return installResult{}, err
+		}
+		hooks, err := installGrokAuto(exe, uninstall)
+		if err != nil {
+			return installResult{}, err
+		}
+		// Every half in one result: the config and settings writes reached
+		// nobody while the first result was dropped (#3220, the #3185 shape).
+		return wroteAll(config, user, hooks, status), nil
 	case "qwen":
 		return installMCPJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall)
 	case "qwen-auto":
@@ -2955,10 +2965,12 @@ func tomlStringArray(xs []string) string {
 // Same [mcp_servers.NAME] TOML shape as Codex; Grok's hook stdout is ignored
 // on passive events, so MCP is the deepest integration available.
 func installGrok(exe string, uninstall bool) (installResult, error) {
-	path := filepath.Join(sources.GrokHome(), "config.toml")
-	cmd, args := mcpCommandArgs(exe)
-	block := fmt.Sprintf("[mcp_servers.deja]\ncommand = %q\nargs = %s\n", cmd, tomlStringArray(args))
-	res, err := installTOML(path, block, uninstall)
+	if !uninstall {
+		if err := grokPreflight(exe, false); err != nil {
+			return installResult{}, err
+		}
+	}
+	res, err := installGrokConfig(exe, uninstall)
 	if err != nil {
 		return res, err
 	}
@@ -2970,6 +2982,13 @@ func installGrok(exe string, uninstall bool) (installResult, error) {
 		return res, uerr
 	}
 	return wroteAll(res, user), nil
+}
+
+// installGrokConfig is Grok Build's half: [mcp_servers.deja] in config.toml.
+func installGrokConfig(exe string, uninstall bool) (installResult, error) {
+	cmd, args := mcpCommandArgs(exe)
+	block := fmt.Sprintf("[mcp_servers.deja]\ncommand = %q\nargs = %s\n", cmd, tomlStringArray(args))
+	return installTOML(filepath.Join(sources.GrokHome(), "config.toml"), block, uninstall)
 }
 
 // tomlHeadersClose is the smallest check worth making on a TOML file deja is
