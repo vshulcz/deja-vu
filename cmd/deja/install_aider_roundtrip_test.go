@@ -38,6 +38,9 @@ func TestAiderConfigRoundTrips(t *testing.T) {
 		{"empty item at column 0", "read:\n-\nmodel: x\n"},
 		// The reader's own file, not deja's (#5209).
 		{"own file named like deja's", "read:\n  - my-aider-context.md\nmodel: x\n"},
+		{"own file with deja's name", "read:\n  - docs/aider-context.md\n  - aider-context.md\nmodel: x\n"},
+		{"deja's name under another key", "files:\n  - x/deja/aider-context.md\nread:\n  - C.md\n"},
+		{"blank line before column-0 items", "read:\n\n- C.md\nmodel: x\n"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			home := t.TempDir()
@@ -256,5 +259,24 @@ func TestAiderEntryFollowsAnEmptyItemsIndent(t *testing.T) {
 	}
 	if want := "read:\n- /x/aider-context.md\n-\nmodel: x\n"; got != want {
 		t.Errorf("got %q, want %q", got, want)
+	}
+	// A blank line before the items is not the items' indent.
+	if got, _ = addAiderReadEntry("read:\n\n- C.md\n", "/x/aider-context.md"); got != "read:\n- /x/aider-context.md\n\n- C.md\n" {
+		t.Errorf("after a blank line: got %q", got)
+	}
+}
+
+// Doctor's wired check reads a scalar or flow read: by the same rule.
+func TestAiderConfReadsContextByName(t *testing.T) {
+	for s, want := range map[string]bool{
+		"read: my-aider-context.md\n":                                           false,
+		"read: [docs/aider-context.md]\n":                                       false,
+		"read: ~/.config/deja/aider-context.md\n":                               true,
+		"read: [a.md, /h/.config/deja/aider-context.md]\n":                      true,
+		"read:\n  - 'C:\\Users\\u\\AppData\\Roaming\\deja\\aider-context.md'\n": true,
+	} {
+		if got := aiderConfReadsContext(s); got != want {
+			t.Errorf("%q: got %v, want %v", s, got, want)
+		}
 	}
 }

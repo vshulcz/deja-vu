@@ -184,7 +184,7 @@ func addAiderReadEntry(s, ctx string) (string, error) {
 		return s + "read:\n" + entry, nil
 	}
 	// The reader's own indent, which may be none: one list cannot mix two.
-	if line, _, _ := strings.Cut(s[at:], "\n"); strings.HasPrefix(strings.TrimLeft(line, " "), "- ") || strings.TrimSpace(line) == "-" {
+	if line, _, _ := strings.Cut(strings.TrimLeft(s[at:], "\n"), "\n"); strings.HasPrefix(strings.TrimLeft(line, " "), "- ") || strings.TrimSpace(line) == "-" {
 		entry = line[:len(line)-len(strings.TrimLeft(line, " "))] + "- " + ctx + "\n"
 	}
 	return s[:at] + entry + s[at:], nil
@@ -299,8 +299,10 @@ func aiderConfReadsContext(s string) bool {
 		if l[0] != ' ' && l[0] != '\t' && !strings.HasPrefix(t, "- ") {
 			v, ok := strings.CutPrefix(l, "read:")
 			inRead = ok
-			if ok && strings.Contains(v, "aider-context.md") {
-				return true
+			if ok {
+				if items, ok := aiderReadItems(v); ok && slices.ContainsFunc(items, aiderContextName) {
+					return true
+				}
 			}
 			continue
 		}
@@ -335,19 +337,23 @@ func aiderBareRead(s string) string {
 }
 
 // aiderContextItem reports whether a block-list line names deja's context
-// file: the file's own name, in any directory deja's config has lived in. A
-// substring match took the reader's my-aider-context.md for deja's and
+// file. A substring match took the reader's my-aider-context.md for deja's and
 // install deleted it (#5209).
 func aiderContextItem(line string) bool {
 	item, ok := strings.CutPrefix(strings.TrimSpace(line), "- ")
-	if !ok {
-		return false
-	}
+	return ok && aiderContextName(item)
+}
+
+// aiderContextName reports whether a read: item is deja's context file:
+// deja/aider-context.md under whatever config directory deja ran with, which
+// is the only place any deja build has written it.
+func aiderContextName(item string) bool {
 	if i := strings.Index(item, " #"); i >= 0 {
 		item = item[:i]
 	}
 	item = strings.Trim(strings.TrimSpace(item), `"'`)
-	return path.Base(strings.ReplaceAll(item, `\`, "/")) == "aider-context.md"
+	item = strings.ReplaceAll(strings.ReplaceAll(item, `\\`, "/"), `\`, "/")
+	return path.Base(item) == "aider-context.md" && path.Base(path.Dir(item)) == "deja"
 }
 
 // removeAiderReadEntry takes deja's entry out of an LF config, and puts back
@@ -356,8 +362,14 @@ func aiderContextItem(line string) bool {
 func removeAiderReadEntry(s, was string) (string, bool) {
 	lines := strings.Split(s, "\n")
 	out := make([]string, 0, len(lines))
+	// Only under read:: an item of another key is not deja's.
+	inRead := false
 	for _, l := range lines {
-		if aiderContextItem(l) {
+		t := strings.TrimSpace(l)
+		if t != "" && !strings.HasPrefix(t, "#") && yamlIndentWidth(l) == 0 && !strings.HasPrefix(t, "- ") && t != "-" {
+			inRead = strings.HasPrefix(l, "read:")
+		}
+		if inRead && aiderContextItem(l) {
 			continue
 		}
 		out = append(out, l)
