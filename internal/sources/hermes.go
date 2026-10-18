@@ -183,26 +183,94 @@ func parseHermesDBWhere(db, where string) ([]model.Session, error) {
 func applyHermesMeta(out []model.Session, meta map[string]hermesMeta) {
 	for i := range out {
 		m := meta[out[i].ID]
-		if m.Cwd != "" {
-			out[i].Project = projectName(m.Cwd)
+		// Only a cli row records a cwd. A branch and a delegate_task child
+		// ran where the session they came from did, and their file tools
+		// resolved a relative path there.
+		cwd := hermesCwd(out[i].ID, meta)
+		if cwd != "" {
+			out[i].Project = projectName(cwd)
+			hermesAnchorPaths(out[i].Messages, cwd)
 		}
-		// A branch is a copy of its source's turns under a new id, so recall
-		// asked from it leaves the source out (#5141). Its row has no cwd; it
-		// ran where its source did.
-		if b := m.Branched; b != "" && m.Source != "subagent" {
-			out[i].Kind, out[i].Parent = "fork", b
-			if m.Cwd == "" && meta[b].Cwd != "" {
-				out[i].Project = projectName(meta[b].Cwd)
-			}
+		// delegate_task marks its child with _delegate_from, which outlives
+		// a delete of the parent. The child's source is "subagent" only
+		// under the classic CLI: under --source, the TUI or a gateway it
+		// takes the parent's, and read by source alone it stood as a
+		// session of its own.
+		if p := hermesDelegator(m); p != "" {
+			out[i].Kind, out[i].Parent = "subagent", p
 			continue
 		}
-		switch m.Source {
-		case "subagent":
-			if m.Parent != "" {
-				out[i].Kind, out[i].Parent = "subagent", m.Parent
-			}
-		case "cron":
+		// A branch is a copy of its source's turns under a new id, so recall
+		// asked from it leaves the source out (#5141).
+		if b := m.Branched; b != "" && m.Source != "subagent" {
+			out[i].Kind, out[i].Parent = "fork", b
+			continue
+		}
+		if m.Source == "cron" {
 			out[i].Kind = "cron"
+		}
+	}
+}
+
+// hermesDelegator is the session that spawned this one with delegate_task,
+// or "".
+func hermesDelegator(m hermesMeta) string {
+	if m.Delegated != "" {
+		return m.Delegated
+	}
+	if m.Source == "subagent" {
+		return m.Parent
+	}
+	return ""
+}
+
+// hermesCwd is the directory a session ran in: its own row's, else the one
+// of the session it was delegated or branched from, followed up the chain.
+func hermesCwd(id string, meta map[string]hermesMeta) string {
+	for range 8 {
+		m, ok := meta[id]
+		if !ok {
+			return ""
+		}
+		if m.Cwd != "" {
+			return m.Cwd
+		}
+		next := hermesDelegator(m)
+		if next == "" {
+			next = m.Branched
+		}
+		if next == "" || next == id {
+			return ""
+		}
+		id = next
+	}
+	return ""
+}
+
+// hermesAnchorPaths puts the relative paths in a session's file records onto
+// the directory the session ran in, the way Hermes' file tools resolved them
+// (tools/file_tools.py). Filed under the bare name, a line written to
+// "child.txt" matched no file blame asked about. A ~ path is the
+// tool's own expansion and stays as written.
+func hermesAnchorPaths(msgs []model.Message, cwd string) {
+	anchor := func(p string) string {
+		if strings.HasPrefix(p, "~") {
+			return p
+		}
+		return resolveToolPath(p, cwd)
+	}
+	for i := range msgs {
+		switch msgs[i].Role {
+		case RoleFiles:
+			ps := strings.Split(msgs[i].Text, "\n")
+			for j := range ps {
+				ps[j] = anchor(ps[j])
+			}
+			msgs[i].Text = strings.Join(ps, "\n")
+		case RoleWrote, RoleEdit:
+			if p, rest, ok := strings.Cut(msgs[i].Text, "\n"); ok {
+				msgs[i].Text = anchor(p) + "\n" + rest
+			}
 		}
 	}
 }
@@ -360,6 +428,9 @@ type hermesMeta struct {
 	// conversation into a new session and marks it with the one it came from
 	// (hermes_cli/cli_commands_mixin.py, 0.17.0).
 	Branched string `json:"branched"`
+	// Delegated is model_config._delegate_from: delegate_task marks its
+	// child with the parent (tools/delegate_tool.py, 0.17.0).
+	Delegated string `json:"delegated"`
 }
 
 // hermesSessionMeta reads hermesMeta for every session. Stamped with the
@@ -393,6 +464,7 @@ func hermesSessionMetaWhere(db, where string) map[string]hermesMeta {
 		// json_valid first: one row of something else would fail the query
 		// and lose every session's cwd with it.
 		fields += `,'branched',case when json_valid(model_config) then cast(json_extract(model_config,'$._branched_from') as text) end`
+		fields += `,'delegated',case when json_valid(model_config) then cast(json_extract(model_config,'$._delegate_from') as text) end`
 	}
 	out, err := sqliteOutput(db, `select json_object(`+fields+`) from sessions`+where)
 	if err != nil {
@@ -410,7 +482,7 @@ func hermesSessionMetaWhere(db, where string) map[string]hermesMeta {
 		if r.ID == "" {
 			continue
 		}
-		meta[r.ID] = hermesMeta{Cwd: strings.TrimSpace(r.Cwd), Source: strings.TrimSpace(r.Source), Parent: strings.TrimSpace(r.Parent), Branched: strings.TrimSpace(r.Branched)}
+		meta[r.ID] = hermesMeta{Cwd: strings.TrimSpace(r.Cwd), Source: strings.TrimSpace(r.Source), Parent: strings.TrimSpace(r.Parent), Branched: strings.TrimSpace(r.Branched), Delegated: strings.TrimSpace(r.Delegated)}
 	}
 	return meta
 }
