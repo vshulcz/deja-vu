@@ -505,7 +505,11 @@ func doctorGooseWired(path string) bool {
 }
 
 func doctorHermesWired(path string) bool {
-	return yamlHasChildKey(path, "mcp_servers:", "deja:")
+	b, err := readConfig(path)
+	if err != nil {
+		return false
+	}
+	return len(hermesDejaEntries(strings.Split(lfText(b), "\n"))) > 0
 }
 
 // Continue keys its servers by a name field inside a list item rather than by a

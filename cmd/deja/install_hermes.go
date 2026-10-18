@@ -379,19 +379,40 @@ func installHermesMCP(exe string, uninstall bool) (installResult, error) {
 	if err != nil {
 		return installResult{}, err
 	}
-	next := removeHermesMCPBlock(lfText(old))
 	var note string
+	next := lfText(old)
+	edited := false
 	if !uninstall {
+		// The same refusals the fresh entry gets: a second top-level
+		// mcp_servers:, which Hermes reads instead, is not one to edit.
+		doc := next
+		if doc != "" && !strings.HasSuffix(doc, "\n") {
+			doc += "\n"
+		}
+		if _, err := yamlTopKeyEnd(doc, "mcp_servers:"); err != nil {
+			return installResult{}, fmt.Errorf("%s: %w", path, err)
+		}
+		lines, n, done, err := hermesEditEntry(strings.Split(next, "\n"), exe)
+		if err != nil {
+			return installResult{}, fmt.Errorf("%s: %w", path, err)
+		}
+		if done {
+			next, note, edited = strings.Join(lines, "\n"), n, true
+		}
+	}
+	if !edited {
+		if err := hermesEntriesRemovable(next); err != nil {
+			return installResult{}, fmt.Errorf("%s: %w", path, err)
+		}
+		next = removeHermesMCPBlock(next)
+	}
+	if !uninstall && !edited {
 		pad, ok := hermesBlockIndent(next)
 		if !ok {
 			pad = "  "
 		}
-		on := "true"
-		if yamlEntrySwitchedOff(lfText(old), "mcp_servers:", "deja") {
-			on, note = "false", switchedOffNote
-		}
 		entry := pad + "deja:\n" + pad + pad + "command: " + yamlQuote(exe) + "\n" +
-			pad + pad + "args:\n" + pad + pad + pad + "- mcp\n" + pad + pad + "enabled: " + on + "\n"
+			pad + pad + "args:\n" + pad + pad + pad + "- mcp\n" + pad + pad + "enabled: true\n"
 		if next != "" && !strings.HasSuffix(next, "\n") {
 			next += "\n"
 		}
@@ -419,7 +440,7 @@ func installHermesMCP(exe string, uninstall bool) (installResult, error) {
 			}
 			noteBlockAdded(path, "mcp_servers")
 		}
-	} else if blockWasAdded(path, "mcp_servers") {
+	} else if uninstall && blockWasAdded(path, "mcp_servers") {
 		// The container goes with the entry when deja is what put it there —
 		// a config the reader owned came back carrying an `mcp_servers:` they
 		// never wrote (#2606, the shape #2604 fixed for the JSON writers). One
@@ -442,60 +463,16 @@ func installHermesMCP(exe string, uninstall bool) (installResult, error) {
 // removeHermesMCPBlock drops our entry and nothing else: the block ends at the
 // next line that is not more indented, so a neighbouring server survives.
 func removeHermesMCPBlock(s string) string {
-	lines := strings.Split(s, "\n")
-	var out []string
 	// Inside `mcp_servers:` and at its own child indent — nothing else. Reading
 	// `deja:` at any depth emptied a server of somebody else's whose env holds
 	// a key by that name, which is a config deja broke while claiming to
 	// uninstall itself (#2730).
-	inBlock := false
-	child := -1
-	for i := 0; i < len(lines); i++ {
-		line := lines[i]
-		if yamlKeyLine(line, "mcp_servers:") && yamlIndentWidth(line) == 0 {
-			inBlock, child = true, -1
-			out = append(out, line)
-			continue
-		}
-		// A comment is at whatever indent its writer liked, so it neither
-		// ends the block nor sets the servers' indent (#4289).
-		entry := strings.TrimSpace(line) != "" && !strings.HasPrefix(strings.TrimSpace(line), "#")
-		if inBlock && entry && yamlIndentWidth(line) == 0 {
-			inBlock, child = false, -1
-		}
-		if inBlock && child < 0 && entry {
-			child = yamlIndentWidth(line)
-		}
-		if !inBlock || strings.TrimSpace(line) != "deja:" || yamlIndentWidth(line) != child {
-			out = append(out, line)
-			continue
-		}
-		pad := yamlIndentWidth(line)
-		i++
-		for i < len(lines) {
-			if strings.TrimSpace(lines[i]) == "" {
-				// A blank line is inside the block only if the block goes on
-				// after it. The one that separates deja's block from what
-				// follows belongs to the file, and eating it made a second
-				// install differ from the first.
-				j := i
-				for j < len(lines) && strings.TrimSpace(lines[j]) == "" {
-					j++
-				}
-				if j < len(lines) && yamlIndentWidth(lines[j]) > pad {
-					i = j
-					continue
-				}
-				break
-			}
-			if yamlIndentWidth(lines[i]) <= pad {
-				break
-			}
-			i++
-		}
-		i--
+	lines := strings.Split(s, "\n")
+	entries := hermesDejaEntries(lines)
+	for i := len(entries) - 1; i >= 0; i-- {
+		lines = append(lines[:entries[i].start], lines[entries[i].end:]...)
 	}
-	return strings.Join(out, "\n")
+	return strings.Join(lines, "\n")
 }
 
 // hermesBlockIndent is the indent the servers under `mcp_servers:` are written
