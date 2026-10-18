@@ -1282,6 +1282,11 @@ func installOpenClawAuto(exe string, uninstall bool) (installResult, error) {
 }
 
 func installHermesAuto(exe string, uninstall bool) (installResult, error) {
+	if !uninstall {
+		if err := checkHermesPluginsEditable(); err != nil {
+			return installResult{}, err
+		}
+	}
 	mcp, err := installHermesMCP(exe, uninstall)
 	if err != nil {
 		return installResult{}, err

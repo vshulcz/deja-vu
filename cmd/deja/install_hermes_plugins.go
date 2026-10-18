@@ -35,7 +35,7 @@ func setHermesPluginEnabled(on bool) error {
 	next, how := e.apply(s)
 	switch {
 	case how == hermesPluginsUnreadable && on:
-		return fmt.Errorf("%s: plugins.enabled is not written in a shape deja can edit safely; add deja to it by hand", path)
+		return hermesPluginsShapeError(path)
 	case how == hermesPluginsUnreadable, !on && how == hermesPluginsMissing, next == s && how != hermesPluginsMissing:
 		return nil
 	case !on:
@@ -59,6 +59,31 @@ func setHermesPluginEnabled(on bool) error {
 	}
 	_, err = writeIfChanged(path, old, []byte(s))
 	return err
+}
+
+// checkHermesPluginsEditable refuses, before anything is written, the
+// plugins.enabled that setHermesPluginEnabled would refuse at the end: found
+// only there, the refusal came after the MCP entry and the plugin directory
+// were already on disk, and Hermes was left listing deja as "not enabled".
+// A plugin the reader switched off is left alone, so its list is not looked at.
+func checkHermesPluginsEditable() error {
+	path := filepath.Join(sources.HermesHome(), "config.yaml")
+	b, err := readConfig(path)
+	if err != nil {
+		return err
+	}
+	if hermesPluginDisabled() {
+		return nil
+	}
+	e := hermesPluginsEdit{on: true}
+	if _, how := e.apply(lfText(b)); how == hermesPluginsUnreadable {
+		return hermesPluginsShapeError(path)
+	}
+	return nil
+}
+
+func hermesPluginsShapeError(path string) error {
+	return fmt.Errorf("%s: plugins.enabled is not written in a shape deja can edit safely; add deja to it by hand", path)
 }
 
 // hermesPluginDisabled reports whether config.yaml lists deja under
