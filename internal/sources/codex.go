@@ -589,6 +589,7 @@ func codexCall(s *model.Session, payload map[string]any, calls map[string]int, c
 	var in struct {
 		Cmd     string `json:"cmd"`
 		Command string `json:"command"`
+		Workdir string `json:"workdir"`
 	}
 	if json.Unmarshal([]byte(args), &in) != nil {
 		return
@@ -601,10 +602,15 @@ func codexCall(s *model.Session, payload map[string]any, calls map[string]int, c
 	}
 	// A model with no apply_patch tool of its own runs it through the shell
 	// with the patch in a heredoc, and Codex applies it all the same. Read as
-	// a command only, the edit left no files or wrote record (#5211).
+	// a command only, the edit left no files or wrote record (#5211). Codex
+	// applies it in the call's workdir, which may not be the session's.
 	if strings.Contains(in.Cmd, "apply_patch") && strings.Contains(in.Cmd, "*** Begin Patch") {
+		dir := cwd
+		if w := strings.TrimSpace(in.Workdir); w != "" {
+			dir = resolveToolPath(w, cwd)
+		}
 		for _, body := range patchTexts(in.Cmd, 0) {
-			codexPatchText(s, body, cwd, t)
+			codexPatchText(s, body, dir, t)
 		}
 	}
 	if !IndexCommands() || !worthIndexing(in.Cmd) {

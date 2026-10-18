@@ -105,3 +105,28 @@ func TestCodexShellApplyPatchRecordsTheEdit(t *testing.T) {
 		t.Errorf("edit = %q, want the replaced line", byRole[RoleEdit])
 	}
 }
+
+// Codex applies a shell apply_patch in the call's workdir, not the session's
+// cwd: filed under the cwd, a patch run from a subdirectory named a file that
+// does not exist and blame found no writer.
+func TestCodexShellApplyPatchResolvesAgainstItsWorkdir(t *testing.T) {
+	p := writeRollout(t, "rollout-2026-10-18T08-04-16-w.jsonl", []string{
+		`{"timestamp":"2026-10-18T05:04:16Z","type":"session_meta","payload":{"id":"w","cwd":"/w/app"}}`,
+		`{"timestamp":"2026-10-18T05:04:17Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"edit sub/parent.txt"}]}}`,
+		`{"timestamp":"2026-10-18T05:04:18Z","type":"response_item","payload":{"type":"function_call","name":"exec_command","call_id":"c1","arguments":"{\"cmd\":\"apply_patch <<'EOF'\\n*** Begin Patch\\n*** Update File: parent.txt\\n@@\\n-QUOKKA-W0 the line this edit replaces\\n+QUOKKA-W1 written from sub\\n*** End Patch\\nEOF\",\"workdir\":\"sub\"}"}}`,
+		`{"timestamp":"2026-10-18T05:04:19Z","type":"response_item","payload":{"type":"function_call","name":"shell_command","call_id":"c2","arguments":"{\"command\":\"apply_patch <<'EOF'\\n*** Begin Patch\\n*** Add File: other.txt\\n+QUOKKA-W2 written from /w/lib\\n*** End Patch\\nEOF\",\"workdir\":\"/w/lib\"}"}}`,
+	})
+	ss, err := ParseCodexRollout(p)
+	if err != nil || len(ss) != 1 {
+		t.Fatalf("sessions = %d, err %v", len(ss), err)
+	}
+	var files []string
+	for _, m := range ss[0].Messages {
+		if m.Role == RoleFiles {
+			files = append(files, m.Text)
+		}
+	}
+	if got := strings.Join(files, "\n"); got != "/w/app/sub/parent.txt\n/w/lib/other.txt" {
+		t.Errorf("files = %q, want each patch under its call's workdir", got)
+	}
+}
