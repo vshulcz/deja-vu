@@ -1649,7 +1649,7 @@ func dejaEntrySwitchedOff(client, path string) bool {
 				continue
 			}
 			entry, ok := v.(map[string]any)
-			if !ok || !entrySwitchedOff(entry) {
+			if !ok || !entrySwitchedOffFor(client, entry) {
 				return false
 			}
 			off = true

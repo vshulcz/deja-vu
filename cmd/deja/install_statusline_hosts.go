@@ -146,13 +146,24 @@ func jsonStatuslineUpdate(path string, keys []string, entry map[string]any, unin
 // same rules: deja's own block is rewritten, anyone else's left with a note.
 // A table set any other way (inline, dotted keys) counts as someone else's.
 func installTOMLStatusline(path, table, block, cmd string, uninstall bool) (installResult, error) {
-	old, err := readConfig(path)
+	old, next, res, err := tomlStatuslineUpdate(path, table, block, cmd, uninstall)
+	if err != nil || next == nil {
+		return res, err
+	}
+	a, err := writeIfChanged(path, old, next)
+	return installResult{Path: path, Action: a}, err
+}
+
+// tomlStatuslineUpdate is installTOMLStatusline without the write: next is
+// nil when the answer is res as it stands.
+func tomlStatuslineUpdate(path, table, block, cmd string, uninstall bool) (old, next []byte, res installResult, err error) {
+	old, err = readConfig(path)
 	if err != nil {
-		return installResult{}, err
+		return nil, nil, installResult{}, err
 	}
 	text := lfText(old)
 	if err := tomlHeadersClose(text); err != nil {
-		return installResult{}, configParseError(path, err)
+		return nil, nil, installResult{}, configParseError(path, err)
 	}
 	lines := strings.Split(text, "\n")
 	code := tomlCodeLines(text)
@@ -187,28 +198,67 @@ func installTOMLStatusline(path, table, block, cmd string, uninstall bool) (inst
 	elsewhere := start < 0 && tomlNamesKeyOutsideTable(code, table)
 	switch {
 	case uninstall && (start < 0 || kind != hookDejas):
-		return installResult{Path: path, Action: "unchanged"}, nil
+		return old, nil, installResult{Path: path, Action: "unchanged"}, nil
 	case !uninstall && kind == hookWrapsDejas:
-		return installResult{Path: path, Action: "unchanged"}, nil
+		return old, nil, installResult{Path: path, Action: "unchanged"}, nil
 	case !uninstall && (elsewhere || start >= 0 && kind == hookNotDejas):
-		return installResult{Path: path, Action: "unchanged", Note: statuslineKeptNote(prev, cmd, true)}, nil
+		return old, nil, installResult{Path: path, Action: "unchanged", Note: statuslineKeptNote(prev, cmd, true)}, nil
+	}
+	// The keys deja's block sets. Anything else in the table is the client's
+	// own: Kimi keeps `items` beside the command and writes both, and
+	// rebuilding the table from deja's block dropped them.
+	blockLines := strings.Split(strings.TrimRight(block, "\n"), "\n")
+	ours := map[string]string{}
+	for _, line := range blockLines[1:] {
+		if k, _, ok := tomlLineKeyValue(line); ok {
+			ours[k] = line
+		}
 	}
 	var out []string
 	switch {
-	case start >= 0 && !uninstall:
-		// Rewritten where it stands. Moved to the end, it traded places with
-		// the MCP block the same target writes, which also goes to the end, so
-		// every repeat install rewrote the file twice and reported a change.
+	case start >= 0:
 		keep := end
 		for keep > start+1 && strings.TrimSpace(lines[keep-1]) == "" {
 			keep--
 		}
-		out = append(append(append(out, lines[:start]...), strings.Split(strings.TrimRight(block, "\n"), "\n")...), lines[keep:]...)
-		s := strings.TrimRight(strings.Join(out, "\n"), "\n") + "\n"
-		a, err := writeIfChanged(path, old, []byte(s))
-		return installResult{Path: path, Action: a}, err
-	case start >= 0:
-		out = append(append(out, lines[:start]...), lines[end:]...)
+		var body []string
+		foreign := false
+		written := map[string]bool{}
+		for i := start + 1; i < keep; i++ {
+			k, _, ok := tomlLineKeyValue(code[i])
+			if _, mine := ours[k]; ok && mine {
+				if !uninstall && !written[k] {
+					body = append(body, ours[k])
+					written[k] = true
+				}
+				continue
+			}
+			// A comment is not a key: on its own it would keep an empty
+			// table, which grok warns about.
+			if strings.TrimSpace(tomlCode(code[i])) != "" {
+				foreign = true
+			}
+			body = append(body, lines[i])
+		}
+		if !uninstall {
+			// Rewritten where it stands. Moved to the end, it traded places
+			// with the MCP block the same target writes, which also goes to
+			// the end, so every repeat install rewrote the file twice.
+			for _, line := range blockLines[1:] {
+				if k, _, ok := tomlLineKeyValue(line); ok && !written[k] {
+					body = append(body, line)
+					written[k] = true
+				}
+			}
+			out = append(append(append(append(out, lines[:start]...), lines[start]), body...), lines[keep:]...)
+			s := strings.TrimRight(strings.Join(out, "\n"), "\n") + "\n"
+			return old, []byte(s), installResult{}, nil
+		}
+		if foreign {
+			out = append(append(append(append(out, lines[:start]...), lines[start]), body...), lines[keep:]...)
+		} else {
+			out = append(append(out, lines[:start]...), lines[end:]...)
+		}
 	default:
 		out = lines
 	}
@@ -222,8 +272,7 @@ func installTOMLStatusline(path, table, block, cmd string, uninstall bool) (inst
 	if s != "" {
 		s += "\n"
 	}
-	a, err := writeIfChanged(path, old, []byte(s))
-	return installResult{Path: path, Action: a}, err
+	return old, []byte(s), installResult{}, nil
 }
 
 // tomlNamesKeyOutsideTable reports whether a.b is set some way other than a
@@ -342,6 +391,9 @@ func installAntigravityStatusline(exe string, uninstall bool) (installResult, er
 // for the answer.
 func installKimiStatusline(exe string, uninstall bool) (installResult, error) {
 	cmd := hostStatuslineCommand(exe, uninstall)
-	block := "[status_line]\ncommand = " + strconv.Quote(cmd) + "\n"
-	return installTOMLStatusline(filepath.Join(sources.KimiConfigDir(), "tui.toml"), "status_line", block, cmd, uninstall)
+	return installTOMLStatusline(filepath.Join(sources.KimiConfigDir(), "tui.toml"), "status_line", kimiStatuslineBlock(cmd), cmd, uninstall)
+}
+
+func kimiStatuslineBlock(cmd string) string {
+	return "[status_line]\ncommand = " + strconv.Quote(cmd) + "\n"
 }

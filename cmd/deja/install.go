@@ -983,22 +983,16 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 	case "muse-auto":
 		return installMuseAuto(exe, uninstall)
 	case "kimi":
-		return installMCPJSON(filepath.Join(sources.KimiConfigDir(), "mcp.json"), exe, uninstall)
+		return installKimiMCP(exe, uninstall)
 	case "kimi-auto":
 		// Both halves in the result: the report is what says which files were
 		// touched, and this one wrote mcp.json without ever naming it (#3254).
-		// The hooks' refusal is asked first, so a refused target writes nothing.
-		if !uninstall {
-			path := filepath.Join(sources.KimiConfigDir(), "config.toml")
-			old, err := readConfig(path)
-			if err != nil {
-				return installResult{}, err
-			}
-			if err := tomlInlineKey(lfText(old), "[[hooks]]"); err != nil {
-				return installResult{}, configParseError(path, err)
-			}
+		// The refusals of the hooks and the status line are asked first, so a
+		// refused target writes nothing.
+		if err := kimiAutoPreflight(exe, uninstall); err != nil {
+			return installResult{}, err
 		}
-		mcp, err := installMCPJSON(filepath.Join(sources.KimiConfigDir(), "mcp.json"), exe, uninstall)
+		mcp, err := installKimiMCP(exe, uninstall)
 		if err != nil {
 			return installResult{}, err
 		}
@@ -3944,7 +3938,37 @@ func keepSwitch(prev any, next map[string]any) string {
 // Calling the entry off told the person recall was off while it ran (#5162;
 // #4303 assumed Cursor read Kiro's key).
 func entrySwitchHonored(client string) bool {
-	return client != "cursor"
+	return len(entrySwitchKeys(client)) > 0
+}
+
+// entrySwitchKeys is which of the entry's own keys a client reads as off.
+// Kimi Code 2.2 reads `enabled` and drops the rest, so `/mcp` lists an entry
+// with "disabled": true connected and runs it.
+func entrySwitchKeys(client string) []string {
+	switch client {
+	case "cursor":
+		return nil
+	case "kimi":
+		return []string{"enabled"}
+	}
+	return []string{"disabled", "enabled"}
+}
+
+// entrySwitchedOffFor is entrySwitchedOff with only the keys the client reads.
+func entrySwitchedOffFor(client string, entry map[string]any) bool {
+	for _, k := range entrySwitchKeys(client) {
+		switch k {
+		case "disabled":
+			if off, ok := entry[k].(bool); ok && off {
+				return true
+			}
+		case "enabled":
+			if on, ok := entry[k].(bool); ok && !on {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // dropNotePart removes one "; "-joined part from an install note.
