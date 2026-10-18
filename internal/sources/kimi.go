@@ -454,7 +454,7 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 			// notice — and names the author in origin.kind. Only the person's
 			// are user turns; a message with no origin is an older protocol's
 			// and was always the person's (#3199).
-			if role == "user" && !kimiPersonsOrigin(msg["origin"]) && !(child && kimiSubagentTask(msg["origin"])) {
+			if role == "user" && !kimiPersonsOrigin(msg["origin"]) && (!child || !kimiSubagentTask(msg["origin"])) {
 				// The host's line still moves the clock: a session whose
 				// last record is a hook's output ended when that arrived.
 				s.Touch(parseTimeAny(m["time"]))
