@@ -514,8 +514,8 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 				}
 				// Kimi resolves a relative path against the session's cwd; kept
 				// bare, blame never matched the record to the file (#5228). A
-				// leading ~ or ~/ is Kimi's to expand and stays as written.
-				if p, _ := args[kimiDialect.pathKey].(string); p != "" && p != "~" && !strings.HasPrefix(p, "~/") {
+				// leading ~, ~/ or ~\ is Kimi's to expand and stays as written.
+				if p, _ := args[kimiDialect.pathKey].(string); p != "" && p != "~" && !strings.HasPrefix(p, "~/") && !strings.HasPrefix(p, `~\`) {
 					if abs := resolveToolPath(p, cwd); abs != p {
 						args = maps.Clone(args)
 						args[kimiDialect.pathKey] = abs
