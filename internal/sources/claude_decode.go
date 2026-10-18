@@ -62,6 +62,11 @@ type claudeLine struct {
 	// ends in the session_01… id a person copies from claude.ai/code (#4667).
 	Subtype string `json:"subtype"`
 	URL     string `json:"url"`
+	// ForkedFrom is stamped on every record a /branch copied out of its
+	// source (2.1.302); its sessionId is the session the branch came from.
+	ForkedFrom *struct {
+		SessionID string `json:"sessionId"`
+	} `json:"forkedFrom"`
 }
 
 type claudeMessage struct {
@@ -107,6 +112,7 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 	// Where each Bash call's record landed, so the result that arrives later
 	// can stamp its outcome onto it.
 	commandAt := map[string][]int{}
+	forkedFrom := ""
 	s := model.Session{
 		Harness: harness,
 		ID:      strings.TrimSuffix(filepath.Base(path), ".jsonl"),
@@ -124,6 +130,9 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 				s.RemoteID = id
 			}
 			return
+		}
+		if v.ForkedFrom != nil && forkedFrom == "" {
+			forkedFrom = v.ForkedFrom.SessionID
 		}
 		if v.Type != "user" && v.Type != "assistant" {
 			return
@@ -219,6 +228,7 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 	if len(s.Messages) == 0 {
 		return nil, err
 	}
+	markClaudeBranch(&s, forkedFrom)
 	// A child run comes in as the task it was handed, the answer it came back
 	// with and what it changed, unless the reader asked for the whole thing
 	// (#3009, #4163).
@@ -233,6 +243,16 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 		s.ProjectFromDir = true
 	}
 	return []model.Session{s}, err
+}
+
+// markClaudeBranch records a /branch's source, which the harness wrote on the
+// records it copied. Without it the branch read as unrelated work, and blame
+// credited it with the edits it had only copied. --fork-session writes no
+// marker, so those forks stay unmarked.
+func markClaudeBranch(s *model.Session, forkedFrom string) {
+	if forkedFrom != "" && forkedFrom != s.ID && s.Kind == "" {
+		s.Kind, s.Parent = "fork", forkedFrom
+	}
 }
 
 // claudeTime accepts the two shapes a transcript uses. Numbers keep going

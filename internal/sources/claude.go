@@ -296,8 +296,12 @@ func parseClaudeGenericFromOffset(path string, offset int64) ([]model.Session, e
 	// Where each Bash call's record landed, so the result that arrives in a
 	// later record can stamp its outcome onto it.
 	commandAt := map[string][]int{}
+	forkedFrom := ""
 	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
 		typ, _ := m["type"].(string)
+		if ff, ok := m["forkedFrom"].(map[string]any); ok && forkedFrom == "" {
+			forkedFrom, _ = ff["sessionId"].(string)
+		}
 		if typ != "user" && typ != "assistant" {
 			return
 		}
@@ -379,6 +383,7 @@ func parseClaudeGenericFromOffset(path string, offset int64) ([]model.Session, e
 	if len(s.Messages) == 0 {
 		return nil, err
 	}
+	markClaudeBranch(&s, forkedFrom)
 	// The same cut the typed parser makes: this is the reference it is proved
 	// against, and a difference here reads as a parser bug (#3009).
 	if IsSubagentPath(path) && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
