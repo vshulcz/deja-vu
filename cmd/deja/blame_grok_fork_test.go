@@ -54,7 +54,8 @@ func TestGrokForkKeepsOnlyItsOwnRecords(t *testing.T) {
 		return append(out, event(sid, owner+"-14", at.Add(2*time.Second), map[string]any{"sessionUpdate": "agent_message_chunk",
 			"content": map[string]any{"type": "text", "text": "done"}}))
 	}
-	group := filepath.Join(root, "sessions", url.PathEscape(proj))
+	// A drive colon is no use in a directory name on Windows.
+	group := filepath.Join(root, "sessions", strings.ReplaceAll(url.PathEscape(proj), ":", "%3A"))
 	write := func(id string, summary map[string]any, lines []string) string {
 		dir := filepath.Join(group, id)
 		if err := os.MkdirAll(dir, 0o755); err != nil {
