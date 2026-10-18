@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -256,10 +257,7 @@ func applyKiroCLIHeader(s *model.Session, path string) {
 	if err != nil {
 		return
 	}
-	var header struct {
-		SessionID string `json:"session_id"`
-		CWD       string `json:"cwd"`
-	}
+	var header kiroCLIHeader
 	if json.Unmarshal(b, &header) != nil {
 		return
 	}
@@ -269,6 +267,46 @@ func applyKiroCLIHeader(s *model.Session, path string) {
 	if header.CWD != "" {
 		s.Project = projectName(header.CWD)
 	}
+	header.applyParent(s)
+}
+
+type kiroCLIHeader struct {
+	SessionID string `json:"session_id"`
+	CWD       string `json:"cwd"`
+	// Set on the session a sub-agent runs in (the subagent tool, 2.32): the
+	// session that spawned it. session_created_reason says "subagent" on
+	// top-level sessions too, so it is not read.
+	ParentSessionID string `json:"parent_session_id"`
+}
+
+func (h kiroCLIHeader) applyParent(s *model.Session) {
+	if p := strings.TrimSpace(h.ParentSessionID); p != "" && p != s.ID {
+		s.Kind = "subagent"
+		s.Parent = p
+	}
+}
+
+var kiroSessionID = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+// KiroSessionHead is what a kiro-cli session's header says about a session
+// the index has not seen yet. A sub-agent's hooks name only its own session
+// and fire before any build, so its digest led with the parent that spawned
+// it. Who it is, not its messages; false unless the header names a parent.
+func KiroSessionHead(id string) (model.Session, bool) {
+	if !kiroSessionID.MatchString(id) {
+		return model.Session{}, false
+	}
+	b, err := os.ReadFile(filepath.Join(KiroRoot(), "cli", id+".json"))
+	if err != nil {
+		return model.Session{}, false
+	}
+	var header kiroCLIHeader
+	if json.Unmarshal(b, &header) != nil {
+		return model.Session{}, false
+	}
+	s := model.Session{ID: id, Harness: "kiro"}
+	header.applyParent(&s)
+	return s, s.Parent != ""
 }
 
 // KiroSessionDir is the directory a Kiro session ran in, from the metadata

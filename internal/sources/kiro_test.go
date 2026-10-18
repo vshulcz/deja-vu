@@ -209,3 +209,36 @@ func kiroFixtureRoot(t *testing.T) string {
 	t.Setenv("DEJA_KIRO_DB", filepath.Join(t.TempDir(), "data.sqlite3"))
 	return root
 }
+
+// A sub-agent's header names the session that spawned it; 2.32 also writes
+// session_created_reason "subagent" on top-level sessions, which says nothing.
+func TestKiroCLISubAgentHangsUnderItsParent(t *testing.T) {
+	dir := t.TempDir()
+	write := func(id, header string) string {
+		if err := os.WriteFile(filepath.Join(dir, id+".json"), []byte(header), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		p := filepath.Join(dir, id+".jsonl")
+		line := `{"version":"v1","kind":"Prompt","data":{"message_id":"m","content":[{"kind":"text","data":"review the jitter"}],"meta":{"timestamp":1792281752}}}` + "\n"
+		if err := os.WriteFile(p, []byte(line), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	child := write("e012b5f2-0f80-45a3-a1f6-eccc522bb35e", `{"session_id":"e012b5f2-0f80-45a3-a1f6-eccc522bb35e","cwd":"/w/app","parent_session_id":"136cf72a-585d-4047-997f-d37a0d0f194a","session_created_reason":"subagent"}`)
+	top := write("136cf72a-585d-4047-997f-d37a0d0f194a", `{"session_id":"136cf72a-585d-4047-997f-d37a0d0f194a","cwd":"/w/app","session_created_reason":"subagent"}`)
+	ss, err := ParseKiroCLIFile(child)
+	if err != nil || len(ss) != 1 {
+		t.Fatalf("child: %v %d", err, len(ss))
+	}
+	if ss[0].Kind != "subagent" || ss[0].Parent != "136cf72a-585d-4047-997f-d37a0d0f194a" {
+		t.Errorf("child kind=%q parent=%q, want a subagent under its parent", ss[0].Kind, ss[0].Parent)
+	}
+	ss, err = ParseKiroCLIFile(top)
+	if err != nil || len(ss) != 1 {
+		t.Fatalf("top: %v %d", err, len(ss))
+	}
+	if ss[0].Kind != "" || ss[0].Parent != "" {
+		t.Errorf("top-level session kind=%q parent=%q, want neither", ss[0].Kind, ss[0].Parent)
+	}
+}
