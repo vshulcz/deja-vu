@@ -732,7 +732,10 @@ import (
 // 77: a Kimi /fork keeps only its own turns under its source, a Kimi
 // sub-agent keeps its task and is read by default, and a relative Write/Edit
 // path sits under the session's cwd (#5226, #5227, #5228, #5229).
-const version = 77
+// 78: a Grok --fork-session copy reads as a fork of its source, and a Grok
+// subagent hangs under the session whose subagent_spawned record names it
+// (#5263, #5264); rows already indexed hold neither until a rebuild.
+const version = 78
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

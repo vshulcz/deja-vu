@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -71,10 +72,12 @@ type grokSummary struct {
 	CreatedAt      string `json:"created_at"`
 	UpdatedAt      string `json:"updated_at"`
 	// Grok Build records the spawn edge itself: a forked child names the
-	// session it came from, a plain subagent says only what it is. deja reads
-	// what is written and invents nothing (#1385).
+	// session it came from, a plain subagent says only what it is and its
+	// parent's transcript records spawning it (grokLineage). deja reads what
+	// is written and invents nothing (#1385).
 	SessionKind     string `json:"session_kind"`
 	ParentSessionID string `json:"parent_session_id"`
+	ForkedAt        string `json:"forked_at"`
 	AgentName       string `json:"agent_name"`
 }
 
@@ -105,15 +108,9 @@ func parseGrokFileFromOffset(path string, offset int64) ([]model.Session, error)
 	if title == "" {
 		title = doc.SessionSummary
 	}
-	// "headless" is how a `grok -p` run is started, not what spawned it: a
-	// top-level session from a shell. Kept as a kind, every scripted session
-	// read as a subagent whose parent was lost (#4585).
-	kind := doc.SessionKind
-	if kind == "headless" {
-		kind = ""
-	}
+	kind, parent := grokLineage(path, id, doc)
 	s := model.Session{ID: id, Harness: "grok", Project: projectName(cwd), Path: path, Title: title,
-		Kind: kind, Parent: doc.ParentSessionID, Agent: doc.AgentName}
+		Kind: kind, Parent: parent, Agent: doc.AgentName}
 	if t, err := time.Parse(time.RFC3339Nano, doc.CreatedAt); err == nil {
 		s.Touch(t)
 	}
@@ -421,6 +418,204 @@ func scanGrokUpdatesFrom(path string, offset int64, fn func(grokUpdateEvent)) er
 			return err
 		}
 	}
+}
+
+// grokLineage is the kind and parent recall needs to keep a session's own
+// relatives out of its answers.
+//
+// "headless" is how a `grok -p` run is started, not what spawned it: a
+// top-level session from a shell. Kept as a kind, every scripted session read
+// as a subagent whose parent was lost (#4585).
+//
+// A `--fork-session` copy names its source and when it forked, under whatever
+// kind the run had; it reads as a fork, or the source came back to the fork as
+// prior history. A subagent's summary names no parent at all on 1.0.41: the
+// edge is the parent's own subagent_spawned record, which names both ends, so
+// the parent is read off that record among the sessions of the same directory.
+func grokLineage(path, id string, doc grokSummary) (kind, parent string) {
+	kind, parent = doc.SessionKind, doc.ParentSessionID
+	if kind == "headless" {
+		kind = ""
+	}
+	spawned := kind == "subagent" || kind == "subagent_fork"
+	if parent != "" && doc.ForkedAt != "" && !spawned {
+		kind = "fork"
+	}
+	if parent == "" && spawned {
+		parent = grokSpawner(path, id, doc.CreatedAt)
+	}
+	return kind, parent
+}
+
+// grokSpawners keeps what grokSpawner found for this process: a live subagent
+// is parsed again on every append, and its parent does not change.
+var grokSpawners sync.Map
+
+// grokSpawner is the parent a subagent_spawned record in the same directory
+// names for child. Only a session created before the child and written to
+// since can hold that record, so the rest are not opened. The record is read
+// for its parent_session_id rather than taken from the file it sits in: a
+// fork of the parent copies the parent's records.
+func grokSpawner(path, child, created string) string {
+	if child == "" {
+		return ""
+	}
+	if p, ok := grokSpawners.Load(child); ok {
+		return p.(string)
+	}
+	own := filepath.Dir(path)
+	group := filepath.Dir(own)
+	entries, err := os.ReadDir(group)
+	if err != nil {
+		return ""
+	}
+	since, _ := time.Parse(time.RFC3339Nano, created)
+	needle := []byte(`"child_session_id":"` + child + `"`)
+	for _, e := range entries {
+		dir := filepath.Join(group, e.Name())
+		if !e.IsDir() || dir == own {
+			continue
+		}
+		updates := filepath.Join(dir, "updates.jsonl")
+		if !since.IsZero() {
+			fi, err := os.Stat(updates)
+			if err != nil || fi.ModTime().Before(since.Add(-time.Minute)) {
+				continue
+			}
+			if c, err := time.Parse(time.RFC3339Nano, readGrokSummary(updates).CreatedAt); err == nil && c.After(since) {
+				continue
+			}
+		}
+		line := fileLineWith(updates, needle)
+		if line == nil {
+			continue
+		}
+		var rec struct {
+			Params struct {
+				Update struct {
+					Kind   string `json:"sessionUpdate"`
+					Parent string `json:"parent_session_id"`
+				} `json:"update"`
+			} `json:"params"`
+		}
+		if json.Unmarshal(line, &rec) == nil && rec.Params.Update.Kind == "subagent_spawned" && rec.Params.Update.Parent != "" {
+			grokSpawners.Store(child, rec.Params.Update.Parent)
+			return rec.Params.Update.Parent
+		}
+	}
+	return ""
+}
+
+// fileLineWith is the first subagent_spawned record of the file holding
+// needle, or nil.
+func fileLineWith(path string, needle []byte) []byte {
+	if !fileContains(path, needle) {
+		return nil
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil
+	}
+	defer func() { _ = f.Close() }()
+	r := bufio.NewReaderSize(f, 64<<10)
+	for {
+		line, err := r.ReadBytes('\n')
+		if bytes.Contains(line, needle) && bytes.Contains(line, []byte(`"subagent_spawned"`)) {
+			return line
+		}
+		if err != nil {
+			return nil
+		}
+	}
+}
+
+// fileContains reports whether needle occurs in the file, read in chunks that
+// overlap by the needle's length so a match across a boundary is not lost.
+func fileContains(path string, needle []byte) bool {
+	f, err := os.Open(path)
+	if err != nil || len(needle) == 0 {
+		return false
+	}
+	defer func() { _ = f.Close() }()
+	buf := make([]byte, 0, 256<<10)
+	chunk := make([]byte, 256<<10)
+	for {
+		n, err := f.Read(chunk)
+		buf = append(buf, chunk[:n]...)
+		if bytes.Contains(buf, needle) {
+			return true
+		}
+		if keep := len(needle) - 1; len(buf) > keep {
+			buf = append(buf[:0], buf[len(buf)-keep:]...)
+		}
+		if err != nil {
+			return false
+		}
+	}
+}
+
+// IsGrokTranscript reports whether path is a Grok Build session's
+// updates.jsonl, the transcript its hooks name.
+func IsGrokTranscript(path string) bool {
+	if filepath.Base(path) != "updates.jsonl" {
+		return false
+	}
+	_, err := os.Stat(filepath.Join(filepath.Dir(path), "summary.json"))
+	return err == nil
+}
+
+// GrokSessionHead is a Grok Build session's identity off its summary.json:
+// enough for recall to leave out its source or parent before any index has
+// read it. The transcript is the hook's when it names one; a hook or MCP
+// call that names only the id finds it under the sessions tree.
+func GrokSessionHead(id, transcript string) (model.Session, bool) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return model.Session{}, false
+	}
+	path := ""
+	if transcript != "" && IsGrokTranscript(transcript) {
+		path = transcript
+	} else if !strings.ContainsAny(id, `/\`) && id != "." && id != ".." {
+		sessions := filepath.Join(GrokRoot(), "sessions")
+		groups, _ := os.ReadDir(sessions)
+		for _, g := range groups {
+			p := filepath.Join(sessions, g.Name(), id, "updates.jsonl")
+			if g.IsDir() && IsGrokTranscript(p) {
+				path = p
+				break
+			}
+		}
+	}
+	if path == "" {
+		return model.Session{}, false
+	}
+	doc := readGrokSummary(path)
+	if doc.Info.ID != "" && doc.Info.ID != id {
+		return model.Session{}, false
+	}
+	kind, parent := grokLineage(path, id, doc)
+	return model.Session{ID: id, Harness: "grok", Path: path, Kind: kind, Parent: parent}, true
+}
+
+// GrokChatHolds reports whether the session's chat_history.jsonl, what Grok
+// sends the model and replays on resume, holds text as a message carried it.
+// The text is matched JSON-encoded, so a tool's output that quotes it, which
+// is encoded once more, does not count. A fork's copy holds what its source
+// was told.
+func GrokChatHolds(transcript, text string) bool {
+	if !IsGrokTranscript(transcript) {
+		return false
+	}
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if enc.Encode(text) != nil {
+		return false
+	}
+	needle := bytes.TrimSuffix(bytes.TrimSpace(buf.Bytes()), []byte(`"`))
+	needle = bytes.TrimPrefix(needle, []byte(`"`))
+	return fileContains(filepath.Join(filepath.Dir(transcript), "chat_history.jsonl"), needle)
 }
 
 func readGrokSummary(updatePath string) grokSummary {

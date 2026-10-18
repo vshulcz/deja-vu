@@ -335,6 +335,9 @@ func askerLineage(dir, asker, transcript string, ids ...string) map[string]bool 
 // transcript the payload names, or opencode's or Hermes' database or Copilot
 // CLI's session folder, which their payloads do not name a file in (#5137).
 func askerHead(id, transcript string) (model.Session, bool) {
+	if transcript != "" && sources.IsGrokTranscript(transcript) {
+		return sources.GrokSessionHead(id, transcript)
+	}
 	if transcript != "" {
 		s, err := sources.TranscriptHead(transcript, id)
 		return s, err == nil
@@ -357,6 +360,11 @@ func askerHead(id, transcript string) (model.Session, bool) {
 	// A kiro-cli sub-agent's header names the session that spawned it; its
 	// hooks name only its own.
 	if s, ok := sources.KiroSessionHead(id); ok {
+		return s, true
+	}
+	// A Grok fork or subagent names its source in summary.json, or its
+	// parent's transcript names it; Grok's prompt and MCP calls name no file.
+	if s, ok := sources.GrokSessionHead(id, ""); ok && s.Parent != "" {
 		return s, true
 	}
 	return model.Session{}, false

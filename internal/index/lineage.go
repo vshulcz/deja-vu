@@ -250,7 +250,7 @@ func HasSession(dir, id string) bool {
 // agent another session spawned.
 func spawnedKind(kind string) bool {
 	switch kind {
-	case "sidechain", "subagent":
+	case "sidechain", "subagent", "subagent_fork":
 		return true
 	}
 	return false
