@@ -742,6 +742,12 @@ import (
 // left out of its recall at any depth; sub-agent rows already indexed hold no
 // parent until a rebuild.
 const version = 80
+const version = 79
+const version = 77
+// 72: an opencode apply_patch with a relative header is filed under the
+// session's directory, as the tool resolved it; rows already indexed carry the
+// bare name until a rebuild.
+const version = 72
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
