@@ -24,6 +24,13 @@ type hermesEntry struct {
 // line missed those, and install wrote a second `deja:` above the reader's
 // (#5172).
 func hermesDejaEntries(lines []string) []hermesEntry {
+	return yamlDejaKeyEntries(lines, "mcp_servers:")
+}
+
+// yamlDejaKeyEntries is hermesDejaEntries under any top-level key: goose
+// keeps its servers under `extensions:` and refuses a file that names one
+// twice (#5190).
+func yamlDejaKeyEntries(lines []string, topKey string) []hermesEntry {
 	var out []hermesEntry
 	inBlock, child := false, -1
 	for i := 0; i < len(lines); i++ {
@@ -36,7 +43,7 @@ func hermesDejaEntries(lines []string) []hermesEntry {
 		}
 		w := yamlIndentWidth(line)
 		if w == 0 {
-			inBlock, child = yamlKeyLine(line, "mcp_servers:"), -1
+			inBlock, child = yamlKeyLine(line, topKey), -1
 			continue
 		}
 		if !inBlock {
@@ -458,15 +465,20 @@ func hermesSpanPlain(lines []string, from, to int) bool {
 // indent would break the file: a value running over lines at any indent, or
 // an anchor on the entry that something else still names.
 func hermesEntriesRemovable(text string) error {
+	return yamlDejaEntriesRemovable(text, "mcp_servers:")
+}
+
+func yamlDejaEntriesRemovable(text, topKey string) error {
 	lines := strings.Split(text, "\n")
-	for _, e := range hermesDejaEntries(lines) {
+	name := strings.TrimSuffix(topKey, ":") + ".deja"
+	for _, e := range yamlDejaKeyEntries(lines, topKey) {
 		if !hermesSpanPlain(lines, e.start, e.end) {
-			return fmt.Errorf("mcp_servers.deja holds a value that runs over several lines, and taking it out by hand is safer — remove the deja entry and run this again")
+			return fmt.Errorf("%s holds a value that runs over several lines, and taking it out by hand is safer — remove the deja entry and run this again", name)
 		}
 		_, rest, _ := hermesKeyLine(lines[e.start])
 		for _, tok := range strings.Fields(stripYAMLComment(rest)) {
 			if a, ok := strings.CutPrefix(tok, "&"); ok && a != "" && strings.Contains(text, "*"+a) {
-				return fmt.Errorf("mcp_servers.deja carries the anchor &%s, which *%s still uses — remove the deja entry by hand and run this again", a, a)
+				return fmt.Errorf("%s carries the anchor &%s, which *%s still uses — remove the deja entry by hand and run this again", name, a, a)
 			}
 		}
 	}

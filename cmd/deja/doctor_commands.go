@@ -118,11 +118,7 @@ func doctorCommandFiles() []doctorCommandFile {
 		}})
 	out = append(out, doctorCommandFile{name: "goose", path: filepath.Join(gooseConfigDir(), "config.yaml"),
 		entry: func(s string) (bool, bool) {
-			// The remover also drops a key left empty; that is not our entry.
-			if removeGooseSlashCommand(s) == dropEmptyYAMLKey(s, "slash_commands:") {
-				return false, false
-			}
-			return true, strings.Contains(s, "recipe_path: "+yamlQuote(gooseRecipePath()))
+			return gooseSlashCommandOurs(s, gooseRecipePath())
 		}})
 	for _, name := range skillIsTheCommandHarnesses() {
 		out = append(out, doctorCommandFile{name: name, path: commandSkillPath(name), skill: true})

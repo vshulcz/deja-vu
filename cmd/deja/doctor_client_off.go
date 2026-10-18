@@ -22,7 +22,7 @@ import (
 func clientMCPEntryOff(name string) string {
 	switch name {
 	case "goose":
-		return yamlSwitchOff(filepath.Join(gooseConfigDir(), "config.yaml"), "goose", "extensions", "deja", "enabled")
+		return gooseMCPOffNote(filepath.Join(gooseConfigDir(), "config.yaml"))
 	case "hermes":
 		return hermesMCPOffNote(filepath.Join(sources.HermesHome(), "config.yaml"))
 	case "codex", "grok":

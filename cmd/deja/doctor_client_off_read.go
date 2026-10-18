@@ -107,18 +107,6 @@ func listHasDeja(v any) bool {
 	return anyDeja(jsonStrings(v))
 }
 
-// yamlSwitchOff is the note for a `<keys>: false` in a YAML config.
-func yamlSwitchOff(p, client string, keys ...string) string {
-	b, err := readConfig(p)
-	if err != nil {
-		return ""
-	}
-	if v, _, _ := yamlLookup(string(b), keys...); v == "false" {
-		return mcpOffNote(client, "`"+strings.Join(keys, ".")+": false`", p)
-	}
-	return ""
-}
-
 // yamlLookup finds the key at keys in a block-style YAML document and returns
 // its scalar, or the items of the list under it, block or flow. Enough for the
 // mappings and lists clients keep their switches in; anchors, multi-line

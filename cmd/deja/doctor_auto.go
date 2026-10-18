@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -499,7 +498,11 @@ func doctorAutoRecall(w io.Writer) {
 // both nest ours under a key: a plain "deja appears in the file" check would
 // pass on a disabled entry.
 func doctorGooseWired(path string) bool {
-	return yamlHasChildKey(path, "extensions:", "deja:")
+	b, err := readConfig(path)
+	if err != nil {
+		return false
+	}
+	return len(gooseDejaEntries(strings.Split(lfText(b), "\n"))) > 0
 }
 
 func doctorHermesWired(path string) bool {
@@ -598,47 +601,6 @@ func yamlTopKeyEnd(doc, key string) (int, error) {
 		}
 	}
 	return found, nil
-}
-
-// yamlHasChildKey reports whether a key sits directly under a top-level parent.
-//
-// The indent is whatever the reader wrote the block at, and asking for exactly
-// two called a goose deja had just wired at four unwired — while the writer
-// itself follows the block (#2614, #2727). "Anywhere below the top level" was
-// the other end of the same mistake: `deja:` in another server's env, or in a
-// comment-shaped example under `notes:`, then read as a wired server (#2730).
-func yamlHasChildKey(path, parent, key string) bool {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return false
-	}
-	lines := strings.Split(string(bytes.TrimPrefix(b, utf8BOM)), "\n")
-	inBlock := false
-	child := -1
-	for _, raw := range lines {
-		line := strings.TrimRight(raw, " \t\r")
-		if strings.TrimSpace(line) == "" || strings.HasPrefix(strings.TrimSpace(line), "#") {
-			continue
-		}
-		if yamlKeyLine(line, parent) && yamlIndentWidth(line) == 0 {
-			inBlock, child = true, -1
-			continue
-		}
-		if !inBlock {
-			continue
-		}
-		if yamlIndentWidth(line) == 0 {
-			inBlock = false
-			continue
-		}
-		if child < 0 {
-			child = yamlIndentWidth(line)
-		}
-		if strings.TrimSpace(line) == key && yamlIndentWidth(line) == child {
-			return true
-		}
-	}
-	return false
 }
 
 // codexHasSeenItsHook reports whether codex has recorded any opinion about

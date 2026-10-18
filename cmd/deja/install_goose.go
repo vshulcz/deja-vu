@@ -61,9 +61,10 @@ func yamlBlockIsSequence(block string) bool {
 }
 
 // yamlEntrySwitchedOff reports whether the entry `name` under the top-level
-// key has been switched off: `enabled: false`, the spelling goose and hermes
-// both read, or `disabled: true`. The writers below rebuild deja's entry
-// whole, and they dropped the switch until they read it first (#4467).
+// key has been switched off the way goose reads it: `enabled: false`. The
+// writer below rebuilt deja's entry whole, and dropped the switch until it read
+// it first (#4467); `disabled: true` is not a field goose has, and reading it
+// switched off a server goose ran (#5192).
 func yamlEntrySwitchedOff(doc, topKey, name string) bool {
 	lines := strings.Split(strings.ReplaceAll(doc, "\r\n", "\n"), "\n")
 	in, child, entry, field := false, -1, -1, -1
@@ -100,16 +101,8 @@ func yamlEntrySwitchedOff(doc, topKey, name string) bool {
 		if w != field {
 			continue
 		}
-		v := strings.ToLower(hermesYAMLScalar(rest))
-		switch hermesKeyName(key) {
-		case "enabled":
-			if v == "false" {
-				return true
-			}
-		case "disabled":
-			if v == "true" {
-				return true
-			}
+		if hermesKeyName(key) == "enabled" && gooseSwitchOff(stripYAMLComment(rest)) {
+			return true
 		}
 	}
 	return false
@@ -126,7 +119,35 @@ func installGoose(exe string, uninstall bool) (installResult, error) {
 	// "extensions:\r" and matches nothing: deja added a second one and left a
 	// file goose cannot read. Edit in LF and put the line endings back.
 	body, crlf := normaliseNewlines(string(old))
-	next := removeGooseExtension(body)
+	var note string
+	if !uninstall {
+		// Refused before any edit: goose reads neither of two extensions keys.
+		if _, err := yamlTopKeyEnd(body+"\n", "extensions:"); err != nil {
+			return installResult{}, fmt.Errorf("%s: %w", path, err)
+		}
+		// The entry the reader already has is edited where it stands, keys
+		// and switch kept (#5190, #5191).
+		lines, n, done, err := gooseEditEntry(strings.Split(body, "\n"), exe)
+		if err != nil {
+			return installResult{}, fmt.Errorf("%s: %w", path, err)
+		}
+		if done {
+			next := keepTrailingNewline(string(old), strings.Join(lines, "\n"))
+			if crlf {
+				next = strings.ReplaceAll(next, "\n", "\r\n")
+			}
+			n = withOtherDejaNames(n, yamlDejaEntryNames(next, "extensions:"))
+			a, werr := writeIfChanged(path, old, []byte(next))
+			return installResult{Path: path, Action: a, Note: n}, werr
+		}
+	}
+	if err := yamlDejaEntriesRemovable(body, "extensions:"); err != nil {
+		return installResult{}, fmt.Errorf("%s: %w", path, err)
+	}
+	// Entries found by key first: they read past a comment at column 0
+	// inside the entry, where the bare-line remover stopped and left half of
+	// it behind. That one stays for the legacy two-space entry (#2614).
+	next := removeGooseExtension(removeGooseExtensionEntries(body))
 	// Removing our entry can leave the key it lived under with nothing in it,
 	// and the insert below only recognises "extensions:" when a line follows
 	// it — so a second install appended a second key and left the file with
@@ -134,7 +155,6 @@ func installGoose(exe string, uninstall bool) (installResult, error) {
 	// empty key first makes the two paths meet: either the key has other
 	// extensions and ours joins them, or it is gone and one is written.
 	next = dropEmptyYAMLKey(next, "extensions:")
-	var note string
 	if !uninstall {
 		on := "true"
 		if yamlEntrySwitchedOff(body, "extensions:", "deja") {
