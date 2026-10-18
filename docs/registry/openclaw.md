@@ -65,6 +65,9 @@ sub-agent's task are dropped from the turn. Verified against 2026.10.4.
   result middleware adds a file's history after a read, edit or patch and the
   earlier fix after a failed command. The hook pack
   adds the digest at `agent:bootstrap`, which fires only in gateway mode.
+  `openclaw chat` and `openclaw tui --local` run no plugin or hook
+  (2026.10.4), so none of this reaches them; MCP recall there leaves out the
+  session OpenClaw wrote to last when no hook stamped one.
 - **Resume**: `openclaw chat --session <key>`. OpenClaw addresses a
   conversation by key (`agent:<id>:<name>`); the uuid its transcript is named
   after opens nothing. Legacy JSONL sessions use `sessions.json` beside the

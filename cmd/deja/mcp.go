@@ -194,6 +194,7 @@ func handleMCP(dir string, req rpcRequest) (any, int, string) {
 		// A malformed or missing clientInfo only loses the client-specific
 		// sentence; initialize itself must still succeed.
 		_ = json.Unmarshal(req.Params, &p)
+		setMCPClient(p.ClientInfo.Name)
 		return map[string]any{
 			"protocolVersion": mcpProtocolVersion,
 			"capabilities":    map[string]any{"tools": map[string]any{}, "resources": map[string]any{}, "prompts": map[string]any{}},

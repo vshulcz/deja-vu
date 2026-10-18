@@ -54,6 +54,11 @@ An OpenClaw heartbeat poll no longer stamps the main DM as in use, which hid
 it from recall in the user's other sessions for twenty minutes after each poll,
 and a poll and its `NO_REPLY` are no longer indexed as a session.
 
+`openclaw chat` and `openclaw tui --local` run no plugin or hook, so deja
+cannot give them a digest or per-prompt recall; install and doctor now say
+so. MCP recall there leaves out the session OpenClaw wrote to last when no
+hook stamped one, instead of answering with the conversation asking.
+
 ## [0.22.2] - 2026-10-17
 
 deja now reads Windsurf / Devin Desktop: Cascade's encrypted conversation

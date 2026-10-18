@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"io"
+	"maps"
 	"os"
 	"sort"
 	"strings"
@@ -396,6 +397,13 @@ func spawnParent(sid string) string {
 // on a page of five (#3945).
 func withoutLiveSessions(dir string, ss []model.Session) []model.Session {
 	live := liveLineage(dir)
+	if asker := openclawUnstampedAsker(dir); asker != "" {
+		live = maps.Clone(live)
+		if live == nil {
+			live = map[string]bool{}
+		}
+		live[asker] = true
+	}
 	if len(live) == 0 {
 		return ss
 	}

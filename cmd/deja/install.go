@@ -1289,8 +1289,17 @@ func installOpenClawAuto(exe string, uninstall bool) (installResult, error) {
 	if err != nil {
 		return installResult{}, err
 	}
+	if !uninstall {
+		fmt.Println("openclaw: " + openclawLocalTUINote)
+	}
 	return wroteAll(mcp, plugin, hooks), nil
 }
+
+// openclawLocalTUINote is said where openclaw-auto reads as wired. OpenClaw's
+// embedded TUI loads plugins and runs no hook of theirs, nor any internal hook
+// (2026.10.4, checked with a plugin registered on every hook name), so deja
+// cannot give it a digest, recall or a live stamp (#5271).
+const openclawLocalTUINote = "`openclaw chat` and `openclaw tui --local` run no plugin or hook — no digest or recall there; `openclaw tui` on the gateway and `openclaw agent --local` have both"
 
 func installHermesAuto(exe string, uninstall bool) (installResult, error) {
 	if !uninstall {

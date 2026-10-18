@@ -105,6 +105,9 @@
 <p>result middleware adds a file&#39;s history after a read, edit or patch and the</p>
 <p>earlier fix after a failed command. The hook pack</p>
 <p>adds the digest at <code>agent:bootstrap</code>, which fires only in gateway mode.</p>
+<p><code>openclaw chat</code> and <code>openclaw tui --local</code> run no plugin or hook</p>
+<p>(2026.10.4), so none of this reaches them; MCP recall there leaves out the</p>
+<p>session OpenClaw wrote to last when no hook stamped one.</p>
 <ul>
 <li><strong>Resume</strong>: <code>openclaw chat --session &lt;key&gt;</code>. OpenClaw addresses a</li>
 </ul>
