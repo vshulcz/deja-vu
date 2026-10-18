@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -102,7 +103,7 @@ func openclawUserText(txt string) string {
 // heartbeat run; the prompt the model saw rides in __openclaw.
 const openclawHeartbeatPoll = "[OpenClaw heartbeat poll]"
 
-// skipHeartbeat drops a gateway heartbeat poll and its silent NO_REPLY. Each
+// skipHeartbeat drops a gateway heartbeat poll and its silent reply. Each
 // poll runs a turn on agent:main:main that nobody asked for, and read as one
 // it titled a window that only got polls and topped `deja last` (#5319). A
 // reply that says something is kept: the poll found work to report.
@@ -113,9 +114,32 @@ func (r *piReader) skipHeartbeat(role string, msg map[string]any, txt string) bo
 		r.inHeartbeat = prov["sourceTool"] == "heartbeat" || strings.TrimSpace(txt) == openclawHeartbeatPoll
 		return r.inHeartbeat
 	case "assistant":
-		return r.inHeartbeat && strings.TrimSpace(txt) == "NO_REPLY"
+		return r.inHeartbeat && openclawHeartbeatAck(txt)
 	}
 	return false
+}
+
+// openclawSilentRE is NO_REPLY alone, as OpenClaw's silent-reply check takes
+// it (src/auto-reply/tokens.ts).
+var openclawSilentRE = regexp.MustCompile(`(?i)^\s*NO_REPLY(?:\s+NO_REPLY)*\s*$`)
+
+// openclawAckEdgeRE is HEARTBEAT_OK at either edge of a reply, with the
+// trailing punctuation and the markup OpenClaw strips around it.
+var openclawAckEdgeRE = regexp.MustCompile(`^[*` + "`" + `~_\s]*(?:HEARTBEAT_OK[^\w]{0,4}\s*)+|(?:\s*HEARTBEAT_OK[^\w]{0,4})+[*` + "`" + `~_\s]*$`)
+
+// openclawHeartbeatAck reports whether a heartbeat reply is only the ack:
+// NO_REPLY, which a heartbeat prompt asks for since 2026.10, or HEARTBEAT_OK,
+// which the 2026.7 default prompt asks for (src/auto-reply/heartbeat.ts),
+// with nothing else said (#5326).
+func openclawHeartbeatAck(txt string) bool {
+	if openclawSilentRE.MatchString(txt) {
+		return true
+	}
+	if !strings.Contains(txt, "HEARTBEAT_OK") {
+		return false
+	}
+	rest := openclawAckEdgeRE.ReplaceAllString(strings.TrimSpace(txt), "")
+	return strings.TrimSpace(strings.Trim(rest, "*`~_")) == ""
 }
 
 // applyOpenClawSpawns hangs each spawned session under the one that spawned
@@ -180,32 +204,32 @@ func openclawDBSpawns(db string) map[string]string {
 }
 
 // openclawStoreSpawns is openclawDBSpawns for a JSONL store, read from the
-// sessions.json beside the transcripts. One file serves every transcript in
-// the directory, so it is read once per change.
+// sessions.json beside the transcripts. The answer holds until that file
+// changes, or, when it needed the transcripts, until one of them does;
+// OpenClaw rewrites sessions.json every turn, so what the transcripts say
+// about spawns is kept per file and only a changed transcript is read again.
 func openclawStoreSpawns(dir string) map[string]string {
 	p := filepath.Join(dir, "sessions.json")
 	openclawSpawnCache.Lock()
 	defer openclawSpawnCache.Unlock()
-	fi, err := os.Stat(p)
+	sfi, err := os.Stat(p)
 	if err != nil {
 		return nil
 	}
-	if c, ok := openclawSpawnCache.m[p]; ok && c.mod.Equal(fi.ModTime()) && c.size == fi.Size() {
-		return c.parents
+	if c, ok := openclawSpawnCache.parents[dir]; ok && c.store.Equal(sfi.ModTime()) && c.size == sfi.Size() {
+		if !c.scanned {
+			return c.parents
+		}
+		if _, changed := openclawScanDir(dir); !changed {
+			return c.parents
+		}
 	}
-	b, err := os.ReadFile(p)
-	if err != nil {
+	store := openclawReadStore(p)
+	if store == nil {
 		return nil
 	}
-	var store map[string]struct {
-		SessionID          string `json:"sessionId"`
-		SpawnedBy          string `json:"spawnedBy"`
-		ParentSessionKey   string `json:"parentSessionKey"`
-		SpawnedBySessionID string `json:"spawnedBySessionId"`
-	}
-	if json.Unmarshal(b, &store) != nil {
-		return nil
-	}
+	var scan []openclawSpawnScan
+	scanned := false
 	parents := map[string]string{}
 	for childKey, e := range store {
 		if e.SessionID == "" {
@@ -218,18 +242,46 @@ func openclawStoreSpawns(dir string) map[string]string {
 				k = e.SpawnedBy
 			}
 			if parent = store[k].SessionID; parent != "" {
-				parent = openclawWindowBefore(dir, childKey, e.SessionID, parent)
+				childStart := openclawHeaderStart(filepath.Join(dir, e.SessionID+".jsonl"))
+				curStart := openclawHeaderStart(filepath.Join(dir, parent+".jsonl"))
+				if !childStart.IsZero() && !curStart.IsZero() && curStart.After(childStart) {
+					if !scanned {
+						scan, _ = openclawScanDir(dir)
+						scanned = true
+					}
+					parent = openclawWindowBefore(scan, childKey, e.SessionID, childStart)
+				}
 			}
 		}
 		if parent != "" {
 			parents[e.SessionID] = parent
 		}
 	}
-	if openclawSpawnCache.m == nil {
-		openclawSpawnCache.m = map[string]openclawSpawnFile{}
+	if openclawSpawnCache.parents == nil {
+		openclawSpawnCache.parents = map[string]openclawSpawnParents{}
 	}
-	openclawSpawnCache.m[p] = openclawSpawnFile{mod: fi.ModTime(), size: fi.Size(), parents: parents}
+	openclawSpawnCache.parents[dir] = openclawSpawnParents{store: sfi.ModTime(), size: sfi.Size(), scanned: scanned, parents: parents}
 	return parents
+}
+
+type openclawStoreEntry struct {
+	SessionID          string `json:"sessionId"`
+	SpawnedBy          string `json:"spawnedBy"`
+	ParentSessionKey   string `json:"parentSessionKey"`
+	SpawnedBySessionID string `json:"spawnedBySessionId"`
+}
+
+// openclawReadStore is sessions.json's entries.
+func openclawReadStore(p string) map[string]openclawStoreEntry {
+	b, err := os.ReadFile(p)
+	if err != nil {
+		return nil
+	}
+	var store map[string]openclawStoreEntry
+	if json.Unmarshal(b, &store) != nil {
+		return nil
+	}
+	return store
 }
 
 // openclawWindowBefore is the window that spawned a child when its requester
@@ -240,55 +292,111 @@ func openclawStoreSpawns(dir string) map[string]string {
 // opened by the time the child did and names it, live or archived (a .zst
 // archive is not opened), and none when nothing does — no parent rather than
 // one that never spawned it.
-func openclawWindowBefore(dir, childKey, childID, current string) string {
-	childStart := openclawHeaderStart(filepath.Join(dir, childID+".jsonl"))
-	curStart := openclawHeaderStart(filepath.Join(dir, current+".jsonl"))
-	if childStart.IsZero() || curStart.IsZero() || !curStart.After(childStart) {
-		return current
-	}
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return ""
-	}
-	named := [][]byte{[]byte(childKey + `"`), []byte(childKey + `\"`)}
+func openclawWindowBefore(scan []openclawSpawnScan, childKey, childID string, childStart time.Time) string {
 	var best string
 	var bestAt time.Time
-	for _, e := range entries {
-		name := e.Name()
-		p := filepath.Join(dir, name)
-		if e.IsDir() || strings.HasSuffix(name, ".zst") || openclawCheckpointRE.MatchString(name) || strings.Contains(name, ".trajectory.") ||
-			!strings.HasSuffix(name, ".jsonl") && !openclawArchiveRE.MatchString(name) {
+	for _, f := range scan {
+		if !f.keys[childKey] || f.id == "" || f.id == childID || f.at.IsZero() || f.at.After(childStart) || !f.at.After(bestAt) {
 			continue
 		}
-		b, err := os.ReadFile(p)
-		if err != nil || !openclawNamesChild(b, named) {
-			continue
-		}
-		id, at := openclawHeader(b)
-		if id == "" || id == childID || at.IsZero() || at.After(childStart) || !at.After(bestAt) {
-			continue
-		}
-		best, bestAt = id, at
+		best, bestAt = f.id, f.at
 	}
 	return best
 }
 
-// openclawNamesChild reports whether a transcript holds a spawn result for
-// the child: its key as childSessionKey, not merely mentioned in a turn.
-func openclawNamesChild(b []byte, named [][]byte) bool {
-	for _, n := range named {
-		for rest := b; ; {
-			i := bytes.Index(rest, n)
-			if i < 0 {
-				break
+// openclawSpawnScan is what one transcript says about spawns: its header and
+// the child keys its sessions_spawn results name.
+type openclawSpawnScan struct {
+	size int64
+	mod  time.Time
+	id   string
+	at   time.Time
+	keys map[string]bool
+}
+
+// openclawScanDir reads every transcript in dir once for its spawn results.
+// A file whose size and mtime have not moved is not read again, so a parse
+// costs a directory listing and the transcripts that changed since the last
+// one (#5332). changed reports a transcript added, removed or moved since.
+// Caller holds openclawSpawnCache.
+func openclawScanDir(dir string) (out []openclawSpawnScan, changed bool) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, true
+	}
+	if openclawSpawnCache.m == nil {
+		openclawSpawnCache.m = map[string]map[string]openclawSpawnScan{}
+	}
+	old := openclawSpawnCache.m[dir]
+	cur := make(map[string]openclawSpawnScan, len(entries))
+	out = make([]openclawSpawnScan, 0, len(entries))
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || strings.HasSuffix(name, ".zst") || openclawCheckpointRE.MatchString(name) || strings.Contains(name, ".trajectory.") ||
+			!strings.HasSuffix(name, ".jsonl") && !openclawArchiveRE.MatchString(name) {
+			continue
+		}
+		fi, err := e.Info()
+		if err != nil {
+			continue
+		}
+		f, ok := old[name]
+		if !ok || f.size != fi.Size() || !f.mod.Equal(fi.ModTime()) {
+			f = openclawScanFile(filepath.Join(dir, name))
+			f.size, f.mod = fi.Size(), fi.ModTime()
+			changed = true
+		}
+		cur[name] = f
+		out = append(out, f)
+	}
+	if len(cur) != len(old) {
+		changed = true
+	}
+	openclawSpawnCache.m[dir] = cur
+	return out, changed
+}
+
+var openclawChildKeyRE = regexp.MustCompile(`childSessionKey(?:\\*")?\s*:\s*\\*"([^"\\]+)`)
+
+// openclawScanFile reads a transcript's header and the child keys its spawn
+// results name as childSessionKey; a key merely mentioned in a turn is not
+// one. Only lines holding that word are matched.
+func openclawScanFile(p string) openclawSpawnScan {
+	var f openclawSpawnScan
+	openclawScanReads.Add(1)
+	fh, err := os.Open(p)
+	if err != nil {
+		return f
+	}
+	defer fh.Close()
+	r := bufio.NewReaderSize(fh, 64<<10)
+	needle := []byte("childSessionKey")
+	for first := true; ; first = false {
+		line, err := r.ReadSlice('\n')
+		if err == bufio.ErrBufferFull {
+			// A line longer than the buffer is gathered whole.
+			buf := append([]byte(nil), line...)
+			for err == bufio.ErrBufferFull {
+				line, err = r.ReadSlice('\n')
+				buf = append(buf, line...)
 			}
-			if bytes.Contains(rest[max(0, i-32):i], []byte("childSessionKey")) {
-				return true
+			line = buf
+		}
+		if first {
+			f.id, f.at = openclawHeader(line)
+		}
+		if bytes.Contains(line, needle) {
+			for _, m := range openclawChildKeyRE.FindAllSubmatch(line, -1) {
+				if f.keys == nil {
+					f.keys = map[string]bool{}
+				}
+				f.keys[string(m[1])] = true
 			}
-			rest = rest[i+len(n):]
+		}
+		if err != nil {
+			return f
 		}
 	}
-	return false
 }
 
 // openclawHeaderStart is when the transcript at p opened, by its header.
@@ -319,13 +427,18 @@ func openclawHeader(b []byte) (string, time.Time) {
 	return h.ID, parseTimeAny(h.Timestamp)
 }
 
-type openclawSpawnFile struct {
-	mod     time.Time
+// openclawScanReads counts transcripts openclawScanFile has opened.
+var openclawScanReads atomic.Int64
+
+type openclawSpawnParents struct {
+	store   time.Time
 	size    int64
+	scanned bool
 	parents map[string]string
 }
 
 var openclawSpawnCache struct {
 	sync.Mutex
-	m map[string]openclawSpawnFile
+	parents map[string]openclawSpawnParents
+	m       map[string]map[string]openclawSpawnScan
 }

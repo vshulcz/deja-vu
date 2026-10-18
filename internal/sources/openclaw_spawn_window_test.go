@@ -1,9 +1,11 @@
 package sources
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // sessions.json holds a key's current window only. After /new, a child
@@ -73,5 +75,82 @@ func TestOpenClawJSONLChildKeepsTheWindowThatSpawnedIt(t *testing.T) {
 	write("sessions.json", `{"agent:main:main":{"sessionId":"p2"},"agent:main:subagent:1":{"sessionId":"kid","spawnedBy":"agent:main:main"}}  `)
 	if got := parentOf(); got != "" {
 		t.Errorf("with no spawner on disk: parent %q, want none", got)
+	}
+}
+
+// Resolving a child spawned before a /new read every transcript in the
+// directory, again for each such child and again on every sessions.json
+// rewrite, which OpenClaw does each turn: 60 children by 300 transcripts took
+// 12 s for one parse (#5332). The transcripts are read once between them.
+func TestOpenClawSpawnWindowReadsEachTranscriptOnce(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "main", "sessions")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write := func(name, body string) {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const kids, others = 20, 30
+	store := `{"agent:main:main":{"sessionId":"cur"}`
+	old := `{"type":"session","version":3,"id":"old","timestamp":"2026-07-20T08:00:00Z"}` + "\n"
+	for i := 0; i < kids; i++ {
+		old += fmt.Sprintf(`{"type":"message","id":"r%d","timestamp":"2026-07-20T08:10:00Z","message":{"role":"toolResult","toolName":"sessions_spawn","content":[{"type":"text","text":"{\\"childSessionKey\\":\\"agent:main:subagent:%d\\"}"}]}}`+"\n", i, i)
+		write(fmt.Sprintf("kid%d.jsonl", i), fmt.Sprintf(`{"type":"session","version":3,"id":"kid%d","timestamp":"2026-07-20T09:00:00Z"}
+{"type":"message","id":"a","timestamp":"2026-07-20T09:00:01Z","message":{"role":"user","content":"child task"}}
+`, i))
+		store += fmt.Sprintf(`,"agent:main:subagent:%d":{"sessionId":"kid%d","spawnedBy":"agent:main:main"}`, i, i)
+	}
+	write("old.jsonl", old)
+	write("cur.jsonl", `{"type":"session","version":3,"id":"cur","timestamp":"2026-07-20T11:00:00Z"}`+"\n")
+	for i := 0; i < others; i++ {
+		write(fmt.Sprintf("o%d.jsonl", i), fmt.Sprintf(`{"type":"session","version":3,"id":"o%d","timestamp":"2026-07-19T08:00:00Z"}`+"\n", i))
+	}
+	write("sessions.json", store+"}")
+	files := int64(kids + others + 2)
+
+	parse := func(i int) {
+		t.Helper()
+		got, err := ParseOpenClawFile(filepath.Join(dir, fmt.Sprintf("kid%d.jsonl", i)))
+		if err != nil || len(got) != 1 || got[0].Parent != "old" {
+			t.Fatalf("kid%d: %+v %v, want parent old", i, got, err)
+		}
+	}
+	before := openclawScanReads.Load()
+	parse(0)
+	if n := openclawScanReads.Load() - before; n > files {
+		t.Errorf("one parse read %d transcripts, want at most the %d in the directory", n, files)
+	}
+	// OpenClaw rewrites sessions.json every turn; that alone reads nothing again.
+	before = openclawScanReads.Load()
+	for i := 0; i < kids; i++ {
+		now := time.Now().Add(time.Duration(i+1) * time.Second)
+		if err := os.Chtimes(filepath.Join(dir, "sessions.json"), now, now); err != nil {
+			t.Fatal(err)
+		}
+		parse(i)
+	}
+	if n := openclawScanReads.Load() - before; n != 0 {
+		t.Errorf("%d parses after sessions.json rewrites read %d transcripts again, want 0", kids, n)
+	}
+	// A transcript that grew is read again, and only that one, with or
+	// without a sessions.json rewrite.
+	write("cur.jsonl", `{"type":"session","version":3,"id":"cur","timestamp":"2026-07-20T11:00:00Z"}`+"\n"+`{"type":"message","id":"a","timestamp":"2026-07-20T11:00:01Z","message":{"role":"user","content":"next"}}`+"\n")
+	before = openclawScanReads.Load()
+	parse(1)
+	if n := openclawScanReads.Load() - before; n != 1 {
+		t.Errorf("after one transcript changed a parse read %d, want 1", n)
+	}
+
+	// A spawn result that lands after the parse, with sessions.json as it
+	// was, still moves the child to the window that names it.
+	write("mid.jsonl", `{"type":"session","version":3,"id":"mid","timestamp":"2026-07-20T08:30:00Z"}`+"\n")
+	parse(2)
+	write("mid.jsonl", `{"type":"session","version":3,"id":"mid","timestamp":"2026-07-20T08:30:00Z"}`+"\n"+
+		`{"type":"message","id":"r","timestamp":"2026-07-20T08:40:00Z","message":{"role":"toolResult","toolName":"sessions_spawn","content":[{"type":"text","text":"{\\"childSessionKey\\":\\"agent:main:subagent:2\\"}"}]}}`+"\n")
+	got, err := ParseOpenClawFile(filepath.Join(dir, "kid2.jsonl"))
+	if err != nil || len(got) != 1 || got[0].Parent != "mid" {
+		t.Errorf("kid2 after a later spawn result: %+v %v, want parent mid", got, err)
 	}
 }

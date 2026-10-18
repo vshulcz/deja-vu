@@ -755,7 +755,8 @@ import (
 // sub-agent run out, unset cuts it to task, edits and last turns (#5301).
 // 86: an OpenClaw JSONL sub-agent spawned before a /new stays under the window
 // that spawned it, not the key's newer one (#5307).
-const version = 86
+// 87: an OpenClaw heartbeat poll answered HEARTBEAT_OK is not a turn (#5326).
+const version = 87
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

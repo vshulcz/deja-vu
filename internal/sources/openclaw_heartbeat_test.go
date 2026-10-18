@@ -62,3 +62,41 @@ func TestOpenClawHeartbeatPollsAreNotTurns(t *testing.T) {
 		}
 	}
 }
+
+// OpenClaw 2026.7's default heartbeat prompt says "reply HEARTBEAT_OK", not
+// NO_REPLY, to the same poll; every ack stayed in the window as an assistant
+// turn (#5326). An ack that carries a report is kept.
+func TestOpenClawHeartbeatOKIsNotATurn(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "main", "sessions")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	poll := `{"type":"message","id":"%s","timestamp":"2026-07-20T05:42:12Z","message":{"role":"user","content":"[OpenClaw heartbeat poll]"}}
+{"type":"message","id":"%s-r","timestamp":"2026-07-20T05:42:16Z","message":{"role":"assistant","content":[{"type":"text","text":%q}]}}
+`
+	body := `{"type":"session","version":3,"id":"hb","timestamp":"2026-07-20T05:00:00Z","cwd":"/work/app"}
+{"type":"message","id":"a","timestamp":"2026-07-20T05:00:01Z","message":{"role":"user","content":"the eviction policy is LRU with a 512 MB cap"}}
+{"type":"message","id":"b","timestamp":"2026-07-20T05:00:05Z","message":{"role":"assistant","content":[{"type":"text","text":"Noted."}]}}
+`
+	for i, ack := range []string{"HEARTBEAT_OK", "**HEARTBEAT_OK**", "HEARTBEAT_OK.", "NO_REPLY NO_REPLY"} {
+		body += fmt.Sprintf(poll, fmt.Sprint("u", i), fmt.Sprint("u", i), ack)
+	}
+	report := "HEARTBEAT_OK — but the nightly build failed on main."
+	body += fmt.Sprintf(poll, "u9", "u9", report)
+	p := filepath.Join(dir, "hb.jsonl")
+	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ParseOpenClawFile(p)
+	if err != nil || len(got) != 1 {
+		t.Fatalf("hb: %v %v", got, err)
+	}
+	var texts []string
+	for _, m := range got[0].Messages {
+		texts = append(texts, m.Text)
+	}
+	want := []string{"the eviction policy is LRU with a 512 MB cap", "Noted.", report}
+	if fmt.Sprint(texts) != fmt.Sprint(want) {
+		t.Errorf("messages = %q, want %q", texts, want)
+	}
+}
