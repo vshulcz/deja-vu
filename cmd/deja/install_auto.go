@@ -57,6 +57,19 @@ var codexHookWiring = []hookWire{
 	{"SessionEnd", "hook-session-end", ""},
 }
 
+// codexHookTimeout is the timeout deja writes for a codex hook, in seconds.
+// codex-cli 0.149.0 caps SessionEnd at 3 s and warns on every start when the
+// file asks for more (#5126); the hook only drops the live stamp, so 3 s is
+// plenty. Every other event keeps 10.
+func codexHookTimeout(event string) int {
+	if event == "SessionEnd" {
+		return codexSessionEndCap
+	}
+	return 10
+}
+
+const codexSessionEndCap = 3
+
 func installCodexHooks(exe string, uninstall bool) (installResult, error) {
 	// Use CodexHome() (honours CODEX_HOME / DEJA_CODEX_ROOT) rather than a raw
 	// ~/.codex join, so a sandboxed install stays sandboxed and a non-default
@@ -132,6 +145,12 @@ func updateCodexHook(root map[string]any, event, cmd, matcher string, uninstall 
 			}
 			found = true
 			adoptCodexHookEntry(entry, cmd, event)
+			// An install from before #5126 wrote 10 here, which codex clamps
+			// with a warning on every start. A lower value the reader set
+			// stays.
+			if event == "SessionEnd" {
+				capHookTimeout(entry, cmd, codexSessionEndCap)
+			}
 			// The matcher is part of the wiring, not a user setting, so an
 			// upgrade has to rewrite it: the SessionStart entry written when
 			// this meant "startup|resume" went on missing every compaction
@@ -146,7 +165,7 @@ func updateCodexHook(root map[string]any, event, cmd, matcher string, uninstall 
 		kept = append(kept, entryAny)
 	}
 	if !uninstall && !found {
-		h := map[string]any{"type": "command", "command": cmd, "timeout": 10}
+		h := map[string]any{"type": "command", "command": cmd, "timeout": codexHookTimeout(event)}
 		// Codex surfaces statusMessage in its hook run summary.
 		if msg := hookStatusMessage(event); msg != "" {
 			h["statusMessage"] = msg
@@ -176,6 +195,21 @@ func adoptHookTimeout(entry map[string]any, cmd string, timeout int) {
 			continue
 		}
 		h["timeout"] = timeout
+	}
+}
+
+// capHookTimeout lowers the timeout on the hook deja owns inside an entry to
+// limit when it asks for more, or says nothing at all.
+func capHookTimeout(entry map[string]any, cmd string, limit int) {
+	hs, _ := entry["hooks"].([]any)
+	for _, hAny := range hs {
+		h, _ := hAny.(map[string]any)
+		if h == nil || h["type"] != "command" || hookCommandKindOf(h["command"], cmd) != hookDejas {
+			continue
+		}
+		if t, ok := h["timeout"].(float64); !ok || t > float64(limit) {
+			h["timeout"] = limit
+		}
 	}
 }
 
@@ -1107,6 +1141,12 @@ func installSettingsHookRetiring(path, event, matcher string, timeout int, cmd s
 			}
 			found = true
 			adoptCodexHookEntry(entry, cmd, event)
+			// An install from before #5126 wrote 10 here, which codex clamps
+			// with a warning on every start. A lower value the reader set
+			// stays.
+			if event == "SessionEnd" {
+				capHookTimeout(entry, cmd, codexSessionEndCap)
+			}
 			// The timeout too. Qwen and gemini read it in milliseconds, and the
 			// 10 an older deja wrote kills the hook ten milliseconds in — which
 			// looks exactly like a harness with no hooks. Adopting the entry
