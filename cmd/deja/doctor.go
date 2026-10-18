@@ -2437,7 +2437,9 @@ func doctorOpencodeConfigPath() string {
 	return path
 }
 
-// doctorOpenClawWired checks openclaw.json's nested mcp.servers map.
+// doctorOpenClawWired checks openclaw.json's nested mcp.servers map, with
+// any $include read in: an entry added by hand to the included file is the
+// wiring `deja install openclaw` asks for there (#5331).
 func doctorOpenClawWired(path string) bool {
 	b, err := readConfig(path)
 	if err != nil {
@@ -2446,6 +2448,9 @@ func doctorOpenClawWired(path string) bool {
 	var root map[string]any
 	if json.Unmarshal([]byte(jsoncToJSON(string(b))), &root) != nil {
 		return strings.Contains(string(b), `"deja"`)
+	}
+	if path == openclawConfigPath() {
+		root, _ = openclawConfigResolved()
 	}
 	mcp, _ := root["mcp"].(map[string]any)
 	servers, _ := mcp["servers"].(map[string]any)

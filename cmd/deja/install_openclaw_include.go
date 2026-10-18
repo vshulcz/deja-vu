@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -16,7 +17,10 @@ import (
 // deja wrote its entry beside the $include, so `openclaw config set` and
 // `openclaw mcp add` stopped reaching the included file, and stayed that way
 // after uninstall (#5258). deja writes neither into a file the config includes
-// nor beside one; it says what to add and where.
+// nor beside one; it says what to add and where, and writes the files of its
+// own that those entries name, so following it gives a working wiring: the
+// entries named a launcher, plugin and hook pack nothing had written, and a
+// rerun refused again while the $include stayed (#5331).
 
 // openclawSection is one place openclaw-auto writes: the keys down to the
 // object deja edits, and what deja would put there.
@@ -25,10 +29,44 @@ type openclawSection struct {
 	want string
 }
 
+// openclawIncludeRefuse is the refusal for openclaw (auto false) or
+// openclaw-auto, or nil. Before refusing it writes deja's own files — the
+// launcher, and for auto the plugin and hook pack — so every path the refusal
+// names is there; openclaw.json and the files it includes stay untouched.
+func openclawIncludeRefuse(exe string, auto bool) error {
+	sections := func(hookExe string) []openclawSection {
+		s := []openclawSection{openclawMCPSection(hookExe)}
+		if auto {
+			s = append(s, openclawAutoSections()...)
+		}
+		return s
+	}
+	if openclawIncludeRefusal(nil, sections(preflightHookExe(exe))...) == nil {
+		return nil
+	}
+	hookExe := hookCommandExe(exe)
+	wrote := []string{}
+	if hookExe != exe {
+		wrote = append(wrote, shortHome(hookExe))
+	}
+	if auto {
+		if _, _, err := writeOpenClawPluginFiles(hookExe); err != nil {
+			return err
+		}
+		if _, err := writeOpenClawHookFiles(hookExe); err != nil {
+			return err
+		}
+		wrote = append(wrote, shortHome(openclawPluginDir()), shortHome(openclawHookDir()))
+	}
+	return openclawIncludeRefusal(wrote, sections(hookExe)...)
+}
+
 // openclawIncludeRefusal is the error for the sections, of those given, that
-// openclaw.json keeps in an included file, or nil. A config that does not
+// openclaw.json keeps in an included file, or nil. Once one is, the others are
+// named too, in openclaw.json, since nothing of the target is written there.
+// wrote is the files of deja's that the entries run. A config that does not
 // parse is left to the writers, which say so in their own words.
-func openclawIncludeRefusal(sections ...openclawSection) error {
+func openclawIncludeRefusal(wrote []string, sections ...openclawSection) error {
 	path := openclawConfigPath()
 	old, err := os.ReadFile(path)
 	if err != nil || len(bytes.TrimSpace(old)) == 0 {
@@ -38,10 +76,11 @@ func openclawIncludeRefusal(sections ...openclawSection) error {
 	if json.Unmarshal([]byte(jsoncToJSON(string(old))), &root) != nil {
 		return nil
 	}
-	var lines []string
+	var lines, beside []string
 	for _, s := range sections {
 		at, inc := openclawIncludeOn(root, s.keys)
 		if at == "" {
+			beside = append(beside, fmt.Sprintf("under %s in %s: %s", strings.Join(s.keys, "."), shortHome(path), s.want))
 			continue
 		}
 		rest := strings.Join(s.keys[strings.Count(at, ".")+1:], ".")
@@ -55,8 +94,13 @@ func openclawIncludeRefusal(sections ...openclawSection) error {
 	if len(lines) == 0 {
 		return nil
 	}
+	lines = append(lines, beside...)
+	files := ""
+	if len(wrote) > 0 {
+		files = " (deja wrote the files these run: " + strings.Join(wrote, ", ") + ")"
+	}
 	return fmt.Errorf("%s keeps a section deja writes in an included file ($include), and deja writes neither into one nor beside it — a key beside the $include turns OpenClaw's own edits of that section into overrides in openclaw.json. "+
-		"Put the section's contents back in openclaw.json in place of the $include and run this again, or add deja by hand: %s", shortHome(path), strings.Join(lines, "; "))
+		"Put the section's contents back in openclaw.json in place of the $include and run this again, or add deja by hand: %s%s", shortHome(path), strings.Join(lines, "; "), files)
 }
 
 // openclawIncludeOn finds the first object on the path, below the root, that
@@ -80,12 +124,25 @@ func openclawIncludeOn(root map[string]any, keys []string) (string, any) {
 // config's directory the way OpenClaw resolves it.
 func openclawIncludeFiles(config string, inc any) string {
 	var names []string
+	for _, p := range openclawIncludePaths(filepath.Dir(config), inc) {
+		names = append(names, shortHome(p))
+	}
+	if len(names) == 0 {
+		return "an $include"
+	}
+	return strings.Join(names, ", ")
+}
+
+// openclawIncludePaths are the files a $include names, one or a list,
+// relative ones against dir.
+func openclawIncludePaths(dir string, inc any) []string {
+	var out []string
 	add := func(v any) {
 		if s, ok := v.(string); ok && s != "" {
 			if !filepath.IsAbs(s) {
-				s = filepath.Join(filepath.Dir(config), s)
+				s = filepath.Join(dir, s)
 			}
-			names = append(names, shortHome(s))
+			out = append(out, s)
 		}
 	}
 	if list, ok := inc.([]any); ok {
@@ -95,10 +152,95 @@ func openclawIncludeFiles(config string, inc any) string {
 	} else {
 		add(inc)
 	}
-	if len(names) == 0 {
-		return "an $include"
+	return out
+}
+
+// openclawConfigResolved is openclaw.json with every $include read in, the
+// way OpenClaw merges them: the files in order, then the keys beside. Doctor
+// reads this, so entries added by hand to an included file count. complete is
+// false when an included file could not be read as JSON with comments —
+// OpenClaw takes JSON5 — and the merged view may be missing what it holds.
+func openclawConfigResolved() (root map[string]any, complete bool) {
+	path := openclawConfigPath()
+	b, err := readConfig(path)
+	if err != nil {
+		return nil, true
 	}
-	return strings.Join(names, ", ")
+	if json.Unmarshal([]byte(jsoncToJSON(string(b))), &root) != nil {
+		return nil, true
+	}
+	complete = true
+	return openclawResolveIncludes(root, filepath.Dir(path), 0, &complete), complete
+}
+
+func openclawResolveIncludes(m map[string]any, dir string, depth int, complete *bool) map[string]any {
+	out := map[string]any{}
+	if inc, ok := m["$include"]; ok {
+		for _, p := range openclawIncludePaths(dir, inc) {
+			var v map[string]any
+			b, err := os.ReadFile(p)
+			if depth > 8 || err != nil || json.Unmarshal([]byte(jsoncToJSON(string(b))), &v) != nil {
+				*complete = false
+				continue
+			}
+			openclawMergeInto(out, openclawResolveIncludes(v, filepath.Dir(p), depth+1, complete))
+		}
+	}
+	for k, v := range m {
+		if k == "$include" {
+			continue
+		}
+		if sub, ok := v.(map[string]any); ok {
+			v = openclawResolveIncludes(sub, dir, depth, complete)
+		}
+		openclawMergeInto(out, map[string]any{k: v})
+	}
+	return out
+}
+
+// openclawMergeInto lays src over dst, objects merged key by key.
+func openclawMergeInto(dst, src map[string]any) {
+	for k, v := range src {
+		a, aok := dst[k].(map[string]any)
+		b, bok := v.(map[string]any)
+		if aok && bok {
+			openclawMergeInto(a, b)
+			continue
+		}
+		dst[k] = v
+	}
+}
+
+// openclawIncludedWiringMissing is, when openclaw.json keeps a section
+// openclaw-auto writes in an included file — and so the install was refused — the entries of the plugin and hook
+// pack that are in neither file yet: the install wrote deja's own files and
+// left these to the reader, so the files alone do not make it wired. "" when
+// nothing is included, or when an included file could not be read.
+func openclawIncludedWiringMissing() string {
+	raw := readJSONConfig(openclawConfigPath())
+	included := false
+	for _, s := range append(openclawAutoSections(), openclawSection{keys: []string{"mcp", "servers"}}) {
+		if at, _ := openclawIncludeOn(raw, s.keys); at != "" {
+			included = true
+		}
+	}
+	if !included {
+		return ""
+	}
+	root, complete := openclawConfigResolved()
+	if !complete {
+		return ""
+	}
+	var missing []string
+	if jsonAt(root, "plugins", "entries", openclawPluginID) == nil {
+		missing = append(missing, "plugins.entries."+openclawPluginID)
+	}
+	if jsonAt(root, "hooks", "internal", "entries", openclawHookName) == nil {
+		missing = append(missing, "hooks.internal.entries."+openclawHookName)
+	} else if jsonAt(root, "hooks", "internal", "enabled") == nil {
+		missing = append(missing, "hooks.internal.enabled")
+	}
+	return strings.Join(missing, ", ")
 }
 
 // openclawMCPSection is where `deja install openclaw` writes.
@@ -118,4 +260,37 @@ func openclawAutoSections() []openclawSection {
 		{keys: []string{"plugins", "load"}, want: `"paths": ` + string(paths) + ``},
 		{keys: []string{"hooks", "internal"}, want: `"enabled": true, "entries": {"` + openclawHookName + `": {"enabled": true}}`},
 	}
+}
+
+// openclawIncludedLeftNote names deja's entries an uninstall leaves in files
+// openclaw.json includes — added there by hand, as the install asked, and
+// pointing at files the uninstall just took away: the MCP entry, and for
+// openclaw-auto the plugin's and the hook pack's.
+func openclawIncludedLeftNote(auto bool) string {
+	raw := readJSONConfig(openclawConfigPath())
+	root, _ := openclawConfigResolved()
+	type left struct {
+		keys []string
+		has  bool
+	}
+	checks := []left{{[]string{"mcp", "servers", "deja"}, jsonAt(root, "mcp", "servers", "deja") != nil}}
+	if auto {
+		checks = append(checks, []left{
+			{[]string{"plugins", "entries", openclawPluginID}, jsonAt(root, "plugins", "entries", openclawPluginID) != nil},
+			{[]string{"plugins", "load", "paths"}, slices.Contains(jsonStrings(jsonAt(root, "plugins", "load", "paths")), openclawPluginDir())},
+			{[]string{"hooks", "internal", "entries", openclawHookName}, jsonAt(root, "hooks", "internal", "entries", openclawHookName) != nil},
+		}...)
+	}
+	var out []string
+	for _, c := range checks {
+		at, inc := openclawIncludeOn(raw, c.keys)
+		if at == "" || !c.has {
+			continue
+		}
+		out = append(out, strings.Join(c.keys, ".")+" in "+openclawIncludeFiles(openclawConfigPath(), inc))
+	}
+	if len(out) == 0 {
+		return ""
+	}
+	return "left deja's entries in the files openclaw.json includes, which deja does not edit — take them out there: " + strings.Join(out, "; ")
 }

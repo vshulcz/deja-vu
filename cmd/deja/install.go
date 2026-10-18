@@ -1279,11 +1279,13 @@ func installOpenClawAuto(exe string, uninstall bool) (installResult, error) {
 	// Every section first: a refusal after the MCP entry went in would leave
 	// the target half wired.
 	if !uninstall {
-		if err := openclawIncludeRefusal(append([]openclawSection{openclawMCPSection(preflightHookExe(exe))}, openclawAutoSections()...)...); err != nil {
+		if err := openclawIncludeRefuse(exe, true); err != nil {
 			return installResult{}, err
 		}
 	}
-	mcp, err := installOpenClawMCP(exe, uninstall)
+	// The entry alone: the refusal above covered it, and the note below names
+	// what is left in included files for all three.
+	mcp, err := installOpenClawMCPEntry(exe, uninstall)
 	if err != nil {
 		return installResult{}, err
 	}
@@ -1299,7 +1301,11 @@ func installOpenClawAuto(exe string, uninstall bool) (installResult, error) {
 	if !uninstall {
 		fmt.Println("openclaw: " + openclawLocalTUINote)
 	}
-	return wroteAll(mcp, plugin, hooks), nil
+	res := wroteAll(mcp, plugin, hooks)
+	if uninstall {
+		res.Note = joinNotesWith("; ", res.Note, openclawIncludedLeftNote(true))
+	}
+	return res, nil
 }
 
 // openclawLocalTUINote is said where openclaw-auto reads as wired. OpenClaw's
@@ -3717,10 +3723,37 @@ func replacedEntryNote(prev, entry any) string {
 	// format gained since, and saying "replaced … which ran /bin/deja" of
 	// /bin/deja is noise sitting where a real takeover should stand out
 	// (#2479).
-	if was == entryCommandName(entry) {
+	if sameDejaCommand(was, entryCommandName(entry)) {
 		return ""
 	}
 	return fmt.Sprintf("replaced the deja entry that was already here, which ran %s", safeForStatusline(was, 200))
+}
+
+// sameDejaCommand reports whether an entry that ran was runs the deja that now
+// does: the same path or, now being the launcher, the binary it wraps or a
+// launcher an older install wrote. The MCP entries moved to the launcher
+// (#5323) said "replaced … which ran <deja>" on every upgrade from this very
+// binary — the noise #2479 took out.
+func sameDejaCommand(was, now string) bool {
+	if was == now {
+		return true
+	}
+	l := dejaLauncherPath()
+	if l == "" || now != l {
+		return false
+	}
+	if filepath.Base(was) == filepath.Base(l) {
+		return true
+	}
+	cur, err := os.ReadFile(l)
+	if err != nil {
+		return false
+	}
+	if string(cur) == dejaLauncherScript(was) {
+		return true
+	}
+	resolved, err := filepath.EvalSymlinks(was)
+	return err == nil && string(cur) == dejaLauncherScript(resolved)
 }
 
 // entryRunsDeja reports whether an MCP entry runs the deja binary, wherever the
@@ -4217,10 +4250,18 @@ func installCopilotMCP(exe string, uninstall bool) (installResult, error) {
 // servers under mcp.servers, not the common mcpServers root.
 func installOpenClawMCP(exe string, uninstall bool) (installResult, error) {
 	if !uninstall {
-		if err := openclawIncludeRefusal(openclawMCPSection(preflightHookExe(exe))); err != nil {
+		if err := openclawIncludeRefuse(exe, false); err != nil {
 			return installResult{}, err
 		}
 	}
+	res, err := installOpenClawMCPEntry(exe, uninstall)
+	if err == nil && uninstall {
+		res.Note = joinNotesWith("; ", res.Note, openclawIncludedLeftNote(false))
+	}
+	return res, err
+}
+
+func installOpenClawMCPEntry(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(sources.OpenClawStateDir(), "openclaw.json")
 	old, err := readConfig(path)
 	if err != nil {
@@ -5344,6 +5385,9 @@ func replacedJSONCLineNote(dropped []string, line string) string {
 	was := jsoncEntryCommand(strings.Join(dropped, " "))
 	if was == "" {
 		return "replaced the deja entry that was already here"
+	}
+	if sameDejaCommand(was, jsoncEntryCommand(line)) {
+		return ""
 	}
 	return fmt.Sprintf("replaced the deja entry that was already here, which ran %s", safeForStatusline(was, 200))
 }

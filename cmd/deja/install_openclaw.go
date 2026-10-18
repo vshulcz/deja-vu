@@ -36,7 +36,7 @@ func installOpenClawHooks(exe string, uninstall bool) (installResult, error) {
 	// config as a hooks.json, and one that names the build it was
 	// installed from stops working the day that build moves (#3682).
 	exe = hookExeFor(exe, uninstall)
-	dir := filepath.Join(sources.OpenClawStateDir(), "hooks", openclawHookName)
+	dir := openclawHookDir()
 	if uninstall {
 		// "removed" only when there was something to remove: a second
 		// uninstall reported taking this directory again, which is a line
@@ -55,24 +55,7 @@ func installOpenClawHooks(exe string, uninstall bool) (installResult, error) {
 		pruneCreatedDir(filepath.Dir(dir))
 		return installResult{Path: dir, Action: "removed"}, nil
 	}
-	noteCreatedDirs(dir)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return installResult{}, err
-	}
-	docPath := filepath.Join(dir, "HOOK.md")
-	oldDoc, err := readConfig(docPath)
-	if err != nil {
-		return installResult{}, err
-	}
-	if _, err := writeIfChanged(docPath, oldDoc, []byte(openclawHookDoc())); err != nil {
-		return installResult{}, err
-	}
-	handlerPath := filepath.Join(dir, "handler.js")
-	oldHandler, err := readConfig(handlerPath)
-	if err != nil {
-		return installResult{}, err
-	}
-	a, err := writeIfChanged(handlerPath, oldHandler, []byte(openclawHandlerJS(exe)))
+	a, err := writeOpenClawHookFiles(exe)
 	if err != nil {
 		return installResult{}, err
 	}
@@ -92,6 +75,35 @@ func installOpenClawHooks(exe string, uninstall bool) (installResult, error) {
 		}
 	}
 	return installResult{Path: dir, Action: a, Note: note}, nil
+}
+
+// openclawHookDir is where the hook pack lives.
+func openclawHookDir() string {
+	return filepath.Join(sources.OpenClawStateDir(), "hooks", openclawHookName)
+}
+
+// writeOpenClawHookFiles writes the hook pack, which is deja's own, and
+// nothing in openclaw.json.
+func writeOpenClawHookFiles(exe string) (string, error) {
+	dir := openclawHookDir()
+	noteCreatedDirs(dir)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", err
+	}
+	docPath := filepath.Join(dir, "HOOK.md")
+	oldDoc, err := readConfig(docPath)
+	if err != nil {
+		return "", err
+	}
+	if _, err := writeIfChanged(docPath, oldDoc, []byte(openclawHookDoc())); err != nil {
+		return "", err
+	}
+	handlerPath := filepath.Join(dir, "handler.js")
+	oldHandler, err := readConfig(handlerPath)
+	if err != nil {
+		return "", err
+	}
+	return writeIfChanged(handlerPath, oldHandler, []byte(openclawHandlerJS(exe)))
 }
 
 func openclawConfigPath() string {

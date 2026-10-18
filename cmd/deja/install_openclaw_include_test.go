@@ -43,9 +43,6 @@ func TestOpenClawInstallRefusesASectionKeptInAnInclude(t *testing.T) {
 			if got := readFile(t, path); got != tc.cfg {
 				t.Errorf("a refused install changed openclaw.json:\n%s", got)
 			}
-			if _, err := os.Stat(openclawPluginDir()); err == nil {
-				t.Error("a refused install wrote the plugin")
-			}
 		})
 	}
 }

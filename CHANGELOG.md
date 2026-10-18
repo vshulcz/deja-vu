@@ -67,7 +67,10 @@ hook stamped one, instead of answering with the conversation asking.
 `deja install openclaw` and `openclaw-auto` refuse a section openclaw.json
 keeps in its own file (`$include`) and say what to add there by hand. Writing
 beside the `$include` made OpenClaw's own edits of that section land in
-openclaw.json instead of the included file.
+openclaw.json instead of the included file. The launcher, plugin and hook pack
+those entries name are written before the refusal, doctor reads the included
+files, and uninstall names the entries it leaves there. An upgrade that moves
+an entry to the launcher no longer says it replaced the same deja.
 
 An OpenClaw sub-agent on a JSONL store stays under the window that spawned
 it after a `/new`; it was filed under the key's newer session.
