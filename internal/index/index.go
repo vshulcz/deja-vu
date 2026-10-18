@@ -729,16 +729,10 @@ import (
 // 76: a goose sub-agent run is read under the session that spawned it, and a
 // goose fork keeps only its own turns; both were indexed the old way
 // (#5232, #5233).
-const version = 76
-const version = 75
-// 73: a Kimi /fork keeps only its own turns under its source, a Kimi
-// sub-agent keeps its task, and a relative Write/Edit path sits under the
-// session's cwd (#5226, #5227, #5228).
-const version = 73
-// 74: a Kimi /fork keeps only its own turns under its source, a Kimi
+// 77: a Kimi /fork keeps only its own turns under its source, a Kimi
 // sub-agent keeps its task and is read by default, and a relative Write/Edit
 // path sits under the session's cwd (#5226, #5227, #5228, #5229).
-const version = 74
+const version = 77
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
