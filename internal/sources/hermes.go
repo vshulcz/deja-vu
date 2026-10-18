@@ -428,7 +428,7 @@ func HermesSessionHead(id string) (model.Session, bool) {
 		return model.Session{}, false
 	}
 	for _, db := range HermesDBs() {
-		m, ok := hermesSessionMetaWhere(db, ` where id = '`+id+`'`)[id]
+		m, ok := hermesSessionMetaWhere(db, ` where id = '`+strings.ReplaceAll(id, "'", "''")+`'`)[id]
 		if !ok {
 			continue
 		}
