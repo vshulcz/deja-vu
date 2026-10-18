@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,6 +28,7 @@ func TestBlameLineGivesAQwenBranchCopyToItsSource(t *testing.T) {
 	if err := os.WriteFile(file, []byte(line+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	jq := func(v string) string { b, _ := json.Marshal(v); return string(b) }
 	const src, branch = "8bde8fee-08e8-4950-b83b-2e23c486eb7d", "42355bb7-67a9-47b4-8436-796a7075a970"
 	records := func(id, forked string) string {
 		ff := ""
@@ -34,10 +36,10 @@ func TestBlameLineGivesAQwenBranchCopyToItsSource(t *testing.T) {
 			ff = `,"forkedFrom":{"sessionId":"` + forked + `"}`
 		}
 		r := func(typ, at, msg string) string {
-			return `{"sessionId":"` + id + `","timestamp":"2026-10-18T06:03:` + at + `Z","type":"` + typ + `","cwd":"` + repo + `"` + ff + `,` + msg + "}\n"
+			return `{"sessionId":"` + id + `","timestamp":"2026-10-18T06:03:` + at + `Z","type":"` + typ + `","cwd":` + jq(repo) + ff + `,` + msg + "}\n"
 		}
 		return r("user", "05.759", `"message":{"role":"user","parts":[{"text":"write parent.txt yourself"}]}`) +
-			r("assistant", "05.848", `"message":{"role":"model","parts":[{"functionCall":{"id":"c1","name":"write_file","args":{"file_path":"`+file+`","content":"`+line+`\n"}}}]}`) +
+			r("assistant", "05.848", `"message":{"role":"model","parts":[{"functionCall":{"id":"c1","name":"write_file","args":{"file_path":`+jq(file)+`,"content":"`+line+`\n"}}}]}`) +
 			r("tool_result", "05.974", `"message":{"role":"user","parts":[{"functionResponse":{"id":"c1","name":"write_file","response":{"output":"ok"}}}]}`)
 	}
 	parse := func(id, body string) model.Session {
