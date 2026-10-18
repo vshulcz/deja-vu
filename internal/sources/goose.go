@@ -1,7 +1,6 @@
 package sources
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -585,40 +584,6 @@ func gooseExitCode(m map[string]any) (int, bool) {
 	return 0, false
 }
 
-// gooseTypeFilter keeps out of recall what goose wrote for itself: Goose
-// stores subagent turns and scheduled runs in the same table as the reader's
-// own sessions. The column exists only on newer stores, and naming it on an
-// older one fails the whole query, so it is probed rather than assumed.
-//
-// Stated as what to exclude rather than what to keep. #2874 named the three
-// types a person reaches goose through today, which fixed the report; written
-// that way round, a type goose adds next is dropped silently and nothing says
-// why — the failure that produced #2873 in the first place. So: a type is a
-// person's work until goose is known to write it for itself.
-func gooseTypeFilter(db string) string {
-	out, err := sqliteOutput(db, "pragma table_info(sessions)")
-	if err != nil || !bytes.Contains(out, []byte("session_type")) {
-		return ""
-	}
-	quoted := make([]string, 0, len(gooseMachineTypes))
-	for _, t := range gooseMachineTypes {
-		quoted = append(quoted, "'"+t+"'")
-	}
-	return " and (s.session_type is null or s.session_type not in (" + strings.Join(quoted, ",") + "))"
-}
-
-// gooseMachineTypes are the session types goose writes for its own work rather
-// than the reader's: a subagent it spawned, spelled both ways across versions,
-// and a run its scheduler started.
-//
-// Read off goose's own enum — user, scheduled, sub_agent, hidden, terminal,
-// gateway, acp — rather than guessed. `hidden` is not on this list although
-// the name suggests it: goose writes it for `goose run --no-session`, the
-// reader working without keeping a session, and for two wizards that store no
-// conversation and fall out of the role join anyway. `gateway` is a person
-// reaching goose from a chat app. Both are history someone made.
-var gooseMachineTypes = []string{"subagent", "sub_agent", "scheduled"}
-
 func ParseGooseDB(db string) ([]model.Session, error) {
 	return parseGooseDBWhere(db, "", 0)
 }
@@ -660,12 +625,23 @@ func parseGooseDBWhere(db, where string, limit int) ([]model.Session, error) {
 	// json_object, one object per row, rather than the sqlite3 shell's -json
 	// formatter: that one is quadratic in the number of characters it escapes,
 	// and a message blob is mostly quotes and backslashes. See opencode.go.
+	g := gooseColumns(db)
+	extra := ""
+	if g.sessionType {
+		extra += `,'session_type',cast(s.session_type as text)`
+	}
+	if g.parent {
+		extra += `,'parent',cast(s.parent_session_id as text)`
+	}
+	if g.messageID {
+		extra += `,'message_id',cast(m.message_id as text)`
+	}
 	q := `select json_object('id',cast(s.id as text),'working_dir',cast(s.working_dir as text),` +
 		`'description',cast(s.description as text),'created_at',s.created_at,'updated_at',s.updated_at,` +
 		`'role',cast(m.role as text),'content_json',cast(m.content_json as text),` +
-		`'created_timestamp',m.created_timestamp) ` +
+		`'created_timestamp',m.created_timestamp` + extra + `) ` +
 		`from sessions s join messages m on m.session_id=s.id ` +
-		`where m.role in ('user','assistant')` + gooseTypeFilter(db) + where +
+		`where m.role in ('user','assistant')` + gooseTypeFilter(g) + where +
 		` order by s.id,m.created_timestamp,m.id` + lim
 	cmd, stopRead := sqliteReadCmd(db, q)
 	defer stopRead()
@@ -673,6 +649,10 @@ func parseGooseDBWhere(db, where string, limit int) ([]model.Session, error) {
 	if err != nil {
 		return nil, err
 	}
+	forks := gooseForks(db, g, where)
+	// copying holds each fork still inside the run of messages it copied: the
+	// copies come first, at the source's own times, and its own turns after.
+	copying := map[string]bool{}
 	by := map[string]*model.Session{}
 	exits := map[string]commandExits{}
 	rows := 0
@@ -703,7 +683,21 @@ func parseGooseDBWhere(db, where string, limit int) ([]model.Session, error) {
 			if s.Project == "" {
 				s.Project = "goose"
 			}
+			if p := str(r["parent"]); p != "" && gooseSubagentType(str(r["session_type"])) {
+				s.Kind, s.Parent = "subagent", p
+			} else if f, ok := forks[id]; ok && f.copied[str(r["message_id"])] {
+				// A fork opens on a copy; a session that shares an id only
+				// further in is not one.
+				s.Kind, s.Parent = "fork", f.source
+				copying[id] = true
+			}
 			by[id] = s
+		}
+		if copying[id] {
+			if forks[id].copied[str(r["message_id"])] {
+				continue
+			}
+			copying[id] = false
 		}
 		role := str(r["role"])
 		t := parseTimeAny(r["created_timestamp"])
@@ -737,6 +731,9 @@ func parseGooseDBWhere(db, where string, limit int) ([]model.Session, error) {
 	}
 	var out []model.Session
 	for _, s := range by {
+		if s.Kind == "subagent" && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
+			s.Messages = KeepSubagentTail(s.Messages)
+		}
 		if len(s.Messages) == 0 {
 			continue
 		}

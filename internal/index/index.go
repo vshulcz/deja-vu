@@ -726,7 +726,10 @@ import (
 // 75: a Grok --fork-session copy keeps only its own records, not the
 // source's it was started from (#5235); forks already indexed keep the copies
 // until a rebuild.
-const version = 75
+// 76: a goose sub-agent run is read under the session that spawned it, and a
+// goose fork keeps only its own turns; both were indexed the old way
+// (#5232, #5233).
+const version = 76
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
