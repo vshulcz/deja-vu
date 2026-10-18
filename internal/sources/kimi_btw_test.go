@@ -60,7 +60,8 @@ func testKimiBtwFork(t *testing.T, btwOrigin string) {
 {"type":"context.append_loop_event","event":{"type":"content.part","part":{"type":"text","text":"it spreads the retries"}},"time":1782295306100}
 {"type":"context.append_loop_event","event":{"type":"step.end","uuid":"b1"},"time":1782295306200}
 `)
-	// A sub-agent the main agent spawned is not a fork and stays out.
+	// A sub-agent the main agent spawned is not a fork: read by default as its
+	// task, answer and changes (#5229), left out under =0.
 	sub := put(filepath.Join(session, "agents", "agent-2", "wire.jsonl"),
 		`{"type":"context.append_message","message":{"role":"user","content":[{"type":"text","text":"search the repo"}]},"time":1782295400000}
 `)
@@ -72,13 +73,13 @@ func testKimiBtwFork(t *testing.T, btwOrigin string) {
 {"type":"context.append_message","message":{"role":"user","content":[{"type":"text","text":"audit the retry path"}],"toolCalls":[],"origin":{"kind":"system_trigger","name":"subagent"}},"time":1782295500000}
 `)
 
-	for _, sw := range []string{"", "1"} {
+	for _, sw := range []string{"", "1", "0"} {
 		t.Setenv("DEJA_INCLUDE_SUBAGENTS", sw)
 		files := strings.Join(KimiSessionFiles(), "\n")
 		if !strings.Contains(files, fork) {
 			t.Errorf("DEJA_INCLUDE_SUBAGENTS=%q: the /btw fork is not read: %s", sw, files)
 		}
-		if strings.Contains(files, sub) != (sw == "1") {
+		if strings.Contains(files, sub) != (sw != "0") {
 			t.Errorf("DEJA_INCLUDE_SUBAGENTS=%q: spawned sub-agent read=%v", sw, strings.Contains(files, sub))
 		}
 		if strings.Contains(files, agentFork) != (sw == "1") {

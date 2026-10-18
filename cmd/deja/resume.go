@@ -328,8 +328,8 @@ func resumeCommand(s model.Session) (string, string, error) {
 	if !resumeIDPattern.MatchString(s.ID) {
 		return "", "", fmt.Errorf("session id %q contains characters deja will not place in a command", digest.Short(s.ID))
 	}
-	// A Kimi or CodeBuddy sub-agent log is a session in deja under
-	// DEJA_INCLUDE_SUBAGENTS=1, a Qwen one by default (#5223), but none of
+	// A CodeBuddy sub-agent log is a session in deja under
+	// DEJA_INCLUDE_SUBAGENTS=1, a Qwen or Kimi one by default (#5223, #5229), but none of
 	// these clients opens one on its own; the
 	// id deja gives it is one they have never seen (#4483).
 	// Muse's child logs are the same: `muse resume <child>` answers "has no

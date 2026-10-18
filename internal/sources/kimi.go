@@ -27,10 +27,10 @@ import (
 // context.append_message records; streamed assistant turns never do — they
 // have to be reconstructed from step.begin → content.part → step.end loop
 // events. Tool calls and their results arrive as loop events too (tool.call,
-// tool.result) and become work records (#655). Only the main agent is indexed
-// by default; think-parts are skipped by design (issue #248), and a sub-agent's
-// agents/<agent-id>/wire.jsonl comes in under DEJA_INCLUDE_SUBAGENTS=1, the
-// same switch as everywhere else (#4483). A /btw side question runs in a fork
+// tool.result) and become work records (#655). A sub-agent's
+// agents/<agent-id>/wire.jsonl is read too, cut to its task, answer and
+// changes unless DEJA_INCLUDE_SUBAGENTS=1 (#4483, #5229); think-parts are
+// skipped by design (issue #248). A /btw side question runs in a fork
 // of the main agent that state.json marks forkedFrom and the btw reminder
 // opens; the person asked it, so it is read whatever the switch says (#4484).
 
@@ -40,8 +40,14 @@ func KimiConfigDir() string { return EnvPath("KIMI_CODE_HOME", filepath.Join(Hom
 
 func KimiRoot() string { return EnvPath("DEJA_KIMI_ROOT", KimiConfigDir()) }
 
+// KimiSessionFiles takes sub-agent logs by default, read the way Claude's and
+// Qwen's are: the task, the last turns and the files the child changed, so
+// blame names the sub-agent that wrote a file (#5229). DEJA_INCLUDE_SUBAGENTS=1
+// keeps the whole run, and an Agent call with fork: true, whose log opens on a
+// copy of main's context; =0 skips them all but a /btw.
 func KimiSessionFiles() []string {
-	subagents := os.Getenv("DEJA_INCLUDE_SUBAGENTS") == "1"
+	whole := os.Getenv("DEJA_INCLUDE_SUBAGENTS") == "1"
+	off := os.Getenv("DEJA_INCLUDE_SUBAGENTS") == "0"
 	forks := map[string]map[string]bool{}
 	return walkFiles(filepath.Join(KimiRoot(), "sessions"), func(p string) bool {
 		if filepath.Base(p) == "wire.jsonl" && filepath.Base(filepath.Dir(p)) == "main" {
@@ -50,7 +56,7 @@ func KimiSessionFiles() []string {
 		if !KimiSubagentFile(p) {
 			return false
 		}
-		if subagents {
+		if whole {
 			return true
 		}
 		dir := kimiSessionDirOf(p)
@@ -59,7 +65,10 @@ func KimiSessionFiles() []string {
 			f = kimiForks(dir)
 			forks[dir] = f
 		}
-		return f[filepath.Base(filepath.Dir(p))] && kimiHasBtw(p)
+		if !f[filepath.Base(filepath.Dir(p))] {
+			return !off
+		}
+		return kimiHasBtw(p)
 	})
 }
 
@@ -97,6 +106,11 @@ func kimiForkFile(p string) bool {
 
 // kimiBtwFile reports whether p is a /btw fork's log.
 func kimiBtwFile(p string) bool { return kimiForkFile(p) && kimiHasBtw(p) }
+
+// KimiSubagentRun reports whether p is a sub-agent run's log, which is read as
+// its task, answer and changes unless DEJA_INCLUDE_SUBAGENTS=1: a sub-agent
+// file that is not a fork of main.
+func KimiSubagentRun(p string) bool { return KimiSubagentFile(p) && !kimiForkFile(p) }
 
 // kimiBtwTrigger reports whether an appended message is the reminder Kimi puts
 // in a fork to open a /btw side question; what comes before it is main's
@@ -593,6 +607,9 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 	} else if fork && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
 		return nil, err
 	}
+	if child && !fork && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
+		s.Messages = KeepSubagentTail(s.Messages)
+	}
 	if len(s.Messages) == 0 {
 		return nil, err
 	}
@@ -612,6 +629,11 @@ func kimiTailResumes(path string, offset int64) bool {
 	// copy; the forked record arriving in the tail sends it back for a whole
 	// read, which drops the copy (#5226).
 	if offset > 0 && kimiTailHasForked(path, offset) {
+		return false
+	}
+	// A sub-agent run is kept as its first turn and its last few, which a tail
+	// read cannot cut the way a whole read does.
+	if offset > 0 && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" && KimiSubagentRun(path) {
 		return false
 	}
 	return kimiResumes(path, offset) && KimiResumes(path, offset)

@@ -16,6 +16,8 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/search.html"></link>
     <updated>2026-10-18T00:00:00Z</updated>
     <summary>deja search syntax: exact and phrase queries, natural language with stop words, fuzzy typo tolerance, confidence tiers, and optional local semantic recall.</summary>
+  </entry>
+  <entry>
     <title>Where Kimi Code stores its history — session format</title>
     <id>https://vshulcz.github.io/deja-vu/registry/kimi.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/kimi.html"></link>
@@ -294,5 +296,12 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-opencode-session-history.html"></link>
     <updated>2026-10-14T00:00:00Z</updated>
     <summary>opencode keeps every session in one SQLite database. What the tables hold, how to remove a session, and why deleting rows does not free the space.</summary>
+  </entry>
+  <entry>
+    <title>Does Claude Code remember previous conversations? — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html"></link>
+    <updated>2026-10-14T00:00:00Z</updated>
+    <summary>Claude Code, Codex, Cursor and Gemini CLI all forget between sessions. What each keeps on disk, what compaction preserves, and how to get history back.</summary>
   </entry>
 </feed>

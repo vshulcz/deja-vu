@@ -16,9 +16,11 @@ reads the file whole when the stream goes on, so the reply is stored once
 (#4445). `tool.result`
 events keep their `output` text under the `tool-output` role, error results
 included. Sub-agent histories under `agents/<agent-id>/wire.jsonl` are read
-only with `DEJA_INCLUDE_SUBAGENTS=1`, each as a session of its own naming the
-parent session (#4483), opening with the task the parent handed it (origin
-`system_trigger`/`subagent`, #5227). A `/btw` side question is the exception: Kimi runs it
+as sessions of their own naming the parent session (#4483), opening with the
+task the parent handed it (origin `system_trigger`/`subagent`, #5227): the
+task, the files it changed and its last turns, so `deja blame` names the
+sub-agent that wrote a file (#5229). `DEJA_INCLUDE_SUBAGENTS=1` takes the whole
+run and `=0` skips them. A `/btw` side question is the exception: Kimi runs it
 in a fork of `main` that `state.json` marks `forkedFrom`, and deja reads that
 fork by default from the btw reminder on (origin `system_trigger`/`btw` in
 0.28, `injection` with variant `btw` from 0.43), so the question and the answer

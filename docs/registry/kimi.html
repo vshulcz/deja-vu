@@ -53,9 +53,11 @@
 <p>(#4445). <code>tool.result</code></p>
 <p>events keep their <code>output</code> text under the <code>tool-output</code> role, error results</p>
 <p>included. Sub-agent histories under <code>agents/&lt;agent-id&gt;/wire.jsonl</code> are read</p>
-<p>only with <code>DEJA_INCLUDE_SUBAGENTS=1</code>, each as a session of its own naming the</p>
-<p>parent session (#4483), opening with the task the parent handed it (origin</p>
-<p><code>system_trigger</code>/<code>subagent</code>, #5227). A <code>/btw</code> side question is the exception: Kimi runs it</p>
+<p>as sessions of their own naming the parent session (#4483), opening with the</p>
+<p>task the parent handed it (origin <code>system_trigger</code>/<code>subagent</code>, #5227): the</p>
+<p>task, the files it changed and its last turns, so <code>deja blame</code> names the</p>
+<p>sub-agent that wrote a file (#5229). <code>DEJA_INCLUDE_SUBAGENTS=1</code> takes the whole</p>
+<p>run and <code>=0</code> skips them. A <code>/btw</code> side question is the exception: Kimi runs it</p>
 <p>in a fork of <code>main</code> that <code>state.json</code> marks <code>forkedFrom</code>, and deja reads that</p>
 <p>fork by default from the btw reminder on (origin <code>system_trigger</code>/<code>btw</code> in</p>
 <p>0.28, <code>injection</code> with variant <code>btw</code> from 0.43), so the question and the answer</p>

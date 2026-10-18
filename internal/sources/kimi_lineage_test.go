@@ -186,3 +186,55 @@ func TestKimiTailWithTheForkedRecordIsReadWhole(t *testing.T) {
 		t.Error("a tail holding the forked record is appended to the stored copy")
 	}
 }
+
+// A line a Kimi sub-agent wrote had no author unless DEJA_INCLUDE_SUBAGENTS=1:
+// the logs were skipped whole (#5229). They come in by default the way
+// Claude's and Qwen's do, as the task, the last turns and every change.
+func TestKimiSubagentIsReadByDefaultAsTaskAnswerAndChanges(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("DEJA_KIMI_ROOT", root)
+	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "")
+	sess := filepath.Join(root, "sessions", "wd_kq-app_ab", "session_p")
+	kimiLineagePut(t, filepath.Join(sess, "state.json"), `{"id":"session_p","version":2,"cwd":"/tmp/proj/kq-app"}`)
+	kimiLineagePut(t, filepath.Join(sess, "agents", "main", "wire.jsonl"), kimiSourceWire)
+	var b strings.Builder
+	b.WriteString(`{"type":"context.append_message","agentId":"agent-0","message":{"role":"user","content":[{"type":"text","text":"Ticket KQC-12 child task: create child2.txt"}],"origin":{"kind":"system_trigger","name":"subagent"}},"time":1792304060100}` + "\n")
+	b.WriteString(`{"type":"context.append_loop_event","agentId":"agent-0","event":{"type":"tool.call","toolCallId":"w1","name":"Write","args":{"path":"child2.txt","content":"the coder sub agent wrote this particular line KQC-12\n"}},"time":1792304060200}` + "\n")
+	for i := 0; i < 8; i++ {
+		b.WriteString(`{"type":"context.append_loop_event","agentId":"agent-0","event":{"type":"tool.result","toolCallId":"r","result":{"output":"middleneedle reading"}},"time":1792304060300}` + "\n")
+	}
+	b.WriteString(`{"type":"context.append_message","agentId":"agent-0","message":{"role":"assistant","content":[{"type":"text","text":"created child2.txt"}]},"time":1792304060400}` + "\n")
+	child := kimiLineagePut(t, filepath.Join(sess, "agents", "agent-0", "wire.jsonl"), b.String())
+
+	found := false
+	for _, f := range KimiSessionFiles() {
+		found = found || f == child
+	}
+	if !found {
+		t.Fatal("the sub-agent log is not read by default")
+	}
+	ss, err := ParseKimiFile(child)
+	if err != nil || len(ss) != 1 {
+		t.Fatalf("parsed %d sessions: %v", len(ss), err)
+	}
+	var roles []string
+	wrote := false
+	for _, m := range ss[0].Messages {
+		roles = append(roles, m.Role)
+		wrote = wrote || m.Role == RoleWrote && strings.HasPrefix(m.Text, "/tmp/proj/kq-app/child2.txt\n")
+	}
+	if ss[0].Messages[0].Role != "user" || !wrote || ss[0].Messages[len(ss[0].Messages)-1].Text != "created child2.txt" {
+		t.Errorf("default read kept %v, want the task, the write and the answer", roles)
+	}
+	if n := len(ss[0].Messages); n > SubagentTailKept+3 {
+		t.Errorf("default read kept %d messages, want the middle cut: %v", n, roles)
+	}
+	// The cut is a whole read's, so a tail is not appended to it.
+	if kimiTailResumes(child, 10) {
+		t.Error("a cut sub-agent log takes a tail read")
+	}
+	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "1")
+	if ss, _ := ParseKimiFile(child); len(ss) != 1 || len(ss[0].Messages) < 12 {
+		t.Errorf("DEJA_INCLUDE_SUBAGENTS=1 does not keep the whole run: %d", len(ss[0].Messages))
+	}
+}
