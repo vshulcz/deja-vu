@@ -67,3 +67,24 @@ export function sessionKey(event, ctx) {
   } catch {}
   return (event && (event.sessionId || event.session_id)) || (ctx && ctx.session && ctx.session.id) || ""
 }
+
+// branchHoldsRecall reports whether what pi sends the model from this branch
+// holds a recall block this package injected: what follows the last
+// compaction, and the entries it kept from before it, firstKeptEntryId on.
+// pi keeps the block as a custom_message and sends it again on a resume, and
+// a fork copies it from its source.
+export function branchHoldsRecall(branch) {
+  const entries = Array.isArray(branch) ? branch : []
+  let keep = ""
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const e = entries[i] || {}
+    if (keep === "" && e.type === "compaction") {
+      keep = String(e.firstKeptEntryId || "")
+      if (!keep) return false
+      continue
+    }
+    if (e.type === "custom_message" && e.customType === "deja-recall") return true
+    if (keep && e.id === keep) return false
+  }
+  return false
+}

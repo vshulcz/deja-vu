@@ -49,7 +49,7 @@ func TestHookContextLeadNamesTheShellWhereThereIsNoTool(t *testing.T) {
 // And the pi extension is the harness that says so.
 func TestPiExtensionSaysItHasNoDejaTool(t *testing.T) {
 	ts := piExtensionTS("/bin/deja")
-	if !strings.Contains(ts, `JSON.stringify({ session_id: sessionID(), cwd: process.cwd(), deja_shell: true })`) {
+	if !strings.Contains(ts, `JSON.stringify({ session_id: sessionID(), parent_session_id: parent, cwd: process.cwd(), deja_shell: true })`) {
 		t.Errorf("the pi extension does not tell hook-context it has no deja tool:\n%s", ts)
 	}
 }
