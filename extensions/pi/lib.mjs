@@ -7,19 +7,22 @@ import { join } from "node:path"
 // installerExtensionPath is where `deja install pi-auto` writes its own
 // extension. pi loads that file and this package side by side, and both
 // would inject recall and register /deja, so this package stands down when
-// the installer's copy is present. Mirrors PiConfigDir() in the installer,
-// which is ~/.pi/agent with no override — pi has none either.
-export function installerExtensionPath(home) {
-  return join(home || "", ".pi", "agent", "extensions", "deja.ts")
+// the installer's copy is present. Mirrors PiConfigDir() in the installer:
+// ~/.pi/agent, or PI_CODING_AGENT_DIR when pi was told to live elsewhere.
+export function installerExtensionPath(home, env = {}) {
+  let dir = String(env.PI_CODING_AGENT_DIR || "")
+  if (dir === "~") dir = home || ""
+  else if (dir.startsWith("~/") || dir.startsWith("~\\")) dir = join(home || "", dir.slice(2))
+  return join(dir || join(home || "", ".pi", "agent"), "extensions", "deja.ts")
 }
 
 // installerExtensionPaths are every place `deja install` writes an extension
 // this package would duplicate. omp runs the same package and the installer
 // writes it under ~/.omp/agent/extensions/deja/index.js, so checking pi's path
 // alone left both running side by side (#3180).
-export function installerExtensionPaths(home) {
+export function installerExtensionPaths(home, env = {}) {
   return [
-    installerExtensionPath(home),
+    installerExtensionPath(home, env),
     join(home || "", ".omp", "agent", "extensions", "deja", "index.js"),
   ]
 }

@@ -72,7 +72,7 @@ export default function (pi: any) {
   // it already does everything below, and two copies would inject the
   // recall twice and register /deja twice.
   try {
-    if (installerExtensionPaths(homedir()).some((p) => existsSync(p))) return;
+    if (installerExtensionPaths(homedir(), process.env).some((p) => existsSync(p))) return;
   } catch {}
 
   // Once per session, not once per process: /new, a resume and a fork keep the

@@ -10,11 +10,12 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
-// pi has no MCP of its own: ~/.pi/agent/mcp.json is read by the
+// pi before 0.99 has no MCP of its own: ~/.pi/agent/mcp.json is read by the
 // pi-mcp-adapter package and nothing else. Without it in pi's packages the
 // server deja declares there never starts, and the row said wired (#4583).
 func TestDoctorPiMCPRowNeedsTheAdapter(t *testing.T) {
 	hermeticEnv(t)
+	fakePiOnPath(t, "@mariozechner/pi-coding-agent", "0.73.1")
 	if _, err := installPiAuto("/bin/deja", false); err != nil {
 		t.Fatalf("install: %v", err)
 	}
@@ -57,6 +58,7 @@ func TestDoctorPiMCPRowNeedsTheAdapter(t *testing.T) {
 // reporting it as done.
 func TestInstallPiSaysTheAdapterIsNeeded(t *testing.T) {
 	hermeticEnv(t)
+	fakePiOnPath(t, "@mariozechner/pi-coding-agent", "0.73.1")
 	r, err := installPiAuto("/bin/deja", false)
 	if err != nil {
 		t.Fatalf("install: %v", err)

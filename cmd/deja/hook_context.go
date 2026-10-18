@@ -629,9 +629,10 @@ func runHookContextMode(dir string, plain, once bool) error {
 		// question, so a first turn with nothing to say has nothing new to say
 		// on the second either.
 		Once bool `json:"deja_once"`
-		// Shell is set by a host with no deja tool for the agent to call: pi
-		// has no MCP of its own, and a lead naming recall_context sent the
-		// model to "Tool recall_context not found" on every first turn (#4584).
+		// Shell is set by a host that cannot count on a deja tool for the
+		// agent to call: pi before 0.99 has no MCP of its own, and a lead
+		// naming recall_context sent the model to "Tool recall_context not
+		// found" on every first turn (#4584).
 		Shell bool `json:"deja_shell"`
 		// The event that fired, when the payload names one. Devin sends
 		// hook_event_name and rejects a reply that names a different event

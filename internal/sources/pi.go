@@ -9,11 +9,32 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
-// PiConfigDir is the native pi coding agent configuration directory.
-func PiConfigDir() string { return filepath.Join(Home(), ".pi", "agent") }
+// PiConfigDir is pi's agent directory. PI_CODING_AGENT_DIR moves it, for
+// pi and for every extension it loads, so deja follows it too: the extension,
+// mcp.json and the sessions all live there.
+func PiConfigDir() string {
+	if p := EnvPath("PI_CODING_AGENT_DIR", ""); p != "" {
+		p = expandTilde(p)
+		if abs, err := filepath.Abs(p); err == nil {
+			p = abs
+		}
+		return p
+	}
+	return filepath.Join(Home(), ".pi", "agent")
+}
 
-// PiRoot returns the session store root, overridable via DEJA_PI_ROOT.
-func PiRoot() string { return EnvPath("DEJA_PI_ROOT", filepath.Join(PiConfigDir(), "sessions")) }
+// PiRoot returns the session store root: DEJA_PI_ROOT, then pi's own
+// PI_CODING_AGENT_SESSION_DIR, then the agent directory's sessions/.
+func PiRoot() string {
+	if p := EnvPath("PI_CODING_AGENT_SESSION_DIR", ""); p != "" {
+		p = expandTilde(p)
+		if abs, err := filepath.Abs(p); err == nil {
+			p = abs
+		}
+		return EnvPath("DEJA_PI_ROOT", p)
+	}
+	return EnvPath("DEJA_PI_ROOT", filepath.Join(PiConfigDir(), "sessions"))
+}
 
 // PiSessionFiles lists transcript files under the pi session root.
 func PiSessionFiles() []string {
