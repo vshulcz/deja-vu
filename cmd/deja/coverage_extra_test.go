@@ -43,6 +43,12 @@ func hermeticEnv(t *testing.T) string {
 	t.Setenv("REASONIX_HOME", "")
 	// Copilot CLI moves its home with COPILOT_HOME, and deja follows it.
 	t.Setenv("COPILOT_HOME", "")
+	// Cline's store moves with its own variables; an unindexed asker is read
+	// off it by id (#5151).
+	t.Setenv("CLINE_DIR", "")
+	t.Setenv("CLINE_DATA_DIR", "")
+	t.Setenv("CLINE_SESSION_DATA_DIR", "")
+	t.Setenv("DEJA_CLINE_ROOT", "")
 	t.Setenv("REASONIX_STATE_HOME", "")
 	t.Setenv("DEJA_REASONIX_ROOT", "")
 	t.Setenv("DEJA_MUSE_ROOTS", "")

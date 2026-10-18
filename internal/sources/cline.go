@@ -196,6 +196,11 @@ type clineManifest struct {
 	Prompt        string `json:"prompt"`
 	Metadata      struct {
 		Title string `json:"title"`
+		// A /fork copies its source's messages, ids and times included, and
+		// names the source here (CLI 3.0.73).
+		Fork struct {
+			ForkedFromSessionID string `json:"forkedFromSessionId"`
+		} `json:"fork"`
 	} `json:"metadata"`
 }
 
@@ -252,6 +257,9 @@ func parseClineModernSession(path string) ([]model.Session, error) {
 			if t := parseTimeAny(firstNonEmpty(man.UpdatedAt, man.EndedAt)); !t.IsZero() {
 				s.Updated = t
 			}
+			if from := strings.TrimSpace(man.Metadata.Fork.ForkedFromSessionID); from != "" && from != id {
+				s.Kind, s.Parent = "fork", from
+			}
 		}
 	}
 	exits := commandExits{}
@@ -289,6 +297,33 @@ func parseClineModernSession(path string) ([]model.Session, error) {
 		return nil, nil
 	}
 	return []model.Session{s}, nil
+}
+
+// ClineForkSession is a Cline CLI /fork read off the store by id, for a fork
+// the index has not seen yet; false for any session that is not a fork.
+// Cline's plugin hands deja the session id and no transcript path, and a
+// fork's first turn comes before any build: its digest and prompt recall led
+// with the session it was forked from (#5151). Only the manifest is read for a
+// session that is not a fork.
+func ClineForkSession(id string) (model.Session, bool) {
+	id = strings.TrimSpace(id)
+	if id == "" || strings.ContainsAny(id, `/\`) || id == "." || id == ".." {
+		return model.Session{}, false
+	}
+	dir := filepath.Join(ClineSessionsDir(), id)
+	b, err := readJSONFile(filepath.Join(dir, id+".json"))
+	if err != nil {
+		return model.Session{}, false
+	}
+	var man clineManifest
+	if json.Unmarshal(b, &man) != nil || strings.TrimSpace(man.Metadata.Fork.ForkedFromSessionID) == "" {
+		return model.Session{}, false
+	}
+	ss, err := parseClineModernSession(filepath.Join(dir, id+".messages.json"))
+	if err != nil || len(ss) == 0 || ss[0].Parent == "" {
+		return model.Session{}, false
+	}
+	return ss[0], true
 }
 
 // clineCompactionSummaries reads the summary a compaction left beside the
