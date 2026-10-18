@@ -773,6 +773,14 @@ func ProjectRelevantSkipping(dir string, projects, terms []string, n int, skip m
 // bridged retry answered instead: that path ranks on neighbouring terms, so a
 // count of the question's own words would be a claim about the wrong query.
 func ProjectRelevantNaming(dir string, projects, terms []string, n int, skip map[string]bool) ([]model.Session, []int, []int, []int, map[string]float64, error) {
+	return ProjectRelevantNamingCut(dir, projects, terms, n, skip, nil)
+}
+
+// ProjectRelevantNamingCut is ProjectRelevantNaming with the records cut keeps
+// out, by session id, left out of what is served: a fork asking gets its
+// source from the fork point on, and a source whose only match was in the
+// turns the fork copied is not served at all (#5335).
+func ProjectRelevantNamingCut(dir string, projects, terms []string, n int, skip map[string]bool, cut map[string]time.Time) ([]model.Session, []int, []int, []int, map[string]float64, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -808,9 +816,12 @@ func ProjectRelevantNaming(dir string, projects, terms []string, n int, skip map
 	if len(metas) == 0 {
 		return nil, nil, nil, nil, nil, nil
 	}
-	out, err := sessionsServable(dir, metas, query.Options{})
+	out, err := sessionsServable(dir, metas, query.Options{ExcludeUpTo: cut})
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
+	}
+	if len(cut) > 0 {
+		out = stillMatching(out, terms, cut)
 	}
 	// Paired by identity, not by position. The counts belong to the ranking,
 	// which works on metas; the sessions come back from sessionsServable, which
@@ -822,6 +833,30 @@ func ProjectRelevantNaming(dir string, projects, terms []string, n int, skip map
 		naming, _ = countsFor(out, metas, naming, naming)
 	}
 	return out, matched, strong, naming, idf, nil
+}
+
+// stillMatching drops a cut session none of whose served messages holds a
+// query term: it ranked on the turns the cut left out.
+func stillMatching(ss []model.Session, terms []string, cut map[string]time.Time) []model.Session {
+	out := ss[:0]
+	for _, s := range ss {
+		if _, ok := cut[s.ID]; !ok || holdsAnyTerm(s, terms) {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func holdsAnyTerm(s model.Session, terms []string) bool {
+	for _, m := range s.Messages {
+		text := strings.ToLower(m.Text)
+		for _, t := range terms {
+			if t != "" && strings.Contains(text, strings.ToLower(t)) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // countsFor re-pairs the per-session counts with the sessions that survived
@@ -2124,7 +2159,7 @@ func sessionsServable(dir string, metas []SessionMeta, o query.Options) ([]model
 	for _, s := range all {
 		kept := s.Messages[:0]
 		for _, m := range s.Messages {
-			if recordServable(m.Role, o) {
+			if recordServable(m.Role, o) && !o.CutRecord(s.ID, m.Time) {
 				kept = append(kept, m)
 			}
 		}
@@ -3095,7 +3130,7 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 	by := map[string]*model.Session{}
 	add := func(r Record) {
 		meta, ok := m.Sessions[r.Key]
-		if !ok || o.ExcludeSessions[meta.ID] {
+		if !ok || o.ExcludeSessions[meta.ID] || o.CutRecord(meta.ID, r.Time) {
 			return
 		}
 		if o.Harness != "" && !harnessMatches(meta.Harness, o.Harness) {

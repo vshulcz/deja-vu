@@ -1512,7 +1512,8 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 			return text, 1, id.size, []string{id.session}, nil, nil
 		}
 	}
-	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: liveLineage(dir)}
+	live, cut := liveLineageCut(dir)
+	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: live, ExcludeUpTo: cut}
 	stale, err := index.EnsureForSearchStale(dir, o, mcpProgress())
 	if err != nil {
 		return "", 0, 0, nil, nil, err
@@ -1578,6 +1579,9 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 		}
 	}
 	o = o2
+	// A fork quoting the turns its source holds said everything twice, the
+	// same as on the search screen (#5320, #5335).
+	hits = dropCopiedHits(dir, hits)
 	if len(hits) == 0 {
 		return emptyRecallAnswerPolicy(dir, q, policyHidden), 0, 0, nil, nil, nil
 	}
@@ -1797,7 +1801,7 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 				// recall_context makes for the same reason (#1011).
 				whole := h.Session
 				if full, ok, ferr := wholeSessionForMCP(dir, whole); ferr == nil && ok {
-					whole = full
+					whole = cutSession(full, o)
 				}
 				// Not the line already shown as this hit's answer. The answer
 				// under the excerpt and the newest conclusion are usually the
@@ -2094,7 +2098,8 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 			return text, 1, id.size, []string{id.session}, nil, id.note, nil
 		}
 	}
-	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: liveLineage(dir)}
+	live, cut := liveLineageCut(dir)
+	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: live, ExcludeUpTo: cut}
 	if stale, err := index.EnsureForSearchStale(dir, o, mcpProgress()); err != nil {
 		return "", 0, 0, nil, nil, "", err
 	} else if stale {
@@ -2132,6 +2137,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 		// here too, or recall_context leaks a withheld imported session.
 		hits, _ = policyFilterHitsCounted(policy.ActivationMCP, hits)
 	}
+	hits = dropCopiedHits(dir, hits)
 	if len(hits) == 0 {
 		// The words found nothing, so try the string as an id. Every line deja
 		// prints carries one, and `deja ctx <id>` opens the session it names —
@@ -2154,7 +2160,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 	// reached the agent, the same gap CLI ctx closed (#1011).
 	whole := hits[0].Session
 	if full, ok, ferr := wholeSessionForMCP(dir, whole); ferr == nil && ok {
-		whole = full
+		whole = cutSession(full, o)
 	}
 	var b bytes.Buffer
 	search.PrintContext(&b, whole, q)

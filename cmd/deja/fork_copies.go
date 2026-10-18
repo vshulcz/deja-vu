@@ -2,6 +2,7 @@ package main
 
 import (
 	"strconv"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -71,17 +72,38 @@ func dropCopiedHits(dir string, hits []search.Hit) []search.Hit {
 	if len(hits) < 2 {
 		return hits
 	}
-	ss := make([]model.Session, len(hits))
-	for i := range hits {
-		ss[i] = hits[i].Session
+	// A copy's matched turns are a subset of its source's, so both hold the
+	// copy's first matched turn: only hits that open alike are compared, which
+	// keeps a broad answer of many hits from comparing every pair.
+	groups := map[string][]int{}
+	for i, h := range hits {
+		for _, m := range h.Session.Messages {
+			if !m.Time.IsZero() {
+				k := h.Session.Harness + "\x00" + m.Role + "\x00" + strconv.FormatInt(m.Time.UnixNano(), 10) + "\x00" + m.Text
+				groups[k] = append(groups[k], i)
+				break
+			}
+		}
 	}
-	copies := copySources(dir, ss, func(src, c model.Session) bool { return heldTurns(src, c) })
-	if len(copies) == 0 {
+	drop := map[int]bool{}
+	for _, at := range groups {
+		if len(at) < 2 {
+			continue
+		}
+		ss := make([]model.Session, len(at))
+		for j, i := range at {
+			ss[j] = hits[i].Session
+		}
+		for j := range copySources(dir, ss, func(src, c model.Session) bool { return heldTurns(src, c) }) {
+			drop[at[j]] = true
+		}
+	}
+	if len(drop) == 0 {
 		return hits
 	}
-	kept := hits[:0]
+	kept := make([]search.Hit, 0, len(hits)-len(drop))
 	for i, h := range hits {
-		if _, copied := copies[i]; !copied {
+		if !drop[i] {
 			kept = append(kept, h)
 		}
 	}
@@ -133,4 +155,26 @@ func lastTitle(s model.Session) string {
 		return s.Title
 	}
 	return firstUserTitle(s)
+}
+
+// cutSession leaves out the records o.ExcludeUpTo keeps out of a session read
+// whole: a fork asking gets its source from the fork point on (#5335).
+func cutSession(s model.Session, o search.Options) model.Session {
+	return cutSessionAt(s, o.ExcludeUpTo)
+}
+
+// cutSessionAt is cutSession with the cuts by session id.
+func cutSessionAt(s model.Session, cut map[string]time.Time) model.Session {
+	at, ok := cut[s.ID]
+	if !ok {
+		return s
+	}
+	kept := make([]model.Message, 0, len(s.Messages))
+	for _, m := range s.Messages {
+		if m.Time.After(at) {
+			kept = append(kept, m)
+		}
+	}
+	s.Messages = kept
+	return s
 }

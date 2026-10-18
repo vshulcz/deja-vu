@@ -54,6 +54,10 @@ type Options struct {
 	// the way out, so a tier that would otherwise be filled by the caller's own
 	// session escalates to the next one instead of answering nothing.
 	ExcludeSessions map[string]bool
+	// ExcludeUpTo keeps out a session's records at or before the time, by id:
+	// the turns a fork already holds as its copy of a source that went on
+	// after it (#5335).
+	ExcludeUpTo map[string]time.Time
 	// Session narrows a search to one session, by the id prefix a hit prints.
 	// Finding the session by what was said and then searching inside it — for a
 	// command, a file, an error — took reopening the transcript by hand (#1321).
@@ -282,4 +286,12 @@ func Tokens(s string) []string {
 		out = append(out, tok)
 	}
 	return out
+}
+
+// CutRecord reports whether a record of session id at t is one ExcludeUpTo
+// keeps out. An untimed record of a cut session goes too: nothing places it
+// after the fork.
+func (o Options) CutRecord(id string, t time.Time) bool {
+	cut, ok := o.ExcludeUpTo[id]
+	return ok && !t.After(cut)
 }

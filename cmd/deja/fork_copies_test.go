@@ -13,6 +13,12 @@ import (
 // records, same uuids and times, plus two turns of its own, into a sandbox
 // Claude store. marked adds the forkedFrom a /branch writes.
 func claudeForkStore(t *testing.T, marked bool) string {
+	return claudeForkStoreWent(t, marked, false)
+}
+
+// claudeForkStoreWent is claudeForkStore with the source going on after the
+// fork when went is set, with a turn the fork never saw.
+func claudeForkStoreWent(t *testing.T, marked, went bool) string {
 	t.Helper()
 	home := hermeticEnv(t)
 	dir := filepath.Join(t.TempDir(), "idx")
@@ -56,7 +62,12 @@ func claudeForkStore(t *testing.T, marked bool) string {
 	if marked {
 		from = src
 	}
-	writeFile(t, filepath.Join(proj, src+".jsonl"), copied(src, ""))
+	srcBody := copied(src, "")
+	if went {
+		srcBody += rec(src, "s1", "user", "back on the source: the ospreyquill cache drops writes", 900, "") +
+			rec(src, "s2", "assistant", "ospreyquill flushes now, zebracount untouched", 905, "")
+	}
+	writeFile(t, filepath.Join(proj, src+".jsonl"), srcBody)
 	writeFile(t, filepath.Join(proj, fork+".jsonl"), copied(fork, from)+
 		rec(fork, "f1", "user", "now look at the importer", 600, "")+
 		rec(fork, "f2", "assistant", "the importer reads the whole file", 605, ""))
@@ -100,5 +111,34 @@ func TestSearchAndLastDoNotRepeatAForksCopiedTurns(t *testing.T) {
 		if !strings.Contains(forkRow, "fork of aaaaaaaa") {
 			t.Errorf("marked=%v: last does not mark the fork:\n%s", marked, out)
 		}
+	}
+}
+
+// A copy dropped after the cap still took a slot and counted: --limit 1
+// said "showing 1 of 2" with the second a fork repeating the first (#5335).
+// And MCP recall listed the fork beside its source (#5320).
+func TestACappedSearchAndMCPRecallDropAForkBeforeCounting(t *testing.T) {
+	dir := claudeForkStore(t, false)
+	out := captureStdout(t, func() {
+		if err := cmdSearch(dir, []string{"zebracount", "--limit", "1", "--json"}, ""); err != nil {
+			t.Fatal(err)
+		}
+	})
+	var got struct {
+		Total  int  `json:"total"`
+		Capped bool `json:"capped"`
+	}
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("%v:\n%s", err, out)
+	}
+	if got.Total != 1 || got.Capped {
+		t.Errorf("total %d capped %v, want 1 and not capped:\n%s", got.Total, got.Capped, out)
+	}
+	rec, err := callMCPTool(dir, "recall", json.RawMessage(`{"query":"zebracount"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(rec, "ffffffff") || !strings.Contains(rec, "aaaaaaaa") {
+		t.Errorf("MCP recall listed the fork's copy beside its source:\n%s", rec)
 	}
 }

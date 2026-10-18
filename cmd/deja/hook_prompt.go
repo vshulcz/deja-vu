@@ -320,11 +320,11 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	}
 	// The asker and what counts as it: a spawn's parent, a sub-agent's parent,
 	// the sub-agents it spawned (#4548), a fork's source (#4549).
-	self := askerLineage(dir, input.SessionID, input.TranscriptPath, input.ParentSessionID)
+	self, cut := askerLineageCut(dir, input.SessionID, input.TranscriptPath, input.ParentSessionID)
 	for id := range self {
 		skip[id] = true
 	}
-	ranked, matched, strong, naming, idfOf, err := index.ProjectRelevantNaming(dir, names, terms, prompt.Candidates, skip)
+	ranked, matched, strong, naming, idfOf, err := index.ProjectRelevantNamingCut(dir, names, terms, prompt.Candidates, skip, cut)
 	// The rule every other surface applies: a promoted note goes in front of
 	// the transcript it was distilled from. This hook ranks sessions and never
 	// builds a search.Hit, so it had no note-over-source rule at all and the
@@ -475,8 +475,8 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// the same thing several times, which is exactly when the answer is
 	// further down than the window reached.
 	if len(ss) < 2 && crowdedOut > 0 {
-		wider, wmatched, wstrong, wnaming, _, werr := index.ProjectRelevantNaming(
-			dir, names, terms, prompt.Candidates*widerWindow, skip)
+		wider, wmatched, wstrong, wnaming, _, werr := index.ProjectRelevantNamingCut(
+			dir, names, terms, prompt.Candidates*widerWindow, skip, cut)
 		if werr == nil {
 			pick(wider, wmatched, wstrong, wnaming)
 		}

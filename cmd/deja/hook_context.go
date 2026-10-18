@@ -735,14 +735,25 @@ func runHookContextMode(dir string, plain, once bool) error {
 	// The session asking is left out of its own digest (#4199), except after a
 	// compaction: the lead there points the agent at that session's id.
 	var self []string
-	for id := range askerLineage(dir, input.SessionID, input.TranscriptPath, input.ParentSessionID) {
+	lineage, cut := askerLineageCut(dir, input.SessionID, input.TranscriptPath, input.ParentSessionID)
+	for id := range lineage {
 		if input.Source == "compact" && id == input.SessionID {
 			continue
 		}
 		self = append(self, id)
 	}
 	sort.Strings(self)
-	digest, sessions, raw, taskMatched, withheld, servedIDs, servedProjects := cachedHookDigestFor(dir, hookProjectPath(input.CWD, input.WorkspaceRoots), self...)
+	var digest string
+	var sessions, withheld int
+	var raw int64
+	var taskMatched, servedIDs, servedProjects []string
+	if len(cut) > 0 {
+		// A fork whose source went on: cut per asker, so not from the cache.
+		e := hookDigestBuild(dir, hookProjectPath(input.CWD, input.WorkspaceRoots), self, false, cut)
+		digest, sessions, raw, taskMatched, withheld, servedIDs, servedProjects = e.Digest, e.Sessions, e.Raw, e.TaskMatched, e.Withheld, e.IDs, e.Projects
+	} else {
+		digest, sessions, raw, taskMatched, withheld, servedIDs, servedProjects = cachedHookDigestFor(dir, hookProjectPath(input.CWD, input.WorkspaceRoots), self...)
+	}
 	if digest == "" {
 		// No session from this project, which is the usual state in a new
 		// checkout — and exactly where knowing what this machine is missing
@@ -1360,14 +1371,14 @@ func hookDigestResult(dir string) (string, int, int64, []string, int, []string, 
 // environment, where a project deja itself had written stayed for every later
 // call in the process (#2182, #2185).
 func hookDigestResultFor(dir, fromPayload string, exclude ...string) (string, int, int64, []string, int, []string, []string) {
-	e := hookDigestBuild(dir, fromPayload, exclude, false)
+	e := hookDigestBuild(dir, fromPayload, exclude, false, nil)
 	return e.Digest, e.Sessions, e.Raw, e.TaskMatched, e.Withheld, e.IDs, e.Projects
 }
 
 // hookDigestEntryFor is the digest as the cache keeps it: with every session
 // it serves, and as it reads with each of them left out.
 func hookDigestEntryFor(dir, fromPayload string) hookCacheEntry {
-	return hookDigestBuild(dir, fromPayload, nil, true)
+	return hookDigestBuild(dir, fromPayload, nil, true, nil)
 }
 
 // withProjectsOf adds the projects of sessions already chosen to a name list,
@@ -1392,7 +1403,9 @@ func withProjectsOf(names []string, ss []model.Session) []string {
 // cache hit from a rebuild.
 var hookDigestRenders atomic.Int64
 
-func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool) (entry hookCacheEntry) {
+// cut leaves out each session's records at or before its time, the turns a
+// fork asking already holds as its copy of a source that went on (#5335).
+func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, cut map[string]time.Time) (entry hookCacheEntry) {
 	withheld := 0
 	defer func() { _ = recover() }()
 	trace := os.Getenv("DEJA_TRACE") == "1"
@@ -1527,6 +1540,12 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool) (
 	render := func(exclude []string) hookCacheEntry {
 		hookDigestRenders.Add(1)
 		ss := slices.DeleteFunc(slices.Clone(ss), func(s model.Session) bool { return s.ID != "" && slices.Contains(exclude, s.ID) })
+		if len(cut) > 0 {
+			ss = slices.DeleteFunc(ss, func(s model.Session) bool { return len(cutSessionAt(s, cut).Messages) == 0 })
+			for i := range ss {
+				ss[i] = cutSessionAt(ss[i], cut)
+			}
+		}
 		// A subagent run is the parent's work seen from inside, and what it says
 		// on its own is the process talk a spawned agent produces — "Sending
 		// verdict", "Worktrees cleaned up". Indexing already treats these runs as

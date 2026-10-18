@@ -507,9 +507,19 @@ type Results struct {
 
 // RunDetailed is Run plus the numbers the cap would otherwise hide.
 func RunDetailed(ss []model.Session, o Options) (Results, error) {
+	return RunDetailedKeeping(ss, o, nil)
+}
+
+// RunDetailedKeeping is RunDetailed with keep applied to the ranked hits
+// before the cap, so what it drops neither fills a slot nor counts in the
+// total.
+func RunDetailedKeeping(ss []model.Session, o Options, keep func([]Hit) []Hit) (Results, error) {
 	hits, err := runScored(ss, o)
 	if err != nil {
 		return Results{}, err
+	}
+	if keep != nil {
+		hits = keep(hits)
 	}
 	r := Results{Hits: hits, Total: len(hits), Tier: setTier(o)}
 	r.Hits, r.Capped = CapHits(hits, o.Limit, o.All)

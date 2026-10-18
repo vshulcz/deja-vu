@@ -41,7 +41,8 @@ import (
 // Read off the manifest, which recall has already loaded: no record is read,
 // so the cost is one pass over the sessions in memory.
 func Lineage(dir string, ids map[string]bool, heads ...model.Session) map[string]bool {
-	return lineage(dir, ids, heads, nil)
+	out, _ := lineage(dir, ids, heads, nil)
+	return out
 }
 
 // LineageWhole is Lineage with askers the index does not hold yet read off
@@ -51,10 +52,11 @@ func Lineage(dir string, ids map[string]bool, heads ...model.Session) map[string
 // The record is matched on role and time: the text the index keeps is redacted
 // and the asker's is not.
 func LineageWhole(dir string, ids map[string]bool, wholes ...model.Session) map[string]bool {
-	return lineage(dir, ids, nil, wholes)
+	out, _ := lineage(dir, ids, nil, wholes)
+	return out
 }
 
-func lineage(dir string, ids map[string]bool, heads, wholes []model.Session) map[string]bool {
+func lineage(dir string, ids map[string]bool, heads, wholes []model.Session) (map[string]bool, map[string]time.Time) {
 	out := make(map[string]bool, len(ids))
 	for id := range ids {
 		if id != "" {
@@ -62,7 +64,7 @@ func lineage(dir string, ids map[string]bool, heads, wholes []model.Session) map
 		}
 	}
 	if len(out) == 0 {
-		return nil
+		return nil, nil
 	}
 	// A head is an asker the index has not seen yet, so it is the newer of any
 	// session it opens alike with: everything indexed it matches, it copied.
@@ -114,7 +116,7 @@ func lineage(dir string, ids map[string]bool, heads, wholes []model.Session) map
 		for _, wf := range wholeForks {
 			out[wf.parent] = true
 		}
-		return out
+		return out, nil
 	}
 	for _, meta := range m.Sessions {
 		if ids[meta.ID] {
@@ -185,7 +187,51 @@ func lineage(dir string, ids map[string]bool, heads, wholes []model.Session) map
 			}
 		}
 	}
-	return out
+	// What stays on the page and shares turns with an asker is cut at the
+	// last turn they share: a source that went on after the fork, a sibling
+	// fork. The asker holds everything up to there already (#5335).
+	cuts := map[string]time.Time{}
+	cutAt := func(id string, at time.Time) {
+		if at.IsZero() || out[id] {
+			return
+		}
+		if at.After(cuts[id]) {
+			cuts[id] = at
+		}
+	}
+	shared := sharedRecords(dir, m)
+	for _, f := range metaForks {
+		if p, ok := parentMeta(f.Harness, f.Parent); ok && !out[p.ID] {
+			at := shared(f, p)
+			if at.IsZero() {
+				// Copied with new times: what the source held when the
+				// fork started is what it copied.
+				at = startedAt(dir, m, f)
+			}
+			cutAt(p.ID, at)
+		}
+	}
+	for _, wf := range wholeForks {
+		if p, ok := parentMeta(wf.harness, wf.parent); ok && !out[p.ID] {
+			at := wholeShared(dir, m, wf.turns, p)
+			if at.IsZero() {
+				at = wf.started
+			}
+			cutAt(p.ID, at)
+		}
+	}
+	for _, meta := range m.Sessions {
+		if meta.Opening == 0 || out[meta.ID] {
+			continue
+		}
+		for _, a := range askers[meta.Opening] {
+			cutAt(meta.ID, shared(a, meta))
+		}
+		for _, w := range wholeOpenings[meta.Opening] {
+			cutAt(meta.ID, wholeShared(dir, m, w, meta))
+		}
+	}
+	return out, cuts
 }
 
 // heldRecords answers whether asker holds other's last record, the same role,

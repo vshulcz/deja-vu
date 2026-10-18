@@ -25,7 +25,13 @@ func seedGaveUpSessions(t *testing.T) string {
 			b.WriteString(`{"type":"` + role + `","sessionId":"` + id + `","timestamp":"` + stamp +
 				`","message":{"role":"` + role + `","content":"` + text + `"}}` + "\n")
 		}
-		turn("user", "the flimsyshard exporter retries too hard", "2026-03-01T10:00:00Z")
+		// Each opens at its own second: two sessions holding the same records
+		// at the same times are a fork and its source, and recall shows one.
+		opened := "2026-03-01T10:00:00Z"
+		if filler > 2 {
+			opened = "2026-03-01T10:00:01Z"
+		}
+		turn("user", "the flimsyshard exporter retries too hard", opened)
 		turn("assistant", "we backed out the jitter change and capped flimsyshard retries at three instead",
 			"2026-03-01T10:01:00Z")
 		for i := range filler {

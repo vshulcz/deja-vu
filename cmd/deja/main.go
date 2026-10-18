@@ -1695,6 +1695,11 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 		fmt.Fprintln(os.Stderr, "deja: matched by error signature; showing the sessions that hit it")
 		hits = search.ErrorHits(ss)
 		o.Total, o.Capped = result.Total, result.Capped
+		errAt := len(hits)
+		hits = dropCopiedHits(dir, hits)
+		if d := errAt - len(hits); o.Total >= d {
+			o.Total -= d
+		}
 		if o.Total < len(hits) {
 			o.Total = len(hits)
 		}
@@ -1705,6 +1710,9 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 		o.Strict = result.Strict
 		fmt.Fprintln(os.Stderr, relevanceLead(result.Strict))
 		hits = markStrictHits(search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(o.Query), result.TermIDF), result)
+		relAt := len(hits)
+		hits = dropCopiedHits(dir, hits)
+		relAt -= len(hits)
 		// This tier ranks and truncates inside retrieval, so counting the
 		// sessions it handed back measures its window, not the match: every
 		// query deeper than the window reported the window's own size and
@@ -1714,6 +1722,9 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 		// its quotes, served here under the relevance label) never truncated,
 		// so what arrived is the whole of it.
 		o.Total, o.Capped = result.Total, result.Capped
+		if o.Total >= relAt {
+			o.Total -= relAt
+		}
 		if o.Total < len(hits) {
 			o.Total = len(hits)
 		}
@@ -1724,7 +1735,9 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 		// RunDetailed rather than Run: the JSON envelope reports how many
 		// sessions matched before the cap, and that is not recoverable from a
 		// list the cap has already trimmed.
-		detailed, rerr := search.RunDetailed(ss, o)
+		// Copies go before the cap: a fork repeating its source took a slot
+		// and counted in the total (#5320, #5335).
+		detailed, rerr := search.RunDetailedKeeping(ss, o, func(hs []search.Hit) []search.Hit { return dropCopiedHits(dir, hs) })
 		if rerr != nil {
 			// "run:" is the name of a function, and the reader of this line is
 			// someone who mistyped a pattern (#2286). The only error that
@@ -1751,12 +1764,14 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 		hits, _ = policyFilterHitsCounted(policy.ActivationSearch, hits)
 	}
 	o.Semantic = semantic
+	// What the semantic tier and reranking brought in, uncapped: a fork's hit
+	// quoting its source again goes here too (#5320).
+	hits = dropCopiedHits(dir, hits)
 	// Policy scoping, reranking and the semantic tier all run after the cap, so
 	// the pre-cap count can no longer describe what is being returned. When
 	// nothing was capped the honest total is simply what survived; when it was,
 	// there is no way to know how the filters would have treated the hidden
 	// ones, so the pre-cap figure stands and `capped` says to distrust it.
-	hits = dropCopiedHits(dir, hits)
 	attachLifecycles(dir, hits)
 	demoted := demoteRejected(hits)
 	attachMoved(hits)

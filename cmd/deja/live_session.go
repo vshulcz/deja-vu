@@ -236,6 +236,13 @@ func liveSessionIDs(dir string) map[string]bool {
 // fork's first turn comes before any build has seen it, and MCP answered it
 // with its source (#5129).
 func liveLineage(dir string) map[string]bool {
+	out, _ := liveLineageCut(dir)
+	return out
+}
+
+// liveLineageCut is liveLineage with the cut LineageCut gives each session it
+// leaves on the page that a live session shares turns with (#5335).
+func liveLineageCut(dir string) (map[string]bool, map[string]time.Time) {
 	ids := liveSessionIDs(dir)
 	var wholes []model.Session
 	for id := range ids {
@@ -246,7 +253,7 @@ func liveLineage(dir string) map[string]bool {
 			wholes = append(wholes, w)
 		}
 	}
-	return index.LineageWhole(dir, ids, wholes...)
+	return index.LineageWholeCut(dir, ids, wholes...)
 }
 
 // liveWholes keeps each unindexed live session read for this process. What a
@@ -310,6 +317,12 @@ func liveWhole(id string) (model.Session, bool) {
 // store: a fork's first prompts come before any build has seen it, and they
 // were the ones answered with the fork's source.
 func askerLineage(dir, asker, transcript string, ids ...string) map[string]bool {
+	out, _ := askerLineageCut(dir, asker, transcript, ids...)
+	return out
+}
+
+// askerLineageCut is askerLineage with the cuts LineageCut gives (#5335).
+func askerLineageCut(dir, asker, transcript string, ids ...string) (map[string]bool, map[string]time.Time) {
 	set := map[string]bool{}
 	for _, id := range append([]string{asker}, ids...) {
 		if id = strings.TrimSpace(id); id == "" {
@@ -327,10 +340,10 @@ func askerLineage(dir, asker, transcript string, ids ...string) map[string]bool 
 		} else if w, ok := sources.ClineForkSession(asker); ok {
 			// Read whole, so the copy it holds is left out and a sibling
 			// fork that went on past it is not (#5151).
-			return index.LineageWhole(dir, set, lineageOnly(w))
+			return index.LineageWholeCut(dir, set, lineageOnly(w))
 		}
 	}
-	return index.Lineage(dir, set, heads...)
+	return index.LineageCut(dir, set, heads...)
 }
 
 // askerHead is the session read off its own store: the first records of the

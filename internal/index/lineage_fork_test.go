@@ -98,3 +98,27 @@ func TestLineageWalksThroughAForkAndAnUnindexedParent(t *testing.T) {
 		}
 	}
 }
+
+// A source left on the page for a fork is cut at the last turn they share,
+// and one left out is not cut at all (#5335).
+func TestLineageCutsASourceThatWentOnAtTheForkPoint(t *testing.T) {
+	dir, turn := forkLineageStore(t)
+	shared := turn("assistant", "", 1).Time
+	for _, c := range []struct {
+		name string
+		ids  map[string]bool
+	}{{"declared fork f", map[string]bool{"f": true}}, {"undeclared copy u", map[string]bool{"u": true}}} {
+		out, cut := LineageCut(dir, c.ids)
+		if out["a"] || !cut["a"].Equal(shared) {
+			t.Errorf("%s: a hidden %v, cut %v, want kept and cut at %v", c.name, out["a"], cut["a"], shared)
+		}
+	}
+	w := model.Session{Harness: "cline", ID: "w", Kind: "fork", Parent: "a",
+		Messages: []model.Message{turn("user", "the retry loop spins", 0), turn("assistant", "backoff never resets", 1), turn("user", "whole fork work", 11)}}
+	if _, cut := LineageWholeCut(dir, map[string]bool{"w": true}, w); !cut["a"].Equal(shared) {
+		t.Errorf("whole fork: cut %v, want %v", cut["a"], shared)
+	}
+	if out, cut := LineageCut(dir, map[string]bool{"g": true}); !out["a"] || !cut["a"].IsZero() {
+		t.Errorf("g holds a's end: a hidden %v, cut %v, want hidden and no cut", out["a"], cut["a"])
+	}
+}
