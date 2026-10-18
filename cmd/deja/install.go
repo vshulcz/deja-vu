@@ -58,10 +58,12 @@ func runInstall(dir string, args []string, uninstall bool) error {
 	// What this run reads is what its writes are checked against (#4561).
 	readBytesMu.Lock()
 	readBytes = map[string][]byte{}
+	runFirstSeen = map[string]*runSeen{}
 	readBytesMu.Unlock()
 	defer func() {
 		readBytesMu.Lock()
 		readBytes = nil
+		runFirstSeen = nil
 		readBytesMu.Unlock()
 	}()
 	removingWiring = uninstall
@@ -2171,6 +2173,7 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 	}
 	// The next write to this file is checked against the read it is built from.
 	forgetRead(given)
+	noteRunWrite(given, next)
 	if len(old) == 0 {
 		return "created", nil
 	}
