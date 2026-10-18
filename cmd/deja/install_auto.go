@@ -1271,6 +1271,13 @@ func kimiHooksUpdate(path, exe string, uninstall bool) (old, next []byte, err er
 // rides the next prompt. The payload names only the session, hence --harness.
 // SessionEnd: the session is over, so its live stamp goes, and the next
 // session's MCP recall can answer with it now rather than in twenty minutes.
+// Kimi Code 2.2 fires it only when a session is closed, and `kimi -p` exits
+// without closing one, so a finished print run stayed hidden for the whole
+// window (#5145). Stop ends every turn, print mode's last one included, so it
+// clears the stamp too; the next turn's UserPromptSubmit stamps again. A turn
+// that opens without a prompt — a background task's notice — or one a
+// sub-agent's Stop cleared mid-way is stamped again by PreToolUse just before
+// it calls deja's MCP tool, so recall still leaves the asking session out.
 // A failed command's fix pair: Kimi fires PostToolUse(Failure) and drops what
 // they print, so the pair waits for the session's next prompt
 // (hook_deferred.go). The payload is snake_case with the shell tool named
@@ -1287,6 +1294,8 @@ var kimiHooks = []struct {
 	{"UserPromptSubmit", "", []string{"hook-prompt", "--plain"}},
 	{"PreCompact", "", []string{"hook-precompact", "--harness", "kimi"}},
 	{"SessionEnd", "", []string{"hook-session-end"}},
+	{"Stop", "", []string{"hook-session-end"}},
+	{"PreToolUse", "^mcp__deja__", []string{"hook-mcp-call"}},
 	{"PostToolUse", "Bash", []string{"hook-tool-after", "--defer"}},
 	{"PostToolUseFailure", "Bash", []string{"hook-tool-after", "--defer"}},
 	{"PreToolUse", "^(Edit|Write)$", []string{"hook-tool", "--defer"}},
@@ -1297,8 +1306,8 @@ var kimiHooks = []struct {
 // line from any path, timeout 30, nothing else. Kimi Code's login and logout
 // write config.toml back from its parsed form, which keeps the tables and
 // drops every comment, the markers with them. Keyed on the marker alone,
-// uninstall then left all seven hooks running a deja-hook it had deleted, and
-// install added seven more beside them. A rule the reader wrote around deja's
+// uninstall then left every hook running a deja-hook it had deleted, and
+// install added a second set beside them. A rule the reader wrote around deja's
 // hook differs in one of those and stays.
 func removeUnmarkedKimiDejaHooks(s, exe string) string {
 	lines := strings.Split(s, "\n")

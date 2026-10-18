@@ -87,7 +87,7 @@ func endSessionLive(dir, id string) {
 }
 
 // runHookSessionEnd is the SessionEnd hook of Claude Code, Codex, Cursor CLI,
-// Gemini CLI, Qwen Code, Kimi Code, Grok and goose, and what the plugins of pi,
+// Gemini CLI, Qwen Code, Kimi Code (its Stop too), Grok and goose, and what the plugins of pi,
 // omp, prime-agent, Senpi, gjc, OpenClaw, Hermes, Cline and dsh run when their
 // host says a session is over. It says nothing back — none of them reads a
 // reply to it — and it runs even with recall off: clearing a stamp never hands
@@ -133,10 +133,12 @@ func refreshDigestAfterSession(dir, cwd string) {
 	requestHookRefresh(dir, cwd)
 }
 
-// runHookMCPCall is Copilot CLI's preMcpToolCall hook: it stamps the session
-// that is about to call an MCP tool, so recall reads a stamp made a moment ago
-// rather than one from a sessionStart that may be past the window (#4551). It
-// prints nothing: Copilot reads a reply as the request's new _meta.
+// runHookMCPCall is Copilot CLI's preMcpToolCall hook, and Kimi Code's
+// PreToolUse on deja's own MCP tool: it stamps the session that is about to
+// call an MCP tool, so recall reads a stamp made a moment ago rather than one
+// from a sessionStart that may be past the window (#4551), or one Kimi's Stop
+// already cleared (#5145). It prints nothing: Copilot reads a reply as the
+// request's new _meta, and Kimi reads an empty one as allow.
 func runHookMCPCall(dir string, stdin io.Reader, _ io.Writer) {
 	var input precompactHookInput
 	_ = json.Unmarshal(readHookPayload(stdin, hookStdinWait), &input)
