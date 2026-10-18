@@ -35,6 +35,9 @@ func TestAiderConfigRoundTrips(t *testing.T) {
 		{"bare key, comment", "read:  # none yet\nmodel: x\n"},
 		{"bare key last, no final newline", "model: x\nread:"},
 		{"empty item (#5206)", "read:\n  -\nmodel: x\n"},
+		{"empty item at column 0", "read:\n-\nmodel: x\n"},
+		// The reader's own file, not deja's (#5209).
+		{"own file named like deja's", "read:\n  - my-aider-context.md\nmodel: x\n"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			home := t.TempDir()
@@ -241,5 +244,17 @@ func TestAiderEmptyKeyRecordFollowsTheFile(t *testing.T) {
 	run(true)
 	if got := aiderConf(t, home); got != "read:  # mine\nmodel: x\n" {
 		t.Errorf("commented key not kept: %q", got)
+	}
+}
+
+// An empty item at column 0 sets the list's indent too: deja's entry at two
+// spaces beside it is a YAML parse error, and aider would not start.
+func TestAiderEntryFollowsAnEmptyItemsIndent(t *testing.T) {
+	got, err := addAiderReadEntry("read:\n-\nmodel: x\n", "/x/aider-context.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "read:\n- /x/aider-context.md\n-\nmodel: x\n"; got != want {
+		t.Errorf("got %q, want %q", got, want)
 	}
 }

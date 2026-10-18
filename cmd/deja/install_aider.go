@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -183,7 +184,7 @@ func addAiderReadEntry(s, ctx string) (string, error) {
 		return s + "read:\n" + entry, nil
 	}
 	// The reader's own indent, which may be none: one list cannot mix two.
-	if line := s[at:]; strings.HasPrefix(strings.TrimLeft(line, " "), "- ") {
+	if line, _, _ := strings.Cut(s[at:], "\n"); strings.HasPrefix(strings.TrimLeft(line, " "), "- ") || strings.TrimSpace(line) == "-" {
 		entry = line[:len(line)-len(strings.TrimLeft(line, " "))] + "- " + ctx + "\n"
 	}
 	return s[:at] + entry + s[at:], nil
@@ -303,7 +304,7 @@ func aiderConfReadsContext(s string) bool {
 			}
 			continue
 		}
-		if inRead && strings.HasPrefix(t, "- ") && strings.Contains(t, "aider-context.md") {
+		if inRead && aiderContextItem(t) {
 			return true
 		}
 	}
@@ -333,6 +334,22 @@ func aiderBareRead(s string) string {
 	return ""
 }
 
+// aiderContextItem reports whether a block-list line names deja's context
+// file: the file's own name, in any directory deja's config has lived in. A
+// substring match took the reader's my-aider-context.md for deja's and
+// install deleted it (#5209).
+func aiderContextItem(line string) bool {
+	item, ok := strings.CutPrefix(strings.TrimSpace(line), "- ")
+	if !ok {
+		return false
+	}
+	if i := strings.Index(item, " #"); i >= 0 {
+		item = item[:i]
+	}
+	item = strings.Trim(strings.TrimSpace(item), `"'`)
+	return path.Base(strings.ReplaceAll(item, `\`, "/")) == "aider-context.md"
+}
+
 // removeAiderReadEntry takes deja's entry out of an LF config, and puts back
 // was — the read: line install promoted — when the list left is exactly what
 // that line held. It reports whether it did.
@@ -340,7 +357,7 @@ func removeAiderReadEntry(s, was string) (string, bool) {
 	lines := strings.Split(s, "\n")
 	out := make([]string, 0, len(lines))
 	for _, l := range lines {
-		if strings.HasPrefix(strings.TrimSpace(l), "- ") && strings.Contains(l, "aider-context.md") {
+		if aiderContextItem(l) {
 			continue
 		}
 		out = append(out, l)
