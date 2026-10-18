@@ -90,6 +90,20 @@ func jsonStatuslineUpdate(path string, keys []string, entry map[string]any, unin
 	before, _ := json.Marshal(root)
 	cmd, _ := entry["command"].(string)
 	last := keys[len(keys)-1]
+	// A null parent in a commented file: the text writer would put a second
+	// key of that name beside it, and the reader's null wins the read.
+	if jsonc && !uninstall {
+		cur := root
+		for _, k := range keys[:len(keys)-1] {
+			v, held := cur[k]
+			if held && v == nil {
+				return installResult{}, fmt.Errorf("%s: %s is null, so there is nowhere to put the status line", path, k)
+			}
+			if cur, _ = v.(map[string]any); cur == nil {
+				break
+			}
+		}
+	}
 	parent := statuslineAt(root, keys, !uninstall)
 	if parent == nil {
 		if uninstall {
@@ -98,6 +112,10 @@ func jsonStatuslineUpdate(path string, keys []string, entry map[string]any, unin
 		return installResult{}, fmt.Errorf("%s: %s is not an object, so there is nowhere to put the status line", path, strings.Join(keys[:len(keys)-1], "."))
 	}
 	existing, _ := parent[last].(map[string]any)
+	// `"statusLine": null` is a key the text writer has to write over, not
+	// beside: the last of two keys wins the read.
+	_, held := parent[last]
+	nullHeld := held && parent[last] == nil
 	kind := hookNotDejas
 	if existing != nil {
 		kind = hookCommandKindOf(existing["command"], cmd)
@@ -125,7 +143,7 @@ func jsonStatuslineUpdate(path string, keys []string, entry map[string]any, unin
 		parent[last] = entry
 	}
 	if jsonc {
-		return installResult{}, fmt.Errorf("%s: deja cannot edit the status line in a file that carries comments — set it by hand, or take the comments out", path)
+		return writeJSONCStatusline(path, old, root, keys, entry, uninstall, nullHeld)
 	}
 	if !write {
 		if after, _ := json.Marshal(root); string(after) == string(before) {
@@ -140,6 +158,68 @@ func jsonStatuslineUpdate(path string, keys []string, entry map[string]any, unin
 	next = append(next, '\n')
 	a, err := writeIfChanged(path, old, next)
 	return installResult{Path: path, Action: a}, err
+}
+
+// writeJSONCStatusline makes the edit decided above as text, for a settings
+// file that carries comments or trailing commas. Copilot CLI, Cursor and the
+// rest read theirs as JSONC, and refusing one failed the whole -auto target
+// after its MCP entry and hooks were written, or, on the way out, left a status
+// line running a deja-hook uninstall had just removed.
+//
+// root is the file as it will read afterwards: on uninstall, a parent the
+// status line was the only thing in is already gone from it, and goes from
+// the text too.
+func writeJSONCStatusline(path string, old []byte, root map[string]any, keys []string, entry map[string]any, uninstall, nullHeld bool) (installResult, error) {
+	text := lfText(old)
+	parents := keys[:len(keys)-1]
+	last := keys[len(keys)-1]
+	var next string
+	var err error
+	if uninstall {
+		dropFrom := len(parents)
+		for i := range parents {
+			if statuslineAt(root, keys[:i+2], false) == nil {
+				dropFrom = i
+				break
+			}
+		}
+		next, err = jsoncSetEntry(text, joinBlockKey(parents), last, "", true, dropFrom)
+	} else {
+		var body string
+		if body, err = jsoncEntryText(entry); err != nil {
+			return installResult{}, err
+		}
+		if nullHeld {
+			next, err = jsoncReplaceNull(text, parents, last, body)
+		} else {
+			next, err = jsoncSetEntry(text, joinBlockKey(parents), last, body, false, len(parents))
+		}
+	}
+	if err != nil {
+		return installResult{}, configParseError(path, err)
+	}
+	a, err := writeIfChanged(path, old, []byte(next))
+	return installResult{Path: path, Action: a}, err
+}
+
+// jsoncReplaceNull writes body over a key's null value under parents.
+func jsoncReplaceNull(text string, parents []string, key, body string) (string, error) {
+	open := zedTopLevelOpen(text)
+	if open < 0 {
+		return "", fmt.Errorf("does not look like a settings object")
+	}
+	block := &zedSpan{keyStart: open, valueOpen: open, valueEnd: zedObjectEnd(text, open)}
+	if len(parents) > 0 {
+		block, _ = walkJSONCKeys(text, open, parents)
+	}
+	if block == nil || block.valueEnd < 0 {
+		return "", fmt.Errorf("cannot find %q to set", strings.Join(append(append([]string{}, parents...), key), "."))
+	}
+	at := jsoncScalarValue(text, block, key)
+	if at == nil || at[0] == at[1] {
+		return "", fmt.Errorf("cannot find %q to set", strings.Join(append(append([]string{}, parents...), key), "."))
+	}
+	return text[:at[0]] + entryAtDepth(body, len(parents)) + text[at[1]:], nil
 }
 
 // installTOMLStatusline writes the [table] block in a TOML config, with the

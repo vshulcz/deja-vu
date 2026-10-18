@@ -240,6 +240,14 @@ func planCopilotHooks(path, exe string, uninstall bool) (copilotHooksPlan, error
 		}
 	}
 	before, _ := json.Marshal(root)
+	// The block as it reads now, apart from root, which the edit below
+	// changes in place: the text path compares the two.
+	var was map[string]any
+	if jsonc {
+		var orig map[string]any
+		_ = json.Unmarshal(source, &orig)
+		was, _ = orig["hooks"].(map[string]any)
+	}
 	hooks, isMap := root["hooks"].(map[string]any)
 	if _, has := root["hooks"]; has && !isMap {
 		if uninstall {
@@ -275,7 +283,18 @@ func planCopilotHooks(path, exe string, uninstall bool) (copilotHooksPlan, error
 		return unchanged, nil
 	}
 	if jsonc {
-		return copilotHooksPlan{}, fmt.Errorf("%s: deja cannot edit hooks in a file that carries comments — add or remove the hook by hand, or take the comments out", path)
+		// Copilot reads its settings as JSONC. Taking deja's entries out is
+		// done as text, so the reader's comments stay; writing them into a
+		// commented file is not needed — deja's own hook file is the one it
+		// writes, and that one is plain JSON.
+		if !uninstall {
+			return copilotHooksPlan{}, fmt.Errorf("%s: deja cannot add hooks to a file that carries comments — add the hook by hand, or take the comments out", path)
+		}
+		text, err := dropCopilotHooksJSONC(lfText(body), was, root)
+		if err != nil {
+			return copilotHooksPlan{}, configParseError(path, err)
+		}
+		return copilotHooksPlan{path: path, old: old, next: append([]byte(header), text...)}, nil
 	}
 	next, err := marshalConfigLike(body, root)
 	if err != nil {
@@ -394,4 +413,46 @@ func copilotHooksOffIn() string {
 func copilotPowerShellCommand(exe string, args ...string) string {
 	p := strings.ReplaceAll(exe, `\`, "/")
 	return strings.Join(append([]string{"& '" + strings.ReplaceAll(p, "'", "''") + "'"}, args...), " ")
+}
+
+// dropCopilotHooksJSONC takes deja's entries out of a commented hooks block:
+// an event left with nothing goes, one that keeps the reader's entries has its
+// list written again, and the block goes when deja is what added it. was is the
+// block as it read before, root the file as it reads after.
+func dropCopilotHooksJSONC(text string, was, root map[string]any) (string, error) {
+	hooks, _ := root["hooks"].(map[string]any)
+	if hooks == nil {
+		return jsoncRemoveKey(text, "hooks", "", 0)
+	}
+	for event, list := range was {
+		now, kept := hooks[event]
+		switch {
+		case !kept:
+			next, err := jsoncRemoveKey(text, "hooks", event, 1)
+			if err != nil {
+				return "", err
+			}
+			text = next
+		case !reflect.DeepEqual(now, list):
+			open := zedTopLevelOpen(text)
+			block, _ := walkJSONCKeys(text, open, []string{"hooks"})
+			if block == nil {
+				return "", fmt.Errorf("no hooks block to edit")
+			}
+			at := jsoncListValue(text, block, event)
+			if at == nil {
+				return "", fmt.Errorf("hooks.%s is not a list deja can edit", event)
+			}
+			// The reader's entries are written again, unescaped: a
+			// `&&` in their command stays readable.
+			var b bytes.Buffer
+			enc := json.NewEncoder(&b)
+			enc.SetEscapeHTML(false)
+			if err := enc.Encode(now); err != nil {
+				return "", err
+			}
+			text = text[:at[0]] + strings.TrimSuffix(b.String(), "\n") + text[at[1]:]
+		}
+	}
+	return text, nil
 }
