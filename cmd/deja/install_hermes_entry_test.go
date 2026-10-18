@@ -156,7 +156,8 @@ func TestInstallHermesFindsItsKeyHoweverItIsSpelled(t *testing.T) {
 // the file left as it was.
 func TestInstallHermesRefusesAnEntryItCannotEditInPlace(t *testing.T) {
 	for name, cfg := range map[string]string{
-		"flow elsewhere":       "mcp_servers:\n  deja: {command: /old/deja, args: [mcp]}\n",
+		"flow unread":          "mcp_servers:\n  deja: {command /old/deja}\n",
+		"flow key twice":       "mcp_servers:\n  deja: {command: /bin/deja, command: /old/deja, args: [mcp]}\n",
 		"nested bracket wrap":  "mcp_servers:\n  deja:\n    command: /old/deja\n    args: [serve, [x]\n    ]\n",
 		"quoted wrap":          "mcp_servers:\n  deja:\n    command: \"/old\n    /deja\"\n    args: [mcp]\n",
 		"other key wraps":      "mcp_servers:\n  deja:\n    env: {A: 1,\nB: 2}\n    command: /old/deja\n    args: [serve]\n",
@@ -347,6 +348,51 @@ func TestUninstallHermesRefusesAnEntryItWouldCutInTwo(t *testing.T) {
 			}
 			if b, _ := os.ReadFile(path); string(b) != cfg {
 				t.Fatalf("a refused uninstall wrote:\n%s", b)
+			}
+		})
+	}
+}
+
+// A one-line entry that needs an edit is written out as a block and edited
+// like one: naming the binary, it kept deja mcp on Hermes' stripped env and
+// the default index, and install said "unchanged" (#5338).
+func TestInstallHermesWritesAOneLineEntryOutAsABlock(t *testing.T) {
+	for name, tc := range map[string]struct{ entry, want string }{
+		"the binary": {"  deja: {command: /bin/deja, args: [mcp], timeout: 30, env: {A: \"x, y\"}}   # mine\n",
+			"  deja: # mine\n    command: \"@L@\"\n    args: [mcp]\n    timeout: 30\n    env: {A: \"x, y\"}\n"},
+		"elsewhere": {"  deja: {enabled: no, command: /old/deja, args: [serve]}\n",
+			"  deja:\n    enabled: no\n    command: \"@L@\"\n    args:\n      - mcp\n"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cfg := "model: x\nmcp_servers:\n" + tc.entry + "  other:\n    command: x\n"
+			path := hermesTestConfig(t, cfg)
+			res, err := installHermesMCP("/bin/deja", false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			b, _ := os.ReadFile(path)
+			if name == "the binary" && hookExeInConfigs("/bin/deja") == "/bin/deja" {
+				// No launcher (Windows): the entry already runs what install writes.
+				if string(b) != cfg {
+					t.Fatalf("install rewrote an entry that runs this binary:\n%s", b)
+				}
+				return
+			}
+			if want := "model: x\nmcp_servers:\n" + hermesL(tc.want) + "  other:\n    command: x\n"; string(b) != want {
+				t.Fatalf("install gave\n%s\nwant\n%s", b, want)
+			}
+			if !strings.Contains(res.Note, hermesFlowRewrittenNote) {
+				t.Errorf("install did not say it rewrote the line: %q", res.Note)
+			}
+			if strings.Contains(name, "elsewhere") != strings.Contains(res.Note, switchedOffNote) {
+				t.Errorf("switched-off note wrong: %q", res.Note)
+			}
+			res, err = installHermesMCP("/bin/deja", false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if again, _ := os.ReadFile(path); string(again) != string(b) || strings.Contains(res.Note, hermesFlowRewrittenNote) {
+				t.Fatalf("a second install changed it again (%q):\n%s", res.Note, again)
 			}
 		})
 	}

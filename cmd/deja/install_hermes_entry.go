@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strings"
 
@@ -276,11 +275,9 @@ func hermesMCPOffNote(p string) string {
 // there is no entry to edit; a flow entry that runs something else, and a
 // key written twice, are refused rather than guessed at.
 //
-// keep are other commands a flow entry may already name and stay as it is:
-// the binary itself, when exe is the launcher. A one-line entry cannot be
-// moved to the launcher in place, and refusing it would break an install that
-// worked before (#5269).
-func hermesEditEntry(lines []string, exe string, keep ...string) (out []string, note string, done bool, err error) {
+// A one-line entry that needs an edit is first written out as a block with
+// the same keys, values and comment, in their order (#5338).
+func hermesEditEntry(lines []string, exe string) (out []string, note string, done bool, err error) {
 	entries := hermesDejaEntries(lines)
 	if len(entries) > 1 {
 		// The shape #5172 left: deja's own block above the reader's. Drop
@@ -319,10 +316,21 @@ func hermesEditEntry(lines []string, exe string, keep ...string) (out []string, 
 			// Nothing of the reader's in it: written as deja writes it.
 			return nil, "", false, nil
 		}
-		if ok && (yamlScalar(m["command"]) == exe || slices.Contains(keep, yamlScalar(m["command"]))) && hermesArgsSay(hermesArgs(nil, hermesField{value: m["args"]})) {
+		if ok && yamlScalar(m["command"]) == exe && hermesArgsSay(hermesArgs(nil, hermesField{value: m["args"]})) {
 			return lines, note, true, nil
 		}
-		return nil, "", false, fmt.Errorf("mcp_servers.deja is written on one line (%s), and deja edits only the block form — rewrite it that way and run this again", strings.TrimSpace(lines[e.start]))
+		// Anything else is edited the way the block form is, once written as
+		// one: a one-line entry naming the binary kept deja mcp on Hermes'
+		// stripped env, away from DEJA_INDEX_DIR (#5338).
+		block, ok := hermesFlowToBlock(lines, e)
+		if !ok {
+			return nil, "", false, fmt.Errorf("mcp_servers.deja is written on one line (%s), and deja edits only the block form — rewrite it that way and run this again", strings.TrimSpace(lines[e.start]))
+		}
+		out, n, done, err := hermesEditEntry(block, exe)
+		if err == nil && done {
+			n = strings.TrimPrefix(n+"; ", "; ") + hermesFlowRewrittenNote
+		}
+		return out, n, done, err
 	}
 	if !hermesSpanPlain(lines, e.start, e.end) {
 		return nil, "", false, fmt.Errorf("mcp_servers.deja holds a value that runs over several lines (a flow collection or a quoted string), and deja edits only one-line values — rewrite it that way and run this again")
@@ -496,4 +504,55 @@ func yamlDejaEntriesRemovable(text, topKey string) error {
 		}
 	}
 	return nil
+}
+
+// hermesFlowRewrittenNote is what install says after writing a one-line entry
+// out as a block: the reader's file changed shape, not only its command.
+const hermesFlowRewrittenNote = "wrote mcp_servers.deja out as a block to point it at the launcher, which carries DEJA_INDEX_DIR; its keys and comment are kept"
+
+// hermesFlowToBlock is lines with the one-line entry e, `deja: {k: v, …}`,
+// written as the block Hermes reads the same: each key on its own line in
+// order, the values as written, a trailing comment after `deja:`. false when
+// the value is not a flow mapping deja reads whole, names a key twice, or
+// lines other than comments follow it in its span.
+func hermesFlowToBlock(lines []string, e hermesEntry) ([]string, bool) {
+	v := e.inline
+	if !strings.HasPrefix(v, "{") || !strings.HasSuffix(v, "}") {
+		return nil, false
+	}
+	for _, l := range lines[e.start+1 : e.end] {
+		if t := strings.TrimSpace(l); t != "" && !strings.HasPrefix(t, "#") {
+			return nil, false
+		}
+	}
+	key, rest, ok := hermesKeyLine(lines[e.start])
+	if !ok {
+		return nil, false
+	}
+	head := e.pad + strings.TrimSpace(key) + ":"
+	if c := strings.TrimSpace(rest[len(stripYAMLComment(rest)):]); c != "" {
+		head += " " + c
+	}
+	indent := e.pad + e.pad
+	if indent == "" {
+		indent = "  "
+	}
+	block := []string{head}
+	seen := map[string]bool{}
+	for _, pair := range hermesFlowSplit(v[1 : len(v)-1]) {
+		k, val, ok := hermesKeyLine(pair)
+		// A key written twice is the reader's to settle, not deja's to pick.
+		if !ok || seen[hermesKeyName(k)] {
+			return nil, false
+		}
+		seen[hermesKeyName(k)] = true
+		line := indent + strings.TrimSpace(k) + ":"
+		if val = strings.TrimSpace(val); val != "" {
+			line += " " + val
+		}
+		block = append(block, line)
+	}
+	out := append([]string(nil), lines[:e.start]...)
+	out = append(out, block...)
+	return append(out, lines[e.start+1:]...), true
 }

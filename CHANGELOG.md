@@ -53,7 +53,8 @@ Kimi included. pi 0.99 and later need no MCP adapter, and
 OpenClaw, Codex, Hermes and Grok start MCP servers with only a few
 variables, so `deja mcp` there lost a moved index (`DEJA_INDEX_DIR`,
 `XDG_CACHE_HOME`), built a second one and answered recall with the asking
-session. Their MCP entries now name the launcher the hooks run through.
+session. Their MCP entries now name the launcher the hooks run through; a
+one-line Hermes entry is written out as a block with its keys and comment kept.
 
 An OpenClaw heartbeat poll no longer stamps the main DM as in use, which hid
 it from recall in the user's other sessions for twenty minutes after each poll,

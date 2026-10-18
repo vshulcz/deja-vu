@@ -381,7 +381,6 @@ func installHermesMCP(exe string, uninstall bool) (installResult, error) {
 	}
 	// Hermes passes its MCP servers only PATH, HOME, XDG_* and a few more, so
 	// the entry names the launcher, which carries DEJA_INDEX_DIR (#5269).
-	bin := exe
 	if !uninstall {
 		exe = hookExeFor(exe, false)
 	}
@@ -398,7 +397,7 @@ func installHermesMCP(exe string, uninstall bool) (installResult, error) {
 		if _, err := yamlTopKeyEnd(doc, "mcp_servers:"); err != nil {
 			return installResult{}, fmt.Errorf("%s: %w", path, err)
 		}
-		lines, n, done, err := hermesEditEntry(strings.Split(next, "\n"), exe, bin)
+		lines, n, done, err := hermesEditEntry(strings.Split(next, "\n"), exe)
 		if err != nil {
 			return installResult{}, fmt.Errorf("%s: %w", path, err)
 		}
