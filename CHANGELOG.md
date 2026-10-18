@@ -65,6 +65,10 @@ cannot give them a digest or per-prompt recall; install and doctor now say
 so. MCP recall there leaves out the session OpenClaw wrote to last when no
 hook stamped one, instead of answering with the conversation asking.
 
+`deja resume` and `deja handoff --to openclaw` open OpenClaw's gateway TUI
+(`openclaw tui`) when a gateway answers, where deja's plugin and hooks run,
+and say so when only the hookless local mode (`openclaw chat`) is there.
+
 `deja install openclaw` and `openclaw-auto` refuse a section openclaw.json
 keeps in its own file (`$include`) and say what to add there by hand. Writing
 beside the `$include` made OpenClaw's own edits of that section land in

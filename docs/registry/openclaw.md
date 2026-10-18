@@ -72,7 +72,12 @@ sub-agent's task are dropped from the turn. Verified against 2026.10.4.
   is refused rather than written beside, with what to add there by hand: a
   key next to the `$include` makes OpenClaw's own edits of that section land
   in openclaw.json.
-- **Resume**: `openclaw chat --session <key>`. OpenClaw addresses a
+- **Resume**: `openclaw tui --session <key>` when a gateway answers where the
+  TUI connects (`OPENCLAW_GATEWAY_URL`, `gateway.remote.url` in remote mode,
+  else 127.0.0.1 on `gateway.port`, default 18789), so the plugin and hooks
+  run there; otherwise `openclaw chat --session <key>` and a line saying the
+  local mode has no digest or recall (#5337). Both take the same key: one TUI,
+  one key resolver (2026.7.1-2). OpenClaw addresses a
   conversation by key (`agent:<id>:<name>`); the uuid its transcript is named
   after opens nothing. Legacy JSONL sessions use `sessions.json` beside the
   transcripts; SQLite sessions use the store's current-session mapping. An
@@ -83,6 +88,7 @@ sub-agent's task are dropped from the turn. Verified against 2026.10.4.
   by synthetic database tests. A spawned sub-agent has a key of its own
   (`agent:main:subagent:<id>`), and `openclaw chat --session` on it loads the
   child's history (2026.10.4, #5303).
-- **Handoff**: exec, `openclaw chat --message <prompt>` sends it once the TUI connects.
+- **Handoff**: exec, `openclaw tui --message <prompt>` (or `openclaw chat` with
+  no gateway, said so) sends it once the TUI connects.
 
 **Last verified:** 2026-09-02

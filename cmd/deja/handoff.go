@@ -99,6 +99,11 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 		age = humanAge(time.Since(s.Updated))
 	}
 	fmt.Fprintf(os.Stderr, "deja: handing off %s · %s · %s · %s\n", s.Harness, s.Project, digest.Short(s.ID), age)
+	if target == "openclaw" {
+		if _, note := openclawTUI(); note != "" {
+			fmt.Fprintf(os.Stderr, "deja: %s\n", note)
+		}
+	}
 	if !s.Updated.IsZero() && time.Since(s.Updated) > 7*24*time.Hour && pickedOnScreen == nil {
 		// The line above already says how old; saying it again here read as
 		// two warnings. One picked on the screen was picked knowing its age.
@@ -388,9 +393,10 @@ func handoffCommand(target, prompt string) ([]string, bool) {
 		// `hermes chat -q` is a single query, the only prompt entry (0.17.0).
 		return []string{"hermes", "chat", "-q", prompt}, true
 	case "openclaw":
-		// `openclaw chat` is the TUI; --message is sent after it connects
-		// (2026.7.1-2).
-		return []string{"openclaw", "chat", "--message", prompt}, true
+		// The TUI; --message is sent after it connects (2026.7.1-2). The
+		// gateway's when one answers, so the plugin and hooks run (#5337).
+		sub, _ := openclawTUI()
+		return []string{"openclaw", sub, "--message", prompt}, true
 	case "deepseek":
 		// The headless profile answers one task and exits (dsh 0.1.1-rc.2).
 		return []string{"dsh", "--profile", "headless", prompt}, true

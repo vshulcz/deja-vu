@@ -113,8 +113,13 @@
 <p>key next to the <code>$include</code> makes OpenClaw&#39;s own edits of that section land</p>
 <p>in openclaw.json.</p>
 <ul>
-<li><strong>Resume</strong>: <code>openclaw chat --session &lt;key&gt;</code>. OpenClaw addresses a</li>
+<li><strong>Resume</strong>: <code>openclaw tui --session &lt;key&gt;</code> when a gateway answers where the</li>
 </ul>
+<p>TUI connects (<code>OPENCLAW_GATEWAY_URL</code>, <code>gateway.remote.url</code> in remote mode,</p>
+<p>else 127.0.0.1 on <code>gateway.port</code>, default 18789), so the plugin and hooks</p>
+<p>run there; otherwise <code>openclaw chat --session &lt;key&gt;</code> and a line saying the</p>
+<p>local mode has no digest or recall (#5337). Both take the same key: one TUI,</p>
+<p>one key resolver (2026.7.1-2). OpenClaw addresses a</p>
 <p>conversation by key (<code>agent:&lt;id&gt;:&lt;name&gt;</code>); the uuid its transcript is named</p>
 <p>after opens nothing. Legacy JSONL sessions use <code>sessions.json</code> beside the</p>
 <p>transcripts; SQLite sessions use the store&#39;s current-session mapping. An</p>
@@ -126,8 +131,9 @@
 <p>(<code>agent:main:subagent:&lt;id&gt;</code>), and <code>openclaw chat --session</code> on it loads the</p>
 <p>child&#39;s history (2026.10.4, #5303).</p>
 <ul>
-<li><strong>Handoff</strong>: exec, <code>openclaw chat --message &lt;prompt&gt;</code> sends it once the TUI connects.</li>
+<li><strong>Handoff</strong>: exec, <code>openclaw tui --message &lt;prompt&gt;</code> (or <code>openclaw chat</code> with</li>
 </ul>
+<p>no gateway, said so) sends it once the TUI connects.</p>
 <p><strong>Last verified:</strong> 2026-09-02</p>
 
 <hr>

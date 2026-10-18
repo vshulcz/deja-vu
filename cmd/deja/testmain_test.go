@@ -21,6 +21,7 @@ func TestMain(m *testing.M) {
 		main()
 		os.Exit(0)
 	}
+	openclawGatewayUp = func() bool { return false }
 	root, err := os.MkdirTemp("", "deja-command-test-")
 	if err != nil {
 		panic(err)
@@ -50,6 +51,10 @@ func TestMain(m *testing.M) {
 		// Set by grok on the hooks it runs, where hook-context and
 		// hook-prompt answer nothing (#4588).
 		"GROK_HOOK_EVENT": "",
+		// Where `openclaw tui` connects; a gateway on the developer's
+		// machine would turn resume's `openclaw chat` into `openclaw tui`.
+		"OPENCLAW_GATEWAY_URL":  "",
+		"OPENCLAW_GATEWAY_PORT": "",
 		// Set by CodeWhale on the hooks it runs; a suite run from inside a
 		// CodeWhale session would hand them to hook-codewhale.
 		"DEEPSEEK_SESSION_ID":   "",

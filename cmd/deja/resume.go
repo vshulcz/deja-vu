@@ -100,6 +100,9 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 	if note := resumeDirGoneNote(s, dir); note != "" {
 		fmt.Fprintf(os.Stderr, "deja: %s\n", note)
 	}
+	if s.Harness == "openclaw" && strings.HasPrefix(cmdline, "openclaw chat ") {
+		fmt.Fprintf(os.Stderr, "deja: %s\n", openclawLocalOnlyNote())
+	}
 	if !doExec {
 		if note := resumeCaveats[s.Harness]; note != "" {
 			// stderr, so `$(deja resume …)` still composes: the command is the
@@ -712,7 +715,8 @@ func resumeCommand(s model.Session) (string, string, error) {
 		if !openclawKeyPattern.MatchString(key) {
 			return "", "", fmt.Errorf("session key %q contains characters deja will not place in a command", key)
 		}
-		return "", "openclaw chat --session " + key, nil
+		sub, _ := openclawTUI()
+		return "", "openclaw " + sub + " --session " + key, nil
 	case "kimi":
 		// In the directory the session was created in: Kimi Code refuses a
 		// session from anywhere else (#4274), so a workDir that is gone is
