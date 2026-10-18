@@ -867,7 +867,7 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 	case "cursor":
 		return installCursor(exe, uninstall)
 	case "cursor-auto":
-		if err := readableStrictJSON(filepath.Join(sources.CursorCLIHome(), "hooks.json")); err != nil {
+		if err := cursorAutoPreflight(exe, uninstall); err != nil {
 			return installResult{}, err
 		}
 		return installCursorAuto(exe, uninstall)
@@ -1307,6 +1307,32 @@ func installPiAuto(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	return wroteAll(mcp, ext), nil
+}
+
+// cursorAutoPreflight runs the refusals of cursor-auto's hook and status
+// line halves before the MCP half writes anything. Only hooks.json was
+// checked, so a read-only cli-config.json was refused after mcp.json and
+// hooks.json had been written, and the target reported a refusal while
+// wired (#5164).
+func cursorAutoPreflight(exe string, uninstall bool) error {
+	hookExe := exe
+	if !uninstall {
+		// The launcher path the writers will name, without writing it yet.
+		if p := dejaLauncherPath(); p != "" {
+			hookExe = p
+		}
+	}
+	if _, err := cursorHooksUpdate(hookExe, uninstall, false); err != nil {
+		return err
+	}
+	// Not on the way out: the plain cursor target removes mcp.json whatever
+	// this says, so refusing here would only leave the hooks running.
+	if uninstall {
+		return nil
+	}
+	_, err := jsonStatuslineUpdate(cursorCLIConfigPath(), []string{"statusLine"},
+		map[string]any{"type": "command", "command": hookRun(hookExe, "statusline")}, uninstall, false)
+	return err
 }
 
 func installCursorAuto(exe string, uninstall bool) (installResult, error) {
@@ -3777,6 +3803,29 @@ func keepSwitch(prev any, next map[string]any) string {
 	return switchedOffNote
 }
 
+// entrySwitchHonored reports whether a client reads the entry's own
+// `disabled`/`enabled` key. cursor-agent does not: 2026.09.02 parses mcp.json
+// through a schema of command/args/env/cwd (or url/headers/auth/tls) that
+// drops every other key, and `cursor-agent mcp list` shows an entry with
+// `"disabled": true` ready. Its switch is `cursor-agent mcp disable`, which
+// writes the project's mcp-disabled.json, and clientMCPDenied reads that.
+// Calling the entry off told the person recall was off while it ran (#5162;
+// #4303 assumed Cursor read Kiro's key).
+func entrySwitchHonored(client string) bool {
+	return client != "cursor"
+}
+
+// dropNotePart removes one "; "-joined part from an install note.
+func dropNotePart(note, part string) string {
+	var keep []string
+	for _, p := range strings.Split(note, "; ") {
+		if p != part {
+			keep = append(keep, p)
+		}
+	}
+	return strings.Join(keep, "; ")
+}
+
 // entrySwitchedOff reports whether the reader has turned this entry off.
 //
 // One switch, two spellings: most hosts write `disabled: true`, opencode
@@ -3848,7 +3897,11 @@ func mcpCommandArgs(exe string) (string, []string) {
 // (~/.cursor/mcp.json). Gemini CLI and Antigravity use the identical
 // mcpServers shape in their own files.
 func installCursor(exe string, uninstall bool) (installResult, error) {
-	return installMCPJSON(filepath.Join(sources.CursorCLIHome(), "mcp.json"), exe, uninstall)
+	res, err := installMCPJSON(filepath.Join(sources.CursorCLIHome(), "mcp.json"), exe, uninstall)
+	if !entrySwitchHonored("cursor") {
+		res.Note = dropNotePart(res.Note, switchedOffNote)
+	}
+	return res, err
 }
 
 // copilotMCPConfigPath is where Copilot CLI reads its MCP servers. Doctor reads

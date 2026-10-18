@@ -56,7 +56,8 @@ func TestInstallKiroSaysTheEntryIsSwitchedOff(t *testing.T) {
 }
 
 // Doctor read a switched-off entry as wired, though the client will never start
-// it (#4303). Cursor goes through the same check.
+// it (#4303). Cursor has no such key on the entry and runs it (#5162), so its
+// row stays unmarked.
 func TestDoctorMarksASwitchedOffMCPEntry(t *testing.T) {
 	hermeticEnv(t)
 	home := os.Getenv("HOME")
@@ -94,8 +95,8 @@ func TestDoctorMarksASwitchedOffMCPEntry(t *testing.T) {
 			continue
 		}
 		seen++
-		if !r.SwitchedOff {
-			t.Errorf("%s row = %+v, want switched_off", r.Name, r)
+		if want := r.Name == "kiro"; r.SwitchedOff != want {
+			t.Errorf("%s row = %+v, want switched_off %v", r.Name, r, want)
 		}
 	}
 	if seen != 2 {
@@ -105,8 +106,8 @@ func TestDoctorMarksASwitchedOffMCPEntry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Count(text, "switched off") < 2 {
-		t.Errorf("the text report does not say the entries are off:\n%s", text)
+	if strings.Count(text, "switched off") != 1 {
+		t.Errorf("the text report should say kiro's entry is off and only that:\n%s", text)
 	}
 
 	// An entry that is on is not marked.
@@ -114,7 +115,7 @@ func TestDoctorMarksASwitchedOffMCPEntry(t *testing.T) {
 	if err := os.WriteFile(kiro, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if dejaEntrySwitchedOff(kiro) {
+	if dejaEntrySwitchedOff("kiro", kiro) {
 		t.Error("an entry that is on reads as switched off")
 	}
 }

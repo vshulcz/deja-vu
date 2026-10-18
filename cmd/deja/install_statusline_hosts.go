@@ -61,6 +61,13 @@ func statuslineAt(root map[string]any, keys []string, create bool) map[string]an
 // rewritten, a stranger's is left alone with a note, and uninstall takes only
 // deja's own.
 func installJSONStatusline(path string, keys []string, entry map[string]any, uninstall bool) (installResult, error) {
+	return jsonStatuslineUpdate(path, keys, entry, uninstall, true)
+}
+
+// jsonStatuslineUpdate is installJSONStatusline with the write optional: unset,
+// it returns the refusal the write would meet and changes nothing, for a
+// target's pre-flight.
+func jsonStatuslineUpdate(path string, keys []string, entry map[string]any, uninstall, write bool) (installResult, error) {
 	old, err := readConfig(path)
 	if err != nil {
 		return installResult{}, err
@@ -80,6 +87,7 @@ func installJSONStatusline(path string, keys []string, entry map[string]any, uni
 			return installResult{}, configParseError(path, err)
 		}
 	}
+	before, _ := json.Marshal(root)
 	cmd, _ := entry["command"].(string)
 	last := keys[len(keys)-1]
 	parent := statuslineAt(root, keys, !uninstall)
@@ -118,6 +126,12 @@ func installJSONStatusline(path string, keys []string, entry map[string]any, uni
 	}
 	if jsonc {
 		return installResult{}, fmt.Errorf("%s: deja cannot edit the status line in a file that carries comments — set it by hand, or take the comments out", path)
+	}
+	if !write {
+		if after, _ := json.Marshal(root); string(after) == string(before) {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
+		return installResult{Path: path}, configWritable(path)
 	}
 	next, err := marshalConfigLike(old, root)
 	if err != nil {

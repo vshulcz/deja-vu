@@ -83,7 +83,7 @@ func fileText(t *testing.T, path string) string {
 // it: the next client start ran deja again for somebody who had switched it
 // off (#4467). The plugin registries did the same through the -auto targets,
 // openclaw while reporting "unchanged" (#4472). Install keeps the switch where
-// the reader put it and says so, the way cursor's entry always has (#2479).
+// the reader put it and says so, the way the shared JSON writer always has (#2479).
 func TestInstallKeepsTheReadersOffSwitch(t *testing.T) {
 	for _, tc := range []struct {
 		target   string
@@ -91,13 +91,14 @@ func TestInstallKeepsTheReadersOffSwitch(t *testing.T) {
 		stillOff func(t *testing.T) bool
 	}{
 		{
-			// The control: the shared writer has kept it since #2479.
-			target: "cursor",
+			// The control: the shared writer has kept it since #2479. Kiro,
+			// not cursor: cursor-agent has no switch on the entry (#5162).
+			target: "kiro",
 			off: func(t *testing.T) {
-				switchJSON(t, filepath.Join(sources.CursorCLIHome(), "mcp.json"), true, "mcpServers", "deja", "disabled")
+				switchJSON(t, kiroMCPSettingsPath(), true, "mcpServers", "deja", "disabled")
 			},
 			stillOff: func(t *testing.T) bool {
-				return readJSONPath(t, filepath.Join(sources.CursorCLIHome(), "mcp.json"), "mcpServers", "deja", "disabled") == true
+				return readJSONPath(t, kiroMCPSettingsPath(), "mcpServers", "deja", "disabled") == true
 			},
 		},
 		{

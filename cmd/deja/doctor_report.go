@@ -1023,7 +1023,7 @@ func collectDoctorMCP() []doctorMCPStatus {
 		if state == "wired" && dejaCommandMissing(config.path) != "" {
 			row.BinaryMissing = true
 		}
-		if state == "wired" && (dejaEntrySwitchedOff(config.path) || doctorMCPSwitchedOff(config.name) != "") {
+		if state == "wired" && (dejaEntrySwitchedOff(config.name, config.path) || doctorMCPSwitchedOff(config.name) != "") {
 			row.SwitchedOff = true
 		}
 		if state == "wired" && config.name == "workbuddy" {

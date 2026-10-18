@@ -1581,7 +1581,7 @@ func doctorMCP(w io.Writer) {
 		}
 		// Declared and switched off is not wired in any sense a session
 		// feels: the client never starts the server (#4303).
-		if status == "wired" && dejaEntrySwitchedOff(c.path) {
+		if status == "wired" && dejaEntrySwitchedOff(c.name, c.path) {
 			fmt.Fprintf(w, "  %-12s %s\n", "",
 				"the entry is switched off — "+c.name+" will not start it until you turn it back on")
 		}
@@ -1625,8 +1625,12 @@ func doctorMCPDuplicateNote(keys []string) string {
 
 // dejaEntrySwitchedOff reports whether every deja entry in a JSON config is
 // switched off — `disabled: true`, or opencode's `enabled: false`, the test
-// install uses. One entry still on is enough for recall to work.
-func dejaEntrySwitchedOff(path string) bool {
+// install uses. One entry still on is enough for recall to work. A client
+// that has no switch on the entry is never off by this test.
+func dejaEntrySwitchedOff(client, path string) bool {
+	if !entrySwitchHonored(client) {
+		return false
+	}
 	b, err := readConfig(path)
 	if err != nil {
 		return false

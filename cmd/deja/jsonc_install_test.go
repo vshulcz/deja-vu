@@ -236,8 +236,10 @@ func TestACommentedConfigKeepsTheFieldsOnDejasOwnEntry(t *testing.T) {
 	if !strings.Contains(got, `"disabled": true`) {
 		t.Errorf("a disabled entry was silently switched on:\n%s", got)
 	}
-	if !strings.Contains(out, "left the entry switched off") {
-		t.Errorf("nothing said the entry is still off:\n%s", out)
+	// Kept, but not called off: cursor-agent ignores the key and runs the
+	// entry (#5162).
+	if strings.Contains(out, "switched off") {
+		t.Errorf("install called a cursor entry off that cursor runs:\n%s", out)
 	}
 }
 
