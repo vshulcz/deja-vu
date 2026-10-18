@@ -359,7 +359,8 @@ modification. Backups and newly created configs are written owner-only
 existing live config is preserved on update.
 
 On non-Windows hosts install also writes `~/.config/deja/bin/deja-hook`, a
-shell script the hook entries name so an upgrade that moves the binary does not
+shell script the hook entries name (and the MCP entries for OpenClaw, Codex,
+Hermes and Grok, which start their servers with a short list of variables) so an upgrade that moves the binary does not
 have to rewrite every config. It is 0755 in a directory the user owns, and it
 runs the first executable it finds among, in this order, `DEJA_BIN`, the path
 the install ran from, `~/.local/bin/deja`, `~/bin/deja`, the usual install

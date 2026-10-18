@@ -153,7 +153,7 @@ startup_timeout_ms = 20000
 			t.Errorf("updated block lost %q:\n%s", want, got)
 		}
 	}
-	command, args := mcpCommandArgs(exe)
+	command, args := mcpLaunchCommandArgs(exe, false)
 	for _, want := range []string{
 		fmt.Sprintf("command = %q", command),
 		"args = " + tomlStringArray(args),

@@ -45,6 +45,17 @@ func hookExeFor(exe string, uninstall bool) string {
 	return hookCommandExe(exe)
 }
 
+// mcpLaunchCommandArgs is the command and args of an MCP entry for a client
+// that starts its servers with a short list of variables: OpenClaw, Codex,
+// Hermes and Grok pass HOME, PATH and a few more, so a `deja mcp` named
+// directly lost DEJA_INDEX_DIR and XDG_CACHE_HOME, opened a second index under
+// ~/.cache/deja and never saw the live stamps the hooks wrote, and the asking
+// session came back in its own recall (#5269, #5124). The launcher carries
+// the install-time values as fallbacks, as it does for hooks.
+func mcpLaunchCommandArgs(exe string, uninstall bool) (string, []string) {
+	return mcpCommandArgs(hookExeFor(exe, uninstall))
+}
+
 // hookRun is a hook command line: the binary, quoted where the shell running
 // it would otherwise split the path, and the subcommand and flags beside it.
 //

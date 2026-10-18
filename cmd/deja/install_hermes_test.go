@@ -63,6 +63,9 @@ func TestInstallHermesQuotesTheCommandPath(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("DEJA_HERMES_HOME", "")
+	// The entry names the launcher under XDG_CONFIG_HOME, so that is where
+	// the YAML metacharacters go (#5269).
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "cfg: v#2"))
 	exe := "/opt/deja: v#2/deja"
 	if _, err := installHermesMCP(exe, false); err != nil {
 		t.Fatalf("install: %v", err)
@@ -72,10 +75,10 @@ func TestInstallHermesQuotesTheCommandPath(t *testing.T) {
 		t.Fatalf("config missing: %v", err)
 	}
 	s := string(cfg)
-	if !strings.Contains(s, "command: "+`"/opt/deja: v#2/deja"`) {
+	if !strings.Contains(s, "command: "+yamlQuote(hookExeInConfigs(exe))) || !strings.Contains(hookExeInConfigs(exe), ": v#2") {
 		t.Fatalf("command path is not YAML-quoted, so Hermes cannot parse it:\n%s", s)
 	}
-	if strings.Contains(s, "command: /opt/deja: v#2/deja") {
+	if strings.Contains(s, "command: "+hookExeInConfigs(exe)) {
 		t.Fatalf("raw unquoted path written, breaks the YAML:\n%s", s)
 	}
 }

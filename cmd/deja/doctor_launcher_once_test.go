@@ -41,8 +41,14 @@ func TestDoctorNamesAMissingLauncherOnce(t *testing.T) {
 					notes++
 				}
 			}
-			if notes != 1 {
-				t.Errorf("the missing launcher is named %d times, want once:\n%s", notes, out)
+			// Hermes's MCP entry names the launcher too since #5269, and its
+			// own row says so once.
+			want := 1
+			if target == "hermes-auto" {
+				want = 2
+			}
+			if notes != want {
+				t.Errorf("the missing launcher is named %d times, want %d:\n%s", notes, want, out)
 			}
 		})
 	}

@@ -45,6 +45,11 @@ Kimi included. pi 0.99 and later need no MCP adapter, and
 `PI_CODING_AGENT_DIR` is followed. OpenClaw install and doctor say when
 `plugins.allow` or `plugins.enabled` keeps deja's plugin off.
 
+OpenClaw, Codex, Hermes and Grok start MCP servers with only a few
+variables, so `deja mcp` there lost a moved index (`DEJA_INDEX_DIR`,
+`XDG_CACHE_HOME`), built a second one and answered recall with the asking
+session. Their MCP entries now name the launcher the hooks run through.
+
 ## [0.22.2] - 2026-10-17
 
 deja now reads Windsurf / Devin Desktop: Cascade's encrypted conversation

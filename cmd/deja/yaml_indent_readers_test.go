@@ -188,7 +188,7 @@ func TestHermesRoundTripsAtEveryIndent(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			for _, want := range []string{"before:", "after:", "deja:", "/opt/deja"} {
+			for _, want := range []string{"before:", "after:", "deja:", hookExeInConfigs("/opt/deja")} {
 				if !strings.Contains(string(wired), want) {
 					t.Fatalf("%q is missing after the install:\n%s", want, wired)
 				}

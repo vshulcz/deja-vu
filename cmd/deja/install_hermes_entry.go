@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -274,7 +275,12 @@ func hermesMCPOffNote(p string) string {
 // stays. Rebuilding the entry whole dropped them (#5173). done is false when
 // there is no entry to edit; a flow entry that runs something else, and a
 // key written twice, are refused rather than guessed at.
-func hermesEditEntry(lines []string, exe string) (out []string, note string, done bool, err error) {
+//
+// keep are other commands a flow entry may already name and stay as it is:
+// the binary itself, when exe is the launcher. A one-line entry cannot be
+// moved to the launcher in place, and refusing it would break an install that
+// worked before (#5269).
+func hermesEditEntry(lines []string, exe string, keep ...string) (out []string, note string, done bool, err error) {
 	entries := hermesDejaEntries(lines)
 	if len(entries) > 1 {
 		// The shape #5172 left: deja's own block above the reader's. Drop
@@ -313,7 +319,7 @@ func hermesEditEntry(lines []string, exe string) (out []string, note string, don
 			// Nothing of the reader's in it: written as deja writes it.
 			return nil, "", false, nil
 		}
-		if ok && yamlScalar(m["command"]) == exe && hermesArgsSay(hermesArgs(nil, hermesField{value: m["args"]})) {
+		if ok && (yamlScalar(m["command"]) == exe || slices.Contains(keep, yamlScalar(m["command"]))) && hermesArgsSay(hermesArgs(nil, hermesField{value: m["args"]})) {
 			return lines, note, true, nil
 		}
 		return nil, "", false, fmt.Errorf("mcp_servers.deja is written on one line (%s), and deja edits only the block form — rewrite it that way and run this again", strings.TrimSpace(lines[e.start]))

@@ -965,6 +965,7 @@ func TestInstallCodexTempHomePreservesOtherTOML(t *testing.T) {
 	h := t.TempDir()
 	t.Setenv("HOME", h)
 	t.Setenv("USERPROFILE", h)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(h, ".config"))
 	path := filepath.Join(h, ".codex", "config.toml")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
@@ -984,7 +985,8 @@ func TestInstallCodexTempHomePreservesOtherTOML(t *testing.T) {
 		t.Fatal(err)
 	}
 	b, _ = os.ReadFile(path)
-	if strings.Count(string(b), "[mcp_servers.deja]") != 1 || !strings.Contains(string(b), `/new/deja`) {
+	// The entry names the launcher, and the launcher the new binary (#5269).
+	if strings.Count(string(b), "[mcp_servers.deja]") != 1 || !strings.Contains(string(b), hookExeInConfigs("/new/deja")) || !dejaWiringPresent(readFile(t, hookExeInConfigs("/new/deja")), "/new/deja") {
 		t.Fatalf("bad replace: %s", b)
 	}
 	if _, err := installTarget("codex", "/new/deja", true); err != nil {

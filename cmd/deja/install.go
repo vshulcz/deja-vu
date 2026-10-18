@@ -3003,7 +3003,7 @@ func installStatusline(exe string, uninstall bool) (installResult, error) {
 
 func installCodex(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(sources.CodexHome(), "config.toml")
-	cmd, args := mcpCommandArgs(exe)
+	cmd, args := mcpLaunchCommandArgs(exe, uninstall)
 	block := fmt.Sprintf("[mcp_servers.deja]\ntype = \"stdio\"\ncommand = %q\nargs = %s\n", cmd, tomlStringArray(args))
 	return installTOML(path, block, uninstall)
 }
@@ -3043,7 +3043,7 @@ func installGrok(exe string, uninstall bool) (installResult, error) {
 
 // installGrokConfig is Grok Build's half: [mcp_servers.deja] in config.toml.
 func installGrokConfig(exe string, uninstall bool) (installResult, error) {
-	cmd, args := mcpCommandArgs(exe)
+	cmd, args := mcpLaunchCommandArgs(exe, uninstall)
 	block := fmt.Sprintf("[mcp_servers.deja]\ncommand = %q\nargs = %s\n", cmd, tomlStringArray(args))
 	return installTOML(filepath.Join(sources.GrokHome(), "config.toml"), block, uninstall)
 }
@@ -4212,7 +4212,7 @@ func installOpenClawMCP(exe string, uninstall bool) (installResult, error) {
 	} else if configIsJSONC(old) {
 		// Two keys deep, which the text writer takes as a dotted block key
 		// (#2783).
-		command, args := mcpCommandArgs(exe)
+		command, args := mcpLaunchCommandArgs(exe, uninstall)
 		return writeJSONCEntry(path, old, "mcp.servers",
 			map[string]any{"command": command, "args": args}, uninstall)
 	} else if json.Unmarshal(old, &root) != nil {
@@ -4253,7 +4253,7 @@ func installOpenClawMCP(exe string, uninstall bool) (installResult, error) {
 			forgetBlockAdded(path, "mcp.servers")
 		}
 	} else {
-		command, args := mcpCommandArgs(exe)
+		command, args := mcpLaunchCommandArgs(exe, uninstall)
 		key := dejaEntryKey(servers)
 		if key != "deja" {
 			noteBlockAdded(path, "mcp.servers."+key)

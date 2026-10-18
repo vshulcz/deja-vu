@@ -21,11 +21,17 @@ func hermesTestConfig(t *testing.T, cfg string) string {
 		t.Fatal(err)
 	}
 	if cfg != "" {
-		if err := os.WriteFile(path, []byte(cfg), 0o644); err != nil {
+		if err := os.WriteFile(path, []byte(hermesL(cfg)), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
 	return path
+}
+
+// hermesL fills in @L@, the command an install from /bin/deja names: the
+// launcher where there is one (#5269).
+func hermesL(s string) string {
+	return strings.ReplaceAll(s, "@L@", hookExeInConfigs("/bin/deja"))
 }
 
 var hermesDejaKey = regexp.MustCompile(`(?m)^  ["']?deja["']? *:`)
@@ -52,8 +58,9 @@ func TestInstallHermesKeepsTheSwitchHermesReads(t *testing.T) {
 		{"disabled: true", false},
 	} {
 		t.Run(tc.value, func(t *testing.T) {
-			cfg := "mcp_servers:\n  deja:\n    command: /bin/deja\n    args: [mcp]\n    " + tc.value + "\n  other:\n    command: x\n"
+			cfg := "mcp_servers:\n  deja:\n    command: @L@\n    args: [mcp]\n    " + tc.value + "\n  other:\n    command: x\n"
 			path := hermesTestConfig(t, cfg)
+			cfg = hermesL(cfg)
 			res, err := installHermesMCP("/bin/deja", false)
 			if err != nil {
 				t.Fatal(err)
@@ -169,9 +176,9 @@ func TestInstallHermesKeepsTheReadersKeysOnItsEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 	b, _ := os.ReadFile(path)
-	want := "mcp_servers:\n  deja:\n    command: \"/bin/deja\"\n    args:\n      - mcp\n" +
+	want := "mcp_servers:\n  deja:\n    command: \"@L@\"\n    args:\n      - mcp\n" +
 		"    timeout: 120\n    env:\n      DEJA_INDEX_DIR: /data/idx\n    tools:\n      include: [search, show]\n    enabled: false\n  other:\n    command: x\n"
-	if string(b) != want {
+	if want = hermesL(want); string(b) != want {
 		t.Fatalf("install gave\n%s\nwant\n%s", b, want)
 	}
 	if !strings.Contains(res.Note, switchedOffNote) {
@@ -184,7 +191,7 @@ func TestInstallHermesKeepsTheReadersKeysOnItsEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 	b, _ = os.ReadFile(path)
-	if want := "mcp_servers:\n    deja:\n        command: \"/bin/deja\"\n        args:\n            - mcp\n        timeout: 5\n"; string(b) != want {
+	if want := hermesL("mcp_servers:\n    deja:\n        command: \"@L@\"\n        args:\n            - mcp\n        timeout: 5\n"); string(b) != want {
 		t.Fatalf("install gave\n%s\nwant\n%s", b, want)
 	}
 }
@@ -253,37 +260,37 @@ func TestInstallHermesEntryShapesFromReview(t *testing.T) {
 	for name, tc := range map[string]struct{ cfg, want, uninstalled string }{
 		"column-0 comment": {
 			cfg:         "mcp_servers:\n  deja:\n    command: /bin/deja\n#    timeout: 30\n    args: [mcp]\n    enabled: false\n  other:\n    command: x\n",
-			want:        "mcp_servers:\n  deja:\n    command: /bin/deja\n#    timeout: 30\n    args: [mcp]\n    enabled: false\n  other:\n    command: x\n",
+			want:        "mcp_servers:\n  deja:\n    command: \"@L@\"\n#    timeout: 30\n    args: [mcp]\n    enabled: false\n  other:\n    command: x\n",
 			uninstalled: "mcp_servers:\n  other:\n    command: x\n",
 		},
 		"comment in args": {
 			cfg:         "mcp_servers:\n  deja:\n    command: /bin/deja\n    args:\n      - serve\n#     - old\n      - mcp\n    timeout: 9\n",
-			want:        "mcp_servers:\n  deja:\n    command: /bin/deja\n    args:\n      - mcp\n    timeout: 9\n",
+			want:        "mcp_servers:\n  deja:\n    command: \"@L@\"\n    args:\n      - mcp\n    timeout: 9\n",
 			uninstalled: "mcp_servers:\n",
 		},
 		"args string": {
 			cfg:         "mcp_servers:\n  deja:\n    command: /bin/deja\n    args: mcp\n",
-			want:        "mcp_servers:\n  deja:\n    command: /bin/deja\n    args:\n      - mcp\n",
+			want:        "mcp_servers:\n  deja:\n    command: \"@L@\"\n    args:\n      - mcp\n",
 			uninstalled: "mcp_servers:\n",
 		},
 		"dash glued": {
 			cfg:         "mcp_servers:\n  deja:\n    command: /bin/deja\n    args:\n      -mcp\n",
-			want:        "mcp_servers:\n  deja:\n    command: /bin/deja\n    args:\n      - mcp\n",
+			want:        "mcp_servers:\n  deja:\n    command: \"@L@\"\n    args:\n      - mcp\n",
 			uninstalled: "mcp_servers:\n",
 		},
 		"args before command": {
 			cfg:         "mcp_servers:\n  deja:\n    args: [old]\n    command: /old/deja\n    timeout: 30\n",
-			want:        "mcp_servers:\n  deja:\n    args:\n      - mcp\n    command: \"/bin/deja\"\n    timeout: 30\n",
+			want:        "mcp_servers:\n  deja:\n    args:\n      - mcp\n    command: \"@L@\"\n    timeout: 30\n",
 			uninstalled: "mcp_servers:\n",
 		},
 		"command on the next line": {
 			cfg:         "mcp_servers:\n  deja:\n    command: >-\n      /old/deja\n    args: [mcp]\n",
-			want:        "mcp_servers:\n  deja:\n    command: \"/bin/deja\"\n    args: [mcp]\n",
+			want:        "mcp_servers:\n  deja:\n    command: \"@L@\"\n    args: [mcp]\n",
 			uninstalled: "mcp_servers:\n",
 		},
 		"old installer's second key": {
 			cfg:         "mcp_servers:\n  deja:\n    command: \"/bin/deja\"\n    args:\n      - mcp\n    enabled: true\n  deja:   # mine\n    command: /old/deja\n    args: [mcp]\n    timeout: 60\n",
-			want:        "mcp_servers:\n  deja:   # mine\n    command: \"/bin/deja\"\n    args: [mcp]\n    timeout: 60\n",
+			want:        "mcp_servers:\n  deja:   # mine\n    command: \"@L@\"\n    args: [mcp]\n    timeout: 60\n",
 			uninstalled: "mcp_servers:\n",
 		},
 	} {
@@ -294,7 +301,7 @@ func TestInstallHermesEntryShapesFromReview(t *testing.T) {
 				t.Fatal(err)
 			}
 			b, _ := os.ReadFile(path)
-			if string(b) != tc.want {
+			if tc.want = hermesL(tc.want); string(b) != tc.want {
 				t.Fatalf("install gave\n%s\nwant\n%s", b, tc.want)
 			}
 			if strings.Contains(tc.cfg, "enabled: false") != strings.Contains(res.Note, switchedOffNote) {
