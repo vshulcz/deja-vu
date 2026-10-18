@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `deja uninstall hermes-auto` says when `memory.provider` in `~/.hermes/config.yaml` still names the `deja-memory` provider it just removed, which left `hermes memory status` reporting the plugin "NOT installed". The key is Hermes's and stays as it is; the line names `hermes memory off` as the way back to the built-in memory.
+
 ## [0.22.2] - 2026-10-17
 
 deja now reads Windsurf / Devin Desktop: Cascade's encrypted conversation

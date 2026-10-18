@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -32,8 +33,17 @@ func installHermesMemoryProvider(exe string, uninstall bool) (installResult, err
 		return installResult{Path: dir, Action: "kept"}, nil
 	}
 	if uninstall {
+		// memory.provider is the reader's key — Hermes wrote it at `hermes
+		// memory setup` — so it stays, but a Hermes left naming a provider
+		// that is gone says "NOT installed" on every status, and uninstall
+		// is the moment to name the way back.
+		note := ""
+		if hermesMemoryProviderIsDeja() {
+			note = "memory.provider in " + shortHome(filepath.Join(sources.HermesHome(), "config.yaml")) +
+				" still names " + hermesMemoryDir + ", left as Hermes wrote it; `hermes memory off` goes back to the built-in memory"
+		}
 		if _, err := os.Stat(dir); err != nil {
-			return installResult{Path: dir, Action: "unchanged"}, nil
+			return installResult{Path: dir, Action: "unchanged", Note: note}, nil
 		}
 		if err := os.RemoveAll(dir); err != nil {
 			return installResult{}, err
@@ -41,7 +51,7 @@ func installHermesMemoryProvider(exe string, uninstall bool) (installResult, err
 		// And the directories deja made above it, while each is empty and
 		// the record says it is deja's (#3698).
 		pruneCreatedDir(filepath.Dir(dir))
-		return installResult{Path: dir, Action: "removed"}, nil
+		return installResult{Path: dir, Action: "removed", Note: note}, nil
 	}
 	noteCreatedDirs(dir)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -65,6 +75,52 @@ func installHermesMemoryProvider(exe string, uninstall bool) (installResult, err
 		return installResult{}, err
 	}
 	return installResult{Path: dir, Action: a}, nil
+}
+
+// hermesMemoryProviderIsDeja reports whether config.yaml sets
+// memory.provider to deja's provider, read line by line as the rest of the
+// Hermes config is: the last `memory:` and the last `provider:` under it, as
+// YAML keeps the last of a repeated key, quoted or plain, a comment after it
+// allowed, and nothing past a `...` that ends the document.
+func hermesMemoryProviderIsDeja() bool {
+	b, err := os.ReadFile(filepath.Join(sources.HermesHome(), "config.yaml"))
+	if err != nil {
+		return false
+	}
+	b = bytes.TrimPrefix(b, utf8BOM)
+	in, child, provider := false, -1, ""
+	for _, line := range strings.Split(lfText(b), "\n") {
+		if yamlDocumentEnd(line) {
+			break
+		}
+		t := strings.TrimSpace(line)
+		if t == "" || strings.HasPrefix(t, "#") {
+			continue
+		}
+		w := yamlIndentWidth(line)
+		if w == 0 {
+			key, rest, ok := hermesKeyLine(line)
+			in, child = ok && hermesKeyName(key) == "memory", -1
+			if in {
+				provider = ""
+				if strings.TrimSpace(stripYAMLComment(rest)) != "" {
+					in = false
+				}
+			}
+			continue
+		}
+		if !in {
+			continue
+		}
+		if child < 0 {
+			child = w
+		}
+		key, rest, ok := hermesKeyLine(line)
+		if ok && w == child && hermesKeyName(key) == "provider" {
+			provider = yamlScalar(strings.TrimSpace(rest))
+		}
+	}
+	return provider == hermesMemoryDir
 }
 
 // hermesInstalledIt reports whether `hermes plugins install` put the named

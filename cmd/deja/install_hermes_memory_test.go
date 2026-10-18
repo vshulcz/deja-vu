@@ -195,3 +195,73 @@ func TestHermesToolsAskForFramedOutput(t *testing.T) {
 		t.Fatalf("argv =\n%s\nwant\n%s", got, want)
 	}
 }
+
+// `hermes memory setup` writes memory.provider: deja-memory, and uninstall
+// takes away the provider it names: Hermes then says "NOT installed" on every
+// `hermes memory status`. The key is the reader's, so it stays — but the
+// uninstall says so and names the way back. Any other value, or none, and
+// there is nothing to say.
+func TestUninstallHermesNamesTheProviderKeyItLeaves(t *testing.T) {
+	cases := []struct {
+		name   string
+		config string // "" writes no config.yaml at all
+		note   bool
+	}{
+		{"set by hermes memory setup", "model: x\nmemory:\n  provider: deja-memory\n", true},
+		{"double quoted, comment after", "memory:  # mine\n    provider: \"deja-memory\"  # set up\n", true},
+		{"single quoted, CRLF", "memory:\r\n  provider: 'deja-memory'\r\n", true},
+		{"other keys around it", "memory:\n  memory_enabled: true\n  provider: deja-memory\nagent:\n  provider: x\n", true},
+		{"no config", "", false},
+		{"no provider", "memory:\n  memory_enabled: true\n", false},
+		{"another provider", "memory:\n  provider: mem0\n", false},
+		{"empty provider", "memory:\n  provider: ''\n", false},
+		{"commented out", "memory:\n  # provider: deja-memory\n", false},
+		{"under another key", "agent:\n  provider: deja-memory\n", false},
+		{"nested deeper", "memory:\n  mem0:\n    provider: deja-memory\n", false},
+		{"last memory block wins", "memory:\n  provider: deja-memory\nmemory:\n  provider: mem0\n", false},
+		{"last provider wins", "memory:\n  provider: mem0\n  provider: deja-memory\n", true},
+		{"after the document end", "model: x\n...\nmemory:\n  provider: deja-memory\n", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			home := t.TempDir()
+			t.Setenv("HOME", home)
+			t.Setenv("USERPROFILE", home)
+			t.Setenv("DEJA_HERMES_HOME", "")
+			t.Setenv("HERMES_HOME", "")
+			if _, err := installHermesMemoryProvider("/bin/deja", false); err != nil {
+				t.Fatalf("install: %v", err)
+			}
+			config := filepath.Join(home, ".hermes", "config.yaml")
+			if tc.config != "" {
+				if err := os.WriteFile(config, []byte(tc.config), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			res, err := installHermesMemoryProvider("/bin/deja", true)
+			if err != nil {
+				t.Fatalf("uninstall: %v", err)
+			}
+			if res.Action != "removed" {
+				t.Fatalf("action = %q, want removed", res.Action)
+			}
+			said := strings.Contains(res.Note, "memory.provider") && strings.Contains(res.Note, "`hermes memory off`")
+			if said != tc.note {
+				t.Fatalf("note = %q, want a memory.provider note: %v", res.Note, tc.note)
+			}
+			if tc.config == "" {
+				if _, err := os.Stat(config); !os.IsNotExist(err) {
+					t.Fatalf("uninstall created %s: %v", config, err)
+				}
+				return
+			}
+			got, err := os.ReadFile(config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(got) != tc.config {
+				t.Fatalf("uninstall changed config.yaml:\n%q\nwant\n%q", got, tc.config)
+			}
+		})
+	}
+}
