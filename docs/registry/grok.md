@@ -37,16 +37,21 @@ Consecutive assistant chunks with the same `promptId` are joined. Consecutive us
 and `forked_at`. deja reads the first three into the session record — they show
 up in `--json` as `kind`, `parent` and `agent`, and `deja show` names the
 session a child was spawned from and the children a parent spawned. A
-`subagent` with no `parent_session_id` keeps its kind and no edge: which
-session asked for it is not written down, and deja does not guess. A
+`subagent` names no `parent_session_id` on 1.0.41; its parent's
+`updates.jsonl` holds a `subagent_spawned` record naming both ends, and deja
+reads the edge from that record (#5264). A `--fork-session` copy names its
+source and `forked_at` and is read as a `fork` of it, so neither one comes back
+to the other as prior work (#5263). A
 `grok -p` run is marked `headless`, which says how the session was started,
 not that something spawned it, so deja records no kind for it (#4585).
 
-A `--fork-session` copy starts with every record of its source, rewritten
+A fork's copy starts with every record of its source, rewritten
 under the fork's `sessionId` and outer `timestamp`; `_meta.eventId` still
 names the source. deja keeps a fork's own records and leaves the copies to the source,
 so search finds the source's turns once and blame names the session that
-wrote a line, not a fork made after it (#5235).
+wrote a line, not a fork made after it (#5235). A resumed or forked session
+already holds the start digest in `chat_history.jsonl`, which Grok sends back
+to the model, so deja does not send another (#5262).
 
 ## Status line
 

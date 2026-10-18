@@ -61,15 +61,20 @@
 <p>and <code>forked_at</code>. deja reads the first three into the session record — they show</p>
 <p>up in <code>--json</code> as <code>kind</code>, <code>parent</code> and <code>agent</code>, and <code>deja show</code> names the</p>
 <p>session a child was spawned from and the children a parent spawned. A</p>
-<p><code>subagent</code> with no <code>parent_session_id</code> keeps its kind and no edge: which</p>
-<p>session asked for it is not written down, and deja does not guess. A</p>
+<p><code>subagent</code> names no <code>parent_session_id</code> on 1.0.41; its parent&#39;s</p>
+<p><code>updates.jsonl</code> holds a <code>subagent_spawned</code> record naming both ends, and deja</p>
+<p>reads the edge from that record (#5264). A <code>--fork-session</code> copy names its</p>
+<p>source and <code>forked_at</code> and is read as a <code>fork</code> of it, so neither one comes back</p>
+<p>to the other as prior work (#5263). A</p>
 <p><code>grok -p</code> run is marked <code>headless</code>, which says how the session was started,</p>
 <p>not that something spawned it, so deja records no kind for it (#4585).</p>
-<p>A <code>--fork-session</code> copy starts with every record of its source, rewritten</p>
+<p>A fork&#39;s copy starts with every record of its source, rewritten</p>
 <p>under the fork&#39;s <code>sessionId</code> and outer <code>timestamp</code>; <code>_meta.eventId</code> still</p>
 <p>names the source. deja keeps a fork&#39;s own records and leaves the copies to the source,</p>
 <p>so search finds the source&#39;s turns once and blame names the session that</p>
-<p>wrote a line, not a fork made after it (#5235).</p>
+<p>wrote a line, not a fork made after it (#5235). A resumed or forked session</p>
+<p>already holds the start digest in <code>chat_history.jsonl</code>, which Grok sends back</p>
+<p>to the model, so deja does not send another (#5262).</p>
 <h2 id="status-line">Status line</h2>
 <p><code>deja install grok-auto</code> adds <code>[ui.status_line]</code> with <code>type = &#34;command&#34;</code> to the</p>
 <p>user <code>config.toml</code>; Grok ignores the table in a project config. It pipes</p>
