@@ -333,7 +333,14 @@ func forkSource(sessions []model.Session, src, fork model.Session) bool {
 // line, is the session that record was copied from when the copy names no
 // source: opencode's --fork carries its source's records at their original
 // times and leaves no marker, and the source started before any copy of it.
+//
+// A sub-agent copies nothing from its parent: a parent and its child writing
+// one line in the same whole second (goose, Hermes) is not a copy, and taking
+// the older session handed the child's line to the parent.
 func copiedFrom(at time.Time, s, best model.Session) bool {
+	if index.SpawnedKind(s.Kind) || index.SpawnedKind(best.Kind) {
+		return false
+	}
 	return !at.IsZero() && s.Harness == best.Harness && !s.Started.IsZero() && s.Started.Before(best.Started)
 }
 
