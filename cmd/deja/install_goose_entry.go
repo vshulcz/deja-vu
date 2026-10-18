@@ -154,7 +154,14 @@ func gooseEditEntry(lines []string, exe string) (out []string, note string, done
 	if _, ok := fields["enabled"]; !ok {
 		edits = append(edits, edit{e.start + 1, e.start + 1, []string{indent + "enabled: true"}})
 	}
-	sort.SliceStable(edits, func(i, j int) bool { return edits[i].from > edits[j].from })
+	// A replace and an insert at one line: the replace goes first, or it
+	// lands on the inserted line and the field it meant to fix stays.
+	sort.SliceStable(edits, func(i, j int) bool {
+		if edits[i].from != edits[j].from {
+			return edits[i].from > edits[j].from
+		}
+		return edits[i].to > edits[j].to
+	})
 	out = append([]string(nil), lines...)
 	for _, ed := range edits {
 		out = append(out[:ed.from], append(append([]string(nil), ed.with...), out[ed.to:]...)...)

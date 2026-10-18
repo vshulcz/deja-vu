@@ -151,3 +151,34 @@ func gooseExtensionNames(t *testing.T, path string) map[string]bool {
 	}
 	return names
 }
+
+// An entry whose first field is a non-stdio type and that has no cmd: the
+// type fix and the cmd insert land on one line, and the type must not be
+// written twice — goose drops the whole file over a duplicate key.
+func TestInstallGooseFixesTheTypeOfAnEntryWithoutCmd(t *testing.T) {
+	hermeticEnv(t)
+	if os.Getenv("DEJA_GOOSE_ROOT") == "" {
+		t.Skip("no goose root in this environment")
+	}
+	cfg := filepath.Join(gooseConfigDir(), "config.yaml")
+	if err := os.MkdirAll(filepath.Dir(cfg), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	const hand = "extensions:\n  deja:\n    type: streamable_http\n    uri: http://127.0.0.1:9/mcp\n    enabled: true\n    name: deja\n    timeout: 300\n"
+	if err := os.WriteFile(cfg, []byte(hand), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 2; i++ {
+		if _, err := captureRun(t, "install", "goose"); err != nil {
+			t.Fatal(err)
+		}
+		got, err := os.ReadFile(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s := string(got)
+		if n := strings.Count(s, "    type:"); n != 1 || !strings.Contains(s, "    type: stdio\n") || !strings.Contains(s, "    cmd: ") {
+			t.Fatalf("install %d left %d type keys:\n%s", i+1, n, s)
+		}
+	}
+}
