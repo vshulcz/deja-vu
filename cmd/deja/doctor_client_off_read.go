@@ -313,24 +313,28 @@ func tomlStringOpenAfter(line, open string) string {
 	return open
 }
 
-// dshRowDisabled reports whether the row with this id in a dsh patch layer
-// carries `disabled: true`, the switch dsh reads per row.
+// dshRowDisabled reports whether dsh ends up with `disabled: true` on the row
+// with this id. dsh applies a layer's patches in order: the insert in deja's
+// block first, then any row the user wrote below it, the last one that says
+// `disabled` deciding. A row above the insert patches nothing, dsh drops it as
+// "entry not found" (#5180).
 func dshRowDisabled(text, id string) bool {
 	lines := strings.Split(text, "\n")
+	inserted, off := false, false
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if !strings.HasPrefix(t, "- ") {
 			continue
 		}
 		dash := yamlIndentWidth(line)
-		inRow, off := false, false
+		inRow, set, val := false, false, false
 		check := func(kv string) {
 			k, v, _ := strings.Cut(kv, ":")
 			switch strings.TrimSpace(k) {
 			case "id":
 				inRow = hermesYAMLScalar(v) == id
 			case "disabled":
-				off = hermesYAMLScalar(v) == "true"
+				set, val = true, strings.ToLower(hermesYAMLScalar(v)) == "true"
 			}
 		}
 		check(strings.TrimSpace(t[2:]))
@@ -346,9 +350,34 @@ func dshRowDisabled(text, id string) bool {
 				check(nt)
 			}
 		}
-		if inRow {
-			return off
+		if !inRow {
+			continue
 		}
+		if !inserted {
+			// The first row naming the id is the insert only when it is one of
+			// the rows an insert list holds, nested under `- insert:`.
+			if !dshRowIsInserted(lines, i) {
+				continue
+			}
+			inserted = true
+		}
+		if set {
+			off = val
+		}
+	}
+	return off
+}
+
+// dshRowIsInserted reports whether the row on line i sits inside an
+// `- insert:` list rather than at the layer's top level.
+func dshRowIsInserted(lines []string, i int) bool {
+	dash := yamlIndentWidth(lines[i])
+	for j := i - 1; j >= 0; j-- {
+		t := strings.TrimSpace(lines[j])
+		if t == "" || t[0] == '#' || yamlIndentWidth(lines[j]) >= dash {
+			continue
+		}
+		return t == "- insert:" || strings.HasPrefix(t, "- insert:") || t == "insert:"
 	}
 	return false
 }
