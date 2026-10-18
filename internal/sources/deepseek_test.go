@@ -208,3 +208,29 @@ func TestDSHHomeReadsDSHHomeTheWayDshDoes(t *testing.T) {
 		}
 	}
 }
+
+// A subagent or subagent_fork run is a log of its own whose header names the
+// parent the way dsh 0.1.1-rc.2 writes it, with the "session-" prefix.
+func TestDeepSeekSubagentNamesItsParent(t *testing.T) {
+	root := t.TempDir()
+	child := strings.Replace(deepSeekLog,
+		`"id":"session-eaf5c9ac-0e47-4d2f-b982-8bae306062d1","createdAt":1787320263519,"cwd":"/work/pgbouncer-lab","delegationDepth":0}`,
+		`"id":"286f51ca-3e5c-437d-8e6b-c9d5cfb5e4d3","createdAt":1787320263519,"cwd":"/work/pgbouncer-lab","parentSession":"session-c559c777-a703-4cfa-9f2e-f4b9ebf675cc","origin":"subagent","delegationDepth":1}`, 1)
+	if child == deepSeekLog {
+		t.Fatal("the fixture header moved; this test no longer writes a sub-agent")
+	}
+	for _, c := range []struct {
+		name, body, kind, parent string
+	}{
+		{"child", child, "subagent", "c559c777-a703-4cfa-9f2e-f4b9ebf675cc"},
+		{"main", deepSeekLog, "", ""},
+	} {
+		ss, err := ParseDeepSeekFile(writeDeepSeekSession(t, root, c.name, c.body, false))
+		if err != nil || len(ss) != 1 {
+			t.Fatalf("%s: %v %#v", c.name, err, ss)
+		}
+		if ss[0].Kind != c.kind || ss[0].Parent != c.parent {
+			t.Errorf("%s: kind/parent = %q/%q, want %q/%q", c.name, ss[0].Kind, ss[0].Parent, c.kind, c.parent)
+		}
+	}
+}

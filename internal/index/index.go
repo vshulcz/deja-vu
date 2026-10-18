@@ -738,7 +738,10 @@ import (
 // 79: a Claude Code /branch is read as a fork of the session it names in
 // forkedFrom, which the rows already indexed do not carry until a rebuild
 // (#5241).
-const version = 79
+// 80: a dsh sub-agent names its parent, and a session's spawned family is
+// left out of its recall at any depth; sub-agent rows already indexed hold no
+// parent until a rebuild.
+const version = 80
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

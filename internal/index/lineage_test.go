@@ -34,3 +34,33 @@ func TestSessionOpeningMatchesACopyOnly(t *testing.T) {
 		t.Errorf("an untimed turn has an opening: %x", got)
 	}
 }
+
+// dsh delegates three deep and a grandchild names the child between them: the
+// root's lineage takes in every descendant, a grandchild's every ancestor, and
+// a cycle in bad data ends.
+func TestSpawnedFamilyWalksEveryDepth(t *testing.T) {
+	m := Manifest{Sessions: map[string]SessionMeta{
+		"root":  {ID: "root"},
+		"child": {ID: "child", Kind: "subagent", Parent: "root"},
+		"grand": {ID: "grand", Kind: "subagent", Parent: "child"},
+		"fork":  {ID: "fork", Kind: "fork", Parent: "root"},
+		"loopa": {ID: "loopa", Kind: "subagent", Parent: "loopb"},
+		"loopb": {ID: "loopb", Kind: "subagent", Parent: "loopa"},
+		"self":  {ID: "self", Kind: "subagent", Parent: "self"},
+	}}
+	out := map[string]bool{}
+	own := spawnedFamily(m, map[string]bool{"root": true}, out)
+	if !own["child"] || !own["grand"] || own["fork"] || own["root"] || len(out) != 0 {
+		t.Errorf("root: own %v, ancestors %v", own, out)
+	}
+	out = map[string]bool{}
+	own = spawnedFamily(m, map[string]bool{"grand": true}, out)
+	if !out["child"] || !out["root"] || len(own) != 0 {
+		t.Errorf("grand: own %v, ancestors %v", own, out)
+	}
+	out = map[string]bool{}
+	own = spawnedFamily(m, map[string]bool{"loopa": true, "self": true}, out)
+	if !out["loopb"] || !own["loopb"] || own["self"] {
+		t.Errorf("cycle: own %v, ancestors %v", own, out)
+	}
+}

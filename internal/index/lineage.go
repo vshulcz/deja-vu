@@ -102,9 +102,10 @@ func lineage(dir string, ids map[string]bool, heads, wholes []model.Session) map
 			}
 		}
 	}
+	own := spawnedFamily(m, ids, out)
 	held := heldRecords(dir, m)
 	for _, meta := range m.Sessions {
-		if spawnedKind(meta.Kind) && meta.Parent != "" && ids[meta.Parent] {
+		if own[meta.ID] {
 			out[meta.ID] = true
 		}
 		if meta.Opening == 0 || ids[meta.ID] {
@@ -244,6 +245,45 @@ func HasSession(dir, id string) bool {
 		}
 	}
 	return false
+}
+
+// spawnedFamily is every sub-agent below the askers and every parent above
+// them, however deep. dsh delegates up to three levels and a grandchild names
+// the child that spawned it, not the session the person is in, so one step
+// each way left the grandchildren on the root's page and the root on theirs.
+// It also adds the ancestors to out.
+func spawnedFamily(m Manifest, ids, out map[string]bool) map[string]bool {
+	children := map[string][]string{}
+	parent := map[string]string{}
+	for _, meta := range m.Sessions {
+		if spawnedKind(meta.Kind) && meta.Parent != "" && meta.Parent != meta.ID {
+			children[meta.Parent] = append(children[meta.Parent], meta.ID)
+			parent[meta.ID] = meta.Parent
+		}
+	}
+	for id := range ids {
+		seen := map[string]bool{id: true}
+		for p := parent[id]; p != "" && !seen[p]; p = parent[p] {
+			seen[p] = true
+			out[p] = true
+		}
+	}
+	own := map[string]bool{}
+	var queue []string
+	for id := range ids {
+		queue = append(queue, id)
+	}
+	for len(queue) > 0 {
+		id := queue[0]
+		queue = queue[1:]
+		for _, c := range children[id] {
+			if !own[c] && !ids[c] {
+				own[c] = true
+				queue = append(queue, c)
+			}
+		}
+	}
+	return own
 }
 
 // spawnedKind reports whether a session's kind is the harness's word for an
