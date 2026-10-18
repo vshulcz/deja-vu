@@ -24,6 +24,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/nfcfold"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/query"
+	"github.com/vshulcz/deja-vu/internal/rulex"
 	"github.com/vshulcz/deja-vu/internal/rustem"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -123,7 +124,7 @@ func searchDetailedRead(dir string, o query.Options) (SearchResult, error) {
 	usedPostings := false
 	if !o.Regex {
 		stems := m.Version >= stemKeysSince
-		if keys := queryKeysFor(o.Query, stems); len(keys) > 0 {
+		if keys := queryKeysLoan(dir, o.Query, stems); len(keys) > 0 {
 			usedPostings = true
 			posts, err = intersectPostings(dir, retrievalKeys(keys))
 			if err != nil {
@@ -294,7 +295,7 @@ func searchDetailedRead(dir string, o query.Options) (SearchResult, error) {
 	}
 	// The postings matched on stems, so the scorer downstream must count any
 	// form of a word, not only the one the reader typed.
-	vars := withStemVariants(m, o, fallbackVariants)
+	vars := withStemVariants(dir, m, o, fallbackVariants)
 	return withRelevanceTail(dir, m, o, SearchResult{Sessions: ss, Tier: fallbackTier, Variants: vars, Keyed: len(vars) > len(fallbackVariants)})
 }
 
@@ -1826,7 +1827,7 @@ func FirstMatch(dir string, queries []string, limit int) ([]model.Session, strin
 		return nil, "", fmt.Errorf("%w: records.bin size does not match the manifest (crash-truncated or uncommitted tail)", errCorruptIndex)
 	}
 	for _, q := range queries {
-		keys := queryKeysFor(q, m.Version >= stemKeysSince)
+		keys := queryKeysLoan(dir, q, m.Version >= stemKeysSince)
 		if len(keys) == 0 {
 			continue
 		}
@@ -3132,7 +3133,7 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 	// Built once: the query side of the check does not change between records,
 	// and this loop runs over every record a query without postings reaches
 	// (#1885).
-	matcher := newRecordMatcher(o, withStemVariants(m, o, variants))
+	matcher := newRecordMatcher(o, withStemVariants(dir, m, o, variants))
 	if len(offsets) > 0 {
 		f, err := openIndexFile(filepath.Join(dir, "records.bin"))
 		if err != nil {
@@ -3331,6 +3332,9 @@ func sortedUniquePostings(posts []posting) []posting {
 }
 
 func postingsFor(dir, tok string) ([]posting, error) {
+	if strings.Contains(tok, "|") {
+		return postingsAny(dir, strings.Split(tok, "|"))
+	}
 	p, ok := bucketPath(dir, tok)
 	if !ok {
 		return nil, nil
@@ -4757,6 +4761,121 @@ func retrievalKeys(keys []string) []string {
 	return keys[:8]
 }
 
+// postingsAny is the union of the postings of several keys: a query term that
+// has another spelling (деплой, deploy) is looked up as one key "a|b".
+func postingsAny(dir string, keys []string) ([]posting, error) {
+	seen := map[int64]bool{}
+	var out []posting
+	for _, key := range keys {
+		list, err := postingsFor(dir, key)
+		if err != nil && !os.IsNotExist(err) {
+			return nil, err
+		}
+		for _, p := range list {
+			if !seen[p.Off] {
+				seen[p.Off] = true
+				out = append(out, p)
+			}
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Off < out[j].Off })
+	return out, nil
+}
+
+// translitBelow is how few sessions the term itself may hit before its
+// transliterations are tried: a name spelled in the other script is looked up
+// when the typed spelling finds almost nothing, never for a common word.
+const translitBelow = 20
+
+// otherSpellings lists the other-script spellings of a query term: the
+// loanword table's, and, when the term itself hits fewer than translitBelow
+// sessions, those of its transliterations the index holds. key is the term's
+// own lookup key. Both are consulted only when the query holds a Russian word
+// (russian): an English query keeps the answer it always had, as "hook"
+// otherwise stops on a session that says «хуки» before the close tier reaches
+// the one that says "hooks", and a rare English word such as "most" would also
+// match «мост».
+func otherSpellings(dir, tok, key string, russian bool) []string {
+	if !russian {
+		return nil
+	}
+	alts := rulex.Alternatives(tok)
+	if dir == "" || utf8.RuneCountInString(tok) < 4 {
+		return alts
+	}
+	var names []string
+	if isCyrillicWord(tok) {
+		names = rulex.ToLatin(tok)
+	} else {
+		names = rulex.ToCyrillic(tok)
+	}
+	if len(names) == 0 {
+		return alts
+	}
+	if own, err := postingsFor(dir, key); err == nil && len(own) >= translitBelow {
+		return alts
+	}
+	// A guess the store never wrote would only add a made-up variant to the
+	// answer, so a spelling is kept when the index holds it.
+	out := append([]string(nil), alts...)
+	for _, n := range names {
+		for _, k := range spellingKeys(n) {
+			if list, err := postingsFor(dir, k); err == nil && len(list) > 0 {
+				out = append(out, n)
+				break
+			}
+		}
+	}
+	return out
+}
+
+// spellingKeys are the lookup keys of an other-script spelling: the stem key of
+// a Cyrillic word, the plain key of a Latin one. A short stem is shared by
+// words that only look related — тест and тесто are both "тест" — so a word
+// that is its own short stem (shorter than shortStem: тест, лог, хук) is looked
+// up by the masculine noun forms instead (тест, тесты, тестов; not тесто).
+// A word the stemmer cut (деплой to депл) keeps its stem key.
+func spellingKeys(a string) []string {
+	st, ok := stemKey(a)
+	if !ok {
+		return []string{"t" + a}
+	}
+	if a != st || utf8.RuneCountInString(st) >= shortStem {
+		return []string{"s" + st}
+	}
+	keys := make([]string, 0, len(nounEndings))
+	for _, e := range nounEndings {
+		keys = append(keys, "t"+a+e)
+	}
+	return keys
+}
+
+const shortStem = 5
+
+var nounEndings = []string{"", "а", "у", "ом", "е", "и", "ы", "ов", "ам", "ами", "ах", "ей"}
+
+// loanwordKey widens a term's key with its other-script spellings:
+// "sдепл" becomes "sдепл|tdeploy|tdeployed|...". Only an index with stem keys
+// can answer the Cyrillic side, so an old one is left alone.
+func loanwordKey(dir, tok, key string, loan, russian bool) string {
+	if !loan {
+		return key
+	}
+	alts := otherSpellings(dir, tok, key, russian)
+	if len(alts) == 0 {
+		return key
+	}
+	parts := []string{key}
+	for _, a := range alts {
+		for _, alt := range spellingKeys(a) {
+			if !slices.Contains(parts, alt) {
+				parts = append(parts, alt)
+			}
+		}
+	}
+	return strings.Join(parts, "|")
+}
+
 // queryKeys builds the keys of a query without stem keys, the way they were
 // built before stemKeysSince; the tests of the plain key list use it.
 func queryKeys(s string) []string { return queryKeysFor(s, false) }
@@ -4764,7 +4883,15 @@ func queryKeys(s string) []string { return queryKeysFor(s, false) }
 // queryKeysFor builds the lookup keys of a query. With stems on, a Cyrillic word
 // is looked up by its stem key, so every form of the lemma lands on one key;
 // the index holds those keys from version stemKeysSince on.
-func queryKeysFor(s string, stems bool) []string {
+func queryKeysFor(s string, stems bool) []string { return queryKeysWith("", s, stems, false) }
+
+// queryKeysLoan is queryKeysFor for the exact tier, where a term with an
+// other-script spelling (деплой, deploy) is looked up as an OR group. The
+// relevance tier keeps plain keys: a common loanword like push or репозиторий
+// widened there pulled in so many sessions that it diluted the ranking.
+func queryKeysLoan(dir, s string, stems bool) []string { return queryKeysWith(dir, s, stems, stems) }
+
+func queryKeysWith(dir, s string, stems, loan bool) []string {
 	toks := query.ExpandCJKTokens(tokens(s))
 	if len(toks) == 0 {
 		return nil
@@ -4784,12 +4911,17 @@ func queryKeysFor(s string, stems bool) []string {
 	if len(content) == 0 {
 		content = toks
 	}
+	russian := hasRussianWord(content)
 	out := make([]string, 0, len(content))
 	for _, tok := range content {
 		// Mirror of indexKeys: the posting side is folded, so the query side
 		// must be too.
-		if st, ok := stemKey(tok); ok && stems {
-			out = append(out, "s"+st)
+		if stems {
+			if st, ok := stemKey(tok); ok {
+				out = append(out, loanwordKey(dir, tok, "s"+st, loan, russian))
+				continue
+			}
+			out = append(out, loanwordKey(dir, tok, "t"+cjkfold.String(tok), loan, russian))
 			continue
 		}
 		out = append(out, "t"+cjkfold.String(tok))
@@ -5427,6 +5559,16 @@ func rerankByBestMessage(ss []model.Session, terms []string, idf map[string]floa
 // beside every surface key of a Cyrillic word.
 const stemKeysSince = 85
 
+// hasRussianWord reports whether any of toks is a Russian word.
+func hasRussianWord(toks []string) bool {
+	for _, t := range toks {
+		if query.IsRussian(t) {
+			return true
+		}
+	}
+	return false
+}
+
 // isCyrillicWord reports a token made of Cyrillic letters only.
 func isCyrillicWord(tok string) bool {
 	for _, r := range tok {
@@ -5451,16 +5593,31 @@ func stemKey(tok string) (string, bool) {
 
 // withStemVariants lets the record check accept any form of a query word: the
 // postings matched on the stem, and the stem is a prefix of every form.
-func withStemVariants(m Manifest, o query.Options, variants map[string][]string) map[string][]string {
+func withStemVariants(dir string, m Manifest, o query.Options, variants map[string][]string) map[string][]string {
 	if m.Version < stemKeysSince || o.Regex {
 		return variants
 	}
 	terms, _ := query.QueryParts(o.Query)
+	russian := hasRussianWord(terms)
 	var out map[string][]string
 	for _, t := range terms {
 		var extra []string
 		if st, ok := stemKey(t); ok && st != t {
 			extra = append(extra, st)
+		}
+		// The postings took the other spellings too, so the record check must
+		// accept them: the stem for a Cyrillic word, the word for a Latin one.
+		key := "t" + t
+		if st, ok := stemKey(t); ok {
+			key = "s" + st
+		}
+		for _, a := range otherSpellings(dir, t, key, russian) {
+			if st, ok := stemKey(a); ok {
+				a = st
+			}
+			if !slices.Contains(extra, a) {
+				extra = append(extra, a)
+			}
 		}
 		if len(extra) == 0 {
 			continue

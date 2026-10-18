@@ -56,6 +56,14 @@ that says «лимит запросов», and the form the query typed earns a 
 Russian stop words are matched by stem. The index format moves to version 85,
 so the first run rebuilds it, and the index grows by about 15%.
 
+IT loanwords match across scripts (деплой and deploy, коммит and commit: 53
+pairs in `internal/rulex/loanwords.tsv`), and a word of four or more letters
+that hits fewer than 20 sessions is also looked up in the other script
+(Нетаньяху and Netanyahu) when the index holds that spelling. A Latin word is
+widened only beside a Russian word, so an English query answers as before. The
+prompt hook folds ё, counts the forms of one Russian word once and splits a
+token that glues the two scripts (`k8sнастройки`, `деплой-k8s`).
+
 ## [0.22.2] - 2026-10-17
 
 deja now reads Windsurf / Devin Desktop: Cascade's encrypted conversation

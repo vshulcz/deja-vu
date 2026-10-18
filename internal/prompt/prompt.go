@@ -13,6 +13,7 @@ import (
 	"unicode"
 
 	"github.com/vshulcz/deja-vu/internal/query"
+	"github.com/vshulcz/deja-vu/internal/rustem"
 )
 
 // relevanceTerms is the ranking's own tokenisation, used for the scripts that
@@ -33,10 +34,10 @@ func termsAsked(ask, rest string) []string {
 	var out []string
 	seen := map[string]bool{}
 	add := func(f string) bool {
-		if seen[f] {
+		if wasSeen(seen, f) {
 			return false
 		}
-		seen[f] = true
+		markSeen(seen, f)
 		out = append(out, f)
 		return len(out) == 6
 	}
@@ -64,6 +65,7 @@ func termsFrom(prompt string, seen map[string]bool, add func(string) bool) bool 
 			r == '-' || r == '_' || r == '.' || r == '/' || r >= 0x400
 		return !wordy
 	})
+	fields = hookFields(fields)
 	for _, f := range fields {
 		// A word at the end of a sentence arrives with its full stop attached,
 		// and the dot then does two things at once: it marks the token as an
@@ -75,7 +77,7 @@ func termsFrom(prompt string, seen map[string]bool, add func(string) bool) bool 
 		// Only the edges are trimmed. A dot inside a token is what makes an IP
 		// address, a version or a filename one word.
 		f = strings.Trim(f, "._-/")
-		if (len(f) < 3 && !shortSubject(f)) || query.IsStopWord(f) || seen[f] || !techTerm(f) {
+		if (len(f) < 3 && !shortSubject(f)) || query.IsStopWord(f) || wasSeen(seen, f) || !techTerm(f) {
 			continue
 		}
 		if add(f) {
@@ -111,7 +113,7 @@ func termsFrom(prompt string, seen map[string]bool, add func(string) bool) bool 
 	// so the words are already there — they just need a length floor and the
 	// closed class removed, and the index matches their inflected forms.
 	for _, f := range fields {
-		if seen[f] || !cyrPromptTerm(f) {
+		if wasSeen(seen, f) || !cyrPromptTerm(f) {
 			continue
 		}
 		if add(f) {
@@ -119,6 +121,75 @@ func termsFrom(prompt string, seen map[string]bool, add func(string) bool) bool 
 		}
 	}
 	return false
+}
+
+// hookFields puts the prompt's words in the form the index reads them in: ё is
+// е, and an identifier glued to a Russian word (k8sнастройки, a missing space
+// or a pasted label) becomes the two words it is, since neither the identifier
+// test nor the Cyrillic one accepts a token of both scripts. A Cyrillic-led
+// token is cut only when it holds a Latin letter or digit (деплой-k8s), so a
+// Russian compound like лог-сообщение stays the one name it is.
+func hookFields(fields []string) []string {
+	out := make([]string, 0, len(fields))
+	for _, f := range fields {
+		f = strings.ReplaceAll(f, "ё", "е")
+		if f == "" || f[0] >= 0x80 && !hasLatin(f) {
+			out = append(out, f)
+			continue
+		}
+		start, cyr := 0, false
+		for i, r := range f {
+			if isCyr := r >= 0x400 && r <= 0x4ff; isCyr != cyr && (isCyr || r < 0x80) {
+				if i > start {
+					out = append(out, f[start:i])
+				}
+				start, cyr = i, isCyr
+			}
+		}
+		out = append(out, f[start:])
+	}
+	return out
+}
+
+// hasLatin reports whether f holds an ASCII letter or digit.
+func hasLatin(f string) bool {
+	for i := 0; i < len(f); i++ {
+		if c := f[i]; c >= 'a' && c <= 'z' || c >= '0' && c <= '9' {
+			return true
+		}
+	}
+	return false
+}
+
+// seenKeys is what a term is remembered by, so the forms of one Russian word
+// spend one place of the six: лимит, лимиты and лимитов are the same term to
+// the index, which reads every form from its stems. Snowball cuts лимит to лим
+// but лимиты to лимит, so a form matches another when any of their keys do.
+func seenKeys(f string) []string {
+	if query.IsRussian(f) && !strings.Contains(f, "-") {
+		keys := rustem.Keys(f)
+		out := make([]string, len(keys))
+		for i, k := range keys {
+			out[i] = "~" + k
+		}
+		return out
+	}
+	return []string{f}
+}
+
+func wasSeen(seen map[string]bool, f string) bool {
+	for _, k := range seenKeys(f) {
+		if seen[k] {
+			return true
+		}
+	}
+	return false
+}
+
+func markSeen(seen map[string]bool, f string) {
+	for _, k := range seenKeys(f) {
+		seen[k] = true
+	}
 }
 
 // splitAsk separates the question from the rest of the prompt. The ask is the
@@ -282,7 +353,7 @@ func cyrPromptTerm(f string) bool {
 	// prompts, dropping the floor from five to three added nine distinct words
 	// across forty-one questions, and six of the nine were closed-class words
 	// missing from the list below; naming them is what makes the floor safe.
-	if letters < 3 || cyrPromptStop[f] {
+	if letters < 3 || cyrStop(f) {
 		return false
 	}
 	// A compound made only of closed-class words is still filler: "то-то-сё"
@@ -293,12 +364,16 @@ func cyrPromptTerm(f string) bool {
 	// question holding a verb — measured on a real store, compound subjects
 	// came back on topic 68% of the time against 100% for plain ones.
 	for _, part := range strings.Split(f, "-") {
-		if len([]rune(part)) >= 3 && !cyrPromptStop[part] {
+		if len([]rune(part)) >= 3 && !cyrStop(part) {
 			return true
 		}
 	}
 	return !strings.Contains(f, "-")
 }
+
+// cyrStop is the hook's own closed class plus the search stop list, which
+// knows every form of a filler verb (делали, покажите) by its stem.
+func cyrStop(w string) bool { return cyrPromptStop[w] || query.IsStopWord(w) }
 
 func hasCJKRune(s string) bool {
 	for _, r := range s {

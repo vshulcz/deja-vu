@@ -263,14 +263,14 @@ func TestPlanTermSessionsReachesAnotherForm(t *testing.T) {
 // matched as written.
 func TestStemVariantsNeedAnIndexWithStemKeys(t *testing.T) {
 	o := query.Options{Query: "лимиты"}
-	if got := withStemVariants(Manifest{Version: stemKeysSince}, o, nil); !reflect.DeepEqual(got["лимиты"], []string{"лимит"}) {
+	if got := withStemVariants(t.TempDir(), Manifest{Version: stemKeysSince}, o, nil); !reflect.DeepEqual(got["лимиты"], []string{"лимит"}) {
 		t.Fatalf("current index: variants = %v, want the stem of «лимиты»", got)
 	}
-	if got := withStemVariants(Manifest{Version: stemKeysSince - 1}, o, nil); len(got) != 0 {
+	if got := withStemVariants(t.TempDir(), Manifest{Version: stemKeysSince - 1}, o, nil); len(got) != 0 {
 		t.Fatalf("index before stem keys: variants = %v, want none", got)
 	}
 	o.Regex = true
-	if got := withStemVariants(Manifest{Version: stemKeysSince}, o, nil); len(got) != 0 {
+	if got := withStemVariants(t.TempDir(), Manifest{Version: stemKeysSince}, o, nil); len(got) != 0 {
 		t.Fatalf("regex query: variants = %v, want none", got)
 	}
 }
