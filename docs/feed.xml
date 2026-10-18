@@ -6,10 +6,24 @@
   <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
   <link rel="self" type="application/atom+xml" href="https://vshulcz.github.io/deja-vu/feed.xml"></link>
   <link rel="hub" href="https://pubsubhubbub.appspot.com/"></link>
-  <updated>2026-10-17T00:00:00Z</updated>
+  <updated>2026-10-18T00:00:00Z</updated>
   <author>
     <name>vshulcz</name>
   </author>
+  <entry>
+    <title>Where Kiro stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/kiro.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/kiro.html"></link>
+    <updated>2026-10-18T00:00:00Z</updated>
+    <summary>Where Kiro writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
+  <entry>
+    <title>Where pi stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/pi.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/pi.html"></link>
+    <updated>2026-10-18T00:00:00Z</updated>
+    <summary>Where pi writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
   <entry>
     <title>deja CLI reference: search, recall, blame, stats — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/commands.html</id>
@@ -30,6 +44,48 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html"></link>
     <updated>2026-10-17T00:00:00Z</updated>
     <summary>One session: rm its .jsonl, or pick it from a list. A whole project: claude project purge. On a timer: cleanupPeriodDays. What /clear does.</summary>
+  </entry>
+  <entry>
+    <title>Codex CLI 的会话历史：查看、搜索和同步 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/codex-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/codex-history.html"></link>
+    <updated>2026-10-17T00:00:00Z</updated>
+    <summary>Codex CLI 把会话历史放在哪里、为什么 grep 会漏掉一周之前的会话、jq 和 sqlite3 怎么读，以及如何搜索全部 Codex 会话。</summary>
+  </entry>
+  <entry>
+    <title>Codex resume 会话：列出、查找和修复报错 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/codex-resume-session.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/codex-resume-session.html"></link>
+    <updated>2026-10-17T00:00:00Z</updated>
+    <summary>codex resume、--all、--last 和 exec resume：为什么某个会话不在选择器里，以及 no rollout found 和 is archived 这两个报错。</summary>
+  </entry>
+  <entry>
+    <title>Claude Code 上下文窗口满了：它会丢掉什么 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/context-window-full.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/context-window-full.html"></link>
+    <updated>2026-10-17T00:00:00Z</updated>
+    <summary>压缩保留了 77% 的决定和 0.2% 的命令——实测。与其为不断增长、直到崩掉的窗口持续付账，不如换个做法。</summary>
+  </entry>
+  <entry>
+    <title>怎么删除 Codex CLI 的会话 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/delete-codex-sessions.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/delete-codex-sessions.html"></link>
+    <updated>2026-10-17T00:00:00Z</updated>
+    <summary>怎么删除 Codex CLI 的会话——删一次 rollout、删一天，或者删掉整个 ~/.codex/sessions——以及为什么 ~/.codex/history.jsonl 无论如何都留着你的提示词。</summary>
+  </entry>
+  <entry>
+    <title>怎么删除 Cursor 的聊天记录 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/delete-cursor-chat-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/delete-cursor-chat-history.html"></link>
+    <updated>2026-10-17T00:00:00Z</updated>
+    <summary>怎么删除 Cursor 的聊天记录——聊天存在 state.vscdb 里的什么位置、为什么删掉整个文件会重置的不只是聊天，以及命令行版另外写了什么。</summary>
+  </entry>
+  <entry>
+    <title>Claude Code：No conversation found with session ID — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/no-conversation-found-claude-code.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/no-conversation-found-claude-code.html"></link>
+    <updated>2026-10-17T00:00:00Z</updated>
+    <summary>claude --resume 在 ~/.claude/projects 下没找到会话文件。五种原因，在 2.1.295 上复现，怎么找到那个文件，以及怎么把会话找回来。</summary>
   </entry>
   <entry>
     <title>API keys in your coding agent transcripts — deja-vu</title>
@@ -74,41 +130,6 @@
     <summary>How to sync between machines without a server: one person, two laptops, one history their agents can all read.</summary>
   </entry>
   <entry>
-    <title>Codex CLI 的会话历史：查看、搜索和同步 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/codex-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/codex-history.html"></link>
-    <updated>2026-10-16T00:00:00Z</updated>
-    <summary>Codex CLI 把会话历史放在哪里、为什么 grep 会漏掉一周之前的会话、jq 和 sqlite3 怎么读，以及如何搜索全部 Codex 会话。</summary>
-  </entry>
-  <entry>
-    <title>Codex resume 会话：列出、查找和修复报错 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/codex-resume-session.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/codex-resume-session.html"></link>
-    <updated>2026-10-16T00:00:00Z</updated>
-    <summary>codex resume、--all、--last 和 exec resume：为什么某个会话不在选择器里，以及 no rollout found 和 is archived 这两个报错。</summary>
-  </entry>
-  <entry>
-    <title>Claude Code 上下文窗口满了：它会丢掉什么 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/context-window-full.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/context-window-full.html"></link>
-    <updated>2026-10-16T00:00:00Z</updated>
-    <summary>压缩保留了 77% 的决定和 0.2% 的命令——实测。与其为不断增长、直到崩掉的窗口持续付账，不如换个做法。</summary>
-  </entry>
-  <entry>
-    <title>怎么删除 Codex CLI 的会话 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/delete-codex-sessions.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/delete-codex-sessions.html"></link>
-    <updated>2026-10-16T00:00:00Z</updated>
-    <summary>怎么删除 Codex CLI 的会话——删一次 rollout、删一天，或者删掉整个 ~/.codex/sessions——以及为什么 ~/.codex/history.jsonl 无论如何都留着你的提示词。</summary>
-  </entry>
-  <entry>
-    <title>怎么删除 Cursor 的聊天记录 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/delete-cursor-chat-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/delete-cursor-chat-history.html"></link>
-    <updated>2026-10-16T00:00:00Z</updated>
-    <summary>怎么删除 Cursor 的聊天记录——聊天存在 state.vscdb 里的什么位置、为什么删掉整个文件会重置的不只是聊天，以及命令行版另外写了什么。</summary>
-  </entry>
-  <entry>
     <title>给 Claude Code 加记忆：召回这台机器上所有智能体的历史会话 — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-claude-code.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-claude-code.html"></link>
@@ -121,13 +142,6 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-cursor.html"></link>
     <updated>2026-10-16T00:00:00Z</updated>
     <summary>如何让 Cursor 查到这台机器上每个编程智能体的会话：它的 SQLite 聊天记录存在哪，以及 deja install cursor-auto 写入了什么。</summary>
-  </entry>
-  <entry>
-    <title>Claude Code：No conversation found with session ID — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/no-conversation-found-claude-code.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/no-conversation-found-claude-code.html"></link>
-    <updated>2026-10-16T00:00:00Z</updated>
-    <summary>claude --resume 在 ~/.claude/projects 下没找到会话文件。五种原因，在 2.1.295 上复现，怎么找到那个文件，以及怎么把会话找回来。</summary>
   </entry>
   <entry>
     <title>隐私：索引什么、脱敏什么、什么都不外传 — deja-vu</title>
@@ -275,19 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/getting-started.html"></link>
     <updated>2026-10-14T00:00:00Z</updated>
     <summary>Install deja and index your coding-agent history in one command, then search it and wire it into your agents over MCP.</summary>
-  </entry>
-  <entry>
-    <title>Claude Code lost your context: how to get it back — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/lost-context.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/lost-context.html"></link>
-    <updated>2026-10-14T00:00:00Z</updated>
-    <summary>A crash, a cleared window or a restart takes the agent&#39;s context but not the transcript — how to get the work back and stop paying for it next time.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to aider: its read-only context — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-aider.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-aider.html"></link>
-    <updated>2026-10-14T00:00:00Z</updated>
-    <summary>aider appends every message to one markdown log and reads none of it back. deja keeps a read-only context file current and indexes every agent on the machine.</summary>
   </entry>
 </feed>

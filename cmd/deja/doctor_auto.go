@@ -310,7 +310,7 @@ func autoWiringState(a autoWiring) (state string, binaryMissing bool) {
 	// Written, and the CLI's default V2 engine does not start it: that runs
 	// kiro_default unless the default agent is deja's or a chat names it
 	// (#4304). The IDE and --v3 run the global file regardless.
-	case a.name == "kiro" && kiroDefaultAgent() != "deja":
+	case a.name == "kiro" && !kiroV2RunsDeja():
 		state = "installed"
 	default:
 		state = "wired"
@@ -444,8 +444,8 @@ func doctorAutoRecall(w io.Writer) {
 			fmt.Fprintf(w, "  %-12s %-11s %s  (deja's hook is not under hooks.events with hooks.enabled on — `deja install zcode-auto`)\n", a.name, "stale", reportPath(path))
 		case a.name == "openclaw" && openclawPluginMissing():
 			fmt.Fprintf(w, "  %-12s %-11s %s  (deja's plugin is not in %s — `openclaw agent --local` and `openclaw chat` get no recall; `deja install openclaw-auto`)\n", a.name, "stale", reportPath(path), reportPath(openclawPluginDir()))
-		case a.name == "kiro" && kiroDefaultAgent() != "deja":
-			fmt.Fprintf(w, "  %-12s %-11s %s  (the IDE and `kiro-cli --v3` run it in every chat; the default V2 engine only in `kiro-cli chat --agent deja`, and `kiro-cli agent set-default deja` makes it every chat's)\n", a.name, "installed", reportPath(path))
+		case a.name == "kiro" && !kiroV2RunsDeja():
+			fmt.Fprintf(w, "  %-12s %-11s %s  (%s)\n", a.name, "installed", reportPath(path), kiroV2Note())
 		default:
 			fmt.Fprintf(w, "  %-12s %-11s %s%s\n", a.name, "wired", reportPath(path), note)
 			if off := autoWiringSwitchedOff(a.name); off != "" {
