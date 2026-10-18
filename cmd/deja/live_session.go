@@ -283,7 +283,9 @@ func liveWhole(id string) (model.Session, bool) {
 	}
 	w, ok = askerHead(id, "")
 	if !ok {
-		return w, false
+		if w, ok = sources.ClineForkSession(id); !ok {
+			return w, false
+		}
 	}
 	w = lineageOnly(w)
 	liveWholes.Lock()
@@ -320,6 +322,10 @@ func askerLineage(dir, asker, transcript string, ids ...string) map[string]bool 
 	if asker = strings.TrimSpace(asker); asker != "" && !isSpawnedReader(asker) && !index.HasSession(dir, asker) {
 		if h, ok := askerHead(asker, transcript); ok {
 			heads = append(heads, h)
+		} else if w, ok := sources.ClineForkSession(asker); ok {
+			// Read whole, so the copy it holds is left out and a sibling
+			// fork that went on past it is not (#5151).
+			return index.LineageWhole(dir, set, lineageOnly(w))
 		}
 	}
 	return index.Lineage(dir, set, heads...)
