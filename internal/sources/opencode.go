@@ -712,10 +712,17 @@ func readOpencodeRows(harness, db, q string, by map[string]*model.Session) (int,
 		}
 		if patch := str(r["patch"]); patch != "" {
 			t := partTime(r)
+			// The tool resolves a relative header against the session's
+			// directory; kept bare, "notes.txt" matched no file blame asked
+			// about.
+			resolve := func(rec string) string {
+				p, rest, _ := strings.Cut(rec, "\n")
+				return resolveToolPath(p, s.Path) + "\n" + rest
+			}
 			if IndexEdits() {
 				for _, span := range patchSpans(patch) {
 					s.Touch(t)
-					s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: span, Time: t})
+					s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: resolve(span), Time: t})
 				}
 			}
 			// apply_patch is opencode's main editing tool, and the payload it
@@ -724,7 +731,7 @@ func readOpencodeRows(harness, db, q string, by map[string]*model.Session) (int,
 			if IndexWrites() {
 				for _, rec := range addedLinesOfPatch(patch) {
 					s.Touch(t)
-					s.Messages = append(s.Messages, model.Message{Role: RoleWrote, Text: rec, Time: t})
+					s.Messages = append(s.Messages, model.Message{Role: RoleWrote, Text: resolve(rec), Time: t})
 				}
 			}
 			continue

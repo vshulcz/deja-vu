@@ -741,7 +741,10 @@ import (
 // 80: a dsh sub-agent names its parent, and a session's spawned family is
 // left out of its recall at any depth; sub-agent rows already indexed hold no
 // parent until a rebuild.
-const version = 80
+// 81: an opencode apply_patch with a relative header is filed under the
+// session's directory, as the tool resolved it; rows already indexed carry the
+// bare name until a rebuild (#5212).
+const version = 81
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
