@@ -25,7 +25,7 @@ func TestTheGooseRecallHonoursTheKillSwitch(t *testing.T) {
 	}
 
 	t.Setenv("DEJA_RECALL", "off")
-	if err := refreshGooseHintsFor(""); err != nil {
+	if err := refreshGooseHintsFor("", ""); err != nil {
 		t.Fatal(err)
 	}
 	if b, err := os.ReadFile(gooseHintsPath()); err == nil && strings.Contains(string(b), gooseRecallStart) {
@@ -49,7 +49,7 @@ func TestTheKillSwitchLeavesTheReadersLines(t *testing.T) {
 	}
 
 	t.Setenv("DEJA_RECALL", "off")
-	if err := refreshGooseHintsFor(""); err != nil {
+	if err := refreshGooseHintsFor("", ""); err != nil {
 		t.Fatal(err)
 	}
 	b, err := os.ReadFile(path)
@@ -69,7 +69,7 @@ func TestTheKillSwitchLeavesTheReadersLines(t *testing.T) {
 func TestTheKillSwitchWritesNothingAtAll(t *testing.T) {
 	gooseHomeForTest(t)
 	t.Setenv("DEJA_RECALL", "off")
-	if err := refreshGooseHintsFor(""); err != nil {
+	if err := refreshGooseHintsFor("", ""); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(gooseHintsPath()); err == nil {
@@ -93,7 +93,7 @@ func TestTheKillSwitchEmptiesTheMoimFile(t *testing.T) {
 	}
 
 	t.Setenv("DEJA_RECALL", "off")
-	if err := refreshGooseHintsFor(""); err != nil {
+	if err := refreshGooseHintsFor("", ""); err != nil {
 		t.Fatal(err)
 	}
 	if b, err := os.ReadFile(moim); err == nil && strings.TrimSpace(string(b)) != "" {

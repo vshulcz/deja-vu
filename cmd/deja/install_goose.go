@@ -9,9 +9,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/search"
 )
 
 // Goose takes MCP servers as an extensions block in config.yaml, and has two
@@ -655,10 +657,13 @@ func cmdGooseHook(dir string, _ []string) error {
 	// other doors, so trailing bytes cost nothing.
 	raw := readHookStdin()
 	var input struct {
-		CWD string `json:"cwd"`
+		CWD       string `json:"cwd"`
+		SessionID string `json:"session_id"`
 	}
 	_ = json.NewDecoder(bytes.NewReader(raw)).Decode(&input)
-	err := refreshGooseHintsFor(input.CWD)
+	// goose fires this on `goose session -r` too, under the resumed id, and
+	// the digest named that session to itself.
+	err := refreshGooseHintsFor(input.CWD, input.SessionID)
 	gooseStatusBanner(dir, raw, os.Stdout)
 	return err
 }
@@ -697,9 +702,6 @@ func gooseStatusBanner(dir string, raw []byte, w io.Writer) {
 // request (#4795). The session-start digest stays there; per-prompt recall
 // needs a channel that is the session's own.
 func refreshGooseForPrompt(dir string, payload []byte) error {
-	if gooseRecallPath() == gooseHintsPath() {
-		return nil
-	}
 	var input struct {
 		// Goose calls it message; matcher_context carries the same text.
 		Message   string `json:"message"`
@@ -708,6 +710,9 @@ func refreshGooseForPrompt(dir string, payload []byte) error {
 		SessionID string `json:"session_id"`
 	}
 	_ = json.NewDecoder(bytes.NewReader(payload)).Decode(&input)
+	if gooseRecallPath() == gooseHintsPath() {
+		return refreshSharedGooseDigest(dir, input.SessionID)
+	}
 	prompt := input.Message
 	if prompt == "" {
 		prompt = input.Prompt
@@ -735,6 +740,71 @@ func refreshGooseForPrompt(dir string, payload []byte) error {
 		return nil
 	}
 	return writeGooseRecall(out.String())
+}
+
+// refreshSharedGooseDigest is the plain-goose prompt hook. It stamps the
+// session live, which the wrapper's hook-prompt does and this one skipped, so
+// the MCP tool answered a plain goose session with its own transcript.
+//
+// The shared AGENTS.md holds the digest of whichever session started last, and
+// every running session re-reads it each turn, after this hook: a session
+// resumed, or one still open when a later one started in its project, was
+// shown itself as history. Only the asker's entry comes out. Rebuilding the
+// block for the asker's project would hand every other session that project's
+// digest, and two open sessions would rewrite it back and forth (#4795).
+func refreshSharedGooseDigest(dir, session string) error {
+	if session == "" || recallIsOff() {
+		return nil
+	}
+	markSessionLive(dir, session)
+	path := gooseHintsPath()
+	old, err := readConfig(path)
+	if err != nil {
+		return nil
+	}
+	doc := string(old)
+	start := strings.Index(doc, gooseRecallStart)
+	if start < 0 {
+		return nil
+	}
+	end := strings.Index(doc[start:], gooseRecallEnd)
+	if end < 0 {
+		return nil
+	}
+	body := doc[start+len(gooseRecallStart) : start+end]
+	next, dropped := dropDigestEntry(body, search.ShortID(session))
+	if !dropped {
+		return nil
+	}
+	if !strings.Contains(next, "\n  - Session: ") {
+		next = gooseNoHistory
+	}
+	_, err = writeIfChanged(path, old, []byte(gooseRecallBlock(doc, strings.TrimLeft(next, "\n"))))
+	return err
+}
+
+// dropDigestEntry takes the entry for one session out of a session-start
+// digest: its "- Session:" line, the indented lines under it, and the
+// "recalled from" line above it that heads that entry alone.
+func dropDigestEntry(digest, shortID string) (string, bool) {
+	lines := strings.Split(digest, "\n")
+	out := make([]string, 0, len(lines))
+	dropped := false
+	for i := 0; i < len(lines); i++ {
+		l := lines[i]
+		if !strings.HasPrefix(l, "  - Session: ") || !strings.HasSuffix(strings.TrimRight(l, " \r"), "`"+shortID+"`") {
+			out = append(out, l)
+			continue
+		}
+		dropped = true
+		if n := len(out); n > 0 && strings.Contains(out[n-1], "recalled from") && !strings.HasPrefix(out[n-1], " ") {
+			out = out[:n-1]
+		}
+		for i+1 < len(lines) && strings.HasPrefix(lines[i+1], "  ") && !strings.HasPrefix(lines[i+1], "  - Session: ") {
+			i++
+		}
+	}
+	return strings.Join(out, "\n"), dropped
 }
 
 // clearGooseRecall takes deja's block out of wherever the recall lives, so a
@@ -791,13 +861,15 @@ func gooseRecallPath() string {
 }
 
 func refreshGooseHints() error {
-	return refreshGooseHintsFor("")
+	return refreshGooseHintsFor("", "")
 }
 
 // refreshGooseHintsFor is refreshGooseHints for a caller that was told which
 // project the call is about; "" leaves the chain to answer, which is what the
-// wrapper and the installer want (#2187).
-func refreshGooseHintsFor(cwd string) error {
+// wrapper and the installer want (#2187). session is the goose session asking,
+// left out of the digest with its lineage, as hook-context leaves out its
+// asker (#4199).
+func refreshGooseHintsFor(cwd, session string) error {
 	// The documented kill switch. Every other hook reads it; this one did not,
 	// so `DEJA_RECALL=off` left deja writing a block into the reader's
 	// AGENTS.md — and that file is re-read every turn, so it kept reaching the
@@ -806,7 +878,16 @@ func refreshGooseHintsFor(cwd string) error {
 	if recallIsOff() {
 		return clearGooseRecall()
 	}
-	digest, sessions, _, _, _, _, _ := cachedHookDigestFor(index.DefaultDir(), cwd, "")
+	dir := index.DefaultDir()
+	var self []string
+	if session != "" {
+		markSessionLive(dir, session)
+		for id := range askerLineage(dir, session, "") {
+			self = append(self, id)
+		}
+		sort.Strings(self)
+	}
+	digest, sessions, _, _, _, _, _ := cachedHookDigestFor(dir, cwd, self...)
 	body := digest
 	if sessions > 0 {
 		body = frameRecall(startLead(gooseLead) + digest)
