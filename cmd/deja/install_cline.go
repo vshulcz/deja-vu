@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -95,6 +97,47 @@ func installClineAuto(exe string, uninstall bool) (installResult, error) {
 	}
 	return wroteAll(installResult{Path: path, Action: a},
 		installResult{Path: dir, Action: skillAction}), nil
+}
+
+// clineAutoPreflight refuses, before the MCP entry is written, a plugin
+// install cannot finish: the entry went first, so a read-only ~/.cline/plugins
+// was refused with deja already in cline_mcp_settings.json and the target
+// reported as refused while half wired (#5203).
+func clineAutoPreflight(exe string) error {
+	dir := filepath.Join(sources.ClinePluginsDir(), "deja")
+	skill := filepath.Join(dir, "skills", "deja-history", "SKILL.md")
+	for _, f := range []struct {
+		path string
+		next []byte
+	}{
+		{filepath.Join(dir, "index.js"), []byte(clinePluginJS(preflightHookExe(exe)))},
+		{filepath.Join(dir, "package.json"), []byte(clinePluginPackage)},
+		{skill, []byte(skillFile(skillBody))},
+	} {
+		old, err := readConfig(f.path)
+		if err != nil {
+			return err
+		}
+		if f.path == skill {
+			// An edited skill is kept, not written.
+			if !forceGuidance && skillWasEdited(f.path, old) {
+				continue
+			}
+			// And an unmarked one is copied to SKILL.md.bak in place first.
+			if len(old) > 0 && !bytes.Equal(old, f.next) && !skillIsMarked(f.path) {
+				if err := configWritable(f.path + ".bak"); err != nil {
+					return err
+				}
+				if dir := filepath.Dir(f.path); !dirWritable(dir) {
+					return &fs.PathError{Op: "write", Path: dir, Err: fs.ErrPermission}
+				}
+			}
+		}
+		if err := writeWouldFail(f.path, old, f.next); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // clinePluginPackage is the manifest that makes ~/.cline/plugins/deja a plugin

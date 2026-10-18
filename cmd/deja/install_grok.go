@@ -141,20 +141,33 @@ func grokPreflight(exe string, auto bool) error {
 	if !auto {
 		return nil
 	}
-	// The path the writer will name, without writing the launcher yet: it
-	// falls back to the binary itself when the launcher cannot be written.
-	hookExe := exe
-	if p := dejaLauncherPath(); p != "" {
-		cur, _ := os.ReadFile(p)
-		if writeWouldFail(p, cur, []byte(dejaLauncherScript(exe))) == nil {
-			hookExe = p
-		}
-	}
-	path, old, next, _, err = grokHooksUpdate(hookExe, false)
+	path, old, next, _, err = grokHooksUpdate(preflightHookExe(exe), false)
 	if err != nil {
 		return err
 	}
 	return writeWouldFail(path, old, next)
+}
+
+// preflightHookExe is the path a hook writer will name, without writing the
+// launcher yet: the binary itself when writeDejaLauncher would fail. That
+// rewrites an existing launcher in place, so only the file has to be
+// writable then, not its directory.
+func preflightHookExe(exe string) string {
+	p := dejaLauncherPath()
+	if p == "" {
+		return exe
+	}
+	next := []byte(dejaLauncherScript(exe))
+	if cur, err := os.ReadFile(p); err == nil {
+		if bytes.Equal(cur, next) || configWritable(p) == nil {
+			return p
+		}
+		return exe
+	}
+	if writeWouldFail(p, nil, next) != nil {
+		return exe
+	}
+	return p
 }
 
 // writeWouldFail says why writing next over old at path would be refused:

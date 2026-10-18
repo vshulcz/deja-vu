@@ -1066,6 +1066,11 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 	case "zcode-auto":
 		return installZCodeAuto(exe, uninstall)
 	case "cline-auto":
+		if !uninstall {
+			if err := clineAutoPreflight(exe); err != nil {
+				return installResult{}, err
+			}
+		}
 		mcp, err := installMCPJSON(sources.ClineMCPSettingsPath(), exe, uninstall)
 		if err != nil {
 			return installResult{}, err
