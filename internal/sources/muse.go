@@ -41,7 +41,7 @@ import (
 // The parent's file also holds the child's task-stream records under another
 // stream id; those are left out, so a child's objective is not read as
 // something the person typed. Child logs are read only with
-// DEJA_INCLUDE_SUBAGENTS=1, as Qwen's are (#4483), and of those only the
+// DEJA_INCLUDE_SUBAGENTS=1, as Kimi's are (#4483), and of those only the
 // children that name a workspace: the rest are Muse's observers (#4711).
 
 // MuseRoots is every session directory: DEJA_MUSE_ROOTS (a path list) when

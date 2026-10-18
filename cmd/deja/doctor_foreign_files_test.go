@@ -43,8 +43,8 @@ func TestAClientsOwnFilesAreNotUnreadTranscripts(t *testing.T) {
 			own: []string{"-w-api/session-organization.v1.json", "-w-api/workflows/run-1.json",
 				"-w-api/workflows/run-1/journal.jsonl", "-w-api/subagents/s1/agent-a1.jsonl",
 				"-w-api/subagents/s1/agent-a1.meta.json"},
-			// The switch takes them now, so the row names it (#4483).
-			want: "1 subagent transcripts skipped — set DEJA_INCLUDE_SUBAGENTS=1",
+			// Read by default now, as Claude's are (#5223), and the row says how.
+			want: "1 subagent transcripts read as task, answer and what they changed",
 		},
 		{
 			// Muse keeps cron.db, goals.db and spilled tool output in each
