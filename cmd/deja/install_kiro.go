@@ -159,6 +159,11 @@ func kiroAgentJSON(exe string) (string, error) {
 			// fix pair wait for the next userPromptSubmit (hook_deferred.go).
 			"preToolUse":  hook("hook-tool", "--defer"),
 			"postToolUse": hook("hook-tool-after", "--defer"),
+			// V2 has no session-end hook. stop fires after every turn, which
+			// is when the session stops being written; left stamped, a
+			// finished session stayed out of the next one's MCP recall for
+			// twenty minutes. The next prompt stamps it again.
+			"stop": hook("hook-session-end"),
 		},
 	}, "", "  ")
 	return string(b) + "\n", err

@@ -184,7 +184,10 @@
 <p>hands it over once: <code>preToolUse</code> runs <code>deja hook-tool --defer</code> for the line</p>
 <p>about a file <code>write</code>, <code>fs_write</code>, <code>fs_append</code> or <code>str_replace</code> edits, and</p>
 <p><code>postToolUse</code> runs <code>deja hook-tool-after --defer</code> for the fix pair of a</p>
-<p>failed <code>shell</code> or <code>execute_bash</code>. Both arrive after the step they are about. An</p>
+<p>failed <code>shell</code> or <code>execute_bash</code>. Both arrive after the step they are about.</p>
+<p><code>stop</code> runs <code>deja hook-session-end</code>: V2 has no session end, and stop fires</p>
+<p>after every turn, so a finished session reaches the next one&#39;s MCP recall</p>
+<p>at once instead of staying marked live for twenty minutes (#5152). An</p>
 <p>agent hook may name no session, so the working directory keys it. The hooks run in that agent only:</p>
 <p><code>kiro-cli chat --agent deja</code>, or <code>kiro-cli agent set-default deja</code>. The</p>
 <p>built-in <code>kiro_default</code> takes no hooks from a file (a <code>kiro_default.json</code> is</p>
@@ -193,6 +196,14 @@
 <p><code>installed</code> until <code>chat.defaultAgent</code> is <code>deja</code>, and uninstall removes that</p>
 <p>setting when it names deja&#39;s agent. The IDE&#39;s <code>.kiro/hooks/</code> are a</p>
 <p>different system: per workspace, fired on file events (#4304).</p>
+<ul>
+<li>Sub-agents: 2.32&#39;s <code>subagent</code> tool runs each stage as a session of its own,</li>
+</ul>
+<p>whose hooks name only that session. The header beside its transcript names</p>
+<p>the spawner in <code>parent_session_id</code>, which deja reads, so the sub-agent hangs</p>
+<p>under it and its digest and recall leave the parent out (#5153).</p>
+<p><code>session_created_reason</code> says <code>subagent</code> on top-level sessions too and is</p>
+<p>not read.</p>
 <h2 id="measured-on-a-live-install">Measured on a live install</h2>
 <p><code>kiro-cli</code> 2.22.0 with its own mock model (<code>KIRO_MOCK_CHAT_RESPONSE</code>), after</p>
 <p><code>deja install kiro-auto</code>: <code>kiro-cli chat --no-interactive --agent deja</code> sent a</p>

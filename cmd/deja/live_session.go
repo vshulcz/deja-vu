@@ -348,6 +348,11 @@ func askerHead(id, transcript string) (model.Session, bool) {
 	if s, ok := sources.HermesSessionHead(id); ok && s.Parent != "" {
 		return s, true
 	}
+	// A kiro-cli sub-agent's header names the session that spawned it; its
+	// hooks name only its own.
+	if s, ok := sources.KiroSessionHead(id); ok {
+		return s, true
+	}
 	return model.Session{}, false
 }
 
