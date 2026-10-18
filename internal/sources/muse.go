@@ -40,9 +40,10 @@ import (
 // A subagent's log is the same format at <uuid>/subagent/<child>/session.jsonl.
 // The parent's file also holds the child's task-stream records under another
 // stream id; those are left out, so a child's objective is not read as
-// something the person typed. Child logs are read only with
-// DEJA_INCLUDE_SUBAGENTS=1, as Kimi's are (#4483), and of those only the
-// children that name a workspace: the rest are Muse's observers (#4711).
+// something the person typed. Child logs are read as their task, edits and
+// last turns, whole with DEJA_INCLUDE_SUBAGENTS=1 and not at all with =0
+// (#5301), and only the children that name a workspace: the rest are Muse's
+// observers (#4711).
 
 // MuseRoots is every session directory: DEJA_MUSE_ROOTS (a path list) when
 // set, else $XDG_DATA_HOME/muse/sessions where XDG_DATA_HOME is absolute, else
@@ -92,10 +93,10 @@ func isMuseSession(p string) bool {
 	return filepath.Base(p) == museLogName && underMuseRoot(p)
 }
 
-// MuseSessionFiles lists the session logs, children only with
-// DEJA_INCLUDE_SUBAGENTS=1.
+// MuseSessionFiles lists the session logs, children unless
+// DEJA_INCLUDE_SUBAGENTS=0.
 func MuseSessionFiles() []string {
-	subagents := os.Getenv("DEJA_INCLUDE_SUBAGENTS") == "1"
+	subagents := !SubagentsOff()
 	var out []string
 	for _, root := range MuseRoots() {
 		out = append(out, walkFiles(root, func(p string) bool {

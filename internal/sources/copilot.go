@@ -357,12 +357,11 @@ func parseCopilotScan(path string, offset int64, scan func(func(map[string]any))
 	// The same rule as Claude Code's sub-agent files: by default the task,
 	// the last turns and what the run changed; all of it with
 	// DEJA_INCLUDE_SUBAGENTS=1, none of it with =0.
-	include := os.Getenv("DEJA_INCLUDE_SUBAGENTS")
 	for _, c := range children {
-		if include == "0" || copied[c.ID] || len(c.Messages) == 0 {
+		if SubagentsOff() || copied[c.ID] || len(c.Messages) == 0 {
 			continue
 		}
-		if include != "1" {
+		if !SubagentsWhole() {
 			c.Messages = KeepSubagentTail(c.Messages)
 		}
 		c.Parent, c.Project = s.ID, s.Project

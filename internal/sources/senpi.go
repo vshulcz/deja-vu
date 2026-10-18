@@ -98,7 +98,7 @@ func kimchiWanted(p string) bool {
 	if !strings.HasSuffix(p, ".jsonl") {
 		return false
 	}
-	return os.Getenv("DEJA_INCLUDE_SUBAGENTS") == "1" || !KimchiSubagentFile(p)
+	return SubagentsWhole() || !KimchiSubagentFile(p)
 }
 
 // KimchiSubagentFile reports whether a transcript is a run of Kimchi's `Agent`

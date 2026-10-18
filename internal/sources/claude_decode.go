@@ -232,7 +232,7 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 	// A child run comes in as the task it was handed, the answer it came back
 	// with and what it changed, unless the reader asked for the whole thing
 	// (#3009, #4163).
-	if IsSubagentPath(path) && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
+	if IsSubagentPath(path) && !SubagentsWhole() {
 		s.Messages = KeepSubagentTail(s.Messages)
 	}
 	// The directory a session was started from is a weak guess at what it was

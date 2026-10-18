@@ -25,6 +25,13 @@
     <summary>deja search syntax: exact and phrase queries, natural language with stop words, fuzzy typo tolerance, confidence tiers, and optional local semantic recall.</summary>
   </entry>
   <entry>
+    <title>Where CodeBuddy Code stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/codebuddy.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/codebuddy.html"></link>
+    <updated>2026-10-18T00:00:00Z</updated>
+    <summary>Where CodeBuddy Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
+  <entry>
     <title>Where Copilot CLI stores its history — session format</title>
     <id>https://vshulcz.github.io/deja-vu/registry/copilot.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/copilot.html"></link>
@@ -72,6 +79,13 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/kiro.html"></link>
     <updated>2026-10-18T00:00:00Z</updated>
     <summary>Where Kiro writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
+  <entry>
+    <title>Where Muse Code stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/muse.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/muse.html"></link>
+    <updated>2026-10-18T00:00:00Z</updated>
+    <summary>Where Muse Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
   </entry>
   <entry>
     <title>Where OpenClaw stores its history — session format</title>
@@ -275,19 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/codex-history.html"></link>
     <updated>2026-10-14T00:00:00Z</updated>
     <summary>Where Codex CLI keeps session history, why grep misses sessions older than a week, jq and sqlite3 recipes, and search across every Codex session.</summary>
-  </entry>
-  <entry>
-    <title>Codex resume session: list, find and fix errors — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html"></link>
-    <updated>2026-10-14T00:00:00Z</updated>
-    <summary>codex resume, --all, --last and exec resume: why a session is missing from the picker, and the no rollout found and is archived errors.</summary>
-  </entry>
-  <entry>
-    <title>What each memory tool knows the day you install it — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/day-zero.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/day-zero.html"></link>
-    <updated>2026-10-14T00:00:00Z</updated>
-    <summary>Eight tools on a machine with 19,195 sessions already on disk, asked 100 questions only that history answers: build time, first answer, hit@1.</summary>
   </entry>
 </feed>

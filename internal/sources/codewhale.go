@@ -217,8 +217,10 @@ func parseCodeWhaleDoc(path string, doc codeWhaleSession) []model.Session {
 	if doc.Metadata.Parent != "" {
 		// `codewhale fork` writes the source id here, and this file is the only
 		// place that edge exists — without it a fork reads as a session of its
-		// own and its parent's context never reaches it.
-		s.Kind = "subagent"
+		// own and its parent's context never reaches it. A fork is a session
+		// the person goes on in, not a run the source spawned, so it is not
+		// cut or left out with the sub-agents (#5301).
+		s.Kind = "fork"
 		s.Parent = doc.Metadata.Parent
 	}
 	failed := codeWhaleFailedCalls(doc.Messages)

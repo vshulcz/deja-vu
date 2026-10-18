@@ -213,7 +213,7 @@ func TestParseMuseRouteFactsCwd(t *testing.T) {
 }
 
 // Store discovery: XDG_DATA_HOME moves the store, DEJA_MUSE_ROOTS replaces
-// it, and a child's log is listed only with DEJA_INCLUDE_SUBAGENTS=1. Nothing
+// it, and a child's log is listed unless DEJA_INCLUDE_SUBAGENTS=0. Nothing
 // else in a session directory is a transcript.
 func TestMuseSessionFiles(t *testing.T) {
 	home := t.TempDir()
@@ -242,8 +242,8 @@ func TestMuseSessionFiles(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if got := MuseSessionFiles(); len(got) != 1 || got[0] != parent {
-		t.Errorf("files = %q, want the parent log only", got)
+	if got := MuseSessionFiles(); len(got) != 2 {
+		t.Errorf("files = %q, want both logs", got)
 	}
 	if !MuseSubagentFile(child) || MuseSubagentFile(parent) {
 		t.Errorf("subagent file: child %v, parent %v", MuseSubagentFile(child), MuseSubagentFile(parent))
@@ -255,9 +255,9 @@ func TestMuseSessionFiles(t *testing.T) {
 		t.Error("isMuseSession matched the wrong file")
 	}
 
-	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "1")
-	if got := MuseSessionFiles(); len(got) != 2 {
-		t.Errorf("files with subagents = %q, want both logs", got)
+	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "0")
+	if got := MuseSessionFiles(); len(got) != 1 || got[0] != parent {
+		t.Errorf("files with subagents off = %q, want the parent log only", got)
 	}
 
 	other := t.TempDir()

@@ -8,9 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 A sub-agent run is a session of its own under the session that spawned it.
-Cursor, Qwen, Kimi and goose sub-agents are now read by default as their task,
-answer and edits, the way Claude Code's are, so `deja blame` names the
-sub-agent that wrote a line; `DEJA_INCLUDE_SUBAGENTS=0` leaves them out.
+Sub-agents are now read by default as their task, answer and edits, the way
+Claude Code's are, so `deja blame` names the sub-agent that wrote a line;
+`DEJA_INCLUDE_SUBAGENTS=0` leaves them out and `=1` takes the whole run in
+every reader that marks one, Gemini, Hermes, OpenClaw, Codex, opencode, Grok,
+pi, Crush, Kiro, Devin, dsh, Muse and CodeBuddy included (#5301). A CodeWhale
+fork is a fork, not a sub-agent, and is read whole.
 Copilot CLI task runs are split out of the parent's log, OpenClaw children and
 Hermes delegates hang under their parent whatever source they ran under, and
 Gemini, Kimi and OpenClaw sub-agents are titled by their task rather than by

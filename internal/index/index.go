@@ -751,7 +751,9 @@ import (
 // file paths sit under the session's directory (#5248, #5249, #5250).
 // 84: an OpenClaw heartbeat poll and its NO_REPLY are not turns, so a window
 // that only got polls is no longer a session (#5319).
-const version = 84
+// 85: DEJA_INCLUDE_SUBAGENTS means the same in every reader: =0 leaves every
+// sub-agent run out, unset cuts it to task, edits and last turns (#5301).
+const version = 85
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

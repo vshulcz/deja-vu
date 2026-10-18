@@ -95,7 +95,7 @@ func CursorTranscripts() []string {
 		}
 		// A subagent's run comes in as its task, its answer and what it changed,
 		// the way Claude's does; =0 leaves them out.
-		if cursorPathHasDir(p, "subagents") && os.Getenv("DEJA_INCLUDE_SUBAGENTS") == "0" {
+		if cursorPathHasDir(p, "subagents") && SubagentsOff() {
 			return nil
 		}
 		if cursorPathHasDir(p, "agent-transcripts") {
@@ -476,7 +476,7 @@ func ParseCursorTranscript(path string) ([]model.Session, error) {
 	if len(s.Messages) == 0 {
 		return nil, err
 	}
-	if s.Kind == "subagent" && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
+	if s.Kind == "subagent" && !SubagentsWhole() {
 		s.Messages = KeepSubagentTail(s.Messages)
 	}
 	return []model.Session{s}, err

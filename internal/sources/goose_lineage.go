@@ -3,7 +3,6 @@ package sources
 import (
 	"bytes"
 	"encoding/json"
-	"os"
 	"strings"
 )
 
@@ -126,7 +125,7 @@ func gooseTypeFilter(g gooseSchema) string {
 	}
 	f := " and (s.session_type is null or s.session_type not in (" + quote(gooseMachineTypes) + "))"
 	sub := " and (s.session_type is null or s.session_type not in (" + quote(gooseSubagentTypes) + ")"
-	if g.parent && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "0" {
+	if g.parent && !SubagentsOff() {
 		sub += " or coalesce(s.parent_session_id,'') <> ''"
 	}
 	return f + sub + ")"

@@ -2,7 +2,6 @@ package sources
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -21,7 +20,7 @@ func QwenRoot() string { return EnvPath("DEJA_QWEN_ROOT", QwenConfigDir()) }
 // the sub-agent that wrote a file (#5223). DEJA_INCLUDE_SUBAGENTS=1 keeps the
 // whole run and =0 skips them.
 func QwenSessionFiles() []string {
-	subagents := os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "0"
+	subagents := !SubagentsOff()
 	return walkFiles(filepath.Join(QwenRoot(), "projects"), func(p string) bool {
 		return strings.HasSuffix(p, ".jsonl") && filepath.Base(filepath.Dir(p)) == "chats" ||
 			subagents && QwenSubagentFile(p)
@@ -245,7 +244,7 @@ func parseQwenScan(path string, scan func(func(map[string]any)) error) ([]model.
 	if len(s.Messages) == 0 {
 		return nil, err
 	}
-	if child && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
+	if child && !SubagentsWhole() {
 		s.Messages = KeepSubagentTail(s.Messages)
 	}
 	return []model.Session{s}, err

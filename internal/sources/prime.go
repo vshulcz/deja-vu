@@ -2,7 +2,6 @@ package sources
 
 import (
 	"math"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -78,7 +77,7 @@ func PrimeSessionFiles() []string {
 	files := walkFiles(PrimeRoot(), func(p string) bool {
 		return strings.HasSuffix(p, ".jsonl")
 	})
-	if os.Getenv("DEJA_INCLUDE_SUBAGENTS") == "0" {
+	if SubagentsOff() {
 		return files
 	}
 	return append(files, walkFiles(PrimeArtifactsRoot(), isPrimeChildTranscript)...)
@@ -100,7 +99,7 @@ func IsPrimeChildPath(p string) bool {
 // isPrimeFile reports whether p is a transcript PrimeSessionFiles would list.
 func isPrimeFile(p string) bool {
 	if strings.HasPrefix(p, PrimeArtifactsRoot()+string(filepath.Separator)) {
-		return isPrimeChildTranscript(p) && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "0"
+		return isPrimeChildTranscript(p) && !SubagentsOff()
 	}
 	return strings.HasSuffix(p, ".jsonl") && strings.HasPrefix(p, PrimeRoot())
 }
@@ -124,7 +123,7 @@ func parsePrimeFileFromOffset(path string, offset int64) ([]model.Session, error
 	// what it changed and how it ended, unless the reader asked for the whole
 	// run. Whole, its reading competed with the parent for recall (#3009,
 	// #4407).
-	if IsPrimeChildPath(path) && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
+	if IsPrimeChildPath(path) && !SubagentsWhole() {
 		for i := range ss {
 			ss[i].Messages = KeepSubagentTail(ss[i].Messages)
 		}

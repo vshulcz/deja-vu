@@ -40,7 +40,7 @@
 <ul>
 <li><strong>ID</strong>: <code>muse</code></li>
 <li><strong>Store</strong>: <code>${XDG_DATA_HOME:-~/.local/share}/muse/sessions/YYYY/MM/DD/&lt;id&gt;/session.jsonl</code> — the same home-relative path on macOS, Linux and Windows</li>
-<li><strong>Subagents</strong>: <code>&lt;id&gt;/subagent/&lt;child&gt;/session.jsonl</code>, read only with <code>DEJA_INCLUDE_SUBAGENTS=1</code></li>
+<li><strong>Subagents</strong>: <code>&lt;id&gt;/subagent/&lt;child&gt;/session.jsonl</code>, read as their task, edits and last turns; <code>DEJA_INCLUDE_SUBAGENTS=1</code> takes the whole run, <code>=0</code> skips them</li>
 <li><strong>Read overrides</strong>: <code>DEJA_MUSE_ROOTS</code>, a path list, replaces the session roots</li>
 <li><strong>Format</strong>: event-sourced JSONL, one record per line, <code>recorded_at</code> in microseconds</li>
 <li><strong>Needs</strong>: nothing</li>
@@ -113,7 +113,7 @@
 <p><code>workspace_root</code>: Muse finds the session from anywhere but takes the directory</p>
 <p>it runs in as the workspace (#4710). A subagent is not resumable on its own</p>
 <p>(<code>has no saved log</code>), so it is refused with the parent&#39;s id.</p>
-<p>Under <code>DEJA_INCLUDE_SUBAGENTS=1</code> only children that name a workspace are read.</p>
+<p>Only children that name a workspace are read.</p>
 <p>Muse also logs its reminder and verification observers as children; their</p>
 <p>prompt is Muse&#39;s own instruction text and they record no workspace (#4711). A</p>
 <p>workflow child names its workspace in <code>session.workspace_branch.observed</code></p>

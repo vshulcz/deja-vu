@@ -53,7 +53,8 @@ func TestAClientsOwnFilesAreNotUnreadTranscripts(t *testing.T) {
 			session: "2026/09/18/u1/session.jsonl",
 			own: []string{"2026/09/18/u1/cron.db", "2026/09/18/u1/goals.db",
 				"2026/09/18/u1/tool-outputs/call_1.txt", "2026/09/18/u1/subagent/c1/session.jsonl"},
-			want: "1 subagent transcripts skipped — set DEJA_INCLUDE_SUBAGENTS=1",
+			// Read by default now, as Claude's are (#5301), and the row says how.
+			want: "1 subagent transcripts read as task, answer and what they changed",
 		},
 		{
 			row: "copilot", env: "DEJA_COPILOT_ROOT",

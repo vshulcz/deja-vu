@@ -209,7 +209,7 @@ func ClaudeFileWanted(p string) bool {
 	if !strings.HasSuffix(p, ".jsonl") {
 		return false
 	}
-	if os.Getenv("DEJA_INCLUDE_SUBAGENTS") == "0" {
+	if SubagentsOff() {
 		return !IsSubagentPath(p)
 	}
 	return true
@@ -217,8 +217,8 @@ func ClaudeFileWanted(p string) bool {
 
 // IsSubagentPath reports whether a transcript is a child run, by where it sits.
 // The file's own isSidechain flag says the same thing for the files that carry
-// it, and a sidechain transcript outside such a directory is a full session as
-// far as this rule is concerned — the same reading the count in #3009 used.
+// it. A sidechain transcript outside such a directory is listed whatever the
+// switch says, and the registry's switch cuts or drops it by its kind (#5301).
 func IsSubagentPath(p string) bool {
 	return strings.Contains(p, string(filepath.Separator)+"subagents"+string(filepath.Separator))
 }
@@ -386,7 +386,7 @@ func parseClaudeGenericFromOffset(path string, offset int64) ([]model.Session, e
 	markClaudeBranch(&s, forkedFrom)
 	// The same cut the typed parser makes: this is the reference it is proved
 	// against, and a difference here reads as a parser bug (#3009).
-	if IsSubagentPath(path) && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
+	if IsSubagentPath(path) && !SubagentsWhole() {
 		s.Messages = KeepSubagentTail(s.Messages)
 	}
 	if p := projectFromPaths(s.Messages); p != "" {

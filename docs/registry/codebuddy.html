@@ -40,7 +40,7 @@
 <ul>
 <li><strong>ID</strong>: <code>codebuddy</code></li>
 <li><strong>Store</strong>: <code>${CODEBUDDY_CONFIG_DIR:-~/.codebuddy}/projects/&lt;mangled-cwd&gt;/&lt;session-id&gt;.jsonl</code> — one file per session</li>
-<li><strong>Sub-agents</strong>: <code>&lt;mangled-cwd&gt;/&lt;session-id&gt;/subagents/agent-&lt;id&gt;.jsonl</code>, read with <code>DEJA_INCLUDE_SUBAGENTS=1</code></li>
+<li><strong>Sub-agents</strong>: <code>&lt;mangled-cwd&gt;/&lt;session-id&gt;/subagents/agent-&lt;id&gt;.jsonl</code>, read as their task, edits and last turns; <code>DEJA_INCLUDE_SUBAGENTS=1</code> takes the whole run, <code>=0</code> skips them</li>
 <li><strong>WorkBuddy</strong>: <code>~/.workbuddy/projects/...</code> (workbuddy.cn) and <code>~/.workbuddy-ai/projects/...</code> (WorkBuddy AI, workbuddy.ai), or <code>$WORKBUDDY_CONFIG_DIR/projects</code>; the same layout and records, read when they exist</li>
 <li><strong>Read overrides</strong>: <code>DEJA_CODEBUDDY_ROOTS</code>, a path list, replaces both stores</li>
 <li><strong>Format</strong>: JSONL — OpenAI Responses-style items</li>

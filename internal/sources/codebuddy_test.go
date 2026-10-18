@@ -79,8 +79,8 @@ func TestCodeBuddySessionFiles(t *testing.T) {
 	writeCodeBuddyFile(t, filepath.Join(root, "repo", "s1.meta.json"), "{}")
 	writeCodeBuddyFile(t, filepath.Join(root, "repo", "memory", "MEMORY.md"), "x")
 
-	if got := CodeBuddySessionFiles(); len(got) != 1 || got[0] != main {
-		t.Fatalf("session files = %v, want [%s]", got, main)
+	if got := CodeBuddySessionFiles(); len(got) != 2 {
+		t.Fatalf("session files = %v, want the session and its sub-agent", got)
 	}
 	if !isCodeBuddySession(main) || isCodeBuddySession(sub) {
 		t.Fatalf("isCodeBuddySession main=%v sub=%v", isCodeBuddySession(main), isCodeBuddySession(sub))
@@ -89,9 +89,9 @@ func TestCodeBuddySessionFiles(t *testing.T) {
 	if got := CodeBuddySidecarFiles(); len(got) != 2 {
 		t.Fatalf("sidecars = %v", got)
 	}
-	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "1")
-	if got := CodeBuddySessionFiles(); len(got) != 2 {
-		t.Fatalf("with sub-agents = %v", got)
+	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "0")
+	if got := CodeBuddySessionFiles(); len(got) != 1 || got[0] != main {
+		t.Fatalf("with sub-agents off = %v, want [%s]", got, main)
 	}
 }
 

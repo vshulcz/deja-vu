@@ -161,7 +161,7 @@ func TestCodeWhaleForkKnowsItsParent(t *testing.T) {
 	if err != nil || len(ss) != 1 {
 		t.Fatalf("parse: %v, %d sessions", err, len(ss))
 	}
-	if ss[0].Kind != "subagent" || ss[0].Parent != "parent-1" {
+	if ss[0].Kind != "fork" || ss[0].Parent != "parent-1" {
 		t.Errorf("kind/parent = %q/%q", ss[0].Kind, ss[0].Parent)
 	}
 }

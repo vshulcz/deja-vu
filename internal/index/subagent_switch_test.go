@@ -50,7 +50,7 @@ func TestUnlistedTranscriptOnDiskIsNotKeptAsDeleted(t *testing.T) {
 		t.Fatalf("with the switch on the child is not indexed: %#v", ss)
 	}
 
-	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "")
+	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "0")
 	var log bytes.Buffer
 	if err := Ensure(dir, "", false, &log); err != nil {
 		t.Fatal(err)

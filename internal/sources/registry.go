@@ -151,7 +151,9 @@ func Registry() []Harness {
 // harnesses.
 func AllHarnesses() []Harness { return allHarnesses() }
 
-func allHarnesses() []Harness {
+func allHarnesses() []Harness { return withSubagentSwitch(harnessTable()) }
+
+func harnessTable() []Harness {
 	return []Harness{
 		{
 			Name: "claude", Load: LoadClaude, Files: ClaudeFiles,

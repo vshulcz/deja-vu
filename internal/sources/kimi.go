@@ -46,8 +46,8 @@ func KimiRoot() string { return EnvPath("DEJA_KIMI_ROOT", KimiConfigDir()) }
 // keeps the whole run, and an Agent call with fork: true, whose log opens on a
 // copy of main's context; =0 skips them all but a /btw.
 func KimiSessionFiles() []string {
-	whole := os.Getenv("DEJA_INCLUDE_SUBAGENTS") == "1"
-	off := os.Getenv("DEJA_INCLUDE_SUBAGENTS") == "0"
+	whole := SubagentsWhole()
+	off := SubagentsOff()
 	forks := map[string]map[string]bool{}
 	return walkFiles(filepath.Join(KimiRoot(), "sessions"), func(p string) bool {
 		if filepath.Base(p) == "wire.jsonl" && filepath.Base(filepath.Dir(p)) == "main" {
@@ -604,10 +604,10 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 		// The person asked it in the session it forked from; it is not a run
 		// that session spawned.
 		s.Kind = "fork"
-	} else if fork && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
+	} else if fork && !SubagentsWhole() {
 		return nil, err
 	}
-	if child && !fork && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
+	if child && !fork && !SubagentsWhole() {
 		s.Messages = KeepSubagentTail(s.Messages)
 	}
 	if len(s.Messages) == 0 {

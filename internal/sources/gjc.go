@@ -1,7 +1,6 @@
 package sources
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -49,7 +48,7 @@ func gjcWanted(p string) bool {
 	if !strings.HasSuffix(p, ".jsonl") {
 		return false
 	}
-	if gjcSubagentPath(p) && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
+	if gjcSubagentPath(p) && !SubagentsWhole() {
 		return false
 	}
 	return true

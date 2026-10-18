@@ -731,7 +731,7 @@ func parseGooseDBWhere(db, where string, limit int) ([]model.Session, error) {
 	}
 	var out []model.Session
 	for _, s := range by {
-		if s.Kind == "subagent" && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
+		if s.Kind == "subagent" && !SubagentsWhole() {
 			s.Messages = KeepSubagentTail(s.Messages)
 		}
 		if len(s.Messages) == 0 {

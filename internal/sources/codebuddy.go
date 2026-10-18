@@ -163,13 +163,14 @@ func IsCodeBuddyTranscript(p string) bool {
 	return err == nil && h == "codebuddy"
 }
 
-// CodeBuddySubagentFile reports a sub-agent's transcript. Read only with
-// DEJA_INCLUDE_SUBAGENTS=1, the way the Claude and Qwen readers do.
+// CodeBuddySubagentFile reports a sub-agent's transcript. Read the way the
+// Claude and Qwen readers read theirs: task, edits and last turns, whole with
+// DEJA_INCLUDE_SUBAGENTS=1, left out with =0 (#5301).
 func CodeBuddySubagentFile(p string) bool { return codeBuddySubagentParts(codeBuddyRel(p)) }
 
 // CodeBuddySessionFiles lists the transcripts.
 func CodeBuddySessionFiles() []string {
-	subagents := os.Getenv("DEJA_INCLUDE_SUBAGENTS") == "1"
+	subagents := !SubagentsOff()
 	var out []string
 	for _, root := range CodeBuddyRoots() {
 		out = append(out, walkFiles(root, func(p string) bool {

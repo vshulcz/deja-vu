@@ -2,7 +2,7 @@
 
 - **ID**: `muse`
 - **Store**: `${XDG_DATA_HOME:-~/.local/share}/muse/sessions/YYYY/MM/DD/<id>/session.jsonl` — the same home-relative path on macOS, Linux and Windows
-- **Subagents**: `<id>/subagent/<child>/session.jsonl`, read only with `DEJA_INCLUDE_SUBAGENTS=1`
+- **Subagents**: `<id>/subagent/<child>/session.jsonl`, read as their task, edits and last turns; `DEJA_INCLUDE_SUBAGENTS=1` takes the whole run, `=0` skips them
 - **Read overrides**: `DEJA_MUSE_ROOTS`, a path list, replaces the session roots
 - **Format**: event-sourced JSONL, one record per line, `recorded_at` in microseconds
 - **Needs**: nothing
@@ -91,7 +91,7 @@ skill is the command: `/deja-history <query>` loads it with the query (1.4.3).
 it runs in as the workspace (#4710). A subagent is not resumable on its own
 (`has no saved log`), so it is refused with the parent's id.
 
-Under `DEJA_INCLUDE_SUBAGENTS=1` only children that name a workspace are read.
+Only children that name a workspace are read.
 Muse also logs its reminder and verification observers as children; their
 prompt is Muse's own instruction text and they record no workspace (#4711). A
 workflow child names its workspace in `session.workspace_branch.observed`
