@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // aider has no hook on a user message, but it reads every read-only file from
@@ -25,14 +27,18 @@ type aiderLive struct {
 	// offset is where the history ended when the run started: what is before
 	// it was asked in an earlier session.
 	offset int64
+	launch time.Time
 
 	mu    sync.Mutex
 	asked string
 	block string
+	// self is the id the index gives the session this aider is writing, once
+	// its header is in the history.
+	self string
 }
 
 func newAiderLive(dir, cwd, history, digest string) *aiderLive {
-	l := &aiderLive{dir: dir, cwd: cwd, history: history,
+	l := &aiderLive{dir: dir, cwd: cwd, history: history, launch: time.Now(),
 		sid: "aider-" + strconv.Itoa(os.Getpid()) + "-" + strconv.FormatInt(time.Now().UnixNano(), 36)}
 	if st, err := os.Stat(history); err == nil {
 		l.offset = st.Size()
@@ -58,7 +64,7 @@ func (l *aiderLive) body() (out string) {
 	}()
 	if q := aiderLastAsk(l.history, l.offset); q != "" && q != l.asked {
 		l.asked = q
-		l.block = antigravityPromptBlock(l.dir, q, l.sid, l.cwd)
+		l.block = antigravityPromptBlock(l.dir, q, l.asker(), l.cwd)
 	}
 	body := l.digest
 	if l.block != "" {
@@ -71,6 +77,20 @@ func (l *aiderLive) body() (out string) {
 		body = withAiderRules(body, string(old))
 	}
 	return body
+}
+
+// asker is the id to ask as: the session this aider is writing, under the id
+// the index has it by. Asked as anything else, that session is a stranger to
+// the hook once an index refresh has read it, and comes back to itself as
+// "this was asked here before".
+func (l *aiderLive) asker() string {
+	if l.self == "" {
+		l.self = sources.AiderSessionAt(l.history, l.offset, l.launch)
+	}
+	if l.self != "" {
+		return l.self
+	}
+	return l.sid
 }
 
 // aiderHistoryTail bounds how much of the chat history is read per request.
