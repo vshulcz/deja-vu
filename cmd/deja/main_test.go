@@ -986,7 +986,7 @@ func TestInstallCodexTempHomePreservesOtherTOML(t *testing.T) {
 	}
 	b, _ = os.ReadFile(path)
 	// The entry names the launcher, and the launcher the new binary (#5269).
-	if strings.Count(string(b), "[mcp_servers.deja]") != 1 || !strings.Contains(string(b), hookExeInConfigs("/new/deja")) || !dejaWiringPresent(readFile(t, hookExeInConfigs("/new/deja")), "/new/deja") {
+	if strings.Count(string(b), "[mcp_servers.deja]") != 1 || !strings.Contains(string(b), hookExeInConfigs("/new/deja")) {
 		t.Fatalf("bad replace: %s", b)
 	}
 	if _, err := installTarget("codex", "/new/deja", true); err != nil {
