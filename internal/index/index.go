@@ -723,7 +723,10 @@ import (
 // 74: a Copilot CLI sub-agent run is its own session under its parent and a
 // /fork names its source (#5216, #5217); rows already indexed hold neither
 // until a rebuild.
-const version = 74
+// 75: a Grok --fork-session copy keeps only its own records, not the
+// source's it was started from (#5235); forks already indexed keep the copies
+// until a rebuild.
+const version = 75
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
