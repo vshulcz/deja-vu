@@ -39,11 +39,13 @@
 <h1>Cursor session format</h1>
 <h2 id="stores-and-files">Stores and files</h2>
 <p>Cursor IDE stores chats in <code>state.vscdb</code> under <code>globalStorage/</code> and <code>workspaceStorage/*/</code>. The user root is <code>~/Library/Application Support/Cursor/User</code> on macOS, <code>%APPDATA%\Cursor\User</code> on Windows and <code>~/.config/Cursor/User</code> elsewhere; on Linux an existing <code>$XDG_CONFIG_HOME/Cursor/User</code> is used when available. <code>DEJA_CURSOR_ROOT</code> overrides IDE discovery.</p>
-<p>Cursor CLI writes <code>projects/&lt;encoded-path&gt;/agent-transcripts/**/*.jsonl</code> below <code>${CURSOR_CONFIG_DIR:-~/.cursor}</code>. <code>DEJA_CURSOR_CLI_ROOT</code> overrides transcript reads. Subagent transcripts are excluded unless <code>DEJA_INCLUDE_SUBAGENTS=1</code> — for index</p>
-<p>size, not because the parent already holds that work. Unlike Claude&#39;s sidechain</p>
-<p>files, Cursor&#39;s have not been read here: what the parent keeps and what only the</p>
-<p>child has is unverified for this harness, so deja indexes them as it finds them</p>
-<p>rather than deriving an edge it has not seen.</p>
+<p>Cursor CLI writes <code>projects/&lt;encoded-path&gt;/agent-transcripts/**/*.jsonl</code> below <code>${CURSOR_CONFIG_DIR:-~/.cursor}</code>. <code>DEJA_CURSOR_CLI_ROOT</code> overrides transcript reads. A subagent&#39;s run is written to</p>
+<p><code>agent-transcripts/&lt;parent&gt;/subagents/&lt;child&gt;.jsonl</code> (cursor-agent&#39;s transcript</p>
+<p>path resolver, <code>kind: &#34;subagent&#34;</code> with <code>parentConversationId</code>). The lines carry</p>
+<p>no ids, so the directory is the parent link. deja reads the child as Claude&#39;s</p>
+<p>sidechains: a session naming its parent, kept as its task, its answer and the</p>
+<p>files it changed, so <code>deja blame</code> can name the subagent that wrote a line.</p>
+<p><code>DEJA_INCLUDE_SUBAGENTS=1</code> takes the whole run, <code>=0</code> leaves them out.</p>
 <h2 id="ide-sqlite-records">IDE SQLite records</h2>
 <p>The <code>cursorDiskKV(key, value)</code> table has session values at <code>composerData:&lt;id&gt;</code> and message values at <code>bubbleId:&lt;composer-id&gt;:&lt;bubble-id&gt;</code>.</p>
 <pre><code class="language-json">{&#34;composerId&#34;:&#34;composer-7&#34;,&#34;name&#34;:&#34;Fix cache invalidation&#34;,&#34;createdAt&#34;:1784278800000,&#34;lastUpdatedAt&#34;:1784278802000}
@@ -88,7 +90,7 @@
 <li>Cursor moved modern IDE chats toward global storage while older versions used workspace databases; both are scanned.</li>
 <li>SQLite values are JSON inside a key-value table and malformed or null entries occur.</li>
 <li>CLI project path encoding has the same separator-versus-hyphen ambiguity as Claude Code.</li>
-<li>A parsed message is capped at 1 MiB. CLI subagent transcripts are opt-in.</li>
+<li>A parsed message is capped at 1 MiB. CLI subagent transcripts come in as task, answer and edits; <code>DEJA_INCLUDE_SUBAGENTS=0</code> skips them.</li>
 <li>Both CLI layouts are written by <code>cursor-agent 2026.09.02-c22c1a3</code>, minutes apart in the same session.</li>
 </ul>
 <p><strong>Last verified:</strong> 2026-10-07</p>

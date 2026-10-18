@@ -23,8 +23,8 @@ project directory names the project, and the header's cwd wins when it is there.
   session they belong to, one file per pass. They are skipped: a sub-agent's
   transcript repeats the parent's work in its own words, and indexed as a
   session of its own it competes with the parent for the same recall slot.
-  `DEJA_INCLUDE_SUBAGENTS=1` takes them, the switch Claude Code's and Cursor's
-  sub-agents already use.
+  `DEJA_INCLUDE_SUBAGENTS=1` takes them, the switch every reader's sub-agents
+  use.
 - **Project directories**: from 0.18, `<project>` is `v2-<identity digest>`
   rather than a slug of the path, with `.gjc-managed-session-scope.v2.json`
   beside the sessions naming the directory. The header's cwd gives the
