@@ -2211,7 +2211,11 @@ func installClaude(exe string, uninstall bool) (installResult, error) {
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
 	} else if configIsJSONC(old) {
-		return writeJSONCEntry(path, old, "mcpServers", mcpServerEntry(exe), uninstall)
+		res, err := writeJSONCEntry(path, old, "mcpServers", mcpServerEntry(exe), uninstall)
+		if !entrySwitchHonored("claude-code") {
+			res.Note = dropNotePart(res.Note, switchedOffNote)
+		}
+		return res, err
 	} else if err := json.Unmarshal(old, &root); err != nil {
 		return installResult{}, configParseError(path, err)
 	}
@@ -2252,6 +2256,9 @@ func installClaude(exe string, uninstall bool) (installResult, error) {
 			noteBlockAdded(path, "mcpServers."+key)
 		}
 		m[key], note = mergeDejaEntry(m[key], mcpServerEntry(exe))
+		if !entrySwitchHonored("claude-code") {
+			note = dropNotePart(note, switchedOffNote)
+		}
 		note = withOtherDejaEntries(note, m, key)
 	}
 	next, err := marshalConfigLike(old, root)
@@ -3946,8 +3953,10 @@ func keepSwitch(prev any, next map[string]any) string {
 // drops every other key, and `cursor-agent mcp list` shows an entry with
 // `"disabled": true` ready. Its switch is `cursor-agent mcp disable`, which
 // writes the project's mcp-disabled.json, and clientMCPDenied reads that.
-// Calling the entry off told the person recall was off while it ran (#5162;
-// #4303 assumed Cursor read Kiro's key).
+// Claude Code does not either: 2.1.302 starts an entry with `"disabled":
+// true`, and its switch is disabledMcpServers in the project's config, which
+// clientMCPDenied reads too. Calling the entry off told the person recall was
+// off while it ran (#5162, #5280; #4303 assumed both read Kiro's key).
 func entrySwitchHonored(client string) bool {
 	return len(entrySwitchKeys(client)) > 0
 }
@@ -3957,7 +3966,7 @@ func entrySwitchHonored(client string) bool {
 // with "disabled": true connected and runs it.
 func entrySwitchKeys(client string) []string {
 	switch client {
-	case "cursor":
+	case "cursor", "claude-code":
 		return nil
 	case "kimi":
 		return []string{"enabled"}
