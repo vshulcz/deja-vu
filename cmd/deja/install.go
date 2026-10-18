@@ -1674,9 +1674,49 @@ func dropOwnBackup(path string) {
 	if err != nil {
 		return
 	}
-	if mentionsDeja(b) && !holdsForeignDejaEntry(b) {
+	if snapshotHoldsDejaWiring(b) && !holdsForeignDejaEntry(b) {
 		_ = os.Remove(bak)
 	}
+}
+
+// snapshotHoldsDejaWiring is mentionsDeja over what deja writes, not over
+// what the reader wrote. In a JSON snapshot the reader's own "deja" — a name
+// in an allow list, as doctor asks of an OpenClaw reader (#5256), or a word
+// in a comment — is theirs, and counting it deleted the snapshot of a config
+// deja never wired (#5281). Deja's entries are keyed by the name or run its
+// commands, and both survive the decode.
+func snapshotHoldsDejaWiring(b []byte) bool {
+	v, ok := decodeJSONCExact(bytes.TrimPrefix(b, utf8BOM))
+	if !ok {
+		return mentionsDeja(b)
+	}
+	out, err := json.MarshalIndent(withoutDejaListNames(v), "", " ")
+	if err != nil {
+		return mentionsDeja(b)
+	}
+	return mentionsDeja(out)
+}
+
+// withoutDejaListNames is v without the list items that are the bare name.
+func withoutDejaListNames(v any) any {
+	switch t := v.(type) {
+	case map[string]any:
+		m := make(map[string]any, len(t))
+		for k, c := range t {
+			m[k] = withoutDejaListNames(c)
+		}
+		return m
+	case []any:
+		var l []any
+		for _, c := range t {
+			if s, ok := c.(string); ok && strings.TrimSpace(s) == "deja" {
+				continue
+			}
+			l = append(l, withoutDejaListNames(c))
+		}
+		return l
+	}
+	return v
 }
 
 // holdsForeignDejaEntry reports whether a snapshot keeps an entry named "deja"
