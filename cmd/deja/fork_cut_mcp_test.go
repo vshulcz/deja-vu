@@ -93,7 +93,8 @@ func TestStartDigestGivesAForkOnlyWhatItsSourceDidAfterTheFork(t *testing.T) {
 		}
 		cwd := filepath.Join(os.Getenv("HOME"), "work", "app")
 		run := func(sid string) string {
-			withHookStdin(t, `{"session_id":"`+sid+`","source":"resume","cwd":"`+cwd+`"}`)
+			payload, _ := json.Marshal(map[string]string{"session_id": sid, "source": "resume", "cwd": cwd})
+			withHookStdin(t, string(payload))
 			return captureStdout(t, func() {
 				if err := runHookContext(dir, true); err != nil {
 					t.Error(err)
