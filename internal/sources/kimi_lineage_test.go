@@ -229,10 +229,6 @@ func TestKimiSubagentIsReadByDefaultAsTaskAnswerAndChanges(t *testing.T) {
 	if n := len(ss[0].Messages); n > SubagentTailKept+3 {
 		t.Errorf("default read kept %d messages, want the middle cut: %v", n, roles)
 	}
-	// The cut is a whole read's, so a tail is not appended to it.
-	if kimiTailResumes(child, 10) {
-		t.Error("a cut sub-agent log takes a tail read")
-	}
 	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "1")
 	if ss, _ := ParseKimiFile(child); len(ss) != 1 || len(ss[0].Messages) < 12 {
 		t.Errorf("DEJA_INCLUDE_SUBAGENTS=1 does not keep the whole run: %d", len(ss[0].Messages))

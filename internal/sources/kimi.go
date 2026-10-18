@@ -631,11 +631,6 @@ func kimiTailResumes(path string, offset int64) bool {
 	if offset > 0 && kimiTailHasForked(path, offset) {
 		return false
 	}
-	// A sub-agent run is kept as its first turn and its last few, which a tail
-	// read cannot cut the way a whole read does.
-	if offset > 0 && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" && KimiSubagentRun(path) {
-		return false
-	}
 	return kimiResumes(path, offset) && KimiResumes(path, offset)
 }
 
