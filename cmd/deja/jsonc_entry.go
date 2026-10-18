@@ -98,10 +98,22 @@ func stripJSONComments(text string) string {
 func jsoncSetEntry(text, blockKey, id, entry string, uninstall bool, dropFrom int) (string, error) {
 	open := zedTopLevelOpen(text)
 	if open < 0 {
-		return "", fmt.Errorf("does not look like a settings object; add %q by hand", strings.Join(splitBlockKey(blockKey), "."))
+		name := id
+		if blockKey != "" {
+			name = strings.Join(append(splitBlockKey(blockKey), id), ".")
+		}
+		return "", fmt.Errorf("does not look like a settings object; add %q by hand", name)
 	}
-	keys := splitBlockKey(blockKey)
-	block, have := walkJSONCKeys(text, open, keys)
+	// An empty blockKey is the top-level object itself, for a setting that
+	// sits there under a key of its own: Copilot's statusLine.
+	var keys []string
+	block, have := &zedSpan{keyStart: open, valueOpen: open, valueEnd: zedObjectEnd(text, open)}, 0
+	if blockKey != "" {
+		keys = splitBlockKey(blockKey)
+		block, have = walkJSONCKeys(text, open, keys)
+	} else if block.valueEnd < 0 {
+		return "", fmt.Errorf("does not look like a settings object; add %q by hand", id)
+	}
 	if block == nil {
 		if uninstall {
 			return text, nil
@@ -142,7 +154,7 @@ func jsoncSetEntry(text, blockKey, id, entry string, uninstall bool, dropFrom in
 		// at the reader's comment (#2740).
 		comma := ","
 		if strings.TrimSpace(stripJSONComments(text[block.valueOpen+1:block.valueEnd-1])) == "" {
-			comma, tail = "", "\n  "
+			comma, tail = "", "\n"+strings.Repeat("  ", len(keys))
 			// Unless what follows opens a line of its own — a block whose body
 			// is a comment. The closing brace is already where it belongs, and
 			// a tail here left a blank line behind on the way out, one more on
@@ -162,19 +174,84 @@ func jsoncSetEntry(text, blockKey, id, entry string, uninstall bool, dropFrom in
 			// and a round trip has to leave the file as it found it (#2783).
 			if dropFrom < len(keys)-1 {
 				chain, _ := walkJSONCKeys(text, open, keys[:dropFrom+1])
-				cut := zedEntrySpan(text, chain)
-				return closeEmptied(text[:cut[0]]+text[cut[1]:], keys), nil
+				return closeEmptied(cutEntry(text, zedEntrySpan(text, chain)), keys), nil
 			}
-			return closeEmptied(zedDropEntry(text, block, found), keys), nil
+			// The block with it when the entry is all it holds, as
+			// zedDropEntry does, and the comma in front either way.
+			cut := zedEntrySpan(text, found)
+			if strings.TrimSpace(text[block.valueOpen+1:cut[0]]+text[cut[1]:block.valueEnd-1]) == "" {
+				cut = zedEntrySpan(text, block)
+			}
+			return closeEmptied(cutEntry(text, cut), keys), nil
 		}
 		// The entry alone. zedDropEntry takes the block with the last entry in
 		// it, which is right for a block deja created and wrong for one the
 		// reader wrote — the rule #2604 and #2583 settled for the other
 		// writers (#2740).
-		cut := zedEntrySpan(text, found)
-		return closeEmptied(text[:cut[0]]+text[cut[1]:], keys), nil
+		return closeEmptied(cutEntry(text, zedEntrySpan(text, found)), keys), nil
 	}
 	return text[:found.valueOpen] + entryAtDepth(entry, len(keys)) + text[found.valueEnd:], nil
+}
+
+// cutEntry takes an entry's span out of the text, and the comma in front of
+// it when there is none behind: the last key of an object has no comma after
+// it, and taking it out alone left `"theme": "dark",` closing the object — a
+// trailing comma the file did not have before deja wrote there. The comma is
+// looked for on the comment-blanked copy, so a comment between the two keys
+// neither hides it nor goes with it.
+//
+// A `//` comment that ends the line in front keeps its newline when nothing
+// after the cut starts a line: walking back over it to the key put the
+// closing brace inside the comment.
+func cutEntry(text string, cut [2]int) string {
+	blank := stripJSONComments(text)
+	j := cut[0] - 1
+	for j >= 0 && (text[j] == ' ' || text[j] == '\t') {
+		j--
+	}
+	rest := strings.TrimLeft(text[cut[1]:], " \t")
+	if endsInLineComment(text, j) && !strings.HasPrefix(rest, "\n") && !strings.HasPrefix(rest, "\r\n") {
+		if nl := strings.IndexByte(text[cut[0]:cut[1]], '\n'); nl >= 0 {
+			cut[0] += nl + 1
+		}
+	}
+	out := text[:cut[0]] + text[cut[1]:]
+	if cut[1] > 0 && text[cut[1]-1] == ',' {
+		return out
+	}
+	i := cut[0] - 1
+	for i >= 0 && (blank[i] == ' ' || blank[i] == '\t' || blank[i] == '\n' || blank[i] == '\r') {
+		i--
+	}
+	if i >= 0 && blank[i] == ',' {
+		return out[:i] + out[i+1:]
+	}
+	return out
+}
+
+// endsInLineComment reports whether a `//` comment runs through text[j] on
+// its line. Scanned from the line's start: a `/* */` ends where it says, a
+// `//` inside a string is not a comment, and a line comment can itself end in
+// `*/`.
+func endsInLineComment(text string, j int) bool {
+	if j < 0 {
+		return false
+	}
+	for i := strings.LastIndexByte(text[:j+1], '\n') + 1; i <= j; i++ {
+		switch {
+		case text[i] == '"':
+			end := zedStringEnd(text, i)
+			if end < 0 {
+				return false
+			}
+			i = end - 1
+		case strings.HasPrefix(text[i:], "//"):
+			return true
+		case strings.HasPrefix(text[i:], "/*"):
+			i = zedSkipComment(text, i) - 1
+		}
+	}
+	return false
 }
 
 // walkJSONCKeys follows a dotted block key from the top-level object, and
@@ -198,7 +275,7 @@ func walkJSONCKeys(text string, open int, keys []string) (*zedSpan, int) {
 // keys deep — openclaw's mcp.servers — came out aligned with the block above
 // it, along with the brace that closes it.
 func entryAtDepth(entry string, depth int) string {
-	if depth <= 1 {
+	if depth == 1 {
 		return entry
 	}
 	return strings.ReplaceAll(entry, "\n    ", "\n"+strings.Repeat("  ", depth+1))
@@ -212,6 +289,21 @@ func entryAtDepth(entry string, depth int) string {
 // Whitespace only, checked on the raw text: a block holding a comment and
 // nothing else is one the reader wrote something in, and it keeps its shape.
 func closeEmptied(text string, keys []string) string {
+	if len(keys) == 0 {
+		// The top-level object, for a key that lives there.
+		open := zedTopLevelOpen(text)
+		if open < 0 {
+			return text
+		}
+		end := zedObjectEnd(text, open)
+		if end < 0 {
+			return text
+		}
+		if body := text[open+1 : end-1]; body != "" && strings.TrimSpace(body) == "" {
+			text = text[:open+1] + text[end-1:]
+		}
+		return text
+	}
 	for i := len(keys); i > 0; i-- {
 		open := zedTopLevelOpen(text)
 		if open < 0 {
@@ -492,21 +584,9 @@ func jsoncRemoveKey(text, blockKey, key string, dropFrom int) (string, error) {
 		if chain == nil || have <= dropFrom {
 			return text, nil
 		}
-		cut := zedEntrySpan(text, chain)
 		// A block that was the last key leaves the comma in front of it
 		// dangling, the same as a last scalar below.
-		if text[cut[1]-1] != ',' {
-			blank := stripJSONComments(text)
-			for i := cut[0] - 1; i >= 0; i-- {
-				if c := blank[i]; c == ' ' || c == '\t' || c == '\n' || c == '\r' {
-					continue
-				} else if c == ',' {
-					cut[0] = i
-				}
-				break
-			}
-		}
-		return closeEmptied(text[:cut[0]]+text[cut[1]:], keys), nil
+		return closeEmptied(cutEntry(text, zedEntrySpan(text, chain)), keys), nil
 	}
 	block, have := walkJSONCKeys(text, open, keys)
 	if block == nil || have < len(keys) {
@@ -529,10 +609,8 @@ func jsoncRemoveKey(text, blockKey, key string, dropFrom int) (string, error) {
 	for end < len(text) && (text[end] == ' ' || text[end] == '\t') {
 		end++
 	}
-	tookComma := false
 	if end < len(text) && text[end] == ',' {
 		end++
-		tookComma = true
 	}
 	for start > block.valueOpen+1 && (text[start-1] == ' ' || text[start-1] == '\t' || text[start-1] == '\n') {
 		start--
@@ -545,18 +623,10 @@ func jsoncRemoveKey(text, blockKey, key string, dropFrom int) (string, error) {
 	// Looked for on the comment-blanked copy, whose offsets are the original's:
 	// a comment sitting between the two keys ends in a non-whitespace byte, and
 	// a backward walk that stops there never reaches the comma (#2811).
-	if !tookComma {
-		blank := stripJSONComments(text)
-		for i := start - 1; i > block.valueOpen; i-- {
-			if c := blank[i]; c == ' ' || c == '\t' || c == '\n' {
-				continue
-			} else if c == ',' {
-				start = i
-			}
-			break
-		}
-	}
-	return closeEmptied(text[:start]+text[end:], keys), nil
+	//
+	// Only the comma byte goes: a comment between it and the key is the
+	// reader's (cutEntry).
+	return closeEmptied(cutEntry(text, [2]int{start, end}), keys), nil
 }
 
 // jsoncScalarValue is where a scalar setting's value sits inside a block, or
@@ -578,7 +648,14 @@ func jsoncScalarValue(text string, block *zedSpan, key string) *[2]int {
 			}
 			if depth == 0 && text[i:end] == want && jsoncIsKey(text, end) {
 				v := end
-				for v < len(text) && (text[v] == ' ' || text[v] == '\t' || text[v] == '\n' || text[v] == ':') {
+				for v < len(text) {
+					if j := zedSkipComment(text, v); j != v {
+						v = j
+						continue
+					}
+					if c := text[v]; c != ' ' && c != '\t' && c != '\n' && c != '\r' && c != ':' {
+						break
+					}
 					v++
 				}
 				// A scalar, and only a scalar: an object or a list under this
@@ -632,7 +709,14 @@ func jsoncListValue(text string, block *zedSpan, key string) *[2]int {
 			}
 			if depth == 0 && text[i:end] == want && jsoncIsKey(text, end) {
 				v := end
-				for v < len(text) && (text[v] == ' ' || text[v] == '\t' || text[v] == '\n' || text[v] == '\r' || text[v] == ':') {
+				for v < len(text) {
+					if j := zedSkipComment(text, v); j != v {
+						v = j
+						continue
+					}
+					if c := text[v]; c != ' ' && c != '\t' && c != '\n' && c != '\r' && c != ':' {
+						break
+					}
 					v++
 				}
 				if v >= len(text) || text[v] != '[' {

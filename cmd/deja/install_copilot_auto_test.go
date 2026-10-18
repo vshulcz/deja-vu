@@ -147,17 +147,17 @@ func TestInstallCopilotAutoClearsTheEntriesOlderInstallsWrote(t *testing.T) {
 	}
 }
 
-// A comment deja cannot keep is a refusal, and a refusal writes nothing: the
+// A file deja cannot read is a refusal, and a refusal writes nothing: the
 // MCP entry and the hook file used to be written first, leaving half a target.
 func TestCopilotAutoRefusesBeforeWritingAnything(t *testing.T) {
 	home := copilotTestHome(t)
 	config := filepath.Join(home, ".copilot", "config.json")
-	before := "{\n  // mine\n  \"hooks\": {\"sessionStart\": [{\"type\": \"command\", \"bash\": \"" + hookExeInConfigs("/usr/local/bin/deja") + " hook-context --copilot\"}]}\n}\n"
+	before := "{\n  \"hooks\": {\"sessionStart\": [{\"type\": \"command\", \"bash\": \"" + hookExeInConfigs("/usr/local/bin/deja") + " hook-context --copilot\"}]}\n"
 	if err := os.WriteFile(config, []byte(before), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := captureRun(t, "install", "copilot-auto", "--no-index"); err == nil {
-		t.Fatal("install edited hooks in a file whose comments it cannot keep")
+		t.Fatal("install went ahead past a config.json it cannot read")
 	}
 	for _, name := range []string{"mcp-config.json", "settings.json", filepath.Join("hooks", "deja.json"), filepath.Join("skills", "deja-history", "SKILL.md")} {
 		if _, err := os.Stat(filepath.Join(home, ".copilot", name)); err == nil {
