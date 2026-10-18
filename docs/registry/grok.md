@@ -42,6 +42,12 @@ session asked for it is not written down, and deja does not guess. A
 `grok -p` run is marked `headless`, which says how the session was started,
 not that something spawned it, so deja records no kind for it (#4585).
 
+A `--fork-session` copy starts with every record of its source, rewritten
+under the fork's `sessionId` and outer `timestamp`; `_meta.eventId` still
+names the source. deja keeps a fork's own records and leaves the copies to the source,
+so search finds the source's turns once and blame names the session that
+wrote a line, not a fork made after it (#5235).
+
 ## Status line
 
 `deja install grok-auto` adds `[ui.status_line]` with `type = "command"` to the

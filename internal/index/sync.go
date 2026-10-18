@@ -46,6 +46,11 @@ type SyncRecord struct {
 	Lifecycle     syncName `json:"lifecycle,omitempty"`
 	LifecycleNote syncName `json:"lifecycle_note,omitempty"`
 	LifecycleAt   syncName `json:"lifecycle_at,omitempty"`
+	// Parent is the session whose own log holds this sub-agent run (Copilot
+	// CLI's task runs). Forgetting the parent forgets the run, and the run
+	// has no tombstone of its own, so the receiver checks the parent's
+	// (#5216). Additive.
+	Parent syncName `json:"parent,omitempty"`
 }
 
 // lifecycleDay is how a lifecycle date is stored: the UTC day of the filing.
@@ -289,6 +294,9 @@ func exportRecordsWith(dir, outDir, peer string, full, relay bool) (int, func() 
 		}
 		text, _ := redact.Text(r.Text)
 		rec := SyncRecord{Harness: meta.Harness, SessionID: sessionID, Project: project, Role: r.Role, Text: text, Time: r.Time, Origin: origin}
+		if !relayed && inParentFile(meta.Harness, meta.Kind, meta.Parent) {
+			rec.Parent = syncName(meta.Parent)
+		}
 		if meta.Harness == "deja" && strings.HasPrefix(sessionID, "deja-note-") {
 			if relayed {
 				rec.Lifecycle, rec.LifecycleNote, rec.LifecycleAt = syncName(meta.Lifecycle), syncName(meta.LifecycleNote), syncName(meta.LifecycleAt)
@@ -671,6 +679,10 @@ func Import(dir, inDir string) (int, error) {
 			// only this one knows why, and behind the ledger the import went
 			// silent exactly when the peer re-sent what you forgot (#980).
 			if dead[sr.Harness+":"+importID] || dead[sr.Harness+":"+origID] {
+				forgottenSkipped++
+				return nil
+			}
+			if parent := string(sr.Parent); parent != "" && (dead[sr.Harness+":"+ImportedSessionID(sr.Harness, parent)] || dead[sr.Harness+":"+parent]) {
 				forgottenSkipped++
 				return nil
 			}

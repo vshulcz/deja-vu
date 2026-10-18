@@ -51,9 +51,14 @@ func TestKimiAndQwenSubagentsComeInUnderTheSwitch(t *testing.T) {
 		}
 		return false
 	}
+	// Qwen's are read by default now (#5223); =0 keeps them out.
 	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "")
-	if has(KimiSessionFiles(), kimiChild) || has(QwenSessionFiles(), qwenChild) {
-		t.Fatal("a sub-agent log is read without the switch")
+	if has(KimiSessionFiles(), kimiChild) {
+		t.Fatal("a Kimi sub-agent log is read without the switch")
+	}
+	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "0")
+	if has(QwenSessionFiles(), qwenChild) {
+		t.Fatal("a Qwen sub-agent log is read under DEJA_INCLUDE_SUBAGENTS=0")
 	}
 	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "1")
 	for _, tc := range []struct {

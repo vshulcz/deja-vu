@@ -310,6 +310,15 @@ func parseCompactionSession(originalPath, harness, workspace string, data []byte
 		sessions, err = parseCodeBuddy(originalPath, compactionMapScanner(originalPath, data))
 	case "copilot":
 		sessions, err = parseCopilotScan(originalPath, 0, compactionMapScanner(originalPath, data))
+		// The log also holds its sub-agents' runs, read as sessions of their
+		// own (#5216); the session here is the one the log belongs to.
+		own := sessions[:0]
+		for _, s := range sessions {
+			if s.Kind != "sidechain" {
+				own = append(own, s)
+			}
+		}
+		sessions = own
 	case "qwen":
 		sessions, err = parseQwenScan(originalPath, compactionMapScanner(originalPath, data))
 	default:

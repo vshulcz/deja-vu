@@ -287,7 +287,7 @@ func attributeByWritten(sessions []model.Session, target search.BlameTarget, c l
 			if !m.Time.IsZero() && !c.When.IsZero() && m.Time.After(c.When) {
 				continue
 			}
-			if best.Matched == "" || m.Time.After(bestAt) {
+			if best.Matched == "" || m.Time.After(bestAt) || (m.Time.Equal(bestAt) && forkSource(sessions, s, best.Session)) {
 				best = lineAuthor{
 					Session: s,
 					Matched: blameSpanKey(line),
@@ -300,6 +300,33 @@ func attributeByWritten(sessions []model.Session, target search.BlameTarget, c l
 		}
 	}
 	return best, best.Matched != ""
+}
+
+// forkSource reports whether src is the session fork was forked from, directly
+// or through forks of forks among the candidates. A fork carries its source's
+// records at their original times, so the two tie on the record that wrote a
+// line, and the newest copy took the credit for an edit it only copied.
+func forkSource(sessions []model.Session, src, fork model.Session) bool {
+	for range sessions {
+		if fork.Kind != "fork" || fork.Parent == "" || fork.Harness != src.Harness {
+			return false
+		}
+		if fork.Parent == src.ID {
+			return true
+		}
+		next, ok := model.Session{}, false
+		for _, c := range sessions {
+			if c.Harness == fork.Harness && c.ID == fork.Parent {
+				next, ok = c, true
+				break
+			}
+		}
+		if !ok {
+			return false
+		}
+		fork = next
+	}
+	return false
 }
 
 // fileLine reads one line of a file, which is the text git attributed to the
@@ -354,7 +381,7 @@ func attributeByReplaced(sessions []model.Session, target search.BlameTarget, c 
 				// repository on the same store, 3 of 17 attributed commits had
 				// a second candidate. The last one to write it before the
 				// commit is the one the commit carried (#3723).
-				if best.Matched == "" || m.Time.After(bestAt) {
+				if best.Matched == "" || m.Time.After(bestAt) || (m.Time.Equal(bestAt) && forkSource(sessions, s, best.Session)) {
 					best = lineAuthor{Session: s, Matched: key, Asked: search.SessionTitle(s), Said: saidBefore(s, i)}
 					bestAt = m.Time
 				}

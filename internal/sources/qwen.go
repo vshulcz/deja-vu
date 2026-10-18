@@ -16,8 +16,12 @@ func QwenConfigDir() string { return filepath.Join(Home(), ".qwen") }
 
 func QwenRoot() string { return EnvPath("DEJA_QWEN_ROOT", QwenConfigDir()) }
 
+// QwenSessionFiles takes sub-agent logs by default, read the way Claude's are:
+// the task, the last turns and the files the child changed, so blame can name
+// the sub-agent that wrote a file (#5223). DEJA_INCLUDE_SUBAGENTS=1 keeps the
+// whole run and =0 skips them.
 func QwenSessionFiles() []string {
-	subagents := os.Getenv("DEJA_INCLUDE_SUBAGENTS") == "1"
+	subagents := os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "0"
 	return walkFiles(filepath.Join(QwenRoot(), "projects"), func(p string) bool {
 		return strings.HasSuffix(p, ".jsonl") && filepath.Base(filepath.Dir(p)) == "chats" ||
 			subagents && QwenSubagentFile(p)
@@ -52,8 +56,8 @@ func QwenSidecarFiles() []string {
 }
 
 // QwenSubagentFile reports whether p is a sub-agent's log,
-// projects/<project>/subagents/<session>/agent-<id>.jsonl. The reader takes
-// only chats/ unless DEJA_INCLUDE_SUBAGENTS=1 (#4483), so doctor counts these
+// projects/<project>/subagents/<session>/agent-<id>.jsonl. With
+// DEJA_INCLUDE_SUBAGENTS=0 the reader leaves them out, and doctor counts them
 // as skipped, not unread (#4475).
 func QwenSubagentFile(p string) bool {
 	return strings.HasSuffix(p, ".jsonl") && qwenUnder(p, "subagents")
@@ -200,6 +204,11 @@ func parseQwenScan(path string, scan func(func(map[string]any)) error) ([]model.
 		if id, _ := m["sessionId"].(string); id != "" && !child {
 			s.ID = id
 		}
+		// Every record of a sub-agent's log names the agent it ran as:
+		// general-purpose, a user agent, or "fork".
+		if name, _ := m["agentName"].(string); child && name != "" && s.Agent == "" {
+			s.Agent = name
+		}
 		t := parseTimeAny(m["timestamp"])
 		s.Touch(t)
 		role := typ
@@ -235,6 +244,9 @@ func parseQwenScan(path string, scan func(func(map[string]any)) error) ([]model.
 	}
 	if len(s.Messages) == 0 {
 		return nil, err
+	}
+	if child && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
+		s.Messages = KeepSubagentTail(s.Messages)
 	}
 	return []model.Session{s}, err
 }

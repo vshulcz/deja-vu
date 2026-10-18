@@ -65,6 +65,11 @@
 <p>session asked for it is not written down, and deja does not guess. A</p>
 <p><code>grok -p</code> run is marked <code>headless</code>, which says how the session was started,</p>
 <p>not that something spawned it, so deja records no kind for it (#4585).</p>
+<p>A <code>--fork-session</code> copy starts with every record of its source, rewritten</p>
+<p>under the fork&#39;s <code>sessionId</code> and outer <code>timestamp</code>; <code>_meta.eventId</code> still</p>
+<p>names the source. deja keeps a fork&#39;s own records and leaves the copies to the source,</p>
+<p>so search finds the source&#39;s turns once and blame names the session that</p>
+<p>wrote a line, not a fork made after it (#5235).</p>
 <h2 id="status-line">Status line</h2>
 <p><code>deja install grok-auto</code> adds <code>[ui.status_line]</code> with <code>type = &#34;command&#34;</code> to the</p>
 <p>user <code>config.toml</code>; Grok ignores the table in a project config. It pipes</p>
