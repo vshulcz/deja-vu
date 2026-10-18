@@ -27,6 +27,21 @@ trailer in the output and added to the command record. `session.shutdown`
 lists `codeChanges.filesModified`; deja does not read it, since the tool events
 already name every file.
 
+A `task` sub-agent runs inside the parent's log: each of its records carries
+`agentId`, and `subagent.started` names the agent. deja reads those records as
+a session of their own (kind `sidechain`, parent the session, agent the
+`agentName`), so `deja show` links the two and blame names the sub-agent for
+what it wrote. As with Claude Code's sub-agent files, the run is kept as its
+task, its last turns and its edits unless `DEJA_INCLUDE_SUBAGENTS=1`; `=0`
+leaves it out. Copilot cannot reopen one (`resumable: false`), so `deja resume`
+points at the parent. Forgetting the parent forgets the run with it.
+
+`/fork` writes a new session that opens with copies of the source's records,
+times included, then a `session.info` record of `infoType` `fork` whose message
+names the source: `Forked from "<title>" (<id>) as …`. deja reads the fork as
+kind `fork` with that parent, drops the copied sub-agent runs (the source holds
+them), and blame gives a line both hold to the source.
+
 - **MCP**: `deja install copilot` writes `mcpServers.deja` into
   `${COPILOT_HOME:-~/.copilot}/mcp-config.json`.
 - **Skill**: `~/.copilot/skills/deja-history/SKILL.md` (under `$COPILOT_HOME`

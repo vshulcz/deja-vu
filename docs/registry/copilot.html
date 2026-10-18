@@ -65,6 +65,19 @@
 <p>trailer in the output and added to the command record. <code>session.shutdown</code></p>
 <p>lists <code>codeChanges.filesModified</code>; deja does not read it, since the tool events</p>
 <p>already name every file.</p>
+<p>A <code>task</code> sub-agent runs inside the parent&#39;s log: each of its records carries</p>
+<p><code>agentId</code>, and <code>subagent.started</code> names the agent. deja reads those records as</p>
+<p>a session of their own (kind <code>sidechain</code>, parent the session, agent the</p>
+<p><code>agentName</code>), so <code>deja show</code> links the two and blame names the sub-agent for</p>
+<p>what it wrote. As with Claude Code&#39;s sub-agent files, the run is kept as its</p>
+<p>task, its last turns and its edits unless <code>DEJA_INCLUDE_SUBAGENTS=1</code>; <code>=0</code></p>
+<p>leaves it out. Copilot cannot reopen one (<code>resumable: false</code>), so <code>deja resume</code></p>
+<p>points at the parent. Forgetting the parent forgets the run with it.</p>
+<p><code>/fork</code> writes a new session that opens with copies of the source&#39;s records,</p>
+<p>times included, then a <code>session.info</code> record of <code>infoType</code> <code>fork</code> whose message</p>
+<p>names the source: <code>Forked from &#34;&lt;title&gt;&#34; (&lt;id&gt;) as …</code>. deja reads the fork as</p>
+<p>kind <code>fork</code> with that parent, drops the copied sub-agent runs (the source holds</p>
+<p>them), and blame gives a line both hold to the source.</p>
 <ul>
 <li><strong>MCP</strong>: <code>deja install copilot</code> writes <code>mcpServers.deja</code> into</li>
 </ul>

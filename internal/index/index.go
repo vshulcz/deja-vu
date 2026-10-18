@@ -720,7 +720,10 @@ import (
 // session already indexed (#5214).
 // 73: Qwen Code sub-agent logs are read by default, as Claude's are, so the
 // files they wrote have an author (#5223).
-const version = 73
+// 74: a Copilot CLI sub-agent run is its own session under its parent and a
+// /fork names its source (#5216, #5217); rows already indexed hold neither
+// until a rebuild.
+const version = 74
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

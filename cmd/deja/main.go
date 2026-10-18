@@ -4280,7 +4280,7 @@ func runForget(dir string, args []string) error {
 			return ensureError(dir, perr)
 		}
 		if o.Session != "" {
-			if err := forgetScopeRefusal(o.Session, pr.Sessions, allMatches); err != nil {
+			if err := forgetScopeRefusal(o.Session, pr.Sessions-pr.Attached, allMatches); err != nil {
 				return err
 			}
 		}
@@ -4312,8 +4312,8 @@ func runForget(dir string, args []string) error {
 		// `--all-matches`, while the command as typed drops nothing (#1032).
 		// The refusal itself points here, so it is not repeated: this run is
 		// the listing it promises.
-		if o.Session != "" && forgetScopeRefusal(o.Session, result.Sessions, allMatches) != nil {
-			fmt.Fprintf(os.Stdout, "%q matches %d sessions — add --all-matches to drop them all\n", o.Session, result.Sessions)
+		if o.Session != "" && forgetScopeRefusal(o.Session, result.Sessions-result.Attached, allMatches) != nil {
+			fmt.Fprintf(os.Stdout, "%q matches %d sessions — add --all-matches to drop them all\n", o.Session, result.Sessions-result.Attached)
 			fmt.Fprintf(os.Stdout, "dry run — nothing was changed\nas it stands this run drops nothing; with --all-matches it would drop: %s\nwould add: %s\n",
 				forgetCounts(result.Sessions, result.Messages), countNoun(result.Tombstones, "tombstone"))
 		} else {
