@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -35,7 +34,7 @@ func setHermesPluginEnabled(on bool) error {
 	next, how := e.apply(s)
 	switch {
 	case how == hermesPluginsUnreadable && on:
-		return fmt.Errorf("%s: plugins.enabled is not written in a shape deja can edit safely; add deja to it by hand", path)
+		return hermesPluginsShapeError(path)
 	case how == hermesPluginsUnreadable, !on && how == hermesPluginsMissing, next == s && how != hermesPluginsMissing:
 		return nil
 	case !on:
