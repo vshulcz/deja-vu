@@ -56,7 +56,7 @@ func TestEveryInstalledConfigIsRecognisableAsDejas(t *testing.T) {
 			return
 		}
 		written++
-		if !mentionsDeja(b) {
+		if !mentionsDeja(b) || !snapshotHoldsDejaWiring(b) {
 			line := strings.Join(strings.Fields(string(b)), " ")
 			if len(line) > 120 {
 				line = line[:120] + "…"
