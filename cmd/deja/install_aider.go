@@ -44,6 +44,21 @@ func installAider(_ string, uninstall bool) (installResult, error) {
 	// so install wrote a second read: key and aider, which keeps the last,
 	// dropped the reader's files (#4330). writeIfChanged puts the endings back.
 	was := aiderReadWas(path)
+	// The reader's own empty read: key, kept where it is: install used to drop
+	// it and append its own at the end, and uninstall then took that away too.
+	// Read off the file while it holds no entry of deja's, so the key is
+	// theirs; a record of an empty key that is gone now is let go.
+	bare := ""
+	if !uninstall && !aiderConfReadsContext(lfText(old)) {
+		bare = aiderBareRead(lfText(old))
+		if was != "" && was != bare && (bare != "" || yamlKeyLine(was, "read:")) {
+			forgetBlockAdded(path, aiderReadWasKey+was)
+			was = ""
+		}
+		if bare != "" {
+			was = bare
+		}
+	}
 	next, _ := removeAiderReadEntry(lfText(old), was)
 	if !uninstall {
 		// The line install turns into a block list, kept so uninstall can put
@@ -60,6 +75,8 @@ func installAider(_ string, uninstall bool) (installResult, error) {
 				forgetBlockAdded(path, aiderReadWasKey+was)
 			}
 			noteBlockAdded(path, aiderReadWasKey+inline)
+		} else if bare != "" {
+			noteBlockAdded(path, aiderReadWasKey+bare)
 		}
 	} else if was != "" {
 		forgetBlockAdded(path, aiderReadWasKey+was)
@@ -118,6 +135,13 @@ func aiderInlineRead(s string) string {
 // their own CONVENTIONS.md there must not lose it. s is LF text.
 func addAiderReadEntry(s, ctx string) (string, error) {
 	entry := "  - " + ctx + "\n"
+	// Every search below goes line by line to a newline: a config whose last
+	// line has none — `read: C.md` — was never matched, and install reported
+	// it unchanged with nothing wired. writeIfChanged takes the newline off
+	// again.
+	if s != "" && !strings.HasSuffix(s, "\n") {
+		s += "\n"
+	}
 	keys := 0
 	for _, line := range strings.Split(s, "\n") {
 		if strings.HasPrefix(line, "read:") {
@@ -128,7 +152,8 @@ func addAiderReadEntry(s, ctx string) (string, error) {
 		return "", fmt.Errorf("read: is written twice at the top level, and aider reads only the last one — keep one and run this again")
 	}
 	// The scalar form takes a single file; promote it to a list so both survive.
-	for _, line := range strings.Split(s, "\n") {
+	lines := strings.Split(s, "\n")
+	for i, line := range lines {
 		v, ok := strings.CutPrefix(line, "read: ")
 		if !ok || strings.TrimSpace(v) == "" || strings.HasPrefix(strings.TrimSpace(v), "#") {
 			continue
@@ -145,10 +170,8 @@ func addAiderReadEntry(s, ctx string) (string, error) {
 			b.WriteString("  - " + it + "\n")
 		}
 		b.WriteString(entry)
-		return strings.Replace(s, line+"\n", b.String(), 1), nil
-	}
-	if s != "" && !strings.HasSuffix(s, "\n") {
-		s += "\n"
+		lines[i] = strings.TrimSuffix(b.String(), "\n")
+		return strings.Join(lines, "\n"), nil
 	}
 	// The block form, found the way the other YAML writers find their keys: a
 	// comment after the key or under it, and a second read: refused (#4290).
@@ -287,6 +310,29 @@ func aiderConfReadsContext(s string) bool {
 	return false
 }
 
+// aiderBareRead is the top-level read: line of an LF config when nothing is
+// under it — the reader's own empty key — or "".
+func aiderBareRead(s string) string {
+	lines := strings.Split(s, "\n")
+	for i, l := range lines {
+		if yamlIndentWidth(l) != 0 || !yamlKeyLine(l, "read:") {
+			continue
+		}
+		for _, next := range lines[i+1:] {
+			t := strings.TrimSpace(next)
+			if t == "" || strings.HasPrefix(t, "#") {
+				continue
+			}
+			if strings.HasPrefix(t, "- ") || t == "-" {
+				return ""
+			}
+			break
+		}
+		return l
+	}
+	return ""
+}
+
 // removeAiderReadEntry takes deja's entry out of an LF config, and puts back
 // was — the read: line install promoted — when the list left is exactly what
 // that line held. It reports whether it did.
@@ -305,16 +351,18 @@ func removeAiderReadEntry(s, was string) (string, bool) {
 	}
 	// A read: key with nothing under it is not the file we found: drop the key
 	// as well, or the next aider start reads a null list. A comment under the
-	// key is not an item.
+	// key is not an item. The reader's own empty key, recorded as was, stays.
 	for i := 0; i < len(out); i++ {
-		if yamlIndentWidth(out[i]) != 0 || !yamlKeyLine(out[i], "read:") {
+		if yamlIndentWidth(out[i]) != 0 || !yamlKeyLine(out[i], "read:") || yamlKeyLine(was, "read:") {
 			continue
 		}
 		j := i + 1
 		for j < len(out) && (strings.TrimSpace(out[j]) == "" || strings.HasPrefix(strings.TrimSpace(out[j]), "#")) {
 			j++
 		}
-		if j < len(out) && strings.HasPrefix(strings.TrimSpace(out[j]), "- ") {
+		// `-` alone is an item too: dropping the key left it orphaned and the
+		// file unparseable.
+		if j < len(out) && (strings.HasPrefix(strings.TrimSpace(out[j]), "- ") || strings.TrimSpace(out[j]) == "-") {
 			continue
 		}
 		out = append(out[:i], out[i+1:]...)
@@ -327,6 +375,10 @@ func removeAiderReadEntry(s, was string) (string, bool) {
 // made it from, when the block holds the same files in the same order. A list
 // the reader has changed since stays as they left it.
 func restoreAiderRead(lines []string, was string) ([]string, bool) {
+	if yamlKeyLine(was, "read:") {
+		// An empty key: nothing was promoted, the key itself is kept.
+		return lines, false
+	}
 	want, ok := aiderReadItems(strings.TrimPrefix(was, "read: "))
 	if !ok {
 		return lines, false
