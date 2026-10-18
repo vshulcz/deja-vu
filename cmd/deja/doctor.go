@@ -2587,7 +2587,7 @@ func doctorTOMLDejaKeys(path string) []string {
 	}
 	found := map[string]bool{}
 	current := ""
-	for _, line := range strings.Split(string(b), "\n") {
+	for _, line := range tomlCodeLines(string(b)) {
 		if key, ok := tomlMCPHeader(line); ok {
 			current = key
 			if key == "deja" {

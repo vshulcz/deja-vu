@@ -1677,33 +1677,49 @@ func foreignEntry(e map[string]any) bool {
 
 // holdsForeignTOMLDejaEntry is foreignEntry for a [mcp_servers.deja] table.
 func holdsForeignTOMLDejaEntry(s string) bool {
-	lines := strings.Split(s, "\n")
+	lines := tomlCodeLines(s)
 	for _, b := range tomlMCPBlocks(s) {
-		if b.key != "deja" || tomlBlockRunsDeja(lines, b) {
-			continue
-		}
-		command, url, mcp := false, false, false
-		for i := b.start + 1; i < b.end; i++ {
-			key, value, ok := tomlLineKeyValue(lines[i])
-			if !ok {
-				continue
-			}
-			switch key {
-			case "url":
-				url = true
-			case "command", "args":
-				command = command || key == "command"
-				value, i = tomlArrayValue(lines, i, b.end, value)
-				for _, w := range tomlStringValues(value) {
-					mcp = mcp || w == "mcp"
-				}
-			}
-		}
-		if (url && !command) || (command && !mcp) {
+		if b.key == "deja" && tomlBlockIsForeign(lines, b) {
 			return true
 		}
 	}
 	return false
+}
+
+// tomlBlockHasKey reports whether the table sets key itself.
+func tomlBlockHasKey(lines []string, b tomlMCPBlock, key string) bool {
+	for i := b.start + 1; i < b.end; i++ {
+		if k, _, ok := tomlLineKeyValue(lines[i]); ok && k == key {
+			return true
+		}
+	}
+	return false
+}
+
+// tomlBlockIsForeign is foreignEntry for one table: a url and no command, or a
+// command that never runs `mcp`.
+func tomlBlockIsForeign(lines []string, b tomlMCPBlock) bool {
+	if tomlBlockRunsDeja(lines, b) {
+		return false
+	}
+	command, url, mcp := false, false, false
+	for i := b.start + 1; i < b.end; i++ {
+		key, value, ok := tomlLineKeyValue(lines[i])
+		if !ok {
+			continue
+		}
+		switch key {
+		case "url":
+			url = true
+		case "command", "args":
+			command = command || key == "command"
+			value, i = tomlArrayValue(lines, i, b.end, value)
+			for _, w := range tomlStringValues(value) {
+				mcp = mcp || w == "mcp"
+			}
+		}
+	}
+	return (url && !command) || (command && !mcp)
 }
 
 // mentionsDeja reports whether a config snapshot carries deja's own wiring.
@@ -2929,7 +2945,10 @@ func installGrok(exe string, uninstall bool) (installResult, error) {
 // actually breaks. `[mcp_servers.theirs` with the bracket missing is the shape
 // a hand-edit leaves, and the one this refuses.
 func tomlHeadersClose(text string) error {
-	for i, line := range strings.Split(text, "\n") {
+	// tomlCodeLines: a line of a multi-line string is text. Codex takes
+	// markdown in developer_instructions, and `[style]: https://…` there was
+	// refused as a header that never closes (#5158).
+	for i, line := range tomlCodeLines(text) {
 		t := strings.TrimSpace(line)
 		if !strings.HasPrefix(t, "[") {
 			continue
@@ -2957,7 +2976,7 @@ func tomlHeadersClose(text string) error {
 func tomlInlineKey(text, header string) error {
 	want := tomlKeyPath(strings.Trim(header, "[]"))
 	table := []string(nil)
-	for i, line := range strings.Split(text, "\n") {
+	for i, line := range tomlCodeLines(text) {
 		code := tomlCode(line)
 		if strings.HasPrefix(code, "[") && strings.HasSuffix(code, "]") {
 			table = tomlKeyPath(strings.Trim(code, "[]"))
@@ -2975,12 +2994,45 @@ func tomlInlineKey(text, header string) error {
 	return nil
 }
 
-// tomlKeyPath splits a dotted TOML key into its parts, unquoted.
+// tomlKeyPath splits a dotted TOML key into its parts, unquoted. The split
+// is outside quotes, so `"deja.old"` stays one name, and whitespace around a
+// dot is TOML's to allow: `[ mcp_servers . deja ]` is deja's table (#5159).
 func tomlKeyPath(k string) []string {
 	var out []string
-	for _, part := range strings.Split(k, ".") {
-		out = append(out, strings.Trim(strings.TrimSpace(part), `"'`))
+	var part strings.Builder
+	var quote byte
+	flush := func() {
+		p := strings.TrimSpace(part.String())
+		if len(p) >= 2 && p[0] == '"' && p[len(p)-1] == '"' {
+			if u, err := strconv.Unquote(p); err == nil {
+				p = u
+			}
+		} else {
+			p = strings.Trim(p, `"'`)
+		}
+		out = append(out, p)
+		part.Reset()
 	}
+	for i := 0; i < len(k); i++ {
+		c := k[i]
+		switch {
+		case quote != 0:
+			if quote == '"' && c == '\\' && i+1 < len(k) {
+				part.WriteByte(c)
+				i++
+				c = k[i]
+			} else if c == quote {
+				quote = 0
+			}
+		case c == '"' || c == '\'':
+			quote = c
+		case c == '.':
+			flush()
+			continue
+		}
+		part.WriteByte(c)
+	}
+	flush()
 	return out
 }
 
@@ -3046,10 +3098,12 @@ func installTOML(path, block string, uninstall bool) (installResult, error) {
 	s := removeCodexDejaBlock(text)
 	if uninstall {
 		for _, key := range foreignTOMLDejaKeys(s) {
-			name := "mcp_servers." + key
-			if blockWasAdded(path, name) {
-				s = removeTOMLMCPBlock(s, key)
-				forgetBlockAdded(path, name)
+			for _, name := range tomlRecordedNames(key) {
+				if blockWasAdded(path, name) {
+					s = removeTOMLMCPBlock(s, key)
+					forgetBlockAdded(path, name)
+					break
+				}
 			}
 		}
 	}
@@ -3076,7 +3130,15 @@ func installTOML(path, block string, uninstall bool) (installResult, error) {
 				own = append(own, b)
 			}
 		}
-		if len(own) == 1 {
+		// Rewritten, not replaced, when it already runs deja: the keys deja
+		// does not own are the reader's — startup_timeout_sec,
+		// tool_timeout_sec, env_vars — and every install, upgrades included,
+		// used to drop them (#5161). One that runs some other program under
+		// deja's name, or carries a url beside the command, is replaced whole;
+		// its snapshot is the .bak.
+		if len(own) == 1 && !tomlBlockIsForeign(tomlCodeLines(text), own[0]) && !tomlBlockHasKey(tomlCodeLines(text), own[0], "url") {
+			s = strings.TrimRight(updateTOMLMCPBlock(text, "deja", block), "\n") + "\n"
+		} else if len(own) == 1 {
 			lines := strings.Split(text, "\n")
 			keep := own[0].end
 			for keep > own[0].start+1 && strings.TrimSpace(lines[keep-1]) == "" {
@@ -3098,7 +3160,7 @@ func installTOML(path, block string, uninstall bool) (installResult, error) {
 // tomlDejaSwitchedOff reports whether `[mcp_servers.deja]` carries
 // `enabled = false`, the switch codex and grok both read.
 func tomlDejaSwitchedOff(s string) bool {
-	lines := strings.Split(s, "\n")
+	lines := tomlCodeLines(s)
 	for _, b := range tomlMCPBlocks(s) {
 		if b.key != "deja" {
 			continue
@@ -3112,8 +3174,11 @@ func tomlDejaSwitchedOff(s string) bool {
 	return false
 }
 
+// tomlMCPBlocks takes the file's text as read, not tomlCodeLines output: it
+// blanks the lines of multi-line strings itself, and a second pass over text
+// whose closing delimiters are already gone would read the rest as string.
 func tomlMCPBlocks(s string) []tomlMCPBlock {
-	lines := strings.Split(s, "\n")
+	lines := tomlCodeLines(s)
 	var out []tomlMCPBlock
 	for i, line := range lines {
 		key, ok := tomlMCPHeader(line)
@@ -3136,17 +3201,33 @@ func tomlMCPBlocks(s string) []tomlMCPBlock {
 // tomlCode first: a header is as entitled to a trailing comment as a value
 // line, and requiring the bracket to end the raw line dropped the whole block
 // — install then appended the duplicate this change exists to stop.
+//
+// The header is read as a key path, so `[ mcp_servers.deja ]`, `[mcp_servers .
+// deja]` and `[mcp_servers."deja"]` are all deja's: matching the literal
+// `[mcp_servers.` prefix missed the spaced ones, install appended a second
+// table, and codex refused the file as a duplicate key (#5159). A sub-table
+// keeps its dotted tail (`deja.env`); a name with a dot of its own stays
+// quoted, so it is never mistaken for one.
 func tomlMCPHeader(line string) (string, bool) {
 	line = tomlCode(line)
-	const prefix = "[mcp_servers."
-	if !strings.HasPrefix(line, prefix) || !strings.HasSuffix(line, "]") {
+	if !strings.HasPrefix(line, "[") || strings.HasPrefix(line, "[[") || !strings.HasSuffix(line, "]") {
 		return "", false
 	}
-	key := strings.TrimSuffix(strings.TrimPrefix(line, prefix), "]")
-	if key == "" || strings.ContainsAny(key, "[]") {
+	path := tomlKeyPath(line[1 : len(line)-1])
+	if len(path) < 2 || path[0] != "mcp_servers" {
 		return "", false
 	}
-	return key, true
+	parts := make([]string, 0, len(path)-1)
+	for _, p := range path[1:] {
+		if p == "" {
+			return "", false
+		}
+		if strings.ContainsAny(p, ".[]") {
+			p = strconv.Quote(p)
+		}
+		parts = append(parts, p)
+	}
+	return strings.Join(parts, "."), true
 }
 
 func foreignTOMLDejaKey(s string) string {
@@ -3158,7 +3239,7 @@ func foreignTOMLDejaKey(s string) string {
 }
 
 func foreignTOMLDejaKeys(s string) []string {
-	lines := strings.Split(s, "\n")
+	lines := tomlCodeLines(s)
 	seen := map[string]bool{}
 	var keys []string
 	for _, b := range tomlMCPBlocks(s) {
@@ -3339,6 +3420,7 @@ func tomlStringValues(s string) []string {
 // same through mergeDejaEntry (#2269).
 func updateTOMLMCPBlock(s, key, replacement string) string {
 	lines := strings.Split(s, "\n")
+	code := tomlCodeLines(s)
 	var target tomlMCPBlock
 	found := false
 	for _, block := range tomlMCPBlocks(s) {
@@ -3363,7 +3445,7 @@ func updateTOMLMCPBlock(s, key, replacement string) string {
 	body := make([]string, 0, target.end-target.start)
 	inserted := false
 	for i := target.start + 1; i < target.end; i++ {
-		k, value, ok := tomlLineKeyValue(lines[i])
+		k, value, ok := tomlLineKeyValue(code[i])
 		if !ok || !tomlOwnedMCPKey(k) {
 			body = append(body, lines[i])
 			continue
@@ -3373,7 +3455,7 @@ func updateTOMLMCPBlock(s, key, replacement string) string {
 			inserted = true
 		}
 		if k == "args" {
-			_, i = tomlArrayValue(lines, i, target.end, value)
+			_, i = tomlArrayValue(code, i, target.end, value)
 		}
 	}
 	if !inserted {
@@ -3384,6 +3466,24 @@ func updateTOMLMCPBlock(s, key, replacement string) string {
 	out = append(out, body...)
 	out = append(out, lines[target.end:]...)
 	return strings.Join(out, "\n")
+}
+
+// tomlRecordedNames is every name an install may have recorded for a
+// hand-named table. Before #5159 the name was the header as written, quotes
+// and all — `mcp_servers."deja-vu"` — and an uninstall that only asked for the
+// unquoted one left the table it had adopted behind.
+func tomlRecordedNames(key string) []string {
+	bare := key
+	if u, err := strconv.Unquote(key); err == nil {
+		bare = u
+	}
+	names := []string{"mcp_servers." + key}
+	for _, k := range []string{strconv.Quote(bare), "'" + bare + "'", bare} {
+		if k != key {
+			names = append(names, "mcp_servers."+k)
+		}
+	}
+	return names
 }
 
 func tomlOwnedMCPKey(key string) bool {
@@ -5354,9 +5454,10 @@ func removeAdoptedDejaEntries(path, container string, m map[string]any) {
 // removable on uninstall (#2648).
 func removeTOMLMCPBlock(s, key string) string {
 	lines := strings.Split(s, "\n")
+	code := tomlCodeLines(s)
 	var out []string
 	for i := 0; i < len(lines); i++ {
-		found, ok := tomlMCPHeader(lines[i])
+		found, ok := tomlMCPHeader(code[i])
 		if !ok || !tomlBlockOwnedBy(found, key) {
 			out = append(out, lines[i])
 			continue
@@ -5366,7 +5467,7 @@ func removeTOMLMCPBlock(s, key string) string {
 		// because it belongs to the key being removed — which is the whole of
 		// the fix for #2716, and why there is no second skip here.
 		i++
-		for i < len(lines) && !strings.HasPrefix(strings.TrimSpace(tomlCode(lines[i])), "[") {
+		for i < len(lines) && !strings.HasPrefix(strings.TrimSpace(tomlCode(code[i])), "[") {
 			i++
 		}
 		i--

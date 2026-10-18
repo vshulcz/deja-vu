@@ -235,25 +235,82 @@ func yamlQuoteEnd(s string, quote byte) int {
 }
 
 // tomlCodeLines is text's lines with those inside a multi-line string
-// blanked, so a line of a string never reads as a key or a table.
+// blanked, so a line of a string never reads as a key or a table. The scan is
+// per character: a triple quote inside a one-line string or a literal, or an
+// escaped quote in a basic multi-line string, opens nothing. Counting
+// delimiters per line took any of them for an opening, blanked the file from
+// there on, and install could no longer see deja's own table (#5158).
 func tomlCodeLines(text string) []string {
 	lines := strings.Split(text, "\n")
 	open := ""
 	for i, line := range lines {
-		if open != "" {
+		was := open
+		open = tomlStringOpenAfter(line, open)
+		if was != "" {
 			lines[i] = ""
-			if strings.Contains(line, open) {
-				open = ""
-			}
-			continue
-		}
-		for _, d := range []string{`"""`, `'''`} {
-			if strings.Count(tomlCode(line), d)%2 == 1 {
-				open = d
-			}
 		}
 	}
 	return lines
+}
+
+// tomlStringOpenAfter says which multi-line delimiter is still open at the end
+// of line, given the one open at its start.
+func tomlStringOpenAfter(line, open string) string {
+	for i := 0; i < len(line); {
+		switch {
+		case open == `"""`:
+			if line[i] == '\\' {
+				i += 2
+				continue
+			}
+			if strings.HasPrefix(line[i:], `"""`) {
+				// Up to two more quotes may end the string's content.
+				i += 3
+				for i < len(line) && line[i] == '"' {
+					i++
+				}
+				open = ""
+				continue
+			}
+			i++
+		case open == "'''":
+			j := strings.Index(line[i:], "'''")
+			if j < 0 {
+				return open
+			}
+			i += j + 3
+			for i < len(line) && line[i] == '\'' {
+				i++
+			}
+			open = ""
+		case strings.HasPrefix(line[i:], `"""`):
+			open = `"""`
+			i += 3
+		case strings.HasPrefix(line[i:], "'''"):
+			open = "'''"
+			i += 3
+		case line[i] == '#':
+			return ""
+		case line[i] == '"':
+			i++
+			for i < len(line) && line[i] != '"' {
+				if line[i] == '\\' {
+					i++
+				}
+				i++
+			}
+			i++
+		case line[i] == '\'':
+			j := strings.IndexByte(line[i+1:], '\'')
+			if j < 0 {
+				return ""
+			}
+			i += j + 2
+		default:
+			i++
+		}
+	}
+	return open
 }
 
 // dshRowDisabled reports whether the row with this id in a dsh patch layer
@@ -301,7 +358,7 @@ func dshRowDisabled(text, id string) bool {
 func tomlDejaEntriesOff(text string) bool {
 	lines := tomlCodeLines(text)
 	off := false
-	for _, b := range tomlMCPBlocks(strings.Join(lines, "\n")) {
+	for _, b := range tomlMCPBlocks(text) {
 		if b.key != "deja" && !tomlBlockRunsDeja(lines, b) {
 			continue
 		}
