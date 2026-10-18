@@ -58,6 +58,9 @@ type BlameHit struct {
 	MessagesCapped bool `json:"messages_capped,omitempty"`
 	// matched are the indices of those messages, in message order.
 	matched []int
+	// wrote is whether the session holds a write or edit of the file that it
+	// did not copy from another candidate.
+	wrote bool
 	// Specificity is how fully the session named the file — a path against a
 	// bare name — and is what orders the answer before the score does (#2840).
 	Specificity float64 `json:"specificity"`
@@ -319,6 +322,7 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 		hit.Specificity = specificity
 		hits = append(hits, hit)
 	}
+	markWriters(hits, target)
 	sort.Slice(hits, func(i, j int) bool {
 		// Whether the session named a path at all, before anything else: the
 		// description this answers to promises the most specific mention
@@ -336,6 +340,12 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 		// reads: by score, one that named it a few more times sat above a newer
 		// one, and the listing read 06-29, 06-27, 06-28. Bare mentions keep the
 		// score, which is what holds an echo of the name below real work.
+		// Then whether it wrote the file: a parent that named the path in the
+		// task and went on is newer than the sub-agent that wrote it, and a
+		// fork that copied the edit is newer than its source (#5317).
+		if hits[i].wrote != hits[j].wrote {
+			return hits[i].wrote
+		}
 		if namedAPath(hits[i]) && !hits[i].Session.Updated.Equal(hits[j].Session.Updated) {
 			return hits[i].Session.Updated.After(hits[j].Session.Updated)
 		}
@@ -351,6 +361,50 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 	liftNotesBy(hits, func(h BlameHit) model.Session { return h.Session })
 	dropRepeatedSnippets(hits)
 	return hits
+}
+
+// markWriters sets wrote on every hit holding a write or edit record of the
+// target, unless every such record is one it shares with the session it was
+// copied or forked from, which is where the work was done.
+func markWriters(hits []BlameHit, target BlameTarget) {
+	sessions := make([]model.Session, len(hits))
+	for i := range hits {
+		sessions[i] = hits[i].Session
+	}
+	key := func(m model.Message) string {
+		return m.Role + "\x00" + strconv.FormatInt(m.Time.UnixNano(), 10) + "\x00" + m.Text
+	}
+	writes := make([]map[string]time.Time, len(hits))
+	for i, s := range sessions {
+		for _, m := range s.Messages {
+			if m.Role != sources.RoleWrote && m.Role != sources.RoleEdit {
+				continue
+			}
+			path, _, ok := strings.Cut(m.Text, "\n")
+			if !ok || !RecordNamesFile(path, target) {
+				continue
+			}
+			if writes[i] == nil {
+				writes[i] = map[string]time.Time{}
+			}
+			writes[i][key(m)] = m.Time
+		}
+	}
+	for i := range hits {
+		for k, at := range writes[i] {
+			copied := false
+			for j := range hits {
+				if j != i && !at.IsZero() && !writes[j][k].IsZero() && SourceOf(sessions, sessions[j], sessions[i], at) {
+					copied = true
+					break
+				}
+			}
+			if !copied {
+				hits[i].wrote = true
+				break
+			}
+		}
+	}
 }
 
 // dropRepeatedSnippets removes a quote the answer has already shown.

@@ -167,3 +167,13 @@ func LoggedID(id string) string {
 	}
 	return b.String()
 }
+
+// SpawnedKind reports whether a session's kind is the harness's word for an
+// agent another session spawned.
+func SpawnedKind(kind string) bool {
+	switch kind {
+	case "sidechain", "subagent", "subagent_fork":
+		return true
+	}
+	return false
+}

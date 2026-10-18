@@ -279,7 +279,7 @@ func attributeByWritten(sessions []model.Session, target search.BlameTarget, c l
 				continue
 			}
 			path, has := sources.WroteRecordHas(m.Text, want)
-			if !has || !recordNamesFile(path, target) {
+			if !has || !search.RecordNamesFile(path, target) {
 				continue
 			}
 			// A session that wrote it after the commit wrote something else:
@@ -287,7 +287,7 @@ func attributeByWritten(sessions []model.Session, target search.BlameTarget, c l
 			if !m.Time.IsZero() && !c.When.IsZero() && m.Time.After(c.When) {
 				continue
 			}
-			if best.Matched == "" || m.Time.After(bestAt) || (m.Time.Equal(bestAt) && (forkSource(sessions, s, best.Session) || copiedFrom(m.Time, s, best.Session))) {
+			if best.Matched == "" || m.Time.After(bestAt) || (m.Time.Equal(bestAt) && search.SourceOf(sessions, s, best.Session, m.Time)) {
 				best = lineAuthor{
 					Session: s,
 					Matched: blameSpanKey(line),
@@ -300,59 +300,6 @@ func attributeByWritten(sessions []model.Session, target search.BlameTarget, c l
 		}
 	}
 	return best, best.Matched != ""
-}
-
-// forkSource reports whether src is the session fork was forked from, directly
-// or through forks of forks among the candidates. A fork carries its source's
-// records at their original times, so the two tie on the record that wrote a
-// line, and the newest copy took the credit for an edit it only copied.
-func forkSource(sessions []model.Session, src, fork model.Session) bool {
-	for range sessions {
-		if fork.Kind != "fork" || fork.Parent == "" || fork.Harness != src.Harness {
-			return false
-		}
-		if fork.Parent == src.ID {
-			return true
-		}
-		next, ok := model.Session{}, false
-		for _, c := range sessions {
-			if c.Harness == fork.Harness && c.ID == fork.Parent {
-				next, ok = c, true
-				break
-			}
-		}
-		if !ok {
-			return false
-		}
-		fork = next
-	}
-	return false
-}
-
-// copiedFrom reports whether s, tied with best on the record that wrote a
-// line, is the session that record was copied from when the copy names no
-// source: opencode's --fork carries its source's records at their original
-// times and leaves no marker, and the source started before any copy of it.
-//
-// A Claude --fork-session copy starts on the same record as its source, and is
-// told apart by holding the source's last turn (#5316).
-//
-// A sub-agent copies nothing from its parent: a parent and its child writing
-// one line in the same whole second (goose, Hermes) is not a copy, and taking
-// the older session handed the child's line to the parent.
-func copiedFrom(at time.Time, s, best model.Session) bool {
-	if index.SpawnedKind(s.Kind) || index.SpawnedKind(best.Kind) {
-		return false
-	}
-	if at.IsZero() || s.Harness != best.Harness {
-		return false
-	}
-	if !s.Started.IsZero() && s.Started.Before(best.Started) {
-		return true
-	}
-	// claude --fork-session copies with the original times, so the copy
-	// starts on its source's first record; what it holds tells them apart.
-	return search.CopyOf(best, s)
 }
 
 // fileLine reads one line of a file, which is the text git attributed to the
@@ -391,7 +338,7 @@ func attributeByReplaced(sessions []model.Session, target search.BlameTarget, c 
 			}
 			// An edit record is "path\n<the text that was replaced>".
 			path, span, ok := strings.Cut(m.Text, "\n")
-			if !ok || !recordNamesFile(path, target) {
+			if !ok || !search.RecordNamesFile(path, target) {
 				continue
 			}
 			// After the commit it cannot be what the commit removed.
@@ -407,7 +354,7 @@ func attributeByReplaced(sessions []model.Session, target search.BlameTarget, c 
 				// repository on the same store, 3 of 17 attributed commits had
 				// a second candidate. The last one to write it before the
 				// commit is the one the commit carried (#3723).
-				if best.Matched == "" || m.Time.After(bestAt) || (m.Time.Equal(bestAt) && (forkSource(sessions, s, best.Session) || copiedFrom(m.Time, s, best.Session))) {
+				if best.Matched == "" || m.Time.After(bestAt) || (m.Time.Equal(bestAt) && search.SourceOf(sessions, s, best.Session, m.Time)) {
 					best = lineAuthor{Session: s, Matched: key, Asked: search.SessionTitle(s), Said: saidBefore(s, i)}
 					bestAt = m.Time
 				}
@@ -416,32 +363,6 @@ func attributeByReplaced(sessions []model.Session, target search.BlameTarget, c 
 		}
 	}
 	return best, best.Matched != ""
-}
-
-// recordNamesFile reports whether a recorded path names the file asked about. The
-// recorded one is absolute and may come from a worktree or another machine, so
-// the comparison is on the tail.
-func recordNamesFile(recorded string, target search.BlameTarget) bool {
-	recorded = strings.TrimSpace(strings.ReplaceAll(recorded, "\\", "/"))
-	if recorded == "" {
-		return false
-	}
-	want := filepath.ToSlash(target.FullPath)
-	if recorded == want {
-		return true
-	}
-	// A worktree or a peer's checkout: the repository-relative tail is what
-	// both have in common. Two segments is enough to tell `pool.go` in two
-	// packages apart and short enough to survive a different checkout root.
-	return strings.HasSuffix(recorded, "/"+tailSegments(want, 2)) && strings.HasSuffix(want, "/"+tailSegments(recorded, 2))
-}
-
-func tailSegments(p string, n int) string {
-	parts := strings.Split(strings.Trim(p, "/"), "/")
-	if len(parts) <= n {
-		return strings.Join(parts, "/")
-	}
-	return strings.Join(parts[len(parts)-n:], "/")
 }
 
 // No "why" line is printed, and that is a measured decision rather than an

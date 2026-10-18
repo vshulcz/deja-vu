@@ -290,13 +290,7 @@ func spawnedFamily(m Manifest, ids, out map[string]bool) map[string]bool {
 // agent another session spawned.
 func SpawnedKind(kind string) bool { return spawnedKind(kind) }
 
-func spawnedKind(kind string) bool {
-	switch kind {
-	case "sidechain", "subagent", "subagent_fork":
-		return true
-	}
-	return false
-}
+func spawnedKind(kind string) bool { return model.SpawnedKind(kind) }
 
 // openingTextBytes is how much of the opening turn the fingerprint reads: the
 // index caps a message's text and a transcript read straight off disk does not.
