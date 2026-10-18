@@ -76,22 +76,33 @@ func wantOnScreen(t *testing.T, s string, want ...string) {
 	}
 }
 
-// drain runs the updates the background work posted, waiting for at least one.
+// drain waits for the screen's background work to end, then runs what it
+// posted, until nothing more is spawned; at least one update must arrive. It
+// waits on the work, not a fixed time: a forget's rebuild on a loaded windows
+// runner outlasted the old 5s (#5160). The deadline only catches a hang.
 func drain(t *testing.T, a *tuiApp) {
 	t.Helper()
-	select {
-	case f := <-a.updates:
-		f()
-	case <-time.After(5 * time.Second):
-		t.Fatal("no update arrived")
-	}
+	ran := 0
 	for {
+		idle := make(chan struct{})
+		go func() { a.bg.Wait(); close(idle) }()
 		select {
-		case f := <-a.updates:
-			f()
-		default:
-			return
+		case <-idle:
+		case <-time.After(2 * time.Minute):
+			t.Fatal("background work still running after 2m")
 		}
+		n := 0
+		for len(a.updates) > 0 {
+			(<-a.updates)()
+			n++
+		}
+		if n == 0 {
+			break
+		}
+		ran += n
+	}
+	if ran == 0 {
+		t.Fatal("no update arrived")
 	}
 }
 
@@ -414,7 +425,7 @@ func TestTUIResumeAndPutBack(t *testing.T) {
 		t.Fatal(err)
 	}
 	a = newTestTUI(t, dir)
-	go a.loadKept()
+	a.spawn(a.loadKept)
 	drain(t, a)
 	if len(a.kept) != 1 || !a.details[sessionKey(a.rows[0].s)].gone {
 		t.Fatalf("kept = %d", len(a.kept))

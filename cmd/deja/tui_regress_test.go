@@ -163,7 +163,7 @@ func TestTUIForgetInDeletedTabDropsTheCard(t *testing.T) {
 		t.Fatal(err)
 	}
 	a := newTestTUI(t, dir)
-	go a.loadKept()
+	a.spawn(a.loadKept)
 	drain(t, a)
 	a.setScope(scopeKept)
 	if len(a.rows) != 1 {
@@ -202,7 +202,7 @@ func TestTUIReaderTakesTheNewRead(t *testing.T) {
 	a.frame(120, 36) // the reader takes the read in hand
 	go a.detailWorker()
 	t.Cleanup(func() { close(a.loadQ) })
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(2 * time.Minute) // polled; only a hang waits this long
 	for time.Now().Before(deadline) {
 		pump(a)
 		if d := a.details[sessionKey(a.reader.s)]; d != nil && len(d.full.Messages) >= 3 {

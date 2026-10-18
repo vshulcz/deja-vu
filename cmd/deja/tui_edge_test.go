@@ -37,7 +37,7 @@ func TestTUILateSearchAfterClear(t *testing.T) {
 	a.query = nil
 	a.loadHome()
 	// Overtaken before it ran, the search is not run at all.
-	time.Sleep(200 * time.Millisecond)
+	a.bg.Wait()
 	select {
 	case f := <-a.updates:
 		f()
@@ -56,7 +56,7 @@ func TestTUITypingRunsTheLastSearchOnly(t *testing.T) {
 	for _, r := range "webhook" {
 		a.handle(tui.Event{Kind: tui.EvKey, Key: tui.KeyRune, Rune: r})
 	}
-	time.Sleep(400 * time.Millisecond)
+	a.bg.Wait()
 	n := 0
 	for len(a.updates) > 0 {
 		(<-a.updates)()
