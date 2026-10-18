@@ -153,8 +153,11 @@ func (r *piReader) line(m map[string]any) {
 		if r.copied(t) {
 			return
 		}
-		s.Touch(t)
 		txt := textFromContent(msg["content"])
+		if r.openclaw && r.skipHeartbeat(role, msg, txt) {
+			return
+		}
+		s.Touch(t)
 		if r.openclaw && role == "user" {
 			txt = openclawUserText(txt)
 		}

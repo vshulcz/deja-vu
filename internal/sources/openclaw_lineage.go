@@ -96,6 +96,26 @@ func openclawUserText(txt string) string {
 	return strings.TrimSpace(b.String())
 }
 
+// openclawHeartbeatPoll is the user text OpenClaw's gateway writes for a
+// heartbeat run; the prompt the model saw rides in __openclaw.
+const openclawHeartbeatPoll = "[OpenClaw heartbeat poll]"
+
+// skipHeartbeat drops a gateway heartbeat poll and its silent NO_REPLY. Each
+// poll runs a turn on agent:main:main that nobody asked for, and read as one
+// it titled a window that only got polls and topped `deja last` (#5319). A
+// reply that says something is kept: the poll found work to report.
+func (r *piReader) skipHeartbeat(role string, msg map[string]any, txt string) bool {
+	switch role {
+	case "user":
+		prov, _ := msg["provenance"].(map[string]any)
+		r.inHeartbeat = prov["sourceTool"] == "heartbeat" || strings.TrimSpace(txt) == openclawHeartbeatPoll
+		return r.inHeartbeat
+	case "assistant":
+		return r.inHeartbeat && strings.TrimSpace(txt) == "NO_REPLY"
+	}
+	return false
+}
+
 // applyOpenClawSpawns hangs each spawned session under the one that spawned
 // it. A fork's header already named its source; the spawn record says the
 // source asked for it, which makes it a sub-agent rather than a branch.

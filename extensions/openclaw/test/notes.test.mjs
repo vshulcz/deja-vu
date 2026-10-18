@@ -253,6 +253,20 @@ test("a receipt left by an owner turn with no reply never reaches a heartbeat ru
   assert.equal(sent[0], undefined)
 })
 
+// A heartbeat poll runs on agent:main:main, and the stamp its prompt hook
+// wrote hid the main DM from recall for twenty minutes (#5270).
+test("a heartbeat run never calls deja's prompt hook", async () => {
+  const p = await plugin()
+  await p.turn({ dispatch: false, trigger: "heartbeat", prompt: "zorbit heartbeat" })
+  let calls = ""
+  try {
+    calls = p.calls()
+  } catch {}
+  assert.deepEqual(promptCalls(calls), [])
+  await p.turn({ prompt: "zorbit again" })
+  assert.equal(promptCalls(p.calls()).length, 1)
+})
+
 test("a reply from another run in the same session does not take the receipt", async () => {
   const p = await plugin()
   await p.turn({ kinds: [] })

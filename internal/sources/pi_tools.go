@@ -51,6 +51,9 @@ type piReader struct {
 	// copiedBefore.
 	openclaw     bool
 	copiedBefore time.Time
+	// inHeartbeat is set from an OpenClaw heartbeat poll until the next
+	// user turn: the poll and its NO_REPLY are not the person's (#5319).
+	inHeartbeat bool
 }
 
 func newPiReader(s *model.Session, useHeaderCwd bool) *piReader {

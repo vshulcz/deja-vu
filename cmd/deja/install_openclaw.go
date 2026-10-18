@@ -497,6 +497,7 @@ export default async (event) => {
         cwd: context.workspaceDir || process.cwd(),
         source: "startup",
         deja_once: true,
+        deja_prompt_stamps: true,
       }),
       encoding: "utf8",
       timeout: 10000,

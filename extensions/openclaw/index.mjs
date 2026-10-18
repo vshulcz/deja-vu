@@ -227,7 +227,7 @@ export default {
         const at = where(seen, event, ctx, process.cwd())
         return ask(
           ["hook-context", "--plain"],
-          JSON.stringify({ session_id: at.id, cwd: at.cwd, source: "startup", deja_once: true }),
+          JSON.stringify({ session_id: at.id, cwd: at.cwd, source: "startup", deja_once: true, deja_prompt_stamps: true }),
           10000,
         )
       }
@@ -268,6 +268,9 @@ export default {
         async (event, ctx) => {
           const prompt = promptText(event)
           if (!prompt) return
+          // A heartbeat poll is not a turn anyone asked for, and its stamp hid
+          // the session from the user's other sessions (#5270).
+          if (ctx && ctx.trigger === "heartbeat") return
           const key = (ctx && ctx.sessionKey) || ""
           // A second prompt hook in the same run keeps the receipt deja already
           // spent on it; one from any other run drops what was left.
@@ -355,6 +358,7 @@ export default {
         api.registerAgentToolResultMiddleware(
           async (event, ctx) => {
             try {
+              if (ctx && ctx.trigger === "heartbeat") return
               const call = toolCall(event, where(seen, event, ctx, process.cwd()))
               if (!call) return
               const line = await ask(call.args, JSON.stringify(call.payload), 5000)

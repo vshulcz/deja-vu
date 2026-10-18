@@ -664,6 +664,7 @@ export default {
     if (typeof api.registerAgentToolResultMiddleware === "function") {
       api.registerAgentToolResultMiddleware(async (event, ctx) => {
         try {
+          if (ctx?.trigger === "heartbeat") return;
           const line = toolLine(event, ctx);
           if (!line) return;
           const content = Array.isArray(event?.result?.content) ? event.result.content : [];
@@ -689,6 +690,7 @@ export default {
         cwd: at.cwd,
         source: "startup",
         deja_once: true,
+        deja_prompt_stamps: true,
       });
     };
     // By default every DM shares agent:main:main, so a receipt is tied to the
@@ -745,6 +747,10 @@ export default {
       async (event, ctx) => {
         const prompt = typeof event?.prompt === "string" ? event.prompt.trim() : "";
         if (!prompt) return;
+        // A heartbeat poll is not a turn anyone asked for: recall on its
+        // prompt has nothing to answer, and the stamp it wrote hid the
+        // session from the user's other sessions for twenty minutes (#5270).
+        if (ctx?.trigger === "heartbeat") return;
         // Recall skips what it already showed this agent session, keyed by the
         // session id. A payload without one turns that off: measured on a real
         // store, half of all injections were then a word-for-word repeat. The

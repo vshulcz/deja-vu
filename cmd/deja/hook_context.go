@@ -640,6 +640,12 @@ func runHookContextMode(dir string, plain, once bool) error {
 		// question, so a first turn with nothing to say has nothing new to say
 		// on the second either.
 		Once bool `json:"deja_once"`
+		// PromptStamps is set by a host whose prompt hook runs on every turn
+		// a person asked for, so a digest call after the first is not what
+		// says the session is in use. OpenClaw fires agent:bootstrap on its
+		// heartbeat polls too, and the stamp they wrote hid the main DM from
+		// recall for twenty minutes after each poll (#5270).
+		PromptStamps bool `json:"deja_prompt_stamps"`
 		// Shell is set by a host that cannot count on a deja tool for the
 		// agent to call: pi before 0.99 has no MCP of its own, and a lead
 		// naming recall_context sent the model to "Tool recall_context not
@@ -672,6 +678,9 @@ func runHookContextMode(dir string, plain, once bool) error {
 		shape = hookToolPlain
 	} else if copilotHookOutput {
 		shape = hookToolCopilot
+	}
+	if input.Once && input.PromptStamps && sessionHadDigest(dir, input.SessionID) {
+		return nil
 	}
 	// The first moment this session exists, so the first recall of it — the one
 	// an agent plans against — already knows whose transcript to leave out.

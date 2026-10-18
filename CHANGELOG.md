@@ -50,6 +50,10 @@ variables, so `deja mcp` there lost a moved index (`DEJA_INDEX_DIR`,
 `XDG_CACHE_HOME`), built a second one and answered recall with the asking
 session. Their MCP entries now name the launcher the hooks run through.
 
+An OpenClaw heartbeat poll no longer stamps the main DM as in use, which hid
+it from recall in the user's other sessions for twenty minutes after each poll,
+and a poll and its `NO_REPLY` are no longer indexed as a session.
+
 ## [0.22.2] - 2026-10-17
 
 deja now reads Windsurf / Devin Desktop: Cascade's encrypted conversation
