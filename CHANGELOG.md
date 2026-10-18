@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+A session is no longer recalled to itself or to its own lineage. A fork,
+`/branch`, resume or sub-agent in Claude Code, Codex, opencode, Copilot,
+Gemini, Hermes, Qwen, Kimi, Cline, Kiro and aider leaves out the session it
+came from, and a resume gets one start digest, not two. The session that just
+ended shows up in the next one's digest, including sessions Hermes still holds
+in `state.db-wal` and Kimi Code 2.x sessions, which now get their project.
+
+`deja install` and `uninstall` leave the client's own config alone. A
+`"disabled": true` that the client ignores is no longer read as off, and the
+client's own switch, extra keys, comments and empty blocks survive install and
+uninstall for Codex, Cursor, Gemini, Hermes, goose, dsh, pi, Qwen and Grok. A
+read-only file is refused before anything is written. pi 0.99 and later need
+no MCP adapter, and `PI_CODING_AGENT_DIR` is followed.
+
 ## [0.22.2] - 2026-10-17
 
 deja now reads Windsurf / Devin Desktop: Cascade's encrypted conversation
