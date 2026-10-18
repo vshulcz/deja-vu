@@ -82,6 +82,7 @@ func parsePiShapedScan(path, harness, project string, useHeaderCwd bool, scan fu
 		Path:    path,
 	}
 	r := newPiReader(&s, useHeaderCwd)
+	r.openclaw = harness == "openclaw"
 	err := scan(r.line)
 	r.finish()
 	if len(s.Messages) == 0 {
@@ -100,6 +101,7 @@ func (r *piReader) line(m map[string]any) {
 	switch typ {
 	case "session":
 		applyPiHeader(s, m, r.useHeaderCwd)
+		r.forkHeader(m)
 		if cwd, _ := m["cwd"].(string); cwd != "" {
 			r.cwd = cwd
 		}
@@ -110,6 +112,9 @@ func (r *piReader) line(m map[string]any) {
 		// 0.18, senpi, kimchi, prime 0.9, OpenClaw 2026.9).
 		if txt, _ := m["summary"].(string); strings.TrimSpace(txt) != "" {
 			t := parseTimeAny(m["timestamp"])
+			if r.copied(t) {
+				return
+			}
 			s.Touch(t)
 			s.Messages = append(s.Messages, model.Message{Role: RoleSummary, Text: strings.TrimSpace(txt), Time: t})
 		}
@@ -125,6 +130,9 @@ func (r *piReader) line(m map[string]any) {
 			// The same summaries as messages, which prime's schema allows.
 			if txt, _ := msg["summary"].(string); strings.TrimSpace(txt) != "" {
 				t := parseTimeAny(m["timestamp"])
+				if r.copied(t) {
+					return
+				}
 				s.Touch(t)
 				s.Messages = append(s.Messages, model.Message{Role: RoleSummary, Text: strings.TrimSpace(txt), Time: t})
 			}
@@ -142,8 +150,14 @@ func (r *piReader) line(m map[string]any) {
 			return
 		}
 		t := parseTimeAny(m["timestamp"])
+		if r.copied(t) {
+			return
+		}
 		s.Touch(t)
 		txt := textFromContent(msg["content"])
+		if r.openclaw && role == "user" {
+			txt = openclawUserText(txt)
+		}
 		if name, _ := msg["toolName"].(string); role == "toolResult" && name == "eval" {
 			txt = evalText(txt)
 		}

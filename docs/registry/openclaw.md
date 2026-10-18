@@ -36,6 +36,17 @@ are in the SQLite store deja already reads. Format verified
 against a 2026.8.2 store and openclaw source
 (`src/config/sessions/session-accessor.sqlite-*.ts`, `paths.ts`).
 
+A sub-agent (`sessions_spawn`) runs in a session of its own, and its entry
+names the session that asked for it (`spawnedBySessionId`, or the requester's
+key in `parent_session_key` / `spawnedBy`, in the database or in
+`sessions.json`), so `deja show` names the parent and the parent lists its
+children. A child spawned with `context: "fork"`, and a branch, opens on a
+header whose `parentSession` names the source, followed by the source's
+entries copied with their original times; deja reads only what comes after
+the header, so the copy is not credited to the child in search or blame. The
+`<<<BEGIN_OPENCLAW_INTERNAL_CONTEXT>>>` blocks OpenClaw wraps around a
+sub-agent's task are dropped from the turn. Verified against 2026.10.4.
+
 - **Plugin package**: `openclaw plugins install clawhub:@vshulcz/openclaw-deja` (also on npm) — `before_prompt_build` recall plus `deja_recall`, `deja_fix`, `deja_blame`; stands down on whatever `deja install openclaw-auto` already wired.
 - **MCP**: `deja install openclaw` wires deja into `openclaw.json` under
   `mcp.servers` (OpenClaw's own layout, not the common `mcpServers` root).

@@ -143,6 +143,7 @@ func parseOpenClawDBWhere(db, where string) ([]model.Session, error) {
 		}
 		openclawInflate(pending)
 		r := newPiReader(s, true)
+		r.openclaw = true
 		for _, row := range pending {
 			var m map[string]any
 			if err := json.Unmarshal([]byte(row.Event), &m); err != nil {
@@ -182,6 +183,9 @@ func parseOpenClawDBWhere(db, where string) ([]model.Session, error) {
 			return nil, fmt.Errorf("openclaw: query failed, the store schema may have changed: %w", err)
 		}
 		return nil, err
+	}
+	if len(out) > 0 {
+		applyOpenClawSpawns(out, openclawDBSpawns(db))
 	}
 	return out, nil
 }

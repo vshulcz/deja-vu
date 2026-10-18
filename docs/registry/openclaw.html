@@ -71,6 +71,16 @@
 <p>are in the SQLite store deja already reads. Format verified</p>
 <p>against a 2026.8.2 store and openclaw source</p>
 <p>(<code>src/config/sessions/session-accessor.sqlite-*.ts</code>, <code>paths.ts</code>).</p>
+<p>A sub-agent (<code>sessions_spawn</code>) runs in a session of its own, and its entry</p>
+<p>names the session that asked for it (<code>spawnedBySessionId</code>, or the requester&#39;s</p>
+<p>key in <code>parent_session_key</code> / <code>spawnedBy</code>, in the database or in</p>
+<p><code>sessions.json</code>), so <code>deja show</code> names the parent and the parent lists its</p>
+<p>children. A child spawned with <code>context: &#34;fork&#34;</code>, and a branch, opens on a</p>
+<p>header whose <code>parentSession</code> names the source, followed by the source&#39;s</p>
+<p>entries copied with their original times; deja reads only what comes after</p>
+<p>the header, so the copy is not credited to the child in search or blame. The</p>
+<p><code>&lt;&lt;&lt;BEGIN_OPENCLAW_INTERNAL_CONTEXT&gt;&gt;&gt;</code> blocks OpenClaw wraps around a</p>
+<p>sub-agent&#39;s task are dropped from the turn. Verified against 2026.10.4.</p>
 <ul>
 <li><strong>Plugin package</strong>: <code>openclaw plugins install clawhub:@vshulcz/openclaw-deja</code> (also on npm) — <code>before_prompt_build</code> recall plus <code>deja_recall</code>, <code>deja_fix</code>, <code>deja_blame</code>; stands down on whatever <code>deja install openclaw-auto</code> already wired.</li>
 <li><strong>MCP</strong>: <code>deja install openclaw</code> wires deja into <code>openclaw.json</code> under</li>

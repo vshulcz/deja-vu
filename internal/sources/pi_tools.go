@@ -46,6 +46,11 @@ type piReader struct {
 	// never arrives is recorded by finish, as the call alone.
 	pending map[string][]model.Message
 	order   []string
+	// openclaw reads the OpenClaw-only parts of the format: a header naming
+	// the source of a fork, and the source's entries copied before
+	// copiedBefore.
+	openclaw     bool
+	copiedBefore time.Time
 }
 
 func newPiReader(s *model.Session, useHeaderCwd bool) *piReader {
