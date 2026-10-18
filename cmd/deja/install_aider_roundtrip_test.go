@@ -26,6 +26,22 @@ func TestAiderConfigRoundTrips(t *testing.T) {
 		{"lf block", "model: x\nread:\n  - C.md\n"},
 		{"null", "model: x\nread: ~\n"},
 		{"quoted flow", "read: [\"#notes.md\", 'k: v.md']\n"},
+		// No final newline: the scalar was never found, install said
+		// unchanged and wired nothing (#5204).
+		{"scalar, no final newline", "model: x\nread: C.md"},
+		{"block, no final newline", "model: x\nread:\n  - C.md"},
+		// The reader's own empty key stays where it was (#5205).
+		{"bare key", "read:\nmodel: x\n"},
+		{"bare key, comment", "read:  # none yet\nmodel: x\n"},
+		{"bare key last, no final newline", "model: x\nread:"},
+		{"empty item (#5206)", "read:\n  -\nmodel: x\n"},
+		{"empty item at column 0", "read:\n-\nmodel: x\n"},
+		// The reader's own file, not deja's (#5209).
+		{"own file named like deja's", "read:\n  - my-aider-context.md\nmodel: x\n"},
+		{"own file with deja's name", "read:\n  - docs/aider-context.md\n  - aider-context.md\nmodel: x\n"},
+		{"deja's name under another key", "files:\n  - x/deja/aider-context.md\nread:\n  - C.md\n"},
+		{"blank line before column-0 items", "read:\n\n- C.md\nmodel: x\n"},
+		{"spaces-only line before column-0 items", "read:\n  \n- C.md\nmodel: x\n"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			home := t.TempDir()
@@ -169,5 +185,103 @@ func TestAiderReadWasKeepsOnlyTheLatestLine(t *testing.T) {
 	}
 	if got := aiderConf(t, home); got != "read: a.md\n" {
 		t.Errorf("uninstall gave back %q, want the line the last install promoted", got)
+	}
+}
+
+// Installed, the reader's empty read: key keeps its place and takes deja's
+// entry under it, rather than being dropped and written again at the end.
+func TestAiderInstallFillsTheReadersEmptyKey(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "cfg"))
+	if err := os.WriteFile(filepath.Join(home, ".aider.conf.yml"), []byte("read:\nmodel: x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installAider("/bin/echo", false); err != nil {
+		t.Fatalf("install: %v", err)
+	}
+	want := "read:\n  - " + aiderContextPath() + "\nmodel: x\n"
+	if got := aiderConf(t, home); got != want {
+		t.Errorf("got\n%q\nwant\n%q", got, want)
+	}
+}
+
+// The record of an empty key goes with the key: deleted by the reader while
+// installed, it does not come back on uninstall; given a comment, it still
+// stays in place.
+func TestAiderEmptyKeyRecordFollowsTheFile(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "cfg"))
+	path := filepath.Join(home, ".aider.conf.yml")
+	write := func(s string) {
+		if err := os.WriteFile(path, []byte(s), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	newProcess := func(uninstall bool) {
+		recordWiring([]string{"aider"}, uninstall)
+		blocksAddedThisRun = nil
+		blocksForgottenThisRun = map[string]bool{}
+	}
+	t.Cleanup(func() { newProcess(false) })
+	run := func(uninstall bool) {
+		if _, err := installAider("/bin/echo", uninstall); err != nil {
+			t.Fatal(err)
+		}
+		newProcess(uninstall)
+	}
+	write("read:\nmodel: x\n")
+	run(false)
+	write("model: x\n")
+	run(false)
+	run(true)
+	if got := aiderConf(t, home); got != "model: x\n" {
+		t.Errorf("deleted key came back: %q", got)
+	}
+	write("read:\nmodel: x\n")
+	run(false)
+	write("read:  # mine\n  - " + aiderContextPath() + "\nmodel: x\n")
+	run(false)
+	run(true)
+	if got := aiderConf(t, home); got != "read:  # mine\nmodel: x\n" {
+		t.Errorf("commented key not kept: %q", got)
+	}
+}
+
+// An empty item at column 0 sets the list's indent too: deja's entry at two
+// spaces beside it is a YAML parse error, and aider would not start.
+func TestAiderEntryFollowsAnEmptyItemsIndent(t *testing.T) {
+	got, err := addAiderReadEntry("read:\n-\nmodel: x\n", "/x/aider-context.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "read:\n- /x/aider-context.md\n-\nmodel: x\n"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	// A blank line before the items is not the items' indent.
+	if got, _ = addAiderReadEntry("read:\n\n- C.md\n", "/x/aider-context.md"); got != "read:\n- /x/aider-context.md\n\n- C.md\n" {
+		t.Errorf("after a blank line: got %q", got)
+	}
+	if got, _ = addAiderReadEntry("read:\n  \n- C.md\n", "/x/aider-context.md"); got != "read:\n- /x/aider-context.md\n  \n- C.md\n" {
+		t.Errorf("after a spaces-only line: got %q", got)
+	}
+}
+
+// Doctor's wired check reads a scalar or flow read: by the same rule.
+func TestAiderConfReadsContextByName(t *testing.T) {
+	for s, want := range map[string]bool{
+		"read: my-aider-context.md\n":                                           false,
+		"read: [docs/aider-context.md]\n":                                       false,
+		"read: [proj/deja/aider-context.md]\n":                                  false,
+		"read: ~/.config/deja/aider-context.md\n":                               true,
+		"read: [a.md, /h/.config/deja/aider-context.md]\n":                      true,
+		"read:\n  - 'C:\\Users\\u\\AppData\\Roaming\\deja\\aider-context.md'\n": true,
+	} {
+		if got := aiderConfReadsContext(s); got != want {
+			t.Errorf("%q: got %v, want %v", s, got, want)
+		}
 	}
 }
