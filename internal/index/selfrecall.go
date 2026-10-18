@@ -64,6 +64,10 @@ var injectedPrefixBlocks = [][2]string{
 	// different harness: the class was not Codex-specific and looking only
 	// where a contributor pointed would have left the rest.
 	{"<session_context>", "</session_context>"},
+	// A Gemini sub-agent gets the same project and extension memory as a part
+	// of its own ahead of the task, deja's MCP instructions included; it
+	// titled every child session (#5214).
+	{"<loaded_context>", "</loaded_context>"},
 	// Cursor stamps a timestamp block ahead of the question it wraps.
 	{"<timestamp>", "</timestamp>"},
 	{"<environment_context>", "</environment_context>"},

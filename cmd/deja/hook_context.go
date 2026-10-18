@@ -227,7 +227,9 @@ func precompactHarnessArg(args []string) string {
 func withoutSubagentRuns(ss []model.Session) []model.Session {
 	out := make([]model.Session, 0, len(ss))
 	for _, s := range ss {
-		if s.Kind == "sidechain" || s.Kind == "cron" {
+		// "sidechain" is Claude's word for the edge; Gemini, Codex, Cursor and
+		// the rest say "subagent", as index.spawnedKind does (#5215).
+		if s.Kind == "sidechain" || s.Kind == "subagent" || s.Kind == "cron" {
 			continue
 		}
 		out = append(out, s)

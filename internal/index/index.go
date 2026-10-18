@@ -715,7 +715,10 @@ import (
 // rows already indexed have neither until a rebuild (#5143). Their first
 // prompt no longer opens with the empty <hook_result> wrappers of deja's own
 // hooks either, which is what titled them (#5144).
-const version = 71
+// 72: a Gemini sub-agent's first turn no longer opens with the
+// <loaded_context> block Gemini puts ahead of its task; it titled every child
+// session already indexed (#5214).
+const version = 72
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

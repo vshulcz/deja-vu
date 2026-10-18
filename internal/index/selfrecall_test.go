@@ -197,6 +197,18 @@ func TestStripsCursorAndGeminiWrappers(t *testing.T) {
 	if got := strings.TrimSpace(stripSelfRecall(gemini)); got != "why is the pool sized like this" {
 		t.Fatalf("gemini: got %q", got)
 	}
+	// A Gemini sub-agent's first turn opens with the project and extension
+	// memory, deja's own MCP instructions among it, as a part of its own
+	// ahead of the task; it titled every child session (#5214).
+	child := "\n<loaded_context>\n<project_context>\nThe following are instructions provided by the tool server 'deja':\n---[start of server instructions]---\ndeja indexes this user's past sessions\n---[end of server instructions]---\n</project_context>\n</loaded_context>\nCreate the child file."
+	if got := strings.TrimSpace(stripSelfRecall(child)); got != "Create the child file." {
+		t.Fatalf("gemini sub-agent: got %q", got)
+	}
+	// A person quoting the tag keeps the sentence.
+	quoted := "why does every child start with <loaded_context>? </loaded_context> is the end"
+	if got := stripSelfRecall(quoted); got != quoted {
+		t.Fatalf("a quoted <loaded_context> was stripped: %q", got)
+	}
 	// The compaction preamble titled real sessions.
 	compacted := "This session is being continued from a previous conversation that ran out of context.\nfix the retry loop"
 	if got := strings.TrimSpace(stripSelfRecall(compacted)); got != "fix the retry loop" {
