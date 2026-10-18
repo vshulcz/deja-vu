@@ -470,7 +470,13 @@ func grokSpawner(path, child, created string) string {
 		return ""
 	}
 	since, _ := time.Parse(time.RFC3339Nano, created)
-	needle := []byte(`"child_session_id":"` + child + `"`)
+	// Encoded, not spliced: an id with a quote or backslash in it is written
+	// escaped in the record.
+	quoted, err := json.Marshal(child)
+	if err != nil {
+		return ""
+	}
+	needle := append([]byte(`"child_session_id":`), quoted...)
 	for _, e := range entries {
 		dir := filepath.Join(group, e.Name())
 		if !e.IsDir() || dir == own {
