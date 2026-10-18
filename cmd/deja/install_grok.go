@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -20,17 +22,35 @@ import (
 // deja used to write config.toml alone, which left grok-dev users with an
 // integration that looked installed and did nothing.
 func installGrokUserSettings(exe string, uninstall bool) (installResult, error) {
-	path := filepath.Join(sources.GrokHome(), "user-settings.json")
-	old, err := readConfig(path)
+	path, old, next, note, err := grokUserSettingsUpdate(exe, uninstall)
 	if err != nil {
 		return installResult{}, err
+	}
+	if next == nil {
+		return installResult{Path: path, Action: "unchanged"}, nil
+	}
+	noteCreatedDirs(filepath.Dir(path))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return installResult{}, err
+	}
+	a, werr := writeIfChanged(path, old, next)
+	return installResult{Path: path, Action: a, Note: note}, werr
+}
+
+// grokUserSettingsUpdate is installGrokUserSettings without the write: next
+// is nil when there is nothing to write.
+func grokUserSettingsUpdate(exe string, uninstall bool) (path string, old, next []byte, note string, err error) {
+	path = filepath.Join(sources.GrokHome(), "user-settings.json")
+	old, err = readConfig(path)
+	if err != nil {
+		return path, nil, nil, "", err
 	}
 	// Round-tripping through a map keeps every key this CLI version has that
 	// deja knows nothing about.
 	root := map[string]any{}
 	if len(old) > 0 {
 		if err := json.Unmarshal(old, &root); err != nil {
-			return installResult{}, configParseError(path, err)
+			return path, old, nil, "", configParseError(path, err)
 		}
 	}
 	mcp, _ := root["mcp"].(map[string]any)
@@ -38,10 +58,18 @@ func installGrokUserSettings(exe string, uninstall bool) (installResult, error) 
 		mcp = map[string]any{}
 	}
 	var kept []any
+	// grok-dev's MCP modal switches a server off with "enabled": false, and
+	// its runtime skips the entry. The rebuilt entry said true (#5196).
+	// The entry grok-dev keys by id "deja" decides, then one labelled deja.
+	off, byID := false, false
 	if servers, ok := mcp["servers"].([]any); ok {
 		for _, s := range servers {
 			if m, ok := s.(map[string]any); ok {
 				if m["id"] == "deja" || m["label"] == "deja" {
+					if id := m["id"] == "deja"; id || !byID {
+						off = m["enabled"] == false
+						byID = byID || id
+					}
 					continue
 				}
 			}
@@ -49,7 +77,6 @@ func installGrokUserSettings(exe string, uninstall bool) (installResult, error) 
 		}
 	}
 	// Another entry that runs deja is said, not doubled in silence (#4556).
-	var note string
 	if !uninstall {
 		var others []string
 		for _, s := range kept {
@@ -59,7 +86,10 @@ func installGrokUserSettings(exe string, uninstall bool) (installResult, error) 
 				}
 			}
 		}
-		note = withOtherDejaNames("", others)
+		if off {
+			note = switchedOffNote
+		}
+		note = withOtherDejaNames(note, others)
 	}
 	if !uninstall {
 		cmd, args := mcpCommandArgs(exe)
@@ -70,7 +100,7 @@ func installGrokUserSettings(exe string, uninstall bool) (installResult, error) 
 		kept = append(kept, map[string]any{
 			"id":        "deja",
 			"label":     "deja",
-			"enabled":   true,
+			"enabled":   !off,
 			"transport": "stdio",
 			"command":   cmd,
 			"args":      anyArgs,
@@ -86,18 +116,75 @@ func installGrokUserSettings(exe string, uninstall bool) (installResult, error) 
 	} else {
 		root["mcp"] = mcp
 	}
-	next, err := marshalConfigLike(old, root)
-	if err != nil {
-		return installResult{}, err
-	}
-	next = append(next, '\n')
 	if uninstall && len(old) == 0 {
-		return installResult{Path: path, Action: "unchanged"}, nil
+		return path, old, nil, "", nil
 	}
-	noteCreatedDirs(filepath.Dir(path))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return installResult{}, err
+	next, err = marshalConfigLike(old, root)
+	if err != nil {
+		return path, old, nil, "", err
 	}
-	a, werr := writeIfChanged(path, old, next)
-	return installResult{Path: path, Action: a, Note: note}, werr
+	return path, old, append(next, '\n'), note, nil
+}
+
+// grokPreflight refuses, before config.toml is written, a later grok file
+// install would need to change and cannot: config.toml goes first, and a
+// read-only user-settings.json or hooks directory was refused once it already
+// held deja (#5197).
+func grokPreflight(exe string, auto bool) error {
+	path, old, next, _, err := grokUserSettingsUpdate(exe, false)
+	if err != nil {
+		return err
+	}
+	if err := writeWouldFail(path, old, next); err != nil {
+		return err
+	}
+	if !auto {
+		return nil
+	}
+	// The path the writer will name, without writing the launcher yet: it
+	// falls back to the binary itself when the launcher cannot be written.
+	hookExe := exe
+	if p := dejaLauncherPath(); p != "" {
+		cur, _ := os.ReadFile(p)
+		if writeWouldFail(p, cur, []byte(dejaLauncherScript(exe))) == nil {
+			hookExe = p
+		}
+	}
+	path, old, next, _, err = grokHooksUpdate(hookExe, false)
+	if err != nil {
+		return err
+	}
+	return writeWouldFail(path, old, next)
+}
+
+// writeWouldFail says why writing next over old at path would be refused:
+// the file is read-only, or the directory the write goes through (and the
+// .bak beside it) is.
+func writeWouldFail(path string, old, next []byte) error {
+	if next == nil || bytes.Equal(old, matchFinalNewline(old, matchLineEndings(old, next))) {
+		return nil
+	}
+	if err := configWritable(path); err != nil {
+		return err
+	}
+	// writeIfChanged follows a link into the dotfiles repo, and its temp file
+	// and .bak go beside the target.
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		path = resolved
+	}
+	dir := filepath.Dir(path)
+	for {
+		if _, err := os.Stat(dir); err == nil {
+			break
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return nil
+		}
+		dir = parent
+	}
+	if !dirWritable(dir) {
+		return &fs.PathError{Op: "write", Path: dir, Err: fs.ErrPermission}
+	}
+	return nil
 }
