@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -271,4 +272,28 @@ func TestThemeSurfacesStayApartIn256Colours(t *testing.T) {
 			}
 		}
 	}
+}
+
+// Key chips and buttons fill with surf2 on surf panels; in light theme both
+// rounded to xterm 254 and the chips lost their fill (#5107). Truecolor keeps
+// the palette's own hex.
+func TestThemeChipsStayApartFromTheirPanelIn256Colours(t *testing.T) {
+	t.Cleanup(func() { setTheme("dark") })
+	for name, p := range palettes {
+		setTheme(name)
+		if s, s2 := tui.To256(cSurf), tui.To256(cSurf2); s == s2 {
+			t.Errorf("%s: surf and surf2 both land on xterm %d", name, s)
+		}
+		c := tui.NewCanvas(1, 1)
+		c.Fill(0, 0, 1, 1, cSurf2)
+		if l, want := c.Lines(tui.ModeTrue)[0], "48;2;"+rgbArgs(p[3]); !strings.Contains(l, want) {
+			t.Errorf("%s: truecolor surf2 = %q, want %s", name, l, want)
+		}
+	}
+}
+
+func rgbArgs(hex string) string {
+	c := tui.Hex(hex)
+	r, g, b := uint64(c)>>16&0xff, uint64(c)>>8&0xff, uint64(c)&0xff
+	return strconv.FormatUint(r, 10) + ";" + strconv.FormatUint(g, 10) + ";" + strconv.FormatUint(b, 10)
 }

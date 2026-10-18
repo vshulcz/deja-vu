@@ -37,15 +37,26 @@ var palettes = map[string][]string{
 		"#bd93f9", "#f1fa8c", "#50fa7b", "#ffb86c", "#ff5555", "#f1fa8c"},
 }
 
+// palettes256 pins the xterm-256 entry of a colour, by its place in the
+// palette, where the nearest entry would merge it with a neighbour. Latte's
+// surf and surf2 both round to 254, so the key chips lost their fill on the
+// panels; surf2 takes the next grey down (#5107).
+var palettes256 = map[string]map[int]int{
+	"light": {3: 253},
+}
+
 // setTheme switches to the named palette; a name it does not know is dark.
 func setTheme(name string) {
 	p, ok := palettes[name]
 	if !ok {
-		p = palettes["dark"]
+		name, p = "dark", palettes["dark"]
 	}
 	for i, c := range []*tui.Color{&cBase, &cMantle, &cSurf, &cSurf2, &cOver, &cText, &cSub, &cMuted, &cFaint,
 		&cAcc, &cYel, &cGrn, &cPeach, &cRed, &cMark} {
 		*c = tui.Hex(p[i])
+		if n, ok := palettes256[name][i]; ok {
+			*c = c.With256(n)
+		}
 	}
 }
 

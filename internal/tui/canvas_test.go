@@ -126,6 +126,13 @@ func TestColors(t *testing.T) {
 	if Index256(208) != Hex("#ff8700") || Index256(240) != Hex("#585858") || Index256(3) != Hex("#bcbcbc") {
 		t.Error("Index256 round trip")
 	}
+	pinned := Hex("#dce0e8").With256(253)
+	if to256(Hex("#dce0e8")) != 254 || to256(pinned) != 253 || pinned.With256(252).With256(-1) != Hex("#dce0e8").With256(252) {
+		t.Errorf("With256: rounds to %d, pinned to %d", to256(Hex("#dce0e8")), to256(pinned))
+	}
+	if r, g, b := pinned.rgb(); r != 0xdc || g != 0xe0 || b != 0xe8 || Color(0).With256(3) != 0 {
+		t.Error("With256 keeps the truecolor value and leaves no colour as none")
+	}
 	for _, c := range []struct {
 		env  map[string]string
 		want Mode

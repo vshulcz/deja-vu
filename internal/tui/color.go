@@ -10,10 +10,24 @@ import (
 	"strings"
 )
 
-// Color is 0 for "keep what is underneath" and otherwise 1<<24 | 0xRRGGBB.
-type Color uint32
+// Color is 0 for "keep what is underneath" and otherwise 1<<24 | 0xRRGGBB,
+// with an optional xterm-256 entry in bits 32-39 (flagged by bit 40) for
+// terminals without truecolor.
+type Color uint64
 
-const colorSet = 1 << 24
+const (
+	colorSet = 1 << 24
+	fallback = 1 << 40
+)
+
+// With256 is c drawn as xterm entry n without truecolor, for two palette
+// colours that the nearest-entry rounding would put on one entry.
+func (c Color) With256(n int) Color {
+	if c == 0 || n < 0 || n > 255 {
+		return c
+	}
+	return c&(1<<25-1) | Color(n)<<32 | fallback
+}
 
 // Hex parses "#rrggbb". Anything else is 0, which draws as nothing.
 func Hex(s string) Color {
@@ -67,6 +81,9 @@ func To256(c Color) int { return to256(c) }
 // to256 picks the nearest xterm-256 entry: the 6x6x6 cube or the grey ramp,
 // whichever lands closer.
 func to256(c Color) int {
+	if c&fallback != 0 {
+		return int(c>>32) & 0xff
+	}
 	r, g, b := c.rgb()
 	near := func(v int) int {
 		best, bi := 1<<30, 0
