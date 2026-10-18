@@ -16,7 +16,7 @@ func RelevanceTerms(q string) []string {
 	// fullwidth punctuation ("？", "，"), so a real Chinese question became
 	// one giant term that matched nothing and never reached bigram
 	// expansion.
-	fields := strings.FieldsFunc(strings.ToLower(q), func(r rune) bool {
+	fields := strings.FieldsFunc(Lower(q), func(r rune) bool {
 		if r < 128 {
 			return (r < 'a' || r > 'z') && (r < '0' || r > '9') &&
 				r != '-' && r != '_' && r != '.' && r != '/'

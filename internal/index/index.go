@@ -749,7 +749,9 @@ import (
 // 83: a Hermes delegate_task child is a sub-agent of its parent whatever
 // source it ran under, files under its parent's project, and Hermes' relative
 // file paths sit under the session's directory (#5248, #5249, #5250).
-const version = 83
+// 84: ё is filed as е, and queries fold it the same way, so «ещё» and «еще»
+// are one word.
+const version = 84
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

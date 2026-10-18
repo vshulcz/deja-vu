@@ -4597,7 +4597,7 @@ func tokenHits(s string, want map[string]bool) map[string]bool {
 		}
 		n = 0
 	}
-	for _, r := range strings.ToLower(s) {
+	for _, r := range query.Lower(s) {
 		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-' ||
 			(n > 0 && isMark(r)) {
 			n += utf8.EncodeRune(buf[n:], r)
@@ -4633,7 +4633,7 @@ func tokens(s string) []string {
 		}
 		b.Reset()
 	}
-	for _, r := range strings.ToLower(s) {
+	for _, r := range query.Lower(s) {
 		// A combining mark continues the word it sits on. Latin NFD is already
 		// composed away above, but Arabic harakat, Hebrew niqqud, Thai vowel
 		// signs and the Indic matras have no precomposed form, so the mark
@@ -4706,7 +4706,7 @@ func splitCompound(word []rune, out *[]string) {
 	boundaries := 0
 	emit := func(end int) {
 		if end-start >= 3 {
-			*out = append(*out, strings.ToLower(string(word[start:end])))
+			*out = append(*out, query.Lower(string(word[start:end])))
 		}
 		start = end
 	}
@@ -5323,7 +5323,7 @@ func rerankByBestMessage(ss []model.Session, terms []string, idf map[string]floa
 	forms := make([][]string, len(terms))
 	wanted := map[string]bool{}
 	for i, t := range terms {
-		t = strings.ToLower(t)
+		t = query.Lower(t)
 		forms[i] = append([]string{t}, stemMatchForms(t)...)
 		for _, f := range forms[i] {
 			wanted[f] = true
@@ -5352,7 +5352,7 @@ func rerankByBestMessage(ss []model.Session, terms []string, idf map[string]floa
 					}
 				}
 				if hit {
-					w := idf[strings.ToLower(t)]
+					w := idf[query.Lower(t)]
 					if w <= 0 {
 						w = 1
 					}

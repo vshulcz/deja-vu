@@ -31,7 +31,7 @@ var stopWords = map[string]bool{
 	"ко": true, "о": true, "об": true, "обо": true, "же": true, "ну": true,
 	"вот": true, "или": true, "если": true, "когда": true, "где": true,
 	"куда": true, "там": true, "тут": true, "здесь": true, "его": true,
-	"её": true, "их": true, "мне": true, "меня": true, "тебе": true,
+	"её": true, "ее": true, "их": true, "мне": true, "меня": true, "тебе": true,
 	"тебя": true, "нам": true, "вам": true, "надо": true, "нужно": true,
 	"можно": true, "может": true, "давай": true, "сделай": true,
 	"делай": true, "делать": true, "сделать": true, "скажи": true,
@@ -140,7 +140,7 @@ func QueryParts(q string) (terms []string, phrases []string) {
 		}
 		content := q[start+1 : i]
 		if hasLetterOrDigit(content) {
-			phrases = appendUnique(phrases, strings.ToLower(strings.TrimSpace(content)))
+			phrases = appendUnique(phrases, Lower(strings.TrimSpace(content)))
 			terms = appendUnique(terms, Tokens(content)...)
 		}
 		start = -1
@@ -218,7 +218,7 @@ func MatchesQuery(text, q string) bool {
 }
 
 func MatchesParts(text string, terms, phrases []string, variants map[string][]string) bool {
-	low := strings.ToLower(text)
+	low := Lower(text)
 	for _, term := range terms {
 		matched := strings.Contains(low, term)
 		for _, variant := range variants[term] {
@@ -259,7 +259,7 @@ func MatchesParts(text string, terms, phrases []string, variants map[string][]st
 // world's alphabets (#828).
 func Tokens(s string) []string {
 	const asciiTrim = "\t\n\r .,;:!?()[]{}<>\"'`"
-	broken := strings.FieldsFunc(strings.ToLower(s), func(r rune) bool {
+	broken := strings.FieldsFunc(Lower(s), func(r rune) bool {
 		if r < 0x80 {
 			return unicode.IsSpace(r)
 		}

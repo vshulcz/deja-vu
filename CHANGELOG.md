@@ -45,6 +45,10 @@ Kimi included. pi 0.99 and later need no MCP adapter, and
 `PI_CODING_AGENT_DIR` is followed. OpenClaw install and doctor say when
 `plugins.allow` or `plugins.enabled` keeps deja's plugin off.
 
+ё and е are one letter in the index and in queries, so «ещё» finds a session
+that says «еще» and the other way round. The index format moves to version 84,
+so the first run rebuilds it.
+
 ## [0.22.2] - 2026-10-17
 
 deja now reads Windsurf / Devin Desktop: Cascade's encrypted conversation

@@ -23,7 +23,7 @@ func DidYouMean(dir, q string) string {
 	changed := false
 	for i, w := range words {
 		toks := query.Tokens(w)
-		if len(toks) != 1 || toks[0] != strings.ToLower(w) {
+		if len(toks) != 1 || toks[0] != query.Lower(w) {
 			continue
 		}
 		t := toks[0]

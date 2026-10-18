@@ -98,7 +98,7 @@ func DecisionText(text string) string {
 	sentences := splitSentences(text)
 	low := make([]string, len(sentences))
 	for i, s := range sentences {
-		low[i] = strings.ToLower(s)
+		low[i] = lower(s)
 	}
 	if out, ok := decisionSentence(text); ok {
 		return out
@@ -119,7 +119,7 @@ func decisionSentence(text string) (string, bool) {
 	sentences := splitSentences(text)
 	low := make([]string, len(sentences))
 	for i, s := range sentences {
-		low[i] = strings.ToLower(s)
+		low[i] = lower(s)
 	}
 	for i, s := range low {
 		if carriesDecisionSentence(s) {

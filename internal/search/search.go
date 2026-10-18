@@ -256,7 +256,7 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 		tier := setTier(o)
 		doc := bm25Document{hit: Hit{Session: s, Tier: tier}, termCount: make([]int, len(qtoks)), userCount: make([]int, len(qtoks))}
 		if s.Title != "" && len(qtoks) > 0 {
-			titleLow := strings.ToLower(s.Title)
+			titleLow := lower(s.Title)
 			for _, tok := range qtoks {
 				if strings.Contains(titleLow, tok) {
 					doc.titleHits++
@@ -285,7 +285,7 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 			// being asked (#2067). Removed from matching only; the line stays
 			// in the transcript for `deja how` and `deja fix`.
 			text := withoutOwnCallLog(m.Text)
-			low := strings.ToLower(text)
+			low := lower(text)
 			c := 0
 			// windowText and windowToks are the pair proximity is measured on: the
 			// surface text and the query's own words, except where the match came from
@@ -573,7 +573,7 @@ func markEarlierAttempts(hits []Hit) {
 	for i := 0; i < n; i++ {
 		set := map[string]bool{}
 		for _, sn := range hits[i].Snippets {
-			for _, w := range strings.Fields(strings.ToLower(sn)) {
+			for _, w := range strings.Fields(lower(sn)) {
 				if len(w) > 3 {
 					set[w] = true
 				}
@@ -1188,7 +1188,7 @@ func decidesSomething(s model.Session) bool {
 		if m.Role == "user" || m.Role == "" || m.Role == roleToolOutput {
 			continue
 		}
-		low := strings.ToLower(m.Text)
+		low := lower(m.Text)
 		for _, phrase := range decisionPhrases {
 			if strings.Contains(low, phrase) {
 				return true
@@ -1714,7 +1714,7 @@ func tierLabel(h Hit) string {
 }
 
 func variantDetail(text string, terms []string, variants map[string][]string) string {
-	low := strings.ToLower(text)
+	low := lower(text)
 	for _, term := range terms {
 		for _, variant := range variants[term] {
 			// A term that matched itself is an exact hit, not a variant —
@@ -1962,7 +1962,7 @@ func PrintContextStyled(w io.Writer, s model.Session, query string, color bool, 
 
 func printContextBody(w io.Writer, s model.Session, query string) {
 	s = withoutHarnessEnvelopes(s)
-	qlow := strings.ToLower(query)
+	qlow := lower(query)
 	terms, phrases := QueryParts(query)
 	budget := ContextBudget
 	// The reply to an included turn comes with it. Every user turn was kept
@@ -2099,7 +2099,7 @@ func contextPartHits(text string, parts []string) []int {
 	if len(parts) == 0 {
 		return nil
 	}
-	low := strings.ToLower(text)
+	low := lower(text)
 	hits := make([]int, len(parts))
 	for i, p := range parts {
 		hits[i] = strings.Count(low, p)
@@ -2355,8 +2355,8 @@ func snippet(s, q string, re *regexp.Regexp) string {
 			}
 		}
 	} else {
-		low := strings.ToLower(s)
-		b := densestMention(low, strings.ToLower(q))
+		low := lower(s)
+		b := densestMention(low, lower(q))
 		if b < 0 {
 			toks := query.Tokens(q)
 			// Centre on where the query's words meet, not on the first one to
@@ -2607,6 +2607,13 @@ func short(s string) string {
 	tail := width - head - 1
 	return string(r[:head]) + "…" + string(r[len(r)-tail:])
 }
+
+// yoPattern quotes s for a regexp in which е and ё match either letter, as
+// the search that found the text treats them as one.
+func yoPattern(s string) string {
+	return strings.NewReplacer("е", "[её]", "ё", "[её]").Replace(regexp.QuoteMeta(lower(s)))
+}
+
 func highlight(s, q string, isRe bool, color bool) string {
 	if !color {
 		return s
@@ -2624,8 +2631,8 @@ func highlight(s, q string, isRe bool, color bool) string {
 			})
 		}
 	}
-	if strings.Contains(strings.ToLower(s), strings.ToLower(q)) {
-		return regexp.MustCompile(`(?i)`+regexp.QuoteMeta(q)).ReplaceAllStringFunc(s, func(x string) string { return cMatch + x + cReset })
+	if strings.Contains(lower(s), lower(q)) {
+		return regexp.MustCompile(`(?i)`+yoPattern(q)).ReplaceAllStringFunc(s, func(x string) string { return cMatch + x + cReset })
 	}
 	toks := query.Tokens(q)
 	if len(toks) == 0 {
@@ -2633,7 +2640,7 @@ func highlight(s, q string, isRe bool, color bool) string {
 	}
 	parts := make([]string, 0, len(toks))
 	for _, t := range toks {
-		parts = append(parts, regexp.QuoteMeta(t))
+		parts = append(parts, yoPattern(t))
 	}
 	return regexp.MustCompile(`(?i)(`+strings.Join(parts, "|")+`)`).ReplaceAllStringFunc(s, func(x string) string { return cMatch + x + cReset })
 }
@@ -2872,7 +2879,7 @@ var creditOpeners = []string{"déjà vu:", "deja vu:", "deja-vu recalled:", "dej
 // It runs mid-text rather than per line because the credit is written into the
 // middle of a reply: "No files changed. No benchmarks run. deja-vu recalled: …".
 func withoutOwnCredit(text string) string {
-	low := strings.ToLower(text)
+	low := lower(text)
 	for _, opener := range creditOpeners {
 		for {
 			i := strings.Index(low, opener)
@@ -2888,7 +2895,7 @@ func withoutOwnCredit(text string) string {
 				end = i + j + 1
 			}
 			text = strings.TrimSpace(text[:i]) + " " + strings.TrimSpace(text[end:])
-			low = strings.ToLower(text)
+			low = lower(text)
 		}
 	}
 	return strings.TrimSpace(text)
@@ -2969,7 +2976,7 @@ func ErrorHits(ss []model.Session) []Hit {
 func sessionHolds(s model.Session, t string) bool {
 	folded := ""
 	for _, m := range s.Messages {
-		low := strings.ToLower(m.Text)
+		low := lower(m.Text)
 		if strings.Contains(low, t) {
 			return true
 		}
@@ -3069,7 +3076,7 @@ func RelevanceHitsWeighted(ss []model.Session, terms []string, idf map[string]fl
 			// a call to deja is not something anyone said, and this tier is
 			// where the live miss came through — the scoring loop was fixed
 			// first and the hit arrived here instead (#2067).
-			low := strings.ToLower(withoutOwnCallLog(m.Text))
+			low := lower(withoutOwnCallLog(m.Text))
 			var foldedLow string
 			distinct := 0
 			weighted := 0.0
@@ -3318,3 +3325,6 @@ func unsafeForTerminal(r rune) bool {
 	}
 	return false
 }
+
+// lower is the text fold both sides of a match use: lowercase plus ё→е.
+func lower(s string) string { return query.Lower(s) }

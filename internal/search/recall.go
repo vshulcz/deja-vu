@@ -119,7 +119,7 @@ const settledProbeBudget = 400
 // BuildAutoRecall applies the session-start recall policy while constructing
 // the digest. Unknown modes use the safe policy.
 func BuildAutoRecall(ss []model.Session, o AutoRecallOptions) AutoRecallResult {
-	mode := strings.ToLower(strings.TrimSpace(o.Mode))
+	mode := lower(strings.TrimSpace(o.Mode))
 	if mode == RecallOff {
 		return AutoRecallResult{}
 	}
@@ -214,7 +214,7 @@ func BuildAutoRecall(ss []model.Session, o AutoRecallOptions) AutoRecallResult {
 }
 
 func projectMatches(project string, names []string) bool {
-	project = strings.ToLower(filepathClean(project))
+	project = lower(filepathClean(project))
 	// A session imported from a peer carries its project under an "imported:"
 	// prefix but is still this project's history. Match the base name too, or the
 	// session-start digest silently drops imported sessions the trust policy
@@ -222,7 +222,7 @@ func projectMatches(project string, names []string) bool {
 	// the two auto-injections disagreed on the same store (#E-new33).
 	bare := strings.TrimPrefix(project, "imported:")
 	for _, name := range names {
-		name = strings.ToLower(filepathClean(name))
+		name = lower(filepathClean(name))
 		if name == "" {
 			continue
 		}
@@ -252,7 +252,7 @@ func sessionWordSet(s model.Session) map[string]bool {
 
 func wordSet(s string) map[string]bool {
 	set := map[string]bool{}
-	for _, word := range strings.FieldsFunc(strings.ToLower(s), func(r rune) bool {
+	for _, word := range strings.FieldsFunc(lower(s), func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
 	}) {
 		if utf8.RuneCountInString(word) >= 3 {
@@ -308,7 +308,7 @@ func termHits(text string, terms []string) int {
 	if len(terms) == 0 {
 		return 0
 	}
-	return TermHitsLowered(strings.ToLower(text), terms)
+	return TermHitsLowered(lower(text), terms)
 }
 
 // TermHitsLowered is termHits over text a caller has already lowercased. The
@@ -431,7 +431,7 @@ func TextCarriesAnyTerm(text string, terms []string) bool {
 // termStem is a term with its last two characters dropped, or empty when the
 // term is too short for that to still identify it.
 func termStem(t string) string {
-	r := []rune(strings.ToLower(t))
+	r := []rune(lower(t))
 	if len(r) < termStemMin {
 		return ""
 	}
@@ -932,7 +932,7 @@ var selfTestPhrases = []string{
 
 // saysItHasNoMemory reports whether a line is one of those admissions.
 func saysItHasNoMemory(line string) bool {
-	low := strings.ToLower(line)
+	low := lower(line)
 	for _, p := range emptyMemoryPhrases {
 		if strings.Contains(low, p) {
 			return true
@@ -947,7 +947,7 @@ func saysItHasNoMemory(line string) bool {
 // blocks of 119 quoted one back as if it were memory.
 func isHarnessCheck(s model.Session) bool {
 	for _, m := range s.Messages {
-		low := strings.ToLower(m.Text)
+		low := lower(m.Text)
 		for _, p := range selfTestPhrases {
 			if strings.Contains(low, p) {
 				return true
@@ -971,7 +971,7 @@ func wasBlocked(conclusions []string) bool {
 		return false
 	}
 	for _, c := range conclusions {
-		low := strings.ToLower(c)
+		low := lower(c)
 		hit := false
 		for _, p := range blockedPhrases {
 			if strings.Contains(low, p) {
@@ -1082,12 +1082,12 @@ func lineAround(s string, n int, terms []string) string {
 		return s
 	}
 	at := -1
-	low := strings.ToLower(s)
+	low := lower(s)
 	for _, t := range terms {
 		if t == "" {
 			continue
 		}
-		i := strings.Index(low, strings.ToLower(t))
+		i := strings.Index(low, lower(t))
 		if i < 0 {
 			if stem := termStem(t); stem != "" {
 				i = strings.Index(low, stem)
@@ -1142,7 +1142,7 @@ func isSmokeTest(problem string, conclusions []string) bool {
 	if total > smokeAnswerMax {
 		return false
 	}
-	low := strings.ToLower(strings.TrimSpace(problem))
+	low := lower(strings.TrimSpace(problem))
 	// The ask is usually the last sentence, not the first: a harness check
 	// says what to do and then how to answer — "search for X. Reply with the
 	// name only." Matching the prompt's opening alone let those through, and
@@ -1179,7 +1179,7 @@ func EarlierAttempts(ss []model.Session) map[string]string {
 			if isWorkRecord(m.Role) {
 				continue
 			}
-			for _, w := range strings.Fields(strings.ToLower(m.Text)) {
+			for _, w := range strings.Fields(lower(m.Text)) {
 				if len(w) > 3 {
 					set[w] = true
 				}
@@ -1239,7 +1239,7 @@ func contentWords(s string) map[string]bool {
 		return r == '_' || r == '-' || r == '.' || r == '/' ||
 			(r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r >= 0x400
 	}
-	for _, w := range strings.FieldsFunc(strings.ToLower(s), func(r rune) bool { return !wordy(r) }) {
+	for _, w := range strings.FieldsFunc(lower(s), func(r rune) bool { return !wordy(r) }) {
 		if len([]rune(w)) >= 3 {
 			out[w] = true
 		}
