@@ -49,17 +49,17 @@ func TestSpawnedFamilyWalksEveryDepth(t *testing.T) {
 		"self":  {ID: "self", Kind: "subagent", Parent: "self"},
 	}}
 	out := map[string]bool{}
-	own := spawnedFamily(m, map[string]bool{"root": true}, out)
+	own := spawnedFamily(m, map[string]bool{"root": true}, out, nil)
 	if !own["child"] || !own["grand"] || own["fork"] || own["root"] || len(out) != 0 {
 		t.Errorf("root: own %v, ancestors %v", own, out)
 	}
 	out = map[string]bool{}
-	own = spawnedFamily(m, map[string]bool{"grand": true}, out)
+	own = spawnedFamily(m, map[string]bool{"grand": true}, out, nil)
 	if !out["child"] || !out["root"] || len(own) != 0 {
 		t.Errorf("grand: own %v, ancestors %v", own, out)
 	}
 	out = map[string]bool{}
-	own = spawnedFamily(m, map[string]bool{"loopa": true, "self": true}, out)
+	own = spawnedFamily(m, map[string]bool{"loopa": true, "self": true}, out, nil)
 	if !out["loopb"] || !own["loopb"] || own["self"] {
 		t.Errorf("cycle: own %v, ancestors %v", own, out)
 	}
