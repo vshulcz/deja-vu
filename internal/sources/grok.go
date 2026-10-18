@@ -213,7 +213,7 @@ type grokUpdateEvent struct {
 
 // grokCopiedEvent reports a record a `--fork-session` copy carries from its
 // source. Grok 1.0.41 copies the source's records into the fork's
-// updates.jsonl under the fork's sessionId and the fork's clock, keeping only
+// updates.jsonl under the fork's sessionId and outer timestamp, keeping
 // the source's eventId. Read as the fork's own, the source's turns showed up
 // twice in search and blame credited the fork, stamped later, with a line its
 // source wrote.
