@@ -319,6 +319,12 @@ var junieSessionID = regexp.MustCompile(`^session-[0-9]{6}-[0-9]{6}-[0-9a-zA-Z]+
 
 var crushSessionID = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
+// subagentNotReopened is the clients that have no command to reopen one of
+// their sub-agent runs on its own.
+var subagentNotReopened = map[string]bool{
+	"kimi": true, "qwen": true, "muse": true, "codebuddy": true, "devin": true, "gemini": true, "cursor": true,
+}
+
 // resumeCommand maps a session to (workdir, command). workdir is empty when
 // the harness resumes globally or the original directory is unknown.
 func resumeCommand(s model.Session) (string, string, error) {
@@ -333,8 +339,13 @@ func resumeCommand(s model.Session) (string, string, error) {
 	// the id deja gives it is one they have never seen (#4483).
 	// Muse's child logs are the same: `muse resume <child>` answers "has no
 	// saved log" (#4710). Gemini CLI's under chats/<parent>/ answer "Invalid
-	// session identifier" (0.64, #5134).
-	if s.Kind == "subagent" && (s.Harness == "kimi" || s.Harness == "qwen" || s.Harness == "muse" || s.Harness == "codebuddy" || s.Harness == "devin" || s.Harness == "gemini") && s.Parent != "" {
+	// session identifier" (0.64, #5134). A Cursor CLI subagent's state lives in
+	// its parent's chat store and only its transcript is a file of its own, so
+	// `cursor-agent --resume <child>` has no chat to open (2026.09.02, #5303).
+	// Hermes and OpenClaw do reopen a child: `hermes --resume <delegate child>`
+	// and `openclaw chat --session agent:main:subagent:<id>` load its history
+	// (Hermes 0.17.0, OpenClaw 2026.10.4, #5303), and goose's does too.
+	if s.Kind == "subagent" && subagentNotReopened[s.Harness] && s.Parent != "" {
 		return "", "", fmt.Errorf("session %s is a sub-agent run, which %s does not reopen on its own — `deja resume %s` reopens the session that spawned it", digest.Short(s.ID), s.Harness, s.Parent)
 	}
 	// A Copilot CLI sub-agent runs inside its parent's log and Copilot marks it

@@ -70,3 +70,63 @@ func TestResumeOpensAKimiSessionFork(t *testing.T) {
 		t.Fatalf("a kimi session fork resumes as %q: %v", cmd, err)
 	}
 }
+
+// A Cursor CLI subagent was told it had left cursor-agent's store, which it
+// was never in: its state lives in the parent's chat, so the refusal names
+// the parent. Hermes and OpenClaw do reopen a child, checked live, so theirs
+// is passed through (#5303).
+func TestResumeSubagentChildPerClient(t *testing.T) {
+	tmp := t.TempDir()
+	cli := filepath.Join(tmp, "cursor")
+	t.Setenv("DEJA_CURSOR_CLI_ROOT", cli)
+	t.Setenv("CURSOR_CONFIG_DIR", cli)
+	cwd := filepath.Join(tmp, "work", "my-app")
+	if err := os.MkdirAll(cwd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	parent := "11111111-0000-0000-0000-000000000001"
+	child := "22222222-0000-0000-0000-000000000002"
+	tp := seedCursorChat(t, cli, cwd, parent)
+	cp := filepath.Join(filepath.Dir(tp), "subagents", child+".jsonl")
+	if err := os.MkdirAll(filepath.Dir(cp), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(cp, []byte(`{"role":"user","message":{"content":[{"type":"text","text":"write the notes"}]}}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir, cmd, err := resumeCommand(model.Session{Harness: "cursor", ID: child, Kind: "subagent", Parent: parent, Path: cp})
+	if err == nil {
+		t.Fatalf("cursor: printed %q for a subagent", resumeCmdLine(dir, cmd))
+	}
+	for _, want := range []string{"sub-agent", "deja resume " + parent} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("cursor: refusal %q does not say %q", err, want)
+		}
+	}
+	if strings.Contains(err.Error(), "no longer in") {
+		t.Errorf("cursor: refusal %q says the child left a store it was never in", err)
+	}
+	// Control: the parent still resumes.
+	if _, cmd, err := resumeCommand(model.Session{Harness: "cursor", ID: parent, Path: tp}); err != nil || !strings.Contains(cmd, "cursor-agent --resume "+parent) {
+		t.Errorf("cursor parent resumes as %q: %v", cmd, err)
+	}
+
+	hermes := model.Session{Harness: "hermes", ID: "20261018_084719_441ac7", Kind: "subagent", Parent: "20261018_084704_a4b1b7",
+		Path: filepath.Join(tmp, "hermes", "state.db")}
+	if _, cmd, err := resumeCommand(hermes); err != nil || cmd != "hermes --resume "+hermes.ID {
+		t.Errorf("hermes child resumes as %q: %v", cmd, err)
+	}
+
+	sessions := filepath.Join(tmp, "openclaw", "agents", "main", "sessions")
+	if err := os.MkdirAll(sessions, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	key := "agent:main:subagent:8b21e74e-29b0-4184-ab79-488c87723f7b"
+	if err := os.WriteFile(filepath.Join(sessions, "sessions.json"), []byte(`{"agent:main:main":{"sessionId":"p"},"`+key+`":{"sessionId":"kid","spawnedBy":"agent:main:main"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	claw := model.Session{Harness: "openclaw", ID: "kid", Kind: "subagent", Parent: "p", Path: filepath.Join(sessions, "kid.jsonl")}
+	if _, cmd, err := resumeCommand(claw); err != nil || cmd != "openclaw chat --session "+key {
+		t.Errorf("openclaw child resumes as %q: %v", cmd, err)
+	}
+}

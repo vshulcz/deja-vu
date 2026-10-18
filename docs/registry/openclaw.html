@@ -122,7 +122,9 @@
 <p>under its old id. Live-verified for JSONL: the terminal UI came up on</p>
 <p><code>agent:main:main</code> with that session&#39;s history, and a run through</p>
 <p><code>openclaw agent --session-id</code> answered from it. SQLite key lookup is covered</p>
-<p>by synthetic database tests.</p>
+<p>by synthetic database tests. A spawned sub-agent has a key of its own</p>
+<p>(<code>agent:main:subagent:&lt;id&gt;</code>), and <code>openclaw chat --session</code> on it loads the</p>
+<p>child&#39;s history (2026.10.4, #5303).</p>
 <ul>
 <li><strong>Handoff</strong>: exec, <code>openclaw chat --message &lt;prompt&gt;</code> sends it once the TUI connects.</li>
 </ul>

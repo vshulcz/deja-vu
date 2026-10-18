@@ -74,7 +74,9 @@
 <p>directory is gone, is not recorded, or is no longer in cursor-agent&#39;s store is</p>
 <p>refused with <code>deja show</code> instead — <code>cursor-agent --resume</code> with no id lists</p>
 <p>chats from every directory. Live-verified: the resumed chat answered from its own</p>
-<p>history. IDE chats carry a composer id from <code>state.vscdb</code> that the CLI does not</p>
+<p>history. A CLI subagent is refused with its parent&#39;s id: its state lives in</p>
+<p>the parent&#39;s chat store and only its transcript is a file of its own, so</p>
+<p><code>--resume</code> has no chat to open for it (#5303). IDE chats carry a composer id from <code>state.vscdb</code> that the CLI does not</p>
 <p>take, so those still reopen only in the editor. On the screen bare <code>deja</code></p>
 <p>opens, <code>r</code> on a CLI chat runs this command for you, and <code>o</code> continues any chat</p>
 <p>in another agent.</p>

@@ -80,7 +80,9 @@ sub-agent's task are dropped from the turn. Verified against 2026.10.4.
   under its old id. Live-verified for JSONL: the terminal UI came up on
   `agent:main:main` with that session's history, and a run through
   `openclaw agent --session-id` answered from it. SQLite key lookup is covered
-  by synthetic database tests.
+  by synthetic database tests. A spawned sub-agent has a key of its own
+  (`agent:main:subagent:<id>`), and `openclaw chat --session` on it loads the
+  child's history (2026.10.4, #5303).
 - **Handoff**: exec, `openclaw chat --message <prompt>` sends it once the TUI connects.
 
 **Last verified:** 2026-09-02

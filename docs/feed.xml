@@ -60,6 +60,13 @@
     <summary>Where Grok Build writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
   </entry>
   <entry>
+    <title>Where Hermes stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/hermes.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/hermes.html"></link>
+    <updated>2026-10-18T00:00:00Z</updated>
+    <summary>Where Hermes writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
+  <entry>
     <title>Where Kimchi Coding stores its history — session format</title>
     <id>https://vshulcz.github.io/deja-vu/registry/kimchi.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/kimchi.html"></link>
@@ -282,12 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/agents.html"></link>
     <updated>2026-10-14T00:00:00Z</updated>
     <summary>How deja gives coding agents a searchable memory over MCP: one tool with recall, context, blame, fix, how, orient, remember and handoff modes.</summary>
-  </entry>
-  <entry>
-    <title>Codex CLI history: view, search and sync it — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/codex-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/codex-history.html"></link>
-    <updated>2026-10-14T00:00:00Z</updated>
-    <summary>Where Codex CLI keeps session history, why grep misses sessions older than a week, jq and sqlite3 recipes, and search across every Codex session.</summary>
   </entry>
 </feed>
