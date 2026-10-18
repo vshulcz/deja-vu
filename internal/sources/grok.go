@@ -126,6 +126,9 @@ func parseGrokFileFromOffset(path string, offset int64) ([]model.Session, error)
 	// speech was rather than assuming it was the message just added.
 	lastKey, lastSpeech := "", -1
 	err := scanGrokUpdatesFrom(path, offset, func(event grokUpdateEvent) {
+		if grokCopiedEvent(event, id, doc.ParentSessionID) {
+			return
+		}
 		role := ""
 		switch event.Params.Update.Kind {
 		case "user_message_chunk":
@@ -201,8 +204,22 @@ type grokUpdateEvent struct {
 		Meta struct {
 			PromptID       string      `json:"promptId"`
 			AgentTimestamp json.Number `json:"agentTimestampMs"`
+			// EventID is "<session id>-<n>" of the session that wrote the
+			// record; a fork's copies keep their source's.
+			EventID string `json:"eventId"`
 		} `json:"_meta"`
 	} `json:"params"`
+}
+
+// grokCopiedEvent reports a record a `--fork-session` copy carries from its
+// source. Grok 1.0.41 copies the source's records into the fork's
+// updates.jsonl under the fork's sessionId and the fork's clock, keeping only
+// the source's eventId. Read as the fork's own, the source's turns showed up
+// twice in search and blame credited the fork, stamped later, with a line its
+// source wrote.
+func grokCopiedEvent(event grokUpdateEvent, id, parent string) bool {
+	eid := event.Params.Meta.EventID
+	return parent != "" && eid != "" && !strings.HasPrefix(eid, id+"-")
 }
 
 // grokWorkRecords reads what a tool_call was asked to do off its rawInput:
