@@ -145,7 +145,8 @@ func TestOpencodeLeavesAConfigItCannotEditAlone(t *testing.T) {
 }
 
 // An inline block with servers in it keeps its shape: the split has to fall on
-// the brace that closes the block, not on the first one in the line.
+// the brace that closes the block, not on the first one in the line. The
+// comment is what sends it to the text writer: plain JSON is decoded.
 func TestOpencodeSplitsAnInlineBlockAtItsOwnBrace(t *testing.T) {
 	hermeticEnv(t)
 	dir := filepath.Join(opencodeConfigHome(), "opencode")
@@ -153,7 +154,7 @@ func TestOpencodeSplitsAnInlineBlockAtItsOwnBrace(t *testing.T) {
 		t.Fatal(err)
 	}
 	path := filepath.Join(dir, "opencode.jsonc")
-	before := "{\n  \"mcp\": {\"a\": {\"type\":\"local\",\"command\":[\"x\"]}}\n}\n"
+	before := "{\n  // servers\n  \"mcp\": {\"a\": {\"type\":\"local\",\"command\":[\"x\"]}}\n}\n"
 	if err := os.WriteFile(path, []byte(before), 0o644); err != nil {
 		t.Fatal(err)
 	}

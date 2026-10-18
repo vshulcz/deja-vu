@@ -1617,11 +1617,19 @@ func snapshotIfSameJSON(path string, old, next []byte) []byte {
 	if bytes.Equal(old, next) {
 		return next
 	}
-	want, ok := decodeJSONExact(next)
+	// JSONC too, while its comments are the snapshot's: opencode's own
+	// `"$schema": "…",}` came back from a round trip with the brace moved,
+	// and an emptied `"mcp": {}` split over two lines. Only deja's own
+	// snapshot there: the widening is not meant to reach a .bak the reader
+	// keeps beside a commented config.
+	want, ok := decodeJSONCExact(next)
 	if !ok {
 		return next
 	}
-	if before, ok := decodeJSONExact(old); ok && reflect.DeepEqual(before, want) {
+	if _, strict := decodeJSONExact(next); !strict && !snapshotTaken(path) {
+		return next
+	}
+	if before, ok := decodeJSONCExact(old); ok && reflect.DeepEqual(before, want) {
 		return next
 	}
 	bak := path + ".bak"
@@ -1633,7 +1641,10 @@ func snapshotIfSameJSON(path string, old, next []byte) []byte {
 		return next
 	}
 	b = bytes.TrimPrefix(b, utf8BOM)
-	if have, ok := decodeJSONExact(b); !ok || !reflect.DeepEqual(want, have) {
+	if have, ok := decodeJSONCExact(b); !ok || !reflect.DeepEqual(want, have) {
+		return next
+	}
+	if jsonCommentText(lfText(b)) != jsonCommentText(lfText(next)) {
 		return next
 	}
 	return b
@@ -4395,8 +4406,11 @@ func installOpencodeShaped(dir, base, exe string, uninstall bool) (installResult
 	var note string
 	// The content, not the name: opencode reads either file as JSONC, and
 	// picking the writer by extension meant the same commented config was
-	// edited as text under one name and refused under the other (#1664).
-	if strings.HasSuffix(path, ".jsonc") || configIsJSONC(old) {
+	// edited as text under one name and refused under the other (#1664). The
+	// same holds the other way: plain JSON in opencode.jsonc — `{}`, the
+	// $schema line on one line, a minified config — was refused by the text
+	// writer while the decoding writer edits those bytes under the other name.
+	if configIsJSONC(old) {
 		next, note, err = updateOpencodeJSONC(old, exe, uninstall)
 	} else {
 		next, note, err = updateOpencodeJSON(old, path, exe, uninstall)
@@ -5109,6 +5123,13 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 			return nil, "", fmt.Errorf("opencode config keeps its servers under \"mcp.servers\"; deja edits the top of the \"mcp\" block and would move the entry there — add the deja server by hand")
 		}
 		body, dropped, wasLast, droppedAt := dropJSONCEntry(block, key)
+		if uninstall && len(dropped) == 0 {
+			// No entry of deja's to take out, so the file as it was: the lines
+			// here are the ones openInlineBlock split, and joining them wrote
+			// a one-line block back over two lines into a config deja had
+			// never touched.
+			return old, leftDejaEntriesNote(servers), nil
+		}
 		// What the reader put on our own entry is theirs: an environment
 		// pointing at a store on another disk, an entry switched off. The
 		// parsed path has merged those since #2479; this one rewrote the line
@@ -5180,7 +5201,7 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 		return []byte(strings.Join(out, "\n") + "\n"), note, nil
 	}
 	if uninstall {
-		return []byte(strings.Join(lines, "\n") + "\n"), "", nil
+		return old, "", nil
 	}
 	// An "mcp" key exists but brace-counting could not bound it — its opening
 	// brace is on a later line, or the braces are unbalanced. Adding a fresh
@@ -5191,6 +5212,17 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 		return nil, "", fmt.Errorf("opencode config has an \"mcp\" block deja could not edit without risking it — add the deja server by hand")
 	}
 	insert := len(lines) - 1
+	// opencode puts its $schema line into a config that lacks one, and into
+	// `{}` that gives `"$schema": "…",}` — the closing brace at the end of
+	// the last line of code (1.18.35). That brace goes on a line of its own so
+	// the block has somewhere to go above it.
+	if insert >= 1 && stripJSONComments(lines[insert]) == lines[insert] {
+		l := strings.TrimRight(lines[insert], " \t")
+		if code, _, _ := jsoncCodeOf(l, false); code != "}" && strings.HasSuffix(code, "}") && jsoncBraceDelta(code) < 0 {
+			lines = append(lines[:insert:insert], strings.TrimRight(l[:len(l)-1], " \t"), "}")
+			insert++
+		}
+	}
 	// The block is spliced in above the file's closing brace, so the file has
 	// to have one of its own on that line. On a config written as a single
 	// line the splice put the new block *before* the object (#2777).
