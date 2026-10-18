@@ -188,6 +188,9 @@ func installGooseCommand(exe string, uninstall bool) (installResult, error) {
 		// Read by value: goose saves this file through serde_yaml, unquoted,
 		// and a match on deja's own text rewrote the entry and moved the key
 		// to the bottom after every save of goose's (#5193).
+		if _, err := yamlTopKeyEnd(normaliseGooseNewlines(string(old))+"\n", "slash_commands:"); err != nil {
+			return installResult{}, fmt.Errorf("%s: %w", path, err)
+		}
 		if _, ours := gooseSlashCommandOurs(normaliseGooseNewlines(string(old)), recipe); ours {
 			return installResult{Path: path, Action: "unchanged"}, nil
 		}

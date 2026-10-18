@@ -221,3 +221,36 @@ func TestInstallGooseKnowsItsEntriesAfterGooseRewritesThem(t *testing.T) {
 		t.Errorf("uninstall:\n%s", got)
 	}
 }
+
+// Review cases: a comment or blank line before the first args item set the
+// item indent to column 0, and uninstall stopped at a column-0 comment and
+// left half the entry; both made a file goose refuses. A second extensions:
+// or slash_commands: key is refused before the in-place edit, as before.
+func TestInstallGooseEntryAroundCommentsAndTwoKeys(t *testing.T) {
+	const exe = "/bin/deja"
+	cfg := "extensions:\n  deja:\n    enabled: true\n    type: stdio\n    cmd: /old/deja\n    args:\n# the subcommand\n\n      - serve\n    envs:\n      A: b\n  mine:\n    enabled: true\n"
+	path := gooseTestConfig(t, cfg)
+	if _, err := installGoose(exe, false); err != nil {
+		t.Fatal(err)
+	}
+	got := readGooseTestConfig(t, path)
+	if regexp.MustCompile(`(?m)^- `).MatchString(got) || !strings.Contains(got, "    envs:\n      A: b\n") {
+		t.Fatalf("args item at column 0 or envs lost:\n%s", got)
+	}
+	if _, err := installGoose(exe, true); err != nil {
+		t.Fatal(err)
+	}
+	got = readGooseTestConfig(t, path)
+	if strings.Contains(got, "serve") || strings.Contains(got, "mcp") || strings.Contains(got, "A: b") || !strings.Contains(got, "  mine:\n") {
+		t.Fatalf("uninstall left part of the entry:\n%s", got)
+	}
+
+	gooseTestConfig(t, "extensions:\n  deja:\n    enabled: true\n    type: stdio\n    cmd: /bin/deja\n    args: [mcp]\nextensions:\n  mine:\n    enabled: true\n")
+	if _, err := installGoose(exe, false); err == nil {
+		t.Error("two extensions: keys accepted")
+	}
+	gooseTestConfig(t, "slash_commands:\n- command: deja\n  recipe_path: "+gooseRecipePath()+"\nslash_commands:\n- command: mine\n")
+	if _, err := installGooseCommand(exe, false); err == nil {
+		t.Error("two slash_commands: keys accepted")
+	}
+}

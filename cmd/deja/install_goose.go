@@ -121,6 +121,10 @@ func installGoose(exe string, uninstall bool) (installResult, error) {
 	body, crlf := normaliseNewlines(string(old))
 	var note string
 	if !uninstall {
+		// Refused before any edit: goose reads neither of two extensions keys.
+		if _, err := yamlTopKeyEnd(body+"\n", "extensions:"); err != nil {
+			return installResult{}, fmt.Errorf("%s: %w", path, err)
+		}
 		// The entry the reader already has is edited where it stands, keys
 		// and switch kept (#5190, #5191).
 		lines, n, done, err := gooseEditEntry(strings.Split(body, "\n"), exe)
@@ -140,7 +144,10 @@ func installGoose(exe string, uninstall bool) (installResult, error) {
 	if err := yamlDejaEntriesRemovable(body, "extensions:"); err != nil {
 		return installResult{}, fmt.Errorf("%s: %w", path, err)
 	}
-	next := removeGooseExtensionEntries(removeGooseExtension(body))
+	// Entries found by key first: they read past a comment at column 0
+	// inside the entry, where the bare-line remover stopped and left half of
+	// it behind. That one stays for the legacy two-space entry (#2614).
+	next := removeGooseExtension(removeGooseExtensionEntries(body))
 	// Removing our entry can leave the key it lived under with nothing in it,
 	// and the insert below only recognises "extensions:" when a line follows
 	// it — so a second install appended a second key and left the file with

@@ -113,9 +113,15 @@ func gooseEditEntry(lines []string, exe string) (out []string, note string, done
 	// Items at the indent the reader's own list uses: goose writes them at
 	// the key's, a hand-written file further in.
 	item := indent + "  - "
-	if hasArgs && argsField.end > argsField.start+1 {
-		first := lines[argsField.start+1]
-		item = first[:yamlIndentWidth(first)] + "- "
+	if hasArgs {
+		// The first item, not a blank or a comment at column 0 before it:
+		// an item written there ends the entry, and goose refuses the file.
+		for _, l := range lines[argsField.start+1 : argsField.end] {
+			if !hermesNoContent(l) {
+				item = l[:yamlIndentWidth(l)] + "- "
+				break
+			}
+		}
 	}
 	argLines := []string{indent + "args:"}
 	for _, a := range args {
