@@ -1276,6 +1276,13 @@ func installAntigravityAuto(exe string, uninstall bool) (installResult, error) {
 }
 
 func installOpenClawAuto(exe string, uninstall bool) (installResult, error) {
+	// Every section first: a refusal after the MCP entry went in would leave
+	// the target half wired.
+	if !uninstall {
+		if err := openclawIncludeRefusal(append([]openclawSection{openclawMCPSection(preflightHookExe(exe))}, openclawAutoSections()...)...); err != nil {
+			return installResult{}, err
+		}
+	}
 	mcp, err := installOpenClawMCP(exe, uninstall)
 	if err != nil {
 		return installResult{}, err
@@ -4209,6 +4216,11 @@ func installCopilotMCP(exe string, uninstall bool) (installResult, error) {
 // installOpenClawMCP wires deja into openclaw.json — OpenClaw keeps MCP
 // servers under mcp.servers, not the common mcpServers root.
 func installOpenClawMCP(exe string, uninstall bool) (installResult, error) {
+	if !uninstall {
+		if err := openclawIncludeRefusal(openclawMCPSection(preflightHookExe(exe))); err != nil {
+			return installResult{}, err
+		}
+	}
 	path := filepath.Join(sources.OpenClawStateDir(), "openclaw.json")
 	old, err := readConfig(path)
 	if err != nil {

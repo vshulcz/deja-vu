@@ -68,6 +68,10 @@ sub-agent's task are dropped from the turn. Verified against 2026.10.4.
   `openclaw chat` and `openclaw tui --local` run no plugin or hook
   (2026.10.4), so none of this reaches them; MCP recall there leaves out the
   session OpenClaw wrote to last when no hook stamped one.
+  A section openclaw.json keeps in its own file (`"mcp": {"$include": …}`)
+  is refused rather than written beside, with what to add there by hand: a
+  key next to the `$include` makes OpenClaw's own edits of that section land
+  in openclaw.json.
 - **Resume**: `openclaw chat --session <key>`. OpenClaw addresses a
   conversation by key (`agent:<id>:<name>`); the uuid its transcript is named
   after opens nothing. Legacy JSONL sessions use `sessions.json` beside the

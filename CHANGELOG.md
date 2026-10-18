@@ -59,6 +59,11 @@ cannot give them a digest or per-prompt recall; install and doctor now say
 so. MCP recall there leaves out the session OpenClaw wrote to last when no
 hook stamped one, instead of answering with the conversation asking.
 
+`deja install openclaw` and `openclaw-auto` refuse a section openclaw.json
+keeps in its own file (`$include`) and say what to add there by hand. Writing
+beside the `$include` made OpenClaw's own edits of that section land in
+openclaw.json instead of the included file.
+
 ## [0.22.2] - 2026-10-17
 
 deja now reads Windsurf / Devin Desktop: Cascade's encrypted conversation

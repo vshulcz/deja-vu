@@ -108,6 +108,10 @@
 <p><code>openclaw chat</code> and <code>openclaw tui --local</code> run no plugin or hook</p>
 <p>(2026.10.4), so none of this reaches them; MCP recall there leaves out the</p>
 <p>session OpenClaw wrote to last when no hook stamped one.</p>
+<p>A section openclaw.json keeps in its own file (<code>&#34;mcp&#34;: {&#34;$include&#34;: …}</code>)</p>
+<p>is refused rather than written beside, with what to add there by hand: a</p>
+<p>key next to the <code>$include</code> makes OpenClaw&#39;s own edits of that section land</p>
+<p>in openclaw.json.</p>
 <ul>
 <li><strong>Resume</strong>: <code>openclaw chat --session &lt;key&gt;</code>. OpenClaw addresses a</li>
 </ul>
