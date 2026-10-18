@@ -228,8 +228,9 @@ func withoutSubagentRuns(ss []model.Session) []model.Session {
 	out := make([]model.Session, 0, len(ss))
 	for _, s := range ss {
 		// "sidechain" is Claude's word for the edge; Gemini, Codex, Cursor and
-		// the rest say "subagent", as index.spawnedKind does (#5215).
-		if s.Kind == "sidechain" || s.Kind == "subagent" || s.Kind == "cron" {
+		// the rest say "subagent", Grok "subagent_fork" too (#5215). The same
+		// words recall leaves out of a session's own lineage.
+		if index.SpawnedKind(s.Kind) || s.Kind == "cron" {
 			continue
 		}
 		out = append(out, s)

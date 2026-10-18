@@ -286,8 +286,10 @@ func spawnedFamily(m Manifest, ids, out map[string]bool) map[string]bool {
 	return own
 }
 
-// spawnedKind reports whether a session's kind is the harness's word for an
+// SpawnedKind reports whether a session's kind is the harness's word for an
 // agent another session spawned.
+func SpawnedKind(kind string) bool { return spawnedKind(kind) }
+
 func spawnedKind(kind string) bool {
 	switch kind {
 	case "sidechain", "subagent", "subagent_fork":
