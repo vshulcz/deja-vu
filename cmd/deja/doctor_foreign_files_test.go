@@ -27,8 +27,8 @@ func TestAClientsOwnFilesAreNotUnreadTranscripts(t *testing.T) {
 			session: "wd_api/s1/agents/main/wire.jsonl",
 			own: []string{"wd_api/s1/state.json", "wd_api/s1/upcoming-goals.json", "wd_api/s1/agents/agent-1/wire.jsonl",
 				"wd_api/s1/agents/main/tasks/bash-a1b2c3d4.json", "wd_api/s1/tasks/bash-e5f6a7b8.json"},
-			// The switch takes them now, so the row names it (#4483).
-			want: "1 subagent transcripts skipped — set DEJA_INCLUDE_SUBAGENTS=1",
+			// Read by default now, as Claude's are (#5229), and the row says how.
+			want: "1 subagent transcripts read as task, answer and what they changed",
 		},
 		{
 			row: "gemini", env: "DEJA_GEMINI_ROOT", sub: "tmp",

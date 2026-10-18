@@ -227,7 +227,8 @@ func TestParseKimiToolRecordSwitchesOff(t *testing.T) {
 	}
 }
 
-func TestKimiSessionFilesSkipsSubAgents(t *testing.T) {
+func TestKimiSessionFilesSkipsSubAgentsUnderZero(t *testing.T) {
+	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "0")
 	root, wire := kimiFixture(t)
 	if err := os.WriteFile(wire, []byte(kimiWireHead), 0o644); err != nil {
 		t.Fatal(err)

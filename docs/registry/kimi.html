@@ -43,7 +43,7 @@
 <li><strong>Read override</strong>: <code>DEJA_KIMI_ROOT</code> (takes precedence over <code>KIMI_CODE_HOME</code> for reads)</li>
 <li><strong>Format</strong>: append-only JSONL wire protocol (observed <code>protocol_version</code> 1.1–1.4)</li>
 </ul>
-<p>Tool calls are <code>tool.call</code> events with <code>name</code> and <code>args</code>: <code>path</code> for the file tools, <code>old_string</code>/<code>new_string</code> on <code>Edit</code>, and the whole file as <code>content</code> on <code>Write</code>, which is the only record a created file&#39;s lines were ever in a session. <code>fixtures/registry/kimi/sessions/wd_demo_0123456789ab/session_changes01</code> pins both shapes, read back as <code>## what it changed</code> by the generic reader.</p>
+<p>Tool calls are <code>tool.call</code> events with <code>name</code> and <code>args</code>: <code>path</code> for the file tools (a relative one is put under the session&#39;s cwd, as Kimi resolves it; #5228), <code>old_string</code>/<code>new_string</code> on <code>Edit</code>, and the whole file as <code>content</code> on <code>Write</code>, which is the only record a created file&#39;s lines were ever in a session. <code>fixtures/registry/kimi/sessions/wd_demo_0123456789ab/session_changes01</code> pins both shapes, read back as <code>## what it changed</code> by the generic reader.</p>
 <p><code>state.json</code> next to each session supplies title, workDir (project) and</p>
 <p>timestamps, and a change to it alone re-reads the session (#4446). User turns arrive as <code>context.append_message</code>; streamed assistant</p>
 <p>turns are reconstructed from <code>step.begin</code> → <code>content.part</code> (type <code>text</code> only;</p>
@@ -53,15 +53,22 @@
 <p>(#4445). <code>tool.result</code></p>
 <p>events keep their <code>output</code> text under the <code>tool-output</code> role, error results</p>
 <p>included. Sub-agent histories under <code>agents/&lt;agent-id&gt;/wire.jsonl</code> are read</p>
-<p>only with <code>DEJA_INCLUDE_SUBAGENTS=1</code>, each as a session of its own naming the</p>
-<p>parent session (#4483). A <code>/btw</code> side question is the exception: Kimi runs it</p>
+<p>as sessions of their own naming the parent session (#4483), opening with the</p>
+<p>task the parent handed it (origin <code>system_trigger</code>/<code>subagent</code>, #5227): the</p>
+<p>task, the files it changed and its last turns, so <code>deja blame</code> names the</p>
+<p>sub-agent that wrote a file (#5229). <code>DEJA_INCLUDE_SUBAGENTS=1</code> takes the whole</p>
+<p>run and <code>=0</code> skips them. A <code>/btw</code> side question is the exception: Kimi runs it</p>
 <p>in a fork of <code>main</code> that <code>state.json</code> marks <code>forkedFrom</code>, and deja reads that</p>
 <p>fork by default from the btw reminder on (origin <code>system_trigger</code>/<code>btw</code> in</p>
 <p>0.28, <code>injection</code> with variant <code>btw</code> from 0.43), so the question and the answer</p>
 <p>are kept without the copy of main&#39;s context the fork opens with. It is a</p>
 <p>session of its own, kind <code>fork</code>, naming the session it was asked in. A fork</p>
 <p>with no btw reminder, such as an <code>Agent</code> call with <code>fork: true</code>, is a sub-agent</p>
-<p>run like any other (#4484).</p>
+<p>run like any other (#4484). A session <code>/fork</code> or <code>kimi fork</code> made copies each</p>
+<p>of its source&#39;s <code>wire.jsonl</code> and closes the copy with a <code>forked</code> record, and</p>
+<p>its <code>state.json</code> names the source as <code>forkedFrom</code>: deja reads it as kind <code>fork</code></p>
+<p>of that source, from the <code>forked</code> record on, so a fork with no turn of its own</p>
+<p>is not a session yet (#5226).</p>
 <p>Media is out of scope.</p>
 <ul>
 <li><strong>MCP</strong>: <code>deja install kimi</code> writes <code>mcpServers.deja</code> into</li>

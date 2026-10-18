@@ -59,3 +59,14 @@ func TestResumeRefusesAKimiBtwFork(t *testing.T) {
 		t.Errorf("refusal %q does not name the session to resume", err)
 	}
 }
+
+// A session /fork or `kimi fork` made is a session of its own, which
+// `kimi --session` opens; resume called it a /btw side question (#5226).
+func TestResumeOpensAKimiSessionFork(t *testing.T) {
+	s := model.Session{Harness: "kimi", ID: "session_fork", Kind: "fork", Parent: "session_src",
+		Path: filepath.Join(t.TempDir(), "kimi", "sessions", "wd", "session_fork", "agents", "main", "wire.jsonl")}
+	_, cmd, err := resumeCommand(s)
+	if err != nil || !strings.Contains(cmd, "session_fork") {
+		t.Fatalf("a kimi session fork resumes as %q: %v", cmd, err)
+	}
+}
