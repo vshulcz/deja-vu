@@ -3,6 +3,7 @@ package index
 import (
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -75,4 +76,32 @@ func wholeShared(dir string, m Manifest, turns map[string]bool, other SessionMet
 		}
 	}
 	return at
+}
+
+// TouchedAfter reports whether meta's session worked on path after at: a
+// files record naming it, stamped later. Touched carries no times, so a
+// source cut at a fork point would count for edits the fork copied (#5341).
+// An untimed record is not after the cut, the way recall cuts it. When no
+// record names the path at all (a redacted one) or the read fails, the answer
+// is yes, which keeps the session counted as before.
+func TouchedAfter(dir string, meta SessionMeta, path string, at time.Time) bool {
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return true
+	}
+	var named, after bool
+	err = eachRecordForKeysInRoles(filepath.Join(dir, "records.bin"), tablesFromManifest(m),
+		map[string]bool{meta.Harness + ":" + meta.ID: true}, map[string]bool{roleFiles: true}, func(r Record) {
+			if after || r.Role != roleFiles {
+				return
+			}
+			for _, p := range strings.Split(r.Text, "\n") {
+				if p = strings.TrimSpace(p); p != "" && SameFile(p, path) {
+					named = true
+					after = r.Time.After(at)
+					return
+				}
+			}
+		})
+	return err != nil || after || !named
 }
