@@ -27,8 +27,8 @@ from `my/app` (#4427, #4457).
   its project asks to fork it instead of reopening it (#4400).
 - **Sub-agent runs** of the `Agent` tool are transcripts of their own beside
   the parent, marked by `parentSession` on the header and a
-  `kimchi:subagent-session` entry after it. They are skipped, as Claude Code's,
-  Cursor's and gjc's sub-agents are; `DEJA_INCLUDE_SUBAGENTS=1` takes them. A
+  `kimchi:subagent-session` entry after it. They are skipped, as gjc's sub-agents
+  are; `DEJA_INCLUDE_SUBAGENTS=1` takes them. A
   fork carries `parentSession` alone and stays a session (#4401).
 - A session file directly under the root has no encoded project directory to
   read a name from, so the header line's `cwd` names the project there — the

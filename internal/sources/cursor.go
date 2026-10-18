@@ -93,7 +93,9 @@ func CursorTranscripts() []string {
 		if !strings.EqualFold(filepath.Ext(p), ".jsonl") {
 			return nil
 		}
-		if cursorPathHasDir(p, "subagents") && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
+		// A subagent's run comes in as its task, its answer and what it changed,
+		// the way Claude's does; =0 leaves them out.
+		if cursorPathHasDir(p, "subagents") && os.Getenv("DEJA_INCLUDE_SUBAGENTS") == "0" {
 			return nil
 		}
 		if cursorPathHasDir(p, "agent-transcripts") {
@@ -403,6 +405,12 @@ var cursorDialect = toolDialect{
 func ParseCursorTranscript(path string) ([]model.Session, error) {
 	id := strings.TrimSuffix(filepath.Base(path), ".jsonl")
 	s := model.Session{Harness: "cursor", ID: id, Project: cursorTranscriptProject(path), Path: path}
+	// cursor-agent writes a subagent's run to
+	// agent-transcripts/<parent>/subagents/<child>.jsonl, and the path is the
+	// only place the parent is named: the lines carry no ids.
+	if parent := CursorSubagentParent(path); parent != "" {
+		s.Kind, s.Parent = "subagent", parent
+	}
 	// The file's own time is the fallback: a transcript with no stamp in it at
 	// all still needs a date, and so does one whose stamps deja cannot read.
 	// Where Cursor wrote the turn's own time, that wins — a copy or a restore
@@ -468,7 +476,25 @@ func ParseCursorTranscript(path string) ([]model.Session, error) {
 	if len(s.Messages) == 0 {
 		return nil, err
 	}
+	if s.Kind == "subagent" && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
+		s.Messages = KeepSubagentTail(s.Messages)
+	}
 	return []model.Session{s}, err
+}
+
+// CursorSubagentParent returns the parent conversation id of a subagent
+// transcript, agent-transcripts/<parent>/subagents/<child>.jsonl, or "" for any
+// other path.
+func CursorSubagentParent(path string) string {
+	dir := filepath.Dir(path)
+	if !strings.EqualFold(filepath.Base(dir), "subagents") {
+		return ""
+	}
+	parentDir := filepath.Dir(dir)
+	if !strings.EqualFold(filepath.Base(filepath.Dir(parentDir)), "agent-transcripts") {
+		return ""
+	}
+	return filepath.Base(parentDir)
 }
 
 // cursorTurnTimeRE is the block Cursor puts ahead of a person's words:

@@ -1284,7 +1284,19 @@ func doctorGooseDetail(sqlite bool) string {
 }
 
 func doctorCursorDetail(sqlite bool) string {
-	parts := []string{doctorCount(len(sources.CursorTranscripts()), "CLI transcript")}
+	transcripts := sources.CursorTranscripts()
+	cli := doctorCount(len(transcripts), "CLI transcript")
+	// By the reader's own test, which matches the directory in any case.
+	short := 0
+	for _, p := range transcripts {
+		if sources.CursorSubagentParent(p) != "" {
+			short++
+		}
+	}
+	if short > 0 && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
+		cli += fmt.Sprintf(", %d subagent transcripts read as task, answer and what they changed — set DEJA_INCLUDE_SUBAGENTS=1 for the whole run", short)
+	}
+	parts := []string{cli}
 	dbs := sources.CursorDBs()
 	if len(dbs) > 0 {
 		var size int64

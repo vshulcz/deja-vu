@@ -744,7 +744,9 @@ import (
 // 81: an opencode apply_patch with a relative header is filed under the
 // session's directory, as the tool resolved it; rows already indexed carry the
 // bare name until a rebuild (#5212).
-const version = 81
+// 82: a Cursor CLI subagent transcript is read by default as its task,
+// answer and edits under the session that spawned it (#5243, #5244).
+const version = 82
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

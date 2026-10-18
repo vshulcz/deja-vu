@@ -137,7 +137,7 @@ func TestCursorTranscriptProjectWalkUp(t *testing.T) {
 	}
 }
 
-func TestCursorTranscriptsSkipSubagents(t *testing.T) {
+func TestCursorTranscriptsTakeSubagentsUnlessSwitchedOff(t *testing.T) {
 	t.Setenv("DEJA_CURSOR_CLI_ROOT", t.TempDir()) // no chats/ of the machine's own
 	root := t.TempDir()
 	t.Setenv("DEJA_CURSOR_CLI_ROOT", root)
@@ -152,9 +152,13 @@ func TestCursorTranscriptsSkipSubagents(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(base, "subagents", "child.jsonl"), []byte(line), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if files := CursorTranscripts(); len(files) != 2 {
+		t.Fatalf("discovery wrong, want the run and its subagent: %v", files)
+	}
+	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "0")
 	files := CursorTranscripts()
 	if len(files) != 1 || !strings.HasSuffix(files[0], "s1.jsonl") {
-		t.Fatalf("discovery wrong: %v", files)
+		t.Fatalf("DEJA_INCLUDE_SUBAGENTS=0 discovery wrong: %v", files)
 	}
 }
 
@@ -169,8 +173,9 @@ func TestCursorTranscriptsPathMatchingIsCaseInsensitive(t *testing.T) {
 	if err := os.WriteFile(path, []byte(`{"role":"user","message":{"content":"hi"}}`+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "0")
 	if got := CursorTranscripts(); len(got) != 0 {
-		t.Fatalf("subagent transcript discovered: %v", got)
+		t.Fatalf("subagent transcript discovered under =0: %v", got)
 	}
 	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "1")
 	if got := CursorTranscripts(); len(got) != 1 || got[0] != path {
