@@ -1376,6 +1376,7 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 	if total > len(ss) {
 		fmt.Fprintf(os.Stderr, "deja: showing %d of %d — `deja last %d` shows the rest\n", len(ss), total, total)
 	}
+	markForkTitles(dir, ss)
 	printLastRows(os.Stdout, ss)
 	// The listing is ordered by a date, so one that has not happened leads it
 	// and nothing else on the screen says why. The first screen carries the
@@ -1755,6 +1756,7 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 	// nothing was capped the honest total is simply what survived; when it was,
 	// there is no way to know how the filters would have treated the hidden
 	// ones, so the pre-cap figure stands and `capped` says to distrust it.
+	hits = dropCopiedHits(dir, hits)
 	attachLifecycles(dir, hits)
 	demoted := demoteRejected(hits)
 	attachMoved(hits)
