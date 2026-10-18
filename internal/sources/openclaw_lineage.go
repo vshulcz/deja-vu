@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -289,9 +290,9 @@ func openclawReadStore(p string) map[string]openclawStoreEntry {
 // a /new every child of the old window was filed under the new one, a session
 // started after the child (#5307). The spawn call's result names the child's
 // key in the requester's transcript: the window taken is the latest one that
-// opened by the time the child did and names it, live or archived (a .zst
-// archive is not opened), and none when nothing does — no parent rather than
-// one that never spawned it.
+// opened by the time the child did and names it, live or archived, compressed
+// or not (#5340), and none when nothing does — no parent rather than one that
+// never spawned it.
 func openclawWindowBefore(scan []openclawSpawnScan, childKey, childID string, childStart time.Time) string {
 	var best string
 	var bestAt time.Time
@@ -332,7 +333,7 @@ func openclawScanDir(dir string) (out []openclawSpawnScan, changed bool) {
 	out = make([]openclawSpawnScan, 0, len(entries))
 	for _, e := range entries {
 		name := e.Name()
-		if e.IsDir() || strings.HasSuffix(name, ".zst") || openclawCheckpointRE.MatchString(name) || strings.Contains(name, ".trajectory.") ||
+		if e.IsDir() || openclawCheckpointRE.MatchString(name) || strings.Contains(name, ".trajectory.") ||
 			!strings.HasSuffix(name, ".jsonl") && !openclawArchiveRE.MatchString(name) {
 			continue
 		}
@@ -342,7 +343,13 @@ func openclawScanDir(dir string) (out []openclawSpawnScan, changed bool) {
 		}
 		f, ok := old[name]
 		if !ok || f.size != fi.Size() || !f.mod.Equal(fi.ModTime()) {
-			f = openclawScanFile(filepath.Join(dir, name))
+			var read bool
+			if f, read = openclawScanFile(filepath.Join(dir, name)); !read {
+				// A .zst left unread for want of zstd is not kept, so the
+				// first parse with zstd installed reads it.
+				changed = true
+				continue
+			}
 			f.size, f.mod = fi.Size(), fi.ModTime()
 			changed = true
 		}
@@ -360,16 +367,32 @@ var openclawChildKeyRE = regexp.MustCompile(`childSessionKey(?:\\*")?\s*:\s*\\*"
 
 // openclawScanFile reads a transcript's header and the child keys its spawn
 // results name as childSessionKey; a key merely mentioned in a turn is not
-// one. Only lines holding that word are matched.
-func openclawScanFile(p string) openclawSpawnScan {
-	var f openclawSpawnScan
+// one. Only lines holding that word are matched. A .zst archive is decoded
+// first; read is false when zstd is missing, so the answer is not kept.
+func openclawScanFile(p string) (f openclawSpawnScan, read bool) {
+	if strings.HasSuffix(p, ".zst") {
+		if !ZstdAvailable() {
+			return f, false
+		}
+		openclawScanReads.Add(1)
+		plain, err := zstdDecoded(p, "openclaw")
+		if err != nil {
+			return f, true
+		}
+		return openclawScanLines(bytes.NewReader(plain)), true
+	}
 	openclawScanReads.Add(1)
 	fh, err := os.Open(p)
 	if err != nil {
-		return f
+		return f, true
 	}
 	defer fh.Close()
-	r := bufio.NewReaderSize(fh, 64<<10)
+	return openclawScanLines(fh), true
+}
+
+func openclawScanLines(src io.Reader) openclawSpawnScan {
+	var f openclawSpawnScan
+	r := bufio.NewReaderSize(src, 64<<10)
 	needle := []byte("childSessionKey")
 	for first := true; ; first = false {
 		line, err := r.ReadSlice('\n')

@@ -69,7 +69,8 @@ keeps in its own file (`$include`) and say what to add there by hand. Writing
 beside the `$include` made OpenClaw's own edits of that section land in
 openclaw.json instead of the included file. The launcher, plugin and hook pack
 those entries name are written before the refusal, doctor reads the included
-files, and uninstall names the entries it leaves there. An upgrade that moves
+files, switches and the conversation-access grant there included, and names
+the file a switch is in, and uninstall names the entries it leaves there. An upgrade that moves
 an entry to the launcher no longer says it replaced the same deja.
 
 An OpenClaw sub-agent on a JSONL store stays under the window that spawned

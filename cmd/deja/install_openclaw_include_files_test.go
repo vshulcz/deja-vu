@@ -183,3 +183,59 @@ func TestOpenClawDoctorReadsIncludedWiring(t *testing.T) {
 		t.Errorf("uninstall edited the included file:\n%s", got)
 	}
 }
+
+// A switch kept in an included file is OpenClaw's as much as one in
+// openclaw.json: doctor reported a wired, running deja while the included
+// file turned the MCP entry, the server list or the hook pack off (#5339).
+func TestOpenClawDoctorReadsSwitchesInIncludedFiles(t *testing.T) {
+	cfg := `{"mcp": {"$include": "./mcp.json5"}, "plugins": {"$include": "./plugins.json5"}, "hooks": {"$include": "./hooks.json5"}, "tools": {"$include": "./tools.json5"}}`
+	for name, tc := range map[string]struct {
+		file, body string
+		off        func() string // the line doctor prints, "" when on
+	}{
+		"tools.deny":             {"tools.json5", `{"deny": ["bundle-mcp"]}`, func() string { return clientMCPDenied("openclaw") }},
+		"hooks.internal.enabled": {"hooks.json5", `{"internal": {"enabled": false, "entries": {"deja-recall": {"enabled": true}}}}`, func() string { return clientHooksOff("openclaw") }},
+		"plugin grant":           {"plugins.json5", `{"entries": {"deja": {"enabled": true}}}`, func() string { return clientHooksOff("openclaw") }},
+		"mcp entry enabled": {"mcp.json5", `{"servers": {"deja": {"command": "deja", "args": ["mcp"], "enabled": false}}}`, func() string {
+			if dejaEntrySwitchedOff("openclaw", openclawConfigPath()) {
+				return "mcp.json5"
+			}
+			return ""
+		}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			ok := map[string]string{
+				"mcp.json5":     `{"servers": {"deja": {"command": "deja", "args": ["mcp"]}}}`,
+				"plugins.json5": `{"entries": {"deja": {"enabled": true, "hooks": {"` + openclawAccessKey + `": true}}}}`,
+				"hooks.json5":   `{"internal": {"enabled": true, "entries": {"deja-recall": {"enabled": true}}}}`,
+				"tools.json5":   `{}`,
+			}
+			openclawIncludeStand(t, cfg, ok)
+			t.Setenv("PATH", t.TempDir()) // the grant check asks the installed openclaw's version
+			if !doctorOpenClawWired(openclawConfigPath()) {
+				t.Fatal("the MCP entry in the included file reads as not wired")
+			}
+			if note := tc.off(); note != "" {
+				t.Fatalf("with every included file on, doctor reads a switch off: %s", note)
+			}
+			dir := filepath.Dir(openclawConfigPath())
+			if err := os.WriteFile(filepath.Join(dir, tc.file), []byte(tc.body), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			note := tc.off()
+			if note == "" {
+				t.Fatalf("%s in %s reads as on", name, tc.file)
+			}
+			if !strings.Contains(note, tc.file) {
+				t.Errorf("the line does not name %s, where the switch is: %s", tc.file, note)
+			}
+		})
+	}
+
+	// Two files in one $include: the line names the one that sets the switch.
+	openclawIncludeStand(t, `{"hooks": {"$include": ["./a.json5", "./b.json5"]}}`,
+		map[string]string{"a.json5": `{}`, "b.json5": `{"internal": {"enabled": false}}`})
+	if note := clientHooksOff("openclaw"); !strings.Contains(note, "b.json5") {
+		t.Errorf("the switch is in b.json5, the line says: %s", note)
+	}
+}

@@ -531,7 +531,10 @@ func EnsureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 			removedAny = true
 		}
 	}
-	if !removedAny && canAppendIncremental(changed, m.Files) && !promptLogTakeover(changed, m.Files, m.Sessions) {
+	// A file touched without being written is recorded, not read (#5324), so
+	// it does not turn an append into a handoff either.
+	dropTouched(changed, nil, m.Files)
+	if !removedAny && (len(changed) == 0 || canAppendIncremental(changed, m.Files) && !promptLogTakeover(changed, m.Files, m.Sessions)) {
 		mark("decide append")
 		// An append is cheap until it isn't. A live session that has been
 		// writing all day — a Grok `updates.jsonl` in the tens of megabytes —
@@ -4030,6 +4033,19 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 }
 
 func updateIndexOnce(dir, harness, scope string, files map[string]FileState, force bool, progress io.Writer) error {
+	return updateIndexPass(dir, harness, scope, files, force, true, progress)
+}
+
+// updateIndexPass is one pass. split lets it append what it can and hand the
+// rest to a second pass; that second pass replaces without splitting again, so
+// a file the append path keeps retrying cannot loop it.
+func updateIndexPass(dir, harness, scope string, files map[string]FileState, force, split bool, progress io.Writer) error {
+	// The walk as it came in: the pass below writes the kept files into files,
+	// and a second pass handed that map would take them for files put back.
+	var walked map[string]FileState
+	if split {
+		walked = maps.Clone(files)
+	}
 	defer readTo(files)()
 	defer sources.PinZstd()()
 	defer walkedThisPass(files)()
@@ -4095,6 +4111,8 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 			changed[p] = f
 		}
 	}
+	// Recorded with its new mtime through files, never read (#5324).
+	touched := dropTouched(changed, files, old.Files)
 	for p := range old.Files {
 		if p == syncImportPath {
 			continue
@@ -4273,15 +4291,18 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 		lastIngestFiles = 0
 		// Nothing to read, but the kept mark has to land, or the next run
 		// takes the same file for a fresh deletion.
-		if len(newlyKept) > 0 || !dated {
+		if len(newlyKept) > 0 || !dated || len(touched) > 0 {
 			for p := range newlyKept {
+				old.Files[p] = files[p]
+			}
+			for p := range touched {
 				old.Files[p] = files[p]
 			}
 			return writeManifestOnly(dir, old)
 		}
 		return nil
 	}
-	if len(removed) == 0 && !rewritten && canAppendIncremental(changed, old.Files) && !promptLogTakeover(changed, old.Files, old.Sessions) {
+	appendPass := func(files, changed map[string]FileState, last bool) error {
 		filesTouched, messages, unreadable, err := appendIncremental(dir, harness, scope, old, files, changed)
 		if IsCorrupt(err) {
 			if progress != nil {
@@ -4292,7 +4313,9 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 		if err != nil {
 			return fmt.Errorf("append: %w", err)
 		}
-		sayKept()
+		if last {
+			sayKept()
+		}
 		if progress != nil {
 			line := fmt.Sprintf("deja: updated %d file%s (%d new message%s)", filesTouched, pluralS(filesTouched), messages, pluralS(messages))
 			// After the first build every run a person sees is this one, so a
@@ -4305,6 +4328,19 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 			fmt.Fprintln(progress, line)
 		}
 		return nil
+	}
+	if len(removed) == 0 && !rewritten && !promptLogTakeover(changed, old.Files, old.Sessions) {
+		if canAppendIncremental(changed, old.Files) {
+			return appendPass(files, changed, true)
+		}
+		// Decided per file: the appendable ones are appended, and the pass
+		// after it, over the same walk, replaces only the rest (#5324).
+		if appendable, rest := splitAppendable(changed, old.Files); split && len(appendable) > 0 && len(rest) > 0 {
+			if err := appendPass(withoutRest(files, rest, old.Files), appendable, false); err != nil {
+				return err
+			}
+			return updateIndexPass(dir, harness, scope, walked, false, false, progress)
+		}
 	}
 	rereadSharedCopies(removed, changed, files, old.Sessions)
 	var replacements []model.Session
