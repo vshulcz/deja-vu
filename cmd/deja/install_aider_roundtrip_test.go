@@ -41,6 +41,7 @@ func TestAiderConfigRoundTrips(t *testing.T) {
 		{"own file with deja's name", "read:\n  - docs/aider-context.md\n  - aider-context.md\nmodel: x\n"},
 		{"deja's name under another key", "files:\n  - x/deja/aider-context.md\nread:\n  - C.md\n"},
 		{"blank line before column-0 items", "read:\n\n- C.md\nmodel: x\n"},
+		{"spaces-only line before column-0 items", "read:\n  \n- C.md\nmodel: x\n"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			home := t.TempDir()
@@ -264,6 +265,9 @@ func TestAiderEntryFollowsAnEmptyItemsIndent(t *testing.T) {
 	if got, _ = addAiderReadEntry("read:\n\n- C.md\n", "/x/aider-context.md"); got != "read:\n- /x/aider-context.md\n\n- C.md\n" {
 		t.Errorf("after a blank line: got %q", got)
 	}
+	if got, _ = addAiderReadEntry("read:\n  \n- C.md\n", "/x/aider-context.md"); got != "read:\n- /x/aider-context.md\n  \n- C.md\n" {
+		t.Errorf("after a spaces-only line: got %q", got)
+	}
 }
 
 // Doctor's wired check reads a scalar or flow read: by the same rule.
@@ -271,6 +275,7 @@ func TestAiderConfReadsContextByName(t *testing.T) {
 	for s, want := range map[string]bool{
 		"read: my-aider-context.md\n":                                           false,
 		"read: [docs/aider-context.md]\n":                                       false,
+		"read: [proj/deja/aider-context.md]\n":                                  false,
 		"read: ~/.config/deja/aider-context.md\n":                               true,
 		"read: [a.md, /h/.config/deja/aider-context.md]\n":                      true,
 		"read:\n  - 'C:\\Users\\u\\AppData\\Roaming\\deja\\aider-context.md'\n": true,

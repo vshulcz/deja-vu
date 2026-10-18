@@ -184,7 +184,14 @@ func addAiderReadEntry(s, ctx string) (string, error) {
 		return s + "read:\n" + entry, nil
 	}
 	// The reader's own indent, which may be none: one list cannot mix two.
-	if line, _, _ := strings.Cut(strings.TrimLeft(s[at:], "\n"), "\n"); strings.HasPrefix(strings.TrimLeft(line, " "), "- ") || strings.TrimSpace(line) == "-" {
+	line := ""
+	for _, l := range strings.Split(s[at:], "\n") {
+		if strings.TrimSpace(l) != "" {
+			line = l
+			break
+		}
+	}
+	if strings.HasPrefix(strings.TrimLeft(line, " "), "- ") || strings.TrimSpace(line) == "-" {
 		entry = line[:len(line)-len(strings.TrimLeft(line, " "))] + "- " + ctx + "\n"
 	}
 	return s[:at] + entry + s[at:], nil
@@ -353,7 +360,9 @@ func aiderContextName(item string) bool {
 	}
 	item = strings.Trim(strings.TrimSpace(item), `"'`)
 	item = strings.ReplaceAll(strings.ReplaceAll(item, `\\`, "/"), `\`, "/")
-	return path.Base(item) == "aider-context.md" && path.Base(path.Dir(item)) == "deja"
+	// deja writes the path absolute; a relative one is the reader's own file.
+	abs := strings.HasPrefix(item, "/") || strings.HasPrefix(item, "~/") || len(item) > 2 && item[1] == ':' && item[2] == '/'
+	return abs && path.Base(item) == "aider-context.md" && path.Base(path.Dir(item)) == "deja"
 }
 
 // removeAiderReadEntry takes deja's entry out of an LF config, and puts back
