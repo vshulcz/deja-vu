@@ -401,8 +401,15 @@ func hermesPluginsPreflight() error {
 		return err
 	}
 	e := hermesPluginsEdit{on: true}
-	if _, how := e.apply(lfText(old)); how == hermesPluginsUnreadable {
+	text := lfText(old)
+	next, how := e.apply(text)
+	if how == hermesPluginsUnreadable {
 		return hermesPluginsShapeError(path)
+	}
+	// A file the edit would change has to be writable before the plugin
+	// files go in, or a read-only config leaves the install half done.
+	if next != text || how == hermesPluginsMissing {
+		return configWritable(path)
 	}
 	return nil
 }

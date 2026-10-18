@@ -74,3 +74,33 @@ func TestAutoTargetWithAReadOnlyHooksFileWritesNothing(t *testing.T) {
 		t.Errorf("a refused target wrote config.toml:\n%s", got)
 	}
 }
+
+// hermes-auto on a read-only config.yaml whose MCP entry is already right:
+// the MCP step has nothing to write, so the refusal came from plugins.enabled
+// after the plugin files were already in.
+func TestHermesAutoOnAReadOnlyConfigWritesNoPluginFiles(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("the file mode is not enforced here")
+	}
+	hermeticEnv(t)
+	cfg := filepath.Join(sources.HermesHome(), "config.yaml")
+	if err := os.MkdirAll(filepath.Dir(cfg), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(cfg, []byte("model: hermes-3\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "install", "hermes", "--no-index", "--no-guidance"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(cfg, 0o444); err != nil {
+		t.Fatal(err)
+	}
+	_, err := captureRun(t, "install", "hermes-auto", "--no-index", "--no-guidance")
+	if err == nil || !strings.Contains(err.Error(), "read-only") {
+		t.Errorf("install did not refuse the read-only config: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(sources.HermesHome(), "plugins", "deja")); err == nil {
+		t.Errorf("a refused install wrote the plugin files")
+	}
+}
