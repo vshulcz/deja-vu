@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -605,10 +606,103 @@ func dshPatchWith(old, block string) (string, error) {
 	if dshHadArrayLine(old) || strings.Contains(old, dshArrayNote) {
 		block = strings.Replace(block, dshBlockStart+"\n", dshBlockStart+"\n"+dshArrayNote+"\n", 1)
 	}
-	if trimmed := stripDSHBlock(old); trimmed != "" {
-		return trimmed + "\n" + block + "\n", nil
+	// At the list's own indent: a column-0 row after `  - id: x` ends the
+	// list, and dsh refuses the file (#5181).
+	if pad := dshListIndent(old); pad != "" {
+		lines := strings.Split(block, "\n")
+		for i := range lines {
+			lines[i] = pad + lines[i]
+		}
+		block = strings.Join(lines, "\n")
 	}
-	return block + "\n", nil
+	// Where the block already stands, so a row the user wrote below it still
+	// comes after the insert it patches. dsh applies a layer in order and
+	// drops a patch whose id is not inserted yet: appending put the block under
+	// the user's `disabled: true` and deja ran again (#5180).
+	var out []string
+	at, skipping := -1, false
+	for _, line := range strings.Split(old, "\n") {
+		switch t := strings.TrimSpace(line); {
+		case strings.HasPrefix(t, dshBlockStart):
+			if at < 0 {
+				at = len(out)
+			}
+			skipping = true
+		case t == dshBlockEnd:
+			skipping = false
+		case skipping, t == "[]":
+		default:
+			out = append(out, line)
+		}
+	}
+	// A block an older install left after the closing `...` moves inside.
+	if end := dshDocumentEnd(out); at >= 0 && (end < 0 || at <= end) {
+		out = append(out[:at], append([]string{block}, out[at:]...)...)
+		return strings.TrimRight(strings.Join(out, "\n"), "\n") + "\n", nil
+	}
+	trimmed := strings.TrimRight(strings.Join(out, "\n"), "\n")
+	if trimmed == "" {
+		return block + "\n", nil
+	}
+	// Inside the document: after a closing `...` the block is a second
+	// document, and dsh takes exactly one (#5181).
+	if end := dshDocumentEnd(out); end >= 0 {
+		head := strings.TrimRight(strings.Join(out[:end], "\n"), "\n")
+		if head != "" {
+			head += "\n"
+		}
+		return head + block + "\n" + strings.TrimRight(strings.Join(out[end:], "\n"), "\n") + "\n", nil
+	}
+	return trimmed + "\n" + block + "\n", nil
+}
+
+// dshAnyRowDisabled reports whether dsh ends up with any of deja's rows off.
+func dshAnyRowDisabled(layer string) bool {
+	for _, id := range []string{"mcp-deja", "deja-command", "deja-auto", "deja-status", "deja-notes"} {
+		if dshRowDisabled(layer, id) {
+			return true
+		}
+	}
+	return false
+}
+
+// dshListIndent is the indent of the layer's top-level list: the first entry
+// outside deja's block.
+func dshListIndent(doc string) string {
+	in := false
+	for _, line := range strings.Split(doc, "\n") {
+		t := strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(t, dshBlockStart):
+			in = true
+		case t == dshBlockEnd:
+			in = false
+		case in || t == "" || strings.HasPrefix(t, "#"):
+		case t == "-" || strings.HasPrefix(t, "- "):
+			return line[:yamlIndentWidth(line)]
+		default:
+			if !strings.HasPrefix(line, "---") && !strings.HasPrefix(line, "%") {
+				return ""
+			}
+		}
+	}
+	return ""
+}
+
+// dshDocumentEnd is the index of the line that closes the document, `...`,
+// when only comments and blank lines follow it; -1 when there is none.
+func dshDocumentEnd(lines []string) int {
+	for i := len(lines) - 1; i >= 0; i-- {
+		t := strings.TrimSpace(lines[i])
+		switch {
+		case t == "" || strings.HasPrefix(t, "#"):
+		case lines[i] == "..." || strings.HasPrefix(lines[i], "... ") || strings.HasPrefix(lines[i], "...\t"):
+			return i
+		default:
+			return -1
+		}
+	}
+	return -1
 }
 
 // checkDSHMarkers reports whether deja's block can be bounded: both markers
@@ -683,11 +777,15 @@ func dshHadArrayLine(doc string) bool {
 }
 
 // dshLayerHasEntry reports whether a layer still carries anything YAML would
-// read as content — a line that is neither blank nor a comment.
+// read as content — a line that is neither blank, a comment, nor a document
+// marker or directive, which leave the document null all the same.
 func dshLayerHasEntry(doc string) bool {
 	for _, line := range strings.Split(doc, "\n") {
-		t := strings.TrimSpace(line)
-		if t != "" && !strings.HasPrefix(t, "#") {
+		t := strings.TrimSpace(strings.TrimSuffix(line, "\r"))
+		switch {
+		case t == "" || strings.HasPrefix(t, "#"), strings.HasPrefix(line, "%"):
+		case line == "---" || line == "..." || strings.HasPrefix(line, "--- #") || strings.HasPrefix(line, "... #"):
+		default:
 			return true
 		}
 	}
@@ -722,7 +820,7 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 		if err := checkDSHMarkers(lfText(old)); err != nil {
 			return installResult{}, err
 		}
-		rest := stripDSHBlock(string(old))
+		rest := stripDSHBlock(lfText(old))
 		if !dshLayerHasEntry(rest) && (strings.TrimSpace(rest) == "" || strings.Contains(string(old), dshArrayNote)) {
 			// An empty layer is the empty array, not an empty file or a
 			// comment alone: dsh parses either as null and refuses to load
@@ -730,11 +828,18 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 			// install replaced the array and said so inside its block, so
 			// uninstall puts it back under the comment (#3271). A file that
 			// never held one is handed back as it was.
-			rest = strings.TrimRight(rest, "\n")
-			if rest != "" {
-				rest += "\n"
+			// Inside the document, as install placed the block.
+			lines := strings.Split(strings.TrimRight(rest, "\n"), "\n")
+			if end := dshDocumentEnd(lines); end >= 0 {
+				lines = append(lines[:end], append([]string{"[]"}, lines[end:]...)...)
+				rest = strings.Join(lines, "\n")
+			} else {
+				rest = strings.TrimRight(rest, "\n")
+				if rest != "" {
+					rest += "\n"
+				}
+				rest += "[]"
 			}
-			rest += "[]"
 		}
 		a, err := writeIfChanged(path, old, []byte(rest+"\n"))
 		if err != nil {
@@ -761,6 +866,20 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 	patched, perr := dshPatchWith(lfText(old), block)
 	if perr != nil {
 		return installResult{}, perr
+	}
+	// So is one it cannot write: the refusal at the layer's own write came
+	// after three plugin directories, which doctor then called wired and
+	// uninstall, finding no block, left behind (#5182). A layer that already
+	// holds this block is not written at all, so the plugins still refresh.
+	if !bytes.Equal(matchFinalNewline(old, matchLineEndings(old, []byte(patched))), old) {
+		if err := configWritable(path); err != nil {
+			return installResult{}, err
+		}
+	}
+	// The note says deja stays off; a row of the user's below the block may
+	// turn it back on, and dsh applies that one last.
+	if note != "" && !dshAnyRowDisabled(patched) {
+		note = ""
 	}
 	if err := yamlWriteBreaks(path, old, []byte(patched)); err != nil {
 		return installResult{}, err
@@ -893,12 +1012,14 @@ func dshKeepSwitches(old, block string) (string, string) {
 		t := strings.TrimSpace(line)
 		switch {
 		case strings.HasPrefix(t, dshBlockStart):
-			in = true
+			in, row = true, ""
 		case t == dshBlockEnd:
 			in, row = false, ""
 		case !in:
 		case strings.HasPrefix(t, "- id:"):
 			row, field = hermesYAMLScalar(strings.TrimPrefix(t, "- id:")), yamlIndentWidth(line)+2
+		case strings.HasPrefix(t, "- ") && yamlIndentWidth(line) < field:
+			row = ""
 		case row != "" && yamlIndentWidth(line) == field:
 			if key, rest, ok := hermesKeyLine(line); ok && hermesKeyName(key) == "disabled" && strings.ToLower(hermesYAMLScalar(rest)) == "true" {
 				off[row] = true
