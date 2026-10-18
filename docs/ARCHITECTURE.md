@@ -23,7 +23,7 @@ against the loader list.
 | Grok Build | `grok.go` | ACP update streams and session summaries under `~/.grok/sessions` |
 | Qwen Code | `qwen.go` | JSONL chats under `~/.qwen/projects/*/chats` |
 | pi | `pi.go` | JSONL transcripts under `~/.pi/agent/sessions` |
-| Copilot CLI | `copilot.go` | `events.jsonl` per session under `~/.copilot/session-state` |
+| Copilot CLI | `copilot.go` | `events.jsonl` per session under `~/.copilot/session-state`; a `task` sub-agent's records (stamped `agentId`) read as a side chain of the session, a `/fork` as a fork of the session its `session.info` note names |
 | VS Code Copilot Chat | `copilot_chat.go`, `copilot_agent.go` | `.jsonl` / `.json` under VS Code User `workspaceStorage/*/chatSessions`, and the extension's own `GitHub.copilot-chat/transcripts/*.jsonl` |
 | Cline | `cline.go` | task JSON under the VS Code extension's storage, both store generations |
 | Continue | `continuedev.go` | one JSON document per session under `~/.continue/sessions`, with `sessions.json` as the list |

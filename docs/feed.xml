@@ -18,6 +18,13 @@
     <summary>deja search syntax: exact and phrase queries, natural language with stop words, fuzzy typo tolerance, confidence tiers, and optional local semantic recall.</summary>
   </entry>
   <entry>
+    <title>Where Copilot CLI stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/copilot.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/copilot.html"></link>
+    <updated>2026-10-18T00:00:00Z</updated>
+    <summary>Where Copilot CLI writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
+  <entry>
     <title>Where Kiro stores its history — session format</title>
     <id>https://vshulcz.github.io/deja-vu/registry/kiro.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/kiro.html"></link>
@@ -282,12 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html"></link>
     <updated>2026-10-14T00:00:00Z</updated>
     <summary>Claude Code, Codex, Cursor and Gemini CLI all forget between sessions. What each keeps on disk, what compaction preserves, and how to get history back.</summary>
-  </entry>
-  <entry>
-    <title>Find the coding session where you solved it — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/find-a-session.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/find-a-session.html"></link>
-    <updated>2026-10-14T00:00:00Z</updated>
-    <summary>How to search chat history across every coding agent on the machine, by the token you remember rather than the topic you half-remember.</summary>
   </entry>
 </feed>

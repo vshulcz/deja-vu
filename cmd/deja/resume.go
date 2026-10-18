@@ -338,6 +338,11 @@ func resumeCommand(s model.Session) (string, string, error) {
 	if s.Kind == "subagent" && (s.Harness == "kimi" || s.Harness == "qwen" || s.Harness == "muse" || s.Harness == "codebuddy" || s.Harness == "devin" || s.Harness == "gemini") && s.Parent != "" {
 		return "", "", fmt.Errorf("session %s is a sub-agent run, which %s does not reopen on its own — `deja resume %s` reopens the session that spawned it", digest.Short(s.ID), s.Harness, s.Parent)
 	}
+	// A Copilot CLI sub-agent runs inside its parent's log and Copilot marks it
+	// resumable: false; --resume=<agentId> names no session it has (#5216).
+	if s.Kind == "sidechain" && s.Harness == "copilot" && s.Parent != "" {
+		return "", "", fmt.Errorf("session %s is a sub-agent run, which copilot does not reopen on its own — `deja resume %s` reopens the session that spawned it", digest.Short(s.ID), s.Parent)
+	}
 	// Nor a Kimi /btw side question, which runs in a fork of the session it
 	// was asked in (#4484).
 	if s.Kind == "fork" && s.Harness == "kimi" && s.Parent != "" {

@@ -2,6 +2,7 @@ package sources
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -124,7 +125,36 @@ func parseCopilotScan(path string, offset int64, scan func(func(map[string]any))
 	}
 	// Which message holds each shell command, by the call id the completion
 	// event repeats: Copilot files the command and its outcome as two records.
-	commandAt := map[string][]int{}
+	type cmdRef struct {
+		s  *model.Session
+		at []int
+	}
+	commandAt := map[string]cmdRef{}
+	// A `task` sub-agent runs inside the parent's log, every record of it
+	// stamped with agentId. It is a session of its own, as Claude Code's
+	// sidechains are: read into the parent, the prompt the parent agent wrote
+	// for it was the person's turn and its edits were the parent's (#5216).
+	var children []*model.Session
+	childByID := map[string]*model.Session{}
+	// A /fork copies the source's records, its sub-agents' among them, and
+	// only then says it is a fork. The copied runs belong to the source,
+	// which has them under the same ids (#5217).
+	copied := map[string]bool{}
+	// When session.start says this session began.
+	var startAt time.Time
+	sessionFor := func(m map[string]any) *model.Session {
+		agent, _ := m["agentId"].(string)
+		if agent == "" {
+			return &s
+		}
+		c := childByID[agent]
+		if c == nil {
+			c = &model.Session{Harness: "copilot", ID: agent, Path: path, Kind: "sidechain"}
+			childByID[agent] = c
+			children = append(children, c)
+		}
+		return c
+	}
 	// Where the session runs, which a patch's relative paths are under. An
 	// incremental read starts past session.start, so it comes off the head,
 	// with the id, start and project a rebuild takes from there: an index run
@@ -138,6 +168,7 @@ func parseCopilotScan(path string, offset int64, scan func(func(map[string]any))
 			s.ID = head.id
 		}
 		s.Touch(head.started)
+		startAt = head.started
 		if cwd != "" {
 			s.Project = copilotProjectName(cwd)
 		}
@@ -146,7 +177,31 @@ func parseCopilotScan(path string, offset int64, scan func(func(map[string]any))
 		typ, _ := m["type"].(string)
 		data, _ := m["data"].(map[string]any)
 		t := parseTimeAny(m["timestamp"])
+		cur := sessionFor(m)
+		// A run from before this session started is a copy: /fork writes the
+		// source's records first and its note only after them, and an index
+		// pass in between would file the copy under the original's id.
+		if cur != &s && !startAt.IsZero() && !t.IsZero() && t.Before(startAt) {
+			copied[cur.ID] = true
+		}
 		switch typ {
+		case "subagent.started":
+			if name, _ := data["agentName"].(string); name != "" {
+				cur.Agent = name
+			} else if name, _ := data["agentDisplayName"].(string); name != "" {
+				cur.Agent = name
+			}
+		case "session.info":
+			if kind, _ := data["infoType"].(string); kind != "fork" || cur != &s {
+				return
+			}
+			msg, _ := data["message"].(string)
+			if src := copilotForkSource(msg); src != "" && src != s.ID {
+				s.Kind, s.Parent = "fork", src
+				for id := range childByID {
+					copied[id] = true
+				}
+			}
 		case "session.start":
 			if data == nil {
 				return
@@ -154,7 +209,12 @@ func parseCopilotScan(path string, offset int64, scan func(func(map[string]any))
 			if id, _ := data["sessionId"].(string); id != "" {
 				s.ID = id
 			}
-			s.Touch(parseTimeAny(data["startTime"]))
+			// The record's own time when startTime is missing: a fork's is
+			// the moment it was made, so the copies still read as older.
+			if startAt = parseTimeAny(data["startTime"]); startAt.IsZero() {
+				startAt = t
+			}
+			s.Touch(startAt)
 			if ctx, ok := data["context"].(map[string]any); ok {
 				if c, _ := ctx["cwd"].(string); c != "" {
 					cwd = c
@@ -170,8 +230,8 @@ func parseCopilotScan(path string, offset int64, scan func(func(map[string]any))
 			ok, _ := data["success"].(bool)
 			txt, _ := data["summaryContent"].(string)
 			if ok && strings.TrimSpace(txt) != "" {
-				s.Touch(t)
-				s.Messages = append(s.Messages, model.Message{Role: RoleSummary, Text: txt, Time: t})
+				cur.Touch(t)
+				cur.Messages = append(cur.Messages, model.Message{Role: RoleSummary, Text: txt, Time: t})
 			}
 		case "user.message", "assistant.message":
 			if data == nil {
@@ -181,13 +241,13 @@ func parseCopilotScan(path string, offset int64, scan func(func(map[string]any))
 			if typ == "assistant.message" {
 				role = "assistant"
 			}
-			s.Touch(t)
+			cur.Touch(t)
 			txt, _ := data["content"].(string)
 			if role == "user" {
 				txt = copilotStripSkillContext(txt)
 			}
 			if txt != "" {
-				s.Messages = append(s.Messages, model.Message{Role: role, Text: txt, Time: t})
+				cur.Messages = append(cur.Messages, model.Message{Role: role, Text: txt, Time: t})
 			}
 		case "tool.execution_start":
 			// The call carries the work: which file, what it replaced, what
@@ -206,8 +266,8 @@ func parseCopilotScan(path string, offset int64, scan func(func(map[string]any))
 			if body, ok := data["arguments"].(string); ok && name == "apply_patch" {
 				resolve := func(p string) string { return resolveToolPath(p, cwd) }
 				if records := applyPatchRecords(body, resolve, t); len(records) > 0 {
-					s.Touch(t)
-					s.Messages = append(s.Messages, records...)
+					cur.Touch(t)
+					cur.Messages = append(cur.Messages, records...)
 				}
 				return
 			}
@@ -244,7 +304,7 @@ func parseCopilotScan(path string, offset int64, scan func(func(map[string]any))
 			if len(records) == 0 {
 				return
 			}
-			s.Touch(t)
+			cur.Touch(t)
 			if id, _ := data["toolCallId"].(string); id != "" && len(cmdAt) > 0 {
 				// Assigned, not appended: an id reused for a later call would
 				// otherwise carry the first call's commands too, and the second
@@ -252,11 +312,11 @@ func parseCopilotScan(path string, offset int64, scan func(func(map[string]any))
 				// (review of #3369).
 				at := make([]int, 0, len(cmdAt))
 				for _, i := range cmdAt {
-					at = append(at, len(s.Messages)+i)
+					at = append(at, len(cur.Messages)+i)
 				}
-				commandAt[id] = at
+				commandAt[id] = cmdRef{s: cur, at: at}
 			}
-			s.Messages = append(s.Messages, records...)
+			cur.Messages = append(cur.Messages, records...)
 		case "tool.execution_complete":
 			// Kept whether or not the call succeeded: the error a command hit
 			// is exactly what a later search reaches for, and copilot's own
@@ -272,9 +332,11 @@ func parseCopilotScan(path string, offset int64, scan func(func(map[string]any))
 			// trailer inside the output (#3369).
 			if code := copilotExitCode(data, out); code > 0 {
 				if id, _ := data["toolCallId"].(string); id != "" {
-					for _, i := range commandAt[id] {
-						if i < len(s.Messages) {
-							s.Messages[i].Text += fmt.Sprintf("  → exit %d", code)
+					if c := commandAt[id]; c.s != nil {
+						for _, i := range c.at {
+							if i < len(c.s.Messages) {
+								c.s.Messages[i].Text += fmt.Sprintf("  → exit %d", code)
+							}
 						}
 					}
 					// Consumed: one outcome belongs to one call.
@@ -284,14 +346,29 @@ func parseCopilotScan(path string, offset int64, scan func(func(map[string]any))
 			if out = strings.TrimSpace(out); out == "" {
 				return
 			}
-			s.Touch(t)
-			s.Messages = append(s.Messages, model.Message{Role: RoleToolOutput, Text: out, Time: t})
+			cur.Touch(t)
+			cur.Messages = append(cur.Messages, model.Message{Role: RoleToolOutput, Text: out, Time: t})
 		}
 	})
-	if len(s.Messages) == 0 {
-		return nil, err
+	var out []model.Session
+	if len(s.Messages) > 0 {
+		out = append(out, s)
 	}
-	return []model.Session{s}, err
+	// The same rule as Claude Code's sub-agent files: by default the task,
+	// the last turns and what the run changed; all of it with
+	// DEJA_INCLUDE_SUBAGENTS=1, none of it with =0.
+	include := os.Getenv("DEJA_INCLUDE_SUBAGENTS")
+	for _, c := range children {
+		if include == "0" || copied[c.ID] || len(c.Messages) == 0 {
+			continue
+		}
+		if include != "1" {
+			c.Messages = KeepSubagentTail(c.Messages)
+		}
+		c.Parent, c.Project = s.ID, s.Project
+		out = append(out, *c)
+	}
+	return out, err
 }
 
 // jsonInt reads a number the scanner decoded with UseNumber, and the two other
@@ -322,9 +399,9 @@ func jsonInt(v any) (int, bool) {
 // whole shape rather than the phrase.
 var copilotShellExitRe = regexp.MustCompile(`<shellId:[^>]*completed with exit code (\d+)>`)
 
-// copilotResumes sends an event log back for a whole read when its tail holds
-// the failed exit of a command started before it (#4443).
-var copilotResumes = resumesUnlessAnswering(`"tool.execution_`, func(m map[string]any) ([]string, string) {
+// copilotExitResumes sends an event log back for a whole read when its tail
+// holds the failed exit of a command started before it (#4443).
+var copilotExitResumes = resumesUnlessAnswering(`"tool.execution_`, func(m map[string]any) ([]string, string) {
 	data, _ := m["data"].(map[string]any)
 	id, _ := data["toolCallId"].(string)
 	switch typ, _ := m["type"].(string); typ {
@@ -339,6 +416,28 @@ var copilotResumes = resumesUnlessAnswering(`"tool.execution_`, func(m map[strin
 	}
 	return nil, ""
 })
+
+// copilotResumes also reads the log whole when its tail closes a sub-agent
+// run, ends or reopens the session, or holds a fork's note. A run cut off
+// without its subagent.completed (a crash, Ctrl-C) heals at the session's
+// shutdown or its next resume. A run is cut to its task, last turns and edits
+// once it is whole, which a tail cannot do, and its records in between are
+// appended as they come; a fork's note says which runs before it are copies of
+// its source's (#5216, #5217). Every other tail, a run's middle included, is
+// read on its own: a whole read on each pass of a long run cost seconds.
+func copilotResumes(path string, offset int64) bool {
+	if !copilotExitResumes(path, offset) {
+		return false
+	}
+	ok := true
+	_ = scanJSONLBytes(path, offset, func(line []byte) {
+		if ok && (bytes.Contains(line, []byte(`"subagent.completed"`)) || bytes.Contains(line, []byte(`"infoType":"fork"`)) ||
+			bytes.Contains(line, []byte(`"session.shutdown"`)) || bytes.Contains(line, []byte(`"session.resume"`))) {
+			ok = false
+		}
+	})
+	return ok
+}
 
 // copilotExitCode reads what a shell call actually did. The telemetry carries
 // the number when Copilot recorded one; the trailer under the output is the
@@ -384,8 +483,9 @@ func copilotReadHead(path string) copilotHead {
 	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for i := 0; i < 8 && sc.Scan(); i++ {
 		var rec struct {
-			Type string `json:"type"`
-			Data struct {
+			Type      string `json:"type"`
+			Timestamp any    `json:"timestamp"`
+			Data      struct {
 				SessionID string `json:"sessionId"`
 				StartTime any    `json:"startTime"`
 				Context   struct {
@@ -394,7 +494,11 @@ func copilotReadHead(path string) copilotHead {
 			} `json:"data"`
 		}
 		if json.Unmarshal(sc.Bytes(), &rec) == nil && rec.Type == "session.start" {
-			return copilotHead{id: rec.Data.SessionID, cwd: rec.Data.Context.CWD, started: parseTimeAny(rec.Data.StartTime)}
+			started := parseTimeAny(rec.Data.StartTime)
+			if started.IsZero() {
+				started = parseTimeAny(rec.Timestamp)
+			}
+			return copilotHead{id: rec.Data.SessionID, cwd: rec.Data.Context.CWD, started: started}
 		}
 	}
 	return copilotHead{}
