@@ -264,7 +264,7 @@ func (tr *traeTurns) tool(s *model.Session, item map[string]any, cwd string, t t
 		if traeClaudeTool(s, item, t) {
 			return
 		}
-		codexCall(s, traeShellCall(item), calls, t)
+		codexCall(s, traeShellCall(item), calls, cwd, t)
 	case "function_call_output", "custom_tool_call_output":
 		codexCallOutput(s, traeOutput(item), calls, t)
 	case "custom_tool_call":
