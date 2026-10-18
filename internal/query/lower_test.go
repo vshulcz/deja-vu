@@ -49,3 +49,17 @@ func TestYoPronounStaysAStopWord(t *testing.T) {
 		}
 	}
 }
+
+func TestIsRussianTakesOnlyTheRussianAlphabet(t *testing.T) {
+	for _, tc := range []struct {
+		in   string
+		want bool
+	}{
+		{"лимит", true}, {"ёлка", true}, {"Ярлык", true}, {"limit", false},
+		{"", false}, {"שלום", false}, {"日本", false}, {"😀", false}, {"ӣ", false},
+	} {
+		if got := IsRussian(tc.in); got != tc.want {
+			t.Errorf("IsRussian(%q) = %v, want %v", tc.in, got, tc.want)
+		}
+	}
+}

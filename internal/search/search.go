@@ -23,6 +23,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/query"
 	"github.com/vshulcz/deja-vu/internal/redact"
+	"github.com/vshulcz/deja-vu/internal/rustem"
 	"github.com/vshulcz/deja-vu/internal/termwidth"
 )
 
@@ -144,13 +145,22 @@ const (
 	bm25K1        = 1.2
 	bm25B         = 0.75
 	userRoleBoost = 1.3
+	// surfaceBonus lifts a Russian term's weight in a session that holds it in
+	// the form the query typed. Every form of the word counts toward the term
+	// frequency (лимиты finds лимит запросов); the typed form is a little more
+	// likely to be the phrase that was meant, and only a little: a bigger bonus
+	// would bring back the form-blind ranking the stem keys exist to undo.
+	surfaceBonus = 0.1
 )
 
 type bm25Document struct {
 	hit       Hit
 	termCount []int
 	userCount []int
-	length    int
+	// surface counts the words matching a Russian term as typed, for
+	// surfaceBonus; it stays zero for a term without other forms.
+	surface []int
+	length  int
 	// minWindow is the tightest character span containing every query token
 	// inside a single message; 0 means never seen together.
 	minWindow int
@@ -254,7 +264,7 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 		// same idea at two scopes, and an agent reading a hit gets the tier from
 		// here (#1616).
 		tier := setTier(o)
-		doc := bm25Document{hit: Hit{Session: s, Tier: tier}, termCount: make([]int, len(qtoks)), userCount: make([]int, len(qtoks))}
+		doc := bm25Document{hit: Hit{Session: s, Tier: tier}, termCount: make([]int, len(qtoks)), userCount: make([]int, len(qtoks)), surface: make([]int, len(qtoks))}
 		if s.Title != "" && len(qtoks) > 0 {
 			titleLow := lower(s.Title)
 			for _, tok := range qtoks {
@@ -266,6 +276,7 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 		if len(qtoks) == 0 {
 			doc.termCount = []int{0}
 			doc.userCount = []int{0}
+			doc.surface = []int{0}
 		}
 		snipCands = snipCands[:0]
 		for mi, m := range s.Messages {
@@ -333,7 +344,7 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 				// strongest few become the excerpts after the scan. Taking the
 				// first three showed wherever a word happened to appear early
 				// rather than the passage that carries the answer.
-				w := tokenWindow(windowText, windowToks)
+				w := tokenWindow(windowText, presentTokens(windowText, windowToks, o.FuzzyVariants))
 				snipCands = append(snipCands, snipCand{text: text, weight: c, window: w, at: mi, when: m.Time,
 					dump: m.Role == roleToolOutput && isDataDump(text)})
 				if w > 0 && (doc.minWindow == 0 || w < doc.minWindow) {
@@ -344,7 +355,7 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 			// is counted above through the fold and, scored against the surface
 			// text where the query's words appear nowhere, would take a term
 			// frequency of zero and rank below a record that matched once.
-			doc.length += countDocumentWords(scoreLow, scoreToks, o.FuzzyVariants, doc.termCount, doc.userCount, m.Role == "user")
+			doc.length += countDocumentWords(scoreLow, scoreToks, o.FuzzyVariants, doc.termCount, doc.userCount, doc.surface, m.Role == "user")
 			// The token, not the raw query — the same rule as countIn. This
 			// path is what scores `retry` inside `retry-backoff`, which
 			// countDocumentWords cannot match because it counts whole words
@@ -693,6 +704,9 @@ func scoreBM25(documents []bm25Document, df []int, corpusDocuments int, avgLengt
 			term := idf * (float64(tf) * (bm25K1 + 1)) / (float64(tf) + bm25K1*norm)
 			if doc.userCount[i] > 0 {
 				term += idf * (float64(doc.userCount[i]) * (bm25K1 + 1)) / (float64(tf) + bm25K1*norm) * (userRoleBoost - 1)
+			}
+			if i < len(doc.surface) && doc.surface[i] > 0 {
+				term *= 1 + surfaceBonus
 			}
 			score += term
 		}
@@ -1268,7 +1282,7 @@ func titleBoost(titleHits, queryTokenCount int) float64 {
 	return 1 + 0.4*float64(titleHits)/float64(queryTokenCount)
 }
 
-func countDocumentWords(s string, terms []string, variants map[string][]string, counts, userCounts []int, user bool) int {
+func countDocumentWords(s string, terms []string, variants map[string][]string, counts, userCounts, surface []int, user bool) int {
 	length := 0
 	start := -1
 	// cjk counts the characters of a run written in a script without spaces, and
@@ -1313,12 +1327,15 @@ func countDocumentWords(s string, terms []string, variants map[string][]string, 
 			cjk, other = 0, 0
 			for j, term := range terms {
 				matched := word == term
+				if matched && surface != nil && len(variants[term]) > 0 && query.IsRussian(term) {
+					surface[j]++
+				}
 				if !matched {
 					// A word matching a fuzzy/stem variant of this term counts
 					// toward its term frequency so BM25 ranks the hit instead of
 					// falling back to recency-only order.
 					for _, v := range variants[term] {
-						if word == v {
+						if word == v || stemForm(word, v) {
 							matched = true
 							break
 						}
@@ -3328,3 +3345,39 @@ func unsafeForTerminal(r rune) bool {
 
 // lower is the text fold both sides of a match use: lowercase plus ё→е.
 func lower(s string) string { return query.Lower(s) }
+
+// stemForm reports whether word is a form of the Russian word whose stem is
+// stem. A stem variant is not itself a word of the text, so an inflected form
+// never equalled it; the stem is a prefix of every form, which keeps the
+// stemmer off the words that cannot match.
+func stemForm(word, stem string) bool {
+	return len(word) > len(stem) && query.IsRussian(stem) && strings.HasPrefix(word, stem) && rustem.HasKey(word, stem)
+}
+
+// presentTokens is qtoks with each Russian word the message does not contain as
+// typed replaced by the variant it does contain. Proximity looks for the query's
+// words in the text; a message that has them in another form (скрипт for
+// скрипты) reported words that never meet and lost the boost to a long message
+// that scatters the same words. English variants are left as they were.
+func presentTokens(low string, qtoks []string, variants map[string][]string) []string {
+	if len(variants) == 0 {
+		return qtoks
+	}
+	out := qtoks
+	for i, tok := range qtoks {
+		vs := variants[tok]
+		if len(vs) == 0 || strings.Contains(low, tok) {
+			continue
+		}
+		for _, v := range vs {
+			if query.IsRussian(v) && strings.Contains(low, v) {
+				if &out[0] == &qtoks[0] {
+					out = append([]string(nil), qtoks...)
+				}
+				out[i] = v
+				break
+			}
+		}
+	}
+	return out
+}

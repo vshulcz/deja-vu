@@ -364,7 +364,11 @@ func planIsIdentifierTerm(t string) bool {
 }
 
 func planTermSessions(dir, term string) map[uint32]bool {
-	keys := queryKeys(term)
+	stems := false
+	if m, err := readManifestCached(dir); err == nil {
+		stems = m.Version >= stemKeysSince
+	}
+	keys := queryKeysFor(term, stems)
 	if len(keys) == 0 {
 		return nil
 	}

@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/vshulcz/deja-vu/internal/rustem"
 )
 
 var stopWords = map[string]bool{
@@ -36,6 +38,17 @@ var stopWords = map[string]bool{
 	"можно": true, "может": true, "давай": true, "сделай": true,
 	"делай": true, "делать": true, "сделать": true, "скажи": true,
 	"говори": true, "покажи": true, "посмотри": true, "пожалуйста": true,
+}
+
+// ruStopStems are Snowball stems of Russian filler verbs, so every form of the
+// verb is dropped, not only the imperative the surface list above holds
+// (делали, покажите, посмотрите, давайте). A stem is shared with whatever else
+// stems to it, so each one was checked against content words: дела (делать)
+// is not дел (дело), покаж (показать) is not показател; быть stays in the
+// surface list because its stem is the noun быт.
+var ruStopStems = map[string]bool{
+	"дела": true, "сдела": true, "дава": true, "скаж": true, "сказа": true,
+	"покаж": true, "показа": true, "посмотр": true, "говор": true,
 }
 
 // Options is one search request: what to look for and what to narrow it to.
@@ -169,12 +182,17 @@ func (o Options) ProjectWants() []string {
 // IsStopWord reports whether a token is a query-time stop word. Retrieval
 // key selection uses it so a long stop word like "before" cannot displace a
 // short content token in the AND intersection.
-func IsStopWord(term string) bool { return stopWords[term] }
+func IsStopWord(term string) bool {
+	if stopWords[term] {
+		return true
+	}
+	return IsRussian(term) && len([]rune(term)) >= 3 && ruStopStems[rustem.Stem(term)]
+}
 
 func withoutStopWords(terms []string) []string {
 	kept := make([]string, 0, len(terms))
 	for _, term := range terms {
-		if !stopWords[term] {
+		if !IsStopWord(term) {
 			kept = append(kept, term)
 		}
 	}

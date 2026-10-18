@@ -28,6 +28,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/nfcfold"
 	"github.com/vshulcz/deja-vu/internal/query"
 	"github.com/vshulcz/deja-vu/internal/redact"
+	"github.com/vshulcz/deja-vu/internal/rustem"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -2080,6 +2081,11 @@ func eachIndexKey(text string, when time.Time, fn func(tok string)) {
 func textKeys(text string, emit func(tok string)) {
 	for _, tok := range tokens(text) {
 		emit("t" + tok)
+		if isCyrillicWord(tok) && utf8.RuneCountInString(tok) >= 3 {
+			for _, st := range rustem.Keys(tok) {
+				emit("s" + st)
+			}
+		}
 	}
 	for _, part := range identifierParts(text) {
 		emit("t" + part)

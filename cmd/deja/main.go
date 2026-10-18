@@ -1197,7 +1197,7 @@ func cmdCtx(dir string, rest []string) error {
 		o.Fuzzy = true
 		o.FuzzyVariants = result.Variants
 	}
-	if result.Tier == search.TierClose && o.FuzzyVariants == nil {
+	if (result.Tier == search.TierClose || result.Keyed) && o.FuzzyVariants == nil {
 		o.FuzzyVariants = result.Variants
 	}
 	var hits []search.Hit
@@ -1681,7 +1681,7 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 		o.Fuzzy = true
 		o.FuzzyVariants = result.Variants
 	}
-	if result.Tier == search.TierClose && o.FuzzyVariants == nil {
+	if (result.Tier == search.TierClose || result.Keyed) && o.FuzzyVariants == nil {
 		o.FuzzyVariants = result.Variants
 	}
 	var hits []search.Hit
@@ -1984,7 +1984,15 @@ func otherWordFormsNote(dir string, o query.Options, hits []search.Hit) string {
 	if o.Regex || o.Tier != search.TierExact || len(hits) == 0 {
 		return ""
 	}
-	terms := query.Tokens(o.Query)
+	var terms []string
+	for _, t := range query.Tokens(o.Query) {
+		// A Cyrillic word is filed under its stem as well, so the exact tier
+		// has already reached every form of it; the note would name forms the
+		// answer holds.
+		if !query.IsRussian(t) {
+			terms = append(terms, t)
+		}
+	}
 	if len(terms) == 0 || len(terms) > 4 {
 		return ""
 	}

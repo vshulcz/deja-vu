@@ -49,6 +49,13 @@ Kimi included. pi 0.99 and later need no MCP adapter, and
 that says «еще» and the other way round. The index format moves to version 84,
 so the first run rebuilds it.
 
+Russian word forms are one word to search. Each Russian word is also filed
+under its Snowball stem (`internal/rustem`, a pure-Go port checked against all
+49,785 words of the official vocabulary), so «лимиты запроса» finds a session
+that says «лимит запросов», and the form the query typed earns a small bonus.
+Russian stop words are matched by stem. The index format moves to version 85,
+so the first run rebuilds it, and the index grows by about 15%.
+
 ## [0.22.2] - 2026-10-17
 
 deja now reads Windsurf / Devin Desktop: Cascade's encrypted conversation

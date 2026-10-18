@@ -59,7 +59,7 @@ func tuiSearch(dir string, o search.Options) ([]search.Hit, error) {
 		o.Fuzzy = true
 		o.FuzzyVariants = result.Variants
 	}
-	if result.Tier == search.TierClose && o.FuzzyVariants == nil {
+	if (result.Tier == search.TierClose || result.Keyed) && o.FuzzyVariants == nil {
 		o.FuzzyVariants = result.Variants
 	}
 	d, err := search.RunDetailed(ss, o)

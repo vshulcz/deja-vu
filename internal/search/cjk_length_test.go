@@ -75,15 +75,15 @@ func TestLongASCIIAsideStillLosesByTheSameMargin(t *testing.T) {
 // document too.
 func TestDocumentLengthUnitPerScript(t *testing.T) {
 	counts, userCounts := make([]int, 1), make([]int, 1)
-	if got := countDocumentWords("we moved the scheduler to its own process", nil, nil, counts, userCounts, false); got != 8 {
+	if got := countDocumentWords("we moved the scheduler to its own process", nil, nil, counts, userCounts, nil, false); got != 8 {
 		t.Errorf("English length = %d, want its 8 words", got)
 	}
 	// 我们把调度器移到了单独的进程 is 14 characters and no spaces.
-	if got := countDocumentWords("我们把调度器移到了单独的进程", nil, nil, counts, userCounts, false); got != 14 {
+	if got := countDocumentWords("我们把调度器移到了单独的进程", nil, nil, counts, userCounts, nil, false); got != 14 {
 		t.Errorf("Chinese length = %d, want its 14 characters", got)
 	}
 	// A run with both in it is one word plus three characters, not three.
-	if got := countDocumentWords("scheduler調度器", nil, nil, counts, userCounts, false); got != 4 {
+	if got := countDocumentWords("scheduler調度器", nil, nil, counts, userCounts, nil, false); got != 4 {
 		t.Errorf("mixed-run length = %d, want 4: the English half counts too", got)
 	}
 }

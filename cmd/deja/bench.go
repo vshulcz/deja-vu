@@ -162,7 +162,7 @@ func measureRecall(dir string, queries []bench.Query, client *embed.Client) (ben
 			return benchMetric{}, fmt.Errorf("benchmark query %q: %w", q.Text, err)
 		}
 		o := search.Options{Query: q.Text, All: true}
-		if result.Fuzzy || result.Stemmed {
+		if result.Fuzzy || result.Stemmed || result.Keyed {
 			o.Fuzzy = true
 			o.FuzzyVariants = result.Variants
 		}

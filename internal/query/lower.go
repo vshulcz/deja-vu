@@ -13,3 +13,11 @@ func Lower(s string) string {
 	}
 	return strings.ReplaceAll(s, "ё", "е")
 }
+
+// IsRussian reports whether s starts with a letter of the Russian alphabet.
+// Every one of them, ё included, is two bytes led by 0xd0 or 0xd1 in UTF-8;
+// Hebrew, Arabic, CJK and emoji lead with higher bytes and stay out of the
+// stemmer.
+func IsRussian(s string) bool {
+	return len(s) >= 2 && (s[0] == 0xd0 || s[0] == 0xd1)
+}

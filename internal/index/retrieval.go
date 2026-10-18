@@ -24,6 +24,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/nfcfold"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/query"
+	"github.com/vshulcz/deja-vu/internal/rustem"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -121,7 +122,8 @@ func searchDetailedRead(dir string, o query.Options) (SearchResult, error) {
 	fallbackTier := query.TierExact
 	usedPostings := false
 	if !o.Regex {
-		if keys := queryKeys(o.Query); len(keys) > 0 {
+		stems := m.Version >= stemKeysSince
+		if keys := queryKeysFor(o.Query, stems); len(keys) > 0 {
 			usedPostings = true
 			posts, err = intersectPostings(dir, retrievalKeys(keys))
 			if err != nil {
@@ -290,7 +292,10 @@ func searchDetailedRead(dir string, o query.Options) (SearchResult, error) {
 	if err != nil {
 		return SearchResult{}, err
 	}
-	return withRelevanceTail(dir, m, o, SearchResult{Sessions: ss, Tier: fallbackTier, Variants: fallbackVariants})
+	// The postings matched on stems, so the scorer downstream must count any
+	// form of a word, not only the one the reader typed.
+	vars := withStemVariants(m, o, fallbackVariants)
+	return withRelevanceTail(dir, m, o, SearchResult{Sessions: ss, Tier: fallbackTier, Variants: vars, Keyed: len(vars) > len(fallbackVariants)})
 }
 
 // sessionKeySet keys sessions the way StrictIDs is keyed, for the paths that
@@ -1306,7 +1311,8 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 	// word among typos, and the project-scoped recall answered nothing (#4789).
 	termsKnown := 0
 	for _, term := range terms {
-		keys := queryKeys(term)
+		stems := m.Version >= stemKeysSince
+		keys := queryKeysFor(term, stems)
 		if len(keys) == 0 {
 			continue
 		}
@@ -1314,7 +1320,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		// "camped" must score sessions that say "camping". Multi-token
 		// terms keep strict AND semantics below.
 		var orKeys []string
-		if len(keys) == 1 {
+		if len(keys) == 1 && !(stems && keys[0][0] == 's') {
 			seenForm := map[string]bool{keys[0]: true}
 			orKeys = []string{keys[0]}
 			for _, form := range stemMatchForms(term) {
@@ -1820,7 +1826,7 @@ func FirstMatch(dir string, queries []string, limit int) ([]model.Session, strin
 		return nil, "", fmt.Errorf("%w: records.bin size does not match the manifest (crash-truncated or uncommitted tail)", errCorruptIndex)
 	}
 	for _, q := range queries {
-		keys := queryKeys(q)
+		keys := queryKeysFor(q, m.Version >= stemKeysSince)
 		if len(keys) == 0 {
 			continue
 		}
@@ -3126,7 +3132,7 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 	// Built once: the query side of the check does not change between records,
 	// and this loop runs over every record a query without postings reaches
 	// (#1885).
-	matcher := newRecordMatcher(o, variants)
+	matcher := newRecordMatcher(o, withStemVariants(m, o, variants))
 	if len(offsets) > 0 {
 		f, err := openIndexFile(filepath.Join(dir, "records.bin"))
 		if err != nil {
@@ -3633,7 +3639,10 @@ func intersectSubstringPostingsDetailed(dir string, bare []string) ([]posting, m
 			return nil, nil, err
 		}
 		for _, e := range entries {
-			tok := strings.TrimPrefix(e.tok, "t")
+			if !strings.HasPrefix(e.tok, "t") {
+				continue
+			}
+			tok := e.tok[1:]
 			for i, b := range bare {
 				if !strings.Contains(tok, b) {
 					continue
@@ -4344,7 +4353,11 @@ func tokenCatalog(dir string) (map[string]bool, error) {
 			return nil, err
 		}
 		for _, entry := range header {
-			catalog[strings.TrimPrefix(entry.tok, "t")] = true
+			// Stem keys ("s"+stem) are index plumbing, not words anybody wrote.
+			if !strings.HasPrefix(entry.tok, "t") {
+				continue
+			}
+			catalog[entry.tok[1:]] = true
 		}
 		_ = f.Close()
 	}
@@ -4744,7 +4757,14 @@ func retrievalKeys(keys []string) []string {
 	return keys[:8]
 }
 
-func queryKeys(s string) []string {
+// queryKeys builds the keys of a query without stem keys, the way they were
+// built before stemKeysSince; the tests of the plain key list use it.
+func queryKeys(s string) []string { return queryKeysFor(s, false) }
+
+// queryKeysFor builds the lookup keys of a query. With stems on, a Cyrillic word
+// is looked up by its stem key, so every form of the lemma lands on one key;
+// the index holds those keys from version stemKeysSince on.
+func queryKeysFor(s string, stems bool) []string {
 	toks := query.ExpandCJKTokens(tokens(s))
 	if len(toks) == 0 {
 		return nil
@@ -4768,6 +4788,10 @@ func queryKeys(s string) []string {
 	for _, tok := range content {
 		// Mirror of indexKeys: the posting side is folded, so the query side
 		// must be too.
+		if st, ok := stemKey(tok); ok && stems {
+			out = append(out, "s"+st)
+			continue
+		}
 		out = append(out, "t"+cjkfold.String(tok))
 	}
 	return out
@@ -5395,6 +5419,62 @@ func rerankByBestMessage(ss []model.Session, terms []string, idf map[string]floa
 	out := make([]model.Session, len(ss))
 	for i, j := range idx {
 		out[i] = ss[j]
+	}
+	return out
+}
+
+// stemKeysSince is the first index version that holds a stem key ("s"+stem)
+// beside every surface key of a Cyrillic word.
+const stemKeysSince = 85
+
+// isCyrillicWord reports a token made of Cyrillic letters only.
+func isCyrillicWord(tok string) bool {
+	for _, r := range tok {
+		if r < 'а' || r > 'я' {
+			if r != 'ё' {
+				return false
+			}
+		}
+	}
+	return tok != ""
+}
+
+// stemKey returns the stem of a Cyrillic word of three letters or more, the
+// word the index keys by lemma.
+func stemKey(tok string) (string, bool) {
+	if !isCyrillicWord(tok) || utf8.RuneCountInString(tok) < 3 {
+		return "", false
+	}
+	st := rustem.Root(tok)
+	return st, true
+}
+
+// withStemVariants lets the record check accept any form of a query word: the
+// postings matched on the stem, and the stem is a prefix of every form.
+func withStemVariants(m Manifest, o query.Options, variants map[string][]string) map[string][]string {
+	if m.Version < stemKeysSince || o.Regex {
+		return variants
+	}
+	terms, _ := query.QueryParts(o.Query)
+	var out map[string][]string
+	for _, t := range terms {
+		var extra []string
+		if st, ok := stemKey(t); ok && st != t {
+			extra = append(extra, st)
+		}
+		if len(extra) == 0 {
+			continue
+		}
+		if out == nil {
+			out = make(map[string][]string, len(variants)+len(terms))
+			for k, v := range variants {
+				out[k] = v
+			}
+		}
+		out[t] = append(append([]string(nil), out[t]...), extra...)
+	}
+	if out == nil {
+		return variants
 	}
 	return out
 }
