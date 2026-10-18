@@ -193,8 +193,13 @@
 <p>built-in <code>kiro_default</code> takes no hooks from a file (a <code>kiro_default.json</code> is</p>
 <p>ignored), and deja does not switch <code>chat.defaultAgent</code>, which would trade</p>
 <p>the default agent&#39;s prompt for its own. <code>deja doctor</code> reads the row as</p>
-<p><code>installed</code> until <code>chat.defaultAgent</code> is <code>deja</code>, and uninstall removes that</p>
-<p>setting when it names deja&#39;s agent. The IDE&#39;s <code>.kiro/hooks/</code> are a</p>
+<p><code>installed</code> until <code>chat.defaultAgent</code> is <code>deja</code> and that agent file still</p>
+<p>runs deja&#39;s hooks (kiro-cli falls back to <code>kiro_default</code> when it is gone,</p>
+<h1 id="5200-and-uninstall-removes-that-setting-when-it-names-deja-s-agent">5200), and uninstall removes that setting when it names deja&#39;s agent.</h1>
+<p>kiro-cli edits the agent in place — <code>kiro-cli mcp add --agent deja</code> adds a</p>
+<p>server, <code>kiro-cli agent upgrade</code> turns the hooks into a list — so install</p>
+<p>and uninstall touch only deja&#39;s keys and hook entries, in either shape, and</p>
+<p>uninstall keeps the file while something of the reader&#39;s is in it (#5199). The IDE&#39;s <code>.kiro/hooks/</code> are a</p>
 <p>different system: per workspace, fired on file events (#4304).</p>
 <ul>
 <li>Sub-agents: 2.32&#39;s <code>subagent</code> tool runs each stage as a session of its own,</li>

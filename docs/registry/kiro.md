@@ -133,8 +133,13 @@ row of `conversations_v2` keyed by the directory it ran in, and the row's JSON
   built-in `kiro_default` takes no hooks from a file (a `kiro_default.json` is
   ignored), and deja does not switch `chat.defaultAgent`, which would trade
   the default agent's prompt for its own. `deja doctor` reads the row as
-  `installed` until `chat.defaultAgent` is `deja`, and uninstall removes that
-  setting when it names deja's agent. The IDE's `.kiro/hooks/` are a
+  `installed` until `chat.defaultAgent` is `deja` and that agent file still
+  runs deja's hooks (kiro-cli falls back to `kiro_default` when it is gone,
+  #5200), and uninstall removes that setting when it names deja's agent.
+  kiro-cli edits the agent in place — `kiro-cli mcp add --agent deja` adds a
+  server, `kiro-cli agent upgrade` turns the hooks into a list — so install
+  and uninstall touch only deja's keys and hook entries, in either shape, and
+  uninstall keeps the file while something of the reader's is in it (#5199). The IDE's `.kiro/hooks/` are a
   different system: per workspace, fired on file events (#4304).
 - Sub-agents: 2.32's `subagent` tool runs each stage as a session of its own,
   whose hooks name only that session. The header beside its transcript names
