@@ -143,10 +143,17 @@ func ParseOpenClawFile(path string) ([]model.Session, error) {
 
 // ParseOpenClawFileFromOffset parses an OpenClaw transcript from a byte offset.
 func ParseOpenClawFileFromOffset(path string, offset int64) ([]model.Session, error) {
+	var ss []model.Session
+	var err error
 	if openclawArchiveRE.MatchString(path) {
-		return parseOpenClawArchive(path)
+		ss, err = parseOpenClawArchive(path)
+	} else {
+		ss, err = parsePiShaped(path, offset, "openclaw", openclawProject(path), true)
 	}
-	return parsePiShaped(path, offset, "openclaw", openclawProject(path), true)
+	if len(ss) > 0 {
+		applyOpenClawSpawns(ss, openclawStoreSpawns(filepath.Dir(path)))
+	}
+	return ss, err
 }
 
 // parseOpenClawArchive reads what a reset or a delete left behind. The file
