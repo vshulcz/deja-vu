@@ -56,7 +56,7 @@ var wiringPathIsTemporary = func(p string) bool {
 // dejaHookCommandIn is dejaHookCommandMissing's sibling: the deja binary a
 // wiring file runs, whether or not it exists.
 func dejaHookCommandIn(path string) string {
-	b, err := os.ReadFile(path)
+	b, err := doctorReadConfig(path)
 	if err != nil {
 		return ""
 	}

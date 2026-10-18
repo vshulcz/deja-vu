@@ -173,6 +173,66 @@ func openclawConfigResolved() (root map[string]any, complete bool) {
 	return openclawResolveIncludes(root, filepath.Dir(path), 0, &complete), complete
 }
 
+// doctorReadConfig is readConfig for doctor's readers of a client config:
+// openclaw.json comes back with its $include files read in, so an entry or
+// switch the user keeps in an included file is seen where OpenClaw sees it
+// (#5339). An included file that does not read leaves the merged view
+// without it, which still holds everything openclaw.json says itself. Every
+// other file, and an openclaw.json without $include, is read as it is.
+func doctorReadConfig(path string) ([]byte, error) {
+	b, err := readConfig(path)
+	if err != nil || path != openclawConfigPath() || !bytes.Contains(b, []byte("$include")) {
+		return b, err
+	}
+	root, _ := openclawConfigResolved()
+	if root == nil {
+		return b, nil
+	}
+	out, err := json.Marshal(root)
+	if err != nil {
+		return b, nil
+	}
+	return out, nil
+}
+
+// openclawDoctorRoot is openclaw.json as doctor reads it, $include files and
+// all, or nil.
+func openclawDoctorRoot() map[string]any {
+	b, err := doctorReadConfig(openclawConfigPath())
+	if err != nil {
+		return nil
+	}
+	m, _ := parseJSONValue(b).(map[string]any)
+	return m
+}
+
+// openclawFileFor is the file a doctor line names for a key: openclaw.json
+// when the key is set there, else the last file the key's section includes
+// that sets it — the one whose value wins — or, when none does, the section's
+// only included file, where the key would go.
+func openclawFileFor(keys ...string) string {
+	path := openclawConfigPath()
+	raw := readJSONConfig(path)
+	if jsonAt(raw, keys...) != nil {
+		return path
+	}
+	at, inc := openclawIncludeOn(raw, keys)
+	if at == "" {
+		return path
+	}
+	rest := keys[strings.Count(at, ".")+1:]
+	ps := openclawIncludePaths(filepath.Dir(path), inc)
+	for i := len(ps) - 1; i >= 0; i-- {
+		if len(rest) > 0 && jsonAt(readJSONConfig(ps[i]), rest...) != nil {
+			return ps[i]
+		}
+	}
+	if len(ps) == 1 {
+		return ps[0]
+	}
+	return path
+}
+
 func openclawResolveIncludes(m map[string]any, dir string, depth int, complete *bool) map[string]any {
 	out := map[string]any{}
 	if inc, ok := m["$include"]; ok {

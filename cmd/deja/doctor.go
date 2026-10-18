@@ -1646,7 +1646,7 @@ func dejaEntrySwitchedOff(client, path string) bool {
 	if !entrySwitchHonored(client) {
 		return false
 	}
-	b, err := readConfig(path)
+	b, err := doctorReadConfig(path)
 	if err != nil {
 		return false
 	}
@@ -1695,7 +1695,7 @@ func dejaCommandMissing(path string) string {
 // thing in TOML, YAML and JSONC, and adding a parser per format to answer one
 // question is not worth the surface.
 func dejaCommandIn(path string) string {
-	b, err := readConfig(path)
+	b, err := doctorReadConfig(path)
 	if err != nil {
 		return ""
 	}
@@ -2441,16 +2441,13 @@ func doctorOpencodeConfigPath() string {
 // any $include read in: an entry added by hand to the included file is the
 // wiring `deja install openclaw` asks for there (#5331).
 func doctorOpenClawWired(path string) bool {
-	b, err := readConfig(path)
+	b, err := doctorReadConfig(path)
 	if err != nil {
 		return false
 	}
 	var root map[string]any
 	if json.Unmarshal([]byte(jsoncToJSON(string(b))), &root) != nil {
 		return strings.Contains(string(b), `"deja"`)
-	}
-	if path == openclawConfigPath() {
-		root, _ = openclawConfigResolved()
 	}
 	mcp, _ := root["mcp"].(map[string]any)
 	servers, _ := mcp["servers"].(map[string]any)
