@@ -69,6 +69,9 @@ keeps in its own file (`$include`) and say what to add there by hand. Writing
 beside the `$include` made OpenClaw's own edits of that section land in
 openclaw.json instead of the included file.
 
+An OpenClaw sub-agent on a JSONL store stays under the window that spawned
+it after a `/new`; it was filed under the key's newer session.
+
 ## [0.22.2] - 2026-10-17
 
 deja now reads Windsurf / Devin Desktop: Cascade's encrypted conversation

@@ -1,6 +1,8 @@
 package sources
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -205,7 +207,7 @@ func openclawStoreSpawns(dir string) map[string]string {
 		return nil
 	}
 	parents := map[string]string{}
-	for _, e := range store {
+	for childKey, e := range store {
 		if e.SessionID == "" {
 			continue
 		}
@@ -215,7 +217,9 @@ func openclawStoreSpawns(dir string) map[string]string {
 			if k == "" {
 				k = e.SpawnedBy
 			}
-			parent = store[k].SessionID
+			if parent = store[k].SessionID; parent != "" {
+				parent = openclawWindowBefore(dir, childKey, e.SessionID, parent)
+			}
 		}
 		if parent != "" {
 			parents[e.SessionID] = parent
@@ -226,6 +230,93 @@ func openclawStoreSpawns(dir string) map[string]string {
 	}
 	openclawSpawnCache.m[p] = openclawSpawnFile{mod: fi.ModTime(), size: fi.Size(), parents: parents}
 	return parents
+}
+
+// openclawWindowBefore is the window that spawned a child when its requester
+// key has moved on. sessions.json holds a key's current window only, so after
+// a /new every child of the old window was filed under the new one, a session
+// started after the child (#5307). The spawn call's result names the child's
+// key in the requester's transcript: the window taken is the latest one that
+// opened by the time the child did and names it, live or archived (a .zst
+// archive is not opened), and none when nothing does — no parent rather than
+// one that never spawned it.
+func openclawWindowBefore(dir, childKey, childID, current string) string {
+	childStart := openclawHeaderStart(filepath.Join(dir, childID+".jsonl"))
+	curStart := openclawHeaderStart(filepath.Join(dir, current+".jsonl"))
+	if childStart.IsZero() || curStart.IsZero() || !curStart.After(childStart) {
+		return current
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return ""
+	}
+	named := [][]byte{[]byte(childKey + `"`), []byte(childKey + `\"`)}
+	var best string
+	var bestAt time.Time
+	for _, e := range entries {
+		name := e.Name()
+		p := filepath.Join(dir, name)
+		if e.IsDir() || strings.HasSuffix(name, ".zst") || openclawCheckpointRE.MatchString(name) || strings.Contains(name, ".trajectory.") ||
+			!strings.HasSuffix(name, ".jsonl") && !openclawArchiveRE.MatchString(name) {
+			continue
+		}
+		b, err := os.ReadFile(p)
+		if err != nil || !openclawNamesChild(b, named) {
+			continue
+		}
+		id, at := openclawHeader(b)
+		if id == "" || id == childID || at.IsZero() || at.After(childStart) || !at.After(bestAt) {
+			continue
+		}
+		best, bestAt = id, at
+	}
+	return best
+}
+
+// openclawNamesChild reports whether a transcript holds a spawn result for
+// the child: its key as childSessionKey, not merely mentioned in a turn.
+func openclawNamesChild(b []byte, named [][]byte) bool {
+	for _, n := range named {
+		for rest := b; ; {
+			i := bytes.Index(rest, n)
+			if i < 0 {
+				break
+			}
+			if bytes.Contains(rest[max(0, i-32):i], []byte("childSessionKey")) {
+				return true
+			}
+			rest = rest[i+len(n):]
+		}
+	}
+	return false
+}
+
+// openclawHeaderStart is when the transcript at p opened, by its header.
+func openclawHeaderStart(p string) time.Time {
+	f, err := os.Open(p)
+	if err != nil {
+		return time.Time{}
+	}
+	defer f.Close()
+	line, _ := bufio.NewReader(f).ReadBytes('\n')
+	_, at := openclawHeader(line)
+	return at
+}
+
+// openclawHeader is the session id and start a transcript's first line names.
+func openclawHeader(b []byte) (string, time.Time) {
+	if i := bytes.IndexByte(b, '\n'); i >= 0 {
+		b = b[:i]
+	}
+	var h struct {
+		Type      string `json:"type"`
+		ID        string `json:"id"`
+		Timestamp any    `json:"timestamp"`
+	}
+	if json.Unmarshal(b, &h) != nil || h.Type != "session" {
+		return "", time.Time{}
+	}
+	return h.ID, parseTimeAny(h.Timestamp)
 }
 
 type openclawSpawnFile struct {

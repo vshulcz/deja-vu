@@ -753,7 +753,9 @@ import (
 // that only got polls is no longer a session (#5319).
 // 85: DEJA_INCLUDE_SUBAGENTS means the same in every reader: =0 leaves every
 // sub-agent run out, unset cuts it to task, edits and last turns (#5301).
-const version = 85
+// 86: an OpenClaw JSONL sub-agent spawned before a /new stays under the window
+// that spawned it, not the key's newer one (#5307).
+const version = 86
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
