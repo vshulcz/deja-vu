@@ -25,6 +25,13 @@ const geminiExtensionName = "deja"
 func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 	exe = hookExeFor(exe, uninstall)
 	dir := filepath.Join(sources.GeminiHome(), "extensions", geminiExtensionName)
+	kind, source, managed := geminiExtensionInstall(dir)
+	if managed && kind == "link" {
+		return geminiLinkedExtension(dir, source, uninstall)
+	}
+	if uninstall && managed {
+		return removeGeminiHooksFromManaged(dir)
+	}
 	if uninstall {
 		// hooksConfig stays: other extensions may rely on it, and turning it
 		// off would silently disable them. Said aloud, because the rest of
@@ -43,15 +50,9 @@ func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 		// Unless deja added the switch itself and no extension left has
 		// hooks to run on it: then it goes too, and the file comes back as
 		// it was (#4216).
-		if err := disableGeminiHooksIfOurs(); err != nil {
+		note, err := geminiSwitchOnUninstall()
+		if err != nil {
 			return installResult{}, err
-		}
-		if err := restoreGeminiHooksSwitch(); err != nil {
-			return installResult{}, err
-		}
-		note := ""
-		if geminiHooksEnabled() {
-			note = "left hooksConfig.enabled on in gemini's settings.json — other extensions may be running on it"
 		}
 		if statErr != nil {
 			return installResult{Path: dir, Action: "unchanged", Note: note}, nil
@@ -62,21 +63,22 @@ func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 	if err := os.MkdirAll(filepath.Join(dir, "hooks"), 0o755); err != nil {
 		return installResult{}, err
 	}
-	manifest, err := json.MarshalIndent(map[string]any{
-		"name":        geminiExtensionName,
-		"version":     "0.1.0",
-		"description": "Recall your own past coding sessions before you ask.",
-	}, "", "  ")
-	if err != nil {
-		return installResult{}, err
-	}
-	manifestPath := filepath.Join(dir, "gemini-extension.json")
-	oldManifest, err := readConfig(manifestPath)
-	if err != nil {
-		return installResult{}, err
-	}
-	if _, err := writeIfChanged(manifestPath, oldManifest, append(manifest, '\n')); err != nil {
-		return installResult{}, err
+	// The manifest of an extension gemini installed is the one it shipped
+	// with — deja's own from the gallery, with its version, MCP server and
+	// context file. Rewriting it took all three away (0.64.0).
+	if managed {
+		if err := restoreGeminiGalleryManifest(dir); err != nil {
+			return installResult{}, err
+		}
+	} else {
+		manifestPath := filepath.Join(dir, "gemini-extension.json")
+		oldManifest, err := readConfig(manifestPath)
+		if err != nil {
+			return installResult{}, err
+		}
+		if _, err := writeIfChanged(manifestPath, oldManifest, geminiManifest()); err != nil {
+			return installResult{}, err
+		}
 	}
 	hooks, err := json.MarshalIndent(map[string]any{
 		"hooks": map[string]any{
@@ -150,6 +152,12 @@ func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 	if err != nil {
 		return installResult{}, err
 	}
+	// Hooks a gallery release shipped are the extension's, not deja's to
+	// replace.
+	if managed && geminiHasHookEntries(oldHooks) && !geminiHooksAreDejas(hooksPath) {
+		return installResult{Path: hooksPath, Action: "unchanged",
+			Note: "the deja extension gemini installed brings hooks of its own — left them as they were"}, nil
+	}
 	a, err := writeIfChanged(hooksPath, oldHooks, append(hooks, '\n'))
 	if err != nil {
 		return installResult{}, err
@@ -158,7 +166,191 @@ func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 	if err != nil {
 		return installResult{}, err
 	}
-	return installResult{Path: dir, Action: a, Note: note}, nil
+	path := dir
+	if managed {
+		path = hooksPath
+	}
+	return installResult{Path: path, Action: a, Note: note}, nil
+}
+
+func geminiManifest() []byte {
+	b, _ := json.MarshalIndent(map[string]any{
+		"name":        geminiExtensionName,
+		"version":     "0.1.0",
+		"description": "Recall your own past coding sessions before you ask.",
+	}, "", "  ")
+	return append(b, '\n')
+}
+
+// geminiExtensionInstall reads the record gemini keeps beside an extension it
+// installed itself, with `gemini extensions install` or `link`. deja's gallery
+// extension is named deja as well, so it lives in the very directory deja
+// writes its hooks to, and taking that directory for deja's own replaced the
+// gallery manifest on install and deleted the extension on uninstall.
+func geminiExtensionInstall(dir string) (kind, source string, managed bool) {
+	b, err := os.ReadFile(filepath.Join(dir, ".gemini-extension-install.json"))
+	if err != nil {
+		return "", "", false
+	}
+	var meta struct {
+		Type   string `json:"type"`
+		Source string `json:"source"`
+	}
+	// A record gemini could not read either is not an install it made.
+	if json.Unmarshal(b, &meta) != nil || meta.Type == "" {
+		return "", "", false
+	}
+	return meta.Type, meta.Source, true
+}
+
+// geminiHooksPath is the hooks file gemini reads for deja's extension: a
+// linked one is loaded from its source, whatever sits in ~/.gemini/extensions.
+func geminiHooksPath() string {
+	dir := filepath.Join(sources.GeminiHome(), "extensions", geminiExtensionName)
+	if kind, source, _ := geminiExtensionInstall(dir); kind == "link" && source != "" {
+		dir = source
+	}
+	return filepath.Join(dir, "hooks", "hooks.json")
+}
+
+// geminiLinkedExtension is a deja extension the reader linked from a checkout.
+// Gemini reads its manifest and hooks from that checkout, so hooks written
+// under ~/.gemini/extensions never run, and writing into the checkout is not
+// deja's call. Nothing is written and the note says why; the MCP half of the
+// target still goes in, so a rewire after an upgrade keeps the server
+// pointed at the binary. On the way out only what an older deja wrote beside
+// the link goes, never the link.
+func geminiLinkedExtension(dir, source string, uninstall bool) (installResult, error) {
+	if !uninstall {
+		return installResult{Path: dir, Action: "unchanged",
+			Note: "linked from " + shortHome(source) + " with `gemini extensions link`, and gemini reads its hooks from there, so deja's were not added — `gemini extensions uninstall deja` and run this again for them"}, nil
+	}
+	a := "unchanged"
+	path := dir
+	hooks := filepath.Join(dir, "hooks", "hooks.json")
+	if geminiHooksAreDejas(hooks) {
+		if err := os.Remove(hooks); err != nil {
+			return installResult{}, err
+		}
+		_ = os.Remove(filepath.Dir(hooks))
+		a, path = "removed", hooks
+	}
+	manifest := filepath.Join(dir, "gemini-extension.json")
+	if b, err := os.ReadFile(manifest); err == nil && bytes.Equal(bytes.TrimSpace(b), bytes.TrimSpace(geminiManifest())) {
+		if err := os.Remove(manifest); err != nil {
+			return installResult{}, err
+		}
+		a, path = "removed", manifest
+	}
+	note, err := geminiSwitchOnUninstall()
+	return installResult{Path: path, Action: a, Note: note}, err
+}
+
+// removeGeminiHooksFromManaged takes deja's hooks out of an extension gemini
+// installed and leaves the extension. A manifest an older deja wrote over the
+// gallery one goes back to the copy it kept.
+func removeGeminiHooksFromManaged(dir string) (installResult, error) {
+	a := "unchanged"
+	hooks := filepath.Join(dir, "hooks", "hooks.json")
+	if geminiHooksAreDejas(hooks) {
+		if err := os.Remove(hooks); err != nil {
+			return installResult{}, err
+		}
+		_ = os.Remove(filepath.Dir(hooks))
+		a = "removed"
+	}
+	if err := restoreGeminiGalleryManifest(dir); err != nil {
+		return installResult{}, err
+	}
+	note, err := geminiSwitchOnUninstall()
+	return installResult{Path: hooks, Action: a, Note: note}, err
+}
+
+// restoreGeminiGalleryManifest puts back the manifest an older deja wrote over
+// the gallery one, from the copy it kept beside it.
+func restoreGeminiGalleryManifest(dir string) error {
+	manifest := filepath.Join(dir, "gemini-extension.json")
+	bak := manifest + ".bak"
+	b, err := os.ReadFile(manifest)
+	if err != nil || !bytes.Equal(bytes.TrimSpace(b), bytes.TrimSpace(geminiManifest())) {
+		return nil
+	}
+	kept, err := os.ReadFile(bak)
+	if err != nil || !json.Valid(kept) {
+		return nil
+	}
+	if err := os.WriteFile(manifest, kept, 0o644); err != nil {
+		return err
+	}
+	return os.Remove(bak)
+}
+
+// geminiSwitchOnUninstall puts hooksConfig back the way deja found it, where
+// it can tell, and says so where it cannot.
+func geminiSwitchOnUninstall() (string, error) {
+	if err := disableGeminiHooksIfOurs(); err != nil {
+		return "", err
+	}
+	if err := restoreGeminiHooksSwitch(); err != nil {
+		return "", err
+	}
+	if geminiHooksEnabled() {
+		return "left hooksConfig.enabled on in gemini's settings.json — other extensions may be running on it", nil
+	}
+	return "", nil
+}
+
+// geminiHasHookEntries reports whether a hooks file declares any hook at all;
+// `{}` or an empty object runs nothing and is not the extension's to keep.
+func geminiHasHookEntries(b []byte) bool {
+	var root struct {
+		Hooks map[string][]struct {
+			Hooks []json.RawMessage `json:"hooks"`
+		} `json:"hooks"`
+	}
+	if json.Unmarshal(b, &root) != nil {
+		return len(bytes.TrimSpace(b)) > 0
+	}
+	for _, groups := range root.Hooks {
+		for _, g := range groups {
+			if len(g.Hooks) > 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// geminiHooksAreDejas reports whether a hooks file holds only deja's hooks:
+// one a gallery release shipped with hooks of its own is the extension's.
+func geminiHooksAreDejas(path string) bool {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	var root struct {
+		Hooks map[string][]struct {
+			Hooks []struct {
+				Name    string `json:"name"`
+				Command string `json:"command"`
+			} `json:"hooks"`
+		} `json:"hooks"`
+	}
+	if json.Unmarshal(b, &root) != nil || len(root.Hooks) == 0 {
+		return false
+	}
+	for _, groups := range root.Hooks {
+		for _, g := range groups {
+			for _, h := range g.Hooks {
+				// Named since 0.64's info line; older installs wrote the
+				// command alone.
+				if h.Name != geminiExtensionName && !mentionsDeja([]byte(h.Command)) {
+					return false
+				}
+			}
+		}
+	}
+	return true
 }
 
 // geminiSwitchRecord is the record that hooksConfig.enabled was false before
@@ -281,9 +473,23 @@ func geminiOtherHooks() bool {
 	if m, _ := filepath.Glob(filepath.Join(exts, "*", "hooks", "hooks.json")); len(m) > 0 {
 		return true
 	}
+	// A linked extension's hooks are at its source. One whose source is there
+	// without a hooks file runs nothing on the switch — deja's own gallery
+	// extension linked from a checkout is that case; one that cannot be read
+	// is counted.
 	metas, _ := filepath.Glob(filepath.Join(exts, "*", ".gemini-extension-install.json"))
 	for _, p := range metas {
-		if b, err := os.ReadFile(p); err == nil && bytes.Contains(b, []byte(`"link"`)) {
+		kind, source, _ := geminiExtensionInstall(filepath.Dir(p))
+		if kind != "link" {
+			if b, err := os.ReadFile(p); err == nil && bytes.Contains(b, []byte(`"link"`)) && kind == "" {
+				return true
+			}
+			continue
+		}
+		if st, err := os.Stat(source); err != nil || !st.IsDir() {
+			return true
+		}
+		if _, err := os.Stat(filepath.Join(source, "hooks", "hooks.json")); err == nil {
 			return true
 		}
 	}
