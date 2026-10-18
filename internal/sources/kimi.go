@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -206,6 +207,9 @@ type kimiState struct {
 	CWD       string `json:"cwd"`
 	CreatedAt any    `json:"createdAt"`
 	UpdatedAt any    `json:"updatedAt"`
+	// ForkedFrom names the source of a 2.x /fork or `kimi fork`, which
+	// copies each of the source's wire.jsonl into the new session (#5226).
+	ForkedFrom string `json:"forkedFrom"`
 }
 
 // dir is the directory the session ran in, under either name.
@@ -228,6 +232,26 @@ func kimiPersonsOrigin(origin any) bool {
 	kind, _ := o["kind"].(string)
 	trigger, _ := o["trigger"].(string)
 	return kind == "" || kind == "user" || strings.HasPrefix(kind, "user") || trigger == "user-slash"
+}
+
+// kimiSubagentTask reports whether a message is the task a sub-agent was
+// handed: kimi-code opens the run, and every resume of it, with the parent's
+// prompt under origin {kind: system_trigger, name: subagent}
+// (AGENT_RUN_PROMPT_ORIGIN). It is the run's question, so it is its user turn;
+// dropped with the host's other lines, the run was titled by its answer
+// (#5227).
+func kimiSubagentTask(origin any) bool {
+	o, ok := origin.(map[string]any)
+	return ok && o["kind"] == "system_trigger" && o["name"] == "subagent"
+}
+
+// kimiGitContext is the block the explore profile's promptPrefix puts ahead
+// of the parent's prompt (collectGitContext): the branch, dirty files and log,
+// or a self-closing tag outside a repository. It is Kimi's, not the task.
+var kimiGitContext = regexp.MustCompile(`^\s*(?:<git-context\b[^>]*/>|(?s:<git-context\b.*?</git-context>))\s*`)
+
+func kimiWithoutGitContext(t string) string {
+	return strings.TrimSpace(kimiGitContext.ReplaceAllString(t, ""))
 }
 
 // kimiSessionState reads the state.json beside a wire.jsonl at
@@ -329,9 +353,14 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 	// and a fork with none is that copy and nothing else (#4484).
 	fork := child && kimiForkFile(path)
 	btw := false
+	cwd, forkedFrom := "", ""
 	if st, ok := kimiSessionState(path); ok {
 		s.Title = strings.TrimSpace(st.Title)
 		s.Project = projectName(st.dir())
+		cwd = st.dir()
+		if f := strings.TrimSpace(st.ForkedFrom); f != "" && f != s.ID {
+			forkedFrom = f
+		}
 		if !child {
 			s.Touch(parseTimeAny(st.CreatedAt))
 			s.Touch(parseTimeAny(st.UpdatedAt))
@@ -347,6 +376,9 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 		s.Parent = s.ID
 		s.ID = filepath.Base(filepath.Dir(path)) + "-" + s.Parent
 		s.Title = ""
+	} else if forkedFrom != "" {
+		// A session /fork made: what it copied is its source's, read there.
+		s.Kind, s.Parent = "fork", forkedFrom
 	}
 	// A Bash call and its result are separate loop events joined by
 	// toolCallId; the command record is kept by id so the exit status the
@@ -367,6 +399,20 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 	}
 	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
 		switch m["type"] {
+		case "forked":
+			// kimi-code's fork copies the source agent's records and closes
+			// the copy with this one; only what follows is the fork's. Read as
+			// its own, the copy put the source's turns, writes and sub-agent
+			// runs in the fork a second time, and blame credited the fork
+			// with the source's lines (#5226).
+			if forkedFrom == "" {
+				return
+			}
+			s.Messages = nil
+			s.Started, s.Updated = time.Time{}, time.Time{}
+			pending.Reset()
+			pendingTime = nil
+			clear(shellAt)
 		case "context.apply_compaction":
 			// The summary the compaction left in place of the turns it
 			// dropped (kimi-code 0.28.1). summary is the model's text, an
@@ -408,7 +454,7 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 			// notice — and names the author in origin.kind. Only the person's
 			// are user turns; a message with no origin is an older protocol's
 			// and was always the person's (#3199).
-			if role == "user" && !kimiPersonsOrigin(msg["origin"]) {
+			if role == "user" && !kimiPersonsOrigin(msg["origin"]) && !(child && kimiSubagentTask(msg["origin"])) {
 				// The host's line still moves the clock: a session whose
 				// last record is a hook's output ended when that arrived.
 				s.Touch(parseTimeAny(m["time"]))
@@ -420,6 +466,9 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 				flush()
 			}
 			text := kimiText(msg["content"])
+			if role == "user" && child && kimiSubagentTask(msg["origin"]) {
+				text = kimiWithoutGitContext(text)
+			}
 			t := parseTimeAny(m["time"])
 			s.Touch(t)
 			if text != "" {
@@ -462,6 +511,15 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 				args, _ := e["args"].(map[string]any)
 				if name == "" || args == nil {
 					return
+				}
+				// Kimi resolves a relative path against the session's cwd; kept
+				// bare, blame never matched the record to the file (#5228). A
+				// leading ~ or ~/ is Kimi's to expand and stays as written.
+				if p, _ := args[kimiDialect.pathKey].(string); p != "" && p != "~" && !strings.HasPrefix(p, "~/") {
+					if abs := resolveToolPath(p, cwd); abs != p {
+						args = maps.Clone(args)
+						args[kimiDialect.pathKey] = abs
+					}
 				}
 				part := []any{map[string]any{"type": "tool_use", "name": name, "input": args}}
 				t := parseTimeAny(m["time"])
@@ -550,7 +608,25 @@ func kimiTailResumes(path string, offset int64) bool {
 	if offset > 0 && kimiBtwFile(path) {
 		return false
 	}
+	// A fork read before Kimi wrote its state.json was stored as its source's
+	// copy; the forked record arriving in the tail sends it back for a whole
+	// read, which drops the copy (#5226).
+	if offset > 0 && kimiTailHasForked(path, offset) {
+		return false
+	}
 	return kimiResumes(path, offset) && KimiResumes(path, offset)
+}
+
+func kimiTailHasForked(path string, offset int64) bool {
+	found := false
+	eachLineFrom(path, offset, func(line []byte) bool {
+		if bytes.Contains(line, []byte(`"forked"`)) && decodeJSONLine(line)["type"] == "forked" {
+			found = true
+			return false
+		}
+		return true
+	})
+	return found
 }
 
 // KimiResumes reports whether the tail of wire.jsonl can be appended to what

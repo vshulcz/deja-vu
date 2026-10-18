@@ -730,6 +730,11 @@ import (
 // goose fork keeps only its own turns; both were indexed the old way
 // (#5232, #5233).
 const version = 76
+const version = 75
+// 73: a Kimi /fork keeps only its own turns under its source, a Kimi
+// sub-agent keeps its task, and a relative Write/Edit path sits under the
+// session's cwd (#5226, #5227, #5228).
+const version = 73
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

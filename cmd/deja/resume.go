@@ -344,8 +344,9 @@ func resumeCommand(s model.Session) (string, string, error) {
 		return "", "", fmt.Errorf("session %s is a sub-agent run, which copilot does not reopen on its own — `deja resume %s` reopens the session that spawned it", digest.Short(s.ID), s.Parent)
 	}
 	// Nor a Kimi /btw side question, which runs in a fork of the session it
-	// was asked in (#4484).
-	if s.Kind == "fork" && s.Harness == "kimi" && s.Parent != "" {
+	// was asked in (#4484). A session /fork made is a session of its own, and
+	// `kimi --session` opens it (#5226).
+	if s.Kind == "fork" && s.Harness == "kimi" && s.Parent != "" && sources.KimiSubagentFile(s.Path) {
 		return "", "", fmt.Errorf("session %s is a /btw side question, which kimi does not reopen on its own — `deja resume %s` reopens the session it was asked in", digest.Short(s.ID), s.Parent)
 	}
 	switch s.Harness {
