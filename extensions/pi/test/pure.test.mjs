@@ -8,6 +8,12 @@ test("the installer's extension is looked for where the installer writes it", ()
   assert.equal(installerExtensionPath("/home/u"), "/home/u/.pi/agent/extensions/deja.ts")
 })
 
+test("PI_CODING_AGENT_DIR moves the installer's extension with pi", () => {
+  assert.equal(installerExtensionPath("/home/u", { PI_CODING_AGENT_DIR: "/srv/pi" }), "/srv/pi/extensions/deja.ts")
+  assert.equal(installerExtensionPath("/home/u", { PI_CODING_AGENT_DIR: "~/alt" }), "/home/u/alt/extensions/deja.ts")
+  assert.equal(installerExtensionPath("/home/u", { PI_CODING_AGENT_DIR: "" }), "/home/u/.pi/agent/extensions/deja.ts")
+})
+
 test("hook-context is read in both shapes deja prints", () => {
   assert.deepEqual(contextText('{"hookSpecificOutput":{"additionalContext":"digest"},"systemMessage":"deja recalled 2"}'), { context: "digest", receipt: "deja recalled 2" })
   assert.deepEqual(contextText("bare text"), { context: "bare text", receipt: "" })

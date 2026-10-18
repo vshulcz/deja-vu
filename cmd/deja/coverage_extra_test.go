@@ -43,6 +43,20 @@ func hermeticEnv(t *testing.T) string {
 	t.Setenv("REASONIX_HOME", "")
 	// Copilot CLI moves its home with COPILOT_HOME, and deja follows it.
 	t.Setenv("COPILOT_HOME", "")
+	// pi's agent directory moves with PI_CODING_AGENT_DIR, and deja follows it.
+	t.Setenv("PI_CODING_AGENT_DIR", "")
+	t.Setenv("PI_CODING_AGENT_SESSION_DIR", "")
+	// And a pi that says nothing shadows the developer's own: its version
+	// decides what install and doctor say about pi's MCP.
+	shadow := t.TempDir()
+	if err := os.MkdirAll(shadow, 0o755); err == nil {
+		name, body := "pi", "#!/bin/sh\n"
+		if runtime.GOOS == "windows" {
+			name, body = "pi.cmd", "@echo off\r\n"
+		}
+		_ = os.WriteFile(filepath.Join(shadow, name), []byte(body), 0o755)
+		t.Setenv("PATH", shadow+string(os.PathListSeparator)+os.Getenv("PATH"))
+	}
 	// Cline's store moves with its own variables; an unindexed asker is read
 	// off it by id (#5151).
 	t.Setenv("CLINE_DIR", "")

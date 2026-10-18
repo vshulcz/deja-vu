@@ -1521,12 +1521,15 @@ func doctorMCP(w io.Writer) {
 		if c.name == "cherrystudio" && doctorCherryStudioMCP(w, status, c.path) {
 			continue
 		}
-		// pi has no MCP of its own, and the file is read only by the adapter
-		// package: declared there without it, the server never starts (#4583).
-		if status == "wired" && c.name == "pi" && !piMCPAdapterInstalled() {
-			fmt.Fprintf(w, "  %-12s %-14s guidance %-11s %s\n", c.name, "no adapter", guidanceStatus(guidanceHarness(c.name)), reportPath(c.path))
-			fmt.Fprintf(w, "  %-12s %s\n", "", piNoAdapterNote)
-			continue
+		// A pi older than 0.99 has no MCP of its own and reads the file only
+		// through the adapter package; a newer one can have its built-in MCP
+		// switched off. Either way the server never starts (#4583).
+		if status == "wired" && c.name == "pi" {
+			if note := piMCPUnreadNote(); note != "" {
+				fmt.Fprintf(w, "  %-12s %-14s guidance %-11s %s\n", c.name, "no adapter", guidanceStatus(guidanceHarness(c.name)), reportPath(c.path))
+				fmt.Fprintf(w, "  %-12s %s\n", "", note)
+				continue
+			}
 		}
 		// WorkBuddy AI declares the server and starts it only once the user
 		// has clicked Trust for it (#4740).

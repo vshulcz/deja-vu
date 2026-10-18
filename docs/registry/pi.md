@@ -87,7 +87,7 @@ The `id` field from the session header line is used as the session ID. The UUID 
 
 ## MCP
 
-pi does not include built-in MCP but supports it via the `pi-mcp-adapter` package (`pi install npm:pi-mcp-adapter`). The adapter reads `~/.pi/agent/mcp.json` with the standard `mcpServers` shape. `deja install pi` writes to that file and says when the adapter is not in pi's packages; `deja doctor` then reports the row as `no adapter` (#4583).
+pi 0.99 and later read `~/.pi/agent/mcp.json` themselves, through the built-in `mcp` extension (`pi mcp list` shows the entry). Older pi reads it only through the `pi-mcp-adapter` package (`pi install npm:pi-mcp-adapter`), which also works on a current pi. `deja install pi` writes the `mcpServers` entry there and says so when nothing in the pi on PATH will read it: a pi older than 0.99 without the adapter, or the built-in extension switched off by `-builtin:mcp` (or a `!builtin:*` glob) in `extensions` of the user `settings.json` or, for a project pi trusts, the project's; `deja doctor` then reports the row as `no adapter` (#4583). `PI_CODING_AGENT_DIR` moves the whole agent directory, and deja follows it for the extension, `mcp.json` and the sessions (`PI_CODING_AGENT_SESSION_DIR` moves the sessions alone). Both are read from the environment of the deja process, so set them where deja runs too.
 
 ## Skill, auto-recall, command
 

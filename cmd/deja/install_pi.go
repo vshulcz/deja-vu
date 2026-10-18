@@ -1,10 +1,18 @@
 package main
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -58,15 +66,19 @@ func installPiShapedExtension(agentDir, exe string, uninstall bool) (installResu
 	return installResult{Path: path, Action: a}, err
 }
 
-// installPiMCP writes the server into ~/.pi/agent/mcp.json. pi has no MCP of
-// its own; that file is read by the pi-mcp-adapter package, so without it in
-// pi's packages the entry is a file nothing reads, and install says so (#4583).
+// installPiMCP writes the server into ~/.pi/agent/mcp.json. pi 0.99 reads
+// that file itself (its built-in mcp extension); older pi only through the
+// pi-mcp-adapter package. Install says so when nothing in the pi here reads
+// it (#4583).
 func installPiMCP(exe string, uninstall bool) (installResult, error) {
 	r, err := installMCPJSON(filepath.Join(sources.PiConfigDir(), "mcp.json"), exe, uninstall)
-	if err != nil || uninstall || piMCPAdapterInstalled() {
+	if err != nil || uninstall {
 		return r, err
 	}
-	note := piNoAdapterNote
+	note := piMCPUnreadNote()
+	if note == "" {
+		return r, nil
+	}
 	if r.Note != "" {
 		note = r.Note + "; " + note
 	}
@@ -75,6 +87,270 @@ func installPiMCP(exe string, uninstall bool) (installResult, error) {
 }
 
 const piNoAdapterNote = "pi reads this file only through the pi-mcp-adapter package — `pi install npm:pi-mcp-adapter`"
+
+// piBuiltinMCPSince is the first pi with MCP of its own: 0.99.0 added the
+// built-in mcp extension, which reads mcp.json from the agent directory.
+const piBuiltinMCPSince = "0.99.0"
+
+// piMCPUnreadNote is why nothing in pi will read mcp.json, and "" when
+// something does: pi-mcp-adapter, or pi's built-in mcp extension on a pi that
+// has one and has not switched it off. A pi whose version cannot be read
+// counts as current, which has it.
+func piMCPUnreadNote() string {
+	if piMCPAdapterInstalled() {
+		return ""
+	}
+	if v := piPackageVersion(); v != "" && !openclawVersionAtLeast(v, piBuiltinMCPSince) {
+		return piNoAdapterNote
+	}
+	if off, at := piBuiltinMCPOff(); off {
+		return "pi's built-in MCP is switched off by `" + at + "`, and pi-mcp-adapter is not installed — nothing in pi reads this file"
+	}
+	return ""
+}
+
+// piBuiltinMCPOff reads pi's `extensions` setting for builtin:mcp, the way
+// pi's package manager does: an entry for it in a trusted project's
+// .pi/settings.json wins, the last one there deciding; otherwise in the user
+// settings.json `-builtin:mcp` beats `+builtin:mcp`, which beats a `!` glob.
+// It returns the entry and the file that switched it off.
+func piBuiltinMCPOff() (bool, string) {
+	const name = "builtin:mcp"
+	matches := func(e string) (mark byte, ok bool) {
+		if e == "" || !strings.ContainsRune("+-!", rune(e[0])) {
+			return 0, false
+		}
+		mark, rule := e[0], e[1:]
+		if mark == '!' {
+			return mark, piGlobMatch(rule, name)
+		}
+		return mark, strings.TrimPrefix(strings.TrimPrefix(rule, "./"), ".\\") == name
+	}
+	where := func(e, p string) string { return e + "` in `" + reportPath(p) }
+	if cwd, err := os.Getwd(); err == nil && piProjectTrusted(cwd) {
+		p := filepath.Join(cwd, ".pi", "settings.json")
+		last := ""
+		for _, e := range jsonStrings(jsonAt(readJSONConfig(p), "extensions")) {
+			if _, ok := matches(e); ok {
+				last = e
+			}
+		}
+		if last != "" {
+			return last[0] != '+', where(last, p)
+		}
+	}
+	p := filepath.Join(sources.PiConfigDir(), "settings.json")
+	var minus, plus, bang string
+	for _, e := range jsonStrings(jsonAt(readJSONConfig(p), "extensions")) {
+		switch mark, ok := matches(e); {
+		case !ok:
+		case mark == '-':
+			minus = e
+		case mark == '+':
+			plus = e
+		case bang == "":
+			bang = e
+		}
+	}
+	switch {
+	case minus != "":
+		return true, where(minus, p)
+	case plus != "":
+		return false, ""
+	case bang != "":
+		return true, where(bang, p)
+	}
+	return false, ""
+}
+
+// piProjectTrusted is pi's project trust for dir: the nearest decision for it
+// or a parent in the agent directory's trust.json. pi reads a project's
+// .pi/settings.json only once the project is trusted, and asks otherwise.
+func piProjectTrusted(dir string) bool {
+	var data map[string]any
+	if b, err := readConfig(filepath.Join(sources.PiConfigDir(), "trust.json")); err == nil {
+		_ = json.Unmarshal(bytes.TrimPrefix(b, []byte("\xef\xbb\xbf")), &data)
+	}
+	if real, err := filepath.EvalSymlinks(dir); err == nil {
+		dir = real
+	}
+	for d := filepath.Clean(dir); ; d = filepath.Dir(d) {
+		if v, ok := data[d].(bool); ok {
+			return v
+		}
+		if filepath.Dir(d) == d {
+			break
+		}
+	}
+	// No decision: the user settings' defaultProjectTrust, "ask" by default,
+	// which a doctor with no UI answers the way pi without one does.
+	return jsonAt(readJSONConfig(filepath.Join(sources.PiConfigDir(), "settings.json")), "defaultProjectTrust") == "always"
+}
+
+// piGlobMatch is the part of minimatch pi's `!` entries use on a name with no
+// slash: `*`, `?`, `**`, `[...]` and `{a,b}`. A brace pair without a comma
+// stays literal, as in minimatch; extglobs (`@(a)`) are not read.
+func piGlobMatch(glob, name string) bool {
+	// braceGroup reports whether the `{` at i opens an alternation: it closes,
+	// and has a comma at its own level.
+	braceGroup := func(i int) bool {
+		depth := 0
+		comma := false
+		for j := i; j < len(glob); j++ {
+			switch glob[j] {
+			case '{':
+				depth++
+			case '}':
+				depth--
+				if depth == 0 {
+					return comma
+				}
+			case ',':
+				if depth == 1 {
+					comma = true
+				}
+			}
+		}
+		return false
+	}
+	var re strings.Builder
+	re.WriteString("^")
+	var groups []bool // per open `{`: an alternation, or literal
+	open := 0
+	for i := 0; i < len(glob); i++ {
+		switch c := glob[i]; c {
+		case '*':
+			if strings.HasPrefix(glob[i:], "**/") {
+				re.WriteString("(?:.*/)?")
+				i += 2
+			} else if strings.HasPrefix(glob[i:], "**") {
+				re.WriteString(".*")
+				i++
+			} else {
+				re.WriteString("[^/]*")
+			}
+		case '?':
+			re.WriteString("[^/]")
+		case '[':
+			j := strings.IndexByte(glob[i+1:], ']')
+			if j < 0 {
+				re.WriteString(`\[`)
+				continue
+			}
+			body := glob[i+1 : i+1+j]
+			re.WriteString("[")
+			if strings.HasPrefix(body, "!") || strings.HasPrefix(body, "^") {
+				re.WriteString("^")
+				body = body[1:]
+			}
+			for _, r := range body {
+				if r == '-' {
+					re.WriteRune(r)
+				} else {
+					re.WriteString(regexp.QuoteMeta(string(r)))
+				}
+			}
+			re.WriteString("]")
+			i += j + 1
+		case '{':
+			g := braceGroup(i)
+			groups = append(groups, g)
+			if g {
+				open++
+				re.WriteString("(?:")
+			} else {
+				re.WriteString(`\{`)
+			}
+		case '}':
+			if n := len(groups); n > 0 {
+				g := groups[n-1]
+				groups = groups[:n-1]
+				if g {
+					open--
+					re.WriteString(")")
+					continue
+				}
+			}
+			re.WriteString(`\}`)
+		case ',':
+			if n := len(groups); n > 0 && groups[n-1] {
+				re.WriteString("|")
+			} else {
+				re.WriteString(",")
+			}
+		default:
+			re.WriteString(regexp.QuoteMeta(string(c)))
+		}
+	}
+	re.WriteString("$")
+	if open != 0 {
+		return false
+	}
+	m, err := regexp.MatchString(re.String(), name)
+	return err == nil && m
+}
+
+// piPackages are the names pi has shipped under.
+var piPackages = []string{"@earendil-works/pi-coding-agent", "@mariozechner/pi-coding-agent"}
+
+// piPackageVersion is the version of the pi on PATH, read from the package
+// its command starts (npm and Homebrew link bin/pi into <package>/dist, npm
+// on Windows leaves pi.cmd beside node_modules), or else the first x.y.z that
+// `pi --version` prints, for a shim that hides the package (pnpm, Volta,
+// Nix); "" when there is no pi or it will not say. Asked once per command.
+func piPackageVersion() string {
+	bin, err := exec.LookPath("pi")
+	if err != nil {
+		return ""
+	}
+	piVersionMu.Lock()
+	defer piVersionMu.Unlock()
+	if v, ok := piVersionCache[bin]; ok {
+		return v
+	}
+	v := piVersionAt(bin)
+	piVersionCache[bin] = v
+	return v
+}
+
+var (
+	piVersionMu    sync.Mutex
+	piVersionCache = map[string]string{}
+	piVersionToken = regexp.MustCompile(`\d+\.\d+\.\d+`)
+)
+
+func piVersionAt(bin string) string {
+	var dirs []string
+	if real, err := filepath.EvalSymlinks(bin); err == nil {
+		for d := filepath.Dir(real); len(dirs) < 4; d = filepath.Dir(d) {
+			dirs = append(dirs, d)
+			if filepath.Dir(d) == d {
+				break
+			}
+		}
+	}
+	for _, name := range piPackages {
+		dirs = append(dirs, filepath.Join(filepath.Dir(bin), "node_modules", filepath.FromSlash(name)))
+	}
+	for _, d := range dirs {
+		b, err := os.ReadFile(filepath.Join(d, "package.json"))
+		if err != nil {
+			continue
+		}
+		var pkg struct{ Name, Version string }
+		if json.Unmarshal(b, &pkg) == nil && slices.Contains(piPackages, pkg.Name) {
+			return pkg.Version
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, bin, "--version")
+	// A wrapper that starts node without exec keeps stdout open after the
+	// kill; WaitDelay stops waiting for it.
+	cmd.WaitDelay = 200 * time.Millisecond
+	out, _ := cmd.Output()
+	return piVersionToken.FindString(string(out))
+}
 
 // piMCPAdapterInstalled reports whether pi loads pi-mcp-adapter: a package
 // source naming it in the user's settings.json or the project's. pi takes a
