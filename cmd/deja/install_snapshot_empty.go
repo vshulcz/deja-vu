@@ -22,6 +22,7 @@ import (
 // only when the comments in the file are the snapshot's, so restoring it does
 // not take back a comment written since.
 func snapshotIfOnlyEmptyBlocksDiffer(path string, old, next []byte) []byte {
+	start := firstSeenThisRun(path, old)
 	b, ok := ownSnapshot(path)
 	if !ok {
 		return next
@@ -42,7 +43,12 @@ func snapshotIfOnlyEmptyBlocksDiffer(path string, old, next []byte) []byte {
 	}
 	// And only the empty blocks deja's own edit explains: one the reader added
 	// or took out since install is theirs, and the snapshot would undo it.
-	prev, ok := decodeJSONCExact(old)
+	// Measured against the file as this run found it, not as the last write
+	// left it: qwen-auto and codebuddy-auto take hooks, server and status line
+	// out of one settings.json in turn, and the write that emptied the hooks
+	// block had already dropped it by the last one, which then read it as the
+	// reader's doing.
+	prev, ok := decodeJSONCExact(start)
 	if !ok || !emptyBlocksDifferByDeja(want, have, prev) {
 		return next
 	}
@@ -151,4 +157,39 @@ func isEmptyContainer(v any) bool {
 		return len(t) == 0
 	}
 	return false
+}
+
+// runFirstSeen is each config as an uninstall run first found it, and what
+// deja's last write in the run left there. Reset with readBytes at the start
+// of every install and uninstall run; outside one it is nil and the caller's
+// own bytes stand.
+var runFirstSeen map[string]*runSeen
+
+type runSeen struct{ start, last []byte }
+
+// firstSeenThisRun is what the empty-block check measures against: the file
+// as the run found it while every change since is deja's own, and otherwise
+// what the writer read. A client that saved in between — the retry of #4561,
+// or qwen writing its settings between deja's three edits — starts it again,
+// so a block the client added or took out stays its change.
+func firstSeenThisRun(path string, old []byte) []byte {
+	readBytesMu.Lock()
+	defer readBytesMu.Unlock()
+	if runFirstSeen == nil {
+		return old
+	}
+	if e, ok := runFirstSeen[path]; ok && e.last != nil && bytes.Equal(e.last, old) {
+		return e.start
+	}
+	runFirstSeen[path] = &runSeen{start: append([]byte{}, old...)}
+	return old
+}
+
+// noteRunWrite records what deja's write put in path, for firstSeenThisRun.
+func noteRunWrite(path string, written []byte) {
+	readBytesMu.Lock()
+	defer readBytesMu.Unlock()
+	if e, ok := runFirstSeen[path]; ok {
+		e.last = append([]byte{}, bytes.TrimPrefix(written, utf8BOM)...)
+	}
 }
