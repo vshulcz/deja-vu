@@ -103,6 +103,18 @@ func anyDeja(list []string) bool {
 	return false
 }
 
+// openclawPluginList is plugins.<key> in openclaw.json the way OpenClaw reads
+// it: trimmed, empty names dropped.
+func openclawPluginList(root map[string]any, key string) []string {
+	var out []string
+	for _, s := range jsonStrings(jsonAt(root, "plugins", key)) {
+		if s = strings.TrimSpace(s); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
 func listHasDeja(v any) bool {
 	return anyDeja(jsonStrings(v))
 }

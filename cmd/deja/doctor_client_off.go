@@ -232,9 +232,24 @@ func clientHooksOff(name string) string {
 		}
 		// The plugin is the per-prompt half; the hook pack above still runs
 		// at bootstrap without it.
-		if jsonAt(root, "plugins", "entries", openclawPluginID, "enabled") == false || listHasDeja(jsonAt(root, "plugins", "deny")) {
+		// OpenClaw's own order: the master switch, the deny list, the entry,
+		// then a non-empty allow list that does not name the plugin.
+		if jsonAt(root, "plugins", "enabled") == false {
+			return "switched off: `plugins.enabled: false` in " + reportPath(p) +
+				" — openclaw loads no plugins, so deja's recall on each prompt never runs"
+		}
+		if jsonAt(root, "plugins", "entries", openclawPluginID, "enabled") == false || anyDeja(openclawPluginList(root, "deny")) {
 			return "switched off: deja's plugin, by `plugins.entries` or `plugins.deny` in " + reportPath(p) +
 				" — openclaw will not run its recall on each prompt"
+		}
+		// A memory or context-engine slot naming deja loads it past the list.
+		slot := func(k string) bool {
+			s, _ := jsonAt(root, "plugins", "slots", k).(string)
+			return strings.TrimSpace(s) == openclawPluginID
+		}
+		if allow := openclawPluginList(root, "allow"); len(allow) > 0 && !anyDeja(allow) && !slot("memory") && !slot("contextEngine") {
+			return "blocked: `plugins.allow` in " + reportPath(p) + " does not name deja, so openclaw keeps deja's plugin off" +
+				" and runs no recall on each prompt — add \"deja\" to it"
 		}
 		// From 2026.8.1 the gateway drops the plugin's prompt hooks without the
 		// grant, and says so only in its own log.
