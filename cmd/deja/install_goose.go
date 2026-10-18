@@ -61,10 +61,21 @@ func yamlBlockIsSequence(block string) bool {
 }
 
 // yamlEntrySwitchedOff reports whether the entry `name` under the top-level
-// key has been switched off: `enabled: false`, the spelling goose and hermes
-// both read, or `disabled: true`. The writers below rebuild deja's entry
-// whole, and they dropped the switch until they read it first (#4467).
+// key has been switched off the way goose reads it: `enabled: false` or
+// `disabled: true`. The writers below rebuild deja's entry whole, and they
+// dropped the switch until they read it first (#4467).
 func yamlEntrySwitchedOff(doc, topKey, name string) bool {
+	_, off := yamlEntrySwitch(doc, topKey, name, func(key, value string) bool {
+		v := strings.ToLower(hermesYAMLScalar(value))
+		return key == "enabled" && v == "false" || key == "disabled" && v == "true"
+	})
+	return off
+}
+
+// yamlEntrySwitch returns the value of the first field of the entry `name`
+// under the top-level key that off reports as switching the entry off, as
+// written: comment stripped, quotes kept.
+func yamlEntrySwitch(doc, topKey, name string, off func(key, value string) bool) (string, bool) {
 	lines := strings.Split(strings.ReplaceAll(doc, "\r\n", "\n"), "\n")
 	in, child, entry, field := false, -1, -1, -1
 	for _, line := range lines {
@@ -100,19 +111,11 @@ func yamlEntrySwitchedOff(doc, topKey, name string) bool {
 		if w != field {
 			continue
 		}
-		v := strings.ToLower(hermesYAMLScalar(rest))
-		switch hermesKeyName(key) {
-		case "enabled":
-			if v == "false" {
-				return true
-			}
-		case "disabled":
-			if v == "true" {
-				return true
-			}
+		if v := strings.TrimSpace(stripYAMLComment(rest)); off(hermesKeyName(key), v) {
+			return v, true
 		}
 	}
-	return false
+	return "", false
 }
 
 func installGoose(exe string, uninstall bool) (installResult, error) {

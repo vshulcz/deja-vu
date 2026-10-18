@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -370,6 +371,57 @@ func yamlQuote(s string) string {
 	return `"` + r.Replace(s) + `"`
 }
 
+// hermesEntrySwitchedOff returns deja's `enabled` under mcp_servers when
+// Hermes reads it as off. Hermes loads the file with PyYAML, YAML 1.1, and
+// passes the value through its own boolish check: `no`, `off`, `0`, `~`, a
+// bare `enabled:` and any string but true, 1 or yes are all off, and
+// `disabled:` is not a key it reads.
+func hermesEntrySwitchedOff(doc string) (string, bool) {
+	return yamlEntrySwitch(doc, "mcp_servers:", "deja", func(key, value string) bool {
+		return key == "enabled" && !hermesBoolish(value)
+	})
+}
+
+var (
+	yaml11Int   = regexp.MustCompile(`^(?:[-+]?0b[0-1_]+|[-+]?0[0-7_]+|[-+]?(?:0|[1-9][0-9_]*)|[-+]?0x[0-9a-fA-F_]+|[-+]?[1-9][0-9_]*(?::[0-5]?[0-9])+)$`)
+	yaml11Float = regexp.MustCompile(`^(?:[-+]?[0-9][0-9_]*\.[0-9_]*(?:[eE][-+][0-9]+)?|\.[0-9][0-9_]*(?:[eE][-+][0-9]+)?|[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+\.[0-9_]*|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN))$`)
+)
+
+// hermesBoolish is whether Hermes reads a YAML scalar as true: PyYAML's
+// resolution of an unquoted one, then Hermes's _parse_boolish — a bool or
+// number as Python's truth, a string only when it is true, 1 or yes.
+func hermesBoolish(v string) bool {
+	if len(v) >= 2 && (v[0] == '"' || v[0] == '\'') && v[len(v)-1] == v[0] {
+		v = v[1 : len(v)-1]
+	} else {
+		switch v {
+		case "", "~", "null", "Null", "NULL",
+			"false", "False", "FALSE", "no", "No", "NO", "off", "Off", "OFF":
+			return false
+		case "true", "True", "TRUE", "yes", "Yes", "YES", "on", "On", "ON":
+			return true
+		}
+		if yaml11Int.MatchString(v) || yaml11Float.MatchString(v) {
+			if strings.Contains(strings.ToLower(v), "inf") || strings.Contains(strings.ToLower(v), "nan") {
+				return true
+			}
+			digits := strings.TrimLeft(v, "+-")
+			if strings.HasPrefix(digits, "0x") || strings.HasPrefix(digits, "0b") {
+				digits = digits[2:]
+			}
+			if i := strings.IndexAny(digits, "eE"); i >= 0 {
+				digits = digits[:i]
+			}
+			return strings.Trim(digits, "0_.:") != ""
+		}
+	}
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "true", "1", "yes":
+		return true
+	}
+	return false
+}
+
 // installHermesMCP edits config.yaml by hand rather than through a YAML
 // round-trip: the file ships with section comments a re-serialise would drop,
 // and `hermes mcp add` prompts before saving, which an installer cannot answer.
@@ -386,12 +438,13 @@ func installHermesMCP(exe string, uninstall bool) (installResult, error) {
 		if !ok {
 			pad = "  "
 		}
-		on := "true"
-		if yamlEntrySwitchedOff(lfText(old), "mcp_servers:", "deja") {
-			on, note = "false", switchedOffNote
+		on := " true"
+		if v, off := hermesEntrySwitchedOff(lfText(old)); off {
+			// Kept as the reader spelt it, a bare `enabled:` included.
+			on, note = strings.TrimRight(" "+v, " "), switchedOffNote
 		}
 		entry := pad + "deja:\n" + pad + pad + "command: " + yamlQuote(exe) + "\n" +
-			pad + pad + "args:\n" + pad + pad + pad + "- mcp\n" + pad + pad + "enabled: " + on + "\n"
+			pad + pad + "args:\n" + pad + pad + pad + "- mcp\n" + pad + pad + "enabled:" + on + "\n"
 		if next != "" && !strings.HasSuffix(next, "\n") {
 			next += "\n"
 		}

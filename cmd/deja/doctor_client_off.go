@@ -24,7 +24,14 @@ func clientMCPEntryOff(name string) string {
 	case "goose":
 		return yamlSwitchOff(filepath.Join(gooseConfigDir(), "config.yaml"), "goose", "extensions", "deja", "enabled")
 	case "hermes":
-		return yamlSwitchOff(filepath.Join(sources.HermesHome(), "config.yaml"), "hermes", "mcp_servers", "deja", "enabled")
+		// Read the way install reads it, so the two cannot disagree on a
+		// spelling: `enabled: no` is as off to Hermes as `false`.
+		p := filepath.Join(sources.HermesHome(), "config.yaml")
+		if b, err := readConfig(p); err == nil {
+			if v, off := hermesEntrySwitchedOff(lfText(b)); off {
+				return mcpOffNote("hermes", "`"+strings.TrimRight("mcp_servers.deja.enabled: "+v, " ")+"`", p)
+			}
+		}
 	case "codex", "grok":
 		home := sources.CodexHome()
 		if name == "grok" {
