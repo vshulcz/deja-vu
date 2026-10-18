@@ -735,7 +735,10 @@ import (
 // 78: a Grok --fork-session copy reads as a fork of its source, and a Grok
 // subagent hangs under the session whose subagent_spawned record names it
 // (#5263, #5264); rows already indexed hold neither until a rebuild.
-const version = 78
+// 79: a Claude Code /branch is read as a fork of the session it names in
+// forkedFrom, which the rows already indexed do not carry until a rebuild
+// (#5241).
+const version = 79
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
