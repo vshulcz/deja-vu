@@ -7,19 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+A sub-agent run is a session of its own under the session that spawned it.
+Cursor, Qwen, Kimi and goose sub-agents are now read by default as their task,
+answer and edits, the way Claude Code's are, so `deja blame` names the
+sub-agent that wrote a line; `DEJA_INCLUDE_SUBAGENTS=0` leaves them out.
+Copilot CLI task runs are split out of the parent's log, OpenClaw children and
+Hermes delegates hang under their parent whatever source they ran under, and
+Gemini, Kimi and OpenClaw sub-agents are titled by their task rather than by
+injected context or their answer. Sub-agent runs stay out of the start digest.
+
+A fork no longer takes credit for what it copied. A Codex `fork_context`
+sub-agent, a Grok `--fork-session` copy, a Kimi `/fork`, a goose fork and an
+OpenClaw fork child keep only their own turns, and Claude Code `/branch`,
+Copilot `/fork`, Grok, Kimi, goose and OpenClaw forks name the session they came
+from. Where a copy still holds its source's records at their original times
+(Claude `/branch`, Qwen `/branch`, opencode `--fork`), blame credits the source.
+Relative paths in opencode `apply_patch`, Hermes `write_file` and `patch`, Kimi
+`Write`/`Edit`, and a Codex `apply_patch` run through the shell are filed under
+the session's directory, so blame finds their writer.
+
 A session is no longer recalled to itself or to its own lineage. A fork,
 `/branch`, resume or sub-agent in Claude Code, opencode, Copilot, Gemini,
-Hermes, Qwen, Kimi, Cline, Kiro and aider leaves out the session it came from,
-and a resume gets one start digest, not two. The session that just ended shows
-up in the next one's digest, including sessions Hermes still holds
-in `state.db-wal` and Kimi Code 2.x sessions, which now get their project.
+Hermes, Qwen, Kimi, Cline, Kiro, aider, Grok, pi, goose and dsh leaves out the
+session it came from, and a dsh session's sub-agents stay out of its recall at
+any depth. A resume gets one start digest, not two, Grok and pi included. The
+session that just ended shows up in the next one's digest, including the first
+session in a new project, sessions Hermes still holds in `state.db-wal` and
+Kimi Code 2.x sessions, which now get their project.
 
 `deja install` and `uninstall` leave the client's own config alone. A
-`"disabled": true` that the client ignores is no longer read as off, and the
-client's own switch, extra keys, comments and empty blocks survive install and
-uninstall for Codex, Cursor, Gemini, Hermes, Kiro, goose, dsh, pi, Qwen and
-Grok. A read-only file is refused before anything is written. pi 0.99 and later
-need no MCP adapter, and `PI_CODING_AGENT_DIR` is followed.
+`"disabled": true` that the client ignores is no longer read as off, Claude
+Code and Kimi Code included, and the client's own switch, extra keys, comments
+and empty blocks survive install and uninstall for Codex, Cursor, Gemini,
+Hermes, Kiro, goose, dsh, pi, Qwen, Grok, aider, Kimi, Copilot, OpenClaw and
+opencode. A read-only file is refused before anything is written, Cline and
+Kimi included. pi 0.99 and later need no MCP adapter, and
+`PI_CODING_AGENT_DIR` is followed. OpenClaw install and doctor say when
+`plugins.allow` or `plugins.enabled` keeps deja's plugin off.
 
 ## [0.22.2] - 2026-10-17
 
