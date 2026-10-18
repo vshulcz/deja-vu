@@ -143,7 +143,7 @@ func jsonStatuslineUpdate(path string, keys []string, entry map[string]any, unin
 		parent[last] = entry
 	}
 	if jsonc {
-		return writeJSONCStatusline(path, old, root, keys, entry, uninstall, nullHeld)
+		return writeJSONCStatusline(path, old, root, keys, entry, uninstall, nullHeld, write)
 	}
 	if !write {
 		if after, _ := json.Marshal(root); string(after) == string(before) {
@@ -169,7 +169,10 @@ func jsonStatuslineUpdate(path string, keys []string, entry map[string]any, unin
 // root is the file as it will read afterwards: on uninstall, a parent the
 // status line was the only thing in is already gone from it, and goes from
 // the text too.
-func writeJSONCStatusline(path string, old []byte, root map[string]any, keys []string, entry map[string]any, uninstall, nullHeld bool) (installResult, error) {
+//
+// write false only checks, as the JSON path does: a pre-flight that wrote
+// here left the status line wired in a target it then refused.
+func writeJSONCStatusline(path string, old []byte, root map[string]any, keys []string, entry map[string]any, uninstall, nullHeld, write bool) (installResult, error) {
 	text := lfText(old)
 	parents := keys[:len(keys)-1]
 	last := keys[len(keys)-1]
@@ -197,6 +200,12 @@ func writeJSONCStatusline(path string, old []byte, root map[string]any, keys []s
 	}
 	if err != nil {
 		return installResult{}, configParseError(path, err)
+	}
+	if !write {
+		if next == text {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
+		return installResult{Path: path}, configWritable(path)
 	}
 	a, err := writeIfChanged(path, old, []byte(next))
 	return installResult{Path: path, Action: a}, err
