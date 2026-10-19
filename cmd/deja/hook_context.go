@@ -722,6 +722,9 @@ func runHookContextMode(dir string, plain, once bool) error {
 	// turns, the digest that opened it among them. A second one led with the
 	// source itself, the fork's own opening under another id (#4549).
 	if input.Source == "fork" {
+		// Its first prompt and tool come before the copy is written; they
+		// learn the source from what this keeps (#5128).
+		rememberClaudeForkSource(dir, input.SessionID, input.TranscriptPath)
 		return nil
 	}
 	if threadHasDigest(dir, input.Source, input.SessionID, input.TranscriptPath) {

@@ -338,11 +338,13 @@ func askerLineageCut(dir, asker, transcript string, ids ...string) (map[string]b
 	var heads []model.Session
 	if asker = strings.TrimSpace(asker); asker != "" && !isSpawnedReader(asker) && !index.HasSession(dir, asker) {
 		if h, ok := askerHead(asker, transcript); ok {
-			heads = append(heads, h)
+			heads = append(heads, withClaudeForkMark(dir, h))
 		} else if w, ok := sources.ClineForkSession(asker); ok {
 			// Read whole, so the copy it holds is left out and a sibling
 			// fork that went on past it is not (#5151).
 			return index.LineageWholeCut(dir, set, lineageOnly(w))
+		} else if src := claudeForkMark(dir, asker); src != "" {
+			heads = append(heads, model.Session{Harness: "claude", ID: asker, Kind: "fork", Parent: src})
 		}
 	}
 	return index.LineageCut(dir, set, heads...)
@@ -432,4 +434,17 @@ func withoutLiveSessions(dir string, ss []model.Session) []model.Session {
 	// An index holding nothing else says so through the empty answer, which is
 	// the honest one: the only session that matched is the one being written.
 	return out
+}
+
+// withClaudeForkMark names the source SessionStart kept for a Claude Code fork
+// whose transcript does not name it yet: the first records hold no forkedFrom
+// until the copy is written after the first tool result (#5128).
+func withClaudeForkMark(dir string, h model.Session) model.Session {
+	if h.Parent != "" || h.Kind != "" {
+		return h
+	}
+	if src := claudeForkMark(dir, h.ID); src != "" && src != h.ID {
+		h.Kind, h.Parent = "fork", src
+	}
+	return h
 }
