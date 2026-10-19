@@ -38,6 +38,7 @@ func AdoptWriteBack(dir, kept, path string) (ok bool, err error) {
 	}
 	fs := walkFileState(path, fi, nil)
 	fs.LastUpdated = of.LastUpdated
+	fs.WrittenBack = true
 	fs.Redactions = of.Redactions
 	m.Files[path] = fs
 	if kept == path {

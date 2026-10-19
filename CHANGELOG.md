@@ -101,8 +101,7 @@ took 25 s to index, now about 2 s.
 
 When two transcripts hold the same session id, a pass that rewrites one reads
 the other again too, so a turn both hold is no longer indexed twice and a copy's
-turns are no longer dropped until `deja index --rebuild`. The index format
-moves to version 90, so the first run rebuilds it.
+turns are no longer dropped until `deja index --rebuild`.
 
 OpenClaw: a heartbeat answered with `HEARTBEAT_OK` is not a session either; a
 sub-agent whose spawning window was archived as `.zst` keeps its parent, and
@@ -114,7 +113,7 @@ clamped to 3 s. After a `kimi -p` run the session is no longer hidden from
 the next session's recall for 20 minutes. In the light theme on a 256-colour
 terminal, key chips no longer melt into their panel.
 ё and е are one letter in the index and in queries, so «ещё» finds a session
-that says «еще» and the other way round. The index format moves to version 89,
+that says «еще» and the other way round. The index format moves to version 90,
 so the first run rebuilds it.
 
 Semantic search works with models trained with instruction prefixes, such as

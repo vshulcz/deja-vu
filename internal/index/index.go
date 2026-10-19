@@ -895,6 +895,11 @@ type FileState struct {
 	// PrefixHash stays for manifests written before this existed; they verify
 	// the old way once, and the next walk records a sample.
 	PrefixSample uint64 `json:"prefix_sample,omitempty"`
+	// WrittenBack marks a transcript `deja resume --write-back` rebuilt from
+	// the index (#4617): it holds the conversation only, so a pass that reads
+	// a session's other copies again carries this one's records instead of
+	// reading it (#5358). It lasts while the file's size and mtime do.
+	WrittenBack bool `json:"written_back,omitempty"`
 }
 
 type SessionMeta struct {

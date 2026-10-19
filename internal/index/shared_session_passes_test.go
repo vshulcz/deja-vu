@@ -165,6 +165,43 @@ func TestPassesOverFilesSharingASessionMatchRebuild(t *testing.T) {
 	}
 }
 
+// A transcript `deja resume --write-back` put back holds the conversation
+// only, and is recorded as read so it never replaces the tool output the index
+// holds (#4617). A rewrite of another copy of the session must not read it.
+func TestACopyRewriteLeavesAWrittenBackTranscriptUnread(t *testing.T) {
+	tmp := hermeticIndexEnv(t)
+	claude := os.Getenv("DEJA_CLAUDE_ROOT")
+	a := filepath.Join(claude, "p", "a.jsonl")
+	b := filepath.Join(claude, "p", "b.jsonl")
+	dir := filepath.Join(tmp, "idx")
+	const t0, t1 = "2026-01-02T03:04:05Z", "2026-01-02T03:04:06Z"
+	tool := `{"type":"user","sessionId":"s-x","timestamp":"` + t1 + `","message":{"role":"user","content":[{"type":"tool_result","content":"toolneedle output of the build"}]}}` + "\n"
+	write(t, a, claudeLine("s-x", t0, "alpha question")+tool)
+	write(t, b, claudeLine("s-x", t0, "alpha question"))
+	indexPass(t, dir)
+	if v := sessionView(t, dir, "claude", "s-x"); !strings.Contains(v, "toolneedle") {
+		t.Fatalf("control: the tool output was not indexed:\n%s", v)
+	}
+	if err := os.Remove(a); err != nil {
+		t.Fatal(err)
+	}
+	indexPass(t, dir)
+	write(t, a, claudeLine("s-x", t0, "alpha question"))
+	if ok, err := AdoptWriteBack(dir, a, a); !ok || err != nil {
+		t.Fatalf("adopt: %v %v", ok, err)
+	}
+	indexPass(t, dir)
+	write(t, b, claudeLine("s-x", t0, "alpha questions")+claudeLine("s-x", "2026-01-02T03:05:00Z", "bravo follow up"))
+	bumpMTime(t, b)
+	var progress strings.Builder
+	if err := Ensure(dir, "", false, &progress); err != nil {
+		t.Fatal(err)
+	}
+	if v := sessionView(t, dir, "claude", "s-x"); !strings.Contains(v, "toolneedle") || !strings.Contains(v, "bravo follow up") {
+		t.Errorf("the rewrite read the written-back copy and dropped its tool output:\n%s\nprogress: %s", v, progress.String())
+	}
+}
+
 // The control: the same passes over distinct sessions match too, and the
 // grown file is still appended from its offset rather than read again.
 func TestPassesOverDistinctSessionsMatchRebuild(t *testing.T) {

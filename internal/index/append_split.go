@@ -72,9 +72,9 @@ func splitAppendable(changed, old map[string]FileState, sessions map[string]Sess
 			return nil, changed
 		}
 	}
-	// A row covering more than one transcript names only the one that owns
-	// it; the others are unknown, so any such row on a changed file keeps the
-	// batch whole.
+	// A changed file that owns a row covering more than one transcript keeps
+	// the batch whole: the replacement half would read the appended copies
+	// again anyway (#5358).
 	for _, meta := range sessions {
 		if _, ok := changed[meta.Path]; ok && (meta.Shared || !meta.SharedStarted.IsZero() || !meta.SharedUpdated.IsZero()) {
 			return nil, changed

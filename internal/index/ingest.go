@@ -4415,6 +4415,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	// it, as a rebuild reads it: the ones that changed, and the copies beside
 	// them that did not (#5358). What those copies hold can name a session
 	// another file holds in turn, so it runs until nothing new is read.
+	copiesRead := 0
 	if heldBy := keysByFile(old.Sessions); len(heldBy) > 0 {
 		var pending []string
 		for p := range changed {
@@ -4424,7 +4425,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		for p := range removed {
 			pending = append(pending, heldBy[p]...)
 		}
-		seen := map[string]bool{}
+		seen, tried := map[string]bool{}, map[string]bool{}
 		for len(pending) > 0 {
 			key := pending[len(pending)-1]
 			pending = pending[:len(pending)-1]
@@ -4437,10 +4438,14 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 				continue
 			}
 			for _, q := range sessionFiles(meta) {
+				// A written-back file holds less than its records do, and
+				// those are carried instead (#4617).
 				f, live := files[q]
-				if _, again := changed[q]; again || !live || kept[q] || f.Kept || !copyable(q) {
+				if _, again := changed[q]; again || tried[q] || !live || kept[q] || f.Kept || f.WrittenBack || !copyable(q) {
 					continue
 				}
+				tried[q] = true
+				copiesRead++
 				changed[q] = f
 				read(q, f)
 				pending = append(pending, heldBy[q]...)
@@ -4550,7 +4555,11 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		// which is a log line for whoever wrote it, on a path every user hits:
 		// the first `deja blame` or search after a day of work prints it above
 		// the answer. Zero counts are left out rather than shown as zero.
-		line := fmt.Sprintf("deja: %s %d changed transcript%s", replacementPassMarker, len(changed), pluralS(len(changed)))
+		n := len(changed) - copiesRead
+		line := fmt.Sprintf("deja: %s %d changed transcript%s", replacementPassMarker, n, pluralS(n))
+		if copiesRead > 0 {
+			line += fmt.Sprintf(", %d cop%s read again", copiesRead, map[bool]string{true: "y", false: "ies"}[copiesRead == 1])
+		}
 		if len(replaceKeys) > 0 {
 			line += fmt.Sprintf(", %d session%s replaced", len(replaceKeys), pluralS(len(replaceKeys)))
 		}
@@ -5875,6 +5884,7 @@ func walkFileState(p string, fi os.FileInfo, old map[string]FileState) FileState
 		if of, ok := old[p]; ok && of.Size == fs.Size && of.MTime == fs.MTime {
 			fs.SafeSize, fs.PrefixHash = of.SafeSize, of.PrefixHash
 			fs.PrefixSample = of.PrefixSample
+			fs.WrittenBack = of.WrittenBack
 		} else {
 			fs.SafeSize = lastCompleteLineOffset(p, fi.Size())
 			fs.PrefixSample = filePrefixSample(p, fs.SafeSize)
