@@ -134,7 +134,7 @@ func mcpResourceRead(dir, uri string) (any, int, string) {
 	// marker neutralisation entirely (#1077).
 	// The changes block can carry the digest past its budget; the cut takes the
 	// end of the conversation, which is why the block sits above it.
-	text := note + frameRecall(fitContextDigest(withChanges(b.String(), s), "", contextMCPBudget-recallFrameOverhead))
+	text := note + frameRecall(fitContextDigest(withChanges(b.String(), s), "", s.ID, contextMCPBudget-recallFrameOverhead))
 	// It also left no trace: a whole session reached the agent and `deja log`
 	// stayed empty — the gap #682 closed for blame.
 	usage.RecordServedFromInto(dir, usage.KindResource, text, mcpConnID(), 1, rawSize([]model.Session{s}), []string{s.ID}, projectsOf(s), policy.Load().Describe(policy.ActivationMCP))

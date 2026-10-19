@@ -1118,6 +1118,11 @@ func ctxFromIDPrefix(dir, q string) (bool, error) {
 		fmt.Fprintln(os.Stdout, line)
 	}
 	cw := &countingWriter{w: os.Stdout}
+	// The digest marks its own cuts; a message the index stored short is a
+	// cut made before it, and `deja show` says so the same way (#5392).
+	if line := clippedMessageNote(dir, s); line != "" {
+		fmt.Fprintln(os.Stderr, line)
+	}
 	search.PrintContextStyled(cw, s, "", search.ColorOK(os.Stdout), printableWidth(os.Stdout))
 	if blk := changesBlock(s, search.ContextBudget-cw.n); blk != "" {
 		fmt.Fprint(os.Stdout, "\n"+blk)
@@ -1260,6 +1265,9 @@ func cmdCtx(dir string, rest []string) error {
 		whole = full
 	}
 	cw := &countingWriter{w: os.Stdout}
+	if line := clippedMessageNote(dir, whole); line != "" {
+		fmt.Fprintln(os.Stderr, line)
+	}
 	search.PrintContextStyled(cw, whole, q, search.ColorOK(os.Stdout), printableWidth(os.Stdout))
 	if blk := changesBlock(whole, search.ContextBudget-cw.n); blk != "" {
 		fmt.Fprint(os.Stdout, "\n"+blk)

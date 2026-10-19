@@ -93,11 +93,14 @@ func TestATrimmedDigestSaysItWasTrimmed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(framed, "digest trimmed") {
+	// Either line says it: the digest's own when the window left turns out,
+	// the reply's when the trim to the budget took the end (#5392).
+	cutLines := func(s string) int { return strings.Count(s, "digest trimmed") + strings.Count(s, " turns shown") }
+	if cutLines(framed) == 0 {
 		t.Errorf("a digest at the budget does not say it was cut:\n%s", framed[len(framed)-200:])
 	}
-	if strings.Count(framed, "digest trimmed") != 1 {
-		t.Errorf("the marker appears %d times", strings.Count(framed, "digest trimmed"))
+	if cutLines(framed) != 1 {
+		t.Errorf("the marker appears %d times", cutLines(framed))
 	}
 
 	// The control: a session that fits gets no marker.
@@ -106,7 +109,7 @@ func TestATrimmedDigestSaysItWasTrimmed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(framed, "digest trimmed") {
+	if cutLines(framed) > 0 {
 		t.Errorf("a digest well inside the budget claims it was cut:\n%s", framed)
 	}
 }
@@ -140,7 +143,7 @@ func TestTheBackupNeverDropsTheMatch(t *testing.T) {
 	full := filler + tail
 	budget := len(full) - 200
 
-	out := fitContextDigest(full, "wobbleshard verdict", budget)
+	out := fitContextDigest(full, "wobbleshard verdict", "", budget)
 	if !strings.Contains(out, "wobbleshard") {
 		t.Errorf("the backup dropped the line carrying the query:\n%s", out[max(0, len(out)-160):])
 	}
@@ -150,8 +153,8 @@ func TestTheBackupNeverDropsTheMatch(t *testing.T) {
 
 	// The control: nothing at stake in that last line, so it is still tidied
 	// away at the line break rather than left ragged.
-	plain := fitContextDigest(filler+strings.Repeat("another filler line ", 25)+"\n", "wobbleshard", budget)
-	if !strings.HasSuffix(plain, contextDigestCut) || strings.Contains(strings.TrimSuffix(plain, contextDigestCut), "another filler") {
+	plain := fitContextDigest(filler+strings.Repeat("another filler line ", 25)+"\n", "wobbleshard", "", budget)
+	if !strings.HasSuffix(plain, contextDigestCut("")) || strings.Contains(strings.TrimSuffix(plain, contextDigestCut("")), "another filler") {
 		t.Errorf("the line-break backup stopped happening when nothing was at stake:\n%q", plain[max(0, len(plain)-200):])
 	}
 }

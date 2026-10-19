@@ -563,7 +563,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			if note != "" {
 				lead = "deja: " + note + "\n\n"
 			}
-			text = frameRecall(fitContextDigest(text, a.Query, contextMCPBudget-recallFrameOverhead-len(lead)))
+			text = frameRecall(fitContextDigest(text, a.Query, firstID(ids), contextMCPBudget-recallFrameOverhead-len(lead)))
 			text = lead + text
 			usage.RecordServedFromInto(dir, usage.KindContext, text, mcpConnID(), sessions, raw, ids, projects, policy.Load().Describe(policy.ActivationMCP))
 		}
@@ -749,21 +749,29 @@ const recallMCPBudget = 4096
 
 // contextDigestCut is the line that admits a digest was cut. Without it the
 // reply ends mid-word and reads as the whole session, which is what an agent
-// then tells the user it saw.
-const contextDigestCut = "\n[digest trimmed to fit the ~8KB budget — call recall_context again for another session, or deja ctx <id> for the whole one]\n"
+// then tells the user it saw. It names `deja show`, the one read that prints a
+// session whole: it pointed at `deja ctx`, which cuts at the same 8 KB, and at
+// recall_context, a tool name the one-tool server no longer lists (#5392).
+func contextDigestCut(id string) string {
+	if id == "" {
+		id = "<id>"
+	}
+	return "\n[digest trimmed to fit the ~8KB budget, the rest of this session left out — `deja show " + search.SafeLine(id) + "` in a shell prints all of it]\n"
+}
 
 // fitContextDigest trims a digest to budget, cutting at a line boundary where
 // one is near enough and saying that it cut. The marker is reserved before the
 // trim, the way recall reserves its paging line (#1726), so the thing that
 // explains the cut is not itself the thing that gets cut.
-func fitContextDigest(text, query string, budget int) string {
+func fitContextDigest(text, query, id string, budget int) string {
 	if len(text) <= budget {
 		return text
 	}
-	if budget <= len(contextDigestCut) {
+	cutLine := contextDigestCut(id)
+	if budget <= len(cutLine) {
 		return trimUTF8(text, budget)
 	}
-	body := trimUTF8(text, budget-len(contextDigestCut))
+	body := trimUTF8(text, budget-len(cutLine))
 	// Back up to the last line break if one is close, so the digest does not
 	// end in the middle of a sentence it will not finish — but never at the
 	// cost of the words the digest was asked for. A match sitting in that last
@@ -773,7 +781,14 @@ func fitContextDigest(text, query string, budget int) string {
 			body = shorter
 		}
 	}
-	return body + contextDigestCut
+	return body + cutLine
+}
+
+func firstID(ids []string) string {
+	if len(ids) == 0 {
+		return ""
+	}
+	return ids[0]
 }
 
 // keepsQuery reports whether the shorter body still carries a query word that
@@ -1508,7 +1523,7 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 			// A deep read, not a page: it gets recall_context's room and cut
 			// marker on top of what the caller reserved. It used to return
 			// before any budget applied, up to 3653 bytes over (#4023).
-			text = fitContextDigest(note+text, q, budget+contextMCPBudget-recallMCPBudget)
+			text = fitContextDigest(note+text, q, id.session, budget+contextMCPBudget-recallMCPBudget)
 			return text, 1, id.size, []string{id.session}, nil, nil
 		}
 	}
