@@ -1,7 +1,10 @@
 package index
 
 import (
+	"fmt"
+	"io"
 	"sync"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -42,10 +45,59 @@ func SetProgress(p Progress) {
 func reportPhase(name string, total int) {
 	progressMu.Lock()
 	p := progressSink
+	lines := phaseLines
 	progressMu.Unlock()
 	if p != nil {
 		p.Phase(name, total)
 	}
+	if lines != nil {
+		lines.phase(name, total)
+	}
+}
+
+// phaseLines is where a run with no live display writes one line per phase.
+// Piped or under cron, `deja index` printed "indexing ..." and then nothing
+// until the per-store counts, so a long run could not be told from a stuck
+// one (#5396).
+var phaseLines *phaseWriter
+
+type phaseWriter struct {
+	mu      sync.Mutex
+	w       io.Writer
+	started time.Time
+}
+
+// SetPhaseLines writes a line per build phase to w, or stops with nil.
+func SetPhaseLines(w io.Writer) {
+	progressMu.Lock()
+	defer progressMu.Unlock()
+	if w == nil {
+		phaseLines = nil
+		return
+	}
+	phaseLines = &phaseWriter{w: w, started: time.Now()}
+}
+
+// phaseUnits names what a phase's total counts.
+var phaseUnits = map[string]string{
+	"reading sessions":  "file",
+	"indexing messages": "message",
+}
+
+func (p *phaseWriter) phase(name string, total int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	line := "deja: " + name
+	if unit := phaseUnits[name]; unit != "" && total > 0 {
+		line += fmt.Sprintf(" — %d %s", total, unit)
+		if total != 1 {
+			line += "s"
+		}
+	}
+	if d := time.Since(p.started); d >= time.Second {
+		line += fmt.Sprintf(" (%s in)", d.Round(time.Second))
+	}
+	fmt.Fprintln(p.w, line)
 }
 
 func reportAdvance(units int) {

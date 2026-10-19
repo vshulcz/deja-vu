@@ -212,7 +212,7 @@ var helpEntries = []helpEntry{
 	{name: "index", group: groupSetup,
 		usage:    []string{"deja index [--rebuild] [--quiet]"},
 		desc:     "read new agent history into the index",
-		more:     "--rebuild reads everything again; --quiet says nothing unless something failed.",
+		more:     "--rebuild reads everything again; --quiet says nothing unless something failed. Exits 3 when the index was written but part of the input was not read.",
 		examples: []string{"deja index", "deja index --rebuild"}},
 	{name: "warmup", group: groupSetup,
 		usage:    []string{"deja warmup"},

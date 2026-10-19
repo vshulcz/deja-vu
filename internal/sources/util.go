@@ -385,9 +385,9 @@ func boundedFrom(path string, f *os.File, offset int64) io.Reader {
 	e, ok := readEnds[path]
 	readEndsMu.Unlock()
 	if !ok {
-		return f
+		return watchedReader(path, f)
 	}
-	return io.LimitReader(f, max(e.size-offset, 0))
+	return watchedReader(path, io.LimitReader(f, max(e.size-offset, 0)))
 }
 
 func scanJSONLFromOffset(path string, offset int64, fn func(map[string]any)) error {
@@ -556,7 +556,7 @@ func parseFiles(files []string, parse func(string) ([]model.Session, error)) []m
 		go func() {
 			defer wg.Done()
 			for j := range jobs {
-				ss, err := safeParse(j.p, parse)
+				ss, err := ReadWatched(j.p, func() ([]model.Session, error) { return safeParse(j.p, parse) })
 				diagFileError(j.p, err)
 				fileParsed(j.p)
 				outs <- struct {
@@ -1087,6 +1087,15 @@ func fileParsed(path string) {
 // order mark some Windows tools write: json.Unmarshal refuses the mark, and the
 // whole session went for three bytes. trimJSONSpace does the same for a line.
 func readJSONFile(path string) ([]byte, error) {
-	b, err := os.ReadFile(path)
-	return bytes.TrimPrefix(b, []byte("\xef\xbb\xbf")), err
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+	var buf bytes.Buffer
+	if fi, err := f.Stat(); err == nil && fi.Size() > 0 {
+		buf.Grow(int(fi.Size()) + bytes.MinRead)
+	}
+	_, err = buf.ReadFrom(watchedReader(path, f))
+	return bytes.TrimPrefix(buf.Bytes(), []byte("\xef\xbb\xbf")), err
 }

@@ -44,7 +44,7 @@ if [ "$arm" = deja ]; then
   done
   # HOME is the run's own home here too: without it the build reads the real
   # machine's stores and the arm measures a history it was never given.
-  ( cd "$R/project" && HOME="$R/home" "$DEJA" index --rebuild >/dev/null 2>&1 )
+  ( cd "$R/project" && HOME="$R/home" "$DEJA" index --rebuild >/dev/null 2>&1 ) || [ $? -eq 3 ]
   # And wait until it answers from that index rather than from a build in
   # progress: a session that starts while the index is still coming up gets the
   # "building" notice in place of the map, which is a different arm.

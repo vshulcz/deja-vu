@@ -35,8 +35,9 @@ func TestAHandWrittenNoteLineDejaCannotReadIsReported(t *testing.T) {
 		t.Fatal(err)
 	}
 	said, err := captureRunStderr(t, "index")
-	if err != nil {
-		t.Fatal(err)
+	// The index is written with a line left out, and the status says so (#5396).
+	if !isExitStatus(err, exitPartial) {
+		t.Fatalf("got %v, want exit status %d", err, exitPartial)
 	}
 	// The run says it, with the count, rather than indexing one note and
 	// moving on.

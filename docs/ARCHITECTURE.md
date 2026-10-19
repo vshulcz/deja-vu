@@ -62,6 +62,8 @@ Every SQLite store above is read through the local `sqlite3` command — opencod
 
 Every one of those reads carries a wall-clock budget, ten minutes by default. One sqlite3 child once ran 13m54s with 0.75s of CPU in deja itself, and nothing in the tree set a deadline, so the run looked hung rather than slow. A store that runs out is an ordinary read error: the harness reports as unreadable, `deja doctor` names it, and the rest of the index still builds. `DEJA_STORE_TIMEOUT` takes a duration, and a zero or negative one turns the cap off for someone who would rather wait than lose a store.
 
+A transcript read has the same budget, counted from the last byte read through the line and document readers rather than from the start, and so do the walk's reads of a changed transcript's head and tail. A file on a mount that stopped answering is skipped and named as unreadable once it has moved nothing for that long, and a slow read that keeps moving is left alone. A read given up marks its directory, so the rest of that directory is skipped at once for the rest of the process instead of costing the budget again. Its goroutine is not waited for; if the blocked call ever returns, what the parser reports after that is dropped. Readers that do not go through those readers (sqlite3 children, `os.ReadFile` in a few parsers) get the budget as a plain wall-clock limit.
+
 ## Index format
 
 Default path: `~/.cache/deja/index.db`.

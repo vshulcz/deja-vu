@@ -91,8 +91,9 @@ func TestDeniedStorePlusNonEmptyIndexStillNamesTheDeniedStore(t *testing.T) {
 	}
 	index.LastBuild = index.BuildSummary{}
 	stderr, err := captureRunStderr(t, "index")
-	if err != nil {
-		t.Fatal(err)
+	// Written, with a store it could not read: exit status 3 (#5396).
+	if !isExitStatus(err, exitPartial) {
+		t.Fatalf("got %v, want exit status %d", err, exitPartial)
 	}
 	if !strings.Contains(stderr, "could not be read (permission denied)") {
 		t.Fatalf("the denied store went unnamed:\n%s", stderr)

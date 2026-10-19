@@ -26,8 +26,9 @@ func TestDoctorJSONNamesTheFilesItsCountsCameFrom(t *testing.T) {
 	if err := os.WriteFile(notes, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := captureRunStderr(t, "index"); err != nil {
-		t.Fatal(err)
+	// A line it could not use: the index is written, and the run says so (#5396).
+	if _, err := captureRunStderr(t, "index"); !isExitStatus(err, exitPartial) {
+		t.Fatalf("got %v, want exit status %d", err, exitPartial)
 	}
 
 	raw, _ := captureRun(t, "doctor", "--json")

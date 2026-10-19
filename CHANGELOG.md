@@ -139,6 +139,15 @@ locked instead of "index is up to date". Sessions already indexed from them stay
 searchable, a locked directory no longer reads as deleted, and `deja doctor`
 names a locked transcript even when it is not the newest one (#5393).
 
+`deja index` exits 3 when it wrote the index but left part of the input
+unread (a path it could not read, a line it skipped), so a cron job or a timer
+can tell that from a clean run; 1 still means the index was not written. Piped
+or under cron it prints one line per phase. A transcript read that moves no
+bytes for `DEJA_STORE_TIMEOUT` (ten minutes by default) is skipped and named,
+and the rest of the run goes on; a slow read that keeps moving is not cut.
+`--rebuild` reads every line again, so a store with an old line deja cannot
+use exits 3 on every rebuild (#5396).
+
 ## [0.22.2] - 2026-10-17
 
 deja now reads Windsurf / Devin Desktop: Cascade's encrypted conversation

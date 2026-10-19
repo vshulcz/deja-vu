@@ -171,7 +171,7 @@ winget install vshulcz.deja-vu</pre>
 <pre>deja "connection pool exhausted"
 deja "have we dealt with jwt refresh rotation before"</pre>
 <p><code>deja brief</code> prints a text summary of recent sessions instead of the screen, and <code>DEJA_TUI=0</code> makes bare <code>deja</code> do the same.</p>
-<div class="note">No <code>deja index</code> step is required — any search, recall, or install builds and refreshes the index as needed. Pass <code>--no-index</code> to <code>deja install</code> if you are scripting an install and want to defer the build. If you do keep the index warm from a shell profile or a cron entry, <code>deja index --quiet</code> says nothing when it worked and still reports every failure — which <code>deja index &gt;/dev/null</code> does not.</div>
+<div class="note">No <code>deja index</code> step is required — any search, recall, or install builds and refreshes the index as needed. Pass <code>--no-index</code> to <code>deja install</code> if you are scripting an install and want to defer the build. If you do keep the index warm from a shell profile or a cron entry, <code>deja index --quiet</code> says nothing when it worked and still reports every failure — which <code>deja index &gt;/dev/null</code> does not. Exit status 3 means the index was written but some paths or lines were not read; <code>deja doctor</code> names them.</div>
 <h2>Wire it into your agents</h2>
 <pre>deja install --all      # MCP recall for every agent found on this machine
 deja install --auto     # same, plus session-start auto-recall where supported</pre>

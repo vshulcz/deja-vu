@@ -61,6 +61,11 @@ func main() {
 	if exe, exeErr := os.Executable(); exeErr == nil {
 		notice.finish(os.Stderr, exe)
 	}
+	var status exitStatus
+	if errors.As(err, &status) {
+		stopProfiling()
+		os.Exit(int(status))
+	}
 	if err != nil {
 		stopProfiling()
 		// Already said, on stderr, in the words that fit what happened: a
@@ -634,14 +639,14 @@ func cmdIndex(dir string, rest []string) error {
 		// Up to date with what it could read: a path it may not read is
 		// still missing from recall on every run, not only the one that
 		// found it (#5393).
-		sayUnreadable(dir)
+		unread := sayUnreadable(dir)
 		// "Up to date" is the most misleading place to stay quiet about it:
 		// nothing changed on disk, so this is exactly where an exclusion set
 		// after the build looks applied and is not.
 		if index.ExclusionsChanged(dir) {
 			fmt.Fprintln(os.Stderr, "deja: the exclude list changed since this index was built — `deja index --rebuild` applies it to sessions already indexed")
 		}
-		return nil
+		return partialIndex(unread, 0)
 	}
 	stopProgress()
 	if !quiet {
@@ -654,7 +659,19 @@ func cmdIndex(dir string, rest []string) error {
 	// command then owed a closing line and had none, leaving "waiting for it
 	// to finish" as the last thing on screen (#1751).
 	progress := &countingWriter{w: said}
-	build := func() error { return index.Ensure(dir, "", force, progress) }
+	// Piped or under cron there is no live display, and a long run printed
+	// "indexing ..." and then nothing until the per-store counts: one line
+	// per phase says where it is (#5396). Not for the warmup, which
+	// publishes its phases to the status file.
+	phases := !quiet && !logoWanted(os.Stdout) && os.Getenv("DEJA_WARMUP_SENTINEL") == ""
+	skippedBefore := index.SkippedThisRun()
+	build := func() error {
+		if phases {
+			index.SetPhaseLines(said)
+			defer index.SetPhaseLines(nil)
+		}
+		return index.Ensure(dir, "", force, progress)
+	}
 	draw := func() error { return withBuildProgress(build) }
 	if quiet {
 		// The live display paints the same progress the sink above is
@@ -689,7 +706,7 @@ func cmdIndex(dir string, rest []string) error {
 	// A store deja could not read loses its sessions from recall, and the index
 	// run is where someone is looking at the counts — doctor knowing about it
 	// is not the same as saying it here (#818).
-	sayUnreadable(dir)
+	unread := sayUnreadable(dir)
 	// An exclusion applies at ingest, so it covers nothing already indexed —
 	// and the sequence someone actually performs is to set the pattern, run
 	// this command, and sync. That used to return silently having applied
@@ -747,6 +764,28 @@ func cmdIndex(dir string, rest []string) error {
 	// the same two numbers for the reader who watched it happen (#867).
 	if b := index.LastBuild; !b.Initial && b.Messages > 0 && logoWanted(os.Stdout) && os.Getenv("DEJA_WARMUP_SENTINEL") == "" {
 		fmt.Fprintf(said, "deja: indexed %d session%s, %d message%s%s\n", b.Sessions, pluralS(b.Sessions), b.Messages, pluralS(b.Messages), tookSuffix(b.Took))
+	}
+	return partialIndex(unread, index.SkippedThisRun()-skippedBefore)
+}
+
+// exitPartial is the status of a `deja index` that wrote the index but left
+// part of the input unread: a path it could not read, or lines it skipped in
+// what it read this run. A cron job or a timer could not tell that from a
+// clean run, because both exited 0 (#5396). 1 stays "the index was not
+// written"; 2 is left alone, since a hook host reads it as "block".
+const exitPartial = 3
+
+// exitStatus is an error that has already been said and carries the status
+// the process exits with.
+type exitStatus int
+
+func (e exitStatus) Error() string { return fmt.Sprintf("exit status %d", int(e)) }
+
+// partialIndex is the outcome of an index run that wrote the index: nil, or
+// exitPartial when something it was given was not read.
+func partialIndex(unreadable, skipped int) error {
+	if unreadable > 0 || skipped > 0 {
+		return exitStatus(exitPartial)
 	}
 	return nil
 }

@@ -93,6 +93,9 @@ func mergeIngestDiag(m *Manifest) {
 	records := sources.DiagUnusableRecords()
 	foldDeferred(m, sources.DiagNoZstdPaths())
 	malformed, failed := sources.DiagSnapshot()
+	for _, n := range malformed {
+		skippedThisRun.Add(int64(n))
+	}
 	if m.IngestFiles == nil {
 		m.IngestFiles = map[string]FileIngest{}
 	}
@@ -167,14 +170,16 @@ func mergeIngestDiag(m *Manifest) {
 	}
 	// A path the walk refused before and reads now: a transcript unchanged
 	// since it was indexed, or a directory that lists again (#5393). Only
-	// the walk's own refusals: a parse error on an unchanged file stands.
+	// the walk's own refusals: a parse error on an unchanged file stands. A
+	// path that is gone has nothing left to report either way, and kept, it
+	// failed every later `deja index` with exit status 3 (#5396).
 	for p, e := range m.IngestFiles {
 		if e.Error == "" || failed[p] != "" {
 			continue
 		}
 		f, walked := passWalked[p]
 		of, held := m.Files[p]
-		if e.Walk && walked && held && sameFile(of, f) || !walked && passWalked != nil && (e.Walk && gone(p) || !held && dirListable(p)) {
+		if e.Walk && walked && held && sameFile(of, f) || !walked && passWalked != nil && (gone(p) || !held && dirListable(p)) {
 			e.Error, e.Walk = "", false
 			if e.Malformed == 0 && e.Clipped == 0 {
 				delete(m.IngestFiles, p)
@@ -202,6 +207,15 @@ func mergeIngestDiag(m *Manifest) {
 	// and `deja sync` writes one, from Import, right after a pass.
 	passParsed, passRead = nil, nil
 }
+
+// skippedThisRun counts the lines this process skipped in what it read, over
+// every pass it ran. Lines skipped by an earlier run are in the manifest, not
+// here: a run that read nothing new skipped nothing.
+var skippedThisRun atomic.Int64
+
+// SkippedThisRun returns how many lines or records this process's passes read
+// and could not use.
+func SkippedThisRun() int { return int(skippedThisRun.Load()) }
 
 // healthFromFiles sums the per-file counts per harness.
 //
@@ -5544,7 +5558,7 @@ func parseChangedFile(harness, p string, old FileState) ([]model.Session, error)
 	if !ok {
 		return nil, nil
 	}
-	return k.Parse(p, old.LastUpdated)
+	return sources.ReadWatched(p, func() ([]model.Session, error) { return k.Parse(p, old.LastUpdated) })
 }
 
 func parseAppendedFile(harness, p string, old FileState, isNew bool) (ss []model.Session, err error) {
@@ -5564,9 +5578,9 @@ func parseAppendedFile(harness, p string, old FileState, isNew bool) (ss []model
 		if !isNew || k.Parse == nil {
 			return nil, nil
 		}
-		return k.Parse(p, 0)
+		return sources.ReadWatched(p, func() ([]model.Session, error) { return k.Parse(p, 0) })
 	}
-	return k.ParseFrom(p, resumeOffset(old), old.LastUpdated)
+	return sources.ReadWatched(p, func() ([]model.Session, error) { return k.ParseFrom(p, resumeOffset(old), old.LastUpdated) })
 }
 
 // harnessForPath reports the fine-grained source kind for a path (claude,
@@ -6043,7 +6057,7 @@ func unreadableCurrent(m Manifest, files map[string]FileState) bool {
 			}
 			continue
 		}
-		if e.Walk && gone(p) {
+		if gone(p) {
 			return false
 		}
 		if _, held := m.Files[p]; !held && dirListable(p) {
@@ -6098,8 +6112,24 @@ func walkFileState(p string, fi os.FileInfo, old map[string]FileState) FileState
 			fs.PrefixSample = of.PrefixSample
 			fs.WrittenBack = of.WrittenBack
 		} else {
-			fs.SafeSize = lastCompleteLineOffset(p, fi.Size())
-			fs.PrefixSample = filePrefixSample(p, fs.SafeSize)
+			// Under the store read budget: the walk reads the tail and the
+			// head of a changed transcript, and a file on a mount that stopped
+			// answering held the run in "finding transcripts" (#5396).
+			type ends struct {
+				safe   int64
+				sample uint64
+			}
+			e, err := sources.Watch(p, func() (ends, error) {
+				safe := lastCompleteLineOffset(p, fi.Size())
+				return ends{safe, filePrefixSample(p, safe)}, nil
+			})
+			if err != nil {
+				// 0 is "not known": the next pass reads the file whole
+				// rather than resuming from a guess.
+				sources.NoteWalkError(p, err)
+				e = ends{}
+			}
+			fs.SafeSize, fs.PrefixSample = e.safe, e.sample
 		}
 	}
 	if k, ok := kindForPath(p); ok && k.Sidecar != nil {

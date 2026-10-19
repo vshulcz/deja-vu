@@ -116,7 +116,8 @@ def run_cell(binary: str, arm: str, bin_label: str, out_root: str, fakehome: str
         )
     elapsed = time.perf_counter() - t0
 
-    if proc.returncode != 0:
+    # 3: the index was written but some input was not read (#5396).
+    if proc.returncode not in (0, 3):
         raise SystemExit(
             f"run_bench: {binary} index --rebuild failed (rc={proc.returncode}) for {bin_label}/{arm} "
             f"round {round_no} — see {log_path}"

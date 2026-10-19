@@ -25,6 +25,9 @@ var diagZstdMissing = map[string]bool{}
 var diagWalkFailed = map[string]string{}
 
 func diagMalformedLine(path string) {
+	if isAbandoned(path) {
+		return
+	}
 	diagMu.Lock()
 	diagMalformed[path]++
 	diagMu.Unlock()
@@ -39,6 +42,9 @@ func diagMalformedLine(path string) {
 // changed since, so the index carries the ids of the rows it skipped before
 // rather than forgetting them on the next pass.
 func diagUnusableRecord(path, id, reason string) {
+	if isAbandoned(path) {
+		return
+	}
 	diagMu.Lock()
 	diagMalformed[path]++
 	diagReasons[path] = reason
@@ -63,6 +69,9 @@ func diagFileError(path string, err error) {
 	if err == nil {
 		return
 	}
+	if _, stalled := err.(*StalledRead); !stalled && isAbandoned(path) {
+		return
+	}
 	diagMu.Lock()
 	diagFailed[path] = err.Error()
 	diagMu.Unlock()
@@ -76,6 +85,9 @@ func diagWalkError(path string, err error) {
 	diagWalkFailed[path] = err.Error()
 	diagMu.Unlock()
 }
+
+// NoteWalkError records a path the walk could not read for another reason.
+func NoteWalkError(path string, err error) { diagWalkError(path, err) }
 
 // NoteUnreadable records a transcript the walk found but may not read.
 func NoteUnreadable(path string) {

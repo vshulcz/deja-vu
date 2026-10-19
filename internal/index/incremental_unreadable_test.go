@@ -177,3 +177,28 @@ func TestALockedTranscriptDeletedStopsBeingReported(t *testing.T) {
 		t.Fatal("not up to date after the deletion was recorded")
 	}
 }
+
+// A file that failed to parse and was then deleted has nothing left to
+// report; kept, it failed every later `deja index` with exit status 3 (#5396).
+func TestAParseErrorOnADeletedFileClears(t *testing.T) {
+	root, dir := allHarnessEnv(t)
+	write(t, filepath.Join(root, "claude", "-tmp-p1", "a.jsonl"), claudeLine("a1", "2026-01-02T03:04:05Z", "clearneedle"))
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	m, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gonePath := filepath.Join(root, "claude", "-tmp-p1", "b.jsonl")
+	m.IngestFiles = map[string]FileIngest{gonePath: {Error: "decode: unexpected end of JSON input"}}
+	if err := writeManifestOnly(dir, m); err != nil {
+		t.Fatal(err)
+	}
+	if err := Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := IngestHealth(dir)["claude"].FailedFiles; got != 0 {
+		t.Fatalf("a deleted file is still reported unreadable: %+v", IngestFilesReport(dir))
+	}
+}
