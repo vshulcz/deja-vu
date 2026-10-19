@@ -171,7 +171,7 @@ func harnessTable() []Harness {
 					Match:     func(p string) bool { return strings.HasSuffix(p, ".jsonl") && UnderClaudeRoot(p) },
 					Parse:     fullParse(ParseClaudeFile),
 					ParseFrom: offsetParse(ParseClaudeFileFromOffset),
-					Resumes:   claudeExitResumes,
+					Resumes:   claudeResumes,
 				},
 			},
 		},

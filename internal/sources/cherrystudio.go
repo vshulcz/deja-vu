@@ -365,7 +365,7 @@ func CherryStudioResumes(path string, offset int64) bool {
 	if offset <= 0 {
 		return true
 	}
-	if !claudeExitResumes(path, offset) {
+	if !claudeResumes(path, offset) {
 		return false
 	}
 	key := cherrySnapshotKey(lastLineBefore(path, offset))

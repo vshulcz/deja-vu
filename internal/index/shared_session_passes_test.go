@@ -21,7 +21,9 @@ func TestPassesOverFilesSharingASessionMatchRebuild(t *testing.T) {
 	type step func(t *testing.T, a, b, c string)
 	cases := []struct {
 		name, id string
-		passes   []step
+		// also names another id the passes must leave as a rebuild does.
+		also   string
+		passes []step
 	}{
 		{
 			name: "grown, then the other rewritten",
@@ -145,6 +147,44 @@ func TestPassesOverFilesSharingASessionMatchRebuild(t *testing.T) {
 				},
 			},
 		},
+		{
+			// A transcript is named by its last sessionId, so a file whose id
+			// changes is filed whole under the new one. The append filed the
+			// turns it had read under the old id and the tail under the new
+			// (#5379).
+			name: "the id changes partway",
+			id:   "s-b",
+			also: "s-a",
+			passes: []step{
+				func(t *testing.T, a, b, c string) { write(t, a, claudeLine("s-a", t0, "alpha one")) },
+				func(t *testing.T, a, b, c string) { appendTo(t, a, claudeLine("s-b", t2, "bravo two")) },
+				func(t *testing.T, a, b, c string) { appendTo(t, a, claudeLine("s-b", t3, "charlie three")) },
+			},
+		},
+		{
+			// And back: the file is the old session again, as a rebuild names it.
+			name: "the id changes and changes back",
+			id:   "s-a",
+			also: "s-b",
+			passes: []step{
+				func(t *testing.T, a, b, c string) { write(t, a, claudeLine("s-a", t0, "alpha one")) },
+				func(t *testing.T, a, b, c string) { appendTo(t, a, claudeLine("s-b", t2, "bravo two")) },
+				func(t *testing.T, a, b, c string) { appendTo(t, a, claudeLine("s-a", t3, "charlie three")) },
+			},
+		},
+		{
+			// The new id is one another file already holds.
+			name: "the id changes to another file's",
+			id:   "s-b",
+			also: "s-a",
+			passes: []step{
+				func(t *testing.T, a, b, c string) {
+					write(t, a, claudeLine("s-a", t0, "alpha one"))
+					write(t, b, claudeLine("s-b", t1, "bravo two"))
+				},
+				func(t *testing.T, a, b, c string) { appendTo(t, a, claudeLine("s-b", t2, "charlie three")) },
+			},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -159,6 +199,9 @@ func TestPassesOverFilesSharingASessionMatchRebuild(t *testing.T) {
 				indexPass(t, dir)
 				if i > 0 {
 					sessionMatchesRebuild(t, dir, "claude", tc.id)
+					if tc.also != "" {
+						sessionMatchesRebuild(t, dir, "claude", tc.also)
+					}
 				}
 			}
 		})
@@ -245,8 +288,9 @@ func TestRandomPassesOverSharedSessionsMatchRebuild(t *testing.T) {
 			ids := []string{"s-a", "s-b", "s-c"}
 			words := []string{"alpha", "bravo", "cache", "delta", "queue", "retry", "webhook", "lockfile"}
 			base := time.Date(2026, 1, 2, 3, 0, 0, 0, time.UTC)
-			// A Claude transcript is one session, named by its last line,
-			// so each file keeps one id, and its turns run forward in time.
+			// A Claude transcript is one session, named by its last line;
+			// an append can change the id it carries from then on (#5379).
+			// Its turns run forward in time.
 			// They come from a small pool so files repeat each other's turns,
 			// times included, the way a fork or a resume copies them.
 			files := []string{"f0.jsonl", "f1.jsonl", "f2.jsonl", "f3.jsonl"}
@@ -277,7 +321,7 @@ func TestRandomPassesOverSharedSessionsMatchRebuild(t *testing.T) {
 					i := rng.Intn(len(files))
 					p := path(i)
 					_, err := os.Stat(p)
-					op := rng.Intn(4)
+					op := rng.Intn(5)
 					t.Logf("pass %d: %s op %d (exists %v)", pass, files[i], op, err == nil)
 					switch {
 					case err != nil:
@@ -287,6 +331,9 @@ func TestRandomPassesOverSharedSessionsMatchRebuild(t *testing.T) {
 					case op == 2:
 						rewrite(i)
 						bumpMTime(t, p)
+					case op == 3:
+						ofFile[i] = ids[rng.Intn(len(ids))]
+						appendTo(t, p, line(i))
 					default:
 						// Deleted: the index keeps what it read, as a
 						// rebuild does from the kept records. Which of a
@@ -343,4 +390,30 @@ func messagesOnly(v string) string {
 		}
 	}
 	return strings.Join(out, "\n")
+}
+
+// The control for the id-change cases: a tail that keeps the file's id is
+// still appended from its offset, and only one that changes it re-reads the
+// file (#5379).
+func TestOnlyATailThatChangesTheIdRereadsItsFile(t *testing.T) {
+	tmp := hermeticIndexEnv(t)
+	a := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "p", "a.jsonl")
+	dir := filepath.Join(tmp, "idx")
+	write(t, a, claudeLine("s-a", "2026-01-02T03:04:05Z", "alpha one"))
+	indexPass(t, dir)
+	for _, step := range []struct {
+		sid     string
+		rereads bool
+	}{{"s-a", false}, {"s-b", true}, {"s-b", false}} {
+		appendTo(t, a, claudeLine(step.sid, "2026-01-02T04:00:00Z", "more from "+step.sid))
+		var progress strings.Builder
+		if err := Ensure(dir, "", false, &progress); err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.Contains(progress.String(), replacementPassMarker); got != step.rereads {
+			t.Errorf("a %s tail re-read the file: %v, want %v (%q)", step.sid, got, step.rereads, progress.String())
+		}
+	}
+	sessionMatchesRebuild(t, dir, "claude", "s-b")
+	sessionMatchesRebuild(t, dir, "claude", "s-a")
 }
