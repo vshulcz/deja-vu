@@ -37,6 +37,9 @@ func TestClaudeTailThatChangesTheSessionIsNotAppended(t *testing.T) {
 		{"named by its file, then its own id", noID, claudeIDLine("f", "two"), true},
 		{"same sidechain", side("ag1", "p"), side("ag1", "p"), true},
 		{"another sidechain", side("ag1", "p"), side("ag2", "p"), false},
+		{"new id after a BOM", "\ufeff" + claudeIDLine("s-a", "one"), claudeIDLine("s-b", "two"), false},
+		{"a line the parser rejects names nothing", claudeIDLine("s-a", "one") + `{"type":"user","sessionId":"s-b","message":"str"}` + "\n", claudeIDLine("s-b", "two"), false},
+		{"new id after a line of many chunks", claudeIDLine("s-a", strings.Repeat("y", 1<<20)), claudeIDLine("s-b", "two"), false},
 	}
 	dir := t.TempDir()
 	for _, tc := range cases {
@@ -50,6 +53,10 @@ func TestClaudeTailThatChangesTheSessionIsNotAppended(t *testing.T) {
 			}
 			if got := claudeResumes(p, int64(len(tc.head))); got != tc.want {
 				t.Errorf("claudeResumes = %v, want %v", got, tc.want)
+			}
+			// Cherry Studio writes the same format and asks the same question.
+			if got := CherryStudioResumes(p, int64(len(tc.head))); got != tc.want {
+				t.Errorf("CherryStudioResumes = %v, want %v", got, tc.want)
 			}
 		})
 	}

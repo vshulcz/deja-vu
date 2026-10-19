@@ -11,20 +11,14 @@ import (
 
 // claudeSessionKey is the identity a record gives the session of its file, as
 // the parser reads it: a sidechain's agent and the parent it names, or the
-// sessionId. ok is false for a record that leaves the identity alone; a
-// record that takes part with no id gives "" and ok, which the parser reads as
-// the name the file started with.
+// sessionId. ok is false for a record the parser skips; a record it reads that
+// carries no id gives "" and ok, and leaves the identity as it was.
 func claudeSessionKey(line []byte) (key string, ok bool) {
+	line = trimJSONSpace(line)
 	if !bytes.Contains(line, []byte(`"type"`)) {
 		return "", false
 	}
-	var v struct {
-		Type        string `json:"type"`
-		IsMeta      bool   `json:"isMeta"`
-		IsSidechain bool   `json:"isSidechain"`
-		AgentID     string `json:"agentId"`
-		SessionID   string `json:"sessionId"`
-	}
+	var v claudeLine
 	if json.Unmarshal(line, &v) != nil || (v.Type != "user" && v.Type != "assistant") ||
 		(v.Type == "user" && v.IsMeta) {
 		return "", false
@@ -88,37 +82,48 @@ func lastClaudeKeyBefore(path string, end int64) (key string, found bool) {
 		return "", false
 	}
 	defer func() { _ = f.Close() }()
-	var partial []byte
+	// check reports whether line names the session, noting one that takes part.
+	check := func(line []byte) bool {
+		k, ok := claudeSessionKey(line)
+		if ok && k != "" {
+			key = k
+			return true
+		}
+		found = found || ok
+		return false
+	}
+	// The pieces of a line that runs on past the chunk being read, in file
+	// order. Joined once when its start is found, so a line of many megabytes
+	// is copied once rather than once per chunk.
+	var carry [][]byte
 	pos := end
 	for pos > 0 {
 		n := min(int64(64<<10), pos)
-		buf := make([]byte, n, n+int64(len(partial)))
+		buf := make([]byte, n)
 		if _, err := f.ReadAt(buf, pos-n); err != nil && err != io.EOF {
 			return "", false
 		}
-		buf = append(buf, partial...)
 		pos -= n
-		// The bytes before the first newline may be the end of a line that
-		// starts in the next chunk back, unless this chunk reached the file's
-		// start.
-		first := 0
-		if pos > 0 {
-			i := bytes.IndexByte(buf, '\n')
+		stop := len(buf)
+		for {
+			i := bytes.LastIndexByte(buf[:stop], '\n')
 			if i < 0 {
-				partial = buf
-				continue
+				break
 			}
-			first = i + 1
-		}
-		lines := bytes.Split(buf[first:], []byte{'\n'})
-		for i := len(lines) - 1; i >= 0; i-- {
-			if k, ok := claudeSessionKey(bytes.TrimSpace(lines[i])); ok && k != "" {
-				return k, true
-			} else if ok {
-				found = true
+			line := buf[i+1 : stop]
+			if len(carry) > 0 {
+				line = bytes.Join(append([][]byte{line}, carry...), nil)
+				carry = nil
 			}
+			if check(line) {
+				return key, true
+			}
+			stop = i
 		}
-		partial = buf[:first]
+		carry = append([][]byte{buf[:stop]}, carry...)
+	}
+	if len(carry) > 0 && check(bytes.Join(carry, nil)) {
+		return key, true
 	}
 	return "", found
 }
