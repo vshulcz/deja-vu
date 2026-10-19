@@ -106,7 +106,7 @@ func TestASearchDoesNotWaitBehindAPassWhereTheOtherDoorsDo(t *testing.T) {
 	}
 	// What it says is the part that does not depend on the clock: the search
 	// took the store as it stands and asked for the refresh in the background.
-	if !strings.Contains(said, "answering from the index as it was") {
+	if !strings.Contains(said, "answering from the index of") {
 		t.Errorf("the search did not answer from the store as it stands:\n%s", said)
 	}
 	if searchStarted && !searchReturned {

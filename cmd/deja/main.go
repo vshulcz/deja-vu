@@ -1652,14 +1652,14 @@ func ensureForCLISearch(dir string, o search.Options, force bool, progress io.Wr
 		defer index.AllowBuild()()
 		return index.EnsureForSearch(dir, o, true, progress)
 	}
-	stale, err := index.EnsureForSearchStale(dir, o, progress)
+	cov, err := index.EnsureForSearchCoverage(dir, o, progress)
 	if err != nil {
 		return err
 	}
 	if line := manualIndexLine(dir); line != "" && progress != io.Discard {
 		saidManualIndex.Do(func() { fmt.Fprintln(progress, line) })
 	}
-	if stale {
+	if cov.Stale {
 		requestWarmup(dir)
 		// Only when there is an index to answer from. On a first build there is
 		// not, and the two lines contradicted each other on the worst run to
@@ -1667,7 +1667,7 @@ func ensureForCLISearch(dir string, o search.Options, force bool, progress io.Wr
 		// from the index as it was" and then "the index is being rebuilt right
 		// now, run this again in a moment" (#3574).
 		if index.ReadableSnapshot(dir) {
-			fmt.Fprintln(progress, "deja: answering from the index as it was — refreshing in the background")
+			fmt.Fprintln(progress, "deja: "+coverageLine(cov))
 		}
 	}
 	return nil
@@ -2952,7 +2952,9 @@ func ensureForCLIRead(dir string) error {
 	if busy {
 		requestWarmup(dir)
 		saidReadingAsItWas.Do(func() {
-			fmt.Fprintln(os.Stderr, "deja: answering from the index as it was — refreshing in the background")
+			c := index.SnapshotCoverage(dir)
+			c.Stale = true
+			fmt.Fprintln(os.Stderr, "deja: "+coverageLine(c))
 		})
 	}
 	return err

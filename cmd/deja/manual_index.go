@@ -15,11 +15,37 @@ func manualIndexLine(dir string) string {
 	if !index.Manual() {
 		return ""
 	}
-	at := index.LastUpdated(dir)
-	if at.IsZero() {
+	c := index.SnapshotCoverage(dir)
+	if c.At.IsZero() {
 		return ""
 	}
-	return fmt.Sprintf("deja: automatic indexing is off — answering from the index of %s (%s)", at.Local().Format("2006-01-02 15:04"), doctorAgo(time.Since(at)))
+	line := "deja: automatic indexing is off — answering from " + indexOfLine(c.At)
+	if c.PartialOf > c.Sessions {
+		line += fmt.Sprintf(", which holds only the %d most recent of %d sessions found — run deja index for the rest", c.Sessions, c.PartialOf)
+	}
+	return line
+}
+
+// indexOfLine is "the index of 2026-10-19 14:02 (3 minutes ago)".
+func indexOfLine(at time.Time) string {
+	return fmt.Sprintf("the index of %s (%s)", at.Local().Format("2006-01-02 15:04"), doctorAgo(time.Since(at)))
+}
+
+// coverageLine says, in one line, how much of the history an answer served
+// from the index on disk covers while a build runs behind it (#5390): the
+// early slice of an unfinished first build holds the newest sessions and is
+// missing the oldest, and a refresh is missing what changed since the index
+// was written.
+func coverageLine(c index.Coverage) string {
+	switch {
+	case c.Sessions > 0 && c.PartialOf > c.Sessions:
+		return fmt.Sprintf("the first index build has not finished — this answer covers only the %d most recent of %d sessions found; older ones are missing until it does", c.Sessions, c.PartialOf)
+	case c.At.IsZero():
+		return "answering from the index as it was — refreshing in the background"
+	case c.Pending > 0 && c.Found > 0:
+		return fmt.Sprintf("answering from %s, %d sessions — refreshing in the background, %d of %d transcripts are new or changed since", indexOfLine(c.At), c.Sessions, c.Pending, c.Found)
+	}
+	return fmt.Sprintf("answering from %s, %d sessions — refreshing in the background, newer sessions may be missing", indexOfLine(c.At), c.Sessions)
 }
 
 // manualIndexNote is the session-start sentence for an index that cannot

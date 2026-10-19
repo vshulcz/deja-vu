@@ -235,6 +235,12 @@ func emptyRecallAnswerPolicy(dir, q string, hidden int) string {
 		// A refresh over an index that already answers: the search ran over
 		// every session indexed so far, and saying nothing can be recalled
 		// yet denied the history it had just searched.
+		// Unless the index is a first build's early slice, where it is the
+		// oldest that are missing (#5390).
+		if c := index.SnapshotCoverage(dir); c.PartialOf > c.Sessions {
+			c.Stale = true
+			return fmt.Sprintf("No prior deja sessions matched %q — %s.", q, coverageLine(c))
+		}
 		return fmt.Sprintf("No prior deja sessions matched %q. The index is refreshing (%s), so the newest sessions may not be in this answer yet.", q, st.progress())
 	}
 	if st != nil {

@@ -27,7 +27,7 @@ func TestABlameRowNamesAFewTouchedFilesNotForty(t *testing.T) {
 		},
 		Count: 1, Snippets: []string{"… internal/thing00.go …"},
 	}
-	body := renderMCPBlame("internal/thing00.go", "thing00.go", []search.BlameHit{hit}, 0, false)
+	body := renderMCPBlame("internal/thing00.go", "thing00.go", []search.BlameHit{hit}, 0, "")
 	var line string
 	for _, l := range strings.Split(body, "\n") {
 		if strings.HasPrefix(l, "also worked on: ") {

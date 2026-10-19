@@ -746,21 +746,33 @@ func blameTextResult(dir string, o search.BlameOptions, path string, limit int) 
 		if err == nil && len(metas) == 0 {
 			return emptyStoreSentence("so nothing can be found"), 0, nil
 		}
-		return noBlameHistorySentence(target.Base, len(metas)), 0, nil
+		out := noBlameHistorySentence(target.Base, len(metas))
+		if refreshing {
+			c := index.SnapshotCoverage(dir)
+			c.Stale = true
+			out += " (" + coverageLine(c) + ")"
+		}
+		return out, 0, nil
 	}
 	// Trimmed without the notes, then rebuilt with them: a session must not
 	// be dropped to make room for a sentence about the index. The answer can
 	// end up a note's length over the budget, about a hundred bytes and worth
 	// more than the session it would otherwise cost.
-	body := renderMCPBlame(path, target.Base, hits, 0, false)
+	body := renderMCPBlame(path, target.Base, hits, 0, "")
 	for len(body) > blameMCPBudget && len(hits) > 1 {
 		hits = hits[:max(len(hits)*3/4, 1)]
-		body = renderMCPBlame(path, target.Base, hits, 0, false)
+		body = renderMCPBlame(path, target.Base, hits, 0, "")
 	}
 	if omitted := found - len(hits); omitted > 0 || refreshing {
 		// Silently returning the top slice let an agent conclude it had seen
 		// every session that touched the file.
-		body = renderMCPBlame(path, target.Base, hits, omitted, refreshing)
+		stale := ""
+		if refreshing {
+			c := index.SnapshotCoverage(dir)
+			c.Stale = true
+			stale = coverageLine(c)
+		}
+		body = renderMCPBlame(path, target.Base, hits, omitted, stale)
 	}
 	return body, len(hits), nil
 }
@@ -1046,10 +1058,10 @@ const blameTouchedCap = 3
 // It answered in JSON until #4634, the one agent-facing mode that did: on a
 // real store 65% of an answer was keys, transcript paths and float scores,
 // and the decision-taken-back line blame attaches never reached the agent.
-func renderMCPBlame(asked, base string, hits []search.BlameHit, omitted int, refreshing bool) string {
+func renderMCPBlame(asked, base string, hits []search.BlameHit, omitted int, stale string) string {
 	var b strings.Builder
-	if refreshing {
-		fmt.Fprintln(&b, "(index refresh running in the background — the very newest sessions may not appear yet)")
+	if stale != "" {
+		fmt.Fprintln(&b, "("+stale+")")
 	}
 	fmt.Fprintf(&b, "deja blame for %q (%d session%s, the one that names it most specifically first)\n", recallListingLine(asked), len(hits), pluralS(len(hits)))
 	for i, h := range hits {
@@ -1551,11 +1563,11 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 	}
 	live, cut := liveLineageCut(dir)
 	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: live, ExcludeUpTo: cut}
-	stale, err := index.EnsureForSearchStale(dir, o, mcpProgress())
+	cov, err := index.EnsureForSearchCoverage(dir, o, mcpProgress())
 	if err != nil {
 		return "", 0, 0, nil, nil, err
 	}
-	if stale {
+	if cov.Stale {
 		// A store rewrote itself (cline, cursor); rebuilding inline would
 		// blow the client's tool timeout, so refresh detached and serve the
 		// current index with an honest note.
@@ -1620,6 +1632,12 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 	// same as on the search screen (#5320, #5335).
 	hits = dropCopiedHits(dir, hits)
 	if len(hits) == 0 {
+		// A miss on a snapshot is a miss on part of the history, and the
+		// part matters: on a first build's early slice it is everything older
+		// than the newest few hundred sessions (#5390).
+		if cov.Stale && cov.Sessions > 0 && policyHidden == 0 {
+			return fmt.Sprintf("No prior deja sessions matched %q — %s.", clampEcho(q), coverageLine(cov)), 0, 0, nil, nil, nil
+		}
 		return emptyRecallAnswerPolicy(dir, q, policyHidden), 0, 0, nil, nil, nil
 	}
 	// Before the page is cut, not after: demoting inside the page is a no-op
@@ -1662,8 +1680,8 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 	// above "none about it" is worse than either alone (#2827).
 	namesTheAsked := result.Tier == search.TierRelevance && len(hits) > 0 &&
 		sessionNamesTheAsked(hits[0].Session, q, result.TermIDF)
-	if stale {
-		fmt.Fprintln(&b, "(index refresh running in the background — the very newest sessions may not appear yet)")
+	if cov.Stale {
+		fmt.Fprintln(&b, "("+coverageLine(cov)+")")
 	}
 	// Whether the question named something the store does not hold. The word
 	// forms line already says which word was dropped; what it did not say is

@@ -147,6 +147,12 @@ bytes for `DEJA_STORE_TIMEOUT` (ten minutes by default) is skipped and named,
 and the rest of the run goes on; a slow read that keeps moving is not cut.
 `--rebuild` reads every line again, so a store with an old line deja cannot
 use exits 3 on every rebuild (#5396).
+While a refresh runs, search and recall say which index they answer from and
+how much of the history it holds: "answering from the index of 2026-10-19
+14:02 (3 minutes ago), 7000 sessions — refreshing in the background, 3000 of
+10000 transcripts are new or changed since". After a first build cut off past its early slice they say it
+covers only the 200 most recent of the sessions found and that the older ones
+are missing, where recall used to say the newest might be (#5390).
 
 ## [0.22.2] - 2026-10-17
 

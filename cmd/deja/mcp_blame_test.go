@@ -25,7 +25,7 @@ func TestMCPBlameLeavesTheTranscriptBehind(t *testing.T) {
 		Title: "pool exhaustion", Count: 3, Score: 1.5, Tier: "exact",
 		Snippets: []string{"we chose transaction pooling"},
 	}}
-	out := renderMCPBlame("pool.go", "pool.go", hits, 0, false)
+	out := renderMCPBlame("pool.go", "pool.go", hits, 0, "")
 	if len(out) > 4096 {
 		t.Fatalf("blame answered %d bytes for one hit; the transcript is still in there", len(out))
 	}
@@ -51,7 +51,7 @@ func TestMCPBlameSaysTheDecisionWasTakenBack(t *testing.T) {
 		Snippets:  []string{"set the pool to 50"},
 		Lifecycle: "rejected", LifecycleAt: "2026-09-01", LifecycleNote: "50 starved the replicas",
 	}}
-	out := renderMCPBlame("pool.go", "pool.go", hits, 0, false)
+	out := renderMCPBlame("pool.go", "pool.go", hits, 0, "")
 	for _, want := range []string{"[this was tried and rejected, 2026-09-01]", "50 starved the replicas"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the page lost %q:\n%s", want, out)

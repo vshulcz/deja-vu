@@ -66,11 +66,11 @@ func TestBlameReadsWithoutWaitingForARebuild(t *testing.T) {
 // And the answer says so, in the line recall uses for the same state.
 func TestBlameSaysWhenItServedASnapshot(t *testing.T) {
 	hits := []search.BlameHit{{Session: model.Session{ID: "s", Harness: "claude", Project: "proj"}, Count: 1}}
-	body := renderMCPBlame("a.go", "a.go", hits, 0, true)
-	if !strings.Contains(body, "index refresh running in the background") {
+	body := renderMCPBlame("a.go", "a.go", hits, 0, coverageLine(index.Coverage{Stale: true}))
+	if !strings.Contains(body, "refreshing in the background") {
 		t.Errorf("a snapshot answer says nothing about the refresh: %s", body)
 	}
-	if quiet := renderMCPBlame("a.go", "a.go", hits, 0, false); strings.Contains(quiet, "refresh") {
+	if quiet := renderMCPBlame("a.go", "a.go", hits, 0, ""); strings.Contains(quiet, "refresh") {
 		t.Errorf("an ordinary answer carries the note: %s", quiet)
 	}
 }
@@ -93,20 +93,20 @@ func TestTheRefreshNoteDoesNotCostASession(t *testing.T) {
 	}
 	// What it does cost is its own length, and no more.
 	over := len(blameBodyFor(hits, true)) - blameMCPBudget
-	if note := len("(index refresh running in the background — the very newest sessions may not appear yet)\n"); over > note {
+	if note := len("(" + coverageLine(index.Coverage{Stale: true}) + ")\n"); over > note {
 		t.Errorf("the payload is %d bytes over the budget, more than the note's %d", over, note)
 	}
 }
 
 // blameBodyFor runs the same trim-then-note sequence blameTextResult does.
 func blameBodyFor(hits []search.BlameHit, refreshing bool) string {
-	body := renderMCPBlame("a.go", "a.go", hits, 0, false)
+	body := renderMCPBlame("a.go", "a.go", hits, 0, "")
 	for len(body) > blameMCPBudget && len(hits) > 1 {
 		hits = hits[:max(len(hits)*3/4, 1)]
-		body = renderMCPBlame("a.go", "a.go", hits, 0, false)
+		body = renderMCPBlame("a.go", "a.go", hits, 0, "")
 	}
 	if refreshing {
-		body = renderMCPBlame("a.go", "a.go", hits, 0, true)
+		body = renderMCPBlame("a.go", "a.go", hits, 0, coverageLine(index.Coverage{Stale: true}))
 	}
 	return body
 }

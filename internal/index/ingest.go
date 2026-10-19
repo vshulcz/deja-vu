@@ -511,11 +511,31 @@ func ensureLocked(dir string, o query.Options, force bool, progress io.Writer) e
 // kicked to a detached warmup instead. The return value says whether the
 // caller is serving a stale view so it can say so honestly.
 func EnsureForSearchStale(dir string, o query.Options, progress io.Writer) (bool, error) {
+	c, err := EnsureForSearchCoverage(dir, o, progress)
+	return c.Stale, err
+}
+
+// EnsureForSearchCoverage is EnsureForSearchStale with what a stale answer
+// covers, for the line that says so (#5390).
+func EnsureForSearchCoverage(dir string, o query.Options, progress io.Writer) (Coverage, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
+	stale, pending, found, err := ensureForSearchStale(dir, o, progress)
+	if err != nil || !stale {
+		return Coverage{}, err
+	}
+	c := SnapshotCoverage(dir)
+	c.Stale, c.Pending, c.Found = true, pending, found
+	return c, nil
+}
+
+// ensureForSearchStale also returns, when it walked the stores before handing
+// the work on, how many transcripts are new or changed since the snapshot and
+// how many it found; zeros when it did not walk or could not tell.
+func ensureForSearchStale(dir string, o query.Options, progress io.Writer) (bool, int, int, error) {
 	if autoUpdatesOff() {
-		return false, manualCheck(dir)
+		return false, 0, 0, manualCheck(dir)
 	}
 	// The wait before an answer is made of three things — taking the lock,
 	// walking the stores to see what changed, and ingesting whatever did — and
@@ -524,11 +544,11 @@ func EnsureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 	mark := searchTrace()
 	unlock, ok, err := tryLockDir(dir)
 	if err != nil {
-		return false, err
+		return false, 0, 0, err
 	}
 	if !ok {
 		// A rebuild is already running; serve the current snapshot.
-		return true, nil
+		return true, 0, 0, nil
 	}
 	defer unlock()
 	mark("lock")
@@ -542,12 +562,12 @@ func EnsureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 	if err != nil || m.Scope != "" || !recordsIntact(dir, m) || mustRebuildBeforeAnswering(m, version) {
 		// No usable index yet (or a rebuild-grade problem): the caller cannot
 		// serve anything sensible stale, so build synchronously.
-		return false, updateIndex(dir, o.Harness, "", want, false, progress)
+		return false, 0, 0, updateIndex(dir, o.Harness, "", want, false, progress)
 	}
 	if newerIndex(m) {
 		// Left alone, and current as far as this build can tell: calling it
 		// stale handed it to a warmup that would not touch it either.
-		return false, nil
+		return false, 0, 0, nil
 	}
 	if m.Version != version {
 		// A content-version bump that this build can still read: the store
@@ -556,15 +576,15 @@ func EnsureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 		// first question after an upgrade wait for the whole pass — 13m54s on
 		// a 520 MB store, and an agent that waited a minute gave up on the
 		// tool (#3552).
-		return true, nil
+		return true, 0, 0, nil
 	}
 	if zoneDrifted(m) {
 		// Regrouping the day buckets or rereading aider headers in this zone
 		// is a full rebuild; hand it to the detached warmup and say the current answer is stale.
-		return true, nil
+		return true, 0, 0, nil
 	}
 	if manifestFresh(m, want, "") {
-		return false, nil
+		return false, 0, 0, nil
 	}
 	changed := map[string]FileState{}
 	removedAny := false
@@ -594,15 +614,15 @@ func EnsureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 		// like rewrite-grade work: the answer comes from the snapshot with the
 		// "as it was" line, and the tail lands before the next question.
 		if tail := appendTailBytes(changed, m.Files); tail > inlineAppendMax {
-			return true, nil
+			return true, len(changed), len(want), nil
 		}
 		err := updateIndex(dir, o.Harness, "", want, false, progress)
 		mark("append")
-		return false, err
+		return false, 0, 0, err
 	}
 	// Caller detaches the rebuild (it owns the executable path).
 	mark("hand to warmup")
-	return true, nil
+	return true, len(changed), len(want), nil
 }
 
 // redactionFloor is the last content version whose bump was about what may be
@@ -1706,7 +1726,7 @@ func publishNewestFirst(dir string, ss []model.Session, progress io.Writer) {
 	// them, and a line saying "3 empty transcripts" must count the whole
 	// corpus rather than this slice of it.
 	wasEmptied, wasCollisions, wasMerged := emptied.Load(), collisions.Load(), merged.Load()
-	err := writeSessions(tmp, dir, newest, nil, "")
+	err := writeSessionsWithSync(tmp, dir, newest, nil, "", importedState{compactions: compactionsForRebuild(dir, readTombstones()), partialOf: distinctSessions(ss)})
 	emptied.Store(wasEmptied)
 	collisions.Store(wasCollisions)
 	merged.Store(wasMerged)
@@ -1716,6 +1736,16 @@ func publishNewestFirst(dir string, ss []model.Session, progress io.Writer) {
 	if progress != nil {
 		fmt.Fprintf(progress, "deja: searchable now with the %d most recent sessions while the rest is indexed\n", len(newest))
 	}
+}
+
+// distinctSessions counts the sessions ss names, the way the build keys them:
+// a transcript read twice is one session, not two.
+func distinctSessions(ss []model.Session) int {
+	seen := make(map[string]struct{}, len(ss))
+	for _, s := range ss {
+		seen[s.Harness+":"+s.ID] = struct{}{}
+	}
+	return len(seen)
 }
 
 // partialPublishFrom is the corpus size at which the wait is worth a second
@@ -1772,7 +1802,8 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 		ExportWatermarks: imp.watermarks, ExportBoundary: imp.boundary, ImportedRecords: imp.dedupe,
 		Compactions:        imp.compactions,
 		ExcludeFingerprint: sources.ExclusionFingerprint(),
-		ToolFingerprint:    mergedToolFingerprint(priorToolFingerprint(dir))}
+		ToolFingerprint:    mergedToolFingerprint(priorToolFingerprint(dir)),
+		PartialOf:          imp.partialOf}
 	recPath := filepath.Join(tmp, "records.bin")
 	rf, err := os.OpenFile(recPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
@@ -5380,6 +5411,9 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	// Read before writeManifest: the fold in there drains the counters, and the
 	// caller prints its line after this returns (#2007).
 	unreadable = totalMalformed()
+	// A pass that recorded files is past a first build's early slice; what
+	// is still missing is what the next walk finds unread.
+	m.PartialOf = 0
 	if err := writeManifest(dir, m); err != nil {
 		return filesTouched, messages, unreadable, err
 	}
