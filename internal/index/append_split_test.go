@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -194,4 +195,117 @@ func bumpMTime(t *testing.T, path string) {
 	if err := os.Chtimes(path, next, next); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// Two transcripts that hold one session are reconciled only when they are
+// read together. Split, the grown one was appended and the other replaced on
+// its own, and the replacement wrote the grown file's turn a second time
+// (#5358 is the multi-pass form). Each case ends where a rebuild would.
+func TestAMixedBatchSharingASessionMatchesRebuild(t *testing.T) {
+	const t0, t1, t2 = "2026-01-02T03:04:05Z", "2026-01-02T03:04:06Z", "2026-01-02T04:00:00Z"
+	cases := []struct {
+		name, id string
+		setup    func(t *testing.T, a, b, c string)
+		change   func(t *testing.T, a, b, c string)
+	}{
+		{
+			name: "grown and rewritten",
+			id:   "s-x",
+			setup: func(t *testing.T, a, b, c string) {
+				write(t, a, claudeLine("s-x", t0, "alpha one"))
+				write(t, b, claudeLine("s-x", t0, "alpha one")+claudeLine("s-x", t1, "beta cache"))
+			},
+			change: func(t *testing.T, a, b, c string) {
+				appendTo(t, a, claudeLine("s-x", t2, "alpha three"))
+				write(t, b, claudeLine("s-x", t0, "alpha one")+claudeLine("s-x", t1, "beta queue"))
+				bumpMTime(t, b)
+			},
+		},
+		{
+			name: "grown and a torn line finished",
+			id:   "s-x",
+			setup: func(t *testing.T, a, b, c string) {
+				write(t, a, claudeLine("s-x", t0, "alpha one"))
+				line := claudeLine("s-x", t1, "beta cache")
+				write(t, b, claudeLine("s-x", t0, "alpha one")+line[:len(line)-10])
+			},
+			change: func(t *testing.T, a, b, c string) {
+				appendTo(t, a, claudeLine("s-x", t2, "alpha three"))
+				write(t, b, claudeLine("s-x", t0, "alpha one")+claudeLine("s-x", t1, "beta cache"))
+				bumpMTime(t, b)
+			},
+		},
+		{
+			name: "new copy beside a rewrite",
+			id:   "s-b",
+			setup: func(t *testing.T, a, b, c string) {
+				write(t, a, claudeLine("s-a", t0, "alpha one"))
+				write(t, b, claudeLine("s-b", t0, "bravo two"))
+			},
+			change: func(t *testing.T, a, b, c string) {
+				write(t, c, claudeLine("s-b", t0, "bravo two")+claudeLine("s-b", t2, "charlie four"))
+				write(t, b, claudeLine("s-b", t0, "bravo too"))
+				bumpMTime(t, b)
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tmp := hermeticIndexEnv(t)
+			claude := os.Getenv("DEJA_CLAUDE_ROOT")
+			a := filepath.Join(claude, "p", "a.jsonl")
+			b := filepath.Join(claude, "p", "b.jsonl")
+			c := filepath.Join(claude, "p", "c.jsonl")
+			tc.setup(t, a, b, c)
+			dir := filepath.Join(tmp, "idx")
+			indexPass(t, dir)
+			tc.change(t, a, b, c)
+			indexPass(t, dir)
+			sessionMatchesRebuild(t, dir, "claude", tc.id)
+		})
+	}
+}
+
+// sessionMatchesRebuild is matchesRebuild with the messages compared as a set: the
+// order two files' turns interleave in follows the order they are read, which
+// neither path fixes.
+func sessionMatchesRebuild(t *testing.T, dir, harness, id string) {
+	t.Helper()
+	fresh := filepath.Join(t.TempDir(), "rebuild.db")
+	if err := Ensure(fresh, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	sorted := func(v string) string {
+		lines := strings.Split(v, "\n")
+		slices.Sort(lines)
+		return strings.Join(lines, "\n")
+	}
+	got, want := sessionView(t, dir, harness, id), sessionView(t, fresh, harness, id)
+	if sorted(got) != sorted(want) {
+		t.Errorf("%s:%s after incremental passes:\n%s\nafter a rebuild:\n%s", harness, id, got, want)
+	}
+}
+
+// The control: distinct sessions still split, and still match a rebuild.
+func TestAMixedBatchOfDistinctSessionsSplitsAndMatchesRebuild(t *testing.T) {
+	tmp := hermeticIndexEnv(t)
+	claude := os.Getenv("DEJA_CLAUDE_ROOT")
+	a := filepath.Join(claude, "p", "a.jsonl")
+	b := filepath.Join(claude, "p", "b.jsonl")
+	write(t, a, claudeLine("s-a", "2026-01-02T03:04:05Z", "alpha one"))
+	write(t, b, claudeLine("s-b", "2026-01-02T03:04:05Z", "beta cache"))
+	dir := filepath.Join(tmp, "idx")
+	indexPass(t, dir)
+	appendTo(t, a, claudeLine("s-a", "2026-01-02T04:00:00Z", "alpha three"))
+	write(t, b, claudeLine("s-b", "2026-01-02T03:04:05Z", "beta queue"))
+	bumpMTime(t, b)
+	var progress bytes.Buffer
+	if err := Ensure(dir, "", false, &progress); err != nil {
+		t.Fatal(err)
+	}
+	if got := progress.String(); !strings.Contains(got, "updated 1 file (1 new message)") {
+		t.Errorf("distinct sessions no longer split: %q", got)
+	}
+	sessionMatchesRebuild(t, dir, "claude", "s-a")
+	sessionMatchesRebuild(t, dir, "claude", "s-b")
 }

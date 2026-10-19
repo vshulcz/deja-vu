@@ -56,13 +56,27 @@ func dropTouched(changed, files, old map[string]FileState) map[string]bool {
 // transcript that grew 281 KB was read whole because a different file kept its
 // size (#5324). Each part on its own is a pass that could have happened: the
 // grown files changing first, the rest after.
-func splitAppendable(changed, old map[string]FileState) (appendable, rest map[string]FileState) {
+//
+// Not when the parts may hold one session. Two transcripts that share an id
+// are reconciled only when they are read together, and the rest replaced on
+// its own wrote the appended file's turns a second time (#5358). A new file's
+// ids are not known until it is read, and a fork or a resume copies a session
+// into one, so a batch with a new file stays whole too.
+func splitAppendable(changed, old map[string]FileState, sessions map[string]SessionMeta) (appendable, rest map[string]FileState) {
 	// A shared store read in the same pass as the files beside it is how one
 	// session moves between them: a ZCode snapshot restored into the CLI
 	// database is read from the database alone only when both are read
-	// together (#4448). Such a batch stays whole.
+	// together (#4448). Such a batch stays whole, as does one with a new file.
 	for p := range changed {
-		if storeHarness(p) != "" {
+		if _, known := old[p]; !known || storeHarness(p) != "" {
+			return nil, changed
+		}
+	}
+	// A row covering more than one transcript names only the one that owns
+	// it; the others are unknown, so any such row on a changed file keeps the
+	// batch whole.
+	for _, meta := range sessions {
+		if _, ok := changed[meta.Path]; ok && (meta.Shared || !meta.SharedStarted.IsZero() || !meta.SharedUpdated.IsZero()) {
 			return nil, changed
 		}
 	}

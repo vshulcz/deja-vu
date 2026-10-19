@@ -4335,7 +4335,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		}
 		// Decided per file: the appendable ones are appended, and the pass
 		// after it, over the same walk, replaces only the rest (#5324).
-		if appendable, rest := splitAppendable(changed, old.Files); split && len(appendable) > 0 && len(rest) > 0 {
+		if appendable, rest := splitAppendable(changed, old.Files, old.Sessions); split && len(appendable) > 0 && len(rest) > 0 {
 			if err := appendPass(withoutRest(files, rest, old.Files), appendable, false); err != nil {
 				return err
 			}

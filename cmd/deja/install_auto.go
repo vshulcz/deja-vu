@@ -1141,12 +1141,6 @@ func installSettingsHookRetiring(path, event, matcher string, timeout int, cmd s
 			}
 			found = true
 			adoptCodexHookEntry(entry, cmd, event)
-			// An install from before #5126 wrote 10 here, which codex clamps
-			// with a warning on every start. A lower value the reader set
-			// stays.
-			if event == "SessionEnd" {
-				capHookTimeout(entry, cmd, codexSessionEndCap)
-			}
 			// The timeout too. Qwen and gemini read it in milliseconds, and the
 			// 10 an older deja wrote kills the hook ten milliseconds in — which
 			// looks exactly like a harness with no hooks. Adopting the entry
