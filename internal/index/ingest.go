@@ -464,7 +464,9 @@ func Unwritable(err error) bool {
 // ensureLocked is the body of an Ensure, with the lock already held.
 func ensureLocked(dir string, o query.Options, force bool, progress io.Writer) error {
 	sweepStaleTmp(dir)
-	prior, priorErr := readManifest(dir)
+	// Cached, and only read: the search that follows reads the same one, and
+	// decoding it twice was most of the manifest's cost to a search (#5386).
+	prior, priorErr := readManifestCached(dir)
 	want := currentFilesReusing("", priorFiles(prior, priorErr))
 	scope := ""
 	m, err := prior, priorErr
@@ -554,8 +556,10 @@ func ensureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 	mark("lock")
 	// Read first, walk second: this is the path every search takes, and
 	// re-deriving state for unchanged transcripts was costing 700 ms of the
-	// second it takes to answer a query.
-	m, err := readManifest(dir)
+	// second it takes to answer a query. Through the cache, since nothing here
+	// writes to it: a long-lived server decoded every session's metadata on
+	// every recall, 12 MB on a 25k-session store (#5386).
+	m, err := readManifestCached(dir)
 	mark("manifest")
 	want := currentFilesReusing("", priorFiles(m, err))
 	mark("walk stores")
@@ -5585,7 +5589,12 @@ func walStat(p string) (size, stamp int64) {
 
 // kindForPath returns the registry FileKind whose Match accepts p.
 func kindForPath(p string) (sources.FileKind, bool) {
-	for _, h := range sources.Registry() {
+	return kindIn(sources.Registry(), p)
+}
+
+// kindIn is kindForPath against a registry already built.
+func kindIn(reg []sources.Harness, p string) (sources.FileKind, bool) {
+	for _, h := range reg {
 		for _, k := range h.Kinds {
 			if k.Match(p) {
 				return k, true
@@ -5996,23 +6005,7 @@ func currentFilesWith(h string, old map[string]FileState) map[string]FileState {
 			paths[p] = true
 		}
 	}
-	out := map[string]FileState{}
-	for p := range paths {
-		fi, err := os.Lstat(p)
-		if os.IsPermission(err) {
-			// Listed by a directory this run may read but not enter.
-			sources.NoteUnreadable(p)
-			continue
-		}
-		if err == nil && fi.Mode()&os.ModeSymlink == 0 && !fi.IsDir() {
-			// Listed all the same: a file this run may not read is not a
-			// deleted one, and the sessions already read from it stay.
-			if sources.ModeUnreadable(p, fi) {
-				sources.NoteUnreadable(p)
-			}
-			out[p] = walkFileState(p, fi, old)
-		}
-	}
+	out := statFiles(paths, old)
 	injectHermesPG(out, old)
 	noteLockedAway(h, out, old)
 	return out
@@ -6141,8 +6134,86 @@ func dirListable(p string) bool {
 	return err == nil || errors.Is(err, io.EOF)
 }
 
+// statFiles is the walk's FileState for each path that is a regular file.
+//
+// Every search stats each transcript to learn nothing moved: 12k files on the
+// store in #5386. The files are independent, so a few workers share them; the
+// result is the same map either way.
+func statFiles(paths map[string]bool, old map[string]FileState) map[string]FileState {
+	list := make([]string, 0, len(paths))
+	for p := range paths {
+		list = append(list, p)
+	}
+	states := make([]FileState, len(list))
+	isFile := make([]bool, len(list))
+	reg := sources.Registry()
+	stat := func(i int) {
+		p := list[i]
+		fi, err := os.Lstat(p)
+		if os.IsPermission(err) {
+			// Listed by a directory this run may read but not enter.
+			sources.NoteUnreadable(p)
+			return
+		}
+		if err == nil && fi.Mode()&os.ModeSymlink == 0 && !fi.IsDir() {
+			// Listed all the same: a file this run may not read is not a
+			// deleted one, and the sessions already read from it stay.
+			if sources.ModeUnreadable(p, fi) {
+				sources.NoteUnreadable(p)
+			}
+			states[i], isFile[i] = walkFileStateIn(reg, p, fi, old), true
+		}
+	}
+	workers := min(runtime.GOMAXPROCS(0), statWorkers, len(list)/statPerWorker)
+	if workers <= 1 {
+		for i := range list {
+			stat(i)
+		}
+	} else {
+		var next atomic.Int64
+		var wg sync.WaitGroup
+		for w := 0; w < workers; w++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for {
+					i := int(next.Add(1)) - 1
+					if i >= len(list) {
+						return
+					}
+					stat(i)
+				}
+			}()
+		}
+		wg.Wait()
+	}
+	out := make(map[string]FileState, len(list))
+	for i, p := range list {
+		if isFile[i] {
+			out[p] = states[i]
+		}
+	}
+	return out
+}
+
+// statWorkers caps the walk's workers: on 12k files four took the walk from
+// 55 ms to 28 ms and eight did no better. statPerWorker is the fewest files
+// worth starting one for.
+const (
+	statWorkers   = 4
+	statPerWorker = 256
+)
+
 // walkFileState is what the walk records for a transcript file.
 func walkFileState(p string, fi os.FileInfo, old map[string]FileState) FileState {
+	return walkFileStateIn(sources.Registry(), p, fi, old)
+}
+
+// walkFileStateIn is walkFileState against a registry the caller built once.
+// Building it is most of what the walk spent per file, twice over — once to
+// find the file's kind, once to name its harness — and a walk visits every
+// transcript on the machine (#5386).
+func walkFileStateIn(reg []sources.Harness, p string, fi os.FileInfo, old map[string]FileState) FileState {
 	fs := FileState{Path: p, Size: fi.Size(), MTime: fi.ModTime().UnixNano()}
 	if strings.HasSuffix(p, ".jsonl") {
 		// Deriving these means reading the file: the tail for the last
@@ -6174,11 +6245,18 @@ func walkFileState(p string, fi os.FileInfo, old map[string]FileState) FileState
 			fs.SafeSize, fs.PrefixSample = e.safe, e.sample
 		}
 	}
-	if k, ok := kindForPath(p); ok && k.Sidecar != nil {
+	k, ok := kindIn(reg, p)
+	if ok && k.Sidecar != nil {
 		fs.MetadataSize, fs.MetadataMTime = k.Sidecar(p)
 	}
 	fs.WALSize, fs.WALMTime = walStat(p)
-	if harnessForPath(p) == "grok" {
+	// The kind's name is what harnessForPath answers for a path it matched;
+	// only a path no kind claims goes on to its probe names.
+	harness := k.Name
+	if !ok {
+		harness = harnessForPath(p)
+	}
+	if harness == "grok" {
 		if cwd, err := os.Lstat(filepath.Join(filepath.Dir(filepath.Dir(p)), ".cwd")); err == nil && cwd.Mode()&os.ModeSymlink == 0 && !cwd.IsDir() {
 			fs.CWDSize = cwd.Size()
 			fs.CWDMTime = cwd.ModTime().UnixNano()

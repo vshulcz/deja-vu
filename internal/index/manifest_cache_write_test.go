@@ -72,22 +72,13 @@ func TestTheManifestCacheStillServesRepeatedReads(t *testing.T) {
 	if _, err := readManifestCached(dir); err != nil {
 		t.Fatal(err)
 	}
-	// Remove the file the decode reads. A cached answer survives it; a
-	// re-decode falls back to readManifest and fails.
-	if err := os.Remove(filepath.Join(dir, "sessions.gob")); err != nil {
-		t.Fatal(err)
-	}
-	// Keep manifest.gob's stamp where the cache saw it.
-	before, err := os.Stat(filepath.Join(dir, "manifest.gob"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chtimes(filepath.Join(dir, "manifest.gob"), before.ModTime(), before.ModTime()); err != nil {
-		t.Fatal(err)
-	}
+	before := manifestDecodes.Load()
 	m, err := readManifestCached(dir)
 	if err != nil {
-		t.Fatalf("the second read did not come from the cache: %v", err)
+		t.Fatal(err)
+	}
+	if n := manifestDecodes.Load() - before; n != 0 {
+		t.Fatalf("the second read decoded the manifest %d times, want it from the cache", n)
 	}
 	if m.Version != version {
 		t.Errorf("cached manifest version = %d, want %d", m.Version, version)

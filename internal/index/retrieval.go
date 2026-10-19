@@ -3912,13 +3912,13 @@ func stemPostings(dir string, terms, phrases []string) ([]posting, map[string][]
 	if !hasStemToken(terms) {
 		return nil, nil, nil
 	}
-	catalog, err := tokenCatalogCached(dir)
+	catalog, err := tokenIndexCached(dir)
 	if err != nil {
 		return nil, nil, err
 	}
 	matchesPer := make([][]string, len(terms))
 	for i, term := range terms {
-		matchesPer[i] = stemMatches(term, catalog)
+		matchesPer[i] = stemMatches(term, catalog.set)
 	}
 	// Whatever the catalog has no whole word for gets one pass looking for the
 	// word inside a token that glued it to something else. One pass for all of
@@ -4021,6 +4021,10 @@ func hasStemToken(terms []string) bool {
 	return false
 }
 
+// gluedCompared counts the tokens the glued step held up against a form, for
+// the test that pins it to the question rather than the catalog (#5386).
+var gluedCompared atomic.Int64
+
 // fillGluedMatches finds a term's other forms inside tokens that glued the
 // word to something else: "k8sнастройки" holds "настройки" and is one token,
 // so nothing splits it and stemMatches, which asks the catalog for whole
@@ -4034,7 +4038,7 @@ func hasStemToken(terms []string) bool {
 // transcript used, while in Latin the same rule reaches "latest" from "tests"
 // and "preserve" from "press". English compounds have their own road — the
 // indexer splits them into parts — and this one would only add coincidences.
-func fillGluedMatches(terms []string, matchesPer [][]string, catalog map[string]bool) {
+func fillGluedMatches(terms []string, matchesPer [][]string, catalog *tokenIndex) {
 	formsPer := make([][]string, len(terms))
 	want := false
 	for i, term := range terms {
@@ -4053,26 +4057,53 @@ func fillGluedMatches(terms []string, matchesPer [][]string, catalog map[string]
 	if !want {
 		return
 	}
+	// The token has to be the word plus something, and the something is what
+	// makes this rung necessary — so the length is measured against the form,
+	// not against the term, which is the longer of the two when the query is
+	// in a case with a long ending. A token that starts or ends with the form
+	// and is longer in bytes is longer in runes too, since the form ends on a
+	// whole rune.
+	//
+	// Looked up by the form's first and last four runes rather than by walking
+	// the catalog once per form: the walk counted the runes of every token in
+	// the store for each of a Cyrillic term's hundred-odd forms, which was most
+	// of a recall's time on a 12k-session store and grew with it (#5386).
+	glued := catalog.gluedKeys()
 	found := make([]map[string]bool, len(terms))
-	for tok := range catalog {
-		for i, forms := range formsPer {
-			for _, f := range forms {
-				// The token has to be the word plus something, and the
-				// something is what makes this rung necessary — so the length
-				// is measured against the form, not against the term, which is
-				// the longer of the two when the query is in a case with a long
-				// ending. Runes on both sides: a byte comparison would admit a
-				// token one byte longer, which in Cyrillic is no character at
-				// all.
-				if len([]rune(tok)) <= len([]rune(f)) ||
-					(!strings.HasPrefix(tok, f) && !strings.HasSuffix(tok, f)) {
-					continue
+	for i, forms := range formsPer {
+		for _, f := range forms {
+			if isASCIIString(f) || !utf8.ValidString(f) {
+				// The keys are taken over non-ASCII tokens by whole runes,
+				// which is no way to find an ASCII form or a broken one;
+				// those are walked for under the old rule.
+				for tok := range catalog.set {
+					gluedCompared.Add(1)
+					if len([]rune(tok)) > len([]rune(f)) && (strings.HasPrefix(tok, f) || strings.HasSuffix(tok, f)) {
+						if found[i] == nil {
+							found[i] = map[string]bool{}
+						}
+						found[i][tok] = true
+					}
 				}
-				if found[i] == nil {
-					found[i] = map[string]bool{}
+				continue
+			}
+			heads, tails := glued.head[runeHead(f, gluedKeyRunes)], glued.tail[runeTail(f, gluedKeyRunes)]
+			gluedCompared.Add(int64(len(heads) + len(tails)))
+			for _, tok := range heads {
+				if len(tok) > len(f) && strings.HasPrefix(tok, f) {
+					if found[i] == nil {
+						found[i] = map[string]bool{}
+					}
+					found[i][tok] = true
 				}
-				found[i][tok] = true
-				break
+			}
+			for _, tok := range tails {
+				if len(tok) > len(f) && strings.HasSuffix(tok, f) {
+					if found[i] == nil {
+						found[i] = map[string]bool{}
+					}
+					found[i][tok] = true
+				}
 			}
 		}
 	}
@@ -4470,8 +4501,8 @@ func tokenCatalogDirs(dir string) (map[string]bool, []bucketDir, error) {
 		}
 		return nil, nil, err
 	}
-	catalog := map[string]bool{}
 	var dirs []bucketDir
+	tokens := 0
 	for _, de := range entries {
 		if de.IsDir() || !strings.HasSuffix(de.Name(), ".bin") {
 			continue
@@ -4486,10 +4517,17 @@ func tokenCatalogDirs(dir string) (map[string]bool, []bucketDir, error) {
 		if serr != nil {
 			return nil, nil, serr
 		}
-		for _, entry := range header {
+		tokens += len(header)
+		dirs = append(dirs, bucketDir{path: path, stat: fi, entries: header})
+	}
+	// Sized before it is filled: grown one token at a time, the map was
+	// rehashed its way up to every token in the store, a third of what a
+	// command-line search that reaches the catalog spent on it (#5386).
+	catalog := make(map[string]bool, tokens)
+	for _, d := range dirs {
+		for _, entry := range d.entries {
 			catalog[strings.TrimPrefix(entry.tok, "t")] = true
 		}
-		dirs = append(dirs, bucketDir{path: path, stat: fi, entries: header})
 	}
 	return catalog, dirs, nil
 }

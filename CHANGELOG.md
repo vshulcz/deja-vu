@@ -107,6 +107,10 @@ session it keeps: they are copied as stored and keep their postings. On a
 A pass that reads Codex's, TRAE's or Claude Code's history.jsonl beside other
 changes replaces only the sessions with a new prompt in it, not every session
 known from the log alone (#5403).
+A search no longer pays for the size of the store before it has found
+anything. On a 12,000-session store a Russian recall that looks for a word
+glued to another took 1.8-3.3 s, now 0.15-0.3 s, and checking what changed
+since the last pass takes 30 ms instead of 190 ms (#5386).
 
 When two transcripts hold the same session id, a pass that rewrites one reads
 the other again too, so a turn both hold is no longer indexed twice and a copy's

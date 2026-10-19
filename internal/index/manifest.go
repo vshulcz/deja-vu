@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -474,7 +475,12 @@ func manifestFresh(m Manifest, files map[string]FileState, scope string) bool {
 	return true
 }
 
+// manifestDecodes counts readManifest's decodes, for the test that pins how
+// many a search makes (#5386).
+var manifestDecodes atomic.Int64
+
 func readManifest(dir string) (Manifest, error) {
+	manifestDecodes.Add(1)
 	var core manifestCore
 	if err := readGob(filepath.Join(dir, "manifest.gob"), &core); err != nil {
 		return Manifest{}, err
