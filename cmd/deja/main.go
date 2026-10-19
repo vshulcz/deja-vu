@@ -4041,7 +4041,7 @@ func orphanedTombstones(dir string, keys []string) map[string]bool {
 			return seen, seen != nil
 		}
 		var found map[string]bool
-		for _, h := range sources.Registry() {
+		for _, h := range sources.StoresToRead() {
 			if h.Name != harness || h.Load == nil {
 				continue
 			}

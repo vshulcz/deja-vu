@@ -1334,18 +1334,14 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 		name string
 		ss   []model.Session
 	}
-	reg := sources.Registry()
+	// A store the reader has asked deja not to read is not walked at all.
+	// Without this the only way to stop `needs-sqlite3` advice for a
+	// harness they do not use was to install the package (#3499).
+	reg := sources.StoresToRead()
 	results := make([]loaded, len(reg))
 	var wg sync.WaitGroup
-	skipStore := sources.ExcludedHarnesses()
 	for i, hr := range reg {
 		if h != "" && h != hr.Name {
-			continue
-		}
-		// A store the reader has asked deja not to read is not walked at all.
-		// Without this the only way to stop `needs-sqlite3` advice for a
-		// harness they do not use was to install the package (#3499).
-		if skipStore[hr.Name] {
 			continue
 		}
 		wg.Add(1)
@@ -5855,7 +5851,11 @@ func currentFilesWith(h string, old map[string]FileState) map[string]FileState {
 	// (#1021).
 	reportPhase("finding transcripts", 0)
 	paths := map[string]bool{}
-	for _, hr := range sources.Registry() {
+	// The stores a rebuild reads, not every store: an excluded harness was
+	// walked and indexed here on every incremental pass (#5394). Its rows in
+	// the manifest are kept as a store outside this run's view, so what is
+	// already indexed stays until a rebuild, as with a project pattern.
+	for _, hr := range sources.StoresToRead() {
 		if h != "" && h != hr.Name {
 			continue
 		}
@@ -5911,7 +5911,7 @@ func walkFileState(p string, fi os.FileInfo, old map[string]FileState) FileState
 // sessions must not be dropped as if forgotten.
 func injectHermesPG(out, old map[string]FileState) {
 	dsn := sources.HermesPGDSN()
-	if dsn == "" {
+	if dsn == "" || !sources.StoreRead("hermes") {
 		for p, of := range old {
 			if sources.IsHermesPGStore(p) {
 				out[p] = of

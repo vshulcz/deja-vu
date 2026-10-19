@@ -305,7 +305,7 @@ func HarnessUnreadCounts(dir string) map[string]int {
 		return nil
 	}
 	out := map[string]int{}
-	for _, h := range sources.Registry() {
+	for _, h := range sources.StoresToRead() {
 		for _, p := range h.Files() {
 			if _, ok := m.Files[p]; ok {
 				continue
@@ -425,6 +425,11 @@ func manifestFresh(m Manifest, files map[string]FileState, scope string) bool {
 		for p, f := range m.Files {
 			// The records a sync brought in have no transcript to list.
 			if _, ok := files[p]; ok || p == syncImportPath {
+				continue
+			}
+			// A store this run does not read keeps its rows as they were
+			// (#5394): nothing for a pass to do.
+			if sources.OutsideStoresRead(p) {
 				continue
 			}
 			// Still gone, from a store that is still there: nothing for a

@@ -145,6 +145,43 @@ func Registry() []Harness {
 	return out
 }
 
+// StoresToRead is Registry less the stores the reader excluded with a
+// `harness:` line or DEJA_EXCLUDE_HARNESSES. Every pass that walks or opens a
+// store starts here, so the exclusion holds on the incremental pass and the
+// freshness check as it does on a rebuild (#5394).
+func StoresToRead() []Harness {
+	reg := Registry()
+	skip := ExcludedHarnesses()
+	if len(skip) == 0 {
+		return reg
+	}
+	out := make([]Harness, 0, len(reg))
+	for _, h := range reg {
+		if !skip[h.Name] {
+			out = append(out, h)
+		}
+	}
+	return out
+}
+
+// StoreRead reports whether a store is one StoresToRead keeps, for callers
+// with their own list of stores.
+func StoreRead(name string) bool { return !StoreSilenced(name) && !HarnessExcluded(name) }
+
+// OutsideStoresRead reports a transcript path that belongs to a store this run
+// does not read. The index keeps such a row as it was, and a freshness check
+// that counted it as a change re-ran the pass on every search.
+func OutsideStoresRead(p string) bool {
+	for _, h := range allHarnesses() {
+		for _, k := range h.Kinds {
+			if k.Match != nil && k.Match(p) {
+				return !StoreRead(h.Name)
+			}
+		}
+	}
+	return false
+}
+
 // AllHarnesses is every harness deja knows how to read, whatever DEJA_STORES
 // says. The set `--harness` accepts, and the number the documentation counts:
 // silencing a store for one run does not make deja a tool that reads fewer
