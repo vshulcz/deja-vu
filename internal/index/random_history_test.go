@@ -133,6 +133,7 @@ func (r *historyRun) compare(seed int64, step int) {
 	if diffSnaps(t, label, got, want) > 0 {
 		t.Fatalf("%s; replay with -args -history-seed=%d. Steps:\n  %s", label, seed, strings.Join(r.log, "\n  "))
 	}
+	samePostings(t, r.index, b)
 }
 
 // wall is an error line a few sessions share, so friction has walls to name.

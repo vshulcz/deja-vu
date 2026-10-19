@@ -4634,14 +4634,12 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		if !ok {
 			return nil
 		}
-		// Carried records were redacted when first written; re-running the
-		// regex battery over the whole corpus made every incremental update
-		// cost O(index), which is what a live cline/cursor store hits on
-		// each change.
 		off, err := rw.write(r)
 		if err != nil {
 			return err
 		}
+		passEncoded.Add(1)
+		passKeyed.Add(1)
 		// The same part and the same tool bit a full build gives the record.
 		// Tokenizing the whole text here put every hash of a written side,
 		// every replaced span's body and whole build logs into the postings
@@ -4655,16 +4653,31 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		m.Sessions[r.Key] = meta
 		return nil
 	}
-	var recErr error
 	// The sessions that lost a record here, which the command failure walk
 	// has to read again along with the ones re-read (#4288).
 	dropped := map[string]bool{}
 	// Seeded with the records carried for a session this pass replaces, so a
 	// turn a kept or skipped copy already holds is not written again.
 	seenMsgs := msgSeen{}
-	if err := eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(old), func(r Record) {
-		if recErr != nil {
-			return
+	// Carried records were redacted, encoded and keyed when first written.
+	// Each is copied as it is stored, and its postings are moved over below:
+	// doing it all again made every replacement pass cost the whole store, on
+	// one core (#5383). Only a session this pass replaces, or one a compaction
+	// may have kept, has its body read.
+	oldTables := tablesFromManifest(old)
+	carried := &carriedRecords{}
+	if err := eachStoredRecord(filepath.Join(dir, "records.bin"), func(oldOff int64, payload []byte) error {
+		kid, pid, rid, rest, ok := recordPrefix(payload)
+		if !ok {
+			return errShortRecord
+		}
+		r := Record{Key: oldTables.lookup(kid), SourcePath: oldTables.lookup(pid), Role: oldTables.lookup(rid)}
+		if _, ok := compacted[r.Key]; ok || replaceKeys[r.Key] {
+			full, err := decodeRecord(payload, oldTables)
+			if err != nil {
+				return err
+			}
+			r = full
 		}
 		// Shared-store harnesses (opencode, cursor) are parsed since a
 		// watermark, so their untouched sessions are NOT re-emitted on a
@@ -4686,21 +4699,31 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		if removed[r.SourcePath] || (changed[r.SourcePath].Path != "" && !fromStore && !leftItsFile(r, replaceKeys, old.Sessions[r.Key], aiderHeld) && !keptThroughCompaction(r, compacted)) || (fromStore && readWholeThisPass(r) && storeKeys[r.Key]) ||
 			(takeovers[r.Key] && isCodexHistory(r.SourcePath)) {
 			dropped[r.Key] = true
-			return
+			return nil
 		}
 		if r.SourcePath == "" {
-			dropped[r.Key] = true // addRec does not carry it
-		} else if replaceKeys[r.Key] {
+			dropped[r.Key] = true // not carried
+			return nil
+		}
+		if replaceKeys[r.Key] {
 			seenMsgs.dup(r.Key, r.Role, r.Time, r.Text)
 		}
-		recErr = addRec(r)
+		meta, ok := old.Sessions[r.Key]
+		if !ok {
+			return nil
+		}
+		off, err := rw.writeStored(r.Key, r.SourcePath, r.Role, rest)
+		if err != nil {
+			return err
+		}
+		carried.add(oldOff, off, meta.Ord, isToolRole(r.Role))
+		if _, exists := m.Sessions[r.Key]; !exists {
+			m.Sessions[r.Key] = meta
+		}
+		return nil
 	}); err != nil {
 		_ = rw.Close()
 		return err
-	}
-	if recErr != nil {
-		_ = rw.Close()
-		return recErr
 	}
 	// Ord is the posting's session id, so two sessions sharing one merges
 	// their postings. A replacement reclaims its Ord from the OLD manifest,
@@ -4783,7 +4806,12 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	if err := rw.Close(); err != nil {
 		return err
 	}
-	if err := writeBucketsConcurrent(filepath.Join(tmp, "buckets"), buckets); err != nil {
+	moved, err := carriedPostings(dir, old, carried)
+	if err != nil {
+		return err
+	}
+	mergePostings(moved, buckets)
+	if err := writeBucketsConcurrent(filepath.Join(tmp, "buckets"), moved); err != nil {
 		return err
 	}
 	settleCopies(&m, old.Sessions, changed, replacements)

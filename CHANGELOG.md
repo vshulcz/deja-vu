@@ -99,6 +99,11 @@ file that can't be appended no longer sends the rest of the pass through a full
 re-parse: a 400 MB transcript that grew 281 KB next to a touched 100 MB one
 took 25 s to index, now about 2 s.
 
+A pass that rewrites the index no longer re-encodes and re-tokenizes every
+session it keeps: they are copied as stored and keep their postings. On a
+12,000-session store a pass over 9 changed transcripts took 45 s, now 7 s
+(#5383).
+
 When two transcripts hold the same session id, a pass that rewrites one reads
 the other again too, so a turn both hold is no longer indexed twice and a copy's
 turns are no longer dropped until `deja index --rebuild`.

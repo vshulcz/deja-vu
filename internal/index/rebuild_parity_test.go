@@ -151,6 +151,7 @@ func sameAsRebuild(t *testing.T, inc string) {
 	if len(diffs) > 0 {
 		t.Errorf("incremental index differs from a rebuild:\n%s", strings.Join(diffs, "\n"))
 	}
+	samePostings(t, inc, fresh)
 }
 
 func parityClaudeLine(id, ts, role, content string) string {
