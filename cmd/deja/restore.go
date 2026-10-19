@@ -96,6 +96,10 @@ func runRestore(dir string, args []string, stdout io.Writer) error {
 		return err
 	}
 	if len(spans) == 0 {
+		if note := restoreDataNote(); note != "" {
+			fmt.Fprintln(stdout, "deja: "+note)
+			return nil
+		}
 		// Same as #834 elsewhere: nothing recorded because nothing is
 		// indexed is a different answer from nothing recorded for this path.
 		if n, err := index.SessionCount(dir); err == nil && n == 0 {

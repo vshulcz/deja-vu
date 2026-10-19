@@ -221,7 +221,7 @@ error. Only commands someone runs write: `deja index`,
 (`forget`, `sync`).
 Answers carry the index date in one line.
 
-Cold rebuild does all parsing first, then writes `records.bin`, buckets, and manifest from one goroutine. That keeps the on-disk index coherent and avoids concurrent writers. The five sidecars derived afterwards — the co-occurrence map, fix pairs, the recurring-command table, the failures and the session facts — each write their own file and read nothing the others write, so they run together, and fix mining and the co-occurrence map also run per session across cores. That is most of the difference between a 51s and a 30s rebuild on a real store.
+Cold rebuild does all parsing first, then writes `records.bin`, buckets, and manifest from one goroutine. That keeps the on-disk index coherent and avoids concurrent writers. The five sidecars derived afterwards — the co-occurrence map, fix pairs, the recurring-command table, the failures and the session facts — each write their own file and read nothing the others write, so they run together, and fix mining and the co-occurrence map also run per session across cores. That is most of the difference between a 51s and a 30s rebuild on a real store. A search-only index (`DEJA_SEARCH_ONLY`, `"search_only"` in `policy.json`) skips all five on every pass and records that in the manifest, so `deja fix` can say why it has nothing. Only a first build or `deja index` run by hand applies the setting, rebuilding once when it changes; automatic passes keep the one on disk, so a hook under another environment cannot rebuild the store back and forth.
 
 ## MCP server design
 

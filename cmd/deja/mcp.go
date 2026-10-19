@@ -888,6 +888,15 @@ func mcpFix(dir, name string, raw json.RawMessage) (string, int, error) {
 		return pol.Allows(policy.ActivationMCP, project)
 	})
 	if len(pairs) == 0 {
+		// Nothing to look in is not nothing found (#5395). What sessions
+		// said about the error still helps.
+		if note := fixDataNote(dir); note != "" {
+			note = "deja: " + note + "."
+			if text, n := fixFallsBackToRecall(dir, a.Error); n > 0 {
+				return note + "\n\n" + text, n, nil
+			}
+			return note, 0, nil
+		}
 		// What the heuristic is for is mining pairs out of a transcript, where
 		// a false positive costs a bad pair. Used on the caller it accuses the
 		// agent of passing the wrong thing: measured against twenty error lines
@@ -1010,6 +1019,9 @@ func mcpHow(dir, name string, raw json.RawMessage) (string, int, error) {
 		// surface was returning the negative regardless.
 		if note := policyHiddenNote(policy.ActivationMCP, hidden); note != "" {
 			return strings.TrimSpace(note), 0, nil
+		}
+		if note := howDataNote(); note != "" {
+			return "deja: " + note + ".", 0, nil
 		}
 		return fmt.Sprintf("No command on this machine mentions %q.", a.What) + emptyStoreNote(dir), 0, nil
 	}

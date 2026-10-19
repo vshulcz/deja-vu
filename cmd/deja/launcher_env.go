@@ -40,7 +40,6 @@ var launcherEnvSettings = map[string]bool{
 	"DEJA_EXCLUDE_PROJECTS":      true,
 	"DEJA_EXCLUDE_HARNESSES":     true,
 	"DEJA_INDEX_TOOL_OUTPUT":     true,
-	"DEJA_INDEX_TOOL_PATHS":      true,
 	"DEJA_INDEX_PATHS":           true,
 	"DEJA_INDEX_WRITES":          true,
 	"DEJA_INDEX_EDITS":           true,
@@ -49,6 +48,7 @@ var launcherEnvSettings = map[string]bool{
 	"DEJA_MACHINE":               true,
 	"DEJA_AUTORECALL_LOCAL_ONLY": true,
 	"DEJA_NO_AUTO_INDEX":         true,
+	"DEJA_SEARCH_ONLY":           true,
 }
 
 // launcherEnvLocation matches the DEJA_* variables that name a path: the index

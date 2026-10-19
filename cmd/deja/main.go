@@ -587,6 +587,10 @@ func cmdIndex(dir string, rest []string) error {
 		return nil
 	}
 	defer index.AllowBuild()()
+	// Run by hand, it is also what turns search-only on or off (#5395).
+	if os.Getenv("DEJA_WARMUP_SENTINEL") == "" {
+		defer index.ApplySearchOnly()()
+	}
 	// Where the command reports that it worked. Nobody is watching a run out
 	// of a shell profile or a hook, and a line printed over the prompt on
 	// every new shell is the kind of thing that gets a tool uninstalled

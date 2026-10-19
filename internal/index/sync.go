@@ -886,6 +886,9 @@ func Import(dir, inDir string) (int, error) {
 // were missing from the command tables and session facts until a rebuild, and
 // a fix the batch confirmed stayed a candidate.
 func refreshImportSidecars(dir string, m Manifest, recsByKey map[string][]Record) {
+	if m.SearchOnly {
+		return
+	}
 	var batch []model.Session
 	for _, key := range sortedKeys(recsByKey) {
 		meta := m.Sessions[key]
@@ -977,7 +980,7 @@ func initEmptyIndex(dir string) error {
 	// Same reasoning for the tools this build could use: blank reads as "an
 	// older deja wrote this", and a store skipped for a missing CLI would then
 	// never be re-read once it was installed (#1760).
-	m := Manifest{Version: version, KeptDated: true, Format: onDiskFormat, Files: map[string]FileState{}, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), ExportWatermarks: map[string]int64{}, ImportedRecords: map[string]bool{},
+	m := Manifest{Version: version, KeptDated: true, Format: onDiskFormat, SearchOnly: searchOnlyFor(dir), Files: map[string]FileState{}, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), ExportWatermarks: map[string]int64{}, ImportedRecords: map[string]bool{},
 		Compactions:        compactionsForRebuild(dir, readTombstones()),
 		ExcludeFingerprint: sources.ExclusionFingerprint(),
 		ToolFingerprint:    mergedToolFingerprint(priorToolFingerprint(dir))}

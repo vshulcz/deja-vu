@@ -578,7 +578,7 @@ func ensureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 		// tool (#3552).
 		return true, 0, 0, nil
 	}
-	if zoneDrifted(m) {
+	if zoneDrifted(m) || miningChanged(m) {
 		// Regrouping the day buckets or rereading aider headers in this zone
 		// is a full rebuild; hand it to the detached warmup and say the current answer is stale.
 		return true, 0, 0, nil
@@ -771,7 +771,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	// incremental build carries the old stamp forward: it keeps records it
 	// wrote under the previous patterns, which is why `deja index` has to ask
 	// for a rebuild rather than quietly declaring the new list in force (#1307).
-	m := Manifest{Version: version, KeptDated: true, Format: onDiskFormat, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), SourcesReadAt: time.Now(), ReadZone: zoneFingerprint(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
+	m := Manifest{Version: version, KeptDated: true, Format: onDiskFormat, SearchOnly: searchOnlyFor(dir), Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), SourcesReadAt: time.Now(), ReadZone: zoneFingerprint(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
 		ExportWatermarks: imported.watermarks, ExportBoundary: imported.boundary, ImportedRecords: imported.dedupe,
 		Compactions:        compactions,
 		ExcludeFingerprint: sources.ExclusionFingerprint(),
@@ -881,27 +881,30 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	// store that is eight seconds of a twenty-second build, and it used to run
 	// under the previous phase's last percentage, so the bar sat still through
 	// it (#3372).
-	reportPhase("mining fixes and commands", 5)
-	// Five passes over the same sessions, each writing its own file and reading
-	// nothing the others write, so they run together rather than one after the
-	// other. Profiled on a real store, they were 9.4 s (fixes) and 6.0 s
-	// (co-occurrence) of a 51 s build, with the whole machine idle beside them.
-	var sidecars sync.WaitGroup
-	for _, build := range []func(){
-		func() { buildCooccur(tmp, ss) },
-		func() { buildFixes(tmp, ss, func(s model.Session) string { return s.Harness + ":" + s.ID }) },
-		func() { buildCommands(tmp, ss) },
-		func() { buildCommandFails(tmp, ss) },
-		func() { buildSessionFacts(tmp, ss) },
-	} {
-		sidecars.Add(1)
-		go func() {
-			defer sidecars.Done()
-			build()
-			reportAdvance(1)
-		}()
+	// Skipped whole on a search-only index (#5395).
+	if !m.SearchOnly {
+		reportPhase("mining fixes and commands", 5)
+		// Five passes over the same sessions, each writing its own file and reading
+		// nothing the others write, so they run together rather than one after the
+		// other. Profiled on a real store, they were 9.4 s (fixes) and 6.0 s
+		// (co-occurrence) of a 51 s build, with the whole machine idle beside them.
+		var sidecars sync.WaitGroup
+		for _, build := range []func(){
+			func() { buildCooccur(tmp, ss) },
+			func() { buildFixes(tmp, ss, func(s model.Session) string { return s.Harness + ":" + s.ID }) },
+			func() { buildCommands(tmp, ss) },
+			func() { buildCommandFails(tmp, ss) },
+			func() { buildSessionFacts(tmp, ss) },
+		} {
+			sidecars.Add(1)
+			go func() {
+				defer sidecars.Done()
+				build()
+				reportAdvance(1)
+			}()
+		}
+		sidecars.Wait()
 	}
-	sidecars.Wait()
 	reportPhase("writing index", sp.bucketCount())
 	if err := sp.writeBuckets(filepath.Join(tmp, "buckets")); err != nil {
 		return err
@@ -1082,6 +1085,9 @@ func applyRenamedFiles(m *Manifest, renamed map[string]string) map[string]bool {
 // rename moved it to. Nothing was read, so the pairs keep their rows and take
 // the new project; the command tables are mined again from the records.
 func reprojectSidecars(dir string, sessions map[string]SessionMeta, keys map[string]bool) {
+	if BuiltSearchOnly(dir) {
+		return
+	}
 	if raw, ok := readFixRaw(dir); !ok {
 		remineFixes(dir)
 	} else if len(raw) > 0 {
@@ -1798,7 +1804,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	writtenMessages := 0
 	lastIngestFiles = len(files)
 	parsedThisPass(files)
-	m := Manifest{Version: version, KeptDated: true, Format: onDiskFormat, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), SourcesReadAt: time.Now(), ReadZone: zoneFingerprint(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
+	m := Manifest{Version: version, KeptDated: true, Format: onDiskFormat, SearchOnly: searchOnlyFor(dir), Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), SourcesReadAt: time.Now(), ReadZone: zoneFingerprint(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
 		ExportWatermarks: imp.watermarks, ExportBoundary: imp.boundary, ImportedRecords: imp.dedupe,
 		Compactions:        imp.compactions,
 		ExcludeFingerprint: sources.ExclusionFingerprint(),
@@ -1924,17 +1930,19 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	// touched and ran. On a real store that is eight seconds of a twenty-second
 	// build, and it used to run under the previous phase's last percentage, so
 	// the bar sat still through it (#3372).
-	reportPhase("mining fixes and commands", 5)
-	buildCooccur(tmp, ss)
-	reportAdvance(1)
-	buildFixes(tmp, ss, func(s model.Session) string { return s.Harness + ":" + s.ID })
-	reportAdvance(1)
-	buildCommands(tmp, ss)
-	reportAdvance(1)
-	buildCommandFails(tmp, ss)
-	reportAdvance(1)
-	buildSessionFacts(tmp, ss)
-	reportAdvance(1)
+	if !m.SearchOnly {
+		reportPhase("mining fixes and commands", 5)
+		buildCooccur(tmp, ss)
+		reportAdvance(1)
+		buildFixes(tmp, ss, func(s model.Session) string { return s.Harness + ":" + s.ID })
+		reportAdvance(1)
+		buildCommands(tmp, ss)
+		reportAdvance(1)
+		buildCommandFails(tmp, ss)
+		reportAdvance(1)
+		buildSessionFacts(tmp, ss)
+		reportAdvance(1)
+	}
 	reportPhase("writing index", sp.bucketCount())
 	if err := sp.writeBuckets(filepath.Join(tmp, "buckets")); err != nil {
 		return err
@@ -4146,6 +4154,9 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	if err == nil && !recordsIntact(dir, old) {
 		force = true // records.bin lost its tail to a crash; only a rebuild is safe
 	}
+	if err == nil && miningChanged(old) {
+		force = true // search-only turned on or off: the sidecars go or come back whole
+	}
 	if err == nil && !force && newerIndex(old) {
 		sayNewerIndex(progress, dir, old)
 		return nil
@@ -4685,7 +4696,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	// keyed on it — the embedding sidecar — that the file it measured was still
 	// there (#1357). Only appendIncremental, which appends in place, may keep a
 	// generation.
-	m := Manifest{Version: version, KeptDated: true, Format: onDiskFormat, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), SourcesReadAt: time.Now(), ReadZone: zoneFingerprint(),
+	m := Manifest{Version: version, KeptDated: true, Format: onDiskFormat, SearchOnly: searchOnlyFor(dir), Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), SourcesReadAt: time.Now(), ReadZone: zoneFingerprint(),
 		Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
 		ExportWatermarks: old.ExportWatermarks, ExportBoundary: old.ExportBoundary, ImportedRecords: old.ImportedRecords,
 		Compactions: cloneCompactions(old.Compactions),
@@ -4920,6 +4931,9 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	}
 	if err := writeManifest(tmp, m); err != nil {
 		return err
+	}
+	if m.SearchOnly {
+		return swapIndexDir(dir, tmp)
 	}
 	carrySidecars(dir, tmp)
 	// After carrying, not instead of it: the fixes merge writes only when it
@@ -5433,6 +5447,9 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	// whole, so a pair that starts before the tail is found; the rest of the
 	// table is still earned, and a candidate on file is what a second sighting
 	// needs to be promoted.
+	if m.SearchOnly {
+		return filesTouched, messages, unreadable, nil
+	}
 	whole, rewhole := wholeSessionsForFixes(dir, m, appended)
 	mergeFixes(dir, dir, nil, whole, rewhole)
 	// The two command tables are mined from every record the index holds, which

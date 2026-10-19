@@ -177,6 +177,10 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 			fmt.Fprint(stdout, note)
 			return nil
 		}
+		if note := howDataNote(); note != "" {
+			fmt.Fprintln(stdout, "deja: "+note)
+			return nil
+		}
 		fmt.Fprintf(stdout, "no command on this machine mentions %q\n", strings.Join(terms, " "))
 		return nil
 	}

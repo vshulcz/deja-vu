@@ -157,6 +157,16 @@ how much of the history it holds: "answering from the index of 2026-10-19
 10000 transcripts are new or changed since". After a first build cut off past its early slice they say it
 covers only the 200 most recent of the sessions found and that the older ones
 are missing, where recall used to say the newest might be (#5390).
+`DEJA_SEARCH_ONLY=1`, or `"search_only": true` in policy.json, builds the index
+for search alone and skips mining fixes, co-occurrence, commands, command
+failures and session facts: a rebuild of a 3,000-session tool-heavy store
+takes 2.7 s of CPU instead of 3.3 s. It is applied by the first build and by
+`deja index`, so a hook running under another environment does not rebuild
+the store back.
+`deja fix` then says the index is search-only instead of that nothing ever
+followed the error, and `deja how` and `deja restore` name `DEJA_INDEX_COMMANDS=0`
+or `DEJA_INDEX_EDITS=0` when those kept their data out. The commands guide lists
+what each `DEJA_INDEX_*` switch leaves out and what stops working (#5395).
 
 ## [0.22.2] - 2026-10-17
 

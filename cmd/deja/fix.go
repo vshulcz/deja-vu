@@ -97,6 +97,10 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 		return writeFixJSON(stdout, pairs)
 	}
 	if len(pairs) == 0 {
+		if note := fixDataNote(dir); note != "" {
+			fmt.Fprintln(stdout, "deja: "+note)
+			return nil
+		}
 		// One honest line. The old code tried to tell "not an error" apart from
 		// "never seen it", but the test it used rejects `Error: …`, `npm ERR!`
 		// and any line with a quote — the exact output people paste — so it

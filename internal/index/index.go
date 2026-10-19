@@ -1157,6 +1157,12 @@ type Manifest struct {
 	// holds only the newest. An answer from it has to say the older ones are
 	// missing, not the newest (#5390). Zero on every complete index.
 	PartialOf int `json:"partial_of,omitempty"`
+	// SearchOnly says the build skipped the derived tables — fixes,
+	// co-occurrence, commands, command failures, session facts — because
+	// DEJA_SEARCH_ONLY or "search_only" asked it to (#5395). A reader of one
+	// of those tables says so rather than answering empty, and a pass whose
+	// setting differs rebuilds once.
+	SearchOnly bool `json:"search_only,omitempty"`
 }
 
 // HarnessIngest is one harness's ingestion health from its last indexing pass.
@@ -1227,6 +1233,7 @@ type manifestCore struct {
 	ReadZone           string
 	Deferred           map[string]FileState
 	PartialOf          int
+	SearchOnly         bool
 }
 
 type RedactionStats struct {
