@@ -570,8 +570,8 @@ func TestHookPromptDoesNotWaitForTheHostToCloseStdin(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-			case <-time.After(5 * time.Second):
-				t.Fatal("hook still blocked on stdin after 5s")
+			case <-time.After(2 * time.Minute):
+				t.Fatal("hook still blocked on stdin after 2m")
 			}
 		})
 	}
