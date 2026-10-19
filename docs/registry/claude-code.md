@@ -35,6 +35,7 @@ Message records have `type`, `sessionId`, `timestamp`, and a `message` object. `
 - Tool and control records use other `type` values and do not become messages.
 - Project path encoding is ambiguous because `-` represents both a separator and a hyphen. deja checks the local filesystem before using a two-segment fallback.
 - Subagent logs are read as task, answer and the files they changed by default; the full child transcript is opt-in.
+- A transcript is one session, named by the last `sessionId` it holds (a sidechain by its `agentId`); an incremental pass whose tail carries another id reads the file again so it is filed the way a rebuild files it (#5379). 2.1.303 writes one id per file: `/clear` starts a new file under a new id, `/branch` rewrites the records it copies to the branch's id, and `--resume` appends under the resumed id.
 - A Bash call that exits non-zero fires `PostToolUseFailure`, not `PostToolUse`, with the output under `error`; a hook reply has to name the event it was sent or Claude Code drops it ("Hook returned incorrect event name"). `claude-auto` wires `hook-tool-after` to both (2.1.287, #4488). Before 2.0.56 the event does not exist and the settings schema rejects the whole file over it, so install leaves it out when `claude --version` is older; the plugin carries it in `hooks/hooks.json`, which an older Claude skips on its own.
 
 **Last verified:** 2026-09-10

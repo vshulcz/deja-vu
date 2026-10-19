@@ -63,7 +63,7 @@ func TestRecallContextShowsTheCodeTheSessionLeft(t *testing.T) {
 		t.Fatalf("n=%d err=%v", n1, err)
 	}
 	// What the MCP tool sends: cut to the reply's budget.
-	text := fitContextDigest(raw, id, contextMCPBudget-recallFrameOverhead)
+	text := fitContextDigest(raw, id, id, contextMCPBudget-recallFrameOverhead)
 	at := strings.Index(text, "## what it changed")
 	if at < 0 {
 		t.Fatalf("no changes block:\n%s", text)

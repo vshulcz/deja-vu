@@ -49,7 +49,7 @@ func TestRecallByIDKeepsToABudget(t *testing.T) {
 	if limit := budget + contextMCPBudget - recallMCPBudget; len(text) > limit {
 		t.Errorf("recall by id came back at %d bytes, over the %d it has", len(text), limit)
 	}
-	if !strings.HasSuffix(text, contextDigestCut) {
+	if !strings.HasSuffix(text, contextDigestCut(id)) && !strings.HasSuffix(text, "`deja show "+id+"` prints every turn]\n") {
 		t.Errorf("a cut digest has to say it was cut:\n%s", text[len(text)-200:])
 	}
 	// Deep, not a page: the id door keeps more than recall's own 4096.

@@ -38,25 +38,48 @@ func changesBlock(s model.Session, room int) string {
 	}
 	var b strings.Builder
 	b.WriteString("## what it changed\n")
-	for _, c := range cs {
+	// The changes that did not fit are counted, not dropped without a word:
+	// the block read as everything the session changed (#5392).
+	const leftOutRoom = 40
+	shown := 0
+	for i, c := range cs {
 		var one string
 		if c.Old == "" {
 			one = fmt.Sprintf("\n%s, new file:\n%s\n", c.Path, clipChange(c.New, changeNewMax))
 		} else {
 			one = fmt.Sprintf("\n%s:\n%s\n", c.Path, clipChange(changeDiff(c.Old, c.New), changeNewMax+changeOldMax))
 		}
-		if b.Len()+len(one) > room {
-			if b.Len() == len("## what it changed\n") {
+		limit := room
+		if i < len(cs)-1 {
+			limit -= leftOutRoom
+		}
+		if b.Len()+len(one) > limit {
+			if shown == 0 {
 				// The first change alone is over: show what fits of it rather
 				// than nothing.
-				b.WriteString(one)
+				b.WriteString(clipToFit(one, limit-b.Len()))
+				shown++
 			}
 			break
 		}
 		b.WriteString(one)
+		shown++
+	}
+	// Written after the redaction and the trim, so neither can take it.
+	count := ""
+	if left := len(cs) - shown; left > 0 {
+		count = fmt.Sprintf("\n(%d more change%s not shown)\n", left, pluralS(left))
 	}
 	text, _ := redact.Text(b.String())
-	return trimUTF8(redact.SafeForDisplay(text), room) + "\n"
+	return trimUTF8(redact.SafeForDisplay(text), max(0, room-len(count))) + count + "\n"
+}
+
+// clipToFit cuts one change to n bytes and says so.
+func clipToFit(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return trimUTF8(s, max(0, n-len("\n…\n"))) + "\n…\n"
 }
 
 func clipChange(s string, n int) string {
