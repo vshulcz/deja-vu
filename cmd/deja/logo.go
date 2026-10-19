@@ -129,7 +129,7 @@ func logoLinesMood(info []string, mood catMood) []string {
 
 func logoLinesArt(art, info []string) []string {
 	col, stacked := logoInfoStart(info)
-	out := make([]string, 0, len(art)+len(info)+2)
+	out := make([]string, 0, len(art)+2)
 	out = append(out, "")
 	if stacked {
 		// Too narrow for two columns. The mark still fits on its own, so keep
