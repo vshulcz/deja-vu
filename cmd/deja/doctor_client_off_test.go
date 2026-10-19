@@ -22,6 +22,9 @@ func TestDoctorReadsTheClientsOwnOffSwitches(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if real, err := filepath.EvalSymlinks(cwd); err == nil {
+		cwd = real
+	}
 	editJSON := func(t *testing.T, path string, edit func(map[string]any)) {
 		t.Helper()
 		root := map[string]any{}
