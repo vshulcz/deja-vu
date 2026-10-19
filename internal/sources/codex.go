@@ -781,18 +781,29 @@ func codexRolloutHead(path string) (id, cwd string, payload map[string]any, at t
 	defer func() { _ = f.Close() }()
 	// Read by line with no cap, as the parse itself reads: a session_meta
 	// carrying long instructions runs past a megabyte, and a capped scanner
-	// lost the id, so a resumed tail was filed as a session of its own.
-	r := bufio.NewReaderSize(f, 64*1024)
+	// lost the id, so a resumed tail was filed as a session of its own. A line
+	// past the buffer is streamed, as the parse streams it, so a command's
+	// output of a hundred megabytes near the top is not held whole (#5391).
+	r := bufio.NewReaderSize(f, jsonlBuffer)
 	// The meta record is the first line in every rollout Codex writes; a few
 	// lines of slack costs nothing and covers a format that adds a preamble.
 	for i := 0; i < 8; i++ {
-		line, err := r.ReadBytes('\n')
+		l, err := readJSONLine(r)
 		var rec struct {
 			Timestamp any            `json:"timestamp"`
 			Type      string         `json:"type"`
 			Payload   map[string]any `json:"payload"`
 		}
-		if json.Unmarshal(trimJSONSpace(line), &rec) != nil || rec.Type != "session_meta" {
+		ok := false
+		if l.long {
+			rec.Type, _ = l.m["type"].(string)
+			rec.Payload, _ = l.m["payload"].(map[string]any)
+			rec.Timestamp = l.m["timestamp"]
+			ok = l.ok
+		} else {
+			ok = json.Unmarshal(trimJSONSpace(l.raw), &rec) == nil
+		}
+		if !ok || rec.Type != "session_meta" {
 			if err != nil {
 				break
 			}

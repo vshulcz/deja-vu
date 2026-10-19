@@ -1,8 +1,6 @@
 package sources
 
 import (
-	"bytes"
-	"encoding/json"
 	"path/filepath"
 	"strings"
 	"time"
@@ -94,14 +92,8 @@ func resumesUnlessAnswering(hint string, answers func(m map[string]any) (calls [
 		}
 		made := map[string]bool{}
 		ok := true
-		_ = scanJSONLBytes(path, offset, func(line []byte) {
-			if !ok || !bytes.Contains(line, []byte(hint)) {
-				return
-			}
-			var m map[string]any
-			d := json.NewDecoder(bytes.NewReader(line))
-			d.UseNumber()
-			if d.Decode(&m) != nil {
+		_ = scanJSONLHinted(path, offset, []byte(hint), func(m map[string]any) {
+			if !ok {
 				return
 			}
 			calls, answered := answers(m)

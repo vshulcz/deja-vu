@@ -321,16 +321,15 @@ func leadingJSONLHeader(path string, offset int64, lookahead int, isHeader func(
 		return nil
 	}
 	defer f.Close()
-	r := bufio.NewReaderSize(io.LimitReader(f, offset), 1024*1024)
+	r := bufio.NewReaderSize(io.LimitReader(f, offset), jsonlBuffer)
 	for range lookahead {
-		line, err := r.ReadBytes('\n')
-		if line = trimJSONSpace(line); len(line) > 0 {
-			var m map[string]any
-			d := json.NewDecoder(strings.NewReader(string(line)))
-			d.UseNumber()
-			if d.Decode(&m) == nil && isHeader(m) {
-				return m
-			}
+		l, err := readJSONLine(r)
+		m, ok := l.m, l.ok
+		if !l.long {
+			m, ok, _ = decodeJSONObjectLine(l.raw)
+		}
+		if ok && isHeader(m) {
+			return m
 		}
 		if err != nil {
 			return nil
@@ -408,23 +407,20 @@ func scanJSONLFromOffset(path string, offset int64, fn func(map[string]any)) err
 // path only names the file in diagnostics. A decompressed archive is read
 // through it from memory, so its plaintext never lands in a temporary file.
 func scanJSONLReader(path string, src io.Reader, fn func(map[string]any)) error {
-	r := bufio.NewReaderSize(src, 1024*1024)
+	r := bufio.NewReaderSize(src, jsonlBuffer)
 	for {
-		line, err := r.ReadBytes('\n')
-		// A UTF-8 BOM on the first line would fail the JSON decode below, so the
-		// opening turn was dropped; trimJSONSpace strips it (and surrounding
-		// space) the way the claude decode path already does.
-		if line = trimJSONSpace(line); len(line) > 0 {
-			var m map[string]any
-			d := json.NewDecoder(strings.NewReader(string(line)))
-			d.UseNumber()
-			if d.Decode(&m) == nil {
-				fn(m)
-			} else if err == nil {
-				// A last line with no newline yet is the client still
-				// writing it; the next pass reads it whole (#4276).
-				diagMalformedLine(path)
-			}
+		l, err := readJSONLine(r)
+		m, ok, empty := l.m, l.ok, l.empty
+		if !l.long {
+			m, ok, empty = decodeJSONObjectLine(l.raw)
+		}
+		// A last line with no newline that does not decode is the client
+		// still writing it; the next pass reads it whole (#4276).
+		switch {
+		case ok:
+			fn(m)
+		case !empty && l.ended:
+			diagMalformedLine(path)
 		}
 		if errors.Is(err, io.EOF) {
 			return nil
@@ -433,6 +429,27 @@ func scanJSONLReader(path string, src io.Reader, fn func(map[string]any)) error 
 			return err
 		}
 	}
+}
+
+// decodeJSONObjectLine decodes a line holding one JSON object, numbers kept as
+// json.Number. A line holding anything else is not one: a null, or an object
+// with more after it, was handed on as a record, or as nothing, and went
+// uncounted (#5391).
+func decodeJSONObjectLine(line []byte) (m map[string]any, ok, empty bool) {
+	// A UTF-8 BOM on the first line would fail the decode, so the opening
+	// turn was dropped; trimJSONSpace strips it and the space around.
+	if line = trimJSONSpace(line); len(line) == 0 {
+		return nil, false, true
+	}
+	d := json.NewDecoder(bytes.NewReader(line))
+	d.UseNumber()
+	if d.Decode(&m) != nil || m == nil {
+		return nil, false, false
+	}
+	if _, err := d.Token(); !errors.Is(err, io.EOF) {
+		return nil, false, false
+	}
+	return m, true, false
 }
 
 // keepRegular drops any path that is not a regular file. Discovery paths that

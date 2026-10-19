@@ -111,6 +111,12 @@ A search no longer pays for the size of the store before it has found
 anything. On a 12,000-session store a Russian recall that looks for a word
 glued to another took 1.8-3.3 s, now 0.15-0.3 s, and checking what changed
 since the last pass takes 30 ms instead of 190 ms (#5386).
+A Codex line of a hundred megabytes, a command's whole output, no longer
+holds several copies of itself in memory: a JSONL line past 1 MB is decoded as
+it streams, each string kept to the 1 MB a message is cut to anyway. An
+incremental pass over one went from 628 MB to 42 MB peak. Every line that is
+not one JSON object now counts as skipped; a `null` line or one with more after
+the object went uncounted (#5391).
 
 When two transcripts hold the same session id, a pass that rewrites one reads
 the other again too, so a turn both hold is no longer indexed twice and a copy's
