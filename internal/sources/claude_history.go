@@ -1,6 +1,10 @@
 package sources
 
 import (
+	"bufio"
+	"encoding/json"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -43,6 +47,46 @@ func IsClaudeHistory(p string) bool {
 // moved under another name with DEJA_CLAUDE_HISTORY_FILE.
 func IsPromptLog(p string) bool {
 	return strings.EqualFold(filepath.Base(p), "history.jsonl") || IsClaudeHistory(p)
+}
+
+// PromptLogSessionIDs is the set of sessions the lines of a prompt log name
+// between two offsets: session_id in Codex's and TRAE's, sessionId in Claude
+// Code's. A pass that holds the log up to from reads it whole for these alone,
+// so a new prompt replaces its own session and not every one the log holds
+// (#5403). Lines that do not decode name nothing.
+func PromptLogSessionIDs(path string, from, to int64) (map[string]bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	if _, err := f.Seek(from, io.SeekStart); err != nil {
+		return nil, err
+	}
+	ids := map[string]bool{}
+	r := bufio.NewReader(io.LimitReader(f, max(to-from, 0)))
+	for {
+		line, err := r.ReadBytes('\n')
+		if line = trimJSONSpace(line); len(line) > 0 {
+			var l struct {
+				Codex  string `json:"session_id"`
+				Claude string `json:"sessionId"`
+			}
+			if json.Unmarshal(line, &l) == nil {
+				for _, id := range []string{l.Codex, l.Claude} {
+					if id != "" {
+						ids[id] = true
+					}
+				}
+			}
+		}
+		if errors.Is(err, io.EOF) {
+			return ids, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
 }
 
 func ParseClaudeHistory(path string) ([]model.Session, error) {

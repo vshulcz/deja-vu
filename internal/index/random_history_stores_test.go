@@ -27,6 +27,9 @@ type opencodeSession struct {
 type historyStores struct {
 	codexRoot string
 	codex     []*codexRollout
+	// codexLogged is the sessions known from Codex's history.jsonl alone.
+	codexLogged []string
+	codexLines  int
 	// db is empty when there is no sqlite3 to write the store with.
 	db       string
 	opencode []*opencodeSession
@@ -162,11 +165,13 @@ func (r *historyRun) codexStep() {
 	if len(m.codex) > 0 {
 		c = m.codex[r.rng.Intn(len(m.codex))]
 	}
-	op := r.rng.Intn(6)
-	if c == nil {
+	op := r.rng.Intn(9)
+	if c == nil && op < 6 {
 		op = 0
 	}
 	switch op {
+	case 6, 7, 8:
+		r.codexHistoryStep(op)
 	case 0:
 		r.next++
 		c = &codexRollout{id: fmt.Sprintf("cx%d", r.next), day: 1 + r.rng.Intn(20)}
@@ -210,6 +215,71 @@ func (r *historyRun) codexStep() {
 		}
 		r.log = append(r.log, "delete codex "+c.id)
 	}
+}
+
+// codexHistoryStep writes Codex's prompt log: prompts of sessions known from
+// the log alone, often in the same pass as another one's rollout landing, so
+// the log is read by the replacement path; or the log trimmed from the front
+// the way Codex keeps it under max_bytes (#5403).
+func (r *historyRun) codexHistoryStep(op int) {
+	m := &r.more
+	hist := filepath.Join(m.codexRoot, "history.jsonl")
+	if op == 8 && fileExists(hist) {
+		b, err := os.ReadFile(hist)
+		if err != nil {
+			r.t.Fatal(err)
+		}
+		lines := strings.SplitAfter(string(b), "\n")
+		cut := 1 + r.rng.Intn(len(lines))
+		writeHistoryFile(r, hist, strings.Join(lines[min(cut, len(lines)):], ""), false)
+		r.log = append(r.log, fmt.Sprintf("codex history trimmed by %d lines", cut))
+		return
+	}
+	var did []string
+	for n := 1 + r.rng.Intn(3); n > 0; n-- {
+		var id string
+		// Codex logs the prompts of sessions with a rollout too.
+		var withRollout []string
+		for _, c := range m.codex {
+			if len(c.id) == 36 {
+				withRollout = append(withRollout, c.id)
+			}
+		}
+		if len(withRollout) > 0 && r.rng.Intn(4) == 0 {
+			id = withRollout[r.rng.Intn(len(withRollout))]
+		} else if len(m.codexLogged) < 3 || r.rng.Intn(3) == 0 {
+			r.next++
+			id = fmt.Sprintf("019a0000-0000-7000-8000-%012d", r.next)
+			m.codexLogged = append(m.codexLogged, id)
+		} else {
+			id = m.codexLogged[r.rng.Intn(len(m.codexLogged))]
+		}
+		m.codexLines++
+		at := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC).Add(time.Duration(m.codexLines) * time.Minute)
+		writeHistoryFile(r, hist, hjson(map[string]any{"session_id": id, "ts": at.Unix(), "text": r.prompt(3)}), fileExists(hist))
+		did = append(did, "a codex history prompt for "+id)
+	}
+	if op == 7 && len(m.codexLogged) > 1 {
+		i := r.rng.Intn(len(m.codexLogged))
+		id := m.codexLogged[i]
+		m.codexLogged = append(m.codexLogged[:i], m.codexLogged[i+1:]...)
+		c := &codexRollout{id: id, day: 1 + r.rng.Intn(20)}
+		body := codexLine(c.at(), "session_meta", map[string]any{"id": c.id, "cwd": "/w/app"})
+		// Now and then the rollout holds no message yet: the session leaves
+		// the history parse with nothing to take its place.
+		if r.rng.Intn(3) > 0 {
+			body += r.codexTurns(c)
+		}
+		writeHistoryFile(r, r.codexPath(c), body, false)
+		m.codex = append(m.codex, c)
+		did = append(did, "the rollout of logged "+id+" lands")
+	}
+	r.log = append(r.log, strings.Join(did, ", "))
+}
+
+func fileExists(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil
 }
 
 func writeHistoryFile(r *historyRun, p, body string, appendTo bool) {
@@ -319,6 +389,7 @@ func (r *historyRun) privacyStep() {
 	for _, c := range m.codex {
 		ids = append(ids, c.id)
 	}
+	ids = append(ids, m.codexLogged...)
 	for _, s := range m.opencode {
 		ids = append(ids, s.id)
 	}

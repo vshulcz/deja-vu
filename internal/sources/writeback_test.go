@@ -112,7 +112,7 @@ func TestWriteBackCodexTakesTheDirectoryTheSessionRecorded(t *testing.T) {
 		if err := os.WriteFile(p, f.Data, 0o600); err != nil {
 			t.Fatal(err)
 		}
-		_, cwd, _ := codexRolloutHead(p)
+		_, cwd, _, _ := codexRolloutHead(p)
 		return cwd
 	}
 

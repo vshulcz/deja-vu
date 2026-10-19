@@ -3948,10 +3948,12 @@ func fullyReadFiles(changed, old map[string]FileState) map[string]FileState {
 // files this pass will re-read arrive with their clip count zeroed — the pass
 // records its own as it goes, and adding it to what the last pass found counted
 // one long message twice.
-func copyIngestFiles(old map[string]FileIngest, reread map[string]FileState) map[string]FileIngest {
+func copyIngestFiles(old map[string]FileIngest, reread map[string]FileState, logTails map[string]map[string]bool) map[string]FileIngest {
 	out := make(map[string]FileIngest, len(old))
 	for p, e := range old {
-		if _, ok := reread[p]; ok {
+		if ids, ok := logTails[p]; ok {
+			e = clipsOutsideTail(e, ids)
+		} else if _, ok := reread[p]; ok {
 			e.Clipped = 0
 			e.ClippedSessions = nil
 		} else {
@@ -4395,6 +4397,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		}
 	}
 	rereadSharedCopies(removed, changed, files, old.Sessions)
+	rereadPromptLogs(removed, changed, files, old.Files, old.Sessions)
 	var replacements []model.Session
 	// This pass's counts, like every other build path (#1850).
 	emptied.Store(0)
@@ -4410,7 +4413,9 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	// A live-locked or half-written store (Cursor holds its sqlite under WAL)
 	// must not fail every search. Keep the old records and the old FileState
 	// so the next run retries this file.
+	logTails := promptLogTails(changed, old.Files, old.IngestFiles)
 	skip := func(p string, err error) {
+		delete(logTails, p)
 		if progress != nil {
 			fmt.Fprintf(progress, "deja: skipping %s this pass: %v\n", filepath.Base(p), err)
 		}
@@ -4442,6 +4447,9 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		if err != nil {
 			skip(p, err)
 			return
+		}
+		if ids, ok := logTails[p]; ok {
+			ss = sessionsNamed(ss, widenLogTail(ids, p, ss, old.Sessions))
 		}
 		if harnessForPath(p) == "opencode" {
 			for _, s := range ss {
@@ -4646,7 +4654,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		// doctor forgot a store's unreadable file because an unrelated
 		// transcript changed (#2015). A store this pass re-read starts over,
 		// because a file rewritten clean has to be able to clear its count.
-		IngestFiles: copyIngestFiles(old.IngestFiles, reread)}
+		IngestFiles: copyIngestFiles(old.IngestFiles, reread, logTails)}
 	skipRedactions := map[string]bool{}
 	for p := range changed {
 		skipRedactions[p] = true
@@ -4739,7 +4747,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		// And only when the pass read that store whole: a store read from its
 		// watermark hands back the new turns alone, so dropping the rest by key
 		// would take the earlier turns of every continued session (#2033).
-		if removed[r.SourcePath] || (changed[r.SourcePath].Path != "" && !fromStore && !leftItsFile(r, replaceKeys, old.Sessions[r.Key], aiderHeld) && !keptThroughCompaction(r, compacted)) || (fromStore && readWholeThisPass(r) && storeKeys[r.Key]) ||
+		if removed[r.SourcePath] || (changed[r.SourcePath].Path != "" && !fromStore && !keptFromLogTail(r, logTails) && !leftItsFile(r, replaceKeys, old.Sessions[r.Key], aiderHeld) && !keptThroughCompaction(r, compacted)) || (fromStore && readWholeThisPass(r) && storeKeys[r.Key]) ||
 			(takeovers[r.Key] && isCodexHistory(r.SourcePath)) {
 			dropped[r.Key] = true
 			return nil

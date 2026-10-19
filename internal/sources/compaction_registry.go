@@ -283,7 +283,7 @@ func compactionSessionWorkspace(harness, path string, s model.Session) string {
 	case "cline":
 		return ClineSessionDir(path)
 	case "trae", "codex":
-		_, cwd, _ := codexRolloutHead(path)
+		_, cwd, _, _ := codexRolloutHead(path)
 		return cwd
 	case "claude":
 		return ClaudeSessionDir(path)

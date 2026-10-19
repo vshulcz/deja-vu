@@ -143,3 +143,25 @@ func TestClaudeEncodedDir(t *testing.T) {
 		t.Error("a session with no transcript was found")
 	}
 }
+
+// The ids a prompt log's lines name between two offsets, in either client's
+// field, and nothing for a line that does not decode (#5403).
+func TestPromptLogSessionIDsReadsOnlyTheSpan(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "history.jsonl")
+	head := `{"session_id":"a","text":"one"}` + "\n"
+	tail := `{"session_id":"b","text":"two"}` + "\n" + `{"sessionId":"c","display":"three"}` + "\n" + "{torn\n" + `{"session_id":"d","text":"after"}` + "\n"
+	if err := os.WriteFile(p, []byte(head+tail), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	end := int64(len(head+tail) - len(`{"session_id":"d","text":"after"}`+"\n"))
+	got, err := PromptLogSessionIDs(p, int64(len(head)), end)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || !got["b"] || !got["c"] {
+		t.Errorf("ids = %v, want b and c", got)
+	}
+	if _, err := PromptLogSessionIDs(filepath.Join(t.TempDir(), "none"), 0, 1); err == nil {
+		t.Error("a missing log read as empty")
+	}
+}

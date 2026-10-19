@@ -658,3 +658,26 @@ func TestCodexForkNamesItsSource(t *testing.T) {
 		t.Error("a transcript was read as another session's")
 	}
 }
+
+// A rollout read first with nothing but its session_meta held no session, so
+// the next read starts past the meta line. It still starts the session at the
+// meta's time, as a read from the first byte does.
+func TestCodexTailAfterAMetaOnlyReadStartsAtTheMeta(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "rollout-2026-06-01T10-00-00-019a0000-0000-7000-8000-000000000001.jsonl")
+	meta := `{"timestamp":"2026-06-01T10:00:00.000Z","type":"session_meta","payload":{"id":"019a0000-0000-7000-8000-000000000001","cwd":"/w/app"}}` + "\n"
+	turn := `{"timestamp":"2026-06-01T10:00:07.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"why does the pool deadlock"}]}}` + "\n"
+	if err := os.WriteFile(p, []byte(meta+turn), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	whole, err := ParseCodexRollout(p)
+	if err != nil || len(whole) != 1 {
+		t.Fatalf("whole read: %v %d sessions", err, len(whole))
+	}
+	tail, err := ParseCodexRolloutFromOffset(p, int64(len(meta)))
+	if err != nil || len(tail) != 1 {
+		t.Fatalf("tail read: %v %d sessions", err, len(tail))
+	}
+	if !tail[0].Started.Equal(whole[0].Started) {
+		t.Errorf("tail starts %v, the whole read %v", tail[0].Started, whole[0].Started)
+	}
+}

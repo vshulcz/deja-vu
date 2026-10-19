@@ -104,6 +104,10 @@ session it keeps: they are copied as stored and keep their postings. On a
 12,000-session store a pass over 9 changed transcripts took 45 s, now 7 s
 (#5383).
 
+A pass that reads Codex's, TRAE's or Claude Code's history.jsonl beside other
+changes replaces only the sessions with a new prompt in it, not every session
+known from the log alone (#5403).
+
 When two transcripts hold the same session id, a pass that rewrites one reads
 the other again too, so a turn both hold is no longer indexed twice and a copy's
 turns are no longer dropped until `deja index --rebuild`.
