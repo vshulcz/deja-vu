@@ -164,7 +164,16 @@ func searchDetailedRead(dir string, o query.Options) (SearchResult, error) {
 						// substring of what the store wrote, so this
 						// comparison would call the close tier empty and hand
 						// the answer to relevance (#2125).
-						closeSS, serr := scanRecordsWithVariants(dir, m, o, postingOffsets(cutPostingsBySession(posts, m, o)), variants)
+						//
+						// Only when a candidate survives the filters: no offsets
+						// hands the scan the whole record log, and a recall whose
+						// project or session filters left none of the hits read
+						// all of it, 13 s on a 4050-session store (#5370).
+						var closeSS []model.Session
+						var serr error
+						if cut := cutPostingsBySession(posts, m, o); len(cut) > 0 {
+							closeSS, serr = scanRecordsWithVariants(dir, m, o, postingOffsets(cut), variants)
+						}
 						agree := false
 						if serr == nil {
 							top := rel.Sessions[0].Harness + ":" + rel.Sessions[0].ID
@@ -3126,6 +3135,10 @@ func isToolRole(role string) bool {
 		role == roleEdit || role == roleSummary || role == roleWrote
 }
 
+// wholeLogScanned, when set, is told of each record a scan with no offsets
+// reads. Tests count it to see which queries walk the whole record log.
+var wholeLogScanned func()
+
 func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []int64, variants map[string][]string) ([]model.Session, error) {
 	by := map[string]*model.Session{}
 	add := func(r Record) {
@@ -3178,6 +3191,9 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 		}
 	} else {
 		if err := eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
+			if wholeLogScanned != nil {
+				wholeLogScanned()
+			}
 			if matcher.matches(r) {
 				add(r)
 			}
