@@ -1905,6 +1905,9 @@ func SearchWithRecoveryDetailed(dir string, o query.Options, progress io.Writer)
 	if err == nil || !IsCorrupt(err) {
 		return r, err
 	}
+	if autoUpdatesOff() {
+		return SearchResult{}, &ManualStop{damagedOrOutdated(err) + ", and automatic indexing is off — rebuild it with: deja index --rebuild"}
+	}
 	if progress != nil {
 		fmt.Fprintf(progress, "deja: %s (%v), rebuilding ...\n", damagedOrOutdated(err), err)
 	}

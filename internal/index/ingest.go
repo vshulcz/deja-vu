@@ -279,6 +279,9 @@ func Ensure(dir string, harness string, force bool, progress io.Writer) error {
 	if dir == "" {
 		dir = DefaultDir()
 	}
+	if autoUpdatesOff() {
+		return manualCheck(dir)
+	}
 	unlock, err := lockDir(dir)
 	if err != nil {
 		return err
@@ -331,6 +334,9 @@ func EnsureUnlessBusy(dir string, progress io.Writer) (bool, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
+	if autoUpdatesOff() {
+		return false, manualCheck(dir)
+	}
 	unlock, ok, err := tryLockDir(dir)
 	if err != nil {
 		return false, err
@@ -351,6 +357,9 @@ func EnsureUnlessBusy(dir string, progress io.Writer) (bool, error) {
 func EnsureForSearch(dir string, o query.Options, force bool, progress io.Writer) error {
 	if dir == "" {
 		dir = DefaultDir()
+	}
+	if autoUpdatesOff() {
+		return manualCheck(dir)
 	}
 	unlock, err := lockDir(dir)
 	if err != nil {
@@ -375,6 +384,9 @@ func EnsureForSearch(dir string, o query.Options, force bool, progress io.Writer
 func EnsureForSearchNoWait(dir string, o query.Options, progress io.Writer) (busy bool, err error) {
 	if dir == "" {
 		dir = DefaultDir()
+	}
+	if autoUpdatesOff() {
+		return false, manualCheck(dir)
 	}
 	unlock, ok, err := tryLockDir(dir)
 	if err != nil {
@@ -467,6 +479,9 @@ func ensureLocked(dir string, o query.Options, force bool, progress io.Writer) e
 func EnsureForSearchStale(dir string, o query.Options, progress io.Writer) (bool, error) {
 	if dir == "" {
 		dir = DefaultDir()
+	}
+	if autoUpdatesOff() {
+		return false, manualCheck(dir)
 	}
 	// The wait before an answer is made of three things — taking the lock,
 	// walking the stores to see what changed, and ingesting whatever did — and

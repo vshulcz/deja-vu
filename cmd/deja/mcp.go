@@ -477,6 +477,16 @@ func spreadQ(mode string, raw json.RawMessage) json.RawMessage {
 }
 
 func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
+	out, err := callMCPToolRaw(dir, name, raw)
+	// An index the switch will not rebuild is something only the user can
+	// act on, so the agent gets it as an answer to pass on (#5385).
+	if index.IsManualStop(err) {
+		return "deja: " + err.Error() + " — tell the user to run it.", nil
+	}
+	return out, err
+}
+
+func callMCPToolRaw(dir, name string, raw json.RawMessage) (string, error) {
 	if name == "deja" {
 		var a struct {
 			Mode string `json:"mode"`
@@ -524,12 +534,18 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		// after the close a planted tag in one of them read as deja's own text
 		// (#5051).
 		env, deliverEnv := environmentOnce(dir)
-		text, sessions, raw, ids, projects, err := recallTextResultIn(dir, a.Query, a.Harness, a.Project, int(a.Limit), int(a.Offset), recallMCPBudget-recallFrameOverhead-len(env))
+		// Above the frame, as recall_context's note goes: deja's own statement
+		// of how old the index is, not recalled text (#5385).
+		dated := ""
+		if line := manualIndexLine(dir); line != "" {
+			dated = line + "\n\n"
+		}
+		text, sessions, raw, ids, projects, err := recallTextResultIn(dir, a.Query, a.Harness, a.Project, int(a.Limit), int(a.Offset), recallMCPBudget-recallFrameOverhead-len(env)-len(dated))
 		if err == nil {
 			if strings.TrimSpace(text) == "" {
 				env = strings.TrimLeft(env, "\n")
 			}
-			text = frameRecall(text + env)
+			text = dated + frameRecall(text+env)
 			deliverEnv()
 			usage.RecordServedFromInto(dir, usage.KindRecall, text, mcpConnID(), sessions, raw, ids, projects, policy.Load().Describe(policy.ActivationMCP))
 		}
@@ -562,6 +578,9 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			lead := ""
 			if note != "" {
 				lead = "deja: " + note + "\n\n"
+			}
+			if line := manualIndexLine(dir); line != "" {
+				lead = line + "\n\n" + lead
 			}
 			text = frameRecall(fitContextDigest(text, a.Query, firstID(ids), contextMCPBudget-recallFrameOverhead-len(lead)))
 			text = lead + text
@@ -661,6 +680,9 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		// the journal.
 		usage.RecordResult(dir, usage.KindRemember, len(a.Text), 1, false)
 		// The note is on disk either way; what is left is making it findable.
+		if index.Manual() {
+			return "Saved. Automatic indexing is off on this machine, so the note becomes searchable after the next `deja index`.", nil
+		}
 		// On upgrade day that meant rebuilding the whole index inside the call
 		// (#1309), so the agent is told instead — the detached warmup picks it
 		// up with everything else.
@@ -2569,6 +2591,11 @@ func rebuildRefusedForAgent(dir string) string {
 // — an internal path and an errno, handed to a model as a broken tool (#972).
 // Every other surface says the same thing in words.
 func buildingNowForAgent(dir string) string {
+	// With automatic indexing off the agent cannot start a build, and "ask
+	// again then" would never come true (#5385).
+	if index.Manual() {
+		return manualIndexNoteForAgent(dir)
+	}
 	// A refresh is not an empty index. The snapshot on disk is published by an
 	// atomic swap and stays readable throughout one, which is why readers take
 	// tryLockDir rather than waiting — so answer from it and let recall say a

@@ -102,7 +102,12 @@ func runRemember(dir string, args []string) error {
 		}
 		return notesWriteError(err)
 	}
-	if err := index.EnsureForSearch(dir, search.Options{All: true}, false, noteIndexNarration(dir)); err != nil {
+	later := ""
+	if index.Manual() {
+		// Indexing the note is an index pass, which the switch leaves to
+		// `deja index` (#5385).
+		later = " — searchable after the next `deja index`"
+	} else if err := index.EnsureForSearch(dir, search.Options{All: true}, false, noteIndexNarration(dir)); err != nil {
 		return err
 	}
 	// A day-note the reader forgot keeps its tombstone until unforget, so a
@@ -120,6 +125,6 @@ func runRemember(dir string, args []string) error {
 		// project name beside it is bounded (#1810).
 		suffix = " " + safeForStatusline("#"+strings.Join(norm, " #"), mcpResourceNameMax)
 	}
-	fmt.Fprintf(os.Stdout, "deja: remembered under %s%s\n", projectForEcho(project), suffix)
+	fmt.Fprintf(os.Stdout, "deja: remembered under %s%s%s\n", projectForEcho(project), suffix, later)
 	return nil
 }

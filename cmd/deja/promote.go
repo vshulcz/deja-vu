@@ -141,7 +141,9 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 	// the transcript. `remember` has done this since it was written; promote
 	// did not, so a decision recorded here was invisible to the hook — which
 	// never builds — until some other command happened to run (#910).
-	if err := index.EnsureForSearch(dir, search.Options{All: true}, false, noteIndexNarration(dir)); err != nil {
+	if index.Manual() {
+		fmt.Fprintln(os.Stderr, "deja: the note is written; automatic indexing is off, so it is searchable after the next `deja index`")
+	} else if err := index.EnsureForSearch(dir, search.Options{All: true}, false, noteIndexNarration(dir)); err != nil {
 		fmt.Fprintf(os.Stderr, "deja: the note is written; the index could not be updated yet — %v\n", err)
 	}
 	// Promoting a session that was forgotten writes the note back to disk, but

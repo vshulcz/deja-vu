@@ -210,6 +210,15 @@ tools and the CLI take that path — a rewrite of a gigabyte of records and
 buckets is not a cost a query can pay — while `deja index` and
 `deja search --rebuild` still do the work in front of you.
 
+`DEJA_NO_AUTO_INDEX=1`, or `"auto_index": false` in `policy.json`, turns all
+of that off for a machine that indexes from cron. Every `Ensure*` then answers
+from the index on disk or returns an error naming `deja index`, `requestWarmup`
+spawns nothing, and the self-healing rebuild of a corrupt bucket becomes an
+error. Only commands someone runs write: `deja index`,
+`deja search --rebuild`, and the ones that change the index on purpose
+(`forget`, `sync`).
+Answers carry the index date in one line.
+
 Cold rebuild does all parsing first, then writes `records.bin`, buckets, and manifest from one goroutine. That keeps the on-disk index coherent and avoids concurrent writers. The five sidecars derived afterwards — the co-occurrence map, fix pairs, the recurring-command table, the failures and the session facts — each write their own file and read nothing the others write, so they run together, and fix mining and the co-occurrence map also run per session across cores. That is most of the difference between a 51s and a 30s rebuild on a real store.
 
 ## MCP server design

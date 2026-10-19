@@ -93,6 +93,9 @@ func hermeticEnv(t *testing.T) string {
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
 	t.Setenv("DEJA_NOTES_FILE", filepath.Join(tmp, "notes.jsonl"))
 	t.Setenv("DEJA_WARMUP_SENTINEL", filepath.Join(tmp, "warmup-guard"))
+	// A developer who runs deja in manual mode would otherwise have every
+	// test that expects a refresh see none (#5385).
+	t.Setenv("DEJA_NO_AUTO_INDEX", "")
 	// The embedding client probes localhost when no endpoint is configured, so
 	// a developer running a local model got a different answer from CI — two
 	// doctor tests red on a clean tree, and bench recall quietly switching arms.

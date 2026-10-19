@@ -128,6 +128,12 @@ passage prefix are no longer compared with the query: search says so once and
 goes on lexically. A long-running `deja mcp` keeps the parsed vector sidecar
 between semantic searches and lets it go two minutes after the last one.
 
+`DEJA_NO_AUTO_INDEX=1`, or `"auto_index": false` in policy.json, stops every
+automatic index update, for a busy machine that runs `deja index` from cron.
+Search, show, MCP tools and hooks answer from the last finished index and say
+when it was updated; with no index they print `deja index` instead of building
+one, and neither the agent nor a hook can start a refresh (#5385).
+
 ## [0.22.2] - 2026-10-17
 
 deja now reads Windsurf / Devin Desktop: Cascade's encrypted conversation

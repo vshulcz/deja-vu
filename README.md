@@ -554,6 +554,16 @@ store, and 0.59 s for the per-prompt hook on an index of 19k sessions.
 </details>
 
 <details>
+<summary><b>Can I stop it reindexing on its own?</b></summary>
+
+Yes. On a busy server, `DEJA_NO_AUTO_INDEX=1` or `"auto_index": false` in
+`~/.config/deja/policy.json` stops every automatic update. Search, MCP recall and hooks
+answer from the last finished index and say when it was updated, and nothing deja starts
+on its own writes it. Run `deja index` from cron or a systemd timer.
+
+</details>
+
+<details>
 <summary><b>Do I have to change how I work?</b></summary>
 
 No. The agent calls recall itself, and with

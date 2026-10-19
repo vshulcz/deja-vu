@@ -527,6 +527,11 @@ func recallIsOff() bool {
 // entire post-upgrade rebuild, while the statusline showed the progress bar
 // (#927).
 func buildNotice(dir string) string {
+	// Nothing builds on its own with automatic indexing off, so no promise of
+	// one: what is missing and the command that builds it (#5385).
+	if index.Manual() {
+		return manualIndexNote(dir)
+	}
 	if st := readWarmupStatus(dir); st != nil {
 		// On a machine no agent has written to, "indexing your history —
 		// recall comes online when it finishes" is deja's first word to an
@@ -851,6 +856,9 @@ func runHookContextMode(dir string, plain, once bool) error {
 		digest += "\n" + tip
 	}
 	digest = frameRecall(digest)
+	if line := manualIndexLine(dir); line != "" {
+		digest += "\n" + line
+	}
 	polName := policy.Load().Describe(policy.ActivationAuto)
 	if unreadable {
 		usage.RecordDigestPolicySessionsUnread(dir, usage.KindHook, digest, input.SessionID, sessions, raw, polName, servedIDs, servedProjects)
@@ -1714,7 +1722,7 @@ func warmupLooksDead(dir string, now time.Time, stamp int64) bool {
 }
 
 func requestWarmup(dir string) {
-	if os.Getenv("DEJA_WARMUP_SENTINEL") != "" || installBuildsIndex {
+	if os.Getenv("DEJA_WARMUP_SENTINEL") != "" || installBuildsIndex || index.Manual() {
 		return
 	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {

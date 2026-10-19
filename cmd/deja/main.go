@@ -502,6 +502,18 @@ func cmdWarmup(dir string, rest []string) error {
 		}
 		return fmt.Errorf("warmup takes no arguments — got %q", a)
 	}
+	// warmup is what hooks and installs start; with automatic indexing off
+	// it reports the index instead of building it (#5385).
+	if index.Manual() {
+		if err := index.ManualStatus(dir); err != nil {
+			return err
+		}
+		if line := manualIndexLine(dir); line != "" {
+			fmt.Fprintln(os.Stderr, line)
+		}
+		_, _ = writeCLISkill()
+		return nil
+	}
 	stop := publishBuildProgress(dir)
 	defer stop()
 	prepareFirstIndexGreeting(dir)
@@ -562,6 +574,14 @@ func cmdIndex(dir string, rest []string) error {
 			return unknownFlag("index", a, indexFlags)
 		}
 	}
+	// The detached warmup runs this command too. With automatic indexing off
+	// it is not the user asking, so it writes nothing; anything else here is
+	// the explicit build the switch leaves on (#5385).
+	if os.Getenv("DEJA_WARMUP_SENTINEL") != "" && index.Manual() {
+		clearWarmupSentinel()
+		return nil
+	}
+	defer index.AllowBuild()()
 	// Where the command reports that it worked. Nobody is watching a run out
 	// of a shell profile or a hook, and a line printed over the prompt on
 	// every new shell is the kind of thing that gets a tool uninstalled
@@ -1573,11 +1593,16 @@ func cmdSearch(dir string, rest []string, sourceInstance string) error {
 // `--rebuild` still waits: someone who asked for the rebuild wants its result.
 func ensureForCLISearch(dir string, o search.Options, force bool, progress io.Writer) error {
 	if force {
+		// Asked for by hand, so it builds with automatic indexing off too.
+		defer index.AllowBuild()()
 		return index.EnsureForSearch(dir, o, true, progress)
 	}
 	stale, err := index.EnsureForSearchStale(dir, o, progress)
 	if err != nil {
 		return err
+	}
+	if line := manualIndexLine(dir); line != "" && progress != io.Discard {
+		saidManualIndex.Do(func() { fmt.Fprintln(progress, line) })
 	}
 	if stale {
 		requestWarmup(dir)
@@ -2866,6 +2891,9 @@ func findByPrefixHarness(dir, p, harness string) (model.Session, bool, error) {
 func ensureForCLIRead(dir string) error {
 	busy, err := index.EnsureUnlessBusy(dir, os.Stderr)
 	answeredFromSnapshot.Store(busy)
+	if line := manualIndexLine(dir); err == nil && line != "" {
+		saidManualIndex.Do(func() { fmt.Fprintln(os.Stderr, line) })
+	}
 	if busy {
 		requestWarmup(dir)
 		saidReadingAsItWas.Do(func() {
@@ -2876,6 +2904,9 @@ func ensureForCLIRead(dir string) error {
 }
 
 var saidReadingAsItWas sync.Once
+
+// saidManualIndex keeps the index-date line to one per command.
+var saidManualIndex sync.Once
 
 // answeredFromSnapshot is whether the last ensureForCLIRead skipped the update
 // because another deja held the lock.
@@ -5059,6 +5090,10 @@ func dirWritable(dir string) bool {
 func ensureError(dir string, err error) error {
 	if dir == "" {
 		dir = index.DefaultDir()
+	}
+	// Worded for the reader already, command included (#5385).
+	if index.IsManualStop(err) {
+		return err
 	}
 	if errors.Is(err, fs.ErrPermission) {
 		// An ejected volume takes its mount point with it, and creating that

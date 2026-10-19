@@ -2708,7 +2708,7 @@ func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 			// A new home has no ~/.cache yet, and a build creates it: that
 			// is an index not built, not a disk that went away.
 			if freshHomePath(parent) {
-				fmt.Fprintln(w, "  status   not built (run `deja warmup`)")
+				fmt.Fprintln(w, notBuiltLine())
 				return
 			}
 			fmt.Fprintf(w, "  status   not reachable — %s is not there; the disk it lives on may have been unmounted\n", reportPath(parent))
@@ -2732,7 +2732,7 @@ func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 			fmt.Fprintf(w, "  status   not built — %s is not writable, so no build can run there; point DEJA_INDEX_DIR somewhere writable\n", filepath.Dir(dir))
 			return
 		}
-		fmt.Fprintln(w, "  status   not built (run `deja warmup`)")
+		fmt.Fprintln(w, notBuiltLine())
 		return
 	}
 	updated := "unknown"
@@ -2751,6 +2751,9 @@ func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 		read = ", stores read " + at.Local().Format("2006-01-02 15:04")
 	}
 	fmt.Fprintf(w, "  status   built (size=%s, updated=%s%s)\n", humanBytes(pathSize(dir)), updated, read)
+	if index.Manual() {
+		fmt.Fprintln(w, "  updates  automatic updates are off — only `deja index` writes the index")
+	}
 	// An index written by an older format is unreadable to this binary: the
 	// hook paths refuse it and ask for a rebuild, which is why memory goes
 	// quiet after an upgrade. doctor called that "up to date" — the one
@@ -3076,4 +3079,13 @@ func noPolicyFileLine() string {
 		return "no file at " + reportPath(p)
 	}
 	return "no policy file — deja cannot find a home directory to look in"
+}
+
+// notBuiltLine is doctor's line for an index not built yet. With automatic
+// indexing off warmup only reports, so it names the command that builds.
+func notBuiltLine() string {
+	if index.Manual() {
+		return "  status   not built, and automatic updates are off (run `deja index`)"
+	}
+	return "  status   not built (run `deja warmup`)"
 }

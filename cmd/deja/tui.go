@@ -4,6 +4,7 @@ import (
 	"io"
 	"maps"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -248,6 +249,9 @@ func (a *tuiApp) refreshIndex() {
 		}
 		a.spawn(a.loadBehind)
 		a.reload()
+		if line := manualIndexLine(a.dir); line != "" {
+			a.say(strings.TrimPrefix(line, "deja: "), false)
+		}
 	})
 }
 

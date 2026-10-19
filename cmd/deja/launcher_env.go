@@ -48,6 +48,7 @@ var launcherEnvSettings = map[string]bool{
 	"DEJA_RECALL":                true,
 	"DEJA_MACHINE":               true,
 	"DEJA_AUTORECALL_LOCAL_ONLY": true,
+	"DEJA_NO_AUTO_INDEX":         true,
 }
 
 // launcherEnvLocation matches the DEJA_* variables that name a path: the index
