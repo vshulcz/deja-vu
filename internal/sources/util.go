@@ -503,7 +503,7 @@ func walkFiles(root string, pred func(string) bool) []string {
 			// to say: the only sign was a file count nobody has memorised
 			// (#816, and the ingest half of it #818).
 			if os.IsPermission(err) {
-				diagFileError(p, err)
+				diagWalkError(p, err)
 			}
 			return nil
 		}

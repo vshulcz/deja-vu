@@ -838,7 +838,16 @@ func probeDoctorStore(check doctorStoreCheck) (store doctorStore, mod time.Time,
 		}
 		return store, time.Time{}, ""
 	}
+	// A transcript whose mode refuses a read is the same fault in any file,
+	// not only the newest one this probe opens; the walk that indexes it says
+	// so from the same stat (#5393).
 	newest, mod = newestDoctorFile(check.files)
+	if p := firstModeUnreadable(check.files); p != "" {
+		store.State = "denied"
+		store.Denied = p
+		store.Partial = anotherFileOpens(check.files, p)
+		return store, mod, ""
+	}
 	f, err := os.Open(newest)
 	if err != nil {
 		if os.IsPermission(err) {
@@ -905,6 +914,19 @@ func parseDoctorStore(check doctorStoreCheck, store doctorStore, mod time.Time, 
 		store.State = "parsed-zero"
 	}
 	return store, mod
+}
+
+// firstModeUnreadable is the first of files, in path order, whose mode says
+// this process may not read it.
+func firstModeUnreadable(files []string) string {
+	files = append([]string(nil), files...)
+	sort.Strings(files)
+	for _, p := range files {
+		if fi, err := os.Lstat(p); err == nil && sources.ModeUnreadable(p, fi) {
+			return p
+		}
+	}
+	return ""
 }
 
 func newestDoctorFile(files []string) (string, time.Time) {

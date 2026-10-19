@@ -631,6 +631,10 @@ func cmdIndex(dir string, rest []string) error {
 		clearWarmupSentinel()
 		fmt.Fprintf(said, "deja: index is up to date (%d session%s)\n", n, pluralS(n))
 		printRetentionDue(said, time.Now())
+		// Up to date with what it could read: a path it may not read is
+		// still missing from recall on every run, not only the one that
+		// found it (#5393).
+		sayUnreadable(dir)
 		// "Up to date" is the most misleading place to stay quiet about it:
 		// nothing changed on disk, so this is exactly where an exclusion set
 		// after the build looks applied and is not.
@@ -685,20 +689,7 @@ func cmdIndex(dir string, rest []string) error {
 	// A store deja could not read loses its sessions from recall, and the index
 	// run is where someone is looking at the counts — doctor knowing about it
 	// is not the same as saying it here (#818).
-	for _, h := range sortedHarnesses(index.IngestHealth(dir)) {
-		e := index.IngestHealth(dir)[h]
-		if e.FailedFiles == 0 {
-			continue
-		}
-		// "deja: deja: 1 path could not be read" is the notes file, and reads
-		// like a stutter. It is the user's own writing, so it says so (#901).
-		name := h
-		if h == "deja" {
-			name = "your notes"
-		}
-		fmt.Fprintf(os.Stderr, "deja: %s: %d path%s could not be read — `deja doctor` names %s\n",
-			name, e.FailedFiles, pluralS(e.FailedFiles), pluralWhich(e.FailedFiles))
-	}
+	sayUnreadable(dir)
 	// An exclusion applies at ingest, so it covers nothing already indexed —
 	// and the sequence someone actually performs is to set the pattern, run
 	// this command, and sync. That used to return silently having applied
@@ -758,6 +749,31 @@ func cmdIndex(dir string, rest []string) error {
 		fmt.Fprintf(said, "deja: indexed %d session%s, %d message%s%s\n", b.Sessions, pluralS(b.Sessions), b.Messages, pluralS(b.Messages), tookSuffix(b.Took))
 	}
 	return nil
+}
+
+// sayUnreadable names, per store, the paths the index could not read. A store
+// deja could not read loses its sessions from recall, and the index run is
+// where someone is looking at the counts — doctor knowing about it is not the
+// same as saying it here (#818). Returns how many there were.
+func sayUnreadable(dir string) int {
+	health := index.IngestHealth(dir)
+	total := 0
+	for _, h := range sortedHarnesses(health) {
+		e := health[h]
+		if e.FailedFiles == 0 {
+			continue
+		}
+		total += e.FailedFiles
+		// "deja: deja: 1 path could not be read" is the notes file, and reads
+		// like a stutter. It is the user's own writing, so it says so (#901).
+		name := h
+		if h == "deja" {
+			name = "your notes"
+		}
+		fmt.Fprintf(os.Stderr, "deja: %s: %d path%s could not be read — `deja doctor` names %s\n",
+			name, e.FailedFiles, pluralS(e.FailedFiles), pluralWhich(e.FailedFiles))
+	}
+	return total
 }
 
 func cmdHookContext(dir string, rest []string) error {

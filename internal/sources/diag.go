@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"io/fs"
 	"maps"
 	"sync"
 )
@@ -16,6 +17,12 @@ var diagFailed = map[string]string{}
 var diagReasons = map[string]string{}
 var diagRecords = map[string]map[string]string{}
 var diagZstdMissing = map[string]bool{}
+
+// diagWalkFailed is the part of diagFailed the walk recorded: directories it
+// could not list and transcripts whose mode refuses a read. A later walk in
+// the same process stands in for an earlier one, so BeginWalk drops these and
+// the new walk records whatever still fails.
+var diagWalkFailed = map[string]string{}
 
 func diagMalformedLine(path string) {
 	diagMu.Lock()
@@ -59,6 +66,37 @@ func diagFileError(path string, err error) {
 	diagMu.Lock()
 	diagFailed[path] = err.Error()
 	diagMu.Unlock()
+}
+
+// diagWalkError is diagFileError for a path the store walk itself could not
+// read.
+func diagWalkError(path string, err error) {
+	diagMu.Lock()
+	diagFailed[path] = err.Error()
+	diagWalkFailed[path] = err.Error()
+	diagMu.Unlock()
+}
+
+// NoteUnreadable records a transcript the walk found but may not read.
+func NoteUnreadable(path string) {
+	diagWalkError(path, &fs.PathError{Op: "open", Path: path, Err: fs.ErrPermission})
+}
+
+// BeginWalk forgets what an earlier walk in this process could not read.
+func BeginWalk() {
+	diagMu.Lock()
+	for p := range diagWalkFailed {
+		delete(diagFailed, p)
+	}
+	diagWalkFailed = map[string]string{}
+	diagMu.Unlock()
+}
+
+// WalkFailures returns the paths the walk since BeginWalk could not read.
+func WalkFailures() map[string]string {
+	diagMu.Lock()
+	defer diagMu.Unlock()
+	return maps.Clone(diagWalkFailed)
 }
 
 // diagNoZstd records a transcript left unread because the zstd CLI is missing.
@@ -131,9 +169,20 @@ func DiagUnusableRecords() map[string]map[string]string {
 	return out
 }
 
+// DiagBeginPass clears the counters for a pass about to parse, keeping what the
+// walk before it could not read: that walk is the one this pass starts from.
+func DiagBeginPass() {
+	DiagSnapshot()
+	diagMu.Lock()
+	maps.Copy(diagFailed, diagWalkFailed)
+	diagMu.Unlock()
+}
+
 // DiagSnapshot returns and clears the counters accumulated since the last
 // snapshot: malformed JSONL lines per file, and files whose parse failed
-// outright with the error text.
+// outright with the error text. What the walk could not read stays known to
+// WalkFailures until the next BeginWalk: a pass that writes twice still starts
+// from that walk.
 func DiagSnapshot() (malformed map[string]int, failed map[string]string) {
 	diagMu.Lock()
 	defer diagMu.Unlock()

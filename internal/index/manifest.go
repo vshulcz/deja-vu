@@ -432,6 +432,11 @@ func manifestFresh(m Manifest, files map[string]FileState, scope string) bool {
 			if sources.OutsideStoresRead(p) {
 				continue
 			}
+			// Behind a directory this run may not enter: held as it was, and
+			// named as unreadable (#5393).
+			if !f.Kept && behindLockedDir(p) {
+				continue
+			}
 			// Still gone, from a store that is still there: nothing for a
 			// pass to do. A store that went whole is a change.
 			if !f.Kept || !deletedFromLiveStore(p) {
@@ -448,6 +453,9 @@ func manifestFresh(m Manifest, files map[string]FileState, scope string) bool {
 		return false
 	}
 	if m.Scope != scope {
+		return false
+	}
+	if !unreadableCurrent(m, files) {
 		return false
 	}
 	// A rollout waiting for zstd changes nothing until it changes or zstd

@@ -143,9 +143,11 @@ func mergeIngestDiag(m *Manifest) {
 		}
 		m.IngestFiles[p] = e
 	}
+	walk := sources.WalkFailures()
 	for p, msg := range failed {
 		e := m.IngestFiles[p]
 		e.Error = msg
+		e.Walk = walk[p] != ""
 		m.IngestFiles[p] = e
 	}
 	// A file this pass read is a file that opens. Only the error goes: the bad
@@ -155,7 +157,25 @@ func mergeIngestDiag(m *Manifest) {
 			continue
 		}
 		if e, ok := m.IngestFiles[p]; ok && e.Error != "" {
-			e.Error = ""
+			e.Error, e.Walk = "", false
+			if e.Malformed == 0 && e.Clipped == 0 {
+				delete(m.IngestFiles, p)
+			} else {
+				m.IngestFiles[p] = e
+			}
+		}
+	}
+	// A path the walk refused before and reads now: a transcript unchanged
+	// since it was indexed, or a directory that lists again (#5393). Only
+	// the walk's own refusals: a parse error on an unchanged file stands.
+	for p, e := range m.IngestFiles {
+		if e.Error == "" || failed[p] != "" {
+			continue
+		}
+		f, walked := passWalked[p]
+		of, held := m.Files[p]
+		if e.Walk && walked && held && sameFile(of, f) || !walked && passWalked != nil && (e.Walk && gone(p) || !held && dirListable(p)) {
+			e.Error, e.Walk = "", false
 			if e.Malformed == 0 && e.Clipped == 0 {
 				delete(m.IngestFiles, p)
 			} else {
@@ -543,7 +563,7 @@ func EnsureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 		if p == syncImportPath {
 			continue
 		}
-		if _, ok := want[p]; !ok {
+		if _, ok := want[p]; !ok && !behindLockedDir(p) {
 			removedAny = true
 		}
 	}
@@ -3952,7 +3972,7 @@ func copyIngestFiles(old map[string]FileIngest, reread map[string]FileState) map
 // passing through updateIndex at all, and which forget and unforget call for
 // themselves.
 func beginPass() {
-	sources.DiagSnapshot()
+	sources.DiagBeginPass()
 	passParsed = nil
 	passRead = nil
 	passWholeStores = nil
@@ -4230,6 +4250,15 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 				unseen[p] = true
 			}
 			continue
+		} else if os.IsPermission(err) {
+			// Behind a directory this run may not enter: not deleted, and
+			// not outside the stores read either. The unreadable line names
+			// the directory (#5393).
+			if of, ok := old.Files[p]; ok {
+				files[p] = of
+				delete(removed, p)
+			}
+			continue
 		}
 		if !deletedFromLiveStore(p) {
 			continue
@@ -4311,12 +4340,15 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		lastIngestFiles = 0
 		// Nothing to read, but the kept mark has to land, or the next run
 		// takes the same file for a fresh deletion.
-		if len(newlyKept) > 0 || !dated || len(touched) > 0 {
+		if len(newlyKept) > 0 || !dated || len(touched) > 0 || !unreadableCurrent(old, files) {
 			for p := range newlyKept {
 				old.Files[p] = files[p]
 			}
 			for p := range touched {
 				old.Files[p] = files[p]
+			}
+			if !unreadableCurrent(old, files) {
+				mergeIngestDiag(&old)
 			}
 			return writeManifestOnly(dir, old)
 		}
@@ -5893,6 +5925,8 @@ func currentFilesWith(h string, old map[string]FileState) map[string]FileState {
 	// way" surface reported an ordinary quiet day until the walk finished
 	// (#1021).
 	reportPhase("finding transcripts", 0)
+	sources.BeginWalk()
+	defer func() { setLastWalkFailed(sources.WalkFailures()) }()
 	paths := map[string]bool{}
 	// The stores a rebuild reads, not every store: an excluded harness was
 	// walked and indexed here on every incremental pass (#5394). Its rows in
@@ -5908,12 +5942,147 @@ func currentFilesWith(h string, old map[string]FileState) map[string]FileState {
 	}
 	out := map[string]FileState{}
 	for p := range paths {
-		if fi, err := os.Lstat(p); err == nil && fi.Mode()&os.ModeSymlink == 0 && !fi.IsDir() {
+		fi, err := os.Lstat(p)
+		if os.IsPermission(err) {
+			// Listed by a directory this run may read but not enter.
+			sources.NoteUnreadable(p)
+			continue
+		}
+		if err == nil && fi.Mode()&os.ModeSymlink == 0 && !fi.IsDir() {
+			// Listed all the same: a file this run may not read is not a
+			// deleted one, and the sessions already read from it stay.
+			if sources.ModeUnreadable(p, fi) {
+				sources.NoteUnreadable(p)
+			}
 			out[p] = walkFileState(p, fi, old)
 		}
 	}
 	injectHermesPG(out, old)
+	noteLockedAway(h, out, old)
 	return out
+}
+
+// noteLockedAway names an indexed transcript the walk did not list because a
+// directory above it now refuses this run. A store that lists its files with
+// a glob drops the refusal on the floor, and the transcript then read as gone
+// (#5393). Once per directory the walk already named. One Lstat per directory:
+// whether a file can be statted is decided by the directories above it.
+func noteLockedAway(h string, out, old map[string]FileState) {
+	if h != "" {
+		return
+	}
+	var failed map[string]string
+	denied := map[string]bool{}
+	for p, f := range old {
+		if _, ok := out[p]; ok || f.Kept || p == syncImportPath || sources.OutsideStoresRead(p) {
+			continue
+		}
+		d := filepath.Dir(p)
+		locked, seen := denied[d]
+		if !seen {
+			locked = behindLockedDir(p)
+			denied[d] = locked
+		}
+		if !locked {
+			continue
+		}
+		if failed == nil {
+			failed = sources.WalkFailures()
+		}
+		named := false
+		for ; d != filepath.Dir(d); d = filepath.Dir(d) {
+			if failed[d] != "" {
+				named = true
+				break
+			}
+		}
+		if !named {
+			sources.NoteUnreadable(p)
+		}
+	}
+}
+
+// lastWalkFailed is what the latest store walk could not read: directories it
+// could not list and transcripts whose mode refuses a read.
+var (
+	lastWalkMu     sync.Mutex
+	lastWalkFailed map[string]string
+)
+
+func setLastWalkFailed(m map[string]string) {
+	lastWalkMu.Lock()
+	lastWalkFailed = m
+	lastWalkMu.Unlock()
+}
+
+func walkFailed() map[string]string {
+	lastWalkMu.Lock()
+	defer lastWalkMu.Unlock()
+	return lastWalkFailed
+}
+
+// unreadableCurrent reports whether the manifest's unreadable paths are the
+// ones the latest walk saw. A chmod changes no size or mtime, and a directory
+// that cannot be listed adds no file, so the walk alone called the index up to
+// date and nothing ever said part of the history was not being read (#5393).
+// Only paths with a recorded error are looked at, so the walk costs no more.
+func unreadableCurrent(m Manifest, files map[string]FileState) bool {
+	failed := walkFailed()
+	for p := range failed {
+		if m.IngestFiles[p].Error == "" {
+			return false
+		}
+	}
+	for p, e := range m.IngestFiles {
+		if e.Error == "" || failed[p] != "" {
+			continue
+		}
+		if f, ok := files[p]; ok {
+			if of, held := m.Files[p]; e.Walk && held && sameFile(of, f) {
+				return false
+			}
+			continue
+		}
+		if e.Walk && gone(p) {
+			return false
+		}
+		if _, held := m.Files[p]; !held && dirListable(p) {
+			return false
+		}
+	}
+	return true
+}
+
+// behindLockedDir reports an indexed file the walk did not list because a
+// directory above it refuses this run, rather than because it went away.
+func behindLockedDir(p string) bool {
+	_, err := os.Lstat(p)
+	return os.IsPermission(err)
+}
+
+// gone reports a path that is no longer there at all: a transcript the walk
+// once could not read, deleted since, has nothing left to report.
+func gone(p string) bool {
+	_, err := os.Lstat(p)
+	return errors.Is(err, fs.ErrNotExist)
+}
+
+// dirListable reports a directory that lists now. Only a directory is
+// opened: the path may be a transcript that failed to read.
+func dirListable(p string) bool {
+	if fi, err := os.Lstat(p); err != nil || !fi.IsDir() {
+		return false
+	}
+	f, err := os.Open(p)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = f.Close() }()
+	if fi, err := f.Stat(); err != nil || !fi.IsDir() {
+		return false
+	}
+	_, err = f.Readdirnames(1)
+	return err == nil || errors.Is(err, io.EOF)
 }
 
 // walkFileState is what the walk records for a transcript file.

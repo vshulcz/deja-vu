@@ -1187,6 +1187,11 @@ type FileIngest struct {
 	// back only what changed, so a pass carries the rows it did not re-read
 	// instead of reporting them gone. Out of the JSON: the count is the contract.
 	Unusable map[string]string `json:"-"`
+	// Walk marks an Error the store walk found rather than a parser: a
+	// directory it could not list or a transcript it may not read. Only those
+	// are cleared by a later walk that reads the path, because a parse error
+	// on a file that has not changed is still the file's (#5393).
+	Walk bool `json:"-"`
 }
 
 type manifestCore struct {

@@ -133,6 +133,11 @@ automatic index update, for a busy machine that runs `deja index` from cron.
 Search, show, MCP tools and hooks answer from the last finished index and say
 when it was updated; with no index they print `deja index` instead of building
 one, and neither the agent nor a hook can start a refresh (#5385).
+`deja index` without `--rebuild` now notices a transcript it may not read and
+a store directory it may not list, and says so on every run while they stay
+locked instead of "index is up to date". Sessions already indexed from them stay
+searchable, a locked directory no longer reads as deleted, and `deja doctor`
+names a locked transcript even when it is not the newest one (#5393).
 
 ## [0.22.2] - 2026-10-17
 
