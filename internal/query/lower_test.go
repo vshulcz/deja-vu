@@ -1,6 +1,9 @@
 package query
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestLowerFoldsYo(t *testing.T) {
 	for _, in := range []string{"зелёный", "зеленый", "ЗЕЛЁНЫЙ", "Зелёный"} {
@@ -46,6 +49,17 @@ func TestYoPronounStaysAStopWord(t *testing.T) {
 		terms, _ := QueryParts(q)
 		if len(terms) != 1 || terms[0] != "отчет" {
 			t.Errorf("QueryParts(%q) = %q", q, terms)
+		}
+	}
+}
+
+// Lower folds ё in the same pass as it lowercases, and gives what lowercasing
+// and then replacing gives, invalid bytes included.
+func TestLowerIsToLowerThenFold(t *testing.T) {
+	for _, in := range []string{"", "ASCII Only", "Ёлка и ЁЖ", "Straße İstanbul ΣΑΣ", "a\xffб\xd1Ё", "ещё всё", "Ѐ Ѝ Ё ё"} {
+		want := strings.ReplaceAll(strings.ToLower(in), "ё", "е")
+		if got := Lower(in); got != want {
+			t.Errorf("Lower(%q) = %q, want %q", in, got, want)
 		}
 	}
 }

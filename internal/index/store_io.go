@@ -961,7 +961,12 @@ func readBucketToken(p, tok string) ([]posting, error) {
 	return nil, nil
 }
 
+// bucketDirReads counts bucket directories read off disk, for the test that
+// pins the part-of-word step to the catalog's copy of them.
+var bucketDirReads atomic.Int64
+
 func openBucketDir(p string) ([]bucketEntry, *os.File, error) {
+	bucketDirReads.Add(1)
 	f, err := openIndexFile(p)
 	if err != nil {
 		return nil, nil, err

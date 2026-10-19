@@ -151,6 +151,9 @@ type tokenIndex struct {
 	umlauted    []string
 	byDigraph   map[string][]string
 	digraphOnce sync.Once
+	// dirs is every bucket's directory, read with the catalog, for the
+	// part-of-word step to walk without opening every bucket again.
+	dirs []bucketDir
 }
 
 const maxIndexedTokenLen = 64
@@ -319,11 +322,13 @@ func tokenIndexCached(dir string) (*tokenIndex, error) {
 	catalogReads.Add(1)
 	sig, err := bucketsSignature(dir)
 	if err != nil {
-		c, cerr := tokenCatalog(dir)
+		c, dirs, cerr := tokenCatalogDirs(dir)
 		if cerr != nil {
 			return nil, cerr
 		}
-		return newTokenIndex(c), nil
+		i := newTokenIndex(c)
+		i.dirs = dirs
+		return i, nil
 	}
 	catalogCache.mu.Lock()
 	if catalogCache.ok && catalogCache.dir == dir && catalogCache.sig == sig {
@@ -332,11 +337,12 @@ func tokenIndexCached(dir string) (*tokenIndex, error) {
 		return i, nil
 	}
 	catalogCache.mu.Unlock()
-	c, err := tokenCatalog(dir)
+	c, dirs, err := tokenCatalogDirs(dir)
 	if err != nil {
 		return nil, err
 	}
 	i := newTokenIndex(c)
+	i.dirs = dirs
 	catalogCache.mu.Lock()
 	catalogCache.dir, catalogCache.sig = dir, sig
 	catalogCache.idx, catalogCache.ok = i, true

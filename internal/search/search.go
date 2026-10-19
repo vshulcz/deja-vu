@@ -3052,6 +3052,7 @@ func RelevanceHitsWeighted(ss []model.Session, terms []string, idf map[string]fl
 		weight = termWeights(ss, terms)
 	}
 	hits := make([]Hit, len(ss))
+	set := newTermSet(terms)
 	// One session's score is read from that session alone, and lowercasing its
 	// messages is where the time goes: profiled on a real store, a recall
 	// answer spent 2.4 s in it and in the ranker's own copy of the same loop.
@@ -3081,30 +3082,23 @@ func RelevanceHitsWeighted(ss []model.Session, terms []string, idf map[string]fl
 			dump     bool
 		}
 		best := make([]msgScore, 0, 8)
+		found := make([]bool, len(terms))
+		var pos []int
 		for mi, m := range s.Messages {
 			// The same rule the scoring loop applies: a transcript's record of
 			// a call to deja is not something anyone said, and this tier is
 			// where the live miss came through — the scoring loop was fixed
 			// first and the hit arrived here instead (#2067).
 			low := lower(withoutOwnCallLog(m.Text))
-			var foldedLow string
+			pos, _ = set.match(low, found, pos)
 			distinct := 0
 			weighted := 0.0
 			center := ""
 			// The rarest term a message holds is what names it, so it is what
 			// the excerpt gets centred on.
 			heaviest := 0.0
-			for _, t := range terms {
-				found := strings.Contains(low, t)
-				if !found {
-					if ft := cjkfold.String(t); ft != t || cjkfold.HasCJK(t) {
-						if foldedLow == "" {
-							foldedLow = cjkfold.String(low)
-						}
-						found = strings.Contains(foldedLow, ft)
-					}
-				}
-				if !found {
+			for ti, t := range terms {
+				if !found[ti] {
 					continue
 				}
 				distinct++

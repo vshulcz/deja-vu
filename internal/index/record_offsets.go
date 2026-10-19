@@ -347,24 +347,52 @@ func eachRecordForKeysByOffsets(f *os.File, dir string, t *recordTables, want, r
 	for k := range want {
 		offs = append(offs, ro.byKey[k]...)
 	}
-	// Reading many sessions record by record loses to one sequential walk.
-	if ro.records > 0 && int64(len(offs)) > ro.records/offsetsWalkShare {
+	// Many sessions at once are walked: their records are held until the
+	// table is known to be right, and a walk streams them instead. One session
+	// is read by offset however long it is, since its caller holds all of it
+	// anyway, and a marathon of a third of the log walked all 200 MB of it.
+	if len(want) > 1 && ro.records > 0 && int64(len(offs)) > ro.records/offsetsWalkShare {
 		return false, nil
 	}
 	atomic.AddInt64(&recordOffsetReads, 1)
 	slices.Sort(offs)
 	recs := make([]Record, 0, len(offs))
-	for _, off := range offs {
-		rec, keep, err := readRecordAtInRoles(f, off, t, want, roles)
-		if err != nil {
-			if errors.Is(err, errOffsetsMismatch) {
-				return false, nil
+	// In spans, the way eachRecordAt reads postings: a session's records sit
+	// back to back in the log, and a pread per record was most of what loading
+	// a long session cost.
+	var buf []byte
+	for i := 0; i < len(offs); {
+		j := i + 1
+		for j < len(offs) && offs[j]-offs[j-1] <= spanGapMax && offs[j]-offs[i] < spanSizeMax {
+			j++
+		}
+		start := offs[i]
+		size := int(offs[j-1]-start) + readAheadSize
+		if cap(buf) < size {
+			buf = make([]byte, size)
+		}
+		b := buf[:size]
+		n, err := f.ReadAt(b, start)
+		if err != nil && !errors.Is(err, io.EOF) {
+			n = 0
+		}
+		b = b[:n]
+		for _, off := range offs[i:j] {
+			rec, keep, whole, err := recordInSpan(b, int(off-start), t, want, roles)
+			if err == nil && !whole {
+				rec, keep, err = readRecordAtInRoles(f, off, t, want, roles)
 			}
-			return false, err
+			if err != nil {
+				if errors.Is(err, errOffsetsMismatch) {
+					return false, nil
+				}
+				return false, err
+			}
+			if keep {
+				recs = append(recs, rec)
+			}
 		}
-		if keep {
-			recs = append(recs, rec)
-		}
+		i = j
 	}
 	for _, rec := range recs {
 		fn(rec)
@@ -373,6 +401,34 @@ func eachRecordForKeysByOffsets(f *os.File, dir string, t *recordTables, want, r
 		return true, err
 	}
 	return true, walkRecordsForKeys(bufio.NewReaderSize(f, 256*1024), t, want, roles, fn)
+}
+
+// recordInSpan is readRecordAtInRoles over a span already read: whole is false
+// when the span ends before the record does, and the caller reads it alone.
+func recordInSpan(b []byte, rel int, t *recordTables, want, roles map[string]bool) (rec Record, keep, whole bool, err error) {
+	if rel < 0 || rel+4 > len(b) {
+		return Record{}, false, false, nil
+	}
+	size := int(binary.LittleEndian.Uint32(b[rel : rel+4]))
+	if size > maxRecordSize {
+		return Record{}, false, true, errOffsetsMismatch
+	}
+	if rel+4+size > len(b) {
+		return Record{}, false, false, nil
+	}
+	payload := b[rel+4 : rel+4+size]
+	key, role, ok := recordRoleIn(payload, t)
+	if !ok || !want[key] {
+		return Record{}, false, true, errOffsetsMismatch
+	}
+	if roles != nil && !roles[role] {
+		return Record{}, false, true, nil
+	}
+	rec, derr := decodeRecord(payload, t)
+	if derr != nil {
+		return Record{}, false, true, fmt.Errorf("%w: %v", errCorruptIndex, derr)
+	}
+	return rec, true, true, nil
 }
 
 // readRecordAtInRoles reads the record at off, checking it belongs to a wanted
