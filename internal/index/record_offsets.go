@@ -122,8 +122,13 @@ func scanRecordOffsets(f *os.File, t *recordTables, start, end int64, into map[s
 		off += 4 + size
 		n++
 	}
+	atomic.AddInt64(&recordOffsetsScanned, n)
 	return n, nil
 }
+
+// recordOffsetsScanned counts the records walked to build offset tables; a
+// test tells a pass that wrote its own table from one that walked the log.
+var recordOffsetsScanned int64
 
 // writeRecordOffsets brings the table in dir up to the first size bytes of
 // its log. A table that still covers a prefix of the log is extended by
@@ -489,4 +494,26 @@ func writeFileAtomic(p string, b []byte) error {
 		return err
 	}
 	return nil
+}
+
+// passOffsets is the offset table of a log a pass writes from scratch,
+// gathered as each record is written.
+type passOffsets struct {
+	byKey   map[string][]int64
+	records int64
+}
+
+func (p *passOffsets) add(key string, off int64) {
+	p.byKey[key] = append(p.byKey[key], off)
+	p.records++
+}
+
+// write commits the table for the log in dir, which holds exactly the
+// records gathered.
+func (p *passOffsets) write(dir string) error {
+	size, fp, err := logFingerprint(filepath.Join(dir, "records.bin"))
+	if err != nil {
+		return err
+	}
+	return writeFileAtomic(filepath.Join(dir, recordOffsetsFile), encodeRecordOffsets(size, p.records, fp, p.byKey))
 }

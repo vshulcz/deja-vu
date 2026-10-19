@@ -4734,6 +4734,9 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	// After the redaction, so the texts compare with what the records hold.
 	compacted := compactedInPlace(replacements, false)
 	buckets := bucketPostings{}
+	// Every record's offset in the new log, as it is written: the table the
+	// commit would otherwise build by walking the whole log again (#5402).
+	offsets := &passOffsets{byKey: map[string][]int64{}}
 	addRec := func(r Record) error {
 		if r.SourcePath == "" {
 			return nil
@@ -4749,6 +4752,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		if err != nil {
 			return err
 		}
+		offsets.add(r.Key, off)
 		passEncoded.Add(1)
 		passKeyed.Add(1)
 		// The same part and the same tool bit a full build gives the record.
@@ -4828,6 +4832,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 			return err
 		}
 		carried.add(oldOff, off, meta.Ord, isToolRole(r.Role))
+		offsets.add(r.Key, off)
 		if _, exists := m.Sessions[r.Key]; !exists {
 			m.Sessions[r.Key] = meta
 		}
@@ -4928,11 +4933,16 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	settleCopies(&m, old.Sessions, changed, replacements)
 	setDatabaseStoreWatermarks(m.Files, m.Sessions)
 	m.RecordStrings = tbl.strs
-	// Ahead of the commit, which checks its entries against the new log
-	// rather than parsing every session that carries a wall again.
-	if b, err := os.ReadFile(filepath.Join(dir, frictionTextsFile)); err == nil {
-		_ = os.WriteFile(filepath.Join(tmp, frictionTextsFile), b, 0o600)
+	_ = offsets.write(tmp)
+	// The sessions this pass read again or dropped a record of. Everything
+	// else was copied as stored, in its order, so what was derived from its
+	// records still holds.
+	for key := range replaceKeys {
+		dropped[key] = true
 	}
+	// Ahead of the commit, which then reads only the sessions that changed
+	// rather than parsing every session that carries a wall again.
+	carryFrictionTexts(dir, tmp, old, dropped)
 	if err := writeManifest(tmp, m); err != nil {
 		return err
 	}
@@ -4946,9 +4956,6 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	// carried file, as a full build would not write it (#4441).
 	mergeFixes(dir, tmp, sessionKeys(m), replacements, replaceKeys)
 	buildCommandsFromIndex(tmp)
-	for key := range replaceKeys {
-		dropped[key] = true
-	}
 	buildCommandFailsFromIndex(tmp, carriedCommandFailState(dir, old, tmp, m.Generation, dropped), dropped)
 	buildSessionFactsFromIndex(tmp)
 	return swapIndexDir(dir, tmp)

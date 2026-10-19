@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync/atomic"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -421,13 +422,32 @@ func commandFailsFromIndex(dir string, prior *commandFailState, redo map[string]
 			st = &commandFailState{Version: commandFailStateVersion, Acc: *newCommandFailAcc()}
 			redo = nil
 		}
-		end, err := eachCommandAndOutputFrom(path, m, from, redo, func(r Record) {
+		take := func(r Record) {
 			if r.Role == roleCommand {
 				st.Acc.command(r.Key, r.Text)
 				return
 			}
 			st.Acc.output(r.Key, r.Text)
-		}, st.Acc.stop)
+		}
+		var end int64
+		if from == fi.Size() && len(redo) > 0 {
+			// The state covers the whole log but the sessions in redo, which a
+			// rewriting pass names: read those alone, through the offset table
+			// where there is one, rather than walking the log (#5402).
+			end = from
+			if want := heldKeys(redo, m); len(want) > 0 {
+				err = eachRecordForKeysInRoles(path, tablesFromManifest(m), want, nil, func(r Record) {
+					atomic.AddInt64(&commandFailRecordsSeen, 1)
+					if r.Role == roleCommand || r.Role == roleToolOutput {
+						take(r)
+						return
+					}
+					st.Acc.stop(r.Key)
+				})
+			}
+		} else {
+			end, err = eachCommandAndOutputFrom(path, m, from, redo, take, st.Acc.stop)
+		}
 		if err != nil {
 			return err
 		}
@@ -447,6 +467,21 @@ func commandFailsFromIndex(dir string, prior *commandFailState, redo map[string]
 		return nil
 	})
 	return out, st, err
+}
+
+// commandFailRecordsSeen counts the records the walk looked at, read or
+// skipped, for a test to tell a walk of the log from a read of a few sessions.
+var commandFailRecordsSeen int64
+
+// heldKeys is the keys of redo that m holds a session for.
+func heldKeys(redo map[string]bool, m Manifest) map[string]bool {
+	out := make(map[string]bool, len(redo))
+	for k := range redo {
+		if _, ok := m.Sessions[k]; ok {
+			out[k] = true
+		}
+	}
+	return out
 }
 
 // eachCommandAndOutputFrom streams the command and tool output records of the
@@ -491,6 +526,7 @@ func eachCommandAndOutputFrom(path string, m Manifest, from int64, redo map[stri
 		}
 		at := off
 		off += int64(len(hdr)) + int64(size)
+		atomic.AddInt64(&commandFailRecordsSeen, 1)
 		key, role, ok := recordRoleIn(payload, t)
 		if !ok {
 			return off, errShortRecord

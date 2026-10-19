@@ -118,6 +118,11 @@ incremental pass over one went from 628 MB to 42 MB peak. Every line that is
 not one JSON object now counts as skipped; a `null` line or one with more after
 the object went uncounted (#5391).
 
+After a pass rewrites the index, the friction texts, the command-failure table
+and the record offset table are brought up to date from the sessions the pass
+changed instead of each reading the whole record log again: 2.0 s to 1.75 s
+per pass on a 12,000-session store (#5402).
+
 When two transcripts hold the same session id, a pass that rewrites one reads
 the other again too, so a turn both hold is no longer indexed twice and a copy's
 turns are no longer dropped until `deja index --rebuild`.
