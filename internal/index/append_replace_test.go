@@ -311,3 +311,94 @@ func TestALeftoverStagingLinkNeverTruncatesTheLiveLog(t *testing.T) {
 		t.Fatalf("damaged: %s", DamageReason(inc))
 	}
 }
+
+// A pass that lands while the per-prompt recall ranks leaves it the answer a
+// ranking made after the pass gives: it is read again from the new
+// generation, not scored from one bucket of each (#5459).
+func TestARankingAcrossAPassAnswersAsOneAfterIt(t *testing.T) {
+	proj, inc := replaceStore(t, 40)
+	for i := 0; i < 3; i++ {
+		rewriteSession(t, proj, "s007")
+		parityPass(t, inc, false)
+	}
+	if m, err := readManifest(inc); err != nil || len(m.DeadRecords) == 0 {
+		t.Fatalf("control: the rewrites listed no dead records (err %v)", err)
+	}
+	// The pass holds the lock, so the ranking reads without it, as it does
+	// beside a pass in another process.
+	unlock, err := lockDir(inc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unlock()
+	// Between a bucket and its overlays, on each read of the session's word:
+	// the ranking reads it twice, once to see it is there at all.
+	landed := 0
+	bucketBaseRead = func(tok string) {
+		if landed == 2 || tok != "ts007" {
+			return
+		}
+		landed++
+		rewriteSession(t, proj, "s007")
+		if err := ensureHeld(inc, "", true, io.Discard); err != nil {
+			t.Fatal(err)
+		}
+	}
+	defer func() { bucketBaseRead = nil }()
+	ranked := func() string {
+		ss, matched, strong, _, idf, err := ProjectRelevantNamingCut(inc, nil, []string{"s007", "pgbouncer3"}, 5, nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var b strings.Builder
+		for i, s := range ss {
+			fmt.Fprintf(&b, "%s:%d:%d:%d ", s.ID, len(s.Messages), matched[i], strong[i])
+		}
+		fmt.Fprintf(&b, "idf %v", idf)
+		return b.String()
+	}
+	got := ranked()
+	if landed != 2 {
+		t.Fatalf("control: %d passes landed during the ranking, want 2", landed)
+	}
+	if want := ranked(); got != want {
+		t.Fatalf("ranked across the passes:\n %s\nafter them:\n %s", got, want)
+	}
+}
+
+// A second pass that lands while a reader reads a session again for the
+// first one zeroes what that reread reads. The reader goes once more, and
+// gets the session as the last pass left it (#5460).
+func TestASecondPassDuringTheRereadStillGetsTheSession(t *testing.T) {
+	proj, inc := replaceStore(t, 12)
+	pinned, err := readManifest(inc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	meta := pinned.Sessions["claude:s007"]
+	rewriteSession(t, proj, "s007")
+	parityPass(t, inc, false)
+	landed := 0
+	sessionReread = func() {
+		if landed > 0 {
+			return
+		}
+		landed++
+		p := filepath.Join(proj, "s007.jsonl")
+		parityWrite(t, p, replaceBody("s007", "wombat "), false)
+		later := time.Now().Add(4 * time.Second)
+		_ = os.Chtimes(p, later, later)
+		parityPass(t, inc, false)
+	}
+	defer func() { sessionReread = nil }()
+	s, ok, err := loadSessionMeta(inc, pinned, meta)
+	if err != nil || !ok {
+		t.Fatalf("loadSessionMeta: ok=%v err=%v", ok, err)
+	}
+	if landed != 1 {
+		t.Fatalf("control: %d passes landed during the reread, want 1", landed)
+	}
+	if len(s.Messages) != 6 || !strings.Contains(s.Messages[0].Text, "wombat") {
+		t.Fatalf("got %d messages, want the 6 of the last rewrite", len(s.Messages))
+	}
+}

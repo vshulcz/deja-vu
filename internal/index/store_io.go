@@ -1428,6 +1428,10 @@ func newBucketReader(dir string) *bucketReader {
 	return &bucketReader{dir: dir, entries: map[string][]bucketEntry{}, layers: map[string][]string{}, dead: deadRecordsOf(dir)}
 }
 
+// bucketBaseRead, when set, runs between a bucket's own postings and its
+// overlays'. Tests land a pass there.
+var bucketBaseRead func(tok string)
+
 func (b *bucketReader) postings(tok string) ([]posting, error) {
 	p, ok := bucketPath(b.dir, tok)
 	if !ok {
@@ -1454,6 +1458,9 @@ func (b *bucketReader) postings(tok string) ([]posting, error) {
 			return nil, err
 		}
 		out = joinPostings(out, posts)
+		if i == 0 && bucketBaseRead != nil {
+			bucketBaseRead(tok)
+		}
 	}
 	return liveOnly(out, b.dead), nil
 }

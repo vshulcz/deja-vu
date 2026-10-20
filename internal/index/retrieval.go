@@ -86,11 +86,17 @@ func searchDetailedOnce(dir string, o query.Options) (SearchResult, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	var r SearchResult
+	return inOneGeneration(dir, func() (SearchResult, error) { return searchDetailedRead(dir, o) })
+}
+
+// inOneGeneration is read, done again while the manifest after it is not the
+// file it was before it, at most three times in all: see searchDetailedOnce.
+func inOneGeneration[T any](dir string, read func() (T, error)) (T, error) {
+	var r T
 	var err error
 	for attempt := 0; attempt < 3; attempt++ {
 		before := manifestGeneration(dir)
-		r, err = searchDetailedRead(dir, o)
+		r, err = read()
 		if sameGeneration(before, manifestGeneration(dir)) {
 			return r, err
 		}
@@ -872,9 +878,29 @@ func ProjectRelevantNamingCut(dir string, projects, terms []string, n int, skip 
 	if ok {
 		defer unlock()
 	}
+	// From one generation, as a search is. A pass that swapped in between a
+	// bucket and its overlays left the ranking the old bucket, where the
+	// session's postings were the dead ones, and no overlay with its live
+	// ones: the session the question named fell out (#5459).
+	r, err := inOneGeneration(dir, func() (projectRelevantRead, error) {
+		return projectRelevantIn(dir, projects, terms, n, skip, cut)
+	})
+	return r.out, r.matched, r.strong, r.naming, r.idf, err
+}
+
+// projectRelevantRead is what ProjectRelevantNamingCut hands back.
+type projectRelevantRead struct {
+	out                     []model.Session
+	matched, strong, naming []int
+	idf                     map[string]float64
+}
+
+// projectRelevantIn is the read ProjectRelevantNamingCut makes, without the
+// lock.
+func projectRelevantIn(dir string, projects, terms []string, n int, skip map[string]bool, cut map[string]time.Time) (projectRelevantRead, error) {
 	m, err := readManifestCached(dir)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return projectRelevantRead{}, err
 	}
 	var keep func(SessionMeta) bool
 	if len(skip) > 0 {
@@ -885,18 +911,18 @@ func ProjectRelevantNamingCut(dir string, projects, terms []string, n int, skip 
 		// A corrupt or unreadable bucket. The hook never rebuilds, so surface
 		// it rather than inject a silently short-ranked déjà vu; the caller
 		// stays quiet on an error.
-		return nil, nil, nil, nil, nil, rerr
+		return projectRelevantRead{}, rerr
 	}
 	metas, matched, strong, naming, idf := rank.metas, rank.informative, rank.strong, rank.naming, rank.idf
 	if bm, bmatched, bstrong, bidf, ok := bridgedRetry(dir, m, projects, terms, n, skip, strong, idf); ok {
 		metas, matched, strong, idf, naming = bm, bmatched, bstrong, bidf, nil
 	}
 	if len(metas) == 0 {
-		return nil, nil, nil, nil, nil, nil
+		return projectRelevantRead{}, nil
 	}
 	out, err := sessionsServable(dir, metas, query.Options{ExcludeUpTo: cut})
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return projectRelevantRead{}, err
 	}
 	if len(cut) > 0 {
 		out = stillMatching(out, terms, cut)
@@ -910,7 +936,7 @@ func ProjectRelevantNamingCut(dir string, projects, terms []string, n int, skip 
 	if naming != nil {
 		naming, _ = countsFor(out, metas, naming, naming)
 	}
-	return out, matched, strong, naming, idf, nil
+	return projectRelevantRead{out, matched, strong, naming, idf}, nil
 }
 
 // stillMatching drops a cut session none of whose served messages holds a
@@ -2374,12 +2400,20 @@ func sessionsForMetas(dir string, metas []SessionMeta) ([]model.Session, error) 
 	out, err := sessionsForMetasIn(dir, m, metas)
 	// Read again when a pass swapped in during the read, as loadSessionMeta
 	// does, without the sessions it took away (#5449).
-	if cur, moved := liveManifest(dir, m); moved {
+	for retry := 0; retry < sessionRereads; retry++ {
+		cur, moved := liveManifest(dir, m)
+		if !moved {
+			break
+		}
+		m = cur
 		metas = slices.DeleteFunc(slices.Clone(metas), func(meta SessionMeta) bool {
-			_, ok := cur.Sessions[meta.Harness+":"+meta.ID]
+			_, ok := m.Sessions[meta.Harness+":"+meta.ID]
 			return !ok
 		})
-		out, err = sessionsForMetasIn(dir, cur, metas)
+		if sessionReread != nil {
+			sessionReread()
+		}
+		out, err = sessionsForMetasIn(dir, m, metas)
 	}
 	if err != nil {
 		return nil, err
@@ -2389,6 +2423,14 @@ func sessionsForMetas(dir string, metas []SessionMeta) ([]model.Session, error) 
 	}
 	return ignoredByPolicy(out), nil
 }
+
+// sessionRereads is how many times a session read goes again for a pass that
+// swapped in under it. Two: a second pass can land while the first reread
+// runs, and that reread then reads the records it zeroes (#5460).
+const sessionRereads = 2
+
+// sessionReread, when set, runs before each reread. Tests land a pass there.
+var sessionReread func()
 
 // liveManifest is the manifest dir holds now, and whether it is another than
 // m: a pass committed since m was read, and records m listed live may have
@@ -3133,11 +3175,19 @@ func loadSessionMeta(dir string, m Manifest, meta SessionMeta) (model.Session, b
 	// in the log this one shares, and the session read empty (#5449). Once
 	// more from the live manifest; a failed read too, since the new log's tail
 	// does not decode with the old tables.
-	if cur, moved := liveManifest(dir, m); moved {
+	for retry := 0; retry < sessionRereads; retry++ {
+		cur, moved := liveManifest(dir, m)
+		if !moved {
+			break
+		}
 		if _, ok := cur.Sessions[key]; !ok {
 			return model.Session{}, false, nil
 		}
-		recs, err = recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(cur), key)
+		m = cur
+		if sessionReread != nil {
+			sessionReread()
+		}
+		recs, err = recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), key)
 	}
 	if err != nil {
 		return model.Session{}, false, err
