@@ -57,6 +57,9 @@ func indexFiles(t *testing.T, dir string) map[string]os.FileInfo {
 			return err
 		}
 		rel, _ := filepath.Rel(dir, p)
+		// Windows reads a file's identity from its path when first asked;
+		// asked later, after a swap, it would be the new file's.
+		_ = os.SameFile(fi, fi)
 		out[rel] = fi
 		return nil
 	})
