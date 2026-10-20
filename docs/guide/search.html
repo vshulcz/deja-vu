@@ -154,7 +154,7 @@
 <ul>
 <li><b>Tokens</b> — <code>deja connection pool</code> matches records containing both words (AND).</li>
 <li><b>Phrases</b> — <code>deja '"connection pool exhausted"'</code> requires the exact contiguous phrase.</li>
-<li><b>Regex</b> — <code>deja --re "timeout|deadline exceeded"</code>.</li>
+<li><b>Regex</b> — <code>deja --re "timeout|deadline exceeded"</code>. Case is ignored, and <code>^</code> and <code>$</code> match at each line, as in grep.</li>
 <li><b>Filters</b> — <code>--harness</code>, <code>--project</code>, <code>--since 30d</code>, <code>--role assistant</code>. Beyond the conversation roles, the index keeps what the agent did: <code>--role files</code> for the paths a turn opened, <code>--role command</code> for the commands that ran, <code>--role edit</code> for the spans an edit replaced, <code>--role tool</code> for what a tool printed. These are searchable but stay out of ordinary results, since a path that happens to contain the words of a question is not an answer to it.</li>
 </ul>
 <h2>What a subagent did</h2>

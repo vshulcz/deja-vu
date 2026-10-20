@@ -196,10 +196,10 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 	qtoksFolded, phrasesFolded := QueryParts(cjkfold.String(o.Query))
 	if o.Regex {
 		var err error
-		re, err = regexp.Compile("(?i)" + o.Query)
+		re, err = compileQueryRegex(o.Query)
 		if err != nil {
-			// The (?i) prefix is deja's, not the user's. Reporting the compile
-			// error verbatim echoes `(?i)(` back at someone who typed `(`, so
+			// The (?im) prefix is deja's, not the user's. Reporting the compile
+			// error verbatim echoes `(?im)(` back at someone who typed `(`, so
 			// re-compile their pattern alone for a message that names what they
 			// actually wrote.
 			if _, uerr := regexp.Compile(o.Query); uerr != nil {
@@ -463,7 +463,7 @@ func renderSnippets(hits []Hit, o Options, n int) {
 		// Already compiled once in runScored, and a hit only reaches here if
 		// that compile succeeded, so a failure now is not reportable and not
 		// possible: fall back to the plain highlighter.
-		re, _ = regexp.Compile("(?i)" + o.Query)
+		re, _ = compileQueryRegex(o.Query)
 	}
 	if n < 0 || n > len(hits) {
 		n = len(hits)
@@ -2419,6 +2419,14 @@ func Recent(ss []model.Session, n int) []model.Session {
 	return out
 }
 
+// compileQueryRegex compiles a --re pattern the way grep reads one: ignoring
+// case, with ^ and $ anchored at each line. A message is often many lines of
+// tool output, and anchoring at the whole text missed `^panic:` on any line
+// but the first.
+func compileQueryRegex(q string) (*regexp.Regexp, error) {
+	return regexp.Compile("(?im)" + q)
+}
+
 // A pattern that can match the empty string — `x*`, `foo?`, `(a|)` — matches
 // between every pair of characters. Counting those reported 88 matches in a
 // session that held none of the pattern's characters at all (#1606); a match
@@ -2434,17 +2442,24 @@ func countRegex(re *regexp.Regexp, s string) int {
 }
 
 func snippet(s, q string, re *regexp.Regexp) string {
-	s = proseForSnippet(s)
+	lines := proseLines(s)
+	s = strings.Join(lines, " ")
 	r := []rune(s)
 	idx := 0
 	if re != nil {
 		// Anchor on the first match that has width; a zero-width one points at
-		// no passage in particular (#1606).
-		for _, loc := range re.FindAllStringIndex(s, -1) {
-			if loc[1] > loc[0] {
-				idx = utf8.RuneCountInString(s[:loc[0]])
-				break
+		// no passage in particular (#1606). Line by line, because the excerpt
+		// joins lines and a ^ or $ in the pattern is anchored at each one.
+		at := 0
+	lineScan:
+		for _, line := range lines {
+			for _, loc := range re.FindAllStringIndex(line, -1) {
+				if loc[1] > loc[0] {
+					idx = at + utf8.RuneCountInString(line[:loc[0]])
+					break lineScan
+				}
 			}
+			at += utf8.RuneCountInString(line) + 1
 		}
 	} else {
 		low := lower(s)
@@ -2711,7 +2726,7 @@ func highlight(s, q string, isRe bool, color bool) string {
 		return s
 	}
 	if isRe {
-		re, err := regexp.Compile("(?i)" + q)
+		re, err := compileQueryRegex(q)
 		if err == nil {
 			return re.ReplaceAllStringFunc(s, func(x string) string {
 				// Zero-width match: colouring it wraps an escape pair around
@@ -2994,6 +3009,12 @@ func withoutOwnCredit(text string) string {
 }
 
 func proseForSnippet(s string) string {
+	return strings.Join(proseLines(s), " ")
+}
+
+// proseLines is the excerpt's text as the lines it is joined from, each with
+// its whitespace collapsed.
+func proseLines(s string) []string {
 	s = redact.SafeForDisplay(s)
 	// Neither the harness nor deja is a witness. An excerpt is offered as
 	// something someone said about the subject, and measured over twelve
@@ -3008,14 +3029,14 @@ func proseForSnippet(s string) string {
 		if line == "" || looksNumbered(line) || looksToolDump(line) || digest.IsListingDump(line) {
 			continue
 		}
-		keep = append(keep, line)
+		keep = append(keep, strings.Join(strings.Fields(line), " "))
 	}
-	out := strings.Join(keep, " ")
-	out = strings.Join(strings.Fields(out), " ")
-	if out == "" {
-		out = strings.Join(strings.Fields(redact.SafeForDisplay(s)), " ")
+	if len(keep) == 0 {
+		if out := strings.Join(strings.Fields(redact.SafeForDisplay(s)), " "); out != "" {
+			keep = append(keep, out)
+		}
 	}
-	return out
+	return keep
 }
 
 func contextText(s string, matched bool) string {

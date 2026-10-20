@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+`deja --re` anchors `^` and `$` at each line, as grep does. They anchored the whole message, so `^panic:` missed a panic printed after any other tool output (#5448).
+
 `deja sync import` also leaves out a peer's records for a store `DEJA_EXCLUDE_HARNESSES` (or a `harness:` line) excludes and for a project the policy `ignore` rule covers, and says how many; a relay no longer sends an excluded store's sessions on (#5435). The `sync-timer` unit carries the `DEJA_*` and `XDG_*` settings of the shell it was installed from, so a timer run syncs into the same index under the same switches (#5436).
 
 A dsh turn no longer fails when recalled history contains `{{...}}`. dsh read deja's project digest and recall as prompt templates, so a past session quoting `{{cwd}}` ended every new turn with `unknown prompt variable` before the model was called; both contexts now pass `interpolate: false` and split the braces (`{ {cwd} }`), which dsh before 0.2.1-alpha.2 needs, in the npm plugin and in `deja install dsh-auto` (#5421).
