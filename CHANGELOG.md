@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 A dsh turn no longer fails when recalled history contains `{{...}}`. dsh read deja's project digest and recall as prompt templates, so a past session quoting `{{cwd}}` ended every new turn with `unknown prompt variable` before the model was called; both contexts now pass `interpolate: false` and split the braces (`{ {cwd} }`), which dsh before 0.2.1-alpha.2 needs, in the npm plugin and in `deja install dsh-auto` (#5421).
+`deja sync` holds a peer's records to this machine's switches: `DEJA_INDEX_TOOL_OUTPUT=0`, `DEJA_INDEX_COMMANDS=0`, `DEJA_INDEX_PATHS=0`, `DEJA_INDEX_EDITS=0`, `DEJA_INDEX_WRITES=0` and `DEJA_INCLUDE_SUBAGENTS=0` leave the same records out of an import as out of a local read, and the import says how many (#5425).
 
 Text pasted into a Claude Code prompt is indexed as the pasted text, without the `<pasted_content id="…">` wrapper Claude Code puts around it. The tags titled sessions (`<pasted_content id="dd73"> Set up and test…`), gave the install's demo question the topic "pasted_content set" and were indexed and recalled as terms; the prompt hook no longer searches on them either. The index rebuilds once to take them out of sessions already stored, including those whose transcript Claude Code has since deleted, and a peer on an older build syncs its prompts in unwrapped.
 

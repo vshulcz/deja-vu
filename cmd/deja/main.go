@@ -1051,6 +1051,9 @@ func printSpawnEdges(w io.Writer, dir string, s model.Session) {
 			by = " as " + s.Agent
 		}
 		fmt.Fprintf(w, "deja: spawned from %s%s — `deja show %s`\n", digest.Short(s.Parent), by, pasteSafe(digest.Short(s.Parent)))
+	} else if s.Kind != "" && strings.HasPrefix(s.Project, "imported:") {
+		// The parent is on the machine that sent it.
+		fmt.Fprintf(w, "deja: %s session from another machine\n", s.Kind)
 	} else if s.Kind != "" {
 		// A kind with no parent is all the harness recorded; saying which
 		// session asked for it would be a guess.

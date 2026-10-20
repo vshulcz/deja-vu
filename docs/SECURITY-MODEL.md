@@ -26,7 +26,7 @@ back. All of it goes through the same redaction pass as conversation text, which
 matters more here than elsewhere: command output carries credentials far more
 often than prose does. `DEJA_INDEX_PATHS=0`, `DEJA_INDEX_COMMANDS=0`,
 `DEJA_INDEX_EDITS=0`, `DEJA_INDEX_WRITES=0` and `DEJA_INDEX_TOOL_OUTPUT=0` each
-disable one of these at ingest.
+disable one of these at ingest, and for records imported from another machine.
 
 The written side of an edit — what the agent typed into the file, which is what
 `deja blame` attributes a line by — is stored as one 64-bit hash per line of 24

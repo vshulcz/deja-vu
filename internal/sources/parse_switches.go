@@ -9,31 +9,51 @@ import "github.com/vshulcz/deja-vu/internal/model"
 // it said it left out (#5413). The registry now drops the switched-off roles
 // from whatever a reader returns; a reader's own test only saves the work.
 
-// switchedOffRoles is the set of record roles the parse switches leave out
-// this run, nil when every switch is on.
-func switchedOffRoles() map[string]bool {
+// parseSwitches pairs each switch with the role it leaves out.
+var parseSwitches = []struct {
+	env  string
+	on   func() bool
+	role string
+}{
+	{"DEJA_INDEX_TOOL_OUTPUT", IndexToolOutput, RoleToolOutput},
+	{"DEJA_INDEX_COMMANDS", IndexCommands, RoleCommand},
+	{"DEJA_INDEX_PATHS", IndexToolPaths, RoleFiles},
+	{"DEJA_INDEX_EDITS", IndexEdits, RoleEdit},
+	{"DEJA_INDEX_WRITES", IndexWrites, RoleWrote},
+}
+
+// SwitchedOffRoles is the set of record roles the parse switches leave out
+// this run, nil when every switch is on. A record that arrives by sync import
+// is held to it as a parsed one is (#5425).
+func SwitchedOffRoles() map[string]bool {
 	var off map[string]bool
-	drop := func(on bool, role string) {
-		if on {
-			return
+	for _, sw := range parseSwitches {
+		if sw.on() {
+			continue
 		}
 		if off == nil {
 			off = map[string]bool{}
 		}
-		off[role] = true
+		off[sw.role] = true
 	}
-	drop(IndexToolOutput(), RoleToolOutput)
-	drop(IndexCommands(), RoleCommand)
-	drop(IndexToolPaths(), RoleFiles)
-	drop(IndexEdits(), RoleEdit)
-	drop(IndexWrites(), RoleWrote)
 	return off
+}
+
+// ParseSwitchesOff names the parse switches set to 0 this run.
+func ParseSwitchesOff() []string {
+	var names []string
+	for _, sw := range parseSwitches {
+		if !sw.on() {
+			names = append(names, sw.env+"=0")
+		}
+	}
+	return names
 }
 
 // ApplyParseSwitches drops the records a parse switch turned off from what a
 // reader returned. The registry runs every parse through it.
 func ApplyParseSwitches(ss []model.Session) []model.Session {
-	off := switchedOffRoles()
+	off := SwitchedOffRoles()
 	if off == nil {
 		return ss
 	}
@@ -46,7 +66,7 @@ func ApplyParseSwitches(ss []model.Session) []model.Session {
 // ParseSwitched is ApplyParseSwitches for one session read outside the
 // registry, as a compaction capture reads it.
 func ParseSwitched(s model.Session) model.Session {
-	if off := switchedOffRoles(); off != nil {
+	if off := SwitchedOffRoles(); off != nil {
 		s.Messages = dropRoles(s.Messages, off)
 	}
 	return s

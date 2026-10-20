@@ -269,6 +269,10 @@ func runSync(dir string, args []string) error {
 			fmt.Fprintf(os.Stdout, "deja: %d record%s left out — your exclude list covers their project (%s)\n",
 				ex, pluralS(ex), reportPath(sources.ExcludePath()))
 		}
+		// The switches set here hold for a peer's records too, and a batch of
+		// nothing but tool output imported 0 under DEJA_INDEX_TOOL_OUTPUT=0
+		// with no word of why (#5425).
+		fmt.Fprint(os.Stdout, switchedOffLine(""))
 		if err != nil {
 			return err
 		}
@@ -329,4 +333,26 @@ func readLastImport(dir string) (lastImport, bool) {
 		return lastImport{}, false
 	}
 	return li, true
+}
+
+// switchedOffLine reports the records the last import left out because a
+// switch set here turns their kind off, or "". They are not in the ledger, so
+// they arrive when the batch is handed over again with the switch unset; a
+// pull has already moved the peer's watermark past them, so for a host the
+// line says how to ask again.
+func switchedOffLine(host string) string {
+	sw := index.ImportSkippedSwitched()
+	if sw == 0 {
+		return ""
+	}
+	names := sources.ParseSwitchesOff()
+	if sources.SubagentsOff() {
+		names = append(names, "DEJA_INCLUDE_SUBAGENTS=0")
+	}
+	again := "import the batch again"
+	if host != "" {
+		again = "run `deja sync ssh " + pasteSafe(host) + " --pull --full`"
+	}
+	return fmt.Sprintf("deja: %d record%s left out — switched off on this machine (%s); to take them, unset it and %s\n",
+		sw, pluralS(sw), strings.Join(names, ", "), again)
 }
