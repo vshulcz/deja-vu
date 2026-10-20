@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+`deja sync import` also leaves out a peer's records for a store `DEJA_EXCLUDE_HARNESSES` (or a `harness:` line) excludes and for a project the policy `ignore` rule covers, and says how many; a relay no longer sends an excluded store's sessions on (#5435). The `sync-timer` unit carries the `DEJA_*` and `XDG_*` settings of the shell it was installed from, so a timer run syncs into the same index under the same switches (#5436).
+
 A dsh turn no longer fails when recalled history contains `{{...}}`. dsh read deja's project digest and recall as prompt templates, so a past session quoting `{{cwd}}` ended every new turn with `unknown prompt variable` before the model was called; both contexts now pass `interpolate: false` and split the braces (`{ {cwd} }`), which dsh before 0.2.1-alpha.2 needs, in the npm plugin and in `deja install dsh-auto` (#5421).
 `deja sync` holds a peer's records to this machine's switches: `DEJA_INDEX_TOOL_OUTPUT=0`, `DEJA_INDEX_COMMANDS=0`, `DEJA_INDEX_PATHS=0`, `DEJA_INDEX_EDITS=0`, `DEJA_INDEX_WRITES=0` and `DEJA_INCLUDE_SUBAGENTS=0` leave the same records out of an import as out of a local read, and the import says how many (#5425).
 Recalled history can no longer make opencode run a command or attach a file. opencode expands `` !`cmd` `` and `@path` in the `/deja` prompt text and `@path` in a sub-agent's task prompt, so a past session quoting either ran it in the shell or shipped the file to the model; deja now breaks up those tokens in the recall it hands opencode and Kilo, and the model still reads every word (#5433, #5439).
@@ -118,7 +120,12 @@ are a quarter of it. On a 25,000-session store a pass over 9 rewritten
 transcripts wrote 798 MB and peaked at 2.5 GB of memory; now it writes 21 MB,
 most of it the manifest, and peaks at 310 MB. A new transcript no longer
 rewrites every postings file either: 225 MB and 2.4 GB there, now 18 MB and
-150 MB. The index is rebuilt once for the new layout (#5387).
+150 MB. The index is rebuilt once for the new layout (#5387). The replaced
+records are zeroed where they stand on the same pass, and so is a word only they
+held in the postings files, so text taken out of a transcript leaves the index
+then rather than at the next compaction (#5429), and an older deja
+meeting the index can no longer bring them back as live (#5428). A lost
+overlay file reads as damage and rebuilds (#5426).
 
 A pass that reads Codex's, TRAE's or Claude Code's history.jsonl beside other
 changes replaces only the sessions with a new prompt in it, not every session

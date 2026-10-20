@@ -1129,6 +1129,10 @@ type Manifest struct {
 	// index healthy (#1088). Additive: a manifest written before this decodes
 	// with it zero, and the check is skipped.
 	BucketFiles int `json:"bucket_files,omitempty"`
+	// bucketsLeaving is how many of the postings files on disk the pass
+	// committing this manifest removes right after: the count above leaves
+	// them out (#5426).
+	bucketsLeaving int
 	// IngestHealth records, per harness, what ingestion skipped on the pass
 	// that last touched it: malformed JSONL lines and files that failed to
 	// parse. Silent loss must be diagnosable (`deja doctor --json`).

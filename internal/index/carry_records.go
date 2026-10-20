@@ -191,13 +191,21 @@ func movedPostings(bdir string, want int, c *carriedRecords) (bucketPostings, er
 	if err != nil {
 		return nil, err
 	}
+	// Read by bucket, each with its overlays joined in; counted with them, as
+	// the manifest counts (#5426).
 	var names []string
+	files := 0
 	for _, e := range entries {
-		if n := e.Name(); !e.IsDir() && strings.HasSuffix(n, ".bin") {
+		n := e.Name()
+		if e.IsDir() || !isPostingsFile(n) {
+			continue
+		}
+		files++
+		if strings.HasSuffix(n, ".bin") {
 			names = append(names, n)
 		}
 	}
-	if len(names) == 0 || len(names) < want {
+	if len(names) == 0 || files < want {
 		return nil, errBucketsShort
 	}
 	workers := min(runtime.NumCPU(), len(names))

@@ -1,8 +1,13 @@
 package index
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/binary"
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -122,4 +127,190 @@ func mergeDead(a, b []int64) []int64 {
 	}
 	out = append(out, a[i:]...)
 	return append(out, b[j:]...)
+}
+
+// A record a pass marks dead is still in the log until the log is written
+// again, and two things read it there. An older deja that meets this index
+// rebuilds it and carries the sessions whose transcripts are gone out of the
+// log, knowing nothing of DeadRecords, so the replaced turns came back live
+// and stayed (#5428). And text a user took out of a transcript sat on disk
+// until a quarter of the log was dead (#5429). So the pass that kills a
+// record overwrites it once its index is swapped in: the frame keeps its
+// length, the three ids all name the record's role, which is no session and
+// no file, and the time and text are zero. Every walk of every version
+// decodes that as an empty record of no session and passes over it.
+
+// scrubPendingFile marks a live index whose dead records a pass has not yet
+// overwritten; the next lock taker finishes the job.
+const scrubPendingFile = "scrub.pending"
+
+// scrubRecords overwrites the records at offs in the log at path, as above,
+// and syncs the log.
+func scrubRecords(path string, offs []int64) error {
+	if len(offs) == 0 {
+		return nil
+	}
+	f, err := os.OpenFile(path, os.O_RDWR, 0)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	var hdr [4]byte
+	var buf []byte
+	for _, off := range offs {
+		if _, err := f.ReadAt(hdr[:], off); err != nil {
+			return err
+		}
+		n := int(binary.LittleEndian.Uint32(hdr[:]))
+		if n > maxRecordSize {
+			return fmt.Errorf("%w: record length %d exceeds cap", errCorruptIndex, n)
+		}
+		if cap(buf) < n {
+			buf = make([]byte, n)
+		}
+		b := buf[:n]
+		if _, err := f.ReadAt(b, off+4); err != nil {
+			return err
+		}
+		if !scrubbedPayload(b) {
+			continue
+		}
+		if _, err := f.WriteAt(b, off+4); err != nil {
+			return err
+		}
+	}
+	return f.Sync()
+}
+
+// scrubbedPayload rewrites b, one record's payload, as an empty record of no
+// session, and reports whether it changed anything. A raw record body is a
+// flag, eight bytes of time and a length, so ten bytes past the ids always
+// fit; when the role's id is longer than the key's and path's together (a
+// one-letter message under a role first seen late), the record keeps its own
+// ids and only its text and time go.
+func scrubbedPayload(b []byte) bool {
+	kid, pid, rid, rest, ok := recordPrefix(b)
+	if !ok {
+		return false
+	}
+	// A real record's time is never eight zero bytes: the zero time is
+	// stored as its own sentinel.
+	if !slices.ContainsFunc(rest, func(c byte) bool { return c != 0 }) {
+		return false
+	}
+	prefix := binary.AppendUvarint(nil, rid)
+	prefix = binary.AppendUvarint(prefix, rid)
+	prefix = binary.AppendUvarint(prefix, rid)
+	if len(prefix)+10 > len(b) {
+		prefix = binary.AppendUvarint(prefix[:0], kid)
+		prefix = binary.AppendUvarint(prefix, pid)
+		prefix = binary.AppendUvarint(prefix, rid)
+	}
+	clear(b[copy(b, prefix):])
+	return true
+}
+
+// scrubAfterSwap clears what the records at offs, which a swapped-in pass
+// killed, leave on disk, and then the mark. First the words only they held,
+// out of the postings files (see blankDeadWords), read from the records
+// themselves, so it goes before the records are overwritten: a pass killed in
+// between finds them still to read. Then the records.
+//
+// The sidecars that say which log they describe do it by a fingerprint of
+// sampled bytes, which an overwrite can land in. What they hold is about the
+// live records, which the overwrite leaves alone, so the fingerprint they
+// carry is moved to the log's new one rather than the sidecars written again.
+func scrubAfterSwap(dir string, offs []int64) {
+	m, err := readManifest(dir)
+	if err != nil {
+		return
+	}
+	log := filepath.Join(dir, "records.bin")
+	words, err := deadWords(log, tablesFromStrings(m.RecordStrings), offs)
+	if err != nil || blankDeadWords(dir, words, m.DeadRecords) != nil {
+		return
+	}
+	size, before, err := logFingerprint(log)
+	if err != nil {
+		return
+	}
+	if scrubRecords(log, offs) != nil {
+		return
+	}
+	if f, err := os.Open(log); err == nil {
+		after, err := recordLogFingerprint(f, size)
+		_ = f.Close()
+		if err == nil && after != before {
+			for _, name := range logStampedFiles {
+				restamp(filepath.Join(dir, name), before, after)
+			}
+		}
+	}
+	_ = os.Remove(filepath.Join(dir, scrubPendingFile))
+}
+
+// deadWords is the postings the records at offs in the log at path would
+// have, by bucket, for those not yet overwritten.
+func deadWords(path string, t *recordTables, offs []int64) (bucketPostings, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+	words := bucketPostings{}
+	var hdr [4]byte
+	for _, off := range offs {
+		if _, err := f.ReadAt(hdr[:], off); err != nil {
+			return nil, err
+		}
+		n := binary.LittleEndian.Uint32(hdr[:])
+		if n > maxRecordSize {
+			return nil, fmt.Errorf("%w: record length %d exceeds cap", errCorruptIndex, n)
+		}
+		b := make([]byte, n)
+		if _, err := f.ReadAt(b, off+4); err != nil {
+			return nil, err
+		}
+		if _, _, _, rest, ok := recordPrefix(b); !ok || !slices.ContainsFunc(rest, func(c byte) bool { return c != 0 }) {
+			continue
+		}
+		r, err := decodeRecord(b, t)
+		if err != nil {
+			continue
+		}
+		addIndexKeys(words, tokenizedPart(r.Role, r.Text), off, 0, r.Time, isToolRole(r.Role))
+	}
+	return words, nil
+}
+
+// logStampedFiles are the sidecars that carry the record log's fingerprint.
+var logStampedFiles = []string{recordOffsetsFile, frictionTextsFile}
+
+// restamp replaces the fingerprint before with after in the file at p, if it
+// carries it.
+func restamp(p string, before, after [sha256.Size]byte) {
+	b, err := os.ReadFile(p)
+	if err != nil {
+		return
+	}
+	i := bytes.Index(b, before[:])
+	if i < 0 {
+		return
+	}
+	copy(b[i:], after[:])
+	_ = writeFileAtomic(p, b)
+}
+
+// recoverScrub finishes what a pass killed between its swap and its scrub
+// left: every dead record the manifest lists, the ones already overwritten
+// passing through unchanged. Only a lock holder calls it.
+func recoverScrub(dir string) {
+	if _, err := os.Stat(filepath.Join(dir, scrubPendingFile)); err != nil {
+		return
+	}
+	m, err := readManifest(dir)
+	if err != nil {
+		return
+	}
+	scrubAfterSwap(dir, m.DeadRecords)
 }

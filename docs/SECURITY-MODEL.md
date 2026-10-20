@@ -55,6 +55,20 @@ location. The directory contains:
   the few files each session touched most, and hashes — not text — of the
   questions it asked.
 
+Text taken out of a transcript leaves `records.bin` and `buckets/` on the next
+`deja index` pass that reads it. The pass zeroes the replaced records in
+`records.bin` where they stand, and in `buckets/` zeroes every word that no
+remaining record holds, all but the one or two leading letters the bucket file
+is named after; a word another session still contains stays, as that
+session's. If the pass is killed between committing the new index and the
+zeroing, the next deja process that takes the index lock finishes it. On
+Windows, a search holding the index open as a pass ends can keep the previous
+index directory (`index.db.old`, or `index.db.old.N` when that one is held
+too) until a later pass removes it; what stays there is usually only the
+record log it shares with the live index, already zeroed. deja overwrites in
+place and does not attempt secure deletion: an SSD or a copy-on-write
+filesystem may keep the old blocks until it reuses them.
+
 At a supported pre-compaction hook, `manifest.gob` also retains redacted,
 transcript-derived continuation packets for at most 32 session/workspace pairs,
 with a 24 KiB limit per packet. These contain objectives, conclusions, the
@@ -68,9 +82,10 @@ before their source sessions have been indexed. See [compaction recovery](compac
 Privacy control files are primary data, not cache data: the XDG-aware
 `~/.config/deja/tombstones` list prevents forgotten source sessions from being
 re-ingested, and `~/.config/deja/exclude` contains project patterns skipped at
-ingest. `DEJA_EXCLUDE_PROJECTS` adds comma-separated patterns. A line in the same file prefixed `harness:` names a store instead of a project — `harness:opencode` — and deja then neither walks it nor asks for the tool that would read it; `deja doctor` and `deja sources` both report it as `excluded` rather than naming a package to install. `DEJA_EXCLUDE_HARNESSES` is the comma-separated form. A store excluded after it was indexed is not walked again on any pass; the sessions already read from it stay in the index, unserved, until `deja index --rebuild` drops them. Store names are exact, not globs: they are the forty-three `deja sources` prints. Patterns also
-apply at `sync export`, so a project excluded after the index was built does not
-leave the machine; what is already indexed stays searchable locally until
+ingest. `DEJA_EXCLUDE_PROJECTS` adds comma-separated patterns. A line in the same file prefixed `harness:` names a store instead of a project — `harness:opencode` — and deja then neither walks it nor asks for the tool that would read it; `deja doctor` and `deja sources` both report it as `excluded` rather than naming a package to install. `DEJA_EXCLUDE_HARNESSES` is the comma-separated form. A store excluded after it was indexed is not walked again on any pass; the sessions already read from it stay in the index, unserved, until `deja index --rebuild` drops them. Store names are exact, not globs: they are the forty-three `deja sources` prints. Patterns and
+excluded stores also apply at `sync export`, so a project or store excluded after
+the index was built does not leave the machine, and at `sync import`, so a peer's
+batch does not put it back; what is already indexed stays searchable locally until
 `deja index --rebuild`, and `deja index` says so when the list has changed. A full `forget`
 rebuild replaces the index atomically before the tombstone list is used by the
 next index pass.
@@ -313,8 +328,10 @@ replaces that default. A file that is missing or does not parse means the
 default policy, so recall never breaks on a bad file; `deja doctor` reports what
 is in force.
 
-The policy filters what recall serves. It does not keep anything out of the
-index; the exclude list and `deja forget` above do that.
+The policy filters what recall serves. It does not keep this machine's own
+sessions out of the index; the exclude list and `deja forget` above do that. A
+peer's records that `ignore` matches are left out at `sync import` and not sent
+at `sync export`.
 
 ## Recall output framing
 

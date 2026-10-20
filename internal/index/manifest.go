@@ -519,7 +519,7 @@ func stampStore(dir string, core *manifestCore, m Manifest, wroteRecords bool) {
 	if fi, err := os.Stat(filepath.Join(dir, "records.bin")); err == nil {
 		core.RecordsSize = fi.Size()
 	}
-	core.BucketFiles = countBucketFiles(filepath.Join(dir, "buckets"))
+	core.BucketFiles = max(countBucketFiles(filepath.Join(dir, "buckets"))-m.bucketsLeaving, 0)
 }
 
 // writeManifest commits the two-file manifest crash-safely. sessions.gob is
@@ -743,7 +743,9 @@ func recordsDamage(dir string, m Manifest, tolerateLonger bool) string {
 	return ""
 }
 
-// countBucketFiles counts the postings files a buckets directory holds.
+// countBucketFiles counts the postings files a buckets directory holds:
+// buckets and their overlays, for a lost overlay drops the postings it held
+// as surely as a lost bucket (#5426).
 func countBucketFiles(dir string) int {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -751,7 +753,7 @@ func countBucketFiles(dir string) int {
 	}
 	n := 0
 	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ".bin") {
+		if !e.IsDir() && isPostingsFile(e.Name()) {
 			n++
 		}
 	}

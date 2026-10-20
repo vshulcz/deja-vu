@@ -717,14 +717,24 @@ func consumeField(b []byte) (string, []byte, bool) {
 // steps leaves a recoverable copy instead of nothing (#181).
 func swapIndexDir(dir, tmp string) error {
 	old := dir + ".old"
-	_ = os.RemoveAll(old)
-	// The parking spot survived the removal above — a leftover from an
+	// A copy left parked survived the removal — a leftover from an
 	// interrupted swap whose permissions stop deja from clearing it. The bare
 	// `rename …: file exists` names two paths nobody chose and gives nothing to
 	// do about either (#1009). Decided before the wait: no amount of waiting
 	// clears it, and the reader has to act on the message either way.
-	if _, statErr := os.Stat(old); statErr == nil {
-		return fmt.Errorf("an earlier index swap left %s behind and deja cannot replace it — remove that directory and run `deja index` again", old)
+	//
+	// Unless what holds it is a reader. The live log is a hard link of the one
+	// in the parked index (append_replace.go), so on Windows any search
+	// running as the last swap ended kept that copy from going, and this pass
+	// failed on it. That clears once the reader lets go, so the pass parks
+	// one name further instead, and the next swap or lock taker removes both.
+	if stuck, err := clearParked(dir); stuck != "" {
+		if !renameHeldOpen(err) {
+			return fmt.Errorf("an earlier index swap left %s behind and deja cannot replace it — remove that directory and run `deja index` again", stuck)
+		}
+		if old = nextParking(dir); old == "" {
+			return fmt.Errorf("earlier index swaps left %s and more behind and deja cannot replace them — remove them and run `deja index` again", stuck)
+		}
 	}
 	carryTombstoneMirror(dir, tmp)
 	// The parking step can afford to wait: the index is still where readers
@@ -756,8 +766,91 @@ func swapIndexDir(dir, tmp string) error {
 		_ = renameWaitingUntil(old, dir, deadline)
 		return err
 	}
-	_ = os.RemoveAll(old)
+	_, _ = clearParked(dir)
 	return nil
+}
+
+// maxParked bounds the parking spots a swap tries past dir.old.
+const maxParked = 16
+
+// removeParked removes a parked index; a test stands where Windows refuses.
+var removeParked = os.RemoveAll
+
+// parkedDirs is every parked copy of dir on disk, dir.old first and then
+// dir.old.N in the order they were parked.
+func parkedDirs(dir string) []string {
+	var out []string
+	if _, err := os.Lstat(dir + ".old"); err == nil {
+		out = append(out, dir+".old")
+	}
+	for _, n := range parkedNumbers(dir) {
+		out = append(out, dir+".old."+strconv.Itoa(n))
+	}
+	return out
+}
+
+// parkedNumbers is the N of every dir.old.N, ascending.
+func parkedNumbers(dir string) []int {
+	entries, err := os.ReadDir(filepath.Dir(dir))
+	if err != nil {
+		return nil
+	}
+	prefix := filepath.Base(dir) + ".old."
+	var out []int
+	for _, e := range entries {
+		rest, ok := strings.CutPrefix(e.Name(), prefix)
+		if !ok {
+			continue
+		}
+		if n, err := strconv.Atoi(rest); err == nil && n > 0 && strconv.Itoa(n) == rest {
+			out = append(out, n)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+// clearParked removes every parked copy of dir. A copy still there comes back
+// with the reason it stayed, a refusal that is not a reader's first; the
+// next parking spot is past it, so the newest copy is always the last.
+func clearParked(dir string) (stuck string, _ error) {
+	var why error
+	for _, p := range parkedDirs(dir) {
+		err := removeParked(p)
+		if _, statErr := os.Lstat(p); statErr != nil {
+			continue
+		}
+		if err == nil {
+			err = fs.ErrExist
+		}
+		if stuck == "" || (renameHeldOpen(why) && !renameHeldOpen(err)) {
+			stuck, why = p, err
+		}
+	}
+	return stuck, why
+}
+
+// nextParking is the spot past every parked copy still there, "" when there
+// are too many to add one.
+func nextParking(dir string) string {
+	n := 1
+	if ns := parkedNumbers(dir); len(ns) > 0 {
+		n = ns[len(ns)-1] + 1
+	}
+	if n > maxParked {
+		return ""
+	}
+	return dir + ".old." + strconv.Itoa(n)
+}
+
+// newestParked is the copy the last swap parked: the highest dir.old.N, as
+// a swap parks past every copy still there.
+func newestParked(dir string) string {
+	ps := parkedDirs(dir)
+	if len(ps) == 0 {
+		return ""
+	}
+	return ps[len(ps)-1]
 }
 
 // indexState is what lives inside the index directory without being built
@@ -905,16 +998,18 @@ func recoverIndexDir(dir string) {
 		return
 	}
 	if _, err := os.Stat(dir); err == nil {
-		_ = os.RemoveAll(dir + ".old")
+		_, _ = clearParked(dir)
 		recoverAppendedTail(dir)
+		recoverScrub(dir)
 		return
 	}
-	if _, err := os.Stat(dir + ".old"); err == nil {
+	if p := newestParked(dir); p != "" {
 		// The same wait: this is the crash-recovery path, and a refusal here
 		// leaves the index missing for the whole run.
-		_ = renameWaiting(dir+".old", dir, parkRenameWait)
+		_ = renameWaiting(p, dir, parkRenameWait)
 	}
 	recoverAppendedTail(dir)
+	recoverScrub(dir)
 }
 
 func writeBucket(p string, data map[string][]posting) error {

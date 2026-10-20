@@ -168,7 +168,7 @@ deja sync                       # every machine deja already knows, both ways</p
 <p>A rule can also be narrower than all imports: <code>imported:&lt;group&gt;</code> matches sessions whose project, on the machine they came from, starts with that directory. It cannot name a machine: the <code>origin</code> on each record is the sender's own name for itself, which nothing verifies, so the policy does not key on it. Receipts and <code>deja log --last</code> name the policy that allowed each injection, so what reached the model is inspectable after the fact rather than a matter of trust.</p>
 
 <h2>Keeping it current</h2>
-<p><code>deja install sync-timer</code> runs the exchange on a schedule, and <code>deja doctor</code> reports each peer with when it last synced — a peer that has quietly stopped is the failure mode worth catching, because everything keeps working and simply stops being shared.</p>
+<p><code>deja install sync-timer</code> runs the exchange on a schedule, and <code>deja doctor</code> reports each peer with when it last synced — a peer that has quietly stopped is the failure mode worth catching, because everything keeps working and simply stops being shared. The timer runs with the <code>DEJA_*</code> and <code>XDG_*</code> settings of the shell you installed it from, since the service manager does not see your shell; install it again after changing them.</p>
 
 <h2>What this is not</h2>
 <p>It is not a team feature. There is no server, no shared account and no access control beyond the SSH you already have — it moves one person's history between one person's machines. Sharing a single session with somebody else is a different job, and <a href="export-conversations.html"><code>deja share</code></a> does that one.</p>
