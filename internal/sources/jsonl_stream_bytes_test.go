@@ -10,7 +10,9 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"runtime/debug"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -117,13 +119,28 @@ func TestScanJSONLBytesHoldsALongLineByItsCut(t *testing.T) {
 	if testing.Short() {
 		t.Skip("writes a 16 MB line")
 	}
+	// Pooled buffers the parse finds gone are allocated again, by chance and
+	// not by the line: 41 and 48 MB on a loaded runner (#5461). A pool loses
+	// them to a collection, to a goroutine moving to another P, and under
+	// -race to a random drop of a quarter of all puts. So no collection and
+	// one P while it is measured, and the read buffers its own pool makes
+	// again are not counted. Left is the encoder encoding/json pools, which
+	// under -race moves either size by 3.3 MB, inside the margin.
+	var refills atomic.Uint64
+	newReader := jsonlReaders.New
+	jsonlReaders.New = func() any { refills.Add(1); return newReader() }
+	defer func() { jsonlReaders.New = newReader }()
 	parse := func(size int) uint64 {
 		p := writeLongClaudeLine(t, size)
 		var before, after runtime.MemStats
 		runtime.GC()
+		refills.Store(0)
+		gc, procs := debug.SetGCPercent(-1), runtime.GOMAXPROCS(1)
 		runtime.ReadMemStats(&before)
 		ss, err := ParseClaudeFile(p)
 		runtime.ReadMemStats(&after)
+		debug.SetGCPercent(gc)
+		runtime.GOMAXPROCS(procs)
 		if err != nil || len(ss) != 1 {
 			t.Fatalf("parse: %v, %d sessions", err, len(ss))
 		}
@@ -141,7 +158,12 @@ func TestScanJSONLBytesHoldsALongLineByItsCut(t *testing.T) {
 		if len(out) != longStringCap || !strings.HasPrefix(out, "Exit code 1\n--- FAIL: TestRetry\n") {
 			t.Errorf("tool output read as %d bytes: %.40q", len(out), out)
 		}
-		return after.TotalAlloc - before.TotalAlloc
+		// The file takes three buffers at most, so more would be the parse
+		// itself making them, which this must not take off.
+		if n := refills.Load(); n > 3 {
+			t.Errorf("a %d MB line made %d read buffers", size>>20, n)
+		}
+		return after.TotalAlloc - before.TotalAlloc - refills.Load()*jsonlBuffer
 	}
 	small, large := parse(4<<20), parse(16<<20)
 	if large > small+6<<20 {
