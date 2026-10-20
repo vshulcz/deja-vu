@@ -72,6 +72,11 @@ func String(s string) string {
 // never the word (#2897). The bigram path is what makes such a script
 // searchable, and it asks this rather than IsCJK.
 func Unspaced(r rune) bool {
+	// Below Thai there is none of either: the common case answered without
+	// the script tables, which were a fifth of a search on Latin text (#5467).
+	if r < 0x0E00 {
+		return false
+	}
 	return IsCJK(r) || IsThai(r)
 }
 

@@ -104,6 +104,30 @@ type Options struct {
 	// Now anchors relative-time phrases in the query ("a week ago"); zero
 	// means the moment of the search.
 	Now time.Time `json:"-"`
+	// Window is how many of the best-ranked sessions the caller reads; zero
+	// means all of them. Set, retrieval ranks a match much larger than that
+	// from the postings and the manifest first and reads only the sessions
+	// that can reach the page: scoring every session a common word matched
+	// took 22 s and 2.6 GB on a 40k-session store (#5467).
+	Window int `json:"-"`
+	// Unread describes the matching sessions retrieval left out under Window.
+	// Ranking needs their number and length for BM25's corpus figures, and
+	// the total needs their number.
+	Unread *Unread `json:"-"`
+}
+
+// Unread is the part of a match retrieval did not read.
+type Unread struct {
+	// Sessions is how many matching sessions were left out.
+	Sessions int
+	// Length is their estimated BM25 length, summed.
+	Length float64
+	// Sample is a handful of sessions read only to check that estimate, keyed
+	// harness:id, each with its estimated length: ranking measures their real
+	// length and scales Length by how far off the estimate was. Drawn from
+	// outside the pool, where the estimate is applied, because the pool is a
+	// biased draw — short sessions rank first.
+	Sample map[string]float64
 }
 
 const (
@@ -222,7 +246,12 @@ func MatchesQuery(text, q string) bool {
 }
 
 func MatchesParts(text string, terms, phrases []string, variants map[string][]string) bool {
-	low := Lower(text)
+	return MatchesLowered(Lower(text), terms, phrases, variants)
+}
+
+// MatchesLowered is MatchesParts for text the caller already put through
+// Lower, which is most of what the check costs on a long record.
+func MatchesLowered(low string, terms, phrases []string, variants map[string][]string) bool {
 	for _, term := range terms {
 		matched := strings.Contains(low, term)
 		for _, variant := range variants[term] {

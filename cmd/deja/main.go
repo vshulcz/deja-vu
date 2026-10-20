@@ -1755,10 +1755,19 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 		fmt.Fprintf(os.Stderr, "deja: answering from the index as it was — %v\n", ensureError(dir, err))
 	}
 	maybeFirstIndexGreeting(dir)
+	// The page is all a capped search shows, so retrieval may rank a large
+	// match from the postings first and read only what can reach it (#5467).
+	if !o.All {
+		o.Window = o.Limit
+		if o.Window <= 0 {
+			o.Window = search.DefaultLimit
+		}
+	}
 	result, err := index.SearchWithRecoveryDetailed(dir, o, os.Stderr)
 	if err != nil {
 		return fmt.Errorf("search: %w", err)
 	}
+	o.Unread = result.Unread
 	// Before ranking, not after: the cap is applied while ranking, so a rule
 	// that runs later still lets denied sessions occupy the result slots and
 	// the allowed ones never reach the page (#1060).

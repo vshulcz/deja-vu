@@ -1574,7 +1574,7 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 		}
 	}
 	live, cut := liveLineageCut(dir)
-	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: live, ExcludeUpTo: cut}
+	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: live, ExcludeUpTo: cut, Window: offset + limit}
 	cov, err := index.EnsureForSearchCoverage(dir, o, mcpProgress())
 	if err != nil {
 		return "", 0, 0, nil, nil, err
@@ -1606,6 +1606,9 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 	if err != nil {
 		return "", 0, 0, nil, nil, err
 	}
+	// Matching sessions ranking never read count toward the total all the
+	// same (#5467).
+	unread := unreadSessions(result)
 	if len(pathScope) > 0 {
 		hits = inProjectHits(hits, pathScope)
 	}
@@ -1634,6 +1637,13 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 				if result.Tier != pr.Tier {
 					rest = nil
 				}
+				// What the two runs left unread: the machine's figure covers
+				// the project's sessions too, so the larger of the two.
+				if rest == nil {
+					unread = unreadSessions(pr)
+				} else {
+					unread = max(unreadSessions(pr), unread+len(hits)-len(ph)-len(rest))
+				}
 				result, o2, policyHidden = pr, po2, phidden
 				hits = append(ph, rest...)
 			}
@@ -1657,12 +1667,14 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 	// not reject sit below the cut and never reach the agent at all. On 30
 	// matches with the 25 newest rejected, `limit 15` served 15 rejected
 	// attempts and none of the 5 clean ones.
-	total := len(hits)
+	total := len(hits) + unread
 	attachLifecycles(dir, hits)
 	twins := twinSessionsFor(dir)
 	demoted := demoteRejected(hits)
 	if offset > 0 {
-		if offset >= total {
+		// Past the read hits too: the total counts sessions ranking never
+		// read, and filters can leave fewer hits than the pool held.
+		if offset >= total || offset >= len(hits) {
 			what := "matches"
 			if result.Tier == search.TierRelevance {
 				what = "sessions ranked by wording"
@@ -2166,7 +2178,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 		}
 	}
 	live, cut := liveLineageCut(dir)
-	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: live, ExcludeUpTo: cut}
+	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: live, ExcludeUpTo: cut, Window: 1}
 	if stale, err := index.EnsureForSearchStale(dir, o, mcpProgress()); err != nil {
 		return "", 0, 0, nil, nil, "", err
 	} else if stale {
@@ -2178,6 +2190,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 	}
 	ss := withoutLiveSessions(dir, result.Sessions)
 	o.Tier = result.Tier
+	o.Unread = result.Unread
 	if result.Stemmed {
 		o.Stemmed = true
 		o.FuzzyVariants = result.Variants
@@ -2231,7 +2244,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 	}
 	var b bytes.Buffer
 	search.PrintContext(&b, whole, q)
-	text := withChanges(b.String(), whole) + contextOthersNote(len(hits))
+	text := withChanges(b.String(), whole) + contextOthersNote(len(hits)+unreadSessions(result))
 	if hits[0].Tier != search.TierExact {
 		// The words below say which one was dropped, and a session matched
 		// without it does not name what was asked either — the dropped word
@@ -2726,6 +2739,7 @@ func recallRank(dir, q string, o search.Options) (index.SearchResult, search.Opt
 	}
 	ss := withoutLiveSessions(dir, result.Sessions)
 	o.Tier = result.Tier
+	o.Unread = result.Unread
 	if result.Stemmed {
 		o.Stemmed = true
 		o.FuzzyVariants = result.Variants
@@ -2763,6 +2777,14 @@ func recallRank(dir, q string, o search.Options) (index.SearchResult, search.Opt
 	}
 	o.Semantic = semantic
 	return result, o, hits, policyHidden, nil
+}
+
+// unreadSessions is how many matching sessions retrieval left unread.
+func unreadSessions(r index.SearchResult) int {
+	if r.Unread == nil {
+		return 0
+	}
+	return r.Unread.Sessions
 }
 
 // inProjectHits keeps the hits whose session belongs to one of names.
