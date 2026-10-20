@@ -7,15 +7,25 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 )
 
 // The point of the package: several writers at once, and a reader that only
 // ever sees one of their payloads whole.
+//
+// The reader here opens the file again the moment it closes it, which is the
+// most pressure the mix check can get and more than any reader deja has. On
+// windows that grip can outlast the publish retry, and the rename is refused
+// while the file is open: three of four writers were denied on CI (#5412). A
+// refused publish leaves the old file whole, so it is counted there and not
+// failed; TestWritesLandPastAPollingReader holds the promise that a write
+// lands when the reader lets go between reads.
 func TestConcurrentWritersNeverPublishAMix(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "status.json")
@@ -31,12 +41,19 @@ func TestConcurrentWritersNeverPublishAMix(t *testing.T) {
 
 	var stop atomic.Bool
 	var wg, writers sync.WaitGroup
+	var landed, refused int64
 	for w := range payloads {
 		writers.Add(1)
 		go func(w int) {
 			defer writers.Done()
 			for i := 0; i < 500 && !stop.Load(); i++ {
-				if err := Write(path, payloads[w], 0o600); err != nil {
+				err := Write(path, payloads[w], 0o600)
+				switch {
+				case err == nil:
+					atomic.AddInt64(&landed, 1)
+				case refusedWhileOpen(err):
+					atomic.AddInt64(&refused, 1)
+				default:
 					t.Error(err)
 					return
 				}
@@ -77,6 +94,84 @@ func TestConcurrentWritersNeverPublishAMix(t *testing.T) {
 	if mixed > 0 {
 		t.Errorf("%d of %d reads saw neither payload whole", mixed, reads)
 	}
+	if landed == 0 {
+		t.Fatalf("no write landed (%d refused), so the reads only ever saw the first payload", refused)
+	}
+	if refused > 0 {
+		t.Logf("%d of %d publishes refused while the reader held the file", refused, landed+refused)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(payloads, func(p []byte) bool { return bytes.Equal(got, p) }) {
+		t.Errorf("the file ended as neither payload whole (%d bytes)", len(got))
+	}
+	leftTemps(t, dir)
+}
+
+// What deja's readers actually do: read the file and let it go, then come back.
+// Every write must land past one of those on every platform — the publish
+// retry is there for exactly this reader on windows.
+func TestWritesLandPastAPollingReader(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "status.json")
+	payloads := [][]byte{
+		bytes.Repeat([]byte("a"), 4000),
+		bytes.Repeat([]byte("b"), 4000),
+	}
+	if err := Write(path, payloads[0], 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stop atomic.Bool
+	var reads int64
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for !stop.Load() {
+			if _, err := os.ReadFile(path); err == nil {
+				atomic.AddInt64(&reads, 1)
+			}
+			// Far tighter than any surface polls the warmup status, which is
+			// the busiest of these files.
+			time.Sleep(5 * time.Millisecond)
+		}
+	}()
+	var writers sync.WaitGroup
+	for w := range payloads {
+		writers.Add(1)
+		go func(w int) {
+			defer writers.Done()
+			for range 100 {
+				if err := Write(path, payloads[w], 0o600); err != nil {
+					t.Error(err)
+					return
+				}
+			}
+		}(w)
+	}
+	writers.Wait()
+	stop.Store(true)
+	<-done
+	if reads == 0 {
+		t.Fatal("the reader never saw the file, so this proves nothing")
+	}
+	leftTemps(t, dir)
+}
+
+// refusedWhileOpen is the rename windows refuses because another handle has
+// the destination open: ERROR_ACCESS_DENIED or ERROR_SHARING_VIOLATION from the
+// rename itself. Anything else, and anything on another OS, is a real failure.
+func refusedWhileOpen(err error) bool {
+	if runtime.GOOS != "windows" {
+		return false
+	}
+	var le *os.LinkError
+	if !errors.As(err, &le) || le.Op != "rename" {
+		return false
+	}
+	var errno syscall.Errno
+	return errors.As(err, &errno) && (errno == 5 || errno == 32)
 }
 
 // Nothing is left behind on the way, and the mode is the one asked for.
