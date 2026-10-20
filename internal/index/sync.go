@@ -218,6 +218,10 @@ func exportRecordsWith(dir, outDir, peer string, full, relay bool) (int, func() 
 	// where memory actually leaves the machine, so the export shipped it to a
 	// peer that then served it as imported memory (#2654).
 	pol := policy.Load()
+	// And a store this machine excludes: set after the index was built, or
+	// holding sessions a peer sent before it was set, it went out on the next
+	// export or relay (#5435).
+	offHarnesses := sources.ExcludedHarnesses()
 	// The oldest instant held back per source. A watermark that ran past an
 	// excluded record would settle it forever: remove the pattern later and
 	// that work never syncs again, because the source resumes from a point
@@ -285,7 +289,7 @@ func exportRecordsWith(dir, outDir, peer string, full, relay bool) (int, func() 
 				origin = syncName(meta.From)
 			}
 		}
-		if (!ex.Empty() && ex.Match(project)) || pol.Ignored(meta.Path, project) {
+		if (!ex.Empty() && ex.Match(project)) || pol.Ignored(meta.Path, project) || offHarnesses[strings.ToLower(meta.Harness)] {
 			// Held, not settled, for both: a watermark that ran past a
 			// withheld record would settle it forever, so lifting the rule
 			// later would never send that work.
@@ -437,6 +441,18 @@ var lastImportSkippedSwitched int
 // ImportSkippedSwitched reports that count.
 func ImportSkippedSwitched() int { return lastImportSkippedSwitched }
 
+// lastImportSkippedHarness and lastImportSkippedIgnored hold how many records
+// the last Import dropped because this machine excludes their harness, or
+// because its ignore rule covers their project. Not entered in the ledger
+// either, so lifting the rule and importing again brings them in (#5435).
+var lastImportSkippedHarness, lastImportSkippedIgnored int
+
+// ImportSkippedHarness reports the first count.
+func ImportSkippedHarness() int { return lastImportSkippedHarness }
+
+// ImportSkippedIgnored reports the second.
+func ImportSkippedIgnored() int { return lastImportSkippedIgnored }
+
 // lastImportSkippedIncomplete holds how many records the last Import dropped
 // because they could not be attributed to a session — no harness or no
 // session_id. deja's own exports always carry both; a hand-made or foreign
@@ -567,6 +583,10 @@ func Import(dir, inDir string) (int, error) {
 	// kept (#5425).
 	offRoles := sources.SwitchedOffRoles()
 	subagentsOff := sources.SubagentsOff()
+	// So do the other two rules that keep work out of this machine's memory:
+	// a store it does not read, and a tree it does not recall from (#5435).
+	offHarnesses := sources.ExcludedHarnesses()
+	pol := policy.Load()
 	if !HasManifest(dir) {
 		if err := initEmptyIndex(dir); err != nil {
 			return 0, err
@@ -629,11 +649,15 @@ func Import(dir, inDir string) (int, error) {
 	incompleteSkipped := 0
 	excludedSkipped := 0
 	switchedSkipped := 0
+	harnessSkipped := 0
+	ignoredSkipped := 0
 	defer func() { lastImportSkippedForgotten = forgottenSkipped }()
 	defer func() { lastImportSkippedOwn = ownSkipped }()
 	defer func() { lastImportSkippedIncomplete = incompleteSkipped }()
 	defer func() { lastImportSkippedExcluded = excludedSkipped }()
 	defer func() { lastImportSkippedSwitched = switchedSkipped }()
+	defer func() { lastImportSkippedHarness = harnessSkipped }()
+	defer func() { lastImportSkippedIgnored = ignoredSkipped }()
 	for _, p := range paths {
 		// A file is imported whole or not at all, so what it contributed is
 		// remembered before it is read and rolled back if it turns out to be
@@ -775,6 +799,16 @@ func Import(dir, inDir string) (int, error) {
 			// the batch it empties does not read as an empty batch (#2666).
 			if ex.Match(sr.Project) {
 				excludedSkipped++
+				return nil
+			}
+			if offHarnesses[strings.ToLower(sr.Harness)] {
+				harnessSkipped++
+				return nil
+			}
+			// Matched as recall would see it once stored, and as the peer
+			// named it, so a glob written for the local name holds too.
+			if pol.Ignored(syncImportPath, importedProjectPrefix+sr.Project) || pol.Ignored("", sr.Project) {
+				ignoredSkipped++
 				return nil
 			}
 			spawned := spawnedKind(string(sr.Kind)) || sr.Parent != ""

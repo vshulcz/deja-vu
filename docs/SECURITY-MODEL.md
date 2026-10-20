@@ -68,9 +68,10 @@ before their source sessions have been indexed. See [compaction recovery](compac
 Privacy control files are primary data, not cache data: the XDG-aware
 `~/.config/deja/tombstones` list prevents forgotten source sessions from being
 re-ingested, and `~/.config/deja/exclude` contains project patterns skipped at
-ingest. `DEJA_EXCLUDE_PROJECTS` adds comma-separated patterns. A line in the same file prefixed `harness:` names a store instead of a project — `harness:opencode` — and deja then neither walks it nor asks for the tool that would read it; `deja doctor` and `deja sources` both report it as `excluded` rather than naming a package to install. `DEJA_EXCLUDE_HARNESSES` is the comma-separated form. A store excluded after it was indexed is not walked again on any pass; the sessions already read from it stay in the index, unserved, until `deja index --rebuild` drops them. Store names are exact, not globs: they are the forty-three `deja sources` prints. Patterns also
-apply at `sync export`, so a project excluded after the index was built does not
-leave the machine; what is already indexed stays searchable locally until
+ingest. `DEJA_EXCLUDE_PROJECTS` adds comma-separated patterns. A line in the same file prefixed `harness:` names a store instead of a project — `harness:opencode` — and deja then neither walks it nor asks for the tool that would read it; `deja doctor` and `deja sources` both report it as `excluded` rather than naming a package to install. `DEJA_EXCLUDE_HARNESSES` is the comma-separated form. A store excluded after it was indexed is not walked again on any pass; the sessions already read from it stay in the index, unserved, until `deja index --rebuild` drops them. Store names are exact, not globs: they are the forty-three `deja sources` prints. Patterns and
+excluded stores also apply at `sync export`, so a project or store excluded after
+the index was built does not leave the machine, and at `sync import`, so a peer's
+batch does not put it back; what is already indexed stays searchable locally until
 `deja index --rebuild`, and `deja index` says so when the list has changed. A full `forget`
 rebuild replaces the index atomically before the tombstone list is used by the
 next index pass.
@@ -313,8 +314,10 @@ replaces that default. A file that is missing or does not parse means the
 default policy, so recall never breaks on a bad file; `deja doctor` reports what
 is in force.
 
-The policy filters what recall serves. It does not keep anything out of the
-index; the exclude list and `deja forget` above do that.
+The policy filters what recall serves. It does not keep this machine's own
+sessions out of the index; the exclude list and `deja forget` above do that. A
+peer's records that `ignore` matches are left out at `sync import` and not sent
+at `sync export`.
 
 ## Recall output framing
 

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"unicode"
 )
 
 // A sync nobody runs is a memory that stops at whichever machine it was made
@@ -101,9 +102,57 @@ func syncAutoPlist(exe string) string {
   <key>StartInterval</key><integer>%d</integer>
   <key>RunAtLoad</key><false/>
   <key>ProcessType</key><string>Background</string>
-</dict>
+%s</dict>
 </plist>
-`, syncAutoLabel, xmlEscape(exe), syncAutoInterval)
+`, syncAutoLabel, xmlEscape(exe), syncAutoInterval, syncAutoPlistEnv())
+}
+
+// syncTimerEnv is what the timer carries from the shell that installed it:
+// the same set the hook launcher bakes in (launcherEnv). launchd and systemd
+// start the unit with their own environment, so without it a timer run synced
+// into another index, under other switches, than `deja sync` typed by hand
+// (#5436). A value holding a control character, or a name that is not a plain
+// variable name, cannot be written into either format safely and is left out.
+func syncTimerEnv() [][2]string {
+	var out [][2]string
+	for _, kv := range launcherEnv(os.Environ()) {
+		if !strings.ContainsFunc(kv[1], unicode.IsControl) && !strings.ContainsFunc(kv[0], notEnvNameRune) {
+			out = append(out, kv)
+		}
+	}
+	return out
+}
+
+// notEnvNameRune is a rune a portable variable name does not hold. A name is
+// written bare into an Environment= line, where a space or quote would split it.
+func notEnvNameRune(r rune) bool {
+	return r != '_' && (r < 'A' || r > 'Z') && (r < 'a' || r > 'z') && (r < '0' || r > '9')
+}
+
+func syncAutoPlistEnv() string {
+	env := syncTimerEnv()
+	if len(env) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("  <key>EnvironmentVariables</key>\n  <dict>\n")
+	for _, kv := range env {
+		fmt.Fprintf(&b, "    <key>%s</key><string>%s</string>\n", xmlEscape(kv[0]), xmlEscape(kv[1]))
+	}
+	b.WriteString("  </dict>\n")
+	return b.String()
+}
+
+// syncAutoServiceEnv writes Environment= lines. Specifiers are expanded there
+// and C escapes read inside quotes, but $ is not substituted, so it is the
+// one character systemdEscape doubles that must stay single here.
+func syncAutoServiceEnv() string {
+	var b strings.Builder
+	r := strings.NewReplacer("\\", "\\\\", "%", "%%", `"`, `\"`)
+	for _, kv := range syncTimerEnv() {
+		fmt.Fprintf(&b, "Environment=\"%s=%s\"\n", kv[0], r.Replace(kv[1]))
+	}
+	return b.String()
 }
 
 func syncAutoUnitDir() string {
@@ -160,8 +209,8 @@ Description=deja: exchange memory with the machines this one syncs with
 
 [Service]
 Type=oneshot
-ExecStart="%s" sync
-`, systemdEscape(exe))
+%sExecStart="%s" sync
+`, syncAutoServiceEnv(), systemdEscape(exe))
 }
 
 func syncAutoTimer() string {

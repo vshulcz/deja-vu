@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+`deja sync import` also leaves out a peer's records for a store `DEJA_EXCLUDE_HARNESSES` (or a `harness:` line) excludes and for a project the policy `ignore` rule covers, and says how many; a relay no longer sends an excluded store's sessions on (#5435). The `sync-timer` unit carries the `DEJA_*` and `XDG_*` settings of the shell it was installed from, so a timer run syncs into the same index under the same switches (#5436).
+
 A dsh turn no longer fails when recalled history contains `{{...}}`. dsh read deja's project digest and recall as prompt templates, so a past session quoting `{{cwd}}` ended every new turn with `unknown prompt variable` before the model was called; both contexts now pass `interpolate: false` and split the braces (`{ {cwd} }`), which dsh before 0.2.1-alpha.2 needs, in the npm plugin and in `deja install dsh-auto` (#5421).
 `deja sync` holds a peer's records to this machine's switches: `DEJA_INDEX_TOOL_OUTPUT=0`, `DEJA_INDEX_COMMANDS=0`, `DEJA_INDEX_PATHS=0`, `DEJA_INDEX_EDITS=0`, `DEJA_INDEX_WRITES=0` and `DEJA_INCLUDE_SUBAGENTS=0` leave the same records out of an import as out of a local read, and the import says how many (#5425).
 A session that says the search in its own words in one message is no longer buried by sessions that hold other forms of the same common words: on a 3,000-session Russian test store where every word is common, the 12 queries worded as the target said them find it in the top five 12 times, against 9 (first 10 against 8) (#5369).
