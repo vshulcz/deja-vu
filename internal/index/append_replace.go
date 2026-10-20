@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // A pass that replaces a few sessions wrote the whole store again: on 25,000
@@ -225,6 +228,12 @@ func scrubAfterSwap(dir string, offs []int64) {
 	if err != nil {
 		return
 	}
+	scrubSwapped(dir, m, offs)
+}
+
+// scrubSwapped is scrubAfterSwap for the pass that just committed m to dir,
+// which has it in hand: reading it back cost a decode of every session row.
+func scrubSwapped(dir string, m Manifest, offs []int64) {
 	log := filepath.Join(dir, "records.bin")
 	words, err := deadWords(log, tablesFromStrings(m.RecordStrings), offs)
 	if err != nil || blankDeadWords(dir, words, m.DeadRecords) != nil {
@@ -274,9 +283,46 @@ func scrubMarked(dir string) (int64, [sha256.Size]byte, error) {
 	return logFingerprint(filepath.Join(dir, "records.bin"))
 }
 
-// deadWords is the postings the records at offs in the log at path would
-// have, by bucket, for those not yet overwritten.
+// deadWords is the words the records at offs in the log at path were filed
+// under, by bucket, for those not yet overwritten. Only the words count: the
+// postings files are asked whether anything live still holds them.
+//
+// On as many cores as there are, in runs of the log: a pass that rewrote a
+// fifth of a 40,000-session store tokenized 200,000 dead records here on one,
+// 17 s of a pass the rewrite it replaced did in 63.
 func deadWords(path string, t *recordTables, offs []int64) (bucketPostings, error) {
+	workers := max(1, min(runtime.NumCPU(), (len(offs)+1023)/1024))
+	parts := make([]bucketPostings, workers)
+	errs := make([]error, workers)
+	var wg sync.WaitGroup
+	for w := range workers {
+		lo, hi := len(offs)*w/workers, len(offs)*(w+1)/workers
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			parts[w], errs[w] = deadWordsOf(path, t, offs[lo:hi])
+		}()
+	}
+	wg.Wait()
+	if err := errors.Join(errs...); err != nil {
+		return nil, err
+	}
+	words := parts[0]
+	for _, part := range parts[1:] {
+		for b, toks := range part {
+			if words[b] == nil {
+				words[b] = toks
+				continue
+			}
+			for tok := range toks {
+				words[b][tok] = nil
+			}
+		}
+	}
+	return words, nil
+}
+
+func deadWordsOf(path string, t *recordTables, offs []int64) (bucketPostings, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -284,6 +330,7 @@ func deadWords(path string, t *recordTables, offs []int64) (bucketPostings, erro
 	defer func() { _ = f.Close() }()
 	words := bucketPostings{}
 	var hdr [4]byte
+	var b []byte
 	for _, off := range offs {
 		if _, err := f.ReadAt(hdr[:], off); err != nil {
 			return nil, err
@@ -292,7 +339,10 @@ func deadWords(path string, t *recordTables, offs []int64) (bucketPostings, erro
 		if n > maxRecordSize {
 			return nil, fmt.Errorf("%w: record length %d exceeds cap", errCorruptIndex, n)
 		}
-		b := make([]byte, n)
+		if cap(b) < int(n) {
+			b = make([]byte, n)
+		}
+		b = b[:n]
 		if _, err := f.ReadAt(b, off+4); err != nil {
 			return nil, err
 		}
@@ -303,7 +353,13 @@ func deadWords(path string, t *recordTables, offs []int64) (bucketPostings, erro
 		if err != nil {
 			continue
 		}
-		addIndexKeys(words, tokenizedPart(r.Role, r.Text), off, 0, r.Time, isToolRole(r.Role))
+		eachIndexKey(tokenizedPart(r.Role, r.Text), r.Time, func(tok string) {
+			bk := bucket(tok)
+			if words[bk] == nil {
+				words[bk] = map[string][]posting{}
+			}
+			words[bk][tok] = nil
+		})
 	}
 	return words, nil
 }

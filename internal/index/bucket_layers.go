@@ -3,6 +3,7 @@ package index
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"encoding/binary"
 	"io"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"unicode/utf8"
 )
 
@@ -347,32 +349,77 @@ const maxPostingBytes = binary.MaxVarintLen64 + binary.MaxVarintLen32 + 1
 // the file without the word instead cost a whole bucket per word, and the
 // buckets of a text index are its first letter (#5429).
 func blankDeadWords(dir string, words bucketPostings, dead []int64) error {
-	for b, toks := range words {
-		base := filepath.Join(dir, "buckets", b+".bin")
-		files := append([]string{base}, bucketLayers(base)...)
-		live := map[string]bool{}
-		for _, p := range files {
-			if err := markLiveWords(p, toks, dead, live); err != nil && !os.IsNotExist(err) {
-				return err
+	names := make([]string, 0, len(words))
+	for b := range words {
+		names = append(names, b)
+	}
+	// A bucket at a time on a few workers, as addOverlays writes them: each
+	// one ends in an fsync, and one after another they were most of what a
+	// small pass spent here.
+	var (
+		wg     sync.WaitGroup
+		mu     sync.Mutex
+		failed error
+	)
+	work := make(chan string)
+	for range min(runtime.NumCPU(), 8, len(names)) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for b := range work {
+				if err := blankDeadBucketWords(filepath.Join(dir, "buckets", b+".bin"), words[b], dead); err != nil {
+					mu.Lock()
+					failed = cmp.Or(failed, err)
+					mu.Unlock()
+				}
 			}
+		}()
+	}
+	for _, b := range names {
+		work <- b
+	}
+	close(work)
+	wg.Wait()
+	return failed
+}
+
+// blankDeadBucketWords is blankDeadWords for the bucket at base and its
+// overlays.
+func blankDeadBucketWords(base string, toks map[string][]posting, dead []int64) error {
+	files := append([]string{base}, bucketLayers(base)...)
+	live := map[string]bool{}
+	// Newest first: the pass that killed these records wrote the session's
+	// new ones into the newest overlay, and a word found live in that small
+	// file is not looked up in the bucket.
+	for _, p := range slices.Backward(files) {
+		if err := markLiveWords(p, toks, dead, live); err != nil && !os.IsNotExist(err) {
+			return err
 		}
-		gone := map[string]bool{}
-		for tok := range toks {
-			if !live[tok] {
-				gone[tok] = true
-			}
+	}
+	gone := map[string]bool{}
+	for tok := range toks {
+		if !live[tok] {
+			gone[tok] = true
 		}
-		if len(gone) == 0 {
-			continue
-		}
-		for _, p := range files {
-			if err := blankWords(p, gone); err != nil && !os.IsNotExist(err) {
-				return err
-			}
+	}
+	if len(gone) == 0 {
+		return nil
+	}
+	for _, p := range files {
+		if err := blankWords(p, gone); err != nil && !os.IsNotExist(err) {
+			return err
 		}
 	}
 	return nil
 }
+
+// liveProbeBytes is how much of a word's postings is read first when asking
+// whether it is still live.
+const liveProbeBytes = 256
+
+// postingBytesProbed counts the postings bytes markLiveWords read, for the
+// test that keeps the scrub from reading a word's whole block.
+var postingBytesProbed atomic.Int64
 
 // markLiveWords sets live[tok] for each word of toks the file at p holds a
 // live posting of.
@@ -382,6 +429,7 @@ func markLiveWords(p string, toks map[string][]posting, dead []int64, live map[s
 		return err
 	}
 	defer func() { _ = f.Close() }()
+	var buf []byte
 	for _, e := range entries {
 		if _, ok := toks[e.tok]; !ok || live[e.tok] {
 			continue
@@ -390,12 +438,27 @@ func markLiveWords(p string, toks map[string][]posting, dead []int64, live map[s
 			live[e.tok] = true
 			continue
 		}
-		buf := make([]byte, e.n)
-		if _, err := f.ReadAt(buf, int64(e.off)); err != nil {
-			return err
-		}
-		if len(liveOnly(decodePostings(buf), dead)) > 0 {
-			live[e.tok] = true
+		// One live posting settles it, and a word the dead records shared
+		// with the rest of the store has one near the start of its block:
+		// reading the whole block cost a common word's postings each time.
+		n := min(int(e.n), liveProbeBytes)
+		for {
+			if cap(buf) < n {
+				buf = make([]byte, n)
+			}
+			b := buf[:n]
+			if _, err := f.ReadAt(b, int64(e.off)); err != nil {
+				return err
+			}
+			postingBytesProbed.Add(int64(n))
+			if len(liveOnly(decodePostings(b), dead)) > 0 {
+				live[e.tok] = true
+				break
+			}
+			if n == int(e.n) {
+				break
+			}
+			n = int(e.n)
 		}
 	}
 	return nil

@@ -839,6 +839,9 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 		return err
 	}
 	defer sp.cleanup()
+	// The command table's state, from the records as they are written: the
+	// first pass after the build reads only what it changed.
+	cmdState := newCommandsState()
 	err = sp.run(func(push func(tokenJob)) error {
 		for _, s := range ss {
 			key := s.Harness + ":" + s.ID
@@ -904,6 +907,9 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 				if err != nil {
 					return err
 				}
+				if msg.Role == roleCommand {
+					cmdState.add(key, tbl.intern(src), text, msg.Time, off)
+				}
 				wroteMu.Lock()
 				wrote[key] = true
 				wroteMu.Unlock()
@@ -962,6 +968,8 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 			}()
 		}
 		sidecars.Wait()
+		// After the facts, whose file it is stamped with.
+		writeCommandsState(tmp, cmdState, m)
 	}
 	reportPhase("writing index", sp.bucketCount())
 	if err := sp.writeBuckets(filepath.Join(tmp, "buckets")); err != nil {
@@ -1160,9 +1168,12 @@ func reprojectSidecars(dir string, sessions map[string]SessionMeta, keys map[str
 			writeFixTables(dir, raw)
 		}
 	}
-	buildCommandsFromIndex(dir)
-	buildCommandFailsFromIndex(dir, nil, nil)
-	buildSessionFactsFromIndex(dir)
+	// Nothing was read, so what the records say is what the states say; the
+	// tables take the new project from the rows.
+	if m, err := readManifest(dir); err == nil {
+		buildCommandTables(dir, dir, m, len(m.DeadRecords), nil)
+	}
+	buildCommandFailsFromIndex(dir, readCommandFailState(dir), nil)
 }
 
 // orphanState is what a full rebuild has to carry: sessions whose transcript
@@ -3982,6 +3993,7 @@ func wholeStoresThisPass(changed, old map[string]FileState) {
 	// is one the walk has to see.
 	passStores = resolveStorePaths()
 	passStoreHarness = new(sync.Map)
+	passSchemaDBs.Store(nil)
 	for p := range changed {
 		harness := storeHarness(p)
 		if harness == "" {
@@ -4066,8 +4078,8 @@ func resolveStoreHarness(p string) string {
 	if sources.IsHermesPGStore(p) {
 		return "hermes"
 	}
-	for h, db := range opencodeSchemaDBs {
-		if p == db() {
+	for h, db := range passSchemaDBPaths() {
+		if p == db {
 			return h
 		}
 	}
@@ -4104,6 +4116,30 @@ func passStorePaths() map[string]string {
 }
 
 var passStores map[string]string
+
+// passSchemaDBPaths is opencodeSchemaDBs resolved once a pass. Resolving
+// opencode's stats two files when XDG_DATA_HOME is set, and storeHarness asks
+// for every path it meets for the first time: on 40,000 transcripts that was
+// a second of a pass that replaced 20 of them.
+func passSchemaDBPaths() map[string]string {
+	if m := passSchemaDBs.Load(); m != nil {
+		return *m
+	}
+	m := make(map[string]string, len(opencodeSchemaDBs))
+	for h, db := range opencodeSchemaDBs {
+		m[h] = db()
+	}
+	// Only inside a pass: outside one nothing says when the stores move.
+	if passesRunning.Load() > 0 {
+		passSchemaDBs.Store(&m)
+	}
+	return m
+}
+
+var (
+	passSchemaDBs atomic.Pointer[map[string]string]
+	passesRunning atomic.Int32
+)
 
 // opencodeSchemaDBs are the databases read through OpenCode's schema, by
 // harness. A session from one names its project directory as its path, not the
@@ -4216,6 +4252,7 @@ func beginPass() {
 	passRead = nil
 	passWholeStores = nil
 	passFromWatermark = nil
+	passSchemaDBs.Store(nil)
 }
 
 // passParsed is the set of files the pass in progress re-read. Package state
@@ -4334,6 +4371,12 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	// (#1861).
 	evicted.Store(0)
 	beginPass()
+	passesRunning.Add(1)
+	defer func() {
+		if passesRunning.Add(-1) == 0 {
+			passSchemaDBs.Store(nil)
+		}
+	}()
 	old, err := readManifest(dir)
 	if err == nil && !recordsIntact(dir, old) {
 		force = true // records.bin lost its tail to a crash; only a rebuild is safe
@@ -4372,7 +4415,13 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 			}
 			// Failing to record it costs the duplicate this exists to avoid,
 			// not correctness: the pass below then treats the file as new.
-			werr := writeManifestMeta(dir, old)
+			// A rename read again is recorded by the pass that reads it, which
+			// writes the manifest anyway; one that fails leaves the rename to
+			// be found again.
+			var werr error
+			if len(regather) == 0 || len(reprojected) > 0 {
+				werr = writeManifestMeta(dir, old)
+			}
 			if werr == nil && len(reprojected) > 0 {
 				reprojectSidecars(dir, old.Sessions, reprojected)
 			}
@@ -4940,7 +4989,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 			}
 		}()
 	}
-	swap := func() error {
+	swap := func(m Manifest) error {
 		if appending && beforeAppendSwap != nil {
 			if err := beforeAppendSwap(); err != nil {
 				return err
@@ -4954,7 +5003,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		err := swapIndexDir(dir, tmp)
 		swapped = err == nil
 		if swapped && len(dead) > 0 {
-			scrubAfterSwap(dir, dead)
+			scrubSwapped(dir, m, dead)
 		}
 		return err
 	}
@@ -5142,7 +5191,11 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	gotAgain := func(r Record) bool {
 		return readAgain[seenKey(r.Key, r.Role, r.Time, r.Text)] || readAgain[seenKey(r.Key, r.Role, r.Time, exitSuffix.ReplaceAllString(r.Text, ""))]
 	}
-	if err := eachStoredRecord(filepath.Join(dir, "records.bin"), oldTables, func(oldOff int64, payload []byte) error {
+	compactedKeys := make(map[string]bool, len(compacted))
+	for key := range compacted {
+		compactedKeys[key] = true
+	}
+	carry := func(oldOff int64, payload []byte) error {
 		kill := func() {
 			if appending {
 				dead = append(dead, oldOff)
@@ -5228,7 +5281,15 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 			m.Sessions[r.Key] = meta
 		}
 		return nil
-	}); err != nil {
+	}
+	if err := carryStoredRecords(dir, old, oldTables, appending, changed, removed, carry, func(key string, offs []int64) {
+		for _, off := range offs {
+			offsets.add(key, off)
+		}
+		if _, exists := m.Sessions[key]; !exists {
+			m.Sessions[key] = old.Sessions[key]
+		}
+	}, rederive, storeKeys, takeovers, compactedKeys); err != nil {
 		_ = rw.Close()
 		return err
 	}
@@ -5392,18 +5453,18 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		return err
 	}
 	if m.SearchOnly {
-		return swap()
+		return swap(m)
 	}
 	carrySidecars(dir, tmp)
 	// After carrying, not instead of it: the fixes merge writes only when it
 	// has something to say, and the carried file is what a quiet update leaves.
-	// The command table is recomputed whole, and an empty one removes the
-	// carried file, as a full build would not write it (#4441).
+	// The command table is recomputed from the sessions this pass changed and
+	// the state the last one left, and an empty one removes the carried file,
+	// as a full build would not write it (#4441).
 	mergeFixes(dir, tmp, sessionKeys(m), replacements, replaceKeys)
-	buildCommandsFromIndex(tmp)
+	buildCommandTables(dir, tmp, m, len(old.DeadRecords), dropped)
 	buildCommandFailsFromIndex(tmp, carriedCommandFailState(dir, old, tmp, m.Generation, dropped), dropped)
-	buildSessionFactsFromIndex(tmp)
-	return swap()
+	return swap(m)
 }
 
 // carrySidecars copies the mined sidecars from the live index into the
@@ -5924,11 +5985,10 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	// this pass added can change them unless it added a command or the output of
 	// one, and most appends are speech, so ask first.
 	if carriesWork(appended) {
-		buildCommandsFromIndex(dir)
-		// From the state the last update left: only the records this pass
-		// appended are read (#4288).
+		// From the states the last update left: only the sessions this pass
+		// appended to are read (#4288).
+		buildCommandTables(dir, dir, m, len(m.DeadRecords), nil)
 		buildCommandFailsFromIndex(dir, readCommandFailState(dir), nil)
-		buildSessionFactsFromIndex(dir)
 	}
 	return filesTouched, messages, unreadable, nil
 }

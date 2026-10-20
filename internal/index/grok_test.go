@@ -55,6 +55,9 @@ func TestMain(m *testing.M) {
 	// DEJA_PASS_* carry a parent's stores into the child it spawns
 	// (cross_process_pass_test.go); DEJA492_* opt into the real-corpus test.
 	testenv.Scrub(stores, "DEJA_PASS_", "DEJA492_")
+	// Every replacing pass the suite runs checks its keyed carry against a
+	// walk of the whole log.
+	checkKeyedCarry = true
 	code := m.Run()
 	_ = os.RemoveAll(root)
 	os.Exit(code)
