@@ -781,7 +781,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 		ExcludeFingerprint: sources.ExclusionFingerprint(),
 		ToolFingerprint:    mergedToolFingerprint(priorToolFingerprint(dir))}
 	recPath := filepath.Join(tmp, "records.bin")
-	rf, err := os.OpenFile(recPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
+	rf, err := createLog(recPath)
 	if err != nil {
 		return err
 	}
@@ -1817,7 +1817,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 		ToolFingerprint:    mergedToolFingerprint(priorToolFingerprint(dir)),
 		PartialOf:          imp.partialOf}
 	recPath := filepath.Join(tmp, "records.bin")
-	rf, err := os.OpenFile(recPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
+	rf, err := createLog(recPath)
 	if err != nil {
 		return err
 	}
@@ -4709,11 +4709,42 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	if err := os.MkdirAll(filepath.Join(tmp, "buckets"), 0o700); err != nil {
 		return err
 	}
-	rf, err := os.OpenFile(filepath.Join(tmp, "records.bin"), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
+	// Appended to the log the old index holds, or the log written anew: see
+	// append_replace.go (#5387).
+	appending := appendsInPlace(dir, tmp, old)
+	swapped := false
+	if appending {
+		defer func() {
+			if !swapped {
+				undoAppend(dir, old.RecordsSize)
+				// Its log is a link to the live one.
+				_ = os.RemoveAll(tmp)
+			}
+		}()
+	}
+	swap := func() error {
+		if appending && beforeAppendSwap != nil {
+			if err := beforeAppendSwap(); err != nil {
+				return err
+			}
+		}
+		err := swapIndexDir(dir, tmp)
+		swapped = err == nil
+		return err
+	}
+	var rf *os.File
+	tbl := newRecordTables()
+	if appending {
+		rf, err = os.OpenFile(filepath.Join(tmp, "records.bin"), os.O_RDWR, 0o600)
+		// Ids continue where the log's records left off; clipped, so the
+		// table this pass grows is not the old manifest's backing array.
+		tbl = tablesFromStrings(slices.Clip(old.RecordStrings))
+	} else {
+		rf, err = createLog(filepath.Join(tmp, "records.bin"))
+	}
 	if err != nil {
 		return err
 	}
-	tbl := newRecordTables()
 	rw, err := newRecordWriter(rf, tbl)
 	if err != nil {
 		_ = rf.Close()
@@ -4740,6 +4771,10 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		// transcript changed (#2015). A store this pass re-read starts over,
 		// because a file rewritten clean has to be able to clear its count.
 		IngestFiles: copyIngestFiles(old.IngestFiles, reread, logTails)}
+	if appending && old.Generation != "" {
+		// Nothing moved: an offset from before still names the same record.
+		m.Generation = old.Generation
+	}
 	skipRedactions := map[string]bool{}
 	for p := range changed {
 		skipRedactions[p] = true
@@ -4762,6 +4797,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	// Every record's offset in the new log, as it is written: the table the
 	// commit would otherwise build by walking the whole log again (#5402).
 	offsets := &passOffsets{byKey: map[string][]int64{}}
+	freshKeys := map[string]bool{}
 	addRec := func(r Record) error {
 		if r.SourcePath == "" {
 			return nil
@@ -4772,6 +4808,10 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		}
 		if !ok {
 			return nil
+		}
+		if appending && !freshKeys[r.Key] {
+			freshKeys[r.Key] = true
+			tbl.fresh(r.Key)
 		}
 		off, err := rw.write(r)
 		if err != nil {
@@ -4806,7 +4846,17 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	// may have kept, has its body read.
 	oldTables := tablesFromManifest(old)
 	carried := &carriedRecords{}
-	if err := eachStoredRecord(filepath.Join(dir, "records.bin"), func(oldOff int64, payload []byte) error {
+	// Appending, a record that is not carried stays where it is and is listed
+	// as dead.
+	var dead []int64
+	var deadBytes int64
+	if err := eachStoredRecord(filepath.Join(dir, "records.bin"), oldTables, func(oldOff int64, payload []byte) error {
+		kill := func() {
+			if appending {
+				dead = append(dead, oldOff)
+				deadBytes += 4 + int64(len(payload))
+			}
+		}
 		kid, pid, rid, rest, ok := recordPrefix(payload)
 		if !ok {
 			return errShortRecord
@@ -4839,10 +4889,12 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		if removed[r.SourcePath] || (changed[r.SourcePath].Path != "" && !fromStore && !keptFromLogTail(r, logTails) && !leftItsFile(r, replaceKeys, old.Sessions[r.Key], aiderHeld) && !keptThroughCompaction(r, compacted)) || (fromStore && readWholeThisPass(r) && storeKeys[r.Key]) ||
 			(takeovers[r.Key] && isCodexHistory(r.SourcePath)) {
 			dropped[r.Key] = true
+			kill()
 			return nil
 		}
 		if r.SourcePath == "" {
 			dropped[r.Key] = true // not carried
+			kill()
 			return nil
 		}
 		if replaceKeys[r.Key] {
@@ -4850,6 +4902,14 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		}
 		meta, ok := old.Sessions[r.Key]
 		if !ok {
+			kill()
+			return nil
+		}
+		if appending {
+			offsets.add(r.Key, oldOff)
+			if _, exists := m.Sessions[r.Key]; !exists {
+				m.Sessions[r.Key] = meta
+			}
 			return nil
 		}
 		off, err := rw.writeStored(r.Key, r.SourcePath, r.Role, rest)
@@ -4947,13 +5007,23 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	if err := rw.Close(); err != nil {
 		return err
 	}
-	moved, err := carriedPostings(dir, old, carried)
-	if err != nil {
-		return err
-	}
-	mergePostings(moved, buckets)
-	if err := writeBucketsConcurrent(filepath.Join(tmp, "buckets"), moved); err != nil {
-		return err
+	if appending {
+		// The kept records' postings are the old ones, linked in; this pass's
+		// go into overlays, and the dead records' are dropped on read.
+		m.DeadRecords = mergeDead(old.DeadRecords, dead)
+		m.DeadBytes = old.DeadBytes + deadBytes
+		if err := addOverlays(filepath.Join(dir, "buckets"), filepath.Join(tmp, "buckets"), buckets, m.DeadRecords); err != nil {
+			return err
+		}
+	} else {
+		moved, err := carriedPostings(dir, old, carried)
+		if err != nil {
+			return err
+		}
+		mergePostings(moved, buckets)
+		if err := writeBucketsConcurrent(filepath.Join(tmp, "buckets"), moved); err != nil {
+			return err
+		}
 	}
 	settleCopies(&m, old.Sessions, changed, replacements)
 	setDatabaseStoreWatermarks(m.Files, m.Sessions)
@@ -4972,7 +5042,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		return err
 	}
 	if m.SearchOnly {
-		return swapIndexDir(dir, tmp)
+		return swap()
 	}
 	carrySidecars(dir, tmp)
 	// After carrying, not instead of it: the fixes merge writes only when it
@@ -4983,7 +5053,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	buildCommandsFromIndex(tmp)
 	buildCommandFailsFromIndex(tmp, carriedCommandFailState(dir, old, tmp, m.Generation, dropped), dropped)
 	buildSessionFactsFromIndex(tmp)
-	return swapIndexDir(dir, tmp)
+	return swap()
 }
 
 // carrySidecars copies the mined sidecars from the live index into the
@@ -5204,20 +5274,15 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	seenMsgs := msgSeen{}
 	// Every session this pass read, for the sidecars at the end.
 	var appended []model.Session
+	// Only what this pass adds: it goes into an overlay beside each bucket
+	// rather than into the bucket written whole again (#5387).
 	loadBucket := func(tok string) (map[string][]posting, error) {
 		b := bucket(tok)
-		if data, ok := buckets[b]; ok {
-			return data, nil
-		}
-		p := filepath.Join(dir, "buckets", b+".bin")
-		data, err := readBucket(p)
-		if os.IsNotExist(err) {
+		data, ok := buckets[b]
+		if !ok {
 			data = map[string][]posting{}
+			buckets[b] = data
 		}
-		if err != nil && !os.IsNotExist(err) {
-			return nil, err
-		}
-		buckets[b] = data
 		return data, nil
 	}
 	m := old
@@ -5461,7 +5526,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	if err := rw.Close(); err != nil {
 		return filesTouched, messages, 0, err
 	}
-	if err := writeBucketsConcurrent(filepath.Join(dir, "buckets"), buckets); err != nil {
+	if err := addOverlays(filepath.Join(dir, "buckets"), filepath.Join(dir, "buckets"), buckets, m.DeadRecords); err != nil {
 		return filesTouched, messages, 0, err
 	}
 	setDatabaseStoreWatermarks(m.Files, m.Sessions)

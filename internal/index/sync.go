@@ -1106,20 +1106,15 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 		return err
 	}
 	buckets := bucketPostings{}
+	// Only what this pass adds: it goes into an overlay beside each bucket
+	// rather than into the bucket written whole again (#5387).
 	loadBucket := func(tok string) (map[string][]posting, error) {
 		b := bucket(tok)
-		if data, ok := buckets[b]; ok {
-			return data, nil
-		}
-		p := filepath.Join(dir, "buckets", b+".bin")
-		data, err := readBucket(p)
-		if os.IsNotExist(err) {
+		data, ok := buckets[b]
+		if !ok {
 			data = map[string][]posting{}
+			buckets[b] = data
 		}
-		if err != nil && !os.IsNotExist(err) {
-			return nil, err
-		}
-		buckets[b] = data
 		return data, nil
 	}
 	keys := make([]string, 0, len(recsByKey))
@@ -1234,7 +1229,7 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 		return err
 	}
 	m.RecordStrings = tbl.strs
-	if err := writeBucketsConcurrent(filepath.Join(dir, "buckets"), buckets); err != nil {
+	if err := addOverlays(filepath.Join(dir, "buckets"), filepath.Join(dir, "buckets"), buckets, m.DeadRecords); err != nil {
 		return err
 	}
 	m.BuiltAt = time.Now()

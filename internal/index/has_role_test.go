@@ -54,7 +54,7 @@ func bigRoleStore(t *testing.T) string {
 	b.WriteString(`{"type":"user","sessionId":"a","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"why does the build fail"}}` + "\n")
 	b.WriteString(`{"type":"user","sessionId":"a","timestamp":"2026-01-02T03:04:06Z","message":{"role":"user","content":[{"type":"tool_result","content":"go build ./... failed"}]}}` + "\n")
 	filler := strings.Repeat("the pgbouncer pool timed out and the retry took another second ", 12)
-	for i := 0; i < 6000; i++ {
+	for i := 0; i < 15000; i++ {
 		fmt.Fprintf(&b, `{"type":"assistant","sessionId":"a","timestamp":"2026-01-02T03:04:07Z","message":{"role":"assistant","content":%q}}`+"\n", fmt.Sprintf("%s %d", filler, i))
 	}
 	// One record of a second role at the very end: an implementation that gives

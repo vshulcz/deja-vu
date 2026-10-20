@@ -175,7 +175,7 @@ func TestEmbedIndexEmbedsOnlyWhatARewriteChanged(t *testing.T) {
 	}
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
 	// Rewritten rather than grown: a rewind cannot be appended onto, so the
-	// pass replaces records.bin and every offset with it.
+	// pass replaces the session, and the vectors of its old records go.
 	rewound := `{"type":"user","sessionId":"a","timestamp":"2026-01-04T00:00:00Z","message":{"role":"user","content":"the scheduler story, rewritten"}}` + "\n"
 	if err := os.WriteFile(filepath.Join(root, "project", "a.jsonl"), []byte(rewound), 0o600); err != nil {
 		t.Fatal(err)
@@ -213,7 +213,9 @@ func TestAVersion1SidecarIsEmbeddedAgainAfterARewrite(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "project", "a.jsonl"), []byte(rewound), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := index.Ensure(dir, "", false, nil); err != nil {
+	// Written again whole: an ordinary pass appends the rewritten transcript
+	// and leaves the offsets a version 1 vector holds valid (#5387).
+	if err := index.Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	embedded.Store(0)

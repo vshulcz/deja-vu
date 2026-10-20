@@ -23,11 +23,12 @@ import (
 //
 // Five classes, because they are the five things that happen to a store:
 // nothing changed, a turn was appended to a transcript, a transcript appeared,
-// a transcript changed its name, a transcript was rewritten. The first four
-// must not rewrite `records.bin` —
-// that is the property the cost rests on, and it is reported per class rather
-// than assumed, since wall time on a shared runner says little and "the bytes
-// that were there are still there" says everything.
+// a transcript changed its name, a transcript was rewritten. None of them
+// may rewrite `records.bin`: a rewritten transcript's records are appended and
+// the old ones listed as dead (#5387). That is the property the cost rests on,
+// and it is reported per class rather than assumed, since wall time on a
+// shared runner says little and "the bytes that were there are still there"
+// says everything.
 
 // ingestClass is one update and what it cost.
 type ingestClass struct {
@@ -242,7 +243,7 @@ func printIngestReport(w io.Writer, r ingestReport) {
 		fmt.Fprintf(w, "%-22s %9.1fms %10.1fMB %9.1fKB %s\n",
 			c.name(), c.WallMS, c.RecordsMB, c.AddedKB, rewrote)
 	}
-	fmt.Fprintln(w, "Only a rewritten transcript should rewrite the store; the other four cost what they added.")
+	fmt.Fprintln(w, "No update should rewrite the store; each costs what it changed.")
 }
 
 // name keeps the printed column stable when a class name is empty, which only

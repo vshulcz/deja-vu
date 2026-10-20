@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -46,21 +47,71 @@ func ReadRecords(dir string) ([]OffsetRecord, error) {
 		return nil, err
 	}
 	defer func() { _ = f.Close() }()
+	w := newLogWalk(f, t, 0)
 	for {
-		off, err := f.Seek(0, io.SeekCurrent)
-		if err != nil {
-			return nil, err
-		}
-		r, err := readRecord(f, t)
+		off, payload, err := w.next()
 		if err == io.EOF {
-			break
+			return out, nil
 		}
 		if err != nil {
 			return nil, err
+		}
+		r, err := decodeRecord(payload, t)
+		if err != nil {
+			return nil, err
+		}
+		// A key the table does not name is a record a pass is still writing:
+		// not in this snapshot, and not to be embedded or sent anywhere.
+		if r.Key == "" {
+			continue
 		}
 		out = append(out, OffsetRecord{Offset: off, Record: r})
 	}
-	return out, nil
+}
+
+// logWalk reads the record log in order, handing back each live record's
+// offset and payload and passing over the dead ones unread. The payload is
+// reused by the next call.
+type logWalk struct {
+	r    *bufio.Reader
+	off  int64
+	dead deadCursor
+	buf  []byte
+}
+
+func newLogWalk(r io.Reader, t *recordTables, from int64) *logWalk {
+	return &logWalk{r: bufio.NewReaderSize(r, 1024*1024), off: from, dead: t.deadFrom(from)}
+}
+
+// next is the next live record. A clean or torn end of the log is io.EOF or
+// io.ErrUnexpectedEOF.
+func (w *logWalk) next() (int64, []byte, error) {
+	var hdr [4]byte
+	for {
+		if _, err := io.ReadFull(w.r, hdr[:]); err != nil {
+			return 0, nil, err
+		}
+		n := binary.LittleEndian.Uint32(hdr[:])
+		if n > maxRecordSize {
+			return 0, nil, fmt.Errorf("%w: record length %d exceeds cap", errCorruptIndex, n)
+		}
+		at := w.off
+		w.off += 4 + int64(n)
+		if w.dead.at(at) {
+			if _, err := w.r.Discard(int(n)); err != nil {
+				return 0, nil, err
+			}
+			continue
+		}
+		if cap(w.buf) < int(n) {
+			w.buf = make([]byte, n)
+		}
+		payload := w.buf[:n]
+		if _, err := io.ReadFull(w.r, payload); err != nil {
+			return 0, nil, err
+		}
+		return at, payload, nil
+	}
 }
 
 func Generation(dir string) (string, error) {
@@ -205,12 +256,16 @@ func eachRecordUntil(path string, t *recordTables, fn func(Record) bool) error {
 		return err
 	}
 	defer func() { _ = f.Close() }()
-	r := bufio.NewReaderSize(f, 1024*1024)
+	w := newLogWalk(f, t, 0)
 	for {
-		rec, err := readRecord(r, t)
+		_, payload, err := w.next()
 		if err == io.EOF || err == io.ErrUnexpectedEOF {
 			return nil
 		}
+		if err != nil {
+			return err
+		}
+		rec, err := decodeRecord(payload, t)
 		if err != nil {
 			return err
 		}
@@ -249,23 +304,14 @@ func eachRecordInRoles(path string, t *recordTables, want map[string]bool, fn fu
 		return err
 	}
 	defer func() { _ = f.Close() }()
-	r := bufio.NewReaderSize(f, 1024*1024)
-	var hdr [4]byte
-	buf := make([]byte, 0, 64*1024)
+	w := newLogWalk(f, t, 0)
 	for {
-		if _, err := io.ReadFull(r, hdr[:]); err != nil {
+		_, payload, err := w.next()
+		if err == io.EOF || err == io.ErrUnexpectedEOF {
 			return nil
 		}
-		size := binary.LittleEndian.Uint32(hdr[:])
-		if size > maxRecordSize {
-			return fmt.Errorf("%w: record length %d exceeds cap", errCorruptIndex, size)
-		}
-		if cap(buf) < int(size) {
-			buf = make([]byte, size)
-		}
-		payload := buf[:size]
-		if _, err := io.ReadFull(r, payload); err != nil {
-			return nil
+		if err != nil {
+			return err
 		}
 		_, role, ok := recordRoleIn(payload, t)
 		if !ok {
@@ -283,38 +329,10 @@ func eachRecordInRoles(path string, t *recordTables, want map[string]bool, fn fu
 }
 
 func eachRecord(path string, t *recordTables, fn func(Record)) error {
-	f, err := openIndexFile(path)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = f.Close() }()
-	r := bufio.NewReaderSize(f, 1024*1024)
-	for {
-		rec, err := readRecord(r, t)
-		if err == io.EOF || err == io.ErrUnexpectedEOF {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		fn(rec)
-	}
-}
-
-func readRecord(r io.Reader, t *recordTables) (Record, error) {
-	var hdr [4]byte
-	if _, err := io.ReadFull(r, hdr[:]); err != nil {
-		return Record{}, err
-	}
-	n := binary.LittleEndian.Uint32(hdr[:])
-	if n > maxRecordSize {
-		return Record{}, fmt.Errorf("%w: record length %d exceeds cap", errCorruptIndex, n)
-	}
-	b := make([]byte, n)
-	if _, err := io.ReadFull(r, b); err != nil {
-		return Record{}, err
-	}
-	return decodeRecord(b, t)
+	return eachRecordUntil(path, t, func(r Record) bool {
+		fn(r)
+		return true
+	})
 }
 
 // eachRecordForKeys walks the log decoding only records whose Key is in
@@ -337,13 +355,15 @@ func eachRecordForKeysInRoles(path string, t *recordTables, want, roles map[stri
 	if ok, err := eachRecordForKeysByOffsets(f, filepath.Dir(path), t, want, roles, fn); ok || err != nil {
 		return err
 	}
-	return walkRecordsForKeys(bufio.NewReaderSize(f, 1024*1024), t, want, roles, fn)
+	return walkRecordsForKeys(bufio.NewReaderSize(f, 1024*1024), 0, t, want, roles, fn)
 }
 
 // walkRecordsForKeys is the walk eachRecordForKeysInRoles does without a
-// table, from wherever r stands to the end of the log.
-func walkRecordsForKeys(r *bufio.Reader, t *recordTables, want, roles map[string]bool, fn func(Record)) error {
+// table, from wherever r stands, which is offset from, to the end of the log.
+func walkRecordsForKeys(r *bufio.Reader, from int64, t *recordTables, want, roles map[string]bool, fn func(Record)) error {
 	var hdr [4]byte
+	dead := t.deadFrom(from)
+	off := from
 	for {
 		if _, err := io.ReadFull(r, hdr[:]); err != nil {
 			if err == io.EOF || err == io.ErrUnexpectedEOF {
@@ -373,7 +393,9 @@ func walkRecordsForKeys(r *bufio.Reader, t *recordTables, want, roles map[string
 		if un <= 0 {
 			return errShortRecord
 		}
-		skip := !want[t.lookup(kid)]
+		at := off
+		off += 4 + int64(n)
+		skip := !want[t.lookup(kid)] || dead.at(at)
 		if !skip && roles != nil {
 			// Key, source and role lead the payload; the body after them is
 			// only read for a role the caller wants.
@@ -452,6 +474,38 @@ func recordNanos(t time.Time) int64 {
 type recordTables struct {
 	strs []string
 	id   map[string]uint64
+	// dead is the manifest's DeadRecords: records a walk of the log skips.
+	dead []int64
+}
+
+// isDead reports whether the record at off was replaced by a later pass.
+func (t *recordTables) isDead(off int64) bool {
+	if t == nil || len(t.dead) == 0 {
+		return false
+	}
+	_, ok := slices.BinarySearch(t.dead, off)
+	return ok
+}
+
+// deadFrom is a cursor over the dead records at or past off, for a walk that
+// visits the log in order.
+func (t *recordTables) deadFrom(off int64) deadCursor {
+	if t == nil || len(t.dead) == 0 {
+		return deadCursor{}
+	}
+	i, _ := slices.BinarySearch(t.dead, off)
+	return deadCursor{d: t.dead[i:]}
+}
+
+type deadCursor struct{ d []int64 }
+
+// at reports whether the record at off is dead. Offsets must be asked in
+// ascending order.
+func (c *deadCursor) at(off int64) bool {
+	for len(c.d) > 0 && c.d[0] < off {
+		c.d = c.d[1:]
+	}
+	return len(c.d) > 0 && c.d[0] == off
 }
 
 func newRecordTables() *recordTables {
@@ -466,7 +520,11 @@ func tablesFromStrings(strs []string) *recordTables {
 	return &recordTables{strs: strs}
 }
 
-func tablesFromManifest(m Manifest) *recordTables { return tablesFromStrings(m.RecordStrings) }
+func tablesFromManifest(m Manifest) *recordTables {
+	t := tablesFromStrings(m.RecordStrings)
+	t.dead = m.DeadRecords
+	return t
+}
 
 func loadRecordTables(dir string) (*recordTables, error) {
 	// Cached: this sits on the search path, and re-decoding the whole
@@ -476,6 +534,18 @@ func loadRecordTables(dir string) (*recordTables, error) {
 		return nil, err
 	}
 	return tablesFromManifest(m), nil
+}
+
+// fresh gives s an id of its own from here on, past every id the table had.
+// Records written under it resolve to nothing in a table from before, which
+// is how a reader of the previous manifest skips a tail appended for it.
+func (t *recordTables) fresh(s string) {
+	if before := len(t.strs); t.intern(s) >= uint64(before) {
+		return // new to the table: its id is past every old one already
+	}
+	id := uint64(len(t.strs))
+	t.strs = append(t.strs, s)
+	t.id[s] = id
 }
 
 // intern returns the id for s, appending it on first sight. Ids are stable:
@@ -828,13 +898,15 @@ var (
 )
 
 // recoverIndexDir finishes an interrupted swapIndexDir: if the index dir is
-// missing but its .old sibling survives, restore it.
+// missing but its .old sibling survives, restore it. A log a killed pass was
+// appending to is cut back to what the manifest committed.
 func recoverIndexDir(dir string) {
 	if dir == "" {
 		return
 	}
 	if _, err := os.Stat(dir); err == nil {
 		_ = os.RemoveAll(dir + ".old")
+		recoverAppendedTail(dir)
 		return
 	}
 	if _, err := os.Stat(dir + ".old"); err == nil {
@@ -842,6 +914,7 @@ func recoverIndexDir(dir string) {
 		// leaves the index missing for the whole run.
 		_ = renameWaiting(dir+".old", dir, parkRenameWait)
 	}
+	recoverAppendedTail(dir)
 }
 
 func writeBucket(p string, data map[string][]posting) error {
@@ -911,11 +984,13 @@ func writeBucket(p string, data map[string][]posting) error {
 		return err
 	}
 	// Rename over the live bucket: readers see the old file or the new one,
-	// never a torn write (#181).
-	return os.Rename(tmp, p)
+	// never a torn write (#181). Waiting out a reader that holds it open, as
+	// Windows refuses the rename until it lets go.
+	return renameWaiting(tmp, p, parkRenameWait)
 }
 
-func readBucket(p string) (map[string][]posting, error) {
+// readBucketFile reads one postings file whole.
+func readBucketFile(p string) (map[string][]posting, error) {
 	entries, f, err := openBucketDir(p)
 	if err != nil {
 		return nil, err
@@ -936,15 +1011,10 @@ func readBucket(p string) (map[string][]posting, error) {
 	return out, nil
 }
 
-func readBucketToken(p, tok string) ([]posting, error) {
+// readBucketFileToken reads one token's postings from one postings file.
+func readBucketFileToken(p, tok string) ([]posting, error) {
 	entries, f, err := openBucketDir(p)
 	if err != nil {
-		// A bucket that was never written means the token simply does not
-		// occur — that is "no postings", not a failure. Erroring here made
-		// the stem tier abort whole searches over an absent shard.
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
 		return nil, err
 	}
 	defer func() { _ = f.Close() }()
@@ -1254,10 +1324,13 @@ func readGob(p string, v any) error {
 type bucketReader struct {
 	dir     string
 	entries map[string][]bucketEntry
+	// layers is each bucket's overlays as first looked up.
+	layers map[string][]string
+	dead   []int64
 }
 
 func newBucketReader(dir string) *bucketReader {
-	return &bucketReader{dir: dir, entries: map[string][]bucketEntry{}}
+	return &bucketReader{dir: dir, entries: map[string][]bucketEntry{}, layers: map[string][]string{}, dead: deadRecordsOf(dir)}
 }
 
 func (b *bucketReader) postings(tok string) ([]posting, error) {
@@ -1265,21 +1338,46 @@ func (b *bucketReader) postings(tok string) ([]posting, error) {
 	if !ok {
 		return nil, nil
 	}
+	layers, cached := b.layers[p]
+	if !cached {
+		layers = bucketLayers(p)
+		b.layers[p] = layers
+	}
+	var out []posting
+	for i, f := range append([]string{p}, layers...) {
+		posts, err := b.filePostings(f, tok)
+		if err != nil {
+			// A bucket that was never written means the token does not occur
+			// — "no postings", not a failure. An overlay merged away since it
+			// was listed is in the file it was merged into.
+			if os.IsNotExist(err) {
+				if i == 0 {
+					return nil, nil
+				}
+				continue
+			}
+			return nil, err
+		}
+		out = joinPostings(out, posts)
+	}
+	return liveOnly(out, b.dead), nil
+}
+
+func (b *bucketReader) filePostings(p, tok string) ([]posting, error) {
 	entries, cached := b.entries[p]
 	if !cached {
 		e, f, err := openBucketDir(p)
 		if err != nil {
-			// A bucket that was never written means the token does not occur
-			// — "no postings", not a failure.
 			if os.IsNotExist(err) {
 				b.entries[p] = nil
-				return nil, nil
 			}
 			return nil, err
 		}
 		_ = f.Close()
 		b.entries[p] = e
 		entries = e
+	} else if entries == nil {
+		return nil, os.ErrNotExist
 	}
 	for _, e := range entries {
 		if e.tok != tok {
@@ -1339,6 +1437,9 @@ func eachRecordAt(f *os.File, offsets []int64, t *recordTables, fn func(Record))
 		}
 		b = b[:n]
 		for _, off := range offsets[i:j] {
+			if t.isDead(off) {
+				continue
+			}
 			rel := int(off - start)
 			if r, ok := decodeRecordIn(b, rel, t); ok {
 				fn(r)

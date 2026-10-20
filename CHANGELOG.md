@@ -106,6 +106,15 @@ session it keeps: they are copied as stored and keep their postings. On a
 12,000-session store a pass over 9 changed transcripts took 45 s, now 7 s
 (#5383).
 
+A pass that replaces a few sessions no longer writes the whole store again: it
+appends their records, marks the old ones dead and puts the new postings in
+small overlay files, and the log is written out again only once dead records
+are a quarter of it. On a 25,000-session store a pass over 9 rewritten
+transcripts wrote 798 MB and peaked at 2.5 GB of memory; now it writes 21 MB,
+most of it the manifest, and peaks at 310 MB. A new transcript no longer
+rewrites every postings file either: 225 MB and 2.4 GB there, now 18 MB and
+150 MB. The index is rebuilt once for the new layout (#5387).
+
 A pass that reads Codex's, TRAE's or Claude Code's history.jsonl beside other
 changes replaces only the sessions with a new prompt in it, not every session
 known from the log alone (#5403).

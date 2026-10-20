@@ -3409,7 +3409,7 @@ func postingsFor(dir, tok string) ([]posting, error) {
 	if !ok {
 		return nil, nil
 	}
-	return readBucketToken(p, tok)
+	return readBucketToken(p, tok, deadRecordsOf(dir))
 }
 
 // bucketName is every name bucket can return. A query reaches a file name
@@ -3689,7 +3689,7 @@ func intersectSubstringPostingsDetailed(dir string, bare []string) ([]posting, m
 	// and it runs whenever the words never meet as typed, which is most
 	// Russian questions (#5378).
 	if idx, err := tokenIndexCached(dir); err == nil && idx.dirs != nil {
-		if posts, variants, ok, err := substringPostingsFrom(idx.dirs, bare); ok || err != nil {
+		if posts, variants, ok, err := substringPostingsFrom(idx.dirs, bare, deadRecordsOf(dir)); ok || err != nil {
 			return posts, variants, err
 		}
 	}
@@ -3702,12 +3702,12 @@ func intersectSubstringPostingsDetailed(dir string, bare []string) ([]posting, m
 	}
 	var dirs []bucketDir
 	for _, de := range buckets {
-		if de.IsDir() || !strings.HasSuffix(de.Name(), ".bin") {
+		if de.IsDir() || !(strings.HasSuffix(de.Name(), ".bin") || isOverlay(de.Name())) {
 			continue
 		}
 		dirs = append(dirs, bucketDir{path: filepath.Join(dir, "buckets", de.Name())})
 	}
-	posts, variants, _, err := substringPostingsFrom(dirs, bare)
+	posts, variants, _, err := substringPostingsFrom(dirs, bare, deadRecordsOf(dir))
 	return posts, variants, err
 }
 
@@ -3715,7 +3715,8 @@ func intersectSubstringPostingsDetailed(dir string, bare []string) ([]posting, m
 // that contains the word. A bucket with entries is read through them, and ok
 // is false when its file is no longer the one they were read from, so the
 // caller reads the store as it is now; one without is read off disk.
-func substringPostingsFrom(dirs []bucketDir, bare []string) (_ []posting, _ map[string][]string, ok bool, _ error) {
+// An overlay is one more file of postings; the dead records' are left out.
+func substringPostingsFrom(dirs []bucketDir, bare []string, dead []int64) (_ []posting, _ map[string][]string, ok bool, _ error) {
 	perTok := make([]map[int64]posting, len(bare))
 	variants := make(map[string][]string, len(bare))
 	for i := range perTok {
@@ -3757,7 +3758,10 @@ func substringPostingsFrom(dirs []bucketDir, bare []string) (_ []posting, _ map[
 						return nil, nil, false, nil
 					}
 				}
-				variants[b] = append(variants[b], tok)
+				// Once, though an overlay can hold the token beside its bucket.
+				if !slices.Contains(variants[b], tok) {
+					variants[b] = append(variants[b], tok)
+				}
 				buf := make([]byte, e.n)
 				if _, err := f.ReadAt(buf, int64(e.off)); err != nil {
 					// The bucket directory validated but the block it points to
@@ -3797,6 +3801,7 @@ func substringPostingsFrom(dirs []bucketDir, bare []string) (_ []posting, _ map[
 		out = append(out, p)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Off < out[j].Off })
+	out = liveOnly(out, dead)
 	for token := range variants {
 		sort.Strings(variants[token])
 	}
@@ -4504,7 +4509,8 @@ func tokenCatalogDirs(dir string) (map[string]bool, []bucketDir, error) {
 	var dirs []bucketDir
 	tokens := 0
 	for _, de := range entries {
-		if de.IsDir() || !strings.HasSuffix(de.Name(), ".bin") {
+		// An overlay holds tokens too, some of them in no bucket yet.
+		if de.IsDir() || !(strings.HasSuffix(de.Name(), ".bin") || isOverlay(de.Name())) {
 			continue
 		}
 		path := filepath.Join(dir, "buckets", de.Name())

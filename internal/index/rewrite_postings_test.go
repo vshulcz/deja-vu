@@ -15,6 +15,10 @@ func postingShape(t *testing.T, dir string) map[string][2]int {
 	if err != nil {
 		t.Fatal(err)
 	}
+	m, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
 	out := map[string][2]int{}
 	for _, f := range files {
 		data, err := readBucket(f)
@@ -22,6 +26,9 @@ func postingShape(t *testing.T, dir string) map[string][2]int {
 			t.Fatal(err)
 		}
 		for tok, ps := range data {
+			if ps = liveOnly(ps, m.DeadRecords); len(ps) == 0 {
+				continue
+			}
 			var c [2]int
 			for _, p := range ps {
 				if p.Tool {

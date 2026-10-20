@@ -54,15 +54,15 @@ func TestDoctorReportsNoCoverageForASidecarSearchRefuses(t *testing.T) {
 		t.Fatal("no coverage before a rebuild, so the test measures nothing")
 	}
 
-	// A transcript rewritten under the index replaces records.bin, so no offset
-	// in the sidecar means what it did and search refuses it. Rewound rather
-	// than added: since #3500 a new transcript is appended, and an append leaves
-	// every offset where it was.
+	// A rebuild replaces records.bin, so no offset in the sidecar means what
+	// it did and search refuses it. A rebuild rather than an ordinary pass:
+	// since #3500 a new transcript is appended and since #5387 a rewritten one
+	// is too, which leaves every kept offset where it was.
 	rewound := `{"type":"user","message":{"role":"user","content":"the cache eviction wiped sessions"},"timestamp":"2026-08-03T10:00:00Z","sessionId":"aaa","cwd":"/proj"}` + "\n"
 	if err := os.WriteFile(filepath.Join(store, "a.jsonl"), []byte(rewound), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := index.Ensure(dir, "", false, nil); err != nil {
+	if err := index.Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	s, err := embed.Read(dir)

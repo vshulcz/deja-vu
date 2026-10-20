@@ -85,7 +85,7 @@ func TestReadBucketAndTokenReadAtError(t *testing.T) {
 	if _, err := readBucket(p); err == nil {
 		t.Fatal("readBucket with truncated payload returned nil error")
 	}
-	if _, err := readBucketToken(p, "talpha"); err == nil {
+	if _, err := readBucketToken(p, "talpha", nil); err == nil {
 		t.Fatal("readBucketToken with truncated payload returned nil error")
 	}
 }

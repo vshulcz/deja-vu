@@ -386,10 +386,16 @@ func carriedCommandFailState(dir string, old Manifest, tmp, generation string, r
 	if err != nil || fi.Size() < st.Size {
 		return nil
 	}
-	if fi.Size() > st.Size {
+	// What dir's manifest committed: a pass that appends shares this log
+	// with tmp, and what it appended is its own (#5387).
+	end := fi.Size()
+	if old.RecordsSize > 0 && old.RecordsSize < end {
+		end = old.RecordsSize
+	}
+	if end > st.Size {
 		// Another turn in the tail ends the session's pending run, as the
 		// walk would have; a command or an output reads the session again.
-		if _, err := eachCommandAndOutputFrom(path, old, st.Size, nil, func(r Record) { redo[r.Key] = true }, st.Acc.stop); err != nil {
+		if _, err := eachCommandAndOutputFrom(path, old, st.Size, end, nil, func(r Record) { redo[r.Key] = true }, st.Acc.stop); err != nil {
 			return nil
 		}
 	}
@@ -446,7 +452,7 @@ func commandFailsFromIndex(dir string, prior *commandFailState, redo map[string]
 				})
 			}
 		} else {
-			end, err = eachCommandAndOutputFrom(path, m, from, redo, take, st.Acc.stop)
+			end, err = eachCommandAndOutputFrom(path, m, from, 0, redo, take, st.Acc.stop)
 		}
 		if err != nil {
 			return err
@@ -490,9 +496,9 @@ func heldKeys(redo map[string]bool, m Manifest) map[string]bool {
 // their prefix, undecoded. Each record of another role is handed to stop by
 // its key alone: a full build ends a pending run on any other turn, and a walk
 // that never saw the prompt or the Read between a clean `make build` and a
-// failing log laid the log at the build (#4309). It returns where the last
-// whole record ended.
-func eachCommandAndOutputFrom(path string, m Manifest, from int64, redo map[string]bool, fn func(Record), stop func(key string)) (int64, error) {
+// failing log laid the log at the build (#4309). It stops at end, or at the
+// end of the log for 0, and returns where the last whole record ended.
+func eachCommandAndOutputFrom(path string, m Manifest, from, end int64, redo map[string]bool, fn func(Record), stop func(key string)) (int64, error) {
 	f, err := openIndexFile(path)
 	if err != nil {
 		return 0, err
@@ -506,7 +512,12 @@ func eachCommandAndOutputFrom(path string, m Manifest, from int64, redo map[stri
 		return 0, err
 	}
 	t := tablesFromManifest(m)
-	r := bufio.NewReaderSize(f, 1024*1024)
+	dead := t.deadFrom(off)
+	var src io.Reader = f
+	if end > 0 {
+		src = io.LimitReader(f, end-off)
+	}
+	r := bufio.NewReaderSize(src, 1024*1024)
 	var hdr [4]byte
 	buf := make([]byte, 0, 64*1024)
 	for {
@@ -527,6 +538,9 @@ func eachCommandAndOutputFrom(path string, m Manifest, from int64, redo map[stri
 		at := off
 		off += int64(len(hdr)) + int64(size)
 		atomic.AddInt64(&commandFailRecordsSeen, 1)
+		if dead.at(at) {
+			continue
+		}
 		key, role, ok := recordRoleIn(payload, t)
 		if !ok {
 			return off, errShortRecord

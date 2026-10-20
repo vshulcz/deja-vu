@@ -767,7 +767,10 @@ import (
 // the install's demo question the topic "pasted_content set" and were indexed
 // as terms; the rebuild unwraps the sessions it carries from records.bin too
 // (deleted, compacted away, imported), and a sync import unwraps on arrival.
-const version = 91
+// 92: a pass that replaces a few sessions appends their records and lists the
+// old ones as dead, and postings land in per-bucket overlay files, so a pass
+// writes what changed rather than the whole log and every bucket (#5387).
+const version = 92
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
@@ -782,7 +785,10 @@ const version = 91
 // "deja is rebuilding its index for this version — ask again then", and an
 // agent does not ask again (#1733 says so about the refresh case). Three of the
 // last four upgrades could have kept answering.
-const onDiskFormat = 2
+//
+// 3: dead records and postings overlay files (#5387). A reader of format 2
+// would serve the replaced records and miss the overlays.
+const onDiskFormat = 3
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message
@@ -1103,6 +1109,14 @@ type Manifest struct {
 	// A live index whose records.bin is shorter than this lost its tail to a
 	// torn write and must be treated as corrupt.
 	RecordsSize int64 `json:"records_size,omitempty"`
+	// DeadRecords are the offsets, ascending, of records a later pass
+	// replaced. A pass that replaces a few sessions appends their new records
+	// and lists the old ones here rather than writing the log again, and every
+	// walk of the log and every postings read skips them. DeadBytes is what
+	// they hold; past a quarter of the log the next replacing pass writes the
+	// log again without them (#5387).
+	DeadRecords []int64 `json:"dead_records,omitempty"`
+	DeadBytes   int64   `json:"dead_bytes,omitempty"`
 	// BucketFiles is how many postings files buckets/ held when the manifest
 	// was committed. Losing the whole directory was already caught (#946), but
 	// a partial copy or an interrupted sync leaves some files behind rather
@@ -1227,6 +1241,8 @@ type manifestCore struct {
 	ImportedRecords  map[string]bool
 	RecordStrings    []string
 	RecordsSize      int64
+	DeadRecords      []int64
+	DeadBytes        int64
 	BucketFiles      int
 	IngestHealth     map[string]HarnessIngest
 	IngestFiles      map[string]FileIngest

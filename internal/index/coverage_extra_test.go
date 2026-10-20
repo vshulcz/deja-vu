@@ -301,11 +301,11 @@ func TestBucketRecordGobAndRecoveryErrors(t *testing.T) {
 	if err := writeBucket(filepath.Join(tmp, "bucket.bin"), map[string][]posting{"tok": {{Off: 2, Sid: 1}, {Off: 2, Sid: 1}, {Off: 9, Sid: 3}}}); err != nil {
 		t.Fatal(err)
 	}
-	posts, err := readBucketToken(filepath.Join(tmp, "bucket.bin"), "tok")
+	posts, err := readBucketToken(filepath.Join(tmp, "bucket.bin"), "tok", nil)
 	if err != nil || len(posts) != 2 || posts[1].Off != 9 {
 		t.Fatalf("readBucketToken posts=%#v err=%v", posts, err)
 	}
-	if none, err := readBucketToken(filepath.Join(tmp, "bucket.bin"), "none"); err != nil || none != nil {
+	if none, err := readBucketToken(filepath.Join(tmp, "bucket.bin"), "none", nil); err != nil || none != nil {
 		t.Fatalf("missing token posts=%#v err=%v", none, err)
 	}
 	if got := decodePostings([]byte{0x80}); len(got) != 0 {
@@ -327,8 +327,8 @@ func TestBucketRecordGobAndRecoveryErrors(t *testing.T) {
 	if _, err := readRecordAt(devNull, 1, newRecordTables()); err == nil && runtime.GOOS != "windows" {
 		t.Fatal("readRecordAt bad seek returned nil")
 	}
-	if _, err := readRecord(&buf, newRecordTables()); !errors.Is(err, io.EOF) {
-		t.Fatalf("empty readRecord err=%v", err)
+	if _, _, err := newLogWalk(&buf, newRecordTables(), 0).next(); !errors.Is(err, io.EOF) {
+		t.Fatalf("empty log walk err=%v", err)
 	}
 	if _, err := decodeRecord([]byte{1, 'k'}, newRecordTables()); !IsCorrupt(err) {
 		t.Fatalf("short decode err=%v", err)

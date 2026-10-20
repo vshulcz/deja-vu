@@ -325,7 +325,7 @@ func readFrictionEntries(dir string, m Manifest, f *os.File, t *recordTables, ke
 		if from == 0 {
 			err = eachRecordForKeysInRoles(filepath.Join(dir, "records.bin"), t, plain, roles, each)
 		} else if _, err = f.Seek(from, io.SeekStart); err == nil {
-			err = walkRecordsForKeys(bufio.NewReaderSize(f, 256*1024), t, plain, roles, each)
+			err = walkRecordsForKeys(bufio.NewReaderSize(f, 256*1024), from, t, plain, roles, each)
 		}
 	}
 	for _, meta := range notes {
@@ -529,8 +529,12 @@ func carryFrictionTexts(dir, tmp string, old Manifest, changed map[string]bool) 
 	}
 	dst := filepath.Join(tmp, frictionTextsFile)
 	ft, ok := decodeFrictionTexts(b)
-	if !ok || ft.size != old.RecordsSize || !logFingerprintIs(filepath.Join(dir, "records.bin"), ft.size, ft.fp) {
-		_ = os.WriteFile(dst, b, 0o600)
+	// A prefix of the log, not the whole of it: a pass that appends its
+	// records shares dir's log, which has grown by them already (#5387).
+	if !ok || ft.size != old.RecordsSize || !logPrefixIs(filepath.Join(dir, "records.bin"), ft.size, ft.fp) {
+		// Not the committed log's. Copied, it would read as covering a log
+		// an appending pass leaves the same up to its tail, sessions it
+		// replaced included; the commit builds the file instead.
 		return
 	}
 	size, fp, err := logFingerprint(filepath.Join(tmp, "records.bin"))
@@ -558,6 +562,21 @@ func logFingerprint(path string) (int64, [sha256.Size]byte, error) {
 	}
 	fp, err := recordLogFingerprint(f, fi.Size())
 	return fi.Size(), fp, err
+}
+
+// logPrefixIs reports whether the log at path starts with size bytes whose
+// fingerprint is fp.
+func logPrefixIs(path string, size int64, fp [sha256.Size]byte) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = f.Close() }()
+	if fi, err := f.Stat(); err != nil || fi.Size() < size {
+		return false
+	}
+	got, err := recordLogFingerprint(f, size)
+	return err == nil && got == fp
 }
 
 // logFingerprintIs reports whether the log at path is size bytes whose

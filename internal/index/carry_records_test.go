@@ -36,6 +36,9 @@ func postingSnapshot(t *testing.T, dir string) map[string]string {
 	}
 	out := map[string][]string{}
 	for _, e := range entries {
+		if isOverlay(e.Name()) {
+			continue // read with its bucket
+		}
 		data, err := readBucket(filepath.Join(dir, "buckets", e.Name()))
 		if err != nil {
 			t.Fatal(err)
@@ -43,6 +46,10 @@ func postingSnapshot(t *testing.T, dir string) map[string]string {
 		for tok, posts := range data {
 			if bucket(tok)+".bin" != e.Name() {
 				t.Errorf("token %q filed in %s", tok, e.Name())
+			}
+			posts = liveOnly(posts, m.DeadRecords)
+			if len(posts) == 0 {
+				continue
 			}
 			for _, p := range posts {
 				r, err := readRecordAt(f, p.Off, tbl)
@@ -155,6 +162,10 @@ func TestReplacementPassWorkIsBoundedByTheChange(t *testing.T) {
 // still a rebuild's.
 func TestReplacementPassRekeysWhenPostingsAreShort(t *testing.T) {
 	tmp := parityEnv(t, map[string]string{"DEJA_CLAUDE_ROOT": "claude"})
+	// The pass that writes the log anew: an appending one keeps the postings
+	// files it has and reads none of them.
+	appendReplacing = false
+	defer func() { appendReplacing = true }()
 	proj := filepath.Join(tmp, "claude", "-tmp-proj")
 	for i := 0; i < 6; i++ {
 		id := fmt.Sprintf("s%d", i)

@@ -159,6 +159,9 @@ func takeSnap(t *testing.T, dir string) snap {
 			t.Fatal(err)
 		}
 		for tok, ps := range data {
+			if ps = liveOnly(ps, m.DeadRecords); len(ps) == 0 {
+				continue
+			}
 			var parts []string
 			for _, p := range ps {
 				r, ok := byOff[p.Off]

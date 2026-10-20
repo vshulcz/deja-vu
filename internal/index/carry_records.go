@@ -1,7 +1,6 @@
 package index
 
 import (
-	"bufio"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -141,35 +140,19 @@ func (rw *recordWriter) writeStored(key, path, role string, rest []byte) (int64,
 	return off, nil
 }
 
-// eachStoredRecord walks the log handing fn each record's offset and payload,
-// undecoded. The payload is reused for the next record. A torn tail ends the
-// walk the way it ends eachRecord.
-func eachStoredRecord(path string, fn func(off int64, payload []byte) error) error {
+// eachStoredRecord walks the live records of the log handing fn each one's
+// offset and payload, undecoded. The payload is reused for the next record. A
+// torn tail ends the walk the way it ends eachRecord.
+func eachStoredRecord(path string, t *recordTables, fn func(off int64, payload []byte) error) error {
 	f, err := openIndexFile(path)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = f.Close() }()
-	r := bufio.NewReaderSize(f, 1<<20)
-	var hdr [4]byte
-	buf := make([]byte, 0, 64<<10)
-	var off int64
+	w := newLogWalk(f, t, 0)
 	for {
-		if _, err := io.ReadFull(r, hdr[:]); err != nil {
-			if err == io.EOF || err == io.ErrUnexpectedEOF {
-				return nil
-			}
-			return err
-		}
-		n := binary.LittleEndian.Uint32(hdr[:])
-		if n > maxRecordSize {
-			return fmt.Errorf("%w: record length %d exceeds cap", errCorruptIndex, n)
-		}
-		if cap(buf) < int(n) {
-			buf = make([]byte, n)
-		}
-		payload := buf[:n]
-		if _, err := io.ReadFull(r, payload); err != nil {
+		off, payload, err := w.next()
+		if err != nil {
 			if err == io.EOF || err == io.ErrUnexpectedEOF {
 				return nil
 			}
@@ -178,7 +161,6 @@ func eachStoredRecord(path string, fn func(off int64, payload []byte) error) err
 		if err := fn(off, payload); err != nil {
 			return err
 		}
-		off += 4 + int64(n)
 	}
 }
 

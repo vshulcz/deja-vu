@@ -80,14 +80,14 @@ func TestAStaleSidecarIsNamedOnTheSearchPath(t *testing.T) {
 		t.Fatalf("a usable sidecar was announced: %q", quiet)
 	}
 
-	// The transcript rewritten under the index, and the offsets the vectors
-	// point at are gone. A new file would be appended since #3500, which leaves
-	// them all valid.
+	// The transcript rewritten under the index and the log written again, and
+	// the offsets the vectors point at are gone. An ordinary pass leaves them
+	// valid: a new file is appended since #3500, a rewritten one since #5387.
 	rewound := `{"type":"user","message":{"role":"user","content":"the cache eviction wiped sessions"},"timestamp":"2026-08-03T10:00:00Z","sessionId":"aaa","cwd":"/proj"}` + "\n"
 	if err := os.WriteFile(filepath.Join(store, "a.jsonl"), []byte(rewound), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := index.Ensure(dir, "", false, nil); err != nil {
+	if err := index.Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	s, err := embed.Read(dir)
