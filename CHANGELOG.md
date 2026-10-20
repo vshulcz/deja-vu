@@ -119,6 +119,11 @@ it streams, each string kept to the 1 MB a message is cut to anyway. An
 incremental pass over one went from 628 MB to 42 MB peak. Every line that is
 not one JSON object now counts as skipped; a `null` line or one with more after
 the object went uncounted (#5391).
+A Claude Code or Cherry Studio line of a hundred megabytes is streamed the
+same way, and so are the checks the incremental pass makes before it reads a
+Claude, Copilot, TRAE or Codex tail, and `deja changes`: indexing a Claude
+transcript with a 100 MB tool output went from 925 MB to 36 MB peak, 4.3 s to
+0.9 s (#5414).
 
 After a pass rewrites the index, the friction texts, the command-failure table
 and the record offset table are brought up to date from the sessions the pass

@@ -433,6 +433,11 @@ var jsonlReaders = sync.Pool{New: func() any { return bufio.NewReaderSize(nil, 1
 
 // scanJSONLBytes hands each line to the caller without copying it or building a
 // decoder for it. The slice is only valid for the duration of the call.
+//
+// A line longer than the buffer is decoded as it streams and handed on
+// re-encoded, its strings cut at longStringCap: read whole, a 100 MB tool
+// output line was held as the line, the decoded content and the joined text
+// (#5414).
 func scanJSONLBytes(path string, offset int64, fn func([]byte)) error {
 	f, err := os.Open(path)
 	if err != nil {
@@ -450,7 +455,10 @@ func scanJSONLBytes(path string, offset int64, fn func([]byte)) error {
 	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
 	r.Reset(boundedFrom(path, f, offset))
 	for {
-		line, err := r.ReadBytes('\n')
+		line, partial, err := readLineBytes(r)
+		if partial {
+			return nil
+		}
 		if trimmed := trimJSONSpace(line); len(trimmed) > 0 {
 			// A last line with no newline that does not parse is the client
 			// still writing it, not a broken line: the next pass reads it

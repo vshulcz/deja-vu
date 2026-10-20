@@ -72,9 +72,13 @@ func transcriptCWD(path string, fits func(cwd string) bool) string {
 		return ""
 	}
 	defer f.Close()
-	r := bufio.NewReader(f)
+	// A head record past the buffer is streamed, as the parse streams it: a
+	// tool output of a hundred megabytes near the top is not held (#5414).
+	r := jsonlReaders.Get().(*bufio.Reader)
+	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
+	r.Reset(f)
 	for i := 0; i < claudeCWDScanLines; i++ {
-		line, err := r.ReadBytes('\n')
+		line, _, err := readLineBytes(r)
 		if bytes.Contains(line, []byte(`"cwd"`)) {
 			var v struct {
 				CWD string `json:"cwd"`

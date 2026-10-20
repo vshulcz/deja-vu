@@ -1,0 +1,283 @@
+package sources
+
+import (
+	"bufio"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"math/rand"
+	"os"
+	"path/filepath"
+	"reflect"
+	"runtime"
+	"strings"
+	"testing"
+)
+
+// streamedBytes is what readLineBytes hands on for a line past the buffer: a
+// reader too small for the line forces the streamed path.
+func streamedBytes(t *testing.T, line string) []byte {
+	t.Helper()
+	r := bufio.NewReaderSize(strings.NewReader(line+"\n"), 16)
+	got, partial, err := readLineBytes(r)
+	if err != nil || partial {
+		t.Fatalf("%q: %v, partial %v", line, err, partial)
+	}
+	if rest, _ := r.ReadByte(); rest != 0 {
+		t.Fatalf("%q: the line was not read to its end", line)
+	}
+	return bytes.Clone(got)
+}
+
+// A line past the buffer reaches a scanJSONLBytes caller as bytes that decode
+// to what the line read whole decodes to, and a line that does not decode is
+// handed on as bytes that do not either, so its caller still counts it.
+// Strings stay under the cap here; the cut is TestScanJSONLBytesHoldsALongLineByItsCut.
+func TestStreamedBytesDecodeAsTheLineReadWhole(t *testing.T) {
+	cases := []string{
+		`{}`, `{"a":1}`, `{"a" : [1, 2.5e3, -0, true, false, null, {"b":"c"}]}`,
+		`{"s":"tab\tquote\" slash\/ back\\ \b\f\n\r <tag> & amp"}`,
+		`{"u":"\u00e9\u20ac\ud83d\ude00\u2028"}`, `{"u":"\ud83d"}`, `{"u":"\ude00"}`,
+		"{\"raw\":\"\xff\xfe ok \xe2\x82\"}", "{\"ctl\":\"a\x01b\"}", `{"bad":"\x"}`,
+		`{"n":01}`, `{"n":1e+5}`, `{"n":-1.5E-3}`, `{"n":12345678901234567890123}`,
+		`null`, `[1,2]`, `"str"`, `{"a":1}}`, `{"a":1} trailing`, `{"a":1}{"b":2}`, `{"a":1,}`,
+		`{"dup":1,"dup":2}`, `{"Type":"user","type":"assistant"}`, `{"a":[{}]}`, `{,}`,
+		// The 16-byte head of this one is a record on its own.
+		`{"a":1}` + strings.Repeat(" ", 40) + `{"b":2}`,
+	}
+	rng := rand.New(rand.NewSource(2))
+	words := []string{"a", "é", "\\", "\"", "\x00", "\xff", "{", "}", "[", "]", ":", ",", "1", "-", "e", " ", "\\u00", "\\ud83d"}
+	for i := 0; i < 3000; i++ {
+		b, _ := json.Marshal(map[string]any{"k": randValue(rng, 3)})
+		cases = append(cases, string(b))
+		mut := []byte(string(b))
+		for j := rng.Intn(3); j >= 0 && len(mut) > 0; j-- {
+			p := rng.Intn(len(mut))
+			mut = append(mut[:p], append([]byte(words[rng.Intn(len(words))]), mut[p+1:]...)...)
+		}
+		cases = append(cases, strings.ReplaceAll(string(mut), "\n", ""))
+	}
+	for _, c := range cases {
+		// A line of 16 bytes or less fits the buffer and is not streamed.
+		line := "  " + c
+		if len(line) <= 16 {
+			continue
+		}
+		want, wok, _ := decodeJSONObjectLine([]byte(line))
+		got := streamedBytes(t, line)
+		if !wok {
+			if len(trimJSONSpace([]byte(line))) > 0 && (len(trimJSONSpace(got)) == 0 || json.Valid(got)) {
+				t.Fatalf("%q does not decode, handed on as %q", c, got)
+			}
+			continue
+		}
+		m, ok, _ := decodeJSONObjectLine(got)
+		if !ok || !reflect.DeepEqual(m, want) {
+			t.Fatalf("%q:\n  whole    %#v\n  streamed %s", c, want, got)
+		}
+		// The typed decode the Claude reader does reads the same record.
+		var a, b claudeLine
+		if (json.Unmarshal([]byte(line), &a) == nil) != (json.Unmarshal(got, &b) == nil) || a.Type != b.Type || a.SessionID != b.SessionID {
+			t.Fatalf("%q: typed decode differs", c)
+		}
+	}
+}
+
+// writeLongClaudeLine writes a Claude transcript whose tool result is one
+// line of size bytes, between a question and an answer.
+func writeLongClaudeLine(t *testing.T, size int) string {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "s1.jsonl")
+	f, err := os.Create(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := bufio.NewWriter(f)
+	fmt.Fprintln(w, `{"type":"user","sessionId":"s1","timestamp":"2026-10-01T10:00:00Z","cwd":"/tmp/proj","message":{"role":"user","content":"why is the build red"}}`)
+	fmt.Fprintln(w, `{"type":"assistant","sessionId":"s1","timestamp":"2026-10-01T10:00:01Z","cwd":"/tmp/proj","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"go test ./..."}}]}}`)
+	fmt.Fprint(w, `{"type":"user","sessionId":"s1","timestamp":"2026-10-01T10:00:02Z","cwd":"/tmp/proj","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","is_error":true,"content":"Exit code 1\n`)
+	chunk := strings.Repeat("--- FAIL: TestRetry\\n", 1<<12)
+	for n := 0; n < size; n += len(chunk) {
+		fmt.Fprint(w, chunk)
+	}
+	fmt.Fprintln(w, `"}]}}`)
+	fmt.Fprintln(w, `{"type":"assistant","sessionId":"s1","timestamp":"2026-10-01T10:00:03Z","cwd":"/tmp/proj","message":{"role":"assistant","content":[{"type":"text","text":"the retry test times out"}]}}`)
+	if err := w.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	_ = f.Close()
+	return p
+}
+
+// A Claude tool output line far past the buffer is read in memory bounded by
+// the cap, not the line, and the turns around it read as before (#5414). A
+// line four times as long costs about the same: read whole, each extra
+// megabyte of line was a few more allocated.
+func TestScanJSONLBytesHoldsALongLineByItsCut(t *testing.T) {
+	if testing.Short() {
+		t.Skip("writes a 16 MB line")
+	}
+	parse := func(size int) uint64 {
+		p := writeLongClaudeLine(t, size)
+		var before, after runtime.MemStats
+		runtime.GC()
+		runtime.ReadMemStats(&before)
+		ss, err := ParseClaudeFile(p)
+		runtime.ReadMemStats(&after)
+		if err != nil || len(ss) != 1 {
+			t.Fatalf("parse: %v, %d sessions", err, len(ss))
+		}
+		var roles []string
+		var out string
+		for _, m := range ss[0].Messages {
+			roles = append(roles, m.Role)
+			if m.Role == RoleToolOutput {
+				out = m.Text
+			}
+		}
+		if want := "user,command,tool-output,assistant"; strings.Join(roles, ",") != want {
+			t.Errorf("roles = %s, want %s", strings.Join(roles, ","), want)
+		}
+		if len(out) != longStringCap || !strings.HasPrefix(out, "Exit code 1\n--- FAIL: TestRetry\n") {
+			t.Errorf("tool output read as %d bytes: %.40q", len(out), out)
+		}
+		return after.TotalAlloc - before.TotalAlloc
+	}
+	small, large := parse(4<<20), parse(16<<20)
+	if large > small+6<<20 {
+		t.Errorf("a 4 MB line allocated %d MB and a 16 MB one %d MB", small>>20, large>>20)
+	}
+}
+
+// A long last line with no newline that does not decode yet is left for the
+// next pass, not counted, as a short one is (#4276); one that does decode is
+// read.
+func TestScanJSONLBytesLeavesALongPartialLastLine(t *testing.T) {
+	big := strings.Repeat("z", jsonlBuffer+10)
+	for name, tc := range map[string]struct {
+		body string
+		want int
+	}{
+		"partial":  {`{"a":1}` + "\n" + `{"x":"` + big, 1},
+		"complete": {`{"a":1}` + "\n" + `{"x":"` + big + `"}`, 2},
+		"broken":   {`{"a":1}` + "\n" + `{"x":"` + big + `"` + "\n" + `{"b":2}` + "\n", 3},
+	} {
+		p := filepath.Join(t.TempDir(), "s.jsonl")
+		if err := os.WriteFile(p, []byte(tc.body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		n := 0
+		if err := scanJSONLBytes(p, 0, func([]byte) { n++ }); err != nil {
+			t.Fatal(err)
+		}
+		if n != tc.want {
+			t.Errorf("%s: handed on %d lines, want %d", name, n, tc.want)
+		}
+	}
+}
+
+// lineMatch finds what bytes.Contains finds in the whole line, however the
+// line is cut into pieces.
+func TestLineMatchFindsAWordAcrossPieces(t *testing.T) {
+	rng := rand.New(rand.NewSource(3))
+	pat := []byte(`"response_item"`)
+	for i := 0; i < 5000; i++ {
+		line := make([]byte, rng.Intn(80))
+		for j := range line {
+			line[j] = `"response_itm`[rng.Intn(13)]
+		}
+		if rng.Intn(3) == 0 {
+			at := rng.Intn(len(line) + 1)
+			line = append(line[:at], append(append([]byte(nil), pat...), line[at:]...)...)
+		}
+		m := lineMatch{pat: pat}
+		for rest := line; len(rest) > 0; {
+			n := 1 + rng.Intn(len(rest))
+			m.feed(rest[:n])
+			rest = rest[n:]
+		}
+		if want := bytes.Contains(line, pat); m.seen != want {
+			t.Fatalf("%q: seen %v, want %v", line, m.seen, want)
+		}
+	}
+}
+
+// codexRoledBefore finds a roled response_item on a line far past its
+// buffer, a word cut at the buffer's edge included, and not two words on two
+// lines.
+func TestCodexRoledBeforeReadsALongLineInPieces(t *testing.T) {
+	// `{"pad":"` and `","type":` put the word 17 bytes past the padding; the
+	// middle two cut it at the 64 KB buffer's edge.
+	for _, pad := range []int{0, 64*1024 - 17 - 5, 64*1024 - 17 - 14, 3 << 20} {
+		line := `{"pad":"` + strings.Repeat("x", pad) + `","type":"response_item","payload":{"role":"user"}}` + "\n"
+		p := filepath.Join(t.TempDir(), "rollout.jsonl")
+		if err := os.WriteFile(p, []byte(line), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if !codexRoledBefore(p, int64(len(line))) {
+			t.Errorf("pad %d: roled response_item not found", pad)
+		}
+		apart := `{"type":"response_item","payload":{"output":"` + strings.Repeat("x", pad) + `"}}` + "\n" + `{"type":"event_msg","payload":{"role":"user"}}` + "\n"
+		if err := os.WriteFile(p, []byte(apart), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if codexRoledBefore(p, int64(len(apart))) {
+			t.Errorf("pad %d: two words on two lines matched", pad)
+		}
+	}
+}
+
+// The session a file was filed under is read back past a long line without
+// holding it: the line is streamed from its start once that is found, so a
+// line four times as long costs about the same (#5414).
+func TestLastClaudeKeyBeforeStreamsALongLine(t *testing.T) {
+	if testing.Short() {
+		t.Skip("writes a 16 MB line")
+	}
+	// readBack reads back from the end of the long line, and from its
+	// middle, where the line is not whole yet and names nothing.
+	readBack := func(size int) (alloc uint64) {
+		p := writeLongClaudeLine(t, size)
+		body, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		last := int64(bytes.LastIndexByte(body[:len(body)-1], '\n') + 1)
+		body = nil
+		for _, end := range []int64{last, last - int64(size/2)} {
+			var before, after runtime.MemStats
+			runtime.GC()
+			runtime.ReadMemStats(&before)
+			key, found := lastClaudeKeyBefore(p, end)
+			runtime.ReadMemStats(&after)
+			if key != "s1" || !found {
+				t.Errorf("%d MB line, end %d: key %q found %v", size>>20, end, key, found)
+			}
+			alloc = max(alloc, after.TotalAlloc-before.TotalAlloc)
+		}
+		return alloc
+	}
+	small, large := readBack(4<<20), readBack(16<<20)
+	if large > small+6<<20 {
+		t.Errorf("reading back past a 4 MB line allocated %d MB and past a 16 MB one %d MB", small>>20, large>>20)
+	}
+	// A long line in the middle of a chunk boundary run: every short line
+	// is still read, and the result matches a read of the joined bytes.
+	short := filepath.Join(t.TempDir(), "s2.jsonl")
+	lines := []string{
+		`{"type":"user","sessionId":"a","message":{"role":"user","content":"q"}}`,
+		`{"type":"user","sessionId":"b","message":{"role":"user","content":"` + strings.Repeat("y", jsonlBuffer+70<<10) + `"}}`,
+		`{"type":"summary","leafUuid":"x"}`,
+	}
+	if err := os.WriteFile(short, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	full := int64(len(strings.Join(lines, "\n")) + 1)
+	if key, found := lastClaudeKeyBefore(short, full); key != "b" || !found {
+		t.Errorf("past a summary: key %q found %v, want b", key, found)
+	}
+	first := int64(len(lines[0]) + 1)
+	if key, found := lastClaudeKeyBefore(short, first); key != "a" || !found {
+		t.Errorf("before the long line: key %q found %v, want a", key, found)
+	}
+}
