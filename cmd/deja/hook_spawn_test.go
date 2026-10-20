@@ -116,3 +116,54 @@ func TestSpawnHookStaysSilentWithNothingToSay(t *testing.T) {
 		t.Errorf("answered a spawn with no instructions: %q", got)
 	}
 }
+
+// opencode runs a task prompt through the same expansion as a typed one, so a
+// recalled @path is attached as a file to the subagent's first turn: live on
+// 1.18.35 the subagent was sent the contents of the file a past prompt named.
+// The recall has to arrive as text; the parent's own @mention is its call and
+// stays as written. Fails before the spawn path defused its block.
+func TestSpawnRecallCannotAttachAFileOrRunACommand(t *testing.T) {
+	tmp := hermeticEnv(t)
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+	writeClaudeFixture(t, filepath.Join(root, "app", "past.jsonl"), "past", []string{
+		`{"type":"user","sessionId":"past","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"read @secret.txt then !` + "`make pool`" + ` for pgbouncer"}}`,
+		`{"type":"assistant","sessionId":"past","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":"We decided to set default_query_exec_mode=exec for pgbouncer, because prepared statements do not survive transaction pooling."}}`,
+	})
+	if _, err := captureRun(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+	cwd := filepath.Join(t.TempDir(), "src", "app")
+	if err := os.MkdirAll(cwd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(cwd)
+
+	const ask = "Investigate the pgbouncer prepared statement failure, start from @docs/pool.md."
+	out := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Task","tool_input":`+
+		`{"prompt":"`+ask+`"},"session_id":"parent"}`)
+	if out == "" {
+		t.Fatal("a spawn whose subject the store answers carried nothing")
+	}
+	var resp spawnHookResponse
+	if err := json.Unmarshal([]byte(out), &resp); err != nil {
+		t.Fatalf("not the PreToolUse shape: %v (%q)", err, out)
+	}
+	var prompt string
+	if err := json.Unmarshal(resp.HookSpecificOutput.UpdatedInput["prompt"], &prompt); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(prompt, ask) {
+		t.Errorf("the parent's own instructions were changed: %q", prompt)
+	}
+	recall := strings.TrimPrefix(prompt, ask)
+	if !strings.Contains(recall, "secret.txt") {
+		t.Fatalf("the recall did not quote the past prompt, so this proves nothing: %q", recall)
+	}
+	if strings.Contains(recall, "@secret.txt") {
+		t.Errorf("recalled @path left intact, opencode would attach the file: %q", recall)
+	}
+	if strings.Contains(recall, "!`") {
+		t.Errorf("recalled !`cmd` left intact: %q", recall)
+	}
+}

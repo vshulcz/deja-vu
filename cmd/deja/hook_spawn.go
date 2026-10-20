@@ -69,6 +69,10 @@ func runHookSpawn(dir string, input toolHookInput, raw []byte, stdout io.Writer)
 	if block == "" {
 		return nil
 	}
+	// opencode and kilo run a task prompt through the same expansion as a typed
+	// one, so a recalled @path would attach that file to the subagent's turn.
+	// Only the recall is defused; the parent's own instructions stay as written.
+	block = defuseHostTriggers(block)
 	extended, err := json.Marshal(text + "\n\n" + block)
 	if err != nil {
 		return nil
