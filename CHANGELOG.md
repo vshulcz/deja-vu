@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-10-21
+
+Big stores are cheap to keep up to date. A pass that replaces a few sessions
+appends their records instead of writing the whole log again and reads only
+what changed: on a 40,000-session store 20 rewritten transcripts take 1.7 s
+instead of 24 s, and peak memory drops from 7 GB to under 1 GB. A search for a
+word most sessions hold answers in about a second instead of 24. Text taken
+out of a transcript leaves the index on the next pass. For busy machines there
+are `DEJA_NO_AUTO_INDEX` and `DEJA_SEARCH_ONLY`, and `deja index` exits 3 on a
+partial run. Sub-agents are sessions of their own in every reader that marks
+one, forks no longer take credit for what they copied, and recalled history
+can no longer run a command in opencode or end a dsh turn. The index is rebuilt
+once on upgrade.
+
 A search for a word most sessions hold no longer reads all of them to show a page. Past 1,000 matches it ranks them first from the postings and the manifest, then reads the 1,000 that can reach the page and 200 more that check its length estimate; the total still counts every match, and `--all` scores every one as before. On a 40,000-session store a word in every session takes 1.1 s and 370 MB instead of 24 s and 2.6 GB, and MCP `recall` 2.5 s instead of 30 s (#5467).
 
 The first index pass after a full build that rewrites, deletes or renames transcripts no longer reads the whole record log for the command-failure table: on a 40,000-session store, 20 rewritten transcripts take 4.0 s instead of 21 s, and the build leaves the table's state for that pass to start from (#5465). Renaming a transcript that shares its session with another file reads the session again only when the rename moves it past another of its files; 20 renames on the same store take 3.2 s instead of 20 s (#5466).
@@ -177,8 +191,7 @@ clamped to 3 s. After a `kimi -p` run the session is no longer hidden from
 the next session's recall for 20 minutes. In the light theme on a 256-colour
 terminal, key chips no longer melt into their panel.
 ё and е are one letter in the index and in queries, so «ещё» finds a session
-that says «еще» and the other way round. The index format moves to version 90,
-so the first run rebuilds it.
+that says «еще» and the other way round.
 
 Semantic search works with models trained with instruction prefixes, such as
 multilingual E5: `DEJA_EMBED_QUERY_PREFIX` and `DEJA_EMBED_PASSAGE_PREFIX` are
