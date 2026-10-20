@@ -379,13 +379,16 @@ jobs:
         with:
           go-version: '1.26.x'
           cache: false
-      # Read from the run's jobs rather than from what the shards uploaded:
-      # artifacts belong to the run, not the attempt, so after a re-run a
-      # shard that failed would still have the first attempt's files.
-      # filter=latest is each job's newest attempt.
+      # `needs: test-shard` is the source of truth: it is every shard's result
+      # for this attempt, carried over for shards a re-run did not touch. The
+      # run's jobs API is only asked which OS a failure belongs to. Asking it
+      # first read shards that had finished minutes earlier as `queued`, and
+      # after a re-run of just the gates it had no rows for them at all, so
+      # the gates went red over green shards (#5416).
       - name: Every shard passed
         env:
           GH_TOKEN: ${{ github.token }}
+          SHARDS: ${{ needs.test-shard.result }}
         shell: bash
         run: |
           set -euo pipefail
@@ -394,14 +397,38 @@ jobs:
             echo "::error::no shards were planned for $OS"
             exit 1
           fi
-          got=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?filter=latest&per_page=100" \
-            --jq '.jobs[] | "\(.name)\t\(.conclusion // .status)"')
+          if [ "$SHARDS" = success ]; then
+            echo "every shard passed"
+            exit 0
+          fi
+          if [ "$SHARDS" != failure ]; then
+            echo "::error::test-shard: $SHARDS"
+            exit 1
+          fi
+          # A shard failed somewhere; find out whether it was one of this OS's.
+          # Every shard has finished by now, so a row that is not `completed`
+          # is the API lagging: wait for it rather than call it a failure.
+          # filter=all with the newest attempt per name, because filter=latest
+          # drops the jobs a partial re-run did not repeat.
+          for _ in $(seq 1 30); do
+            got=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?filter=all&per_page=100" \
+              --jq '.jobs[] | [.name, .run_attempt, .status, (.conclusion // "")] | @tsv' |
+              sort -t$'\t' -k2,2n |
+              awk -F'\t' '{ row[$1] = $3 "\t" $4 } END { for (n in row) print n "\t" row[n] }')
+            pending=0
+            while IFS= read -r name; do
+              st=$(awk -F'\t' -v n="$name" '$1 == n { print $2 }' <<<"$got")
+              if [ "$st" != completed ]; then pending=1; fi
+            done <<<"$want"
+            [ "$pending" = 0 ] && break
+            sleep 10
+          done
           fail=0
           while IFS= read -r name; do
-            c=$(awk -F'\t' -v n="$name" '$1 == n { print $2 }' <<<"$got" | tail -1)
-            echo "$name: ${c:-missing}"
-            if [ "$c" != success ]; then
-              echo "::error::$name: ${c:-missing}"
+            row=$(awk -F'\t' -v n="$name" '$1 == n { print $2 "/" $3 }' <<<"$got")
+            echo "$name: ${row:-missing}"
+            if [ "$row" != completed/success ]; then
+              echo "::error::$name: ${row:-missing}"
               fail=1
             fi
           done <<<"$want"
