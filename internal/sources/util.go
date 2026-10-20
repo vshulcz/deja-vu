@@ -197,6 +197,9 @@ func textFromContentKind(v any) (string, bool) {
 		}
 		if typ == "tool_result" {
 			sawTool = true
+			if !IndexToolOutput() {
+				continue
+			}
 		} else if txt != "" {
 			sawSpeech = true
 		}

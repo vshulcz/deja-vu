@@ -186,6 +186,9 @@ func captureCompactionFrom(dir string, input precompactHookInput, read func(work
 		failure("workspace_mismatch")
 		return index.CompactionState{}, false
 	}
+	// Each capture reads its store beside the registry; what a parse switch
+	// keeps out of the index stays out of the packet too.
+	transcript.Session = sources.ParseSwitched(transcript.Session)
 	// A host that saves the message deja answered with its recall in it
 	// (CodeWhale's message_submit, Amp's agent.start) keeps the person's words
 	// in front of the block; the block alone would make the turn noise.

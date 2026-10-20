@@ -18,6 +18,8 @@ type Harness struct {
 	Load  func() []model.Session // full cold load of every session
 	Files func() []string        // current on-disk files to consider for indexing
 	Kinds []FileKind             // one or more on-disk file shapes to match+parse
+	// switched marks a Load the read switches wrap.
+	switched bool
 }
 
 // FileKind is one on-disk file shape belonging to a harness. A harness can have
@@ -43,6 +45,8 @@ type FileKind struct {
 	// is part of the file state and a change re-reads the session (#4319,
 	// #4446). nil when the transcript holds it all.
 	Sidecar func(path string) (size, stamp int64)
+	// switched marks a Parse and ParseFrom the read switches wrap.
+	switched bool
 }
 
 func sinceTime(nano int64) time.Time { return time.Unix(0, nano) }

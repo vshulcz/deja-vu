@@ -344,6 +344,9 @@ func claudeTextKind(raw json.RawMessage) (string, bool) {
 		}
 		if part.Type == "tool_result" {
 			sawToolResult = true
+			if !IndexToolOutput() {
+				continue
+			}
 		} else if chunk != "" {
 			sawSpeech = true
 		}

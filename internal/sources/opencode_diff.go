@@ -242,7 +242,9 @@ func ParseOpencodeDiffSessions(paths []string) ([]model.Session, error) {
 		out = append(out, ss...)
 		ids = ids[n:]
 	}
-	return withOpencodeDiffsFor(out), nil
+	// Read beside the registry, so the switches its kinds apply are applied
+	// here too.
+	return applyReadSwitches(withOpencodeDiffsFor(out)), nil
 }
 
 // parseOpencodeStore and parseOpencodeStoreSince are the database kind's

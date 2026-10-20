@@ -184,6 +184,14 @@ the store back.
 followed the error, and `deja how` and `deja restore` name `DEJA_INDEX_COMMANDS=0`
 or `DEJA_INDEX_EDITS=0` when those kept their data out. The commands guide lists
 what each `DEJA_INDEX_*` switch leaves out and what stops working (#5395).
+`DEJA_INDEX_TOOL_OUTPUT=0` now leaves tool output out of Claude Code, Cherry
+Studio, Crush, goose, Grok, pi and Command Code sessions too, and
+`DEJA_INDEX_COMMANDS=0` leaves commands out of goose and Copilot agent
+transcripts. Every `DEJA_INDEX_*` switch is applied to what each reader
+returns and to the context a compaction capture keeps, so a new reader gets
+them without testing them itself; opencode sessions re-read for their diffs
+get them and `DEJA_INCLUDE_SUBAGENTS` too. If you run with either switch, run
+`deja index --rebuild` once to drop what was indexed before (#5413).
 
 ## [0.22.2] - 2026-10-17
 
