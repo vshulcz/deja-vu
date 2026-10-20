@@ -294,15 +294,27 @@ func (a *commandFailAcc) table(project func(key string) (string, bool)) []Comman
 }
 
 // buildCommandFails mines the failures out of the sessions a full build holds.
-func buildCommandFails(tmp string, ss []model.Session) {
+// With a generation it also leaves the walk's state for the log in tmp, so the
+// first update after the build starts from it. Without one the first replacing
+// pass walked the whole log again: 15 of 21 s for 20 sessions of a 40,000
+// session store (#5465). ss must already be redacted as the records are.
+func buildCommandFails(tmp, generation string, ss []model.Session) {
 	acc := newCommandFailAcc()
 	projects := map[string]string{}
+	// What the record log holds, as the build writes it: a turn another file
+	// of the session already gave is written once, and a blank one not at all.
+	// The walk an update starts from reads the log, so the state has to agree
+	// with it.
+	seen := msgSeen{}
 	for _, s := range ss {
 		key := s.Harness + ":" + s.ID
 		if _, ok := projects[key]; !ok {
 			projects[key] = s.Project
 		}
 		for _, m := range s.Messages {
+			if seen.dup(key, m.Role, m.Time, m.Text) || strings.TrimSpace(m.Text) == "" {
+				continue
+			}
 			switch m.Role {
 			case roleCommand:
 				acc.command(key, m.Text)
@@ -318,6 +330,21 @@ func buildCommandFails(tmp string, ss []model.Session) {
 		p, ok := projects[key]
 		return p, ok
 	}))
+	if generation == "" {
+		return
+	}
+	fi, err := os.Stat(filepath.Join(tmp, "records.bin"))
+	if err != nil {
+		return
+	}
+	// As the walk leaves it: a session with nothing on file reads the same as
+	// one never seen.
+	for key, s := range acc.Sessions {
+		if len(s.Fails) == 0 && s.Pending == "" {
+			delete(acc.Sessions, key)
+		}
+	}
+	_ = writeGobAtomic(commandFailStatePath(tmp), &commandFailState{Version: commandFailStateVersion, Generation: generation, Size: fi.Size(), Acc: *acc})
 }
 
 // buildCommandFailsFromIndex is the same from the records an index already

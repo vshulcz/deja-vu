@@ -118,3 +118,19 @@ func settleCopies(m *Manifest, old map[string]SessionMeta, reread map[string]Fil
 		}
 	}
 }
+
+// renameReorders reports whether the renames in renamed (new path to old)
+// put files, a session's files under their new names, in another order than
+// they had under the old ones.
+func renameReorders(files []string, renamed map[string]string) bool {
+	now := slices.Clone(files)
+	slices.Sort(now)
+	before := make([]string, len(now))
+	for i, p := range now {
+		before[i] = p
+		if op, ok := renamed[p]; ok {
+			before[i] = op
+		}
+	}
+	return !slices.IsSorted(before)
+}

@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The first index pass after a full build that rewrites, deletes or renames transcripts no longer reads the whole record log for the command-failure table: on a 40,000-session store, 20 rewritten transcripts take 4.0 s instead of 21 s, and the build leaves the table's state for that pass to start from (#5465). Renaming a transcript that shares its session with another file reads the session again only when the rename moves it past another of its files; 20 renames on the same store take 3.2 s instead of 20 s (#5466).
 `deja --re` anchors `^` and `$` at each line, as grep does. They anchored the whole message, so `^panic:` missed a panic printed after any other tool output (#5448).
 `deja embed` no longer sends a whole Cursor, Continue or Cline session again each time it grows. Those harnesses date unstamped turns from the file's modification time, and the vector identity held the time; it now holds only the session, role and text, so a session grown by one exchange embeds 2 records instead of every one. A version 2 sidecar is rekeyed on the next run without embedding again (#4976).
 

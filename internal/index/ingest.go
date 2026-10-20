@@ -951,7 +951,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 			func() { buildCooccur(tmp, ss) },
 			func() { buildFixes(tmp, ss, func(s model.Session) string { return s.Harness + ":" + s.ID }) },
 			func() { buildCommands(tmp, ss) },
-			func() { buildCommandFails(tmp, ss) },
+			func() { buildCommandFails(tmp, m.Generation, ss) },
 			func() { buildSessionFacts(tmp, ss) },
 		} {
 			sidecars.Add(1)
@@ -2043,7 +2043,8 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 		reportAdvance(1)
 		buildCommands(tmp, ss)
 		reportAdvance(1)
-		buildCommandFails(tmp, ss)
+		// No state: ss may hold text the records were redacted from.
+		buildCommandFails(tmp, "", ss)
 		reportAdvance(1)
 		buildSessionFacts(tmp, ss)
 		reportAdvance(1)
@@ -4350,17 +4351,23 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	// store holding twenty-one copies of it and twenty dead rows, with search
 	// answering once and nothing on any screen saying so (#3546).
 	// A renamed file another transcript shares a session with is read again
-	// with its copies: the row's owner is the smallest path, and a rename
-	// can move it either way. Followed by name alone, the row kept the moved
-	// file as its owner where a rebuild hands it to a copy.
+	// with its copies when the rename moves it past another of the session's
+	// files: the row's owner is the smallest path, and a rebuild reads them in
+	// path order. Followed by name alone, the row kept the moved file as its
+	// owner where a rebuild hands it to a copy. A rename that keeps the order
+	// changes nothing a rebuild would, and reading the session again sent it
+	// down the replacing path: 20 s for 20 renames at 40,000 sessions (#5466).
 	var regather []string
 	if err == nil && !force {
 		if pairs := detectRenamedFiles(old.Files, files); len(pairs) > 0 {
 			reprojected := applyRenamedFiles(&old, pairs)
 			heldBy := keysByFile(old.Sessions)
 			for np := range pairs {
-				if len(heldBy[np]) > 0 {
-					regather = append(regather, np)
+				for _, key := range heldBy[np] {
+					if renameReorders(sessionFiles(old.Sessions[key]), pairs) {
+						regather = append(regather, np)
+						break
+					}
 				}
 			}
 			// Failing to record it costs the duplicate this exists to avoid,
