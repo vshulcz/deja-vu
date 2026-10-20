@@ -270,9 +270,12 @@ func searchDetailedRead(dir string, o query.Options) (SearchResult, error) {
 	// agent's own live session, which holds them because the question came
 	// from it — the answer is still the rest of the ladder, not nothing. The
 	// early return here served empty to 23 of 255 real recall calls (#4766).
+	holding := len(posts)
 	posts = cutPostingsBySession(posts, m, o)
 	var ss []model.Session
+	var unread *query.Unread
 	if len(posts) > 0 {
+		posts, unread = poolPostings(posts, m, o, holding)
 		// With the variants the rung above collected, not without them. A
 		// substring variant needs none — the text holding "opencode" holds
 		// "code" too — but a compound spelled apart is not a substring of
@@ -309,7 +312,7 @@ func searchDetailedRead(dir string, o query.Options) (SearchResult, error) {
 	if err != nil {
 		return SearchResult{}, err
 	}
-	return withRelevanceTail(ranking, dir, m, o, SearchResult{Sessions: ss, Tier: fallbackTier, Variants: fallbackVariants})
+	return withRelevanceTail(ranking, dir, m, o, SearchResult{Sessions: ss, Tier: fallbackTier, Variants: fallbackVariants, Unread: unread})
 }
 
 // sessionKeySet keys sessions the way StrictIDs is keyed, for the paths that
@@ -3386,6 +3389,79 @@ func cutPostingsBySession(posts []posting, m Manifest, o query.Options) []postin
 		return nil
 	}
 	return capPostingsPerSession(out, perSessionCandidates)
+}
+
+// poolPostings keeps the postings of the sessions worth ranking in full when
+// the caller reads only a window of the answer. A word in most of a store
+// matched 40k sessions, and reading and scoring every one of them to show 15
+// took 22 s and 2.6 GB (#5467). The pool is chosen from the postings and the
+// manifest alone; the rest is described in the Unread it returns.
+//
+// Not for a search inside one session or one role: those score a part of each
+// session the postings cannot see.
+//
+// holding is how many postings matched, which on the exact tier is how many
+// records of the store hold the query.
+func poolPostings(posts []posting, m Manifest, o query.Options, holding int) ([]posting, *query.Unread) {
+	if o.Window <= 0 || o.Session != "" || o.Role != "" {
+		return posts, nil
+	}
+	n := search.PoolSize(o.Window)
+	records := map[uint32]int{}
+	for _, p := range posts {
+		records[p.Sid]++
+	}
+	if len(records) <= n {
+		return posts, nil
+	}
+	metaByOrd := sessionMetaByOrd(m)
+	// What the ignore rule withholds is dropped here rather than after the
+	// scan, so the unread count does not include it.
+	pol, excluded := policy.Load(), sources.ExcludedHarnesses()
+	sids := make([]uint32, 0, len(records))
+	for sid := range records {
+		meta := metaByOrd[sid]
+		if excluded[strings.ToLower(meta.Harness)] || pol.Ignored(meta.Path, meta.Project) {
+			continue
+		}
+		sids = append(sids, sid)
+	}
+	if len(sids) <= n {
+		return posts, nil
+	}
+	sort.Slice(sids, func(i, j int) bool { return sids[i] < sids[j] })
+	stored := 0
+	for _, meta := range m.Sessions {
+		stored += meta.Counted
+	}
+	share := 0.0
+	if stored > 0 {
+		share = min(float64(holding)/float64(stored), 1)
+	}
+	cands := make([]search.PoolCandidate, len(sids))
+	for i, sid := range sids {
+		meta := metaByOrd[sid]
+		s := sessionFromMeta(meta)
+		s.Held = meta.Counted
+		cands[i] = search.PoolCandidate{Session: s, Records: records[sid]}
+	}
+	keep, unread := search.Pool(cands, o, n, share)
+	if keep == nil {
+		return posts, nil
+	}
+	kept := make(map[uint32]bool, n)
+	for i, sid := range sids {
+		if keep[i] {
+			kept[sid] = true
+		}
+	}
+	out := make([]posting, 0, len(posts))
+	for _, p := range posts {
+		if kept[p.Sid] {
+			out = append(out, p)
+		}
+	}
+	return out, &unread
 }
 
 // perSessionCandidates bounds how many matching messages of one session are

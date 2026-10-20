@@ -162,7 +162,7 @@ type bm25Document struct {
 // a parts match first, then either a whole-query substring count for a single
 // bare token or a per-token count, plus any quoted phrases.
 func countIn(text, low string, qtoks, phrases []string, variants map[string][]string) int {
-	if !MatchesParts(text, qtoks, phrases, variants) {
+	if !query.MatchesLowered(low, qtoks, phrases, variants) {
 		return 0
 	}
 	if len(qtoks) == 1 && len(phrases) == 0 && variants == nil {
@@ -234,6 +234,10 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 	df := make([]int, len(qtoks))
 	corpusDocuments := 0
 	corpusLength := 0
+	// The sessions read to check the estimate retrieval counted the unread
+	// ones at, measured apart.
+	sampleDF := make([]int, len(qtoks))
+	sampleDocuments, sampleLength, sampleEstimate := 0, 0, 0.0
 	for _, s := range merged {
 		if o.Harness != "" && s.Harness != o.Harness {
 			continue
@@ -429,14 +433,47 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 		}
 		corpusDocuments++
 		corpusLength += doc.length
+		var sampled bool
+		if o.Unread != nil {
+			var est float64
+			est, sampled = o.Unread.Sample[doc.hit.Session.Harness+":"+doc.hit.Session.ID]
+			if sampled {
+				sampleDocuments++
+				sampleLength += doc.length
+				sampleEstimate += est
+			}
+		}
 		for i, n := range doc.termCount {
 			if n > 0 {
 				df[i]++
+				if sampled {
+					sampleDF[i]++
+				}
 			}
 		}
 		if doc.hit.Count > 0 {
 			documents = append(documents, doc)
 		}
+	}
+	// The sessions retrieval did not read still belong to the corpus: their
+	// count and length are what BM25's figures are made of, and leaving them
+	// out would score the pool as if it were the whole match. Their length is
+	// an estimate, scaled by how far the same estimate was off on the sample
+	// read alongside the pool.
+	if u := o.Unread; u != nil && u.Sessions > 0 && corpusDocuments > 0 {
+		scale := 1.0
+		share := func(i int) float64 { return float64(df[i]) / float64(corpusDocuments) }
+		if sampleDocuments > 0 {
+			if sampleEstimate > 0 {
+				scale = float64(sampleLength) / sampleEstimate
+			}
+			share = func(i int) float64 { return float64(sampleDF[i]) / float64(sampleDocuments) }
+		}
+		corpusLength += int(u.Length * scale)
+		for i := range df {
+			df[i] += int(math.Round(share(i) * float64(u.Sessions)))
+		}
+		corpusDocuments += u.Sessions
 	}
 	avgLength := 0.0
 	if corpusDocuments > 0 {
@@ -523,9 +560,19 @@ func RunDetailedKeeping(ss []model.Session, o Options, keep func([]Hit) []Hit) (
 	}
 	r := Results{Hits: hits, Total: len(hits), Tier: setTier(o)}
 	r.Hits, r.Capped = CapHits(hits, o.Limit, o.All)
+	// The unread sessions matched as well. They are counted before the trust
+	// policy reads the pool, so a rule withholding some of them is not
+	// subtracted from the total.
+	if o.Unread != nil && o.Unread.Sessions > 0 {
+		r.Total += o.Unread.Sessions
+		r.Capped = true
+	}
 	renderSnippets(r.Hits, o, -1)
 	return r, nil
 }
+
+// DefaultLimit is how many hits a search shows when no flag says.
+const DefaultLimit = 15
 
 // CapHits bounds what a search hands back, with the default a reader gets when
 // they pass no flag. It lives here rather than inside RunDetailed because the
@@ -534,7 +581,7 @@ func RunDetailedKeeping(ss []model.Session, o Options, keep func([]Hit) []Hit) (
 // sessions for `--limit 3`, and fifty for no flag at all (#3345).
 func CapHits(hits []Hit, limit int, all bool) ([]Hit, bool) {
 	if limit == 0 && !all {
-		limit = 15
+		limit = DefaultLimit
 	}
 	if limit > 0 && len(hits) > limit {
 		return hits[:limit], true

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/query"
 )
 
 // version 12 resharded non-ASCII tokens across buckets; 13 interned the key
@@ -1353,6 +1354,9 @@ type SearchResult struct {
 	// it that choice was made by counting terms, one each, and the two disagreed
 	// exactly when one rare word carried the session. Empty on every other tier.
 	TermIDF map[string]float64 `json:",omitempty"`
+	// Unread is set when Options.Window let the exact tier read only the
+	// sessions that can reach the page. The caller hands it to ranking.
+	Unread *query.Unread `json:",omitempty"`
 }
 
 // IsStrict says whether this session holds every word of the query rather
