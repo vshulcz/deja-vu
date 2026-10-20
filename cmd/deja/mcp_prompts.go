@@ -78,9 +78,9 @@ func mcpPromptGet(dir string, params json.RawMessage) (any, int, string) {
 // @path would ship an arbitrary file to the model. The recall is reference
 // text about a past session, not an instruction to this host, so a space goes
 // in to keep the token inert — !`x` stays legible as "! `x`" and the model
-// still reads every word. @ is split only at a token boundary, where a host
-// treats it as a mention, so an address like a@b in the middle of a word is
-// left alone.
+// still reads every word. @ is split unless a word character precedes it:
+// opencode attached x,@path as readily as a bare @path, while an address like
+// a@b is no mention and is left alone.
 func defuseHostTriggers(s string) string {
 	r := []rune(s)
 	var b strings.Builder
@@ -94,7 +94,7 @@ func defuseHostTriggers(s string) string {
 		switch {
 		case c == '!' && n == '`':
 			b.WriteByte(' ')
-		case c == '@' && !unicode.IsSpace(n) && (i == 0 || unicode.IsSpace(r[i-1])):
+		case c == '@' && !unicode.IsSpace(n) && (i == 0 || !isWordRune(r[i-1])):
 			b.WriteByte(' ')
 		}
 	}
@@ -105,4 +105,8 @@ func defuseHostTriggers(s string) string {
 // escape the user's own punctuation.
 func quoted(s string) string {
 	return "\"" + s + "\""
+}
+
+func isWordRune(c rune) bool {
+	return c == '_' || unicode.IsLetter(c) || unicode.IsDigit(c)
 }
