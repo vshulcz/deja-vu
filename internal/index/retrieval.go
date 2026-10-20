@@ -414,12 +414,55 @@ func withRelevanceTail(once *relevanceOnce, dir string, m Manifest, o query.Opti
 	// of places, not an unconditional lead. A strict session the ranking scored
 	// badly can now be passed by a relevance session it scored well.
 	unranked := len(rel.Sessions)
+	// A strict session the pool never scored sat behind all of it, so ten
+	// places could not bring it near the page however well its message
+	// answered: on a store where every query word is common, the pool fills
+	// with sessions holding some form of each word in one message, and the one
+	// that said the query in its own words ranked 41st (#5369). It is placed
+	// instead by how many pool sessions say the query, in the words it was
+	// asked in, at least as well as its best message does, without the strict
+	// lead on top: placed ten ahead of that, an incidental strict session
+	// passed answers the pool had ranked first. Never lower than before. Not
+	// for a long query, which is ranked by its sessions
+	// rather than their best message, nor for a head whose AND dropped a word.
+	byMsg := map[string]int{}
+	var outside []model.Session
+	if !isLongQuery(RelevanceTermsWithTime(o.Query, o.Now)) && !droppedAWord(res.Variants) {
+		for _, s := range ss {
+			if _, ok := relRank[s.Harness+":"+s.ID]; !ok {
+				outside = append(outside, s)
+			}
+		}
+	}
+	if len(outside) > 0 {
+		mt := newMessageTerms(RelevanceTermsWithTime(o.Query, o.Now), rel.TermIDF, true)
+		pool := make([]float64, len(rel.Sessions))
+		parallelForRanked(len(pool), func(i int) { pool[i] = mt.best(rel.Sessions[i]) })
+		for _, s := range outside {
+			sc, r := mt.best(s), 0
+			if sc <= 0 {
+				continue
+			}
+			for _, p := range pool {
+				if p >= sc {
+					r++
+				}
+			}
+			byMsg[s.Harness+":"+s.ID] = r
+		}
+	}
+	// Doubled, so a session placed by its message sits just behind the pool
+	// session it ties with rather than ahead of it.
 	place := func(s model.Session, strict bool) int {
-		r, ok := relRank[s.Harness+":"+s.ID]
+		key := s.Harness + ":" + s.ID
+		r, ok := relRank[key]
 		if !ok {
+			if m, ok := byMsg[key]; ok {
+				return min(2*m+1, 2*fusedPlace(unranked, true))
+			}
 			r = unranked
 		}
-		return fusedPlace(r, strict)
+		return 2 * fusedPlace(r, strict)
 	}
 	merged := append([]model.Session(nil), ss...)
 	added := 0
@@ -5536,57 +5579,151 @@ var rerankWorkers = defaultRerankWorkers
 
 func defaultRerankWorkers() int { return runtime.NumCPU() }
 
-func rerankByBestMessage(ss []model.Session, terms []string, idf map[string]float64) []model.Session {
-	forms := make([][]string, len(terms))
-	wanted := map[string]bool{}
+// messageTerms is each term with the forms a message may hold it in, every
+// one of those forms, and the term each form stands for.
+type messageTerms struct {
+	terms  []string
+	forms  [][]string
+	wanted map[string]bool
+	of     map[string]int
+	idf    map[string]float64
+}
+
+// newMessageTerms takes each term in its word forms, or with exact as asked.
+func newMessageTerms(terms []string, idf map[string]float64, exact bool) messageTerms {
+	mt := messageTerms{terms: terms, forms: make([][]string, len(terms)), wanted: map[string]bool{}, of: map[string]int{}, idf: idf}
 	for i, t := range terms {
 		t = query.Lower(t)
-		forms[i] = append([]string{t}, stemMatchForms(t)...)
-		for _, f := range forms[i] {
-			wanted[f] = true
+		mt.forms[i] = []string{t}
+		if !exact {
+			mt.forms[i] = append(mt.forms[i], stemMatchForms(t)...)
+		}
+		for _, f := range mt.forms[i] {
+			mt.wanted[f] = true
+			if _, ok := mt.of[f]; !ok {
+				mt.of[f] = i
+			}
 		}
 	}
+	return mt
+}
+
+// proximityWeight is what a message gains for holding every term close
+// together: up to this much more when they sit side by side, less as the
+// words between them spread them apart. On a 3,000-session store where every
+// word is common it took a query's target from 10th to 5th, and from the second
+// page to the first for one worded as the target said it (#5369).
+const proximityWeight = 1.0
+
+// best is the score of s's best message: the idf of each term it holds, half
+// again in a user turn, more when the terms sit together, and a tool record
+// at toolMatchWeight.
+func (mt messageTerms) best(s model.Session) float64 {
+	msgs := s.Messages
+	if len(msgs) > bestMessageTurns {
+		msgs = msgs[:bestMessageTurns]
+	}
+	best := 0.0
+	for _, msg := range msgs {
+		toks := tokenHits(msg.Text, mt.wanted)
+		score := 0.0
+		held := 0
+		for ti, t := range mt.terms {
+			hit := false
+			for _, f := range mt.forms[ti] {
+				if toks[f] {
+					hit = true
+					break
+				}
+			}
+			if hit {
+				held++
+				w := mt.idf[query.Lower(t)]
+				if w <= 0 {
+					w = 1
+				}
+				score += w
+				if msg.Role == "user" {
+					score += 0.5 * w
+				}
+			}
+		}
+		if held > 1 && held == len(mt.terms) {
+			if w := mt.window(msg.Text); w > 0 {
+				score *= 1 + proximityWeight*float64(held)/float64(w)
+			}
+		}
+		if isToolRole(msg.Role) {
+			score *= toolMatchWeight
+		}
+		if score > best {
+			best = score
+		}
+	}
+	return best
+}
+
+// window is the fewest words of text that hold a form of every term, or 0
+// when one is missing. Words are cut as tokenHits cuts them.
+func (mt messageTerms) window(text string) int {
+	var at []int // the term each word is a form of, -1 for any other word
+	var buf [tokenHitCap]byte
+	n := 0
+	flush := func() {
+		if n >= 2 {
+			i, ok := mt.of[string(buf[:n])]
+			if !ok {
+				i = -1
+			}
+			at = append(at, i)
+		}
+		n = 0
+	}
+	for _, r := range query.Lower(nfcfold.Compose(text)) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-' || (n > 0 && isMark(r)) {
+			n += utf8.EncodeRune(buf[n:], r)
+			if n > 64 {
+				flush()
+			}
+		} else {
+			flush()
+		}
+	}
+	flush()
+	count := make([]int, len(mt.forms))
+	have, best, lo := 0, 0, 0
+	for hi, t := range at {
+		if t < 0 {
+			continue
+		}
+		if count[t] == 0 {
+			have++
+		}
+		count[t]++
+		for have == len(mt.forms) {
+			if w := hi - lo + 1; best == 0 || w < best {
+				best = w
+			}
+			if l := at[lo]; l >= 0 {
+				count[l]--
+				if count[l] == 0 {
+					have--
+				}
+			}
+			lo++
+		}
+	}
+	return best
+}
+
+func rerankByBestMessage(ss []model.Session, terms []string, idf map[string]float64) []model.Session {
+	mt := newMessageTerms(terms, idf, false)
 	best := make([]float64, len(ss))
 	// Per session and independent, and lowercasing every message of every
 	// ranked session is where a recall answer spends its time: 1.6 s of 2.4 s
 	// on a real store, profiled. Spread across cores; each session's score is
 	// computed exactly as before, so the ranking is unchanged.
-	parallelForRanked(len(ss), func(i int) {
-		s := ss[i]
-		msgs := s.Messages
-		if len(msgs) > bestMessageTurns {
-			msgs = msgs[:bestMessageTurns]
-		}
-		for _, msg := range msgs {
-			toks := tokenHits(msg.Text, wanted)
-			score := 0.0
-			for ti, t := range terms {
-				hit := false
-				for _, f := range forms[ti] {
-					if toks[f] {
-						hit = true
-						break
-					}
-				}
-				if hit {
-					w := idf[query.Lower(t)]
-					if w <= 0 {
-						w = 1
-					}
-					score += w
-					if msg.Role == "user" {
-						score += 0.5 * w
-					}
-				}
-			}
-			if isToolRole(msg.Role) {
-				score *= toolMatchWeight
-			}
-			if score > best[i] {
-				best[i] = score
-			}
-		}
-	})
+	parallelForRanked(len(ss), func(i int) { best[i] = mt.best(ss[i]) })
 	// Fuse rather than replace: the pool's own order is session-level IDF
 	// overlap, which wins on a small haystack; the best-message score wins on
 	// a large pile. Reciprocal rank fusion keeps both votes.
