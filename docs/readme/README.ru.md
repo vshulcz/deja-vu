@@ -15,7 +15,7 @@ deja индексирует всё, на месяцы назад, и отдаё�
 
 <p align="center"><sub><em>Никто ничего не искал — агент вызвал deja сам. Два настоящих прогона, настоящая модель, настоящие вызовы инструментов, на синтетическом корпусе: ничья история не публикуется.</em></sub></p>
 
-<p align="center"><b>deja полна с первой минуты: история, которую 42 агент уже записал, индекс за несколько секунд, без модели и без отдельного шага сбора.</b></p>
+<p align="center"><b>deja полна с первой минуты: история, которую 43 агент уже записал, индекс за несколько секунд, без модели и без отдельного шага сбора.</b></p>
 
 <table align="center">
 <tr>
@@ -222,7 +222,7 @@ Grok Build · Hermes · Goose · Qwen Code · Kimi Code · pi · omp (Oh My Pi) 
 Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Roo Code ·
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
 Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·
-TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · Zed.
+TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · Zed.
 
 Что именно каждый из них поддерживает — MCP-recall, авто-recall, skills, команды, resume, handoff — см. в
 [матрице возможностей в английском README](../../README.md#supported-harnesses). Нестандартные пути к хранилищам

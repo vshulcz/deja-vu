@@ -14,7 +14,7 @@
 
 <p align="center"><sub><em>没有人去搜索——是智能体自己调用了 deja。两次真实运行，真实模型、真实工具调用，跑在合成语料上：不会公开任何人的历史。</em></sub></p>
 
-<p align="center"><b>deja 一开始就是满的：四十二个智能体早已写下的历史，几秒建好索引，不需要模型，也不需要额外的采集步骤。</b></p>
+<p align="center"><b>deja 一开始就是满的：四十三个智能体早已写下的历史，几秒建好索引，不需要模型，也不需要额外的采集步骤。</b></p>
 
 <table align="center">
 <tr>
@@ -114,7 +114,7 @@ skill 调用的是上面装好的 `deja` 二进制，自己不带。
 
 ## 能得到什么
 
-**在 Codex 里解决，Claude 记得。** 四十二个编程智能体把每一次对话都写进本地文件，
+**在 Codex 里解决，Claude 记得。** 四十三个编程智能体把每一次对话都写进本地文件，
 deja 把这些文件变成一层它们都能读的记忆。
 
 | | |
@@ -200,7 +200,7 @@ Grok Build · Hermes · Goose · Qwen Code · Kimi Code · pi · omp (Oh My Pi) 
 Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Roo Code ·
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
 Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·
-TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · Zed。
+TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · Zed。
 
 每个工具分别支持 MCP 召回、自动召回、技能、命令、resume 和 handoff 中的哪些，见
 [英文 README 的能力矩阵](../../README.md#supported-harnesses)。自定义存储位置通过 `DEJA_*_ROOT`

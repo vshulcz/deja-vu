@@ -35,7 +35,7 @@ the place to discuss design.
 ## Next
 
 - **Compaction recovery on the last hosts.** The packet after a compaction now
-  reaches 34 of the 42 harnesses: from the transcript a hook is handed where the
+  reaches 34 of the 43 harnesses: from the transcript a hook is handed where the
   host offers one, and elsewhere from the turns the store keeps before the
   summary, delivered on the next hook that reaches the model. Devin CLI is next,
   once its `sessions.db` catch-up has a capture to ride. aider, Continue, Kiro,
@@ -51,7 +51,7 @@ the place to discuss design.
   recording what a recall was for, not only that it happened — would let reuse be
   both stronger and precise without lifting an off-topic session.
 - **Point-of-action in the harnesses that still refuse it.** The file's prior
-  decision before an edit reaches 31 of the 42 harnesses and the repair beside a
+  decision before an edit reaches 31 of the 43 harnesses and the repair beside a
   failed command 30. Where a host drops what a hook returns — Kimi, Kiro, goose,
   CodeWhale, Antigravity, Junie — the line is parked and arrives with the next
   hook that reaches the model, a step late. What is left is the hosts with no

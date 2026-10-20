@@ -154,3 +154,4 @@ https://vshulcz.github.io/deja-vu/registry/jetbrains.html
 https://vshulcz.github.io/deja-vu/registry/junie.html
 https://vshulcz.github.io/deja-vu/registry/devin.html
 https://vshulcz.github.io/deja-vu/registry/windsurf.html
+https://vshulcz.github.io/deja-vu/registry/mcode.html

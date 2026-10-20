@@ -7,12 +7,12 @@
 
 <p align="center"><strong>Your coding agents stop re-debugging what you already fixed.</strong></p>
 
-**deja starts full**: the history 42 agents already wrote, with no model and no capture step. It
+**deja starts full**: the history 43 agents already wrote, with no model and no capture step. It
 indexes the sessions your coding agents already wrote to disk — months of
 history from before you installed it — and serves them back over MCP, in
 whichever agent asks.
 
-Forty-two coding agents write every conversation to local files, among them
+Forty-three coding agents write every conversation to local files, among them
 Claude Code, Codex, Cursor, opencode, Gemini CLI, Cline, Copilot CLI, VS Code
 Copilot Chat, Roo Code, Kilo Code, aider, Goose, Qwen Code, Kimi Code,
 Antigravity, Grok Build, OpenClaw, pi, omp, DeepSeek Harness, Hermes, Kiro,

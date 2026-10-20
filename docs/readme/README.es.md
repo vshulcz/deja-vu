@@ -15,7 +15,7 @@ al agente que está trabajando ahora.</p>
 
 <p align="center"><sub><em>Nadie buscó nada: el agente llamó a deja por su cuenta. Dos ejecuciones reales, modelo real, llamadas a herramientas reales, sobre un corpus sintético: no se publica el historial de nadie.</em></sub></p>
 
-<p align="center"><b>deja está llena desde el primer minuto: el historial que 42 agentes ya escribieron, indexado en segundos, sin modelo y sin un paso aparte de captura.</b></p>
+<p align="center"><b>deja está llena desde el primer minuto: el historial que 43 agentes ya escribieron, indexado en segundos, sin modelo y sin un paso aparte de captura.</b></p>
 
 <table align="center">
 <tr>
@@ -225,7 +225,7 @@ Grok Build · Hermes · Goose · Qwen Code · Kimi Code · pi · omp (Oh My Pi) 
 Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Roo Code ·
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
 Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·
-TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · Zed.
+TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · Zed.
 
 Qué soporta cada uno —recall por MCP, recall automático, skills, comandos, resume, handoff— está en la
 [matriz de capacidades del README en inglés](../../README.md#supported-harnesses). Las rutas de almacenamiento

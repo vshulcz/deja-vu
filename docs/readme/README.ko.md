@@ -14,7 +14,7 @@ deja는 몇 달 전 기록까지 전부 색인하고, 지금 일하는 에이전
 
 <p align="center"><sub><em>아무도 검색하지 않았습니다. 에이전트가 스스로 deja를 호출했습니다. 실제 모델과 실제 도구 호출로 진행한 두 번의 실제 실행이며, 합성 코퍼스 위에서 돌렸기 때문에 누구의 기록도 공개되지 않습니다.</em></sub></p>
 
-<p align="center"><b>deja는 처음부터 가득 차 있습니다. 42개 에이전트가 이미 남긴 기록, 몇 초 만에 끝나는 색인, 모델도 별도의 수집 단계도 없습니다.</b></p>
+<p align="center"><b>deja는 처음부터 가득 차 있습니다. 43개 에이전트가 이미 남긴 기록, 몇 초 만에 끝나는 색인, 모델도 별도의 수집 단계도 없습니다.</b></p>
 
 <table align="center">
 <tr>
@@ -217,7 +217,7 @@ Grok Build · Hermes · Goose · Qwen Code · Kimi Code · pi · omp (Oh My Pi) 
 Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Roo Code ·
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
 Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·
-TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · Zed.
+TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · Zed.
 
 각 도구가 MCP 회상, 자동 회상, skill, 명령, resume, handoff 중 무엇을 지원하는지는
 [영문 README의 기능 표](../../README.md#supported-harnesses)에 있습니다. 저장 위치를 바꿨다면 `DEJA_*_ROOT`

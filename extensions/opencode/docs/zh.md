@@ -2,7 +2,7 @@
 
 [English](../README.md) | 中文
 
-opencode 记得自己的会话。这个插件回答的是另一个问题：你在这台机器上 Claude Code、Codex、Cursor、Gemini、Zed 等其他四十一个编程智能体里做过什么，包括你安装任何东西之前的那几个月。
+opencode 记得自己的会话。这个插件回答的是另一个问题：你在这台机器上 Claude Code、Codex、Cursor、Gemini、Zed 等其他四十二个编程智能体里做过什么，包括你安装任何东西之前的那几个月。
 
 插件运行 [deja](https://github.com/vshulcz/deja-vu)，一个本地 Go 可执行文件，索引这些智能体本来就写在磁盘上的会话记录。不用大模型，不用向量嵌入，除了每天一次的版本检查之外不走网络，`DEJA_OFFLINE=1` 可以关掉它。
 

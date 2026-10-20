@@ -6,14 +6,14 @@
 <script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
 <title>deja-vu — the one memory your coding agents share</title>
 <meta name="theme-color" content="#0b0f10">
-<meta name="description" content="The most accurate, cheapest and fastest memory for coding agents: Claude Code, Codex and 40 more agents, built from the sessions already on your disk.">
+<meta name="description" content="The most accurate, cheapest and fastest memory for coding agents: Claude Code, Codex and 41 more agents, built from the sessions already on your disk.">
 <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
 <link rel="alternate" type="application/atom+xml" title="deja-vu docs" href="https://vshulcz.github.io/deja-vu/feed.xml">
 <meta property="og:type" content="website">
 <meta property="og:title" content="deja-vu — the one memory your coding agents share">
-<meta property="og:description" content="Most accurate (97.2% R@5 on LongMemEval-S), half the tokens of agentmemory, 17.6 s to index 19,195 sessions. One memory for 42 coding agents, from the history already on disk.">
+<meta property="og:description" content="Most accurate (97.2% R@5 on LongMemEval-S), half the tokens of agentmemory, 17.6 s to index 19,195 sessions. One memory for 43 coding agents, from the history already on disk.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -21,7 +21,7 @@
 <meta name="theme-color" content="#0b0f10">
 <link rel="icon" type="image/svg+xml" sizes="16x16" href="assets/favicon.svg">
 <link rel="icon" type="image/svg+xml" sizes="any" href="assets/icon.svg">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"deja-vu","operatingSystem":"macOS, Linux, Windows","applicationCategory":"DeveloperApplication","description":"deja-vu is a local memory tool for coding agents: it indexes the session transcripts that Claude Code, Codex, Cursor and 39 other agents already write to disk, and gives the relevant past work back to the agent through hooks and an MCP server, with no LLM and nothing leaving the machine.","url":"https://vshulcz.github.io/deja-vu/","sameAs":["https://github.com/vshulcz/deja-vu","https://www.npmjs.com/package/@vshulcz/deja-vu","https://formulae.brew.sh/formula/deja-vu"],"downloadUrl":"https://github.com/vshulcz/deja-vu/releases","license":"https://github.com/vshulcz/deja-vu/blob/main/LICENSE","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"Vladislav Shulcz","url":"https://github.com/vshulcz"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"deja-vu","operatingSystem":"macOS, Linux, Windows","applicationCategory":"DeveloperApplication","description":"deja-vu is a local memory tool for coding agents: it indexes the session transcripts that Claude Code, Codex, Cursor and 40 other agents already write to disk, and gives the relevant past work back to the agent through hooks and an MCP server, with no LLM and nothing leaving the machine.","url":"https://vshulcz.github.io/deja-vu/","sameAs":["https://github.com/vshulcz/deja-vu","https://www.npmjs.com/package/@vshulcz/deja-vu","https://formulae.brew.sh/formula/deja-vu"],"downloadUrl":"https://github.com/vshulcz/deja-vu/releases","license":"https://github.com/vshulcz/deja-vu/blob/main/LICENSE","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"Vladislav Shulcz","url":"https://github.com/vshulcz"}}</script>
 <link rel="icon" type="image/svg+xml" sizes="16x16" href="assets/favicon.svg">
 <link rel="icon" type="image/svg+xml" sizes="any" href="assets/icon.svg">
 <link rel="apple-touch-icon" href="assets/icon.svg">
@@ -297,7 +297,7 @@ footer a:hover{color:var(--ink)}
   .proof,.steps{grid-template-columns:1fr}
 }
 </style>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebSite", "name": "deja-vu", "alternateName": "deja", "url": "https://vshulcz.github.io/deja-vu/", "description": "deja-vu is a local memory tool for coding agents: it indexes the session transcripts that Claude Code, Codex, Cursor and 39 other agents already write to disk, and gives the relevant past work back to the agent through hooks and an MCP server, with no LLM and nothing leaving the machine.", "inLanguage": "en", "sameAs": ["https://github.com/vshulcz/deja-vu"], "publisher": {"@type": "Person", "name": "vshulcz", "url": "https://github.com/vshulcz"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebSite", "name": "deja-vu", "alternateName": "deja", "url": "https://vshulcz.github.io/deja-vu/", "description": "deja-vu is a local memory tool for coding agents: it indexes the session transcripts that Claude Code, Codex, Cursor and 40 other agents already write to disk, and gives the relevant past work back to the agent through hooks and an MCP server, with no LLM and nothing leaving the machine.", "inLanguage": "en", "sameAs": ["https://github.com/vshulcz/deja-vu"], "publisher": {"@type": "Person", "name": "vshulcz", "url": "https://github.com/vshulcz"}}</script>
 </head>
 <body>
 
@@ -319,7 +319,7 @@ footer a:hover{color:var(--ink)}
     <p id="recall-line" hidden></p>
     <h1>Your agent is about to re-debug something you fixed in <em>March</em>.</h1>
     <p class="lede">Fix it in Codex, and Claude Code remembers. deja indexes the sessions all
-      42 of your coding agents already wrote to disk — months of history from before you
+      43 of your coding agents already wrote to disk — months of history from before you
       installed it — and hands the right one back in whichever agent asks.</p>
     <div class="cmdline">
       <span class="p">$</span>
@@ -335,7 +335,7 @@ footer a:hover{color:var(--ink)}
   </div>
 </header>
 
-<p class="defn">deja-vu is a local memory tool for coding agents: it indexes the session transcripts that Claude Code, Codex, Cursor and 39 other agents already write to disk, and gives the relevant past work back to the agent through hooks and an MCP server, with no LLM and nothing leaving the machine.</p>
+<p class="defn">deja-vu is a local memory tool for coding agents: it indexes the session transcripts that Claude Code, Codex, Cursor and 40 other agents already write to disk, and gives the relevant past work back to the agent through hooks and an MCP server, with no LLM and nothing leaving the machine.</p>
 
 
 <div class="exchange reveal">
@@ -431,7 +431,7 @@ footer a:hover{color:var(--ink)}
 </section>
 
 <section class="reveal" id="harnesses">
-  <h2>Works with <span class="fig">42</span></h2>
+  <h2>Works with <span class="fig">43</span></h2>
   <div class="split">
     <div><p class="big" style="margin:0">Solve it in Codex. <em>Claude remembers.</em></p></div>
     <div class="right"><div class="agents" style="margin:0">
@@ -443,6 +443,7 @@ footer a:hover{color:var(--ink)}
     <span>Amp</span><span>Continue</span><span>Copilot Chat</span><span>prime-agent</span>
     <span>Crush</span><span>Senpi</span><span>Kimchi Coding</span><span>Command Code</span><span>ZCode</span><span>gajae-code</span><span>CodeWhale</span><span>Reasonix</span>
     <span>CodeBuddy Code</span><span>TRAE CLI</span><span>Muse Code</span><span>Junie</span><span>JetBrains AI Assistant</span><span>Devin CLI</span><span>Windsurf / Devin Desktop</span>
+    <span>MiniMax Code</span>
     <span class="more">one memory, all of them</span>
   </div></div>
   </div>
@@ -690,7 +691,7 @@ document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
   }
   var COMMANDS={
     'help':'<p class="none">this input is a tiny deja: type words to search 16 demo sessions.\ncommands: <span class="t">sources</span> · <span class="t">stats</span> · <span class="t">version</span> · <span class="t">clear</span>\nthe real CLI does far more — see <a href="guide/commands.html">cli reference</a></p>',
-    'sources':'<p class="none">claude&nbsp;&nbsp;codex&nbsp;&nbsp;opencode&nbsp;&nbsp;cursor&nbsp;&nbsp;gemini&nbsp;&nbsp;aider&nbsp;&nbsp;antigravity&nbsp;&nbsp;grok&nbsp;&nbsp;qwen&nbsp;&nbsp;kimi&nbsp;&nbsp;cline&nbsp;&nbsp;roo&nbsp;&nbsp;kilocode&nbsp;&nbsp;cherrystudio&nbsp;&nbsp;kiro&nbsp;&nbsp;pi&nbsp;&nbsp;omp&nbsp;&nbsp;openclaw&nbsp;&nbsp;goose&nbsp;&nbsp;copilot&nbsp;&nbsp;copilot-chat&nbsp;&nbsp;deepseek&nbsp;&nbsp;crush&nbsp;&nbsp;zed&nbsp;&nbsp;hermes&nbsp;&nbsp;prime&nbsp;&nbsp;amp&nbsp;&nbsp;continue&nbsp;&nbsp;senpi&nbsp;&nbsp;kimchi&nbsp;&nbsp;commandcode&nbsp;&nbsp;zcode&nbsp;&nbsp;gjc&nbsp;&nbsp;codewhale&nbsp;&nbsp;reasonix&nbsp;&nbsp;codebuddy&nbsp;&nbsp;trae&nbsp;&nbsp;muse&nbsp;&nbsp;junie&nbsp;&nbsp;jetbrains&nbsp;&nbsp;devin&nbsp;&nbsp;windsurf\n42 harnesses, one index — real paths in the <a href="guide/harnesses.html">harness table</a></p>',
+    'sources':'<p class="none">claude&nbsp;&nbsp;codex&nbsp;&nbsp;opencode&nbsp;&nbsp;cursor&nbsp;&nbsp;gemini&nbsp;&nbsp;aider&nbsp;&nbsp;antigravity&nbsp;&nbsp;grok&nbsp;&nbsp;qwen&nbsp;&nbsp;kimi&nbsp;&nbsp;cline&nbsp;&nbsp;roo&nbsp;&nbsp;kilocode&nbsp;&nbsp;cherrystudio&nbsp;&nbsp;kiro&nbsp;&nbsp;pi&nbsp;&nbsp;omp&nbsp;&nbsp;openclaw&nbsp;&nbsp;goose&nbsp;&nbsp;copilot&nbsp;&nbsp;copilot-chat&nbsp;&nbsp;deepseek&nbsp;&nbsp;crush&nbsp;&nbsp;zed&nbsp;&nbsp;hermes&nbsp;&nbsp;prime&nbsp;&nbsp;amp&nbsp;&nbsp;continue&nbsp;&nbsp;senpi&nbsp;&nbsp;kimchi&nbsp;&nbsp;commandcode&nbsp;&nbsp;zcode&nbsp;&nbsp;gjc&nbsp;&nbsp;codewhale&nbsp;&nbsp;reasonix&nbsp;&nbsp;codebuddy&nbsp;&nbsp;trae&nbsp;&nbsp;muse&nbsp;&nbsp;junie&nbsp;&nbsp;jetbrains&nbsp;&nbsp;devin&nbsp;&nbsp;windsurf&nbsp;&nbsp;mcode\n43 harnesses, one index — real paths in the <a href="guide/harnesses.html">harness table</a></p>',
     'stats':'<p class="none">sessions 16 · messages 412 · top project api-gateway\nlast 12 months&nbsp;&nbsp;▁▁▂▃▂▅▆▄▇█▆▇\n(demo numbers — <span class="t">deja stats</span> wraps your real year)</p>',
     'version':'<p class="none">deja 0.22.2</p>',
     'clear':''
