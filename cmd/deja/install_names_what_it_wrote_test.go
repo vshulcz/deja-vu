@@ -75,6 +75,13 @@ func reportNames(out, path string) bool {
 		if namedWhole(out, p) || namedWhole(out, shortHome(p)) {
 			return true
 		}
+		// The walk stops at the root. On Windows filepath.Dir("C:\\") is
+		// "C:\\", so a file the report never named sent this loop round the
+		// drive forever — the test hung instead of failing, which is the one
+		// outcome a reader of it cannot act on (#3254).
+		if next := filepath.Dir(p); next == p {
+			break
+		}
 	}
 	return false
 }
