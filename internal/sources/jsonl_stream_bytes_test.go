@@ -117,15 +117,19 @@ func writeLongClaudeLine(t *testing.T, size int) string {
 // megabyte of line was a few more allocated.
 func TestScanJSONLBytesHoldsALongLineByItsCut(t *testing.T) {
 	if testing.Short() {
-		t.Skip("writes a 16 MB line")
+		t.Skip("writes an 8 MB line")
 	}
-	// Pooled buffers the parse finds gone are allocated again, by chance and
-	// not by the line: 41 and 48 MB on a loaded runner (#5461). A pool loses
-	// them to a collection, to a goroutine moving to another P, and under
-	// -race to a random drop of a quarter of all puts. So no collection and
-	// one P while it is measured, and the read buffers its own pool makes
-	// again are not counted. Left is the encoder encoding/json pools, which
-	// under -race moves either size by 3.3 MB, inside the margin.
+	// What the parse allocates besides the line is buffers it takes from
+	// pools, and whether a pool still holds one is chance: -race drops a
+	// quarter of all puts, and encoding/json keeps a large buffer by how the
+	// process used it before, so on CI a 4 MB and a 16 MB line read 40 and
+	// 47 MB (#5461, #5473). With the cut at 16 KB those buffers are too small
+	// to matter: every json buffer lost costs kilobytes, a line held whole
+	// still costs megabytes. The read buffers the pool makes again are a
+	// megabyte each and not counted, and no collection empties a pool while
+	// it is measured.
+	defer func(n int) { longStringCap = n }(longStringCap)
+	longStringCap = 16 << 10
 	var refills atomic.Uint64
 	newReader := jsonlReaders.New
 	jsonlReaders.New = func() any { refills.Add(1); return newReader() }
@@ -165,9 +169,9 @@ func TestScanJSONLBytesHoldsALongLineByItsCut(t *testing.T) {
 		}
 		return after.TotalAlloc - before.TotalAlloc - refills.Load()*jsonlBuffer
 	}
-	small, large := parse(4<<20), parse(16<<20)
-	if large > small+6<<20 {
-		t.Errorf("a 4 MB line allocated %d MB and a 16 MB one %d MB", small>>20, large>>20)
+	small, large := parse(2<<20), parse(8<<20)
+	if large > small+1<<20 {
+		t.Errorf("a 2 MB line allocated %d KB and an 8 MB one %d KB", small>>10, large>>10)
 	}
 }
 
