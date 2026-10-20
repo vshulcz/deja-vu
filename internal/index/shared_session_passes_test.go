@@ -315,7 +315,6 @@ func TestRandomPassesOverSharedSessionsMatchRebuild(t *testing.T) {
 				rewrite(i)
 			}
 			indexPass(t, dir)
-			deleted := false
 			for pass := range 6 {
 				for range 1 + rng.Intn(2) {
 					i := rng.Intn(len(files))
@@ -336,12 +335,8 @@ func TestRandomPassesOverSharedSessionsMatchRebuild(t *testing.T) {
 						appendTo(t, p, line(i))
 					default:
 						// Deleted: the index keeps what it read, as a
-						// rebuild does from the kept records. Which of a
-						// kept and a live copy names the row is the
-						// rebuild's own order, so from here on only the
-						// records are compared.
+						// rebuild does from the kept records.
 						_ = os.Remove(p)
-						deleted = true
 					}
 				}
 				indexPass(t, dir)
@@ -355,10 +350,8 @@ func TestRandomPassesOverSharedSessionsMatchRebuild(t *testing.T) {
 					t.Fatal(err)
 				}
 				for _, id := range ids {
-					got, want := sortedLines(sessionView(t, dir, "claude", id)), sortedLines(sessionView(t, fresh, "claude", id))
-					if deleted {
-						got, want = messagesOnly(got), messagesOnly(want)
-					}
+					got, want := sortedLines(sessionView(t, dir, "claude", id)+rowView(t, dir, "claude", id)),
+						sortedLines(sessionView(t, fresh, "claude", id)+rowView(t, fresh, "claude", id))
 					if got != want {
 						t.Errorf("claude:%s after incremental passes:\n%s\nafter a rebuild:\n%s", id, got, want)
 					}
@@ -381,15 +374,22 @@ func sortedLines(v string) string {
 	return strings.Join(lines, "\n")
 }
 
-// messagesOnly is a sessionView without the row's own lines.
-func messagesOnly(v string) string {
-	var out []string
-	for _, l := range strings.Split(v, "\n") {
-		if !strings.HasPrefix(l, "title=") && !strings.HasPrefix(l, "words=") {
-			out = append(out, l)
+// rowView is the rest of a session's row that sessionView leaves out: the
+// file that owns it and the span of the files that share it (#5380).
+func rowView(t *testing.T, dir, harness, id string) string {
+	t.Helper()
+	metas, err := AllMeta(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var b strings.Builder
+	for _, m := range metas {
+		if m.Harness == harness && m.ID == id {
+			fmt.Fprintf(&b, "path=%s shared=%v shared_started=%s shared_updated=%s\n", m.Path, m.Shared,
+				m.SharedStarted.UTC().Format(time.RFC3339), m.SharedUpdated.UTC().Format(time.RFC3339))
 		}
 	}
-	return strings.Join(out, "\n")
+	return b.String()
 }
 
 // The control for the id-change cases: a tail that keeps the file's id is
@@ -416,4 +416,71 @@ func TestOnlyATailThatChangesTheIdRereadsItsFile(t *testing.T) {
 	}
 	sessionMatchesRebuild(t, dir, "claude", "s-b")
 	sessionMatchesRebuild(t, dir, "claude", "s-a")
+}
+
+// A transcript moved in one pass, its new copy holding an earlier turn too so
+// the walk cannot pair the two files by their bytes, is the move the rename
+// rule pairs by content: the row names the new file and is not shared with
+// the one that went (#1086). A deleted transcript sends the pass to that rule
+// (#5380).
+func TestATranscriptMovedWithAnEarlierTurnIsNotSharedWithItsOldPath(t *testing.T) {
+	tmp := hermeticIndexEnv(t)
+	claude := os.Getenv("DEJA_CLAUDE_ROOT")
+	a := filepath.Join(claude, "p", "a.jsonl")
+	b := filepath.Join(claude, "p", "b.jsonl")
+	dir := filepath.Join(tmp, "idx")
+	write(t, a, claudeLine("s-a", "2026-01-02T03:04:05Z", "alpha one"))
+	indexPass(t, dir)
+	if err := os.Remove(a); err != nil {
+		t.Fatal(err)
+	}
+	write(t, b, claudeLine("s-a", "2026-01-02T03:00:00Z", "zero first")+claudeLine("s-a", "2026-01-02T03:04:05Z", "alpha one"))
+	indexPass(t, dir)
+	if got := rowView(t, dir, "claude", "s-a"); !strings.Contains(got, "path="+b+" shared=false") {
+		t.Errorf("the moved transcript's row: %s", got)
+	}
+	sessionMatchesRebuild(t, dir, "claude", "s-a")
+}
+
+// A deleted owner whose copy beside it holds its last turn is kept, not taken
+// for a move to the copy: the copy was there before. Its records stay under
+// it (#5380).
+func TestADeletedOwnerIsNotTakenForAMoveToItsCopy(t *testing.T) {
+	tmp := hermeticIndexEnv(t)
+	claude := os.Getenv("DEJA_CLAUDE_ROOT")
+	a := filepath.Join(claude, "p", "a.jsonl")
+	b := filepath.Join(claude, "p", "b.jsonl")
+	dir := filepath.Join(tmp, "idx")
+	write(t, a, claudeLine("s-x", "2026-01-02T03:04:05Z", "zebra unique turn"))
+	indexPass(t, dir)
+	write(t, b, claudeLine("s-x", "2026-01-02T03:04:05Z", "zebra unique turn")+claudeLine("s-x", "2026-01-02T03:05:00Z", "bravo more"))
+	indexPass(t, dir)
+	if err := os.Remove(a); err != nil {
+		t.Fatal(err)
+	}
+	indexPass(t, dir)
+	m, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f, ok := m.Files[a]; !ok || !f.Kept {
+		t.Errorf("the deleted owner is not kept: %+v %v", f, ok)
+	}
+	write(t, b, claudeLine("s-x", "2026-01-02T03:05:00Z", "bravo rewritten"))
+	bumpMTime(t, b)
+	indexPass(t, dir)
+	if v := sessionView(t, dir, "claude", "s-x"); !strings.Contains(v, "zebra unique turn") {
+		t.Errorf("the deleted transcript's turn went with its copy's rewrite:\n%s", v)
+	}
+	fresh := filepath.Join(t.TempDir(), "rebuilt")
+	if err := os.CopyFS(fresh, os.DirFS(dir)); err != nil {
+		t.Fatal(err)
+	}
+	if err := Ensure(fresh, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	got := sortedLines(sessionView(t, dir, "claude", "s-x") + rowView(t, dir, "claude", "s-x"))
+	if want := sortedLines(sessionView(t, fresh, "claude", "s-x") + rowView(t, fresh, "claude", "s-x")); got != want {
+		t.Errorf("after the passes:\n%s\nafter a rebuild:\n%s", got, want)
+	}
 }

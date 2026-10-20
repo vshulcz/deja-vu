@@ -770,7 +770,11 @@ import (
 // 92: a pass that replaces a few sessions appends their records and lists the
 // old ones as dead, and postings land in per-bucket overlay files, so a pass
 // writes what changed rather than the whole log and every bucket (#5387).
-const version = 92
+// 93: rows of a session several transcripts hold match a rebuild: a deleted
+// transcript keeps the counts read while it was on disk and spans its own
+// records beside copies, a copy that leaves takes its span with it, and the
+// span of the files beside the owner no longer holds the owner's own (#5380).
+const version = 93
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

@@ -2,6 +2,7 @@ package index
 
 import (
 	"slices"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -103,7 +104,15 @@ func settleCopies(m *Manifest, old map[string]SessionMeta, reread map[string]Fil
 			}
 			keep = append(keep, p)
 		}
-		if cp := withCopies(row.Path, keep, readFrom[key]...); len(cp) > 0 || len(row.Copies) > 0 {
+		cp := withCopies(row.Path, keep, readFrom[key]...)
+		// The last copy beside a row nobody read again left it: what is
+		// left is one transcript, as a rebuild finds it (#5380).
+		if len(cp) == 0 && len(readFrom[key]) == 0 && len(old[key].Copies) > 0 {
+			row.Shared = false
+			row.SharedStarted, row.SharedUpdated = time.Time{}, time.Time{}
+			m.Sessions[key] = row
+		}
+		if len(cp) > 0 || len(row.Copies) > 0 {
 			row.Copies = cp
 			m.Sessions[key] = row
 		}
