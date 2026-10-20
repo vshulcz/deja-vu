@@ -57,11 +57,14 @@ location. The directory contains:
 
 Text taken out of a transcript leaves `records.bin` and `buckets/` on the next
 `deja index` pass that reads it. The pass zeroes the replaced records in
-`records.bin` where they stand, and in `buckets/` zeroes every word that no
-remaining record holds, all but the one or two leading letters the bucket file
-is named after; a word another session still contains stays, as that
-session's. If the pass is killed between committing the new index and the
-zeroing, the next deja process that takes the index lock finishes it. On
+`records.bin` where they stand, and in `buckets/` blanks every word that no
+remaining record holds: a word filed under two leading letters keeps those,
+which the bucket file is named after, and one filed under a hash, as every
+CJK word is, is overwritten whole with filler. A one-letter word of a
+non-Latin alphabet can stay as it is. A word another session still contains
+stays, as that session's. If the pass is killed between committing the new index and
+the zeroing, the next `deja index`, or any deja process that takes the index
+lock, finishes it. On
 Windows, a search holding the index open as a pass ends can keep the previous
 index directory (`index.db.old`, or `index.db.old.N` when that one is held
 too) until a later pass removes it; what stays there is usually only the

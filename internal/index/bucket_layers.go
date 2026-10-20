@@ -464,28 +464,56 @@ func blankWords(p string, gone map[string]bool) error {
 	return f.Sync()
 }
 
-// blankedWord is tok with every byte past the ones its bucket is named from
-// zeroed: the word stays filed in the bucket it is in, and keeps no more of
-// itself than the bucket's name already says. ok is false for a word no such
-// prefix keeps in its bucket.
+// blankedWord is tok overwritten, at its length, so it stays filed in the
+// bucket it is in and keeps no more of itself than the bucket's name says.
+// A bucket named after two ASCII letters keeps those and zeroes the rest.
+// One named by a hash of the leading runes, as every CJK key's is, says
+// nothing of them, so the word is replaced whole by filler hashing to the
+// same bucket (#5452): an invalid byte, which keeps it off the ASCII buckets
+// and apart from any real word, and control bytes. ok is false for a word
+// with no such filler: only a one-letter two-byte word, whose filler has two
+// bytes to hash and reaches most buckets but not all.
 func blankedWord(tok string) (_ []byte, ok bool) {
 	want := bucket(tok)
-	end, runes := 0, 0
-	for end < len(tok) && runes < 3 {
-		_, size := utf8.DecodeRuneInString(tok[end:])
-		end += size
-		runes++
-		if runes < 2 {
-			continue
+	b := make([]byte, len(tok))
+	if len(tok) >= 2 && want == safe(tok[:2]) {
+		copy(b, tok[:2])
+		return b, true
+	}
+	switch {
+	case len(b) >= 3:
+		f, ok := hashedFillers()[want]
+		if !ok {
+			return nil, false
 		}
-		b := make([]byte, len(tok))
-		copy(b, tok[:end])
-		if bucket(string(b)) == want {
-			return b, true
+		copy(b, f[:])
+		return b, true
+	case len(b) == 2:
+		for c := byte(0); c < utf8.RuneSelf; c++ {
+			for _, f := range [][]byte{{0xff, c}, {c, 0xff}} {
+				if bucket(string(f)) == want {
+					return f, true
+				}
+			}
 		}
 	}
 	return nil, false
 }
+
+// hashedFillers is, by hashed bucket, three bytes that, followed by zeros,
+// file a word there: only the first three runes are hashed.
+var hashedFillers = sync.OnceValue(func() map[string][3]byte {
+	out := make(map[string][3]byte, len(hexBuckets))
+	for c1 := byte(0); c1 < utf8.RuneSelf && len(out) < len(hexBuckets); c1++ {
+		for c2 := byte(0); c2 < utf8.RuneSelf; c2++ {
+			f := [3]byte{0xff, c1, c2}
+			if name := bucket(string(f[:])); out[name] == ([3]byte{}) {
+				out[name] = f
+			}
+		}
+	}
+	return out
+})
 
 // encodeBucketEstimate is the size an overlay of data comes to, near enough
 // to plan merges by: the postings blocks without the directory.

@@ -125,7 +125,10 @@ rewrites every postings file either: 225 MB and 2.4 GB there, now 18 MB and
 records are zeroed where they stand on the same pass, and so is a word only they
 held in the postings files, so text taken out of a transcript leaves the index
 then rather than at the next compaction (#5429), and an older deja
-meeting the index can no longer bring them back as live (#5428). A lost
+meeting the index can no longer bring them back as live (#5428). CJK words
+are overwritten too (#5452), a `show` running across the pass no longer gets the
+session back empty (#5449), and `deja index` on an index that looks up to date
+finishes the zeroing a killed pass left (#5450). A lost
 overlay file reads as damage and rebuilds (#5426).
 
 A pass that reads Codex's, TRAE's or Claude Code's history.jsonl beside other

@@ -2367,10 +2367,44 @@ func metasNotIgnoredBy(pol policy.Policy, metas []SessionMeta) []SessionMeta {
 // records.bin. The per-session variant re-scanned the whole log for every
 // session, which turned a session-start hook into hundreds of milliseconds.
 func sessionsForMetas(dir string, metas []SessionMeta) ([]model.Session, error) {
-	tbl, terr := loadRecordTables(dir)
-	if terr != nil {
-		return nil, terr
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return nil, err
 	}
+	out, err := sessionsForMetasIn(dir, m, metas)
+	// Read again when a pass swapped in during the read, as loadSessionMeta
+	// does, without the sessions it took away (#5449).
+	if cur, moved := liveManifest(dir, m); moved {
+		metas = slices.DeleteFunc(slices.Clone(metas), func(meta SessionMeta) bool {
+			_, ok := cur.Sessions[meta.Harness+":"+meta.ID]
+			return !ok
+		})
+		out, err = sessionsForMetasIn(dir, cur, metas)
+	}
+	if err != nil {
+		return nil, err
+	}
+	for i := range out {
+		orderPromotedNote(&out[i])
+	}
+	return ignoredByPolicy(out), nil
+}
+
+// liveManifest is the manifest dir holds now, and whether it is another than
+// m: a pass committed since m was read, and records m listed live may have
+// been zeroed in the log they share (#5449). Every pass stamps its build
+// time, and one that zeroes records lists them dead.
+func liveManifest(dir string, m Manifest) (Manifest, bool) {
+	cur, err := readManifestCached(dir)
+	if err != nil || len(cur.DeadRecords) == len(m.DeadRecords) && cur.BuiltAt.Equal(m.BuiltAt) && cur.Generation == m.Generation {
+		return m, false
+	}
+	return cur, true
+}
+
+// sessionsForMetasIn is the read sessionsForMetas makes with m's tables.
+func sessionsForMetasIn(dir string, m Manifest, metas []SessionMeta) ([]model.Session, error) {
+	tbl := tablesFromManifest(m)
 	want := make(map[string]int, len(metas))
 	out := make([]model.Session, len(metas))
 	for i, meta := range metas {
@@ -2386,13 +2420,7 @@ func sessionsForMetas(dir string, metas []SessionMeta) ([]model.Session, error) 
 			out[i].Messages = append(out[i].Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
 		}
 	})
-	if err != nil {
-		return nil, err
-	}
-	for i := range out {
-		orderPromotedNote(&out[i])
-	}
-	return ignoredByPolicy(out), nil
+	return out, err
 }
 
 // RecentProjects is RecentProject for several project names at once: one
@@ -3099,11 +3127,22 @@ func betterIDMatch(candidate, held SessionMeta) bool {
 }
 
 func loadSessionMeta(dir string, m Manifest, meta SessionMeta) (model.Session, bool, error) {
-	s := sessionFromMeta(meta)
-	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), meta.Harness+":"+meta.ID)
+	key := meta.Harness + ":" + meta.ID
+	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), key)
+	// A pass that swapped in during the read zeroes the records it replaced
+	// in the log this one shares, and the session read empty (#5449). Once
+	// more from the live manifest; a failed read too, since the new log's tail
+	// does not decode with the old tables.
+	if cur, moved := liveManifest(dir, m); moved {
+		if _, ok := cur.Sessions[key]; !ok {
+			return model.Session{}, false, nil
+		}
+		recs, err = recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(cur), key)
+	}
 	if err != nil {
 		return model.Session{}, false, err
 	}
+	s := sessionFromMeta(meta)
 	for _, r := range recs {
 		s.Messages = append(s.Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
 	}

@@ -230,7 +230,7 @@ func scrubAfterSwap(dir string, offs []int64) {
 	if err != nil || blankDeadWords(dir, words, m.DeadRecords) != nil {
 		return
 	}
-	size, before, err := logFingerprint(log)
+	size, before, err := scrubMarked(dir)
 	if err != nil {
 		return
 	}
@@ -247,6 +247,31 @@ func scrubAfterSwap(dir string, offs []int64) {
 		}
 	}
 	_ = os.Remove(filepath.Join(dir, scrubPendingFile))
+}
+
+// markScrubPending writes the mark into dir, carrying the size and
+// fingerprint of its log before any record is zeroed. Those are what the
+// sidecars carry until the scrub moves them, and a pass killed after zeroing
+// the records leaves a log that no longer has them to read back (#5451).
+func markScrubPending(dir string) error {
+	size, fp, err := logFingerprint(filepath.Join(dir, "records.bin"))
+	if err != nil {
+		return err
+	}
+	b := binary.LittleEndian.AppendUint64(nil, uint64(size))
+	return os.WriteFile(filepath.Join(dir, scrubPendingFile), append(b, fp[:]...), 0o600)
+}
+
+// scrubMarked is the log size and fingerprint the mark in dir carries, or
+// the log's own when the mark has none: one written before it carried them.
+func scrubMarked(dir string) (int64, [sha256.Size]byte, error) {
+	var fp [sha256.Size]byte
+	b, err := os.ReadFile(filepath.Join(dir, scrubPendingFile))
+	if err == nil && len(b) == 8+sha256.Size {
+		copy(fp[:], b[8:])
+		return int64(binary.LittleEndian.Uint64(b)), fp, nil
+	}
+	return logFingerprint(filepath.Join(dir, "records.bin"))
 }
 
 // deadWords is the postings the records at offs in the log at path would

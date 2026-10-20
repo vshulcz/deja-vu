@@ -294,19 +294,37 @@ func sweepStaleTmp(dir string) {
 // SweepStaleTmp is sweepStaleTmp for callers that do not already hold the dir
 // lock — `deja index` decides the index is fresh and returns before Ensure
 // ever runs, which is exactly the run that used to walk past the leftover.
+// The same goes for what a pass killed after its swap leaves: the scrub of
+// the records it replaced, and the parked copy of the index before it. The
+// lock finishes both (recoverIndexDir), so they are a reason to take it too
+// (#5450).
 func SweepStaleTmp(dir string) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	if _, err := os.Stat(dir + ".tmp"); err != nil {
+	if !leftBehind(dir) {
 		return
 	}
-	unlock, err := lockDir(dir)
-	if err != nil {
+	// Not waited for: a holder ran the same recovery when it took the lock,
+	// and an up-to-date answer should not sit behind a whole pass.
+	unlock, ok, err := tryLockDir(dir)
+	if err != nil || !ok {
 		return
 	}
 	defer unlock()
 	sweepStaleTmp(dir)
+}
+
+// leftBehind reports whether a pass that did not finish left anything a lock
+// taker clears: a staging dir, a scrub, a parked index.
+func leftBehind(dir string) bool {
+	if _, err := os.Stat(dir + ".tmp"); err == nil {
+		return true
+	}
+	if _, err := os.Stat(filepath.Join(dir, scrubPendingFile)); err == nil {
+		return true
+	}
+	return len(parkedDirs(dir)) > 0
 }
 
 func Ensure(dir string, harness string, force bool, progress io.Writer) error {
@@ -4922,7 +4940,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 			}
 		}
 		if appending && len(dead) > 0 {
-			if err := os.WriteFile(filepath.Join(tmp, scrubPendingFile), nil, 0o600); err != nil {
+			if err := markScrubPending(tmp); err != nil {
 				return err
 			}
 		}

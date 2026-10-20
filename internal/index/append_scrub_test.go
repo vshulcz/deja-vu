@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 // secretStore is replaceStore with s007's first turn carrying word, rewritten
@@ -289,5 +290,167 @@ func TestASwapParksPastACopyAReaderHolds(t *testing.T) {
 	}
 	if err := swapIndexDir(dir, dir+".next"); err == nil || !strings.Contains(err.Error(), "remove that directory") {
 		t.Fatalf("a parking spot held by permissions: err = %v", err)
+	}
+}
+
+// A reader that read the manifest before a replacing pass swapped in, and the
+// records after the pass zeroed the ones it replaced, gets the session as the
+// new manifest has it, not an empty one.
+func TestAReaderHoldingTheLastManifestStillGetsAReplacedSession(t *testing.T) {
+	proj, inc := replaceStore(t, 12)
+	pinned, err := readManifest(inc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	meta, ok := pinned.Sessions["claude:s007"]
+	if !ok {
+		t.Fatal("control: no claude:s007 in the manifest")
+	}
+	rewriteSession(t, proj, "s007")
+	parityPass(t, inc, false)
+	if m, err := readManifest(inc); err != nil || len(m.DeadRecords) == 0 {
+		t.Fatalf("control: the rewrite listed no dead records (err %v)", err)
+	}
+	s, ok, err := loadSessionMeta(inc, pinned, meta)
+	if err != nil || !ok {
+		t.Fatalf("loadSessionMeta: ok=%v err=%v", ok, err)
+	}
+	if len(s.Messages) != 6 || !strings.Contains(s.Messages[0].Text, "quokka") {
+		t.Fatalf("a reader on the last manifest got %d messages, want the 6 of the rewrite", len(s.Messages))
+	}
+}
+
+// `deja index` on an index that looks up to date still finishes a scrub a
+// killed pass left, and clears the parked copy it left: it returns before
+// Ensure takes the lock, so nothing else would.
+func TestTheUpToDatePathFinishesAnInterruptedScrub(t *testing.T) {
+	inc, before := secretStore(t, "hunter2zanzibarpw")
+	log := filepath.Join(inc, "records.bin")
+	f, err := os.OpenFile(log, os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteAt(before, 0); err != nil {
+		t.Fatal(err)
+	}
+	_ = f.Close()
+	if err := os.WriteFile(filepath.Join(inc, scrubPendingFile), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(inc+".old", 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(inc+".old", "sessions.gob"), []byte("hunter2zanzibarpw"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	invalidateManifestCache(inc)
+	if fresh, _ := UpToDate(inc, ""); !fresh {
+		t.Fatal("control: the index does not read as up to date")
+	}
+	SweepStaleTmp(inc)
+	if b, _ := os.ReadFile(log); bytes.Contains(b, []byte("hunter2zanzibarpw")) {
+		t.Error("the removed word is still in records.bin")
+	}
+	if _, err := os.Stat(inc + ".old"); err == nil {
+		t.Error("the parked copy is still there")
+	}
+	if _, err := os.Stat(filepath.Join(inc, scrubPendingFile)); err == nil {
+		t.Error("the mark is still there")
+	}
+}
+
+// A pass killed after it zeroed the records and before it moved the
+// sidecars' fingerprint leaves them naming the log as it was. The lock taker
+// that finishes the scrub moves them, so they keep answering.
+func TestFinishingAScrubRestampsTheSidecarsAKilledPassLeft(t *testing.T) {
+	inc, before := secretStore(t, "hunter2zanzibarpw")
+	log := filepath.Join(inc, "records.bin")
+	_, after, err := logFingerprint(log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.OpenFile(log, os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteAt(before, 0); err != nil {
+		t.Fatal(err)
+	}
+	_ = f.Close()
+	// The state just before the scrub: the log unzeroed, the sidecars
+	// stamped for it, the mark as the pass writes it.
+	_, pre, err := logFingerprint(log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	restamp(filepath.Join(inc, recordOffsetsFile), after, pre)
+	if err := markScrubPending(inc); err != nil {
+		t.Fatal(err)
+	}
+	m, err := readManifest(inc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Killed here: the records zeroed, the sidecars not yet moved.
+	if err := scrubRecords(log, m.DeadRecords); err != nil {
+		t.Fatal(err)
+	}
+	unlock, err := lockDir(inc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unlock()
+	lf, err := os.Open(log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lf.Close()
+	if _, err := readRecordOffsetsFor(inc, lf, nil); err != nil {
+		t.Fatalf("recoffsets.bin no longer matches the log: %v", err)
+	}
+}
+
+// A CJK word is posted as bigrams, each of whose bucket is named from a hash
+// of the whole key. Removed, none of its bigrams stays readable.
+func TestRemovedCJKTextLeavesThePostings(t *testing.T) {
+	inc, _ := secretStore(t, "麒麟獬豸")
+	for _, pair := range []string{"麒麟", "麟獬", "獬豸"} {
+		if filesHold(t, filepath.Join(inc, "buckets"), pair) {
+			t.Errorf("the bigram %s of the removed word is still in buckets/", pair)
+		}
+	}
+	sameAsRebuild(t, inc)
+}
+
+// A blanked word stays in its bucket and keeps nothing the bucket's name
+// does not already say: the two letters an ASCII bucket is named after, and
+// none of a word filed under a hash.
+func TestBlankedWordKeepsOnlyTheBucketName(t *testing.T) {
+	if n := len(hashedFillers()); n != len(hexBuckets) {
+		t.Fatalf("fillers for %d of %d hashed buckets", n, len(hexBuckets))
+	}
+	for _, tok := range []string{"t麒麟", "t麟", "да", "éa", "привет", "zanzibar", "naïve", "я"} {
+		b, ok := blankedWord(tok)
+		if !ok {
+			if len(tok) > 2 {
+				t.Errorf("%q: not blanked", tok)
+			}
+			continue
+		}
+		if len(b) != len(tok) || bucket(string(b)) != bucket(tok) {
+			t.Errorf("%q: blanked to %q, bucket %s, want %s", tok, b, bucket(string(b)), bucket(tok))
+		}
+		keep := 0
+		if bucket(tok) == safe(tok[:2]) {
+			keep = 2
+		}
+		if !bytes.Equal(b[:keep], []byte(tok[:keep])) {
+			t.Errorf("%q: blanked to %q, which moved the bucket's letters", tok, b)
+		}
+		for _, r := range tok[keep:] {
+			if r >= utf8.RuneSelf && bytes.Contains(b, []byte(string(r))) || r < utf8.RuneSelf && keep > 0 && bytes.IndexByte(b[keep:], byte(r)) >= 0 {
+				t.Errorf("%q: blanked to %q, which still holds %q", tok, b, r)
+			}
+		}
 	}
 }
