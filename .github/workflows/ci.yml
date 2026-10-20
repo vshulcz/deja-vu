@@ -323,20 +323,14 @@ jobs:
         run: |
           report=$(./deja bench ingest --json)
           printf '%s\n' "$report"
-          # Nothing but a rewrite rewrites.
+          # No update rewrites the store, a rewritten transcript included (#5387).
           printf '%s\n' "$report" | jq -e '
-            [.classes[] | select(.name != "rewritten transcript") | .rewritten]
-            | length > 0 and all(. == false)'
-          # And the rewrite class is still there to be compared against, so a
-          # renamed or removed class cannot make the check above vacuous.
-          printf '%s\n' "$report" | jq -e '
-            [.classes[] | select(.name == "rewritten transcript" and .rewritten)]
-            | length == 1'
+            [.classes[].rewritten] | length > 0 and all(. == false)'
           # And every class is present. A wall-clock comparison stood here and
           # failed on the runner while the local margin was five-fold — which
           # is the lesson above, applied to this step rather than quoted by it.
           # What the gate can hold on a shared machine is the shape: the five
-          # classes exist, and only one of them rewrites.
+          # classes exist, and none of them rewrites.
           printf '%s\n' "$report" | jq -e '
             [.classes[].name] | sort == [
               "appended turn", "new transcript", "renamed transcript",
