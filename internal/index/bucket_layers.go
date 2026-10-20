@@ -33,6 +33,9 @@ func overlayPath(base string, n int) string {
 // isOverlay reports whether a file in buckets/ is an overlay.
 func isOverlay(name string) bool { return strings.HasSuffix(name, ".ov") }
 
+// isPostingsFile reports whether a file in buckets/ is a bucket or an overlay.
+func isPostingsFile(name string) bool { return strings.HasSuffix(name, ".bin") || isOverlay(name) }
+
 // bucketLayers is the overlays of the bucket at base, oldest first. They are
 // numbered without gaps; a merge removes the newest first, so a reader that
 // stops at the first missing one never skips a file.
@@ -329,7 +332,7 @@ func linkBuckets(from, to string, touched bucketPostings) error {
 	}
 	for _, e := range entries {
 		name := e.Name()
-		if e.IsDir() || !(strings.HasSuffix(name, ".bin") || isOverlay(name)) {
+		if e.IsDir() || !isPostingsFile(name) {
 			continue
 		}
 		b, _, _ := strings.Cut(name, ".")

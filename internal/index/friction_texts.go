@@ -578,18 +578,3 @@ func logPrefixIs(path string, size int64, fp [sha256.Size]byte) bool {
 	got, err := recordLogFingerprint(f, size)
 	return err == nil && got == fp
 }
-
-// logFingerprintIs reports whether the log at path is size bytes whose
-// fingerprint is fp.
-func logFingerprintIs(path string, size int64, fp [sha256.Size]byte) bool {
-	f, err := os.Open(path)
-	if err != nil {
-		return false
-	}
-	defer func() { _ = f.Close() }()
-	if fi, err := f.Stat(); err != nil || fi.Size() != size {
-		return false
-	}
-	got, err := recordLogFingerprint(f, size)
-	return err == nil && got == fp
-}

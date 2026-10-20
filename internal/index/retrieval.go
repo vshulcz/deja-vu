@@ -3702,7 +3702,7 @@ func intersectSubstringPostingsDetailed(dir string, bare []string) ([]posting, m
 	}
 	var dirs []bucketDir
 	for _, de := range buckets {
-		if de.IsDir() || !(strings.HasSuffix(de.Name(), ".bin") || isOverlay(de.Name())) {
+		if de.IsDir() || !isPostingsFile(de.Name()) {
 			continue
 		}
 		dirs = append(dirs, bucketDir{path: filepath.Join(dir, "buckets", de.Name())})
@@ -4510,7 +4510,7 @@ func tokenCatalogDirs(dir string) (map[string]bool, []bucketDir, error) {
 	tokens := 0
 	for _, de := range entries {
 		// An overlay holds tokens too, some of them in no bucket yet.
-		if de.IsDir() || !(strings.HasSuffix(de.Name(), ".bin") || isOverlay(de.Name())) {
+		if de.IsDir() || !isPostingsFile(de.Name()) {
 			continue
 		}
 		path := filepath.Join(dir, "buckets", de.Name())
