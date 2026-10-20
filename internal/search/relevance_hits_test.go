@@ -138,7 +138,7 @@ func TestErrorHitsSnippetTheNeighbourhood(t *testing.T) {
 			{Role: "command", Text: "added a nil guard in worker.go"},
 		},
 	}}
-	hits := ErrorHits(ss)
+	hits := ErrorHits(ss, "")
 	if len(hits) != 1 {
 		t.Fatalf("hits = %d", len(hits))
 	}

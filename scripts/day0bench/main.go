@@ -370,7 +370,7 @@ func run(w writer, all, qs []question, control, misses, ranks bool) (runResult, 
 		var hits []search.Hit
 		switch result.Tier {
 		case search.TierError:
-			hits = search.ErrorHits(result.Sessions)
+			hits = search.ErrorHits(result.Sessions, o.Query)
 		case search.TierRelevance:
 			hits = search.RelevanceHits(result.Sessions, index.RelevanceTerms(q.Question))
 		default:

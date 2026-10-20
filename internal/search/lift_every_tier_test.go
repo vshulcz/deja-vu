@@ -32,7 +32,7 @@ func TestEveryTierPutsANoteAboveItsSource(t *testing.T) {
 	ss := []model.Session{source, between, note}
 
 	for name, hits := range map[string][]Hit{
-		"error":     ErrorHits(ss),
+		"error":     ErrorHits(ss, ""),
 		"relevance": RelevanceHits(ss, []string{"goblin", "pool"}),
 	} {
 		var noteAt, sourceAt = -1, -1

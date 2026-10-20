@@ -333,7 +333,7 @@ func rank(idx, q string) ([]search.Hit, error) {
 	}
 	switch result.Tier {
 	case search.TierError:
-		return search.ErrorHits(result.Sessions), nil
+		return search.ErrorHits(result.Sessions, o.Query), nil
 	case search.TierRelevance:
 		return search.RelevanceHits(result.Sessions, index.RelevanceTerms(q)), nil
 	}

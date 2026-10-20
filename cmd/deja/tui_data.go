@@ -47,7 +47,7 @@ func tuiSearch(dir string, o search.Options) ([]search.Hit, error) {
 	ss, _ := policyFilterSessionsCounted(policy.ActivationSearch, search.WithoutIgnored(result.Sessions))
 	switch result.Tier {
 	case search.TierError:
-		return search.ErrorHits(ss), nil
+		return search.ErrorHits(ss, o.Query), nil
 	case search.TierRelevance:
 		return markStrictHits(search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(o.Query), result.TermIDF), result), nil
 	}

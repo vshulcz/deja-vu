@@ -9,6 +9,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"regexp/syntax"
 	"sort"
 	"strconv"
 	"strings"
@@ -1293,7 +1294,7 @@ func cmdCtx(dir string, rest []string) error {
 		// Both tiers below build their own hits and never went through the cap
 		// in RunDetailed, so `--limit 3` printed the whole window — fifty
 		// sessions — and so did a query with no flag (#3345).
-		hits, _ = capTierHits(search.ErrorHits(ss), o)
+		hits, _ = capTierHits(search.ErrorHits(ss, o.Query), o)
 	} else if result.Tier == search.TierRelevance {
 		o.Strict = result.Strict
 		fmt.Fprintln(os.Stderr, relevanceLead(result.Strict))
@@ -1788,7 +1789,7 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 		// zero it out — the word ladder already failed, which is why this tier
 		// fired at all.
 		fmt.Fprintln(os.Stderr, "deja: matched by error signature; showing the sessions that hit it")
-		hits = search.ErrorHits(ss)
+		hits = search.ErrorHits(ss, o.Query)
 		o.Total, o.Capped = result.Total, result.Capped
 		errAt := len(hits)
 		hits = dropCopiedHits(dir, hits)
@@ -2259,11 +2260,11 @@ func printNoMatchesHinted(w io.Writer, dir, q string, regex, hinted bool) (misty
 		}
 		return
 	} else if ok {
-		fmt.Fprint(w, fitNotice(w, fmt.Sprintf("deja: no matches in %d indexed session%s — try fewer words or --re (query %q)\n", reach, pluralS(reach), q)))
+		fmt.Fprint(w, fitNotice(w, fmt.Sprintf("deja: no matches in %d indexed session%s — %s (query %q)\n", reach, pluralS(reach), missAdvice(q, regex), q)))
 	} else if n, err := index.SessionCount(dir); err == nil {
-		fmt.Fprint(w, fitNotice(w, fmt.Sprintf("deja: no matches in %d indexed session%s — try fewer words or --re (query %q)\n", n, pluralS(n), q)))
+		fmt.Fprint(w, fitNotice(w, fmt.Sprintf("deja: no matches in %d indexed session%s — %s (query %q)\n", n, pluralS(n), missAdvice(q, regex), q)))
 	} else {
-		fmt.Fprintf(w, "deja: no matches — try fewer words or --re (query %q)\n", q)
+		fmt.Fprintf(w, "deja: no matches — %s (query %q)\n", missAdvice(q, regex), q)
 	}
 	// Before advising fewer words: the sessions that hold every one of them may
 	// exist and be covered by the ignore rule, in which case rewording is the
@@ -2272,8 +2273,10 @@ func printNoMatchesHinted(w io.Writer, dir, q string, regex, hinted bool) (misty
 		fmt.Fprint(w, note)
 	}
 	// Which word to drop is the reader's next question, and deja read the
-	// per-term counts to decide there was no intersection (#826).
-	if line := termCountLine(dir, q); line != "" {
+	// per-term counts to decide there was no intersection (#826). Not for a
+	// pattern: its words are not looked up together, so "no session has them
+	// together" is not why it missed.
+	if line := termCountLine(dir, q); line != "" && !regex {
 		fmt.Fprint(w, line)
 	}
 	// The first thing anyone types is a guess at a command name, and a wrong
@@ -2294,6 +2297,34 @@ func printNoMatchesHinted(w io.Writer, dir, q string, regex, hinted bool) (misty
 		fmt.Fprint(w, note)
 	}
 	return mistypedCommand
+}
+
+// missAdvice is what to try after a miss. "Try --re" said to someone who used
+// it is advice they already followed; a pattern misses for its own reasons —
+// an anchor, since ^ and $ hold at each line, or being stricter than the text.
+func missAdvice(q string, regex bool) string {
+	if !regex {
+		return "try fewer words or --re"
+	}
+	if re, err := syntax.Parse(q, syntax.Perl); err == nil && hasAnchor(re) {
+		return "try the pattern without ^ or $, a looser one, or plain words without --re"
+	}
+	return "try a looser pattern, or plain words without --re"
+}
+
+// hasAnchor reports a ^ or $ in a parsed pattern; one inside a class or
+// escaped is a character, not an anchor.
+func hasAnchor(re *syntax.Regexp) bool {
+	switch re.Op {
+	case syntax.OpBeginLine, syntax.OpEndLine, syntax.OpBeginText, syntax.OpEndText:
+		return true
+	}
+	for _, sub := range re.Sub {
+		if hasAnchor(sub) {
+			return true
+		}
+	}
+	return false
 }
 
 // roleServedHint names the answer deja is holding but ranking will never

@@ -374,7 +374,7 @@ func runQuestion(q lmeQuestion) (int, questionDetail, time.Duration, error) {
 	// order-preserving RelevanceHits when the ladder degraded to relevance.
 	var hits []search.Hit
 	if result.Tier == search.TierError {
-		hits = search.ErrorHits(result.Sessions)
+		hits = search.ErrorHits(result.Sessions, o.Query)
 	} else if result.Tier == search.TierRelevance {
 		hits = search.RelevanceHits(result.Sessions, index.RelevanceTerms(q.Question))
 	} else if hits, err = search.Run(result.Sessions, o); err != nil {

@@ -2442,10 +2442,24 @@ func countRegex(re *regexp.Regexp, s string) int {
 }
 
 func snippet(s, q string, re *regexp.Regexp) string {
-	lines := proseLines(s)
+	return snippetAt(s, q, re, matchedLine(q, re))
+}
+
+// snippetAt is snippet with the test for a line that holds the match given
+// separately. The error tier centres on nothing in particular (q is empty) but
+// still knows which lines the reader pasted.
+func snippetAt(s, q string, re *regexp.Regexp, matched func(string) bool) string {
+	lines, first := proseLinesKeeping(s, matched)
 	s = strings.Join(lines, " ")
 	r := []rune(s)
 	idx := 0
+	if re == nil && q == "" && first > 0 {
+		// Nothing to centre on but the line the paste named: start there, so
+		// a panic forty lines into a test log is in the window.
+		for _, line := range lines[:first] {
+			idx += utf8.RuneCountInString(line) + 1
+		}
+	}
 	if re != nil {
 		// Anchor on the first match that has width; a zero-width one points at
 		// no passage in particular (#1606). Line by line, because the excerpt
@@ -3015,6 +3029,20 @@ func proseForSnippet(s string) string {
 // proseLines is the excerpt's text as the lines it is joined from, each with
 // its whitespace collapsed.
 func proseLines(s string) []string {
+	lines, _ := proseLinesKeeping(s, nil)
+	return lines
+}
+
+// proseLinesKeeping is proseLines that keeps a dump line holding the match
+// when no other line holds it, and also returns the index of the first kept
+// line that holds the match, or -1.
+//
+// The dump filters are there for the noise around an answer, and a line they
+// recognise can be the answer: an agent's test run panics, the agent searches
+// `assignment to entry in nil map`, and the excerpt showed the stack frames
+// and the FAIL summary while dropping the `panic:` line itself as a dump. The
+// line the reader searched for is the one line an excerpt must not lose.
+func proseLinesKeeping(s string, matched func(string) bool) ([]string, int) {
 	s = redact.SafeForDisplay(s)
 	// Neither the harness nor deja is a witness. An excerpt is offered as
 	// something someone said about the subject, and measured over twelve
@@ -3023,21 +3051,96 @@ func proseLines(s string) []string {
 	// coming back as evidence. Both are stripped where they sit, so a message
 	// that carries a person's words around them keeps the words.
 	s = withoutOwnCredit(digest.StripClosedHarnessBlocks(s))
-	var keep []string
+	type cand struct {
+		line      string
+		dump, hit bool
+	}
+	var cands []cand
+	proseHit := false
 	for _, line := range strings.Split(s, "\n") {
 		line = strings.TrimSpace(line)
-		if line == "" || looksNumbered(line) || looksToolDump(line) || digest.IsListingDump(line) {
+		if line == "" {
 			continue
 		}
-		keep = append(keep, strings.Join(strings.Fields(line), " "))
+		line = strings.Join(strings.Fields(line), " ")
+		dump := looksNumbered(line) || looksToolDump(line) || digest.IsListingDump(line)
+		// Asked of every line that would be dropped, and of the others only
+		// until one of them holds the match.
+		hit := matched != nil && (dump || !proseHit) && matched(line)
+		if hit && !dump {
+			proseHit = true
+		}
+		cands = append(cands, cand{line, dump, hit})
+	}
+	var keep []string
+	first := -1
+	for _, c := range cands {
+		// A dump line that matched stays only when no other line did: prose
+		// that says the same thing is the better excerpt.
+		if c.dump && (!c.hit || proseHit) {
+			continue
+		}
+		if c.hit && first < 0 {
+			first = len(keep)
+		}
+		keep = append(keep, c.line)
 	}
 	if len(keep) == 0 {
 		if out := strings.Join(strings.Fields(redact.SafeForDisplay(s)), " "); out != "" {
 			keep = append(keep, out)
 		}
 	}
-	return keep
+	return keep, first
 }
+
+// matchedLine says whether an excerpt line holds what the reader searched for:
+// a width-having match of the pattern, the query as typed, at least half of
+// its words as whole words, or — for a pasted error — a line the paste itself
+// carries. Half rather than any: "to" and "in" are words of `panic: assignment
+// to entry in nil map`, and one of them is in every frame of the stack below it.
+func matchedLine(q string, re *regexp.Regexp) func(string) bool {
+	if re != nil {
+		return func(line string) bool {
+			for _, loc := range re.FindAllStringIndex(line, -1) {
+				if loc[1] > loc[0] {
+					return true
+				}
+			}
+			return false
+		}
+	}
+	// Lines arrive redacted, so the paste is compared redacted too: a token in
+	// the error line is "[redacted]" on both sides.
+	lowQ := lower(strings.Join(strings.Fields(redact.SafeForDisplay(q)), " "))
+	toks := query.Tokens(q)
+	if len(toks) == 0 {
+		return nil
+	}
+	need := (len(toks) + 1) / 2
+	return func(line string) bool {
+		low := lower(line)
+		if strings.Contains(low, lowQ) {
+			return true
+		}
+		// A line of the paste, long enough to be an error and not a stray
+		// "FAIL" or "}" that any output carries.
+		if utf8.RuneCountInString(low) >= pastedLineMin && strings.Contains(lowQ, low) {
+			return true
+		}
+		n := 0
+		for _, t := range toks {
+			if containsWord(low, t) {
+				if n++; n >= need {
+					return true
+				}
+			}
+		}
+		return false
+	}
+}
+
+// pastedLineMin is how long a line must be to count as one the reader pasted.
+const pastedLineMin = 12
 
 func contextText(s string, matched bool) string {
 	s = redact.SafeForDisplay(s)
@@ -3062,7 +3165,12 @@ const TierRelevance = query.TierRelevance
 // each becomes one hit whose snippets are those messages — re-scoring them
 // against the paste's words (as the relevance tier would) throws away the
 // passage the tier found and can render a real match as "0 matches".
-func ErrorHits(ss []model.Session) []Hit {
+//
+// paste is what the reader pasted. It does not move the excerpt's centre, only
+// keeps the lines it carries from being dropped as dumps, and starts the
+// excerpt at the first of them.
+func ErrorHits(ss []model.Session, paste string) []Hit {
+	matched := matchedLine(paste, nil)
 	hits := make([]Hit, 0, len(ss))
 	for rank, s := range ss {
 		hit := Hit{Session: s, Tier: TierError, Count: len(s.Messages), Score: float64(len(ss) - rank)}
@@ -3070,7 +3178,7 @@ func ErrorHits(ss []model.Session) []Hit {
 			if strings.TrimSpace(m.Text) == "" {
 				continue
 			}
-			if sn := snippet(m.Text, "", nil); sn != "" {
+			if sn := snippetAt(m.Text, "", nil, matched); sn != "" {
 				hit.Snippets = append(hit.Snippets, sn)
 				hit.quoted = append(hit.quoted, m.Text)
 			}

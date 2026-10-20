@@ -2189,7 +2189,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 	}
 	var hits []search.Hit
 	if result.Tier == search.TierError {
-		hits = search.ErrorHits(ss)
+		hits = search.ErrorHits(ss, o.Query)
 	} else if result.Tier == search.TierRelevance {
 		hits = markStrictHits(search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(q), result.TermIDF), result)
 	} else if hits, err = search.Run(ss, o); err != nil {
@@ -2737,7 +2737,7 @@ func recallRank(dir, q string, o search.Options) (index.SearchResult, search.Opt
 	}
 	var hits []search.Hit
 	if result.Tier == search.TierError {
-		hits = search.ErrorHits(ss)
+		hits = search.ErrorHits(ss, o.Query)
 	} else if result.Tier == search.TierRelevance {
 		terms := index.RelevanceMatchTerms(q)
 		if result.Directory != "" {
