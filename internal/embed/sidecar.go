@@ -1,6 +1,7 @@
 package embed
 
 import (
+	"bufio"
 	"context"
 	"encoding/binary"
 	"fmt"
@@ -398,49 +399,53 @@ func readFile(path string) (Sidecar, error) {
 		return Sidecar{}, err
 	}
 	defer func() { _ = f.Close() }()
+	// Buffered: decoding straight off the file was a few syscalls per vector,
+	// and on windows the file stays open for all of it, which refuses the
+	// publish of the next sidecar over it (#5412).
+	r := bufio.NewReaderSize(f, 1<<16)
 	var got [4]byte
-	if _, err = f.Read(got[:]); err != nil || got != magic {
+	if _, err = io.ReadFull(r, got[:]); err != nil || got != magic {
 		return Sidecar{}, fmt.Errorf("invalid vector sidecar")
 	}
 	var version, dim uint16
 	var count, covered uint64
 	var model, gen string
-	if err = binary.Read(f, binary.LittleEndian, &version); err != nil || version < 1 || version > sidecarVersion {
+	if err = binary.Read(r, binary.LittleEndian, &version); err != nil || version < 1 || version > sidecarVersion {
 		return Sidecar{}, fmt.Errorf("unsupported vector sidecar")
 	}
-	if err = binary.Read(f, binary.LittleEndian, &dim); err != nil {
+	if err = binary.Read(r, binary.LittleEndian, &dim); err != nil {
 		return Sidecar{}, err
 	}
-	if model, err = readString(f); err != nil {
+	if model, err = readString(r); err != nil {
 		return Sidecar{}, err
 	}
-	if gen, err = readString(f); err != nil {
+	if gen, err = readString(r); err != nil {
 		return Sidecar{}, err
 	}
-	if err = binary.Read(f, binary.LittleEndian, &count); err != nil {
+	if err = binary.Read(r, binary.LittleEndian, &count); err != nil {
 		return Sidecar{}, err
 	}
 	if count > 10_000_000 || dim > 16_384 {
 		return Sidecar{}, fmt.Errorf("invalid vector sidecar dimensions")
 	}
-	if err = binary.Read(f, binary.LittleEndian, &covered); err != nil {
+	if err = binary.Read(r, binary.LittleEndian, &covered); err != nil {
 		return Sidecar{}, err
 	}
 	out := Sidecar{Model: model, Generation: gen, Dim: int(dim), Covered: int(covered), Vectors: make([]Vector, count)}
 	for i := range out.Vectors {
-		if err = binary.Read(f, binary.LittleEndian, &out.Vectors[i].Offset); err != nil {
+		if err = binary.Read(r, binary.LittleEndian, &out.Vectors[i].Offset); err != nil {
 			return Sidecar{}, err
 		}
 		if version >= 2 {
-			if err = binary.Read(f, binary.LittleEndian, &out.Vectors[i].Ident); err != nil {
+			if err = binary.Read(r, binary.LittleEndian, &out.Vectors[i].Ident); err != nil {
 				return Sidecar{}, err
 			}
 		}
-		if out.Vectors[i].Key, err = readString(f); err != nil {
+		if out.Vectors[i].Key, err = readString(r); err != nil {
 			return Sidecar{}, err
 		}
 		out.Vectors[i].Values = make([]float32, out.Dim)
-		if err = binary.Read(f, binary.LittleEndian, out.Vectors[i].Values); err != nil {
+		if err = binary.Read(r, binary.LittleEndian, out.Vectors[i].Values); err != nil {
 			return Sidecar{}, err
 		}
 	}
