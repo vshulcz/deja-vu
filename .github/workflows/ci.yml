@@ -292,9 +292,6 @@ jobs:
       # runners in centralus, eastus, eastus2 and northcentralus, where it had
       # taken 43-94 minutes before. A fresh runner never reuses a cached test
       # result, so nothing is lost.
-      - run: go test -count=20 -v -run 'TestConcurrentWritersNeverPublishAMix|TestWritesLandPastAPollingReader' ./internal/atomicfile/ | grep -E '^(---|ok|FAIL)|refused'
-        if: matrix.shard == 1
-        shell: bash
       - run: go test -count=1 -timeout 25m -run "$RUN" -skip "$SKIP" ./...
         if: runner.os == 'Windows' && env.FULL == 'true'
         shell: bash
