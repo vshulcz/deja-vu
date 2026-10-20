@@ -1267,11 +1267,18 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 		return err
 	}
 	m.RecordStrings = tbl.strs
-	if err := addOverlays(filepath.Join(dir, "buckets"), filepath.Join(dir, "buckets"), buckets, m.DeadRecords); err != nil {
+	stale, err := addOverlays(filepath.Join(dir, "buckets"), filepath.Join(dir, "buckets"), buckets, m.DeadRecords)
+	if err != nil {
 		return err
 	}
 	m.BuiltAt = time.Now()
-	return writeManifest(dir, *m)
+	m.bucketsLeaving = staleCount(stale)
+	if err := writeManifest(dir, *m); err != nil {
+		return err
+	}
+	dropStale(stale)
+	m.bucketsLeaving = 0
+	return nil
 }
 
 func shortHash(s string) string {

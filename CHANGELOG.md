@@ -117,7 +117,12 @@ are a quarter of it. On a 25,000-session store a pass over 9 rewritten
 transcripts wrote 798 MB and peaked at 2.5 GB of memory; now it writes 21 MB,
 most of it the manifest, and peaks at 310 MB. A new transcript no longer
 rewrites every postings file either: 225 MB and 2.4 GB there, now 18 MB and
-150 MB. The index is rebuilt once for the new layout (#5387).
+150 MB. The index is rebuilt once for the new layout (#5387). The replaced
+records are zeroed where they stand on the same pass, and so is a word only they
+held in the postings files, so text taken out of a transcript leaves the index
+then rather than at the next compaction (#5429), and an older deja
+meeting the index can no longer bring them back as live (#5428). A lost
+overlay file reads as damage and rebuilds (#5426).
 
 A pass that reads Codex's, TRAE's or Claude Code's history.jsonl beside other
 changes replaces only the sessions with a new prompt in it, not every session

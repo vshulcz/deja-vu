@@ -55,6 +55,20 @@ location. The directory contains:
   the few files each session touched most, and hashes — not text — of the
   questions it asked.
 
+Text taken out of a transcript leaves `records.bin` and `buckets/` on the next
+`deja index` pass that reads it. The pass zeroes the replaced records in
+`records.bin` where they stand, and in `buckets/` zeroes every word that no
+remaining record holds, all but the one or two leading letters the bucket file
+is named after; a word another session still contains stays, as that
+session's. If the pass is killed between committing the new index and the
+zeroing, the next deja process that takes the index lock finishes it. On
+Windows, a search holding the index open as a pass ends can keep the previous
+index directory (`index.db.old`, or `index.db.old.N` when that one is held
+too) until a later pass removes it; what stays there is usually only the
+record log it shares with the live index, already zeroed. deja overwrites in
+place and does not attempt secure deletion: an SSD or a copy-on-write
+filesystem may keep the old blocks until it reuses them.
+
 At a supported pre-compaction hook, `manifest.gob` also retains redacted,
 transcript-derived continuation packets for at most 32 session/workspace pairs,
 with a 24 KiB limit per packet. These contain objectives, conclusions, the

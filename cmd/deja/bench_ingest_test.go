@@ -31,6 +31,13 @@ func TestBenchIngestNoUpdateRewritesTheStore(t *testing.T) {
 	if added := report.Classes[2].AddedKB; added <= 0 {
 		t.Errorf("a new transcript added %.2f KB of records, so it was not indexed", added)
 	}
+	// The records a rewrite replaced are cleared where they stand, and only
+	// those: no other class clears anything (#5429).
+	for i, c := range report.Classes {
+		if cleared := c.ClearedKB > 0; cleared != (c.Name == "rewritten transcript") {
+			t.Errorf("class %d %q cleared %.2f KB of records", i, c.Name, c.ClearedKB)
+		}
+	}
 	// A rename adds nothing: the bytes are already on file under the old name,
 	// and re-reading them was what #3546 fixed.
 	renamed := report.Classes[3]

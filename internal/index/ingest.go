@@ -4789,6 +4789,10 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	// append_replace.go (#5387).
 	appending := appendsInPlace(dir, tmp, old)
 	swapped := false
+	// Appending, a record that is not carried stays where it is and is listed
+	// as dead, and is overwritten once the swap commits.
+	var dead []int64
+	var deadBytes int64
 	if appending {
 		defer func() {
 			if !swapped {
@@ -4804,8 +4808,16 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 				return err
 			}
 		}
+		if appending && len(dead) > 0 {
+			if err := os.WriteFile(filepath.Join(tmp, scrubPendingFile), nil, 0o600); err != nil {
+				return err
+			}
+		}
 		err := swapIndexDir(dir, tmp)
 		swapped = err == nil
+		if swapped && len(dead) > 0 {
+			scrubAfterSwap(dir, dead)
+		}
 		return err
 	}
 	var rf *os.File
@@ -4960,10 +4972,6 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 			}
 		}
 	}
-	// Appending, a record that is not carried stays where it is and is listed
-	// as dead.
-	var dead []int64
-	var deadBytes int64
 	if err := eachStoredRecord(filepath.Join(dir, "records.bin"), oldTables, func(oldOff int64, payload []byte) error {
 		kill := func() {
 			if appending {
@@ -5175,7 +5183,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		// go into overlays, and the dead records' are dropped on read.
 		m.DeadRecords = mergeDead(old.DeadRecords, dead)
 		m.DeadBytes = old.DeadBytes + deadBytes
-		if err := addOverlays(filepath.Join(dir, "buckets"), filepath.Join(tmp, "buckets"), buckets, m.DeadRecords); err != nil {
+		if _, err := addOverlays(filepath.Join(dir, "buckets"), filepath.Join(tmp, "buckets"), buckets, m.DeadRecords); err != nil {
 			return err
 		}
 	} else {
@@ -5701,9 +5709,11 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	if err := rw.Close(); err != nil {
 		return filesTouched, messages, 0, err
 	}
-	if err := addOverlays(filepath.Join(dir, "buckets"), filepath.Join(dir, "buckets"), buckets, m.DeadRecords); err != nil {
+	stale, err := addOverlays(filepath.Join(dir, "buckets"), filepath.Join(dir, "buckets"), buckets, m.DeadRecords)
+	if err != nil {
 		return filesTouched, messages, 0, err
 	}
+	m.bucketsLeaving = staleCount(stale)
 	setDatabaseStoreWatermarks(m.Files, m.Sessions)
 	m.RecordStrings = tbl.strs
 	// Read before writeManifest: the fold in there drains the counters, and the
@@ -5715,6 +5725,8 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	if err := writeManifest(dir, m); err != nil {
 		return filesTouched, messages, unreadable, err
 	}
+	dropStale(stale)
+	m.bucketsLeaving = 0
 	// The sidecars, from what this pass read and from the records already on
 	// file. The replacement path does the same three things after it carries
 	// them over; this path used to do none of them, which was survivable while

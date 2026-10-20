@@ -1,6 +1,10 @@
 package index
 
 import (
+	"bufio"
+	"bytes"
+	"encoding/binary"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -8,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"unicode/utf8"
 )
 
 // A pass that adds a few sessions used to write every postings file again: a
@@ -149,14 +154,14 @@ func readBucketToken(p, tok string, dead []int64) ([]posting, error) {
 // file open would refuse that.
 //
 // With dst the same as src the work happens in place. Each step renames a
-// whole file in and then removes the files it repeats, newest first, so a
-// reader sees the old layers, or the new with a repeat it joins away. A
-// reader that listed the layers before a merge can miss the merged ones for
-// that one read.
-func addOverlays(src, dst string, adds bucketPostings, dead []int64) error {
+// whole file in, and the files it repeats are handed back, each bucket's
+// newest first, for the caller to remove once its manifest commits (see
+// dropStale): a reader sees the old layers, or the new with a repeat it joins
+// away, and the files on disk never fall below the count the manifest holds.
+func addOverlays(src, dst string, adds bucketPostings, dead []int64) (stale [][]string, _ error) {
 	if src != dst {
 		if err := linkBuckets(src, dst, adds); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	names := make([]string, 0, len(adds))
@@ -190,39 +195,45 @@ func addOverlays(src, dst string, adds bucketPostings, dead []int64) error {
 					return
 				}
 				reportAdvance(1)
-				if err := addOverlay(filepath.Join(src, b+".bin"), filepath.Join(dst, b+".bin"), adds[b], dead); err != nil {
-					mu.Lock()
-					if failed == nil {
-						failed = err
-					}
-					mu.Unlock()
+				gone, err := addOverlay(filepath.Join(src, b+".bin"), filepath.Join(dst, b+".bin"), adds[b], dead)
+				mu.Lock()
+				if err != nil && failed == nil {
+					failed = err
 				}
+				if len(gone) > 0 {
+					stale = append(stale, gone)
+				}
+				mu.Unlock()
 			}
 		}()
 	}
 	wg.Wait()
-	return failed
+	return stale, failed
 }
 
 // addOverlay files add for the bucket at src into dst. The plan is made from
 // the sizes in src: the new overlay folds into the one before it while that
 // one is no more than twice its size, and everything folds into the bucket
-// once the overlays hold a quarter of it.
-func addOverlay(src, dst string, add map[string][]posting, dead []int64) error {
+// once the overlays hold a quarter of it. In place, it returns the overlays
+// the step made redundant, newest first.
+func addOverlay(src, dst string, add map[string][]posting, dead []int64) ([]string, error) {
 	inPlace := src == dst
 	bi, err := os.Stat(src)
 	if os.IsNotExist(err) {
-		return writeBucket(dst, add)
+		if len(add) == 0 {
+			return nil, nil
+		}
+		return nil, writeBucket(dst, add)
 	}
 	if err != nil {
-		return err
+		return nil, err
 	}
 	layers := bucketLayers(src)
 	sizes := make([]int64, 0, len(layers)+1)
 	for _, p := range layers {
 		fi, err := os.Stat(p)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		sizes = append(sizes, fi.Size())
 	}
@@ -241,24 +252,24 @@ func addOverlay(src, dst string, add map[string][]posting, dead []int64) error {
 	if len(sizes) > maxOverlays || held*4 > bi.Size() {
 		data, err := readBucket(src)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		for tok, posts := range add {
 			data[tok] = joinPostings(data[tok], posts)
 		}
 		if err := writeBucket(dst, liveBucket(data, dead)); err != nil {
-			return err
+			return nil, err
 		}
 		if inPlace {
-			dropLayers(dst, 1, len(layers))
+			return newestFirst(dst, 1, len(layers)), nil
 		}
-		return nil
+		return nil, nil
 	}
 	merged := map[string][]posting{}
 	for _, p := range layers[from-1:] {
 		data, err := readBucketFile(p)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		for tok, posts := range data {
 			merged[tok] = joinPostings(merged[tok], posts)
@@ -269,33 +280,211 @@ func addOverlay(src, dst string, add map[string][]posting, dead []int64) error {
 	}
 	if !inPlace {
 		if err := os.Link(src, dst); err != nil {
-			return err
+			return nil, err
 		}
 		for i, p := range layers[:from-1] {
 			if err := os.Link(p, overlayPath(dst, i+1)); err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
 	if err := writeBucket(overlayPath(dst, from), liveBucket(merged, dead)); err != nil {
-		return err
+		return nil, err
 	}
 	if inPlace {
-		dropLayers(dst, from+1, len(layers))
+		return newestFirst(dst, from+1, len(layers)), nil
+	}
+	return nil, nil
+}
+
+// newestFirst is the overlays numbered first to last of the bucket at base,
+// newest first.
+func newestFirst(base string, first, last int) []string {
+	var out []string
+	for i := last; i >= first; i-- {
+		out = append(out, overlayPath(base, i))
+	}
+	return out
+}
+
+// staleCount is how many files stale names.
+func staleCount(stale [][]string) int {
+	n := 0
+	for _, s := range stale {
+		n += len(s)
+	}
+	return n
+}
+
+// dropStale removes the overlays an in-place merge made redundant, each
+// bucket's newest first. A file that will not go (Windows, a reader holding
+// it) stops its bucket there: what is left repeats postings the merged file
+// holds, which a read joins away and the next merge takes in, and no gap
+// opens below it. It runs after the manifest commits, which counted the
+// files without these: before, a reader's damage check would see fewer
+// files than the manifest it read promised (#5426).
+func dropStale(stale [][]string) {
+	for _, files := range stale {
+		for _, p := range files {
+			if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
+				break
+			}
+		}
+	}
+}
+
+// maxPostingBytes bounds one encoded posting: two varints, of an offset
+// difference and of a session id with the tool bit.
+const maxPostingBytes = binary.MaxVarintLen64 + binary.MaxVarintLen32 + 1
+
+// blankDeadWords overwrites, in the postings files of the index at dir, every
+// word of words (the dead records' postings by bucket) that no live record
+// holds any more. The bytes of the word in the file's directory past the
+// bucket's own letters become zeros, in place: the entry keeps its length and
+// its block, which holds only dead records' postings, and no query names a
+// word of zeros. A block too long to
+// be dead records' alone is a live word, known without decoding it. Rewriting
+// the file without the word instead cost a whole bucket per word, and the
+// buckets of a text index are its first letter (#5429).
+func blankDeadWords(dir string, words bucketPostings, dead []int64) error {
+	for b, toks := range words {
+		base := filepath.Join(dir, "buckets", b+".bin")
+		files := append([]string{base}, bucketLayers(base)...)
+		live := map[string]bool{}
+		for _, p := range files {
+			if err := markLiveWords(p, toks, dead, live); err != nil && !os.IsNotExist(err) {
+				return err
+			}
+		}
+		gone := map[string]bool{}
+		for tok := range toks {
+			if !live[tok] {
+				gone[tok] = true
+			}
+		}
+		if len(gone) == 0 {
+			continue
+		}
+		for _, p := range files {
+			if err := blankWords(p, gone); err != nil && !os.IsNotExist(err) {
+				return err
+			}
+		}
 	}
 	return nil
 }
 
-// dropLayers removes the overlays numbered first to last of the bucket at
-// base, newest first. A file that will not go (Windows, a reader holding it)
-// stops it there: what is left repeats postings the merged file holds, which
-// a read joins away and the next merge takes in, and no gap opens below it.
-func dropLayers(base string, first, last int) {
-	for i := last; i >= first; i-- {
-		if err := os.Remove(overlayPath(base, i)); err != nil && !os.IsNotExist(err) {
-			return
+// markLiveWords sets live[tok] for each word of toks the file at p holds a
+// live posting of.
+func markLiveWords(p string, toks map[string][]posting, dead []int64, live map[string]bool) error {
+	entries, f, err := openBucketDir(p)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	for _, e := range entries {
+		if _, ok := toks[e.tok]; !ok || live[e.tok] {
+			continue
+		}
+		if int(e.n) > maxPostingBytes*len(dead) {
+			live[e.tok] = true
+			continue
+		}
+		buf := make([]byte, e.n)
+		if _, err := f.ReadAt(buf, int64(e.off)); err != nil {
+			return err
+		}
+		if len(liveOnly(decodePostings(buf), dead)) > 0 {
+			live[e.tok] = true
 		}
 	}
+	return nil
+}
+
+// blankWords zeroes the words of gone where the directory of the postings
+// file at p names them, and syncs the file.
+func blankWords(p string, gone map[string]bool) error {
+	f, err := os.OpenFile(p, os.O_RDWR, 0)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	r := bufio.NewReader(f)
+	magic := make([]byte, len(bucketMagic))
+	if _, err := io.ReadFull(r, magic); err != nil || !bytes.Equal(magic, bucketMagic) {
+		return errCorruptIndex
+	}
+	count, err := binary.ReadUvarint(r)
+	if err != nil {
+		return err
+	}
+	pos := int64(len(bucketMagic) + uvarintLen(count))
+	type span struct {
+		at    int64
+		blank []byte
+	}
+	var hits []span
+	tb := []byte{}
+	for i := uint64(0); i < count; i++ {
+		ln, err := binary.ReadUvarint(r)
+		if err != nil {
+			return err
+		}
+		pos += int64(uvarintLen(ln))
+		if ln > uint64(maxRecordSize) {
+			return errCorruptIndex
+		}
+		if cap(tb) < int(ln) {
+			tb = make([]byte, ln)
+		}
+		tb = tb[:ln]
+		if _, err := io.ReadFull(r, tb); err != nil {
+			return err
+		}
+		if gone[string(tb)] {
+			if b, ok := blankedWord(string(tb)); ok {
+				hits = append(hits, span{pos, b})
+			}
+		}
+		pos += int64(ln)
+		n, err := binary.ReadUvarint(r)
+		if err != nil {
+			return err
+		}
+		pos += int64(uvarintLen(n))
+	}
+	if len(hits) == 0 {
+		return nil
+	}
+	for _, h := range hits {
+		if _, err := f.WriteAt(h.blank, h.at); err != nil {
+			return err
+		}
+	}
+	return f.Sync()
+}
+
+// blankedWord is tok with every byte past the ones its bucket is named from
+// zeroed: the word stays filed in the bucket it is in, and keeps no more of
+// itself than the bucket's name already says. ok is false for a word no such
+// prefix keeps in its bucket.
+func blankedWord(tok string) (_ []byte, ok bool) {
+	want := bucket(tok)
+	end, runes := 0, 0
+	for end < len(tok) && runes < 3 {
+		_, size := utf8.DecodeRuneInString(tok[end:])
+		end += size
+		runes++
+		if runes < 2 {
+			continue
+		}
+		b := make([]byte, len(tok))
+		copy(b, tok[:end])
+		if bucket(string(b)) == want {
+			return b, true
+		}
+	}
+	return nil, false
 }
 
 // encodeBucketEstimate is the size an overlay of data comes to, near enough
