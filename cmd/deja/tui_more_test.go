@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -289,6 +290,37 @@ func TestThemeChipsStayApartFromTheirPanelIn256Colours(t *testing.T) {
 		if l, want := c.Lines(tui.ModeTrue)[0], "48;2;"+rgbArgs(p[3]); !strings.Contains(l, want) {
 			t.Errorf("%s: truecolor surf2 = %q, want %s", name, l, want)
 		}
+	}
+}
+
+// The header bar and code blocks fill with mantle on a base page; in light
+// theme both rounded to xterm 255 and the bar melted into the page (#5355).
+// Mantle has no grey between base and surf to take, so it must also keep off
+// the entries the chips and panels use.
+func TestThemeHeaderStaysApartFromThePageIn256Colours(t *testing.T) {
+	t.Cleanup(func() { setTheme("dark") })
+	for name := range palettes {
+		setTheme(name)
+		m := tui.To256(cMantle)
+		for what, c := range map[string]tui.Color{"base": cBase, "surf": cSurf, "surf2": cSurf2} {
+			if tui.To256(c) == m {
+				t.Errorf("%s: mantle and %s both land on xterm %d", name, what, m)
+			}
+		}
+	}
+	dir, _ := tuiStore(t)
+	t.Setenv("DEJA_THEME", "light")
+	a := newTestTUI(t, dir)
+	setTheme("light")
+	lines := a.frame(100, 30).Lines(tui.Mode256)
+	bg := regexp.MustCompile(`48;5;(\d+)`)
+	header := bg.FindStringSubmatch(lines[0])
+	page := "48;5;" + strconv.Itoa(tui.To256(cBase))
+	if header == nil || header[0] == page {
+		t.Errorf("light header bar fills with %v, the page with %s:\n%q", header, page, lines[0])
+	}
+	if !strings.Contains(strings.Join(lines[1:], "\n"), page) {
+		t.Errorf("control: no cell below the header fills with the page's %s", page)
 	}
 }
 
