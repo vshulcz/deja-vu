@@ -12,7 +12,7 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { argv, contributions, exitStatus, guarded, newestEvents, noteBoard, resultText, splitHookReply } from "./lib.js";
+import { argv, contributions, exitStatus, guarded, inert, newestEvents, noteBoard, resultText, splitHookReply } from "./lib.js";
 
 const require = createRequire(import.meta.url);
 
@@ -282,19 +282,20 @@ function autoDigest(ctx, board) {
     ctx.systemPrompt.context({
       name: "deja:project",
       order: 110,
+      interpolate: false,
       text: (assembly) => {
         const agent = assembly && assembly.agent;
         if (!agent) return "";
         const sid = sessionId(agent);
         if (sid && seen.has(sid)) return "";
         if (sid) seen.add(sid);
-        return askHook(
+        return inert(askHook(
           ["hook-context", "--plain"],
           ["hook-context"],
           JSON.stringify({ session_id: sid, cwd: sessionCwd(agent), source: "startup", deja_once: true }),
           sid,
           board,
-        );
+        ));
       },
     }),
   );
@@ -344,6 +345,7 @@ function autoRecall(ctx, board) {
     ctx.systemPrompt.context({
       name: "deja:recall",
       order: 120,
+      interpolate: false,
       text: (assembly) => {
         const agent = assembly && assembly.agent;
         if (!agent) return "";
@@ -360,13 +362,13 @@ function autoRecall(ctx, board) {
           asked = prompt;
           askedIn = cwd;
           askedBy = sid;
-          recalled = askHook(
+          recalled = inert(askHook(
             ["hook-prompt", "--plain"],
             ["hook-prompt"],
             JSON.stringify({ prompt, cwd, session_id: sid }),
             sid,
             board,
-          );
+          ));
         }
         // Silence is the common case: this speaks only when the history answers.
         return recalled;
