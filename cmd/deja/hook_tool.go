@@ -165,6 +165,9 @@ const (
 	hookToolCrush
 	// Copilot CLI's flat {"additionalContext": …}; see hook_strict.go.
 	hookToolCopilot
+	// MiniMax Code's {"hookSpecificOutput":{"hookEventName":…,"additionalContext":…}};
+	// see hook_mcode.go.
+	hookToolMcode
 )
 
 func hookToolShapeOf(rest []string) hookToolShape {
@@ -178,6 +181,8 @@ func hookToolShapeOf(rest []string) hookToolShape {
 		return hookToolCrush
 	case "--copilot", "-copilot":
 		return hookToolCopilot
+	case "--mcode", "-mcode":
+		return hookToolMcode
 	}
 	return hookToolClaude
 }
@@ -321,6 +326,9 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 		return nil
 	case hookToolCopilot:
 		emitCopilotContext(stdout, out)
+		return nil
+	case hookToolMcode:
+		emitMcodeContext(stdout, event, out)
 		return nil
 	}
 	var resp sessionStartHookResponse

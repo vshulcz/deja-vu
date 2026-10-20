@@ -1192,6 +1192,12 @@ func doctorHarnessStores(w io.Writer, dir string, all bool) {
 		sources.MuseSessionFiles(), sources.MuseSubagentFile, sources.MuseSidecarFiles()...)
 	dshRoot := sources.DeepSeekRoot()
 	printFiles("deepseek", dshRoot, doctorExists(dshRoot), sources.DeepSeekSessionFiles())
+	// MiniMax Code keeps one transcript per session under its own data
+	// directory, sharded by the day the conversation started. The runtime's
+	// own bookkeeping sits beside each transcript and is named rather than
+	// counted as a file deja could not read.
+	mcodeRoot := sources.McodeRoot()
+	printFilesBeside("mcode", mcodeRoot, doctorExists(mcodeRoot), sources.McodeSessionFiles(), sources.McodeSidecarFiles()...)
 	zedDB := sources.ZedDB()
 	printRow("zed", zedDB, doctorFilePresent(zedDB), doctorSQLiteDetail(zedDB, sqlite))
 	// One store for every local session, as Zed has — but the file the row
@@ -2122,6 +2128,7 @@ func doctorMCPConfigs() []doctorMCPConfig {
 		{"junie", junieMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"jetbrains", jetBrainsMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"windsurf", windsurfMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
+		{"mcode", mcodeConfigPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"gjc", gjcMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"zcode", zcodeConfigPath(), doctorZCodeWired, nil},
 		{"commandcode", commandCodeMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},

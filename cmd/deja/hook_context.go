@@ -683,6 +683,8 @@ func runHookContextMode(dir string, plain, once bool) error {
 		shape = hookToolPlain
 	} else if copilotHookOutput {
 		shape = hookToolCopilot
+	} else if mcodeHookOutput {
+		shape = hookToolMcode
 	}
 	if input.Once && input.PromptStamps && sessionHadDigest(dir, input.SessionID) {
 		return nil

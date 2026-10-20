@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where MiniMax Code stores its history — session format</title>
+<meta name="description" content="Where MiniMax Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/mcode.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where MiniMax Code stores its history — session format">
+<meta property="og:description" content="Where MiniMax Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/mcode.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where MiniMax Code stores its history — session format">
+<meta name="twitter:description" content="Where MiniMax Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where MiniMax Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"MiniMax Code","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/mcode.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/mcode.html","name":"MiniMax Code","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="amp.html">Amp</a><a href="antigravity.html">Antigravity</a><a href="cherrystudio.html">Cherry Studio</a><a href="claude-code.html">Claude Code</a><a href="cline.html">Cline</a><a href="codebuddy.html">CodeBuddy Code</a><a href="codewhale.html">CodeWhale</a><a href="codex.html">Codex CLI</a><a href="commandcode.html">Command Code</a><a href="continue.html">Continue</a><a href="copilot.html">Copilot CLI</a><a href="crush.html">Crush</a><a href="cursor.html">Cursor</a><a href="deepseek.html">DeepSeek Harness</a><a href="devin.html">Devin CLI</a><a href="gjc.html">gajae-code</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="jetbrains.html">JetBrains AI Assistant</a><a href="junie.html">Junie</a><a href="kilocode.html">Kilo Code</a><a href="kimchi.html">Kimchi Coding</a><a href="kimi.html">Kimi Code</a><a href="kiro.html">Kiro</a><a href="mcode.html" aria-current="page">MiniMax Code</a><a href="muse.html">Muse Code</a><a href="omp.html">omp (Oh My Pi)</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="prime.html">prime-agent (PrimeIntellect)</a><a href="qwen.html">Qwen Code</a><a href="reasonix.html">Reasonix</a><a href="roo.html">Roo Code</a><a href="senpi.html">Senpi</a><a href="trae.html">TRAE CLI</a><a href="copilot-chat.html">VS Code Copilot Chat</a><a href="windsurf.html">Windsurf / Devin Desktop</a><a href="zcode.html">ZCode</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>MiniMax Code</h1>
+<ul>
+<li><strong>ID</strong>: <code>mcode</code></li>
+<li><strong>Store</strong>: <code>~/.minimax/v2/sessions/YYYY/MM/DD/&lt;session&gt;/messages.jsonl</code></li>
+<li><strong>Read overrides</strong>: <code>DEJA_MCODE_ROOT</code>, a path, replaces the session root</li>
+<li><strong>Format</strong>: JSONL, one message per line, <code>timestamp</code> in milliseconds</li>
+<li><strong>Needs</strong>: nothing</li>
+</ul>
+<p>MiniMax Code is the desktop agent. Its local runtime keeps one directory per</p>
+<p>conversation, sharded by the day it started, and writes the transcript beside a</p>
+<p><code>manifest.json</code>:</p>
+<pre><code>~/.minimax/v2/sessions/2026/10/20/02-57-27-477-session_&lt;id&gt;/
+    manifest.json
+    messages.jsonl</code></pre>
+<p>Every line is one message:</p>
+<pre><code class="language-json">{&#34;message_id&#34;:&#34;msg-user-v1-…&#34;,&#34;turn_id&#34;:&#34;…&#34;,
+ &#34;message&#34;:{&#34;role&#34;:&#34;user&#34;,&#34;content&#34;:[{&#34;type&#34;:&#34;text&#34;,&#34;text&#34;:&#34;…&#34;}],
+            &#34;timestamp&#34;:1792465048498,
+            &#34;canonicalTextRange&#34;:{&#34;startOffset&#34;:110,&#34;endOffset&#34;:145}}}</code></pre>
+<p>The role is <code>user</code>, <code>assistant</code> or <code>toolResult</code>. A content block is <code>text</code>,</p>
+<p><code>thinking</code> or <code>toolCall</code> — <code>{type, id, name, arguments}</code> — and a tool result</p>
+<p>carries the <code>toolCallId</code> and <code>toolName</code> it answers.</p>
+<p>A fourth role, <code>compactionSummary</code>, is what a compaction leaves behind. The</p>
+<p>runtime rewrites the transcript in place: the summary of the turns it cut takes</p>
+<p>their place, and the turns themselves move to the runtime&#39;s own <code>snapshots/</code></p>
+<p>directory. The summary is therefore the only record of them the transcript</p>
+<p>holds, and deja indexes it under the summary role — dropped it would be the</p>
+<p>half of the conversation nobody could find, and read as speech it would be</p>
+<p>words the person never said.</p>
+<p>A person&#39;s turn does not hold only what the person wrote. The runtime</p>
+<p>assembles the turn around it: the agent banner, the permission notice, the</p>
+<p>skill catalogue, the media reminder. <code>canonicalTextRange</code> says which part of</p>
+<p>that text was typed, and deja keeps that part alone — the rest is the</p>
+<p>harness talking to itself, and indexing it would put the runtime&#39;s own words</p>
+<p>at the head of every session on the machine.</p>
+<p>The <code>thinking</code> block is the model reasoning out loud, not what it told the</p>
+<p>person, so it stays out of the transcript the way it does in every other</p>
+<p>harness here.</p>
+<p>The transcript records no working directory, so the project comes from where</p>
+<p>the session&#39;s own file activity was — the same evidence the other harnesses</p>
+<p>without a recorded cwd are filed under.</p>
+<p>The session id is the one <code>manifest.json</code> records; the directory name carries</p>
+<p>it base64-encoded, and is read when the manifest is missing.</p>
+<p><strong>Last verified:</strong> 2026-10-20</p>
+<h2 id="sources">Sources</h2>
+<p>The shape was read off MiniMax Code&#39;s own local runtime v2 sessions</p>
+<p>(<code>~/.minimax/v2/sessions</code>), not off documentation: the runtime ships no</p>
+<p>published format for its transcripts. The fixture is synthetic.</p>
+<h2 id="wiring">Wiring</h2>
+<p><code>deja install mcode</code> writes the server into <code>~/.minimax/mcp.json</code>, the file</p>
+<p>MCode&#39;s own MCP page writes:</p>
+<pre><code class="language-json">{&#34;mcpServers&#34;: {&#34;deja&#34;: {&#34;type&#34;: &#34;stdio&#34;, &#34;command&#34;: &#34;deja&#34;, &#34;args&#34;: [&#34;mcp&#34;]}}}</code></pre>
+<p><code>deja install mcode-auto</code> adds a MiniMax-format plugin package under</p>
+<p><code>~/.minimax/plugins/deja/</code>, whose hooks are the events the runtime fires:</p>
+<div class="tablewrap"><table>
+<tr><th>Event</th><th>Hook</th><th>Matcher</th></tr>
+<tr><td><code>SessionStart</code></td><td><code>deja hook-context --mcode</code></td><td>—</td></tr>
+<tr><td><code>UserPromptSubmit</code></td><td><code>deja hook-prompt --mcode</code></td><td>—</td></tr>
+<tr><td><code>PreToolUse</code></td><td><code>deja hook-tool --mcode</code></td><td>`bash\</td><td>edit\</td><td>write\</td><td>read`</td></tr>
+<tr><td><code>PostToolUse</code></td><td><code>deja hook-tool-after --mcode</code></td><td><code>bash</code></td></tr>
+<tr><td><code>SessionEnd</code></td><td><code>deja hook-session-end</code></td><td>—</td></tr>
+<tr><td><code>PreCompact</code></td><td><code>deja hook-precompact --harness mcode</code></td><td>—</td></tr>
+</table></div>
+<p>The payload is Claude-shaped — the event name, the prompt, the tool name and</p>
+<p>its input, the session id, the cwd — so the hooks read it unchanged. Only the</p>
+<p>way the answer is written back is MiniMax Code&#39;s own: <code>--mcode</code> puts the text</p>
+<p>under <code>hookSpecificOutput.additionalContext</code>, under the event it answers,</p>
+<p>which is the only place that runtime reads it from.</p>
+<p><code>deja handoff --to mcode --exec</code> runs the MiniMax Code CLI with the digest as</p>
+<p>its first prompt. The desktop app is not a command line, so the handoff needs</p>
+<p>the CLI (<code>mcode</code>) on the machine.</p>
+
+<hr>
+<p>deja reads this format and 42 others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article>
+</div>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

@@ -3588,6 +3588,106 @@
           "proof": "fixture"
         }
       }
+    },
+    {
+      "id": "mcode",
+      "store_paths": [
+        "~/.minimax/v2/sessions/YYYY/MM/DD/<session>/messages.jsonl",
+        "${DEJA_MCODE_ROOT}/YYYY/MM/DD/<session>/messages.jsonl"
+      ],
+      "format_kind": "jsonl",
+      "fixture_paths": [
+        "fixtures/registry/mcode/v2/sessions/2026/10/20/02-57-27-477-session_bXZzXzBmMWUyZDNjNGI1YTY5Nzg4Nzk2YTViNGMzZDJlMWYw/messages.jsonl"
+      ],
+      "parser_source": "internal/sources/mcode.go",
+      "last_verified": "2026-10-20",
+      "display_name": "MiniMax Code",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": false,
+        "resume": false,
+        "handoff": "exec",
+        "prereq": "the MiniMax Code CLI (`mcode`) for `deja handoff --to mcode --exec`"
+      },
+      "gaps": {
+        "command": {
+          "state": "impossible",
+          "why": "No slash-command surface for a third party: the V1 plugin package carries skills, agents, hooks and scripts, and the manifest has no field for a command, so a /deja command has nowhere to be written (MiniMax plugin reference, package structure and manifest fields)."
+        },
+        "resume": {
+          "state": "impossible",
+          "why": "MiniMax Code has no command that reopens a session from outside the app: a conversation is picked from the desktop app's own task panel, and the runtime's session id is an argument no documented entry point takes, so `deja resume` can name the session but cannot hand back a command that opens it."
+        }
+      },
+      "surfaces": {
+        "digest": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "the package's SessionStart hook runs `deja hook-context --mcode`, whose text goes into hookSpecificOutput.additionalContext"
+        },
+        "prompt": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "the UserPromptSubmit hook runs `deja hook-prompt --mcode`; the payload is Claude-shaped, so the hook reads it unchanged"
+        },
+        "pre_tool": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "the PreToolUse hook runs `deja hook-tool --mcode` for the shell and file tools"
+        },
+        "failure": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "the PostToolUse hook runs `deja hook-tool-after --mcode`, which answers with what this machine ran after the same failure"
+        },
+        "compaction_reset": {
+          "status": "partial",
+          "proof": "stand",
+          "note": "the PreCompact hook runs and captures the transcript, but MiniMax Code's PreCompact output can only defer the compaction, so the reset itself is not told to the model"
+        },
+        "compaction_capture": {
+          "status": "partial",
+          "proof": "stand",
+          "note": "the capture runs at PreCompact with --harness mcode and reads the v2 transcript through MCode's own reader; what the model is told about it has no surface to travel on"
+        },
+        "compaction_packet": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "MiniMax Code's PreCompact handler can only answer with a decision to defer the compaction, and its post-compaction event is observation only, so the packet has no surface to travel on and rides the next prompt instead"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "deja install mcode writes the server into ~/.minimax/mcp.json, the shape MCode's own MCP page writes"
+        },
+        "handoff": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "deja handoff --to mcode --exec runs the MiniMax Code CLI with the digest as its first prompt"
+        },
+        "session_end": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "the SessionEnd hook runs `deja hook-session-end`, which records the end; MiniMax Code's SessionEnd is observation only, so nothing is said to the model"
+        },
+        "rules": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "MiniMax Code has no global rules file: it reads AGENTS.md from the workspace the session is in, so a block written into one home directory would reach no session"
+        },
+        "statusline": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "MiniMax Code has no status line a plugin can write to: the plugin hook reference lists the events and their outputs, and none of them is a status surface; the desktop shows the session in its own task panel"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "a compaction rewrites the transcript in place and the summary that takes the cut turns' place is indexed under the summary role, so the turns it replaced stay findable"
+        }
+      }
     }
   ]
 }

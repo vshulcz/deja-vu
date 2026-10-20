@@ -185,6 +185,10 @@ func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain b
 		emitCopilotContext(stdout, payload)
 		return nil
 	}
+	if mcodeHookOutput {
+		emitMcodeContext(stdout, replyEventName(input.HookEventName, "PostToolUse", "PostToolUse", "PostToolUseFailure"), payload)
+		return nil
+	}
 	var resp sessionStartHookResponse
 	// The event it was sent. Claude Code fires PostToolUseFailure for a command
 	// that exited non-zero and drops a reply naming any other event (#4488);

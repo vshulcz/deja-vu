@@ -122,6 +122,11 @@ func autoWirings() []autoWiring {
 		// checking the old path reported a correctly wired machine as missing.
 		{"roo", func() string { return guidancePath("roo") }, "",
 			"guidance — the agent is told to call recall, not handed it"},
+		// MiniMax Code loads a plugin package from its own plugin directory,
+		// and the hook document inside it is where its hooks live.
+		{"mcode", func() string {
+			return filepath.Join(sources.McodeConfigHome(), "plugins", "deja", "hooks", "hooks.json")
+		}, "hook-context", ""},
 	}
 	for _, e := range traeIDEPresent() {
 		ws = append(ws, autoWiring{"trae-ide", e.hooksPath, "hook-context", ""})

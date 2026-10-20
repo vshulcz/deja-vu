@@ -373,6 +373,10 @@ func handoffCommand(target, prompt string) ([]string, bool) {
 	case "muse":
 		// `muse exec "<prompt>"` runs one task and exits (1.4.2, #4709).
 		return []string{"muse", "exec", prompt}, true
+	case "mcode":
+		// The MiniMax Code CLI takes the prompt as its argument and starts the
+		// TUI with it (mcode [options] [prompt]).
+		return []string{"mcode", prompt}, true
 	case "kiro":
 		// `kiro-cli chat [INPUT]`, "the first question to ask" (2.22.0).
 		return []string{"kiro-cli", "chat", prompt}, true
@@ -481,5 +485,6 @@ func pasteOnlyFooter(prefix string) string {
 
 func handoffTargets() []string {
 	return []string{"claude", "codex", "opencode", "cursor", "copilot", "copilot-chat", "gemini", "qwen", "antigravity", "aider", "pi", "senpi", "omp", "amp", "prime", "grok", "cline", "goose", "kimi", "crush",
-		"kilocode", "continue", "commandcode", "codebuddy", "trae", "muse", "kiro", "gjc", "kimchi", "codewhale", "junie", "hermes", "openclaw", "deepseek", "reasonix", "zcode", "devin"}
+		"kilocode", "continue", "commandcode", "codebuddy", "trae", "muse", "kiro", "gjc", "kimchi", "codewhale", "junie", "hermes", "openclaw", "deepseek", "reasonix", "zcode", "devin",
+		"mcode"}
 }

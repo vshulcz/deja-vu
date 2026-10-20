@@ -122,6 +122,11 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 		if h.ID == "cline" {
 			gotSkill = strings.Contains(clinePluginJS("/bin/deja"), `"skills"`)
 		}
+		// MiniMax Code reads no user-level skill directory either: the skill
+		// rides in the plugin package, and the manifest is what names it.
+		if h.ID == "mcode" {
+			gotSkill = strings.Contains(string(mcodePluginManifest()), "skills/deja-history/SKILL.md")
+		}
 		if gotSkill != c.Skill {
 			t.Fatalf("%s: registry skill=%v, code says %v", h.ID, c.Skill, gotSkill)
 		}

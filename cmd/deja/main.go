@@ -261,6 +261,8 @@ var commands = map[string]command{
 			return nil
 		}
 		plain := false
+		// --mcode answers in MiniMax Code's shape (hook_mcode.go).
+		mcodeHookOutput = mcodeHookFlag(rest)
 		for _, a := range rest {
 			switch a {
 			case "--plain", "-plain":
@@ -321,6 +323,8 @@ var commands = map[string]command{
 		if len(rest) > 0 && (rest[0] == "--copilot" || rest[0] == "-copilot") {
 			copilotHookOutput = true
 		}
+		// --mcode answers in MiniMax Code's shape (hook_mcode.go).
+		mcodeHookOutput = mcodeHookFlag(rest)
 		return endLineOnTerminal(os.Stdout, func(w io.Writer) error { return runHookToolAfterMode(dir, os.Stdin, w, plain) })
 	},
 	"check": func(dir string, rest []string) error {
@@ -822,6 +826,8 @@ func sayUnreadable(dir string) int {
 func cmdHookContext(dir string, rest []string) error {
 	plain := false
 	once := false
+	// --mcode answers in MiniMax Code's shape (hook_mcode.go).
+	mcodeHookOutput = mcodeHookFlag(rest)
 	for _, a := range rest {
 		switch a {
 		case "--plain", "-plain":
@@ -3934,6 +3940,7 @@ func printSourcesTo(w io.Writer, dir string) {
 		{"windsurf", sources.WindsurfRoot(), []string{sources.WindsurfRoot()}, sources.WindsurfSessionFiles, sources.LoadWindsurf},
 		{"reasonix", sources.ReasonixRoot(), sources.ReasonixRoots(), sources.ReasonixSessionFiles, sources.LoadReasonix},
 		{"muse", sources.MuseRoot(), sources.MuseRoots(), sources.MuseSessionFiles, sources.LoadMuse},
+		{"mcode", sources.McodeRoot(), []string{sources.McodeRoot()}, sources.McodeSessionFiles, sources.LoadMcode},
 		{"deepseek", sources.DeepSeekRoot(), []string{sources.DeepSeekRoot()}, sources.DeepSeekSessionFiles, sources.LoadDeepSeek},
 		{"zed", sources.ZedDB(), []string{sources.ZedDB()}, func() []string { return presentFiles(sources.ZedDB()) }, sources.LoadZed},
 		{"devin", filepath.Dir(sources.DevinSessionsDB()), []string{filepath.Dir(sources.DevinSessionsDB())}, sources.DevinFiles, sources.LoadDevin},

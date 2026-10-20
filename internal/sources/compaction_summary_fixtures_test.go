@@ -33,6 +33,7 @@ var compactionSummaryFixtures = []struct {
 	{"codewhale", "codewhale/sessions/registry-codewhale.json", "CODEWHALE-SUMMARY"},
 	{"crush", "crush/crush.sql", "CRUSH-SUMMARY"},
 	{"antigravity", "antigravity/brain/registry-antigravity/.system_generated/logs/transcript.jsonl", "ANTIGRAVITY-SUMMARY"},
+	{"mcode", "mcode/v2/sessions/2026/10/20/02-57-27-477-session_bXZzXzBmMWUyZDNjNGI1YTY5Nzg4Nzk2YTViNGMzZDJlMWYw/messages.jsonl", "MCODE-SUMMARY"},
 }
 
 func TestRegistryFixturesIndexCompactionSummaries(t *testing.T) {

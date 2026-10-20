@@ -656,6 +656,10 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 // reads: Copilot CLI's flat one under --copilot, Claude's envelope otherwise.
 // A strict host gets no receipt line.
 func writePromptResponse(stdout io.Writer, resp sessionStartHookResponse) {
+	if mcodeHookOutput {
+		emitMcodeContext(stdout, resp.HookSpecificOutput.HookEventName, resp.HookSpecificOutput.AdditionalContext)
+		return
+	}
 	if copilotHookOutput {
 		emitCopilotContext(stdout, resp.HookSpecificOutput.AdditionalContext)
 		return

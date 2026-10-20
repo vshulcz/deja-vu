@@ -43,6 +43,7 @@ This registry records observed on-disk session formats for the harnesses that de
 | [Reasonix](reasonix.md) | flat role/content JSONL per session, clock and workspace in a sidecar; 1.x keeps a zstd-framed event log per session directory |
 | [TRAE CLI](trae.md) | Codex rollouts under `~/.trae/cli`, user turns from events only, tool calls in `history_mutation` |
 | [Muse Code](muse.md) | event-sourced JSONL per session directory, sharded by day |
+| [MiniMax Code](mcode.md) | one JSONL transcript per session directory, sharded by day, with the runtime's own context marked out of the person's turn |
 | [Cherry Studio](cherrystudio.md) | Claude Code transcripts under the desktop app's data, one snapshot per stream chunk |
 | [Continue](continue.md) | one JSON document per session, list beside it |
 | [Crush](crush.md) | one SQLite store per project, registry in the data home |

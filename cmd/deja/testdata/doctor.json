@@ -354,6 +354,15 @@
       "indexed_sessions": 0
     },
     {
+      "name": "mcode",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.minimax/v2/sessions"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
       "name": "deepseek",
       "state": "missing",
       "paths": [
@@ -584,6 +593,11 @@
       "path": "<tmp>/home/.codeium/windsurf/mcp_config.json"
     },
     {
+      "name": "mcode",
+      "state": "config-missing",
+      "path": "<tmp>/home/.minimax/mcp.json"
+    },
+    {
       "name": "gjc",
       "state": "config-missing",
       "path": "<tmp>/home/.gjc/agent/mcp.json"
@@ -809,6 +823,11 @@
       "name": "roo",
       "state": "missing",
       "path": "<tmp>/home/.agents/skills/deja-history/SKILL.md"
+    },
+    {
+      "name": "mcode",
+      "state": "missing",
+      "path": "<tmp>/home/.minimax/plugins/deja/hooks/hooks.json"
     },
     {
       "name": "trae-ide",

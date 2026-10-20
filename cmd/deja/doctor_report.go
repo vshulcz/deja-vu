@@ -577,6 +577,7 @@ func doctorStoreChecks() []doctorStoreCheck {
 		{"windsurf", []string{sources.WindsurfRoot()}, sources.WindsurfSessionFiles, sources.ParseWindsurfFile},
 		{"reasonix", sources.ReasonixRoots(), sources.ReasonixSessionFiles, sources.ParseReasonixFile},
 		{"muse", sources.MuseRoots(), sources.MuseSessionFiles, sources.ParseMuseFile},
+		{"mcode", []string{sources.McodeRoot()}, sources.McodeSessionFiles, sources.ParseMcodeFile},
 		{"deepseek", []string{sources.DeepSeekRoot()}, sources.DeepSeekSessionFiles, sources.ParseDeepSeekFile},
 		// Zed keeps one SQLite store rather than session files, so the file
 		// list is the database itself — the shape opencode's row uses.

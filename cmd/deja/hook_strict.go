@@ -27,6 +27,10 @@ var strictHookOutput bool
 // emitHookResponse writes the session-start response, minus anything a strict
 // host would reject.
 func emitHookResponse(resp sessionStartHookResponse) {
+	if mcodeHookOutput {
+		emitMcodeContext(os.Stdout, resp.HookSpecificOutput.HookEventName, resp.HookSpecificOutput.AdditionalContext)
+		return
+	}
 	if copilotHookOutput {
 		emitCopilotContext(os.Stdout, resp.HookSpecificOutput.AdditionalContext)
 		return
