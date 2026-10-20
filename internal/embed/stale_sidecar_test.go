@@ -88,11 +88,15 @@ func TestSemanticSearchRefusesASidecarFromAnotherIndex(t *testing.T) {
 	}
 }
 
-// The same crossed vector with the current generation shows what the guard
-// prevents, and proves the fixture really does cross a key with another
-// session's text.
-func TestCrossedVectorMisattributesWithoutTheGuard(t *testing.T) {
+// The same crossed vector with the current generation: the layout holds, but
+// the record at the offset belongs to another session, so it is refused too
+// rather than quoted under the wrong name. The fixture really does cross a key
+// with another session's text.
+func TestCrossedVectorIsRefusedOnItsOwnIndex(t *testing.T) {
 	dir, records := threeSessionStore(t)
+	if records[2].Record.Key == records[1].Record.Key || strings.Contains(records[2].Record.Text, "kafka") {
+		t.Fatal("the fixture did not cross a session key with another session's record")
+	}
 	gen, err := index.Generation(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -104,11 +108,9 @@ func TestCrossedVectorMisattributesWithoutTheGuard(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(hits) != 1 {
-		t.Fatalf("got %d hits, want the crossed one", len(hits))
-	}
-	if strings.Contains(hits[0].Snippets[0], "kafka") {
-		t.Fatal("the fixture did not cross a session key with another session's record")
+	if len(hits) != 0 {
+		t.Errorf("got %d hits from a vector whose offset holds another session's record: %q under %s",
+			len(hits), hits[0].Snippets[0], hits[0].Session.ID)
 	}
 }
 

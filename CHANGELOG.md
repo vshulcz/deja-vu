@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 `deja --re` anchors `^` and `$` at each line, as grep does. They anchored the whole message, so `^panic:` missed a panic printed after any other tool output (#5448).
+`deja embed` no longer sends a whole Cursor, Continue or Cline session again each time it grows. Those harnesses date unstamped turns from the file's modification time, and the vector identity held the time; it now holds only the session, role and text, so a session grown by one exchange embeds 2 records instead of every one. A version 2 sidecar is rekeyed on the next run without embedding again (#4976).
 
 `deja sync import` also leaves out a peer's records for a store `DEJA_EXCLUDE_HARNESSES` (or a `harness:` line) excludes and for a project the policy `ignore` rule covers, and says how many; a relay no longer sends an excluded store's sessions on (#5435). The `sync-timer` unit carries the `DEJA_*` and `XDG_*` settings of the shell it was installed from, so a timer run syncs into the same index under the same switches (#5436).
 

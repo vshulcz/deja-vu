@@ -343,14 +343,18 @@ Reading one session back (`ctx`, `recall_context`, the session resource) puts th
 `deja embed` writes `<index-dir>.vectors.bin`. The file begins with `DJV1`, a
 version, vector dimension, model name, manifest generation, vector count, and
 covered-record watermark. Each entry stores the records.bin byte offset, the
-record's identity (a hash of its session, role, time, length and first 256
-bytes of text), its session key, and fixed-width float32 values. Writes use a
+record's identity (a hash of its session, role, text length and the first and
+last 256 bytes of text), its session key, and fixed-width float32 values. Writes use a
 temporary file and rename. A rewrite of records.bin moves the offsets, so a
 vector finds its record by identity once its offset no longer holds it, and
 the next `deja embed` carries every vector to its record's new offset and
-embeds only records it has not seen. A changed model discards old entries.
+embeds only records it has not seen. The time stays out of the identity, since
+harnesses that write no per-turn time date every turn from the file's mtime.
+A changed model discards old entries.
 Version 1 entries have no identity: they are carried only while the layout
-they were made for holds, and search refuses them after a rewrite. A sidecar
+they were made for holds, and search refuses them after a rewrite. Version 2
+identities included the time; they are still matched and rewritten as version
+3 on the next `deja embed`. A sidecar
 that will not parse is treated as absent only by `deja embed`, which writes a
 new one from scratch. Search and recall do not ignore it silently: they keep
 the lexical order and print one notice saying semantic search is off until

@@ -18,10 +18,11 @@ import (
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
 )
 
-// sidecarVersion 2 adds each vector's Ident. A version 1 file is still read,
-// and its vectors are rekeyed on the next `deja embed` while the layout they
-// were made for holds.
-const sidecarVersion uint16 = 2
+// sidecarVersion 2 adds each vector's Ident; 3 drops the record's time from
+// it. A version 1 file is still read, and its vectors are rekeyed on the next
+// `deja embed` while the layout they were made for holds; a version 2 file is
+// rekeyed by its own identity, wherever its records now sit.
+const sidecarVersion uint16 = 3
 
 var magic = [4]byte{'D', 'J', 'V', '1'}
 
@@ -36,41 +37,84 @@ type Vector struct {
 }
 
 // RecordIdent names a record by what it holds rather than where it sits: its
-// session, role, time and text. Any pass that rewrites records.bin moves the
+// session, role and text. Any pass that rewrites records.bin moves the
 // offsets, and a sidecar keyed by offset alone was thrown away and embedded
 // again from zero, 45 minutes on a 112k-record store, often within the hour
-// it was built (#4976). The text is hashed by its length and first 256 bytes,
-// which with the session and the time is enough to tell records apart and
+// it was built (#4976). The text is hashed by its length and its first and
+// last 256 bytes, which with the session is enough to tell records apart and
 // keeps a lookup over every record cheap.
+//
+// The time stays out: a vector is made from the text alone, and a harness that
+// writes no time per turn (Cursor without its <timestamp> block, Continue,
+// Cline's fallback) dates its turns from the file's modification time, so
+// every pass that grew the session gave each of its records a new identity
+// and the next embed sent the whole session again.
 func RecordIdent(r index.Record) uint64 {
-	// FNV-1a by hand, without the allocations of hash/fnv and fmt.
-	const prime = 1099511628211
-	h := uint64(14695981039346656037)
-	str := func(s string) {
-		for i := 0; i < len(s); i++ {
-			h = (h ^ uint64(s[i])) * prime
-		}
-		h *= prime
+	h := identHash()
+	h.str(r.Key)
+	h.str(r.Role)
+	h.num(uint64(len(r.Text)))
+	head, tail := r.Text, ""
+	if len(head) > 256 {
+		head = r.Text[:256]
+		tail = r.Text[max(256, len(r.Text)-256):]
 	}
-	num := func(n uint64) {
-		for i := 0; i < 8; i++ {
-			h = (h ^ (n & 0xff)) * prime
-			n >>= 8
-		}
-	}
+	h.str(head)
+	h.str(tail)
+	return h.sum()
+}
+
+// recordIdentV2 is the identity a version 2 sidecar holds: the time in place
+// of the tail. It is how those vectors find their records once, to be rekeyed.
+func recordIdentV2(r index.Record) uint64 {
+	h := identHash()
 	text := r.Text
 	if len(text) > 256 {
 		text = text[:256]
 	}
-	str(r.Key)
-	str(r.Role)
-	num(uint64(r.Time.UnixNano()))
-	num(uint64(len(r.Text)))
-	str(text)
-	if h != 0 {
-		return h
+	h.str(r.Key)
+	h.str(r.Role)
+	h.num(uint64(r.Time.UnixNano()))
+	h.num(uint64(len(r.Text)))
+	h.str(text)
+	return h.sum()
+}
+
+// fnv is FNV-1a by hand, without the allocations of hash/fnv and fmt.
+type fnv uint64
+
+func identHash() *fnv { h := fnv(14695981039346656037); return &h }
+
+const fnvPrime = 1099511628211
+
+func (h *fnv) str(s string) {
+	for i := 0; i < len(s); i++ {
+		*h = (*h ^ fnv(s[i])) * fnvPrime
+	}
+	*h *= fnvPrime
+}
+
+func (h *fnv) num(n uint64) {
+	for i := 0; i < 8; i++ {
+		*h = (*h ^ fnv(n&0xff)) * fnvPrime
+		n >>= 8
+	}
+}
+
+func (h *fnv) sum() uint64 {
+	if *h != 0 {
+		return uint64(*h)
 	}
 	return 1
+}
+
+// identOf is the identity function the vectors of a sidecar written as version
+// were keyed with.
+func identOf(version uint16) func(index.Record) uint64 {
+	if version == 2 {
+		return recordIdentV2
+	}
+	return RecordIdent
 }
 
 // keyed reports whether every vector carries its record's identity, so none
@@ -84,41 +128,48 @@ func keyed(s Sidecar) bool {
 	return true
 }
 
-// recordLookup finds the record a vector was made from: at its offset while
-// the index keeps the layout the sidecar was written for, and by identity once
-// a rewrite has moved it. Hashing every record costs about 30 ms over 100k, so
-// it is paid only after a rewrite, once per search.
+// recordLookup finds the record a vector was made from: at its offset when
+// the record there is still the one it names, and by identity once a rewrite
+// has moved it. A version 1 vector names nothing and is trusted at its offset
+// only while the index keeps the layout the sidecar was written for. Hashing
+// every record costs about 30 ms over 100k, so the identity map is built only
+// when a vector has moved, once per search.
 type recordLookup struct {
 	records  []index.OffsetRecord
-	byOffset map[int64]index.Record
-	byIdent  map[uint64]index.Record
+	byOffset map[int64]index.OffsetRecord
+	byIdent  map[uint64]index.OffsetRecord
+	ident    func(index.Record) uint64
 	layout   bool
 }
 
-func newRecordLookup(records []index.OffsetRecord, layout bool) *recordLookup {
-	l := &recordLookup{records: records, byOffset: make(map[int64]index.Record, len(records)), layout: layout}
+func newRecordLookup(records []index.OffsetRecord, layout bool, ident func(index.Record) uint64) *recordLookup {
+	l := &recordLookup{records: records, byOffset: make(map[int64]index.OffsetRecord, len(records)), layout: layout, ident: ident}
 	for _, r := range records {
-		l.byOffset[r.Offset] = r.Record
+		l.byOffset[r.Offset] = r
 	}
 	return l
 }
 
-func (l *recordLookup) find(v Vector) (index.Record, bool) {
-	r, ok := l.byOffset[v.Offset]
-	if v.Ident == 0 || l.layout {
-		return r, ok
+func (l *recordLookup) find(v Vector) (index.OffsetRecord, bool) {
+	if r, ok := l.byOffset[v.Offset]; ok && r.Record.Key == v.Key {
+		if (v.Ident == 0 && l.layout) || (v.Ident != 0 && l.ident(r.Record) == v.Ident) {
+			return r, true
+		}
+	}
+	if v.Ident == 0 {
+		return index.OffsetRecord{}, false
 	}
 	if l.byIdent == nil {
-		l.byIdent = make(map[uint64]index.Record, len(l.records))
+		l.byIdent = make(map[uint64]index.OffsetRecord, len(l.records))
 		for _, x := range l.records {
-			id := RecordIdent(x.Record)
+			id := l.ident(x.Record)
 			if _, dup := l.byIdent[id]; !dup {
-				l.byIdent[id] = x.Record
+				l.byIdent[id] = x
 			}
 		}
 	}
-	r, ok = l.byIdent[v.Ident]
-	return r, ok && r.Key == v.Key
+	r, ok := l.byIdent[v.Ident]
+	return r, ok && r.Record.Key == v.Key
 }
 
 type Sidecar struct {
@@ -126,6 +177,9 @@ type Sidecar struct {
 	Dim               int
 	Vectors           []Vector
 	Covered           int
+	// Version is the format the file was read in, which names the identity
+	// its vectors hold. Zero means current.
+	Version uint16
 }
 
 // Stale reports whether a sidecar was built for a different index than the one
@@ -219,38 +273,24 @@ func EmbedIndex(dir string, client *Client, keep func(index.Record) bool) (Sidec
 	// being carried forward: a policy that tightens has to reach the sidecar
 	// too, since SemanticSearch reads this file directly and kept vectors bring
 	// the withheld sessions back as answers (#1311). A version 1 vector has no
-	// identity and is carried only while the layout it was made for holds.
-	current := make(map[uint64]index.OffsetRecord, len(recs))
-	for _, r := range recs {
-		if id := RecordIdent(r.Record); current[id].Record.Key == "" {
-			current[id] = r
-		}
-	}
-	var lookup *recordLookup
-	if sameLayout(old.Generation, gen) {
-		lookup = newRecordLookup(recs, true)
-	}
+	// identity and is carried only while the layout it was made for holds; a
+	// version 2 one is found by the identity it was written with.
+	lookup := newRecordLookup(recs, sameLayout(old.Generation, gen), identOf(old.Version))
 	covered := make(map[uint64]bool, len(old.Vectors))
 	kept := old.Vectors[:0:0]
 	for _, v := range old.Vectors {
-		id := v.Ident
-		if id == 0 {
-			if lookup == nil {
-				continue
-			}
-			r, ok := lookup.byOffset[v.Offset]
-			if !ok || r.Key != v.Key {
-				continue
-			}
-			id = RecordIdent(r)
+		r, ok := lookup.find(v)
+		if !ok {
+			continue
 		}
-		r, ok := current[id]
-		if !ok || r.Record.Key != v.Key || covered[id] {
+		id := RecordIdent(r.Record)
+		if covered[id] {
 			continue
 		}
 		covered[id] = true
 		kept = append(kept, Vector{Offset: r.Offset, Ident: id, Key: v.Key, Values: v.Values})
 	}
+	old.Version = sidecarVersion
 	old.Vectors = kept
 	pending := toEmbed(recs, covered)
 	batches := 0
@@ -431,7 +471,7 @@ func readFile(path string) (Sidecar, error) {
 	if err = binary.Read(r, binary.LittleEndian, &covered); err != nil {
 		return Sidecar{}, err
 	}
-	out := Sidecar{Model: model, Generation: gen, Dim: int(dim), Covered: int(covered), Vectors: make([]Vector, count)}
+	out := Sidecar{Model: model, Generation: gen, Dim: int(dim), Covered: int(covered), Vectors: make([]Vector, count), Version: version}
 	for i := range out.Vectors {
 		if err = binary.Read(r, binary.LittleEndian, &out.Vectors[i].Offset); err != nil {
 			return Sidecar{}, err
