@@ -793,6 +793,21 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	}
 	preRedactSessions(&m, ss)
 	seenMsgs := msgSeen{}
+	// A turn a deleted transcript shares with one on disk stays filed under
+	// the deleted one, as the incremental pass files it: under the live copy,
+	// the next rebuild no longer found it kept, and a rewrite of that copy
+	// took it from the index. Written where the live copy has it, so the
+	// session keeps its order.
+	keptTurns := map[string]string{}
+	for _, s := range ss {
+		if _, ok := orphans.files[s.Path]; ok {
+			for _, msg := range s.Messages {
+				if k := seenKey(s.Harness+":"+s.ID, msg.Role, msg.Time, msg.Text); keptTurns[k] == "" {
+					keptTurns[k] = s.Path
+				}
+			}
+		}
+	}
 	// Counted in messages and reported when a batch has actually been
 	// indexed, not when it was handed to the spiller: reporting per session
 	// pushed sent the bar from 1% to 99% in one step and then held it at 99%
@@ -850,9 +865,14 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 				markShared(m.Sessions, key)
 			}
 			recordCopy(m.Sessions, key, prev, s)
+			_, isKept := orphans.files[s.Path]
 			for _, msg := range s.Messages {
 				if seenMsgs.dup(key, msg.Role, msg.Time, msg.Text) {
 					continue
+				}
+				src := s.Path
+				if k := keptTurns[seenKey(key, msg.Role, msg.Time, msg.Text)]; k != "" && !isKept {
+					src = k
 				}
 				// Already redacted (and length-capped) by preRedactSessions.
 				text := msg.Text
@@ -862,7 +882,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 				if strings.TrimSpace(text) == "" {
 					continue
 				}
-				off, err := rw.write(Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
+				off, err := rw.write(Record{Key: key, SourcePath: src, Role: msg.Role, Text: text, Time: msg.Time})
 				if err != nil {
 					return err
 				}
@@ -885,6 +905,17 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 		return err
 	}
 	dropEmptySessions(&m, wrote)
+	for key, ps := range orphans.bare {
+		if row, ok := m.Sessions[key]; ok {
+			row.Copies = withCopies(row.Path, row.Copies, ps...)
+			m.Sessions[key] = row
+			for _, p := range ps {
+				st := orphans.bareFiles[p]
+				st.Kept = true
+				m.Files[p] = st
+			}
+		}
+	}
 	// The five sidecars walk every session again — what co-occurs, which
 	// command followed which error, what was run and what failed. On a real
 	// store that is eight seconds of a twenty-second build, and it used to run
@@ -1137,6 +1168,11 @@ type orphanState struct {
 	// dated is the old manifest's KeptDated: a row first found gone here is
 	// dated only when the store before this build dated its own.
 	dated bool
+	// bare are the kept copies whose every turn was filed under another file
+	// of the session, by key. They hold no records and stay the session's
+	// copies, so a rewrite of the file holding their turns leaves them here.
+	bare      map[string][]string
+	bareFiles map[string]FileState
 }
 
 // orphanedSessions preserves sessions the client's own housekeeping deleted.
@@ -1251,10 +1287,22 @@ func orphanedSessions(dir, harness string, files map[string]FileState) orphanSta
 	for _, key := range sortedKeys(by) {
 		out.sessions = append(out.sessions, *by[key])
 	}
-	for p := range want {
-		if !seen[p] {
-			out.unreadable++
+	heldBy := keysByFile(m.Sessions)
+	for _, p := range sortedKeys(want) {
+		if seen[p] {
+			continue
 		}
+		if keys := heldBy[p]; len(keys) > 0 {
+			if out.bare == nil {
+				out.bare, out.bareFiles = map[string][]string{}, map[string]FileState{}
+			}
+			for _, key := range keys {
+				out.bare[key] = append(out.bare[key], p)
+			}
+			out.bareFiles[p] = m.Files[p]
+			continue
+		}
+		out.unreadable++
 	}
 	return out
 }
@@ -2293,14 +2341,18 @@ func writeBucketsConcurrent(dir string, buckets bucketPostings) error {
 }
 
 func (m msgSeen) dup(key, role string, ts time.Time, text string) bool {
-	h := fnv.New64a()
-	_, _ = h.Write([]byte(text))
-	k := key + "\x00" + role + "\x00" + ts.UTC().Format(time.RFC3339Nano) + "\x00" + fmt.Sprintf("%x", h.Sum64())
+	k := seenKey(key, role, ts, text)
 	if m[k] {
 		return true
 	}
 	m[k] = true
 	return false
+}
+
+func seenKey(key, role string, ts time.Time, text string) string {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(text))
+	return key + "\x00" + role + "\x00" + ts.UTC().Format(time.RFC3339Nano) + "\x00" + fmt.Sprintf("%x", h.Sum64())
 }
 
 // repeatKey is a message as the record dedupe sees it: role, time and text.
@@ -3032,9 +3084,12 @@ func ownerRow(prev SessionMeta, s model.Session, ord uint32, collided bool) Sess
 // rowRetaken is a row about to be taken again from its files: the span of the
 // copies beside its owner goes, and a deleted owner gives up the row until its
 // records are read back in, as a rebuild reads them after the files on disk.
-func rowRetaken(row SessionMeta, keptOwner string) SessionMeta {
+// So does an owner read again whole, which takes the row back if it still
+// holds the session; held, it kept a file that had moved on to another id.
+func rowRetaken(row SessionMeta, keptOwner string, reread map[string]FileState) SessionMeta {
 	row.SharedStarted, row.SharedUpdated = time.Time{}, time.Time{}
-	if keptOwner != "" && row.Path == keptOwner {
+	_, again := reread[row.Path]
+	if keptOwner != "" && row.Path == keptOwner || again && copyable(row.Path) {
 		row.Path, row.Shared = "", false
 	}
 	return row
@@ -3160,6 +3215,43 @@ func coversKept(r model.Session, meta SessionMeta) bool {
 		}
 	}
 	return false
+}
+
+// holdsKeptRecords reports whether r holds every turn filed under the kept
+// file at path. A copy of the session that only shares its last turn is not
+// the file moved, and taking it for one dropped the turns only the deleted
+// file held. Asked only once coversKept has matched, which is rare.
+func holdsKeptRecords(dir string, m Manifest, r model.Session, path string) bool {
+	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), r.Harness+":"+r.ID)
+	if err != nil {
+		return false
+	}
+	have := map[uint64]bool{}
+	for _, msg := range r.Messages {
+		msg.Text, _, _ = indexedText(msg.Text)
+		have[messageFingerprint(msg)] = true
+		if base := exitSuffix.ReplaceAllString(msg.Text, ""); base != msg.Text {
+			msg.Text = base
+			have[messageFingerprint(msg)] = true
+		}
+	}
+	for _, rec := range recs {
+		if rec.SourcePath != path {
+			continue
+		}
+		msg := model.Message{Role: rec.Role, Text: carriedText(r.Harness, rec.Role, rec.Text), Time: rec.Time}
+		if have[messageFingerprint(msg)] {
+			continue
+		}
+		if base := exitSuffix.ReplaceAllString(msg.Text, ""); base != msg.Text {
+			msg.Text = base
+			if have[messageFingerprint(msg)] {
+				continue
+			}
+		}
+		return false
+	}
+	return true
 }
 
 // exitSuffix is the status the parsers append to a command once its result is
@@ -4239,9 +4331,20 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	// pointing at a path that is gone: twenty renames of one 4 KB log left the
 	// store holding twenty-one copies of it and twenty dead rows, with search
 	// answering once and nothing on any screen saying so (#3546).
+	// A renamed file another transcript shares a session with is read again
+	// with its copies: the row's owner is the smallest path, and a rename
+	// can move it either way. Followed by name alone, the row kept the moved
+	// file as its owner where a rebuild hands it to a copy.
+	var regather []string
 	if err == nil && !force {
 		if pairs := detectRenamedFiles(old.Files, files); len(pairs) > 0 {
 			reprojected := applyRenamedFiles(&old, pairs)
+			heldBy := keysByFile(old.Sessions)
+			for np := range pairs {
+				if len(heldBy[np]) > 0 {
+					regather = append(regather, np)
+				}
+			}
 			// Failing to record it costs the duplicate this exists to avoid,
 			// not correctness: the pass below then treats the file as new.
 			werr := writeManifestMeta(dir, old)
@@ -4399,10 +4502,14 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		}
 		// Kept for the sessions it holds, as a rebuild keeps it for its
 		// records: a file whose sessions were all forgotten holds nothing.
+		// A copy beside another file's row holds them too, and dropping it
+		// took the turns only it had.
 		if held == nil {
 			held = map[string]bool{}
 			for _, meta := range old.Sessions {
-				held[meta.Path] = true
+				for _, q := range sessionFiles(meta) {
+					held[q] = true
+				}
 			}
 		}
 		if !held[p] {
@@ -4487,6 +4594,12 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		if arrived || len(sharedBy[p]) > 0 {
 			handover = true
 			break
+		}
+	}
+	for _, p := range regather {
+		if f, ok := files[p]; ok {
+			changed[p] = f
+			handover = true
 		}
 	}
 	if len(changed) == 0 && len(removed) == 0 && !handover {
@@ -4749,7 +4862,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		moved := false
 		for _, i := range arrivals[key] {
 			r := replacements[i]
-			if (ownDir || filepath.Dir(r.Path) == filepath.Dir(meta.Path)) && coversKept(r, meta) {
+			if (ownDir || filepath.Dir(r.Path) == filepath.Dir(meta.Path)) && coversKept(r, meta) && holdsKeptRecords(dir, old, r, meta.Path) {
 				moved = true
 				break
 			}
@@ -4972,6 +5085,38 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 			}
 		}
 	}
+	// A turn a deleted copy shared with a live one was filed once, under
+	// whichever was read first. When that live file is read again without
+	// it, the turn goes to the deleted copy rather than out of the index:
+	// the deleted transcript can no longer be read to say which turns it
+	// held, so it keeps every one the session loses here.
+	keptCopy := map[string]string{}
+	for key := range rederive {
+		for _, q := range sessionFiles(old.Sessions[key]) {
+			if _, again := changed[q]; !again && files[q].Kept && (keptCopy[key] == "" || q < keptCopy[key]) {
+				keptCopy[key] = q
+			}
+		}
+	}
+	readAgain := msgSeen{}
+	for _, s := range replacements {
+		if key := s.Harness + ":" + s.ID; keptCopy[key] != "" {
+			for _, msg := range s.Messages {
+				readAgain.dup(key, msg.Role, msg.Time, msg.Text)
+				// A command whose result landed since is the same turn.
+				readAgain.dup(key, msg.Role, msg.Time, exitSuffix.ReplaceAllString(msg.Text, ""))
+			}
+		}
+	}
+	// Only a turn from before the copy was last written can be one it held:
+	// a later one, rewound or rewritten away, was never in it.
+	couldHold := func(r Record, k string) bool {
+		f := files[k]
+		return r.Time.IsZero() || f.MTime == 0 || r.Time.UnixNano() <= f.MTime
+	}
+	gotAgain := func(r Record) bool {
+		return readAgain[seenKey(r.Key, r.Role, r.Time, r.Text)] || readAgain[seenKey(r.Key, r.Role, r.Time, exitSuffix.ReplaceAllString(r.Text, ""))]
+	}
 	if err := eachStoredRecord(filepath.Join(dir, "records.bin"), oldTables, func(oldOff int64, payload []byte) error {
 		kill := func() {
 			if appending {
@@ -5010,6 +5155,15 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		// would take the earlier turns of every continued session (#2033).
 		if removed[r.SourcePath] || (changed[r.SourcePath].Path != "" && !fromStore && !keptFromLogTail(r, logTails) && !leftItsFile(r, replaceKeys, old.Sessions[r.Key], aiderHeld) && !keptThroughCompaction(r, compacted)) || (fromStore && readWholeThisPass(r) && storeKeys[r.Key]) ||
 			(takeovers[r.Key] && isCodexHistory(r.SourcePath)) {
+			if k := keptCopy[r.Key]; k != "" && !removed[r.SourcePath] && copyable(r.SourcePath) && couldHold(r, k) && !gotAgain(r) {
+				kill()
+				r.SourcePath = k
+				if at := orphanKey(r.Key, k); unread[at] {
+					h, _, _ := strings.Cut(r.Key, ":")
+					unreadMsgs[at] = append(unreadMsgs[at], model.Message{Role: r.Role, Text: carriedText(h, r.Role, r.Text), Time: r.Time})
+				}
+				return addRec(r)
+			}
 			dropped[r.Key] = true
 			kill()
 			return nil
@@ -5100,7 +5254,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 			// ones read now and the ones that were not, as a rebuild takes it:
 			// held, it kept the span of a copy that has since left (#5380).
 			rederived[key] = true
-			held = rowRetaken(held, keptOwner[key])
+			held = rowRetaken(held, keptOwner[key], reread)
 			if ok {
 				m.Sessions[key] = held
 			}
@@ -5144,7 +5298,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	}
 	for key := range rederive {
 		if row, ok := m.Sessions[key]; ok && !rederived[key] {
-			m.Sessions[key] = rowRetaken(row, keptOwner[key])
+			m.Sessions[key] = rowRetaken(row, keptOwner[key], reread)
 		}
 	}
 	for _, at := range sortedKeys(unread) {

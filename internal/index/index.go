@@ -774,7 +774,13 @@ import (
 // transcript keeps the counts read while it was on disk and spans its own
 // records beside copies, a copy that leaves takes its span with it, and the
 // span of the files beside the owner no longer holds the owner's own (#5380).
-const version = 93
+// 94: a deleted transcript keeps every turn it held beside a copy: a copy
+// that did not own the row is kept, a rebuild files shared turns under the
+// deleted file, and a rewrite of the live copy leaves them with it. A
+// renamed copy or one that moved to another id gives the row back to the
+// smallest path, and a file holding only the last turn is not a move
+// (#5441, #5442, #5443, #5444, #5445).
+const version = 94
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
