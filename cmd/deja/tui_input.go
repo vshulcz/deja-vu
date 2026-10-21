@@ -205,6 +205,9 @@ func (a *tuiApp) move(d int) {
 		a.sel = len(a.rows) - 1
 	}
 	a.want(a.rows[a.sel].s)
+	if d > 0 {
+		a.loadMore()
+	}
 }
 
 func (a *tuiApp) setScope(s int) {

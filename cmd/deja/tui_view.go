@@ -150,7 +150,11 @@ func (a *tuiApp) drawSearch(l layout, y int) {
 	case a.searching:
 		count = "…"
 	default:
-		count = num(len(a.rows))
+		n, more := a.listedCount()
+		count = num(n)
+		if more {
+			count += "+"
+		}
 	}
 	max := x1 - termwidth.Columns(count) - 2
 	x := 6

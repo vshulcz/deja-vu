@@ -114,6 +114,17 @@ type Options struct {
 	// Ranking needs their number and length for BM25's corpus figures, and
 	// the total needs their number.
 	Unread *Unread `json:"-"`
+	// Activation is the trust-policy path the answer goes out on (search,
+	// mcp). Set, the pool leaves out what the policy withholds there: a
+	// denied session took a pool slot from one the page could show, and the
+	// unread count reported it as a match.
+	Activation string `json:"-"`
+	// PoolScope names the projects of a narrower search the caller will cut
+	// from this one. Under Window, retrieval also reads every session of
+	// theirs that matched, outside the pool, when the narrower search would
+	// have read them all; Unread.Scoped lists them and Unread.ScopeWhole says
+	// it happened.
+	PoolScope []string `json:"-"`
 }
 
 // Unread is the part of a match retrieval did not read.
@@ -128,6 +139,17 @@ type Unread struct {
 	// outside the pool, where the estimate is applied, because the pool is a
 	// biased draw — short sessions rank first.
 	Sample map[string]float64
+	// Withheld is how many matching sessions the trust policy kept out of
+	// the pool under Options.Activation; they are in neither the pool nor
+	// Sessions.
+	Withheld int
+	// Scoped is what Options.PoolScope added to the read, keyed harness:id:
+	// matches counted in Sessions above, read only for the narrower answer.
+	// Ranking this one leaves them out.
+	Scoped map[string]bool
+	// ScopeWhole is set when every matching session of Options.PoolScope was
+	// read.
+	ScopeWhole bool
 }
 
 const (

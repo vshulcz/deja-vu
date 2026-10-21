@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The command tables of a session two transcripts share count the copy the
   row names, in a pass and a full build alike, and a migrated goose session
   counts each run once (#5490, #5491).
+The search screen reads a page at a time. A word most of a 40,000-session store holds lists its first 80 cards in about 1 s instead of 16, the list is headed with every match, and the next page loads as the selection nears the end (#5487). MCP `recall` runs one index search where it ran two, the project's answer cut from the machine's: 2.4 s to 1.3 s outside any known project, 2.2 s to 1.4 s inside one, same page (#5486). A session the trust policy withholds no longer takes a slot in a large search's pool or counts toward its total (#5488).
 
 ## [0.23.0] - 2026-10-21
 

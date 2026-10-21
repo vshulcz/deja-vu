@@ -67,6 +67,11 @@ type tuiApp struct {
 	rows        []tuiRow
 	listed      string // the scope and query rows answers
 	total       int
+	hits        []search.Hit // what the search read, in rank order
+	asked       int          // how many hits it asked for
+	matched     int          // how many sessions matched in all
+	loadingMore bool
+	exhausted   bool // the last page added nothing
 	sel, scroll int
 	tookMS      float64
 	widened     bool
@@ -414,10 +419,11 @@ func (a *tuiApp) setRows(ss []model.Session, hits []search.Hit, total int) {
 	if len(a.filter) > 0 || a.scope == scopeKept || box.active() {
 		a.total = len(rows)
 	}
+	scroll := a.scroll
 	a.sel, a.scroll = 0, 0
 	for i, r := range rows {
 		if sessionKey(r.s) == keep {
-			a.sel = i
+			a.sel, a.scroll = i, scroll
 		}
 	}
 	for i, r := range rows {
@@ -428,12 +434,46 @@ func (a *tuiApp) setRows(ss []model.Session, hits []search.Hit, total int) {
 	}
 }
 
+// startSearch runs the box's search from its first page. A refresh of the
+// same list reads as far as the reader had scrolled.
 func (a *tuiApp) startSearch() {
+	limit := tuiPage
+	if a.listed == num(a.scope)+"\x00"+string(a.query) && a.asked > limit {
+		limit = a.asked
+	}
+	a.searchPage(limit, false)
+}
+
+// moreLeft says whether the match holds sessions past what the list read.
+func (a *tuiApp) moreLeft() bool {
+	return len(a.query) > 0 && !a.searching && !a.exhausted && a.matched > a.asked
+}
+
+// loadMore asks for the next page once the selection nears the end of the
+// list. The list reads a page at a time: ranking every session a common word
+// matched took 16 s on a 40k-session store before the first card (#5487).
+func (a *tuiApp) loadMore() {
+	if a.loadingMore || !a.moreLeft() || a.sel < len(a.rows)-tuiMoreAhead {
+		return
+	}
+	a.loadingMore = true
+	a.searchPage(a.asked+tuiPage, true)
+}
+
+// searchPage runs the box's search for its first limit hits. With next it
+// extends the list on screen: the cards already there keep their places and
+// the new ones follow.
+func (a *tuiApp) searchPage(limit int, next bool) {
 	a.seq++
 	seq, q, scope, box := a.seq, string(a.query), a.scope, a.box()
 	o := box.options(a.scopeProjects())
-	o.Limit = 80
-	a.searching = true
+	o.Limit = limit
+	if next && a.widened {
+		o.Projects = nil
+	}
+	if !next {
+		a.searching = true
+	}
 	a.latest.Store(int64(seq))
 	// A search already overtaken by the next keystroke is not run: on a large
 	// history each one is a full pass, and a word typed at speed started one
@@ -446,14 +486,14 @@ func (a *tuiApp) startSearch() {
 			return
 		}
 		start := time.Now()
-		hits, err := tuiSearch(a.dir, o)
-		widened := false
+		hits, matched, err := tuiSearchPage(a.dir, o)
+		widened := next && a.widened
 		// A project named with in: is what was asked for; only the tab's
 		// scope widens on its own.
-		if err == nil && len(hits) == 0 && scope == scopeHere && len(o.Projects) > 0 && len(box.projects) == 0 && !stale() {
+		if !next && err == nil && len(hits) == 0 && scope == scopeHere && len(o.Projects) > 0 && len(box.projects) == 0 && !stale() {
 			wide := o
 			wide.Projects = nil
-			hits, err = tuiSearch(a.dir, wide)
+			hits, matched, err = tuiSearchPage(a.dir, wide)
 			widened = len(hits) > 0
 		}
 		took := float64(time.Since(start).Microseconds()) / 1000
@@ -461,12 +501,22 @@ func (a *tuiApp) startSearch() {
 			if seq != a.seq {
 				return
 			}
-			a.searching = false
+			a.searching, a.loadingMore = false, false
 			if err != nil {
 				a.say("Search failed: "+err.Error(), false)
 				return
 			}
-			a.tookMS, a.widened = took, widened
+			if next {
+				// A page that added no hit ends the list where it is: the
+				// count above it read the postings, and they promised more
+				// than the text holds.
+				hits = appendNewHits(a.hits, hits)
+				a.exhausted = len(hits) == len(a.hits)
+			} else {
+				a.tookMS, a.exhausted = took, false
+			}
+			a.hits, a.asked, a.matched = hits, limit, matched
+			a.widened = widened
 			refresh := a.listed == num(a.scope)+"\x00"+q
 			a.setRows(nil, hits, len(hits))
 			if len(a.rows) == 0 && scope != scopeKept {

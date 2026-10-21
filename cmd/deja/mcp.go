@@ -1574,7 +1574,7 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 		}
 	}
 	live, cut := liveLineageCut(dir)
-	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: live, ExcludeUpTo: cut, Window: offset + limit}
+	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: live, ExcludeUpTo: cut, Window: offset + limit, Activation: policy.ActivationMCP}
 	cov, err := index.EnsureForSearchCoverage(dir, o, mcpProgress())
 	if err != nil {
 		return "", 0, 0, nil, nil, err
@@ -1602,6 +1602,17 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 		// accepted and then ignored.
 		o.Projects = []string{project}
 	}
+	// The project the agent is working in answers first. The prompt hook
+	// ranks inside it and recall ranked the whole machine, so the same
+	// question found the decision through the hook and buried it here: on a
+	// stand with ~1800 real sessions behind one project, the session that
+	// answered sat at 20-39 for the queries agents sent, or outside the
+	// candidates altogether. The rest of the machine follows.
+	var scope []string
+	if project == "" {
+		scope = howScope(howCwd(), "", false)
+		o.PoolScope = scope
+	}
 	result, o2, hits, policyHidden, err := recallRank(dir, q, o)
 	if err != nil {
 		return "", 0, 0, nil, nil, err
@@ -1612,41 +1623,47 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 	if len(pathScope) > 0 {
 		hits = inProjectHits(hits, pathScope)
 	}
-	if project == "" {
-		// The project the agent is working in answers first. The prompt hook
-		// ranks inside it and recall ranked the whole machine, so the same
-		// question found the decision through the hook and buried it here: on
-		// a stand with ~1800 real sessions behind one project, the session
-		// that answered sat at 20-39 for the queries agents sent, or outside
-		// the candidates altogether. The rest of the machine follows.
-		if scope := howScope(howCwd(), "", false); len(scope) > 0 {
-			po := o
-			po.Projects = scope
-			pr, po2, ph, phidden, perr := recallRank(dir, q, po)
-			// The index filter matches names as substrings; kept are the
-			// sessions the hooks call this project's, by the same rule, so a
-			// directory that merely shares the name does not lead (#2333).
-			ph = inProjectHits(ph, scope)
-			// Even when another project matches the words better: there the
-			// words are someone else's PR or pool, here they are the decision
-			// this repository lives by, which is why the hook ranks inside the
-			// project only. The rest of the machine follows only from the same
-			// tier, so the lines above the page describe all of it.
-			if perr == nil && len(ph) > 0 {
-				rest := hitsNotIn(hits, ph)
-				if result.Tier != pr.Tier {
-					rest = nil
-				}
-				// What the two runs left unread: the machine's figure covers
-				// the project's sessions too, so the larger of the two.
-				if rest == nil {
-					unread = unreadSessions(pr)
-				} else {
-					unread = max(unreadSessions(pr), unread+len(hits)-len(ph)-len(rest))
-				}
-				result, o2, policyHidden = pr, po2, phidden
-				hits = append(ph, rest...)
+	if len(scope) > 0 {
+		po := o
+		po.Projects, po.PoolScope = scope, nil
+		// Cut from the machine's search when that one read everything the
+		// project's would: a second search of a word most sessions hold
+		// cost as much again (#5486). And not run at all where no session
+		// is the project's, which used to walk every rung of the ladder to
+		// find nothing.
+		var pr index.SearchResult
+		var po2 search.Options
+		var ph []search.Hit
+		var phidden int
+		var perr error
+		if cut, ok := index.ScopedFrom(result, scope); ok {
+			pr, po2, ph, phidden, perr = recallRankFrom(dir, q, po, cut)
+		} else if index.AnyInScope(dir, scope) {
+			pr, po2, ph, phidden, perr = recallRank(dir, q, po)
+		}
+		// The index filter matches names as substrings; kept are the
+		// sessions the hooks call this project's, by the same rule, so a
+		// directory that merely shares the name does not lead (#2333).
+		ph = inProjectHits(ph, scope)
+		// Even when another project matches the words better: there the
+		// words are someone else's PR or pool, here they are the decision
+		// this repository lives by, which is why the hook ranks inside the
+		// project only. The rest of the machine follows only from the same
+		// tier, so the lines above the page describe all of it.
+		if perr == nil && len(ph) > 0 {
+			rest := hitsNotIn(hits, ph)
+			if result.Tier != pr.Tier {
+				rest = nil
 			}
+			// What the two runs left unread: the machine's figure covers
+			// the project's sessions too, so the larger of the two.
+			if rest == nil {
+				unread = unreadSessions(pr)
+			} else {
+				unread = max(unreadSessions(pr), unread+len(hits)-len(ph)-len(rest))
+			}
+			result, o2, policyHidden = pr, po2, phidden
+			hits = append(ph, rest...)
 		}
 	}
 	o = o2
@@ -2178,7 +2195,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 		}
 	}
 	live, cut := liveLineageCut(dir)
-	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: live, ExcludeUpTo: cut, Window: 1}
+	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: live, ExcludeUpTo: cut, Window: 1, Activation: policy.ActivationMCP}
 	if stale, err := index.EnsureForSearchStale(dir, o, mcpProgress()); err != nil {
 		return "", 0, 0, nil, nil, "", err
 	} else if stale {
@@ -2209,6 +2226,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 		return "", 0, 0, nil, nil, "", err
 	}
 	hits, policyHidden := policyFilterHitsCounted(policy.ActivationMCP, hits)
+	policyHidden += unreadWithheld(result)
 	var semantic bool
 	hits, semantic = maybeSemantic(dir, hits, o, os.Stderr)
 	if semantic {
@@ -2733,11 +2751,20 @@ func rememberSavedNote(dir string) string {
 
 // recallRank runs one recall search and turns its sessions into ranked hits.
 func recallRank(dir, q string, o search.Options) (index.SearchResult, search.Options, []search.Hit, int, error) {
-	result, err := index.SearchWithRecoveryDetailed(dir, o, mcpProgress())
+	result, err := recallSearch(dir, o, mcpProgress())
 	if err != nil {
 		return index.SearchResult{}, o, nil, 0, err
 	}
-	ss := withoutLiveSessions(dir, result.Sessions)
+	return recallRankFrom(dir, q, o, result)
+}
+
+// recallSearch is the index search recall ranks; a test counts the calls.
+var recallSearch = index.SearchWithRecoveryDetailed
+
+// recallRankFrom is recallRank on a search already run.
+func recallRankFrom(dir, q string, o search.Options, result index.SearchResult) (index.SearchResult, search.Options, []search.Hit, int, error) {
+	var err error
+	ss := withoutLiveSessions(dir, withoutScoped(result))
 	o.Tier = result.Tier
 	o.Unread = result.Unread
 	if result.Stemmed {
@@ -2764,6 +2791,7 @@ func recallRank(dir, q string, o search.Options) (index.SearchResult, search.Opt
 		return index.SearchResult{}, o, nil, 0, err
 	}
 	hits, policyHidden := policyFilterHitsCounted(policy.ActivationMCP, hits)
+	policyHidden += unreadWithheld(result)
 	if os.Getenv("DEJA_EMBED") != "off" {
 		hits = maybeRerank(dir, hits, o, os.Stderr)
 	}
@@ -2777,6 +2805,30 @@ func recallRank(dir, q string, o search.Options) (index.SearchResult, search.Opt
 	}
 	o.Semantic = semantic
 	return result, o, hits, policyHidden, nil
+}
+
+// withoutScoped is what a search read for its own ranking: the sessions
+// read only so a project's answer could be cut from it are left out.
+func withoutScoped(r index.SearchResult) []model.Session {
+	if r.Unread == nil || len(r.Unread.Scoped) == 0 {
+		return r.Sessions
+	}
+	out := make([]model.Session, 0, len(r.Sessions))
+	for _, s := range r.Sessions {
+		if !r.Unread.Scoped[s.Harness+":"+s.ID] {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// unreadWithheld is how many matching sessions the trust policy kept out of
+// the pool, which the filter after ranking never sees.
+func unreadWithheld(r index.SearchResult) int {
+	if r.Unread == nil {
+		return 0
+	}
+	return r.Unread.Withheld
 }
 
 // unreadSessions is how many matching sessions retrieval left unread.

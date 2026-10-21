@@ -560,9 +560,9 @@ func RunDetailedKeeping(ss []model.Session, o Options, keep func([]Hit) []Hit) (
 	}
 	r := Results{Hits: hits, Total: len(hits), Tier: setTier(o)}
 	r.Hits, r.Capped = CapHits(hits, o.Limit, o.All)
-	// The unread sessions matched as well. They are counted before the trust
-	// policy reads the pool, so a rule withholding some of them is not
-	// subtracted from the total.
+	// The unread sessions matched as well. What the trust policy withholds
+	// on Options.Activation is already out of them, so the total does not
+	// count a session the page could never show.
 	if o.Unread != nil && o.Unread.Sessions > 0 {
 		r.Total += o.Unread.Sessions
 		r.Capped = true

@@ -274,8 +274,10 @@ func searchDetailedRead(dir string, o query.Options) (SearchResult, error) {
 	posts = cutPostingsBySession(posts, m, o)
 	var ss []model.Session
 	var unread *query.Unread
+	var scoped []posting
+	var scopeWhole bool
 	if len(posts) > 0 {
-		posts, unread = poolPostings(posts, m, o, holding)
+		posts, unread, scoped, scopeWhole = poolPostings(posts, m, o, holding)
 		// With the variants the rung above collected, not without them. A
 		// substring variant needs none — the text holding "opencode" holds
 		// "code" too — but a compound spelled apart is not a substring of
@@ -312,7 +314,29 @@ func searchDetailedRead(dir string, o query.Options) (SearchResult, error) {
 	if err != nil {
 		return SearchResult{}, err
 	}
-	return withRelevanceTail(ranking, dir, m, o, SearchResult{Sessions: ss, Tier: fallbackTier, Variants: fallbackVariants, Unread: unread})
+	res, err := withRelevanceTail(ranking, dir, m, o, SearchResult{Sessions: ss, Tier: fallbackTier, Variants: fallbackVariants, Unread: unread})
+	// What o.PoolScope asked for is read after this search settled its own
+	// answer, and only onto a plain exact one: that is the only answer a
+	// narrower one is cut from.
+	if err == nil && scopeWhole && res.Unread == unread && res.Tier == query.TierExact {
+		// No offsets would scan the whole record log.
+		var extra []model.Session
+		if len(scoped) > 0 {
+			var serr error
+			if extra, serr = scanRecordsWithVariants(dir, m, o, postingOffsets(scoped), fallbackVariants); serr != nil {
+				return res, nil
+			}
+		}
+		for _, s := range extra {
+			if unread.Scoped == nil {
+				unread.Scoped = map[string]bool{}
+			}
+			unread.Scoped[s.Harness+":"+s.ID] = true
+		}
+		res.Sessions = append(res.Sessions, extra...)
+		unread.ScopeWhole = true
+	}
+	return res, err
 }
 
 // sessionKeySet keys sessions the way StrictIDs is keyed, for the paths that
@@ -3402,9 +3426,13 @@ func cutPostingsBySession(posts []posting, m Manifest, o query.Options) []postin
 //
 // holding is how many postings matched, which on the exact tier is how many
 // records of the store hold the query.
-func poolPostings(posts []posting, m Manifest, o query.Options, holding int) ([]posting, *query.Unread) {
+//
+// scoped are the postings of the sessions o.PoolScope adds, read apart so
+// they never decide this search's own tier, and whole says the narrower
+// search would read nothing else.
+func poolPostings(posts []posting, m Manifest, o query.Options, holding int) ([]posting, *query.Unread, []posting, bool) {
 	if o.Window <= 0 || o.Session != "" || o.Role != "" {
-		return posts, nil
+		return posts, nil, nil, false
 	}
 	n := search.PoolSize(o.Window)
 	records := map[uint32]int{}
@@ -3412,22 +3440,28 @@ func poolPostings(posts []posting, m Manifest, o query.Options, holding int) ([]
 		records[p.Sid]++
 	}
 	if len(records) <= n {
-		return posts, nil
+		return posts, nil, nil, false
 	}
 	metaByOrd := sessionMetaByOrd(m)
-	// What the ignore rule withholds is dropped here rather than after the
-	// scan, so the unread count does not include it.
+	// What the ignore rule and the trust policy withhold is dropped here
+	// rather than after the scan, so the unread count does not include it and
+	// a denied session does not take a slot from one the page can show (#5488).
 	pol, excluded := policy.Load(), sources.ExcludedHarnesses()
 	sids := make([]uint32, 0, len(records))
+	withheld := 0
 	for sid := range records {
 		meta := metaByOrd[sid]
 		if excluded[strings.ToLower(meta.Harness)] || pol.Ignored(meta.Path, meta.Project) {
 			continue
 		}
+		if o.Activation != "" && !pol.Allows(o.Activation, meta.Project) {
+			withheld++
+			continue
+		}
 		sids = append(sids, sid)
 	}
 	if len(sids) <= n {
-		return posts, nil
+		return posts, nil, nil, false
 	}
 	sort.Slice(sids, func(i, j int) bool { return sids[i] < sids[j] })
 	stored := 0
@@ -3447,21 +3481,71 @@ func poolPostings(posts []posting, m Manifest, o query.Options, holding int) ([]
 	}
 	keep, unread := search.Pool(cands, o, n, share)
 	if keep == nil {
-		return posts, nil
+		return posts, nil, nil, false
 	}
+	unread.Withheld = withheld
 	kept := make(map[uint32]bool, n)
 	for i, sid := range sids {
 		if keep[i] {
 			kept[sid] = true
 		}
 	}
+	extra, whole := scopedPool(records, sids, kept, metaByOrd, o, n)
 	out := make([]posting, 0, len(posts))
+	var scoped []posting
 	for _, p := range posts {
 		if kept[p.Sid] {
 			out = append(out, p)
+		} else if extra[p.Sid] {
+			scoped = append(scoped, p)
 		}
 	}
-	return out, &unread
+	if !whole {
+		scoped = nil
+	}
+	return out, &unread, scoped, whole
+}
+
+// scopedPool picks what else to read for o.PoolScope: every matching session
+// of theirs outside kept, when the narrower search would read them all, so
+// that answer can be cut from this one instead of searched again. Recall
+// ranks the caller's project first and the machine after, and the second
+// search of a common word cost a third of its time on a 40k-session store
+// (#5486). whole is false when the narrower search would pool too.
+//
+// Its rule for reading everything: under its pool size, before or after the
+// ignore rule and the trust policy drop what they withhold, it reads every
+// candidate, those included.
+func scopedPool(records map[uint32]int, sids []uint32, kept map[uint32]bool, metaByOrd map[uint32]SessionMeta, o query.Options, n int) (extra map[uint32]bool, whole bool) {
+	if len(o.PoolScope) == 0 {
+		return nil, false
+	}
+	in := func(sid uint32) bool {
+		meta := metaByOrd[sid]
+		return query.ProjectAnyMatches(meta.Project, meta.From, o.PoolScope)
+	}
+	var scope []uint32
+	for sid := range records {
+		if in(sid) {
+			scope = append(scope, sid)
+		}
+	}
+	allowed := 0
+	for _, sid := range sids {
+		if in(sid) {
+			allowed++
+		}
+	}
+	if len(scope) > n && allowed > n {
+		return nil, false
+	}
+	extra = map[uint32]bool{}
+	for _, sid := range scope {
+		if !kept[sid] {
+			extra[sid] = true
+		}
+	}
+	return extra, true
 }
 
 // perSessionCandidates bounds how many matching messages of one session are

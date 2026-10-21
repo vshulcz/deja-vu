@@ -1762,6 +1762,7 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 		if o.Window <= 0 {
 			o.Window = search.DefaultLimit
 		}
+		o.Activation = policy.ActivationSearch
 	}
 	result, err := index.SearchWithRecoveryDetailed(dir, o, os.Stderr)
 	if err != nil {
@@ -1772,6 +1773,7 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 	// that runs later still lets denied sessions occupy the result slots and
 	// the allowed ones never reach the page (#1060).
 	ss, policyHidden := policyFilterSessionsCounted(policy.ActivationSearch, search.WithoutIgnored(result.Sessions))
+	policyHidden += unreadWithheld(result)
 	o.PolicyWithheld = policyHidden
 	o.Tier = result.Tier
 	if result.Neighbour {

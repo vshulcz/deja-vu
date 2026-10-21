@@ -42,7 +42,11 @@ func (a *tuiApp) sectionLabel() (string, string) {
 		for _, r := range a.rows {
 			agents[r.s.Harness] = true
 		}
-		label := tuiCount(len(a.rows), "session") + " across " + tuiCount(len(agents), "agent")
+		n, more := a.listedCount()
+		label := tuiCount(n, "session") + " across " + tuiCount(len(agents), "agent")
+		if more {
+			label = grouped(n) + "+ sessions across " + tuiCount(len(agents), "agent")
+		}
 		box := a.box()
 		note := "all projects"
 		switch {
@@ -69,6 +73,21 @@ func (a *tuiApp) sectionLabel() (string, string) {
 		return "Deleted by their agent, kept by deja", grouped(a.total)
 	}
 	return "Recent", grouped(a.total)
+}
+
+// listedCount is the count a search list is headed with: every session that
+// matched while the list reads a page at a time, or the cards themselves when
+// a filter the index cannot apply stands between the two; more is set when
+// that is a lower bound.
+func (a *tuiApp) listedCount() (n int, more bool) {
+	if !a.moreLeft() {
+		return len(a.rows), false
+	}
+	box := a.box()
+	if len(a.filter) > 0 || a.scope == scopeKept || len(box.harnesses) > 1 || !box.until.IsZero() {
+		return len(a.rows), true
+	}
+	return a.matched, false
 }
 
 func tuiCount(n int, word string) string {
