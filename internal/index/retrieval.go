@@ -277,13 +277,22 @@ func searchDetailedRead(dir string, o query.Options) (SearchResult, error) {
 	var scoped []posting
 	var scopeWhole bool
 	if len(posts) > 0 {
-		posts, unread, scoped, scopeWhole = poolPostings(posts, m, o, holding)
+		pool := poolPostings(posts, m, o, holding)
+		posts, unread, scoped, scopeWhole = pool.read, pool.unread, pool.scoped, pool.whole
 		// With the variants the rung above collected, not without them. A
 		// substring variant needs none — the text holding "opencode" holds
 		// "code" too — but a compound spelled apart is not a substring of
 		// anything the store wrote, so the postings found the session and
 		// this check dropped it again (#2125).
 		ss, err = scanRecordsWithVariants(dir, m, o, postingOffsets(posts), fallbackVariants)
+		if err == nil && unread != nil {
+			var more []model.Session
+			if more, err = verifyUnread(dir, m, o, fallbackVariants, ss, pool); len(more) > 0 {
+				// Read now, so ranked with the rest; the scope's own matches
+				// among them need no second read.
+				ss, scoped = append(ss, more...), nil
+			}
+		}
 	}
 	if err == nil && len(ss) == 0 {
 		if result, ferr := stemSearch(dir, m, o); ferr != nil {
@@ -3427,12 +3436,12 @@ func cutPostingsBySession(posts []posting, m Manifest, o query.Options) []postin
 // holding is how many postings matched, which on the exact tier is how many
 // records of the store hold the query.
 //
-// scoped are the postings of the sessions o.PoolScope adds, read apart so
-// they never decide this search's own tier, and whole says the narrower
-// search would read nothing else.
-func poolPostings(posts []posting, m Manifest, o query.Options, holding int) ([]posting, *query.Unread, []posting, bool) {
+// The scoped postings are those of the sessions o.PoolScope adds, read apart
+// so they never decide this search's own tier.
+func poolPostings(posts []posting, m Manifest, o query.Options, holding int) pooled {
+	all := pooled{read: posts}
 	if o.Window <= 0 || o.Session != "" || o.Role != "" {
-		return posts, nil, nil, false
+		return all
 	}
 	n := search.PoolSize(o.Window)
 	records := map[uint32]int{}
@@ -3440,7 +3449,7 @@ func poolPostings(posts []posting, m Manifest, o query.Options, holding int) ([]
 		records[p.Sid]++
 	}
 	if len(records) <= n {
-		return posts, nil, nil, false
+		return all
 	}
 	metaByOrd := sessionMetaByOrd(m)
 	// What the ignore rule and the trust policy withhold is dropped here
@@ -3449,6 +3458,7 @@ func poolPostings(posts []posting, m Manifest, o query.Options, holding int) ([]
 	pol, excluded := policy.Load(), sources.ExcludedHarnesses()
 	sids := make([]uint32, 0, len(records))
 	withheld := 0
+	denied, allowed := map[uint32]bool{}, map[uint32]bool{}
 	for sid := range records {
 		meta := metaByOrd[sid]
 		if excluded[strings.ToLower(meta.Harness)] || pol.Ignored(meta.Path, meta.Project) {
@@ -3456,12 +3466,14 @@ func poolPostings(posts []posting, m Manifest, o query.Options, holding int) ([]
 		}
 		if o.Activation != "" && !pol.Allows(o.Activation, meta.Project) {
 			withheld++
+			denied[sid] = true
 			continue
 		}
 		sids = append(sids, sid)
+		allowed[sid] = true
 	}
 	if len(sids) <= n {
-		return posts, nil, nil, false
+		return all
 	}
 	sort.Slice(sids, func(i, j int) bool { return sids[i] < sids[j] })
 	stored := 0
@@ -3481,7 +3493,7 @@ func poolPostings(posts []posting, m Manifest, o query.Options, holding int) ([]
 	}
 	keep, unread := search.Pool(cands, o, n, share)
 	if keep == nil {
-		return posts, nil, nil, false
+		return all
 	}
 	unread.Withheld = withheld
 	kept := make(map[uint32]bool, n)
@@ -3490,20 +3502,136 @@ func poolPostings(posts []posting, m Manifest, o query.Options, holding int) ([]
 			kept[sid] = true
 		}
 	}
-	extra, whole := scopedPool(records, sids, kept, metaByOrd, o, n)
-	out := make([]posting, 0, len(posts))
-	var scoped []posting
+	extra, scopeWhole := scopedPool(records, sids, kept, metaByOrd, o, n)
+	out := pooled{unread: &unread, whole: scopeWhole, readSessions: len(kept), all: posts, kept: kept, allowed: allowed, denied: denied}
 	for _, p := range posts {
 		if kept[p.Sid] {
-			out = append(out, p)
-		} else if extra[p.Sid] {
-			scoped = append(scoped, p)
+			out.read = append(out.read, p)
+		} else if extra[p.Sid] && scopeWhole {
+			out.scoped = append(out.scoped, p)
 		}
 	}
-	if !whole {
-		scoped = nil
+	return out
+}
+
+// pooled is what poolPostings split a match into.
+type pooled struct {
+	// read are the postings of the sessions ranked in full, and
+	// readSessions how many sessions they come from.
+	read         []posting
+	readSessions int
+	unread       *query.Unread
+	// scoped and whole are what Options.PoolScope added: see scopedPool.
+	scoped []posting
+	whole  bool
+	// all are the postings the pool was drawn from. Of their sessions, kept
+	// were read, allowed and not kept are what Unread.Sessions counts, and
+	// denied what Unread.Withheld counts. Those two were not checked against
+	// the text.
+	all                   []posting
+	kept, allowed, denied map[uint32]bool
+}
+
+// verifyUnreadBudget is how many postings of the unread sessions are checked
+// against the text before their count is estimated instead.
+var verifyUnreadBudget = 20000
+
+// verifyUnread makes the unread counts ones the text bears out. The pool is
+// drawn from the postings, which say which records hold every word, not
+// whether the words stand together the way a quoted phrase asks: "alpha beta"
+// over 1,900 sessions that hold both words apart read the 5 that say it and
+// counted the rest as matches, 106 in all (#5495).
+//
+// When every session read passed the text check, the postings were exact and
+// the counts stand: a plain word costs nothing here. Otherwise the unread
+// sessions are checked the same way, and the ones that pass are returned to
+// be ranked with the pool, which leaves nothing unread. Past
+// verifyUnreadBudget postings the counts are instead scaled by how many of the
+// sample read with the pool passed, and Unread.Estimated says so.
+func verifyUnread(dir string, m Manifest, o query.Options, variants map[string][]string, ss []model.Session, pool pooled) ([]model.Session, error) {
+	u := pool.unread
+	if len(ss) >= pool.readSessions || u.Sessions+u.Withheld == 0 {
+		return nil, nil
 	}
-	return out, &unread, scoped, whole
+	var rest, denied []posting
+	over := false
+	for _, p := range pool.all {
+		switch {
+		case pool.denied[p.Sid]:
+			denied = append(denied, p)
+		case pool.allowed[p.Sid] && !pool.kept[p.Sid]:
+			rest = append(rest, p)
+		}
+		if over = len(rest)+len(denied) > verifyUnreadBudget; over {
+			break
+		}
+	}
+	if !over {
+		more, err := sessionsBorneOut(dir, m, o, variants, rest)
+		if err != nil {
+			return nil, err
+		}
+		withheld, err := sessionsBorneOut(dir, m, o, variants, denied)
+		if err != nil {
+			return nil, err
+		}
+		u.Sessions, u.Length, u.Withheld = 0, 0, len(withheld)
+		return more, nil
+	}
+	passed, sampled := 0, len(u.Sample)
+	for _, s := range ss {
+		if _, ok := u.Sample[s.Harness+":"+s.ID]; ok {
+			passed++
+		}
+	}
+	if sampled == 0 {
+		passed, sampled = len(ss), pool.readSessions
+	}
+	rate := float64(passed) / float64(sampled)
+	u.Sessions = int(math.Round(float64(u.Sessions) * rate))
+	u.Length *= rate
+	u.Withheld = int(math.Round(float64(u.Withheld) * rate))
+	u.Estimated = true
+	return nil, nil
+}
+
+// sessionsBorneOut is the sessions whose records at posts pass the text check
+// a search makes. The reads are split by session over a few workers: one
+// record read at a time spent 0.85 s in pread on 3,100 sessions of a
+// 40k-session store.
+func sessionsBorneOut(dir string, m Manifest, o query.Options, variants map[string][]string, posts []posting) ([]model.Session, error) {
+	// No offsets would scan the whole record log.
+	if len(posts) == 0 {
+		return nil, nil
+	}
+	workers := min(runtime.NumCPU(), 4, (len(posts)+511)/512)
+	offsets := make([][]int64, workers)
+	for _, p := range posts {
+		w := int(p.Sid) % workers
+		offsets[w] = append(offsets[w], p.Off)
+	}
+	found := make([][]model.Session, workers)
+	errs := make([]error, workers)
+	var wg sync.WaitGroup
+	for w := range workers {
+		if len(offsets[w]) == 0 {
+			continue
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			found[w], errs[w] = scanRecordsWithVariants(dir, m, o, offsets[w], variants)
+		}()
+	}
+	wg.Wait()
+	var out []model.Session
+	for w := range workers {
+		if errs[w] != nil {
+			return nil, errs[w]
+		}
+		out = append(out, found[w]...)
+	}
+	return out, nil
 }
 
 // scopedPool picks what else to read for o.PoolScope: every matching session

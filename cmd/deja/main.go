@@ -1858,7 +1858,7 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 			}
 			return rerr
 		}
-		hits, o.Total, o.Capped = detailed.Hits, detailed.Total, detailed.Capped
+		hits, o.Total, o.Capped, o.TotalEstimated = detailed.Hits, detailed.Total, detailed.Capped, detailed.Estimated
 	}
 	if !o.NoEmbed && os.Getenv("DEJA_EMBED") != "off" {
 		hits = maybeRerank(dir, hits, o, os.Stderr)
@@ -1886,7 +1886,7 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 	demoted := demoteRejected(hits)
 	attachMoved(hits)
 	if !o.Capped {
-		o.Total = len(hits)
+		o.Total, o.TotalEstimated = len(hits), false
 	}
 	if note := demotedNote(hits, demoted); note != "" {
 		fmt.Fprintf(os.Stderr, "deja: %s\n", note)
@@ -1930,10 +1930,14 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 		// an explicit --limit, or by the relevance tier's own retrieval window,
 		// and neither of those lifts with the flag they are being sent to
 		// (#1608). Say what is shown and leave the advice out.
+		total := fmt.Sprint(o.Total)
+		if o.TotalEstimated {
+			total = "about " + total
+		}
 		if o.All {
-			fmt.Fprintf(os.Stderr, "deja: showing %d of %d\n", len(hits), o.Total)
+			fmt.Fprintf(os.Stderr, "deja: showing %d of %s\n", len(hits), total)
 		} else {
-			fmt.Fprintf(os.Stderr, "deja: showing %d of %d — add --all to see the rest\n", len(hits), o.Total)
+			fmt.Fprintf(os.Stderr, "deja: showing %d of %s — add --all to see the rest\n", len(hits), total)
 		}
 	}
 	// The answer can also be short for a reason no flag lifts. Counted over the

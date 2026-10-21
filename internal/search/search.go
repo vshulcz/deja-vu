@@ -68,6 +68,11 @@ type searchJSONEnvelope struct {
 	// Total is how many sessions matched before the cap; Capped says whether
 	// the cap hid any. Counting the returned hits alone measures the cap.
 	Total int `json:"total"`
+	// TotalEstimated says total counts sessions the search did not read by an
+	// estimate: the text check turned down sessions the postings named (a
+	// quoted phrase over common words), and the unread ones were too many to
+	// check.
+	TotalEstimated bool `json:"total_estimated,omitempty"`
 	// Strict is how many of the hits hold every word of the query. It appears
 	// on the relevance tier, where a thin strict answer is merged into the
 	// ranking and published under a label that means nothing matched: a
@@ -540,6 +545,9 @@ type Results struct {
 	// relevance. relevance means nothing matched and these are the nearest
 	// sessions, which is not the same kind of answer.
 	Tier string
+	// Estimated says Total counts sessions retrieval did not read by an
+	// estimate (query.Unread.Estimated).
+	Estimated bool
 }
 
 // RunDetailed is Run plus the numbers the cap would otherwise hide.
@@ -566,6 +574,11 @@ func RunDetailedKeeping(ss []model.Session, o Options, keep func([]Hit) []Hit) (
 	if o.Unread != nil && o.Unread.Sessions > 0 {
 		r.Total += o.Unread.Sessions
 		r.Capped = true
+	}
+	// An estimate of none left over is still one: the sample held no match,
+	// which says few, not none, and --all reads them all.
+	if o.Unread != nil && o.Unread.Estimated {
+		r.Estimated, r.Capped = true, true
 	}
 	renderSnippets(r.Hits, o, -1)
 	return r, nil
@@ -1572,17 +1585,18 @@ func Print(w io.Writer, hits []Hit, o Options) {
 		// every fallback path emitted an object, so a consumer had to handle
 		// two contracts and could not tell which it had until it looked.
 		_ = json.NewEncoder(w).Encode(searchJSONEnvelope{
-			SchemaVersion: jsonout.Version,
-			Tier:          setTier(o),
-			Total:         o.Total,
-			Strict:        o.Strict,
-			Capped:        o.Capped,
-			Withheld:      o.PolicyWithheld,
-			Hits:          hits,
-			Fuzzy:         o.Fuzzy,
-			Stemmed:       o.Stemmed,
-			Semantic:      o.Semantic,
-			Variants:      o.FuzzyVariants,
+			SchemaVersion:  jsonout.Version,
+			Tier:           setTier(o),
+			Total:          o.Total,
+			TotalEstimated: o.TotalEstimated,
+			Strict:         o.Strict,
+			Capped:         o.Capped,
+			Withheld:       o.PolicyWithheld,
+			Hits:           hits,
+			Fuzzy:          o.Fuzzy,
+			Stemmed:        o.Stemmed,
+			Semantic:       o.Semantic,
+			Variants:       o.FuzzyVariants,
 		})
 		return
 	}

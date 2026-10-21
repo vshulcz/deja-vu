@@ -1435,39 +1435,49 @@ func recallText(dir, q, harness string, limit, budget int) (string, error) {
 // answer to it. On the relevance tier the line says what they are instead
 // (#2074).
 func recallCountLine(q, tier string, offset, served, total, strict int, namesTheAsked bool) string {
+	return recallCountLineAbout(q, tier, offset, served, total, strict, namesTheAsked, false)
+}
+
+// recallCountLineAbout is recallCountLine with the total said as an estimate
+// when about is set: retrieval scaled the unread part of it from a sample.
+func recallCountLineAbout(q, tier string, offset, served, total, strict int, namesTheAsked, about bool) string {
 	q = clampEcho(q)
+	of := fmt.Sprint(total)
+	if about {
+		of = "about " + of
+	}
 	switch {
 	case tier == search.TierRelevance && strict > 0 && offset > 0:
-		return fmt.Sprintf("deja recall for %q (%d-%d of %d ranked; %d %s every word)\n", q, offset+1, offset+served, total, strict, holdOrHolds(strict))
+		return fmt.Sprintf("deja recall for %q (%d-%d of %s ranked; %d %s every word)\n", q, offset+1, offset+served, of, strict, holdOrHolds(strict))
 	case tier == search.TierRelevance && strict > 0:
 		// "none about it" over an answer that holds the whole query is the
 		// count line's half of #3815.
-		return fmt.Sprintf("deja recall for %q (%d of %d ranked; %d %s every word)\n", q, served, total, strict, holdOrHolds(strict))
+		return fmt.Sprintf("deja recall for %q (%d of %s ranked; %d %s every word)\n", q, served, of, strict, holdOrHolds(strict))
 	case tier == search.TierRelevance && namesTheAsked && offset > 0:
 		// "none about it" is the same claim the lead makes, so it follows the
 		// same reading: the exact match failed, and the first session named
 		// what was asked (#2827).
-		return fmt.Sprintf("ranked by wording for %q (%d-%d of %d)\n", q, offset+1, offset+served, total)
+		return fmt.Sprintf("ranked by wording for %q (%d-%d of %s)\n", q, offset+1, offset+served, of)
 	case tier == search.TierRelevance && namesTheAsked:
-		return fmt.Sprintf("ranked by wording for %q (%d of %d)\n", q, served, total)
+		return fmt.Sprintf("ranked by wording for %q (%d of %s)\n", q, served, of)
 	case tier == search.TierRelevance && offset > 0:
 		// The tier before the page: page two of an answer to a question
 		// nothing is about is still not a page of matches, and saying so only
 		// on page one was the same contradiction one line further down.
-		return fmt.Sprintf("nearest by wording to %q (%d-%d of %d ranked, none about it)\n", q, offset+1, offset+served, total)
+		return fmt.Sprintf("nearest by wording to %q (%d-%d of %s ranked, none about it)\n", q, offset+1, offset+served, of)
 	case offset > 0:
-		return fmt.Sprintf("deja recall for %q (matches %d-%d of %d)\n", q, offset+1, offset+served, total)
-	case tier == search.TierRelevance && served < total:
-		return fmt.Sprintf("nearest by wording to %q (%d of %d ranked, none about it)\n", q, served, total)
+		return fmt.Sprintf("deja recall for %q (matches %d-%d of %s)\n", q, offset+1, offset+served, of)
+	case tier == search.TierRelevance && (served < total || about):
+		return fmt.Sprintf("nearest by wording to %q (%d of %s ranked, none about it)\n", q, served, of)
 	case tier == search.TierRelevance:
 		return fmt.Sprintf("nearest by wording to %q (%d ranked, none about it)\n", q, served)
-	case served < total:
+	case served < total || about:
 		// How many came back is not how many matched, and the agent is the
 		// reader that cannot ask a human. "(5 match(es))" reads as five exist,
 		// which is a different answer from sixteen thousand matched and here
 		// are five — one is worth acting on, the other is a sample that will
 		// fill a context window with whatever ranked highest (#1308).
-		return fmt.Sprintf("deja recall for %q (%d of %d matched)\n", q, served, total)
+		return fmt.Sprintf("deja recall for %q (%d of %s matched)\n", q, served, of)
 	default:
 		return fmt.Sprintf("deja recall for %q (%s)\n", q, search.MatchCount(served))
 	}
@@ -1619,7 +1629,7 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 	}
 	// Matching sessions ranking never read count toward the total all the
 	// same (#5467).
-	unread := unreadSessions(result)
+	unread, about := unreadSessions(result), unreadEstimated(result)
 	if len(pathScope) > 0 {
 		hits = inProjectHits(hits, pathScope)
 	}
@@ -1658,9 +1668,10 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 			// What the two runs left unread: the machine's figure covers
 			// the project's sessions too, so the larger of the two.
 			if rest == nil {
-				unread = unreadSessions(pr)
+				unread, about = unreadSessions(pr), unreadEstimated(pr)
 			} else {
 				unread = max(unreadSessions(pr), unread+len(hits)-len(ph)-len(rest))
+				about = about || unreadEstimated(pr)
 			}
 			result, o2, policyHidden = pr, po2, phidden
 			hits = append(ph, rest...)
@@ -1696,7 +1707,7 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 			if result.Tier == search.TierRelevance {
 				what = "sessions ranked by wording"
 			}
-			return fmt.Sprintf("No more %s for %q: %d total, offset %d.", what, clampEcho(q), total, offset), 0, 0, nil, nil, nil
+			return fmt.Sprintf("No more %s for %q: %s total, offset %d.", what, clampEcho(q), aboutCount(total, about), offset), 0, 0, nil, nil, nil
 		}
 		hits = hits[offset:]
 	}
@@ -1808,6 +1819,9 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 	// follow-up line was trimmed off the end (#1308).
 	var hb strings.Builder
 	headerRoom := b.Len() + recallHeaderReserve(q, result.Tier, offset, limit, total)
+	if about {
+		headerRoom += len("about ")
+	}
 	for i, h := range hits {
 		fmt.Fprintf(&hb, "\n%d. [%s] %s · %s · %s", i+1,
 			recallListingLine(h.Session.Harness), recallListingLine(h.Session.Project), recallListingLine(h.Session.ID), search.MatchCount(h.Count))
@@ -1966,7 +1980,7 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 	// From what was served, not from the limit: the loop also stops on the
 	// token budget, and then this said "2 more" while five were left — the
 	// agent asks for offset=served and the arithmetic has to hold.
-	b.WriteString(recallCountLine(q, result.Tier, offset, served, total, strictShown, namesTheAsked))
+	b.WriteString(recallCountLineAbout(q, result.Tier, offset, served, total, strictShown, namesTheAsked, about))
 	b.WriteString(hb.String())
 	// From what was served, not from the limit: the loop also stops on the
 	// token budget, and then this said "2 more" while five were left — the
@@ -1982,7 +1996,7 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 			// more of the nearest wording.
 			what = "ranked by wording"
 		}
-		more = fmt.Sprintf("\n%d more %s — call recall again with offset=%d.\n", left, what, offset+served)
+		more = fmt.Sprintf("\n%s more %s — call recall again with offset=%d.\n", aboutCount(left, about), what, offset+served)
 	}
 	// The move the paging line cannot offer. A hit quotes at most three of its
 	// matches, so a session that matched hundreds of times arrives as a
@@ -2262,7 +2276,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 	}
 	var b bytes.Buffer
 	search.PrintContext(&b, whole, q)
-	text := withChanges(b.String(), whole) + contextOthersNote(len(hits)+unreadSessions(result))
+	text := withChanges(b.String(), whole) + contextOthersNote(len(hits)+unreadSessions(result), unreadEstimated(result))
 	if hits[0].Tier != search.TierExact {
 		// The words below say which one was dropped, and a session matched
 		// without it does not name what was asked either — the dropped word
@@ -2355,12 +2369,12 @@ func pluralHave(n int) string {
 //
 // Silent on a single match: a sentence about others would be untrue, and an
 // agent told to go looking spends a call finding nothing.
-func contextOthersNote(hits int) string {
+func contextOthersNote(hits int, about bool) string {
 	if hits < 2 {
 		return ""
 	}
-	return fmt.Sprintf("\n%d other session%s matched this question — call recall for the list if this one does not answer it.\n",
-		hits-1, pluralS(hits-1))
+	return fmt.Sprintf("\n%s other session%s matched this question — call recall for the list if this one does not answer it.\n",
+		aboutCount(hits-1, about), pluralS(hits-1))
 }
 
 // relevanceHitsAreAboutIt reports whether some session being served is about
@@ -2829,6 +2843,20 @@ func unreadWithheld(r index.SearchResult) int {
 		return 0
 	}
 	return r.Unread.Withheld
+}
+
+// unreadEstimated says unreadSessions is an estimate: retrieval scaled it
+// from a sample rather than checking each unread session against the text.
+func unreadEstimated(r index.SearchResult) bool {
+	return r.Unread != nil && r.Unread.Estimated
+}
+
+// aboutCount is n, said as an estimate when about is set.
+func aboutCount(n int, about bool) string {
+	if about {
+		return fmt.Sprintf("about %d", n)
+	}
+	return fmt.Sprint(n)
 }
 
 // unreadSessions is how many matching sessions retrieval left unread.

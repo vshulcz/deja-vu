@@ -74,6 +74,9 @@ type Options struct {
 	// survived it. Counting the survivors measures the cap.
 	Total  int
 	Capped bool
+	// TotalEstimated says Total counts sessions retrieval did not read by an
+	// estimate (Unread.Estimated).
+	TotalEstimated bool
 	// Strict is how many of these sessions hold every word of the query. It
 	// is nonzero only on the relevance tier, where a thin strict answer is
 	// merged into the ranking and published under that label: the tier then
@@ -129,7 +132,10 @@ type Options struct {
 
 // Unread is the part of a match retrieval did not read.
 type Unread struct {
-	// Sessions is how many matching sessions were left out.
+	// Sessions is how many matching sessions were left out: as the postings
+	// count them when every session read bore them out, scaled from the
+	// sample when Estimated. Otherwise the unread ones that pass the text
+	// check are read too, and this is zero.
 	Sessions int
 	// Length is their estimated BM25 length, summed.
 	Length float64
@@ -150,6 +156,10 @@ type Unread struct {
 	// ScopeWhole is set when every matching session of Options.PoolScope was
 	// read.
 	ScopeWhole bool
+	// Estimated says Sessions and Withheld were scaled from the sample rather
+	// than checked against the text, session by session: the postings
+	// over-counted what was read, and the unread ones were too many to check.
+	Estimated bool
 }
 
 const (

@@ -57,6 +57,11 @@ from a list of hits:
   all 20 answers labelled `relevance` had a strict head of 1 to 9 sessions,
   and none of them had matched nothing.
 - `total` and `capped` — how many sessions matched, and whether a cap hid some.
+- `total_estimated` — `total` counts the sessions a paged search did not read
+  by an estimate rather than by checking each against the text. Set when the
+  text check turned down sessions the words' postings named, most often a
+  quoted phrase over common words, and the unread ones were too many to check;
+  omitted otherwise.
 - `policy_withheld` — how many matching sessions this machine's trust policy
   kept out of the answer. Omitted when none were. Present on `search --json`,
   `last --json` and `stats --json`, so an empty result can be told apart from a
