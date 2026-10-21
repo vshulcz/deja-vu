@@ -89,6 +89,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   16 MB line is read in memory bounded by the message cap instead of the
   line (#5424).
 The search screen reads a page at a time. A word most of a 40,000-session store holds lists its first 80 cards in about 1 s instead of 16, the list is headed with every match, and the next page loads as the selection nears the end (#5487). MCP `recall` runs one index search where it ran two, the project's answer cut from the machine's: 2.4 s to 1.3 s outside any known project, 2.2 s to 1.4 s inside one, same page (#5486). A session the trust policy withholds no longer takes a slot in a large search's pool or counts toward its total (#5488).
+- A search over sessions that share turns but each go on past them no longer
+  compares every pair: 6,000 such sessions answer in 0.43 s instead of 5.1 s
+  (#5523).
 - MCP `recall`'s `limit` says it is per ~4 KB page, and a page that ran out of
   room before reaching `limit` says `(page full)` on its paging line, so a
   caller knows a bigger limit won't fit more (#5511).
