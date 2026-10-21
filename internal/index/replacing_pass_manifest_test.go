@@ -35,6 +35,14 @@ func indexCommandPass(t *testing.T, dir string, handOver bool) (decodes, walks i
 func TestAReplacingPassDecodesTheManifestOnce(t *testing.T) {
 	proj, inc := replaceStore(t, 40)
 	rewriteSession(t, proj, "s007")
+	// Written a while ago: a directory that changed just before the walk is
+	// taken for one that changed after it (#5503).
+	ago := time.Now().Add(-time.Minute)
+	for _, d := range []string{proj, filepath.Dir(proj)} {
+		if err := os.Chtimes(d, ago, ago); err != nil {
+			t.Fatal(err)
+		}
+	}
 	decodes, walks := indexCommandPass(t, inc, true)
 	// The freshness check's, which the pass then changes.
 	if decodes != 1 {

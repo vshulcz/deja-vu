@@ -277,6 +277,8 @@ type FreshCheck struct {
 	files              map[string]FileState
 	prior              Manifest
 	manifest, sessions os.FileInfo
+	// walked is when the walk started listing the stores.
+	walked time.Time
 }
 
 // CheckUpToDate is UpToDate that also returns its walk, for the pass the same
@@ -292,6 +294,7 @@ func CheckUpToDate(dir string, harness string) (bool, int, *FreshCheck) {
 	if err != nil {
 		return false, 0, nil
 	}
+	c.walked = time.Now()
 	want := currentFilesReusing(harness, priorFiles(prior, err))
 	scope := ""
 	if harness != "" {
@@ -311,7 +314,9 @@ func CheckUpToDate(dir string, harness string) (bool, int, *FreshCheck) {
 // the pass starts from the walk that answer made, rather than walking every
 // store a second time, 70 ms of `deja index` on 40,000 sessions (#5471). Not
 // when another process wrote the index in between: its manifest holds files
-// as they were after that walk, and the pass walks again.
+// as they were after that walk, and the pass walks again. Nor when a
+// transcript arrived, left or moved since the walk, including while the pass
+// waited for the lock (#5503).
 func EnsureChecked(c *FreshCheck, force bool, progress io.Writer) error {
 	if c == nil {
 		return errors.New("index: EnsureChecked without a check")
@@ -325,6 +330,101 @@ func EnsureChecked(c *FreshCheck, force bool, progress io.Writer) error {
 	}
 	defer unlock()
 	return ensureHeldFrom(c.dir, c.harness, force, progress, c)
+}
+
+// listingsUnchangedSince reports whether no directory holding a transcript of
+// the walks, nor the ones above it up to the store, has changed since t, when
+// the walk started. A transcript that arrived after it is not in the walk,
+// and the prompt log naming its session is then read with the transcript on
+// disk, so the log's line is skipped; a later pass does not undo that
+// (#5503). The index's own files name the directories a store emptied since.
+// A prompt log or a database store sits at a fixed path rather than in a
+// listing: its directory is where the climb stops, as it does at the home
+// directory, which change for other reasons. Codex files a rollout three
+// levels down, by year, month and day. About 500 stats for 43,000
+// transcripts.
+func listingsUnchangedSince(t time.Time, walks ...map[string]FileState) bool {
+	listed, fixed := map[string]bool{}, map[string]bool{}
+	for _, files := range walks {
+		for p := range files {
+			// The directory first: asking the registry what a path is costs
+			// more than the stat, and one transcript lists its directory.
+			d := parentDir(p)
+			if listed[d] {
+				continue
+			}
+			if isCodexHistory(p) || storeHarness(p) != "" {
+				fixed[d] = true
+				continue
+			}
+			listed[d] = true
+		}
+	}
+	// Up to the top of the store: the highest of the three directories above
+	// that holds another listed one, and at least the one above.
+	home, _ := os.UserHomeDir()
+	above := func(d string) []string {
+		var up []string
+		for range 3 {
+			u := filepath.Dir(d)
+			if u == d || u == home || fixed[u] {
+				break
+			}
+			up, d = append(up, u), u
+		}
+		return up
+	}
+	under := map[string]int{}
+	for d := range listed {
+		for _, u := range above(d) {
+			under[u]++
+		}
+	}
+	dirs := map[string]bool{}
+	for d := range listed {
+		dirs[d] = true
+		up := above(d)
+		top := min(1, len(up))
+		for i, u := range up {
+			if under[u] > 1 {
+				top = i + 1
+			}
+		}
+		for _, u := range up[:top] {
+			dirs[u] = true
+		}
+	}
+	for d := range dirs {
+		fi, err := os.Stat(d)
+		if os.IsNotExist(err) {
+			// Gone, which the one above it shows.
+			continue
+		}
+		if err != nil {
+			return false
+		}
+		m := fi.ModTime()
+		// Linux and Windows stamp a directory from a clock a tick behind
+		// time.Now, and a file system that keeps whole seconds, or FAT's
+		// two, cannot tell the walk's own seconds from those before.
+		if !m.Before(t.Add(-listingSlack)) || m.Nanosecond() == 0 && m.Unix() >= t.Unix()-1 {
+			return false
+		}
+	}
+	return true
+}
+
+// listingSlack is how far before the walk a directory change still counts
+// as after it.
+const listingSlack = 50 * time.Millisecond
+
+// parentDir is filepath.Dir for a clean path, without the copy Dir makes:
+// 1.8 ms against 4.9 ms over 43,000 paths.
+func parentDir(p string) string {
+	if i := strings.LastIndexByte(p, '/'); i > 0 && filepath.Separator == '/' {
+		return p[:i]
+	}
+	return filepath.Dir(p)
 }
 
 // handedManifest is the manifest a freshness check decoded, handed to the
@@ -446,12 +546,17 @@ func ensureHeldFrom(dir string, harness string, force bool, progress io.Writer, 
 		want     map[string]FileState
 	)
 	if c != nil && c.files != nil && c.harness == harness && sameGeneration(c.manifest, manifestGeneration(dir)) && sameGeneration(c.sessions, sessionsGeneration(dir)) {
-		// Said all the same: it is the phase the pass starts from.
-		reportPhase("finding transcripts", 0)
 		// Both are the check's alone, so the pass may change them.
 		prior, want = c.prior, c.files
 		c.prior, c.files = Manifest{}, nil
 		defer handManifest(dir, c.manifest, c.sessions, prior)()
+		if listingsUnchangedSince(c.walked, want, prior.Files) {
+			// Said all the same: it is the phase the pass starts from.
+			reportPhase("finding transcripts", 0)
+		} else {
+			// The manifest is still the one the check read; the walk is not.
+			want = currentFilesReusing(harness, prior.Files)
+		}
 	} else {
 		if c != nil {
 			c.prior, c.files = Manifest{}, nil
@@ -4933,10 +5038,17 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 			diffs = append(diffs, p)
 			return
 		}
-		ss, err := parseChangedFile(harness, p, old.Files[p])
+		ss, f, again, err := readSettled(p, f, func() ([]model.Session, error) { return parseChangedFile(harness, p, old.Files[p]) })
 		if err != nil {
 			skip(p, err)
 			return
+		}
+		if _, ok := changed[p]; ok {
+			changed[p] = f
+		}
+		if again {
+			// Read whole: the tail was named from the walk's size.
+			delete(logTails, p)
 		}
 		if ids, ok := logTails[p]; ok {
 			ss = sessionsNamed(ss, widenLogTail(ids, p, ss, old.Sessions))
@@ -5046,6 +5158,10 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	// A file the pass read is a file that opens, whether or not it read all of
 	// it, so an error recorded when it did not has to go.
 	readThisPass(changed)
+	// Each file's read drops what the index holds from a transcript; this
+	// drops what a transcript in the same batch holds, as a rebuild does. A
+	// log read before its session's transcript kept the log's prompt (#5503).
+	replacements = dropShadowedPrompts(replacements, old.Sessions)
 	replaceKeys := map[string]bool{}
 	for _, s := range replacements {
 		replaceKeys[s.Harness+":"+s.ID] = true
@@ -5813,6 +5929,52 @@ func readTo(files map[string]FileState) func() {
 	return sources.LimitReads(ends)
 }
 
+// errChangedWhileRead is a file rewritten after the walk stated it: what the
+// read found is not what the state the pass would record describes.
+var errChangedWhileRead = errors.New("changed while deja read it")
+
+// readAsWalked reports whether p, just read, still holds what f, its walk
+// state, describes. A transcript rewritten after the walk was read as it is
+// now and recorded as it was, and the pass after it could not tell what it
+// held: a rewrite between `deja index`'s check and its pass lost the
+// session's commands (#5503). Growth alone is fine: the read stops at the
+// walk's size (readTo). A database store is read from its watermark, which
+// moves with what was read, not with the walk.
+func readAsWalked(p string, f FileState) bool {
+	if storeHarness(p) != "" {
+		return true
+	}
+	fi, err := os.Lstat(p)
+	if err != nil {
+		return false
+	}
+	if fi.Size() == f.Size && fi.ModTime().UnixNano() == f.MTime {
+		return true
+	}
+	return strings.HasSuffix(p, ".jsonl") && f.PrefixSample != 0 && fi.Size() >= f.Size && filePrefixSample(p, f.SafeSize) == f.PrefixSample
+}
+
+// readSettled runs parse for p, read at f, its walk state, and returns what
+// it read with the state it was read at. A file rewritten after the walk is
+// stated and read again, twice at most, and then left for the next pass.
+// again reports a read at a state other than f.
+func readSettled(p string, f FileState, parse func() ([]model.Session, error)) (ss []model.Session, at FileState, again bool, err error) {
+	for try := 0; ; try++ {
+		ss, err = parse()
+		if err != nil || readAsWalked(p, f) {
+			return ss, f, try > 0, err
+		}
+		fi, serr := os.Lstat(p)
+		if try == 2 || serr != nil || !fi.Mode().IsRegular() {
+			return nil, f, false, errChangedWhileRead
+		}
+		f = walkFileStateIn(sources.Registry(), p, fi, nil)
+		if strings.HasSuffix(p, ".jsonl") {
+			defer sources.LimitReads(map[string]int64{p: f.Size})()
+		}
+	}
+}
+
 // resumeOffset is where an appended read of a known file starts: the end of
 // the last complete line indexed, or the old size when none was recorded.
 func resumeOffset(old FileState) int64 {
@@ -5894,9 +6056,29 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 		}
 	}
 	parsedThisPass(newFiles)
-	for _, p := range sortedKeys(changed) {
+	// Prompt logs after the transcripts: a session whose transcript this pass
+	// reads is then held from it, and its log line dropped as a rebuild drops
+	// it (#5503).
+	order := sortedKeys(changed)
+	sort.SliceStable(order, func(i, j int) bool { return !isCodexHistory(order[i]) && isCodexHistory(order[j]) })
+	for _, p := range order {
 		of, known := old.Files[p]
-		ss, err := parseAppendedFile(harness, p, of, !known)
+		var ss []model.Session
+		var err error
+		if known {
+			// Appended to from where the last pass stopped, which a rewrite
+			// moves: the next pass decides how to read it.
+			ss, err = parseAppendedFile(harness, p, of, false)
+			if err == nil && !readAsWalked(p, changed[p]) {
+				err = errChangedWhileRead
+			}
+		} else {
+			var f FileState
+			ss, f, _, err = readSettled(p, changed[p], func() ([]model.Session, error) { return parseAppendedFile(harness, p, of, true) })
+			if err == nil {
+				m.Files[p], changed[p] = f, f
+			}
+		}
 		if err != nil {
 			if known {
 				m.Files[p] = of // retry this file on the next pass
