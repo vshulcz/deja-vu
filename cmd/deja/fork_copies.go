@@ -15,6 +15,14 @@ import (
 // judged by what it holds, which costs a read only for the pairs maybe says
 // look alike (#5320).
 func copySources(dir string, ss []model.Session, maybe func(src, c int, sameShape bool) bool) map[int]int {
+	return copySourcesAmong(dir, ss, maybe, nil, nil)
+}
+
+// copySourcesAmong is copySources that asks only the positions in
+// buckets[bucketOf(c)], ascending, whether they are c's source. A bucket must
+// hold every src maybe(src, c, _) can hold for; a negative bucket asks none,
+// and nil buckets ask every position.
+func copySourcesAmong(dir string, ss []model.Session, maybe func(src, c int, sameShape bool) bool, buckets [][]int, bucketOf func(c int) int) map[int]int {
 	out := map[int]int{}
 	shapes := copyMessageShapes(ss)
 	type classKey struct {
@@ -26,6 +34,7 @@ func copySources(dir string, ss []model.Session, maybe func(src, c int, sameShap
 	type peerClass struct {
 		at    []int
 		equal bool
+		class int
 	}
 	classes := map[classKey]int{}
 	var peers []peerClass
@@ -38,7 +47,7 @@ func copySources(dir string, ss []model.Session, maybe func(src, c int, sameShap
 		if !ok {
 			k = len(peers)
 			classes[key] = k
-			peers = append(peers, peerClass{equal: s.Kind != "fork"})
+			peers = append(peers, peerClass{equal: s.Kind != "fork", class: k})
 		} else if !ss[peers[k].at[0]].Started.Equal(s.Started) {
 			peers[k].equal = false
 		}
@@ -48,13 +57,42 @@ func copySources(dir string, ss []model.Session, maybe func(src, c int, sameShap
 	eligible := func(i, j int) bool {
 		return i != j && ss[i].Harness == ss[j].Harness && maybe(j, i, shapes[i] == shapes[j])
 	}
+	// A bucket split by peer class, so an equal class is passed over whole
+	// rather than walked by each of its members.
+	split := map[int][]peerClass{}
+	bucketPeers := func(b int) []peerClass {
+		if got, ok := split[b]; ok {
+			return got
+		}
+		var got []peerClass
+		at := map[int]int{}
+		for _, j := range buckets[b] {
+			k := classOf[j]
+			g, ok := at[k]
+			if !ok {
+				g = len(got)
+				at[k] = g
+				got = append(got, peerClass{equal: peers[k].equal, class: k})
+			}
+			got[g].at = append(got[g].at, j)
+		}
+		split[b] = got
+		return got
+	}
 	needed := make([]bool, len(ss))
 	for i, c := range ss {
 		first := len(ss)
-		for k, group := range peers {
+		groups := peers
+		if buckets != nil {
+			groups = nil
+			if b := bucketOf(i); b >= 0 {
+				groups = bucketPeers(b)
+			}
+		}
+		for _, group := range groups {
 			// Equal ordinary peers have neither ancestry nor an earlier start.
 			// Keep the class pending without materializing its directed pairs.
-			if k == classOf[i] && group.equal {
+			if group.class == classOf[i] && group.equal {
 				continue
 			}
 			for _, j := range group.at {
@@ -270,9 +308,10 @@ func dropCopiedHits(dir string, hits []search.Hit) []search.Hit {
 				}
 			}
 		}
-		for j := range copySources(dir, ss, func(src, c int, sameShape bool) bool {
-			return (sameShape && len(turns[c]) > 0) || heldTurns(turns[src], turns[c])
-		}) {
+		buckets, rarest := holdersOfRarest(turns)
+		for j := range copySourcesAmong(dir, ss, func(src, c int, sameShape bool) bool {
+			return (sameShape && len(turns[c]) > 0) || heldTurnsOf(turns[src], turns[c])
+		}, buckets, rarest) {
 			drop[at[j]] = true
 		}
 	}
@@ -299,17 +338,63 @@ func heldTurns(src, c map[string]bool) bool {
 	return len(c) > 0
 }
 
+// holdersOfRarest buckets the positions by the timed turns they hold, and
+// picks for c the bucket of its rarest turn. A source holds every turn of its
+// copy, so only that bucket is asked: hits that each matched a turn of their
+// own are not compared in pairs (#5549).
+func holdersOfRarest(turns []map[string]bool) ([][]int, func(c int) int) {
+	var buckets [][]int
+	of := map[string]int{}
+	for j := range turns {
+		for k := range turns[j] {
+			b, ok := of[k]
+			if !ok {
+				b = len(buckets)
+				of[k] = b
+				buckets = append(buckets, nil)
+			}
+			buckets[b] = append(buckets[b], j)
+		}
+	}
+	return buckets, func(c int) int {
+		fewest := -1
+		for k := range turns[c] {
+			if b := of[k]; fewest < 0 || len(buckets[b]) < len(buckets[fewest]) {
+				fewest = b
+			}
+		}
+		return fewest
+	}
+}
+
+// heldTurnsOf is heldTurns; a test counts the comparisons through it.
+var heldTurnsOf = heldTurns
+
 // markForkTitles prefixes the title of a session listed beside the session it
 // was forked or copied from: both open on the same turn, so `last` showed two
 // rows under one title.
 func markForkTitles(dir string, ss []model.Session) {
-	copies := copySources(dir, ss, func(i, j int, _ bool) bool {
+	titles := make([]int, len(ss))
+	var byTitle [][]int
+	of := map[string]int{}
+	for i, s := range ss {
+		t := lastTitle(s)
+		b, ok := of[t]
+		if !ok {
+			b = len(byTitle)
+			of[t] = b
+			byTitle = append(byTitle, nil)
+		}
+		titles[i] = b
+		byTitle[b] = append(byTitle[b], i)
+	}
+	copies := copySourcesAmong(dir, ss, func(i, j int, _ bool) bool {
 		src, c := ss[i], ss[j]
-		if lastTitle(src) != lastTitle(c) {
+		if titles[i] != titles[j] {
 			return false
 		}
 		return c.Parent == src.ID || (!c.Started.IsZero() && c.Started.Equal(src.Started))
-	})
+	}, byTitle, func(c int) int { return titles[c] })
 	for i, j := range copies {
 		ss[i].Title = "fork of " + search.ShortID(ss[j].ID) + ": " + lastTitle(ss[i])
 	}
