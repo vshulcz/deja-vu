@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   904 s to 285 s of CPU (#5512).
 - A cold build derives each session's row on every core instead of in the
   write loop: 189-202 s to 157-169 s on a 40,000-session store (#5524).
+- A cold build of a store under 20,000 sessions no longer holds every
+  session's words at once to count which words go together: a 12,000-session
+  Codex store peaks at 2.4 GB instead of 4.0 GB (#5533).
 - A cold build writes a quarter of the scratch data it did, so a busy disk
   no longer stalls it: 2.47 GB to 0.59 GB on a 12,000-session Codex store, and
   indexing messages took 15-20 s instead of 32-35 s with the disk under other
