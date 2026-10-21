@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- A question with a word the store never saw reads each word's postings once
+  when it tries the word's neighbours, instead of once per neighbour: on
+  19,195 sessions search p95 went from 420 to 170 ms and the slowest question
+  from 740 to 200 ms, with the same answers (#5540).
+
 ### Fixed
 
 - A SQLite store read is given up only when it stops moving, not at ten

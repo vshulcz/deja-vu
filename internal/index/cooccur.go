@@ -521,39 +521,61 @@ func cooccurSearchOver(dir string, m Manifest, o query.Options, terms []string, 
 	if err != nil {
 		return SearchResult{}, err
 	}
+	// Each attempt swaps one word and keeps the others, so the others' postings
+	// are the same on every attempt. Reading them again per neighbour read the
+	// same buckets terms × neighbours times: 450 ms of a sentence's search
+	// (#5540). Each word is read once, and a swap can only match when every
+	// word it keeps holds postings, so a sentence with two words the store
+	// never saw has no swap to try at all.
+	swappable := false
+	for _, term := range terms {
+		for _, n := range neighbors[term] {
+			if catalog[n] {
+				swappable = true
+				break
+			}
+		}
+	}
+	if !swappable {
+		return SearchResult{}, nil
+	}
+	byTerm := make([][]posting, len(terms))
+	missing := -1
+	for j, t := range terms {
+		byTerm[j] = cooccurPostings(dir, m, t)
+		if len(byTerm[j]) > 0 {
+			continue
+		}
+		if missing >= 0 {
+			return SearchResult{}, nil
+		}
+		missing = j
+	}
 	for i, term := range terms {
+		if missing >= 0 && i != missing {
+			continue
+		}
+		kept, keptFrom := keptIntersection(byTerm, i)
+		if keptFrom >= 0 && len(kept) == 0 {
+			continue
+		}
 		for _, n := range neighbors[term] {
 			if !catalog[n] {
 				continue
 			}
-			perToken := make([]map[int64]posting, 0, len(terms))
+			swapped := cooccurPostings(dir, m, n)
+			if len(swapped) == 0 {
+				continue
+			}
 			variants := map[string][]string{}
-			ok := true
 			for j, other := range terms {
-				tok := other
-				if j == i {
-					tok = n
-				}
-				posts, perr := postingsFor(dir, "t"+tok)
-				if perr != nil || len(posts) == 0 {
-					ok = false
-					break
-				}
-				set := map[int64]posting{}
-				for _, p := range posts {
-					set[p.Off] = p
-				}
-				perToken = append(perToken, set)
 				if j == i {
 					variants[other] = []string{n}
 				} else {
 					variants[other] = []string{other}
 				}
 			}
-			if !ok {
-				continue
-			}
-			posts := intersectPostingMaps(perToken)
+			posts := withSwapped(kept, keptFrom, i, swapped)
 			if len(posts) == 0 {
 				continue
 			}
@@ -658,4 +680,104 @@ func parallelInOrder[T any](n, window int, produce func(i int) T, consume func(i
 	}
 	close(stop)
 	wg.Wait()
+}
+
+// cooccurPostings is one word's postings for the swap rung, each record once
+// and in record order. A failed read is no postings, as it always was here.
+func cooccurPostings(dir string, m Manifest, tok string) []posting {
+	p, ok := bucketPath(dir, "t"+tok)
+	if !ok {
+		return nil
+	}
+	posts, err := readBucketToken(p, "t"+tok, m.DeadRecords)
+	if err != nil || len(posts) == 0 {
+		return nil
+	}
+	return uniqueByOffset(posts)
+}
+
+// uniqueByOffset is posts in record order, one posting per record. A token's
+// postings come back that way already and are returned as they are; anything
+// else is sorted with the last posting of a record kept, which is what keying
+// a map by offset kept.
+func uniqueByOffset(posts []posting) []posting {
+	if strictlyByOffset(posts) {
+		return posts
+	}
+	out := append([]posting(nil), posts...)
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Off < out[j].Off })
+	n := 0
+	for k := range out {
+		if n > 0 && out[n-1].Off == out[k].Off {
+			out[n-1] = out[k]
+			continue
+		}
+		out[n] = out[k]
+		n++
+	}
+	return out[:n]
+}
+
+func strictlyByOffset(posts []posting) bool {
+	for i := 1; i < len(posts); i++ {
+		if posts[i].Off <= posts[i-1].Off {
+			return false
+		}
+	}
+	return true
+}
+
+// keptIntersection is the records every word but the swapped one holds, and
+// the position of the first kept word, whose postings the result carries; -1
+// when no word is kept.
+func keptIntersection(byTerm [][]posting, swapped int) ([]posting, int) {
+	var out []posting
+	from := -1
+	for j, posts := range byTerm {
+		if j == swapped {
+			continue
+		}
+		if from < 0 {
+			out, from = posts, j
+			continue
+		}
+		out = intersectSortedPostings(out, posts)
+		if len(out) == 0 {
+			break
+		}
+	}
+	return out, from
+}
+
+// withSwapped is the records the kept words and the swapped-in word all hold,
+// carrying the postings of the first word of the query, as the map
+// intersection did.
+func withSwapped(kept []posting, keptFrom, swappedAt int, swapped []posting) []posting {
+	switch {
+	case keptFrom < 0:
+		return swapped
+	case swappedAt < keptFrom:
+		return intersectSortedPostings(swapped, kept)
+	default:
+		return intersectSortedPostings(kept, swapped)
+	}
+}
+
+// intersectSortedPostings is the records both lists hold, with a's postings.
+// Both are sorted by record with one posting per record.
+func intersectSortedPostings(a, b []posting) []posting {
+	var out []posting
+	for i, j := 0, 0; i < len(a) && j < len(b); {
+		switch {
+		case a[i].Off < b[j].Off:
+			i++
+		case a[i].Off > b[j].Off:
+			j++
+		default:
+			out = append(out, a[i])
+			i++
+			j++
+		}
+	}
+	return out
 }
