@@ -20,20 +20,30 @@ func CopyOf(c, src model.Session) bool {
 // holdsLastTurn reports whether holder has other's last timed turn, the same
 // role, time and text. A reply the harness wrote on its own is passed over.
 func holdsLastTurn(holder, other model.Session) bool {
-	for i := len(other.Messages) - 1; i >= 0; i-- {
-		m := other.Messages[i]
+	m, ok := LastTurn(other)
+	if !ok {
+		return false
+	}
+	for _, h := range holder.Messages {
+		if h.Role == m.Role && h.Time.UnixNano() == m.Time.UnixNano() && h.Text == m.Text {
+			return true
+		}
+	}
+	return false
+}
+
+// LastTurn is the turn CopyOf looks for in a copy: s's last timed message,
+// passing over empty ones, summaries and replies the harness wrote on its own.
+func LastTurn(s model.Session) (model.Message, bool) {
+	for i := len(s.Messages) - 1; i >= 0; i-- {
+		m := s.Messages[i]
 		t := strings.TrimSpace(m.Text)
 		if m.Time.IsZero() || t == "" || m.Role == roleSummary || (m.Role == "assistant" && t == "No response requested.") {
 			continue
 		}
-		for _, h := range holder.Messages {
-			if h.Role == m.Role && h.Time.UnixNano() == m.Time.UnixNano() && h.Text == m.Text {
-				return true
-			}
-		}
-		return false
+		return m, true
 	}
-	return false
+	return model.Message{}, false
 }
 
 // SourceOf reports whether src is the session the records c shares with it at

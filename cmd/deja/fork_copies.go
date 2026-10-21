@@ -147,22 +147,54 @@ func copySources(dir string, ss []model.Session, maybe func(src, c int, sameShap
 		}
 		complete[k] = append(complete[k], i)
 	}
+	// A copy holds its source's last turn, so a class is only compared with
+	// the classes whose last turn it holds: a map hit per message instead of
+	// every pair of classes (#5523). A source with the copy's own last turn
+	// holds that turn too, so it is never one.
+	type turnKey struct {
+		harness, role, text string
+		at                  int64
+	}
+	keyOf := func(harness string, m model.Message) turnKey {
+		return turnKey{harness, m.Role, m.Text, m.Time.UnixNano()}
+	}
+	lasts := make([]turnKey, len(complete))
+	hasLast := make([]bool, len(complete))
+	byLast := map[turnKey][]int{}
+	for k, f := range representatives {
+		if m, ok := search.LastTurn(full[f]); ok {
+			lasts[k], hasLast[k] = keyOf(full[f].Harness, m), true
+			byLast[lasts[k]] = append(byLast[lasts[k]], k)
+		}
+	}
+	visited := make([]int, len(complete))
 	for c, candidates := range complete {
-		for src, sources := range complete {
-			if c == src || full[representatives[c]].Harness != full[representatives[src]].Harness || !search.CopyOf(full[representatives[c]], full[representatives[src]]) {
+		rep := full[representatives[c]]
+		for _, m := range rep.Messages {
+			key := keyOf(rep.Harness, m)
+			if hasLast[c] && key == lasts[c] {
 				continue
 			}
-			for _, i := range candidates {
-				if fixed[i] {
+			for _, src := range byLast[key] {
+				if c == src || visited[src] == c+1 {
 					continue
 				}
-				for _, j := range sources {
-					if previous, done := out[i]; done && previous <= j {
-						break
+				visited[src] = c + 1
+				if !copyOf(rep, full[representatives[src]]) {
+					continue
+				}
+				for _, i := range candidates {
+					if fixed[i] {
+						continue
 					}
-					if eligible(i, j) {
-						out[i] = j
-						break
+					for _, j := range complete[src] {
+						if previous, done := out[i]; done && previous <= j {
+							break
+						}
+						if eligible(i, j) {
+							out[i] = j
+							break
+						}
 					}
 				}
 			}
@@ -170,6 +202,9 @@ func copySources(dir string, ss []model.Session, maybe func(src, c int, sameShap
 	}
 	return out
 }
+
+// copyOf is search.CopyOf; a test counts the comparisons through it.
+var copyOf = search.CopyOf
 
 // copyMessageShapes preserves every field used by CopyOf, including zero-time eligibility.
 func copyMessageShapes(ss []model.Session) []int {
