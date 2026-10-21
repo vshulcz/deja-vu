@@ -61,11 +61,11 @@ func IngestHealth(dir string) map[string]HarnessIngest {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	m, err := readManifest(dir)
+	m, err := readManifestCached(dir)
 	if err != nil {
 		return nil
 	}
-	return m.IngestHealth
+	return maps.Clone(m.IngestHealth)
 }
 
 // IngestFilesReport returns the same story per file: which path each refused
@@ -261,12 +261,31 @@ func healthFromFiles(files map[string]FileIngest) map[string]HarnessIngest {
 // index holds. Only `deja index` asks: silence reads as "it did not run", but
 // saying it on every search would be noise on a line nobody asked about (#824).
 func UpToDate(dir string, harness string) (bool, int) {
+	fresh, n, _ := CheckUpToDate(dir, harness)
+	return fresh, n
+}
+
+// FreshCheck is the walk of the stores an UpToDate answer came from, and the
+// manifest it was held against, decoded for this check alone.
+type FreshCheck struct {
+	dir, harness       string
+	files              map[string]FileState
+	prior              Manifest
+	manifest, sessions os.FileInfo
+}
+
+// CheckUpToDate is UpToDate that also returns its walk, for the pass the same
+// command runs next to start from (EnsureChecked). Nil when there was none.
+func CheckUpToDate(dir string, harness string) (bool, int, *FreshCheck) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
+	c := &FreshCheck{dir: dir, harness: harness, manifest: manifestGeneration(dir), sessions: sessionsGeneration(dir)}
+	// Not through the cache: a stale answer hands this copy to the pass that
+	// follows, which changes it, and a fresh one hands it to the cache.
 	prior, err := readManifest(dir)
 	if err != nil {
-		return false, 0
+		return false, 0, nil
 	}
 	want := currentFilesReusing(harness, priorFiles(prior, err))
 	scope := ""
@@ -274,9 +293,74 @@ func UpToDate(dir string, harness string) (bool, int) {
 		scope = harness
 	}
 	if !manifestFresh(prior, want, scope) || !recordsIntact(dir, prior) {
-		return false, len(prior.Sessions)
+		c.files, c.prior = want, prior
+		return false, len(prior.Sessions), c
 	}
-	return true, len(prior.Sessions)
+	if c.manifest != nil && c.sessions != nil {
+		cacheManifest(dir, c.manifest, c.sessions, prior)
+	}
+	return true, len(prior.Sessions), nil
+}
+
+// EnsureChecked is Ensure for the command that has just asked CheckUpToDate:
+// the pass starts from the walk that answer made, rather than walking every
+// store a second time, 70 ms of `deja index` on 40,000 sessions (#5471). Not
+// when another process wrote the index in between: its manifest holds files
+// as they were after that walk, and the pass walks again.
+func EnsureChecked(c *FreshCheck, force bool, progress io.Writer) error {
+	if c == nil {
+		return errors.New("index: EnsureChecked without a check")
+	}
+	if autoUpdatesOff() {
+		return manualCheck(c.dir)
+	}
+	unlock, err := lockDir(c.dir)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	return ensureHeldFrom(c.dir, c.harness, force, progress, c)
+}
+
+// handedManifest is the manifest a freshness check decoded, handed to the
+// pass the same command runs: nothing else holds it, so the pass may change
+// it rather than decode its own (#5471).
+var handedManifest struct {
+	mu                 sync.Mutex
+	dir                string
+	m                  Manifest
+	manifest, sessions os.FileInfo
+}
+
+// handManifest hands m, decoded from the files mfi and sfi describe, to the
+// next pass over dir, and returns what takes it back.
+func handManifest(dir string, mfi, sfi os.FileInfo, m Manifest) func() {
+	h := &handedManifest
+	h.mu.Lock()
+	h.dir, h.manifest, h.sessions, h.m = dir, mfi, sfi, m
+	h.mu.Unlock()
+	return func() { takeHanded(dir) }
+}
+
+func takeHanded(dir string) (Manifest, os.FileInfo, os.FileInfo, bool) {
+	h := &handedManifest
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.dir == "" || h.dir != dir {
+		return Manifest{}, nil, nil, false
+	}
+	m, mfi, sfi := h.m, h.manifest, h.sessions
+	h.dir, h.manifest, h.sessions, h.m = "", nil, nil, Manifest{}
+	return m, mfi, sfi, true
+}
+
+// takeHandedManifest is readManifest, answered by the manifest handed to a
+// pass over dir while the files are the ones it was decoded from.
+func takeHandedManifest(dir string) (Manifest, error) {
+	if m, mfi, sfi, ok := takeHanded(dir); ok && sameGeneration(mfi, manifestGeneration(dir)) && sameGeneration(sfi, sessionsGeneration(dir)) {
+		return m, nil
+	}
+	return readManifest(dir)
 }
 
 // sweepStaleTmp deletes a build scratch dir left by a process that died
@@ -343,11 +427,33 @@ func Ensure(dir string, harness string, force bool, progress io.Writer) error {
 }
 
 func ensureHeld(dir string, harness string, force bool, progress io.Writer) error {
+	return ensureHeldFrom(dir, harness, force, progress, nil)
+}
+
+func ensureHeldFrom(dir string, harness string, force bool, progress io.Writer, c *FreshCheck) error {
 	sweepStaleTmp(dir)
 	// The manifest is read before the walk so unchanged files can carry
-	// their derived state forward instead of being re-read.
-	prior, priorErr := readManifest(dir)
-	want := currentFilesReusing(harness, priorFiles(prior, priorErr))
+	// their derived state forward instead of being re-read. Only read here:
+	// the pass decodes its own copy to change.
+	var (
+		prior    Manifest
+		priorErr error
+		want     map[string]FileState
+	)
+	if c != nil && c.files != nil && c.harness == harness && sameGeneration(c.manifest, manifestGeneration(dir)) && sameGeneration(c.sessions, sessionsGeneration(dir)) {
+		// Said all the same: it is the phase the pass starts from.
+		reportPhase("finding transcripts", 0)
+		// Both are the check's alone, so the pass may change them.
+		prior, want = c.prior, c.files
+		c.prior, c.files = Manifest{}, nil
+		defer handManifest(dir, c.manifest, c.sessions, prior)()
+	} else {
+		if c != nil {
+			c.prior, c.files = Manifest{}, nil
+		}
+		prior, priorErr = readManifestCached(dir)
+		want = currentFilesReusing(harness, priorFiles(prior, priorErr))
+	}
 	scope := ""
 	if harness != "" {
 		// A harness-scoped index is partial by construction; the manifest
@@ -4379,7 +4485,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 			passSchemaDBs.Store(nil)
 		}
 	}()
-	old, err := readManifest(dir)
+	old, err := takeHandedManifest(dir)
 	if err == nil && !recordsIntact(dir, old) {
 		force = true // records.bin lost its tail to a crash; only a rebuild is safe
 	}
@@ -5033,7 +5139,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	// keyed on it — the embedding sidecar — that the file it measured was still
 	// there (#1357). Only appendIncremental, which appends in place, may keep a
 	// generation.
-	m := Manifest{Version: version, KeptDated: true, Format: onDiskFormat, SearchOnly: searchOnlyFor(dir), Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), SourcesReadAt: time.Now(), ReadZone: zoneFingerprint(),
+	m := Manifest{Version: version, KeptDated: true, Format: onDiskFormat, SearchOnly: searchOnlyAfter(old), Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), SourcesReadAt: time.Now(), ReadZone: zoneFingerprint(),
 		Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
 		ExportWatermarks: old.ExportWatermarks, ExportBoundary: old.ExportBoundary, ImportedRecords: old.ImportedRecords,
 		Compactions: cloneCompactions(old.Compactions),
@@ -5041,7 +5147,9 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		// those patterns, so claiming today's set would be a lie the reader
 		// cannot check.
 		ExcludeFingerprint: old.ExcludeFingerprint,
-		ToolFingerprint:    mergedToolFingerprint(priorToolFingerprint(dir)),
+		// What the index on disk recorded: old is that manifest, or what the
+		// followed renames wrote of it.
+		ToolFingerprint: mergedToolFingerprint(old.ToolFingerprint),
 		// What deja could not read is about the files, not about the pass that
 		// happened to notice: the lines are still there. Dropping the map meant
 		// doctor forgot a store's unreadable file because an unrelated
@@ -5458,7 +5566,9 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	// Ahead of the commit, which then reads only the sessions that changed
 	// rather than parsing every session that carries a wall again.
 	carryFrictionTexts(dir, tmp, old, dropped)
-	if err := writeManifest(tmp, m); err != nil {
+	// Nothing below changes m, so the commands, the swap and the CLI's checks
+	// after the pass read the manifest from memory.
+	if err := writeManifestShared(tmp, m); err != nil {
 		return err
 	}
 	if m.SearchOnly {
@@ -6539,7 +6649,12 @@ func currentFiles(h string) map[string]FileState {
 	return currentFilesWith(h, nil)
 }
 
+// storeWalks counts the walks of the stores, for the test that keeps `deja
+// index` to one.
+var storeWalks atomic.Int64
+
 func currentFilesWith(h string, old map[string]FileState) map[string]FileState {
+	storeWalks.Add(1)
 	// Walking the stores is the first thing a build does and, on a network
 	// volume, the slowest: it published nothing, so every "memory is on its
 	// way" surface reported an ordinary quiet day until the walk finished

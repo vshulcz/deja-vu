@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -145,21 +146,33 @@ func claudeRetentionDue(now time.Time) (retentionDue, bool) {
 		if err != nil {
 			continue
 		}
-		for _, p := range projects {
-			if !p.IsDir() {
-				continue
+		// On every core: after each `deja index` this read 40,000 times on a
+		// store that size, one after another (#5471).
+		lists := make([][]fs.DirEntry, len(projects))
+		parallelChunks(len(projects), func(i int) {
+			if !projects[i].IsDir() {
+				return
 			}
-			files, err := os.ReadDir(filepath.Join(root, p.Name()))
-			if err != nil {
-				continue
+			if list, err := os.ReadDir(filepath.Join(root, projects[i].Name())); err == nil {
+				lists[i] = list
 			}
-			for _, f := range files {
-				if f.IsDir() || !strings.HasSuffix(f.Name(), ".jsonl") {
-					continue
+		})
+		var files []fs.DirEntry
+		for _, list := range lists {
+			for _, f := range list {
+				if !f.IsDir() && strings.HasSuffix(f.Name(), ".jsonl") {
+					files = append(files, f)
 				}
-				if fi, err := f.Info(); err == nil && fi.ModTime().Before(cutoff) {
-					d.n++
-				}
+			}
+		}
+		due := make([]bool, len(files))
+		parallelChunks(len(files), func(i int) {
+			fi, err := files[i].Info()
+			due[i] = err == nil && fi.ModTime().Before(cutoff)
+		})
+		for _, ok := range due {
+			if ok {
+				d.n++
 			}
 		}
 	}

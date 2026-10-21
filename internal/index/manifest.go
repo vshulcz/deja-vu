@@ -485,11 +485,16 @@ func readManifest(dir string) (Manifest, error) {
 	if err := readGob(filepath.Join(dir, "manifest.gob"), &core); err != nil {
 		return Manifest{}, err
 	}
-	m := Manifest{Version: core.Version, Format: core.Format, Files: core.Files, BuiltAt: core.BuiltAt, SourcesReadAt: core.SourcesReadAt, Generation: core.Generation, Scope: core.Scope, Redacted: core.Redacted, RedactionRules: core.RedactionRules, ExportWatermarks: core.ExportWatermarks, ExportBoundary: core.ExportBoundary, ImportedRecords: core.ImportedRecords, RecordStrings: core.RecordStrings, RecordsSize: core.RecordsSize, DeadRecords: core.DeadRecords, DeadBytes: core.DeadBytes, BucketFiles: core.BucketFiles, IngestHealth: core.IngestHealth, IngestFiles: core.IngestFiles, ExcludeFingerprint: core.ExcludeFingerprint, ToolFingerprint: core.ToolFingerprint, Compactions: core.Compactions, KeptDated: core.KeptDated, ReadZone: core.ReadZone, Deferred: core.Deferred, PartialOf: core.PartialOf, SearchOnly: core.SearchOnly, Sessions: map[string]SessionMeta{}}
+	m := manifestFromCore(core, map[string]SessionMeta{})
 	if err := readGob(filepath.Join(dir, "sessions.gob"), &m.Sessions); err != nil {
 		return Manifest{}, err
 	}
 	return m, nil
+}
+
+// manifestFromCore is the Manifest that manifest.gob's core and sessions make.
+func manifestFromCore(core manifestCore, sessions map[string]SessionMeta) Manifest {
+	return Manifest{Version: core.Version, Format: core.Format, Files: core.Files, BuiltAt: core.BuiltAt, SourcesReadAt: core.SourcesReadAt, Generation: core.Generation, Scope: core.Scope, Redacted: core.Redacted, RedactionRules: core.RedactionRules, ExportWatermarks: core.ExportWatermarks, ExportBoundary: core.ExportBoundary, ImportedRecords: core.ImportedRecords, RecordStrings: core.RecordStrings, RecordsSize: core.RecordsSize, DeadRecords: core.DeadRecords, DeadBytes: core.DeadBytes, BucketFiles: core.BucketFiles, IngestHealth: core.IngestHealth, IngestFiles: core.IngestFiles, ExcludeFingerprint: core.ExcludeFingerprint, ToolFingerprint: core.ToolFingerprint, Compactions: core.Compactions, KeptDated: core.KeptDated, ReadZone: core.ReadZone, Deferred: core.Deferred, PartialOf: core.PartialOf, SearchOnly: core.SearchOnly, Sessions: sessions}
 }
 
 // writeManifestOnly persists manifest.gob without rewriting sessions.gob —
@@ -529,23 +534,32 @@ func stampStore(dir string, core *manifestCore, m Manifest, wroteRecords bool) {
 // leaves the old manifest pointing at old data, and the next run reindexes
 // rather than serving a fresh-looking index whose sessions are stale.
 func writeManifest(dir string, m Manifest) error {
-	return commitManifest(dir, m, true)
+	return commitManifest(dir, m, true, false)
+}
+
+// writeManifestShared is writeManifest for a pass that is done with m: what
+// it wrote becomes this process's cached manifest, so the reads that follow
+// the pass do not decode the files it has just encoded (#5471). The caller
+// must not change m, its maps or its slices afterwards.
+func writeManifestShared(dir string, m Manifest) error {
+	return commitManifest(dir, m, true, true)
 }
 
 // writeManifestMeta is writeManifest for a writer that changed sessions or
 // files but appended no records, such as a followed rename.
 func writeManifestMeta(dir string, m Manifest) error {
-	return commitManifest(dir, m, false)
+	return commitManifest(dir, m, false, false)
 }
 
-func commitManifest(dir string, m Manifest, wroteRecords bool) error {
+func commitManifest(dir string, m Manifest, wroteRecords, share bool) error {
 	mergeIngestDiag(&m)
 	core := manifestCore{Version: m.Version, Format: m.Format, Files: m.Files, BuiltAt: m.BuiltAt, SourcesReadAt: m.SourcesReadAt, Generation: m.Generation, Scope: m.Scope, Redacted: m.Redacted, RedactionRules: m.RedactionRules, ExportWatermarks: m.ExportWatermarks, ExportBoundary: m.ExportBoundary, ImportedRecords: m.ImportedRecords, RecordStrings: m.RecordStrings, DeadRecords: m.DeadRecords, DeadBytes: m.DeadBytes, IngestHealth: m.IngestHealth, IngestFiles: m.IngestFiles, ExcludeFingerprint: m.ExcludeFingerprint, ToolFingerprint: m.ToolFingerprint, Compactions: m.Compactions, KeptDated: m.KeptDated, ReadZone: m.ReadZone, Deferred: m.Deferred, PartialOf: m.PartialOf, SearchOnly: m.SearchOnly}
 	stampStore(dir, &core, m, wroteRecords)
-	if err := writeGobAtomic(filepath.Join(dir, "sessions.gob"), m.Sessions); err != nil {
+	sfi, err := writeGobAtomicStat(filepath.Join(dir, "sessions.gob"), m.Sessions)
+	if err != nil {
 		return err
 	}
-	err := writeGobAtomic(filepath.Join(dir, "manifest.gob"), core)
+	mfi, err := writeGobAtomicStat(filepath.Join(dir, "manifest.gob"), core)
 	// The cache this process holds is keyed on manifest.gob's mtime and size,
 	// and the comment there claimed the atomic swap always changes that pair.
 	// It does not: a rewrite that keeps the size and lands inside one tick of
@@ -553,6 +567,13 @@ func commitManifest(dir string, m Manifest, wroteRecords bool) error {
 	// then answers from the manifest before this one. The writer knows, so it
 	// says so.
 	invalidateManifestCache(dir)
+	if err == nil && share && mfi != nil && sfi != nil {
+		sessions := m.Sessions
+		if sessions == nil {
+			sessions = map[string]SessionMeta{}
+		}
+		cacheManifest(dir, mfi, sfi, manifestFromCore(core, sessions))
+	}
 	if err == nil && wroteRecords {
 		// Best effort: a table that could not be written leaves readers
 		// walking the log, which is what they did before it existed.

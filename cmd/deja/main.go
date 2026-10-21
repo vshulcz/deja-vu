@@ -616,7 +616,7 @@ func cmdIndex(dir string, rest []string) error {
 	// existed (#1021).
 	stopProgress := publishBuildProgress(dir)
 	index.SweepStaleTmp(dir)
-	fresh, n := index.UpToDate(dir, "")
+	fresh, n, check := index.CheckUpToDate(dir, "")
 	// A note bucket's id names the local day of whichever process indexed the
 	// line, so a `remember` under TZ=UTC and one under the machine's own zone
 	// split the same moment into two buckets. `show` tells the reader this
@@ -674,6 +674,9 @@ func cmdIndex(dir string, rest []string) error {
 		if phases {
 			index.SetPhaseLines(said)
 			defer index.SetPhaseLines(nil)
+		}
+		if check != nil {
+			return index.EnsureChecked(check, force, progress)
 		}
 		return index.Ensure(dir, "", force, progress)
 	}

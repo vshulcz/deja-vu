@@ -841,11 +841,12 @@ func probeDoctorStore(check doctorStoreCheck) (store doctorStore, mod time.Time,
 	// A transcript whose mode refuses a read is the same fault in any file,
 	// not only the newest one this probe opens; the walk that indexes it says
 	// so from the same stat (#5393).
-	newest, mod = newestDoctorFile(check.files)
-	if p := firstModeUnreadable(check.files); p != "" {
+	var unreadable string
+	newest, mod, unreadable = newestDoctorFile(check.files)
+	if unreadable != "" {
 		store.State = "denied"
-		store.Denied = p
-		store.Partial = anotherFileOpens(check.files, p)
+		store.Denied = unreadable
+		store.Partial = anotherFileOpens(check.files, unreadable)
 		return store, mod, ""
 	}
 	f, err := os.Open(newest)
@@ -916,30 +917,39 @@ func parseDoctorStore(check doctorStoreCheck, store doctorStore, mod time.Time, 
 	return store, mod
 }
 
-// firstModeUnreadable is the first of files, in path order, whose mode says
-// this process may not read it.
-func firstModeUnreadable(files []string) string {
+// newestDoctorFile is the most recently modified of files with its time, and
+// the first of them in path order whose mode says this process may not read
+// it. One stat a file, on every core: a walk for each answer was a third of
+// what `deja index` spent after its pass on a 40,000-session store (#5471).
+func newestDoctorFile(files []string) (newest string, mod time.Time, unreadable string) {
 	files = append([]string(nil), files...)
 	sort.Strings(files)
-	for _, p := range files {
-		if fi, err := os.Lstat(p); err == nil && sources.ModeUnreadable(p, fi) {
-			return p
+	refused := make([]bool, len(files))
+	mods := make([]time.Time, len(files))
+	parallelChunks(len(files), func(i int) {
+		fi, err := os.Lstat(files[i])
+		if err != nil {
+			return
+		}
+		refused[i] = sources.ModeUnreadable(files[i], fi)
+		// The time is the file's, not a link's.
+		if !fi.Mode().IsRegular() {
+			if fi, err = os.Stat(files[i]); err != nil {
+				return
+			}
+		}
+		mods[i] = fi.ModTime()
+	})
+	newest = files[0]
+	for i, path := range files {
+		if unreadable == "" && refused[i] {
+			unreadable = path
+		}
+		if mods[i].After(mod) {
+			newest, mod = path, mods[i]
 		}
 	}
-	return ""
-}
-
-func newestDoctorFile(files []string) (string, time.Time) {
-	files = append([]string(nil), files...)
-	sort.Strings(files)
-	newest := files[0]
-	var newestMod time.Time
-	for _, path := range files {
-		if fi, err := os.Stat(path); err == nil && fi.ModTime().After(newestMod) {
-			newest, newestMod = path, fi.ModTime()
-		}
-	}
-	return newest, newestMod
+	return newest, mod, unreadable
 }
 
 func inspectDoctorIndex(dir string, storeMods []time.Time) doctorIndexReport {

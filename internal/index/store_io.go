@@ -766,6 +766,7 @@ func swapIndexDir(dir, tmp string) error {
 		_ = renameWaitingUntil(old, dir, deadline)
 		return err
 	}
+	moveManifestCache(tmp, dir)
 	_, _ = clearParked(dir)
 	return nil
 }
@@ -1363,15 +1364,22 @@ func writeGob(p string, v any) error {
 // writeGobAtomic writes to a sibling temp file and renames it over p, so a
 // crash mid-write can never leave p half-decoded.
 func writeGobAtomic(p string, v any) error {
+	_, err := writeGobAtomicStat(p, v)
+	return err
+}
+
+// writeGobAtomicStat is writeGobAtomic that also returns the file it wrote as
+// stat saw it before the rename, which moves the name and not the file.
+func writeGobAtomicStat(p string, v any) (os.FileInfo, error) {
 	tmp := p + ".tmp"
 	f, err := os.OpenFile(tmp, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err := gob.NewEncoder(f).Encode(v); err != nil {
 		_ = f.Close()
 		_ = os.Remove(tmp)
-		return err
+		return nil, err
 	}
 	// fsync before rename: manifest.gob is the freshness/RecordsSize authority and
 	// must land durably last, like records.bin and the buckets. Skipping it left a
@@ -1379,11 +1387,11 @@ func writeGobAtomic(p string, v any) error {
 	if err := f.Sync(); err != nil {
 		_ = f.Close()
 		_ = os.Remove(tmp)
-		return err
+		return nil, err
 	}
 	if err := f.Close(); err != nil {
 		_ = os.Remove(tmp)
-		return err
+		return nil, err
 	}
 	// The lock keeps other writers out but not readers, and on Windows a
 	// reader decoding manifest.gob refuses the rename onto it with "Access is
@@ -1391,9 +1399,18 @@ func writeGobAtomic(p string, v any) error {
 	// reader is a decode away from closing, so wait it out as the swap does.
 	if err := renameWaiting(tmp, p, parkRenameWait); err != nil {
 		_ = os.Remove(tmp)
-		return err
+		return nil, err
 	}
-	return nil
+	// The writer holds the lock, so what is at p is what it wrote.
+	fi, err := os.Stat(p)
+	if err != nil {
+		// Written; only the stat failed, and nil caches nothing.
+		return nil, nil
+	}
+	// Windows reads a file's identity from its path when first compared, and
+	// this path moves with the staging directory: read it while it is here.
+	_ = os.SameFile(fi, fi)
+	return fi, nil
 }
 
 func readGob(p string, v any) error {
