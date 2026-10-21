@@ -380,40 +380,48 @@ func (r *piReader) toolResult(msg map[string]any, t time.Time) {
 
 // piResumes sends a pi-shaped transcript back for a whole read when its tail
 // holds the result of a shell, edit or write call made before it: the result
-// is what marks the command's exit and keeps or drops the edit (#4443).
-//
-// A shell result counts only when the command failed. A clean one is every
-// command still running when a pass reads the call, deja's own run from the
-// agent's shell among them, and re-reading for each sent most passes of such
-// a session through the replacement path; the split call keeps no
-// "→ exit 0", as Codex never writes one.
-var piResumes = resumesUnlessAnswering(`"toolCall`, func(m map[string]any) ([]string, string) {
+// is what marks the command's exit and keeps or drops the edit (#4443). A
+// clean shell result marks exit 0, so it sends the file back too when the
+// call it answers ran a command, as Claude's does (#5527).
+var piResumes = resumesUnlessSettling(`"toolCall`, func(m map[string]any) (calls, failed, clean []string) {
 	msg, _ := m["message"].(map[string]any)
 	switch role, _ := msg["role"].(string); role {
 	case "assistant":
-		var ids []string
 		items, _ := msg["content"].([]any)
 		for _, it := range items {
 			if c, ok := it.(map[string]any); ok && c["type"] == "toolCall" {
 				if id, _ := c["id"].(string); id != "" {
-					ids = append(ids, id)
+					calls = append(calls, id)
 				}
 			}
 		}
-		return ids, ""
 	case "toolResult":
 		name, _ := msg["toolName"].(string)
+		id, _ := msg["toolCallId"].(string)
 		if piDialect.shellTools[name] && !piCommandFailed(msg) {
-			return nil, ""
+			return nil, nil, []string{id}
 		}
 		// apply_patch holds its edit and wrote records for its result like
 		// edit and write, so a result in the tail keeps or drops them.
 		if name == "" || piDialect.shellTools[name] || piDialect.editTools[name] || name == "apply_patch" {
-			id, _ := msg["toolCallId"].(string)
-			return nil, id
+			return nil, []string{id}, nil
 		}
 	}
-	return nil, ""
+	return calls, nil, nil
+}, func(line []byte) []string {
+	msg, _ := decodeJSONLine(line)["message"].(map[string]any)
+	items, _ := msg["content"].([]any)
+	var ids []string
+	for _, it := range items {
+		c, _ := it.(map[string]any)
+		id, _ := c["id"].(string)
+		name, _ := c["name"].(string)
+		args, _ := c["arguments"].(map[string]any)
+		if c["type"] == "toolCall" && id != "" && len(commandsIn([]any{map[string]any{"type": "tool_use", "name": name, "input": args}}, piDialect)) > 0 {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 })
 
 // piCommandFailed reports whether a shell result says the command failed.

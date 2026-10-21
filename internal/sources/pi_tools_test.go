@@ -164,8 +164,9 @@ func TestGjcHashlineEditsAreIndexed(t *testing.T) {
 }
 
 // A shell call whose result lands a pass later sends the file back for a whole
-// read only when the result is a failure. A clean result is every command the
-// agent runs while an index pass is going, deja's own included (#4443).
+// read: a failure's code and a clean run's exit 0 are both marked on the
+// stored command (#4443, #5527). A call that ran no command, as an empty one,
+// lets the clean result append.
 func TestPiResumesPastACleanCommandResult(t *testing.T) {
 	head := `{"type":"session","version":3,"id":"s","timestamp":"2026-09-01T09:00:00Z","cwd":"/tmp/proj"}
 {"type":"message","id":"a1","timestamp":"2026-09-01T09:02:00Z","message":{"role":"assistant","content":[{"type":"toolCall","id":"c1","name":"bash","arguments":{"command":"deja search retry"}}]}}
@@ -174,8 +175,8 @@ func TestPiResumesPastACleanCommandResult(t *testing.T) {
 		name, res string
 		resumes   bool
 	}{
-		{"clean", `"details":{"exitCode":0},"isError":false`, true},
-		{"clean without a code", `"isError":false`, true},
+		{"clean", `"details":{"exitCode":0},"isError":false`, false},
+		{"clean without a code", `"isError":false`, false},
 		{"failed", `"details":{"exitCode":2},"isError":true`, false},
 		{"nonzero code", `"details":{"exitCode":1},"isError":false`, false},
 	} {
@@ -189,6 +190,15 @@ func TestPiResumesPastACleanCommandResult(t *testing.T) {
 				t.Errorf("piResumes = %v, want %v", got, tc.resumes)
 			}
 		})
+	}
+	// The control: a clean answer to a call the file does not hold.
+	p := filepath.Join(t.TempDir(), "s.jsonl")
+	body := head + `{"type":"message","id":"r1","timestamp":"2026-09-01T09:02:01Z","message":{"role":"toolResult","toolCallId":"c9","toolName":"bash","content":[{"type":"text","text":"ok"}],"isError":false}}` + "\n"
+	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !piResumes(p, int64(len(head))) {
+		t.Error("a clean answer to a call that ran no command sent the file back")
 	}
 }
 

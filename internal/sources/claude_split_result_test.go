@@ -23,7 +23,7 @@ func TestClaudeTailAnsweringACallBeforeIt(t *testing.T) {
 	}
 	bash := call("c1", "Bash", `{"command":"go build ./..."}`)
 	edit := call("c1", "Edit", `{"file_path":"/w/main.go","old_string":"a","new_string":"b"}`)
-	far := bash + `{"type":"user","sessionId":"s","message":{"role":"user","content":"` + strings.Repeat("x", claudeCallWindow) + `"}}` + "\n"
+	far := bash + `{"type":"user","sessionId":"s","message":{"role":"user","content":"` + strings.Repeat("x", callWindow) + `"}}` + "\n"
 	cases := []struct {
 		name, head, tail string
 		want             bool

@@ -34,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   writes the old copy and the new one in the order the log held them (#5519).
 - A Claude command whose result lands one pass after its call carries the
   `exit 0` its result reports, as after a rebuild, instead of no outcome
-  (#5527).
+  (#5527). So does a goose, kiro-cli or pi-family command (#5529).
 - `deja index --quiet` no longer prints the shared-id line, which now counts
   sessions rather than transcripts. Command "last run" dates read the same
   after a pass and a rebuild, and a plain word some sessions hold only in a
