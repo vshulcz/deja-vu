@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/query"
@@ -47,6 +49,9 @@ func buildCooccur(tmp string, ss []model.Session) {
 		if v, ok := ids[t]; ok {
 			return v
 		}
+		// A copy: the token came out of a strings.Builder and carries its
+		// spare capacity, which would otherwise live as long as the map.
+		t = strings.Clone(t)
 		v := uint32(len(toks))
 		ids[t] = v
 		toks = append(toks, t)
@@ -55,11 +60,15 @@ func buildCooccur(tmp string, ss []model.Session) {
 	// Tokenising every message of every session is what this pass costs — 6.0 s
 	// of a build on a real store, and the only single-threaded thing left in
 	// the sidecar phase. Each session's distinct tokens are collected in
-	// parallel and interned afterwards in session order, so the ids, the
-	// document frequencies and everything downstream are what one core
-	// produced.
-	uniquePerSession := make([][]string, len(ss))
-	parallelForRanked(len(ss), func(i int) {
+	// parallel and interned in session order, so the ids, the document
+	// frequencies and everything downstream are what one core produced.
+	//
+	// A session's token strings are dropped as soon as they are interned, a
+	// few sessions per core behind the workers. Holding every session's list
+	// until all were tokenised was 1.4 GB of a 12k-session cold build's peak.
+	var df []int
+	perSession := make([][]uint32, 0, len(ss))
+	parallelInOrder(len(ss), 4*rerankWorkers(), func(i int) []string {
 		seen := make(map[string]bool, 256)
 		var out []string
 		for _, m := range ss[i].Messages {
@@ -74,11 +83,8 @@ func buildCooccur(tmp string, ss []model.Session) {
 				out = append(out, tok)
 			}
 		}
-		uniquePerSession[i] = out
-	})
-	var df []int
-	perSession := make([][]uint32, 0, len(ss))
-	for _, unique := range uniquePerSession {
+		return out
+	}, func(_ int, unique []string) {
 		list := make([]uint32, 0, len(unique))
 		for _, tok := range unique {
 			v := id(tok)
@@ -89,7 +95,7 @@ func buildCooccur(tmp string, ss []model.Session) {
 			df[v]++
 		}
 		perSession = append(perSession, list)
-	}
+	})
 	maxDF := len(ss) / 4
 	if maxDF < 8 {
 		maxDF = 8
@@ -592,4 +598,64 @@ func cooccurSearchOver(dir string, m Manifest, o query.Options, terms []string, 
 		return SearchResult{}, nil
 	}
 	return SearchResult{Sessions: found, Stemmed: true, Neighbour: true, Variants: gathered, Tier: query.TierClose}, nil
+}
+
+// parallelInOrder runs produce for 0..n-1 on every core and hands each result
+// to consume on the calling goroutine in index order. No more than window
+// results are produced and not yet consumed, so what the results hold is
+// bounded by the window rather than by n.
+func parallelInOrder[T any](n, window int, produce func(i int) T, consume func(i int, v T)) {
+	workers := rerankWorkers()
+	if workers > n {
+		workers = n
+	}
+	if workers < 2 || n < 4 {
+		for i := range n {
+			consume(i, produce(i))
+		}
+		return
+	}
+	if window < workers {
+		window = workers
+	}
+	// A worker takes a slot before it takes an index, and the consumer gives
+	// the slot back once that index is consumed. Indices are taken in order, so
+	// every one taken and not consumed lies in [consumed, consumed+window) and
+	// slot i%window is free when i lands in it.
+	free := make(chan struct{}, window)
+	for range window {
+		free <- struct{}{}
+	}
+	slots := make([]chan T, window)
+	for i := range slots {
+		slots[i] = make(chan T, 1)
+	}
+	var next atomic.Int64
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(workers)
+	for range workers {
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-free:
+				case <-stop:
+					return
+				}
+				i := int(next.Add(1)) - 1
+				if i >= n {
+					return
+				}
+				slots[i%window] <- produce(i)
+			}
+		}()
+	}
+	for i := range n {
+		v := <-slots[i%window]
+		consume(i, v)
+		free <- struct{}{}
+	}
+	close(stop)
+	wg.Wait()
 }
