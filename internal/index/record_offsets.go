@@ -198,6 +198,13 @@ func encodeRecordOffsets(covered, records int64, fp [sha256.Size]byte, byKey map
 		data.Write(tmp[:binary.PutUvarint(tmp[:], uint64(len(e.key)))])
 		data.WriteString(e.key)
 		offs := byKey[e.key]
+		// Deltas, so in log order, as a walk lists them. A pass appending to
+		// the log gathers out of order a turn a rewrite moves to a session's
+		// kept copy: written at the end, it comes ahead of the copy's own
+		// records, which stay where they were (#5522).
+		if !slices.IsSorted(offs) {
+			slices.Sort(offs)
+		}
 		data.Write(tmp[:binary.PutUvarint(tmp[:], uint64(len(offs)))])
 		prev := int64(0)
 		for _, o := range offs {
