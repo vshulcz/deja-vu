@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `deja forget` on a session whose transcript was already deleted no longer
+  leaves that file counted as kept, which only a second rebuild cleared
+  (#5521).
 - A SQLite store read is given up only when it stops moving, not at ten
   minutes on the clock: a Hermes store of 1,683 sessions still reading on a
   slow disk was cut and left out of a first build. A store given up, or whose

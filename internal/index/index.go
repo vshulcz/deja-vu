@@ -801,7 +801,9 @@ import (
 // directory is read again with it when its tail holds a turn that copy has,
 // and an append that moves a shared row mines its runs again (#5508, #5509,
 // #5510).
-const version = 100
+// 101: a build drops the kept file of a deleted transcript whose sessions were
+// all forgotten (#5521).
+const version = 101
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

@@ -991,6 +991,19 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	}
 	ss = filterTombstonedSet(ss, dead)
 	ss = dropShadowedPrompts(ss, nil)
+	// A kept file is kept for the sessions this build still writes from it.
+	// One whose sessions were all forgotten or excluded above holds no
+	// records once it is written, and the next rebuild no longer keeps it
+	// (#5521).
+	held := map[string]bool{}
+	for _, s := range ss {
+		held[s.Path] = true
+	}
+	for p := range orphans.files {
+		if !held[p] {
+			delete(orphans.files, p)
+		}
+	}
 	for p, st := range orphans.files {
 		if !st.Kept && orphans.dated {
 			st.KeptAt = time.Now().Unix()
