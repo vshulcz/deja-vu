@@ -1403,7 +1403,7 @@ type bucketPostings map[string]map[string][]posting
 // session objects in one indexing pass. Distinct messages (codex history
 // accumulation) pass through; format twins (gemini .json/.jsonl, cursor
 // multi-store composers) collapse.
-type msgSeen map[string]bool
+type msgSeen map[seenK]bool
 
 // recordWriter appends length-prefixed records through one buffer, tracking
 // the file offset in memory: the hot rebuild path used to pay a Seek syscall

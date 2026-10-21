@@ -3,13 +3,13 @@ package sources
 import (
 	"bufio"
 	"hash/fnv"
+	"hash/maphash"
 	"os"
 	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -182,19 +182,32 @@ func IsMessageRole(role string) bool {
 // CountMessages counts the messages in these sessions, by IsMessageRole, the
 // way the index keeps them: the same message arriving twice in one session —
 // a store's two formats of one conversation — is kept once.
+//
+// The text is keyed by its hash, as the index's own dedupe keys it. Keyed by
+// the text itself the set was a second copy of the corpus: 1.3 GB live at the
+// peak of a cold build over a 5 GB store, and the build counts three times.
 func CountMessages(ss []model.Session) int {
+	type msgKey struct {
+		session string
+		role    string
+		sec     int64
+		nsec    int
+		text    uint64
+	}
+	seed := maphash.MakeSeed()
 	n := 0
-	seen := map[string]bool{}
+	seen := map[msgKey]struct{}{}
 	for _, s := range ss {
+		session := s.Harness + ":" + s.ID
 		for _, m := range s.Messages {
 			if !IsMessageRole(m.Role) {
 				continue
 			}
-			k := s.Harness + ":" + s.ID + "\x00" + m.Role + "\x00" + m.Time.UTC().Format(time.RFC3339Nano) + "\x00" + m.Text
-			if seen[k] {
+			k := msgKey{session, m.Role, m.Time.Unix(), m.Time.Nanosecond(), maphash.String(seed, m.Text)}
+			if _, ok := seen[k]; ok {
 				continue
 			}
-			seen[k] = true
+			seen[k] = struct{}{}
 			n++
 		}
 	}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"hash/maphash"
 	"io"
 	"io/fs"
 	"maps"
@@ -33,6 +34,10 @@ import (
 )
 
 func summarizeBuild(initial bool, sessions int, messages int, ss []model.Session) {
+	LastBuild = buildSummary(initial, sessions, messages, ss)
+}
+
+func buildSummary(initial bool, sessions int, messages int, ss []model.Session) BuildSummary {
 	counts := map[string]*HarnessCount{}
 	order := []string{}
 	parsed := sources.CountMessages(ss)
@@ -51,7 +56,7 @@ func summarizeBuild(initial bool, sessions int, messages int, ss []model.Session
 	for _, name := range order {
 		per = append(per, *counts[name])
 	}
-	LastBuild = BuildSummary{Initial: initial, Sessions: sessions, Messages: messages,
+	return BuildSummary{Initial: initial, Sessions: sessions, Messages: messages,
 		Dropped: parsed - messages, Harnesses: len(order), PerHarness: per}
 }
 
@@ -716,6 +721,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	defer readTo(files)()
 	defer sources.PinZstd()()
 	defer walkedThisPass(files)()
+	defer tightenGCForBuild()()
 	// This build's counts, not the process's: see writeSessionsWithSync (#1850).
 	beginPass()
 	emptied.Store(0)
@@ -816,7 +822,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	// the next rebuild no longer found it kept, and a rewrite of that copy
 	// took it from the index. Written where the live copy has it, so the
 	// session keeps its order.
-	keptTurns := map[string]string{}
+	keptTurns := map[seenK]string{}
 	for _, s := range ss {
 		if _, ok := orphans.files[s.Path]; ok {
 			for _, msg := range s.Messages {
@@ -892,8 +898,10 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 					continue
 				}
 				src := s.Path
-				if k := keptTurns[seenKey(key, msg.Role, msg.Time, msg.Text)]; k != "" && !isKept {
-					src = k
+				if len(keptTurns) > 0 && !isKept {
+					if k := keptTurns[seenKey(key, msg.Role, msg.Time, msg.Text)]; k != "" {
+						src = k
+					}
 				}
 				// Already redacted (and length-capped) by preRedactSessions.
 				text := msg.Text
@@ -972,6 +980,12 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 		// After the facts, whose file it is stamped with.
 		writeCommandsState(tmp, cmdState, m)
 	}
+	// Nothing below reads a session's text: counted here, the sessions can go
+	// before the bucket files are assembled, rather than sitting beside the
+	// postings as the larger half of the build's peak.
+	summary := buildSummary(initialBuild, len(m.Sessions), writtenMessages, ss)
+	ss, imported.sessions, orphans.sessions, vanished = nil, nil, nil, nil
+	cmdState, seenMsgs, keptTurns = nil, nil, nil
 	reportPhase("writing index", sp.bucketCount())
 	if err := sp.writeBuckets(filepath.Join(tmp, "buckets")); err != nil {
 		return err
@@ -986,7 +1000,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	if err := swapIndexDir(dir, tmp); err != nil {
 		return err
 	}
-	summarizeBuild(initialBuild, len(m.Sessions), writtenMessages, ss)
+	LastBuild = summary
 	return nil
 }
 
@@ -2381,10 +2395,31 @@ func (m msgSeen) dup(key, role string, ts time.Time, text string) bool {
 	return false
 }
 
-func seenKey(key, role string, ts time.Time, text string) string {
-	h := fnv.New64a()
-	_, _ = h.Write([]byte(text))
-	return key + "\x00" + role + "\x00" + ts.UTC().Format(time.RFC3339Nano) + "\x00" + fmt.Sprintf("%x", h.Sum64())
+// seenK is a message as msgSeen tells it apart: session, role, time and text,
+// hashed to 128 bits. The joined string it was, time formatted and hash in
+// hex, was an allocation per message and 430 MB live at the peak of a cold
+// build over 3.7M messages; this is 16 bytes inline.
+type seenK [2]uint64
+
+var seenSeeds = [2]maphash.Seed{maphash.MakeSeed(), maphash.MakeSeed()}
+
+func seenKey(key, role string, ts time.Time, text string) seenK {
+	var k seenK
+	var stamp [12]byte
+	binary.LittleEndian.PutUint64(stamp[:8], uint64(ts.Unix()))
+	binary.LittleEndian.PutUint32(stamp[8:], uint32(ts.Nanosecond()))
+	for i, seed := range seenSeeds {
+		var h maphash.Hash
+		h.SetSeed(seed)
+		_, _ = h.WriteString(key)
+		_ = h.WriteByte(0)
+		_, _ = h.WriteString(role)
+		_ = h.WriteByte(0)
+		_, _ = h.Write(stamp[:])
+		_, _ = h.WriteString(text)
+		k[i] = h.Sum64()
+	}
+	return k
 }
 
 // repeatKey is a message as the record dedupe sees it: role, time and text.
