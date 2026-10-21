@@ -1049,6 +1049,17 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 			}
 		}
 	}
+	// The file a turn of a live session is filed under when that is a deleted
+	// copy's, which the command tables read as the record says.
+	keptSource := func(key string, s model.Session, msg model.Message) string {
+		if len(keptTurns) == 0 {
+			return ""
+		}
+		if _, isKept := orphans.files[s.Path]; isKept {
+			return ""
+		}
+		return keptTurns[seenKey(key, msg.Role, msg.Time, msg.Text)]
+	}
 	// Counted in messages and reported when a batch has actually been
 	// indexed, not when it was handed to the spiller: reporting per session
 	// pushed sent the bar from 1% to 99% in one step and then held it at 99%
@@ -1118,16 +1129,13 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	err = sp.run(func(push func(tokenJob)) error {
 		for _, s := range ss {
 			key := s.Harness + ":" + s.ID
-			_, isKept := orphans.files[s.Path]
 			for _, msg := range s.Messages {
 				if seenMsgs.dup(key, msg.Role, msg.Time, msg.Text) {
 					continue
 				}
 				src := s.Path
-				if len(keptTurns) > 0 && !isKept {
-					if k := keptTurns[seenKey(key, msg.Role, msg.Time, msg.Text)]; k != "" {
-						src = k
-					}
+				if k := keptSource(key, s, msg); k != "" {
+					src = k
 				}
 				// Already redacted (and length-capped) by preRedactSessions.
 				text := msg.Text
@@ -1187,7 +1195,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 		// other. Profiled on a real store, they were 9.4 s (fixes) and 6.0 s
 		// (co-occurrence) of a 51 s build, with the whole machine idle beside them.
 		var sidecars sync.WaitGroup
-		cmds := commandSessions(ss, m)
+		cmds := commandSessions(ss, m, keptSource)
 		for _, build := range []func(){
 			func() { buildCooccur(tmp, ss) },
 			func() { buildFixes(tmp, cmds, func(s model.Session) string { return s.Harness + ":" + s.ID }) },
@@ -2440,7 +2448,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 		reportPhase("mining fixes and commands", 5)
 		buildCooccur(tmp, ss)
 		reportAdvance(1)
-		cmds := commandSessions(ss, m)
+		cmds := commandSessions(ss, m, nil)
 		buildFixes(tmp, cmds, func(s model.Session) string { return s.Harness + ":" + s.ID })
 		reportAdvance(1)
 		buildCommands(tmp, cmds)
@@ -6279,6 +6287,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	seenMsgs := msgSeen{}
 	// Every session this pass read, for the sidecars at the end.
 	var appended []model.Session
+	var rowMoved map[string]bool
 	// Only what this pass adds: it goes into an overlay beside each bucket
 	// rather than into the bucket written whole again (#5387).
 	loadBucket := func(tok string) (map[string][]posting, error) {
@@ -6515,6 +6524,14 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 				}
 			}
 			meta.Copies = withCopies(meta.Path, before.Copies, before.Path, s.Path)
+			// Which copy's commands the tables count follows the row's file
+			// (foreignPath): one that moved has its runs mined again.
+			if named && (before.Path != meta.Path || before.Shared != meta.Shared) {
+				if rowMoved == nil {
+					rowMoved = map[string]bool{}
+				}
+				rowMoved[key] = true
+			}
 			m.Sessions[key] = meta
 			for _, msg := range s.Messages {
 				// Already redacted (and length-capped) by preRedactSessions above.
@@ -6594,12 +6611,12 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	// one, and most appends are speech, so ask first.
 	// A pass killed after its commit and before the tables left them behind
 	// the log, which the next pass heals whatever it appended.
-	if carriesWork(appended) || commandTablesBehind(dir, m) {
+	if carriesWork(appended) || commandTablesBehind(dir, m) || len(rowMoved) > 0 {
 		// From the states the last update left: only the sessions this pass
 		// appended to are read (#4288). The command state goes last, so it
 		// stays behind until both tables are written.
-		buildCommandFailsFromIndex(dir, readCommandFailState(dir), nil)
-		buildCommandTables(dir, dir, m, len(m.DeadRecords), nil)
+		buildCommandFailsFromIndex(dir, readCommandFailState(dir), maps.Clone(rowMoved))
+		buildCommandTables(dir, dir, m, len(m.DeadRecords), maps.Clone(rowMoved))
 	}
 	return filesTouched, messages, unreadable, nil
 }

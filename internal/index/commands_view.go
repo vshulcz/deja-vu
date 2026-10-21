@@ -18,26 +18,22 @@ import (
 // of which a pass reading the log could give again.
 //
 // ss must already be redacted as the records are, and in the order they were
-// written.
-func commandSessions(ss []model.Session, m Manifest) []model.Session {
+// written. filedUnder, when set, is the file the build filed a turn under
+// where that is not its session's own: a turn a deleted copy shares, which
+// stays the deleted copy's (see keptTurns). The table goes by that file, as a
+// pass reading the record does.
+func commandSessions(ss []model.Session, m Manifest, filedUnder func(key string, s model.Session, msg model.Message) string) []model.Session {
 	out := make([]model.Session, 0, len(ss))
 	at := make(map[string]int, len(ss))
 	seen := msgSeen{}
 	for _, s := range ss {
 		key := s.Harness + ":" + s.ID
 		meta, ok := m.Sessions[key]
-		if !ok || foreignPath(s.Path, meta) {
+		if !ok {
 			continue
 		}
+		foreign := foreignPath(s.Path, meta)
 		i, again := at[key]
-		if !again {
-			i = len(out)
-			at[key] = i
-			row := s
-			row.Messages = nil
-			row.Project = meta.Project
-			out = append(out, row)
-		}
 		// The session's own slice while nothing is left out of it, which is
 		// nearly every session: copying every message of a store doubled what
 		// the sidecars held.
@@ -47,7 +43,15 @@ func commandSessions(ss []model.Session, m Manifest) []model.Session {
 		}
 		whole := !again
 		for j, msg := range s.Messages {
-			if !seen.dup(key, msg.Role, msg.Time, msg.Text) && strings.TrimSpace(msg.Text) != "" {
+			left := seen.dup(key, msg.Role, msg.Time, msg.Text) || strings.TrimSpace(msg.Text) == ""
+			if !left && filedUnder != nil {
+				if p := filedUnder(key, s, msg); p != "" {
+					left = foreignPath(p, meta)
+				} else {
+					left = foreign
+				}
+			}
+			if !left {
 				if !whole {
 					msgs = append(msgs, msg)
 				}
@@ -60,6 +64,16 @@ func commandSessions(ss []model.Session, m Manifest) []model.Session {
 		}
 		if whole {
 			msgs = s.Messages
+		}
+		if !again {
+			if foreign && len(msgs) == 0 {
+				continue
+			}
+			i = len(out)
+			at[key] = i
+			row := s
+			row.Project = meta.Project
+			out = append(out, row)
 		}
 		out[i].Messages = msgs
 	}

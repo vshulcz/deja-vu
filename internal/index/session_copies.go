@@ -137,13 +137,15 @@ func renameReorders(files []string, renamed map[string]string) bool {
 	return !slices.IsSorted(before)
 }
 
-// sharedTakeovers names the held owners a file in changed takes a row from:
-// a transcript in another directory, under the same filename-derived id, whose
-// path sorts first (#699). A turn both hold was written under the owner read
-// first, and the command tables leave a turn of another directory's copy out,
-// so the new owner's facts lost it where a rebuild kept it (#5492). The pass
-// reads the old owner again with it, and the turn goes to the copy a rebuild
-// gives it.
+// sharedTakeovers names the live copies a file in changed has to be read
+// again with: transcripts in another directory under the same filename-derived
+// id (#699) whose paths sort after it. A turn copies share is written once,
+// under the first that holds it, and a rebuild reads them in path order, so it
+// is the smaller path's. Appended, the turn stayed under the copy that had it
+// first, and the command tables leave a turn of another directory's copy out:
+// a copy taking the row lost it from the row's facts (#5492), and so did an
+// owner appending a turn a later copy already held. Read again with it, the
+// copies are written in path order, as a rebuild writes them.
 func sharedTakeovers(changed, files map[string]FileState, sessions map[string]SessionMeta) map[string]bool {
 	var out map[string]bool
 	for p := range changed {
@@ -151,17 +153,22 @@ func sharedTakeovers(changed, files map[string]FileState, sessions map[string]Se
 			continue
 		}
 		meta, ok := sessions[harnessForPath(p)+":"+filepath.Base(fileStem(p))]
-		if !ok || p >= meta.Path || filepath.Dir(p) == filepath.Dir(meta.Path) || !copyable(meta.Path) {
+		if !ok {
 			continue
 		}
-		// A written-back file holds less than its records do (#4617).
-		if f, ok := files[meta.Path]; !ok || f.Kept || f.WrittenBack {
-			continue
+		for _, q := range sessionFiles(meta) {
+			if q <= p || filepath.Dir(p) == filepath.Dir(q) || !copyable(q) {
+				continue
+			}
+			// A written-back file holds less than its records do (#4617).
+			if f, ok := files[q]; !ok || f.Kept || f.WrittenBack {
+				continue
+			}
+			if out == nil {
+				out = map[string]bool{}
+			}
+			out[q] = true
 		}
-		if out == nil {
-			out = map[string]bool{}
-		}
-		out[meta.Path] = true
 	}
 	return out
 }

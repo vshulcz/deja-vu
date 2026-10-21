@@ -845,11 +845,11 @@ func fixSessionsForPass(tmp string, old, m Manifest, replacements []model.Sessio
 		}
 	}
 	if len(fromLog) == 0 {
-		return commandSessions(replacements, m), replaced
+		return commandSessions(replacements, m, nil), replaced
 	}
 	rows, err := rowSessionsFromRecords(tmp, m, fromLog)
 	if err != nil {
-		return commandSessions(replacements, m), replaced
+		return commandSessions(replacements, m, nil), replaced
 	}
 	var read []model.Session
 	for _, s := range replacements {
@@ -861,7 +861,7 @@ func fixSessionsForPass(tmp string, old, m Manifest, replacements []model.Sessio
 	for k := range fromLog {
 		keys[k] = true
 	}
-	return append(commandSessions(read, m), rows...), keys
+	return append(commandSessions(read, m, nil), rows...), keys
 }
 
 // readFixRaw loads the raw pairs. An index built before them has only the

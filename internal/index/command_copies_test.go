@@ -179,3 +179,98 @@ func TestCopiesReadInOnePassFileASharedTurnAsARebuild(t *testing.T) {
 	parityPass(t, inc, false)
 	sameCommandTables(t, inc)
 }
+
+// A deleted copy keeps the turns it shared with a live copy in another
+// project, filed under itself. The command tables go by that filing in a
+// build as in a pass: the build counted the live copy's run from the session
+// it read, where the record a pass reads names the deleted file.
+func TestADeletedCopysSharedTurnCountsAsItsRecordIsFiled(t *testing.T) {
+	inc, write := collisionStore(t)
+	write("app", "dup", "make zzapp")
+	write("infra", "dup", "make zzshared", "make zzinfra")
+	parityPass(t, inc, true)
+	infra := filepath.Join(filepath.Dir(inc), "claude", "-tmp-infra", "dup.jsonl")
+	if err := os.Remove(infra); err != nil {
+		t.Fatal(err)
+	}
+	parityPass(t, inc, false)
+	// The live copy now runs what the deleted one ran, at the same turn.
+	write("app", "dup", "make zzshared", "make zzapp")
+	parityPass(t, inc, false)
+	if m, err := readManifest(inc); err != nil || !m.Files[infra].Kept {
+		t.Fatalf("the deleted copy is not kept, so this measures nothing: %v", err)
+	}
+	sameTablesAsItsRebuild(t, inc)
+}
+
+// sameTablesAsItsRebuild fails the test where the command tables of inc
+// differ from a rebuild of inc itself, which keeps what its deleted
+// transcripts held.
+func sameTablesAsItsRebuild(t *testing.T, inc string) {
+	t.Helper()
+	fresh := filepath.Join(t.TempDir(), "rebuilt")
+	if err := os.CopyFS(fresh, os.DirFS(inc)); err != nil {
+		t.Fatal(err)
+	}
+	parityPass(t, fresh, true)
+	a, b := paritySnapshot(t, inc), paritySnapshot(t, fresh)
+	for _, k := range []string{"commands", "fails", "facts"} {
+		if a[k] != b[k] {
+			t.Errorf("%s after the pass:\n  %s\nafter a rebuild:\n  %s", k, a[k], b[k])
+		}
+	}
+}
+
+// The row's owner appending a turn a copy in another project already holds
+// takes the turn, as a rebuild reading the copies in path order gives it: it
+// stayed with the copy that held it first, and the tables left it out.
+func TestAnOwnerAppendingASharedTurnKeepsItInTheFacts(t *testing.T) {
+	inc, write := collisionStore(t)
+	write("app", "dup", "make zzapp")
+	write("infra", "dup", "make zzapp", "make zzshared")
+	parityPass(t, inc, true)
+	app := filepath.Join(filepath.Dir(inc), "claude", "-tmp-app", "dup.jsonl")
+	b, err := os.ReadFile(filepath.Join(filepath.Dir(inc), "claude", "-tmp-infra", "dup.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The infra copy's last turn, the command and its output, as the app copy
+	// writes it.
+	lines := strings.SplitAfter(string(b), "\n")
+	tail := strings.ReplaceAll(strings.Join(lines[len(lines)-3:], ""), `"/tmp/infra"`, `"/tmp/app"`)
+	parityWrite(t, app, tail, true)
+	parityPass(t, inc, false)
+	held := false
+	for _, c := range ReadSessionFacts(inc)["claude:dup"].Commands {
+		held = held || strings.Contains(c.Text, "zzshared")
+	}
+	if !held {
+		t.Errorf("the owner's appended run left the row's facts: %+v", ReadSessionFacts(inc)["claude:dup"].Commands)
+	}
+	sameTablesAsItsRebuild(t, inc)
+}
+
+// A new transcript that takes a row from a deleted copy in another project
+// has the session's failures counted again under the new owner: the append
+// left them as counted under the deleted one.
+func TestARowMovedByAnAppendRecountsItsFailures(t *testing.T) {
+	inc, write := collisionStore(t)
+	write("infra", "dup", "make zzinfra")
+	write("app", "other", "make zzinfra")
+	parityPass(t, inc, true)
+	if err := os.Remove(filepath.Join(filepath.Dir(inc), "claude", "-tmp-infra", "dup.jsonl")); err != nil {
+		t.Fatal(err)
+	}
+	parityPass(t, inc, false)
+	write("app", "dup", "make zzapp")
+	parityPass(t, inc, false)
+	if m, err := readManifest(inc); err != nil || !strings.Contains(m.Sessions["claude:dup"].Path, "-tmp-app") {
+		t.Fatalf("the new copy did not take the row, so this measures nothing: %v", err)
+	}
+	for _, f := range ReadCommandFails(inc) {
+		if strings.Contains(f.Head, "zzinfra") && f.Sessions > 1 {
+			t.Errorf("the deleted copy's failure still counts for the row: %+v", f)
+		}
+	}
+	sameTablesAsItsRebuild(t, inc)
+}

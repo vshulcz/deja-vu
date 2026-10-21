@@ -796,6 +796,11 @@ import (
 // its commands in time order (#5519).
 // 99: a command whose clean result lands in the tail a pass appends is read
 // with its result, so it carries the exit 0 a rebuild gives it (#5527).
+// 99: a build's command tables go by the file each turn is filed under, a
+// deleted copy's included, and list a session's facts in time order; a copy
+// changed beside a later one in another directory is read again with it, and
+// an append that moves a shared row mines its runs again (#5508, #5509,
+// #5510).
 const version = 99
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
