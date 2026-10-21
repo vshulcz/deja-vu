@@ -46,10 +46,13 @@ The default index is `~/.cache/deja/index.db`; `DEJA_INDEX_DIR` changes that
 location. The directory contains:
 
 - `records.bin`, with redacted message records;
-- `buckets/*.bin`, with token postings into those records;
+- `buckets/*.bin`, with token postings into those records, and the `*.ov`
+  overlays beside them that hold the postings of records added since;
 - `frictext.bin`, the first line of each repeated error's tool output, already
   redacted, and `recoffsets.bin`, where each session's records sit in
   `records.bin`;
+- `commands-state.bin`, each session's commands as its redacted records hold
+  them, so a pass mines only the sessions it changed;
 - `manifest.gob` and `sessions.gob`, with source file state, session metadata,
   redaction counts by rule, sync watermarks, imported-record deduplication keys,
   the few files each session touched most, and hashes — not text — of the
@@ -366,6 +369,14 @@ The frame covers:
   (`deja --framed search …`), which the agent tools in the dsh, opencode,
   OpenClaw and Hermes plugins and the skills and slash commands that send an
   agent to the shell use.
+
+Some hosts act on tokens in the text they are handed before the model sees
+it. opencode and Kilo run `` !`cmd` `` and attach `@path` in the `/deja` prompt
+text, and attach `@path` in a sub-agent's task prompt; deja puts a space into
+those tokens in the recall it gives them, so the words still reach the model
+and nothing runs or attaches. dsh reads deja's digest and recall as prompt
+templates, so both pass `interpolate: false`, and a recalled `{{...}}` is
+split into `{ {...} }`, which dsh before 0.2.1-alpha.2 needs.
 
 The framing bytes count against the existing injection budgets, a budget that
 cuts a block closes its frame rather than leaving it open, empty results stay

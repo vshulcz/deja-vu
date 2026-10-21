@@ -6,10 +6,31 @@
   <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
   <link rel="self" type="application/atom+xml" href="https://vshulcz.github.io/deja-vu/feed.xml"></link>
   <link rel="hub" href="https://pubsubhubbub.appspot.com/"></link>
-  <updated>2026-10-20T00:00:00Z</updated>
+  <updated>2026-10-21T00:00:00Z</updated>
   <author>
     <name>vshulcz</name>
   </author>
+  <entry>
+    <title>deja-vu — the one memory your coding agents share</title>
+    <id>https://vshulcz.github.io/deja-vu/</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
+    <updated>2026-10-21T00:00:00Z</updated>
+    <summary>The most accurate, cheapest and fastest memory for coding agents: Claude Code, Codex and 40 more agents, built from the sessions already on your disk.</summary>
+  </entry>
+  <entry>
+    <title>How to delete CodeBuddy session history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html"></link>
+    <updated>2026-10-21T00:00:00Z</updated>
+    <summary>How to delete CodeBuddy Code and WorkBuddy sessions — the .jsonl conversation, its .meta.json, rollback sidecar and file-history snapshots.</summary>
+  </entry>
+  <entry>
+    <title>Sync coding-agent history between machines — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html"></link>
+    <updated>2026-10-21T00:00:00Z</updated>
+    <summary>How to sync between machines without a server: one person, two laptops, one history their agents can all read.</summary>
+  </entry>
   <entry>
     <title>Coding-agent memory benchmarks: quality and cost — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/benchmarks.html</id>
@@ -18,18 +39,18 @@
     <summary>Reproducible, honest measurements of deja&#39;s search quality and the token cost of reaching working context — run them yourself.</summary>
   </entry>
   <entry>
-    <title>How to delete CodeBuddy session history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html"></link>
-    <updated>2026-10-20T00:00:00Z</updated>
-    <summary>How to delete CodeBuddy Code and WorkBuddy sessions — the .jsonl conversation, its .meta.json, rollback sidecar and file-history snapshots.</summary>
-  </entry>
-  <entry>
     <title>deja CLI reference: search, recall, blame, stats — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/commands.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/commands.html"></link>
-    <updated>2026-10-19T00:00:00Z</updated>
+    <updated>2026-10-20T00:00:00Z</updated>
     <summary>Every deja subcommand: search, ctx, blame, fix, how, secrets, remember, forget, stats, last, sources, install, embed, sync, doctor, bench and update.</summary>
+  </entry>
+  <entry>
+    <title>Search your Claude Code and Codex history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/search.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/search.html"></link>
+    <updated>2026-10-20T00:00:00Z</updated>
+    <summary>deja search syntax: exact and phrase queries, natural language with stop words, fuzzy typo tolerance, confidence tiers, and optional local semantic recall.</summary>
   </entry>
   <entry>
     <title>Install deja and index your agent history — deja-vu</title>
@@ -44,13 +65,6 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html"></link>
     <updated>2026-10-19T00:00:00Z</updated>
     <summary>OpenClaw keeps a session log per agent and can resume one, but reads no earlier session. deja indexes them with every other agent on the machine.</summary>
-  </entry>
-  <entry>
-    <title>Search your Claude Code and Codex history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/search.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/search.html"></link>
-    <updated>2026-10-19T00:00:00Z</updated>
-    <summary>deja search syntax: exact and phrase queries, natural language with stop words, fuzzy typo tolerance, confidence tiers, and optional local semantic recall.</summary>
   </entry>
   <entry>
     <title>Where Claude Code stores its history — session format</title>
@@ -235,13 +249,6 @@
     <summary>deja is local by design: no network path in indexing or search unless semantic search is on, credentials redacted at index time, and forget/exclude controls.</summary>
   </entry>
   <entry>
-    <title>Sync coding-agent history between machines — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html"></link>
-    <updated>2026-10-16T00:00:00Z</updated>
-    <summary>How to sync between machines without a server: one person, two laptops, one history their agents can all read.</summary>
-  </entry>
-  <entry>
     <title>给 Claude Code 加记忆：召回这台机器上所有智能体的历史会话 — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-claude-code.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-claude-code.html"></link>
@@ -261,13 +268,6 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/privacy.html"></link>
     <updated>2026-10-16T00:00:00Z</updated>
     <summary>deja 索引的是可能含有凭据的会话历史：索引和检索都在本地，凭据在写入前就被脱敏，排除、遗忘与信任范围决定留下什么。</summary>
-  </entry>
-  <entry>
-    <title>deja-vu — the one memory your coding agents share</title>
-    <id>https://vshulcz.github.io/deja-vu/</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
-    <updated>2026-10-15T00:00:00Z</updated>
-    <summary>The most accurate, cheapest and fastest memory for coding agents: Claude Code, Codex and 40 more agents, built from the sessions already on your disk.</summary>
   </entry>
   <entry>
     <title>Memory plugins for Claude Code, Codex and Cursor, compared</title>

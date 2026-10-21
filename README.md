@@ -509,14 +509,17 @@ A cold full build over it takes 71 s and writes a 232 MB index — 4% of the
 corpus, because the share falls as transcripts repeat themselves — and the
 end-to-end median is unchanged at 0.25 s.
 
-The index is incremental. When a session file grows, only that file is re-read.
+The index is incremental. When a session file grows, only that file is re-read. When one is
+rewritten, its new records are appended and the old ones zeroed in place. On a
+40,000-session store a pass over 20 rewritten transcripts takes 1.7 s and peaks under 1 GB,
+and a search for a word most sessions hold takes about a second.
 
 </details>
 
 ## How it works
 
 Local inverted index in `~/.cache/deja`: parse the JSONL and SQLite stores, redact
-credentials, write `records.bin` plus token buckets, and track per-file state in
+credentials, write an append-only `records.bin` plus token buckets, and track per-file state in
 `manifest.gob` so repeat runs only ingest what changed. The MCP server, stats, share and
 sync all read that one index. Details in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 

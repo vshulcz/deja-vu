@@ -117,7 +117,9 @@ Search flow:
 1. Tokenize the query.
 2. Read posting lists from the token buckets.
 3. Intersect posting lists for multi-word searches.
-4. Filter postings by session metadata and read every matching candidate record.
+4. Filter postings by session metadata and read the matching candidate records;
+   past 1,000 matching sessions a page reads only those that can reach it (see
+   [Ranking](#ranking)).
 5. Group records back into sessions and score them in `internal/search` with BM25
    (`k1=1.2`, `b=0.75`). Document frequency and document length are measured
    over the candidate records at search time. User-message term contributions
@@ -166,7 +168,7 @@ transcript keeps what deja printed and blame reads transcripts.
 
 The export watermark is per peer and source path (falling back to session key for synthetic records) and is stored in `manifest.gob` as the max exported record timestamp. Re-running export emits only records with a newer timestamp for that source and that peer, so what one machine has already received says nothing about what another still needs. An export with no peer named keeps the bare source key, which is what manifests written before per-peer watermarks carry. Text is redacted again during export.
 
-`deja sync import <dir>` reads all `*.jsonl` batches, runs each record's text through the redactor again under this machine's rules (counted in `stats --redaction` like local ingest), appends records to the local index, updates touched token buckets, and writes imported session metadata with the original harness and an `imported:` project prefix. Imported IDs are namespaced (`imported-<hash>`) so they do not clobber local sessions from the same harness. The manifest stores dedupe keys of `harness:session_id:time:role:text-hash` (the older time-only key is still honoured), making re-import idempotent. Imported records live only in the index, so full rebuilds replay them from the old `records.bin` before regenerating from sources, and exports skip them to avoid echoing history back to its origin, unless `sync export --include-imported` asks to relay them.
+`deja sync import <dir>` reads all `*.jsonl` batches, runs each record's text through the redactor again under this machine's rules (counted in `stats --redaction` like local ingest), appends records to the local index, updates touched token buckets, and writes imported session metadata with the original harness and an `imported:` project prefix. The import holds a peer's records to this machine's switches: what `DEJA_INDEX_*` and `DEJA_INCLUDE_SUBAGENTS=0` leave out of a local read, a store `DEJA_EXCLUDE_HARNESSES` or a `harness:` line excludes, and a project the policy `ignore` rule covers stay out, and the import says how many. Imported IDs are namespaced (`imported-<hash>`) so they do not clobber local sessions from the same harness. The manifest stores dedupe keys of `harness:session_id:time:role:text-hash` (the older time-only key is still honoured), making re-import idempotent. Imported records live only in the index, so full rebuilds replay them from the old `records.bin` before regenerating from sources, and exports skip them to avoid echoing history back to its origin, unless `sync export --include-imported` asks to relay them.
 
 ### Which machines are one machine
 
@@ -180,6 +182,8 @@ The name a machine calls itself is its hostname, and an imported session is stam
 
 `deja sync ssh <host>` wraps the same export/import in one command: export to a temp dir, scp the batches, run the remote import (system ssh/scp, remote binary from PATH or `~/.local/bin/deja`).
 
+`deja install sync-timer` runs a bare `deja sync` from a launchd agent or a systemd user timer. The unit carries the `DEJA_*` and `XDG_*` settings of the shell it was installed from, the set the hook launcher records, since neither service manager sees that shell; a timer run then syncs into the same index under the same switches.
+
 Each of those phases names itself on stderr before it starts, repeats every ten seconds while it runs, and the run ends with where the time went; the remote's own output is echoed line by line as it arrives rather than after the ssh command exits, bounded and sanitised per line the way every other remote sentence is. Plain lines rather than a bar, because this output is read from a launchd log as often as from a terminal. Transfer says how many bytes in how many batches; nothing says anything per record or per path.
 
 ## Incremental algorithm
@@ -191,7 +195,7 @@ Each of those phases names itself on stderr before it starts, repeats every ten 
 - fresh manifest: do nothing;
 - version or scope mismatch: rebuild. Two versions are tracked: the content version, which moves when deja derives something new from a transcript, and the on-disk format, which moves only when an older layout would be mis-read. A store whose content version is stale is re-read but keeps answering from what it has; only a format mismatch makes search say it cannot answer yet;
 - append-only JSONL changes: append new records and update touched buckets. A harness whose sessions are re-read whole when they change (opencode, Kilo, ZCode, Cursor, Grok, Zed, Hermes, OpenClaw, Crush, goose) replaces those sessions instead (#4207, #4450);
-- removed files or non-append changes: rewrite the index while preserving unchanged records and replacing changed sessions.
+- removed files or non-append changes: replace the changed sessions. Their new records are appended to `records.bin`, the old ones are marked dead and zeroed in place, and their postings go in overlays; the log is written out again without dead records once they are a quarter of it (see Dead records above).
 
 A file takes the append path only when the prefix deja already read is still
 byte-for-byte what it read: a rewind that truncates and regrows past the old
