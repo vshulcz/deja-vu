@@ -1125,7 +1125,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 		if owns {
 			row := ownerRow(prev, s, texts[i].row(s), ord, collided)
 			if kept, ok := orphans.rows[orphanKey(key, s.Path)]; ok {
-				row.Counted, row.Words, row.LastMsg, row.Opening = kept.Counted, kept.Words, kept.LastMsg, kept.Opening
+				row = withKeptText(row, kept)
 			}
 			m.Sessions[key] = row
 		} else {
@@ -1616,6 +1616,18 @@ func orphanedSessions(dir, harness string, files map[string]FileState) orphanSta
 		out.unreadable++
 	}
 	return out
+}
+
+// withKeptText is row with what the pass read off a deleted transcript's text
+// when it was on disk. Its records are not the file: a turn another copy holds
+// was filed under one of them, and the log holds them in the order passes
+// wrote them, so what is read off them in order (the conclusion, the friction
+// and questions up to their caps) came back other than the pass had it.
+func withKeptText(row, kept SessionMeta) SessionMeta {
+	row.Counted, row.Words, row.LastMsg, row.Opening = kept.Counted, kept.Words, kept.LastMsg, kept.Opening
+	row.Settled, row.RanCommand, row.Asked, row.Hit, row.GaveUp = kept.Settled, kept.RanCommand, kept.Asked, kept.Hit, kept.GaveUp
+	row.Touched, row.TouchHits = kept.Touched, kept.TouchHits
+	return row
 }
 
 // keepCopyOrder puts the copies of a session that has a kept file in the

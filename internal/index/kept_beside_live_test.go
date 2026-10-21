@@ -3,6 +3,7 @@ package index
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -26,45 +27,63 @@ func (h *twoWayEnv) threeWays(label string, steps ...func()) {
 	diffSnaps(t, label, takeSnap(t, a), takeSnap(t, b))
 }
 
-func keptBesideLive(t *testing.T, h *twoWayEnv) (seed, rewriteMove func()) {
-	wall := func(port string) string { return "dial tcp 127.0.0.1:" + port + ": connect: connection refused\n" }
-	sess := func(p, sid string, day int, q, port string) string {
-		return hPrompt(p, sid, day, 0, q) + hBash(p, sid, day, 1, sid+"a", "make migrate", wall(port), true)
-	}
-	seed = func() {
-		h.put("svc", "s1", sess("svc", "s1", 2, "why does the pool fail", "5432"))
-		h.put("app", "s2", sess("app", "s2", 3, "why does the queue fail", "5432"))
-	}
-	rewriteMove = func() {
-		h.put("svc", "s1", sess("svc", "s1", 5, "again: why does the ledger fail", "6432"))
-		if err := os.MkdirAll(filepath.Dir(h.path("infra", "s1")), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Rename(h.path("svc", "s1"), h.path("infra", "s1")); err != nil {
-			t.Fatal(err)
-		}
-	}
-	return seed, rewriteMove
-}
-
-func TestKeptBesideALiveCopyRewritten(t *testing.T) {
+// A transcript rewritten and moved from svc to app, rewritten again and moved
+// back leaves the app file deleted and owning the row, its path sorting
+// first. The pass took the row's conclusion off the file when it was on disk;
+// a rebuild took it off the deleted file's records in the order passes wrote
+// them, and named the second day's "worker" where the pass had the third
+// day's "mutex".
+func TestADeletedCopyOwningTheRowKeepsWhatThePassReadOffIt(t *testing.T) {
 	h := newTwoWayEnv(t)
-	seed, rm := keptBesideLive(t, h)
-	h.threeWays("kept beside a live copy, rewritten", seed, rm, func() {
-		h.put("infra", "s1", hPrompt("infra", "s1", 7, 0, "third: why does the outbox fail")+
-			hBash("infra", "s1", 7, 1, "s1z", "go build ./...", "ok", false))
+	day := func(p string, d int, q, said string) string {
+		return hPrompt(p, "s8", d, 0, q) + hBash(p, "s8", d, 1, "b", "go build ./...", "ok", false) +
+			hBash(p, "s8", d, 2, "c", "make migrate", "dial tcp 127.0.0.1:5432: connect: connection refused\n", true) + hSay(p, "s8", d, 6, said)
+	}
+	move := func(from, to string) {
+		if err := os.MkdirAll(filepath.Dir(h.path(to, "s8")), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Rename(h.path(from, "s8"), h.path(to, "s8")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	h.threeWays("moved back", func() {
+		h.put("svc", "s8", day("svc", 8, "start: why does the build fail", "The ledger needs a fix."))
+	}, func() {
+		h.put("svc", "s8", day("svc", 9, "again: why does the build fail", "The worker needs a fix."))
+		move("svc", "app")
+	}, func() {
+		h.put("app", "s8", day("app", 10, "again: why does the parser fail", "The mutex needs a fix."))
+	}, func() {
+		move("app", "svc")
 	})
 }
 
-func TestKeptBesideALiveCopyRenamed(t *testing.T) {
-	h := newTwoWayEnv(t)
-	seed, rm := keptBesideLive(t, h)
-	h.threeWays("kept beside a live copy, renamed", seed, rm, func() {
-		if err := os.MkdirAll(filepath.Dir(h.path("app", "s1")), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Rename(h.path("infra", "s1"), h.path("app", "s1")); err != nil {
-			t.Fatal(err)
-		}
-	})
+// A pass that carries some of a session's records and writes others gathers
+// their offsets out of log order; the table it writes lists them in the
+// order a walk finds them.
+func TestAPassWritesOffsetsInLogOrder(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "records.bin"), make([]byte, 64), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	p := &passOffsets{byKey: map[string][]int64{}}
+	for _, off := range []int64{40, 52, 0, 12} {
+		p.add("claude:s5", off)
+	}
+	if err := p.write(dir); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.Open(filepath.Join(dir, "records.bin"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	ro, err := readRecordOffsetsFor(dir, f, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := ro.byKey["claude:s5"]; !slices.Equal(got, []int64{0, 12, 40, 52}) {
+		t.Errorf("offsets = %v, want them in log order", got)
+	}
 }
