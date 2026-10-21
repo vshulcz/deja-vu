@@ -57,3 +57,33 @@ func TestBenchCorpusShape(t *testing.T) {
 		t.Logf("%-7s %6d bytes  %d redactions", name, len(s), c.Total())
 	}
 }
+
+// mixed is what a Codex-heavy store is made of: tool output with colons, JSON,
+// arrows and dashes outside ASCII, config that names passwords and tokens, a
+// chat line in Russian, and one real secret among a lot of near misses. Every
+// cheap gate passes on it, so it is where the regexes used to walk the text.
+var mixed = strings.Repeat(
+	"→ running `go test ./...` — ok: 42 passed, 0 failed (1.2s)\n"+
+		`{"type":"function_call_output","output":"config.yaml: password_policy: strict, token_ttl: 15m, api_key_header: X-Api-Key"}`+"\n"+
+		"пароль от стейджа лежит в vault, ключ: см. README — не коммитить\n"+
+		"db_pass is read from env; bypass=false; compass: north; the password is wrong\n"+
+		"curl -H 'Authorization: Bearer $TOKEN' https://api.example.com/v1/items?page=2 → 200 OK\n"+
+		"2026-10-21T17:16:59Z INFO login ok user=deploy; ftp disabled; --token-file ~/.cache/x\n", 6) +
+	"export OPENAI_API_KEY=sk-proj-abcDEF1234567890123456789012345\n"
+
+func BenchmarkTextMixed(b *testing.B) { benchText(b, mixed) }
+
+// The same inputs through the plain regexes, so one run shows the ratio.
+func BenchmarkTextMixedRegex(b *testing.B) {
+	b.SetBytes(int64(len(mixed)))
+	for i := 0; i < b.N; i++ {
+		text(mixed, false)
+	}
+}
+
+func BenchmarkTextChattyRegex(b *testing.B) {
+	b.SetBytes(int64(len(chatty)))
+	for i := 0; i < b.N; i++ {
+		text(chatty, false)
+	}
+}

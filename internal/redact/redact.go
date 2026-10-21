@@ -499,12 +499,16 @@ func containsAnyFold(s string, hints []string) bool {
 // read again without them, and that reading wins when it finds more. Text
 // with nothing behind its escapes keeps them, as the index keeps a transcript
 // as it found it.
-func Text(s string) (string, Counts) {
-	out, counts := textPass(s, nil)
+func Text(s string) (string, Counts) { return text(s, true) }
+
+// text is Text with the finders on or off; off is the plain regexes, which a
+// test holds the finders against.
+func text(s string, fast bool) (string, Counts) {
+	out, counts := textPass(s, nil, fast)
 	if strings.IndexByte(out, 0x1b) < 0 {
 		return out, counts
 	}
-	plain, more := textPass(StripEscapes(out), nil)
+	plain, more := textPass(StripEscapes(out), nil, fast)
 	if len(more) == 0 {
 		return out, counts
 	}
@@ -529,14 +533,17 @@ const pemBreak = `(?:[ \t]*\r?\n|(?:\\+r)?\\+n)[ \t]*`
 //
 // A nil allow set means every rule, so Text is this function with no filter and
 // the two cannot drift apart.
-func TextKinds(s string, allow map[string]bool) (string, Counts) { return textPass(s, allow) }
+func TextKinds(s string, allow map[string]bool) (string, Counts) { return textPass(s, allow, true) }
 
-func textPass(s string, allow map[string]bool) (string, Counts) {
+func textPass(s string, allow map[string]bool, fast bool) (string, Counts) {
 	counts := Counts{}
 	if Disabled() || s == "" {
 		return s, counts
 	}
 	p := kindPass{counts: counts, allow: allow}
+	if fast {
+		p.v = &view{}
+	}
 	lower := strings.ToLower(s)
 	if strings.Contains(s, "-----BEGIN") {
 		s = replaceWhole(s, pemPrivateRE, "private-key", p)
@@ -723,6 +730,18 @@ func textPass(s string, allow map[string]bool) (string, Counts) {
 type kindPass struct {
 	counts Counts
 	allow  map[string]bool
+	v      *view
+}
+
+// finderFor is the finder that answers for a rule, or nil when the plain
+// regex is still the one that runs.
+func (p kindPass) finderFor(re *regexp.Regexp, s string) *finder {
+	f := finders[re]
+	if f == nil || p.v == nil {
+		return nil
+	}
+	p.v.reset(s)
+	return f
 }
 
 func (p kindPass) on(kind string) bool { return p.allow == nil || p.allow[kind] }
@@ -732,6 +751,11 @@ func (p kindPass) add(kind string, n int) { p.counts.Add(kind, n) }
 func replaceWhole(s string, re *regexp.Regexp, kind string, p kindPass) string {
 	if !p.on(kind) {
 		return s
+	}
+	if f := p.finderFor(re, s); f != nil {
+		matches := f.all(p.v)
+		p.add(kind, len(matches))
+		return spliceMatches(s, matches, func(string) string { return "[redacted:" + kind + "]" })
 	}
 	n := 0
 	out := re.ReplaceAllStringFunc(s, func(_ string) string {
@@ -746,6 +770,13 @@ func replaceSubmatch(s string, re *regexp.Regexp, kind string, p kindPass, repl 
 	if !p.on(kind) {
 		return s
 	}
+	if f := p.finderFor(re, s); f != nil {
+		matches := f.all(p.v)
+		p.add(kind, len(matches))
+		return spliceMatches(s, matches, func(match string) string {
+			return repl(re.FindStringSubmatch(match))
+		})
+	}
 	n := 0
 	out := re.ReplaceAllStringFunc(s, func(match string) string {
 		n++
@@ -753,6 +784,23 @@ func replaceSubmatch(s string, re *regexp.Regexp, kind string, p kindPass, repl 
 	})
 	p.add(kind, n)
 	return out
+}
+
+// spliceMatches is ReplaceAllStringFunc over matches already found.
+func spliceMatches(s string, matches [][]int, repl func(string) string) string {
+	if len(matches) == 0 {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	at := 0
+	for _, m := range matches {
+		b.WriteString(s[at:m[0]])
+		b.WriteString(repl(s[m[0]:m[1]]))
+		at = m[1]
+	}
+	b.WriteString(s[at:])
+	return b.String()
 }
 
 // replaceGroup redacts one capture group of every match and leaves the rest of
@@ -767,7 +815,12 @@ func replaceGroup(s string, re *regexp.Regexp, group int, kind string, p kindPas
 	if !p.on(kind) {
 		return s
 	}
-	matches := re.FindAllStringSubmatchIndex(s, -1)
+	var matches [][]int
+	if f := p.finderFor(re, s); f != nil {
+		matches = f.all(p.v)
+	} else {
+		matches = re.FindAllStringSubmatchIndex(s, -1)
+	}
 	if len(matches) == 0 {
 		return s
 	}
@@ -816,40 +869,45 @@ func allDigits(s string) bool {
 }
 
 func replaceProvider(s string, p kindPass) string {
-	return providerRE.ReplaceAllStringFunc(s, func(v string) string {
-		kind := "provider-token"
-		switch {
-		case strings.HasPrefix(v, "ghp_"), strings.HasPrefix(v, "gho_"), strings.HasPrefix(v, "ghs_"),
-			strings.HasPrefix(v, "ghu_"), strings.HasPrefix(v, "ghr_"), strings.HasPrefix(v, "github_pat_"):
-			kind = "github-token"
-		case strings.HasPrefix(v, "sk_live_"), strings.HasPrefix(v, "sk_test_"),
-			strings.HasPrefix(v, "rk_live_"), strings.HasPrefix(v, "rk_test_"):
-			kind = "stripe-key"
-		case strings.HasPrefix(v, "sk-ant-"):
-			kind = "anthropic-key"
-		case strings.HasPrefix(v, "sk-"):
-			kind = "openai-key"
-		case strings.HasPrefix(v, "gsk_"):
-			kind = "groq-key"
-		case strings.HasPrefix(v, "xai-"):
-			kind = "xai-key"
-		case strings.HasPrefix(v, "hf_"):
-			kind = "huggingface-token"
-		case strings.HasPrefix(v, "glpat-"):
-			kind = "gitlab-token"
-		case strings.HasPrefix(v, "npm_"):
-			kind = "npm-token"
-		case strings.HasPrefix(v, "xoxb-"), strings.HasPrefix(v, "xoxp-"), strings.HasPrefix(v, "xoxc-"), strings.HasPrefix(v, "xoxs-"):
-			kind = "slack-token"
-		case strings.HasPrefix(v, "AIza"):
-			kind = "google-api-key"
-		}
-		if !p.on(kind) {
-			return v
-		}
-		p.add(kind, 1)
-		return "[redacted:" + kind + "]"
-	})
+	if f := p.finderFor(providerRE, s); f != nil {
+		return spliceMatches(s, f.all(p.v), func(v string) string { return providerMask(v, p) })
+	}
+	return providerRE.ReplaceAllStringFunc(s, func(v string) string { return providerMask(v, p) })
+}
+
+func providerMask(v string, p kindPass) string {
+	kind := "provider-token"
+	switch {
+	case strings.HasPrefix(v, "ghp_"), strings.HasPrefix(v, "gho_"), strings.HasPrefix(v, "ghs_"),
+		strings.HasPrefix(v, "ghu_"), strings.HasPrefix(v, "ghr_"), strings.HasPrefix(v, "github_pat_"):
+		kind = "github-token"
+	case strings.HasPrefix(v, "sk_live_"), strings.HasPrefix(v, "sk_test_"),
+		strings.HasPrefix(v, "rk_live_"), strings.HasPrefix(v, "rk_test_"):
+		kind = "stripe-key"
+	case strings.HasPrefix(v, "sk-ant-"):
+		kind = "anthropic-key"
+	case strings.HasPrefix(v, "sk-"):
+		kind = "openai-key"
+	case strings.HasPrefix(v, "gsk_"):
+		kind = "groq-key"
+	case strings.HasPrefix(v, "xai-"):
+		kind = "xai-key"
+	case strings.HasPrefix(v, "hf_"):
+		kind = "huggingface-token"
+	case strings.HasPrefix(v, "glpat-"):
+		kind = "gitlab-token"
+	case strings.HasPrefix(v, "npm_"):
+		kind = "npm-token"
+	case strings.HasPrefix(v, "xoxb-"), strings.HasPrefix(v, "xoxp-"), strings.HasPrefix(v, "xoxc-"), strings.HasPrefix(v, "xoxs-"):
+		kind = "slack-token"
+	case strings.HasPrefix(v, "AIza"):
+		kind = "google-api-key"
+	}
+	if !p.on(kind) {
+		return v
+	}
+	p.add(kind, 1)
+	return "[redacted:" + kind + "]"
 }
 
 func closingQuote(open, close string) string {
