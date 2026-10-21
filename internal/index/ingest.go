@@ -991,12 +991,6 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	}
 	ss = filterTombstonedSet(ss, dead)
 	ss = dropShadowedPrompts(ss, nil)
-	// A deleted copy takes its place among the copies on disk, in path order,
-	// as the passes that read it while it was there wrote it: appended after
-	// them, its turns came after the live copies' in the log, and the tables
-	// mined from the log in order (a command's run ending at the next turn)
-	// came out different.
-	sortCopies(ss)
 	for p, st := range orphans.files {
 		if !st.Kept && orphans.dated {
 			st.KeptAt = time.Now().Unix()

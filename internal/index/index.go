@@ -799,8 +799,7 @@ import (
 // 99: a build's command tables go by the file each turn is filed under, a
 // deleted copy's included, and list a session's facts in time order; a copy
 // 98: a build's command tables go by the file each turn is filed under, a
-// deleted copy's included, and list a session's facts in time order; a
-// rebuild writes a deleted copy among the live ones in path order; a copy
+// deleted copy's included, and list a session's facts in time order; a copy
 // changed beside a later one in another directory is read again with it, and
 // an append that moves a shared row mines its runs again (#5508, #5509,
 // #5510).
