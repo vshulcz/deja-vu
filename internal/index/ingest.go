@@ -1060,7 +1060,10 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	// The command table's state, from the records as they are written: the
 	// first pass after the build reads only what it changed.
 	cmdState := newCommandsState()
-	for _, s := range ss {
+	// What each session's row reads off its text, all at once: in the loop it
+	// was one core's work for most of the phase.
+	texts := sessionTexts(ss)
+	for i, s := range ss {
 		key := s.Harness + ":" + s.ID
 		ord := uint32(0)
 		own := s
@@ -1091,7 +1094,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 			collisions.Add(key)
 		}
 		if owns {
-			row := ownerRow(prev, s, ord, collided)
+			row := ownerRow(prev, s, texts[i].row(s), ord, collided)
 			if kept, ok := orphans.rows[orphanKey(key, s.Path)]; ok {
 				row.Counted, row.Words, row.LastMsg, row.Opening = kept.Counted, kept.Words, kept.LastMsg, kept.Opening
 			}
@@ -2255,8 +2258,11 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 		return err
 	}
 	defer sp.cleanup()
+	// What each session's row reads off its text, all at once: in the loop it
+	// was one core's work for most of the phase.
+	texts := sessionTexts(ss)
 	err = sp.run(func(push func(tokenJob)) error {
-		for _, s := range ss {
+		for i, s := range ss {
 			key := s.Harness + ":" + s.ID
 			ord := uint32(0)
 			own := s
@@ -2287,7 +2293,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 				collisions.Add(key)
 			}
 			if owns {
-				m.Sessions[key] = ownerRow(prev, s, ord, collided)
+				m.Sessions[key] = ownerRow(prev, s, texts[i].row(s), ord, collided)
 			} else {
 				widenSpan(m.Sessions, key, own)
 			}
@@ -2782,7 +2788,59 @@ func dropStoredRepeats(rw *recordWriter, dir string, s *model.Session, row Sessi
 	s.Messages = out
 }
 
-func metaForSession(s model.Session) SessionMeta {
+func metaForSession(s model.Session) SessionMeta { return textOf(s).row(s) }
+
+// sessionText is the part of a session's row read off its messages: the
+// derived title and every field mined from the text. It is the expensive part,
+// mostly redaction, so a build computes it for every session in parallel ahead
+// of the write loop, which then only lays the session's own fields over it.
+// title is the s.Title it was computed for: the loop can still hand a session
+// the title of an earlier row with its id.
+type sessionText struct {
+	meta  SessionMeta
+	title string
+}
+
+// row is the session's row: its own fields over what its text gave.
+func (t sessionText) row(s model.Session) SessionMeta {
+	meta := t.meta
+	if s.Title != t.title {
+		meta.Title, meta.AgentTitle = sessionRowTitle(s)
+	}
+	meta.ID, meta.Harness, meta.Project, meta.Path = s.ID, s.Harness, s.Project, s.Path
+	meta.Started, meta.Updated = s.Started, s.Updated
+	meta.Kind, meta.Parent, meta.Agent = s.Kind, s.Parent, s.Agent
+	meta.OrigID, meta.RemoteID, meta.From = s.OrigID, s.RemoteID, s.From
+	meta.Lifecycle, meta.LifecycleNote, meta.LifecycleAt = s.Lifecycle, s.LifecycleNote, s.LifecycleAt
+	return meta
+}
+
+// sessionTexts is textOf for every session, spread over the cores.
+func sessionTexts(ss []model.Session) []sessionText {
+	out := make([]sessionText, len(ss))
+	workers := min(runtime.GOMAXPROCS(0), len(ss))
+	var next atomic.Int64
+	var wg sync.WaitGroup
+	for w := 0; w < workers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				i := int(next.Add(1)) - 1
+				if i >= len(ss) {
+					return
+				}
+				out[i] = textOf(ss[i])
+			}
+		}()
+	}
+	wg.Wait()
+	return out
+}
+
+// sessionRowTitle is the title a session's row carries, and whether it is the
+// agent's words rather than the user's.
+func sessionRowTitle(s model.Session) (string, bool) {
 	title := s.Title
 	agentTitle := s.AgentTitle
 	if title == "" {
@@ -2811,6 +2869,12 @@ func metaForSession(s model.Session) SessionMeta {
 		// since they existed.
 		title = widenThinSourceTitle(s, boundSourceTitle(s.Harness, title))
 	}
+	return title, agentTitle
+}
+
+// textOf is the row fields s's messages give.
+func textOf(s model.Session) sessionText {
+	title, agentTitle := sessionRowTitle(s)
 	// The import fields travel with the session, not with the transcript: a
 	// rebuild reloads imported sessions out of the index itself, and rebuilding
 	// the row from scratch dropped what only the import knew — the note's state
@@ -2823,9 +2887,9 @@ func metaForSession(s model.Session) SessionMeta {
 	if len(s.Messages) > 0 {
 		last = messageFingerprint(s.Messages[len(s.Messages)-1])
 	}
-	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, AgentTitle: agentTitle, Started: s.Started, Updated: s.Updated, Touched: touched, TouchHits: touchHits, Counted: len(s.Messages), LastMsg: last, Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages), GaveUp: gaveUp(s.Messages), Words: sessionWords(s.Messages), NoText: !holdsText(s), Settled: sessionSettled(s), RanCommand: ranCommand(s.Messages),
+	return sessionText{title: s.Title, meta: SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, AgentTitle: agentTitle, Started: s.Started, Updated: s.Updated, Touched: touched, TouchHits: touchHits, Counted: len(s.Messages), LastMsg: last, Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages), GaveUp: gaveUp(s.Messages), Words: sessionWords(s.Messages), NoText: !holdsText(s), Settled: sessionSettled(s), RanCommand: ranCommand(s.Messages),
 		Kind: s.Kind, Parent: s.Parent, Agent: s.Agent, Opening: SessionOpening(s),
-		OrigID: s.OrigID, RemoteID: s.RemoteID, From: s.From, Lifecycle: s.Lifecycle, LifecycleNote: s.LifecycleNote, LifecycleAt: s.LifecycleAt}
+		OrigID: s.OrigID, RemoteID: s.RemoteID, From: s.From, Lifecycle: s.Lifecycle, LifecycleNote: s.LifecycleNote, LifecycleAt: s.LifecycleAt}}
 }
 
 // sessionSettled is what this session concluded, taken from its tail.
@@ -3446,14 +3510,15 @@ func widenSpan(sessions map[string]SessionMeta, key string, s model.Session) {
 }
 
 // ownerRow is the row of s, which owns it. prev is the row held before, and
-// collided says whether s collided with it. The span of the files that share
+// collided says whether s collided with it, and meta is s's own row,
+// metaForSession's. The span of the files that share
 // the id stays in the row, so reading the owner alone does not drop it
 // (#4574): prev's own span when prev was another file sharing the id, a
 // collision or a stub with nothing to index, and what prev kept when it was
 // the same file. A row s supersedes, a ZCode snapshot restored into the
 // database, gives it nothing.
-func ownerRow(prev SessionMeta, s model.Session, ord uint32, collided bool) SessionMeta {
-	meta := metaWithOrd(metaForSession(s), ord)
+func ownerRow(prev SessionMeta, s model.Session, meta SessionMeta, ord uint32, collided bool) SessionMeta {
+	meta = metaWithOrd(meta, ord)
 	switch {
 	case prev.Path == "" || prev.Path == s.Path:
 		meta.SharedStarted, meta.SharedUpdated = prev.SharedStarted, prev.SharedUpdated
@@ -5685,7 +5750,10 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		}
 	}
 	rederived := map[string]bool{}
-	for _, s := range replacements {
+	// What each session's row reads off its text, all at once: in the loop it
+	// was one core's work for most of the phase.
+	texts := sessionTexts(replacements)
+	for i, s := range replacements {
 		key := s.Harness + ":" + s.ID
 		ord := uint32(0)
 		if om, ok := old.Sessions[key]; ok {
@@ -5734,7 +5802,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 			collisions.Add(key)
 		}
 		if owns {
-			m.Sessions[key] = ownerRow(held, s, ord, collided)
+			m.Sessions[key] = ownerRow(held, s, texts[i].row(s), ord, collided)
 		} else {
 			if _, present := m.Sessions[key]; !present {
 				m.Sessions[key] = held
@@ -5776,7 +5844,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		}
 		owns, collided := claimSession(row, cp)
 		if owns {
-			next := ownerRow(row, cp, row.Ord, collided)
+			next := ownerRow(row, cp, metaForSession(cp), row.Ord, collided)
 			// What the records cannot count, as the rebuild carries it.
 			if was := old.Sessions[key]; q == keptOwner[key] {
 				next.Counted, next.Words, next.LastMsg, next.Opening = was.Counted, was.Words, was.LastMsg, was.Opening
@@ -6265,7 +6333,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 				if named {
 					prev.Started, prev.Updated = before.Started, before.Updated
 				}
-				meta = ownerRow(prev, s, prev.Ord, collided)
+				meta = ownerRow(prev, s, metaForSession(s), prev.Ord, collided)
 				if !prev.Started.IsZero() && (meta.Started.IsZero() || prev.Started.Before(meta.Started)) {
 					meta.Started = prev.Started
 				}
