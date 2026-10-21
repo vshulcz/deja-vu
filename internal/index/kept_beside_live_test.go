@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -148,5 +149,88 @@ func TestAPassWritesOffsetsInLogOrder(t *testing.T) {
 	}
 	if got := ro.byKey["claude:s5"]; !slices.Equal(got, []int64{0, 12, 40, 52}) {
 		t.Errorf("offsets = %v, want them in log order", got)
+	}
+}
+
+// `deja forget` of a session whose transcript is deleted takes the file out
+// of the kept ones as it goes, as the next pass and a rebuild do: kept, it
+// stayed in the "no longer on disk" count until a pass had something to read.
+func TestForgetDropsTheDeletedTranscriptItTakes(t *testing.T) {
+	h := newTwoWayEnv(t)
+	// Forget writes its tombstones beside the config.
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(h.tmp, "config"))
+	a := filepath.Join(h.tmp, "a.db")
+	h.put("app", "s1", richSession("app", "s1", 2, "pool"))
+	h.put("svc", "s2", richSession("svc", "s2", 3, "queue"))
+	if err := Ensure(a, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(h.path("svc", "s2")); err != nil {
+		t.Fatal(err)
+	}
+	if err := Ensure(a, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	kept := func() []string {
+		t.Helper()
+		m, err := readManifest(a)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []string
+		for p, f := range m.Files {
+			if f.Kept {
+				out = append(out, filepath.Base(filepath.Dir(p))+"/"+filepath.Base(p))
+			}
+		}
+		return out
+	}
+	if got := kept(); !slices.Equal(got, []string{"-Users-me-svc/s2.jsonl"}) {
+		t.Fatalf("control: kept files before forget = %v", got)
+	}
+	if _, err := Forget(a, ForgetOptions{Session: "s2"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := kept(); len(got) != 0 {
+		t.Errorf("kept files after forget = %v, want none", got)
+	}
+}
+
+// A line the live copy repeats, whose first copy is filed under the deleted
+// transcript the rewrite and move left behind: the pass took the repeat for a
+// new turn, a rebuild of the file counts it once. A line the live copy takes
+// up for the first time, twice in one append, still counts once, and so does
+// a line with a secret in it, which the records hold redacted.
+func TestARepeatedLineOfAKeptCopysTurnCountsOnce(t *testing.T) {
+	for _, tc := range []struct {
+		name, text    string
+		heldByRewrite bool
+		appendTimes   int
+	}{
+		{"held before", "The queue needs a fix.", true, 1},
+		{"new to the file, twice in one append", "The queue needs a fix.", false, 2},
+		{"redacted", "The queue needs GITHUB_TOKEN=ghp_16C7e42F292c6912E7710c838347Ae178B4a", true, 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newTwoWayEnv(t)
+			said := hSay("svc", "s1", 2, 2, tc.text)
+			rewrite := hPrompt("svc", "s1", 3, 0, "again: why does the ledger fail") + hSay("svc", "s1", 3, 1, "The ledger needs a fix.")
+			if tc.heldByRewrite {
+				rewrite = hPrompt("svc", "s1", 3, 0, "again: why does the ledger fail") + said + hSay("svc", "s1", 3, 1, "The ledger needs a fix.")
+			}
+			h.threeWays(tc.name, func() {
+				h.put("svc", "s1", hPrompt("svc", "s1", 2, 0, "why does the pool fail")+said)
+			}, func() {
+				h.put("svc", "s1", rewrite)
+				if err := os.MkdirAll(filepath.Dir(h.path("infra", "s1")), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Rename(h.path("svc", "s1"), h.path("infra", "s1")); err != nil {
+					t.Fatal(err)
+				}
+			}, func() {
+				h.add("infra", "s1", strings.Repeat(said, tc.appendTimes)+hSay("infra", "s1", 3, 3, "The outbox needs a fix."))
+			})
+		})
 	}
 }
