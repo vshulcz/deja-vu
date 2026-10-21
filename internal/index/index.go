@@ -791,7 +791,10 @@ import (
 // (#5492).
 // 97: fixes are mined from what the record log holds, as the command tables
 // are: of two transcripts sharing an id only the copy the row names (#5504).
-const version = 97
+// 98: a rebuild writes a kept transcript and the copy on disk of the same
+// session in the order the log held them, and takes a session's facts from
+// its commands in time order (#5519).
+const version = 98
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

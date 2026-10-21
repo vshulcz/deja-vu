@@ -63,7 +63,17 @@ func sessionFactsPath(dir string) string { return filepath.Join(dir, sessionFact
 func buildSessionFacts(tmp string, ss []model.Session) {
 	out := make(map[string]SessionFact, len(ss))
 	for _, s := range ss {
-		if f, ok := sessionFactOf(s.Messages); ok {
+		// In time order, as a pass reads them from the records: the copies of
+		// a session that kept a file are joined in log order, and a kept file
+		// can hold turns older than the one on disk.
+		var cmds []model.Message
+		for _, m := range s.Messages {
+			if m.Role == roleCommand {
+				cmds = append(cmds, m)
+			}
+		}
+		sort.SliceStable(cmds, func(i, j int) bool { return cmds[i].Time.Before(cmds[j].Time) })
+		if f, ok := sessionFactOf(cmds); ok {
 			out[s.Harness+":"+s.ID] = f
 		}
 		if len(out) >= sessionFactsMax {

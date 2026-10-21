@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/fs"
 	"maps"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -1059,50 +1060,56 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	// The command table's state, from the records as they are written: the
 	// first pass after the build reads only what it changed.
 	cmdState := newCommandsState()
+	for _, s := range ss {
+		key := s.Harness + ":" + s.ID
+		ord := uint32(0)
+		own := s
+		if old, ok := m.Sessions[key]; ok {
+			ord = old.Ord
+			if s.Started.IsZero() || (!old.Started.IsZero() && old.Started.Before(s.Started)) {
+				s.Started = old.Started
+			}
+			if old.Updated.After(s.Updated) {
+				s.Updated = old.Updated
+			}
+			if s.Project == "history" && old.Project != "" && old.Project != "history" {
+				s.Project = old.Project
+			}
+			if s.Title == "" {
+				s.Title = old.Title
+			}
+		}
+		if ord == 0 {
+			ord = nextSessionOrd(m.Sessions)
+		}
+		prev := m.Sessions[key]
+		owns, collided := claimSession(prev, s)
+		if !holdsText(s) {
+			emptied.Add(1)
+		}
+		if collided {
+			collisions.Add(key)
+		}
+		if owns {
+			row := ownerRow(prev, s, ord, collided)
+			if kept, ok := orphans.rows[orphanKey(key, s.Path)]; ok {
+				row.Counted, row.Words, row.LastMsg, row.Opening = kept.Counted, kept.Words, kept.LastMsg, kept.Opening
+			}
+			m.Sessions[key] = row
+		} else {
+			widenSpan(m.Sessions, key, own)
+		}
+		if collided {
+			markShared(m.Sessions, key)
+		}
+		recordCopy(m.Sessions, key, prev, s)
+	}
+	// The rows above take the files in the order the sources hand them; the
+	// records, and what is mined from them, keep the order the log had.
+	keepCopyOrder(ss, orphans)
 	err = sp.run(func(push func(tokenJob)) error {
 		for _, s := range ss {
 			key := s.Harness + ":" + s.ID
-			ord := uint32(0)
-			own := s
-			if old, ok := m.Sessions[key]; ok {
-				ord = old.Ord
-				if s.Started.IsZero() || (!old.Started.IsZero() && old.Started.Before(s.Started)) {
-					s.Started = old.Started
-				}
-				if old.Updated.After(s.Updated) {
-					s.Updated = old.Updated
-				}
-				if s.Project == "history" && old.Project != "" && old.Project != "history" {
-					s.Project = old.Project
-				}
-				if s.Title == "" {
-					s.Title = old.Title
-				}
-			}
-			if ord == 0 {
-				ord = nextSessionOrd(m.Sessions)
-			}
-			prev := m.Sessions[key]
-			owns, collided := claimSession(prev, s)
-			if !holdsText(s) {
-				emptied.Add(1)
-			}
-			if collided {
-				collisions.Add(key)
-			}
-			if owns {
-				row := ownerRow(prev, s, ord, collided)
-				if kept, ok := orphans.rows[orphanKey(key, s.Path)]; ok {
-					row.Counted, row.Words, row.LastMsg, row.Opening = kept.Counted, kept.Words, kept.LastMsg, kept.Opening
-				}
-				m.Sessions[key] = row
-			} else {
-				widenSpan(m.Sessions, key, own)
-			}
-			if collided {
-				markShared(m.Sessions, key)
-			}
-			recordCopy(m.Sessions, key, prev, s)
 			_, isKept := orphans.files[s.Path]
 			for _, msg := range s.Messages {
 				if seenMsgs.dup(key, msg.Role, msg.Time, msg.Text) {
@@ -1428,6 +1435,9 @@ type orphanState struct {
 	// copies, so a rewrite of the file holding their turns leaves them here.
 	bare      map[string][]string
 	bareFiles map[string]FileState
+	// first is where each file of a session first shows in the old log, by
+	// key and path: the order its copies are written in again.
+	first map[string]map[string]int
 }
 
 // orphanedSessions preserves sessions the client's own housekeeping deleted.
@@ -1498,7 +1508,24 @@ func orphanedSessions(dir, harness string, files map[string]FileState) orphanSta
 	by := map[string]*model.Session{}
 	seen := map[string]bool{}
 	spans := map[string]bool{}
+	// Only the sessions of a kept file can be ordered by it.
+	out.first = map[string]map[string]int{}
+	for key, meta := range m.Sessions {
+		for _, p := range sessionFiles(meta) {
+			if want[p] {
+				out.first[key] = map[string]int{}
+				break
+			}
+		}
+	}
+	n := 0
 	_ = eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
+		n++
+		if seenAt, ok := out.first[r.Key]; ok {
+			if _, ok := seenAt[r.SourcePath]; !ok {
+				seenAt[r.SourcePath] = n
+			}
+		}
 		if !want[r.SourcePath] {
 			return
 		}
@@ -1560,6 +1587,51 @@ func orphanedSessions(dir, harness string, files map[string]FileState) orphanSta
 		out.unreadable++
 	}
 	return out
+}
+
+// keepCopyOrder puts the copies of a session that has a kept file in the
+// order the old log held them, for the records and what is mined from them.
+// A transcript rewritten and moved in one pass is no rename: the pass keeps
+// the old file's records where they were and appends the new file's, while
+// the rebuild wrote every file on disk before the kept ones, so the session
+// read back in another order and its facts, fixes and friction texts differed
+// from the pass's. A file the log never held goes last, as a pass appends it.
+func keepCopyOrder(ss []model.Session, orphans orphanState) {
+	if len(orphans.files) == 0 {
+		return
+	}
+	kept := map[string]bool{}
+	for _, s := range ss {
+		if _, ok := orphans.files[s.Path]; ok {
+			kept[s.Harness+":"+s.ID] = true
+		}
+	}
+	slots := map[string][]int{}
+	for i, s := range ss {
+		if key := s.Harness + ":" + s.ID; kept[key] {
+			slots[key] = append(slots[key], i)
+		}
+	}
+	for key, at := range slots {
+		if len(at) < 2 {
+			continue
+		}
+		first := orphans.first[key]
+		pos := func(s model.Session) int {
+			if n, ok := first[s.Path]; ok {
+				return n
+			}
+			return math.MaxInt
+		}
+		group := make([]model.Session, len(at))
+		for j, i := range at {
+			group[j] = ss[i]
+		}
+		sort.SliceStable(group, func(a, b int) bool { return pos(group[a]) < pos(group[b]) })
+		for j, i := range at {
+			ss[i] = group[j]
+		}
+	}
 }
 
 // orphanKey names a kept file's session: its row's key and the file.
