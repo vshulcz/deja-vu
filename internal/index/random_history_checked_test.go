@@ -35,6 +35,10 @@ func TestRandomCheckedHistoriesMatchARebuild(t *testing.T) {
 func runCheckedHistory(t *testing.T, seed int64) {
 	h := newTwoWayEnv(t)
 	r := &historyRun{t: t, h: h, rng: rand.New(rand.NewSource(seed)), index: filepath.Join(h.tmp, "a.db"), walls: seed%3 == 0}
+	// The fixed seeds replay #5503's histories as they were found.
+	if seed != 2123 && seed != 5016 {
+		r.shapes = rand.New(rand.NewSource(-seed))
+	}
 	r.openStores()
 	// The sweep that found the seeds above made a copy of a session on one
 	// step in eight; the draw stays so they replay the same histories.
