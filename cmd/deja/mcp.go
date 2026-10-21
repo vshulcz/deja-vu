@@ -386,7 +386,7 @@ func dejaTool() map[string]any {
 				"q":       map[string]any{"type": "string", "description": "What to ask about: the question or exact token; for blame a path, for fix the failing output verbatim, for remember the fact."},
 				"harness": map[string]any{"type": "string", "description": harnessFilterDescription()},
 				"project": map[string]any{"type": "string", "description": "Optional project filter; for remember, where it is filed."},
-				"limit":   map[string]any{"type": "number", "description": "Max results."},
+				"limit":   map[string]any{"type": "number", "description": "Max sessions per ~4 KB page."},
 			},
 			"required": []string{"mode"},
 		},
@@ -1512,7 +1512,7 @@ func wholeSessionForMCP(dir string, s model.Session) (model.Session, bool, error
 // the query, and a constant that fitted a short one stopped covering an error
 // string pasted in whole — which is exactly what the tool description asks
 // agents to send.
-const recallCountLineReserve = 64
+const recallCountLineReserve = 80
 
 // recallHeaderReserve is that plus the count line this answer will actually
 // print.
@@ -1726,7 +1726,7 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 		}
 	}
 	var b strings.Builder
-	served := 0
+	served, pageFull := 0, false
 	// One answer for both lines: the lead and the count used to be able to
 	// disagree, and a page that says "the first one names what you asked"
 	// above "none about it" is worse than either alone (#2827).
@@ -1974,6 +1974,7 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 		}
 		served++
 		if headerRoom+hb.Len() >= budget {
+			pageFull = true
 			break
 		}
 	}
@@ -1996,7 +1997,14 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 			// more of the nearest wording.
 			what = "ranked by wording"
 		}
-		more = fmt.Sprintf("\n%s more %s — call recall again with offset=%d.\n", aboutCount(left, about), what, offset+served)
+		// A page cut by its size, not by limit: say so, or a caller that
+		// asked for 20 and got 3 cannot tell a bigger limit will not help
+		// (#5511).
+		page := ""
+		if pageFull {
+			page = " (page full)"
+		}
+		more = fmt.Sprintf("\n%s more %s%s — call recall again with offset=%d.\n", aboutCount(left, about), what, page, offset+served)
 	}
 	// The move the paging line cannot offer. A hit quotes at most three of its
 	// matches, so a session that matched hundreds of times arrives as a

@@ -68,16 +68,16 @@ func TestTheConclusionsBlockSurvivesEveryBudgetItWasMeasuredAt(t *testing.T) {
 
 // Below those budgets the block is withheld, and that is the branch the comment
 // says is the only thing the sign changes. Pinned so the boundary is a fact
-// rather than folklore: at 1200 the page still carries the outcome, at 600 it
+// rather than folklore: at 1250 the page still carries the outcome, at 600 it
 // is excerpts only.
 func TestTheConclusionsBlockIsWithheldOnASmallPage(t *testing.T) {
 	dir := seedConclusionCorpus(t)
-	withBlock, _, _, _, err := recallTextResult(dir, "flimsyshard retry cap", "", 0, 0, 1200)
+	withBlock, _, _, _, err := recallTextResult(dir, "flimsyshard retry cap", "", 0, 0, 1250)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(withBlock, "decided to cap") {
-		t.Errorf("a 1200-byte page no longer carries the outcome:\n%s", withBlock)
+		t.Errorf("a 1250-byte page no longer carries the outcome:\n%s", withBlock)
 	}
 	small, _, _, _, err := recallTextResult(dir, "flimsyshard retry cap", "", 0, 0, 600)
 	if err != nil {
