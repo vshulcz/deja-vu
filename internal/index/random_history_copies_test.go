@@ -14,11 +14,25 @@ import (
 // pass left them in the log, which a rebuild does not (#5504).
 func TestRandomHistoriesWithSharedCopiesMatchARebuild(t *testing.T) {
 	for _, seed := range historySeeds() {
-		t.Run(fmt.Sprint(seed), func(t *testing.T) { runCopiesHistory(t, seed) })
+		t.Run(fmt.Sprint(seed), func(t *testing.T) { runCopiesHistory(t, seed, false) })
 	}
 }
 
-func runCopiesHistory(t *testing.T, seed int64) {
+// The same with each copy written on its session's own day, so a copy can
+// hold a turn its session holds, identical to the second. Which copy such a
+// turn is filed under, and in what order a deleted copy's turns sit among
+// the live ones', moved the command tables (#5509, #5508).
+func TestRandomHistoriesWithSameDayCopiesMatchARebuild(t *testing.T) {
+	seeds := []int64{15, 18, 19, 24}
+	if *historySeed != 0 {
+		seeds = []int64{*historySeed}
+	}
+	for _, seed := range seeds {
+		t.Run(fmt.Sprint(seed), func(t *testing.T) { runCopiesHistory(t, seed, true) })
+	}
+}
+
+func runCopiesHistory(t *testing.T, seed int64, sameDay bool) {
 	h := newTwoWayEnv(t)
 	r := &historyRun{t: t, h: h, rng: rand.New(rand.NewSource(seed)), index: filepath.Join(h.tmp, "a.db"), walls: true}
 	r.openStores()
@@ -57,7 +71,10 @@ func runCopiesHistory(t *testing.T, seed int64) {
 		}
 		// Days after any the sessions reach, so no turn of a copy is one its
 		// session holds: which copy a shared turn is filed under is #5492's.
-		c := &historySession{project: proj, sid: s.sid, day: 25 + r.rng.Intn(3)}
+		c := &historySession{project: proj, sid: s.sid, day: s.day}
+		if !sameDay {
+			c.day = 25 + r.rng.Intn(3)
+		}
 		h.put(proj, s.sid, hPrompt(proj, s.sid, s.day, 0, "copy: "+r.words(5))+r.turns(c))
 		copies = append(copies, c)
 		r.log = append(r.log, "copy of "+s.sid+" in "+proj)
