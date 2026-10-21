@@ -72,3 +72,10 @@ func TestASQLiteReadUnderTheBudgetAnswersWithoutProgressLines(t *testing.T) {
 		t.Errorf("the read does not ask for progress: %q", cmd.Args)
 	}
 }
+
+func clip(s string) string {
+	if len(s) > 120 {
+		return s[:60] + "…" + s[len(s)-60:]
+	}
+	return s
+}

@@ -69,7 +69,7 @@ func sqliteOutput(db string, tail ...string) ([]byte, error) {
 
 // stdout is the child's output with the progress lines taken out.
 func (r *sqliteRead) stdout() (io.Reader, error) {
-	pipe, err := r.Cmd.StdoutPipe()
+	pipe, err := r.StdoutPipe()
 	if err != nil {
 		return nil, err
 	}
