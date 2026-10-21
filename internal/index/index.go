@@ -781,7 +781,11 @@ import (
 // renamed copy or one that moved to another id gives the row back to the
 // smallest path, and a file holding only the last turn is not a move
 // (#5441, #5442, #5443, #5444, #5445).
-const version = 94
+// 95: the command tables count what the record log holds: a turn two copies
+// of a session share once, and of two transcripts sharing an id only the copy
+// the row names, and a pass takes the words it removes out of the neighbour
+// map (#5489, #5490, #5491).
+const version = 95
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

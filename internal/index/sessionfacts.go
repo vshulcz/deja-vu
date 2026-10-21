@@ -83,6 +83,9 @@ func buildSessionFacts(tmp string, ss []model.Session) {
 func buildSessionFactsFromIndex(tmp string) {
 	byKey := map[string][]model.Message{}
 	if err := EachRecordOfRole(tmp, roleCommand, func(meta SessionMeta, r Record) {
+		if foreignPath(r.SourcePath, meta) {
+			return
+		}
 		byKey[r.Key] = append(byKey[r.Key], model.Message{Role: roleCommand, Text: r.Text, Time: r.Time})
 	}); err != nil {
 		return

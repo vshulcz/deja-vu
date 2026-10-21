@@ -13,7 +13,8 @@ import (
 // lives next to "jwks" and "rotation". A compact neighbor map built at full
 // rebuild lets a zero-result query swap one token for a proven neighbor —
 // personal, deterministic, no models. The map regenerates on every full
-// rebuild and is intentionally left stale by incremental appends.
+// rebuild. A pass adds nothing to it, and takes out of it the words it took out
+// of the index (see dropCooccurWords).
 
 const (
 	cooccurFile        = "cooccur.gob"
@@ -184,6 +185,99 @@ func buildCooccur(tmp string, ss []model.Session) {
 		return
 	}
 	_ = writeGob(cooccurPath(tmp), neighbors)
+}
+
+// dropCooccurWords takes every word drop names out of dir's neighbour map,
+// as a word and as a neighbour, and a word left with no neighbours with it.
+//
+// Text taken out of a transcript leaves the index on the pass that replaced
+// it (#5429), and the map held its words until the next full build. The map is
+// read only when a pass has words to drop: it is bounded by the vocabulary of
+// at most cooccurMaxSessions sessions, 0.9 MB and 4 ms to read on a 214 MB
+// store, and a pass that kills nothing never opens it.
+func dropCooccurWords(dir string, drop func(word string) bool) error {
+	m := readCooccur(dir)
+	if m == nil {
+		return nil
+	}
+	return writeCooccurWithout(dir, m, drop)
+}
+
+// writeCooccurWithout writes m, dir's neighbour map, into dir without the
+// words drop names, if there are any.
+func writeCooccurWithout(dir string, m map[string][]string, drop func(word string) bool) error {
+	changed := false
+	for tok, ns := range m {
+		if drop(tok) {
+			delete(m, tok)
+			changed = true
+			continue
+		}
+		kept := ns[:0]
+		for _, n := range ns {
+			if drop(n) {
+				changed = true
+				continue
+			}
+			kept = append(kept, n)
+		}
+		if len(kept) == 0 {
+			delete(m, tok)
+			continue
+		}
+		m[tok] = kept
+	}
+	if !changed {
+		return nil
+	}
+	// An empty map rather than no file, which a reader holding it open on
+	// Windows would refuse to let go; a read of either finds no neighbours.
+	return writeGobAtomic(cooccurPath(dir), m)
+}
+
+// cooccurVocabulary is every word of m, as a word or a neighbour; nil unless
+// want.
+func cooccurVocabulary(m map[string][]string, want bool) map[string]bool {
+	if !want || m == nil {
+		return nil
+	}
+	out := make(map[string]bool, 2*len(m))
+	for tok, ns := range m {
+		out[tok] = true
+		for _, n := range ns {
+			out[n] = true
+		}
+	}
+	return out
+}
+
+// cooccurUnindexed is the words of dir's neighbour map that have no postings
+// in words, the postings of an index written anew. Each was taken out of the
+// index or was only ever in a part of a record the postings do not hold, a
+// file's body or a long output's middle, which no posting can confirm another
+// session still holds. nil when there is no map.
+func cooccurUnindexed(dir string, words bucketPostings) map[string]bool {
+	m := readCooccur(dir)
+	if m == nil {
+		return nil
+	}
+	out := map[string]bool{}
+	held := func(w string) bool {
+		k := "t" + w
+		_, ok := words[bucket(k)][k]
+		return ok
+	}
+	for tok, ns := range m {
+		if !held(tok) {
+			out[tok] = true
+		}
+		for _, n := range ns {
+			if !held(n) {
+				out[n] = true
+			}
+		}
+	}
+	return out
 }
 
 func readCooccur(dir string) map[string][]string {

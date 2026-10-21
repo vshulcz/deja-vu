@@ -235,9 +235,37 @@ func scrubAfterSwap(dir string, offs []int64) {
 // which has it in hand: reading it back cost a decode of every session row.
 func scrubSwapped(dir string, m Manifest, offs []int64) {
 	log := filepath.Join(dir, "records.bin")
-	words, err := deadWords(log, tablesFromStrings(m.RecordStrings), offs)
-	if err != nil || blankDeadWords(dir, words, m.DeadRecords) != nil {
+	neighbours := readCooccur(dir)
+	words, unindexed, err := deadWords(log, tablesFromStrings(m.RecordStrings), offs, neighbours != nil)
+	if err != nil {
 		return
+	}
+	// The neighbour map takes its words from the whole text of a record, and
+	// the postings from part of it. A map word the dead records held only
+	// where the postings do not look is asked of the postings too: one no
+	// live record has a posting for goes, as nothing can say another session
+	// still holds it, and one with a posting stays.
+	vocab := cooccurVocabulary(neighbours, len(unindexed) > 0)
+	for w := range unindexed {
+		if !vocab[w] {
+			continue
+		}
+		k := "t" + w
+		if words[bucket(k)] == nil {
+			words[bucket(k)] = map[string][]posting{}
+		}
+		if _, ok := words[bucket(k)][k]; !ok {
+			words[bucket(k)][k] = nil
+		}
+	}
+	gone, err := blankDeadWords(dir, words, m.DeadRecords)
+	if err != nil {
+		return
+	}
+	// Best effort: a map a reader holds open on Windows is not a reason to
+	// leave the records unzeroed.
+	if neighbours != nil {
+		_ = writeCooccurWithout(dir, neighbours, func(w string) bool { return gone["t"+w] })
 	}
 	size, before, err := scrubMarked(dir)
 	if err != nil {
@@ -285,14 +313,17 @@ func scrubMarked(dir string) (int64, [sha256.Size]byte, error) {
 
 // deadWords is the words the records at offs in the log at path were filed
 // under, by bucket, for those not yet overwritten. Only the words count: the
-// postings files are asked whether anything live still holds them.
+// postings files are asked whether anything live still holds them. With
+// unindexed it also gives the neighbour map's words of the part of each
+// record the postings leave out (see tokenizedPart).
 //
 // On as many cores as there are, in runs of the log: a pass that rewrote a
 // fifth of a 40,000-session store tokenized 200,000 dead records here on one,
 // 17 s of a pass the rewrite it replaced did in 63.
-func deadWords(path string, t *recordTables, offs []int64) (bucketPostings, error) {
+func deadWords(path string, t *recordTables, offs []int64, unindexed bool) (bucketPostings, map[string]bool, error) {
 	workers := max(1, min(runtime.NumCPU(), (len(offs)+1023)/1024))
 	parts := make([]bucketPostings, workers)
+	rests := make([]map[string]bool, workers)
 	errs := make([]error, workers)
 	var wg sync.WaitGroup
 	for w := range workers {
@@ -300,15 +331,15 @@ func deadWords(path string, t *recordTables, offs []int64) (bucketPostings, erro
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			parts[w], errs[w] = deadWordsOf(path, t, offs[lo:hi])
+			parts[w], rests[w], errs[w] = deadWordsOf(path, t, offs[lo:hi], unindexed)
 		}()
 	}
 	wg.Wait()
 	if err := errors.Join(errs...); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	words := parts[0]
-	for _, part := range parts[1:] {
+	words, rest := parts[0], rests[0]
+	for i, part := range parts[1:] {
 		for b, toks := range part {
 			if words[b] == nil {
 				words[b] = toks
@@ -318,33 +349,37 @@ func deadWords(path string, t *recordTables, offs []int64) (bucketPostings, erro
 				words[b][tok] = nil
 			}
 		}
+		for w := range rests[i+1] {
+			rest[w] = true
+		}
 	}
-	return words, nil
+	return words, rest, nil
 }
 
-func deadWordsOf(path string, t *recordTables, offs []int64) (bucketPostings, error) {
+func deadWordsOf(path string, t *recordTables, offs []int64, unindexed bool) (bucketPostings, map[string]bool, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer func() { _ = f.Close() }()
 	words := bucketPostings{}
+	unposted := map[string]bool{}
 	var hdr [4]byte
 	var b []byte
 	for _, off := range offs {
 		if _, err := f.ReadAt(hdr[:], off); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		n := binary.LittleEndian.Uint32(hdr[:])
 		if n > maxRecordSize {
-			return nil, fmt.Errorf("%w: record length %d exceeds cap", errCorruptIndex, n)
+			return nil, nil, fmt.Errorf("%w: record length %d exceeds cap", errCorruptIndex, n)
 		}
 		if cap(b) < int(n) {
 			b = make([]byte, n)
 		}
 		b = b[:n]
 		if _, err := f.ReadAt(b, off+4); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if _, _, _, rest, ok := recordPrefix(b); !ok || !slices.ContainsFunc(rest, func(c byte) bool { return c != 0 }) {
 			continue
@@ -353,15 +388,21 @@ func deadWordsOf(path string, t *recordTables, offs []int64) (bucketPostings, er
 		if err != nil {
 			continue
 		}
-		eachIndexKey(tokenizedPart(r.Role, r.Text), r.Time, func(tok string) {
+		part := tokenizedPart(r.Role, r.Text)
+		eachIndexKey(part, r.Time, func(tok string) {
 			bk := bucket(tok)
 			if words[bk] == nil {
 				words[bk] = map[string][]posting{}
 			}
 			words[bk][tok] = nil
 		})
+		if unindexed && len(part) != len(r.Text) {
+			for _, tok := range tokens(r.Text) {
+				unposted[tok] = true
+			}
+		}
 	}
-	return words, nil
+	return words, unposted, nil
 }
 
 // logStampedFiles are the sidecars that carry the record log's fingerprint.

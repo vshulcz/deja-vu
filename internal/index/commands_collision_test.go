@@ -66,8 +66,7 @@ func indexFilesHolding(t *testing.T, dir, word string) []string {
 		if err != nil {
 			return err
 		}
-		// The neighbour map is rebuilt by full builds alone, collision or not.
-		if bytes.Contains(b, []byte(word)) && d.Name() != cooccurFile {
+		if bytes.Contains(b, []byte(word)) {
 			rel, _ := filepath.Rel(dir, p)
 			out = append(out, rel)
 		}

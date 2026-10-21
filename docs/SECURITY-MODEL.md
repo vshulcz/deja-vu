@@ -61,7 +61,10 @@ location. The directory contains:
 Text taken out of a transcript leaves `records.bin` and `buckets/` on the next
 `deja index` pass that reads it, and a command taken out leaves the command
 tables (`commands.gob`, `commandfails.gob`, `sessionfacts.gob`) on the same
-pass. The pass zeroes the replaced records in
+pass. A word no remaining record holds also leaves the co-occurrence map
+(`cooccur.gob`) on that pass, and so does one the removed text held only in a
+file body or the middle of a long output, which the postings never index, even
+when another session still has it there. The pass zeroes the replaced records in
 `records.bin` where they stand, and in `buckets/` blanks every word that no
 remaining record holds: a word filed under two leading letters keeps those,
 which the bucket file is named after, and one filed under a hash, as every

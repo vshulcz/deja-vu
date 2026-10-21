@@ -347,8 +347,9 @@ const maxPostingBytes = binary.MaxVarintLen64 + binary.MaxVarintLen32 + 1
 // word of zeros. A block too long to
 // be dead records' alone is a live word, known without decoding it. Rewriting
 // the file without the word instead cost a whole bucket per word, and the
-// buckets of a text index are its first letter (#5429).
-func blankDeadWords(dir string, words bucketPostings, dead []int64) error {
+// buckets of a text index are its first letter (#5429). It returns the words
+// it blanked.
+func blankDeadWords(dir string, words bucketPostings, dead []int64) (map[string]bool, error) {
 	names := make([]string, 0, len(words))
 	for b := range words {
 		names = append(names, b)
@@ -360,6 +361,7 @@ func blankDeadWords(dir string, words bucketPostings, dead []int64) error {
 		wg     sync.WaitGroup
 		mu     sync.Mutex
 		failed error
+		gone   = map[string]bool{}
 	)
 	work := make(chan string)
 	for range min(runtime.NumCPU(), 8, len(names)) {
@@ -367,11 +369,13 @@ func blankDeadWords(dir string, words bucketPostings, dead []int64) error {
 		go func() {
 			defer wg.Done()
 			for b := range work {
-				if err := blankDeadBucketWords(filepath.Join(dir, "buckets", b+".bin"), words[b], dead); err != nil {
-					mu.Lock()
-					failed = cmp.Or(failed, err)
-					mu.Unlock()
+				blanked, err := blankDeadBucketWords(filepath.Join(dir, "buckets", b+".bin"), words[b], dead)
+				mu.Lock()
+				failed = cmp.Or(failed, err)
+				for w := range blanked {
+					gone[w] = true
 				}
+				mu.Unlock()
 			}
 		}()
 	}
@@ -380,12 +384,12 @@ func blankDeadWords(dir string, words bucketPostings, dead []int64) error {
 	}
 	close(work)
 	wg.Wait()
-	return failed
+	return gone, failed
 }
 
 // blankDeadBucketWords is blankDeadWords for the bucket at base and its
 // overlays.
-func blankDeadBucketWords(base string, toks map[string][]posting, dead []int64) error {
+func blankDeadBucketWords(base string, toks map[string][]posting, dead []int64) (map[string]bool, error) {
 	files := append([]string{base}, bucketLayers(base)...)
 	live := map[string]bool{}
 	// Newest first: the pass that killed these records wrote the session's
@@ -393,7 +397,7 @@ func blankDeadBucketWords(base string, toks map[string][]posting, dead []int64) 
 	// file is not looked up in the bucket.
 	for _, p := range slices.Backward(files) {
 		if err := markLiveWords(p, toks, dead, live); err != nil && !os.IsNotExist(err) {
-			return err
+			return nil, err
 		}
 	}
 	gone := map[string]bool{}
@@ -403,14 +407,14 @@ func blankDeadBucketWords(base string, toks map[string][]posting, dead []int64) 
 		}
 	}
 	if len(gone) == 0 {
-		return nil
+		return nil, nil
 	}
 	for _, p := range files {
 		if err := blankWords(p, gone); err != nil && !os.IsNotExist(err) {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return gone, nil
 }
 
 // liveProbeBytes is how much of a word's postings is read first when asking

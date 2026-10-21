@@ -250,7 +250,10 @@ func buildCommandTables(dir, tmp string, m Manifest, priorDead int, redo map[str
 		}
 		commandRecordsMined.Add(1)
 		st.add(r.Key, pid, r.Text, r.Time, off)
-		msgs[r.Key] = append(msgs[r.Key], model.Message{Role: roleCommand, Text: r.Text, Time: r.Time})
+		// The facts are the row's copy's, as the table is (see commandSessions).
+		if !foreignPath(r.SourcePath, m.Sessions[r.Key]) {
+			msgs[r.Key] = append(msgs[r.Key], model.Message{Role: roleCommand, Text: r.Text, Time: r.Time})
+		}
 		return nil
 	}
 	if st != nil {

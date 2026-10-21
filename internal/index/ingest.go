@@ -953,12 +953,13 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 		// other. Profiled on a real store, they were 9.4 s (fixes) and 6.0 s
 		// (co-occurrence) of a 51 s build, with the whole machine idle beside them.
 		var sidecars sync.WaitGroup
+		cmds := commandSessions(ss, m)
 		for _, build := range []func(){
 			func() { buildCooccur(tmp, ss) },
 			func() { buildFixes(tmp, ss, func(s model.Session) string { return s.Harness + ":" + s.ID }) },
-			func() { buildCommands(tmp, ss) },
-			func() { buildCommandFails(tmp, m.Generation, ss) },
-			func() { buildSessionFacts(tmp, ss) },
+			func() { buildCommands(tmp, cmds) },
+			func() { buildCommandFails(tmp, m.Generation, cmds) },
+			func() { buildSessionFacts(tmp, cmds) },
 		} {
 			sidecars.Add(1)
 			go func() {
@@ -2052,12 +2053,13 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 		reportAdvance(1)
 		buildFixes(tmp, ss, func(s model.Session) string { return s.Harness + ":" + s.ID })
 		reportAdvance(1)
-		buildCommands(tmp, ss)
+		cmds := commandSessions(ss, m)
+		buildCommands(tmp, cmds)
 		reportAdvance(1)
 		// No state: ss may hold text the records were redacted from.
-		buildCommandFails(tmp, "", ss)
+		buildCommandFails(tmp, "", cmds)
 		reportAdvance(1)
-		buildSessionFacts(tmp, ss)
+		buildSessionFacts(tmp, cmds)
 		reportAdvance(1)
 	}
 	reportPhase("writing index", sp.bucketCount())
@@ -5418,6 +5420,10 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	if err := rw.Close(); err != nil {
 		return err
 	}
+	// The neighbour map's words an index written anew has no postings for,
+	// which the carried map loses (see cooccurUnindexed). Appending, the scrub
+	// after the swap takes them out instead.
+	var unposted map[string]bool
 	if appending {
 		// The kept records' postings are the old ones, linked in; this pass's
 		// go into overlays, and the dead records' are dropped on read.
@@ -5434,6 +5440,9 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		mergePostings(moved, buckets)
 		if err := writeBucketsConcurrent(filepath.Join(tmp, "buckets"), moved); err != nil {
 			return err
+		}
+		if !m.SearchOnly {
+			unposted = cooccurUnindexed(dir, moved)
 		}
 	}
 	settleCopies(&m, old.Sessions, changed, replacements)
@@ -5456,6 +5465,9 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		return swap(m)
 	}
 	carrySidecars(dir, tmp)
+	if len(unposted) > 0 {
+		_ = dropCooccurWords(tmp, func(w string) bool { return unposted[w] })
+	}
 	// After carrying, not instead of it: the fixes merge writes only when it
 	// has something to say, and the carried file is what a quiet update leaves.
 	// The command table is recomputed from the sessions this pass changed and

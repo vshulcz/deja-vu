@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A word taken out of every transcript leaves `cooccur.gob` on the pass that
+  replaced it, not at the next full build (#5489).
+- The command tables of a session two transcripts share count the copy the
+  row names, in a pass and a full build alike, and a migrated goose session
+  counts each run once (#5490, #5491).
+
 ## [0.23.0] - 2026-10-21
 
 Big stores are cheap to keep up to date. A pass that replaces a few sessions

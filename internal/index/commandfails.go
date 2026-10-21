@@ -297,22 +297,19 @@ func (a *commandFailAcc) table(project func(key string) (string, bool)) []Comman
 // With a generation it also leaves the walk's state for the log in tmp, so the
 // first update after the build starts from it. Without one the first replacing
 // pass walked the whole log again: 15 of 21 s for 20 sessions of a 40,000
-// session store (#5465). ss must already be redacted as the records are.
+// session store (#5465). ss is what the record log holds (see
+// commandSessions): the walk an update starts from reads the log, so the
+// state has to agree with it.
 func buildCommandFails(tmp, generation string, ss []model.Session) {
 	acc := newCommandFailAcc()
 	projects := map[string]string{}
-	// What the record log holds, as the build writes it: a turn another file
-	// of the session already gave is written once, and a blank one not at all.
-	// The walk an update starts from reads the log, so the state has to agree
-	// with it.
-	seen := msgSeen{}
 	for _, s := range ss {
 		key := s.Harness + ":" + s.ID
 		if _, ok := projects[key]; !ok {
 			projects[key] = s.Project
 		}
 		for _, m := range s.Messages {
-			if seen.dup(key, m.Role, m.Time, m.Text) || strings.TrimSpace(m.Text) == "" {
+			if strings.TrimSpace(m.Text) == "" {
 				continue
 			}
 			switch m.Role {
@@ -471,6 +468,9 @@ func commandFailsFromIndex(dir string, prior *commandFailState, redo map[string]
 			if want := heldKeys(redo, m); len(want) > 0 {
 				err = eachRecordForKeysInRoles(path, tablesFromManifest(m), want, nil, func(r Record) {
 					atomic.AddInt64(&commandFailRecordsSeen, 1)
+					if foreignPath(r.SourcePath, m.Sessions[r.Key]) {
+						return
+					}
 					if r.Role == roleCommand || r.Role == roleToolOutput {
 						take(r)
 						return
@@ -568,14 +568,17 @@ func eachCommandAndOutputFrom(path string, m Manifest, from, end int64, redo map
 		if dead.at(at) {
 			continue
 		}
-		key, role, ok := recordRoleIn(payload, t)
+		kid, pid, rid, _, ok := recordPrefix(payload)
 		if !ok {
 			return off, errShortRecord
 		}
+		key, role := t.lookup(kid), t.lookup(rid)
 		if at < from && !redo[key] {
 			continue
 		}
-		if _, ok := m.Sessions[key]; !ok {
+		// The other copy of a shared row is not this session's to run or to
+		// end a run of, as a build leaves it out (see commandSessions).
+		if meta, ok := m.Sessions[key]; !ok || foreignPath(t.lookup(pid), meta) {
 			continue
 		}
 		if role != roleCommand && role != roleToolOutput {
