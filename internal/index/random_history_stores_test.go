@@ -33,7 +33,11 @@ type historyStores struct {
 	// db is empty when there is no sqlite3 to write the store with.
 	db       string
 	opencode []*opencodeSession
-	clock    int64
+	// grokDB is a store whose records name the database, as cursor's and
+	// goose's do; opencode's name the project.
+	grokDB string
+	grok   []*opencodeSession
+	clock  int64
 	// claudeHistory is Claude Code's prompt log.
 	claudeHistory string
 	// forgotten holds session ids forget took out, for unforget to bring back.
@@ -56,6 +60,11 @@ func (r *historyRun) openStores() {
 	if _, err := exec.LookPath("sqlite3"); err == nil {
 		m.db = filepath.Join(r.h.tmp, "opencode.db")
 		t.Setenv("DEJA_OPENCODE_DB", m.db)
+		m.grokDB = filepath.Join(r.h.tmp, "grok.db")
+		t.Setenv("DEJA_GROK_DB", m.grokDB)
+		r.sqlOn(m.grokDB, `CREATE TABLE workspaces (id TEXT PRIMARY KEY, canonical_path TEXT);
+CREATE TABLE sessions (id TEXT PRIMARY KEY, workspace_id TEXT, title TEXT, cwd_last TEXT, created_at TEXT);
+CREATE TABLE messages (session_id TEXT, seq INTEGER, role TEXT, message_json TEXT, created_at TEXT);`)
 		r.sql(`create table session(id text primary key, directory text, title text, time_created integer, time_updated integer);
 create table message(id text primary key, session_id text, time_created integer, time_updated integer, data text);
 create table part(id text primary key, message_id text, session_id text, time_created integer, time_updated integer, data text);`)
@@ -96,7 +105,16 @@ func (r *historyRun) anyStep() {
 			r.step()
 			return
 		}
-		r.opencodeStep()
+		if r.rng.Intn(3) == 0 {
+			r.grokStep()
+		} else {
+			r.opencodeStep()
+		}
+		// A store and a transcript changed in one pass: the pass carries
+		// the store's sessions by key and the transcript's by path (#5476).
+		if r.rng.Intn(2) == 0 {
+			r.step()
+		}
 	case n < 18:
 		r.privacyStep()
 	default:
@@ -303,13 +321,45 @@ func writeHistoryFile(r *historyRun, p, body string, appendTo bool) {
 
 func (r *historyRun) sql(stmts string) {
 	r.t.Helper()
-	if out, err := exec.Command("sqlite3", r.more.db, stmts).CombinedOutput(); err != nil {
+	r.sqlOn(r.more.db, stmts)
+}
+
+func (r *historyRun) sqlOn(db, stmts string) {
+	r.t.Helper()
+	if out, err := exec.Command("sqlite3", db, stmts).CombinedOutput(); err != nil {
 		r.t.Fatalf("sqlite3: %v %s", err, out)
 	}
 	// The store is noticed by its mtime, and two writes in one second would
 	// otherwise look like none.
 	at := time.Now().Add(time.Duration(len(r.log)+1) * time.Second)
-	_ = os.Chtimes(r.more.db, at, at)
+	_ = os.Chtimes(db, at, at)
+}
+
+// grokStep starts a grok session or adds turns to one, at the store's clock.
+func (r *historyRun) grokStep() {
+	m := &r.more
+	m.clock = max(m.clock+1000, time.Now().UnixMilli())
+	turn := func(s *opencodeSession) string {
+		s.msgs++
+		role, msg := "user", `{"content":"why does the `+r.words(4)+` fail"}`
+		if s.msgs%2 == 0 {
+			role, msg = "assistant", `{"content":[{"type":"text","text":"The `+r.words(5)+` needs a fix."}]}`
+		}
+		at := time.UnixMilli(m.clock + int64(s.msgs)).UTC().Format("2006-01-02T15:04:05.000Z")
+		return fmt.Sprintf("INSERT INTO messages VALUES ('%s',%d,'%s','%s','%s');\n", s.id, s.msgs, role, msg, at)
+	}
+	if len(m.grok) == 0 || r.rng.Intn(3) == 0 {
+		r.next++
+		s := &opencodeSession{id: fmt.Sprintf("gk%d", r.next)}
+		at := time.UnixMilli(m.clock).UTC().Format("2006-01-02T15:04:05.000Z")
+		r.sqlOn(m.grokDB, fmt.Sprintf("INSERT INTO sessions VALUES ('%s','w','start: %s','/w/%s','%s');\n", s.id, r.words(3), historyProjects[r.rng.Intn(len(historyProjects))], at)+turn(s))
+		m.grok = append(m.grok, s)
+		r.log = append(r.log, "new grok "+s.id)
+		return
+	}
+	s := m.grok[r.rng.Intn(len(m.grok))]
+	r.sqlOn(m.grokDB, turn(s)+turn(s))
+	r.log = append(r.log, "grow grok "+s.id)
 }
 
 // opencodeMessage adds one message with one text part, at the store's clock.

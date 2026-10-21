@@ -35,11 +35,16 @@ var checkKeyedCarry bool
 // carrySuspects is the sessions whose records a replacing pass may drop,
 // move or read, when that set can be named from the manifest: every file the
 // pass read again or lost is a transcript of its own, whose records name it
-// and are filed under the sessions that list it. A shared store, a prompt log
-// or an import names other paths, and the pass walks the log for those.
+// and are filed under the sessions that list it. A shared store the pass read
+// again drops records only by the keys it handed back, which the caller names
+// in sets (#5476). A store that went, a prompt log or an import names other
+// paths, and the pass walks the log for those.
 func carrySuspects(old Manifest, changed map[string]FileState, removed map[string]bool, sets ...map[string]bool) (map[string]bool, bool) {
 	touched := make(map[string]bool, len(changed)+len(removed))
 	for p := range changed {
+		if storeHarness(p) != "" {
+			continue
+		}
 		if !copyable(p) {
 			return nil, false
 		}
@@ -293,7 +298,7 @@ func carryStoredRecords(dir string, old Manifest, t *recordTables, appending boo
 	if checkKeyedCarry {
 		plain := func(key, path string) bool {
 			_, ok := old.Sessions[key]
-			return ok && path != "" && !removed[path] && changed[path].Path == ""
+			return ok && path != "" && !removed[path] && (changed[path].Path == "" || storeHarness(path) != "")
 		}
 		return verifyKeyedCarry(dir, old.RecordsSize, t, handled, rested, plain)
 	}

@@ -3,6 +3,7 @@ package index
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync/atomic"
 	"testing"
@@ -161,6 +162,82 @@ func TestCarriedCommandFactsMatchTheirState(t *testing.T) {
 	parityPass(t, inc, false)
 	if got := len(ReadSessionFacts(inc)); got != 6 {
 		t.Errorf("facts for %d sessions after the pass, want 6", got)
+	}
+	sameAsRebuild(t, inc)
+}
+
+// A store that changed in the same pass carries the sessions it handed back,
+// not the whole log: someone running opencode or grok changes its database on
+// most passes (#5476).
+func TestAPassThatAlsoChangesAStoreReadsOnlyTheSessionsItChanged(t *testing.T) {
+	if _, err := exec.LookPath("sqlite3"); err != nil {
+		t.Skip("sqlite3 not available")
+	}
+	const n = 12
+	inc, shorten := smallPassStore(t, n)
+	tmp := filepath.Dir(inc)
+	oc, grok := filepath.Join(tmp, "opencode.db"), filepath.Join(tmp, "grok.db")
+	t.Setenv("DEJA_OPENCODE_DB", oc)
+	t.Setenv("DEJA_GROK_DB", grok)
+	clock := time.Now().Add(-2 * time.Hour).UnixMilli()
+	// Turn i of session n at minute 10i+n: each one past the slack a since
+	// read goes back, and a later turn past every earlier one.
+	ocMsg := func(n, i int) string {
+		at := clock + int64(10*i+n)*60_000
+		return fmt.Sprintf(`insert into message values('oc%[1]d-m%[2]d','oc%[1]d',%[3]d,%[3]d,'{"role":"user","time":{"created":%[3]d}}');
+insert into part values('oc%[1]d-p%[2]d','oc%[1]d-m%[2]d','oc%[1]d',%[3]d,%[3]d,'{"type":"text","text":"why does the pool %[1]d step %[2]d hang"}');
+update session set time_updated=%[3]d where id='oc%[1]d';
+`, n, i, at)
+	}
+	grokMsg := func(n, i int) string {
+		return fmt.Sprintf(`INSERT INTO messages VALUES ('g%[1]d',%[2]d,'user','{"content":"why does the queue %[1]d step %[2]d stall"}','2026-07-27T10:%02[3]d:00.000Z');
+`, n, i, 10*i+n)
+	}
+	ocSQL := `create table session(id text primary key, directory text, title text, time_created integer, time_updated integer);
+create table message(id text primary key, session_id text, time_created integer, time_updated integer, data text);
+create table part(id text primary key, message_id text, session_id text, time_created integer, time_updated integer, data text);
+`
+	grokSQL := `CREATE TABLE workspaces (id TEXT PRIMARY KEY, canonical_path TEXT);
+CREATE TABLE sessions (id TEXT PRIMARY KEY, workspace_id TEXT, title TEXT, cwd_last TEXT, created_at TEXT);
+CREATE TABLE messages (session_id TEXT, seq INTEGER, role TEXT, message_json TEXT, created_at TEXT);
+`
+	for i := 0; i < 6; i++ {
+		ocSQL += fmt.Sprintf("insert into session values('oc%d','/w/app','pool %d',%d,%d);\n", i, i, clock, clock) + ocMsg(i, 0) + ocMsg(i, 1)
+		grokSQL += fmt.Sprintf("INSERT INTO sessions VALUES ('g%d','w','queue %d','/work/api','2026-07-27T10:00:00.000Z');\n", i, i) + grokMsg(i, 0) + grokMsg(i, 1)
+	}
+	paritySQL(t, oc, ocSQL)
+	paritySQL(t, grok, grokSQL)
+	touch := func(p string, s int) {
+		at := time.Now().Add(time.Duration(s) * time.Minute)
+		_ = os.Chtimes(p, at, at)
+	}
+	parityPass(t, inc, false)
+	if !HasSession(inc, "oc3") || !HasSession(inc, "g3") {
+		t.Fatal("the stores were not indexed, so this measures nothing")
+	}
+
+	walked := storedRecordsWalked.Load()
+	shorten(5)
+	paritySQL(t, oc, ocMsg(3, 2))
+	paritySQL(t, grok, grokMsg(3, 2))
+	touch(oc, 1)
+	touch(grok, 1)
+	parityPass(t, inc, false)
+	walked = storedRecordsWalked.Load() - walked
+	// The transcript's twelve records, and in each store the changed
+	// session and the one at the watermark, which a since read takes again.
+	if walked == 0 || walked > 12+2*(2+2) {
+		t.Errorf("the pass walked %d stored records, want at most the changed sessions' 20 of %d", walked, n*12+24)
+	}
+	sameAsRebuild(t, inc)
+
+	// A store change alone reads the session it changed.
+	walked = storedRecordsWalked.Load()
+	paritySQL(t, oc, ocMsg(1, 3))
+	touch(oc, 2)
+	parityPass(t, inc, false)
+	if walked = storedRecordsWalked.Load() - walked; walked == 0 || walked > 2+3 {
+		t.Errorf("an opencode message walked %d stored records, want at most the changed session's and the watermark's 5", walked)
 	}
 	sameAsRebuild(t, inc)
 }
