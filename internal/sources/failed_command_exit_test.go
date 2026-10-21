@@ -205,7 +205,8 @@ func TestClineBatchStampsARepeatedCommandOncePerEntry(t *testing.T) {
 // A failed result that lands a pass after its call sends the file back for a
 // whole read in every appendable format whose reader now stamps the failure,
 // as kiro-cli's does above; a clean one, or a call and failure both in the
-// tail, does not (#4443).
+// tail, does not (#4443). Claude's reader stamps exit 0 on a clean result
+// too, so its clean answer to a stored command is read whole as well (#5527).
 func TestAFailedResultForAStoredCallIsReadWithItsCall(t *testing.T) {
 	claudeCall := `{"type":"assistant","sessionId":"c1","timestamp":"2026-10-01T10:00:01Z","cwd":"/tmp/proj","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"go test ./..."}}]}}` + "\n"
 	claudeOut := func(failed bool) string {
@@ -237,7 +238,7 @@ func TestAFailedResultForAStoredCallIsReadWithItsCall(t *testing.T) {
 		want             bool
 	}{
 		{"claude", claudeCall, claudeOut(true), false},
-		{"claude", claudeCall, claudeOut(false), true},
+		{"claude", claudeCall, claudeOut(false), false},
 		{"claude", "", claudeCall + claudeOut(true), true},
 		{"cherrystudio", claudeCall, claudeOut(true), false},
 		{"goose-jsonl", gooseCall, gooseOut(true), false},

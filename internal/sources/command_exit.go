@@ -1,7 +1,11 @@
 package sources
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 	"strconv"
 	"strings"
 
@@ -137,27 +141,97 @@ func lastLine(s string) string {
 }
 
 // claudeExitResumes is the #4443 rule for Claude's format, which Cherry Studio
-// writes too: a tail holding the failed result of a call stored already is
-// read whole, or the call never gets the exit its result names; a clean one
-// is let go, as it is for pi.
-var claudeExitResumes = resumesUnlessAnswering(`"tool_`, func(m map[string]any) ([]string, string) {
-	msg, _ := m["message"].(map[string]any)
-	items, _ := msg["content"].([]any)
-	var calls []string
-	for _, it := range items {
-		p, _ := it.(map[string]any)
-		switch p["type"] {
-		case "tool_use":
-			calls = append(calls, str(p["id"]))
-		case "tool_result":
-			failed, _ := p["is_error"].(bool)
-			if id := str(p["tool_use_id"]); failed && id != "" && claudeOutcome(id, true, p["content"]).Known {
-				return calls, id
+// writes too: a tail holding the result of a command call stored already is
+// read whole, or the call never gets the exit its result names. A failed
+// result says so on its own; a clean one stamps exit 0 only on a command, so
+// the call it answers is looked up before the tail, and a clean answer to any
+// other tool is let go, as it is for pi.
+func claudeExitResumes(path string, offset int64) bool {
+	if offset <= 0 {
+		return true
+	}
+	made := map[string]bool{}
+	var clean []string
+	ok := true
+	_ = scanJSONLHinted(path, offset, []byte(`"tool_`), func(m map[string]any) {
+		if !ok {
+			return
+		}
+		msg, _ := m["message"].(map[string]any)
+		items, _ := msg["content"].([]any)
+		for _, it := range items {
+			p, _ := it.(map[string]any)
+			switch p["type"] {
+			case "tool_use":
+				made[str(p["id"])] = true
+			case "tool_result":
+				id := str(p["tool_use_id"])
+				if id == "" || made[id] {
+					continue
+				}
+				failed, _ := p["is_error"].(bool)
+				if !failed {
+					clean = append(clean, id)
+				} else if claudeOutcome(id, true, p["content"]).Known {
+					ok = false
+				}
 			}
 		}
+	})
+	return ok && !claudeCommandCallBefore(path, offset, clean)
+}
+
+// claudeCallWindow is how far before a tail claudeCommandCallBefore looks for
+// the call a clean result answers. A pass between a call and its result
+// leaves the call among the last lines it read.
+const claudeCallWindow = 4 << 20
+
+// claudeCommandCallBefore reports whether one of ids is a command call in the
+// window of the file before end. Only the lines naming an id are decoded. A
+// call not found there is taken for one that ran no command, as before.
+func claudeCommandCallBefore(path string, end int64, ids []string) bool {
+	if len(ids) == 0 || !IndexCommands() {
+		return false
 	}
-	return calls, ""
-})
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = f.Close() }()
+	start := max(0, end-claudeCallWindow)
+	buf := make([]byte, end-start)
+	if _, err := f.ReadAt(buf, start); err != nil && err != io.EOF {
+		return false
+	}
+	for _, id := range ids {
+		quoted := []byte(`"` + id + `"`)
+		for rest := buf; ; {
+			i := bytes.Index(rest, quoted)
+			if i < 0 {
+				break
+			}
+			from := bytes.LastIndexByte(rest[:i], '\n') + 1
+			to := len(rest)
+			if j := bytes.IndexByte(rest[i:], '\n'); j >= 0 {
+				to = i + j
+			}
+			var v struct {
+				Message struct {
+					Content json.RawMessage `json:"content"`
+				} `json:"message"`
+			}
+			if json.Unmarshal(bytes.TrimPrefix(rest[from:to], []byte("\ufeff")), &v) == nil {
+				for _, c := range claudeCommands(v.Message.Content) {
+					if c.ID == id {
+						return true
+					}
+				}
+			}
+			rest = rest[to:]
+		}
+	}
+	return false
+}
 
 // gooseExitResumes is the same rule for goose's jsonl sessions.
 var gooseExitResumes = resumesUnlessAnswering(`"tool`, func(m map[string]any) ([]string, string) {

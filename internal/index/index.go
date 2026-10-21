@@ -794,7 +794,9 @@ import (
 // 98: a rebuild writes a kept transcript and the copy on disk of the same
 // session in the order the log held them, and takes a session's facts from
 // its commands in time order (#5519).
-const version = 98
+// 99: a command whose clean result lands in the tail a pass appends is read
+// with its result, so it carries the exit 0 a rebuild gives it (#5527).
+const version = 99
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
