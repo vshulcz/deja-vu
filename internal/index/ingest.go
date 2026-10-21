@@ -2680,7 +2680,12 @@ func signalLine(l string) bool {
 // pair, and building the slice only to walk it once cost a third of the keying
 // time on a Han corpus (#492).
 func eachIndexKey(text string, when time.Time, fn func(tok string)) {
-	emit := dedupe(fn)
+	indexKeysRepeating(text, when, dedupe(fn))
+}
+
+// indexKeysRepeating is eachIndexKey without the dedupe, for a caller that
+// already sees each key through a map of its own: the spill workers (#5526).
+func indexKeysRepeating(text string, when time.Time, emit func(tok string)) {
 	textKeys(text, emit)
 	for _, tok := range dateTokens(when) {
 		emit(tok)
