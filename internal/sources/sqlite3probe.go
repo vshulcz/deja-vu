@@ -1,10 +1,12 @@
 package sources
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -32,6 +34,9 @@ var sqlite3Probe struct {
 	mu      sync.Mutex
 	key     string
 	problem string
+	// progress is whether this binary takes `.progress`, which a read uses to
+	// show it is still moving (see sqliteRead).
+	progress bool
 }
 
 // SQLite3Available reports whether the sqlite3 CLI the database readers shell
@@ -57,9 +62,41 @@ func SQLite3Problem() string {
 	if sqlite3Probe.key == key {
 		return sqlite3Probe.problem
 	}
-	sqlite3Probe.problem = probeSQLite3(path)
+	sqlite3Probe.progress = probeProgress(path)
+	sqlite3Probe.problem = ""
+	if !sqlite3Probe.progress {
+		sqlite3Probe.problem = probeSQLite3(path)
+	}
 	sqlite3Probe.key = key
 	return sqlite3Probe.problem
+}
+
+// sqlite3Progress reports whether the sqlite3 on PATH works and takes
+// `.progress`.
+func sqlite3Progress() bool {
+	if SQLite3Problem() != "" {
+		return false
+	}
+	sqlite3Probe.mu.Lock()
+	defer sqlite3Probe.mu.Unlock()
+	return sqlite3Probe.progress
+}
+
+// probeProgress asks the probe question with `.progress` on. A shell built
+// without it, or older than 3.22, stops at the unknown command, and the plain
+// probe then says whether the binary works at all. One run for a sqlite3 that
+// has it, as before.
+func probeProgress(path string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), sqlite3ProbeBudget)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, path, "-readonly", ":memory:", ".timeout 5000", sqliteProgressArg, sqlite3ProbeQuery)
+	cmd.WaitDelay = time.Second
+	out, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	b, _ := io.ReadAll(&progressFilter{r: bufio.NewReader(bytes.NewReader(out))})
+	return strings.TrimSpace(string(b)) == sqlite3ProbeAnswer
 }
 
 // SQLite3Broken reports that a sqlite3 is on PATH and does not work, as
@@ -73,7 +110,7 @@ func SQLite3Broken() bool {
 // stubs written in the same instant use it.
 func ResetSQLite3Probe() {
 	sqlite3Probe.mu.Lock()
-	sqlite3Probe.key, sqlite3Probe.problem = "", ""
+	sqlite3Probe.key, sqlite3Probe.problem, sqlite3Probe.progress = "", "", false
 	sqlite3Probe.mu.Unlock()
 }
 

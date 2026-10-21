@@ -22,7 +22,7 @@ func GrokDB() string {
 func LoadGrokDB() []model.Session {
 	ss, err := ParseGrokDBSince(GrokDB(), time.Time{})
 	if err != nil {
-		return nil
+		return dbRead(GrokDB(), nil, err)
 	}
 	return ss
 }
@@ -138,7 +138,7 @@ func ParseGrokDBSince(db string, t time.Time) ([]model.Session, error) {
 			// changed its schema. Reporting the second as "no sessions" makes
 			// a whole harness disappear from recall while doctor still calls
 			// the store healthy.
-			return nil, fmt.Errorf("grok: query failed, the store schema may have changed: %w", err)
+			return nil, schemaChanged("grok", err)
 		}
 		return nil, err
 	}

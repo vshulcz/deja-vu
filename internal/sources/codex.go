@@ -77,7 +77,8 @@ func LoadCodex() []model.Session {
 	for _, s := range ss {
 		seen[s.ID] = true
 	}
-	if hist, _ := ParseCodexHistory(filepath.Join(CodexRoot(), "history.jsonl")); len(hist) > 0 {
+	histPath := filepath.Join(CodexRoot(), "history.jsonl")
+	if hist, err := ParseCodexHistory(histPath); len(storeRead(histPath, hist, err)) > 0 {
 		for _, h := range hist {
 			if !seen[h.ID] {
 				ss = append(ss, h)

@@ -152,7 +152,7 @@ func PinZstd() func() {
 func LoadZed() []model.Session {
 	ss, err := ParseZedDBSince(ZedDB(), time.Time{})
 	if err != nil {
-		return nil
+		return dbRead(ZedDB(), nil, err)
 	}
 	return ss
 }
@@ -270,7 +270,7 @@ func zedRows(db, cols, where string) ([]zedRow, error) {
 			// sqlite3 refused to run. Reporting the second as "no sessions"
 			// makes a harness disappear from recall while doctor still calls
 			// the store healthy.
-			return nil, fmt.Errorf("zed: query failed, the store schema may have changed: %w", err)
+			return nil, schemaChanged("zed", err)
 		}
 		return nil, err
 	}

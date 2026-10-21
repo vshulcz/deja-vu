@@ -76,7 +76,8 @@ func LoadTrae() []model.Session {
 	for _, s := range ss {
 		seen[s.ID] = true
 	}
-	if hist, _ := ParseTraeHistory(filepath.Join(TraeRoot(), "history.jsonl")); len(hist) > 0 {
+	histPath := filepath.Join(TraeRoot(), "history.jsonl")
+	if hist, err := ParseTraeHistory(histPath); len(storeRead(histPath, hist, err)) > 0 {
 		for _, h := range hist {
 			if !seen[h.ID] {
 				ss = append(ss, h)

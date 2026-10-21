@@ -213,7 +213,7 @@ func parseOpenClawDBWhere(db, where string) ([]model.Session, error) {
 			// No stdout is a query that matched nothing or one sqlite3 refused
 			// to run; the second must not read as an empty store, or a whole
 			// harness vanishes from recall while doctor calls it healthy.
-			return nil, fmt.Errorf("openclaw: query failed, the store schema may have changed: %w", err)
+			return nil, schemaChanged("openclaw", err)
 		}
 		return nil, err
 	}

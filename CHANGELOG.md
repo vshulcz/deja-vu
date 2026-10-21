@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A SQLite store read is given up only when it stops moving, not at ten
+  minutes on the clock: a Hermes store of 1,683 sessions still reading on a
+  slow disk was cut and left out of a first build. A store given up, or whose
+  read fails, is named (`hermes: skipped — no progress for 10m0s;
+  DEJA_STORE_TIMEOUT=0 waits`), `deja index` exits 3 and `deja doctor` lists
+  it, and a rebuild keeps what the last index held from it (#5517).
 - A word taken out of every transcript leaves `cooccur.gob` on the pass that
   replaced it, not at the next full build (#5489).
 - The command tables of a session two transcripts share count the copy the

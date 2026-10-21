@@ -966,6 +966,11 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	// A transcript its harness rewrote to a summary keeps the turns the last
 	// build held for it (#4795).
 	ss = carryCompactedAway(dir, ss)
+	unread := map[string]bool{}
+	for p := range sources.DiagFailedPaths() {
+		unread[p] = true
+	}
+	ss = append(ss, sources.FilterSessions(unreadStoresCarry(dir, harness, unread, ss))...)
 	forgetUnreadStores(files)
 	// Imported sessions are filtered too: excluding a project must also drop
 	// what a peer already pushed, not only what arrives next.
@@ -1674,6 +1679,51 @@ func vanishedFromStores(dir, harness string, files map[string]FileState, fresh [
 		}
 		stores[p] = true
 	}
+	return carryFromStores(dir, m, stores, fresh)
+}
+
+// unreadStoresCarry returns what the last build held from the stores this
+// pass could not read: a read that failed or was given up for making no
+// progress. Read whole, a rebuild wrote only what it read, so a Hermes store
+// that stalled took every session it held out of the index (#5517). A store
+// skipped is unread, not emptied; its file row is left out, so the next pass
+// reads it again.
+func unreadStoresCarry(dir, harness string, unread map[string]bool, fresh []model.Session) []model.Session {
+	if len(unread) == 0 {
+		return nil
+	}
+	m, err := readManifest(dir)
+	if err != nil {
+		return nil
+	}
+	stores := map[string]bool{}
+	for p := range unread {
+		if _, ok := m.Files[p]; !ok {
+			continue
+		}
+		// Gone since the walk: orphanedSessions answers for that.
+		if !sources.IsHermesPGStore(p) {
+			if _, err := os.Lstat(p); err != nil {
+				continue
+			}
+		}
+		if harness != "" {
+			name := harnessForPath(p)
+			if store := sources.HarnessForKind(name); store != "" {
+				name = store
+			}
+			if name != harness {
+				continue
+			}
+		}
+		stores[p] = true
+	}
+	return carryFromStores(dir, m, stores, fresh)
+}
+
+// carryFromStores returns the sessions the manifest m holds from stores that
+// fresh does not, rebuilt from their records.
+func carryFromStores(dir string, m Manifest, stores map[string]bool, fresh []model.Session) []model.Session {
 	if len(stores) == 0 {
 		return nil
 	}
@@ -1860,6 +1910,7 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 	wg.Wait()
 	unreadable := malformedByHarness()
 	refused := failedByHarness()
+	stalled := stalledByHarness()
 	var ss []model.Session
 	for _, r := range results {
 		if len(r.ss) == 0 {
@@ -1877,6 +1928,8 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 				switch reason := sources.SkipReason(r.name); {
 				case reason != "":
 					fmt.Fprintf(progress, "deja: %s: skipped — %s\n", r.name, reason)
+				case refused[r.name] > 0 && refused[r.name] == len(stalled[r.name]):
+					fmt.Fprintf(progress, "deja: %s: skipped — %s\n", harnessLabel(r.name), stallNarration(stalled[r.name]))
 				case unreadable[r.name] > 0 || refused[r.name] > 0:
 					fmt.Fprintln(progress, nothingReadableNarration(r.name, unreadable[r.name], refused[r.name]))
 				}
@@ -1888,8 +1941,11 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 			readMu.Lock()
 			took := readTook[r.name]
 			readMu.Unlock()
-			fmt.Fprintln(progress, withReadTime(
-				harnessNarration(r.name, r.ss, sources.SkipReason(r.name), unreadable[r.name], refused[r.name]), took))
+			line := harnessNarration(r.name, r.ss, sources.SkipReason(r.name), unreadable[r.name], refused[r.name])
+			if len(stalled[r.name]) > 0 {
+				line += " — " + stallNarration(stalled[r.name])
+			}
+			fmt.Fprintln(progress, withReadTime(line, took))
 		}
 	}
 	return ss
@@ -2013,6 +2069,36 @@ func nothingReadableNarration(name string, unreadable, refused int) string {
 		what = append(what, fmt.Sprintf("%d path%s", refused, pluralS(refused)))
 	}
 	return fmt.Sprintf("deja: %s: nothing indexed — %s could not be read", label, strings.Join(what, " and "))
+}
+
+// stalledByHarness is failedByHarness for the reads given up for making no
+// progress, with the budget each ran out of.
+func stalledByHarness() map[string][]time.Duration {
+	out := map[string][]time.Duration{}
+	for p, idle := range sources.DiagStalledPaths() {
+		if h := sources.HarnessForKind(harnessForPath(p)); h != "" {
+			out[h] = append(out[h], idle)
+		}
+	}
+	return out
+}
+
+// stallNarration says that a read was given up and how to wait instead. Said
+// like a store deja could not open, it read as a permission problem, and
+// before that a store given up was not mentioned at all (#5517).
+func stallNarration(idle []time.Duration) string {
+	var budget time.Duration
+	for _, d := range idle {
+		budget = max(budget, d)
+	}
+	what := "a read in the same directory stopped moving"
+	if budget > 0 {
+		what = "no progress for " + budget.String()
+	}
+	if n := len(idle); n > 1 {
+		what = fmt.Sprintf("%d reads given up, %s", n, what)
+	}
+	return what + "; DEJA_STORE_TIMEOUT=0 waits"
 }
 
 // failedByHarness is malformedByHarness for the paths that would not open or

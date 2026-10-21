@@ -63,22 +63,25 @@ func offsetParse(f func(string, int64) ([]model.Session, error)) func(string, in
 
 // dbParse/dbParseFrom handle the db-backed kinds — opencode, cursor, goose,
 // grok, hermes and zed — which filter by time rather than byte offset.
+// dbParse reads a database store whole or from its watermark. A read that
+// fails records the store as unread, as the full build's loaders do: a pass
+// that skipped a store whose query failed exited 0 (#5517).
 func dbParse(full func(string) ([]model.Session, error), since func(string, time.Time) ([]model.Session, error)) func(string, int64) ([]model.Session, error) {
 	return func(p string, nano int64) ([]model.Session, error) {
+		var ss []model.Session
+		var err error
 		if nano > 0 {
-			return since(p, sinceTime(nano))
+			ss, err = since(p, sinceTime(nano))
+		} else {
+			ss, err = full(p)
 		}
-		return full(p)
+		return dbRead(p, ss, err), err
 	}
 }
 
 func dbParseFrom(full func(string) ([]model.Session, error), since func(string, time.Time) ([]model.Session, error)) func(string, int64, int64) ([]model.Session, error) {
-	return func(p string, _ int64, nano int64) ([]model.Session, error) {
-		if nano > 0 {
-			return since(p, sinceTime(nano))
-		}
-		return full(p)
-	}
+	parse := dbParse(full, since)
+	return func(p string, _ int64, nano int64) ([]model.Session, error) { return parse(p, nano) }
 }
 
 // resumesUnlessAnswering is the Resumes of a format that files a tool call and
@@ -386,8 +389,8 @@ func harnessTable() []Harness {
 				// db-backed kinds.
 				Name:      "hermes-pg",
 				Match:     func(p string) bool { return IsHermesPGStore(p) },
-				Parse:     func(_ string, nano int64) ([]model.Session, error) { return ParseHermesPG(HermesPGDSN(), nano) },
-				ParseFrom: func(_ string, _, nano int64) ([]model.Session, error) { return ParseHermesPG(HermesPGDSN(), nano) },
+				Parse:     func(p string, nano int64) ([]model.Session, error) { return hermesPGRead(p, nano) },
+				ParseFrom: func(p string, _, nano int64) ([]model.Session, error) { return hermesPGRead(p, nano) },
 			}},
 		},
 		{

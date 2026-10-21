@@ -100,8 +100,8 @@ func kiroUnderSessDir(p string) bool {
 func LoadKiro() []model.Session {
 	ss := parseFiles(KiroCLIFiles(), ParseKiroCLIFile)
 	ss = append(ss, parseFiles(KiroIDEFiles(), ParseKiroIDEFile)...)
-	dbSS, _ := ParseKiroDB(KiroDB())
-	return append(ss, dbSS...)
+	dbSS, err := ParseKiroDB(KiroDB())
+	return append(ss, dbRead(KiroDB(), dbSS, err)...)
 }
 
 // ParseKiroCLIFile reads one CLI transcript.

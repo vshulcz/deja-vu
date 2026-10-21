@@ -180,3 +180,10 @@ func hermesPGSessionMeta(dsn string) map[string]hermesMeta {
 	}
 	return meta
 }
+
+// hermesPGRead is the index's read of the Postgres store, recorded as unread
+// under its token when it fails.
+func hermesPGRead(token string, sinceNano int64) ([]model.Session, error) {
+	ss, err := ParseHermesPG(HermesPGDSN(), sinceNano)
+	return storeRead(token, ss, err), err
+}

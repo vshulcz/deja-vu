@@ -130,8 +130,8 @@ func OpenClawSidecarFiles() []string {
 func LoadOpenClaw() []model.Session {
 	ss := parseFiles(OpenClawSessionFiles(), ParseOpenClawFile)
 	for _, db := range OpenClawAgentDBs() {
-		got, _ := ParseOpenClawDB(db)
-		ss = append(ss, got...)
+		got, err := ParseOpenClawDB(db)
+		ss = append(ss, dbRead(db, got, err)...)
 	}
 	return ss
 }

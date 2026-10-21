@@ -89,8 +89,8 @@ func CrushDBs() []string {
 func LoadCrush() []model.Session {
 	var out []model.Session
 	for _, db := range CrushDBs() {
-		got, _ := ParseCrushDB(db)
-		out = append(out, got...)
+		got, err := ParseCrushDB(db)
+		out = append(out, dbRead(db, got, err)...)
 	}
 	return out
 }

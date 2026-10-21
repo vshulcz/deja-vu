@@ -41,9 +41,9 @@ type StalledRead struct {
 
 func (e *StalledRead) Error() string {
 	if e.Idle == 0 {
-		return fmt.Sprintf("read %s: skipped, a read in the same directory stopped moving (DEJA_STORE_TIMEOUT)", e.Path)
+		return fmt.Sprintf("read %s: skipped, a read in the same directory stopped moving; DEJA_STORE_TIMEOUT=0 waits", e.Path)
 	}
-	return fmt.Sprintf("read %s: no progress for %s, skipped (DEJA_STORE_TIMEOUT)", e.Path, e.Idle)
+	return fmt.Sprintf("read %s: no progress for %s, skipped; DEJA_STORE_TIMEOUT=0 waits", e.Path, e.Idle)
 }
 
 // ReadWatched runs parse for path and gives up on it once its reads have made
@@ -170,13 +170,21 @@ type progressReader struct {
 
 func (p progressReader) Read(b []byte) (int, error) {
 	n, err := p.r.Read(b)
-	if n > 0 && watching.Load() > 0 {
-		now := time.Now().UnixNano()
-		watchMu.Lock()
-		for m := range watched[p.path] {
-			*m = now
-		}
-		watchMu.Unlock()
+	if n > 0 {
+		markProgress(p.path)
 	}
 	return n, err
+}
+
+// markProgress moves every watch of path to now.
+func markProgress(path string) {
+	if watching.Load() == 0 {
+		return
+	}
+	now := time.Now().UnixNano()
+	watchMu.Lock()
+	for m := range watched[path] {
+		*m = now
+	}
+	watchMu.Unlock()
 }

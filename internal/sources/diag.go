@@ -1,9 +1,13 @@
 package sources
 
 import (
+	"errors"
 	"io/fs"
 	"maps"
 	"sync"
+	"time"
+
+	"github.com/vshulcz/deja-vu/internal/model"
 )
 
 // Ingest diagnostics are a side channel, not a parser API change: scanners and
@@ -17,6 +21,11 @@ var diagFailed = map[string]string{}
 var diagReasons = map[string]string{}
 var diagRecords = map[string]map[string]string{}
 var diagZstdMissing = map[string]bool{}
+
+// diagStalled is the part of diagFailed given up for making no progress, with
+// how long it sat: the run says so in those words rather than "could not be
+// read", which reads like a permission problem.
+var diagStalled = map[string]time.Duration{}
 
 // diagWalkFailed is the part of diagFailed the walk recorded: directories it
 // could not list and transcripts whose mode refuses a read. A later walk in
@@ -74,7 +83,19 @@ func diagFileError(path string, err error) {
 	}
 	diagMu.Lock()
 	diagFailed[path] = err.Error()
+	var st *StalledRead
+	if errors.As(err, &st) {
+		diagStalled[path] = st.Idle
+	}
 	diagMu.Unlock()
+}
+
+// DiagStalledPaths returns the paths given up for making no progress so far,
+// with the budget each ran out of, without clearing them.
+func DiagStalledPaths() map[string]time.Duration {
+	diagMu.Lock()
+	defer diagMu.Unlock()
+	return maps.Clone(diagStalled)
 }
 
 // diagWalkError is diagFileError for a path the store walk itself could not
@@ -204,5 +225,28 @@ func DiagSnapshot() (malformed map[string]int, failed map[string]string) {
 	diagReasons = map[string]string{}
 	diagRecords = map[string]map[string]string{}
 	diagZstdMissing = map[string]bool{}
+	diagStalled = map[string]time.Duration{}
 	return malformed, failed
+}
+
+// storeRead hands back what a loader read from one store and records the
+// store as unread when the read failed. The loaders a full build runs dropped
+// that error, so a database deja could not read, or gave up on, left the
+// index without its sessions and the run exited 0 with nothing said (#5517).
+// A store that is not there is not unread input.
+func storeRead(path string, ss []model.Session, err error) []model.Session {
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		diagFileError(path, err)
+	}
+	return ss
+}
+
+// dbRead is storeRead for a store read through sqlite3. While sqlite3 is
+// missing or broken SkipReason names the store on every pass, and the same
+// store counted as unread each time made every pass exit 3 over a tool.
+func dbRead(path string, ss []model.Session, err error) []model.Session {
+	if err != nil && SQLite3Problem() != "" {
+		return ss
+	}
+	return storeRead(path, ss, err)
 }
