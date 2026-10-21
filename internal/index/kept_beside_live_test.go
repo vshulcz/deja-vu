@@ -47,7 +47,7 @@ func TestADeletedCopyOwningTheRowKeepsWhatThePassReadOffIt(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	h.threeWays("moved back", func() {
+	steps := []func(){func() {
 		h.put("svc", "s8", day("svc", 8, "start: why does the build fail", "The ledger needs a fix."))
 	}, func() {
 		h.put("svc", "s8", day("svc", 9, "again: why does the build fail", "The worker needs a fix."))
@@ -56,7 +56,70 @@ func TestADeletedCopyOwningTheRowKeepsWhatThePassReadOffIt(t *testing.T) {
 		h.put("app", "s8", day("app", 10, "again: why does the parser fail", "The mutex needs a fix."))
 	}, func() {
 		move("app", "svc")
-	})
+	}}
+	settled := func(dir string) string {
+		t.Helper()
+		m, err := readManifest(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return m.Sessions["claude:s8"].Settled
+	}
+	h.threeWays("moved back", steps...)
+	// The live copy written again: the pass takes the row back from the
+	// deleted file's records, and kept the conclusion it read off it.
+	h2 := newTwoWayEnv(t)
+	h = h2
+	h.threeWays("moved back, then the live copy rewritten", append(steps, func() {
+		h.put("svc", "s8", day("svc", 11, "again: why does the outbox fail", "Nothing settled yet."))
+	})...)
+	if got := settled(filepath.Join(h.tmp, "a.db")); got != "The mutex needs a fix." {
+		t.Errorf("Settled after the live copy is rewritten = %q, want the deleted file's", got)
+	}
+}
+
+// A version bump rebuilds what was read off a deleted transcript from its
+// records, as it always did: a bump can change what is redacted from the
+// conclusion, or how friction and questions are read.
+func TestAVersionBumpRereadsADeletedTranscriptsConclusion(t *testing.T) {
+	h := newTwoWayEnv(t)
+	h.put("app", "s1", richSession("app", "s1", 2, "pool"))
+	h.put("app", "s2", richSession("app", "s2", 3, "queue"))
+	a := filepath.Join(h.tmp, "a.db")
+	if err := Ensure(a, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(h.path("app", "s2")); err != nil {
+		t.Fatal(err)
+	}
+	if err := Ensure(a, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	m, err := readManifest(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	row := m.Sessions["claude:s2"]
+	if row.Settled == "" {
+		t.Fatal("control: the kept session settled nothing")
+	}
+	row.Settled, row.Hit = "stale", []uint64{42}
+	m.Sessions["claude:s2"] = row
+	m.Version = version - 1
+	if err := writeManifestMeta(a, m); err != nil {
+		t.Fatal(err)
+	}
+	invalidateManifestCache(a)
+	if err := Ensure(a, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	m, err = readManifest(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := m.Sessions["claude:s2"]; got.Settled == "stale" || slices.Equal(got.Hit, []uint64{42}) {
+		t.Errorf("the bump kept the old row's text: settled %q, hit %v", got.Settled, got.Hit)
+	}
 }
 
 // A pass that carries some of a session's records and writes others gathers

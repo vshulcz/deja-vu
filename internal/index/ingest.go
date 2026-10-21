@@ -1125,7 +1125,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 		if owns {
 			row := ownerRow(prev, s, texts[i].row(s), ord, collided)
 			if kept, ok := orphans.rows[orphanKey(key, s.Path)]; ok {
-				row = withKeptText(row, kept)
+				row = withKeptRow(row, kept, orphans.current)
 			}
 			m.Sessions[key] = row
 		} else {
@@ -1459,6 +1459,8 @@ type orphanState struct {
 	// dated is the old manifest's KeptDated: a row first found gone here is
 	// dated only when the store before this build dated its own.
 	dated bool
+	// current is whether this version wrote the old manifest.
+	current bool
 	// bare are the kept copies whose every turn was filed under another file
 	// of the session, by key. They hold no records and stay the session's
 	// copies, so a rewrite of the file holding their turns leaves them here.
@@ -1486,6 +1488,7 @@ func orphanedSessions(dir, harness string, files map[string]FileState) orphanSta
 		return out
 	}
 	out.dated = m.KeptDated
+	out.current = m.Version == version
 	want := map[string]bool{}
 	var present map[string]bool
 	moved := map[string]bool{}
@@ -1618,15 +1621,20 @@ func orphanedSessions(dir, harness string, files map[string]FileState) orphanSta
 	return out
 }
 
-// withKeptText is row with what the pass read off a deleted transcript's text
-// when it was on disk. Its records are not the file: a turn another copy holds
-// was filed under one of them, and the log holds them in the order passes
-// wrote them, so what is read off them in order (the conclusion, the friction
-// and questions up to their caps) came back other than the pass had it.
-func withKeptText(row, kept SessionMeta) SessionMeta {
+// withKeptRow is row with what the pass read off a deleted transcript when it
+// was on disk. Its records are not the file: a turn another copy holds was
+// filed under one of them, and the log holds them in the order passes wrote
+// them, so what is read off them in order (the conclusion, the friction lines
+// and questions up to their caps) came back other than the pass had it
+// (#5535). Those are taken only from a row this version wrote: a version bump
+// that changes how they are read, or what is redacted from the conclusion,
+// recomputes them from the records.
+func withKeptRow(row, kept SessionMeta, sameVersion bool) SessionMeta {
 	row.Counted, row.Words, row.LastMsg, row.Opening = kept.Counted, kept.Words, kept.LastMsg, kept.Opening
-	row.Settled, row.RanCommand, row.Asked, row.Hit, row.GaveUp = kept.Settled, kept.RanCommand, kept.Asked, kept.Hit, kept.GaveUp
-	row.Touched, row.TouchHits = kept.Touched, kept.TouchHits
+	if sameVersion {
+		row.Settled, row.RanCommand, row.Asked, row.Hit, row.GaveUp = kept.Settled, kept.RanCommand, kept.Asked, kept.Hit, kept.GaveUp
+		row.Touched, row.TouchHits = kept.Touched, kept.TouchHits
+	}
 	return row
 }
 
@@ -5970,8 +5978,8 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		if owns {
 			next := ownerRow(row, cp, metaForSession(cp), row.Ord, collided)
 			// What the records cannot count, as the rebuild carries it.
-			if was := old.Sessions[key]; q == keptOwner[key] {
-				next.Counted, next.Words, next.LastMsg, next.Opening = was.Counted, was.Words, was.LastMsg, was.Opening
+			if q == keptOwner[key] {
+				next = withKeptRow(next, old.Sessions[key], true)
 			}
 			m.Sessions[key] = next
 		} else {
