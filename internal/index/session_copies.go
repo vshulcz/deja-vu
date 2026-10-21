@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // A session id can live in several transcripts: a fork or a resume copies the
@@ -139,23 +140,29 @@ func renameReorders(files []string, renamed map[string]string) bool {
 
 // sharedTakeovers names the live copies a file in changed has to be read
 // again with: transcripts in another directory under the same filename-derived
-// id (#699) whose paths sort after it. A turn copies share is written once,
-// under the first that holds it, and a rebuild reads them in path order, so it
-// is the smaller path's. Appended, the turn stayed under the copy that had it
-// first, and the command tables leave a turn of another directory's copy out:
-// a copy taking the row lost it from the row's facts (#5492), and so did an
-// owner appending a turn a later copy already held. Read again with it, the
-// copies are written in path order, as a rebuild writes them.
-func sharedTakeovers(changed, files map[string]FileState, sessions map[string]SessionMeta) map[string]bool {
+// id (#699) whose paths sort after it and that hold a turn it now holds. A
+// turn copies share is written once, under the first that holds it, and a
+// rebuild reads them in path order, so it is the smaller path's. Appended, the
+// turn stayed under the copy that had it first, and the command tables leave a
+// turn of another directory's copy out: a copy taking the row lost it from the
+// row's facts (#5492), and so did an owner appending a turn a later copy
+// already held (#5509). Read again with it, the copies are written in path
+// order, as a rebuild writes them.
+//
+// A file new to the index is read whole and takes them all. A known one is
+// asked about its tail alone, against the records filed under each copy, so a
+// live owner beside a copy it forked from long ago still appends.
+func sharedTakeovers(dir, harness string, old Manifest, changed, files map[string]FileState) map[string]bool {
 	var out map[string]bool
-	for p := range changed {
+	for _, p := range sortedKeys(changed) {
 		if !copyable(p) {
 			continue
 		}
-		meta, ok := sessions[harnessForPath(p)+":"+filepath.Base(fileStem(p))]
+		meta, ok := old.Sessions[harnessForPath(p)+":"+filepath.Base(fileStem(p))]
 		if !ok {
 			continue
 		}
+		var after []string
 		for _, q := range sessionFiles(meta) {
 			if q <= p || filepath.Dir(p) == filepath.Dir(q) || !copyable(q) {
 				continue
@@ -164,10 +171,60 @@ func sharedTakeovers(changed, files map[string]FileState, sessions map[string]Se
 			if f, ok := files[q]; !ok || f.Kept || f.WrittenBack {
 				continue
 			}
+			after = append(after, q)
+		}
+		if len(after) == 0 {
+			continue
+		}
+		if of, known := old.Files[p]; known {
+			after = copiesHoldingTail(dir, harness, old, p, of, after)
+		}
+		for _, q := range after {
 			if out == nil {
 				out = map[string]bool{}
 			}
 			out[q] = true
+		}
+	}
+	return out
+}
+
+// copiesHoldingTail is those of qs with a record of a turn the tail of p
+// written since of holds. A tail that cannot be read takes them all.
+func copiesHoldingTail(dir, harness string, old Manifest, p string, of FileState, qs []string) []string {
+	ss, err := parseAppendedFile(harness, p, of, false)
+	if err != nil {
+		return qs
+	}
+	ss = sources.FilterSessions(ss)
+	preRedactSessions(nil, ss)
+	tail, keys := map[repeatKey]bool{}, map[string]bool{}
+	for _, s := range ss {
+		keys[s.Harness+":"+s.ID] = true
+		for _, m := range s.Messages {
+			// A command is the same turn before and after its result lands.
+			tail[repeatKeyOf(m.Role, m.Time, exitSuffix.ReplaceAllString(m.Text, ""))] = true
+		}
+	}
+	if len(tail) == 0 {
+		return nil
+	}
+	want := map[string]bool{}
+	for _, q := range qs {
+		want[q] = true
+	}
+	held := map[string]bool{}
+	if err := eachRecordForKeys(filepath.Join(dir, "records.bin"), tablesFromManifest(old), keys, func(r Record) {
+		if want[r.SourcePath] && tail[repeatKeyOf(r.Role, r.Time, exitSuffix.ReplaceAllString(r.Text, ""))] {
+			held[r.SourcePath] = true
+		}
+	}); err != nil {
+		return qs
+	}
+	var out []string
+	for _, q := range qs {
+		if held[q] {
+			out = append(out, q)
 		}
 	}
 	return out

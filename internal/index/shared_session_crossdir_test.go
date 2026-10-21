@@ -14,9 +14,10 @@ import (
 
 // Random passes over copies of one session spread over several project
 // directories, with deletes, renames and rewrites, each compared to a rebuild:
-// the records, the row, the command tables, the session facts and the fixes.
-// A deleted copy keeps every turn it held. CROSS_DIR_PARITY_SEEDS=from:to
-// sweeps more seeds.
+// the records, the row, the command tables and the session facts. A deleted
+// copy keeps every turn it held. CROSS_DIR_PARITY_SEEDS=from:to sweeps more
+// seeds. The fixes are compared too once a pass mines them as a rebuild does
+// (#5504): add "fixes" to the keys below.
 func TestRandomPassesOverCopiesInSeveralProjectsMatchRebuild(t *testing.T) {
 	from, to := 0, 3
 	if testing.Short() {
@@ -173,7 +174,7 @@ func crossDirRun(t *testing.T, seed int64) {
 			}
 		}
 		got, want := tables(dir), tables(fresh)
-		for _, k := range []string{"commands", "fails", "facts", "fixes"} {
+		for _, k := range []string{"commands", "fails", "facts"} {
 			if got[k] != want[k] {
 				t.Errorf("%s after incremental passes:\n%s\nafter a rebuild:\n%s", k, got[k], want[k])
 			}

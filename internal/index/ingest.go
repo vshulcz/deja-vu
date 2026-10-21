@@ -843,7 +843,7 @@ func ensureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 	// A file touched without being written is recorded, not read (#5324), so
 	// it does not turn an append into a handoff either.
 	dropTouched(changed, nil, m.Files)
-	if !removedAny && (len(changed) == 0 || canAppendIncremental(changed, m.Files) && !promptLogTakeover(changed, m.Files, m.Sessions) && sharedTakeovers(changed, want, m.Sessions) == nil) {
+	if !removedAny && (len(changed) == 0 || canAppendIncremental(changed, m.Files) && !promptLogTakeover(changed, m.Files, m.Sessions) && sharedTakeovers(dir, o.Harness, m, changed, want) == nil) {
 		mark("decide append")
 		// An append is cheap until it isn't. A live session that has been
 		// writing all day — a Grok `updates.jsonl` in the tens of megabytes —
@@ -5234,7 +5234,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		}
 		return nil
 	}
-	takenFrom := sharedTakeovers(changed, files, old.Sessions)
+	takenFrom := sharedTakeovers(dir, harness, old, changed, files)
 	if len(removed) == 0 && !rewritten && !handover && !promptLogTakeover(changed, old.Files, old.Sessions) && takenFrom == nil {
 		if canAppendIncremental(changed, old.Files) {
 			return appendPass(files, changed, true)
@@ -6526,7 +6526,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 			meta.Copies = withCopies(meta.Path, before.Copies, before.Path, s.Path)
 			// Which copy's commands the tables count follows the row's file
 			// (foreignPath): one that moved has its runs mined again.
-			if named && (before.Path != meta.Path || before.Shared != meta.Shared) {
+			if named && (before.Shared != meta.Shared || meta.Shared && filepath.Dir(before.Path) != filepath.Dir(meta.Path)) {
 				if rowMoved == nil {
 					rowMoved = map[string]bool{}
 				}

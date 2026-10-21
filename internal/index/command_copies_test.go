@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/model"
 )
 
 // Two transcripts in two projects sharing an id are one row, of the project
@@ -273,4 +275,42 @@ func TestARowMovedByAnAppendRecountsItsFailures(t *testing.T) {
 		}
 	}
 	sameTablesAsItsRebuild(t, inc)
+}
+
+// The owner of a shared row appending turns no other copy holds is still an
+// append: only a tail holding a turn a later copy has is read again with it.
+func TestAnOwnerAppendingItsOwnTurnsBesideACopyStaysAnAppend(t *testing.T) {
+	inc, write := collisionStore(t)
+	write("app", "dup", "make zzapp")
+	write("infra", "dup", "make zzinfra")
+	parityPass(t, inc, true)
+	app := filepath.Join(filepath.Dir(inc), "claude", "-tmp-app", "dup.jsonl")
+	parityWrite(t, app, `{"type":"user","sessionId":"dup","timestamp":"2026-07-17T10:00:00Z","cwd":"/tmp/app","message":{"role":"user","content":"and the changelog"}}`+"\n", true)
+	var progress strings.Builder
+	if err := Ensure(inc, "", false, &progress); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(progress.String(), replacementPassMarker) {
+		t.Errorf("an append of the owner's own turn read the copies again: %q", progress.String())
+	}
+	sameTablesAsItsRebuild(t, inc)
+}
+
+// Every build leaves the copy in another directory out of the tables, the
+// early slice a first build publishes included, which files no turn under a
+// deleted copy.
+func TestCommandSessionsLeavesTheOtherProjectsCopyOut(t *testing.T) {
+	m := Manifest{Sessions: map[string]SessionMeta{"claude:dup": {Path: "/p/a/dup.jsonl", Shared: true}}}
+	at := time.Date(2026, 1, 2, 3, 0, 0, 0, time.UTC)
+	ss := []model.Session{
+		{Harness: "claude", ID: "dup", Path: "/p/a/dup.jsonl", Messages: []model.Message{{Role: roleCommand, Text: "$ make own", Time: at}}},
+		{Harness: "claude", ID: "dup", Path: "/p/b/dup.jsonl", Messages: []model.Message{{Role: roleCommand, Text: "$ make foreign", Time: at.Add(time.Minute)}}},
+	}
+	for _, s := range commandSessions(ss, m, nil) {
+		for _, msg := range s.Messages {
+			if strings.Contains(msg.Text, "foreign") {
+				t.Errorf("the other project's run is counted for the row: %+v", msg)
+			}
+		}
+	}
 }

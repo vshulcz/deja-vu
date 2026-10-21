@@ -44,11 +44,12 @@ func commandSessions(ss []model.Session, m Manifest, filedUnder func(key string,
 		whole := !again
 		for j, msg := range s.Messages {
 			left := seen.dup(key, msg.Role, msg.Time, msg.Text) || strings.TrimSpace(msg.Text) == ""
-			if !left && filedUnder != nil {
-				if p := filedUnder(key, s, msg); p != "" {
-					left = foreignPath(p, meta)
-				} else {
-					left = foreign
+			if !left {
+				left = foreign
+				if filedUnder != nil {
+					if p := filedUnder(key, s, msg); p != "" {
+						left = foreignPath(p, meta)
+					}
 				}
 			}
 			if !left {
