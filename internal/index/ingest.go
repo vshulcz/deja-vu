@@ -737,7 +737,7 @@ func ensureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 	// A file touched without being written is recorded, not read (#5324), so
 	// it does not turn an append into a handoff either.
 	dropTouched(changed, nil, m.Files)
-	if !removedAny && (len(changed) == 0 || canAppendIncremental(changed, m.Files) && !promptLogTakeover(changed, m.Files, m.Sessions)) {
+	if !removedAny && (len(changed) == 0 || canAppendIncremental(changed, m.Files) && !promptLogTakeover(changed, m.Files, m.Sessions) && sharedTakeovers(changed, want, m.Sessions) == nil) {
 		mark("decide append")
 		// An append is cheap until it isn't. A live session that has been
 		// writing all day — a Grok `updates.jsonl` in the tens of megabytes —
@@ -4865,7 +4865,8 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		}
 		return nil
 	}
-	if len(removed) == 0 && !rewritten && !handover && !promptLogTakeover(changed, old.Files, old.Sessions) {
+	takenFrom := sharedTakeovers(changed, files, old.Sessions)
+	if len(removed) == 0 && !rewritten && !handover && !promptLogTakeover(changed, old.Files, old.Sessions) && takenFrom == nil {
 		if canAppendIncremental(changed, old.Files) {
 			return appendPass(files, changed, true)
 		}
@@ -4879,6 +4880,13 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		}
 	}
 	rereadSharedCopies(removed, changed, files, old.Sessions)
+	takenRead := 0
+	for p := range takenFrom {
+		if _, again := changed[p]; !again {
+			changed[p] = files[p]
+			takenRead++
+		}
+	}
 	rereadPromptLogs(removed, changed, files, old.Files, old.Sessions)
 	var replacements []model.Session
 	// This pass's counts, like every other build path (#1850).
@@ -4948,7 +4956,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	// it, as a rebuild reads it: the ones that changed, and the copies beside
 	// them that did not (#5358). What those copies hold can name a session
 	// another file holds in turn, so it runs until nothing new is read.
-	copiesRead := 0
+	copiesRead := takenRead
 	if heldBy := keysByFile(old.Sessions); len(heldBy) > 0 {
 		var pending []string
 		for p := range changed {
@@ -4989,6 +4997,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 			}
 		}
 	}
+	sortCopies(replacements)
 	var pending []string
 	for _, p := range diffs {
 		if !fromDB[strings.TrimSuffix(filepath.Base(p), filepath.Ext(p))] {

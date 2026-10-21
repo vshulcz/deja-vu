@@ -1,7 +1,9 @@
 package index
 
 import (
+	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -133,4 +135,53 @@ func renameReorders(files []string, renamed map[string]string) bool {
 		}
 	}
 	return !slices.IsSorted(before)
+}
+
+// sharedTakeovers names the held owners a file in changed takes a row from:
+// a transcript in another directory, under the same filename-derived id, whose
+// path sorts first (#699). A turn both hold was written under the owner read
+// first, and the command tables leave a turn of another directory's copy out,
+// so the new owner's facts lost it where a rebuild kept it (#5492). The pass
+// reads the old owner again with it, and the turn goes to the copy a rebuild
+// gives it.
+func sharedTakeovers(changed, files map[string]FileState, sessions map[string]SessionMeta) map[string]bool {
+	var out map[string]bool
+	for p := range changed {
+		if !copyable(p) {
+			continue
+		}
+		meta, ok := sessions[harnessForPath(p)+":"+filepath.Base(fileStem(p))]
+		if !ok || p >= meta.Path || filepath.Dir(p) == filepath.Dir(meta.Path) || !copyable(meta.Path) {
+			continue
+		}
+		// A written-back file holds less than its records do (#4617).
+		if f, ok := files[meta.Path]; !ok || f.Kept || f.WrittenBack {
+			continue
+		}
+		if out == nil {
+			out = map[string]bool{}
+		}
+		out[meta.Path] = true
+	}
+	return out
+}
+
+// sortCopies puts the per-file transcripts of ss in path order, in the slots
+// they hold, and leaves the rest where they are. A turn copies share is
+// written once, under the first that holds it: read in map order, the pass
+// filed it under either copy, where a rebuild reads them in path order and the
+// command tables leave a copy in another directory out (#5492).
+func sortCopies(ss []model.Session) {
+	var at []int
+	var cp []model.Session
+	for i, s := range ss {
+		if copyable(s.Path) {
+			at = append(at, i)
+			cp = append(cp, s)
+		}
+	}
+	slices.SortStableFunc(cp, func(a, b model.Session) int { return strings.Compare(a.Path, b.Path) })
+	for k, i := range at {
+		ss[i] = cp[k]
+	}
 }

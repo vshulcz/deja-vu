@@ -137,3 +137,45 @@ insert into messages (session_id, role, content_json, created_timestamp) values 
 	parityPass(t, fresh, true)
 	return inc, fresh
 }
+
+// A copy with a smaller path that turns up after the first was indexed takes
+// the row. A turn both copies hold is the new owner's, as a rebuild files it,
+// and stays in the row's facts (#5492).
+func TestASharedTurnFollowsTheRowToANewOwner(t *testing.T) {
+	inc, write := collisionStore(t)
+	write("infra", "dup", "make zzshared", "make zzinfra")
+	parityPass(t, inc, true)
+	write("app", "dup", "make zzshared", "make zzapp")
+	parityPass(t, inc, false)
+	m, err := readManifest(inc)
+	if err != nil || !m.Sessions["claude:dup"].Shared || !strings.Contains(m.Sessions["claude:dup"].Path, "-tmp-app") {
+		t.Fatalf("the app copy did not take the shared row, so this measures nothing: %+v %v", m.Sessions["claude:dup"], err)
+	}
+	held := false
+	for _, c := range ReadSessionFacts(inc)["claude:dup"].Commands {
+		held = held || strings.Contains(c.Text, "zzshared")
+	}
+	if !held {
+		t.Errorf("the shared turn left the row's facts: %+v", ReadSessionFacts(inc)["claude:dup"].Commands)
+	}
+	sameCommandTables(t, inc)
+}
+
+// Copies read again in one pass are written in path order, as a rebuild
+// writes them, so a turn they share goes to the copy that owns the row. Map
+// order filed it under either; eight sessions make a pass right by chance
+// once in 256 (#5492).
+func TestCopiesReadInOnePassFileASharedTurnAsARebuild(t *testing.T) {
+	inc, write := collisionStore(t)
+	for i := range 8 {
+		write("app", fmt.Sprintf("dup%d", i), "make zzapp")
+		write("infra", fmt.Sprintf("dup%d", i), "make zzinfra")
+	}
+	parityPass(t, inc, true)
+	for i := range 8 {
+		write("app", fmt.Sprintf("dup%d", i), "make zzshared", "make zzapp")
+		write("infra", fmt.Sprintf("dup%d", i), "make zzshared", "make zzinfra")
+	}
+	parityPass(t, inc, false)
+	sameCommandTables(t, inc)
+}

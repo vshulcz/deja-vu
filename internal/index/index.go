@@ -785,7 +785,11 @@ import (
 // of a session share once, and of two transcripts sharing an id only the copy
 // the row names, and a pass takes the words it removes out of the neighbour
 // map (#5489, #5490, #5491).
-const version = 95
+// 96: a copy that takes a shared row from a transcript in another directory
+// reads the old owner again, and copies read in one pass are written in path
+// order, so a turn they share is filed under the copy a rebuild gives it
+// (#5492).
+const version = 96
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
