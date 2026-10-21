@@ -5984,11 +5984,14 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	// is a scan of records.bin — 2.9s of an 8.6s pass on a 191 MB store. Nothing
 	// this pass added can change them unless it added a command or the output of
 	// one, and most appends are speech, so ask first.
-	if carriesWork(appended) {
+	// A pass killed after its commit and before the tables left them behind
+	// the log, which the next pass heals whatever it appended.
+	if carriesWork(appended) || commandTablesBehind(dir, m) {
 		// From the states the last update left: only the sessions this pass
-		// appended to are read (#4288).
-		buildCommandTables(dir, dir, m, len(m.DeadRecords), nil)
+		// appended to are read (#4288). The command state goes last, so it
+		// stays behind until both tables are written.
 		buildCommandFailsFromIndex(dir, readCommandFailState(dir), nil)
+		buildCommandTables(dir, dir, m, len(m.DeadRecords), nil)
 	}
 	return filesTouched, messages, unreadable, nil
 }

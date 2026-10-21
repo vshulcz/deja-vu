@@ -59,7 +59,9 @@ location. The directory contains:
   questions it asked.
 
 Text taken out of a transcript leaves `records.bin` and `buckets/` on the next
-`deja index` pass that reads it. The pass zeroes the replaced records in
+`deja index` pass that reads it, and a command taken out leaves the command
+tables (`commands.gob`, `commandfails.gob`, `sessionfacts.gob`) on the same
+pass. The pass zeroes the replaced records in
 `records.bin` where they stand, and in `buckets/` blanks every word that no
 remaining record holds: a word filed under two leading letters keeps those,
 which the bucket file is named after, and one filed under a hash, as every

@@ -31,7 +31,7 @@ const (
 
 // commandsStateMagic changes with what the state means; a state of another
 // one is walked again rather than read.
-var commandsStateMagic = [8]byte{'D', 'J', 'C', 'M', 'D', 'S', '0', '2'}
+var commandsStateMagic = [8]byte{'D', 'J', 'C', 'M', 'D', 'S', '0', '3'}
 
 func commandsStatePath(dir string) string { return filepath.Join(dir, commandsStateFile) }
 
@@ -64,10 +64,10 @@ type commandsSession struct {
 	// Paths are the files its command records name, as ids in the log's
 	// string table, which a followed rename rewrites: a record from another
 	// file than the row's is two transcripts sharing an id, which the table
-	// refuses to attribute (see buildCommandsFromIndex).
+	// does not attribute (see buildCommandsFromIndex).
 	Paths []uint64
-	// Runs is by normalised command.
-	Runs map[string]*commandsRun
+	// Runs[i] is what Paths[i] ran, by normalised command.
+	Runs []map[string]*commandsRun
 }
 
 // commandsRun is one command in one session: the text and log offset of its
@@ -87,11 +87,14 @@ func newCommandsState() *commandsState {
 func (st *commandsState) add(key string, path uint64, text string, at time.Time, off int64) {
 	s := st.Sessions[key]
 	if s == nil {
-		s = &commandsSession{Runs: map[string]*commandsRun{}}
+		s = &commandsSession{}
 		st.Sessions[key] = s
 	}
-	if !slices.Contains(s.Paths, path) {
+	i := slices.Index(s.Paths, path)
+	if i < 0 {
+		i = len(s.Paths)
 		s.Paths = append(s.Paths, path)
+		s.Runs = append(s.Runs, map[string]*commandsRun{})
 	}
 	cmd := withoutExitStatus(strings.TrimSpace(firstTextLine(text)))
 	if cmd == "" || len(cmd) > commandTextMax {
@@ -101,10 +104,10 @@ func (st *commandsState) add(key string, path uint64, text string, at time.Time,
 	if low == "" {
 		return
 	}
-	r := s.Runs[low]
+	r := s.Runs[i][low]
 	if r == nil {
 		r = &commandsRun{Cmd: cmd, First: off}
-		s.Runs[low] = r
+		s.Runs[i][low] = r
 	}
 	r.Runs++
 	if at.After(r.Last) {
@@ -113,8 +116,8 @@ func (st *commandsState) add(key string, path uint64, text string, at time.Time,
 }
 
 // table is the command table of the sessions in m, the one a walk of the
-// log gives; collided is the walk's refusal.
-func (st *commandsState) table(m Manifest) (out []CommandUse, collided bool) {
+// log gives.
+func (st *commandsState) table(m Manifest) (out []CommandUse) {
 	type acc struct {
 		use       CommandUse
 		first     int64
@@ -128,12 +131,31 @@ func (st *commandsState) table(m Manifest) (out []CommandUse, collided bool) {
 		if !ok {
 			continue
 		}
-		for _, id := range s.Paths {
-			if p := t.lookup(id); p != "" && meta.Path != "" && p != meta.Path {
-				return nil, true
+		runs := s.Runs[0]
+		if len(s.Paths) > 1 || foreignPath(t.lookup(s.Paths[0]), meta) {
+			runs = map[string]*commandsRun{}
+			for i, id := range s.Paths {
+				if foreignPath(t.lookup(id), meta) {
+					continue
+				}
+				for low, r := range s.Runs[i] {
+					o := runs[low]
+					if o == nil {
+						c := *r
+						runs[low] = &c
+						continue
+					}
+					if r.First < o.First {
+						o.Cmd, o.First = r.Cmd, r.First
+					}
+					o.Runs += r.Runs
+					if r.Last.After(o.Last) {
+						o.Last = r.Last
+					}
+				}
 			}
 		}
-		for low, r := range s.Runs {
+		for low, r := range runs {
 			a := by[low]
 			if a == nil {
 				a = &acc{use: CommandUse{Command: r.Cmd}, first: r.First, byProject: map[string]*projAcc{}}
@@ -174,7 +196,18 @@ func (st *commandsState) table(m Manifest) (out []CommandUse, collided bool) {
 	if len(out) > commandsMax {
 		out = out[:commandsMax]
 	}
-	return out, false
+	return out
+}
+
+// foreignPath reports whether a command record from the file p belongs to
+// another transcript than meta's row: two transcripts in two directories
+// sharing an id (#699). The row names the winner's project, and filing the
+// other copy's commands under it is the leak ByProject exists to prevent, so
+// the table leaves them out until a full build reads each copy as its own
+// session. One conversation in two stores, as goose's migration left it, is
+// one row of one project and not shared.
+func foreignPath(p string, meta SessionMeta) bool {
+	return meta.Shared && p != "" && meta.Path != "" && p != meta.Path && filepath.Dir(p) != filepath.Dir(meta.Path)
 }
 
 // commandRecordsMined counts the command records the command tables read,
@@ -264,12 +297,10 @@ func buildCommandTables(dir, tmp string, m Manifest, priorDead int, redo map[str
 			facts[key] = f
 		}
 	}
-	if out, collided := st.table(m); !collided {
-		if len(out) == 0 {
-			_ = os.Remove(commandsPath(tmp))
-		} else {
-			_ = writeGobAtomic(commandsPath(tmp), out)
-		}
+	if out := st.table(m); len(out) == 0 {
+		_ = os.Remove(commandsPath(tmp))
+	} else {
+		_ = writeGobAtomic(commandsPath(tmp), out)
 	}
 	if len(facts) == 0 {
 		_ = os.Remove(sessionFactsPath(tmp))
@@ -301,6 +332,79 @@ func carriedCommandsState(dir string, m Manifest, priorDead int, size int64) (*c
 		return nil, nil
 	}
 	return st, facts
+}
+
+// commandTablesBehind reports whether a command or an output in dir's log is
+// past what the command tables were mined from. A pass that appends one
+// commits the log first and the tables after, so one killed in between left
+// them stale, and a pass appending none never asked again.
+func commandTablesBehind(dir string, m Manifest) bool {
+	gen, from, ok := commandsStateHead(dir)
+	if !ok || gen != m.Generation {
+		return true
+	}
+	path := filepath.Join(dir, "records.bin")
+	fi, err := os.Stat(path)
+	if err != nil || from == fi.Size() {
+		return false
+	}
+	// A tail this long is walked by the rebuild that moves the state past
+	// it, rather than again on every pass that adds none.
+	if from > fi.Size() || fi.Size()-from > commandsTailWalkMax {
+		return true
+	}
+	f, err := openIndexFile(path)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = f.Close() }()
+	if _, err := f.Seek(from, io.SeekStart); err != nil {
+		return false
+	}
+	t := tablesFromManifest(m)
+	errFound := errors.New("found")
+	err = walkStored(io.LimitReader(f, fi.Size()-from), t, from, func(_ int64, payload []byte) error {
+		_, _, rid, _, ok := recordPrefix(payload)
+		if !ok {
+			return errShortRecord
+		}
+		if r := t.lookup(rid); r == roleCommand || r == roleToolOutput {
+			return errFound
+		}
+		return nil
+	})
+	return errors.Is(err, errFound)
+}
+
+// commandsTailWalkMax is how much of the log past the command state a pass
+// that appended no command reads to find one.
+const commandsTailWalkMax = 4 << 20
+
+// commandsStateHead is the generation and log size the state in dir names,
+// read without the rest of it.
+func commandsStateHead(dir string) (gen string, size int64, ok bool) {
+	f, err := os.Open(commandsStatePath(dir))
+	if err != nil {
+		return "", 0, false
+	}
+	defer func() { _ = f.Close() }()
+	b := make([]byte, 512)
+	n, _ := io.ReadFull(f, b)
+	b = b[:n]
+	if len(b) < len(commandsStateMagic) || [8]byte(b[:8]) != commandsStateMagic {
+		return "", 0, false
+	}
+	b = b[8:]
+	l, k := binary.Uvarint(b)
+	if k <= 0 || l > uint64(len(b)-k) {
+		return "", 0, false
+	}
+	gen, b = string(b[k:k+int(l)]), b[k+int(l):]
+	v, k := binary.Uvarint(b)
+	if k <= 0 {
+		return "", 0, false
+	}
+	return gen, int64(v), true
 }
 
 // commandsTail adds to redo the sessions with a command in the log at path
@@ -377,18 +481,18 @@ func writeCommandsStateFile(dir string, st *commandsState) error {
 		s := st.Sessions[key]
 		str(key)
 		body = binary.AppendUvarint(body, uint64(len(s.Paths)))
-		for _, id := range s.Paths {
+		for i, id := range s.Paths {
 			body = binary.AppendUvarint(body, id)
-		}
-		lows := slices.Sorted(maps.Keys(s.Runs))
-		body = binary.AppendUvarint(body, uint64(len(lows)))
-		for _, low := range lows {
-			r := s.Runs[low]
-			body = binary.AppendUvarint(body, text(low))
-			body = binary.AppendUvarint(body, text(r.Cmd))
-			body = binary.AppendUvarint(body, uint64(r.First))
-			body = binary.AppendUvarint(body, uint64(r.Runs))
-			body = binary.AppendVarint(body, recordNanos(r.Last))
+			lows := slices.Sorted(maps.Keys(s.Runs[i]))
+			body = binary.AppendUvarint(body, uint64(len(lows)))
+			for _, low := range lows {
+				r := s.Runs[i][low]
+				body = binary.AppendUvarint(body, text(low))
+				body = binary.AppendUvarint(body, text(r.Cmd))
+				body = binary.AppendUvarint(body, uint64(r.First))
+				body = binary.AppendUvarint(body, uint64(r.Runs))
+				body = binary.AppendVarint(body, recordNanos(r.Last))
+			}
 		}
 	}
 	out := append([]byte{}, commandsStateMagic[:]...)
@@ -458,25 +562,30 @@ func readCommandsStateFile(dir string) (*commandsState, bool) {
 	ns := num()
 	for i := uint64(0); i < ns && !bad; i++ {
 		key := str()
-		s := &commandsSession{Runs: map[string]*commandsRun{}}
+		s := &commandsSession{}
 		np := num()
 		for j := uint64(0); j < np && !bad; j++ {
 			s.Paths = append(s.Paths, num())
+			runs := map[string]*commandsRun{}
+			s.Runs = append(s.Runs, runs)
+			nr := num()
+			for k := uint64(0); k < nr && !bad; k++ {
+				low, cmd := textAt(), textAt()
+				r := &commandsRun{Cmd: cmd, First: int64(num()), Runs: int(num())}
+				ns, n := binary.Varint(b)
+				if n <= 0 {
+					bad = true
+					break
+				}
+				b = b[n:]
+				if ns != zeroTimeUnixNano {
+					r.Last = time.Unix(0, ns)
+				}
+				runs[low] = r
+			}
 		}
-		nr := num()
-		for j := uint64(0); j < nr && !bad; j++ {
-			low, cmd := textAt(), textAt()
-			r := &commandsRun{Cmd: cmd, First: int64(num()), Runs: int(num())}
-			ns, n := binary.Varint(b)
-			if n <= 0 {
-				bad = true
-				break
-			}
-			b = b[n:]
-			if ns != zeroTimeUnixNano {
-				r.Last = time.Unix(0, ns)
-			}
-			s.Runs[low] = r
+		if len(s.Paths) == 0 {
+			bad = true
 		}
 		st.Sessions[key] = s
 	}
