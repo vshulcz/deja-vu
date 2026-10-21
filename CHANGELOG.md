@@ -19,6 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   postings: on a 40k-session store `"jolquihol huxdex"` said 9 of 4,109 and
   now lists 15 of 28. Past 20,000 postings the count is an estimate and says
   `about` (`total_estimated` in `--json`) (#5495).
+- Fixes and `frictext.bin` of a session two transcripts in two projects share
+  are read from the copy the row names, as the command tables are, so a pass
+  no longer pairs one file's error with the other's remedy and matches a
+  rebuild (#5504).
+- `deja index --quiet` no longer prints the shared-id line, which now counts
+  sessions rather than transcripts. Command "last run" dates read the same
+  after a pass and a rebuild, and a plain word some sessions hold only in a
+  command checks just those sessions instead of every unread match (#5504).
 The search screen reads a page at a time. A word most of a 40,000-session store holds lists its first 80 cards in about 1 s instead of 16, the list is headed with every match, and the next page loads as the selection nears the end (#5487). MCP `recall` runs one index search where it ran two, the project's answer cut from the machine's: 2.4 s to 1.3 s outside any known project, 2.2 s to 1.4 s inside one, same page (#5486). A session the trust policy withholds no longer takes a slot in a large search's pool or counts toward its total (#5488).
 
 ## [0.23.0] - 2026-10-21

@@ -293,6 +293,16 @@ func ReadCommands(dir string) []CommandUse {
 	if err := readGob(commandsPath(dir), &out); err != nil {
 		return nil
 	}
+	// In local time whichever path wrote the table: a pass takes the times
+	// from the record log in local time and a build from the transcripts in
+	// UTC, so "last Jan 2" moved a day around midnight with the path.
+	for i := range out {
+		out[i].Last = out[i].Last.Local()
+		for p, pu := range out[i].ByProject {
+			pu.Last = pu.Last.Local()
+			out[i].ByProject[p] = pu
+		}
+	}
 	return out
 }
 

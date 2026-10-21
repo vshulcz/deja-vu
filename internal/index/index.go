@@ -789,7 +789,9 @@ import (
 // reads the old owner again, and copies read in one pass are written in path
 // order, so a turn they share is filed under the copy a rebuild gives it
 // (#5492).
-const version = 96
+// 97: fixes are mined from what the record log holds, as the command tables
+// are: of two transcripts sharing an id only the copy the row names (#5504).
+const version = 97
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

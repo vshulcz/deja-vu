@@ -284,10 +284,11 @@ func searchDetailedRead(dir string, o query.Options) (SearchResult, error) {
 		// "code" too — but a compound spelled apart is not a substring of
 		// anything the store wrote, so the postings found the session and
 		// this check dropped it again (#2125).
-		ss, err = scanRecordsWithVariants(dir, m, o, postingOffsets(posts), fallbackVariants)
+		var misses int
+		ss, misses, err = scanRecordsTextMisses(dir, m, o, postingOffsets(posts), fallbackVariants)
 		if err == nil && unread != nil {
 			var more []model.Session
-			if more, err = verifyUnread(dir, m, o, fallbackVariants, ss, pool); len(more) > 0 {
+			if more, err = verifyUnread(dir, m, o, fallbackVariants, ss, pool, misses == 0); len(more) > 0 {
 				// Read now, so ranked with the rest; the scope's own matches
 				// among them need no second read.
 				ss, scoped = append(ss, more...), nil
@@ -3337,6 +3338,16 @@ func isToolRole(role string) bool {
 var wholeLogScanned func()
 
 func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []int64, variants map[string][]string) ([]model.Session, error) {
+	ss, _, err := scanRecordsTextMisses(dir, m, o, offsets, variants)
+	return ss, err
+}
+
+// scanRecordsTextMisses is scanRecordsWithVariants that also counts the
+// records read that do not pass the text check: none, and every session the
+// read dropped was dropped for its role or the caller's filters, not because
+// its postings named text it does not hold.
+func scanRecordsTextMisses(dir string, m Manifest, o query.Options, offsets []int64, variants map[string][]string) ([]model.Session, int, error) {
+	misses := 0
 	by := map[string]*model.Session{}
 	add := func(r Record) {
 		meta, ok := m.Sessions[r.Key]
@@ -3375,16 +3386,18 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 	if len(offsets) > 0 {
 		f, err := openIndexFile(filepath.Join(dir, "records.bin"))
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		defer func() { _ = f.Close() }()
 		offsets = sortedUniqueOffsets(offsets)
 		if err := eachRecordAt(f, offsets, tablesFromManifest(m), func(r Record) {
 			if matcher.matches(r) {
 				add(r)
+			} else {
+				misses++
 			}
 		}); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 	} else {
 		if err := eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
@@ -3393,9 +3406,11 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 			}
 			if matcher.matches(r) {
 				add(r)
+			} else {
+				misses++
 			}
 		}); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 	}
 	out := make([]model.Session, 0, len(by))
@@ -3405,7 +3420,7 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 	}
 	// The scoring and relevance tiers build their sessions here rather than
 	// through sessionsForMetas, so the ignore rule has to hold at both.
-	return ignoredByPolicy(out), nil
+	return ignoredByPolicy(out), misses, nil
 }
 
 func cutPostingsBySession(posts []posting, m Manifest, o query.Options) []posting {
@@ -3543,15 +3558,25 @@ var verifyUnreadBudget = 20000
 // counted the rest as matches, 106 in all (#5495).
 //
 // When every session read passed the text check, the postings were exact and
-// the counts stand: a plain word costs nothing here. Otherwise the unread
+// the counts stand: a plain word costs nothing here. When every record read
+// passed it and only the role filter dropped a session, the word matched in a
+// command or a file list, which only a session whose postings are all tool
+// records can be left with: those are checked and the counts cut by the ones
+// that fail, where every unread match used to be read again. Otherwise the unread
 // sessions are checked the same way, and the ones that pass are returned to
 // be ranked with the pool, which leaves nothing unread. Past
 // verifyUnreadBudget postings the counts are instead scaled by how many of the
 // sample read with the pool passed, and Unread.Estimated says so.
-func verifyUnread(dir string, m Manifest, o query.Options, variants map[string][]string, ss []model.Session, pool pooled) ([]model.Session, error) {
+func verifyUnread(dir string, m Manifest, o query.Options, variants map[string][]string, ss []model.Session, pool pooled, exactText bool) ([]model.Session, error) {
 	u := pool.unread
 	if len(ss) >= pool.readSessions || u.Sessions+u.Withheld == 0 {
 		return nil, nil
+	}
+	if exactText {
+		// Past the budget the counts are scaled below, as for a phrase.
+		if done, err := cutRoleOnlyUnread(dir, m, o, variants, pool); done || err != nil {
+			return nil, err
+		}
 	}
 	var rest, denied []posting
 	over := false
@@ -3595,6 +3620,76 @@ func verifyUnread(dir string, m Manifest, o query.Options, variants map[string][
 	return nil, nil
 }
 
+// cutRoleOnlyUnread takes out of the unread counts the sessions whose
+// postings are all tool records and none of whose records this query may be
+// served: a word only a command or a file list holds. done is false when
+// they are past verifyUnreadBudget postings and nothing was checked.
+func cutRoleOnlyUnread(dir string, m Manifest, o query.Options, variants map[string][]string, pool pooled) (done bool, err error) {
+	u := pool.unread
+	spoken := map[uint32]bool{}
+	for _, p := range pool.all {
+		if !p.Tool {
+			spoken[p.Sid] = true
+		}
+	}
+	var rest, denied []posting
+	for _, p := range pool.all {
+		if spoken[p.Sid] || pool.kept[p.Sid] {
+			continue
+		}
+		switch {
+		case pool.denied[p.Sid]:
+			denied = append(denied, p)
+		case pool.allowed[p.Sid]:
+			rest = append(rest, p)
+		}
+		if len(rest)+len(denied) > verifyUnreadBudget {
+			return false, nil
+		}
+	}
+	byOrd := sessionMetaByOrd(m)
+	failed := func(posts []posting) (map[string]bool, error) {
+		held, err := sessionsBorneOut(dir, m, o, variants, posts)
+		if err != nil {
+			return nil, err
+		}
+		ok := map[string]bool{}
+		for _, s := range held {
+			ok[s.Harness+":"+s.ID] = true
+		}
+		out := map[string]bool{}
+		for _, p := range posts {
+			meta := byOrd[p.Sid]
+			if k := meta.Harness + ":" + meta.ID; !ok[k] {
+				out[k] = true
+			}
+		}
+		return out, nil
+	}
+	gone, err := failed(rest)
+	if err != nil {
+		return true, err
+	}
+	withheld, err := failed(denied)
+	if err != nil {
+		return true, err
+	}
+	if len(gone) > 0 && u.Sessions > 0 {
+		left := max(u.Sessions-len(gone), 0)
+		u.Length *= float64(left) / float64(u.Sessions)
+		u.Sessions = left
+		for k := range gone {
+			delete(u.Sample, k)
+		}
+	}
+	u.Withheld = max(u.Withheld-len(withheld), 0)
+	return true, nil
+}
+
+// unreadPostingsChecked counts the postings sessionsBorneOut reads, for the
+// tests that keep a plain word from reading its unread matches again.
+var unreadPostingsChecked atomic.Int64
+
 // sessionsBorneOut is the sessions whose records at posts pass the text check
 // a search makes. The reads are split by session over a few workers: one
 // record read at a time spent 0.85 s in pread on 3,100 sessions of a
@@ -3604,6 +3699,7 @@ func sessionsBorneOut(dir string, m Manifest, o query.Options, variants map[stri
 	if len(posts) == 0 {
 		return nil, nil
 	}
+	unreadPostingsChecked.Add(int64(len(posts)))
 	workers := min(runtime.NumCPU(), 4, (len(posts)+511)/512)
 	offsets := make([][]int64, workers)
 	for _, p := range posts {

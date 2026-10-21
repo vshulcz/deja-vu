@@ -936,7 +936,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	// This build's counts, not the process's: see writeSessionsWithSync (#1850).
 	beginPass()
 	emptied.Store(0)
-	collisions.Store(0)
+	collisions.Store(nil)
 	merged.Store(0)
 	// A rebuild evicts nothing, but a number left by an earlier build must not
 	// outlive it (#1861).
@@ -1088,7 +1088,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 				emptied.Add(1)
 			}
 			if collided {
-				collisions.Add(1)
+				collisions.Add(key)
 			}
 			if owns {
 				row := ownerRow(prev, s, ord, collided)
@@ -1175,7 +1175,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 		cmds := commandSessions(ss, m)
 		for _, build := range []func(){
 			func() { buildCooccur(tmp, ss) },
-			func() { buildFixes(tmp, ss, func(s model.Session) string { return s.Harness + ":" + s.ID }) },
+			func() { buildFixes(tmp, cmds, func(s model.Session) string { return s.Harness + ":" + s.ID }) },
 			func() { buildCommands(tmp, cmds) },
 			func() { buildCommandFails(tmp, m.Generation, cmds) },
 			func() { buildSessionFacts(tmp, cmds) },
@@ -1981,12 +1981,12 @@ func malformedByHarness() map[string]int {
 	return out
 }
 
-// ReportCollisions returns how many transcripts shared an id with another since
-// the last build, and clears the counter. Silence was the worst part of #698:
+// ReportCollisions returns how many sessions had a transcript share their id
+// with another since the last build, and clears the count. Silence was the worst part of #698:
 // the indexer counted every session on disk while the manifest held fewer, and
 // nothing connected the two numbers.
 func ReportCollisions() int {
-	return int(collisions.Swap(0))
+	return len(collisions.Swap(nil))
 }
 
 // ReportMerged is ReportCollisions plus the pairs deja merges without warning.
@@ -2139,7 +2139,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	// beside it did the same. One process is one build for the CLI, which is
 	// why it showed in the test binary first.
 	emptied.Store(0)
-	collisions.Store(0)
+	collisions.Store(nil)
 	merged.Store(0)
 	initialBuild := !HasManifest(dir)
 	writtenMessages := 0
@@ -2212,7 +2212,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 				emptied.Add(1)
 			}
 			if collided {
-				collisions.Add(1)
+				collisions.Add(key)
 			}
 			if owns {
 				m.Sessions[key] = ownerRow(prev, s, ord, collided)
@@ -2276,9 +2276,9 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 		reportPhase("mining fixes and commands", 5)
 		buildCooccur(tmp, ss)
 		reportAdvance(1)
-		buildFixes(tmp, ss, func(s model.Session) string { return s.Harness + ":" + s.ID })
-		reportAdvance(1)
 		cmds := commandSessions(ss, m)
+		buildFixes(tmp, cmds, func(s model.Session) string { return s.Harness + ":" + s.ID })
+		reportAdvance(1)
 		buildCommands(tmp, cmds)
 		reportAdvance(1)
 		// No state: ss may hold text the records were redacted from.
@@ -3300,10 +3300,43 @@ func sortedKeys[V any](m map[string]V) []string {
 // Qualifying the key with the path was tried and reverted: records already on
 // disk carry the old key, so an incremental pass that reassigned one dropped
 // the session it renamed.
-// collisions counts the transcripts that shared an id with another during the
-// current build. The two full-build paths index sessions in parallel, so the
-// counter is atomic.
-var collisions atomic.Int64
+// collisions holds the session keys whose transcripts shared an id with
+// another during the current build. A set rather than a counter: a key read
+// from three files counted twice, and a pass that re-reads every copy of a
+// shared id counted each copy, where the line it feeds says sessions. The two
+// full-build paths index sessions in parallel, so it is locked.
+var collisions keySet
+
+type keySet struct {
+	mu sync.Mutex
+	m  map[string]bool
+}
+
+func (k *keySet) Add(key string) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	if k.m == nil {
+		k.m = map[string]bool{}
+	}
+	k.m[key] = true
+}
+
+// Swap replaces the set with keys and returns what it held.
+func (k *keySet) Swap(keys map[string]bool) map[string]bool {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	was := k.m
+	k.m = keys
+	return was
+}
+
+func (k *keySet) Store(keys map[string]bool) { k.Swap(keys) }
+
+func (k *keySet) Load() map[string]bool {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	return maps.Clone(k.m)
+}
 
 // merged counts every pair of transcripts that became one row, including the
 // ones deja does not warn about — a goose session present in both of that
@@ -4996,7 +5029,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	var replacements []model.Session
 	// This pass's counts, like every other build path (#1850).
 	emptied.Store(0)
-	collisions.Store(0)
+	collisions.Store(nil)
 	merged.Store(0)
 	lastIngestFiles = len(changed)
 	// The sessions a shared store handed back. Only those may drop a store's
@@ -5626,7 +5659,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		}
 		owns, collided := claimSession(held, s)
 		if collided {
-			collisions.Add(1)
+			collisions.Add(key)
 		}
 		if owns {
 			m.Sessions[key] = ownerRow(held, s, ord, collided)
@@ -5743,7 +5776,8 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	// The command table is recomputed from the sessions this pass changed and
 	// the state the last one left, and an empty one removes the carried file,
 	// as a full build would not write it (#4441).
-	mergeFixes(dir, tmp, sessionKeys(m), replacements, replaceKeys)
+	fixSessions, fixKeys := fixSessionsForPass(tmp, old, m, replacements, replaceKeys)
+	mergeFixes(dir, tmp, sessionKeys(m), fixSessions, fixKeys)
 	buildCommandTables(dir, tmp, m, len(old.DeadRecords), dropped)
 	buildCommandFailsFromIndex(tmp, carriedCommandFailState(dir, old, tmp, m.Generation, dropped), dropped)
 	return swap(m)
@@ -5989,7 +6023,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	// read between builds otherwise reported its own colliding ids plus the
 	// ones before it (#1850).
 	emptied.Store(0)
-	collisions.Store(0)
+	collisions.Store(nil)
 	merged.Store(0)
 	lastIngestFiles = len(changed)
 	readThisPass(changed)
@@ -6171,7 +6205,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 				meta.SharedStarted, meta.SharedUpdated = widerSpan(meta.SharedStarted, meta.SharedUpdated, s.Started, s.Updated)
 			}
 			if collided {
-				collisions.Add(1)
+				collisions.Add(key)
 				meta.Shared = true
 			}
 			// A tail with no files of its own names only the directory the

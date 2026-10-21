@@ -195,6 +195,10 @@ func writeFrictionTexts(dir string, m Manifest, size int64) error {
 			// A promoted note is reordered on load, so its first lines are
 			// not an append's to extend.
 			whole[k] = true
+		case meta.Shared:
+			// The tail may be a copy that took the row, which leaves the old
+			// entry the other copy's.
+			whole[k] = true
 		default:
 			extend[k] = true
 		}
@@ -321,7 +325,12 @@ func readFrictionEntries(dir string, m Manifest, f *os.File, t *recordTables, ke
 	var err error
 	if len(plain) > 0 {
 		roles := map[string]bool{roleToolOutput: true}
-		each := func(r Record) { send(r.Key, r.Text) }
+		each := func(r Record) {
+			// The row's copy, as the reader takes it (see toolOutput).
+			if !foreignPath(r.SourcePath, m.Sessions[r.Key]) {
+				send(r.Key, r.Text)
+			}
+		}
 		if from == 0 {
 			err = eachRecordForKeysInRoles(filepath.Join(dir, "records.bin"), t, plain, roles, each)
 		} else if _, err = f.Seek(from, io.SeekStart); err == nil {

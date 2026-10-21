@@ -101,3 +101,70 @@ func TestQuotedPhrasePastTheBudgetIsAnEstimate(t *testing.T) {
 		t.Errorf("total %d estimated %v, want an estimate near 5", r.Total, r.Estimated)
 	}
 }
+
+// A plain word some sessions hold only in a command: the read drops those for
+// their role, not because the postings were wrong, and the check re-read every
+// unread match of the word on that miss alone. Only the unread sessions that
+// hold it in tool records alone are checked, and the count is the ones that
+// say it.
+func TestAPlainWordInCommandsChecksOnlyTheCommandOnlySessions(t *testing.T) {
+	n := search.PoolSize(15) + 900
+	dir := filepath.Join(t.TempDir(), "index.db")
+	now := time.Now()
+	ss := make([]model.Session, 0, n)
+	spoken := 0
+	for i := 0; i < n; i++ {
+		at := now.Add(-time.Duration(i) * time.Minute)
+		msg := model.Message{Role: "user", Text: fmt.Sprintf("the zzquokka rollout of run %d", i), Time: at}
+		if i%10 == 1 {
+			msg = model.Message{Role: roleCommand, Text: fmt.Sprintf("make zzquokka RUN=%d", i), Time: at}
+		} else {
+			spoken++
+		}
+		ss = append(ss, model.Session{Harness: "claude", ID: fmt.Sprintf("s-%05d", i), Project: "shop", Started: at, Updated: at,
+			Messages: []model.Message{{Role: "user", Text: fmt.Sprintf("run %d", i), Time: at}, msg}})
+	}
+	writeTestStore(t, dir, ss...)
+	unreadPostingsChecked.Store(0)
+	res, err := SearchDetailed(dir, query.Options{Query: "zzquokka", Window: 15})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Unread == nil || res.Unread.Sessions == 0 {
+		t.Fatalf("every match was read: %d sessions, unread %+v", len(res.Sessions), res.Unread)
+	}
+	if got := len(res.Sessions) + res.Unread.Sessions; got != spoken {
+		t.Errorf("read and unread add up to %d, want the %d sessions that say it", got, spoken)
+	}
+	if got := unreadPostingsChecked.Load(); got > int64(n/10+1) {
+		t.Errorf("checked %d postings, more than the %d sessions holding the word only in a command", got, n/10+1)
+	}
+}
+
+// Past the budget the sessions holding the word only in a command are not
+// checked one by one, and the count is scaled and says so.
+func TestAPlainWordInCommandsPastTheBudgetIsAnEstimate(t *testing.T) {
+	defer func(b int) { verifyUnreadBudget = b }(verifyUnreadBudget)
+	verifyUnreadBudget = 10
+	n := search.PoolSize(15) + 300
+	dir := filepath.Join(t.TempDir(), "index.db")
+	now := time.Now()
+	ss := make([]model.Session, 0, n)
+	for i := 0; i < n; i++ {
+		at := now.Add(-time.Duration(i) * time.Minute)
+		msg := model.Message{Role: "user", Text: fmt.Sprintf("the zzquokka rollout of run %d", i), Time: at}
+		if i%2 == 1 {
+			msg = model.Message{Role: roleCommand, Text: fmt.Sprintf("make zzquokka RUN=%d", i), Time: at}
+		}
+		ss = append(ss, model.Session{Harness: "claude", ID: fmt.Sprintf("s-%05d", i), Project: "shop", Started: at, Updated: at,
+			Messages: []model.Message{{Role: "user", Text: fmt.Sprintf("run %d", i), Time: at}, msg}})
+	}
+	writeTestStore(t, dir, ss...)
+	res, err := SearchDetailed(dir, query.Options{Query: "zzquokka", Window: 15})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Unread == nil || !res.Unread.Estimated {
+		t.Fatalf("unread %+v, want an estimate", res.Unread)
+	}
+}

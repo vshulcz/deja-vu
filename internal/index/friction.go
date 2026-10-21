@@ -826,7 +826,13 @@ func (rd *frictionReader) toolOutput(meta SessionMeta) ([]string, bool) {
 	got := make(map[string][]string, len(keys))
 	err := eachRecordForKeysInRoles(filepath.Join(rd.dir, "records.bin"), tablesFromManifest(rd.m), keys,
 		map[string]bool{roleToolOutput: true}, func(r Record) {
-			got[r.Key] = append(got[r.Key], r.Text)
+			// Of two transcripts sharing an id, the copy the row names, as
+			// the fixes and the command tables take it: the other's records
+			// sit in the log where the pass that read it put them, which a
+			// rebuild does not (#5504).
+			if !foreignPath(r.SourcePath, rd.m.Sessions[r.Key]) {
+				got[r.Key] = append(got[r.Key], r.Text)
+			}
 		})
 	if err != nil {
 		// What one session's read would have said, session by session.

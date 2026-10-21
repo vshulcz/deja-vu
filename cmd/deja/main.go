@@ -728,8 +728,10 @@ func cmdIndex(dir string, rest []string) error {
 		fmt.Fprintf(said, "deja: %d transcript%s held no message deja could index — not counted as %s\n",
 			n, pluralS(n), pluralSessionWord(n))
 	}
+	// Said on every pass that reads a shared id's copies again, so it is a
+	// count like the ones above and --quiet keeps it out.
 	if n := index.ReportCollisions(); n > 0 {
-		fmt.Fprintf(os.Stderr, "deja: %d session%s %s an id with another transcript — each pair is filed under one project, the one whose file sorts first\n", n, pluralS(n), verbShare(n))
+		fmt.Fprintf(said, "deja: %d session%s %s an id with another transcript — each pair is filed under one project, the one whose file sorts first\n", n, pluralS(n), verbShare(n))
 	}
 	// The per-harness lines above count transcripts, so once any of them
 	// merged, those lines add up to more than the index holds — and the
