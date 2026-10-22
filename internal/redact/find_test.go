@@ -122,6 +122,8 @@ func TestFindersMatchRegexes(t *testing.T) {
 	n := 60000
 	if testing.Short() {
 		n = 5000
+	} else if raceEnabled {
+		n = 8000
 	}
 	r := rand.New(rand.NewSource(1))
 	for i := 0; i < n; i++ {
