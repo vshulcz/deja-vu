@@ -2,6 +2,16 @@ package bench
 
 import "testing"
 
+// A corpus that cannot be hashed has no identity to pin, so building one stops.
+func TestHashOfStopsOnAValueJSONCannotEncode(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("hashOf returned a hash for a channel")
+		}
+	}()
+	hashOf(make(chan int))
+}
+
 func TestGenerateIsDeterministic(t *testing.T) {
 	a := Generate(Seed)
 	b := Generate(Seed)

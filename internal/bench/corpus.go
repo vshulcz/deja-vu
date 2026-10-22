@@ -133,15 +133,21 @@ func Generate(seed int64) Corpus {
 			},
 		})
 	}
-	b, err := json.Marshal(struct { //nolint:musttag // field names are the hash input, tags would add nothing
+	return Corpus{Sessions: sessions, Queries: queries, Hash: hashOf(struct {
 		Sessions []model.Session
 		Queries  []Query
-	}{sessions, queries})
+	}{sessions, queries})}
+}
+
+// hashOf is the hex sha256 of v's JSON: the identity a generated corpus is
+// pinned by.
+func hashOf(v any) string {
+	b, err := json.Marshal(v)
 	if err != nil {
 		panic(err)
 	}
 	h := sha256.Sum256(b)
-	return Corpus{Sessions: sessions, Queries: queries, Hash: hex.EncodeToString(h[:])}
+	return hex.EncodeToString(h[:])
 }
 
 // occasions are what a person adds when they actually ask: not "connection pool

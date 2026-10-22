@@ -1,9 +1,6 @@
 package bench
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"math/rand"
 	"time"
@@ -208,12 +205,7 @@ func promptCorpusHash(chains []PromptChain) string {
 		}
 		out = append(out, s)
 	}
-	b, err := json.Marshal(out) //nolint:musttag // field names are the hash input, tags would add nothing
-	if err != nil {
-		panic(err)
-	}
-	h := sha256.Sum256(b)
-	return hex.EncodeToString(h[:])
+	return hashOf(out)
 }
 
 // cooccurTieCopies is how many sessions repeat the tying sentence. The map

@@ -1,9 +1,6 @@
 package bench
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -130,12 +127,7 @@ func GenerateContext(seed int64) ContextCorpus {
 		chain.Sessions = append(chain.Sessions, model.Session{ID: id + "-task", Harness: "claude", Project: project, Started: t, Updated: t, Messages: []model.Message{{Role: "user", Text: chain.Task, Time: t}}})
 		chains = append(chains, chain)
 	}
-	b, err := json.Marshal(chains) //nolint:musttag // field names are the hash input, tags would add nothing
-	if err != nil {
-		panic(err)
-	}
-	h := sha256.Sum256(b)
-	return ContextCorpus{Chains: chains, Hash: hex.EncodeToString(h[:])}
+	return ContextCorpus{Chains: chains, Hash: hashOf(chains)}
 }
 
 // fillerText builds a deterministic block of session noise: log-like lines
@@ -180,12 +172,7 @@ func GenerateContextMarathon(seed int64) ContextCorpus {
 		}
 		chains = append(chains, foldChain(chain))
 	}
-	b, err := json.Marshal(chains) //nolint:musttag // field names are the hash input, tags would add nothing
-	if err != nil {
-		panic(err)
-	}
-	h := sha256.Sum256(b)
-	return ContextCorpus{Chains: chains, Hash: hex.EncodeToString(h[:])}
+	return ContextCorpus{Chains: chains, Hash: hashOf(chains)}
 }
 
 // foldChain merges a chain's prior sessions into one, keeping the task session
