@@ -63,3 +63,49 @@ func TestRecallOnTheCommandLineIsTheMCPAnswer(t *testing.T) {
 		}
 	}
 }
+
+// The page ends with "call recall again with offset=N". A plugin tool that
+// serves this page through the shell had no way to ask for that offset, so the
+// paging line pointed at nothing; --offset is the MCP tool's offset.
+func TestRecallOnTheCommandLinePagesWithOffset(t *testing.T) {
+	hermeticEnv(t)
+	proj := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-work-app")
+	for _, s := range []string{"s1", "s2", "s3"} {
+		writeClaudeFixture(t, filepath.Join(proj, s+".jsonl"), s, []string{
+			`{"type":"user","sessionId":"` + s + `","cwd":"/work/app","timestamp":"2026-09-01T10:00:00Z","message":{"role":"user","content":"the quorbleflax cache in ` + s + ` keeps evicting"}}`,
+			`{"type":"assistant","sessionId":"` + s + `","cwd":"/work/app","timestamp":"2026-09-01T10:01:00Z","message":{"role":"assistant","content":"quorbleflax eviction comes from the ttl in ` + s + `"}}`,
+		})
+	}
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	// A plugin's child inherits COLUMNS; what it reads is still the page.
+	t.Setenv("COLUMNS", "40")
+	var first bytes.Buffer
+	if err := runRecall(dir, []string{"--limit", "1", "quorbleflax"}, &first); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(first.String(), "offset=1") {
+		t.Fatalf("the first page names no offset to ask for:\n%s", first.String())
+	}
+	var second bytes.Buffer
+	if err := runRecall(dir, []string{"--limit", "1", "--offset", "1", "quorbleflax"}, &second); err != nil {
+		t.Fatalf("recall --offset 1: %v", err)
+	}
+	if second.String() == first.String() || !strings.Contains(second.String(), "offset=2") {
+		t.Errorf("--offset 1 did not serve the next page:\nfirst:\n%s\nsecond:\n%s", first.String(), second.String())
+	}
+	mcp, err := callMCPTool(dir, "deja", json.RawMessage(`{"mode":"recall","q":"quorbleflax","limit":1,"offset":1}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(mcp, strings.TrimRight(second.String(), "\n")) {
+		t.Errorf("the command and the tool disagree at offset 1.\ncli:\n%s\nmcp:\n%s", second.String(), mcp)
+	}
+	for _, bad := range [][]string{{"--offset", "-1", "x"}, {"--offset", "two", "x"}, {"x", "--offset"}} {
+		if err := runRecall(dir, bad, &bytes.Buffer{}); err == nil {
+			t.Errorf("recall %q was accepted", bad)
+		}
+	}
+}

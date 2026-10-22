@@ -12,6 +12,8 @@ import {
   contextText,
   contributions,
   mcpWired,
+  recallArgv,
+  recallSilence,
   stripJSONComments,
   userTurns,
 } from "../lib.js"
@@ -473,4 +475,37 @@ test("every agent tool asks deja for framed output", () => {
     assert.ok(before.endsWith('"--framed", ...'), `${SRC.slice(m.index, m.index + 40)} in a tool is not framed`)
   }
   assert.ok(tools >= 3, `found ${tools} tool calls, so this proves nothing`)
+})
+
+// deja_recall ran `search --json`, which carries every hit's matched messages
+// whole: 222,536 characters for five hits on a synthetic store, 661,528 on a
+// tester's, where the MCP recall tool answers the same question in 4,096
+// (#5568). The tool now asks for that page, and pages with --offset.
+test("deja_recall asks for the recall page, not search", () => {
+  const SRC = readFileSync(new URL("../index.js", import.meta.url), "utf8")
+  const start = SRC.indexOf('deja_recall: {')
+  const tool = SRC.slice(start, SRC.indexOf('deja_session: {', start))
+  assert.ok(start >= 0 && tool.length > 0, "deja_recall is not where this test looks")
+  assert.match(tool, /recallArgv\((args|params)\)/)
+  assert.doesNotMatch(tool, /"search"|--json/)
+  assert.match(tool, /offset/, "the tool takes no offset, so the page's paging line points at nothing")
+})
+
+test("recallArgv asks for one page, from the offset given", () => {
+  assert.deepEqual(recallArgv({ query: "pgbouncer" }), ["recall", "--limit", "5", "pgbouncer"])
+  assert.deepEqual(recallArgv({ query: "pgbouncer", limit: 500, offset: 0 }), ["recall", "--limit", "20", "pgbouncer"])
+  assert.deepEqual(recallArgv({ query: "pgbouncer", limit: "3", offset: 6.7 }), [
+    "recall", "--limit", "3", "--offset", "6", "pgbouncer",
+  ])
+  // Junk and negatives fall back to the first page; a dash query still gets
+  // the terminator after the flags.
+  assert.deepEqual(recallArgv({ query: "--json", offset: -2 }), ["recall", "--limit", "5", "--", "--json"])
+  assert.deepEqual(recallArgv({ query: "x", offset: "two" }), ["recall", "--limit", "5", "x"])
+})
+
+test("silence past the first page is an old deja, not an empty history", () => {
+  assert.match(recallSilence(recallArgv({ query: "x", offset: 5 })), /deja update/)
+  assert.equal(recallSilence(recallArgv({ query: "x" })), "Nothing in this machine's history matches that.")
+  // An offset JavaScript would print as 1e+21 is one deja cannot parse.
+  assert.deepEqual(recallArgv({ query: "x", offset: 1e21 }), ["recall", "--limit", "5", "--offset", "1000000000", "x"])
 })

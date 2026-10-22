@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A transcript with nothing to index, such as one tool result that was only a
   `<deja-recall>` block, no longer gets an empty session in `deja last` from
   an incremental pass. A rebuild never listed it (#5563).
+- The `deja_recall` tool in the dsh, opencode, OpenClaw and Hermes plugins
+  answers with the MCP recall page, about 4 KB, and takes an `offset` for the
+  next one. dsh and opencode handed the model `search --json`: 222,536
+  characters for five hits on a test store. `deja recall` takes `--offset`
+  (#5568).
 
 ## [0.23.1] - 2026-10-22
 

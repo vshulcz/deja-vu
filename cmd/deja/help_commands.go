@@ -66,7 +66,7 @@ var helpEntries = []helpEntry{
 		more:     "A query prints the best-matching session's digest, an id that session's; then the code the session changed, each edit as the lines it removed and added.",
 		examples: []string{`deja ctx "schema migration rollback" > deja-context.md`, "deja ctx 01a00feb"}},
 	{name: "recall", group: groupSearch,
-		usage:    []string{"deja recall <words> [--project name] [--harness name] [--limit n]"},
+		usage:    []string{"deja recall <words> [--project name] [--harness name] [--limit n] [--offset n]"},
 		desc:     "the page the MCP recall tool gives an agent",
 		more:     "About 4 KB, this project first. For skills and scripts that reach deja through the shell rather than MCP.",
 		examples: []string{`deja recall "pgbouncer prepared statements"`}},

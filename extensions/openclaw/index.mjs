@@ -16,6 +16,8 @@ import {
   installerPluginPath,
   mcpWired,
   promptText,
+  recallArgv,
+  recallSilence,
   receiptAllowed,
   receiptLine,
   replyTakes,
@@ -115,6 +117,7 @@ const RECALL_SCHEMA = {
   properties: {
     query: { type: "string", description: "Error text, identifier, command, or a short description of the problem. Several words are ANDed." },
     limit: { type: "integer", description: "How many sessions to return. Default 5." },
+    offset: { type: "integer", description: "Sessions to skip, from the offset the previous page named. Default 0." },
   },
   required: ["query"],
 }
@@ -150,9 +153,10 @@ export default {
     }
     const answer = (out) => text(out || (installed ? NOTHING : MISSING))
 
-    // --framed: search, fix and blame print for a person, and what a tool
-    // returns goes to the model, which has to get it inside deja's
-    // untrusted-data frame. /deja below answers the person and stays plain.
+    // --framed: fix and blame print for a person, and what a tool returns goes
+    // to the model, which has to get it inside deja's untrusted-data frame.
+    // recall frames its own page. /deja below answers the person and stays
+    // plain.
     if (adds.tools) {
       api.registerTool({
         name: "deja_recall",
@@ -160,8 +164,10 @@ export default {
           "Search this machine's own past AI coding sessions — every agent used on it, including months before deja was installed. Use before debugging an error or re-implementing something that may already exist, before the first edit in a task and before calling a change done or ready to merge, and whenever the user implies the work happened before.",
         parameters: RECALL_SCHEMA,
         async execute(_id, params) {
-          const limit = String(Math.min(Math.max(Number(params.limit) || 5, 1), 20))
-          return answer(await ask(["--framed", ...argv("search", ["--limit", limit], params.query)], undefined, 120000))
+          // The page the MCP recall tool serves, framed and budgeted by deja.
+          const call = recallArgv(params)
+          const out = await ask(call, undefined, 120000)
+          return answer(out || (installed ? recallSilence(call) : ""))
         },
       })
       api.registerTool({

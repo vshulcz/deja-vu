@@ -147,9 +147,10 @@ func TestHermesGeneratedPythonCompiles(t *testing.T) {
 	}
 }
 
-// The model-facing tools hand back what the command printed, and search, fix
-// and blame print for a person: no frame, planted tags intact (#5051). Each one
-// asks for the framed form.
+// The model-facing tools hand back what the command printed, and fix and blame
+// print for a person: no frame, planted tags intact (#5051). Each asks for the
+// framed form. deja_recall asks for the recall page, which frames itself and
+// stays within the MCP tool's budget, where search grew with every hit (#5568).
 func TestHermesToolsAskForFramedOutput(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("stub deja is a shebang script")
@@ -179,6 +180,7 @@ func TestHermesToolsAskForFramedOutput(t *testing.T) {
 	}
 	run := "import provider\np = provider.DejaMemoryProvider()\n" +
 		"p.handle_tool_call('deja_recall', {'query': 'q'})\n" +
+		"p.handle_tool_call('deja_recall', {'query': '-q', 'offset': 3})\n" +
 		"p.handle_tool_call('deja_fix', {'error': 'e'})\n" +
 		"p.handle_tool_call('deja_blame', {'path': 'a.go'})\n"
 	cmd := exec.Command(py, "-c", run)
@@ -190,7 +192,7 @@ func TestHermesToolsAskForFramedOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stub deja was not called: %v", err)
 	}
-	want := `["--framed", "search", "q"]` + "\n" + `["--framed", "fix", "e"]` + "\n" + `["--framed", "blame", "a.go"]` + "\n"
+	want := `["recall", "q"]` + "\n" + `["recall", "--offset", "3", "--", "-q"]` + "\n" + `["--framed", "fix", "e"]` + "\n" + `["--framed", "blame", "a.go"]` + "\n"
 	if string(got) != want {
 		t.Fatalf("argv =\n%s\nwant\n%s", got, want)
 	}

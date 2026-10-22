@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -13,7 +14,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
-var recallFlags = []string{"--project", "--harness", "--limit"}
+var recallFlags = []string{"--project", "--harness", "--limit", "--offset"}
 
 // runRecall prints what the MCP recall tool answers: the framed page, budgeted
 // the same way, this project first. `deja search --json` was the only answer
@@ -21,7 +22,7 @@ var recallFlags = []string{"--project", "--harness", "--limit"}
 // harness truncates to nothing; a skill that drives deja through the shell had
 // nothing it could read (#4781).
 func runRecall(dir string, args []string, stdout io.Writer) error {
-	limit := 0
+	limit, offset := 0, 0
 	project, harness := "", ""
 	var terms []string
 	value := func(i int, flag string) (string, error) {
@@ -57,6 +58,18 @@ func runRecall(dir string, args []string, stdout io.Writer) error {
 				return fmt.Errorf("recall: --limit wants a positive number, got %q", v)
 			}
 			limit, i = n, i+1
+		case "--offset":
+			// The page ends by naming the offset of the rest; a plugin tool that
+			// serves this page needs a way to ask for it.
+			v, err := value(i, a)
+			if err != nil {
+				return err
+			}
+			n, err := strconv.Atoi(v)
+			if err != nil || n < 0 {
+				return fmt.Errorf("recall: --offset wants a number from 0 up, got %q", v)
+			}
+			offset, i = n, i+1
 		case "--project":
 			v, err := value(i, a)
 			if err != nil {
@@ -87,14 +100,19 @@ func runRecall(dir string, args []string, stdout io.Writer) error {
 		_, err := fmt.Fprintln(stdout, frameRecall(line))
 		return err
 	}
-	text, sessions, raw, ids, projects, err := recallTextResultIn(dir, q, harness, project, limit, 0, recallMCPBudget-recallFrameOverhead)
+	text, sessions, raw, ids, projects, err := recallTextResultIn(dir, q, harness, project, limit, offset, recallMCPBudget-recallFrameOverhead)
 	if err != nil {
 		return err
 	}
 	text = frameRecall(text)
 	usage.RecordServedFromInto(dir, usage.KindRecall, text, "", sessions, raw, ids, projects, policy.Load().Describe(policy.ActivationMCP))
-	if color, width := search.ColorOK(stdout), printableWidth(stdout); color || width > 0 {
-		text = recallForScreen(text, color, width)
+	// Only a terminal gets the screen form: printableWidth answers COLUMNS for
+	// a pipe too, and a plugin tool that inherited it handed the model a
+	// rewrapped page with the frame's own line cut in four (#5568).
+	if f, ok := stdout.(*os.File); ok && briefWanted(f) {
+		if color, width := search.ColorOK(stdout), printableWidth(stdout); color || width > 0 {
+			text = recallForScreen(text, color, width)
+		}
 	}
 	_, err = fmt.Fprintln(stdout, text)
 	return err

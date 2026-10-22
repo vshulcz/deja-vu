@@ -143,7 +143,7 @@ _deja_completion() {
             if [[ "$prev" == "--harness" ]]; then
                 COMPREPLY=( $(compgen -W "$harnesses" -- "$cur") )
             else
-                COMPREPLY=( $(compgen -W "--project --harness --limit" -- "$cur") )
+                COMPREPLY=( $(compgen -W "--project --harness --limit --offset" -- "$cur") )
             fi
             ;;
         remember)
@@ -373,7 +373,7 @@ _deja() {
       _arguments '--json[print JSON]' '--from=[which machine]:origin:(machine local)' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '--role=[filter by role]:role:(%ROLES%)' '1:count:'
       ;;
     recall)
-      _arguments '--project=[project name]:project:' '--harness=[filter by harness]:harness:($harnesses)' '--limit=[maximum sessions]:count:' '*:query:'
+      _arguments '--project=[project name]:project:' '--harness=[filter by harness]:harness:($harnesses)' '--limit=[maximum sessions]:count:' '--offset=[sessions to skip]:count:' '*:query:'
       ;;
     remember)
       _arguments '--project=[note project]:project:' '*--tag=[tag the note, repeatable]:tag:' '1:text:'
@@ -520,6 +520,7 @@ complete -c deja -n '__fish_seen_subcommand_from last' -l role -r -a '%ROLES%'
 complete -c deja -n '__fish_seen_subcommand_from recall; and not __fish_seen_subcommand_from bench' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from recall; and not __fish_seen_subcommand_from bench' -l harness -r -a '%HARNESSES%'
 complete -c deja -n '__fish_seen_subcommand_from recall; and not __fish_seen_subcommand_from bench' -l limit -r
+complete -c deja -n '__fish_seen_subcommand_from recall; and not __fish_seen_subcommand_from bench' -l offset -r
 complete -c deja -n '__fish_seen_subcommand_from remember' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from remember' -l tag -r
 complete -c deja -n '__fish_seen_subcommand_from rules; and not __fish_seen_subcommand_from sync status candidates' -f -a 'sync status candidates'
@@ -639,7 +640,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
             }
             'recall' {
                 if ($previous -eq '--harness') { $harnesses }
-                else { @('--project', '--harness', '--limit') }
+                else { @('--project', '--harness', '--limit', '--offset') }
             }
             'remember' { @('--project', '--tag') }
             'rules' {
