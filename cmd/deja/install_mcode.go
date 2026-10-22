@@ -105,9 +105,8 @@ func mcodeHooksDoc(exe string) []byte {
 			"hooks": []any{map[string]any{
 				"type":    "command",
 				"command": cmd,
-				// The runtime's own budget is fifteen seconds per event and
-				// this hook answers in milliseconds; five is the default and
-				// the ceiling MiniMax Code allows.
+				// Seconds. MiniMax Code takes 1 to 10 and defaults to 5;
+				// this hook answers in milliseconds.
 				"timeout": 5,
 			}},
 		}

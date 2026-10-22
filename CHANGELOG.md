@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from 9.3 s to 4.2 s and the whole build from 273 to 215 CPU-seconds (#5567).
 ### Added
 
+- MiniMax Code: sessions under `~/.minimax/v2/sessions` are indexed with the
+  person's own words rather than the runtime's reminders, `deja resume` prints
+  `mcode --session <id>`, and `deja install mcode` / `mcode-auto` write the MCP
+  entry and a hook plugin (#5593).
 - `deja search --sort date` lists the newest match first, in the text and in
   `--json`, and `^s` in the search screen turns the list newest first under
   day headings and back. On a common word the page is the newest of the whole
