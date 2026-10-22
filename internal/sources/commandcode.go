@@ -1,7 +1,6 @@
 package sources
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"os"
@@ -64,6 +63,7 @@ func CommandCodeUnderRoot(p string) bool {
 	return strings.HasPrefix(p, CommandCodeRoot()) && commandCodeIsTranscript(p)
 }
 
+// LoadCommandCode reads every Command Code session on this machine.
 func LoadCommandCode() []model.Session {
 	return parseFiles(CommandCodeSessionFiles(), ParseCommandCodeFile)
 }
@@ -235,7 +235,7 @@ func CommandCodeSessionDir(path string) string {
 		return ""
 	}
 	defer f.Close()
-	r := jsonlReaders.Get().(*bufio.Reader)
+	r := jsonlReader()
 	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
 	r.Reset(f)
 	for range claudeCWDScanLines {

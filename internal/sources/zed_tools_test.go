@@ -46,7 +46,7 @@ func zedWorkedStore(t *testing.T) []string {
 	if len(sessions) != 1 {
 		t.Fatalf("sessions = %d, want 1", len(sessions))
 	}
-	var roles []string
+	roles := make([]string, 0, len(sessions[0].Messages))
 	for _, m := range sessions[0].Messages {
 		roles = append(roles, m.Role+"\t"+m.Text)
 	}

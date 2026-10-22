@@ -143,8 +143,20 @@ func vocabEdit(path, span string) string {
 func vocabWrote(path, text string) string { return RoleWrote + ": " + WroteRecord(path, text) }
 
 func vocabJSON(v any) string {
-	b, _ := json.Marshal(v)
+	b, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
 	return string(b)
+}
+
+func mustJSON(tb testing.TB, v any) []byte {
+	tb.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	return b
 }
 
 func vocabWrite(t *testing.T, path string, lines ...string) string {
@@ -173,7 +185,7 @@ func vocabSQL(t *testing.T, script string) string {
 		t.Skip("sqlite3 not installed")
 	}
 	db := filepath.Join(t.TempDir(), "store.db")
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
 	return db
@@ -183,6 +195,7 @@ func vocabSQL(t *testing.T, script string) string {
 // cell_id, new_source, edit_mode} (#4489).
 func vocabClaude(parse func(string) ([]model.Session, error)) func(t *testing.T) []model.Session {
 	return func(t *testing.T) []model.Session {
+		t.Helper()
 		root := t.TempDir()
 		t.Setenv("DEJA_CLAUDE_ROOT", root)
 		line := func(content any) string {
@@ -202,6 +215,7 @@ func vocabClaude(parse func(string) ([]model.Session, error)) func(t *testing.T)
 // Codex 0.149: shell_command {command, workdir}, the shell whenever unified
 // exec is off (#4490).
 func vocabCodex(t *testing.T) []model.Session {
+	t.Helper()
 	rec := func(typ string, payload any) string {
 		return vocabJSON(map[string]any{"timestamp": "2026-10-01T10:00:01.000Z", "type": typ, "payload": payload})
 	}
@@ -220,6 +234,7 @@ func vocabCodex(t *testing.T) []model.Session {
 // arguments are the patch string itself (#4491).
 func vocabCopilot(patch string) func(t *testing.T) []model.Session {
 	return func(t *testing.T) []model.Session {
+		t.Helper()
 		ev := func(name string, args any) string {
 			return vocabJSON(map[string]any{"type": "tool.execution_start", "timestamp": "2026-10-01T10:00:01.000Z",
 				"data": map[string]any{"toolCallId": name, "toolName": name, "arguments": args}})
@@ -237,6 +252,7 @@ func vocabCopilot(patch string) func(t *testing.T) []model.Session {
 // Copilot Chat 0.64.1: copilot_readFile keeps its target only in the
 // message uris (#4492).
 func vocabCopilotChat(t *testing.T) []model.Session {
+	t.Helper()
 	uris := map[string]any{"file:///tmp/proj/retry.go": map[string]any{"$mid": 1, "path": "/tmp/proj/retry.go", "scheme": "file"}}
 	p := vocabWrite(t, filepath.Join(t.TempDir(), "chatSessions", "5c0ffee0-0000-4000-8000-000000000000.jsonl"),
 		vocabJSON(map[string]any{"kind": 0, "v": map[string]any{"version": 3, "sessionId": "5c0ffee0-0000-4000-8000-000000000000", "creationDate": 1790000000000, "requests": []any{}}}),
@@ -254,6 +270,7 @@ func vocabCopilotChat(t *testing.T) []model.Session {
 
 // Gemini CLI 0.60.0: read_many_files {include: [paths or globs]} (#4494).
 func vocabGemini(t *testing.T) []model.Session {
+	t.Helper()
 	_, chats := geminiTree(t)
 	call := map[string]any{"id": "rm1", "name": "read_many_files", "status": "success",
 		"args": map[string]any{"include": []any{"/tmp/proj/many_a.go", "/tmp/proj/many_b.go", "src/**/*.go"}}}
@@ -268,6 +285,7 @@ func vocabGemini(t *testing.T) []model.Session {
 // opencode 1.18: edit {filePath, oldString, newString}, write {filePath,
 // content} (#4495).
 func vocabOpencodeV1(t *testing.T) []model.Session {
+	t.Helper()
 	part := func(id, tool string, input any) string {
 		// Spelled out rather than marshalled: opencode writes type and tool
 		// first, and the reader's cheap gate looks for them there.
@@ -288,6 +306,7 @@ insert into message values('m1','ses_1',1790000001000,'{"role":"assistant","time
 
 // opencode 2.0.22: write {path, content} (#4495).
 func vocabOpencodeV2(t *testing.T) []model.Session {
+	t.Helper()
 	content := []any{map[string]any{"type": "tool", "id": "c1", "name": "write", "time": map[string]any{"start": 1790000002000},
 		"state": map[string]any{"status": "completed", "input": map[string]any{"path": "/tmp/proj/backoff.go", "content": "func backoffJitter(attempt int) time.Duration { return 0 }"}}}}
 	db := vocabSQL(t, `create table session_v2(id text primary key, project_id text, parent_id text, directory text, title text, time_created integer, time_updated integer);
@@ -301,6 +320,7 @@ insert into session_message values('m2','s1','assistant',2,1790000001000,1790000
 // Grok Build 1.0.41: search_replace {file_path, old_string, new_string},
 // write {file_path, content} (#4497).
 func vocabGrok(t *testing.T) []model.Session {
+	t.Helper()
 	call := func(id, name string, in any) string {
 		return vocabJSON(map[string]any{"timestamp": 1790874400002, "params": map[string]any{"update": map[string]any{
 			"sessionUpdate": "tool_call", "toolCallId": id, "title": name, "rawInput": in,
@@ -319,6 +339,7 @@ func vocabGrok(t *testing.T) []model.Session {
 // grok-dev 1.1.7: AI SDK tool-call and tool-result parts in grok.db, bash
 // {command}, read_file/write_file/edit_file {path, …} (#4498).
 func vocabGrokDB(t *testing.T) []model.Session {
+	t.Helper()
 	var b strings.Builder
 	b.WriteString(`CREATE TABLE sessions (id TEXT PRIMARY KEY, workspace_id TEXT, title TEXT, cwd_last TEXT, created_at TEXT);
 CREATE TABLE messages (session_id TEXT, seq INTEGER, role TEXT, message_json TEXT, created_at TEXT);
@@ -349,6 +370,7 @@ INSERT INTO sessions VALUES ('gd1','w1','fix the retry loop','/tmp/proj','2026-0
 // OpenClaw 2026.7.1: apply_patch {input}, on for every model (#4500).
 func vocabOpenClaw(patch string) func(t *testing.T) []model.Session {
 	return func(t *testing.T) []model.Session {
+		t.Helper()
 		p := vocabWrite(t, filepath.Join(t.TempDir(), "agents", "main", "sessions", "oc-s1.jsonl"),
 			`{"type":"session","version":3,"id":"oc-s1","timestamp":"2026-09-20T10:00:00.000Z","cwd":"/tmp/proj"}`,
 			`{"type":"message","id":"u1","timestamp":"2026-09-20T10:00:00.000Z","message":{"role":"user","content":[{"type":"text","text":"fix the retry loop"}]}}`,
@@ -364,6 +386,7 @@ func vocabOpenClaw(patch string) func(t *testing.T) []model.Session {
 // apply_patch {input} (#4503).
 func vocabClineSDK(patch string) func(t *testing.T) []model.Session {
 	return func(t *testing.T) []model.Session {
+		t.Helper()
 		use := func(id, name string, in any) any {
 			return map[string]any{"role": "assistant", "content": []any{map[string]any{"type": "tool_use", "id": id, "name": name, "input": in}}}
 		}
@@ -382,6 +405,7 @@ func vocabClineSDK(patch string) func(t *testing.T) []model.Session {
 // markers, apply_patch {input} (#4504).
 func vocabClineVSCode(patch string) func(t *testing.T) []model.Session {
 	return func(t *testing.T) []model.Session {
+		t.Helper()
 		use := func(id, name string, in any) any {
 			return map[string]any{"role": "assistant", "content": []any{map[string]any{"type": "tool_use", "id": id, "name": name, "input": in}}}
 		}
@@ -399,6 +423,7 @@ func vocabClineVSCode(patch string) func(t *testing.T) []model.Session {
 // kiro-cli --v3 and the Kiro IDE (@kiro/agent 0.66.0): tool_call records with
 // toolName and args (#4506).
 func vocabKiroIDE(t *testing.T) []model.Session {
+	t.Helper()
 	dir := filepath.Join(t.TempDir(), "f045c81011ce49e2", "sess_00000000-0000-4000-8000-0000000000aa")
 	n := 0
 	rec := func(payload any) string {

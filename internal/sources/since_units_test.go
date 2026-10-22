@@ -29,7 +29,7 @@ insert into session values ('s1','/tmp/app',%[1]d,%[1]d);
 insert into message values ('m1','s1','{"role":"user"}',%[1]d);
 insert into part values ('p1','m1',json_object('type','text','text','the autovacuum thread stalls'));
 `, newer.Unix())
-	if out, err := exec.Command("sqlite3", db, stmts).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, stmts).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}
 	// The premise: a full read does take this row, so a since clause that
@@ -69,7 +69,7 @@ insert into session values ('s1','/tmp/app',%[1]d,%[1]d);
 insert into message values ('m1','s1','{"role":"user"}',%[1]d);
 insert into part values ('p1','m1',json_object('type','text','text','the autovacuum thread stalls'));
 `, older.UnixMilli())
-	if out, err := exec.Command("sqlite3", db, stmts).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, stmts).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}
 	if whole, err := ParseOpencodeDBSince(db, time.Time{}); err != nil || len(whole) != 1 {

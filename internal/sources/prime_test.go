@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func writePrimeSession(t *testing.T, root, id, cwd string) string {
+func writePrimeSession(t *testing.T, root, id, cwd string) {
 	t.Helper()
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		t.Fatal(err)
@@ -22,7 +22,6 @@ func writePrimeSession(t *testing.T, root, id, cwd string) string {
 	if err := os.WriteFile(path, []byte(lines), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	return path
 }
 
 // The root is flat — one file per session, named by uuid7 — so there is no
@@ -158,7 +157,7 @@ func TestPrimeChildrenFollowTheSubagentSwitch(t *testing.T) {
 		if err != nil || len(ss) != 1 {
 			t.Fatalf("parse child: %v, %d sessions", err, len(ss))
 		}
-		var out []string
+		out := make([]string, 0, len(ss[0].Messages))
 		for _, m := range ss[0].Messages {
 			out = append(out, m.Text)
 		}

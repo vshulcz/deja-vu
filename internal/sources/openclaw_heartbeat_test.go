@@ -49,7 +49,7 @@ func TestOpenClawHeartbeatPollsAreNotTurns(t *testing.T) {
 	if err != nil || len(got) != 1 {
 		t.Fatalf("dm: %v %v", got, err)
 	}
-	var texts []string
+	texts := make([]string, 0, len(got[0].Messages))
 	for _, m := range got[0].Messages {
 		texts = append(texts, m.Text)
 	}
@@ -81,7 +81,7 @@ func TestOpenClawHeartbeatOKIsNotATurn(t *testing.T) {
 `
 	var bodySb81 strings.Builder
 	for i, ack := range []string{"HEARTBEAT_OK", "**HEARTBEAT_OK**", "HEARTBEAT_OK.", "NO_REPLY NO_REPLY"} {
-		bodySb81.WriteString(fmt.Sprintf(poll, fmt.Sprint("u", i), fmt.Sprint("u", i), ack))
+		fmt.Fprintf(&bodySb81, poll, fmt.Sprint("u", i), fmt.Sprint("u", i), ack)
 	}
 	body += bodySb81.String()
 	report := "HEARTBEAT_OK — but the nightly build failed on main."
@@ -94,7 +94,7 @@ func TestOpenClawHeartbeatOKIsNotATurn(t *testing.T) {
 	if err != nil || len(got) != 1 {
 		t.Fatalf("hb: %v %v", got, err)
 	}
-	var texts []string
+	texts := make([]string, 0, len(got[0].Messages))
 	for _, m := range got[0].Messages {
 		texts = append(texts, m.Text)
 	}

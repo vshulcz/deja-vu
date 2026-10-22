@@ -51,7 +51,7 @@ func gooseLineageSessions(t *testing.T) map[string]model.Session {
 		t.Skip("sqlite3 not installed")
 	}
 	db := filepath.Join(t.TempDir(), "sessions.db")
-	if out, err := exec.Command("sqlite3", db, gooseLineageStore).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, gooseLineageStore).CombinedOutput(); err != nil {
 		t.Fatalf("create db: %v: %s", err, out)
 	}
 	ss, err := ParseGooseDB(db)
@@ -66,7 +66,7 @@ func gooseLineageSessions(t *testing.T) map[string]model.Session {
 }
 
 func gooseTexts(s model.Session) string {
-	var b []string
+	b := make([]string, 0, len(s.Messages))
 	for _, m := range s.Messages {
 		b = append(b, m.Text)
 	}
@@ -143,7 +143,7 @@ insert into messages values (24,'chatcmpl-a','20261018_7','assistant','[{"type":
 insert into messages values (25,'msg_e1','20261018_7','user','[{"type":"text","text":"edited fork goes on"}]',1792305670);
 insert into sessions values ('20261018_8','cron','','/w/my-app','2026-10-18 06:42:00','2026-10-18 06:42:10','scheduled',null);
 insert into messages values (26,'msg_s1','20261018_8','user','[{"type":"text","text":"cron noise"}]',1792305720);`
-	if out, err := exec.Command("sqlite3", db, edit).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, edit).CombinedOutput(); err != nil {
 		t.Fatalf("create db: %v: %s", err, out)
 	}
 	full, err := ParseGooseDB(db)

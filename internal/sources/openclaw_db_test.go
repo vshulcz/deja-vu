@@ -27,7 +27,7 @@ func openclawTestDB(t *testing.T) (root, db string) {
 	if err := os.MkdirAll(filepath.Dir(db), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("sqlite3", db)
+	cmd := exec.CommandContext(t.Context(), "sqlite3", db)
 	cmd.Stdin = strings.NewReader(string(sql))
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("create sqlite fixture: %v: %s", err, out)
@@ -129,7 +129,7 @@ func TestOpenClawEmptyStoreIsQuietAndAForeignOneSaysSo(t *testing.T) {
 		t.Errorf("empty store: %v %v", got, err)
 	}
 	other := filepath.Join(dir, "other.sqlite")
-	if out, err := exec.Command("sqlite3", other, "create table t(x)").CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", other, "create table t(x)").CombinedOutput(); err != nil {
 		t.Fatalf("%v: %s", err, out)
 	}
 	// A database that exists but has no transcript_events is a schema deja
@@ -149,7 +149,7 @@ func TestOpenClawSessionKeyFromInitialSQLiteSchema(t *testing.T) {
 create table session_routes(session_key text primary key, session_id text not null);
 insert into sessions values('old', 'agent:main:main'), ('current', 'agent:main:main'), ('other', 'agent:main:other');
 insert into session_routes values('agent:main:main', 'current'), ('agent:main:other', 'other');`
-	if out, err := exec.Command("sqlite3", db, stmts).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, stmts).CombinedOutput(); err != nil {
 		t.Fatalf("create initial SQLite schema: %v: %s", err, out)
 	}
 	for _, tc := range []struct {
@@ -173,7 +173,7 @@ func TestOpenClawSessionKeyRejectsUnknownSQLiteSchema(t *testing.T) {
 		t.Skip("sqlite3 not installed")
 	}
 	db := filepath.Join(t.TempDir(), "openclaw-agent.sqlite")
-	if out, err := exec.Command("sqlite3", db, "create table unrelated(id text)").CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, "create table unrelated(id text)").CombinedOutput(); err != nil {
 		t.Fatalf("create unknown schema: %v: %s", err, out)
 	}
 	if _, err := OpenClawSessionKey(db, "session-id"); err == nil {

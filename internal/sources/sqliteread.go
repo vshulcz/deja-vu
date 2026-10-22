@@ -3,6 +3,7 @@ package sources
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -46,7 +47,7 @@ type sqliteRead struct {
 
 // sqliteReadCmd builds a read against a SQLite store under the store read
 // budget. The caller defers the release, which ends a child it never waited
-// for. A read given up is an ordinary read error, a *StalledRead, which every
+// for. A read given up is an ordinary read error, a *StalledReadError, which every
 // caller already handles: the harness reports it as unreadable and doctor
 // names it, rather than the run sitting on it forever.
 func sqliteReadCmd(db string, tail ...string) (*sqliteRead, func()) {
@@ -56,7 +57,7 @@ func sqliteReadCmd(db string, tail ...string) (*sqliteRead, func()) {
 		args = append(args, sqliteProgressArg)
 	}
 	args = append(args, tail...)
-	r := &sqliteRead{Cmd: exec.Command("sqlite3", args...), db: db, budget: budget, quit: make(chan struct{}), killed: make(chan struct{})}
+	r := &sqliteRead{Cmd: exec.CommandContext(context.Background(), "sqlite3", args...), db: db, budget: budget, quit: make(chan struct{}), killed: make(chan struct{})}
 	return r, r.release
 }
 
@@ -149,7 +150,7 @@ func (r *sqliteRead) release() {
 	}
 }
 
-func (r *sqliteRead) stallError() error { return &StalledRead{Path: r.db, Idle: r.budget} }
+func (r *sqliteRead) stallError() error { return &StalledReadError{Path: r.db, Idle: r.budget} }
 
 // ended is what the output says when it ends: the stall, if the read was
 // given up, rather than whatever the closed pipe said.
@@ -222,8 +223,8 @@ func (f *progressFilter) Read(p []byte) (int, error) {
 			f.moved()
 		}
 		atStart := !f.midLine
-		f.midLine = err == bufio.ErrBufferFull
-		if err != nil && err != bufio.ErrBufferFull {
+		f.midLine = errors.Is(err, bufio.ErrBufferFull)
+		if err != nil && !f.midLine {
 			if f.ended != nil {
 				err = f.ended(err)
 			}
@@ -261,7 +262,7 @@ func isProgressLine(b []byte) bool {
 // which is most often a harness that changed its schema. A read given up for
 // making no progress before its first row says that instead.
 func schemaChanged(store string, err error) error {
-	var st *StalledRead
+	var st *StalledReadError
 	if errors.As(err, &st) {
 		return err
 	}

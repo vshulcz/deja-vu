@@ -26,14 +26,14 @@ insert into message values('m2','s1',1767409260000,'{"role":"assistant","agent":
 insert into part values('p2','m2','{"type":"text","text":"the backoff counts from zero","time":{"start":"2026-01-02T03:01:00Z"}}');
 insert into message values('m3','s1',1767409320000,'{"role":"assistant","summary":true,"mode":"compaction","agent":"compaction"}');
 insert into part values('p3','m3','{"type":"text","text":"## Goal\nBring the exporter to a state where the retry budget is three","time":{"start":"2026-01-02T03:02:00Z"}}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
 	ss, err := ParseOpencodeDB(db)
 	if err != nil || len(ss) != 1 {
 		t.Fatalf("len=%d err=%v", len(ss), err)
 	}
-	var roles []string
+	roles := make([]string, 0, len(ss[0].Messages))
 	var summary string
 	for _, m := range ss[0].Messages {
 		roles = append(roles, m.Role)

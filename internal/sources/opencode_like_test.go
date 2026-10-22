@@ -24,7 +24,7 @@ insert into message values('m1','a_b',1,'{"role":"user"}');
 insert into message values('m2','axb',1,'{"role":"user"}');
 insert into part values('p1','m1','{"type":"text","text":"literal a_b marker"}');
 insert into part values('p2','m2','{"type":"text","text":"literal axb marker"}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("seed: %v %s", err, out)
 	}
 	t.Setenv("HOME", t.TempDir())

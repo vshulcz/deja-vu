@@ -62,7 +62,7 @@ create table part (id text primary key, message_id text, data text);
 insert into session values ('acp-9', '/private/tmp/proj', 1790000000000, 1790000060000);
 insert into message values ('m1', 'acp-9', 1790000000000, '{"role":"user","time":{"created":1790000000000}}');
 insert into part values ('p1', 'm1', '{"type":"text","text":"fix the retry loop, it never stops"}');`
-	if out, err := exec.Command("sqlite3", db, seed).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, seed).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}
 	n := 0
@@ -144,7 +144,7 @@ func TestZCodeLegacySidecarFollowsTheRestore(t *testing.T) {
 	if !SQLite3Available() {
 		t.Skip("sqlite3 CLI not available")
 	}
-	if out, err := exec.Command("sqlite3", db, `create table session (id text primary key); insert into session values ('acp-9');`).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, `create table session (id text primary key); insert into session values ('acp-9');`).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}
 	if size, stamp := zcodeLegacySidecar(snap); size != 1 || stamp != 1 {

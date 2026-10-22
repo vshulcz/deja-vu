@@ -24,7 +24,7 @@ create table part(id text, message_id text, data text);
 insert into session values('s1','/w/app2','2026-01-02T03:00:00Z','2026-01-03T03:00:00Z');
 insert into message values('m1','s1',1767409200000,'{"role":"assistant"}');
 insert into part values('p1','m1','{"type":"tool","tool":"apply_patch","state":{"status":"completed","input":{"patchText":"` + patch + `"}},"time":{"start":"2026-01-02T03:00:02Z"}}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
 	ss, err := ParseOpencodeDB(db)

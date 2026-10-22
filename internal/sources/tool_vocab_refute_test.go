@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -115,6 +116,7 @@ func TestRelativePatchPathsResolveAgainstTheSession(t *testing.T) {
 	for name, parse := range map[string]func(t *testing.T) []model.Session{
 		"copilot": vocabCopilot(relPatch),
 		"copilot from an offset": func(t *testing.T) []model.Session {
+			t.Helper()
 			ss := vocabCopilot(relPatch)(t)
 			path := ss[0].Path
 			// Past session.start, the way an incremental index reads on.
@@ -122,7 +124,7 @@ func TestRelativePatchPathsResolveAgainstTheSession(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			off := int64(strings.Index(string(raw), "\n") + 1)
+			off := int64(bytes.IndexByte(raw, '\n') + 1)
 			out, err := ParseCopilotFileFromOffset(path, off)
 			if err != nil {
 				t.Fatal(err)
@@ -130,6 +132,7 @@ func TestRelativePatchPathsResolveAgainstTheSession(t *testing.T) {
 			return out
 		},
 		"cline-sdk": func(t *testing.T) []model.Session {
+			t.Helper()
 			dir := filepath.Join(t.TempDir(), "1790877871095_abcdf")
 			vocabWrite(t, filepath.Join(dir, "1790877871095_abcdf.json"), `{"session_id":"1790877871095_abcdf","cwd":"/tmp/proj"}`)
 			p := vocabWrite(t, filepath.Join(dir, "1790877871095_abcdf.messages.json"), vocabJSON(map[string]any{"messages": []any{

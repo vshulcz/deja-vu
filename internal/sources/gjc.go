@@ -85,6 +85,7 @@ func GjcUnderRoot(p string) bool {
 	return strings.HasPrefix(p, GjcRoot()) && gjcWanted(p)
 }
 
+// LoadGjc reads every gjc session on this machine.
 func LoadGjc() []model.Session { return parseFiles(GjcSessionFiles(), ParseGjcFile) }
 
 // ParseGjcFile reads one transcript.

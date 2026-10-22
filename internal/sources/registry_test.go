@@ -74,8 +74,8 @@ func TestFormatRegistryConformance(t *testing.T) {
 
 		t.Run(entry.ID, func(t *testing.T) {
 			for _, fixture := range entry.FixturePaths {
-				fixture := filepath.Join(root, filepath.FromSlash(fixture))
-				sessions := parseRegistryFixture(t, entry.ID, fixture)
+				fixturePath := filepath.Join(root, filepath.FromSlash(fixture))
+				sessions := parseRegistryFixture(t, entry.ID, fixturePath)
 				validateRegistrySessions(t, entry.ID, sessions)
 			}
 		})
@@ -132,6 +132,7 @@ func validateRegistryEntry(t *testing.T, root string, entry formatRegistryEntry)
 }
 
 func parseRegistryFixture(t *testing.T, id, path string) []model.Session {
+	t.Helper()
 	return parseRegistryFixtureIn(t, id, path, t.TempDir())
 }
 
@@ -173,7 +174,7 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 				t.Fatal(readErr)
 			}
 			db := filepath.Join(work, "kilo.db")
-			if out, runErr := exec.Command("sqlite3", db, string(sql)).CombinedOutput(); runErr != nil {
+			if out, runErr := exec.CommandContext(t.Context(), "sqlite3", db, string(sql)).CombinedOutput(); runErr != nil {
 				t.Fatalf("create sqlite fixture: %v: %s", runErr, out)
 			}
 			sessions, err = ParseKiloDB(db)
@@ -211,7 +212,7 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 				t.Fatal(readErr)
 			}
 			db := filepath.Join(work, "db.sqlite")
-			build := exec.Command("sqlite3", db)
+			build := exec.CommandContext(t.Context(), "sqlite3", db)
 			build.Stdin = strings.NewReader(string(sql))
 			if out, runErr := build.CombinedOutput(); runErr != nil {
 				t.Fatalf("create sqlite fixture: %v: %s", runErr, out)
@@ -249,7 +250,7 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 		// and one file holding both schemas is a store neither reader
 		// describes.
 		db := filepath.Join(work, strings.TrimSuffix(filepath.Base(path), ".sql")+".db")
-		if out, runErr := exec.Command("sqlite3", db, string(sql)).CombinedOutput(); runErr != nil {
+		if out, runErr := exec.CommandContext(t.Context(), "sqlite3", db, string(sql)).CombinedOutput(); runErr != nil {
 			t.Fatalf("create sqlite fixture: %v: %s", runErr, out)
 		}
 		sessions, err = ParseOpencodeDB(db)
@@ -275,7 +276,7 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 				t.Fatal(readErr)
 			}
 			db := filepath.Join(work, "goose.db")
-			if out, runErr := exec.Command("sqlite3", db, string(sql)).CombinedOutput(); runErr != nil {
+			if out, runErr := exec.CommandContext(t.Context(), "sqlite3", db, string(sql)).CombinedOutput(); runErr != nil {
 				t.Fatalf("create sqlite fixture: %v: %s", runErr, out)
 			}
 			sessions, err = ParseGooseDB(db)
@@ -297,7 +298,7 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 			if mkErr := os.MkdirAll(filepath.Dir(db), 0o755); mkErr != nil {
 				t.Fatal(mkErr)
 			}
-			cmd := exec.Command("sqlite3", db)
+			cmd := exec.CommandContext(t.Context(), "sqlite3", db)
 			cmd.Stdin = strings.NewReader(string(sql))
 			if out, runErr := cmd.CombinedOutput(); runErr != nil {
 				t.Fatalf("create sqlite fixture: %v: %s", runErr, out)
@@ -321,7 +322,7 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 		if mkErr := os.MkdirAll(filepath.Dir(db), 0o755); mkErr != nil {
 			t.Fatal(mkErr)
 		}
-		cmd := exec.Command("sqlite3", db)
+		cmd := exec.CommandContext(t.Context(), "sqlite3", db)
 		cmd.Stdin = strings.NewReader(string(sql))
 		if out, runErr := cmd.CombinedOutput(); runErr != nil {
 			t.Fatalf("create sqlite fixture: %v: %s", runErr, out)
@@ -336,7 +337,7 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 			t.Fatal(readErr)
 		}
 		db := filepath.Join(work, "state.db")
-		if out, runErr := exec.Command("sqlite3", db, string(sql)).CombinedOutput(); runErr != nil {
+		if out, runErr := exec.CommandContext(t.Context(), "sqlite3", db, string(sql)).CombinedOutput(); runErr != nil {
 			t.Fatalf("create sqlite fixture: %v: %s", runErr, out)
 		}
 		sessions, err = ParseHermesDB(db)
@@ -352,7 +353,7 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 		// On stdin rather than as an argument: this fixture documents its
 		// opaque blob in a leading `--` comment, and the sqlite3 CLI reads a
 		// leading `--` as an option.
-		build := exec.Command("sqlite3", db)
+		build := exec.CommandContext(t.Context(), "sqlite3", db)
 		build.Stdin = strings.NewReader(string(sql))
 		if out, runErr := build.CombinedOutput(); runErr != nil {
 			t.Fatalf("create sqlite fixture: %v: %s", runErr, out)
@@ -376,7 +377,7 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 		if mkErr := os.MkdirAll(filepath.Dir(db), 0o755); mkErr != nil {
 			t.Fatal(mkErr)
 		}
-		build := exec.Command("sqlite3", db)
+		build := exec.CommandContext(t.Context(), "sqlite3", db)
 		build.Stdin = strings.NewReader(string(sql))
 		if out, runErr := build.CombinedOutput(); runErr != nil {
 			t.Fatalf("create sqlite fixture: %v: %s", runErr, out)

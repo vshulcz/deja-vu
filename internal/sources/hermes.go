@@ -21,8 +21,9 @@ func HermesHome() string {
 	return EnvPath("DEJA_HERMES_HOME", EnvPath("HERMES_HOME", filepath.Join(Home(), ".hermes")))
 }
 
-// Hermes keeps one SQLite store per profile under ~/.hermes/profiles/<name>,
-// so a user running several profiles has several stores and all of them count.
+// HermesProfilesRoot is where Hermes profiles live. Hermes keeps one SQLite
+// store per profile under ~/.hermes/profiles/<name>, so a user running several
+// profiles has several stores and all of them count.
 func HermesProfilesRoot() string {
 	if p := os.Getenv("DEJA_HERMES_PROFILES_ROOT"); p != "" {
 		return p
@@ -72,6 +73,7 @@ func HermesSessionFiles() []string {
 	return files
 }
 
+// LoadHermes reads every Hermes store on this machine.
 func LoadHermes() []model.Session {
 	var out []model.Session
 	for _, db := range HermesDBs() {
@@ -85,6 +87,7 @@ func LoadHermes() []model.Session {
 	return out
 }
 
+// ParseHermesDB reads every session in the Hermes store at db.
 func ParseHermesDB(db string) ([]model.Session, error) {
 	return parseHermesDBWhere(db, "")
 }
@@ -458,7 +461,7 @@ func hermesSessionMetaWhere(db, where string) map[string]hermesMeta {
 	var fieldsSb458 strings.Builder
 	for col, key := range map[string]string{"cwd": "cwd", "source": "source", "parent_session_id": "parent"} {
 		if cols[col] {
-			fieldsSb458.WriteString(fmt.Sprintf(`,'%s',cast(%s as text)`, key, col))
+			fmt.Fprintf(&fieldsSb458, `,'%s',cast(%s as text)`, key, col)
 		}
 	}
 	fields += fieldsSb458.String()
@@ -600,8 +603,8 @@ func hermesResolved(p string) string {
 	}
 	rest := ""
 	for dir := p; ; dir = filepath.Dir(dir) {
-		if real, err := filepath.EvalSymlinks(dir); err == nil {
-			return filepath.Join(real, rest)
+		if resolved, err := filepath.EvalSymlinks(dir); err == nil {
+			return filepath.Join(resolved, rest)
 		}
 		if filepath.Dir(dir) == dir {
 			return p

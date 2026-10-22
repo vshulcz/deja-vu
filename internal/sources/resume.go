@@ -1,7 +1,6 @@
 package sources
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"io"
@@ -54,7 +53,7 @@ func eachLineFrom(path string, offset int64, fn func(line []byte) bool) {
 		return
 	}
 	defer func() { _ = f.Close() }()
-	r := jsonlReaders.Get().(*bufio.Reader)
+	r := jsonlReader()
 	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
 	r.Reset(io.NewSectionReader(f, offset, 1<<62))
 	for {

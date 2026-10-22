@@ -118,8 +118,10 @@ func ClineLegacyRoots() []string {
 // doctor forms read it, so the row and the machine report cannot disagree on
 // where a cline transcript is looked for (#3399).
 func ClineStoreRoots() []string {
-	roots := []string{ClineSessionsDir()}
-	for _, root := range ClineLegacyRoots() {
+	legacy := ClineLegacyRoots()
+	roots := make([]string, 0, 1+len(legacy))
+	roots = append(roots, ClineSessionsDir())
+	for _, root := range legacy {
 		roots = append(roots, filepath.Join(root, "tasks"))
 	}
 	return roots
@@ -151,6 +153,7 @@ func ClineSidecarFiles() []string {
 	})
 }
 
+// LoadCline reads every Cline session on this machine.
 func LoadCline() []model.Session {
 	return parseFiles(ClineSessionFiles(), ParseClineFile)
 }

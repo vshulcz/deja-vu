@@ -30,7 +30,7 @@ func ReadZCodeCompaction(sessionID string) (CompactionTranscript, bool, error) {
 	db := ZCodeDB()
 	info, err := regularCompactionFile(db)
 	if err != nil {
-		return CompactionTranscript{}, false, nil
+		return CompactionTranscript{}, false, nil //nolint:nilerr // no store means no compaction to read
 	}
 	id := sqlEscape(sessionID)
 	cmd, stop := sqliteReadCmd(db, "select json_object('id',id,'at',time_created) from message where session_id='"+id+

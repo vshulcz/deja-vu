@@ -24,7 +24,7 @@ insert into cursorDiskKV values
  ('composerData:comp-1', json('{"composerId":"comp-1","name":"Fix the pager","createdAt":1752600000000,"lastUpdatedAt":1752600100000}')),
  ('bubbleId:comp-1:b1', json('{"type":1,"text":"the first question","timestamp":1752600001000,"workspaceProjectDir":"/Users/me/work/my-app"}')),
  ('bubbleId:comp-1:b2', json('{"type":2,"text":"the later answer","timestamp":1752600900000}'));`
-	if out, err := exec.Command("sqlite3", db, schema).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, schema).CombinedOutput(); err != nil {
 		t.Fatalf("seed: %v: %s", err, out)
 	}
 	texts := func(ms int64) []string {
@@ -87,7 +87,7 @@ insert into cursorDiskKV values ('composerData:still', json('{"composerId":"stil
 insert into cursorDiskKV values ('bubbleId:still:b1', json('{"type":1,"text":"nothing new","timestamp":1752600001000}'));
 commit;`)
 	// On stdin: the script is past the 32 KiB a Windows command line holds.
-	seed := exec.Command("sqlite3", db)
+	seed := exec.CommandContext(t.Context(), "sqlite3", db)
 	seed.Stdin = strings.NewReader(b.String())
 	if out, err := seed.CombinedOutput(); err != nil {
 		t.Fatalf("seed: %v: %s", err, out)

@@ -44,15 +44,15 @@ func TestAnOldRecordIsRewrittenOnceAndThenSettles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, append(old, '\n'), 0o600); err != nil {
+	if err = os.WriteFile(path, append(old, '\n'), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
 	tags := []string{"red\x1b[31mALERT\x1b[0m", strings.Repeat("w", 400)}
 	promote := func() {
 		t.Helper()
-		if err := AppendPromotedSourced("proj", "retries", "we cap retries at three", "sess1", "accepted", tags, time.Time{}, now); err != nil {
-			t.Fatal(err)
+		if perr := AppendPromotedSourced("proj", "retries", "we cap retries at three", "sess1", "accepted", tags, time.Time{}, now); perr != nil {
+			t.Fatal(perr)
 		}
 	}
 	promote()

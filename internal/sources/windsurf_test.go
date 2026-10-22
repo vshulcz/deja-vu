@@ -55,7 +55,7 @@ func TestWindsurfReadsPromptsAndReplies(t *testing.T) {
 	if want := projectName("/home/dev/src/notes-api"); s.Project != want {
 		t.Fatalf("project = %q, want %q", s.Project, want)
 	}
-	var got []string
+	got := make([]string, 0, len(s.Messages))
 	for _, m := range s.Messages {
 		got = append(got, m.Role+": "+m.Text)
 	}

@@ -39,7 +39,7 @@ func TestWriteBackCodeBuddyReadsBack(t *testing.T) {
 	if f.Path != s.Path || f.Turns != 2 {
 		t.Fatalf("path %q turns %d", f.Path, f.Turns)
 	}
-	if err := os.WriteFile(f.Path, f.Data, 0o600); err != nil {
+	if err = os.WriteFile(f.Path, f.Data, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	back, err := ParseCodeBuddyFile(f.Path)

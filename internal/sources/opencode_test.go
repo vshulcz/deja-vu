@@ -90,7 +90,7 @@ insert into message values('m1','s1',1767409200000,'{"role":"assistant"}');
 insert into part values('p1','m1','{"type":"tool","tool":"bash","state":{"input":{"command":"go test ./pkg/ -run Retry"}},"time":{"start":"2026-01-02T03:00:00Z"}}');
 insert into part values('p2','m1','{"type":"tool","tool":"bash","state":{"input":{"command":"ls -la"}},"time":{"start":"2026-01-02T03:00:01Z"}}');
 insert into part values('p3','m1','{"type":"tool","tool":"apply_patch","state":{"input":{"patchText":"` + patch + `"}},"time":{"start":"2026-01-02T03:00:02Z"}}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
 	ss, err := ParseOpencodeDB(db)
@@ -129,7 +129,7 @@ insert into message values('m1','s1',1767409200000,'{"role":"assistant"}');
 insert into part values('p1','m1','{"type":"tool","tool":"bash","state":{"input":{"command":"go test ./pkg/"},"output":"--- FAIL: TestRetry\nFAIL\tpkg 0.1s","metadata":{"exit":1}},"time":{"start":"2026-01-02T03:00:00Z"}}');
 insert into part values('p2','m1','{"type":"tool","tool":"bash","state":{"input":{"command":"go build ./..."},"output":"","metadata":{"exit":0}},"time":{"start":"2026-01-02T03:00:01Z"}}');
 insert into part values('p3','m1','{"type":"tool","tool":"read","state":{"input":{"filePath":"/w/big.go"},"output":"package main\n// thousands of lines of file content"},"time":{"start":"2026-01-02T03:00:02Z"}}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
 	ss, err := ParseOpencodeDB(db)

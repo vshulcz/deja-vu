@@ -23,7 +23,7 @@ INSERT INTO sessions VALUES ('s1','w1','Pool timeouts','/work/api','` + early + 
 INSERT INTO messages VALUES ('s1',0,'user','{"role":"user","content":"connection pool exhausted again"}','` + early + `');
 INSERT INTO messages VALUES ('s1',1,'assistant','{"role":"assistant","content":[{"type":"text","text":"raise max_conns"}]}','` + late + `');
 `
-	cmd := exec.Command("sqlite3", db)
+	cmd := exec.CommandContext(t.Context(), "sqlite3", db)
 	cmd.Stdin = stringsReader(schema)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("seed: %v: %s", err, out)

@@ -57,7 +57,7 @@ insert into session_message values('m3','quiet','user',1,1790858000000,179085800
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			db := filepath.Join(t.TempDir(), "opencode.db")
-			if out, err := exec.Command("sqlite3", db, tc.script).CombinedOutput(); err != nil {
+			if out, err := exec.CommandContext(t.Context(), "sqlite3", db, tc.script).CombinedOutput(); err != nil {
 				t.Fatalf("sqlite: %v %s", err, out)
 			}
 			for _, read := range []struct {
@@ -97,7 +97,7 @@ create table part(id text primary key, message_id text, session_id text, time_cr
 insert into session values('s1','/w/app',1790858248400,1790858252010);
 insert into message values('m1','s1',1790858252010,1790858252010,'{"role":"user"}');
 insert into part values('p1','m1','s1',1790858252010,1790858252010,'{"type":"text","text":"same millisecond"}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite: %v %s", err, out)
 	}
 	ss, err := ParseOpencodeDBSince(db, time.UnixMilli(1790858252010))

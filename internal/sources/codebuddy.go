@@ -172,7 +172,7 @@ func CodeBuddySubagentFile(p string) bool { return codeBuddySubagentParts(codeBu
 // CodeBuddySessionFiles lists the transcripts.
 func CodeBuddySessionFiles() []string {
 	subagents := !SubagentsOff()
-	var out []string
+	var out []string //nolint:prealloc // each root adds an unknown number of files
 	for _, root := range CodeBuddyRoots() {
 		out = append(out, walkFiles(root, func(p string) bool {
 			parts := codeBuddyRelTo(root, p)
@@ -189,7 +189,7 @@ func CodeBuddySessionFiles() []string {
 // file anywhere else under a project is still reported, which is how drift in
 // the store shows up.
 func CodeBuddySidecarFiles() []string {
-	var out []string
+	var out []string //nolint:prealloc // each root adds an unknown number of files
 	for _, root := range CodeBuddyRoots() {
 		out = append(out, walkFiles(root, func(p string) bool {
 			parts := codeBuddyRelTo(root, p)
@@ -206,6 +206,7 @@ func CodeBuddySidecarFiles() []string {
 	return out
 }
 
+// LoadCodeBuddy reads every CodeBuddy session on this machine.
 func LoadCodeBuddy() []model.Session {
 	return parseFiles(CodeBuddySessionFiles(), ParseCodeBuddyFile)
 }
@@ -365,7 +366,7 @@ func codeBuddyExitCode(out string) (int, bool) {
 		return 0, false
 	}
 	for _, line := range slices.Backward(lines) {
-		line := strings.TrimSpace(line)
+		line = strings.TrimSpace(line)
 		switch {
 		case line == "" || line == "Signal: (none)":
 		case strings.HasPrefix(line, "Signal: "), strings.HasPrefix(line, "(command "):

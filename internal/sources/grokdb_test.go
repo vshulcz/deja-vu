@@ -28,7 +28,7 @@ INSERT INTO messages VALUES ('s1',3,'assistant','{"role":"assistant","content":[
 INSERT INTO sessions VALUES ('s0','w1','Yesterday','/work/api','2026-07-26T09:00:00.000Z');
 INSERT INTO messages VALUES ('s0',0,'user','{"role":"user","content":"nothing touched this one again"}','2026-07-26T09:00:00.000Z');
 `
-	cmd := exec.Command("sqlite3", db)
+	cmd := exec.CommandContext(t.Context(), "sqlite3", db)
 	cmd.Stdin = stringsReader(schema)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("seed: %v: %s", err, out)

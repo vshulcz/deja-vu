@@ -173,10 +173,12 @@ func DeepSeekSessionFiles() []string {
 	return out
 }
 
+// LoadDeepSeek reads every DeepSeek session on this machine.
 func LoadDeepSeek() []model.Session {
 	return parseFiles(DeepSeekSessionFiles(), ParseDeepSeekFile)
 }
 
+// ParseDeepSeekFile reads one DeepSeek session log.
 func ParseDeepSeekFile(path string) ([]model.Session, error) {
 	raw, err := readDeepSeekLog(path)
 	if err != nil {
@@ -268,11 +270,11 @@ func ParseDeepSeekFile(path string) ([]model.Session, error) {
 			// A run of three or more consecutive deltas is stored as one packed
 			// row rather than as the events themselves, so a reader that knows
 			// only `assistant/chunk` loses exactly the long answers.
-			at := parseTimeAny(e["time0"])
+			chunkAt := parseTimeAny(e["time0"])
 			for _, part := range deepSeekPackedTexts(data["texts"]) {
 				pending = append(pending, part)
-				pendingAt = at
-				s.Touch(at)
+				pendingAt = chunkAt
+				s.Touch(chunkAt)
 			}
 		case "assistant/message":
 			// The complete message supersedes whatever of it was streamed.

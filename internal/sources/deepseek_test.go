@@ -52,7 +52,7 @@ func writeDeepSeekSession(t *testing.T, root, id, body string, compress bool) st
 		return path
 	}
 	out := path + ".zstd"
-	if err := exec.Command("zstd", "-q", "-o", out, path).Run(); err != nil {
+	if err := exec.CommandContext(t.Context(), "zstd", "-q", "-o", out, path).Run(); err != nil {
 		t.Fatalf("zstd: %v", err)
 	}
 	if err := os.Remove(path); err != nil {
@@ -88,7 +88,7 @@ func TestParseDeepSeekFile(t *testing.T) {
 		t.Errorf("title = %q", s.Title)
 	}
 
-	var roles []string
+	roles := make([]string, 0, len(s.Messages))
 	for _, m := range s.Messages {
 		roles = append(roles, m.Role)
 	}

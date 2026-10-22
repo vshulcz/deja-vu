@@ -12,7 +12,7 @@ func TestExitStderrLineIsTheFirstLineSqliteWrote(t *testing.T) {
 	if _, err := exec.LookPath("sh"); err != nil {
 		t.Skip("no sh")
 	}
-	cmd := exec.Command("sh", "-c", "echo 'Error: in prepare, file is not a database (26)' >&2; echo second >&2; exit 26")
+	cmd := exec.CommandContext(t.Context(), "sh", "-c", "echo 'Error: in prepare, file is not a database (26)' >&2; echo second >&2; exit 26")
 	_, err := cmd.Output()
 	if got := ExitStderrLine(err); got != "Error: in prepare, file is not a database (26)" {
 		t.Fatalf("line = %q", got)

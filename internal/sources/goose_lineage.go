@@ -77,7 +77,11 @@ func gooseForks(db string, g gooseSchema, where string) map[string]gooseFork {
 	}
 	forks := map[string]gooseFork{}
 	for line := range bytes.SplitSeq(out, []byte("\n")) {
-		var r struct{ Fork, Source, IDs string }
+		var r struct {
+			Fork   string `json:"fork"`
+			Source string `json:"source"`
+			IDs    string `json:"ids"`
+		}
 		if json.Unmarshal(line, &r) != nil || r.Fork == "" || r.Source == "" {
 			continue
 		}

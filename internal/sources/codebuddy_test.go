@@ -112,7 +112,7 @@ func TestParseCodeBuddyFixture(t *testing.T) {
 	if want := time.UnixMilli(1780000000000); !s.Started.Equal(want) {
 		t.Fatalf("started = %v, want %v", s.Started, want)
 	}
-	var got []string
+	got := make([]string, 0, len(s.Messages))
 	for _, m := range s.Messages {
 		got = append(got, m.Role+": "+m.Text)
 	}

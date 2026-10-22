@@ -118,7 +118,7 @@ func renderKimi(s model.Session, turns []model.Message) (string, []byte, error) 
 	return s.Path, data, err
 }
 
-func kimiWriteBackExtras(s model.Session, turns []model.Message, f WriteBackFile) (sidecars, appends []WriteBackPart, err error) {
+func kimiWriteBackExtras(s model.Session, turns []model.Message, _ WriteBackFile) (sidecars, appends []WriteBackPart, err error) {
 	home, sessionDir, key, _ := kimiWriteBackDirs(s)
 	workDir := kimiWorkDir(home, key, s.ID)
 	start, end := turns[0].Time, turns[len(turns)-1].Time

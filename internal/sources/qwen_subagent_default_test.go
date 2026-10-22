@@ -66,7 +66,7 @@ func TestQwenSubagentRunIsReadByDefault(t *testing.T) {
 	if s.Kind != "subagent" || s.Parent != parent || s.Agent != "fork" {
 		t.Errorf("child read as kind=%q parent=%q agent=%q, want a fork sub-agent of %s", s.Kind, s.Parent, s.Agent, parent)
 	}
-	var text []string
+	text := make([]string, 0, len(s.Messages))
 	wrote := false
 	for _, m := range s.Messages {
 		text = append(text, m.Text)

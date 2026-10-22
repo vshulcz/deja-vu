@@ -16,12 +16,12 @@ func TestClaudeProjectNameResolvesHyphenatedDirs(t *testing.T) {
 		t.Skip("claude encodes unix-style absolute paths; resolution is a no-op on windows")
 	}
 	tmp := t.TempDir()
-	real := filepath.Join(tmp, "projects", "deja-vu")
-	if err := os.MkdirAll(real, 0o755); err != nil {
+	resolved := filepath.Join(tmp, "projects", "deja-vu")
+	if err := os.MkdirAll(resolved, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	encoded := strings.ReplaceAll(real, string(filepath.Separator), "-")
-	if got := claudeProjectName(filepath.Join("/claude/projects", encoded)); got != "projects/deja-vu" {
+	encoded := strings.ReplaceAll(resolved, string(filepath.Separator), "-")
+	if got := claudeProjectName(filepath.Join(filepath.FromSlash("/claude/projects"), encoded)); got != "projects/deja-vu" {
 		t.Fatalf("resolved name = %q, want projects/deja-vu", got)
 	}
 	// Non-existent paths keep the old heuristic.

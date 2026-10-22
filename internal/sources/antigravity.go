@@ -26,6 +26,7 @@ var antigravityUserBlockREs = []*regexp.Regexp{
 	regexp.MustCompile(`(?s)<USER_SETTINGS_CHANGE>.*?</USER_SETTINGS_CHANGE>`),
 }
 
+// AntigravityRoots lists the Antigravity data dirs under ~/.gemini.
 func AntigravityRoots() []string {
 	if v := os.Getenv("DEJA_ANTIGRAVITY_ROOT"); v != "" {
 		return []string{v}
@@ -49,7 +50,7 @@ func AntigravityRoots() []string {
 // `.system_generated`, so the row could say nothing about any of it until
 // #3377.
 func AntigravitySidecarFiles() []string {
-	var out []string
+	var out []string //nolint:prealloc // each root adds an unknown number of files
 	for _, root := range AntigravityRoots() {
 		out = append(out, walkFiles(root, func(p string) bool {
 			rel, err := filepath.Rel(root, p)
@@ -93,6 +94,7 @@ func AntigravitySidecarFiles() []string {
 	return out
 }
 
+// AntigravityTranscripts lists every Antigravity transcript.jsonl.
 func AntigravityTranscripts() []string {
 	var out []string
 	for _, root := range AntigravityRoots() {
@@ -104,10 +106,12 @@ func AntigravityTranscripts() []string {
 	return out
 }
 
+// LoadAntigravity reads every Antigravity session on this machine.
 func LoadAntigravity() []model.Session {
 	return parseFiles(AntigravityTranscripts(), ParseAntigravityFile)
 }
 
+// ParseAntigravityFile reads one Antigravity transcript.
 func ParseAntigravityFile(path string) ([]model.Session, error) {
 	return parseAntigravityWith(path, func(fn func(map[string]any)) error {
 		return scanJSONLFromOffset(path, 0, fn)
@@ -135,7 +139,7 @@ func parseAntigravityWith(path string, scan func(func(map[string]any)) error) ([
 	var running []int
 	asked := 0
 	err := scan(func(m map[string]any) {
-		role := ""
+		var role string
 		source, _ := m["source"].(string)
 		switch source {
 		case "USER_EXPLICIT":

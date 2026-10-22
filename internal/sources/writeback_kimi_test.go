@@ -57,10 +57,10 @@ func TestKimiWriteBackReadsBackAndListsTheSession(t *testing.T) {
 		t.Fatalf("index entry after the tombstone = %+v", appends)
 	}
 	for _, p := range append(sidecars, WriteBackPart{Path: f.Path, Data: f.Data}) {
-		if err := os.MkdirAll(filepath.Dir(p.Path), 0o700); err != nil {
+		if err = os.MkdirAll(filepath.Dir(p.Path), 0o700); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(p.Path, p.Data, 0o600); err != nil {
+		if err = os.WriteFile(p.Path, p.Data, 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -71,7 +71,7 @@ func TestKimiWriteBackReadsBackAndListsTheSession(t *testing.T) {
 	if err != nil || len(ss) != 1 {
 		t.Fatalf("parse back: %v %d", err, len(ss))
 	}
-	var got []string
+	got := make([]string, 0, len(ss[0].Messages))
 	for _, m := range ss[0].Messages {
 		got = append(got, m.Role+":"+m.Text)
 	}

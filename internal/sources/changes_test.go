@@ -28,7 +28,7 @@ func TestChangesReadsEditsBackFromTheTranscript(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := Changes(model.Session{Harness: "claude", ID: id, Path: path})
-	var paths []string
+	paths := make([]string, 0, len(got))
 	for _, c := range got {
 		paths = append(paths, c.Path+":"+c.New)
 	}

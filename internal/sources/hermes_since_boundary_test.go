@@ -30,7 +30,7 @@ func TestHermesHandsBackTheWatermarksOwnSecond(t *testing.T) {
 			stmts := `create table messages (id integer primary key, session_id text, role text, content text, timestamp real);` +
 				`insert into messages values (1,'s1','user','first turn',` + tc.a + `);` +
 				`insert into messages values (2,'s1','user','second turn',` + tc.b + `);`
-			if out, err := exec.Command("sqlite3", db, stmts).CombinedOutput(); err != nil {
+			if out, err := exec.CommandContext(t.Context(), "sqlite3", db, stmts).CombinedOutput(); err != nil {
 				t.Fatalf("seed: %v %s", err, out)
 			}
 			ss, err := ParseHermesDBSince(db, time.Unix(at, 0))

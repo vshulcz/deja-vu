@@ -109,7 +109,7 @@ func TestClaudeHistoryStaysOutOfAPinnedStore(t *testing.T) {
 	}
 	t.Setenv("DEJA_CLAUDE_ROOT", "")
 	t.Setenv("CLAUDE_CONFIG_DIR", "/x/cfg")
-	if got := ClaudeHistoryFile(); got != filepath.Join("/x/cfg", "history.jsonl") {
+	if got := ClaudeHistoryFile(); got != filepath.FromSlash("/x/cfg/history.jsonl") {
 		t.Errorf("ClaudeHistoryFile = %q", got)
 	}
 }

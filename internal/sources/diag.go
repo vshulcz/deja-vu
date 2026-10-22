@@ -78,12 +78,13 @@ func diagFileError(path string, err error) {
 	if err == nil {
 		return
 	}
-	if _, stalled := err.(*StalledRead); !stalled && isAbandoned(path) {
+	var stalled *StalledReadError
+	if !errors.As(err, &stalled) && isAbandoned(path) {
 		return
 	}
 	diagMu.Lock()
 	diagFailed[path] = err.Error()
-	var st *StalledRead
+	var st *StalledReadError
 	if errors.As(err, &st) {
 		diagStalled[path] = st.Idle
 	}

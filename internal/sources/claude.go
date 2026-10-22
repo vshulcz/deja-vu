@@ -27,6 +27,7 @@ func ClaudeJSONPath() string {
 	return filepath.Join(EnvPath("CLAUDE_CONFIG_DIR", Home()), ".claude.json")
 }
 
+// ClaudeRoot is the Claude Code projects dir that holds the transcripts.
 func ClaudeRoot() string {
 	return EnvPath("DEJA_CLAUDE_ROOT", filepath.Join(ClaudeConfigDir(), claudeProjectsDirName()))
 }
@@ -67,10 +68,7 @@ func ClaudeRoots() []string {
 		return []string{p}
 	}
 	cfg := ClaudeConfigDir()
-	roots := []string{filepath.Join(cfg, claudeProjectsDirName())}
-	roots = append(roots, filepath.Join(cfg, "transcripts"))
-	roots = append(roots, XcodeClaudeRoot())
-	roots = append(roots, ccMirrorRoots()...)
+	roots := append([]string{filepath.Join(cfg, claudeProjectsDirName()), filepath.Join(cfg, "transcripts"), XcodeClaudeRoot()}, ccMirrorRoots()...)
 	var out []string
 	for _, r := range roots {
 		r = filepath.Clean(r)
@@ -109,6 +107,7 @@ func ccMirrorRoots() []string {
 	return out
 }
 
+// LoadClaude reads every Claude Code session on this machine.
 func LoadClaude() []model.Session {
 	ss := parseFiles(claudeTranscriptFiles(), ParseClaudeFile)
 	if hist := ClaudeHistoryFile(); hist != "" && fileExists(hist) {
@@ -137,7 +136,7 @@ func ClaudeFiles() []string {
 }
 
 func claudeTranscriptFiles() []string {
-	var out []string
+	var out []string //nolint:prealloc // each root adds an unknown number of files
 	for _, root := range ClaudeRoots() {
 		out = append(out, walkFiles(root, ClaudeFileWanted)...)
 	}
@@ -149,7 +148,7 @@ func claudeTranscriptFiles() []string {
 // doctor counted each as a skipped sub-agent, and one was enough to tell the
 // user to set a variable for transcripts deja already reads (#4478).
 func ClaudeSidecarFiles() []string {
-	var out []string
+	var out []string //nolint:prealloc // each root adds an unknown number of files
 	for _, root := range ClaudeRoots() {
 		out = append(out, walkFiles(root, func(p string) bool {
 			return IsSubagentPath(p) && strings.HasSuffix(p, ".meta.json")
@@ -271,10 +270,12 @@ func KeepSubagentTail(ms []model.Message) []model.Message {
 	return append(kept, ms[tail:]...)
 }
 
+// ParseClaudeFile reads one Claude Code transcript.
 func ParseClaudeFile(path string) ([]model.Session, error) {
 	return parseClaudeFileFromOffset(path, 0)
 }
 
+// ParseClaudeFileFromOffset reads a Claude Code transcript from offset on.
 func ParseClaudeFileFromOffset(path string, offset int64) ([]model.Session, error) {
 	return parseClaudeFileFromOffset(path, offset)
 }
@@ -424,7 +425,8 @@ func claudeProjectName(dir string) string {
 		return "-"
 	}
 	if v, ok := projectNameCache.Load(base); ok {
-		return v.(string)
+		name, _ := v.(string)
+		return name
 	}
 	name := decodeProjectBase(base)
 	projectNameCache.Store(base, name)

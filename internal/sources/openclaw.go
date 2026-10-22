@@ -224,13 +224,13 @@ func OpenClawSessionKey(path, id string) (string, error) {
 	}
 	b, err := os.ReadFile(filepath.Join(filepath.Dir(path), "sessions.json"))
 	if err != nil {
-		return "", nil
+		return "", nil //nolint:nilerr // no session index means no key
 	}
 	var store map[string]struct {
 		SessionID string `json:"sessionId"`
 	}
 	if err := json.Unmarshal(b, &store); err != nil {
-		return "", nil
+		return "", nil //nolint:nilerr // no session index means no key
 	}
 	for key, rec := range store {
 		if rec.SessionID == id {

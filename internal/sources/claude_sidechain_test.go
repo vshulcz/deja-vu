@@ -62,7 +62,7 @@ func TestClaudeSidechainIsItsOwnSession(t *testing.T) {
 	// A parent transcript is untouched: no kind, no parent, its own id.
 	top := filepath.Join(root, "-work-app", parentID+".jsonl")
 	plain := `{"type":"user","sessionId":"` + parentID + `","timestamp":"2026-08-18T15:00:00.000Z","cwd":"/work/app","message":{"role":"user","content":"launch a reviewer"}}` + "\n"
-	if err := os.WriteFile(top, []byte(plain), 0o644); err != nil {
+	if err = os.WriteFile(top, []byte(plain), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	ps, err := ParseClaudeFile(top)

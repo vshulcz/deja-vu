@@ -53,9 +53,9 @@ func (m pbMsg) fixed64(num uint64, v uint64) pbMsg {
 }
 
 func pbStamp(t time.Time) pbMsg {
-	m := pbMsg(nil).varint(1, uint64(t.Unix()))
+	m := pbMsg(nil).varint(1, uint64(t.Unix())) //nolint:gosec // fixture times are after 1970
 	if t.Nanosecond() != 0 {
-		m = m.varint(2, uint64(t.Nanosecond()))
+		m = m.varint(2, uint64(t.Nanosecond())) //nolint:gosec // nanoseconds are never negative
 	}
 	return m
 }

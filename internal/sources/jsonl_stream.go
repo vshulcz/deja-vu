@@ -100,7 +100,7 @@ func readLineBytes(r *bufio.Reader) (line []byte, partial bool, err error) {
 		var b bytes.Buffer
 		enc := json.NewEncoder(&b)
 		enc.SetEscapeHTML(false)
-		if enc.Encode(m) != nil {
+		if encErr := enc.Encode(m); encErr != nil {
 			return notAnObject, false, err
 		}
 		return bytes.TrimSuffix(b.Bytes(), []byte{'\n'}), false, err
@@ -119,7 +119,7 @@ var notAnObject = []byte("{")
 // streamedLineAt is the line in f's bytes [start, end) as readLineBytes reads
 // it, a copy the caller can keep; nil when it does not decode.
 func streamedLineAt(f *os.File, start, end int64) []byte {
-	r := jsonlReaders.Get().(*bufio.Reader)
+	r := jsonlReader()
 	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
 	r.Reset(io.NewSectionReader(f, start, max(end-start, 0)))
 	line, _, _ := readLineBytes(r)
@@ -145,7 +145,7 @@ func scanJSONLHinted(path string, offset int64, hint []byte, fn func(map[string]
 			return err
 		}
 	}
-	r := jsonlReaders.Get().(*bufio.Reader)
+	r := jsonlReader()
 	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
 	r.Reset(boundedFrom(path, f, offset))
 	for {
@@ -293,7 +293,7 @@ func (d *streamDecoder) next() (byte, error) {
 }
 
 func (d *streamDecoder) literal(rest string) error {
-	for i := 0; i < len(rest); i++ {
+	for i := range len(rest) {
 		if c, err := d.src.readByte(); err != nil || c != rest[i] {
 			return errStreamSyntax
 		}

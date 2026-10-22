@@ -60,7 +60,7 @@ func KiloRoots() []string {
 
 // KiloTaskFiles lists the transcripts of the extension store.
 func KiloTaskFiles() []string {
-	var files []string
+	var files []string //nolint:prealloc // each root adds an unknown number of files
 	for _, root := range KiloRoots() {
 		files = append(files, walkFiles(filepath.Join(root, "tasks"), func(p string) bool {
 			return filepath.Base(p) == "api_conversation_history.json"
@@ -112,6 +112,7 @@ func KiloSessionFiles() []string {
 	return out
 }
 
+// LoadKilo reads every Kilo Code session on this machine, tasks and database.
 func LoadKilo() []model.Session {
 	ss := parseFiles(KiloTaskFiles(), ParseKiloTask)
 	dbSS, err := ParseKiloDB(KiloDB())

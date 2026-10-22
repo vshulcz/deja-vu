@@ -97,7 +97,8 @@ func repoRoot(dir string) string {
 		return ""
 	}
 	if v, ok := repoRootCache.Load(dir); ok {
-		return v.(string)
+		root, _ := v.(string)
+		return root
 	}
 	root := ""
 	// Stop when the parent stops changing rather than on "/": on Windows the

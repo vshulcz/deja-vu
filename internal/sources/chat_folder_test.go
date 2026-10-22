@@ -21,11 +21,11 @@ func TestChatFolderNamesItsWorkspaceRoot(t *testing.T) {
 			t.Errorf("cwdProjectName(%q) = %q, want %q", cwd, got, want)
 		}
 	}
-	root, ok := ChatWorkspaceRoot(filepath.Join("/home", "a", "WorkBuddy AI", "2026-10-05-15-06-37"))
-	if !ok || root != filepath.Join("/home", "a", "WorkBuddy AI") {
+	root, ok := ChatWorkspaceRoot(filepath.FromSlash("/home/a/WorkBuddy AI/2026-10-05-15-06-37"))
+	if !ok || root != filepath.FromSlash("/home/a/WorkBuddy AI") {
 		t.Fatalf("ChatWorkspaceRoot = %q %v", root, ok)
 	}
-	if _, ok := ChatWorkspaceRoot(filepath.Join("/home", "a", "app")); ok {
+	if _, ok := ChatWorkspaceRoot(filepath.FromSlash("/home/a/app")); ok {
 		t.Fatal("a folder the user named was taken for a chat folder")
 	}
 	// A lone timestamp folder at a filesystem root has no root of its own.

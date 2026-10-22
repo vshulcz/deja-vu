@@ -1,7 +1,6 @@
 package sources
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -35,6 +34,7 @@ func GrokRoot() string {
 // like growth from the outside — the index compares the recorded prefix hash
 // before resuming a parse, and reparses in full when it moved.
 
+// GrokSessionFiles lists every grok updates.jsonl.
 func GrokSessionFiles() []string {
 	return walkFiles(filepath.Join(GrokRoot(), "sessions"), func(p string) bool {
 		return filepath.Base(p) == "updates.jsonl"
@@ -58,6 +58,7 @@ func GrokSidecarFiles() []string {
 	})
 }
 
+// LoadGrok reads every grok session file on this machine.
 func LoadGrok() []model.Session {
 	return parseFiles(GrokSessionFiles(), ParseGrokFile)
 }
@@ -81,6 +82,7 @@ type grokSummary struct {
 	AgentName       string `json:"agent_name"`
 }
 
+// ParseGrokFile reads one grok updates.jsonl.
 func ParseGrokFile(path string) ([]model.Session, error) {
 	return parseGrokFileFromOffset(path, 0)
 }
@@ -126,7 +128,7 @@ func parseGrokFileFromOffset(path string, offset int64) ([]model.Session, error)
 		if grokCopiedEvent(event, id, doc.ParentSessionID) {
 			return
 		}
-		role := ""
+		var role string
 		switch event.Params.Update.Kind {
 		case "user_message_chunk":
 			role = "user"
@@ -278,7 +280,7 @@ var grokDialect = toolDialect{
 // message the stored part ended on, the file is read whole (#4445).
 func GrokResumes(path string, offset int64) bool {
 	return resumesUnlessJoined(path, offset, func(line []byte) (string, bool) {
-		role := ""
+		var role string
 		switch {
 		case bytes.Contains(line, grokUserChunk):
 			role = "user"
@@ -402,7 +404,7 @@ func scanGrokUpdatesFrom(path string, offset int64, fn func(grokUpdateEvent)) er
 			return err
 		}
 	}
-	r := jsonlReaders.Get().(*bufio.Reader)
+	r := jsonlReader()
 	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
 	r.Reset(boundedFrom(path, f, offset))
 	for {
@@ -465,8 +467,9 @@ func grokSpawner(path, child, created string) string {
 	if child == "" {
 		return ""
 	}
-	if p, ok := grokSpawners.Load(child); ok {
-		return p.(string)
+	if v, ok := grokSpawners.Load(child); ok {
+		p, _ := v.(string)
+		return p
 	}
 	own := filepath.Dir(path)
 	group := filepath.Dir(own)
@@ -528,7 +531,7 @@ func fileLineWith(path string, needle []byte) []byte {
 		return nil
 	}
 	defer func() { _ = f.Close() }()
-	r := jsonlReaders.Get().(*bufio.Reader)
+	r := jsonlReader()
 	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
 	r.Reset(f)
 	for {
@@ -626,7 +629,7 @@ func GrokChatHolds(transcript, text string) bool {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
-	if enc.Encode(text) != nil {
+	if err := enc.Encode(text); err != nil {
 		return false
 	}
 	needle := bytes.TrimSuffix(bytes.TrimSpace(buf.Bytes()), []byte(`"`))

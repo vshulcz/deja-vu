@@ -115,7 +115,7 @@ func TestTraeItemCompletedDialect(t *testing.T) {
 		t.Fatalf("assistant turns = %q, want %q", got, wantAsst)
 	}
 	// In order: the answers come from a fallback source and are merged by time.
-	var order []string
+	order := make([]string, 0, len(s.Messages))
 	for _, m := range s.Messages {
 		order = append(order, m.Role)
 	}
@@ -231,13 +231,13 @@ func TestTraeResumesWholeOnSplitMirror(t *testing.T) {
 	}
 	offset := fi.Size()
 	appendLine := func(line string) {
-		f, err := os.OpenFile(p, os.O_APPEND|os.O_WRONLY, 0o644)
-		if err != nil {
-			t.Fatal(err)
+		f, openErr := os.OpenFile(p, os.O_APPEND|os.O_WRONLY, 0o644)
+		if openErr != nil {
+			t.Fatal(openErr)
 		}
 		defer f.Close()
-		if _, err := f.WriteString(line + "\n"); err != nil {
-			t.Fatal(err)
+		if _, werr := f.WriteString(line + "\n"); werr != nil {
+			t.Fatal(werr)
 		}
 	}
 	appendLine(`{"timestamp":"2026-10-01T09:00:01.001Z","type":"event_msg","payload":{"type":"item_completed","turn_id":"turn-1","item":{"type":"UserMessage","id":"m1","content":[{"type":"text","text":"rename the config loader"}]}}}`)
@@ -331,7 +331,8 @@ func TestTraeDisplayCompletionsCarryThePrompt(t *testing.T) {
 
 	// The same prompt again from item_completed, as 0.201.4 wrote it, is one
 	// prompt, not two.
-	both := append(lines[:3:3], `{"timestamp":"2026-10-01T09:00:01.001Z","type":"event_msg","payload":{"type":"item_completed","turn_id":"turn-1","item":{"type":"UserMessage","id":"msg-user","content":[{"type":"text","text":"why does the retry loop never back off"}]}}}`)
+	both := lines[:3:3]
+	both = append(both, `{"timestamp":"2026-10-01T09:00:01.001Z","type":"event_msg","payload":{"type":"item_completed","turn_id":"turn-1","item":{"type":"UserMessage","id":"msg-user","content":[{"type":"text","text":"why does the retry loop never back off"}]}}}`)
 	both = append(both, lines[3:]...)
 	s = parseTraeOne(t, writeTraeRollout(t, t.TempDir(), both...))
 	if got := textsOf(s, "user"); len(got) != 1 {

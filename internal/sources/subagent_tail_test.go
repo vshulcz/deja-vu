@@ -2,6 +2,7 @@ package sources
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,7 +24,7 @@ func TestASubagentIsReadAsItsTaskAndItsAnswer(t *testing.T) {
 	line := func(role, text string, minute int) string {
 		b, err := json.Marshal(map[string]any{
 			"type": role, "sessionId": "parent-1", "isSidechain": true, "agentId": "child-1",
-			"timestamp": "2026-08-02T10:" + string(rune('0'+minute/10)) + string(rune('0'+minute%10)) + ":00Z",
+			"timestamp": "2026-08-02T10:" + fmt.Sprintf("%02d", minute) + ":00Z",
 			"message":   map[string]any{"role": role, "content": text},
 		})
 		if err != nil {
@@ -55,7 +56,7 @@ func TestASubagentIsReadAsItsTaskAndItsAnswer(t *testing.T) {
 		t.Fatalf("the whole child run was indexed: %d messages", len(s.Messages))
 	}
 	joined := strings.Join(func() []string {
-		var out []string
+		out := make([]string, 0, len(s.Messages))
 		for _, m := range s.Messages {
 			out = append(out, m.Text)
 		}

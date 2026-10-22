@@ -27,7 +27,7 @@ func TestCompressedTranscriptsNeedNoTempFile(t *testing.T) {
 	if !ZstdAvailable() {
 		t.Skip("zstd CLI not installed")
 	}
-	rollout := writeCodexRollout(t, filepath.Join(t.TempDir(), "sessions"), "rollout-thread-7.jsonl", true)
+	rollout := writeCodexRollout(t, filepath.Join(t.TempDir(), "sessions"), true)
 
 	sessions := filepath.Join(t.TempDir(), "main", "sessions")
 	if err := os.MkdirAll(sessions, 0o755); err != nil {
@@ -37,7 +37,7 @@ func TestCompressedTranscriptsNeedNoTempFile(t *testing.T) {
 	if err := os.WriteFile(plain, []byte(openclawArchiveBody("cccc3333", "we settled on one shard")), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := exec.Command("zstd", "-q", "--rm", plain).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "zstd", "-q", "--rm", plain).CombinedOutput(); err != nil {
 		t.Fatalf("zstd: %v: %s", err, out)
 	}
 

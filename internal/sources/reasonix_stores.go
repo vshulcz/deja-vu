@@ -228,7 +228,7 @@ func ReasonixSidecarFiles() []string {
 	for _, dir := range ReasonixSessionDirsAll() {
 		_ = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 			if err != nil {
-				return nil
+				return nil //nolint:nilerr // the walk goes past entries it cannot read
 			}
 			if d.IsDir() {
 				if p != dir && strings.HasPrefix(d.Name(), ".") {

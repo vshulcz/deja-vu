@@ -36,7 +36,8 @@ var HermesPGRunner = func(dsn, sql string) ([]byte, error) {
 	cmd := exec.Command("psql", dsn, "-tAXq", "-v", "ON_ERROR_STOP=1", "-c", sql)
 	out, err := cmd.Output()
 	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
+		var ee *exec.ExitError
+		if errors.As(err, &ee) && len(ee.Stderr) > 0 {
 			return nil, fmt.Errorf("psql: %s", strings.TrimSpace(string(ee.Stderr)))
 		}
 		return nil, err
@@ -160,7 +161,7 @@ func hermesPGSessionMeta(dsn string) map[string]hermesMeta {
 	var fieldsSb159 strings.Builder
 	for col, key := range map[string]string{"cwd": "cwd", "source": "source", "parent_session_id": "parent"} {
 		if cols[col] {
-			fieldsSb159.WriteString(fmt.Sprintf(", %s::text as %s", col, key))
+			fmt.Fprintf(&fieldsSb159, ", %s::text as %s", col, key)
 		}
 	}
 	fields += fieldsSb159.String()

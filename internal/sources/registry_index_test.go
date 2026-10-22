@@ -27,7 +27,7 @@ func TestRegistryIndexLinksEveryHarnessAndEveryPage(t *testing.T) {
 			DisplayName string `json:"display_name"`
 		} `json:"harnesses"`
 	}
-	if err := json.Unmarshal(b, &reg); err != nil {
+	if err = json.Unmarshal(b, &reg); err != nil {
 		t.Fatal(err)
 	}
 

@@ -1,7 +1,6 @@
 package sources
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,7 +23,7 @@ func TestChangesLeaveOutEditsThatFailed(t *testing.T) {
 		return p
 	}
 	paths := func(cs []Change) string {
-		var out []string
+		out := make([]string, 0, len(cs))
 		for _, c := range cs {
 			out = append(out, c.Path+":"+c.New)
 		}
@@ -52,13 +51,13 @@ func TestChangesLeaveOutEditsThatFailed(t *testing.T) {
 	}
 
 	rec := func(typ string, payload any) string {
-		b, _ := json.Marshal(map[string]any{"type": typ, "payload": payload})
+		b := mustJSON(t, map[string]any{"type": typ, "payload": payload})
 		return string(b)
 	}
 	patch := func(file, newText string) string {
 		return "*** Begin Patch\n*** Update File: " + file + "\n@@\n-a\n+" + newText + "\n*** End Patch\n"
 	}
-	shellArgs, _ := json.Marshal(map[string]any{"command": []string{"apply_patch", patch("old.go", "NEVER")}})
+	shellArgs := mustJSON(t, map[string]any{"command": []string{"apply_patch", patch("old.go", "NEVER")}})
 	codex := write(
 		rec("session_meta", map[string]any{"id": "s", "cwd": "/w"}),
 		rec("response_item", map[string]any{"type": "custom_tool_call", "call_id": "c1", "name": "apply_patch", "input": patch("bad.go", "NEVER")}),

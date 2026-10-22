@@ -49,12 +49,12 @@ func withOpencodeStore(t *testing.T) {
 // A sqlite3 on PATH that does not answer read every store as empty with exit
 // 0, which deja could not tell from an empty database.
 func TestSQLite3ProbeCatchesABinaryThatDoesNotAnswer(t *testing.T) {
-	real, realErr := exec.LookPath("sqlite3")
+	resolved, realErr := exec.LookPath("sqlite3")
 	cases := []struct {
 		name, body, want string
 		needsReal        bool
 	}{
-		{"first-arg wrapper", `exec ` + real + ` "$1"`, "did not answer a probe query (no output)", true},
+		{"first-arg wrapper", `exec ` + resolved + ` "$1"`, "did not answer a probe query (no output)", true},
 		{"silent stub", "exit 0", "did not answer a probe query (no output)", false},
 		{"garbage", "echo hello", `answered a probe query with "hello"`, false},
 		{"failing", "echo 'Error: no such function: json_object' >&2; exit 1", "failed a probe query (exit status 1: Error: no such function: json_object)", false},
@@ -85,7 +85,7 @@ func TestSQLite3ProbeCatchesABinaryThatDoesNotAnswer(t *testing.T) {
 
 func TestSQLite3ProbeAbsentAndWorking(t *testing.T) {
 	withOpencodeStore(t)
-	real, err := exec.LookPath("sqlite3")
+	resolved, err := exec.LookPath("sqlite3")
 
 	t.Setenv("PATH", t.TempDir())
 	ResetSQLite3Probe()
@@ -103,7 +103,7 @@ func TestSQLite3ProbeAbsentAndWorking(t *testing.T) {
 	if err != nil {
 		t.Skip("no real sqlite3")
 	}
-	t.Setenv("PATH", filepath.Dir(real))
+	t.Setenv("PATH", filepath.Dir(resolved))
 	if got := SQLite3Problem(); got != "" {
 		t.Errorf("real sqlite3: problem = %q", got)
 	}

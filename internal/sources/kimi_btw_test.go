@@ -28,6 +28,7 @@ func TestKimiBtwForkKeepsTheQuestionNotTheCopiedContext(t *testing.T) {
 }
 
 func testKimiBtwFork(t *testing.T, btwOrigin string) {
+	t.Helper()
 	root := t.TempDir()
 	t.Setenv("HOME", filepath.Join(root, "home"))
 	t.Setenv("USERPROFILE", filepath.Join(root, "home"))
@@ -93,7 +94,7 @@ func testKimiBtwFork(t *testing.T, btwOrigin string) {
 		if s.Kind != "fork" || s.Parent != "session_t01" || s.ID == "session_t01" {
 			t.Errorf("fork read as id=%q kind=%q parent=%q", s.ID, s.Kind, s.Parent)
 		}
-		var got []string
+		got := make([]string, 0, len(s.Messages))
 		for _, m := range s.Messages {
 			got = append(got, m.Role+": "+m.Text)
 		}

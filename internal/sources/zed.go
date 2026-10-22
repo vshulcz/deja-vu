@@ -2,6 +2,7 @@ package sources
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -149,6 +150,7 @@ func PinZstd() func() {
 	}
 }
 
+// LoadZed reads every thread in the Zed store.
 func LoadZed() []model.Session {
 	ss, err := ParseZedDBSince(ZedDB(), time.Time{})
 	if err != nil {
@@ -157,6 +159,7 @@ func LoadZed() []model.Session {
 	return ss
 }
 
+// ParseZedDB reads every thread in the Zed store at db.
 func ParseZedDB(db string) ([]model.Session, error) {
 	return ParseZedDBSince(db, time.Time{})
 }
@@ -192,7 +195,7 @@ type zedRow struct {
 func ParseZedDBSince(db string, t time.Time) ([]model.Session, error) {
 	// The sqlite3 CLI creates a missing database on open — never let it.
 	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
-		return nil, nil
+		return nil, nil //nolint:nilerr // a missing or empty store holds no sessions
 	}
 	where := zedSinceWhere(t)
 	rows, err := zedRows(db, zedFullCols, where)
@@ -390,7 +393,7 @@ func zstdDecode(frame []byte) ([]byte, error) {
 	if len(frame) == 0 {
 		return nil, errors.New("zed: empty thread body")
 	}
-	cmd := exec.Command("zstd", "-d", "-c", "-q")
+	cmd := exec.CommandContext(context.Background(), "zstd", "-d", "-c", "-q")
 	cmd.Stdin = bytes.NewReader(frame)
 	var out, errBuf bytes.Buffer
 	cmd.Stdout = &out

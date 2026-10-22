@@ -66,8 +66,9 @@ func underTraeSessions(p string) bool {
 	return false
 }
 
+// LoadTrae reads every Trae rollout and history on this machine.
 func LoadTrae() []model.Session {
-	var files []string
+	var files []string //nolint:prealloc // each dir adds an unknown number of files
 	for _, dir := range TraeSessionDirs() {
 		files = append(files, walkFiles(dir, codexRolloutWanted)...)
 	}
@@ -89,18 +90,22 @@ func LoadTrae() []model.Session {
 	return ss
 }
 
+// ParseTraeRollout reads one Trae rollout.
 func ParseTraeRollout(path string) ([]model.Session, error) {
 	return ParseTraeRolloutFromOffset(path, 0)
 }
 
+// ParseTraeRolloutFromOffset reads a Trae rollout from offset on.
 func ParseTraeRolloutFromOffset(path string, offset int64) ([]model.Session, error) {
 	return parseRolloutFile(path, offset, "trae")
 }
 
+// ParseTraeHistory reads a Trae history.jsonl from the start.
 func ParseTraeHistory(path string) ([]model.Session, error) {
 	return ParseTraeHistoryFromOffset(path, 0)
 }
 
+// ParseTraeHistoryFromOffset reads a Trae history.jsonl from offset on.
 func ParseTraeHistoryFromOffset(path string, offset int64) ([]model.Session, error) {
 	return parseRolloutHistory(path, offset, "trae")
 }
@@ -354,7 +359,10 @@ func traeShellCall(item map[string]any) map[string]any {
 	if n := len(in.Command); n >= 3 && (in.Command[n-2] == "-lc" || in.Command[n-2] == "-c") {
 		cmd = in.Command[n-1]
 	}
-	b, _ := json.Marshal(map[string]string{"cmd": cmd})
+	b, err := json.Marshal(map[string]string{"cmd": cmd})
+	if err != nil {
+		return item
+	}
 	out := make(map[string]any, len(item))
 	maps.Copy(out, item)
 	out["name"] = "exec_command"

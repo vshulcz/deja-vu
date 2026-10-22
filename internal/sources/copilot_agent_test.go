@@ -63,7 +63,7 @@ func TestCopilotAgentTranscriptIsReadAndSearchable(t *testing.T) {
 	if s.Started.IsZero() {
 		t.Error("session.start carried a start time and it was dropped")
 	}
-	var roles []string
+	roles := make([]string, 0, len(s.Messages))
 	var joined string
 	var joinedSb68 strings.Builder
 	for _, m := range s.Messages {

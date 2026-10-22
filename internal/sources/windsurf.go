@@ -54,6 +54,7 @@ func isWindsurfTrajectory(p string) bool {
 	return filepath.Ext(p) == ".pb" && filepath.Dir(p) == filepath.Join(WindsurfRoot(), "cascade")
 }
 
+// LoadWindsurf reads every Windsurf session on this machine.
 func LoadWindsurf() []model.Session {
 	return parseFiles(WindsurfSessionFiles(), ParseWindsurfFile)
 }
@@ -375,10 +376,10 @@ func pbWalk(b []byte, fn func(num uint64, wire int, v uint64, data []byte) error
 			v, b = uint64(binary.LittleEndian.Uint32(b)), b[4:]
 		case pbBytes:
 			l, n := binary.Uvarint(b)
-			if n <= 0 || l > uint64(len(b)-n) {
+			if n <= 0 || l > uint64(len(b)-n) { //nolint:gosec // n <= len(b)
 				return errPBMalformed
 			}
-			data, b = b[n:n+int(l)], b[n+int(l):]
+			data, b = b[n:n+int(l)], b[n+int(l):] //nolint:gosec // l <= len(b)-n, checked above
 		default:
 			return errPBMalformed
 		}
@@ -408,9 +409,9 @@ func pbTimestamp(b []byte) (time.Time, error) {
 		}
 		switch num {
 		case 1:
-			sec = int64(v)
+			sec = int64(v) //nolint:gosec // protobuf int64 travels as its two's complement
 		case 2:
-			nsec = int64(int32(v))
+			nsec = int64(int32(v)) //nolint:gosec // protobuf int32 travels as its two's complement
 		}
 		return nil
 	})

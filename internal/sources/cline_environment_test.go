@@ -75,7 +75,7 @@ func TestRooTaskIndexesTheQuestionWithoutTheListing(t *testing.T) {
 		t.Fatal(err)
 	}
 	path := filepath.Join(dir, "api_conversation_history.json")
-	if err := os.WriteFile(path, b, 0o644); err != nil {
+	if err = os.WriteFile(path, b, 0o644); err != nil {
 		t.Fatal(err)
 	}
 

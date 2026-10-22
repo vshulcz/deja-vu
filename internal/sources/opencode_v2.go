@@ -73,7 +73,8 @@ func opencodeSchemaOf(db string) opencodeSchema {
 		key = fmt.Sprintf("%s|%d|%d", db, fi.Size(), fi.ModTime().UnixNano())
 	}
 	if v, ok := opencodeSchemaCache.Load(key); ok {
-		return v.(opencodeSchema)
+		schema, _ := v.(opencodeSchema)
+		return schema
 	}
 	got := readOpencodeSchema(db)
 	opencodeSchemaCache.Store(key, got)

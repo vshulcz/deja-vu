@@ -158,7 +158,7 @@ insert into message values ('m-assistant', 'kilo-1', 1784278802000, '{"role":"as
 insert into part values ('p-user', 'm-user', '{"type":"text","text":"why does the migration hang","time":{"start":"2026-07-17T09:00:01Z"}}');
 insert into part values ('p-assistant', 'm-assistant', '{"type":"text","text":"the advisory lock was never released","time":{"start":"2026-07-17T09:00:02Z"}}');
 `
-	if out, err := exec.Command("sqlite3", db, schema).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, schema).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}
 	ss := LoadKilo()

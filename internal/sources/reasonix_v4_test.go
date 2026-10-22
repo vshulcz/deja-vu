@@ -57,7 +57,7 @@ func (l *rxLog) record(rec map[string]any) []byte {
 	if err != nil {
 		l.t.Fatal(err)
 	}
-	cmd := exec.Command("zstd", "-q", "-c")
+	cmd := exec.CommandContext(l.t.Context(), "zstd", "-q", "-c")
 	cmd.Stdin = bytes.NewReader(raw)
 	z, err := cmd.Output()
 	if err != nil {
@@ -65,8 +65,8 @@ func (l *rxLog) record(rec map[string]any) []byte {
 	}
 	var h [12]byte
 	copy(h[:], reasonixV4FrameMagic)
-	binary.BigEndian.PutUint32(h[4:], uint32(len(z)))
-	binary.BigEndian.PutUint32(h[8:], uint32(len(raw)))
+	binary.BigEndian.PutUint32(h[4:], uint32(len(z)))   //nolint:gosec // test frames are small
+	binary.BigEndian.PutUint32(h[8:], uint32(len(raw))) //nolint:gosec // test frames are small
 	l.buf.Write(h[:])
 	l.buf.Write(z)
 	return raw
@@ -80,7 +80,7 @@ func (l *rxLog) open(at time.Time, evs ...rxEvent)  { l.write(at, false, evs) }
 func (l *rxLog) write(at time.Time, commit bool, evs []rxEvent) {
 	l.t.Helper()
 	l.batches++
-	commitID := "commit-" + string(rune('a'+l.batches))
+	commitID := "commit-" + string(rune('a'+l.batches)) //nolint:gosec // a handful of test batches
 	digest := sha256.New()
 	add := func(raw []byte) { digest.Write(raw); digest.Write([]byte{0}) }
 	add(l.record(map[string]any{
@@ -93,7 +93,7 @@ func (l *rxLog) write(at time.Time, commit bool, evs []rxEvent) {
 		if err != nil {
 			l.t.Fatal(err)
 		}
-		event := map[string]any{"id": "ev" + string(rune('a'+l.seq)), "seq": l.seq, "kind": ev.kind}
+		event := map[string]any{"id": "ev" + string(rune('a'+l.seq)), "seq": l.seq, "kind": ev.kind} //nolint:gosec // a handful of test events
 		if ev.external {
 			sum := sha256.Sum256(body)
 			d := hex.EncodeToString(sum[:])
@@ -186,7 +186,7 @@ func TestParseReasonixV4Session(t *testing.T) {
 	if s.ID != id || s.Title != "relay build error" || s.Project != "workspace/demo" {
 		t.Errorf("id/title/project = %q/%q/%q", s.ID, s.Title, s.Project)
 	}
-	var msgs []modelMessage
+	msgs := make([]modelMessage, 0, len(s.Messages))
 	for _, m := range s.Messages {
 		msgs = append(msgs, modelMessage{m.Role, m.Text, m.Time})
 	}

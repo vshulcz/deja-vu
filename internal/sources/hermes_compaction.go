@@ -57,7 +57,7 @@ func (h *hermesSession) headCopies(from, i int) int {
 			ok = h.copyOf(i-m+p, from+p, t)
 		}
 		if ok {
-			for p := 0; p < m; p++ {
+			for p := range m {
 				h.rows[i-m+p].copy = true
 			}
 			return m

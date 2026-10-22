@@ -37,7 +37,7 @@ insert into messages values (5,'s1','user','` + fail("panic: sql: database is cl
 insert into messages values (6,'s2','user','[{"type":"text","text":"build it"}]',100);
 insert into messages values (7,'s2','user','` + fail("old failure from turn one") + `',101);
 insert into messages values (8,'s2','user','[{"type":"text","text":"something else"}]',102);`
-	if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, sql).CombinedOutput(); err != nil {
 		t.Fatalf("create db: %v: %s", err, out)
 	}
 	if got := GooseTurnFailure("s1"); got != "panic: sql: database is closed" {

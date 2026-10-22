@@ -1,7 +1,7 @@
 package sources
 
 import (
-	"crypto/md5"
+	"crypto/md5" //nolint:gosec // cursor-agent names its chat folders by this hash
 	"encoding/hex"
 	"encoding/json"
 	"os"
@@ -55,7 +55,7 @@ func CursorChatCWD(transcript string) (cwd string, verified bool) {
 // CursorChatBucket is the chats/ folder cursor-agent keeps a directory's chats
 // in.
 func CursorChatBucket(cwd string) string {
-	sum := md5.Sum([]byte(cwd))
+	sum := md5.Sum([]byte(cwd)) //nolint:gosec // cursor-agent names its chat folders by this hash
 	return hex.EncodeToString(sum[:])
 }
 

@@ -72,7 +72,7 @@ func clineVSCodeSidecar(p string) (int64, int64) {
 					}
 					h := fnv.New64a()
 					_, _ = h.Write([]byte(strconv.FormatInt(m.TS, 10) + "\x00" + m.Task + "\x00" + m.CWD))
-					c.entries[m.ID] = int64(h.Sum64())
+					c.entries[m.ID] = int64(h.Sum64()) //nolint:gosec // a hash; the bits are kept as they are
 				}
 			}
 		}

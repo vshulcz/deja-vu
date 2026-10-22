@@ -40,7 +40,7 @@ insert into part select 'p1','m1',json_object(
 	if err := os.WriteFile(sql, []byte(script), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	setup := exec.Command("sqlite3", db)
+	setup := exec.CommandContext(t.Context(), "sqlite3", db)
 	f, err := os.Open(sql)
 	if err != nil {
 		t.Fatal(err)

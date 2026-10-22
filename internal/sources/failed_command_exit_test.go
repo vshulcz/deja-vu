@@ -42,7 +42,10 @@ func TestAFailedCommandKeepsItsExitCode(t *testing.T) {
 		return p
 	}
 	file := func(name, body string) func(*testing.T, string) string {
-		return func(t *testing.T, dir string) string { return write(t, filepath.Join(dir, name), body) }
+		return func(t *testing.T, dir string) string {
+			t.Helper()
+			return write(t, filepath.Join(dir, name), body)
+		}
 	}
 
 	rows := []struct {
@@ -61,6 +64,7 @@ func TestAFailedCommandKeepsItsExitCode(t *testing.T) {
 		{name: "kimchi", kind: "kimchi", fixture: file("2026-09-20T10-00-00-000Z_s1.jsonl", failedPiTranscript)},
 		{name: "cherrystudio-pi", fixture: file("2026-09-20T10-00-00-000Z_s1.jsonl", failedPiTranscript), parse: func(p string) ([]model.Session, error) { return ParseCherryStudioPiFileFromOffset(p, 0) }},
 		{name: "goose", kind: "goose-db", fixture: func(t *testing.T, _ string) string {
+			t.Helper()
 			return seedDB(t, "sessions.db", `create table sessions (id text primary key, name text, description text, working_dir text, created_at text, updated_at text);
 create table messages (id integer primary key autoincrement, session_id text, role text, content_json text, created_timestamp integer);
 insert into sessions values ('20260920_1','n','fix the retry loop','/tmp/proj','2026-09-20T10:00:00Z','2026-09-20T10:05:00Z');
@@ -69,6 +73,7 @@ insert into messages(session_id,role,content_json,created_timestamp) values ('20
 insert into messages(session_id,role,content_json,created_timestamp) values ('20260920_1','user','[{"type":"toolResponse","id":"c1","toolResult":{"status":"success","value":{"content":[{"type":"text","text":"./retry.go:12:5: undefined: backoffJitter\n\nCommand exited with code 1"}],"isError":true,"structuredContent":{"stdout":"","stderr":"./retry.go:12:5: undefined: backoffJitter","exit_code":1,"timed_out":false}}}}]',1790874402);`)
 		}},
 		{name: "cline cli", kind: "cline-sdk", fixture: func(t *testing.T, dir string) string {
+			t.Helper()
 			id := "1790877871094"
 			write(t, filepath.Join(dir, id, id+".json"), `{"cwd":"/tmp/proj","started_at":"2026-10-01T18:00:00Z"}`)
 			return write(t, filepath.Join(dir, id, id+".messages.json"), `{"version":1,"agent":"lead","sessionId":"`+id+`","messages":[
@@ -79,6 +84,7 @@ insert into messages(session_id,role,content_json,created_timestamp) values ('20
   {"query":"go test ./...","result":"[Command exited with code 1]\n\n[stderr]\n./retry.go:12:5: undefined: backoffJitter\n","error":"Command exited with code 1","success":false}]}]}]}`)
 		}},
 		{name: "cline vscode", kind: "cline-vscode", fixture: func(t *testing.T, dir string) string {
+			t.Helper()
 			write(t, filepath.Join(dir, "state", "taskHistory.json"), `[{"id":"1790000000000","ts":1790000000000,"task":"fix the retry loop","cwdOnTaskInitialization":"/tmp/proj"}]`)
 			return write(t, filepath.Join(dir, "tasks", "1790000000000", "api_conversation_history.json"), `[
  {"role":"user","content":[{"type":"text","text":"<task>fix the retry loop</task>"}]},
@@ -86,6 +92,7 @@ insert into messages(session_id,role,content_json,created_timestamp) values ('20
  {"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"Command failed with exit code 1.\nOutput:\n./retry.go:12:5: undefined: backoffJitter"}]}]`)
 		}},
 		{name: "kiro-cli", kind: "kiro-cli", fixture: func(t *testing.T, dir string) string {
+			t.Helper()
 			return write(t, filepath.Join(dir, "cli", "11111111-2222-4333-8444-555555555555.jsonl"), strings.Join([]string{
 				`{"version":"v1","kind":"Prompt","data":{"message_id":"m0","content":[{"kind":"text","data":"fix the retry loop"}],"meta":{"timestamp":1790848800}}}`,
 				`{"version":"v1","kind":"AssistantMessage","data":{"message_id":"m1","content":[{"kind":"toolUse","data":{"toolUseId":"t1","name":"shell","input":{"command":"go test ./..."}}}],"meta":{"timestamp":1790848801}}}`,
@@ -93,6 +100,7 @@ insert into messages(session_id,role,content_json,created_timestamp) values ('20
 			}, "\n")+"\n")
 		}},
 		{name: "kiro-cli no-interactive", kind: "kiro-db", fixture: func(t *testing.T, _ string) string {
+			t.Helper()
 			return kiroTestDB(t, kiroDBRow("/tmp/proj", "bf73e1f5-0000-4000-8000-000000000003", `{"conversation_id":"bf73e1f5-0000-4000-8000-000000000003","history":[
  {"user":{"content":{"Prompt":{"prompt":"fix the retry loop"}},"timestamp":"2026-10-01T10:00:00+00:00"},
   "assistant":{"ToolUse":{"message_id":"m1","content":"Running the tests.","tool_uses":[{"id":"t1","name":"execute_bash","args":{"command":"go test ./..."}}]}}},
@@ -100,6 +108,7 @@ insert into messages(session_id,role,content_json,created_timestamp) values ('20
   "assistant":{"Response":{"message_id":"m2","content":"The build is broken."}}}]}`, 1790848800000))
 		}},
 		{name: "copilot-chat", kind: "copilot-chat", fixture: func(t *testing.T, dir string) string {
+			t.Helper()
 			return write(t, filepath.Join(dir, "workspaceStorage", "a1b2", "chatSessions", "5c0ffee0-0000-4000-8000-000000000000.jsonl"), strings.Join([]string{
 				`{"kind":0,"v":{"version":3,"sessionId":"5c0ffee0-0000-4000-8000-000000000000","creationDate":1790000000000,"customTitle":"fix the retry loop","requests":[]}}`,
 				`{"kind":2,"k":["requests"],"v":[{"requestId":"request_1","timestamp":1790000001000,"message":{"text":"fix the retry loop"},"response":[{"kind":"toolInvocationSerialized","isComplete":true,"toolCallId":"c2","toolId":"run_in_terminal","toolSpecificData":{"kind":"terminal","commandLine":{"original":"go test ./..."},"language":"sh","terminalCommandState":{"exitCode":1,"timestamp":1790000003000,"duration":1200},"terminalCommandOutput":{"text":"./retry.go:12:5: undefined: backoffJitter\nFAIL"}}}]}]}`,

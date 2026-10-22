@@ -54,7 +54,7 @@ func gkWrite(t *testing.T, s model.Session) (WriteBackFile, []WriteBackPart) {
 }
 
 func gkTurns(ms []model.Message) string {
-	var out []string
+	out := make([]string, 0, len(ms))
 	for _, m := range ms {
 		out = append(out, m.Role+":"+m.Text)
 	}

@@ -38,6 +38,7 @@ import (
 // does not affect it because that variable only relocates reads.
 func KimiConfigDir() string { return EnvPath("KIMI_CODE_HOME", filepath.Join(Home(), ".kimi-code")) }
 
+// KimiRoot is the Kimi Code config dir deja reads sessions from.
 func KimiRoot() string { return EnvPath("DEJA_KIMI_ROOT", KimiConfigDir()) }
 
 // KimiSessionFiles takes sub-agent logs by default, read the way Claude's and
@@ -186,12 +187,15 @@ func KimiSubagentFile(p string) bool {
 		filepath.Base(filepath.Dir(dir)) == "agents"
 }
 
+// LoadKimi reads every Kimi Code session on this machine.
 func LoadKimi() []model.Session { return parseFiles(KimiSessionFiles(), ParseKimiFile) }
 
+// ParseKimiFile reads one Kimi Code transcript.
 func ParseKimiFile(path string) ([]model.Session, error) {
 	return parseKimiFileFromOffset(path, 0)
 }
 
+// ParseKimiFileFromOffset reads a Kimi Code transcript from offset on.
 func ParseKimiFileFromOffset(path string, offset int64) ([]model.Session, error) {
 	return parseKimiFileFromOffset(path, offset)
 }

@@ -83,7 +83,7 @@ func ParseOpencodeDiff(path string) ([]model.Session, error) {
 	if err := json.Unmarshal(b, &entries); err != nil {
 		// A file being written while deja reads it, or a shape this build does
 		// not know: not fatal for a store whose sessions come from elsewhere.
-		return nil, nil
+		return nil, nil //nolint:nilerr // a diff file being written is skipped
 	}
 	if len(entries) == 0 {
 		return nil, nil

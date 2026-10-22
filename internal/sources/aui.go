@@ -76,7 +76,7 @@ func auiRecords(events []auiEvent, cwd string) []model.Message {
 		}
 		s.body = e.Body
 	}
-	var out []model.Message
+	var out []model.Message //nolint:prealloc // each step yields any number of records
 	for _, s := range order {
 		out = append(out, s.records(cwd)...)
 	}
@@ -227,16 +227,16 @@ func changedLines(before, after string) (old, written string) {
 // in front of a prompt or a tool result for what its hooks answered. That is
 // a hook talking (deja's own recall among them), not the person or the agent.
 func withoutAdditionalContext(s string) string {
-	const open, close = "<additional_context>", "</additional_context>"
+	const open, closeTag = "<additional_context>", "</additional_context>"
 	for {
 		i := strings.Index(s, open)
 		if i < 0 {
 			return s
 		}
-		j := strings.Index(s[i:], close)
+		j := strings.Index(s[i:], closeTag)
 		if j < 0 {
 			return strings.TrimSpace(s[:i])
 		}
-		s = s[:i] + s[i+j+len(close):]
+		s = s[:i] + s[i+j+len(closeTag):]
 	}
 }

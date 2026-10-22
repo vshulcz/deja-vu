@@ -99,11 +99,11 @@ func TestOpenClawSpawnWindowReadsEachTranscriptOnce(t *testing.T) {
 	var oldSb98 strings.Builder
 	var storeSb98 strings.Builder
 	for i := range kids {
-		oldSb98.WriteString(fmt.Sprintf(`{"type":"message","id":"r%d","timestamp":"2026-07-20T08:10:00Z","message":{"role":"toolResult","toolName":"sessions_spawn","content":[{"type":"text","text":"{\\"childSessionKey\\":\\"agent:main:subagent:%d\\"}"}]}}`+"\n", i, i))
+		fmt.Fprintf(&oldSb98, `{"type":"message","id":"r%d","timestamp":"2026-07-20T08:10:00Z","message":{"role":"toolResult","toolName":"sessions_spawn","content":[{"type":"text","text":"{\\"childSessionKey\\":\\"agent:main:subagent:%d\\"}"}]}}`+"\n", i, i)
 		write(fmt.Sprintf("kid%d.jsonl", i), fmt.Sprintf(`{"type":"session","version":3,"id":"kid%d","timestamp":"2026-07-20T09:00:00Z"}
 {"type":"message","id":"a","timestamp":"2026-07-20T09:00:01Z","message":{"role":"user","content":"child task"}}
 `, i))
-		storeSb98.WriteString(fmt.Sprintf(`,"agent:main:subagent:%d":{"sessionId":"kid%d","spawnedBy":"agent:main:main"}`, i, i))
+		fmt.Fprintf(&storeSb98, `,"agent:main:subagent:%d":{"sessionId":"kid%d","spawnedBy":"agent:main:main"}`, i, i)
 	}
 	old += oldSb98.String()
 	store += storeSb98.String()

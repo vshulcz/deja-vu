@@ -47,7 +47,7 @@ func TestClaudeBranchNamesItsSource(t *testing.T) {
 
 	// Control: the source itself carries no marker and stays a plain session.
 	plain := filepath.Join(dir, src+".jsonl")
-	if err := os.WriteFile(plain, []byte(`{"type":"user","sessionId":"`+src+`","uuid":"u1","timestamp":"2026-10-18T04:38:45.469Z","cwd":"/work/app","message":{"role":"user","content":"edit main.go"}}`+"\n"), 0o644); err != nil {
+	if err = os.WriteFile(plain, []byte(`{"type":"user","sessionId":"`+src+`","uuid":"u1","timestamp":"2026-10-18T04:38:45.469Z","cwd":"/work/app","message":{"role":"user","content":"edit main.go"}}`+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	ps, err := ParseClaudeFile(plain)

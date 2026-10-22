@@ -70,8 +70,8 @@ func TestKimiForkKeepsOnlyItsOwnTurnsUnderItsSource(t *testing.T) {
 	if got := f.Started.UnixMilli(); got != 1792304313000 {
 		t.Errorf("fork starts at %d, want its own first turn 1792304313000", got)
 	}
-	if ss, _ := ParseKimiFile(copiedChild); len(ss) != 0 {
-		t.Errorf("a copied, unresumed sub-agent log reads as %d sessions of the fork: %#v", len(ss), ss)
+	if copied, _ := ParseKimiFile(copiedChild); len(copied) != 0 {
+		t.Errorf("a copied, unresumed sub-agent log reads as %d sessions of the fork: %#v", len(copied), copied)
 	}
 
 	// The source is untouched by the rule: it carries no forkedFrom.
@@ -217,7 +217,7 @@ func TestKimiSubagentIsReadByDefaultAsTaskAnswerAndChanges(t *testing.T) {
 	if err != nil || len(ss) != 1 {
 		t.Fatalf("parsed %d sessions: %v", len(ss), err)
 	}
-	var roles []string
+	roles := make([]string, 0, len(ss[0].Messages))
 	wrote := false
 	for _, m := range ss[0].Messages {
 		roles = append(roles, m.Role)

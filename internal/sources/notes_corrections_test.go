@@ -52,7 +52,7 @@ func TestPromotedNoteServesTheLatestCorrectionFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 	lines = append(lines, string(plain), string(plain2))
-	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+	if err = os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

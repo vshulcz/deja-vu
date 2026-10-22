@@ -76,7 +76,7 @@ func writeHermesStore(t *testing.T, schema, rows string) string {
 		t.Fatal(err)
 	}
 	db := filepath.Join(dir, "state.db")
-	cmd := exec.Command("sqlite3", db)
+	cmd := exec.CommandContext(t.Context(), "sqlite3", db)
 	cmd.Stdin = strings.NewReader(schema + rows)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3: %v\n%s", err, out)

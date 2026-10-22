@@ -27,7 +27,7 @@ insert into message values('m3','s1',1767409320000,'{"role":"user","agent":"buil
 insert into part values('p3','m3','{"type":"text","synthetic":true,"text":"Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed.","time":{"start":"2026-01-02T03:02:00Z"}}');
 insert into message values('m4','s1',1767409380000,'{"role":"user","agent":"build"}');
 insert into part values('p4','m4','{"type":"text","synthetic":true,"text":"The following tool was executed by the user","time":{"start":"2026-01-02T03:03:00Z"}}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
 	ss, err := ParseOpencodeDB(db)

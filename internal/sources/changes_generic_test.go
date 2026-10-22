@@ -19,8 +19,9 @@ func TestChangesReadsKimiEditAndWriteCalls(t *testing.T) {
 	if err != nil || len(ss) != 1 {
 		t.Fatalf("ParseKimiFile: %v, %d sessions", err, len(ss))
 	}
-	var got []string
-	for _, c := range Changes(ss[0]) {
+	changes := Changes(ss[0])
+	got := make([]string, 0, len(changes))
+	for _, c := range changes {
 		got = append(got, c.Path+"|"+c.Old+"|"+c.New)
 	}
 	if want := "pool.go|MaxConns: 10|MaxConns: 40 pool_test.go||package demo"; strings.Join(got, " ") != want {
@@ -36,7 +37,8 @@ func TestChangesReadsKimiEditAndWriteCalls(t *testing.T) {
 func TestChangesReadsAnotherHarnessesEditCalls(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("DEJA_COPILOT_ROOT", root)
-	lines := append(copilotFixtureLines()[:4],
+	lines := copilotFixtureLines()[:4]
+	lines = append(lines,
 		`{"type":"tool.execution_start","data":{"toolCallId":"t1","toolName":"view","arguments":{"path":"/Users/x/coding/gateway/pool.go"}},"timestamp":"2026-07-20T05:13:59.000Z"}`,
 		`{"type":"tool.execution_complete","data":{"toolCallId":"t1","result":{"path":"/Users/x/coding/gateway/pool.go","content":"READ ONLY"}},"timestamp":"2026-07-20T05:13:59.100Z"}`,
 		`{"type":"tool.execution_start","data":{"toolCallId":"t2","toolName":"edit","arguments":{"path":"/Users/x/coding/gateway/pool.go","old_str":"MaxConns: 10","new_str":"MaxConns: 40"}},"timestamp":"2026-07-20T05:13:59.200Z"}`,
@@ -49,8 +51,9 @@ func TestChangesReadsAnotherHarnessesEditCalls(t *testing.T) {
 		`{"type":"assistant.message","data":{"content":"raised the pool"},"timestamp":"2026-07-20T05:14:00.973Z"}`,
 	)
 	p := writeCopilotFixture(t, root, "7cf44517-55ca-435c-893a-3fde1973a44e", lines)
-	var got []string
-	for _, c := range Changes(model.Session{Harness: "copilot", ID: "7cf44517-55ca-435c-893a-3fde1973a44e", Path: p}) {
+	changes := Changes(model.Session{Harness: "copilot", ID: "7cf44517-55ca-435c-893a-3fde1973a44e", Path: p})
+	got := make([]string, 0, len(changes))
+	for _, c := range changes {
 		got = append(got, c.Path+"|"+c.Old+"|"+c.New)
 	}
 	if want := "pool.go|MaxConns: 10|MaxConns: 40 pool_test.go||package gateway"; strings.Join(got, " ") != want {
@@ -65,8 +68,9 @@ func TestChangesReadsQwenEditCalls(t *testing.T) {
 	t.Setenv("DEJA_QWEN_ROOT", root)
 	p := filepath.Join(root, "projects", "-workspace-registry-demo", "chats", "registry-qwen-edit.jsonl")
 	copyFixture(t, "fixtures/registry/qwen/projects/-workspace-registry-demo/chats/registry-qwen-edit.jsonl", p)
-	var got []string
-	for _, c := range Changes(model.Session{Harness: "qwen", ID: "registry-qwen-edit", Path: p}) {
+	changes := Changes(model.Session{Harness: "qwen", ID: "registry-qwen-edit", Path: p})
+	got := make([]string, 0, len(changes))
+	for _, c := range changes {
 		got = append(got, c.Path+"|"+c.Old+"|"+c.New)
 	}
 	if want := "pool.go|MaxConns: 10|MaxConns: 40 pool_test.go||package demo"; strings.Join(got, " ") != want {

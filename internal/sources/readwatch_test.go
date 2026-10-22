@@ -105,7 +105,7 @@ func TestAStalledReadSaysWhy(t *testing.T) {
 	block := make(chan struct{})
 	defer close(block)
 	_, err := ReadWatched("/nowhere.jsonl", func() ([]model.Session, error) { <-block; return nil, nil })
-	var stalled *StalledRead
+	var stalled *StalledReadError
 	if !errors.As(err, &stalled) {
 		t.Fatalf("got %v, want a stalled read", err)
 	}
@@ -124,7 +124,7 @@ func TestAStalledDirectoryIsNotWaitedOnTwice(t *testing.T) {
 	}
 	start := time.Now()
 	_, err := Watch(filepath.Join(dir, "b.jsonl"), func() (int, error) { <-block; return 0, nil })
-	var stalled *StalledRead
+	var stalled *StalledReadError
 	if !errors.As(err, &stalled) || time.Since(start) > 50*time.Millisecond {
 		t.Fatalf("the second file waited %v (%v)", time.Since(start), err)
 	}

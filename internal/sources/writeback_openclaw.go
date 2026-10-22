@@ -1,8 +1,8 @@
 package sources
 
 import (
+	"bytes"
 	"path/filepath"
-	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -42,7 +42,7 @@ func renderPiShapedNoCWD(s model.Session, turns []model.Message) (string, []byte
 	if err != nil {
 		return "", nil, err
 	}
-	nl := strings.IndexByte(string(data), '\n')
+	nl := bytes.IndexByte(data, '\n')
 	start := turns[0].Time
 	if !s.Started.IsZero() && s.Started.Before(start) {
 		start = s.Started

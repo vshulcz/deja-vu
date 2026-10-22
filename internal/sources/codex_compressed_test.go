@@ -22,12 +22,12 @@ const codexRolloutFixture = `{"timestamp":"2026-07-17T09:00:00.000Z","type":"ses
 {"timestamp":"2026-07-17T09:00:02.000Z","type":"response_item","payload":{"role":"assistant","content":[{"type":"output_text","text":"the advisory lock was never released"}]}}
 `
 
-func writeCodexRollout(t *testing.T, dir, name string, compress bool) string {
+func writeCodexRollout(t *testing.T, dir string, compress bool) string {
 	t.Helper()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	plain := filepath.Join(dir, name)
+	plain := filepath.Join(dir, "rollout-thread-7.jsonl")
 	if err := os.WriteFile(plain, []byte(codexRolloutFixture), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +35,7 @@ func writeCodexRollout(t *testing.T, dir, name string, compress bool) string {
 		return plain
 	}
 	out := plain + ".zst"
-	if err := exec.Command("zstd", "-q", "-o", out, plain).Run(); err != nil {
+	if err := exec.CommandContext(t.Context(), "zstd", "-q", "-o", out, plain).Run(); err != nil {
 		t.Fatalf("zstd: %v", err)
 	}
 	if err := os.Remove(plain); err != nil {
@@ -51,7 +51,7 @@ func TestCodexReadsACompressedRollout(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("DEJA_CODEX_ROOT", root)
 	t.Setenv("DEJA_XCODE_CODEX_ROOT", filepath.Join(root, "absent"))
-	writeCodexRollout(t, filepath.Join(root, "sessions", "2026", "07", "17"), "rollout-thread-7.jsonl", true)
+	writeCodexRollout(t, filepath.Join(root, "sessions", "2026", "07", "17"), true)
 
 	files := CodexFiles()
 	if len(files) != 1 || !strings.HasSuffix(files[0], ".jsonl.zst") {
@@ -83,8 +83,7 @@ func TestCodexReadsTheArchivedDirectory(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("DEJA_CODEX_ROOT", root)
 	t.Setenv("DEJA_XCODE_CODEX_ROOT", filepath.Join(root, "absent"))
-	writeCodexRollout(t, filepath.Join(root, "archived_sessions", "2026", "07", "17"),
-		"rollout-thread-7.jsonl", false)
+	writeCodexRollout(t, filepath.Join(root, "archived_sessions", "2026", "07", "17"), false)
 
 	ss := LoadCodex()
 	if len(ss) != 1 || ss[0].ID != "thread-7" {
@@ -110,8 +109,8 @@ func TestCodexReadsOneFilePerSession(t *testing.T) {
 	t.Setenv("DEJA_CODEX_ROOT", root)
 	t.Setenv("DEJA_XCODE_CODEX_ROOT", filepath.Join(root, "absent"))
 	dir := filepath.Join(root, "sessions", "2026", "07", "17")
-	writeCodexRollout(t, dir, "rollout-thread-7.jsonl", true)
-	writeCodexRollout(t, dir, "rollout-thread-7.jsonl", false)
+	writeCodexRollout(t, dir, true)
+	writeCodexRollout(t, dir, false)
 
 	if n := len(CodexFiles()); n != 2 {
 		t.Fatalf("both files should be visible to diagnostics, got %d", n)
@@ -131,8 +130,7 @@ func TestCodexSaysWhenItNeedsZstd(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("DEJA_CODEX_ROOT", root)
 	t.Setenv("DEJA_XCODE_CODEX_ROOT", filepath.Join(root, "absent"))
-	writeCodexRollout(t, filepath.Join(root, "sessions", "2026", "07", "17"),
-		"rollout-thread-7.jsonl", false)
+	writeCodexRollout(t, filepath.Join(root, "sessions", "2026", "07", "17"), false)
 	if got := SkipReason("codex"); got != "" {
 		t.Errorf("a plain store explains nothing, got %q", got)
 	}

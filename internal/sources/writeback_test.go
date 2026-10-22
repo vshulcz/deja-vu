@@ -34,10 +34,10 @@ func writeAndRead(t *testing.T, s model.Session, parse func(string) ([]model.Ses
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Dir(f.Path), 0o700); err != nil {
+	if err = os.MkdirAll(filepath.Dir(f.Path), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(f.Path, f.Data, 0o600); err != nil {
+	if err = os.WriteFile(f.Path, f.Data, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	ss, err := parse(f.Path)
@@ -53,7 +53,7 @@ func writeAndRead(t *testing.T, s model.Session, parse func(string) ([]model.Ses
 func assertTurns(t *testing.T, got []model.Message) {
 	t.Helper()
 	want := []string{"user:why does the pool exhaust <under load> & retry", "assistant:raise MaxOpenConns to 50", "user:done?"}
-	var have []string
+	have := make([]string, 0, len(got))
 	for _, m := range got {
 		have = append(have, m.Role+":"+m.Text)
 	}
@@ -142,7 +142,7 @@ func TestWriteBackCodexTakesTheDirectoryTheSessionRecorded(t *testing.T) {
 	db := filepath.Join(root, "state_5.sqlite")
 	sql := func(q string) {
 		t.Helper()
-		if out, err := exec.Command("sqlite3", db, q).CombinedOutput(); err != nil {
+		if out, err := exec.CommandContext(t.Context(), "sqlite3", db, q).CombinedOutput(); err != nil {
 			t.Fatalf("sqlite3: %v %s", err, out)
 		}
 	}

@@ -41,6 +41,7 @@ type note struct {
 	SrcTS string `json:"src_ts,omitempty"`
 }
 
+// NotesFile is the path of deja's own notes file.
 func NotesFile() string {
 	if p := os.Getenv("DEJA_NOTES_FILE"); p != "" {
 		return p
@@ -98,6 +99,7 @@ func NormalizeTags(tags []string) []string {
 	return out
 }
 
+// AppendNote appends an untagged note for project.
 func AppendNote(project, text string, now time.Time) error {
 	return AppendNoteTagged(project, text, nil, now)
 }
@@ -158,27 +160,28 @@ func noteAlreadyStored(path, project, text string) bool {
 
 // readNoteLine reads one line, reporting a line past max rather than buffering
 // it: the caller skips it and carries on down the file.
-func readNoteLine(br *bufio.Reader, max int) (line []byte, tooLong bool, err error) {
+func readNoteLine(br *bufio.Reader, most int) (line []byte, tooLong bool, err error) {
 	var buf []byte
 	for {
 		chunk, e := br.ReadSlice('\n')
 		// The cap is on the line's content; the newline that ends it is not
 		// part of the note, and counting it made a line of exactly max bytes
 		// look one byte too long.
-		if len(buf)+len(bytes.TrimSuffix(chunk, []byte("\n"))) > max {
+		if len(buf)+len(bytes.TrimSuffix(chunk, []byte("\n"))) > most {
 			tooLong = true
 			buf = nil
 		}
 		if !tooLong {
 			buf = append(buf, chunk...)
 		}
-		if e == bufio.ErrBufferFull {
+		if errors.Is(e, bufio.ErrBufferFull) {
 			continue
 		}
 		return buf, tooLong, e
 	}
 }
 
+// AppendNoteTagged appends a note for project with tags.
 func AppendNoteTagged(project, text string, tags []string, now time.Time) error {
 	project = strings.TrimSpace(project)
 	if project == "" {
@@ -225,11 +228,11 @@ func AppendNoteTagged(project, text string, tags []string, now time.Time) error 
 func padTrailingNewline(f *os.File) error {
 	info, err := f.Stat()
 	if err != nil || info.Size() == 0 {
-		return nil
+		return nil //nolint:nilerr // best effort, the append goes ahead
 	}
 	last := make([]byte, 1)
-	if _, err := f.ReadAt(last, info.Size()-1); err != nil {
-		return nil
+	if _, err = f.ReadAt(last, info.Size()-1); err != nil {
+		return nil //nolint:nilerr // best effort, the append goes ahead
 	}
 	if last[0] == '\n' {
 		return nil
@@ -238,6 +241,7 @@ func padTrailingNewline(f *os.File) error {
 	return err
 }
 
+// LoadNotes reads deja's notes file as sessions.
 func LoadNotes() []model.Session {
 	// The error is recorded, not swallowed: notes are read straight here
 	// rather than through parseFiles, so a notes file the process cannot read
@@ -281,10 +285,12 @@ func noteIDProject(project string) string {
 	return out
 }
 
+// ParseNotesFile reads a notes file from the start.
 func ParseNotesFile(path string) ([]model.Session, error) {
 	return ParseNotesFileFromOffset(path, 0)
 }
 
+// ParseNotesFileFromOffset reads a notes file from offset on, one session per project and day.
 func ParseNotesFileFromOffset(path string, offset int64) ([]model.Session, error) {
 	byDay := map[string]*model.Session{}
 	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
@@ -433,6 +439,7 @@ func AppendPromoted(project, title, text, session, state string, now time.Time) 
 	return AppendPromotedTagged(project, title, text, session, state, nil, now)
 }
 
+// AppendPromotedTagged appends a promoted note with no source time.
 func AppendPromotedTagged(project, title, text, session, state string, tags []string, now time.Time) error {
 	return AppendPromotedSourced(project, title, text, session, state, tags, time.Time{}, now)
 }

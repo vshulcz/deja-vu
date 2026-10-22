@@ -58,7 +58,7 @@ func genericChanges(s model.Session) []Change {
 	if !ok || k.Parse == nil {
 		return nil
 	}
-	if ss, err := k.Parse(s.Path, 0); err != nil || len(ss) != 1 {
+	if ss, parseErr := k.Parse(s.Path, 0); parseErr != nil || len(ss) != 1 {
 		return nil
 	}
 	f, err := os.Open(s.Path)

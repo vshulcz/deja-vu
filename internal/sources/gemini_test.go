@@ -159,7 +159,7 @@ func TestGeminiDedupeKeepsAResumedTranscript(t *testing.T) {
 		{Harness: "gemini", ID: "w", Path: "/a/session-w.json", Messages: msgs(6)},
 		{Harness: "gemini", ID: "w", Path: "/a/session-w.jsonl", Messages: msgs(3)},
 	})
-	var paths []string
+	paths := make([]string, 0, len(out))
 	for _, s := range out {
 		paths = append(paths, s.Path)
 	}
@@ -184,8 +184,9 @@ func TestGeminiDedupeIgnoresReadOrder(t *testing.T) {
 		for _, i := range order {
 			in = append(in, files[i])
 		}
-		var paths []string
-		for _, s := range dedupeGeminiSessions(in) {
+		kept := dedupeGeminiSessions(in)
+		paths := make([]string, 0, len(kept))
+		for _, s := range kept {
 			paths = append(paths, s.Path)
 		}
 		sort.Strings(paths)
@@ -234,7 +235,7 @@ func TestGeminiResumeSnapshotKeepsTheHookedPrompt(t *testing.T) {
 	if err != nil || len(ss) != 1 {
 		t.Fatalf("parse: %v, %d sessions", err, len(ss))
 	}
-	var all []string
+	all := make([]string, 0, len(ss[0].Messages))
 	for _, m := range ss[0].Messages {
 		all = append(all, m.Role+": "+m.Text)
 	}
@@ -265,7 +266,7 @@ func TestGeminiSnapshotsFollowGeminisHistory(t *testing.T) {
 		if err != nil || len(ss) != 1 {
 			t.Fatalf("parse %s: %v, %d sessions", name, err, len(ss))
 		}
-		var all []string
+		all := make([]string, 0, len(ss[0].Messages))
 		for _, m := range ss[0].Messages {
 			all = append(all, m.Text)
 		}

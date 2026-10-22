@@ -45,6 +45,7 @@ func OpencodeDB() string {
 	return db
 }
 
+// LoadOpencode reads every session in the OpenCode store.
 func LoadOpencode() []model.Session {
 	// A store that would not open — locked past the timeout by the agent
 	// using it, or unreadable — is reported like a transcript that would not
@@ -108,22 +109,26 @@ func withOpencodeDiffs(ss []model.Session) []model.Session {
 	return ss
 }
 
+// LoadOpencodeMatching reads the OpenCode sessions whose text contains q.
 func LoadOpencodeMatching(q string) []model.Session {
 	where := fmt.Sprintf(" and lower(p.data) like '%%%s%%' escape '\\'", sqlEscape(sqlLikeEscape(strings.ToLower(q))))
 	ss, _ := ParseOpencodeDBWhere(OpencodeDB(), where, 5000)
 	return ss
 }
 
+// LoadOpencodeRecent reads the newest OpenCode history, capped at n*20 rows.
 func LoadOpencodeRecent(n int) []model.Session {
 	ss, _ := ParseOpencodeDBWhere(OpencodeDB(), "", n*20)
 	return ss
 }
 
+// LoadOpencodeSince reads the OpenCode sessions that changed after t.
 func LoadOpencodeSince(t time.Time) []model.Session {
 	ss, _ := ParseOpencodeDBSince(OpencodeDB(), t)
 	return ss
 }
 
+// LoadOpencodePrefix reads the OpenCode sessions whose id starts with p.
 func LoadOpencodePrefix(p string) []model.Session {
 	where := fmt.Sprintf(" and s.id like '%s%%' escape '\\'", sqlEscape(sqlLikeEscape(p)))
 	ss, _ := ParseOpencodeDBWhere(OpencodeDB(), where, 0)
@@ -152,7 +157,7 @@ var opencodeSetCap = 2000
 // empty, the 1.x reader takes the same sessions.
 func parseOpencodeSet(harness, db, where1, set string) ([]model.Session, error) {
 	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
-		return nil, nil
+		return nil, nil //nolint:nilerr // a missing or empty store holds no sessions
 	}
 	ids, ok := opencodeIDs(db, set)
 	if !ok {
@@ -226,10 +231,12 @@ func OpencodeStoreLacks(harness, id string) bool {
 	return true
 }
 
+// ParseOpencodeDB reads every session in the OpenCode store at db.
 func ParseOpencodeDB(db string) ([]model.Session, error) {
 	return ParseOpencodeDBWhere(db, "", 0)
 }
 
+// ParseOpencodeDBSince reads the sessions in the OpenCode store at db that changed after t.
 func ParseOpencodeDBSince(db string, t time.Time) ([]model.Session, error) {
 	if t.IsZero() {
 		return ParseOpencodeDBWhere(db, "", 0)
@@ -309,6 +316,7 @@ func opencodeTouchedSet(table string, t time.Time, touched string) string {
 		table, newerThanEpoch("time_updated", t), sqlEscape(t.UTC().Format(time.RFC3339Nano)), touched)
 }
 
+// ParseOpencodeDBWhere reads the sessions in the OpenCode store at db that match the SQL clause where, capped at limit rows when limit > 0.
 func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) {
 	return parseOpencodeSchemaDB("opencode", db, where, limit)
 }
@@ -330,7 +338,7 @@ func parseOpencodeSchemaDB(harness, db, where string, limit int) ([]model.Sessio
 func parseOpencodeLayouts(harness, db, where1, where2 string, limit int, only2 string) ([]model.Session, error) {
 	// The sqlite3 CLI CREATES a missing database file on open — never let it.
 	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
-		return nil, nil
+		return nil, nil //nolint:nilerr // a missing or empty store holds no sessions
 	}
 	schema := opencodeSchemaOf(db)
 	by := map[string]*model.Session{}
@@ -818,6 +826,7 @@ func opencodeParents(db string) map[string]string {
 	return m
 }
 
+// OpencodeCounts reports how many sessions and text parts the OpenCode store holds.
 func OpencodeCounts() (sessions, messages int, err error) {
 	if fi, e := os.Stat(OpencodeDB()); e != nil || fi.Size() == 0 {
 		return 0, 0, nil

@@ -30,7 +30,7 @@ type WriteBackFile struct {
 
 // WriteBackRefusal says why a session cannot be written back, naming what the
 // index lacks or what the format needs.
-type WriteBackRefusal struct {
+type WriteBackRefusal struct { //nolint:errname // exported name used by cmd/deja
 	Harness string
 	Reason  string
 }
@@ -265,8 +265,9 @@ func renderClaude(s model.Session, turns []model.Message) (string, []byte, error
 // model on resume) and as an event (what its history view shows), the way
 // codex writes them.
 func codexWriteBackRoots() []string {
-	var out []string
-	for _, r := range CodexRoots() {
+	roots := CodexRoots()
+	out := make([]string, 0, 2*len(roots))
+	for _, r := range roots {
 		out = append(out, filepath.Join(r, "sessions"), filepath.Join(r, "archived_sessions"))
 	}
 	return out

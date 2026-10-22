@@ -24,7 +24,7 @@ insert into part values('p1','m1','{"type":"text","text":"Read-only review of th
 insert into session values('ses_thin',NULL,'/w','done','2026-01-02T04:00:00Z','2026-01-02T04:30:00Z');
 insert into message values('m2','ses_thin',1767412800000,'{"role":"user"}');
 insert into part values('p2','m2','{"type":"text","text":"render the plots for the report","time":{"start":"2026-01-02T04:00:00Z"}}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
 	ss, err := ParseOpencodeDB(db)

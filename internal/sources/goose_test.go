@@ -60,11 +60,13 @@ func TestParseGooseFileFromOffset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.WriteString(appendLine); err != nil {
-		f.Close()
+	if _, err = f.WriteString(appendLine); err != nil {
+		_ = f.Close()
 		t.Fatal(err)
 	}
-	f.Close()
+	if err = f.Close(); err != nil {
+		t.Fatal(err)
+	}
 	ss, err := ParseGooseFileFromOffset(jsonl, off)
 	if err != nil {
 		t.Fatal(err)
@@ -125,7 +127,7 @@ create table messages (id integer primary key autoincrement, session_id text, ro
 insert into sessions values ('20250724_2','n','sqlite demo','/workspace/demo','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z');
 insert into messages values (1,'20250724_2','user','[{"type":"text","text":"db hello"}]',1784282401);
 insert into messages values (2,'20250724_2','assistant','[{"type":"text","text":"db reply"}]',1784282402);`
-	if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, sql).CombinedOutput(); err != nil {
 		t.Fatalf("create db: %v: %s", err, out)
 	}
 	ss, err := ParseGooseDB(db)
@@ -185,7 +187,7 @@ insert into messages values (8,'s_old','user','[{"type":"text","text":"legacy"}]
 insert into messages values (9,'s_sub','user','[{"type":"text","text":"subagent noise"}]',1784282401);
 insert into messages values (10,'s_sub2','user','[{"type":"text","text":"subagent noise"}]',1784282401);
 insert into messages values (11,'s_cron','user','[{"type":"text","text":"cron noise"}]',1784282401);`
-	if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, sql).CombinedOutput(); err != nil {
 		t.Fatalf("create db: %v: %s", err, out)
 	}
 	ss, err := ParseGooseDB(db)

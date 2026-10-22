@@ -73,7 +73,7 @@ func TestClineCompactionSummaryIsReadFromItsFile(t *testing.T) {
 	if err != nil || len(ss) != 1 {
 		t.Fatalf("parse: %v %d", err, len(ss))
 	}
-	var order []string
+	order := make([]string, 0, len(ss[0].Messages))
 	for _, m := range ss[0].Messages {
 		order = append(order, m.Role+":"+m.Text)
 	}

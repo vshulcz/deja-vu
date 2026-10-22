@@ -12,12 +12,12 @@ import "strings"
 // person's sentence that mentions <user_query> is left alone. With more than
 // one pair the last is the prompt, the earlier ones being quoted context.
 func UserQuery(text string) (string, bool) {
-	const open, close = "<user_query>", "</user_query>"
+	const open, closeTag = "<user_query>", "</user_query>"
 	t := strings.TrimSpace(text)
-	if !strings.HasPrefix(t, "<") || !strings.HasSuffix(t, close) {
+	if !strings.HasPrefix(t, "<") || !strings.HasSuffix(t, closeTag) {
 		return "", false
 	}
-	body := t[:len(t)-len(close)]
+	body := t[:len(t)-len(closeTag)]
 	start := strings.LastIndex(body, open)
 	if start < 0 {
 		return "", false

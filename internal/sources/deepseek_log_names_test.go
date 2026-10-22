@@ -75,7 +75,7 @@ func TestParseDeepSeekFileReadsAV3Log(t *testing.T) {
 	paths := []string{v3}
 	if ZstdAvailable() {
 		framed := v3 + ".zstd"
-		if err := exec.Command("zstd", "-q", "-k", "-o", framed, v3).Run(); err != nil {
+		if err := exec.CommandContext(t.Context(), "zstd", "-q", "-k", "-o", framed, v3).Run(); err != nil {
 			t.Fatalf("zstd: %v", err)
 		}
 		paths = append(paths, framed)

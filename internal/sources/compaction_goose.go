@@ -43,13 +43,13 @@ func ReadGooseCompaction(sessionID string) (CompactionTranscript, bool, error) {
 			N  int64 `json:"n"`
 		}
 		if strings.TrimSpace(string(out)) == "" || json.Unmarshal(out, &b) != nil || b.ID == 0 {
-			return CompactionTranscript{}, false, nil
+			return CompactionTranscript{}, false, nil //nolint:nilerr // a store with no compaction row has nothing to read
 		}
 		// What the person saw, up to the note: the summary is agent-only, and
 		// so is every earlier compaction's.
 		where := fmt.Sprintf(" and s.id='%s' and (m.created_timestamp < %d or (m.created_timestamp = %d and m.id < %d)) and not (%s)",
 			id, b.At, b.At, b.ID, hidden)
-		ss, err := parseGooseDBWhere(db, where, 0)
+		ss, err := parseGooseDBWhere(db, where)
 		if err != nil {
 			return CompactionTranscript{}, false, err
 		}

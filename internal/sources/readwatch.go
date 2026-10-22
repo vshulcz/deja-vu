@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -33,13 +34,13 @@ var (
 	watching atomic.Int64
 )
 
-// StalledRead is the error for a read given up for making no progress.
-type StalledRead struct {
+// StalledReadError is the error for a read given up for making no progress.
+type StalledReadError struct {
 	Path string
 	Idle time.Duration
 }
 
-func (e *StalledRead) Error() string {
+func (e *StalledReadError) Error() string {
 	if e.Idle == 0 {
 		return fmt.Sprintf("read %s: skipped, a read in the same directory stopped moving; DEJA_STORE_TIMEOUT=0 waits", e.Path)
 	}
@@ -50,7 +51,8 @@ func (e *StalledRead) Error() string {
 // no progress for the store read budget, recording the path as unreadable.
 func ReadWatched(path string, parse func() ([]model.Session, error)) ([]model.Session, error) {
 	ss, err := Watch(path, parse)
-	if _, ok := err.(*StalledRead); ok {
+	var stalled *StalledReadError
+	if errors.As(err, &stalled) {
 		diagFileError(path, err)
 	}
 	return ss, err
@@ -71,7 +73,7 @@ func Watch[T any](path string, fn func() (T, error)) (T, error) {
 	watchMu.Lock()
 	if stalledDirs[dir] > 0 {
 		watchMu.Unlock()
-		return zero, &StalledRead{Path: path}
+		return zero, &StalledReadError{Path: path}
 	}
 	mark := new(int64)
 	*mark = time.Now().UnixNano()
@@ -144,7 +146,7 @@ func Watch[T any](path string, fn func() (T, error)) (T, error) {
 					delete(watched, path)
 				}
 				watchMu.Unlock()
-				return zero, &StalledRead{Path: path, Idle: budget}
+				return zero, &StalledReadError{Path: path, Idle: budget}
 			}
 			watchMu.Unlock()
 		}

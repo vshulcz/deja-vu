@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,7 +29,7 @@ func TestOneHugeNoteDoesNotDisableTheDuplicateCheck(t *testing.T) {
 	if err == nil {
 		t.Fatal("a note already on file was written again after an oversized one")
 	}
-	if err != ErrNoteExists {
+	if !errors.Is(err, ErrNoteExists) {
 		t.Fatalf("want ErrNoteExists, got %v", err)
 	}
 
@@ -36,10 +37,10 @@ func TestOneHugeNoteDoesNotDisableTheDuplicateCheck(t *testing.T) {
 	// refused — so the assertion above is not vacuous.
 	plain := filepath.Join(t.TempDir(), "plain.jsonl")
 	t.Setenv("DEJA_NOTES_FILE", plain)
-	if err := AppendNote("proj", "the retry cap is three", now); err != nil {
+	if err = AppendNote("proj", "the retry cap is three", now); err != nil {
 		t.Fatal(err)
 	}
-	if err := AppendNote("proj", "the retry cap is three", now); err != ErrNoteExists {
+	if err = AppendNote("proj", "the retry cap is three", now); !errors.Is(err, ErrNoteExists) {
 		t.Fatalf("the control does not hold: %v", err)
 	}
 
@@ -90,11 +91,11 @@ func TestTheLineCapCountsTheNoteNotItsNewline(t *testing.T) {
 			grown := strings.Repeat("z", 64+pad)
 			path2 := filepath.Join(t.TempDir(), "notes2.jsonl")
 			t.Setenv("DEJA_NOTES_FILE", path2)
-			if err := AppendNote("proj", grown, stamp); err != nil {
+			if err = AppendNote("proj", grown, stamp); err != nil {
 				t.Fatal(err)
 			}
 			err = AppendNote("proj", grown, stamp)
-			if tc.compare && err != ErrNoteExists {
+			if tc.compare && !errors.Is(err, ErrNoteExists) {
 				t.Errorf("a line at the cap was not compared: %v", err)
 			}
 			if !tc.compare && err != nil {

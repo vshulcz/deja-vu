@@ -26,8 +26,9 @@ func TestGenericChangesSkipsFailedEditCalls(t *testing.T) {
 	if err := os.WriteFile(p, []byte(lines), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	var got []string
-	for _, c := range Changes(model.Session{Harness: "gemini", ID: "sess-failed-edit-1", Path: p}) {
+	changes := Changes(model.Session{Harness: "gemini", ID: "sess-failed-edit-1", Path: p})
+	got := make([]string, 0, len(changes))
+	for _, c := range changes {
 		got = append(got, c.Old+"|"+c.New)
 	}
 	if want := "Timeout: 1s|Timeout: 5s"; strings.Join(got, " ") != want {

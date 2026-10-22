@@ -1,7 +1,6 @@
 package sources
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -29,7 +28,7 @@ func TestRooEnvironmentDetailsIsNotTheUsersText(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	b, _ := json.Marshal(turns)
+	b := mustJSON(t, turns)
 	path := filepath.Join(dir, "api_conversation_history.json")
 	if err := os.WriteFile(path, b, 0o644); err != nil {
 		t.Fatal(err)

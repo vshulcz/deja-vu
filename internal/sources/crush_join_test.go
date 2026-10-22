@@ -12,7 +12,11 @@ func crushJoinRecords(t *testing.T, session string, rows [][]any) []string {
 	sql := "insert into sessions values ('" + session + "',null,'retry',2,0,0,0.0,1784282499,1784282400,null,null);\n"
 	var sqlSb13 strings.Builder
 	for i, r := range rows {
-		kind, id, tool, payload, isErr := r[0].(string), r[1].(string), r[2].(string), r[3].(string), r[4].(bool)
+		kind, _ := r[0].(string)
+		id, _ := r[1].(string)
+		tool, _ := r[2].(string)
+		payload, _ := r[3].(string)
+		isErr, _ := r[4].(bool)
 		at := int64(1784282400 + i)
 		if kind == "call" {
 			sqlSb13.WriteString(crushInsert(t, "m"+itoa(i), session, "assistant", at, []any{

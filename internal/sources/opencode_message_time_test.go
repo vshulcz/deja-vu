@@ -30,7 +30,7 @@ insert into message values ('m2','s1','{"role":"user","time":{"created":` + ms(i
 insert into part values ('p2','m2',json_object('type','text','text','the blob carries this one'));
 insert into message values ('m3','s1','{"role":"user"}',0);
 insert into part values ('p3','m3',json_object('type','text','text','nothing carries this one'));`
-	if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, sql).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}
 	ss, err := ParseOpencodeDB(db)

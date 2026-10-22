@@ -19,7 +19,7 @@ import (
 func TestRooLegacyXMLCallsLeaveRecords(t *testing.T) {
 	const env = "<environment_details>\n# VSCode Visible Files\nretry/backoff.go\n</environment_details>"
 	turn := func(role string, texts ...string) map[string]any {
-		var blocks []any
+		blocks := make([]any, 0, len(texts))
 		for _, t := range texts {
 			blocks = append(blocks, map[string]any{"type": "text", "text": t})
 		}
@@ -127,7 +127,7 @@ func TestRooXMLOnlyInXMLEraTasks(t *testing.T) {
 		return path
 	}
 	text := func(role string, texts ...string) map[string]any {
-		var blocks []any
+		blocks := make([]any, 0, len(texts))
 		for _, s := range texts {
 			blocks = append(blocks, map[string]any{"type": "text", "text": s})
 		}

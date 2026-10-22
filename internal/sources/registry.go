@@ -1,3 +1,4 @@
+// Package sources reads each AI coding tool's session stores into model.Session values.
 package sources
 
 import (
@@ -390,8 +391,8 @@ func harnessTable() []Harness {
 				// token and re-reads by timestamp watermark like the other
 				// db-backed kinds.
 				Name:      "hermes-pg",
-				Match:     func(p string) bool { return IsHermesPGStore(p) },
-				Parse:     func(p string, nano int64) ([]model.Session, error) { return hermesPGRead(p, nano) },
+				Match:     IsHermesPGStore,
+				Parse:     hermesPGRead,
 				ParseFrom: func(p string, _, nano int64) ([]model.Session, error) { return hermesPGRead(p, nano) },
 			}},
 		},

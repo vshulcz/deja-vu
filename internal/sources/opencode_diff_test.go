@@ -107,8 +107,8 @@ func TestAnEmptyDiffFileIsNotASession(t *testing.T) {
 // a second variable to keep in step is how two paths drift apart.
 func TestTheDiffStoreFollowsTheDatabasePath(t *testing.T) {
 	t.Setenv("DEJA_OPENCODE_DIFFS", "")
-	t.Setenv("DEJA_OPENCODE_DB", filepath.Join("/tmp", "stand", "opencode.db"))
-	want := filepath.Join("/tmp", "stand", "storage", "session_diff")
+	t.Setenv("DEJA_OPENCODE_DB", filepath.FromSlash("/tmp/stand/opencode.db"))
+	want := filepath.FromSlash("/tmp/stand/storage/session_diff")
 	if got := OpencodeDiffDir(); got != want {
 		t.Errorf("OpencodeDiffDir() = %q, want %q", got, want)
 	}

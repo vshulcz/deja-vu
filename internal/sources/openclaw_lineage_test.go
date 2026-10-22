@@ -60,7 +60,7 @@ func TestOpenClawSubagentsHangUnderTheirParent(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(db), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("sqlite3", db)
+	cmd := exec.CommandContext(t.Context(), "sqlite3", db)
 	cmd.Stdin = strings.NewReader(openclawSpawnSQL)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("create store: %v: %s", err, out)

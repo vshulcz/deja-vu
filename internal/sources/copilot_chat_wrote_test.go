@@ -54,7 +54,7 @@ func TestCopilotChatRecordsTheWrittenSideOfAnEdit(t *testing.T) {
 	// The record's hash set is exactly the two written lines: the path line is
 	// not a written line, and a record holding anything else would attribute a
 	// line this session never wrote.
-	var want []string
+	want := make([]string, 0, 2)
 	for _, line := range []string{written, second} {
 		h, ok := HashWrittenLine(line)
 		if !ok {

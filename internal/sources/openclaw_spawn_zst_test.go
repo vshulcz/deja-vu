@@ -28,7 +28,7 @@ func TestOpenClawChildKeepsASpawnerArchivedAsZst(t *testing.T) {
 	spawn := `{"type":"message","id":"r","timestamp":"2026-07-20T08:59:59Z","message":{"role":"toolResult","toolCallId":"c1","toolName":"sessions_spawn","content":[{"type":"text","text":"{\"status\":\"accepted\",\"childSessionKey\":\"agent:main:subagent:1\",\"runId\":\"r1\"}"}]}}`
 	plain := write("p.jsonl.deleted.2026-07-20T10-59-00.000Z", `{"type":"session","version":3,"id":"p","timestamp":"2026-07-20T08:00:00Z","cwd":"/work/app"}
 `+spawn+"\n")
-	if out, err := exec.Command("zstd", "-q", "--rm", plain).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "zstd", "-q", "--rm", plain).CombinedOutput(); err != nil {
 		t.Fatalf("zstd: %v: %s", err, out)
 	}
 	kid := write("kid.jsonl", `{"type":"session","version":3,"id":"kid","timestamp":"2026-07-20T09:00:00Z","cwd":"/work/app"}

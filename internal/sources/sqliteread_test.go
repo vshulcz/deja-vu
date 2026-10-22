@@ -254,7 +254,7 @@ func TestProgressFilterTakesOutOnlyProgressLines(t *testing.T) {
 		t.Error("no movement reported")
 	}
 	// The end of a read given up says so, not what the closed pipe said.
-	stall := &StalledRead{Path: "x", Idle: time.Second}
+	stall := &StalledReadError{Path: "x", Idle: time.Second}
 	f = &progressFilter{r: bufio.NewReader(strings.NewReader("{}\n")), ended: func(error) error { return stall }}
 	if _, err := io.ReadAll(f); !errors.Is(err, stall) {
 		t.Errorf("end of a given-up read = %v", err)

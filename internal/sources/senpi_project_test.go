@@ -1,7 +1,6 @@
 package sources
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -27,7 +26,7 @@ func TestSenpiProjectComesFromTheHeaderCwd(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	quoted, _ := json.Marshal(cwd)
+	quoted := mustJSON(t, cwd)
 	head := `{"type":"session","version":3,"id":"b1000000-0000-7000-8000-000000000001","timestamp":"2026-10-01T23:00:00Z","cwd":` + string(quoted) + `}` + "\n"
 	first := `{"type":"message","id":"u1","timestamp":"2026-10-01T23:00:01Z","message":{"role":"user","content":[{"type":"text","text":"fix the retry loop"}]}}` + "\n"
 	tail := `{"type":"message","id":"a1","timestamp":"2026-10-01T23:00:02Z","message":{"role":"assistant","content":[{"type":"text","text":"capped at five"}]}}` + "\n"

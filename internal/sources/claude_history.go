@@ -89,6 +89,7 @@ func PromptLogSessionIDs(path string, from, to int64) (map[string]bool, error) {
 	}
 }
 
+// ParseClaudeHistory reads a Claude Code history.jsonl from the start.
 func ParseClaudeHistory(path string) ([]model.Session, error) {
 	return ParseClaudeHistoryFromOffset(path, 0)
 }

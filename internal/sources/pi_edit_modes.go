@@ -49,7 +49,10 @@ func piEditModes(args map[string]any) []map[string]any {
 			if to := str(em["rename"]); to != "" && op == "update" {
 				var written []any
 				for _, h := range pe {
-					hm := h.(map[string]any)
+					hm, isMap := h.(map[string]any)
+					if !isMap {
+						continue
+					}
 					written = append(written, map[string]any{"newText": hm["newText"]})
 					hm["newText"] = ""
 				}

@@ -98,6 +98,7 @@ func kiroUnderSessDir(p string) bool {
 	return strings.HasPrefix(filepath.Base(filepath.Dir(p)), "sess_")
 }
 
+// LoadKiro reads every Kiro session on this machine: CLI, IDE and database.
 func LoadKiro() []model.Session {
 	ss := parseFiles(KiroCLIFiles(), ParseKiroCLIFile)
 	ss = append(ss, parseFiles(KiroIDEFiles(), ParseKiroIDEFile)...)
@@ -253,8 +254,9 @@ var kiroExitResumes = resumesUnlessSettling(`"toolUseId"`, func(m map[string]any
 }, func(line []byte) []string {
 	data, _ := decodeJSONLine(line)["data"].(map[string]any)
 	_, calls, _ := kiroContent(data["content"])
-	var ids []string
-	for _, c := range commandCallsIn(calls, kiroDialect) {
+	cmds := commandCallsIn(calls, kiroDialect)
+	ids := make([]string, 0, len(cmds))
+	for _, c := range cmds {
 		ids = append(ids, c.ID)
 	}
 	return ids

@@ -183,6 +183,7 @@ func CodeWhaleWorkspace(path string) string {
 	return doc.Metadata.Workspace
 }
 
+// LoadCodeWhale reads every CodeWhale session on this machine.
 func LoadCodeWhale() []model.Session {
 	return parseFiles(CodeWhaleSessionFiles(), ParseCodeWhaleFile)
 }

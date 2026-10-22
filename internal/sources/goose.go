@@ -133,7 +133,7 @@ func GooseDBs() []string {
 }
 
 func gooseJSONLFiles() []string {
-	var out []string
+	var out []string //nolint:prealloc // each dir adds an unknown number of files
 	for _, dir := range GooseSessionsDirs() {
 		out = append(out, walkFiles(dir, func(p string) bool {
 			return strings.HasSuffix(p, ".jsonl") && filepath.Base(p) != "sessions.db"
@@ -156,6 +156,7 @@ func GooseSessionFiles() []string {
 	return out
 }
 
+// LoadGoose reads every goose session on this machine, files and database.
 func LoadGoose() []model.Session {
 	ss := parseFiles(gooseJSONLFiles(), ParseGooseFile)
 	for _, db := range GooseDBs() {
@@ -165,10 +166,12 @@ func LoadGoose() []model.Session {
 	return ss
 }
 
+// ParseGooseFile reads one goose session file.
 func ParseGooseFile(path string) ([]model.Session, error) {
 	return parseGooseFileFromOffset(path, 0)
 }
 
+// ParseGooseFileFromOffset reads a goose session file from offset on.
 func ParseGooseFileFromOffset(path string, offset int64) ([]model.Session, error) {
 	return parseGooseFileFromOffset(path, offset)
 }
@@ -507,12 +510,12 @@ func withoutGooseTurnContext(text string) string {
 		if open < 0 {
 			break
 		}
-		close := strings.Index(text[open:], "</turn-context>")
-		if close < 0 {
+		closeAt := strings.Index(text[open:], "</turn-context>")
+		if closeAt < 0 {
 			text = text[:open]
 			break
 		}
-		text = text[:open] + text[open+close+len("</turn-context>"):]
+		text = text[:open] + text[open+closeAt+len("</turn-context>"):]
 	}
 	return strings.TrimSpace(text)
 }
@@ -578,13 +581,15 @@ func gooseExitCode(m map[string]any) (int, bool) {
 	return 0, false
 }
 
+// ParseGooseDB reads every session in the goose database at db.
 func ParseGooseDB(db string) ([]model.Session, error) {
-	return parseGooseDBWhere(db, "", 0)
+	return parseGooseDBWhere(db, "")
 }
 
+// ParseGooseDBSince reads the sessions in the goose database at db that changed after t.
 func ParseGooseDBSince(db string, t time.Time) ([]model.Session, error) {
 	if t.IsZero() {
-		return parseGooseDBWhere(db, "", 0)
+		return parseGooseDBWhere(db, "")
 	}
 	// A second back, as crush, hermes, kiro and devin look: both sides are
 	// compared in whole seconds, and a turn stored in the watermark's own
@@ -605,16 +610,12 @@ func ParseGooseDBSince(db string, t time.Time) ([]model.Session, error) {
 	// whole in the index: a partial return would replace what goose already
 	// had there (#2033).
 	where := fmt.Sprintf(" and (m.created_timestamp > %d or datetime(s.updated_at) > datetime('%s'))", sec, rfc)
-	return parseGooseDBWhere(db, where, 0)
+	return parseGooseDBWhere(db, where)
 }
 
-func parseGooseDBWhere(db, where string, limit int) ([]model.Session, error) {
+func parseGooseDBWhere(db, where string) ([]model.Session, error) {
 	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
 		return nil, nil
-	}
-	lim := ""
-	if limit > 0 {
-		lim = fmt.Sprintf(" limit %d", limit)
 	}
 	// json_object, one object per row, rather than the sqlite3 shell's -json
 	// formatter: that one is quadratic in the number of characters it escapes,
@@ -636,7 +637,7 @@ func parseGooseDBWhere(db, where string, limit int) ([]model.Session, error) {
 		`'created_timestamp',m.created_timestamp` + extra + `) ` +
 		`from sessions s join messages m on m.session_id=s.id ` +
 		`where m.role in ('user','assistant')` + gooseTypeFilter(g) + where +
-		` order by s.id,m.created_timestamp,m.id` + lim
+		` order by s.id,m.created_timestamp,m.id`
 	cmd, stopRead := sqliteReadCmd(db, q)
 	defer stopRead()
 	dec, err := sqliteRows(cmd)

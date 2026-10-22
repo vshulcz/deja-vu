@@ -14,7 +14,7 @@ import (
 // arguments a JSON string, each result keyed by the call's id.
 func copilotChatRequestWithCalls(t *testing.T, calls []map[string]any, results map[string]any) map[string]any {
 	t.Helper()
-	var tc []any
+	tc := make([]any, 0, len(calls))
 	for _, c := range calls {
 		args, err := json.Marshal(c["args"])
 		if err != nil {
@@ -88,7 +88,7 @@ func TestCopilotChatReadsTheReplacedSideFromToolCallRounds(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := filepath.Join(t.TempDir(), "s.json")
-	if err := os.WriteFile(p, b, 0o644); err != nil {
+	if err = os.WriteFile(p, b, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	got := copilotChatRecordsOf(t, p, RoleEdit)

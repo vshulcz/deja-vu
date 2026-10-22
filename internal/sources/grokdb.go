@@ -12,13 +12,15 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
-// The maintained grok CLI keeps no session files: everything lands in a
-// SQLite database next to the config it shares with the other two CLIs. A
-// deja that only walks ~/.grok/sessions sees none of that history.
+// GrokDB is the grok CLI's store. The maintained grok CLI keeps no session
+// files: everything lands in a SQLite database next to the config it shares
+// with the other two CLIs. A deja that only walks ~/.grok/sessions sees none
+// of that history.
 func GrokDB() string {
 	return EnvPath("DEJA_GROK_DB", filepath.Join(GrokRoot(), "grok.db"))
 }
 
+// LoadGrokDB reads every session in the grok database.
 func LoadGrokDB() []model.Session {
 	ss, err := ParseGrokDBSince(GrokDB(), time.Time{})
 	if err != nil {
