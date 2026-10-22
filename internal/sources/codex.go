@@ -682,8 +682,11 @@ func codexCallOutput(s *model.Session, payload map[string]any, calls map[string]
 }
 
 // codexPatchFile matches the file headers of the apply_patch format Codex uses
-// for every edit it makes; it has no Read or Edit tool of its own.
-var codexPatchFile = regexp.MustCompile(`(?m)^\*\*\* (?:Update|Add|Delete) File: (.+)$`)
+// for every edit it makes; it has no Read or Edit tool of its own. A rename is
+// "*** Update File: a" then "*** Move to: b", and the hunks after it are
+// written to b (codex-rs/apply-patch parser.rs change_move), so b is the file
+// they go under.
+var codexPatchFile = regexp.MustCompile(`(?m)^\*\*\* (?:(?:Update|Add|Delete) File|Move to): (.+)$`)
 
 // codexPatch turns an apply_patch call into the files it touched and the lines
 // it removed. Paths in the patch are relative to the session's cwd.

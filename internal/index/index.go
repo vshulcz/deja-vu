@@ -809,7 +809,8 @@ import (
 // (#5563).
 // 104: a Copilot agent transcript's insert_edit_into_file records what it
 // wrote (#595).
-const version = 104
+// 105: an apply_patch rename files its hunks under the new name (#595).
+const version = 105
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

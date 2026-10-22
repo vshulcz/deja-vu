@@ -1032,6 +1032,8 @@ func partTime(r map[string]any) time.Time {
 // patchSpans turns an apply_patch payload into the same "path\nreplaced bytes"
 // records a Claude Edit produces, so `deja restore` does not have to care which
 // harness did the work. Only removed lines count: the added ones are on disk.
+// The hunks of a renamed file go under the name after "*** Move to:", the
+// file they were written to.
 func patchSpans(patch string) []string {
 	var out []string
 	path := ""
@@ -1050,7 +1052,8 @@ func patchSpans(patch string) []string {
 		switch {
 		case strings.HasPrefix(line, "*** Update File:"),
 			strings.HasPrefix(line, "*** Delete File:"),
-			strings.HasPrefix(line, "*** Add File:"):
+			strings.HasPrefix(line, "*** Add File:"),
+			strings.HasPrefix(line, "*** Move to:"):
 			flush()
 			path = strings.TrimSpace(line[strings.Index(line, ":")+1:])
 		case strings.HasPrefix(line, "@@"), line == "*** End Patch":
