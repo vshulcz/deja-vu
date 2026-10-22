@@ -2,9 +2,11 @@ package index
 
 import (
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/query"
 )
@@ -247,5 +249,83 @@ func TestUnwrapBlockKeepsContents(t *testing.T) {
 	got := unwrapBlock("<user_query>one</user_query> and <user_query>two</user_query>", "<user_query>", "</user_query>")
 	if got != "one and two" {
 		t.Fatalf("got %q", got)
+	}
+}
+
+// A tool result that is nothing but deja's own recall block strips to empty,
+// and a rebuild writes no record for it (#551). The pass that re-reads a
+// changed transcript wrote it anyway, an empty tool-output between the turns
+// (#5555). Each case rewrites its file in place, so the pass is the
+// replacement one, not an append.
+func TestAReReadDropsAToolResultThatIsOnlyRecall(t *testing.T) {
+	const sid = "11111111-2222-4333-8444-555555555555"
+	recall := "<deja-recall>\nRecalled history from prior sessions\n- example hit\n</deja-recall>"
+	at := time.Date(2026, 10, 15, 1, 0, 0, 0, time.UTC)
+	cases := []struct {
+		harness, id string
+		path        func() string
+		body, extra string
+	}{
+		{
+			harness: "claude", id: sid,
+			path: func() string { return filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "demo", sid+".jsonl") },
+			body: hjson(map[string]any{"type": "user", "sessionId": sid, "uuid": "u1", "timestamp": "2026-10-15T01:00:00.000Z", "cwd": "/tmp/demo",
+				"message": map[string]any{"role": "user", "content": "what did we decide about the cache?"}}) +
+				hjson(map[string]any{"type": "assistant", "sessionId": sid, "uuid": "a1", "parentUuid": "u1", "timestamp": "2026-10-15T01:00:01.000Z", "cwd": "/tmp/demo",
+					"message": map[string]any{"role": "assistant", "content": []any{map[string]any{"type": "tool_use", "id": "toolu_1", "name": "mcp__deja__deja", "input": map[string]any{"mode": "recall", "q": "cache"}}}}}) +
+				hjson(map[string]any{"type": "user", "sessionId": sid, "uuid": "u2", "parentUuid": "a1", "timestamp": "2026-10-15T01:00:02.000Z", "cwd": "/tmp/demo",
+					"message": map[string]any{"role": "user", "content": []any{map[string]any{"tool_use_id": "toolu_1", "type": "tool_result", "content": []any{map[string]any{"type": "text", "text": recall}}}}}}) +
+				hjson(map[string]any{"type": "assistant", "sessionId": sid, "uuid": "a2", "parentUuid": "u2", "timestamp": "2026-10-15T01:00:03.000Z", "cwd": "/tmp/demo",
+					"message": map[string]any{"role": "assistant", "content": []any{map[string]any{"type": "text", "text": "We decided to keep the cache."}}}}),
+			extra: hjson(map[string]any{"type": "user", "sessionId": sid, "uuid": "u3", "parentUuid": "a2", "timestamp": "2026-10-15T01:00:04.000Z", "cwd": "/tmp/demo",
+				"message": map[string]any{"role": "user", "content": "more"}}),
+		},
+		{
+			harness: "codex", id: sid,
+			path: func() string {
+				return filepath.Join(os.Getenv("DEJA_CODEX_ROOT"), "sessions", "2026", "10", "15", "rollout-2026-10-15T01-00-00-"+sid+".jsonl")
+			},
+			body: codexLine(at, "session_meta", map[string]any{"id": sid, "cwd": "/tmp/demo"}) +
+				codexLine(at, "response_item", map[string]any{"type": "message", "role": "user",
+					"content": []any{map[string]any{"type": "input_text", "text": "what did we decide about the cache?"}}}) +
+				codexLine(at.Add(time.Second), "response_item", map[string]any{"type": "function_call", "name": "mcp__deja__deja", "call_id": "c1", "arguments": `{"mode":"recall","q":"cache"}`}) +
+				codexLine(at.Add(2*time.Second), "response_item", map[string]any{"type": "function_call_output", "call_id": "c1", "output": recall}) +
+				codexLine(at.Add(3*time.Second), "response_item", map[string]any{"type": "message", "role": "assistant",
+					"content": []any{map[string]any{"type": "output_text", "text": "We decided to keep the cache."}}}),
+			extra: codexLine(at.Add(4*time.Second), "response_item", map[string]any{"type": "message", "role": "user",
+				"content": []any{map[string]any{"type": "input_text", "text": "more"}}}),
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.harness, func(t *testing.T) {
+			tmp := hermeticIndexEnv(t)
+			dir := filepath.Join(tmp, "idx")
+			p := tc.path()
+			write(t, p, tc.body)
+			if err := Ensure(dir, "", true, nil); err != nil {
+				t.Fatal(err)
+			}
+			appendTo(t, p, tc.extra)
+			indexPass(t, dir)
+			write(t, p, tc.body)
+			bumpMTime(t, p)
+			var progress strings.Builder
+			if err := Ensure(dir, "", false, &progress); err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(progress.String(), replacementPassMarker) {
+				t.Fatalf("the restore did not take the re-read pass, so this measures nothing: %q", progress.String())
+			}
+			s, ok, err := FindByIdentity(dir, tc.harness, tc.id)
+			if err != nil || !ok {
+				t.Fatalf("session gone after the re-read (%v)", err)
+			}
+			for _, m := range s.Messages {
+				if strings.TrimSpace(m.Text) == "" {
+					t.Errorf("the re-read kept an empty %s record", m.Role)
+				}
+			}
+			sessionMatchesRebuild(t, dir, tc.harness, tc.id)
+		})
 	}
 }

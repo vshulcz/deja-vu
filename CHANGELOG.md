@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A transcript read again after a change no longer keeps an empty tool-output
+  record for a tool result that was only a `<deja-recall>` block, so it matches
+  a rebuild (#5555).
+
 ## [0.23.1] - 2026-10-22
 
 Big stores build and search for less. A cold build peaks at half the memory

@@ -6005,11 +6005,16 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		}
 		recordCopy(m.Sessions, key, held, s)
 		for _, msg := range s.Messages {
-			if seenMsgs.dup(key, msg.Role, msg.Time, msg.Text) {
-				continue
-			}
 			// Already redacted (and length-capped) by preRedactSessions above.
 			text := msg.Text
+			// Plumbing alone strips to empty and is not written, as a rebuild
+			// does not write it (#551, #5555).
+			if strings.TrimSpace(text) == "" {
+				continue
+			}
+			if seenMsgs.dup(key, msg.Role, msg.Time, text) {
+				continue
+			}
 			if err := addRec(Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time}); err != nil {
 				_ = rw.Close()
 				return err

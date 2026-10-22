@@ -803,7 +803,9 @@ import (
 // #5510).
 // 101: a build drops the kept file of a deleted transcript whose sessions were
 // all forgotten (#5521).
-const version = 101
+// 102: a pass that re-reads a changed transcript drops a record that strips to
+// empty, as a rebuild does (#5555).
+const version = 102
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
