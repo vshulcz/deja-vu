@@ -888,10 +888,6 @@ type claudeToolOutcome struct {
 	Known bool
 }
 
-func claudeToolOutcomes(raw json.RawMessage) []claudeToolOutcome {
-	return claudeToolOutcomesIn(splitClaudeContent(raw))
-}
-
 func claudeToolOutcomesIn(c *claudeContent) []claudeToolOutcome {
 	if !c.array {
 		return nil
