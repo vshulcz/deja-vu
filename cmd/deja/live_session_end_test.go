@@ -125,10 +125,10 @@ func TestClaudeAutoWiresSessionEndAndUninstallRoundTrips(t *testing.T) {
 	// No timeout: Claude Code then gives the hook its SessionEnd default of
 	// 1.5 s, and a timeout of ours would only cut that budget or, larger,
 	// hold every /exit and /clear the reader makes.
-	for _, e := range asType[[]any](t, settingsHooks(t, b)["SessionEnd"]) {
-		for _, h := range asType[[]any](t, asType[map[string]any](t, e)["hooks"]) {
-			h := asType[map[string]any](t, h)
-			if _, has := h["timeout"]; has && strings.HasSuffix(asType[string](t, h["command"]), " hook-session-end") {
+	for _, e := range typedOrFatal[[]any](t, settingsHooks(t, b)["SessionEnd"]) {
+		for _, h := range typedOrFatal[[]any](t, typedOrFatal[map[string]any](t, e)["hooks"]) {
+			h := typedOrFatal[map[string]any](t, h)
+			if _, has := h["timeout"]; has && strings.HasSuffix(typedOrFatal[string](t, h["command"]), " hook-session-end") {
 				t.Errorf("deja's SessionEnd entry carries a timeout: %v", h["timeout"])
 			}
 		}

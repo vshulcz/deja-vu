@@ -1,3 +1,5 @@
+// Command deja indexes the session transcripts of the coding agents on this
+// machine and answers recall, blame and fix questions from them.
 package main
 
 import (

@@ -762,7 +762,7 @@ func TestMCPHandshakeListRecallRoundTrip(t *testing.T) {
 	if err := json.Unmarshal([]byte(lines[0]), &initResp); err != nil {
 		t.Fatal(err)
 	}
-	res := asType[map[string]any](t, initResp["result"])
+	res := typedOrFatal[map[string]any](t, initResp["result"])
 	if res["protocolVersion"] != mcpProtocolVersion {
 		t.Fatalf("bad init: %#v", initResp)
 	}
