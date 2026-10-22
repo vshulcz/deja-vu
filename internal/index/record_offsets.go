@@ -521,16 +521,11 @@ func (p *passOffsets) add(key string, off int64) {
 }
 
 // write commits the table for the log in dir, which holds exactly the
-// records gathered. A pass gathers a session's records out of log order when
-// it carries some and writes others, so each key's offsets are put back in
-// the order a walk finds them.
+// records gathered.
 func (p *passOffsets) write(dir string) error {
 	size, fp, err := logFingerprint(filepath.Join(dir, "records.bin"))
 	if err != nil {
 		return err
-	}
-	for _, offs := range p.byKey {
-		slices.Sort(offs)
 	}
 	return writeFileAtomic(filepath.Join(dir, recordOffsetsFile), encodeRecordOffsets(size, p.records, fp, p.byKey))
 }

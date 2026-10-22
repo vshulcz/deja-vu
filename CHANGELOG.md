@@ -49,9 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A session whose deleted transcript owns its row keeps, after a rebuild,
   the conclusion, friction lines and questions the pass read off that file,
   not ones taken from its records in log order (#5535).
-- `deja forget` of a session whose transcript is deleted no longer leaves
-  the file counted as kept until the next pass (#5543), and a line a live
-  transcript repeats from a deleted copy is counted once (#5544).
+- A line a live transcript repeats from a deleted copy of the same session
+  is counted once (#5544).
 - `deja index --quiet` no longer prints the shared-id line, which now counts
   sessions rather than transcripts. Command "last run" dates read the same
   after a pass and a rebuild, and a plain word some sessions hold only in a

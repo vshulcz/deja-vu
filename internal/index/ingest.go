@@ -989,24 +989,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 		fmt.Fprintf(progress, "deja: %d session%s no longer in %s store — still searchable; `deja resume <id> --write-back` puts one back, `deja forget --session <id>` drops one for good\n",
 			len(vanished), pluralS(len(vanished)), map[bool]string{true: "its", false: "their"}[len(vanished) == 1])
 	}
-	// A deleted transcript whose sessions `deja forget` takes here holds
-	// nothing: kept, it stayed in the "no longer on disk" count until a pass
-	// with something to read dropped it.
-	paths := func() map[string]bool {
-		at := map[string]bool{}
-		for _, s := range ss {
-			at[s.Path] = true
-		}
-		return at
-	}
-	before := paths()
 	ss = filterTombstonedSet(ss, dead)
-	after := paths()
-	for p := range orphans.files {
-		if before[p] && !after[p] {
-			delete(orphans.files, p)
-		}
-	}
 	ss = dropShadowedPrompts(ss, nil)
 	// A kept file is kept for the sessions this build still writes from it.
 	// One whose sessions were all forgotten or excluded above holds no
