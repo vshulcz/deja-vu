@@ -39,7 +39,9 @@ var errStreamSyntax = errors.New("invalid JSON")
 
 // jsonLine is one line of a JSONL file as readJSONLine reads it.
 type jsonLine struct {
-	// raw is a line that fit the buffer, for the caller to decode.
+	// raw is a line that fit the buffer, for the caller to decode. It is the
+	// reader's buffer, valid until the next read: every caller decodes it at
+	// once, and copying each line first was 1.8 GB of a 12k-session build.
 	raw []byte
 	// long is a line that did not; m and ok are what it decoded to: ok is
 	// false for anything but one JSON object, and empty for a blank line.
@@ -60,7 +62,7 @@ func readJSONLine(r *bufio.Reader) (jsonLine, error) {
 func readJSONLineHinted(r *bufio.Reader, hint []byte) (jsonLine, bool, error) {
 	line, err := r.ReadSlice('\n')
 	if !errors.Is(err, bufio.ErrBufferFull) {
-		return jsonLine{raw: bytes.Clone(line), ended: err == nil}, false, err
+		return jsonLine{raw: line, ended: err == nil}, false, err
 	}
 	src := &lineSrc{r: r, head: trimBOM(bytes.Clone(line)), hint: hint}
 	if len(hint) > 0 {
@@ -143,7 +145,9 @@ func scanJSONLHinted(path string, offset int64, hint []byte, fn func(map[string]
 			return err
 		}
 	}
-	r := bufio.NewReaderSize(boundedFrom(path, f, offset), jsonlBuffer)
+	r := jsonlReaders.Get().(*bufio.Reader)
+	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
+	r.Reset(boundedFrom(path, f, offset))
 	for {
 		l, seen, err := readJSONLineHinted(r, hint)
 		switch {

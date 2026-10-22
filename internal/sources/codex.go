@@ -827,7 +827,9 @@ func codexRolloutHead(path string) (id, cwd string, payload map[string]any, at t
 	// lost the id, so a resumed tail was filed as a session of its own. A line
 	// past the buffer is streamed, as the parse streams it, so a command's
 	// output of a hundred megabytes near the top is not held whole (#5391).
-	r := bufio.NewReaderSize(f, jsonlBuffer)
+	r := jsonlReaders.Get().(*bufio.Reader)
+	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
+	r.Reset(f)
 	// The meta record is the first line in every rollout Codex writes; a few
 	// lines of slack costs nothing and covers a format that adds a preamble.
 	for i := 0; i < 8; i++ {

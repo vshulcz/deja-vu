@@ -324,7 +324,9 @@ func leadingJSONLHeader(path string, offset int64, lookahead int, isHeader func(
 		return nil
 	}
 	defer f.Close()
-	r := bufio.NewReaderSize(io.LimitReader(f, offset), jsonlBuffer)
+	r := jsonlReaders.Get().(*bufio.Reader)
+	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
+	r.Reset(io.LimitReader(f, offset))
 	for range lookahead {
 		l, err := readJSONLine(r)
 		m, ok := l.m, l.ok
@@ -409,8 +411,13 @@ func scanJSONLFromOffset(path string, offset int64, fn func(map[string]any)) err
 // scanJSONLReader is the line loop of scanJSONLFromOffset over any reader;
 // path only names the file in diagnostics. A decompressed archive is read
 // through it from memory, so its plaintext never lands in a temporary file.
+//
+// The buffer comes from jsonlReaders: allocated per file it was 11.7 GB of a
+// 12k-session cold build, a megabyte a transcript (#5586).
 func scanJSONLReader(path string, src io.Reader, fn func(map[string]any)) error {
-	r := bufio.NewReaderSize(src, jsonlBuffer)
+	r := jsonlReaders.Get().(*bufio.Reader)
+	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
+	r.Reset(src)
 	for {
 		l, err := readJSONLine(r)
 		m, ok, empty := l.m, l.ok, l.empty

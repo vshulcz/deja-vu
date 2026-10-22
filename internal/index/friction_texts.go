@@ -98,7 +98,7 @@ func stampText(h uint64, text string) uint64 {
 // walls not already there. It is frictionTexts' loop with the wanted set
 // fixed to every wall.
 func firstFrictionLines(text string, walls map[uint64]bool, lines map[uint64]string) {
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		line, ok := FrictionLine(line)
 		if !ok || line == "" {
 			continue
