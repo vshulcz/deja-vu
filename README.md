@@ -148,8 +148,8 @@ The binary alone is a complete install for searching: index, search, `show`, `ct
 and turns on session-start recall — worth having, and optional. On a binary-only setup
 `deja doctor` reports every MCP target as `config missing`, or `not-wired` where the agent
 is installed, which is that setup working as intended. `deja warmup` also leaves a skill at `~/.agents/skills/deja-search/SKILL.md`
-that teaches an agent the CLI contract — `deja search --json`, `ctx`, `blame`, how to read
-`tier` and `total` — so it knows history is searchable without MCP. The copy in the repo is
+that teaches an agent the CLI contract — `deja recall`, `ctx`, `blame`, how to read the
+recall page and ask for the next one — so it knows history is searchable without MCP. The copy in the repo is
 [`skills/deja-search/SKILL.md`](skills/deja-search/SKILL.md).
 
 `deja install --all` is `--auto` without the session-start recall: agents answer from memory

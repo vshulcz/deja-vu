@@ -36,6 +36,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   next one. dsh and opencode handed the model `search --json`: 222,536
   characters for five hits on a test store. `deja recall` takes `--offset`
   (#5568).
+- The skills' shell fallback is `deja recall`, not `deja --framed search
+  --json`, which ran to 222,546 bytes for one query on the same store against
+  4,097 (#5578). The Devin plugin's copy of the skill had drifted and is
+  current again.
+- A recall page that names a session matched more often than it can quote
+  says to call recall with that id, not recall_context, which the OpenClaw and
+  Hermes plugins do not have. Recall opens any id recall_context would,
+  including a Devin subagent's (#5579).
 
 ## [0.23.1] - 2026-10-22
 

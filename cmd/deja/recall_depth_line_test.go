@@ -24,7 +24,7 @@ func TestARecallPageWithMoreInOneSessionSaysToOpenIt(t *testing.T) {
 	marathonCorpus(t)
 
 	got := mcpRecallText(t, "pgbouncer pool")
-	if !strings.Contains(got, "recall_context") {
+	if !strings.Contains(got, "call recall again with that id") {
 		t.Errorf("the page never names the move that reads the rest of the session:\n%s", head(got))
 	}
 	if !strings.Contains(got, "marathon") {

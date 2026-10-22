@@ -1682,6 +1682,21 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 	// same as on the search screen (#5320, #5335).
 	hits = dropCopiedHits(dir, hits)
 	if len(hits) == 0 {
+		// The words found nothing, so try the string as an id, as
+		// recall_context does. The page sends a session too deep to quote back
+		// here by its id (#5579), and an id looksLikeSessionID turns away —
+		// a Devin subagent's carries a colon — would otherwise answer that
+		// nothing matched.
+		if !looksLikeSessionID(q) {
+			if text, id, ok := contextByID(dir, q); ok {
+				note := ""
+				if id.note != "" {
+					note = id.note + "\n"
+				}
+				text = fitContextDigest(note+text, q, id.session, budget+contextMCPBudget-recallMCPBudget)
+				return text, 1, id.size, []string{id.session}, nil, nil
+			}
+		}
 		// A miss on a snapshot is a miss on part of the history, and the
 		// part matters: on a first build's early slice it is everything older
 		// than the newest few hundred sessions (#5390).
@@ -2013,10 +2028,13 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 	// such a session: three to seven tool calls each, all but one of them a
 	// re-worded recall, and the figure asked for was in the served excerpts
 	// twice of six. With this line the same six cost 36% less context handed
-	// and 51% less billed.
+	// and 51% less billed. It names recall with the id, which resolves to the
+	// same digest as recall_context: the OpenClaw and Hermes plugins and the
+	// shell have recall and no recall_context, and were sent to a tool they
+	// could not call (#5579).
 	deep := ""
 	if deepest := deepestServed(hits, served); deepest != nil {
-		deep = fmt.Sprintf("\nSession %s matched %d times and only three of them fit here — call recall_context with that id to read the rest.\n",
+		deep = fmt.Sprintf("\nSession %s matched %d times and only three of them fit here — call recall again with that id as the query for a digest of it.\n",
 			deepest.Session.ID, deepest.Count)
 	}
 	// The paging line is the instruction, not the evidence: appending it before
