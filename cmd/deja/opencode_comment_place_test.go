@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -45,7 +46,7 @@ func TestOpencodeEntryGoesAboveTheCommentOfTheFirstServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if i, j := strings.Index(string(next), `"deja"`), strings.Index(string(next), "*/"); i < j {
+	if i, j := bytes.Index(next, []byte(`"deja"`)), bytes.Index(next, []byte("*/")); i < j {
 		t.Fatalf("deja's entry went inside a block comment:\n%s", next)
 	}
 

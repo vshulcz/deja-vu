@@ -37,9 +37,12 @@ func storeOf(t *testing.T, n int, cwdOf func(int) string, textOf func(int) strin
 		}
 		id := fmt.Sprintf("%08d-2222-4000-8000-a1b2c3d4e5f6", i)
 		text := textOf(i)
-		line, _ := json.Marshal(map[string]any{"type": "user", "sessionId": id, "cwd": cwd,
+		line, err := json.Marshal(map[string]any{"type": "user", "sessionId": id, "cwd": cwd,
 			"timestamp": at.Add(time.Duration(i) * time.Minute).Format(time.RFC3339),
 			"message":   map[string]any{"role": "user", "content": text}})
+		if err != nil {
+			t.Fatal(err)
+		}
 		if err := os.WriteFile(filepath.Join(store, id+".jsonl"), append(line, '\n'), 0o644); err != nil {
 			t.Fatal(err)
 		}

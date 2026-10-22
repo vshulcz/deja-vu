@@ -125,7 +125,7 @@ func TestASettingsHookOnACommentedFileIsHonest(t *testing.T) {
 	}
 
 	// Writing one cannot be done without losing the comments, and says so.
-	if _, err := installSettingsHook(path, "UserPromptSubmit", "", 60000, "/opt/deja", false); err == nil {
+	if _, err = installSettingsHook(path, "UserPromptSubmit", "", 60000, "/opt/deja", false); err == nil {
 		t.Error("a hook was written into a file deja cannot rewrite")
 	} else if !strings.Contains(err.Error(), "carries comments") {
 		t.Errorf("the refusal does not say why: %v", err)

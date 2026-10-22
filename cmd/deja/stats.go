@@ -91,7 +91,7 @@ func runStats(dir string, args []string) error {
 			if i+1 >= len(args) {
 				return fmt.Errorf("stats: %s needs value", args[i])
 			}
-			v := args[i+1]
+			v := args[i+1] //nolint:gosec // i+1 < len(args) is checked above
 			i++
 			if strings.TrimSpace(v) == "" {
 				// Empty is how "no filter" is spelled inside deja (#1612).

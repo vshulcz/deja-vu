@@ -66,7 +66,7 @@ func TestEveryNothingLeavesClaimCarriesItsScope(t *testing.T) {
 		`(leaves (your|the|this) (machine|laptop|computer)` +
 		`|is (ever )?(sent|uploaded)( anywhere| to anyone)?` +
 		`|gets (sent|uploaded))` +
-		`|(?i)(fully|entirely|completely|100%) local` +
+		`|(fully|entirely|completely|100%) local` +
 		`|全部在本地|完全本地`)
 	// What makes the sentence true: a stated exception, or a subject narrow
 	// enough to be accurate on its own.
@@ -81,7 +81,7 @@ func TestEveryNothingLeavesClaimCarriesItsScope(t *testing.T) {
 		"the semantic path is off", "in place",
 	}
 	var checked int
-	err := filepath.WalkDir(filepath.Join(root), func(p string, d os.DirEntry, err error) error {
+	err := filepath.WalkDir(filepath.Clean(root), func(p string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -100,7 +100,7 @@ func TestEveryNothingLeavesClaimCarriesItsScope(t *testing.T) {
 		if strings.Contains(p, "CHANGELOG.md") {
 			return nil // a record of what was said, not a claim being made
 		}
-		b, err := os.ReadFile(p)
+		b, err := os.ReadFile(p) //nolint:gosec // G122: test reads the repo's own checked-in files
 		if err != nil {
 			return err
 		}
@@ -166,7 +166,7 @@ func TestNoNetworkSearchClaimNamesTheSemanticPath(t *testing.T) {
 		if strings.Contains(p, "CHANGELOG.md") {
 			return nil
 		}
-		b, err := os.ReadFile(p)
+		b, err := os.ReadFile(p) //nolint:gosec // G122: test reads the repo's own checked-in files
 		if err != nil {
 			return err
 		}

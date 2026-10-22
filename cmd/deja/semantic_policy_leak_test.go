@@ -34,7 +34,7 @@ func TestSemanticSearchHonoursTheTrustPolicy(t *testing.T) {
 
 	// A constant-vector endpoint: every query is cosine-1 to the stored record,
 	// so a lexical miss always falls through to a semantic match.
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"data":[{"embedding":[1,0]}]}`))
 	}))
 	defer ts.Close()

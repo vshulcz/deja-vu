@@ -91,7 +91,7 @@ func TestScrubDryRunChangesNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out strings.Builder
-	if err := runSecretsScrub(dir, true, &out); err != nil {
+	if err = runSecretsScrub(dir, true, &out); err != nil {
 		t.Fatalf("scrub --dry-run: %v", err)
 	}
 	after, err := os.ReadFile(transcript)
@@ -199,12 +199,12 @@ func TestScrubLeavesAFileItCannotMatch(t *testing.T) {
 // what the reader asked for.
 func TestScrubWillNotFollowASymlink(t *testing.T) {
 	dir := t.TempDir()
-	real := filepath.Join(dir, "real.jsonl")
-	if err := os.WriteFile(real, []byte(`{"t":"postgres://svc:hunter2pass@db:5432/app"}`+"\n"), 0o644); err != nil {
+	realFile := filepath.Join(dir, "real.jsonl")
+	if err := os.WriteFile(realFile, []byte(`{"t":"postgres://svc:hunter2pass@db:5432/app"}`+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	link := filepath.Join(dir, "link.jsonl")
-	if err := os.Symlink(real, link); err != nil {
+	if err := os.Symlink(realFile, link); err != nil {
 		t.Skipf("symlinks unavailable: %v", err)
 	}
 	targets, unreachable := scrubTargets([]index.SecretFinding{
@@ -216,7 +216,7 @@ func TestScrubWillNotFollowASymlink(t *testing.T) {
 	if unreachable["the transcript is a symlink — edit what it points at"] != 1 {
 		t.Errorf("the symlink was counted as %v", unreachable)
 	}
-	if b, _ := os.ReadFile(real); !strings.Contains(string(b), "hunter2pass") {
+	if b, _ := os.ReadFile(realFile); !strings.Contains(string(b), "hunter2pass") {
 		t.Error("what the link pointed at was rewritten")
 	}
 }

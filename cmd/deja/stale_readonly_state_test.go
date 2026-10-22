@@ -64,7 +64,7 @@ func TestAStaleIndexNobodyCanRebuildIsNamedEverywhere(t *testing.T) {
 			State string `json:"state"`
 		} `json:"index"`
 	}
-	if err := json.Unmarshal([]byte(raw), &report); err != nil {
+	if err = json.Unmarshal([]byte(raw), &report); err != nil {
 		t.Fatalf("doctor --json is not JSON: %v", err)
 	}
 	if report.Index.State != "stale-readonly" {

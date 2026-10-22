@@ -29,7 +29,10 @@ func seedCandidateSession(t *testing.T, rel, id string, start time.Time, turns .
 			"timestamp": start.Add(time.Duration(i) * time.Minute).UTC().Format(time.RFC3339),
 			"message":   map[string]any{"role": tr.role, "content": tr.text},
 		}
-		line, _ := json.Marshal(rec)
+		line, err := json.Marshal(rec)
+		if err != nil {
+			t.Fatal(err)
+		}
 		b.Write(line)
 		b.WriteByte('\n')
 	}
@@ -227,7 +230,7 @@ func treeListing(t *testing.T, root string) []string {
 	var out []string
 	_ = filepath.Walk(root, func(p string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // a file gone mid-walk is left out of the listing
 		}
 		out = append(out, p+" "+info.ModTime().String())
 		return nil

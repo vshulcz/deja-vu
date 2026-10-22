@@ -44,7 +44,10 @@ func assertShellReportPair(t *testing.T, errLine string, response map[string]any
 		"tool_name": "run_shell_command", "tool_input": map[string]any{"command": "go vet ./..."},
 	}
 	maps.Copy(payload, response)
-	raw, _ := json.Marshal(payload)
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
 	var out bytes.Buffer
 	if err := runHookToolAfterMode(dir, bytes.NewReader(raw), &out, true); err != nil {
 		t.Fatal(err)

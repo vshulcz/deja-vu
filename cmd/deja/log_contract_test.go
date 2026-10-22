@@ -32,7 +32,7 @@ func TestLogJSONKeysMatchTheDocumentedContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	var events []map[string]any
-	if err := json.Unmarshal([]byte(out), &events); err != nil {
+	if err = json.Unmarshal([]byte(out), &events); err != nil {
 		t.Fatalf("%v: %s", err, out)
 	}
 	if len(events) != 3 {
@@ -114,7 +114,7 @@ func TestLogLastJSONKeysMatchTheDocumentedContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	var snap map[string]any
-	if err := json.Unmarshal([]byte(out), &snap); err != nil {
+	if err = json.Unmarshal([]byte(out), &snap); err != nil {
 		t.Fatalf("%v: %s", err, out)
 	}
 	doc, err := os.ReadFile("../../docs/json-output.md")

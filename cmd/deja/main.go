@@ -149,7 +149,7 @@ func loadAll(h string) []model.Session {
 }
 
 func loadFileSources() []model.Session {
-	var ss []model.Session
+	var ss []model.Session //nolint:prealloc // the count is whatever each store holds
 	for _, harness := range []string{"claude", "codex", "aider", "gemini", "cursor", "antigravity", "grok", "qwen", "kimi", "goose", "hermes"} {
 		ss = append(ss, loadAll(harness)...)
 	}
@@ -788,7 +788,7 @@ const exitPartial = 3
 
 // exitStatus is an error that has already been said and carries the status
 // the process exits with.
-type exitStatus int
+type exitStatus int //nolint:errname // index_partial_exit_test.go names it
 
 func (e exitStatus) Error() string { return fmt.Sprintf("exit status %d", int(e)) }
 
@@ -885,8 +885,8 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 	// A harness that does not exist matches nothing, and the refusal then
 	// blamed the id the reader typed correctly (#2251). search, last, blame
 	// and the MCP tools have always named the value they did not recognise.
-	if err := checkHarness(&o.harness); err != nil {
-		return err
+	if herr := checkHarness(&o.harness); herr != nil {
+		return herr
 	}
 	var s model.Session
 	var ok, prefixed bool
@@ -904,9 +904,9 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 		// no session matches while the same prefix without --harness worked.
 		s, ok, err = index.FindByIdentity(dir, o.harness, o.id)
 		if err == nil && !ok {
-			s, ok, err = findByPrefixHarness(dir, o.id, o.harness)
+			s, ok = findByPrefixHarness(dir, o.id, o.harness)
 			prefixed = true
-			if err == nil && ok && o.json {
+			if ok && o.json {
 				err = ambiguousJSONPrefixIn(dir, o.id, o.harness)
 			}
 		}
@@ -1049,19 +1049,20 @@ func showWindowNote(offset, returned, total int) string {
 // reader who found the parent could not get to it and a reader who found the
 // child could not say what asked for it (#1385).
 func printSpawnEdges(w io.Writer, dir string, s model.Session) {
-	if s.Parent != "" && s.Kind == "fork" {
+	switch {
+	case s.Parent != "" && s.Kind == "fork":
 		// A Codex fork names the thread it branched from; nothing spawned it.
 		fmt.Fprintf(w, "deja: forked from %s — `deja show %s`\n", digest.Short(s.Parent), pasteSafe(digest.Short(s.Parent)))
-	} else if s.Parent != "" {
+	case s.Parent != "":
 		by := ""
 		if s.Agent != "" {
 			by = " as " + s.Agent
 		}
 		fmt.Fprintf(w, "deja: spawned from %s%s — `deja show %s`\n", digest.Short(s.Parent), by, pasteSafe(digest.Short(s.Parent)))
-	} else if s.Kind != "" && strings.HasPrefix(s.Project, "imported:") {
+	case s.Kind != "" && strings.HasPrefix(s.Project, "imported:"):
 		// The parent is on the machine that sent it.
 		fmt.Fprintf(w, "deja: %s session from another machine\n", s.Kind)
-	} else if s.Kind != "" {
+	case s.Kind != "":
 		// A kind with no parent is all the harness recorded; saying which
 		// session asked for it would be a guess.
 		fmt.Fprintf(w, "deja: %s session — the harness records no parent for it\n", s.Kind)
@@ -1136,15 +1137,15 @@ func parseShow(args []string) (showOptions, error) {
 				return o, fmt.Errorf("%s needs value", a)
 			}
 			i++
-			if strings.TrimSpace(args[i]) == "" {
+			if strings.TrimSpace(args[i]) == "" { //nolint:gosec // bounds checked before i++
 				// Empty is how "no filter" is spelled inside deja (#1612).
 				return o, fmt.Errorf("%s needs value", a)
 			}
 			if a == "--harness" {
-				o.harness = args[i]
+				o.harness = args[i] //nolint:gosec // bounds checked before i++
 				continue
 			}
-			n, e := strconv.Atoi(args[i])
+			n, e := strconv.Atoi(args[i]) //nolint:gosec // bounds checked before i++
 			if e != nil || n < 0 || (a == "--limit" && n == 0) {
 				return o, fmt.Errorf("%s needs a positive integer", a)
 			}
@@ -1278,15 +1279,16 @@ func cmdCtx(dir string, rest []string) error {
 	// Which rung answered, said out loud on stderr as the search screen says
 	// it — stdout stays the context block an agent parses. ctx served an
 	// answer to a word the caller never typed and said nothing about it.
-	if result.Neighbour {
+	switch {
+	case result.Neighbour:
 		printNeighbour(os.Stderr, result.Variants)
 		o.Stemmed = true
 		o.FuzzyVariants = result.Variants
-	} else if result.Stemmed {
+	case result.Stemmed:
 		printStemmed(os.Stderr, result.Variants)
 		o.Stemmed = true
 		o.FuzzyVariants = result.Variants
-	} else if result.Fuzzy {
+	case result.Fuzzy:
 		printSpellings(os.Stderr, result.Variants)
 		o.Fuzzy = true
 		o.FuzzyVariants = result.Variants
@@ -1397,18 +1399,18 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 		return err
 	}
 	harnessRaw := o.Harness
-	if err := checkHarness(&o.Harness); err != nil {
-		return err
+	if herr := checkHarness(&o.Harness); herr != nil {
+		return herr
 	}
-	if err := checkRole(o.Role); err != nil {
-		return err
+	if rerr := checkRole(o.Role); rerr != nil {
+		return rerr
 	}
 	// Uncut, because the count the reader is told about has to be the count
 	// they would get by asking again — and the trust policy filters below,
 	// after the cut, so a total taken before it promised rows the policy would
 	// not hand over (#2638). RecentMatching builds the whole matching set
 	// before cutting anyway, so nothing is read twice.
-	ss, _, err := recentMatchingCounted(dir, 0, o)
+	ss, err := recentMatching(dir, 0, o)
 	if err != nil {
 		return err
 	}
@@ -1732,11 +1734,11 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 		return err
 	}
 	harnessRaw := o.Harness
-	if err := checkHarness(&o.Harness); err != nil {
-		return err
+	if herr := checkHarness(&o.Harness); herr != nil {
+		return herr
 	}
-	if err := checkRole(o.Role); err != nil {
-		return err
+	if rerr := checkRole(o.Role); rerr != nil {
+		return rerr
 	}
 	sinceRaw := sinceRawArg(filtered)
 	// Before the index build, so the reader who meant a command sees it first,
@@ -1752,7 +1754,7 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 	o.SourceInstance = sourceInstance
 	o.RecallWorn = usage.WornSessions(dir)
 	prepareFirstIndexGreeting(dir)
-	if err := withBuildProgress(func() error { return ensureForCLISearch(dir, o, force, os.Stderr) }); err != nil {
+	if err = withBuildProgress(func() error { return ensureForCLISearch(dir, o, force, os.Stderr) }); err != nil {
 		// A store that cannot be written still has an index that can be read:
 		// answering from it beats answering nothing (#904).
 		if !staleUnwritableIndex(dir, err) {
@@ -1782,15 +1784,16 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 	policyHidden += unreadWithheld(result)
 	o.PolicyWithheld = policyHidden
 	o.Tier = result.Tier
-	if result.Neighbour {
+	switch {
+	case result.Neighbour:
 		printNeighbour(os.Stderr, result.Variants)
 		o.Stemmed = true
 		o.FuzzyVariants = result.Variants
-	} else if result.Stemmed {
+	case result.Stemmed:
 		printStemmed(os.Stderr, result.Variants)
 		o.Stemmed = true
 		o.FuzzyVariants = result.Variants
-	} else if result.Fuzzy {
+	case result.Fuzzy:
 		printFuzzy(os.Stderr, result.Variants)
 		o.Fuzzy = true
 		o.FuzzyVariants = result.Variants
@@ -2372,7 +2375,7 @@ func missAdvice(q string, regex bool) string {
 // hasAnchor reports a ^ or $ in a parsed pattern; one inside a class or
 // escaped is a character, not an anchor.
 func hasAnchor(re *syntax.Regexp) bool {
-	switch re.Op {
+	switch re.Op { //nolint:exhaustive // only the four anchor ops answer here; the rest recurse below
 	case syntax.OpBeginLine, syntax.OpEndLine, syntax.OpBeginText, syntax.OpEndText:
 		return true
 	}
@@ -2531,7 +2534,7 @@ func hiddenByOwnSettings() string {
 		for name := range stores {
 			settings[harnessExclusionSource(name)] = true
 		}
-		var names []string
+		names := make([]string, 0, len(settings))
 		for name := range settings {
 			names = append(names, name)
 		}
@@ -2987,7 +2990,7 @@ func noteAmbiguousPrefixIn(dir, id, harness, action string) {
 // recent" of them, which need not be the one picked.
 var pickedOnScreen *model.Session
 
-func findByPrefix(dir, p string) (model.Session, bool, error) {
+func findByPrefix(dir, p string) (model.Session, bool, error) { //nolint:unparam // handoff.go and coverage_extra_test.go read the error
 	if s := pickedOnScreen; s != nil && p == s.ID {
 		if full, ok, err := index.FindByIdentity(dir, s.Harness, s.ID); err == nil && ok {
 			return full, true, nil
@@ -3012,13 +3015,13 @@ func findByPrefix(dir, p string) (model.Session, bool, error) {
 // The prefix is resolved among that harness's sessions: picking the newest
 // across every harness and then refusing it said no session matches while one
 // in the named harness started with the prefix.
-func findByPrefixHarness(dir, p, harness string) (model.Session, bool, error) {
+func findByPrefixHarness(dir, p, harness string) (model.Session, bool) {
 	if err := ensureForCLIRead(dir); err == nil {
 		if s, ok, err := lookupUnlessNew(dir, func() (model.Session, bool, error) { return index.FindByPrefixIn(dir, p, harness) }); err == nil {
 			if ok {
 				noteForgottenSource(s, p, true)
 			}
-			return s, ok, nil
+			return s, ok
 		}
 	}
 	var ss []model.Session
@@ -3027,8 +3030,7 @@ func findByPrefixHarness(dir, p, harness string) (model.Session, bool, error) {
 			ss = append(ss, s)
 		}
 	}
-	s, ok := search.FindByPrefix(ss, p)
-	return s, ok, nil
+	return search.FindByPrefix(ss, p)
 }
 
 // ensureForCLIRead brings the index up to date before `last` or `show` reads
@@ -3086,13 +3088,6 @@ func recent(dir string, n int) ([]model.Session, error) {
 }
 
 func recentMatching(dir string, n int, o search.Options) ([]model.Session, error) {
-	ss, _, err := recentMatchingCounted(dir, n, o)
-	return ss, err
-}
-
-// recentMatchingCounted is recentMatching with how many matched before the cut,
-// so the listing can say what it left out (#2638).
-func recentMatchingCounted(dir string, n int, o search.Options) ([]model.Session, int, error) {
 	if err := ensureForCLIRead(dir); err == nil {
 		if o.Role != "" {
 			// The role has to travel into the index query, not just the filter
@@ -3103,17 +3098,17 @@ func recentMatchingCounted(dir string, n int, o search.Options) ([]model.Session
 			ss, err := index.SearchWithRecovery(dir, search.Options{All: true, Role: o.Role}, io.Discard)
 			if err == nil {
 				ss = filterRecentSources(ss, o)
-				return search.Recent(ss, n), len(ss), nil
+				return search.Recent(ss, n), nil
 			}
-		} else if ss, total, err := index.RecentMatchingCounted(dir, n, o); err == nil {
-			return ss, total, nil
+		} else if ss, _, err := index.RecentMatchingCounted(dir, n, o); err == nil {
+			return ss, nil
 		}
 	}
 	ss := filterRecentSources(loadFileSources(), o)
 	if o.Harness == "" || o.Harness == "opencode" {
 		ss = append(ss, filterRecentSources(sources.LoadOpencodeRecent(n), o)...)
 	}
-	return search.Recent(ss, n), len(ss), nil
+	return search.Recent(ss, n), nil
 }
 
 var lastFlags = []string{"--json", "--project", "--harness", "--from", "--since", "--role", "--limit"}
@@ -3133,7 +3128,7 @@ func parseLast(args []string) (int, search.Options, string, error) {
 				return n, o, sinceRaw, fmt.Errorf("%s needs value", a)
 			}
 			i++
-			v := args[i]
+			v := args[i] //nolint:gosec // bounds checked before i++
 			// Empty is how "no filter" is spelled inside deja, so an empty
 			// argument reached the search as no filter at all and a scripted
 			// `--project "$PROJECT"` with the variable unset quietly returned
@@ -3505,17 +3500,17 @@ func parseBlame(args []string) (string, search.BlameOptions, blameMode, error) {
 				return "", o, mode, fmt.Errorf("%s needs value", a)
 			}
 			i++
-			if strings.TrimSpace(args[i]) == "" {
+			if strings.TrimSpace(args[i]) == "" { //nolint:gosec // bounds checked before i++
 				// Empty is how "no filter" is spelled inside deja (#1612).
 				return "", o, mode, fmt.Errorf("%s needs value", a)
 			}
 			switch a {
 			case "--harness":
-				o.Harness = args[i]
+				o.Harness = args[i] //nolint:gosec // bounds checked before i++
 			case "--project":
-				o.Project = args[i]
+				o.Project = args[i] //nolint:gosec // bounds checked before i++
 			case "--since":
-				d, err := parseDur(args[i])
+				d, err := parseDur(args[i]) //nolint:gosec // bounds checked before i++
 				if err != nil {
 					return "", o, mode, err
 				}
@@ -3550,8 +3545,8 @@ func runBlame(dir string, args []string) error {
 	// A typo'd harness must name the mistake, not read as "nobody touched this
 	// file under harness X" — the same reason search and the MCP blame validate
 	// it (#1113). blame has no --role to check.
-	if err := checkHarness(&o.Harness); err != nil {
-		return err
+	if herr := checkHarness(&o.Harness); herr != nil {
+		return herr
 	}
 	target, err := search.ResolveBlamePath(path)
 	if err != nil {
@@ -3693,7 +3688,7 @@ func blameScope(cwd string, target search.BlameTarget, project string, allProjec
 	return howScope(cwd, "", false)
 }
 
-func findBlameHits(dir string, target search.BlameTarget, o search.BlameOptions, activation string, progress io.Writer) ([]search.BlameHit, int, int, error) {
+func findBlameHits(dir string, target search.BlameTarget, o search.BlameOptions, activation string, progress io.Writer) ([]search.BlameHit, int, int, error) { //nolint:unparam // blame tests in blame_*_test.go pass it
 	hits, hidden, total, _, err := blameHits(dir, target, o, activation, progress, false)
 	return hits, hidden, total, err
 }
@@ -4269,7 +4264,7 @@ func printSourcesTo(w io.Writer, dir string) {
 		if f, err := os.Open(sources.OpencodeDB()); err != nil {
 			reason = err.Error()
 		} else {
-			f.Close()
+			_ = f.Close()
 		}
 		note = "\t(cannot be read — " + reason + ")" + note
 	}
@@ -4373,33 +4368,33 @@ func runForget(dir string, args []string) error {
 			// would widen a deletion rather than a search (#1612). --unforget
 			// keeps its own refusal, which asks for an id rather than offering
 			// the flags that forget instead of restoring.
-			if strings.TrimSpace(args[i]) == "" && args[i-1] != "--unforget" {
+			if strings.TrimSpace(args[i]) == "" && args[i-1] != "--unforget" { //nolint:gosec // bounds checked before i++
 				return fmt.Errorf("forget: %s needs a value", args[i-1])
 			}
 			switch args[i-1] {
 			case "--session":
-				o.Session = index.PastedSelector(args[i])
+				o.Session = index.PastedSelector(args[i]) //nolint:gosec // bounds checked before i++
 			case "--project":
-				o.Project = args[i]
+				o.Project = args[i] //nolint:gosec // bounds checked before i++
 			case "--unforget":
-				unforget, unforgetGiven = index.PastedSelector(args[i]), true
+				unforget, unforgetGiven = index.PastedSelector(args[i]), true //nolint:gosec // bounds checked before i++
 			case "--before":
-				if d, err := parseDurAny(args[i]); err == nil {
+				if d, err := parseDurAny(args[i]); err == nil { //nolint:gosec // bounds checked before i++
 					// "older than 0 days" is the whole store, and the typo that
 					// produces it is 0 for 30. The neighbouring value behaves
 					// the opposite way — --before 9999d matches nothing — and a
 					// negative duration filters nothing in `last` while
 					// deleting everything here (#739).
 					if d <= 0 {
-						return fmt.Errorf("forget: --before %s means older than now, which is every session — use a real age like 30d, or --project/--session", args[i])
+						return fmt.Errorf("forget: --before %s means older than now, which is every session — use a real age like 30d, or --project/--session", args[i]) //nolint:gosec // bounds checked before i++
 					}
 					o.Before = time.Now().Add(-d)
-				} else if t, e := parseForgetDate(args[i]); e == nil {
+				} else if t, e := parseForgetDate(args[i]); e == nil { //nolint:gosec // bounds checked before i++
 					o.Before = t
 				} else {
 					// --before takes either form, so naming only one of them
 					// leaves the reader guessing which they got wrong.
-					return fmt.Errorf("forget: %q is neither a duration nor a date — try 30d, 12h, or 2026-01-31", args[i])
+					return fmt.Errorf("forget: %q is neither a duration nor a date — try 30d, 12h, or 2026-01-31", args[i]) //nolint:gosec // bounds checked before i++
 				}
 			}
 		default:
@@ -4571,7 +4566,7 @@ func runForget(dir string, args []string) error {
 		// denied` names an internal path and leaves the reader believing the
 		// session is gone while search still returns it (#976).
 		if !o.DryRun && index.Tombstoned(forgetKeyOf(dir, o)) {
-			return fmt.Errorf("%v\nthe session is marked forgotten and is still in the index until it can be rebuilt — search keeps returning it until then", ensureError(dir, err))
+			return fmt.Errorf("%w\nthe session is marked forgotten and is still in the index until it can be rebuilt — search keeps returning it until then", ensureError(dir, err))
 		}
 		return ensureError(dir, err)
 	}
@@ -4847,7 +4842,7 @@ func redactionsUnder(files map[string]int, root string) int {
 
 func pathSize(root string) int64 {
 	var total int64
-	_ = filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+	_ = filepath.WalkDir(root, func(_ string, d os.DirEntry, err error) error {
 		if err == nil && d.Type()&os.ModeSymlink == 0 && !d.IsDir() {
 			if fi, e := d.Info(); e == nil {
 				total += fi.Size()
@@ -4980,7 +4975,7 @@ func movedBucketHint(dir, id string) string {
 			if !pol.Allows(policy.ActivationSearch, m.Project) {
 				return ""
 			}
-			return fmt.Sprintf(" — the days regrouped when this machine's zone changed; it is `%s` now", want)
+			return fmt.Sprintf(" — the days regrouped when this machine's zone changed; it is %#q now", want)
 		}
 	}
 	return ""
@@ -5024,7 +5019,7 @@ func indexIsEmpty(dir string) bool {
 // for a machine deja has never seen history from; a run that has just evicted a
 // store says what went away instead, because the line above it has already told
 // the reader what was lost and the two must not contradict each other (#1762).
-func emptyIndexReason(b index.BuildSummary, evicted int) string {
+func emptyIndexReason(_ index.BuildSummary, evicted int) string {
 	if evicted > 0 {
 		return emptyIndexHint(fmt.Sprintf("%d indexed file%s went away with the store that held %s, and nothing is left to index",
 			evicted, pluralS(evicted), pluralWhich(evicted)))

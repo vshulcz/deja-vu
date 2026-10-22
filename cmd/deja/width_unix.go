@@ -23,7 +23,7 @@ func terminalWidth() (int, bool) {
 		rows, cols, xpixel, ypixel uint16
 	}
 	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, os.Stdout.Fd(),
-		uintptr(syscall.TIOCGWINSZ), uintptr(unsafe.Pointer(&ws)))
+		uintptr(syscall.TIOCGWINSZ), uintptr(unsafe.Pointer(&ws))) //nolint:gosec // TIOCGWINSZ needs a pointer to the winsize struct
 	if errno != 0 || ws.cols == 0 {
 		return 0, false
 	}

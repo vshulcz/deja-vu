@@ -10,7 +10,7 @@ import (
 func topJSONKeys(v any) []string {
 	var out []string
 	rt := reflect.TypeOf(v)
-	for i := 0; i < rt.NumField(); i++ {
+	for i := range rt.NumField() {
 		name, _, _ := strings.Cut(rt.Field(i).Tag.Get("json"), ",")
 		if name != "" && name != "-" {
 			out = append(out, name)

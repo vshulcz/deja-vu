@@ -289,7 +289,7 @@ func (a *tuiApp) drawSkeleton(x, y, w, n int) {
 }
 
 // drawStores lists the agents read so far, one row each.
-func (a *tuiApp) drawStores(tx, ly, right int, stores []agentCount, all bool) int {
+func (a *tuiApp) drawStores(tx, ly, right int, stores []agentCount, _ bool) int {
 	p := a.p
 	for i, ac := range stores {
 		if i == 8 {

@@ -11,7 +11,7 @@ import (
 // line over 32,767 characters outright — and it refuses it after the export has
 // run, which is the worst moment to find out (#2002).
 func TestScpSplitsPathsUnderTheCommandLineBound(t *testing.T) {
-	var paths []string
+	paths := make([]string, 0, 23336)
 	for i := range 23336 {
 		paths = append(paths, fmt.Sprintf(`C:\Users\someone\AppData\Local\Temp\deja-sync-9f3a12bc-17761031960%05d.jsonl`, i))
 	}

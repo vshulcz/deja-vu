@@ -52,7 +52,7 @@ func TestLauncherCarriesStoreLocationsIntoAStrippedHookEnv(t *testing.T) {
 
 	run := func(env ...string) map[string]string {
 		t.Helper()
-		cmd := exec.Command(launcher, "hook-prompt")
+		cmd := exec.CommandContext(t.Context(), launcher, "hook-prompt")
 		cmd.Env = append([]string{"HOME=" + filepath.Join(tmp, "home"), "PATH=/usr/bin:/bin"}, env...)
 		out, err := cmd.Output()
 		if err != nil {

@@ -21,9 +21,9 @@ import (
 func TestEveryReaderSurvivesABrokenUsageLog(t *testing.T) {
 	// A size no other row carries, so "the good line survived" cannot be
 	// satisfied by something else on the screen.
-	good := fmt.Sprintf(`{"t":"%s","kind":"hook","bytes":8181,"sessions":2}`,
+	good := fmt.Sprintf(`{"t":%q,"kind":"hook","bytes":8181,"sessions":2}`,
 		time.Now().Add(-time.Hour).UTC().Format(time.RFC3339Nano))
-	future := fmt.Sprintf(`{"t":"%s","kind":"hook","bytes":100,"sessions":1}`,
+	future := fmt.Sprintf(`{"t":%q,"kind":"hook","bytes":100,"sessions":1}`,
 		time.Now().AddDate(1, 0, 0).UTC().Format(time.RFC3339Nano))
 
 	for _, c := range []struct{ name, body string }{
@@ -141,7 +141,7 @@ func TestAFutureUsageEventIsShownButNotCounted(t *testing.T) {
 		t.Fatal(err)
 	}
 	future := time.Now().AddDate(1, 0, 0).UTC().Format(time.RFC3339Nano)
-	body := fmt.Sprintf(`{"t":"%s","kind":"hook","bytes":5151,"sessions":1}`, future) + "\n"
+	body := fmt.Sprintf(`{"t":%q,"kind":"hook","bytes":5151,"sessions":1}`, future) + "\n"
 	if err := os.WriteFile(usage.Path(dir), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -171,7 +171,7 @@ func TestAFutureUsageEventIsShownButNotCounted(t *testing.T) {
 		at = midnight.Add(time.Second)
 	}
 	past := at.UTC().Format(time.RFC3339Nano)
-	if err := os.WriteFile(usage.Path(dir), []byte(fmt.Sprintf(`{"t":"%s","kind":"hook","bytes":5151,"sessions":1}`, past)+"\n"), 0o644); err != nil {
+	if err = os.WriteFile(usage.Path(dir), []byte(fmt.Sprintf(`{"t":%q,"kind":"hook","bytes":5151,"sessions":1}`, past)+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	bar, err = captureRun(t, "statusline")

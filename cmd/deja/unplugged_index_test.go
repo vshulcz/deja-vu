@@ -37,15 +37,15 @@ func TestAnUnpluggedIndexDiskIsNotPermissionsOrAMissingIndex(t *testing.T) {
 	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
 		t.Skip("directory permissions do not deny reads here")
 	}
-	real := filepath.Join(tmp, "here", "index.db")
-	if err := os.MkdirAll(filepath.Dir(real), 0o755); err != nil {
+	indexPath := filepath.Join(tmp, "here", "index.db")
+	if err := os.MkdirAll(filepath.Dir(indexPath), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := ensureError(real, os.ErrPermission); err == nil || !strings.Contains(err.Error(), "permissions") {
+	if err := ensureError(indexPath, os.ErrPermission); err == nil || !strings.Contains(err.Error(), "permissions") {
 		t.Errorf("a locked directory stopped being a permissions problem: %v", err)
 	}
 	out.Reset()
-	doctorIndex(&out, doctorIndexReport{State: "missing", Path: real}, real)
+	doctorIndex(&out, doctorIndexReport{State: "missing", Path: indexPath}, indexPath)
 	if !strings.Contains(out.String(), "not built") {
 		t.Errorf("an absent index stopped saying so:\n%s", out.String())
 	}

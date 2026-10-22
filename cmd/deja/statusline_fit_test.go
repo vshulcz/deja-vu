@@ -49,8 +49,8 @@ func TestOnATooNarrowBarTheFilenameStillGivesWay(t *testing.T) {
 	}
 	// The title floor still holds, so the segment says what the session was
 	// about rather than showing a stub.
-	open, close := strings.Index(got, "“"), strings.Index(got, "”")
-	if open < 0 || close < open {
+	open, shut := strings.Index(got, "“"), strings.Index(got, "”")
+	if open < 0 || shut < open {
 		t.Errorf("the quoted title is gone: %q", got)
 	}
 }

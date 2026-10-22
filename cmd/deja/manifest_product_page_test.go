@@ -40,7 +40,7 @@ func TestManifestProductPagesResolve(t *testing.T) {
 		default:
 			return nil
 		}
-		b, err := os.ReadFile(path)
+		b, err := os.ReadFile(path) //nolint:gosec // walks the repo's own checked-in tree
 		if err != nil {
 			return err
 		}

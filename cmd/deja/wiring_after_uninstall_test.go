@@ -105,7 +105,7 @@ func writeWiringExe(t *testing.T, exe string) {
 		t.Fatal(err)
 	}
 	var st map[string]any
-	if err := json.Unmarshal(b, &st); err != nil {
+	if err = json.Unmarshal(b, &st); err != nil {
 		t.Fatal(err)
 	}
 	st["exe"] = exe

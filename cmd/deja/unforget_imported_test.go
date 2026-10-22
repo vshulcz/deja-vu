@@ -32,14 +32,14 @@ func TestUnforgetSaysWhenAnImportedSessionCannotComeBack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), append(b, '\n'), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), append(b, '\n'), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	dir := filepath.Join(tmp, "index.db")
-	if err := index.Ensure(dir, "", false, nil); err != nil {
+	if err = index.Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := captureRun(t, "sync", "import", exp); err != nil {
+	if _, err = captureRun(t, "sync", "import", exp); err != nil {
 		t.Fatal(err)
 	}
 	var imported string
@@ -56,7 +56,7 @@ func TestUnforgetSaysWhenAnImportedSessionCannotComeBack(t *testing.T) {
 		t.Fatal("no imported session in the index")
 	}
 
-	if _, err := captureRunStderr(t, "forget", "--session", imported); err != nil {
+	if _, err = captureRunStderr(t, "forget", "--session", imported); err != nil {
 		t.Fatal(err)
 	}
 	out, err := captureRun(t, "forget", "--unforget", "claude:"+imported)
@@ -71,7 +71,7 @@ func TestUnforgetSaysWhenAnImportedSessionCannotComeBack(t *testing.T) {
 	}
 
 	// A local session still round-trips, and still says so.
-	if _, err := captureRunStderr(t, "forget", "--session", "loc"); err != nil {
+	if _, err = captureRunStderr(t, "forget", "--session", "loc"); err != nil {
 		t.Fatal(err)
 	}
 	out, err = captureRun(t, "forget", "--unforget", "claude:loc")

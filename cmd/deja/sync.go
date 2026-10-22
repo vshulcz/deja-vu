@@ -112,7 +112,7 @@ func runSync(dir string, args []string) error {
 					return errors.New("sync export: --peer needs a name")
 				}
 				i++
-				peer = rest[i]
+				peer = rest[i] //nolint:gosec // i+1 < len(rest) is checked above
 				continue
 			}
 			// A dropped flag fell back to the incremental path, which on a
@@ -346,8 +346,9 @@ func excludedByRuleLines() string {
 			ex, pluralS(ex), reportPath(sources.ExcludePath()))
 	}
 	if n := index.ImportSkippedHarness(); n > 0 {
-		names := make([]string, 0)
-		for name := range sources.ExcludedHarnesses() {
+		excluded := sources.ExcludedHarnesses()
+		names := make([]string, 0, len(excluded))
+		for name := range excluded {
 			names = append(names, name)
 		}
 		sort.Strings(names)

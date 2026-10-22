@@ -40,7 +40,7 @@ func seedReuse(t *testing.T, sessions map[string]struct {
 		t.Fatal(err)
 	}
 	for sid, s := range sessions {
-		for i := 0; i < s.times; i++ {
+		for range s.times {
 			usage.RecordServedSessions(dir, usage.KindRecall, 100, 1, false, 1000, []string{sid})
 		}
 	}

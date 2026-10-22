@@ -25,7 +25,7 @@ func TestBareDejaPrintsWelcomeNotFullUsage(t *testing.T) {
 	}
 
 	withTempStores(t)
-	if _, err := captureRun(t, "index"); err != nil {
+	if _, err = captureRun(t, "index"); err != nil {
 		t.Fatal(err)
 	}
 	out, err = captureRun(t)

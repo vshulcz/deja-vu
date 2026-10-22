@@ -134,16 +134,16 @@ func asVersion1Sidecar(t *testing.T, dir string) {
 	}
 	var b bytes.Buffer
 	str := func(v string) {
-		_ = binary.Write(&b, binary.LittleEndian, uint32(len(v)))
+		_ = binary.Write(&b, binary.LittleEndian, uint32(len(v))) //nolint:gosec // fixture strings are a few bytes
 		b.WriteString(v)
 	}
 	b.WriteString("DJV1")
 	_ = binary.Write(&b, binary.LittleEndian, uint16(1))
-	_ = binary.Write(&b, binary.LittleEndian, uint16(s.Dim))
+	_ = binary.Write(&b, binary.LittleEndian, uint16(s.Dim)) //nolint:gosec // fixture dimension is small
 	str(s.Model)
 	str(s.Generation)
 	_ = binary.Write(&b, binary.LittleEndian, uint64(len(s.Vectors)))
-	_ = binary.Write(&b, binary.LittleEndian, uint64(s.Covered))
+	_ = binary.Write(&b, binary.LittleEndian, uint64(s.Covered)) //nolint:gosec // a fixture count, never negative
 	for _, v := range s.Vectors {
 		_ = binary.Write(&b, binary.LittleEndian, v.Offset)
 		str(v.Key)

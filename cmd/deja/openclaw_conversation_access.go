@@ -95,8 +95,8 @@ func openclawPackageVersion() string {
 		return ""
 	}
 	var dirs []string
-	if real, err := filepath.EvalSymlinks(bin); err == nil {
-		for d := filepath.Dir(real); len(dirs) < 4; d = filepath.Dir(d) {
+	if resolved, err := filepath.EvalSymlinks(bin); err == nil {
+		for d := filepath.Dir(resolved); len(dirs) < 4; d = filepath.Dir(d) {
 			dirs = append(dirs, d)
 			if filepath.Dir(d) == d {
 				break
@@ -109,7 +109,10 @@ func openclawPackageVersion() string {
 		if err != nil {
 			continue
 		}
-		var pkg struct{ Name, Version string }
+		var pkg struct {
+			Name    string `json:"name"`
+			Version string `json:"version"`
+		}
 		if json.Unmarshal(b, &pkg) == nil && pkg.Name == "openclaw" {
 			return pkg.Version
 		}
@@ -120,9 +123,9 @@ func openclawPackageVersion() string {
 // openclawVersionAtLeast compares OpenClaw's date versions, 2026.9.8 or
 // 2026.7.1-2, by their first three numbers. One it cannot read counts as
 // new.
-func openclawVersionAtLeast(v, min string) bool {
+func openclawVersionAtLeast(v, least string) bool {
 	a, okA := openclawVersionParts(v)
-	b, okB := openclawVersionParts(min)
+	b, okB := openclawVersionParts(least)
 	if !okA || !okB {
 		return true
 	}

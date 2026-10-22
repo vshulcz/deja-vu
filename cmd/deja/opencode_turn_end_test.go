@@ -30,10 +30,10 @@ func runNode(t *testing.T, dir, driver string) string {
 		t.Skip("node is needed to run the plugin opencode would run")
 	}
 	run := filepath.Join(dir, "drive.mjs")
-	if err := os.WriteFile(run, []byte(driver), 0o644); err != nil {
+	if err = os.WriteFile(run, []byte(driver), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	out, err := exec.Command(node, run).CombinedOutput()
+	out, err := exec.CommandContext(t.Context(), node, run).CombinedOutput()
 	if err != nil {
 		t.Fatalf("driving the plugin: %v\n%s", err, out)
 	}

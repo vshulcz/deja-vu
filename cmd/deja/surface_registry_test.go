@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -90,9 +91,9 @@ func wiredSurfaces(t *testing.T, harness string) map[string]bool {
 	var text strings.Builder
 	_ = filepath.Walk(tmp, func(p string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() || info.Size() > 4<<20 {
-			return nil
+			return nil //nolint:nilerr // an unreadable entry is skipped, not a failure
 		}
-		b, _ := os.ReadFile(p)
+		b, _ := os.ReadFile(p) //nolint:gosec // reads a temp home the test built
 		text.Write(b)
 		text.WriteByte('\n')
 		return nil
@@ -323,8 +324,8 @@ func TestTheParityTableIsRenderedFromTheRegistry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	i := strings.Index(string(page), "<!-- parity:start -->")
-	j := strings.Index(string(page), "<!-- parity:end -->")
+	i := bytes.Index(page, []byte("<!-- parity:start -->"))
+	j := bytes.Index(page, []byte("<!-- parity:end -->"))
 	if i < 0 || j < i {
 		t.Fatal("the harnesses page has no parity markers — run `go run ./scripts/genmatrix`")
 	}

@@ -88,7 +88,7 @@ func (a *tuiApp) openPalette() {
 
 func (a *tuiApp) handlePalette(ev tui.Event) {
 	items := a.shownPalette()
-	switch ev.Key {
+	switch ev.Key { //nolint:exhaustive // other keys do nothing here
 	case tui.KeyEsc:
 		a.modal = modalNone
 	case tui.KeyUp:

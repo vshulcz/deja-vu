@@ -167,7 +167,7 @@ func TestUnforgetBringsTheSessionBackWithoutAFullRebuild(t *testing.T) {
 	if err != nil || len(before) != 2 {
 		t.Fatalf("seed: %d sessions err=%v", len(before), err)
 	}
-	if _, err := captureRun(t, "forget", "--session", "t00"); err != nil {
+	if _, err = captureRun(t, "forget", "--session", "t00"); err != nil {
 		t.Fatal(err)
 	}
 	gone, err := index.Search(dir, search.Options{Query: "pool sizing", All: true})

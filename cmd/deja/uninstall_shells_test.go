@@ -37,7 +37,7 @@ func TestUninstallRemovesTheShellsItCreated(t *testing.T) {
 	var left []string
 	_ = filepath.Walk(home, func(p string, fi os.FileInfo, err error) error {
 		if err != nil || !fi.Mode().IsRegular() {
-			return nil
+			return nil //nolint:nilerr // an unreadable entry is not a leftover config
 		}
 		// deja's own state is not a harness config.
 		if strings.Contains(p, filepath.Join(".config", "deja")) {

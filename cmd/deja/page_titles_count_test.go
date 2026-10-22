@@ -63,9 +63,9 @@ func TestPageTitlesCountTheRestOfTheHarnesses(t *testing.T) {
 		if e.IsDir() || filepath.Ext(e.Name()) != ".html" || e.Name() == "README.html" {
 			continue
 		}
-		b, err := os.ReadFile(filepath.Join(dir, e.Name()))
-		if err != nil {
-			t.Fatalf("%s: %v", e.Name(), err)
+		b, readErr := os.ReadFile(filepath.Join(dir, e.Name()))
+		if readErr != nil {
+			t.Fatalf("%s: %v", e.Name(), readErr)
 		}
 		pages++
 		if !strings.Contains(string(b), want) {

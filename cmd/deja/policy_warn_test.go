@@ -47,7 +47,7 @@ func TestSearchIsQuietWhenThePolicyLoadsOrIsAbsent(t *testing.T) {
 		t.Errorf("no policy file at all still warned:\n%s", errOut)
 	}
 
-	if err := os.WriteFile(pol, []byte(`{"activations":{"search":{"imported":false}}}`), 0o600); err != nil {
+	if err = os.WriteFile(pol, []byte(`{"activations":{"search":{"imported":false}}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	errOut, err = captureRunStderr(t, "capstan pawl")

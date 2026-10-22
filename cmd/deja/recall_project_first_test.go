@@ -28,8 +28,11 @@ func TestRecallPutsThisProjectsAnswerFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 	line := func(sid, cwd, role, text string) string {
-		b, _ := json.Marshal(map[string]any{"type": role, "sessionId": sid, "cwd": cwd, "timestamp": "2026-09-10T10:00:00Z",
+		b, err := json.Marshal(map[string]any{"type": role, "sessionId": sid, "cwd": cwd, "timestamp": "2026-09-10T10:00:00Z",
 			"message": map[string]any{"role": role, "content": text}})
+		if err != nil {
+			t.Fatal(err)
+		}
 		return string(b)
 	}
 	writeClaudeFixture(t, filepath.Join(root, sources.ClaudeProjectName(ledgerd), "dana.jsonl"), "dana", []string{
@@ -62,14 +65,14 @@ func TestRecallPutsThisProjectsAnswerFirst(t *testing.T) {
 	t.Chdir(ledgerd)
 	text := ask(q)
 	m := firstRow.FindStringSubmatch(text)
-	if m == nil || !strings.HasSuffix(m[1], "ledgerd") || !strings.Contains(text, "Dana") {
+	if len(m) < 2 || !strings.HasSuffix(m[1], "ledgerd") || !strings.Contains(text, "Dana") {
 		t.Fatalf("from inside ledgerd, its own answer is not first:\n%s", firstLines(text, 12))
 	}
 
 	// Control: asked from a directory that is no project, the sixty win, so
 	// the order above is the project's doing and not the fixture's.
 	t.Chdir(t.TempDir())
-	if m := firstRow.FindStringSubmatch(ask(q)); m == nil || strings.HasSuffix(m[1], "ledgerd") {
+	if m := firstRow.FindStringSubmatch(ask(q)); len(m) < 2 || strings.HasSuffix(m[1], "ledgerd") {
 		t.Fatalf("outside any project ledgerd still led, so the test above proves nothing: %v", m)
 	}
 
@@ -96,7 +99,7 @@ func TestRecallProjectNamedByAWorktreePath(t *testing.T) {
 	}
 	git := func(args ...string) {
 		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", repo, "-c", "user.name=t", "-c", "user.email=t@example.com"}, args...)...)
+		cmd := exec.CommandContext(t.Context(), "git", append([]string{"-C", repo, "-c", "user.name=t", "-c", "user.email=t@example.com"}, args...)...)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
@@ -107,8 +110,11 @@ func TestRecallProjectNamedByAWorktreePath(t *testing.T) {
 	git("worktree", "add", "-q", "--detach", tree)
 
 	line := func(sid, cwd, role, text string) string {
-		b, _ := json.Marshal(map[string]any{"type": role, "sessionId": sid, "cwd": cwd, "timestamp": "2026-09-10T10:00:00Z",
+		b, err := json.Marshal(map[string]any{"type": role, "sessionId": sid, "cwd": cwd, "timestamp": "2026-09-10T10:00:00Z",
 			"message": map[string]any{"role": role, "content": text}})
+		if err != nil {
+			t.Fatal(err)
+		}
 		return string(b)
 	}
 	writeClaudeFixture(t, filepath.Join(root, sources.ClaudeProjectName(repo), "pay.jsonl"), "pay", []string{
@@ -125,7 +131,10 @@ func TestRecallProjectNamedByAWorktreePath(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(tree)
-	args, _ := json.Marshal(map[string]string{"mode": "recall", "q": "payouts service binary name", "project": tree})
+	args, err := json.Marshal(map[string]string{"mode": "recall", "q": "payouts service binary name", "project": tree})
+	if err != nil {
+		t.Fatal(err)
+	}
 	text, err := callMCPTool(dir, "deja", args)
 	if err != nil {
 		t.Fatal(err)
@@ -150,8 +159,11 @@ func TestRecallKeepsThisProjectWhenItLacksSomeWords(t *testing.T) {
 		t.Fatal(err)
 	}
 	line := func(sid, cwd, role, text string) string {
-		b, _ := json.Marshal(map[string]any{"type": role, "sessionId": sid, "cwd": cwd, "timestamp": "2026-09-14T10:00:00Z",
+		b, err := json.Marshal(map[string]any{"type": role, "sessionId": sid, "cwd": cwd, "timestamp": "2026-09-14T10:00:00Z",
 			"message": map[string]any{"role": role, "content": text}})
+		if err != nil {
+			t.Fatal(err)
+		}
 		return string(b)
 	}
 	writeClaudeFixture(t, filepath.Join(root, sources.ClaudeProjectName(ledgerd), "replay.jsonl"), "replay", []string{
@@ -175,7 +187,7 @@ func TestRecallKeepsThisProjectWhenItLacksSomeWords(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if m := regexp.MustCompile(`\n1\. \[[^\]]*\] (\S+)`).FindStringSubmatch(text); m == nil || !strings.HasSuffix(m[1], "ledgerd") || !strings.Contains(text, "4117") {
+	if m := regexp.MustCompile(`\n1\. \[[^\]]*\] (\S+)`).FindStringSubmatch(text); len(m) < 2 || !strings.HasSuffix(m[1], "ledgerd") || !strings.Contains(text, "4117") {
 		t.Fatalf("this project's answer is not first:\n%s", firstLines(text, 14))
 	}
 }

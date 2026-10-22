@@ -77,7 +77,7 @@ func (a *tuiApp) handleModal(ev tui.Event) {
 	if a.modal == modalContinue {
 		n = len(a.shownTargets())
 	}
-	switch ev.Key {
+	switch ev.Key { //nolint:exhaustive // other keys do nothing here
 	case tui.KeyLeft:
 		a.m.sel--
 	case tui.KeyRight, tui.KeyTab:

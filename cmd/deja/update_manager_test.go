@@ -58,7 +58,7 @@ func TestUpdateDefersToThePackageManagerThatOwnsTheBinary(t *testing.T) {
 		cfg  updateConfig
 	}{
 		{"force", updateConfig{force: true, currentVersion: "0.1.0", goos: "linux", goarch: "amd64", executable: "/opt/homebrew/Cellar/deja-vu/0.16.5/bin/deja"}},
-		{"plain path", updateConfig{currentVersion: "0.1.0", goos: "linux", goarch: "amd64", executable: filepath.Join("/usr", "local", "bin", "deja")}},
+		{"plain path", updateConfig{currentVersion: "0.1.0", goos: "linux", goarch: "amd64", executable: filepath.FromSlash("/usr/local/bin/deja")}},
 	} {
 		reached := false
 		var out bytes.Buffer

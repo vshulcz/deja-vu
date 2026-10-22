@@ -92,7 +92,11 @@ func TestBothOpencodePluginsCarryTheFileLineBackFromARead(t *testing.T) {
 		"1.x": opencodeLegacyPluginJS("/bin/deja"),
 		"2.x": opencodePluginJS("/bin/deja"),
 	} {
-		after := js[strings.Index(js, "execute.after"):]
+		at := strings.Index(js, "execute.after")
+		if at < 0 {
+			t.Fatalf("%s: the plugin has no after-seam", name)
+		}
+		after := js[at:]
 		if !strings.Contains(after, "filePath") {
 			t.Errorf("%s: the after-seam does not read the path the tool was given", name)
 		}

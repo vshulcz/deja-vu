@@ -79,7 +79,7 @@ func TestTUIBehindTheUncommittedChange(t *testing.T) {
 	repo := t.TempDir()
 	run := func(args ...string) {
 		t.Helper()
-		cmd := exec.Command(git, append([]string{"-C", repo, "-c", "user.name=t", "-c", "user.email=t@example.com"}, args...)...)
+		cmd := exec.CommandContext(t.Context(), git, append([]string{"-C", repo, "-c", "user.name=t", "-c", "user.email=t@example.com"}, args...)...)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v %s", args, err, out)
 		}

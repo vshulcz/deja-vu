@@ -261,7 +261,10 @@ func rxString(fields map[string]json.RawMessage, key string) string {
 func withString(fields map[string]json.RawMessage, key, value string) map[string]json.RawMessage {
 	out := make(map[string]json.RawMessage, len(fields))
 	maps.Copy(out, fields)
-	b, _ := json.Marshal(value)
+	b, err := json.Marshal(value)
+	if err != nil {
+		return fields
+	}
 	out[key] = b
 	return out
 }
@@ -474,12 +477,12 @@ func (x *rxExt) onCompaction(ctx context.Context, fields map[string]json.RawMess
 	// hosts: the summarizer may drop the guidance, and the next turn's
 	// hook-prompt hands the stored packet out once.
 	if raw, err := json.Marshal(folded); err == nil {
-		captureCompaction(x.dir, precompactHookInput{SessionID: key, CWD: cwd, Harness: "reasonix", Messages: raw})
+		captureCompaction(x.dir, precompactHookInput{SessionID: key, CWD: cwd, Harness: "reasonix", Messages: raw}) //nolint:contextcheck // the PreCompact path every hook shares takes no context
 	}
 	data := digest.ExtractCompactionContext(session, digest.ExtractOptions{})
 	withCommandOutcomes(&data, session)
 	data.Carry = digest.ExtractCarry(session.Messages, nil)
-	data.Freshness = compactionFreshness(compactionWorkspace(cwd))
+	data.Freshness = compactionFreshness(compactionWorkspace(cwd)) //nolint:contextcheck // shared with the PreCompact hook, which has no context
 	if ctx.Err() != nil {
 		return nil
 	}

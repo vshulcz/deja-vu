@@ -15,9 +15,9 @@ import (
 func TestSearchSaysWhatTheIgnoreRuleWithheld(t *testing.T) {
 	tmp := hermeticEnv(t)
 	claude := filepath.Join(tmp, "claude")
-	real := filepath.Join(claude, "projects", "-tmp-app")
+	realDir := filepath.Join(claude, "projects", "-tmp-app")
 	jobs := filepath.Join(claude, ".claude", "jobs", "abc", "projects", "-tmp-app")
-	for _, d := range []string{real, jobs} {
+	for _, d := range []string{realDir, jobs} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -33,7 +33,7 @@ func TestSearchSaysWhatTheIgnoreRuleWithheld(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	write(real, "keeper", "the invoice renderer lost its footer", 2*time.Hour)
+	write(realDir, "keeper", "the invoice renderer lost its footer", 2*time.Hour)
 	for i, sid := range []string{"scratch1", "scratch2"} {
 		write(jobs, sid, "why did the quokka telemetry sharding keep failing", time.Duration(i+1)*time.Hour)
 	}

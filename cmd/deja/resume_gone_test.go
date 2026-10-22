@@ -87,7 +87,7 @@ create table part(id text, message_id text, data text);
 insert into session values('ses_kept','/work/app','2026-01-02T03:00:00Z','2026-01-02T03:00:00Z');
 insert into message values('m1','ses_kept',1,'{"role":"user"}');
 insert into part values('p1','m1','{"type":"text","text":"hello"}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("seed: %v %s", err, out)
 	}
 	t.Setenv("DEJA_OPENCODE_DB", db)

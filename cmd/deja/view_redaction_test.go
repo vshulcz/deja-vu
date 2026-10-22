@@ -21,7 +21,7 @@ func TestTheViewRedactsWhatTheIndexKept(t *testing.T) {
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	const secret = "8f14e45fceea167a5a36dedd4bea2543"
+	const secret = "8f14e45fceea167a5a36dedd4bea2543" //nolint:gosec // fake secret the redaction must hide
 	const token = "ghp_abcdefghijklmnopqrstuvwxyz0123456789"
 	rec := `{"type":"user","sessionId":"v1","cwd":"/w","timestamp":"2026-08-22T01:00:00Z","message":{"role":"user","content":"vexlorb {\"api_key\": \"` + secret + `\"} and ` + token + `"}}` + "\n"
 	if err := os.WriteFile(filepath.Join(root, "a.jsonl"), []byte(rec), 0o644); err != nil {

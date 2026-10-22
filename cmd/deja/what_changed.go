@@ -86,18 +86,18 @@ func whatChangedFor(dir string) ([]string, string) {
 	if err := os.WriteFile(marker, []byte(version+"\n"), 0o600); err != nil || last == "" {
 		return nil, ""
 	}
-	items := whatChangedItems(dejavu.Changelog, last, version, 3)
+	items := whatChangedItems(dejavu.Changelog, last, version)
 	if len(items) == 0 {
 		return nil, ""
 	}
 	return items, version
 }
 
-// whatChangedItems returns up to n bullet items from every CHANGELOG section
+// whatChangedItems returns up to three bullet items from every CHANGELOG section
 // newer than lastVersion, in changelog order (newest first). It returns an
 // empty slice when the current version is not newer than lastVersion, or when
 // no newer section has any items.
-func whatChangedItems(changelog, lastVersion, currentVersion string, n int) []string {
+func whatChangedItems(changelog, lastVersion, currentVersion string) []string {
 	if currentVersion == "" || currentVersion == "dev" {
 		return nil
 	}
@@ -119,7 +119,7 @@ func whatChangedItems(changelog, lastVersion, currentVersion string, n int) []st
 			line = strings.TrimSpace(line)
 			if after0, ok := strings.CutPrefix(line, "- "); ok {
 				items = append(items, firstSentence(after0))
-				if len(items) >= n {
+				if len(items) >= 3 {
 					return items
 				}
 			}

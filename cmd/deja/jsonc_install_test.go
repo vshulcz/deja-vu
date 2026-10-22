@@ -51,7 +51,7 @@ func TestInstallKeepsACommentedConfig(t *testing.T) {
 	}
 
 	// A second install changes nothing, and an uninstall gives the file back.
-	if _, err := captureRun(t, "install", "cursor", "--no-index"); err != nil {
+	if _, err = captureRun(t, "install", "cursor", "--no-index"); err != nil {
 		t.Fatal(err)
 	}
 	again, err := os.ReadFile(path)
@@ -61,7 +61,7 @@ func TestInstallKeepsACommentedConfig(t *testing.T) {
 	if string(again) != got {
 		t.Errorf("a second install rewrote the file:\nfirst:\n%s\nsecond:\n%s", got, again)
 	}
-	if _, err := captureRun(t, "uninstall", "cursor"); err != nil {
+	if _, err = captureRun(t, "uninstall", "cursor"); err != nil {
 		t.Fatal(err)
 	}
 	back, err := os.ReadFile(path)

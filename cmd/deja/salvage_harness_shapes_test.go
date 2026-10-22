@@ -19,7 +19,13 @@ func TestToolAfterSalvagesACutGeminiOrQwenPayload(t *testing.T) {
 	seedFixPair(t, knownErr, "make clean && make CGO_ENABLED=0")
 	dir := os.Getenv("DEJA_INDEX_DIR")
 
-	str := func(s string) string { b, _ := json.Marshal(s); return string(b) }
+	str := func(s string) string {
+		b, err := json.Marshal(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
 	payload := func(shape string, pad int) []byte {
 		body := knownErr + "\n" + strings.Repeat("build: checking package\n", pad)
 		head := `{"session_id":"` + shape + `","cwd":"/work/app","tool_input":{"command":"make deploy"},"tool_name":"run_shell_command",`

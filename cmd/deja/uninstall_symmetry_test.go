@@ -63,16 +63,16 @@ func TestUninstallTakesBackEveryFileItWrote(t *testing.T) {
 	}
 	_ = filepath.Walk(home, func(p string, fi os.FileInfo, err error) error {
 		if err != nil || !fi.Mode().IsRegular() {
-			return nil
+			return nil //nolint:nilerr // an unreadable entry is not a leftover config
 		}
 		// deja's own directory is not a harness config: the wiring record
 		// lives there and is the binary's, not the harness's.
 		if strings.Contains(p, filepath.Join(".config", "deja")) {
 			return nil
 		}
-		b, rerr := os.ReadFile(p)
+		b, rerr := os.ReadFile(p) //nolint:gosec // test walks its own temp home
 		if rerr != nil {
-			return nil
+			return nil //nolint:nilerr // an unreadable file is not a leftover config
 		}
 		if mentionsDeja(b) {
 			t.Errorf("uninstall left %s, which still names deja: %s", p,
@@ -101,7 +101,7 @@ func TestInstallStatuslineRewritesOneWrittenByAnotherBuild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(settings, b, 0o644); err != nil {
+	if err = os.WriteFile(settings, b, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	out, err := captureRun(t, "install", "statusline", "--no-index")

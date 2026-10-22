@@ -142,7 +142,7 @@ func TestAFailingSSHCaptureCannotWriteOnThisTerminal(t *testing.T) {
 	}
 	old := sshRunner
 	t.Cleanup(func() { sshRunner = old })
-	sshRunner = func(name string, args ...string) (string, error) {
+	sshRunner = func(_ string, _ ...string) (string, error) {
 		return "mktemp: no space\x1b[31m\rHACKED " + strings.Repeat("padding ", 300), errors.New("exit status 1")
 	}
 	err := syncSSHHost(dir, "peer\x1b[31mX", true, false, false)

@@ -36,7 +36,7 @@ func TestPromoteSaysWhenTheSessionAlreadyLeft(t *testing.T) {
 		t.Errorf("a session that never left was called sent:\n%s", out)
 	}
 
-	if _, err := index.ExportFull(dir, filepath.Join(tmp, "export")); err != nil {
+	if _, err = index.ExportFull(dir, filepath.Join(tmp, "export")); err != nil {
 		t.Fatal(err)
 	}
 

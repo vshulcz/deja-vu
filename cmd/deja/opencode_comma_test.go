@@ -61,7 +61,7 @@ func TestOpencodeJSONCGivesTheConfigBackAsItWas(t *testing.T) {
 			if !strings.Contains(string(installed), `"deja"`) {
 				t.Fatalf("install wrote no entry:\n%s", installed)
 			}
-			if err := parsesAsJSONC(t, string(installed)); err != nil {
+			if err = parsesAsJSONC(t, string(installed)); err != nil {
 				t.Fatalf("install left a file that does not parse: %v\n%s", err, installed)
 			}
 			back, _, err := updateOpencodeJSONC(installed, "/usr/local/bin/deja", true)

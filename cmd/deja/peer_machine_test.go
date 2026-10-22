@@ -20,7 +20,7 @@ func seedPeerBatch(t *testing.T, tmp, origin string, n int) string {
 	if err := os.MkdirAll(batch, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	var lines []string
+	lines := make([]string, 0, n)
 	for i := range n {
 		rec := map[string]any{
 			"harness": "claude", "session_id": origin + string(rune('a'+i)), "project": "proj",

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"crypto/md5"
+	"crypto/md5" //nolint:gosec // Cursor names its chat folder by this hash
 	"encoding/hex"
 	"os"
 	"path/filepath"
@@ -26,7 +26,7 @@ func seedCursorChat(t *testing.T, cli, cwd, id string) string {
 	if err := os.WriteFile(tp, []byte(`{"role":"user","message":{"content":[{"type":"text","text":"hello there"}]}}`+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	sum := md5.Sum([]byte(cwd))
+	sum := md5.Sum([]byte(cwd)) //nolint:gosec // Cursor names its chat folder by this hash
 	chat := filepath.Join(cli, "chats", hex.EncodeToString(sum[:]), id)
 	if err := os.MkdirAll(chat, 0o755); err != nil {
 		t.Fatal(err)

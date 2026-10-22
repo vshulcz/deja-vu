@@ -16,15 +16,15 @@ import (
 )
 
 // checkPersonLines fails when the lines deja shows the person run past one
-// terminal line each or past max lines in all.
-func checkPersonLines(t *testing.T, what, msg string, max int) {
+// terminal line each or past most lines in all.
+func checkPersonLines(t *testing.T, what, msg string, most int) {
 	t.Helper()
 	lines := strings.Split(msg, "\n")
 	if msg == "" {
 		lines = nil
 	}
-	if len(lines) > max {
-		t.Errorf("%s is %d lines, want at most %d:\n%s", what, len(lines), max, msg)
+	if len(lines) > most {
+		t.Errorf("%s is %d lines, want at most %d:\n%s", what, len(lines), most, msg)
 	}
 	for _, l := range lines {
 		if w := termwidth.Columns(l); w > noteWidth {
@@ -67,14 +67,17 @@ func TestSessionStartSaysAtMostTwoShortLines(t *testing.T) {
 	t.Chdir(cwd)
 
 	start := func(sid string) string {
-		payload, _ := json.Marshal(map[string]any{"session_id": sid, "cwd": cwd, "source": "startup"})
+		payload, err := json.Marshal(map[string]any{"session_id": sid, "cwd": cwd, "source": "startup"})
+		if err != nil {
+			t.Fatal(err)
+		}
 		withHookStdin(t, string(payload))
 		out := captureStdout(t, func() { _ = runHookContext(dir, false) })
 		var resp sessionStartHookResponse
 		if strings.TrimSpace(out) == "" {
 			return ""
 		}
-		if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &resp); err != nil {
+		if err = json.Unmarshal([]byte(strings.TrimSpace(out)), &resp); err != nil {
 			t.Fatalf("not the hook envelope: %v\n%s", err, out)
 		}
 		return resp.SystemMessage
@@ -90,7 +93,10 @@ func TestSessionStartSaysAtMostTwoShortLines(t *testing.T) {
 	}
 	checkPersonLines(t, "the second session start", second, 2)
 
-	payload, _ := json.Marshal(map[string]any{"prompt": "what grace should the zorbit queue drain use before deploy", "cwd": cwd, "session_id": "width-3"})
+	payload, err := json.Marshal(map[string]any{"prompt": "what grace should the zorbit queue drain use before deploy", "cwd": cwd, "session_id": "width-3"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	var out bytes.Buffer
 	if err := runHookPromptMode(dir, bytes.NewReader(payload), &out, false); err != nil {
 		t.Fatal(err)

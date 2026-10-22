@@ -197,7 +197,7 @@ func TestHermesRoundTripsAtEveryIndent(t *testing.T) {
 				t.Errorf("deja's entry was not written at the block's indent:\n%s", wired)
 			}
 
-			if _, err := installHermesMCP("/opt/deja", true); err != nil {
+			if _, err = installHermesMCP("/opt/deja", true); err != nil {
 				t.Fatal(err)
 			}
 			back, err := os.ReadFile(path)

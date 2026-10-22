@@ -55,7 +55,7 @@ func TestSearchDoesNotWaitForARewrite(t *testing.T) {
 
 	// aider has no append path, so its growth is rewrite-grade work.
 	body := "# aider chat started at 2026-07-02 10:00:00\n\n#### rewriteneedle first\n\n#### deferredneedle second\n"
-	if err := os.WriteFile(history, []byte(body), 0o644); err != nil {
+	if err = os.WriteFile(history, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	out, err = captureRunStderr(t, "search", "deferredneedle")

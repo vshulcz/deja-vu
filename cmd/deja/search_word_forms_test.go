@@ -23,7 +23,7 @@ func TestSearchFindsTheIesPluralFromTheSingular(t *testing.T) {
 		{"s-macerator", "the macerator subsystem: queries handled during service"},
 		{"s-alternator", "the alternator subsystem: proxies handled during service"},
 	} {
-		var lines []string
+		lines := make([]string, 0, 3)
 		for i := range 3 {
 			lines = append(lines, fmt.Sprintf(`{"type":"user","sessionId":%q,"cwd":"/tmp/stem","timestamp":"2026-06-0%dT10:00:00Z","message":{"role":"user","content":%q}}`, tc.id, i+1, tc.text+fmt.Sprintf(" line %d", i)))
 		}
@@ -57,7 +57,7 @@ func TestSearchFindsTheIesPluralFromTheSingular(t *testing.T) {
 			t.Errorf("%q answered nothing over a store that holds it as a plural", q)
 			continue
 		}
-		var ids []string
+		ids := make([]string, 0, len(got.Hits))
 		for _, h := range got.Hits {
 			ids = append(ids, h.Session.ID)
 		}

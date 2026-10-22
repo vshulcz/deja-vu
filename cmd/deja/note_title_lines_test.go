@@ -33,10 +33,10 @@ func TestANoteTitleWithNewlinesStaysOnOneLine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(notes, append(line, '\n'), 0o644); err != nil {
+	if err = os.WriteFile(notes, append(line, '\n'), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := captureRun(t, "index"); err != nil {
+	if _, err = captureRun(t, "index"); err != nil {
 		t.Fatal(err)
 	}
 	// The surfaces that print a note's title. `search` and `show` are not
@@ -47,9 +47,9 @@ func TestANoteTitleWithNewlinesStaysOnOneLine(t *testing.T) {
 		{"last"},
 		{"stats"},
 	} {
-		out, err := captureRun(t, args...)
-		if err != nil {
-			t.Fatalf("%v: %v", args, err)
+		out, runErr := captureRun(t, args...)
+		if runErr != nil {
+			t.Fatalf("%v: %v", args, runErr)
 		}
 		// The premise: the title reached this surface at all.
 		if !strings.Contains(out, "pool timeout") {
@@ -65,7 +65,7 @@ func TestANoteTitleWithNewlinesStaysOnOneLine(t *testing.T) {
 	// break in the source rather than in the rendering — the same property,
 	// checked in the JSON the page hands its script.
 	page := filepath.Join(t.TempDir(), "v.html")
-	if _, err := captureRun(t, "view", "--no-open", "--out", page); err != nil {
+	if _, err = captureRun(t, "view", "--no-open", "--out", page); err != nil {
 		t.Fatal(err)
 	}
 	b, err := os.ReadFile(page)

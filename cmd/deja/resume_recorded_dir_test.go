@@ -24,7 +24,13 @@ func TestResumeRecordedDirectoryPresentAndGone(t *testing.T) {
 	t.Setenv("DEJA_PI_ROOT", filepath.Join(tmp, "pi"))
 	t.Setenv("DEJA_KIRO_ROOT", filepath.Join(tmp, "kiro"))
 	t.Setenv("DEJA_ROO_CLI_ROOT", filepath.Join(tmp, "roo"))
-	jsonStr := func(s string) string { b, _ := json.Marshal(s); return string(b) }
+	jsonStr := func(s string) string {
+		b, err := json.Marshal(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
 
 	const (
 		refuse = "refuse" // error naming the directory and `deja show`
@@ -37,13 +43,15 @@ func TestResumeRecordedDirectoryPresentAndGone(t *testing.T) {
 		session func(t *testing.T, name, dir string) model.Session
 		goneCmd func(s model.Session) string // the command once the directory is gone, when it changes
 	}{
-		{"pi", fork, func(t *testing.T, name, dir string) model.Session {
+		{"pi", fork, func(t *testing.T, _, dir string) model.Session {
+			t.Helper()
 			id := "01a0f828-1111-4222-8333-444455556666"
 			p := filepath.Join(tmp, "pi", piSessionFolder(dir), "2026-10-01T09-00-00-000Z_"+id+".jsonl")
 			writeResumeFile(t, p, `{"type":"session","version":3,"id":"`+id+`","timestamp":"2026-10-01T09:00:00.000Z","cwd":`+jsonStr(dir)+`}`+"\n")
 			return model.Session{Harness: "pi", ID: id, Path: p}
 		}, nil},
 		{"grok", note, func(t *testing.T, name, dir string) model.Session {
+			t.Helper()
 			// QueryEscape, not PathEscape: the folder holds a Windows path's
 			// colon too, which no Windows directory name can.
 			p := filepath.Join(tmp, "grok", url.QueryEscape(dir), "019f-"+name, "updates.jsonl")
@@ -52,6 +60,7 @@ func TestResumeRecordedDirectoryPresentAndGone(t *testing.T) {
 			return model.Session{Harness: "grok", ID: "019f-" + name, Path: p}
 		}, nil},
 		{"kiro", note, func(t *testing.T, name, dir string) model.Session {
+			t.Helper()
 			id := "11111111-2222-4333-8444-555555555555"
 			p := filepath.Join(tmp, "kiro", name, id+".jsonl")
 			writeResumeFile(t, filepath.Join(tmp, "kiro", name, id+".json"), `{"session_id":"`+id+`","cwd":`+jsonStr(filepath.ToSlash(dir))+`}`)
@@ -59,37 +68,42 @@ func TestResumeRecordedDirectoryPresentAndGone(t *testing.T) {
 			return model.Session{Harness: "kiro", ID: id, Path: p}
 		}, nil},
 		{"continue", note, func(t *testing.T, name, dir string) model.Session {
+			t.Helper()
 			id := "5f38800d-4bfe-4a34-a6f1-b117d8ce618c"
 			p := filepath.Join(tmp, "continue", name, id+".json")
 			writeResumeFile(t, p, `{"sessionId":"`+id+`","workspaceDirectory":`+jsonStr(dir)+`,"history":[]}`)
 			return model.Session{Harness: "continue", ID: id, Path: p}
 		}, nil},
 		{"codewhale", note, func(t *testing.T, name, dir string) model.Session {
+			t.Helper()
 			id := "eeeeeeee-0000-4000-8000-000000000005"
 			p := filepath.Join(tmp, "codewhale", name, id+".json")
 			writeResumeFile(t, p, `{"schema_version":1,"metadata":{"id":"`+id+`","workspace":`+jsonStr(dir)+`},"messages":[]}`)
 			return model.Session{Harness: "codewhale", ID: id, Path: p}
 		}, nil},
 		{"commandcode", note, func(t *testing.T, name, dir string) model.Session {
+			t.Helper()
 			id := "0c4d0000-1111-4222-8333-444455556666"
 			p := filepath.Join(tmp, "commandcode", name, id+".jsonl")
 			writeResumeFile(t, p, `{"type":"session","version":3,"id":"`+id+`","cwd":`+jsonStr(dir)+`}`+"\n")
 			return model.Session{Harness: "commandcode", ID: id, Path: p}
 		}, func(s model.Session) string { return commandCodeBin() + " --session " + s.ID }},
 		{"reasonix", note, func(t *testing.T, name, dir string) model.Session {
+			t.Helper()
 			id := "20261001-101000.000000000-deepseek-chat"
 			p := filepath.Join(tmp, "reasonix", name, id+".jsonl")
 			writeResumeFile(t, p+".meta", `{"workspace_root":`+jsonStr(dir)+`}`)
 			return model.Session{Harness: "reasonix", ID: id, Path: p}
 		}, func(s model.Session) string { return "reasonix --resume " + s.Path }},
 		{"roo", refuse, func(t *testing.T, name, dir string) model.Session {
+			t.Helper()
 			id := "01a07bf9-8882-7703-a3fa-245deb8ea752"
 			if name == "gone" {
 				id = "01a07bf9-8882-7703-a3fa-245deb8ea753"
 			}
 			return model.Session{Harness: "roo", ID: "roo-task-" + id, Path: rooCLITask(t, filepath.Join(tmp, "roo"), id, filepath.ToSlash(dir))}
 		}, nil},
-		{"crush", refuse, func(t *testing.T, name, dir string) model.Session {
+		{"crush", refuse, func(_ *testing.T, _, dir string) model.Session {
 			return model.Session{Harness: "crush", ID: "942cbc1e-78c7-41cb-aa8a-78c3baab018c", Path: filepath.Join(dir, ".crush", "crush.db")}
 		}, nil},
 	}
@@ -158,19 +172,22 @@ func TestResumePiTakesTheHeaderCwdNotTheFolderName(t *testing.T) {
 	}
 	tmp := t.TempDir()
 	t.Setenv("DEJA_PI_ROOT", filepath.Join(tmp, "pi"))
-	real := filepath.Join(tmp, "w", "my-app")
-	for _, d := range []string{real, filepath.Join(tmp, "w", "my", "app")} {
+	realDir := filepath.Join(tmp, "w", "my-app")
+	for _, d := range []string{realDir, filepath.Join(tmp, "w", "my", "app")} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
 			t.Fatal(err)
 		}
 	}
 	id := "01a0f828-1111-4222-8333-444455556666"
-	p := filepath.Join(tmp, "pi", "--"+strings.ReplaceAll(strings.TrimPrefix(real, "/"), "/", "-")+"--", id+".jsonl")
-	cwd, _ := json.Marshal(real)
+	p := filepath.Join(tmp, "pi", "--"+strings.ReplaceAll(strings.TrimPrefix(realDir, "/"), "/", "-")+"--", id+".jsonl")
+	cwd, err := json.Marshal(realDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 	writeResumeFile(t, p, `{"type":"session","version":3,"id":"`+id+`","cwd":`+string(cwd)+`}`+"\n")
 	dir, cmd, err := resumeCommand(model.Session{Harness: "pi", ID: id, Path: p})
-	if err != nil || dir != real || cmd != "pi --session "+id {
-		t.Fatalf("got (%q, %q, %v), want (%q, pi --session %s)", dir, cmd, err, real, id)
+	if err != nil || dir != realDir || cmd != "pi --session "+id {
+		t.Fatalf("got (%q, %q, %v), want (%q, pi --session %s)", dir, cmd, err, realDir, id)
 	}
 }
 

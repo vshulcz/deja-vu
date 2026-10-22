@@ -213,8 +213,8 @@ func printScrub(w io.Writer, outcomes []scrubOutcome, unreachable map[string]int
 			// message text; this pass reads the raw file. When the two disagree
 			// the reader has to know, or they close a file that still holds a
 			// value (#3823).
-			if wrote := countOf(o.written); wrote < o.target.found {
-				fmt.Fprintf(w, "    %d of the %d the report counted here — the rest is spelled differently in the file itself\n", wrote, o.target.found)
+			if replaced := countOf(o.written); replaced < o.target.found {
+				fmt.Fprintf(w, "    %d of the %d the report counted here — the rest is spelled differently in the file itself\n", replaced, o.target.found)
 			}
 			if o.backup != "" {
 				fmt.Fprintf(w, "    the original is %s\n", search.SafePath(reportPath(o.backup)))
@@ -261,7 +261,7 @@ func countOf(counts map[string]int) int {
 }
 
 func scrubKindSummary(counts map[string]int) string {
-	var parts []string
+	parts := make([]string, 0, len(counts))
 	for _, kind := range sortedKindCounts(counts) {
 		parts = append(parts, fmt.Sprintf("%d %s", counts[kind], kind))
 	}

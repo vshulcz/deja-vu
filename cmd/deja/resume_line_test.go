@@ -88,6 +88,7 @@ func TestResumeLineLandsInTheDirInEachShell(t *testing.T) {
 		dirs = append(dirs, d)
 	}
 	run := func(t *testing.T, goos, cmdline string, shell ...string) {
+		t.Helper()
 		for _, d := range dirs {
 			line, ok := resumeLine(goos, d, cmdline)
 			if !ok {
@@ -102,7 +103,7 @@ func TestResumeLineLandsInTheDirInEachShell(t *testing.T) {
 			if err := os.WriteFile(script, []byte(body), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			out, err := exec.Command(shell[0], append(shell[1:], script)...).CombinedOutput()
+			out, err := exec.CommandContext(t.Context(), shell[0], append(shell[1:], script)...).CombinedOutput()
 			got := strings.TrimSpace(string(out))
 			if err != nil || got != d {
 				t.Errorf("%s: %s\n printed %q, want %q (%v)", shell[0], line, got, d, err)

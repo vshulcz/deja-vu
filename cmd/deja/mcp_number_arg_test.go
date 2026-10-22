@@ -27,7 +27,7 @@ func TestANumericArgumentThatIsNotANumberSaysSo(t *testing.T) {
 
 	// A numeric string is still a number, the way hosts that stringify send it.
 	a.Limit = 0
-	if err := decodeToolArgs("recall", json.RawMessage(`{"query":"exporter","limit":"3"}`), &a); err != nil {
+	if err = decodeToolArgs("recall", json.RawMessage(`{"query":"exporter","limit":"3"}`), &a); err != nil {
 		t.Fatalf("a stringified number was refused: %v", err)
 	}
 	if a.Limit != 3 {

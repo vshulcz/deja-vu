@@ -127,7 +127,7 @@ func parseBox(q []rune, now time.Time) boxFilters {
 				span.end, low = words[i].end, next
 			}
 		}
-		since, until := time.Time{}, time.Time{}
+		var since, until time.Time
 		switch low {
 		case "today":
 			since = day
@@ -170,14 +170,14 @@ func (a *tuiApp) wall() time.Time {
 
 // drawQuery writes the box's text with its filters as chips. A query too long
 // for the box keeps its end, where the cursor is.
-func (a *tuiApp) drawQuery(x, y, max int) int {
+func (a *tuiApp) drawQuery(x, y, most int) int {
 	p := a.p
 	q := a.query
 	// The width of q[start:] only falls as start grows: a search, not a walk
 	// that measures the whole tail for every rune of a long paste.
-	start := sort.Search(len(q), func(i int) bool { return termwidth.Columns(string(q[i:])) <= max-x-1 })
+	start := sort.Search(len(q), func(i int) bool { return termwidth.Columns(string(q[i:])) <= most-x-1 })
 	if start > 0 {
-		x = p.Put(x, y, "…", fgs(cMuted), max)
+		x = p.Put(x, y, "…", fgs(cMuted), most)
 		start++
 	}
 	in := make([]bool, len(q))
@@ -196,7 +196,7 @@ func (a *tuiApp) drawQuery(x, y, max int) int {
 		if in[i] {
 			st = chip
 		}
-		x = p.Put(x, y, string(q[i:j]), st, max)
+		x = p.Put(x, y, string(q[i:j]), st, most)
 		i = j
 	}
 	return x

@@ -22,7 +22,7 @@ func msgs(texts ...string) []model.Message {
 // sessions people ask about — measured here, the 2% that cross the line are
 // the current work.
 func TestFocusSessionKeepsTheMatchingPart(t *testing.T) {
-	var texts []string
+	texts := make([]string, 0, 400)
 	for range 400 {
 		texts = append(texts, "routine chatter with nothing to recall")
 	}
@@ -53,7 +53,7 @@ func TestFocusSessionKeepsTheMatchingPart(t *testing.T) {
 // A term common enough to appear throughout keeps most of the session. Giving
 // up there sends nothing; the densest windows are the answer.
 func TestFocusSessionFallsBackToTheDensestWindows(t *testing.T) {
-	var texts []string
+	texts := make([]string, 0, 800)
 	for range 800 {
 		texts = append(texts, "the queue drained again")
 	}

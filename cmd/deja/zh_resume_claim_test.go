@@ -36,7 +36,7 @@ func TestChineseResumeClaimMatchesTheRegistry(t *testing.T) {
 		if err != nil || d.IsDir() || filepath.Ext(path) != ".html" {
 			return err
 		}
-		b, err := os.ReadFile(path)
+		b, err := os.ReadFile(path) //nolint:gosec // test walks the repo's own site pages
 		if err != nil {
 			return err
 		}

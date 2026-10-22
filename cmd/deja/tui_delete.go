@@ -34,7 +34,7 @@ func (a *tuiApp) askDelete() {
 // handleDelete takes y for the erase. Enter keeps the session: it cannot be
 // undone, so a reflexive Enter must not be the yes.
 func (a *tuiApp) handleDelete(ev tui.Event) {
-	switch ev.Key {
+	switch ev.Key { //nolint:exhaustive // other keys leave the prompt open
 	case tui.KeyEnter, tui.KeyEsc:
 		a.modal = modalNone
 	case tui.KeyRune:

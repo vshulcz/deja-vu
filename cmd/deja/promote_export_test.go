@@ -31,10 +31,10 @@ func TestExportAppendsAfterAFileWithNoTrailingNewline(t *testing.T) {
 
 	// A file that does end with a newline keeps exactly one blank line.
 	normal := filepath.Join(dir, "norm.md")
-	if err := os.WriteFile(normal, []byte("# Notes\n\ntext\n"), 0o644); err != nil {
+	if err = os.WriteFile(normal, []byte("# Notes\n\ntext\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := exportPromoted(normal, "pool exhausted", "raised it", "claude:s1", "accepted", time.Time{}); err != nil {
+	if _, err = exportPromoted(normal, "pool exhausted", "raised it", "claude:s1", "accepted", time.Time{}); err != nil {
 		t.Fatal(err)
 	}
 	got, err = os.ReadFile(normal)

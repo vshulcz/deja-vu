@@ -35,7 +35,7 @@ func TestWiringRepairFollowsAMovedBinary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(wiringStatePath(), b, 0o644); err != nil {
+	if err = os.WriteFile(wiringStatePath(), b, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	claudeJSON := filepath.Join(home, ".claude.json")
@@ -54,7 +54,7 @@ func TestWiringRepairFollowsAMovedBinary(t *testing.T) {
 		old = strings.ReplaceAll(old, esc(p), esc(wired.Exe))
 		old = strings.ReplaceAll(old, p, wired.Exe)
 	}
-	if err := os.WriteFile(claudeJSON, []byte(old), 0o644); err != nil {
+	if err = os.WriteFile(claudeJSON, []byte(old), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

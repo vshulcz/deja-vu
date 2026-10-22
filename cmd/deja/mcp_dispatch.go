@@ -283,7 +283,10 @@ func mcpBuildingLine(dir string) string {
 }
 
 func mcpIDKey(id any) string {
-	b, _ := json.Marshal(id)
+	b, err := json.Marshal(id)
+	if err != nil {
+		return ""
+	}
 	return string(b)
 }
 

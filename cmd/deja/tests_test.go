@@ -14,7 +14,8 @@ import (
 
 // run is one build or test invocation in a transcript: the command, then the
 // output that came back.
-func testRunLines(session, cwd, day, id, cmd, out string) []string {
+func testRunLines(session, day, id, cmd, out string) []string {
+	const cwd = "/work/app"
 	ts := day + "T10:00:00Z"
 	return []string{
 		`{"type":"assistant","sessionId":"` + session + `","cwd":"` + cwd + `","timestamp":"` + ts +
@@ -43,15 +44,15 @@ func jsonQuoted(s string) string {
 func TestAFilteredRunIsCountedAsNeitherPassNorFail(t *testing.T) {
 	withStatsStores(t)
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
-	var lines []string
-	lines = append(lines, testRunLines("r1", "/work/app", "2026-03-02", "c1",
+	lines := make([]string, 0, 6)
+	lines = append(lines, testRunLines("r1", "2026-03-02", "c1",
 		"go test ./internal/fetch -count=1", "ok  \tgithub.com/me/app/internal/fetch\t1.2s")...)
 	// The same command line as the run above on purpose: a session repeating
 	// one verbatim keeps a single command record and both outputs, and the
 	// second run has to survive that (#539).
-	lines = append(lines, testRunLines("r1", "/work/app", "2026-03-02", "c2",
+	lines = append(lines, testRunLines("r1", "2026-03-02", "c2",
 		"go test ./internal/fetch -count=1", "--- FAIL: TestRetryBudget (0.01s)\nFAIL\tgithub.com/me/app/internal/fetch\t0.9s\nFAIL")...)
-	lines = append(lines, testRunLines("r1", "/work/app", "2026-03-02", "c3",
+	lines = append(lines, testRunLines("r1", "2026-03-02", "c3",
 		`go test ./... -count=1 2>&1 | grep -E "^FAIL" | head -3; echo DONE`, "DONE")...)
 	writeClaudeFixture(t, filepath.Join(claudeRoot, "-work-app", "r1.jsonl"), "r1", lines)
 	dir := index.DefaultDir()
@@ -92,16 +93,16 @@ func TestOnlyATestThatFailedOnTwoDaysIsListed(t *testing.T) {
 	fail := func(name string) string {
 		return "--- FAIL: " + name + " (0.02s)\nFAIL\tgithub.com/me/app/internal/fetch\t0.4s\nFAIL"
 	}
-	var lines []string
+	lines := make([]string, 0, 8)
 	// Twice in one day.
-	lines = append(lines, testRunLines("r2", "/work/app", "2026-03-03", "a1",
+	lines = append(lines, testRunLines("r2", "2026-03-03", "a1",
 		"go test ./internal/fetch", fail("TestQuokkabloomOnce"))...)
-	lines = append(lines, testRunLines("r2", "/work/app", "2026-03-03", "a2",
+	lines = append(lines, testRunLines("r2", "2026-03-03", "a2",
 		"go test ./internal/fetch", fail("TestQuokkabloomOnce"))...)
 	// Once on each of two days.
-	lines = append(lines, testRunLines("r2", "/work/app", "2026-03-03", "a3",
+	lines = append(lines, testRunLines("r2", "2026-03-03", "a3",
 		"go test ./internal/fetch", fail("TestQuokkabloomKeepsComingBack"))...)
-	lines = append(lines, testRunLines("r2", "/work/app", "2026-03-05", "a4",
+	lines = append(lines, testRunLines("r2", "2026-03-05", "a4",
 		"go test ./internal/fetch", fail("TestQuokkabloomKeepsComingBack"))...)
 	writeClaudeFixture(t, filepath.Join(claudeRoot, "-work-app", "r2.jsonl"), "r2", lines)
 	dir := index.DefaultDir()
@@ -135,9 +136,9 @@ func TestOnlyATestThatFailedOnTwoDaysIsListed(t *testing.T) {
 func TestTestsJSONCarriesTheSeriesAndTheFlagsAreChecked(t *testing.T) {
 	withStatsStores(t)
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
-	var lines []string
+	lines := make([]string, 0, 6)
 	for i, day := range []string{"2026-03-09", "2026-03-10", "2026-03-17"} {
-		lines = append(lines, testRunLines("r3", "/work/app", day, fmt.Sprintf("j%d", i),
+		lines = append(lines, testRunLines("r3", day, fmt.Sprintf("j%d", i),
 			"go build ./...", "# github.com/me/app\ninternal/fetch/fetch.go:12:3: undefined: quokkabloom")...)
 	}
 	writeClaudeFixture(t, filepath.Join(claudeRoot, "-work-app", "r3.jsonl"), "r3", lines)
@@ -191,10 +192,10 @@ func TestTestsScreenEdges(t *testing.T) {
 		t.Fatalf("a store with no runs does not say so:\n%s", out.String())
 	}
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
-	var lines []string
+	lines := make([]string, 0, 8)
 	for i, name := range []string{"TestAlpha", "TestBeta"} {
 		for d, day := range []string{"2026-04-01", "2026-04-02"} {
-			lines = append(lines, testRunLines("r4", "/work/app", day, fmt.Sprintf("k%d%d", i, d),
+			lines = append(lines, testRunLines("r4", day, fmt.Sprintf("k%d%d", i, d),
 				"go test ./internal/"+name,
 				"--- FAIL: "+name+" (0.01s)\nFAIL\tgithub.com/me/app\t0.3s\nFAIL")...)
 		}

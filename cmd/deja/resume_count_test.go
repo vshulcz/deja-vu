@@ -29,7 +29,7 @@ func TestTheResumeCountFollowsTheRegistry(t *testing.T) {
 			} `json:"capabilities"`
 		} `json:"harnesses"`
 	}
-	if err := json.Unmarshal(b, &reg); err != nil {
+	if err = json.Unmarshal(b, &reg); err != nil {
 		t.Fatal(err)
 	}
 
@@ -57,9 +57,9 @@ func TestTheResumeCountFollowsTheRegistry(t *testing.T) {
 		"docs/guide/lost-context.html",
 	}
 	for _, page := range pages {
-		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(page)))
-		if err != nil {
-			t.Fatal(err)
+		raw, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(page)))
+		if readErr != nil {
+			t.Fatal(readErr)
 		}
 		text := proseOf(string(raw))
 		found := claim.FindAllStringSubmatchIndex(text, -1)

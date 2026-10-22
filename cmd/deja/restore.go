@@ -64,9 +64,9 @@ func runRestore(dir string, args []string, stdout io.Writer) error {
 				return errors.New("restore: --span needs value")
 			}
 			i++
-			n, err := strconv.Atoi(args[i])
+			n, err := strconv.Atoi(args[i]) //nolint:gosec // G602: i+1 < len(args) checked above
 			if err != nil || n <= 0 {
-				return fmt.Errorf("restore: --span wants a positive number, got %q", args[i])
+				return fmt.Errorf("restore: --span wants a positive number, got %q", args[i]) //nolint:gosec // G602: i+1 < len(args) checked above
 			}
 			want = n
 		case "-o", "--out":
@@ -74,7 +74,7 @@ func runRestore(dir string, args []string, stdout io.Writer) error {
 				return errors.New("restore: -o needs value")
 			}
 			i++
-			out = args[i]
+			out = args[i] //nolint:gosec // G602: i+1 < len(args) checked above
 		default:
 			if strings.HasPrefix(args[i], "-") {
 				return unknownFlag("restore", args[i], restoreFlags)

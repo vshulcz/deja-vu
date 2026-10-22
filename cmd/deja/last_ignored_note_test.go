@@ -16,9 +16,9 @@ import (
 func TestLastSaysWhatTheIgnoreRuleWithheld(t *testing.T) {
 	tmp := hermeticEnv(t)
 	claude := filepath.Join(tmp, "claude")
-	real := filepath.Join(claude, "projects", "-tmp-app")
+	realDir := filepath.Join(claude, "projects", "-tmp-app")
 	jobs := filepath.Join(claude, ".claude", "jobs", "abc", "projects", "-tmp-app")
-	for _, d := range []string{real, jobs} {
+	for _, d := range []string{realDir, jobs} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -34,7 +34,7 @@ func TestLastSaysWhatTheIgnoreRuleWithheld(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	write(real, "keeper", "the pool starves under load", 2*time.Hour)
+	write(realDir, "keeper", "the pool starves under load", 2*time.Hour)
 	for i, sid := range []string{"scratch1", "scratch2", "scratch3"} {
 		write(jobs, sid, "one-shot question "+sid, time.Duration(i+1)*time.Hour)
 	}

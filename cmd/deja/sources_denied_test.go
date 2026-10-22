@@ -34,7 +34,7 @@ func TestSourcesSaysWhenAStoreCannotBeRead(t *testing.T) {
 		t.Fatalf("a readable store was reported as locked: %q", line)
 	}
 
-	if err := os.Chmod(filepath.Join(qwen, "projects"), 0o000); err != nil {
+	if err = os.Chmod(filepath.Join(qwen, "projects"), 0o000); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(filepath.Join(qwen, "projects"), 0o755) })

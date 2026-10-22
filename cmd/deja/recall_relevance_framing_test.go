@@ -88,7 +88,10 @@ func TestTheCountLineDoesNotEchoAWholeTranscriptBack(t *testing.T) {
 func TestALongQueryStillLeavesRoomForTheLineThatSaysHowToPage(t *testing.T) {
 	dir := manySessionStore(t, 40)
 	q := "parser rejects frames the pipeline stalled " + strings.Repeat("and the retry budget was exhausted ", 4)
-	arg, _ := json.Marshal(map[string]any{"query": q, "limit": 3})
+	arg, err := json.Marshal(map[string]any{"query": q, "limit": 3})
+	if err != nil {
+		t.Fatal(err)
+	}
 	text, err := callMCPTool(dir, "recall", arg)
 	if err != nil {
 		t.Fatal(err)

@@ -103,7 +103,7 @@ await pack(b);
 	if err := os.WriteFile(run, []byte(driver), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := exec.Command(node, run).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), node, run).CombinedOutput(); err != nil {
 		t.Fatalf("driving the plugin: %v\n%s", err, out)
 	}
 	got := readFile(t, calls)

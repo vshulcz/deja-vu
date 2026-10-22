@@ -35,25 +35,25 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 				return errors.New("promote: --state needs a value")
 			}
 			i++
-			state = strings.ToLower(args[i])
+			state = strings.ToLower(args[i]) //nolint:gosec // G602: i+1 < len(args) checked above
 		case "--note":
 			if i+1 >= len(args) {
 				return errors.New("promote: --note needs text")
 			}
 			i++
-			noteText = args[i]
+			noteText = args[i] //nolint:gosec // G602: i+1 < len(args) checked above
 		case "--to":
 			if i+1 >= len(args) {
 				return errors.New("promote: --to needs a path")
 			}
 			i++
-			exportPath = args[i]
+			exportPath = args[i] //nolint:gosec // G602: i+1 < len(args) checked above
 		case "--tag":
 			if i+1 >= len(args) {
 				return errors.New("promote: --tag needs a value")
 			}
 			i++
-			tags = append(tags, args[i])
+			tags = append(tags, args[i]) //nolint:gosec // G602: i+1 < len(args) checked above
 		default:
 			if strings.HasPrefix(args[i], "-") {
 				return unknownFlag("promote", args[i], promoteFlags)

@@ -96,7 +96,7 @@ func TestOpencodePluginNamesTheParentOfASubAgent(t *testing.T) {
 	}
 	dir := t.TempDir()
 	plugin := filepath.Join(dir, "deja.mjs")
-	if err := os.WriteFile(plugin, []byte(opencodeLegacyPluginJS("/usr/local/bin/deja")), 0o644); err != nil {
+	if err = os.WriteFile(plugin, []byte(opencodeLegacyPluginJS("/usr/local/bin/deja")), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	driver := `
@@ -117,10 +117,10 @@ await hooks["experimental.chat.messages.transform"]({ sessionID: "ses_child" },
 for (const c of ran) console.log(c.includes("hook-context") ? "context:" + c : c.includes("hook-prompt") ? "prompt:" + c : "other:" + c);
 `
 	run := filepath.Join(dir, "drive.mjs")
-	if err := os.WriteFile(run, []byte(driver), 0o644); err != nil {
+	if err = os.WriteFile(run, []byte(driver), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	out, err := exec.Command(node, run).CombinedOutput()
+	out, err := exec.CommandContext(t.Context(), node, run).CombinedOutput()
 	if err != nil {
 		t.Fatalf("driving the plugin: %v\n%s", err, out)
 	}

@@ -128,7 +128,11 @@ func TestKimiManifestsAgree(t *testing.T) {
 	// prefix appears in paths and nowhere else — a description mentioning it
 	// would be rewritten too, and the comparison would pass on a difference.
 	for _, key := range []string{"description", "homepage", "keywords", "interface", "author"} {
-		if b, _ := json.Marshal(root[key]); strings.Contains(string(b), "extensions/kimi") {
+		b, err := json.Marshal(root[key])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(b), "extensions/kimi") {
 			t.Fatalf("%s mentions the path prefix, which the comparison rewrites: %s", key, b)
 		}
 	}

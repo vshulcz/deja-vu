@@ -59,8 +59,9 @@ func continueTargets(lookPath func(string) (string, error), used map[string]int)
 	if lookPath == nil {
 		lookPath = exec.LookPath
 	}
-	var out []continueTarget
-	for _, id := range handoffTargets() {
+	targets := handoffTargets()
+	out := make([]continueTarget, 0, len(targets)+len(handoffPasteOnly))
+	for _, id := range targets {
 		t := continueTarget{id: id}
 		if argv, ok := handoffCommand(id, ""); ok && len(argv) > 0 {
 			_, err := lookPath(argv[0])

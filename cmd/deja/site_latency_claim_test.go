@@ -18,7 +18,7 @@ func TestNothingOutsideTheReadmePromisesSubMillisecond(t *testing.T) {
 	var offenders []string
 	err := filepath.Walk(root, func(p string, fi os.FileInfo, err error) error {
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // an unreadable entry is skipped, not a failure
 		}
 		if fi.IsDir() {
 			switch fi.Name() {
@@ -36,9 +36,9 @@ func TestNothingOutsideTheReadmePromisesSubMillisecond(t *testing.T) {
 		if strings.Contains(p, "CHANGELOG") {
 			return nil
 		}
-		b, rerr := os.ReadFile(p)
+		b, rerr := os.ReadFile(p) //nolint:gosec // reads the repo's own checked-in tree
 		if rerr != nil {
-			return nil
+			return nil //nolint:nilerr // an unreadable file is skipped, not a failure
 		}
 		text := string(b)
 		for _, claim := range []string{"sub-millisecond", "亚毫秒", "under a millisecond", "in under a millisecond"} {

@@ -310,7 +310,7 @@ func (a *tuiApp) handleReader(ev tui.Event) {
 	if ev.Kind != tui.EvKey {
 		return
 	}
-	switch ev.Key {
+	switch ev.Key { //nolint:exhaustive // other keys do nothing here
 	case tui.KeyUp:
 		r.top--
 	case tui.KeyDown:

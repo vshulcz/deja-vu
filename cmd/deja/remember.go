@@ -50,7 +50,7 @@ func runRemember(dir string, args []string) error {
 			if i+1 >= len(args) {
 				return errors.New("remember: --project needs value")
 			}
-			project = args[i+1]
+			project = args[i+1] //nolint:gosec // G602: i+1 < len(args) checked above
 			i++
 			continue
 		}
@@ -58,7 +58,7 @@ func runRemember(dir string, args []string) error {
 			if i+1 >= len(args) {
 				return errors.New("remember: --tag needs value")
 			}
-			tags = append(tags, args[i+1])
+			tags = append(tags, args[i+1]) //nolint:gosec // G602: i+1 < len(args) checked above
 			i++
 			continue
 		}
@@ -72,7 +72,7 @@ func runRemember(dir string, args []string) error {
 			if text != "" {
 				return errors.New("remember: expected one text argument — quote the note: deja remember \"the whole note\"")
 			}
-			text = args[i+1]
+			text = args[i+1] //nolint:gosec // G602: i+1 < len(args) checked above
 			i++
 			continue
 		}

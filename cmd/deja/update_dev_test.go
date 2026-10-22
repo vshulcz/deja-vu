@@ -16,7 +16,7 @@ func TestPerformUpdateLeavesADevBuildAlone(t *testing.T) {
 	if err := os.WriteFile(target, []byte("source build"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	download, requests := newUpdateDownloader(t, "1.2.0", "linux", "amd64", []byte("release binary"), false)
+	download, requests := newUpdateDownloader(t, "linux", []byte("release binary"), false)
 
 	var out bytes.Buffer
 	if err := performUpdate(updateConfig{
@@ -46,7 +46,7 @@ func TestPerformUpdateForcedOnADevBuild(t *testing.T) {
 	if err := os.WriteFile(target, []byte("source build"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	download, _ := newUpdateDownloader(t, "1.2.0", "linux", "amd64", []byte("release binary"), false)
+	download, _ := newUpdateDownloader(t, "linux", []byte("release binary"), false)
 
 	var out bytes.Buffer
 	if err := performUpdate(updateConfig{

@@ -55,7 +55,7 @@ func TestTheOptionalSessionKeysAreDocumentedToo(t *testing.T) {
 	var report struct {
 		Sessions []map[string]any `json:"sessions"`
 	}
-	if err := json.Unmarshal([]byte(out), &report); err != nil {
+	if err = json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatal(err)
 	}
 	emitted := map[string]any{}

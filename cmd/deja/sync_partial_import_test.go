@@ -55,7 +55,7 @@ func TestAnInterruptedTransferImportsWhatArrivedAndNamesWhatDidNot(t *testing.T)
 
 	// And the store agrees with the report: the whole batch is in, the cut one
 	// is not.
-	if err := index.Ensure(dir, "", true, nil); err != nil {
+	if err = index.Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	listed, err := captureRun(t, "last", "10")

@@ -13,7 +13,7 @@ import (
 // entire message list: one call on a common path returned 495 KB into an
 // agent's context, against the ~4 KB the other tools answer in.
 func TestMCPBlameLeavesTheTranscriptBehind(t *testing.T) {
-	var msgs []model.Message
+	msgs := make([]model.Message, 0, 200)
 	for range 200 {
 		msgs = append(msgs, model.Message{Role: "assistant", Text: strings.Repeat("x", 500)})
 	}

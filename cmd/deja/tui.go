@@ -351,7 +351,7 @@ func (a *tuiApp) loadHome() {
 		a.agentsHere = tuiAgentCounts(here)
 	}
 	var ss []model.Session
-	total := 0
+	var total int
 	switch a.scope {
 	case scopeKept:
 		ss, total = a.kept, len(a.kept)

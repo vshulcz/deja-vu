@@ -18,8 +18,9 @@ func TestDoctorDropsTheStoresDejaStoresSilences(t *testing.T) {
 	}
 
 	t.Setenv(sources.StoresEnv, "claude,notes")
-	var got []string
-	for _, c := range doctorStoreChecks() {
+	checks := doctorStoreChecks()
+	got := make([]string, 0, len(checks))
+	for _, c := range checks {
 		got = append(got, c.name)
 	}
 	if len(got) != 2 {

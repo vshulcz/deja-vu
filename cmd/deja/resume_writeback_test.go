@@ -77,7 +77,7 @@ func TestResumeWriteBackRestoresADeletedClaudeSession(t *testing.T) {
 	// Run again: the file is there, nothing is rewritten.
 	before, _ := os.Stat(path)
 	out.Reset()
-	if err := runResume(dir, []string{id, "--write-back"}, &out); err != nil {
+	if err = runResume(dir, []string{id, "--write-back"}, &out); err != nil {
 		t.Fatal(err)
 	}
 	after, _ := os.Stat(path)
@@ -93,14 +93,14 @@ func TestResumeWriteBackRestoresADeletedClaudeSession(t *testing.T) {
 	}
 	_, _ = f.WriteString(`{"type":"user","sessionId":"` + id + `","uuid":"u3","parentUuid":"x","timestamp":"2026-10-02T10:00:00Z","message":{"role":"user","content":"is the cap raised"}}` + "\n")
 	_ = f.Close()
-	if err := index.Ensure(dir, "", false, nil); err != nil {
+	if err = index.Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	s, ok, err := index.FindByPrefix(dir, id)
 	if err != nil || !ok {
 		t.Fatalf("session gone from the index: %v", err)
 	}
-	var roles []string
+	roles := make([]string, 0, len(s.Messages))
 	for _, m := range s.Messages {
 		roles = append(roles, m.Role)
 	}

@@ -58,7 +58,7 @@ func TestStatsNamesTheFilterThatEmptiedIt(t *testing.T) {
 	// And an index with nothing in it keeps the advice that fits it, filter or
 	// no filter — there the build is exactly what is missing.
 	hermeticEnv(t)
-	if err := index.Ensure(filepath.Join(t.TempDir(), "index.db"), "", false, nil); err != nil {
+	if err = index.Ensure(filepath.Join(t.TempDir(), "index.db"), "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	out, err = captureRun(t, "stats", "--since", "30d")

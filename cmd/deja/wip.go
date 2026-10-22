@@ -75,7 +75,7 @@ func runWIP(dir string, args []string, stdout io.Writer) error {
 	if !ok {
 		if n, err := index.SessionCount(dir); err != nil || n == 0 {
 			fmt.Fprintln(stdout, emptyIndexHint("no session to pick up"))
-			return nil
+			return nil //nolint:nilerr // an unreadable index reads as empty, the hint says so
 		}
 		fmt.Fprintln(stdout, "deja: no session in this project to pick up")
 		return nil

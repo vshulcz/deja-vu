@@ -190,8 +190,8 @@ func syncSSHPush(dir, host string, full bool) (err error) {
 		phases.finishPhase()
 	}()
 	phases.start("indexing what changed")
-	if err := index.EnsureForSearch(dir, search.Options{All: true}, false, os.Stderr); err != nil {
-		return err
+	if ensureErr := index.EnsureForSearch(dir, search.Options{All: true}, false, os.Stderr); ensureErr != nil {
+		return ensureErr
 	}
 	tmp, err := os.MkdirTemp("", "deja-sync-")
 	if err != nil {
@@ -239,8 +239,8 @@ func syncSSHPush(dir, host string, full bool) (err error) {
 	for _, chunk := range scpChunks(batches, sshArgsBudget(sshOpts(), host, rtmp)) {
 		scpArgs := append(append(sshOpts(), "-q"), chunk...)
 		scpArgs = append(scpArgs, host+":"+rtmp+"/")
-		if out, err := sshRunner("scp", scpArgs...); err != nil {
-			return fmt.Errorf("scp: %v: %s", err, remoteOutputForEcho(out))
+		if scpOut, scpErr := sshRunner("scp", scpArgs...); scpErr != nil {
+			return fmt.Errorf("scp: %w: %s", scpErr, remoteOutputForEcho(scpOut))
 		}
 	}
 	remote := fmt.Sprintf(`d=$(command -v deja || echo "$HOME/.local/bin/deja"); "$d" sync import %s; rc=$?; rm -rf %s; exit $rc`,
@@ -255,7 +255,7 @@ func syncSSHPush(dir, host string, full bool) (err error) {
 	streamed := restore()
 	out = strings.TrimSpace(out)
 	if err != nil {
-		return fmt.Errorf("remote import: %v: %s", err, remoteOutputForEcho(out))
+		return fmt.Errorf("remote import: %w: %s", err, remoteOutputForEcho(out))
 	}
 	if err := commit(); err != nil {
 		return fmt.Errorf("delivered, but recording watermarks failed (next push may resend; harmless — import dedupes): %w", err)
@@ -320,7 +320,7 @@ func syncSSHPull(dir, host string, full bool) (err error) {
 		out = strings.TrimSpace(out)
 	}
 	if err != nil {
-		return fmt.Errorf("remote export: %v: %s", err, remoteOutputForEcho(out))
+		return fmt.Errorf("remote export: %w: %s", err, remoteOutputForEcho(out))
 	}
 	if out != "" {
 		fmt.Fprintf(os.Stdout, "%s: %s\n", hostForEcho(host), remoteOutputForEcho(out))
@@ -340,13 +340,13 @@ func syncSSHPull(dir, host string, full bool) (err error) {
 	}
 	defer os.RemoveAll(ltmp)
 	phases.start("transferring from %s", hostForEcho(host))
-	if out, err := sshRunner("scp", append(sshOpts(), "-q", host+":"+rtmp+"/*.jsonl", ltmp+"/")...); err != nil {
+	if scpOut, scpErr := sshRunner("scp", append(sshOpts(), "-q", host+":"+rtmp+"/*.jsonl", ltmp+"/")...); scpErr != nil {
 		cleanup()
 		// The host stays as written here: the sentence hands over a command to
 		// paste, and a bounded name would name no machine. Same tension as the
 		// tombstone id in #1794.
-		return fmt.Errorf("scp: %v: %s — the remote already advanced its watermark for this batch; recover it with `deja sync ssh %s --pull --full`",
-			err, remoteOutputForEcho(out), pasteSafe(host))
+		return fmt.Errorf("scp: %w: %s — the remote already advanced its watermark for this batch; recover it with `deja sync ssh %s --pull --full`",
+			scpErr, remoteOutputForEcho(scpOut), pasteSafe(host))
 	}
 	cleanup()
 	// Taken before the import so only what this exchange brings is attributed
@@ -368,7 +368,7 @@ func sshCapture(host, cmd string) (string, error) {
 	out, err := sshRunner("ssh", append(sshOpts(), host, cmd)...)
 	s := strings.TrimSpace(out)
 	if err != nil {
-		return "", fmt.Errorf("ssh %s: %v: %s", hostForEcho(host), err, remoteOutputForEcho(s))
+		return "", fmt.Errorf("ssh %s: %w: %s", hostForEcho(host), err, remoteOutputForEcho(s))
 	}
 	// A remote that still prints something conversational on stdout (motd,
 	// profile chatter) leaves the useful value on the last line.
@@ -429,7 +429,7 @@ func sshArgsBudget(opts []string, host, rtmp string) int {
 // send it would be worse than letting the platform complain about that one.
 func scpChunks(paths []string, budget int) [][]string {
 	var out [][]string
-	var cur []string
+	cur := make([]string, 0, len(paths))
 	n := 0
 	for _, p := range paths {
 		cost := len(p) + 1

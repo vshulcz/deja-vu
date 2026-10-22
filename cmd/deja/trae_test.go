@@ -60,7 +60,10 @@ func TestDoctorReportsTheTraeStore(t *testing.T) {
 			continue
 		}
 		found = true
-		b, _ := json.Marshal(c.paths)
+		b, err := json.Marshal(c.paths)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if len(c.files) != 2 || !strings.Contains(string(b), "trae") {
 			t.Errorf("trae store check = %d files at %s, want 2 under the trae root", len(c.files), b)
 		}

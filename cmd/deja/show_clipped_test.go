@@ -79,7 +79,7 @@ func TestShowClippedNoteStaysOnTheSessionThatHoldsIt(t *testing.T) {
 		row("44444444-0000-4000-8000-000000000004", "fix the retry loop", "the loop now stops after three tries") +
 		row("55555555-0000-4000-8000-000000000005", strings.Repeat("a", 64*1024), "a paste exactly at the cap, kept whole")
 	db := filepath.Join(tmp, "threads.db")
-	cmd := exec.Command("sqlite3", db)
+	cmd := exec.CommandContext(t.Context(), "sqlite3", db)
 	cmd.Stdin = strings.NewReader(sql)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("create sqlite fixture: %v: %s", err, out)

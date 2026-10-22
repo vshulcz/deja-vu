@@ -31,14 +31,14 @@ func TestLastHonoursTheTrustPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), append(b, '\n'), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), append(b, '\n'), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	dir := filepath.Join(tmp, "index.db")
-	if err := index.Ensure(dir, "", false, nil); err != nil {
+	if err = index.Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := captureRun(t, "sync", "import", exp); err != nil {
+	if _, err = captureRun(t, "sync", "import", exp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -53,7 +53,7 @@ func TestLastHonoursTheTrustPolicy(t *testing.T) {
 	}
 
 	policyFile := filepath.Join(tmp, "policy.json")
-	if err := os.WriteFile(policyFile, []byte(`{"activations":{"search":{"local":true,"imported":false}}}`), 0o644); err != nil {
+	if err = os.WriteFile(policyFile, []byte(`{"activations":{"search":{"local":true,"imported":false}}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_POLICY_FILE", policyFile)
@@ -100,18 +100,18 @@ func TestLastEmptiedByPolicyDoesNotAdviseAnIndexRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), append(b, '\n'), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), append(b, '\n'), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	dir := filepath.Join(tmp, "index.db")
-	if err := index.Ensure(dir, "", false, nil); err != nil {
+	if err = index.Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := captureRun(t, "sync", "import", exp); err != nil {
+	if _, err = captureRun(t, "sync", "import", exp); err != nil {
 		t.Fatal(err)
 	}
 	policyFile := filepath.Join(tmp, "policy.json")
-	if err := os.WriteFile(policyFile, []byte(`{"activations":{"search":{"local":true,"imported":false}}}`), 0o644); err != nil {
+	if err = os.WriteFile(policyFile, []byte(`{"activations":{"search":{"local":true,"imported":false}}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_POLICY_FILE", policyFile)

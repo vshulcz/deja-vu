@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -69,12 +70,12 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 	// Naming an exact id is still browsing under the search activation, so a
 	// session a trust rule withholds must not be reopenable here any more than
 	// through show, share, promote or handoff (#1026).
-	if err := denyPolicyHidden(prefix, s, os.Stderr); err != nil {
-		return err
+	if denyErr := denyPolicyHidden(prefix, s, os.Stderr); denyErr != nil {
+		return denyErr
 	}
 	if app {
-		if err := resumeGoneError(s); err != nil {
-			return err
+		if goneErr := resumeGoneError(s); goneErr != nil {
+			return goneErr
 		}
 		return openInCodexApp(s, runtime.GOOS)
 	}
@@ -95,8 +96,8 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 		}
 		return err
 	}
-	if err := resumeGoneError(s); err != nil {
-		return err
+	if goneErr := resumeGoneError(s); goneErr != nil {
+		return goneErr
 	}
 	if note := resumeDirGoneNote(s, dir); note != "" {
 		fmt.Fprintf(os.Stderr, "deja: %s\n", note)
@@ -126,7 +127,7 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	c := exec.Command(parts[0], parts[1:]...)
+	c := exec.CommandContext(context.Background(), parts[0], parts[1:]...)
 	if dir != "" {
 		c.Dir = dir
 	}
@@ -142,10 +143,10 @@ func openInCodexApp(s model.Session, goos string) error {
 		return err
 	}
 	fmt.Fprintf(os.Stderr, "deja: opening %s in the ChatGPT app\n", digest.Short(s.ID))
-	c := exec.Command(argv[0], argv[1:]...)
+	c := exec.CommandContext(context.Background(), argv[0], argv[1:]...)
 	c.Stderr = os.Stderr
 	if err := c.Run(); err != nil {
-		return fmt.Errorf("the ChatGPT app did not open it (%v) — an app too old to take codex:// links does this; `deja resume %s` prints the codex command", err, s.ID)
+		return fmt.Errorf("the ChatGPT app did not open it (%w) — an app too old to take codex:// links does this; `deja resume %s` prints the codex command", err, s.ID)
 	}
 	return nil
 }

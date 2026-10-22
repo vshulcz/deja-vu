@@ -34,7 +34,7 @@ func updateInto(t *testing.T, dir string) {
 	}
 }
 
-func strandStaging(t *testing.T, dir, name string, age time.Duration) string {
+func strandStaging(t *testing.T, dir, name string, age time.Duration) {
 	t.Helper()
 	p := filepath.Join(dir, name)
 	if err := os.WriteFile(p, make([]byte, 4096), 0o600); err != nil {
@@ -44,7 +44,6 @@ func strandStaging(t *testing.T, dir, name string, age time.Duration) string {
 	if err := os.Chtimes(p, when, when); err != nil {
 		t.Fatal(err)
 	}
-	return p
 }
 
 // An update killed between staging and rename strands a binary's worth of bytes

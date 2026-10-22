@@ -23,7 +23,7 @@ func TestRebuildWindowErrorNamesTheRebuild(t *testing.T) {
 	missing := &fs.PathError{Op: "open", Path: filepath.Join(dir, "manifest.gob"), Err: fs.ErrNotExist}
 
 	// Nobody holding the lock: the error is what it says it is.
-	if got := rebuildWindowError(missing); got != error(missing) {
+	if got := rebuildWindowError(missing); got != error(missing) { //nolint:errorlint // the same error, not one wrapping it
 		t.Errorf("with no rebuild running: %v", got)
 	}
 
@@ -43,7 +43,7 @@ func TestRebuildWindowErrorNamesTheRebuild(t *testing.T) {
 	other := errors.New("i/o error")
 	rebuildInProgress = func(string) bool { return true }
 	defer func() { rebuildInProgress = old }()
-	if got := rebuildWindowError(other); got != other {
+	if got := rebuildWindowError(other); got != other { //nolint:errorlint // the same error, not one wrapping it
 		t.Errorf("an unrelated error was rewritten during a rebuild: %v", got)
 	}
 }

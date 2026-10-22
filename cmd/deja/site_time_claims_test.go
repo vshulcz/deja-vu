@@ -12,7 +12,7 @@ import (
 
 // datedStore writes sessions with identical text at the given ages, so nothing
 // but the timestamp can decide how they rank.
-func datedStore(t *testing.T, stamps map[string]string) string {
+func datedStore(t *testing.T, stamps map[string]string) {
 	t.Helper()
 	tmp := hermeticEnv(t)
 	root := filepath.Join(tmp, "claude", "-tmp-projm")
@@ -27,11 +27,9 @@ func datedStore(t *testing.T, stamps map[string]string) string {
 			t.Fatal(err)
 		}
 	}
-	dir := index.DefaultDir()
-	if err := index.Ensure(dir, "", true, nil); err != nil {
+	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
 		t.Fatal(err)
 	}
-	return dir
 }
 
 func firstHitID(t *testing.T, out string, ids ...string) string {
@@ -53,7 +51,7 @@ func firstHitID(t *testing.T, out string, ids ...string) string {
 func TestTimeHintsRankOnlyTheNoExactMatchFallback(t *testing.T) {
 	now := time.Now()
 	lastMonth := now.AddDate(0, -1, 0)
-	dir := datedStore(t, map[string]string{
+	datedStore(t, map[string]string{
 		// Dated in the same calendar deja reads "last month" in — the local
 		// one. Formatted through UTC and taken two hours back, the newest
 		// session landed in the previous month whenever the run happened early
@@ -63,7 +61,6 @@ func TestTimeHintsRankOnlyTheNoExactMatchFallback(t *testing.T) {
 		"m_last": lastMonth.Format("2006-01-02") + "T10:00:00Z",
 		"m_now":  now.Format("2006-01-02") + "T10:00:00Z",
 	})
-	_ = dir
 
 	// Baseline: nothing but recency.
 	base, err := captureRun(t, "search", "invoice exporter")
@@ -99,11 +96,10 @@ func TestTimeHintsRankOnlyTheNoExactMatchFallback(t *testing.T) {
 // "no matches" on a store where every session carries that year.
 func TestBareYearFindsNothingWhileTheYearStillRanks(t *testing.T) {
 	year := time.Now().AddDate(-2, 0, 0).Format("2006")
-	dir := datedStore(t, map[string]string{
+	datedStore(t, map[string]string{
 		"y_old": year + "-05-14T10:00:00Z",
 		"y_new": time.Now().Add(-2*time.Hour).UTC().Format("2006-01-02") + "T10:00:00Z",
 	})
-	_ = dir
 
 	// With content words the year selects; this is what makes it a real token.
 	out, err := captureRun(t, "search", "invoice exporter "+year)

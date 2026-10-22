@@ -21,8 +21,11 @@ func TestResumeReasonix(t *testing.T) {
 		t.Fatal(err)
 	}
 	path := filepath.Join(dir, "20260920-101000.000000000-deepseek-chat.jsonl")
-	meta, _ := json.Marshal(map[string]any{"workspace_root": ws})
-	if err := os.WriteFile(path+".meta", meta, 0o644); err != nil {
+	meta, err := json.Marshal(map[string]any{"workspace_root": ws})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(path+".meta", meta, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	id := "20260920-101000.000000000-deepseek-chat"
@@ -68,8 +71,14 @@ func TestResumeReasonixV4(t *testing.T) {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
 		}
-		m, _ := json.Marshal(map[string]any{"codec": "reasonix.session.linear/v4", "sessionId": filepath.Base(dir)})
-		h, _ := json.Marshal(map[string]any{"cwd": ws})
+		m, err := json.Marshal(map[string]any{"codec": "reasonix.session.linear/v4", "sessionId": filepath.Base(dir)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		h, err := json.Marshal(map[string]any{"cwd": ws})
+		if err != nil {
+			t.Fatal(err)
+		}
 		for name, body := range map[string][]byte{"manifest.json": m, "header.json": h, "events.frames": nil} {
 			if err := os.WriteFile(filepath.Join(dir, name), body, 0o644); err != nil {
 				t.Fatal(err)

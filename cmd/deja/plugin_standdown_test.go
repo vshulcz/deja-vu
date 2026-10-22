@@ -19,7 +19,7 @@ func runPluginBridge(t *testing.T, script string) bool {
 	if err := os.WriteFile(filepath.Join(bin, "deja"), []byte(fake), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("sh", filepath.Join("..", "..", script), "hook-context")
+	cmd := exec.CommandContext(t.Context(), "sh", filepath.Join("..", "..", script), "hook-context")
 	cmd.Env = append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+"/usr/bin:/bin")
 	cmd.Stdin = strings.NewReader("{}")
 	if out, err := cmd.CombinedOutput(); err != nil {

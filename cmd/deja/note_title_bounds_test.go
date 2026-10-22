@@ -33,10 +33,10 @@ func TestEverySurfaceThatPrintsANoteTitleBoundsIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(notes, append(line, '\n'), 0o644); err != nil {
+	if err = os.WriteFile(notes, append(line, '\n'), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := captureRun(t, "index"); err != nil {
+	if _, err = captureRun(t, "index"); err != nil {
 		t.Fatal(err)
 	}
 	// The premise: the title really is unbounded in the index, which is what

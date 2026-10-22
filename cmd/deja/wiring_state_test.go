@@ -34,12 +34,15 @@ func TestWiringRefreshesAfterUpgrade(t *testing.T) {
 			"type": "command", "command": "/old/deja hook-context", "timeout": 10,
 		}}}},
 	}}
-	b, _ := json.MarshalIndent(stale, "", "  ")
-	if err := os.WriteFile(settings, b, 0o644); err != nil {
+	b, err := json.MarshalIndent(stale, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(settings, b, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	statePath := wiringStatePath()
-	if err := os.WriteFile(statePath, []byte(`{"version":"0.14.0","targets":["qwen-auto"]}`), 0o644); err != nil {
+	if err = os.WriteFile(statePath, []byte(`{"version":"0.14.0","targets":["qwen-auto"]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

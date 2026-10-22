@@ -169,7 +169,7 @@ func TestReleaseNoticeLooksOnceADayAndPrintsWhatTheLookFound(t *testing.T) {
 	stamp := dir + ".release"
 	now := time.Unix(1_800_000_000, 0)
 	var spawned []string
-	spawn := func(s string) error { spawned = append(spawned, s); return nil }
+	spawn := func(s string) error { spawned = append(spawned, s); return nil } //nolint:unparam // matches startReleaseNotice's spawn
 	exe := "/usr/local/bin/deja"
 	runAt := func(at time.Time) string {
 		var out bytes.Buffer

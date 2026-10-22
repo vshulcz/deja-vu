@@ -153,17 +153,17 @@ func (a *tuiApp) drawSearch(l layout, y int) {
 			count += "+"
 		}
 	}
-	max := x1 - termwidth.Columns(count) - 2
+	limit := x1 - termwidth.Columns(count) - 2
 	x := 6
 	if len(a.query) == 0 {
 		if !a.listFocus {
-			x = p.Put(x, y, "▏", fgs(cAcc), max)
+			x = p.Put(x, y, "▏", fgs(cAcc), limit)
 		}
-		p.PutClip(x, y, "Search everything your agents ever did", fgs(cMuted), max)
+		p.PutClip(x, y, "Search everything your agents ever did", fgs(cMuted), limit)
 	} else {
-		x = a.drawQuery(x, y, max)
+		x = a.drawQuery(x, y, limit)
 		if !a.listFocus {
-			p.Put(x, y, "▏", fgs(cAcc), max+1)
+			p.Put(x, y, "▏", fgs(cAcc), limit+1)
 		}
 	}
 	p.Put(x1-termwidth.Columns(count)-1, y, count, fgs(cMuted), x1)
@@ -266,7 +266,7 @@ func (a *tuiApp) drawToast() {
 
 // drawCat paints the mascot in half blocks: one cell holds two pixel rows,
 // the upper as foreground and the lower as background.
-func (a *tuiApp) drawCat(x, y int, m mark.Mood) (w, h int) {
+func (a *tuiApp) drawCat(x, y int, m mark.Mood) {
 	g := mark.Grid(m)
 	for row := 0; row+1 < len(g); row += 2 {
 		for col := range g[row] {
@@ -282,11 +282,7 @@ func (a *tuiApp) drawCat(x, y int, m mark.Mood) (w, h int) {
 				a.p.Put(cx, cy, "▄", fgs(tui.Index256(bot)), a.p.W)
 			}
 		}
-		if len(g[row]) > w {
-			w = len(g[row])
-		}
 	}
-	return w, len(g) / 2
 }
 
 func (a *tuiApp) drawEmpty(l layout) {

@@ -55,7 +55,7 @@ func frameRecall(text string) string {
 	return recallFrameHeader + neutralizeFrameMarkers(text) + recallFrameFooter
 }
 
-// fitFramed joins blocks with sep and keeps the result within max bytes
+// fitFramed joins blocks with sep and keeps the result within limit bytes
 // without cutting through a frame. Cut after framing, a long reply ended inside
 // the block with `<deja-recall>` open and no close (#5051), and everything the
 // host put after it read as still inside. A block that does not fit whole is
@@ -63,10 +63,10 @@ func frameRecall(text string) string {
 // frame is dropped. A part already framed by its builder is unframed and
 // framed again around the shorter body, which needs no second pass of the
 // neutraliser: a prefix of neutralised text holds no marker.
-func fitFramed(parts []string, sep string, max int) string {
+func fitFramed(parts []string, sep string, limit int) string {
 	var b strings.Builder
 	for _, p := range parts {
-		room := max - b.Len()
+		room := limit - b.Len()
 		if b.Len() > 0 {
 			room -= len(sep)
 		}

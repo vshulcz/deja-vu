@@ -67,7 +67,7 @@ func (f *fileProgress) Advance(units int) {
 	f.flush(false)
 }
 
-func (f *fileProgress) Harness(name string, sessions, messages int) {
+func (f *fileProgress) Harness(_ string, _, messages int) {
 	if messages == 0 {
 		return
 	}

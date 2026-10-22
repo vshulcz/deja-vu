@@ -349,7 +349,7 @@ func piRules(dir string, overrides ...string) rulesFile {
 // block goes into whichever already wins. $CODEWHALE_HOME does not move it: a
 // stand with it set loaded nothing from the moved directory.
 func codeWhaleRulesPath() string {
-	var others []string
+	others := make([]string, 0, 6)
 	for _, name := range []string{"AGENTS.md", "instructions.md"} {
 		for _, dir := range []string{".codewhale", ".agents", ".deepseek"} {
 			others = append(others, filepath.Join(homeDir(), dir, name))
@@ -446,7 +446,7 @@ func rulesState(path, body string) (string, error) {
 	}
 	doc := string(bytes.TrimPrefix(b, utf8BOM))
 	if checkMarkerPairs(doc, rulesStart, rulesEnd, "rules") != nil {
-		return "unbounded", nil
+		return "unbounded", nil //nolint:nilerr // a lost marker is the "unbounded" state, not a failure
 	}
 	start, end := markerLines(doc, rulesStart, rulesEnd)
 	if start < 0 || end < 0 {

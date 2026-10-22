@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/xml"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -38,7 +39,7 @@ func TestRenderStatsCardDeterministicAndEscaped(t *testing.T) {
 	decoder := xml.NewDecoder(strings.NewReader(one))
 	for {
 		if _, err := decoder.Token(); err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			t.Fatalf("card is not XML: %v", err)

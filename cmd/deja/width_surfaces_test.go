@@ -19,7 +19,7 @@ func widthStore(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	var paths []string
+	paths := make([]string, 0, 2)
 	for _, rel := range []string{
 		"internal/application/partner/requests.go",
 		"internal/domain/partner/webhook_delivery.go",

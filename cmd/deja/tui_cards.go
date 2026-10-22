@@ -261,7 +261,7 @@ func (a *tuiApp) drawCard(l layout, i int, r tuiRow, y, minY, maxY int) {
 		y += 2
 		lines -= 2
 	}
-	for k := 0; k < lines; k++ {
+	for k := range lines {
 		yy := y + k
 		if yy < minY || yy >= maxY {
 			continue

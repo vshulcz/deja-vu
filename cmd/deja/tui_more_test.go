@@ -318,7 +318,7 @@ func TestThemeHeaderStaysApartFromThePageIn256Colours(t *testing.T) {
 	bg := regexp.MustCompile(`48;5;(\d+)`)
 	header := bg.FindStringSubmatch(lines[0])
 	page := "48;5;" + strconv.Itoa(tui.To256(cBase))
-	if header == nil || header[0] == page {
+	if len(header) == 0 || header[0] == page {
 		t.Errorf("light header bar fills with %v, the page with %s:\n%q", header, page, lines[0])
 	}
 	if !strings.Contains(strings.Join(lines[1:], "\n"), page) {

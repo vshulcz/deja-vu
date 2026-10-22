@@ -84,7 +84,7 @@ func TestRecallNamesTheFilesUnderTheBestHit(t *testing.T) {
 // Past the cap the line says how many it did not name, or a partial list reads
 // as the whole of it.
 func TestRecallCountsTheFilesItDidNotName(t *testing.T) {
-	var paths []string
+	paths := make([]string, 0, recallTouchedFiles+3)
 	for i := range recallTouchedFiles + 3 {
 		paths = append(paths, fmt.Sprintf("/w/app/pkg/file%02d.go", i))
 	}
@@ -123,7 +123,11 @@ func TestRecallCountsTheFilesItDidNotName(t *testing.T) {
 	// alone would pass while the list was wrong, and checking the list alone
 	// would pass while the count was.
 	var extra int
-	if _, err := fmt.Sscanf(got[strings.Index(got, "(+"):], "(+%d more)", &extra); err != nil {
+	cut := strings.Index(got, "(+")
+	if cut < 0 {
+		t.Fatalf("the line does not say how many of its %d paths it left out: %q", held, got)
+	}
+	if _, err := fmt.Sscanf(got[cut:], "(+%d more)", &extra); err != nil {
 		t.Fatalf("the line does not say how many of its %d paths it left out: %q", held, got)
 	}
 	if named != recallTouchedFiles {

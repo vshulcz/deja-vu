@@ -105,7 +105,7 @@ func TestResumeRefusesAHermesSessionDeletedInHermes(t *testing.T) {
 create table messages(id integer primary key, session_id text, role text, content text, timestamp real);
 insert into sessions values('20261001_181726_aaaaaa','/tmp/proj');
 insert into messages values(1,'20261001_181726_aaaaaa','user','hello',1);`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("seed: %v %s", err, out)
 	}
 	gone := model.Session{Harness: "hermes", ID: "20261001_181726_5aedef", Path: db}

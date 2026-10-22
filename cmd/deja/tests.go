@@ -68,9 +68,9 @@ func runTests(dir string, args []string, stdout io.Writer) error {
 				return errors.New("tests: --limit needs value")
 			}
 			i++
-			n, err := strconv.Atoi(args[i])
+			n, err := strconv.Atoi(args[i]) //nolint:gosec // i+1 < len(args) is checked above
 			if err != nil || n < 0 {
-				return fmt.Errorf("tests: --limit wants a number, got %q", args[i])
+				return fmt.Errorf("tests: --limit wants a number, got %q", args[i]) //nolint:gosec // i+1 < len(args) is checked above
 			}
 			limit = n
 		default:

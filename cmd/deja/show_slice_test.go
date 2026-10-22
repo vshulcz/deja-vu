@@ -58,7 +58,7 @@ func TestShowHonoursOffsetAndLimitInTextOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
-	var lines []string
+	lines := make([]string, 0, 10)
 	for i := range 10 {
 		lines = append(lines, `{"type":"user","sessionId":"ten","cwd":"/w/p","timestamp":"2026-07-21T10:0`+
 			string(rune('0'+i))+`:00Z","message":{"role":"user","content":"message number `+string(rune('0'+i))+`"}}`)

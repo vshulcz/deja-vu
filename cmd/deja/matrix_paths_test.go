@@ -32,7 +32,7 @@ func TestTheHarnessMatrixNamesEveryStorePath(t *testing.T) {
 			StorePaths []string `json:"store_paths"`
 		} `json:"harnesses"`
 	}
-	if err := json.Unmarshal(b, &reg); err != nil {
+	if err = json.Unmarshal(b, &reg); err != nil {
 		t.Fatal(err)
 	}
 	page, err := os.ReadFile(filepath.Join(root, "docs", "guide", "harnesses.html"))

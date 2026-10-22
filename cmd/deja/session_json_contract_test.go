@@ -108,7 +108,7 @@ func TestSessionJSONKeysAreDocumented(t *testing.T) {
 	if err := os.MkdirAll(store, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	var lines []string
+	lines := make([]string, 0, 4)
 	for i := range 4 {
 		role := "user"
 		if i%2 == 1 {

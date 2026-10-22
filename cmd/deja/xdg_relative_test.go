@@ -18,14 +18,7 @@ func TestRelativeXDGConfigHomeIsIgnored(t *testing.T) {
 		t.Fatal(err)
 	}
 	wd := t.TempDir()
-	prev, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(wd); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(prev) })
+	t.Chdir(wd)
 	t.Setenv("XDG_CONFIG_HOME", "relcfg")
 
 	if _, err := captureRun(t, "install", "claude-code"); err != nil {
@@ -72,14 +65,7 @@ func TestRelativeXDGConfigHomeIsIgnoredByEveryConfigFile(t *testing.T) {
 	writeClaudeTurn(t, filepath.Join(tmp, "claude", "w", "sess-1.jsonl"), "sess-1", "a turn to forget")
 	home := os.Getenv("HOME")
 	wd := t.TempDir()
-	prev, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(wd); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(prev) })
+	t.Chdir(wd)
 	t.Setenv("XDG_CONFIG_HOME", "relcfg")
 
 	if _, err := captureRun(t, "install", "aider", "--no-index"); err != nil {

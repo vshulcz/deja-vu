@@ -48,7 +48,7 @@ func TestSyncExportIntoAnUnwritableDirectorySaysWhatToFix(t *testing.T) {
 	}
 
 	// And the refusal left the watermarks alone: everything is still owed.
-	if err := os.Chmod(out, 0o700); err != nil {
+	if err = os.Chmod(out, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	n, err := index.Export(os.Getenv("DEJA_INDEX_DIR"), out)

@@ -17,7 +17,7 @@ func manySessions(t *testing.T, n int) {
 	for i := range n {
 		id := fmt.Sprintf("s%d", i)
 		writeClaudeFixture(t, filepath.Join(root, "-w-app", id+".jsonl"), id, []string{
-			fmt.Sprintf(`{"type":"user","sessionId":"%s","cwd":"/w/app","timestamp":"2026-07-01T10:%02d:00Z","message":{"role":"user","content":"the widget pipeline keeps stalling on shard %d"}}`, id, i%60, i),
+			fmt.Sprintf(`{"type":"user","sessionId":%q,"cwd":"/w/app","timestamp":"2026-07-01T10:%02d:00Z","message":{"role":"user","content":"the widget pipeline keeps stalling on shard %d"}}`, id, i%60, i),
 		})
 	}
 	if _, err := captureRun(t, "index"); err != nil {

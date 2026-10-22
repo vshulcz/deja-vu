@@ -53,10 +53,11 @@ func TestWhichJSONSurfacesCarryASchemaVersion(t *testing.T) {
 		run         func(t *testing.T) string
 		versionable bool
 	}{
-		{"deja log --json", func(t *testing.T) string { return runLogString(t, dir, "--json") }, false},
-		{"deja log --last --json", func(t *testing.T) string { return runLogString(t, dir, "--last", "--json") }, false},
-		{"deja last --json", func(t *testing.T) string { return captureRunString(t, "last", "3", "--json") }, true},
+		{"deja log --json", func(t *testing.T) string { t.Helper(); return runLogString(t, dir, "--json") }, false},
+		{"deja log --last --json", func(t *testing.T) string { t.Helper(); return runLogString(t, dir, "--last", "--json") }, false},
+		{"deja last --json", func(t *testing.T) string { t.Helper(); return captureRunString(t, "last", "3", "--json") }, true},
 		{"deja show <exact-id> --harness <name> --json", func(t *testing.T) string {
+			t.Helper()
 			return captureRunString(t, "show", "svterm", "--harness", "claude", "--json")
 		}, true},
 	} {

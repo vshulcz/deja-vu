@@ -142,16 +142,19 @@ func serveMCP(dir string, r io.Reader, w io.Writer) error {
 				srv.refuse(req.ID, -32600, "unsupported jsonrpc version "+req.JSONRPC+" — this server speaks 2.0")
 			} else if msg := rpcIDProblem(req); msg != "" {
 				srv.refuse(nil, -32600, msg)
-			} else if !isNotification(req.ID) && req.Method == "" {
-				srv.refuse(req.ID, -32600, "request has no method")
-			} else if !isNotification(req.ID) {
-				srv.serve(req)
-			} else if req.Method == "notifications/cancelled" {
-				srv.cancel(req.Params)
+			} else {
+				switch {
+				case !isNotification(req.ID) && req.Method == "":
+					srv.refuse(req.ID, -32600, "request has no method")
+				case !isNotification(req.ID):
+					srv.serve(req)
+				case req.Method == "notifications/cancelled":
+					srv.cancel(req.Params)
+				}
 			}
 		}
 		if err != nil {
-			if err != io.EOF && os.Getenv("DEJA_DEBUG") == "1" {
+			if !errors.Is(err, io.EOF) && os.Getenv("DEJA_DEBUG") == "1" {
 				fmt.Fprintf(os.Stderr, "deja mcp read error: %v\n", err)
 			}
 			// Input is over, but requests already read are still owed their
@@ -162,16 +165,16 @@ func serveMCP(dir string, r io.Reader, w io.Writer) error {
 	}
 }
 
-// readMCPLine reads one newline-delimited frame. A frame longer than max is
+// readMCPLine reads one newline-delimited frame. A frame longer than most is
 // drained and reported via overlong=true rather than buffered whole, so a
 // hostile or corrupt client can't exhaust memory or kill the loop.
-func readMCPLine(br *bufio.Reader, max int) (line []byte, overlong bool, err error) {
+func readMCPLine(br *bufio.Reader, most int) (line []byte, overlong bool, err error) {
 	for {
 		chunk, e := br.ReadSlice('\n')
-		if e == bufio.ErrBufferFull {
-			if len(line)+len(chunk) > max {
+		if errors.Is(e, bufio.ErrBufferFull) {
+			if len(line)+len(chunk) > most {
 				// Drain the rest of this overlong frame up to the next newline.
-				for e == bufio.ErrBufferFull {
+				for errors.Is(e, bufio.ErrBufferFull) {
 					_, e = br.ReadSlice('\n')
 				}
 				return nil, true, e
@@ -275,7 +278,7 @@ func asArgError(err error) error {
 }
 
 func writeRPCError(enc *json.Encoder, id any, code int, msg string) {
-	_ = enc.Encode(map[string]any{"jsonrpc": "2.0", "id": id, "error": map[string]any{"code": code, "message": msg}})
+	_ = enc.Encode(map[string]any{"jsonrpc": "2.0", "id": id, "error": map[string]any{"code": code, "message": msg}}) //nolint:errchkjson // a failed reply means the client is gone; there is no one left to tell
 }
 
 func toolText(text string) map[string]any {
@@ -319,7 +322,7 @@ func isJSONObject(raw json.RawMessage) bool {
 // jsonTypeName names a Go kind the way the tool schema does, so the message
 // matches what the caller was asked for rather than how it is stored.
 func jsonTypeName(k reflect.Kind) string {
-	switch k {
+	switch k { //nolint:exhaustive // the schema only names these; every other kind it accepts is a number
 	case reflect.String:
 		return "a string"
 	case reflect.Bool:
@@ -1004,7 +1007,7 @@ func mcpHow(dir, name string, raw json.RawMessage) (string, int, error) {
 	if len(entries) == 0 && hidden == 0 && ignored == 0 && len(scope) > 0 && strings.TrimSpace(a.Project) == "" {
 		wider, h2, i2, werr := howEntries(dir, strings.Fields(a.What), nil, policy.ActivationMCP)
 		if werr == nil && (len(wider) > 0 || h2 > 0 || i2 > 0) {
-			entries, hidden, ignored, scope = wider, h2, i2, nil
+			entries, hidden, ignored = wider, h2, i2
 		}
 	}
 	if len(entries) == 0 {
@@ -1544,7 +1547,7 @@ func twinSessionsFor(dir string) map[string][]string {
 }
 
 // recallTextResult keeps the four-value shape its callers and tests read.
-func recallTextResult(dir, q, harness string, limit, offset, budget int) (string, int, int64, []string, error) {
+func recallTextResult(dir, q, harness string, limit, offset, budget int) (string, int, int64, []string, error) { //nolint:unparam // same shape as recallTextResultFrom; fix_fallback.go and many tests call it
 	text, sessions, raw, ids, _, err := recallTextResultFrom(dir, q, harness, limit, offset, budget)
 	return text, sessions, raw, ids, err
 }
@@ -1599,7 +1602,7 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 	// by the rule the hooks use.
 	var pathScope []string
 	if p := strings.TrimSpace(project); filepath.IsAbs(p) {
-		if st, err := os.Stat(p); err == nil && st.IsDir() {
+		if st, statErr := os.Stat(p); statErr == nil && st.IsDir() {
 			pathScope = howScope(p, "", false)
 		}
 	}
@@ -1672,7 +1675,7 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 				about = about || unreadEstimated(pr)
 			}
 			result, o2, policyHidden = pr, po2, phidden
-			hits = append(ph, rest...)
+			hits = slices.Concat(ph, rest)
 		}
 	}
 	o = o2
@@ -1764,20 +1767,21 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 	// the absent-word case can say it from wherever the chain stopped without
 	// saying it twice.
 	saidNothing := false
-	if result.Stemmed {
+	switch {
+	case result.Stemmed:
 		fmt.Fprintf(&b, "No exact match; using word forms: %s\n", strings.Join(fuzzySummary(result.Variants), ", "))
-	} else if result.Fuzzy {
+	case result.Fuzzy:
 		fmt.Fprintf(&b, "No exact match; using close spellings: %s\n", strings.Join(fuzzySummary(result.Variants), ", "))
-	} else if result.Tier == search.TierError {
+	case result.Tier == search.TierError:
 		fmt.Fprintln(&b, "No exact match; these sessions hit the same error (matched by signature).")
-	} else if result.Directory != "" && strictShown == 0 {
+	case result.Directory != "" && strictShown == 0:
 		// The file was asked about, nothing names it, and these sessions are
 		// about the directory it sits in. "No session is about this" over a
 		// rule set for that directory read as "nothing applies", and the
 		// agent changed the file without the check the rule asked for (#4762).
 		fmt.Fprintf(&b, "Nothing in history names that file; sessions about its directory %s come first. A rule set for the directory may apply to this change, so check whether it still holds before acting on it.\n", recallListingLine(result.Directory))
 		namesTheAsked = true
-	} else if strictShown > 0 {
+	case strictShown > 0:
 		// Before every heuristic below it, because this one is a fact about
 		// the answer rather than a reading of its wording: these sessions
 		// were matched, not ranked, and the relevance label they arrive
@@ -1785,14 +1789,14 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 		// underneath it (#3815).
 		fmt.Fprintf(&b, "%s below %s every word of the query; the rest are ranked by wording. Check that one describes what is happening now before acting on it.\n",
 			pluralSessions(strictShown), holdOrHolds(strictShown))
-	} else if namesTheAsked {
+	case namesTheAsked:
 		// The same reading recall_context got in #2831: the tier says the
 		// exact match failed, not that the answer is unrelated. On a store
 		// with competition an ordinary question rarely survives the exact AND,
 		// so the sentence below disowned pages whose first session was the
 		// right one (#2827).
 		fmt.Fprintln(&b, "No session matched every word, so these were ranked — the first one names what you asked about. Check that it describes what is happening now before acting on it.")
-	} else if result.Tier == search.TierRelevance {
+	case result.Tier == search.TierRelevance:
 		// Not "ranked by relevance", which reads as "here is what I found
 		// about it". Nothing matched: these are the nearest sessions by
 		// wording, and an agent handed them under the old line answered
@@ -2211,7 +2215,7 @@ func contextByID(dir, q string) (string, idContext, bool) {
 }
 
 // recallContextResult keeps the four-value shape its callers and tests read.
-func recallContextResult(dir, q, harness string) (string, int, int64, []string, error) {
+func recallContextResult(dir, q, harness string) (string, int, int64, []string, error) { //nolint:unparam // same shape as recallTextResult; changes_block_test.go calls it
 	text, sessions, raw, ids, _, _, err := recallContextResultFrom(dir, q, harness)
 	return text, sessions, raw, ids, err
 }

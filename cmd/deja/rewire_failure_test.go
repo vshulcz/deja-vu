@@ -36,7 +36,7 @@ func TestTheSessionStartNamesAWiringItCouldNotRepair(t *testing.T) {
 	if aged == string(b) {
 		t.Fatalf("the fixture record has no version to age:\n%s", b)
 	}
-	if err := os.WriteFile(path, []byte(aged), 0o600); err != nil {
+	if err = os.WriteFile(path, []byte(aged), 0o600); err != nil {
 		t.Fatal(err)
 	}
 

@@ -5,6 +5,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -63,7 +64,7 @@ func newHTTPUpdateDownloader(client *http.Client) updateDownloader {
 	}
 	client = &configured
 	return func(url string, limit int64, label string) ([]byte, error) {
-		req, err := http.NewRequest(http.MethodGet, url, nil)
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
 		if err != nil {
 			return nil, fmt.Errorf("request %s: %w", label, err)
 		}
@@ -153,7 +154,7 @@ func performUpdate(cfg updateConfig, out io.Writer) error {
 		return err
 	}
 	var release updateRelease
-	if err := json.Unmarshal(body, &release); err != nil {
+	if err = json.Unmarshal(body, &release); err != nil {
 		return fmt.Errorf("decode latest release: %w", err)
 	}
 	latest := normalizeUpdateVersion(release.TagName)

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -36,7 +37,7 @@ func TestOpenClawAutoTakesACommentedConfig(t *testing.T) {
 		t.Errorf("the comment was dropped:\n%s", b)
 	}
 	var root map[string]any
-	if err := json.Unmarshal([]byte(stripJSONComments(string(b))), &root); err != nil {
+	if err = json.Unmarshal([]byte(stripJSONComments(string(b))), &root); err != nil {
 		t.Fatalf("the file no longer parses: %v\n%s", err, b)
 	}
 	hooks, _ := root["hooks"].(map[string]any)
@@ -51,7 +52,7 @@ func TestOpenClawAutoTakesACommentedConfig(t *testing.T) {
 		t.Errorf("the entry went in without the switch that runs it:\n%s", b)
 	}
 
-	if _, err := installOpenClawAuto("/bin/deja", true); err != nil {
+	if _, err = installOpenClawAuto("/bin/deja", true); err != nil {
 		t.Fatalf("uninstall refused the commented config: %v", err)
 	}
 	b, err = os.ReadFile(path)
@@ -283,7 +284,7 @@ func TestOpenClawAutoRemovesASwitchTheReaderMoved(t *testing.T) {
 	// The reader tidies: the switch goes last, with a line about it. Written
 	// out rather than edited, so the fixture is exactly the shape being tested.
 	var entry string
-	if i := strings.Index(string(b), `"deja-recall"`); i >= 0 {
+	if i := bytes.Index(b, []byte(`"deja-recall"`)); i >= 0 {
 		if j := strings.Index(string(b)[i:], "}"); j >= 0 {
 			entry = string(b)[i : i+j+1]
 		}
@@ -296,11 +297,11 @@ func TestOpenClawAutoRemovesASwitchTheReaderMoved(t *testing.T) {
 	// has nothing to find.
 	moved := "{\n  // mine\n  \"hooks\": {\n    \"internal\": {\n      \"entries\": {\n        " +
 		entry + "\n      },\n      \"timeoutMs\": 500,\n      // deja turned this on\n      \"enabled\": true\n    }\n  }\n}\n"
-	if err := os.WriteFile(path, []byte(moved), 0o644); err != nil {
+	if err = os.WriteFile(path, []byte(moved), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := installOpenClawAuto("/bin/deja", true); err != nil {
+	if _, err = installOpenClawAuto("/bin/deja", true); err != nil {
 		t.Fatalf("uninstall refused the config: %v", err)
 	}
 	b, err = os.ReadFile(path)

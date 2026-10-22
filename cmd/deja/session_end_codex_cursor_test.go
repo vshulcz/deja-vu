@@ -54,7 +54,7 @@ func TestCodexAutoWiresSessionEndAndUninstallRoundTrips(t *testing.T) {
 	if st := codexHookWiringState(); len(st.missing) != 0 {
 		t.Errorf("doctor reads codex events missing after a fresh install: %v", st.missing)
 	}
-	if _, err := installCodexHooks("/usr/local/bin/deja", false); err != nil {
+	if _, err = installCodexHooks("/usr/local/bin/deja", false); err != nil {
 		t.Fatal(err)
 	}
 	if again, _ := os.ReadFile(path); !bytes.Equal(again, b) {
@@ -69,7 +69,7 @@ func TestCodexAutoWiresSessionEndAndUninstallRoundTrips(t *testing.T) {
 		t.Errorf("codex's SessionEnd payload left the session stamped: %v", readLiveSessions(dir))
 	}
 
-	if _, err := installCodexHooks("/usr/local/bin/deja", true); err != nil {
+	if _, err = installCodexHooks("/usr/local/bin/deja", true); err != nil {
 		t.Fatal(err)
 	}
 	after, err := os.ReadFile(path)
@@ -125,7 +125,7 @@ func TestCursorAutoWiresSessionEndAndUninstallRoundTrips(t *testing.T) {
 		t.Errorf("cursor's sessionEnd payload left the session stamped: %v", readLiveSessions(dir))
 	}
 
-	if _, err := installCursorHooks("/usr/local/bin/deja", true); err != nil {
+	if _, err = installCursorHooks("/usr/local/bin/deja", true); err != nil {
 		t.Fatal(err)
 	}
 	after, err := os.ReadFile(path)

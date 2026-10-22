@@ -56,12 +56,12 @@ func TestNoteTagsCannotCloseThePagesScript(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(notes, append(body, '\n'), 0o600); err != nil {
+	if err = os.WriteFile(notes, append(body, '\n'), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
 	dir := index.DefaultDir()
-	if err := index.Ensure(dir, "", true, nil); err != nil {
+	if err = index.Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	path, _, err := writeViewHTML(dir, filepath.Join(tmp, "view.html"))

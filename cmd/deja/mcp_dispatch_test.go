@@ -116,6 +116,7 @@ func (h *slowHandler) gate(q string) chan struct{} {
 }
 
 func (h *slowHandler) install(t *testing.T) {
+	t.Helper()
 	saved := mcpHandler
 	mcpHandler = func(dir string, req rpcRequest) (any, int, string) {
 		if req.Method != "tools/call" {
@@ -135,6 +136,7 @@ func (h *slowHandler) install(t *testing.T) {
 }
 
 func setDeadline(t *testing.T, d time.Duration) {
+	t.Helper()
 	saved := mcpDeadline
 	mcpDeadline = d
 	t.Cleanup(func() { mcpDeadline = saved })

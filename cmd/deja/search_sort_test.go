@@ -226,7 +226,7 @@ func TestNewestFirstNoteNamesARankedWindow(t *testing.T) {
 func TestTUIDateHeadsPartialMatchesApart(t *testing.T) {
 	dir, _ := tuiStore(t)
 	a := newTestTUI(t, dir)
-	var hits []search.Hit
+	hits := make([]search.Hit, 0, len(a.rows))
 	for i, r := range a.rows {
 		hits = append(hits, search.Hit{Session: r.s, Strict: i == len(a.rows)-1})
 	}

@@ -59,14 +59,14 @@ func TestTheLauncherFindsTheBinaryAfterItMoves(t *testing.T) {
 
 	// The upgrade: same name, somewhere else, and nothing has rewritten a
 	// config. It is found on the PATH, which is where an upgrade leaves it.
-	if err := os.Remove(first); err != nil {
+	if err = os.Remove(first); err != nil {
 		t.Fatal(err)
 	}
 	next := filepath.Join(tmp, "new", "deja")
-	if err := os.MkdirAll(filepath.Dir(next), 0o755); err != nil {
+	if err = os.MkdirAll(filepath.Dir(next), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(next, []byte("#!/bin/sh\necho new \"$@\"\n"), 0o755); err != nil {
+	if err = os.WriteFile(next, []byte("#!/bin/sh\necho new \"$@\"\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if out := runLauncher(t, launcher, []string{"PATH=" + filepath.Dir(next)}); !strings.HasPrefix(out, "new hook-prompt") {
@@ -76,7 +76,7 @@ func TestTheLauncherFindsTheBinaryAfterItMoves(t *testing.T) {
 	// DEJA_BIN wins over both, for a machine that keeps deja somewhere of its
 	// own.
 	pinned := filepath.Join(tmp, "pinned-deja")
-	if err := os.WriteFile(pinned, []byte("#!/bin/sh\necho pinned \"$@\"\n"), 0o755); err != nil {
+	if err = os.WriteFile(pinned, []byte("#!/bin/sh\necho pinned \"$@\"\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if out := runLauncher(t, launcher, []string{"DEJA_BIN=" + pinned, "PATH=" + filepath.Dir(next)}); !strings.HasPrefix(out, "pinned hook-prompt") {
@@ -86,7 +86,7 @@ func TestTheLauncherFindsTheBinaryAfterItMoves(t *testing.T) {
 	// And when there is no deja anywhere, silence and a zero exit: a hook that
 	// cannot find its binary has no memory to add, and a failing hook is
 	// something harnesses report at the reader every turn.
-	out, err := exec.Command(launcher, "hook-prompt").Output()
+	out, err := exec.CommandContext(t.Context(), launcher, "hook-prompt").Output()
 	if err == nil && strings.TrimSpace(string(out)) != "" {
 		t.Fatalf("a launcher with nothing to run said %q", out)
 	}
@@ -94,7 +94,7 @@ func TestTheLauncherFindsTheBinaryAfterItMoves(t *testing.T) {
 
 func runLauncher(t *testing.T, launcher string, env []string) string {
 	t.Helper()
-	cmd := exec.Command(launcher, "hook-prompt")
+	cmd := exec.CommandContext(t.Context(), launcher, "hook-prompt")
 	cmd.Env = append([]string{"PATH=/nonexistent"}, env...)
 	out, err := cmd.Output()
 	if err != nil {

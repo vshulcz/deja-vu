@@ -140,8 +140,7 @@ func (p *buildProgress) render(frame int) []string {
 	if phase == "" {
 		phase = "starting"
 	}
-	info = append(info, logoAccent+spin+logoReset+" "+logoBold+phase+logoReset)
-	info = append(info, p.bar())
+	info = append(info, logoAccent+spin+logoReset+" "+logoBold+phase+logoReset, p.bar())
 
 	// Stores appear as they finish, newest last, so the column grows into the
 	// same shape the finished greeting has. Columns are aligned on the widest

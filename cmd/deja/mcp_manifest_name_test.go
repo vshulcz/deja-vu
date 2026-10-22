@@ -36,7 +36,7 @@ func TestMCPServerNamesStayConsistentAcrossManifests(t *testing.T) {
 		}
 		rel = filepath.ToSlash(rel)
 
-		b, err := os.ReadFile(path)
+		b, err := os.ReadFile(path) //nolint:gosec // G122: test reads the repo's own checked-in files
 		if err != nil {
 			return err
 		}
