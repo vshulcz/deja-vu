@@ -2,6 +2,7 @@ package index
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -216,5 +217,31 @@ func TestDeferredRolloutReadWhenFingerprintHadZstd(t *testing.T) {
 	}
 	if _, waiting := m.Deferred[zst]; waiting {
 		t.Fatal("rollout still held as waiting after it was read")
+	}
+}
+
+// On a first build big enough to publish its newest slice early, the rollouts
+// waiting for zstd are still held as waiting once the build ends; the early
+// publish must not drain the list the full build commits (#5110).
+func TestFirstBuildKeepsDeferredAcrossNewestFirstPublish(t *testing.T) {
+	tmp := hermeticIndexEnv(t)
+	_, _, zst := zstdStubRollouts(t, tmp, "zstd-big-thread")
+	dir := filepath.Join(os.Getenv("DEJA_CODEX_ROOT"), "sessions", "2026", "07", "30")
+	for i := 0; i < partialPublishFrom+10; i++ {
+		id := fmt.Sprintf("big-%04d", i)
+		write(t, filepath.Join(dir, "rollout-2026-07-30T00-00-00-"+id+".jsonl"),
+			strings.ReplaceAll(codexRolloutHead, "cx-1", id))
+	}
+
+	idx := filepath.Join(tmp, "idx")
+	if err := Ensure(idx, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	m, err := readManifest(idx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, waiting := m.Deferred[zst]; !waiting {
+		t.Fatalf("first build left Deferred empty (%d entries), want the compressed rollout", len(m.Deferred))
 	}
 }

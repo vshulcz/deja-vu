@@ -2290,7 +2290,13 @@ func publishNewestFirst(dir string, ss []model.Session, progress io.Writer) {
 	// them, and a line saying "3 empty transcripts" must count the whole
 	// corpus rather than this slice of it.
 	wasEmptied, wasCollisions, wasMerged := emptied.Load(), collisions.Load(), merged.Load()
+	// The same goes for what the parsers reported: the manifest write folds
+	// and drains it, and the full build has to fold it again — malformed
+	// lines, failed reads, the rollouts waiting for zstd (#5110).
+	diag, skipped := sources.DiagSave(), skippedThisRun.Load()
 	err := writeSessionsWithSync(tmp, dir, newest, nil, "", importedState{compactions: compactionsForRebuild(dir, readTombstones()), partialOf: distinctSessions(ss)})
+	sources.DiagRestore(diag)
+	skippedThisRun.Store(skipped)
 	emptied.Store(wasEmptied)
 	collisions.Store(wasCollisions)
 	merged.Store(wasMerged)

@@ -150,6 +150,55 @@ func DiagNoZstdPaths() map[string]bool {
 	return maps.Clone(diagZstdMissing)
 }
 
+// DiagState is what DiagSnapshot clears, held aside by DiagSave.
+type DiagState struct {
+	malformed map[string]int
+	failed    map[string]string
+	reasons   map[string]string
+	records   map[string]map[string]string
+	noZstd    map[string]bool
+	stalled   map[string]time.Duration
+}
+
+// DiagSave copies everything a pass has reported so far, for a manifest write
+// that drains it before the pass that read it is done: the early publish of a
+// first build writes a slice of the corpus, and the full build after it folds
+// the same reports (#5110).
+func DiagSave() DiagState {
+	diagMu.Lock()
+	defer diagMu.Unlock()
+	records := make(map[string]map[string]string, len(diagRecords))
+	for p, recs := range diagRecords {
+		records[p] = maps.Clone(recs)
+	}
+	return DiagState{
+		malformed: maps.Clone(diagMalformed),
+		failed:    maps.Clone(diagFailed),
+		reasons:   maps.Clone(diagReasons),
+		records:   records,
+		noZstd:    maps.Clone(diagZstdMissing),
+		stalled:   maps.Clone(diagStalled),
+	}
+}
+
+// DiagRestore puts back what DiagSave copied, in place of whatever is there.
+func DiagRestore(s DiagState) {
+	diagMu.Lock()
+	defer diagMu.Unlock()
+	clear(diagMalformed)
+	maps.Copy(diagMalformed, s.malformed)
+	clear(diagFailed)
+	maps.Copy(diagFailed, s.failed)
+	clear(diagReasons)
+	maps.Copy(diagReasons, s.reasons)
+	clear(diagRecords)
+	maps.Copy(diagRecords, s.records)
+	clear(diagZstdMissing)
+	maps.Copy(diagZstdMissing, s.noZstd)
+	clear(diagStalled)
+	maps.Copy(diagStalled, s.stalled)
+}
+
 // DiagMalformedCounts returns the malformed-line counts accumulated so far
 // without clearing them. The index narrates each store as it lands, which is
 // before the manifest fold that drains these counters (#1993).

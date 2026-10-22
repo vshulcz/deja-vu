@@ -29,6 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A first build large enough to answer early no longer forgets the malformed
+  lines, unreadable files and rollouts waiting for zstd it found, so doctor
+  still reports them (#5110).
 - An `apply_patch` that renames a file (`*** Move to:`) records its hunks
   under the new name, so `deja blame` and `deja restore` find them there.
   Codex, opencode, Copilot CLI, OpenClaw, pi, Cline, Roo and Amp filed them

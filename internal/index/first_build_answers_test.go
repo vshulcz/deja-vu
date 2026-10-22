@@ -161,3 +161,44 @@ func TestARealFirstBuildSaysItIsSearchableAlready(t *testing.T) {
 		t.Errorf("the finished index holds %d sessions, want 420", len(metas))
 	}
 }
+
+// The early publish writes a manifest, and a manifest write folds and drains
+// what the parsers reported. A first build big enough to publish early still
+// ends with the bad line it read counted, once (#5110).
+func TestFirstBuildKeepsSkippedLinesAcrossNewestFirstPublish(t *testing.T) {
+	tmp := hermeticIndexEnv(t)
+	dir := filepath.Join(os.Getenv("DEJA_CODEX_ROOT"), "sessions", "2026", "07", "30")
+	bad := filepath.Join(dir, "rollout-2026-07-30T00-00-00-bad-line.jsonl")
+	write(t, bad, strings.ReplaceAll(codexRolloutHead, "cx-1", "bad-line")+"{not json\n")
+	for i := 0; i < partialPublishFrom+10; i++ {
+		id := fmt.Sprintf("big-%04d", i)
+		write(t, filepath.Join(dir, "rollout-2026-07-30T00-00-00-"+id+".jsonl"),
+			strings.ReplaceAll(codexRolloutHead, "cx-1", id))
+	}
+
+	idx := filepath.Join(tmp, "idx")
+	before := SkippedThisRun()
+	var progress strings.Builder
+	if err := Ensure(idx, "", false, &progress); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(progress.String(), "searchable now") {
+		t.Fatalf("no early publish on this build:\n%s", progress.String())
+	}
+	m, err := readManifest(idx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.PartialOf != 0 {
+		t.Fatalf("index is still the early slice (PartialOf %d)", m.PartialOf)
+	}
+	if got := m.IngestFiles[bad].Malformed; got != 1 {
+		t.Fatalf("Malformed for the bad rollout = %d, want 1", got)
+	}
+	if got := m.IngestHealth["codex"].MalformedLines; got != 1 {
+		t.Fatalf("codex MalformedLines = %d, want 1", got)
+	}
+	if got := SkippedThisRun() - before; got != 1 {
+		t.Fatalf("SkippedThisRun moved by %d, want 1", got)
+	}
+}
