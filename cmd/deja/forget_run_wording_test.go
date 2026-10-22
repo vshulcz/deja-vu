@@ -22,11 +22,11 @@ func TestForgetSaysTheSameThingWhetherOrNotItActs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	real, err := captureRun(t, "forget", "--session", id)
+	said, err := captureRun(t, "forget", "--session", id)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, c := range []struct{ label, out string }{{"dry run", dry}, {"the run that acts", real}} {
+	for _, c := range []struct{ label, out string }{{"dry run", dry}, {"the run that acts", said}} {
 		if !strings.Contains(c.out, "your own notes") {
 			t.Errorf("%s does not call a remember note what it is:\n%s", c.label, c.out)
 		}

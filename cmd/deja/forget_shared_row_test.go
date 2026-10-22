@@ -50,14 +50,14 @@ func TestForgetSaysWhenARowCoversTwoConversations(t *testing.T) {
 
 	// A row that holds one conversation says nothing extra.
 	store := filepath.Join(root, "-solo")
-	if err := os.MkdirAll(store, 0o755); err != nil {
+	if err = os.MkdirAll(store, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	rec := `{"type":"user","message":{"role":"user","content":"a solo conversation"},"timestamp":"2026-07-12T10:00:00Z","sessionId":"solo","cwd":"/solo"}` + "\n"
-	if err := os.WriteFile(filepath.Join(store, "solo.jsonl"), []byte(rec), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(store, "solo.jsonl"), []byte(rec), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := index.Ensure(dir, "", true, nil); err != nil {
+	if err = index.Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	out, err = captureRun(t, "forget", "--session", "solo")

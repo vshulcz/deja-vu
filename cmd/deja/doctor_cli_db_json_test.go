@@ -38,7 +38,7 @@ insert into message values ('m1','s1','{"role":"user","time":{"created":17673228
 insert into part values ('p1','m1',json_object('type','text','text','fix the retry loop','time',json_object('start',1767322800000)));
 `
 	for _, db := range dbs {
-		if out, err := exec.Command("sqlite3", db, seed).CombinedOutput(); err != nil {
+		if out, err := exec.CommandContext(t.Context(), "sqlite3", db, seed).CombinedOutput(); err != nil {
 			t.Fatalf("sqlite3 seed: %v %s", err, out)
 		}
 	}

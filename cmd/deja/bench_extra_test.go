@@ -16,7 +16,7 @@ func TestWriteBenchCorpusRoundtrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	found := 0
-	if err := filepath.Walk(tmp, func(path string, fi os.FileInfo, err error) error {
+	if err := filepath.Walk(tmp, func(_ string, fi os.FileInfo, err error) error {
 		if err == nil && !fi.IsDir() {
 			found++
 		}

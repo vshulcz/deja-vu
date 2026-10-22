@@ -16,9 +16,9 @@ import (
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
-func indexedCollisionHits(t testing.TB, n int, unique bool) (string, []search.Hit) {
-	t.Helper()
-	home := t.TempDir()
+func indexedCollisionHits(tb testing.TB, n int, unique bool) (string, []search.Hit) {
+	tb.Helper()
+	home := tb.TempDir()
 	root := filepath.Join(home, "claude")
 	project := filepath.Join(root, "project")
 	dir := filepath.Join(home, "index")
@@ -33,10 +33,10 @@ func indexedCollisionHits(t testing.TB, n int, unique bool) (string, []search.Hi
 		"DEJA_NOTES_FILE":      filepath.Join(home, "notes.jsonl"),
 		"DEJA_WARMUP_SENTINEL": filepath.Join(home, "warmup"),
 	} {
-		t.Setenv(key, value)
+		tb.Setenv(key, value)
 	}
 	if err := os.MkdirAll(project, 0o700); err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	at := time.Date(2026, 10, 19, 0, 0, 0, 0, time.UTC)
 	ids := make([]index.Identity, n)
@@ -55,26 +55,26 @@ func indexedCollisionHits(t testing.TB, n int, unique bool) (string, []search.Hi
 				"message":   map[string]string{"role": "user", "content": text},
 			})
 			if err != nil {
-				t.Fatal(err)
+				tb.Fatal(err)
 			}
 			body = append(body, record...)
 			body = append(body, '\n')
 		}
 		if err := os.WriteFile(filepath.Join(project, id+".jsonl"), body, 0o600); err != nil {
-			t.Fatal(err)
+			tb.Fatal(err)
 		}
 	}
 	if err := index.Ensure(dir, "claude", true, nil); err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	ss, err := index.FindManyByIdentity(dir, ids)
 	if err != nil || len(ss) != n {
-		t.Fatalf("indexed sessions: got %d, want %d, error %v", len(ss), n, err)
+		tb.Fatalf("indexed sessions: got %d, want %d, error %v", len(ss), n, err)
 	}
 	hits := make([]search.Hit, n)
 	for i, s := range ss {
 		if len(s.Messages) != 12 {
-			t.Fatalf("session %s has %d messages, want 12", s.ID, len(s.Messages))
+			tb.Fatalf("session %s has %d messages, want 12", s.ID, len(s.Messages))
 		}
 		hits[i].Session = s
 	}

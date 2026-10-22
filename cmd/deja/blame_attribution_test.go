@@ -123,7 +123,7 @@ func TestTheGitNoteRecordsTheAttributionOnceOnItsOwnRef(t *testing.T) {
 	repo := t.TempDir()
 	git := func(args ...string) string {
 		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		cmd := exec.CommandContext(t.Context(), "git", append([]string{"-C", repo}, args...)...)
 		cmd.Env = append(os.Environ(),
 			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
 			"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com")
@@ -199,7 +199,7 @@ func TestTheGitNotePassesOnGitsOwnRefusal(t *testing.T) {
 	repo := t.TempDir()
 	run := func(env []string, args ...string) string {
 		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		cmd := exec.CommandContext(t.Context(), "git", append([]string{"-C", repo}, args...)...)
 		cmd.Env = append(os.Environ(), env...)
 		out, err := cmd.CombinedOutput()
 		if err != nil {

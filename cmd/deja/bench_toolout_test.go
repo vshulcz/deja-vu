@@ -43,7 +43,7 @@ func TestBenchCorpusCarriesToolOutput(t *testing.T) {
 				Content json.RawMessage `json:"content"`
 			} `json:"message"`
 		}
-		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+		if err = json.Unmarshal([]byte(line), &entry); err != nil {
 			t.Fatal(err)
 		}
 		if strings.Contains(string(entry.Message.Content), `"tool_result"`) {
@@ -60,7 +60,7 @@ func TestBenchCorpusCarriesToolOutput(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "index.db")
 	restore := isolateBenchEnv(t.TempDir(), root, dir)
 	defer restore()
-	if err := index.EnsureForSearch(dir, query.Options{All: true}, true, io.Discard); err != nil {
+	if err = index.EnsureForSearch(dir, query.Options{All: true}, true, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	ss, err := index.Search(dir, query.Options{Query: "v41", Limit: 5})

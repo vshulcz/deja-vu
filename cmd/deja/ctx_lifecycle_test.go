@@ -48,10 +48,10 @@ func TestCtxByIDSaysTheDecisionWasTakenBack(t *testing.T) {
 	// The control: a session nobody took back gets no marker.
 	plain := filepath.Join(store, "bbbb0002.jsonl")
 	const other = "bbbb0002-1111-4000-8000-d6e7f8a9b0c1"
-	if err := os.WriteFile(plain, []byte(`{"type":"user","timestamp":"2026-07-11T10:00:00Z","sessionId":"`+other+`","cwd":"/api","message":{"role":"user","content":"the scheduler dispatches work"}}`+"\n"), 0o644); err != nil {
+	if err = os.WriteFile(plain, []byte(`{"type":"user","timestamp":"2026-07-11T10:00:00Z","sessionId":"`+other+`","cwd":"/api","message":{"role":"user","content":"the scheduler dispatches work"}}`+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := index.Ensure(dir, "", false, nil); err != nil {
+	if err = index.Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	out, err = captureRun(t, "ctx", "bbbb0002")

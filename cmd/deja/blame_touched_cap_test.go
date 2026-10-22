@@ -16,7 +16,7 @@ import (
 // sessions and 9.9 KB of quoted history, and with the list bounded the same
 // budget carried 38 sessions and 15.7 KB.
 func TestABlameRowNamesAFewTouchedFilesNotForty(t *testing.T) {
-	var touched []string
+	touched := make([]string, 0, 30)
 	for i := range 30 {
 		touched = append(touched, fmt.Sprintf("/work/app/internal/thing%02d.go", i))
 	}

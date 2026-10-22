@@ -35,7 +35,7 @@ func TestAntigravityEditLineRidesTheNextInvocation(t *testing.T) {
 	if err := os.WriteFile(transcript, []byte(strings.Join(steps, "\n")+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	payload, _ := json.Marshal(map[string]any{
+	payload := mustMarshal(t, map[string]any{
 		"invocationNum": 1, "workspacePaths": []string{"/work/alpha"},
 		"transcriptPath": transcript, "conversationId": "agy-1",
 	})
@@ -47,7 +47,7 @@ func TestAntigravityEditLineRidesTheNextInvocation(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
 		t.Fatalf("reply %q: %v", out.String(), err)
 	}
-	var said []string
+	said := make([]string, 0, len(resp.InjectSteps))
 	for _, s := range resp.InjectSteps {
 		said = append(said, s.EphemeralMessage)
 	}

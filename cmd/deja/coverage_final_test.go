@@ -110,7 +110,7 @@ func TestPrintSourcesAntigravityFallback(t *testing.T) {
 
 type alwaysErrWriter struct{}
 
-func (alwaysErrWriter) Write(p []byte) (int, error) { return 0, errors.New("write boom") }
+func (alwaysErrWriter) Write(_ []byte) (int, error) { return 0, errors.New("write boom") }
 
 func TestServeMCPEncodeError(t *testing.T) {
 	req := `{"jsonrpc":"2.0","id":1,"method":"initialize"}` + "\n"
@@ -228,15 +228,11 @@ func TestHookDigestHyphenatedProjectNameBranch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	oldwd, _ := os.Getwd()
 	work := filepath.Join(tmp, "workroot", "my-project")
 	if err := os.MkdirAll(work, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chdir(work); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(oldwd) })
+	t.Chdir(work)
 
 	digest := hookDigest(index.DefaultDir())
 	if digest == "" {

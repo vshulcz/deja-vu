@@ -70,7 +70,7 @@ func TestAWhollyLockedStoreIsNotCalledPartlyReadable(t *testing.T) {
 	if err := os.MkdirAll(proj, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	var locked []string
+	locked := make([]string, 0, 2)
 	for _, name := range []string{"a.jsonl", "b.jsonl"} {
 		p := filepath.Join(proj, name)
 		body := `{"type":"user","sessionId":"` + name + `","cwd":"/w","timestamp":"2026-08-08T01:00:00Z","message":{"role":"user","content":"flumberjack"}}` + "\n"

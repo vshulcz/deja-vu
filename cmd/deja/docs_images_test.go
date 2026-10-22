@@ -23,7 +23,7 @@ func TestEveryImageThePagesAskForExists(t *testing.T) {
 		if err != nil || d.IsDir() || filepath.Ext(path) != ".html" {
 			return err
 		}
-		b, err := os.ReadFile(path)
+		b, err := os.ReadFile(path) //nolint:gosec // the test walks the repo checkout
 		if err != nil {
 			return err
 		}

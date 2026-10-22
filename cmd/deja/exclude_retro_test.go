@@ -60,7 +60,7 @@ func TestExportHonoursAnExclusionSetAfterTheBuild(t *testing.T) {
 func TestExportWithoutExclusionsShipsEverything(t *testing.T) {
 	dir := excludeStore(t)
 	out := filepath.Join(t.TempDir(), "batch")
-	shipped := ""
+	var shipped string
 	if _, err := index.ExportFull(dir, out); err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +112,7 @@ func TestIndexSaysAnExclusionNeedsARebuildAfterAnIncrementalBuild(t *testing.T) 
 		t.Errorf("an incremental build claimed the new exclusion set without applying it:\n%s", out)
 	}
 	// The rebuild does apply it, and then the line has to stop.
-	if _, err := captureRunStderr(t, "index", "--rebuild"); err != nil {
+	if _, err = captureRunStderr(t, "index", "--rebuild"); err != nil {
 		t.Fatal(err)
 	}
 	out, err = captureRunStderr(t, "index")
@@ -224,7 +224,7 @@ func TestShareRefusesAnExcludedProject(t *testing.T) {
 
 // sessionIDFor finds the id of the session holding a phrase, before any
 // exclusion is set.
-func sessionIDFor(t *testing.T, phrase string) string {
+func sessionIDFor(t *testing.T, _ string) string {
 	t.Helper()
 	metas, err := index.AllMeta(index.DefaultDir())
 	if err != nil {

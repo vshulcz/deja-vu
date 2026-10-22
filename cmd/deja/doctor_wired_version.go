@@ -144,8 +144,8 @@ func readDejaBinaryVersion(p string) string {
 	if _, ok := parseUpdateVersion(bi.Main.Version); ok {
 		return normalizeUpdateVersion(bi.Main.Version)
 	}
-	if real, err := filepath.EvalSymlinks(p); err == nil {
-		if m := cellarVersion.FindStringSubmatch(filepath.ToSlash(real)); m != nil {
+	if resolved, linkErr := filepath.EvalSymlinks(p); linkErr == nil {
+		if m := cellarVersion.FindStringSubmatch(filepath.ToSlash(resolved)); m != nil {
 			if _, ok := parseUpdateVersion(m[1]); ok {
 				return m[1]
 			}
@@ -153,7 +153,7 @@ func readDejaBinaryVersion(p string) string {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, p, "version").Output()
+	out, err := exec.CommandContext(ctx, p, "version").Output() //nolint:gosec // runs the deja binary the wiring names
 	if err != nil {
 		return ""
 	}
@@ -174,8 +174,7 @@ func doctorWiredFiles() []wiredFile {
 	for _, c := range doctorMCPConfigs() {
 		out = append(out, wiredFile{c.name, c.path})
 	}
-	out = append(out, wiredFile{"claude-code", claudeHookWiringState().path})
-	out = append(out, wiredFile{"codex-hook", codexHookWiringState().path})
+	out = append(out, wiredFile{"claude-code", claudeHookWiringState().path}, wiredFile{"codex-hook", codexHookWiringState().path})
 	for _, a := range autoWirings() {
 		if a.marker != "" {
 			out = append(out, wiredFile{a.name, a.path()})

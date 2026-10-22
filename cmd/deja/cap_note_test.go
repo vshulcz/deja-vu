@@ -70,7 +70,7 @@ func TestFilesSaysWhenItCutTheList(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	var lines []string
+	lines := make([]string, 0, 7)
 	for i := range 6 {
 		name := filepath.Join(repo, "file"+string(rune('a'+i))+".go")
 		if err := os.WriteFile(name, []byte("package p\n"), 0o644); err != nil {

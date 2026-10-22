@@ -28,7 +28,7 @@ func TestTheSessionCountFindsTheMachineInEitherCase(t *testing.T) {
 	if err := os.MkdirAll(batch, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	var lines []string
+	lines := make([]string, 0, 3)
 	for i := range 3 {
 		rec := map[string]any{
 			"harness": "claude", "session_id": "remote" + string(rune('a'+i)), "project": "proj",

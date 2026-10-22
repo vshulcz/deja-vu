@@ -63,9 +63,9 @@ func runBrief(dir string, w io.Writer) error {
 		// one fact about their own work. Build the index — the progress display
 		// and the per-harness summary already exist — and show the brief.
 		if !index.HasManifest(dir) {
-			greeted, err := buildForFirstRun(dir)
-			if err != nil {
-				return err
+			greeted, buildErr := buildForFirstRun(dir)
+			if buildErr != nil {
+				return buildErr
 			}
 			justGreeted = greeted
 			if ov, err = index.OverviewServable(dir); err != nil {
@@ -416,7 +416,7 @@ func briefRowMax(w io.Writer) int {
 	return briefTitleMax
 }
 
-func trimBriefTitleTo(t string, max int) string {
+func trimBriefTitleTo(t string, most int) string {
 	t = strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
 			return ' '
@@ -431,8 +431,8 @@ func trimBriefTitleTo(t string, max int) string {
 	// and a Chinese title is one rune and two columns per character, so a
 	// 44-rune cap printed 88 columns and the line the budget exists to fit
 	// ran off the edge (#1073 fixed the same overflow for Latin text).
-	if termwidth.Columns(t) > max {
-		return termwidth.Cut(t, max) + "…"
+	if termwidth.Columns(t) > most {
+		return termwidth.Cut(t, most) + "…"
 	}
 	return t
 }

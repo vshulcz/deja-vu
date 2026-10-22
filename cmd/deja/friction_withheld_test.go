@@ -19,7 +19,7 @@ func TestFrictionCountsWithheldSessionsNotRecords(t *testing.T) {
 	if err := os.MkdirAll(store, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	var lines []string
+	lines := make([]string, 0, 10)
 	for i := range 10 {
 		lines = append(lines, `{"type":"user","timestamp":"2026-07-10T10:0`+string(rune('0'+i))+`:00Z","sessionId":"bbbb0001-1111-4000-8000-d6e7f8a9b0c1","cwd":"/api","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"a`+string(rune('0'+i))+`","content":"connection refused on port 5432"}]}}`)
 	}

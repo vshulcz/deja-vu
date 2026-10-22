@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -56,7 +55,7 @@ func TestGrokStartAndPromptWaitForTheFirstToolHook(t *testing.T) {
 	}
 	t.Chdir(cwd)
 	// Quoted as JSON: a Windows cwd's backslashes are not valid escapes.
-	cwdJSON, _ := json.Marshal(cwd)
+	cwdJSON := mustMarshal(t, cwd)
 
 	// Through the dispatcher, the way grok runs them.
 	run := func(name, payload string) string {

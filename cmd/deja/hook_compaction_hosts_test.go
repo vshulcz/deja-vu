@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,7 +13,7 @@ import (
 
 func hostsPrompt(t *testing.T, dir string, payload map[string]any) string {
 	t.Helper()
-	b, _ := json.Marshal(payload)
+	b := mustMarshal(t, payload)
 	var out bytes.Buffer
 	if err := runHookPrompt(dir, bytes.NewReader(b), &out); err != nil {
 		t.Fatal(err)
@@ -23,6 +22,7 @@ func hostsPrompt(t *testing.T, dir string, payload map[string]any) string {
 }
 
 func hostsNoWarmup(t *testing.T) {
+	t.Helper()
 	old := spawnWarmup
 	spawnWarmup = func(string, string) error { return nil }
 	t.Cleanup(func() { spawnWarmup = old })
@@ -87,7 +87,7 @@ func TestGeminiCompactionIsHandedBackAtTheNextPrompt(t *testing.T) {
 	}
 	// Only Gemini's prompt event looks: a host that has its own PreCompact
 	// hook gets no capture from its prompts.
-	b, _ := json.Marshal(map[string]any{"session_id": "gem-2", "transcript_path": transcript, "cwd": workspace, "prompt": "what next"})
+	b := mustMarshal(t, map[string]any{"session_id": "gem-2", "transcript_path": transcript, "cwd": workspace, "prompt": "what next"})
 	var other bytes.Buffer
 	if err := runHookPrompt(dir, bytes.NewReader(b), &other); err != nil {
 		t.Fatal(err)
@@ -105,8 +105,8 @@ func TestHermesTurnsBecomeTheNextTurnsPacket(t *testing.T) {
 	hostsNoWarmup(t)
 	workspace := compactionGitRepo(t)
 	dir := index.DefaultDir()
-	result, _ := json.Marshal(map[string]any{"output": "--- FAIL: TestParseSeed\nwant 3, got 4\nFAIL", "exit_code": 1})
-	payload, _ := json.Marshal(map[string]any{
+	result := mustMarshal(t, map[string]any{"output": "--- FAIL: TestParseSeed\nwant 3, got 4\nFAIL", "exit_code": 1})
+	payload := mustMarshal(t, map[string]any{
 		"session_id": "hermes-new", "cwd": workspace, "harness": "hermes",
 		"messages": []any{
 			map[string]any{"role": "user", "content": "fix the parser test"},
@@ -135,7 +135,7 @@ func TestOpencodeStoreSessionBecomesTheNextTurnsPacket(t *testing.T) {
 	workspace := compactionGitRepo(t)
 	dir := index.DefaultDir()
 	db := filepath.Join(t.TempDir(), "opencode.db")
-	quoted, _ := json.Marshal(workspace)
+	quoted := mustMarshal(t, workspace)
 	script := `create table session(id text, directory text, time_created any, time_updated any);
 create table message(id text, session_id text, time_created any, data text);
 create table part(id text, message_id text, data text);
@@ -145,11 +145,11 @@ insert into part values('p1','m1','{"type":"text","text":"fix the parser test"}'
 insert into message values('m2','ses_oc',1767409201000,'{"role":"assistant"}');
 insert into part values('p2','m2','{"type":"tool","tool":"bash","state":{"input":{"command":"go test ./parser/..."},"output":"--- FAIL: TestParseSeed\nwant 3, got 4","metadata":{"exit":1}},"time":{"start":"2026-01-02T03:00:01Z"}}');
 insert into part values('p3','m2','{"type":"text","text":"The parser test fails: want 3, got 4. I decided to fix parse.go next."}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
 	t.Setenv("DEJA_OPENCODE_DB", db)
-	payload, _ := json.Marshal(map[string]any{"session_id": "ses_oc", "cwd": workspace, "harness": "opencode"})
+	payload := mustMarshal(t, map[string]any{"session_id": "ses_oc", "cwd": workspace, "harness": "opencode"})
 	withHookStdin(t, string(payload))
 	runHookPrecompact(dir)
 	out := hostsPrompt(t, dir, map[string]any{"session_id": "ses_oc", "cwd": workspace, "prompt": "Continue if you have next steps"})

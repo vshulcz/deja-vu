@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -104,7 +103,7 @@ func TestTheSessionStartDigestRecordsItsProjects(t *testing.T) {
 	if len(snaps) != 1 {
 		t.Fatalf("snapshots = %d, want one", len(snaps))
 	}
-	if got, _ := json.Marshal(snaps[0].Projects); !strings.Contains(string(got), "work/api") {
+	if got := mustMarshal(t, snaps[0].Projects); !strings.Contains(string(got), "work/api") {
 		t.Errorf("projects = %s, want the project the digest was built from", got)
 	}
 }

@@ -101,9 +101,9 @@ func TestNoAutoIndexEveryTriggerLeavesTheIndexAlone(t *testing.T) {
 		if i > 0 {
 			growPriorSession(t, fmt.Sprintf("%s%d", autoOffWord, i))
 		}
-		before := stampManifest(t, dir)
+		prior := stampManifest(t, dir)
 		_ = captureStderr(t, tr.run)
-		if after := stampManifest(t, dir); !bytes.Equal(after.body, before.body) || after.mtime != before.mtime {
+		if after := stampManifest(t, dir); !bytes.Equal(after.body, prior.body) || after.mtime != prior.mtime {
 			t.Errorf("%s rewrote the index with automatic indexing off", tr.name)
 		}
 	}

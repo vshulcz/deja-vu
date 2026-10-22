@@ -102,7 +102,7 @@ func referenceCopySources(dir string, ss []model.Session, maybe func(src, c int)
 }
 
 func TestCopySourcesShapesDifferential(t *testing.T) {
-	rng := rand.New(rand.NewSource(23))
+	rng := rand.New(rand.NewSource(23)) //nolint:gosec // seeded for a reproducible differential
 	at := time.Date(2026, 10, 21, 0, 0, 0, 0, time.UTC)
 	times := []time.Time{{}, at, at.Add(time.Second), time.Unix(0, time.Time{}.UnixNano())}
 	roles := []string{"user", "assistant", "summary", "user\x00"}

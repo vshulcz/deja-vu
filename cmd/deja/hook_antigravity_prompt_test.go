@@ -100,7 +100,7 @@ func TestTheSecondCallAnswersTheQuestion(t *testing.T) {
 		"transcriptPath": transcript,
 		"workspacePaths": []string{filepath.Join(os.TempDir(), "app")},
 	}
-	b, _ := json.Marshal(payload)
+	b := mustMarshal(t, payload)
 	var out bytes.Buffer
 	if err := runHookAntigravity(dir, bytes.NewReader(b), &out); err != nil {
 		t.Fatal(err)

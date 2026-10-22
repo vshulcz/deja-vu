@@ -58,7 +58,7 @@ func TestACommentedConfigStillTakesTheEntry(t *testing.T) {
 				t.Fatalf("the entry was not written:\n%s", b)
 			}
 			var root map[string]any
-			if err := json.Unmarshal([]byte(stripJSONComments(string(b))), &root); err != nil {
+			if err = json.Unmarshal([]byte(stripJSONComments(string(b))), &root); err != nil {
 				t.Fatalf("the file no longer parses: %v\n%s", err, b)
 			}
 			m := root
@@ -73,7 +73,7 @@ func TestACommentedConfigStillTakesTheEntry(t *testing.T) {
 				t.Errorf("the entry is not under %v:\n%s", c.block, b)
 			}
 
-			if _, err := c.write("/bin/deja", true); err != nil {
+			if _, err = c.write("/bin/deja", true); err != nil {
 				t.Fatalf("uninstall refused the commented config: %v", err)
 			}
 			b, err = os.ReadFile(path)

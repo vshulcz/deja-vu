@@ -39,7 +39,7 @@ func TestBlameCarriesTheDecisionThatHolds(t *testing.T) {
 		t.Errorf("a decision that holds was reported as withdrawn:\n%s", out)
 	}
 
-	if _, err := captureRun(t, "promote", "w25", "--state", "rejected", "--note", "rolled back, the cap stays at 20"); err != nil {
+	if _, err = captureRun(t, "promote", "w25", "--state", "rejected", "--note", "rolled back, the cap stays at 20"); err != nil {
 		t.Fatal(err)
 	}
 	out, err = captureRun(t, "blame", "pool.go")

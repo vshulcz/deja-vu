@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -30,7 +29,7 @@ func TestRecallContextShowsTheCodeTheSessionLeft(t *testing.T) {
 	n := 0
 	line := func(typ string, content any) {
 		n++
-		raw, _ := json.Marshal(map[string]any{
+		raw := mustMarshal(t, map[string]any{
 			"type": typ, "sessionId": id, "cwd": "/proj",
 			"timestamp": fmt.Sprintf("2026-07-01T10:%02d:%02dZ", n/60, n%60),
 			"message":   map[string]any{"role": typ, "content": content},
@@ -126,7 +125,7 @@ func TestRecallContextShowsACodexSessionsPatch(t *testing.T) {
 	}
 	const id = "019a0001-1111-7000-8000-d6e7f8a9b0c1"
 	rec := func(at, typ string, payload any) string {
-		b, _ := json.Marshal(map[string]any{"timestamp": at, "type": typ, "payload": payload})
+		b := mustMarshal(t, map[string]any{"timestamp": at, "type": typ, "payload": payload})
 		return string(b) + "\n"
 	}
 	patch := "*** Begin Patch\n*** Update File: /proj/django/ops.py\n@@\n def reduce(self):\n-    pass\n+    return [AddIndex(self.name)]\n*** End Patch\n"

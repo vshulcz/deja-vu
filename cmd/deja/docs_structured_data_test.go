@@ -27,8 +27,8 @@ func TestGuidePagesCarryValidStructuredData(t *testing.T) {
 		found := 0
 		for _, m := range block.FindAllStringSubmatch(string(b), -1) {
 			found++
-			var any any
-			if err := json.Unmarshal([]byte(m[1]), &any); err != nil {
+			var decoded any
+			if err := json.Unmarshal([]byte(m[1]), &decoded); err != nil {
 				t.Errorf("%s: JSON-LD does not parse — %v", filepath.Base(page), err)
 			}
 		}

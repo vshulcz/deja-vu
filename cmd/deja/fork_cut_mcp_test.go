@@ -65,7 +65,7 @@ func TestPromptRecallGivesAForkOnlyWhatItsSourceDidAfterTheFork(t *testing.T) {
 		}
 		cwd := filepath.Join(os.Getenv("HOME"), "work", "app")
 		ask := func(sid, prompt string) string {
-			payload, _ := json.Marshal(map[string]string{"session_id": sid, "cwd": cwd, "prompt": prompt})
+			payload := mustMarshal(t, map[string]string{"session_id": sid, "cwd": cwd, "prompt": prompt})
 			var out strings.Builder
 			if err := runHookPrompt(dir, strings.NewReader(string(payload)), &out); err != nil {
 				t.Fatal(err)
@@ -93,7 +93,7 @@ func TestStartDigestGivesAForkOnlyWhatItsSourceDidAfterTheFork(t *testing.T) {
 		}
 		cwd := filepath.Join(os.Getenv("HOME"), "work", "app")
 		run := func(sid string) string {
-			payload, _ := json.Marshal(map[string]string{"session_id": sid, "source": "resume", "cwd": cwd})
+			payload := mustMarshal(t, map[string]string{"session_id": sid, "source": "resume", "cwd": cwd})
 			withHookStdin(t, string(payload))
 			return captureStdout(t, func() {
 				if err := runHookContext(dir, true); err != nil {

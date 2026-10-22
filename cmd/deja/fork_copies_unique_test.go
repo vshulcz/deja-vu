@@ -36,7 +36,7 @@ func TestDropCopiedHitsUniquePeersCompareLinearly(t *testing.T) {
 // Asking only the holders of the rarest turn finds the same sources as asking
 // every position, over random turn sets, ancestry and starts.
 func TestCopySourcesRarestTurnMatchesEveryPair(t *testing.T) {
-	rng := rand.New(rand.NewSource(5))
+	rng := rand.New(rand.NewSource(5)) //nolint:gosec // seeded for a reproducible differential
 	at := time.Date(2026, 10, 22, 0, 0, 0, 0, time.UTC)
 	starts := []time.Time{{}, at, at.Add(time.Second)}
 	kinds := []string{"", "fork", "subagent"}

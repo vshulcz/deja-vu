@@ -28,7 +28,8 @@ func TestBriefRecentBlockShowsOneProjectSpelling(t *testing.T) {
 	if len(lines) < 3 {
 		t.Fatalf("want three recent lines, got %d:\n%s", len(lines), buf.String())
 	}
-	var spellings, dates []string
+	spellings := make([]string, 0, len(lines))
+	dates := make([]string, 0, len(lines))
 	for _, l := range lines {
 		project, date := briefLineFields(t, visibleText(l))
 		spellings = append(spellings, project)

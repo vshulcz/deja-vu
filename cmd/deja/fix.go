@@ -42,9 +42,9 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 				return errors.New("fix: --limit wants a number")
 			}
 			i++
-			n, err := strconv.Atoi(args[i])
+			n, err := strconv.Atoi(args[i]) //nolint:gosec // the bound is checked above
 			if err != nil || n <= 0 {
-				return fmt.Errorf("fix: --limit wants a positive number, got %q", args[i])
+				return fmt.Errorf("fix: --limit wants a positive number, got %q", args[i]) //nolint:gosec // the bound is checked above
 			}
 			limit = n
 		case "--":

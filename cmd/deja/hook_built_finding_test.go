@@ -70,7 +70,7 @@ func sessionStartNote(t *testing.T, dir string) string {
 		t.Fatal(err)
 	}
 	t.Chdir(cwd)
-	payload, _ := json.Marshal(map[string]any{"session_id": "first", "cwd": cwd, "source": "startup"})
+	payload := mustMarshal(t, map[string]any{"session_id": "first", "cwd": cwd, "source": "startup"})
 	withHookStdin(t, string(payload))
 	out := captureStdout(t, func() { _ = runHookContext(dir, false) })
 	var resp sessionStartHookResponse

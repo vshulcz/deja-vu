@@ -37,7 +37,7 @@ func TestClippedMessageIsCounted(t *testing.T) {
 	var res struct {
 		Total int `json:"total"`
 	}
-	if err := json.Unmarshal([]byte(out), &res); err != nil {
+	if err = json.Unmarshal([]byte(out), &res); err != nil {
 		t.Fatalf("json: %v\n%s", err, out)
 	}
 	if res.Total != 0 {

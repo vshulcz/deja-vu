@@ -199,8 +199,8 @@ func clientHooksOff(name string) string {
 		// workspace path, the last one that matches winning.
 		p = filepath.Join(sources.GeminiHome(), "extensions", "extension-enablement.json")
 		if cwd, err := os.Getwd(); err == nil {
-			if real, err := filepath.EvalSymlinks(cwd); err == nil {
-				cwd = real
+			if resolved, err := filepath.EvalSymlinks(cwd); err == nil {
+				cwd = resolved
 			}
 			if geminiExtensionEnabled(jsonStrings(jsonAt(readJSONConfig(p), "deja", "overrides")), cwd) {
 				return ""
@@ -388,8 +388,8 @@ func doctorProjectDir(mainRepo bool) string {
 	if err != nil {
 		return ""
 	}
-	if real, err := filepath.EvalSymlinks(cwd); err == nil {
-		cwd = real
+	if resolved, err := filepath.EvalSymlinks(cwd); err == nil {
+		cwd = resolved
 	}
 	root := gitRootOf(filepath.Join(cwd, "x"))
 	if root == "" {

@@ -29,7 +29,7 @@ func TestSharedSkillSurvivesUninstallOfOneReader(t *testing.T) {
 	if r.Action != "kept" {
 		t.Fatalf("uninstalling one reader = %q, want kept", r.Action)
 	}
-	if _, err := os.Stat(path); err != nil {
+	if _, err = os.Stat(path); err != nil {
 		t.Fatalf("shared skill removed while gemini still reads it: %v", err)
 	}
 

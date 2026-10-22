@@ -68,7 +68,7 @@ func TestCodexReinstallLowersOldSessionEndTimeout(t *testing.T) {
 		seed, want float64
 	}{{10, 3}, {2, 2}} {
 		cmd := hookRun("/usr/local/bin/deja", "hook-session-end")
-		seed, _ := json.Marshal(map[string]any{"hooks": map[string]any{
+		seed := mustMarshal(t, map[string]any{"hooks": map[string]any{
 			"SessionEnd": []any{map[string]any{"hooks": []any{map[string]any{"type": "command", "command": cmd, "timeout": c.seed}}}},
 		}})
 		if err := os.WriteFile(path, seed, 0o644); err != nil {

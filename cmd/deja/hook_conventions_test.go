@@ -43,7 +43,7 @@ func TestProjectConventionsFiltersToAcceptedAndProject(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out := projectConventions([]string{"proj"}, 6, 800)
+	out := projectConventions([]string{"proj"})
 	if !strings.Contains(out, "keepmarker") {
 		t.Fatalf("accepted decision for the project was not surfaced:\n%s", out)
 	}
@@ -54,7 +54,7 @@ func TestProjectConventionsFiltersToAcceptedAndProject(t *testing.T) {
 		t.Fatalf("another project's decision leaked in:\n%s", out)
 	}
 	// A project with nothing accepted gets no block at all.
-	if s := projectConventions([]string{"other"}, 6, 800); strings.Contains(s, "keepmarker") {
+	if s := projectConventions([]string{"other"}); strings.Contains(s, "keepmarker") {
 		t.Fatalf("proj decision leaked into other's block:\n%s", s)
 	}
 }
@@ -96,6 +96,9 @@ func TestSessionStartSurfacesADecisionTheDigestDropped(t *testing.T) {
 	}
 	marker := "pgxdecisionmarker"
 	idx := strings.Index(text, "standing decisions in this project")
+	if idx < 0 {
+		t.Fatalf("no standing decisions block:\n%s", text)
+	}
 	convBlock := text[idx:]
 	rest := text[:idx]
 	if !strings.Contains(convBlock, marker) {

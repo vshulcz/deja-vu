@@ -23,7 +23,7 @@ func TestFilesRowStripsWhatTheTerminalActsOn(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	var paths []string
+	paths := make([]string, 0, 4)
 	for _, name := range []string{
 		"retry_\x1b[31mred\x1b[0m_handler.go",
 		"retry_\rrewound_handler.go",

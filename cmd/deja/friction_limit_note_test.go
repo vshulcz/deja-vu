@@ -13,12 +13,12 @@ import (
 // list with nothing after it reads as the whole of it — the sentence `how` and
 // `files` print for the same flag (#2311).
 func TestFrictionSaysWhatTheLimitLeftOut(t *testing.T) {
-	var lines []string
 	errs := []string{
 		"undefined: snorblefunc in vendor/blarg/api.go",
 		"panic: quaxbolt deadline exceeded",
 		"TypeError: cannot read property 'zonk' of undefined",
 	}
+	lines := make([]string, 0, 3*len(errs))
 	n := 0
 	for _, e := range errs {
 		for k := range 3 {

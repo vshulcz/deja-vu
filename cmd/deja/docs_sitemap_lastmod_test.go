@@ -23,7 +23,7 @@ import (
 // change lands.
 func TestSitemapLastmodFollowsThePages(t *testing.T) {
 	root := filepath.Join("..", "..")
-	if out, err := exec.Command("git", "-C", root, "rev-parse", "--is-shallow-repository").Output(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "git", "-C", root, "rev-parse", "--is-shallow-repository").Output(); err != nil {
 		t.Skipf("no git history to compare against: %v", err)
 	} else if strings.TrimSpace(string(out)) == "true" {
 		t.Skip("shallow clone: every file looks like it changed in the tip commit")
@@ -147,7 +147,7 @@ func TestGuideDateModifiedIsTheSitemapDay(t *testing.T) {
 			if !ok {
 				continue
 			}
-			if pub := published.FindSubmatch(page); pub != nil && string(pub[1]) > want {
+			if pub := published.FindSubmatch(page); len(pub) > 1 && string(pub[1]) > want {
 				want = string(pub[1])
 			}
 			if got := string(m[1]); got != want {

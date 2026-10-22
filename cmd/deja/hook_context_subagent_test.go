@@ -15,8 +15,7 @@ import (
 // ("Sending verdict", "Worktrees cleaned up") led the block ahead of the
 // session that settled the work (#3368).
 func TestTheSessionStartDigestPrefersSessionsSomebodyWorkedIn(t *testing.T) {
-	claudeRoot := hookDigestFixture(t, true)
-	_ = claudeRoot
+	hookDigestFixture(t, true)
 	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +44,8 @@ func TestAProjectOfOnlySubagentRunsStillGetsADigest(t *testing.T) {
 
 // hookDigestFixture writes one subagent run and, when withParent, the session
 // that spawned it, then puts the test in that project's directory.
-func hookDigestFixture(t *testing.T, withParent bool) string {
+func hookDigestFixture(t *testing.T, withParent bool) {
+	t.Helper()
 	// A project of its own: withStatsStores seeds beta, gamma and the rest,
 	// and the fallback case needs a project that holds nothing else.
 	project := "beta"
@@ -78,5 +78,4 @@ func hookDigestFixture(t *testing.T, withParent bool) string {
 		t.Fatal(err)
 	}
 	t.Chdir(cwd)
-	return claudeRoot
 }

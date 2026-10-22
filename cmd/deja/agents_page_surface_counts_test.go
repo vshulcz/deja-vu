@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -26,7 +27,7 @@ func TestAgentsPageCountsTheWiredSurfaces(t *testing.T) {
 			} `json:"surfaces"`
 		} `json:"harnesses"`
 	}
-	if err := json.Unmarshal(b, &reg); err != nil {
+	if err = json.Unmarshal(b, &reg); err != nil {
 		t.Fatal(err)
 	}
 	count := func(surface, status string) int {
@@ -47,12 +48,16 @@ func TestAgentsPageCountsTheWiredSurfaces(t *testing.T) {
 		{"<b>On each prompt</b>", "prompt"},
 		{"<b>Before an edit or a command</b>", "pre_tool"},
 	} {
-		at := strings.Index(string(page), c.item)
+		at := bytes.Index(page, []byte(c.item))
 		if at < 0 {
 			t.Fatalf("agents.html lost the %q item", c.item)
 		}
 		li := string(page[at:])
-		li = li[:strings.Index(li, "</li>")]
+		end := strings.Index(li, "</li>")
+		if end < 0 {
+			t.Fatalf("agents.html: the %q item never closes", c.item)
+		}
+		li = li[:end]
 		m := claim.FindStringSubmatch(li)
 		if m == nil {
 			t.Fatalf("%s: no \"in N of the M harnesses … in part in K more\" sentence:\n%s", c.surface, li)

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -23,6 +22,7 @@ func stubAncestors(t *testing.T, argv ...[]string) {
 // forkFirstPrompt is the fork's first prompt hook, its transcript not written
 // yet, after a SessionStart when started is set.
 func forkFirstPrompt(t *testing.T, started bool) string {
+	t.Helper()
 	dir, fork := forkStore(t, true)
 	transcript := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-w-p", fork+".jsonl")
 	// Claude Code 2.1.302 writes the fork's copy after its first tool result.
@@ -33,7 +33,7 @@ func forkFirstPrompt(t *testing.T, started bool) string {
 		[]string{"/bin/sh", "-c", "deja hook-context"},
 		[]string{"/usr/local/bin/claude", "-p", "--resume", forkSourceID, "--fork-session", forkQuestion})
 	if started {
-		start, _ := json.Marshal(map[string]string{"session_id": fork, "source": "fork", "transcript_path": transcript, "cwd": "/w/p", "hook_event_name": "SessionStart"})
+		start := mustMarshal(t, map[string]string{"session_id": fork, "source": "fork", "transcript_path": transcript, "cwd": "/w/p", "hook_event_name": "SessionStart"})
 		withHookStdin(t, string(start))
 		if out := captureStdout(t, func() {
 			if err := runHookContext(dir, false); err != nil {
@@ -43,7 +43,7 @@ func forkFirstPrompt(t *testing.T, started bool) string {
 			t.Errorf("a fork got a session-start digest:\n%s", out)
 		}
 	}
-	payload, _ := json.Marshal(map[string]string{"session_id": fork, "transcript_path": transcript, "cwd": "/w/p", "prompt": forkQuestion, "hook_event_name": "UserPromptSubmit"})
+	payload := mustMarshal(t, map[string]string{"session_id": fork, "transcript_path": transcript, "cwd": "/w/p", "prompt": forkQuestion, "hook_event_name": "UserPromptSubmit"})
 	var out strings.Builder
 	if err := runHookPrompt(dir, strings.NewReader(string(payload)), &out); err != nil {
 		t.Fatal(err)

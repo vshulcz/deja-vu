@@ -106,7 +106,7 @@ const peerClockSlack = time.Minute
 // peerLine is one machine's state in one line: how long since memory moved,
 // which way it has not moved, and how much of this index came from there.
 func peerLine(p peers.Peer, sessions int, now time.Time) string {
-	line := ""
+	var line string
 	switch {
 	case p.Last().IsZero():
 		line = "never exchanged"

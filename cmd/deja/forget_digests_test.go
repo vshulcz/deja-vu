@@ -35,10 +35,10 @@ func TestForgetTakesTheDigestsOfWhatItForgot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(batch, "batch.jsonl"), append(b, '\n'), 0o600); err != nil {
+	if err = os.WriteFile(filepath.Join(batch, "batch.jsonl"), append(b, '\n'), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := runSync(dir, []string{"import", batch}); err != nil {
+	if err = runSync(dir, []string{"import", batch}); err != nil {
 		t.Fatal(err)
 	}
 	usage.RecordServedFrom(dir, usage.KindRecall,
@@ -48,7 +48,7 @@ func TestForgetTakesTheDigestsOfWhatItForgot(t *testing.T) {
 		"<deja-recall>\n1. my own connection pool question\n", 1, 400, nil,
 		[]string{"tmp/mine"}, "local+imported")
 
-	if _, err := captureRun(t, "forget", "--project", "imported:secretclient/api"); err != nil {
+	if _, err = captureRun(t, "forget", "--project", "imported:secretclient/api"); err != nil {
 		t.Fatal(err)
 	}
 

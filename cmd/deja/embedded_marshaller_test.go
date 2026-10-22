@@ -36,7 +36,7 @@ func embeddedMarshallers(t reflect.Type, seen map[reflect.Type]bool) []string {
 	}
 	seen[t] = true
 	var found []string
-	for i := 0; i < t.NumField(); i++ {
+	for i := range t.NumField() {
 		f := t.Field(i)
 		if f.Anonymous && writesItsOwnJSON(f.Type) {
 			found = append(found, fmt.Sprintf("%s embeds %s, which writes its own JSON", t, f.Type))
@@ -59,7 +59,7 @@ func TestNoReportedTypeEmbedsAMarshaller(t *testing.T) {
 	// One map across the roots: a type's fields do not depend on which root
 	// reached it, so inspecting it once inspects it for all of them.
 	seen := map[reflect.Type]bool{}
-	var found []string
+	found := make([]string, 0, len(roots))
 	for _, r := range roots {
 		found = append(found, embeddedMarshallers(reflect.TypeOf(r), seen)...)
 	}

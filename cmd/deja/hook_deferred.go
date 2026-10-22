@@ -221,7 +221,10 @@ func hookOutputNotes(out []byte) []byte {
 	if json.Unmarshal(bytes.TrimSpace(out), &v) != nil || v.SystemMessage == "" {
 		return nil
 	}
-	b, _ := json.Marshal(v)
+	b, err := json.Marshal(v)
+	if err != nil {
+		return nil
+	}
 	return append(b, '\n')
 }
 
@@ -297,11 +300,14 @@ func withDeferred(out []byte, pending string, plain bool, event string) []byte {
 	if plain || len(t) > 0 {
 		return []byte(join(string(t)) + "\n")
 	}
+	var answer any = map[string]any{"hookSpecificOutput": map[string]any{"hookEventName": event, "additionalContext": pending}}
 	if copilotHookOutput {
-		b, _ := json.Marshal(map[string]string{"additionalContext": pending})
-		return append(b, '\n')
+		answer = map[string]string{"additionalContext": pending}
 	}
-	b, _ := json.Marshal(map[string]any{"hookSpecificOutput": map[string]any{"hookEventName": event, "additionalContext": pending}})
+	b, err := json.Marshal(answer)
+	if err != nil {
+		return out
+	}
 	return append(b, '\n')
 }
 
@@ -465,7 +471,7 @@ func runHookStop(dir string, stdin io.Reader, stdout io.Writer) error {
 	}
 	b, err := json.Marshal(map[string]string{"decision": "block", "reason": pending})
 	if err != nil {
-		return nil
+		return nil //nolint:nilerr // a hook never fails the host
 	}
 	fmt.Fprintln(stdout, string(b))
 	return nil

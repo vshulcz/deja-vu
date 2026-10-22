@@ -143,7 +143,7 @@ func TestQuotedHeadlineNumbersComeFromTheRuns(t *testing.T) {
 		t.Fatal(err)
 	}
 	var lme benchArtifact
-	if err := json.Unmarshal(b, &lme); err != nil {
+	if err = json.Unmarshal(b, &lme); err != nil {
 		t.Fatal(err)
 	}
 	locomoRaw, err := os.ReadFile(filepath.Join(root, "docs", "benchmarks", "locomo.json"))
@@ -151,7 +151,7 @@ func TestQuotedHeadlineNumbersComeFromTheRuns(t *testing.T) {
 		t.Fatal(err)
 	}
 	var locomo benchArtifact
-	if err := json.Unmarshal(locomoRaw, &locomo); err != nil {
+	if err = json.Unmarshal(locomoRaw, &locomo); err != nil {
 		t.Fatal(err)
 	}
 
@@ -160,7 +160,7 @@ func TestQuotedHeadlineNumbersComeFromTheRuns(t *testing.T) {
 		t.Fatal(err)
 	}
 	var full benchArtifact
-	if err := json.Unmarshal(fullRaw, &full); err != nil {
+	if err = json.Unmarshal(fullRaw, &full); err != nil {
 		t.Fatal(err)
 	}
 
@@ -183,9 +183,9 @@ func TestQuotedHeadlineNumbersComeFromTheRuns(t *testing.T) {
 		"docs/llms.txt",
 		"docs/guide/compare.html",
 	} {
-		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name)))
-		if err != nil {
-			t.Fatalf("%s: %v", name, err)
+		raw, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(name)))
+		if readErr != nil {
+			t.Fatalf("%s: %v", name, readErr)
 		}
 		text := string(raw)
 		// By offset, not by the matched text: two quotes in one file can read

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -132,7 +131,7 @@ func TestForgetLeavesOtherProjectsNotesAlone(t *testing.T) {
 	notes := filepath.Join(tmp, "notes.jsonl")
 	keep := map[string]any{"ts": "2026-07-21T10:00:00Z", "project": "elsewhere", "text": "someone else's decision",
 		"kind": "promoted", "session": "claude:zz9", "state": "accepted", "title": "a title from another project"}
-	line, _ := json.Marshal(keep)
+	line := mustMarshal(t, keep)
 	if err := os.WriteFile(notes, append(line, '\n'), 0o600); err != nil {
 		t.Fatal(err)
 	}

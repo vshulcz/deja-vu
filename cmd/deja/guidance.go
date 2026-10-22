@@ -472,8 +472,8 @@ func installGuidance(harness string, uninstall bool) (installResult, error) {
 	// product, @vibe-kit/grok-cli, shares ~/.grok and reads GROK.md, and
 	// retiring that block would take deja away from whoever runs it.
 	if harness == "grok" {
-		if err := writeSharedSkill(harness, uninstall); err != nil {
-			return installResult{}, err
+		if skillErr := writeSharedSkill(harness, uninstall); skillErr != nil {
+			return installResult{}, skillErr
 		}
 	}
 	old, err := os.ReadFile(path)
@@ -494,8 +494,8 @@ func installGuidance(harness string, uninstall bool) (installResult, error) {
 			if restoredGuidance[path] {
 				return installResult{Path: path, Action: "kept", Note: retiredNote}, nil
 			}
-			if err := os.Remove(path); err != nil {
-				return installResult{}, err
+			if removeErr := os.Remove(path); removeErr != nil {
+				return installResult{}, removeErr
 			}
 			// And put back what install replaced. It said where the copy went
 			// — "your copy is at …SKILL.md.bak" — and removing deja's file
@@ -509,18 +509,17 @@ func installGuidance(harness string, uninstall bool) (installResult, error) {
 				return installResult{Path: path, Action: "restored", Note: retiredNote}, nil
 			}
 			return installResult{Path: path, Action: "removed", Note: retiredNote}, nil
-		} else {
-			next = []byte(guidanceText(harness))
-			// A skill inside an antigravity plugin directory is ingested only
-			// when plugin.json marks that directory as a plugin — without it the
-			// whole directory is skipped silently, which `agy plugin validate`
-			// reports as "missing plugin.json". `install antigravity-auto`
-			// writes the marker; plain `install antigravity` did not, so the
-			// guidance landed somewhere nothing would read.
-			if harness == "antigravity" {
-				if err := ensureAntigravityPluginMarker(); err != nil {
-					return installResult{}, err
-				}
+		}
+		next = []byte(guidanceText(harness))
+		// A skill inside an antigravity plugin directory is ingested only
+		// when plugin.json marks that directory as a plugin — without it the
+		// whole directory is skipped silently, which `agy plugin validate`
+		// reports as "missing plugin.json". `install antigravity-auto`
+		// writes the marker; plain `install antigravity` did not, so the
+		// guidance landed somewhere nothing would read.
+		if harness == "antigravity" {
+			if markerErr := ensureAntigravityPluginMarker(); markerErr != nil {
+				return installResult{}, markerErr
 			}
 		}
 	} else {
@@ -618,7 +617,7 @@ func removeGrokTwinBlock() (unbounded string, err error) {
 	}
 	updated, uerr := updateGuidanceBlock(string(oldAlt), true)
 	if uerr != nil {
-		return alt, nil
+		return alt, nil //nolint:nilerr // the caller names an unbounded twin by path
 	}
 	_, werr := writeIfChanged(alt, oldAlt, []byte(updated))
 	return "", werr
@@ -788,7 +787,7 @@ func restoreReplacedFile(path string, ours func([]byte) bool) (bool, error) {
 	bak := path + ".bak"
 	b, err := os.ReadFile(bak)
 	if err != nil {
-		return false, nil
+		return false, nil //nolint:nilerr // no backup means nothing to restore
 	}
 	if ours(b) {
 		return false, os.Remove(bak)

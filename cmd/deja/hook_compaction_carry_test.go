@@ -19,7 +19,7 @@ func claudeLines(t *testing.T, workspace string, minute int, pairs ...string) st
 	t.Helper()
 	var b strings.Builder
 	for i := 0; i < len(pairs); i += 2 {
-		kind, text := pairs[i], pairs[i+1]
+		kind, text := pairs[i], pairs[i+1] //nolint:gosec // pairs come in twos
 		rec := map[string]any{
 			"sessionId": "compaction-fixture", "cwd": workspace,
 			"timestamp": fmt.Sprintf("2026-09-10T11:%02d:%02dZ", minute, i/2),

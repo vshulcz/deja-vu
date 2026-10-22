@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/vshulcz/deja-vu/internal/sources"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // Every writer that can add a container to someone else's config, seeded twice:
@@ -77,7 +78,7 @@ func TestEveryWriterGivesBackTheBlockItMade(t *testing.T) {
 			if string(wired) == tc.body {
 				t.Fatalf("install changed nothing, so the uninstall proves nothing:\n%s", wired)
 			}
-			if _, err := installTarget(tc.target, "/bin/deja", true); err != nil {
+			if _, err = installTarget(tc.target, "/bin/deja", true); err != nil {
 				t.Fatalf("uninstall: %v", err)
 			}
 			back, err := os.ReadFile(path)

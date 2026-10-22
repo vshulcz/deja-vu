@@ -43,7 +43,7 @@ func TestKimiForkGetsNoSecondDigest(t *testing.T) {
 		if forkedFrom != "" {
 			st["forkedFrom"] = forkedFrom
 		}
-		b, _ := json.Marshal(st)
+		b := mustMarshal(t, st)
 		if err := os.WriteFile(filepath.Join(d, "state.json"), b, 0o644); err != nil {
 			t.Fatal(err)
 		}

@@ -58,7 +58,7 @@ func TestDoctorSaysDSHWillNotStartWhenAPluginFileIsGone(t *testing.T) {
 		t.Errorf("a complete install was reported as broken:\n%s", text)
 	}
 
-	if err := os.Remove(dshAutoPath()); err != nil {
+	if err = os.Remove(dshAutoPath()); err != nil {
 		t.Fatal(err)
 	}
 	if got := mcpRow(); got["plugin_missing"] != true {

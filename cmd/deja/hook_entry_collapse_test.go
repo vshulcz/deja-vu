@@ -23,7 +23,7 @@ func TestInstallCollapsesEntriesFromDifferentlyNamedBuilds(t *testing.T) {
 	t.Cleanup(forgetWrittenExes)
 
 	// Six builds under six names, none of them in deja's record.
-	var entries []any
+	entries := make([]any, 0, 7)
 	for _, name := range []string{"deja-cont", "deja-sl", "deja-prog2", "deja-shapes", "deja-arm", "deja-prog"} {
 		entries = append(entries, map[string]any{
 			"hooks": []any{map[string]any{

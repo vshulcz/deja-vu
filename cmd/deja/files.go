@@ -66,17 +66,17 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 				return errors.New("files: --limit needs value")
 			}
 			i++
-			n, err := strconv.Atoi(args[i])
+			n, err := strconv.Atoi(args[i]) //nolint:gosec // the bound is checked above
 			if err != nil || n <= 0 {
-				return fmt.Errorf("files: --limit wants a positive number, got %q", args[i])
+				return fmt.Errorf("files: --limit wants a positive number, got %q", args[i]) //nolint:gosec // the bound is checked above
 			}
 			limit = n
 		case "--project":
-			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" { //nolint:gosec // the bound is checked first
 				return errors.New("files: --project needs value")
 			}
 			i++
-			project = args[i]
+			project = args[i] //nolint:gosec // the bound is checked above
 		case "--all-projects":
 			// The answer is scoped to this project by default (#3713); this
 			// asks the machine instead.
@@ -132,9 +132,9 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		wide := o
 		wide.Projects = nil
 		if again, werr := index.SearchWithRecovery(dir, wide, os.Stderr); werr == nil {
-			again, h2 := policyFilterSessionsCounted(policy.ActivationSearch, again)
-			if len(again) > 0 || h2 > 0 {
-				hits, hidden, widened = again, h2, true
+			kept, h2 := policyFilterSessionsCounted(policy.ActivationSearch, again)
+			if len(kept) > 0 || h2 > 0 {
+				hits, hidden, widened = kept, h2, true
 				scope = nil
 			}
 		}
@@ -178,7 +178,7 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		// An empty store is not a miss on the topic: deja has nothing to look
 		// in, and saying "no sessions mention it" reads as "looked, not there"
 		// (#834).
-		if n, err := index.SessionCount(dir); err == nil && n == 0 {
+		if n, countErr := index.SessionCount(dir); countErr == nil && n == 0 {
 			fmt.Fprintln(stdout, emptyIndexHint(fmt.Sprintf("no sessions mention %q", q)))
 			return nil
 		}
@@ -279,7 +279,7 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 					seenHere[p] = true
 					sessions[p]++
 				}
-				if withinTime(m.Time, hit, filesWindow) {
+				if withinTime(m.Time, hit) {
 					near[p]++
 					if !nearHere[p] {
 						nearHere[p] = true
@@ -530,12 +530,12 @@ func topicTimes(ms []model.Message, needles []string) []time.Time {
 	return out
 }
 
-func withinTime(t time.Time, at []time.Time, w time.Duration) bool {
+func withinTime(t time.Time, at []time.Time) bool {
 	if t.IsZero() {
 		return false
 	}
 	for _, p := range at {
-		if d := t.Sub(p); d < w && d > -w {
+		if d := t.Sub(p); d < filesWindow && d > -filesWindow {
 			return true
 		}
 	}
@@ -578,7 +578,9 @@ func isScratch(p string) bool {
 func inRepository(p string) bool {
 	dir := filepath.Dir(p)
 	if v, ok := repoCheck.Load(dir); ok {
-		return v.(bool)
+		if known, isBool := v.(bool); isBool {
+			return known
+		}
 	}
 	found := inRepositoryUncached(p)
 	repoCheck.Store(dir, found)

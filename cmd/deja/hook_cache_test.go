@@ -56,7 +56,7 @@ func TestCachedHookDigestServesWithinTTLAndInvalidates(t *testing.T) {
 		t.Fatal(err)
 	}
 	e.At = time.Now().Add(-2 * hookDigestTTL)
-	nb, _ := json.Marshal(e)
+	nb := mustMarshal(t, e)
 	if err := os.WriteFile(cachePath, nb, 0o600); err != nil {
 		t.Fatal(err)
 	}

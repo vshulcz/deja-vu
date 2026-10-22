@@ -40,7 +40,7 @@ func TestBenchRecallJSONAndIsolation(t *testing.T) {
 		} `json:"lexical"`
 		HybridStatus string `json:"hybrid_status"`
 	}
-	if err := json.Unmarshal([]byte(out), &report); err != nil {
+	if err = json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("invalid benchmark JSON %q: %v", out, err)
 	}
 	if len(report.CorpusHash) != 64 || report.Sessions != bench.SessionCount || report.Queries != bench.QueryCount || report.Lexical.RecallAt5 < 0.85 || report.Lexical.RecallAt10 < report.Lexical.RecallAt5 || report.Lexical.MedianMS < 0 || report.HybridStatus == "" {
@@ -136,15 +136,8 @@ func TestBenchmarkTempDirStaysInWorkspace(t *testing.T) {
 }
 
 func TestBenchmarkTempDirRejectsSquattedParent(t *testing.T) {
-	workingDir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
 	root := t.TempDir()
-	if err := os.Chdir(root); err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(workingDir) }()
+	t.Chdir(root)
 	if err := os.WriteFile(filepath.Join(root, ".deja-bench"), []byte("not a directory"), 0o600); err != nil {
 		t.Fatal(err)
 	}

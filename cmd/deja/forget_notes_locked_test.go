@@ -50,7 +50,7 @@ func TestForgetSaysWhenTheBorrowedTitleSurvived(t *testing.T) {
 	}
 
 	locked := filepath.Dir(notes)
-	if err := os.Chmod(locked, 0o500); err != nil {
+	if err = os.Chmod(locked, 0o500); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(locked, 0o700) })

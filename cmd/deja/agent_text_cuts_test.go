@@ -78,7 +78,7 @@ func TestTheEnvironmentBlockCutsOnRuneBoundaries(t *testing.T) {
 	tmp := hermeticEnv(t)
 	// Three project directories: a wall of one repository is no longer a fact
 	// about the machine.
-	var roots []string
+	roots := make([]string, 0, environmentMinProjects)
 	for i := range environmentMinProjects {
 		root := filepath.Join(tmp, "claude", fmt.Sprintf("proj-w%d", i))
 		if err := os.MkdirAll(root, 0o755); err != nil {

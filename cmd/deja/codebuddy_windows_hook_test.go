@@ -12,6 +12,20 @@ import (
 	"testing"
 )
 
+func codebuddyHookCommand(t *testing.T, entry any) any {
+	t.Helper()
+	group, _ := entry.(map[string]any)
+	hooks, _ := group["hooks"].([]any)
+	if len(hooks) == 0 {
+		t.Fatalf("no hooks in %v", entry)
+	}
+	h, ok := hooks[0].(map[string]any)
+	if !ok {
+		t.Fatalf("hook is not an object: %v", hooks[0])
+	}
+	return h["command"]
+}
+
 // hookEchoEnv turns the test binary into a stand-in for deja: it prints its
 // arguments on one line and then whatever came in on stdin, and exits 0, or
 // with the code in hookEchoExitEnv.
@@ -149,9 +163,8 @@ func TestCodeBuddyWindowsHookLineReplacesTheQuotedOne(t *testing.T) {
 	if len(entries) != 1 {
 		t.Fatalf("%d SessionStart entries, want 1: %v", len(entries), entries)
 	}
-	h := entries[0].(map[string]any)["hooks"].([]any)[0].(map[string]any)
-	if h["command"] != line {
-		t.Fatalf("command %q, want %q", h["command"], line)
+	if got := codebuddyHookCommand(t, entries[0]); got != line {
+		t.Fatalf("command %q, want %q", got, line)
 	}
 	// From another install path: still ours, still one entry.
 	moved := codeBuddyHookRun("windows", `D:\Tools Dir\deja.exe`, "hook-context")
@@ -159,7 +172,7 @@ func TestCodeBuddyWindowsHookLineReplacesTheQuotedOne(t *testing.T) {
 		t.Fatal(err)
 	}
 	entries, _ = readJSONConfig(path)["hooks"].(map[string]any)["SessionStart"].([]any)
-	if len(entries) != 1 || entries[0].(map[string]any)["hooks"].([]any)[0].(map[string]any)["command"] != moved {
+	if len(entries) != 1 || codebuddyHookCommand(t, entries[0]) != moved {
 		t.Fatalf("after a move: %v", entries)
 	}
 	if _, err := installSettingsHookCmd(path, "SessionStart", "", 60, moved, true); err != nil {
@@ -232,7 +245,7 @@ func TestCodeBuddyHookLineRunsInEveryWindowsShell(t *testing.T) {
 		t.Log("no Git Bash on this machine; the bash leg is not run")
 	}
 	for _, r := range runs {
-		c := exec.Command(r.argv[0], r.argv[1:]...)
+		c := exec.CommandContext(t.Context(), r.argv[0], r.argv[1:]...)
 		c.Env = append(os.Environ(), hookEchoEnv+"=1")
 		c.Stdin = strings.NewReader(payload)
 		var stderr strings.Builder
@@ -243,7 +256,7 @@ func TestCodeBuddyHookLineRunsInEveryWindowsShell(t *testing.T) {
 			t.Errorf("%s ran %q:\n err %v\n out %q\nwant %q\n stderr %s", r.name, line, err, got, want, stderr.String())
 		}
 
-		c = exec.Command(r.argv[0], r.argv[1:]...)
+		c = exec.CommandContext(t.Context(), r.argv[0], r.argv[1:]...)
 		c.Env = append(os.Environ(), hookEchoEnv+"=1", hookEchoExitEnv+"=3")
 		c.Stdin = strings.NewReader(payload)
 		err = c.Run()

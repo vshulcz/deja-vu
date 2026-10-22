@@ -13,6 +13,7 @@ import (
 // records, same uuids and times, plus two turns of its own, into a sandbox
 // Claude store. marked adds the forkedFrom a /branch writes.
 func claudeForkStore(t *testing.T, marked bool) string {
+	t.Helper()
 	return claudeForkStoreWent(t, marked, false)
 }
 

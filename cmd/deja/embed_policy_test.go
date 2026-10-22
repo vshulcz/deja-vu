@@ -53,7 +53,7 @@ func TestEmbedKeepHonoursEveryActivation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var recs []index.Record
+	recs := make([]index.Record, 0, len(offs))
 	for _, o := range offs {
 		recs = append(recs, o.Record)
 	}

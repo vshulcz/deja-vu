@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -186,7 +187,7 @@ begin;
 		return err
 	}
 	defer func() { _ = f.Close() }()
-	cmd := exec.Command("sqlite3", db)
+	cmd := exec.CommandContext(context.Background(), "sqlite3", db)
 	cmd.Stdin = f
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("sqlite3 setup: %w: %s", err, out)

@@ -35,7 +35,7 @@ func aged(t *testing.T, ps ...string) {
 	for _, p := range ps {
 		_ = filepath.Walk(p, func(q string, _ os.FileInfo, err error) error {
 			if err == nil {
-				_ = os.Chtimes(q, old, old)
+				_ = os.Chtimes(q, old, old) //nolint:gosec // the test walks its own temp tree
 			}
 			return nil
 		})

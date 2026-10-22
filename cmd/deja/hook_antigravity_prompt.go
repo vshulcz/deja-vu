@@ -112,7 +112,7 @@ func transcriptTailSteps(path string) []transcriptStep {
 	lines := strings.Split(string(buf), "\n")
 	out := make([]transcriptStep, 0, len(lines))
 	for _, line := range slices.Backward(lines) {
-		line := strings.TrimSpace(line)
+		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
@@ -147,8 +147,8 @@ func userRequestText(content string) string {
 		return strings.TrimSpace(content)
 	}
 	rest := after
-	if close := strings.Index(rest, userRequestClose); close >= 0 {
-		rest = rest[:close]
+	if end := strings.Index(rest, userRequestClose); end >= 0 {
+		rest = rest[:end]
 	}
 	return strings.TrimSpace(rest)
 }

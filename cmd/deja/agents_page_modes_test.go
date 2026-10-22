@@ -48,7 +48,7 @@ func TestTheAgentsPageNamesEveryMCPMode(t *testing.T) {
 // a mode added there has to reach the page.
 func mcpToolModes(t *testing.T) []string {
 	t.Helper()
-	b, err := os.ReadFile(filepath.Join("mcp.go"))
+	b, err := os.ReadFile("mcp.go")
 	if err != nil {
 		t.Fatal(err)
 	}

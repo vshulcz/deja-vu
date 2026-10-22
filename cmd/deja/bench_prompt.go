@@ -434,8 +434,8 @@ func measurePrompt(seed int64) (promptReport, error) {
 			// asking both about every chain in the corpus, this is the one arm
 			// of seven where they disagree — "как там pr, смержился?" scored
 			// correct here while the hook answered nothing.
-			if fired, carries := hookEndToEndAs(indexDir, scope, chain.Question, chain.Fact, chain.Topic,
-				"benchshort"); fired {
+			if hooked, carries := hookEndToEndAs(indexDir, scope, chain.Question, chain.Fact, chain.Topic,
+				"benchshort"); hooked {
 				arm.Fired++
 				if carries {
 					arm.Correct++
@@ -457,8 +457,8 @@ func measurePrompt(seed int64) (promptReport, error) {
 		case "tool-only":
 			arm = &report.ToolOnly
 			arm.Cases++
-			if fired, _ := hookEndToEndAs(indexDir, scope, chain.Question, chain.Fact, chain.Topic,
-				"benchtoolonly"); fired {
+			if hooked, _ := hookEndToEndAs(indexDir, scope, chain.Question, chain.Fact, chain.Topic,
+				"benchtoolonly"); hooked {
 				arm.Fired++
 				arm.FalseFires++
 			} else {
@@ -470,8 +470,8 @@ func measurePrompt(seed int64) (promptReport, error) {
 			arm.Cases++
 			// Asked from the session that holds the answer: recalling it to
 			// itself spends tokens to say what is already on screen.
-			if fired, carries := hookEndToEndAs(indexDir, scope, chain.Question, chain.Fact, chain.Topic,
-				chain.ID+"-session"); fired && carries {
+			if hooked, carries := hookEndToEndAs(indexDir, scope, chain.Question, chain.Fact, chain.Topic,
+				chain.ID+"-session"); hooked && carries {
 				arm.Fired++
 				arm.FalseFires++
 			} else {
@@ -481,8 +481,8 @@ func measurePrompt(seed int64) (promptReport, error) {
 		case "hook-e2e":
 			arm = &report.EndToEnd
 			arm.Cases++
-			fired, carries := hookEndToEnd(indexDir, scope, chain.Question, chain.Fact, chain.Topic)
-			if fired {
+			hooked, carries := hookEndToEnd(indexDir, scope, chain.Question, chain.Fact, chain.Topic)
+			if hooked {
 				arm.Fired++
 				if carries {
 					arm.Correct++
@@ -494,9 +494,9 @@ func measurePrompt(seed int64) (promptReport, error) {
 		case "compound-subject":
 			arm = &report.Compound
 			arm.Cases++
-			if fired, correct := promptBenchProbe(indexDir, scope, chain.ID, terms); fired {
+			if probed, matched := promptBenchProbe(indexDir, scope, chain.ID, terms); probed {
 				arm.Fired++
-				if correct {
+				if matched {
 					arm.Correct++
 				} else {
 					arm.FalseFires++
@@ -530,14 +530,14 @@ func measurePrompt(seed int64) (promptReport, error) {
 		}
 		if chain.Paraphrase != "" {
 			pterms := prompt.Terms(chain.Paraphrase)
-			arm := &report.Paraphrase
-			arm.Cases++
+			para := &report.Paraphrase
+			para.Cases++
 			if pfired, pcorrect := promptBenchProbe(indexDir, scope, chain.ID, pterms); pfired {
-				arm.Fired++
+				para.Fired++
 				if pcorrect {
-					arm.Correct++
+					para.Correct++
 				} else {
-					arm.FalseFires++
+					para.FalseFires++
 				}
 			}
 		}

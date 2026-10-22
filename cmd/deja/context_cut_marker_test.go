@@ -62,7 +62,7 @@ func TestTheChangesBlockCountsWhatDidNotFit(t *testing.T) {
 	n := 0
 	line := func(typ string, content any) {
 		n++
-		raw, _ := json.Marshal(map[string]any{
+		raw := mustMarshal(t, map[string]any{
 			"type": typ, "sessionId": id, "cwd": "/proj",
 			"timestamp": fmt.Sprintf("2026-07-01T10:%02d:%02dZ", n/60, n%60),
 			"message":   map[string]any{"role": typ, "content": content},

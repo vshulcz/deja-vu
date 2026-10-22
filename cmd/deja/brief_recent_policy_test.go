@@ -14,7 +14,7 @@ import (
 // Search, `last`, blame and the status line all refuse a session a trust rule
 // withholds; this screen named three of them.
 func TestBriefRecentHonoursThePolicy(t *testing.T) {
-	dir := importedStore(t, 3)
+	dir := importedStore(t)
 	writePolicy(t, `{"activations":{"search":{"local":true,"imported":false},"auto":{"local":true,"imported":false}}}`)
 
 	var buf bytes.Buffer
@@ -29,7 +29,7 @@ func TestBriefRecentHonoursThePolicy(t *testing.T) {
 // With no rule in the way the block still fills: a fix that simply dropped it
 // would pass the test above.
 func TestBriefRecentStillNamesWhatIsAllowed(t *testing.T) {
-	dir := importedStore(t, 3)
+	dir := importedStore(t)
 
 	var buf bytes.Buffer
 	if err := runBrief(dir, &buf); err != nil {
@@ -47,7 +47,7 @@ func TestBriefRecentStillNamesWhatIsAllowed(t *testing.T) {
 // A rule that withholds only some sessions leaves the block full rather than
 // short: the brief asks for more than it shows for exactly this reason.
 func TestBriefRecentFillsAroundWithheldSessions(t *testing.T) {
-	dir := importedStore(t, 3)
+	dir := importedStore(t)
 	// A local session alongside the imported ones, newer than none of them:
 	// the block should fill with it rather than come back short.
 	store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")

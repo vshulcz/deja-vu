@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -22,7 +21,7 @@ func TestMuseCompactionPacketReachesTheNextPrompt(t *testing.T) {
 	dir := index.DefaultDir()
 	const id = "01a10bdb-0147-7f40-99e9-cc17071cd6e8"
 	rec := func(n int, typ string, payload any) string {
-		b, _ := json.Marshal(map[string]any{
+		b := mustMarshal(t, map[string]any{
 			"schema_version": 1, "id": "r", "stream": map[string]any{"kind": "session", "id": id},
 			"sequence": n, "recorded_at": int64(1_791_200_000_000_000) + int64(n)*1_000_000,
 			"record_type": "event", "payload_type": typ, "payload": payload,
@@ -44,7 +43,7 @@ func TestMuseCompactionPacketReachesTheNextPrompt(t *testing.T) {
 		run(5, map[string]any{"kind": "assistant_message_committed", "text": "The parser test fails: want 3, got 4. I decided to fix parse.go next."}),
 	}, "\n")+"\n")
 
-	pre, _ := json.Marshal(map[string]any{"hook_event_name": "PreCompact", "trigger": "hard", "session_id": id, "cwd": workspace, "transcript_path": nil, "model_provider": "meta"})
+	pre := mustMarshal(t, map[string]any{"hook_event_name": "PreCompact", "trigger": "hard", "session_id": id, "cwd": workspace, "transcript_path": nil, "model_provider": "meta"})
 	withHookStdin(t, string(pre))
 	runHookPrecompact(dir)
 	if _, found, err := index.Compaction(dir, id, workspace); err != nil || !found {
@@ -66,11 +65,11 @@ func TestMuseCompactionRefusesALogOfAnotherSession(t *testing.T) {
 	workspace := compactionGitRepo(t)
 	dir := index.DefaultDir()
 	const id = "01a10bdb-0147-7f40-99e9-cc17071cd6e8"
-	b, _ := json.Marshal(map[string]any{"stream": map[string]any{"kind": "session", "id": "01a10bdb-0000-7000-8000-000000000000"},
+	b := mustMarshal(t, map[string]any{"stream": map[string]any{"kind": "session", "id": "01a10bdb-0000-7000-8000-000000000000"},
 		"recorded_at": 1_791_200_000_000_000, "payload_type": "runtime.session",
 		"payload": map[string]any{"kind": "run", "event": map[string]any{"kind": "started", "prompt": "someone else's work"}}})
 	compactionWrite(t, filepath.Join(sources.MuseRoot(), "2026", "10", "05", id, "session.jsonl"), string(b)+"\n")
-	pre, _ := json.Marshal(map[string]any{"hook_event_name": "PreCompact", "trigger": "hard", "session_id": id, "cwd": workspace})
+	pre := mustMarshal(t, map[string]any{"hook_event_name": "PreCompact", "trigger": "hard", "session_id": id, "cwd": workspace})
 	withHookStdin(t, string(pre))
 	runHookPrecompact(dir)
 	if _, found, _ := index.Compaction(dir, id, workspace); found {

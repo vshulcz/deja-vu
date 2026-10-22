@@ -29,7 +29,7 @@ func TestDoctorNamesTheMachinesThatSentWork(t *testing.T) {
 		batch := t.TempDir()
 		// Written as a batch is written on the wire: `origin` is the machine
 		// that exported it, and its type is unexported here.
-		var lines []string
+		lines := make([]string, 0, len(ids))
 		for _, id := range ids {
 			lines = append(lines, fmt.Sprintf(
 				`{"harness":"claude","session_id":%q,"project":"work/app","role":"user",`+
@@ -63,7 +63,7 @@ func TestDoctorNamesTheMachinesThatSentWork(t *testing.T) {
 	// A machine with neither peers nor imports still says so.
 	hermeticEnv(t)
 	empty := index.DefaultDir()
-	if err := index.Ensure(empty, "", true, nil); err != nil {
+	if err = index.Ensure(empty, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	out, err = captureRun(t, "doctor")

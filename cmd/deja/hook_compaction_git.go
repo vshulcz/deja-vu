@@ -182,8 +182,8 @@ func hashUntrackedFile(h hash.Hash, root, name string, used *int64) bool {
 	}
 	hashWorktreeField(h, info.Mode().String())
 	if info.Mode()&os.ModeSymlink != 0 {
-		target, err := os.Readlink(path)
-		if err != nil {
+		target, linkErr := os.Readlink(path)
+		if linkErr != nil {
 			return false
 		}
 		hashWorktreeField(h, target)

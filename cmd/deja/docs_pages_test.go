@@ -117,8 +117,9 @@ func TestTextSitemapMatchesTheXMLOne(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var want []string
-	for _, m := range regexp.MustCompile(`<loc>([^<]+)</loc>`).FindAllStringSubmatch(string(xml), -1) {
+	locs := regexp.MustCompile(`<loc>([^<]+)</loc>`).FindAllStringSubmatch(string(xml), -1)
+	want := make([]string, 0, len(locs))
+	for _, m := range locs {
 		want = append(want, m[1])
 	}
 	got := strings.Split(strings.TrimSpace(string(txt)), "\n")

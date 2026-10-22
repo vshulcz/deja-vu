@@ -96,7 +96,7 @@ func TestInstallGooseKeepsAHandWrittenBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := captureRun(t, "install", "goose"); err != nil {
+	if _, err = captureRun(t, "install", "goose"); err != nil {
 		t.Fatal(err)
 	}
 	second, err := os.ReadFile(cfg)

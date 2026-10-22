@@ -127,13 +127,14 @@ func writeLineAnswerJSON(w io.Writer, answer lineAnswerJSON) error {
 func blameLineOnly(w io.Writer, dir string, target search.BlameTarget, hits []search.BlameHit, mode blameMode) error {
 	c, author, found, why := lineAttribution(dir, target, hits)
 	if mode.Attribution {
-		if mode.JSON {
+		switch {
+		case mode.JSON:
 			if err := writeLineAnswerJSON(w, buildLineAnswer(target, c, author, found, why)); err != nil {
 				return err
 			}
-		} else if why != "" {
+		case why != "":
 			fmt.Fprintf(w, "%s:%d — %s\n", target.Base, target.Line, why)
-		} else {
+		default:
 			printLineAuthor(w, target, c, author, found)
 		}
 	}

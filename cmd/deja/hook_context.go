@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1338,7 +1339,7 @@ func requestHookRefresh(dir, cwd string) {
 	if strings.HasSuffix(strings.TrimSuffix(exe, ".exe"), ".test") {
 		return
 	}
-	cmd := exec.Command(exe, "hook-refresh")
+	cmd := exec.CommandContext(context.Background(), exe, "hook-refresh")
 	cmd.Env = append(os.Environ(), "DEJA_HOOK_REFRESH=1", "CLAUDE_PROJECT_DIR="+cwd)
 	devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
 	if err != nil {
@@ -1471,7 +1472,7 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, c
 			allowedNames = append(allowedNames, n)
 		}
 	}
-	conventions := projectConventions(allowedNames, 6, 800)
+	conventions := projectConventions(allowedNames)
 	var ss []model.Session
 	seen := map[string]bool{}
 	lookupNames := names
@@ -1552,11 +1553,11 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, c
 	// place, and the next variant has to start from the order the store gave.
 	render := func(exclude []string) hookCacheEntry {
 		hookDigestRenders.Add(1)
-		ss := slices.DeleteFunc(slices.Clone(ss), func(s model.Session) bool { return s.ID != "" && slices.Contains(exclude, s.ID) })
+		variant := slices.DeleteFunc(slices.Clone(ss), func(s model.Session) bool { return s.ID != "" && slices.Contains(exclude, s.ID) })
 		if len(cut) > 0 {
-			ss = slices.DeleteFunc(ss, func(s model.Session) bool { return len(cutSessionAt(s, cut).Messages) == 0 })
-			for i := range ss {
-				ss[i] = cutSessionAt(ss[i], cut)
+			variant = slices.DeleteFunc(variant, func(s model.Session) bool { return len(cutSessionAt(s, cut).Messages) == 0 })
+			for i := range variant {
+				variant[i] = cutSessionAt(variant[i], cut)
 			}
 		}
 		// A subagent run is the parent's work seen from inside, and what it says
@@ -1566,10 +1567,10 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, c
 		// them like any other session and let one lead the block ahead of the
 		// session that settled the work (#3368). Kept only when the project has
 		// nothing else: a subagent's transcript still beats an empty digest.
-		if kept := withoutSubagentRuns(ss); len(kept) > 0 {
-			ss = kept
+		if kept := withoutSubagentRuns(variant); len(kept) > 0 {
+			variant = kept
 		}
-		if len(ss) == 0 {
+		if len(variant) == 0 {
 			// A project can have settled decisions and no recent session left to
 			// show them (the transcript was forgotten, or aged past the window).
 			// The standing decisions still apply, so serve them alone rather than
@@ -1581,36 +1582,36 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, c
 			// that separates "the rule hid all of it" from "no history here".
 			return hookCacheEntry{Withheld: withheld}
 		}
-		scores, matched := taskScores(ss, taskFiles)
-		sort.Slice(ss, func(i, j int) bool {
-			if scores[ss[i].Harness+":"+ss[i].ID] != scores[ss[j].Harness+":"+ss[j].ID] {
-				return scores[ss[i].Harness+":"+ss[i].ID] > scores[ss[j].Harness+":"+ss[j].ID]
+		scores, matched := taskScores(variant, taskFiles)
+		sort.Slice(variant, func(i, j int) bool {
+			if scores[variant[i].Harness+":"+variant[i].ID] != scores[variant[j].Harness+":"+variant[j].ID] {
+				return scores[variant[i].Harness+":"+variant[i].ID] > scores[variant[j].Harness+":"+variant[j].ID]
 			}
-			return ss[i].Updated.After(ss[j].Updated)
+			return variant[i].Updated.After(variant[j].Updated)
 		})
-		if len(ss) > 12 {
-			ss = ss[:12]
+		if len(variant) > 12 {
+			variant = variant[:12]
 		}
 		// Digest and scoring only ever use the recent tail; hauling a marathon
 		// session's megabytes through word sets is pure waste.
-		for i := range ss {
-			if len(ss[i].Messages) > 150 {
-				ss[i].Messages = ss[i].Messages[len(ss[i].Messages)-150:]
+		for i := range variant {
+			if len(variant[i].Messages) > 150 {
+				variant[i].Messages = variant[i].Messages[len(variant[i].Messages)-150:]
 			}
 		}
 		mark("task-scores")
 		// A rejected session belongs last, and the mark has to travel with it: the
 		// block listed the correction as a separate item and left the session it
 		// corrects unmarked (#761).
-		ss, rejectedWarning := orderForInjection(ss)
-		ss, unseen := leadWithUnseen(dir, names, ss)
+		variant, rejectedWarning := orderForInjection(variant)
+		variant, unseen := leadWithUnseen(dir, names, variant)
 		// A session found by where its work happened carries the name of the
 		// directory it was started in, which is not one the cwd can guess — the
 		// safe-mode filter is a name list, so the evidence that admitted the
 		// session admits its name with it (#2040). The trust policy has already
 		// had its say on each of these, one session at a time, above.
-		result := search.BuildAutoRecall(ss, search.AutoRecallOptions{
-			Mode: mode, ProjectNames: withProjectsOf(names, ss), TaskScores: scores, Unseen: unseen})
+		result := search.BuildAutoRecall(variant, search.AutoRecallOptions{
+			Mode: mode, ProjectNames: withProjectsOf(names, variant), TaskScores: scores, Unseen: unseen})
 		mark("build-digest")
 		if result.Sessions == 0 {
 			matched = nil
@@ -1641,7 +1642,7 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, c
 		// prints about itself (1 session distilled, 3 sessions' bytes claimed).
 		// The projects behind what actually went out, so the injection log can be
 		// held to a rule or a forget without reading the digest's prose (#2349).
-		return hookCacheEntry{Digest: text, Sessions: result.Sessions, Raw: result.RawBytes, TaskMatched: matched, Withheld: withheld, IDs: result.IDs, Projects: digestProjects(ss, envFrom)}
+		return hookCacheEntry{Digest: text, Sessions: result.Sessions, Raw: result.RawBytes, TaskMatched: matched, Withheld: withheld, IDs: result.IDs, Projects: digestProjects(variant, envFrom)}
 	}
 	entry = render(exclude)
 	if variants && entry.Digest != "" {
@@ -1761,11 +1762,11 @@ func requestWarmup(dir string) {
 			return
 		}
 	}
-	if _, err := fmt.Fprintln(f, now.UnixNano()); err != nil {
+	if _, err = fmt.Fprintln(f, now.UnixNano()); err != nil {
 		_ = f.Close()
 		return
 	}
-	if err := f.Close(); err != nil {
+	if err = f.Close(); err != nil {
 		return
 	}
 	exe, err := os.Executable()
@@ -1778,7 +1779,7 @@ func requestWarmup(dir string) {
 }
 
 func startDetachedWarmup(exe, sentinel string) error {
-	cmd := exec.Command(exe, "index")
+	cmd := exec.CommandContext(context.Background(), exe, "index")
 	cmd.Env = append(os.Environ(), "DEJA_WARMUP_SENTINEL="+sentinel)
 	devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
 	if err != nil {

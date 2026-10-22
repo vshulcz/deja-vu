@@ -45,7 +45,7 @@ func TestEnsureErrorNamesWhatToFix(t *testing.T) {
 // error`, which tells the reader neither that the disk is gone nor what to do
 // (#899).
 func TestEnsureErrorNamesAnUnreachableDisk(t *testing.T) {
-	dir := filepath.Join("/Volumes", "somewhere", "index.db")
+	dir := filepath.FromSlash("/Volumes/somewhere/index.db")
 	for _, errno := range []syscall.Errno{syscall.EIO, syscall.ENXIO, syscall.ENODEV} {
 		got := ensureError(dir, fmt.Errorf("write %s: %w", filepath.Join(dir+".tmp", "records.bin"), errno)).Error()
 		if !strings.Contains(got, "not reachable") || !strings.Contains(got, filepath.Dir(dir)) {

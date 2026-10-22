@@ -32,10 +32,10 @@ func TestTheCardAndThePagePrintTheWeekTheyWereHanded(t *testing.T) {
 	// only ever passes two-digit numbers would not notice a renderer that
 	// formatted its own.
 	r.WeekRecalls = 1234
-	if card := renderStatsCard(r); !strings.Contains(card, ">1,234</text>") {
+	if card = renderStatsCard(r); !strings.Contains(card, ">1,234</text>") {
 		t.Errorf("the card does not group thousands the way the report's other figures are grouped")
 	}
-	if page := renderPage(t, r); !strings.Contains(page, "1,234 times this week") {
+	if page = renderPage(t, r); !strings.Contains(page, "1,234 times this week") {
 		t.Errorf("the page does not group thousands")
 	}
 

@@ -128,7 +128,7 @@ func TestDoctorJSONCarriesTheClaudeAndCodexHookRows(t *testing.T) {
 		}
 	}
 
-	var all []string
+	all := make([]string, 0, len(claudeHookWiring))
 	for _, h := range claudeHookWiring {
 		all = append(all, h.Event)
 	}

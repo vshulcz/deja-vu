@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -48,7 +47,7 @@ INSERT INTO sessions VALUES ('job-zephyr','` + source + `',NULL,'/w/p');
 INSERT INTO messages (session_id,role,content,timestamp) VALUES
  ('job-zephyr','user','the zephyr reconciler drops refunds with QX-77',1785000000),
  ('job-zephyr','assistant','The zephyr reconciler skips refunds whose QX-77 ledger id is reused; keyed it on the refund id.',1785000060);`
-		cmd := exec.Command("sqlite3", filepath.Join(home, "state.db"))
+		cmd := exec.CommandContext(t.Context(), "sqlite3", filepath.Join(home, "state.db"))
 		cmd.Stdin = strings.NewReader(script)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("sqlite3: %v\n%s", err, out)
@@ -57,7 +56,7 @@ INSERT INTO messages (session_id,role,content,timestamp) VALUES
 		if err := index.Ensure(dir, "", false, nil); err != nil {
 			t.Fatal(err)
 		}
-		payload, _ := json.Marshal(map[string]string{"session_id": "asker-" + source, "cwd": "/w/p", "prompt": "why does the zephyr reconciler drop refunds with QX-77"})
+		payload := mustMarshal(t, map[string]string{"session_id": "asker-" + source, "cwd": "/w/p", "prompt": "why does the zephyr reconciler drop refunds with QX-77"})
 		var out strings.Builder
 		if err := runHookPromptMode(dir, strings.NewReader(string(payload)), &out, true); err != nil {
 			t.Fatal(err)
@@ -66,7 +65,7 @@ INSERT INTO messages (session_id,role,content,timestamp) VALUES
 		if err != nil {
 			t.Fatal(err)
 		}
-		var ids []string
+		ids := make([]string, 0, len(hits))
 		for _, h := range hits {
 			ids = append(ids, h.ID)
 		}

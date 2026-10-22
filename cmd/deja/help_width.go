@@ -90,7 +90,7 @@ func usageGroups(s string) []string {
 	var out []string
 	depth := 0
 	start := -1
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		switch c := s[i]; {
 		case c == '[' || c == '(':
 			if depth == 0 && start < 0 {

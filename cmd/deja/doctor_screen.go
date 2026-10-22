@@ -191,7 +191,7 @@ func doctorFoldSection(section string, lines []string, present map[string]bool, 
 			skillNote = l
 			continue
 		}
-		if strings.HasPrefix(l, "  ") && !strings.HasPrefix(l, "   ") && len(blocks) >= 0 {
+		if strings.HasPrefix(l, "  ") && !strings.HasPrefix(l, "   ") {
 			name, rest, _ := strings.Cut(strings.TrimPrefix(l, "  "), " ")
 			blocks = append(blocks, block{lines: []string{l}, name: name, state: strings.TrimLeft(rest, " ")})
 			continue

@@ -37,7 +37,7 @@ func TestTheDocsAreCheckedOutWithUnixLineEndings(t *testing.T) {
 		if err != nil || d.IsDir() || !texty[strings.ToLower(filepath.Ext(p))] {
 			return err
 		}
-		b, err := os.ReadFile(p)
+		b, err := os.ReadFile(p) //nolint:gosec // the test walks the repo checkout
 		if err != nil {
 			return err
 		}

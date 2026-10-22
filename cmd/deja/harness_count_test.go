@@ -20,7 +20,7 @@ func TestTheIntroductionsCountEveryHarness(t *testing.T) {
 	root := filepath.Join("..", "..")
 	n := registryHarnessCount(t, root)
 	// "and <count> more", with the agents it names in the words just before it.
-	phrase := regexp.MustCompile(`and[\s\n]+([a-z-]+)[\s\n]+more`)
+	phrase := regexp.MustCompile(`and\s+([a-z-]+)\s+more`)
 	names := regexp.MustCompile(`Claude Code|Codex|Cursor|opencode|Gemini|Copilot|Zed`)
 	files := []string{
 		"extensions/zed/README.md",

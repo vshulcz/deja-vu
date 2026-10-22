@@ -31,7 +31,7 @@ func writeTruncatedSidecar(t *testing.T, dir string) {
 }
 
 func writeSidecarString(b *bytes.Buffer, s string) {
-	_ = binary.Write(b, binary.LittleEndian, uint32(len(s)))
+	_ = binary.Write(b, binary.LittleEndian, uint32(len(s))) //nolint:gosec // fixture strings are short
 	b.WriteString(s)
 }
 

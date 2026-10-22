@@ -27,7 +27,7 @@ func seedWallsHitting(t *testing.T, n int, output string) string {
 	tmp := hermeticEnv(t)
 	// Three project directories, because the block claims something about the
 	// machine and a wall of one repository no longer qualifies.
-	var roots []string
+	roots := make([]string, 0, environmentMinProjects)
 	for i := range environmentMinProjects {
 		root := filepath.Join(tmp, "claude", fmt.Sprintf("proj-w%d", i))
 		if err := os.MkdirAll(root, 0o755); err != nil {
@@ -234,7 +234,17 @@ func TestEnvironmentBlockIsFramedInMCPRecall(t *testing.T) {
 			if code != 0 {
 				t.Fatal(msg)
 			}
-			out = res.(map[string]any)["messages"].([]map[string]any)[0]["content"].(map[string]any)["text"].(string)
+			reply, _ := res.(map[string]any)
+			msgs, _ := reply["messages"].([]map[string]any)
+			if len(msgs) == 0 {
+				t.Fatalf("prompts/get returned no messages: %#v", res)
+			}
+			content, _ := msgs[0]["content"].(map[string]any)
+			text, ok := content["text"].(string)
+			if !ok {
+				t.Fatalf("prompts/get message has no text: %#v", msgs[0])
+			}
+			out = text
 		}
 		if !strings.Contains(out, "ERRINJ") {
 			t.Fatalf("%s: the fixture produced no environment block, so this proves nothing:\n%s", via, out)

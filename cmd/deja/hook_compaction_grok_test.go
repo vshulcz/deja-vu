@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -28,7 +29,7 @@ func grokUpdates(t *testing.T, workspace, id string) string {
 	}
 	compactionWrite(t, filepath.Join(sources.GrokRoot(), "sessions", group, ".cwd"), workspace)
 	dir := filepath.Join(sources.GrokRoot(), "sessions", group, id)
-	summary, _ := json.Marshal(map[string]any{
+	summary := mustMarshal(t, map[string]any{
 		"info":              map[string]any{"id": id, "cwd": workspace},
 		"session_summary":   "fix the parser test",
 		"created_at":        "2026-10-07T10:20:23.521115Z",
@@ -55,7 +56,7 @@ func grokUpdates(t *testing.T, workspace, id string) string {
 	return path
 }
 
-func jsonInt(n int64) string { b, _ := json.Marshal(n); return string(b) }
+func jsonInt(n int64) string { return strconv.FormatInt(n, 10) }
 
 // Grok Build's PreCompact names updates.jsonl in both spellings. Grok throws
 // away what the prompt hook prints, so the packet goes out on the next
@@ -72,11 +73,11 @@ func TestGrokCompactionPacketRidesTheNextToolCall(t *testing.T) {
 	dir := index.DefaultDir()
 	const id = "66666666-6666-4666-8666-666666666666"
 	path := grokUpdates(t, workspace, id)
-	if real, err := filepath.EvalSymlinks(path); err == nil {
-		path = real
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		path = resolved
 	}
 
-	pre, _ := json.Marshal(map[string]any{
+	pre := mustMarshal(t, map[string]any{
 		"hookEventName": "pre_compact", "sessionId": id, "cwd": workspace, "workspaceRoot": workspace + "/",
 		"transcriptPath": path, "permissionMode": "default", "source": "manual",
 		"hook_event_name": "PreCompact", "session_id": id, "transcript_path": path,
@@ -95,14 +96,14 @@ func TestGrokCompactionPacketRidesTheNextToolCall(t *testing.T) {
 	// The prompt hook answers nothing on Grok: what it has waits for the
 	// session's next tool hook (hook_deferred.go).
 	t.Setenv("GROK_HOOK_EVENT", "user_prompt_submit")
-	prompt, _ := json.Marshal(map[string]any{"sessionId": id, "session_id": id, "cwd": workspace, "prompt": "carry on"})
+	prompt := mustMarshal(t, map[string]any{"sessionId": id, "session_id": id, "cwd": workspace, "prompt": "carry on"})
 	withHookStdin(t, string(prompt))
 	if out := captureStdout(t, func() { _ = runHookDeferred(dir, "hook-prompt", nil, commands["hook-prompt"]) }); strings.Contains(out, "additionalContext") {
 		t.Fatalf("Grok's prompt hook answered: %s", out)
 	}
 
 	t.Setenv("GROK_HOOK_EVENT", "pre_tool_use")
-	tool, _ := json.Marshal(map[string]any{
+	tool := mustMarshal(t, map[string]any{
 		"hookEventName": "pre_tool_use", "sessionId": id, "cwd": workspace, "workspaceRoot": workspace + "/",
 		"transcriptPath": path, "toolName": "run_terminal_command", "toolUseId": "call_2",
 		"toolInput":       map[string]any{"command": "go test ./parser/...", "description": "run it"},

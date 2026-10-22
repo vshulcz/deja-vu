@@ -71,9 +71,9 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 			return errors.New("friction: --limit needs value")
 		}
 		i++
-		n, err := strconv.Atoi(args[i])
+		n, err := strconv.Atoi(args[i]) //nolint:gosec // the bound is checked above
 		if err != nil || n <= 0 {
-			return fmt.Errorf("friction: --limit wants a positive number, got %q", args[i])
+			return fmt.Errorf("friction: --limit wants a positive number, got %q", args[i]) //nolint:gosec // the bound is checked above
 		}
 		limit = n
 	}
@@ -280,8 +280,8 @@ func scanFriction(dir string, pol policy.Policy) (*frictionScan, error) {
 		}
 		key := meta.Harness + ":" + meta.ID
 		sessions[key] = true
-		for line := range strings.SplitSeq(r.Text, "\n") {
-			line, sig, ok := index.FrictionSignature(line)
+		for raw := range strings.SplitSeq(r.Text, "\n") {
+			line, sig, ok := index.FrictionSignature(raw)
 			if !ok {
 				continue
 			}

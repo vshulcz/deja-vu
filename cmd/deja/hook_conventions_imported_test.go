@@ -43,7 +43,7 @@ func TestStandingDecisionsIncludeWhatArrivedBySync(t *testing.T) {
 	hermeticEnv(t)
 	importDecision(t, "home/app", "the retry budget stays at 5")
 
-	out := projectConventions([]string{"home/app"}, 6, 800)
+	out := projectConventions([]string{"home/app"})
 	if !strings.Contains(out, "retry budget stays at 5") {
 		t.Errorf("a decision the team agreed on elsewhere is not standing here:\n%s", out)
 	}
@@ -54,7 +54,7 @@ func TestAnImportedDecisionKeepsItsScope(t *testing.T) {
 	hermeticEnv(t)
 	importDecision(t, "clients/acme", "the acme retry budget stays at 5")
 
-	if out := projectConventions([]string{"home/app"}, 6, 800); strings.Contains(out, "acme retry budget") {
+	if out := projectConventions([]string{"home/app"}); strings.Contains(out, "acme retry budget") {
 		t.Errorf("another project's decision reached this project's block:\n%s", out)
 	}
 }
@@ -65,7 +65,7 @@ func TestAWithheldImportedDecisionIsNotStanding(t *testing.T) {
 	importDecision(t, "home/app", "the retry budget stays at 5")
 	writePolicy(t, `{"activations":{"auto":{"imported":false}}}`)
 
-	if out := projectConventions([]string{"home/app"}, 6, 800); strings.Contains(out, "retry budget") {
+	if out := projectConventions([]string{"home/app"}); strings.Contains(out, "retry budget") {
 		t.Errorf("imported memory the auto rule withholds is standing anyway:\n%s", out)
 	}
 }
@@ -93,7 +93,7 @@ func TestADecisionThatCameBackDoesNotStandTwice(t *testing.T) {
 	}
 	importDecision(t, "home/app", "the retry budget stays at 5")
 
-	out := projectConventions([]string{"home/app"}, 6, 800)
+	out := projectConventions([]string{"home/app"})
 	if n := strings.Count(out, "retry budget stays at 5"); n != 1 {
 		t.Errorf("one decision, %d lines:\n%s", n, out)
 	}

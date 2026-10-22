@@ -7,7 +7,7 @@ import (
 )
 
 func metas(projects ...string) []index.SessionMeta {
-	var out []index.SessionMeta
+	out := make([]index.SessionMeta, 0, len(projects))
 	for _, p := range projects {
 		out = append(out, index.SessionMeta{Project: p})
 	}

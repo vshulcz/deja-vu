@@ -69,8 +69,8 @@ func grokPluginInstalledVersion() string {
 	if !ok {
 		return ""
 	}
-	_, version, _ := grokPluginManifest(dir)
-	return version
+	_, installed, _ := grokPluginManifest(dir)
+	return installed
 }
 
 // grokPluginNote is what doctor adds after "plugin": which version is running,

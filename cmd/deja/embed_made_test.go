@@ -60,7 +60,7 @@ func TestSearchIgnoresASidecarMadeByAnotherModelOrPrefix(t *testing.T) {
 	t.Setenv("DEJA_EMBED_URL", ts.URL)
 
 	hits := func() []search.Hit {
-		var out []search.Hit
+		out := make([]search.Hit, 0, 3)
 		for _, h := range []struct {
 			id    string
 			score float64
@@ -70,7 +70,7 @@ func TestSearchIgnoresASidecarMadeByAnotherModelOrPrefix(t *testing.T) {
 		return out
 	}
 	ids := func(hs []search.Hit) string {
-		var s []string
+		s := make([]string, 0, len(hs))
 		for _, h := range hs {
 			s = append(s, h.Session.ID)
 		}

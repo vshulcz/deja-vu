@@ -34,7 +34,7 @@ func TestContextJSONAndIsolation(t *testing.T) {
 		t.Fatal(err)
 	}
 	var report contextReport
-	if err := json.Unmarshal([]byte(out), &report); err != nil {
+	if err = json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("invalid context JSON %q: %v", out, err)
 	}
 	if report.Chains != bench.ContextChainCount || report.Negatives != bench.ContextNegativeCount || len(report.CorpusHash) != 64 {

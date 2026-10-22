@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -36,7 +37,7 @@ func TestUnplacedFiles(t *testing.T) {
 		t.Errorf("unplaced = %d, want 2", got)
 	}
 	// Everything accounted for: nothing to report.
-	all := append(seen, filepath.Join(root, "proj", "stray.jsonl"), filepath.Join(root, "proj", "other", "deeper.json"))
+	all := slices.Concat(seen, []string{filepath.Join(root, "proj", "stray.jsonl"), filepath.Join(root, "proj", "other", "deeper.json")})
 	if got, _ := unplacedFiles(root, all, nil); got != 0 {
 		t.Errorf("unplaced = %d with every file seen", got)
 	}

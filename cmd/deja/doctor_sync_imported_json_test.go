@@ -28,7 +28,7 @@ func TestDoctorJSONReportsWhatArrivedWithoutAPeerRow(t *testing.T) {
 	importFrom := func(machine string, ids ...string) {
 		t.Helper()
 		batch := t.TempDir()
-		var lines []string
+		lines := make([]string, 0, len(ids))
 		for _, id := range ids {
 			lines = append(lines, fmt.Sprintf(
 				`{"harness":"claude","session_id":%q,"project":"work/app","role":"user",`+
@@ -58,7 +58,7 @@ func TestDoctorJSONReportsWhatArrivedWithoutAPeerRow(t *testing.T) {
 			} `json:"imported"`
 		} `json:"sync"`
 	}
-	if err := json.Unmarshal([]byte(raw), &report); err != nil {
+	if err = json.Unmarshal([]byte(raw), &report); err != nil {
 		t.Fatalf("doctor --json is not JSON: %v", err)
 	}
 	if len(report.Sync.Peers) != 0 {
@@ -75,7 +75,7 @@ func TestDoctorJSONReportsWhatArrivedWithoutAPeerRow(t *testing.T) {
 	// A machine that has exchanged nothing says nothing rather than an empty
 	// list, so a reader can tell it from a deja too old to report this.
 	hermeticEnv(t)
-	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
+	if err = index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	raw, err = captureRun(t, "doctor", "--json")

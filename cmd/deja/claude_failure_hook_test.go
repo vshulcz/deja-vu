@@ -18,7 +18,7 @@ import (
 func TestToolAfterAnswersTheFailureEventItWasSent(t *testing.T) {
 	seedFixPair(t, "panic: sql: database is closed", "make clean && make CGO_ENABLED=0")
 	// The shape captured from a live claude -p run, error text swapped in.
-	payload, _ := json.Marshal(map[string]any{
+	payload := mustMarshal(t, map[string]any{
 		"session_id":      "agent-fail",
 		"cwd":             "/work/app",
 		"hook_event_name": "PostToolUseFailure",

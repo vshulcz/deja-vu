@@ -16,7 +16,7 @@ import (
 // Recent history only, because CI checks out a shallow clone; what it
 // measures is the commits a PR would land, not the archive.
 func TestNoCommitCarriesAnAITrailer(t *testing.T) {
-	out, err := exec.Command("git", "log", "-60", "--format=%H%x00%B%x01").Output()
+	out, err := exec.CommandContext(t.Context(), "git", "log", "-60", "--format=%H%x00%B%x01").Output()
 	if err != nil {
 		t.Skipf("git log unavailable here: %v", err)
 	}

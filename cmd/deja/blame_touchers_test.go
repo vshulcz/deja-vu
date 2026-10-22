@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,7 +27,7 @@ func TestBlameFindsSessionsThatOnlyTouchedTheFile(t *testing.T) {
 		}
 	}
 	edit := func(path string) string {
-		b, _ := json.Marshal(map[string]any{"file_path": path, "old_string": "a", "new_string": "b"})
+		b := mustMarshal(t, map[string]any{"file_path": path, "old_string": "a", "new_string": "b"})
 		return `{"type":"assistant","sessionId":"edited","cwd":"/w/p","timestamp":"2026-07-25T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":` + string(b) + `}]}}`
 	}
 	// Says the name, never touches it.
@@ -111,7 +110,7 @@ func TestBlameFindsASessionThatBothMentionsAndTouchesTheFile(t *testing.T) {
 	}
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	edited := filepath.ToSlash(filepath.Join(tmp, "repo", "internal", "parser.go"))
-	b, _ := json.Marshal(map[string]any{"file_path": edited, "old_string": "a", "new_string": "b"})
+	b := mustMarshal(t, map[string]any{"file_path": edited, "old_string": "a", "new_string": "b"})
 	body := `{"type":"user","sessionId":"s2","cwd":"/w/p","timestamp":"2026-07-21T10:00:00Z","message":{"role":"user","content":"the parser choked on a nested block"}}` + "\n" +
 		`{"type":"assistant","sessionId":"s2","cwd":"/w/p","timestamp":"2026-07-21T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":` + string(b) + `}]}}` + "\n"
 	if err := os.WriteFile(filepath.Join(root, "s2.jsonl"), []byte(body), 0o644); err != nil {

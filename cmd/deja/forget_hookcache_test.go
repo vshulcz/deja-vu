@@ -36,11 +36,11 @@ func TestForgetTakesTheCachedDigestWithIt(t *testing.T) {
 		t.Fatal(err)
 	}
 	cache := hookCachePath(dir, cwd)
-	if err := os.WriteFile(cache, b, 0o600); err != nil {
+	if err = os.WriteFile(cache, b, 0o600); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := captureRun(t, "forget", "--session", "s1"); err != nil {
+	if _, err = captureRun(t, "forget", "--session", "s1"); err != nil {
 		t.Fatal(err)
 	}
 	left, err := os.ReadFile(cache)

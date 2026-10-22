@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,7 +24,7 @@ func TestCommandCodeCompactionIsCaughtUpAtTheNextToolCall(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(transcript), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	cwd, _ := json.Marshal(workspace)
+	cwd := mustMarshal(t, workspace)
 	turns := []string{
 		`{"type":"session","version":3,"id":"cc-1","timestamp":"2026-10-07T10:00:00Z","cwd":` + string(cwd) + `}`,
 		`{"type":"message","id":"a1","timestamp":"2026-10-07T10:00:01Z","message":{"role":"user","content":[{"type":"text","text":"fix the parser test"}]}}`,
@@ -37,7 +36,7 @@ func TestCommandCodeCompactionIsCaughtUpAtTheNextToolCall(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	tp, _ := json.Marshal(transcript)
+	tp := mustMarshal(t, transcript)
 	tool := `{"session_id":"cc-1","transcript_path":` + string(tp) + `,"cwd":` + string(cwd) +
 		`,"hook_event_name":"PreToolUse","tool_name":"shell_command","tool_display_name":"SHELL","tool_input":{"command":"go test ./parser/..."}}`
 	write()

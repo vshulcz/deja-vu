@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,7 +27,7 @@ func TestBlameLineGivesAQwenBranchCopyToItsSource(t *testing.T) {
 	if err := os.WriteFile(file, []byte(line+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	jq := func(v string) string { b, _ := json.Marshal(v); return string(b) }
+	jq := func(v string) string { b := mustMarshal(t, v); return string(b) }
 	const src, branch = "8bde8fee-08e8-4950-b83b-2e23c486eb7d", "42355bb7-67a9-47b4-8436-796a7075a970"
 	records := func(id, forked string) string {
 		ff := ""

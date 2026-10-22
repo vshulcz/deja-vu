@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -87,7 +86,7 @@ func TestACopilotForksDigestLeavesOutItsSource(t *testing.T) {
 func TestACopilotForksPromptRecallLeavesOutItsSource(t *testing.T) {
 	dir, source, fork := copilotForkStore(t)
 	ask := func(sid string) string {
-		payload, _ := json.Marshal(map[string]string{"sessionId": sid, "cwd": "/w/p", "prompt": forkQuestion})
+		payload := mustMarshal(t, map[string]string{"sessionId": sid, "cwd": "/w/p", "prompt": forkQuestion})
 		var out strings.Builder
 		if err := runHookPrompt(dir, strings.NewReader(string(payload)), &out); err != nil {
 			t.Fatal(err)

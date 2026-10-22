@@ -88,7 +88,7 @@ func TestBriefLeavesAnExistingIndexAlone(t *testing.T) {
 		t.Fatal(err)
 	}
 	var second bytes.Buffer
-	if err := runBrief(dir, &second); err != nil {
+	if err = runBrief(dir, &second); err != nil {
 		t.Fatal(err)
 	}
 	after, err := os.Stat(filepath.Join(dir, "manifest.gob"))

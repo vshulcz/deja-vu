@@ -108,7 +108,7 @@ func TestGooseCommandRoundTripsAtEveryIndent(t *testing.T) {
 				}
 			}
 
-			if _, err := installGooseCommand("/opt/deja", true); err != nil {
+			if _, err = installGooseCommand("/opt/deja", true); err != nil {
 				t.Fatal(err)
 			}
 			back, err := os.ReadFile(path)
@@ -147,7 +147,7 @@ func TestGooseCommandSurvivesWindowsLineEndings(t *testing.T) {
 	if n := strings.Count(string(wired), "slash_commands:"); n != 1 {
 		t.Errorf("%d slash_commands keys after two installs:\n%s", n, wired)
 	}
-	if _, err := installGooseCommand("/opt/deja", true); err != nil {
+	if _, err = installGooseCommand("/opt/deja", true); err != nil {
 		t.Fatal(err)
 	}
 	back, err := os.ReadFile(path)

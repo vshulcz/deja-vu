@@ -27,7 +27,7 @@ func codexHome(t *testing.T, events ...string) {
 		}
 		return "hook-unknown"
 	}
-	var entries []string
+	entries := make([]string, 0, len(events))
 	for _, e := range events {
 		entries = append(entries, `"`+e+`":[{"matcher":"","hooks":[{"type":"command","command":"/usr/local/bin/deja `+
 			sub(e)+`"}]}]`)
@@ -64,7 +64,7 @@ func TestDoctorNamesTheCodexEventsAnOlderInstallLacks(t *testing.T) {
 
 func TestDoctorIsQuietWhenCodexHasEveryEvent(t *testing.T) {
 	withStatsStores(t)
-	var all []string
+	all := make([]string, 0, len(codexHookWiring))
 	for _, h := range codexHookWiring {
 		all = append(all, h.Event)
 	}

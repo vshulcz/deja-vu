@@ -24,14 +24,7 @@ func TestHandoffWithNoIdSkipsRememberedNotes(t *testing.T) {
 	if err := os.MkdirAll(work, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	back, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(work); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(back) })
+	t.Chdir(work)
 	dir := filepath.Join(tmp, "index.db")
 	t.Setenv("DEJA_INDEX_DIR", dir)
 	if err := index.Ensure(dir, "", false, nil); err != nil {

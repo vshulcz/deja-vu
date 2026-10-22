@@ -22,7 +22,7 @@ func TestAWindowsHookPathSurvivesBash(t *testing.T) {
 		`C:\Users\a b\scoop\shims\deja.exe`,
 	} {
 		cmd := hookCommandQuoteFor("windows", path)
-		out, err := exec.Command("bash", "-c", "printf %s "+cmd).Output()
+		out, err := exec.CommandContext(t.Context(), "bash", "-c", "printf %s "+cmd).Output()
 		if err != nil {
 			t.Fatalf("bash -c %q: %v", cmd, err)
 		}
@@ -55,7 +55,7 @@ func TestAWindowsHookPathRunsInCmdAndPowerShell(t *testing.T) {
 		// is the test's, the path in front of it is what is under test.
 		{"powershell", "-NoProfile", "-Command", cmd + " '-test.run=NoSuchTest'"},
 	} {
-		if out, err := exec.Command(sh[0], sh[1:]...).CombinedOutput(); err != nil {
+		if out, err := exec.CommandContext(t.Context(), sh[0], sh[1:]...).CombinedOutput(); err != nil {
 			t.Errorf("%s ran %q: %v\n%s", sh[0], sh[len(sh)-1], err, out)
 		}
 	}

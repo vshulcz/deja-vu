@@ -75,10 +75,10 @@ const ingestCopies = 4
 // the store is large enough for the cost of a pass to show.
 func ingestBenchStore(ss []model.Session, n int) []model.Session {
 	out := make([]model.Session, 0, len(ss)*n)
-	for copy := range n {
+	for pass := range n {
 		for _, s := range ss {
 			dup := s
-			dup.ID = fmt.Sprintf("%s-c%d", s.ID, copy)
+			dup.ID = fmt.Sprintf("%s-c%d", s.ID, pass)
 			out = append(out, dup)
 		}
 	}
@@ -185,8 +185,8 @@ func measureIngestPass(indexDir string) (ingestClass, error) {
 		return ingestClass{}, err
 	}
 	start := time.Now()
-	if err := index.Ensure(indexDir, "", false, io.Discard); err != nil {
-		return ingestClass{}, err
+	if ensureErr := index.Ensure(indexDir, "", false, io.Discard); ensureErr != nil {
+		return ingestClass{}, ensureErr
 	}
 	wall := time.Since(start)
 	after, err := os.ReadFile(records)

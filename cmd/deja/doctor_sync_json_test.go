@@ -55,7 +55,7 @@ func TestTheJSONReportCarriesTheSyncState(t *testing.T) {
 	if failing == nil {
 		t.Fatalf("the failing peer is missing: %#v", rows)
 	}
-	if failing["last_error"] == nil || !strings.Contains(failing["last_error"].(string), "255") {
+	if msg, ok := failing["last_error"].(string); !ok || !strings.Contains(msg, "255") {
 		t.Errorf("the failure a script would watch for is not in the row: %#v", failing)
 	}
 	if failing["last_pull"] != nil {
@@ -138,7 +138,7 @@ func TestTheJSONReportNamesThePeerExactly(t *testing.T) {
 	if err := json.Unmarshal([]byte(out.String()), &report); err != nil {
 		t.Fatal(err)
 	}
-	var hosts []string
+	hosts := make([]string, 0, len(report.Sync.Peers))
 	for _, p := range report.Sync.Peers {
 		hosts = append(hosts, p.Host)
 	}

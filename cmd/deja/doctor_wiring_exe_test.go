@@ -54,7 +54,7 @@ func TestDoctorNamesConfigsPointingAtAMissingBinary(t *testing.T) {
 
 	// A binary that is where the configs say: nothing to report.
 	here := filepath.Join(tmp, "deja")
-	if err := os.WriteFile(here, []byte("#!/bin/sh\n"), 0o755); err != nil {
+	if err = os.WriteFile(here, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	write(here)

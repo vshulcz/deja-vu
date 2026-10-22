@@ -125,7 +125,7 @@ func TestCopilotPromptAnswersEachHostInItsShape(t *testing.T) {
 func TestVSCodeTerminalFailureGetsTheFixPairNested(t *testing.T) {
 	seedFixPair(t, "panic: sql: database is closed", "make clean && make CGO_ENABLED=0")
 	withCopilotFlag(t)
-	payload, _ := json.Marshal(map[string]any{
+	payload := mustMarshal(t, map[string]any{
 		"timestamp": "2026-10-07T10:00:00.000Z", "hook_event_name": "PostToolUse", "session_id": "vs-1",
 		"cwd": "/work/app", "tool_name": "run_in_terminal", "tool_use_id": "call_2",
 		"tool_input":    map[string]any{"command": "make", "explanation": "build", "isBackground": false},
@@ -148,7 +148,7 @@ func TestVSCodeTerminalFailureGetsTheFixPairNested(t *testing.T) {
 // under error_message.
 func TestCursorToolFailureGetsTheFixPair(t *testing.T) {
 	seedFixPair(t, "panic: sql: database is closed", "make clean && make CGO_ENABLED=0")
-	payload, _ := json.Marshal(map[string]any{
+	payload := mustMarshal(t, map[string]any{
 		"conversation_id": "c-1", "hook_event_name": "postToolUseFailure", "cwd": "/work/app",
 		"tool_name": "Shell", "tool_input": map[string]any{"command": "make"},
 		"error_message": "panic: sql: database is closed", "failure_type": "error",
@@ -170,7 +170,7 @@ func TestCopilotCompactionIsCapturedFromItsEventLog(t *testing.T) {
 	workspace := compactionGitRepo(t)
 	dir := index.DefaultDir()
 	const id = "5b6c06d9-1f64-4b28-a6b1-4f1b23528483"
-	cwd, _ := json.Marshal(workspace)
+	cwd := mustMarshal(t, workspace)
 	log := filepath.Join(t.TempDir(), "session-state", id, "events.jsonl")
 	compactionWrite(t, log, strings.Join([]string{
 		`{"type":"session.start","data":{"sessionId":"` + id + `","copilotVersion":"1.0.92","startTime":"2026-10-07T10:21:00Z","context":{"cwd":` + string(cwd) + `}},"id":"a","timestamp":"2026-10-07T10:21:00Z"}`,

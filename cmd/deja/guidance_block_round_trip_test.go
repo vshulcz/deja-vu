@@ -42,7 +42,7 @@ func TestAGuidanceBlockRoundTripLeavesTheFileAsItWas(t *testing.T) {
 		if !containsBlock(string(mid)) {
 			t.Fatalf("install wrote no block into %q", theirs)
 		}
-		if _, err := captureRun(t, "uninstall", "grok"); err != nil {
+		if _, err = captureRun(t, "uninstall", "grok"); err != nil {
 			t.Fatalf("uninstall grok: %v", err)
 		}
 		got, err := os.ReadFile(path)

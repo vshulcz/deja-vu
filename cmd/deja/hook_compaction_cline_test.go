@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -21,14 +20,14 @@ func TestClineCompactionIsReadFromMessagesJSON(t *testing.T) {
 	dir := index.DefaultDir()
 	const id = "1791367873575_myzey"
 	session := filepath.Join(sources.ClineSessionsDir(), id)
-	manifest, _ := json.Marshal(map[string]any{
+	manifest := mustMarshal(t, map[string]any{
 		"version": 1, "session_id": id, "source": "cli", "started_at": "2026-10-07T10:11:13.579Z",
 		"status": "completed", "provider": "openai-compatible", "model": "stub-model",
 		"cwd": workspace, "workspace_root": workspace, "prompt": "fix the parser test",
 		"messages_path": filepath.Join(session, id+".messages.json"),
 	})
 	compactionWrite(t, filepath.Join(session, id+".json"), string(manifest))
-	messages, _ := json.Marshal(map[string]any{
+	messages := mustMarshal(t, map[string]any{
 		"version": 1, "updated_at": "2026-10-07T10:11:16.423Z", "agent": "lead", "sessionId": id,
 		"origin": map[string]any{"source": "cli", "mode": "user", "sessionId": id, "version": "3.0.69"},
 		"messages": []any{

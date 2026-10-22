@@ -422,7 +422,7 @@ func inDotDir(root, p string) bool {
 	if err != nil {
 		return false
 	}
-	for _, part := range strings.Split(filepath.Dir(rel), string(filepath.Separator)) {
+	for part := range strings.SplitSeq(filepath.Dir(rel), string(filepath.Separator)) {
 		if strings.HasPrefix(part, ".") && part != "." && part != ".." {
 			return true
 		}
@@ -455,7 +455,7 @@ func unplacedFilesIn(root string, seen []string, skipped func(string) bool, dotD
 	}
 	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
-			return nil
+			return nil //nolint:nilerr // unreadable entries are skipped
 		}
 		switch strings.ToLower(filepath.Ext(p)) {
 		case ".jsonl", ".json":
@@ -506,12 +506,7 @@ func inExtensionState(root, p string) bool {
 	if err != nil {
 		return false
 	}
-	for _, seg := range strings.Split(filepath.ToSlash(rel), "/") {
-		if seg == "extensions" {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(strings.Split(filepath.ToSlash(rel), "/"), "extensions")
 }
 
 // printDoctorStoreWarnings says what deja could not read and why.
@@ -531,12 +526,13 @@ func printDoctorStoreWarnings(w io.Writer, stores []doctorStore) {
 			// A skip reason here is a count of files deja opened and refused,
 			// not a format change: Windsurf trajectories that fail
 			// authentication (#308).
-			if store.Skipped != "" {
+			switch {
+			case store.Skipped != "":
 				fmt.Fprintf(w, "  warning      %s %s; those sessions are missing from recall\n", store.Name, store.Skipped)
-			} else if store.Error != "" {
+			case store.Error != "":
 				fmt.Fprintf(w, "  warning      %s store cannot be read — %s; please report it\n",
 					store.Name, store.Error)
-			} else {
+			default:
 				fmt.Fprintf(w, "  warning      %s store cannot be read — its format may have changed; please report it\n", store.Name)
 			}
 		case "denied":
@@ -591,8 +587,8 @@ func storeDiskGone(location string) bool {
 
 func doctorLocationRoots(location string) []string {
 	var roots []string
-	for _, part := range strings.Split(location, string(os.PathListSeparator)) {
-		for _, root := range strings.Split(part, ", ") {
+	for part := range strings.SplitSeq(location, string(os.PathListSeparator)) {
+		for root := range strings.SplitSeq(part, ", ") {
 			if root = strings.TrimSpace(root); root != "" {
 				roots = append(roots, root)
 			}
@@ -616,7 +612,7 @@ func oneStoreDiskGone(path string) bool {
 		return false
 	}
 	dir := filepath.Dir(path)
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		if dirExists(dir) {
 			return false
 		}
@@ -2080,7 +2076,7 @@ type doctorMCPConfig struct {
 }
 
 func doctorMCPConfigs() []doctorMCPConfig {
-	configs := []doctorMCPConfig{
+	configs := []doctorMCPConfig{ //nolint:prealloc // a literal table; the loop below adds a row per IDE
 		{"claude-code", sources.ClaudeJSONPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"codex", filepath.Join(sources.CodexHome(), "config.toml"), doctorTOMLWired, doctorTOMLDejaKeys},
 		{"opencode", doctorOpencodeConfigPath(), doctorJSONWiredIn(doctorOpencodeServers), doctorJSONDejaKeysIn(doctorOpencodeServers)},
@@ -2165,7 +2161,7 @@ func dshPluginsMissing(path string) []string {
 	}
 	var missing []string
 	inBlock := false
-	for _, line := range strings.Split(lfText(b), "\n") {
+	for line := range strings.SplitSeq(lfText(b), "\n") {
 		t := strings.TrimSpace(line)
 		switch {
 		case strings.HasPrefix(t, dshBlockStart):
@@ -2211,11 +2207,12 @@ func dshNameMissing(name string) []string {
 		// that is not the one in the layer (#4438).
 		// Any other host but localhost names a share, \\host\path.
 		p := u.Path
-		if len(u.Host) == 2 && u.Host[1] == ':' {
+		switch {
+		case len(u.Host) == 2 && u.Host[1] == ':':
 			p = u.Host + p
-		} else if u.Host != "" && u.Host != "localhost" {
+		case u.Host != "" && u.Host != "localhost":
 			p = "//" + u.Host + p
-		} else if len(p) > 2 && p[0] == '/' && p[2] == ':' {
+		case len(p) > 2 && p[0] == '/' && p[2] == ':':
 			p = p[1:]
 		}
 		p = filepath.FromSlash(p)
@@ -2255,12 +2252,7 @@ func dshProfileDirs() []string {
 
 // dshLayerNamesMissing reports whether the layer names a plugin file that is gone.
 func dshLayerNamesMissing(file string) bool {
-	for _, m := range dshPluginsMissing(dshPatchPath()) {
-		if m == file {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(dshPluginsMissing(dshPatchPath()), file)
 }
 
 // dshPluginsMissingNote is the line under the deepseek row when the layer names
@@ -2628,11 +2620,8 @@ func doctorTOMLDejaKeys(path string) []string {
 		if !ok || (key != "command" && key != "args") {
 			continue
 		}
-		for _, value := range tomlStringValues(value) {
-			if commandIsDeja(value) {
-				found[current] = true
-				break
-			}
+		if slices.ContainsFunc(tomlStringValues(value), commandIsDeja) {
+			found[current] = true
 		}
 	}
 	var out []string
@@ -2777,6 +2766,7 @@ func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 		// The binary was rolled back, not the index. Saying "older" here sent
 		// that reader looking in the wrong direction (#890).
 		fmt.Fprintln(w, "  format   written by a newer deja than this one — this build answers from it as it is and leaves it alone; `deja index --rebuild` rebuilds it for this one")
+	case index.ReadStateCurrent:
 	}
 	// A store whose postings vanished or whose record log was truncated cannot
 	// answer anything, and said "up to date" until #735. The next search
@@ -3014,12 +3004,7 @@ func doctorExists(path string) bool {
 
 // doctorAnyExists reports whether at least one of the paths is on disk.
 func doctorAnyExists(paths []string) bool {
-	for _, p := range paths {
-		if doctorExists(p) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(paths, doctorExists)
 }
 
 func doctorFilePresent(path string) bool {

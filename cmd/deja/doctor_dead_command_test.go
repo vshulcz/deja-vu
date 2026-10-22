@@ -21,7 +21,7 @@ func TestDoctorNamesAConfigPointingAtAMissingBinary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := installTarget("claude", exe, false); err != nil {
+	if _, err = installTarget("claude", exe, false); err != nil {
 		t.Fatal(err)
 	}
 	recordWiring([]string{"claude"}, false)
@@ -48,7 +48,7 @@ func TestDoctorNamesAConfigPointingAtAMissingBinary(t *testing.T) {
 		t.Fatal(err)
 	}
 	quoted := string(marshalled[1 : len(marshalled)-1])
-	if err := os.WriteFile(p, []byte(strings.ReplaceAll(string(b), jsonEscaped(t, exe), quoted)), 0o644); err != nil {
+	if err = os.WriteFile(p, []byte(strings.ReplaceAll(string(b), jsonEscaped(t, exe), quoted)), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -72,15 +72,15 @@ func TestDoctorNamesAConfigPointingAtAMissingBinary(t *testing.T) {
 // JSONC that will not parse as JSON all have to be read (#2216).
 func TestTheMissingBinaryCheckReadsEveryConfigShapeAndNothingElse(t *testing.T) {
 	dir := t.TempDir()
-	real := filepath.Join(dir, "deja")
-	if err := os.WriteFile(real, []byte("#!/bin/sh\n"), 0o755); err != nil {
+	resolved := filepath.Join(dir, "deja")
+	if err := os.WriteFile(resolved, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	// Both spelled the way this platform spells an absolute path, and escaped
 	// for the format they are pasted into: a Windows path is backslashes.
 	gone := filepath.Join(dir, "gone", "deja")
 	goneJSON := jsonEscaped(t, gone)
-	realJSON := jsonEscaped(t, real)
+	realJSON := jsonEscaped(t, resolved)
 	for _, c := range []struct {
 		name string
 		body string
@@ -94,7 +94,7 @@ func TestTheMissingBinaryCheckReadsEveryConfigShapeAndNothingElse(t *testing.T) 
 		{"a quoted path in toml", "[mcp_servers.deja]\ncommand = \"" + realJSON + "\"\n", ""},
 		// TOML's literal string, where a backslash is a backslash and nothing
 		// is escaped — which is how a Windows path is written there.
-		{"a literal path in toml", "[mcp_servers.deja]\ncommand = '" + real + "'\n", ""},
+		{"a literal path in toml", "[mcp_servers.deja]\ncommand = '" + resolved + "'\n", ""},
 		{"a literal path that is gone", "[mcp_servers.deja]\ncommand = '" + gone + "'\n", gone},
 		// YAML's double-quoted scalar escapes like JSON does.
 		{"a quoted path in yaml", "extensions:\n  deja:\n    cmd: \"" + goneJSON + "\"\n", gone},

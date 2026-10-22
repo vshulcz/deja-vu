@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"crypto/md5"
+	"crypto/md5" //nolint:gosec // Cursor names chat dirs by the md5 of the workspace
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -22,8 +22,8 @@ import (
 // chats/<md5 of the cwd>/<id>/ with its meta.json, which has the results.
 func cursorChat(t *testing.T, workspace, id string) string {
 	t.Helper()
-	chat := filepath.Join(sources.CursorCLIRoot(), "chats", fmt.Sprintf("%x", md5.Sum([]byte(workspace))), id)
-	meta, _ := json.Marshal(map[string]any{"cwd": workspace})
+	chat := filepath.Join(sources.CursorCLIRoot(), "chats", fmt.Sprintf("%x", md5.Sum([]byte(workspace))), id) //nolint:gosec // Cursor names chat dirs by the md5 of the workspace
+	meta := mustMarshal(t, map[string]any{"cwd": workspace})
 	compactionWrite(t, filepath.Join(chat, "meta.json"), string(meta))
 	fence := "```"
 	msgs := []string{
@@ -43,7 +43,7 @@ func cursorChat(t *testing.T, workspace, id string) string {
 	rootID := sha256.Sum256(root)
 	fmt.Fprintf(&sql, "insert into blobs values ('%x', X'%x');\n", rootID, root)
 	fmt.Fprintf(&sql, "insert into meta values ('0', '%s');\n", hex.EncodeToString([]byte(fmt.Sprintf(`{"agentId":"a","latestRootBlobId":"%x"}`, rootID))))
-	if out, err := exec.Command("sqlite3", filepath.Join(chat, "store.db"), sql.String()).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", filepath.Join(chat, "store.db"), sql.String()).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}
 

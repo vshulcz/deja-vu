@@ -118,6 +118,7 @@ func TestBriefKeepsWeekLineWhenItAddsRecalls(t *testing.T) {
 // on that same work — the normal case, since what you repeat is what gets
 // recalled.
 func seedAskedAndReused(t *testing.T, reusedTitle string) string {
+	t.Helper()
 	dir := seedAgedSessions(t, map[string]agedSession{
 		"a1": {"why does the docker build fail on arm64", 40 * 24 * time.Hour},
 		"a2": {"why does the docker build fail on arm64", 6 * 24 * time.Hour},

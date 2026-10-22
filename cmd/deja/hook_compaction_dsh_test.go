@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -21,8 +20,8 @@ func TestDeepSeekCompactionIsReadFromTheSessionLog(t *testing.T) {
 	workspace := compactionGitRepo(t)
 	dir := index.DefaultDir()
 	const id = "03698097-e226-4edb-93a7-b2890b9e469c"
-	cwd, _ := json.Marshal(workspace)
-	output, _ := json.Marshal("--- FAIL: TestParseSeed\nwant 3, got 4\nFAIL\n[exit code: 1]")
+	cwd := mustMarshal(t, workspace)
+	output := mustMarshal(t, "--- FAIL: TestParseSeed\nwant 3, got 4\nFAIL\n[exit code: 1]")
 	lines := []string{
 		`{"type":"session","version":0,"id":"session-` + id + `","createdAt":1791368690569,"cwd":` + string(cwd) + `,"delegationDepth":0}`,
 		`{"type":"turn/start","seq":4,"time":1791368690578,"data":{"turn":1}}`,

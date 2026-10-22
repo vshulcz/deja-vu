@@ -38,10 +38,10 @@ func codexHookPositions(root map[string]any) map[codexHookPos]string {
 		groups, _ := groupsAny.([]any)
 		for g, groupAny := range groups {
 			group, _ := groupAny.(map[string]any)
-			matcher, _ := json.Marshal(group["matcher"])
+			matcher, _ := json.Marshal(group["matcher"]) //nolint:errchkjson // a value decoded from JSON always encodes
 			list, _ := group["hooks"].([]any)
 			for h, hook := range list {
-				b, _ := json.Marshal(hook)
+				b, _ := json.Marshal(hook) //nolint:errchkjson // a value decoded from JSON always encodes
 				out[codexHookPos{codexEventKey(event), g, h}] = string(matcher) + "\x00" + string(b)
 			}
 		}
@@ -98,7 +98,7 @@ func sortedHookPositions(m map[codexHookPos]string) []codexHookPos {
 func moveCodexHookTrust(cfgPath, hooksPath string, before, after map[string]any) error {
 	old, err := os.ReadFile(cfgPath)
 	if err != nil {
-		return nil
+		return nil //nolint:nilerr // no config means no trust entries to move
 	}
 	next := rewriteCodexHookTrust(string(old), codexHookPathSpellings(hooksPath), codexTrustMoves(before, after))
 	if next == string(old) {

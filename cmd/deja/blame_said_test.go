@@ -95,7 +95,8 @@ func TestTheQuotedTurnIsBoundedAndFarTurnsAreLeftAlone(t *testing.T) {
 	if r := []rune(got); len(r) != saidBeforeMax+1 || !strings.HasSuffix(got, "…") {
 		t.Fatalf("quoted %d runes, want %d and a marker", len([]rune(got)), saidBeforeMax+1)
 	}
-	msgs := []model.Message{{Role: "assistant", Text: aReason}}
+	msgs := make([]model.Message, 0, saidBeforeLookback+7)
+	msgs = append(msgs, model.Message{Role: "assistant", Text: aReason})
 	for range saidBeforeLookback + 5 {
 		msgs = append(msgs, model.Message{Role: "user", Text: "go on"})
 	}

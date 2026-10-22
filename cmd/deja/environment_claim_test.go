@@ -19,7 +19,7 @@ import (
 // under it, where nothing is missing and nothing can be installed.
 func TestEnvironmentBlockDoesNotBlameAMissingTool(t *testing.T) {
 	tmp := hermeticEnv(t)
-	var roots []string
+	roots := make([]string, 0, environmentMinProjects)
 	for i := range environmentMinProjects {
 		root := filepath.Join(tmp, "claude", fmt.Sprintf("proj-c%d", i))
 		if err := os.MkdirAll(root, 0o755); err != nil {

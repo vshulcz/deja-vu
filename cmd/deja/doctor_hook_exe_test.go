@@ -36,12 +36,12 @@ func TestDoctorNamesHooksRunningABinaryThatIsGone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(claude, b, 0o644); err != nil {
+	if err = os.WriteFile(claude, b, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	cursor := filepath.Join(sources.CursorCLIHome(), "hooks.json")
-	if err := os.MkdirAll(filepath.Dir(cursor), 0o755); err != nil {
+	if err = os.MkdirAll(filepath.Dir(cursor), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	hooks := map[string]any{"hooks": map[string]any{

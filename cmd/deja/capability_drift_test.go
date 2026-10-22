@@ -48,7 +48,7 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 		t.Fatal(err)
 	}
 	var reg capRegistry
-	if err := json.Unmarshal(b, &reg); err != nil {
+	if err = json.Unmarshal(b, &reg); err != nil {
 		t.Fatal(err)
 	}
 	// The registry names a harness; install names a target. Where the two differ
@@ -79,8 +79,8 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 		if v, ok := installID[h.ID]; ok {
 			id = v
 		}
-		r, err := installTarget(id, "/bin/deja", false)
-		gotMCP := err == nil && r.Action != "" && r.Action != "guidance-only"
+		r, installErr := installTarget(id, "/bin/deja", false)
+		gotMCP := installErr == nil && r.Action != "" && r.Action != "guidance-only"
 		if h.ID == "aider" {
 			// aider has an install target but no MCP client: what it writes is
 			// the read: key, and recall arrives through `deja aider`.
@@ -92,7 +92,7 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 
 		// Auto-recall hooks exist only where an -auto target installs.
 		if c.Auto != autoCapable[h.ID] {
-			if _, err := installTarget(h.ID+"-auto", "/bin/deja", false); (err == nil) != c.Auto {
+			if _, autoErr := installTarget(h.ID+"-auto", "/bin/deja", false); (autoErr == nil) != c.Auto {
 				t.Fatalf("%s: registry auto=%v disagrees with install targets", h.ID, c.Auto)
 			}
 		}
@@ -130,7 +130,7 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 		// list kept beside it — a list would only ever agree with itself.
 		// Claude Code gets a file in commands/; cline, hermes and pi register
 		// theirs inside the plugin deja writes for them.
-		gotCommand := false
+		var gotCommand bool
 		switch h.ID {
 		case "claude":
 			gotCommand = strings.Contains(claudeCommandMD("/bin/deja"), "deja")
@@ -195,24 +195,24 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 		// the next run reports a different one.
 		have := map[string]bool{"mcp": c.MCP, "auto": c.Auto, "skill": c.Skill, "command": c.Command,
 			"resume": c.Resume}
-		for _, cap := range []string{"mcp", "auto", "skill", "command", "resume"} {
-			have := have[cap]
-			g, ok := h.Gaps[cap]
+		for _, capability := range []string{"mcp", "auto", "skill", "command", "resume"} {
+			have := have[capability]
+			g, ok := h.Gaps[capability]
 			if have {
 				if ok {
-					t.Fatalf("%s: %s is supported but still carries a gap entry", h.ID, cap)
+					t.Fatalf("%s: %s is supported but still carries a gap entry", h.ID, capability)
 				}
 				continue
 			}
 			if !ok {
-				t.Fatalf("%s: %s is false with no gaps entry saying why", h.ID, cap)
+				t.Fatalf("%s: %s is false with no gaps entry saying why", h.ID, capability)
 			}
 			if !gapStates[g.State] {
-				t.Fatalf("%s: %s gap state %q is not one of todo/impossible/blocked/unknown", h.ID, cap, g.State)
+				t.Fatalf("%s: %s gap state %q is not one of todo/impossible/blocked/unknown", h.ID, capability, g.State)
 			}
 			why := strings.TrimSpace(g.Why)
 			if why == "" {
-				t.Fatalf("%s: %s gap has no why", h.ID, cap)
+				t.Fatalf("%s: %s gap has no why", h.ID, capability)
 			}
 			// A reason has to say something. "No slash command yet." passed the
 			// check above on eight entries and told a reader nothing they could
@@ -221,7 +221,7 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 			// problem, and a reference so the trail is followable.
 			if len(why) < 60 {
 				t.Fatalf("%s: %s gap why is %d characters (%q) — say what the surface is and what is missing",
-					h.ID, cap, len(why), why)
+					h.ID, capability, len(why), why)
 			}
 			// Work has to be followable: a `todo` somebody could pick up, and an
 			// `unknown` somebody could go and find out, both need an issue or a
@@ -230,13 +230,13 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 			if g.State == "todo" || g.State == "unknown" {
 				if !strings.Contains(why, "#") && !strings.HasPrefix(g.Source, "http") {
 					t.Fatalf("%s: %s is %s and cites neither an issue nor a source: %q",
-						h.ID, cap, g.State, why)
+						h.ID, capability, g.State, why)
 				}
 			}
 			// "Blocked" is a claim about someone else's bug, so it has to point
 			// at it — otherwise nobody can tell when it stops being true.
 			if g.State == "blocked" && !strings.HasPrefix(g.Source, "http") {
-				t.Fatalf("%s: %s is blocked upstream but has no source link", h.ID, cap)
+				t.Fatalf("%s: %s is blocked upstream but has no source link", h.ID, capability)
 			}
 		}
 
@@ -319,7 +319,7 @@ func plausibleSession(t *testing.T, harness string) model.Session {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
 		}
-		ws, _ := json.Marshal(t.TempDir())
+		ws := mustMarshal(t, t.TempDir())
 		item := `{"id":"` + id + `","ts":1,"task":"t","workspace":` + string(ws) + `}`
 		if err := os.WriteFile(filepath.Join(dir, "history_item.json"), []byte(item), 0o644); err != nil {
 			t.Fatal(err)

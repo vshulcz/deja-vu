@@ -29,12 +29,12 @@ func TestCrushToolHookCarriesThePreviousFailuresFixPair(t *testing.T) {
 	if err := os.MkdirAll(home, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	reg, _ := json.Marshal(map[string]any{"projects": []map[string]string{{"path": "/work/app", "data_dir": data}}})
+	reg := mustMarshal(t, map[string]any{"projects": []map[string]string{{"path": "/work/app", "data_dir": data}}})
 	if err := os.WriteFile(filepath.Join(home, "projects.json"), reg, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	parts := func(v any) string {
-		b, _ := json.Marshal(v)
+		b := mustMarshal(t, v)
 		return "'" + strings.ReplaceAll(string(b), "'", "''") + "'"
 	}
 	sql := `create table sessions (id text primary key, parent_session_id text, title text not null,
@@ -49,7 +49,7 @@ insert into messages values ('u1','c1','user',` + parts([]map[string]any{{"type"
 insert into messages values ('a1','c1','assistant',` + parts([]map[string]any{{"type": "tool_call", "data": map[string]any{"id": "k1", "name": "bash", "input": `{"command":"make"}`}}}) + `,'m',101,101,null,'p',0);
 insert into messages values ('r1','c1','tool',` + parts([]map[string]any{{"type": "tool_result", "data": map[string]any{"tool_call_id": "k1", "content": "goroutine 1 [running]:\npanic: sql: database is closed\nExit code 2\n<cwd>/work/app</cwd>"}}}) + `,'m',102,102,null,'p',0);
 `
-	cmd := exec.Command("sqlite3", filepath.Join(data, "crush.db"))
+	cmd := exec.CommandContext(t.Context(), "sqlite3", filepath.Join(data, "crush.db"))
 	cmd.Stdin = strings.NewReader(sql)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("build store: %v: %s", err, out)
@@ -87,16 +87,16 @@ func TestCrushSummaryIsCaughtUpAtTheNextToolCall(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	reg, _ := json.Marshal(map[string]any{"projects": []map[string]string{{"path": workspace, "data_dir": data}}})
+	reg := mustMarshal(t, map[string]any{"projects": []map[string]string{{"path": workspace, "data_dir": data}}})
 	if err := os.WriteFile(filepath.Join(home, "projects.json"), reg, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	text := func(s string) string {
-		b, _ := json.Marshal([]map[string]any{{"type": "text", "data": map[string]any{"text": s}}})
+		b := mustMarshal(t, []map[string]any{{"type": "text", "data": map[string]any{"text": s}}})
 		return "'" + strings.ReplaceAll(string(b), "'", "''") + "'"
 	}
 	sqlite := func(sql string) {
-		cmd := exec.Command("sqlite3", filepath.Join(data, "crush.db"))
+		cmd := exec.CommandContext(t.Context(), "sqlite3", filepath.Join(data, "crush.db"))
 		cmd.Stdin = strings.NewReader(sql)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("store: %v: %s", err, out)
@@ -113,7 +113,7 @@ insert into sessions values ('c2',null,'t',2,0,0,0,101,100,null,null);
 insert into messages values ('u1','c2','user',` + text("fix the parser test") + `,'m',100,100,null,'p',0);
 insert into messages values ('a1','c2','assistant',` + text("The parser test fails: want 3, got 4. I decided to fix parse.go next.") + `,'m',101,101,null,'p',0);
 `)
-	tool, _ := json.Marshal(map[string]any{"event": "PreToolUse", "session_id": "c2", "cwd": workspace,
+	tool := mustMarshal(t, map[string]any{"event": "PreToolUse", "session_id": "c2", "cwd": workspace,
 		"tool_name": "view", "tool_input": map[string]any{"file_path": filepath.Join(workspace, "parse.go")}})
 	if out := runDeferredHook(t, dir, "hook-tool", []string{"--crush"}, string(tool)); strings.Contains(out, "Compaction context") {
 		t.Fatalf("a session never summarised got a packet: %s", out)

@@ -79,7 +79,7 @@ func TestASessionStartAgainstADamagedStoreIsQuietAndSaysWhy(t *testing.T) {
 	}
 
 	// And with a cache to serve, the same session says both things at once.
-	if err := os.Remove(filepath.Join(dir, "warmup.sentinel")); err != nil {
+	if err = os.Remove(filepath.Join(dir, "warmup.sentinel")); err != nil {
 		t.Fatal(err)
 	}
 	writeHookCache(dir, "/proj", "an earlier digest", 1, 10, nil, 0, nil, nil)
