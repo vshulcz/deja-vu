@@ -7,12 +7,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/gitread"
-	"github.com/vshulcz/deja-vu/internal/model"
 )
 
 func TestCompactionFreshnessTracksDirtyStagedAndUntrackedChanges(t *testing.T) {
@@ -79,10 +79,10 @@ func TestCompactionFreshnessMarksLargeUntrackedFilesPartial(t *testing.T) {
 //
 // A wall-clock reading on a shared runner is mostly the runner's load, so one
 // sample against a fixed share of the budget flaked (#5551: 2.4 s of 4 s on a
-// loaded windows leg). The check is timed against one bare git process on the
-// same runner, and the best complete round of a few is kept, so a load spike
-// has to hit every round to fail it while a hook that starts doing more work
-// still does.
+// loaded windows leg). Each round now times seven bare git processes, the
+// count the check makes, right before the check itself. Load slows both alike,
+// so the middle ratio of five rounds holds where the wall time does not, and a
+// check that starts doing more than seven processes' worth of work still fails.
 func TestCompactionFreshnessBudgetIsSizedForTheSlowPlatform(t *testing.T) {
 	repo := compactionGitRepo(t)
 	compactionWrite(t, filepath.Join(repo, "tracked.txt"), "base\n")
@@ -90,52 +90,60 @@ func TestCompactionFreshnessBudgetIsSizedForTheSlowPlatform(t *testing.T) {
 	compactionGit(t, repo, "commit", "-m", "base")
 	compactionWrite(t, filepath.Join(repo, "tracked.txt"), "dirty\n")
 
-	// compactionFreshness makes seven git calls; a few more process costs of
-	// slack cover status and diff doing real work, a regression does not fit.
-	const gitCalls, slack = 7, 5
-	const rounds = 5
-	best, bare := time.Duration(1<<62), time.Duration(1<<62)
-	var last model.RepositoryFreshness
-	bareGit := func() {
+	// Idle or loaded the middle ratio sits at 0.9-1.3 on a mac; four more
+	// calls put it at 1.6-1.9 and twice the calls at 2.0-2.4.
+	const gitCalls, rounds, batchesAllowed, maxRatio = 7, 5, 3, 1.6
+	sevenBare := func() time.Duration {
 		start := time.Now()
-		if out, err := gitread.Command(context.Background(), "-C", repo, "rev-parse", "--is-inside-work-tree").Output(); err != nil {
-			t.Fatalf("bare git: %v: %s", err, out)
+		for range gitCalls {
+			if out, err := gitread.Command(context.Background(), "-C", repo, "rev-parse", "--is-inside-work-tree").Output(); err != nil {
+				t.Fatalf("bare git: %v: %s", err, out)
+			}
 		}
-		bare = min(bare, time.Since(start))
+		return time.Since(start)
 	}
-	// A high reading of the baseline would loosen the check, so take its best
-	// before the first round can pass on it.
-	for range rounds {
-		bareGit()
-	}
-	for range rounds {
-		bareGit()
-		start := time.Now()
-		last = compactionFreshness(repo)
-		took := time.Since(start)
-		if last.Error != "" || strings.HasPrefix(last.WorktreeState, "partial:") {
-			continue
+	sevenBare() // the first git of a run pays for a cold binary
+	best := time.Duration(1 << 62)
+	// batch is the middle ratio of five rounds. A burst of load can still
+	// land on most of one batch, so a batch over the line gets two more
+	// chances; a check that really does more work is over in every one.
+	batch := func() []float64 {
+		ratios := make([]float64, 0, rounds)
+		for round := range rounds {
+			bare := sevenBare()
+			start := time.Now()
+			freshness := compactionFreshness(repo)
+			took := time.Since(start)
+			if freshness.Error != "" || strings.HasPrefix(freshness.WorktreeState, "partial:") {
+				t.Fatalf("a repository with one dirty file did not fingerprint in %v (round %d took %v): %#v",
+					compactionGitBudget, round+1, took.Round(time.Millisecond), freshness)
+			}
+			best = min(best, took)
+			ratios = append(ratios, float64(took)/float64(bare))
 		}
-		best = min(best, took)
-		if best <= compactionGitBudget/2 && best <= (gitCalls+slack)*bare {
+		slices.Sort(ratios)
+		return ratios
+	}
+	var batches [][]float64
+	for len(batches) < batchesAllowed {
+		ratios := batch()
+		batches = append(batches, ratios)
+		if ratios[rounds/2] <= maxRatio {
 			break
 		}
 	}
-	if best == time.Duration(1<<62) {
-		t.Fatalf("a repository with one dirty file did not fingerprint in %v in any of %d rounds: %#v",
-			compactionGitBudget, rounds, last)
-	}
-	t.Logf("best of up to %d rounds: freshness %v, one bare git %v, budget %v",
-		rounds, best.Round(time.Millisecond), bare.Round(time.Millisecond), compactionGitBudget)
+	ratio := batches[len(batches)-1][rounds/2]
+	t.Logf("freshness at best %v of a %v budget; against %d bare git processes run just before it, middle ratios %.2f",
+		best.Round(time.Millisecond), compactionGitBudget, gitCalls, batches)
 	// Half the budget spent on the smallest repository there is means the
 	// margin is gone for a real one.
 	if best > compactionGitBudget/2 {
 		t.Errorf("one dirty file cost at best %v of the %v budget, leaving no margin for a real repository",
 			best.Round(time.Millisecond), compactionGitBudget)
 	}
-	if limit := (gitCalls + slack) * bare; best > limit {
-		t.Errorf("one dirty file cost at best %v, %.1f bare git processes (%v each); the check makes %d calls and may cost %d",
-			best.Round(time.Millisecond), float64(best)/float64(bare), bare.Round(time.Millisecond), gitCalls, gitCalls+slack)
+	if ratio > maxRatio {
+		t.Errorf("one dirty file cost %.2f times what %d bare git processes cost just before it in each of %d batches (%.2f); the check makes %d calls and may cost %.1f times",
+			ratio, gitCalls, len(batches), batches, gitCalls, maxRatio)
 	}
 	if win, unix := compactionBudgetFor("windows"), compactionBudgetFor("linux"); win <= unix {
 		t.Errorf("windows budget = %v against %v elsewhere: the platform where a process is expensive needs more, not the same",
