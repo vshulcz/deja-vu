@@ -225,7 +225,7 @@ func (a *tuiApp) drawFooter() {
 	case a.listFocus && len(a.rows) > 0:
 		keys = [][2]string{{"↵", "read"}, {"r", "resume"}, {"o", "continue in…"}, {"c", "copy context"}, {"a", "agents"}, {"/", "search"}, {"?", "help"}}
 	case len(a.query) > 0:
-		keys = [][2]string{{"↑↓", "pick"}, {"↵", "read"}, {"tab", "scope"}, {"^o", "continue in…"}, {"^k", "commands"}, {"esc", "clear"}}
+		keys = [][2]string{{"↑↓", "pick"}, {"↵", "read"}, {"tab", "scope"}, {"^o", "continue in…"}, {"^s", a.sortHint()}, {"^k", "commands"}, {"esc", "clear"}}
 	default:
 		keys = [][2]string{{"type", "search"}, {"↑↓", "pick"}, {"↵", "read"}, {"tab", "scope"}, {"^k", "commands"}, {"?", "help"}, {"esc", "quit"}}
 	}

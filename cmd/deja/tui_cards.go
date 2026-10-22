@@ -64,7 +64,15 @@ func (a *tuiApp) sectionLabel() (string, string) {
 		} else if f != "" {
 			note = f
 		}
-		return label, note
+		// The order is always named: at 80 columns the footer has no room
+		// for the ^s that changes it. It is the order of the cards listed,
+		// which a toggle changes only once its search is back.
+		if a.rowsByDate {
+			note += " · newest first"
+		} else {
+			note += " · best first"
+		}
+		return label, strings.TrimPrefix(note, " · ")
 	}
 	switch a.scope {
 	case scopeHere:
@@ -73,6 +81,14 @@ func (a *tuiApp) sectionLabel() (string, string) {
 		return "Deleted by their agent, kept by deja", grouped(a.total)
 	}
 	return "Recent", grouped(a.total)
+}
+
+// sortHint is what ^s turns the search list to.
+func (a *tuiApp) sortHint() string {
+	if a.byDate {
+		return "best first"
+	}
+	return "newest first"
 }
 
 // listedCount is the count a search list is headed with: every session that
@@ -146,7 +162,7 @@ func (a *tuiApp) groupHeading(l layout, i int, r tuiRow, y int) {
 			}
 			n++
 		}
-		if end < len(a.rows) || len(a.rows) >= a.total {
+		if end < len(a.rows) || len(a.rows) >= a.total && !a.moreLeft() {
 			note = grouped(n)
 		}
 	}
@@ -161,8 +177,10 @@ func (a *tuiApp) drawCards(l layout) {
 		top += 4
 	}
 	// A list made of groups draws each heading with its group, so the
-	// headings scroll with the cards; a single list keeps one fixed label.
-	if a.rows[0].section == "" {
+	// headings scroll with the cards; a single list keeps one fixed label,
+	// and so does a search read by date, whose label says how many matched
+	// and in what order.
+	if a.rows[0].section == "" || a.searchRows {
 		label, note := a.sectionLabel()
 		nx := p.Put(l.listX+1, top, strings.ToUpper(label), fgs(cMuted), l.listX+l.listW)
 		p.PutClip(nx+2, top, note, fgs(cFaint), l.listX+l.listW)

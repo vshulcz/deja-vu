@@ -1798,6 +1798,13 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 		o.FuzzyVariants = result.Variants
 	}
 	var hits []search.Hit
+	// The relevance and error tiers hand back a ranked window, not the
+	// whole match: date order over them is the newest of that window, and
+	// tierWindow says the match ran past it.
+	tierWindow, windowRead := false, 0
+	// --all reads newest first unless --sort relevance says otherwise; --json
+	// keeps the ranked order a script may rely on unless --sort date asks.
+	dated := o.Sort == search.SortDate || o.All && !o.JSON && o.Sort == ""
 	switch result.Tier {
 	case search.TierError:
 		// A pasted error IS a match; ErrorHits keeps the ranking and the error
@@ -1807,6 +1814,7 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 		fmt.Fprintln(os.Stderr, "deja: matched by error signature; showing the sessions that hit it")
 		hits = search.ErrorHits(ss, o.Query)
 		o.Total, o.Capped = result.Total, result.Capped
+		tierWindow = result.Capped
 		errAt := len(hits)
 		hits = dropCopiedHits(dir, hits)
 		if d := errAt - len(hits); o.Total >= d {
@@ -1815,12 +1823,20 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 		if o.Total < len(hits) {
 			o.Total = len(hits)
 		}
+		if o.Sort == search.SortDate {
+			search.ByDate(hits)
+			windowRead = len(hits)
+		}
 		var capped bool
 		hits, capped = capTierHits(hits, o)
 		o.Capped = o.Capped || capped
 	case search.TierRelevance:
 		o.Strict = result.Strict
-		fmt.Fprintln(os.Stderr, relevanceLead(result.Strict))
+		lead := relevanceLead(result.Strict)
+		if dated && result.Strict > 0 {
+			lead = strings.Replace(lead, "the rest below are ranked by relevance", "they come first and the rest after, each newest first", 1)
+		}
+		fmt.Fprintln(os.Stderr, lead)
 		hits = markStrictHits(search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(o.Query), result.TermIDF), result)
 		relAt := len(hits)
 		hits = dropCopiedHits(dir, hits)
@@ -1840,6 +1856,11 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 		if o.Total < len(hits) {
 			o.Total = len(hits)
 		}
+		tierWindow = result.Capped
+		if o.Sort == search.SortDate {
+			search.ByDate(hits)
+			windowRead = len(hits)
+		}
 		var relCapped bool
 		hits, relCapped = capTierHits(hits, o)
 		o.Capped = o.Capped || relCapped
@@ -1849,7 +1870,22 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 		// list the cap has already trimmed.
 		// Copies go before the cap: a fork repeating its source took a slot
 		// and counted in the total (#5320, #5335).
-		detailed, rerr := search.RunDetailedKeeping(ss, o, func(hs []search.Hit) []search.Hit { return dropCopiedHits(dir, hs) })
+		keep := func(hs []search.Hit) []search.Hit { return dropCopiedHits(dir, hs) }
+		detailed, rerr := search.RunDetailedKeeping(ss, o, keep)
+		// A date page drawn from the newest matches by their postings comes
+		// back short when few of them say a quoted phrase and the rest were
+		// too many to check. It is read whole then, as the screen does.
+		if rerr == nil && o.Sort == search.SortDate && o.Window > 0 && len(detailed.Hits) < o.Window && detailed.Total > len(detailed.Hits) {
+			whole := o
+			whole.Window, whole.Unread = 0, nil
+			if r2, err2 := index.SearchWithRecoveryDetailed(dir, whole, io.Discard); err2 == nil && r2.Tier == result.Tier {
+				ss2, _ := policyFilterSessionsCounted(policy.ActivationSearch, search.WithoutIgnored(r2.Sessions))
+				whole.Unread = r2.Unread
+				if d2, e2 := search.RunDetailedKeeping(ss2, whole, keep); e2 == nil {
+					detailed, o.Unread = d2, r2.Unread
+				}
+			}
+		}
 		if rerr != nil {
 			// "run:" is the name of a function, and the reader of this line is
 			// someone who mistyped a pattern (#2286). The only error that
@@ -1862,7 +1898,8 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 		}
 		hits, o.Total, o.Capped, o.TotalEstimated = detailed.Hits, detailed.Total, detailed.Capped, detailed.Estimated
 	}
-	if !o.NoEmbed && os.Getenv("DEJA_EMBED") != "off" {
+	// A rerank reorders by meaning, which date order throws away again.
+	if !o.NoEmbed && os.Getenv("DEJA_EMBED") != "off" && o.Sort != search.SortDate {
 		hits = maybeRerank(dir, hits, o, os.Stderr)
 	}
 	var semantic bool
@@ -1961,16 +1998,15 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 	o.Width = printableWidth(os.Stdout)
 	// --all is the whole list, and past the first screen the scores are near
 	// ties a reader cannot see, so the order read as random: Jun 2, May 13,
-	// Mar 4, then Jun 22 (#45). The whole list reads newest first; --json keeps
-	// the ranked order a script may rely on.
-	if o.All && !o.JSON && len(hits) > 1 {
-		sort.SliceStable(hits, func(i, j int) bool { return hits[i].Session.Updated.After(hits[j].Session.Updated) })
-		// Under --limit the list is the top of the ranking, and "all 5
-		// matches" sat under "showing 5 of 40".
-		if o.Total > len(hits) {
-			fmt.Fprintln(os.Stderr, "deja: newest first")
-		} else {
-			fmt.Fprintf(os.Stderr, "deja: all %d matches, newest first\n", len(hits))
+	// Mar 4, then Jun 22 (#45). The whole list reads newest first unless
+	// --sort relevance says otherwise; --json keeps the ranked order a script
+	// may rely on unless --sort date asks for this one (#5577).
+	if dated {
+		// The semantic tier and the demotion of rejected sessions reorder
+		// after retrieval; the date is the last word.
+		search.ByDate(hits)
+		if !o.JSON && len(hits) > 1 {
+			fmt.Fprintln(os.Stderr, "deja: "+newestFirstNote(o, len(hits), tierWindow, windowRead))
 		}
 	}
 	// Through a counter, so the log records what actually went out rather than
@@ -3245,7 +3281,7 @@ func parseSearch(args []string) (search.Options, error) {
 			o.All = true
 		case "--no-embed":
 			o.NoEmbed = true
-		case "--harness", "--project", "--since", "--role", "--limit", "--session":
+		case "--harness", "--project", "--since", "--role", "--limit", "--session", "--sort":
 			if i+1 >= len(args) {
 				return o, fmt.Errorf("%s needs value", a)
 			}
@@ -3268,6 +3304,15 @@ func parseSearch(args []string) (search.Options, error) {
 				o.Role = v
 			case "--session":
 				o.Session = v
+			case "--sort":
+				switch strings.ToLower(v) {
+				case search.SortDate, "newest":
+					o.Sort = search.SortDate
+				case search.SortRelevance:
+					o.Sort = search.SortRelevance
+				default:
+					return o, fmt.Errorf("--sort takes date or relevance, not %q", v)
+				}
 			case "--limit":
 				n, err := strconv.Atoi(v)
 				if err != nil || n < 1 || n > 100 {
@@ -3286,7 +3331,7 @@ func parseSearch(args []string) (search.Options, error) {
 			// "--retry budget"` is a real search. A token one edit away from a
 			// real flag is not: folding `--limti` into the query turned a
 			// working search into "you have no such memory" (#755).
-			if nearestKnownFlag(a, searchFlags) != "" {
+			if nearestSearchFlag(a) != "" {
 				return o, unknownFlag("search", a, searchFlags)
 			}
 			// A flag deja takes elsewhere is not a typo and is nowhere near a
@@ -3395,16 +3440,29 @@ var (
 
 var searchFlags = []string{
 	"--json", "--re", "--all", "--no-embed", "--rebuild",
-	"--harness", "--project", "--since", "--role", "--limit", "--session",
+	"--harness", "--project", "--since", "--role", "--limit", "--session", "--sort",
 }
 
 // nearestSearchFlag names the search flag a token was probably meant to be.
 // The rule it introduced is now every command's, in nearestKnownFlag; this is
 // the search-shaped name for it, kept because search is the one command where
 // the answer also decides whether a dashed token is a query term.
+//
+// --sort is left out of the near misses: --soft, --port and --short are one
+// edit from it and are things people search for (`git reset --soft`).
 func nearestSearchFlag(a string) string {
-	return nearestKnownFlag(a, searchFlags)
+	return nearestKnownFlag(a, searchNearMissFlags)
 }
+
+var searchNearMissFlags = func() []string {
+	var out []string
+	for _, f := range searchFlags {
+		if f != "--sort" {
+			out = append(out, f)
+		}
+	}
+	return out
+}()
 
 // blameMode is what the caller asked for beyond the hits: the line answer on
 // its own (`--attribution`), as JSON, and whether to record it in
@@ -5362,7 +5420,7 @@ func indexLooksUnmounted(dir string) (string, bool) {
 // legitimately contain one.
 var searchValueFlags = map[string]bool{
 	"--harness": true, "--project": true, "--since": true,
-	"--role": true, "--limit": true,
+	"--role": true, "--limit": true, "--session": true, "--sort": true,
 }
 
 func splitEqualsForms(args []string) []string {
@@ -5819,4 +5877,20 @@ func capTierHits(hits []search.Hit, o search.Options) ([]search.Hit, bool) {
 	// same two flags mean opposite things depending on which tier answered
 	// (review of #3345).
 	return search.CapHits(hits, o.Limit, false)
+}
+
+// newestFirstNote is the line above a date-ordered answer. The exact tiers
+// read the newest of the whole match, so the line says only the order; the
+// relevance and error tiers rank a window first, and the newest of that
+// window is not the newest of the match when it ran past it.
+func newestFirstNote(o search.Options, shown int, tierWindow bool, window int) string {
+	switch {
+	case tierWindow && window > 0:
+		return fmt.Sprintf("newest first among the %d closest of %s", window, grouped(o.Total))
+	case o.Total > shown:
+		// Under --limit the list is the top of the order, and "all 5
+		// matches" sat under "showing 5 of 40".
+		return "newest first"
+	}
+	return fmt.Sprintf("all %d matches, newest first", shown)
 }

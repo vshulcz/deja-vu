@@ -157,6 +157,12 @@ it ended; only the first three hits are checked, and `DEJA_MOVED=0` turns it
 off. `lifecycle`, `lifecycle_note` and `lifecycle_at` (optional) on the hit
 carry the state of a promoted decision, as they do on a `blame` row.
 
+`hits` come in ranked order, `--all` included. `--sort date` puts them newest
+`updated` first, and on the `exact`, `close` and `stemmed` tiers the page is
+the newest of the whole match. The `relevance` and `error` tiers rank a window
+of at most 50 sessions first, so there it is the newest of that window, and on
+`relevance` the hits with `strict` set come before the rest.
+
 ### What a hit's `messages` are
 
 The passages that matched, each with the message after it — the answer to what

@@ -69,6 +69,11 @@ type Options struct {
 	From  string
 	Since time.Duration
 	Limit int
+	// Sort is the order of the answer: SortDate lists the newest match first,
+	// anything else ranks by relevance. Under Window the pool is then the
+	// newest matches rather than the best-scored ones, so the page is the
+	// newest of the whole match, not the newest of its best thousand (#5577).
+	Sort string `json:"-"`
 	// Total and Capped travel from RunDetailed to Print so the JSON envelope
 	// can report how many sessions matched before the cap, not merely how many
 	// survived it. Counting the survivors measures the cap.
@@ -161,6 +166,12 @@ type Unread struct {
 	// over-counted what was read, and the unread ones were too many to check.
 	Estimated bool
 }
+
+// The orders Options.Sort takes.
+const (
+	SortRelevance = "relevance"
+	SortDate      = "date"
+)
 
 const (
 	TierExact    = "exact"

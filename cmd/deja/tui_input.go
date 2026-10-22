@@ -147,6 +147,8 @@ func (a *tuiApp) ctrlKey(r rune) {
 		a.move(1)
 	case 'p':
 		a.move(-1)
+	case 's':
+		a.toggleSort()
 	}
 }
 
@@ -181,6 +183,8 @@ func (a *tuiApp) listAction(r rune) bool {
 		a.askDelete()
 	case 'a':
 		a.openModal(modalAgents)
+	case 's':
+		a.toggleSort()
 	case '?':
 		a.openModal(modalHelp)
 	case 'q':

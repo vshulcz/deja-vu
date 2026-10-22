@@ -20,6 +20,7 @@ type tuiRow struct {
 	snips []string // the matched lines, best first
 
 	section string // a heading drawn over this card, when it starts a group
+	partial bool   // a relevance hit that holds only some of the words, under strict ones
 	file    string // the changed file a card behind the diff was found through
 }
 
@@ -81,9 +82,15 @@ func tuiSearchRead(dir string, o search.Options) ([]search.Hit, int, error) {
 	switch result.Tier {
 	case search.TierError:
 		hits := search.ErrorHits(ss, o.Query)
+		if o.Sort == search.SortDate {
+			search.ByDate(hits)
+		}
 		return hits, len(hits), nil
 	case search.TierRelevance:
 		hits := markStrictHits(search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(o.Query), result.TermIDF), result)
+		if o.Sort == search.SortDate {
+			search.ByDate(hits)
+		}
 		return hits, len(hits), nil
 	}
 	o.Tier = result.Tier

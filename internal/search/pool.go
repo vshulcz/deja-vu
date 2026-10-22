@@ -39,8 +39,9 @@ const (
 // hits ranks in full.
 func PoolSize(window int) int { return max(poolMin, poolPerHit*window) }
 
-// Pool picks the n of cands worth reading: the ones with the best score the
-// manifest and the postings alone can give, built from the same parts as the
+// Pool picks the n of cands worth reading: the newest under SortDate,
+// otherwise the ones with the best score the manifest and the postings alone
+// can give, built from the same parts as the
 // full ranking — term frequency against length, the title, reuse, notes and
 // age. keep is nil when every candidate fits. unread describes the rest, with
 // lengths estimated the way runScored measures them.
@@ -59,6 +60,12 @@ func Pool(cands []PoolCandidate, o Options, n int, share float64) (keep []bool, 
 	}
 	sort.SliceStable(order, func(a, b int) bool {
 		x, y := order[a], order[b]
+		// A date-ordered answer pages through the newest matches, so those
+		// are the ones read; ranked by score, the pool's newest were the
+		// newest of its best thousand (#5577).
+		if o.Sort == SortDate && !cands[x].Session.Updated.Equal(cands[y].Session.Updated) {
+			return cands[x].Session.Updated.After(cands[y].Session.Updated)
+		}
 		if score[x] != score[y] {
 			return score[x] > score[y]
 		}

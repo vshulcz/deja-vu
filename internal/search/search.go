@@ -46,7 +46,23 @@ const (
 	TierSemantic = query.TierSemantic
 	TierStemmed  = "stemmed"
 	TierError    = query.TierError
+
+	SortRelevance = query.SortRelevance
+	SortDate      = query.SortDate
 )
+
+// ByDate puts hits newest first, keeping the ranked order between sessions
+// of the same moment. On the relevance tier the sessions that hold every
+// word stay ahead of the ones holding some, each part newest first: dated in
+// one run, a tail of newer partial matches pushed the real ones off the page.
+func ByDate(hits []Hit) {
+	sort.SliceStable(hits, func(i, j int) bool {
+		if hits[i].Strict != hits[j].Strict {
+			return hits[i].Strict
+		}
+		return hits[i].Session.Updated.After(hits[j].Session.Updated)
+	})
+}
 
 func QueryParts(q string) (terms []string, phrases []string) { return query.QueryParts(q) }
 
@@ -566,8 +582,32 @@ func RunDetailedKeeping(ss []model.Session, o Options, keep func([]Hit) []Hit) (
 	if keep != nil {
 		hits = keep(hits)
 	}
-	r := Results{Hits: hits, Total: len(hits), Tier: setTier(o)}
-	r.Hits, r.Capped = CapHits(hits, o.Limit, o.All)
+	r := Results{Total: len(hits), Tier: setTier(o)}
+	if o.Sort == SortDate {
+		ByDate(hits)
+		// The earlier-attempt marks were taken over the ranking's head; the
+		// page is the date order's head now.
+		renderSnippets(hits, o, earlierAttemptWindow)
+		markEarlierAttempts(hits)
+		// The sample read to check the unread estimate is older than every
+		// session of a date pool, and the unread ones between them were not
+		// read: a sampled hit on the page skips them. It still counts.
+		if u := o.Unread; u != nil && (u.Sessions > 0 || u.Estimated) && len(u.Sample) > 0 {
+			kept := hits[:0:0]
+			for _, h := range hits {
+				if _, sampled := u.Sample[h.Session.Harness+":"+h.Session.ID]; !sampled {
+					kept = append(kept, h)
+				}
+			}
+			if len(kept) < len(hits) {
+				r.Capped = true
+			}
+			hits = kept
+		}
+	}
+	var capped bool
+	r.Hits, capped = CapHits(hits, o.Limit, o.All)
+	r.Capped = r.Capped || capped
 	// The unread sessions matched as well. What the trust policy withholds
 	// on Options.Activation is already out of them, so the total does not
 	// count a session the page could never show.

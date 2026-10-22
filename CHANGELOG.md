@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A cold build keys messages without allocating a string per word, so the
   indexing phase takes half the CPU. On a 12,000-session Codex store it drops
   from 9.3 s to 4.2 s and the whole build from 273 to 215 CPU-seconds (#5567).
+### Added
+
+- `deja search --sort date` lists the newest match first, in the text and in
+  `--json`, and `^s` in the search screen turns the list newest first under
+  day headings and back. On a common word the page is the newest of the whole
+  match, not the newest of the best-ranked thousand (#5577).
 
 ### Fixed
 
