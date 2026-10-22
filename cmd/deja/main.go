@@ -3925,6 +3925,26 @@ func harnessExclusionSource(name string) string {
 	return sources.ExcludePath()
 }
 
+// harnessExclusionSources names where a set of store exclusions come from:
+// the exclude file, DEJA_EXCLUDE_HARNESSES, or both.
+func harnessExclusionSources(names map[string]bool) string {
+	env, file := false, false
+	for name := range names {
+		if harnessExclusionSource(name) == "DEJA_EXCLUDE_HARNESSES" {
+			env = true
+		} else {
+			file = true
+		}
+	}
+	switch {
+	case env && file:
+		return reportPath(sources.ExcludePath()) + " and DEJA_EXCLUDE_HARNESSES"
+	case env:
+		return "DEJA_EXCLUDE_HARNESSES"
+	}
+	return reportPath(sources.ExcludePath())
+}
+
 func harnessExclusionReason(name string) string {
 	setting := harnessExclusionSource(name)
 	if setting == "DEJA_EXCLUDE_HARNESSES" {

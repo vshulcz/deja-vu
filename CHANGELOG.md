@@ -120,6 +120,12 @@ The search screen reads a page at a time. A word most of a 40,000-session store 
   rebuild the same command tables, facts and fixes, including a copy that takes
   the row from another project and a deleted copy that kept turns it shared
   (#5492, #5508, #5509, #5510).
+- With `DEJA_EXCLUDE_HARNESSES` set, `deja stats`, `deja sources`, the empty
+  search and the first screen count project patterns and name the setting that
+  excluded each store, instead of blaming the exclude file (#5401).
+- `deja uninstall opencode` takes deja's entry out of a tui.json that has
+  comments, and uninstall keeps a comment the reader wrote on the list entry
+  before deja's, in tui.json and OpenClaw's load paths (#5313, #5557).
 
 ## [0.23.0] - 2026-10-21
 

@@ -592,7 +592,8 @@ func printNoHistory(w io.Writer, stale bool) {
 	// And the other reason nothing was found: the reader asked deja not to read
 	// it. "No agent has run here yet" is then advice for a state deja is not in
 	// — the store is on disk and deja was told to leave it alone (#3499).
-	excluded := len(sources.ExcludedHarnesses())
+	excludedSet := sources.ExcludedHarnesses()
+	excluded := len(excludedSet)
 	if denied := deniedStoreCount(); denied > 0 {
 		fmt.Fprintf(w, "Nothing was found on this machine, but %d store%s could not be\n",
 			denied, pluralS(denied))
@@ -601,7 +602,7 @@ func printNoHistory(w io.Writer, stale bool) {
 		fmt.Fprintf(w, "Nothing was found on this machine, and %d store%s excluded in\n",
 			excluded, pluralS(excluded))
 		fmt.Fprintf(w, "%s — `deja doctor` names %s.\n",
-			reportPath(sources.ExcludePath()), pluralWhich(excluded))
+			harnessExclusionSources(excludedSet), pluralWhich(excluded))
 	} else {
 		fmt.Fprintln(w, "Nothing was found on this machine, which usually means no agent has")
 		fmt.Fprintln(w, "run here yet, or its store lives somewhere else.")
