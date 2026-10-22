@@ -7,12 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- A transcript read again after a change no longer keeps an empty tool-output
-  record for a tool result that was only a `<deja-recall>` block, so it matches
-  a rebuild (#5555).
-
 ## [0.23.1] - 2026-10-22
 
 Big stores build and search for less. A cold build peaks at half the memory
@@ -132,6 +126,9 @@ The search screen reads a page at a time. A word most of a 40,000-session store 
 - `deja uninstall opencode` takes deja's entry out of a tui.json that has
   comments, and uninstall keeps a comment the reader wrote on the list entry
   before deja's, in tui.json and OpenClaw's load paths (#5313, #5557).
+- A transcript read again after a change no longer keeps an empty tool-output
+  record for a tool result that was only a `<deja-recall>` block, so it matches
+  a rebuild (#5555).
 
 ## [0.23.0] - 2026-10-21
 
