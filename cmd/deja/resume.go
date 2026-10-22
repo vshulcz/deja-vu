@@ -392,10 +392,10 @@ func resumeCommand(s model.Session) (string, string, error) {
 		return existingDir(sources.MuseWorkspace(s.Path)), "muse resume " + s.ID, nil
 	case "mcode":
 		// `mcode --session <id>` opens a session by the id its manifest
-		// records ("open a Session by id", @minimax-ai/code 0.6.12 --help).
-		// The runtime keeps the session's workspace in its own database, and
-		// the transcript records none, so there is no directory to cd to.
-		return "", "mcode --session " + s.ID, nil
+		// records, from any directory ("open a Session by id",
+		// @minimax-ai/code 0.6.12 --help). The cd is the workspace the
+		// runtime's database recorded, when it is still there.
+		return existingDir(sources.McodeSessionWorkspace(s.ID)), "mcode --session " + s.ID, nil
 	case "opencode":
 		// opencode sessions carry their project directory. opencode reopens a
 		// session from anywhere, so a deleted one is left out rather than

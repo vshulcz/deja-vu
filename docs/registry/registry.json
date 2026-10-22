@@ -3609,7 +3609,7 @@
         "command": false,
         "resume": true,
         "handoff": "exec",
-        "prereq": "the MiniMax Code CLI (`mcode`) for `deja resume` and `deja handoff --to mcode --exec`"
+        "prereq": "the MiniMax Code CLI (`mcode`) for `deja resume` and `deja handoff --to mcode --exec`; `sqlite3` for the session's workspace"
       },
       "gaps": {
         "command": {

@@ -14,7 +14,9 @@ import (
 // MiniMax Code 0.6.12 hands every hook a transcript_path, but it is a
 // temporary Claude-compatible projection under $TMPDIR/minimax-plugin-hooks,
 // deleted after the call. The hook entry says --harness mcode, and the
-// session's own messages.jsonl is found by the id (#5593).
+// session's own messages.jsonl is found by the id (#5593). The workspace
+// matched against the hook's cwd is workspace_dir, the worktree, not the
+// parent repository a worktree session is filed under.
 func TestMcodeCompactionReadsTheStoreNotTheTemporaryProjection(t *testing.T) {
 	if _, err := exec.LookPath("sqlite3"); err != nil {
 		t.Skip("sqlite3 not installed")
@@ -35,8 +37,8 @@ func TestMcodeCompactionReadsTheStoreNotTheTemporaryProjection(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(db), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	sql := "create table local_runtime_sessions (session_id text primary key, workspace_dir text, project_workspace_dir text);" +
-		"insert into local_runtime_sessions values ('" + id + "', '" + strings.ReplaceAll(workspace, "'", "''") + "', '');"
+	sql := "create table local_runtime_sessions (session_id text primary key, workspace_dir text, project_workspace_dir text, is_default_workspace integer not null default 0);" +
+		"insert into local_runtime_sessions values ('" + id + "', '" + strings.ReplaceAll(workspace, "'", "''") + "', '/elsewhere/parent-repo', 0);"
 	if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}

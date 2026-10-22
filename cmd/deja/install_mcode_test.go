@@ -209,6 +209,7 @@ func TestMcodeAutoNamesEveryFileItWrote(t *testing.T) {
 // `mcode --session <id>` opens a session by the manifest's id (0.6.12
 // --help); the registry used to call resume impossible (#5593).
 func TestMcodeResumeOpensTheSessionByID(t *testing.T) {
+	hermeticEnv(t)
 	dir, cmd, err := resumeCommand(model.Session{Harness: "mcode", ID: "mvs_0f1e2d3c", Project: "p"})
 	if err != nil || dir != "" || cmd != "mcode --session mvs_0f1e2d3c" {
 		t.Fatalf("resume = %q %q %v", dir, cmd, err)

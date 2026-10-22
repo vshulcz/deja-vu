@@ -4,7 +4,7 @@
 - **Store**: `~/.minimax/v2/sessions/YYYY/MM/DD/<session>/messages.jsonl`
 - **Read overrides**: `DEJA_MCODE_ROOT`, a path, replaces the session root
 - **Format**: JSONL, one message per line, `timestamp` in milliseconds
-- **Needs**: `sqlite3` for the session's workspace; the transcripts read without it
+- **Needs**: `sqlite3` for the session's workspace (project, resume directory, compaction capture); the transcripts read without it
 
 MiniMax Code is the desktop agent. Its local runtime keeps one directory per
 conversation, sharded by the day it started, and writes the transcript beside a
@@ -61,11 +61,15 @@ person, so it stays out of the transcript the way it does in every other
 harness here.
 
 The transcript records no working directory. The runtime keeps it in
-`~/.minimax/v2/sqlite/runtime-state.sqlite` (`local_runtime_sessions`,
-`project_workspace_dir` or `workspace_dir`), which deja reads through
-`sqlite3`. Without `sqlite3` the project comes from where the session's own
-file activity was, the evidence the other harnesses without a recorded cwd are
-filed under.
+`~/.minimax/v2/sqlite/runtime-state.sqlite` (`local_runtime_sessions`):
+`workspace_dir` is where the session ran, `project_workspace_dir` the
+repository a worktree session belongs to, and `is_default_workspace` marks a
+chat in the runtime's own scratch directory, which names no project. deja reads
+them through `sqlite3`; the project is `project_workspace_dir`, else
+`workspace_dir`. Without `sqlite3`, or for a default-workspace chat, the
+project comes from where the session's own file activity was, the evidence the
+other harnesses without a recorded cwd are filed under, and a PreCompact
+capture can only match the hook's directory that way.
 
 The session id is the one `manifest.json` records; the directory name carries
 it base64url-encoded, and is read when the manifest is missing.
@@ -117,5 +121,5 @@ its first prompt. The desktop app is not a command line, so the handoff needs
 the CLI (`mcode`) on the machine.
 
 `deja resume <id>` prints `mcode --session <id>`, which opens the session by
-the id its manifest records. The runtime keeps the session's workspace in its
-own database, so no directory comes with it.
+the id its manifest records from any directory, run in the session's
+workspace when the runtime's database names one that still exists.

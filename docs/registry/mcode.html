@@ -42,7 +42,7 @@
 <li><strong>Store</strong>: <code>~/.minimax/v2/sessions/YYYY/MM/DD/&lt;session&gt;/messages.jsonl</code></li>
 <li><strong>Read overrides</strong>: <code>DEJA_MCODE_ROOT</code>, a path, replaces the session root</li>
 <li><strong>Format</strong>: JSONL, one message per line, <code>timestamp</code> in milliseconds</li>
-<li><strong>Needs</strong>: <code>sqlite3</code> for the session&#39;s workspace; the transcripts read without it</li>
+<li><strong>Needs</strong>: <code>sqlite3</code> for the session&#39;s workspace (project, resume directory, compaction capture); the transcripts read without it</li>
 </ul>
 <p>MiniMax Code is the desktop agent. Its local runtime keeps one directory per</p>
 <p>conversation, sharded by the day it started, and writes the transcript beside a</p>
@@ -91,11 +91,15 @@
 <p>person, so it stays out of the transcript the way it does in every other</p>
 <p>harness here.</p>
 <p>The transcript records no working directory. The runtime keeps it in</p>
-<p><code>~/.minimax/v2/sqlite/runtime-state.sqlite</code> (<code>local_runtime_sessions</code>,</p>
-<p><code>project_workspace_dir</code> or <code>workspace_dir</code>), which deja reads through</p>
-<p><code>sqlite3</code>. Without <code>sqlite3</code> the project comes from where the session&#39;s own</p>
-<p>file activity was, the evidence the other harnesses without a recorded cwd are</p>
-<p>filed under.</p>
+<p><code>~/.minimax/v2/sqlite/runtime-state.sqlite</code> (<code>local_runtime_sessions</code>):</p>
+<p><code>workspace_dir</code> is where the session ran, <code>project_workspace_dir</code> the</p>
+<p>repository a worktree session belongs to, and <code>is_default_workspace</code> marks a</p>
+<p>chat in the runtime&#39;s own scratch directory, which names no project. deja reads</p>
+<p>them through <code>sqlite3</code>; the project is <code>project_workspace_dir</code>, else</p>
+<p><code>workspace_dir</code>. Without <code>sqlite3</code>, or for a default-workspace chat, the</p>
+<p>project comes from where the session&#39;s own file activity was, the evidence the</p>
+<p>other harnesses without a recorded cwd are filed under, and a PreCompact</p>
+<p>capture can only match the hook&#39;s directory that way.</p>
 <p>The session id is the one <code>manifest.json</code> records; the directory name carries</p>
 <p>it base64url-encoded, and is read when the manifest is missing.</p>
 <p><strong>Last verified:</strong> 2026-10-22</p>
@@ -134,8 +138,8 @@
 <p>its first prompt. The desktop app is not a command line, so the handoff needs</p>
 <p>the CLI (<code>mcode</code>) on the machine.</p>
 <p><code>deja resume &lt;id&gt;</code> prints <code>mcode --session &lt;id&gt;</code>, which opens the session by</p>
-<p>the id its manifest records. The runtime keeps the session&#39;s workspace in its</p>
-<p>own database, so no directory comes with it.</p>
+<p>the id its manifest records from any directory, run in the session&#39;s</p>
+<p>workspace when the runtime&#39;s database names one that still exists.</p>
 
 <hr>
 <p>deja reads this format and 42 others, and turns what it finds into memory your

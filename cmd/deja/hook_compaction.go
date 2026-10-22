@@ -56,11 +56,10 @@ func compactionSource(input precompactHookInput, workspace string) (sources.Comp
 		transcript sources.CompactionTranscript
 		err        error
 	)
-	// A host deja names with --harness that also hands over a file outside
-	// every store deja reads: MiniMax Code gives hooks a temporary
-	// Claude-compatible projection of the session and deletes it after the
-	// call. Its own store, read by the session id, is the record.
-	if input.Harness != "" && input.TranscriptPath != "" && sources.CompactionTranscriptHarness(input.TranscriptPath) == "" {
+	// MiniMax Code gives hooks a temporary Claude-compatible projection of
+	// the session as transcript_path and deletes it after the call. Its own
+	// store, read by the session id, is the record.
+	if input.Harness == "mcode" {
 		input.TranscriptPath = ""
 	}
 	switch {

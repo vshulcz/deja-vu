@@ -179,17 +179,75 @@ func TestMcodeTheDirectoryIDIsBase64URL(t *testing.T) {
 	}
 }
 
-// What a plugin hook answered rides the tool result and the turn as
-// <plugin-hook-context> (seen in a live 0.6.12 run). With deja installed that
-// is deja's own recall, and indexing it would feed recall back into the index.
+// What a plugin hook answered rides the tool result, as its own last text
+// block, and the turn's text, after a blank line (MAr, uJn, tTn in 0.6.12; the
+// tool-result block seen in a live run). With deja installed that is deja's
+// own recall, and indexing it would feed recall back into the index. Output
+// that only mentions the tag keeps every line.
 func TestMcodeHookContextIsNotIndexed(t *testing.T) {
 	got := parseMcodeLines(t,
 		mcodeUserLine(`"content":[{"type":"text","text":"asked\n\n<plugin-hook-context>\nRECALL-ECHO\n</plugin-hook-context>"}]`),
 		`{"message_id":"m2","turn_id":"t1","message":{"role":"toolResult","toolCallId":"c","toolName":"bash",`+
-			`"content":[{"type":"text","text":"hi\n\n<plugin-hook-context>\nRECALL-ECHO\n</plugin-hook-context>"}],"timestamp":1792465960901}}`)
-	want := []string{"user: asked", RoleToolOutput + ": hi"}
+			`"content":[{"type":"text","text":"hi\n"},{"type":"text","text":"<plugin-hook-context>\nRECALL-ECHO\n</plugin-hook-context>"}],"timestamp":1792465960901}}`,
+		`{"message_id":"m3","turn_id":"t1","message":{"role":"toolResult","toolCallId":"c2","toolName":"bash",`+
+			`"content":[{"type":"text","text":"a <plugin-hook-context> tag\nreal line\n</plugin-hook-context> end"}],"timestamp":1792465960902}}`)
+	want := []string{"user: asked", RoleToolOutput + ": hi", RoleToolOutput + ": a <plugin-hook-context> tag\nreal line\n</plugin-hook-context> end"}
 	if strings.Join(got, "|") != strings.Join(want, "|") {
 		t.Fatalf("messages = %q, want %q", got, want)
+	}
+}
+
+// A compaction marker heads the history it kept; a read resumed past it takes
+// the title from the first real turn, as the full read does.
+func TestMcodeTheTitleSurvivesAnAppendAfterACompactionMarker(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, mcodeTranscriptName)
+	head := mcodeUserLine(`"content":[{"type":"text","text":"<system-reminder>S</system-reminder>"}],"archonCompaction":{"version":2,"summary":"S","recentUserQueries":[]}`) + "\n" +
+		mcodeUserLine(`"content":[{"type":"text","text":"original question"}]`) + "\n"
+	if err := os.WriteFile(path, []byte(head+mcodeUserLine(`"content":[{"type":"text","text":"later question"}]`)+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tail, err := ParseMcodeFileFromOffset(path, int64(len(head)))
+	if err != nil || len(tail) != 1 {
+		t.Fatalf("tail = %v, %v", tail, err)
+	}
+	if tail[0].Title != "original question" {
+		t.Fatalf("title = %q, want the first real turn", tail[0].Title)
+	}
+}
+
+// A range written as 3266.0 is an integer to the runtime.
+func TestMcodeAnIntegralFloatOffsetIsAnOffset(t *testing.T) {
+	got := parseMcodeLines(t, mcodeUserLine(`"content":[{"type":"text","text":"xxtyped"}],"canonicalTextRange":{"startOffset":2.0,"endOffset":7e0}`))
+	if len(got) != 1 || got[0] != "user: typed" {
+		t.Fatalf("messages = %q", got)
+	}
+}
+
+// A history rewrite the runtime staged and left behind is the same session,
+// not a second one; it is bookkeeping.
+func TestMcodeAStagedHistoryRewriteIsNotASecondSession(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "v2", "sessions")
+	t.Setenv("DEJA_MCODE_ROOT", root)
+	dir := filepath.Join(root, "2026", "10", "22", "15-47-55-700-session_x")
+	staged := filepath.Join(dir, ".history-mutation-1", mcodeTranscriptName)
+	for _, p := range []string{filepath.Join(dir, mcodeTranscriptName), staged} {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(mcodeUserLine(`"content":[{"type":"text","text":"hi"}]`)+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := len(McodeSessionFiles()); n != 1 {
+		t.Fatalf("transcripts = %d, want 1", n)
+	}
+	found := false
+	for _, p := range McodeSidecarFiles() {
+		found = found || p == staged
+	}
+	if !found {
+		t.Fatal("the staged copy is neither a transcript nor bookkeeping")
 	}
 }
 
@@ -221,15 +279,26 @@ func TestMcodeTheProjectIsTheWorkspaceTheRuntimeRecorded(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(db), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	sql := "create table local_runtime_sessions (session_id text primary key, workspace_dir text, project_workspace_dir text);" +
-		"insert into local_runtime_sessions values ('mvs_ws', '" + strings.ReplaceAll(ws, "'", "''") + "', null);" +
-		"insert into local_runtime_sessions values ('mvs_rel', 'relative/dir', '');"
+	tree := filepath.Join(base, "work", "billing-api-wt")
+	sql := "create table local_runtime_sessions (session_id text primary key, workspace_dir text, project_workspace_dir text, is_default_workspace integer not null default 0);" +
+		"insert into local_runtime_sessions values ('mvs_ws', '" + strings.ReplaceAll(tree, "'", "''") + "', '" + strings.ReplaceAll(ws, "'", "''") + "', 0);" +
+		"insert into local_runtime_sessions values ('mvs_default', '" + strings.ReplaceAll(filepath.Join(base, ".minimax", "workspace"), "'", "''") + "', null, 1);" +
+		"insert into local_runtime_sessions values ('mvs_rel', 'relative/dir', '', 0);"
 	if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3: %v %s", err, out)
 	}
+	// A worktree session is filed under the repository, and its workspace is
+	// the worktree.
 	ss := LoadMcode()
 	if len(ss) != 1 || ss[0].Project != projectName(ws) {
 		t.Fatalf("project = %q, want %q", ss[0].Project, projectName(ws))
+	}
+	if got := McodeSessionWorkspace("mvs_ws"); got != tree {
+		t.Fatalf("workspace = %q, want %q", got, tree)
+	}
+	// The runtime's own scratch directory is no project.
+	if McodeSessionWorkspace("mvs_default") != "" {
+		t.Fatal("a default-workspace chat was given a project")
 	}
 	if McodeSessionWorkspace("mvs_rel") != "" || McodeSessionWorkspace("") != "" {
 		t.Fatal("a relative or missing workspace came back")

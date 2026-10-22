@@ -284,11 +284,8 @@ func harnessTable() []Harness {
 			// it started, and writes the transcript beside a manifest.
 			Name: "mcode", Load: LoadMcode, Files: McodeSessionFiles,
 			Kinds: []FileKind{{
-				Name: "mcode",
-				Match: func(p string) bool {
-					return filepath.Base(p) == mcodeTranscriptName &&
-						strings.HasPrefix(p, McodeRoot()+string(filepath.Separator))
-				},
+				Name:      "mcode",
+				Match:     mcodeIsTranscript,
 				Parse:     fullParse(ParseMcodeFile),
 				ParseFrom: offsetParse(ParseMcodeFileFromOffset),
 			}},

@@ -72,11 +72,21 @@ func McodeRoot() string {
 const mcodeTranscriptName = "messages.jsonl"
 
 // McodeSessionFiles lists the transcripts under the session root.
+// A .history-mutation-<id> directory inside a session is the runtime staging
+// a rewrite of the history (RSe); a copy left behind is the same session, not
+// another one.
 func McodeSessionFiles() []string {
-	return walkFiles(McodeRoot(), func(p string) bool {
-		return filepath.Base(p) == mcodeTranscriptName &&
-			strings.HasPrefix(p, McodeRoot()+string(filepath.Separator))
-	})
+	return walkFiles(McodeRoot(), mcodeIsTranscript)
+}
+
+func mcodeIsTranscript(p string) bool {
+	return filepath.Base(p) == mcodeTranscriptName &&
+		strings.HasPrefix(p, McodeRoot()+string(filepath.Separator)) &&
+		!mcodeStaged(p)
+}
+
+func mcodeStaged(p string) bool {
+	return strings.HasPrefix(filepath.Base(filepath.Dir(p)), ".history-mutation-")
 }
 
 // McodeSidecarFiles lists the runtime's own bookkeeping beside each
@@ -98,7 +108,7 @@ func McodeSidecarFiles() []string {
 		if !strings.HasPrefix(p, McodeRoot()+string(filepath.Separator)) {
 			return false
 		}
-		if names[filepath.Base(p)] {
+		if names[filepath.Base(p)] || mcodeStaged(p) {
 			return true
 		}
 		return mcodeUnderDir(p, "snapshots") || mcodeUnderDir(p, "reports")
@@ -160,7 +170,7 @@ func parseMcodeFile(path string, offset int64) ([]model.Session, error) {
 		role, _ := msg["role"].(string)
 		switch role {
 		case "user":
-			if msg["archonCompaction"] != nil {
+			if mcodeIsCompactionMarker(msg) {
 				mcodeApplyArchon(&s, msg)
 				return
 			}
@@ -171,7 +181,7 @@ func parseMcodeFile(path string, offset int64) ([]model.Session, error) {
 			mcodeApplySummary(&s, msg)
 		case "toolResult":
 			t := parseTimeAny(msg["timestamp"])
-			text := mcodeWithoutHookContext(mcodeText(msg["content"]))
+			text := mcodeText(mcodeWithoutHookBlocks(msg["content"]))
 			if text == "" || !IndexToolOutput() {
 				return
 			}
@@ -184,7 +194,7 @@ func parseMcodeFile(path string, offset int64) ([]model.Session, error) {
 	if len(s.Messages) == 0 {
 		return nil, err
 	}
-	if ws := McodeSessionWorkspace(s.ID); ws != "" {
+	if ws := mcodeSessionProject(s.ID); ws != "" {
 		s.Project = projectName(ws)
 	} else if p := projectFromPaths(s.Messages); p != "" {
 		s.Project = p
@@ -205,21 +215,35 @@ func McodeStateDB() string {
 var mcodeWorkspaceCache struct {
 	sync.Mutex
 	key  string
-	dirs map[string]string
+	dirs map[string]mcodeDirs
 }
 
-// McodeSessionWorkspace is the directory the session ran in. The transcript
-// and the manifest record none; the runtime keeps it in the
-// local_runtime_sessions table (workspace_dir, project_workspace_dir). ""
-// when the database or sqlite3 is not there.
+// mcodeDirs is where one session ran: workspace is the directory its tools ran
+// in (a worktree, for a worktree session), project the repository it belongs
+// to.
+type mcodeDirs struct{ workspace, project string }
+
+// McodeSessionWorkspace is the directory the session ran in, the cwd its hooks
+// are given. The transcript and the manifest record none; the runtime keeps
+// it in local_runtime_sessions.workspace_dir. "" when the database or sqlite3
+// is not there, or when the session ran in the runtime's default workspace,
+// which is its own scratch directory and no project.
 func McodeSessionWorkspace(id string) string {
-	if id == "" {
-		return ""
-	}
-	return mcodeWorkspaces()[id]
+	return mcodeWorkspaces()[id].workspace
 }
 
-func mcodeWorkspaces() map[string]string {
+// mcodeSessionProject is the repository the session belongs to:
+// project_workspace_dir, which for a worktree session is the parent checkout,
+// else the workspace.
+func mcodeSessionProject(id string) string {
+	d := mcodeWorkspaces()[id]
+	if d.project != "" {
+		return d.project
+	}
+	return d.workspace
+}
+
+func mcodeWorkspaces() map[string]mcodeDirs {
 	db := McodeStateDB()
 	info, err := os.Stat(db)
 	if err != nil || !info.Mode().IsRegular() {
@@ -241,22 +265,30 @@ func mcodeWorkspaces() map[string]string {
 	if !SQLite3Available() {
 		return nil
 	}
-	out, err := sqliteOutput(db, "select json_object('id', session_id, 'dir', "+
-		"coalesce(nullif(project_workspace_dir, ''), workspace_dir, '')) from local_runtime_sessions;")
+	out, err := sqliteOutput(db, "select json_object('id', session_id, "+
+		"'ws', coalesce(workspace_dir, ''), 'proj', coalesce(project_workspace_dir, '')) "+
+		"from local_runtime_sessions where is_default_workspace = 0;")
 	if err != nil {
 		return nil
 	}
 	rows, err := sqliteObjects[struct {
-		ID  string `json:"id"`
-		Dir string `json:"dir"`
+		ID   string `json:"id"`
+		WS   string `json:"ws"`
+		Proj string `json:"proj"`
 	}](out)
 	if err != nil {
 		return nil
 	}
-	dirs := make(map[string]string, len(rows))
+	abs := func(p string) string {
+		if filepath.IsAbs(p) {
+			return filepath.Clean(p)
+		}
+		return ""
+	}
+	dirs := make(map[string]mcodeDirs, len(rows))
 	for _, r := range rows {
-		if r.ID != "" && filepath.IsAbs(r.Dir) {
-			dirs[r.ID] = filepath.Clean(r.Dir)
+		if d := (mcodeDirs{abs(r.WS), abs(r.Proj)}); r.ID != "" && d.workspace != "" {
+			dirs[r.ID] = d
 		}
 	}
 	c.dirs = dirs
@@ -341,8 +373,18 @@ func isMcodeTurn(m map[string]any) bool {
 	if msg == nil {
 		return false
 	}
+	if mcodeIsCompactionMarker(msg) {
+		return false
+	}
 	role, _ := msg["role"].(string)
 	return role == "user" || role == "assistant" || role == "toolResult"
+}
+
+// mcodeIsCompactionMarker reports whether a user-role line is a compaction
+// marker rather than a turn: it carries an archonCompaction object.
+func mcodeIsCompactionMarker(msg map[string]any) bool {
+	_, ok := msg["archonCompaction"].(map[string]any)
+	return ok
 }
 
 // mcodeApplyUser folds a person's turn into the session: the text they typed,
@@ -404,7 +446,7 @@ func mcodeApplyArchon(s *model.Session, msg map[string]any) {
 // adding it a second time would show the person their own question twice.
 func mcodeApplyUserTitle(s *model.Session, m map[string]any) {
 	msg, _ := m["message"].(map[string]any)
-	if msg == nil || msg["archonCompaction"] != nil {
+	if msg == nil || mcodeIsCompactionMarker(msg) {
 		return
 	}
 	text := mcodeUserText(msg)
@@ -439,8 +481,9 @@ func mcodeUserText(msg map[string]any) string {
 		if cut, ok := mcodeCanonicalText(joined, ctr); ok {
 			return strings.TrimSpace(cut)
 		}
-		// A range that does not fit the text: the runtime gives up on the
-		// turn, deja keeps what is left once the runtime's blocks are out.
+		// A range that does not fit the text: the runtime treats the whole
+		// history as unreadable; deja keeps this turn with the runtime's
+		// blocks taken out.
 	}
 	text := mcodeWithoutHookContext(mcodeStripRuntimeBlocks(joined))
 	if mcodeCronPrompt.MatchString(text) {
@@ -463,17 +506,49 @@ var mcodeRuntimeBlocks = []*regexp.Regexp{
 // person (RUt).
 var mcodeCronPrompt = regexp.MustCompile(`(?i)^\[(?:System CronTask|Cron Report\b)[^\]]*\]`)
 
-// mcodeHookContext is what plugin hooks answered, which the runtime appends to
-// the turn and to the tool result as <plugin-hook-context> (MAr, tTn). With
-// deja installed that is deja's own recall; indexed, it would come back as
-// the session's words the next time (#4801).
-var mcodeHookContext = regexp.MustCompile(`(?s)<plugin-hook-context>.*?</plugin-hook-context>`)
+// mcodeHookContext is what plugin hooks answered. The runtime appends it as
+// "<plugin-hook-context>\n…\n</plugin-hook-context>": as the last text block
+// of a tool result, and after "\n\n" at the end of a turn's text. With deja
+// installed that is deja's own recall; indexed, it would come back as the
+// session's words the next time (#4801). Only that trailing shape is taken
+// out, so output that merely mentions the tag keeps it.
+const (
+	mcodeHookOpen  = "<plugin-hook-context>\n"
+	mcodeHookClose = "\n</plugin-hook-context>"
+)
+
+func mcodeIsHookContext(text string) bool {
+	return strings.HasPrefix(text, mcodeHookOpen) && strings.HasSuffix(text, mcodeHookClose)
+}
+
+// mcodeWithoutHookBlocks drops the text blocks that are a hook's answer.
+func mcodeWithoutHookBlocks(v any) any {
+	blocks, ok := v.([]any)
+	if !ok {
+		return v
+	}
+	out := make([]any, 0, len(blocks))
+	for _, b := range blocks {
+		if m, ok := b.(map[string]any); ok {
+			if text, _ := m["text"].(string); m["type"] == "text" && mcodeIsHookContext(text) {
+				continue
+			}
+		}
+		out = append(out, b)
+	}
+	return out
+}
 
 func mcodeWithoutHookContext(text string) string {
-	if !strings.Contains(text, "<plugin-hook-context>") {
+	t := strings.TrimRight(text, " \t\r\n")
+	if !strings.HasSuffix(t, mcodeHookClose) {
 		return text
 	}
-	return strings.TrimSpace(mcodeHookContext.ReplaceAllString(text, ""))
+	i := strings.LastIndex(t, "\n\n"+mcodeHookOpen)
+	if i < 0 {
+		return text
+	}
+	return strings.TrimSpace(t[:i])
 }
 
 func mcodeStripRuntimeBlocks(text string) string {
@@ -535,11 +610,15 @@ func mcodeCanonicalText(text string, ctr map[string]any) (string, bool) {
 func mcodeOffset(v any) (int, bool) {
 	switch x := v.(type) {
 	case json.Number:
-		n, err := x.Int64()
-		if err != nil {
+		if n, err := x.Int64(); err == nil {
+			return int(n), true
+		}
+		// 3266.0 and 1e3 are integers to the runtime too.
+		f, err := x.Float64()
+		if err != nil || f != float64(int64(f)) {
 			return 0, false
 		}
-		return int(n), true
+		return int(f), true
 	case float64:
 		if x != float64(int(x)) {
 			return 0, false
