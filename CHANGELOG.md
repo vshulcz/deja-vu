@@ -92,6 +92,8 @@ The search screen reads a page at a time. A word most of a 40,000-session store 
 - A search over sessions that share turns but each go on past them no longer
   compares every pair: 6,000 such sessions answer in 0.43 s instead of 5.1 s
   (#5523).
+- A search over many unrelated sessions that open on the same turn no longer
+  compares them in pairs: 6,000 answer in 0.33 s instead of 9.7 s (#5549).
 - MCP `recall`'s `limit` says it is per ~4 KB page, and a page that ran out of
   room before reaching `limit` says `(page full)` on its paging line, so a
   caller knows a bigger limit won't fit more (#5511).
