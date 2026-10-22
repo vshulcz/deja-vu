@@ -2,6 +2,7 @@ package sources
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -175,5 +176,90 @@ func TestMcodeTheDirectoryIDIsBase64URL(t *testing.T) {
 	}
 	if id, ok := decodeMcodeID("bXZzXz8+Pw=="); !ok || id != "mvs_?>?" {
 		t.Fatalf("standard: id = %q ok = %v", id, ok)
+	}
+}
+
+// What a plugin hook answered rides the tool result and the turn as
+// <plugin-hook-context> (seen in a live 0.6.12 run). With deja installed that
+// is deja's own recall, and indexing it would feed recall back into the index.
+func TestMcodeHookContextIsNotIndexed(t *testing.T) {
+	got := parseMcodeLines(t,
+		mcodeUserLine(`"content":[{"type":"text","text":"asked\n\n<plugin-hook-context>\nRECALL-ECHO\n</plugin-hook-context>"}]`),
+		`{"message_id":"m2","turn_id":"t1","message":{"role":"toolResult","toolCallId":"c","toolName":"bash",`+
+			`"content":[{"type":"text","text":"hi\n\n<plugin-hook-context>\nRECALL-ECHO\n</plugin-hook-context>"}],"timestamp":1792465960901}}`)
+	want := []string{"user: asked", RoleToolOutput + ": hi"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("messages = %q, want %q", got, want)
+	}
+}
+
+// The transcript records no directory; the runtime's database does
+// (local_runtime_sessions.workspace_dir), and the session is filed under it.
+func TestMcodeTheProjectIsTheWorkspaceTheRuntimeRecorded(t *testing.T) {
+	if _, err := exec.LookPath("sqlite3"); err != nil {
+		t.Skip("sqlite3 not installed")
+	}
+	base := t.TempDir()
+	root := filepath.Join(base, "v2", "sessions")
+	t.Setenv("DEJA_MCODE_ROOT", root)
+	ws := filepath.Join(base, "work", "billing-api")
+	dir := filepath.Join(root, "2026", "10", "22", "15-47-55-700-session_x")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "manifest.json"), []byte(`{"sessionId":"mvs_ws"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, mcodeTranscriptName), []byte(mcodeUserLine(`"content":[{"type":"text","text":"hi"}]`)+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Without the database the project is unknown.
+	if ss := LoadMcode(); len(ss) != 1 || ss[0].Project != "-" {
+		t.Fatalf("sessions = %#v, want one with no project", ss)
+	}
+	db := McodeStateDB()
+	if err := os.MkdirAll(filepath.Dir(db), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	sql := "create table local_runtime_sessions (session_id text primary key, workspace_dir text, project_workspace_dir text);" +
+		"insert into local_runtime_sessions values ('mvs_ws', '" + strings.ReplaceAll(ws, "'", "''") + "', null);" +
+		"insert into local_runtime_sessions values ('mvs_rel', 'relative/dir', '');"
+	if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
+		t.Fatalf("sqlite3: %v %s", err, out)
+	}
+	ss := LoadMcode()
+	if len(ss) != 1 || ss[0].Project != projectName(ws) {
+		t.Fatalf("project = %q, want %q", ss[0].Project, projectName(ws))
+	}
+	if McodeSessionWorkspace("mvs_rel") != "" || McodeSessionWorkspace("") != "" {
+		t.Fatal("a relative or missing workspace came back")
+	}
+}
+
+// A PreCompact hook finds the session by id: the directory name carries it in
+// base64url, and the manifest has the last word.
+func TestMcodeSessionPathFindsTheSessionByID(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "v2", "sessions")
+	t.Setenv("DEJA_MCODE_ROOT", root)
+	dir := filepath.Join(root, "2026", "10", "22", "15-47-55-700-session_bXZzXz8-Pw")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, mcodeTranscriptName)
+	if err := os.WriteFile(path, []byte(mcodeUserLine(`"content":[{"type":"text","text":"hi"}]`)+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := McodeSessionPath("mvs_?>?"); got != path {
+		t.Fatalf("path = %q, want %q", got, path)
+	}
+	if McodeSessionPath("mvs_other") != "" || McodeSessionPath("") != "" {
+		t.Fatal("an id the store does not hold came back with a path")
+	}
+	if _, err := ReadCompactionStore("mcode", "mvs_other"); err == nil {
+		t.Fatal("captured a session the store does not hold")
+	}
+	tr, err := ReadCompactionStore("mcode", "mvs_?>?")
+	if err != nil || tr.Harness != "mcode" || tr.Path != path {
+		t.Fatalf("capture = %#v, %v", tr, err)
 	}
 }

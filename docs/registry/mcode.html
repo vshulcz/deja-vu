@@ -42,7 +42,7 @@
 <li><strong>Store</strong>: <code>~/.minimax/v2/sessions/YYYY/MM/DD/&lt;session&gt;/messages.jsonl</code></li>
 <li><strong>Read overrides</strong>: <code>DEJA_MCODE_ROOT</code>, a path, replaces the session root</li>
 <li><strong>Format</strong>: JSONL, one message per line, <code>timestamp</code> in milliseconds</li>
-<li><strong>Needs</strong>: nothing</li>
+<li><strong>Needs</strong>: <code>sqlite3</code> for the session&#39;s workspace; the transcripts read without it</li>
 </ul>
 <p>MiniMax Code is the desktop agent. Its local runtime keeps one directory per</p>
 <p>conversation, sharded by the day it started, and writes the transcript beside a</p>
@@ -90,9 +90,12 @@
 <p>The <code>thinking</code> block is the model reasoning out loud, not what it told the</p>
 <p>person, so it stays out of the transcript the way it does in every other</p>
 <p>harness here.</p>
-<p>The transcript records no working directory, so the project comes from where</p>
-<p>the session&#39;s own file activity was — the same evidence the other harnesses</p>
-<p>without a recorded cwd are filed under.</p>
+<p>The transcript records no working directory. The runtime keeps it in</p>
+<p><code>~/.minimax/v2/sqlite/runtime-state.sqlite</code> (<code>local_runtime_sessions</code>,</p>
+<p><code>project_workspace_dir</code> or <code>workspace_dir</code>), which deja reads through</p>
+<p><code>sqlite3</code>. Without <code>sqlite3</code> the project comes from where the session&#39;s own</p>
+<p>file activity was, the evidence the other harnesses without a recorded cwd are</p>
+<p>filed under.</p>
 <p>The session id is the one <code>manifest.json</code> records; the directory name carries</p>
 <p>it base64url-encoded, and is read when the manifest is missing.</p>
 <p><strong>Last verified:</strong> 2026-10-22</p>
@@ -119,7 +122,11 @@
 <tr><td><code>PreCompact</code></td><td><code>deja hook-precompact --harness mcode</code></td><td>—</td></tr>
 </table></div>
 <p>The payload is Claude-shaped — the event name, the prompt, the tool name and</p>
-<p>its input, the session id, the cwd — so the hooks read it unchanged. Only the</p>
+<p>its input, the session id, the cwd — so the hooks read it unchanged. Its</p>
+<p><code>transcript_path</code> is a temporary Claude-compatible projection the runtime</p>
+<p>deletes after the call, so the PreCompact capture reads the session from the</p>
+<p>store by its id instead. What a hook answers comes back in the turn and the</p>
+<p>tool result as <code>&lt;plugin-hook-context&gt;</code>, and is left out of the index. Only the</p>
 <p>way the answer is written back is MiniMax Code&#39;s own: <code>--mcode</code> puts the text</p>
 <p>under <code>hookSpecificOutput.additionalContext</code>, under the event it answers,</p>
 <p>which is the only place that runtime reads it from.</p>

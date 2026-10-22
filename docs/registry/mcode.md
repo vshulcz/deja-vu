@@ -4,7 +4,7 @@
 - **Store**: `~/.minimax/v2/sessions/YYYY/MM/DD/<session>/messages.jsonl`
 - **Read overrides**: `DEJA_MCODE_ROOT`, a path, replaces the session root
 - **Format**: JSONL, one message per line, `timestamp` in milliseconds
-- **Needs**: nothing
+- **Needs**: `sqlite3` for the session's workspace; the transcripts read without it
 
 MiniMax Code is the desktop agent. Its local runtime keeps one directory per
 conversation, sharded by the day it started, and writes the transcript beside a
@@ -60,9 +60,12 @@ The `thinking` block is the model reasoning out loud, not what it told the
 person, so it stays out of the transcript the way it does in every other
 harness here.
 
-The transcript records no working directory, so the project comes from where
-the session's own file activity was — the same evidence the other harnesses
-without a recorded cwd are filed under.
+The transcript records no working directory. The runtime keeps it in
+`~/.minimax/v2/sqlite/runtime-state.sqlite` (`local_runtime_sessions`,
+`project_workspace_dir` or `workspace_dir`), which deja reads through
+`sqlite3`. Without `sqlite3` the project comes from where the session's own
+file activity was, the evidence the other harnesses without a recorded cwd are
+filed under.
 
 The session id is the one `manifest.json` records; the directory name carries
 it base64url-encoded, and is read when the manifest is missing.
@@ -100,7 +103,11 @@ MCode's own MCP page writes:
 | `PreCompact` | `deja hook-precompact --harness mcode` | — |
 
 The payload is Claude-shaped — the event name, the prompt, the tool name and
-its input, the session id, the cwd — so the hooks read it unchanged. Only the
+its input, the session id, the cwd — so the hooks read it unchanged. Its
+`transcript_path` is a temporary Claude-compatible projection the runtime
+deletes after the call, so the PreCompact capture reads the session from the
+store by its id instead. What a hook answers comes back in the turn and the
+tool result as `<plugin-hook-context>`, and is left out of the index. Only the
 way the answer is written back is MiniMax Code's own: `--mcode` puts the text
 under `hookSpecificOutput.additionalContext`, under the event it answers,
 which is the only place that runtime reads it from.

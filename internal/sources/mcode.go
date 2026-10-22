@@ -3,10 +3,12 @@ package sources
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"unicode/utf16"
 	"unicode/utf8"
 
@@ -48,9 +50,10 @@ import (
 // person, so it stays out of the transcript the way it does in every other
 // harness here.
 //
-// The transcript holds no working directory, so the project comes from where
-// the session's own file activity was: the same evidence the other harnesses
-// without a recorded cwd are filed under (#542).
+// The transcript holds no working directory. The runtime keeps it in its own
+// SQLite store (McodeSessionWorkspace), read through sqlite3; without that,
+// the project comes from where the session's own file activity was, the
+// evidence the other harnesses without a recorded cwd are filed under (#542).
 //
 // Read off MiniMax Code's local runtime v2 sessions, 2026-10-20; user text and
 // compaction markers checked against the @minimax-ai/code 0.6.12 bundle.
@@ -168,7 +171,7 @@ func parseMcodeFile(path string, offset int64) ([]model.Session, error) {
 			mcodeApplySummary(&s, msg)
 		case "toolResult":
 			t := parseTimeAny(msg["timestamp"])
-			text := mcodeText(msg["content"])
+			text := mcodeWithoutHookContext(mcodeText(msg["content"]))
 			if text == "" || !IndexToolOutput() {
 				return
 			}
@@ -181,12 +184,83 @@ func parseMcodeFile(path string, offset int64) ([]model.Session, error) {
 	if len(s.Messages) == 0 {
 		return nil, err
 	}
-	if p := projectFromPaths(s.Messages); p != "" {
+	if ws := McodeSessionWorkspace(s.ID); ws != "" {
+		s.Project = projectName(ws)
+	} else if p := projectFromPaths(s.Messages); p != "" {
 		s.Project = p
 	} else {
 		s.ProjectFromDir = true
 	}
 	return []model.Session{s}, err
+}
+
+// McodeStateDB is the runtime's own SQLite store, beside the sessions
+// directory: ~/.minimax/v2/sqlite/runtime-state.sqlite.
+func McodeStateDB() string {
+	return filepath.Join(filepath.Dir(McodeRoot()), "sqlite", "runtime-state.sqlite")
+}
+
+// mcodeWorkspaceCache is the session-to-workspace table, read once per
+// change of the database rather than once per transcript.
+var mcodeWorkspaceCache struct {
+	sync.Mutex
+	key  string
+	dirs map[string]string
+}
+
+// McodeSessionWorkspace is the directory the session ran in. The transcript
+// and the manifest record none; the runtime keeps it in the
+// local_runtime_sessions table (workspace_dir, project_workspace_dir). ""
+// when the database or sqlite3 is not there.
+func McodeSessionWorkspace(id string) string {
+	if id == "" {
+		return ""
+	}
+	return mcodeWorkspaces()[id]
+}
+
+func mcodeWorkspaces() map[string]string {
+	db := McodeStateDB()
+	info, err := os.Stat(db)
+	if err != nil || !info.Mode().IsRegular() {
+		return nil
+	}
+	// The runtime writes through a WAL, so the main file's clock alone can
+	// stay put while sessions are added.
+	key := fmt.Sprintf("%s|%d|%d", db, info.ModTime().UnixNano(), info.Size())
+	if wal, err := os.Stat(db + "-wal"); err == nil {
+		key += fmt.Sprintf("|%d|%d", wal.ModTime().UnixNano(), wal.Size())
+	}
+	c := &mcodeWorkspaceCache
+	c.Lock()
+	defer c.Unlock()
+	if c.key == key {
+		return c.dirs
+	}
+	c.key, c.dirs = key, nil
+	if !SQLite3Available() {
+		return nil
+	}
+	out, err := sqliteOutput(db, "select json_object('id', session_id, 'dir', "+
+		"coalesce(nullif(project_workspace_dir, ''), workspace_dir, '')) from local_runtime_sessions;")
+	if err != nil {
+		return nil
+	}
+	rows, err := sqliteObjects[struct {
+		ID  string `json:"id"`
+		Dir string `json:"dir"`
+	}](out)
+	if err != nil {
+		return nil
+	}
+	dirs := make(map[string]string, len(rows))
+	for _, r := range rows {
+		if r.ID != "" && filepath.IsAbs(r.Dir) {
+			dirs[r.ID] = filepath.Clean(r.Dir)
+		}
+	}
+	c.dirs = dirs
+	return dirs
 }
 
 // mcodeDialect is MCode's tool vocabulary: bash takes `command`, read and
@@ -368,7 +442,7 @@ func mcodeUserText(msg map[string]any) string {
 		// A range that does not fit the text: the runtime gives up on the
 		// turn, deja keeps what is left once the runtime's blocks are out.
 	}
-	text := mcodeStripRuntimeBlocks(joined)
+	text := mcodeWithoutHookContext(mcodeStripRuntimeBlocks(joined))
 	if mcodeCronPrompt.MatchString(text) {
 		return ""
 	}
@@ -388,6 +462,19 @@ var mcodeRuntimeBlocks = []*regexp.Regexp{
 // mcodeCronPrompt is the head of a turn a scheduled task sent rather than a
 // person (RUt).
 var mcodeCronPrompt = regexp.MustCompile(`(?i)^\[(?:System CronTask|Cron Report\b)[^\]]*\]`)
+
+// mcodeHookContext is what plugin hooks answered, which the runtime appends to
+// the turn and to the tool result as <plugin-hook-context> (MAr, tTn). With
+// deja installed that is deja's own recall; indexed, it would come back as
+// the session's words the next time (#4801).
+var mcodeHookContext = regexp.MustCompile(`(?s)<plugin-hook-context>.*?</plugin-hook-context>`)
+
+func mcodeWithoutHookContext(text string) string {
+	if !strings.Contains(text, "<plugin-hook-context>") {
+		return text
+	}
+	return strings.TrimSpace(mcodeHookContext.ReplaceAllString(text, ""))
+}
 
 func mcodeStripRuntimeBlocks(text string) string {
 	for _, re := range mcodeRuntimeBlocks {
@@ -552,4 +639,35 @@ func mcodeToolCalls(v any) []any {
 		out = append(out, map[string]any{"type": "tool_use", "id": id, "name": name, "input": in})
 	}
 	return out
+}
+
+// McodeSessionPath is the transcript of the session with this id, or "" when
+// the store holds none. The directory name ends in session_ and the id in
+// base64url cut at 180 characters (JDe); the id itself is checked against
+// the manifest, so a cut name never stands in for another session.
+func McodeSessionPath(id string) string {
+	if id == "" {
+		return ""
+	}
+	enc := base64.RawURLEncoding.EncodeToString([]byte(id))
+	if len(enc) > 180 {
+		enc = enc[:180]
+	}
+	for _, p := range McodeSessionFiles() {
+		if strings.HasSuffix(filepath.Base(filepath.Dir(p)), "session_"+enc) && mcodeSessionID(p) == id {
+			return p
+		}
+	}
+	return ""
+}
+
+// readMcodeCompaction captures a MiniMax Code session for a PreCompact hook.
+// The hook payload's transcript_path is a temporary projection the runtime
+// deletes after the call, so the session is found in the store by its id.
+func readMcodeCompaction(id string) (CompactionTranscript, error) {
+	path := McodeSessionPath(id)
+	if path == "" {
+		return CompactionTranscript{}, fmt.Errorf("%w: no mcode session %q", ErrTranscriptIdentity, id)
+	}
+	return ReadCompactionSession("mcode", id, path, "")
 }

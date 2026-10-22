@@ -3646,7 +3646,7 @@
         "compaction_capture": {
           "status": "partial",
           "proof": "stand",
-          "note": "the capture runs at PreCompact with --harness mcode and reads the v2 transcript through MCode's own reader; what the model is told about it has no surface to travel on"
+          "note": "the capture runs at PreCompact with --harness mcode and reads the session from the v2 store by its id, not the temporary transcript_path the hook is given; what the model is told about it has no surface to travel on"
         },
         "compaction_packet": {
           "status": "no",

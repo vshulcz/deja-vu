@@ -29,6 +29,8 @@ func ReadCompactionStore(harness, nativeSessionID string) (CompactionTranscript,
 		db = KiloDB()
 	case "muse":
 		return readMuseCompaction(nativeSessionID)
+	case "mcode":
+		return readMcodeCompaction(nativeSessionID)
 	default:
 		return CompactionTranscript{}, ErrUnsupportedCompactionTranscript
 	}
