@@ -192,7 +192,7 @@ func AllHarnesses() []Harness { return allHarnesses() }
 
 func allHarnesses() []Harness { return withSubagentSwitch(harnessTable()) }
 
-func harnessTable() []Harness {
+func harnessTable() []Harness { //nolint:funlen // one entry per supported harness
 	return []Harness{
 		{
 			Name: "claude", Load: LoadClaude, Files: ClaudeFiles,

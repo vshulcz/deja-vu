@@ -137,7 +137,6 @@ func forgetInChild(dir string) func(string) error {
 		if err != nil {
 			return err
 		}
-		//nolint:gosec // runs this binary on an id from the index
 		cmd := exec.CommandContext(context.Background(), exe, "forget", "--session", id)
 		cmd.Env = append(os.Environ(), "DEJA_INDEX_DIR="+dir)
 		out, err := cmd.CombinedOutput()

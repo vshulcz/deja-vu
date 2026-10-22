@@ -398,11 +398,11 @@ func openInBrowser(path string) {
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "darwin":
-		cmd = exec.CommandContext(context.Background(), "open", path) //nolint:gosec // path is the page deja just wrote
+		cmd = exec.CommandContext(context.Background(), "open", path)
 	case "windows":
-		cmd = exec.CommandContext(context.Background(), "cmd", "/c", "start", "", path) //nolint:gosec // path is the page deja just wrote
+		cmd = exec.CommandContext(context.Background(), "cmd", "/c", "start", "", path)
 	default:
-		cmd = exec.CommandContext(context.Background(), "xdg-open", path) //nolint:gosec // path is the page deja just wrote
+		cmd = exec.CommandContext(context.Background(), "xdg-open", path)
 	}
 	_ = cmd.Start()
 }

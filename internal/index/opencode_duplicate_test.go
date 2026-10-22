@@ -26,7 +26,7 @@ insert into session values ('%[1]s','/tmp/app',0,0);
 insert into message values ('m-%[1]s','%[1]s','{"role":"user"}',0);
 insert into part values ('p-%[1]s','m-%[1]s',json_object('type','text','text','%[2]s'));
 `, id, text)
-	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, stmts).CombinedOutput(); err != nil { //nolint:gosec // a fixed tool on the test's own temp files
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, stmts).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}
 }

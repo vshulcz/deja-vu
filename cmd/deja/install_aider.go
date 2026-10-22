@@ -573,7 +573,7 @@ func cmdAider(dir string, rest []string, sourceInstance string) error {
 			args = append(slices.Clone(rest), aiderReadArgs(rest, wd, aiderContextPath())...)
 		}
 	}
-	cmd := exec.CommandContext(context.Background(), bin, args...) //nolint:gosec // runs the user's own aider with their arguments
+	cmd := exec.CommandContext(context.Background(), bin, args...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return runOutlivingSignals(cmd)
 }

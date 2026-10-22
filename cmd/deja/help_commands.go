@@ -334,7 +334,7 @@ func runToolHelp(name string, rest []string) error {
 	if err != nil {
 		return fmt.Errorf("%s is not on PATH: %w — `deja help %s` is deja's page for it", name, err, name)
 	}
-	cmd := exec.CommandContext(context.Background(), bin, rest...) //nolint:gosec // runs the tool the user named
+	cmd := exec.CommandContext(context.Background(), bin, rest...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return cmd.Run()
 }

@@ -43,7 +43,7 @@ func TestInstallKeepsWiringWhenStdoutClosesEarly(t *testing.T) {
 		t.Fatal(err)
 	}
 	var said bytes.Buffer
-	cmd := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestInstallPipeHelper$") //nolint:gosec // re-runs this test binary
+	cmd := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestInstallPipeHelper$")
 	cmd.Env = append(os.Environ(), installPipeHelperEnv+"="+home)
 	cmd.Stdout, cmd.Stdin, cmd.Stderr = stdoutW, stdin, &said
 	if serr := cmd.Start(); serr != nil {

@@ -124,7 +124,7 @@ func TestGooseCompactionIsCaughtUpAtStop(t *testing.T) {
 	}
 	db := filepath.Join(root, "sessions", "sessions.db")
 	sqlite := func(sql string) {
-		if out, err := exec.CommandContext(t.Context(), "sqlite3", db, sql).CombinedOutput(); err != nil { //nolint:gosec // the test runs its own fixture command
+		if out, err := exec.CommandContext(t.Context(), "sqlite3", db, sql).CombinedOutput(); err != nil {
 			t.Fatalf("store: %v: %s", err, out)
 		}
 	}

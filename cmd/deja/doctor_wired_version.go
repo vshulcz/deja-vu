@@ -153,7 +153,7 @@ func readDejaBinaryVersion(p string) string {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, p, "version").Output() //nolint:gosec // runs the deja binary the wiring names
+	out, err := exec.CommandContext(ctx, p, "version").Output()
 	if err != nil {
 		return ""
 	}

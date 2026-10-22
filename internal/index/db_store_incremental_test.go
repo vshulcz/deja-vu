@@ -15,7 +15,7 @@ import (
 // with a `--` comment would otherwise be read as an option.
 func runStoreSQL(t *testing.T, db, sql string) {
 	t.Helper()
-	cmd := exec.CommandContext(t.Context(), "sqlite3", db) //nolint:gosec // a fixed tool on the test's own temp files
+	cmd := exec.CommandContext(t.Context(), "sqlite3", db)
 	cmd.Stdin = strings.NewReader(sql)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3: %v: %s", err, out)

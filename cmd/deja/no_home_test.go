@@ -45,7 +45,7 @@ func TestNoHomeHelperProcess(_ *testing.T) {
 func runWithNoHome(t *testing.T, args ...string) (int, []string) {
 	t.Helper()
 	wd := t.TempDir()
-	cmd := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestNoHomeHelperProcess$") //nolint:gosec // G702: re-runs this test binary
+	cmd := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestNoHomeHelperProcess$")
 	cmd.Dir = wd
 	cmd.Stdin = strings.NewReader("{}")
 	cmd.Env = append(os.Environ(),

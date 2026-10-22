@@ -409,7 +409,7 @@ func TestAMoveThatAddsAnExitStatusIsStillAMove(t *testing.T) {
 				dir := filepath.Join(os.Getenv("DEJA_CODEX_ROOT"), "sessions", "2026", "07", "31")
 				p := filepath.Join(dir, "rollout-2026-07-31T00-00-00-cx-1.jsonl")
 				appendFile(t, p, `{"timestamp":"2026-07-31T00:00:03Z","type":"response_item","payload":{"type":"function_call_output","call_id":"c1","output":"Process exited with code 1\nOutput:\nFAIL\n"}}`+"\n")
-				if out, err := exec.CommandContext(t.Context(), "zstd", "-q", "--rm", p).CombinedOutput(); err != nil { //nolint:gosec // a fixed tool on the test's own temp files
+				if out, err := exec.CommandContext(t.Context(), "zstd", "-q", "--rm", p).CombinedOutput(); err != nil {
 					t.Fatalf("zstd: %v %s", err, out)
 				}
 				return p, p + ".zst"

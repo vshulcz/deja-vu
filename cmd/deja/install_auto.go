@@ -283,7 +283,7 @@ func installOpencodeShapedPlugin(dir, exe string, uninstall bool, js func(exe st
 	return installResult{Path: path, Action: a}, err
 }
 
-func opencodePluginJS(exe string) string {
+func opencodePluginJS(exe string) string { //nolint:funlen // the body is the plugin's source text
 	// OpenCode V2 reads only the module's default export, and it must carry
 	// an id and a setup (or effect) function; the V1 named-export shape was
 	// rejected outright ("Missing key at [\"default\"]", ref err_bb76d60a),
@@ -673,7 +673,7 @@ func opencodeLegacyPluginJS(exe string) string {
 
 // legacyPluginJSFor is the 1.x plugin with the target that regenerates it in
 // its header: Kilo CLI loads the same file (#4398).
-func legacyPluginJSFor(target, exe string) string {
+func legacyPluginJSFor(target, exe string) string { //nolint:funlen // the body is the plugin's source text
 	// opencode's hook output goes into the model's context, so a progress
 	// note cannot ride along with it — it would be prompt noise. The TUI
 	// toast is the channel meant for the human, so the build announces itself

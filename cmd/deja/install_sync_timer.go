@@ -251,7 +251,7 @@ func runServiceManager(name string, args ...string) (string, error) {
 	if underTestBinary() {
 		return "", nil
 	}
-	out, err := exec.CommandContext(context.Background(), name, args...).CombinedOutput() //nolint:gosec // name is launchctl or systemctl, fixed by the callers
+	out, err := exec.CommandContext(context.Background(), name, args...).CombinedOutput()
 	return strings.TrimSpace(string(out)), err
 }
 

@@ -37,7 +37,7 @@ func TestTestMainScrubsEveryVariableTheCodeReads(t *testing.T) {
 	if len(read) < 50 {
 		t.Fatalf("found only %d variables, the scan is broken", len(read))
 	}
-	cmd := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestScrubHelperProcess$") //nolint:gosec // reruns this test binary
+	cmd := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestScrubHelperProcess$")
 	cmd.Env = append(os.Environ(), "SCRUB_PROBE=1")
 	for _, name := range read {
 		// Runtime knobs the runtime parses before main: a path in them is a

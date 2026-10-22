@@ -49,7 +49,7 @@ func useHelper(t *testing.T) {
 	t.Helper()
 	original := newCheckCmd
 	newCheckCmd = func(string) *exec.Cmd {
-		cmd := exec.CommandContext(context.Background(), os.Args[0], "-test.run=TestHelperDeja") //nolint:gosec // re-runs this test binary
+		cmd := exec.CommandContext(context.Background(), os.Args[0], "-test.run=TestHelperDeja")
 		cmd.Env = append(os.Environ(), "PLANBENCH_HELPER=1")
 		return cmd
 	}

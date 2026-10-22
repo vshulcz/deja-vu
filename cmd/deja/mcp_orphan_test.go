@@ -22,7 +22,7 @@ func TestMCPOrphanHelperProcess(_ *testing.T) {
 }
 
 func mcpOrphanHelper(mode string) *exec.Cmd {
-	cmd := exec.CommandContext(context.Background(), os.Args[0], "-test.run=^TestMCPOrphanHelperProcess$") //nolint:gosec // G702: re-runs this test binary
+	cmd := exec.CommandContext(context.Background(), os.Args[0], "-test.run=^TestMCPOrphanHelperProcess$")
 	cmd.Env = append(os.Environ(), "DEJA_MCP_ORPHAN_HELPER="+mode)
 	return cmd
 }

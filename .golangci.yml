@@ -87,6 +87,9 @@ linters:
         - G304
         - G306
         - G703
+        # Taint rules whose results change from run to run on the same tree.
+        - G702
+        - G709
     dupword:
       # Repeated words in literals are test data ("two two" is the fixture).
       comments-only: true

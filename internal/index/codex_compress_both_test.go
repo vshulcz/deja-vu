@@ -23,7 +23,7 @@ func TestACodexRolloutSeenInBothFormsIsHeldOnceAfterTheJSONLGoes(t *testing.T) {
 	if err := Ensure(idx, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := exec.CommandContext(t.Context(), "zstd", "-q", "-k", p).CombinedOutput(); err != nil { //nolint:gosec // a fixed tool on the test's own temp files
+	if out, err := exec.CommandContext(t.Context(), "zstd", "-q", "-k", p).CombinedOutput(); err != nil {
 		t.Fatalf("zstd: %v %s", err, out)
 	}
 	if err := Ensure(idx, "", false, nil); err != nil {

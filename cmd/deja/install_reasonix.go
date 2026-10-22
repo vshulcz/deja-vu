@@ -471,7 +471,7 @@ func installReasonixViaCLI(cli, src string) error {
 	}()
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, cli, "plugin", "install", src, "--name", reasonixPluginName, "--replace", "--yes") //nolint:gosec // cli is the reasonix found on PATH
+	cmd := exec.CommandContext(ctx, cli, "plugin", "install", src, "--name", reasonixPluginName, "--replace", "--yes")
 	cmd.Env = append(os.Environ(), "REASONIX_HOME="+sources.ReasonixHome())
 	out, err := cmd.CombinedOutput()
 	if err != nil {

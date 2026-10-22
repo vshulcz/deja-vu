@@ -136,7 +136,7 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 	if _, err := exec.LookPath(argv[0]); err != nil {
 		return fmt.Errorf("handoff: %s is not installed (looked for %q in PATH)", target, argv[0])
 	}
-	c := exec.CommandContext(context.Background(), argv[0], argv[1:]...) //nolint:gosec // runs the agent the user asked to hand off to
+	c := exec.CommandContext(context.Background(), argv[0], argv[1:]...)
 	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return c.Run()
 }

@@ -77,7 +77,7 @@ func TestTwoIndexProcessesLeaveOneGoodStore(t *testing.T) {
 			// rather than hanging the package.
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 			defer cancel()
-			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=TestCrossProcessIndexChild") //nolint:gosec // the test binary running itself
+			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=TestCrossProcessIndexChild")
 			cmd.Env = append(append([]string{}, env...), fmt.Sprintf("DEJA_PASS_FULL=%d", boolToInt(i == 0)))
 			<-start
 			out, err := cmd.CombinedOutput()
