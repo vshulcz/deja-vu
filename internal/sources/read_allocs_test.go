@@ -71,6 +71,9 @@ func TestSplitContentReadsWhatEachReaderReadAlone(t *testing.T) {
 // build (#5586). Reading many small transcripts allocates far less than one
 // buffer each now.
 func TestReadingTranscriptsReusesTheLineBuffer(t *testing.T) {
+	if raceEnabled {
+		t.Skip("sync.Pool drops buffers on purpose under -race")
+	}
 	dir := t.TempDir()
 	var paths []string
 	for i := 0; i < 64; i++ {
