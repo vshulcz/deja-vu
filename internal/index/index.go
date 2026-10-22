@@ -805,7 +805,9 @@ import (
 // all forgotten (#5521).
 // 102: a pass that re-reads a changed transcript drops a record that strips to
 // empty, as a rebuild does (#5555).
-const version = 102
+// 103: an incremental pass gives no row to a session it holds no record of
+// (#5563).
+const version = 103
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
@@ -1221,6 +1223,12 @@ type Manifest struct {
 	// of those tables says so rather than answering empty, and a pass whose
 	// setting differs rebuilds once.
 	SearchOnly bool `json:"search_only,omitempty"`
+	// Empty holds the rows of sessions with no record, a transcript that had
+	// nothing to index, out of Sessions so no reader lists them (#868,
+	// #5563). A pass takes one back when its id is read again: a Gemini
+	// resume stub's row carries its span and file to the transcript that
+	// takes the id later, as a rebuild reading both gives (#4213).
+	Empty map[string]SessionMeta `json:"empty,omitempty"`
 }
 
 // HarnessIngest is one harness's ingestion health from its last indexing pass.
@@ -1294,6 +1302,7 @@ type manifestCore struct {
 	Deferred           map[string]FileState
 	PartialOf          int
 	SearchOnly         bool
+	Empty              map[string]SessionMeta
 }
 
 type RedactionStats struct {

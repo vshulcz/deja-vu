@@ -329,3 +329,68 @@ func TestAReReadDropsAToolResultThatIsOnlyRecall(t *testing.T) {
 		})
 	}
 }
+
+// A transcript with nothing to index has no row after a rebuild (#868). The
+// append pass and the re-read pass gave it one with no records under it, an
+// untitled line in `deja last` (#5563).
+func TestAPassGivesNoRowToATranscriptWithNothingToIndex(t *testing.T) {
+	recallOnly := func(sid string) string {
+		return hjson(map[string]any{"type": "user", "sessionId": sid, "uuid": "u2", "timestamp": "2026-10-15T01:00:01.000Z", "cwd": "/tmp/demo",
+			"message": map[string]any{"role": "user", "content": []any{map[string]any{"tool_use_id": "toolu_1", "type": "tool_result",
+				"content": []any{map[string]any{"type": "text", "text": "<deja-recall>\nRecalled history from prior sessions\n- example hit\n</deja-recall>"}}}}}})
+	}
+	hasRow := func(t *testing.T, dir, id string) bool {
+		t.Helper()
+		metas, err := AllMeta(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, m := range metas {
+			if m.ID == id {
+				return true
+			}
+		}
+		return false
+	}
+	for _, tc := range []struct {
+		name, id, marker string
+		change           func(t *testing.T, root string)
+	}{
+		{"a new file, appended", "s-c", "updated 1 file", func(t *testing.T, root string) {
+			write(t, filepath.Join(root, "p", "c.jsonl"), recallOnly("s-c"))
+		}},
+		{"a file that held text, read again", "s-b", replacementPassMarker, func(t *testing.T, root string) {
+			p := filepath.Join(root, "p", "b.jsonl")
+			write(t, p, recallOnly("s-b"))
+			bumpMTime(t, p)
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tmp := hermeticIndexEnv(t)
+			dir := filepath.Join(tmp, "idx")
+			root := os.Getenv("DEJA_CLAUDE_ROOT")
+			write(t, filepath.Join(root, "p", "a.jsonl"), claudeLine("s-a", "2026-10-15T01:00:00Z", "alpha one"))
+			write(t, filepath.Join(root, "p", "b.jsonl"), claudeLine("s-b", "2026-10-15T01:00:00Z", "beta one"))
+			if err := Ensure(dir, "", true, nil); err != nil {
+				t.Fatal(err)
+			}
+			tc.change(t, root)
+			var progress strings.Builder
+			if err := Ensure(dir, "", false, &progress); err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(progress.String(), tc.marker) {
+				t.Fatalf("the pass was not the one this case is about: %q", progress.String())
+			}
+			if hasRow(t, dir, tc.id) {
+				t.Errorf("%s has a row with nothing under it", tc.id)
+			}
+			// The control: the session that holds text keeps its row.
+			if !hasRow(t, dir, "s-a") {
+				t.Error("the pass dropped s-a, which holds text")
+			}
+			sessionMatchesRebuild(t, dir, "claude", tc.id)
+			sessionMatchesRebuild(t, dir, "claude", "s-a")
+		})
+	}
+}

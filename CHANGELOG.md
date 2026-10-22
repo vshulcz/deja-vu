@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A transcript with nothing to index, such as one tool result that was only a
+  `<deja-recall>` block, no longer gets an empty session in `deja last` from
+  an incremental pass. A rebuild never listed it (#5563).
+
 ## [0.23.1] - 2026-10-22
 
 Big stores build and search for less. A cold build peaks at half the memory

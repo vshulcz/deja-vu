@@ -8,6 +8,7 @@ import (
 	"hash/fnv"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -472,9 +473,21 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 	// is documented and useful, but it also made `forget --session s1` drop
 	// s1 and every s1x beside it — twelve sessions for a selector that named
 	// one, reported only afterwards (#870).
+	// A row set aside with nothing to index answers to the same selectors as
+	// a listed one: its title and project sit in manifest.gob, and its
+	// tombstone keeps the session out once it holds text (#5563).
+	rows := m.Sessions
+	if len(m.Empty) > 0 {
+		rows = maps.Clone(m.Sessions)
+		for key, meta := range m.Empty {
+			if _, listed := rows[key]; !listed {
+				rows[key] = meta
+			}
+		}
+	}
 	exact := ""
 	if o.Session != "" {
-		for _, meta := range m.Sessions {
+		for _, meta := range rows {
 			if meta.ID == o.Session {
 				exact = o.Session
 				break
@@ -489,7 +502,7 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 			}
 		}
 	}
-	for key, meta := range m.Sessions {
+	for key, meta := range rows {
 		if exact != "" && meta.ID != exact {
 			continue
 		}

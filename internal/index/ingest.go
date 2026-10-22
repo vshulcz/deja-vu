@@ -1395,6 +1395,19 @@ func applyRenamedFiles(m *Manifest, renamed map[string]string) map[string]bool {
 				m.Sessions[key] = meta
 			}
 		}
+		// A row set aside follows its file too, or the transcript that takes
+		// its id later loses the span a rebuild gives it (#5563).
+		for key, meta := range m.Empty {
+			if meta.Path == op {
+				meta.Path = np
+				for _, s := range moved {
+					if s.Harness+":"+s.ID == key && s.Project != "" {
+						meta.Project = s.Project
+					}
+				}
+				m.Empty[key] = meta
+			}
+		}
 		for i, str := range m.RecordStrings {
 			if str == op {
 				m.RecordStrings[i] = np
@@ -2227,10 +2240,12 @@ func forgetUnreadStores(files map[string]FileState) {
 // (1159 against 1157 on my store) (#868). The build counts the empty
 // transcripts as it reads them, not the rows dropped here: an empty transcript
 // sharing an id with one that holds text leaves no empty row behind (#4213).
+// The row is set aside in Empty, not lost: a transcript that takes the id in a
+// later pass spans it (#5563).
 func dropEmptySessions(m *Manifest, wrote map[string]bool) {
 	for key := range m.Sessions {
 		if !wrote[key] {
-			delete(m.Sessions, key)
+			setAsideEmpty(m, key)
 		}
 	}
 }
@@ -5944,8 +5959,12 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	// What each session's row reads off its text, all at once: in the loop it
 	// was one core's work for most of the phase.
 	texts := sessionTexts(replacements)
+	// The sessions read this pass: one with no record under it when the pass
+	// is done goes to Empty, as a rebuild sets it aside (#5563).
+	readKeys := map[string]bool{}
 	for i, s := range replacements {
 		key := s.Harness + ":" + s.ID
+		readKeys[key] = true
 		ord := uint32(0)
 		if om, ok := old.Sessions[key]; ok {
 			ord = om.Ord
@@ -5958,8 +5977,15 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		}
 		held, ok := m.Sessions[key]
 		if !ok {
-			// The row may exist only in the manifest being replaced.
-			held = old.Sessions[key]
+			// The row may exist only in the manifest being replaced, or be set
+			// aside there with nothing to index (#5563).
+			var listed bool
+			if held, listed = old.Sessions[key]; !listed {
+				// Set aside without an Ord; the one this pass gives it.
+				if row, ok := old.Empty[key]; ok {
+					held = metaWithOrd(row, ord)
+				}
+			}
 			// The file that owned it was read again whole and none of its
 			// records were carried: the row starts over from what this pass
 			// reads, as a rebuild starts it. Held, it kept the span and the
@@ -6053,6 +6079,20 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 			markShared(m.Sessions, key)
 		}
 		recordCopy(m.Sessions, key, row, cp)
+	}
+	m.Empty = keepEmpty(old.Empty, m.Sessions, m.Files)
+	// A file read again whole says what it holds now: a row set aside for it
+	// that this pass did not read again names an id the file no longer has.
+	for key, row := range m.Empty {
+		// A prompt log read from its tail does not say what the rest holds.
+		if _, again := reread[row.Path]; again && !readKeys[key] && logTails[row.Path] == nil {
+			delete(m.Empty, key)
+		}
+	}
+	for key := range readKeys {
+		if len(offsets.byKey[key]) == 0 {
+			setAsideEmpty(&m, key)
+		}
 	}
 	if err := rw.Close(); err != nil {
 		return err
@@ -6414,6 +6454,10 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	if m.Sessions == nil {
 		m.Sessions = map[string]SessionMeta{}
 	}
+	m.Empty = keepEmpty(old.Empty, m.Sessions, files)
+	// The rows this pass made or took back from Empty, and the ones it wrote a
+	// record under: one with none goes back to Empty (#5563).
+	emptyBefore, wroteUnder := map[string]bool{}, map[string]bool{}
 	// Sorted, not map order: two sessions can claim the same harness:id, and
 	// which one wins decided the project a whole conversation was filed under
 	// — differently on every run (#698).
@@ -6489,7 +6533,14 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 		filesTouched++
 		for _, s := range ss {
 			key := s.Harness + ":" + s.ID
-			meta := m.Sessions[key]
+			meta, listed := m.Sessions[key]
+			if row, ok := m.Empty[key]; ok && !listed {
+				meta = metaWithOrd(row, nextSessionOrd(m.Sessions))
+				delete(m.Empty, key)
+			}
+			if !listed {
+				emptyBefore[key] = true
+			}
 			before := meta
 			named := meta.ID != ""
 			if !named {
@@ -6656,6 +6707,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 					return filesTouched, messages, 0, err
 				}
 				messages++
+				wroteUnder[key] = true
 				// Keyed the way a rebuild keys it: only the part that earns
 				// postings, its date keys, and the tool bit.
 				var keyErr error
@@ -6679,6 +6731,11 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	}
 	if err := rw.Close(); err != nil {
 		return filesTouched, messages, 0, err
+	}
+	for key := range emptyBefore {
+		if !wroteUnder[key] {
+			setAsideEmpty(&m, key)
+		}
 	}
 	stale, err := addOverlays(filepath.Join(dir, "buckets"), filepath.Join(dir, "buckets"), buckets, m.DeadRecords)
 	if err != nil {
