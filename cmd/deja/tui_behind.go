@@ -41,7 +41,7 @@ func changedFiles(cwd string) []string {
 		return nil
 	}
 	var files []string
-	for _, f := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+	for f := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
 		if f = strings.TrimSpace(f); f != "" {
 			files = append(files, f)
 		}

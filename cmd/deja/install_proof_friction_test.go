@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -25,8 +26,8 @@ func TestInstallProofNamesTheRecurringError(t *testing.T) {
 	for i := 1; i <= 4; i++ {
 		id := fmt.Sprintf("s%d", i)
 		writeClaudeFixture(t, filepath.Join(root, id+".jsonl"), id, []string{
-			`{"type":"user","sessionId":"` + id + `","cwd":"/w/p","timestamp":"2026-07-2` + fmt.Sprint(i) + `T10:00:00Z","message":{"role":"user","content":"deploy it"}}`,
-			`{"type":"user","sessionId":"` + id + `","cwd":"/w/p","timestamp":"2026-07-2` + fmt.Sprint(i) + `T10:01:00Z","message":{"role":"user","content":[{"type":"tool_result","content":"zsh: command not found: timeout"}]}}`,
+			`{"type":"user","sessionId":"` + id + `","cwd":"/w/p","timestamp":"2026-07-2` + strconv.Itoa(i) + `T10:00:00Z","message":{"role":"user","content":"deploy it"}}`,
+			`{"type":"user","sessionId":"` + id + `","cwd":"/w/p","timestamp":"2026-07-2` + strconv.Itoa(i) + `T10:01:00Z","message":{"role":"user","content":[{"type":"tool_result","content":"zsh: command not found: timeout"}]}}`,
 		})
 	}
 	writeClaudeFixture(t, filepath.Join(root, "ok.jsonl"), "ok", []string{

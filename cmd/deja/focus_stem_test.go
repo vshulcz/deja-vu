@@ -19,7 +19,7 @@ import (
 func TestFocusKeepsAnInflectedMatch(t *testing.T) {
 	start := time.Date(2026, 7, 1, 9, 0, 0, 0, time.UTC)
 	msgs := make([]model.Message, 0, dejaVuMaxMessages+4)
-	for i := 0; i < dejaVuMaxMessages+2; i++ {
+	for i := range dejaVuMaxMessages + 2 {
 		at := start.Add(time.Duration(i) * time.Minute)
 		msgs = append(msgs, model.Message{Role: "user", Text: "продолжай дальше", Time: at})
 	}

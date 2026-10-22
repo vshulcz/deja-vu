@@ -50,7 +50,7 @@ func TestSpaceInTheBinaryPathIsQuotedWhereItMustBe(t *testing.T) {
 				// A shell-quoted or JSON-quoted path is fine. What is not is
 				// the path sitting bare in a YAML scalar or a shell line,
 				// where the space ends the word.
-				for _, line := range strings.Split(body, "\n") {
+				for line := range strings.SplitSeq(body, "\n") {
 					if !strings.Contains(line, "John Smith") {
 						continue
 					}

@@ -94,7 +94,7 @@ func cursorHooksUpdate(exe string, uninstall, write bool) (installResult, error)
 	setCursorHook(hooks, "sessionEnd", hookRun(exe, "hook-session-end"), "", uninstall)
 	// Nothing of deja's came out: the reader's `version` and empty block are
 	// theirs, and a commented file is not refused for them.
-	if hooksAfter, _ := json.Marshal(hooks); uninstall && string(hooksAfter) == string(hooksBefore) {
+	if hooksAfter, _ := json.Marshal(hooks); uninstall && bytes.Equal(hooksAfter, hooksBefore) {
 		return installResult{Path: path, Action: "unchanged"}, nil
 	}
 	if len(hooks) == 0 {
@@ -105,7 +105,7 @@ func cursorHooksUpdate(exe string, uninstall, write bool) (installResult, error)
 		return installResult{Path: path, Action: "unchanged"}, nil
 	}
 	after, _ := json.Marshal(root)
-	changed := string(after) != string(before)
+	changed := !bytes.Equal(after, before)
 	if commented {
 		if !changed {
 			return installResult{Path: path, Action: "unchanged"}, nil

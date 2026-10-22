@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -211,7 +212,7 @@ func TestReasonixExtCarriesContextIntoTheCompactionSummary(t *testing.T) {
 	_ = json.Unmarshal(got["messages"], &have)
 	wb, _ := json.Marshal(want)
 	hb, _ := json.Marshal(have)
-	if string(wb) != string(hb) {
+	if !bytes.Equal(wb, hb) {
 		t.Errorf("the fold was changed:\n%s\nwant\n%s", hb, wb)
 	}
 	// The fold took the digest away with it, so the next turn carries it again.

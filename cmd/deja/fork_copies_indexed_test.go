@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strconv"
 	"testing"
 	"time"
 
@@ -49,7 +50,7 @@ func indexedCollisionHits(t testing.TB, n int, unique bool) (string, []search.Hi
 				text += fmt.Sprintf(" peer %d", i)
 			}
 			record, err := json.Marshal(map[string]any{
-				"type": "user", "sessionId": id, "uuid": fmt.Sprint(j), "cwd": home,
+				"type": "user", "sessionId": id, "uuid": strconv.Itoa(j), "cwd": home,
 				"timestamp": at.Add(time.Duration(j) * time.Second).Format(time.RFC3339Nano),
 				"message":   map[string]string{"role": "user", "content": text},
 			})
@@ -188,7 +189,7 @@ func BenchmarkDropCopiedHitsIndexed(b *testing.B) {
 
 func BenchmarkDropCopiedHitsIndexedStartOutlier(b *testing.B) {
 	for _, n := range []int{100, 800, 2400} {
-		b.Run(fmt.Sprint(n), func(b *testing.B) {
+		b.Run(strconv.Itoa(n), func(b *testing.B) {
 			dir, hits := indexedCollisionHits(b, n, false)
 			// Matching turns can tie while one session's metadata starts earlier.
 			hits[n-1].Session.Started = hits[n-1].Session.Started.Add(-time.Second)

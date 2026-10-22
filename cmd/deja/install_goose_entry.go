@@ -1,8 +1,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -62,9 +64,9 @@ func gooseEditEntry(lines []string, exe string) (out []string, note string, done
 		}
 		if len(keep) == 1 {
 			lines = append([]string(nil), lines...)
-			for i := len(entries) - 1; i >= 0; i-- {
-				if entries[i] != keep[0] {
-					lines = append(lines[:entries[i].start], lines[entries[i].end:]...)
+			for _, entrie := range slices.Backward(entries) {
+				if entrie != keep[0] {
+					lines = append(lines[:entrie.start], lines[entrie.end:]...)
 				}
 			}
 			entries = gooseDejaEntries(lines)
@@ -92,7 +94,7 @@ func gooseEditEntry(lines []string, exe string) (out []string, note string, done
 		return nil, "", false, fmt.Errorf("extensions.deja is written on one line (%s), and deja edits only the block form — rewrite it that way and run this again", strings.TrimSpace(lines[e.start]))
 	}
 	if !hermesSpanPlain(lines, e.start, e.end) {
-		return nil, "", false, fmt.Errorf("extensions.deja holds a value that runs over several lines (a flow collection or a quoted string), and deja edits only one-line values — rewrite it that way and run this again")
+		return nil, "", false, errors.New("extensions.deja holds a value that runs over several lines (a flow collection or a quoted string), and deja edits only one-line values — rewrite it that way and run this again")
 	}
 	fields, indent := hermesFields(lines, e)
 	if len(fields) == 0 {
@@ -202,8 +204,8 @@ func gooseSameArgs(a, b []string) bool {
 func removeGooseExtensionEntries(s string) string {
 	lines := strings.Split(s, "\n")
 	entries := gooseDejaEntries(lines)
-	for i := len(entries) - 1; i >= 0; i-- {
-		lines = append(lines[:entries[i].start], lines[entries[i].end:]...)
+	for _, entrie := range slices.Backward(entries) {
+		lines = append(lines[:entrie.start], lines[entrie.end:]...)
 	}
 	return strings.Join(lines, "\n")
 }

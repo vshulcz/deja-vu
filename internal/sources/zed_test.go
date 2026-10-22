@@ -606,7 +606,7 @@ func TestRegistryFixtureZstdBlobMatchesItsDocumentedPlaintext(t *testing.T) {
 	sql := string(b)
 
 	var documented string
-	for _, line := range strings.Split(sql, "\n") {
+	for line := range strings.SplitSeq(sql, "\n") {
 		if rest, ok := strings.CutPrefix(strings.TrimSpace(line), "-- {"); ok {
 			documented = "{" + rest
 			break

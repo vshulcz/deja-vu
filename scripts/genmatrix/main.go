@@ -173,7 +173,7 @@ func htmlTable(r registry) string {
 	b.WriteString("<p>✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ waiting on the harness itself &middot; ? not investigated</p>")
 	if n := notes(r, func(s string) string { return "<code>" + s + "</code>" }, html.EscapeString); n != "" {
 		b.WriteString("\n<ul>")
-		for _, line := range strings.Split(strings.TrimSpace(n), "\n") {
+		for line := range strings.SplitSeq(strings.TrimSpace(n), "\n") {
 			line = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "- "))
 			if line == "" {
 				continue

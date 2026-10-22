@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"maps"
 	"strings"
 	"testing"
 )
@@ -19,9 +21,7 @@ func TestAnEntrySwitchedOffIsReportedWhicheverWayItIsSpelt(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			prev := map[string]any{"command": "/old/deja", "args": []any{"mcp"}}
-			for k, v := range off {
-				prev[k] = v
-			}
+			maps.Copy(prev, off)
 			merged, note := mergeDejaEntry(prev, map[string]any{"command": "/new/deja", "args": []string{"mcp"}})
 			for k, v := range off {
 				if merged[k] != v {
@@ -43,9 +43,7 @@ func TestAnEntryThatIsOnSaysNothingAboutASwitch(t *testing.T) {
 		{"enabled": true},
 	} {
 		prev := map[string]any{"command": "/old/deja", "args": []any{"mcp"}}
-		for k, v := range on {
-			prev[k] = v
-		}
+		maps.Copy(prev, on)
 		_, note := mergeDejaEntry(prev, map[string]any{"command": "/new/deja", "args": []string{"mcp"}})
 		if strings.Contains(note, "switched off") {
 			t.Errorf("%v: an entry that is on was reported as off: %q", on, note)
@@ -156,7 +154,7 @@ func TestASwitchedOffEntryOfDejasIsNotReportedReplacedEveryRun(t *testing.T) {
 	if !strings.Contains(note, "switched off") {
 		t.Errorf("the entry is still off and nothing says so: %q", note)
 	}
-	if string(next) != string(old) {
+	if !bytes.Equal(next, old) {
 		t.Errorf("a repeat install rewrote the entry:\n%s", next)
 	}
 }

@@ -64,7 +64,7 @@ var genNoise = []string{
 func genText(r *rand.Rand) string {
 	var b strings.Builder
 	n := 1 + r.Intn(14)
-	for i := 0; i < n; i++ {
+	for range n {
 		switch r.Intn(7) {
 		case 0, 1:
 			b.WriteString(genKeys[r.Intn(len(genKeys))])
@@ -84,7 +84,7 @@ func genText(r *rand.Rand) string {
 		case 6:
 			// raw bytes, sometimes invalid UTF-8
 			k := r.Intn(6)
-			for j := 0; j < k; j++ {
+			for range k {
 				b.WriteByte(byte(r.Intn(256)))
 			}
 		}
@@ -145,7 +145,7 @@ func TestFindersMatchRegexesOnHugeText(t *testing.T) {
 
 func FuzzFindersMatchRegexes(f *testing.F) {
 	r := rand.New(rand.NewSource(3))
-	for i := 0; i < 64; i++ {
+	for range 64 {
 		f.Add(genText(r))
 	}
 	f.Fuzz(func(t *testing.T, in string) { sameAsRegex(t, in) })

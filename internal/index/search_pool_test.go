@@ -24,7 +24,7 @@ func TestCommonWordSearchScoresOnlyThePool(t *testing.T) {
 	// Sessions that differ in age, length and how often they say the word,
 	// so the page depends on more than which is newest.
 	filler := strings.Repeat("checked the service config and the queue settings again ", 8)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		at := now.Add(-time.Duration(i%97) * 24 * time.Hour).Add(-time.Duration(i) * time.Minute)
 		ms := []model.Message{{Role: "user", Text: fmt.Sprintf("the deploy of service %d is slow", i), Time: at}}
 		for j := 0; j < i%5; j++ {

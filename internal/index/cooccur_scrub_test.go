@@ -32,7 +32,7 @@ func neighbourStore(t *testing.T, word string, inOutput bool) (inc string, rewri
 		b += parityClaudeLine(id, "01:02Z", "user", `[{"type":"tool_result","tool_use_id":"t1","content":`+fmt.Sprintf("%q", out)+`}]`)
 		return b
 	}
-	for i := 0; i < 16; i++ {
+	for i := range 16 {
 		id := fmt.Sprintf("s%03d", i)
 		parityWrite(t, filepath.Join(proj, id+".jsonl"), body(id, i < 4), false)
 	}
@@ -43,7 +43,7 @@ func neighbourStore(t *testing.T, word string, inOutput bool) (inc string, rewri
 	}
 	return inc, func() {
 		later := time.Now().Add(2 * time.Second)
-		for i := 0; i < 4; i++ {
+		for i := range 4 {
 			p := filepath.Join(proj, fmt.Sprintf("s%03d.jsonl", i))
 			parityWrite(t, p, body(fmt.Sprintf("s%03d", i), false), false)
 			_ = os.Chtimes(p, later, later)

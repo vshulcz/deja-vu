@@ -22,7 +22,7 @@ func TestHookPromptNarrowsAMarathonItShows(t *testing.T) {
 	ts := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
 
 	lines := make([]string, 0, dejaVuMaxMessages+3)
-	for i := 0; i < dejaVuMaxMessages+1; i++ {
+	for i := range dejaVuMaxMessages + 1 {
 		lines = append(lines, fmt.Sprintf(
 			`{"type":"assistant","sessionId":"marathon","timestamp":"%s","message":{"role":"assistant","content":"routine step %d, nothing to see"}}`,
 			ts, i))
@@ -53,7 +53,7 @@ func TestHookPromptNarrowsAMarathonItShows(t *testing.T) {
 	}
 	// Only the quoted lines matter: the credit line names the session by its
 	// opening message, which is noise by construction here.
-	for _, ln := range strings.Split(out.String(), "\n") {
+	for ln := range strings.SplitSeq(out.String(), "\n") {
 		quoted := strings.TrimSpace(ln)
 		if !strings.HasPrefix(quoted, "- User:") && !strings.HasPrefix(quoted, "- Assistant:") {
 			continue

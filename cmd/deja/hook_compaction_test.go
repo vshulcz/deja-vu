@@ -81,7 +81,7 @@ func TestCompactionHooksRecoverBeforeIndexBuildOnceAndMeasureRawActions(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = io.WriteString(f, compactionFixture(t, "claude-after.jsonl", workspace))
+	_, err = f.WriteString(compactionFixture(t, "claude-after.jsonl", workspace))
 	if closeErr := f.Close(); err != nil || closeErr != nil {
 		t.Fatalf("append fixture: %v %v", err, closeErr)
 	}

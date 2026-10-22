@@ -66,9 +66,7 @@ func (p *syncPhases) start(format string, args ...any) {
 	stop := p.stop
 	p.mu.Unlock()
 	p.writef("deja: %s…\n", name)
-	p.done.Add(1)
-	go func() {
-		defer p.done.Done()
+	p.done.Go(func() {
 		tick := time.NewTicker(p.beat)
 		defer tick.Stop()
 		for {
@@ -83,7 +81,7 @@ func (p *syncPhases) start(format string, args ...any) {
 				p.writef("deja: still %s… %s\n", still, roundSecs(since))
 			}
 		}
-	}()
+	})
 }
 
 // note is one line inside the current phase — a batch count, a byte total —

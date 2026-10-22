@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/vshulcz/deja-vu/internal/peers"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/peers"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -54,11 +55,11 @@ func runSync(dir string, args []string) error {
 		case "export", "import":
 			return fmt.Errorf("sync %s needs a directory: deja sync %s <dir>", args[0], args[0])
 		case "ssh":
-			return fmt.Errorf("sync ssh needs a host: deja sync ssh <host>")
+			return errors.New("sync ssh needs a host: deja sync ssh <host>")
 		case "forget":
-			return fmt.Errorf("sync forget needs a host — `deja doctor` lists the machines deja knows")
+			return errors.New("sync forget needs a host — `deja doctor` lists the machines deja knows")
 		}
-		return fmt.Errorf("sync needs export <dir>, import <dir>, ssh <host> — or no argument at all, for every machine deja knows")
+		return errors.New("sync needs export <dir>, import <dir>, ssh <host> — or no argument at all, for every machine deja knows")
 	}
 	switch args[0] {
 	case "ssh":
@@ -108,7 +109,7 @@ func runSync(dir string, args []string) error {
 			// — and the second one silently sends almost nothing.
 			if a == "--peer" {
 				if i+1 >= len(rest) {
-					return fmt.Errorf("sync export: --peer needs a name")
+					return errors.New("sync export: --peer needs a name")
 				}
 				i++
 				peer = rest[i]
@@ -124,7 +125,7 @@ func runSync(dir string, args []string) error {
 			out = a
 		}
 		if out == "" {
-			return fmt.Errorf("sync export needs a directory: deja sync export <dir>")
+			return errors.New("sync export needs a directory: deja sync export <dir>")
 		}
 		if err := index.EnsureForSearch(dir, search.Options{All: true}, false, os.Stderr); err != nil {
 			// An index that cannot be written stops the export before a record

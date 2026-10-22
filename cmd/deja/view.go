@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"os"
@@ -108,7 +109,7 @@ func runView(dir string, args []string) error {
 		switch args[i] {
 		case "--out":
 			if i+1 >= len(args) {
-				return fmt.Errorf("view: --out needs a path")
+				return errors.New("view: --out needs a path")
 			}
 			i++
 			out = args[i]

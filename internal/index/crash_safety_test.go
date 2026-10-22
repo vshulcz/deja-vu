@@ -314,7 +314,7 @@ func TestAZeroedPostingBlockIsCorruption(t *testing.T) {
 // interned ids through the wrong table.
 func TestASearchRacingRebuildsKeepsEveryHitInItsSession(t *testing.T) {
 	h := newTwoWayEnv(t)
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		id := fmt.Sprintf("s%02d", i)
 		h.put("app", id, hPrompt("app", id, 2+i%20, 0, fmt.Sprintf("sessword%02d lives only here", i)))
 	}
@@ -429,7 +429,7 @@ insert into part values('p2','m2','s2',%[1]d,%[1]d,'{"type":"text","text":"punct
 	}
 	// The session ahead of the clock is above the capped mark on every pass;
 	// reading it again must not store it again.
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		later = later.Add(2 * time.Second)
 		_ = os.Chtimes(db, later, later)
 		if err := Ensure(dir, "", false, nil); err != nil {

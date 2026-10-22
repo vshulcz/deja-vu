@@ -49,7 +49,7 @@ func TestStreamedBytesDecodeAsTheLineReadWhole(t *testing.T) {
 	}
 	rng := rand.New(rand.NewSource(2))
 	words := []string{"a", "é", "\\", "\"", "\x00", "\xff", "{", "}", "[", "]", ":", ",", "1", "-", "e", " ", "\\u00", "\\ud83d"}
-	for i := 0; i < 3000; i++ {
+	for range 3000 {
 		b, _ := json.Marshal(map[string]any{"k": randValue(rng, 3)})
 		cases = append(cases, string(b))
 		mut := []byte(string(b))
@@ -207,7 +207,7 @@ func TestScanJSONLBytesLeavesALongPartialLastLine(t *testing.T) {
 func TestLineMatchFindsAWordAcrossPieces(t *testing.T) {
 	rng := rand.New(rand.NewSource(3))
 	pat := []byte(`"response_item"`)
-	for i := 0; i < 5000; i++ {
+	for range 5000 {
 		line := make([]byte, rng.Intn(80))
 		for j := range line {
 			line[j] = `"response_itm`[rng.Intn(13)]

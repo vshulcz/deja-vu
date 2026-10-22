@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -93,9 +94,11 @@ func TestTypedClaudeParserMatchesTheGenericOne(t *testing.T) {
 	for name, lines := range cases {
 		path := filepath.Join(dir, name)
 		body := ""
+		var bodySb96 strings.Builder
 		for _, l := range lines {
-			body += l + "\n"
+			bodySb96.WriteString(l + "\n")
 		}
+		body += bodySb96.String()
 		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}

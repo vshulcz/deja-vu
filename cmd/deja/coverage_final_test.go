@@ -1,11 +1,13 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -108,7 +110,7 @@ func TestPrintSourcesAntigravityFallback(t *testing.T) {
 
 type alwaysErrWriter struct{}
 
-func (alwaysErrWriter) Write(p []byte) (int, error) { return 0, fmt.Errorf("write boom") }
+func (alwaysErrWriter) Write(p []byte) (int, error) { return 0, errors.New("write boom") }
 
 func TestServeMCPEncodeError(t *testing.T) {
 	req := `{"jsonrpc":"2.0","id":1,"method":"initialize"}` + "\n"
@@ -216,10 +218,10 @@ func TestHookDigestHyphenatedProjectNameBranch(t *testing.T) {
 	// "my-project" decodes (via the dash heuristic) to "my/project", which
 	// differs from the raw directory basename — exercising hookDigest's
 	// second name-candidate branch.
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		id := fmt.Sprintf("hookmany%d", i)
 		writeClaudeFixture(t, filepath.Join(claudeRoot, "-tmp-my-project", id+".jsonl"), id, []string{
-			`{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-0` + fmt.Sprint(i+1) + `T03:04:05Z","message":{"role":"user","content":"hyphen project memory"}}`,
+			`{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-0` + strconv.Itoa(i+1) + `T03:04:05Z","message":{"role":"user","content":"hyphen project memory"}}`,
 		})
 	}
 	if err := index.EnsureForSearch(idx, search.Options{Query: "hyphen", All: true}, false, io.Discard); err != nil {

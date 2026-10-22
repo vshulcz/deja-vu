@@ -52,7 +52,7 @@ func TestTheReadPhaseMovesPerFile(t *testing.T) {
 	claude := filepath.Join(tmp, "claude")
 	at := time.Now().Add(-48 * time.Hour).UTC().Format(time.RFC3339)
 	const files = 6
-	for i := 0; i < files; i++ {
+	for i := range files {
 		dir := filepath.Join(claude, "proj")
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
@@ -100,9 +100,9 @@ func TestTheIndexingPhaseCountsMessagesAsTheyAreIndexed(t *testing.T) {
 	}
 	at := time.Now().Add(-48 * time.Hour).UTC().Format(time.RFC3339)
 	const sessions, msgs = 3, 40
-	for i := 0; i < sessions; i++ {
+	for i := range sessions {
 		var lines []byte
-		for k := 0; k < msgs; k++ {
+		for k := range msgs {
 			lines = append(lines, []byte(fmt.Sprintf(
 				`{"type":"user","sessionId":"quokkabloom-%d","timestamp":%q,`+
 					`"message":{"role":"user","content":"quokkabloom span %d of session %d"}}`+"\n",

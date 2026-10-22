@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp/syntax"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -103,7 +104,7 @@ func rebuildWindowError(err error) error {
 		}
 		return err
 	}
-	return fmt.Errorf("the index is being rebuilt right now — run this again in a moment")
+	return errors.New("the index is being rebuilt right now — run this again in a moment")
 }
 
 func loadAll(h string) []model.Session {
@@ -1159,7 +1160,7 @@ func parseShow(args []string) (showOptions, error) {
 				return o, unknownFlag("show", a, showFlags)
 			}
 			if o.id != "" {
-				return o, fmt.Errorf("show accepts one session id")
+				return o, errors.New("show accepts one session id")
 			}
 			o.id = a
 		}
@@ -1170,7 +1171,7 @@ func parseShow(args []string) (showOptions, error) {
 		return o, errors.New(showNeedsID)
 	}
 	if o.limit > 200 {
-		return o, fmt.Errorf("show --limit must not exceed 200")
+		return o, errors.New("show --limit must not exceed 200")
 	}
 	return o, nil
 }
@@ -1645,7 +1646,7 @@ func pluralThatThose(n int) string {
 // Anything shelling out to deja with user text should use this.
 func cmdSearch(dir string, rest []string, sourceInstance string) error {
 	if len(rest) == 0 {
-		return fmt.Errorf("search needs a query")
+		return errors.New("search needs a query")
 	}
 	return runSearch(dir, rest, sourceInstance)
 }
@@ -1969,7 +1970,7 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 		// an explicit --limit, or by the relevance tier's own retrieval window,
 		// and neither of those lifts with the flag they are being sent to
 		// (#1608). Say what is shown and leave the advice out.
-		total := fmt.Sprint(o.Total)
+		total := strconv.Itoa(o.Total)
 		if o.TotalEstimated {
 			total = "about " + total
 		}
@@ -2375,12 +2376,7 @@ func hasAnchor(re *syntax.Regexp) bool {
 	case syntax.OpBeginLine, syntax.OpEndLine, syntax.OpBeginText, syntax.OpEndText:
 		return true
 	}
-	for _, sub := range re.Sub {
-		if hasAnchor(sub) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(re.Sub, hasAnchor)
 }
 
 // roleServedHint names the answer deja is holding but ranking will never
@@ -2594,10 +2590,8 @@ func commandHint(q string) string {
 	if _, ok := commands[low]; ok {
 		return "" // reached search only because it was used as a word
 	}
-	for _, name := range []string{"search", "show", "last", "aider", "goose"} {
-		if low == name {
-			return ""
-		}
+	if slices.Contains([]string{"search", "show", "last", "aider", "goose"}, low) {
+		return ""
 	}
 	// The switch in run() handles these before the map is consulted, so the
 	// map alone would miss the commonest words of all — "serch" landed on
@@ -2766,10 +2760,8 @@ func checkRole(role string) error {
 	if role == "" {
 		return nil
 	}
-	for _, r := range knownRoles {
-		if r == role {
-			return nil
-		}
+	if slices.Contains(knownRoles, role) {
+		return nil
 	}
 	return fmt.Errorf("%q is not a role deja knows — one of: %s", role, strings.Join(knownRoles, ", "))
 }
@@ -3316,7 +3308,7 @@ func parseSearch(args []string) (search.Options, error) {
 			case "--limit":
 				n, err := strconv.Atoi(v)
 				if err != nil || n < 1 || n > 100 {
-					return o, fmt.Errorf("--limit needs an integer from 1 to 100")
+					return o, errors.New("--limit needs an integer from 1 to 100")
 				}
 				o.Limit = n
 			default:
@@ -3358,7 +3350,7 @@ func parseSearch(args []string) (search.Options, error) {
 	// while a real word was rescued by its word-forms and hid the gap.
 	o.Query = nfcfold.Compose(strings.TrimSpace(strings.Join(q, " ")))
 	if o.Query == "" {
-		return o, fmt.Errorf("query required")
+		return o, errors.New("query required")
 	}
 	return o, nil
 }
@@ -3490,7 +3482,7 @@ func parseBlame(args []string) (string, search.BlameOptions, blameMode, error) {
 			// nobody has ever touched.
 			if i+1 < len(args) {
 				if path != "" {
-					return "", o, mode, fmt.Errorf("blame accepts one path")
+					return "", o, mode, errors.New("blame accepts one path")
 				}
 				path = args[i+1]
 			}
@@ -3538,13 +3530,13 @@ func parseBlame(args []string) (string, search.BlameOptions, blameMode, error) {
 				return "", o, mode, fmt.Errorf("blame: unknown flag %q; a path or question that starts with a dash goes after `--`", a)
 			}
 			if path != "" {
-				return "", o, mode, fmt.Errorf("blame accepts one path")
+				return "", o, mode, errors.New("blame accepts one path")
 			}
 			path = a
 		}
 	}
 	if path == "" {
-		return "", o, mode, fmt.Errorf("blame needs a path — `deja blame <file>` or `deja blame <file>:<line>`")
+		return "", o, mode, errors.New("blame needs a path — `deja blame <file>` or `deja blame <file>:<line>`")
 	}
 	return path, o, mode, nil
 }
@@ -3860,8 +3852,8 @@ func parseDur(s string) (time.Duration, error) {
 const maxDurationDays = int(math.MaxInt64 / (24 * int64(time.Hour)))
 
 func parseDurAny(s string) (time.Duration, error) {
-	if strings.HasSuffix(s, "d") {
-		n, err := strconv.Atoi(strings.TrimSuffix(s, "d"))
+	if before, ok := strings.CutSuffix(s, "d"); ok {
+		n, err := strconv.Atoi(before)
 		if err != nil {
 			return 0, durationError(s)
 		}
@@ -3975,7 +3967,7 @@ func projectExcludePatterns() int {
 // An environment exclusion must not be attributed to the exclude file.
 // Prefer the environment when both settings exclude the same store.
 func harnessExclusionSource(name string) string {
-	for _, excluded := range strings.Split(os.Getenv("DEJA_EXCLUDE_HARNESSES"), ",") {
+	for excluded := range strings.SplitSeq(os.Getenv("DEJA_EXCLUDE_HARNESSES"), ",") {
 		if strings.EqualFold(strings.TrimSpace(excluded), name) {
 			return "DEJA_EXCLUDE_HARNESSES"
 		}
@@ -4426,14 +4418,14 @@ func runForget(dir string, args []string) error {
 	// the reader asked to bring something back and was told how to drop more
 	// (#1041).
 	if unforgetGiven && unforget == "" {
-		return fmt.Errorf("forget: --unforget needs an id — `deja forget --list` names the ids")
+		return errors.New("forget: --unforget needs an id — `deja forget --list` names the ids")
 	}
 	if !list && unforget == "" && o.Session == "" && o.Project == "" && o.Before.IsZero() {
 		// Naming the selectors here is what separates one call from hundreds:
 		// forgetting 100 sessions one id at a time took 10.5s against 0.2s for
 		// `--project`, and nothing on this path said the second form exists
 		// (#1022).
-		return fmt.Errorf("forget: selector required — `--session <id>`, `--project <name>` or `--before <date>`; `--dry-run` shows what would go, `--list` what already went")
+		return errors.New("forget: selector required — `--session <id>`, `--project <name>` or `--before <date>`; `--dry-run` shows what would go, `--list` what already went")
 	}
 	if list {
 		keys := index.Tombstones()
@@ -4840,7 +4832,7 @@ func parseForgetDate(s string) (time.Time, error) {
 			return t, nil
 		}
 	}
-	return time.Time{}, fmt.Errorf("invalid date")
+	return time.Time{}, errors.New("invalid date")
 }
 
 func redactionsUnder(files map[string]int, root string) int {
@@ -5492,8 +5484,8 @@ func unforgetGoneLines(missing []string) []string {
 	var imported, local []string
 	for _, key := range missing {
 		id := key
-		if i := strings.IndexByte(key, ':'); i >= 0 {
-			id = key[i+1:]
+		if _, after, ok := strings.Cut(key, ":"); ok {
+			id = after
 		}
 		if strings.HasPrefix(id, "imported-") {
 			imported = append(imported, key)
@@ -5671,7 +5663,7 @@ func forgottenSourceNote(s model.Session, selector string, resolved bool) string
 	// Prose, not a command: the key is read here rather than pasted — the
 	// command in this sentence takes no argument — so it is neutralised the
 	// way every other echo is.
-	return fmt.Sprintf("%s is forgotten — this is the note promoted from it; `deja forget --list` names what is gone", safeForStatusline(key, 200))
+	return safeForStatusline(key, 200) + " is forgotten — this is the note promoted from it; `deja forget --list` names what is gone"
 }
 
 // selectorNamesSession reports whether the reader's selector names this
@@ -5682,7 +5674,7 @@ func selectorNamesSession(selector, key string, resolved bool) bool {
 		return false
 	}
 	_, id, _ := strings.Cut(key, ":")
-	for _, word := range strings.Fields(selector) {
+	for word := range strings.FieldsSeq(selector) {
 		if word == key || word == id {
 			return true
 		}
@@ -5772,10 +5764,8 @@ func forgetDigestMatcher(o index.ForgetOptions, keys []string) func(usage.Snapsh
 	}
 	return func(s usage.Snapshot) bool {
 		if o.Project != "" {
-			for _, p := range s.Projects {
-				if p == o.Project {
-					return true
-				}
+			if slices.Contains(s.Projects, o.Project) {
+				return true
 			}
 			if len(s.Projects) == 0 && digestNames(s.Digest, o.Project) {
 				return true
@@ -5809,11 +5799,9 @@ func digestNames(digest, want string) bool {
 	if want == "" {
 		return false
 	}
-	for _, line := range strings.Split(digest, "\n") {
-		for _, field := range digestNamedFields(line) {
-			if field == want {
-				return true
-			}
+	for line := range strings.SplitSeq(digest, "\n") {
+		if slices.Contains(digestNamedFields(line), want) {
+			return true
 		}
 	}
 	return false
@@ -5825,7 +5813,7 @@ func digestNames(digest, want string) bool {
 func digestNamedFields(line string) []string {
 	var out []string
 	if _, after, ok := strings.Cut(line, "] "); ok {
-		for _, field := range strings.Split(after, " · ") {
+		for field := range strings.SplitSeq(after, " · ") {
 			out = append(out, strings.TrimSpace(field))
 		}
 	}
@@ -5843,20 +5831,20 @@ func betweenAll(s, marker string) []string {
 			return out
 		}
 		rest := s[i+len(marker):]
-		j := strings.Index(rest, marker)
-		if j < 0 {
+		before, after, ok := strings.Cut(rest, marker)
+		if !ok {
 			return out
 		}
-		out = append(out, strings.TrimSpace(rest[:j]))
-		s = rest[j+len(marker):]
+		out = append(out, strings.TrimSpace(before))
+		s = after
 	}
 }
 
 // flagName is the flag without its value, so `--limit=3` and `--limit 3` are
 // recognised as the same spelling.
 func flagName(a string) string {
-	if i := strings.IndexByte(a, '='); i >= 0 {
-		return a[:i]
+	if before, _, ok := strings.Cut(a, "="); ok {
+		return before
 	}
 	return a
 }

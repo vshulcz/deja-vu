@@ -62,7 +62,7 @@ func TestACommandWithNoRecordedStatusDoesNotClaimToHavePassed(t *testing.T) {
 func TestASessionFactIsCappedAndDeduped(t *testing.T) {
 	dir := t.TempDir()
 	var msgs []model.Message
-	for i := 0; i < 30; i++ {
+	for i := range 30 {
 		msgs = append(msgs, model.Message{Role: roleCommand, Text: "make test  → exit 0", Time: at(i)})
 	}
 	buildSessionFacts(dir, []model.Session{factSession("s3", msgs...)})

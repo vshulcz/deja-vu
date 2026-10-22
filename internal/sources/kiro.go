@@ -2,6 +2,7 @@ package sources
 
 import (
 	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -438,9 +439,7 @@ var kiroDialect = toolDialect{
 // listing rather than a file the session touched.
 func kiroToolCall(name string, args map[string]any) map[string]any {
 	in := make(map[string]any, len(args))
-	for k, v := range args {
-		in[k] = v
-	}
+	maps.Copy(in, args)
 	for from, to := range map[string]string{"oldStr": "old_str", "newStr": "new_str", "file_text": "content",
 		// The v3 engine's write text and delete target (#4506).
 		"text": "content", "targetFile": "path"} {

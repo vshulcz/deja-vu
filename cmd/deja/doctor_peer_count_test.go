@@ -29,7 +29,7 @@ func TestTheSessionCountFindsTheMachineInEitherCase(t *testing.T) {
 		t.Fatal(err)
 	}
 	var lines []string
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		rec := map[string]any{
 			"harness": "claude", "session_id": "remote" + string(rune('a'+i)), "project": "proj",
 			"role": "user", "text": "retry loop", "time": "2026-08-20T10:00:0" + string(rune('0'+i)) + "Z",

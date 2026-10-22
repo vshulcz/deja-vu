@@ -43,7 +43,7 @@ func TestAWallWithNoTextLeftDoesNotSpendTheSlot(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		write(i, true)
 	}
 	setHome(t, t.TempDir())

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"reflect"
 	"strconv"
@@ -160,7 +161,7 @@ func TestInliningNeverChangesWhatTheConfigSays(t *testing.T) {
 		if err != nil {
 			t.Fatalf("config %d, second pass: %v", i, err)
 		}
-		if string(again) != string(out) {
+		if !bytes.Equal(again, out) {
 			t.Errorf("config %d is not stable across two writes:\nfirst:\n%s\nsecond:\n%s", i, out, again)
 		}
 	}
@@ -232,7 +233,7 @@ func TestInliningHandlesTheShapesThatBrokeIt(t *testing.T) {
 	t.Run("a config with a thousand inline blocks", func(t *testing.T) {
 		var b strings.Builder
 		b.WriteString("{\n  \"projects\": {\n")
-		for i := 0; i < 1000; i++ {
+		for i := range 1000 {
 			b.WriteString(`    "/work/repo` + strconv.Itoa(i) +
 				`": {"allowedTools": ["Bash(git:*)", "Read"], "hasTrustDialogAccepted": true},` + "\n")
 		}

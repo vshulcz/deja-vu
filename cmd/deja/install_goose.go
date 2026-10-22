@@ -33,7 +33,7 @@ import (
 // inlineYAMLValue returns the value written on the same line as a top-level
 // key, or "" when the key is absent or opens a block.
 func inlineYAMLValue(doc, key string) string {
-	for _, line := range strings.Split(doc, "\n") {
+	for line := range strings.SplitSeq(doc, "\n") {
 		if !strings.HasPrefix(line, key) {
 			continue
 		}
@@ -50,7 +50,7 @@ func inlineYAMLValue(doc, key string) string {
 // a sequence item rather than a mapping entry, skipping blank lines and
 // comments. A block that is empty, or holds mapping entries, is not one.
 func yamlBlockIsSequence(block string) bool {
-	for _, line := range strings.Split(block, "\n") {
+	for line := range strings.SplitSeq(block, "\n") {
 		if strings.TrimSpace(line) == "" || strings.HasPrefix(strings.TrimSpace(line), "#") {
 			continue
 		}
@@ -384,7 +384,7 @@ func yamlKeyLineEnd(s, key string) int {
 // nested inside ours rather than beside it (#2614). An empty block has no
 // indent to follow and gives "".
 func yamlBlockIndent(block string) string {
-	for _, line := range strings.Split(block, "\n") {
+	for line := range strings.SplitSeq(block, "\n") {
 		if strings.TrimSpace(line) == "" || strings.HasPrefix(strings.TrimSpace(line), "#") {
 			continue
 		}
@@ -915,10 +915,10 @@ func dropGooseRecallBlock(path string) error {
 		return nil
 	}
 	rest := string(old)[start:]
-	end := strings.Index(rest, gooseRecallEnd)
+	_, after0, ok := strings.Cut(rest, gooseRecallEnd)
 	before, after := string(old)[:start], ""
-	if end >= 0 {
-		after = strings.TrimLeft(rest[end+len(gooseRecallEnd):], "\n")
+	if ok {
+		after = strings.TrimLeft(after0, "\n")
 	}
 	// The block went in after the reader's text and a blank line; at the end
 	// of the file that blank line leaves with it, or every round trip gave the

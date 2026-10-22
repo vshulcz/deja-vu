@@ -17,7 +17,7 @@ func straddleStore(t *testing.T, home string) (dir string, write func(prefix, cm
 	t.Setenv("DEJA_CLAUDE_ROOT", root)
 	write = func(prefix, cmd string, n int) {
 		t.Helper()
-		for i := 0; i < n; i++ {
+		for i := range n {
 			id := fmt.Sprintf("%s%d", prefix, i)
 			p := filepath.Join(root, "proj", id+".jsonl")
 			if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {

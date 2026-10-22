@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -302,8 +303,8 @@ func parseGeminiJSONLWith(path string, scan func(func(map[string]any)) error) ([
 			return
 		}
 		if rid, ok := m["$rewindTo"].(string); ok {
-			for i := len(msgs) - 1; i >= 0; i-- {
-				if msgs[i].ID == rid {
+			for i, msg := range slices.Backward(msgs) {
+				if msg.ID == rid {
 					msgs = msgs[:i]
 					reindex()
 					break
@@ -549,13 +550,13 @@ func geminiFooterRank(l string) int {
 // output that happens to look like a footer line is not taken into it.
 func geminiFooterExit(lines []string) int {
 	below := len(geminiFooterOrder)
-	for i := len(lines) - 1; i >= 0; i-- {
-		r := geminiFooterRank(lines[i])
+	for _, line := range slices.Backward(lines) {
+		r := geminiFooterRank(line)
 		if r < 0 || r >= below {
 			return 0
 		}
 		if r == 0 {
-			m := geminiExit.FindStringSubmatch(lines[i])
+			m := geminiExit.FindStringSubmatch(line)
 			code, err := strconv.Atoi(m[1])
 			if err != nil {
 				return 0

@@ -24,7 +24,7 @@ func TestAHandoffCarriesTheLatestConclusionsNotTheFirst(t *testing.T) {
 	add("user", "the release pipeline fails on the arm64 runner, find out why", 0)
 	add("user", "never push to main; always open a PR first", time.Minute)
 	add("assistant", "Root cause: the publish step is blocked by the expired npm token.", 2*time.Minute)
-	for i := 0; i < 120; i++ {
+	for i := range 120 {
 		add("assistant", fmt.Sprintf("reading workflow step %d of the release job, nothing new there", i), time.Duration(i+3)*time.Hour)
 		add("user", "дальше", time.Duration(i+3)*time.Hour+time.Minute)
 	}

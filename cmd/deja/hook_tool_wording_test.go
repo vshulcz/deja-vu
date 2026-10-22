@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -22,12 +23,12 @@ func editStore(t *testing.T) string {
 	}
 	now := time.Now().UTC()
 	at := func(m int) string { return now.Add(-time.Duration(m) * time.Minute).Format(time.RFC3339) }
-	for k := 0; k < 6; k++ {
+	for k := range 6 {
 		sid := fmt.Sprintf("f%d", k)
 		lines := []string{
 			`{"type":"user","sessionId":"` + sid + `","timestamp":"` + at(200-10*k) + `","cwd":"/work/app","message":{"role":"user","content":"work on the invoice renderer"}}`,
 			`{"type":"assistant","sessionId":"` + sid + `","timestamp":"` + at(199-10*k) + `","cwd":"/work/app","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/work/app/render.go","old_string":"x","new_string":"y"}}]}}`,
-			`{"type":"assistant","sessionId":"` + sid + `","timestamp":"` + at(198-10*k) + `","cwd":"/work/app","message":{"role":"assistant","content":"changed the renderer (` + fmt.Sprint(k) + `)"}}`,
+			`{"type":"assistant","sessionId":"` + sid + `","timestamp":"` + at(198-10*k) + `","cwd":"/work/app","message":{"role":"assistant","content":"changed the renderer (` + strconv.Itoa(k) + `)"}}`,
 		}
 		if err := os.WriteFile(filepath.Join(store, sid+".jsonl"), []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
 			t.Fatal(err)

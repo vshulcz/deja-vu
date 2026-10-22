@@ -119,7 +119,7 @@ func dejaHookLineCounts(t *testing.T, home string) map[string]int {
 		}
 		n := 0
 		for _, cmd := range hookCommandLinesIn(string(b)) {
-			for _, field := range strings.Fields(cmd) {
+			for field := range strings.FieldsSeq(cmd) {
 				if hookNames[strings.Trim(field, `"'`)] {
 					n++
 					break

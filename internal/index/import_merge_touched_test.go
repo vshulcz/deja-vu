@@ -3,6 +3,7 @@ package index
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 )
@@ -63,12 +64,7 @@ func TestReimportKeepsEarlierTouchedFiles(t *testing.T) {
 		t.Fatalf("imported session not found in %d metas", len(metas))
 	}
 	has := func(p string) bool {
-		for _, x := range found.Touched {
-			if x == p {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(found.Touched, p)
 	}
 	if !has("/repo/db.go") {
 		t.Errorf("Touched=%v missing the new file /repo/db.go", found.Touched)

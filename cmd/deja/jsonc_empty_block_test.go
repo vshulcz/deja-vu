@@ -25,7 +25,7 @@ func TestJSONCEmptyBlockStaysParseable(t *testing.T) {
 	}
 	// Strip the line comments the way a jsonc reader would, then parse.
 	var body []string
-	for _, l := range strings.Split(got, "\n") {
+	for l := range strings.SplitSeq(got, "\n") {
 		if i := strings.Index(l, "//"); i >= 0 {
 			l = l[:i]
 		}
@@ -48,7 +48,7 @@ func TestJSONCInlineBlockLeavesNoTrailingSpace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, l := range strings.Split(string(out), "\n") {
+	for l := range strings.SplitSeq(string(out), "\n") {
 		if l != strings.TrimRight(l, " \t") {
 			t.Errorf("a line ends in whitespace: %q\n%s", l, out)
 		}

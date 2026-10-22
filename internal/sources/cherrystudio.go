@@ -425,16 +425,13 @@ func lastLineBefore(path string, end int64) []byte {
 	var line []byte
 	pos := end - 1 // the newline that ends the line
 	for pos > 0 {
-		n := int64(64 << 10)
-		if n > pos {
-			n = pos
-		}
+		n := min(int64(64<<10), pos)
 		buf := make([]byte, n)
 		if _, err := f.ReadAt(buf, pos-n); err != nil && err != io.EOF {
 			return nil
 		}
-		for i := len(buf) - 1; i >= 0; i-- {
-			if buf[i] == '\n' {
+		for i, b := range slices.Backward(buf) {
+			if b == '\n' {
 				return append(buf[i+1:], line...)
 			}
 		}

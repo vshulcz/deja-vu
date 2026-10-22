@@ -70,7 +70,7 @@ console.log("dispose:" + JSON.stringify(ran.filter((c) => c.includes("hook-sessi
 	// not spawn deja for ses_F a second time.
 	for _, c := range []struct{ phase, ends, not string }{{"idle:", "ses_F", ""}, {"dispose:", "ses_G", "ses_F"}} {
 		line := ""
-		for _, l := range strings.Split(got, "\n") {
+		for l := range strings.SplitSeq(got, "\n") {
 			if strings.HasPrefix(l, c.phase) {
 				line = l
 			}

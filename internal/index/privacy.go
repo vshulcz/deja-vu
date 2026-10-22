@@ -759,8 +759,8 @@ func tombstoneMatches(key, prefix string) bool {
 		return strings.HasPrefix(key, prefix)
 	}
 	id := key
-	if i := strings.IndexByte(key, ':'); i >= 0 {
-		id = key[i+1:]
+	if _, after, ok0 := strings.Cut(key, ":"); ok0 {
+		id = after
 	}
 	// Same widening as the forget selector: the id a reader copies off a
 	// result line carries the elision (#855), and a session that arrived by

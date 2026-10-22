@@ -18,15 +18,13 @@ func TestWarmupStatusSurvivesConcurrentReports(t *testing.T) {
 	p := newFileProgress(dir)
 	p.Phase("reading sessions", 100)
 	var wg sync.WaitGroup
-	for i := 0; i < 16; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := 0; j < 40; j++ {
+	for range 16 {
+		wg.Go(func() {
+			for range 40 {
 				p.Advance(1)
 				p.Harness("claude", 1, 1)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	st := readWarmupStatus(dir)

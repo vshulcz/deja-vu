@@ -24,7 +24,7 @@ func TestSearchFindsTheIesPluralFromTheSingular(t *testing.T) {
 		{"s-alternator", "the alternator subsystem: proxies handled during service"},
 	} {
 		var lines []string
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			lines = append(lines, fmt.Sprintf(`{"type":"user","sessionId":%q,"cwd":"/tmp/stem","timestamp":"2026-06-0%dT10:00:00Z","message":{"role":"user","content":%q}}`, tc.id, i+1, tc.text+fmt.Sprintf(" line %d", i)))
 		}
 		writeClaudeFixture(t, filepath.Join(root, "projects", "-tmp-stem", tc.id+".jsonl"), tc.id, lines)

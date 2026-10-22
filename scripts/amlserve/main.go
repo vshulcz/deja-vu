@@ -102,8 +102,8 @@ func (s *server) authed(h http.HandlerFunc) http.HandlerFunc {
 			got := r.Header.Get("X-Api-Key")
 			if a := r.Header.Get("Authorization"); got == "" && a != "" {
 				for _, p := range []string{"Bearer ", "Token "} {
-					if strings.HasPrefix(a, p) {
-						got = strings.TrimPrefix(a, p)
+					if after, ok := strings.CutPrefix(a, p); ok {
+						got = after
 					}
 				}
 			}

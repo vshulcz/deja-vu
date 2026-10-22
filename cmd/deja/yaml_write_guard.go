@@ -38,7 +38,7 @@ func yamlWriteBreaks(path string, old, next []byte) error {
 func yamlShapeProblem(text string) string {
 	flow := ""
 	seen := map[string]string{}
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		trimmed := strings.TrimSpace(line)
 		switch {
 		case trimmed == "" || strings.HasPrefix(trimmed, "#"):

@@ -260,7 +260,7 @@ func TestDoctorTraeIDERows(t *testing.T) {
 	var auto bytes.Buffer
 	doctorAutoRecall(&auto)
 	var row string
-	for _, l := range strings.Split(auto.String(), "\n") {
+	for l := range strings.SplitSeq(auto.String(), "\n") {
 		if strings.HasPrefix(strings.TrimSpace(l), "trae-ide ") {
 			row = l
 		}

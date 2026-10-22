@@ -52,7 +52,7 @@ func TestRecallDoesNotPayTwiceForOneAnswer(t *testing.T) {
 		t.Fatal(err)
 	}
 	seen := map[string]int{}
-	for _, ln := range strings.Split(text, "\n") {
+	for ln := range strings.SplitSeq(text, "\n") {
 		ln = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(ln), "- "))
 		if !strings.HasPrefix(ln, "→ ") {
 			continue

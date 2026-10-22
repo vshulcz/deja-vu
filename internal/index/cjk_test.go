@@ -1,10 +1,13 @@
 package index
 
 import (
-	"github.com/vshulcz/deja-vu/internal/cjkfold"
+	"slices"
+
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/cjkfold"
 
 	search "github.com/vshulcz/deja-vu/internal/query"
 )
@@ -211,12 +214,7 @@ func TestRelevanceTermsKeepNonASCIILetters(t *testing.T) {
 // IsStopWord only knows Latin and Cyrillic.
 func TestCJKFunctionBigramsAreNotQueryTerms(t *testing.T) {
 	has := func(terms []string, want string) bool {
-		for _, term := range terms {
-			if term == want {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(terms, want)
 	}
 	terms := RelevanceTerms("复旦大学在哪个城市？")
 	for _, junk := range []string{"在哪", "哪个"} {

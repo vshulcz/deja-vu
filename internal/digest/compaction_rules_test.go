@@ -118,7 +118,7 @@ func TestStandingRulesMergeWithTheLastPacket(t *testing.T) {
 
 func TestStandingRulesAreBounded(t *testing.T) {
 	var turns []string
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		turns = append(turns, "Never touch generated file number "+strings.Repeat("x", i+1)+" in this repo.")
 	}
 	rules := ExtractStandingRules(rulesSession(turns...), nil)

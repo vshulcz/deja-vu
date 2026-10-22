@@ -52,14 +52,8 @@ func TestTranscriptControlCharactersDoNotReachAnySurface(t *testing.T) {
 	}
 	for name, out := range surfaces {
 		if loc := actedOn.FindStringIndex(out); loc != nil {
-			a := loc[0] - 30
-			if a < 0 {
-				a = 0
-			}
-			b := loc[1] + 30
-			if b > len(out) {
-				b = len(out)
-			}
+			a := max(loc[0]-30, 0)
+			b := min(loc[1]+30, len(out))
 			t.Errorf("%s prints %q, which a terminal acts on rather than prints — near %q",
 				name, out[loc[0]:loc[1]], out[a:b])
 		}

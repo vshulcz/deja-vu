@@ -127,9 +127,11 @@ func cherryStudioDBFixture(t *testing.T, rows ...[3]string) string {
 		t.Fatal(err)
 	}
 	sql := "create table mcp_server (id text primary key, name text not null, command text, args text, is_active integer not null default 1);"
+	var sqlSb130 strings.Builder
 	for i, r := range rows {
-		sql += "insert into mcp_server (id, name, command, args) values ('" + string(rune('a'+i)) + "', '" + r[0] + "', '" + r[1] + "', '" + r[2] + "');"
+		sqlSb130.WriteString("insert into mcp_server (id, name, command, args) values ('" + string(rune('a'+i)) + "', '" + r[0] + "', '" + r[1] + "', '" + r[2] + "');")
 	}
+	sql += sqlSb130.String()
 	if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3: %v %s", err, out)
 	}
@@ -153,7 +155,7 @@ func cherryMCPText(t *testing.T) string {
 	doctorMCP(&buf)
 	var keep []string
 	on := false
-	for _, line := range strings.Split(buf.String(), "\n") {
+	for line := range strings.SplitSeq(buf.String(), "\n") {
 		if strings.HasPrefix(line, "  cherrystudio ") {
 			on = true
 		} else if on && !strings.HasPrefix(line, "               ") {

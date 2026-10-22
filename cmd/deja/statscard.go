@@ -192,7 +192,7 @@ func renderHeatmap(b *strings.Builder, hm stats.HeatmapStats, x0, y0 int) {
 		cardText(b, x0+mt.Col*step, y0-6, 10, "400", mt.Label, "#55626a")
 	}
 	for col, week := range hm.Weeks {
-		for d := 0; d < 7; d++ {
+		for d := range 7 {
 			c := week[d]
 			if c < 0 {
 				continue

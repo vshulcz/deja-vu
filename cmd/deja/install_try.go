@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -168,12 +169,7 @@ func oneOfThemDecidedSomething(dir string, hits []model.Session) bool {
 	if err != nil {
 		return false
 	}
-	for _, s := range full {
-		if sessionSettledSomething(s) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(full, sessionSettledSomething)
 }
 
 // sessionSettledSomething is the shared recogniser, over the side of the
@@ -226,7 +222,7 @@ var askingWords = map[string]bool{
 // nothing is stemmed or reordered. The caller decides how many to use.
 func promptTopicWords(title string) []string {
 	var words []string
-	for _, w := range strings.Fields(strings.ToLower(title)) {
+	for w := range strings.FieldsSeq(strings.ToLower(title)) {
 		w = strings.TrimFunc(w, func(r rune) bool {
 			return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '-' && r != '_' && r != '.' && r != '/'
 		})

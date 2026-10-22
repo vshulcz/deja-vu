@@ -50,7 +50,7 @@ func TestReadmeSidecarSizeMatchesWhatEmbedWrites(t *testing.T) {
 		t.Fatal(err)
 	}
 	var lines strings.Builder
-	for i := 0; i < 64; i++ {
+	for i := range 64 {
 		fmt.Fprintf(&lines, `{"type":"user","sessionId":"s","timestamp":"2026-01-01T00:00:00Z","message":{"role":"user","content":"sidecar sizing message %d"}}`+"\n", i)
 	}
 	if err := os.WriteFile(filepath.Join(root, "session.jsonl"), []byte(lines.String()), 0o600); err != nil {

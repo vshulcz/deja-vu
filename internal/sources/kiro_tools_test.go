@@ -66,7 +66,7 @@ func TestKiroCLIReadsToolCallsAndResults(t *testing.T) {
 		t.Errorf("the written and read files are not recorded: %q", got[RoleFiles])
 	}
 	for _, rec := range got[RoleFiles] {
-		for _, p := range strings.Split(rec, "\n") {
+		for p := range strings.SplitSeq(rec, "\n") {
 			if p == "/tmp/proj" {
 				t.Errorf("a directory listing was recorded as a file: %q", got[RoleFiles])
 			}

@@ -42,12 +42,12 @@ func TestLogoWanted(t *testing.T) {
 // build greeting.
 func TestLogoLinesKeepsAColumnTallerThanTheMark(t *testing.T) {
 	info := []string{"deja-vu", "", "header"}
-	for i := 0; i < 22; i++ {
+	for i := range 22 {
 		info = append(info, "store"+strconv.Itoa(i))
 	}
 	out := logoLines(info)
 	plain := strings.Join(out, "\n")
-	for i := 0; i < 22; i++ {
+	for i := range 22 {
 		if !strings.Contains(plain, "store"+strconv.Itoa(i)) {
 			t.Fatalf("store%d was dropped from a %d-line column rendered as %d lines", i, len(info), len(out))
 		}

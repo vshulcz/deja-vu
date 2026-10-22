@@ -46,7 +46,7 @@ func TestEveryHookInjectionSaysItIsUntrusted(t *testing.T) {
 	// The pre-action hook speaks about a file several sessions have worked on:
 	// one edit is not a history worth interrupting for, so the fixture has to
 	// carry the shape that surface actually answers to.
-	for k := 0; k < 6; k++ {
+	for k := range 6 {
 		sid := fmt.Sprintf("e%d", k)
 		at := base.Add(time.Duration(k) * time.Hour)
 		rows := []string{

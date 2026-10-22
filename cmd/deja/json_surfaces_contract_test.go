@@ -123,9 +123,11 @@ func TestEveryJSONSurfaceMatchesItsSection(t *testing.T) {
 			}
 			section := docSection(t, doc, s.heading)
 			named := section
+			var namedSb126 strings.Builder
 			for _, h := range s.shared {
-				named += docSection(t, doc, h)
+				namedSb126.WriteString(docSection(t, doc, h))
 			}
+			named += namedSb126.String()
 			emitted := map[string]bool{}
 			collectJSONKeys(v, s.dynamic, s.data, emitted)
 			for _, k := range sortedSet(emitted) {

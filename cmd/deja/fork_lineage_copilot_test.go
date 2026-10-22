@@ -39,7 +39,7 @@ func copilotForkStore(t *testing.T) (dir, source, fork string) {
 		return fmt.Sprintf(`{"type":"user.message","data":{"content":%q},"timestamp":%q}`, user, at(d)) + "\n" +
 			fmt.Sprintf(`{"type":"assistant.message","data":{"content":%q},"timestamp":%q}`, reply, at(d+5*time.Second)) + "\n"
 	}
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		id := fmt.Sprintf("%08d-0000-4000-8000-000000000000", i)
 		write(id, start(id, at(-time.Duration(i+2)*time.Hour))+turn(fmt.Sprintf("rename table%d in the billing schema", i), "done", -time.Duration(i+2)*time.Hour))
 	}

@@ -58,7 +58,7 @@ func TestFuzzyLengthBucketsMatchBruteForce(t *testing.T) {
 		}
 		return string(b)
 	}
-	for i := 0; i < 4000; i++ {
+	for range 4000 {
 		catalog[word(al, 1+rng.Intn(30))] = true
 		catalog[word(cyr, 1+rng.Intn(20))] = true
 	}
@@ -70,7 +70,7 @@ func TestFuzzyLengthBucketsMatchBruteForce(t *testing.T) {
 
 	idx := newTokenIndex(catalog)
 	queries := []string{"a", "ab", "abcdefgh", "мосты", "конфигурация", long, long[:20], strings.Repeat("z", 40)}
-	for i := 0; i < 40; i++ {
+	for range 40 {
 		queries = append(queries, word(al, 1+rng.Intn(20)), word(cyr, 1+rng.Intn(16)))
 	}
 	for _, q := range queries {

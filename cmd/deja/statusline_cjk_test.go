@@ -25,9 +25,9 @@ func seedCJKTitleIndex(t *testing.T, titles []string) string {
 	for i, title := range titles {
 		sid := fmt.Sprintf("cj%02d", i)
 		body := `{"type":"user","sessionId":"` + sid + `","cwd":"/w/cj","timestamp":"2026-07-1` +
-			fmt.Sprint(i) + `T10:00:00Z","message":{"role":"user","content":"` + title + `"}}` + "\n" +
+			strconv.Itoa(i) + `T10:00:00Z","message":{"role":"user","content":"` + title + `"}}` + "\n" +
 			`{"type":"assistant","sessionId":"` + sid + `","cwd":"/w/cj","timestamp":"2026-07-1` +
-			fmt.Sprint(i) + `T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/w/cj/retry.go"}}]}}` + "\n"
+			strconv.Itoa(i) + `T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/w/cj/retry.go"}}]}}` + "\n"
 		if err := os.WriteFile(filepath.Join(root, sid+".jsonl"), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}

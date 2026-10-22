@@ -98,7 +98,7 @@ func sameCommandWithout(failed, worked, prog string) bool {
 	var kept []string
 	dropNext := false
 	found := false
-	for _, f := range strings.Fields(strings.TrimPrefix(strings.TrimSpace(failed), "$ ")) {
+	for f := range strings.FieldsSeq(strings.TrimPrefix(strings.TrimSpace(failed), "$ ")) {
 		if dropNext {
 			dropNext = false
 			// A wrapper's first argument is its own — `timeout 90` — and the

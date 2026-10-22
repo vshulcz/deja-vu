@@ -17,7 +17,7 @@ func TestFrictionTextsAnswerOrFallBack(t *testing.T) {
 	t.Setenv("DEJA_CLAUDE_ROOT", root)
 	walls := []string{"make: *** [widget] Error 2", "zsh:1: command not found: frobnicate"}
 	for w, wall := range walls {
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			id := fmt.Sprintf("w%ds%d", w, i)
 			at := fmt.Sprintf("2026-07-01T1%d:%02d:00Z", w, i*10)
 			body := `{"type":"user","sessionId":"` + id + `","cwd":"/w/app","timestamp":"` + at + `","message":{"role":"user","content":"the build keeps stopping"}}` + "\n" +

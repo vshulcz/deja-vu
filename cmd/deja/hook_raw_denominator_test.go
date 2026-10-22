@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -33,10 +34,12 @@ func TestHookRawCountsOnlyTheSessionsItServed(t *testing.T) {
 	var total int64
 	for _, s := range sessions {
 		body := ""
+		var bodySb36 strings.Builder
 		for i := 0; i < s.lines; i++ {
-			body += `{"type":"user","message":{"role":"user","content":"` + text + `"},"timestamp":"` + s.when + `","sessionId":"` + s.id + `","cwd":"/proj"}` + "\n"
+			bodySb36.WriteString(`{"type":"user","message":{"role":"user","content":"` + text + `"},"timestamp":"` + s.when + `","sessionId":"` + s.id + `","cwd":"/proj"}` + "\n")
 			total += int64(len(text))
 		}
+		body += bodySb36.String()
 		if err := os.WriteFile(filepath.Join(store, s.id+".jsonl"), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}

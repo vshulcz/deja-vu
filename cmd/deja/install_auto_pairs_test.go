@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -46,12 +47,7 @@ func TestAutoTargetsCarryTheirMCPServer(t *testing.T) {
 }
 
 func hasTarget(name string) bool {
-	for _, t := range installTargetNames() {
-		if t == name {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(installTargetNames(), name)
 }
 
 // installedFiles installs one target into an empty home and returns what it

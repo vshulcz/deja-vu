@@ -46,7 +46,7 @@ func TestLastSaysWhenASessionIsStampedAhead(t *testing.T) {
 	var out string
 	stderr := captureStderr(t, func() { out, _ = captureRun(t, "last") })
 	// The premise: the future session really does lead the listing.
-	first := strings.SplitN(strings.TrimSpace(out), "\n", 2)[0]
+	first, _, _ := strings.Cut(strings.TrimSpace(out), "\n")
 	if !strings.Contains(first, "transaction mode") {
 		t.Fatalf("the session stamped ahead is not at the top, so this measures nothing: %q", first)
 	}

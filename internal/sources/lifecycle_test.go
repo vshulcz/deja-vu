@@ -3,6 +3,7 @@ package sources
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -10,9 +11,11 @@ func writeNotes(t *testing.T, lines ...string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "notes.jsonl")
 	body := ""
+	var bodySb13 strings.Builder
 	for _, l := range lines {
-		body += l + "\n"
+		bodySb13.WriteString(l + "\n")
 	}
+	body += bodySb13.String()
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}

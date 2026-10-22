@@ -219,7 +219,7 @@ func check(bin, path string) ([]string, error) {
 		return nil, err
 	}
 	var findings []string
-	for _, line := range strings.Split(stdout.String(), "\n") {
+	for line := range strings.SplitSeq(stdout.String(), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue

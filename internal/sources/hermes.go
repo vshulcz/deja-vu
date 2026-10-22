@@ -331,7 +331,7 @@ func hermesColumns(db string) map[string]bool {
 		return nil
 	}
 	cols := map[string]bool{}
-	for _, line := range strings.Split(string(out), "\n") {
+	for line := range strings.SplitSeq(string(out), "\n") {
 		// cid|name|type|notnull|dflt_value|pk
 		if f := strings.SplitN(line, "|", 3); len(f) == 3 {
 			cols[f[1]] = true
@@ -447,7 +447,7 @@ func hermesSessionMeta(db string) map[string]hermesMeta {
 func hermesSessionMetaWhere(db, where string) map[string]hermesMeta {
 	cols := map[string]bool{}
 	if out, err := sqliteOutput(db, `select name from pragma_table_info('sessions')`); err == nil {
-		for _, c := range strings.Fields(string(out)) {
+		for c := range strings.FieldsSeq(string(out)) {
 			cols[c] = true
 		}
 	}
@@ -455,11 +455,13 @@ func hermesSessionMetaWhere(db, where string) map[string]hermesMeta {
 		return nil
 	}
 	fields := `'id',cast(id as text)`
+	var fieldsSb458 strings.Builder
 	for col, key := range map[string]string{"cwd": "cwd", "source": "source", "parent_session_id": "parent"} {
 		if cols[col] {
-			fields += fmt.Sprintf(`,'%s',cast(%s as text)`, key, col)
+			fieldsSb458.WriteString(fmt.Sprintf(`,'%s',cast(%s as text)`, key, col))
 		}
 	}
+	fields += fieldsSb458.String()
 	if cols["model_config"] {
 		// json_valid first: one row of something else would fail the query
 		// and lose every session's cwd with it.

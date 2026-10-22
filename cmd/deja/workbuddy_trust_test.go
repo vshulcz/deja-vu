@@ -135,7 +135,7 @@ func TestDoctorWorkBuddyTrust(t *testing.T) {
 	text := func() string {
 		var buf bytes.Buffer
 		doctorMCP(&buf)
-		for _, line := range strings.Split(buf.String(), "\n") {
+		for line := range strings.SplitSeq(buf.String(), "\n") {
 			if strings.HasPrefix(strings.TrimSpace(line), "workbuddy ") {
 				return line
 			}

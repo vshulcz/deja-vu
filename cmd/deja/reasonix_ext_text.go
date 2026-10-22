@@ -25,7 +25,7 @@ var rxTeamcityLine = regexp.MustCompile(`(?m)^##teamcity\[.*\]$`)
 // rxOneLine folds a recall block onto one line, tags included.
 func rxOneLine(block string) string {
 	var kept []string
-	for _, ln := range strings.Split(block, "\n") {
+	for ln := range strings.SplitSeq(block, "\n") {
 		if ln = strings.TrimSpace(ln); ln != "" {
 			kept = append(kept, ln)
 		}

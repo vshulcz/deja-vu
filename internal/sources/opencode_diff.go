@@ -134,7 +134,7 @@ func ParseOpencodeDiff(path string) ([]model.Session, error) {
 // adds, in order, for hashing under the file they went into.
 func addedLinesOfUnifiedDiff(patch string) string {
 	var added []string
-	for _, line := range strings.Split(patch, "\n") {
+	for line := range strings.SplitSeq(patch, "\n") {
 		switch {
 		case strings.HasPrefix(line, "+++"):
 			// A file header, not content.
@@ -163,7 +163,7 @@ func unifiedDiffSpans(file, patch string) []string {
 		out = append(out, file+"\n"+span)
 		removed = nil
 	}
-	for _, line := range strings.Split(patch, "\n") {
+	for line := range strings.SplitSeq(patch, "\n") {
 		switch {
 		case strings.HasPrefix(line, "@@"):
 			flush()

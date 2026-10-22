@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -44,13 +45,7 @@ func CodexRoots() []string {
 	var roots []string
 	for _, root := range []string{CodexRoot(), XcodeCodexRoot()} {
 		root = filepath.Clean(root)
-		seen := false
-		for _, existing := range roots {
-			if existing == root {
-				seen = true
-				break
-			}
-		}
+		seen := slices.Contains(roots, root)
 		if !seen {
 			roots = append(roots, root)
 		}
@@ -708,7 +703,7 @@ func codexPatchText(s *model.Session, body, cwd string, t time.Time) {
 	removed := map[string][]string{}
 	added := map[string][]string{}
 	current := ""
-	for _, line := range strings.Split(body, "\n") {
+	for line := range strings.SplitSeq(body, "\n") {
 		if m := codexPatchFile.FindStringSubmatch(line); m != nil {
 			current = resolveToolPath(strings.TrimSpace(m[1]), cwd)
 			if !seen[current] {
@@ -832,7 +827,7 @@ func codexRolloutHead(path string) (id, cwd string, payload map[string]any, at t
 	r.Reset(f)
 	// The meta record is the first line in every rollout Codex writes; a few
 	// lines of slack costs nothing and covers a format that adds a preamble.
-	for i := 0; i < 8; i++ {
+	for range 8 {
 		l, err := readJSONLine(r)
 		var rec struct {
 			Timestamp any            `json:"timestamp"`

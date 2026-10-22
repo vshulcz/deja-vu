@@ -342,10 +342,7 @@ func sameThoughtTwice(kept []map[string]bool, words map[string]bool) bool {
 				shared++
 			}
 		}
-		smaller := len(words)
-		if len(prev) < smaller {
-			smaller = len(prev)
-		}
+		smaller := min(len(prev), len(words))
 		if smaller > 0 && float64(shared)/float64(smaller) >= recapOverlap {
 			return true
 		}

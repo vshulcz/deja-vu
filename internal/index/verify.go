@@ -17,7 +17,7 @@ import (
 // `echo`, `git status`), and at least one part checks.
 func VerifyCommand(cmd string) bool {
 	checks := false
-	for _, part := range strings.Split(strings.ReplaceAll(strings.ReplaceAll(cmd, "&&", ";"), "||", ";"), ";") {
+	for part := range strings.SplitSeq(strings.ReplaceAll(strings.ReplaceAll(cmd, "&&", ";"), "||", ";"), ";") {
 		part = strings.TrimSpace(part)
 		if part == "" || InspectionCommand(part) {
 			continue

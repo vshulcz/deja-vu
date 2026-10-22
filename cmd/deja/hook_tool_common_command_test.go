@@ -43,7 +43,7 @@ func TestTheCommandLineAnswersAboutAnOrdinaryCommand(t *testing.T) {
 	})
 	// Sessions that ran the same command, making its words ordinary — which is
 	// exactly what happens on a real machine.
-	for k := 0; k < 8; k++ {
+	for k := range 8 {
 		sid := fmt.Sprintf("r%d", k)
 		write(sid, []string{
 			`{"type":"user","sessionId":"` + sid + `","timestamp":"` + at(300-10*k) + `","cwd":"/work/app","message":{"role":"user","content":"run the tests"}}`,

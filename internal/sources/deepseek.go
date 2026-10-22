@@ -206,7 +206,7 @@ func ParseDeepSeekFile(path string) ([]model.Session, error) {
 		// every consumer that filters by date.
 		s.Messages = append(s.Messages, model.Message{Role: "assistant", Text: text, Time: pendingAt})
 	}
-	for _, line := range bytes.Split(raw, []byte("\n")) {
+	for line := range bytes.SplitSeq(raw, []byte("\n")) {
 		line = bytes.TrimSpace(line)
 		if len(line) == 0 {
 			continue

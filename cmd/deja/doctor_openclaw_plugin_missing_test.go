@@ -22,7 +22,7 @@ func TestDoctorOpenClawRowSeesTheMissingPlugin(t *testing.T) {
 	row := func() (string, string) {
 		var out bytes.Buffer
 		doctorAutoRecall(&out)
-		for _, l := range strings.Split(out.String(), "\n") {
+		for l := range strings.SplitSeq(out.String(), "\n") {
 			if strings.HasPrefix(strings.TrimSpace(l), "openclaw ") {
 				state, _ := autoWiringState(openclawAutoRow(t))
 				return l, state

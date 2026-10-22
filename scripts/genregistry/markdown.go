@@ -101,10 +101,7 @@ func renderMarkdown(src string) (body, title string) {
 			flushList()
 		case strings.HasPrefix(trimmed, "#"):
 			flushList()
-			level := len(trimmed) - len(strings.TrimLeft(trimmed, "#"))
-			if level > 6 {
-				level = 6
-			}
+			level := min(len(trimmed)-len(strings.TrimLeft(trimmed, "#")), 6)
 			text := strings.TrimSpace(trimmed[level:])
 			if level == 1 && title == "" {
 				title = text

@@ -31,7 +31,7 @@ func TestTheCommandsPageNamesEveryCommand(t *testing.T) {
 
 	spelledOtherwise := map[string]bool{"brief": true, "search": true}
 	var missing []string
-	for _, line := range strings.Split(usageText(), "\n") {
+	for line := range strings.SplitSeq(usageText(), "\n") {
 		// A name, not a flag: the usage lists `deja --harness name` under the
 		// bare query as well.
 		m := regexp.MustCompile(`^\s+deja ([a-z][a-z-]*)`).FindStringSubmatch(line)

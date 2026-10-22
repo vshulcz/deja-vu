@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -96,7 +97,7 @@ func openclawDBSessionKey(db, id string) (string, error) {
 		return "", fmt.Errorf("openclaw: read session schema: %w", err)
 	}
 	tables := make(map[string]bool)
-	for _, name := range strings.Fields(string(known)) {
+	for name := range strings.FieldsSeq(string(known)) {
 		tables[name] = true
 	}
 	quotedID := strings.ReplaceAll(id, "'", "''")
@@ -113,7 +114,7 @@ func openclawDBSessionKey(db, id string) (string, error) {
 			`join session_routes r on r.session_key = s.session_key ` +
 			`and r.session_id = s.session_id where s.session_id = '` + quotedID + `'`
 	default:
-		return "", fmt.Errorf("openclaw: store has no supported current-session mapping")
+		return "", errors.New("openclaw: store has no supported current-session mapping")
 	}
 	raw, err := sqliteOutput(db, query)
 	if err != nil {

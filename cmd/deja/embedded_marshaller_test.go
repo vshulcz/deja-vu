@@ -13,7 +13,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
-var jsonMarshaler = reflect.TypeOf((*json.Marshaler)(nil)).Elem()
+var jsonMarshaler = reflect.TypeFor[json.Marshaler]()
 
 func writesItsOwnJSON(t reflect.Type) bool {
 	return t.Implements(jsonMarshaler) || reflect.PointerTo(t).Implements(jsonMarshaler)
@@ -71,7 +71,7 @@ func TestNoReportedTypeEmbedsAMarshaller(t *testing.T) {
 		usage.Summary
 		Extra int `json:"extra"`
 	}
-	if got := embeddedMarshallers(reflect.TypeOf(outer{}), map[reflect.Type]bool{}); len(got) != 1 {
+	if got := embeddedMarshallers(reflect.TypeFor[outer](), map[reflect.Type]bool{}); len(got) != 1 {
 		t.Errorf("the walk misses the case it exists for: %v", got)
 	}
 	// And the shape really does drop the outer field, which is why it matters.

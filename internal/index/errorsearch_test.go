@@ -88,9 +88,11 @@ func TestErrorTierCarriesWhatFollowedTheError(t *testing.T) {
 		t.Fatalf("sessions = %d, want 1", len(res.Sessions))
 	}
 	var text string
+	var textSb91 strings.Builder
 	for _, msg := range res.Sessions[0].Messages {
-		text += msg.Text + "\n"
+		textSb91.WriteString(msg.Text + "\n")
 	}
+	text += textSb91.String()
 	if !strings.Contains(text, "uv pip install aiokafka") {
 		t.Errorf("the recovery is not in the result:\n%s", text)
 	}
@@ -167,7 +169,7 @@ func TestErrorTierTotalAndCapped(t *testing.T) {
 	dir := t.TempDir()
 	// 60 sessions all hitting the same error line — more than relevanceWindow.
 	ss := make([]model.Session, 0, 60)
-	for i := 0; i < 60; i++ {
+	for i := range 60 {
 		id := "s" + string(rune('A'+i/26)) + string(rune('a'+i%26))
 		ss = append(ss, model.Session{
 			Harness: "claude", ID: id, Project: "p",

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -474,8 +475,8 @@ func removeHermesMCPBlock(s string) string {
 	// uninstall itself (#2730).
 	lines := strings.Split(s, "\n")
 	entries := hermesDejaEntries(lines)
-	for i := len(entries) - 1; i >= 0; i-- {
-		lines = append(lines[:entries[i].start], lines[entries[i].end:]...)
+	for _, entrie := range slices.Backward(entries) {
+		lines = append(lines[:entrie.start], lines[entrie.end:]...)
 	}
 	return strings.Join(lines, "\n")
 }

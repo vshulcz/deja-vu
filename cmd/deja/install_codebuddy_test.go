@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -147,12 +148,7 @@ func TestCodeBuddyIsAnInstallTarget(t *testing.T) {
 func TestCodeBuddyDetectedByItsStore(t *testing.T) {
 	home := filepath.Join(hermeticEnv(t), "home")
 	has := func() bool {
-		for _, n := range existingTargets() {
-			if n == "codebuddy" {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(existingTargets(), "codebuddy")
 	}
 	if err := os.MkdirAll(filepath.Join(home, ".codebuddy"), 0o755); err != nil {
 		t.Fatal(err)

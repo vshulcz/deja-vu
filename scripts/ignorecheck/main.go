@@ -58,7 +58,7 @@ func main() {
 		os.Exit(1)
 	}
 	ignored := map[string]bool{}
-	for _, line := range strings.Split(string(b), "\n") {
+	for line := range strings.SplitSeq(string(b), "\n") {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "/") && !strings.HasSuffix(line, "/") {
 			ignored[strings.TrimPrefix(line, "/")] = true

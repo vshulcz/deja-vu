@@ -14,7 +14,7 @@ import (
 // context budget several times over.
 func longSessionAround(turns int) model.Session {
 	msgs := []model.Message{{Role: "user", Text: "before we start, remind me about retries later"}}
-	for i := 0; i < turns; i++ {
+	for range turns {
 		msgs = append(msgs, model.Message{Role: "user", Text: "unrelated question " + strings.Repeat("x", 200)})
 		msgs = append(msgs, model.Message{Role: "assistant", Text: "unrelated answer " + strings.Repeat("y", 200)})
 	}
@@ -45,7 +45,7 @@ func TestContextCarriesAnEarlyExchangeOverALaterMention(t *testing.T) {
 		{Role: "user", Text: "what should we do about retries?"},
 		{Role: "assistant", Text: "we decided to cap retries at 3 and give up after that"},
 	}
-	for i := 0; i < 60; i++ {
+	for range 60 {
 		msgs = append(msgs, model.Message{Role: "user", Text: "unrelated question " + strings.Repeat("x", 200)})
 		msgs = append(msgs, model.Message{Role: "assistant", Text: "unrelated answer " + strings.Repeat("y", 200)})
 	}

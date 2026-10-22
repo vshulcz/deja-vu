@@ -74,8 +74,8 @@ func walAtRest(db string) bool {
 func uriPath(p string) string {
 	p = filepath.ToSlash(p)
 	lead := ""
-	if strings.HasPrefix(p, "/") {
-		lead, p = "/", strings.TrimPrefix(p, "/")
+	if after, ok := strings.CutPrefix(p, "/"); ok {
+		lead, p = "/", after
 	}
 	parts := strings.Split(p, "/")
 	for i, seg := range parts {

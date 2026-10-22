@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -28,10 +29,8 @@ func nearestKnownFlag(a string, known []string) string {
 	if !strings.HasPrefix(a, "--") || len([]rune(a)) < 4 {
 		return ""
 	}
-	for _, f := range known {
-		if a == f {
-			return ""
-		}
+	if slices.Contains(known, a) {
+		return ""
 	}
 	return nearestTarget(a, known)
 }

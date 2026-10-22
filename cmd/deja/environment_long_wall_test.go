@@ -25,7 +25,7 @@ func TestALongWallKeepsWhatNamesIt(t *testing.T) {
 		t.Fatal(err)
 	}
 	wall := `psql: error: connection to server at "db.internal.example.com" (198.51.100.7), port 5432 failed: Connection refused`
-	for k := 0; k < 4; k++ {
+	for k := range 4 {
 		sid := fmt.Sprintf("s%d", k)
 		at := time.Now().Add(-time.Duration(200-20*k) * time.Minute).UTC().Format(time.RFC3339)
 		lines := []string{
@@ -48,7 +48,7 @@ func TestALongWallKeepsWhatNamesIt(t *testing.T) {
 		t.Errorf("the block kept the host and dropped the failure:\n%s", block)
 	}
 	// Still bounded: the block goes into every session start.
-	for _, line := range strings.Split(block, "\n") {
+	for line := range strings.SplitSeq(block, "\n") {
 		if len(line) > 200 {
 			t.Errorf("a %d-byte line in a block injected on every session start:\n%s", len(line), line)
 		}

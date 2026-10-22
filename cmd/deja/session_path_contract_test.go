@@ -18,7 +18,7 @@ func TestTheDocumentedPathNamesTheOpencodeException(t *testing.T) {
 		t.Fatal(err)
 	}
 	line := ""
-	for _, l := range strings.Split(string(b), "\n") {
+	for l := range strings.SplitSeq(string(b), "\n") {
 		if strings.HasPrefix(strings.TrimSpace(l), "| `path` |") {
 			line = strings.TrimSpace(l)
 			break

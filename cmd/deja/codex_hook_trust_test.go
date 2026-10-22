@@ -144,7 +144,7 @@ func TestRewriteCodexHookTrustKeepsWhatIsNotAPin(t *testing.T) {
 // loop made 1,500 hooks take seconds.
 func TestCodexTrustMovesIsFastOnALongHooksFile(t *testing.T) {
 	var groups []any
-	for i := 0; i < 3000; i++ {
+	for i := range 3000 {
 		groups = append(groups, map[string]any{"hooks": []any{map[string]any{"type": "command", "command": "c" + strconv.Itoa(i)}}})
 	}
 	before := map[string]any{"hooks": map[string]any{"SessionStart": groups}}

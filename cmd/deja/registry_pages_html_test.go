@@ -49,7 +49,7 @@ func TestRegistryPagesAreBuiltAndListed(t *testing.T) {
 			// page. That is what goes wrong in practice: someone documents a
 			// new quirk in the markdown and the page a reader lands on still
 			// describes last month's format.
-			for _, line := range strings.Split(string(src), "\n") {
+			for line := range strings.SplitSeq(string(src), "\n") {
 				line = strings.TrimSpace(line)
 				switch {
 				case strings.HasPrefix(line, "## "):

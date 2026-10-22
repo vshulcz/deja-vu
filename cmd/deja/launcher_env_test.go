@@ -59,7 +59,7 @@ func TestLauncherCarriesStoreLocationsIntoAStrippedHookEnv(t *testing.T) {
 			t.Fatalf("launcher: %v", err)
 		}
 		got := map[string]string{}
-		for _, l := range strings.Split(string(out), "\n") {
+		for l := range strings.SplitSeq(string(out), "\n") {
 			if k, v, ok := strings.Cut(l, "="); ok {
 				got[k] = v
 			}

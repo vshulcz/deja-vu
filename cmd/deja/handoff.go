@@ -469,7 +469,7 @@ func pasteOnlyFooter(prefix string) string {
 				width = 76
 			}
 			more := fmt.Sprintf("(%d more: %s)", len(found)-shown, strings.Join(found[shown:], ", "))
-			for _, line := range strings.Split(wrapProse(more, width-2), "\n") {
+			for line := range strings.SplitSeq(wrapProse(more, width-2), "\n") {
 				b.WriteString("  " + line + "\n")
 			}
 			break

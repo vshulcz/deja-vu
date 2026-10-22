@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -232,7 +233,7 @@ func TestQwenAutoWiresSessionEndAndUninstallRoundTrips(t *testing.T) {
 	if _, err := installTarget("qwen-auto", "/usr/local/bin/deja", false); err != nil {
 		t.Fatal(err)
 	}
-	if again, _ := os.ReadFile(path); string(again) != string(b) {
+	if again, _ := os.ReadFile(path); !bytes.Equal(again, b) {
 		t.Errorf("a second install changed the file:\n--- first\n%s\n--- second\n%s", b, again)
 	}
 	for _, a := range autoWirings() {

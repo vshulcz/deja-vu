@@ -42,7 +42,7 @@ func TestSyncImportProofDatesInTheReadersZone(t *testing.T) {
 		t.Fatal(err)
 	}
 	var proof string
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		if strings.Contains(line, "imported:boat") {
 			proof = line
 		}

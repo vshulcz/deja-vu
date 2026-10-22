@@ -109,7 +109,7 @@ func TestSessionJSONKeysAreDocumented(t *testing.T) {
 		t.Fatal(err)
 	}
 	var lines []string
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		role := "user"
 		if i%2 == 1 {
 			role = "assistant"

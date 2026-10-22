@@ -89,7 +89,7 @@ func TestStatsCreditLineSingular(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out, `"déjà vu" 1 time (`) {
-		for _, line := range strings.Split(out, "\n") {
+		for line := range strings.SplitSeq(out, "\n") {
 			if strings.Contains(line, "Credited aloud") {
 				t.Fatalf("credit line: %q", line)
 			}

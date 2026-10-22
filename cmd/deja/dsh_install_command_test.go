@@ -26,7 +26,7 @@ func TestDshInstallCommandCarriesAProfile(t *testing.T) {
 			t.Fatalf("%s: %v", rel, err)
 		}
 		text := string(b)
-		for _, line := range strings.Split(text, "\n") {
+		for line := range strings.SplitSeq(text, "\n") {
 			if !strings.Contains(line, "dsh plugin") || !strings.Contains(line, "add") {
 				continue
 			}

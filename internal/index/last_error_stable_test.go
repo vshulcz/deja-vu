@@ -27,7 +27,7 @@ func TestTheReportedErrorIsTheSameOnEveryRun(t *testing.T) {
 	if first.FailedFiles != 3 {
 		t.Fatalf("%d failed files counted, want 3", first.FailedFiles)
 	}
-	for i := 0; i < 200; i++ {
+	for i := range 200 {
 		if got := healthFromFiles(files)["claude"].LastError; got != first.LastError {
 			t.Fatalf("run %d reported %q where the first run reported %q", i+2, got, first.LastError)
 		}

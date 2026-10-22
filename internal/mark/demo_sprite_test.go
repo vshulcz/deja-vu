@@ -24,7 +24,7 @@ func TestTheDemoFilmDrawsTheSameCat(t *testing.T) {
 		t.Fatal("story.py no longer has a CAT_BODY literal in the shape this expects")
 	}
 	var rows []string
-	for _, line := range strings.Split(string(m[1]), "\n") {
+	for line := range strings.SplitSeq(string(m[1]), "\n") {
 		line = strings.TrimSpace(line)
 		if q := strings.Index(line, `"`); q >= 0 {
 			if end := strings.LastIndex(line, `"`); end > q {

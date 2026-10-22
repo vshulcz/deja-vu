@@ -156,7 +156,7 @@ func ScanTestHistory(dir string) (TestHistory, error) {
 				return
 			}
 			if r.Role == roleCommand {
-				for _, line := range strings.Split(r.Text, "\n") {
+				for line := range strings.SplitSeq(r.Text, "\n") {
 					m := buildTestRE.FindStringSubmatch(line)
 					if m == nil {
 						continue

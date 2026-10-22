@@ -105,7 +105,7 @@ console.log("empty fork", tag(await prompt(sm("efork-1", [], { id: "efork-1", pa
 		}
 		calls, _ := os.ReadFile(log)
 		var forkPrompt string
-		for _, line := range strings.Split(string(calls), "\n") {
+		for line := range strings.SplitSeq(string(calls), "\n") {
 			if strings.HasPrefix(line, "hook-context") && (strings.Contains(line, `"res-1"`) || strings.Contains(line, `"fork-1"`)) {
 				t.Errorf("%s: asked for a start digest for a session that holds one: %s", name, line)
 			}

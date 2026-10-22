@@ -95,7 +95,7 @@ func QwenProjectDirBase(path string) string {
 // in.
 func qwenFolderIs(cwd, base string) bool {
 	enc := claudeEncodePath(cwd)
-	return enc == base || strings.ToLower(enc) == base
+	return enc == base || strings.EqualFold(enc, base)
 }
 
 // qwenTranscriptCWD is the directory the transcript at path records, when its
@@ -489,7 +489,7 @@ func UnwrapShellReport(s string) string {
 	}
 	var kept []string
 	labelled := false
-	for _, line := range strings.Split(s, "\n") {
+	for line := range strings.SplitSeq(s, "\n") {
 		t := strings.TrimSpace(line)
 		// `Error: (none)` is qwen's report saying there was no error. A real
 		// one keeps its label: it is the failure, and a line the command

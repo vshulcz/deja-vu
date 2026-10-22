@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -63,11 +64,11 @@ func TestTheWholeQueryStillHoldsWhenEveryWordIsThere(t *testing.T) {
 func absentWordCorpus(t *testing.T) {
 	t.Helper()
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
-	for i := 0; i < 55; i++ {
+	for i := range 55 {
 		at := time.Now().Add(-time.Duration(i+2) * time.Hour).UTC().Format(time.RFC3339)
 		id := fmt.Sprintf("f%02d", i)
 		writeClaudeFixture(t, filepath.Join(root, "-tmp-app", id+".jsonl"), id, []string{
-			`{"type":"user","sessionId":"` + id + `","timestamp":"` + at + `","cwd":"/tmp/app","message":{"role":"user","content":"routine standup chatter about the worker pool number ` + fmt.Sprint(i) + `"}}`,
+			`{"type":"user","sessionId":"` + id + `","timestamp":"` + at + `","cwd":"/tmp/app","message":{"role":"user","content":"routine standup chatter about the worker pool number ` + strconv.Itoa(i) + `"}}`,
 		})
 	}
 	at := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)

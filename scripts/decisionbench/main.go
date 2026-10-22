@@ -19,6 +19,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -39,8 +40,8 @@ func reportUsage(sessions []model.Session, verbose bool) {
 	base := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	for i, t := range []string{"retry budget", "cache stampede", "leader election", "schema drift"} {
 		day := base.AddDate(0, 0, -i)
-		a := "used-" + fmt.Sprint(i)
-		b := "unused-" + fmt.Sprint(i)
+		a := "used-" + strconv.Itoa(i)
+		b := "unused-" + strconv.Itoa(i)
 		text := t + " is the thing we keep hitting; here is what happens and why"
 		corpus = append(corpus, session(a, day, []string{text, "and a second turn about " + t}))
 		corpus = append(corpus, session(b, day, []string{text, "and a second turn about " + t}))
@@ -81,8 +82,8 @@ func reportUsage(sessions []model.Session, verbose bool) {
 	kept := 0
 	for i, t := range []string{"connection pool", "index rebuild", "token refresh"} {
 		day := base.AddDate(0, 0, -i)
-		strong := "strong-" + fmt.Sprint(i)
-		wornWeak := "worn-weak-" + fmt.Sprint(i)
+		strong := "strong-" + strconv.Itoa(i)
+		wornWeak := "worn-weak-" + strconv.Itoa(i)
 		risk = append(risk, session(strong, day, []string{
 			t + " " + t + " keeps failing, and here is the whole story of " + t,
 			"more about " + t,
@@ -92,7 +93,7 @@ func reportUsage(sessions []model.Session, verbose bool) {
 			"the rest is unrelated",
 		}))
 		riskWorn[wornWeak] = 40 // far past anything the cap allows
-		risk = append(risk, session("filler-"+fmt.Sprint(i), day, []string{"unrelated chatter"}))
+		risk = append(risk, session("filler-"+strconv.Itoa(i), day, []string{"unrelated chatter"}))
 		hits, _ := search.Run(risk, search.Options{Query: t, All: true, RecallWorn: riskWorn})
 		if len(hits) > 0 && hits[0].Session.ID == strong {
 			kept++

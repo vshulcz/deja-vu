@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -64,9 +65,9 @@ func TestTheRestoreNamesWhatCameBack(t *testing.T) {
 	if err := os.MkdirAll(store, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		id := fmt.Sprintf("sess%d", i)
-		rec := `{"type":"user","message":{"role":"user","content":"decision ` + id + `"},"timestamp":"2026-07-1` + fmt.Sprint(i) + `T10:00:00Z","sessionId":"` + id + `","cwd":"/proj"}` + "\n"
+		rec := `{"type":"user","message":{"role":"user","content":"decision ` + id + `"},"timestamp":"2026-07-1` + strconv.Itoa(i) + `T10:00:00Z","sessionId":"` + id + `","cwd":"/proj"}` + "\n"
 		if err := os.WriteFile(filepath.Join(store, id+".jsonl"), []byte(rec), 0o644); err != nil {
 			t.Fatal(err)
 		}

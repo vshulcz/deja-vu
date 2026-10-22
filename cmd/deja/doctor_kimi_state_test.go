@@ -29,7 +29,7 @@ func TestDoctorDoesNotCallKimisStateUnrecognised(t *testing.T) {
 	t.Setenv("DEJA_KIMI_ROOT", root)
 	var buf bytes.Buffer
 	doctorHarnesses(&buf, t.TempDir())
-	for _, line := range strings.Split(buf.String(), "\n") {
+	for line := range strings.SplitSeq(buf.String(), "\n") {
 		if strings.Contains(line, "kimi") && strings.Contains(line, "not recognised") {
 			t.Errorf("the session's own state file is counted as a transcript deja failed to read: %q", line)
 		}

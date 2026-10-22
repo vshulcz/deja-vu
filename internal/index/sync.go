@@ -8,9 +8,11 @@ import (
 	"fmt"
 	"hash/fnv"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -186,9 +188,7 @@ func exportRecordsWith(dir, outDir, peer string, full, relay bool) (int, func() 
 	bySource := map[string][]SyncRecord{}
 	self := MachineName()
 	nextWatermarks := map[string]int64{}
-	for k, v := range m.ExportWatermarks {
-		nextWatermarks[k] = v
-	}
+	maps.Copy(nextWatermarks, m.ExportWatermarks)
 	// Records that already went out at exactly the watermark instant. Time
 	// alone cannot resume precisely when a harness stamps a whole session
 	// with one timestamp, so the boundary is remembered by record identity.
@@ -402,7 +402,7 @@ func exportRecordsWith(dir, outDir, peer string, full, relay bool) (int, func() 
 				for h := range set {
 					hashes = append(hashes, h)
 				}
-				sort.Slice(hashes, func(i, j int) bool { return hashes[i] < hashes[j] })
+				slices.Sort(hashes)
 				cur.ExportBoundary[source] = hashes
 			} else {
 				delete(cur.ExportBoundary, source)
@@ -679,15 +679,9 @@ func Import(dir, inDir string) (int, error) {
 		for k, v := range recsByKey {
 			before.counts[k] = len(v)
 		}
-		for k, v := range metas {
-			before.metas[k] = v
-		}
-		for k, v := range titleAt {
-			before.at[k] = v
-		}
-		for k, v := range titleRankOf {
-			before.rank[k] = v
-		}
+		maps.Copy(before.metas, metas)
+		maps.Copy(before.at, titleAt)
+		maps.Copy(before.rank, titleRankOf)
 		if err := readSyncFile(p, func(sr SyncRecord) error {
 			origID := sr.SessionID
 			if sr.Harness == "" || origID == "" {
@@ -995,9 +989,7 @@ func restoreMap[V any](live, saved map[string]V) {
 			delete(live, k)
 		}
 	}
-	for k, v := range saved {
-		live[k] = v
-	}
+	maps.Copy(live, saved)
 }
 
 // batchName is how a batch file is named on screen. The name comes from the

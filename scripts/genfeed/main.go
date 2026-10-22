@@ -17,6 +17,7 @@ package main
 
 import (
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -114,7 +115,7 @@ func run() error {
 		})
 	}
 	if len(all) == 0 {
-		return fmt.Errorf("docs/sitemap.xml named no pages")
+		return errors.New("docs/sitemap.xml named no pages")
 	}
 	// Newest first, and by URL inside a day so a run twice over the same tree
 	// writes the same file.

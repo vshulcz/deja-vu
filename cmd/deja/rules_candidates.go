@@ -2,11 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -87,7 +89,7 @@ func runRulesCandidates(dir string, w io.Writer, args []string) error {
 			asJSON = true
 		case "--limit":
 			if i+1 >= len(args) {
-				return fmt.Errorf("rules candidates: --limit needs value")
+				return errors.New("rules candidates: --limit needs value")
 			}
 			i++
 			n, err := strconv.Atoi(args[i])
@@ -97,7 +99,7 @@ func runRulesCandidates(dir string, w io.Writer, args []string) error {
 			limit = n
 		case "--since":
 			if i+1 >= len(args) {
-				return fmt.Errorf("rules candidates: --since needs value")
+				return errors.New("rules candidates: --since needs value")
 			}
 			i++
 			d, err := parseDur(args[i])
@@ -258,12 +260,7 @@ func candidateSession(meta index.SessionMeta, pol policy.Policy) bool {
 	if pol.Ignored(meta.Path, meta.Project) {
 		return false
 	}
-	for _, p := range []string{meta.Path, meta.Project} {
-		if throwawayPath(p) {
-			return false
-		}
-	}
-	return true
+	return !slices.ContainsFunc([]string{meta.Path, meta.Project}, throwawayPath)
 }
 
 // candidateTempRoots is a variable so a test, whose fixtures necessarily live

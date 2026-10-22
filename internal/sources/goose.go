@@ -58,13 +58,7 @@ func GooseDataDirs() []string {
 				continue
 			}
 			path = filepath.Clean(path)
-			seen := false
-			for _, existing := range out {
-				if existing == path {
-					seen = true
-					break
-				}
-			}
+			seen := slices.Contains(out, path)
 			if !seen {
 				out = append(out, path)
 			}
@@ -382,7 +376,7 @@ func gooseTextEditorDiff(callPath, diff string) (files, spans, wrote []string) {
 	base := strings.Split(slashed(callPath), "/")
 	last := base[len(base)-1]
 	isFile := path.Ext(last) != ""
-	for _, line := range strings.Split(diff, "\n") {
+	for line := range strings.SplitSeq(diff, "\n") {
 		if h, ok := strings.CutPrefix(line, "+++ "); ok && path.Base(slashed(unifiedDiffPath(h))) == last {
 			isFile = true
 		}

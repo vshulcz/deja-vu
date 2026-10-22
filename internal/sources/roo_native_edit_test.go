@@ -53,7 +53,7 @@ func TestRooNativeEditToolsLeaveRecords(t *testing.T) {
 		for _, m := range ss[0].Messages {
 			switch m.Role {
 			case RoleFiles:
-				for _, p := range strings.Split(m.Text, "\n") {
+				for p := range strings.SplitSeq(m.Text, "\n") {
 					files[p] = true
 				}
 			case RoleEdit:

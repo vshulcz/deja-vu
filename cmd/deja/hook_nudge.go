@@ -44,7 +44,7 @@ func failureNudge(dir, prompt string) string {
 // reportsFailure reads the user's own words, line by line, using the same rule
 // the index uses when it marks a session as reporting a dead end.
 func reportsFailure(prompt string) bool {
-	for _, line := range strings.Split(prompt, "\n") {
+	for line := range strings.SplitSeq(prompt, "\n") {
 		if _, ok := index.GiveUpLine(line); ok {
 			return true
 		}

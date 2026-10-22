@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/vshulcz/deja-vu"
+	dejavu "github.com/vshulcz/deja-vu"
 	"github.com/vshulcz/deja-vu/internal/termwidth"
 )
 
@@ -115,10 +115,10 @@ func whatChangedItems(changelog, lastVersion, currentVersion string, n int) []st
 			// This section is not newer than the last version this machine ran.
 			continue
 		}
-		for _, line := range strings.Split(section.body, "\n") {
+		for line := range strings.SplitSeq(section.body, "\n") {
 			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "- ") {
-				items = append(items, firstSentence(strings.TrimPrefix(line, "- ")))
+			if after0, ok := strings.CutPrefix(line, "- "); ok {
+				items = append(items, firstSentence(after0))
 				if len(items) >= n {
 					return items
 				}

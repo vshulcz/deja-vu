@@ -19,7 +19,7 @@ func yamlDejaEntryNames(text, key string) []string {
 		}
 		name, item, runs = "", false, false
 	}
-	for _, line := range strings.Split(lfText([]byte(text)), "\n") {
+	for line := range strings.SplitSeq(lfText([]byte(text)), "\n") {
 		t := strings.TrimSpace(stripYAMLComment(line))
 		if t == "" {
 			continue

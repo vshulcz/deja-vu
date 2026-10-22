@@ -16,7 +16,7 @@ import (
 // surface for a whole session (#3620).
 func TestAJSONHitCarriesTheMatchedPassagesOnly(t *testing.T) {
 	var ms []model.Message
-	for i := 0; i < 400; i++ {
+	for i := range 400 {
 		text := fmt.Sprintf("ordinary line %d about nothing much", i)
 		if i == 17 || i == 392 {
 			text = fmt.Sprintf("line %d: the billing exporter drops every third retry", i)
@@ -58,9 +58,11 @@ func TestAJSONHitCarriesTheMatchedPassagesOnly(t *testing.T) {
 	}
 	// And they are the ones that matched, not the first or last few.
 	joined := ""
+	var joinedSb61 strings.Builder
 	for _, m := range h.Session.Messages {
-		joined += m.Text + "\n"
+		joinedSb61.WriteString(m.Text + "\n")
 	}
+	joined += joinedSb61.String()
 	for _, want := range []string{"line 17:", "line 392:"} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("the matched passage %q is missing:\n%s", want, joined)

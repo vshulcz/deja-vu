@@ -2,11 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -61,7 +63,7 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 			// and so did an unknown one and an empty --project: the answer came
 			// back looking like an answer to what was asked (#1628).
 			if i+1 >= len(args) {
-				return fmt.Errorf("files: --limit needs value")
+				return errors.New("files: --limit needs value")
 			}
 			i++
 			n, err := strconv.Atoi(args[i])
@@ -71,7 +73,7 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 			limit = n
 		case "--project":
 			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
-				return fmt.Errorf("files: --project needs value")
+				return errors.New("files: --project needs value")
 			}
 			i++
 			project = args[i]
@@ -95,7 +97,7 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		}
 	}
 	if len(terms) == 0 {
-		return fmt.Errorf("usage: deja files <topic> [--project name] [--all-projects] [--limit n] [--json]")
+		return errors.New("usage: deja files <topic> [--project name] [--all-projects] [--limit n] [--json]")
 	}
 	q := strings.Join(terms, " ")
 	// The answer is about the repository the question was asked in. Read over
@@ -258,7 +260,7 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 			if m.Role != "files" {
 				continue
 			}
-			for _, p := range strings.Split(m.Text, "\n") {
+			for p := range strings.SplitSeq(m.Text, "\n") {
 				p = strings.TrimSpace(p)
 				if p == "" || isScratch(p) {
 					continue
@@ -384,10 +386,7 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		label = max(label, len(pluralSessions(nearSessions[r.path])))
 	}
 	if w := printableWidth(stdout); w > 0 && w-3-label < col {
-		col = w - 3 - label
-		if col < 16 {
-			col = 16
-		}
+		col = max(w-3-label, 16)
 	}
 	for _, r := range rows {
 		// Padded here rather than with %-*s, whose width is runes: a path under
@@ -634,8 +633,8 @@ func trimPathTo(p string, width int) string {
 func tailToColumns(s string, width int) string {
 	r := []rune(s)
 	n := 0
-	for i := len(r) - 1; i >= 0; i-- {
-		w := termwidth.RuneColumns(r[i])
+	for i, v := range slices.Backward(r) {
+		w := termwidth.RuneColumns(v)
 		if n+w > width {
 			return string(r[i+1:])
 		}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -30,7 +31,7 @@ func touchedLineStore(t *testing.T, paths ...string) (string, model.Session) {
 			t.Fatal(err)
 		}
 		b.WriteString(`{"type":"assistant","sessionId":"t1","cwd":"/w/t","timestamp":"2026-07-20T10:0` +
-			fmt.Sprint(i+1) + `:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":` +
+			strconv.Itoa(i+1) + `:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":` +
 			string(q) + `}}]}}` + "\n")
 	}
 	if err := os.WriteFile(filepath.Join(root, "t1.jsonl"), []byte(b.String()), 0o644); err != nil {
@@ -84,7 +85,7 @@ func TestRecallNamesTheFilesUnderTheBestHit(t *testing.T) {
 // as the whole of it.
 func TestRecallCountsTheFilesItDidNotName(t *testing.T) {
 	var paths []string
-	for i := 0; i < recallTouchedFiles+3; i++ {
+	for i := range recallTouchedFiles + 3 {
 		paths = append(paths, fmt.Sprintf("/w/app/pkg/file%02d.go", i))
 	}
 	dir, s := touchedLineStore(t, paths...)

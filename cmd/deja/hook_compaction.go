@@ -312,7 +312,7 @@ func compactionCommandKey(cmd string) string {
 // firstFrictionLine is the line of a command's output that names a failure, if
 // any: a failing run says so on one line and prints many.
 func firstFrictionLine(out string) string {
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -257,9 +258,7 @@ func cloneCompactions(states map[string]CompactionState) map[string]CompactionSt
 		return nil
 	}
 	out := make(map[string]CompactionState, len(states))
-	for key, state := range states {
-		out[key] = state
-	}
+	maps.Copy(out, states)
 	return out
 }
 

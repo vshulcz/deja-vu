@@ -128,7 +128,7 @@ func TestSyncTimerUnitsSurviveAnAwkwardPath(t *testing.T) {
 	}
 
 	service := syncAutoService(exe)
-	for _, line := range strings.Split(service, "\n") {
+	for line := range strings.SplitSeq(service, "\n") {
 		if !strings.HasPrefix(line, "ExecStart=") {
 			continue
 		}
@@ -190,7 +190,7 @@ func syncTimerArgs(t *testing.T, body string) []string {
 		}
 		return out
 	}
-	for _, line := range strings.Split(body, "\n") {
+	for line := range strings.SplitSeq(body, "\n") {
 		if v, ok := strings.CutPrefix(line, "ExecStart="); ok {
 			return strings.Fields(strings.ReplaceAll(v, `"`, ""))
 		}

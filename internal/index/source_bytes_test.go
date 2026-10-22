@@ -82,7 +82,7 @@ func filesUnderReview(root string) ([]string, error) {
 		return nil, err
 	}
 	var names []string
-	for _, name := range bytes.Split(out, []byte{0}) {
+	for name := range bytes.SplitSeq(out, []byte{0}) {
 		if len(name) == 0 {
 			continue
 		}

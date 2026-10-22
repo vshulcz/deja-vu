@@ -34,7 +34,7 @@ func TestAReReadFileDoesNotCountItsRedactionsTwice(t *testing.T) {
 		t.Helper()
 		var b strings.Builder
 		b.WriteString(`{"agent":"lead","messages":[`)
-		for i := 0; i < turns; i++ {
+		for i := range turns {
 			if i > 0 {
 				b.WriteString(",")
 			}

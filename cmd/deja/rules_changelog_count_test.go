@@ -18,11 +18,11 @@ func TestChangelogRulesSyncCountIsTheList(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(b)
-	start := strings.Index(text, "## [Unreleased]")
-	if start < 0 {
+	_, after, ok := strings.Cut(text, "## [Unreleased]")
+	if !ok {
 		t.Skip("no unreleased section")
 	}
-	unreleased := text[start+len("## [Unreleased]"):]
+	unreleased := after
 	if end := strings.Index(unreleased, "\n## "); end >= 0 {
 		unreleased = unreleased[:end]
 	}

@@ -85,7 +85,7 @@ func TestHelpNamesEveryRoleThatMatches(t *testing.T) {
 	// usage line and the search-flag description. Asserting on the whole help
 	// text lets one of them carry the other.
 	lastLine, flagLine := "", ""
-	for _, line := range strings.Split(help, "\n") {
+	for line := range strings.SplitSeq(help, "\n") {
 		if strings.Contains(line, "deja last [n]") {
 			lastLine = line
 		}
@@ -142,7 +142,7 @@ func TestHelpUsageBlockIsOneColumn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, line := range strings.Split(help, "\n") {
+	for line := range strings.SplitSeq(help, "\n") {
 		if strings.HasPrefix(line, "\t") && strings.Contains(line, "deja ") {
 			t.Errorf("usage line is indented with a tab, not two spaces: %q", line)
 		}

@@ -35,7 +35,7 @@ func TestIdenticalRepromoteDoesNotGrowTheNote(t *testing.T) {
 	}
 
 	// Five identical promotes collapse to one message.
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		appendOnce("accepted", "pool exhausted", "davit", []string{"perf"})
 	}
 	if got := noteMessages(); got != 1 {

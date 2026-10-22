@@ -147,10 +147,7 @@ func logoLinesArt(art, info []string) []string {
 		}
 		return append(out, "")
 	}
-	top := (len(art) - len(info)) / 2
-	if top < 0 {
-		top = 0
-	}
+	top := max((len(art)-len(info))/2, 0)
 	for i, a := range art {
 		line := "  " + a
 		if j := i - top; j >= 0 && j < len(info) && info[j] != "" {

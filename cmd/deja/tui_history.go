@@ -21,7 +21,7 @@ func loadTUIHistory(dir string) []string {
 		return nil
 	}
 	var out []string
-	for _, l := range strings.Split(string(b), "\n") {
+	for l := range strings.SplitSeq(string(b), "\n") {
 		if l = strings.TrimSpace(l); l != "" {
 			out = append(out, l)
 		}

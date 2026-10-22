@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -174,7 +175,7 @@ func TestInstallZedIsIdempotentAndReversible(t *testing.T) {
 	if second.Action != "unchanged" {
 		t.Errorf("a second install rewrote the file: %s", second.Action)
 	}
-	if string(afterFirst) != string(afterSecond) {
+	if !bytes.Equal(afterFirst, afterSecond) {
 		t.Errorf("installing twice is not the same as once:\n%s\n---\n%s", afterFirst, afterSecond)
 	}
 

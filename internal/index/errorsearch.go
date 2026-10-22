@@ -105,7 +105,7 @@ func errorSigSearch(dir string, m Manifest, o query.Options) (SearchResult, erro
 // went wrong. A paste usually carries one; a long trace can carry several.
 func querySigs(q string) map[uint64]bool {
 	out := map[uint64]bool{}
-	for _, raw := range strings.Split(q, "\n") {
+	for raw := range strings.SplitSeq(q, "\n") {
 		if line, ok := FrictionLine(raw); ok {
 			out[frictionHash(line)] = true
 		}
@@ -120,7 +120,7 @@ func aroundErrorLines(ms []model.Message, sigs map[uint64]bool) []model.Message 
 	keep := map[int]bool{}
 	for i, m := range ms {
 		hit := false
-		for _, raw := range strings.Split(m.Text, "\n") {
+		for raw := range strings.SplitSeq(m.Text, "\n") {
 			if line, ok := FrictionLine(raw); ok && sigs[frictionHash(line)] {
 				hit = true
 				break

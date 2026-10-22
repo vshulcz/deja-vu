@@ -1,6 +1,7 @@
 package embed
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
@@ -51,7 +52,7 @@ func TestWriteLeavesTheOldSidecarWhenItCannotFinish(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(after) != string(before) {
+	if !bytes.Equal(after, before) {
 		t.Error("the sidecar changed on a write that failed")
 	}
 }

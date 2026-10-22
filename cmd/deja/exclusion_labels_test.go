@@ -48,7 +48,7 @@ func TestSourcesNamesTheHarnessExclusionSetting(t *testing.T) {
 			printSourcesTo(&out, filepath.Join(tmp, "index.db"))
 			for _, name := range []string{"codex", "aider", "opencode"} {
 				var row string
-				for _, line := range strings.Split(out.String(), "\n") {
+				for line := range strings.SplitSeq(out.String(), "\n") {
 					if strings.HasPrefix(line, name+"\t") {
 						row = line
 						break

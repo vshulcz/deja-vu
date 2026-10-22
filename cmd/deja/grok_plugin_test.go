@@ -164,7 +164,7 @@ func TestDoctorReportsAStaleGrokPlugin(t *testing.T) {
 	var buf bytes.Buffer
 	doctorAutoRecall(&buf)
 	var row string
-	for _, l := range strings.Split(buf.String(), "\n") {
+	for l := range strings.SplitSeq(buf.String(), "\n") {
 		if strings.Contains(l, "grok") {
 			row = l
 			break
@@ -190,7 +190,7 @@ func TestDoctorSaysWhatACurrentGrokPluginIsDoing(t *testing.T) {
 	var buf bytes.Buffer
 	doctorAutoRecall(&buf)
 	var row string
-	for _, l := range strings.Split(buf.String(), "\n") {
+	for l := range strings.SplitSeq(buf.String(), "\n") {
 		if strings.Contains(l, "grok") {
 			row = l
 			break

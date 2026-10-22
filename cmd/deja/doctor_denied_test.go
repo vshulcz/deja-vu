@@ -123,7 +123,7 @@ func TestDoctorRowSeparatesAPartlyReadableStore(t *testing.T) {
 	var out strings.Builder
 	doctorHarnesses(&out, dir)
 	row := ""
-	for _, line := range strings.Split(out.String(), "\n") {
+	for line := range strings.SplitSeq(out.String(), "\n") {
 		if strings.HasPrefix(strings.TrimSpace(line), "claude ") {
 			row = line
 		}

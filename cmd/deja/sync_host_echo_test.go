@@ -43,7 +43,7 @@ func TestTheDoctorDoesNotHandTheTerminalAPeerName(t *testing.T) {
 	if !strings.Contains(out, "ALERT") {
 		t.Errorf("the host deja is talking to is gone from the line:\n%s", out)
 	}
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		if len(line) > 400 {
 			t.Errorf("one peer line is %d bytes:\n%s", len(line), line[:120])
 		}

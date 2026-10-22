@@ -100,10 +100,7 @@ func (s *spiller) bucketCount() int {
 // workers in batches: one channel send per message caused enough scheduler
 // wakeups to show up as ~20% of a cold rebuild profile.
 func (s *spiller) run(feed func(push func(tokenJob)) error) error {
-	workers := runtime.NumCPU()
-	if workers < 1 {
-		workers = 1
-	}
+	workers := max(runtime.NumCPU(), 1)
 	// A batch is also the window a worker groups postings by token in: on a
 	// 12k-session store 2048 messages spill 0.59 GB where 512 spill 0.77 GB
 	// (#5526).
@@ -117,10 +114,8 @@ func (s *spiller) run(feed func(push func(tokenJob)) error) error {
 		}
 	}
 	var wg sync.WaitGroup
-	for i := 0; i < workers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range workers {
+		wg.Go(func() {
 			g := newSpillGroups()
 			seen := map[string]bool{}
 			flush := func() {
@@ -153,7 +148,7 @@ func (s *spiller) run(feed func(push func(tokenJob)) error) error {
 				reportAdvance(len(batch))
 			}
 			s.noteBuckets(seen)
-		}()
+		})
 	}
 	batch := make([]tokenJob, 0, batchSize)
 	push := func(j tokenJob) {
@@ -184,7 +179,7 @@ func (s *spiller) run(feed func(push func(tokenJob)) error) error {
 // reads a spill file back.
 func (s *spiller) flushWriters() error {
 	var first error
-	for i := 0; i < spillShards; i++ {
+	for i := range spillShards {
 		s.mu[i].Lock()
 		if s.w[i] != nil {
 			if err := s.w[i].Flush(); err != nil && first == nil {
@@ -209,20 +204,12 @@ func (s *spiller) writeBuckets(dir string) error {
 	if err := s.flushWriters(); err != nil {
 		return err
 	}
-	workers := runtime.NumCPU()
-	if workers > spillWriters {
-		workers = spillWriters
-	}
-	if workers < 1 {
-		workers = 1
-	}
+	workers := max(min(runtime.NumCPU(), spillWriters), 1)
 	jobs := make(chan int)
 	errCh := make(chan error, 1)
 	var wg sync.WaitGroup
-	for i := 0; i < workers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range workers {
+		wg.Go(func() {
 			for sh := range jobs {
 				if err := s.writeShard(dir, sh); err != nil {
 					select {
@@ -231,9 +218,9 @@ func (s *spiller) writeBuckets(dir string) error {
 					}
 				}
 			}
-		}()
+		})
 	}
-	for sh := 0; sh < spillShards; sh++ {
+	for sh := range spillShards {
 		jobs <- sh
 	}
 	close(jobs)

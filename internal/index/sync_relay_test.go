@@ -60,7 +60,7 @@ func TestASyncedMachineCanBePulledFrom(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, line := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+		for line := range strings.SplitSeq(strings.TrimSpace(string(b)), "\n") {
 			if strings.TrimSpace(line) == "" {
 				continue
 			}

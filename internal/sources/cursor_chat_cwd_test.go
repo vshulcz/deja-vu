@@ -26,8 +26,8 @@ func TestCursorChatMissesDoNotRescanChats(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for b := 0; b < 20; b++ {
-		for c := 0; c < 5; c++ {
+	for b := range 20 {
+		for c := range 5 {
 			writeChat(fmt.Sprintf("/work/p%d", b), fmt.Sprintf("chat-%d-%d", b, c))
 		}
 	}
@@ -47,7 +47,7 @@ func TestCursorChatMissesDoNotRescanChats(t *testing.T) {
 	if cwd, ok := CursorChatCWD(transcript("chat-3-1")); cwd != "/work/p3" || !ok {
 		t.Fatalf("present chat = %q, %v", cwd, ok)
 	}
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		if cwd, _ := CursorChatCWD(transcript(fmt.Sprintf("gone-%d", i))); cwd != "" {
 			t.Fatalf("gone chat %d = %q", i, cwd)
 		}
@@ -84,7 +84,7 @@ func TestCursorChatMissesTrustAChatsDirFromTheFuture(t *testing.T) {
 	ahead := time.Now().Add(time.Hour)
 	_ = os.Chtimes(chats, ahead, ahead)
 	before := cursorChatIndex.scans
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		CursorChatCWD(filepath.Join(cli, "projects", "work-p", "agent-transcripts", fmt.Sprintf("gone-%d", i), fmt.Sprintf("gone-%d.jsonl", i)))
 	}
 	if n := cursorChatIndex.scans - before; n != 1 {

@@ -16,7 +16,7 @@ import (
 func TestUnseenSessionsOutrankRecency(t *testing.T) {
 	now := time.Now()
 	var ss []model.Session
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		ss = append(ss, model.Session{
 			ID:      string(rune('a' + i)),
 			Project: "org/app",
@@ -62,7 +62,7 @@ func TestUnseenSessionsOutrankRecency(t *testing.T) {
 func TestNoUnseenSetLeavesTheOrderAlone(t *testing.T) {
 	now := time.Now()
 	var ss []model.Session
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		ss = append(ss, model.Session{
 			ID:      string(rune('a' + i)),
 			Project: "org/app",

@@ -61,7 +61,7 @@ insert into part values('p2','m2','{"type":"text","text":"hello from secret"}');
 
 	out := captureStdout(t, func() { printSources(filepath.Join(tmp, "index.db")) })
 	row := func(name string) string {
-		for _, l := range strings.Split(out, "\n") {
+		for l := range strings.SplitSeq(out, "\n") {
 			if strings.HasPrefix(l, name+"\t") {
 				return l
 			}
@@ -115,7 +115,7 @@ insert into part values('p1','m1','{"type":"text","text":"hello from keep"}');`
 
 	row := func() string {
 		out := captureStdout(t, func() { printSources(filepath.Join(tmp, "index.db")) })
-		for _, l := range strings.Split(out, "\n") {
+		for l := range strings.SplitSeq(out, "\n") {
 			if strings.HasPrefix(l, "opencode\t") {
 				return l
 			}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -33,7 +34,7 @@ func TestRootManifestMirrorsTheDshPlugin(t *testing.T) {
 	for _, key := range []string{"name", "version", "license", "engines", "dependencies"} {
 		a, _ := json.Marshal(top[key])
 		b, _ := json.Marshal(sub[key])
-		if string(a) != string(b) {
+		if !bytes.Equal(a, b) {
 			t.Errorf("root package.json %s = %s, extensions/dsh has %s", key, a, b)
 		}
 	}

@@ -73,7 +73,7 @@ for (const c of contexts) {
 	got := string(out)
 	for _, name := range []string{"deja:project", "deja:recall"} {
 		line := ""
-		for _, l := range strings.Split(got, "\n") {
+		for l := range strings.SplitSeq(got, "\n") {
 			if strings.HasPrefix(l, name+" ") {
 				line = l
 			}

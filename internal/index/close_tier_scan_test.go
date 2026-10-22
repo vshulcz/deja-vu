@@ -22,7 +22,7 @@ func TestCloseTierWithNoCandidateLeftReadsNoRecordLog(t *testing.T) {
 		Harness: "claude", ID: "here", Project: "mine",
 		Messages: []model.Message{{Role: "user", Text: "the bridge between services in our app keeps retrying"}},
 	}}
-	for i := 0; i < 40; i++ {
+	for i := range 40 {
 		ss = append(ss, model.Session{
 			Harness: "claude", ID: fmt.Sprintf("filler-%d", i), Project: "mine",
 			Messages: []model.Message{

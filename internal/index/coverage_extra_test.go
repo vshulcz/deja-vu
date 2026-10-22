@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -82,7 +84,7 @@ func TestPhraseAndFuzzyIndexedSearch(t *testing.T) {
 
 func BenchmarkFuzzyTokenEnumeration(b *testing.B) {
 	catalog := make(map[string]bool, 50000)
-	for i := 0; i < 50000; i++ {
+	for i := range 50000 {
 		catalog[fmt.Sprintf("synthetic-token-%05d", i)] = true
 	}
 	b.ResetTimer()
@@ -93,7 +95,7 @@ func BenchmarkFuzzyTokenEnumeration(b *testing.B) {
 
 func BenchmarkStemTokenEnumeration(b *testing.B) {
 	catalog := make(map[string]bool, 50000)
-	for i := 0; i < 50000; i++ {
+	for i := range 50000 {
 		catalog[fmt.Sprintf("synthetic-token-%05d", i)] = true
 	}
 	b.ResetTimer()
@@ -147,7 +149,7 @@ func TestStemMatchCapsAndShortTerms(t *testing.T) {
 	if got := stemMatches("token", catalog); len(got) != 1 || got[0] != "token" {
 		t.Fatalf("short exact stem=%v", got)
 	}
-	for i := 0; i < 12; i++ {
+	for i := range 12 {
 		catalog[fmt.Sprintf("rotate-form-%02d", i)] = true
 	}
 	if got := stemMatches("rotate", catalog); len(got) > 8 {
@@ -162,12 +164,7 @@ func TestStemMatchCapsAndShortTerms(t *testing.T) {
 }
 
 func containsString(values []string, want string) bool {
-	for _, value := range values {
-		if value == want {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(values, want)
 }
 
 func TestFuzzyHelperCapsAndDistanceRules(t *testing.T) {
@@ -456,7 +453,7 @@ func TestDefaultDirQueriesFiltersAndCorruptBucketBranches(t *testing.T) {
 	manyManifest := Manifest{Sessions: map[string]SessionMeta{}}
 	for i := 1; i <= 20; i++ {
 		many = append(many, posting{Off: int64(i), Sid: uint32(i)})
-		manyManifest.Sessions[fmt.Sprintf("h:%d", i)] = SessionMeta{ID: fmt.Sprint(i), Harness: "h", Project: "p", Ord: uint32(i), Updated: time.Now().Add(time.Duration(i) * time.Second)}
+		manyManifest.Sessions[fmt.Sprintf("h:%d", i)] = SessionMeta{ID: strconv.Itoa(i), Harness: "h", Project: "p", Ord: uint32(i), Updated: time.Now().Add(time.Duration(i) * time.Second)}
 	}
 	if got := cutPostingsBySession(many, manyManifest, search.Options{}); len(got) != 20 {
 		t.Fatalf("candidate cut len=%d", len(got))

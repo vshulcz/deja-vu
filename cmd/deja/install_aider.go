@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -124,7 +125,7 @@ func aiderReadWas(path string) string {
 // aiderInlineRead is the top-level `read: <value>` line addAiderReadEntry
 // would rewrite as a block list, or "".
 func aiderInlineRead(s string) string {
-	for _, line := range strings.Split(s, "\n") {
+	for line := range strings.SplitSeq(s, "\n") {
 		if v, ok := strings.CutPrefix(line, "read: "); ok && strings.TrimSpace(v) != "" && !strings.HasPrefix(strings.TrimSpace(v), "#") {
 			return line
 		}
@@ -144,13 +145,13 @@ func addAiderReadEntry(s, ctx string) (string, error) {
 		s += "\n"
 	}
 	keys := 0
-	for _, line := range strings.Split(s, "\n") {
+	for line := range strings.SplitSeq(s, "\n") {
 		if strings.HasPrefix(line, "read:") {
 			keys++
 		}
 	}
 	if keys > 1 {
-		return "", fmt.Errorf("read: is written twice at the top level, and aider reads only the last one — keep one and run this again")
+		return "", errors.New("read: is written twice at the top level, and aider reads only the last one — keep one and run this again")
 	}
 	// The scalar form takes a single file; promote it to a list so both survive.
 	lines := strings.Split(s, "\n")
@@ -185,7 +186,7 @@ func addAiderReadEntry(s, ctx string) (string, error) {
 	}
 	// The reader's own indent, which may be none: one list cannot mix two.
 	line := ""
-	for _, l := range strings.Split(s[at:], "\n") {
+	for l := range strings.SplitSeq(s[at:], "\n") {
 		if strings.TrimSpace(l) != "" {
 			line = l
 			break
@@ -297,7 +298,7 @@ func yamlFlowItems(v string) ([]string, bool) {
 // flow list.
 func aiderConfReadsContext(s string) bool {
 	inRead := false
-	for _, l := range strings.Split(s, "\n") {
+	for l := range strings.SplitSeq(s, "\n") {
 		l = strings.TrimRight(l, " \t\r")
 		t := strings.TrimSpace(l)
 		if t == "" || strings.HasPrefix(t, "#") {

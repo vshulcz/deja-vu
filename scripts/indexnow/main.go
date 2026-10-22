@@ -91,7 +91,7 @@ func readList(path string) ([]string, error) {
 	}
 	seen := map[string]bool{}
 	var urls []string
-	for _, line := range strings.Split(string(b), "\n") {
+	for line := range strings.SplitSeq(string(b), "\n") {
 		u := strings.TrimSpace(line)
 		if u == "" || strings.HasPrefix(u, "#") || seen[u] {
 			continue

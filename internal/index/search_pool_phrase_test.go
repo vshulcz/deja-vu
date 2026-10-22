@@ -113,7 +113,7 @@ func TestAPlainWordInCommandsChecksOnlyTheCommandOnlySessions(t *testing.T) {
 	now := time.Now()
 	ss := make([]model.Session, 0, n)
 	spoken := 0
-	for i := 0; i < n; i++ {
+	for i := range n {
 		at := now.Add(-time.Duration(i) * time.Minute)
 		msg := model.Message{Role: "user", Text: fmt.Sprintf("the zzquokka rollout of run %d", i), Time: at}
 		if i%10 == 1 {
@@ -150,7 +150,7 @@ func TestAPlainWordInCommandsPastTheBudgetIsAnEstimate(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "index.db")
 	now := time.Now()
 	ss := make([]model.Session, 0, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		at := now.Add(-time.Duration(i) * time.Minute)
 		msg := model.Message{Role: "user", Text: fmt.Sprintf("the zzquokka rollout of run %d", i), Time: at}
 		if i%2 == 1 {

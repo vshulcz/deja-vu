@@ -85,7 +85,7 @@ func TestDamageReasonNamesWhatBroke(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := f.Write([]byte("a record from a build that crashed")); err != nil {
+			if _, err := f.WriteString("a record from a build that crashed"); err != nil {
 				t.Fatal(err)
 			}
 			if err := f.Close(); err != nil {

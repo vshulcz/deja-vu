@@ -26,10 +26,7 @@ func newLayout(w, h int) layout {
 	l.bodyH = h - 1 - l.bodyTop
 	l.listX = 1
 	if w >= 96 {
-		l.listW = w * 55 / 100
-		if l.listW > 74 {
-			l.listW = 74
-		}
+		l.listW = min(w*55/100, 74)
 		l.prevX = l.listX + l.listW + 2
 		l.prevW = w - l.prevX - 1
 	} else {
@@ -260,10 +257,7 @@ func (a *tuiApp) drawToast() {
 		mark, mc = "!", cPeach
 	}
 	text := a.toast
-	w := termwidth.Columns(text) + 6
-	if w > p.W-4 {
-		w = p.W - 4
-	}
+	w := min(termwidth.Columns(text)+6, p.W-4)
 	x, y := p.W-w-2, p.H-3
 	p.Fill(x, y, w, 1, cSurf2)
 	p.Put(x+1, y, mark, boldOn(mc, cSurf2), x+w)
@@ -328,14 +322,8 @@ func (a *tuiApp) drawEmpty(l layout) {
 		line = "Did you mean “" + b.suggest + "”? It finds " + tuiCount(b.found, "session") + "."
 	}
 	cw, ch := 24, 11
-	x := (l.w - cw - 6 - 50) / 2
-	if x < 2 {
-		x = 2
-	}
-	y := l.bodyTop + (l.bodyH-ch)/2 - 1
-	if y < l.bodyTop {
-		y = l.bodyTop
-	}
+	x := max((l.w-cw-6-50)/2, 2)
+	y := max(l.bodyTop+(l.bodyH-ch)/2-1, l.bodyTop)
 	tx := x + cw + 6
 	if l.w >= 80 {
 		a.drawCat(x, y, mood)

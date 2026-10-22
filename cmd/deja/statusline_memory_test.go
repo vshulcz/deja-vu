@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -24,12 +25,12 @@ func seedTouchedIndex(t *testing.T, sessions int, sharedFile string) string {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
-	for i := 0; i < sessions; i++ {
+	for i := range sessions {
 		sid := fmt.Sprintf("t%02d", i)
 		body := `{"type":"user","sessionId":"` + sid + `","cwd":"/w/t","timestamp":"2026-07-1` +
-			fmt.Sprint(i%10) + `T10:00:00Z","message":{"role":"user","content":"pool sizing, round ` + fmt.Sprint(i) + `"}}` + "\n" +
+			strconv.Itoa(i%10) + `T10:00:00Z","message":{"role":"user","content":"pool sizing, round ` + strconv.Itoa(i) + `"}}` + "\n" +
 			`{"type":"assistant","sessionId":"` + sid + `","cwd":"/w/t","timestamp":"2026-07-1` +
-			fmt.Sprint(i%10) + `T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Read","input":{"file_path":"` + sharedFile + `"}}]}}` + "\n"
+			strconv.Itoa(i%10) + `T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Read","input":{"file_path":"` + sharedFile + `"}}]}}` + "\n"
 		if err := os.WriteFile(filepath.Join(root, sid+".jsonl"), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}
@@ -433,11 +434,13 @@ func TestStatuslineMemoryLooksPastTheBusiestFile(t *testing.T) {
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	read := func(sid, path string, n int) string {
 		out := ""
-		for i := 0; i < n; i++ {
-			out += `{"type":"assistant","sessionId":"` + sid + `","cwd":"/w/d","timestamp":"2026-07-1` +
-				fmt.Sprint(i%9) + `T10:0` + fmt.Sprint(i%9) + `:00Z","message":{"role":"assistant","content":` +
-				`[{"type":"tool_use","name":"Read","input":{"file_path":"` + path + `"}}]}}` + "\n"
+		var outSb436 strings.Builder
+		for i := range n {
+			outSb436.WriteString(`{"type":"assistant","sessionId":"` + sid + `","cwd":"/w/d","timestamp":"2026-07-1` +
+				strconv.Itoa(i%9) + `T10:0` + strconv.Itoa(i%9) + `:00Z","message":{"role":"assistant","content":` +
+				`[{"type":"tool_use","name":"Read","input":{"file_path":"` + path + `"}}]}}` + "\n")
 		}
+		out += outSb436.String()
 		return out
 	}
 	// The current session hammers a brand new file and also opens an old one.
@@ -477,9 +480,9 @@ func TestStatuslineMemoryNamesTheSameSessionEveryTime(t *testing.T) {
 	}
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	// Every session ends on the same stamp, so Updated decides nothing.
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		sid := fmt.Sprintf("tie%d", i)
-		body := `{"type":"user","sessionId":"` + sid + `","cwd":"/w/t","timestamp":"2026-07-11T10:00:00Z","message":{"role":"user","content":"subject number ` + fmt.Sprint(i) + `"}}` + "\n" +
+		body := `{"type":"user","sessionId":"` + sid + `","cwd":"/w/t","timestamp":"2026-07-11T10:00:00Z","message":{"role":"user","content":"subject number ` + strconv.Itoa(i) + `"}}` + "\n" +
 			`{"type":"assistant","sessionId":"` + sid + `","cwd":"/w/t","timestamp":"2026-07-11T10:00:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Read","input":{"file_path":"/w/t/shared.go"}}]}}` + "\n"
 		if err := os.WriteFile(filepath.Join(root, sid+".jsonl"), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
@@ -495,7 +498,7 @@ func TestStatuslineMemoryNamesTheSameSessionEveryTime(t *testing.T) {
 		t.Fatal("no memory reported for a file five other sessions touched")
 	}
 	// Each call re-reads the manifest, so each one sees a fresh map order.
-	for i := 0; i < 40; i++ {
+	for i := range 40 {
 		got, ok := statuslineMemory(dir, in)
 		if !ok {
 			t.Fatalf("run %d reported nothing", i)

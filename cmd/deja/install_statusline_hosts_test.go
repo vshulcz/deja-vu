@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -102,7 +103,7 @@ func TestAutoTargetsWireTheHostsStatusLine(t *testing.T) {
 		if _, err := installTarget(c.target, "/opt/deja/bin/deja", false); err != nil {
 			t.Fatal(err)
 		}
-		if after, _ := os.ReadFile(c.path); string(after) != string(before) {
+		if after, _ := os.ReadFile(c.path); !bytes.Equal(after, before) {
 			t.Errorf("%s: a second install changed %s:\n%s\n---\n%s", c.target, c.path, before, after)
 		}
 		if _, err := installTarget(c.target, "/opt/deja/bin/deja", true); err != nil {

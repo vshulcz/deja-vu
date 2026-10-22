@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -15,21 +16,25 @@ func seedCursorStore(t *testing.T, db, composer string, bubbles [][2]any) {
 	t.Helper()
 	var last int64
 	headers := ""
+	var headersSb18 strings.Builder
 	for i, b := range bubbles {
 		if ts := b[1].(int64); ts > last {
 			last = ts
 		}
 		if i > 0 {
-			headers += ","
+			headersSb18.WriteString(",")
 		}
-		headers += fmt.Sprintf(`{"bubbleId":"b%d","type":1}`, i)
+		headersSb18.WriteString(fmt.Sprintf(`{"bubbleId":"b%d","type":1}`, i))
 	}
+	headers += headersSb18.String()
 	stmts := "create table if not exists cursorDiskKV (key text primary key, value text);\n"
 	stmts += fmt.Sprintf("insert or replace into cursorDiskKV values ('composerData:%[1]s', json('{\"composerId\":\"%[1]s\",\"name\":\"work\",\"createdAt\":%[2]d,\"lastUpdatedAt\":%[2]d,\"fullConversationHeadersOnly\":[%[3]s]}'));\n", composer, last, headers)
+	var stmtsSb29 strings.Builder
 	for i, b := range bubbles {
-		stmts += fmt.Sprintf("insert or replace into cursorDiskKV values ('bubbleId:%s:b%d', json('{\"type\":1,\"text\":\"%s\",\"timestamp\":%d,\"workspaceProjectDir\":\"/tmp/app\"}'));\n",
-			composer, i, b[0].(string), b[1].(int64))
+		stmtsSb29.WriteString(fmt.Sprintf("insert or replace into cursorDiskKV values ('bubbleId:%s:b%d', json('{\"type\":1,\"text\":\"%s\",\"timestamp\":%d,\"workspaceProjectDir\":\"/tmp/app\"}'));\n",
+			composer, i, b[0].(string), b[1].(int64)))
 	}
+	stmts += stmtsSb29.String()
 	if out, err := exec.Command("sqlite3", db, stmts).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}

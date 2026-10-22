@@ -3,6 +3,7 @@ package index
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -33,9 +34,11 @@ func TestGooseDescriptionArrivesAfterTheFirstPass(t *testing.T) {
 	}
 	write := func(lines ...string) {
 		body := ""
+		var bodySb36 strings.Builder
 		for _, l := range lines {
-			body += l + "\n"
+			bodySb36.WriteString(l + "\n")
 		}
+		body += bodySb36.String()
 		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 			t.Fatal(err)
 		}

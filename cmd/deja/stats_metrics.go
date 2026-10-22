@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/stats"
@@ -29,7 +30,7 @@ func statsHeadline(r stats.Report) string {
 }
 
 func formatStatNumber(n int) string {
-	s := fmt.Sprintf("%d", n)
+	s := strconv.Itoa(n)
 	for i := len(s) - 3; i > 0; i -= 3 {
 		s = s[:i] + "," + s[i:]
 	}

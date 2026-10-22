@@ -2,6 +2,7 @@ package search
 
 import (
 	"math/rand"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -15,8 +16,8 @@ func referenceHoldsLastTurn(holder, other model.Session) bool {
 	key := func(m model.Message) string {
 		return m.Role + "\x00" + strconv.FormatInt(m.Time.UnixNano(), 10) + "\x00" + m.Text
 	}
-	for i := len(other.Messages) - 1; i >= 0; i-- {
-		m := other.Messages[i]
+	for _, m := range slices.Backward(other.Messages) {
+
 		text := strings.TrimSpace(m.Text)
 		if m.Time.IsZero() || text == "" || m.Role == roleSummary || (m.Role == "assistant" && text == "No response requested.") {
 			continue

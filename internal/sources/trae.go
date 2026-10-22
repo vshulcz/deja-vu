@@ -3,7 +3,9 @@ package sources
 import (
 	"bytes"
 	"encoding/json"
+	"maps"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -306,11 +308,8 @@ func traeItemText(item map[string]any, types ...string) string {
 		if !ok {
 			continue
 		}
-		for _, want := range types {
-			if typ == want {
-				b.WriteString(txt)
-				break
-			}
+		if slices.Contains(types, typ) {
+			b.WriteString(txt)
 		}
 	}
 	return b.String()
@@ -357,9 +356,7 @@ func traeShellCall(item map[string]any) map[string]any {
 	}
 	b, _ := json.Marshal(map[string]string{"cmd": cmd})
 	out := make(map[string]any, len(item))
-	for k, v := range item {
-		out[k] = v
-	}
+	maps.Copy(out, item)
 	out["name"] = "exec_command"
 	out["arguments"] = string(b)
 	return out
@@ -383,9 +380,7 @@ func traeOutput(item map[string]any) map[string]any {
 		}
 	}
 	out := make(map[string]any, len(item))
-	for k, v := range item {
-		out[k] = v
-	}
+	maps.Copy(out, item)
 	out["output"] = b.String()
 	return out
 }
@@ -423,10 +418,8 @@ func traeResumes(path string, offset int64) bool {
 	for _, hks := range all[:headLen] {
 		for _, h := range hks {
 			for _, tks := range tail {
-				for _, k := range tks {
-					if h.repeats(k) {
-						return false
-					}
+				if slices.ContainsFunc(tks, h.repeats) {
+					return false
 				}
 			}
 		}

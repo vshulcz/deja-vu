@@ -97,7 +97,7 @@ func shiftFirstOffset(b []byte) []byte {
 	out := append([]byte(nil), b...)
 	n := int(binary.LittleEndian.Uint32(out[24+sha256.Size:]))
 	data := recordOffsetsHeaderSize + 16*n
-	for i := 0; i < n; i++ {
+	for i := range n {
 		p := data + int(binary.LittleEndian.Uint64(out[recordOffsetsHeaderSize+16*i+8:]))
 		kl, w := binary.Uvarint(out[p:])
 		p += w + int(kl)

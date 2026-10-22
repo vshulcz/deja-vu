@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -28,7 +29,7 @@ func runCheckTo(dir string, args []string, stdin io.Reader, stdout, stderr io.Wr
 		return fmt.Errorf("check takes only '-', got an extra %q", args[1])
 	}
 	if len(args) != 1 || args[0] != "-" {
-		return fmt.Errorf("check needs '-' to read a plan from stdin")
+		return errors.New("check needs '-' to read a plan from stdin")
 	}
 	plan, err := io.ReadAll(stdin)
 	if err != nil {

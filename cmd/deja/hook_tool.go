@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -501,7 +502,7 @@ func commandHintsOn() bool {
 // File: p", and a rename adds "*** Move to: p".
 func applyPatchFiles(patch string) []string {
 	var out []string
-	for _, line := range strings.Split(patch, "\n") {
+	for line := range strings.SplitSeq(patch, "\n") {
 		line = strings.TrimSpace(line)
 		for _, pfx := range []string{"*** Update File: ", "*** Add File: ", "*** Delete File: ", "*** Move to: "} {
 			if strings.HasPrefix(line, pfx) {
@@ -911,7 +912,7 @@ func commandDecisionLine(dir, cwd, cmd, self string, lookupOnly bool) string {
 // ranking.
 func normalizedCommandText(cmd string) string {
 	var out []string
-	for _, f := range strings.Fields(cmd) {
+	for f := range strings.FieldsSeq(cmd) {
 		if strings.HasPrefix(f, "-") {
 			continue
 		}
@@ -1261,10 +1262,8 @@ func trimTrailingFragment(s string) string {
 // project being worked in now. It is what stops a same-named file in an
 // unrelated repo from being counted.
 func fileMetaInScope(meta index.SessionMeta, path string, projects []string) bool {
-	for _, t := range meta.Touched {
-		if t == path {
-			return true
-		}
+	if slices.Contains(meta.Touched, path) {
+		return true
 	}
 	proj := strings.TrimPrefix(meta.Project, "imported:")
 	for _, cand := range projects {

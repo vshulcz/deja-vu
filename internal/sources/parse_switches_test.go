@@ -207,7 +207,7 @@ func TestSubagentTailIsCutAfterTheParseSwitches(t *testing.T) {
 	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "")
 	t.Setenv("DEJA_INDEX_TOOL_OUTPUT", "0")
 	var msgs []model.Message
-	for i := 0; i < 6; i++ {
+	for range 6 {
 		msgs = append(msgs, model.Message{Role: "assistant", Text: "turn"}, model.Message{Role: RoleToolOutput, Text: "out"})
 	}
 	ss := applyReadSwitches([]model.Session{{ID: "kid", Kind: "subagent", Messages: append([]model.Message{{Role: "user", Text: "the task"}}, msgs...)}})

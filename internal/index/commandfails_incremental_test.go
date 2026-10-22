@@ -109,7 +109,7 @@ func countOutputsRead(t *testing.T) *int {
 func TestACommandFailureUpdateReadsOnlyWhatChanged(t *testing.T) {
 	c, tmp := newCFStore(t)
 	const n = 40
-	for i := 0; i < n; i++ {
+	for i := range n {
 		c.write("app", i, fmt.Sprintf("fix the store test %d", i))
 	}
 	dir := filepath.Join(tmp, "index.db")
@@ -183,7 +183,7 @@ func TestACommandFailureUpdateReadsOnlyWhatChanged(t *testing.T) {
 func TestACommandFailureUpdateEndsWhereAFullBuildDoes(t *testing.T) {
 	c, tmp := newCFStore(t)
 	projects := []string{"app", "web"}
-	for i := 0; i < 24; i++ {
+	for i := range 24 {
 		c.write(projects[i%2], i, fmt.Sprintf("fix the store test %d", i))
 	}
 	// Four sessions in a project of their own, the only ones whose builds

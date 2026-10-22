@@ -65,7 +65,7 @@ func clineForkStoreWith(t *testing.T, sibling bool) (dir, source, fork string) {
 			t.Fatal(err)
 		}
 	}
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		write(fmt.Sprintf("17900000%05d_old%02d", i, i), "", fmt.Sprintf("rename table%d in the billing schema", i), "done", t0.Add(-time.Duration(i+2)*time.Hour))
 	}
 	write("1790000099999_prior", "", "the retry loop in fetch.go spins on HTTP 500 again", "Capped the retry loop in fetch.go at MaxAttempts five.", t0.Add(-time.Hour))

@@ -29,9 +29,11 @@ func TestTUISessionActions(t *testing.T) {
 		t.Errorf("p copied %q, toast %q", copied, a.toast)
 	}
 	labels := ""
+	var labelsSb32 strings.Builder
 	for _, it := range a.paletteItems() {
-		labels += it.key + " " + it.label + "\n"
+		labelsSb32.WriteString(it.key + " " + it.label + "\n")
 	}
+	labels += labelsSb32.String()
 	for _, want := range []string{"i Copy the session id", "p Copy the project path", "F Forget this session…"} {
 		if !strings.Contains(labels, want) {
 			t.Errorf("palette lacks %q:\n%s", want, labels)

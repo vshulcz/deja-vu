@@ -37,7 +37,7 @@ func seedFallthroughStore(t *testing.T) {
 	}
 	// Sessions that ran into the same absent program, which is what
 	// missingProgramLine asks for before it will say anything.
-	for k := 0; k < 3; k++ {
+	for k := range 3 {
 		sid := fmt.Sprintf("m%d", k)
 		write(sid, []string{
 			`{"type":"user","sessionId":"` + sid + `","timestamp":"` + at(800-10*k) + `","cwd":"/work/app","message":{"role":"user","content":"wrap the orders migration in a time limit"}}`,
@@ -50,7 +50,7 @@ func seedFallthroughStore(t *testing.T) {
 		ran("dec", at(400)),
 		`{"type":"assistant","sessionId":"dec","timestamp":"` + at(399) + `","cwd":"/work/app","message":{"role":"assistant","content":"no: run the orders migration against the replica first"}}`,
 	})
-	for k := 0; k < 5; k++ {
+	for k := range 5 {
 		sid := fmt.Sprintf("f%d", k)
 		write(sid, []string{
 			`{"type":"user","sessionId":"` + sid + `","timestamp":"` + at(200-20*k) + `","cwd":"/work/app","message":{"role":"user","content":"run the orders migration again"}}`,

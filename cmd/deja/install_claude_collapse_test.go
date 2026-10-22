@@ -23,7 +23,7 @@ func TestInstallCollapsesClaudeHooksOntoOne(t *testing.T) {
 		t.Fatal(err)
 	}
 	var entries []string
-	for i := 0; i < 8; i++ {
+	for range 8 {
 		entries = append(entries, `{"hooks":[{"type":"command","command":"/usr/local/bin/deja hook-prompt"}]}`)
 	}
 	doubled := `{"hooks":{"UserPromptSubmit":[` + strings.Join(entries, ",") + `]}}`

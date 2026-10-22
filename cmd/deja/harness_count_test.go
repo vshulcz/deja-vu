@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -48,10 +47,7 @@ func TestTheIntroductionsCountEveryHarness(t *testing.T) {
 			said := text[loc[2]:loc[3]]
 			// Only the sentence the phrase sits in: a file that says "opencode"
 			// in its own header is not naming it as one of the agents here.
-			from := loc[0] - 100
-			if from < 0 {
-				from = 0
-			}
+			from := max(loc[0]-100, 0)
 			// One agent named twice in the same sentence — a listing whose
 			// own harness appears in its title and again in the list — is
 			// still one agent, and counting it twice made the sentence look
@@ -83,7 +79,7 @@ func TestTheFirstRunScreenCountsTheRegistry(t *testing.T) {
 	if harnessCount() != n {
 		t.Errorf("the binary counts %d harnesses; docs/registry has %d", harnessCount(), n)
 	}
-	if got, want := spelledCount(harnessCount()-6), fmt.Sprint(spelledCount(n-6)); got != want {
+	if got, want := spelledCount(harnessCount()-6), spelledCount(n-6); got != want {
 		t.Errorf("the first-run screen would say %q, want %q", got, want)
 	}
 	if strings.Contains(spelledCount(harnessCount()-6), " ") {

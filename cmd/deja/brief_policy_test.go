@@ -20,7 +20,7 @@ func importedStore(t *testing.T, n int) string {
 		t.Fatal(err)
 	}
 	var batch []byte
-	for i := 0; i < n; i++ {
+	for i := range n {
 		b, err := json.Marshal(index.SyncRecord{
 			Harness: "claude", SessionID: "peer" + string(rune('1'+i)), Project: "tmp/projx",
 			Role: "user", Text: "the kafka consumer rebalance keeps flapping, take " + string(rune('1'+i)),
@@ -138,7 +138,7 @@ func TestBriefStaysQuietWhenThePolicyWithholdsNothing(t *testing.T) {
 
 // askedLine returns the "asked" row of the brief, or "" if there is none.
 func askedLine(out string) string {
-	for _, ln := range strings.Split(out, "\n") {
+	for ln := range strings.SplitSeq(out, "\n") {
 		if strings.HasPrefix(ln, "asked ") {
 			return ln
 		}
@@ -219,7 +219,7 @@ func TestBriefAskedTwiceCountsImportedAndHonoursPolicy(t *testing.T) {
 
 // hitLine returns the "hit" (friction) row of the brief, or "" if there is none.
 func hitLine(out string) string {
-	for _, ln := range strings.Split(out, "\n") {
+	for ln := range strings.SplitSeq(out, "\n") {
 		if strings.HasPrefix(ln, "hit ") {
 			return ln
 		}

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -279,7 +280,7 @@ func planCopilotHooks(path, exe string, uninstall bool) (copilotHooksPlan, error
 		}
 	}
 	after, _ := json.Marshal(root)
-	if string(after) == string(before) {
+	if bytes.Equal(after, before) {
 		return unchanged, nil
 	}
 	if jsonc {
@@ -437,7 +438,7 @@ func dropCopilotHooksJSONC(text string, was, root map[string]any) (string, error
 			open := zedTopLevelOpen(text)
 			block, _ := walkJSONCKeys(text, open, []string{"hooks"})
 			if block == nil {
-				return "", fmt.Errorf("no hooks block to edit")
+				return "", errors.New("no hooks block to edit")
 			}
 			at := jsoncListValue(text, block, event)
 			if at == nil {

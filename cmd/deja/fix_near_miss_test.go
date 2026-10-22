@@ -22,7 +22,7 @@ func TestFixNamesTheErrorItDoesHold(t *testing.T) {
 	if err := os.MkdirAll(store, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		base := time.Now().Add(-time.Duration(6+i) * time.Hour).UTC()
 		rows := []string{
 			fmt.Sprintf(`{"type":"assistant","sessionId":"acme%d","timestamp":%q,"message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"make acme-migrate"}}]}}`,

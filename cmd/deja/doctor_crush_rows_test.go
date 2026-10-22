@@ -59,7 +59,7 @@ insert into messages values ('m1','s1','user','[{"type":"text","data":{"text":"f
 		var buf bytes.Buffer
 		doctorHarnesses(&buf, dir)
 		var out []string
-		for _, line := range strings.Split(buf.String(), "\n") {
+		for line := range strings.SplitSeq(buf.String(), "\n") {
 			if strings.HasPrefix(strings.TrimSpace(line), "crush ") {
 				out = append(out, line)
 			}

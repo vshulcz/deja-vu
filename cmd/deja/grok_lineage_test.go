@@ -33,9 +33,11 @@ func grokSession(t *testing.T, cwd, id, summaryExtra, text, chat string, extra .
 	ts := now.Add(-30 * time.Second).Unix()
 	lines := `{"timestamp":` + strconv.FormatInt(ts, 10) + `,"method":"session/update","params":{"sessionId":"` + id + `","update":{"sessionUpdate":"user_message_chunk","content":{"type":"text","text":"` + text + `"}}}}` + "\n" +
 		`{"timestamp":` + strconv.FormatInt(ts+1, 10) + `,"method":"session/update","params":{"sessionId":"` + id + `","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"noted: ` + text + `"}}}}` + "\n"
+	var linesSb36 strings.Builder
 	for _, l := range extra {
-		lines += l + "\n"
+		linesSb36.WriteString(l + "\n")
 	}
+	lines += linesSb36.String()
 	updates := filepath.Join(dir, "updates.jsonl")
 	if err := os.WriteFile(updates, []byte(lines), 0o644); err != nil {
 		t.Fatal(err)

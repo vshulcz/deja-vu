@@ -45,7 +45,7 @@ func TestSourcesListsEveryHarnessInTheRegistry(t *testing.T) {
 	// would not know they could exclude. The number is the row count, not the
 	// registry's: deja prints its own store too.
 	rows := 0
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(out), "\n") {
 		if strings.TrimSpace(line) != "" {
 			rows++
 		}

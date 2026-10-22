@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -39,7 +40,7 @@ func TestAThinPageDoesNotSayToOpenAnything(t *testing.T) {
 	hermeticEnv(t)
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
 	at := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		id := fmt.Sprintf("thin%02d", i)
 		writeClaudeFixture(t, filepath.Join(root, "-tmp-app", id+".jsonl"), id, []string{
 			`{"type":"user","sessionId":"` + id + `","timestamp":"` + at + `","cwd":"/tmp/app","message":{"role":"user","content":"the pgbouncer pool dropped connections once"}}`,
@@ -61,16 +62,16 @@ func marathonCorpus(t *testing.T) {
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
 	at := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
 	lines := make([]string, 0, 60)
-	for i := 0; i < 60; i++ {
+	for i := range 60 {
 		lines = append(lines, `{"type":"user","sessionId":"marathon","timestamp":"`+at+
 			`","cwd":"/tmp/app","message":{"role":"user","content":"the pgbouncer pool kept dropping connections, note `+
-			fmt.Sprint(i)+`"}}`)
+			strconv.Itoa(i)+`"}}`)
 	}
 	writeClaudeFixture(t, filepath.Join(root, "-tmp-app", "marathon.jsonl"), "marathon", lines)
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		id := fmt.Sprintf("f%02d", i)
 		writeClaudeFixture(t, filepath.Join(root, "-tmp-app", id+".jsonl"), id, []string{
-			`{"type":"user","sessionId":"` + id + `","timestamp":"` + at + `","cwd":"/tmp/app","message":{"role":"user","content":"standup chatter about the pool number ` + fmt.Sprint(i) + `"}}`,
+			`{"type":"user","sessionId":"` + id + `","timestamp":"` + at + `","cwd":"/tmp/app","message":{"role":"user","content":"standup chatter about the pool number ` + strconv.Itoa(i) + `"}}`,
 		})
 	}
 	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {

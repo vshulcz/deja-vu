@@ -227,7 +227,7 @@ func TestFirstBuildKeepsDeferredAcrossNewestFirstPublish(t *testing.T) {
 	tmp := hermeticIndexEnv(t)
 	_, _, zst := zstdStubRollouts(t, tmp, "zstd-big-thread")
 	dir := filepath.Join(os.Getenv("DEJA_CODEX_ROOT"), "sessions", "2026", "07", "30")
-	for i := 0; i < partialPublishFrom+10; i++ {
+	for i := range partialPublishFrom + 10 {
 		id := fmt.Sprintf("big-%04d", i)
 		write(t, filepath.Join(dir, "rollout-2026-07-30T00-00-00-"+id+".jsonl"),
 			strings.ReplaceAll(codexRolloutHead, "cx-1", id))

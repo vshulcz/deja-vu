@@ -105,7 +105,7 @@ func TestKimiAutoFindsItsHooksAfterKimiRewroteTheConfig(t *testing.T) {
 	// What Kimi 2.2 left after /logout from Kimi Code: the same tables, no
 	// comments, a blank line between them.
 	var kept []string
-	for _, line := range strings.Split(string(b), "\n") {
+	for line := range strings.SplitSeq(string(b), "\n") {
 		if !strings.HasPrefix(strings.TrimSpace(line), "#") {
 			kept = append(kept, line)
 		}

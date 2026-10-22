@@ -571,17 +571,12 @@ func parseFiles(files []string, parse func(string) ([]model.Session, error)) []m
 		ss []model.Session
 	})
 	var wg sync.WaitGroup
-	n := runtime.NumCPU()
-	if len(files) < n {
-		n = len(files)
-	}
+	n := min(len(files), runtime.NumCPU())
 	if n == 0 {
 		return nil
 	}
-	for i := 0; i < n; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range n {
+		wg.Go(func() {
 			for j := range jobs {
 				ss, err := ReadWatched(j.p, func() ([]model.Session, error) { return safeParse(j.p, parse) })
 				diagFileError(j.p, err)
@@ -591,7 +586,7 @@ func parseFiles(files []string, parse func(string) ([]model.Session, error)) []m
 					ss []model.Session
 				}{i: j.i, ss: ss}
 			}
-		}()
+		})
 	}
 	go func() {
 		for i, f := range files {

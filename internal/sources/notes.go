@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -183,10 +182,10 @@ func readNoteLine(br *bufio.Reader, max int) (line []byte, tooLong bool, err err
 func AppendNoteTagged(project, text string, tags []string, now time.Time) error {
 	project = strings.TrimSpace(project)
 	if project == "" {
-		return fmt.Errorf("project required")
+		return errors.New("project required")
 	}
 	if strings.TrimSpace(text) == "" {
-		return fmt.Errorf("text required")
+		return errors.New("text required")
 	}
 	path := NotesFile()
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
@@ -196,7 +195,7 @@ func AppendNoteTagged(project, text string, tags []string, now time.Time) error 
 		return ErrNoteExists
 	}
 	if info, err := os.Lstat(path); err == nil && info.Mode()&os.ModeSymlink != 0 {
-		return fmt.Errorf("notes file is a symlink")
+		return errors.New("notes file is a symlink")
 	}
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0o600)
 	if err != nil {
@@ -443,21 +442,21 @@ func AppendPromotedTagged(project, title, text, session, state string, tags []st
 // someone got around to promoting it.
 func AppendPromotedSourced(project, title, text, session, state string, tags []string, srcTS, now time.Time) error {
 	if strings.TrimSpace(session) == "" {
-		return fmt.Errorf("session required")
+		return errors.New("session required")
 	}
 	if !NoteStates[state] {
-		return fmt.Errorf("state must be accepted, rejected, superseded or stale")
+		return errors.New("state must be accepted, rejected, superseded or stale")
 	}
 	project = strings.TrimSpace(project)
 	if project == "" || strings.TrimSpace(text) == "" {
-		return fmt.Errorf("project and text required")
+		return errors.New("project and text required")
 	}
 	path := NotesFile()
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
 	if info, err := os.Lstat(path); err == nil && info.Mode()&os.ModeSymlink != 0 {
-		return fmt.Errorf("notes file is a symlink")
+		return errors.New("notes file is a symlink")
 	}
 	// An identical re-promote is not a correction. `promote` writes a record
 	// every run, so re-promoting an unchanged decision (same state, text,
@@ -748,7 +747,7 @@ func ConflictingNotes(candidate PromotedNote, all []PromotedNote) []PromotedNote
 
 func noteWordSet(s string) map[string]bool {
 	out := map[string]bool{}
-	for _, w := range strings.Fields(strings.ToLower(s)) {
+	for w := range strings.FieldsSeq(strings.ToLower(s)) {
 		w = strings.Trim(w, ".,!?:;()[]\"'`")
 		if len(w) >= 5 {
 			out[w] = true
@@ -858,7 +857,7 @@ func rewriteNotes(edit func(map[string]any) (map[string]any, bool)) (int, error)
 	}
 	var lines []string
 	changed := 0
-	for _, line := range strings.Split(string(b), "\n") {
+	for line := range strings.SplitSeq(string(b), "\n") {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}

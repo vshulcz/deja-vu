@@ -17,7 +17,9 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -300,7 +302,7 @@ func renderGoVersionConst(path, name string) func(pins) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		if !re.MatchString(string(b)) {
+		if !re.Match(b) {
 			return nil, fmt.Errorf("%s has no %s to pin", path, name)
 		}
 		return []byte(re.ReplaceAllString(string(b), `${1}"`+p.version+`"`)), nil
@@ -346,7 +348,7 @@ func renderPluginVersion(path string) func(pins) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		if !jsonVersion.MatchString(string(b)) {
+		if !jsonVersion.Match(b) {
 			return nil, fmt.Errorf("%s has no version field to pin", path)
 		}
 		return []byte(jsonVersion.ReplaceAllString(string(b), `${1}"`+p.version+`"`)), nil
@@ -424,7 +426,7 @@ func runCheck(root string) error {
 		if err != nil {
 			return err
 		}
-		if string(got) != string(want) {
+		if !bytes.Equal(got, want) {
 			return fmt.Errorf("%s is not pinned to %s — run: go run ./scripts/pinmanifests -version %s -checksums <checksums.txt>", path, version, version)
 		}
 	}
@@ -443,7 +445,7 @@ func latestRelease() (string, error) {
 		return "", err
 	}
 	if r.TagName == "" {
-		return "", fmt.Errorf("no tag_name in the latest release")
+		return "", errors.New("no tag_name in the latest release")
 	}
 	return strings.TrimPrefix(r.TagName, "v"), nil
 }

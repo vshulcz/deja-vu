@@ -18,7 +18,7 @@ func TestContinueTurnsNeverPassTheFileMtime(t *testing.T) {
 	sid := "8f1c2a3e-0000-4000-8000-000000000000"
 	created := time.Date(2026, 10, 1, 20, 33, 0, 0, time.UTC)
 	var history []any
-	for i := 0; i < 17; i++ {
+	for i := range 17 {
 		role := "user"
 		if i%2 == 1 {
 			role = "assistant"

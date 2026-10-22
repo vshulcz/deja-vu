@@ -105,7 +105,7 @@ func TestFilesTableAlignsCJKPaths(t *testing.T) {
 
 	var widths []int
 	var rows []string
-	for _, line := range strings.Split(buf.String(), "\n") {
+	for line := range strings.SplitSeq(buf.String(), "\n") {
 		if !strings.HasPrefix(line, "  ") {
 			continue
 		}

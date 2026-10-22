@@ -368,7 +368,7 @@ func TestCJKIndexDifferentialGenerative492(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
 
 	t.Run("bucket random bytes", func(t *testing.T) {
-		for i := 0; i < 1000; i++ {
+		for i := range 1000 {
 			b := make([]byte, rng.Intn(32))
 			for j := range b {
 				b[j] = byte(rng.Intn(256))
@@ -395,10 +395,10 @@ func TestCJKIndexDifferentialGenerative492(t *testing.T) {
 			'한', '글', '만',
 			'a', 'Z', '0', '_', '-', ' ', '.', '/', '\n',
 		}
-		for i := 0; i < 300; i++ {
+		for range 300 {
 			var text strings.Builder
 			n := rng.Intn(80)
-			for j := 0; j < n; j++ {
+			for range n {
 				text.WriteRune(alphabet[rng.Intn(len(alphabet))])
 			}
 

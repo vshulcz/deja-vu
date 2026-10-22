@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -109,7 +110,7 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 			// an unknown flag and an empty argument all used to pass through in
 			// silence, the same holes files had (#1630, #1628).
 			if i+1 >= len(args) {
-				return fmt.Errorf("how: --limit needs value")
+				return errors.New("how: --limit needs value")
 			}
 			i++
 			n, err := strconv.Atoi(args[i])
@@ -119,7 +120,7 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 			limit = n
 		case "--project":
 			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
-				return fmt.Errorf("how: --project needs value")
+				return errors.New("how: --project needs value")
 			}
 			i++
 			project = args[i]
@@ -141,7 +142,7 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 		}
 	}
 	if len(terms) == 0 {
-		return fmt.Errorf("usage: deja how <what> [--project name] [--limit n] [--json]")
+		return errors.New("usage: deja how <what> [--project name] [--limit n] [--json]")
 	}
 	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
 		return ensureError(dir, err)

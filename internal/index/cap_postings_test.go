@@ -6,7 +6,7 @@ import (
 
 func postingsFrom(sid uint32, n int, base int64) []posting {
 	out := make([]posting, 0, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		out = append(out, posting{Off: base + int64(i), Sid: sid})
 	}
 	return out

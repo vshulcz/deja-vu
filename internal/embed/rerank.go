@@ -15,10 +15,7 @@ func Rerank(ctx context.Context, hits []search.Hit, query string, sidecar Sideca
 	if err != nil {
 		return nil, err
 	}
-	limit := len(hits)
-	if limit > 64 {
-		limit = 64
-	}
+	limit := min(len(hits), 64)
 	max := hits[0].Score
 	min := hits[0].Score
 	for _, h := range hits[:limit] {

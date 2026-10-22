@@ -51,7 +51,7 @@ func TestJSONAlwaysSaysWhichTierAnswered(t *testing.T) {
 // how many matched before it.
 func TestRunDetailedReportsWhatTheCapHides(t *testing.T) {
 	var ss []model.Session
-	for i := 0; i < 40; i++ {
+	for i := range 40 {
 		ss = append(ss, model.Session{
 			ID: fmt.Sprintf("s%02d", i), Harness: "claude",
 			Messages: []model.Message{{Role: "user", Text: "needle"}},
@@ -247,7 +247,7 @@ func TestPasteDetectionBoundaries(t *testing.T) {
 	}
 	// Long prose with distinct lines is not a dump however long it runs.
 	var prose strings.Builder
-	for i := 0; i < 30; i++ {
+	for i := range 30 {
 		fmt.Fprintf(&prose, "paragraph %d saying something different about the pool\n", i)
 	}
 	if looksPasted(msg(prose.String())) {

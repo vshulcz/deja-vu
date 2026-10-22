@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -29,7 +30,7 @@ const switchTurns = 10
 
 func switchJSONL(n int, line func(i int) string) string {
 	var b strings.Builder
-	for i := 0; i < n; i++ {
+	for i := range n {
 		b.WriteString(line(i))
 		b.WriteString("\n")
 	}
@@ -122,7 +123,7 @@ func switchCases() []switchCase {
 			root := t.TempDir()
 			t.Setenv("DEJA_CODEWHALE_ROOT", root)
 			var msgs []string
-			for i := 0; i < switchTurns; i++ {
+			for i := range switchTurns {
 				role := "user"
 				if i%2 == 1 {
 					role = "assistant"
@@ -133,7 +134,7 @@ func switchCases() []switchCase {
 		}},
 		{kind: "hermes", child: "s-sub", long: true, setup: func(t *testing.T) string {
 			var rows []string
-			for i := 0; i < switchTurns; i++ {
+			for i := range switchTurns {
 				role := "user"
 				if i%2 == 1 {
 					role = "assistant"
@@ -260,7 +261,7 @@ func TestSubagentSwitchMeansTheSameInEveryReader(t *testing.T) {
 func TestApplySubagentSwitchLeavesOtherSessionsAlone(t *testing.T) {
 	msgs := make([]model.Message, 9)
 	for i := range msgs {
-		msgs[i] = model.Message{Role: "user", Text: fmt.Sprint(i)}
+		msgs[i] = model.Message{Role: "user", Text: strconv.Itoa(i)}
 	}
 	in := []model.Session{
 		{ID: "top", Messages: msgs},

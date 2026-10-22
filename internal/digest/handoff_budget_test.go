@@ -23,7 +23,7 @@ func TestALongSessionStillHandsOverItsConclusions(t *testing.T) {
 		})
 	}
 	add("user", "we need to cut the p99 on the orders endpoint from 900ms to under 300ms", 0)
-	for i := 0; i < 96; i++ {
+	for i := range 96 {
 		add("assistant", fmt.Sprintf("step %d: reading handler_%d.go and measuring that span; nothing conclusive yet", i, i), 1+2*i)
 		add("user", fmt.Sprintf("go on (%d)", i), 2+2*i)
 	}

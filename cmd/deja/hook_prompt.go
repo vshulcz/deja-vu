@@ -1037,8 +1037,8 @@ func (sl seenLines) asked(sid, key string, window time.Duration) bool {
 	}
 	want := hookseenKey(sid)
 	cutoff := time.Now().UTC().Add(-window)
-	for i := len(sl) - 1; i >= 0; i-- {
-		parts := strings.Fields(sl[i])
+	for _, s := range slices.Backward(sl) {
+		parts := strings.Fields(s)
 		if len(parts) < 3 || parts[0] != want || parts[1] != key {
 			continue
 		}
@@ -1152,7 +1152,7 @@ func forgetInjected(dir, sid string) {
 		keys[hookseenKey(onceDigestKey(sid))] = true
 	}
 	var kept []string
-	for _, line := range strings.Split(string(b), "\n") {
+	for line := range strings.SplitSeq(string(b), "\n") {
 		if line == "" {
 			continue
 		}
@@ -1341,7 +1341,7 @@ func dejaVuLineDue(dir, sid string) bool {
 	now := time.Now()
 	key := dejaVuKey(sid)
 	if b, err := os.ReadFile(p); err == nil {
-		for _, line := range strings.Split(string(b), "\n") {
+		for line := range strings.SplitSeq(string(b), "\n") {
 			fields := strings.Fields(line)
 			if len(fields) != 2 || fields[0] != key {
 				continue
@@ -1387,7 +1387,7 @@ const (
 func recordDejaVuLine(path, sid string, now time.Time) bool {
 	kept := []string{sid + " " + strconv.FormatInt(now.Unix(), 10)}
 	if b, err := os.ReadFile(path); err == nil {
-		for _, line := range strings.Split(string(b), "\n") {
+		for line := range strings.SplitSeq(string(b), "\n") {
 			fields := strings.Fields(line)
 			if len(fields) != 2 || fields[0] == sid {
 				continue

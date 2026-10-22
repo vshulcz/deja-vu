@@ -16,6 +16,8 @@ package main
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -50,8 +52,8 @@ func main() {
 		off, on, n := 0, 0, 0
 		for i, t := range topics {
 			day := base.AddDate(0, 0, -i)
-			ans := "answer-" + fmt.Sprint(i)
-			dis := "distractor-" + fmt.Sprint(i)
+			ans := "answer-" + strconv.Itoa(i)
+			dis := "distractor-" + strconv.Itoa(i)
 
 			// The answer states the topic and that it was settled — quiet, one
 			// mention of the terms per turn.
@@ -60,9 +62,11 @@ func main() {
 			// The distractor repeats the query terms `extra` more times and was
 			// never reused: it looks more like an answer on the text alone.
 			loud := t
-			for k := 0; k < extra; k++ {
-				loud += " " + t
+			var loudSb63 strings.Builder
+			for range extra {
+				loudSb63.WriteString(" " + t)
 			}
+			loud += loudSb63.String()
 			distractor := session(dis, day, []string{loud + " keeps failing", "raw logs about " + t})
 
 			corpus := []model.Session{answer, distractor}

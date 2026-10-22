@@ -51,7 +51,7 @@ func storeThatKeepsMissing(t *testing.T, prog string, n int) string {
 	withStatsStores(t)
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
 	ts := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		id := "s" + string(rune('a'+i))
 		writeClaudeFixture(t, filepath.Join(claudeRoot, "app", id+".jsonl"), id, []string{
 			`{"type":"assistant","sessionId":"` + id + `","timestamp":"` + ts +

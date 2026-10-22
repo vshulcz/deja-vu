@@ -45,7 +45,7 @@ func TestDoctorNamesAnUnreadOpenClawTranscriptButNotItsSidecars(t *testing.T) {
 	var buf bytes.Buffer
 	doctorHarnesses(&buf, t.TempDir())
 	var row string
-	for _, l := range strings.Split(buf.String(), "\n") {
+	for l := range strings.SplitSeq(buf.String(), "\n") {
 		if strings.Contains(l, "openclaw") && strings.Contains(l, "file") {
 			row = l
 			break

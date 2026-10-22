@@ -185,7 +185,7 @@ func opencodeIDs(db, set string) ([]string, bool) {
 		return nil, false
 	}
 	var ids []string
-	for _, ln := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+	for ln := range strings.SplitSeq(strings.TrimSpace(string(b)), "\n") {
 		if ln = strings.TrimSpace(ln); ln != "" {
 			ids = append(ids, ln)
 		}
@@ -217,7 +217,7 @@ func OpencodeStoreLacks(harness, id string) bool {
 	if !ok || names == "" {
 		return false
 	}
-	for _, table := range strings.Fields(names) {
+	for table := range strings.FieldsSeq(names) {
 		n, ok := query(fmt.Sprintf(`select count(*) from %s where id='%s'`, table, sqlEscape(id)))
 		if !ok || n != "0" {
 			return false
@@ -1048,7 +1048,7 @@ func patchSpans(patch string) []string {
 		}
 		removed = nil
 	}
-	for _, line := range strings.Split(patch, "\n") {
+	for line := range strings.SplitSeq(patch, "\n") {
 		switch {
 		case strings.HasPrefix(line, "*** Update File:"),
 			strings.HasPrefix(line, "*** Delete File:"),

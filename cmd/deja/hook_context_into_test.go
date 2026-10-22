@@ -23,7 +23,7 @@ func snapshotOnlyInto(t *testing.T, dir, kind string) string {
 		t.Fatalf("nothing was written to the injection log: %v", err)
 	}
 	seen := map[string]bool{}
-	for _, line := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(string(b)), "\n") {
 		var snap usage.Snapshot
 		if json.Unmarshal([]byte(line), &snap) != nil {
 			t.Fatalf("the injection log has a line deja cannot read back: %s", line)

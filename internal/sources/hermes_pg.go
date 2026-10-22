@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -127,7 +128,7 @@ func ParseHermesPG(dsn string, sinceNano int64) ([]model.Session, error) {
 		return nil, fmt.Errorf("hermes pg: %w", err)
 	}
 	if d, ok := tok.(json.Delim); !ok || d != '[' {
-		return nil, fmt.Errorf("hermes pg: expected a json array")
+		return nil, errors.New("hermes pg: expected a json array")
 	}
 	out2, err := decodeHermesArray(dec, "hermes", HermesPGStorePath(dsn))
 	if err != nil {
@@ -156,11 +157,13 @@ func hermesPGSessionMeta(dsn string) map[string]hermesMeta {
 		return nil
 	}
 	fields := "id::text as id"
+	var fieldsSb159 strings.Builder
 	for col, key := range map[string]string{"cwd": "cwd", "source": "source", "parent_session_id": "parent"} {
 		if cols[col] {
-			fields += fmt.Sprintf(", %s::text as %s", col, key)
+			fieldsSb159.WriteString(fmt.Sprintf(", %s::text as %s", col, key))
 		}
 	}
+	fields += fieldsSb159.String()
 	out, err = HermesPGRunner(dsn, `select coalesce(json_agg(s),'[]') from (select `+fields+` from sessions) s`)
 	if err != nil {
 		return nil

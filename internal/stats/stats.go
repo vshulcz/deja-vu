@@ -285,7 +285,7 @@ func buildHeatmap(byDay map[string]int, now time.Time) HeatmapStats {
 	for cur := start; !cur.After(end); {
 		var week [7]int
 		colDate := cur
-		for d := 0; d < 7; d++ {
+		for d := range 7 {
 			if cur.After(end) {
 				week[d] = -1
 			} else {
@@ -589,7 +589,7 @@ func CreditedRefs(text string) []string {
 	}
 	var out []string
 	seen := map[string]bool{}
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		if !strings.Contains(strings.ToLower(line), "déjà vu") {
 			continue
 		}

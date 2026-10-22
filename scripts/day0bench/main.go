@@ -35,7 +35,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/pprof"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -290,7 +290,7 @@ func percentiles(ds []time.Duration) (time.Duration, time.Duration) {
 		return 0, 0
 	}
 	s := append([]time.Duration(nil), ds...)
-	sort.Slice(s, func(i, j int) bool { return s[i] < s[j] })
+	slices.Sort(s)
 	at := func(q float64) time.Duration {
 		i := int(float64(len(s)-1) * q)
 		return s[i]

@@ -38,7 +38,7 @@ func TestTheCommandLineCarriesThePromotedDecision(t *testing.T) {
 		bash("dec", at(400)),
 		`{"type":"assistant","sessionId":"dec","timestamp":"` + at(399) + `","cwd":"/work/app","message":{"role":"assistant","content":"no: run the orders migration against the replica first"}}`,
 	})
-	for k := 0; k < 5; k++ {
+	for k := range 5 {
 		sid := fmt.Sprintf("f%d", k)
 		write(sid, []string{
 			`{"type":"user","sessionId":"` + sid + `","timestamp":"` + at(200-20*k) + `","cwd":"/work/app","message":{"role":"user","content":"run the orders migration again"}}`,

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -75,7 +76,7 @@ func fillerTokens(r *rand.Rand, n int) []string {
 		for j := range b {
 			b[j] = letters[r.Intn(len(letters))]
 		}
-		out[i] = string(b) + fmt.Sprint(i)
+		out[i] = string(b) + strconv.Itoa(i)
 	}
 	return out
 }
@@ -92,7 +93,7 @@ func gluedCatalog(r *rand.Rand, fillers int) map[string]bool {
 	glue := []string{"k8s", "v2", "x", "под", "пере", "_", "ё", "\xff", "-"}
 	for _, term := range gluedTerms {
 		forms := append(stemMatchForms(term), term)
-		for k := 0; k < 12; k++ {
+		for range 12 {
 			f := forms[r.Intn(len(forms))]
 			g := glue[r.Intn(len(glue))]
 			switch r.Intn(4) {
@@ -157,7 +158,7 @@ func TestGluedStepDoesNotGrowWithTheCatalog(t *testing.T) {
 // registry twice per file, which was most of 190 ms on 12k files.
 func TestStoreWalkDoesNotRebuildTheRegistryPerFile(t *testing.T) {
 	h := newTwoWayEnv(t)
-	for i := 0; i < 400; i++ {
+	for i := range 400 {
 		sid := fmt.Sprintf("w%03d", i)
 		h.put("app", sid, hPrompt("app", sid, 1, 0, "walk me"))
 	}
@@ -175,7 +176,7 @@ func TestStoreWalkDoesNotRebuildTheRegistryPerFile(t *testing.T) {
 func TestStatFilesSharedOutMatchesOneByOne(t *testing.T) {
 	h := newTwoWayEnv(t)
 	paths := map[string]bool{}
-	for i := 0; i < 3*statPerWorker; i++ {
+	for i := range 3 * statPerWorker {
 		sid := fmt.Sprintf("p%04d", i)
 		h.put("app", sid, hPrompt("app", sid, 1, 0, strings.Repeat("x", i%50)))
 		paths[h.path("app", sid)] = true
@@ -238,7 +239,7 @@ func TestSearchDecodesTheManifestOnce(t *testing.T) {
 func TestDamagedSessionsFileStillRebuildsThroughTheCache(t *testing.T) {
 	dir := recallReadsStore(t)
 	o := query.Options{Query: "frobnicator handshake"}
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		if err := EnsureForSearch(dir, o, false, nil); err != nil {
 			t.Fatal(err)
 		}

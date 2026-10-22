@@ -31,7 +31,7 @@ func TestEveryRegistryFixtureParsesUnderAHostilePath(t *testing.T) {
 	hermeticSourcesEnv(t)
 	registry := readFormatRegistry(t, filepath.Join(root, "docs", "registry", "registry.json"))
 	for _, entry := range registry.Harnesses {
-		entry := entry
+
 		t.Run(entry.ID, func(t *testing.T) {
 			// The whole fixture tree moves, not the one file: several parsers
 			// read a sibling — kimi's state.json, goose's session header — and

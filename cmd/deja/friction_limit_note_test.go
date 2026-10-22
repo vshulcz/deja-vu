@@ -21,7 +21,7 @@ func TestFrictionSaysWhatTheLimitLeftOut(t *testing.T) {
 	}
 	n := 0
 	for _, e := range errs {
-		for k := 0; k < 3; k++ {
+		for k := range 3 {
 			lines = append(lines, fmt.Sprintf(
 				`{"type":"user","sessionId":"s%d","cwd":"/w/p","timestamp":"2026-07-2%dT10:00:00Z","message":{"role":"user","content":[{"type":"tool_result","content":%q}]}}`,
 				n, k+1, e))

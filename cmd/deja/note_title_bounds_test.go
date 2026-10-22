@@ -64,7 +64,7 @@ func TestEverySurfaceThatPrintsANoteTitleBoundsIt(t *testing.T) {
 		if strings.Contains(out, "deepmarker") {
 			t.Errorf("%v printed the whole note title, marker and all", args)
 		}
-		for _, l := range strings.Split(out, "\n") {
+		for l := range strings.SplitSeq(out, "\n") {
 			if n := len([]rune(l)); n > roomForARow {
 				t.Errorf("%v printed a %d-rune line from a note title", args, n)
 			}

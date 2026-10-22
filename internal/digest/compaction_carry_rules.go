@@ -65,12 +65,12 @@ func carryUnits(text string, fences bool) []string {
 		text = carryFenceRE.ReplaceAllString(text, " ")
 	}
 	var out []string
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		line = strings.TrimSpace(carryLeadRE.ReplaceAllString(line, ""))
 		if line == "" {
 			continue
 		}
-		for _, s := range strings.Split(carrySplitRE.ReplaceAllString(line, "${1}\n${2}"), "\n") {
+		for s := range strings.SplitSeq(carrySplitRE.ReplaceAllString(line, "${1}\n${2}"), "\n") {
 			s = strings.TrimSpace(strings.Trim(strings.TrimSpace(s), "|"))
 			if n := utf8.RuneCountInString(s); n > 12 && n < 400 {
 				out = append(out, s)

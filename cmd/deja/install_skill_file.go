@@ -40,7 +40,7 @@ func installSkillFile(path string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	next := []byte(skillFile(skillBody))
-	if string(old) == string(next) {
+	if bytes.Equal(old, next) {
 		return installResult{Path: path, Action: "unchanged"}, nil
 	}
 	if err := writeSkillOfOurs(path, old, next); err != nil {

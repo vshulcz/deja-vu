@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -829,7 +830,7 @@ func firstID(ids []string) string {
 // the longer one did. A query whose words are nowhere in either is no reason to
 // keep the ragged ending.
 func keepsQuery(shorter, longer, query string) bool {
-	for _, word := range strings.Fields(strings.ToLower(query)) {
+	for word := range strings.FieldsSeq(strings.ToLower(query)) {
 		if len(word) < 3 {
 			continue
 		}
@@ -1442,7 +1443,7 @@ func recallCountLine(q, tier string, offset, served, total, strict int, namesThe
 // when about is set: retrieval scaled the unread part of it from a sample.
 func recallCountLineAbout(q, tier string, offset, served, total, strict int, namesTheAsked, about bool) string {
 	q = clampEcho(q)
-	of := fmt.Sprint(total)
+	of := strconv.Itoa(total)
 	if about {
 		of = "about " + of
 	}
@@ -1521,10 +1522,7 @@ func recallHeaderReserve(q, tier string, offset, limit, total int) int {
 	// answer is built, and reserving for the shorter one would let the
 	// other overrun what it was promised.
 	short := len(recallCountLine(q, tier, offset, limit, total, 0, true))
-	long := len(recallCountLine(q, tier, offset, limit, total, 0, false))
-	if short > long {
-		long = short
-	}
+	long := max(short, len(recallCountLine(q, tier, offset, limit, total, 0, false)))
 	// The strict line names a count of its own and can be the longest of the
 	// three, so reserve for it too rather than let it overrun (#3815).
 	if strict := len(recallCountLine(q, search.TierRelevance, offset, limit, total, limit, false)); strict > long {
@@ -2497,10 +2495,8 @@ func sessionSpeaksEvery(s model.Session, terms []string) bool {
 // empty variant, which is how the "ignored" note is written.
 func namedSomethingAbsent(variants map[string][]string) bool {
 	for _, values := range variants {
-		for _, v := range values {
-			if v == "" {
-				return true
-			}
+		if slices.Contains(values, "") {
+			return true
 		}
 	}
 	return false
@@ -2882,7 +2878,7 @@ func aboutCount(n int, about bool) string {
 	if about {
 		return fmt.Sprintf("about %d", n)
 	}
-	return fmt.Sprint(n)
+	return strconv.Itoa(n)
 }
 
 // unreadSessions is how many matching sessions retrieval left unread.

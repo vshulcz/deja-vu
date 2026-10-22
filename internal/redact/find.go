@@ -368,10 +368,7 @@ func delimAt(s string, i int, eqOnly bool) (int, bool) {
 
 // firstOf is the first byte of set in s[i:i+limit], or 0.
 func firstOf(s string, i, limit int, set string) (int, byte) {
-	end := i + limit
-	if end > len(s) {
-		end = len(s)
-	}
+	end := min(i+limit, len(s))
 	if j := strings.IndexAny(s[i:end], set); j >= 0 {
 		return i + j, s[i+j]
 	}
@@ -582,10 +579,7 @@ var (
 
 	passwordFlagFind = newFinder(passwordFlagRE, 2, true, flagHints,
 		func(v *view, k int) (int, int, bool) {
-			lo := k - 2
-			if lo < 0 {
-				lo = 0
-			}
+			lo := max(k-2, 0)
 			return lo, k, true
 		})
 

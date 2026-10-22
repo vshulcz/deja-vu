@@ -36,7 +36,7 @@ func TestBenchCorpusCarriesToolOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 	var sawToolResult bool
-	for _, line := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(string(raw)), "\n") {
 		var entry struct {
 			Type    string `json:"type"`
 			Message struct {

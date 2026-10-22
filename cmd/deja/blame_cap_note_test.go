@@ -32,7 +32,7 @@ func TestBlameSaysHowManyItHeldBack(t *testing.T) {
 	t.Setenv("DEJA_NOTES_FILE", filepath.Join(tmp, "notes.jsonl"))
 	dir := filepath.Join(tmp, "index.db")
 	t.Setenv("DEJA_INDEX_DIR", dir)
-	for i := 0; i < 25; i++ {
+	for i := range 25 {
 		at := time.Now().Add(-time.Duration(2+i) * time.Hour).UTC().Format(time.RFC3339)
 		line := fmt.Sprintf(`{"type":"user","sessionId":"s%03d","timestamp":%q,"cwd":"/work/app",`+
 			`"message":{"role":"user","content":"touching api/upload.go, take %d"}}`, i, at, i)

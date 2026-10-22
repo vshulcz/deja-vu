@@ -22,7 +22,7 @@ func TestToolHookLeavesTheLiveSessionOutOfTheFileLine(t *testing.T) {
 			`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"` + ts + `","message":{"role":"assistant","content":"` + said + `"}}`,
 		})
 	}
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		edit("old"+string(rune('0'+i)), "2026-01-0"+string(rune('2'+i))+"T03:04:05Z",
 			"We settled on three in retry.cfg; five retries overloaded the upstream.")
 	}

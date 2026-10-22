@@ -125,7 +125,7 @@ var hrefPattern = regexp.MustCompile(`href="([^"]+)"`)
 // is the switcher wherever it has been moved to in the file.
 func switcherLine(text string) string {
 	last := readmeLanguages[len(readmeLanguages)-1].name
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		if strings.Contains(line, last) && strings.Contains(line, "href=") {
 			return line
 		}

@@ -77,7 +77,7 @@ func TestQwenWiresTheFixPairToTheFailureEvent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(b) != string(b2) {
+	if !bytes.Equal(b, b2) {
 		t.Errorf("a second install changed the file:\n%s\n%s", b, b2)
 	}
 }

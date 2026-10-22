@@ -24,7 +24,7 @@ func TestTwoBuildsNeverPublishHalfAStatus(t *testing.T) {
 
 	var stop atomic.Bool
 	var wg sync.WaitGroup
-	for w := 0; w < 4; w++ {
+	for w := range 4 {
 		wg.Add(1)
 		go func(w int) {
 			defer wg.Done()
@@ -36,9 +36,7 @@ func TestTwoBuildsNeverPublishHalfAStatus(t *testing.T) {
 		}(w)
 	}
 	var reads, empty, bad int64
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for !stop.Load() {
 			raw, err := os.ReadFile(p)
 			if err != nil {
@@ -54,7 +52,7 @@ func TestTwoBuildsNeverPublishHalfAStatus(t *testing.T) {
 				atomic.AddInt64(&bad, 1)
 			}
 		}
-	}()
+	})
 	// Run until the reader has actually read something, not for a fixed slice
 	// of time: on a loaded runner 300 ms passed with the reader never scheduled,
 	// and the test failed saying it proved nothing — which was true, and about

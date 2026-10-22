@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -40,7 +41,7 @@ func runWIP(dir string, args []string, stdout io.Writer) error {
 		case "--json":
 			asJSON = true
 		default:
-			return fmt.Errorf("wip takes --json and nothing else")
+			return errors.New("wip takes --json and nothing else")
 		}
 	}
 	// Built first, like every other reader: on a fresh machine the lookup

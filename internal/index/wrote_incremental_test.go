@@ -71,7 +71,7 @@ func TestTheWrittenSideSurvivesAnIncrementalUpdate(t *testing.T) {
 			if m.Role != sources.RoleWrote {
 				continue
 			}
-			for _, h := range strings.Fields(strings.SplitN(m.Text, "\n", 2)[1]) {
+			for h := range strings.FieldsSeq(strings.SplitN(m.Text, "\n", 2)[1]) {
 				held[parseHexForTest(t, h)] = true
 			}
 		}

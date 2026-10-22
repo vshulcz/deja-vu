@@ -25,7 +25,7 @@ func TestASearchFloodDoesNotEvictTheFortnightOfStarts(t *testing.T) {
 	var lines []string
 	starts := 0
 	for day := 13; day >= 0; day-- {
-		for k := 0; k < 2; k++ {
+		for k := range 2 {
 			e := Event{Time: now.Add(-time.Duration(day)*24*time.Hour - time.Duration(k)*time.Hour),
 				Kind: KindHook, Bytes: 1800, Sessions: 3, RawBytes: 21000}
 			b, err := json.Marshal(e)
@@ -35,7 +35,7 @@ func TestASearchFloodDoesNotEvictTheFortnightOfStarts(t *testing.T) {
 			lines = append(lines, string(b))
 			starts++
 		}
-		for i := 0; i < 1000; i++ {
+		for i := range 1000 {
 			e := Event{Time: now.Add(-time.Duration(day)*24*time.Hour - time.Duration(i)*time.Second),
 				Kind: KindSearch, Bytes: 5200, Sessions: 12}
 			b, err := json.Marshal(e)

@@ -137,7 +137,7 @@ func peerLine(p peers.Peer, sessions int, now time.Time) string {
 	// Said once: a machine added under the name it calls itself repeats
 	// nothing.
 	if m := strings.TrimSpace(p.Machine); m != "" && !sameMachineName(m, p.Host) {
-		line += fmt.Sprintf(" — calls itself %s", safeForStatusline(m, doctorPeerNameMax))
+		line += " — calls itself " + safeForStatusline(m, doctorPeerNameMax)
 	}
 	if p.LastError != "" {
 		// The stored error usually quotes the host back, so it carries whatever
@@ -166,11 +166,11 @@ func doctorAgo(d time.Duration) string {
 	case d < time.Minute:
 		return "just now"
 	case d < time.Hour:
-		return fmt.Sprintf("%s ago", doctorCount(int(d.Minutes()), "minute"))
+		return doctorCount(int(d.Minutes()), "minute") + " ago"
 	case d < 24*time.Hour:
-		return fmt.Sprintf("%s ago", doctorCount(int(d.Hours()), "hour"))
+		return doctorCount(int(d.Hours()), "hour") + " ago"
 	default:
-		return fmt.Sprintf("%s ago", doctorCount(int(d.Hours()/24), "day"))
+		return doctorCount(int(d.Hours()/24), "day") + " ago"
 	}
 }
 

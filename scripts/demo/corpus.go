@@ -215,7 +215,7 @@ func background(n int) []session {
 	harnesses := []string{"claude", "codex", "cursor"}
 
 	out := make([]session, 0, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		c := components[i%len(components)]
 		sym := symptoms[(i/3)%len(symptoms)]
 		cause := causes[(i/7)%len(causes)]

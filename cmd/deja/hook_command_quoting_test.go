@@ -115,7 +115,7 @@ func quotedSpans(text string, quote byte) []string {
 // subcommands, which is what makes it a line deja wrote rather than a path
 // mentioned in prose.
 func hasDejaSubcommand(cmd string) bool {
-	for _, field := range strings.Fields(cmd) {
+	for field := range strings.FieldsSeq(cmd) {
 		if dejaSubcommandInConfigs[strings.Trim(field, `"'`)] {
 			return strings.Contains(cmd, "deja")
 		}

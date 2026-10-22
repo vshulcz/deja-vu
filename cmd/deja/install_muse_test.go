@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -159,12 +160,7 @@ func TestMuseIsAnInstallTarget(t *testing.T) {
 	// --auto finds Muse by its session store, not by the config directory
 	// deja creates when it installs.
 	has := func() bool {
-		for _, n := range existingTargets() {
-			if n == "muse" {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(existingTargets(), "muse")
 	}
 	if err := os.MkdirAll(filepath.Join(home, ".config", "muse"), 0o755); err != nil {
 		t.Fatal(err)

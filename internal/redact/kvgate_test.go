@@ -22,7 +22,7 @@ func TestKVGateNeverHidesAMatch(t *testing.T) {
 		"abcdefghijklmnop", "abcdefghijklmnopqrstuvwxyz012345", "short",
 		"the", "handler", "returns", "500", "sk-", "Bearer",
 	}
-	for i := 0; i < 20000; i++ {
+	for range 20000 {
 		var b strings.Builder
 		for n := rng.Intn(8); n >= 0; n-- {
 			b.WriteString(parts[rng.Intn(len(parts))])

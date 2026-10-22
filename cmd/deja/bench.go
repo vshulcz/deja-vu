@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -65,7 +66,7 @@ func runBench(args []string) error {
 		return runBenchRead(args[1:])
 	}
 	if len(args) < 1 || args[0] != "recall" {
-		return fmt.Errorf("bench: usage: bench recall|context|prompt|block|ingest|read [--json] [--seed N]")
+		return errors.New("bench: usage: bench recall|context|prompt|block|ingest|read [--json] [--seed N]")
 	}
 	jsonOutput, seed, err := parseBenchArgs("recall", args[1:])
 	if err != nil {
@@ -194,7 +195,7 @@ func measureRecall(dir string, queries []bench.Query, client *embed.Client) (ben
 			rr += 1 / float64(rank)
 		}
 	}
-	sort.Slice(latencies, func(i, j int) bool { return latencies[i] < latencies[j] })
+	slices.Sort(latencies)
 	median := latencies[len(latencies)/2]
 	return benchMetric{
 		RecallAt1:  float64(got1) / float64(len(queries)),

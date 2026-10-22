@@ -86,9 +86,11 @@ func antigravityExitTranscript(steps ...string) func(*testing.T, string) string 
 	return func(t *testing.T, dir string) string {
 		lines := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-09-30T10:00:00Z","content":"<USER_REQUEST>\nfix the retry loop\n</USER_REQUEST>"}` + "\n" +
 			`{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-09-30T10:00:05Z","content":"","tool_calls":[{"name":"run_command","args":{"CommandLine":"\"go test ./...\"","Cwd":"\"/tmp/proj\""}}]}` + "\n"
+		var linesSb89 strings.Builder
 		for _, s := range steps {
-			lines += `{"step_index":2,"source":"MODEL","type":"GENERIC","status":"DONE","created_at":"2026-09-30T10:00:09Z","content":` + vocabJSON(s) + `}` + "\n"
+			linesSb89.WriteString(`{"step_index":2,"source":"MODEL","type":"GENERIC","status":"DONE","created_at":"2026-09-30T10:00:09Z","content":` + vocabJSON(s) + `}` + "\n")
 		}
+		lines += linesSb89.String()
 		return writeExitFixture(t, filepath.Join(dir, "brain", "b0c1d2e3", ".system_generated", "logs", "transcript.jsonl"), lines)
 	}
 }
@@ -156,15 +158,17 @@ func TestCrushJoinsACallToItsResult(t *testing.T) {
 		{"edit_unanswered", "edit", edit, "", false, []string{"files /tmp/proj/retry.go", "edit /tmp/proj/retry.go\n" + oldLoop, "wrote"}},
 	}
 	sql := ""
+	var sqlSb159 strings.Builder
 	for i, c := range cases {
-		sql += "insert into sessions values ('" + c.id + "',null,'retry',2,0,0,0.0," + itoa(1784282405+i*10) + "," + itoa(1784282400+i*10) + ",null,null);\n"
-		sql += crushInsert(t, "a_"+c.id, c.id, "assistant", int64(1784282400+i*10), []any{
-			map[string]any{"type": "tool_call", "data": map[string]any{"id": "c_" + c.id, "name": c.tool, "input": c.input, "finished": true}}})
+		sqlSb159.WriteString("insert into sessions values ('" + c.id + "',null,'retry',2,0,0,0.0," + itoa(1784282405+i*10) + "," + itoa(1784282400+i*10) + ",null,null);\n")
+		sqlSb159.WriteString(crushInsert(t, "a_"+c.id, c.id, "assistant", int64(1784282400+i*10), []any{
+			map[string]any{"type": "tool_call", "data": map[string]any{"id": "c_" + c.id, "name": c.tool, "input": c.input, "finished": true}}}))
 		if c.result != "" {
-			sql += crushInsert(t, "t_"+c.id, c.id, "tool", int64(1784282401+i*10), []any{
-				map[string]any{"type": "tool_result", "data": map[string]any{"tool_call_id": "c_" + c.id, "name": c.tool, "content": c.result, "is_error": c.isErr}}})
+			sqlSb159.WriteString(crushInsert(t, "t_"+c.id, c.id, "tool", int64(1784282401+i*10), []any{
+				map[string]any{"type": "tool_result", "data": map[string]any{"tool_call_id": "c_" + c.id, "name": c.tool, "content": c.result, "is_error": c.isErr}}}))
 		}
 	}
+	sql += sqlSb159.String()
 	ss, err := ParseCrushDB(crushStore(t, "proj", sql))
 	if err != nil {
 		t.Fatal(err)

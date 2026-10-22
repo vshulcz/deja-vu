@@ -2,6 +2,7 @@ package search
 
 import (
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -35,8 +36,8 @@ func holdsLastTurn(holder, other model.Session) bool {
 // LastTurn is the turn CopyOf looks for in a copy: s's last timed message,
 // passing over empty ones, summaries and replies the harness wrote on its own.
 func LastTurn(s model.Session) (model.Message, bool) {
-	for i := len(s.Messages) - 1; i >= 0; i-- {
-		m := s.Messages[i]
+	for _, m := range slices.Backward(s.Messages) {
+
 		t := strings.TrimSpace(m.Text)
 		if m.Time.IsZero() || t == "" || m.Role == roleSummary || (m.Role == "assistant" && t == "No response requested.") {
 			continue

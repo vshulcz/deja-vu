@@ -24,7 +24,7 @@ func TestTheHooksTableSaysWhichRowsAreNotHooks(t *testing.T) {
 		{"roo", "guidance"},
 	} {
 		line := ""
-		for _, l := range strings.Split(got, "\n") {
+		for l := range strings.SplitSeq(got, "\n") {
 			if strings.Contains(l, want.name+" ") {
 				line = l
 			}
@@ -39,7 +39,7 @@ func TestTheHooksTableSaysWhichRowsAreNotHooks(t *testing.T) {
 	}
 
 	// And a real hook carries no such note, or the distinction says nothing.
-	for _, l := range strings.Split(got, "\n") {
+	for l := range strings.SplitSeq(got, "\n") {
 		if strings.Contains(l, "opencode ") &&
 			(strings.Contains(l, "context file") || strings.Contains(l, "guidance")) {
 			t.Errorf("a real hook was annotated as something else:\n  %s", l)

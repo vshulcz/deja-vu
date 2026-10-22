@@ -147,7 +147,7 @@ func TestHermesPluginsEnabledKeepsItsListStyle(t *testing.T) {
 // on the first one included.
 func topLevelKeys(text, key string) int {
 	n := 0
-	for _, line := range strings.Split(strings.TrimPrefix(text, "\ufeff"), "\n") {
+	for line := range strings.SplitSeq(strings.TrimPrefix(text, "\ufeff"), "\n") {
 		if strings.HasPrefix(line, key) {
 			n++
 		}

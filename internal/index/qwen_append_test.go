@@ -57,7 +57,7 @@ func TestAGrowingQwenSessionIsAppendedNotReread(t *testing.T) {
 		}
 	}
 	var seed []string
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		seed = append(seed, qwenLine(i, fmt.Sprintf("seed %d zonkomatic", i)))
 	}
 	write(seed)
@@ -104,7 +104,7 @@ func TestAGrowingQwenSessionIsAppendedNotReread(t *testing.T) {
 	// its old length, which looks exactly like an append until the prefix is
 	// compared. The old text must not survive.
 	var rewritten []string
-	for i := 0; i < 9; i++ {
+	for i := range 9 {
 		rewritten = append(rewritten, qwenLine(i, fmt.Sprintf("rewritten %d zonkomatic", i)))
 	}
 	write(rewritten)

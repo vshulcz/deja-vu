@@ -19,7 +19,7 @@ func fusionIndex(t *testing.T) string {
 	tmp := hermeticIndexEnv(t)
 	dir := filepath.Join(tmp, "idx")
 	var sessions []model.Session
-	for i := 0; i < 80; i++ {
+	for i := range 80 {
 		sessions = append(sessions, model.Session{
 			ID: fmt.Sprintf("filler%02d", i), Harness: "claude", Project: "p", Updated: time.Now(),
 			Messages: []model.Message{{Role: "user", Text: "notes about the weekly planning meeting"}},

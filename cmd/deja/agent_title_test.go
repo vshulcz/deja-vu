@@ -35,7 +35,7 @@ func TestTheListingSaysWhenATitleIsTheAgentsOwnWords(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(out), "\n") {
 		switch {
 		case strings.Contains(line, "noq"):
 			if !strings.Contains(line, "agent: the vault rotation") {

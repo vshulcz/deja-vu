@@ -54,7 +54,7 @@ func bigRoleStore(t *testing.T) string {
 	b.WriteString(`{"type":"user","sessionId":"a","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"why does the build fail"}}` + "\n")
 	b.WriteString(`{"type":"user","sessionId":"a","timestamp":"2026-01-02T03:04:06Z","message":{"role":"user","content":[{"type":"tool_result","content":"go build ./... failed"}]}}` + "\n")
 	filler := strings.Repeat("the pgbouncer pool timed out and the retry took another second ", 12)
-	for i := 0; i < 15000; i++ {
+	for i := range 15000 {
 		fmt.Fprintf(&b, `{"type":"assistant","sessionId":"a","timestamp":"2026-01-02T03:04:07Z","message":{"role":"assistant","content":%q}}`+"\n", fmt.Sprintf("%s %d", filler, i))
 	}
 	// One record of a second role at the very end: an implementation that gives
@@ -105,9 +105,9 @@ func TestHasRecordOfRoleStopsEarly(t *testing.T) {
 	// all of it fixed, so one scheduler stall on a loaded runner is a multiple
 	// of the whole measurement while the full scan absorbs the same stall.
 	early := time.Hour
-	for round := 0; round < 3; round++ {
+	for range 3 {
 		started := time.Now()
-		for i := 0; i < 20; i++ {
+		for range 20 {
 			if !HasRecordOfRole(dir, roleToolOutput) {
 				t.Fatal("lost the record it just found")
 			}
@@ -118,7 +118,7 @@ func TestHasRecordOfRoleStopsEarly(t *testing.T) {
 	}
 
 	started := time.Now()
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		if HasRecordOfRole(dir, "no-such-role") {
 			t.Fatal("a role nothing carries was reported present")
 		}

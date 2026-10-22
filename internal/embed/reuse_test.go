@@ -294,7 +294,7 @@ func TestEmbedIndexKeepsVectorsWhenOnlyTheTimeMoved(t *testing.T) {
 	path := filepath.Join(tdir, "cur.jsonl")
 	turns := func(n int, at time.Time) {
 		var b strings.Builder
-		for i := 0; i < n; i++ {
+		for i := range n {
 			fmt.Fprintf(&b, `{"role":"user","message":{"content":[{"type":"text","text":"cursor question %d about the scheduler"}]}}`+"\n", i)
 			fmt.Fprintf(&b, `{"role":"assistant","message":{"content":[{"type":"text","text":"cursor answer %d"}]}}`+"\n", i)
 		}

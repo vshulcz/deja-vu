@@ -52,7 +52,7 @@ func quotedList(keys []string, n int) string {
 		return strings.Join(out, ", ")
 	}
 	out := make([]string, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		out[i] = fmt.Sprintf("%q", keys[i])
 	}
 	return fmt.Sprintf("%s and %d more", strings.Join(out, ", "), len(keys)-n)

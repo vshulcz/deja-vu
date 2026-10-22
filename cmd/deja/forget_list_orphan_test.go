@@ -49,7 +49,7 @@ func TestForgetListMarksATombstoneWhoseSessionIsGone(t *testing.T) {
 		t.Fatal(err)
 	}
 	rows := map[string]string{}
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(out), "\n") {
 		id, _, _ := strings.Cut(line, "\t")
 		rows[id] = line
 	}

@@ -76,7 +76,7 @@ func TestReadingTranscriptsReusesTheLineBuffer(t *testing.T) {
 	}
 	dir := t.TempDir()
 	var paths []string
-	for i := 0; i < 64; i++ {
+	for i := range 64 {
 		p := filepath.Join(dir, fmt.Sprintf("r%d.jsonl", i))
 		line := `{"type":"response_item","payload":{"type":"message","role":"user","content":"hi"}}` + "\n"
 		if err := os.WriteFile(p, []byte(strings.Repeat(line, 3)), 0o600); err != nil {

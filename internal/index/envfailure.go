@@ -37,7 +37,7 @@ func commandLevelFailure(text, line string) bool {
 	}
 	// The shell's own position marker is stripped from the stored line, so
 	// the raw line it came from is what says the shell printed it.
-	for _, raw := range strings.Split(text, "\n") {
+	for raw := range strings.SplitSeq(text, "\n") {
 		if !shellErrorPrefix(raw) {
 			continue
 		}
@@ -77,7 +77,7 @@ func commandRunningBefore(ms []model.Message, i int, prog string) string {
 		if prog == "" {
 			return strings.TrimSpace(firstLineOf(ms[k].Text))
 		}
-		for _, line := range strings.Split(ms[k].Text, "\n") {
+		for line := range strings.SplitSeq(ms[k].Text, "\n") {
 			line = strings.TrimSpace(line)
 			for _, part := range commandParts(line) {
 				if commandProgram(commandTokens(part)) == prog {

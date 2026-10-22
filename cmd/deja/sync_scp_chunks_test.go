@@ -12,7 +12,7 @@ import (
 // run, which is the worst moment to find out (#2002).
 func TestScpSplitsPathsUnderTheCommandLineBound(t *testing.T) {
 	var paths []string
-	for i := 0; i < 23336; i++ {
+	for i := range 23336 {
 		paths = append(paths, fmt.Sprintf(`C:\Users\someone\AppData\Local\Temp\deja-sync-9f3a12bc-17761031960%05d.jsonl`, i))
 	}
 	budget := sshArgsBudget([]string{"-o", "BatchMode=yes"}, "root@example.com", "/tmp/deja-sync-XXXX")

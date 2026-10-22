@@ -37,7 +37,7 @@ func forkStore(t *testing.T, unindexed bool) (dir, claudeFork string) {
 	}
 	claude := filepath.Join(tmp, "claude", "-w-p")
 	// Other work, so the question's words are rare enough to identify it.
-	for i := 0; i < 40; i++ {
+	for i := range 40 {
 		id := fmt.Sprintf("other-%d", i)
 		write(filepath.Join(claude, id+".jsonl"),
 			fmt.Sprintf(`{"type":"user","sessionId":%q,"cwd":"/w/p","timestamp":"2026-07-01T09:%02d:00Z","message":{"role":"user","content":"rename table%d and column%d in the billing schema"}}`, id, i, i, i)+"\n")
@@ -219,7 +219,7 @@ func TestALongHeadedForksPromptRecallLeavesOutItsSource(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for i := 0; i < 40; i++ {
+	for i := range 40 {
 		id := fmt.Sprintf("other-%d", i)
 		write(id+".jsonl", fmt.Sprintf(`{"type":"user","sessionId":%q,"cwd":"/w/p","timestamp":"2026-07-01T09:%02d:00Z","message":{"role":"user","content":"rename table%d and column%d in the billing schema"}}`, id, i, i, i)+"\n")
 	}

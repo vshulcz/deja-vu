@@ -7,6 +7,7 @@ import (
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -170,7 +171,7 @@ func TestPerformUpdateDownloadFailurePreservesBinary(t *testing.T) {
 		executable:     target,
 		latestURL:      testLatestReleaseURL,
 		download: func(_ string, _ int64, _ string) ([]byte, error) {
-			return nil, fmt.Errorf("service unavailable")
+			return nil, errors.New("service unavailable")
 		},
 	}, io.Discard)
 	if err == nil || !strings.Contains(err.Error(), "service unavailable") {

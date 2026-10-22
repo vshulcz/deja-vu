@@ -227,7 +227,7 @@ func keyerTexts() []string {
 	}
 	r := rand.New(rand.NewSource(5567))
 	alphabet := []string{"a", "Z", "_", "-", " ", "ё", "Ё", "é", "́", "中", "國", "的", "了", "ｱ", "\xff", "1", "️", "ب", "َ", "\n", "Σ", "ß"}
-	for i := 0; i < 2000; i++ {
+	for range 2000 {
 		var b strings.Builder
 		for n := r.Intn(120); n > 0; n-- {
 			b.WriteString(alphabet[r.Intn(len(alphabet))])
@@ -297,7 +297,7 @@ func TestSpillWorkersAllocateNothingPerRepeatedWord(t *testing.T) {
 	var jobs []tokenJob
 	when := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
 	off := int64(0)
-	for i := 0; i < 20000; i++ {
+	for i := range 20000 {
 		text := fmt.Sprintf("The build FAILED on runSpillWorker: undefined zorbleFrobnicate in package main, step %d of the deploy pipeline 日本語のテスト", i%50)
 		jobs = append(jobs, tokenJob{text: text, offset: off, sid: uint32(i/40 + 1), when: when})
 		off += int64(len(text))

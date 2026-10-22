@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -28,7 +29,7 @@ func TestParseRefusesAnIncompleteChecksumFile(t *testing.T) {
 		t.Fatalf("arm64 = %q", p.arm64)
 	}
 
-	onlyOne := strings.SplitN(sample, "\n", 2)[0]
+	onlyOne, _, _ := strings.Cut(sample, "\n")
 	if _, err := parse("1.2.3", onlyOne); err == nil {
 		t.Fatal("a checksums file missing arm64 was accepted")
 	}
@@ -118,12 +119,12 @@ func TestRenderScoopIsStableAndComplete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		again, err := renderScoop(p)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if string(again) != string(first) {
+		if !bytes.Equal(again, first) {
 			t.Fatal("renderScoop output varies between calls")
 		}
 	}

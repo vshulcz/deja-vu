@@ -88,7 +88,7 @@ func TestFilesRowStripsWhatTheTerminalActsOn(t *testing.T) {
 	// before, so the row carrying them ended in a different column.
 	var widths []int
 	var rows []string
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		if strings.HasPrefix(line, "  ") {
 			rows = append(rows, line)
 			widths = append(widths, termwidth.Columns(line))

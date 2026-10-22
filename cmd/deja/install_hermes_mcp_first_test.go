@@ -210,7 +210,7 @@ func TestContinueAndGooseKeysWithCommentsRoundTrip(t *testing.T) {
 			if err := os.WriteFile(path, []byte(tc.cfg), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			for i := 0; i < 2; i++ {
+			for range 2 {
 				if _, err := tc.install("/bin/deja", false); err != nil {
 					t.Fatal(err)
 				}

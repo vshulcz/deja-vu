@@ -422,7 +422,7 @@ func codexProjectCWD(project string) string {
 			if err != nil {
 				continue
 			}
-			for _, cwd := range strings.Split(string(out), "\n") {
+			for cwd := range strings.SplitSeq(string(out), "\n") {
 				cwd = strings.TrimSpace(cwd)
 				if cwd == "" || cwdProjectName(cwd) != project || cwd == found {
 					continue

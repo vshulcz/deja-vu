@@ -17,7 +17,7 @@ func TestAWholeTaskThatWillNotParseIsReportedAsAPath(t *testing.T) {
 	dir := t.TempDir()
 	var b strings.Builder
 	b.WriteString("[")
-	for i := 0; i < 200; i++ {
+	for i := range 200 {
 		fmt.Fprintf(&b, `{"ts":%d,"type":"say","say":"text","text":"turn %d about the pool"},`, 1782900000+i, i)
 	}
 	truncated := strings.TrimSuffix(b.String(), ",") // no closing bracket

@@ -42,7 +42,7 @@ func TestShowNamesTheSessionsAroundASpawn(t *testing.T) {
 	// One long session spawns a hundred agents. Naming every child buries the
 	// count, which is the part a reader can act on.
 	many := make([]model.Session, 0, 161)
-	for i := 0; i < 161; i++ {
+	for i := range 161 {
 		many = append(many, model.Session{ID: "aa" + strings.Repeat("b", 8) + string(rune('a'+i%26))})
 	}
 	ChildrenOfSession = func(dir, id string) ([]model.Session, error) { return many, nil }

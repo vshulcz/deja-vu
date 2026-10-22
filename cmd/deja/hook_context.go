@@ -360,15 +360,17 @@ const noteWidth = 100
 // noteWidth, so a long tally drops out of the line instead of wrapping it.
 func fitNote(base string, parts ...string) string {
 	n := termwidth.Columns(base)
+	var baseSb363 strings.Builder
 	for _, p := range parts {
 		if p == "" {
 			continue
 		}
 		if m := termwidth.Columns(p); n+m <= noteWidth {
-			base += p
+			baseSb363.WriteString(p)
 			n += m
 		}
 	}
+	base += baseSb363.String()
 	return base
 }
 
@@ -1038,7 +1040,7 @@ func noteIsNews(p, note string) bool {
 	}
 	h := fnv.New64a()
 	_, _ = h.Write([]byte(note))
-	sum := fmt.Sprintf("%x", h.Sum64())
+	sum := strconv.FormatUint(h.Sum64(), 16)
 	if b, err := os.ReadFile(p); err == nil {
 		parts := strings.Fields(string(b))
 		if len(parts) == 2 && parts[0] == sum {
@@ -1056,7 +1058,7 @@ func noteIsNews(p, note string) bool {
 func receiptIsNews(dir, digest string) bool {
 	h := fnv.New64a()
 	_, _ = h.Write([]byte(digest))
-	sum := fmt.Sprintf("%x", h.Sum64())
+	sum := strconv.FormatUint(h.Sum64(), 16)
 	p := dir + ".receipt"
 	if b, err := os.ReadFile(p); err == nil {
 		parts := strings.Fields(string(b))
@@ -1932,7 +1934,7 @@ func serviceReceipt(dir string) string {
 		parts = append(parts, fmt.Sprintf("%d recall%s", served, pluralS(served)))
 	}
 	if n.Injections > 0 {
-		parts = append(parts, fmt.Sprintf("memory arrived %s", timesToday(n.Injections)))
+		parts = append(parts, "memory arrived "+timesToday(n.Injections))
 	}
 	// The bytes stay in the gate above and out of the line: "3.1 KB distilled
 	// from 40 KB" was a number nobody acted on, and it pushed the receipt

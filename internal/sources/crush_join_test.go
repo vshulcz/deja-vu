@@ -10,17 +10,19 @@ import (
 func crushJoinRecords(t *testing.T, session string, rows [][]any) []string {
 	t.Helper()
 	sql := "insert into sessions values ('" + session + "',null,'retry',2,0,0,0.0,1784282499,1784282400,null,null);\n"
+	var sqlSb13 strings.Builder
 	for i, r := range rows {
 		kind, id, tool, payload, isErr := r[0].(string), r[1].(string), r[2].(string), r[3].(string), r[4].(bool)
 		at := int64(1784282400 + i)
 		if kind == "call" {
-			sql += crushInsert(t, "m"+itoa(i), session, "assistant", at, []any{
-				map[string]any{"type": "tool_call", "data": map[string]any{"id": id, "name": tool, "input": payload, "finished": true}}})
+			sqlSb13.WriteString(crushInsert(t, "m"+itoa(i), session, "assistant", at, []any{
+				map[string]any{"type": "tool_call", "data": map[string]any{"id": id, "name": tool, "input": payload, "finished": true}}}))
 		} else {
-			sql += crushInsert(t, "m"+itoa(i), session, "tool", at, []any{
-				map[string]any{"type": "tool_result", "data": map[string]any{"tool_call_id": id, "name": tool, "content": payload, "is_error": isErr}}})
+			sqlSb13.WriteString(crushInsert(t, "m"+itoa(i), session, "tool", at, []any{
+				map[string]any{"type": "tool_result", "data": map[string]any{"tool_call_id": id, "name": tool, "content": payload, "is_error": isErr}}}))
 		}
 	}
+	sql += sqlSb13.String()
 	ss, err := ParseCrushDB(crushStore(t, "proj", sql))
 	if err != nil {
 		t.Fatal(err)

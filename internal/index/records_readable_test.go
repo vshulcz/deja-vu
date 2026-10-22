@@ -32,7 +32,7 @@ func TestSearchToleratesAnInFlightAppend(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.Write([]byte("uncommitted appended tail bytes not in any bucket")); err != nil {
+	if _, err := f.WriteString("uncommitted appended tail bytes not in any bucket"); err != nil {
 		t.Fatal(err)
 	}
 	_ = f.Close()

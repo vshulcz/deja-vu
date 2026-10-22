@@ -1,8 +1,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -292,9 +294,9 @@ func hermesEditEntry(lines []string, exe string) (out []string, note string, don
 		// one Hermes reads, and dropping that one would change what runs.
 		if len(keep) == 1 && keep[0] == entries[len(entries)-1] {
 			lines = append([]string(nil), lines...)
-			for i := len(entries) - 1; i >= 0; i-- {
-				if entries[i] != keep[0] {
-					lines = append(lines[:entries[i].start], lines[entries[i].end:]...)
+			for _, entrie := range slices.Backward(entries) {
+				if entrie != keep[0] {
+					lines = append(lines[:entrie.start], lines[entrie.end:]...)
 				}
 			}
 			entries = hermesDejaEntries(lines)
@@ -333,7 +335,7 @@ func hermesEditEntry(lines []string, exe string) (out []string, note string, don
 		return out, n, done, err
 	}
 	if !hermesSpanPlain(lines, e.start, e.end) {
-		return nil, "", false, fmt.Errorf("mcp_servers.deja holds a value that runs over several lines (a flow collection or a quoted string), and deja edits only one-line values — rewrite it that way and run this again")
+		return nil, "", false, errors.New("mcp_servers.deja holds a value that runs over several lines (a flow collection or a quoted string), and deja edits only one-line values — rewrite it that way and run this again")
 	}
 	fields, indent := hermesFields(lines, e)
 	if len(fields) == 0 {
@@ -497,7 +499,7 @@ func yamlDejaEntriesRemovable(text, topKey string) error {
 			return fmt.Errorf("%s holds a value that runs over several lines, and taking it out by hand is safer — remove the deja entry and run this again", name)
 		}
 		_, rest, _ := hermesKeyLine(lines[e.start])
-		for _, tok := range strings.Fields(stripYAMLComment(rest)) {
+		for tok := range strings.FieldsSeq(stripYAMLComment(rest)) {
 			if a, ok := strings.CutPrefix(tok, "&"); ok && a != "" && strings.Contains(text, "*"+a) {
 				return fmt.Errorf("%s carries the anchor &%s, which *%s still uses — remove the deja entry by hand and run this again", name, a, a)
 			}

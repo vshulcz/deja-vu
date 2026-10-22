@@ -212,8 +212,8 @@ func copilotChatMatch(p string) bool {
 func copilotChatDropJSONSiblings(files []string) []string {
 	hasLog := make(map[string]bool)
 	for _, p := range files {
-		if strings.HasSuffix(p, ".jsonl") {
-			hasLog[strings.TrimSuffix(p, ".jsonl")] = true
+		if before, ok := strings.CutSuffix(p, ".jsonl"); ok {
+			hasLog[before] = true
 		}
 	}
 	var out []string

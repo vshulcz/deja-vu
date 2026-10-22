@@ -237,7 +237,7 @@ func safeGitRelativePath(name string) bool {
 	if name == "" || filepath.IsAbs(name) || strings.Contains(name, "\\") {
 		return false
 	}
-	for _, component := range strings.Split(name, "/") {
+	for component := range strings.SplitSeq(name, "/") {
 		if component == "" || component == "." || component == ".." {
 			return false
 		}

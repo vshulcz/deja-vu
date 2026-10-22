@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -50,7 +51,7 @@ func Share(s model.Session, budget int) string {
 			if text == "" {
 				continue
 			}
-			chunk := fmt.Sprintf("%s\n\n", text)
+			chunk := text + "\n\n"
 			// At a message boundary, with no cut marker: the marker promises
 			// that nothing follows it, and something does — the section this
 			// ceiling exists to leave room for. The block's closing sentence
@@ -74,7 +75,7 @@ func Share(s model.Session, budget int) string {
 			if text == "" {
 				continue
 			}
-			chunk := fmt.Sprintf("%s\n\n", text)
+			chunk := text + "\n\n"
 			cut := b.Len()+len(chunk) > budget
 			if cut {
 				chunk = cutMarked(chunk, budget-b.Len())
@@ -157,7 +158,7 @@ func looksLikeProse(line string) bool {
 		return true
 	}
 	letters, total, wordish, spaceless := 0, 0, 0, 0
-	for _, f := range strings.Fields(line) {
+	for f := range strings.FieldsSeq(line) {
 		hasLetter := false
 		for _, r := range f {
 			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r >= 0x80 {
@@ -277,7 +278,7 @@ func IsDocumentItem(message, line string) bool {
 		return false
 	}
 	lines, marked := 0, 0
-	for _, l := range strings.Split(message, "\n") {
+	for l := range strings.SplitSeq(message, "\n") {
 		if strings.TrimSpace(l) == "" {
 			continue
 		}
@@ -503,10 +504,8 @@ func ProjectNameCandidates(cwd string) []string {
 	cwd = projectRoot(cwd)
 	names := []string{sources.ClaudeProjectName(cwd)}
 	add := func(name string) {
-		for _, n := range names {
-			if n == name {
-				return
-			}
+		if slices.Contains(names, name) {
+			return
 		}
 		names = append(names, name)
 	}
@@ -579,7 +578,7 @@ func gitWorktreeRoots(cwd string) []string {
 	// same path and dedupe away, and a root spelled differently — through a
 	// symlink — is a spelling recall wants to see.
 	var roots []string
-	for _, line := range strings.Split(string(out), "\n") {
+	for line := range strings.SplitSeq(string(out), "\n") {
 		p, ok := strings.CutPrefix(line, "worktree ")
 		p = strings.TrimSpace(p)
 		if !ok || p == "" {
@@ -776,7 +775,7 @@ func compactionIntent(summary string) string {
 		rest = rest[:j]
 	}
 	var kept []string
-	for _, line := range strings.Split(rest, "\n") {
+	for line := range strings.SplitSeq(rest, "\n") {
 		line = strings.TrimRight(line, " \t")
 		if strings.TrimSpace(line) == "" {
 			if len(kept) == 0 {
@@ -991,8 +990,8 @@ func tailSection(s model.Session, budget int) string {
 		picked = append(picked, m)
 	}
 	var b strings.Builder
-	for i := len(picked) - 1; i >= 0; i-- {
-		m := picked[i]
+	for _, m := range slices.Backward(picked) {
+
 		chunk := fmt.Sprintf("**%s:** %s\n\n", m.Role, MessageText(m.Text))
 		cut := b.Len()+len(chunk) > budget
 		if cut {
@@ -1235,7 +1234,7 @@ func withoutDejaLines(text string) string {
 		return text
 	}
 	var kept []string
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		if !quotesDeja(strings.ToLower(line)) {
 			kept = append(kept, line)
 		}

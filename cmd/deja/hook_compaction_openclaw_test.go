@@ -104,7 +104,7 @@ await h.before_compaction({ messageCount: 4, messages: [], sessionFile: "/s/sa1.
 		t.Fatal(err)
 	}
 	got := map[string]map[string]any{}
-	for _, l := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+	for l := range strings.SplitSeq(strings.TrimSpace(string(b)), "\n") {
 		sub, body, _ := strings.Cut(l, "\t")
 		var m map[string]any
 		if err := json.Unmarshal([]byte(body), &m); err != nil {

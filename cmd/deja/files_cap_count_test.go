@@ -27,7 +27,7 @@ func TestFilesSaysWhenTheReadBudgetBit(t *testing.T) {
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
 	const over = 40
 	total := filesMaxSessions + over
-	for i := 0; i < total; i++ {
+	for i := range total {
 		id := fmt.Sprintf("s%04d", i)
 		day := 1 + i/24
 		hour := i % 24

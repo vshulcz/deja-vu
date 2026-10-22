@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -130,10 +131,7 @@ func (h *fakeRxHost) handle(f rxFrame) {
 		h.mu.Lock()
 		data := h.content[p.ContentRef]
 		h.mu.Unlock()
-		end := p.Offset + 5
-		if end > int64(len(data)) {
-			end = int64(len(data))
-		}
+		end := min(p.Offset+5, int64(len(data)))
 		page := map[string]any{"contentRef": p.ContentRef, "offset": p.Offset, "encoding": "utf8",
 			"dataBase64": base64.StdEncoding.EncodeToString(data[p.Offset:end]), "totalBytes": len(data)}
 		if end < int64(len(data)) {
@@ -164,7 +162,7 @@ func (h *fakeRxHost) raw(line string) {
 func (h *fakeRxHost) request(method string, params any) rxFrame {
 	h.t.Helper()
 	h.nextID++
-	id := json.RawMessage(fmt.Sprint(h.nextID))
+	id := json.RawMessage(strconv.Itoa(h.nextID))
 	b, _ := json.Marshal(params)
 	h.write(rxFrame{ID: id, Method: method, Params: b})
 	return h.await(id)
@@ -304,7 +302,7 @@ func TestReasonixExtSurvivesMalformedFrames(t *testing.T) {
 		t.Errorf("unknown method answer = %+v, want -32601", f.Error)
 	}
 	h.nextID++
-	id := json.RawMessage(fmt.Sprint(h.nextID))
+	id := json.RawMessage(strconv.Itoa(h.nextID))
 	h.write(rxFrame{ID: id, Method: "extension/intercept", Params: json.RawMessage(`"not an object"`)})
 	if f := h.await(id); f.Error == nil || f.Error.Code != -32602 {
 		t.Errorf("unreadable intercept answer = %+v, want -32602", f.Error)

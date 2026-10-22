@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -369,8 +370,8 @@ func rotateSnapshots(p string, incoming int) {
 	var buf bytes.Buffer
 	for {
 		buf.Reset()
-		for i := len(snaps) - 1; i >= 0; i-- {
-			if b, err := marshalSnapshot(snaps[i]); err == nil {
+		for _, snap := range slices.Backward(snaps) {
+			if b, err := marshalSnapshot(snap); err == nil {
 				buf.Write(append(b, '\n'))
 			}
 		}
@@ -527,10 +528,7 @@ func boundTerms(terms []string) []string {
 	if total <= termsRoom {
 		return terms
 	}
-	each := termsRoom/max(len(terms), 1) - 3
-	if each < 8 {
-		each = 8
-	}
+	each := max(termsRoom/max(len(terms), 1)-3, 8)
 	out := make([]string, len(terms))
 	for i, t := range terms {
 		if len(t) > each {
@@ -575,12 +573,12 @@ func forgetSnapshotsLocked(p string, drop func(Snapshot) bool) (int, error) {
 	// Back to the order the file was written in, so the surviving records keep
 	// their positions: the rotation and `--last` both read this file as
 	// appended (#2140).
-	for i := len(snaps) - 1; i >= 0; i-- {
-		if drop(snaps[i]) {
+	for _, snap := range slices.Backward(snaps) {
+		if drop(snap) {
 			gone++
 			continue
 		}
-		b, err := marshalSnapshot(snaps[i])
+		b, err := marshalSnapshot(snap)
 		if err != nil {
 			continue
 		}

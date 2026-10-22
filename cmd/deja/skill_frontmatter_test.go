@@ -74,9 +74,9 @@ func frontmatterField(text, key string) string {
 	if end < 0 {
 		return ""
 	}
-	for _, line := range strings.Split(text[3:3+end], "\n") {
-		if strings.HasPrefix(line, key+":") {
-			return strings.TrimSpace(strings.TrimPrefix(line, key+":"))
+	for line := range strings.SplitSeq(text[3:3+end], "\n") {
+		if after0, ok := strings.CutPrefix(line, key+":"); ok {
+			return strings.TrimSpace(after0)
 		}
 	}
 	return ""

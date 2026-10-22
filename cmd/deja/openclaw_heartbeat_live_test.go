@@ -108,7 +108,7 @@ await pack(b);
 	}
 	got := readFile(t, calls)
 	var prompts, tools, digests int
-	for _, l := range strings.Split(strings.TrimSpace(got), "\n") {
+	for l := range strings.SplitSeq(strings.TrimSpace(got), "\n") {
 		sub, payload, _ := strings.Cut(l, " ")
 		switch sub {
 		case "hook-prompt":

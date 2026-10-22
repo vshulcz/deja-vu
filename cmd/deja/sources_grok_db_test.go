@@ -45,7 +45,7 @@ INSERT INTO messages VALUES ('s2',0,'user','{"role":"user","content":"the retry 
 	// printed zeros.
 	out := captureStdout(t, func() { printSources(filepath.Join(home, "index.db")) })
 	line := ""
-	for _, l := range strings.Split(out, "\n") {
+	for l := range strings.SplitSeq(out, "\n") {
 		if strings.HasPrefix(l, "grok\t") {
 			line = l
 		}

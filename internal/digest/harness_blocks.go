@@ -2,6 +2,7 @@ package digest
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -203,15 +204,15 @@ func checkpointTurn(prompt string) string {
 	}
 	turn := ""
 	marks := checkpointEntryRE.FindAllStringIndex(recent, -1)
-	for i := len(marks) - 1; i >= 0; i-- {
-		if recent[marks[i][0]:marks[i][1]] != "[User]" {
+	for i, mark := range slices.Backward(marks) {
+		if recent[mark[0]:mark[1]] != "[User]" {
 			continue
 		}
 		to := len(recent)
 		if i+1 < len(marks) {
 			to = marks[i+1][0]
 		}
-		text := strings.TrimSpace(strings.TrimPrefix(recent[marks[i][1]:to], ":"))
+		text := strings.TrimSpace(strings.TrimPrefix(recent[mark[1]:to], ":"))
 		// A directory switch is serialised as a [User] line the person never typed.
 		if strings.HasPrefix(text, "The working directory has been changed to ") {
 			continue

@@ -201,7 +201,7 @@ func TestCopilotSubagentKeepsItsTaskTailAndEdits(t *testing.T) {
 	t.Setenv("DEJA_COPILOT_ROOT", root)
 	lines := copilotSubagentLines(copilotParentID, "2026-10-18T05:31:46.707Z")
 	run := lines[:8]
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		run = append(run, `{"type":"assistant.message","agentId":"`+copilotChildID+`","data":{"content":"reading more of the repo, step `+string(rune('a'+i))+`"},"timestamp":"2026-10-18T05:31:50.00`+string(rune('0'+i))+`Z"}`)
 	}
 	p := writeCopilotFixture(t, root, copilotParentID, append(run, lines[8:]...))

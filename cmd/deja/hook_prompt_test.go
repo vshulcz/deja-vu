@@ -3,8 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
-	"github.com/vshulcz/deja-vu/internal/prompt"
 	"io"
 	"os"
 	"path/filepath"
@@ -12,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/prompt"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/stats"
@@ -218,7 +218,7 @@ func TestLimitHandoffTipSkipsTheStartingSession(t *testing.T) {
 func TestSSHSyncTipThresholdAndOnce(t *testing.T) {
 	withStatsStores(t)
 	var ss []model.Session
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		ss = append(ss, model.Session{ID: strconv.Itoa(i), Messages: []model.Message{{Role: "user", Text: "run ssh mini and check"}}})
 	}
 	tip := sshSyncTip(index.DefaultDir(), ss)
@@ -433,8 +433,8 @@ func TestHookPromptSkipsMarathonSessions(t *testing.T) {
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
 	old := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
 	var lines []string
-	for i := 0; i < dejaVuMaxMessages+10; i++ {
-		lines = append(lines, `{"type":"user","sessionId":"hay","timestamp":"`+old+`","message":{"role":"user","content":"quetzalcoatl stampede msg `+fmt.Sprint(i)+`"}}`)
+	for i := range dejaVuMaxMessages + 10 {
+		lines = append(lines, `{"type":"user","sessionId":"hay","timestamp":"`+old+`","message":{"role":"user","content":"quetzalcoatl stampede msg `+strconv.Itoa(i)+`"}}`)
 	}
 	writeClaudeFixture(t, filepath.Join(claudeRoot, "-tmp-hay", "hay.jsonl"), "hay", lines)
 	writeClaudeFixture(t, filepath.Join(claudeRoot, "-tmp-hay", "focus.jsonl"), "focus", []string{

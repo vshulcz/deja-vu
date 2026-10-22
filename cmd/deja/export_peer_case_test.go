@@ -20,7 +20,7 @@ func TestOneMachineSettlesUnderOneWatermarkWhicheverCase(t *testing.T) {
 		t.Fatal(err)
 	}
 	var lines []string
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		lines = append(lines, `{"type":"user","sessionId":"s`+string(rune('a'+i))+`","cwd":"/proj","timestamp":"2026-08-20T10:0`+string(rune('0'+i))+`:00Z","message":{"role":"user","content":"retry loop"}}`)
 	}
 	if err := os.WriteFile(filepath.Join(store, "s.jsonl"), []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {

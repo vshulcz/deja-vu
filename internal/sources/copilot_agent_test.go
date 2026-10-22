@@ -65,10 +65,12 @@ func TestCopilotAgentTranscriptIsReadAndSearchable(t *testing.T) {
 	}
 	var roles []string
 	var joined string
+	var joinedSb68 strings.Builder
 	for _, m := range s.Messages {
 		roles = append(roles, m.Role)
-		joined += m.Role + ": " + m.Text + "\n"
+		joinedSb68.WriteString(m.Role + ": " + m.Text + "\n")
 	}
+	joined += joinedSb68.String()
 	for _, want := range []string{"why does the packer manifest fail", "names a source that is not built"} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("%q is missing from the session:\n%s", want, joined)

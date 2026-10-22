@@ -226,7 +226,7 @@ func TestRerankUsesBestDuplicateAndRejectsEmptyQueryVector(t *testing.T) {
 		t.Fatalf("rerank = %#v, %v", got, err)
 	}
 	var many []search.Hit
-	for i := 0; i < 65; i++ {
+	for i := range 65 {
 		many = append(many, search.Hit{Session: session("a"), Score: float64(i)})
 	}
 	if _, err := Rerank(context.Background(), many, "q", sidecar, &Client{URL: s.URL}); err != nil {

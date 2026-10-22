@@ -20,7 +20,7 @@ func TestImportedOrdinalsAreDistinctAndCheap(t *testing.T) {
 	}
 	var body []byte
 	const n = 300
-	for i := 0; i < n; i++ {
+	for i := range n {
 		b, err := json.Marshal(SyncRecord{Harness: "claude", SessionID: fixedID(i), Project: "work/api",
 			Role: "user", Text: "record about the pool cap"})
 		if err != nil {

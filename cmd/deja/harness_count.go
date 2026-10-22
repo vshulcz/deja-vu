@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"strconv"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -32,7 +32,7 @@ func spelledCount(n int) string {
 		"thirty-two", "thirty-three", "thirty-four", "thirty-five", "thirty-six",
 		"thirty-seven", "thirty-eight", "thirty-nine", "forty"}
 	if n < 0 || n >= len(words) {
-		return fmt.Sprint(n)
+		return strconv.Itoa(n)
 	}
 	return words[n]
 }

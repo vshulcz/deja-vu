@@ -31,10 +31,10 @@ func frictionIgnoreStore(t *testing.T) string {
 			t.Fatal(err)
 		}
 	}
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		write("keep", fmt.Sprintf("k%d", i))
 	}
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		write("scratch", fmt.Sprintf("s%d", i))
 	}
 	dir := filepath.Join(home, "index.db")
@@ -76,7 +76,7 @@ func TestTopFrictionDropsAWallOnlyTheIgnoredTreeHits(t *testing.T) {
 	if err := os.WriteFile(policyFile, []byte(`{"ignore":["*scratch*"]}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		id := fmt.Sprintf("s%d", i)
 		p := filepath.Join(root, "-w-scratch", id+".jsonl")
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {

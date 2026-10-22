@@ -12,7 +12,7 @@ import (
 // the middle of a rune and the page then shows a replacement glyph.
 func TestSessionPreviewCutsOnARuneBoundary(t *testing.T) {
 	var msgs []model.Message
-	for i := 0; i < 90; i++ {
+	for range 90 {
 		msgs = append(msgs, model.Message{Role: "user", Text: "x" + strings.Repeat("é", 40)})
 	}
 	// The trailing cut moved to clipForPage, which runs after the redaction —

@@ -244,9 +244,11 @@ func relevanceWords(s model.Session) int {
 
 func sessionWordSet(s model.Session) map[string]bool {
 	text := s.Title
+	var textSb247 strings.Builder
 	for _, m := range s.Messages {
-		text += " " + m.Text
+		textSb247.WriteString(" " + m.Text)
 	}
+	text += textSb247.String()
 	return wordSet(text)
 }
 
@@ -869,17 +871,19 @@ func densestLine(text string, terms []string) (string, int) {
 	// equal-volume control — one line before the match and one after — falls to
 	// 25, so the gain is the direction and not the size.
 	took := 0
+	var bestSb872 strings.Builder
 	for _, next := range lines[bestAt+1:] {
 		next = strings.TrimSpace(next)
 		if next == "" {
 			continue
 		}
-		best += " " + next
+		bestSb872.WriteString(" " + next)
 		took++
 		if took == 2 {
 			break
 		}
 	}
+	best += bestSb872.String()
 	return best, bestHits
 }
 
@@ -1105,14 +1109,8 @@ func lineAround(s string, n int, terms []string) string {
 	// A little before the match, so the reader lands on a phrase rather than
 	// mid-word, and the rest of the budget after it.
 	const lead = 40
-	start := at - lead
-	if start < 0 {
-		start = 0
-	}
-	end := start + n
-	if end > len(r) {
-		end = len(r)
-	}
+	start := max(at-lead, 0)
+	end := min(start+n, len(r))
 	out := strings.TrimSpace(string(r[start:end]))
 	if start > 0 {
 		out = "…" + out
@@ -1179,7 +1177,7 @@ func EarlierAttempts(ss []model.Session) map[string]string {
 			if isWorkRecord(m.Role) {
 				continue
 			}
-			for _, w := range strings.Fields(lower(m.Text)) {
+			for w := range strings.FieldsSeq(lower(m.Text)) {
 				if len(w) > 3 {
 					set[w] = true
 				}

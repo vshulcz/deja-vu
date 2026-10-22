@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -22,11 +23,11 @@ func TestAFleetOfSpawnedAgentsEachGetMemory(t *testing.T) {
 	// neither the idf floor nor the "one or two sessions identify themselves"
 	// rescue, and the ranking then matches nothing — which is the fixture
 	// mistake 465 measured, not a property of the hook.
-	for k := 0; k < 2; k++ {
+	for k := range 2 {
 		id := fmt.Sprintf("kafka%d", k)
 		writeClaudeFixture(t, filepath.Join(root, "app", id+".jsonl"), id, []string{
-			`{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-0` + fmt.Sprint(k+2) + `T03:04:05Z","message":{"role":"user","content":"the kafka consumer rebalance keeps flapping on the orders topic"}}`,
-			`{"type":"assistant","sessionId":"` + id + `","timestamp":"2026-01-0` + fmt.Sprint(k+2) + `T03:04:06Z","message":{"role":"assistant","content":"The fix was to raise session.timeout.ms above the poll interval; nothing else held."}}`,
+			`{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-0` + strconv.Itoa(k+2) + `T03:04:05Z","message":{"role":"user","content":"the kafka consumer rebalance keeps flapping on the orders topic"}}`,
+			`{"type":"assistant","sessionId":"` + id + `","timestamp":"2026-01-0` + strconv.Itoa(k+2) + `T03:04:06Z","message":{"role":"assistant","content":"The fix was to raise session.timeout.ms above the poll interval; nothing else held."}}`,
 		})
 	}
 	// Unrelated work, so the words of the question carry weight: in a store
@@ -37,8 +38,8 @@ func TestAFleetOfSpawnedAgentsEachGetMemory(t *testing.T) {
 		"the feature flags", "the toast component", "the graphql schema"} {
 		id := fmt.Sprintf("t%d", i)
 		writeClaudeFixture(t, filepath.Join(root, "app", id+".jsonl"), id, []string{
-			`{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-01T0` + fmt.Sprint(i%10) + `:00:00Z","message":{"role":"user","content":"work on ` + top + ` today"}}`,
-			`{"type":"assistant","sessionId":"` + id + `","timestamp":"2026-01-01T0` + fmt.Sprint(i%10) + `:00:01Z","message":{"role":"assistant","content":"changed ` + top + ` and the tests pass"}}`,
+			`{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-01T0` + strconv.Itoa(i%10) + `:00:00Z","message":{"role":"user","content":"work on ` + top + ` today"}}`,
+			`{"type":"assistant","sessionId":"` + id + `","timestamp":"2026-01-01T0` + strconv.Itoa(i%10) + `:00:01Z","message":{"role":"assistant","content":"changed ` + top + ` and the tests pass"}}`,
 		})
 	}
 	if _, err := captureRun(t, "index"); err != nil {

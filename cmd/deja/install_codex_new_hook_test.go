@@ -32,9 +32,11 @@ func TestCodexInstallNamesTheHooksLeftToApprove(t *testing.T) {
 			}
 			hooks := filepath.Join(home, "hooks.json")
 			cfg := "model = \"gpt-5\"\n"
+			var cfgSb35 strings.Builder
 			for _, e := range c.events {
-				cfg += "\n[hooks.state." + strconv.Quote(hooks+":"+e+":0:0") + "]\ntrusted_hash = \"sha256:00\"\n"
+				cfgSb35.WriteString("\n[hooks.state." + strconv.Quote(hooks+":"+e+":0:0") + "]\ntrusted_hash = \"sha256:00\"\n")
 			}
+			cfg += cfgSb35.String()
 			if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte(cfg), 0o644); err != nil {
 				t.Fatal(err)
 			}
@@ -44,11 +46,13 @@ func TestCodexInstallNamesTheHooksLeftToApprove(t *testing.T) {
 				}
 			})
 			said := ""
-			for _, l := range strings.Split(out, "\n") {
+			var saidSb47 strings.Builder
+			for l := range strings.SplitSeq(out, "\n") {
 				if strings.HasPrefix(l, "codex: ") {
-					said += l
+					saidSb47.WriteString(l)
 				}
 			}
+			said += saidSb47.String()
 			if c.want == "" && said != "" || c.want != "" && !strings.Contains(said, c.want) {
 				t.Errorf("install said %q, want %q", said, c.want)
 			}

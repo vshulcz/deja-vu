@@ -54,7 +54,7 @@ func TestCRLFCommentedConfigsRoundTrip(t *testing.T) {
 			if err := os.WriteFile(path, []byte(seed), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			for i := 0; i < 2; i++ {
+			for i := range 2 {
 				if _, err := c.write(path, false); err != nil {
 					t.Fatalf("install %d: %v", i+1, err)
 				}

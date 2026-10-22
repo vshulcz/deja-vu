@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -95,7 +96,7 @@ func (h *fnv) str(s string) {
 }
 
 func (h *fnv) num(n uint64) {
-	for i := 0; i < 8; i++ {
+	for range 8 {
 		*h = (*h ^ fnv(n&0xff)) * fnvPrime
 		n >>= 8
 	}
@@ -295,10 +296,7 @@ func EmbedIndex(dir string, client *Client, keep func(index.Record) bool) (Sidec
 	pending := toEmbed(recs, covered)
 	batches := 0
 	for len(pending) > 0 {
-		n := len(pending)
-		if n > embedBatch {
-			n = embedBatch
-		}
+		n := min(len(pending), embedBatch)
 		texts := make([]string, n)
 		for i := range pending[:n] {
 			texts[i] = client.PassagePrefix + truncate(pending[i].Record.Text)
@@ -445,13 +443,13 @@ func readFile(path string) (Sidecar, error) {
 	r := bufio.NewReaderSize(f, 1<<16)
 	var got [4]byte
 	if _, err = io.ReadFull(r, got[:]); err != nil || got != magic {
-		return Sidecar{}, fmt.Errorf("invalid vector sidecar")
+		return Sidecar{}, errors.New("invalid vector sidecar")
 	}
 	var version, dim uint16
 	var count, covered uint64
 	var model, gen string
 	if err = binary.Read(r, binary.LittleEndian, &version); err != nil || version < 1 || version > sidecarVersion {
-		return Sidecar{}, fmt.Errorf("unsupported vector sidecar")
+		return Sidecar{}, errors.New("unsupported vector sidecar")
 	}
 	if err = binary.Read(r, binary.LittleEndian, &dim); err != nil {
 		return Sidecar{}, err
@@ -466,7 +464,7 @@ func readFile(path string) (Sidecar, error) {
 		return Sidecar{}, err
 	}
 	if count > 10_000_000 || dim > 16_384 {
-		return Sidecar{}, fmt.Errorf("invalid vector sidecar dimensions")
+		return Sidecar{}, errors.New("invalid vector sidecar dimensions")
 	}
 	if err = binary.Read(r, binary.LittleEndian, &covered); err != nil {
 		return Sidecar{}, err

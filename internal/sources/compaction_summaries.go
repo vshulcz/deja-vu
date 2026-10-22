@@ -27,7 +27,7 @@ var antigravityCheckpointMarker = regexp.MustCompile(`^\{\{ CHECKPOINT \d+ \}\}$
 // checkpoint with nothing else in it is "".
 func antigravityCheckpointSummary(content string) string {
 	var keep []string
-	for _, line := range strings.Split(content, "\n") {
+	for line := range strings.SplitSeq(content, "\n") {
 		t := strings.TrimSpace(line)
 		if antigravityCheckpointMarker.MatchString(t) ||
 			strings.HasPrefix(t, "**The earlier parts of this conversation have been truncated") ||

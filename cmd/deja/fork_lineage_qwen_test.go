@@ -49,7 +49,7 @@ func qwenForkStore(t *testing.T) (dir, source, fork, forkPath string) {
 		}
 		return p
 	}
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		id := fmt.Sprintf("%08d-0000-4000-8000-000000000000", i)
 		d := -time.Duration(i+2) * time.Hour
 		write(id, turn(id, "", fmt.Sprintf("rename table%d in the billing schema", i), "done", d))

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync/atomic"
@@ -229,10 +230,8 @@ func (a *commandFailAcc) output(key, text string) {
 	// and the rest is that failure repeating itself.
 	f := commandFailPair{Head: s.Pending, Line: line}
 	s.Pending = ""
-	for _, have := range s.Fails {
-		if have == f {
-			return
-		}
+	if slices.Contains(s.Fails, f) {
+		return
 	}
 	s.Fails = append(s.Fails, f)
 }

@@ -40,7 +40,7 @@ func TestAPeerNameCannotWriteOnTheReport(t *testing.T) {
 	// One row per peer: a name with a newline in it must not become a second
 	// line that reads as deja's own.
 	rows := 0
-	for _, line := range strings.Split(sync, "\n") {
+	for line := range strings.SplitSeq(sync, "\n") {
 		if strings.Contains(line, "last exchange") {
 			rows++
 		}

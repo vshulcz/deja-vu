@@ -18,6 +18,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -142,7 +143,7 @@ func main() {
 		cleanup()
 	}
 
-	sort.Slice(searchTimes, func(i, j int) bool { return searchTimes[i] < searchTimes[j] })
+	slices.Sort(searchTimes)
 	fmt.Printf("\nLoCoMo · deja production retrieval path (session-level, lexical ladder, no LLM)\n")
 	fmt.Printf("questions: %d · wall: %s · median search: %s\n\n", total.n, time.Since(start).Round(time.Second), searchTimes[len(searchTimes)/2].Round(time.Microsecond))
 	names := map[string]string{"1": "multi-hop", "2": "temporal", "3": "open-domain", "4": "single-hop", "5": "adversarial*"}

@@ -200,7 +200,7 @@ func TestKimiSubagentIsReadByDefaultAsTaskAnswerAndChanges(t *testing.T) {
 	var b strings.Builder
 	b.WriteString(`{"type":"context.append_message","agentId":"agent-0","message":{"role":"user","content":[{"type":"text","text":"Ticket KQC-12 child task: create child2.txt"}],"origin":{"kind":"system_trigger","name":"subagent"}},"time":1792304060100}` + "\n")
 	b.WriteString(`{"type":"context.append_loop_event","agentId":"agent-0","event":{"type":"tool.call","toolCallId":"w1","name":"Write","args":{"path":"child2.txt","content":"the coder sub agent wrote this particular line KQC-12\n"}},"time":1792304060200}` + "\n")
-	for i := 0; i < 8; i++ {
+	for range 8 {
 		b.WriteString(`{"type":"context.append_loop_event","agentId":"agent-0","event":{"type":"tool.result","toolCallId":"r","result":{"output":"middleneedle reading"}},"time":1792304060300}` + "\n")
 	}
 	b.WriteString(`{"type":"context.append_message","agentId":"agent-0","message":{"role":"assistant","content":[{"type":"text","text":"created child2.txt"}]},"time":1792304060400}` + "\n")

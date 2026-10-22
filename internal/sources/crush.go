@@ -119,7 +119,7 @@ func crushSummaryExpr(db string) string {
 	out, _ := sqliteOutput(db, "select name from pragma_table_info('sessions') where name='summary_message_id'"+
 		" union all select name from pragma_table_info('messages') where name='is_summary_message'")
 	var conds []string
-	for _, col := range strings.Fields(string(out)) {
+	for col := range strings.FieldsSeq(string(out)) {
 		switch col {
 		case "summary_message_id":
 			conds = append(conds, "m.id = coalesce(s.summary_message_id,'')")

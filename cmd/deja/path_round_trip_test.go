@@ -57,7 +57,7 @@ func TestAPrintedPathFindsItsOwnSpan(t *testing.T) {
 	// The premise: blame found the file at all, or there is no printed path to
 	// carry anywhere.
 	printed := ""
-	for _, line := range strings.Split(blamed, "\n") {
+	for line := range strings.SplitSeq(blamed, "\n") {
 		if f := strings.TrimSpace(line); strings.HasSuffix(f, "spaces.go") {
 			printed = f
 			break

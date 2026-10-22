@@ -301,7 +301,7 @@ func readRecordOffsetsFor(dir string, f *os.File, keys map[string]bool) (recordO
 		p += n
 		offs := make([]int64, 0, cnt)
 		prev := int64(0)
-		for i := uint64(0); i < cnt; i++ {
+		for range cnt {
 			d, n := binary.Uvarint(b[p:])
 			if n <= 0 {
 				return false
@@ -314,7 +314,7 @@ func readRecordOffsetsFor(dir string, f *os.File, keys map[string]bool) (recordO
 		return true
 	}
 	if keys == nil {
-		for i := 0; i < nkeys; i++ {
+		for i := range nkeys {
 			_, at := entryAt(i)
 			if !decode(at, "") {
 				return recordOffsets{}, errNoRecordOffsets

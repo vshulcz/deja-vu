@@ -2,10 +2,10 @@ package index
 
 import (
 	"flag"
-	"fmt"
 	"io"
 	"math/rand"
 	"path/filepath"
+	"strconv"
 	"testing"
 )
 
@@ -28,7 +28,7 @@ func TestRandomCheckedHistoriesMatchARebuild(t *testing.T) {
 		}
 	}
 	for _, seed := range seeds {
-		t.Run(fmt.Sprint(seed), func(t *testing.T) { runCheckedHistory(t, seed) })
+		t.Run(strconv.FormatInt(seed, 10), func(t *testing.T) { runCheckedHistory(t, seed) })
 	}
 }
 
@@ -47,7 +47,7 @@ func runCheckedHistory(t *testing.T, seed int64) {
 		r.anyStep()
 	}
 	steps := 48
-	for i := 0; i < steps; i++ {
+	for i := range steps {
 		step()
 		var err error
 		switch mode := r.rng.Intn(4); mode {

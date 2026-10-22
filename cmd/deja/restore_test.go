@@ -214,10 +214,10 @@ func TestRestoreFindsSpansInACrowdedSession(t *testing.T) {
 	// with the numbers, not reproduced here.
 	b.WriteString(`{"type":"user","sessionId":"big","cwd":"/w","timestamp":"2026-07-20T09:00:00Z","message":{"role":"user","content":"a long refactor"}}` + "\n")
 	b.WriteString(edit("/w/needle.go", "the bytes that stopped existing"))
-	for i := 0; i < 200; i++ {
+	for i := range 200 {
 		b.WriteString(fmt.Sprintf(`{"type":"assistant","sessionId":"big","cwd":"/w","timestamp":"2026-07-20T10:00:00Z","message":{"role":"assistant","content":"step %d of the refactor, needle and other words"}}`, i) + "\n")
 	}
-	for i := 0; i < 400; i++ {
+	for i := range 400 {
 		b.WriteString(edit(fmt.Sprintf("/w/filler%03d.go", i), fmt.Sprintf("old filler %d", i)))
 	}
 	if err := os.WriteFile(filepath.Join(root, "big.jsonl"), []byte(b.String()), 0o644); err != nil {
@@ -256,7 +256,7 @@ func TestRestoreListsTheNewestUnlessAll(t *testing.T) {
 	}
 	var b strings.Builder
 	fmt.Fprintln(&b, `{"type":"user","sessionId":"claude-many","cwd":"/w","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"keep tuning the pool"}}`)
-	for i := 0; i < restoreListMax+5; i++ {
+	for i := range restoreListMax + 5 {
 		fmt.Fprintf(&b, `{"type":"assistant","sessionId":"claude-many","cwd":"/w","timestamp":"2026-01-02T03:%02d:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/w/pool.go","old_string":"const size = %d"}}]}}`+"\n", 5+i, i)
 	}
 	if err := os.WriteFile(filepath.Join(proj, "s.jsonl"), []byte(b.String()), 0o600); err != nil {

@@ -26,7 +26,7 @@ func TestSourcesNamesSqlitesReasonForAStoreThatIsNotADatabase(t *testing.T) {
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
 	t.Setenv("DEJA_NOTES_FILE", filepath.Join(tmp, "notes.jsonl"))
 	out := captureStdout(t, func() { printSources(filepath.Join(tmp, "index.db")) })
-	for _, l := range strings.Split(out, "\n") {
+	for l := range strings.SplitSeq(out, "\n") {
 		if strings.HasPrefix(l, "opencode\t") {
 			if !strings.Contains(l, "cannot be read — sqlite3: ") || !strings.Contains(l, "not a database") {
 				t.Fatalf("row does not carry sqlite's reason: %s", l)

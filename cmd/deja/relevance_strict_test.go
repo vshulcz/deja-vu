@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -22,11 +23,11 @@ func TestRecallDoesNotSayNothingMatchedWhenSomethingDid(t *testing.T) {
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
 	// More sessions than the window the tail is drawn from, or the strict
 	// answer is served on its own tier and none of this happens.
-	for i := 0; i < 55; i++ {
+	for i := range 55 {
 		at := time.Now().Add(-time.Duration(i+2) * time.Hour).UTC().Format(time.RFC3339)
 		id := fmt.Sprintf("f%02d", i)
 		writeClaudeFixture(t, filepath.Join(root, "-tmp-app", id+".jsonl"), id, []string{
-			`{"type":"user","sessionId":"` + id + `","timestamp":"` + at + `","cwd":"/tmp/app","message":{"role":"user","content":"routine standup chatter about the worker pool number ` + fmt.Sprint(i) + `"}}`,
+			`{"type":"user","sessionId":"` + id + `","timestamp":"` + at + `","cwd":"/tmp/app","message":{"role":"user","content":"routine standup chatter about the worker pool number ` + strconv.Itoa(i) + `"}}`,
 		})
 	}
 	at := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)

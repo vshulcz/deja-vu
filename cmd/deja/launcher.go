@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -127,7 +128,7 @@ func writeDejaLauncher(exe string) (string, error) {
 	}
 	old, err := os.ReadFile(path)
 	next := []byte(dejaLauncherScript(exe))
-	if err != nil || string(old) != string(next) {
+	if err != nil || !bytes.Equal(old, next) {
 		if err := os.WriteFile(path, next, 0o755); err != nil {
 			return "", err
 		}

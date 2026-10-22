@@ -26,7 +26,7 @@ create index session_message_session_type_seq_idx on session_message(session_id,
 begin;
 `)
 	var ids []string
-	for i := 0; i < n; i++ {
+	for i := range n {
 		ids = append(ids, fmt.Sprintf("ses_%04d", i))
 	}
 	ids = append(ids, "ses_a_b", "ses_axb", "ses_a%c", "ses_o'q")

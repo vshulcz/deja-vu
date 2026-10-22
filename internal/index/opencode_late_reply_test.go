@@ -379,7 +379,7 @@ update session set time_updated=1790858252010 where id='ses_a';`)
 
 	b, _ := os.ReadFile(log)
 	reads := 0
-	for _, line := range strings.Split(string(b), "\n") {
+	for line := range strings.SplitSeq(string(b), "\n") {
 		if strings.Contains(line, "join message m on m.session_id=s.id") {
 			reads++
 		}

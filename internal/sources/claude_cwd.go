@@ -77,7 +77,7 @@ func transcriptCWD(path string, fits func(cwd string) bool) string {
 	r := jsonlReaders.Get().(*bufio.Reader)
 	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
 	r.Reset(f)
-	for i := 0; i < claudeCWDScanLines; i++ {
+	for range claudeCWDScanLines {
 		line, _, err := readLineBytes(r)
 		if bytes.Contains(line, []byte(`"cwd"`)) {
 			var v struct {

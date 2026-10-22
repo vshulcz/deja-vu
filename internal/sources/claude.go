@@ -3,6 +3,7 @@ package sources
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 
@@ -73,13 +74,7 @@ func ClaudeRoots() []string {
 	var out []string
 	for _, r := range roots {
 		r = filepath.Clean(r)
-		duplicate := false
-		for _, existing := range out {
-			if existing == r {
-				duplicate = true
-				break
-			}
-		}
+		duplicate := slices.Contains(out, r)
 		if duplicate {
 			continue
 		}
@@ -262,7 +257,7 @@ func KeepSubagentTail(ms []model.Message) []model.Message {
 			kept = append(kept, m)
 		case RoleFiles:
 			var paths []string
-			for _, p := range strings.Split(m.Text, "\n") {
+			for p := range strings.SplitSeq(m.Text, "\n") {
 				if changed[p] {
 					paths = append(paths, p)
 				}

@@ -95,7 +95,7 @@ func TestAClientsOwnFilesAreNotUnreadTranscripts(t *testing.T) {
 			var out bytes.Buffer
 			doctorHarnesses(&out, t.TempDir())
 			var row string
-			for _, line := range strings.Split(out.String(), "\n") {
+			for line := range strings.SplitSeq(out.String(), "\n") {
 				if strings.HasPrefix(strings.TrimSpace(line), tc.row+" ") {
 					row = strings.TrimSpace(line)
 				}
@@ -145,7 +145,7 @@ func TestDoctorCountsAKimiBtwForkAsRead(t *testing.T) {
 	var out bytes.Buffer
 	doctorHarnesses(&out, t.TempDir())
 	var row string
-	for _, line := range strings.Split(out.String(), "\n") {
+	for line := range strings.SplitSeq(out.String(), "\n") {
 		if strings.HasPrefix(strings.TrimSpace(line), "kimi ") && strings.Contains(line, "file") {
 			row = strings.TrimSpace(line)
 		}

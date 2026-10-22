@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"unicode/utf8"
@@ -353,10 +354,8 @@ func reasonixDesktopWorkspace(root, id string) string {
 		return ""
 	}
 	for _, w := range st.Workspaces {
-		for _, sid := range w.SessionIDs {
-			if sid == id {
-				return w.Root
-			}
+		if slices.Contains(w.SessionIDs, id) {
+			return w.Root
 		}
 	}
 	return ""

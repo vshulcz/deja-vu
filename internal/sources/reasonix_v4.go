@@ -375,11 +375,11 @@ func (tr *reasonixV4Transcript) noteWorkspace(m *reasonixV4Message) {
 	}
 	text, _ := m.Content.(string)
 	const marker = "\nCurrent workspace: "
-	i := strings.Index(text, marker)
-	if i < 0 {
+	_, after, ok := strings.Cut(text, marker)
+	if !ok {
 		return
 	}
-	line := text[i+len(marker):]
+	line := after
 	if j := strings.IndexByte(line, '\n'); j >= 0 {
 		line = line[:j]
 	}

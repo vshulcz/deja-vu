@@ -388,7 +388,7 @@ func zedBody(dataType, hexData string) ([]byte, error) {
 // than one it refuses. Incremental runs decompress only the threads that moved.
 func zstdDecode(frame []byte) ([]byte, error) {
 	if len(frame) == 0 {
-		return nil, fmt.Errorf("zed: empty thread body")
+		return nil, errors.New("zed: empty thread body")
 	}
 	cmd := exec.Command("zstd", "-d", "-c", "-q")
 	cmd.Stdin = bytes.NewReader(frame)
@@ -829,7 +829,7 @@ func zedProject(folders string, th zedThread) string {
 // comma-joined index for display order; deja wants one project name, so the
 // first path wins and multi-root threads are named after it.
 func zedFolder(folders string) string {
-	for _, p := range strings.Split(folders, "\n") {
+	for p := range strings.SplitSeq(folders, "\n") {
 		if p = strings.TrimSpace(p); p != "" {
 			return p
 		}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -65,7 +66,7 @@ func runRecap(dir string, args []string, stdout io.Writer) error {
 			asJSON = true
 		case "--since":
 			if i+1 >= len(args) {
-				return fmt.Errorf("recap: --since needs value")
+				return errors.New("recap: --since needs value")
 			}
 			i++
 			d, err := parseDur(args[i])
@@ -75,7 +76,7 @@ func runRecap(dir string, args []string, stdout io.Writer) error {
 			since, sinceText = d, args[i]
 		case "--limit":
 			if i+1 >= len(args) {
-				return fmt.Errorf("recap: --limit needs value")
+				return errors.New("recap: --limit needs value")
 			}
 			i++
 			n, err := strconv.Atoi(args[i])

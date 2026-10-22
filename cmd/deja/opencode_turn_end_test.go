@@ -43,7 +43,7 @@ func runNode(t *testing.T, dir, driver string) string {
 func stubCalls(calls, sub string) []string {
 	b, _ := os.ReadFile(calls)
 	var out []string
-	for _, l := range strings.Split(string(b), "\n") {
+	for l := range strings.SplitSeq(string(b), "\n") {
 		if strings.HasPrefix(l, sub+" ") {
 			out = append(out, l)
 		}

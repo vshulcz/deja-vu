@@ -57,7 +57,7 @@ func TestFindByIDAnswersTheSameWayTwice(t *testing.T) {
 	if err != nil || !ok {
 		t.Fatalf("the id is in the index but FindByID missed it: %v %v", ok, err)
 	}
-	for i := 0; i < 400; i++ {
+	for i := range 400 {
 		got, ok, err := FindByID(dir, "shared")
 		if err != nil || !ok {
 			t.Fatalf("lookup %d: %v %v", i, ok, err)

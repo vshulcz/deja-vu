@@ -31,7 +31,7 @@ func runHookCapturing(t *testing.T, dir, event string) string {
 		done <- string(b)
 	}()
 	go func() {
-		_, _ = inW.Write([]byte(event + "\n"))
+		_, _ = inW.WriteString(event + "\n")
 		_ = inW.Close()
 	}()
 	if err := runHookContext(dir, false); err != nil {

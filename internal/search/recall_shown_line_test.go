@@ -19,7 +19,7 @@ func TestRecallBlockDoesNotOpenWithFillerFromTheTop(t *testing.T) {
 		{Role: "user", Text: "carry on then", Time: start},
 		{Role: "assistant", Text: "opened the file and looked around", Time: start.Add(time.Minute)},
 	}
-	for i := 0; i < 200; i++ {
+	for i := range 200 {
 		at := start.Add(time.Duration(i+2) * time.Minute)
 		msgs = append(msgs,
 			model.Message{Role: "user", Text: "keep going", Time: at},

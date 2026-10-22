@@ -63,7 +63,7 @@ func TestOpencodePluginsNameTheSessionToTheDigest(t *testing.T) {
 		"2.x": opencodePluginJS("/usr/local/bin/deja"),
 	} {
 		calls := 0
-		for _, line := range strings.Split(js, "\n") {
+		for line := range strings.SplitSeq(js, "\n") {
 			if strings.HasPrefix(strings.TrimSpace(line), "//") || !strings.Contains(line, "hook-context") {
 				continue
 			}

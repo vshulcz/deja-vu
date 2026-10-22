@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/vshulcz/deja-vu/internal/search"
 	"io"
 	"regexp"
 	"strconv"
@@ -12,6 +11,8 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/vshulcz/deja-vu/internal/search"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -186,7 +187,7 @@ func planFindings(dir, plan, sessionID string) []string {
 		// the less deja said (#2485).
 		if fix := planRemedy(dir, match.Wall.Text); fix != "" &&
 			!strings.EqualFold(strings.TrimSpace(fix), strings.TrimSpace(strings.TrimPrefix(match.Command, "$ "))) {
-			line += fmt.Sprintf("; what followed it: %s", strconv.Quote(neutralPlanEvidence(fix)))
+			line += "; what followed it: " + strconv.Quote(neutralPlanEvidence(fix))
 		}
 		findings = append(findings, planFinding{
 			line:     line,

@@ -103,7 +103,7 @@ func TestSearchAndLastDoNotRepeatAForksCopiedTurns(t *testing.T) {
 			}
 		})
 		var forkRow string
-		for _, ln := range strings.Split(out, "\n") {
+		for ln := range strings.SplitSeq(out, "\n") {
 			if strings.Contains(ln, "ffffffff") {
 				forkRow = ln
 			}

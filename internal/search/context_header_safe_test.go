@@ -17,7 +17,7 @@ func TestPrintContextSanitisesTheHeader(t *testing.T) {
 	var b bytes.Buffer
 	s := model.Session{Harness: "claude", Project: "proj\x1b[31m", ID: "id\u202eevil"}
 	PrintContext(&b, s, "")
-	header := strings.SplitN(b.String(), "\n", 2)[0]
+	header, _, _ := strings.Cut(b.String(), "\n")
 	for _, r := range header {
 		if unicode.IsControl(r) {
 			t.Fatalf("context header carried a control rune %U: %q", r, header)

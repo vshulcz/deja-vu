@@ -49,7 +49,7 @@ func TestACutContextSaysWhatItLeftOut(t *testing.T) {
 // it showed, and does not call the last one missing.
 func TestAWindowThatLeavesOutEarlierTurnsCountsThem(t *testing.T) {
 	var msgs []model.Message
-	for i := 0; i < 40; i++ {
+	for range 40 {
 		msgs = append(msgs, model.Message{Role: "user", Text: strings.Repeat("an ordinary question about nothing much ", 8)})
 	}
 	msgs = append(msgs, model.Message{Role: "assistant", Text: "the quokkabloom retry is capped at three"})

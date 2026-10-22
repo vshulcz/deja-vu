@@ -30,7 +30,7 @@ func TestConclusionsSurfacesTheOutcomeNewestFirst(t *testing.T) {
 
 func TestConclusionsHonoursBudgetAndCount(t *testing.T) {
 	var ms []model.Message
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		ms = append(ms, model.Message{Role: "assistant", Text: "The fix was to bump the timeout, and it works now."})
 	}
 	if got := Conclusions(model.Session{Messages: ms}, 4000, 2); len(got) > 2 {

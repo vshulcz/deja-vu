@@ -4,6 +4,7 @@ package testenv
 import (
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -37,10 +38,8 @@ func Redirects(name string) bool {
 	if toolchain[name] || strings.HasSuffix(name, "_HELPER") || strings.HasPrefix(name, "DEJA_WRITE_") {
 		return false
 	}
-	for _, s := range secrets {
-		if name == s {
-			return true
-		}
+	if slices.Contains(secrets, name) {
+		return true
 	}
 	return strings.HasPrefix(name, "DEJA_") || location.MatchString(name)
 }

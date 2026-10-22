@@ -70,7 +70,7 @@ func TestInstallCursorHooksIsIdempotentAndReversible(t *testing.T) {
 	if err := os.WriteFile(path, []byte(seed), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if _, err := installCursorHooks("/bin/deja", false); err != nil {
 			t.Fatalf("install %d: %v", i, err)
 		}

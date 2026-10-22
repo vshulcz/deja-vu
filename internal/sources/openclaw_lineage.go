@@ -165,7 +165,7 @@ func openclawDBSpawns(db string) map[string]string {
 		return nil
 	}
 	have := map[string]bool{}
-	for _, c := range strings.Fields(string(cols)) {
+	for c := range strings.FieldsSeq(string(cols)) {
 		have[c] = true
 	}
 	if !have["session_windows.parent_session_key"] || !have["session_windows.spawned_by"] {

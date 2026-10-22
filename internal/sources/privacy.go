@@ -36,7 +36,7 @@ func ExclusionPatterns() []string {
 		}
 	}
 	read(ExcludePath())
-	for _, pattern := range strings.Split(os.Getenv("DEJA_EXCLUDE_PROJECTS"), ",") {
+	for pattern := range strings.SplitSeq(os.Getenv("DEJA_EXCLUDE_PROJECTS"), ",") {
 		if pattern = strings.TrimSpace(pattern); pattern != "" {
 			out = append(out, strings.ToLower(pattern))
 		}
@@ -72,13 +72,13 @@ const harnessExcludePrefix = "harness:"
 func ExcludedHarnesses() map[string]bool {
 	out := map[string]bool{}
 	for _, pattern := range ExclusionPatterns() {
-		if name := strings.TrimPrefix(pattern, harnessExcludePrefix); name != pattern {
+		if name, ok := strings.CutPrefix(pattern, harnessExcludePrefix); ok {
 			if name = strings.TrimSpace(name); name != "" {
 				out[name] = true
 			}
 		}
 	}
-	for _, name := range strings.Split(os.Getenv("DEJA_EXCLUDE_HARNESSES"), ",") {
+	for name := range strings.SplitSeq(os.Getenv("DEJA_EXCLUDE_HARNESSES"), ",") {
 		if name = strings.ToLower(strings.TrimSpace(name)); name != "" {
 			out[name] = true
 		}

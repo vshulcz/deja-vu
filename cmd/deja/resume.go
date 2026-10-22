@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -53,7 +54,7 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 		return idPrefixNeeded(dir, "resume needs an id prefix", "resume needs an id prefix (see `deja last`)")
 	}
 	if app && (doExec || writeBack) {
-		return fmt.Errorf("resume: --app opens the session in the ChatGPT app, so it takes neither --exec nor --write-back")
+		return errors.New("resume: --app opens the session in the ChatGPT app, so it takes neither --exec nor --write-back")
 	}
 	s, ok, err := findByPrefix(dir, prefix)
 	if pickedOnScreen == nil || pickedOnScreen.ID != prefix {
@@ -230,7 +231,7 @@ func resumeArgv(cmdline string) ([]string, error) {
 		out = append(out, cur.String())
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("resume: empty command")
+		return nil, errors.New("resume: empty command")
 	}
 	return out, nil
 }
@@ -547,7 +548,7 @@ func resumeCommand(s model.Session) (string, string, error) {
 			}
 			return dir, "cursor-agent --resume " + s.ID, nil
 		}
-		return "", "", fmt.Errorf("cursor IDE chats reopen from the Cursor UI, not the terminal")
+		return "", "", errors.New("cursor IDE chats reopen from the Cursor UI, not the terminal")
 	case "grok":
 		// Grok Build resumes by session id and scopes its session list by the
 		// working directory, so this runs in the original project. It reopens
@@ -561,7 +562,7 @@ func resumeCommand(s model.Session) (string, string, error) {
 		return existingDir(resumeRecordedDir(s)), "grok --resume " + s.ID, nil
 	case "cline":
 		if strings.HasPrefix(s.ID, "cline-task-") {
-			return "", "", fmt.Errorf("legacy Cline VS Code tasks reopen from the extension's history UI, not the terminal")
+			return "", "", errors.New("legacy Cline VS Code tasks reopen from the extension's history UI, not the terminal")
 		}
 		// cline reopens the transcript from anywhere but runs its tools in
 		// the current directory, so the command runs where the session did
@@ -592,12 +593,12 @@ func resumeCommand(s model.Session) (string, string, error) {
 			}
 			return dir, "roo --session-id " + id, nil
 		}
-		return "", "", fmt.Errorf("roo tasks from the VS Code extension reopen from its history UI; only the ones the roo CLI created take --session-id")
+		return "", "", errors.New("roo tasks from the VS Code extension reopen from its history UI; only the ones the roo CLI created take --session-id")
 	case "zed":
 		// These two used to fall through to "don't know how to resume", which
 		// reads like deja is missing something. Both are settled answers, and
 		// the registry has carried the reason all along.
-		return "", "", fmt.Errorf("zed threads reopen from the editor's own history — no zed flag takes a thread id")
+		return "", "", errors.New("zed threads reopen from the editor's own history — no zed flag takes a thread id")
 	case "devin":
 		// `devin --resume <id>` finds the session in its one global store, so
 		// the recorded directory is a preference, not a requirement: reopen
@@ -607,9 +608,9 @@ func resumeCommand(s model.Session) (string, string, error) {
 		// `devin-desktop --sessions` opens the Sessions window with Cascade's
 		// history in it and takes no id; the extension's own RPCs that do are
 		// private (#308).
-		return "", "", fmt.Errorf("windsurf conversations reopen from Devin Desktop's Sessions window (`devin-desktop --sessions`); no command takes a conversation id")
+		return "", "", errors.New("windsurf conversations reopen from Devin Desktop's Sessions window (`devin-desktop --sessions`); no command takes a conversation id")
 	case "deepseek":
-		return "", "", fmt.Errorf("neither of DeepSeek Harness's two apps takes a session id, so there is nothing to reopen by")
+		return "", "", errors.New("neither of DeepSeek Harness's two apps takes a session id, so there is nothing to reopen by")
 	case "codewhale":
 		// Its sessions are per-workspace — `--continue` refuses in a directory
 		// that has none — so the command goes with the workspace it was worked
@@ -765,7 +766,7 @@ func resumeCommand(s model.Session) (string, string, error) {
 		if dir := sources.CopilotChatWorkspaceDir(s.Path); dir != "" {
 			return "", "", fmt.Errorf("copilot-chat sessions reopen in VS Code: open the workspace (code %s), then Chat: Show Chats", shellQuoteIfNeeded(dir))
 		}
-		return "", "", fmt.Errorf("copilot-chat sessions reopen from Chat: Show Chats, not the terminal")
+		return "", "", errors.New("copilot-chat sessions reopen from Chat: Show Chats, not the terminal")
 	default:
 		return "", "", fmt.Errorf("don't know how to resume %q sessions", s.Harness)
 	}

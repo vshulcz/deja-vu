@@ -30,7 +30,7 @@ func TestASearchDoesNotWaitBehindAPassWhereTheOtherDoorsDo(t *testing.T) {
 	// Enough of a store that a rebuild is long against a search: the point is
 	// the difference between the two, not either number.
 	const sessions = 600
-	for i := 0; i < sessions; i++ {
+	for i := range sessions {
 		rec := claudeRecord(t, map[string]any{
 			"type": "user", "sessionId": fmt.Sprintf("s%03d", i), "cwd": "/tmp/app",
 			"timestamp": stamp,
@@ -55,12 +55,10 @@ func TestASearchDoesNotWaitBehindAPassWhereTheOtherDoorsDo(t *testing.T) {
 		t.Helper()
 		done := make(chan struct{})
 		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			defer close(done)
 			_ = index.Ensure(dir, "", true, nil)
-		}()
+		})
 		time.Sleep(10 * time.Millisecond) // long enough for the pass to hold the lock
 		select {
 		case <-done:

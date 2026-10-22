@@ -38,20 +38,20 @@ func TestReadLoopAndClose(t *testing.T) {
 	go term.readLoop()
 	go term.watchSize()
 
-	_, _ = w.Write([]byte("x\x1b[A"))
+	_, _ = w.WriteString("x\x1b[A")
 	if ev := next(t, term); ev.Rune != 'x' {
 		t.Errorf("first = %+v", ev)
 	}
 	if ev := next(t, term); ev.Key != KeyUp {
 		t.Errorf("second = %+v", ev)
 	}
-	_, _ = w.Write([]byte("\x1b"))
+	_, _ = w.WriteString("\x1b")
 	if ev := next(t, term); ev.Key != KeyEsc {
 		t.Errorf("a lone ESC = %+v", ev)
 	}
-	_, _ = w.Write([]byte("\x1b["))
+	_, _ = w.WriteString("\x1b[")
 	time.Sleep(50 * time.Millisecond)
-	_, _ = w.Write([]byte("B"))
+	_, _ = w.WriteString("B")
 	if ev := next(t, term); ev.Key != KeyDown {
 		t.Errorf("a sequence split over two reads = %+v", ev)
 	}
@@ -89,9 +89,9 @@ func TestReadLoopWaitsForASlowPaste(t *testing.T) {
 	term := &Term{in: r, out: out, events: make(chan Event, 8), stop: make(chan struct{}), restore: func() {}}
 	term.wg.Add(1)
 	go term.readLoop()
-	_, _ = w.Write([]byte("\x1b[200~line one\r"))
+	_, _ = w.WriteString("\x1b[200~line one\r")
 	time.Sleep(450 * time.Millisecond)
-	_, _ = w.Write([]byte("rm -rf x\r\x1b[201~"))
+	_, _ = w.WriteString("rm -rf x\r\x1b[201~")
 	if ev := next(t, term); ev.Kind != EvPaste || ev.Text != "line one\rrm -rf x\r" {
 		t.Errorf("slow paste = %+v", ev)
 	}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -98,7 +99,7 @@ func countWordForTest(n int) string {
 		"thirty-three", "thirty-four", "thirty-five", "thirty-six", "thirty-seven",
 		"thirty-eight", "thirty-nine", "forty"}
 	if n < 0 || n >= len(words) {
-		return fmt.Sprint(n)
+		return strconv.Itoa(n)
 	}
 	return words[n]
 }

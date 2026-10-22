@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"math/rand"
 	"reflect"
 	"strconv"
@@ -46,7 +45,7 @@ func TestCopySourcesRarestTurnMatchesEveryPair(t *testing.T) {
 		ss := make([]model.Session, 2+rng.Intn(10))
 		turns := make([]map[string]bool, len(ss))
 		for i := range ss {
-			ss[i] = model.Session{ID: fmt.Sprint(i), Harness: "codex", Kind: kinds[rng.Intn(len(kinds))], Parent: fmt.Sprint(rng.Intn(len(ss))), Started: starts[rng.Intn(len(starts))]}
+			ss[i] = model.Session{ID: strconv.Itoa(i), Harness: "codex", Kind: kinds[rng.Intn(len(kinds))], Parent: strconv.Itoa(rng.Intn(len(ss))), Started: starts[rng.Intn(len(starts))]}
 			if i > 0 && rng.Intn(3) == 0 {
 				ss[i].Messages = ss[rng.Intn(i)].Messages
 			} else {

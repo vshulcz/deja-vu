@@ -15,7 +15,7 @@ import (
 // (#4310).
 func TestRemovingOneCopyOfASharedIDKeepsWhatTheOtherHolds(t *testing.T) {
 	c, tmp := newCFStore(t)
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		c.write("mmm", i, fmt.Sprintf("fix the store test %d", i))
 	}
 	c.write("aaa", 0, "the same id in another project")

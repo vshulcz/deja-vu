@@ -1,17 +1,13 @@
 package prompt
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
 
 func has(terms []string, want string) bool {
-	for _, t := range terms {
-		if t == want {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(terms, want)
 }
 
 // Six terms is the whole budget, and a paste above the question spends it on

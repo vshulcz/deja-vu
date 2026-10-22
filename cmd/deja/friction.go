@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -43,7 +44,7 @@ const frictionRowBytes = 79
 // So the note counts sessions holding a failure, not sessions holding a
 // recurring one, which is the bar `how` uses for the same sentence.
 func hasFrictionLine(text string) bool {
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		if _, ok := index.FrictionLine(line); ok {
 			return true
 		}
@@ -67,7 +68,7 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 			return fmt.Errorf("friction: unknown flag %q — it takes --limit n and --json", args[i])
 		}
 		if i+1 >= len(args) {
-			return fmt.Errorf("friction: --limit needs value")
+			return errors.New("friction: --limit needs value")
 		}
 		i++
 		n, err := strconv.Atoi(args[i])
@@ -279,7 +280,7 @@ func scanFriction(dir string, pol policy.Policy) (*frictionScan, error) {
 		}
 		key := meta.Harness + ":" + meta.ID
 		sessions[key] = true
-		for _, line := range strings.Split(r.Text, "\n") {
+		for line := range strings.SplitSeq(r.Text, "\n") {
 			line, sig, ok := index.FrictionSignature(line)
 			if !ok {
 				continue

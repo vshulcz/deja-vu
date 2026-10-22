@@ -430,10 +430,10 @@ func TestIncrementalAppendOneFileBenchmarkStyle(t *testing.T) {
 		t.Fatal(err)
 	}
 	const fileCount = 30
-	for i := 0; i < fileCount; i++ {
+	for i := range fileCount {
 		p := filepath.Join(proj, fmt.Sprintf("s%02d.jsonl", i))
 		var b strings.Builder
-		for j := 0; j < 30; j++ {
+		for j := range 30 {
 			fmt.Fprintf(&b, `{"type":"user","sessionId":"s%02d","timestamp":"2026-01-02T03:%02d:05Z","message":{"role":"user","content":"fixture stable-%02d message-%02d"}}`+"\n", i, j%60, i, j)
 		}
 		if err := os.WriteFile(p, []byte(b.String()), 0o644); err != nil {
@@ -462,7 +462,7 @@ func TestIncrementalAppendOneFileBenchmarkStyle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 12; i++ {
+	for i := range 12 {
 		fmt.Fprintf(f, `{"type":"assistant","sessionId":"s17","timestamp":"2026-01-02T04:%02d:05Z","message":{"role":"assistant","content":"one-file incremental-needle new-%02d"}}`+"\n", i, i)
 	}
 	if err := f.Close(); err != nil {
@@ -671,10 +671,10 @@ func BenchmarkColdEnsureSynthetic(b *testing.B) {
 	}
 	const fileCount = 200
 	const messagesPerFile = 200
-	for i := 0; i < fileCount; i++ {
+	for i := range fileCount {
 		p := filepath.Join(proj, fmt.Sprintf("s%03d.jsonl", i))
 		var sb strings.Builder
-		for j := 0; j < messagesPerFile; j++ {
+		for j := range messagesPerFile {
 			role := "user"
 			if j%2 == 1 {
 				role = "assistant"
@@ -707,10 +707,10 @@ func BenchmarkWarmSearchSynthetic(b *testing.B) {
 	}
 	const fileCount = 1250
 	const messagesPerFile = 12
-	for i := 0; i < fileCount; i++ {
+	for i := range fileCount {
 		p := filepath.Join(proj, fmt.Sprintf("s%04d.jsonl", i))
 		var sb strings.Builder
-		for j := 0; j < messagesPerFile; j++ {
+		for j := range messagesPerFile {
 			role := "user"
 			if j%2 == 1 {
 				role = "assistant"

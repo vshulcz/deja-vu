@@ -20,7 +20,7 @@ func TestTheReadmeBannerAgreesWithItsOwnTable(t *testing.T) {
 	}
 	text := string(b)
 	banner := ""
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		if strings.Contains(line, "hit@1") && strings.Contains(line, "lookups") {
 			banner = line
 			break

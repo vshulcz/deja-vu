@@ -36,9 +36,9 @@ func TestEveryImageThePagesAskForExists(t *testing.T) {
 			src, _, _ = strings.Cut(src, "?")
 			src, _, _ = strings.Cut(src, "#")
 			var want string
-			if strings.HasPrefix(src, "/") {
+			if after0, ok := strings.CutPrefix(src, "/"); ok {
 				// Absolute on the published site, which is served under /deja-vu/.
-				want = filepath.Join(root, filepath.FromSlash(strings.TrimPrefix(strings.TrimPrefix(src, "/"), "deja-vu/")))
+				want = filepath.Join(root, filepath.FromSlash(strings.TrimPrefix(after0, "deja-vu/")))
 			} else {
 				want = filepath.Join(filepath.Dir(path), filepath.FromSlash(src))
 			}

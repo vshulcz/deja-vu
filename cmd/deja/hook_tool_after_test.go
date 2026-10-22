@@ -35,7 +35,7 @@ func seedFixPair(t *testing.T, errLine, fixCmd string) string {
 	// Twice, in two sessions. One session running something after an error is
 	// half the evidence — deja keeps it as a candidate and does not serve it
 	// until a second session confirms the same remedy.
-	for n := 0; n < 2; n++ {
+	for n := range 2 {
 		body := line("user", "the build is broken", 0) +
 			line("assistant", "ran it and got:\n"+errLine, 1) +
 			toolUse(fixCmd, 2) +

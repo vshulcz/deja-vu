@@ -98,13 +98,11 @@ func to256(c Color) int {
 	cube := 16 + 36*ri + 6*gi + bi
 	cr, cg, cb := cubeLevels[ri], cubeLevels[gi], cubeLevels[bi]
 	avg := (r + g + b) / 3
-	gi2 := (avg - 3) / 10 // the nearest step of 8, 18, ... 238
-	if gi2 < 0 {
-		gi2 = 0
-	}
-	if gi2 > 23 {
-		gi2 = 23
-	}
+	gi2 := min(
+		// the nearest step of 8, 18, ... 238
+		max(
+
+			(avg-3)/10, 0), 23)
 	gv := 8 + gi2*10
 	dist := func(x, y, z int) int { return (r-x)*(r-x) + (g-y)*(g-y) + (b-z)*(b-z) }
 	if dist(gv, gv, gv) < dist(cr, cg, cb) {

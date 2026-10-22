@@ -40,7 +40,7 @@ func TestAnAppendInFlightIsNotDamage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.Write([]byte("records of a session the manifest has not committed yet")); err != nil {
+	if _, err := f.WriteString("records of a session the manifest has not committed yet"); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.Close(); err != nil {

@@ -55,7 +55,7 @@ func storeTouchingAFile(t *testing.T, n int, ending string) string {
 	withStatsStores(t)
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
 	ts := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		id := "fd" + string(rune('a'+i))
 		writeClaudeFixture(t, filepath.Join(claudeRoot, "app", id+".jsonl"), id, []string{
 			`{"type":"user","sessionId":"` + id + `","cwd":"/work/app","timestamp":"` + ts +

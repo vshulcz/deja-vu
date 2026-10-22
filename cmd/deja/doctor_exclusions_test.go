@@ -54,7 +54,7 @@ func TestDoctorSaysAnExcludePatternIsNotAppliedYet(t *testing.T) {
 	if !strings.Contains(out, "exclusions") {
 		t.Fatalf("doctor no longer reports the exclude list at all:\n%s", out)
 	}
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		if !strings.Contains(line, "exclusions") {
 			continue
 		}
@@ -79,7 +79,7 @@ func TestDoctorSaysNothingExtraWhenTheExcludeListIsInForce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		if strings.Contains(line, "exclusions") && strings.Contains(line, "rebuild") {
 			t.Fatalf("the pattern is in force; nothing should point at a rebuild:\n%s", line)
 		}

@@ -3,6 +3,7 @@ package index
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -66,8 +67,8 @@ func TestTornTailLineIndexedOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	safe := 0
-	for i := len(b) - 1; i >= 0; i-- {
-		if b[i] == '\n' {
+	for i, v := range slices.Backward(b) {
+		if v == '\n' {
 			safe = i + 1
 			break
 		}

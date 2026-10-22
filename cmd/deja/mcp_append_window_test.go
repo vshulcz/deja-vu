@@ -46,7 +46,7 @@ func TestRecallAnswersDuringAnIncrementalAppend(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.Write([]byte("records of the new session, manifest not committed")); err != nil {
+	if _, err := f.WriteString("records of the new session, manifest not committed"); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.Close(); err != nil {

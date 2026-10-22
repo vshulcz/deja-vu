@@ -21,7 +21,7 @@ func TestTheNeighbourRescueFiresOnASentence(t *testing.T) {
 	dir := filepath.Join(tmp, "idx")
 	var sessions []model.Session
 	// Ordinary work, so the question's ordinary words are not rare by accident.
-	for i := 0; i < 60; i++ {
+	for i := range 60 {
 		sessions = append(sessions, model.Session{
 			ID: fmt.Sprintf("noise%02d", i), Harness: "claude", Project: "p", Updated: time.Now(),
 			Messages: []model.Message{{Role: "user",
@@ -30,7 +30,7 @@ func TestTheNeighbourRescueFiresOnASentence(t *testing.T) {
 	}
 	// The sentence that ties the reader's word to the project's, said in three
 	// sessions, which is the evidence the map asks for.
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		sessions = append(sessions, model.Session{
 			ID: fmt.Sprintf("explains%02d", i), Harness: "claude", Project: "p", Updated: time.Now(),
 			Messages: []model.Message{{Role: "user",
@@ -81,7 +81,7 @@ func TestTheNarrowedAndKeepsOnlyIdentifyingWords(t *testing.T) {
 	tmp := hermeticIndexEnv(t)
 	dir := filepath.Join(tmp, "idx")
 	var sessions []model.Session
-	for i := 0; i < 60; i++ {
+	for i := range 60 {
 		sessions = append(sessions, model.Session{
 			ID: fmt.Sprintf("noise%02d", i), Harness: "claude", Project: "p", Updated: time.Now(),
 			Messages: []model.Message{{Role: "user",
@@ -123,14 +123,14 @@ func TestTheLadderReachesTheNeighbourRescue(t *testing.T) {
 	tmp := hermeticIndexEnv(t)
 	dir := filepath.Join(tmp, "idx")
 	var sessions []model.Session
-	for i := 0; i < 60; i++ {
+	for i := range 60 {
 		sessions = append(sessions, model.Session{
 			ID: fmt.Sprintf("noise%02d", i), Harness: "claude", Project: "p", Updated: time.Now(),
 			Messages: []model.Message{{Role: "user",
 				Text: fmt.Sprintf("weekly deploy notes for shard %d, nothing unusual", i)}},
 		})
 	}
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		sessions = append(sessions, model.Session{
 			ID: fmt.Sprintf("explains%02d", i), Harness: "claude", Project: "p", Updated: time.Now(),
 			Messages: []model.Message{{Role: "user",

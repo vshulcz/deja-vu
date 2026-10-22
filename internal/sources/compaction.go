@@ -600,10 +600,7 @@ func compactionBoundaryFingerprint(tail []byte, tailOffset, at int64) string {
 	if at < 0 || tailOffset < 0 || tailOffset+int64(len(tail)) < at {
 		return ""
 	}
-	start := at - compactionBoundaryBytes
-	if start < 0 {
-		start = 0
-	}
+	start := max(at-compactionBoundaryBytes, 0)
 	if start < tailOffset {
 		return ""
 	}

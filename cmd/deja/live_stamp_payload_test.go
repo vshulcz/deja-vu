@@ -60,7 +60,7 @@ func TestHermesProviderNamesTheSessionToHookContext(t *testing.T) {
 	}
 	var ids []string
 	ended := false
-	for _, line := range strings.Split(string(b), "\n") {
+	for line := range strings.SplitSeq(string(b), "\n") {
 		if strings.HasPrefix(line, "hook-session-end") && strings.Contains(line, `"session_id": "20261007_101900_bbbbbb"`) {
 			ended = true
 		}

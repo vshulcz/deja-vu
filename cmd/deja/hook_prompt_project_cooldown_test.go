@@ -72,7 +72,7 @@ func TestTheProjectCooldownIsAWindowNotABan(t *testing.T) {
 	dir := t.TempDir() + "/index.db"
 	const project = "deja-vu"
 	rememberInjectedFor(dir, "agent-one", project, sessionsWithIDs("marathon"))
-	for i := 0; i < injectionCooldown; i++ {
+	for range injectionCooldown {
 		rememberInjectedFor(dir, "agent-one", project, sessionsWithIDs("filler"))
 	}
 	if got := recentlyInjectedInProject(dir, project, injectionCooldown); got["marathon"] {

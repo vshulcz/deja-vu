@@ -126,7 +126,7 @@ for (const c of ran) console.log(c.includes("hook-context") ? "context:" + c : c
 	}
 	for _, kind := range []string{"context:", "prompt:"} {
 		found := false
-		for _, l := range strings.Split(string(out), "\n") {
+		for l := range strings.SplitSeq(string(out), "\n") {
 			if strings.HasPrefix(l, kind) && strings.Contains(l, `"parent_session_id":"ses_parent"`) {
 				found = true
 			}

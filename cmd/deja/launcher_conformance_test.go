@@ -56,7 +56,7 @@ func TestEveryGeneratedHookNamesTheLauncher(t *testing.T) {
 			// server in the same file, and that entry names the binary on
 			// purpose — it is the hook commands that have to go through the
 			// launcher.
-			for _, line := range strings.Split(text, "\n") {
+			for line := range strings.SplitSeq(text, "\n") {
 				if !strings.Contains(line, "hook-") {
 					continue
 				}

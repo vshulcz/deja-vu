@@ -141,7 +141,7 @@ func yamlBlockEnd(text string, from int) int {
 // and any comment or blank line after it, an indented line follows: the
 // comment then sits inside the block rather than closing it (#4289).
 func yamlBlockGoesOn(rest string) bool {
-	for _, line := range strings.Split(rest, "\n") {
+	for line := range strings.SplitSeq(rest, "\n") {
 		t := strings.TrimSpace(line)
 		if t == "" || strings.HasPrefix(t, "#") {
 			continue

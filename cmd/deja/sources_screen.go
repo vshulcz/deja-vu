@@ -15,7 +15,7 @@ func sourcesScreen(tsv string, colour bool, width int) string {
 	}
 	var rows []row
 	empty, total := 0, 0
-	for _, line := range strings.Split(strings.TrimSuffix(tsv, "\n"), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSuffix(tsv, "\n"), "\n") {
 		if line == "" {
 			continue
 		}
@@ -36,7 +36,7 @@ func sourcesScreen(tsv string, colour bool, width int) string {
 		}
 		var notes []string
 		redacted := "0"
-		for _, kv := range strings.Fields(f[2]) {
+		for kv := range strings.FieldsSeq(f[2]) {
 			k, v, _ := strings.Cut(kv, "=")
 			switch k {
 			case "sessions":
@@ -111,7 +111,7 @@ func sourcesScreen(tsv string, colour bool, width int) string {
 		}
 	}
 	if empty > 0 {
-		line := fmt.Sprintf("%s with no sessions — `deja sources | cat` lists every store", doctorCount(empty, "more store"))
+		line := doctorCount(empty, "more store") + " with no sessions — `deja sources | cat` lists every store"
 		for _, l := range wrapHanging(line, width, 2) {
 			b.WriteString(l + "\n")
 		}

@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/docsdate"
@@ -256,7 +257,7 @@ func countWord(n int) string {
 		"thirty-three", "thirty-four", "thirty-five", "thirty-six", "thirty-seven",
 		"thirty-eight", "thirty-nine", "forty"}
 	if n < 0 || n >= len(words) {
-		return fmt.Sprint(n)
+		return strconv.Itoa(n)
 	}
 	return words[n]
 }
@@ -506,7 +507,7 @@ func requireFullHistory() error {
 		return err
 	}
 	if shallow {
-		return fmt.Errorf("this clone is shallow, so every page's date would come out as the boundary commit's — check out with fetch-depth: 0")
+		return errors.New("this clone is shallow, so every page's date would come out as the boundary commit's — check out with fetch-depth: 0")
 	}
 	return nil
 }

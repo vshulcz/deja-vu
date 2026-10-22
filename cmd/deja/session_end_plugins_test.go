@@ -34,7 +34,7 @@ func recordingDeja(t *testing.T) (string, func() []pluginCall) {
 	return stub, func() []pluginCall {
 		b, _ := os.ReadFile(log)
 		var out []pluginCall
-		for _, l := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+		for l := range strings.SplitSeq(strings.TrimSpace(string(b)), "\n") {
 			args, in, ok := strings.Cut(l, "|")
 			if !ok {
 				continue

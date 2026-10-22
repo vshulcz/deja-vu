@@ -81,11 +81,11 @@ func openclawTranscript(root, p string) bool {
 
 // openclawArchiveLive is the transcript an archive was renamed from.
 func openclawArchiveLive(p string) string {
-	at := strings.Index(p, ".jsonl.")
-	if at < 0 {
+	before, _, ok := strings.Cut(p, ".jsonl.")
+	if !ok {
 		return p
 	}
-	return p[:at] + ".jsonl"
+	return before + ".jsonl"
 }
 
 // OpenClawSessionFiles lists live transcript files for all agents.

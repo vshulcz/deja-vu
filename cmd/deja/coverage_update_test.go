@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -65,7 +66,7 @@ func TestDownloaderReadAllErrorAndOverLimitAfterRead(t *testing.T) {
 		if !ok {
 			t.Fatal("ResponseWriter does not support flushing")
 		}
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			_, _ = w.Write([]byte("x"))
 			flusher.Flush()
 		}
@@ -202,7 +203,7 @@ func TestPerformUpdateAssetAndChecksumLookupErrors(t *testing.T) {
 	checksumDownloadFails := cfg
 	checksumDownloadFails.download = func(url string, limit int64, label string) ([]byte, error) {
 		if label == "checksums.txt" {
-			return nil, fmt.Errorf("checksum fetch boom")
+			return nil, errors.New("checksum fetch boom")
 		}
 		return release, nil
 	}
@@ -227,7 +228,7 @@ func TestPerformUpdateAssetAndChecksumLookupErrors(t *testing.T) {
 			return []byte(strings.Repeat("a", 64) + "  " + archiveName + "\n"), nil
 		}
 		if label == archiveName {
-			return nil, fmt.Errorf("archive fetch boom")
+			return nil, errors.New("archive fetch boom")
 		}
 		return release, nil
 	}

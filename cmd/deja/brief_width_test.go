@@ -47,7 +47,7 @@ func briefStore(t *testing.T, project string, ages ...time.Duration) string {
 
 func recentLines(out string) []string {
 	var got []string
-	for _, l := range strings.Split(out, "\n") {
+	for l := range strings.SplitSeq(out, "\n") {
 		if strings.Contains(l, "[claude]") {
 			got = append(got, l)
 		}
@@ -189,7 +189,7 @@ func TestBriefWireLineFitsSixtyColumns(t *testing.T) {
 				t.Fatal(err)
 			}
 			var wire string
-			for _, l := range strings.Split(buf.String(), "\n") {
+			for l := range strings.SplitSeq(buf.String(), "\n") {
 				if strings.Contains(l, "install --auto") {
 					wire = l
 				}

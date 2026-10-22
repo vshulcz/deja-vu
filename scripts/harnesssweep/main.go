@@ -271,7 +271,7 @@ func setupCodex(home, base, model string) error {
 	// Keep whatever deja wrote (its MCP block) and add only the provider.
 	var keep []string
 	if b, err := os.ReadFile(path); err == nil {
-		for _, line := range strings.Split(string(b), "\n") {
+		for line := range strings.SplitSeq(string(b), "\n") {
 			if !strings.HasPrefix(line, "model =") && !strings.HasPrefix(line, "model_provider =") &&
 				!strings.HasPrefix(line, "approval_policy") && !strings.HasPrefix(line, "sandbox_mode") &&
 				!strings.HasPrefix(line, "[model_providers.") {
@@ -385,7 +385,7 @@ func main() {
 		}
 	}
 	wanted := map[string]bool{}
-	for _, n := range strings.Split(*only, ",") {
+	for n := range strings.SplitSeq(*only, ",") {
 		if n = strings.TrimSpace(n); n != "" {
 			wanted[n] = true
 		}

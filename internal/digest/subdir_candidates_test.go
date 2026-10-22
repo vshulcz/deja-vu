@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -58,12 +59,7 @@ func TestProjectNameCandidatesNameTheRepositoryFromASubdirectory(t *testing.T) {
 }
 
 func has(names []string, want string) bool {
-	for _, n := range names {
-		if n == want {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(names, want)
 }
 
 // Inside a submodule git names the gitdir rather than the working tree, so the

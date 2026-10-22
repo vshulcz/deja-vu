@@ -77,8 +77,8 @@ func (h *hermesSession) row(r map[string]any) {
 			row.summary, row.text = row.text, ""
 			if i := strings.Index(row.summary, hermesSummaryEnd); i >= 0 {
 				rest := row.summary[i:]
-				if j := strings.IndexByte(rest, '\n'); j >= 0 {
-					row.text = strings.TrimSpace(rest[j+1:])
+				if _, after, ok := strings.Cut(rest, "\n"); ok {
+					row.text = strings.TrimSpace(after)
 				}
 				row.summary = strings.TrimSpace(row.summary[:i])
 			}

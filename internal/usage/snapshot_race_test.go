@@ -95,7 +95,7 @@ func TestConcurrentWritersNeverInterleaveASnapshot(t *testing.T) {
 func TestARotationLeavesTheFileUnderItsOwnThreshold(t *testing.T) {
 	dir := t.TempDir()
 	big := strings.Repeat("y", 40<<10)
-	for i := 0; i < snapshotsToKeep+4; i++ {
+	for range snapshotsToKeep + 4 {
 		RecordDigestPolicy(dir, KindHook, big, 1, 0, "local-only")
 	}
 	fi, err := os.Stat(SnapshotPath(dir))
@@ -113,7 +113,7 @@ func TestARotationLeavesTheFileUnderItsOwnThreshold(t *testing.T) {
 func TestTheNewestDigestSurvivesARotationOfBigRecords(t *testing.T) {
 	dir := t.TempDir()
 	big := strings.Repeat("y", 40<<10)
-	for i := 0; i < snapshotsToKeep+4; i++ {
+	for range snapshotsToKeep + 4 {
 		RecordDigestPolicy(dir, KindHook, big, 1, 0, "local-only")
 	}
 	RecordDigestPolicy(dir, KindHook, "the one just served", 1, 0, "local-only")

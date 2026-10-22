@@ -61,12 +61,12 @@ func TestHandoffDropsTheWholeShareHeader(t *testing.T) {
 	if strings.Contains(out, "deja share") {
 		t.Errorf("the share header survived into the handoff: %q", out)
 	}
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		if strings.TrimSpace(line) == "fake" {
 			t.Errorf("the tail of the id is standing on its own line:\n%s", out)
 		}
 	}
-	first := strings.SplitN(out, "\n", 2)[0]
+	first, _, _ := strings.Cut(out, "\n")
 	for _, r := range first {
 		if unicode.IsControl(r) {
 			t.Errorf("a control character reached the framing line: %q in %q", r, first)

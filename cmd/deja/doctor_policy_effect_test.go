@@ -56,7 +56,7 @@ func TestDoctorPolicySaysHowMuchTheRuleWithholds(t *testing.T) {
 		t.Errorf("doctor does not say what the rule keeps back:\n%s", got)
 	}
 	// The paths the rule leaves alone must not claim to withhold anything.
-	for _, line := range strings.Split(got, "\n") {
+	for line := range strings.SplitSeq(got, "\n") {
 		if strings.Contains(line, "local+imported") && strings.Contains(line, "withholds") {
 			t.Errorf("an unrestricted path was said to withhold rows: %q", line)
 		}

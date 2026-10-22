@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	search "github.com/vshulcz/deja-vu/internal/query"
@@ -18,10 +19,12 @@ func syncPeerIndex(t *testing.T, msgs ...string) (string, string) {
 		t.Fatal(err)
 	}
 	body := ""
+	var bodySb21 strings.Builder
 	for i, m := range msgs {
-		body += m
+		bodySb21.WriteString(m)
 		_ = i
 	}
+	body += bodySb21.String()
 	if err := os.WriteFile(filepath.Join(proj, "s1.jsonl"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}

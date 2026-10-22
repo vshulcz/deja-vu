@@ -1,9 +1,9 @@
 package index
 
 import (
-	"fmt"
 	"math/rand"
 	"slices"
+	"strconv"
 	"testing"
 	"time"
 
@@ -19,7 +19,7 @@ func TestNewestNMatchesAFullSort(t *testing.T) {
 		ss := make([]model.Session, size)
 		for i := range ss {
 			// Few distinct moments, so ties fall to harness and id.
-			ss[i] = model.Session{ID: fmt.Sprint(r.Intn(size + 1)), Harness: []string{"claude", "codex"}[r.Intn(2)],
+			ss[i] = model.Session{ID: strconv.Itoa(r.Intn(size + 1)), Harness: []string{"claude", "codex"}[r.Intn(2)],
 				Updated: base.Add(time.Duration(r.Intn(50)) * time.Hour)}
 		}
 		want := slices.Clone(ss)

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -39,15 +40,17 @@ func TestRarityTakesTheRarerOfTheTwoVerdicts(t *testing.T) {
 
 	// One marathon that is about quetzalcoatl and says it in every turn.
 	var marathon string
-	for i := 0; i < 300; i++ {
-		marathon += line("marathon", fmt.Sprintf("quetzalcoatl deploy step %d, checked the branch again", i), start.Add(time.Duration(i)*time.Minute))
+	var marathonSb42 strings.Builder
+	for i := range 300 {
+		marathonSb42.WriteString(line("marathon", fmt.Sprintf("quetzalcoatl deploy step %d, checked the branch again", i), start.Add(time.Duration(i)*time.Minute)))
 	}
+	marathon += marathonSb42.String()
 	if err := os.WriteFile(filepath.Join(proj, "marathon.jsonl"), []byte(marathon), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	// A hundred ordinary sessions, each saying "branch" once. Nothing repeats
 	// it, so a per-session cap never binds on it.
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		sid := fmt.Sprintf("ordinary-%d", i)
 		body := line(sid, fmt.Sprintf("looked at the branch and the tests for task %d", i), start.Add(time.Duration(i)*time.Hour))
 		if err := os.WriteFile(filepath.Join(proj, sid+".jsonl"), []byte(body), 0o644); err != nil {
@@ -103,24 +106,28 @@ func TestRarityIsNotInvertedByMarathonSessions(t *testing.T) {
 	}
 
 	// Thirteen marathons that say "branch" all day long.
-	for s := 0; s < 13; s++ {
+	for s := range 13 {
 		sid := fmt.Sprintf("marathon-%d", s)
 		body := ""
-		for i := 0; i < 200; i++ {
-			body += say(sid, fmt.Sprintf("branch work, run %d", i), s*300+i)
+		var bodySb109 strings.Builder
+		for i := range 200 {
+			bodySb109.WriteString(say(sid, fmt.Sprintf("branch work, run %d", i), s*300+i))
 		}
+		body += bodySb109.String()
 		if err := os.WriteFile(filepath.Join(proj, sid+".jsonl"), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
 	// Sixteen sessions mention "pgbouncer" three times each — more sessions
 	// than "branch" lives in, a fraction of the messages.
-	for s := 0; s < 16; s++ {
+	for s := range 16 {
 		sid := fmt.Sprintf("touched-%d", s)
 		body := ""
-		for i := 0; i < 3; i++ {
-			body += say(sid, fmt.Sprintf("pgbouncer pool question %d", i), 5000+s*10+i)
+		var bodySb121 strings.Builder
+		for i := range 3 {
+			bodySb121.WriteString(say(sid, fmt.Sprintf("pgbouncer pool question %d", i), 5000+s*10+i))
 		}
+		body += bodySb121.String()
 		if err := os.WriteFile(filepath.Join(proj, sid+".jsonl"), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}

@@ -26,6 +26,7 @@ func TestOpenClawReadsCompressedEvents(t *testing.T) {
 		`{"type":"message","id":"a1","parentId":"c1","timestamp":"2026-10-01T09:00:03Z","message":{"role":"assistant","content":[{"type":"text","text":"ZSTD-ANSWER ` + strings.Repeat("raise server_idle_timeout. ", 50) + `"}]}}`,
 	}
 	sql := "create table transcript_events (session_id text not null, seq integer not null, event_json text, created_at integer not null, event_zstd blob, event_utf8_bytes integer, navigation_json text, primary key (session_id, seq));\n"
+	var sqlSb29 strings.Builder
 	for i, e := range events {
 		row := "'" + strings.ReplaceAll(e, "'", "''") + "',null,null"
 		if len(e) >= 1024 {
@@ -37,8 +38,9 @@ func TestOpenClawReadsCompressedEvents(t *testing.T) {
 			}
 			row = "null,X'" + hex.EncodeToString(frame) + "'," + strconv.Itoa(len(e))
 		}
-		sql += "insert into transcript_events (session_id,seq,event_json,event_zstd,event_utf8_bytes,created_at) values ('" + id + "'," + strconv.Itoa(i) + "," + row + ",1790000000000);\n"
+		sqlSb29.WriteString("insert into transcript_events (session_id,seq,event_json,event_zstd,event_utf8_bytes,created_at) values ('" + id + "'," + strconv.Itoa(i) + "," + row + ",1790000000000);\n")
 	}
+	sql += sqlSb29.String()
 	db := filepath.Join(t.TempDir(), "main", "agent", "openclaw-agent.sqlite")
 	if err := os.MkdirAll(filepath.Dir(db), 0o755); err != nil {
 		t.Fatal(err)

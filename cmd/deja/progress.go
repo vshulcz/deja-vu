@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -80,9 +81,7 @@ func (p *buildProgress) Harness(name string, sessions, messages int) {
 // start paints at a fixed cadence rather than on every update: parsing
 // reports in bursts, and redrawing per burst makes the spinner stutter.
 func (p *buildProgress) start() {
-	p.done.Add(1)
-	go func() {
-		defer p.done.Done()
+	p.done.Go(func() {
 		tick := time.NewTicker(80 * time.Millisecond)
 		defer tick.Stop()
 		frame := 0
@@ -95,7 +94,7 @@ func (p *buildProgress) start() {
 				frame++
 			}
 		}
-	}()
+	})
 }
 
 // finish erases the live area so the caller's own summary lands on a clean
@@ -152,7 +151,7 @@ func (p *buildProgress) render(frame int) []string {
 		if len(h.name) > nameW {
 			nameW = len(h.name)
 		}
-		if n := len(fmt.Sprint(h.sessions)); n > sessW {
+		if n := len(strconv.Itoa(h.sessions)); n > sessW {
 			sessW = n
 		}
 	}

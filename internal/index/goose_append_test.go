@@ -59,7 +59,7 @@ func TestAGrowingGooseSessionKeepsItsProject(t *testing.T) {
 		}
 	}
 	seed := []string{gooseHeaderLine()}
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		seed = append(seed, gooseTurn(i, fmt.Sprintf("seed %d zonkomatic", i)))
 	}
 	write(seed)
@@ -116,7 +116,7 @@ func TestAGrowingGooseSessionKeepsItsProject(t *testing.T) {
 
 	// The rewind the prefix comparison exists for.
 	rewritten := []string{gooseHeaderLine()}
-	for i := 0; i < 9; i++ {
+	for i := range 9 {
 		rewritten = append(rewritten, gooseTurn(i, fmt.Sprintf("rewritten %d zonkomatic", i)))
 	}
 	write(rewritten)

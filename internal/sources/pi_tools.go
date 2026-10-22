@@ -2,6 +2,7 @@ package sources
 
 import (
 	"encoding/json"
+	"maps"
 	"regexp"
 	"strconv"
 	"strings"
@@ -135,9 +136,7 @@ func (r *piReader) call(id, name string, args map[string]any, applied bool, t ti
 	for _, in := range calls {
 		if p, _ := in["path"].(string); p != "" && r.abs(p) != p {
 			abs := make(map[string]any, len(in))
-			for k, v := range in {
-				abs[k] = v
-			}
+			maps.Copy(abs, in)
 			abs["path"] = r.abs(p)
 			in = abs
 		}
@@ -261,7 +260,7 @@ func (r *piReader) hashline(id, input string, t time.Time) {
 	// written text, not an omp header.
 	omp := !strings.HasPrefix(input, "§") && !strings.Contains(input, "\n§")
 	cur, inOp := "", false
-	for _, l := range strings.Split(input, "\n") {
+	for l := range strings.SplitSeq(input, "\n") {
 		l = strings.TrimRight(l, "\r")
 		if p, ok := ompHashlinePath(l); omp && ok {
 			if cur, inOp = r.abs(p), false; cur != "" {
@@ -358,7 +357,7 @@ func (r *piReader) toolResult(msg map[string]any, t time.Time) {
 			return
 		}
 		var removed []string
-		for _, l := range strings.Split(diff, "\n") {
+		for l := range strings.SplitSeq(diff, "\n") {
 			if !strings.HasPrefix(l, "-") || strings.HasPrefix(l, "---") {
 				continue
 			}

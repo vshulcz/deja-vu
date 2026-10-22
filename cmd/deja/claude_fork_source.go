@@ -88,7 +88,7 @@ func pruneForkMarks(p string) {
 	}
 	now := time.Now()
 	var keep []string
-	for _, line := range strings.Split(string(b), "\n") {
+	for line := range strings.SplitSeq(string(b), "\n") {
 		f := strings.Fields(line)
 		if len(f) != 3 {
 			continue
@@ -109,7 +109,7 @@ func claudeForkMark(dir, sid string) string {
 		return ""
 	}
 	src := ""
-	for _, line := range strings.Split(string(b), "\n") {
+	for line := range strings.SplitSeq(string(b), "\n") {
 		if f := strings.Fields(line); len(f) == 3 && f[0] == sid {
 			src = f[1]
 		}

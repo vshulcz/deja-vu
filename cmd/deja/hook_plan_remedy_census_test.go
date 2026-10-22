@@ -49,7 +49,7 @@ func TestThePlanFindingCarriesTheRemedyBesideTheCensusCommand(t *testing.T) {
 			{"assistant", "looked at " + top + ", changed what was needed and the tests pass"},
 		}, 900-10*i)
 	}
-	for k := 0; k < 4; k++ {
+	for k := range 4 {
 		write(fmt.Sprintf("m%d", k), [][2]any{
 			{"user", fmt.Sprintf("run the orders migration (%d) against the production database", k)},
 			{"assistant", []any{map[string]any{"type": "tool_use", "name": "Bash", "input": map[string]any{"command": "make migrate-orders"}}}},

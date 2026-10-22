@@ -28,7 +28,7 @@ func TestBlockOpensOnTheLineThatAnswers(t *testing.T) {
 	// Terms arrive most-identifying first, the way the hook orders them.
 	block := AutoRecallDigestFor([]model.Session{s}, 2000, []string{"quicksilver", "decide"})
 	first := ""
-	for _, ln := range strings.Split(block, "\n") {
+	for ln := range strings.SplitSeq(block, "\n") {
 		ln = strings.TrimSpace(ln)
 		if strings.HasPrefix(ln, "- User:") || strings.HasPrefix(ln, "- Assistant:") {
 			first = ln

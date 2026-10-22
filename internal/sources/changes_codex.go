@@ -184,7 +184,7 @@ func parseApplyPatch(patch string) []Change {
 		}
 		path, adding, updating, add = "", false, false, nil
 	}
-	for _, l := range strings.Split(strings.ReplaceAll(patch, "\r\n", "\n"), "\n") {
+	for l := range strings.SplitSeq(strings.ReplaceAll(patch, "\r\n", "\n"), "\n") {
 		switch {
 		case strings.HasPrefix(l, "*** Add File: "):
 			flushFile()

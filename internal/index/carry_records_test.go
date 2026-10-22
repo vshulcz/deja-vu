@@ -111,7 +111,7 @@ func TestReplacementPassWorkIsBoundedByTheChange(t *testing.T) {
 	const sessions, turns = 40, 6
 	body := func(id string, n int, tail string) string {
 		var b strings.Builder
-		for i := 0; i < n; i++ {
+		for i := range n {
 			role, text := "user", fmt.Sprintf(`"why does the %s retry loop spin, take %d"`, id, i)
 			if i%2 == 1 {
 				role, text = "assistant", fmt.Sprintf(`"the backoff in %s never resets, ещё раз %d 索引"`, id, i)
@@ -123,7 +123,7 @@ func TestReplacementPassWorkIsBoundedByTheChange(t *testing.T) {
 		}
 		return b.String()
 	}
-	for i := 0; i < sessions; i++ {
+	for i := range sessions {
 		id := fmt.Sprintf("s%02d", i)
 		parityWrite(t, filepath.Join(proj, id+".jsonl"), body(id, turns, ""), false)
 	}
@@ -167,7 +167,7 @@ func TestReplacementPassRekeysWhenPostingsAreShort(t *testing.T) {
 	appendReplacing = false
 	defer func() { appendReplacing = true }()
 	proj := filepath.Join(tmp, "claude", "-tmp-proj")
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		id := fmt.Sprintf("s%d", i)
 		parityWrite(t, filepath.Join(proj, id+".jsonl"),
 			parityClaudeLine(id, "00:00Z", "user", fmt.Sprintf(`"pgbouncer pool %s"`, id))+

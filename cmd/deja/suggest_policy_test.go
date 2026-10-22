@@ -28,7 +28,7 @@ func recentImportedStore(t *testing.T, n int) string {
 		"cache eviction wiped session store",
 	}
 	var batch []byte
-	for i := 0; i < n; i++ {
+	for i := range n {
 		b, err := json.Marshal(index.SyncRecord{
 			Harness: "claude", SessionID: "peer" + string(rune('1'+i)), Project: "tmp/projx",
 			Role: "user", Text: topics[i%len(topics)], Time: now.AddDate(0, 0, -i-1),

@@ -81,7 +81,7 @@ func TestRunBM25DeterministicIDTieBreak(t *testing.T) {
 		{ID: "z", Updated: when, Messages: []model.Message{{Role: "user", Text: "needle"}}},
 		{ID: "a", Updated: when, Messages: []model.Message{{Role: "user", Text: "needle"}}},
 	}
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		hits, err := Run(ss, Options{Query: "needle", All: true})
 		if err != nil || len(hits) != 2 || hits[0].Session.ID != "a" || hits[1].Session.ID != "z" {
 			t.Fatalf("iteration %d hits=%#v err=%v", i, hits, err)
@@ -115,7 +115,7 @@ func TestRunInvalidRegexAndResultLimit(t *testing.T) {
 		t.Fatal("expected invalid regex error")
 	}
 	var ss []model.Session
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		ss = append(ss, model.Session{ID: string(rune('a' + i)), Harness: "claude", Project: "p", Updated: time.Now().Add(time.Duration(i) * time.Minute), Messages: []model.Message{{Role: "user", Text: "needle"}}})
 	}
 	hits, err := Run(ss, Options{Query: "needle"})
@@ -733,7 +733,7 @@ func TestSearchRoleFilterAcceptsTool(t *testing.T) {
 // turns the query matched (#R8-budget).
 func TestPrintContextAnchorsBudgetOnTheMatch(t *testing.T) {
 	var msgs []model.Message
-	for i := 0; i < 40; i++ {
+	for range 40 {
 		msgs = append(msgs,
 			model.Message{Role: "user", Text: strings.Repeat("unrelated bulk chatter ", 20)},
 			model.Message{Role: "assistant", Text: strings.Repeat("unrelated reply prose ", 20)})

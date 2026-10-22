@@ -45,7 +45,7 @@ func dejaVuRows(t *testing.T, dir string) []usage.Snapshot {
 		return nil
 	}
 	var out []usage.Snapshot
-	for _, line := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(string(b)), "\n") {
 		var snap usage.Snapshot
 		if json.Unmarshal([]byte(line), &snap) != nil {
 			continue

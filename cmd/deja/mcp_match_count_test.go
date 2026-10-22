@@ -19,7 +19,7 @@ func manySessionStore(t *testing.T, n int) string {
 	if err := os.MkdirAll(proj, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < n; i++ {
+	for i := range n {
 		line := fmt.Sprintf(`{"type":"user","message":{"role":"user","content":"the pipeline run %d stalled on retry"},"timestamp":"2026-08-02T10:00:0%dZ","sessionId":"s%d","cwd":"/work"}`, i, i%10, i) + "\n"
 		if err := os.WriteFile(filepath.Join(proj, fmt.Sprintf("s%d.jsonl", i)), []byte(line), 0o644); err != nil {
 			t.Fatal(err)

@@ -10,7 +10,7 @@ func topLevelJSONKeys(v any) map[string]bool {
 	keys := map[string]bool{}
 	rt := reflect.TypeOf(v)
 	for i := 0; i < rt.NumField(); i++ {
-		name := strings.Split(rt.Field(i).Tag.Get("json"), ",")[0]
+		name, _, _ := strings.Cut(rt.Field(i).Tag.Get("json"), ",")
 		if name != "" && name != "-" {
 			keys[name] = true
 		}

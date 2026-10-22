@@ -48,7 +48,7 @@ func TestDoctorReportsStaleWiring(t *testing.T) {
 	doctorAutoRecall(&buf)
 	out := buf.String()
 	line := ""
-	for _, l := range strings.Split(out, "\n") {
+	for l := range strings.SplitSeq(out, "\n") {
 		if strings.Contains(l, " pi ") {
 			line = l
 		}
@@ -73,7 +73,7 @@ func TestDoctorReportsWiredWhenTheMarkerIsThere(t *testing.T) {
 	}
 	var buf bytes.Buffer
 	doctorAutoRecall(&buf)
-	for _, l := range strings.Split(buf.String(), "\n") {
+	for l := range strings.SplitSeq(buf.String(), "\n") {
 		if strings.Contains(l, " pi ") && !strings.Contains(l, "wired") {
 			t.Fatalf("a fresh install is not reported wired: %q", l)
 		}

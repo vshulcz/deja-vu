@@ -17,7 +17,7 @@ func spillJobs() []tokenJob {
 	var jobs []tokenJob
 	when := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
 	off := int64(0)
-	for i := 0; i < 5000; i++ {
+	for i := range 5000 {
 		sid := uint32(i/7 + 1)
 		if i%11 == 0 {
 			sid = uint32(3) // a session that steps back
@@ -52,9 +52,9 @@ func distinctJobs() []tokenJob {
 	var jobs []tokenJob
 	when := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
 	off := int64(0)
-	for i := 0; i < 300; i++ {
+	for i := range 300 {
 		var b strings.Builder
-		for w := 0; w < 1000; w++ {
+		for w := range 1000 {
 			fmt.Fprintf(&b, "w%dx%d ", i, w)
 		}
 		jobs = append(jobs, tokenJob{text: b.String(), offset: off, sid: uint32(i + 1), when: when})

@@ -83,8 +83,8 @@ func mcpResourceRead(dir, uri string) (any, int, string) {
 	// writes it. No harness name carries one, so the first is always the right
 	// one; an id that does keeps everything after it.
 	id := ref
-	if i := strings.IndexByte(ref, ':'); i >= 0 {
-		id = ref[i+1:]
+	if _, after, ok := strings.Cut(ref, ":"); ok {
+		id = after
 	}
 	// Every id has the empty string as a prefix, so a URI carrying no id at all
 	// matched the first session and handed back a transcript nobody asked for —

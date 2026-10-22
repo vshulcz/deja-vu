@@ -1,6 +1,7 @@
 package digest
 
 import (
+	"maps"
 	"regexp"
 	"slices"
 	"sort"
@@ -79,8 +80,8 @@ type carryItem struct {
 func ExtractCarry(messages []model.Message, prev []model.ContextCarry) []model.ContextCarry {
 	var ev []carryEvent
 	scanned := 0
-	for i := len(messages) - 1; i >= 0; i-- {
-		m := messages[i]
+	for _, m := range slices.Backward(messages) {
+
 		scanned += len(m.Text)
 		if scanned > maxContextScanBytes {
 			break
@@ -115,12 +116,10 @@ func carryBuild(ev []carryEvent, prev []model.ContextCarry) []model.ContextCarry
 	for j, e := range ev {
 		texts = append(texts, strings.ToLower(e.text))
 		if e.kind != 't' {
-			for issue, pr := range carryIssuePRPairs(carryBNorm(e.text)) {
-				closedBy[issue] = pr
-			}
+			maps.Copy(closedBy, carryIssuePRPairs(carryBNorm(e.text)))
 		}
 		if e.kind == 't' {
-			for _, line := range strings.Split(e.text, "\n") {
+			for line := range strings.SplitSeq(e.text, "\n") {
 				if carryCloseCmdRE.MatchString(line) { // "for n in 12 34; do gh pr merge $n" too
 					for _, m := range carryCmdNumRE.FindAllStringSubmatch(line, -1) {
 						closed[atoiCarry(m[1])] = append(closed[atoiCarry(m[1])], j)
@@ -156,7 +155,7 @@ func carryBuild(ev []carryEvent, prev []model.ContextCarry) []model.ContextCarry
 		if !carryHasLinkWord(low) {
 			continue
 		}
-		for _, line := range strings.Split(low, "\n") {
+		for line := range strings.SplitSeq(low, "\n") {
 			var linked []int
 			for _, m := range carryLinksRE.FindAllStringSubmatch(line, -1) {
 				linked = append(linked, atoiCarry(m[1]))
@@ -253,7 +252,7 @@ func carryForward(prev []model.ContextCarry, hasUser bool, closed map[int][]int,
 				continue
 			}
 		case carryOpen:
-			for _, k := range strings.Split(p.Key, ",") {
+			for k := range strings.SplitSeq(p.Key, ",") {
 				if n, err := strconv.Atoi(strings.TrimPrefix(strings.TrimSpace(k), "#")); err == nil && len(closed[n]) == 0 {
 					it.ns = append(it.ns, n)
 				}
@@ -389,7 +388,7 @@ func carryLine(c model.ContextCarry) string {
 	}
 	if c.Kind == carryOpen {
 		var missing []string
-		for _, k := range strings.Split(c.Key, ",") {
+		for k := range strings.SplitSeq(c.Key, ",") {
 			if k != "" && !strings.Contains(text, k) {
 				missing = append(missing, k)
 			}

@@ -21,7 +21,7 @@ func seedPeerBatch(t *testing.T, tmp, origin string, n int) string {
 		t.Fatal(err)
 	}
 	var lines []string
-	for i := 0; i < n; i++ {
+	for i := range n {
 		rec := map[string]any{
 			"harness": "claude", "session_id": origin + string(rune('a'+i)), "project": "proj",
 			"role": "user", "text": "retry loop", "time": "2026-08-20T10:00:0" + string(rune('0'+i)) + "Z",

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -233,7 +234,7 @@ func TestASecondInstallLeavesTheNestedConfigAlone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("second install failed: %v", err)
 	}
-	if string(twice) != string(once) {
+	if !bytes.Equal(twice, once) {
 		t.Errorf("the second install rewrote the file:\n%s\n---\n%s", once, twice)
 	}
 	got := jsoncValue(t, twice)

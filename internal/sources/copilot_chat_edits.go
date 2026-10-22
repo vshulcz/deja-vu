@@ -2,6 +2,7 @@ package sources
 
 import (
 	"encoding/json"
+	"maps"
 	"strings"
 	"time"
 
@@ -88,9 +89,7 @@ func copilotChatEditCall(name string, args map[string]any) map[string]any {
 	if p, _ := args["filePath"].(string); p != "" {
 		if plain := chatResourcePath(p); plain != p {
 			in = make(map[string]any, len(args))
-			for k, v := range args {
-				in[k] = v
-			}
+			maps.Copy(in, args)
 			in["filePath"] = plain
 		}
 	}

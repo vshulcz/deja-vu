@@ -245,14 +245,14 @@ func unwrapBlock(text, open, close string) string {
 			return text
 		}
 		rest := text[start+len(open):]
-		end := strings.Index(rest, close)
-		if end < 0 {
+		before, after, ok := strings.Cut(rest, close)
+		if !ok {
 			return text
 		}
 		// A wrapper writes its own line breaks around what a person typed:
 		// Cursor's <user_query> puts the question on its own line. Those two
 		// belong to the tags, not to the words.
-		text = text[:start] + strings.Trim(rest[:end], "\n") + rest[end+len(close):]
+		text = text[:start] + strings.Trim(before, "\n") + after
 	}
 }
 
@@ -289,14 +289,14 @@ func stripBetween(text, open, close string) string {
 		}
 		b.WriteString(rest[:start])
 		after := rest[start+len(open):]
-		end := strings.Index(after, close)
-		if end < 0 {
+		_, after0, ok := strings.Cut(after, close)
+		if !ok {
 			// An unclosed marker means the block was truncated — by a context
 			// cap, a crash, or a harness that stores a prefix. Everything from
 			// the marker on is ours, so none of it should be indexed.
 			break
 		}
-		rest = after[end+len(close):]
+		rest = after0
 	}
 	out := b.String()
 	// Collapse the blank lines the removal leaves behind, so a message that was

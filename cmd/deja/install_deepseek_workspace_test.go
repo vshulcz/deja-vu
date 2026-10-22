@@ -117,7 +117,7 @@ for (const [id, cwd] of [["s1", "/work/alpha"], ["s2", "/work/beta"]]) {
 		t.Fatalf("deja was never asked: %v", err)
 	}
 	var got []string
-	for _, line := range strings.Split(strings.TrimSpace(string(body)), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(string(body)), "\n") {
 		var payload struct {
 			CWD string `json:"cwd"`
 		}

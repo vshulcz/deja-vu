@@ -94,7 +94,7 @@ func searchDetailedOnce(dir string, o query.Options) (SearchResult, error) {
 func inOneGeneration[T any](dir string, read func() (T, error)) (T, error) {
 	var r T
 	var err error
-	for attempt := 0; attempt < 3; attempt++ {
+	for range 3 {
 		before := manifestGeneration(dir)
 		r, err = read()
 		if sameGeneration(before, manifestGeneration(dir)) {
@@ -596,10 +596,8 @@ func (r *relevanceOnce) get(dir string, m Manifest, o query.Options) (SearchResu
 // rest of the query".
 func droppedAWord(variants map[string][]string) bool {
 	for _, forms := range variants {
-		for _, f := range forms {
-			if f == "" {
-				return true
-			}
+		if slices.Contains(forms, "") {
+			return true
 		}
 	}
 	return false
@@ -2437,7 +2435,7 @@ func sessionsForMetas(dir string, metas []SessionMeta) ([]model.Session, error) 
 	out, err := sessionsForMetasIn(dir, m, metas)
 	// Read again when a pass swapped in during the read, as loadSessionMeta
 	// does, without the sessions it took away (#5449).
-	for retry := 0; retry < sessionRereads; retry++ {
+	for range sessionRereads {
 		cur, moved := liveManifest(dir, m)
 		if !moved {
 			break
@@ -3212,7 +3210,7 @@ func loadSessionMeta(dir string, m Manifest, meta SessionMeta) (model.Session, b
 	// in the log this one shares, and the session read empty (#5449). Once
 	// more from the live manifest; a failed read too, since the new log's tail
 	// does not decode with the old tables.
-	for retry := 0; retry < sessionRereads; retry++ {
+	for range sessionRereads {
 		cur, moved := liveManifest(dir, m)
 		if !moved {
 			break
@@ -3490,7 +3488,7 @@ func poolPostings(posts []posting, m Manifest, o query.Options, holding int) poo
 	if len(sids) <= n {
 		return all
 	}
-	sort.Slice(sids, func(i, j int) bool { return sids[i] < sids[j] })
+	slices.Sort(sids)
 	stored := 0
 	for _, meta := range m.Sessions {
 		stored += meta.Counted
@@ -3713,11 +3711,9 @@ func sessionsBorneOut(dir string, m Manifest, o query.Options, variants map[stri
 		if len(offsets[w]) == 0 {
 			continue
 		}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			found[w], errs[w] = scanRecordsWithVariants(dir, m, o, offsets[w], variants)
-		}()
+		})
 	}
 	wg.Wait()
 	var out []model.Session
@@ -3891,7 +3887,7 @@ func postingOffsets(posts []posting) []int64 {
 
 func sortedUniqueOffsets(offsets []int64) []int64 {
 	out := append([]int64(nil), offsets...)
-	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	slices.Sort(out)
 	n := 0
 	for _, off := range out {
 		if n == 0 || out[n-1] != off {
@@ -4519,7 +4515,7 @@ func stemPostings(dir string, terms, phrases []string) ([]posting, map[string][]
 		}
 	}
 	if len(anchors) >= 4 {
-		for x := 0; x < len(order); x++ {
+		for x := range order {
 			for y := x + 1; y < len(order); y++ {
 				i, j := order[x], order[y]
 				if posts := intersectPostingMaps(sets(map[int]bool{i: true, j: true})); len(posts) > 0 {
@@ -4772,9 +4768,9 @@ func cyrMatchForms(term string) []string {
 			forms = append(forms, f)
 		}
 	}
-	if strings.HasSuffix(term, "ь") {
+	if before, ok := strings.CutSuffix(term, "ь"); ok {
 		// Soft stem — the third-declension nouns: сеть, жизнь, ночь, очередь.
-		if base := strings.TrimSuffix(term, "ь"); len([]rune(base)) >= 3 {
+		if base := before; len([]rune(base)) >= 3 {
 			// The bare stem is deliberately not emitted: a third-declension
 			// noun's stem is not a word on its own (сеть -> сет), while for a
 			// ь-final imperative it is — борись would recall Борис.
@@ -4911,8 +4907,8 @@ func oneSuffixStep(word string) []string {
 	case strings.HasSuffix(word, "s"):
 		add(strings.TrimSuffix(word, "s"))
 	}
-	if strings.HasSuffix(word, "e") {
-		base := strings.TrimSuffix(word, "e")
+	if before, ok := strings.CutSuffix(word, "e"); ok {
+		base := before
 		add(base + "ing")
 		add(base + "ed")
 		add(strings.TrimSuffix(word, "te") + "tion")
@@ -5874,10 +5870,7 @@ const bestMessageTurns = 4000
 // parallelForRanked runs fn over 0..n-1 on one goroutine per core, once there is
 // enough work to pay for handing it out.
 func parallelForRanked(n int, fn func(i int)) {
-	workers := rerankWorkers()
-	if workers > n {
-		workers = n
-	}
+	workers := min(rerankWorkers(), n)
 	if workers < 2 || n < 4 {
 		for i := range n {
 			fn(i)

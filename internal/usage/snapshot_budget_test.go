@@ -16,7 +16,7 @@ import (
 func TestTwentyOfTheLargestAnswerStillFit(t *testing.T) {
 	dir := t.TempDir()
 	big := strings.Repeat("b", 8192)
-	for i := 0; i < snapshotsToKeep; i++ {
+	for range snapshotsToKeep {
 		RecordDigestPolicy(dir, KindBlame, big, 1, 0, "local-only")
 	}
 	if got := len(Snapshots(dir, 0)); got != snapshotsToKeep {

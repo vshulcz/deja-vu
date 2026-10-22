@@ -81,7 +81,7 @@ func TestAValueThatCannotBeAFieldIsDroppedNotMangled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, line := range strings.Split(strings.TrimRight(string(body), "\n"), "\n") {
+	for line := range strings.SplitSeq(strings.TrimRight(string(body), "\n"), "\n") {
 		if n := len(strings.Fields(line)); n != 2 && n != 3 {
 			t.Errorf("a line of %d fields: %q", n, line)
 		}

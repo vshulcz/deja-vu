@@ -15,7 +15,7 @@ import (
 // and the trust policy can hide a project's failures.
 func TestCommandFailedBeforeFindsTheShapeThatFailed(t *testing.T) {
 	c, tmp := newCFStore(t)
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		c.write("app", i, "fix the store test")
 	}
 	dir := filepath.Join(tmp, "index.db")

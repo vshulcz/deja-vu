@@ -62,7 +62,7 @@ func TestFilesFitsTheTerminal(t *testing.T) {
 		t.Fatal(err)
 	}
 	rows := 0
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		if !strings.HasPrefix(line, "  ") {
 			continue
 		}
@@ -131,7 +131,7 @@ func TestSearchOutputFitsTheTerminal(t *testing.T) {
 		t.Fatal(err)
 	}
 	seen := false
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		if !strings.HasPrefix(line, "  ") {
 			continue
 		}

@@ -144,7 +144,7 @@ func gitRemovedLines(path, sha string) map[string]bool {
 		return nil
 	}
 	removed := map[string]bool{}
-	for _, ln := range strings.Split(out, "\n") {
+	for ln := range strings.SplitSeq(out, "\n") {
 		if !strings.HasPrefix(ln, "-") || strings.HasPrefix(ln, "---") {
 			continue
 		}
@@ -345,7 +345,7 @@ func attributeByReplaced(sessions []model.Session, target search.BlameTarget, c 
 			if !m.Time.IsZero() && !c.When.IsZero() && m.Time.After(c.When) {
 				continue
 			}
-			for _, ln := range strings.Split(span, "\n") {
+			for ln := range strings.SplitSeq(span, "\n") {
 				key := blameSpanKey(ln)
 				if key == "" || !removed[key] {
 					continue

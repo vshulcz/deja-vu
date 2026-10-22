@@ -43,7 +43,7 @@ func TestAStoreOfOneSessionStillRecallsIt(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(claude, "beta", "hookfix.jsonl"), []byte(line+"\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		for i := 0; i < fillers; i++ {
+		for i := range fillers {
 			l := fmt.Sprintf(`{"type":"user","sessionId":"filler%d","timestamp":%q,`+
 				`"message":{"role":"user","content":"unrelated work about deployments and dashboards"}}`, i, at)
 			if err := os.WriteFile(filepath.Join(claude, "alpha", fmt.Sprintf("f%d.jsonl", i)), []byte(l+"\n"), 0o644); err != nil {

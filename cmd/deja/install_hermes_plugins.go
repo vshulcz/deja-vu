@@ -68,7 +68,7 @@ func hermesPluginDisabled() bool {
 		return false
 	}
 	in, list, child := false, false, -1
-	for _, line := range strings.Split(lfText(b), "\n") {
+	for line := range strings.SplitSeq(lfText(b), "\n") {
 		t := strings.TrimSpace(line)
 		if t == "" || strings.HasPrefix(t, "#") {
 			continue
@@ -97,7 +97,7 @@ func hermesPluginDisabled() bool {
 		}
 		v := strings.TrimSpace(stripYAMLComment(rest))
 		if strings.HasPrefix(v, "[") && strings.HasSuffix(v, "]") {
-			for _, item := range strings.Split(v[1:len(v)-1], ",") {
+			for item := range strings.SplitSeq(v[1:len(v)-1], ",") {
 				if hermesYAMLScalar(item) == "deja" {
 					return true
 				}

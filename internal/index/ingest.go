@@ -1216,12 +1216,10 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 			func() { buildCommandFails(tmp, m.Generation, cmds) },
 			func() { buildSessionFacts(tmp, cmds) },
 		} {
-			sidecars.Add(1)
-			go func() {
-				defer sidecars.Done()
+			sidecars.Go(func() {
 				build()
 				reportAdvance(1)
-			}()
+			})
 		}
 		sidecars.Wait()
 		// After the facts, whose file it is stamped with.
@@ -2535,26 +2533,21 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 // workers in batches: one channel send per message caused enough scheduler
 // wakeups to show up as ~20% of a cold rebuild profile.
 func indexTextParallel(feed func(push func(tokenJob)) error) (bucketPostings, error) {
-	workers := runtime.NumCPU()
-	if workers < 1 {
-		workers = 1
-	}
+	workers := max(runtime.NumCPU(), 1)
 	const batchSize = 512
 	jobs := make(chan []tokenJob, workers*4)
 	partials := make([]bucketPostings, workers)
 	var wg sync.WaitGroup
-	for i := 0; i < workers; i++ {
-		i := i
+	for i := range workers {
+
 		partials[i] = bucketPostings{}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for batch := range jobs {
 				for _, job := range batch {
 					addIndexKeys(partials[i], job.text, job.offset, job.sid, job.when, job.tool)
 				}
 			}
-		}()
+		})
 	}
 	batch := make([]tokenJob, 0, batchSize)
 	push := func(j tokenJob) {
@@ -2618,8 +2611,8 @@ func dateTokens(when time.Time) []string {
 func tokenizedPart(role, text string) string {
 	switch role {
 	case roleEdit, roleWrote:
-		if i := strings.IndexByte(text, '\n'); i >= 0 {
-			return text[:i]
+		if before, _, ok := strings.Cut(text, "\n"); ok {
+			return before
 		}
 		return text
 	case roleToolOutput:
@@ -2768,13 +2761,7 @@ func writeBucketsConcurrent(dir string, buckets bucketPostings) error {
 	if len(buckets) == 0 {
 		return nil
 	}
-	workers := runtime.NumCPU()
-	if workers > 8 {
-		workers = 8
-	}
-	if workers < 1 {
-		workers = 1
-	}
+	workers := max(min(runtime.NumCPU(), 8), 1)
 	type bucketWrite struct {
 		name string
 		data map[string][]posting
@@ -2782,10 +2769,8 @@ func writeBucketsConcurrent(dir string, buckets bucketPostings) error {
 	jobs := make(chan bucketWrite)
 	errCh := make(chan error, 1)
 	var wg sync.WaitGroup
-	for i := 0; i < workers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range workers {
+		wg.Go(func() {
 			for job := range jobs {
 				reportAdvance(1)
 				if err := writeBucket(filepath.Join(dir, job.name+".bin"), job.data); err != nil {
@@ -2795,7 +2780,7 @@ func writeBucketsConcurrent(dir string, buckets bucketPostings) error {
 					}
 				}
 			}
-		}()
+		})
 	}
 	for b, data := range buckets {
 		jobs <- bucketWrite{name: b, data: data}
@@ -3015,10 +3000,8 @@ func sessionTexts(ss []model.Session) []sessionText {
 	workers := min(runtime.GOMAXPROCS(0), len(ss))
 	var next atomic.Int64
 	var wg sync.WaitGroup
-	for w := 0; w < workers; w++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range workers {
+		wg.Go(func() {
 			for {
 				i := int(next.Add(1)) - 1
 				if i >= len(ss) {
@@ -3026,7 +3009,7 @@ func sessionTexts(ss []model.Session) []sessionText {
 				}
 				out[i] = textOf(ss[i])
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	return out
@@ -3205,8 +3188,8 @@ func newMessages(meta *SessionMeta, ms []model.Message) []model.Message {
 	if meta.LastMsg == 0 {
 		return ms
 	}
-	for i := len(ms) - 1; i >= 0; i-- {
-		if messageFingerprint(ms[i]) == meta.LastMsg {
+	for i, m := range slices.Backward(ms) {
+		if messageFingerprint(m) == meta.LastMsg {
 			return ms[i+1:]
 		}
 	}
@@ -3477,7 +3460,7 @@ func topTouchedFiles(ms []model.Message) []string {
 // countTouchedPaths tallies the file paths in one `files` record's text, one
 // per line, skipping deja's own injected artifacts.
 func countTouchedPaths(count map[string]int, text string) {
-	for _, p := range strings.Split(text, "\n") {
+	for p := range strings.SplitSeq(text, "\n") {
 		if p = strings.TrimSpace(p); p != "" && !agentOwnedFile(p) {
 			count[p]++
 		}
@@ -3838,8 +3821,8 @@ func coversKept(r model.Session, meta SessionMeta) bool {
 	if meta.LastMsg == 0 {
 		return len(r.Messages) >= meta.Counted
 	}
-	for i := len(r.Messages) - 1; i >= 0; i-- {
-		m := r.Messages[i]
+	for _, m := range slices.Backward(r.Messages) {
+
 		// Fingerprinted as stored: the row's was taken after redaction, and
 		// the arrival has not been redacted yet.
 		m.Text, _, _ = indexedText(m.Text)
@@ -7155,10 +7138,8 @@ func mountRoot(dir string) bool {
 	if runtime.GOOS == "windows" {
 		return filepath.VolumeName(dir) == dir || parent == filepath.VolumeName(dir)+`\`
 	}
-	for _, m := range mountParents {
-		if parent == m {
-			return true
-		}
+	if slices.Contains(mountParents, parent) {
+		return true
 	}
 	// /run/media/<user>/<volume> is what udisks2 uses.
 	return runtime.GOOS == "linux" && filepath.Dir(parent) == "/run/media"
@@ -7496,10 +7477,8 @@ func statFiles(paths map[string]bool, old map[string]FileState) map[string]FileS
 	} else {
 		var next atomic.Int64
 		var wg sync.WaitGroup
-		for w := 0; w < workers; w++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+		for range workers {
+			wg.Go(func() {
 				for {
 					i := int(next.Add(1)) - 1
 					if i >= len(list) {
@@ -7507,7 +7486,7 @@ func statFiles(paths map[string]bool, old map[string]FileState) map[string]FileS
 					}
 					stat(i)
 				}
-			}()
+			})
 		}
 		wg.Wait()
 	}
@@ -7634,16 +7613,13 @@ func lastCompleteLineOffset(p string, size int64) int64 {
 	const window = 64 * 1024
 	end := size
 	for end > 0 {
-		start := end - window
-		if start < 0 {
-			start = 0
-		}
+		start := max(end-window, 0)
 		buf := make([]byte, end-start)
 		if _, err := f.ReadAt(buf, start); err != nil {
 			return size
 		}
-		for i := len(buf) - 1; i >= 0; i-- {
-			if buf[i] == '\n' {
+		for i, b := range slices.Backward(buf) {
+			if b == '\n' {
 				return start + int64(i) + 1
 			}
 		}
@@ -7676,17 +7652,12 @@ func preRedactSessions(m *Manifest, ss []model.Session) {
 	var mu sync.Mutex
 	jobs := make(chan int)
 	var wg sync.WaitGroup
-	workers := runtime.GOMAXPROCS(0)
-	if workers > len(ss) {
-		workers = len(ss)
-	}
+	workers := min(runtime.GOMAXPROCS(0), len(ss))
 	if workers < 1 {
 		return
 	}
-	for w := 0; w < workers; w++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range workers {
+		wg.Go(func() {
 			for si := range jobs {
 				s := &ss[si]
 				for mi := range s.Messages {
@@ -7724,7 +7695,7 @@ func preRedactSessions(m *Manifest, ss []model.Session) {
 				}
 				s.Messages = dropRepeatedMessages(s.Messages)
 			}
-		}()
+		})
 	}
 	for si := range ss {
 		jobs <- si

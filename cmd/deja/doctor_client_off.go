@@ -5,6 +5,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -89,10 +90,8 @@ func clientMCPDenied(name string) string {
 	case "grok":
 		p := filepath.Join(sources.GrokHome(), "config.toml")
 		if b, err := readConfig(p); err == nil {
-			for _, s := range tomlTopLevelStrings(string(b), "disabled_mcp_servers") {
-				if nameIsDeja(s) {
-					return mcpOffNote(name, "`disabled_mcp_servers` lists deja", p)
-				}
+			if slices.ContainsFunc(tomlTopLevelStrings(string(b), "disabled_mcp_servers"), nameIsDeja) {
+				return mcpOffNote(name, "`disabled_mcp_servers` lists deja", p)
 			}
 		}
 	case "omp", "gjc":

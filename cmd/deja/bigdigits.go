@@ -75,7 +75,7 @@ func drawBig(text string, colour, digitScale int) []string {
 		if !ok {
 			continue
 		}
-		for y := 0; y < 5; y++ {
+		for y := range 5 {
 			for _, px := range glyph[y] {
 				fill := ' '
 				if px == '#' {
@@ -104,14 +104,11 @@ func drawBig(text string, colour, digitScale int) []string {
 // halfBlockRow prints two pixel rows in one line of cells: the upper row as the
 // foreground of ▀ and the lower as its background.
 func halfBlockRow(top, bottom string, colour int) string {
-	width := len(top)
-	if len(bottom) > width {
-		width = len(bottom)
-	}
+	width := max(len(bottom), len(top))
 	at := func(s string, i int) bool { return i < len(s) && s[i] == '#' }
 
 	var b strings.Builder
-	for i := 0; i < width; i++ {
+	for i := range width {
 		upper, lower := at(top, i), at(bottom, i)
 		switch {
 		case upper && lower:

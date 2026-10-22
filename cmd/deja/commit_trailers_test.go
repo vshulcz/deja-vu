@@ -21,7 +21,7 @@ func TestNoCommitCarriesAnAITrailer(t *testing.T) {
 		t.Skipf("git log unavailable here: %v", err)
 	}
 	trailer := regexp.MustCompile(`(?im)^\s*(co-authored-by:.*anthropic\.com|claude-session:|.*claude\.ai/code/session_|.*generated with \[?claude code)`)
-	for _, rec := range strings.Split(string(out), "\x01") {
+	for rec := range strings.SplitSeq(string(out), "\x01") {
 		hash, body, ok := strings.Cut(rec, "\x00")
 		if !ok {
 			continue

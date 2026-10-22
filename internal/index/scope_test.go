@@ -28,7 +28,7 @@ func TestRelevanceTierAppliesScopeBeforeTruncation(t *testing.T) {
 	}
 	// 60 Claude sessions matching three of the four query terms, so they all
 	// outrank the Codex one and fill the top 50 on their own.
-	for i := 0; i < 60; i++ {
+	for i := range 60 {
 		line := fmt.Sprintf(`{"type":"user","sessionId":"c%d","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"kubernetes autoscaler telemetry notes %d"}}`, i, i) + "\n"
 		if err := os.WriteFile(filepath.Join(proj, fmt.Sprintf("c%d.jsonl", i)), []byte(line), 0o644); err != nil {
 			t.Fatal(err)

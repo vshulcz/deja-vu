@@ -25,7 +25,7 @@ func TestCodexHistoryReplacesOnlyTheSessionsWithNewLines(t *testing.T) {
 	hist := filepath.Join(tmp, "codex", "history.jsonl")
 	base := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
 	var body strings.Builder
-	for i := 0; i < 30; i++ {
+	for i := range 30 {
 		id := fmt.Sprintf("019a0000-0000-7000-8000-%012d", i)
 		body.WriteString(codexHistoryLine(id, base.Add(time.Duration(i)*time.Minute), fmt.Sprintf("why does the ledger %d retry", i)))
 		body.WriteString(codexHistoryLine(id, base.Add(time.Duration(i)*time.Minute+time.Second), "and the outbox too"))

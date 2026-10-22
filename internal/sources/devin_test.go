@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -689,7 +690,7 @@ func TestParseDevinDBManyBranchesGetDistinctIDs(t *testing.T) {
 			role = "assistant"
 		}
 		if i > 1 {
-			parent = fmt.Sprint(i - 1)
+			parent = strconv.Itoa(i - 1)
 		}
 		rows = append(rows, fmt.Sprintf(
 			`('big',%d,%s,'{"message_id":"m%d","role":"%s","content":"trunk %d"}',%d,'{}')`,

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -62,7 +63,7 @@ func TestTheSubmissionTableMatchesTheCommittedRuns(t *testing.T) {
 		}
 		// The set size is the other half of the claim: 470 and 500 give
 		// different numbers for the same system, which the page says itself.
-		if !strings.Contains(row, fmt.Sprint(a.Total.N)) {
+		if !strings.Contains(row, strconv.Itoa(a.Total.N)) {
 			t.Errorf("the %q row does not say which set it counted (%d questions)", c.label, a.Total.N)
 		}
 	}
@@ -71,7 +72,7 @@ func TestTheSubmissionTableMatchesTheCommittedRuns(t *testing.T) {
 // submissionRow is the table line whose first cell names that set.
 func submissionRow(t *testing.T, page, label string) string {
 	t.Helper()
-	for _, line := range strings.Split(page, "\n") {
+	for line := range strings.SplitSeq(page, "\n") {
 		if strings.HasPrefix(strings.TrimSpace(line), "|") && strings.Contains(line, label) {
 			return line
 		}

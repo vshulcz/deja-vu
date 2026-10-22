@@ -36,7 +36,7 @@ func TestDoctorNamesAMissingLauncherOnce(t *testing.T) {
 				t.Fatal(err)
 			}
 			notes := 0
-			for _, line := range strings.Split(out, "\n") {
+			for line := range strings.SplitSeq(out, "\n") {
 				if strings.Contains(line, filepath.Base(launcher)+", which is not there") {
 					notes++
 				}

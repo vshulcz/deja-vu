@@ -22,7 +22,7 @@ func HermesPruneDue(db string, retention, window time.Duration, now time.Time) (
 	if err != nil {
 		return 0, false
 	}
-	for _, c := range strings.Fields(string(out)) {
+	for c := range strings.FieldsSeq(string(out)) {
 		cols[c] = true
 	}
 	if !cols["ended_at"] || !cols["started_at"] {

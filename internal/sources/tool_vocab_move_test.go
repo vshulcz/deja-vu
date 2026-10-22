@@ -44,7 +44,7 @@ func TestApplyPatchMoveFilesTheHunksUnderTheNewName(t *testing.T) {
 			}
 			got := map[string]bool{}
 			for _, rec := range vocabRoles(ss, RoleFiles) {
-				for _, f := range strings.Split(rec, "\n") {
+				for f := range strings.SplitSeq(rec, "\n") {
 					got[f] = true
 				}
 			}

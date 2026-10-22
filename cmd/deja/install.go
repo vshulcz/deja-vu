@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -1178,9 +1179,9 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 func wroteAll(rs ...installResult) installResult {
 	out := rs[len(rs)-1]
 	if out.Note == "" {
-		for i := len(rs) - 1; i >= 0; i-- {
-			if rs[i].Path != "" && rs[i].Note != "" {
-				out = rs[i]
+		for _, r := range slices.Backward(rs) {
+			if r.Path != "" && r.Note != "" {
+				out = r
 				break
 			}
 		}
@@ -1527,9 +1528,9 @@ func noteCreatedDirs(dir string) {
 		}
 		missing = append(missing, d)
 	}
-	for i := len(missing) - 1; i >= 0; i-- {
-		if !slices.Contains(createdDirsByThisRun, missing[i]) {
-			createdDirsByThisRun = append(createdDirsByThisRun, missing[i])
+	for _, m := range slices.Backward(missing) {
+		if !slices.Contains(createdDirsByThisRun, m) {
+			createdDirsByThisRun = append(createdDirsByThisRun, m)
 		}
 	}
 }
@@ -1773,10 +1774,8 @@ func holdsForeignDejaEntry(b []byte) bool {
 				}
 			}
 		case []any:
-			for _, c := range t {
-				if walk(c) {
-					return true
-				}
+			if slices.ContainsFunc(t, walk) {
+				return true
 			}
 		}
 		return false
@@ -1882,7 +1881,7 @@ func mentionsDeja(b []byte) bool {
 // required, so a path that merely contains the word and a subcommand named in
 // prose are each not enough.
 func linesRunDeja(b []byte) bool {
-	for _, line := range strings.Split(lfText(b), "\n") {
+	for line := range strings.SplitSeq(lfText(b), "\n") {
 		fields := strings.Fields(line)
 		for i := 1; i < len(fields); i++ {
 			sub := strings.Trim(fields[i], `"',;)`)
@@ -1936,7 +1935,7 @@ func matchLineEndings(old, next []byte) []byte {
 	// its own output first is not given a second carriage return.
 	var b bytes.Buffer
 	b.Grow(len(next) + bytes.Count(next, []byte("\n")))
-	for i := 0; i < len(next); i++ {
+	for i := range next {
 		if next[i] == '\n' && (i == 0 || next[i-1] != '\r') {
 			b.WriteByte('\r')
 		}
@@ -2697,8 +2696,8 @@ func hookLineRest(cmd string) string {
 	if _, rest, ok := quotedHookLine(cmd); ok {
 		return rest
 	}
-	if i := strings.IndexByte(cmd, ' '); i >= 0 {
-		return strings.TrimSpace(cmd[i+1:])
+	if _, after, ok := strings.Cut(cmd, " "); ok {
+		return strings.TrimSpace(after)
 	}
 	return ""
 }
@@ -3746,7 +3745,7 @@ func replacedEntryNote(prev, entry any) string {
 	if sameDejaCommand(was, entryCommandName(entry)) {
 		return ""
 	}
-	return fmt.Sprintf("replaced the deja entry that was already here, which ran %s", safeForStatusline(was, 200))
+	return "replaced the deja entry that was already here, which ran " + safeForStatusline(was, 200)
 }
 
 // sameDejaCommand reports whether an entry that ran was runs the deja that now
@@ -3804,12 +3803,7 @@ func entryRunsDeja(entry map[string]any) bool {
 			}
 		}
 	}
-	for _, w := range words {
-		if isDejaBinaryToken(w) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(words, isDejaBinaryToken)
 }
 
 // withOtherDejaEntries folds the note about a second deja server into whatever
@@ -3964,12 +3958,8 @@ func mergeDejaEntry(prev any, entry map[string]any) (map[string]any, string) {
 		return entry, note
 	}
 	out := make(map[string]any, len(old)+len(entry))
-	for k, v := range old {
-		out[k] = v
-	}
-	for k, v := range entry {
-		out[k] = v
-	}
+	maps.Copy(out, old)
+	maps.Copy(out, entry)
 	// deja owns how the entry is launched, and it writes that at the top level.
 	// An entry written in the nested shape kept its `transport` beside the
 	// command deja had just written, and a client that prefers the nested one
@@ -4103,7 +4093,7 @@ func entrySwitchedOffFor(client string, entry map[string]any) bool {
 // dropNotePart removes one "; "-joined part from an install note.
 func dropNotePart(note, part string) string {
 	var keep []string
-	for _, p := range strings.Split(note, "; ") {
+	for p := range strings.SplitSeq(note, "; ") {
 		if p != part {
 			keep = append(keep, p)
 		}
@@ -4859,7 +4849,7 @@ func jsoncFirstCodeLine(body []string) int {
 // jsoncLineOpensInBlock reports whether line i starts inside a /* */ comment.
 func jsoncLineOpensInBlock(body []string, i int) bool {
 	inBlock := false
-	for j := 0; j < i; j++ {
+	for j := range i {
 		_, inBlock, _ = jsoncCodeOf(body[j], inBlock)
 	}
 	return inBlock
@@ -5172,7 +5162,7 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 			// back out — and gave a file with no trailing newline one.
 			return old, "", nil
 		}
-		return nil, "", fmt.Errorf("opencode config has an \"mcp\" block deja could not edit without risking it — add the deja server by hand")
+		return nil, "", errors.New("opencode config has an \"mcp\" block deja could not edit without risking it — add the deja server by hand")
 	}
 	start, end := -1, -1
 	sameLine := false
@@ -5211,7 +5201,7 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 		// shape this text path cannot edit safely, and the refusal below says
 		// so rather than guessing where the commas go.
 		if !emptyJSONCBlockRE.MatchString(code) {
-			return nil, "", fmt.Errorf("opencode config has an \"mcp\" block deja could not edit without risking it — add the deja server by hand")
+			return nil, "", errors.New("opencode config has an \"mcp\" block deja could not edit without risking it — add the deja server by hand")
 		}
 		indent := lines[start][:len(lines[start])-len(strings.TrimLeft(lines[start], " \t"))]
 		at := strings.LastIndex(lines[start], "{")
@@ -5251,7 +5241,7 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 		// (#3929). This writer speaks the 1.x shape only; refuse rather than
 		// relocate.
 		if !uninstall && jsoncEntryIsNested(block, key) {
-			return nil, "", fmt.Errorf("opencode config keeps its servers under \"mcp.servers\"; deja edits the top of the \"mcp\" block and would move the entry there — add the deja server by hand")
+			return nil, "", errors.New("opencode config keeps its servers under \"mcp.servers\"; deja edits the top of the \"mcp\" block and would move the entry there — add the deja server by hand")
 		}
 		body, dropped, wasLast, droppedAt := dropJSONCEntry(block, key)
 		if uninstall && len(dropped) == 0 {
@@ -5340,7 +5330,7 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 	// user's other servers. Refuse rather than corrupt a config that cannot be
 	// rebuilt; the caller surfaces this so the user can wire deja by hand.
 	if start >= 0 || opencodeHasMCPKey(lines) {
-		return nil, "", fmt.Errorf("opencode config has an \"mcp\" block deja could not edit without risking it — add the deja server by hand")
+		return nil, "", errors.New("opencode config has an \"mcp\" block deja could not edit without risking it — add the deja server by hand")
 	}
 	insert := len(lines) - 1
 	// opencode puts its $schema line into a config that lacks one, and into
@@ -5358,7 +5348,7 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 	// to have one of its own on that line. On a config written as a single
 	// line the splice put the new block *before* the object (#2777).
 	if insert < 1 || strings.TrimSpace(stripJSONComments(lines[insert])) != "}" {
-		return nil, "", fmt.Errorf("opencode config is not laid out in a way deja can add to — add the deja server by hand")
+		return nil, "", errors.New("opencode config is not laid out in a way deja can add to — add the deja server by hand")
 	}
 	// The comma goes on the last line of code above the brace, and only when
 	// that code has none yet. Walking up past every line that already ended
@@ -5409,18 +5399,18 @@ func replacedJSONCLineNote(dropped []string, line string) string {
 	if sameDejaCommand(was, jsoncEntryCommand(line)) {
 		return ""
 	}
-	return fmt.Sprintf("replaced the deja entry that was already here, which ran %s", safeForStatusline(was, 200))
+	return "replaced the deja entry that was already here, which ran " + safeForStatusline(was, 200)
 }
 
 // jsoncEntryCommand pulls the command out of an entry deja did not write. It
 // reads the text rather than the JSON: the block may carry comments and
 // trailing commas, which is why this writer exists at all.
 func jsoncEntryCommand(text string) string {
-	i := strings.Index(text, `"command"`)
-	if i < 0 {
+	_, after, ok := strings.Cut(text, `"command"`)
+	if !ok {
 		return ""
 	}
-	rest := text[i+len(`"command"`):]
+	rest := after
 	if j := strings.IndexAny(rest, `"`); j >= 0 {
 		rest = rest[j+1:]
 		if k := strings.IndexByte(rest, '"'); k > 0 {
@@ -5570,10 +5560,8 @@ func unknownTargetMessage(target string) error {
 	// different agent. A known target with `-auto` on it is someone asking for
 	// recall wiring that target does not have (#4301).
 	if base, ok := strings.CutSuffix(strings.ToLower(strings.TrimSpace(target)), "-auto"); ok && base != "" {
-		for _, n := range names {
-			if n == base {
-				return fmt.Errorf("unknown target %q — %s has no -auto target; `deja install %s` wires it", target, base, base)
-			}
+		if slices.Contains(names, base) {
+			return fmt.Errorf("unknown target %q — %s has no -auto target; `deja install %s` wires it", target, base, base)
 		}
 	}
 	if near := nearestTarget(target, names); near != "" {

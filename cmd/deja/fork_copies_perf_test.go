@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
@@ -14,11 +15,11 @@ func collisionHits(n int, unique bool) []search.Hit {
 	hits := make([]search.Hit, n)
 	at := time.Date(2026, 10, 19, 0, 0, 0, 0, time.UTC)
 	for i := range hits {
-		s := model.Session{ID: fmt.Sprint(i), Harness: "codex", Started: at}
+		s := model.Session{ID: strconv.Itoa(i), Harness: "codex", Started: at}
 		for j := range 12 {
 			text := fmt.Sprintf("WARMUP_SENTINEL native synthetic %d", j)
 			if unique {
-				text += fmt.Sprint(i)
+				text += strconv.Itoa(i)
 			}
 			s.Messages = append(s.Messages, model.Message{Role: "user", Time: at, Text: text})
 		}

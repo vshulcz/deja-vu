@@ -22,7 +22,7 @@ func TestInstallerAsksThroughTheControllingTerminal(t *testing.T) {
 	}
 	// Comments are allowed to name the old condition; code is not.
 	var code []string
-	for _, line := range strings.Split(string(b), "\n") {
+	for line := range strings.SplitSeq(string(b), "\n") {
 		if trimmed := strings.TrimSpace(line); !strings.HasPrefix(trimmed, "#") {
 			code = append(code, line)
 		}

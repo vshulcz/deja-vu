@@ -20,9 +20,11 @@ func TestAppendedTailKeepsTheProjectFromPaths(t *testing.T) {
 	}
 	p := filepath.Join(root, "claude", "-home-me", "s.jsonl")
 	head := claudeLineAt("s1", "2026-07-17T09:00:00Z", "projneedle look at alpha", "/home/me")
+	var headSb23 strings.Builder
 	for i, f := range []string{"a.go", "b.go", "c.go"} {
-		head += claudeEditAt("s1", "2026-07-17T09:00:0"+string(rune('1'+i))+"Z", filepath.Join(repo, f), "/home/me")
+		headSb23.WriteString(claudeEditAt("s1", "2026-07-17T09:00:0"+string(rune('1'+i))+"Z", filepath.Join(repo, f), "/home/me"))
 	}
+	head += headSb23.String()
 	write(t, p, head)
 	o := search.Options{Query: "projneedle", All: true}
 	if err := EnsureForSearch(dir, o, false, nil); err != nil {

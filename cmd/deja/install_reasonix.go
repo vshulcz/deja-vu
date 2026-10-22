@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -457,14 +458,14 @@ func installReasonixViaCLI(cli, src string) error {
 		missing = append(missing, reasonixCrashDir())
 	}
 	defer func() {
-		for i := len(missing) - 1; i >= 0; i-- {
-			if _, err := os.Lstat(missing[i]); err != nil {
+		for _, m := range slices.Backward(missing) {
+			if _, err := os.Lstat(m); err != nil {
 				continue
 			}
-			if missing[i] == key {
+			if m == key {
 				createdByThisRun = append(createdByThisRun, key)
 			} else {
-				createdDirsByThisRun = append(createdDirsByThisRun, missing[i])
+				createdDirsByThisRun = append(createdDirsByThisRun, m)
 			}
 		}
 	}()

@@ -89,7 +89,7 @@ func piPatchEdits(op, diff string) []any {
 		}
 		removed, added = nil, nil
 	}
-	for _, l := range strings.Split(diff, "\n") {
+	for l := range strings.SplitSeq(diff, "\n") {
 		switch {
 		case strings.HasPrefix(l, "@@"):
 			flush()

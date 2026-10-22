@@ -3,6 +3,7 @@ package index
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -52,9 +53,11 @@ func TestImportKeepsTheCountsBehindTouched(t *testing.T) {
 
 	// The second works on another file throughout.
 	second := rec("user", "working on the pool", 10)
-	for i := 0; i < 5; i++ {
-		second += rec("files", "/repo/pool.go", 11+i)
+	var secondSb55 strings.Builder
+	for i := range 5 {
+		secondSb55.WriteString(rec("files", "/repo/pool.go", 11+i))
 	}
+	second += secondSb55.String()
 	batch("deja-sync-b.jsonl", second)
 
 	meta = importedPeerMeta(t, dir)

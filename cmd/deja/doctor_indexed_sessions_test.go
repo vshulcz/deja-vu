@@ -95,7 +95,7 @@ func TestDoctorRowCountsIndexedSessions(t *testing.T) {
 
 func harnessRow(t *testing.T, out, name string) string {
 	t.Helper()
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		if strings.HasPrefix(strings.TrimSpace(line), name+" ") {
 			return line
 		}

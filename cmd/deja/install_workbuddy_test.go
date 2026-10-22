@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -81,12 +82,7 @@ func TestInstallWorkBuddyKeepsTheFileTheAgentReads(t *testing.T) {
 func TestWorkBuddyDetectedByItsStore(t *testing.T) {
 	home := filepath.Join(hermeticEnv(t), "home")
 	has := func() bool {
-		for _, n := range existingTargets() {
-			if n == "workbuddy" {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(existingTargets(), "workbuddy")
 	}
 	if has() {
 		t.Fatal("a machine without WorkBuddy counted as one")

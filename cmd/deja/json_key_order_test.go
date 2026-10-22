@@ -96,7 +96,7 @@ func TestMarshalConfigLikeKeepsEachArrayEntrysOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(got) != string(old) {
+	if !bytes.Equal(got, old) {
 		t.Errorf("round trip changed the file:\n%s", got)
 	}
 

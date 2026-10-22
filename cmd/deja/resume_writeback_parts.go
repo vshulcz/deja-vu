@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -25,8 +26,8 @@ func writeBackWithParts(s model.Session, f sources.WriteBackFile) error {
 	}
 	var made []string
 	undo := func() {
-		for i := len(made) - 1; i >= 0; i-- {
-			_ = os.Remove(made[i])
+		for _, m := range slices.Backward(made) {
+			_ = os.Remove(m)
 		}
 	}
 	for _, p := range sidecars {

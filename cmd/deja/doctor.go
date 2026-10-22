@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -93,7 +94,7 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup, dir strin
 		// whatever directory they were standing in (#1692). There is no
 		// database at a path like that to verify anyway.
 		if !filepath.IsAbs(dir) {
-			return fmt.Errorf("doctor --deep cannot find your index — set HOME, or DEJA_INDEX_DIR to an absolute path")
+			return errors.New("doctor --deep cannot find your index — set HOME, or DEJA_INDEX_DIR to an absolute path")
 		}
 		dr, err := index.DeepVerify(dir)
 		if err != nil {
@@ -1316,7 +1317,7 @@ func doctorCursorDetail(sqlite bool) string {
 	// costs nothing and this stays quiet; if a release stops writing
 	// transcripts, this is the only thing that would say so (#3772).
 	if n := sources.CursorChatsWithoutTranscript(); n > 0 {
-		parts = append(parts, fmt.Sprintf("%s with no transcript — contents not readable yet", doctorCount(n, "CLI chat")))
+		parts = append(parts, doctorCount(n, "CLI chat")+" with no transcript — contents not readable yet")
 	}
 	return strings.Join(parts, ", ")
 }

@@ -16,7 +16,7 @@ import (
 func TestCappedNoteDoesNotAdviseAllWhenAllIsAlreadyOn(t *testing.T) {
 	tmp := hermeticEnv(t)
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		id := fmt.Sprintf("sess-%02d", i)
 		line := fmt.Sprintf(`{"type":"user","sessionId":%q,"cwd":"/tmp/hunt","timestamp":"2026-05-0%dT10:00:00Z","message":{"role":"user","content":"the retry loop keeps firing"}}`, id, i+1)
 		writeClaudeFixture(t, filepath.Join(root, "projects", "-tmp-hunt", id+".jsonl"), id, []string{line})

@@ -2,6 +2,7 @@ package sources
 
 import (
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -415,12 +416,7 @@ func harnessTable() []Harness {
 			}, {
 				Name: "goose-db",
 				Match: func(p string) bool {
-					for _, db := range GooseDBs() {
-						if p == db {
-							return true
-						}
-					}
-					return false
+					return slices.Contains(GooseDBs(), p)
 				},
 				Parse:     dbParse(ParseGooseDB, ParseGooseDBSince),
 				ParseFrom: dbParseFrom(ParseGooseDB, ParseGooseDBSince),
@@ -648,12 +644,7 @@ func harnessTable() []Harness {
 					if !hasBase(p, "crush.db") {
 						return false
 					}
-					for _, db := range CrushDBs() {
-						if p == db {
-							return true
-						}
-					}
-					return false
+					return slices.Contains(CrushDBs(), p)
 				},
 				Parse:     dbParse(ParseCrushDB, ParseCrushDBSince),
 				ParseFrom: dbParseFrom(ParseCrushDB, ParseCrushDBSince),

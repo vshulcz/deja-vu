@@ -126,7 +126,7 @@ func dejaOwnsFile(home, p string) bool {
 	if err != nil {
 		return false
 	}
-	for _, part := range strings.Split(filepath.ToSlash(rel), "/") {
+	for part := range strings.SplitSeq(filepath.ToSlash(rel), "/") {
 		if part == "deja" || strings.HasPrefix(part, "deja.") {
 			return true
 		}

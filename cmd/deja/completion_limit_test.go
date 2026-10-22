@@ -64,7 +64,7 @@ func TestBashCompletionLimitScope(t *testing.T) {
 				t.Fatalf("bash completion failed: %v\n%s", err, out)
 			}
 			got := false
-			for _, candidate := range strings.Fields(string(out)) {
+			for candidate := range strings.FieldsSeq(string(out)) {
 				got = got || candidate == "--limit"
 			}
 			if got != tc.want {

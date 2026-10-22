@@ -182,7 +182,7 @@ func stripJSONCComments(b []byte) []byte {
 func dropTrailingCommas(b []byte) []byte {
 	out := make([]byte, 0, len(b))
 	inString, escaped := false, false
-	for i := 0; i < len(b); i++ {
+	for i := range b {
 		c := b[i]
 		if inString {
 			out = append(out, c)

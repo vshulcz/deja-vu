@@ -24,7 +24,7 @@ func TestTheEnvironmentBlockRecordsWhereItCameFrom(t *testing.T) {
 	if err := os.MkdirAll(store, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		at := time.Now().Add(-time.Duration(2+i) * time.Hour).UTC().Format(time.RFC3339)
 		rows := []string{
 			fmt.Sprintf(`{"type":"user","sessionId":"acme%d","timestamp":%q,"cwd":"/clients/acme/api",`+
@@ -84,7 +84,7 @@ func TestTheSessionStartDigestRecordsItsProjects(t *testing.T) {
 	if err := os.MkdirAll(store, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		at := time.Now().Add(-time.Duration(3+i) * time.Hour).UTC().Format(time.RFC3339)
 		line := fmt.Sprintf(`{"type":"user","sessionId":"mine%d","timestamp":%q,"cwd":"/work/api",`+
 			`"message":{"role":"user","content":"my own retry budget question %d"}}`, i, at, i)

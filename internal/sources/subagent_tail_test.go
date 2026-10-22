@@ -32,9 +32,11 @@ func TestASubagentIsReadAsItsTaskAndItsAnswer(t *testing.T) {
 		return string(b) + "\n"
 	}
 	body := line("user", "find where the retry budget is set", 0)
+	var bodySb35 strings.Builder
 	for i := 1; i <= 20; i++ {
-		body += line("assistant", "reading another file, nothing here yet", i)
+		bodySb35.WriteString(line("assistant", "reading another file, nothing here yet", i))
 	}
+	body += bodySb35.String()
 	body += line("assistant", "the retry budget is set in config/retry.go, five attempts", 21)
 	path := filepath.Join(sub, "child-1.jsonl")
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
@@ -89,11 +91,13 @@ func TestAnOrdinarySessionIsNotCut(t *testing.T) {
 		t.Fatal(err)
 	}
 	var body string
-	for i := 0; i < 12; i++ {
-		body += `{"type":"user","sessionId":"s1","timestamp":"2026-08-02T10:00:0` +
+	var bodySb92 strings.Builder
+	for i := range 12 {
+		bodySb92.WriteString(`{"type":"user","sessionId":"s1","timestamp":"2026-08-02T10:00:0` +
 			string(rune('0'+i%10)) + `Z","message":{"role":"user","content":"turn ` +
-			string(rune('a'+i)) + `"}}` + "\n"
+			string(rune('a'+i)) + `"}}` + "\n")
 	}
+	body += bodySb92.String()
 	path := filepath.Join(proj, "s1.jsonl")
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatal(err)

@@ -52,7 +52,7 @@ func TestTestMainScrubsEveryVariableTheCodeReads(t *testing.T) {
 		t.Fatalf("helper: %v\n%s", err, out)
 	}
 	var leaked []string
-	for _, line := range strings.Split(string(out), "\n") {
+	for line := range strings.SplitSeq(string(out), "\n") {
 		if name, ok := strings.CutPrefix(line, "LEAK "); ok && !harmless[name] {
 			leaked = append(leaked, name)
 		}

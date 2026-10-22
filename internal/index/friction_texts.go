@@ -6,8 +6,10 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync/atomic"
@@ -237,9 +239,7 @@ func writeFrictionTexts(dir string, m Manifest, size int64) error {
 		_ = os.Remove(path)
 		return err
 	}
-	for k, e := range got {
-		out.entries[k] = e
-	}
+	maps.Copy(out.entries, got)
 	got, err = read(extend, nil, old.size, func(k string) (uint64, map[uint64]string) {
 		e := old.entries[k]
 		return e.stamp, keepWalls(e.lines, walls)
@@ -248,9 +248,7 @@ func writeFrictionTexts(dir string, m Manifest, size int64) error {
 		_ = os.Remove(path)
 		return err
 	}
-	for k, e := range got {
-		out.entries[k] = e
-	}
+	maps.Copy(out.entries, got)
 	return writeFileAtomic(path, encodeFrictionTexts(out))
 }
 
@@ -379,7 +377,7 @@ func encodeFrictionTexts(ft frictionTextFile) []byte {
 	for h := range ft.walls {
 		walls = append(walls, h)
 	}
-	sort.Slice(walls, func(i, j int) bool { return walls[i] < walls[j] })
+	slices.Sort(walls)
 	uv(uint64(len(walls)))
 	for _, h := range walls {
 		u64(h)
@@ -398,7 +396,7 @@ func encodeFrictionTexts(ft frictionTextFile) []byte {
 		for h := range e.lines {
 			hs = append(hs, h)
 		}
-		sort.Slice(hs, func(i, j int) bool { return hs[i] < hs[j] })
+		slices.Sort(hs)
 		uv(uint64(len(hs)))
 		for _, h := range hs {
 			u64(h)

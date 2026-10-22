@@ -75,7 +75,7 @@ func TestChineseResumeClaimMatchesTheRegistry(t *testing.T) {
 			// match reads the sentence as naming a harness that resumes. The
 			// list is separated by 、 and closed with 和.
 			named := map[string]bool{}
-			for _, item := range strings.Split(strings.ReplaceAll(m[2], "和", "、"), "、") {
+			for item := range strings.SplitSeq(strings.ReplaceAll(m[2], "和", "、"), "、") {
 				if item = strings.TrimSpace(item); item != "" {
 					named[item] = true
 				}

@@ -11,12 +11,12 @@ import (
 // #1963 proposed counting them; these are the numbers that say otherwise.
 func TestTheImpactRatioIgnoresTheEnvironmentBlock(t *testing.T) {
 	dir := t.TempDir()
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		RecordResultRaw(dir, KindRecall, 900, 2, false, 9000)
 	}
 	before := Impact(dir)
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		RecordResultRaw(dir, KindHook, 501, 0, true, 0)
 	}
 	after := Impact(dir)

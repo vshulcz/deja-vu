@@ -55,7 +55,7 @@ func TestANoteTitleWithNewlinesStaysOnOneLine(t *testing.T) {
 		if !strings.Contains(out, "pool timeout") {
 			t.Fatalf("%v does not print the note title, so it measures nothing:\n%s", args, out)
 		}
-		for _, l := range strings.Split(out, "\n") {
+		for l := range strings.SplitSeq(out, "\n") {
 			if strings.HasPrefix(strings.TrimSpace(l), forged) || strings.HasPrefix(strings.TrimSpace(l), "## ") {
 				t.Errorf("%v: a line of the title became a line of its own: %q", args, l)
 			}

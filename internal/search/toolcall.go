@@ -53,14 +53,14 @@ func withoutOwnCallLog(text string) string {
 func isOwnCallLine(line string) bool {
 	low := strings.ToLower(line)
 	for _, name := range dejaCallNames {
-		at := strings.Index(low, name)
-		if at < 0 {
+		_, after, ok := strings.Cut(low, name)
+		if !ok {
 			continue
 		}
 		// The arguments follow the name — a line merely discussing the tool
 		// ("recall_context returns a digest") has no object after it and is
 		// ordinary prose worth keeping.
-		if strings.Contains(low[at+len(name):], `{"`) {
+		if strings.Contains(after, `{"`) {
 			return true
 		}
 	}

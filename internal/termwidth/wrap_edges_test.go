@@ -9,7 +9,7 @@ import (
 // narrow pane does not get one word per line.
 func TestIndentKeepsTwentyColumnsUnderAWideIndent(t *testing.T) {
 	got := Indent("one two three four five six seven eight", 24, strings.Repeat(" ", 20), strings.Repeat(" ", 20))
-	first := strings.Split(got, "\n")[0]
+	first, _, _ := strings.Cut(got, "\n")
 	if Columns(strings.TrimLeft(first, " ")) < 15 {
 		t.Errorf("first line kept too little text: %q", first)
 	}

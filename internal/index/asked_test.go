@@ -76,7 +76,7 @@ func TestAskedHashesAreStableAndBounded(t *testing.T) {
 		t.Fatalf("got %v", got)
 	}
 	var many []model.Message
-	for i := 0; i < 30; i++ {
+	for i := range 30 {
 		many = append(many, model.Message{Role: "user", Text: "why does thing number " + string(rune('a'+i)) + " fail here?"})
 	}
 	if got := askedHashes(many); len(got) != askedQuestionCap {

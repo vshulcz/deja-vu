@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -479,7 +480,7 @@ func runRulesTo(w io.Writer, args []string) error {
 			sync = true
 		case "status":
 		case "candidates":
-			return fmt.Errorf("rules: candidates goes first and takes no other subcommand — `deja rules candidates [--json] [--limit n] [--since 90d]`")
+			return errors.New("rules: candidates goes first and takes no other subcommand — `deja rules candidates [--json] [--limit n] [--since 90d]`")
 		default:
 			return unknownFlag("rules", a, []string{"sync", "status", "candidates"})
 		}

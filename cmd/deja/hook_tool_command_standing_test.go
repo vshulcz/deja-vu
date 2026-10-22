@@ -45,7 +45,7 @@ func TestACommandDoesNotOwnANoteAboutSomethingElse(t *testing.T) {
 		bash("dec", at(400), "npm root -g"),
 		`{"type":"assistant","sessionId":"dec","timestamp":"` + at(399) + `","cwd":"/work/app","message":{"role":"assistant","content":"the description leads with the task, not the category"}}`,
 	})
-	for k := 0; k < 4; k++ {
+	for k := range 4 {
 		sid := fmt.Sprintf("r%d", k)
 		write(sid, []string{
 			`{"type":"user","sessionId":"` + sid + `","timestamp":"` + at(200-20*k) + `","cwd":"/work/app","message":{"role":"user","content":"where are the global packages"}}`,
@@ -105,7 +105,7 @@ func TestACommandKeepsANoteThatNamesIt(t *testing.T) {
 	// The head of the line needs the command to be a habit: a single sighting
 	// is not worth a line at all, so without these the test would pass on
 	// silence.
-	for k := 0; k < 5; k++ {
+	for k := range 5 {
 		sid := fmt.Sprintf("m%d", k)
 		write(sid, []string{
 			`{"type":"user","sessionId":"` + sid + `","timestamp":"` + at(300-20*k) + `","cwd":"/work/app","message":{"role":"user","content":"run the orders migration again"}}`,

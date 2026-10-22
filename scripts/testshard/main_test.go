@@ -51,7 +51,7 @@ func TestEveryNameLandsInExactlyOneShard(t *testing.T) {
 	probe := append([]string{}, names...)
 	rng := rand.New(rand.NewSource(1))
 	const alphabet = "09AZ_azé日"
-	for i := 0; i < 2000; i++ {
+	for range 2000 {
 		b := []rune(names[rng.Intn(len(names))])
 		b = b[:rng.Intn(len(b)+1)]
 		for j := rng.Intn(4); j > 0; j-- {

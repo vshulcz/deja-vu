@@ -195,7 +195,7 @@ func TestAnInPlaceMergeLeavesItsRedundantOverlaysToTheCaller(t *testing.T) {
 	base := filepath.Join(d, "ab.bin")
 	layer := func(n, from int) map[string][]posting {
 		out := map[string][]posting{}
-		for i := 0; i < n; i++ {
+		for i := range n {
 			out["ab"+strings.Repeat("x", i%7)+string(rune('a'+i%26))+strings.Repeat("y", i/26)] = []posting{{Off: int64(from + i), Sid: 1}}
 		}
 		return out

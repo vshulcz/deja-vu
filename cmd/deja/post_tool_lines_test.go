@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -17,7 +18,7 @@ func seedFileHistory(t *testing.T) {
 	tmp := hermeticEnv(t)
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		id := "s" + string(rune('0'+i))
 		writeClaudeFixture(t, filepath.Join(root, "alpha", id+".jsonl"), id, []string{
 			`{"type":"user","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"edit"}}`,
@@ -156,7 +157,7 @@ func TestZCodeWiresTheToolEvents(t *testing.T) {
 		t.Fatal(err)
 	}
 	b2, _ := os.ReadFile(zcodeConfigPath())
-	if string(b2) != string(b) {
+	if !bytes.Equal(b2, b) {
 		t.Errorf("a second install changed the file:\n%s", b2)
 	}
 	if _, err := installZCodeHooks("/bin/deja", true); err != nil {

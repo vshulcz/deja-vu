@@ -27,7 +27,7 @@ func TestFrictionNamesTheRuleThatEmptiedIt(t *testing.T) {
 	}
 	batch := t.TempDir()
 	var buf bytes.Buffer
-	for j := 0; j < 3; j++ {
+	for j := range 3 {
 		rec := index.SyncRecord{
 			Harness: "claude", SessionID: "peer" + string(rune('0'+j)), Project: "secretclient/api",
 			Role: "tool-output", Text: "panic: quaxbolt overflow in ledger/quaxbolt.go",

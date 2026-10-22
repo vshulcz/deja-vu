@@ -75,7 +75,7 @@ func TestDescribeNamesTheRuleSet(t *testing.T) {
 	// differently from one receipt to the next.
 	p := Policy{Activations: map[string]map[string]bool{ActivationAuto: {"imported:mini": false, "imported:laptop": false}}}
 	first := p.Describe(ActivationAuto)
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		if got := p.Describe(ActivationAuto); got != first {
 			t.Fatalf("description varies between calls: %q then %q", first, got)
 		}

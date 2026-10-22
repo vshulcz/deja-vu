@@ -14,7 +14,7 @@ import (
 // called the same five injections recalls (#1575).
 func TestTheReceiptCallsInjectionsWhatTheStatuslineCallsThem(t *testing.T) {
 	dir := t.TempDir()
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		usage.RecordDigest(dir, usage.KindHook, strings.Repeat("x", 400), 2, 4000)
 	}
 
@@ -34,7 +34,7 @@ func TestTheReceiptCallsInjectionsWhatTheStatuslineCallsThem(t *testing.T) {
 // A day an agent asked for memory itself still reads as recalls.
 func TestTheReceiptStillCountsWhatAnAgentAskedFor(t *testing.T) {
 	dir := t.TempDir()
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		usage.RecordDigest(dir, usage.KindRecall, strings.Repeat("x", 400), 2, 4000)
 	}
 
@@ -47,10 +47,10 @@ func TestTheReceiptStillCountsWhatAnAgentAskedFor(t *testing.T) {
 // And a day with both says both, rather than folding one into the other.
 func TestTheReceiptSeparatesWhatWasAskedForFromWhatArrived(t *testing.T) {
 	dir := t.TempDir()
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		usage.RecordDigest(dir, usage.KindRecall, strings.Repeat("x", 400), 2, 4000)
 	}
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		usage.RecordDigest(dir, usage.KindHook, strings.Repeat("x", 400), 2, 4000)
 	}
 

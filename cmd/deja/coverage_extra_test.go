@@ -618,7 +618,7 @@ func TestShareStatsResumeAndSyncEdgeBranches(t *testing.T) {
 	}
 	msg := strings.Repeat("word ", 20) + "\n"
 	var many []string
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		many = append(many, msg)
 	}
 	if got := digest.MessageText(strings.Join(many, "")); strings.Count(got, "word") > 16*20 {
@@ -879,7 +879,7 @@ func TestHookDigestPlainAndLimitBranches(t *testing.T) {
 		work = filepath.Join(tmp, "many")
 	}
 	projDir := filepath.Join(claudeRoot, encodedProjectDir(work))
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		id := string(rune('a'+i)) + "many"
 		writeClaudeFixture(t, filepath.Join(projDir, id+".jsonl"), id, []string{`{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"many project memory ` + id + `"}}`})
 	}

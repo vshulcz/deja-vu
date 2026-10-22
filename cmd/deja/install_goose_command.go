@@ -60,7 +60,7 @@ func gooseSlashCommandsBlock(s string) string {
 // YAML serializer writes, and an entry spliced in at two spaces beside it is a
 // file no parser will read (#2724).
 func gooseListIndent(block string) (string, bool) {
-	for _, line := range strings.Split(block, "\n") {
+	for line := range strings.SplitSeq(block, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 			continue

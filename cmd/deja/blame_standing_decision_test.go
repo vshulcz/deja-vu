@@ -37,7 +37,7 @@ func blameStore(t *testing.T) string {
 		edit("dec", "return 3", at(400)),
 		`{"type":"assistant","sessionId":"dec","timestamp":"` + at(399) + `","cwd":"/work/app","message":{"role":"assistant","content":"no: the pool change fixed the timeouts, the retry budget stays at 5"}}`,
 	})
-	for k := 0; k < 3; k++ {
+	for k := range 3 {
 		sid := "f" + string(rune('0'+k))
 		write(sid, 100-10*k, []string{
 			`{"type":"user","sessionId":"` + sid + `","timestamp":"` + at(100-10*k) + `","cwd":"/work/app","message":{"role":"user","content":"more work on retry.go"}}`,

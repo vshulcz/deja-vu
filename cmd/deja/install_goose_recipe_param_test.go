@@ -48,7 +48,7 @@ func TestTheGooseRecipeParameterIsNotSwallowedByTheInstructions(t *testing.T) {
 	if strings.HasPrefix(line, "  parameters:") {
 		t.Errorf("the parameters block is indented into the instructions:\n%s", r)
 	}
-	for _, l := range strings.Split(r, "\n") {
+	for l := range strings.SplitSeq(r, "\n") {
 		if strings.TrimSpace(l) == "parameters:" && l != "parameters:" {
 			t.Errorf("parameters is written at %q, want the first column", l)
 		}

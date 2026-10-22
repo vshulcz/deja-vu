@@ -17,7 +17,7 @@ import (
 // it, which is a test that passes on prose it never read.
 func policyBulletFor(t *testing.T, policy, command string) string {
 	t.Helper()
-	for _, item := range strings.Split(policy, "\n- ") {
+	for item := range strings.SplitSeq(policy, "\n- ") {
 		if strings.Contains(item, "`"+command+"`") {
 			return item
 		}

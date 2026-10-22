@@ -21,7 +21,7 @@ func TestOneDecisiveWordOutranksTwoFillerOnes(t *testing.T) {
 	// in a corpus of four everything is rare, idf collapses, and an earlier
 	// tier answers before relevance is ever asked.
 	var texts []string
-	for i := 0; i < 40; i++ {
+	for range 40 {
 		texts = append(texts, "there are many ways to own one of these and many people own several")
 	}
 	answer := len(texts)

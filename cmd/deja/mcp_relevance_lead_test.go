@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -20,11 +21,11 @@ import (
 func TestTheRelevanceLeadSaysWhichKindOfMissItIs(t *testing.T) {
 	hermeticEnv(t)
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
-	for i := 0; i < 40; i++ {
+	for i := range 40 {
 		at := time.Now().Add(-time.Duration(i+1) * time.Hour).UTC().Format(time.RFC3339)
 		id := fmt.Sprintf("s%02d", i)
 		writeClaudeFixture(t, filepath.Join(root, "-tmp-app", id+".jsonl"), id, []string{
-			`{"type":"user","sessionId":"` + id + `","timestamp":"` + at + `","cwd":"/tmp/app","message":{"role":"user","content":"the checkout throttle kept tripping under load on shard ` + fmt.Sprint(i) + `"}}`,
+			`{"type":"user","sessionId":"` + id + `","timestamp":"` + at + `","cwd":"/tmp/app","message":{"role":"user","content":"the checkout throttle kept tripping under load on shard ` + strconv.Itoa(i) + `"}}`,
 			`{"type":"assistant","sessionId":"` + id + `","timestamp":"` + at + `","cwd":"/tmp/app","message":{"role":"assistant","content":"we raised the throttle window and the checkout queue drained"}}`,
 		})
 	}

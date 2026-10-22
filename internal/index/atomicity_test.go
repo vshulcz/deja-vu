@@ -360,12 +360,12 @@ func TestRarityCountsMessagesNotWholeSessions(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		write(fmt.Sprintf("subj%d", i), []string{"we put prepared statements behind pgbouncer today"})
 	}
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		var lines []string
-		for k := 0; k < 40; k++ {
+		for k := range 40 {
 			lines = append(lines, fmt.Sprintf("pushed the branch again after fix %d", k))
 		}
 		write(fmt.Sprintf("work%d", i), lines)

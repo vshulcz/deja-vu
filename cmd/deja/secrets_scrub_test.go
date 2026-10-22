@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -97,7 +98,7 @@ func TestScrubDryRunChangesNothing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(after) != string(before) {
+	if !bytes.Equal(after, before) {
 		t.Errorf("the dry run rewrote the file:\n%s", after)
 	}
 	if got := scrubBackupsIn(filepath.Dir(transcript)); len(got) != 0 {

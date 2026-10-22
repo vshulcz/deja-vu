@@ -115,7 +115,7 @@ func filesMovedSince(paths []string, since time.Time, budget time.Duration) move
 			continue
 		}
 		seen := map[string]bool{}
-		for _, line := range strings.Split(string(out), "\n") {
+		for line := range strings.SplitSeq(string(out), "\n") {
 			if line = strings.TrimSpace(line); line != "" {
 				seen[line] = true
 			}

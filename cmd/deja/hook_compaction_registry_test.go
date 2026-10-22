@@ -123,7 +123,7 @@ func TestTraeRolloutCompactionIsReadByTheTraeReader(t *testing.T) {
 		t.Fatal(err)
 	}
 	var capture *usage.Event
-	for _, line := range strings.Split(strings.TrimSpace(string(journal)), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(string(journal)), "\n") {
 		var e usage.Event
 		if json.Unmarshal([]byte(line), &e) == nil && e.Kind == usage.KindCompactionCapture {
 			capture = &e

@@ -11,7 +11,7 @@ import (
 func TestHelpFitsAnOrdinaryTerminal(t *testing.T) {
 	for _, width := range []int{80, 100, 120} {
 		wrapped := wrapUsage(usageText(), width)
-		for _, line := range strings.Split(wrapped, "\n") {
+		for line := range strings.SplitSeq(wrapped, "\n") {
 			if len([]rune(line)) > width {
 				t.Errorf("at %d columns a line is %d wide:\n%s", width, len([]rune(line)), line)
 			}
@@ -62,7 +62,7 @@ func TestASingleCommandsHelpFitsToo(t *testing.T) {
 		if h == "" {
 			t.Fatalf("no help for %q", name)
 		}
-		for _, line := range strings.Split(wrapUsage(h, 80), "\n") {
+		for line := range strings.SplitSeq(wrapUsage(h, 80), "\n") {
 			if len([]rune(line)) > 80 {
 				t.Errorf("%s --help has a line %d wide:\n%s", name, len([]rune(line)), line)
 			}
@@ -79,7 +79,7 @@ func TestBothHelpSurfacesAreWrappedForTheTerminal(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v: %v", args, err)
 		}
-		for _, line := range strings.Split(out, "\n") {
+		for line := range strings.SplitSeq(out, "\n") {
 			if len([]rune(line)) > 80 {
 				t.Errorf("%v printed a line %d wide:\n%s", args, len([]rune(line)), line)
 			}

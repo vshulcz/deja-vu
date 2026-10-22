@@ -28,7 +28,7 @@ func TestKimiStopClearsTheStampAndMCPCallRestampsIt(t *testing.T) {
 		{"event = \"PreToolUse\"\nmatcher = \"^mcp__deja__\"\ncommand = ", " hook-mcp-call\"\n"},
 	} {
 		found := false
-		for _, table := range strings.Split(string(b), "[[hooks]]") {
+		for table := range strings.SplitSeq(string(b), "[[hooks]]") {
 			found = found || strings.Contains(table, want[0]) && strings.Contains(table, want[1])
 		}
 		if !found {

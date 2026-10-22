@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -21,9 +22,7 @@ func openclawIncludeStand(t *testing.T, cfg string, included map[string]string) 
 		t.Fatal(err)
 	}
 	files := map[string]string{"openclaw.json": cfg}
-	for name, body := range included {
-		files[name] = body
-	}
+	maps.Copy(files, included)
 	for name, body := range files {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
 			t.Fatal(err)

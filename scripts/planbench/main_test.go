@@ -25,7 +25,7 @@ func TestHelperDeja(t *testing.T) {
 	if err != nil {
 		os.Exit(2)
 	}
-	for _, line := range strings.Split(string(plan), "\n") {
+	for line := range strings.SplitSeq(string(plan), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "EXIT" {
 			fmt.Fprintln(os.Stderr, "deja: check failed")

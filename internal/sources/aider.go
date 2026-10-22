@@ -100,7 +100,7 @@ func aiderProjects() []string {
 		return nil
 	}
 	var out []string
-	for _, l := range strings.Split(string(b), "\n") {
+	for l := range strings.SplitSeq(string(b), "\n") {
 		if l = strings.TrimRight(l, "\r"); l != "" {
 			out = append(out, l)
 		}

@@ -87,7 +87,7 @@ func TestInstallJSONCRootTrailingCommaKeepsTheFileParsing(t *testing.T) {
 				// Whatever the reader wrote stays where it was: every one of
 				// their lines is still in the file, at most with a comma added.
 				noCommas := strings.ReplaceAll(got, ",", "")
-				for _, l := range strings.Split(in, "\n") {
+				for l := range strings.SplitSeq(in, "\n") {
 					if !strings.Contains(noCommas, strings.ReplaceAll(l, ",", "")) {
 						t.Errorf("line %q is gone or changed:\n%s", l, got)
 					}

@@ -41,7 +41,7 @@ insert into part values('p1','m1','{"type":"text","text":"why does the pager sta
 		t.Fatal(err)
 	}
 	out := captureStdout(t, func() { printSources(filepath.Join(tmp, "index.db")) })
-	for _, l := range strings.Split(out, "\n") {
+	for l := range strings.SplitSeq(out, "\n") {
 		if !strings.HasPrefix(l, "opencode\t") {
 			continue
 		}

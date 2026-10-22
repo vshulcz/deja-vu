@@ -119,7 +119,7 @@ func TestRecallSendsADeepReadBackToRecall(t *testing.T) {
 	hermeticEnv(t)
 	proj := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-work-app")
 	var lines []string
-	for i := 0; i < 2*deepReadFrom; i++ {
+	for i := range 2 * deepReadFrom {
 		role := "user"
 		if i%2 == 1 {
 			role = "assistant"

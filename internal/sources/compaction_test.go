@@ -200,7 +200,7 @@ func TestReadCompactionTranscriptBoundsLargeClaudeTail(t *testing.T) {
 		t.Fatal(err)
 	}
 	padding := strings.Repeat("x", 700)
-	for i := 0; i < 7000; i++ {
+	for i := range 7000 {
 		if _, err := fmt.Fprintf(f, `{"type":"assistant","sessionId":"claude-1","message":{"role":"assistant","content":"%s-%d"}}`+"\n", padding, i); err != nil {
 			t.Fatal(err)
 		}

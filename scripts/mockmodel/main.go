@@ -25,6 +25,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"maps"
 	"net/http"
 	"os"
 	"strconv"
@@ -348,7 +349,7 @@ func (s *server) recordWith(path string, msgs []message, tools []string) {
 func writeJSON(w http.ResponseWriter, code int, body any) {
 	b, _ := json.Marshal(body)
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Content-Length", fmt.Sprint(len(b)))
+	w.Header().Set("Content-Length", strconv.Itoa(len(b)))
 	w.WriteHeader(code)
 	_, _ = w.Write(b)
 }
@@ -452,9 +453,7 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request, req request) {
 		map[string]any{},
 	} {
 		chunk := map[string]any{}
-		for k, v := range base {
-			chunk[k] = v
-		}
+		maps.Copy(chunk, base)
 		finish := any(nil)
 		if len(delta.(map[string]any)) == 0 {
 			finish = "stop"
@@ -500,9 +499,7 @@ func (s *server) responses(w http.ResponseWriter, r *http.Request, req request) 
 	}
 	w.Header().Set("Content-Type", "text/event-stream")
 	inProgress := map[string]any{}
-	for k, v := range body {
-		inProgress[k] = v
-	}
+	maps.Copy(inProgress, body)
 	inProgress["status"] = "in_progress"
 	inProgress["output"] = []any{}
 	sse(w, "response.created", map[string]any{"type": "response.created", "response": inProgress})
@@ -560,9 +557,7 @@ func (s *server) messages(w http.ResponseWriter, r *http.Request, req request) {
 	}
 	w.Header().Set("Content-Type", "text/event-stream")
 	start := map[string]any{}
-	for k, v := range body {
-		start[k] = v
-	}
+	maps.Copy(start, body)
 	start["content"] = []any{}
 	sse(w, "message_start", map[string]any{"type": "message_start", "message": start})
 	if block, ok := body["content"].([]any); ok && len(block) > 0 {

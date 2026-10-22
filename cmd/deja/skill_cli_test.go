@@ -31,7 +31,7 @@ func TestWarmupWritesTheCLISkill(t *testing.T) {
 	}
 	// The point of the second skill: it must not send an agent at MCP tools
 	// that a CLI-only machine never installed.
-	for _, line := range strings.Split(string(body), "\n") {
+	for line := range strings.SplitSeq(string(body), "\n") {
 		if strings.HasPrefix(line, "- recall") || strings.HasPrefix(line, "- how:") {
 			t.Errorf("the CLI skill names an MCP tool as a thing to call: %q", line)
 		}
@@ -172,7 +172,7 @@ func TestInstalledSkillsKeepMetadataFlat(t *testing.T) {
 			t.Fatalf("%s: no frontmatter:\n%s", name, file)
 		}
 		inMeta := false
-		for _, line := range strings.Split(strings.TrimSuffix(parts[1], "\n"), "\n") {
+		for line := range strings.SplitSeq(strings.TrimSuffix(parts[1], "\n"), "\n") {
 			switch {
 			case line == "metadata:":
 				inMeta = true

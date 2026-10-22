@@ -57,7 +57,7 @@ func mcpToolModes(t *testing.T) []string {
 		t.Fatal("the tool schema no longer declares a mode enum")
 	}
 	var out []string
-	for _, part := range strings.Split(string(m[1]), ",") {
+	for part := range strings.SplitSeq(string(m[1]), ",") {
 		part = strings.TrimSpace(part)
 		if part == "" {
 			continue

@@ -84,7 +84,7 @@ func New() (*Client, error) {
 		return &Client{URL: endpoint, Model: model, apiKey: embedAPIKey(endpoint), HTTP: &http.Client{Timeout: 120 * time.Second}, QueryPrefix: os.Getenv("DEJA_EMBED_QUERY_PREFIX"), PassagePrefix: os.Getenv("DEJA_EMBED_PASSAGE_PREFIX")}, nil
 	}
 	if Off() {
-		return nil, fmt.Errorf("embedding is off (DEJA_EMBED_OFF=1)")
+		return nil, errors.New("embedding is off (DEJA_EMBED_OFF=1)")
 	}
 	for _, endpoint := range probeURLs {
 		c := &Client{URL: endpoint, Model: model, HTTP: &http.Client{Timeout: 120 * time.Second}, QueryPrefix: os.Getenv("DEJA_EMBED_QUERY_PREFIX"), PassagePrefix: os.Getenv("DEJA_EMBED_PASSAGE_PREFIX")}
@@ -180,7 +180,7 @@ func (c *Client) probe() error {
 		if err != nil {
 			return err
 		}
-		return fmt.Errorf("empty embedding response")
+		return errors.New("empty embedding response")
 	}
 	return nil
 }

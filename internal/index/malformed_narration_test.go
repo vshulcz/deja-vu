@@ -41,7 +41,7 @@ func TestAnIndexRunSaysWhatItCouldNotRead(t *testing.T) {
 	// escaping it. A raw control byte inside a JSON string is invalid JSON, so
 	// claude_decode.go drops the whole line.
 	var body strings.Builder
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		role := "user"
 		if i%2 == 1 {
 			role = "assistant"
@@ -99,7 +99,7 @@ func TestAnIndexRunSaysWhatItCouldNotRead(t *testing.T) {
 	if !strings.Contains(said, "deja: codex:") {
 		t.Fatalf("the clean store never narrated, so nothing here checks attribution:\n%s", said)
 	}
-	for _, line := range strings.Split(said, "\n") {
+	for line := range strings.SplitSeq(said, "\n") {
 		if strings.HasPrefix(line, "deja: codex:") && strings.Contains(line, "could not be read") {
 			t.Errorf("the claude store's loss was charged to codex too: %q", line)
 		}

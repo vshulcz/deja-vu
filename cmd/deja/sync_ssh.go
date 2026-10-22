@@ -74,13 +74,13 @@ func runSyncSSH(dir string, args []string) error {
 				return unknownFlag("sync ssh", a, syncSSHFlags)
 			}
 			if host != "" {
-				return fmt.Errorf("sync ssh takes one host")
+				return errors.New("sync ssh takes one host")
 			}
 			host = a
 		}
 	}
 	if host == "" {
-		return fmt.Errorf("sync ssh needs a host (an ssh alias or user@host)")
+		return errors.New("sync ssh needs a host (an ssh alias or user@host)")
 	}
 	return syncSSHHost(dir, host, pull, full, both)
 }
@@ -223,7 +223,7 @@ func syncSSHPush(dir, host string, full bool) (err error) {
 	}
 	batches, err := filepath.Glob(filepath.Join(tmp, "*.jsonl"))
 	if err != nil || len(batches) == 0 {
-		return fmt.Errorf("no batches produced")
+		return errors.New("no batches produced")
 	}
 	rtmp, err := sshCapture(host, "mktemp -d")
 	if err != nil {
@@ -417,12 +417,10 @@ func sshArgsBudget(opts []string, host, rtmp string) int {
 	for _, o := range opts {
 		fixed += len(o) + 1
 	}
-	budget := scpCommandLineMax - fixed
-	if budget < 512 {
+	budget := max(scpCommandLineMax-fixed,
 		// A pathological set of options should still move one file at a time
 		// rather than produce an empty chunk and loop forever.
-		budget = 512
-	}
+		512)
 	return budget
 }
 

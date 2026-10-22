@@ -101,7 +101,7 @@ func TestTheDateColumnRunsOneWayDownTheScreen(t *testing.T) {
 		t.Fatal(err)
 	}
 	dates := []string{}
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(out), "\n") {
 		parts := regexp.MustCompile(`\s{2,}`).Split(line, -1)
 		if len(parts) < 3 {
 			continue

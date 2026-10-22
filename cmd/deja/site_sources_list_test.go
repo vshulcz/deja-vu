@@ -25,7 +25,7 @@ func TestTheHomePageNamesEveryHarnessItCounts(t *testing.T) {
 		t.Fatal("the home page has no `sources` line to check")
 	}
 	named := map[string]bool{}
-	for _, n := range strings.Fields(strings.ReplaceAll(string(line[1]), "&nbsp;", " ")) {
+	for n := range strings.FieldsSeq(strings.ReplaceAll(string(line[1]), "&nbsp;", " ")) {
 		named[n] = true
 	}
 

@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -675,15 +676,12 @@ const earlierAttemptWindow = 50
 // above some margin. The old session stays in the results — history is the
 // product — but agents and readers see which one the project moved on to.
 func markEarlierAttempts(hits []Hit) {
-	n := len(hits)
-	if n > earlierAttemptWindow {
-		n = earlierAttemptWindow
-	}
+	n := min(len(hits), earlierAttemptWindow)
 	sets := make([]map[string]bool, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		set := map[string]bool{}
 		for _, sn := range hits[i].Snippets {
-			for _, w := range strings.Fields(lower(sn)) {
+			for w := range strings.FieldsSeq(lower(sn)) {
 				if len(w) > 3 {
 					set[w] = true
 				}
@@ -699,8 +697,8 @@ func markEarlierAttempts(hits []Hit) {
 		}
 		sets[i] = set
 	}
-	for i := 0; i < n; i++ {
-		for j := 0; j < n; j++ {
+	for i := range n {
+		for j := range n {
 			if i == j || hits[i].Superseded != "" {
 				continue
 			}
@@ -1427,11 +1425,8 @@ func countDocumentWords(s string, terms []string, variants map[string][]string, 
 					// A word matching a fuzzy/stem variant of this term counts
 					// toward its term frequency so BM25 ranks the hit instead of
 					// falling back to recency-only order.
-					for _, v := range variants[term] {
-						if word == v {
-							matched = true
-							break
-						}
+					if slices.Contains(variants[term], word) {
+						matched = true
 					}
 				}
 				if matched {
@@ -1527,10 +1522,7 @@ func boundedMessages(ms []model.Message, matched []int) ([]model.Message, bool) 
 		keep = append(keep, i, i+1)
 	}
 	if len(matched) == 0 {
-		from := total - jsonHitMessages
-		if from < 0 {
-			from = 0
-		}
+		from := max(total-jsonHitMessages, 0)
 		for i := from; i < total; i++ {
 			keep = append(keep, i)
 		}
@@ -1769,10 +1761,7 @@ func fitProject(project string, width int, harness, date, id string, count int, 
 	// The column is padded to ten, so a name shorter than that costs ten either
 	// way and the budget has to say so.
 	fixed := termwidth.Columns(fmt.Sprintf("[%s]  · %s · %s — %s%s", harness, date, id, MatchCount(count), tier))
-	room := width - fixed
-	if room < 10 {
-		room = 10
-	}
+	room := max(width-fixed, 10)
 	if termwidth.Columns(project) <= room {
 		return project
 	}
@@ -2146,7 +2135,7 @@ func clipCompactionSummary(text string, parts []string) string {
 	var b strings.Builder
 	b.WriteString(compactionSummaryLead)
 	lines := 0
-	for _, raw := range strings.Split(text, "\n") {
+	for raw := range strings.SplitSeq(text, "\n") {
 		line := strings.TrimSpace(raw)
 		if line == "" || contextPartHits(line, parts) == nil {
 			continue
@@ -2181,7 +2170,7 @@ func clipCompactionSummary(text string, parts []string) string {
 // about.
 func firstLines(text string, n int) string {
 	var out []string
-	for _, raw := range strings.Split(text, "\n") {
+	for raw := range strings.SplitSeq(text, "\n") {
 		if line := strings.TrimSpace(raw); line != "" {
 			out = append(out, line)
 			if len(out) == n {
@@ -2295,10 +2284,7 @@ var renderContextTurnsWorkers = runtime.NumCPU
 // same bytes in the same order however many cores run it.
 func renderContextTurns(turns []contextTurn) []string {
 	out := make([]string, len(turns))
-	workers := renderContextTurnsWorkers()
-	if workers > len(turns) {
-		workers = len(turns)
-	}
+	workers := min(renderContextTurnsWorkers(), len(turns))
 	if workers < 2 || len(turns) < 32 {
 		for i, t := range turns {
 			out[i] = SafeText(contextText(t.raw, t.carriesQuery()))
@@ -2609,10 +2595,7 @@ func snippetAt(s, q string, re *regexp.Regexp, matched func(string) bool) string
 			idx = utf8.RuneCountInString(low[:b])
 		}
 	}
-	start := idx - 100
-	if start < 0 {
-		start = 0
-	}
+	start := max(idx-100, 0)
 	end := start + 300
 	if end > len(r) {
 		// Spend the whole window: a match near the end of a message left the
@@ -2654,10 +2637,7 @@ func snippetAt(s, q string, re *regexp.Regexp, matched func(string) bool) string
 // end of the message from sliding off its own match.
 func snapToWords(r []rune, start, end, match int) (int, int) {
 	if start > 0 {
-		limit := start + sentenceSnapRunes
-		if limit > match {
-			limit = match
-		}
+		limit := min(start+sentenceSnapRunes, match)
 		moved := start
 		// A sentence start is worth more than a word start, so look for one
 		// first across the whole budget.
@@ -2668,10 +2648,7 @@ func snapToWords(r []rune, start, end, match int) (int, int) {
 			}
 		}
 		if moved == start {
-			wordLimit := start + headWordSnapRunes
-			if wordLimit > limit {
-				wordLimit = limit
-			}
+			wordLimit := min(start+headWordSnapRunes, limit)
 			for i := start; i < wordLimit; i++ {
 				if isSpace(r[i]) {
 					moved = i + 1
@@ -2687,10 +2664,7 @@ func snapToWords(r []rune, start, end, match int) (int, int) {
 		}
 	}
 	if end < len(r) {
-		floor := end - tailWordSnapRunes
-		if floor < match+1 {
-			floor = match + 1
-		}
+		floor := max(end-tailWordSnapRunes, match+1)
 		for i := end; i > floor; i-- {
 			if isSpace(r[i-1]) {
 				end = i - 1
@@ -3158,7 +3132,7 @@ func proseLinesKeeping(s string, matched func(string) bool) ([]string, int) {
 	}
 	var cands []cand
 	proseHit := false
-	for _, line := range strings.Split(s, "\n") {
+	for line := range strings.SplitSeq(s, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
@@ -3454,10 +3428,7 @@ func RelevanceHitsWeighted(ss []model.Session, terms []string, idf map[string]fl
 // is enough work to pay for them. The bound is the same shape renderContextTurns
 // uses: a handful of items is faster on one core than it is to hand out.
 func parallelForSessions(n int, fn func(i int)) {
-	workers := relevanceWorkers()
-	if workers > n {
-		workers = n
-	}
+	workers := min(relevanceWorkers(), n)
 	if workers < 2 || n < 4 {
 		for i := range n {
 			fn(i)

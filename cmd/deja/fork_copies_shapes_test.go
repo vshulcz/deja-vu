@@ -1,9 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"math/rand"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
@@ -111,7 +111,7 @@ func TestCopySourcesShapesDifferential(t *testing.T) {
 	for round := range 300 {
 		ss := make([]model.Session, 8)
 		for i := range ss {
-			ss[i] = model.Session{ID: fmt.Sprint(rng.Intn(5)), Harness: fmt.Sprint(rng.Intn(2)), Kind: kinds[rng.Intn(len(kinds))], Parent: fmt.Sprint(rng.Intn(5)), Started: times[rng.Intn(len(times))]}
+			ss[i] = model.Session{ID: strconv.Itoa(rng.Intn(5)), Harness: strconv.Itoa(rng.Intn(2)), Kind: kinds[rng.Intn(len(kinds))], Parent: strconv.Itoa(rng.Intn(5)), Started: times[rng.Intn(len(times))]}
 			if i > 0 && rng.Intn(2) == 0 {
 				ss[i].Messages = ss[rng.Intn(i)].Messages
 			} else {

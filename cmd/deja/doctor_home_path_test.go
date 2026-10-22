@@ -58,7 +58,7 @@ func TestDoctorContractsTheHomePath(t *testing.T) {
 // failure.
 func storeLines(out string) string {
 	var keep []string
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		if strings.Contains(line, "claude") || strings.Contains(line, "index") {
 			keep = append(keep, line)
 		}

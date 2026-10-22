@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -170,7 +171,7 @@ func dejaHookIn(text string) bool {
 	}
 	var root any
 	if json.Unmarshal([]byte(jsoncToJSON(strings.TrimPrefix(text, string(utf8BOM)))), &root) != nil {
-		for _, l := range strings.Split(text, "\n") {
+		for l := range strings.SplitSeq(text, "\n") {
 			if runsDeja(quotedPathUnescape.Replace(l)) {
 				return true
 			}
@@ -183,10 +184,8 @@ func dejaHookIn(text string) bool {
 		case string:
 			return runsDeja(v)
 		case []any:
-			for _, e := range v {
-				if walk(e) {
-					return true
-				}
+			if slices.ContainsFunc(v, walk) {
+				return true
 			}
 		case map[string]any:
 			for _, e := range v {

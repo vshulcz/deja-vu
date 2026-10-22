@@ -33,7 +33,7 @@ func TestHowRanksByHowManySessionsRanIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	first := strings.SplitN(strings.TrimSpace(out), "\n", 2)[0]
+	first, _, _ := strings.Cut(strings.TrimSpace(out), "\n")
 	if !strings.Contains(first, "-count=1") {
 		t.Errorf("the command two sessions ran is not first:\n%s", out)
 	}

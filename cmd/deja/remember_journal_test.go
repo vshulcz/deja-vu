@@ -22,7 +22,7 @@ func rememberEvents(t *testing.T, dir string) int {
 		return 0
 	}
 	n := 0
-	for _, line := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(string(b)), "\n") {
 		var ev struct {
 			Kind string `json:"kind"`
 		}

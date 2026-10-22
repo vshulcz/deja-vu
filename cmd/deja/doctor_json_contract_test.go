@@ -19,7 +19,7 @@ func collectDoctorKeys(t reflect.Type, into map[string]bool) {
 	}
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
-		name := strings.Split(f.Tag.Get("json"), ",")[0]
+		name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
 		if name == "-" {
 			continue
 		}
@@ -38,7 +38,7 @@ func collectDoctorKeys(t reflect.Type, into map[string]bool) {
 func TestDoctorJSONKeysMatchTheDocumentedContract(t *testing.T) {
 	section := docSection(t, jsonOutputDoc(t), "## `deja doctor --json`")
 	emitted := map[string]bool{}
-	collectDoctorKeys(reflect.TypeOf(doctorReport{}), emitted)
+	collectDoctorKeys(reflect.TypeFor[doctorReport](), emitted)
 	for _, k := range sortedSet(emitted) {
 		if !namesKey(section, k) {
 			t.Errorf("doctor --json emits %q, and its section in docs/json-output.md never names it", k)

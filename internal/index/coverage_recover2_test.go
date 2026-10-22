@@ -280,10 +280,12 @@ func TestExportDefaultDirSourceFallbackAndOrphanSkip(t *testing.T) {
 	}
 	matches, _ := filepath.Glob(filepath.Join(tmp, "batch-out", "*.jsonl"))
 	var all string
+	var allSb283 strings.Builder
 	for _, p := range matches {
 		b, _ := os.ReadFile(p)
-		all += string(b)
+		allSb283.WriteString(string(b))
 	}
+	all += allSb283.String()
 	if strings.Contains(all, "orphan text") {
 		t.Fatal("orphan record with no manifest session was exported")
 	}

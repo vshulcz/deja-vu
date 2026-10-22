@@ -69,7 +69,7 @@ func TestFilesJSONCarriesTheRankedRows(t *testing.T) {
 		// A seed the parser cannot read indexes as nothing, and the assertions
 		// below then fail for a reason that has nothing to do with ranking —
 		// which is how this test went red on Windows and nowhere else.
-		for _, line := range strings.Split(strings.TrimSpace(string(body)), "\n") {
+		for line := range strings.SplitSeq(strings.TrimSpace(string(body)), "\n") {
 			if !json.Valid([]byte(line)) {
 				t.Fatalf("the seeded transcript is not JSON: %s", line)
 			}

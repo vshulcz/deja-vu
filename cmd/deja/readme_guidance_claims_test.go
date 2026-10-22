@@ -57,7 +57,7 @@ func readmeGuidanceParagraph(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, para := range strings.Split(string(b), "\n\n") {
+	for para := range strings.SplitSeq(string(b), "\n\n") {
 		if strings.Contains(para, "Install also writes user-level guidance") {
 			return para
 		}
@@ -117,7 +117,7 @@ func TestReadmeCursorGetsASkill(t *testing.T) {
 	// shared directory for Grok too, so a Cursor sentence that said nothing at
 	// all would pass on someone else's words.
 	sentence := ""
-	for _, s := range strings.Split(para, ". ") {
+	for s := range strings.SplitSeq(para, ". ") {
 		if strings.Contains(s, "Cursor has no user-level instructions file") {
 			sentence = s
 		}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -103,9 +104,7 @@ func sameTree(t *testing.T, what string, before, after map[string]string) {
 
 func cloneTree(m map[string]string) map[string]string {
 	out := make(map[string]string, len(m))
-	for k, v := range m {
-		out[k] = v
-	}
+	maps.Copy(out, m)
 	return out
 }
 
@@ -447,7 +446,7 @@ func TestInstallReasonixPlainKeepsAnInstalledRuntime(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		if strings.HasPrefix(line, "reasonix") && !strings.Contains(line, "unchanged") {
 			t.Errorf("install --all rewrote the package: %s", line)
 		}

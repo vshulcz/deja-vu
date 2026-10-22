@@ -39,7 +39,7 @@ func TestTUIHelpLabelsWhole(t *testing.T) {
 	}
 	// Wide enough, the three sections sit side by side.
 	s := screen(a.frame(140, 36))
-	for _, ln := range strings.Split(s, "\n") {
+	for ln := range strings.SplitSeq(s, "\n") {
 		if strings.Contains(ln, "FIND") && !strings.Contains(ln, "ACT") {
 			t.Errorf("sections not side by side: %q", ln)
 		}

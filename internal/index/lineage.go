@@ -3,6 +3,7 @@ package index
 import (
 	"hash/fnv"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -269,9 +270,9 @@ func heldRecords(dir string, m Manifest) func(asker, other SessionMeta) bool {
 		// a backgrounded session gains "No response requested." and a task
 		// notification, and the fork that holds every turn before them got
 		// its source back as recall (#4251).
-		for i := len(recs) - 1; i >= 0; i-- {
-			if !afterForkNoise(recs[i]) {
-				return set[key(recs[i])]
+		for _, rec := range slices.Backward(recs) {
+			if !afterForkNoise(rec) {
+				return set[key(rec)]
 			}
 		}
 		return false
@@ -290,12 +291,12 @@ func endedBy(dir string, m Manifest, src SessionMeta, at time.Time) bool {
 	if err != nil {
 		return false
 	}
-	for i := len(recs) - 1; i >= 0; i-- {
-		switch r := recs[i]; {
+	for _, rec := range slices.Backward(recs) {
+		switch r := rec; {
 		case afterForkNoise(r), r.Role == roleEdit, r.Role == roleWrote, r.Role == roleFiles, r.Time.IsZero():
 			continue
 		}
-		return !recs[i].Time.After(at)
+		return !rec.Time.After(at)
 	}
 	return false
 }
@@ -351,12 +352,12 @@ func wholeHolds(dir string, m Manifest, wholes []map[string]bool, other SessionM
 	if err != nil {
 		return false
 	}
-	for i := len(recs) - 1; i >= 0; i-- {
-		switch r := recs[i]; {
+	for _, rec := range slices.Backward(recs) {
+		switch r := rec; {
 		case afterForkNoise(r), r.Role == roleEdit, r.Role == roleWrote, r.Role == roleFiles:
 			continue
 		}
-		k := turnKey(recs[i].Role, recs[i].Time.UnixMilli())
+		k := turnKey(rec.Role, rec.Time.UnixMilli())
 		for _, w := range wholes {
 			if w[k] {
 				return true

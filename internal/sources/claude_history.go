@@ -174,11 +174,13 @@ func claudeHistoryText(m map[string]any) string {
 		b, _ := strconv.Atoi(keys[j])
 		return a < b
 	})
+	var textSb177 strings.Builder
 	for _, k := range keys {
 		if !used[k] {
-			text += "\n\n" + content[k]
+			textSb177.WriteString("\n\n" + content[k])
 		}
 	}
+	text += textSb177.String()
 	return text
 }
 

@@ -10,7 +10,7 @@ import (
 // the card, which happened whenever the trailing year opened on a partial week
 // from the month before.
 func TestMonthTicksNeverShareAColumnEdge(t *testing.T) {
-	for i := 0; i < 400; i++ {
+	for i := range 400 {
 		now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC).AddDate(0, 0, i)
 		hm := buildHeatmap(map[string]int{}, now)
 		for j := 1; j < len(hm.Months); j++ {

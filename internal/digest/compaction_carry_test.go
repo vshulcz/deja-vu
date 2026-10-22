@@ -258,7 +258,7 @@ func TestCarryKeepsToItsShareOfThePacket(t *testing.T) {
 		Objective:   model.ContextFact{Text: "Fix retry cancellation."},
 		Conclusions: []model.ContextFact{{Text: "Root cause: the retry loop ignored ctx.Done."}},
 	}
-	for i := 0; i < 12; i++ {
+	for i := range 12 {
 		c.Carry = append(c.Carry, model.ContextCarry{Kind: "open", Key: fmt.Sprintf("#%d", 7300+i),
 			Text: strings.Repeat("длинное описание ", 10) + fmt.Sprintf("PR #%d ждёт мейнтейнера", 7300+i)})
 	}

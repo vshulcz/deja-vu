@@ -270,7 +270,7 @@ func tiedChains(rng *rand.Rand, base time.Time) []PromptChain {
 			ID: chain.ID + "-answer", Harness: "claude", Project: chain.Project,
 			Updated: t.Add(20 * time.Minute),
 			Messages: []model.Message{
-				{Role: "user", Text: fmt.Sprintf("we decided %s", topic.fact), Time: t},
+				{Role: "user", Text: "we decided " + topic.fact, Time: t},
 				{Role: "assistant", Text: fillerText(rng, "wrote it down and moved on"), Time: t.Add(time.Minute)},
 			},
 		})
@@ -321,8 +321,8 @@ func promptShapeChain(rng *rand.Rand, i int, kind string, topic promptTopic, sta
 		Paraphrase: topic.paraphrase,
 		Kind:       kind,
 	}
-	msgs := []model.Message{{Role: "user", Text: fmt.Sprintf("we decided %s", topic.fact), Time: start}}
-	for k := 0; k < turns; k++ {
+	msgs := []model.Message{{Role: "user", Text: "we decided " + topic.fact, Time: start}}
+	for k := range turns {
 		msgs = append(msgs,
 			model.Message{Role: "user", Text: fillerText(rng, "started it over and watched what happened"), Time: start.Add(time.Duration(2*k+2) * time.Minute)},
 			model.Message{Role: "assistant", Text: fillerText(rng, "followed it down and rewrote the middle part"), Time: start.Add(time.Duration(2*k+3) * time.Minute)},
@@ -364,9 +364,9 @@ func GeneratePrompt(seed int64) PromptCorpus {
 			Question:   topic.question,
 			Paraphrase: topic.paraphrase,
 		}
-		for j := 0; j < PromptPriorCount; j++ {
+		for j := range PromptPriorCount {
 			t := base.Add(time.Duration(i*10+j) * time.Minute)
-			msgs := []model.Message{{Role: "user", Text: fmt.Sprintf("we decided %s", topic.fact), Time: t}}
+			msgs := []model.Message{{Role: "user", Text: "we decided " + topic.fact, Time: t}}
 			for k := 0; k < 4+rng.Intn(6); k++ {
 				msgs = append(msgs,
 					model.Message{Role: "user", Text: fillerText(rng, "started it over and watched what happened"), Time: t.Add(time.Duration(2*k+2) * time.Minute)},
@@ -450,7 +450,7 @@ func GeneratePrompt(seed int64) PromptCorpus {
 			{Role: "user", Text: "погоди, а что там дальше по задаче", Time: t},
 			{Role: "assistant", Text: "смотрю, сейчас продолжу", Time: t.Add(time.Minute)},
 		}
-		for k := 0; k < 40; k++ {
+		for k := range 40 {
 			at := t.Add(time.Duration(k+2) * time.Minute)
 			msgs = append(msgs,
 				model.Message{Role: "user", Text: "давай дальше, покажи ещё раз", Time: at},
@@ -464,7 +464,7 @@ func GeneratePrompt(seed int64) PromptCorpus {
 		// hold both kinds: the two slots go to whichever lines win, and every
 		// way of choosing by where or how often the word fell hands them to the
 		// mentions.
-		for k := 0; k < 3; k++ {
+		for k := range 3 {
 			msgs = append(msgs, model.Message{
 				Role: "assistant",
 				Text: "потом посмотрю про " + ru.word + ", пока не трогаю",
@@ -496,7 +496,7 @@ func GeneratePrompt(seed int64) PromptCorpus {
 		project := fmt.Sprintf("promptbenchconcluded%02d", i)
 		t := base.Add(time.Duration(2700+i*10) * time.Minute)
 		var chatter []model.Message
-		for k := 0; k < 60; k++ {
+		for k := range 60 {
 			chatter = append(chatter, model.Message{
 				Role: "assistant",
 				Text: "смотрел " + c.word + " ещё раз, пока ничего не трогаю",
@@ -535,7 +535,7 @@ func GeneratePrompt(seed int64) PromptCorpus {
 		project := fmt.Sprintf("promptbenchdecen%02d", i)
 		t := base.Add(time.Duration(2900+i*10) * time.Minute)
 		msgs := make([]model.Message, 0, 4)
-		for k := 0; k < 3; k++ {
+		for k := range 3 {
 			msgs = append(msgs, model.Message{
 				Role: "assistant",
 				Text: "will look at " + d.word + " later, not touching it yet",
@@ -580,7 +580,7 @@ func GeneratePrompt(seed int64) PromptCorpus {
 	const marathonProject = "promptbenchmarathonvs"
 	marathonStart := base.Add(3300 * time.Minute)
 	var longSession []model.Message
-	for k := 0; k < 90; k++ {
+	for k := range 90 {
 		at := marathonStart.Add(time.Duration(k) * time.Minute)
 		longSession = append(longSession,
 			model.Message{Role: "user", Text: fillerText(rng, "another pass over the same branch"), Time: at},
@@ -851,7 +851,7 @@ func GeneratePrompt(seed int64) PromptCorpus {
 		{"parquet", "parquet writes are batched per hour, not per row", "how often do we write parquet?", ""},
 	}
 	var noise []model.Message
-	for k := 0; k < 200; k++ {
+	for k := range 200 {
 		t := base.Add(time.Duration(1200+k) * time.Minute)
 		noise = append(noise,
 			model.Message{Role: "user", Text: fillerText(rng, "another pass over the same branch"), Time: t},
@@ -909,7 +909,7 @@ func GeneratePrompt(seed int64) PromptCorpus {
 	// words that identify something. A background that repeated one phrase in
 	// every session put it in 89% of them instead, dropped it far under the
 	// floor, and hid the very defect this corpus exists to reproduce.
-	for i := 0; i < promptBackgroundCount; i++ {
+	for i := range promptBackgroundCount {
 		id := fmt.Sprintf("prompt-bg-%03d", i)
 		t := base.Add(time.Duration(3000+i) * time.Minute)
 		// Both strides are coprime with the pool length, so every phrase gets
@@ -920,7 +920,7 @@ func GeneratePrompt(seed int64) PromptCorpus {
 		a := promptWorkingTalk[(i*7)%len(promptWorkingTalk)]
 		b := promptWorkingTalk[(i*11+5)%len(promptWorkingTalk)]
 		var msgs []model.Message
-		for k := 0; k < 6; k++ {
+		for k := range 6 {
 			at := t.Add(time.Duration(k) * time.Minute)
 			msgs = append(msgs,
 				model.Message{Role: "user", Text: fillerText(rng, a), Time: at},
@@ -937,7 +937,7 @@ func GeneratePrompt(seed int64) PromptCorpus {
 	}
 	// Negative controls share the corpus but hold none of its topics, so a
 	// question about them must not recall anything.
-	for i := 0; i < PromptNegativeCount; i++ {
+	for i := range PromptNegativeCount {
 		id := fmt.Sprintf("prompt-negative-%02d", i)
 		t := base.Add(time.Duration(500+i*10) * time.Minute)
 		chains = append(chains, PromptChain{

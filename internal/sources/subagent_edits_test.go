@@ -32,21 +32,25 @@ func TestASubagentKeepsItsEditsWhenItsMiddleIsCut(t *testing.T) {
 		return string(b) + "\n"
 	}
 	body := rec("user", "move Recommended out of idea.go", 0)
+	var bodySb35 strings.Builder
 	for i := 11; i <= 15; i++ {
-		body += rec("assistant", []any{
+		bodySb35.WriteString(rec("assistant", []any{
 			map[string]any{"type": "tool_use", "id": fmt.Sprintf("r%d", i), "name": "Read", "input": map[string]any{"file_path": fmt.Sprintf("/repo/only-read-%d.go", i)}},
-		}, i)
+		}, i))
 	}
+	body += bodySb35.String()
+	var bodySb40 strings.Builder
 	for i := 16; i <= 25; i++ {
-		body += rec("assistant", []any{
+		bodySb40.WriteString(rec("assistant", []any{
 			map[string]any{"type": "text", "text": "reading another file"},
 			map[string]any{"type": "tool_use", "id": fmt.Sprintf("t%d", i), "name": "Edit", "input": map[string]any{
 				"file_path": "/repo/idea.go", "old_string": fmt.Sprintf("old line %d", i), "new_string": fmt.Sprintf("\tSource Source // set to USER for every idea published from bot %d", i)}},
 			map[string]any{"type": "tool_use", "id": fmt.Sprintf("m%d", i), "name": "Read", "input": map[string]any{"file_path": fmt.Sprintf("/repo/only-read-beside-%d.go", i)}},
 			map[string]any{"type": "tool_use", "id": fmt.Sprintf("b%d", i), "name": "Bash", "input": map[string]any{"command": fmt.Sprintf("go test ./... # %d", i)}},
-		}, i)
-		body += rec("user", []any{map[string]any{"type": "tool_result", "tool_use_id": fmt.Sprintf("b%d", i), "content": "ok  repo 0.1s"}}, i)
+		}, i))
+		bodySb40.WriteString(rec("user", []any{map[string]any{"type": "tool_result", "tool_use_id": fmt.Sprintf("b%d", i), "content": "ok  repo 0.1s"}}, i))
 	}
+	body += bodySb40.String()
 	body += rec("assistant", "moved Recommended into recommended.go; tests pass", 30)
 	path := filepath.Join(sub, "agent-child-1.jsonl")
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {

@@ -222,9 +222,9 @@ func openclawFileFor(keys ...string) string {
 	}
 	rest := keys[strings.Count(at, ".")+1:]
 	ps := openclawIncludePaths(filepath.Dir(path), inc)
-	for i := len(ps) - 1; i >= 0; i-- {
-		if len(rest) > 0 && jsonAt(readJSONConfig(ps[i]), rest...) != nil {
-			return ps[i]
+	for _, p := range slices.Backward(ps) {
+		if len(rest) > 0 && jsonAt(readJSONConfig(p), rest...) != nil {
+			return p
 		}
 	}
 	if len(ps) == 1 {

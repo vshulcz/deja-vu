@@ -207,7 +207,7 @@ func TestACancelledCallIsNotRunAndNotAnswered(t *testing.T) {
 	setDeadline(t, 0)
 	s := openMCPSession(t, t.TempDir())
 	// Fill every worker so the next call queues.
-	for i := 0; i < mcpWorkers; i++ {
+	for i := range mcpWorkers {
 		s.call(10+i, fmt.Sprintf(`{"mode":"recall","query":"busy%d"}`, i))
 	}
 	deadline := time.Now().Add(2 * time.Minute)
@@ -223,11 +223,11 @@ func TestACancelledCallIsNotRunAndNotAnswered(t *testing.T) {
 		t.Fatalf("ping reply = %#v", got)
 	}
 	close(h.gate("queued"))
-	for i := 0; i < mcpWorkers; i++ {
+	for i := range mcpWorkers {
 		close(h.gate(fmt.Sprintf("busy%d", i)))
 	}
 	seen := map[int]bool{}
-	for i := 0; i < mcpWorkers; i++ {
+	for range mcpWorkers {
 		got := s.next(2 * time.Minute)
 		if got == nil {
 			t.Fatalf("missing reply after %v", seen)

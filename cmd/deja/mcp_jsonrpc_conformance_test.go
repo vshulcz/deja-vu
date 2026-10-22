@@ -20,7 +20,7 @@ func serveFrames(t *testing.T, frames ...string) []map[string]any {
 		t.Fatal(err)
 	}
 	var replies []map[string]any
-	for _, line := range strings.Split(strings.TrimSpace(out.String()), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(out.String()), "\n") {
 		if line == "" {
 			continue
 		}

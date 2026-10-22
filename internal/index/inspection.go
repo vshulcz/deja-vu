@@ -20,8 +20,8 @@ func commandParts(cmd string) []string {
 	fields := strings.FieldsFunc(cmd, func(r rune) bool { return r == ';' || r == '\n' })
 	var out []string
 	for _, f := range fields {
-		for _, part := range strings.Split(f, "&&") {
-			for _, part := range strings.Split(part, "||") {
+		for part := range strings.SplitSeq(f, "&&") {
+			for part := range strings.SplitSeq(part, "||") {
 				if p := strings.TrimSpace(part); p != "" {
 					out = append(out, p)
 				}

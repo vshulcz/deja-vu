@@ -73,7 +73,7 @@ func TestDejaVuLineReturnsAfterTheWindow(t *testing.T) {
 // bound on a machine that opens many.
 func TestDejaVuLineFileStaysBounded(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "index.db")
-	for i := 0; i < dejaVuLineKeep*3; i++ {
+	for i := range dejaVuLineKeep * 3 {
 		dejaVuLineDue(dir, "agent-"+strconv.Itoa(i))
 	}
 	b, err := os.ReadFile(dir + ".dejavu")
@@ -81,7 +81,7 @@ func TestDejaVuLineFileStaysBounded(t *testing.T) {
 		t.Fatal(err)
 	}
 	lines := 0
-	for _, l := range strings.Split(string(b), "\n") {
+	for l := range strings.SplitSeq(string(b), "\n") {
 		if strings.TrimSpace(l) != "" {
 			lines++
 		}

@@ -55,7 +55,7 @@ await handlers[` + "`" + hook + "`" + `](` + event + `, ctx);
 		t.Fatalf("the plugin never ran deja: %v", err)
 	}
 	var got []map[string]any
-	for _, l := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+	for l := range strings.SplitSeq(strings.TrimSpace(string(b)), "\n") {
 		var m map[string]any
 		if err := json.Unmarshal([]byte(l), &m); err != nil {
 			t.Fatalf("payload %q: %v", l, err)

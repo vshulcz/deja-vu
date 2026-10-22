@@ -201,11 +201,8 @@ func sessionsTouching(metas []index.SessionMeta, path string, self index.Session
 		if m.ID == self.ID && m.Harness == self.Harness {
 			continue
 		}
-		for _, p := range m.Touched {
-			if p == path {
-				out = append(out, m)
-				break
-			}
+		if slices.Contains(m.Touched, path) {
+			out = append(out, m)
 		}
 	}
 	return out

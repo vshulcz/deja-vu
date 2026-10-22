@@ -70,7 +70,7 @@ func ScanYearWork(dir string, from time.Time) (YearWork, error) {
 		switch r.Role {
 		case roleFiles:
 			// One record holds the paths of one turn, a path per line.
-			for _, p := range strings.Split(r.Text, "\n") {
+			for p := range strings.SplitSeq(r.Text, "\n") {
 				if p = strings.TrimSpace(p); p != "" {
 					files[p] = true
 				}

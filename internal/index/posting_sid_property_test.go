@@ -14,11 +14,11 @@ import (
 func TestAnyBlockOfPostingsSurvivesTheRoundTrip(t *testing.T) {
 	extremes := []uint32{0, 1, 2, math.MaxUint32, math.MaxUint32 - 1, 1 << 31, (1 << 31) - 1, 1<<31 + 1}
 	rng := rand.New(rand.NewSource(11))
-	for round := 0; round < 300; round++ {
+	for round := range 300 {
 		n := 1 + rng.Intn(12)
 		posts := make([]posting, 0, n)
 		off := int64(rng.Intn(1000))
-		for i := 0; i < n; i++ {
+		for range n {
 			// Offsets must ascend: a block is what writeBucket produced, and
 			// it sorts by offset. The session ids are deliberately not sorted.
 			off += int64(1 + rng.Intn(5000))

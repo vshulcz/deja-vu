@@ -126,7 +126,7 @@ func TestZedIndexesTheFilesAThreadTouched(t *testing.T) {
 			continue
 		}
 		seen := map[string]bool{}
-		for _, p := range strings.Split(text, "\n") {
+		for p := range strings.SplitSeq(text, "\n") {
 			if seen[p] {
 				t.Errorf("%s is listed twice in one record: %q", p, text)
 			}

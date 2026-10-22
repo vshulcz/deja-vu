@@ -96,7 +96,7 @@ func cardMood(r stats.Report) catMood {
 func streakDays(hm stats.HeatmapStats) int {
 	var days []int
 	for _, week := range hm.Weeks {
-		for d := 0; d < 7; d++ {
+		for d := range 7 {
 			days = append(days, week[d])
 		}
 	}
@@ -313,10 +313,7 @@ func leftPad(s string, w int) string {
 // sectionRule is a heading with a hairline running out to the card's edge, so
 // the eye finds the blocks without either of them shouting.
 func sectionRule(title string) string {
-	rule := cardInner - visibleLen(title) - 1
-	if rule < 0 {
-		rule = 0
-	}
+	rule := max(cardInner-visibleLen(title)-1, 0)
 	return paint(cardDim, title) + " " + paint(cardRule, strings.Repeat("─", rule))
 }
 
@@ -348,10 +345,7 @@ func heatLines(hm stats.HeatmapStats) []string {
 	// A year is 53 weeks and the card is 56 columns, so even a full history
 	// leaves a remainder. Pad on the left: the right edge is today, which is
 	// the end worth anchoring, and the gap lands before the history began.
-	lead := cardInner - len(weeks)*cell
-	if lead < 0 {
-		lead = 0
-	}
+	lead := max(cardInner-len(weeks)*cell, 0)
 
 	var grid []string
 	// Seven days is odd, so the last row carries one day over an empty one.
@@ -500,10 +494,7 @@ func footer() string {
 		visibleLen(left)+visibleLen(span)+visibleLen(right)+6 <= cardInner {
 		left += "  ·  " + span
 	}
-	gap := cardInner - visibleLen(left) - visibleLen(right)
-	if gap < 1 {
-		gap = 1
-	}
+	gap := max(cardInner-visibleLen(left)-visibleLen(right), 1)
 	return paint(cardFaint, left) + strings.Repeat(" ", gap) + paint(mark.Coat, right)
 }
 

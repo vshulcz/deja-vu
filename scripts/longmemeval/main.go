@@ -14,10 +14,12 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -202,7 +204,7 @@ func main() {
 		}
 	}
 
-	sort.Slice(searchTimes, func(i, j int) bool { return searchTimes[i] < searchTimes[j] })
+	slices.Sort(searchTimes)
 	sumHits := 0
 	for _, h := range hitCounts {
 		sumHits += h
@@ -466,7 +468,7 @@ func fatal(err error) {
 func runPrecision(questions []lmeQuestion) {
 	n := len(questions)
 	if n < 2 {
-		fatal(fmt.Errorf("need at least 2 questions for precision pairing"))
+		fatal(errors.New("need at least 2 questions for precision pairing"))
 	}
 	var surfaced, exactish int
 	byTier := map[string]int{}

@@ -473,7 +473,7 @@ func proseWidth() int {
 func wrapProse(s string, width int) string {
 	var lines []string
 	cur := ""
-	for _, w := range strings.Fields(s) {
+	for w := range strings.FieldsSeq(s) {
 		if cur != "" && len([]rune(cur))+1+len([]rune(w)) > width {
 			lines = append(lines, cur)
 			cur = w

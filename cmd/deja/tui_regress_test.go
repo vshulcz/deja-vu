@@ -53,7 +53,7 @@ func TestTUIRandomInputKeepsTheFrame(t *testing.T) {
 			t.Fatalf("panic %v after:\n%s", r, strings.Join(log[max(0, len(log)-30):], "\n"))
 		}
 	}()
-	for step := 0; step < 400; step++ {
+	for step := range 400 {
 		var ev tui.Event
 		switch rng.Intn(7) {
 		case 0, 1:
@@ -136,7 +136,7 @@ func TestTUIReaderShowsAHitPastTheEdge(t *testing.T) {
 func TestTUIFindReachesPastTheUnfoldCap(t *testing.T) {
 	dir, root := tuiStore(t)
 	var b strings.Builder
-	for i := 0; i < 450; i++ {
+	for i := range 450 {
 		fmt.Fprintf(&b, "line %d of the build log\n", i)
 	}
 	b.WriteString("FATAL quokkaerror in the linker\n")

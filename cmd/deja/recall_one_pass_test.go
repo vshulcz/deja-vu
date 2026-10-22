@@ -29,7 +29,7 @@ func storeOf(t *testing.T, n int, cwdOf func(int) string, textOf func(int) strin
 	tmp := hermeticEnv(t)
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
 	at := time.Date(2026, 7, 1, 10, 0, 0, 0, time.UTC)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		cwd := cwdOf(i)
 		store := filepath.Join(root, "-work-"+filepath.Base(cwd))
 		if err := os.MkdirAll(store, 0o755); err != nil {

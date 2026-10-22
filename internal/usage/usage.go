@@ -715,11 +715,11 @@ func stampPrefix(line string) (string, bool) {
 		return "", false
 	}
 	rest := line[len(prefix):]
-	end := strings.IndexByte(rest, '"')
-	if end < 0 {
+	before, _, ok := strings.Cut(rest, "\"")
+	if !ok {
 		return "", false
 	}
-	stamp := rest[:end]
+	stamp := before
 	// Only the shape the writer emits: UTC, with the trailing Z, and long
 	// enough to carry whole seconds. An offset like +02:00 sorts by its digits
 	// rather than by when it happened.

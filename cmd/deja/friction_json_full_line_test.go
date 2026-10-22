@@ -27,7 +27,7 @@ func TestFrictionJSONCarriesTheWholeErrorLine(t *testing.T) {
 	if err := os.MkdirAll(proj, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < index.FrictionMinSessions; i++ {
+	for i := range index.FrictionMinSessions {
 		sid := fmt.Sprintf("long%02d", i)
 		payload, err := json.Marshal(long + "\nexit status 2")
 		if err != nil {

@@ -3,6 +3,7 @@ package sources
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -37,9 +38,11 @@ func TestAppendNoteStartsAFreshLineWhenFileLacksTrailingNewline(t *testing.T) {
 		}
 	}
 	joined := ""
+	var joinedSb40 strings.Builder
 	for _, x := range texts {
-		joined += x + "|"
+		joinedSb40.WriteString(x + "|")
 	}
+	joined += joinedSb40.String()
 	if !contains(texts, "first note") {
 		t.Errorf("first note lost: %q", joined)
 	}

@@ -33,7 +33,7 @@ func projectFromPaths(ms []model.Message) string {
 		if m.Role != RoleFiles {
 			continue
 		}
-		for _, p := range strings.Split(m.Text, "\n") {
+		for p := range strings.SplitSeq(m.Text, "\n") {
 			p = strings.TrimSpace(p)
 			if p == "" {
 				continue

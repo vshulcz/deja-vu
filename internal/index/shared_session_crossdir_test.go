@@ -204,7 +204,7 @@ func crossDirRun(t *testing.T, seed int64) {
 func crossDirPrompts(t *testing.T, body string) []string {
 	t.Helper()
 	var out []string
-	for _, l := range strings.Split(strings.TrimSpace(body), "\n") {
+	for l := range strings.SplitSeq(strings.TrimSpace(body), "\n") {
 		var w struct {
 			SessionID string
 			Timestamp string

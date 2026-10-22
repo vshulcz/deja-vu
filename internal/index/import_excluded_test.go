@@ -3,6 +3,7 @@ package index
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -25,9 +26,11 @@ func TestImportCountsWhatTheExcludeListKeptOut(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := ""
+	var bodySb28 strings.Builder
 	for _, id := range []string{"a1", "a2", "a3"} {
-		body += `{"harness":"claude","session_id":"` + id + `","project":"alpha","role":"user","text":"the zonkobuffer keeps overflowing","time":"2026-07-01T10:00:00Z","origin":"mini"}` + "\n"
+		bodySb28.WriteString(`{"harness":"claude","session_id":"` + id + `","project":"alpha","role":"user","text":"the zonkobuffer keeps overflowing","time":"2026-07-01T10:00:00Z","origin":"mini"}` + "\n")
 	}
+	body += bodySb28.String()
 	if err := os.WriteFile(filepath.Join(batch, "deja-sync-test.jsonl"), []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}

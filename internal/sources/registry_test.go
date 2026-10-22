@@ -72,7 +72,6 @@ func TestFormatRegistryConformance(t *testing.T) {
 		registered = append(registered, entry.ID)
 		validateRegistryEntry(t, root, entry)
 
-		entry := entry
 		t.Run(entry.ID, func(t *testing.T) {
 			for _, fixture := range entry.FixturePaths {
 				fixture := filepath.Join(root, filepath.FromSlash(fixture))

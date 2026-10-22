@@ -320,7 +320,7 @@ func syncTimerBinary(goos string) (exe string, scheduled bool) {
 		if err != nil {
 			return "", false
 		}
-		for _, line := range strings.Split(string(b), "\n") {
+		for line := range strings.SplitSeq(string(b), "\n") {
 			if !strings.HasPrefix(line, "ExecStart=") {
 				continue
 			}

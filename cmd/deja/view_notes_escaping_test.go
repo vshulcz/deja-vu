@@ -17,11 +17,11 @@ import (
 func notesPayload(t *testing.T, page string) string {
 	t.Helper()
 	const marker = ",N="
-	i := strings.Index(page, marker)
-	if i < 0 {
+	_, after, ok := strings.Cut(page, marker)
+	if !ok {
 		t.Fatalf("the view page no longer embeds a notes array; this test reads the wrong thing now")
 	}
-	rest := page[i+len(marker):]
+	rest := after
 	if j := strings.Index(rest, "];"); j >= 0 {
 		return rest[:j+1]
 	}

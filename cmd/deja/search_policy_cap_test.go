@@ -25,7 +25,7 @@ func TestPolicyFilterRunsBeforeTheCap(t *testing.T) {
 		t.Fatal(err)
 	}
 	var buf strings.Builder
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		rec := index.SyncRecord{
 			Harness:   "claude",
 			SessionID: fmt.Sprintf("peer-%02d", i),
@@ -46,7 +46,7 @@ func TestPolicyFilterRunsBeforeTheCap(t *testing.T) {
 	}
 
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		id := fmt.Sprintf("local-%02d", i)
 		line := fmt.Sprintf(`{"type":"user","sessionId":%q,"cwd":"/tmp/local","timestamp":"2026-05-0%dT10:00:00Z","message":{"role":"user","content":"the bearing seal here at home"}}`, id, i+1)
 		writeClaudeFixture(t, filepath.Join(root, "projects", "-tmp-local", id+".jsonl"), id, []string{line})

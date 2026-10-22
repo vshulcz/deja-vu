@@ -35,7 +35,7 @@ func TestDoctorReportsTheTraeStore(t *testing.T) {
 	var buf bytes.Buffer
 	doctorHarnesses(&buf, t.TempDir())
 	var row string
-	for _, l := range strings.Split(buf.String(), "\n") {
+	for l := range strings.SplitSeq(buf.String(), "\n") {
 		if strings.Contains(l, "trae") && strings.Contains(l, "file") {
 			row = l
 			break
@@ -47,7 +47,7 @@ func TestDoctorReportsTheTraeStore(t *testing.T) {
 	if !strings.Contains(row, "2 files") || strings.Contains(row, "not recognised") {
 		t.Errorf("row = %q, want 2 files and nothing unrecognised", row)
 	}
-	for _, l := range strings.Split(buf.String(), "\n") {
+	for l := range strings.SplitSeq(buf.String(), "\n") {
 		if strings.Contains(l, "codex") && strings.Contains(l, "2 files") {
 			t.Errorf("codex row counted TRAE's rollouts: %q", l)
 		}

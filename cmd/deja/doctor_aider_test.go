@@ -39,7 +39,7 @@ func TestDoctorAiderRowReadsTheConfig(t *testing.T) {
 	text := func() string {
 		var b bytes.Buffer
 		doctorAutoRecall(&b)
-		for _, l := range strings.Split(b.String(), "\n") {
+		for l := range strings.SplitSeq(b.String(), "\n") {
 			if strings.HasPrefix(strings.TrimSpace(l), "aider ") {
 				return l
 			}

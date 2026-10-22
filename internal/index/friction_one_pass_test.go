@@ -21,7 +21,7 @@ func TestTopFrictionReadsTheLogOnceForSeveralWalls(t *testing.T) {
 		"fatal: refusing to merge unrelated histories",
 	}
 	for w, wall := range walls {
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			id := fmt.Sprintf("w%ds%d", w, i)
 			// Minutes apart so every wall has its own newest session.
 			at := fmt.Sprintf("2026-07-01T1%d:%02d:00Z", w, i*10)

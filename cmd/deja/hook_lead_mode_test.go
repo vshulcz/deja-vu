@@ -31,7 +31,7 @@ func TestTheLeadSaysHowWideTheRecallReached(t *testing.T) {
 		}
 	}
 	write("-work-api", "mine", "/work/api", "my own retry budget question, long enough to rank", 20)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		write("-clients-acme-api", fmt.Sprintf("acme%d", i), "/clients/acme/api",
 			"the acme ledger cutover and the client contact list", i+1)
 	}

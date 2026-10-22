@@ -26,7 +26,7 @@ func TestCountMessagesDoesNotCopyTheText(t *testing.T) {
 	const msgs, size = 400, 64 << 10
 	at := time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)
 	ss := []model.Session{{Harness: "claude", ID: "s1"}}
-	for i := 0; i < msgs; i++ {
+	for i := range msgs {
 		text := strings.Repeat(string(rune('a'+i%26)), size-1) + string(rune('A'+i/26))
 		ss[0].Messages = append(ss[0].Messages, model.Message{Role: "user", Text: text, Time: at.Add(time.Duration(i) * time.Second)})
 	}

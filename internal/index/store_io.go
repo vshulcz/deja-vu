@@ -143,7 +143,7 @@ func newRecordWriter(f *os.File, t *recordTables) (*recordWriter, error) {
 func (rw *recordWriter) write(r Record) (int64, error) {
 	b := encodeRecord(r, rw.tables)
 	if len(b) > 1<<31 {
-		return 0, fmt.Errorf("record too large")
+		return 0, errors.New("record too large")
 	}
 	var hdr [4]byte
 	binary.LittleEndian.PutUint32(hdr[:], uint32(len(b)))
@@ -180,7 +180,7 @@ func writeRecord(f *os.File, r Record, t *recordTables) (int64, error) {
 	}
 	b := encodeRecord(r, t)
 	if len(b) > 1<<31 {
-		return 0, fmt.Errorf("record too large")
+		return 0, errors.New("record too large")
 	}
 	var hdr [4]byte
 	binary.LittleEndian.PutUint32(hdr[:], uint32(len(b)))
@@ -378,10 +378,7 @@ func walkRecordsForKeys(r *bufio.Reader, from int64, t *recordTables, want, role
 		// The key id is the first varint of the payload, so peek it and skip
 		// the rest of the record without touching it. Materializing every
 		// record just to read two bytes copied the whole log per query.
-		peek := int(n)
-		if peek > binary.MaxVarintLen64 {
-			peek = binary.MaxVarintLen64
-		}
+		peek := min(int(n), binary.MaxVarintLen64)
 		head, perr := r.Peek(peek)
 		if perr != nil && len(head) == 0 {
 			if perr == io.EOF || perr == io.ErrUnexpectedEOF {
@@ -1057,7 +1054,7 @@ func writeBucket(p string, data map[string][]posting) error {
 		if _, err := w.Write(scratch[:n]); err != nil {
 			return err
 		}
-		if _, err := w.Write([]byte(e.tok)); err != nil {
+		if _, err := w.WriteString(e.tok); err != nil {
 			return err
 		}
 		n = binary.PutUvarint(scratch[:], uint64(e.n))
@@ -1143,7 +1140,7 @@ func openBucketDir(p string) ([]bucketEntry, *os.File, error) {
 		f.Close()
 		return nil, nil, fmt.Errorf("%w: %v", errCorruptIndex, err)
 	}
-	if string(magic) != string(bucketMagic) {
+	if !bytes.Equal(magic, bucketMagic) {
 		f.Close()
 		// Named for what it is. The magic moves when the posting format
 		// changes, and every reader of an index written by another version
@@ -1175,7 +1172,7 @@ func openBucketDir(p string) ([]bucketEntry, *os.File, error) {
 	// Offsets are not stored; they are the running sum of the lengths, taken
 	// from where the directory ends.
 	dirLen := uint64(len(bucketMagic)) + uint64(uvarintLen(count))
-	for i := uint64(0); i < count; i++ {
+	for range count {
 		ln, err := binary.ReadUvarint(r)
 		if err != nil {
 			f.Close()

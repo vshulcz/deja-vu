@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -286,15 +287,15 @@ func openclawLoadPathsJSONC(text, dir string, on bool, kept, loadKeys, pluginKey
 	}
 	open := zedTopLevelOpen(text)
 	if open < 0 {
-		return "", fmt.Errorf("does not look like a settings object")
+		return "", errors.New("does not look like a settings object")
 	}
 	block, have := walkJSONCKeys(text, open, []string{"plugins", "load"})
 	if block == nil || have < 2 {
-		return "", fmt.Errorf("plugins.load is not where it parsed")
+		return "", errors.New("plugins.load is not where it parsed")
 	}
 	at := jsoncListValue(text, block, "paths")
 	if at == nil {
-		return "", fmt.Errorf("plugins.load.paths is not where it parsed")
+		return "", errors.New("plugins.load.paths is not where it parsed")
 	}
 	blank := stripJSONComments(text)
 	// The last thing in the list that is not space or a comment.
@@ -363,8 +364,8 @@ func jsoncCutListStrings(text string, at [2]int, match func(string) bool) (strin
 		}
 	}
 	space := func(c byte) bool { return c == ' ' || c == '\t' }
-	for k := len(hits) - 1; k >= 0; k-- {
-		from, to := hits[k][0], hits[k][1]
+	for _, hit := range slices.Backward(hits) {
+		from, to := hit[0], hit[1]
 		comma := -1
 		j := to
 		for j < at[1]-1 && (space(blank[j]) || blank[j] == '\n' || blank[j] == '\r') {

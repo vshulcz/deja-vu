@@ -205,7 +205,7 @@ func TestCodexPluginStandsDownForTheInstaller(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !pattern.MatchString(string(written)) {
+	if !pattern.Match(written) {
 		t.Fatalf("the script's own pattern does not match what the installer writes: %s", written)
 	}
 }

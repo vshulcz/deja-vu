@@ -166,7 +166,7 @@ func TestDemoteRejectedKeepsTheRankingOrder(t *testing.T) {
 	// quicksort falls back to insertion sort — which is stable — below twelve.
 	var hits []search.Hit
 	var want []string
-	for i := 0; i < 24; i++ {
+	for i := range 24 {
 		id := fmt.Sprintf("h%02d", i)
 		h := search.Hit{Session: model.Session{ID: id, Project: "p"}}
 		if i%5 == 3 {

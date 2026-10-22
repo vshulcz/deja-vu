@@ -20,7 +20,7 @@ func TestFindManyByIdentity(t *testing.T) {
 	if err := os.MkdirAll(proj, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		id := fmt.Sprintf("s%d", i)
 		one := fmt.Sprintf(`{"type":"user","sessionId":%q,"timestamp":"2026-01-0%dT03:04:05Z","message":{"role":"user","content":"needle %s asked"}}`, id, i+1, id) + "\n"
 		two := fmt.Sprintf(`{"type":"assistant","sessionId":%q,"timestamp":"2026-01-0%dT03:05:05Z","message":{"role":"assistant","content":"answer for %s"}}`, id, i+1, id) + "\n"

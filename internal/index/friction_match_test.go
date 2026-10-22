@@ -116,7 +116,7 @@ func frictionTestLines() []string {
 		"command", "Permission", "denied", "panic:", "--- FAIL:", "TestFoo", "echo", "\"", "$(", "K",
 		"ё", "ß", "x", " ", "  ", ":", "1", "2026-10-22", "[", "]", "fatal:", "cannot", "find", "timed",
 		"out", "after", "symbol(s)", "\xff", "İ", "undefined:", "npm", "err!", "E "}
-	for i := 0; i < 20000; i++ {
+	for range 20000 {
 		var b strings.Builder
 		for n := r.Intn(30); n > 0; n-- {
 			b.WriteString(words[r.Intn(len(words))])

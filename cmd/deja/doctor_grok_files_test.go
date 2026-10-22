@@ -47,7 +47,7 @@ func TestDoctorDoesNotCallGroksOwnFilesUnrecognised(t *testing.T) {
 	var buf bytes.Buffer
 	doctorHarnesses(&buf, t.TempDir())
 	var row string
-	for _, l := range strings.Split(buf.String(), "\n") {
+	for l := range strings.SplitSeq(buf.String(), "\n") {
 		if strings.Contains(l, "grok") && strings.Contains(l, "file") {
 			row = l
 			break
@@ -65,7 +65,7 @@ func TestDoctorDoesNotCallGroksOwnFilesUnrecognised(t *testing.T) {
 	write(filepath.Join(dir, "updates.v2.jsonl"), "{}\n")
 	buf.Reset()
 	doctorHarnesses(&buf, t.TempDir())
-	for _, l := range strings.Split(buf.String(), "\n") {
+	for l := range strings.SplitSeq(buf.String(), "\n") {
 		if strings.Contains(l, "grok") && strings.Contains(l, "file") {
 			if !strings.Contains(l, "1 not recognised here") {
 				t.Errorf("row = %q, want it to name the one file deja did not read", l)

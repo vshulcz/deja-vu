@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -138,7 +139,7 @@ func TestInstallRooAllowsDejasOwnTool(t *testing.T) {
 		t.Fatal(err)
 	}
 	after, _ := os.ReadFile(path)
-	if string(before) != string(after) {
+	if !bytes.Equal(before, after) {
 		t.Fatalf("a second install changed the file:\n%s\n%s", before, after)
 	}
 }

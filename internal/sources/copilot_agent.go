@@ -90,7 +90,7 @@ func parseCopilotAgentTranscript(path string, data []byte) ([]model.Session, err
 		}
 		copilotAgentToolArgs(&s, name, args, at, addPath)
 	}
-	for _, raw := range strings.Split(string(data), "\n") {
+	for raw := range strings.SplitSeq(string(data), "\n") {
 		raw = strings.TrimSpace(raw)
 		if raw == "" {
 			continue

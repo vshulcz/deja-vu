@@ -206,9 +206,7 @@ func DiagMalformedCounts() map[string]int {
 	diagMu.Lock()
 	defer diagMu.Unlock()
 	out := make(map[string]int, len(diagMalformed))
-	for p, n := range diagMalformed {
-		out[p] = n
-	}
+	maps.Copy(out, diagMalformed)
 	return out
 }
 
@@ -220,9 +218,7 @@ func DiagFailedPaths() map[string]string {
 	diagMu.Lock()
 	defer diagMu.Unlock()
 	out := make(map[string]string, len(diagFailed))
-	for p, msg := range diagFailed {
-		out[p] = msg
-	}
+	maps.Copy(out, diagFailed)
 	return out
 }
 
@@ -233,9 +229,7 @@ func DiagReasons() map[string]string {
 	diagMu.Lock()
 	defer diagMu.Unlock()
 	out := make(map[string]string, len(diagReasons))
-	for p, r := range diagReasons {
-		out[p] = r
-	}
+	maps.Copy(out, diagReasons)
 	return out
 }
 

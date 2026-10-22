@@ -3,6 +3,7 @@ package index
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -19,9 +20,11 @@ func TestTurnsMovedToAKeptCopyKeepTheOffsetTableInLogOrder(t *testing.T) {
 	// writing it again.
 	for _, sid := range []string{"s1", "s2", "s4", "s5"} {
 		body := ""
-		for i := 0; i < 8; i++ {
-			body += hPrompt("svc", sid, 1, i, "why does the ledger fail on retry number "+sid)
+		var bodySb22 strings.Builder
+		for i := range 8 {
+			bodySb22.WriteString(hPrompt("svc", sid, 1, i, "why does the ledger fail on retry number "+sid))
 		}
+		body += bodySb22.String()
 		h.put("svc", sid, body)
 	}
 	build := func(rebuild bool) {

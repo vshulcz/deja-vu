@@ -15,7 +15,7 @@ import (
 func TestLogSaysWhenItStoppedAtTheDefault(t *testing.T) {
 	hermeticEnv(t)
 	dir := index.DefaultDir()
-	for i := 0; i < 25; i++ {
+	for range 25 {
 		usage.RecordDigest(dir, usage.KindDejaVu, "<deja-recall>\n  - Session: **a** `1`\n", 2, 1160)
 	}
 

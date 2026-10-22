@@ -505,7 +505,7 @@ func TestReasonixFileTools(t *testing.T) {
 		vocabCheck(t, ss, want, unwanted)
 		got := map[string]bool{}
 		for _, p := range vocabRoles(ss, RoleFiles) {
-			for _, f := range strings.Split(p, "\n") {
+			for f := range strings.SplitSeq(p, "\n") {
 				got[f] = true
 			}
 		}

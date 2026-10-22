@@ -1,14 +1,12 @@
 package index
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 func hasTerm(terms []string, want string) bool {
-	for _, term := range terms {
-		if term == want {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(terms, want)
 }
 
 // cjkFunctionRunes listed only Simplified Mandarin forms, so the same closed

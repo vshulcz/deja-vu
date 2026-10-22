@@ -56,7 +56,7 @@ func HandoffIntent(text string) (HandoffAsk, bool) {
 		return HandoffAsk{}, false
 	}
 	var ask HandoffAsk
-	for _, tok := range strings.Fields(text) {
+	for tok := range strings.FieldsSeq(text) {
 		if id := sessionIDToken(tok); id != "" {
 			ask.IDs = append(ask.IDs, id)
 		}

@@ -2,9 +2,11 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -632,7 +634,7 @@ func dshPatchWith(old, block string) (string, error) {
 	// the user's `disabled: true` and deja ran again (#5180).
 	var out []string
 	at, skipping := -1, false
-	for _, line := range strings.Split(old, "\n") {
+	for line := range strings.SplitSeq(old, "\n") {
 		switch t := strings.TrimSpace(line); {
 		case strings.HasPrefix(t, dshBlockStart):
 			if at < 0 {
@@ -681,7 +683,7 @@ func dshAnyRowDisabled(layer string) bool {
 // outside deja's block.
 func dshListIndent(doc string) string {
 	in := false
-	for _, line := range strings.Split(doc, "\n") {
+	for line := range strings.SplitSeq(doc, "\n") {
 		t := strings.TrimSpace(line)
 		switch {
 		case strings.HasPrefix(t, dshBlockStart):
@@ -703,11 +705,11 @@ func dshListIndent(doc string) string {
 // dshDocumentEnd is the index of the line that closes the document, `...`,
 // when only comments and blank lines follow it; -1 when there is none.
 func dshDocumentEnd(lines []string) int {
-	for i := len(lines) - 1; i >= 0; i-- {
-		t := strings.TrimSpace(lines[i])
+	for i, line := range slices.Backward(lines) {
+		t := strings.TrimSpace(line)
 		switch {
 		case t == "" || strings.HasPrefix(t, "#"):
-		case lines[i] == "..." || strings.HasPrefix(lines[i], "... ") || strings.HasPrefix(lines[i], "...\t"):
+		case line == "..." || strings.HasPrefix(line, "... ") || strings.HasPrefix(line, "...\t"):
 			return i
 		default:
 			return -1
@@ -742,11 +744,11 @@ func checkDSHMarkers(doc string) error {
 	case start < 0 && end < 0:
 		return nil
 	case start < 0:
-		return fmt.Errorf("deja's block in cordis.patch.yml has no start marker — put it back, or delete the block entirely")
+		return errors.New("deja's block in cordis.patch.yml has no start marker — put it back, or delete the block entirely")
 	case end < 0:
-		return fmt.Errorf("deja's block in cordis.patch.yml has no end marker — put it back, or delete the block entirely")
+		return errors.New("deja's block in cordis.patch.yml has no end marker — put it back, or delete the block entirely")
 	case end < start:
-		return fmt.Errorf("deja's block in cordis.patch.yml has its end marker above its start marker — put them in order, or delete the block entirely")
+		return errors.New("deja's block in cordis.patch.yml has its end marker above its start marker — put them in order, or delete the block entirely")
 	}
 	return nil
 }
@@ -756,7 +758,7 @@ func checkDSHMarkers(doc string) error {
 func stripDSHBlock(s string) string {
 	var out []string
 	skipping := false
-	for _, line := range strings.Split(s, "\n") {
+	for line := range strings.SplitSeq(s, "\n") {
 		switch {
 		case strings.HasPrefix(strings.TrimSpace(line), dshBlockStart):
 			skipping = true
@@ -779,7 +781,7 @@ func stripDSHBlock(s string) string {
 // dshHadArrayLine reports whether the layer carries the `[]` placeholder on a
 // line of its own — the shape a generated layer has, and what install replaced.
 func dshHadArrayLine(doc string) bool {
-	for _, line := range strings.Split(doc, "\n") {
+	for line := range strings.SplitSeq(doc, "\n") {
 		if strings.TrimSpace(line) == "[]" {
 			return true
 		}
@@ -791,7 +793,7 @@ func dshHadArrayLine(doc string) bool {
 // read as content — a line that is neither blank, a comment, nor a document
 // marker or directive, which leave the document null all the same.
 func dshLayerHasEntry(doc string) bool {
-	for _, line := range strings.Split(doc, "\n") {
+	for line := range strings.SplitSeq(doc, "\n") {
 		t := strings.TrimSpace(strings.TrimSuffix(line, "\r"))
 		switch {
 		case t == "" || strings.HasPrefix(t, "#"), strings.HasPrefix(line, "%"):
@@ -1019,7 +1021,7 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 func dshKeepSwitches(old, block string) (string, string) {
 	off := map[string]bool{}
 	in, row, field := false, "", 0
-	for _, line := range strings.Split(old, "\n") {
+	for line := range strings.SplitSeq(old, "\n") {
 		t := strings.TrimSpace(line)
 		switch {
 		case strings.HasPrefix(t, dshBlockStart):

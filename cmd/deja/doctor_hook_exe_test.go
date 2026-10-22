@@ -158,7 +158,7 @@ func TestDoctorNamesPluginHooksRunningABinaryThatIsGone(t *testing.T) {
 	// would pass the line above.
 	for _, c := range cases {
 		wired := false
-		for _, line := range strings.Split(got, "\n") {
+		for line := range strings.SplitSeq(got, "\n") {
 			if strings.HasPrefix(strings.TrimSpace(line), c.name+" ") && strings.Contains(line, "wired") {
 				wired = true
 			}

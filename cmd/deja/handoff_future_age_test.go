@@ -64,7 +64,7 @@ func TestHandoffReceiptOnAFutureSession(t *testing.T) {
 	if !strings.Contains(out, "handing off") {
 		t.Fatalf("no receipt: %q", out)
 	}
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		if strings.Contains(line, "handing off") && strings.Contains(line, "m old") && strings.Contains(line, "-") {
 			t.Errorf("the receipt claims a negative age: %q", line)
 		}

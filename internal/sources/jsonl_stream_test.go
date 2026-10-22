@@ -45,7 +45,7 @@ func TestStreamedLineDecodesAsALineReadWhole(t *testing.T) {
 	}
 	rng := rand.New(rand.NewSource(1))
 	words := []string{"a", "é", "\U0001F600", "\\", "\"", "\n", "\x00", "\xff", "{", "}", "[", "]", ":", ",", "1", "-", ".", "e", " ", "\\u00", "\\ud83d", "\\ude00"}
-	for i := 0; i < 3000; i++ {
+	for range 3000 {
 		v := map[string]any{"k": randValue(rng, 3)}
 		b, _ := json.Marshal(v)
 		cases = append(cases, string(b))

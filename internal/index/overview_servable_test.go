@@ -36,10 +36,10 @@ func halvedStore(t *testing.T) string {
 			t.Fatal(err)
 		}
 	}
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		write("keep", fmt.Sprintf("k%d", i), "01")
 	}
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		write("scratch", fmt.Sprintf("s%d", i), "02")
 	}
 	dir := filepath.Join(home, "index.db")

@@ -24,7 +24,7 @@ func bigGrokUpdates(t *testing.T, lines int) string {
 	}
 	payload := strings.Repeat("build output line with paths and errors ", 100)
 	var b strings.Builder
-	for i := 0; i < lines; i++ {
+	for i := range lines {
 		switch i % 20 {
 		case 0:
 			fmt.Fprintf(&b, `{"timestamp":%d,"method":"session/update","params":{"update":{"sessionUpdate":"user_message_chunk","content":{"type":"text","text":"question %d about the build"},"_meta":{"promptIndex":%d}}}}`+"\n", 1782900000+i, i, i)
@@ -77,7 +77,7 @@ func TestGrokIndexesTheRunWithoutGoingQuadratic(t *testing.T) {
 	// would read about 16x.
 	best := math.Inf(1)
 	var roles map[string]int
-	for attempt := 0; attempt < 3; attempt++ {
+	for range 3 {
 		small, _ := parseGrokTiming(t, 500)
 		large, r := parseGrokTiming(t, 2000)
 		roles = r

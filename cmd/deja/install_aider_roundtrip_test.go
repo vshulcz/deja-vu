@@ -97,7 +97,7 @@ func TestAiderConfigRoundTrips(t *testing.T) {
 // context file.
 func confReadsDejaContext(s string) bool {
 	inRead := false
-	for _, l := range strings.Split(s, "\n") {
+	for l := range strings.SplitSeq(s, "\n") {
 		t := strings.TrimSpace(l)
 		if t == "" || strings.HasPrefix(t, "#") {
 			continue

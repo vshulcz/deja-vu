@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -18,7 +19,7 @@ func TestPastedIssueFindsTheSameBugOverALongSession(t *testing.T) {
 	// Past bestMessageStore sessions the result is re-read by its best
 	// message, which must not undo what the long query ranked.
 	for _, filler := range []int{80, bestMessageStore} {
-		t.Run(fmt.Sprint(filler), func(t *testing.T) { pastedIssue(t, filler) })
+		t.Run(strconv.Itoa(filler), func(t *testing.T) { pastedIssue(t, filler) })
 	}
 }
 

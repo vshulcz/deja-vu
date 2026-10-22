@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -56,7 +57,7 @@ func runStats(dir string, args []string) error {
 			jsonOut = true
 		case "--html":
 			if html {
-				return fmt.Errorf("stats: --html specified twice")
+				return errors.New("stats: --html specified twice")
 			}
 			html = true
 			htmlPath = "deja-stats.html"
@@ -72,7 +73,7 @@ func runStats(dir string, args []string) error {
 			year = true
 		case "--card":
 			if card {
-				return fmt.Errorf("stats: --card specified twice")
+				return errors.New("stats: --card specified twice")
 			}
 			card = true
 			// No path means the terminal. The SVG is for the places a
@@ -117,7 +118,7 @@ func runStats(dir string, args []string) error {
 		}
 	}
 	if (jsonOut && card) || (jsonOut && html) || (card && html) {
-		return fmt.Errorf("stats: choose one output")
+		return errors.New("stats: choose one output")
 	}
 	if err := checkHarness(&options.Harness); err != nil {
 		return fmt.Errorf("stats: %w", err)
@@ -126,10 +127,10 @@ func runStats(dir string, args []string) error {
 		return fmt.Errorf("stats: %w", err)
 	}
 	if impact && year {
-		return fmt.Errorf("stats: --impact and --year are two reports — ask for one")
+		return errors.New("stats: --impact and --year are two reports — ask for one")
 	}
 	if impact && redaction {
-		return fmt.Errorf("stats: --impact and --redaction are two reports — ask for one")
+		return errors.New("stats: --impact and --redaction are two reports — ask for one")
 	}
 	// Both reports cover the whole store and print as text or JSON. They
 	// printed text over a --html or --card they ignored, and returned the same
@@ -156,10 +157,10 @@ func runStats(dir string, args []string) error {
 		// filter passed with it would narrow some figures (the sessions) and
 		// not others (the records) and the screen would not add up.
 		if options.Harness != "" || options.Project != "" || options.Since > 0 || options.Role != "" {
-			return fmt.Errorf("stats: --year takes no filters — it is the whole of the last twelve months, on purpose")
+			return errors.New("stats: --year takes no filters — it is the whole of the last twelve months, on purpose")
 		}
 		if card || html || redaction {
-			return fmt.Errorf("stats: choose one output")
+			return errors.New("stats: choose one output")
 		}
 		if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
 			return ensureError(dir, err)
@@ -167,7 +168,7 @@ func runStats(dir string, args []string) error {
 		return runStatsYear(os.Stdout, dir, jsonOut)
 	}
 	if redaction && card {
-		return fmt.Errorf("stats: --redaction cannot combine with --card")
+		return errors.New("stats: --redaction cannot combine with --card")
 	}
 	// A card is a shareable artifact, not a build log: keep the per-harness
 	// indexing chatter off stdout/stderr and show one quiet status line instead.
@@ -401,10 +402,9 @@ func printStats(w io.Writer, r stats.Report) {
 	fmt.Fprintf(w, "%sBy harness%s\n", bold, reset)
 	for _, h := range r.Harnesses {
 		tag := statHarnessTag(h.Harness, color)
-		pad := 14 - len(h.Harness) - 2 // visible width: [name]
-		if pad < 1 {
-			pad = 1
-		}
+		pad := max(
+			// visible width: [name]
+			14-len(h.Harness)-2, 1)
 		// The counts are padded columns, but the nouns are prose: a machine
 		// with one session read "1 sessions  1 messages" eight lines above the
 		// Highlights block that says "1 message" (#1598).
@@ -472,7 +472,7 @@ func printStats(w io.Writer, r stats.Report) {
 	// together; this line used to count recalls alone under nearly the same
 	// words, so the two read as a contradiction ("served 4 times", "Recalls
 	// served 0"). It now gives the same total and says how it splits.
-	served := fmt.Sprintf("  Memory served    %s", grouped(r.Recall.Recalls+r.Recall.Injections))
+	served := "  Memory served    " + grouped(r.Recall.Recalls+r.Recall.Injections)
 	if since := r.Recall.Since; !since.IsZero() {
 		served += " since " + search.DisplayDate(since)
 	}

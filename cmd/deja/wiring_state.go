@@ -107,10 +107,8 @@ func rememberWrittenExe(st *wiringState, exe string) {
 	if exe == "" {
 		return
 	}
-	for _, p := range st.Exes {
-		if p == exe {
-			return
-		}
+	if slices.Contains(st.Exes, exe) {
+		return
 	}
 	st.Exes = append(st.Exes, exe)
 	if len(st.Exes) > wiringExeHistory {
@@ -353,7 +351,7 @@ func underTempDir(p string) bool {
 			return true
 		}
 	}
-	for _, seg := range strings.Split(filepath.ToSlash(filepath.Dir(p)), "/") {
+	for seg := range strings.SplitSeq(filepath.ToSlash(filepath.Dir(p)), "/") {
 		switch strings.ToLower(seg) {
 		case "tmp", "temp":
 			return true
@@ -561,17 +559,10 @@ func dirWiringCreated(dir string) bool {
 
 // wiringCreated reports that deja created this config rather than finding it.
 func wiringCreated(path string) bool {
-	for _, p := range readWiringState().Created {
-		if p == path {
-			return true
-		}
+	if slices.Contains(readWiringState().Created, path) {
+		return true
 	}
-	for _, p := range createdByThisRun {
-		if p == path {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(createdByThisRun, path)
 }
 
 // refreshCommandFile rewrites the /deja command for a target that already has
@@ -624,7 +615,7 @@ func gooseSlashCommandPresent() bool {
 	if err != nil {
 		return false
 	}
-	for _, line := range strings.Split(string(b), "\n") {
+	for line := range strings.SplitSeq(string(b), "\n") {
 		switch strings.TrimSpace(line) {
 		case `- command: "deja"`, "- command: deja", "- command: 'deja'":
 			return true

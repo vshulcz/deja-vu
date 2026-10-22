@@ -127,7 +127,7 @@ func TestRotationKeepsWhatArrivedLastNotWhatIsStampedLatest(t *testing.T) {
 	// the end: the last appended carries the oldest stamp of the lot.
 	body := strings.Repeat("x", RecordRoom/2)
 	var b strings.Builder
-	for i := 0; i < snapshotsToKeep*3; i++ {
+	for i := range snapshotsToKeep * 3 {
 		line, err := marshalSnapshot(Snapshot{
 			Time: now.Add(-time.Duration(i) * time.Minute), Kind: "hook",
 			Bytes: len(body), Digest: fmt.Sprintf("d%03d ", i) + body,

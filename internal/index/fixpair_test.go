@@ -54,7 +54,7 @@ func TestFixPairsDropACommandTheErrorOutlivedLater(t *testing.T) {
 		{Role: "command", Text: "brew install coreutils for timeout", Time: now.Add(time.Minute)},
 	}
 	// Far enough that the old six-record window never reached it.
-	for i := 0; i < 12; i++ {
+	for i := range 12 {
 		ms = append(ms, model.Message{Role: "tool-output", Text: "ok", Time: now.Add(time.Duration(i) * time.Minute)})
 	}
 	ms = append(ms, model.Message{
@@ -75,7 +75,7 @@ func TestFixPairsKeepACommandADifferentErrorFollowed(t *testing.T) {
 		{Role: "tool-output", Text: "zsh:1: command not found: timeout", Time: now},
 		{Role: "command", Text: "curl --max-time 5 example.internal", Time: now.Add(time.Minute)},
 	}
-	for i := 0; i < 12; i++ {
+	for i := range 12 {
 		ms = append(ms, model.Message{Role: "tool-output", Text: "ok", Time: now.Add(time.Duration(i) * time.Minute)})
 	}
 	ms = append(ms, model.Message{

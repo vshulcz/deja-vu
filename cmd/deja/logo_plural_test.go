@@ -57,7 +57,7 @@ func TestStatsScreenCountsInSingularAtOne(t *testing.T) {
 		WeekInjected:  1,
 	})
 
-	for _, line := range strings.Split(buf.String(), "\n") {
+	for line := range strings.SplitSeq(buf.String(), "\n") {
 		text := visibleText(line)
 		for _, wrong := range []string{"1 sessions", "1 messages", "1 recalls", "1 auto-injections", "1 prompts"} {
 			if strings.Contains(text, wrong) {

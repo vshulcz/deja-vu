@@ -187,10 +187,8 @@ func addOverlays(src, dst string, adds bucketPostings, dead []int64) (stale [][]
 		next++
 		return names[next-1], true
 	}
-	for w := 0; w < workers; w++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range workers {
+		wg.Go(func() {
 			for {
 				b, ok := take()
 				if !ok {
@@ -207,7 +205,7 @@ func addOverlays(src, dst string, adds bucketPostings, dead []int64) (stale [][]
 				}
 				mu.Unlock()
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	return stale, failed
@@ -365,9 +363,7 @@ func blankDeadWords(dir string, words bucketPostings, dead []int64) (map[string]
 	)
 	work := make(chan string)
 	for range min(runtime.NumCPU(), 8, len(names)) {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for b := range work {
 				blanked, err := blankDeadBucketWords(filepath.Join(dir, "buckets", b+".bin"), words[b], dead)
 				mu.Lock()
@@ -377,7 +373,7 @@ func blankDeadWords(dir string, words bucketPostings, dead []int64) (map[string]
 				}
 				mu.Unlock()
 			}
-		}()
+		})
 	}
 	for _, b := range names {
 		work <- b
@@ -492,7 +488,7 @@ func blankWords(p string, gone map[string]bool) error {
 	}
 	var hits []span
 	tb := []byte{}
-	for i := uint64(0); i < count; i++ {
+	for range count {
 		ln, err := binary.ReadUvarint(r)
 		if err != nil {
 			return err
@@ -556,7 +552,7 @@ func blankedWord(tok string) (_ []byte, ok bool) {
 		copy(b, f[:])
 		return b, true
 	case len(b) == 2:
-		for c := byte(0); c < utf8.RuneSelf; c++ {
+		for c := range byte(utf8.RuneSelf) {
 			for _, f := range [][]byte{{0xff, c}, {c, 0xff}} {
 				if bucket(string(f)) == want {
 					return f, true
@@ -572,7 +568,7 @@ func blankedWord(tok string) (_ []byte, ok bool) {
 var hashedFillers = sync.OnceValue(func() map[string][3]byte {
 	out := make(map[string][3]byte, len(hexBuckets))
 	for c1 := byte(0); c1 < utf8.RuneSelf && len(out) < len(hexBuckets); c1++ {
-		for c2 := byte(0); c2 < utf8.RuneSelf; c2++ {
+		for c2 := range byte(utf8.RuneSelf) {
 			f := [3]byte{0xff, c1, c2}
 			if name := bucket(string(f[:])); out[name] == ([3]byte{}) {
 				out[name] = f

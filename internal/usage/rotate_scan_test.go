@@ -22,7 +22,7 @@ func TestDecidingThereIsNothingToDropDoesNotParseTheLog(t *testing.T) {
 		var b strings.Builder
 		now := time.Now().UTC()
 		step := oldest / time.Duration(n)
-		for i := 0; i < n; i++ {
+		for i := range n {
 			stamp := now.Add(-time.Duration(i) * step).Format(time.RFC3339Nano)
 			fmt.Fprintf(&b, `{"t":%q,"kind":"recall","bytes":900,"sessions":2,"raw":9000,"ids":["s%d"]}`+"\n", stamp, i)
 		}
@@ -50,7 +50,7 @@ func TestDecidingThereIsNothingToDropDoesNotParseTheLog(t *testing.T) {
 	best := func(age time.Duration) time.Duration {
 		t.Helper()
 		fastest := time.Duration(1<<62 - 1)
-		for round := 0; round < 3; round++ {
+		for range 3 {
 			fresh := t.TempDir()
 			write(fresh, 12000, age)
 			start := time.Now()
@@ -64,7 +64,7 @@ func TestDecidingThereIsNothingToDropDoesNotParseTheLog(t *testing.T) {
 	nothingOld := best(13 * 24 * time.Hour)
 	mustRotate := best(30 * 24 * time.Hour)
 	warm := time.Duration(1<<62 - 1)
-	for round := 0; round < 3; round++ {
+	for range 3 {
 		start := time.Now()
 		RecordResultRaw(dir, KindHook, 600, 1, false, 6000)
 		if took := time.Since(start); took < warm {

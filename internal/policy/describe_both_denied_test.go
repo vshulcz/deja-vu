@@ -44,7 +44,7 @@ func TestDescribeNamesTheRuleThatIsActuallyInForce(t *testing.T) {
 // full set (#1023).
 func TestDescribeCapsALongDenyList(t *testing.T) {
 	rules := map[string]bool{"local": true}
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		rules[fmt.Sprintf("imported:grp%02d", i)] = false
 	}
 	got := Policy{Activations: map[string]map[string]bool{ActivationSearch: rules}}.Describe(ActivationSearch)

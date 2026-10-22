@@ -10,11 +10,11 @@ import (
 // it inside a text far longer than any occurrence cap.
 func denseAround(before, after int) string {
 	var b strings.Builder
-	for i := 0; i < before; i++ {
+	for range before {
 		b.WriteString("alpha ")
 	}
 	b.WriteString("alpha beta")
-	for i := 0; i < after; i++ {
+	for range after {
 		b.WriteString(" alpha")
 	}
 	return b.String()

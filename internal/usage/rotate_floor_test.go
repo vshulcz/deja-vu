@@ -21,7 +21,7 @@ func agedLog(t *testing.T, days int) (dir, path string) {
 	}
 	now := time.Now().UTC()
 	var b strings.Builder
-	for i := 0; i < 4000; i++ {
+	for i := range 4000 {
 		e := Event{
 			Time: now.Add(-time.Duration(days+i%5) * 24 * time.Hour), Kind: KindRecall,
 			Bytes: 500, Sessions: 2, RawBytes: 5000, SessionIDs: []string{strings.Repeat("x", 200)},

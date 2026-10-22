@@ -21,7 +21,7 @@ func TestThePageCarriesTheNewestNotesAndSaysSo(t *testing.T) {
 	body := strings.Repeat("the connection pool was exhausted while the migration held the lock. ", 90)
 	var b strings.Builder
 	const total = 1000
-	for i := 0; i < total; i++ {
+	for i := range total {
 		// Oldest first in the file, so file order and date order disagree —
 		// which is what makes the sort part of the fix rather than a detail.
 		line, err := json.Marshal(map[string]any{

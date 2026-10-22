@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"testing"
 	"time"
@@ -163,7 +164,7 @@ func TestAReadThatFinishesAtTheBudgetLeavesNoMark(t *testing.T) {
 	t.Setenv("DEJA_STORE_TIMEOUT", "20ms")
 	dir := t.TempDir()
 	for i := range 200 {
-		_, _ = Watch(filepath.Join(dir, fmt.Sprint(i)), func() (int, error) { time.Sleep(20 * time.Millisecond); return 0, nil })
+		_, _ = Watch(filepath.Join(dir, strconv.Itoa(i)), func() (int, error) { time.Sleep(20 * time.Millisecond); return 0, nil })
 	}
 	deadline := time.Now().Add(2 * time.Second)
 	for {

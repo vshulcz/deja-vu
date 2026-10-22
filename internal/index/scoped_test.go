@@ -21,7 +21,7 @@ func TestPoolScopeDoesNotDecideTheWiderAnswer(t *testing.T) {
 	now := time.Now()
 	n := search.PoolSize(5) + 300
 	var ss []model.Session
-	for i := 0; i < n; i++ {
+	for i := range n {
 		at := now.Add(-time.Duration(i) * time.Minute)
 		text, project := fmt.Sprintf("alpha went first and beta went after, run %d", i), "other"
 		if i >= n-12 {

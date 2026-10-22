@@ -700,7 +700,7 @@ func shownLineCarriesATerm(dir, project string, terms []string) bool {
 		return false
 	}
 	block := search.AutoRecallDigestFor(keep, promptHookBudget-recallFrameOverhead, terms)
-	for _, line := range strings.Split(block, "\n") {
+	for line := range strings.SplitSeq(block, "\n") {
 		line = strings.TrimSpace(line)
 		// The header line names the session; the first line under it is what
 		// frames the block.
@@ -740,7 +740,7 @@ func firstShownLineCarries(dir, project string, terms []string, topic string) bo
 	if len(keep) == 0 {
 		return false
 	}
-	for _, ln := range strings.Split(search.AutoRecallDigestFor(keep, 2000, terms), "\n") {
+	for ln := range strings.SplitSeq(search.AutoRecallDigestFor(keep, 2000, terms), "\n") {
 		ln = strings.TrimSpace(ln)
 		if !strings.HasPrefix(ln, "- User:") && !strings.HasPrefix(ln, "- Assistant:") {
 			continue
@@ -779,7 +779,7 @@ func blockCarries(dir, project string, terms []string, fact, topic string) bool 
 	// which it is either way — rather than whether it carries the conclusion.
 	// An arm that did not skip it read 2/2 even after the conclusion had been
 	// emptied of its content.
-	for _, w := range strings.Fields(fact) {
+	for w := range strings.FieldsSeq(fact) {
 		if len([]rune(w)) < 7 || search.TextCarriesTerm(topic, w) {
 			continue
 		}
@@ -904,7 +904,7 @@ func blockOpensOnEcho(dir, project string, terms []string, question string) bool
 	if len(keep) == 0 {
 		return false
 	}
-	for _, ln := range strings.Split(search.AutoRecallDigestForAsked(keep, 2000, terms, question), "\n") {
+	for ln := range strings.SplitSeq(search.AutoRecallDigestForAsked(keep, 2000, terms, question), "\n") {
 		t := strings.TrimSpace(ln)
 		if !strings.HasPrefix(t, "- User:") && !strings.HasPrefix(t, "- Assistant:") {
 			continue
@@ -945,7 +945,7 @@ func hookEndToEndAs(dir, project, question, fact, topic, sid string) (fired, car
 	// pr went in after the flake was fixed" has no word that long, so the arm
 	// scored a false fire no product change could ever fix. Skip the short
 	// words and the subject instead of the short words alone.
-	for _, w := range strings.Fields(fact) {
+	for w := range strings.FieldsSeq(fact) {
 		w = strings.Trim(w, ".,:;!?()\"'\u00ab\u00bb")
 		if len([]rune(w)) < 5 || strings.EqualFold(w, topic) {
 			continue

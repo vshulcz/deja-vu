@@ -68,7 +68,7 @@ func runWithNoHome(t *testing.T, args ...string) (int, []string) {
 	// wait, but the arms wait side by side, so it can be long enough for a
 	// warmup slowed by -race on a busy runner.
 	var left []string
-	for i := 0; i < 40; i++ {
+	for range 40 {
 		found, err := filepath.Glob(filepath.Join(wd, "*"))
 		if err != nil {
 			t.Fatal(err)

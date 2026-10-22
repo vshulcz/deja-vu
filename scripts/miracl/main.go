@@ -20,6 +20,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -176,7 +177,7 @@ func main() {
 			_, _ = missFile.Write(append(b, '\n'))
 		}
 	}
-	sort.Slice(times, func(i, j int) bool { return times[i] < times[j] })
+	slices.Sort(times)
 	fmt.Printf("%-12s %6s %8s %8s %8s %8s %8s\n", "lang", "n", "hit@1", "hit@5", "hit@10", "hit@20", "MRR")
 	fmt.Printf("%-12s %6d %7.1f%% %7.1f%% %7.1f%% %7.1f%%   %.3f\n", *lang, n,
 		pct(h1, n), pct(h5, n), pct(h10, n), pct(h20, n), mrr/float64(n))

@@ -30,7 +30,7 @@ func TestPrintSessionHeaderIsOneSafeLine(t *testing.T) {
 				Harness: "claude", Project: tc.project, ID: tc.id,
 				Messages: []model.Message{{Role: "user", Text: "the retry queue stalls on staging"}},
 			})
-			header := strings.SplitN(b.String(), "\n", 2)[0]
+			header, _, _ := strings.Cut(b.String(), "\n")
 			for _, r := range header {
 				if unicode.IsControl(r) {
 					t.Errorf("a control character reached the header: %q in %q", r, header)
@@ -59,8 +59,8 @@ func TestShowAndContextHeadersAgree(t *testing.T) {
 	var show, ctx strings.Builder
 	PrintSession(&show, s)
 	PrintContext(&ctx, s, "retry")
-	showHead := strings.SplitN(show.String(), "\n", 2)[0]
-	ctxHead := strings.SplitN(ctx.String(), "\n", 2)[0]
+	showHead, _, _ := strings.Cut(show.String(), "\n")
+	ctxHead, _, _ := strings.Cut(ctx.String(), "\n")
 	if !strings.Contains(ctxHead, strings.TrimPrefix(showHead, "# ")) {
 		t.Errorf("the two headers scrub differently:\n  show    %q\n  context %q", showHead, ctxHead)
 	}
@@ -73,7 +73,7 @@ func TestPrintSessionHeaderUnchangedForPlainText(t *testing.T) {
 		Harness: "claude", Project: "w/app", ID: "abcdef",
 		Messages: []model.Message{{Role: "user", Text: "hello"}},
 	})
-	if got := strings.SplitN(b.String(), "\n", 2)[0]; got != "# claude · w/app · abcdef" {
+	if got, _, _ := strings.Cut(b.String(), "\n"); got != "# claude · w/app · abcdef" {
 		t.Errorf("plain header changed: %q", got)
 	}
 }

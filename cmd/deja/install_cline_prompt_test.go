@@ -143,7 +143,7 @@ build([
 	}
 	body, _ := os.ReadFile(calls)
 	var prompt string
-	for _, line := range strings.Split(string(body), "\n") {
+	for line := range strings.SplitSeq(string(body), "\n") {
 		if strings.HasPrefix(line, "hook-prompt") {
 			prompt = line
 		}

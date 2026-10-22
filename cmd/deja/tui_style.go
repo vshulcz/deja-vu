@@ -235,7 +235,7 @@ func highlightMask(rs []rune, terms []string) []bool {
 func queryTerms(q string) []string {
 	var out []string
 	seen := map[string]bool{}
-	for _, f := range strings.Fields(strings.ReplaceAll(q, "\"", " ")) {
+	for f := range strings.FieldsSeq(strings.ReplaceAll(q, "\"", " ")) {
 		k := strings.ToLower(f)
 		if len([]rune(f)) < 2 || seen[k] {
 			continue

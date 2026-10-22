@@ -74,7 +74,7 @@ func checkCompletionDispatch(t *testing.T, cases []completionDispatchCase) {
 						t.Fatalf("%s completion: %v\n%s", shell, err, out)
 					}
 					got := map[string]bool{}
-					for _, line := range strings.Split(string(out), "\n") {
+					for line := range strings.SplitSeq(string(out), "\n") {
 						line, _, _ = strings.Cut(line, "\t")
 						line, _, _ = strings.Cut(line, "[")
 						// zsh marks a repeatable flag with a leading `*`; the user still types --tag.

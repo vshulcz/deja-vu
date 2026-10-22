@@ -1,6 +1,9 @@
 package digest
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // MessageText lost coverage when the shared display filter replaced its own
 // ANSI stripper: the branches that survive a control sequence, a fenced block
@@ -15,9 +18,11 @@ func TestMessageTextBranches(t *testing.T) {
 	}
 	// The cap keeps the first sixteen prose lines and drops the rest.
 	long := ""
-	for i := 0; i < 30; i++ {
-		long += "this is a sentence of ordinary prose about pooling\n"
+	var longSb18 strings.Builder
+	for range 30 {
+		longSb18.WriteString("this is a sentence of ordinary prose about pooling\n")
 	}
+	long += longSb18.String()
 	got := MessageText(long)
 	if n := len(got); n == 0 {
 		t.Fatal("prose distilled to nothing")

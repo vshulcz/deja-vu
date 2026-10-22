@@ -51,7 +51,7 @@ func TestEntropySpansMatchesOnRandomInput(t *testing.T) {
 	// test, because nobody can reproduce the failure.
 	rng := rand.New(rand.NewSource(20260729))
 	alphabet := []byte("abcXYZ019+/_-= \n\t.:\"'{}")
-	for i := 0; i < 4000; i++ {
+	for range 4000 {
 		n := rng.Intn(120)
 		b := make([]byte, n)
 		for j := range b {

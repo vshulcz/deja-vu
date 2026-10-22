@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -161,10 +162,5 @@ func skillIsTheCommandHarnesses() []string {
 }
 
 func skillIsTheCommand(harness string) bool {
-	for _, name := range skillIsTheCommandHarnesses() {
-		if name == harness {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(skillIsTheCommandHarnesses(), harness)
 }

@@ -96,10 +96,7 @@ func buildCooccur(tmp string, ss []model.Session) {
 		}
 		perSession = append(perSession, list)
 	})
-	maxDF := len(ss) / 4
-	if maxDF < 8 {
-		maxDF = 8
-	}
+	maxDF := max(len(ss)/4, 8)
 	band := func(v uint32) bool { return df[v] >= cooccurMinDF && df[v] <= maxDF }
 
 	// The tokens each session contributes pairs from: rarest first, capped, so a
@@ -144,10 +141,10 @@ func buildCooccur(tmp string, ss []model.Session) {
 	// to both sides here rebuilds the same candidate lists the single-map
 	// version produced; the final sort is by count then token, so the order
 	// shards are visited in cannot reach the output.
-	for shard := uint64(0); shard < cooccurShards; shard++ {
+	for shard := range uint64(cooccurShards) {
 		pairs := map[uint64]int{}
 		for _, kept := range keptPerSession {
-			for i := 0; i < len(kept); i++ {
+			for i := range kept {
 				for j := i + 1; j < len(kept); j++ {
 					a, b := kept[i], kept[j]
 					if a > b {
@@ -627,10 +624,7 @@ func cooccurSearchOver(dir string, m Manifest, o query.Options, terms []string, 
 // results are produced and not yet consumed, so what the results hold is
 // bounded by the window rather than by n.
 func parallelInOrder[T any](n, window int, produce func(i int) T, consume func(i int, v T)) {
-	workers := rerankWorkers()
-	if workers > n {
-		workers = n
-	}
+	workers := min(rerankWorkers(), n)
 	if workers < 2 || n < 4 {
 		for i := range n {
 			consume(i, produce(i))

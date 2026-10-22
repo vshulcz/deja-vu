@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -345,8 +346,8 @@ func codeBuddyExitCode(out string) (int, bool) {
 	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
 	// From the end: the status lines follow the output, which may itself print
 	// a line that looks like one.
-	for i := len(lines) - 1; i >= 0; i-- {
-		rest, ok := strings.CutPrefix(strings.TrimSpace(lines[i]), "Exit Code: ")
+	for _, line := range slices.Backward(lines) {
+		rest, ok := strings.CutPrefix(strings.TrimSpace(line), "Exit Code: ")
 		if !ok {
 			continue
 		}
@@ -363,8 +364,8 @@ func codeBuddyExitCode(out string) (int, bool) {
 	if len(lines) < 2 || !strings.HasPrefix(lines[1], "Stdout: ") {
 		return 0, false
 	}
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := strings.TrimSpace(lines[i])
+	for _, line := range slices.Backward(lines) {
+		line := strings.TrimSpace(line)
 		switch {
 		case line == "" || line == "Signal: (none)":
 		case strings.HasPrefix(line, "Signal: "), strings.HasPrefix(line, "(command "):

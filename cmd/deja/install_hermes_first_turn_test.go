@@ -47,7 +47,7 @@ func TestHermesFirstTurnNamesTheSessionToHookContext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, line := range strings.Split(string(b), "\n") {
+	for line := range strings.SplitSeq(string(b), "\n") {
 		if strings.HasPrefix(line, "hook-context") {
 			if !strings.Contains(line, `"session_id": "20261001_182154_69936a"`) {
 				t.Errorf("hook-context was not told which session is starting: %q", line)

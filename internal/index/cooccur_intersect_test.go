@@ -20,7 +20,7 @@ func TestSwapIntersectionMatchesTheMapIntersection(t *testing.T) {
 		}
 		return out
 	}
-	for round := 0; round < 2000; round++ {
+	for round := range 2000 {
 		terms := make([][]posting, 1+rng.Intn(4))
 		for j := range terms {
 			terms[j] = randomPostings()

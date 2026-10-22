@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -33,9 +34,7 @@ const (
 // and so does an allowConversationAccess the reader set to false.
 func openclawPluginEntry(have map[string]any, grant bool) (map[string]any, string) {
 	entry := map[string]any{}
-	for k, v := range have {
-		entry[k] = v
-	}
+	maps.Copy(entry, have)
 	var note string
 	if entry["enabled"] == false {
 		note = "left deja's plugin switched off, the way it was — `openclaw plugins enable deja` turns it back on"
@@ -44,9 +43,7 @@ func openclawPluginEntry(have map[string]any, grant bool) (map[string]any, strin
 	}
 	hooks := map[string]any{}
 	if h, ok := entry["hooks"].(map[string]any); ok {
-		for k, v := range h {
-			hooks[k] = v
-		}
+		maps.Copy(hooks, h)
 	} else if entry["hooks"] != nil {
 		// Not an object: a config deja does not understand, left as it is.
 		return entry, note

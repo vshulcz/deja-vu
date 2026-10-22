@@ -328,11 +328,9 @@ func deadWords(path string, t *recordTables, offs []int64, unindexed bool) (buck
 	var wg sync.WaitGroup
 	for w := range workers {
 		lo, hi := len(offs)*w/workers, len(offs)*(w+1)/workers
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			parts[w], rests[w], errs[w] = deadWordsOf(path, t, offs[lo:hi], unindexed)
-		}()
+		})
 	}
 	wg.Wait()
 	if err := errors.Join(errs...); err != nil {

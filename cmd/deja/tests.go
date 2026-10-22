@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -64,7 +65,7 @@ func runTests(dir string, args []string, stdout io.Writer) error {
 			asJSON = true
 		case "--limit":
 			if i+1 >= len(args) {
-				return fmt.Errorf("tests: --limit needs value")
+				return errors.New("tests: --limit needs value")
 			}
 			i++
 			n, err := strconv.Atoi(args[i])

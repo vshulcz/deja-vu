@@ -754,7 +754,7 @@ func guidanceResult(harness string, uninstall bool) (installResult, error) {
 
 func guidanceOutput(harness string, result installResult) string {
 	if result.Path == "" {
-		return fmt.Sprintf("%s: guidance unsupported", harness)
+		return harness + ": guidance unsupported"
 	}
 	line := fmt.Sprintf("%s: guidance %s %s", harness, result.Action, shortHome(result.Path))
 	// A file deja knows about and could not act on. Printed under the action

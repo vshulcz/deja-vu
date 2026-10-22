@@ -46,7 +46,7 @@ func TestDoctorCallsAClientConfigWithoutDejaMissing(t *testing.T) {
 				t.Helper()
 				var buf bytes.Buffer
 				doctorAutoRecall(&buf)
-				for _, l := range strings.Split(buf.String(), "\n") {
+				for l := range strings.SplitSeq(buf.String(), "\n") {
 					if strings.HasPrefix(l, "  "+name+" ") {
 						return l
 					}

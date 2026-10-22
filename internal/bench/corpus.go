@@ -79,7 +79,7 @@ func Generate(seed int64) Corpus {
 	base := time.Date(2099, time.January, 2, 3, 4, 5, 0, time.UTC)
 	sessions := make([]model.Session, 0, SessionCount)
 	queries := make([]Query, 0, QueryCount)
-	for i := 0; i < SessionCount; i++ {
+	for i := range SessionCount {
 		t := topics[i%len(topics)]
 		id := fmt.Sprintf("session-%03d", i)
 		project := fmt.Sprintf("project-%02d", i%25)
