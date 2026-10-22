@@ -82,35 +82,8 @@ func lineage(dir string, ids map[string]bool, heads, wholes []model.Session) (ma
 			out[parent] = true
 		}
 	}
-	type wholeFork struct {
-		harness, parent string
-		turns           map[string]bool
-		started         time.Time
-	}
-	var wholeForks []wholeFork
 	var metaForks []SessionMeta
-	for _, h := range heads {
-		if ids[h.ID] {
-			parentOf(h.Kind, h.Parent)
-			if o := SessionOpening(h); o != 0 {
-				headOpenings[o] = true
-			}
-		}
-	}
-	wholeOpenings := map[uint64][]map[string]bool{}
-	for _, w := range wholes {
-		if !ids[w.ID] {
-			continue
-		}
-		if w.Kind == "fork" && w.Parent != "" {
-			wholeForks = append(wholeForks, wholeFork{w.Harness, w.Parent, wholeTurns(w), firstTimed(w)})
-		} else {
-			parentOf(w.Kind, w.Parent)
-		}
-		if o := SessionOpening(w); o != 0 {
-			wholeOpenings[o] = append(wholeOpenings[o], wholeTurns(w))
-		}
-	}
+	wholeForks, wholeOpenings := unindexedAskers(ids, heads, wholes, headOpenings, parentOf)
 	m, err := readManifestCached(dir)
 	if err != nil {
 		// Nothing indexed to hide, so a named source costs nothing.
@@ -188,6 +161,51 @@ func lineage(dir string, ids map[string]bool, heads, wholes []model.Session) (ma
 			}
 		}
 	}
+	return out, lineageCuts(dir, m, out, metaForks, wholeForks, askers, wholeOpenings, parentMeta)
+}
+
+// wholeFork is a fork read off its store in full: the source it names and the
+// turns it holds.
+type wholeFork struct {
+	harness, parent string
+	turns           map[string]bool
+	started         time.Time
+}
+
+// unindexedAskers reads the askers the index does not hold yet: each head's
+// opening goes into headOpenings, and the whole ones come back as forks that
+// name a source and as turns by opening. parentOf is called for each asker's
+// parent as lineage counts it.
+func unindexedAskers(ids map[string]bool, heads, wholes []model.Session, headOpenings map[uint64]bool, parentOf func(kind, parent string)) ([]wholeFork, map[uint64][]map[string]bool) {
+	var wholeForks []wholeFork
+	for _, h := range heads {
+		if ids[h.ID] {
+			parentOf(h.Kind, h.Parent)
+			if o := SessionOpening(h); o != 0 {
+				headOpenings[o] = true
+			}
+		}
+	}
+	wholeOpenings := map[uint64][]map[string]bool{}
+	for _, w := range wholes {
+		if !ids[w.ID] {
+			continue
+		}
+		if w.Kind == "fork" && w.Parent != "" {
+			wholeForks = append(wholeForks, wholeFork{w.Harness, w.Parent, wholeTurns(w), firstTimed(w)})
+		} else {
+			parentOf(w.Kind, w.Parent)
+		}
+		if o := SessionOpening(w); o != 0 {
+			wholeOpenings[o] = append(wholeOpenings[o], wholeTurns(w))
+		}
+	}
+	return wholeForks, wholeOpenings
+}
+
+// lineageCuts is where each session left out of out is cut for the askers it
+// shares turns with.
+func lineageCuts(dir string, m Manifest, out map[string]bool, metaForks []SessionMeta, wholeForks []wholeFork, askers map[uint64][]SessionMeta, wholeOpenings map[uint64][]map[string]bool, parentMeta func(harness, id string) (SessionMeta, bool)) map[string]time.Time {
 	// What stays on the page and shares turns with an asker is cut at the
 	// last turn they share: a source that went on after the fork, a sibling
 	// fork. The asker holds everything up to there already (#5335).
@@ -232,7 +250,7 @@ func lineage(dir string, ids map[string]bool, heads, wholes []model.Session) (ma
 			cutAt(meta.ID, wholeShared(dir, m, w, meta))
 		}
 	}
-	return out, cuts
+	return cuts
 }
 
 // heldRecords answers whether asker holds other's last record, the same role,

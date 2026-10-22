@@ -441,6 +441,7 @@ func PastedSelector(raw string) string {
 	return s
 }
 
+// Forget tombstones the sessions o selects and rebuilds the index without them.
 func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 	if dir == "" {
 		dir = DefaultDir()
@@ -468,77 +469,10 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 		}
 	}
 	dead := readTombstones()
-	var added []string
 	matched := map[string]bool{}
 	result := ForgetResult{}
-	// An id that names a session exactly means that session. Prefix matching
-	// is documented and useful, but it also made `forget --session s1` drop
-	// s1 and every s1x beside it — twelve sessions for a selector that named
-	// one, reported only afterwards (#870).
-	// A row set aside with nothing to index answers to the same selectors as
-	// a listed one: its title and project sit in manifest.gob, and its
-	// tombstone keeps the session out once it holds text (#5563).
-	rows := m.Sessions
-	if len(m.Empty) > 0 {
-		rows = maps.Clone(m.Sessions)
-		for key, meta := range m.Empty {
-			if _, listed := rows[key]; !listed {
-				rows[key] = meta
-			}
-		}
-	}
-	exact := ""
-	if o.Session != "" {
-		for _, meta := range rows {
-			if meta.ID == o.Session {
-				exact = o.Session
-				break
-			}
-		}
-		if exact == "" {
-			for _, state := range m.Compactions {
-				if state.SessionID == o.Session {
-					exact = o.Session
-					break
-				}
-			}
-		}
-	}
-	for key, meta := range rows {
-		if exact != "" && meta.ID != exact {
-			continue
-		}
-		if !sessionMatches(meta, o) {
-			continue
-		}
-		matched[key] = true
-		result.Sessions++
-		result.Keys = append(result.Keys, key)
-		// A run kept in its parent's own log, matched along with the parent,
-		// is covered by the parent's tombstone (#5216): one of its own would
-		// outlive an unforget of the parent.
-		if inParentFile(meta.Harness, meta.Kind, meta.Parent) {
-			if pm, ok := m.Sessions[meta.Harness+":"+meta.Parent]; ok && (exact == "" || pm.ID == exact) && sessionMatches(pm, o) {
-				result.Attached++
-				continue
-			}
-		}
-		if meta.Harness == "deja" {
-			result.Notes++
-			if strings.HasPrefix(meta.ID, "deja-note-") {
-				result.Promoted++
-			}
-		}
-		if !dead[key] {
-			result.Tombstones++
-			if !o.DryRun {
-				added = append(added, key)
-			}
-		}
-		if !o.DryRun {
-			dead[key] = true
-		}
-	}
+	rows, exact := forgetRows(m, o)
+	added := matchForget(rows, m.Sessions, o, exact, dead, matched, &result)
 	// A sub-agent run kept in its parent's own file is part of that
 	// transcript: Copilot CLI writes a task's records into the parent's log,
 	// and before they were read as a session of their own they went with it
@@ -601,24 +535,7 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 	// still holds it sends it under their own bucket id, which was a key this
 	// index had never seen — and deja announced the line the reader had just
 	// deleted (#985). The content key is the one #977 already dedupes on.
-	var contentKeys []string
-	for _, r := range readRecordsForForget(dir) {
-		if !matched[r.Record.Key] {
-			continue
-		}
-		result.Messages++
-		meta, ok := m.Sessions[r.Record.Key]
-		if !ok || meta.Harness != "deja" || !strings.HasPrefix(meta.ID, "deja-20") {
-			continue
-		}
-		th := fnv.New64a()
-		_, _ = th.Write([]byte(r.Record.Text))
-		key := dayBucketKey(SyncRecord{Harness: "deja", SessionID: meta.ID, Project: meta.Project,
-			Role: r.Record.Role, Time: r.Record.Time}, th.Sum64())
-		if key != "" {
-			contentKeys = append(contentKeys, r.Record.Key+"\x00"+key)
-		}
-	}
+	contentKeys := forgetContentKeys(dir, m, matched, &result)
 	if o.DryRun {
 		return result, nil
 	}
@@ -675,6 +592,112 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 	sort.Strings(keys)
 	_ = writeTombstoneMirrorAt(dir, keys)
 	return result, nil
+}
+
+// forgetRows is the rows a forget selector is matched against and the session
+// id it names exactly, or "" when it names none.
+func forgetRows(m Manifest, o ForgetOptions) (map[string]SessionMeta, string) {
+	// An id that names a session exactly means that session. Prefix matching
+	// is documented and useful, but it also made `forget --session s1` drop
+	// s1 and every s1x beside it — twelve sessions for a selector that named
+	// one, reported only afterwards (#870).
+	// A row set aside with nothing to index answers to the same selectors as
+	// a listed one: its title and project sit in manifest.gob, and its
+	// tombstone keeps the session out once it holds text (#5563).
+	rows := m.Sessions
+	if len(m.Empty) > 0 {
+		rows = maps.Clone(m.Sessions)
+		for key, meta := range m.Empty {
+			if _, listed := rows[key]; !listed {
+				rows[key] = meta
+			}
+		}
+	}
+	exact := ""
+	if o.Session != "" {
+		for _, meta := range rows {
+			if meta.ID == o.Session {
+				exact = o.Session
+				break
+			}
+		}
+		if exact == "" {
+			for _, state := range m.Compactions {
+				if state.SessionID == o.Session {
+					exact = o.Session
+					break
+				}
+			}
+		}
+	}
+	return rows, exact
+}
+
+// matchForget marks the rows o selects in matched and counts them into result.
+// Unless o is a dry run each is tombstoned in dead, and the keys new to dead
+// come back.
+func matchForget(rows, sessions map[string]SessionMeta, o ForgetOptions, exact string, dead, matched map[string]bool, result *ForgetResult) []string {
+	var added []string
+	for key, meta := range rows {
+		if exact != "" && meta.ID != exact {
+			continue
+		}
+		if !sessionMatches(meta, o) {
+			continue
+		}
+		matched[key] = true
+		result.Sessions++
+		result.Keys = append(result.Keys, key)
+		// A run kept in its parent's own log, matched along with the parent,
+		// is covered by the parent's tombstone (#5216): one of its own would
+		// outlive an unforget of the parent.
+		if inParentFile(meta.Harness, meta.Kind, meta.Parent) {
+			if pm, ok := sessions[meta.Harness+":"+meta.Parent]; ok && (exact == "" || pm.ID == exact) && sessionMatches(pm, o) {
+				result.Attached++
+				continue
+			}
+		}
+		if meta.Harness == "deja" {
+			result.Notes++
+			if strings.HasPrefix(meta.ID, "deja-note-") {
+				result.Promoted++
+			}
+		}
+		if !dead[key] {
+			result.Tombstones++
+			if !o.DryRun {
+				added = append(added, key)
+			}
+		}
+		if !o.DryRun {
+			dead[key] = true
+		}
+	}
+	return added
+}
+
+// forgetContentKeys counts the matched sessions' messages into result and
+// returns the content keys of the day notes among them.
+func forgetContentKeys(dir string, m Manifest, matched map[string]bool, result *ForgetResult) []string {
+	var contentKeys []string
+	for _, r := range readRecordsForForget(dir) {
+		if !matched[r.Record.Key] {
+			continue
+		}
+		result.Messages++
+		meta, ok := m.Sessions[r.Record.Key]
+		if !ok || meta.Harness != "deja" || !strings.HasPrefix(meta.ID, "deja-20") {
+			continue
+		}
+		th := fnv.New64a()
+		_, _ = th.Write([]byte(r.Record.Text))
+		key := dayBucketKey(SyncRecord{Harness: "deja", SessionID: meta.ID, Project: meta.Project,
+			Role: r.Record.Role, Time: r.Record.Time}, th.Sum64())
+		if key != "" {
+			contentKeys = append(contentKeys, r.Record.Key+"\x00"+key)
+		}
+	}
+	return contentKeys
 }
 
 // storeManifest stands in for the manifest of an index never built: the
