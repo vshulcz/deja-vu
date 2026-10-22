@@ -14,6 +14,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/embed"
 	"github.com/vshulcz/deja-vu/internal/harnesscolor"
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/stats"
@@ -37,7 +38,16 @@ type redactionReport struct {
 	Tombstones  int                       `json:"tombstones"`
 }
 
-func runStats(dir string, args []string) error {
+// statsArgs is what `deja stats` was asked.
+type statsArgs struct {
+	jsonOut, impact, year, card, html, redaction bool
+	cardPath, htmlPath                           string
+	options                                      search.Options
+	sinceRaw, harnessRaw                         string
+}
+
+// parseStatsArgs reads the `deja stats` arguments.
+func parseStatsArgs(args []string) (statsArgs, error) {
 	jsonOut := false
 	impact := false
 	year := false
@@ -57,7 +67,7 @@ func runStats(dir string, args []string) error {
 			jsonOut = true
 		case "--html":
 			if html {
-				return errors.New("stats: --html specified twice")
+				return statsArgs{}, errors.New("stats: --html specified twice")
 			}
 			html = true
 			htmlPath = "deja-stats.html"
@@ -73,7 +83,7 @@ func runStats(dir string, args []string) error {
 			year = true
 		case "--card":
 			if card {
-				return errors.New("stats: --card specified twice")
+				return statsArgs{}, errors.New("stats: --card specified twice")
 			}
 			card = true
 			// No path means the terminal. The SVG is for the places a
@@ -89,13 +99,13 @@ func runStats(dir string, args []string) error {
 			}
 		case "--harness", "--project", "--since", "--role":
 			if i+1 >= len(args) {
-				return fmt.Errorf("stats: %s needs value", args[i])
+				return statsArgs{}, fmt.Errorf("stats: %s needs value", args[i])
 			}
-			v := args[i+1] //nolint:gosec // i+1 < len(args) is checked above
+			v := args[i+1]
 			i++
 			if strings.TrimSpace(v) == "" {
 				// Empty is how "no filter" is spelled inside deja (#1612).
-				return fmt.Errorf("stats: %s needs value", args[i-1])
+				return statsArgs{}, fmt.Errorf("stats: %s needs value", args[i-1])
 			}
 			switch args[i-1] {
 			case "--harness":
@@ -108,15 +118,23 @@ func runStats(dir string, args []string) error {
 			case "--since":
 				d, err := parseDur(v)
 				if err != nil {
-					return err
+					return statsArgs{}, err
 				}
 				options.Since = d
 				sinceRaw = v
 			}
 		default:
-			return unknownFlag("stats", args[i], statsFlags)
+			return statsArgs{}, unknownFlag("stats", args[i], statsFlags)
 		}
 	}
+	return statsArgs{jsonOut: jsonOut, impact: impact, year: year, card: card, html: html, redaction: redaction,
+		cardPath: cardPath, htmlPath: htmlPath, options: options, sinceRaw: sinceRaw, harnessRaw: harnessRaw}, nil
+}
+
+// checkStatsArgs refuses the flag combinations that ask for two things at once.
+func checkStatsArgs(a *statsArgs) error {
+	jsonOut, impact, card, html, redaction := a.jsonOut, a.impact, a.card, a.html, a.redaction
+	year, options := a.year, &a.options
 	if (jsonOut && card) || (jsonOut && html) || (card && html) {
 		return errors.New("stats: choose one output")
 	}
@@ -149,6 +167,19 @@ func runStats(dir string, args []string) error {
 			return fmt.Errorf("stats: %s prints as text or --json, not as --card or --html", r.flag)
 		}
 	}
+	return nil
+}
+
+func runStats(dir string, args []string) error {
+	a, perr := parseStatsArgs(args)
+	if perr != nil {
+		return perr
+	}
+	if err := checkStatsArgs(&a); err != nil {
+		return err
+	}
+	jsonOut, impact, year, cardPath, card, html, redaction := a.jsonOut, a.impact, a.year, a.cardPath, a.card, a.html, a.redaction
+	options, sinceRaw, harnessRaw := a.options, a.sinceRaw, a.harnessRaw
 	if impact {
 		return runStatsImpact(os.Stdout, dir, jsonOut)
 	}
@@ -259,6 +290,12 @@ func runStats(dir string, args []string) error {
 	if fi, e := os.Stat(embed.Path(dir)); e == nil {
 		report.SidecarSize = fi.Size()
 	}
+	return writeStatsReport(report, ss, a, sshTip)
+}
+
+// writeStatsReport prints the report in the form that was asked for.
+func writeStatsReport(report stats.Report, ss []model.Session, a statsArgs, sshTip string) error {
+	jsonOut, card, cardPath, htmlPath, options := a.jsonOut, a.card, a.cardPath, a.htmlPath, a.options
 	if card && cardPath == "" {
 		printStatsCard(os.Stdout, report)
 		fmt.Fprintf(os.Stdout, "\n%s\n", "for a README or a post: deja stats --card deja-stats.svg")

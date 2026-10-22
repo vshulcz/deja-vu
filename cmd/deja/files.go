@@ -48,7 +48,17 @@ const (
 
 var filesFlags = []string{"--project", "--all-projects", "--limit", "--json"}
 
-func runFiles(dir string, args []string, stdout io.Writer) error {
+// filesOptions is what `deja files` was asked.
+type filesOptions struct {
+	terms       []string
+	limit       int
+	project     string
+	allProjects bool
+	asJSON      bool
+}
+
+// parseFilesArgs reads the `deja files` arguments.
+func parseFilesArgs(args []string) (filesOptions, error) {
 	var terms []string
 	limit := 10
 	project := ""
@@ -63,20 +73,20 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 			// and so did an unknown one and an empty --project: the answer came
 			// back looking like an answer to what was asked (#1628).
 			if i+1 >= len(args) {
-				return errors.New("files: --limit needs value")
+				return filesOptions{}, errors.New("files: --limit needs value")
 			}
 			i++
-			n, err := strconv.Atoi(args[i]) //nolint:gosec // the bound is checked above
+			n, err := strconv.Atoi(args[i])
 			if err != nil || n <= 0 {
-				return fmt.Errorf("files: --limit wants a positive number, got %q", args[i]) //nolint:gosec // the bound is checked above
+				return filesOptions{}, fmt.Errorf("files: --limit wants a positive number, got %q", args[i])
 			}
 			limit = n
 		case "--project":
-			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" { //nolint:gosec // the bound is checked first
-				return errors.New("files: --project needs value")
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
+				return filesOptions{}, errors.New("files: --project needs value")
 			}
 			i++
-			project = args[i] //nolint:gosec // the bound is checked above
+			project = args[i]
 		case "--all-projects":
 			// The answer is scoped to this project by default (#3713); this
 			// asks the machine instead.
@@ -89,17 +99,26 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 			i = len(args)
 		default:
 			if strings.HasPrefix(args[i], "-") {
-				return unknownFlag("files", args[i], filesFlags)
+				return filesOptions{}, unknownFlag("files", args[i], filesFlags)
 			}
 			if strings.TrimSpace(args[i]) != "" {
 				terms = append(terms, args[i])
 			}
 		}
 	}
-	if len(terms) == 0 {
+	return filesOptions{terms: terms, limit: limit, project: project, allProjects: allProjects, asJSON: asJSON}, nil
+}
+
+func runFiles(dir string, args []string, stdout io.Writer) error {
+	opts, perr := parseFilesArgs(args)
+	if perr != nil {
+		return perr
+	}
+	limit, project, allProjects, asJSON := opts.limit, opts.project, opts.allProjects, opts.asJSON
+	if len(opts.terms) == 0 {
 		return errors.New("usage: deja files <topic> [--project name] [--all-projects] [--limit n] [--json]")
 	}
-	q := strings.Join(terms, " ")
+	q := strings.Join(opts.terms, " ")
 	// The answer is about the repository the question was asked in. Read over
 	// the machine, a generic topic answered with the busiest project's files:
 	// asked in this repository, `deja files "timeout"` named eight paths and
@@ -221,12 +240,6 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 	// as one needle, which no single message carries, so `deja files "a b c"`
 	// answered nothing where `deja files a b c` answered (#3409).
 	needles := lowerAll(strings.Fields(q))
-	filtered := 0                    // recorded paths dropped by the repository filter
-	near := map[string]int{}         // path -> times touched near the topic
-	nearSessions := map[string]int{} // path -> how many sessions touched it near the topic
-	total := map[string]int{}        // path -> times touched anywhere in these sessions
-	sessions := map[string]int{}     // path -> how many sessions touched it
-	scanned := 0
 
 	// One pass for all 250, not one pass each: the per-identity lookup streams
 	// the whole record log every time it is called (#1069).
@@ -239,56 +252,8 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		return fmt.Errorf("read sessions: %w", err)
 	}
 
-	for _, full := range full250 {
-		// The window is counted over speech and file events only. Tool output is
-		// two thirds of the records in a session, so a raw message count would be
-		// a few seconds of one command — far too narrow to connect a subject to
-		// the files it was about.
-		msgs := meaningful(full.Messages)
-		hit := topicTimes(msgs, needles)
-		if len(hit) == 0 {
-			// The search tier that produced this hit can be semantic, so a session
-			// can arrive without the words ever being said in it. Counting its
-			// files would put a one-off touch from an unrelated project at the top
-			// on perfect specificity.
-			continue
-		}
-		scanned++
-		seenHere := map[string]bool{}
-		nearHere := map[string]bool{}
-		for _, m := range msgs {
-			if m.Role != "files" {
-				continue
-			}
-			for p := range strings.SplitSeq(m.Text, "\n") {
-				p = strings.TrimSpace(p)
-				if p == "" || isScratch(p) {
-					continue
-				}
-				if !inRepository(p) {
-					// Recorded, but not under a repository on this disk today.
-					// Usually a probe script; sometimes a repo that was
-					// archived, renamed, or lives on a volume that is not
-					// mounted. Counted rather than forgotten, so the empty
-					// answer can say which of the two happened (#664).
-					filtered++
-					continue
-				}
-				total[p]++
-				if !seenHere[p] {
-					seenHere[p] = true
-					sessions[p]++
-				}
-				if withinTime(m.Time, hit) {
-					near[p]++
-					if !nearHere[p] {
-						nearHere[p] = true
-						nearSessions[p]++
-					}
-				}
-			}
-		}
-	}
+	t := tallyFilesNear(full250, needles)
+	filtered, near, nearSessions, total, sessions, scanned := t.filtered, t.near, t.nearSessions, t.total, t.sessions, t.scanned
 	if len(near) == 0 {
 		// Sessions matched and no file sat near the topic. Still an envelope:
 		// the counts beside the empty list are what distinguish this from a
@@ -407,6 +372,78 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		fmt.Fprintf(os.Stderr, "deja: showing %d of %d — raise --limit for the rest\n", len(rows), cut)
 	}
 	return nil
+}
+
+// filesTally is what one pass over the matched sessions counted.
+type filesTally struct {
+	filtered     int            // recorded paths dropped by the repository filter
+	near         map[string]int // path -> times touched near the topic
+	nearSessions map[string]int // path -> how many sessions touched it near the topic
+	total        map[string]int // path -> times touched anywhere in these sessions
+	sessions     map[string]int // path -> how many sessions touched it
+	scanned      int
+}
+
+// tallyFilesNear counts the files each session touched, and which of those
+// touches sat near the topic.
+func tallyFilesNear(full250 []model.Session, needles []string) filesTally {
+	filtered := 0
+	near := map[string]int{}
+	nearSessions := map[string]int{}
+	total := map[string]int{}
+	sessions := map[string]int{}
+	scanned := 0
+	for _, full := range full250 {
+		// The window is counted over speech and file events only. Tool output is
+		// two thirds of the records in a session, so a raw message count would be
+		// a few seconds of one command — far too narrow to connect a subject to
+		// the files it was about.
+		msgs := meaningful(full.Messages)
+		hit := topicTimes(msgs, needles)
+		if len(hit) == 0 {
+			// The search tier that produced this hit can be semantic, so a session
+			// can arrive without the words ever being said in it. Counting its
+			// files would put a one-off touch from an unrelated project at the top
+			// on perfect specificity.
+			continue
+		}
+		scanned++
+		seenHere := map[string]bool{}
+		nearHere := map[string]bool{}
+		for _, m := range msgs {
+			if m.Role != "files" {
+				continue
+			}
+			for p := range strings.SplitSeq(m.Text, "\n") {
+				p = strings.TrimSpace(p)
+				if p == "" || isScratch(p) {
+					continue
+				}
+				if !inRepository(p) {
+					// Recorded, but not under a repository on this disk today.
+					// Usually a probe script; sometimes a repo that was
+					// archived, renamed, or lives on a volume that is not
+					// mounted. Counted rather than forgotten, so the empty
+					// answer can say which of the two happened (#664).
+					filtered++
+					continue
+				}
+				total[p]++
+				if !seenHere[p] {
+					seenHere[p] = true
+					sessions[p]++
+				}
+				if withinTime(m.Time, hit) {
+					near[p]++
+					if !nearHere[p] {
+						nearHere[p] = true
+						nearSessions[p]++
+					}
+				}
+			}
+		}
+	}
+	return filesTally{filtered: filtered, near: near, nearSessions: nearSessions, total: total, sessions: sessions, scanned: scanned}
 }
 
 // projectScopeHint is the line under a `files` or `how` answer that says which

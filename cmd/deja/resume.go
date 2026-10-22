@@ -364,6 +364,12 @@ func resumeCommand(s model.Session) (string, string, error) {
 	if s.Kind == "fork" && s.Harness == "kimi" && s.Parent != "" && sources.KimiSubagentFile(s.Path) {
 		return "", "", fmt.Errorf("session %s is a /btw side question, which kimi does not reopen on its own — `deja resume %s` reopens the session it was asked in", digest.Short(s.ID), s.Parent)
 	}
+	return resumeHarnessCommand(s)
+}
+
+// resumeHarnessCommand is the per-harness half of resumeCommand, once the
+// session is one deja can place in a command at all.
+func resumeHarnessCommand(s model.Session) (string, string, error) {
 	switch s.Harness {
 	case "claude":
 		// Claude Code deleted the transcript and only the prompts were left in
@@ -496,6 +502,14 @@ func resumeCommand(s model.Session) (string, string, error) {
 		// header records — no guess, the same cwd gjc's scope file names
 		// (#4395).
 		return existingDir(resumeRecordedDir(s)), "gjc --resume " + s.ID, nil
+	default:
+		return resumeHarnessCommandMore(s)
+	}
+}
+
+// resumeHarnessCommandMore is resumeHarnessCommand for the next group of harnesses.
+func resumeHarnessCommandMore(s model.Session) (string, string, error) {
+	switch s.Harness {
 	case "hermes":
 		// Hermes takes the same session ID deja indexes, so this resumes the
 		// exact conversation rather than the most recent one — from the
@@ -628,6 +642,14 @@ func resumeCommand(s model.Session) (string, string, error) {
 			return "", "", fmt.Errorf("session id %q is not one junie --session-id takes", s.ID)
 		}
 		return existingDir(resumeRecordedDir(s)), "junie --session-id " + s.ID + " --resume", nil
+	default:
+		return resumeHarnessCommandRest(s)
+	}
+}
+
+// resumeHarnessCommandRest is resumeHarnessCommand for the remaining harnesses.
+func resumeHarnessCommandRest(s model.Session) (string, string, error) {
+	switch s.Harness {
 	case "reasonix":
 		// `--resume` looks an id up in the store of the workspace it runs in
 		// (the git root of the working directory), so it goes with that

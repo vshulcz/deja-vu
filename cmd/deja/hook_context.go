@@ -766,75 +766,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 		digest, sessions, raw, taskMatched, withheld, servedIDs, servedProjects = cachedHookDigestFor(dir, hookProjectPath(input.CWD, input.WorkspaceRoots), self...)
 	}
 	if digest == "" {
-		// No session from this project, which is the usual state in a new
-		// checkout — and exactly where knowing what this machine is missing
-		// helps most. The block is about the machine, not the project, so it
-		// does not depend on the digest having found anything.
-		// The block answers for the switch itself since #2701 — the guard that
-		// stood here is what taught it to.
-		if env, from := environmentBlockFrom(dir, policy.ActivationAuto); env != "" {
-			out := frameRecall(env)
-			// The block is about the machine and names no project, so without
-			// the projects behind its walls a forget of one of them could not
-			// reach the stored text (#2349).
-			if unreadable {
-				usage.RecordDigestPolicySessionsUnread(dir, usage.KindHook, out, input.SessionID, 0, 0, policy.Load().Describe(policy.ActivationAuto), nil, from)
-			} else {
-				usage.RecordDigestPolicyFrom(dir, usage.KindHook, out, input.SessionID, 0, 0, from, policy.Load().Describe(policy.ActivationAuto))
-			}
-			if plain {
-				fmt.Fprintln(os.Stdout, out)
-				return nil
-			}
-			var resp sessionStartHookResponse
-			resp.HookSpecificOutput.HookEventName = eventName
-			resp.HookSpecificOutput.AdditionalContext = out
-			// The environment block is not the project's memory, and while a
-			// build runs it is all there is: without this the whole rebuild
-			// passed in silence on any machine with facts to report (#927).
-			if notesHaveReader() {
-				resp.SystemMessage = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring), joinNotes(withheldEverythingNote(dir, withheld), buildNotice(dir))))
-				// Last, after anything that needs acting on: what the build
-				// found, once (#3073), then once a week what the week looked
-				// like (#3065).
-				resp.SystemMessage = joinNotes(resp.SystemMessage, humanNotes(dir))
-			}
-			emitHookResponse(resp)
-			return nil
-		}
-		// A first build (or one forced by a new index format) is running in
-		// the background. It never blocks the agent, but starting in silence
-		// looks like deja is simply not working — so say what is happening.
-		// Only on the JSON path: systemMessage is the host's UI channel,
-		// whereas the plain path is injected into the model's context, where
-		// a progress line is noise.
-		if !plain && notesHaveReader() {
-			// The session that asks for the build is the one that hears
-			// nothing about it: the child has not written its first progress
-			// line yet. That session is the first one after an upgrade or a
-			// damaged store — the moment deja most looks broken (#878).
-			//
-			// Including the very first build. Requiring a manifest left the
-			// one moment deja most looks broken in silence: a machine with
-			// ten thousand transcripts and no index yet said nothing at all,
-			// twice over, while the build ran (#909).
-			//
-			// A machine with no history also asks for a build; it sees this
-			// line once, truthfully, and never again — the next session has a
-			// manifest and reads the published progress instead.
-			line := buildNotice(dir)
-			if note := unreadableStoreNote(dir); storeNoteIsNews(dir, note) {
-				line = joinNotes(note, line)
-			}
-			line = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring), joinNotes(withheldEverythingNote(dir, withheld), line)))
-			if line != "" {
-				var resp sessionStartHookResponse
-				resp.HookSpecificOutput.HookEventName = eventName
-				resp.SystemMessage = line
-				emitHookResponse(resp)
-			}
-		}
-		return nil
+		return hookContextWithoutDigest(dir, rewired, unreadable, plain, eventName, input.SessionID, withheld)
 	}
 	// One actionable line so injected memory leads somewhere: models that see
 	// bare data tend to ignore it.
@@ -969,6 +901,80 @@ func runHookContextMode(dir string, plain, once bool) error {
 		}
 	}
 	emitHookResponse(resp)
+	return nil
+}
+
+// hookContextWithoutDigest answers a session start that found no session from
+// this project: the machine's environment block, or a word about the build.
+func hookContextWithoutDigest(dir string, rewired []string, unreadable, plain bool, eventName, sessionID string, withheld int) error {
+	// No session from this project, which is the usual state in a new
+	// checkout — and exactly where knowing what this machine is missing
+	// helps most. The block is about the machine, not the project, so it
+	// does not depend on the digest having found anything.
+	// The block answers for the switch itself since #2701 — the guard that
+	// stood here is what taught it to.
+	if env, from := environmentBlockFrom(dir, policy.ActivationAuto); env != "" {
+		out := frameRecall(env)
+		// The block is about the machine and names no project, so without
+		// the projects behind its walls a forget of one of them could not
+		// reach the stored text (#2349).
+		if unreadable {
+			usage.RecordDigestPolicySessionsUnread(dir, usage.KindHook, out, sessionID, 0, 0, policy.Load().Describe(policy.ActivationAuto), nil, from)
+		} else {
+			usage.RecordDigestPolicyFrom(dir, usage.KindHook, out, sessionID, 0, 0, from, policy.Load().Describe(policy.ActivationAuto))
+		}
+		if plain {
+			fmt.Fprintln(os.Stdout, out)
+			return nil
+		}
+		var resp sessionStartHookResponse
+		resp.HookSpecificOutput.HookEventName = eventName
+		resp.HookSpecificOutput.AdditionalContext = out
+		// The environment block is not the project's memory, and while a
+		// build runs it is all there is: without this the whole rebuild
+		// passed in silence on any machine with facts to report (#927).
+		if notesHaveReader() {
+			resp.SystemMessage = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring), joinNotes(withheldEverythingNote(dir, withheld), buildNotice(dir))))
+			// Last, after anything that needs acting on: what the build
+			// found, once (#3073), then once a week what the week looked
+			// like (#3065).
+			resp.SystemMessage = joinNotes(resp.SystemMessage, humanNotes(dir))
+		}
+		emitHookResponse(resp)
+		return nil
+	}
+	// A first build (or one forced by a new index format) is running in
+	// the background. It never blocks the agent, but starting in silence
+	// looks like deja is simply not working — so say what is happening.
+	// Only on the JSON path: systemMessage is the host's UI channel,
+	// whereas the plain path is injected into the model's context, where
+	// a progress line is noise.
+	if !plain && notesHaveReader() {
+		// The session that asks for the build is the one that hears
+		// nothing about it: the child has not written its first progress
+		// line yet. That session is the first one after an upgrade or a
+		// damaged store — the moment deja most looks broken (#878).
+		//
+		// Including the very first build. Requiring a manifest left the
+		// one moment deja most looks broken in silence: a machine with
+		// ten thousand transcripts and no index yet said nothing at all,
+		// twice over, while the build ran (#909).
+		//
+		// A machine with no history also asks for a build; it sees this
+		// line once, truthfully, and never again — the next session has a
+		// manifest and reads the published progress instead.
+		line := buildNotice(dir)
+		if note := unreadableStoreNote(dir); storeNoteIsNews(dir, note) {
+			line = joinNotes(note, line)
+		}
+		line = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring), joinNotes(withheldEverythingNote(dir, withheld), line)))
+		if line != "" {
+			var resp sessionStartHookResponse
+			resp.HookSpecificOutput.HookEventName = eventName
+			resp.SystemMessage = line
+			emitHookResponse(resp)
+		}
+	}
 	return nil
 }
 

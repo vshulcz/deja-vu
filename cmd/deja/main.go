@@ -1786,153 +1786,18 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 	policyHidden += unreadWithheld(result)
 	o.PolicyWithheld = policyHidden
 	o.Tier = result.Tier
-	switch {
-	case result.Neighbour:
-		printNeighbour(os.Stderr, result.Variants)
-		o.Stemmed = true
-		o.FuzzyVariants = result.Variants
-	case result.Stemmed:
-		printStemmed(os.Stderr, result.Variants)
-		o.Stemmed = true
-		o.FuzzyVariants = result.Variants
-	case result.Fuzzy:
-		printFuzzy(os.Stderr, result.Variants)
-		o.Fuzzy = true
-		o.FuzzyVariants = result.Variants
-	}
-	if result.Tier == search.TierClose && o.FuzzyVariants == nil {
-		o.FuzzyVariants = result.Variants
-	}
-	var hits []search.Hit
+	applySearchLadder(&o, result)
 	// The relevance and error tiers hand back a ranked window, not the
 	// whole match: date order over them is the newest of that window, and
 	// tierWindow says the match ran past it.
-	tierWindow, windowRead := false, 0
 	// --all reads newest first unless --sort relevance says otherwise; --json
 	// keeps the ranked order a script may rely on unless --sort date asks.
 	dated := o.Sort == search.SortDate || o.All && !o.JSON && o.Sort == ""
-	switch result.Tier {
-	case search.TierError:
-		// A pasted error IS a match; ErrorHits keeps the ranking and the error
-		// neighbourhood the tier found. Re-scoring it as an ordinary run would
-		// zero it out — the word ladder already failed, which is why this tier
-		// fired at all.
-		fmt.Fprintln(os.Stderr, "deja: matched by error signature; showing the sessions that hit it")
-		hits = search.ErrorHits(ss, o.Query)
-		o.Total, o.Capped = result.Total, result.Capped
-		tierWindow = result.Capped
-		errAt := len(hits)
-		hits = dropCopiedHits(dir, hits)
-		if d := errAt - len(hits); o.Total >= d {
-			o.Total -= d
-		}
-		if o.Total < len(hits) {
-			o.Total = len(hits)
-		}
-		if o.Sort == search.SortDate {
-			search.ByDate(hits)
-			windowRead = len(hits)
-		}
-		var capped bool
-		hits, capped = capTierHits(hits, o)
-		o.Capped = o.Capped || capped
-	case search.TierRelevance:
-		o.Strict = result.Strict
-		lead := relevanceLead(result.Strict)
-		if dated && result.Strict > 0 {
-			lead = strings.Replace(lead, "the rest below are ranked by relevance", "they come first and the rest after, each newest first", 1)
-		}
-		fmt.Fprintln(os.Stderr, lead)
-		hits = markStrictHits(search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(o.Query), result.TermIDF), result)
-		relAt := len(hits)
-		hits = dropCopiedHits(dir, hits)
-		relAt -= len(hits)
-		// This tier ranks and truncates inside retrieval, so counting the
-		// sessions it handed back measures its window, not the match: every
-		// query deeper than the window reported the window's own size and
-		// capped: false, which told a consumer to stop checking exactly when
-		// there was something to check. Take the tier's figures when it has
-		// them; the paths that report none (a quoted query retried without
-		// its quotes, served here under the relevance label) never truncated,
-		// so what arrived is the whole of it.
-		o.Total, o.Capped = result.Total, result.Capped
-		if o.Total >= relAt {
-			o.Total -= relAt
-		}
-		if o.Total < len(hits) {
-			o.Total = len(hits)
-		}
-		tierWindow = result.Capped
-		if o.Sort == search.SortDate {
-			search.ByDate(hits)
-			windowRead = len(hits)
-		}
-		var relCapped bool
-		hits, relCapped = capTierHits(hits, o)
-		o.Capped = o.Capped || relCapped
-	default:
-		// RunDetailed rather than Run: the JSON envelope reports how many
-		// sessions matched before the cap, and that is not recoverable from a
-		// list the cap has already trimmed.
-		// Copies go before the cap: a fork repeating its source took a slot
-		// and counted in the total (#5320, #5335).
-		keep := func(hs []search.Hit) []search.Hit { return dropCopiedHits(dir, hs) }
-		detailed, rerr := search.RunDetailedKeeping(ss, o, keep)
-		// A date page drawn from the newest matches by their postings comes
-		// back short when few of them say a quoted phrase and the rest were
-		// too many to check. It is read whole then, as the screen does.
-		if rerr == nil && o.Sort == search.SortDate && o.Window > 0 && len(detailed.Hits) < o.Window && detailed.Total > len(detailed.Hits) {
-			whole := o
-			whole.Window, whole.Unread = 0, nil
-			if r2, err2 := index.SearchWithRecoveryDetailed(dir, whole, io.Discard); err2 == nil && r2.Tier == result.Tier {
-				ss2, _ := policyFilterSessionsCounted(policy.ActivationSearch, search.WithoutIgnored(r2.Sessions))
-				whole.Unread = r2.Unread
-				if d2, e2 := search.RunDetailedKeeping(ss2, whole, keep); e2 == nil {
-					detailed, o.Unread = d2, r2.Unread
-				}
-			}
-		}
-		if rerr != nil {
-			// "run:" is the name of a function, and the reader of this line is
-			// someone who mistyped a pattern (#2286). The only error that
-			// reaches here in practice is the regexp compile, so it says which
-			// input to look at, in the words the other bad flags use (#1602).
-			if o.Regex {
-				return rePatternError(o.Query, rerr)
-			}
-			return rerr
-		}
-		hits, o.Total, o.Capped, o.TotalEstimated = detailed.Hits, detailed.Total, detailed.Capped, detailed.Estimated
+	hits, tierWindow, windowRead, err := searchTierHits(dir, &o, result, ss, dated)
+	if err != nil {
+		return err
 	}
-	// A rerank reorders by meaning, which date order throws away again.
-	if !o.NoEmbed && os.Getenv("DEJA_EMBED") != "off" && o.Sort != search.SortDate {
-		hits = maybeRerank(dir, hits, o, os.Stderr)
-	}
-	var semantic bool
-	hits, semantic = maybeSemantic(dir, hits, o, os.Stderr)
-	if semantic {
-		// The lexical hits were scoped by the trust policy above, but the
-		// semantic tier reaches the whole sidecar and brings back sessions of
-		// its own — an imported peer's content the policy withholds from every
-		// other read path leaked straight through the embedding fallback. Scope
-		// the semantic hits the same way before they are shown.
-		hits, _ = policyFilterHitsCounted(policy.ActivationSearch, hits)
-	}
-	o.Semantic = semantic
-	// What the semantic tier and reranking brought in, uncapped: a fork's hit
-	// quoting its source again goes here too (#5320).
-	hits = dropCopiedHits(dir, hits)
-	// Policy scoping, reranking and the semantic tier all run after the cap, so
-	// the pre-cap count can no longer describe what is being returned. When
-	// nothing was capped the honest total is simply what survived; when it was,
-	// there is no way to know how the filters would have treated the hidden
-	// ones, so the pre-cap figure stands and `capped` says to distrust it.
-	attachLifecycles(dir, hits)
-	demoted := demoteRejected(hits)
-	attachMoved(hits)
-	if !o.Capped {
-		o.Total, o.TotalEstimated = len(hits), false
-	}
+	hits, demoted := searchAfterRank(dir, hits, &o)
 	if note := demotedNote(hits, demoted); note != "" {
 		fmt.Fprintf(os.Stderr, "deja: %s\n", note)
 	}
@@ -1941,49 +1806,10 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 	}
 	mistyped := false
 	if len(hits) == 0 {
-		// An empty search is a moment for the mark, but only at a terminal
-		// and never into a pipe a script reads (#4624).
-		if !o.JSON && logoWanted(os.Stdout) {
-			mood, _ := searchCatMoment(true)
-			printLogoMood(os.Stdout, nil, mood)
-		}
-		// The policy is named before the generic advice: "try fewer words" is
-		// wrong counsel for someone whose words were fine (#680). A filter the
-		// caller set is the same kind of fact, and `deja last` has named it all
-		// along (#715).
-		switch note := policyHiddenNote(policy.ActivationSearch, policyHidden); {
-		case note != "":
-			fmt.Fprint(os.Stderr, note)
-		case activeFilters(o, sinceRaw, harnessRaw) != "":
-			fmt.Fprintf(os.Stderr, "deja: %q matched nothing under %s\n", o.Query, activeFilters(o, sinceRaw, harnessRaw))
-			fmt.Fprint(os.Stderr, emptyRoleNote(dir, o.Role))
-			fmt.Fprint(os.Stderr, olderThanWindow(dir, o.Since))
-			// This branch does not go through printNoMatches, which is where
-			// the line lives for the other miss, so it says it itself.
-			fmt.Fprint(os.Stderr, ignoredHiddenNoteFor("answer", index.IgnoredWithAllTerms(dir, query.Tokens(o.Query))))
-		default:
-			mistyped = printNoMatchesHinted(os.Stderr, dir, o.Query, o.Regex, hinted) || hinted
-		}
+		mistyped = printSearchMiss(dir, o, policyHidden, sinceRaw, harnessRaw, hinted)
 	}
 	if o.Capped && len(hits) > 0 {
-		// The cap is silent everywhere else: 15 results look like the whole
-		// answer, and nothing says another N are waiting behind --all. deja
-		// narrates every other place the ladder hides a session, so it says
-		// this one too.
-		//
-		// Except to a reader who already typed --all: there the list was cut by
-		// an explicit --limit, or by the relevance tier's own retrieval window,
-		// and neither of those lifts with the flag they are being sent to
-		// (#1608). Say what is shown and leave the advice out.
-		total := strconv.Itoa(o.Total)
-		if o.TotalEstimated {
-			total = "about " + total
-		}
-		if o.All {
-			fmt.Fprintf(os.Stderr, "deja: showing %d of %s\n", len(hits), total)
-		} else {
-			fmt.Fprintf(os.Stderr, "deja: showing %d of %s — add --all to see the rest\n", len(hits), total)
-		}
+		printSearchCapped(o, len(hits))
 	}
 	// The answer can also be short for a reason no flag lifts. Counted over the
 	// sessions holding every term, so an ordinary search in a store with a big
@@ -2040,6 +1866,12 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 		fmt.Fprintf(os.Stderr, "deja: %d session%s here stamped later than this machine's clock — a stamp that has not happened cannot be placed against the others\n",
 			n, pluralS(n))
 	}
+	return searchAfterPrint(dir, o, len(hits), bare, hinted, mistyped)
+}
+
+// searchAfterPrint is what search says once the results are out: the hint
+// for a mistyped command, its exit code, and the daily tip.
+func searchAfterPrint(dir string, o search.Options, found int, bare, hinted, mistyped bool) error {
 	// A wrong guess at a command name falls through to search, and the hint
 	// that names it ran only on an empty result — so a typo whose word happens
 	// to be in the history got a conversation back and nothing about the
@@ -2050,7 +1882,7 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 	// There, a hint costs nothing over a failed search; here it lands on an
 	// answer the reader may well have wanted, and "doctors pool" is a search
 	// however close its first word sits to a command name.
-	if bare && !hinted && !o.JSON && len(hits) > 0 && len(strings.Fields(o.Query)) == 1 {
+	if bare && !hinted && !o.JSON && found > 0 && len(strings.Fields(o.Query)) == 1 {
 		fmt.Fprint(os.Stderr, commandHint(o.Query))
 	}
 	// A search that found nothing is not a failure — that is the ordinary
@@ -2067,10 +1899,219 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 	// --json: a pipe, a script or a hook reads the results, not advice. On
 	// stderr, so the results themselves stay what they were, and only when
 	// stderr is a terminal too: `2>file` is a log, not a reader.
-	if len(hits) > 0 && !o.JSON && briefWanted(os.Stdout) && briefWanted(os.Stderr) {
+	if found > 0 && !o.JSON && briefWanted(os.Stdout) && briefWanted(os.Stderr) {
 		maybeTip(os.Stderr, dir+".tip", time.Now())
 	}
 	return nil
+}
+
+// searchAfterRank runs what comes after the tier ranked: the rerank, the
+// semantic tier and the lifecycle marks. It returns the hits and how many
+// rejected ones were moved down.
+func searchAfterRank(dir string, hits []search.Hit, o *search.Options) ([]search.Hit, int) {
+	// A rerank reorders by meaning, which date order throws away again.
+	if !o.NoEmbed && os.Getenv("DEJA_EMBED") != "off" && o.Sort != search.SortDate {
+		hits = maybeRerank(dir, hits, *o, os.Stderr)
+	}
+	var semantic bool
+	hits, semantic = maybeSemantic(dir, hits, *o, os.Stderr)
+	if semantic {
+		// The lexical hits were scoped by the trust policy above, but the
+		// semantic tier reaches the whole sidecar and brings back sessions of
+		// its own — an imported peer's content the policy withholds from every
+		// other read path leaked straight through the embedding fallback. Scope
+		// the semantic hits the same way before they are shown.
+		hits, _ = policyFilterHitsCounted(policy.ActivationSearch, hits)
+	}
+	o.Semantic = semantic
+	// What the semantic tier and reranking brought in, uncapped: a fork's hit
+	// quoting its source again goes here too (#5320).
+	hits = dropCopiedHits(dir, hits)
+	// Policy scoping, reranking and the semantic tier all run after the cap, so
+	// the pre-cap count can no longer describe what is being returned. When
+	// nothing was capped the honest total is simply what survived; when it was,
+	// there is no way to know how the filters would have treated the hidden
+	// ones, so the pre-cap figure stands and `capped` says to distrust it.
+	attachLifecycles(dir, hits)
+	demoted := demoteRejected(hits)
+	attachMoved(hits)
+	if !o.Capped {
+		o.Total, o.TotalEstimated = len(hits), false
+	}
+	return hits, demoted
+}
+
+// applySearchLadder records which rung of the word ladder answered, and says
+// so on stderr.
+func applySearchLadder(o *search.Options, result index.SearchResult) {
+	switch {
+	case result.Neighbour:
+		printNeighbour(os.Stderr, result.Variants)
+		o.Stemmed = true
+		o.FuzzyVariants = result.Variants
+	case result.Stemmed:
+		printStemmed(os.Stderr, result.Variants)
+		o.Stemmed = true
+		o.FuzzyVariants = result.Variants
+	case result.Fuzzy:
+		printFuzzy(os.Stderr, result.Variants)
+		o.Fuzzy = true
+		o.FuzzyVariants = result.Variants
+	}
+	if result.Tier == search.TierClose && o.FuzzyVariants == nil {
+		o.FuzzyVariants = result.Variants
+	}
+}
+
+// searchTierHits turns what retrieval handed back into hits, the way the tier
+// that answered ranks them. tierWindow says the tier's window cut the match
+// short and windowRead how much of it was read in date order.
+func searchTierHits(dir string, o *search.Options, result index.SearchResult, ss []model.Session, dated bool) (hits []search.Hit, tierWindow bool, windowRead int, err error) {
+	switch result.Tier {
+	case search.TierError:
+		// A pasted error IS a match; ErrorHits keeps the ranking and the error
+		// neighbourhood the tier found. Re-scoring it as an ordinary run would
+		// zero it out — the word ladder already failed, which is why this tier
+		// fired at all.
+		fmt.Fprintln(os.Stderr, "deja: matched by error signature; showing the sessions that hit it")
+		hits = search.ErrorHits(ss, o.Query)
+		o.Total, o.Capped = result.Total, result.Capped
+		tierWindow = result.Capped
+		errAt := len(hits)
+		hits = dropCopiedHits(dir, hits)
+		if d := errAt - len(hits); o.Total >= d {
+			o.Total -= d
+		}
+		if o.Total < len(hits) {
+			o.Total = len(hits)
+		}
+		if o.Sort == search.SortDate {
+			search.ByDate(hits)
+			windowRead = len(hits)
+		}
+		var capped bool
+		hits, capped = capTierHits(hits, *o)
+		o.Capped = o.Capped || capped
+	case search.TierRelevance:
+		o.Strict = result.Strict
+		lead := relevanceLead(result.Strict)
+		if dated && result.Strict > 0 {
+			lead = strings.Replace(lead, "the rest below are ranked by relevance", "they come first and the rest after, each newest first", 1)
+		}
+		fmt.Fprintln(os.Stderr, lead)
+		hits = markStrictHits(search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(o.Query), result.TermIDF), result)
+		relAt := len(hits)
+		hits = dropCopiedHits(dir, hits)
+		relAt -= len(hits)
+		// This tier ranks and truncates inside retrieval, so counting the
+		// sessions it handed back measures its window, not the match: every
+		// query deeper than the window reported the window's own size and
+		// capped: false, which told a consumer to stop checking exactly when
+		// there was something to check. Take the tier's figures when it has
+		// them; the paths that report none (a quoted query retried without
+		// its quotes, served here under the relevance label) never truncated,
+		// so what arrived is the whole of it.
+		o.Total, o.Capped = result.Total, result.Capped
+		if o.Total >= relAt {
+			o.Total -= relAt
+		}
+		if o.Total < len(hits) {
+			o.Total = len(hits)
+		}
+		tierWindow = result.Capped
+		if o.Sort == search.SortDate {
+			search.ByDate(hits)
+			windowRead = len(hits)
+		}
+		var relCapped bool
+		hits, relCapped = capTierHits(hits, *o)
+		o.Capped = o.Capped || relCapped
+	default:
+		// RunDetailed rather than Run: the JSON envelope reports how many
+		// sessions matched before the cap, and that is not recoverable from a
+		// list the cap has already trimmed.
+		// Copies go before the cap: a fork repeating its source took a slot
+		// and counted in the total (#5320, #5335).
+		keep := func(hs []search.Hit) []search.Hit { return dropCopiedHits(dir, hs) }
+		detailed, rerr := search.RunDetailedKeeping(ss, *o, keep)
+		// A date page drawn from the newest matches by their postings comes
+		// back short when few of them say a quoted phrase and the rest were
+		// too many to check. It is read whole then, as the screen does.
+		if rerr == nil && o.Sort == search.SortDate && o.Window > 0 && len(detailed.Hits) < o.Window && detailed.Total > len(detailed.Hits) {
+			whole := *o
+			whole.Window, whole.Unread = 0, nil
+			if r2, err2 := index.SearchWithRecoveryDetailed(dir, whole, io.Discard); err2 == nil && r2.Tier == result.Tier {
+				ss2, _ := policyFilterSessionsCounted(policy.ActivationSearch, search.WithoutIgnored(r2.Sessions))
+				whole.Unread = r2.Unread
+				if d2, e2 := search.RunDetailedKeeping(ss2, whole, keep); e2 == nil {
+					detailed, o.Unread = d2, r2.Unread
+				}
+			}
+		}
+		if rerr != nil {
+			// "run:" is the name of a function, and the reader of this line is
+			// someone who mistyped a pattern (#2286). The only error that
+			// reaches here in practice is the regexp compile, so it says which
+			// input to look at, in the words the other bad flags use (#1602).
+			if o.Regex {
+				return nil, false, 0, rePatternError(o.Query, rerr)
+			}
+			return nil, false, 0, rerr
+		}
+		hits, o.Total, o.Capped, o.TotalEstimated = detailed.Hits, detailed.Total, detailed.Capped, detailed.Estimated
+	}
+	return hits, tierWindow, windowRead, nil
+}
+
+// printSearchMiss says why a search came back empty. It reports whether the
+// query looked like a mistyped command.
+func printSearchMiss(dir string, o search.Options, policyHidden int, sinceRaw, harnessRaw string, hinted bool) bool {
+	// An empty search is a moment for the mark, but only at a terminal
+	// and never into a pipe a script reads (#4624).
+	if !o.JSON && logoWanted(os.Stdout) {
+		mood, _ := searchCatMoment(true)
+		printLogoMood(os.Stdout, nil, mood)
+	}
+	// The policy is named before the generic advice: "try fewer words" is
+	// wrong counsel for someone whose words were fine (#680). A filter the
+	// caller set is the same kind of fact, and `deja last` has named it all
+	// along (#715).
+	switch note := policyHiddenNote(policy.ActivationSearch, policyHidden); {
+	case note != "":
+		fmt.Fprint(os.Stderr, note)
+	case activeFilters(o, sinceRaw, harnessRaw) != "":
+		fmt.Fprintf(os.Stderr, "deja: %q matched nothing under %s\n", o.Query, activeFilters(o, sinceRaw, harnessRaw))
+		fmt.Fprint(os.Stderr, emptyRoleNote(dir, o.Role))
+		fmt.Fprint(os.Stderr, olderThanWindow(dir, o.Since))
+		// This branch does not go through printNoMatches, which is where
+		// the line lives for the other miss, so it says it itself.
+		fmt.Fprint(os.Stderr, ignoredHiddenNoteFor("answer", index.IgnoredWithAllTerms(dir, query.Tokens(o.Query))))
+	default:
+		return printNoMatchesHinted(os.Stderr, dir, o.Query, o.Regex, hinted) || hinted
+	}
+	return false
+}
+
+// printSearchCapped says how much of a capped answer is shown.
+func printSearchCapped(o search.Options, shown int) {
+	// The cap is silent everywhere else: 15 results look like the whole
+	// answer, and nothing says another N are waiting behind --all. deja
+	// narrates every other place the ladder hides a session, so it says
+	// this one too.
+	//
+	// Except to a reader who already typed --all: there the list was cut by
+	// an explicit --limit, or by the relevance tier's own retrieval window,
+	// and neither of those lifts with the flag they are being sent to
+	// (#1608). Say what is shown and leave the advice out.
+	total := strconv.Itoa(o.Total)
+	if o.TotalEstimated {
+		total = "about " + total
+	}
+	if o.All {
+		fmt.Fprintf(os.Stderr, "deja: showing %d of %s\n", shown, total)
+	} else {
+		fmt.Fprintf(os.Stderr, "deja: showing %d of %s — add --all to see the rest\n", shown, total)
+	}
 }
 
 // printNeighbour narrates a co-occurrence swap. It is not a word form: the
@@ -4340,77 +4381,11 @@ func forgetScopeRefusal(selector string, matches int, allMatches bool) error {
 }
 
 func runForget(dir string, args []string) error {
-	var o index.ForgetOptions
-	list := false
-	allMatches := false
-	unforget, unforgetGiven := "", false
-	given := map[string]bool{}
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--list":
-			list = true
-		case "--dry-run":
-			o.DryRun = true
-		case "--all-matches":
-			allMatches = true
-		case "--session", "--project", "--before", "--unforget":
-			// Given twice, the last one used to win in silence: `deja forget
-			// --session a --session b` deleted b, reported one session and
-			// left a behind, which the reader believes is gone (#2271).
-			// stats already refuses this shape for its own flags.
-			if given[args[i]] {
-				return fmt.Errorf("forget: %s specified twice", args[i])
-			}
-			given[args[i]] = true
-			if i+1 >= len(args) {
-				return fmt.Errorf("forget: %s needs a value", args[i])
-			}
-			i++
-			// Empty is how "no filter" is spelled inside deja, and here it
-			// would widen a deletion rather than a search (#1612). --unforget
-			// keeps its own refusal, which asks for an id rather than offering
-			// the flags that forget instead of restoring.
-			if strings.TrimSpace(args[i]) == "" && args[i-1] != "--unforget" { //nolint:gosec // bounds checked before i++
-				return fmt.Errorf("forget: %s needs a value", args[i-1])
-			}
-			switch args[i-1] {
-			case "--session":
-				o.Session = index.PastedSelector(args[i]) //nolint:gosec // bounds checked before i++
-			case "--project":
-				o.Project = args[i] //nolint:gosec // bounds checked before i++
-			case "--unforget":
-				unforget, unforgetGiven = index.PastedSelector(args[i]), true //nolint:gosec // bounds checked before i++
-			case "--before":
-				if d, err := parseDurAny(args[i]); err == nil { //nolint:gosec // bounds checked before i++
-					// "older than 0 days" is the whole store, and the typo that
-					// produces it is 0 for 30. The neighbouring value behaves
-					// the opposite way — --before 9999d matches nothing — and a
-					// negative duration filters nothing in `last` while
-					// deleting everything here (#739).
-					if d <= 0 {
-						return fmt.Errorf("forget: --before %s means older than now, which is every session — use a real age like 30d, or --project/--session", args[i]) //nolint:gosec // bounds checked before i++
-					}
-					o.Before = time.Now().Add(-d)
-				} else if t, e := parseForgetDate(args[i]); e == nil { //nolint:gosec // bounds checked before i++
-					o.Before = t
-				} else {
-					// --before takes either form, so naming only one of them
-					// leaves the reader guessing which they got wrong.
-					return fmt.Errorf("forget: %q is neither a duration nor a date — try 30d, 12h, or 2026-01-31", args[i]) //nolint:gosec // bounds checked before i++
-				}
-			}
-		default:
-			// An id is not a flag, and every other command that takes one
-			// takes it bare — `show`, `handoff` and `ctx` all do. forget asks
-			// for --session because it is the destructive one, and saying so
-			// is the whole difference between a dead end and one more word to
-			// type (#2656, the lesson #2191 recorded for --harness).
-			if !strings.HasPrefix(args[i], "-") {
-				return fmt.Errorf("forget: a session id goes after --session — `deja forget --session %s`", pasteSafe(args[i]))
-			}
-			return unknownFlag("forget", args[i], forgetFlags)
-		}
+	fa, perr := parseForgetArgs(args)
+	if perr != nil {
+		return perr
 	}
+	o, list, allMatches, unforget, unforgetGiven := fa.o, fa.list, fa.allMatches, fa.unforget, fa.unforgetGiven
 	// An empty `--unforget` was answered with the selectors for forgetting:
 	// the reader asked to bring something back and was told how to drop more
 	// (#1041).
@@ -4425,104 +4400,10 @@ func runForget(dir string, args []string) error {
 		return errors.New("forget: selector required — `--session <id>`, `--project <name>` or `--before <date>`; `--dry-run` shows what would go, `--list` what already went")
 	}
 	if list {
-		keys := index.Tombstones()
-		// A tombstone whose session is in neither the index nor any store
-		// suppresses nothing: it is left over from a session deleted on disk
-		// since, and nothing told it apart from one somebody forgot yesterday
-		// (#3753). Marked after a tab, so each row still starts with its id and
-		// the list is still one line per tombstone.
-		orphaned := orphanedTombstones(dir, keys)
-		for _, key := range keys {
-			if orphaned[key] {
-				fmt.Fprintln(os.Stdout, key+"\t(no session left — the tombstone suppresses nothing)")
-				continue
-			}
-			fmt.Fprintln(os.Stdout, key)
-		}
-		// The list is where someone who dropped more than they meant to lands,
-		// and it named no way back: `--unforget` lived in `deja help` only, and
-		// the hint for a guessed `deja unforget` pointed at this same list
-		// (#919).
-		if len(keys) == 0 {
-			// Silence here is the one answer a reader cannot act on: it looks
-			// the same as a command that did not run, and every other empty
-			// result says so out loud (#1040). On stderr, so a pipe still
-			// counts only ids.
-			fmt.Fprintln(os.Stderr, "deja: nothing is forgotten on this machine")
-		}
-		if len(keys) > 0 {
-			quoted := pasteSafe(keys[0])
-			fmt.Fprintf(os.Stderr, "deja: `deja forget --unforget %s` brings one back and rebuilds the index%s\n", quoted, pasteSafeCaveat(quoted))
-		}
-		return nil
+		return printForgetList(dir)
 	}
 	if unforget != "" {
-		// The destructive direction refuses a prefix that reaches more than one
-		// session; the undo restored them all and said so afterwards, while the
-		// hint printed beside the list promises one (#961).
-		if n := index.TombstoneMatches(unforget); n > 1 && !allMatches {
-			// "`deja forget --list` names them" sends the reader to a list of
-			// everything this machine ever forgot, where the three that match
-			// are theirs to find. Name them here instead (#1014).
-			return fmt.Errorf("%q brings back %d forgotten sessions (%s) — add --all-matches to restore them all, or name one",
-				unforget, n, joinCapped(index.TombstonesMatching(unforget), 5))
-		}
-		var lifted int
-		// The ids to name afterwards are the tombstones this call lifts, read
-		// before it lifts them — after the rebuild the manifest holds every
-		// session the selector matches, restored or never forgotten (#1095).
-		lifting := index.TombstonesMatching(unforget)
-		if o.DryRun {
-			// --dry-run on the undo brought the session back anyway: the
-			// destructive side runs a dry probe and never touches disk, but
-			// this path went straight to Unforget, which lifts the tombstone
-			// and rebuilds. Name what it would restore and stop (#1066).
-			if len(lifting) == 0 {
-				return fmt.Errorf("no tombstone matches %q — `deja forget --list` shows what is forgotten", unforget)
-			}
-			fmt.Fprintf(os.Stdout, "dry run — nothing was changed\nwould restore %d tombstone%s and rebuild the index — %s\n",
-				len(lifting), pluralS(len(lifting)), joinCapped(lifting, 5))
-			return nil
-		}
-		if err := withBuildProgress(func() error {
-			var err error
-			lifted, err = index.Unforget(dir, unforget, os.Stderr)
-			return err
-		}); err != nil {
-			return err
-		}
-		if lifted == 0 {
-			// A restore that restored nothing used to exit 0, so a script
-			// could not tell it from a restore that worked: the typo, the id
-			// that was never forgotten and the session still gone all read as
-			// success (#2263). Every neighbour refuses what it cannot find.
-			return fmt.Errorf("no tombstone matches %q — `deja forget --list` shows what is forgotten", unforget)
-		}
-		// Lifting a tombstone brings a session back only if the transcript is
-		// still on this machine. An imported one lives only in the index, so
-		// forget took the last copy — and the undo reported a restore that did
-		// not happen (#967).
-		back, gone, names, missing := restoredSessions(dir, unforget, lifted, lifting)
-		restorePromotedTitles(dir, unforget)
-		if back > 0 {
-			// The ids, not just the count: this is the moment someone checks
-			// that they got back exactly what they lost, and both the list and
-			// the ambiguity refusal name them a step earlier (#1095, #1014).
-			// Prose, not a command: the names are read, not pasted, so they
-			// are neutralised rather than quoted. Raw, an escape byte in a
-			// project name landed here on the line after the hint that told
-			// the reader to run this (#1794).
-			fmt.Fprintf(os.Stdout, "restored %d session%s and rebuilt the index — %s\n", back, pluralS(back), safeForStatusline(joinCapped(names, 5), 200))
-		}
-		for _, line := range unforgetGoneLines(missing) {
-			fmt.Fprintln(os.Stdout, line)
-		}
-		if gone > 0 && len(missing) == 0 {
-			// The selector was a prefix rather than whole keys, so which ones
-			// did not come back is not known by name here.
-			fmt.Fprintf(os.Stdout, "%d of them did not come back — the tombstone is lifted, but the records are not in the index; `deja forget --list` shows what is left\n", gone)
-		}
-		return nil
+		return runUnforget(dir, unforget, allMatches, o.DryRun)
 	}
 	// The scope check runs on a dry pass first: a refusal printed after
 	// index.Forget has already written the tombstones is not a refusal.
@@ -4573,54 +4454,7 @@ func runForget(dir string, args []string) error {
 		return ensureError(dir, err)
 	}
 	if o.DryRun {
-		// The dry run is where someone checks the scope, so it says the same
-		// thing the real run would refuse with rather than erroring: nothing
-		// is being changed here, and the note is the answer they came for.
-		// It goes above the counts, and the counts say whose run they are:
-		// under an ambiguous selector the numbers were those of
-		// `--all-matches`, while the command as typed drops nothing (#1032).
-		// The refusal itself points here, so it is not repeated: this run is
-		// the listing it promises.
-		if o.Session != "" && forgetScopeRefusal(o.Session, result.Sessions-result.Attached, allMatches) != nil {
-			fmt.Fprintf(os.Stdout, "%q matches %d sessions — add --all-matches to drop them all\n", o.Session, result.Sessions-result.Attached)
-			fmt.Fprintf(os.Stdout, "dry run — nothing was changed\nas it stands this run drops nothing; with --all-matches it would drop: %s\nwould add: %s\n",
-				forgetCounts(result.Sessions, result.Messages), countNoun(result.Tombstones, "tombstone"))
-		} else {
-			fmt.Fprintf(os.Stdout, "dry run — nothing was changed\nwould drop: %s\nwould add: %s\n",
-				forgetCounts(result.Sessions, result.Messages), countNoun(result.Tombstones, "tombstone"))
-		}
-		if result.Unindexed && result.Sessions > 0 {
-			fmt.Fprintln(os.Stdout, "nothing is indexed yet — the tombstones would keep these sessions out of the first `deja index`")
-		} else if result.Unindexed {
-			fmt.Fprintln(os.Stdout, "nothing is indexed yet, and no session store on this machine holds a match")
-		}
-		// The ids, so the scope can be checked by name and not by a count
-		// alone: the refusal sends the reader here to see what would go.
-		if len(result.Keys) > 0 {
-			keys := append([]string(nil), result.Keys...)
-			sort.Strings(keys)
-			fmt.Fprintln(os.Stdout, "sessions: "+safeForStatusline(joinCapped(keys, 10), 400))
-		}
-		if line := forgetNotesLine(result); line != "" {
-			fmt.Fprintln(os.Stdout, line)
-		}
-		if line := forgetCopiesLine(result.Copies); line != "" {
-			fmt.Fprintln(os.Stdout, line)
-		}
-		if n := usage.CountSnapshots(dir, forgetDigestMatcher(o, result.Keys)); n > 0 {
-			fmt.Fprintf(os.Stdout, "would remove: %d stored digest(s) from the injection log\n", n)
-		}
-		// Two transcripts can write the same harness:id, and then one manifest
-		// row holds both conversations. The build says so once (#698); forget
-		// said "1 session" and took two, from two projects (#970).
-		if o.DryRun {
-			shared = sharedRowsAmong(dir, result.Keys)
-		}
-		if n := shared; n > 0 {
-			fmt.Fprintf(os.Stdout, "%s covered more than one conversation — transcripts that share an id are filed under one row, and both go\n",
-				doctorCount(n, "of them"))
-		}
-		return nil
+		return printForgetDryRun(dir, o, result, allMatches, shared)
 	}
 	// A promoted note borrows the source session's first line as its title, and
 	// the note is a separate record — so forgetting a session left that line on
@@ -4633,102 +4467,14 @@ func runForget(dir string, args []string) error {
 	// found this — sitting in notes.jsonl after the project was forgotten
 	// (#690).
 	if len(result.Keys) > 0 {
-		dropped := make(map[string]bool, len(result.Keys))
-		for _, k := range result.Keys {
-			dropped[k] = true
-		}
-		// Only when the reader named a session: a note swept up by --project or
-		// --before is a decision they deliberately kept, and destroying it is
-		// what #690 exists to prevent. Naming the note's own id is the one
-		// case where "forget this" can only mean its text (#841).
-		if o.Session != "" {
-			if gone, err := sources.ForgetPromotedNotes(func(noteID string) bool {
-				return dropped["deja:"+noteID]
-			}); err != nil {
-				fmt.Fprintf(os.Stdout, "could not remove %s from %s: %v\n", pluralNote(result.Notes), sources.NotesFile(), err)
-			} else if gone > 0 {
-				fmt.Fprintf(os.Stdout, "removed %d promoted note%s from %s\n", gone, pluralS(gone), sources.NotesFile())
-			}
-		}
-		// The digests those sessions were served in are content too, and the
-		// page publishes them: forget already reaches the note log for the
-		// same reason (#690, #841). The usage log stays — an event is what
-		// happened, not what was said (#2325).
-		if gone, err := usage.ForgetSnapshots(dir, forgetDigestMatcher(o, result.Keys)); err != nil {
-			fmt.Fprintf(os.Stdout, "could not remove stored digests from the injection log: %v\n", err)
-		} else if gone > 0 {
-			fmt.Fprintf(os.Stdout, "removed %d stored digest%s from the injection log\n", gone, pluralS(gone))
-		}
-		n, err := sources.ForgetPromotedTitles(func(src string) bool {
-			return dropped[src]
-		})
-		switch {
-		case err != nil:
-			// The borrowed title is the forgotten session's first turn — a
-			// customer name in the case that found this (#666, #690). Dropping
-			// the error left three success lines standing over a line still on
-			// disk, which is the one thing the privacy command must not do
-			// (#804).
-			fmt.Fprintf(os.Stdout, "could not clear the title borrowed from the forgotten session%s: %v\n", pluralS(len(result.Keys)), err)
-			// Name the fix by the cause: on a full disk the first version of
-			// this line sent people to chmod a file that was already writable
-			// (#808).
-			fmt.Fprintf(os.Stdout, "it is still in %s — %s and run this again\n", sources.NotesFile(), forgetTitleFix(err))
-		case n > 0:
-			// The note keeps the decision it was promoted for — often the
-			// reason the raw session was safe to forget (#666) — so say that
-			// its content is still there rather than let the line read as
-			// "the note was handled" (#841).
-			// The ids, not an ellipsis: this line knows which notes it just
-			// cleared, and `deja forget --session deja-note-…` matched
-			// nothing — it sent the reader to `deja last` to look up
-			// something the command was already holding (#1030).
-			what := "it"
-			if n > 1 {
-				what = "them"
-			}
-			fmt.Fprintf(os.Stdout, "cleared the borrowed title from %d promoted note%s; %s still holds what you wrote there — `deja forget --session %s` removes %s\n",
-				n, pluralS(n), sources.NotesFile(), clearedNoteIDs(result.Keys), what)
-		}
+		forgetPromotedLeftovers(dir, o, result)
 	}
 	// Nothing matched is a different answer from nothing was dropped: the
 	// first means the selector found no session, and reporting it as a
 	// successful removal of zero leaves the reader believing they deleted
 	// something that is in fact still there under a different id.
 	if result.Sessions == 0 && result.Messages == 0 {
-		// A note whose own project was forgotten keeps its line in
-		// notes.jsonl while its index row is gone, and the id the forget
-		// line offers then matched nothing at all — the file, not the
-		// index, is what holds a note (#1030).
-		if o.Session != "" {
-			if gone, err := sources.ForgetPromotedNotes(func(noteID string) bool {
-				return noteID == strings.TrimPrefix(o.Session, "deja:")
-			}); err == nil && gone > 0 {
-				fmt.Fprintf(os.Stdout, "removed %d promoted note%s from %s\n", gone, pluralS(gone), sources.NotesFile())
-				return nil
-			}
-		}
-		// A name that matched nothing is a failure, the way `--unforget` has
-		// treated one since #2263: `deja forget --session $ID && echo removed`
-		// printed "removed" for a session still on disk under another id, which
-		// is the shape #3567 closed for a mistyped command. A window is not a
-		// name — `--before 30d` on a young store covering nothing is the right
-		// outcome, and a cleanup loop under `set -e` must not abort on it.
-		if result.Unindexed {
-			// No index to drop from, and no store holds a match: there is no
-			// harness:id to write a tombstone under.
-			if o.Session != "" || o.Project != "" {
-				return fmt.Errorf("nothing matched %s — nothing is indexed yet and no session store on this machine holds one, so no tombstone was written", forgetSelector(o))
-			}
-			fmt.Fprintf(os.Stdout, "nothing matched %s — nothing is indexed yet and no session store on this machine holds one\n", forgetSelector(o))
-			return nil
-		}
-		if o.Session != "" || o.Project != "" {
-			return fmt.Errorf("nothing matched %s — no session was dropped%s",
-				forgetSelector(o), movedBucketHint(dir, o.Session))
-		}
-		fmt.Fprintf(os.Stdout, "nothing matched %s — no session was dropped%s\n", forgetSelector(o), movedBucketHint(dir, o.Session))
-		return nil
+		return forgetNothingMatched(dir, o, result)
 	}
 	if result.Unindexed {
 		// Nothing was in an index to drop; "sessions dropped: 1" would claim a

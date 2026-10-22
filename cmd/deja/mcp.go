@@ -1683,28 +1683,7 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 	// same as on the search screen (#5320, #5335).
 	hits = dropCopiedHits(dir, hits)
 	if len(hits) == 0 {
-		// The words found nothing, so try the string as an id, as
-		// recall_context does. The page sends a session too deep to quote back
-		// here by its id (#5579), and an id looksLikeSessionID turns away —
-		// a Devin subagent's carries a colon — would otherwise answer that
-		// nothing matched.
-		if !looksLikeSessionID(q) {
-			if text, id, ok := contextByID(dir, q); ok {
-				note := ""
-				if id.note != "" {
-					note = id.note + "\n"
-				}
-				text = fitContextDigest(note+text, q, id.session, budget+contextMCPBudget-recallMCPBudget)
-				return text, 1, id.size, []string{id.session}, nil, nil
-			}
-		}
-		// A miss on a snapshot is a miss on part of the history, and the
-		// part matters: on a first build's early slice it is everything older
-		// than the newest few hundred sessions (#5390).
-		if cov.Stale && cov.Sessions > 0 && policyHidden == 0 {
-			return fmt.Sprintf("No prior deja sessions matched %q — %s.", clampEcho(q), coverageLine(cov)), 0, 0, nil, nil, nil
-		}
-		return emptyRecallAnswerPolicy(dir, q, policyHidden), 0, 0, nil, nil, nil
+		return recallMissAnswer(dir, q, budget, cov, policyHidden)
 	}
 	// Before the page is cut, not after: demoting inside the page is a no-op
 	// when every hit on it was rejected, and then the approaches the reader did
@@ -1763,70 +1742,7 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 	if absent {
 		namesTheAsked = false
 	}
-	// Whether the line below the tier already said nothing is about this, so
-	// the absent-word case can say it from wherever the chain stopped without
-	// saying it twice.
-	saidNothing := false
-	switch {
-	case result.Stemmed:
-		fmt.Fprintf(&b, "No exact match; using word forms: %s\n", strings.Join(fuzzySummary(result.Variants), ", "))
-	case result.Fuzzy:
-		fmt.Fprintf(&b, "No exact match; using close spellings: %s\n", strings.Join(fuzzySummary(result.Variants), ", "))
-	case result.Tier == search.TierError:
-		fmt.Fprintln(&b, "No exact match; these sessions hit the same error (matched by signature).")
-	case result.Directory != "" && strictShown == 0:
-		// The file was asked about, nothing names it, and these sessions are
-		// about the directory it sits in. "No session is about this" over a
-		// rule set for that directory read as "nothing applies", and the
-		// agent changed the file without the check the rule asked for (#4762).
-		fmt.Fprintf(&b, "Nothing in history names that file; sessions about its directory %s come first. A rule set for the directory may apply to this change, so check whether it still holds before acting on it.\n", recallListingLine(result.Directory))
-		namesTheAsked = true
-	case strictShown > 0:
-		// Before every heuristic below it, because this one is a fact about
-		// the answer rather than a reading of its wording: these sessions
-		// were matched, not ranked, and the relevance label they arrive
-		// under is what a thin strict answer gets once the ranking is hung
-		// underneath it (#3815).
-		fmt.Fprintf(&b, "%s below %s every word of the query; the rest are ranked by wording. Check that one describes what is happening now before acting on it.\n",
-			pluralSessions(strictShown), holdOrHolds(strictShown))
-	case namesTheAsked:
-		// The same reading recall_context got in #2831: the tier says the
-		// exact match failed, not that the answer is unrelated. On a store
-		// with competition an ordinary question rarely survives the exact AND,
-		// so the sentence below disowned pages whose first session was the
-		// right one (#2827).
-		fmt.Fprintln(&b, "No session matched every word, so these were ranked — the first one names what you asked about. Check that it describes what is happening now before acting on it.")
-	case result.Tier == search.TierRelevance:
-		// Not "ranked by relevance", which reads as "here is what I found
-		// about it". Nothing matched: these are the nearest sessions by
-		// wording, and an agent handed them under the old line answered
-		// questions about subjects this machine has never held — eight of
-		// eight came back with sessions rather than nothing, and the tool
-		// description promises an empty result means no record (#2074).
-		//
-		// But only where it is true. The tier is reached whenever the exact
-		// AND misses, which a real question does all the time: measured on
-		// this store, four of five questions about work done that same day
-		// were headed "No session is about this" while the session below was
-		// exactly about it (#657). A session that speaks one of the question's
-		// identifying words is about it as far as deja can tell, and saying
-		// otherwise teaches the reader to ignore the line that matters.
-		// The query's own words, not the stem forms the ranking also tries:
-		// the idf map is keyed by what the reader typed.
-		asked, _ := query.QueryParts(q)
-		if !absent && relevanceHitsAreAboutIt(hits, asked, result.TermIDF) {
-			fmt.Fprintln(&b, "No exact match; the sessions below are ranked by relevance — check that one describes what is happening now before acting on it.")
-		} else {
-			fmt.Fprintln(&b, nothingIsAboutThis+" so the sessions below are the nearest by wording — treat them as leads to check, not as a record, and say plainly if none of them answers.")
-			saidNothing = true
-		}
-	}
-	if absent && !saidNothing {
-		// The tier below relevance already says which word it dropped; this
-		// says what dropping it means, in the words the relevance tier uses
-		// for the same situation.
-		fmt.Fprintln(&b, nothingIsAboutThis+" so the sessions below are the nearest by wording — treat them as leads to check, not as a record, and say plainly if none of them answers.")
-	}
+	namesTheAsked = writeRecallLead(&b, result, hits, q, strictShown, absent, namesTheAsked)
 	if note := demotedNote(hits, demoted); note != "" {
 		fmt.Fprintln(&b, note+" — read the order as the user's judgement, not as recency.")
 	}
@@ -1840,71 +1756,7 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 		headerRoom += len("about ")
 	}
 	for i, h := range hits {
-		fmt.Fprintf(&hb, "\n%d. [%s] %s · %s · %s", i+1,
-			recallListingLine(h.Session.Harness), recallListingLine(h.Session.Project), recallListingLine(h.Session.ID), search.MatchCount(h.Count))
-		// A session with no user turn is the agent's own words, and the lines
-		// below carry no role — so an assertion a model made arrived as a fact
-		// from the store (#1107, the shape #1100 fixed for the listing).
-		if h.Session.AgentTitle {
-			fmt.Fprint(&hb, " · agent-opened, no human turn")
-		}
-		if !h.Session.Updated.IsZero() {
-			fmt.Fprintf(&hb, " · updated %s (%s)", h.Session.Updated.Local().Format("2006-01-02"), search.RelativeDate(h.Session.Updated))
-		}
-		if h.Reused > 1 {
-			fmt.Fprintf(&hb, " · reused %d×", h.Reused)
-		}
-		fmt.Fprintln(&hb)
-		if line := lifecycleLine(h); line != "" {
-			fmt.Fprintf(&hb, "%s\n", line)
-		}
-		// A session that says it backed an approach out carries a signal the
-		// lifecycle states would carry if anyone set them by hand — on a real
-		// 1160-session store not one did. The wording tells the agent an
-		// approach inside was abandoned, not that the whole session is a dead
-		// end: the tried-then-fixed session is the most useful one, and the
-		// excerpts show which path was dropped.
-		// And only where "somewhere in this session" is a place the agent can
-		// look: the same rule the search screen got in #3474, from the same
-		// function so the two cannot drift.
-		if h.Session.GaveUp && h.Lifecycle == "" && search.AbandonmentWorthSaying(h) {
-			fmt.Fprintln(&hb, "[this session abandoned one approach partway — check the excerpts for which, the rest may still hold]")
-		}
-		// Sync keeps both copies when a session id is on two machines, and
-		// nothing connected them: one session's two histories read as two
-		// unrelated sessions, sometimes disagreeing with each other (#1775).
-		if twin := twins[h.Session.Harness+":"+h.Session.ID]; len(twin) > 0 {
-			// OrigID is the fact; an "imported-" id is only the convention
-			// sync mints, and a harness could name a local session that way.
-			if h.Session.OrigID != "" {
-				fmt.Fprintf(&hb, "[another machine's copy of %s, which this machine has too — the two may not say the same thing]\n", joinCapped(twin, 3))
-			} else {
-				fmt.Fprintf(&hb, "[this machine's copy; the same session arrived from elsewhere as %s — they may not say the same thing]\n", joinCapped(twin, 3))
-			}
-		}
-		if h.Superseded != "" {
-			fmt.Fprintf(&hb, "[earlier attempt — a newer session in this project covers the same ground, updated %s]\n", h.Superseded)
-		}
-		// `deja brief` counts these — a wrong clock, a transcript copied from a
-		// machine set wrong, a harness writing local time as UTC — so deja knew
-		// and the page that an agent reads did not. The date stays as the
-		// transcript wrote it; what is added is that it cannot be trusted for
-		// "newest", which is the one thing the top of a recall page implies
-		// (#1753).
-		if index.StampedAhead(h.Session.Updated, time.Now()) {
-			fmt.Fprintln(&hb, "[stamped later than this machine's clock — its date cannot place it against the others]")
-		}
-		if h.Strict {
-			// The tier label belongs to the set; this hit holds the whole
-			// query, and printing "relevance" over it is the per-session half
-			// of the same false claim (#3815).
-			fmt.Fprintln(&hb, "[holds every word of the query]")
-		} else if h.Tier != search.TierExact {
-			fmt.Fprintf(&hb, "[%s]\n", h.Tier)
-		}
-		for _, sn := range h.Snippets {
-			fmt.Fprintf(&hb, "- %s\n", recallListingLine(sn))
-		}
+		writeRecallHitHead(&hb, h, i, twins)
 		// Under the best hit only, and only when there is budget left: the
 		// excerpts say where the query words appear, which is not the same as
 		// what the session concluded. An agent had to open the session to learn
@@ -1913,81 +1765,7 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 		// recall itself. Later hits stay excerpt-only; they are candidates to
 		// choose between, not answers.
 		if i == 0 {
-			// The plus is deliberate as it stands, and measured: making it a
-			// minus — which is what the words above suggest — changes nothing
-			// on a full page (identical payloads at 4096, 3000 and 2400 bytes,
-			// with and without long conclusions) and only withholds the block
-			// on a nearly empty one, where it fits with room to spare. The
-			// outer trim is what actually bounds the payload. Left as it is
-			// rather than "corrected" blind; whoever changes it should measure
-			// the same three budgets first (#1319).
-			if left := budget - headerRoom + hb.Len() - recallConclusionsReserve; left > recallConclusionsMin {
-				// The hit carries only the matching messages, so the decision —
-				// usually worded nothing like the query — is not in it. Read the
-				// whole session for the best hit alone, the same upgrade
-				// recall_context makes for the same reason (#1011).
-				whole := h.Session
-				if full, ok, ferr := wholeSessionForMCP(dir, whole); ferr == nil && ok {
-					whole = cutSession(full, o)
-				}
-				// Not the line already shown as this hit's answer. The answer
-				// under the excerpt and the newest conclusion are usually the
-				// same sentence, and printing it twice charged the agent twice
-				// for one fact — 16% of a small payload — while costing the
-				// conclusions list one of its three slots (#1319).
-				// Ask for as many extra as there are answer lines above: the
-				// drop below can take any of them, and asking for a fixed one
-				// more still showed two where three were available.
-				// Three more than the list can show: the gate below drops the
-				// ones about something else, and asking for exactly three
-				// showed one where three were available.
-				want := 3 + shownAnswers(h.Snippets) + conclusionGateSlack
-				// A long session is read around the passages it was quoted
-				// for, not as a whole: its newest conclusions are about
-				// whatever it did last.
-				src, long := conclusionSource(whole, h.QuotedMessages())
-				cs := withoutShownAnswer(digest.SubstantialConclusions(src, left, want), h.Snippets)
-				cs, aboutIt := conclusionsAboutIt(cs, q, h.Snippets)
-				if long && !aboutIt {
-					// The one-line offer below is the newest thing the
-					// passages' turns settled, which in a long session is
-					// rarely the thing asked about.
-					cs = nil
-				}
-				if len(cs) > 0 {
-					if len(cs) > 3 {
-						cs = cs[:3]
-					}
-					label := "  what this session concluded:"
-					if !aboutIt {
-						// Nothing it concluded is about the question, and this
-						// is the newest thing it settled instead. Said plainly,
-						// because the label is what an agent reads as the claim.
-						label = "  what this session concluded, about its own work:"
-					}
-					fmt.Fprintln(&hb, label)
-					for _, c := range cs {
-						fmt.Fprintf(&hb, "  → %s\n", recallListingLine(c))
-					}
-				}
-				// The files that work touched, for a few dozen bytes. Without
-				// them an agent that has just learned "we solved this before"
-				// still has to search the tree for where — and that search
-				// costs far more context than naming the paths here does.
-				if paths := recallTouchedLine(dir, h.Session, query.Tokens(q)); paths != "" {
-					fmt.Fprintf(&hb, "  files it touched: %s\n", paths)
-				}
-				// And what it ran, with the status the harness recorded. The
-				// line above says where the work was; this one is the only
-				// part of a recall answer that is not a claim — an agent
-				// verifies "the suite reads SVC_FIXTURES" by running it, and
-				// measured on a 325-file repository it spent ten to sixteen
-				// reads doing that after the answer had already arrived
-				// (#3951). "exit 0 here" is the evidence that search was for.
-				if ran := recallRanLine(dir, h.Session); ran != "" {
-					fmt.Fprintf(&hb, "  %s\n", ran)
-				}
-			}
+			writeRecallConclusions(&hb, dir, q, h, o, budget, headerRoom)
 		}
 		served++
 		if headerRoom+hb.Len() >= budget {
@@ -2003,6 +1781,40 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 	// From what was served, not from the limit: the loop also stops on the
 	// token budget, and then this said "2 more" while five were left — the
 	// agent asks for offset=served and the arithmetic has to hold.
+	out := recallPageFooter(&b, hits, result, offset, served, total, budget, pageFull, about)
+	raw, ids, projects := recallServedFacts(hits, served)
+	return out, served, raw, ids, projects, nil
+}
+
+// recallMissAnswer answers a recall whose words matched nothing.
+func recallMissAnswer(dir, q string, budget int, cov index.Coverage, policyHidden int) (string, int, int64, []string, []string, error) {
+	// The words found nothing, so try the string as an id, as
+	// recall_context does. The page sends a session too deep to quote back
+	// here by its id (#5579), and an id looksLikeSessionID turns away —
+	// a Devin subagent's carries a colon — would otherwise answer that
+	// nothing matched.
+	if !looksLikeSessionID(q) {
+		if text, id, ok := contextByID(dir, q); ok {
+			note := ""
+			if id.note != "" {
+				note = id.note + "\n"
+			}
+			text = fitContextDigest(note+text, q, id.session, budget+contextMCPBudget-recallMCPBudget)
+			return text, 1, id.size, []string{id.session}, nil, nil
+		}
+	}
+	// A miss on a snapshot is a miss on part of the history, and the
+	// part matters: on a first build's early slice it is everything older
+	// than the newest few hundred sessions (#5390).
+	if cov.Stale && cov.Sessions > 0 && policyHidden == 0 {
+		return fmt.Sprintf("No prior deja sessions matched %q — %s.", clampEcho(q), coverageLine(cov)), 0, 0, nil, nil, nil
+	}
+	return emptyRecallAnswerPolicy(dir, q, policyHidden), 0, 0, nil, nil, nil
+}
+
+// recallPageFooter is the page with its paging and depth lines, trimmed to
+// the budget with room left for them.
+func recallPageFooter(b *strings.Builder, hits []search.Hit, result index.SearchResult, offset, served, total, budget int, pageFull, about bool) string {
 	more := ""
 	if left := total - offset - served; left > 0 {
 		what := "matches"
@@ -2071,6 +1883,230 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 	// is read as the line above the paging line (#1799), and a second
 	// instruction wedged between them takes that place.
 	out += more + deep
+	return out
+}
+
+// writeRecallLead writes the line that says how the page was matched, and
+// returns namesTheAsked as that line left it.
+func writeRecallLead(b *strings.Builder, result index.SearchResult, hits []search.Hit, q string, strictShown int, absent, namesTheAsked bool) bool {
+	// Whether the line below the tier already said nothing is about this, so
+	// the absent-word case can say it from wherever the chain stopped without
+	// saying it twice.
+	saidNothing := false
+	switch {
+	case result.Stemmed:
+		fmt.Fprintf(b, "No exact match; using word forms: %s\n", strings.Join(fuzzySummary(result.Variants), ", "))
+	case result.Fuzzy:
+		fmt.Fprintf(b, "No exact match; using close spellings: %s\n", strings.Join(fuzzySummary(result.Variants), ", "))
+	case result.Tier == search.TierError:
+		fmt.Fprintln(b, "No exact match; these sessions hit the same error (matched by signature).")
+	case result.Directory != "" && strictShown == 0:
+		// The file was asked about, nothing names it, and these sessions are
+		// about the directory it sits in. "No session is about this" over a
+		// rule set for that directory read as "nothing applies", and the
+		// agent changed the file without the check the rule asked for (#4762).
+		fmt.Fprintf(b, "Nothing in history names that file; sessions about its directory %s come first. A rule set for the directory may apply to this change, so check whether it still holds before acting on it.\n", recallListingLine(result.Directory))
+		namesTheAsked = true
+	case strictShown > 0:
+		// Before every heuristic below it, because this one is a fact about
+		// the answer rather than a reading of its wording: these sessions
+		// were matched, not ranked, and the relevance label they arrive
+		// under is what a thin strict answer gets once the ranking is hung
+		// underneath it (#3815).
+		fmt.Fprintf(b, "%s below %s every word of the query; the rest are ranked by wording. Check that one describes what is happening now before acting on it.\n",
+			pluralSessions(strictShown), holdOrHolds(strictShown))
+	case namesTheAsked:
+		// The same reading recall_context got in #2831: the tier says the
+		// exact match failed, not that the answer is unrelated. On a store
+		// with competition an ordinary question rarely survives the exact AND,
+		// so the sentence below disowned pages whose first session was the
+		// right one (#2827).
+		fmt.Fprintln(b, "No session matched every word, so these were ranked — the first one names what you asked about. Check that it describes what is happening now before acting on it.")
+	case result.Tier == search.TierRelevance:
+		// Not "ranked by relevance", which reads as "here is what I found
+		// about it". Nothing matched: these are the nearest sessions by
+		// wording, and an agent handed them under the old line answered
+		// questions about subjects this machine has never held — eight of
+		// eight came back with sessions rather than nothing, and the tool
+		// description promises an empty result means no record (#2074).
+		//
+		// But only where it is true. The tier is reached whenever the exact
+		// AND misses, which a real question does all the time: measured on
+		// this store, four of five questions about work done that same day
+		// were headed "No session is about this" while the session below was
+		// exactly about it (#657). A session that speaks one of the question's
+		// identifying words is about it as far as deja can tell, and saying
+		// otherwise teaches the reader to ignore the line that matters.
+		// The query's own words, not the stem forms the ranking also tries:
+		// the idf map is keyed by what the reader typed.
+		asked, _ := query.QueryParts(q)
+		if !absent && relevanceHitsAreAboutIt(hits, asked, result.TermIDF) {
+			fmt.Fprintln(b, "No exact match; the sessions below are ranked by relevance — check that one describes what is happening now before acting on it.")
+		} else {
+			fmt.Fprintln(b, nothingIsAboutThis+" so the sessions below are the nearest by wording — treat them as leads to check, not as a record, and say plainly if none of them answers.")
+			saidNothing = true
+		}
+	}
+	if absent && !saidNothing {
+		// The tier below relevance already says which word it dropped; this
+		// says what dropping it means, in the words the relevance tier uses
+		// for the same situation.
+		fmt.Fprintln(b, nothingIsAboutThis+" so the sessions below are the nearest by wording — treat them as leads to check, not as a record, and say plainly if none of them answers.")
+	}
+	return namesTheAsked
+}
+
+// writeRecallHitHead writes one hit's header, its marks and its excerpts.
+func writeRecallHitHead(hb *strings.Builder, h search.Hit, i int, twins map[string][]string) {
+	fmt.Fprintf(hb, "\n%d. [%s] %s · %s · %s", i+1,
+		recallListingLine(h.Session.Harness), recallListingLine(h.Session.Project), recallListingLine(h.Session.ID), search.MatchCount(h.Count))
+	// A session with no user turn is the agent's own words, and the lines
+	// below carry no role — so an assertion a model made arrived as a fact
+	// from the store (#1107, the shape #1100 fixed for the listing).
+	if h.Session.AgentTitle {
+		fmt.Fprint(hb, " · agent-opened, no human turn")
+	}
+	if !h.Session.Updated.IsZero() {
+		fmt.Fprintf(hb, " · updated %s (%s)", h.Session.Updated.Local().Format("2006-01-02"), search.RelativeDate(h.Session.Updated))
+	}
+	if h.Reused > 1 {
+		fmt.Fprintf(hb, " · reused %d×", h.Reused)
+	}
+	fmt.Fprintln(hb)
+	if line := lifecycleLine(h); line != "" {
+		fmt.Fprintf(hb, "%s\n", line)
+	}
+	// A session that says it backed an approach out carries a signal the
+	// lifecycle states would carry if anyone set them by hand — on a real
+	// 1160-session store not one did. The wording tells the agent an
+	// approach inside was abandoned, not that the whole session is a dead
+	// end: the tried-then-fixed session is the most useful one, and the
+	// excerpts show which path was dropped.
+	// And only where "somewhere in this session" is a place the agent can
+	// look: the same rule the search screen got in #3474, from the same
+	// function so the two cannot drift.
+	if h.Session.GaveUp && h.Lifecycle == "" && search.AbandonmentWorthSaying(h) {
+		fmt.Fprintln(hb, "[this session abandoned one approach partway — check the excerpts for which, the rest may still hold]")
+	}
+	// Sync keeps both copies when a session id is on two machines, and
+	// nothing connected them: one session's two histories read as two
+	// unrelated sessions, sometimes disagreeing with each other (#1775).
+	if twin := twins[h.Session.Harness+":"+h.Session.ID]; len(twin) > 0 {
+		// OrigID is the fact; an "imported-" id is only the convention
+		// sync mints, and a harness could name a local session that way.
+		if h.Session.OrigID != "" {
+			fmt.Fprintf(hb, "[another machine's copy of %s, which this machine has too — the two may not say the same thing]\n", joinCapped(twin, 3))
+		} else {
+			fmt.Fprintf(hb, "[this machine's copy; the same session arrived from elsewhere as %s — they may not say the same thing]\n", joinCapped(twin, 3))
+		}
+	}
+	if h.Superseded != "" {
+		fmt.Fprintf(hb, "[earlier attempt — a newer session in this project covers the same ground, updated %s]\n", h.Superseded)
+	}
+	// `deja brief` counts these — a wrong clock, a transcript copied from a
+	// machine set wrong, a harness writing local time as UTC — so deja knew
+	// and the page that an agent reads did not. The date stays as the
+	// transcript wrote it; what is added is that it cannot be trusted for
+	// "newest", which is the one thing the top of a recall page implies
+	// (#1753).
+	if index.StampedAhead(h.Session.Updated, time.Now()) {
+		fmt.Fprintln(hb, "[stamped later than this machine's clock — its date cannot place it against the others]")
+	}
+	if h.Strict {
+		// The tier label belongs to the set; this hit holds the whole
+		// query, and printing "relevance" over it is the per-session half
+		// of the same false claim (#3815).
+		fmt.Fprintln(hb, "[holds every word of the query]")
+	} else if h.Tier != search.TierExact {
+		fmt.Fprintf(hb, "[%s]\n", h.Tier)
+	}
+	for _, sn := range h.Snippets {
+		fmt.Fprintf(hb, "- %s\n", recallListingLine(sn))
+	}
+}
+
+// writeRecallConclusions writes what the best hit concluded, the files it
+// touched and what it ran, when the budget leaves room for them.
+func writeRecallConclusions(hb *strings.Builder, dir, q string, h search.Hit, o search.Options, budget, headerRoom int) {
+	// The plus is deliberate as it stands, and measured: making it a
+	// minus — which is what the words above suggest — changes nothing
+	// on a full page (identical payloads at 4096, 3000 and 2400 bytes,
+	// with and without long conclusions) and only withholds the block
+	// on a nearly empty one, where it fits with room to spare. The
+	// outer trim is what actually bounds the payload. Left as it is
+	// rather than "corrected" blind; whoever changes it should measure
+	// the same three budgets first (#1319).
+	if left := budget - headerRoom + hb.Len() - recallConclusionsReserve; left > recallConclusionsMin {
+		// The hit carries only the matching messages, so the decision —
+		// usually worded nothing like the query — is not in it. Read the
+		// whole session for the best hit alone, the same upgrade
+		// recall_context makes for the same reason (#1011).
+		whole := h.Session
+		if full, ok, ferr := wholeSessionForMCP(dir, whole); ferr == nil && ok {
+			whole = cutSession(full, o)
+		}
+		// Not the line already shown as this hit's answer. The answer
+		// under the excerpt and the newest conclusion are usually the
+		// same sentence, and printing it twice charged the agent twice
+		// for one fact — 16% of a small payload — while costing the
+		// conclusions list one of its three slots (#1319).
+		// Ask for as many extra as there are answer lines above: the
+		// drop below can take any of them, and asking for a fixed one
+		// more still showed two where three were available.
+		// Three more than the list can show: the gate below drops the
+		// ones about something else, and asking for exactly three
+		// showed one where three were available.
+		want := 3 + shownAnswers(h.Snippets) + conclusionGateSlack
+		// A long session is read around the passages it was quoted
+		// for, not as a whole: its newest conclusions are about
+		// whatever it did last.
+		src, long := conclusionSource(whole, h.QuotedMessages())
+		cs := withoutShownAnswer(digest.SubstantialConclusions(src, left, want), h.Snippets)
+		cs, aboutIt := conclusionsAboutIt(cs, q, h.Snippets)
+		if long && !aboutIt {
+			// The one-line offer below is the newest thing the
+			// passages' turns settled, which in a long session is
+			// rarely the thing asked about.
+			cs = nil
+		}
+		if len(cs) > 0 {
+			if len(cs) > 3 {
+				cs = cs[:3]
+			}
+			label := "  what this session concluded:"
+			if !aboutIt {
+				// Nothing it concluded is about the question, and this
+				// is the newest thing it settled instead. Said plainly,
+				// because the label is what an agent reads as the claim.
+				label = "  what this session concluded, about its own work:"
+			}
+			fmt.Fprintln(hb, label)
+			for _, c := range cs {
+				fmt.Fprintf(hb, "  → %s\n", recallListingLine(c))
+			}
+		}
+		// The files that work touched, for a few dozen bytes. Without
+		// them an agent that has just learned "we solved this before"
+		// still has to search the tree for where — and that search
+		// costs far more context than naming the paths here does.
+		if paths := recallTouchedLine(dir, h.Session, query.Tokens(q)); paths != "" {
+			fmt.Fprintf(hb, "  files it touched: %s\n", paths)
+		}
+		// And what it ran, with the status the harness recorded. The
+		// line above says where the work was; this one is the only
+		// part of a recall answer that is not a claim — an agent
+		// verifies "the suite reads SVC_FIXTURES" by running it, and
+		// measured on a 325-file repository it spent ten to sixteen
+		// reads doing that after the answer had already arrived
+		// (#3951). "exit 0 here" is the evidence that search was for.
+		if ran := recallRanLine(dir, h.Session); ran != "" {
+			fmt.Fprintf(hb, "  %s\n", ran)
+		}
+	}
+}
+
+// recallServedFacts is the size, ids and projects of the hits a page served.
+func recallServedFacts(hits []search.Hit, served int) (int64, []string, []string) {
 	var raw int64
 	var ids []string
 	// The projects behind the served hits, deduped in the order they appear —
@@ -2091,7 +2127,7 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 			raw += int64(len(m.Text))
 		}
 	}
-	return out, served, raw, ids, projects, nil
+	return raw, ids, projects
 }
 
 // cutMarker ends a line the page budget cut, matching what an excerpt
