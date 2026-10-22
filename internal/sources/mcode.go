@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
-	"time"
 	"unicode/utf16"
 	"unicode/utf8"
 
@@ -38,9 +38,11 @@ import (
 //
 // A person's turn does not hold only what the person wrote. The runtime
 // assembles the turn around it: the agent banner, the permission notice, the
-// skill catalogue, the media reminder. canonicalTextRange says which part of
-// that text was typed, and indexing the rest would put the harness's own words
-// at the head of every session on the machine and in every answer about them.
+// skill catalogue, the media reminder. genuineUserQueryText or
+// canonicalTextRange says which part of that text was typed (mcodeUserText),
+// and indexing the rest would put the harness's own words at the head of every
+// session on the machine and in every answer about them. A user-role line
+// carrying archonCompaction is a compaction marker, not a turn.
 //
 // The thinking block is the model reasoning out loud, not what it told the
 // person, so it stays out of the transcript the way it does in every other
@@ -50,7 +52,8 @@ import (
 // the session's own file activity was: the same evidence the other harnesses
 // without a recorded cwd are filed under (#542).
 //
-// Read off MiniMax Code's local runtime v2 sessions, 2026-10-20.
+// Read off MiniMax Code's local runtime v2 sessions, 2026-10-20; user text and
+// compaction markers checked against the @minimax-ai/code 0.6.12 bundle.
 
 // McodeConfigHome is MCode's own data directory, where its MCP configuration
 // lives beside the sessions.
@@ -154,6 +157,10 @@ func parseMcodeFile(path string, offset int64) ([]model.Session, error) {
 		role, _ := msg["role"].(string)
 		switch role {
 		case "user":
+			if msg["archonCompaction"] != nil {
+				mcodeApplyArchon(&s, msg)
+				return
+			}
 			mcodeApplyUser(&s, m)
 		case "assistant":
 			mcodeApplyAssistant(&s, msg)
@@ -237,10 +244,12 @@ func mcodeManifestID(dir string) string {
 	return m.SessionID
 }
 
-// decodeMcodeID decodes the base64 the directory name carries the id in.
+// decodeMcodeID decodes the id the directory name carries: base64url, no
+// padding, cut at 180 characters (JDe). Standard base64 is tried too.
 func decodeMcodeID(enc string) (string, bool) {
-	for _, enc := range []string{strings.TrimRight(enc, "="), enc} {
-		raw, err := base64.RawStdEncoding.DecodeString(enc)
+	enc = strings.TrimRight(enc, "=")
+	for _, dec := range []*base64.Encoding{base64.RawURLEncoding, base64.RawStdEncoding} {
+		raw, err := dec.DecodeString(enc)
 		if err != nil {
 			continue
 		}
@@ -296,12 +305,32 @@ func mcodeApplySummary(s *model.Session, msg map[string]any) {
 	s.Messages = append(s.Messages, model.Message{Role: RoleSummary, Text: text, Time: t})
 }
 
+// mcodeApplyArchon reads a compaction marker: a user-role line the runtime
+// writes at the head of the history it kept, carrying archonCompaction. It is
+// not a turn the person typed. Its summary, when it has one, is the record of
+// the turns the compaction cut, and is indexed the way a compactionSummary
+// line is. The marker a migration leaves when it could not recover the older
+// history (archonLegacyContextBoundary) says only that, and is skipped.
+func mcodeApplyArchon(s *model.Session, msg map[string]any) {
+	if _, ok := msg["archonLegacyContextBoundary"]; ok {
+		return
+	}
+	ac, _ := msg["archonCompaction"].(map[string]any)
+	text, _ := ac["summary"].(string)
+	if strings.TrimSpace(text) == "" {
+		return
+	}
+	t := parseTimeAny(msg["timestamp"])
+	s.Touch(t)
+	s.Messages = append(s.Messages, model.Message{Role: RoleSummary, Text: text, Time: t})
+}
+
 // mcodeApplyUserTitle takes only the title from a turn, for the line a
 // resumed read reads again. The turn itself is already in the index, and
 // adding it a second time would show the person their own question twice.
 func mcodeApplyUserTitle(s *model.Session, m map[string]any) {
 	msg, _ := m["message"].(map[string]any)
-	if msg == nil {
+	if msg == nil || msg["archonCompaction"] != nil {
 		return
 	}
 	text := mcodeUserText(msg)
@@ -313,19 +342,85 @@ func mcodeApplyUserTitle(s *model.Session, m map[string]any) {
 	}
 }
 
-// mcodeUserText is what the person wrote in this turn: the canonical text the
-// runtime marked, or the whole turn when it marked none.
+// mcodeUserText is what the person wrote in this turn, read the way the
+// runtime reads it back (J4n in @minimax-ai/code 0.6.12):
+//
+//  1. genuineUserQueryText, when the turn carries it, is the typed text. The
+//     runtime writes it, with an empty canonicalTextRange, whenever the typed
+//     text is not the tail of what it assembled around it.
+//  2. canonicalTextRange marks the typed text inside every text block joined.
+//  3. A turn with neither is the assembled text with the runtime's
+//     system-reminder and background-task-finished blocks taken out; a
+//     scheduled task's own prompt is no one's words.
+//
+// A compaction marker (archonCompaction) is not a turn at all; the caller
+// handles it before this.
 func mcodeUserText(msg map[string]any) string {
-	text := mcodeText(msg["content"])
+	if v, ok := msg["genuineUserQueryText"]; ok {
+		text, _ := v.(string)
+		return strings.TrimSpace(text)
+	}
+	joined := mcodeJoinedText(msg["content"])
 	if ctr, ok := msg["canonicalTextRange"].(map[string]any); ok {
-		// The range counts into the turn's own text, which is one block: the
-		// runtime wraps the request in the context it assembled and marks
-		// what the person wrote inside it.
-		if cut, ok := mcodeCanonicalText(mcodeFirstText(msg["content"]), ctr); ok {
-			text = cut
+		if cut, ok := mcodeCanonicalText(joined, ctr); ok {
+			return strings.TrimSpace(cut)
 		}
+		// A range that does not fit the text: the runtime gives up on the
+		// turn, deja keeps what is left once the runtime's blocks are out.
+	}
+	text := mcodeStripRuntimeBlocks(joined)
+	if mcodeCronPrompt.MatchString(text) {
+		return ""
+	}
+	return text
+}
+
+// mcodeRuntimeBlocks are the blocks the runtime wraps around a turn: the
+// reminders it adds and the notice that a background task finished. The
+// patterns are the runtime's own (AUt), case-insensitive, with the
+// self-closing form too.
+var mcodeRuntimeBlocks = []*regexp.Regexp{
+	regexp.MustCompile(`(?is)<system-reminder\b[^>]*>.*?</system-reminder>`),
+	regexp.MustCompile(`(?is)<background-task-finished\b[^>]*>.*?</background-task-finished>`),
+	regexp.MustCompile(`(?i)<(?:system-reminder|background-task-finished)\b[^>]*/>`),
+}
+
+// mcodeCronPrompt is the head of a turn a scheduled task sent rather than a
+// person (RUt).
+var mcodeCronPrompt = regexp.MustCompile(`(?i)^\[(?:System CronTask|Cron Report\b)[^\]]*\]`)
+
+func mcodeStripRuntimeBlocks(text string) string {
+	for _, re := range mcodeRuntimeBlocks {
+		text = re.ReplaceAllString(text, "")
 	}
 	return strings.TrimSpace(text)
+}
+
+// mcodeJoinedText is the turn's text blocks joined with a newline, untrimmed:
+// the string canonicalTextRange counts into (YIe). A content that is a plain
+// string is that string.
+func mcodeJoinedText(v any) string {
+	if s, ok := v.(string); ok {
+		return s
+	}
+	blocks, ok := v.([]any)
+	if !ok {
+		return ""
+	}
+	var out []string
+	for _, b := range blocks {
+		m, ok := b.(map[string]any)
+		if !ok {
+			continue
+		}
+		if typ, _ := m["type"].(string); typ != "text" {
+			continue
+		}
+		if text, ok := m["text"].(string); ok {
+			out = append(out, text)
+		}
+	}
+	return strings.Join(out, "\n")
 }
 
 // mcodeCanonicalText cuts the text the person typed out of the text the
@@ -334,7 +429,7 @@ func mcodeUserText(msg map[string]any) string {
 // character is one unit there and three bytes here.
 func mcodeCanonicalText(text string, ctr map[string]any) (string, bool) {
 	start, ok := mcodeOffset(ctr["startOffset"])
-	if !ok {
+	if !ok || start < 0 {
 		return "", false
 	}
 	end, ok := mcodeOffset(ctr["endOffset"])
@@ -359,6 +454,9 @@ func mcodeOffset(v any) (int, bool) {
 		}
 		return int(n), true
 	case float64:
+		if x != float64(int(x)) {
+			return 0, false
+		}
 		return int(x), true
 	case int:
 		return x, true
@@ -426,28 +524,6 @@ func mcodeText(v any) string {
 	return strings.TrimSpace(strings.Join(out, "\n"))
 }
 
-// mcodeFirstText is the first text block of a turn, which is where the
-// runtime's assembled context and the person's own words sit together.
-func mcodeFirstText(v any) string {
-	blocks, ok := v.([]any)
-	if !ok {
-		return ""
-	}
-	for _, b := range blocks {
-		m, ok := b.(map[string]any)
-		if !ok {
-			continue
-		}
-		if typ, _ := m["type"].(string); typ != "text" {
-			continue
-		}
-		if text, _ := m["text"].(string); text != "" {
-			return text
-		}
-	}
-	return ""
-}
-
 // mcodeToolCalls puts the calls in the tool_use shape the shared extractors
 // read.
 func mcodeToolCalls(v any) []any {
@@ -476,41 +552,4 @@ func mcodeToolCalls(v any) []any {
 		out = append(out, map[string]any{"type": "tool_use", "id": id, "name": name, "input": in})
 	}
 	return out
-}
-
-// McodeSessionPath is the transcript of the session with this id, or "" when
-// the machine holds no such session. The id is the one the runtime shows, the
-// manifest's, and the directory name carries it base64-encoded.
-func McodeSessionPath(id string) string {
-	if id == "" {
-		return ""
-	}
-	for _, p := range McodeSessionFiles() {
-		if mcodeSessionID(p) == id {
-			return p
-		}
-	}
-	return ""
-}
-
-// McodeSessionTime is when the session with this id ran, read from the
-// manifest's clock rather than from a message, so a session with no message
-// yet still has one.
-func McodeSessionTime(id string) (time.Time, bool) {
-	path := McodeSessionPath(id)
-	if path == "" {
-		return time.Time{}, false
-	}
-	b, err := os.ReadFile(filepath.Join(filepath.Dir(path), "manifest.json"))
-	if err != nil {
-		return time.Time{}, false
-	}
-	var m struct {
-		CreatedAtMs json.Number `json:"createdAtMs"`
-	}
-	if json.Unmarshal(b, &m) != nil {
-		return time.Time{}, false
-	}
-	t := parseTimeAny(m.CreatedAtMs)
-	return t, !t.IsZero()
 }

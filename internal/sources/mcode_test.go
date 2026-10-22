@@ -198,9 +198,8 @@ func TestMcodeSidecarsAreNamedRatherThanCountedAsUnread(t *testing.T) {
 	}
 }
 
-// The registry loader, the lookup the surfaces use to open one session, and
-// the clock the manifest keeps: the three answers a reader asks the store for.
-func TestMcodeTheStoreIsReadableAndLookupableById(t *testing.T) {
+// The registry loader finds the session and files it under the manifest's id.
+func TestMcodeTheStoreIsReadableUnderTheManifestID(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, "2026", "10", "20", "03-00-00-000-session_abc")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -225,19 +224,6 @@ func TestMcodeTheStoreIsReadableAndLookupableById(t *testing.T) {
 	}
 	if ss[0].ID != "mvs_lookup" {
 		t.Fatalf("id = %q, want the manifest's", ss[0].ID)
-	}
-	if McodeSessionPath("mvs_lookup") == "" {
-		t.Fatal("the session the store holds is not found by its id")
-	}
-	if McodeSessionPath("mvs_nothing") != "" || McodeSessionPath("") != "" {
-		t.Fatal("an id the store does not hold came back with a path")
-	}
-	at, ok := McodeSessionTime("mvs_lookup")
-	if !ok || at.IsZero() {
-		t.Fatalf("clock = %v ok = %v, want the manifest's", at, ok)
-	}
-	if _, ok := McodeSessionTime("mvs_nothing"); ok {
-		t.Fatal("a session the store does not hold came back with a clock")
 	}
 }
 
