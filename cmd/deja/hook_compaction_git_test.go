@@ -10,6 +10,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/gitread"
+	"github.com/vshulcz/deja-vu/internal/model"
 )
 
 func TestCompactionFreshnessTracksDirtyStagedAndUntrackedChanges(t *testing.T) {
@@ -73,6 +76,13 @@ func TestCompactionFreshnessMarksLargeUntrackedFilesPartial(t *testing.T) {
 // Seven git calls share it, so it has to be sized for the platform where a
 // process is expensive — the windows runner spent all 750 ms of the old one on
 // a repository with one dirty file (#3645).
+//
+// A wall-clock reading on a shared runner is mostly the runner's load, so one
+// sample against a fixed share of the budget flaked (#5551: 2.4 s of 4 s on a
+// loaded windows leg). The check is timed against one bare git process on the
+// same runner, and the best complete round of a few is kept, so a load spike
+// has to hit every round to fail it while a hook that starts doing more work
+// still does.
 func TestCompactionFreshnessBudgetIsSizedForTheSlowPlatform(t *testing.T) {
 	repo := compactionGitRepo(t)
 	compactionWrite(t, filepath.Join(repo, "tracked.txt"), "base\n")
@@ -80,18 +90,52 @@ func TestCompactionFreshnessBudgetIsSizedForTheSlowPlatform(t *testing.T) {
 	compactionGit(t, repo, "commit", "-m", "base")
 	compactionWrite(t, filepath.Join(repo, "tracked.txt"), "dirty\n")
 
-	start := time.Now()
-	freshness := compactionFreshness(repo)
-	took := time.Since(start)
-	if freshness.Error != "" || strings.HasPrefix(freshness.WorktreeState, "partial:") {
-		t.Fatalf("a repository with one dirty file did not fingerprint in %v (it took %v): %#v",
-			compactionGitBudget, took.Round(time.Millisecond), freshness)
+	// compactionFreshness makes seven git calls; a few more process costs of
+	// slack cover status and diff doing real work, a regression does not fit.
+	const gitCalls, slack = 7, 5
+	const rounds = 5
+	best, bare := time.Duration(1<<62), time.Duration(1<<62)
+	var last model.RepositoryFreshness
+	bareGit := func() {
+		start := time.Now()
+		if out, err := gitread.Command(context.Background(), "-C", repo, "rev-parse", "--is-inside-work-tree").Output(); err != nil {
+			t.Fatalf("bare git: %v: %s", err, out)
+		}
+		bare = min(bare, time.Since(start))
 	}
+	// A high reading of the baseline would loosen the check, so take its best
+	// before the first round can pass on it.
+	for range rounds {
+		bareGit()
+	}
+	for range rounds {
+		bareGit()
+		start := time.Now()
+		last = compactionFreshness(repo)
+		took := time.Since(start)
+		if last.Error != "" || strings.HasPrefix(last.WorktreeState, "partial:") {
+			continue
+		}
+		best = min(best, took)
+		if best <= compactionGitBudget/2 && best <= (gitCalls+slack)*bare {
+			break
+		}
+	}
+	if best == time.Duration(1<<62) {
+		t.Fatalf("a repository with one dirty file did not fingerprint in %v in any of %d rounds: %#v",
+			compactionGitBudget, rounds, last)
+	}
+	t.Logf("best of up to %d rounds: freshness %v, one bare git %v, budget %v",
+		rounds, best.Round(time.Millisecond), bare.Round(time.Millisecond), compactionGitBudget)
 	// Half the budget spent on the smallest repository there is means the
 	// margin is gone for a real one.
-	if took > compactionGitBudget/2 {
-		t.Errorf("one dirty file cost %v of the %v budget, leaving no margin for a real repository",
-			took.Round(time.Millisecond), compactionGitBudget)
+	if best > compactionGitBudget/2 {
+		t.Errorf("one dirty file cost at best %v of the %v budget, leaving no margin for a real repository",
+			best.Round(time.Millisecond), compactionGitBudget)
+	}
+	if limit := (gitCalls + slack) * bare; best > limit {
+		t.Errorf("one dirty file cost at best %v, %.1f bare git processes (%v each); the check makes %d calls and may cost %d",
+			best.Round(time.Millisecond), float64(best)/float64(bare), bare.Round(time.Millisecond), gitCalls, gitCalls+slack)
 	}
 	if win, unix := compactionBudgetFor("windows"), compactionBudgetFor("linux"); win <= unix {
 		t.Errorf("windows budget = %v against %v elsewhere: the platform where a process is expensive needs more, not the same",
