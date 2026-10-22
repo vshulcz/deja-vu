@@ -381,10 +381,23 @@ func isMcodeTurn(m map[string]any) bool {
 }
 
 // mcodeIsCompactionMarker reports whether a user-role line is a compaction
-// marker rather than a turn: it carries an archonCompaction object.
+// marker rather than a turn: archonCompaction is set to a truthy value, the
+// runtime's own test (J4n).
 func mcodeIsCompactionMarker(msg map[string]any) bool {
-	_, ok := msg["archonCompaction"].(map[string]any)
-	return ok
+	switch v := msg["archonCompaction"].(type) {
+	case nil:
+		return false
+	case bool:
+		return v
+	case string:
+		return v != ""
+	case json.Number:
+		f, err := v.Float64()
+		return err != nil || f != 0
+	case float64:
+		return v != 0
+	}
+	return true
 }
 
 // mcodeApplyUser folds a person's turn into the session: the text they typed,

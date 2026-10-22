@@ -332,3 +332,17 @@ func TestMcodeSessionPathFindsTheSessionByID(t *testing.T) {
 		t.Fatalf("capture = %#v, %v", tr, err)
 	}
 }
+
+// archonCompaction marks a line the way the runtime tests it: by truthiness.
+func TestMcodeACompactionMarkerIsTruthy(t *testing.T) {
+	for _, v := range []string{`true`, `1`, `"x"`, `[]`} {
+		if got := parseMcodeLines(t, mcodeUserLine(`"content":[{"type":"text","text":"typed"}],"archonCompaction":`+v)); len(got) != 0 {
+			t.Fatalf("archonCompaction %s: messages = %q, want none", v, got)
+		}
+	}
+	for _, v := range []string{`null`, `false`, `0`, `""`} {
+		if got := parseMcodeLines(t, mcodeUserLine(`"content":[{"type":"text","text":"typed"}],"archonCompaction":`+v)); len(got) != 1 {
+			t.Fatalf("archonCompaction %s: messages = %q, want the turn", v, got)
+		}
+	}
+}
