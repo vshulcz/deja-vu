@@ -424,6 +424,8 @@ func claudeProjectName(dir string) string {
 	if base == "" || base == "." || base == string(filepath.Separator) {
 		return "-"
 	}
+	// Stats the alias file first: an edit drops the names cached under it.
+	loadProjectAliases()
 	if v, ok := projectNameCache.Load(base); ok {
 		name, _ := v.(string)
 		return name
@@ -567,8 +569,18 @@ func splitEncodedWindowsDrive(base string) (root, rest string, ok bool) {
 }
 
 // ClaudeProjectName derives the display project name using the same rules as
-// the Claude source parser.
-func ClaudeProjectName(dir string) string { return claudeProjectName(dir) }
+// the Claude source parser. A directory the alias file covers is the project it
+// names there, so a note filed from it lands where the hooks look.
+func ClaudeProjectName(dir string) string {
+	if name, ok := ProjectAliasFor(dir); ok {
+		return name
+	}
+	return claudeProjectName(dir)
+}
+
+// PlainProjectName is ClaudeProjectName without the alias step, for a real
+// directory: the name a session there carried before the file named its tree.
+func PlainProjectName(dir string) string { return claudeProjectName(dir) }
 
 // ClaudeProjectDirBase returns the encoded project dir name for a transcript
 // path, e.g. "-Users-x-projects-app" for .../projects/-Users-x-projects-app/s.jsonl.

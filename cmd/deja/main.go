@@ -654,6 +654,7 @@ func cmdIndex(dir string, rest []string) error {
 		if index.ExclusionsChanged(dir) {
 			fmt.Fprintln(os.Stderr, "deja: the exclude list changed since this index was built — `deja index --rebuild` applies it to sessions already indexed")
 		}
+		sayAliasesChanged(dir)
 		return partialIndex(unread, 0)
 	}
 	stopProgress()
@@ -725,6 +726,7 @@ func cmdIndex(dir string, rest []string) error {
 	if index.ExclusionsChanged(dir) {
 		fmt.Fprintln(os.Stderr, "deja: the exclude list changed since this index was built — `deja index --rebuild` applies it to sessions already indexed")
 	}
+	sayAliasesChanged(dir)
 	// The parse count and the indexed count differ by exactly these, and this
 	// is where both are on screen (#868).
 	if n := index.ReportEmptySessions(); n > 0 {
@@ -801,6 +803,15 @@ func partialIndex(unreadable, skipped int) error {
 		return exitStatus(exitPartial)
 	}
 	return nil
+}
+
+// sayAliasesChanged says the project alias file changed since the build. The
+// aliases name sessions at ingest, so the edit renames nothing already indexed;
+// the rebuild is the reader's to start, it rereads every store (#5373).
+func sayAliasesChanged(dir string) {
+	if index.ProjectAliasesChanged(dir) {
+		fmt.Fprintf(os.Stderr, "deja: %s changed since this index was built — `deja index --rebuild` renames the sessions already indexed\n", reportPath(sources.ProjectAliasPath()))
+	}
 }
 
 // sayUnreadable names, per store, the paths the index could not read. A store

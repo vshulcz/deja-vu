@@ -636,6 +636,30 @@ battle-tested paths. Field reports welcome in [#9](https://github.com/vshulcz/de
 </details>
 
 <details>
+<summary><b>One project is spread over several checkouts. Can recall treat them as one?</b></summary>
+
+A project is named after the directory an agent ran in, so every checkout of a
+monorepo, and every worktree made for a task, is a project of its own, and the
+hooks recall only from the one they stand in. List the trees in
+`~/.config/deja/projects`, one `<path> = <name>` per line:
+
+```text
+~/work/monorepo = work
+~/work/worktrees = work
+```
+
+Every directory under a listed path is then that project, for indexing, the
+hooks and recall alike; the longest matching path wins. Editing the file renames
+nothing already indexed: `deja index` and `deja doctor` say when a rebuild is
+due, and `deja index --rebuild` files the sessions whose transcripts are still on
+disk under the new name. Sessions indexed before the file existed still match
+from their own checkout until then; kept sessions whose transcript is gone, and
+`deja remember` notes, keep the name they were filed under. The exclude file wins: a repository excluded by
+its own name stays out, and a pattern for the alias name excludes the whole tree.
+
+</details>
+
+<details>
 <summary><b>How do I wipe everything?</b></summary>
 
 ```sh
@@ -644,7 +668,7 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ```
 
 The index is under `~/.cache/deja`, your `remember` and `promote` notes in
-`~/.local/share/deja`, and the rules, exclude list and hook launcher in
+`~/.local/share/deja`, and the rules, exclude list, project aliases and hook launcher in
 `~/.config/deja` (or under `XDG_DATA_HOME` and `XDG_CONFIG_HOME` when set; on
 Windows the notes are in `%AppData%\deja`).
 

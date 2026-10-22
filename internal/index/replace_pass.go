@@ -467,6 +467,7 @@ func (rp *replacePass) startManifest() {
 		// those patterns, so claiming today's set would be a lie the reader
 		// cannot check.
 		ExcludeFingerprint: rp.old.ExcludeFingerprint,
+		AliasFingerprint:   rp.old.AliasFingerprint,
 		// What the index on disk recorded: old is that manifest, or what the
 		// followed renames wrote of it.
 		ToolFingerprint: mergedToolFingerprint(rp.old.ToolFingerprint),

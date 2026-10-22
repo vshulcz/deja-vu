@@ -1010,6 +1010,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 		ExportWatermarks: imported.watermarks, ExportBoundary: imported.boundary, ImportedRecords: imported.dedupe,
 		Compactions:        compactions,
 		ExcludeFingerprint: sources.ExclusionFingerprint(),
+		AliasFingerprint:   sources.ProjectAliasFingerprint(),
 		ToolFingerprint:    mergedToolFingerprint(priorToolFingerprint(dir))}
 	recPath := filepath.Join(tmp, "records.bin")
 	rf, err := createLog(recPath)
@@ -2397,6 +2398,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 		ExportWatermarks: imp.watermarks, ExportBoundary: imp.boundary, ImportedRecords: imp.dedupe,
 		Compactions:        imp.compactions,
 		ExcludeFingerprint: sources.ExclusionFingerprint(),
+		AliasFingerprint:   sources.ProjectAliasFingerprint(),
 		ToolFingerprint:    mergedToolFingerprint(priorToolFingerprint(dir)),
 		PartialOf:          imp.partialOf}
 	recPath := filepath.Join(tmp, "records.bin")

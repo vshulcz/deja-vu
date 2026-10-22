@@ -232,7 +232,7 @@ func doctorFoldSection(section string, lines []string, present map[string]bool, 
 
 // doctorIndexKeys are the keys the Index section prints, longest first where
 // one is a prefix of another.
-var doctorIndexKeys = []string{"exclusions", "integrity", "freshness", "last sync", "location", "security", "expiring", "status", "format", "ingest", "clock"}
+var doctorIndexKeys = []string{"exclusions", "integrity", "freshness", "last sync", "location", "security", "expiring", "projects", "status", "format", "ingest", "clock"}
 
 // doctorIndexKey pads an Index row's key to the widest one, so the values
 // start in one column.

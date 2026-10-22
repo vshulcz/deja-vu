@@ -1194,6 +1194,10 @@ type Manifest struct {
 	// it decodes with it empty, and an empty one means "not recorded", which
 	// says nothing rather than guessing.
 	ExcludeFingerprint string `json:"exclude_fingerprint,omitempty"`
+	// AliasFingerprint is the same for the project alias file
+	// (sources.ProjectAliasFingerprint): aliases name sessions at ingest, so an
+	// edit renames nothing already indexed until a rebuild.
+	AliasFingerprint string `json:"alias_fingerprint,omitempty"`
 	// ToolFingerprint records which external CLIs were available when this
 	// index was built. A store deja could not read for want of sqlite3 or zstd
 	// is not stale by its file state — the transcripts did not change — so
@@ -1307,6 +1311,7 @@ type manifestCore struct {
 	IngestFiles      map[string]FileIngest
 	// ExcludeFingerprint, ToolFingerprint: see Manifest.
 	ExcludeFingerprint string
+	AliasFingerprint   string
 	ToolFingerprint    string
 	Compactions        map[string]CompactionState
 	KeptDated          bool

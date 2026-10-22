@@ -505,17 +505,23 @@ func UTF8SafeCut(s string, n int) string {
 	return s[:n]
 }
 
-// ProjectNameCandidates lists the names sessions of the project at cwd may be
-// recorded under, worktrees included.
+// ProjectNameCandidates is every name the sessions of the project at cwd may
+// carry. Under a path the alias file names, that name comes first, then the
+// names the directory had without it: sessions and notes indexed before the
+// file existed still carry those until a rebuild.
 func ProjectNameCandidates(cwd string) []string {
-	cwd = projectRoot(cwd)
-	names := []string{sources.ClaudeProjectName(cwd)}
+	var names []string
 	add := func(name string) {
-		if slices.Contains(names, name) {
+		if name == "" || slices.Contains(names, name) {
 			return
 		}
 		names = append(names, name)
 	}
+	if name, ok := sources.ProjectAliasFor(cwd); ok {
+		add(name)
+	}
+	cwd = projectRoot(cwd)
+	add(sources.PlainProjectName(cwd))
 	if base := filepath.Base(cwd); base != "" {
 		add(filepath.Base(filepath.Dir(cwd)) + "/" + base)
 		add(base)
@@ -526,7 +532,10 @@ func ProjectNameCandidates(cwd string) []string {
 	// different repos that merely share a basename stay separate everywhere
 	// the full encoded path matches first.
 	for _, root := range gitWorktreeRoots(cwd) {
-		add(sources.ClaudeProjectName(root))
+		if name, ok := sources.ProjectAliasFor(root); ok {
+			add(name)
+		}
+		add(sources.PlainProjectName(root))
 		if base := filepath.Base(root); base != "" {
 			add(filepath.Base(filepath.Dir(root)) + "/" + base)
 			add(base)

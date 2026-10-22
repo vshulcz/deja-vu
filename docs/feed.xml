@@ -39,6 +39,20 @@
     <summary>Hermes searches its own sessions and keeps MEMORY.md. deja adds the other forty-one agents: a plugin on pre_llm_call, the MCP tools, and a skill.</summary>
   </entry>
   <entry>
+    <title>Several agents on one repository — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/parallel-sessions.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/parallel-sessions.html"></link>
+    <updated>2026-10-22T00:00:00Z</updated>
+    <summary>What breaks when you run agents in parallel on one repository, and what each of them can still know about the others.</summary>
+  </entry>
+  <entry>
+    <title>Privacy — deja-vu docs</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/privacy.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/privacy.html"></link>
+    <updated>2026-10-22T00:00:00Z</updated>
+    <summary>deja is local by design: no network path in indexing or search unless semantic search is on, credentials redacted at index time, and forget/exclude controls.</summary>
+  </entry>
+  <entry>
     <title>Search your Claude Code and Codex history — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/search.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/search.html"></link>
@@ -275,19 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/credentials-in-transcripts.html"></link>
     <updated>2026-10-16T00:00:00Z</updated>
     <summary>Agents write every command output to plaintext transcripts. One machine held 84 credentials in 42 sessions. How to find yours, and what to do about them.</summary>
-  </entry>
-  <entry>
-    <title>Delete Copilot CLI session history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-copilot-cli-session-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-copilot-cli-session-history.html"></link>
-    <updated>2026-10-16T00:00:00Z</updated>
-    <summary>Copilot CLI keeps each session in its own directory under session-state. Find it, delete one session or all of them, and know what goes with them.</summary>
-  </entry>
-  <entry>
-    <title>Delete Qwen Code chat history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-qwen-code-chat-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-qwen-code-chat-history.html"></link>
-    <updated>2026-10-16T00:00:00Z</updated>
-    <summary>Qwen Code keeps one JSONL file per session under ~/.qwen/projects. Delete one session with its sub-agent logs, or all, and keep your settings.</summary>
   </entry>
 </feed>

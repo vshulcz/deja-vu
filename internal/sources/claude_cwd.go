@@ -130,7 +130,8 @@ func claudeProjectNameFor(path string) string {
 func claudeCachedProjectName(dir, path string) (string, bool) {
 	// Its own cache, keyed by the folder: the shared one is keyed by an
 	// encoded name other harnesses' folders can share, and an entry decoded
-	// for one of them would answer for this one.
+	// for one of them would answer for this one. An alias file edit drops it.
+	loadProjectAliases()
 	if v, ok := claudeCWDNameCache.Load(dir); ok {
 		name, _ := v.(string)
 		return name, true
@@ -163,8 +164,20 @@ var (
 // last two segments, as a decoded folder name would give them. A file:// URI
 // is read as the path it names, escapes decoded (#4461), and a drive is not a
 // parent: C:\proj is "proj". A WorkBuddy chat folder names the workspace root
-// it sits in (ChatWorkspaceRoot).
+// it sits in (ChatWorkspaceRoot). A directory the alias file covers is the
+// project it names there (ProjectAliasFor).
 func cwdProjectName(cwd string) string {
+	if p, ok := fileURIPath(cwd); ok {
+		cwd = p
+	}
+	if name, ok := ProjectAliasFor(cwd); ok {
+		return name
+	}
+	return plainCWDProjectName(cwd)
+}
+
+// plainCWDProjectName is cwdProjectName without the alias file.
+func plainCWDProjectName(cwd string) string {
 	if p, ok := fileURIPath(cwd); ok {
 		cwd = p
 	}

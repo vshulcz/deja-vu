@@ -2316,6 +2316,13 @@ func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 	} else {
 		fmt.Fprintf(w, "  exclusions %d active patterns\n", n)
 	}
+	// The alias file names sessions at ingest too, so an edit is in force for
+	// new sessions only until a rebuild (#5373).
+	if index.ProjectAliasesChanged(dir) {
+		fmt.Fprintf(w, "  projects %s changed, sessions already indexed keep their old names — `deja index --rebuild`\n", reportPath(sources.ProjectAliasPath()))
+	} else if n := sources.ProjectAliasCount(); n > 0 {
+		fmt.Fprintf(w, "  projects %d tree%s named in %s\n", n, pluralS(n), reportPath(sources.ProjectAliasPath()))
+	}
 	// A precise non-claim: users deciding what to trust deserve to read the
 	// boundary in the tool itself, not only in the security docs.
 	fmt.Fprintln(w, "  security plaintext on disk — protected by file permissions only, no encryption or access control")

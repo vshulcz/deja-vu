@@ -758,6 +758,7 @@ func initEmptyIndex(dir string) error {
 	m := Manifest{Version: version, KeptDated: true, Format: onDiskFormat, SearchOnly: searchOnlyFor(dir), Files: map[string]FileState{}, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), ExportWatermarks: map[string]int64{}, ImportedRecords: map[string]bool{},
 		Compactions:        compactionsForRebuild(dir, readTombstones()),
 		ExcludeFingerprint: sources.ExclusionFingerprint(),
+		AliasFingerprint:   sources.ProjectAliasFingerprint(),
 		ToolFingerprint:    mergedToolFingerprint(priorToolFingerprint(dir))}
 	return writeManifest(dir, m)
 }
