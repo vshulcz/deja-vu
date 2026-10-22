@@ -178,7 +178,8 @@ func addedLinesOfPatch(patch string) []string {
 		switch {
 		case strings.HasPrefix(line, "*** Update File:"),
 			strings.HasPrefix(line, "*** Delete File:"),
-			strings.HasPrefix(line, "*** Add File:"):
+			strings.HasPrefix(line, "*** Add File:"),
+			strings.HasPrefix(line, "*** Move to:"):
 			flush()
 			path = strings.TrimSpace(line[strings.Index(line, ":")+1:])
 		case line == "*** End Patch":

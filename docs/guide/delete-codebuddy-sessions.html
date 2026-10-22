@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to delete CodeBuddy session history — deja-vu</title>
+<meta name="description" content="How to delete CodeBuddy Code and WorkBuddy sessions — the .jsonl conversation, its .meta.json, rollback sidecar and file-history snapshots.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="How to delete CodeBuddy session history">
+<meta property="og:description" content="How to delete CodeBuddy Code and WorkBuddy sessions — the .jsonl conversation, its .meta.json, rollback sidecar and file-history snapshots.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="How to delete CodeBuddy session history">
+<meta name="twitter:description" content="How to delete CodeBuddy Code and WorkBuddy sessions — the .jsonl conversation, its .meta.json, rollback sidecar and file-history snapshots.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "How to delete CodeBuddy and WorkBuddy session history, and what you lose", "description": "How to delete CodeBuddy Code and WorkBuddy sessions — the .jsonl conversation, its .meta.json, rollback sidecar and file-history snapshots.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-10-16", "dateModified": "2026-10-21"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete CodeBuddy sessions", "item": "https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How do I delete a CodeBuddy session?", "acceptedAnswer": {"@type": "Answer", "text": "Remove <session-id>.jsonl under ${CODEBUDDY_CONFIG_DIR:-~/.codebuddy}/projects/<folder>/, its <session-id>.meta.json, the <session-id>/ directory beside it (the sub-agent transcripts), its <session-id>.file-rollback.ndjson sidecar, and ~/.codebuddy/file-history/<session-id>/, the snapshots that /rewind uses. One project's sessions are one directory, so rm -rf projects/<folder> covers them all."}}, {"@type": "Question", "name": "Where does CodeBuddy Code store its sessions?", "acceptedAnswer": {"@type": "Answer", "text": "In a directory per working directory under ~/.codebuddy/projects, named by the cwd with /, \\ and : turned into - and the leading dash dropped, one JSONL per session. WorkBuddy keeps the same tree in ~/.workbuddy (workbuddy.cn) and ~/.workbuddy-ai (workbuddy.ai)."}}, {"@type": "Question", "name": "Do the sub-agent transcripts stay when I delete the session file?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. <session-id>/subagents/agent-*.jsonl sit in a directory of the same name beside the file, so remove both unless you want the sub-agent turns kept."}}, {"@type": "Question", "name": "Does deleting a CodeBuddy session affect WorkBuddy?", "acceptedAnswer": {"@type": "Answer", "text": "No. WorkBuddy writes its own sessions in its own homes; remove ~/.workbuddy/projects or ~/.workbuddy-ai/projects separately."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a>
+<div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<details class="grpfold"><summary>Why agents forget <span class="n">11</span></summary>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="one-rules-file.html">One rules file</a>
+<a href="token-cost.html">What memory costs</a>
+</details>
+<details class="grpfold"><summary>Session history <span class="n">11</span></summary>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="codex-history.html">Codex history</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="credentials-in-transcripts.html">Credentials in transcripts</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
+</details>
+<details class="grpfold" open><summary>Deleting sessions <span class="n">21</span></summary>
+<a href="session-files-on-disk.html">Claude Code</a>
+<a href="delete-old-claude-sessions.html">Old sessions</a>
+<a href="delete-codex-sessions.html">Codex</a>
+<a href="delete-cursor-chat-history.html">Cursor</a>
+<a href="cursor-state-vscdb-too-large.html">Cursor state.vscdb too large</a>
+<a href="delete-copilot-chat-history.html">Copilot Chat</a>
+<a href="delete-copilot-cli-session-history.html">Copilot CLI</a>
+<a href="delete-gemini-cli-history.html">Gemini CLI</a>
+<a href="delete-opencode-session-history.html">opencode</a>
+<a href="delete-cline-task-history.html">Cline</a>
+<a href="delete-roo-task-history.html">Roo Code</a>
+<a href="delete-zed-thread-history.html">Zed</a>
+<a href="delete-kilo-code-task-history.html">Kilo Code</a>
+<a href="delete-amp-thread-history.html">Amp</a>
+<a href="delete-continue-session-history.html">Continue</a>
+<a href="delete-kiro-session-history.html">Kiro</a>
+<a href="delete-kimi-code-session-history.html">Kimi Code</a>
+<a href="delete-windsurf-cascade-history.html">Windsurf</a>
+<a href="delete-qwen-code-chat-history.html">Qwen Code</a>
+<a href="delete-trae-sessions.html">TRAE CLI</a>
+<a href="delete-codebuddy-sessions.html" aria-current="page">CodeBuddy</a>
+</details>
+<details class="grpfold"><summary>Per-agent guides <span class="n">36</span></summary>
+<a href="memory-for-aider.html">aider</a>
+<a href="memory-for-amp.html">Amp</a>
+<a href="memory-for-antigravity.html">Antigravity</a>
+<a href="memory-for-cherrystudio.html">Cherry Studio</a>
+<a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-codewhale.html">CodeWhale</a>
+<a href="memory-for-codex.html">Codex</a>
+<a href="memory-for-commandcode.html">Command Code</a>
+<a href="memory-for-continue.html">Continue</a>
+<a href="memory-for-copilot.html">Copilot CLI</a>
+<a href="memory-for-crush.html">Crush</a>
+<a href="memory-for-cursor.html">Cursor</a>
+<a href="memory-for-dsh.html">dsh</a>
+<a href="memory-for-gjc.html">gajae-code</a>
+<a href="memory-for-gemini.html">Gemini CLI</a>
+<a href="memory-for-goose.html">Goose</a>
+<a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-hermes.html">Hermes</a>
+<a href="memory-for-kilocode.html">Kilo Code</a>
+<a href="memory-for-kimchi.html">Kimchi Coding</a>
+<a href="memory-for-kimi.html">Kimi Code</a>
+<a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-omp.html">omp</a>
+<a href="memory-for-openclaw.html">OpenClaw</a>
+<a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-pi.html">pi</a>
+<a href="memory-for-prime.html">prime-agent</a>
+<a href="memory-for-qwen.html">Qwen Code</a>
+<a href="memory-for-reasonix.html">Reasonix</a>
+<a href="memory-for-roo.html">Roo Code</a>
+<a href="memory-for-senpi.html">Senpi</a>
+<a href="memory-for-copilot-chat.html">VS Code Copilot Chat</a>
+<a href="memory-for-windsurf.html">Windsurf</a>
+<a href="memory-for-zcode.html">ZCode</a>
+<a href="memory-for-zed.html">Zed</a>
+</details>
+<div class="grp">Evidence</div>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="claude-mem-alternative.html">claude-mem alternative</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>How to delete CodeBuddy and WorkBuddy session history, and what you lose</h1>
+<p class="pagelede">CodeBuddy keeps one <code>&lt;session-id&gt;.jsonl</code> conversation and its <code>.meta.json</code> per session under <code>~/.codebuddy/projects</code>, and cleans expired sessions itself via SessionHistoryClean (cleanupPeriodDays defaults to 30)<span class="mins" data-mins></span></p>
+
+<p>CodeBuddy Code is Tencent's terminal agent, and it keeps one <code>.jsonl</code> conversation per session, with a <code>.meta.json</code> beside it, in the directory shape Claude Code uses: a directory per working directory under <code>${CODEBUDDY_CONFIG_DIR:-~/.codebuddy}/projects</code>, named by the cwd with <code>/</code>, <code>\</code> and <code>:</code> turned into <code>-</code> and the leading dash dropped, one file per session. CodeBuddy also cleans expired sessions itself: <code>SessionHistoryClean</code> runs on <code>cleanupPeriodDays</code> (defaults to 30 days) and removes sessions past their TTL, so the agent lists what is on disk, and deleting is removing files. WorkBuddy is the same agent under another name: workbuddy.cn and WorkBuddy AI write the same tree in their own homes, <code>~/.workbuddy</code> and <code>~/.workbuddy-ai</code>.</p>
+
+<h2>How to delete CodeBuddy sessions</h2>
+<p>The files and the sub-agent directory sit beside each other: <code>&lt;session-id&gt;.jsonl</code> is the conversation, <code>&lt;session-id&gt;.meta.json</code> its metadata, and <code>&lt;session-id&gt;/subagents/agent-*.jsonl</code> holds the turns its sub-agents ran. The session also leaves a <code>&lt;session-id&gt;.file-rollback.ndjson</code> sidecar beside them and the snapshots its edits made in <code>~/.codebuddy/file-history/&lt;session-id&gt;/</code> — the same set CodeBuddy's own delete removes. Removing the file alone leaves everything else on disk, so the one-session command names all of it.</p>
+<pre># the project directories, one per working directory
+ls ~/.codebuddy/projects
+
+# one session — the conversation, its metadata file, the sub-agent
+# transcripts, the rollback sidecar and the edits' file-history
+# snapshots go together
+rm -r ~/.codebuddy/projects/&lt;folder&gt;/&lt;session-id&gt;.jsonl \
+      ~/.codebuddy/projects/&lt;folder&gt;/&lt;session-id&gt;.meta.json \
+      ~/.codebuddy/projects/&lt;folder&gt;/&lt;session-id&gt; \
+      ~/.codebuddy/projects/&lt;folder&gt;/&lt;session-id&gt;.file-rollback.ndjson \
+      ~/.codebuddy/file-history/&lt;session-id&gt;
+
+# every session of one project; the folder also holds any memory/ dir,
+# which CodeBuddy's own cleanup conservatively skips and rm does not
+rm -rf ~/.codebuddy/projects/&lt;folder&gt;
+
+# the whole store
+rm -rf ~/.codebuddy/projects
+
+# WorkBuddy keeps its own sessions, in its own homes; other runtime data
+# (sessions/, file-history/, history.jsonl) may sit beside projects/, so check
+# the homes before assuming rm clears everything WorkBuddy has
+rm -rf ~/.workbuddy/projects ~/.workbuddy-ai/projects</pre>
+<p>If <code>CODEBUDDY_CONFIG_DIR</code> is set the store moves with it, and <code>WORKBUDDY_CONFIG_DIR</code> does the same for WorkBuddy.</p>
+
+<h2>What is in the store</h2>
+<p>JSON Lines, one file per session. Each line is one item — a <code>message</code> with a role and text blocks, <code>function_call</code> and <code>function_call_result</code> for the tools, plus <code>reasoning</code>, titles and bookkeeping. CodeBuddy also cleans expired sessions itself: <code>SessionHistoryClean</code> runs on <code>cleanupPeriodDays</code> (defaults to 30 days) and removes sessions past their TTL. Timestamps are epoch milliseconds and every record carries the working directory. Sub-agent transcripts are the same shape, in the directory of the same name; deja reads each one as a session of its own under the parent, as its task, answer and edits; <code>DEJA_INCLUDE_SUBAGENTS=1</code> takes the whole run and <code>=0</code> leaves them out.</p>
+<p>It is plain text and it is verbatim: whatever a command printed into the conversation is in the file. Treat the projects directory the way you treat your shell history. The <a href="../registry/codebuddy.html">format registry</a> documents every field.</p>
+
+<h2>What you lose</h2>
+<p>The session leaves the agent's own history list, and what goes with it is the record: the commands, their output, and the edits, none of which are recoverable from a summary. deja reads these files — and WorkBuddy's — along with every other agent's on the machine, so a decision made here answers a question asked in Claude Code or Cursor. A session it has already indexed stays searchable after the file goes; only <code>deja forget</code> drops one on purpose.</p>
+<p>In the screen bare <code>deja</code> opens, a deleted session sits under the Deleted tab, and <code>R</code> writes one back so <code>codebuddy -r &lt;id&gt;</code> finds it again, with the conversation but not the tool calls. WorkBuddy comes back refused: deja knows no command that reopens one. That is a reason to index before deleting, not a reason to keep gigabytes.</p>
+
+<p><a href="session-files-on-disk.html">The same question for Claude Code</a> · <a href="where-sessions-are-stored.html">Where every agent stores history</a> · <a href="../registry/codebuddy.html">The CodeBuddy format registry</a></p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

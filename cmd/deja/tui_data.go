@@ -20,6 +20,7 @@ type tuiRow struct {
 	snips []string // the matched lines, best first
 
 	section string // a heading drawn over this card, when it starts a group
+	partial bool   // a relevance hit that holds only some of the words, under strict ones
 	file    string // the changed file a card behind the diff was found through
 }
 
@@ -35,23 +36,65 @@ type tuiDetail struct {
 
 func sessionKey(s model.Session) string { return s.Harness + "\x00" + s.ID }
 
+// tuiPage is how many hits the list reads at a time, and tuiMoreAhead how
+// close to its end the selection gets before the next page is asked for.
+const (
+	tuiPage      = 80
+	tuiMoreAhead = 10
+)
+
 // tuiSearch runs a query the way `deja search` does, minus everything that
 // prints: the tier ladder, the trust policy, the ranking. The rerank and the
 // semantic fallback are left out because they are the slow part and the list
 // is redrawn on every key.
 func tuiSearch(dir string, o search.Options) ([]search.Hit, error) {
-	result, err := index.SearchWithRecoveryDetailed(dir, o, io.Discard)
+	hits, _, err := tuiSearchPage(dir, o)
+	return hits, err
+}
+
+// tuiSearchPage is tuiSearch for the first o.Limit hits, and how many
+// sessions matched in all. Retrieval reads only what can reach those hits, the
+// way a paged `deja search` does.
+func tuiSearchPage(dir string, o search.Options) ([]search.Hit, int, error) {
+	if o.Limit <= 0 || o.All {
+		return tuiSearchRead(dir, o)
+	}
+	w := o
+	w.Window, w.Activation = o.Limit, policy.ActivationSearch
+	hits, total, err := tuiSearchRead(dir, w)
+	// A short page with sessions left unread means the pool held few that
+	// the text bears out, which a quoted phrase over two common words does:
+	// one card over "1,206 sessions" where five said it. The page is read
+	// whole then, the way it was before it was paged.
+	if err == nil && len(hits) < o.Limit && total > len(hits) {
+		return tuiSearchRead(dir, o)
+	}
+	return hits, total, err
+}
+
+// tuiSearchRead is one search of the list, read as o says.
+func tuiSearchRead(dir string, o search.Options) ([]search.Hit, int, error) {
+	result, err := tuiIndexSearch(dir, o, io.Discard)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	ss, _ := policyFilterSessionsCounted(policy.ActivationSearch, search.WithoutIgnored(result.Sessions))
 	switch result.Tier {
 	case search.TierError:
-		return search.ErrorHits(ss), nil
+		hits := search.ErrorHits(ss, o.Query)
+		if o.Sort == search.SortDate {
+			search.ByDate(hits)
+		}
+		return hits, len(hits), nil
 	case search.TierRelevance:
-		return markStrictHits(search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(o.Query), result.TermIDF), result), nil
+		hits := markStrictHits(search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(o.Query), result.TermIDF), result)
+		if o.Sort == search.SortDate {
+			search.ByDate(hits)
+		}
+		return hits, len(hits), nil
 	}
 	o.Tier = result.Tier
+	o.Unread = result.Unread
 	if result.Neighbour || result.Stemmed {
 		o.Stemmed = true
 		o.FuzzyVariants = result.Variants
@@ -63,7 +106,33 @@ func tuiSearch(dir string, o search.Options) ([]search.Hit, error) {
 		o.FuzzyVariants = result.Variants
 	}
 	d, err := search.RunDetailed(ss, o)
-	return d.Hits, err
+	return d.Hits, d.Total, err
+}
+
+// tuiIndexSearch is the index search the list runs; a test counts what it
+// reads.
+var tuiIndexSearch = index.SearchWithRecoveryDetailed
+
+// appendNewHits is the list extended by a longer read of the same search,
+// up to len(got) hits: what is already listed keeps its place, and the hits it
+// does not hold follow in their order. A larger read ranks a larger pool, so
+// it can place a listed hit lower than the page it came on; that one stays.
+func appendNewHits(have, got []search.Hit) []search.Hit {
+	seen := make(map[string]bool, len(have))
+	out := append(make([]search.Hit, 0, len(got)), have...)
+	for _, h := range have {
+		seen[sessionKey(h.Session)] = true
+	}
+	for _, h := range got {
+		if len(out) >= len(got) {
+			break
+		}
+		if !seen[sessionKey(h.Session)] {
+			seen[sessionKey(h.Session)] = true
+			out = append(out, h)
+		}
+	}
+	return out
 }
 
 // tuiRecent is the home list: the newest sessions in scope, under whatever

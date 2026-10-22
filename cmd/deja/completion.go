@@ -78,7 +78,7 @@ _deja_completion() {
     local install_targets="%INSTALL_TARGETS% --all --auto"
 
     if (( COMP_CWORD == 1 )); then
-        COMPREPLY=( $(compgen -W "$commands --version -version --json --re --all --no-embed --harness --project --since --role --session --rebuild --limit" -- "$cur") )
+        COMPREPLY=( $(compgen -W "$commands --version -version --json --re --all --no-embed --harness --project --since --role --session --rebuild --limit --sort" -- "$cur") )
         return
     fi
 
@@ -143,7 +143,7 @@ _deja_completion() {
             if [[ "$prev" == "--harness" ]]; then
                 COMPREPLY=( $(compgen -W "$harnesses" -- "$cur") )
             else
-                COMPREPLY=( $(compgen -W "--project --harness --limit" -- "$cur") )
+                COMPREPLY=( $(compgen -W "--project --harness --limit --offset" -- "$cur") )
             fi
             ;;
         remember)
@@ -264,8 +264,10 @@ _deja_completion() {
         *)
             if [[ "$prev" == "--harness" ]]; then
                 COMPREPLY=( $(compgen -W "$harnesses" -- "$cur") )
+            elif [[ "$prev" == "--sort" ]]; then
+                COMPREPLY=( $(compgen -W "relevance date" -- "$cur") )
             else
-                COMPREPLY=( $(compgen -W "--json --re --all --no-embed --harness --project --since --role --session --rebuild --limit" -- "$cur") )
+                COMPREPLY=( $(compgen -W "--json --re --all --no-embed --harness --project --since --role --session --rebuild --limit --sort" -- "$cur") )
             fi
             ;;
     esac
@@ -373,7 +375,7 @@ _deja() {
       _arguments '--json[print JSON]' '--from=[which machine]:origin:(machine local)' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '--role=[filter by role]:role:(%ROLES%)' '1:count:'
       ;;
     recall)
-      _arguments '--project=[project name]:project:' '--harness=[filter by harness]:harness:($harnesses)' '--limit=[maximum sessions]:count:' '*:query:'
+      _arguments '--project=[project name]:project:' '--harness=[filter by harness]:harness:($harnesses)' '--limit=[maximum sessions]:count:' '--offset=[sessions to skip]:count:' '*:query:'
       ;;
     remember)
       _arguments '--project=[note project]:project:' '*--tag=[tag the note, repeatable]:tag:' '1:text:'
@@ -444,7 +446,7 @@ _deja() {
     brief|check|ctx|embed|hook-precompact|hook-prompt|mcp|share|sources|statusline|version|warmup)
       ;;
     *)
-      _arguments '--json[print JSON]' '--re[interpret query as a regular expression]' '--all[include all results]' '--no-embed[skip semantic reranking]' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '--role=[filter by role]:role:(%ROLES%)' '--session=[only one session]:id:' '--rebuild[force a full rebuild]' '--limit=[max sessions to return (1-100)]:count:'
+      _arguments '--json[print JSON]' '--re[interpret query as a regular expression]' '--all[include all results]' '--no-embed[skip semantic reranking]' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '--role=[filter by role]:role:(%ROLES%)' '--session=[only one session]:id:' '--rebuild[force a full rebuild]' '--limit=[max sessions to return (1-100)]:count:' '--sort=[order of the results]:order:(relevance date)'
       ;;
   esac
 }
@@ -469,6 +471,8 @@ complete -c deja -n '__deja_needs_command' -l session -r
 complete -c deja -n '__deja_needs_command' -l rebuild
 complete -c deja -n '__deja_needs_command' -l limit -r -d 'Max sessions to return (1-100)'
 complete -c deja -n '__fish_seen_subcommand_from search' -l limit -r -d 'Max sessions to return (1-100)'
+complete -c deja -n '__deja_needs_command' -l sort -x -a 'relevance date' -d 'Order of the results'
+complete -c deja -n '__fish_seen_subcommand_from search' -l sort -x -a 'relevance date' -d 'Order of the results'
 
 complete -c deja -n '__fish_seen_subcommand_from completion' -a 'bash zsh fish powershell pwsh'
 complete -c deja -n '__fish_seen_subcommand_from blame' -l attribution -d 'Show line attribution'
@@ -520,6 +524,7 @@ complete -c deja -n '__fish_seen_subcommand_from last' -l role -r -a '%ROLES%'
 complete -c deja -n '__fish_seen_subcommand_from recall; and not __fish_seen_subcommand_from bench' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from recall; and not __fish_seen_subcommand_from bench' -l harness -r -a '%HARNESSES%'
 complete -c deja -n '__fish_seen_subcommand_from recall; and not __fish_seen_subcommand_from bench' -l limit -r
+complete -c deja -n '__fish_seen_subcommand_from recall; and not __fish_seen_subcommand_from bench' -l offset -r
 complete -c deja -n '__fish_seen_subcommand_from remember' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from remember' -l tag -r
 complete -c deja -n '__fish_seen_subcommand_from rules; and not __fish_seen_subcommand_from sync status candidates' -f -a 'sync status candidates'
@@ -590,7 +595,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
     $handoffTargets = @('%HANDOFF_TARGETS%' -split ' ' | Where-Object { $_ })
     $defaultOptions = @(
         '--json', '--re', '--all', '--no-embed', '--harness', '--project',
-        '--since', '--role', '--session', '--rebuild', '--limit'
+        '--since', '--role', '--session', '--rebuild', '--limit', '--sort'
     )
 
     $elements = @($commandAst.CommandElements | ForEach-Object { $_.Extent.Text })
@@ -639,7 +644,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
             }
             'recall' {
                 if ($previous -eq '--harness') { $harnesses }
-                else { @('--project', '--harness', '--limit') }
+                else { @('--project', '--harness', '--limit', '--offset') }
             }
             'remember' { @('--project', '--tag') }
             'rules' {
@@ -696,7 +701,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 else { @('--limit', '--json') }
             }
             { $_ -in @('brief', 'check', 'ctx', 'embed', 'hook-precompact', 'hook-prompt', 'mcp', 'share', 'sources', 'statusline', 'version', 'warmup') } { @() }
-            default { $defaultOptions }
+            default { if ($previous -eq '--sort') { @('relevance', 'date') } else { $defaultOptions } }
         }
     }
 

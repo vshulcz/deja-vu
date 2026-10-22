@@ -24,6 +24,7 @@ func TestNearestSearchFlag(t *testing.T) {
 	for _, ok := range []string{
 		"--retry", "--json", "--limit", "--re", "--all",
 		"pool", "-x", "--", "--zzzzzzzz", "--nosuchflag",
+		"--soft", "--port", "--short", "--sorts", "--sort",
 	} {
 		if got := nearestSearchFlag(ok); got != "" {
 			t.Errorf("nearestSearchFlag(%q) = %q, want silence", ok, got)

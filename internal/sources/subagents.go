@@ -50,7 +50,7 @@ func switchedParse(f func(string, int64) ([]model.Session, error)) func(string, 
 	}
 	return func(p string, nano int64) ([]model.Session, error) {
 		ss, err := f(p, nano)
-		return ApplySubagentSwitch(ss), err
+		return applyReadSwitches(ss), err
 	}
 }
 
@@ -60,7 +60,7 @@ func switchedParseFrom(f func(string, int64, int64) ([]model.Session, error)) fu
 	}
 	return func(p string, off, nano int64) ([]model.Session, error) {
 		ss, err := f(p, off, nano)
-		return ApplySubagentSwitch(ss), err
+		return applyReadSwitches(ss), err
 	}
 }
 
@@ -68,17 +68,26 @@ func switchedLoad(f func() []model.Session) func() []model.Session {
 	if f == nil {
 		return nil
 	}
-	return func() []model.Session { return ApplySubagentSwitch(f()) }
+	return func() []model.Session { return applyReadSwitches(f()) }
 }
 
-// withSubagentSwitch wraps every parse a harness makes in the switch.
+// applyReadSwitches is every switch on what a reader returned: the parse
+// switches, then the sub-agent cut, so the turns a cut keeps are counted
+// among the records the index keeps.
+func applyReadSwitches(ss []model.Session) []model.Session {
+	return ApplySubagentSwitch(ApplyParseSwitches(ss))
+}
+
+// withSubagentSwitch wraps every parse a harness makes in the sub-agent and
+// parse switches.
 func withSubagentSwitch(hs []Harness) []Harness {
 	for i := range hs {
-		hs[i].Load = switchedLoad(hs[i].Load)
+		hs[i].Load, hs[i].switched = switchedLoad(hs[i].Load), true
 		kinds := make([]FileKind, len(hs[i].Kinds))
 		for j, k := range hs[i].Kinds {
 			k.Parse = switchedParse(k.Parse)
 			k.ParseFrom = switchedParseFrom(k.ParseFrom)
+			k.switched = true
 			kinds[j] = k
 		}
 		hs[i].Kinds = kinds

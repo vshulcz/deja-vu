@@ -165,8 +165,8 @@ func GooseSessionFiles() []string {
 func LoadGoose() []model.Session {
 	ss := parseFiles(gooseJSONLFiles(), ParseGooseFile)
 	for _, db := range GooseDBs() {
-		dbSS, _ := ParseGooseDB(db)
-		ss = append(ss, dbSS...)
+		dbSS, err := ParseGooseDB(db)
+		ss = append(ss, dbRead(db, dbSS, err)...)
 	}
 	return ss
 }
@@ -725,7 +725,7 @@ func parseGooseDBWhere(db, where string, limit int) ([]model.Session, error) {
 			// changed its schema. Reporting the second as "no sessions" makes
 			// a whole harness disappear from recall while doctor still calls
 			// the store healthy.
-			return nil, fmt.Errorf("goose: query failed, the store schema may have changed: %w", err)
+			return nil, schemaChanged("goose", err)
 		}
 		return nil, err
 	}

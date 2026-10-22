@@ -323,20 +323,14 @@ jobs:
         run: |
           report=$(./deja bench ingest --json)
           printf '%s\n' "$report"
-          # Nothing but a rewrite rewrites.
+          # No update rewrites the store, a rewritten transcript included (#5387).
           printf '%s\n' "$report" | jq -e '
-            [.classes[] | select(.name != "rewritten transcript") | .rewritten]
-            | length > 0 and all(. == false)'
-          # And the rewrite class is still there to be compared against, so a
-          # renamed or removed class cannot make the check above vacuous.
-          printf '%s\n' "$report" | jq -e '
-            [.classes[] | select(.name == "rewritten transcript" and .rewritten)]
-            | length == 1'
+            [.classes[].rewritten] | length > 0 and all(. == false)'
           # And every class is present. A wall-clock comparison stood here and
           # failed on the runner while the local margin was five-fold — which
           # is the lesson above, applied to this step rather than quoted by it.
           # What the gate can hold on a shared machine is the shape: the five
-          # classes exist, and only one of them rewrites.
+          # classes exist, and none of them rewrites.
           printf '%s\n' "$report" | jq -e '
             [.classes[].name] | sort == [
               "appended turn", "new transcript", "renamed transcript",
@@ -360,7 +354,7 @@ jobs:
     if: ${{ !cancelled() }}
     name: test / ${{ matrix.os }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     permissions:
       contents: read
       actions: read
@@ -379,13 +373,16 @@ jobs:
         with:
           go-version: '1.26.x'
           cache: false
-      # Read from the run's jobs rather than from what the shards uploaded:
-      # artifacts belong to the run, not the attempt, so after a re-run a
-      # shard that failed would still have the first attempt's files.
-      # filter=latest is each job's newest attempt.
+      # `needs: test-shard` is the source of truth: it is every shard's result
+      # for this attempt, carried over for shards a re-run did not touch. The
+      # run's jobs API is only asked which OS a failure belongs to. Asking it
+      # first read shards that had finished minutes earlier as `queued`, and
+      # after a re-run of just the gates it had no rows for them at all, so
+      # the gates went red over green shards (#5416).
       - name: Every shard passed
         env:
           GH_TOKEN: ${{ github.token }}
+          SHARDS: ${{ needs.test-shard.result }}
         shell: bash
         run: |
           set -euo pipefail
@@ -394,17 +391,56 @@ jobs:
             echo "::error::no shards were planned for $OS"
             exit 1
           fi
-          got=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?filter=latest&per_page=100" \
-            --jq '.jobs[] | "\(.name)\t\(.conclusion // .status)"')
+          if [ "$SHARDS" = success ]; then
+            echo "every shard passed"
+            exit 0
+          fi
+          if [ "$SHARDS" != failure ] && [ "$SHARDS" != cancelled ]; then
+            echo "::error::test-shard: $SHARDS"
+            exit 1
+          fi
+          # A shard failed or timed out somewhere; find out whether it was one
+          # of this OS's. Every shard has finished by now, so a row that is not
+          # `completed` is the API lagging: wait for it rather than call it a
+          # failure. filter=all with the newest attempt per name, because
+          # filter=latest drops the jobs a partial re-run did not repeat.
+          all=$(jq -r '.include[] | "test \(.shard)/\(.of) / \(.os)"' <<<"$MATRIX")
+          got=
+          for _ in $(seq 1 60); do
+            got=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?filter=all&per_page=100" \
+              --jq '.jobs[] | [.name, .run_attempt, .status, (.conclusion // "")] | @tsv' |
+              sort -t$'\t' -k2,2n |
+              awk -F'\t' '{ row[$1] = $3 "\t" $4 } END { for (n in row) print n "\t" row[n] }') || { sleep 10; continue; }
+            pending=0
+            while IFS= read -r name; do
+              st=$(awk -F'\t' -v n="$name" '$1 == n { print $2 }' <<<"$got")
+              if [ "$st" != completed ]; then pending=1; fi
+            done <<<"$want"
+            [ "$pending" = 0 ] && break
+            sleep 10
+          done
           fail=0
           while IFS= read -r name; do
-            c=$(awk -F'\t' -v n="$name" '$1 == n { print $2 }' <<<"$got" | tail -1)
-            echo "$name: ${c:-missing}"
-            if [ "$c" != success ]; then
-              echo "::error::$name: ${c:-missing}"
+            row=$(awk -F'\t' -v n="$name" '$1 == n { print $2 "/" $3 }' <<<"$got")
+            echo "$name: ${row:-missing}"
+            if [ "$row" != completed/success ]; then
+              echo "::error::$name: ${row:-missing}"
               fail=1
             fi
           done <<<"$want"
+          # needs: says a shard did not pass. If the API shows every one of them
+          # passing, it is behind (an earlier attempt's success standing in for a
+          # re-run's failure), and passing here would turn every gate green over
+          # a red shard.
+          bad=0
+          while IFS= read -r name; do
+            row=$(awk -F'\t' -v n="$name" '$1 == n { print $2 "/" $3 }' <<<"$got")
+            if [ "$row" != completed/success ]; then bad=1; fi
+          done <<<"$all"
+          if [ "$bad" = 0 ]; then
+            echo "::error::test-shard is $SHARDS but the jobs API shows every shard passing"
+            fail=1
+          fi
           exit $fail
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         if: matrix.os == 'ubuntu-latest'

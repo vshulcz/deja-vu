@@ -98,7 +98,7 @@ func stampText(h uint64, text string) uint64 {
 // walls not already there. It is frictionTexts' loop with the wanted set
 // fixed to every wall.
 func firstFrictionLines(text string, walls map[uint64]bool, lines map[uint64]string) {
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		line, ok := FrictionLine(line)
 		if !ok || line == "" {
 			continue
@@ -194,6 +194,10 @@ func writeFrictionTexts(dir string, m Manifest, size int64) error {
 		case meta.Harness == "deja":
 			// A promoted note is reordered on load, so its first lines are
 			// not an append's to extend.
+			whole[k] = true
+		case meta.Shared:
+			// The tail may be a copy that took the row, which leaves the old
+			// entry the other copy's.
 			whole[k] = true
 		default:
 			extend[k] = true
@@ -321,11 +325,16 @@ func readFrictionEntries(dir string, m Manifest, f *os.File, t *recordTables, ke
 	var err error
 	if len(plain) > 0 {
 		roles := map[string]bool{roleToolOutput: true}
-		each := func(r Record) { send(r.Key, r.Text) }
+		each := func(r Record) {
+			// The row's copy, as the reader takes it (see toolOutput).
+			if !foreignPath(r.SourcePath, m.Sessions[r.Key]) {
+				send(r.Key, r.Text)
+			}
+		}
 		if from == 0 {
 			err = eachRecordForKeysInRoles(filepath.Join(dir, "records.bin"), t, plain, roles, each)
 		} else if _, err = f.Seek(from, io.SeekStart); err == nil {
-			err = walkRecordsForKeys(bufio.NewReaderSize(f, 256*1024), t, plain, roles, each)
+			err = walkRecordsForKeys(bufio.NewReaderSize(f, 256*1024), from, t, plain, roles, each)
 		}
 	}
 	for _, meta := range notes {
@@ -529,8 +538,12 @@ func carryFrictionTexts(dir, tmp string, old Manifest, changed map[string]bool) 
 	}
 	dst := filepath.Join(tmp, frictionTextsFile)
 	ft, ok := decodeFrictionTexts(b)
-	if !ok || ft.size != old.RecordsSize || !logFingerprintIs(filepath.Join(dir, "records.bin"), ft.size, ft.fp) {
-		_ = os.WriteFile(dst, b, 0o600)
+	// A prefix of the log, not the whole of it: a pass that appends its
+	// records shares dir's log, which has grown by them already (#5387).
+	if !ok || ft.size != old.RecordsSize || !logPrefixIs(filepath.Join(dir, "records.bin"), ft.size, ft.fp) {
+		// Not the committed log's. Copied, it would read as covering a log
+		// an appending pass leaves the same up to its tail, sessions it
+		// replaced included; the commit builds the file instead.
 		return
 	}
 	size, fp, err := logFingerprint(filepath.Join(tmp, "records.bin"))
@@ -560,15 +573,15 @@ func logFingerprint(path string) (int64, [sha256.Size]byte, error) {
 	return fi.Size(), fp, err
 }
 
-// logFingerprintIs reports whether the log at path is size bytes whose
+// logPrefixIs reports whether the log at path starts with size bytes whose
 // fingerprint is fp.
-func logFingerprintIs(path string, size int64, fp [sha256.Size]byte) bool {
+func logPrefixIs(path string, size int64, fp [sha256.Size]byte) bool {
 	f, err := os.Open(path)
 	if err != nil {
 		return false
 	}
 	defer func() { _ = f.Close() }()
-	if fi, err := f.Stat(); err != nil || fi.Size() != size {
+	if fi, err := f.Stat(); err != nil || fi.Size() < size {
 		return false
 	}
 	got, err := recordLogFingerprint(f, size)

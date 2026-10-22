@@ -42,6 +42,15 @@ func (r installResult) touched() []string {
 }
 
 func runInstall(dir string, args []string, uninstall bool) error {
+	// Before this run prints anything: stdout may be a pipe that closes while
+	// the run still has state to write — `deja install aider | head -1` takes
+	// one line and goes, with the config edits already on disk and
+	// `defer recordWiring` still to come. Go answers the next write on such a
+	// stdout with SIGPIPE and dies, skipping every deferred call, so those
+	// edits were never recorded and uninstall had nothing to put the reader's
+	// file back with (#5322). Ignored, the write fails as EPIPE and the run
+	// goes on losing lines rather than state.
+	ignoreSIGPIPE()
 	// Every path deja writes hangs off the home directory, and homeDir()
 	// answers "" when it cannot find one. filepath.Join("", ".claude") is
 	// ".claude", so with HOME unset install wrote .claude/, .claude.json and
@@ -3111,11 +3120,19 @@ func tomlHeadersClose(text string) error {
 // (`mcp_servers.mine.command = …`) is a table a header may extend.
 func tomlInlineKey(text, header string) error {
 	want := tomlKeyPath(strings.Trim(header, "[]"))
+	wantArray := strings.HasPrefix(header, "[[")
 	table := []string(nil)
 	for i, line := range tomlCodeLines(text) {
 		code := tomlCode(line)
 		if strings.HasPrefix(code, "[") && strings.HasSuffix(code, "]") {
 			table = tomlKeyPath(strings.Trim(code, "[]"))
+			// An array of tables is not the table deja adds: declaring a key as
+			// both is the same double definition, so `[[mcp_servers.deja]]` is
+			// refused too (#5297). Only when deja adds a plain table; its own
+			// `[[hooks]]` is an array by design and the reader's entries stay legal.
+			if strings.HasPrefix(code, "[[") && !wantArray && tomlPathHasPrefix(want, table) {
+				return fmt.Errorf("line %d declares %s as an array of tables, and the %s table deja adds would define it twice — write it as %s tables or add deja by hand", i+1, strings.Join(table, "."), header, header)
+			}
 			continue
 		}
 		k, _, ok := strings.Cut(code, "=")
@@ -3220,11 +3237,14 @@ func installTOML(path, block string, uninstall bool) (installResult, error) {
 			noteBlockAdded(path, "mcp_servers."+key)
 			next := []byte(updateTOMLMCPBlock(text, key, block))
 			a, err := writeIfChanged(path, old, next)
-			return installResult{
-				Path:   path,
-				Action: a,
-				Note:   fmt.Sprintf("updated %q, which already ran deja, instead of adding a second entry", key),
-			}, err
+			res := installResult{Path: path, Action: a}
+			// Said on the run that adopted the entry, not on every run after it
+			// (#5298). key keeps the quotes it was written with, so trim them
+			// before %q or a quoted key is quoted twice.
+			if err == nil && a != "unchanged" {
+				res.Note = fmt.Sprintf("updated %q, which already ran deja, instead of adding a second entry", strings.Trim(key, `"'`))
+			}
+			return res, err
 		}
 	}
 

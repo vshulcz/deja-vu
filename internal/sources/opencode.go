@@ -50,7 +50,7 @@ func LoadOpencode() []model.Session {
 	// using it, or unreadable — is reported like a transcript that would not
 	// parse, so the pass says so and does not record the store as read.
 	ss, err := ParseOpencodeDBWhere(OpencodeDB(), "", 0)
-	diagFileError(OpencodeDB(), err)
+	ss = dbRead(OpencodeDB(), ss, err)
 	// And the diff store beside it, which is the only record of what most of
 	// those sessions changed (#3791). A full pass goes through Load rather
 	// than through the file kinds, so registering the kind alone left this
@@ -769,8 +769,7 @@ func readOpencodeRows(harness, db, q string, by map[string]*model.Session) (int,
 			// changed its schema. Reporting the second as "no sessions" makes
 			// a whole harness disappear from recall while doctor still calls
 			// the store healthy.
-			return 0, fmt.Errorf("opencode: query failed, the store schema may have changed: %w",
-				withStderr(err, &whyNot))
+			return 0, schemaChanged("opencode", withStderr(err, &whyNot))
 		}
 		return rows, err
 	}
@@ -1033,6 +1032,8 @@ func partTime(r map[string]any) time.Time {
 // patchSpans turns an apply_patch payload into the same "path\nreplaced bytes"
 // records a Claude Edit produces, so `deja restore` does not have to care which
 // harness did the work. Only removed lines count: the added ones are on disk.
+// The hunks of a renamed file go under the name after "*** Move to:", the
+// file they were written to.
 func patchSpans(patch string) []string {
 	var out []string
 	path := ""
@@ -1051,7 +1052,8 @@ func patchSpans(patch string) []string {
 		switch {
 		case strings.HasPrefix(line, "*** Update File:"),
 			strings.HasPrefix(line, "*** Delete File:"),
-			strings.HasPrefix(line, "*** Add File:"):
+			strings.HasPrefix(line, "*** Add File:"),
+			strings.HasPrefix(line, "*** Move to:"):
 			flush()
 			path = strings.TrimSpace(line[strings.Index(line, ":")+1:])
 		case strings.HasPrefix(line, "@@"), line == "*** End Patch":

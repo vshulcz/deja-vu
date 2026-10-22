@@ -96,7 +96,8 @@ func scanRecordOffsets(f *os.File, t *recordTables, start, end int64, into map[s
 	}
 	r := bufio.NewReaderSize(io.LimitReader(f, end-start), 1024*1024)
 	off := start
-	var n int64
+	dead := t.deadFrom(start)
+	var n, scanned int64
 	var hdr [4]byte
 	for off < end {
 		if _, err := io.ReadFull(r, hdr[:]); err != nil {
@@ -114,15 +115,18 @@ func scanRecordOffsets(f *os.File, t *recordTables, start, end int64, into map[s
 		if un <= 0 {
 			return 0, errShortRecord
 		}
-		key := t.lookup(kid)
-		into[key] = append(into[key], off)
+		if !dead.at(off) {
+			key := t.lookup(kid)
+			into[key] = append(into[key], off)
+			n++
+		}
 		if _, err := r.Discard(int(size)); err != nil {
 			return 0, err
 		}
 		off += 4 + size
-		n++
+		scanned++
 	}
-	atomic.AddInt64(&recordOffsetsScanned, n)
+	atomic.AddInt64(&recordOffsetsScanned, scanned)
 	return n, nil
 }
 
@@ -194,6 +198,13 @@ func encodeRecordOffsets(covered, records int64, fp [sha256.Size]byte, byKey map
 		data.Write(tmp[:binary.PutUvarint(tmp[:], uint64(len(e.key)))])
 		data.WriteString(e.key)
 		offs := byKey[e.key]
+		// Deltas, so in log order, as a walk lists them. A pass appending to
+		// the log gathers out of order a turn a rewrite moves to a session's
+		// kept copy: written at the end, it comes ahead of the copy's own
+		// records, which stay where they were (#5522).
+		if !slices.IsSorted(offs) {
+			slices.Sort(offs)
+		}
 		data.Write(tmp[:binary.PutUvarint(tmp[:], uint64(len(offs)))])
 		prev := int64(0)
 		for _, o := range offs {
@@ -361,6 +372,7 @@ func eachRecordForKeysByOffsets(f *os.File, dir string, t *recordTables, want, r
 	}
 	atomic.AddInt64(&recordOffsetReads, 1)
 	slices.Sort(offs)
+	offs = slices.DeleteFunc(offs, t.isDead)
 	recs := make([]Record, 0, len(offs))
 	// In spans, the way eachRecordAt reads postings: a session's records sit
 	// back to back in the log, and a pread per record was most of what loading
@@ -405,7 +417,7 @@ func eachRecordForKeysByOffsets(f *os.File, dir string, t *recordTables, want, r
 	if _, err := f.Seek(ro.covered, io.SeekStart); err != nil {
 		return true, err
 	}
-	return true, walkRecordsForKeys(bufio.NewReaderSize(f, 256*1024), t, want, roles, fn)
+	return true, walkRecordsForKeys(bufio.NewReaderSize(f, 256*1024), ro.covered, t, want, roles, fn)
 }
 
 // recordInSpan is readRecordAtInRoles over a span already read: whole is false

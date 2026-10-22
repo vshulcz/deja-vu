@@ -1,7 +1,9 @@
 package embed
 
 import (
+	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +12,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 )
@@ -175,7 +178,7 @@ func TestEmbedIndexEmbedsOnlyWhatARewriteChanged(t *testing.T) {
 	}
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
 	// Rewritten rather than grown: a rewind cannot be appended onto, so the
-	// pass replaces records.bin and every offset with it.
+	// pass replaces the session, and the vectors of its old records go.
 	rewound := `{"type":"user","sessionId":"a","timestamp":"2026-01-04T00:00:00Z","message":{"role":"user","content":"the scheduler story, rewritten"}}` + "\n"
 	if err := os.WriteFile(filepath.Join(root, "project", "a.jsonl"), []byte(rewound), 0o600); err != nil {
 		t.Fatal(err)
@@ -213,7 +216,9 @@ func TestAVersion1SidecarIsEmbeddedAgainAfterARewrite(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "project", "a.jsonl"), []byte(rewound), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := index.Ensure(dir, "", false, nil); err != nil {
+	// Written again whole: an ordinary pass appends the rewritten transcript
+	// and leaves the offsets a version 1 vector holds valid (#5387).
+	if err := index.Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	embedded.Store(0)
@@ -254,9 +259,9 @@ func TestAVersion1SidecarIsRekeyedWhileItsLayoutHolds(t *testing.T) {
 	}
 }
 
-// The identity reads the length of the whole text and only its first 256
-// bytes, so two long records that start alike but differ in length are told
-// apart, and a record read again names itself the same way.
+// The identity reads the length of the whole text and its first and last 256
+// bytes, so two long records that start alike but differ in length or ending
+// are told apart, and a record read again names itself the same way.
 func TestRecordIdentTellsLongRecordsApart(t *testing.T) {
 	head := strings.Repeat("the scheduler retries ", 20)
 	a := index.Record{Key: "claude:a", Role: "user", Text: head + "once"}
@@ -264,7 +269,117 @@ func TestRecordIdentTellsLongRecordsApart(t *testing.T) {
 	if RecordIdent(a) == RecordIdent(b) {
 		t.Error("two long records of different lengths share an identity")
 	}
+	c := index.Record{Key: "claude:a", Role: "user", Text: head + "ending one"}
+	d := index.Record{Key: "claude:a", Role: "user", Text: head + "ending two"}
+	if RecordIdent(c) == RecordIdent(d) {
+		t.Error("two long records of one length that end apart share an identity")
+	}
 	if RecordIdent(a) != RecordIdent(index.Record{Key: "claude:a", Role: "user", Text: head + "once"}) {
 		t.Error("the same record read twice named itself differently")
+	}
+}
+
+// A harness that writes no time per turn dates them all from the file's
+// modification time, so each pass that grew the session moved every record's
+// time. The identity held the time, and the next embed sent the whole session
+// again (#4976); it holds only what the vector is made from now.
+func TestEmbedIndexKeepsVectorsWhenOnlyTheTimeMoved(t *testing.T) {
+	var embedded atomic.Int64
+	client := countingClient(t, &embedded)
+	dir, _ := embedStore(t)
+	tdir := filepath.Join(os.Getenv("DEJA_CURSOR_CLI_ROOT"), "projects", "work", "agent-transcripts", "cur")
+	if err := os.MkdirAll(tdir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(tdir, "cur.jsonl")
+	turns := func(n int, at time.Time) {
+		var b strings.Builder
+		for i := 0; i < n; i++ {
+			fmt.Fprintf(&b, `{"role":"user","message":{"content":[{"type":"text","text":"cursor question %d about the scheduler"}]}}`+"\n", i)
+			fmt.Fprintf(&b, `{"role":"assistant","message":{"content":[{"type":"text","text":"cursor answer %d"}]}}`+"\n", i)
+		}
+		if err := os.WriteFile(path, []byte(b.String()), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(path, at, at); err != nil {
+			t.Fatal(err)
+		}
+		if err := index.Ensure(dir, "", false, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	start := time.Date(2026, 10, 1, 10, 0, 0, 0, time.UTC)
+	turns(3, start)
+	if _, err := EmbedIndex(dir, client, nil); err != nil {
+		t.Fatal(err)
+	}
+	if n := embedded.Load(); n != 5+6 {
+		t.Fatalf("first embed sent %d records, want 11; is the transcript indexed?", n)
+	}
+	turns(4, start.Add(5*time.Minute))
+	embedded.Store(0)
+	if _, err := EmbedIndex(dir, client, nil); err != nil {
+		t.Fatal(err)
+	}
+	if n := embedded.Load(); n != 2 {
+		t.Errorf("a session that grew by one exchange re-embedded %d records, want its 2 new ones", n)
+	}
+}
+
+// A version 2 sidecar keyed its vectors with the time in the identity. Its
+// vectors still find their records after a rewrite, by that identity, and are
+// rekeyed: upgrading deja does not embed the store again.
+func TestAVersion2SidecarIsRekeyedAfterARewrite(t *testing.T) {
+	var embedded atomic.Int64
+	client := countingClient(t, &embedded)
+	dir, _ := embedStore(t)
+	recs, err := index.ReadRecords(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := EmbedIndex(dir, client, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v2 := map[int64]uint64{}
+	for _, r := range recs {
+		v2[r.Offset] = recordIdentV2(r.Record)
+	}
+	for i := range s.Vectors {
+		s.Vectors[i].Ident = v2[s.Vectors[i].Offset]
+	}
+	if err := write(dir, s); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(Path(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	binary.LittleEndian.PutUint16(raw[4:], 2)
+	if err := os.WriteFile(Path(dir), raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+	rewound := `{"type":"user","sessionId":"a","timestamp":"2026-01-04T00:00:00Z","message":{"role":"user","content":"the scheduler story, rewritten"}}` + "\n"
+	if err := os.WriteFile(filepath.Join(root, "project", "a.jsonl"), []byte(rewound), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	embedded.Store(0)
+	again, err := EmbedIndex(dir, client, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := embedded.Load(); n != 1 {
+		t.Errorf("a version 2 sidecar after a rewrite re-embedded %d records, want only the rewritten 1", n)
+	}
+	got, err := readFile(Path(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Version != sidecarVersion || len(again.Vectors) != 5 {
+		t.Errorf("sidecar is version %d with %d vectors, want %d and 5", got.Version, len(again.Vectors), sidecarVersion)
 	}
 }

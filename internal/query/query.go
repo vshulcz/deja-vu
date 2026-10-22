@@ -69,11 +69,19 @@ type Options struct {
 	From  string
 	Since time.Duration
 	Limit int
+	// Sort is the order of the answer: SortDate lists the newest match first,
+	// anything else ranks by relevance. Under Window the pool is then the
+	// newest matches rather than the best-scored ones, so the page is the
+	// newest of the whole match, not the newest of its best thousand (#5577).
+	Sort string `json:"-"`
 	// Total and Capped travel from RunDetailed to Print so the JSON envelope
 	// can report how many sessions matched before the cap, not merely how many
 	// survived it. Counting the survivors measures the cap.
 	Total  int
 	Capped bool
+	// TotalEstimated says Total counts sessions retrieval did not read by an
+	// estimate (Unread.Estimated).
+	TotalEstimated bool
 	// Strict is how many of these sessions hold every word of the query. It
 	// is nonzero only on the relevance tier, where a thin strict answer is
 	// merged into the ranking and published under that label: the tier then
@@ -104,7 +112,66 @@ type Options struct {
 	// Now anchors relative-time phrases in the query ("a week ago"); zero
 	// means the moment of the search.
 	Now time.Time `json:"-"`
+	// Window is how many of the best-ranked sessions the caller reads; zero
+	// means all of them. Set, retrieval ranks a match much larger than that
+	// from the postings and the manifest first and reads only the sessions
+	// that can reach the page: scoring every session a common word matched
+	// took 22 s and 2.6 GB on a 40k-session store (#5467).
+	Window int `json:"-"`
+	// Unread describes the matching sessions retrieval left out under Window.
+	// Ranking needs their number and length for BM25's corpus figures, and
+	// the total needs their number.
+	Unread *Unread `json:"-"`
+	// Activation is the trust-policy path the answer goes out on (search,
+	// mcp). Set, the pool leaves out what the policy withholds there: a
+	// denied session took a pool slot from one the page could show, and the
+	// unread count reported it as a match.
+	Activation string `json:"-"`
+	// PoolScope names the projects of a narrower search the caller will cut
+	// from this one. Under Window, retrieval also reads every session of
+	// theirs that matched, outside the pool, when the narrower search would
+	// have read them all; Unread.Scoped lists them and Unread.ScopeWhole says
+	// it happened.
+	PoolScope []string `json:"-"`
 }
+
+// Unread is the part of a match retrieval did not read.
+type Unread struct {
+	// Sessions is how many matching sessions were left out: as the postings
+	// count them when every session read bore them out, scaled from the
+	// sample when Estimated. Otherwise the unread ones that pass the text
+	// check are read too, and this is zero.
+	Sessions int
+	// Length is their estimated BM25 length, summed.
+	Length float64
+	// Sample is a handful of sessions read only to check that estimate, keyed
+	// harness:id, each with its estimated length: ranking measures their real
+	// length and scales Length by how far off the estimate was. Drawn from
+	// outside the pool, where the estimate is applied, because the pool is a
+	// biased draw — short sessions rank first.
+	Sample map[string]float64
+	// Withheld is how many matching sessions the trust policy kept out of
+	// the pool under Options.Activation; they are in neither the pool nor
+	// Sessions.
+	Withheld int
+	// Scoped is what Options.PoolScope added to the read, keyed harness:id:
+	// matches counted in Sessions above, read only for the narrower answer.
+	// Ranking this one leaves them out.
+	Scoped map[string]bool
+	// ScopeWhole is set when every matching session of Options.PoolScope was
+	// read.
+	ScopeWhole bool
+	// Estimated says Sessions and Withheld were scaled from the sample rather
+	// than checked against the text, session by session: the postings
+	// over-counted what was read, and the unread ones were too many to check.
+	Estimated bool
+}
+
+// The orders Options.Sort takes.
+const (
+	SortRelevance = "relevance"
+	SortDate      = "date"
+)
 
 const (
 	TierExact    = "exact"
@@ -222,7 +289,12 @@ func MatchesQuery(text, q string) bool {
 }
 
 func MatchesParts(text string, terms, phrases []string, variants map[string][]string) bool {
-	low := Lower(text)
+	return MatchesLowered(Lower(text), terms, phrases, variants)
+}
+
+// MatchesLowered is MatchesParts for text the caller already put through
+// Lower, which is most of what the check costs on a long record.
+func MatchesLowered(low string, terms, phrases []string, variants map[string][]string) bool {
 	for _, term := range terms {
 		matched := strings.Contains(low, term)
 		for _, variant := range variants[term] {

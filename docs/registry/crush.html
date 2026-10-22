@@ -56,7 +56,9 @@
 <p>lines that <code>deja restore</code> and <code>deja blame</code> read (#4377). <code>lsp_replace_symbol</code></p>
 <p>writes its <code>replacement</code> in place of a symbol, before it or after it, and is</p>
 <p>read as written lines unless its <code>action</code> is <code>delete</code>; the replaced symbol is</p>
-<p>only in the result&#39;s metadata (#4533).</p>
+<p>only in the result&#39;s metadata, <code>{file_path, old_content, new_content, action}</code>.</p>
+<p>It is read from there: the lines the result names (<code>lines N-M</code>) of the old</p>
+<p>content, or the lines the two contents do not share (#4533, #595).</p>
 <p><code>tool_result</code> carries what the tool printed with a <code>&lt;cwd&gt;…&lt;/cwd&gt;</code> tag appended,</p>
 <p>which is the same directory on every line in the store and is stripped rather</p>
 <p>than indexed — left in, a search for the project name would match every tool</p>

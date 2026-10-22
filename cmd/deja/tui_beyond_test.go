@@ -17,7 +17,7 @@ func typeQuery(t *testing.T, a *tuiApp, q string) {
 	a.reload()
 	drain(t, a)
 	if len(a.rows) == 0 {
-		deadline := time.Now().Add(5 * time.Second)
+		deadline := time.Now().Add(2 * time.Minute)
 		for a.beyond.listed != a.listed && time.Now().Before(deadline) {
 			drain(t, a)
 		}

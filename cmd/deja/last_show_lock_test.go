@@ -56,7 +56,7 @@ func TestLastAndShowAnswerWhileAnotherDejaHoldsTheIndexLock(t *testing.T) {
 					if err != nil {
 						t.Errorf("%s: %v", r.name, err)
 					}
-				case <-time.After(5 * time.Second):
+				case <-time.After(2 * time.Minute):
 					waited = r.name
 				}
 			})

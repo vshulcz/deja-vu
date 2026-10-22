@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -331,21 +332,30 @@ func TestGeminiTranscriptTakingAStubRowMatchesARebuild(t *testing.T) {
 	// With and without the resumed turns: without them the transcript ends
 	// before the stub was written, and the row's span has to keep the stub's.
 	// The stub sorts first, so the rebuild reads it first and merges its span.
+	// The stub's row has no record, so it is set aside rather than listed,
+	// whichever pass read the stub (#5563).
 	for name, real := range map[string]string{"resumed": geminiOriginal() + geminiResumedTail(), "ends before the stub": geminiOriginal()} {
-		t.Run(name, func(t *testing.T) { transcriptTakesStubRow(t, real) })
+		for _, by := range []string{"append", "re-read", "rebuild"} {
+			t.Run(name+", stub read by "+by, func(t *testing.T) { transcriptTakesStubRow(t, real, by) })
+		}
 	}
 }
 
-func transcriptTakesStubRow(t *testing.T, real string) {
+func transcriptTakesStubRow(t *testing.T, real, by string) {
 	tmp := hermeticIndexEnv(t)
-	write(t, filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "p", "other.jsonl"),
-		claudeLine("s-other", "2026-01-02T03:04:05Z", "the exporter retries without a pause"))
+	other := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "p", "other.jsonl")
+	write(t, other, claudeLine("s-other", "2026-01-02T03:04:05Z", "the exporter retries without a pause")+
+		claudeLine("s-other", "2026-01-02T03:04:06Z", "and the backoff is capped"))
 	dir := filepath.Join(tmp, "idx")
 	if err := Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	write(t, filepath.Join(geminiChats(), "session-a-008140a7.jsonl"), geminiStub())
-	if err := Ensure(dir, "", false, nil); err != nil {
+	if by == "re-read" {
+		// A file that shrank sends the pass to the re-read path.
+		write(t, other, claudeLine("s-other", "2026-01-02T03:04:05Z", "the exporter retries without a pause"))
+	}
+	if err := Ensure(dir, "", by == "rebuild", nil); err != nil {
 		t.Fatal(err)
 	}
 	write(t, filepath.Join(geminiChats(), "session-b-008140a7.jsonl"), real)
@@ -366,9 +376,9 @@ func transcriptTakesStubRow(t *testing.T, real string) {
 	}
 	want := row()
 	if got.Counted != want.Counted || got.Words != want.Words || got.LastMsg != want.LastMsg || got.NoText != want.NoText ||
-		!got.Started.Equal(want.Started) || !got.Updated.Equal(want.Updated) || got.Path != want.Path {
-		t.Errorf("row after the transcript arrived: Counted=%d Words=%d Started=%v Updated=%v Path=%s; a rebuild gives Counted=%d Words=%d Started=%v Updated=%v Path=%s",
-			got.Counted, got.Words, got.Started, got.Updated, got.Path, want.Counted, want.Words, want.Started, want.Updated, want.Path)
+		!got.Started.Equal(want.Started) || !got.Updated.Equal(want.Updated) || got.Path != want.Path || !slices.Equal(got.Copies, want.Copies) {
+		t.Errorf("row after the transcript arrived: Counted=%d Words=%d Started=%v Updated=%v Path=%s Copies=%v; a rebuild gives Counted=%d Words=%d Started=%v Updated=%v Path=%s Copies=%v",
+			got.Counted, got.Words, got.Started, got.Updated, got.Path, got.Copies, want.Counted, want.Words, want.Started, want.Updated, want.Path, want.Copies)
 	}
 }
 

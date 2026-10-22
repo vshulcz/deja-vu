@@ -60,7 +60,9 @@
 <p>new turns use <code>read</code>, <code>write</code>, <code>edit</code> and <code>bash</code>, where <code>edit</code> takes</p>
 <p><code>edits[{oldText,newText}]</code> (also sent as a JSON string, or as one top-level</p>
 <p><code>oldText</code>/<code>newText</code> pair, both read the same way); the older <code>read_file</code>, <code>write_file</code> and <code>edit_file</code></p>
-<p>names are still read for sessions saved before. Commands also run through</p>
+<p>names are still read for sessions saved before. <code>fim_edit</code> names only two</p>
+<p>anchors and gets back the text it generated, <code>generated_text</code> in the JSON its</p>
+<p>result holds; that is read as the written side (#595). Commands also run through</p>
 <p><code>terminal/run</code> (a PTY session) and <code>task_shell_start</code> (a background task), both</p>
 <p>under <code>command</code>, and are read as commands (#4538). <code>apply_patch</code> takes a</p>
 <p>unified diff (<code>--- a/x</code> / <code>+++ b/x</code>, not codex&#39;s <code>*** Begin Patch</code>) under</p>

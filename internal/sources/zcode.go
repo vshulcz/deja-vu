@@ -80,8 +80,8 @@ func ZCodeUnderRoot(p string) bool {
 func LoadZCode() []model.Session {
 	ss := parseFiles(ZCodeTranscriptFiles(), ParseZCodeFile)
 	ss = append(ss, parseFiles(ZCodeLegacyFiles(), ParseZCodeLegacyFile)...)
-	dbSS, _ := ParseZCodeDB(ZCodeDB())
-	return append(ss, dbSS...)
+	dbSS, err := ParseZCodeDB(ZCodeDB())
+	return append(ss, dbRead(ZCodeDB(), dbSS, err)...)
 }
 
 // ZCodeTranscriptFiles is the JSONL half on its own. Callers that parse with

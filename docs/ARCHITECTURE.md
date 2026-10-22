@@ -61,9 +61,9 @@ File-based sources are parsed with a worker pool sized to `runtime.NumCPU()`. Re
 
 Every SQLite store above is read through the local `sqlite3` command — opencode's and the schemas that borrow it, Cursor IDE state, Goose, Zed, Crush, Kiro, Devin, Hermes, and the databases Grok and OpenClaw keep beside their JSONL. Cursor CLI transcripts are plain JSONL; their tool results come from the chat's `store.db` beside them. There is no CGO SQLite dependency. Before trusting it, deja asks the `sqlite3` on PATH one JSON query per process: a wrapper that drops its arguments or a stub that prints nothing would otherwise read every store as empty, so a binary that does not answer is reported by path, as a missing one is.
 
-Every one of those reads carries a wall-clock budget, ten minutes by default. One sqlite3 child once ran 13m54s with 0.75s of CPU in deja itself, and nothing in the tree set a deadline, so the run looked hung rather than slow. A store that runs out is an ordinary read error: the harness reports as unreadable, `deja doctor` names it, and the rest of the index still builds. `DEJA_STORE_TIMEOUT` takes a duration, and a zero or negative one turns the cap off for someone who would rather wait than lose a store.
+Every one of those reads is given up once it stops moving: ten minutes by default with no byte from the sqlite3 child, where a byte is a row or a line `.progress` prints every thousand steps of SQLite's virtual machine, so a sort or scan with no row yet still counts as moving. sqlite3 buffers its output on a pipe, so those lines arrive a few hundred at a time, seconds apart on a slow disk. A sqlite3 without `.progress` is judged by its rows. One sqlite3 child once ran 13m54s with 0.75s of CPU in deja itself and nothing in the tree set a deadline; a fixed ten-minute wall clock that followed cut a Hermes store still reading on a slow disk. A store given up, or whose read fails, is an ordinary read error: the run names it, exits 3, `deja doctor` names it, and the rest of the index still builds. A rebuild that cannot read a store keeps what the last build held from it and reads it again on the next pass. `DEJA_STORE_TIMEOUT` takes a duration, and a zero or negative one turns the bound off for someone who would rather wait than lose a store.
 
-A transcript read has the same budget, counted from the last byte read through the line and document readers rather than from the start, and so do the walk's reads of a changed transcript's head and tail. A file on a mount that stopped answering is skipped and named as unreadable once it has moved nothing for that long, and a slow read that keeps moving is left alone. A read given up marks its directory, so the rest of that directory is skipped at once for the rest of the process instead of costing the budget again. Its goroutine is not waited for; if the blocked call ever returns, what the parser reports after that is dropped. Readers that do not go through those readers (sqlite3 children, `os.ReadFile` in a few parsers) get the budget as a plain wall-clock limit.
+A transcript read has the same budget, counted from the last byte read through the line and document readers rather than from the start, and so do the walk's reads of a changed transcript's head and tail. A file on a mount that stopped answering is skipped and named as unreadable once it has moved nothing for that long, and a slow read that keeps moving is left alone. A read given up marks its directory, so the rest of that directory is skipped at once for the rest of the process instead of costing the budget again. Its goroutine is not waited for; if the blocked call ever returns, what the parser reports after that is dropped. A sqlite3 child read inside such a watch moves it as its bytes arrive. `os.ReadFile` in a few parsers gets the budget as a plain wall-clock limit.
 
 ## Index format
 
@@ -72,8 +72,10 @@ Default path: `~/.cache/deja/index.db`.
 Files:
 
 - `records.bin`: length-prefixed records. Each record stores session key, source path, role, text, and timestamp. The session key, path and role are interned ids in the record's prefix, outside the body, so a scan for one kind of record reads the prefix and skips the rest; bodies of 8 KiB and up are deflated, smaller ones are not, because the read side pays more for a lower floor than the index saves.
-- `buckets/*.bin`: token bucket files. A token maps to compact postings: record offset, session ordinal, and one bit marking the posting as a work record.
-- `recoffsets.bin`: where each session's records sit in `records.bin`, so reading one session back skips the walk over the whole log. It is a cache checked against the log: missing or stale, it costs the walk and nothing else.
+- `buckets/*.bin`: token bucket files. A token maps to compact postings: record offset, session ordinal, and one bit marking the posting as a work record. A pass that adds records puts their postings in overlays beside the bucket (`tx.1.ov` next to `tx.bin`, same format) instead of writing the bucket again; readers join a bucket and its overlays. Overlays are merged pairwise while the newer is at least half the size of the one before it, and into the bucket once they hold a quarter of it.
+- Dead records: a pass that replaces sessions (a transcript rewritten rather than appended to) appends their new records to `records.bin` and lists the offsets of the records they replace in the manifest. Every walk of the log and every postings read skips them. The pass stages its index in a new directory of hard links to the old files, so the swap is still the commit; each session it writes gets a fresh key id in the string table, so a reader holding the previous manifest resolves the appended tail to no session. When dead records reach a quarter of the log, the next replacing pass writes the log again without them, as it does where hard links are refused. A pass killed mid-append leaves `append.pending` with the old size, and the next lock holder cuts the log back to it. Once the swap commits, the pass zeroes the dead records where they stand: the frame keeps its length and the three ids all name the record's role, so any walk, an older deja's included, reads an empty record of no session. Before that it zeroes, in the directory of each postings file, every word only dead records held, past the letters the bucket is named after; the entry and its block stay, holding dead postings only. The log fingerprint in `recoffsets.bin` and `frictext.bin` moves to the zeroed log. A pass killed before the zeroing leaves `scrub.pending`, and the next lock holder finishes it. A swap that cannot remove `index.db.old` because a reader holds it (Windows) parks at `index.db.old.N`; recovery restores the highest.
+- `recoffsets.bin`: where each session's records sit in `records.bin`, so reading one session back skips the walk over the whole log. It is a cache checked against the log: missing or stale, it costs the walk and nothing else. A replacing pass that appends in place reads through it only the sessions whose files changed or went; it walks the log when one of those files is a shared store or a prompt log, whose records name other paths.
+- `commands-state.bin`: each session's part of the command table, so a pass that rewrites a few sessions mines only theirs for `commands.gob` and `sessionfacts.gob`. It names the log, its size, its count of dead records and the facts file written beside it; a state that does not match is walked again.
 - `frictext.bin`: the first line of each repeated error per session, written at build time so the session-start block does not read those sessions back. `fixraw.gob` keeps every fix pair before judging, so an update judges them as a rebuild does.
 - `manifest.gob` / `sessions.gob`: index version, source file state, redaction counters, sync export watermarks, imported-record dedupe keys, session metadata (including ordinals, the files a session touched most, hashes of the questions it asked, and the other transcripts that hold its id), build time, and search scope.
 
@@ -116,7 +118,9 @@ Search flow:
 1. Tokenize the query.
 2. Read posting lists from the token buckets.
 3. Intersect posting lists for multi-word searches.
-4. Filter postings by session metadata and read every matching candidate record.
+4. Filter postings by session metadata and read the matching candidate records;
+   past 1,000 matching sessions a page reads only those that can reach it (see
+   [Ranking](#ranking)).
 5. Group records back into sessions and score them in `internal/search` with BM25
    (`k1=1.2`, `b=0.75`). Document frequency and document length are measured
    over the candidate records at search time. User-message term contributions
@@ -165,7 +169,7 @@ transcript keeps what deja printed and blame reads transcripts.
 
 The export watermark is per peer and source path (falling back to session key for synthetic records) and is stored in `manifest.gob` as the max exported record timestamp. Re-running export emits only records with a newer timestamp for that source and that peer, so what one machine has already received says nothing about what another still needs. An export with no peer named keeps the bare source key, which is what manifests written before per-peer watermarks carry. Text is redacted again during export.
 
-`deja sync import <dir>` reads all `*.jsonl` batches, runs each record's text through the redactor again under this machine's rules (counted in `stats --redaction` like local ingest), appends records to the local index, updates touched token buckets, and writes imported session metadata with the original harness and an `imported:` project prefix. Imported IDs are namespaced (`imported-<hash>`) so they do not clobber local sessions from the same harness. The manifest stores dedupe keys of `harness:session_id:time:role:text-hash` (the older time-only key is still honoured), making re-import idempotent. Imported records live only in the index, so full rebuilds replay them from the old `records.bin` before regenerating from sources, and exports skip them to avoid echoing history back to its origin, unless `sync export --include-imported` asks to relay them.
+`deja sync import <dir>` reads all `*.jsonl` batches, runs each record's text through the redactor again under this machine's rules (counted in `stats --redaction` like local ingest), appends records to the local index, updates touched token buckets, and writes imported session metadata with the original harness and an `imported:` project prefix. The import holds a peer's records to this machine's switches: what `DEJA_INDEX_*` and `DEJA_INCLUDE_SUBAGENTS=0` leave out of a local read, a store `DEJA_EXCLUDE_HARNESSES` or a `harness:` line excludes, and a project the policy `ignore` rule covers stay out, and the import says how many. Imported IDs are namespaced (`imported-<hash>`) so they do not clobber local sessions from the same harness. The manifest stores dedupe keys of `harness:session_id:time:role:text-hash` (the older time-only key is still honoured), making re-import idempotent. Imported records live only in the index, so full rebuilds replay them from the old `records.bin` before regenerating from sources, and exports skip them to avoid echoing history back to its origin, unless `sync export --include-imported` asks to relay them.
 
 ### Which machines are one machine
 
@@ -179,6 +183,8 @@ The name a machine calls itself is its hostname, and an imported session is stam
 
 `deja sync ssh <host>` wraps the same export/import in one command: export to a temp dir, scp the batches, run the remote import (system ssh/scp, remote binary from PATH or `~/.local/bin/deja`).
 
+`deja install sync-timer` runs a bare `deja sync` from a launchd agent or a systemd user timer. The unit carries the `DEJA_*` and `XDG_*` settings of the shell it was installed from, the set the hook launcher records, since neither service manager sees that shell; a timer run then syncs into the same index under the same switches.
+
 Each of those phases names itself on stderr before it starts, repeats every ten seconds while it runs, and the run ends with where the time went; the remote's own output is echoed line by line as it arrives rather than after the ssh command exits, bounded and sanitised per line the way every other remote sentence is. Plain lines rather than a bar, because this output is read from a launchd log as often as from a terminal. Transfer says how many bytes in how many batches; nothing says anything per record or per path.
 
 ## Incremental algorithm
@@ -190,7 +196,7 @@ Each of those phases names itself on stderr before it starts, repeats every ten 
 - fresh manifest: do nothing;
 - version or scope mismatch: rebuild. Two versions are tracked: the content version, which moves when deja derives something new from a transcript, and the on-disk format, which moves only when an older layout would be mis-read. A store whose content version is stale is re-read but keeps answering from what it has; only a format mismatch makes search say it cannot answer yet;
 - append-only JSONL changes: append new records and update touched buckets. A harness whose sessions are re-read whole when they change (opencode, Kilo, ZCode, Cursor, Grok, Zed, Hermes, OpenClaw, Crush, goose) replaces those sessions instead (#4207, #4450);
-- removed files or non-append changes: rewrite the index while preserving unchanged records and replacing changed sessions.
+- removed files or non-append changes: replace the changed sessions. Their new records are appended to `records.bin`, the old ones are marked dead and zeroed in place, and their postings go in overlays; the log is written out again without dead records once they are a quarter of it (see Dead records above).
 
 A file takes the append path only when the prefix deja already read is still
 byte-for-byte what it read: a rewind that truncates and regrows past the old
@@ -334,6 +340,8 @@ Search intersects postings to find candidates, then scores each with BM25 over t
 - **promoted note** — a curated note outranks the raw transcript it was distilled from.
 - **freshness** — recency decays the score gently so time is a hint, not a filter.
 
+A search that shows a page (`deja search` without `--all`, MCP `recall` and `recall_context`) does not read every session a common word matched. When more than `max(1000, 20 × page)` sessions match, it ranks them first from the postings and the manifest — matched records with an estimated occurrence count, estimated length, title, reuse, notes and age — and reads only that many, plus 200 others spread over the estimated lengths. Those 200 correct the length estimate the unread sessions enter BM25's corpus figures with, and the total counts the unread sessions too. Below the threshold, and with `--all`, every match is scored as before. The search screen reads the same way, 80 hits a page. Sessions the trust policy withholds on that surface are left out of the pool and counted as withheld, not as matches. The postings say which records hold every word, not whether a quoted phrase stands in them, so when any pooled session fails the text check, the unread and withheld ones are checked the same way and the unread ones that pass are ranked with the pool. Past 20,000 of their postings the counts are scaled by how many of the 200 passed instead, and the total says it is an estimate (`about N`, `total_estimated` in `--json`). MCP `recall` ranks the cwd's project first and the machine after from one search: the pool also reads the project's matches when they fit, and the project's answer is cut from them.
+
 `recall_context` and the hooks reuse the same scored order; the point-of-action decision line comes from the same conclusion extraction the digest uses.
 
 Reading one session back (`ctx`, `recall_context`, the session resource) puts the code it changed under the header, ahead of the conversation, so a digest cut to its budget loses the end of the talk rather than the fix. A cut says so where it happens: a turn cut short ends with how much of it was left out, the window ends with how many turns it showed and whether the last one is among them, and both name `deja show <id>`, which prints every stored turn; changes that did not fit are counted. The edits are read from the transcript at that moment (`sources.Changes`: Claude Code edits, Codex `apply_patch` calls, and for other harnesses any edit-shaped call in a JSON transcript that holds one session): the index keeps the written side of an edit only as line hashes, and that stays so.
@@ -343,14 +351,18 @@ Reading one session back (`ctx`, `recall_context`, the session resource) puts th
 `deja embed` writes `<index-dir>.vectors.bin`. The file begins with `DJV1`, a
 version, vector dimension, model name, manifest generation, vector count, and
 covered-record watermark. Each entry stores the records.bin byte offset, the
-record's identity (a hash of its session, role, time, length and first 256
-bytes of text), its session key, and fixed-width float32 values. Writes use a
+record's identity (a hash of its session, role, text length and the first and
+last 256 bytes of text), its session key, and fixed-width float32 values. Writes use a
 temporary file and rename. A rewrite of records.bin moves the offsets, so a
 vector finds its record by identity once its offset no longer holds it, and
 the next `deja embed` carries every vector to its record's new offset and
-embeds only records it has not seen. A changed model discards old entries.
+embeds only records it has not seen. The time stays out of the identity, since
+harnesses that write no per-turn time date every turn from the file's mtime.
+A changed model discards old entries.
 Version 1 entries have no identity: they are carried only while the layout
-they were made for holds, and search refuses them after a rewrite. A sidecar
+they were made for holds, and search refuses them after a rewrite. Version 2
+identities included the time; they are still matched and rewritten as version
+3 on the next `deja embed`. A sidecar
 that will not parse is treated as absent only by `deja embed`, which writes a
 new one from scratch. Search and recall do not ignore it silently: they keep
 the lexical order and print one notice saying semantic search is off until

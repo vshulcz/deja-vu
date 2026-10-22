@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/query"
 )
 
 // version 12 resharded non-ASCII tokens across buckets; 13 interned the key
@@ -762,7 +763,56 @@ import (
 // are one word.
 // 90: a row names every transcript that holds its id, and a pass that
 // replaces the session reads them all (#5358).
-const version = 90
+// 91: a Claude Code prompt no longer carries the <pasted_content id="…">
+// wrapper around pasted text, only the text. The tags titled sessions, gave
+// the install's demo question the topic "pasted_content set" and were indexed
+// as terms; the rebuild unwraps the sessions it carries from records.bin too
+// (deleted, compacted away, imported), and a sync import unwraps on arrival.
+// 92: a pass that replaces a few sessions appends their records and lists the
+// old ones as dead, and postings land in per-bucket overlay files, so a pass
+// writes what changed rather than the whole log and every bucket (#5387).
+// 93: rows of a session several transcripts hold match a rebuild: a deleted
+// transcript keeps the counts read while it was on disk and spans its own
+// records beside copies, a copy that leaves takes its span with it, and the
+// span of the files beside the owner no longer holds the owner's own (#5380).
+// 94: a deleted transcript keeps every turn it held beside a copy: a copy
+// that did not own the row is kept, a rebuild files shared turns under the
+// deleted file, and a rewrite of the live copy leaves them with it. A
+// renamed copy or one that moved to another id gives the row back to the
+// smallest path, and a file holding only the last turn is not a move
+// (#5441, #5442, #5443, #5444, #5445).
+// 95: the command tables count what the record log holds: a turn two copies
+// of a session share once, and of two transcripts sharing an id only the copy
+// the row names, and a pass takes the words it removes out of the neighbour
+// map (#5489, #5490, #5491).
+// 96: a copy that takes a shared row from a transcript in another directory
+// reads the old owner again, and copies read in one pass are written in path
+// order, so a turn they share is filed under the copy a rebuild gives it
+// (#5492).
+// 97: fixes are mined from what the record log holds, as the command tables
+// are: of two transcripts sharing an id only the copy the row names (#5504).
+// 98: a rebuild writes a kept transcript and the copy on disk of the same
+// session in the order the log held them, and takes a session's facts from
+// its commands in time order (#5519).
+// 99: a command whose clean result lands in the tail a pass appends is read
+// with its result, so it carries the exit 0 a rebuild gives it (#5527).
+// 100: a build's command tables go by the file each turn is filed under, a
+// deleted copy's included; a copy changed beside a later one in another
+// directory is read again with it when its tail holds a turn that copy has,
+// and an append that moves a shared row mines its runs again (#5508, #5509,
+// #5510).
+// 101: a build drops the kept file of a deleted transcript whose sessions were
+// all forgotten (#5521).
+// 102: a pass that re-reads a changed transcript drops a record that strips to
+// empty, as a rebuild does (#5555).
+// 103: an incremental pass gives no row to a session it holds no record of
+// (#5563).
+// 104: a Copilot agent transcript's insert_edit_into_file records what it
+// wrote (#595).
+// 105: an apply_patch rename files its hunks under the new name (#595).
+// 106: CodeWhale write_file and fim_edit, Crush lsp_replace_symbol and Reasonix
+// delete_symbol record the side of the change they used to drop (#595).
+const version = 106
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
@@ -777,7 +827,10 @@ const version = 90
 // "deja is rebuilding its index for this version — ask again then", and an
 // agent does not ask again (#1733 says so about the refresh case). Three of the
 // last four upgrades could have kept answering.
-const onDiskFormat = 2
+//
+// 3: dead records and postings overlay files (#5387). A reader of format 2
+// would serve the replaced records and miss the overlays.
+const onDiskFormat = 3
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message
@@ -1098,6 +1151,14 @@ type Manifest struct {
 	// A live index whose records.bin is shorter than this lost its tail to a
 	// torn write and must be treated as corrupt.
 	RecordsSize int64 `json:"records_size,omitempty"`
+	// DeadRecords are the offsets, ascending, of records a later pass
+	// replaced. A pass that replaces a few sessions appends their new records
+	// and lists the old ones here rather than writing the log again, and every
+	// walk of the log and every postings read skips them. DeadBytes is what
+	// they hold; past a quarter of the log the next replacing pass writes the
+	// log again without them (#5387).
+	DeadRecords []int64 `json:"dead_records,omitempty"`
+	DeadBytes   int64   `json:"dead_bytes,omitempty"`
 	// BucketFiles is how many postings files buckets/ held when the manifest
 	// was committed. Losing the whole directory was already caught (#946), but
 	// a partial copy or an interrupted sync leaves some files behind rather
@@ -1106,6 +1167,10 @@ type Manifest struct {
 	// index healthy (#1088). Additive: a manifest written before this decodes
 	// with it zero, and the check is skipped.
 	BucketFiles int `json:"bucket_files,omitempty"`
+	// bucketsLeaving is how many of the postings files on disk the pass
+	// committing this manifest removes right after: the count above leaves
+	// them out (#5426).
+	bucketsLeaving int
 	// IngestHealth records, per harness, what ingestion skipped on the pass
 	// that last touched it: malformed JSONL lines and files that failed to
 	// parse. Silent loss must be diagnosable (`deja doctor --json`).
@@ -1163,6 +1228,12 @@ type Manifest struct {
 	// of those tables says so rather than answering empty, and a pass whose
 	// setting differs rebuilds once.
 	SearchOnly bool `json:"search_only,omitempty"`
+	// Empty holds the rows of sessions with no record, a transcript that had
+	// nothing to index, out of Sessions so no reader lists them (#868,
+	// #5563). A pass takes one back when its id is read again: a Gemini
+	// resume stub's row carries its span and file to the transcript that
+	// takes the id later, as a rebuild reading both gives (#4213).
+	Empty map[string]SessionMeta `json:"empty,omitempty"`
 }
 
 // HarnessIngest is one harness's ingestion health from its last indexing pass.
@@ -1222,6 +1293,8 @@ type manifestCore struct {
 	ImportedRecords  map[string]bool
 	RecordStrings    []string
 	RecordsSize      int64
+	DeadRecords      []int64
+	DeadBytes        int64
 	BucketFiles      int
 	IngestHealth     map[string]HarnessIngest
 	IngestFiles      map[string]FileIngest
@@ -1234,6 +1307,7 @@ type manifestCore struct {
 	Deferred           map[string]FileState
 	PartialOf          int
 	SearchOnly         bool
+	Empty              map[string]SessionMeta
 }
 
 type RedactionStats struct {
@@ -1318,6 +1392,9 @@ type SearchResult struct {
 	// it that choice was made by counting terms, one each, and the two disagreed
 	// exactly when one rare word carried the session. Empty on every other tier.
 	TermIDF map[string]float64 `json:",omitempty"`
+	// Unread is set when Options.Window let the exact tier read only the
+	// sessions that can reach the page. The caller hands it to ranking.
+	Unread *query.Unread `json:",omitempty"`
 }
 
 // IsStrict says whether this session holds every word of the query rather
@@ -1360,7 +1437,7 @@ type bucketPostings map[string]map[string][]posting
 // session objects in one indexing pass. Distinct messages (codex history
 // accumulation) pass through; format twins (gemini .json/.jsonl, cursor
 // multi-store composers) collapse.
-type msgSeen map[string]bool
+type msgSeen map[seenK]bool
 
 // recordWriter appends length-prefixed records through one buffer, tracking
 // the file offset in memory: the hot rebuild path used to pay a Seek syscall

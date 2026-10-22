@@ -114,8 +114,8 @@ func KiloSessionFiles() []string {
 
 func LoadKilo() []model.Session {
 	ss := parseFiles(KiloTaskFiles(), ParseKiloTask)
-	dbSS, _ := ParseKiloDB(KiloDB())
-	return append(ss, dbSS...)
+	dbSS, err := ParseKiloDB(KiloDB())
+	return append(ss, dbRead(KiloDB(), dbSS, err)...)
 }
 
 // vsCodeHosts are the editors that load a VS Code extension, in the order the

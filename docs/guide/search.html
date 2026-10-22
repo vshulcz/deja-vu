@@ -32,7 +32,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Search", "description": "deja search syntax: exact and phrase queries, natural language with stop-word handling, fuzzy typo tolerance, confidence tiers, and optional local semantic recall.", "url": "https://vshulcz.github.io/deja-vu/guide/search.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/search.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-07-19", "dateModified": "2026-10-19"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Search", "description": "deja search syntax: exact and phrase queries, natural language with stop-word handling, fuzzy typo tolerance, confidence tiers, and optional local semantic recall.", "url": "https://vshulcz.github.io/deja-vu/guide/search.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/search.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-07-19", "dateModified": "2026-10-22"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Search","item":"https://vshulcz.github.io/deja-vu/guide/search.html"}]}</script>
 </head>
 <body>
@@ -73,7 +73,7 @@
 <a href="recover-a-deleted-session.html">Recover a deleted session</a>
 <a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
-<details class="grpfold"><summary>Deleting sessions <span class="n">20</span></summary>
+<details class="grpfold"><summary>Deleting sessions <span class="n">21</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
 <a href="delete-old-claude-sessions.html">Old sessions</a>
 <a href="delete-codex-sessions.html">Codex</a>
@@ -94,6 +94,7 @@
 <a href="delete-windsurf-cascade-history.html">Windsurf</a>
 <a href="delete-qwen-code-chat-history.html">Qwen Code</a>
 <a href="delete-trae-sessions.html">TRAE CLI</a>
+<a href="delete-codebuddy-sessions.html">CodeBuddy</a>
 </details>
 <details class="grpfold"><summary>Per-agent guides <span class="n">36</span></summary>
 <a href="memory-for-aider.html">aider</a>
@@ -148,12 +149,12 @@
 <p class="pagelede">how a query finds a session you half-remember<span class="mins" data-mins></span></p>
 <p>Search is lexical by default — fast, offline, no model required — with graceful fallbacks so natural phrasing still works.</p>
 <h2>Searching as you type</h2>
-<p>Run <code>deja</code> with no arguments at a terminal and it opens a full-screen search over every agent's history. Results come in as you type, and the status line says how many sessions were searched and in how many milliseconds. <code>tab</code> moves between this project, all projects and the sessions deja kept after their agent deleted them; <code>a</code> filters by agent; <code>↑</code> on an empty box brings back past searches. The box also takes filters: an agent with a colon (<code>codex:</code>), <code>today</code>, <code>yesterday</code>, <code>week</code>, <code>month</code> and <code>in:&lt;project&gt;</code>. <code>↵</code> opens a session at the match. In the reader <code>/</code> finds a word, <code>n</code>/<code>N</code> step through the matches, <code>]</code>/<code>[</code> jump between the turns you asked and <code>t</code> unfolds long messages. <code>?</code> lists every key. When the same question was asked in more than one session, a "deja vu" banner says so and the newest answer is selected. <code>DEJA_TUI=0</code> keeps the text brief instead.</p>
+<p>Run <code>deja</code> with no arguments at a terminal and it opens a full-screen search over every agent's history. Results come in as you type, and the status line says how many sessions were searched and in how many milliseconds. <code>tab</code> moves between this project, all projects and the sessions deja kept after their agent deleted them; <code>a</code> filters by agent; <code>↑</code> on an empty box brings back past searches; <code>^s</code> lists the results newest first under day headings, and again goes back to best match first. The box also takes filters: an agent with a colon (<code>codex:</code>), <code>today</code>, <code>yesterday</code>, <code>week</code>, <code>month</code> and <code>in:&lt;project&gt;</code>. <code>↵</code> opens a session at the match. In the reader <code>/</code> finds a word, <code>n</code>/<code>N</code> step through the matches, <code>]</code>/<code>[</code> jump between the turns you asked and <code>t</code> unfolds long messages. <code>?</code> lists every key. When the same question was asked in more than one session, a "deja vu" banner says so and the newest answer is selected. <code>DEJA_TUI=0</code> keeps the text brief instead.</p>
 <h2>Query forms</h2>
 <ul>
 <li><b>Tokens</b> — <code>deja connection pool</code> matches records containing both words (AND).</li>
 <li><b>Phrases</b> — <code>deja '"connection pool exhausted"'</code> requires the exact contiguous phrase.</li>
-<li><b>Regex</b> — <code>deja --re "timeout|deadline exceeded"</code>.</li>
+<li><b>Regex</b> — <code>deja --re "timeout|deadline exceeded"</code>. Case is ignored, and <code>^</code> and <code>$</code> match at each line, as in grep.</li>
 <li><b>Filters</b> — <code>--harness</code>, <code>--project</code>, <code>--since 30d</code>, <code>--role assistant</code>. Beyond the conversation roles, the index keeps what the agent did: <code>--role files</code> for the paths a turn opened, <code>--role command</code> for the commands that ran, <code>--role edit</code> for the spans an edit replaced, <code>--role tool</code> for what a tool printed. These are searchable but stay out of ordinary results, since a path that happens to contain the words of a question is not an answer to it.</li>
 </ul>
 <h2>What a subagent did</h2>
@@ -178,7 +179,7 @@ deja "ran out of db connections"   # matches "connection pool exhausted"</pre>
 <h2>Natural-language queries</h2>
 <p>Stop words are dropped, word forms bridge morphology in both directions (<code>failing</code> finds <code>fails</code>), and when no session holds every remaining token deja drops up to two — telling you exactly which (<code>ignoring "why" — no session matches it together with the rest</code>). Zero results now mean the content genuinely is not there.</p>
 <h2>Search by time</h2>
-<p>Every message also carries its month and year in the postings, and a query with no exact match reads them: <code>deja "what did we do in may"</code> meets May's sessions structurally, and relative phrases resolve against the moment you ask — <code>a week ago</code>, <code>last month</code>, <code>10 days ago</code>. They rank the fallback, they never filter, and a query whose words already match something is answered on those words alone — so for a hard cutoff, or to narrow a query that does match, use <code>--since</code>.</p>
+<p>Every message also carries its month and year in the postings, and a query with no exact match reads them: <code>deja "what did we do in may"</code> meets May's sessions structurally, and relative phrases resolve against the moment you ask — <code>a week ago</code>, <code>last month</code>, <code>10 days ago</code>. They rank the fallback, they never filter, and a query whose words already match something is answered on those words alone — so for a hard cutoff, or to narrow a query that does match, use <code>--since</code>. To read the matches by date instead of by relevance, <code>--sort date</code> lists the newest first, in <code>--json</code> too. It reads the newest of the whole match, so on a word thousands of sessions hold the page is still the latest ones; when nothing matches exactly, it orders the ranked fallback, and says so when that was cut.</p>
 <h2>Earlier attempts</h2>
 <p>When an old session and a newer one from the same project match the same ground, the older hit is labeled an earlier attempt with the newer session's date — in CLI output, MCP digests, and as an additive <code>superseded</code> field in <code>--json</code>. History stays; the direction the project moved is visible.</p>
 <h2>What ranks first</h2>

@@ -39,7 +39,9 @@ var errStreamSyntax = errors.New("invalid JSON")
 
 // jsonLine is one line of a JSONL file as readJSONLine reads it.
 type jsonLine struct {
-	// raw is a line that fit the buffer, for the caller to decode.
+	// raw is a line that fit the buffer, for the caller to decode. It is the
+	// reader's buffer, valid until the next read: every caller decodes it at
+	// once, and copying each line first was 1.8 GB of a 12k-session build.
 	raw []byte
 	// long is a line that did not; m and ok are what it decoded to: ok is
 	// false for anything but one JSON object, and empty for a blank line.
@@ -60,7 +62,7 @@ func readJSONLine(r *bufio.Reader) (jsonLine, error) {
 func readJSONLineHinted(r *bufio.Reader, hint []byte) (jsonLine, bool, error) {
 	line, err := r.ReadSlice('\n')
 	if !errors.Is(err, bufio.ErrBufferFull) {
-		return jsonLine{raw: bytes.Clone(line), ended: err == nil}, false, err
+		return jsonLine{raw: line, ended: err == nil}, false, err
 	}
 	src := &lineSrc{r: r, head: trimBOM(bytes.Clone(line)), hint: hint}
 	if len(hint) > 0 {
@@ -71,6 +73,57 @@ func readJSONLineHinted(r *bufio.Reader, hint []byte) (jsonLine, bool, error) {
 	l.m, l.ok, l.empty = decodeStreamedLine(src)
 	l.ended, err = src.drain()
 	return l, src.seen, err
+}
+
+// readLineBytes reads one line of r for a caller that decodes the bytes
+// itself. A line that fits the buffer comes back as it is, valid until the
+// next read. A longer one is decoded as it streams and comes back re-encoded,
+// its strings cut at longStringCap, or as bytes no decoder takes when it holds
+// no object, so a caller that counts the lines it cannot decode still counts
+// it. partial is
+// a long last line with no newline that does not decode yet: the client is
+// still writing it.
+func readLineBytes(r *bufio.Reader) (line []byte, partial bool, err error) {
+	line, err = r.ReadSlice('\n')
+	if !errors.Is(err, bufio.ErrBufferFull) {
+		return line, false, err
+	}
+	head := trimBOM(bytes.Clone(line))
+	src := &lineSrc{r: r, head: head}
+	m, ok, empty := decodeStreamedLine(src)
+	ended, err := src.drain()
+	if ended {
+		err = nil
+	}
+	switch {
+	case ok:
+		var b bytes.Buffer
+		enc := json.NewEncoder(&b)
+		enc.SetEscapeHTML(false)
+		if enc.Encode(m) != nil {
+			return notAnObject, false, err
+		}
+		return bytes.TrimSuffix(b.Bytes(), []byte{'\n'}), false, err
+	case empty:
+		return nil, false, err
+	case !ended && errors.Is(err, io.EOF):
+		return nil, true, err
+	}
+	return notAnObject, false, err
+}
+
+// notAnObject stands for a long line that holds no object. Its head could be
+// valid JSON on its own, one record followed by more, so it is not handed on.
+var notAnObject = []byte("{")
+
+// streamedLineAt is the line in f's bytes [start, end) as readLineBytes reads
+// it, a copy the caller can keep; nil when it does not decode.
+func streamedLineAt(f *os.File, start, end int64) []byte {
+	r := jsonlReaders.Get().(*bufio.Reader)
+	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
+	r.Reset(io.NewSectionReader(f, start, max(end-start, 0)))
+	line, _, _ := readLineBytes(r)
+	return bytes.Clone(line)
 }
 
 func trimBOM(b []byte) []byte {
@@ -92,7 +145,9 @@ func scanJSONLHinted(path string, offset int64, hint []byte, fn func(map[string]
 			return err
 		}
 	}
-	r := bufio.NewReaderSize(boundedFrom(path, f, offset), jsonlBuffer)
+	r := jsonlReaders.Get().(*bufio.Reader)
+	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
+	r.Reset(boundedFrom(path, f, offset))
 	for {
 		l, seen, err := readJSONLineHinted(r, hint)
 		switch {

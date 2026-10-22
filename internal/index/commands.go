@@ -185,15 +185,12 @@ func buildCommandsFromIndex(tmp string) {
 	// the row — and the trust policy, --project and the exclude patterns all key
 	// on that. Recomputing from records here would file the loser's commands
 	// under the winner's project, which is the leak ByProject exists to prevent.
-	// A record whose source path is not the row's path is exactly that case;
-	// leave the carried table alone rather than publish a wrong attribution.
-	collided := false
+	// A record whose source path is not the row's path is exactly that case,
+	// and it stays out of the table rather than publish a wrong attribution.
+	// Refusing the whole table instead kept a carried one that still listed
+	// commands every transcript had dropped (#5477).
 	err := EachRecordOfRole(tmp, roleCommand, func(meta SessionMeta, r Record) {
-		if collided {
-			return
-		}
-		if r.SourcePath != "" && meta.Path != "" && r.SourcePath != meta.Path {
-			collided = true
+		if foreignPath(r.SourcePath, meta) {
 			return
 		}
 		cmd := withoutExitStatus(strings.TrimSpace(firstTextLine(r.Text)))
@@ -224,7 +221,7 @@ func buildCommandsFromIndex(tmp string) {
 			a.use.Last = r.Time
 		}
 	})
-	if err != nil || collided {
+	if err != nil {
 		// An extra, never a reason to fail an update: the carried table stays.
 		return
 	}
@@ -295,6 +292,16 @@ func ReadCommands(dir string) []CommandUse {
 	var out []CommandUse
 	if err := readGob(commandsPath(dir), &out); err != nil {
 		return nil
+	}
+	// In local time whichever path wrote the table: a pass takes the times
+	// from the record log in local time and a build from the transcripts in
+	// UTC, so "last Jan 2" moved a day around midnight with the path.
+	for i := range out {
+		out[i].Last = out[i].Last.Local()
+		for p, pu := range out[i].ByProject {
+			pu.Last = pu.Last.Local()
+			out[i].ByProject[p] = pu
+		}
 	}
 	return out
 }

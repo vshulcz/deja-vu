@@ -7,15 +7,25 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 )
 
 // The point of the package: several writers at once, and a reader that only
 // ever sees one of their payloads whole.
+//
+// The reader here opens the file again the moment it closes it, which is the
+// most pressure the mix check can get and more than any poller of these files
+// puts on them. On windows that grip can outlast the publish retry, and the
+// rename is refused while the file is open: three of four writers were denied
+// on CI (#5412). A refused publish leaves the old file whole, so it is counted
+// here and not failed; TestWritesLandPastAPollingReader holds the promise that
+// a write lands when the reader lets go between reads.
 func TestConcurrentWritersNeverPublishAMix(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "status.json")
@@ -31,12 +41,22 @@ func TestConcurrentWritersNeverPublishAMix(t *testing.T) {
 
 	var stop atomic.Bool
 	var wg, writers sync.WaitGroup
+	var landed, refused int64
 	for w := range payloads {
 		writers.Add(1)
 		go func(w int) {
 			defer writers.Done()
 			for i := 0; i < 500 && !stop.Load(); i++ {
-				if err := Write(path, payloads[w], 0o600); err != nil {
+				err := Write(path, payloads[w], 0o600)
+				switch {
+				case err == nil:
+					atomic.AddInt64(&landed, 1)
+				case refusedWhileOpen(err):
+					// Each refusal is the whole retry schedule; carrying on
+					// would make this test minutes long on a slow runner.
+					atomic.AddInt64(&refused, 1)
+					return
+				default:
 					t.Error(err)
 					return
 				}
@@ -77,6 +97,69 @@ func TestConcurrentWritersNeverPublishAMix(t *testing.T) {
 	if mixed > 0 {
 		t.Errorf("%d of %d reads saw neither payload whole", mixed, reads)
 	}
+	if landed == 0 {
+		t.Fatalf("no write landed (%d refused), so the reads only ever saw the first payload", refused)
+	}
+	if refused > 0 {
+		t.Logf("%d of %d publishes refused while the reader held the file", refused, landed+refused)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(payloads, func(p []byte) bool { return bytes.Equal(got, p) }) {
+		t.Errorf("the file ended as neither payload whole (%d bytes)", len(got))
+	}
+	leftTemps(t, dir)
+}
+
+// What deja's readers actually do: read the file and let it go, then come back.
+// Every write must land past one of those on every platform — the publish
+// retry is there for exactly this reader on windows.
+func TestWritesLandPastAPollingReader(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "status.json")
+	payloads := [][]byte{
+		bytes.Repeat([]byte("a"), 4000),
+		bytes.Repeat([]byte("b"), 4000),
+	}
+	if err := Write(path, payloads[0], 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stop atomic.Bool
+	var reads int64
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for !stop.Load() {
+			if _, err := os.ReadFile(path); err == nil {
+				atomic.AddInt64(&reads, 1)
+			}
+			// Far tighter than any surface polls the warmup status, which is
+			// the busiest of these files.
+			time.Sleep(5 * time.Millisecond)
+		}
+	}()
+	var writers sync.WaitGroup
+	for w := range payloads {
+		writers.Add(1)
+		go func(w int) {
+			defer writers.Done()
+			for range 100 {
+				if err := Write(path, payloads[w], 0o600); err != nil {
+					t.Error(err)
+					return
+				}
+			}
+		}(w)
+	}
+	writers.Wait()
+	stop.Store(true)
+	<-done
+	if reads == 0 {
+		t.Fatal("the reader never saw the file, so this proves nothing")
+	}
+	leftTemps(t, dir)
 }
 
 // Nothing is left behind on the way, and the mode is the one asked for.
@@ -292,4 +375,47 @@ func leftTemps(t *testing.T, dir string) {
 			t.Errorf("left %s behind", e.Name())
 		}
 	}
+}
+
+// The refusal publish retries is the rename's own access-denied or sharing
+// violation, and nothing else: not another syscall's, not another error.
+func TestOnlyARefusedRenameCountsAsOpen(t *testing.T) {
+	for _, c := range []struct {
+		err  error
+		want bool
+	}{
+		{&os.LinkError{Op: "rename", Old: "a", New: "b", Err: syscall.Errno(5)}, true},
+		{&os.LinkError{Op: "rename", Old: "a", New: "b", Err: syscall.Errno(32)}, true},
+		{&os.LinkError{Op: "rename", Old: "a", New: "b", Err: syscall.Errno(2)}, false},
+		{&os.LinkError{Op: "link", Old: "a", New: "b", Err: syscall.Errno(5)}, false},
+		{&os.PathError{Op: "open", Path: "a", Err: syscall.Errno(5)}, false},
+		{errors.New("access is denied"), false},
+	} {
+		if got := isOpenRefusal(c.err); got != c.want {
+			t.Errorf("isOpenRefusal(%v) = %v, want %v", c.err, got, c.want)
+		}
+	}
+	if runtime.GOOS != "windows" && refusedWhileOpen(&os.LinkError{Op: "rename", Err: syscall.Errno(5)}) {
+		t.Error("a unix rename failure was treated as a windows refusal and would be retried")
+	}
+}
+
+// A refusal that never clears runs the whole schedule and then reports the
+// rename's error, leaving the old file and no temp behind.
+func TestARefusalThatNeverClearsGivesUp(t *testing.T) {
+	retryable = func(error) bool { return true }
+	t.Cleanup(func() { retryable = refusedWhileOpen })
+	dir := t.TempDir()
+	path := filepath.Join(dir, "occupied")
+	if err := os.MkdirAll(filepath.Join(path, "child"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now()
+	if err := Write(path, []byte("x"), 0o600); err == nil {
+		t.Fatal("replacing a non-empty directory reported success")
+	}
+	if took := time.Since(start); took < time.Second {
+		t.Errorf("gave up after %v; the schedule is meant to outlast a reader's grip", took)
+	}
+	leftTemps(t, dir)
 }

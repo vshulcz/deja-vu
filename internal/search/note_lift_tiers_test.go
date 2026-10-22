@@ -26,7 +26,7 @@ func TestTheErrorAndRelevanceTiersLiftANoteOverItsSource(t *testing.T) {
 		name string
 		hits []Hit
 	}{
-		{"error", ErrorHits(ranked)},
+		{"error", ErrorHits(ranked, "")},
 		{"relevance", RelevanceHitsWeighted(ranked, []string{"pgbouncer", "pool"}, nil)},
 	} {
 		var at = map[string]int{}

@@ -45,3 +45,28 @@ func TestRebuildReconcilesWhenTranscriptsCollapse(t *testing.T) {
 			indexed, sumSessions, out)
 	}
 }
+
+// Three transcripts of one id are one session sharing its id, not two, and
+// --quiet keeps the line out like the other counts.
+func TestTheSharedIDLineCountsSessionsAndKeepsQuiet(t *testing.T) {
+	withStatsStores(t)
+	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
+	const turn = `{"type":"user","sessionId":"dup1","timestamp":"2026-05-01T10:00:00Z","message":{"role":"user","content":"the pool cap decision"}}`
+	for _, f := range []string{"a.jsonl", "b.jsonl", "c.jsonl"} {
+		writeClaudeFixture(t, filepath.Join(claudeRoot, "-tmp-dup", f), "dup1", []string{turn})
+	}
+	out, err := captureRunStderr(t, "index", "--rebuild")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "deja: 1 session shares an id with another transcript") {
+		t.Errorf("three transcripts of one id, want 1 session in the line:\n%s", out)
+	}
+	out, err = captureRunStderr(t, "index", "--rebuild", "--quiet")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "an id with another transcript") {
+		t.Errorf("--quiet still prints the shared-id line:\n%s", out)
+	}
+}

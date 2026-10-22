@@ -1,7 +1,12 @@
 package sources
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
+	"os"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -137,44 +142,151 @@ func lastLine(s string) string {
 }
 
 // claudeExitResumes is the #4443 rule for Claude's format, which Cherry Studio
-// writes too: a tail holding the failed result of a call stored already is
-// read whole, or the call never gets the exit its result names; a clean one
-// is let go, as it is for pi.
-var claudeExitResumes = resumesUnlessAnswering(`"tool_`, func(m map[string]any) ([]string, string) {
+// writes too: a tail holding the result of a command call stored already is
+// read whole, or the call never gets the exit its result names. A failed
+// result says so on its own; a clean one stamps exit 0 only on a command, so
+// the call it answers is looked up before the tail, and a clean answer to any
+// other tool is let go, as it is for pi.
+var claudeExitResumes = resumesUnlessSettling(`"tool_`, func(m map[string]any) (calls, failed, clean []string) {
 	msg, _ := m["message"].(map[string]any)
 	items, _ := msg["content"].([]any)
-	var calls []string
 	for _, it := range items {
 		p, _ := it.(map[string]any)
 		switch p["type"] {
 		case "tool_use":
 			calls = append(calls, str(p["id"]))
 		case "tool_result":
-			failed, _ := p["is_error"].(bool)
-			if id := str(p["tool_use_id"]); failed && id != "" && claudeOutcome(id, true, p["content"]).Known {
-				return calls, id
+			id := str(p["tool_use_id"])
+			if id == "" {
+				continue
+			}
+			if bad, _ := p["is_error"].(bool); !bad {
+				clean = append(clean, id)
+			} else if claudeOutcome(id, true, p["content"]).Known {
+				failed = append(failed, id)
 			}
 		}
 	}
-	return calls, ""
+	return calls, failed, clean
+}, func(line []byte) []string {
+	var v struct {
+		Message struct {
+			Content json.RawMessage `json:"content"`
+		} `json:"message"`
+	}
+	if json.Unmarshal(line, &v) != nil {
+		return nil
+	}
+	var ids []string
+	for _, c := range claudeCommands(v.Message.Content) {
+		ids = append(ids, c.ID)
+	}
+	return ids
 })
 
-// gooseExitResumes is the same rule for goose's jsonl sessions.
-var gooseExitResumes = resumesUnlessAnswering(`"tool`, func(m map[string]any) ([]string, string) {
+// resumesUnlessSettling is resumesUnlessAnswering for a reader that stamps
+// exit 0 on a command its clean result answers, as well as the code of a
+// failed one. answers gives the calls a line makes, the ones it answers with
+// a failure the reader stamps, and the ones it answers cleanly. A clean one
+// is looked up before the tail, and only one that ran a command sends the
+// file back for a whole read, or the command keeps no exit where a rebuild
+// stamps 0 (#5527). commands gives the ids of the calls in a line that ran
+// one.
+func resumesUnlessSettling(hint string, answers func(m map[string]any) (calls, failed, clean []string), commands func(line []byte) []string) func(string, int64) bool {
+	return func(path string, offset int64) bool {
+		if offset <= 0 {
+			return true
+		}
+		made := map[string]bool{}
+		var clean []string
+		ok := true
+		_ = scanJSONLHinted(path, offset, []byte(hint), func(m map[string]any) {
+			if !ok {
+				return
+			}
+			calls, failed, settled := answers(m)
+			for _, id := range calls {
+				made[id] = true
+			}
+			for _, id := range failed {
+				ok = ok && made[id]
+			}
+			for _, id := range settled {
+				if !made[id] {
+					clean = append(clean, id)
+				}
+			}
+		})
+		return ok && !commandCallBefore(path, offset, clean, commands)
+	}
+}
+
+// callWindow is how far before a tail commandCallBefore looks for the call a
+// clean result answers. A pass between a call and its result leaves the call
+// among the last lines it read.
+const callWindow = 4 << 20
+
+// commandCallBefore reports whether one of ids is a call that ran a command,
+// in the window of the file before end. Only the lines naming an id are
+// decoded. A call not found there is taken for one that ran no command, as
+// before.
+func commandCallBefore(path string, end int64, ids []string, commands func(line []byte) []string) bool {
+	if len(ids) == 0 || !IndexCommands() {
+		return false
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = f.Close() }()
+	start := max(0, end-callWindow)
+	buf := make([]byte, end-start)
+	if _, err := f.ReadAt(buf, start); err != nil && err != io.EOF {
+		return false
+	}
+	for _, id := range ids {
+		quoted := []byte(`"` + id + `"`)
+		for rest := buf; ; {
+			i := bytes.Index(rest, quoted)
+			if i < 0 {
+				break
+			}
+			from := bytes.LastIndexByte(rest[:i], '\n') + 1
+			to := len(rest)
+			if j := bytes.IndexByte(rest[i:], '\n'); j >= 0 {
+				to = i + j
+			}
+			if slices.Contains(commands(bytes.TrimPrefix(rest[from:to], []byte("\ufeff"))), id) {
+				return true
+			}
+			rest = rest[to:]
+		}
+	}
+	return false
+}
+
+// gooseExitResumes is the same rule for goose's jsonl sessions, whose reader
+// stamps the exit_code of a clean run too.
+var gooseExitResumes = resumesUnlessSettling(`"tool`, func(m map[string]any) (calls, failed, clean []string) {
 	items, _ := m["content"].([]any)
-	var calls []string
 	for _, it := range items {
 		p, _ := it.(map[string]any)
 		switch p["type"] {
 		case "toolRequest":
 			calls = append(calls, str(p["id"]))
 		case "toolResponse":
-			if code, ok := gooseExitCode(p); ok && code != 0 && str(p["id"]) != "" {
-				return calls, str(p["id"])
+			if code, ok := gooseExitCode(p); ok && str(p["id"]) != "" {
+				if code != 0 {
+					failed = append(failed, str(p["id"]))
+				} else {
+					clean = append(clean, str(p["id"]))
+				}
 			}
 		}
 	}
-	return calls, ""
+	return calls, failed, clean
+}, func(line []byte) []string {
+	return gooseParts(decodeJSONLine(line)["content"]).callIDs
 })
 
 // qwenExitResumes is the same rule for Qwen Code, which writes Gemini's parts:

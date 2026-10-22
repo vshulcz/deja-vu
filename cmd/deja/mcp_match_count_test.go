@@ -55,6 +55,20 @@ func TestRecallSaysHowManyMatchedNotJustHowManyCameBack(t *testing.T) {
 	}
 }
 
+// A page cut by its 4 KB, not by limit, says so: a caller that asked for 40
+// and got a handful otherwise retries with a bigger limit that cannot help
+// (#5511). The test above is the control: cut by limit, no note.
+func TestRecallSaysAFullPageIsCutBySizeNotByLimit(t *testing.T) {
+	dir := manySessionStore(t, 40)
+	text, _, _, _, err := recallTextResult(dir, "pipeline", "", 40, 0, recallMCPBudget)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(text, "(page full) — call recall again with offset=") {
+		t.Errorf("a page cut by size does not say so:\n%s", text)
+	}
+}
+
 // A precise hit still reads as precise: everything that matched came back, so
 // there is no sample to warn about.
 func TestRecallKeepsThePlainCountWhenNothingWasHeldBack(t *testing.T) {
@@ -129,9 +143,9 @@ func TestTheFollowUpCountMatchesWhatWasServed(t *testing.T) {
 	if served >= 15 {
 		t.Fatalf("the budget no longer cuts this answer short (served %d of 15), so this test guards nothing", served)
 	}
-	want := fmt.Sprintf("%d more matches — call recall again with offset=%d.", 40-served, served)
+	want := fmt.Sprintf("%d more matches (page full) — call recall again with offset=%d.", 40-served, served)
 	if 40-served == 1 {
-		want = fmt.Sprintf("1 more match — call recall again with offset=%d.", served)
+		want = fmt.Sprintf("1 more match (page full) — call recall again with offset=%d.", served)
 	}
 	if !strings.Contains(text, want) {
 		t.Errorf("expected %q in:\n%s", want, text)

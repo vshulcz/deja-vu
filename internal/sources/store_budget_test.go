@@ -3,6 +3,8 @@ package sources
 import (
 	"os/exec"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 )
@@ -34,41 +36,46 @@ func TestStoreReadBudget(t *testing.T) {
 	}
 }
 
-// And the budget is on the command, not merely computed: a read given no time
-// has to come back as an error rather than run to completion.
-func TestASQLiteReadRunsOutOfBudget(t *testing.T) {
+// A fast read is not cut by a budget shorter than it, since the bound is on
+// standing still rather than on the clock, and the lines `.progress` adds to
+// keep a long query moving never reach the caller (#5517).
+func TestASQLiteReadUnderTheBudgetAnswersWithoutProgressLines(t *testing.T) {
 	if _, err := exec.LookPath("sqlite3"); err != nil {
 		t.Skip("sqlite3 not installed")
 	}
+	ResetSQLite3Probe()
+	if !sqlite3Progress() {
+		t.Skip("this sqlite3 has no .progress")
+	}
 	db := filepath.Join(t.TempDir(), "store.db")
-	script := "create table t(a text); insert into t values('one'),('two');"
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.Command("sqlite3", db, "create table t(a text); insert into t values('one');").CombinedOutput(); err != nil {
 		t.Fatalf("building the fixture: %v: %s", err, out)
 	}
-
-	// With a budget nothing can meet.
-	t.Setenv("DEJA_STORE_TIMEOUT", "1ns")
-	if _, err := sqliteOutput(db, "select a from t"); err == nil {
-		t.Error("a read with no time to run came back without an error")
-	}
-
-	// With the cap off, the same read answers — so the failure above is the
-	// budget and not the fixture.
-	t.Setenv("DEJA_STORE_TIMEOUT", "0")
-	out, err := sqliteOutput(db, "select a from t")
+	t.Setenv("DEJA_STORE_TIMEOUT", "250ms")
+	// No row until the end, and long past the budget: the progress lines
+	// are all that moves.
+	q := "with recursive c(x) as (select 1 union all select x+1 from c where x<6000000) select count(*) from c;"
+	started := time.Now()
+	out, err := sqliteOutput(db, q)
 	if err != nil {
-		t.Fatalf("the same read failed with the cap off: %v", err)
+		t.Fatalf("a read that kept moving failed after %s: %v", time.Since(started).Round(time.Millisecond), err)
 	}
-	if len(out) == 0 {
-		t.Error("the read answered nothing with the cap off")
+	if got := strings.TrimSpace(string(out)); got != "6000000" {
+		t.Errorf("answer = %q, want 6000000", clip(got))
 	}
-
-	// The command form carries it too, which is what the fourteen call sites
-	// use: a deadline on the context, released by the caller.
-	t.Setenv("DEJA_STORE_TIMEOUT", "1ns")
+	if time.Since(started) < 250*time.Millisecond {
+		t.Log("the query beat the budget here, so only the filter was checked")
+	}
 	cmd, stop := sqliteReadCmd(db, "select a from t")
 	defer stop()
-	if err := cmd.Run(); err == nil {
-		t.Error("the command form ran to completion with no time to do it")
+	if !slices.Contains(cmd.Args, sqliteProgressArg) {
+		t.Errorf("the read does not ask for progress: %q", cmd.Args)
 	}
+}
+
+func clip(s string) string {
+	if len(s) > 120 {
+		return s[:60] + "…" + s[len(s)-60:]
+	}
+	return s
 }

@@ -76,7 +76,7 @@ func carryCompactedAway(dir string, ss []model.Session) []model.Session {
 		if !ok || r.SourcePath != ss[i].Path || !keptThroughCompaction(r, compacted) {
 			return
 		}
-		carried[r.Key] = append(carried[r.Key], model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
+		carried[r.Key] = append(carried[r.Key], model.Message{Role: r.Role, Text: carriedText(ss[i].Harness, r.Role, r.Text), Time: r.Time})
 	})
 	for key, ms := range carried {
 		s := &ss[at[key]]

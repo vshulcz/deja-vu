@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -63,7 +64,7 @@ func sessionFactsPath(dir string) string { return filepath.Join(dir, sessionFact
 func buildSessionFacts(tmp string, ss []model.Session) {
 	out := make(map[string]SessionFact, len(ss))
 	for _, s := range ss {
-		if f, ok := sessionFactOf(s.Messages); ok {
+		if f, ok := sessionFactOf(commandsInTimeOrder(s.Messages)); ok {
 			out[s.Harness+":"+s.ID] = f
 		}
 		if len(out) >= sessionFactsMax {
@@ -83,6 +84,9 @@ func buildSessionFacts(tmp string, ss []model.Session) {
 func buildSessionFactsFromIndex(tmp string) {
 	byKey := map[string][]model.Message{}
 	if err := EachRecordOfRole(tmp, roleCommand, func(meta SessionMeta, r Record) {
+		if foreignPath(r.SourcePath, meta) {
+			return
+		}
 		byKey[r.Key] = append(byKey[r.Key], model.Message{Role: roleCommand, Text: r.Text, Time: r.Time})
 	}); err != nil {
 		return
@@ -103,6 +107,32 @@ func buildSessionFactsFromIndex(tmp string) {
 		return
 	}
 	_ = writeGob(sessionFactsPath(tmp), out)
+}
+
+// commandsInTimeOrder is msgs as a pass reads them back for the facts: in
+// time order, as written where times tie. Copies of one session are written
+// one after the other, so their commands interleave in time, and "most
+// recently first" was the last copy's first.
+func commandsInTimeOrder(msgs []model.Message) []model.Message {
+	var last time.Time
+	sorted := true
+	for _, m := range msgs {
+		if m.Role == roleCommand {
+			sorted = sorted && !m.Time.Before(last)
+			last = m.Time
+		}
+	}
+	if sorted {
+		return msgs
+	}
+	var cmds []model.Message
+	for _, m := range msgs {
+		if m.Role == roleCommand {
+			cmds = append(cmds, m)
+		}
+	}
+	sort.SliceStable(cmds, func(i, j int) bool { return cmds[i].Time.Before(cmds[j].Time) })
+	return cmds
 }
 
 // sessionFactOf reduces one session's messages to what a reader can act on.

@@ -3,6 +3,8 @@ package digest
 import (
 	"regexp"
 	"strings"
+
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // harnessBlockTags are the envelopes a harness wraps around, or delivers as,
@@ -162,6 +164,10 @@ func StripHarnessBlocks(prompt string) string {
 		prompt = harnessBlockRe.ReplaceAllString(prompt, "")
 		prompt = orphanCloseRe.ReplaceAllString(prompt, "")
 		prompt = userQueryTagRe.ReplaceAllString(prompt, "")
+		// Claude Code's paste wrapper is the one envelope whose body is the
+		// person's: the tags go and the pasted text stays, or the hook asks
+		// recall about `pasted_content` and the paste's id.
+		prompt = sources.UnwrapPastedContent(prompt)
 	}
 	if strings.Contains(prompt, " says: ") {
 		prompt = stripHookStatusLines(prompt)

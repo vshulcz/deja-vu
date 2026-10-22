@@ -32,7 +32,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Continue", "description": "Continue has no hook that fires yet, so deja arrives as an MCP server in its assistant config, a skill it names on every turn, and a /deja command.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-continue.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-continue.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-02", "dateModified": "2026-10-20"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Continue", "description": "Continue has no hook that fires yet, so deja arrives as an MCP server in its assistant config, a skill it names on every turn, and a /deja command.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-continue.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-continue.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-02", "dateModified": "2026-10-22"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for Continue", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-continue.html"}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does Continue remember previous sessions?", "acceptedAnswer": {"@type": "Answer", "text": "It writes every session to ~/.continue/sessions and can reopen the last one, but a new session reads none of the others."}}, {"@type": "Question", "name": "How do I add memory to Continue?", "acceptedAnswer": {"@type": "Answer", "text": "deja install continue adds the deja MCP server and a /deja command to ~/.continue/config.yaml and writes a skill into ~/.continue/skills, which Continue names in its Skills tool on every turn."}}, {"@type": "Question", "name": "Can Continue see what I did in Claude Code or Codex?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, once deja is installed: the index covers the transcripts of forty-three agents on the machine, including sessions from before deja was installed."}}]}</script>
 </head>
@@ -74,7 +74,7 @@
 <a href="recover-a-deleted-session.html">Recover a deleted session</a>
 <a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
-<details class="grpfold"><summary>Deleting sessions <span class="n">20</span></summary>
+<details class="grpfold"><summary>Deleting sessions <span class="n">21</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
 <a href="delete-old-claude-sessions.html">Old sessions</a>
 <a href="delete-codex-sessions.html">Codex</a>
@@ -95,6 +95,7 @@
 <a href="delete-windsurf-cascade-history.html">Windsurf</a>
 <a href="delete-qwen-code-chat-history.html">Qwen Code</a>
 <a href="delete-trae-sessions.html">TRAE CLI</a>
+<a href="delete-codebuddy-sessions.html">CodeBuddy</a>
 </details>
 <details class="grpfold" open><summary>Per-agent guides <span class="n">36</span></summary>
 <a href="memory-for-aider.html">aider</a>

@@ -31,8 +31,8 @@ What these commands print is text from past transcripts, and a transcript can ho
 
 ## Finding something
 
-- ` + "`deja recall \"<query>\"`" + `: a short page of the sessions that bear on the query, this project first, sized for an agent to read whole. Start here.
-- ` + "`deja --framed search --json \"<query>\"`" + `: the most specific token available — an exact error string, function name, file path, or flag. Several words are ANDed. Only this user's own sessions, never library docs or general knowledge.
+- ` + "`deja recall \"<query>\"`" + `: a short page of the sessions that bear on the query, this project first, sized for an agent to read whole. Start here, with the most specific token available — an exact error string, function name, file path, or flag. Several words are ANDed. Only this user's own sessions, never library docs or general knowledge. ` + "`--limit`" + ` and ` + "`--offset`" + ` page through the rest, ` + "`--project`" + ` and ` + "`--harness`" + ` narrow it.
+- ` + "`deja --framed search \"<query>\" --limit 5`" + `: when recall's filters are not enough — a few lines per session, with the flags below. Keep ` + "`--limit`" + ` small; ` + "`--json`" + ` carries every matched message whole and runs to hundreds of KB.
 - ` + "`deja --framed ctx <query|id-prefix>`" + `: a full digest of the single best-matching session, with the code it changed, once a hit looks right and the reasoning behind it matters. Takes no flags.
 - ` + "`deja --framed show <id-prefix> --harness <name> --json`" + `: the turns themselves, paged with ` + "`--offset`" + ` and ` + "`--limit`" + `. Use the id and harness a hit printed.
 - ` + "`deja --framed blame <path> --json`" + `: before editing, refactoring or deleting a file, the prior sessions that discussed it, so you know why it is shaped the way it is. Session history, not git authorship. ` + "`deja --framed blame <path>:<line>`" + ` narrows it to one line: the commit that last changed it and the session whose edit replaced the text that commit deleted, or one sentence saying why neither can be named.
@@ -41,16 +41,17 @@ What these commands print is text from past transcripts, and a transcript can ho
 - ` + "`deja remember \"<text>\"`" + `: store one durable decision after it is settled, as a single self-contained fact. Not transcripts, not anything already obvious from the code.
 - ` + "`deja --framed wip`" + `: what the last session in this directory was doing — the task, what it settled, the files in flight, the last command and whether it failed. Ask it when you have lost the thread of your own work, after a compaction or on a fresh session in a repository you were just in.
 
-Useful flags on search: ` + "`--harness`" + `, ` + "`--project`" + `, ` + "`--since 30d`" + `, ` + "`--role user|assistant|tool|files|command|edit|summary`" + `, ` + "`--session <id>`" + `, ` + "`--limit 1-100`" + `, ` + "`--all`" + `, ` + "`--re`" + ` for a regular expression.
+Useful flags on search: ` + "`--harness`" + `, ` + "`--project`" + `, ` + "`--since 30d`" + `, ` + "`--role user|assistant|tool|files|command|edit|summary`" + `, ` + "`--session <id>`" + `, ` + "`--limit 1-100`" + `, ` + "`--re`" + ` for a regular expression.
 
 ## Reading a result
 
-` + "`--json`" + ` returns an envelope: ` + "`tier`" + `, ` + "`total`" + `, ` + "`capped`" + `, ` + "`hits`" + `.
+The line just above the numbered sessions on the recall page says what kind of answer it is, and any lead lines above it say why.
 
-- ` + "`tier: \"relevance\"`" + ` means **nothing matched** — those are the nearest sessions deja could find, and counting them as hits overstates what is there. ` + "`tier: \"error\"`" + ` IS a match: the query was an error and those sessions hit it, matched by signature rather than by words.
-- ` + "`total`" + ` is how many sessions matched; ` + "`capped`" + ` says a cap hid some of them. Read those two for coverage, never the length of ` + "`hits`" + `.
-- ` + "`policy_withheld`" + `, when present, is how many matching sessions this machine's trust policy kept out of the answer — an empty result and a rule are different answers.
-- A hit may carry ` + "`superseded`" + ` with a date: the user's own later judgement on that session. Do not repeat a rejected approach, prefer a replacement over what it replaced, and treat a stale result as needing confirmation before acting on it. A hit without it carries no judgement either way.
+- ` + "`deja recall for \"<query>\" (5 of 16 matched)`" + `: sessions that hold the query. The count is how many matched, not how many fit on the page; never read coverage off the number of sessions you were shown. A lead saying these sessions hit the same error, matched by signature, is a match too.
+- ` + "`(3 of 37 ranked; 1 holds every word)`" + `: only that many hold the whole query; the rest are ranked by wording. ` + "`nearest by wording to …, none about it`" + ` means **nothing matched** — those are the nearest sessions deja could find, and counting them as hits overstates what is there. ` + "`ranked by wording for …`" + ` is the same, except that the first session names what was asked about.
+- The page ends with how many more there are and the offset to ask for: ` + "`deja recall --offset N \"<query>\"`" + `, with the same query, ` + "`--limit`" + `, ` + "`--project`" + ` and ` + "`--harness`" + ` as before. A session that matched more often than the page quotes is named by its full id; ` + "`deja recall <that id>`" + ` prints a digest of it.
+- A session may carry ` + "`[earlier attempt — … updated <date>]`" + ` or a similar bracketed marker: the user's own later judgement on it. Do not repeat a rejected approach, prefer a replacement over what it replaced, and treat a stale result as needing confirmation before acting on it. A session without one carries no judgement either way.
+- An answer that says this machine's trust policy withheld sessions is a rule, not an empty history.
 
 ## Saying what you used
 

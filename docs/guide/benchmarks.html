@@ -32,7 +32,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Benchmarks", "description": "Reproducible, honest measurements of deja's search quality and the token cost of reaching working context — run them yourself.", "url": "https://vshulcz.github.io/deja-vu/guide/benchmarks.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/benchmarks.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-07-19", "dateModified": "2026-09-27"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Benchmarks", "description": "Reproducible, honest measurements of deja's search quality and the token cost of reaching working context — run them yourself.", "url": "https://vshulcz.github.io/deja-vu/guide/benchmarks.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/benchmarks.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-07-19", "dateModified": "2026-10-20"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Benchmarks","item":"https://vshulcz.github.io/deja-vu/guide/benchmarks.html"}]}</script>
 </head>
 <body>
@@ -73,7 +73,7 @@
 <a href="recover-a-deleted-session.html">Recover a deleted session</a>
 <a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
-<details class="grpfold"><summary>Deleting sessions <span class="n">20</span></summary>
+<details class="grpfold"><summary>Deleting sessions <span class="n">21</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
 <a href="delete-old-claude-sessions.html">Old sessions</a>
 <a href="delete-codex-sessions.html">Codex</a>
@@ -94,6 +94,7 @@
 <a href="delete-windsurf-cascade-history.html">Windsurf</a>
 <a href="delete-qwen-code-chat-history.html">Qwen Code</a>
 <a href="delete-trae-sessions.html">TRAE CLI</a>
+<a href="delete-codebuddy-sessions.html">CodeBuddy</a>
 </details>
 <details class="grpfold"><summary>Per-agent guides <span class="n">36</span></summary>
 <a href="memory-for-aider.html">aider</a>
@@ -164,7 +165,7 @@ deja bench prompt</pre>
 <h2>What an update costs</h2>
 <pre>deja bench ingest</pre>
 <p>The three above score what comes back. This one asks what it costs to keep the index current, which is the half nobody was measuring: a path that rewrote and re-tokenized the whole store every time a new conversation appeared survived two months and twenty releases before anyone produced a number for it.</p>
-<p>Five classes, because they are the things that happen to a store — nothing changed, a turn was appended to a transcript, a transcript appeared, a transcript was renamed, a transcript was rewritten — and for each one the wall time, the records written, and whether the records already on file were replaced. Only the last class should replace them; the other four must cost what they added, and a rename, which some harnesses do when a session is resumed, must not cost a second copy of the log. That column is the regression gate, because it is exact where a wall time on a shared runner is not.</p>
+<p>Five classes, because they are the things that happen to a store — nothing changed, a turn was appended to a transcript, a transcript appeared, a transcript was renamed, a transcript was rewritten — and for each one the wall time, the records written, and whether the records already on file were replaced. None of them should replace them: each must cost what it changed, a rewritten transcript appends its records, marks the old ones dead and clears them where they stand, and a rename, which some harnesses do when a session is resumed, must not cost a second copy of the log. That column is the regression gate, because it is exact where a wall time on a shared runner is not.</p>
 
 <h2>What a store costs to read</h2>
 <pre>deja bench read</pre>

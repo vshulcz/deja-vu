@@ -587,7 +587,11 @@ func jsoncRemoveKey(text, blockKey, key string, dropFrom int) (string, error) {
 	if open < 0 {
 		return text, nil
 	}
-	keys := splitBlockKey(blockKey)
+	// An empty blockKey is the top-level object, for a key that lives there.
+	var keys []string
+	if blockKey != "" {
+		keys = splitBlockKey(blockKey)
+	}
 	if dropFrom < len(keys) {
 		chain, have := walkJSONCKeys(text, open, keys[:dropFrom+1])
 		if chain == nil || have <= dropFrom {
@@ -598,6 +602,13 @@ func jsoncRemoveKey(text, blockKey, key string, dropFrom int) (string, error) {
 		return closeEmptied(cutEntry(text, zedEntrySpan(text, chain)), keys), nil
 	}
 	block, have := walkJSONCKeys(text, open, keys)
+	if len(keys) == 0 {
+		end := zedObjectEnd(text, open)
+		if end < 0 {
+			return text, nil
+		}
+		block = &zedSpan{keyStart: open, valueOpen: open, valueEnd: end}
+	}
 	if block == nil || have < len(keys) {
 		return text, nil
 	}

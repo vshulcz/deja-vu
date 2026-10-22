@@ -359,6 +359,8 @@ func syncSSHPull(dir, host string, full bool) (err error) {
 	}
 	learnPeerMachine(dir, host, before)
 	fmt.Fprint(os.Stdout, sshCountLine("imported", n))
+	fmt.Fprint(os.Stdout, excludedByRuleLines())
+	fmt.Fprint(os.Stdout, switchedOffLine(host))
 	return nil
 }
 

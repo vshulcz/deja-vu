@@ -36,8 +36,8 @@ Three lessons from using it, so the next measurement does not relearn them:
   the runner never writes into a live index either way. Take that copy
   before the first build: a live store grows while the run is going, and
   then the cells are timing different bytes.
-- The stub arm has to be a *build* with the `cjkIndexKeys` call in
-  `textKeys` (which `indexKeys` goes through) removed, not a runtime switch. `run_bench.py` only measures —
+- The stub arm has to be a *build* with the `k.cjkKeys` call in
+  `keyer.textKeys` (which `indexKeys` goes through) removed, not a runtime switch. `run_bench.py` only measures —
   it never compiles anything, it runs `<bin> index --rebuild` for each cell —
   so any difference between arms has to be baked into the binary handed to
   `--bin` before the run starts. A build was lost to learning this.

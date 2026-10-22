@@ -302,6 +302,11 @@ func trimPytestMarker(l string) string {
 // shapes runners emit: 2026-07-12T10:00:00Z, 2026-07-12 10:00:00.123, and the
 // same inside [].
 func trimTimestamp(l string) string {
+	// The pattern opens with a bracket or a digit; asking the regexp about
+	// every other line of every tool output was a fifth of normalizeFriction.
+	if l == "" || (l[0] != '[' && (l[0] < '0' || l[0] > '9')) {
+		return l
+	}
 	if m := leadingTimestamp.FindString(l); m != "" {
 		return strings.TrimSpace(l[len(m):])
 	}
@@ -394,6 +399,15 @@ func isFriction(l string) bool {
 	// this machine's store that is 2,318 of the 6,744 error lines an agent
 	// actually hit — the single most common failure it sees, and the one it
 	// most often solved before.
+	//
+	// Every phrase test below needs one of the phrases in the line, so a line
+	// with none of them is a wall exactly when it names a test failure. Most
+	// lines carry none, and the checks in between were most of what a cold
+	// build spent here (#5586).
+	hit := frictionPhrasesIn(l)
+	if hit == 0 {
+		return namedTestFailure(l)
+	}
 	if namedTestFailure(l) {
 		return true
 	}
@@ -411,69 +425,10 @@ func isFriction(l string) bool {
 	if isDejaOwnReport(l) {
 		return false
 	}
-	// The list was nine phrases about things not being found or permitted, and
-	// it matched 3 of 12 ordinary errors on measurement — missing runtime
-	// panics, database timeouts, auth failures and build failures, which is
-	// most of what a machine actually trips over. One miss was capitalisation
-	// alone: curl writes "Connection refused" (#729).
-	low := strings.ToLower(l)
-	for _, p := range []string{
-		// Not found, not permitted — the original list.
-		"command not found", "modulenotfounderror", "no module named",
-		"not found: ", "cannot find", "no such file or directory",
-		"undefined:", "connection refused", "permission denied",
-		// Crashed.
-		"panic:", "segmentation fault", "exception in thread",
-		"nullpointerexception", "index out of range", "stack overflow",
-		"typeerror:", "referenceerror:", "keyerror:", "attributeerror:",
-		// Refused by a server or a tool, with the tool named.
-		"fatal:", "npm err!", "rpc failed", "timeout expired",
-		"statement timeout", "connection reset", "connection timed out",
-		// Failed to build or run.
-		"] error ", "build failed", "compilation failed", "cannot be resolved",
-		// Measured against 24 errors an agent actually hits, the list above
-		// recognised 5 (#2434). These are the rest, each carrying the tool's
-		// own wording rather than the bare subject: "access denied for" is a
-		// server refusing a named user, where "access denied" alone is a
-		// sentence someone writes about roles.
-		"duplicate key value", "deadlock detected", "access denied for",
-		"failed to connect to", "cannot import name", "symbol(s) not found",
-		"undefined symbol:", "undefined reference to",
-		"failed to push some refs", "acquiring the state lock",
-		"no space left on device",
-		// Three this machine hits that nothing above reached: the two ways the
-		// go toolchain says there is no module here, counted 17 and 12 times
-		// in the real stores, and sqlite saying a table is missing, 4 times.
-		// "no such file or directory" was already here; its sibling was not
-		// (#3373).
-		"go.mod file not found", "does not contain main module",
-		// The walls an agent hits that none of the above reached, counted over
-		// 102,735 commands and 2,951 failures in this machine's transcripts.
-		//
-		// A command that ran out of time is the commonest of them — 144
-		// sightings — and the wording is the harness's, not a server's, so
-		// "connection timed out" above never covered it. What memory has to
-		// say about it is worth the line: the same command timed out here
-		// before, and either it wants a longer budget or it wants the
-		// background.
-		"timed out after",
-		// The harness refusing the agent's own call: a file edited without
-		// being read again, an argument the tool would not take, a tool that
-		// is off in this session. 32 sightings, and every one is the agent's
-		// own mistake rather than the machine's, which is the kind a memory
-		// can actually stop.
-		"tool_use_error", "inputvalidationerror",
-		"has been modified since read", "no such tool available",
-		// The tail of a Python traceback names the failure; only four of these
-		// were listed and the rest fell through. 30 sightings of the JSON one
-		// alone.
-		"jsondecodeerror", "valueerror:", "runtimeerror:", "oserror:",
-		"filenotfounderror:", "importerror:", "unicodedecodeerror:",
-	} {
-		if strings.Contains(low, p) {
-			return true
-		}
+	if hit&hitPhrase != 0 {
+		return true
 	}
+	low := strings.ToLower(l)
 	// A database saying a thing is not there says it in its own shape: the
 	// line opens with the server's ERROR marker. The phrase on its own is a
 	// sentence people write — "the orders table does not exist yet" — so it is
@@ -498,6 +453,68 @@ func isFriction(l string) bool {
 		return true
 	}
 	return false
+}
+
+// frictionPhrases are the error shapes that name something specific; a line
+// carrying one is friction. Lowercase ASCII, matched against the lowered line.
+//
+// The list was nine phrases about things not being found or permitted, and
+// it matched 3 of 12 ordinary errors on measurement — missing runtime
+// panics, database timeouts, auth failures and build failures, which is
+// most of what a machine actually trips over. One miss was capitalisation
+// alone: curl writes "Connection refused" (#729).
+var frictionPhrases = []string{
+	// Not found, not permitted — the original list.
+	"command not found", "modulenotfounderror", "no module named",
+	"not found: ", "cannot find", "no such file or directory",
+	"undefined:", "connection refused", "permission denied",
+	// Crashed.
+	"panic:", "segmentation fault", "exception in thread",
+	"nullpointerexception", "index out of range", "stack overflow",
+	"typeerror:", "referenceerror:", "keyerror:", "attributeerror:",
+	// Refused by a server or a tool, with the tool named.
+	"fatal:", "npm err!", "rpc failed", "timeout expired",
+	"statement timeout", "connection reset", "connection timed out",
+	// Failed to build or run.
+	"] error ", "build failed", "compilation failed", "cannot be resolved",
+	// Measured against 24 errors an agent actually hits, the list above
+	// recognised 5 (#2434). These are the rest, each carrying the tool's
+	// own wording rather than the bare subject: "access denied for" is a
+	// server refusing a named user, where "access denied" alone is a
+	// sentence someone writes about roles.
+	"duplicate key value", "deadlock detected", "access denied for",
+	"failed to connect to", "cannot import name", "symbol(s) not found",
+	"undefined symbol:", "undefined reference to",
+	"failed to push some refs", "acquiring the state lock",
+	"no space left on device",
+	// Three this machine hits that nothing above reached: the two ways the
+	// go toolchain says there is no module here, counted 17 and 12 times
+	// in the real stores, and sqlite saying a table is missing, 4 times.
+	// "no such file or directory" was already here; its sibling was not
+	// (#3373).
+	"go.mod file not found", "does not contain main module",
+	// The walls an agent hits that none of the above reached, counted over
+	// 102,735 commands and 2,951 failures in this machine's transcripts.
+	//
+	// A command that ran out of time is the commonest of them — 144
+	// sightings — and the wording is the harness's, not a server's, so
+	// "connection timed out" above never covered it. What memory has to
+	// say about it is worth the line: the same command timed out here
+	// before, and either it wants a longer budget or it wants the
+	// background.
+	"timed out after",
+	// The harness refusing the agent's own call: a file edited without
+	// being read again, an argument the tool would not take, a tool that
+	// is off in this session. 32 sightings, and every one is the agent's
+	// own mistake rather than the machine's, which is the kind a memory
+	// can actually stop.
+	"tool_use_error", "inputvalidationerror",
+	"has been modified since read", "no such tool available",
+	// The tail of a Python traceback names the failure; only four of these
+	// were listed and the rest fell through. 30 sightings of the JSON one
+	// alone.
+	"jsondecodeerror", "valueerror:", "runtimeerror:", "oserror:",
+	"filenotfounderror:", "importerror:", "unicodedecodeerror:",
 }
 
 // noSuchTableRE is the driver's own shape: the table is named right after the
@@ -529,7 +546,7 @@ func frictionHashes(ms []model.Message) []uint64 {
 		if m.Role != roleToolOutput {
 			continue
 		}
-		for _, line := range strings.Split(m.Text, "\n") {
+		for line := range strings.SplitSeq(m.Text, "\n") {
 			line, ok := FrictionLine(line)
 			if !ok {
 				continue
@@ -758,7 +775,7 @@ func frictionTexts(rd *frictionReader, metas []SessionMeta, want map[uint64]stri
 			continue
 		}
 		for _, text := range outputs {
-			for _, line := range strings.Split(text, "\n") {
+			for line := range strings.SplitSeq(text, "\n") {
 				line, ok := FrictionLine(line)
 				if !ok {
 					continue
@@ -826,7 +843,13 @@ func (rd *frictionReader) toolOutput(meta SessionMeta) ([]string, bool) {
 	got := make(map[string][]string, len(keys))
 	err := eachRecordForKeysInRoles(filepath.Join(rd.dir, "records.bin"), tablesFromManifest(rd.m), keys,
 		map[string]bool{roleToolOutput: true}, func(r Record) {
-			got[r.Key] = append(got[r.Key], r.Text)
+			// Of two transcripts sharing an id, the copy the row names, as
+			// the fixes and the command tables take it: the other's records
+			// sit in the log where the pass that read it put them, which a
+			// rebuild does not (#5504).
+			if !foreignPath(r.SourcePath, rd.m.Sessions[r.Key]) {
+				got[r.Key] = append(got[r.Key], r.Text)
+			}
 		})
 	if err != nil {
 		// What one session's read would have said, session by session.
@@ -873,6 +896,9 @@ func trimTestDuration(l string) string {
 // name, as opposed to the bare `FAIL` and `--- FAIL` summaries that name
 // nothing and are rejected with the other generic shapes.
 func namedTestFailure(l string) bool {
+	if !strings.HasPrefix(l, "--- ") {
+		return false
+	}
 	m := goTestFailure.FindStringSubmatch(l)
 	if m == nil {
 		return false

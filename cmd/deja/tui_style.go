@@ -40,9 +40,12 @@ var palettes = map[string][]string{
 // palettes256 pins the xterm-256 entry of a colour, by its place in the
 // palette, where the nearest entry would merge it with a neighbour. Latte's
 // surf and surf2 both round to 254, so the key chips lost their fill on the
-// panels; surf2 takes the next grey down (#5107).
+// panels; surf2 takes the next grey down (#5107). Base and mantle both round
+// to 255, and no grey sits between 255 and surf's 254, so the header bar and
+// code blocks take white, a step lighter than the page instead of darker
+// (#5355).
 var palettes256 = map[string]map[int]int{
-	"light": {3: 253},
+	"light": {1: 231, 3: 253},
 }
 
 // setTheme switches to the named palette; a name it does not know is dark.

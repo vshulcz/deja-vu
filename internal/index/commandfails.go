@@ -294,7 +294,13 @@ func (a *commandFailAcc) table(project func(key string) (string, bool)) []Comman
 }
 
 // buildCommandFails mines the failures out of the sessions a full build holds.
-func buildCommandFails(tmp string, ss []model.Session) {
+// With a generation it also leaves the walk's state for the log in tmp, so the
+// first update after the build starts from it. Without one the first replacing
+// pass walked the whole log again: 15 of 21 s for 20 sessions of a 40,000
+// session store (#5465). ss is what the record log holds (see
+// commandSessions): the walk an update starts from reads the log, so the
+// state has to agree with it.
+func buildCommandFails(tmp, generation string, ss []model.Session) {
 	acc := newCommandFailAcc()
 	projects := map[string]string{}
 	for _, s := range ss {
@@ -303,6 +309,9 @@ func buildCommandFails(tmp string, ss []model.Session) {
 			projects[key] = s.Project
 		}
 		for _, m := range s.Messages {
+			if strings.TrimSpace(m.Text) == "" {
+				continue
+			}
 			switch m.Role {
 			case roleCommand:
 				acc.command(key, m.Text)
@@ -318,6 +327,21 @@ func buildCommandFails(tmp string, ss []model.Session) {
 		p, ok := projects[key]
 		return p, ok
 	}))
+	if generation == "" {
+		return
+	}
+	fi, err := os.Stat(filepath.Join(tmp, "records.bin"))
+	if err != nil {
+		return
+	}
+	// As the walk leaves it: a session with nothing on file reads the same as
+	// one never seen.
+	for key, s := range acc.Sessions {
+		if len(s.Fails) == 0 && s.Pending == "" {
+			delete(acc.Sessions, key)
+		}
+	}
+	_ = writeGobAtomic(commandFailStatePath(tmp), &commandFailState{Version: commandFailStateVersion, Generation: generation, Size: fi.Size(), Acc: *acc})
 }
 
 // buildCommandFailsFromIndex is the same from the records an index already
@@ -386,10 +410,16 @@ func carriedCommandFailState(dir string, old Manifest, tmp, generation string, r
 	if err != nil || fi.Size() < st.Size {
 		return nil
 	}
-	if fi.Size() > st.Size {
+	// What dir's manifest committed: a pass that appends shares this log
+	// with tmp, and what it appended is its own (#5387).
+	end := fi.Size()
+	if old.RecordsSize > 0 && old.RecordsSize < end {
+		end = old.RecordsSize
+	}
+	if end > st.Size {
 		// Another turn in the tail ends the session's pending run, as the
 		// walk would have; a command or an output reads the session again.
-		if _, err := eachCommandAndOutputFrom(path, old, st.Size, nil, func(r Record) { redo[r.Key] = true }, st.Acc.stop); err != nil {
+		if _, err := eachCommandAndOutputFrom(path, old, st.Size, end, nil, func(r Record) { redo[r.Key] = true }, st.Acc.stop); err != nil {
 			return nil
 		}
 	}
@@ -438,6 +468,9 @@ func commandFailsFromIndex(dir string, prior *commandFailState, redo map[string]
 			if want := heldKeys(redo, m); len(want) > 0 {
 				err = eachRecordForKeysInRoles(path, tablesFromManifest(m), want, nil, func(r Record) {
 					atomic.AddInt64(&commandFailRecordsSeen, 1)
+					if foreignPath(r.SourcePath, m.Sessions[r.Key]) {
+						return
+					}
 					if r.Role == roleCommand || r.Role == roleToolOutput {
 						take(r)
 						return
@@ -446,7 +479,7 @@ func commandFailsFromIndex(dir string, prior *commandFailState, redo map[string]
 				})
 			}
 		} else {
-			end, err = eachCommandAndOutputFrom(path, m, from, redo, take, st.Acc.stop)
+			end, err = eachCommandAndOutputFrom(path, m, from, 0, redo, take, st.Acc.stop)
 		}
 		if err != nil {
 			return err
@@ -490,9 +523,9 @@ func heldKeys(redo map[string]bool, m Manifest) map[string]bool {
 // their prefix, undecoded. Each record of another role is handed to stop by
 // its key alone: a full build ends a pending run on any other turn, and a walk
 // that never saw the prompt or the Read between a clean `make build` and a
-// failing log laid the log at the build (#4309). It returns where the last
-// whole record ended.
-func eachCommandAndOutputFrom(path string, m Manifest, from int64, redo map[string]bool, fn func(Record), stop func(key string)) (int64, error) {
+// failing log laid the log at the build (#4309). It stops at end, or at the
+// end of the log for 0, and returns where the last whole record ended.
+func eachCommandAndOutputFrom(path string, m Manifest, from, end int64, redo map[string]bool, fn func(Record), stop func(key string)) (int64, error) {
 	f, err := openIndexFile(path)
 	if err != nil {
 		return 0, err
@@ -506,7 +539,12 @@ func eachCommandAndOutputFrom(path string, m Manifest, from int64, redo map[stri
 		return 0, err
 	}
 	t := tablesFromManifest(m)
-	r := bufio.NewReaderSize(f, 1024*1024)
+	dead := t.deadFrom(off)
+	var src io.Reader = f
+	if end > 0 {
+		src = io.LimitReader(f, end-off)
+	}
+	r := bufio.NewReaderSize(src, 1024*1024)
 	var hdr [4]byte
 	buf := make([]byte, 0, 64*1024)
 	for {
@@ -527,14 +565,20 @@ func eachCommandAndOutputFrom(path string, m Manifest, from int64, redo map[stri
 		at := off
 		off += int64(len(hdr)) + int64(size)
 		atomic.AddInt64(&commandFailRecordsSeen, 1)
-		key, role, ok := recordRoleIn(payload, t)
+		if dead.at(at) {
+			continue
+		}
+		kid, pid, rid, _, ok := recordPrefix(payload)
 		if !ok {
 			return off, errShortRecord
 		}
+		key, role := t.lookup(kid), t.lookup(rid)
 		if at < from && !redo[key] {
 			continue
 		}
-		if _, ok := m.Sessions[key]; !ok {
+		// The other copy of a shared row is not this session's to run or to
+		// end a run of, as a build leaves it out (see commandSessions).
+		if meta, ok := m.Sessions[key]; !ok || foreignPath(t.lookup(pid), meta) {
 			continue
 		}
 		if role != roleCommand && role != roleToolOutput {

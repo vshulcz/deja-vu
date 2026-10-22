@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"unicode"
 )
 
 // A slash command, in the only form a harness can offer without deja shipping a
@@ -65,13 +66,47 @@ func mcpPromptGet(dir string, params json.RawMessage) (any, int, string) {
 		"description": "What this machine's past sessions say about " + quoted(query),
 		"messages": []map[string]any{{
 			"role":    "user",
-			"content": map[string]any{"type": "text", "text": text},
+			"content": map[string]any{"type": "text", "text": defuseHostTriggers(text)},
 		}},
 	}, 0, ""
+}
+
+// defuseHostTriggers breaks the two tokens a host acts on when it pastes this
+// prompt result straight into its own input. opencode runs !`cmd` through the
+// shell and attaches @path files it finds, and gemini and qwen read the same
+// `@` mention; so a recalled backtick command would execute and a recalled
+// @path would ship an arbitrary file to the model. The recall is reference
+// text about a past session, not an instruction to this host, so a space goes
+// in to keep the token inert — !`x` stays legible as "! `x`" and the model
+// still reads every word. @ is split unless a word character precedes it:
+// opencode attached x,@path as readily as a bare @path, while an address like
+// a@b is no mention and is left alone.
+func defuseHostTriggers(s string) string {
+	r := []rune(s)
+	var b strings.Builder
+	b.Grow(len(s) + 16)
+	for i, c := range r {
+		b.WriteRune(c)
+		if i+1 >= len(r) {
+			continue
+		}
+		n := r[i+1]
+		switch {
+		case c == '!' && n == '`':
+			b.WriteByte(' ')
+		case c == '@' && !unicode.IsSpace(n) && (i == 0 || !isWordRune(r[i-1])):
+			b.WriteByte(' ')
+		}
+	}
+	return b.String()
 }
 
 // quoted wraps a query for a one-line message without a formatter that would
 // escape the user's own punctuation.
 func quoted(s string) string {
 	return "\"" + s + "\""
+}
+
+func isWordRune(c rune) bool {
+	return c == '_' || unicode.IsLetter(c) || unicode.IsDigit(c)
 }

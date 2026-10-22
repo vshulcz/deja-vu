@@ -253,4 +253,36 @@ func TestInstallGooseEntryAroundCommentsAndTwoKeys(t *testing.T) {
 	if _, err := installGooseCommand(exe, false); err == nil {
 		t.Error("two slash_commands: keys accepted")
 	}
+	// A refused command writes nothing: the recipe used to be written first and
+	// then stayed on disk with no entry pointing at it (#5296).
+	if _, err := os.Stat(gooseRecipePath()); !os.IsNotExist(err) {
+		t.Errorf("a refused duplicate key left the recipe behind: %v", err)
+	}
+	gooseTestConfig(t, "slash_commands: []\n")
+	if _, err := installGooseCommand(exe, false); err == nil {
+		t.Error("an inline slash_commands: value accepted")
+	}
+	if _, err := os.Stat(gooseRecipePath()); !os.IsNotExist(err) {
+		t.Errorf("a refused inline value left the recipe behind: %v", err)
+	}
+}
+
+// The recipe is still refreshed when the config already holds the entry: only
+// a refusal skips it, not the "unchanged" returns.
+func TestInstallGooseCommandRefreshesTheRecipeForAnEntryAlreadyThere(t *testing.T) {
+	const oldExe, newExe = "/old/bin/deja", "/new/bin/deja"
+	gooseTestConfig(t, "slash_commands:\n- command: \"deja\"\n  recipe_path: \""+gooseRecipePath()+"\"\n")
+	if err := os.WriteFile(gooseRecipePath(), []byte(gooseRecipe(oldExe)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installGooseCommand(newExe, false); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(gooseRecipePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != gooseRecipe(newExe) {
+		t.Errorf("the recipe still runs the old binary:\n%s", got)
+	}
 }

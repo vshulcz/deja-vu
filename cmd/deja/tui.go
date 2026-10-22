@@ -67,9 +67,17 @@ type tuiApp struct {
 	rows        []tuiRow
 	listed      string // the scope and query rows answers
 	total       int
+	hits        []search.Hit // what the search read, in rank order
+	asked       int          // how many hits it asked for
+	matched     int          // how many sessions matched in all
+	loadingMore bool
+	exhausted   bool // the last page added nothing
 	sel, scroll int
 	tookMS      float64
 	widened     bool
+	byDate      bool // the search list reads newest first, not best first
+	searchRows  bool // rows holds a search's hits, not the home list
+	rowsByDate  bool // and they were read newest first
 	searching   bool
 	seq         int
 	latest      atomic.Int64 // seq of the newest search, read off the loop
@@ -371,6 +379,7 @@ func (a *tuiApp) setRows(ss []model.Session, hits []search.Hit, total int) {
 		keep = sessionKey(a.rows[a.sel].s)
 	}
 	a.listed = listed
+	a.searchRows = hits != nil
 	var rows []tuiRow
 	box := a.box()
 	add := func(s model.Session, snips []string) {
@@ -380,11 +389,22 @@ func (a *tuiApp) setRows(ss []model.Session, hits []search.Hit, total int) {
 		rows = append(rows, tuiRow{s: s, snips: snips})
 	}
 	if hits != nil {
+		strict := false
+		for _, h := range hits {
+			strict = strict || h.Strict
+		}
 		for _, h := range hits {
 			if a.scope == scopeKept && !a.keptIDs[sessionKey(h.Session)] {
 				continue
 			}
+			n := len(rows)
 			add(h.Session, tuiSnippets(h))
+			if len(rows) > n {
+				rows[n].partial = strict && !h.Strict
+			}
+		}
+		if a.rowsByDate {
+			a.daySections(rows)
 		}
 	} else {
 		for _, s := range ss {
@@ -397,16 +417,7 @@ func (a *tuiApp) setRows(ss []model.Session, hits []search.Hit, total int) {
 					behind = append(behind, b)
 				}
 			}
-			now := time.Now()
-			if a.clock != nil {
-				now = a.clock()
-			}
-			last := ""
-			for i := range rows {
-				if g := dayGroup(rows[i].s.Updated, now); g != last {
-					rows[i].section, last = g, g
-				}
-			}
+			a.daySections(rows)
 			rows = withBehind(behind, rows)
 		}
 	}
@@ -414,10 +425,11 @@ func (a *tuiApp) setRows(ss []model.Session, hits []search.Hit, total int) {
 	if len(a.filter) > 0 || a.scope == scopeKept || box.active() {
 		a.total = len(rows)
 	}
+	scroll := a.scroll
 	a.sel, a.scroll = 0, 0
 	for i, r := range rows {
 		if sessionKey(r.s) == keep {
-			a.sel = i
+			a.sel, a.scroll = i, scroll
 		}
 	}
 	for i, r := range rows {
@@ -428,12 +440,89 @@ func (a *tuiApp) setRows(ss []model.Session, hits []search.Hit, total int) {
 	}
 }
 
+// daySections heads each run of cards from the same day group, for a list
+// that reads newest first.
+func (a *tuiApp) daySections(rows []tuiRow) {
+	now := time.Now()
+	if a.clock != nil {
+		now = a.clock()
+	}
+	last := ""
+	for i := range rows {
+		g := dayGroup(rows[i].s.Updated, now)
+		// A relevance answer lists the sessions holding every word first,
+		// then the rest, each newest first: the rest are headed apart.
+		if rows[i].partial {
+			g += " · some of the words"
+		}
+		if g != last {
+			rows[i].section, last = g, g
+		}
+	}
+}
+
+// toggleSort switches the search list between best first and newest first.
+// The newest are read from the whole match, a page at a time like the
+// ranking, not sorted out of the page already listed (#5577).
+func (a *tuiApp) toggleSort() {
+	a.byDate = !a.byDate
+	// A search on screen says its order in its label; the home list is
+	// newest first either way, so there the order is said for the next search.
+	if a.box().text != "" {
+		a.startSearch()
+		return
+	}
+	if a.byDate {
+		a.say("Searches list newest first", true)
+	} else {
+		a.say("Searches list best match first", true)
+	}
+}
+
+// startSearch runs the box's search from its first page. A refresh of the
+// same list reads as far as the reader had scrolled.
 func (a *tuiApp) startSearch() {
+	limit := tuiPage
+	if a.listed == num(a.scope)+"\x00"+string(a.query) && a.asked > limit {
+		limit = a.asked
+	}
+	a.searchPage(limit, false)
+}
+
+// moreLeft says whether the match holds sessions past what the list read.
+func (a *tuiApp) moreLeft() bool {
+	return len(a.query) > 0 && !a.searching && !a.exhausted && a.matched > a.asked
+}
+
+// loadMore asks for the next page once the selection nears the end of the
+// list. The list reads a page at a time: ranking every session a common word
+// matched took 16 s on a 40k-session store before the first card (#5487).
+func (a *tuiApp) loadMore() {
+	if a.loadingMore || !a.moreLeft() || a.sel < len(a.rows)-tuiMoreAhead {
+		return
+	}
+	a.loadingMore = true
+	a.searchPage(a.asked+tuiPage, true)
+}
+
+// searchPage runs the box's search for its first limit hits. With next it
+// extends the list on screen: the cards already there keep their places and
+// the new ones follow.
+func (a *tuiApp) searchPage(limit int, next bool) {
 	a.seq++
 	seq, q, scope, box := a.seq, string(a.query), a.scope, a.box()
 	o := box.options(a.scopeProjects())
-	o.Limit = 80
-	a.searching = true
+	o.Limit = limit
+	byDate := a.byDate
+	if byDate {
+		o.Sort = search.SortDate
+	}
+	if next && a.widened {
+		o.Projects = nil
+	}
+	if !next {
+		a.searching = true
+	}
 	a.latest.Store(int64(seq))
 	// A search already overtaken by the next keystroke is not run: on a large
 	// history each one is a full pass, and a word typed at speed started one
@@ -446,14 +535,14 @@ func (a *tuiApp) startSearch() {
 			return
 		}
 		start := time.Now()
-		hits, err := tuiSearch(a.dir, o)
-		widened := false
+		hits, matched, err := tuiSearchPage(a.dir, o)
+		widened := next && a.widened
 		// A project named with in: is what was asked for; only the tab's
 		// scope widens on its own.
-		if err == nil && len(hits) == 0 && scope == scopeHere && len(o.Projects) > 0 && len(box.projects) == 0 && !stale() {
+		if !next && err == nil && len(hits) == 0 && scope == scopeHere && len(o.Projects) > 0 && len(box.projects) == 0 && !stale() {
 			wide := o
 			wide.Projects = nil
-			hits, err = tuiSearch(a.dir, wide)
+			hits, matched, err = tuiSearchPage(a.dir, wide)
 			widened = len(hits) > 0
 		}
 		took := float64(time.Since(start).Microseconds()) / 1000
@@ -461,12 +550,23 @@ func (a *tuiApp) startSearch() {
 			if seq != a.seq {
 				return
 			}
-			a.searching = false
+			a.searching, a.loadingMore = false, false
 			if err != nil {
 				a.say("Search failed: "+err.Error(), false)
 				return
 			}
-			a.tookMS, a.widened = took, widened
+			if next {
+				// A page that added no hit ends the list where it is: the
+				// count above it read the postings, and they promised more
+				// than the text holds.
+				hits = appendNewHits(a.hits, hits)
+				a.exhausted = len(hits) == len(a.hits)
+			} else {
+				a.tookMS, a.exhausted = took, false
+			}
+			a.hits, a.asked, a.matched = hits, limit, matched
+			a.widened = widened
+			a.rowsByDate = byDate
 			refresh := a.listed == num(a.scope)+"\x00"+q
 			a.setRows(nil, hits, len(hits))
 			if len(a.rows) == 0 && scope != scopeKept {

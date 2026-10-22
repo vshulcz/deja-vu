@@ -63,3 +63,12 @@ func TestLowerIsToLowerThenFold(t *testing.T) {
 		}
 	}
 }
+
+// A tokenizer folds rune by rune with LowerRune and must land where Lower does.
+func TestLowerRuneIsLowerForOneRune(t *testing.T) {
+	for _, r := range "AzЁёİΣKȺ中�" {
+		if got, want := string(LowerRune(r)), Lower(string(r)); got != want {
+			t.Errorf("LowerRune(%q) = %q, Lower gives %q", r, got, want)
+		}
+	}
+}

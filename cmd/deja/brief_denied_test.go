@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // The first screen a new user sees, on a machine whose store deja is not
@@ -94,5 +96,22 @@ func TestTheEmptyScreenCountsLockedStoresCorrectly(t *testing.T) {
 	}
 	if strings.Contains(out, "names it") {
 		t.Errorf("two stores, one pronoun:\n%s", out)
+	}
+}
+
+// A store excluded with DEJA_EXCLUDE_HARNESSES was said to be excluded in the
+// exclude file, which the reader never wrote (#5506 follow-up).
+func TestTheEmptyScreenNamesTheEnvironmentForAnEnvExclusion(t *testing.T) {
+	hermeticEnv(t)
+	t.Setenv("DEJA_EXCLUDE_HARNESSES", "claude")
+
+	var b bytes.Buffer
+	printNoHistory(&b, false)
+	out := strings.Join(strings.Fields(b.String()), " ")
+	if !strings.Contains(out, "excluded in DEJA_EXCLUDE_HARNESSES") {
+		t.Errorf("the empty screen does not name the environment:\n%s", out)
+	}
+	if strings.Contains(out, reportPath(sources.ExcludePath())) {
+		t.Errorf("the empty screen names an exclude file nobody wrote:\n%s", out)
 	}
 }

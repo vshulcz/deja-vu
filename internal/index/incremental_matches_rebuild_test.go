@@ -148,7 +148,7 @@ func takeSnap(t *testing.T, dir string) snap {
 	byOff := map[int64]Record{}
 	for _, r := range recs {
 		byOff[r.Offset] = r.Record
-		s.records = append(s.records, fmt.Sprintf("%s|%s|%s|%s|%q", r.Record.Key, r.Record.Role, r.Record.Time.UTC().Format("2006-01-02T15:04:05.000"), filepath.Base(r.Record.SourcePath), r.Record.Text))
+		s.records = append(s.records, fmt.Sprintf("%s|%s|%s|%s|%q", r.Record.Key, r.Record.Role, r.Record.Time.UTC().Format("2006-01-02T15:04:05.000"), r.Record.SourcePath, r.Record.Text))
 	}
 	sort.Strings(s.records)
 	checkRecordOffsets(t, dir, m, recs)
@@ -159,6 +159,9 @@ func takeSnap(t *testing.T, dir string) snap {
 			t.Fatal(err)
 		}
 		for tok, ps := range data {
+			if ps = liveOnly(ps, m.DeadRecords); len(ps) == 0 {
+				continue
+			}
 			var parts []string
 			for _, p := range ps {
 				r, ok := byOff[p.Off]

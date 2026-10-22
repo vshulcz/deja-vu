@@ -8,11 +8,13 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -265,10 +267,11 @@ func runSync(dir string, args []string) error {
 		// The reader's own pattern, and the drop most likely to empty a batch
 		// entirely — after which "imported 0 records" is the whole story they
 		// get (#2666).
-		if ex := index.ImportSkippedExcluded(); ex > 0 {
-			fmt.Fprintf(os.Stdout, "deja: %d record%s left out — your exclude list covers their project (%s)\n",
-				ex, pluralS(ex), reportPath(sources.ExcludePath()))
-		}
+		fmt.Fprint(os.Stdout, excludedByRuleLines())
+		// The switches set here hold for a peer's records too, and a batch of
+		// nothing but tool output imported 0 under DEJA_INDEX_TOOL_OUTPUT=0
+		// with no word of why (#5425).
+		fmt.Fprint(os.Stdout, switchedOffLine(""))
 		if err != nil {
 			return err
 		}
@@ -329,4 +332,52 @@ func readLastImport(dir string) (lastImport, bool) {
 		return lastImport{}, false
 	}
 	return li, true
+}
+
+// excludedByRuleLines reports the records the last import left out because a
+// rule on this machine keeps their project or their harness out of its memory,
+// one line per rule, or "". A pull prints them too: a batch emptied by one of
+// them read as an empty batch there (#5435).
+func excludedByRuleLines() string {
+	var b strings.Builder
+	if ex := index.ImportSkippedExcluded(); ex > 0 {
+		fmt.Fprintf(&b, "deja: %d record%s left out — your exclude list covers their project (%s)\n",
+			ex, pluralS(ex), reportPath(sources.ExcludePath()))
+	}
+	if n := index.ImportSkippedHarness(); n > 0 {
+		names := make([]string, 0)
+		for name := range sources.ExcludedHarnesses() {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		fmt.Fprintf(&b, "deja: %d record%s left out — this machine does not read their harness (excluded: %s)\n",
+			n, pluralS(n), strings.Join(names, ", "))
+	}
+	if n := index.ImportSkippedIgnored(); n > 0 {
+		fmt.Fprintf(&b, "deja: %d record%s left out — your ignore rule covers their project (%s)\n",
+			n, pluralS(n), reportPath(policy.Path()))
+	}
+	return b.String()
+}
+
+// switchedOffLine reports the records the last import left out because a
+// switch set here turns their kind off, or "". They are not in the ledger, so
+// they arrive when the batch is handed over again with the switch unset; a
+// pull has already moved the peer's watermark past them, so for a host the
+// line says how to ask again.
+func switchedOffLine(host string) string {
+	sw := index.ImportSkippedSwitched()
+	if sw == 0 {
+		return ""
+	}
+	names := sources.ParseSwitchesOff()
+	if sources.SubagentsOff() {
+		names = append(names, "DEJA_INCLUDE_SUBAGENTS=0")
+	}
+	again := "import the batch again"
+	if host != "" {
+		again = "run `deja sync ssh " + pasteSafe(host) + " --pull --full`"
+	}
+	return fmt.Sprintf("deja: %d record%s left out — switched off on this machine (%s); to take them, unset it and %s\n",
+		sw, pluralS(sw), strings.Join(names, ", "), again)
 }

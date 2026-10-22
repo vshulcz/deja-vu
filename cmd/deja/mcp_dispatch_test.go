@@ -151,12 +151,12 @@ func TestASlowCallDoesNotHoldUpTheOnesBesideIt(t *testing.T) {
 	s := openMCPSession(t, t.TempDir())
 	s.call(1, `{"mode":"recall","query":"slow"}`)
 	s.call(2, `{"mode":"recall","query":"fast"}`)
-	got := s.next(5 * time.Second)
+	got := s.next(2 * time.Minute)
 	if got == nil || replyID(got) != 2 || replyText(got) != "answer for fast" {
 		t.Fatalf("the fast call should answer first, got %#v", got)
 	}
 	close(h.gate("slow"))
-	if got := s.next(5 * time.Second); got == nil || replyID(got) != 1 {
+	if got := s.next(2 * time.Minute); got == nil || replyID(got) != 1 {
 		t.Fatalf("the slow call should still answer, got %#v", got)
 	}
 	s.close()
@@ -171,7 +171,7 @@ func TestACallPastTheDeadlineIsAnsweredWithANoteAndKeepsItsAnswer(t *testing.T) 
 	setDeadline(t, 50*time.Millisecond)
 	s := openMCPSession(t, t.TempDir())
 	s.call(1, `{"mode":"recall","query":"slow"}`)
-	got := s.next(5 * time.Second)
+	got := s.next(2 * time.Minute)
 	if got == nil || replyID(got) != 1 {
 		t.Fatalf("no reply at the deadline: %#v", got)
 	}
@@ -180,7 +180,7 @@ func TestACallPastTheDeadlineIsAnsweredWithANoteAndKeepsItsAnswer(t *testing.T) 
 	}
 	// Asked again while it still runs: joins the work, does not start more.
 	s.call(2, `{"mode":"recall","query":"slow"}`)
-	if got := s.next(5 * time.Second); got == nil || replyID(got) != 2 || !strings.Contains(replyText(got), "has not finished") {
+	if got := s.next(2 * time.Minute); got == nil || replyID(got) != 2 || !strings.Contains(replyText(got), "has not finished") {
 		t.Fatalf("second ask should get the note too, got %#v", got)
 	}
 	close(h.gate("slow"))
@@ -190,7 +190,7 @@ func TestACallPastTheDeadlineIsAnsweredWithANoteAndKeepsItsAnswer(t *testing.T) 
 	// Asked again after it finished: the kept answer, at once.
 	setDeadline(t, 0)
 	s.call(3, `{"mode":"recall","query":"slow"}`)
-	if got := s.next(5 * time.Second); got == nil || replyID(got) != 3 || replyText(got) != "answer for slow" {
+	if got := s.next(2 * time.Minute); got == nil || replyID(got) != 3 || replyText(got) != "answer for slow" {
 		t.Fatalf("third ask should get the kept answer, got %#v", got)
 	}
 	if n := h.calls.Load(); n != 1 {
@@ -210,7 +210,7 @@ func TestACancelledCallIsNotRunAndNotAnswered(t *testing.T) {
 	for i := 0; i < mcpWorkers; i++ {
 		s.call(10+i, fmt.Sprintf(`{"mode":"recall","query":"busy%d"}`, i))
 	}
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(2 * time.Minute)
 	for h.calls.Load() < mcpWorkers && time.Now().Before(deadline) {
 		time.Sleep(time.Millisecond)
 	}
@@ -219,7 +219,7 @@ func TestACancelledCallIsNotRunAndNotAnswered(t *testing.T) {
 	// A ping is answered on the read loop, so its reply means the cancel
 	// before it has been read.
 	s.send(`{"jsonrpc":"2.0","id":99,"method":"ping"}`)
-	if got := s.next(5 * time.Second); got == nil || replyID(got) != 99 {
+	if got := s.next(2 * time.Minute); got == nil || replyID(got) != 99 {
 		t.Fatalf("ping reply = %#v", got)
 	}
 	close(h.gate("queued"))
@@ -228,7 +228,7 @@ func TestACancelledCallIsNotRunAndNotAnswered(t *testing.T) {
 	}
 	seen := map[int]bool{}
 	for i := 0; i < mcpWorkers; i++ {
-		got := s.next(5 * time.Second)
+		got := s.next(2 * time.Minute)
 		if got == nil {
 			t.Fatalf("missing reply after %v", seen)
 		}

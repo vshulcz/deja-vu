@@ -32,7 +32,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Windsurf / Devin Desktop", "description": "Cascade writes each conversation to an encrypted file under ~/.codeium/windsurf and starts new ones without them. deja reads the files and gives Cascade recall.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-windsurf.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-windsurf.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-10-14", "dateModified": "2026-10-20"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Windsurf / Devin Desktop", "description": "Cascade writes each conversation to an encrypted file under ~/.codeium/windsurf and starts new ones without them. deja reads the files and gives Cascade recall.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-windsurf.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-windsurf.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-10-14", "dateModified": "2026-10-22"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for Windsurf / Devin Desktop", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-windsurf.html"}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Where does Windsurf store Cascade conversations?", "acceptedAnswer": {"@type": "Answer", "text": "One file per conversation at ~/.codeium/windsurf/cascade/<cascade-id>.pb on macOS and Linux, and C:\\Users\\<name>\\.codeium\\windsurf\\cascade on Windows. Devin Desktop uses the same directory. Each file is a protobuf sealed with AES-256-GCM, so grep and a text editor see only noise."}}, {"@type": "Question", "name": "Does Windsurf Cascade remember previous conversations?", "acceptedAnswer": {"@type": "Answer", "text": "Not on its own. A new Cascade conversation starts with your rules and what Cascade saved as memories; earlier conversations are not read back. With deja installed, Cascade can search them through an MCP tool, prompted by a rule, a skill and a /deja workflow."}}, {"@type": "Question", "name": "Why can't deja add recall to every Windsurf prompt?", "acceptedAnswer": {"@type": "Answer", "text": "Cascade hooks cannot pass text to the model: exit code 2 only blocks, and show_output is shown in the UI and is not offered for pre_user_prompt. So recall in Windsurf is pulled by the model through the MCP tool rather than pushed on each prompt."}}]}</script>
 </head>
@@ -74,7 +74,7 @@
 <a href="recover-a-deleted-session.html">Recover a deleted session</a>
 <a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
-<details class="grpfold"><summary>Deleting sessions <span class="n">20</span></summary>
+<details class="grpfold"><summary>Deleting sessions <span class="n">21</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
 <a href="delete-old-claude-sessions.html">Old sessions</a>
 <a href="delete-codex-sessions.html">Codex</a>
@@ -95,6 +95,7 @@
 <a href="delete-windsurf-cascade-history.html">Windsurf</a>
 <a href="delete-qwen-code-chat-history.html">Qwen Code</a>
 <a href="delete-trae-sessions.html">TRAE CLI</a>
+<a href="delete-codebuddy-sessions.html">CodeBuddy</a>
 </details>
 <details class="grpfold" open><summary>Per-agent guides <span class="n">36</span></summary>
 <a href="memory-for-aider.html">aider</a>

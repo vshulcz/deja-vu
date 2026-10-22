@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // setHome points a test's home at dir the way every platform reads it.
@@ -19,12 +21,27 @@ import (
 //
 // The unix behaviour is unchanged: HOME still decides, and the extra keys are
 // only read on windows.
+//
+// XDG_CONFIG_HOME follows the home too. TestMain sets it once for the package,
+// and it outranks HOME, so every tombstone and exclude list a test wrote went
+// to the one directory all tests share: the next test to index a session of
+// the same id found it already forgotten (#5570).
 func setHome(t *testing.T, dir string) {
 	t.Helper()
 	t.Setenv("HOME", dir)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, ".config"))
 	t.Setenv("USERPROFILE", dir)
 	t.Setenv("APPDATA", filepath.Join(dir, "AppData", "Roaming"))
 	t.Setenv("LOCALAPPDATA", filepath.Join(dir, "AppData", "Local"))
+}
+
+// A tombstone one test writes must not be in the next test's config (#5570).
+func TestSetHomeGivesTheTestItsOwnConfig(t *testing.T) {
+	dir := t.TempDir()
+	setHome(t, dir)
+	if got, want := sources.ConfigDir(), filepath.Join(dir, ".config", "deja"); got != want {
+		t.Fatalf("config dir after setHome = %s, want %s under the test's home", got, want)
+	}
 }
 
 // The next test written in here will be copied from the one above it, and the

@@ -110,8 +110,7 @@ func LoadDevin() []model.Session {
 	var all []model.Session
 	for _, p := range DevinFiles() {
 		s, err := ParseDevinDB(p)
-		diagFileError(p, err)
-		all = append(all, s...)
+		all = append(all, dbRead(p, s, err)...)
 	}
 	return all
 }
@@ -222,7 +221,7 @@ func parseDevinDBWhere(db, where string) ([]model.Session, error) {
 			if !devinDBHasTable(db) {
 				return nil, nil
 			}
-			return nil, fmt.Errorf("devin: query failed, the store schema may have changed: %w", err)
+			return nil, schemaChanged("devin", err)
 		}
 		return nil, err
 	}

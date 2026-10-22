@@ -18,12 +18,13 @@ import { accessSync, constants, existsSync, readFileSync } from "node:fs"
 
 import {
   argv,
-  clampLimit,
   cliPluginPath,
   configPaths,
   contextText,
   contributions,
   mcpWired,
+  recallArgv,
+  recallSilence,
   TOOL_SPECS,
   userTurns,
   zodTools,
@@ -218,10 +219,17 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
       args: {
         query: { type: "string", description: "Specific tokens to match. Several words are ANDed." },
         limit: { type: "number", optional: true, description: "How many sessions to return. Default 5." },
+        offset: {
+          type: "number",
+          optional: true,
+          description: "Sessions to skip, from the offset the previous page named. Default 0.",
+        },
       },
       async execute(args) {
-        const limit = String(clampLimit(args.limit))
-        return answer(await ask(["--framed", ...argv("search", ["--json", "--limit", limit], args.query)]))
+        // The page the MCP recall tool serves, framed and budgeted by deja.
+        const call = recallArgv(args)
+        const out = await ask(call)
+        return answer(out || (installed ? recallSilence(call) : ""))
       },
     },
     deja_session: {

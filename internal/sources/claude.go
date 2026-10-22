@@ -121,8 +121,8 @@ func LoadClaude() []model.Session {
 		for _, s := range ss {
 			seen[s.ID] = true
 		}
-		h, _ := ParseClaudeHistory(hist)
-		for _, s := range h {
+		h, err := ParseClaudeHistory(hist)
+		for _, s := range storeRead(hist, h, err) {
 			if !seen[s.ID] {
 				ss = append(ss, s)
 			}
@@ -338,6 +338,9 @@ func parseClaudeGenericFromOffset(path string, offset int64) ([]model.Session, e
 		}
 		if summary, _ := m["isCompactSummary"].(bool); summary && typ == "user" && role == "user" {
 			role = RoleSummary
+		}
+		if role == "user" {
+			txt = UnwrapPastedContent(txt)
 		}
 		if txt != "" {
 			s.Messages = append(s.Messages, model.Message{Role: role, Text: txt, Time: t})

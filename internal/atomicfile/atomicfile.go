@@ -20,11 +20,14 @@
 package atomicfile
 
 import (
+	"errors"
 	"io"
 	"math/rand/v2"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -41,13 +44,40 @@ import (
 // every attempt and spends its whole budget without landing. Twenty attempts
 // 5 ms apart were 100 ms of that; the schedule below is about 1.3 seconds, and
 // the jitter is what stops the two loops from keeping step.
+//
+// Only that refusal is retried. Any other failed rename, and every failed
+// rename on unix, is not going to change in a second, and a hook used to wait
+// the whole schedule out before reporting it.
 func publish(tmp, path string) error {
 	err := os.Rename(tmp, path)
-	for i := 0; err != nil && i < renameTries; i++ {
+	for i := 0; err != nil && retryable(err) && i < renameTries; i++ {
 		time.Sleep(renameBackoff(i))
 		err = os.Rename(tmp, path)
 	}
 	return err
+}
+
+// refusedWhileOpen is the rename windows refuses because another handle has
+// the destination open: ERROR_ACCESS_DENIED or ERROR_SHARING_VIOLATION from
+// the rename itself. Go opens files without FILE_SHARE_DELETE, so any reader
+// holding the file causes it.
+func refusedWhileOpen(err error) bool {
+	return runtime.GOOS == "windows" && isOpenRefusal(err)
+}
+
+// retryable is what publish retries; a variable so the schedule can be driven
+// on a platform that never refuses.
+var retryable = refusedWhileOpen
+
+// isOpenRefusal is refusedWhileOpen without the platform check, which is
+// windows-only in effect: those error numbers mean something else elsewhere.
+func isOpenRefusal(err error) bool {
+	var le *os.LinkError
+	if !errors.As(err, &le) || le.Op != "rename" {
+		return false
+	}
+	var errno syscall.Errno
+	return errors.As(err, &errno) && (errno == 5 || errno == 32)
 }
 
 // renameBackoff is how long attempt i waits: doubling from renameWait to

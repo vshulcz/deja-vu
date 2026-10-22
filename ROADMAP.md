@@ -16,13 +16,16 @@ the place to discuss design.
   is the failure path, where a pair exists for 21% of the failures an agent
   actually hits and the rest are the harness's own refusals, which deja has no
   lever on yet.
-- **What a read costs.** One search allocates 701 MB and 57% of it is candidate
-  message text copied out of the file to be scored, while the postings already
-  carry the offsets of the records that matched. Reading only what is scored, and
-  reading it without copying, are the two directions; both touch the hot path, so
-  each wants its latency, peak-RSS and bench numbers before and after. The last
-  profile, and why it moved, is on
-  [#3491](https://github.com/vshulcz/deja-vu/issues/3491).
+- **What a pass costs on a big store.** A pass that replaces a few sessions
+  now appends their records and reads only what changed, so 20 rewritten
+  transcripts on a 40,000-session store take 1.7 s. What is left reads or writes
+  more than the change: the manifest is decoded and written whole, so 20 renames
+  still take 1.4 s ([#5471](https://github.com/vshulcz/deja-vu/issues/5471)); a
+  pass that also sees an opencode, Kilo, ZCode, Cursor or goose database change
+  walks the whole log ([#5476](https://github.com/vshulcz/deja-vu/issues/5476));
+  and command text removed from a transcript that shares its session id with
+  another stays in `commands.gob`
+  ([#5477](https://github.com/vshulcz/deja-vu/issues/5477)).
 - **Windows correctness.** The Windows leg runs on `main`, on the weekly canary
   and on any pull request labelled `windows` rather than on every commit, so the
   gap between "green on Linux and macOS" and "correct on Windows" has to be
@@ -57,11 +60,6 @@ the place to discuss design.
   hook that reaches the model, a step late. What is left is the hosts with no
   tool hook that runs: aider, Continue's CLI, Roo Code, Zed and JetBrains AI
   Assistant, each recorded in the registry with the measurement behind it.
-- **Follow the work an agent handed off.** A subagent's run is its own session
-  now, and where a harness records the edge (Grok's `summary.json`, Claude's
-  sidechain files, Hermes' `parent_session_id`) recall can name the parent and the children. Cursor writes
-  subagent transcripts too and their shape is unread; the rest of the harnesses
-  that spawn agents are the same question.
 - **Close the matrix from upstream.** What is left in the support table is
   someone else's to ship: aider has no MCP client and no custom commands, Roo
   Code was archived with no hook events, Zed exposes no lifecycle hook. Each becomes work the day
@@ -72,7 +70,11 @@ the place to discuss design.
 
 - Mature the optional semantic tier (`deja embed`): still off by default and
   external to the binary, it should degrade and recover as cleanly as the lexical
-  ladder does.
+  ladder does. Vectors rerank lexical hits and answer when nothing matches; a
+  vector-first leg would reach the cross-language and paraphrase questions that
+  share no words with the session, and it gets measured before it changes the
+  ranking
+  ([#4976](https://github.com/vshulcz/deja-vu/issues/4976)).
 
 ## Not planned
 

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -89,8 +91,8 @@ func CrushDBs() []string {
 func LoadCrush() []model.Session {
 	var out []model.Session
 	for _, db := range CrushDBs() {
-		got, _ := ParseCrushDB(db)
-		out = append(out, got...)
+		got, err := ParseCrushDB(db)
+		out = append(out, dbRead(db, got, err)...)
 	}
 	return out
 }
@@ -247,6 +249,9 @@ type crushPart struct {
 		ID         string `json:"id"`
 		ToolCallID string `json:"tool_call_id"`
 		IsError    bool   `json:"is_error"`
+		// Metadata is the JSON string a tool hands its renderer beside the
+		// result (internal/agent/agent.go, ClientMetadata).
+		Metadata string `json:"metadata"`
 	} `json:"data"`
 }
 
@@ -420,6 +425,9 @@ func crushMessages(role, parts string, at time.Time) ([]crushRecord, []crushResu
 			if p.Data.ToolCallID != "" {
 				results = append(results, crushResult{p.Data.ToolCallID, p.Data.Content, p.Data.IsError})
 			}
+			if span, ok := crushReplacedSymbol(p.Data.Name, p.Data.Content, p.Data.Metadata, p.Data.IsError); ok && IndexEdits() {
+				out = append(out, crushRecord{Message: model.Message{Role: RoleEdit, Text: span, Time: at}})
+			}
 			text := strings.TrimSpace(crushStripCWD(p.Data.Content))
 			if text == "" {
 				continue
@@ -429,6 +437,55 @@ func crushMessages(role, parts string, at time.Time) ([]crushRecord, []crushResu
 	}
 	return out, results
 }
+
+// crushReplacedSymbol is the replaced side of an lsp_replace_symbol, as
+// "path\nspan". The call carries only what it wrote; its result's metadata,
+// ReplaceSymbolResponseMetadata {file_path, old_content, new_content, action}
+// (internal/agent/tools/lsp_replace_symbol.go), holds the file before and
+// after. A replace or a delete says which lines the symbol was on — "Replaced
+// symbol 'x' in f (lines N-M)" — and those lines of the old content are the
+// symbol; without them, the lines the two contents do not share stand in
+// (#595). An insert before or after the symbol replaced nothing.
+func crushReplacedSymbol(tool, content, metadata string, failed bool) (string, bool) {
+	if tool != "lsp_replace_symbol" || failed || metadata == "" {
+		return "", false
+	}
+	var m struct {
+		FilePath   string `json:"file_path"`
+		OldContent string `json:"old_content"`
+		NewContent string `json:"new_content"`
+		Action     string `json:"action"`
+	}
+	if json.Unmarshal([]byte(metadata), &m) != nil {
+		return "", false
+	}
+	path := crushPlainText(m.FilePath)
+	if path == "" || strings.ContainsAny(path, "\n\r") {
+		return "", false
+	}
+	if m.Action == "add_before" || m.Action == "add_after" {
+		return "", false
+	}
+	old, _ := changedLines(m.OldContent, m.NewContent)
+	if r := crushSymbolLines.FindStringSubmatch(firstLine(content)); r != nil {
+		from, _ := strconv.Atoi(r[1])
+		to, _ := strconv.Atoi(r[2])
+		if lines := strings.Split(m.OldContent, "\n"); from >= 1 && from <= to && to <= len(lines) {
+			old = strings.Join(lines[from-1:to], "\n")
+		}
+	}
+	if strings.TrimSpace(old) == "" {
+		return "", false
+	}
+	if len(old) > editSpanMax {
+		old = old[:editSpanMax]
+	}
+	return path + "\n" + crushPlainText(old), true
+}
+
+// crushSymbolLines reads the line range off lsp_replace_symbol's summary for a
+// replace or a delete, 1-based and inclusive.
+var crushSymbolLines = regexp.MustCompile(`^(?:Replaced|Deleted) symbol .* \(lines (\d+)-(\d+)\)$`)
 
 // crushStripCWD drops the <cwd>…</cwd> tag Crush appends to a tool result. It
 // is the same directory on every line of every session, and left in it is a

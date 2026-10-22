@@ -118,14 +118,14 @@ func TestACommandFailureUpdateReadsOnlyWhatChanged(t *testing.T) {
 	}
 	read := countOutputsRead(t)
 
-	// The first update after a full build has nothing to start from and walks
-	// everything once. That is the control: the counter sees the whole index.
+	// The first update after a full build starts from the state the build
+	// left, as every later one does (#5465).
 	c.appendTurn("app", 0, 10, "go test ./...", "--- FAIL: TestStoreRejectsStaleWrites (0.01s)\nFAIL")
 	if err := Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
-	if *read < n {
-		t.Fatalf("the first update read %d outputs of more than %d, so the counter does not see the walk", *read, n)
+	if *read > 1 {
+		t.Errorf("the first update after a full build read %d tool outputs, want 1", *read)
 	}
 
 	*read = 0

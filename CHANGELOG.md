@@ -7,6 +7,209 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- A cold build keys messages without allocating a string per word, so the
+  indexing phase takes half the CPU. On a 12,000-session Codex store it drops
+  from 9.3 s to 4.2 s and the whole build from 273 to 215 CPU-seconds (#5567).
+### Added
+
+- `deja search --sort date` lists the newest match first, in the text and in
+  `--json`, and `^s` in the search screen turns the list newest first under
+  day headings and back. On a common word the page is the newest of the whole
+  match, not the newest of the best-ranked thousand (#5577).
+- A cold build reads each transcript line once instead of handing it to six
+  readers that each decoded it again, and checks tool output for known errors
+  in one pass per line. On 40,000 sessions it takes 60 s instead of 87 s and
+  353 CPU-seconds instead of 551 (#5586).
+
+### Fixed
+
+- An `apply_patch` that renames a file (`*** Move to:`) records its hunks
+  under the new name, so `deja blame` and `deja restore` find them there.
+  Codex, opencode, Copilot CLI, OpenClaw, pi, Cline, Roo and Amp filed them
+  under the old path (#595).
+- `deja blame` attributes lines written by CodeWhale's `write_file` and
+  `fim_edit` (the latter read from its result), and `deja blame` and
+  `deja restore` see the symbol a Crush `lsp_replace_symbol` replaced (from
+  the result's metadata) and the lines a Reasonix `delete_symbol` cut (from
+  the diff it returns). Each kept only the path, or only the written side
+  (#595).
+- `deja blame` attributes a line a Copilot agent wrote with
+  `insert_edit_into_file`. The transcript reader kept only the file's path
+  (#595).
+- A transcript with nothing to index, such as one tool result that was only a
+  `<deja-recall>` block, no longer gets an empty session in `deja last` from
+  an incremental pass. A rebuild never listed it (#5563).
+- The `deja_recall` tool in the dsh, opencode, OpenClaw and Hermes plugins
+  answers with the MCP recall page, about 4 KB, and takes an `offset` for the
+  next one. dsh and opencode handed the model `search --json`: 222,536
+  characters for five hits on a test store. `deja recall` takes `--offset`
+  (#5568).
+- The skills' shell fallback is `deja recall`, not `deja --framed search
+  --json`, which ran to 222,546 bytes for one query on the same store against
+  4,097 (#5578). The Devin plugin's copy of the skill had drifted and is
+  current again.
+- A recall page that names a session matched more often than it can quote
+  says to call recall with that id, not recall_context, which the OpenClaw and
+  Hermes plugins do not have. Recall opens any id recall_context would,
+  including a Devin subagent's (#5579).
+
+## [0.23.1] - 2026-10-22
+
+Big stores build and search for less. A cold build peaks at half the memory
+it did (4.7 GB instead of 9.4 GB on 40,000 sessions, 2.4 GB instead of 4.0 GB
+on a 12,000-session Codex store), redacts with 17x less CPU and writes a
+quarter of the scratch data. The slowest searches answer in under 200 ms in
+process instead of up to 800, and a search over many copies or look-alike
+sessions is no longer quadratic, a slowdown 0.23.0 made worse. A pass and a
+rebuild now agree on copies of one session in several projects. The index is
+rebuilt once on upgrade.
+
+### Changed
+
+- A question with a word the store never saw reads each word's postings once
+  when it tries the word's neighbours, instead of once per neighbour: on
+  19,195 sessions search p95 went from 420 to 170 ms and the slowest question
+  from 740 to 200 ms, with the same answers (#5540).
+- A cold build peaks at half the memory: 4.7 GB instead of 9.4 GB on a
+  40,000-session store. The message count and the rebuild's dedupe set key on
+  a hash instead of the text, and a full build runs the collector at GOGC=25
+  unless GOGC or GOMEMLIMIT is set (#5498).
+- Redacting secrets during a build takes 17x less CPU with the same output: on
+  a 12,000-session Codex store the cold build went from 109 s to 45 s wall and
+  904 s to 285 s of CPU (#5512).
+- A cold build derives each session's row on every core instead of in the
+  write loop: 189-202 s to 157-169 s on a 40,000-session store (#5524).
+- A cold build of a store under 20,000 sessions no longer holds every
+  session's words at once to count which words go together: a 12,000-session
+  Codex store peaks at 2.4 GB instead of 4.0 GB (#5533).
+- A cold build writes a quarter of the scratch data it did, so a busy disk
+  no longer stalls it: 2.47 GB to 0.59 GB on a 12,000-session Codex store, and
+  indexing messages took 15-20 s instead of 32-35 s with the disk under other
+  load (#5526).
+- `deja index` decodes the manifest and walks the stores once: renaming 20
+  transcripts on a 40,000-session store takes 0.97 s instead of 1.5 s (#5471).
+- A pass that also sees a database store change (opencode, grok and the like)
+  reads only the sessions that store changed: one new opencode message on a
+  40,000-session store goes from 2.4 s to 1.4 s (#5476).
+- The search screen reads a page at a time. A word most of a 40,000-session
+  store holds lists its first 80 cards in about 1 s instead of 16, the list is
+  headed with every match, and the next page loads as the selection nears the
+  end (#5487).
+- MCP `recall` runs one index search where it ran two: 2.4 s to 1.3 s outside
+  any known project, 2.2 s to 1.4 s inside one, same page (#5486).
+- A session the trust policy withholds no longer takes a slot in a large
+  search's pool or counts toward its total (#5488).
+
+### Fixed
+
+- `deja forget` on a session whose transcript was already deleted no longer
+  leaves that file counted as kept, which only a second rebuild cleared
+  (#5521).
+- A SQLite store read is given up only when it stops moving, not at ten
+  minutes on the clock: a Hermes store of 1,683 sessions still reading on a
+  slow disk was cut and left out of a first build. A store given up, or whose
+  read fails, is named (`hermes: skipped — no progress for 10m0s;
+  DEJA_STORE_TIMEOUT=0 waits`), `deja index` exits 3 and `deja doctor` lists
+  it, and a rebuild keeps what the last index held from it (#5517).
+- A word taken out of every transcript leaves `cooccur.gob` on the pass that
+  replaced it, not at the next full build (#5489).
+- The command tables of a session two transcripts share count the copy the
+  row names, in a pass and a full build alike, and a migrated goose session
+  counts each run once (#5490, #5491).
+- A paged `deja search`, MCP `recall` and `recall_context` check a quoted
+  phrase's unread matches against the text instead of counting the words'
+  postings: on a 40k-session store `"jolquihol huxdex"` said 9 of 4,109 and
+  now lists 15 of 28. Past 20,000 postings the count is an estimate and says
+  `about` (`total_estimated` in `--json`) (#5495).
+- Fixes and `frictext.bin` of a session two transcripts in two projects share
+  are read from the copy the row names, as the command tables are, so a pass
+  no longer pairs one file's error with the other's remedy and matches a
+  rebuild (#5504).
+- A transcript rewritten and moved to another project before the next pass
+  keeps the friction line and session facts a rebuild gives it: the rebuild
+  writes the old copy and the new one in the order the log held them (#5519).
+- A Claude command whose result lands one pass after its call carries the
+  `exit 0` its result reports, as after a rebuild, instead of no outcome
+  (#5527). So does a goose, kiro-cli or pi-family command (#5529).
+  (#5527).
+- A session whose deleted transcript owns its row keeps, after a rebuild,
+  the conclusion, friction lines and questions the pass read off that file,
+  not ones taken from its records in log order (#5535).
+- A line a live transcript repeats from a deleted copy of the same session
+  is counted once (#5544).
+- `deja index --quiet` no longer prints the shared-id line, which now counts
+  sessions rather than transcripts. Command "last run" dates read the same
+  after a pass and a rebuild, and a plain word some sessions hold only in a
+  command checks just those sessions instead of every unread match (#5504).
+- The Grok, Command Code, Kimi and Kiro line readers and tail checks stream
+  long JSONL lines through `readLineBytes` rather than holding them whole: a
+  16 MB line is read in memory bounded by the message cap instead of the
+  line (#5424).
+The search screen reads a page at a time. A word most of a 40,000-session store holds lists its first 80 cards in about 1 s instead of 16, the list is headed with every match, and the next page loads as the selection nears the end (#5487). MCP `recall` runs one index search where it ran two, the project's answer cut from the machine's: 2.4 s to 1.3 s outside any known project, 2.2 s to 1.4 s inside one, same page (#5486). A session the trust policy withholds no longer takes a slot in a large search's pool or counts toward its total (#5488).
+- A search over sessions that share turns but each go on past them no longer
+  compares every pair: 6,000 such sessions answer in 0.43 s instead of 5.1 s
+  (#5523).
+- A search over many unrelated sessions that open on the same turn no longer
+  compares them in pairs: 6,000 answer in 0.33 s instead of 9.7 s (#5549).
+- MCP `recall`'s `limit` says it is per ~4 KB page, and a page that ran out of
+  room before reaching `limit` says `(page full)` on its paging line, so a
+  caller knows a bigger limit won't fit more (#5511).
+- A search over many sessions holding the same turns no longer goes
+  quadratic: 2,400 identical sessions answer in 0.9 s where 0.23.0 ran past
+  15 s (#5499).
+- A transcript that lands between `deja index`'s freshness check and its pass
+  is no longer lost or doubled, and a file rewritten after its stat is read
+  again (#5503).
+- A command removed from transcripts sharing an id leaves `commands.gob` on the
+  next pass (#5477).
+- Copies of one session id in several project directories give a pass and a
+  rebuild the same command tables, facts and fixes, including a copy that takes
+  the row from another project and a deleted copy that kept turns it shared
+  (#5492, #5508, #5509, #5510).
+- With `DEJA_EXCLUDE_HARNESSES` set, `deja stats`, `deja sources`, the empty
+  search and the first screen count project patterns and name the setting that
+  excluded each store, instead of blaming the exclude file (#5401).
+- `deja uninstall opencode` takes deja's entry out of a tui.json that has
+  comments, and uninstall keeps a comment the reader wrote on the list entry
+  before deja's, in tui.json and OpenClaw's load paths (#5313, #5557).
+- A transcript read again after a change no longer keeps an empty tool-output
+  record for a tool result that was only a `<deja-recall>` block, so it matches
+  a rebuild (#5555).
+
+## [0.23.0] - 2026-10-21
+
+Big stores are cheap to keep up to date. A pass that replaces a few sessions
+appends their records instead of writing the whole log again and reads only
+what changed: on a 40,000-session store 20 rewritten transcripts take 1.7 s
+instead of 24 s, and peak memory drops from 7 GB to under 1 GB. A search for a
+word most sessions hold answers in about a second instead of 24. Text taken
+out of a transcript leaves the index on the next pass. For busy machines there
+are `DEJA_NO_AUTO_INDEX` and `DEJA_SEARCH_ONLY`, and `deja index` exits 3 on a
+partial run. Sub-agents are sessions of their own in every reader that marks
+one, forks no longer take credit for what they copied, and recalled history
+can no longer run a command in opencode or end a dsh turn. The index is rebuilt
+once on upgrade.
+
+A search for a word most sessions hold no longer reads all of them to show a page. Past 1,000 matches it ranks them first from the postings and the manifest, then reads the 1,000 that can reach the page and 200 more that check its length estimate; the total still counts every match, and `--all` scores every one as before. On a 40,000-session store a word in every session takes 1.1 s and 370 MB instead of 24 s and 2.6 GB, and MCP `recall` 2.5 s instead of 30 s (#5467).
+
+The first index pass after a full build that rewrites, deletes or renames transcripts no longer reads the whole record log for the command-failure table: on a 40,000-session store, 20 rewritten transcripts take 4.0 s instead of 21 s, and the build leaves the table's state for that pass to start from (#5465). Renaming a transcript that shares its session with another file reads the session again only when the rename moves it past another of its files; 20 renames on the same store take 3.2 s instead of 20 s (#5466).
+`deja --re` anchors `^` and `$` at each line, as grep does. They anchored the whole message, so `^panic:` missed a panic printed after any other tool output (#5448).
+`deja embed` no longer sends a whole Cursor, Continue or Cline session again each time it grows. Those harnesses date unstamped turns from the file's modification time, and the vector identity held the time; it now holds only the session, role and text, so a session grown by one exchange embeds 2 records instead of every one. A version 2 sidecar is rekeyed on the next run without embedding again (#4976).
+
+A search excerpt keeps the line that matched when it looks like tool noise. Searching `assignment to entry in nil map` showed the stack frames of a Go test panic and dropped the `panic:` line itself; `panic:`, `goroutine N`, `npm ERR!` and numbered lines are still left out when they do not hold the match (#5456). A `--re` search that finds nothing suggests a looser pattern, dropping `^`/`$`, or plain words, instead of "try fewer words or --re" (#5457).
+
+`deja sync import` also leaves out a peer's records for a store `DEJA_EXCLUDE_HARNESSES` (or a `harness:` line) excludes and for a project the policy `ignore` rule covers, and says how many; a relay no longer sends an excluded store's sessions on (#5435). The `sync-timer` unit carries the `DEJA_*` and `XDG_*` settings of the shell it was installed from, so a timer run syncs into the same index under the same switches (#5436).
+
+A dsh turn no longer fails when recalled history contains `{{...}}`. dsh read deja's project digest and recall as prompt templates, so a past session quoting `{{cwd}}` ended every new turn with `unknown prompt variable` before the model was called; both contexts now pass `interpolate: false` and split the braces (`{ {cwd} }`), which dsh before 0.2.1-alpha.2 needs, in the npm plugin and in `deja install dsh-auto` (#5421).
+`deja sync` holds a peer's records to this machine's switches: `DEJA_INDEX_TOOL_OUTPUT=0`, `DEJA_INDEX_COMMANDS=0`, `DEJA_INDEX_PATHS=0`, `DEJA_INDEX_EDITS=0`, `DEJA_INDEX_WRITES=0` and `DEJA_INCLUDE_SUBAGENTS=0` leave the same records out of an import as out of a local read, and the import says how many (#5425).
+Recalled history can no longer make opencode run a command or attach a file. opencode expands `` !`cmd` `` and `@path` in the `/deja` prompt text and `@path` in a sub-agent's task prompt, so a past session quoting either ran it in the shell or shipped the file to the model; deja now breaks up those tokens in the recall it hands opencode and Kilo, and the model still reads every word (#5433, #5439).
+A deleted transcript that shared its session with another file keeps every turn it held. Deleting a copy that did not own the row dropped the turns only it had, a rebuild filed shared turns under the copy still on disk, and a later rewrite of that copy took them out of the index. A renamed copy and a file that moved to another session id now give the row to the file a rebuild picks, and a new file holding only a deleted transcript's last turn is no longer taken for the transcript moved (#5441, #5442, #5443, #5444, #5445).
+A session that says the search in its own words in one message is no longer buried by sessions that hold other forms of the same common words: on a 3,000-session Russian test store where every word is common, the 12 queries worded as the target said them find it in the top five 12 times, against 9 (first 10 against 8) (#5369).
+
+Text pasted into a Claude Code prompt is indexed as the pasted text, without the `<pasted_content id="…">` wrapper Claude Code puts around it. The tags titled sessions (`<pasted_content id="dd73"> Set up and test…`), gave the install's demo question the topic "pasted_content set" and were indexed and recalled as terms; the prompt hook no longer searches on them either. The index rebuilds once to take them out of sessions already stored, including those whose transcript Claude Code has since deleted, and a peer on an older build syncs its prompts in unwrapped.
+
 A sub-agent run is a session of its own under the session that spawned it.
 Sub-agents are now read by default as their task, answer and edits, the way
 Claude Code's are, so `deja blame` names the sub-agent that wrote a line;
@@ -104,6 +307,23 @@ session it keeps: they are copied as stored and keep their postings. On a
 12,000-session store a pass over 9 changed transcripts took 45 s, now 7 s
 (#5383).
 
+A pass that replaces a few sessions no longer writes the whole store again: it
+appends their records, marks the old ones dead and puts the new postings in
+small overlay files, and the log is written out again only once dead records
+are a quarter of it. On a 25,000-session store a pass over 9 rewritten
+transcripts wrote 798 MB and peaked at 2.5 GB of memory; now it writes 21 MB,
+most of it the manifest, and peaks at 310 MB. A new transcript no longer
+rewrites every postings file either: 225 MB and 2.4 GB there, now 18 MB and
+150 MB. The index is rebuilt once for the new layout (#5387). The replaced
+records are zeroed where they stand on the same pass, and so is a word only they
+held in the postings files, so text taken out of a transcript leaves the index
+then rather than at the next compaction (#5429), and an older deja
+meeting the index can no longer bring them back as live (#5428). CJK words
+are overwritten too (#5452), a `show` running across the pass no longer gets the
+session back empty (#5449), and `deja index` on an index that looks up to date
+finishes the zeroing a killed pass left (#5450). A lost
+overlay file reads as damage and rebuilds (#5426).
+
 A pass that reads Codex's, TRAE's or Claude Code's history.jsonl beside other
 changes replaces only the sessions with a new prompt in it, not every session
 known from the log alone (#5403).
@@ -117,6 +337,11 @@ it streams, each string kept to the 1 MB a message is cut to anyway. An
 incremental pass over one went from 628 MB to 42 MB peak. Every line that is
 not one JSON object now counts as skipped; a `null` line or one with more after
 the object went uncounted (#5391).
+A Claude Code or Cherry Studio line of a hundred megabytes is streamed the
+same way, and so are the checks the incremental pass makes before it reads a
+Claude, Copilot, TRAE or Codex tail, and `deja changes`: indexing a Claude
+transcript with a 100 MB tool output went from 925 MB to 36 MB peak, 4.3 s to
+0.9 s (#5414).
 
 After a pass rewrites the index, the friction texts, the command-failure table
 and the record offset table are brought up to date from the sessions the pass
@@ -137,8 +362,7 @@ clamped to 3 s. After a `kimi -p` run the session is no longer hidden from
 the next session's recall for 20 minutes. In the light theme on a 256-colour
 terminal, key chips no longer melt into their panel.
 ё and е are one letter in the index and in queries, so «ещё» finds a session
-that says «еще» and the other way round. The index format moves to version 90,
-so the first run rebuilds it.
+that says «еще» and the other way round.
 
 Semantic search works with models trained with instruction prefixes, such as
 multilingual E5: `DEJA_EMBED_QUERY_PREFIX` and `DEJA_EMBED_PASSAGE_PREFIX` are
@@ -182,6 +406,14 @@ the store back.
 followed the error, and `deja how` and `deja restore` name `DEJA_INDEX_COMMANDS=0`
 or `DEJA_INDEX_EDITS=0` when those kept their data out. The commands guide lists
 what each `DEJA_INDEX_*` switch leaves out and what stops working (#5395).
+`DEJA_INDEX_TOOL_OUTPUT=0` now leaves tool output out of Claude Code, Cherry
+Studio, Crush, goose, Grok, pi and Command Code sessions too, and
+`DEJA_INDEX_COMMANDS=0` leaves commands out of goose and Copilot agent
+transcripts. Every `DEJA_INDEX_*` switch is applied to what each reader
+returns and to the context a compaction capture keeps, so a new reader gets
+them without testing them itself; opencode sessions re-read for their diffs
+get them and `DEJA_INCLUDE_SUBAGENTS` too. If you run with either switch, run
+`deja index --rebuild` once to drop what was indexed before (#5413).
 
 ## [0.22.2] - 2026-10-17
 

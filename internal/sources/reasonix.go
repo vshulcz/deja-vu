@@ -190,8 +190,8 @@ func LoadReasonix() []model.Session {
 // reasonixDialect is what Reasonix calls its tools (internal/tools/builtin).
 // notebook_edit writes a cell's new_source unless its edit_mode is delete,
 // delete_range and delete_symbol name the file they cut from, and move_file
-// names two (reasonixMovePaths); delete_range's removed lines are in its
-// result (reasonixRangeCalls) (#4541).
+// names two (reasonixMovePaths); delete_range's and delete_symbol's removed
+// lines are in their result (reasonixRangeCalls) (#4541, #595).
 var reasonixDialect = toolDialect{
 	pathKey: "path",
 	pathTools: map[string]bool{
@@ -477,10 +477,11 @@ func reasonixMovePaths(blocks []any, record string) string {
 	return strings.Join(paths, "\n")
 }
 
-// reasonixRangeCalls is the file of each delete_range call by call id. The
-// call names only anchors; the unified diff its result carries holds the
-// lines it removed, and a call that failed carries an error instead of a
-// diff (#4541).
+// reasonixRangeCalls is the file of each delete_range and delete_symbol call
+// by call id. The call names only anchors, or a symbol; the unified diff its
+// result carries holds the lines it removed (both return diff.Build's Diff,
+// internal/tools/builtin/delete_range.go and delete_symbol.go), and a call
+// that failed carries an error instead of a diff (#4541, #595).
 type reasonixRangeCalls map[string]string
 
 func (r reasonixRangeCalls) note(toolCalls any) {
@@ -488,13 +489,14 @@ func (r reasonixRangeCalls) note(toolCalls any) {
 		m := it.(map[string]any)
 		in, _ := m["input"].(map[string]any)
 		id, _ := m["id"].(string)
-		if p, _ := in["path"].(string); m["name"] == "delete_range" && id != "" && p != "" {
+		if p, _ := in["path"].(string); (m["name"] == "delete_range" || m["name"] == "delete_symbol") && id != "" && p != "" {
 			r[id] = p
 		}
 	}
 }
 
-// spans is the edit records of the delete_range call a result answers.
+// spans is the edit records of the delete_range or delete_symbol call a
+// result answers.
 func (r reasonixRangeCalls) spans(callID, result string, ts time.Time) []model.Message {
 	path, ok := r[callID]
 	if !ok {

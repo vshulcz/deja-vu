@@ -128,8 +128,7 @@ func LoadCursor() []model.Session {
 	var ss []model.Session
 	for _, db := range CursorDBs() {
 		got, err := ParseCursorDB(db)
-		diagFileError(db, err)
-		ss = append(ss, got...)
+		ss = append(ss, dbRead(db, got, err)...)
 	}
 	ss = append(ss, parseFiles(CursorTranscripts(), ParseCursorTranscript)...)
 	return ss

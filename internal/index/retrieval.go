@@ -86,11 +86,17 @@ func searchDetailedOnce(dir string, o query.Options) (SearchResult, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	var r SearchResult
+	return inOneGeneration(dir, func() (SearchResult, error) { return searchDetailedRead(dir, o) })
+}
+
+// inOneGeneration is read, done again while the manifest after it is not the
+// file it was before it, at most three times in all: see searchDetailedOnce.
+func inOneGeneration[T any](dir string, read func() (T, error)) (T, error) {
+	var r T
 	var err error
 	for attempt := 0; attempt < 3; attempt++ {
 		before := manifestGeneration(dir)
-		r, err = searchDetailedRead(dir, o)
+		r, err = read()
 		if sameGeneration(before, manifestGeneration(dir)) {
 			return r, err
 		}
@@ -264,15 +270,30 @@ func searchDetailedRead(dir string, o query.Options) (SearchResult, error) {
 	// agent's own live session, which holds them because the question came
 	// from it — the answer is still the rest of the ladder, not nothing. The
 	// early return here served empty to 23 of 255 real recall calls (#4766).
+	holding := len(posts)
 	posts = cutPostingsBySession(posts, m, o)
 	var ss []model.Session
+	var unread *query.Unread
+	var scoped []posting
+	var scopeWhole bool
 	if len(posts) > 0 {
+		pool := poolPostings(posts, m, o, holding)
+		posts, unread, scoped, scopeWhole = pool.read, pool.unread, pool.scoped, pool.whole
 		// With the variants the rung above collected, not without them. A
 		// substring variant needs none — the text holding "opencode" holds
 		// "code" too — but a compound spelled apart is not a substring of
 		// anything the store wrote, so the postings found the session and
 		// this check dropped it again (#2125).
-		ss, err = scanRecordsWithVariants(dir, m, o, postingOffsets(posts), fallbackVariants)
+		var misses int
+		ss, misses, err = scanRecordsTextMisses(dir, m, o, postingOffsets(posts), fallbackVariants)
+		if err == nil && unread != nil {
+			var more []model.Session
+			if more, err = verifyUnread(dir, m, o, fallbackVariants, ss, pool, misses == 0); len(more) > 0 {
+				// Read now, so ranked with the rest; the scope's own matches
+				// among them need no second read.
+				ss, scoped = append(ss, more...), nil
+			}
+		}
 	}
 	if err == nil && len(ss) == 0 {
 		if result, ferr := stemSearch(dir, m, o); ferr != nil {
@@ -303,7 +324,29 @@ func searchDetailedRead(dir string, o query.Options) (SearchResult, error) {
 	if err != nil {
 		return SearchResult{}, err
 	}
-	return withRelevanceTail(ranking, dir, m, o, SearchResult{Sessions: ss, Tier: fallbackTier, Variants: fallbackVariants})
+	res, err := withRelevanceTail(ranking, dir, m, o, SearchResult{Sessions: ss, Tier: fallbackTier, Variants: fallbackVariants, Unread: unread})
+	// What o.PoolScope asked for is read after this search settled its own
+	// answer, and only onto a plain exact one: that is the only answer a
+	// narrower one is cut from.
+	if err == nil && scopeWhole && res.Unread == unread && res.Tier == query.TierExact {
+		// No offsets would scan the whole record log.
+		var extra []model.Session
+		if len(scoped) > 0 {
+			var serr error
+			if extra, serr = scanRecordsWithVariants(dir, m, o, postingOffsets(scoped), fallbackVariants); serr != nil {
+				return res, nil
+			}
+		}
+		for _, s := range extra {
+			if unread.Scoped == nil {
+				unread.Scoped = map[string]bool{}
+			}
+			unread.Scoped[s.Harness+":"+s.ID] = true
+		}
+		res.Sessions = append(res.Sessions, extra...)
+		unread.ScopeWhole = true
+	}
+	return res, err
 }
 
 // sessionKeySet keys sessions the way StrictIDs is keyed, for the paths that
@@ -414,12 +457,55 @@ func withRelevanceTail(once *relevanceOnce, dir string, m Manifest, o query.Opti
 	// of places, not an unconditional lead. A strict session the ranking scored
 	// badly can now be passed by a relevance session it scored well.
 	unranked := len(rel.Sessions)
+	// A strict session the pool never scored sat behind all of it, so ten
+	// places could not bring it near the page however well its message
+	// answered: on a store where every query word is common, the pool fills
+	// with sessions holding some form of each word in one message, and the one
+	// that said the query in its own words ranked 41st (#5369). It is placed
+	// instead by how many pool sessions say the query, in the words it was
+	// asked in, at least as well as its best message does, without the strict
+	// lead on top: placed ten ahead of that, an incidental strict session
+	// passed answers the pool had ranked first. Never lower than before. Not
+	// for a long query, which is ranked by its sessions
+	// rather than their best message, nor for a head whose AND dropped a word.
+	byMsg := map[string]int{}
+	var outside []model.Session
+	if !isLongQuery(RelevanceTermsWithTime(o.Query, o.Now)) && !droppedAWord(res.Variants) {
+		for _, s := range ss {
+			if _, ok := relRank[s.Harness+":"+s.ID]; !ok {
+				outside = append(outside, s)
+			}
+		}
+	}
+	if len(outside) > 0 {
+		mt := newMessageTerms(RelevanceTermsWithTime(o.Query, o.Now), rel.TermIDF, true)
+		pool := make([]float64, len(rel.Sessions))
+		parallelForRanked(len(pool), func(i int) { pool[i] = mt.best(rel.Sessions[i]) })
+		for _, s := range outside {
+			sc, r := mt.best(s), 0
+			if sc <= 0 {
+				continue
+			}
+			for _, p := range pool {
+				if p >= sc {
+					r++
+				}
+			}
+			byMsg[s.Harness+":"+s.ID] = r
+		}
+	}
+	// Doubled, so a session placed by its message sits just behind the pool
+	// session it ties with rather than ahead of it.
 	place := func(s model.Session, strict bool) int {
-		r, ok := relRank[s.Harness+":"+s.ID]
+		key := s.Harness + ":" + s.ID
+		r, ok := relRank[key]
 		if !ok {
+			if m, ok := byMsg[key]; ok {
+				return min(2*m+1, 2*fusedPlace(unranked, true))
+			}
 			r = unranked
 		}
-		return fusedPlace(r, strict)
+		return 2 * fusedPlace(r, strict)
 	}
 	merged := append([]model.Session(nil), ss...)
 	added := 0
@@ -829,9 +915,29 @@ func ProjectRelevantNamingCut(dir string, projects, terms []string, n int, skip 
 	if ok {
 		defer unlock()
 	}
+	// From one generation, as a search is. A pass that swapped in between a
+	// bucket and its overlays left the ranking the old bucket, where the
+	// session's postings were the dead ones, and no overlay with its live
+	// ones: the session the question named fell out (#5459).
+	r, err := inOneGeneration(dir, func() (projectRelevantRead, error) {
+		return projectRelevantIn(dir, projects, terms, n, skip, cut)
+	})
+	return r.out, r.matched, r.strong, r.naming, r.idf, err
+}
+
+// projectRelevantRead is what ProjectRelevantNamingCut hands back.
+type projectRelevantRead struct {
+	out                     []model.Session
+	matched, strong, naming []int
+	idf                     map[string]float64
+}
+
+// projectRelevantIn is the read ProjectRelevantNamingCut makes, without the
+// lock.
+func projectRelevantIn(dir string, projects, terms []string, n int, skip map[string]bool, cut map[string]time.Time) (projectRelevantRead, error) {
 	m, err := readManifestCached(dir)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return projectRelevantRead{}, err
 	}
 	var keep func(SessionMeta) bool
 	if len(skip) > 0 {
@@ -842,18 +948,18 @@ func ProjectRelevantNamingCut(dir string, projects, terms []string, n int, skip 
 		// A corrupt or unreadable bucket. The hook never rebuilds, so surface
 		// it rather than inject a silently short-ranked déjà vu; the caller
 		// stays quiet on an error.
-		return nil, nil, nil, nil, nil, rerr
+		return projectRelevantRead{}, rerr
 	}
 	metas, matched, strong, naming, idf := rank.metas, rank.informative, rank.strong, rank.naming, rank.idf
 	if bm, bmatched, bstrong, bidf, ok := bridgedRetry(dir, m, projects, terms, n, skip, strong, idf); ok {
 		metas, matched, strong, idf, naming = bm, bmatched, bstrong, bidf, nil
 	}
 	if len(metas) == 0 {
-		return nil, nil, nil, nil, nil, nil
+		return projectRelevantRead{}, nil
 	}
 	out, err := sessionsServable(dir, metas, query.Options{ExcludeUpTo: cut})
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return projectRelevantRead{}, err
 	}
 	if len(cut) > 0 {
 		out = stillMatching(out, terms, cut)
@@ -867,7 +973,7 @@ func ProjectRelevantNamingCut(dir string, projects, terms []string, n int, skip 
 	if naming != nil {
 		naming, _ = countsFor(out, metas, naming, naming)
 	}
-	return out, matched, strong, naming, idf, nil
+	return projectRelevantRead{out, matched, strong, naming, idf}, nil
 }
 
 // stillMatching drops a cut session none of whose served messages holds a
@@ -2324,10 +2430,60 @@ func metasNotIgnoredBy(pol policy.Policy, metas []SessionMeta) []SessionMeta {
 // records.bin. The per-session variant re-scanned the whole log for every
 // session, which turned a session-start hook into hundreds of milliseconds.
 func sessionsForMetas(dir string, metas []SessionMeta) ([]model.Session, error) {
-	tbl, terr := loadRecordTables(dir)
-	if terr != nil {
-		return nil, terr
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return nil, err
 	}
+	out, err := sessionsForMetasIn(dir, m, metas)
+	// Read again when a pass swapped in during the read, as loadSessionMeta
+	// does, without the sessions it took away (#5449).
+	for retry := 0; retry < sessionRereads; retry++ {
+		cur, moved := liveManifest(dir, m)
+		if !moved {
+			break
+		}
+		m = cur
+		metas = slices.DeleteFunc(slices.Clone(metas), func(meta SessionMeta) bool {
+			_, ok := m.Sessions[meta.Harness+":"+meta.ID]
+			return !ok
+		})
+		if sessionReread != nil {
+			sessionReread()
+		}
+		out, err = sessionsForMetasIn(dir, m, metas)
+	}
+	if err != nil {
+		return nil, err
+	}
+	for i := range out {
+		orderPromotedNote(&out[i])
+	}
+	return ignoredByPolicy(out), nil
+}
+
+// sessionRereads is how many times a session read goes again for a pass that
+// swapped in under it. Two: a second pass can land while the first reread
+// runs, and that reread then reads the records it zeroes (#5460).
+const sessionRereads = 2
+
+// sessionReread, when set, runs before each reread. Tests land a pass there.
+var sessionReread func()
+
+// liveManifest is the manifest dir holds now, and whether it is another than
+// m: a pass committed since m was read, and records m listed live may have
+// been zeroed in the log they share (#5449). Every pass stamps its build
+// time, and one that zeroes records lists them dead.
+func liveManifest(dir string, m Manifest) (Manifest, bool) {
+	cur, err := readManifestCached(dir)
+	if err != nil || len(cur.DeadRecords) == len(m.DeadRecords) && cur.BuiltAt.Equal(m.BuiltAt) && cur.Generation == m.Generation {
+		return m, false
+	}
+	return cur, true
+}
+
+// sessionsForMetasIn is the read sessionsForMetas makes with m's tables.
+func sessionsForMetasIn(dir string, m Manifest, metas []SessionMeta) ([]model.Session, error) {
+	tbl := tablesFromManifest(m)
 	want := make(map[string]int, len(metas))
 	out := make([]model.Session, len(metas))
 	for i, meta := range metas {
@@ -2343,13 +2499,7 @@ func sessionsForMetas(dir string, metas []SessionMeta) ([]model.Session, error) 
 			out[i].Messages = append(out[i].Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
 		}
 	})
-	if err != nil {
-		return nil, err
-	}
-	for i := range out {
-		orderPromotedNote(&out[i])
-	}
-	return ignoredByPolicy(out), nil
+	return out, err
 }
 
 // RecentProjects is RecentProject for several project names at once: one
@@ -3056,11 +3206,30 @@ func betterIDMatch(candidate, held SessionMeta) bool {
 }
 
 func loadSessionMeta(dir string, m Manifest, meta SessionMeta) (model.Session, bool, error) {
-	s := sessionFromMeta(meta)
-	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), meta.Harness+":"+meta.ID)
+	key := meta.Harness + ":" + meta.ID
+	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), key)
+	// A pass that swapped in during the read zeroes the records it replaced
+	// in the log this one shares, and the session read empty (#5449). Once
+	// more from the live manifest; a failed read too, since the new log's tail
+	// does not decode with the old tables.
+	for retry := 0; retry < sessionRereads; retry++ {
+		cur, moved := liveManifest(dir, m)
+		if !moved {
+			break
+		}
+		if _, ok := cur.Sessions[key]; !ok {
+			return model.Session{}, false, nil
+		}
+		m = cur
+		if sessionReread != nil {
+			sessionReread()
+		}
+		recs, err = recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), key)
+	}
 	if err != nil {
 		return model.Session{}, false, err
 	}
+	s := sessionFromMeta(meta)
 	for _, r := range recs {
 		s.Messages = append(s.Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
 	}
@@ -3169,6 +3338,16 @@ func isToolRole(role string) bool {
 var wholeLogScanned func()
 
 func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []int64, variants map[string][]string) ([]model.Session, error) {
+	ss, _, err := scanRecordsTextMisses(dir, m, o, offsets, variants)
+	return ss, err
+}
+
+// scanRecordsTextMisses is scanRecordsWithVariants that also counts the
+// records read that do not pass the text check: none, and every session the
+// read dropped was dropped for its role or the caller's filters, not because
+// its postings named text it does not hold.
+func scanRecordsTextMisses(dir string, m Manifest, o query.Options, offsets []int64, variants map[string][]string) ([]model.Session, int, error) {
+	misses := 0
 	by := map[string]*model.Session{}
 	add := func(r Record) {
 		meta, ok := m.Sessions[r.Key]
@@ -3207,16 +3386,18 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 	if len(offsets) > 0 {
 		f, err := openIndexFile(filepath.Join(dir, "records.bin"))
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		defer func() { _ = f.Close() }()
 		offsets = sortedUniqueOffsets(offsets)
 		if err := eachRecordAt(f, offsets, tablesFromManifest(m), func(r Record) {
 			if matcher.matches(r) {
 				add(r)
+			} else {
+				misses++
 			}
 		}); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 	} else {
 		if err := eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
@@ -3225,9 +3406,11 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 			}
 			if matcher.matches(r) {
 				add(r)
+			} else {
+				misses++
 			}
 		}); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 	}
 	out := make([]model.Session, 0, len(by))
@@ -3237,7 +3420,7 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 	}
 	// The scoring and relevance tiers build their sessions here rather than
 	// through sessionsForMetas, so the ignore rule has to hold at both.
-	return ignoredByPolicy(out), nil
+	return ignoredByPolicy(out), misses, nil
 }
 
 func cutPostingsBySession(posts []posting, m Manifest, o query.Options) []posting {
@@ -3254,6 +3437,339 @@ func cutPostingsBySession(posts []posting, m Manifest, o query.Options) []postin
 		return nil
 	}
 	return capPostingsPerSession(out, perSessionCandidates)
+}
+
+// poolPostings keeps the postings of the sessions worth ranking in full when
+// the caller reads only a window of the answer. A word in most of a store
+// matched 40k sessions, and reading and scoring every one of them to show 15
+// took 22 s and 2.6 GB (#5467). The pool is chosen from the postings and the
+// manifest alone; the rest is described in the Unread it returns.
+//
+// Not for a search inside one session or one role: those score a part of each
+// session the postings cannot see.
+//
+// holding is how many postings matched, which on the exact tier is how many
+// records of the store hold the query.
+//
+// The scoped postings are those of the sessions o.PoolScope adds, read apart
+// so they never decide this search's own tier.
+func poolPostings(posts []posting, m Manifest, o query.Options, holding int) pooled {
+	all := pooled{read: posts}
+	if o.Window <= 0 || o.Session != "" || o.Role != "" {
+		return all
+	}
+	n := search.PoolSize(o.Window)
+	records := map[uint32]int{}
+	for _, p := range posts {
+		records[p.Sid]++
+	}
+	if len(records) <= n {
+		return all
+	}
+	metaByOrd := sessionMetaByOrd(m)
+	// What the ignore rule and the trust policy withhold is dropped here
+	// rather than after the scan, so the unread count does not include it and
+	// a denied session does not take a slot from one the page can show (#5488).
+	pol, excluded := policy.Load(), sources.ExcludedHarnesses()
+	sids := make([]uint32, 0, len(records))
+	withheld := 0
+	denied, allowed := map[uint32]bool{}, map[uint32]bool{}
+	for sid := range records {
+		meta := metaByOrd[sid]
+		if excluded[strings.ToLower(meta.Harness)] || pol.Ignored(meta.Path, meta.Project) {
+			continue
+		}
+		if o.Activation != "" && !pol.Allows(o.Activation, meta.Project) {
+			withheld++
+			denied[sid] = true
+			continue
+		}
+		sids = append(sids, sid)
+		allowed[sid] = true
+	}
+	if len(sids) <= n {
+		return all
+	}
+	sort.Slice(sids, func(i, j int) bool { return sids[i] < sids[j] })
+	stored := 0
+	for _, meta := range m.Sessions {
+		stored += meta.Counted
+	}
+	share := 0.0
+	if stored > 0 {
+		share = min(float64(holding)/float64(stored), 1)
+	}
+	cands := make([]search.PoolCandidate, len(sids))
+	for i, sid := range sids {
+		meta := metaByOrd[sid]
+		s := sessionFromMeta(meta)
+		s.Held = meta.Counted
+		cands[i] = search.PoolCandidate{Session: s, Records: records[sid]}
+	}
+	keep, unread := search.Pool(cands, o, n, share)
+	if keep == nil {
+		return all
+	}
+	unread.Withheld = withheld
+	kept := make(map[uint32]bool, n)
+	for i, sid := range sids {
+		if keep[i] {
+			kept[sid] = true
+		}
+	}
+	extra, scopeWhole := scopedPool(records, sids, kept, metaByOrd, o, n)
+	out := pooled{unread: &unread, whole: scopeWhole, readSessions: len(kept), all: posts, kept: kept, allowed: allowed, denied: denied}
+	for _, p := range posts {
+		if kept[p.Sid] {
+			out.read = append(out.read, p)
+		} else if extra[p.Sid] && scopeWhole {
+			out.scoped = append(out.scoped, p)
+		}
+	}
+	return out
+}
+
+// pooled is what poolPostings split a match into.
+type pooled struct {
+	// read are the postings of the sessions ranked in full, and
+	// readSessions how many sessions they come from.
+	read         []posting
+	readSessions int
+	unread       *query.Unread
+	// scoped and whole are what Options.PoolScope added: see scopedPool.
+	scoped []posting
+	whole  bool
+	// all are the postings the pool was drawn from. Of their sessions, kept
+	// were read, allowed and not kept are what Unread.Sessions counts, and
+	// denied what Unread.Withheld counts. Those two were not checked against
+	// the text.
+	all                   []posting
+	kept, allowed, denied map[uint32]bool
+}
+
+// verifyUnreadBudget is how many postings of the unread sessions are checked
+// against the text before their count is estimated instead.
+var verifyUnreadBudget = 20000
+
+// verifyUnread makes the unread counts ones the text bears out. The pool is
+// drawn from the postings, which say which records hold every word, not
+// whether the words stand together the way a quoted phrase asks: "alpha beta"
+// over 1,900 sessions that hold both words apart read the 5 that say it and
+// counted the rest as matches, 106 in all (#5495).
+//
+// When every session read passed the text check, the postings were exact and
+// the counts stand: a plain word costs nothing here. When every record read
+// passed it and only the role filter dropped a session, the word matched in a
+// command or a file list, which only a session whose postings are all tool
+// records can be left with: those are checked and the counts cut by the ones
+// that fail, where every unread match used to be read again. Otherwise the unread
+// sessions are checked the same way, and the ones that pass are returned to
+// be ranked with the pool, which leaves nothing unread. Past
+// verifyUnreadBudget postings the counts are instead scaled by how many of the
+// sample read with the pool passed, and Unread.Estimated says so.
+func verifyUnread(dir string, m Manifest, o query.Options, variants map[string][]string, ss []model.Session, pool pooled, exactText bool) ([]model.Session, error) {
+	u := pool.unread
+	if len(ss) >= pool.readSessions || u.Sessions+u.Withheld == 0 {
+		return nil, nil
+	}
+	if exactText {
+		// Past the budget the counts are scaled below, as for a phrase.
+		if done, err := cutRoleOnlyUnread(dir, m, o, variants, pool); done || err != nil {
+			return nil, err
+		}
+	}
+	var rest, denied []posting
+	over := false
+	for _, p := range pool.all {
+		switch {
+		case pool.denied[p.Sid]:
+			denied = append(denied, p)
+		case pool.allowed[p.Sid] && !pool.kept[p.Sid]:
+			rest = append(rest, p)
+		}
+		if over = len(rest)+len(denied) > verifyUnreadBudget; over {
+			break
+		}
+	}
+	if !over {
+		more, err := sessionsBorneOut(dir, m, o, variants, rest)
+		if err != nil {
+			return nil, err
+		}
+		withheld, err := sessionsBorneOut(dir, m, o, variants, denied)
+		if err != nil {
+			return nil, err
+		}
+		u.Sessions, u.Length, u.Withheld = 0, 0, len(withheld)
+		return more, nil
+	}
+	passed, sampled := 0, len(u.Sample)
+	for _, s := range ss {
+		if _, ok := u.Sample[s.Harness+":"+s.ID]; ok {
+			passed++
+		}
+	}
+	if sampled == 0 {
+		passed, sampled = len(ss), pool.readSessions
+	}
+	rate := float64(passed) / float64(sampled)
+	u.Sessions = int(math.Round(float64(u.Sessions) * rate))
+	u.Length *= rate
+	u.Withheld = int(math.Round(float64(u.Withheld) * rate))
+	u.Estimated = true
+	return nil, nil
+}
+
+// cutRoleOnlyUnread takes out of the unread counts the sessions whose
+// postings are all tool records and none of whose records this query may be
+// served: a word only a command or a file list holds. done is false when
+// they are past verifyUnreadBudget postings and nothing was checked.
+func cutRoleOnlyUnread(dir string, m Manifest, o query.Options, variants map[string][]string, pool pooled) (done bool, err error) {
+	u := pool.unread
+	spoken := map[uint32]bool{}
+	for _, p := range pool.all {
+		if !p.Tool {
+			spoken[p.Sid] = true
+		}
+	}
+	var rest, denied []posting
+	for _, p := range pool.all {
+		if spoken[p.Sid] || pool.kept[p.Sid] {
+			continue
+		}
+		switch {
+		case pool.denied[p.Sid]:
+			denied = append(denied, p)
+		case pool.allowed[p.Sid]:
+			rest = append(rest, p)
+		}
+		if len(rest)+len(denied) > verifyUnreadBudget {
+			return false, nil
+		}
+	}
+	byOrd := sessionMetaByOrd(m)
+	failed := func(posts []posting) (map[string]bool, error) {
+		held, err := sessionsBorneOut(dir, m, o, variants, posts)
+		if err != nil {
+			return nil, err
+		}
+		ok := map[string]bool{}
+		for _, s := range held {
+			ok[s.Harness+":"+s.ID] = true
+		}
+		out := map[string]bool{}
+		for _, p := range posts {
+			meta := byOrd[p.Sid]
+			if k := meta.Harness + ":" + meta.ID; !ok[k] {
+				out[k] = true
+			}
+		}
+		return out, nil
+	}
+	gone, err := failed(rest)
+	if err != nil {
+		return true, err
+	}
+	withheld, err := failed(denied)
+	if err != nil {
+		return true, err
+	}
+	if len(gone) > 0 && u.Sessions > 0 {
+		left := max(u.Sessions-len(gone), 0)
+		u.Length *= float64(left) / float64(u.Sessions)
+		u.Sessions = left
+		for k := range gone {
+			delete(u.Sample, k)
+		}
+	}
+	u.Withheld = max(u.Withheld-len(withheld), 0)
+	return true, nil
+}
+
+// unreadPostingsChecked counts the postings sessionsBorneOut reads, for the
+// tests that keep a plain word from reading its unread matches again.
+var unreadPostingsChecked atomic.Int64
+
+// sessionsBorneOut is the sessions whose records at posts pass the text check
+// a search makes. The reads are split by session over a few workers: one
+// record read at a time spent 0.85 s in pread on 3,100 sessions of a
+// 40k-session store.
+func sessionsBorneOut(dir string, m Manifest, o query.Options, variants map[string][]string, posts []posting) ([]model.Session, error) {
+	// No offsets would scan the whole record log.
+	if len(posts) == 0 {
+		return nil, nil
+	}
+	unreadPostingsChecked.Add(int64(len(posts)))
+	workers := min(runtime.NumCPU(), 4, (len(posts)+511)/512)
+	offsets := make([][]int64, workers)
+	for _, p := range posts {
+		w := int(p.Sid) % workers
+		offsets[w] = append(offsets[w], p.Off)
+	}
+	found := make([][]model.Session, workers)
+	errs := make([]error, workers)
+	var wg sync.WaitGroup
+	for w := range workers {
+		if len(offsets[w]) == 0 {
+			continue
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			found[w], errs[w] = scanRecordsWithVariants(dir, m, o, offsets[w], variants)
+		}()
+	}
+	wg.Wait()
+	var out []model.Session
+	for w := range workers {
+		if errs[w] != nil {
+			return nil, errs[w]
+		}
+		out = append(out, found[w]...)
+	}
+	return out, nil
+}
+
+// scopedPool picks what else to read for o.PoolScope: every matching session
+// of theirs outside kept, when the narrower search would read them all, so
+// that answer can be cut from this one instead of searched again. Recall
+// ranks the caller's project first and the machine after, and the second
+// search of a common word cost a third of its time on a 40k-session store
+// (#5486). whole is false when the narrower search would pool too.
+//
+// Its rule for reading everything: under its pool size, before or after the
+// ignore rule and the trust policy drop what they withhold, it reads every
+// candidate, those included.
+func scopedPool(records map[uint32]int, sids []uint32, kept map[uint32]bool, metaByOrd map[uint32]SessionMeta, o query.Options, n int) (extra map[uint32]bool, whole bool) {
+	if len(o.PoolScope) == 0 {
+		return nil, false
+	}
+	in := func(sid uint32) bool {
+		meta := metaByOrd[sid]
+		return query.ProjectAnyMatches(meta.Project, meta.From, o.PoolScope)
+	}
+	var scope []uint32
+	for sid := range records {
+		if in(sid) {
+			scope = append(scope, sid)
+		}
+	}
+	allowed := 0
+	for _, sid := range sids {
+		if in(sid) {
+			allowed++
+		}
+	}
+	if len(scope) > n && allowed > n {
+		return nil, false
+	}
+	extra = map[uint32]bool{}
+	for _, sid := range scope {
+		if !kept[sid] {
+			extra[sid] = true
+		}
+	}
+	return extra, true
 }
 
 // perSessionCandidates bounds how many matching messages of one session are
@@ -3409,7 +3925,7 @@ func postingsFor(dir, tok string) ([]posting, error) {
 	if !ok {
 		return nil, nil
 	}
-	return readBucketToken(p, tok)
+	return readBucketToken(p, tok, deadRecordsOf(dir))
 }
 
 // bucketName is every name bucket can return. A query reaches a file name
@@ -3689,7 +4205,7 @@ func intersectSubstringPostingsDetailed(dir string, bare []string) ([]posting, m
 	// and it runs whenever the words never meet as typed, which is most
 	// Russian questions (#5378).
 	if idx, err := tokenIndexCached(dir); err == nil && idx.dirs != nil {
-		if posts, variants, ok, err := substringPostingsFrom(idx.dirs, bare); ok || err != nil {
+		if posts, variants, ok, err := substringPostingsFrom(idx.dirs, bare, deadRecordsOf(dir)); ok || err != nil {
 			return posts, variants, err
 		}
 	}
@@ -3702,12 +4218,12 @@ func intersectSubstringPostingsDetailed(dir string, bare []string) ([]posting, m
 	}
 	var dirs []bucketDir
 	for _, de := range buckets {
-		if de.IsDir() || !strings.HasSuffix(de.Name(), ".bin") {
+		if de.IsDir() || !isPostingsFile(de.Name()) {
 			continue
 		}
 		dirs = append(dirs, bucketDir{path: filepath.Join(dir, "buckets", de.Name())})
 	}
-	posts, variants, _, err := substringPostingsFrom(dirs, bare)
+	posts, variants, _, err := substringPostingsFrom(dirs, bare, deadRecordsOf(dir))
 	return posts, variants, err
 }
 
@@ -3715,7 +4231,8 @@ func intersectSubstringPostingsDetailed(dir string, bare []string) ([]posting, m
 // that contains the word. A bucket with entries is read through them, and ok
 // is false when its file is no longer the one they were read from, so the
 // caller reads the store as it is now; one without is read off disk.
-func substringPostingsFrom(dirs []bucketDir, bare []string) (_ []posting, _ map[string][]string, ok bool, _ error) {
+// An overlay is one more file of postings; the dead records' are left out.
+func substringPostingsFrom(dirs []bucketDir, bare []string, dead []int64) (_ []posting, _ map[string][]string, ok bool, _ error) {
 	perTok := make([]map[int64]posting, len(bare))
 	variants := make(map[string][]string, len(bare))
 	for i := range perTok {
@@ -3757,7 +4274,10 @@ func substringPostingsFrom(dirs []bucketDir, bare []string) (_ []posting, _ map[
 						return nil, nil, false, nil
 					}
 				}
-				variants[b] = append(variants[b], tok)
+				// Once, though an overlay can hold the token beside its bucket.
+				if !slices.Contains(variants[b], tok) {
+					variants[b] = append(variants[b], tok)
+				}
 				buf := make([]byte, e.n)
 				if _, err := f.ReadAt(buf, int64(e.off)); err != nil {
 					// The bucket directory validated but the block it points to
@@ -3797,6 +4317,7 @@ func substringPostingsFrom(dirs []bucketDir, bare []string) (_ []posting, _ map[
 		out = append(out, p)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Off < out[j].Off })
+	out = liveOnly(out, dead)
 	for token := range variants {
 		sort.Strings(variants[token])
 	}
@@ -4504,7 +5025,8 @@ func tokenCatalogDirs(dir string) (map[string]bool, []bucketDir, error) {
 	var dirs []bucketDir
 	tokens := 0
 	for _, de := range entries {
-		if de.IsDir() || !strings.HasSuffix(de.Name(), ".bin") {
+		// An overlay holds tokens too, some of them in no bucket yet.
+		if de.IsDir() || !isPostingsFile(de.Name()) {
 			continue
 		}
 		path := filepath.Join(dir, "buckets", de.Name())
@@ -4823,46 +5345,22 @@ func tokenHits(s string, want map[string]bool) map[string]bool {
 	return hit
 }
 
+// tokens is the distinct words of s, longest first, as the query side and the
+// sidecars read them. eachWord cuts them, the same walk the index keys with.
 func tokens(s string) []string {
-	// Fold NFD to NFC so an accented word keys the same whether it was typed or
-	// stored decomposed. A combining mark is category Mn, not a letter, so the
-	// tokenizer below would otherwise split "café" (NFD) into "cafe" and drop
-	// the accent, keying it apart from the precomposed "café" (#1098). Both the
-	// stored text (indexKeys) and the query (queryKeys) pass through here, so
-	// the fold is symmetric and the two sides always meet on one key.
-	s = nfcfold.Compose(s)
 	seen := map[string]bool{}
 	var out []string
-	var b strings.Builder
-	flush := func() {
-		if b.Len() >= 2 {
-			t := b.String()
-			if !seen[t] {
-				seen[t] = true
-				out = append(out, t)
-			}
+	var buf [1 + tokenHitCap]byte
+	eachWord(s, &buf, func(b []byte) {
+		// A map lookup keyed by a converted byte slice does not allocate, so
+		// only a word not seen yet is copied.
+		if seen[string(b[1:])] {
+			return
 		}
-		b.Reset()
-	}
-	for _, r := range query.Lower(s) {
-		// A combining mark continues the word it sits on. Latin NFD is already
-		// composed away above, but Arabic harakat, Hebrew niqqud, Thai vowel
-		// signs and the Indic matras have no precomposed form, so the mark
-		// ended the token: كَتَبَ was indexed as three one-letter tokens and
-		// हिन्दी as two, and the words themselves were not in the index at all
-		// (#1941). A mark cannot start a token, so a stray one still
-		// separates.
-		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-' ||
-			(b.Len() > 0 && isMark(r)) {
-			b.WriteRune(r)
-			if b.Len() > 64 {
-				flush()
-			}
-		} else {
-			flush()
-		}
-	}
-	flush()
+		t := string(b[1:])
+		seen[t] = true
+		out = append(out, t)
+	})
 	sort.Slice(out, func(i, j int) bool { return len(out[i]) > len(out[j]) })
 	return out
 }
@@ -4884,63 +5382,17 @@ func indexKeys(s string) []string {
 	return out
 }
 
-// identifierParts emits the lowered inner words of compound identifiers so
-// `deja "user profile"` finds getUserProfile and refresh_token_rotation.
-// It walks the original-cased text: case humps are gone after lowering.
-// Only words of 6+ runes with a real boundary produce parts, and only parts
-// of 3+ runes are kept — short fragments ride the substring tier instead.
+// identifierParts is what keyer.identifierParts emits, as words.
 func identifierParts(s string) []string {
 	var out []string
-	var word []rune
-	flushWord := func() {
-		if len(word) >= 6 {
-			splitCompound(word, &out)
-		}
-		word = word[:0]
-	}
-	for _, r := range s {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-' {
-			word = append(word, r)
-			if len(word) > 64 {
-				flushWord()
-			}
-			continue
-		}
-		flushWord()
-	}
-	flushWord()
+	var k keyer
+	k.identifierParts(s, func(b []byte) { out = append(out, string(b[1:])) })
 	return out
 }
 
 func splitCompound(word []rune, out *[]string) {
-	start := 0
-	boundaries := 0
-	emit := func(end int) {
-		if end-start >= 3 {
-			*out = append(*out, query.Lower(string(word[start:end])))
-		}
-		start = end
-	}
-	for i := 1; i < len(word); i++ {
-		c, p := word[i], word[i-1]
-		switch {
-		case c == '_' || c == '-':
-			emit(i)
-			start = i + 1
-			boundaries++
-		case unicode.IsUpper(c) && (unicode.IsLower(p) || unicode.IsDigit(p)):
-			// getUser | getUserById: hump boundary
-			emit(i)
-			boundaries++
-		case unicode.IsLower(c) && unicode.IsUpper(p) && i-1 > start:
-			// JSONData -> JSON | Data: break before the last upper
-			emit(i - 1)
-			boundaries++
-		}
-	}
-	if boundaries > 0 {
-		emit(len(word))
-	}
+	var k keyer
+	k.splitCompound(word, func(b []byte) { *out = append(*out, string(b[1:])) })
 }
 
 func retrievalKeys(keys []string) []string {
@@ -5530,57 +5982,151 @@ var rerankWorkers = defaultRerankWorkers
 
 func defaultRerankWorkers() int { return runtime.NumCPU() }
 
-func rerankByBestMessage(ss []model.Session, terms []string, idf map[string]float64) []model.Session {
-	forms := make([][]string, len(terms))
-	wanted := map[string]bool{}
+// messageTerms is each term with the forms a message may hold it in, every
+// one of those forms, and the term each form stands for.
+type messageTerms struct {
+	terms  []string
+	forms  [][]string
+	wanted map[string]bool
+	of     map[string]int
+	idf    map[string]float64
+}
+
+// newMessageTerms takes each term in its word forms, or with exact as asked.
+func newMessageTerms(terms []string, idf map[string]float64, exact bool) messageTerms {
+	mt := messageTerms{terms: terms, forms: make([][]string, len(terms)), wanted: map[string]bool{}, of: map[string]int{}, idf: idf}
 	for i, t := range terms {
 		t = query.Lower(t)
-		forms[i] = append([]string{t}, stemMatchForms(t)...)
-		for _, f := range forms[i] {
-			wanted[f] = true
+		mt.forms[i] = []string{t}
+		if !exact {
+			mt.forms[i] = append(mt.forms[i], stemMatchForms(t)...)
+		}
+		for _, f := range mt.forms[i] {
+			mt.wanted[f] = true
+			if _, ok := mt.of[f]; !ok {
+				mt.of[f] = i
+			}
 		}
 	}
+	return mt
+}
+
+// proximityWeight is what a message gains for holding every term close
+// together: up to this much more when they sit side by side, less as the
+// words between them spread them apart. On a 3,000-session store where every
+// word is common it took a query's target from 10th to 5th, and from the second
+// page to the first for one worded as the target said it (#5369).
+const proximityWeight = 1.0
+
+// best is the score of s's best message: the idf of each term it holds, half
+// again in a user turn, more when the terms sit together, and a tool record
+// at toolMatchWeight.
+func (mt messageTerms) best(s model.Session) float64 {
+	msgs := s.Messages
+	if len(msgs) > bestMessageTurns {
+		msgs = msgs[:bestMessageTurns]
+	}
+	best := 0.0
+	for _, msg := range msgs {
+		toks := tokenHits(msg.Text, mt.wanted)
+		score := 0.0
+		held := 0
+		for ti, t := range mt.terms {
+			hit := false
+			for _, f := range mt.forms[ti] {
+				if toks[f] {
+					hit = true
+					break
+				}
+			}
+			if hit {
+				held++
+				w := mt.idf[query.Lower(t)]
+				if w <= 0 {
+					w = 1
+				}
+				score += w
+				if msg.Role == "user" {
+					score += 0.5 * w
+				}
+			}
+		}
+		if held > 1 && held == len(mt.terms) {
+			if w := mt.window(msg.Text); w > 0 {
+				score *= 1 + proximityWeight*float64(held)/float64(w)
+			}
+		}
+		if isToolRole(msg.Role) {
+			score *= toolMatchWeight
+		}
+		if score > best {
+			best = score
+		}
+	}
+	return best
+}
+
+// window is the fewest words of text that hold a form of every term, or 0
+// when one is missing. Words are cut as tokenHits cuts them.
+func (mt messageTerms) window(text string) int {
+	var at []int // the term each word is a form of, -1 for any other word
+	var buf [tokenHitCap]byte
+	n := 0
+	flush := func() {
+		if n >= 2 {
+			i, ok := mt.of[string(buf[:n])]
+			if !ok {
+				i = -1
+			}
+			at = append(at, i)
+		}
+		n = 0
+	}
+	for _, r := range query.Lower(nfcfold.Compose(text)) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-' || (n > 0 && isMark(r)) {
+			n += utf8.EncodeRune(buf[n:], r)
+			if n > 64 {
+				flush()
+			}
+		} else {
+			flush()
+		}
+	}
+	flush()
+	count := make([]int, len(mt.forms))
+	have, best, lo := 0, 0, 0
+	for hi, t := range at {
+		if t < 0 {
+			continue
+		}
+		if count[t] == 0 {
+			have++
+		}
+		count[t]++
+		for have == len(mt.forms) {
+			if w := hi - lo + 1; best == 0 || w < best {
+				best = w
+			}
+			if l := at[lo]; l >= 0 {
+				count[l]--
+				if count[l] == 0 {
+					have--
+				}
+			}
+			lo++
+		}
+	}
+	return best
+}
+
+func rerankByBestMessage(ss []model.Session, terms []string, idf map[string]float64) []model.Session {
+	mt := newMessageTerms(terms, idf, false)
 	best := make([]float64, len(ss))
 	// Per session and independent, and lowercasing every message of every
 	// ranked session is where a recall answer spends its time: 1.6 s of 2.4 s
 	// on a real store, profiled. Spread across cores; each session's score is
 	// computed exactly as before, so the ranking is unchanged.
-	parallelForRanked(len(ss), func(i int) {
-		s := ss[i]
-		msgs := s.Messages
-		if len(msgs) > bestMessageTurns {
-			msgs = msgs[:bestMessageTurns]
-		}
-		for _, msg := range msgs {
-			toks := tokenHits(msg.Text, wanted)
-			score := 0.0
-			for ti, t := range terms {
-				hit := false
-				for _, f := range forms[ti] {
-					if toks[f] {
-						hit = true
-						break
-					}
-				}
-				if hit {
-					w := idf[query.Lower(t)]
-					if w <= 0 {
-						w = 1
-					}
-					score += w
-					if msg.Role == "user" {
-						score += 0.5 * w
-					}
-				}
-			}
-			if isToolRole(msg.Role) {
-				score *= toolMatchWeight
-			}
-			if score > best[i] {
-				best[i] = score
-			}
-		}
-	})
+	parallelForRanked(len(ss), func(i int) { best[i] = mt.best(ss[i]) })
 	// Fuse rather than replace: the pool's own order is session-level IDF
 	// overlap, which wins on a small haystack; the best-message score wins on
 	// a large pile. Reciprocal rank fusion keeps both votes.

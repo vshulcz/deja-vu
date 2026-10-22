@@ -58,6 +58,7 @@ the list narrows as you type.
 
 - `↑↓` picks a session, `↵` opens it at the match, `n` and `N` step through the matches, `esc` goes back. Inside a session, `/` finds a word and `]` `[` jump between the turns you asked.
 - The box takes filters: an agent with a colon (`codex:`), `today`, `yesterday`, `week`, `month`, and `in:<project>`.
+- `^s` lists the results newest first under day headings, and back to best match first. `deja search --sort date` does the same from a script.
 - `r` resumes the session in the agent that wrote it. `o` continues it in any other agent, which starts with what the session asked, decided and left open.
 - `tab` switches between this project, all projects and Deleted, the sessions their agent deleted that deja still holds; `R` puts one back.
 - `D` erases a session from its agent and from deja, after asking (`deja delete <id>` from a script).
@@ -148,8 +149,8 @@ The binary alone is a complete install for searching: index, search, `show`, `ct
 and turns on session-start recall — worth having, and optional. On a binary-only setup
 `deja doctor` reports every MCP target as `config missing`, or `not-wired` where the agent
 is installed, which is that setup working as intended. `deja warmup` also leaves a skill at `~/.agents/skills/deja-search/SKILL.md`
-that teaches an agent the CLI contract — `deja search --json`, `ctx`, `blame`, how to read
-`tier` and `total` — so it knows history is searchable without MCP. The copy in the repo is
+that teaches an agent the CLI contract — `deja recall`, `ctx`, `blame`, how to read the
+recall page and ask for the next one — so it knows history is searchable without MCP. The copy in the repo is
 [`skills/deja-search/SKILL.md`](skills/deja-search/SKILL.md).
 
 `deja install --all` is `--auto` without the session-start recall: agents answer from memory
@@ -204,7 +205,7 @@ $ deja "jwt refresh token"
 
 | Command | What it does |
 | --- | --- |
-| `deja <query>` | Search every history. Multi-word is AND and quoted phrases require contiguous text; a query with no exact match then tries word forms and close spellings, which is where a substring reaches its word (`code` finds `opencode`). |
+| `deja <query>` | Search every history. Multi-word is AND and quoted phrases require contiguous text; a query with no exact match then tries word forms and close spellings, which is where a substring reaches its word (`code` finds `opencode`). `--sort date` lists the newest match first. |
 | `deja` | In a terminal, the full-screen search above. `deja brief` prints the text summary instead: today's sessions, what deja served, recent work and a search to try. |
 | `deja wip` | What the last session in this directory was doing: the task, what it settled, the files in flight, the last command and whether it failed — derived from the transcript, not from a note someone remembered to write. |
 | `deja blame <path>[:line]` | Which sessions discussed a file, what was decided, and why. With a line: the commit that last changed it, and the session that wrote that line or the text the commit replaced. `--attribution` prints the line answer alone, as JSON with `--json`, and `--git-note` records it in `refs/notes/deja`. |
@@ -510,14 +511,17 @@ A cold full build over it takes 71 s and writes a 232 MB index — 4% of the
 corpus, because the share falls as transcripts repeat themselves — and the
 end-to-end median is unchanged at 0.25 s.
 
-The index is incremental. When a session file grows, only that file is re-read.
+The index is incremental. When a session file grows, only that file is re-read. When one is
+rewritten, its new records are appended and the old ones zeroed in place. On a
+40,000-session store a pass over 20 rewritten transcripts takes 1.7 s and peaks under 1 GB,
+and a search for a word most sessions hold takes about a second.
 
 </details>
 
 ## How it works
 
 Local inverted index in `~/.cache/deja`: parse the JSONL and SQLite stores, redact
-credentials, write `records.bin` plus token buckets, and track per-file state in
+credentials, write an append-only `records.bin` plus token buckets, and track per-file state in
 `manifest.gob` so repeat runs only ingest what changed. The MCP server, stats, share and
 sync all read that one index. Details in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 

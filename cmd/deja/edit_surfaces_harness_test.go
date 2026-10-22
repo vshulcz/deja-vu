@@ -86,3 +86,31 @@ func assertEditSurfaces(t *testing.T, harness, id, file, span, topic string) {
 		t.Fatalf("blame does not attribute the removed line to %s: %+v ok=%v", id, author.Session, ok)
 	}
 }
+
+// assertWrittenBlame checks that blame attributes a line a commit added to file
+// to the session that wrote it, through the reader's written side alone: the
+// commit removed nothing, so the replaced-span rule has nothing to match
+// (#595).
+func assertWrittenBlame(t *testing.T, id, file, line string) {
+	t.Helper()
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(file, []byte(line+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, ok, err := index.FindByIDPreferProject(dir, id, "")
+	if err != nil || !ok {
+		t.Fatalf("session %s not in the index: %v", id, err)
+	}
+	commit := lineCommit{SHA: "abcdef12", When: time.Now().Add(24 * 365 * time.Hour)}
+	target := search.BlameTarget{FullPath: file, Base: filepath.Base(file), Line: 1}
+	author, ok := attributeLine([]model.Session{s}, target, commit, nil)
+	if !ok || author.Session.ID != id || !author.Wrote {
+		t.Fatalf("blame does not attribute %q in %s to %s: %+v ok=%v", line, file, id, author.Session, ok)
+	}
+}

@@ -124,8 +124,9 @@ func TestSQLite3ProbeRunsOncePerBinary(t *testing.T) {
 		SkipReason("opencode")
 	}
 	b, _ := os.ReadFile(count)
-	if n := strings.Count(string(b), "x"); n != 1 {
-		t.Errorf("probed %d times, want 1", n)
+	// Once with `.progress` and, since this one did not answer, once without.
+	if n := strings.Count(string(b), "x"); n != 2 {
+		t.Errorf("ran the probe %d times, want 2 for one binary", n)
 	}
 }
 

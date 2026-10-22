@@ -75,12 +75,12 @@ func HermesSessionFiles() []string {
 func LoadHermes() []model.Session {
 	var out []model.Session
 	for _, db := range HermesDBs() {
-		ss, _ := ParseHermesDB(db)
-		out = append(out, ss...)
+		ss, err := ParseHermesDB(db)
+		out = append(out, dbRead(db, ss, err)...)
 	}
 	if dsn := HermesPGDSN(); dsn != "" {
-		ss, _ := ParseHermesPG(dsn, 0)
-		out = append(out, ss...)
+		ss, err := ParseHermesPG(dsn, 0)
+		out = append(out, storeRead(HermesPGStorePath(dsn), ss, err)...)
 	}
 	return out
 }
@@ -167,7 +167,7 @@ func parseHermesDBWhere(db, where string) ([]model.Session, error) {
 			// changed its schema. Reporting the second as "no sessions" makes
 			// a whole harness disappear from recall while doctor still calls
 			// the store healthy.
-			return nil, fmt.Errorf("hermes: query failed, the store schema may have changed: %w", err)
+			return nil, schemaChanged("hermes", err)
 		}
 		return nil, err
 	}

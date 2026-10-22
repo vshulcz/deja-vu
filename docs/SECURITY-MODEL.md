@@ -26,7 +26,7 @@ back. All of it goes through the same redaction pass as conversation text, which
 matters more here than elsewhere: command output carries credentials far more
 often than prose does. `DEJA_INDEX_PATHS=0`, `DEJA_INDEX_COMMANDS=0`,
 `DEJA_INDEX_EDITS=0`, `DEJA_INDEX_WRITES=0` and `DEJA_INDEX_TOOL_OUTPUT=0` each
-disable one of these at ingest.
+disable one of these at ingest, and for records imported from another machine.
 
 The written side of an edit — what the agent typed into the file, which is what
 `deja blame` attributes a line by — is stored as one 64-bit hash per line of 24
@@ -46,14 +46,39 @@ The default index is `~/.cache/deja/index.db`; `DEJA_INDEX_DIR` changes that
 location. The directory contains:
 
 - `records.bin`, with redacted message records;
-- `buckets/*.bin`, with token postings into those records;
+- `buckets/*.bin`, with token postings into those records, and the `*.ov`
+  overlays beside them that hold the postings of records added since;
 - `frictext.bin`, the first line of each repeated error's tool output, already
   redacted, and `recoffsets.bin`, where each session's records sit in
   `records.bin`;
+- `commands-state.bin`, each session's commands as its redacted records hold
+  them, so a pass mines only the sessions it changed;
 - `manifest.gob` and `sessions.gob`, with source file state, session metadata,
   redaction counts by rule, sync watermarks, imported-record deduplication keys,
   the few files each session touched most, and hashes — not text — of the
   questions it asked.
+
+Text taken out of a transcript leaves `records.bin` and `buckets/` on the next
+`deja index` pass that reads it, and a command taken out leaves the command
+tables (`commands.gob`, `commandfails.gob`, `sessionfacts.gob`) on the same
+pass. A word no remaining record holds also leaves the co-occurrence map
+(`cooccur.gob`) on that pass, and so does one the removed text held only in a
+file body or the middle of a long output, which the postings never index, even
+when another session still has it there. The pass zeroes the replaced records in
+`records.bin` where they stand, and in `buckets/` blanks every word that no
+remaining record holds: a word filed under two leading letters keeps those,
+which the bucket file is named after, and one filed under a hash, as every
+CJK word is, is overwritten whole with filler. A one-letter word of a
+non-Latin alphabet can stay as it is. A word another session still contains
+stays, as that session's. If the pass is killed between committing the new index and
+the zeroing, the next `deja index`, or any deja process that takes the index
+lock, finishes it. On
+Windows, a search holding the index open as a pass ends can keep the previous
+index directory (`index.db.old`, or `index.db.old.N` when that one is held
+too) until a later pass removes it; what stays there is usually only the
+record log it shares with the live index, already zeroed. deja overwrites in
+place and does not attempt secure deletion: an SSD or a copy-on-write
+filesystem may keep the old blocks until it reuses them.
 
 At a supported pre-compaction hook, `manifest.gob` also retains redacted,
 transcript-derived continuation packets for at most 32 session/workspace pairs,
@@ -68,9 +93,10 @@ before their source sessions have been indexed. See [compaction recovery](compac
 Privacy control files are primary data, not cache data: the XDG-aware
 `~/.config/deja/tombstones` list prevents forgotten source sessions from being
 re-ingested, and `~/.config/deja/exclude` contains project patterns skipped at
-ingest. `DEJA_EXCLUDE_PROJECTS` adds comma-separated patterns. A line in the same file prefixed `harness:` names a store instead of a project — `harness:opencode` — and deja then neither walks it nor asks for the tool that would read it; `deja doctor` and `deja sources` both report it as `excluded` rather than naming a package to install. `DEJA_EXCLUDE_HARNESSES` is the comma-separated form. A store excluded after it was indexed is not walked again on any pass; the sessions already read from it stay in the index, unserved, until `deja index --rebuild` drops them. Store names are exact, not globs: they are the forty-four `deja sources` prints. Patterns also
-apply at `sync export`, so a project excluded after the index was built does not
-leave the machine; what is already indexed stays searchable locally until
+ingest. `DEJA_EXCLUDE_PROJECTS` adds comma-separated patterns. A line in the same file prefixed `harness:` names a store instead of a project — `harness:opencode` — and deja then neither walks it nor asks for the tool that would read it; `deja doctor` and `deja sources` both report it as `excluded` rather than naming a package to install. `DEJA_EXCLUDE_HARNESSES` is the comma-separated form. A store excluded after it was indexed is not walked again on any pass; the sessions already read from it stay in the index, unserved, until `deja index --rebuild` drops them. Store names are exact, not globs: they are the forty-four `deja sources` prints. Patterns and
+excluded stores also apply at `sync export`, so a project or store excluded after
+the index was built does not leave the machine, and at `sync import`, so a peer's
+batch does not put it back; what is already indexed stays searchable locally until
 `deja index --rebuild`, and `deja index` says so when the list has changed. A full `forget`
 rebuild replaces the index atomically before the tombstone list is used by the
 next index pass.
@@ -313,8 +339,10 @@ replaces that default. A file that is missing or does not parse means the
 default policy, so recall never breaks on a bad file; `deja doctor` reports what
 is in force.
 
-The policy filters what recall serves. It does not keep anything out of the
-index; the exclude list and `deja forget` above do that.
+The policy filters what recall serves. It does not keep this machine's own
+sessions out of the index; the exclude list and `deja forget` above do that. A
+peer's records that `ignore` matches are left out at `sync import` and not sent
+at `sync export`.
 
 ## Recall output framing
 
@@ -346,6 +374,14 @@ The frame covers:
   (`deja --framed search …`), which the agent tools in the dsh, opencode,
   OpenClaw and Hermes plugins and the skills and slash commands that send an
   agent to the shell use.
+
+Some hosts act on tokens in the text they are handed before the model sees
+it. opencode and Kilo run `` !`cmd` `` and attach `@path` in the `/deja` prompt
+text, and attach `@path` in a sub-agent's task prompt; deja puts a space into
+those tokens in the recall it gives them, so the words still reach the model
+and nothing runs or attaches. dsh reads deja's digest and recall as prompt
+templates, so both pass `interpolate: false`, and a recalled `{{...}}` is
+split into `{ {...} }`, which dsh before 0.2.1-alpha.2 needs.
 
 The framing bytes count against the existing injection budgets, a budget that
 cuts a block closes its frame rather than leaving it open, empty results stay

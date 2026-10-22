@@ -23,7 +23,9 @@ record, a `tool_result` becomes tool output, error runs included. Since 0.9.6
 new turns use `read`, `write`, `edit` and `bash`, where `edit` takes
 `edits[{oldText,newText}]` (also sent as a JSON string, or as one top-level
 `oldText`/`newText` pair, both read the same way); the older `read_file`, `write_file` and `edit_file`
-names are still read for sessions saved before. Commands also run through
+names are still read for sessions saved before. `fim_edit` names only two
+anchors and gets back the text it generated, `generated_text` in the JSON its
+result holds; that is read as the written side (#595). Commands also run through
 `terminal/run` (a PTY session) and `task_shell_start` (a background task), both
 under `command`, and are read as commands (#4538). `apply_patch` takes a
 unified diff (`--- a/x` / `+++ b/x`, not codex's `*** Begin Patch`) under

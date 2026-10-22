@@ -280,7 +280,7 @@ func sessionMatchesRebuild(t *testing.T, dir, harness, id string) {
 		slices.Sort(lines)
 		return strings.Join(lines, "\n")
 	}
-	got, want := sessionView(t, dir, harness, id), sessionView(t, fresh, harness, id)
+	got, want := sessionView(t, dir, harness, id)+rowView(t, dir, harness, id), sessionView(t, fresh, harness, id)+rowView(t, fresh, harness, id)
 	if sorted(got) != sorted(want) {
 		t.Errorf("%s:%s after incremental passes:\n%s\nafter a rebuild:\n%s", harness, id, got, want)
 	}

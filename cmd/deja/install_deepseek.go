@@ -194,10 +194,19 @@ function cardLoaded() {
 }
 
 function askHook(hook, payload) {
-  if (!notes || !notes.board.hasReader() || !cardLoaded()) return ask([hook, "--plain"], payload);
+  if (!notes || !notes.board.hasReader() || !cardLoaded()) return inert(ask([hook, "--plain"], payload));
   const reply = notes.split(ask([hook], payload));
   notes.board.push(payload.session_id, reply.notes);
-  return reply.context;
+  return inert(reply.context);
+}
+
+// inert keeps recalled text out of dsh's prompt templating: dsh reads every
+// {{name}} in a context as a prompt variable and throws on one it does not
+// know, ending the turn before the model is called (#5421). Both contexts say
+// interpolate: false, which dsh 0.2.1-alpha.2 and later honour; for older
+// hosts the braces are split too, so { {cwd} } holds no {{ to resolve.
+function inert(text) {
+  return String(text || "").replace(/\{(?=\{)/g, "{ ").replace(/\}(?=\})/g, "} ");
 }
 
 // The session goes with the prompt: a compaction's recovery packet is kept
@@ -363,6 +372,7 @@ function apply(ctx) {
     ctx.systemPrompt.context({
       name: "deja:project",
       order: 110,
+      interpolate: false,
       text: (assembly) => {
         const agent = assembly && assembly.agent;
         if (!agent) return "";
@@ -372,6 +382,7 @@ function apply(ctx) {
     ctx.systemPrompt.context({
       name: "deja:recall",
       order: 120,
+      interpolate: false,
       text: (assembly) => {
         const agent = assembly && assembly.agent;
         if (!agent) return "";

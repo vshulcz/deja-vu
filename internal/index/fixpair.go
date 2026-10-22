@@ -2,6 +2,7 @@ package index
 
 import (
 	"cmp"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -133,6 +134,11 @@ func fixesPath(dir string) string { return filepath.Join(dir, fixesFile) }
 // buildFixes writes the mined pairs into the build directory. Like every other
 // sidecar here, failures are swallowed: this is an extra, never a reason to
 // fail an index build.
+//
+// ss is the sessions as commandSessions gives them, the record log's view: a
+// pass mines a session again from its records, and a copy of its id in another
+// project's directory was mined with the row's copy there and on its own here,
+// so the pass paired one file's error with the other's remedy (#5504).
 func buildFixes(tmp string, ss []model.Session, keyOf func(model.Session) string) {
 	// Mining is per session and reads nothing shared, and it was 9.4 s of a
 	// 51 s build on a real store — the longest of the four sidecars, with the
@@ -366,7 +372,7 @@ func lastFrictionIndex(ms []model.Message) map[uint64]int {
 		if m.Role != roleToolOutput && m.Role != "assistant" {
 			continue
 		}
-		for _, raw := range strings.Split(m.Text, "\n") {
+		for raw := range strings.SplitSeq(m.Text, "\n") {
 			if line, ok := FrictionLine(raw); ok {
 				last[frictionHash(line)] = i
 			}
@@ -390,7 +396,7 @@ func outputReadsAsFailure(text string) bool {
 	if _, _, ok := firstFrictionLine(text); ok {
 		return true
 	}
-	for _, raw := range strings.Split(text, "\n") {
+	for raw := range strings.SplitSeq(text, "\n") {
 		l := strings.TrimSpace(raw)
 		for _, g := range genericFailure {
 			if strings.HasPrefix(l, g) {
@@ -625,7 +631,7 @@ func opensMoreInput(cmd string) bool {
 // firstFrictionLine returns the first line of a record that names something
 // specific that went wrong, with its hash.
 func firstFrictionLine(text string) (string, uint64, bool) {
-	for _, raw := range strings.Split(text, "\n") {
+	for raw := range strings.SplitSeq(text, "\n") {
 		if line, ok := FrictionLine(raw); ok {
 			return line, frictionHash(line), true
 		}
@@ -639,7 +645,7 @@ func otherFrictionSigs(text string, first uint64) []uint64 {
 	const most = 8
 	var out []uint64
 	seen := map[uint64]bool{first: true}
-	for _, raw := range strings.Split(text, "\n") {
+	for raw := range strings.SplitSeq(text, "\n") {
 		line, ok := FrictionLine(raw)
 		if !ok {
 			continue
@@ -668,7 +674,7 @@ func firstLineOf(s string) string {
 // specific that went wrong. Callers use it to tell "never seen this error"
 // apart from "that was not an error".
 func LooksLikeError(text string) bool {
-	for _, raw := range strings.Split(text, "\n") {
+	for raw := range strings.SplitSeq(text, "\n") {
 		if _, ok := FrictionLine(raw); ok {
 			return true
 		}
@@ -771,11 +777,16 @@ func writeFixTables(dir string, raw []FixPair) {
 // changed, read whole from the index in dir, and their keys. A pair runs from
 // an error to the remedy after it, so mined from a tail alone an error before
 // the tail and its remedy in it were never paired, and a later repeat of the
-// error moves the pair. Only a tail that brings a tool record can change them.
+// error moves the pair. Only a tail that brings a tool record can change them,
+// or one of a shared id, whose file can take the row from the copy it named.
 // On a read error the tails are mined as they are.
 func wholeSessionsForFixes(dir string, m Manifest, tails []model.Session) ([]model.Session, map[string]bool) {
 	keys := map[string]bool{}
 	for _, s := range tails {
+		if m.Sessions[s.Harness+":"+s.ID].Shared {
+			keys[s.Harness+":"+s.ID] = true
+			continue
+		}
 		for _, msg := range s.Messages {
 			if msg.Role != "user" && msg.Role != "assistant" {
 				keys[s.Harness+":"+s.ID] = true
@@ -786,8 +797,22 @@ func wholeSessionsForFixes(dir string, m Manifest, tails []model.Session) ([]mod
 	if len(keys) == 0 {
 		return nil, keys
 	}
+	out, err := rowSessionsFromRecords(dir, m, keys)
+	if err != nil {
+		return tails, map[string]bool{}
+	}
+	return out, keys
+}
+
+// rowSessionsFromRecords is the sessions of keys as the record log in dir
+// holds them, each the copy its row names, in key order.
+func rowSessionsFromRecords(dir string, m Manifest, keys map[string]bool) ([]model.Session, error) {
 	by := map[string]*model.Session{}
 	if err := eachRecordForKeys(filepath.Join(dir, "records.bin"), tablesFromManifest(m), keys, func(r Record) {
+		// The row's copy, as a build mines it (see commandSessions).
+		if foreignPath(r.SourcePath, m.Sessions[r.Key]) {
+			return
+		}
 		s := by[r.Key]
 		if s == nil {
 			cp := sessionFromMeta(m.Sessions[r.Key])
@@ -796,13 +821,47 @@ func wholeSessionsForFixes(dir string, m Manifest, tails []model.Session) ([]mod
 		}
 		s.Messages = append(s.Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
 	}); err != nil {
-		return tails, map[string]bool{}
+		return nil, err
 	}
 	out := make([]model.Session, 0, len(by))
 	for _, k := range sortedKeys(by) {
 		out = append(out, *by[k])
 	}
-	return out, keys
+	return out, nil
+}
+
+// fixSessionsForPass is what a replacing pass mines fixes from: the sessions
+// it read again, as commandSessions gives them. A shared id's row is read back
+// from the record log in tmp instead, whose manifest is m: the pass may have
+// read only the copy the row does not name, or none, when the row's file was
+// removed and the index keeps its turns, or a copy took the row from another
+// (#5504).
+func fixSessionsForPass(tmp string, old, m Manifest, replacements []model.Session, replaced map[string]bool) ([]model.Session, map[string]bool) {
+	fromLog := map[string]bool{}
+	for k, meta := range m.Sessions {
+		was, ok := old.Sessions[k]
+		if replaced[k] && (meta.Shared || was.Shared) || !replaced[k] && ok && was.Path != meta.Path {
+			fromLog[k] = true
+		}
+	}
+	if len(fromLog) == 0 {
+		return commandSessions(replacements, m, nil), replaced
+	}
+	rows, err := rowSessionsFromRecords(tmp, m, fromLog)
+	if err != nil {
+		return commandSessions(replacements, m, nil), replaced
+	}
+	var read []model.Session
+	for _, s := range replacements {
+		if !fromLog[s.Harness+":"+s.ID] {
+			read = append(read, s)
+		}
+	}
+	keys := maps.Clone(replaced)
+	for k := range fromLog {
+		keys[k] = true
+	}
+	return append(commandSessions(read, m, nil), rows...), keys
 }
 
 // readFixRaw loads the raw pairs. An index built before them has only the
@@ -850,7 +909,7 @@ func remineFixes(dir string) {
 	var order []string
 	if err := eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
 		meta, ok := m.Sessions[r.Key]
-		if !ok {
+		if !ok || foreignPath(r.SourcePath, meta) {
 			return
 		}
 		s := by[r.Key]
@@ -894,7 +953,7 @@ func ReadFixes(dir string) []FixPair {
 // held, the very line it had just been given.
 func fixSignaturesFor(dir, text string) map[uint64]bool {
 	sigs := map[uint64]bool{}
-	for _, raw := range strings.Split(text, "\n") {
+	for raw := range strings.SplitSeq(text, "\n") {
 		if line, ok := FrictionLine(raw); ok {
 			sigs[frictionHash(line)] = true
 		}
@@ -905,7 +964,7 @@ func fixSignaturesFor(dir, text string) map[uint64]bool {
 	// Exact lines only, and only after nothing hashed: this is deja recognising
 	// its own wording, not a search for something like it.
 	want := map[string]bool{}
-	for _, raw := range strings.Split(text, "\n") {
+	for raw := range strings.SplitSeq(text, "\n") {
 		if l := strings.ToLower(strings.TrimSpace(raw)); l != "" {
 			want[l] = true
 		}

@@ -129,7 +129,7 @@ func TestBucketOffsetsAreDerivedCorrectly(t *testing.T) {
 	}
 	// And reading one token directly must land on the same block.
 	for tok, w := range want {
-		g, err := readBucketToken(p, tok)
+		g, err := readBucketToken(p, tok, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

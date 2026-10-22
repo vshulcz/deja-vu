@@ -1,6 +1,9 @@
 package digest
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestStripHarnessBlocksLeavesThePersonsWords(t *testing.T) {
 	cases := map[string]string{
@@ -31,5 +34,16 @@ func TestStripHarnessBlocksLeavesThePersonsWords(t *testing.T) {
 		if got := StripHarnessBlocks(in); got != want {
 			t.Errorf("StripHarnessBlocks(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// Claude Code's paste wrapper is the one envelope whose body is the person's:
+// the prompt hook searched on `pasted_content` and the paste's id. The tags
+// go, the pasted text stays.
+func TestPasteWrapperIsUnwrappedNotStripped(t *testing.T) {
+	in := "<pasted_content id=\"dd73\">\nthe zorblax hook never fires\n</pasted_content id=\"dd73\">\n\nwhy?\n<system-reminder>\nnoise\n</system-reminder>"
+	const want = "the zorblax hook never fires why?"
+	if got := strings.Join(strings.Fields(StripHarnessBlocks(in)), " "); got != want {
+		t.Errorf("StripHarnessBlocks = %q, want %q", got, want)
 	}
 }

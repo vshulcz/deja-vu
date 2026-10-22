@@ -29,3 +29,7 @@ func lowerFold(r rune) rune {
 	}
 	return r
 }
+
+// LowerRune is Lower for one rune: Lower(s) is s with LowerRune applied to
+// every rune, so a tokenizer can fold as it walks instead of copying s first.
+func LowerRune(r rune) rune { return lowerFold(r) }

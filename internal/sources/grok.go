@@ -402,9 +402,14 @@ func scanGrokUpdatesFrom(path string, offset int64, fn func(grokUpdateEvent)) er
 			return err
 		}
 	}
-	r := bufio.NewReaderSize(boundedFrom(path, f, offset), 1024*1024)
+	r := jsonlReaders.Get().(*bufio.Reader)
+	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
+	r.Reset(boundedFrom(path, f, offset))
 	for {
-		line, err := r.ReadBytes('\n')
+		line, partial, err := readLineBytes(r)
+		if partial {
+			return nil
+		}
 		if bytes.Contains(line, grokUserChunk) || bytes.Contains(line, grokAgentChunk) || bytes.Contains(line, grokToolCall) || bytes.Contains(line, grokToolUpdate) {
 			var event grokUpdateEvent
 			if json.Unmarshal(trimJSONSpace(line), &event) == nil {
@@ -523,11 +528,16 @@ func fileLineWith(path string, needle []byte) []byte {
 		return nil
 	}
 	defer func() { _ = f.Close() }()
-	r := bufio.NewReaderSize(f, 64<<10)
+	r := jsonlReaders.Get().(*bufio.Reader)
+	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
+	r.Reset(f)
 	for {
-		line, err := r.ReadBytes('\n')
+		line, partial, err := readLineBytes(r)
+		if partial {
+			return nil
+		}
 		if bytes.Contains(line, needle) && bytes.Contains(line, []byte(`"subagent_spawned"`)) {
-			return line
+			return bytes.Clone(line)
 		}
 		if err != nil {
 			return nil

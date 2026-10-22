@@ -12,7 +12,7 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { argv, contributions, exitStatus, guarded, newestEvents, noteBoard, resultText, splitHookReply } from "./lib.js";
+import { argv, contributions, recallArgv, recallSilence, exitStatus, guarded, inert, newestEvents, noteBoard, resultText, splitHookReply } from "./lib.js";
 
 const require = createRequire(import.meta.url);
 
@@ -60,9 +60,10 @@ const DEJA = resolveDeja();
 
 // run returns stdout, or "" when deja is missing or says nothing. Memory is
 // optional everywhere: a throw here would end the turn.
-function run(args, input) {
+function run(args, input, cwd) {
   try {
     return execFileSync(DEJA, args, {
+      cwd,
       encoding: "utf8",
       timeout: 20000,
       maxBuffer: 8 * 1024 * 1024,
@@ -95,8 +96,8 @@ function tools(ctx) {
   if (!defineTool) return;
 
   // Every tool here answers with the text deja printed, so one output
-  // declaration serves them all. Printed with --framed: search, ctx, blame,
-  // fix and how write for a person, and without the frame a tag planted in a
+  // declaration serves them all. Printed with --framed: ctx, blame, fix and
+  // how write for a person (recall frames its own page), and without the frame a tag planted in a
   // transcript reached the model as though deja had closed its own block. The schema is plain JSON Schema — a
   // schemastery instance is rejected as "schema must be a value schema object",
   // because the host validates that this is an ordinary JSON record.
@@ -119,14 +120,19 @@ function tools(ctx) {
         type: "number",
         description: "How many sessions to return. Default 5.",
       },
+      offset: {
+        type: "number",
+        description: "Sessions to skip, from the offset the previous page named. Default 0.",
+      },
     },
     output: TEXT_OUTPUT,
-    execute(args) {
-      // deja itself caps the window; asking for a hundred sessions would
-      // spend the model's context on a tail nobody reads.
-      const asked = Number.isFinite(args.limit) ? Math.trunc(args.limit) : 5;
-      const limit = String(Math.min(20, Math.max(1, asked)));
-      return Promise.resolve(answer(run(["--framed", ...argv("search", ["--json", "--limit", limit], args.query)])));
+    execute(args, exec) {
+      // The page the MCP recall tool serves, framed and budgeted by deja. It
+      // puts the project of its working directory first, so it runs in the
+      // calling session's workspace rather than wherever dsh was launched.
+      const call = recallArgv(args);
+      const out = run(call, undefined, sessionCwd(exec && exec.agent));
+      return Promise.resolve(answer(out || (INSTALLED ? recallSilence(call) : "")));
     },
   })));
 
@@ -282,19 +288,20 @@ function autoDigest(ctx, board) {
     ctx.systemPrompt.context({
       name: "deja:project",
       order: 110,
+      interpolate: false,
       text: (assembly) => {
         const agent = assembly && assembly.agent;
         if (!agent) return "";
         const sid = sessionId(agent);
         if (sid && seen.has(sid)) return "";
         if (sid) seen.add(sid);
-        return askHook(
+        return inert(askHook(
           ["hook-context", "--plain"],
           ["hook-context"],
           JSON.stringify({ session_id: sid, cwd: sessionCwd(agent), source: "startup", deja_once: true }),
           sid,
           board,
-        );
+        ));
       },
     }),
   );
@@ -344,6 +351,7 @@ function autoRecall(ctx, board) {
     ctx.systemPrompt.context({
       name: "deja:recall",
       order: 120,
+      interpolate: false,
       text: (assembly) => {
         const agent = assembly && assembly.agent;
         if (!agent) return "";
@@ -360,13 +368,13 @@ function autoRecall(ctx, board) {
           asked = prompt;
           askedIn = cwd;
           askedBy = sid;
-          recalled = askHook(
+          recalled = inert(askHook(
             ["hook-prompt", "--plain"],
             ["hook-prompt"],
             JSON.stringify({ prompt, cwd, session_id: sid }),
             sid,
             board,
-          );
+          ));
         }
         // Silence is the common case: this speaks only when the history answers.
         return recalled;

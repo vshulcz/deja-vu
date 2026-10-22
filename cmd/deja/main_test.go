@@ -1220,6 +1220,8 @@ func flagArgsFor(flag string) []string {
 		return []string{"--limit", "15", "q"}
 	case "--session":
 		return []string{"--session", "01a00feb", "q"}
+	case "--sort":
+		return []string{"--sort", "date", "q"}
 	default:
 		return []string{flag, "q"}
 	}

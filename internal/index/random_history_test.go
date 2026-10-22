@@ -74,6 +74,8 @@ type historySession struct {
 	// said is the last line the agent said, kept to be written again verbatim,
 	// time and all, as a store that duplicates a line does.
 	said string
+	// first is the body the transcript was first written with.
+	first string
 }
 
 type historyRun struct {
@@ -89,6 +91,12 @@ type historyRun struct {
 	// awaiting holds sessions whose prompt is in the log and whose transcript
 	// the next step writes.
 	awaiting []awaitingTranscript
+	// shapes, when set, draws the steps a pass lands in the middle of: a
+	// transcript rewritten and moved at once, which keeps the old file beside
+	// the new one, a call whose result lands a pass later, and a rewrite that
+	// replays the turns the transcript started with. Its own source, so the
+	// histories without it replay as they were.
+	shapes *rand.Rand
 }
 
 type awaitingTranscript struct {
@@ -98,7 +106,7 @@ type awaitingTranscript struct {
 
 func runRandomHistory(t *testing.T, seed int64, walls bool) {
 	h := newTwoWayEnv(t)
-	r := &historyRun{t: t, h: h, rng: rand.New(rand.NewSource(seed)), index: filepath.Join(h.tmp, "a.db"), walls: walls}
+	r := &historyRun{t: t, h: h, rng: rand.New(rand.NewSource(seed)), index: filepath.Join(h.tmp, "a.db"), walls: walls, shapes: rand.New(rand.NewSource(-seed))}
 	r.openStores()
 	// Even seeds extend the offset table on every pass; odd ones leave the
 	// tail to the readers' walk, as a small append does on a real store.
@@ -229,6 +237,10 @@ func (r *historyRun) step() {
 		r.log = append(r.log, "finish the torn line of "+s.sid)
 		return
 	}
+	if s != nil && op != 0 && op != 1 && r.shapes != nil && r.shapes.Intn(6) == 0 {
+		r.shapeStep(s)
+		return
+	}
 	switch op {
 	case 0, 1:
 		r.next++
@@ -238,6 +250,7 @@ func (r *historyRun) step() {
 			first = historyThin[r.rng.Intn(len(historyThin))]
 		}
 		body := hPrompt(s.project, s.sid, s.day, 0, first) + r.turns(s)
+		s.first = body
 		r.promptLogged(s, first)
 		if r.next%3 == 0 {
 			r.awaiting = append(r.awaiting, awaitingTranscript{s, body})
@@ -298,5 +311,56 @@ func (r *historyRun) step() {
 			}
 		}
 		r.log = append(r.log, "delete "+s.sid)
+	}
+}
+
+// shapeStep is one of the steps shapes draws, on s.
+func (r *historyRun) shapeStep(s *historySession) {
+	h := r.h
+	switch r.shapes.Intn(3) {
+	case 0:
+		// Written again and moved to another project before the next pass:
+		// no rename, the old file is kept and the new one is a copy.
+		to := historyProjects[r.shapes.Intn(len(historyProjects))]
+		if to == s.project {
+			to = "moved"
+		}
+		s.day++
+		s.min = 0
+		h.put(s.project, s.sid, hPrompt(s.project, s.sid, s.day, 0, "again: "+r.words(5))+r.turns(s))
+		if err := os.MkdirAll(filepath.Dir(h.path(to, s.sid)), 0o755); err != nil {
+			r.t.Fatal(err)
+		}
+		if err := os.Rename(h.path(s.project, s.sid), h.path(to, s.sid)); err != nil {
+			r.t.Fatal(err)
+		}
+		r.log = append(r.log, "rewrite "+s.sid+" and move it from "+s.project+" to "+to)
+		s.project = to
+	case 1:
+		// A command whose result lands a pass after its call.
+		if s.min > 58 {
+			s.day, s.min = s.day+1, 0
+		}
+		s.min++
+		s.calls++
+		out, failed := "ok", false
+		switch r.shapes.Intn(3) {
+		case 0:
+			out, failed = "Exit code 1\n--- FAIL: TestPool\n"+r.wall()+"FAIL", true
+		case 1:
+			out = r.wall() + "ok"
+		}
+		call, result, _ := strings.Cut(hBash(s.project, s.sid, s.day, s.min, fmt.Sprintf("%s-%d", s.sid, s.calls), "go test ./"+historyWords[r.shapes.Intn(len(historyWords))]+"/...", out, failed), "\n")
+		h.add(s.project, s.sid, call+"\n")
+		s.torn = result
+		r.log = append(r.log, "a call of "+s.sid+" whose result lands a pass later")
+	default:
+		// Written again with the turns it started with, as a resume that
+		// replays them does, then more.
+		if s.first == "" {
+			s.first = hPrompt(s.project, s.sid, s.day, 0, "replayed: "+r.words(3))
+		}
+		h.put(s.project, s.sid, s.first+r.turns(s))
+		r.log = append(r.log, "rewrite "+s.sid+" replaying its first turns")
 	}
 }

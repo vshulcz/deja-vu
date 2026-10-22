@@ -101,7 +101,7 @@ winget install vshulcz.deja-vu
 セッション開始時のリコールを有効にするためのもので、あると便利ですが任意です。バイナリのみの構成では
 `deja doctor` がすべての MCP ターゲットを `config missing`（エージェントが入っている場合は `not-wired`）と報告しますが、これはその構成として想定どおりの
 動作です。`deja warmup` は `~/.agents/skills/deja-search/SKILL.md` にスキルも配置します。このスキルは
-エージェントに CLI の使い方——`deja search --json`、`ctx`、`blame`、`tier` と `total` の読み方——を教えるので、
+エージェントに CLI の使い方——`deja recall`、`ctx`、`blame`、recall ページの読み方と次のページの取り方——を教えるので、
 MCP なしでも履歴を検索できることをエージェントが理解できます。リポジトリ内のコピーは
 [`skills/deja-search/SKILL.md`](../../skills/deja-search/SKILL.md) です。
 

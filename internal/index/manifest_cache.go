@@ -64,11 +64,30 @@ func readManifestCached(dir string) (Manifest, error) {
 	if err != nil {
 		return m, err
 	}
+	cacheManifest(dir, fi, si, m)
+	return m, nil
+}
+
+// cacheManifest makes m the cached manifest of dir, as read from the files fi
+// and si describe.
+func cacheManifest(dir string, fi, si os.FileInfo, m Manifest) {
 	manifestCache.mu.Lock()
 	manifestCache.dir, manifestCache.fi, manifestCache.sessions = dir, fi, si
 	manifestCache.m, manifestCache.ok = m, true
 	manifestCache.mu.Unlock()
-	return m, nil
+}
+
+// moveManifestCache follows a directory renamed from tmp to dir: its files
+// are the same files, so a manifest cached for tmp is dir's now.
+func moveManifestCache(tmp, dir string) {
+	manifestCache.mu.Lock()
+	defer manifestCache.mu.Unlock()
+	switch manifestCache.dir {
+	case tmp:
+		manifestCache.dir = dir
+	case dir:
+		manifestCache.ok = false
+	}
 }
 
 // manifestGeneration is the manifest file as one stat sees it, nil when there
@@ -76,6 +95,15 @@ func readManifestCached(dir string) (Manifest, error) {
 // these name the same generation only if they are the same file.
 func manifestGeneration(dir string) os.FileInfo {
 	fi, err := os.Stat(filepath.Join(dir, "manifest.gob"))
+	if err != nil {
+		return nil
+	}
+	return fi
+}
+
+// sessionsGeneration is manifestGeneration for sessions.gob.
+func sessionsGeneration(dir string) os.FileInfo {
+	fi, err := os.Stat(filepath.Join(dir, "sessions.gob"))
 	if err != nil {
 		return nil
 	}

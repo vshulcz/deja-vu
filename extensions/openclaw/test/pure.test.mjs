@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs"
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { accessNote, argv, configPath, contributions, installerPluginPath, mcpWired, promptText, toolCall, where } from "../lib.mjs"
+import { accessNote, argv, configPath, contributions, installerPluginPath, mcpWired, promptText, recallArgv, recallSilence, toolCall, where } from "../lib.mjs"
 
 test("a missing conversation-access grant is named with the command that sets it", () => {
   const granted = { plugins: { entries: { "deja-vu": { hooks: { allowConversationAccess: true } } } } }
@@ -101,7 +101,7 @@ test("a finished tool maps to the call the installer's plugin makes", () => {
 // print for a person: no frame, and a tag planted in a transcript went through
 // as though deja had closed its own block (#5051). Every call inside a tool
 // asks for --framed output; the /deja command answers the person and stays
-// plain.
+// plain. deja_recall asks for the recall page, which deja frames itself.
 test("every agent tool asks deja for framed output", () => {
   const SRC = readFileSync(new URL("../index.mjs", import.meta.url), "utf8")
   let tools = 0
@@ -111,5 +111,39 @@ test("every agent tool asks deja for framed output", () => {
     tools++
     assert.ok(before.endsWith('"--framed", ...'), `${SRC.slice(m.index, m.index + 40)} in a tool is not framed`)
   }
-  assert.ok(tools >= 3, `found ${tools} tool calls, so this proves nothing`)
+  assert.ok(tools >= 2, `found ${tools} tool calls, so this proves nothing`)
+})
+
+// deja_recall ran `--framed search`, whose page grows with the hits: 21,137
+// characters for twenty on a synthetic store, where the MCP recall tool
+// answers in 4,096 (#5568). The tool now asks for that page, and pages with
+// --offset.
+test("deja_recall asks for the recall page, not search", () => {
+  const SRC = readFileSync(new URL("../index.mjs", import.meta.url), "utf8")
+  const start = SRC.indexOf('name: "deja_recall"')
+  const tool = SRC.slice(start, SRC.indexOf('name: "deja_fix"', start))
+  assert.ok(start >= 0 && tool.length > 0, "deja_recall is not where this test looks")
+  assert.match(tool, /recallArgv\((args|params)\)/)
+  assert.doesNotMatch(tool, /"search"|--json/)
+  const schema = SRC.slice(SRC.indexOf("const RECALL_SCHEMA"), SRC.indexOf("const FIX_SCHEMA"))
+  assert.match(schema, /offset/, "the tool takes no offset, so the page's paging line points at nothing")
+})
+
+test("recallArgv asks for one page, from the offset given", () => {
+  assert.deepEqual(recallArgv({ query: "pgbouncer" }), ["recall", "--limit", "5", "pgbouncer"])
+  assert.deepEqual(recallArgv({ query: "pgbouncer", limit: 500, offset: 0 }), ["recall", "--limit", "20", "pgbouncer"])
+  assert.deepEqual(recallArgv({ query: "pgbouncer", limit: "3", offset: 6.7 }), [
+    "recall", "--limit", "3", "--offset", "6", "pgbouncer",
+  ])
+  // Junk and negatives fall back to the first page; a dash query still gets
+  // the terminator after the flags.
+  assert.deepEqual(recallArgv({ query: "--json", offset: -2 }), ["recall", "--limit", "5", "--", "--json"])
+  assert.deepEqual(recallArgv({ query: "x", offset: "two" }), ["recall", "--limit", "5", "x"])
+})
+
+test("silence past the first page is an old deja, not an empty history", () => {
+  assert.match(recallSilence(recallArgv({ query: "x", offset: 5 })), /deja update/)
+  assert.equal(recallSilence(recallArgv({ query: "x" })), "Nothing in this machine's history matches that.")
+  // An offset JavaScript would print as 1e+21 is one deja cannot parse.
+  assert.deepEqual(recallArgv({ query: "x", offset: 1e21 }), ["recall", "--limit", "5", "--offset", "1000000000", "x"])
 })

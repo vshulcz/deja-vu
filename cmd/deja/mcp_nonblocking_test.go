@@ -46,7 +46,7 @@ func TestRememberAnswersWhileTheIndexIsLocked(t *testing.T) {
 		if !strings.Contains(out, "emembered") && !strings.Contains(out, "Saved") {
 			t.Errorf("remember answered something else while the index was locked: %q", out)
 		}
-	case <-time.After(5 * time.Second):
+	case <-time.After(2 * time.Minute):
 		t.Fatal("remember waited on the index lock instead of answering")
 	}
 

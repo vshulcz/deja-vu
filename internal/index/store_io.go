@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -46,21 +47,71 @@ func ReadRecords(dir string) ([]OffsetRecord, error) {
 		return nil, err
 	}
 	defer func() { _ = f.Close() }()
+	w := newLogWalk(f, t, 0)
 	for {
-		off, err := f.Seek(0, io.SeekCurrent)
-		if err != nil {
-			return nil, err
-		}
-		r, err := readRecord(f, t)
+		off, payload, err := w.next()
 		if err == io.EOF {
-			break
+			return out, nil
 		}
 		if err != nil {
 			return nil, err
+		}
+		r, err := decodeRecord(payload, t)
+		if err != nil {
+			return nil, err
+		}
+		// A key the table does not name is a record a pass is still writing:
+		// not in this snapshot, and not to be embedded or sent anywhere.
+		if r.Key == "" {
+			continue
 		}
 		out = append(out, OffsetRecord{Offset: off, Record: r})
 	}
-	return out, nil
+}
+
+// logWalk reads the record log in order, handing back each live record's
+// offset and payload and passing over the dead ones unread. The payload is
+// reused by the next call.
+type logWalk struct {
+	r    *bufio.Reader
+	off  int64
+	dead deadCursor
+	buf  []byte
+}
+
+func newLogWalk(r io.Reader, t *recordTables, from int64) *logWalk {
+	return &logWalk{r: bufio.NewReaderSize(r, 1024*1024), off: from, dead: t.deadFrom(from)}
+}
+
+// next is the next live record. A clean or torn end of the log is io.EOF or
+// io.ErrUnexpectedEOF.
+func (w *logWalk) next() (int64, []byte, error) {
+	var hdr [4]byte
+	for {
+		if _, err := io.ReadFull(w.r, hdr[:]); err != nil {
+			return 0, nil, err
+		}
+		n := binary.LittleEndian.Uint32(hdr[:])
+		if n > maxRecordSize {
+			return 0, nil, fmt.Errorf("%w: record length %d exceeds cap", errCorruptIndex, n)
+		}
+		at := w.off
+		w.off += 4 + int64(n)
+		if w.dead.at(at) {
+			if _, err := w.r.Discard(int(n)); err != nil {
+				return 0, nil, err
+			}
+			continue
+		}
+		if cap(w.buf) < int(n) {
+			w.buf = make([]byte, n)
+		}
+		payload := w.buf[:n]
+		if _, err := io.ReadFull(w.r, payload); err != nil {
+			return 0, nil, err
+		}
+		return at, payload, nil
+	}
 }
 
 func Generation(dir string) (string, error) {
@@ -205,12 +256,16 @@ func eachRecordUntil(path string, t *recordTables, fn func(Record) bool) error {
 		return err
 	}
 	defer func() { _ = f.Close() }()
-	r := bufio.NewReaderSize(f, 1024*1024)
+	w := newLogWalk(f, t, 0)
 	for {
-		rec, err := readRecord(r, t)
+		_, payload, err := w.next()
 		if err == io.EOF || err == io.ErrUnexpectedEOF {
 			return nil
 		}
+		if err != nil {
+			return err
+		}
+		rec, err := decodeRecord(payload, t)
 		if err != nil {
 			return err
 		}
@@ -249,23 +304,14 @@ func eachRecordInRoles(path string, t *recordTables, want map[string]bool, fn fu
 		return err
 	}
 	defer func() { _ = f.Close() }()
-	r := bufio.NewReaderSize(f, 1024*1024)
-	var hdr [4]byte
-	buf := make([]byte, 0, 64*1024)
+	w := newLogWalk(f, t, 0)
 	for {
-		if _, err := io.ReadFull(r, hdr[:]); err != nil {
+		_, payload, err := w.next()
+		if err == io.EOF || err == io.ErrUnexpectedEOF {
 			return nil
 		}
-		size := binary.LittleEndian.Uint32(hdr[:])
-		if size > maxRecordSize {
-			return fmt.Errorf("%w: record length %d exceeds cap", errCorruptIndex, size)
-		}
-		if cap(buf) < int(size) {
-			buf = make([]byte, size)
-		}
-		payload := buf[:size]
-		if _, err := io.ReadFull(r, payload); err != nil {
-			return nil
+		if err != nil {
+			return err
 		}
 		_, role, ok := recordRoleIn(payload, t)
 		if !ok {
@@ -283,38 +329,10 @@ func eachRecordInRoles(path string, t *recordTables, want map[string]bool, fn fu
 }
 
 func eachRecord(path string, t *recordTables, fn func(Record)) error {
-	f, err := openIndexFile(path)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = f.Close() }()
-	r := bufio.NewReaderSize(f, 1024*1024)
-	for {
-		rec, err := readRecord(r, t)
-		if err == io.EOF || err == io.ErrUnexpectedEOF {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		fn(rec)
-	}
-}
-
-func readRecord(r io.Reader, t *recordTables) (Record, error) {
-	var hdr [4]byte
-	if _, err := io.ReadFull(r, hdr[:]); err != nil {
-		return Record{}, err
-	}
-	n := binary.LittleEndian.Uint32(hdr[:])
-	if n > maxRecordSize {
-		return Record{}, fmt.Errorf("%w: record length %d exceeds cap", errCorruptIndex, n)
-	}
-	b := make([]byte, n)
-	if _, err := io.ReadFull(r, b); err != nil {
-		return Record{}, err
-	}
-	return decodeRecord(b, t)
+	return eachRecordUntil(path, t, func(r Record) bool {
+		fn(r)
+		return true
+	})
 }
 
 // eachRecordForKeys walks the log decoding only records whose Key is in
@@ -337,13 +355,15 @@ func eachRecordForKeysInRoles(path string, t *recordTables, want, roles map[stri
 	if ok, err := eachRecordForKeysByOffsets(f, filepath.Dir(path), t, want, roles, fn); ok || err != nil {
 		return err
 	}
-	return walkRecordsForKeys(bufio.NewReaderSize(f, 1024*1024), t, want, roles, fn)
+	return walkRecordsForKeys(bufio.NewReaderSize(f, 1024*1024), 0, t, want, roles, fn)
 }
 
 // walkRecordsForKeys is the walk eachRecordForKeysInRoles does without a
-// table, from wherever r stands to the end of the log.
-func walkRecordsForKeys(r *bufio.Reader, t *recordTables, want, roles map[string]bool, fn func(Record)) error {
+// table, from wherever r stands, which is offset from, to the end of the log.
+func walkRecordsForKeys(r *bufio.Reader, from int64, t *recordTables, want, roles map[string]bool, fn func(Record)) error {
 	var hdr [4]byte
+	dead := t.deadFrom(from)
+	off := from
 	for {
 		if _, err := io.ReadFull(r, hdr[:]); err != nil {
 			if err == io.EOF || err == io.ErrUnexpectedEOF {
@@ -373,7 +393,9 @@ func walkRecordsForKeys(r *bufio.Reader, t *recordTables, want, roles map[string
 		if un <= 0 {
 			return errShortRecord
 		}
-		skip := !want[t.lookup(kid)]
+		at := off
+		off += 4 + int64(n)
+		skip := !want[t.lookup(kid)] || dead.at(at)
 		if !skip && roles != nil {
 			// Key, source and role lead the payload; the body after them is
 			// only read for a role the caller wants.
@@ -452,6 +474,38 @@ func recordNanos(t time.Time) int64 {
 type recordTables struct {
 	strs []string
 	id   map[string]uint64
+	// dead is the manifest's DeadRecords: records a walk of the log skips.
+	dead []int64
+}
+
+// isDead reports whether the record at off was replaced by a later pass.
+func (t *recordTables) isDead(off int64) bool {
+	if t == nil || len(t.dead) == 0 {
+		return false
+	}
+	_, ok := slices.BinarySearch(t.dead, off)
+	return ok
+}
+
+// deadFrom is a cursor over the dead records at or past off, for a walk that
+// visits the log in order.
+func (t *recordTables) deadFrom(off int64) deadCursor {
+	if t == nil || len(t.dead) == 0 {
+		return deadCursor{}
+	}
+	i, _ := slices.BinarySearch(t.dead, off)
+	return deadCursor{d: t.dead[i:]}
+}
+
+type deadCursor struct{ d []int64 }
+
+// at reports whether the record at off is dead. Offsets must be asked in
+// ascending order.
+func (c *deadCursor) at(off int64) bool {
+	for len(c.d) > 0 && c.d[0] < off {
+		c.d = c.d[1:]
+	}
+	return len(c.d) > 0 && c.d[0] == off
 }
 
 func newRecordTables() *recordTables {
@@ -466,7 +520,11 @@ func tablesFromStrings(strs []string) *recordTables {
 	return &recordTables{strs: strs}
 }
 
-func tablesFromManifest(m Manifest) *recordTables { return tablesFromStrings(m.RecordStrings) }
+func tablesFromManifest(m Manifest) *recordTables {
+	t := tablesFromStrings(m.RecordStrings)
+	t.dead = m.DeadRecords
+	return t
+}
 
 func loadRecordTables(dir string) (*recordTables, error) {
 	// Cached: this sits on the search path, and re-decoding the whole
@@ -476,6 +534,18 @@ func loadRecordTables(dir string) (*recordTables, error) {
 		return nil, err
 	}
 	return tablesFromManifest(m), nil
+}
+
+// fresh gives s an id of its own from here on, past every id the table had.
+// Records written under it resolve to nothing in a table from before, which
+// is how a reader of the previous manifest skips a tail appended for it.
+func (t *recordTables) fresh(s string) {
+	if before := len(t.strs); t.intern(s) >= uint64(before) {
+		return // new to the table: its id is past every old one already
+	}
+	id := uint64(len(t.strs))
+	t.strs = append(t.strs, s)
+	t.id[s] = id
 }
 
 // intern returns the id for s, appending it on first sight. Ids are stable:
@@ -647,14 +717,24 @@ func consumeField(b []byte) (string, []byte, bool) {
 // steps leaves a recoverable copy instead of nothing (#181).
 func swapIndexDir(dir, tmp string) error {
 	old := dir + ".old"
-	_ = os.RemoveAll(old)
-	// The parking spot survived the removal above — a leftover from an
+	// A copy left parked survived the removal — a leftover from an
 	// interrupted swap whose permissions stop deja from clearing it. The bare
 	// `rename …: file exists` names two paths nobody chose and gives nothing to
 	// do about either (#1009). Decided before the wait: no amount of waiting
 	// clears it, and the reader has to act on the message either way.
-	if _, statErr := os.Stat(old); statErr == nil {
-		return fmt.Errorf("an earlier index swap left %s behind and deja cannot replace it — remove that directory and run `deja index` again", old)
+	//
+	// Unless what holds it is a reader. The live log is a hard link of the one
+	// in the parked index (append_replace.go), so on Windows any search
+	// running as the last swap ended kept that copy from going, and this pass
+	// failed on it. That clears once the reader lets go, so the pass parks
+	// one name further instead, and the next swap or lock taker removes both.
+	if stuck, err := clearParked(dir); stuck != "" {
+		if !renameHeldOpen(err) {
+			return fmt.Errorf("an earlier index swap left %s behind and deja cannot replace it — remove that directory and run `deja index` again", stuck)
+		}
+		if old = nextParking(dir); old == "" {
+			return fmt.Errorf("earlier index swaps left %s and more behind and deja cannot replace them — remove them and run `deja index` again", stuck)
+		}
 	}
 	carryTombstoneMirror(dir, tmp)
 	// The parking step can afford to wait: the index is still where readers
@@ -686,8 +766,92 @@ func swapIndexDir(dir, tmp string) error {
 		_ = renameWaitingUntil(old, dir, deadline)
 		return err
 	}
-	_ = os.RemoveAll(old)
+	moveManifestCache(tmp, dir)
+	_, _ = clearParked(dir)
 	return nil
+}
+
+// maxParked bounds the parking spots a swap tries past dir.old.
+const maxParked = 16
+
+// removeParked removes a parked index; a test stands where Windows refuses.
+var removeParked = os.RemoveAll
+
+// parkedDirs is every parked copy of dir on disk, dir.old first and then
+// dir.old.N in the order they were parked.
+func parkedDirs(dir string) []string {
+	var out []string
+	if _, err := os.Lstat(dir + ".old"); err == nil {
+		out = append(out, dir+".old")
+	}
+	for _, n := range parkedNumbers(dir) {
+		out = append(out, dir+".old."+strconv.Itoa(n))
+	}
+	return out
+}
+
+// parkedNumbers is the N of every dir.old.N, ascending.
+func parkedNumbers(dir string) []int {
+	entries, err := os.ReadDir(filepath.Dir(dir))
+	if err != nil {
+		return nil
+	}
+	prefix := filepath.Base(dir) + ".old."
+	var out []int
+	for _, e := range entries {
+		rest, ok := strings.CutPrefix(e.Name(), prefix)
+		if !ok {
+			continue
+		}
+		if n, err := strconv.Atoi(rest); err == nil && n > 0 && strconv.Itoa(n) == rest {
+			out = append(out, n)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+// clearParked removes every parked copy of dir. A copy still there comes back
+// with the reason it stayed, a refusal that is not a reader's first; the
+// next parking spot is past it, so the newest copy is always the last.
+func clearParked(dir string) (stuck string, _ error) {
+	var why error
+	for _, p := range parkedDirs(dir) {
+		err := removeParked(p)
+		if _, statErr := os.Lstat(p); statErr != nil {
+			continue
+		}
+		if err == nil {
+			err = fs.ErrExist
+		}
+		if stuck == "" || (renameHeldOpen(why) && !renameHeldOpen(err)) {
+			stuck, why = p, err
+		}
+	}
+	return stuck, why
+}
+
+// nextParking is the spot past every parked copy still there, "" when there
+// are too many to add one.
+func nextParking(dir string) string {
+	n := 1
+	if ns := parkedNumbers(dir); len(ns) > 0 {
+		n = ns[len(ns)-1] + 1
+	}
+	if n > maxParked {
+		return ""
+	}
+	return dir + ".old." + strconv.Itoa(n)
+}
+
+// newestParked is the copy the last swap parked: the highest dir.old.N, as
+// a swap parks past every copy still there.
+func newestParked(dir string) string {
+	ps := parkedDirs(dir)
+	if len(ps) == 0 {
+		return ""
+	}
+	return ps[len(ps)-1]
 }
 
 // indexState is what lives inside the index directory without being built
@@ -828,20 +992,25 @@ var (
 )
 
 // recoverIndexDir finishes an interrupted swapIndexDir: if the index dir is
-// missing but its .old sibling survives, restore it.
+// missing but its .old sibling survives, restore it. A log a killed pass was
+// appending to is cut back to what the manifest committed.
 func recoverIndexDir(dir string) {
 	if dir == "" {
 		return
 	}
 	if _, err := os.Stat(dir); err == nil {
-		_ = os.RemoveAll(dir + ".old")
+		_, _ = clearParked(dir)
+		recoverAppendedTail(dir)
+		recoverScrub(dir)
 		return
 	}
-	if _, err := os.Stat(dir + ".old"); err == nil {
+	if p := newestParked(dir); p != "" {
 		// The same wait: this is the crash-recovery path, and a refusal here
 		// leaves the index missing for the whole run.
-		_ = renameWaiting(dir+".old", dir, parkRenameWait)
+		_ = renameWaiting(p, dir, parkRenameWait)
 	}
+	recoverAppendedTail(dir)
+	recoverScrub(dir)
 }
 
 func writeBucket(p string, data map[string][]posting) error {
@@ -911,11 +1080,13 @@ func writeBucket(p string, data map[string][]posting) error {
 		return err
 	}
 	// Rename over the live bucket: readers see the old file or the new one,
-	// never a torn write (#181).
-	return os.Rename(tmp, p)
+	// never a torn write (#181). Waiting out a reader that holds it open, as
+	// Windows refuses the rename until it lets go.
+	return renameWaiting(tmp, p, parkRenameWait)
 }
 
-func readBucket(p string) (map[string][]posting, error) {
+// readBucketFile reads one postings file whole.
+func readBucketFile(p string) (map[string][]posting, error) {
 	entries, f, err := openBucketDir(p)
 	if err != nil {
 		return nil, err
@@ -936,15 +1107,10 @@ func readBucket(p string) (map[string][]posting, error) {
 	return out, nil
 }
 
-func readBucketToken(p, tok string) ([]posting, error) {
+// readBucketFileToken reads one token's postings from one postings file.
+func readBucketFileToken(p, tok string) ([]posting, error) {
 	entries, f, err := openBucketDir(p)
 	if err != nil {
-		// A bucket that was never written means the token simply does not
-		// occur — that is "no postings", not a failure. Erroring here made
-		// the stem tier abort whole searches over an absent shard.
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
 		return nil, err
 	}
 	defer func() { _ = f.Close() }()
@@ -1198,15 +1364,22 @@ func writeGob(p string, v any) error {
 // writeGobAtomic writes to a sibling temp file and renames it over p, so a
 // crash mid-write can never leave p half-decoded.
 func writeGobAtomic(p string, v any) error {
+	_, err := writeGobAtomicStat(p, v)
+	return err
+}
+
+// writeGobAtomicStat is writeGobAtomic that also returns the file it wrote as
+// stat saw it before the rename, which moves the name and not the file.
+func writeGobAtomicStat(p string, v any) (os.FileInfo, error) {
 	tmp := p + ".tmp"
 	f, err := os.OpenFile(tmp, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err := gob.NewEncoder(f).Encode(v); err != nil {
 		_ = f.Close()
 		_ = os.Remove(tmp)
-		return err
+		return nil, err
 	}
 	// fsync before rename: manifest.gob is the freshness/RecordsSize authority and
 	// must land durably last, like records.bin and the buckets. Skipping it left a
@@ -1214,11 +1387,11 @@ func writeGobAtomic(p string, v any) error {
 	if err := f.Sync(); err != nil {
 		_ = f.Close()
 		_ = os.Remove(tmp)
-		return err
+		return nil, err
 	}
 	if err := f.Close(); err != nil {
 		_ = os.Remove(tmp)
-		return err
+		return nil, err
 	}
 	// The lock keeps other writers out but not readers, and on Windows a
 	// reader decoding manifest.gob refuses the rename onto it with "Access is
@@ -1226,9 +1399,18 @@ func writeGobAtomic(p string, v any) error {
 	// reader is a decode away from closing, so wait it out as the swap does.
 	if err := renameWaiting(tmp, p, parkRenameWait); err != nil {
 		_ = os.Remove(tmp)
-		return err
+		return nil, err
 	}
-	return nil
+	// The writer holds the lock, so what is at p is what it wrote.
+	fi, err := os.Stat(p)
+	if err != nil {
+		// Written; only the stat failed, and nil caches nothing.
+		return nil, nil
+	}
+	// Windows reads a file's identity from its path when first compared, and
+	// this path moves with the staging directory: read it while it is here.
+	_ = os.SameFile(fi, fi)
+	return fi, nil
 }
 
 func readGob(p string, v any) error {
@@ -1254,32 +1436,67 @@ func readGob(p string, v any) error {
 type bucketReader struct {
 	dir     string
 	entries map[string][]bucketEntry
+	// layers is each bucket's overlays as first looked up.
+	layers map[string][]string
+	dead   []int64
 }
 
 func newBucketReader(dir string) *bucketReader {
-	return &bucketReader{dir: dir, entries: map[string][]bucketEntry{}}
+	return &bucketReader{dir: dir, entries: map[string][]bucketEntry{}, layers: map[string][]string{}, dead: deadRecordsOf(dir)}
 }
+
+// bucketBaseRead, when set, runs between a bucket's own postings and its
+// overlays'. Tests land a pass there.
+var bucketBaseRead func(tok string)
 
 func (b *bucketReader) postings(tok string) ([]posting, error) {
 	p, ok := bucketPath(b.dir, tok)
 	if !ok {
 		return nil, nil
 	}
+	layers, cached := b.layers[p]
+	if !cached {
+		layers = bucketLayers(p)
+		b.layers[p] = layers
+	}
+	var out []posting
+	for i, f := range append([]string{p}, layers...) {
+		posts, err := b.filePostings(f, tok)
+		if err != nil {
+			// A bucket that was never written means the token does not occur
+			// — "no postings", not a failure. An overlay merged away since it
+			// was listed is in the file it was merged into.
+			if os.IsNotExist(err) {
+				if i == 0 {
+					return nil, nil
+				}
+				continue
+			}
+			return nil, err
+		}
+		out = joinPostings(out, posts)
+		if i == 0 && bucketBaseRead != nil {
+			bucketBaseRead(tok)
+		}
+	}
+	return liveOnly(out, b.dead), nil
+}
+
+func (b *bucketReader) filePostings(p, tok string) ([]posting, error) {
 	entries, cached := b.entries[p]
 	if !cached {
 		e, f, err := openBucketDir(p)
 		if err != nil {
-			// A bucket that was never written means the token does not occur
-			// — "no postings", not a failure.
 			if os.IsNotExist(err) {
 				b.entries[p] = nil
-				return nil, nil
 			}
 			return nil, err
 		}
 		_ = f.Close()
 		b.entries[p] = e
 		entries = e
+	} else if entries == nil {
+		return nil, os.ErrNotExist
 	}
 	for _, e := range entries {
 		if e.tok != tok {
@@ -1339,6 +1556,9 @@ func eachRecordAt(f *os.File, offsets []int64, t *recordTables, fn func(Record))
 		}
 		b = b[:n]
 		for _, off := range offsets[i:j] {
+			if t.isDead(off) {
+				continue
+			}
 			rel := int(off - start)
 			if r, ok := decodeRecordIn(b, rel, t); ok {
 				fn(r)

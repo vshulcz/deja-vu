@@ -54,9 +54,14 @@ func eachLineFrom(path string, offset int64, fn func(line []byte) bool) {
 		return
 	}
 	defer func() { _ = f.Close() }()
-	r := bufio.NewReader(io.NewSectionReader(f, offset, 1<<62))
+	r := jsonlReaders.Get().(*bufio.Reader)
+	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
+	r.Reset(io.NewSectionReader(f, offset, 1<<62))
 	for {
-		line, err := r.ReadBytes('\n')
+		line, partial, err := readLineBytes(r)
+		if partial {
+			return
+		}
 		if line = trimJSONSpace(line); len(line) > 0 && !fn(line) {
 			return
 		}

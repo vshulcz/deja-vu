@@ -3,9 +3,6 @@ package index
 import (
 	"hash/fnv"
 	"unicode/utf8"
-
-	"github.com/vshulcz/deja-vu/internal/cjkfold"
-	"github.com/vshulcz/deja-vu/internal/query"
 )
 
 // hexBuckets fixes every shard name in a lookup table. bucket relies on these
@@ -95,82 +92,8 @@ func bucketInvalidUTF8(tok string) string {
 	return hexBuckets[h.Sum32()%256]
 }
 
-// cjkIndexKeys emits folded posting keys directly from CJK runs. It keeps the
-// query-side bigram path independent and deduplicates folded pairs because the
-// index callers already treat repeated posting keys as one key. The packed
-// representation widens each rune before shifting so supplementary-plane
-// values cannot overflow (#492).
+// cjkIndexKeys is what keyer.cjkKeys emits, as strings.
 func cjkIndexKeys(s string, emit func(tok string)) {
-	// A CJK rune is never a single UTF-8 byte, so this guard preserves the
-	// cjkBigrams fast path without decoding an ASCII-only message.
-	ascii := true
-	for i := 0; i < len(s); i++ {
-		if s[i] >= utf8.RuneSelf {
-			ascii = false
-			break
-		}
-	}
-	if ascii {
-		return
-	}
-
-	seen := map[uint64]struct{}{}
-	emitFolded := func(r1, r2 rune) {
-		// Grammar earns no posting. A pair of function runes — 的了, 在哪,
-		// 什么 — is the CJK counterpart of a stop word: the query side has
-		// dropped it from the term list since it was written, so the postings
-		// were carrying the most frequent pairs in the language for nothing
-		// (#492). queryKeys drops them from the AND for the same reason.
-		if r1 != 0 && query.CJKFunctionRune(r1) && query.CJKFunctionRune(r2) {
-			return
-		}
-		key := (uint64(r1) << 21) | uint64(r2)
-		if _, ok := seen[key]; ok {
-			return
-		}
-		seen[key] = struct{}{}
-
-		n := 1 + utf8.RuneLen(r2)
-		if r1 != 0 {
-			n += utf8.RuneLen(r1)
-		}
-		tok := make([]byte, n)
-		tok[0] = 't'
-		pos := 1
-		if r1 != 0 {
-			pos += utf8.EncodeRune(tok[pos:], r1)
-		}
-		utf8.EncodeRune(tok[pos:], r2)
-		emit(string(tok))
-	}
-
-	var previous rune
-	runLength := 0
-	flush := func() {
-		if runLength == 1 {
-			// Zero is only the packed-key marker for a unigram. It is never
-			// written into the emitted token.
-			emitFolded(0, previous)
-		}
-		runLength = 0
-	}
-
-	for _, r := range s {
-		if !cjkfold.Unspaced(r) {
-			flush()
-			continue
-		}
-
-		r = cjkfold.Rune(r)
-		if runLength == 0 {
-			previous = r
-			runLength = 1
-			continue
-		}
-
-		emitFolded(previous, r)
-		previous = r
-		runLength = 2
-	}
-	flush()
+	var k keyer
+	k.cjkKeys(s, func(b []byte) { emit(string(b)) })
 }

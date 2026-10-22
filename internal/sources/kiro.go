@@ -100,8 +100,8 @@ func kiroUnderSessDir(p string) bool {
 func LoadKiro() []model.Session {
 	ss := parseFiles(KiroCLIFiles(), ParseKiroCLIFile)
 	ss = append(ss, parseFiles(KiroIDEFiles(), ParseKiroIDEFile)...)
-	dbSS, _ := ParseKiroDB(KiroDB())
-	return append(ss, dbSS...)
+	dbSS, err := ParseKiroDB(KiroDB())
+	return append(ss, dbRead(KiroDB(), dbSS, err)...)
 }
 
 // ParseKiroCLIFile reads one CLI transcript.
@@ -228,12 +228,11 @@ func KiroCLIResumes(path string, offset int64) bool {
 	})
 }
 
-// kiroExitResumes is the #4443 rule for kiro-cli: a clean result left in the
-// next pass is let go, as it is for pi, and a failed one is not.
-var kiroExitResumes = resumesUnlessAnswering(`"toolUseId"`, func(m map[string]any) ([]string, string) {
+// kiroExitResumes is the #4443 rule for kiro-cli, whose reader stamps the
+// exit_status of a clean run too.
+var kiroExitResumes = resumesUnlessSettling(`"toolUseId"`, func(m map[string]any) (calls, failed, clean []string) {
 	data, _ := m["data"].(map[string]any)
 	parts, _ := data["content"].([]any)
-	var calls []string
 	for _, part := range parts {
 		p, _ := part.(map[string]any)
 		d, _ := p["data"].(map[string]any)
@@ -243,11 +242,21 @@ var kiroExitResumes = resumesUnlessAnswering(`"toolUseId"`, func(m map[string]an
 			calls = append(calls, id)
 		case "toolResult":
 			if code, ok := kiroExitStatus(d["content"]); ok && code != 0 {
-				return calls, id
+				failed = append(failed, id)
+			} else if ok {
+				clean = append(clean, id)
 			}
 		}
 	}
-	return calls, ""
+	return calls, failed, clean
+}, func(line []byte) []string {
+	data, _ := decodeJSONLine(line)["data"].(map[string]any)
+	_, calls, _ := kiroContent(data["content"])
+	var ids []string
+	for _, c := range commandCallsIn(calls, kiroDialect) {
+		ids = append(ids, c.ID)
+	}
+	return ids
 })
 
 // applyKiroCLIHeader reads identity out of the header file beside the

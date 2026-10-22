@@ -32,7 +32,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Keeping agent history in sync across machines", "description": "How to sync between machines without a server: one person, two laptops, one history their agents can all read.", "url": "https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-08-24", "dateModified": "2026-10-16"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Keeping agent history in sync across machines", "description": "How to sync between machines without a server: one person, two laptops, one history their agents can all read.", "url": "https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-08-24", "dateModified": "2026-10-21"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Across machines","item":"https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Can I share coding-agent history between my laptop and my desktop?","acceptedAnswer":{"@type":"Answer","text":"Yes. deja sync ssh <host> exchanges indexed sessions over your own SSH connection, append-only and with no service in the middle."}},{"@type":"Question","name":"Does syncing agent history need a cloud account?","acceptedAnswer":{"@type":"Answer","text":"No. The transport is ssh and scp with the credentials you already use; the remote runs its own deja to import the batch."}},{"@type":"Question","name":"Can I keep synced memory searchable but stop it being injected automatically?","acceptedAnswer":{"@type":"Answer","text":"Yes. A trust policy can allow imported memory for search and MCP while denying it on auto-recall, per origin or per peer machine."}}]}</script>
 </head>
@@ -74,7 +74,7 @@
 <a href="recover-a-deleted-session.html">Recover a deleted session</a>
 <a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
-<details class="grpfold"><summary>Deleting sessions <span class="n">20</span></summary>
+<details class="grpfold"><summary>Deleting sessions <span class="n">21</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
 <a href="delete-old-claude-sessions.html">Old sessions</a>
 <a href="delete-codex-sessions.html">Codex</a>
@@ -95,6 +95,7 @@
 <a href="delete-windsurf-cascade-history.html">Windsurf</a>
 <a href="delete-qwen-code-chat-history.html">Qwen Code</a>
 <a href="delete-trae-sessions.html">TRAE CLI</a>
+<a href="delete-codebuddy-sessions.html">CodeBuddy</a>
 </details>
 <details class="grpfold"><summary>Per-agent guides <span class="n">36</span></summary>
 <a href="memory-for-aider.html">aider</a>
@@ -159,7 +160,7 @@ deja sync                       # every machine deja already knows, both ways</p
 <p>Transfers are incremental and append-only: each side keeps a watermark and sends what the other has not seen. <code>--full</code> resends everything, which is the recovery path when a batch was lost — the error message says so at the moment it happens rather than leaving you to guess.</p>
 
 <h2>What arrives</h2>
-<p>Indexed sessions, not the harness's raw files. The receiving machine can search them, and every record in a batch carries its <code>origin</code>, the name of the machine the work happened on (<code>DEJA_MACHINE</code>, else the host name), so a hit says "we fixed this on the laptop in July" as a fact you can see rather than one you have to remember, and <code>deja last --from laptop</code> lists that machine's sessions. A session passed on with <code>sync export --include-imported</code> keeps the name of the machine it started on. Redaction runs three times: when each machine indexes its own transcripts, again on export, and again when the receiving machine imports the batch, so a batch written by an older deja is masked by the receiver's rules too.</p>
+<p>Indexed sessions, not the harness's raw files. The receiving machine can search them, and every record in a batch carries its <code>origin</code>, the name of the machine the work happened on (<code>DEJA_MACHINE</code>, else the host name), so a hit says "we fixed this on the laptop in July" as a fact you can see rather than one you have to remember, and <code>deja last --from laptop</code> lists that machine's sessions. A session passed on with <code>sync export --include-imported</code> keeps the name of the machine it started on. Redaction runs three times: when each machine indexes its own transcripts, again on export, and again when the receiving machine imports the batch, so a batch written by an older deja is masked by the receiver's rules too. The receiver's switches hold as well: what <code>DEJA_INDEX_*</code> and <code>DEJA_INCLUDE_SUBAGENTS=0</code> keep out of a local read, a store <code>DEJA_EXCLUDE_HARNESSES</code> excludes and a project the policy's <code>ignore</code> rule covers stay out of the import, which says how many it left out, and a machine relaying with <code>--include-imported</code> does not pass on the sessions of a store it excludes.</p>
 
 <h2>Deciding what synced memory may do</h2>
 <p>Memory from another machine is not automatically as trusted as memory from this one — a work laptop's history in a personal session, or the reverse, is a real concern. The trust policy at <code>~/.config/deja/policy.json</code> separates the paths memory can activate on: <code>search</code>, <code>mcp</code> and <code>auto</code>. Synced sessions stay searchable but never inject themselves:</p>
@@ -167,7 +168,7 @@ deja sync                       # every machine deja already knows, both ways</p
 <p>A rule can also be narrower than all imports: <code>imported:&lt;group&gt;</code> matches sessions whose project, on the machine they came from, starts with that directory. It cannot name a machine: the <code>origin</code> on each record is the sender's own name for itself, which nothing verifies, so the policy does not key on it. Receipts and <code>deja log --last</code> name the policy that allowed each injection, so what reached the model is inspectable after the fact rather than a matter of trust.</p>
 
 <h2>Keeping it current</h2>
-<p><code>deja install sync-timer</code> runs the exchange on a schedule, and <code>deja doctor</code> reports each peer with when it last synced — a peer that has quietly stopped is the failure mode worth catching, because everything keeps working and simply stops being shared.</p>
+<p><code>deja install sync-timer</code> runs the exchange on a schedule, and <code>deja doctor</code> reports each peer with when it last synced — a peer that has quietly stopped is the failure mode worth catching, because everything keeps working and simply stops being shared. The timer runs with the <code>DEJA_*</code> and <code>XDG_*</code> settings of the shell you installed it from, since the service manager does not see your shell; install it again after changing them.</p>
 
 <h2>What this is not</h2>
 <p>It is not a team feature. There is no server, no shared account and no access control beyond the SSH you already have — it moves one person's history between one person's machines. Sharing a single session with somebody else is a different job, and <a href="export-conversations.html"><code>deja share</code></a> does that one.</p>

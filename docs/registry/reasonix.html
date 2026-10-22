@@ -61,9 +61,10 @@
 <p>keep the replaced span. <code>notebook_edit</code>, <code>delete_range</code> and <code>delete_symbol</code></p>
 <p>name their file under <code>path</code> and <code>move_file</code> two, under <code>source_path</code> and</p>
 <p><code>destination_path</code>; <code>notebook_edit</code>&#39;s <code>new_source</code> is the written side unless</p>
-<p>its <code>edit_mode</code> is <code>delete</code>, and <code>delete_range</code>, which names only anchors, has</p>
-<p>its removed lines read from the unified diff its result returns — a call that</p>
-<p>failed returns an error and gives none (#4541). A <code>tool</code> line is tool output. <code>system</code> lines and user</p>
+<p>its <code>edit_mode</code> is <code>delete</code>, and <code>delete_range</code>, which names only anchors, and</p>
+<p><code>delete_symbol</code>, which names only the symbol, have their removed lines read</p>
+<p>from the unified diff their result returns — a call that failed returns an</p>
+<p>error and gives none (#4541, #595). A <code>tool</code> line is tool output. <code>system</code> lines and user</p>
 <p>lines marked <code>host_authored</code> are dropped: the host wrote them, not the person.</p>
 <p>Where <code>raw_content</code> is set on a user or tool line it is the text before the</p>
 <p>host added context or cut a result for the model, and that is what is indexed.</p>

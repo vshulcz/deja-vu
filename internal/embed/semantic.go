@@ -49,7 +49,7 @@ func SemanticSearch(ctx context.Context, dir string, o search.Options, sidecar S
 	if err != nil {
 		return nil, err
 	}
-	lookup := newRecordLookup(records, sameLayout(sidecar.Generation, gen))
+	lookup := newRecordLookup(records, sameLayout(sidecar.Generation, gen), identOf(sidecar.Version))
 	best := make(map[string]match)
 	heldNotes := make(map[string]match)
 	for _, vector := range sidecar.Vectors {
@@ -57,7 +57,8 @@ func SemanticSearch(ctx context.Context, dir string, o search.Options, sidecar S
 		if !ok {
 			continue
 		}
-		record, ok := lookup.find(vector)
+		found, ok := lookup.find(vector)
+		record := found.Record
 		if !ok || (o.Role != "" && record.Role != o.Role) {
 			continue
 		}

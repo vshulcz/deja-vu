@@ -77,7 +77,7 @@ func TestPartOfWordStepReadsTheCatalogsDirectories(t *testing.T) {
 	for _, d := range idx.dirs {
 		paths = append(paths, bucketDir{path: d.path})
 	}
-	wantPosts, wantVariants, _, err := substringPostingsFrom(paths, bare)
+	wantPosts, wantVariants, _, err := substringPostingsFrom(paths, bare, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

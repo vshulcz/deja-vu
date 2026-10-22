@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -76,7 +77,8 @@ func LoadCodex() []model.Session {
 	for _, s := range ss {
 		seen[s.ID] = true
 	}
-	if hist, _ := ParseCodexHistory(filepath.Join(CodexRoot(), "history.jsonl")); len(hist) > 0 {
+	histPath := filepath.Join(CodexRoot(), "history.jsonl")
+	if hist, err := ParseCodexHistory(histPath); len(storeRead(histPath, hist, err)) > 0 {
 		for _, h := range hist {
 			if !seen[h.ID] {
 				ss = append(ss, h)
@@ -680,8 +682,11 @@ func codexCallOutput(s *model.Session, payload map[string]any, calls map[string]
 }
 
 // codexPatchFile matches the file headers of the apply_patch format Codex uses
-// for every edit it makes; it has no Read or Edit tool of its own.
-var codexPatchFile = regexp.MustCompile(`(?m)^\*\*\* (?:Update|Add|Delete) File: (.+)$`)
+// for every edit it makes; it has no Read or Edit tool of its own. A rename is
+// "*** Update File: a" then "*** Move to: b", and the hunks after it are
+// written to b (codex-rs/apply-patch parser.rs change_move), so b is the file
+// they go under.
+var codexPatchFile = regexp.MustCompile(`(?m)^\*\*\* (?:(?:Update|Add|Delete) File|Move to): (.+)$`)
 
 // codexPatch turns an apply_patch call into the files it touched and the lines
 // it removed. Paths in the patch are relative to the session's cwd.
@@ -753,7 +758,9 @@ func codexPatchText(s *model.Session, body, cwd string, t time.Time) {
 }
 
 // codexRoledBefore reports whether a rollout's first offset bytes hold a
-// roled response_item, which makes its event stream a copy.
+// roled response_item, which makes its event stream a copy. A line is read a
+// buffer at a time, so a command's output of a hundred megabytes is not held
+// to look for two words in it (#5414).
 func codexRoledBefore(path string, offset int64) bool {
 	f, err := os.Open(path)
 	if err != nil {
@@ -761,16 +768,52 @@ func codexRoledBefore(path string, offset int64) bool {
 	}
 	defer func() { _ = f.Close() }()
 	r := bufio.NewReaderSize(io.LimitReader(f, offset), 64*1024)
+	item, role := lineMatch{pat: []byte(`"response_item"`)}, lineMatch{pat: []byte(`"role":`)}
 	for {
-		line, err := r.ReadBytes('\n')
-		if bytes.Contains(line, []byte(`"response_item"`)) && bytes.Contains(line, []byte(`"role":`)) {
+		chunk, err := r.ReadSlice('\n')
+		item.feed(chunk)
+		role.feed(chunk)
+		if item.seen && role.seen {
 			return true
+		}
+		if errors.Is(err, bufio.ErrBufferFull) {
+			continue
 		}
 		if err != nil {
 			return false
 		}
+		item.reset()
+		role.reset()
 	}
 }
+
+// lineMatch looks for pat in a line fed to it a piece at a time, a match
+// across two pieces included.
+type lineMatch struct {
+	pat  []byte
+	tail []byte
+	seen bool
+}
+
+func (m *lineMatch) feed(chunk []byte) {
+	if m.seen || len(m.pat) == 0 {
+		m.seen = true
+		return
+	}
+	keep := len(m.pat) - 1
+	join := append(m.tail, chunk[:min(len(chunk), keep)]...)
+	if bytes.Contains(join, m.pat) || bytes.Contains(chunk, m.pat) {
+		m.seen = true
+		return
+	}
+	if len(chunk) >= keep {
+		m.tail = append(m.tail[:0], chunk[len(chunk)-keep:]...)
+	} else {
+		m.tail = append(m.tail[:0], join[max(len(join)-keep, 0):]...)
+	}
+}
+
+func (m *lineMatch) reset() { m.tail, m.seen = m.tail[:0], false }
 
 // codexRolloutHead reads the identity a rollout declares in its first record.
 func codexRolloutHead(path string) (id, cwd string, payload map[string]any, at time.Time) {
@@ -784,7 +827,9 @@ func codexRolloutHead(path string) (id, cwd string, payload map[string]any, at t
 	// lost the id, so a resumed tail was filed as a session of its own. A line
 	// past the buffer is streamed, as the parse streams it, so a command's
 	// output of a hundred megabytes near the top is not held whole (#5391).
-	r := bufio.NewReaderSize(f, jsonlBuffer)
+	r := jsonlReaders.Get().(*bufio.Reader)
+	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
+	r.Reset(f)
 	// The meta record is the first line in every rollout Codex writes; a few
 	// lines of slack costs nothing and covers a format that adds a preamble.
 	for i := 0; i < 8; i++ {

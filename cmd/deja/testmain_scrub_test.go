@@ -40,7 +40,9 @@ func TestTestMainScrubsEveryVariableTheCodeReads(t *testing.T) {
 	cmd := exec.Command(os.Args[0], "-test.run=^TestScrubHelperProcess$")
 	cmd.Env = append(os.Environ(), "SCRUB_PROBE=1")
 	for _, name := range read {
-		if name == "PATH" || name == "GOMAXPROCS" {
+		// Runtime knobs the runtime parses before main: a path in them is a
+		// fatal error, not a leak.
+		if name == "PATH" || name == "GOMAXPROCS" || name == "GOGC" || name == "GOMEMLIMIT" {
 			continue
 		}
 		cmd.Env = append(cmd.Env, name+"=/leak/"+name)

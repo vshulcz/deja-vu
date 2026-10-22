@@ -54,6 +54,39 @@ func TestOpencodeAutoTakesACommentedTuiJSON(t *testing.T) {
 	}
 }
 
+// A reader who followed install's note and listed deja's status-line plugin
+// in a commented tui.json was left by uninstall with a list entry pointing at
+// the file it had just deleted (#5313). Only deja's element goes, as text:
+// the comment stays, and so do the reader's own entries.
+func TestUninstallTakesDejasEntryOutOfACommentedTuiJSON(t *testing.T) {
+	for _, c := range []struct{ seed, want string }{
+		{
+			"{\n  // my tui settings\n  \"$schema\": \"https://opencode.ai/tui.json\",\n  \"theme\": \"tokyonight\",\n  \"plugin\": [\"./plugins/deja-status.tsx\"]\n}\n",
+			"{\n  // my tui settings\n  \"$schema\": \"https://opencode.ai/tui.json\",\n  \"theme\": \"tokyonight\"\n}\n",
+		},
+		{
+			"{\n  // my tui settings\n  \"plugin\": [\n    // mine first\n    \"./plugins/mine.tsx\",\n    \"./plugins/deja-status.tsx\",\n  ],\n  \"theme\": \"tokyonight\"\n}\n",
+			"{\n  // my tui settings\n  \"plugin\": [\n    // mine first\n    \"./plugins/mine.tsx\",\n  ],\n  \"theme\": \"tokyonight\"\n}\n",
+		},
+	} {
+		dir := opencodeV1(t)
+		list := filepath.Join(dir, "tui.json")
+		if err := os.WriteFile(list, []byte(c.seed), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		out, err := captureRun(t, "uninstall", "opencode-auto")
+		if err != nil {
+			t.Fatalf("uninstall refused it: %v\n%s", err, out)
+		}
+		if strings.Contains(out, "from its plugin list") {
+			t.Errorf("uninstall left the entry to the reader:\n%s", out)
+		}
+		if b, _ := os.ReadFile(list); string(b) != c.want {
+			t.Errorf("uninstall left\n%s\nwant\n%s", b, c.want)
+		}
+	}
+}
+
 // A tui.json the reader had is theirs to keep: uninstall deleted every one
 // that held nothing but what install found or added — an empty file, `{}`,
 // an empty plugin list, opencode's own $schema line.

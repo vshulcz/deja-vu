@@ -21,6 +21,35 @@ export function argv(cmd, flags, text) {
   return arg.startsWith("-") ? [cmd, ...flags, "--", arg] : [cmd, ...flags, arg];
 }
 
+// recallArgv is the call behind the deja_recall tool: `deja recall`, the page
+// the MCP recall tool serves, framed and held to its 4 KB budget by deja
+// itself. The tool used to run `search --json`, which carries every hit's
+// matched messages whole and handed a model 661,528 characters for five hits
+// (#5568). The page ends with "call recall again with offset=N"; offset is
+// how the tool asks for that, and it is sent only past the first page, so a
+// deja too old to know --offset still answers the first one.
+export function recallArgv(args) {
+  const count = (v, fallback) => {
+    const n = Math.trunc(Number(v));
+    return v == null || v === "" || !Number.isFinite(n) ? fallback : n;
+  };
+  const limit = Math.min(20, Math.max(1, count(args && args.limit, 5)));
+  const offset = Math.min(1e9, Math.max(0, count(args && args.offset, 0)));
+  const flags = ["--limit", String(limit)];
+  if (offset > 0) flags.push("--offset", String(offset));
+  return argv("recall", flags, args && args.query);
+}
+
+// recallSilence is the answer when `deja recall` printed nothing. Past the
+// first page that is a deja older than --offset refusing the flag, not an
+// empty history: recall always prints a line, "No more matches" included.
+export function recallSilence(call) {
+  if (call.includes("--offset")) {
+    return "This deja cannot page recall. Run deja update, then ask again with the same offset.";
+  }
+  return "Nothing in this machine's history matches that.";
+}
+
 // guarded runs one registration, and swallows the host's refusal of a name it
 // already holds.
 //
@@ -60,6 +89,18 @@ export function exitStatus(text) {
   const exit = /\n\[exit code: (\d+)\]$/.exec(text);
   if (exit) return { body: text.slice(0, exit.index), failed: exit[1] !== "0" };
   return { body: text, failed: false };
+}
+
+// inert keeps recalled text out of dsh's prompt templating. dsh reads every
+// {{name}} in a context as a prompt variable and throws on one it does not
+// know, which ends the turn before the model is called. Past sessions quote
+// templates, and that very error, so one recall carrying {{cwd}} broke every
+// turn after it (#5421). `interpolate: false` tells dsh 0.2.1-alpha.2 and later
+// to leave the text alone; older hosts ignore it, and a listener on
+// system-prompt/assemble may drop it, so the braces are split as well:
+// { {cwd} } still reads as braces and holds no {{ to resolve.
+export function inert(text) {
+  return String(text || "").replace(/\{(?=\{)/g, "{ ").replace(/\}(?=\})/g, "} ");
 }
 
 // contributions says what this package adds, given what `deja install` already

@@ -473,24 +473,27 @@ func TestCommandCodeShellArgsAndReadGlobs(t *testing.T) {
 // Reasonix 1.39.6: notebook_edit {path, new_source, edit_mode}, delete_range
 // {path, start_anchor, end_anchor} whose result is a unified diff,
 // delete_symbol {path, name, kind} and move_file {source_path,
-// destination_path}. A delete_range that failed returns an error, not a
-// diff (#4541).
+// destination_path}. delete_symbol returns the unified diff of what it cut
+// too (internal/tools/builtin/delete_symbol.go, #595). A delete_range that
+// failed returns an error, not a diff (#4541).
 func TestReasonixFileTools(t *testing.T) {
 	cell := "retries = compute_backoff_with_jitter(attempt, base=0.5)"
 	dropped := "dropped = legacy_cell(attempt)"
 	rangeDiff := "--- a/retry.go\n+++ b/retry.go\n@@\n-func legacyRetry() error {\n-\treturn errGiveUp\n-}\n"
+	symbolDiff := "--- a/symbols.go\n+++ b/symbols.go\n@@ -3,4 +3,1 @@\n package retry\n-func legacyBackoff(attempt int) time.Duration {\n-\treturn time.Duration(attempt) * time.Second\n-}\n"
 	calls := []any{
 		toolCall("c1", "notebook_edit", map[string]any{"path": "/tmp/proj/retry.ipynb", "cell_number": 0, "new_source": cell, "edit_mode": "replace"}),
 		toolCall("c2", "notebook_edit", map[string]any{"path": "/tmp/proj/old.ipynb", "cell_number": 1, "new_source": dropped, "edit_mode": "delete"}),
 		toolCall("c3", "delete_range", map[string]any{"path": "/tmp/proj/retry.go", "start_anchor": "func legacyRetry() error {", "end_anchor": "}"}),
 		toolCall("c4", "delete_range", map[string]any{"path": "/tmp/proj/backoff.go", "start_anchor": "func gone() {", "end_anchor": "}"}),
-		toolCall("c5", "delete_symbol", map[string]any{"path": "/tmp/proj/symbols.go", "name": "legacyRetry", "kind": "func"}),
+		toolCall("c5", "delete_symbol", map[string]any{"path": "/tmp/proj/symbols.go", "name": "legacyBackoff", "kind": "func"}),
 		toolCall("c6", "move_file", map[string]any{"source_path": "/tmp/proj/jitter.go", "destination_path": "/tmp/proj/backoff/jitter.go"}),
 	}
-	results := []string{"edited cell 0", "deleted cell 1", rangeDiff, "start_anchor not found in /tmp/proj/backoff.go", "deleted", "moved"}
+	results := []string{"edited cell 0", "deleted cell 1", rangeDiff, "start_anchor not found in /tmp/proj/backoff.go", symbolDiff, "moved"}
 	want := []string{
 		vocabWrote("/tmp/proj/retry.ipynb", cell),
 		vocabEdit("/tmp/proj/retry.go", "func legacyRetry() error {\n\treturn errGiveUp\n}"),
+		vocabEdit("/tmp/proj/symbols.go", "func legacyBackoff(attempt int) time.Duration {\n\treturn time.Duration(attempt) * time.Second\n}"),
 	}
 	unwanted := []string{vocabWrote("/tmp/proj/old.ipynb", dropped)}
 	// v1 puts all the calls' files in one record and v4 one per call, so the

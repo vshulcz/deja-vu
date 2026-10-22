@@ -140,7 +140,7 @@ var codeWhaleDialect = toolDialect{
 	// background task, both under `command` (#4538).
 	shellTools: map[string]bool{"exec_shell": true, "bash": true, "Bash": true, "terminal/run": true, "task_shell_start": true},
 	editTools: map[string]bool{
-		"edit": true, "write": true,
+		"edit": true, "write": true, "write_file": true,
 		"edit_file": true, "fim_edit": true, "str_replace": true,
 	},
 	oldKey:      "old_string",
@@ -224,6 +224,7 @@ func parseCodeWhaleDoc(path string, doc codeWhaleSession) []model.Session {
 		s.Parent = doc.Metadata.Parent
 	}
 	failed := codeWhaleFailedCalls(doc.Messages)
+	fims := map[string]string{}
 	start := doc.Metadata.CreatedAt
 	if start.IsZero() {
 		start = doc.Metadata.UpdatedAt
@@ -265,6 +266,11 @@ func parseCodeWhaleDoc(path string, doc codeWhaleSession) []model.Session {
 			s.Messages = append(s.Messages, rec)
 		}
 		for _, rec := range codeWhalePatchRecords(m.Content, failed, doc.Metadata.Workspace, ts) {
+			s.Touch(ts)
+			s.Messages = append(s.Messages, rec)
+		}
+		codeWhaleNoteFims(m.Content, fims)
+		for _, rec := range codeWhaleFimRecords(m.Content, fims, ts) {
 			s.Touch(ts)
 			s.Messages = append(s.Messages, rec)
 		}
@@ -405,6 +411,71 @@ func codeWhalePatchRecords(raw json.RawMessage, failed map[string]bool, workspac
 			}
 		}
 		out = append(out, patchRecords(files, nil, wrote, ts)...)
+	}
+	return out
+}
+
+// codeWhaleNoteFims adds the file of each fim_edit call in a message to
+// pending, by call id. The call names only two anchors; the model's text
+// between them comes back in the result, FimEditResult {success, path,
+// generated_text, …} serialized as the tool_result's content (tools/fim.rs),
+// so that is where its written side is (#595). Calls are noted as they come
+// and taken by the result that answers them, so an id a provider reuses
+// later names the later call.
+func codeWhaleNoteFims(raw json.RawMessage, pending map[string]string) {
+	if !bytes.Contains(raw, []byte(`"fim_edit"`)) {
+		return
+	}
+	var blocks []any
+	if json.Unmarshal(raw, &blocks) != nil {
+		return
+	}
+	for _, it := range blocks {
+		name, in, ok := toolPart(it, codeWhaleDialect)
+		id, _ := it.(map[string]any)["id"].(string)
+		if !ok || name != "fim_edit" || id == "" {
+			continue
+		}
+		// file_path and filePath are folded onto path before it runs
+		// (file.rs PATH_ALIASES).
+		for _, k := range []string{"path", "file_path", "filePath"} {
+			if p, _ := in[k].(string); p != "" {
+				pending[id] = p
+				break
+			}
+		}
+	}
+}
+
+// codeWhaleFimRecords is the written side of each fim_edit a message's
+// results answer. A result that is an error wrote nothing.
+func codeWhaleFimRecords(raw json.RawMessage, fims map[string]string, ts time.Time) []model.Message {
+	if len(fims) == 0 || !IndexWrites() || !bytes.Contains(raw, []byte(`"tool_result"`)) {
+		return nil
+	}
+	var blocks []map[string]any
+	if json.Unmarshal(raw, &blocks) != nil {
+		return nil
+	}
+	var out []model.Message
+	for _, b := range blocks {
+		id, _ := b["tool_use_id"].(string)
+		path, ok := fims[id]
+		if typ, _ := b["type"].(string); typ != "tool_result" || !ok {
+			continue
+		}
+		delete(fims, id)
+		content, _ := b["content"].(string)
+		var res struct {
+			Success       bool   `json:"success"`
+			GeneratedText string `json:"generated_text"`
+		}
+		if failed, _ := b["is_error"].(bool); failed || json.Unmarshal([]byte(content), &res) != nil || !res.Success {
+			continue
+		}
+		if rec := WroteRecord(path, res.GeneratedText); rec != "" {
+			out = append(out, model.Message{Role: RoleWrote, Text: rec, Time: ts})
+		}
 	}
 	return out
 }

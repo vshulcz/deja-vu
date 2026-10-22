@@ -86,7 +86,7 @@ func statIndexFile(path string) (os.FileInfo, error) {
 
 // swapInFlight reports whether a directory on the way to path has been renamed
 // aside and not yet replaced: gone from where it belongs, and sitting at its
-// ".old" parking spot.
+// ".old" parking spot, or one past it (see swapIndexDir).
 //
 // Both halves are needed. The parking spot alone survives a crashed swap until
 // the next build clears it, and waiting on that would tax every read on a
@@ -96,7 +96,7 @@ func statIndexFile(path string) (os.FileInfo, error) {
 func swapInFlight(path string) bool {
 	d := filepath.Dir(path)
 	for i := 0; i < 2; i++ {
-		if _, err := os.Stat(d + ".old"); err == nil {
+		if len(parkedDirs(d)) > 0 {
 			if _, err := os.Stat(d); errors.Is(err, fs.ErrNotExist) {
 				return true
 			}

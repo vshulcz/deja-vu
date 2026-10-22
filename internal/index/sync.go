@@ -51,6 +51,10 @@ type SyncRecord struct {
 	// has no tombstone of its own, so the receiver checks the parent's
 	// (#5216). Additive.
 	Parent syncName `json:"parent,omitempty"`
+	// Kind marks a sub-agent run, so DEJA_INCLUDE_SUBAGENTS=0 on the
+	// receiving machine leaves it out as its own readers do (#5425).
+	// Additive.
+	Kind syncName `json:"kind,omitempty"`
 }
 
 // lifecycleDay is how a lifecycle date is stored: the UTC day of the filing.
@@ -214,6 +218,10 @@ func exportRecordsWith(dir, outDir, peer string, full, relay bool) (int, func() 
 	// where memory actually leaves the machine, so the export shipped it to a
 	// peer that then served it as imported memory (#2654).
 	pol := policy.Load()
+	// And a store this machine excludes: set after the index was built, or
+	// holding sessions a peer sent before it was set, it went out on the next
+	// export or relay (#5435).
+	offHarnesses := sources.ExcludedHarnesses()
 	// The oldest instant held back per source. A watermark that ran past an
 	// excluded record would settle it forever: remove the pattern later and
 	// that work never syncs again, because the source resumes from a point
@@ -281,7 +289,7 @@ func exportRecordsWith(dir, outDir, peer string, full, relay bool) (int, func() 
 				origin = syncName(meta.From)
 			}
 		}
-		if (!ex.Empty() && ex.Match(project)) || pol.Ignored(meta.Path, project) {
+		if (!ex.Empty() && ex.Match(project)) || pol.Ignored(meta.Path, project) || offHarnesses[strings.ToLower(meta.Harness)] {
 			// Held, not settled, for both: a watermark that ran past a
 			// withheld record would settle it forever, so lifting the rule
 			// later would never send that work.
@@ -296,6 +304,9 @@ func exportRecordsWith(dir, outDir, peer string, full, relay bool) (int, func() 
 		rec := SyncRecord{Harness: meta.Harness, SessionID: sessionID, Project: project, Role: r.Role, Text: text, Time: r.Time, Origin: origin}
 		if !relayed && inParentFile(meta.Harness, meta.Kind, meta.Parent) {
 			rec.Parent = syncName(meta.Parent)
+		}
+		if spawnedKind(meta.Kind) {
+			rec.Kind = syncName(meta.Kind)
 		}
 		if meta.Harness == "deja" && strings.HasPrefix(sessionID, "deja-note-") {
 			if relayed {
@@ -420,6 +431,27 @@ var lastImportSkippedExcluded int
 
 // ImportSkippedExcluded reports that count.
 func ImportSkippedExcluded() int { return lastImportSkippedExcluded }
+
+// lastImportSkippedSwitched holds how many records the last Import dropped
+// because a switch set on this machine leaves their kind out: a parse switch
+// their role, DEJA_INCLUDE_SUBAGENTS=0 a sub-agent run. They are not entered
+// in the ledger, so the same batch imported with the switch on brings them in.
+var lastImportSkippedSwitched int
+
+// ImportSkippedSwitched reports that count.
+func ImportSkippedSwitched() int { return lastImportSkippedSwitched }
+
+// lastImportSkippedHarness and lastImportSkippedIgnored hold how many records
+// the last Import dropped because this machine excludes their harness, or
+// because its ignore rule covers their project. Not entered in the ledger
+// either, so lifting the rule and importing again brings them in (#5435).
+var lastImportSkippedHarness, lastImportSkippedIgnored int
+
+// ImportSkippedHarness reports the first count.
+func ImportSkippedHarness() int { return lastImportSkippedHarness }
+
+// ImportSkippedIgnored reports the second.
+func ImportSkippedIgnored() int { return lastImportSkippedIgnored }
 
 // lastImportSkippedIncomplete holds how many records the last Import dropped
 // because they could not be attributed to a session — no harness or no
@@ -546,6 +578,15 @@ func Import(dir, inDir string) (int, error) {
 		}
 	}
 	ex := sources.NewExcluder()
+	// The switches a reader on this machine runs under hold for what a peer
+	// indexed under its own: the batch carries every role the other machine
+	// kept (#5425).
+	offRoles := sources.SwitchedOffRoles()
+	subagentsOff := sources.SubagentsOff()
+	// So do the other two rules that keep work out of this machine's memory:
+	// a store it does not read, and a tree it does not recall from (#5435).
+	offHarnesses := sources.ExcludedHarnesses()
+	pol := policy.Load()
 	if !HasManifest(dir) {
 		if err := initEmptyIndex(dir); err != nil {
 			return 0, err
@@ -607,10 +648,16 @@ func Import(dir, inDir string) (int, error) {
 	forgottenSkipped := 0
 	incompleteSkipped := 0
 	excludedSkipped := 0
+	switchedSkipped := 0
+	harnessSkipped := 0
+	ignoredSkipped := 0
 	defer func() { lastImportSkippedForgotten = forgottenSkipped }()
 	defer func() { lastImportSkippedOwn = ownSkipped }()
 	defer func() { lastImportSkippedIncomplete = incompleteSkipped }()
 	defer func() { lastImportSkippedExcluded = excludedSkipped }()
+	defer func() { lastImportSkippedSwitched = switchedSkipped }()
+	defer func() { lastImportSkippedHarness = harnessSkipped }()
+	defer func() { lastImportSkippedIgnored = ignoredSkipped }()
 	for _, p := range paths {
 		// A file is imported whole or not at all, so what it contributed is
 		// remembered before it is read and rolled back if it turns out to be
@@ -696,7 +743,7 @@ func Import(dir, inDir string) (int, error) {
 			// where the value was, and keyed on what it sent the record landed
 			// twice. The key on the sent text is what older builds wrote, and
 			// is still honoured.
-			text, cnt := redact.Text(sr.Text)
+			text, cnt := redact.Text(carriedText(sr.Harness, sr.Role, sr.Text))
 			th := fnv.New64a()
 			_, _ = th.Write([]byte(text))
 			rawHash := th.Sum64()
@@ -754,6 +801,21 @@ func Import(dir, inDir string) (int, error) {
 				excludedSkipped++
 				return nil
 			}
+			if offHarnesses[strings.ToLower(sr.Harness)] {
+				harnessSkipped++
+				return nil
+			}
+			// Matched as recall would see it once stored, and as the peer
+			// named it, so a glob written for the local name holds too.
+			if pol.Ignored(syncImportPath, importedProjectPrefix+sr.Project) || pol.Ignored("", sr.Project) {
+				ignoredSkipped++
+				return nil
+			}
+			spawned := spawnedKind(string(sr.Kind)) || sr.Parent != ""
+			if offRoles[sr.Role] || (spawned && subagentsOff) {
+				switchedSkipped++
+				return nil
+			}
 			key := sr.Harness + ":" + importID
 			// Count what redaction removed, the way local ingest does — the
 			// import path redacted the text but threw the count away, so
@@ -769,6 +831,11 @@ func Import(dir, inDir string) (int, error) {
 			meta := metas[key]
 			if meta.ID == "" {
 				meta = SessionMeta{ID: importID, Harness: sr.Harness, Project: importedProjectPrefix + sr.Project, Path: syncImportPath, OrigID: origID, From: string(sr.Origin)}
+			}
+			if spawnedKind(string(sr.Kind)) {
+				meta.Kind = string(sr.Kind)
+			} else if sr.Parent != "" {
+				meta.Kind = "sidechain" // a run in its parent's log, from a build that sends no kind
 			}
 			if meta.Started.IsZero() || (!sr.Time.IsZero() && sr.Time.Before(meta.Started)) {
 				meta.Started = sr.Time
@@ -1106,20 +1173,15 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 		return err
 	}
 	buckets := bucketPostings{}
+	// Only what this pass adds: it goes into an overlay beside each bucket
+	// rather than into the bucket written whole again (#5387).
 	loadBucket := func(tok string) (map[string][]posting, error) {
 		b := bucket(tok)
-		if data, ok := buckets[b]; ok {
-			return data, nil
-		}
-		p := filepath.Join(dir, "buckets", b+".bin")
-		data, err := readBucket(p)
-		if os.IsNotExist(err) {
+		data, ok := buckets[b]
+		if !ok {
 			data = map[string][]posting{}
+			buckets[b] = data
 		}
-		if err != nil && !os.IsNotExist(err) {
-			return nil, err
-		}
-		buckets[b] = data
 		return data, nil
 	}
 	keys := make([]string, 0, len(recsByKey))
@@ -1170,6 +1232,11 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 		old := m.Sessions[key]
 		if old.ID != "" {
 			meta.Ord = old.Ord
+			// A batch from a build that does not send the kind keeps the
+			// one an earlier batch named.
+			if meta.Kind == "" {
+				meta.Kind = old.Kind
+			}
 			if old.Started.Before(meta.Started) || meta.Started.IsZero() {
 				meta.Started = old.Started
 			}
@@ -1234,11 +1301,18 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 		return err
 	}
 	m.RecordStrings = tbl.strs
-	if err := writeBucketsConcurrent(filepath.Join(dir, "buckets"), buckets); err != nil {
+	stale, err := addOverlays(filepath.Join(dir, "buckets"), filepath.Join(dir, "buckets"), buckets, m.DeadRecords)
+	if err != nil {
 		return err
 	}
 	m.BuiltAt = time.Now()
-	return writeManifest(dir, *m)
+	m.bucketsLeaving = staleCount(stale)
+	if err := writeManifest(dir, *m); err != nil {
+		return err
+	}
+	dropStale(stale)
+	m.bucketsLeaving = 0
+	return nil
 }
 
 func shortHash(s string) string {

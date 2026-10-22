@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -23,11 +26,12 @@ import (
 //
 // Five classes, because they are the five things that happen to a store:
 // nothing changed, a turn was appended to a transcript, a transcript appeared,
-// a transcript changed its name, a transcript was rewritten. The first four
-// must not rewrite `records.bin` —
-// that is the property the cost rests on, and it is reported per class rather
-// than assumed, since wall time on a shared runner says little and "the bytes
-// that were there are still there" says everything.
+// a transcript changed its name, a transcript was rewritten. None of them
+// may rewrite `records.bin`: a rewritten transcript's records are appended and
+// the old ones listed as dead (#5387), and cleared where they stand (#5429). That is the property the cost rests on,
+// and it is reported per class rather than assumed, since wall time on a
+// shared runner says little and "the bytes that were there are still there"
+// says everything.
 
 // ingestClass is one update and what it cost.
 type ingestClass struct {
@@ -35,6 +39,7 @@ type ingestClass struct {
 	WallMS    float64 `json:"wall_ms"`
 	RecordsMB float64 `json:"records_mb"`
 	AddedKB   float64 `json:"added_kb"`
+	ClearedKB float64 `json:"cleared_kb"`
 	Rewritten bool    `json:"rewritten"`
 }
 
@@ -196,20 +201,51 @@ func measureIngestPass(indexDir string) (ingestClass, error) {
 		return ingestClass{}, err
 	}
 	rewritten := !os.SameFile(wasFile, isFile) || len(after) < len(before)
+	var cleared int
 	if !rewritten {
-		for i := range before {
-			if before[i] != after[i] {
-				rewritten = true
-				break
-			}
-		}
+		cleared, rewritten = clearedInPlace(before, after[:len(before)])
 	}
 	return ingestClass{
 		WallMS:    float64(wall.Microseconds()) / 1000,
 		RecordsMB: float64(len(after)) / (1 << 20),
 		AddedKB:   float64(grew) / 1024,
+		ClearedKB: float64(cleared) / 1024,
 		Rewritten: rewritten,
 	}, nil
+}
+
+// clearedInPlace compares the log before a pass with the same bytes after it,
+// record by record. A pass may clear a record it replaced where it stands —
+// the frame kept, the payload three ids and then zeros (#5429) — and that is
+// what cleared counts. Any other changed byte is the store rewritten.
+func clearedInPlace(before, after []byte) (cleared int, rewritten bool) {
+	for off := 0; off+4 <= len(before); {
+		n := int(binary.LittleEndian.Uint32(before[off:]))
+		end := off + 4 + n
+		if end > len(before) {
+			end = len(before)
+		}
+		if !bytes.Equal(before[off:end], after[off:end]) {
+			if !bytes.Equal(before[off:off+4], after[off:off+4]) || !clearedPayload(after[off+4:end]) {
+				return cleared, true
+			}
+			cleared += end - off
+		}
+		off = end
+	}
+	return cleared, false
+}
+
+// clearedPayload reports a payload of three ids and nothing after them.
+func clearedPayload(p []byte) bool {
+	for i := 0; i < 3; i++ {
+		_, n := binary.Uvarint(p)
+		if n <= 0 {
+			return false
+		}
+		p = p[n:]
+	}
+	return !slices.ContainsFunc(p, func(c byte) bool { return c != 0 })
 }
 
 // appendBenchTurn adds one message to a transcript the index has already read,
@@ -233,16 +269,16 @@ func appendBenchTurn(path, id, text string) error {
 func printIngestReport(w io.Writer, r ingestReport) {
 	fmt.Fprintln(w, "deja bench ingest")
 	fmt.Fprintf(w, "corpus: %d sessions, seed %d\n", r.Sessions, r.Seed)
-	fmt.Fprintf(w, "%-22s %10s %12s %10s %s\n", "update", "wall", "records", "added", "rewrote the store")
+	fmt.Fprintf(w, "%-22s %10s %12s %10s %10s %s\n", "update", "wall", "records", "added", "cleared", "rewrote the store")
 	for _, c := range r.Classes {
 		rewrote := "no"
 		if c.Rewritten {
 			rewrote = "YES"
 		}
-		fmt.Fprintf(w, "%-22s %9.1fms %10.1fMB %9.1fKB %s\n",
-			c.name(), c.WallMS, c.RecordsMB, c.AddedKB, rewrote)
+		fmt.Fprintf(w, "%-22s %9.1fms %10.1fMB %9.1fKB %9.1fKB %s\n",
+			c.name(), c.WallMS, c.RecordsMB, c.AddedKB, c.ClearedKB, rewrote)
 	}
-	fmt.Fprintln(w, "Only a rewritten transcript should rewrite the store; the other four cost what they added.")
+	fmt.Fprintln(w, "No update should rewrite the store; each costs what it changed.")
 }
 
 // name keeps the printed column stable when a class name is empty, which only

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/query"
 )
 
 // The install used to end with a placeholder — `deja "something you fixed weeks
@@ -179,5 +181,53 @@ func TestThePromptSpanReadsAsOneMonthWhenItIsOne(t *testing.T) {
 	}
 	if got := promptSpan(time.Time{}, jun); got != "" {
 		t.Errorf("span = %q, want nothing when a date is missing", got)
+	}
+}
+
+// Claude Code wraps pasted text in <pasted_content id="…">, and on a machine
+// whose sessions mostly open with a paste the install asked "what did we
+// decide about pasted_content set?" and listed a session as
+// `<pasted_content id="dd73"> Set up and test…`. The wrapper is the host's
+// markup: the topic, the preview and the index hold only the pasted text.
+func TestPasteWrapperIsNotATopicATitleOrATerm(t *testing.T) {
+	hermeticEnv(t)
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+	writeClaudeFixture(t, filepath.Join(root, "-work-api", "a.jsonl"), "s1", []string{
+		`{"type":"user","sessionId":"s1","timestamp":"2026-06-02T12:00:00Z","message":{"role":"user","content":"<pasted_content id=\"dd73\">\npgbouncer prepared statements keep failing under the pool\n</pasted_content id=\"dd73\">"}}`,
+		`{"type":"assistant","sessionId":"s1","timestamp":"2026-06-02T12:04:00Z","message":{"role":"assistant","content":[{"type":"text","text":"we decided to run the pooler in transaction mode and turn the driver cache off"}]}}`,
+	})
+	writeClaudeFixture(t, filepath.Join(root, "-work-api", "b.jsonl"), "s2", []string{
+		`{"type":"user","sessionId":"s2","timestamp":"2026-07-14T09:00:00Z","message":{"role":"user","content":"<pasted_content id=\"a1f0\">\npgbouncer prepared statements again after the driver upgrade\n</pasted_content id=\"a1f0\">"}}`,
+		`{"type":"assistant","sessionId":"s2","timestamp":"2026-07-14T09:20:00Z","message":{"role":"assistant","content":[{"type":"text","text":"the fix was to keep transaction mode and leave the driver cache off"}]}}`,
+	})
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	p, ok := buildTryPrompt(dir)
+	if !ok {
+		t.Fatal("no prompt was built")
+	}
+	if strings.Contains(p.Question, "pasted_content") || !strings.Contains(p.Question, "pgbouncer") {
+		t.Errorf("question = %q, want the pasted text's topic", p.Question)
+	}
+
+	recent, err := index.Recent(dir, 10)
+	if err != nil || len(recent) != 2 {
+		t.Fatalf("recent: %v, %d", err, len(recent))
+	}
+	for _, s := range recent {
+		if title := sessionHeadline(s); strings.Contains(title, "pasted_content") || !strings.HasPrefix(title, "pgbouncer prepared statements") {
+			t.Errorf("preview = %q, want the pasted text", title)
+		}
+	}
+
+	result, err := index.SearchWithRecoveryDetailed(dir, query.Options{Query: "pasted_content", All: true}, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hits := matchedSessions(result, result.Sessions); len(hits) != 0 {
+		t.Errorf("the wrapper was indexed as a term: %d sessions match it", len(hits))
 	}
 }

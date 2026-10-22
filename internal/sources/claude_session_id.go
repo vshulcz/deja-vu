@@ -94,12 +94,33 @@ func lastClaudeKeyBefore(path string, end int64) (key string, found bool) {
 	}
 	// The pieces of a line that runs on past the chunk being read, in file
 	// order. Joined once when its start is found, so a line of many megabytes
-	// is copied once rather than once per chunk.
+	// is copied once rather than once per chunk. A line past the buffer is not
+	// held at all: once its start is found it is streamed from the file, as the
+	// parse streams it (#5414). lineEnd is where the carried line ends.
 	var carry [][]byte
+	carried, lineEnd, long := 0, int64(0), false
+	held := func(start int64, piece []byte) []byte {
+		if long {
+			long, carry, carried = false, nil, 0
+			return streamedLineAt(f, start, lineEnd)
+		}
+		if len(carry) > 0 {
+			piece = bytes.Join(append([][]byte{piece}, carry...), nil)
+			carry, carried = nil, 0
+		}
+		return piece
+	}
 	pos := end
+	// spare is the last chunk when nothing carried kept it: past a long line
+	// every chunk is read into the same one.
+	var spare []byte
 	for pos > 0 {
 		n := min(int64(64<<10), pos)
-		buf := make([]byte, n)
+		buf := spare[:0:cap(spare)]
+		if int64(cap(buf)) < n {
+			buf = make([]byte, n)
+		}
+		buf, spare = buf[:n], nil
 		if _, err := f.ReadAt(buf, pos-n); err != nil && err != io.EOF {
 			return "", false
 		}
@@ -110,19 +131,25 @@ func lastClaudeKeyBefore(path string, end int64) (key string, found bool) {
 			if i < 0 {
 				break
 			}
-			line := buf[i+1 : stop]
-			if len(carry) > 0 {
-				line = bytes.Join(append([][]byte{line}, carry...), nil)
-				carry = nil
-			}
-			if check(line) {
+			if check(held(pos+int64(i)+1, buf[i+1:stop])) {
 				return key, true
 			}
 			stop = i
 		}
-		carry = append([][]byte{buf[:stop]}, carry...)
+		if len(carry) == 0 && !long {
+			lineEnd = pos + int64(stop)
+		}
+		if !long {
+			carry = append([][]byte{buf[:stop]}, carry...)
+			if carried += stop; carried > jsonlBuffer {
+				long, carry = true, nil
+			}
+		}
+		if long || stop == 0 {
+			spare = buf
+		}
 	}
-	if len(carry) > 0 && check(bytes.Join(carry, nil)) {
+	if (long || len(carry) > 0) && check(held(0, nil)) {
 		return key, true
 	}
 	return "", found

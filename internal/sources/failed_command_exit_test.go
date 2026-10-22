@@ -149,14 +149,15 @@ func assertCommand(t *testing.T, ss []model.Session, want string) {
 	t.Errorf("commands = %q, want %q among them", got, want)
 }
 
-// A kiro-cli result that lands a pass after its call is read whole when it
-// failed, or the stored call never gets its exit (#4505); a clean one is not.
+// A kiro-cli result that lands a pass after its call is read whole, or the
+// stored call never gets its exit: a failure's code (#4505) or a clean run's
+// exit 0 (#5527).
 func TestKiroCLIReadsAFailedResultWithItsCall(t *testing.T) {
 	call := `{"version":"v1","kind":"AssistantMessage","data":{"message_id":"m1","content":[{"kind":"toolUse","data":{"toolUseId":"t1","name":"shell","input":{"command":"go test ./..."}}}],"meta":{"timestamp":1790848801}}}` + "\n"
 	result := func(status string) string {
 		return `{"version":"v1","kind":"ToolResults","data":{"message_id":"m2","content":[{"kind":"toolResult","data":{"toolUseId":"t1","content":[{"kind":"json","data":{"exit_status":"` + status + `","stdout":"","stderr":""}}],"status":"success"}}],"meta":{"timestamp":1790848802}}}` + "\n"
 	}
-	for status, want := range map[string]bool{"exit status: 1": false, "exit status: 0": true} {
+	for status, want := range map[string]bool{"exit status: 1": false, "exit status: 0": false} {
 		p := filepath.Join(t.TempDir(), "s.jsonl")
 		if err := os.WriteFile(p, []byte(call+result(status)), 0o644); err != nil {
 			t.Fatal(err)
@@ -205,7 +206,9 @@ func TestClineBatchStampsARepeatedCommandOncePerEntry(t *testing.T) {
 // A failed result that lands a pass after its call sends the file back for a
 // whole read in every appendable format whose reader now stamps the failure,
 // as kiro-cli's does above; a clean one, or a call and failure both in the
-// tail, does not (#4443).
+// tail, does not (#4443). Claude's, goose's, kiro-cli's and the pi family's
+// readers stamp exit 0 on a clean result too, so their clean answer to a
+// stored command is read whole as well (#5527).
 func TestAFailedResultForAStoredCallIsReadWithItsCall(t *testing.T) {
 	claudeCall := `{"type":"assistant","sessionId":"c1","timestamp":"2026-10-01T10:00:01Z","cwd":"/tmp/proj","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"go test ./..."}}]}}` + "\n"
 	claudeOut := func(failed bool) string {
@@ -237,11 +240,11 @@ func TestAFailedResultForAStoredCallIsReadWithItsCall(t *testing.T) {
 		want             bool
 	}{
 		{"claude", claudeCall, claudeOut(true), false},
-		{"claude", claudeCall, claudeOut(false), true},
+		{"claude", claudeCall, claudeOut(false), false},
 		{"claude", "", claudeCall + claudeOut(true), true},
 		{"cherrystudio", claudeCall, claudeOut(true), false},
 		{"goose-jsonl", gooseCall, gooseOut(true), false},
-		{"goose-jsonl", gooseCall, gooseOut(false), true},
+		{"goose-jsonl", gooseCall, gooseOut(false), false},
 		{"goose-jsonl", gooseCall, `{"role":"user","created":1790874402,"content":[{"type":"toolResponse","id":"c1","toolResult":{"status":"success","value":{"content":[{"type":"text","text":"FAIL"}],"structuredContent":{"exit_code":2}}}}]}` + "\n", false},
 		{"goose-jsonl", "", gooseCall + gooseOut(true), true},
 		// Command Code's failure is the "Exit code: N" line, with no is_error
@@ -251,7 +254,9 @@ func TestAFailedResultForAStoredCallIsReadWithItsCall(t *testing.T) {
 		{"commandcode", "", commandCodeCall + commandCodeResult("Exit code: 1\nFAIL"), true},
 		// A PowerShell run is the shell since #4523.
 		{"kimchi", piCall("c1", "powershell", `{"command":"go vet ./retry"}`) + "\n", piResult("c1", "powershell", "vet: unreachable\n\nCommand exited with code 1", `{}`, true) + "\n", false},
-		{"kimchi", piCall("c1", "powershell", `{"command":"go vet ./retry"}`) + "\n", piResult("c1", "powershell", "ok", `{}`, false) + "\n", true},
+		{"kimchi", piCall("c1", "powershell", `{"command":"go vet ./retry"}`) + "\n", piResult("c1", "powershell", "ok", `{}`, false) + "\n", false},
+		{"kimchi", piCall("c1", "read", `{"path":"retry.go"}`) + "\n", piResult("c1", "powershell", "ok", `{}`, false) + "\n", true},
+		{"goose-jsonl", "", `{"role":"user","created":1790874402,"content":[{"type":"toolResponse","id":"c9","toolResult":{"status":"success","value":{"content":[{"type":"text","text":"ok"}],"structuredContent":{"exit_code":0}}}}]}` + "\n", true},
 	} {
 		p := filepath.Join(t.TempDir(), "s.jsonl")
 		body := `{"type":"user","sessionId":"c1","timestamp":"2026-10-01T10:00:00Z","message":{"role":"user","content":"fix the retry loop"}}` + "\n" + c.head

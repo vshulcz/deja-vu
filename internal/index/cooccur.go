@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/query"
@@ -13,7 +15,8 @@ import (
 // lives next to "jwks" and "rotation". A compact neighbor map built at full
 // rebuild lets a zero-result query swap one token for a proven neighbor —
 // personal, deterministic, no models. The map regenerates on every full
-// rebuild and is intentionally left stale by incremental appends.
+// rebuild. A pass adds nothing to it, and takes out of it the words it took out
+// of the index (see dropCooccurWords).
 
 const (
 	cooccurFile        = "cooccur.gob"
@@ -46,6 +49,9 @@ func buildCooccur(tmp string, ss []model.Session) {
 		if v, ok := ids[t]; ok {
 			return v
 		}
+		// A copy: the token came out of a strings.Builder and carries its
+		// spare capacity, which would otherwise live as long as the map.
+		t = strings.Clone(t)
 		v := uint32(len(toks))
 		ids[t] = v
 		toks = append(toks, t)
@@ -54,11 +60,15 @@ func buildCooccur(tmp string, ss []model.Session) {
 	// Tokenising every message of every session is what this pass costs — 6.0 s
 	// of a build on a real store, and the only single-threaded thing left in
 	// the sidecar phase. Each session's distinct tokens are collected in
-	// parallel and interned afterwards in session order, so the ids, the
-	// document frequencies and everything downstream are what one core
-	// produced.
-	uniquePerSession := make([][]string, len(ss))
-	parallelForRanked(len(ss), func(i int) {
+	// parallel and interned in session order, so the ids, the document
+	// frequencies and everything downstream are what one core produced.
+	//
+	// A session's token strings are dropped as soon as they are interned, a
+	// few sessions per core behind the workers. Holding every session's list
+	// until all were tokenised was 1.4 GB of a 12k-session cold build's peak.
+	var df []int
+	perSession := make([][]uint32, 0, len(ss))
+	parallelInOrder(len(ss), 4*rerankWorkers(), func(i int) []string {
 		seen := make(map[string]bool, 256)
 		var out []string
 		for _, m := range ss[i].Messages {
@@ -73,11 +83,8 @@ func buildCooccur(tmp string, ss []model.Session) {
 				out = append(out, tok)
 			}
 		}
-		uniquePerSession[i] = out
-	})
-	var df []int
-	perSession := make([][]uint32, 0, len(ss))
-	for _, unique := range uniquePerSession {
+		return out
+	}, func(_ int, unique []string) {
 		list := make([]uint32, 0, len(unique))
 		for _, tok := range unique {
 			v := id(tok)
@@ -88,7 +95,7 @@ func buildCooccur(tmp string, ss []model.Session) {
 			df[v]++
 		}
 		perSession = append(perSession, list)
-	}
+	})
 	maxDF := len(ss) / 4
 	if maxDF < 8 {
 		maxDF = 8
@@ -184,6 +191,99 @@ func buildCooccur(tmp string, ss []model.Session) {
 		return
 	}
 	_ = writeGob(cooccurPath(tmp), neighbors)
+}
+
+// dropCooccurWords takes every word drop names out of dir's neighbour map,
+// as a word and as a neighbour, and a word left with no neighbours with it.
+//
+// Text taken out of a transcript leaves the index on the pass that replaced
+// it (#5429), and the map held its words until the next full build. The map is
+// read only when a pass has words to drop: it is bounded by the vocabulary of
+// at most cooccurMaxSessions sessions, 0.9 MB and 4 ms to read on a 214 MB
+// store, and a pass that kills nothing never opens it.
+func dropCooccurWords(dir string, drop func(word string) bool) error {
+	m := readCooccur(dir)
+	if m == nil {
+		return nil
+	}
+	return writeCooccurWithout(dir, m, drop)
+}
+
+// writeCooccurWithout writes m, dir's neighbour map, into dir without the
+// words drop names, if there are any.
+func writeCooccurWithout(dir string, m map[string][]string, drop func(word string) bool) error {
+	changed := false
+	for tok, ns := range m {
+		if drop(tok) {
+			delete(m, tok)
+			changed = true
+			continue
+		}
+		kept := ns[:0]
+		for _, n := range ns {
+			if drop(n) {
+				changed = true
+				continue
+			}
+			kept = append(kept, n)
+		}
+		if len(kept) == 0 {
+			delete(m, tok)
+			continue
+		}
+		m[tok] = kept
+	}
+	if !changed {
+		return nil
+	}
+	// An empty map rather than no file, which a reader holding it open on
+	// Windows would refuse to let go; a read of either finds no neighbours.
+	return writeGobAtomic(cooccurPath(dir), m)
+}
+
+// cooccurVocabulary is every word of m, as a word or a neighbour; nil unless
+// want.
+func cooccurVocabulary(m map[string][]string, want bool) map[string]bool {
+	if !want || m == nil {
+		return nil
+	}
+	out := make(map[string]bool, 2*len(m))
+	for tok, ns := range m {
+		out[tok] = true
+		for _, n := range ns {
+			out[n] = true
+		}
+	}
+	return out
+}
+
+// cooccurUnindexed is the words of dir's neighbour map that have no postings
+// in words, the postings of an index written anew. Each was taken out of the
+// index or was only ever in a part of a record the postings do not hold, a
+// file's body or a long output's middle, which no posting can confirm another
+// session still holds. nil when there is no map.
+func cooccurUnindexed(dir string, words bucketPostings) map[string]bool {
+	m := readCooccur(dir)
+	if m == nil {
+		return nil
+	}
+	out := map[string]bool{}
+	held := func(w string) bool {
+		k := "t" + w
+		_, ok := words[bucket(k)][k]
+		return ok
+	}
+	for tok, ns := range m {
+		if !held(tok) {
+			out[tok] = true
+		}
+		for _, n := range ns {
+			if !held(n) {
+				out[n] = true
+			}
+		}
+	}
+	return out
 }
 
 func readCooccur(dir string) map[string][]string {
@@ -421,39 +521,61 @@ func cooccurSearchOver(dir string, m Manifest, o query.Options, terms []string, 
 	if err != nil {
 		return SearchResult{}, err
 	}
+	// Each attempt swaps one word and keeps the others, so the others' postings
+	// are the same on every attempt. Reading them again per neighbour read the
+	// same buckets terms × neighbours times: 450 ms of a sentence's search
+	// (#5540). Each word is read once, and a swap can only match when every
+	// word it keeps holds postings, so a sentence with two words the store
+	// never saw has no swap to try at all.
+	swappable := false
+	for _, term := range terms {
+		for _, n := range neighbors[term] {
+			if catalog[n] {
+				swappable = true
+				break
+			}
+		}
+	}
+	if !swappable {
+		return SearchResult{}, nil
+	}
+	byTerm := make([][]posting, len(terms))
+	missing := -1
+	for j, t := range terms {
+		byTerm[j] = cooccurPostings(dir, m, t)
+		if len(byTerm[j]) > 0 {
+			continue
+		}
+		if missing >= 0 {
+			return SearchResult{}, nil
+		}
+		missing = j
+	}
 	for i, term := range terms {
+		if missing >= 0 && i != missing {
+			continue
+		}
+		kept, keptFrom := keptIntersection(byTerm, i)
+		if keptFrom >= 0 && len(kept) == 0 {
+			continue
+		}
 		for _, n := range neighbors[term] {
 			if !catalog[n] {
 				continue
 			}
-			perToken := make([]map[int64]posting, 0, len(terms))
+			swapped := cooccurPostings(dir, m, n)
+			if len(swapped) == 0 {
+				continue
+			}
 			variants := map[string][]string{}
-			ok := true
 			for j, other := range terms {
-				tok := other
-				if j == i {
-					tok = n
-				}
-				posts, perr := postingsFor(dir, "t"+tok)
-				if perr != nil || len(posts) == 0 {
-					ok = false
-					break
-				}
-				set := map[int64]posting{}
-				for _, p := range posts {
-					set[p.Off] = p
-				}
-				perToken = append(perToken, set)
 				if j == i {
 					variants[other] = []string{n}
 				} else {
 					variants[other] = []string{other}
 				}
 			}
-			if !ok {
-				continue
-			}
-			posts := intersectPostingMaps(perToken)
+			posts := withSwapped(kept, keptFrom, i, swapped)
 			if len(posts) == 0 {
 				continue
 			}
@@ -498,4 +620,164 @@ func cooccurSearchOver(dir string, m Manifest, o query.Options, terms []string, 
 		return SearchResult{}, nil
 	}
 	return SearchResult{Sessions: found, Stemmed: true, Neighbour: true, Variants: gathered, Tier: query.TierClose}, nil
+}
+
+// parallelInOrder runs produce for 0..n-1 on every core and hands each result
+// to consume on the calling goroutine in index order. No more than window
+// results are produced and not yet consumed, so what the results hold is
+// bounded by the window rather than by n.
+func parallelInOrder[T any](n, window int, produce func(i int) T, consume func(i int, v T)) {
+	workers := rerankWorkers()
+	if workers > n {
+		workers = n
+	}
+	if workers < 2 || n < 4 {
+		for i := range n {
+			consume(i, produce(i))
+		}
+		return
+	}
+	if window < workers {
+		window = workers
+	}
+	// A worker takes a slot before it takes an index, and the consumer gives
+	// the slot back once that index is consumed. Indices are taken in order, so
+	// every one taken and not consumed lies in [consumed, consumed+window) and
+	// slot i%window is free when i lands in it.
+	free := make(chan struct{}, window)
+	for range window {
+		free <- struct{}{}
+	}
+	slots := make([]chan T, window)
+	for i := range slots {
+		slots[i] = make(chan T, 1)
+	}
+	var next atomic.Int64
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(workers)
+	for range workers {
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-free:
+				case <-stop:
+					return
+				}
+				i := int(next.Add(1)) - 1
+				if i >= n {
+					return
+				}
+				slots[i%window] <- produce(i)
+			}
+		}()
+	}
+	for i := range n {
+		v := <-slots[i%window]
+		consume(i, v)
+		free <- struct{}{}
+	}
+	close(stop)
+	wg.Wait()
+}
+
+// cooccurPostings is one word's postings for the swap rung, each record once
+// and in record order. A failed read is no postings, as it always was here.
+func cooccurPostings(dir string, m Manifest, tok string) []posting {
+	p, ok := bucketPath(dir, "t"+tok)
+	if !ok {
+		return nil
+	}
+	posts, err := readBucketToken(p, "t"+tok, m.DeadRecords)
+	if err != nil || len(posts) == 0 {
+		return nil
+	}
+	return uniqueByOffset(posts)
+}
+
+// uniqueByOffset is posts in record order, one posting per record. A token's
+// postings come back that way already and are returned as they are; anything
+// else is sorted with the last posting of a record kept, which is what keying
+// a map by offset kept.
+func uniqueByOffset(posts []posting) []posting {
+	if strictlyByOffset(posts) {
+		return posts
+	}
+	out := append([]posting(nil), posts...)
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Off < out[j].Off })
+	n := 0
+	for k := range out {
+		if n > 0 && out[n-1].Off == out[k].Off {
+			out[n-1] = out[k]
+			continue
+		}
+		out[n] = out[k]
+		n++
+	}
+	return out[:n]
+}
+
+func strictlyByOffset(posts []posting) bool {
+	for i := 1; i < len(posts); i++ {
+		if posts[i].Off <= posts[i-1].Off {
+			return false
+		}
+	}
+	return true
+}
+
+// keptIntersection is the records every word but the swapped one holds, and
+// the position of the first kept word, whose postings the result carries; -1
+// when no word is kept.
+func keptIntersection(byTerm [][]posting, swapped int) ([]posting, int) {
+	var out []posting
+	from := -1
+	for j, posts := range byTerm {
+		if j == swapped {
+			continue
+		}
+		if from < 0 {
+			out, from = posts, j
+			continue
+		}
+		out = intersectSortedPostings(out, posts)
+		if len(out) == 0 {
+			break
+		}
+	}
+	return out, from
+}
+
+// withSwapped is the records the kept words and the swapped-in word all hold,
+// carrying the postings of the first word of the query, as the map
+// intersection did.
+func withSwapped(kept []posting, keptFrom, swappedAt int, swapped []posting) []posting {
+	switch {
+	case keptFrom < 0:
+		return swapped
+	case swappedAt < keptFrom:
+		return intersectSortedPostings(swapped, kept)
+	default:
+		return intersectSortedPostings(kept, swapped)
+	}
+}
+
+// intersectSortedPostings is the records both lists hold, with a's postings.
+// Both are sorted by record with one posting per record.
+func intersectSortedPostings(a, b []posting) []posting {
+	var out []posting
+	for i, j := 0, 0; i < len(a) && j < len(b); {
+		switch {
+		case a[i].Off < b[j].Off:
+			i++
+		case a[i].Off > b[j].Off:
+			j++
+		default:
+			out = append(out, a[i])
+			i++
+			j++
+		}
+	}
+	return out
 }

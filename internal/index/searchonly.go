@@ -68,6 +68,14 @@ func searchOnlyFor(dir string) bool {
 	return SearchOnly()
 }
 
+// searchOnlyAfter is searchOnlyFor for a pass that holds the manifest on disk.
+func searchOnlyAfter(old Manifest) bool {
+	if settingBuilds.Load() > 0 {
+		return SearchOnly()
+	}
+	return old.SearchOnly
+}
+
 // miningChanged reports a `deja index` asked for the other setting than the
 // index was built under. Turning it on drops the tables and turning it off
 // mines them from every session, and only a full pass does either.

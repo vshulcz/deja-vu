@@ -130,7 +130,7 @@ func parseKiroDBWhere(db, where string) ([]model.Session, error) {
 			}
 			// No rows can be an empty table or a schema sqlite3 refused, and
 			// only the second is worth saying.
-			return nil, fmt.Errorf("kiro: query failed, the store schema may have changed: %w", err)
+			return nil, schemaChanged("kiro", err)
 		}
 		return nil, err
 	}
