@@ -1,6 +1,8 @@
 package index
 
 import (
+	"fmt"
+	"io/fs"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -59,8 +61,29 @@ func TestMain(m *testing.M) {
 	// walk of the whole log.
 	checkKeyedCarry = true
 	code := m.Run()
+	// setHome gives each test its own config directory. Anything here was
+	// written by a test that skipped it, and is in every later test's way.
+	// root/.config is where it goes for a test that blanks XDG_CONFIG_HOME
+	// without a home of its own.
+	leaked := append(sharedConfigFiles(filepath.Join(root, "config")), sharedConfigFiles(filepath.Join(root, ".config", "deja"))...)
+	if len(leaked) > 0 && code == 0 {
+		fmt.Fprintf(os.Stderr, "a test wrote deja config to the directory the package shares (give it setHome): %v\n", leaked)
+		code = 1
+	}
 	_ = os.RemoveAll(root)
 	os.Exit(code)
+}
+
+func sharedConfigFiles(dir string) []string {
+	var files []string
+	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			rel, _ := filepath.Rel(dir, path)
+			files = append(files, rel)
+		}
+		return nil
+	})
+	return files
 }
 
 func TestGrokIndexGrowthRenameAndRewind(t *testing.T) {
