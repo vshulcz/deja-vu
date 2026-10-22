@@ -33,7 +33,7 @@ func threeWordStore(t *testing.T) (*twoWayEnv, string) {
 // zeroRecordContaining zeroes the whole frame (header + payload) of the first
 // record whose text contains word: the hole a crash on a writeback filesystem
 // leaves. File length is unchanged, so the manifest size check passes.
-func zeroRecordContaining(t *testing.T, dir, word string) {
+func zeroRecordContaining(t *testing.T, dir, word string) { //nolint:unparam // the call names the record it tears
 	t.Helper()
 	recs, err := ReadRecords(dir)
 	if err != nil {
@@ -392,7 +392,7 @@ func TestASessionAheadOfTheClockDoesNotFreezeTheStoreMark(t *testing.T) {
 	t.Setenv("DEJA_OPENCODE_DB", db)
 	run := func(sql string) {
 		t.Helper()
-		if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
+		if out, err := exec.CommandContext(t.Context(), "sqlite3", db, sql).CombinedOutput(); err != nil {
 			t.Fatalf("sqlite3: %v %s", err, out)
 		}
 	}

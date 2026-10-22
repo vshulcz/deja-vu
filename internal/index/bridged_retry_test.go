@@ -18,7 +18,7 @@ func bridgedStore(t *testing.T) string {
 	t.Helper()
 	tmp := hermeticIndexEnv(t)
 	dir := filepath.Join(tmp, "idx")
-	var sessions []model.Session
+	sessions := make([]model.Session, 0, 84)
 	for i := range 80 {
 		sessions = append(sessions, model.Session{
 			ID: fmt.Sprintf("filler%02d", i), Harness: "claude", Project: "p", Updated: time.Now(),

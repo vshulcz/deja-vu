@@ -26,7 +26,7 @@ func TestIncrementalUpdateRedactsWhatItMines(t *testing.T) {
 	}
 	t.Setenv("DEJA_CLAUDE_ROOT", claude)
 
-	const secret = "sk-live-ZZTOPSECRET1234567890abcd"
+	const secret = "sk-live-ZZTOPSECRET1234567890abcd" //nolint:gosec // a fake secret the redaction test plants
 	plain := func(name, ts string) {
 		body := `{"type":"user","sessionId":"` + name + `","cwd":"/w","timestamp":"` + ts + `","message":{"role":"user","content":"ordinary work"}}
 {"type":"assistant","sessionId":"` + name + `","cwd":"/w","timestamp":"` + ts + `","message":{"role":"assistant","content":"nothing special"}}
@@ -100,11 +100,11 @@ func filesHolding(t *testing.T, dir, want string) []string {
 	var out []string
 	err := filepath.Walk(dir, func(p string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
-			return nil
+			return nil //nolint:nilerr // best-effort walk
 		}
-		b, err := os.ReadFile(p)
+		b, err := os.ReadFile(p) //nolint:gosec // walks the test's own temp dir
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // best-effort walk
 		}
 		if strings.Contains(string(b), want) {
 			out = append(out, filepath.Base(p))

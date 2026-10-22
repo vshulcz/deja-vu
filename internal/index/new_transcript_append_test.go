@@ -44,7 +44,7 @@ func TestANewTranscriptIsAppendedNotRewritten(t *testing.T) {
 	write(t, filepath.Join(claude, "p", "second.jsonl"),
 		claudeLine("s-second", "2026-01-02T05:00:00Z", "the billing webhook retries twice"))
 	var progress bytes.Buffer
-	if err := Ensure(dir, "", false, &progress); err != nil {
+	if err = Ensure(dir, "", false, &progress); err != nil {
 		t.Fatal(err)
 	}
 	if got := progress.String(); !strings.Contains(got, "updated 1 file") {
@@ -104,7 +104,7 @@ func TestANewFileOfAKindThatCannotResumeIsAppendedWhole(t *testing.T) {
 	write(t, gemini, `{"sessionId":"g-new","startTime":"2026-01-03T00:00:00Z","messages":`+
 		`[{"type":"user","content":"the invoice job hammers the billing API"}]}`)
 	var progress bytes.Buffer
-	if err := Ensure(dir, "", false, &progress); err != nil {
+	if err = Ensure(dir, "", false, &progress); err != nil {
 		t.Fatal(err)
 	}
 	if got := progress.String(); !strings.Contains(got, "updated 1 file") {

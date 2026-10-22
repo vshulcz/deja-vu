@@ -37,6 +37,7 @@ import (
 // TestVerdict is what a run's own output said about it.
 type TestVerdict string
 
+// The verdicts a run's output can give.
 const (
 	TestPassed    TestVerdict = "passed"
 	TestFailed    TestVerdict = "failed"
@@ -144,7 +145,7 @@ func ScanTestHistory(dir string) (TestHistory, error) {
 		case TestPassed:
 			out.Passed++
 			b.Passed++
-		default:
+		case TestNoVerdict:
 			out.NoVerdict++
 			b.NoVerdict++
 		}

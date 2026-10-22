@@ -12,7 +12,7 @@ import (
 // answer on a real store. Spreading work changes nothing about the answer only
 // if the order it comes back in is the same, so both paths are run.
 func TestRankingIsTheSameOnOneCoreAndMany(t *testing.T) {
-	var ss []model.Session
+	ss := make([]model.Session, 0, 24)
 	for i := range 24 {
 		msgs := []model.Message{
 			{Role: "user", Text: fmt.Sprintf("session %d asks about the retry budget", i)},

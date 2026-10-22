@@ -280,7 +280,7 @@ func heldRecords(dir string, m Manifest) func(asker, other SessionMeta) bool {
 }
 
 // endedBy reports whether src's last turn came no later than at, so a fork
-// that started at at was made after everything src holds. A fork read with no
+// that started at that moment was made after everything src holds. A fork read with no
 // times says nothing either way, and its source is left out as it always was;
 // a read that fails answers no.
 func endedBy(dir string, m Manifest, src SessionMeta, at time.Time) bool {

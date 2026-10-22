@@ -547,8 +547,8 @@ func frictionHashes(ms []model.Message) []uint64 {
 		if m.Role != roleToolOutput {
 			continue
 		}
-		for line := range strings.SplitSeq(m.Text, "\n") {
-			line, ok := FrictionLine(line)
+		for raw := range strings.SplitSeq(m.Text, "\n") {
+			line, ok := FrictionLine(raw)
 			if !ok {
 				continue
 			}
@@ -773,8 +773,8 @@ func frictionTexts(rd *frictionReader, metas []SessionMeta, want map[uint64]stri
 			continue
 		}
 		for _, text := range outputs {
-			for line := range strings.SplitSeq(text, "\n") {
-				line, ok := FrictionLine(line)
+			for raw := range strings.SplitSeq(text, "\n") {
+				line, ok := FrictionLine(raw)
 				if !ok {
 					continue
 				}

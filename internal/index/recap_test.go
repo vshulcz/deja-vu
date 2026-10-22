@@ -94,8 +94,8 @@ func TestALongLineIsCutAtASentence(t *testing.T) {
 func TestOneConclusionStatedTwiceIsOneLine(t *testing.T) {
 	dir := t.TempDir() + "/index.db"
 	at := time.Now().Add(-2 * time.Hour)
-	say := func(text string, min int) model.Message {
-		return model.Message{Role: "assistant", Text: text, Time: at.Add(time.Duration(min) * time.Minute)}
+	say := func(text string, minute int) model.Message {
+		return model.Message{Role: "assistant", Text: text, Time: at.Add(time.Duration(minute) * time.Minute)}
 	}
 	writeStore(t, dir, []model.Session{{
 		ID: "s1", Harness: "claude", Project: "work/app", Path: "/tmp/s1.jsonl", Updated: at,

@@ -41,7 +41,7 @@ func TestAForgottenNoteStaysGoneWhenAPeerSendsTheirOwnBucket(t *testing.T) {
 	if local == "" {
 		t.Fatal("the note did not land in a day bucket")
 	}
-	if _, err := Forget(dir, ForgetOptions{Session: "deja:" + local}); err != nil {
+	if _, err = Forget(dir, ForgetOptions{Session: "deja:" + local}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -53,7 +53,7 @@ func TestAForgottenNoteStaysGoneWhenAPeerSendsTheirOwnBucket(t *testing.T) {
 		peer = "deja-2026-08-04-x29"
 	}
 	exp := filepath.Join(tmp, "transfer")
-	if err := os.MkdirAll(exp, 0o755); err != nil {
+	if err = os.MkdirAll(exp, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	b, err := json.Marshal(SyncRecord{Harness: "deja", SessionID: peer,
@@ -61,7 +61,7 @@ func TestAForgottenNoteStaysGoneWhenAPeerSendsTheirOwnBucket(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(exp, "deja-sync.jsonl"), append(b, '\n'), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(exp, "deja-sync.jsonl"), append(b, '\n'), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	n, err := Import(dir, exp)

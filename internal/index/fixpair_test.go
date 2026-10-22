@@ -49,7 +49,7 @@ func TestFixPairsDropACommandTheErrorSurvived(t *testing.T) {
 // that way.
 func TestFixPairsDropACommandTheErrorOutlivedLater(t *testing.T) {
 	now := time.Now()
-	ms := []model.Message{
+	ms := []model.Message{ //nolint:prealloc // a fixture literal the loop below grows
 		{Role: "tool-output", Text: "zsh:1: command not found: timeout", Time: now},
 		{Role: "command", Text: "brew install coreutils for timeout", Time: now.Add(time.Minute)},
 	}
@@ -71,7 +71,7 @@ func TestFixPairsDropACommandTheErrorOutlivedLater(t *testing.T) {
 // table for any session that hit more than one thing.
 func TestFixPairsKeepACommandADifferentErrorFollowed(t *testing.T) {
 	now := time.Now()
-	ms := []model.Message{
+	ms := []model.Message{ //nolint:prealloc // a fixture literal the loop below grows
 		{Role: "tool-output", Text: "zsh:1: command not found: timeout", Time: now},
 		{Role: "command", Text: "curl --max-time 5 example.internal", Time: now.Add(time.Minute)},
 	}
@@ -201,7 +201,7 @@ func TestBuildFixesDropsTheUnrelatedNextCommand(t *testing.T) {
 // through the same path almost everyone builds their first index on.
 func TestFixPairsAreRedactedLikeTheRecordLog(t *testing.T) {
 	dir := t.TempDir()
-	secret := "AKIAIOSFODNN7EXAMPLE"
+	secret := "AKIAIOSFODNN7EXAMPLE" //nolint:gosec // a fake secret the redaction test plants
 	// Two sessions with the same error and remedy, so the pair survives on
 	// corroboration alone — the point here is redaction, not the match rule.
 	session := func(id string) model.Session {

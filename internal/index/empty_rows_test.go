@@ -37,7 +37,7 @@ insert into sessions values ('20260101_120000','n','pgbouncer pool','/tmp/app','
 insert into messages values (1,'20260101_120000','user','[{"type":"text","text":"<deja-recall>\nRecalled history from prior sessions\n- x\n</deja-recall>"}]',1767268800);
 insert into sessions values ('20260102_120000','n','kafka lag','/tmp/app2','2026-01-02 12:00:00','2026-01-02 12:05:00');
 insert into messages values (2,'20260102_120000','user','[{"type":"text","text":"<deja-recall>\nRecalled history from prior sessions\n- y\n</deja-recall>"}]',1767355200);`
-	if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, sql).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3: %v %s", err, out)
 	}
 	other := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "p", "other.jsonl")
@@ -162,7 +162,7 @@ insert into sessions values ('s1','n','pgbouncer pool','/tmp/secretproj','2026-0
 insert into messages values (1,'s1','user','[{"type":"text","text":"why does pgbouncer time out"}]',1767268800);
 insert into sessions values ('s2','n','acquisition of rivalco','/tmp/secretproj','2026-01-02 12:00:00','2026-01-02 12:05:00');
 insert into messages values (2,'s2','user','[{"type":"text","text":"<deja-recall>\nRecalled history from prior sessions\n- y\n</deja-recall>"}]',1767355200);`
-	if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, sql).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3: %v %s", err, out)
 	}
 	dir := filepath.Join(tmp, "idx")

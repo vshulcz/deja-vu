@@ -73,7 +73,7 @@ func TestPartOfWordStepReadsTheCatalogsDirectories(t *testing.T) {
 	}
 	// The same answer as reading every directory off disk.
 	idx, _ := tokenIndexCached(dir)
-	var paths []bucketDir
+	paths := make([]bucketDir, 0, len(idx.dirs))
 	for _, d := range idx.dirs {
 		paths = append(paths, bucketDir{path: d.path})
 	}
@@ -109,7 +109,7 @@ func TestOneLongSessionLoadsThroughTheTable(t *testing.T) {
 	if atomic.LoadInt64(&recordOffsetReads) == before {
 		t.Error("one long session walked the whole log instead of reading its own records")
 	}
-	var got []string
+	got := make([]string, 0, len(s.Messages))
 	for _, m := range s.Messages {
 		got = append(got, m.Role+"|"+m.Text)
 	}
@@ -145,7 +145,7 @@ func TestDamerauRunesStopsOnlyPastTheLimit(t *testing.T) {
 		return d[len(a)][len(b)]
 	}
 	alphabet := []rune("абвгдеж")
-	rng := rand.New(rand.NewSource(5378))
+	rng := rand.New(rand.NewSource(5378)) //nolint:gosec // a seeded fixture, not crypto
 	word := func() []rune {
 		w := make([]rune, 1+rng.Intn(12))
 		for i := range w {

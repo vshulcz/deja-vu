@@ -97,7 +97,7 @@ func TestEnsureForSearchNoWait(t *testing.T) {
 	}
 	_ = os.Remove(dir + ".lock")
 	locked := filepath.Dir(dir)
-	if err := os.Chmod(locked, 0o555); err != nil {
+	if err = os.Chmod(locked, 0o555); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })

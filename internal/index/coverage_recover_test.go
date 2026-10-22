@@ -186,11 +186,11 @@ func TestCodexDualSourceDuplicateMergeBranches(t *testing.T) {
 
 	dir2 := filepath.Join(tmp, "writesessions-idx")
 	tmp2 := dir2 + ".tmp"
-	if err := os.MkdirAll(filepath.Join(tmp2, "buckets"), 0o755); err != nil {
+	if err = os.MkdirAll(filepath.Join(tmp2, "buckets"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	sessLoad := loadProgress("codex", nil)
-	if err := writeSessionsWithSync(tmp2, dir2, sessLoad, currentFiles("codex"), "", importedState{}); err != nil {
+	if err = writeSessionsWithSync(tmp2, dir2, sessLoad, currentFiles("codex"), "", importedState{}); err != nil {
 		t.Fatal(err)
 	}
 	ss2, err := Search(dir2, search.Options{Query: "dupneedle", All: true})
@@ -258,7 +258,7 @@ func TestUpdateIndexSyncImportSkipAndCorruptAppendRebuild(t *testing.T) {
 	// Manually mark the virtual import path as tracked so updateIndex's
 	// removed-file scan walks over it.
 	m.Files[syncImportPath] = FileState{Path: syncImportPath}
-	if err := writeManifest(dir, m); err != nil {
+	if err = writeManifest(dir, m); err != nil {
 		t.Fatal(err)
 	}
 	// Append a second line so the append-eligible path runs and old.Files
@@ -267,15 +267,15 @@ func TestUpdateIndexSyncImportSkipAndCorruptAppendRebuild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.WriteString(claudeLine("s1", "2026-01-02T03:05:05Z", "syncskip needle two")); err != nil {
+	if _, err = f.WriteString(claudeLine("s1", "2026-01-02T03:05:05Z", "syncskip needle two")); err != nil {
 		t.Fatal(err)
 	}
-	f.Close()
-	if err := Ensure(dir, "", false, nil); err != nil {
+	_ = f.Close()
+	if err = Ensure(dir, "", false, nil); err != nil {
 		t.Fatalf("update with virtual import path in Files: %v", err)
 	}
-	if ss, err := Search(dir, search.Options{Query: "syncskip needle two", All: true}); err != nil || len(ss) == 0 {
-		t.Fatalf("appended message missing: %#v err=%v", ss, err)
+	if ss, searchErr := Search(dir, search.Options{Query: "syncskip needle two", All: true}); searchErr != nil || len(ss) == 0 {
+		t.Fatalf("appended message missing: %#v err=%v", ss, searchErr)
 	}
 
 	// Corrupt-bucket-during-append case: precreate a garbage bucket file for
@@ -284,12 +284,12 @@ func TestUpdateIndexSyncImportSkipAndCorruptAppendRebuild(t *testing.T) {
 	dir2 := filepath.Join(tmp, "idx2")
 	file2 := filepath.Join(claudeRoot, "p2", "s2.jsonl")
 	write(t, file2, claudeLine("s2", "2026-01-02T03:04:05Z", "corruptbucket base"))
-	if err := Ensure(dir2, "", false, nil); err != nil {
+	if err = Ensure(dir2, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	tok := "zzcorruptcollision"
 	bpath := filepath.Join(dir2, "buckets", bucket("t"+tok)+".bin")
-	if err := os.WriteFile(bpath, []byte("garbage"), 0o644); err != nil {
+	if err = os.WriteFile(bpath, []byte("garbage"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	f2, err := os.OpenFile(file2, os.O_APPEND|os.O_WRONLY, 0o644)
@@ -299,7 +299,7 @@ func TestUpdateIndexSyncImportSkipAndCorruptAppendRebuild(t *testing.T) {
 	if _, err := f2.WriteString(claudeLine("s2", "2026-01-02T03:05:05Z", tok)); err != nil {
 		t.Fatal(err)
 	}
-	f2.Close()
+	_ = f2.Close()
 	if err := Ensure(dir2, "", false, nil); err != nil {
 		t.Fatalf("append with corrupt bucket must self-heal via rebuild, got err=%v", err)
 	}
@@ -335,10 +335,10 @@ func TestUpdateIndexAppendNonCorruptErrorWrapped(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.WriteString(claudeLine("s1", "2026-01-02T03:05:05Z", tok)); err != nil {
+	if _, err = f.WriteString(claudeLine("s1", "2026-01-02T03:05:05Z", tok)); err != nil {
 		t.Fatal(err)
 	}
-	f.Close()
+	_ = f.Close()
 	err = Ensure(dir, "", false, nil)
 	if err == nil {
 		t.Fatal("Ensure with unreadable bucket file returned nil error")

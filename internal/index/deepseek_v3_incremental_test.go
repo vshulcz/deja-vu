@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -75,8 +76,8 @@ func TestDeepSeekV3LogReachesTheIncrementalIndex(t *testing.T) {
 	}
 	assertFound("shardneedle")
 
-	grown := append(v3, []byte(`{"type":"user/message","seq":30,"time":1787420264580,"data":{"content":[{"type":"text","text":"growthneedle and after a reshard"}],"source":{"kind":"user"},"role":"user"}}
-`)...)
+	grown := slices.Concat(v3, []byte(`{"type":"user/message","seq":30,"time":1787420264580,"data":{"content":[{"type":"text","text":"growthneedle and after a reshard"}],"source":{"kind":"user"},"role":"user"}}
+`))
 	if err := os.WriteFile(path, grown, 0o644); err != nil {
 		t.Fatal(err)
 	}

@@ -15,7 +15,7 @@ import (
 // record on the store first, 13 s on 4050 sessions (#5370).
 func TestCloseTierWithNoCandidateLeftReadsNoRecordLog(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "index.db")
-	ss := []model.Session{{
+	ss := []model.Session{{ //nolint:prealloc // a fixture literal the loop below grows
 		Harness: "claude", ID: "elsewhere", Project: "other",
 		Messages: []model.Message{{Role: "user", Text: "the reverseproxy bridge between services kept retrying"}},
 	}, {
@@ -46,7 +46,7 @@ func TestCloseTierWithNoCandidateLeftReadsNoRecordLog(t *testing.T) {
 		t.Errorf("the recall read %d records of the whole log after the filter left no candidate", read)
 	}
 	if len(res.Sessions) == 0 || res.Sessions[0].ID != "here" {
-		ids := []string{}
+		ids := make([]string, 0, len(res.Sessions))
 		for _, s := range res.Sessions {
 			ids = append(ids, s.ID)
 		}

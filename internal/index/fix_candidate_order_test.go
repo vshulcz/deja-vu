@@ -42,7 +42,7 @@ func TestASightingIsServedWhenNothingIsConfirmed(t *testing.T) {
 	}
 }
 
-func mustFriction(t *testing.T, line string) string {
+func mustFriction(t *testing.T, line string) string { //nolint:unparam // the call names the line it classifies
 	t.Helper()
 	l, ok := FrictionLine(line)
 	if !ok {

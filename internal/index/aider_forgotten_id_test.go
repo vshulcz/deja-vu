@@ -1,7 +1,7 @@
 package index
 
 import (
-	"crypto/sha1"
+	"crypto/sha1" //nolint:gosec // a short id, not a security hash
 	"encoding/hex"
 	"os"
 	"path/filepath"
@@ -40,7 +40,7 @@ func TestAForgottenAiderSessionStaysForgottenUnderItsNewID(t *testing.T) {
 	t.Setenv("DEJA_ANTIGRAVITY_ROOT", filepath.Join(tmp, "no-antigravity"))
 	t.Setenv("AIDER_CHAT_HISTORY_FILE", "")
 	t.Setenv("DEJA_AIDER_ROOTS", root)
-	h := sha1.Sum([]byte(hist))
+	h := sha1.Sum([]byte(hist)) //nolint:gosec // a short id, not a security hash
 	legacy := "aider:aider-" + hex.EncodeToString(h[:6]) + "-2"
 	if err := writeTombstones(map[string]bool{legacy: true}); err != nil {
 		t.Fatal(err)

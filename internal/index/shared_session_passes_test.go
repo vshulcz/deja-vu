@@ -29,12 +29,17 @@ func TestPassesOverFilesSharingASessionMatchRebuild(t *testing.T) {
 			name: "grown, then the other rewritten",
 			id:   "s-x",
 			passes: []step{
-				func(t *testing.T, a, b, c string) {
+				func(t *testing.T, a, b, _ string) {
+					t.Helper()
 					write(t, a, claudeLine("s-x", t0, "alpha one"))
 					write(t, b, claudeLine("s-x", t0, "alpha one")+claudeLine("s-x", t1, "beta cache"))
 				},
-				func(t *testing.T, a, b, c string) { appendTo(t, a, claudeLine("s-x", t2, "alpha three")) },
-				func(t *testing.T, a, b, c string) {
+				func(t *testing.T, a, _, _ string) {
+					t.Helper()
+					appendTo(t, a, claudeLine("s-x", t2, "alpha three"))
+				},
+				func(t *testing.T, _, b, _ string) {
+					t.Helper()
 					write(t, b, claudeLine("s-x", t0, "alpha one")+claudeLine("s-x", t1, "beta queue"))
 					bumpMTime(t, b)
 				},
@@ -44,13 +49,18 @@ func TestPassesOverFilesSharingASessionMatchRebuild(t *testing.T) {
 			name: "grown, then a torn line finished",
 			id:   "s-x",
 			passes: []step{
-				func(t *testing.T, a, b, c string) {
+				func(t *testing.T, a, b, _ string) {
+					t.Helper()
 					write(t, a, claudeLine("s-x", t0, "alpha one"))
 					line := claudeLine("s-x", t1, "beta cache")
 					write(t, b, claudeLine("s-x", t0, "alpha one")+line[:len(line)-10])
 				},
-				func(t *testing.T, a, b, c string) { appendTo(t, a, claudeLine("s-x", t2, "alpha three")) },
-				func(t *testing.T, a, b, c string) {
+				func(t *testing.T, a, _, _ string) {
+					t.Helper()
+					appendTo(t, a, claudeLine("s-x", t2, "alpha three"))
+				},
+				func(t *testing.T, _, b, _ string) {
+					t.Helper()
 					write(t, b, claudeLine("s-x", t0, "alpha one")+claudeLine("s-x", t1, "beta cache"))
 					bumpMTime(t, b)
 				},
@@ -60,14 +70,17 @@ func TestPassesOverFilesSharingASessionMatchRebuild(t *testing.T) {
 			name: "new copy, then the original rewritten",
 			id:   "s-b",
 			passes: []step{
-				func(t *testing.T, a, b, c string) {
+				func(t *testing.T, a, b, _ string) {
+					t.Helper()
 					write(t, a, claudeLine("s-a", t0, "alpha one"))
 					write(t, b, claudeLine("s-b", t0, "bravo two"))
 				},
-				func(t *testing.T, a, b, c string) {
+				func(t *testing.T, _, _, c string) {
+					t.Helper()
 					write(t, c, claudeLine("s-b", t0, "bravo two")+claudeLine("s-b", t2, "charlie four"))
 				},
-				func(t *testing.T, a, b, c string) {
+				func(t *testing.T, _, b, _ string) {
+					t.Helper()
 					write(t, b, claudeLine("s-b", t0, "bravo too"))
 					bumpMTime(t, b)
 				},
@@ -79,11 +92,16 @@ func TestPassesOverFilesSharingASessionMatchRebuild(t *testing.T) {
 			name: "the file a shared turn was filed under drops it",
 			id:   "s-x",
 			passes: []step{
-				func(t *testing.T, a, b, c string) {
+				func(t *testing.T, _, b, _ string) {
+					t.Helper()
 					write(t, b, claudeLine("s-x", t0, "alpha one")+claudeLine("s-x", t1, "beta cache"))
 				},
-				func(t *testing.T, a, b, c string) { write(t, a, claudeLine("s-x", t0, "alpha one")) },
-				func(t *testing.T, a, b, c string) {
+				func(t *testing.T, a, _, _ string) {
+					t.Helper()
+					write(t, a, claudeLine("s-x", t0, "alpha one"))
+				},
+				func(t *testing.T, _, b, _ string) {
+					t.Helper()
 					write(t, b, claudeLine("s-x", t1, "beta queue"))
 					bumpMTime(t, b)
 				},
@@ -95,14 +113,17 @@ func TestPassesOverFilesSharingASessionMatchRebuild(t *testing.T) {
 			name: "owner unchanged, two others change",
 			id:   "s-x",
 			passes: []step{
-				func(t *testing.T, a, b, c string) {
+				func(t *testing.T, a, _, _ string) {
+					t.Helper()
 					write(t, a, claudeLine("s-x", t0, "alpha one"))
 				},
-				func(t *testing.T, a, b, c string) {
+				func(t *testing.T, _, b, c string) {
+					t.Helper()
 					write(t, b, claudeLine("s-x", t0, "alpha one")+claudeLine("s-x", t1, "beta cache"))
 					write(t, c, claudeLine("s-x", t1, "beta cache")+claudeLine("s-x", t2, "charlie four"))
 				},
-				func(t *testing.T, a, b, c string) {
+				func(t *testing.T, _, b, c string) {
+					t.Helper()
 					// beta cache is filed under b, which sorts first.
 					appendTo(t, b, claudeLine("s-x", t3, "delta five"))
 					write(t, c, claudeLine("s-x", t1, "beta cache")+claudeLine("s-x", t3, "charlie queue"))
@@ -117,11 +138,13 @@ func TestPassesOverFilesSharingASessionMatchRebuild(t *testing.T) {
 			id:   "s-b",
 			passes: []step{
 				func(t *testing.T, a, b, c string) {
+					t.Helper()
 					write(t, a, claudeLine("s-a", t0, "alpha one"))
 					write(t, b, claudeLine("s-b", t0, "bravo two")+claudeLine("s-b", t1, "bravo cache"))
 					write(t, c, claudeLine("s-b", t0, "bravo two"))
 				},
-				func(t *testing.T, a, b, c string) {
+				func(t *testing.T, _, b, c string) {
+					t.Helper()
 					appendTo(t, c, claudeLine("s-b", t2, "charlie three"))
 					write(t, b, claudeLine("s-b", t0, "bravo two")+claudeLine("s-b", t1, "bravo queue"))
 					bumpMTime(t, b)
@@ -134,14 +157,17 @@ func TestPassesOverFilesSharingASessionMatchRebuild(t *testing.T) {
 			id:   "s-b",
 			passes: []step{
 				func(t *testing.T, a, b, c string) {
+					t.Helper()
 					write(t, a, claudeLine("s-a", t0, "alpha one"))
 					write(t, b, claudeLine("s-b", t0, "bravo two")+claudeLine("s-b", t1, "bravo cache"))
 					write(t, c, claudeLine("s-b", t0, "bravo two"))
 				},
-				func(t *testing.T, a, b, c string) {
+				func(t *testing.T, _, _, c string) {
+					t.Helper()
 					appendTo(t, c, claudeLine("s-b", t1, "bravo cache")+claudeLine("s-b", t2, "charlie three"))
 				},
-				func(t *testing.T, a, b, c string) {
+				func(t *testing.T, _, b, _ string) {
+					t.Helper()
 					write(t, b, claudeLine("s-b", t2, "bravo queue"))
 					bumpMTime(t, b)
 				},
@@ -156,9 +182,18 @@ func TestPassesOverFilesSharingASessionMatchRebuild(t *testing.T) {
 			id:   "s-b",
 			also: "s-a",
 			passes: []step{
-				func(t *testing.T, a, b, c string) { write(t, a, claudeLine("s-a", t0, "alpha one")) },
-				func(t *testing.T, a, b, c string) { appendTo(t, a, claudeLine("s-b", t2, "bravo two")) },
-				func(t *testing.T, a, b, c string) { appendTo(t, a, claudeLine("s-b", t3, "charlie three")) },
+				func(t *testing.T, a, _, _ string) {
+					t.Helper()
+					write(t, a, claudeLine("s-a", t0, "alpha one"))
+				},
+				func(t *testing.T, a, _, _ string) {
+					t.Helper()
+					appendTo(t, a, claudeLine("s-b", t2, "bravo two"))
+				},
+				func(t *testing.T, a, _, _ string) {
+					t.Helper()
+					appendTo(t, a, claudeLine("s-b", t3, "charlie three"))
+				},
 			},
 		},
 		{
@@ -167,9 +202,18 @@ func TestPassesOverFilesSharingASessionMatchRebuild(t *testing.T) {
 			id:   "s-a",
 			also: "s-b",
 			passes: []step{
-				func(t *testing.T, a, b, c string) { write(t, a, claudeLine("s-a", t0, "alpha one")) },
-				func(t *testing.T, a, b, c string) { appendTo(t, a, claudeLine("s-b", t2, "bravo two")) },
-				func(t *testing.T, a, b, c string) { appendTo(t, a, claudeLine("s-a", t3, "charlie three")) },
+				func(t *testing.T, a, _, _ string) {
+					t.Helper()
+					write(t, a, claudeLine("s-a", t0, "alpha one"))
+				},
+				func(t *testing.T, a, _, _ string) {
+					t.Helper()
+					appendTo(t, a, claudeLine("s-b", t2, "bravo two"))
+				},
+				func(t *testing.T, a, _, _ string) {
+					t.Helper()
+					appendTo(t, a, claudeLine("s-a", t3, "charlie three"))
+				},
 			},
 		},
 		{
@@ -178,11 +222,15 @@ func TestPassesOverFilesSharingASessionMatchRebuild(t *testing.T) {
 			id:   "s-b",
 			also: "s-a",
 			passes: []step{
-				func(t *testing.T, a, b, c string) {
+				func(t *testing.T, a, b, _ string) {
+					t.Helper()
 					write(t, a, claudeLine("s-a", t0, "alpha one"))
 					write(t, b, claudeLine("s-b", t1, "bravo two"))
 				},
-				func(t *testing.T, a, b, c string) { appendTo(t, a, claudeLine("s-b", t2, "charlie three")) },
+				func(t *testing.T, a, _, _ string) {
+					t.Helper()
+					appendTo(t, a, claudeLine("s-b", t2, "charlie three"))
+				},
 			},
 		},
 	}
@@ -281,7 +329,7 @@ func TestRandomPassesOverSharedSessionsMatchRebuild(t *testing.T) {
 	}
 	for seed := range seeds {
 		t.Run(fmt.Sprint("seed", seed), func(t *testing.T) {
-			rng := rand.New(rand.NewSource(int64(seed)))
+			rng := rand.New(rand.NewSource(int64(seed))) //nolint:gosec // a seeded fixture, not crypto
 			tmp := hermeticIndexEnv(t)
 			claude := os.Getenv("DEJA_CLAUDE_ROOT")
 			dir := filepath.Join(tmp, "idx")

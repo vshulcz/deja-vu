@@ -23,7 +23,7 @@ func TestHermesGreetingDoesNotNameTheSession(t *testing.T) {
 		t.Fatal(err)
 	}
 	db := filepath.Join(dir, "state.db")
-	cmd := exec.Command("sqlite3", db)
+	cmd := exec.CommandContext(t.Context(), "sqlite3", db)
 	cmd.Stdin = strings.NewReader(`CREATE TABLE messages (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		session_id TEXT NOT NULL,

@@ -61,7 +61,7 @@ func TestANoteDoesNotArriveTwiceUnderTwoBucketIds(t *testing.T) {
 
 	// A different note in the same bucket is not a duplicate.
 	write("deja-sync-c.jsonl", SyncRecord{Harness: "deja", SessionID: "deja-2026-07-12-p", Project: "p", Role: "user", Text: "a different note entirely"})
-	if _, err := Import(dir, exp); err != nil {
+	if _, err = Import(dir, exp); err != nil {
 		t.Fatal(err)
 	}
 	ss, err = Search(dir, query.Options{Query: "different note entirely", All: true})
@@ -73,10 +73,10 @@ func TestANoteDoesNotArriveTwiceUnderTwoBucketIds(t *testing.T) {
 	}
 	// And an ordinary session still dedupes on its own id.
 	write("deja-sync-d.jsonl", SyncRecord{Harness: "claude", SessionID: "s1", Project: "p", Role: "user", Text: "an ordinary transcript line"})
-	if _, err := Import(dir, exp); err != nil {
+	if _, err = Import(dir, exp); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Import(dir, exp); err != nil {
+	if _, err = Import(dir, exp); err != nil {
 		t.Fatal(err)
 	}
 	ss, err = Search(dir, query.Options{Query: "ordinary transcript line", All: true})

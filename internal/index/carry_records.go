@@ -103,7 +103,7 @@ func recordPrefix(b []byte) (kid, pid, rid uint64, rest []byte, ok bool) {
 		if len(b) < 9 {
 			return 0, 0, 0, nil, false
 		}
-		if _, _, ok := consumeField(b[9:]); !ok {
+		if _, ok := consumeField(b[9:]); !ok {
 			return 0, 0, 0, nil, false
 		}
 	default:
@@ -152,7 +152,7 @@ func eachStoredRecord(path string, t *recordTables, fn func(off int64, payload [
 	for {
 		off, payload, err := w.next()
 		if err != nil {
-			if err == io.EOF || err == io.ErrUnexpectedEOF {
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 				return nil
 			}
 			return err

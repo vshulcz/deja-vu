@@ -36,7 +36,7 @@ func writeDshLog(t *testing.T, path, body string) {
 			if line == "" {
 				continue
 			}
-			cmd := exec.Command("zstd", "-q", "-c")
+			cmd := exec.CommandContext(t.Context(), "zstd", "-q", "-c")
 			cmd.Stdin = strings.NewReader(line)
 			frame, err := cmd.Output()
 			if err != nil {

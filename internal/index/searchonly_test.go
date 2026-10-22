@@ -67,7 +67,7 @@ func TestASearchOnlyBuildSkipsTheDerivedTables(t *testing.T) {
 	}
 	_, _ = f.WriteString(claudeBashLine("s-one", "2026-01-02T06:01:00Z", "go vet ./internal/exporter/"))
 	_ = f.Close()
-	if err := Ensure(dir, "", false, nil); err != nil {
+	if err = Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	if got := present(dir); len(got) > 0 {
@@ -78,7 +78,7 @@ func TestASearchOnlyBuildSkipsTheDerivedTables(t *testing.T) {
 	// a hook started without the user's environment does not rebuild the
 	// store over it, and the shell does not rebuild it back.
 	t.Setenv(SearchOnlyEnv, "")
-	if err := Ensure(dir, "", true, nil); err != nil {
+	if err = Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	if got := present(dir); len(got) > 0 || !BuiltSearchOnly(dir) {
@@ -97,7 +97,7 @@ func TestASearchOnlyBuildSkipsTheDerivedTables(t *testing.T) {
 	}
 
 	// And the policy file turns it on the same way.
-	if err := os.WriteFile(filepath.Join(tmp, "policy.json"), []byte(`{"search_only": true}`), 0o600); err != nil {
+	if err = os.WriteFile(filepath.Join(tmp, "policy.json"), []byte(`{"search_only": true}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	undo = ApplySearchOnly()

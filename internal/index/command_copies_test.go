@@ -122,10 +122,10 @@ create table messages (id integer primary key autoincrement, session_id text, ro
 {"role":"assistant","content":%s,"created":%d}
 `, id, base, fmt.Sprintf(tool, i), base+10)
 		parityWrite(t, filepath.Join(sessions, id+".jsonl"), jsonl, false)
-		sqlSb117.WriteString(fmt.Sprintf(`insert into sessions values ('%s','n','pool','/tmp/app','2026-01-01 12:00:00','2026-01-01 12:05:00');
+		fmt.Fprintf(&sqlSb117, `insert into sessions values ('%s','n','pool','/tmp/app','2026-01-01 12:00:00','2026-01-01 12:05:00');
 insert into messages (session_id, role, content_json, created_timestamp) values ('%s','user','[{"type":"text","text":"why does pgbouncer time out"}]',%d);
 insert into messages (session_id, role, content_json, created_timestamp) values ('%s','assistant','%s',%d);
-`, id, id, base, id, fmt.Sprintf(tool, i), base+10))
+`, id, id, base, id, fmt.Sprintf(tool, i), base+10)
 	}
 	sql += sqlSb117.String()
 	paritySQL(t, db, sql)

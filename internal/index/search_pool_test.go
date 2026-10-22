@@ -27,7 +27,7 @@ func TestCommonWordSearchScoresOnlyThePool(t *testing.T) {
 	for i := range n {
 		at := now.Add(-time.Duration(i%97) * 24 * time.Hour).Add(-time.Duration(i) * time.Minute)
 		ms := []model.Message{{Role: "user", Text: fmt.Sprintf("the deploy of service %d is slow", i), Time: at}}
-		for j := 0; j < i%5; j++ {
+		for j := range i % 5 {
 			ms = append(ms, model.Message{Role: "assistant", Text: strings.Repeat("deploy ", 1+(i*7+j)%4) + filler[:(i*13+j*29)%len(filler)], Time: at})
 		}
 		ss = append(ss, model.Session{Harness: "claude", ID: fmt.Sprintf("s-%05d", i), Project: "shop", Started: at, Updated: at, Messages: ms})

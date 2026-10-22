@@ -32,7 +32,7 @@ func planCorpus(t *testing.T, commands int) string {
 	dir := filepath.Join(tmp, "plan-index")
 	base := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 
-	var sessions []model.Session
+	sessions := make([]model.Session, 0, 59)
 	for i := range 59 {
 		s := model.Session{
 			ID:      "s" + string(rune('A'+i/26)) + string(rune('a'+i%26)),
@@ -244,7 +244,7 @@ func planOrderCorpus(t *testing.T) string {
 		wallTieOne: {0, 3}, wallTieTwo: {0, 3}, wallTooRare: {0, 2},
 	}
 
-	var sessions []model.Session
+	sessions := make([]model.Session, 0, 59)
 	for i := range 59 {
 		s := model.Session{
 			ID:      "o" + string(rune('A'+i/26)) + string(rune('a'+i%26)),

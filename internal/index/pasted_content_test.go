@@ -30,7 +30,7 @@ func claudeSession(t *testing.T, dir, id string) (string, SessionMeta) {
 	if err != nil || len(ss) != 1 {
 		t.Fatalf("session %s: %v, %d found", id, err, len(ss))
 	}
-	var text []string
+	text := make([]string, 0, len(ss[0].Messages))
 	for _, m := range ss[0].Messages {
 		text = append(text, m.Text)
 	}

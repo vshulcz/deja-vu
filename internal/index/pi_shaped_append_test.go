@@ -62,17 +62,17 @@ func TestThePiShapedStoresAppendInsteadOfRereading(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := f.WriteString(turn("assistant", "2026-01-02T03:05:00Z", "raised the pool to 40")); err != nil {
+			if _, err = f.WriteString(turn("assistant", "2026-01-02T03:05:00Z", "raised the pool to 40")); err != nil {
 				t.Fatal(err)
 			}
-			if err := f.Close(); err != nil {
+			if err = f.Close(); err != nil {
 				t.Fatal(err)
 			}
 			after := currentFileStateFor(t, path)
 			if !canAppendIncremental(map[string]FileState{path: after}, map[string]FileState{path: before}) {
 				t.Fatalf("%s still re-reads the whole file for one appended turn", tc.harness)
 			}
-			if err := Ensure(dir, "", false, nil); err != nil {
+			if err = Ensure(dir, "", false, nil); err != nil {
 				t.Fatal(err)
 			}
 

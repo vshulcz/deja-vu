@@ -20,7 +20,7 @@ func TestAFirstBuildAnswersBeforeItFinishes(t *testing.T) {
 	tmp := hermeticIndexEnv(t)
 	dir := filepath.Join(tmp, "idx")
 	now := time.Now()
-	var ss []model.Session
+	ss := make([]model.Session, 0, 500)
 	for i := range 500 {
 		ss = append(ss, model.Session{
 			ID: fmt.Sprintf("s%03d", i), Harness: "claude", Project: "p",
@@ -92,7 +92,7 @@ func TestTheEarlyPublishHoldsBackWhereItWouldNotHelp(t *testing.T) {
 	// And where an index already exists, replacing it with a slice would be a
 	// regression rather than a head start.
 	dir2 := filepath.Join(tmp, "existing")
-	var many []model.Session
+	many := make([]model.Session, 0, 500)
 	for i := range 500 {
 		many = append(many, model.Session{
 			ID: fmt.Sprintf("s%03d", i), Harness: "claude", Project: "p",

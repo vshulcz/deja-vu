@@ -57,7 +57,7 @@ insert into part values ('p1','m1','task-1',%d,%d,'{"type":"text","text":"fix th
 	if err := os.MkdirAll(filepath.Dir(db), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := exec.Command("sqlite3", db, seed).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, seed).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}
 	indexPass(t, dir)

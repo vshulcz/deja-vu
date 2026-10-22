@@ -12,8 +12,8 @@ func titleOf(ms ...model.Message) string {
 	return t
 }
 
-func userAt(text string, min int) model.Message {
-	return model.Message{Role: "user", Text: text, Time: time.Date(2026, 1, 2, 3, min, 0, 0, time.UTC)}
+func userAt(text string, minute int) model.Message {
+	return model.Message{Role: "user", Text: text, Time: time.Date(2026, 1, 2, 3, minute, 0, 0, time.UTC)}
 }
 
 // A session that opens with a greeting was named after it — 17 rows reading

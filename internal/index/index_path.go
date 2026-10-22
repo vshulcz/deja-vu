@@ -20,7 +20,7 @@ func checkIndexPath(dir string) error {
 	}
 	fi, err := os.Stat(dir)
 	if err != nil || fi.IsDir() {
-		return nil
+		return nil //nolint:nilerr // a path that will not stat is no file in the way
 	}
 	return fmt.Errorf("the index path %s is a file, not a directory — deja will not replace it; move it aside, or point DEJA_INDEX_DIR at a directory", dir)
 }

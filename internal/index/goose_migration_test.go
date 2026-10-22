@@ -43,7 +43,7 @@ create table messages (id integer primary key autoincrement, session_id text, ro
 insert into sessions values ('20260101_120000','n','pgbouncer pool','/tmp/app','2026-01-01 12:00:00','2026-01-01 12:05:00');
 insert into messages values (1,'20260101_120000','user','[{"type":"text","text":"why does pgbouncer time out"}]',1767268800);
 insert into messages values (2,'20260101_120000','user','[{"type":"text","text":"and after the restart"}]',1767269100);`
-	if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, sql).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}
 

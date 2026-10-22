@@ -67,7 +67,7 @@ func TestADeletedTranscriptStaysInTheIndex(t *testing.T) {
 	// And it stays kept on the pass after that, when there is nothing else to
 	// do. That run is the fast one: the index reads as fresh and says nothing.
 	log.Reset()
-	if err := Ensure(dir, "claude", false, &log); err != nil {
+	if err = Ensure(dir, "claude", false, &log); err != nil {
 		t.Fatal(err)
 	}
 	if log.Len() > 0 {

@@ -218,7 +218,7 @@ func TestFailedAppendLeavesThePreviousIndex(t *testing.T) {
 	if got := indexFiles(t, inc)["records.bin"].Size(); got != was {
 		t.Fatalf("records.bin is %d bytes after the failed pass, was %d", got, was)
 	}
-	if _, err := os.Stat(filepath.Join(inc, appendPendingFile)); err == nil {
+	if _, statErr := os.Stat(filepath.Join(inc, appendPendingFile)); statErr == nil {
 		t.Error("the pending mark outlived the pass")
 	}
 	if Damaged(inc) {

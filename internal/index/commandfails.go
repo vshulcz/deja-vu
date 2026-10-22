@@ -418,7 +418,7 @@ func carriedCommandFailState(dir string, old Manifest, tmp, generation string, r
 	if end > st.Size {
 		// Another turn in the tail ends the session's pending run, as the
 		// walk would have; a command or an output reads the session again.
-		if _, err := eachCommandAndOutputFrom(path, old, st.Size, end, nil, func(r Record) { redo[r.Key] = true }, st.Acc.stop); err != nil {
+		if _, err = eachCommandAndOutputFrom(path, old, st.Size, end, nil, func(r Record) { redo[r.Key] = true }, st.Acc.stop); err != nil {
 			return nil
 		}
 	}

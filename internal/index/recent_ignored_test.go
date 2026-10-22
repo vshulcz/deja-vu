@@ -16,8 +16,8 @@ import (
 func TestTheRecentListingSkipsIgnoredSessions(t *testing.T) {
 	tmp := t.TempDir()
 	jobs := filepath.Join(tmp, "home", ".claude", "jobs", "abc", "projects", "-w-app")
-	real := filepath.Join(tmp, "home", "projects", "-w-app")
-	for _, d := range []string{jobs, real} {
+	realPath := filepath.Join(tmp, "home", "projects", "-w-app")
+	for _, d := range []string{jobs, realPath} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -37,7 +37,7 @@ func TestTheRecentListingSkipsIgnoredSessions(t *testing.T) {
 		}
 	}
 	write(jobs, "scratch", "the frobnicator keeps dropping its widgets under load")
-	write(real, "keeper", "the frobnicator keeps dropping its widgets under load")
+	write(realPath, "keeper", "the frobnicator keeps dropping its widgets under load")
 
 	// Both roots are read: the ignored one is a subtree of the store, which is
 	// how it looks on a real machine.

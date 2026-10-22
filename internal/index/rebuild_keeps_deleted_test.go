@@ -103,7 +103,7 @@ func TestAFullRebuildKeepsADeletedTranscript(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := Ensure(dir, "claude", true, nil); err != nil {
+	if err = Ensure(dir, "claude", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	after, err := os.Stat(filepath.Join(dir, "records.bin"))

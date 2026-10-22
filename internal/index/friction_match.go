@@ -46,7 +46,7 @@ func newFrictionMatcher(aux map[string]uint8, phrases []string) *frictionMatcher
 	}
 	classes := uint8(1) // 0 is every byte no phrase holds
 	for p := range pats {
-		for i := 0; i < len(p); i++ {
+		for i := range len(p) {
 			if c := p[i]; m.class[c] == 0 {
 				m.class[c] = classes
 				classes++
@@ -62,12 +62,12 @@ func newFrictionMatcher(aux map[string]uint8, phrases []string) *frictionMatcher
 	m.out = []uint8{0}
 	for p, bit := range pats {
 		s := 0
-		for i := 0; i < len(p); i++ {
+		for i := range len(p) {
 			c := m.class[p[i]]
 			if m.next[s][c] == 0 {
 				m.next = append(m.next, make([]uint16, classes))
 				m.out = append(m.out, 0)
-				m.next[s][c] = uint16(len(m.next) - 1)
+				m.next[s][c] = uint16(len(m.next) - 1) //nolint:gosec // states are bounded by the fixed phrase list
 			}
 			s = int(m.next[s][c])
 		}
@@ -101,7 +101,7 @@ func newFrictionMatcher(aux map[string]uint8, phrases []string) *frictionMatcher
 // phrase hit ends the walk: nothing else is asked of a line that has one.
 func frictionPhrasesIn(l string) uint8 {
 	m := frictionMatch()
-	for i := 0; i < len(l); i++ {
+	for i := range len(l) {
 		if l[i] >= utf8.RuneSelf {
 			// Lowering can move a rune into ASCII (U+212A KELVIN SIGN is k),
 			// so a line that is not ASCII is lowered first, as it was.
@@ -114,7 +114,7 @@ func frictionPhrasesIn(l string) uint8 {
 func (m *frictionMatcher) match(s string) uint8 {
 	var hit uint8
 	state := uint16(0)
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		state = m.next[state][m.class[s[i]]]
 		if o := m.out[state]; o != 0 {
 			hit |= o

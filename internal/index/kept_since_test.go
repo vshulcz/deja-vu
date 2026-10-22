@@ -39,7 +39,7 @@ func TestKeptSinceDatesADeletedTranscriptFromThePassThatFoundItGone(t *testing.T
 	if later, _ := KeptSince(dir, time.Now().Add(time.Hour), farFuture); len(later) != 0 {
 		t.Errorf("a window after the deletion still counts it: %+v", later)
 	}
-	if err := Ensure(dir, "claude", true, nil); err != nil {
+	if err = Ensure(dir, "claude", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	again, err := KeptSince(dir, before, farFuture)

@@ -24,6 +24,7 @@ func TestPastedIssueFindsTheSameBugOverALongSession(t *testing.T) {
 }
 
 func pastedIssue(t *testing.T, filler int) {
+	t.Helper()
 	tmp := t.TempDir()
 	root := filepath.Join(tmp, "claude")
 	setHome(t, filepath.Join(tmp, "home"))
@@ -63,7 +64,7 @@ fixed in the writer buffering refactor: flush the quote state before the gzip st
 		t.Fatal(err)
 	}
 	if len(r.Sessions) == 0 || r.Sessions[0].ID != "same-bug" {
-		var ids []string
+		ids := make([]string, 0, len(r.Sessions))
 		for _, s := range r.Sessions {
 			ids = append(ids, s.ID)
 		}

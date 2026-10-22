@@ -46,6 +46,7 @@ func write(t *testing.T, path, content string) {
 }
 
 func seedFileHarnesses(t *testing.T, root string) {
+	t.Helper()
 	// claude
 	write(t, filepath.Join(root, "claude", "-p-app", "c1.jsonl"),
 		`{"type":"user","sessionId":"c1","timestamp":"2026-02-01T10:00:00Z","message":{"role":"user","content":"claundneedle unicode тест 日本語"}}`+"\n")
@@ -78,6 +79,7 @@ func seedFileHarnesses(t *testing.T, root string) {
 }
 
 func seedCursorDB(t *testing.T, root string) bool {
+	t.Helper()
 	if _, err := exec.LookPath("sqlite3"); err != nil {
 		return false
 	}
@@ -90,7 +92,7 @@ insert into cursorDiskKV values
  ('composerData:cu1', json('{"composerId":"cu1","name":"cursortitle","createdAt":1769940000000,"lastUpdatedAt":1769940300000}')),
  ('bubbleId:cu1:b1', json('{"type":1,"text":"cursorneedle question","timestamp":1769940001000,"workspaceProjectDir":"/p/app"}')),
  ('bubbleId:cu1:b2', json('{"type":2,"text":"cursorneedle answer","timestamp":1769940002000}'));`
-	if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, sql).CombinedOutput(); err != nil {
 		t.Fatalf("seed cursor db: %v: %s", err, out)
 	}
 	return true
@@ -158,7 +160,7 @@ func TestRebuildDeterminism(t *testing.T) {
 			t.Fatal(err)
 		}
 		msgs := 0
-		_ = eachRecord(filepath.Join(dir, "records.bin"), mustTables(t, dir), func(r Record) { msgs++ })
+		_ = eachRecord(filepath.Join(dir, "records.bin"), mustTables(t, dir), func(_ Record) { msgs++ })
 		return len(m.Sessions), msgs
 	}
 	s1, m1 := count()

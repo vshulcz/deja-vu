@@ -403,7 +403,7 @@ func blankDeadBucketWords(base string, toks map[string][]posting, dead []int64) 
 		}
 	}
 	if len(gone) == 0 {
-		return nil, nil
+		return nil, nil //nolint:nilnil // a nil set is the empty set
 	}
 	for _, p := range files {
 		if err := blankWords(p, gone); err != nil && !os.IsNotExist(err) {
@@ -447,7 +447,7 @@ func markLiveWords(p string, toks map[string][]posting, dead []int64, live map[s
 				buf = make([]byte, n)
 			}
 			b := buf[:n]
-			if _, err := f.ReadAt(b, int64(e.off)); err != nil {
+			if _, err := f.ReadAt(b, int64(e.off)); err != nil { //nolint:gosec // offsets are checked against the bucket size on open
 				return err
 			}
 			postingBytesProbed.Add(int64(n))
@@ -474,7 +474,7 @@ func blankWords(p string, gone map[string]bool) error {
 	defer func() { _ = f.Close() }()
 	r := bufio.NewReader(f)
 	magic := make([]byte, len(bucketMagic))
-	if _, err := io.ReadFull(r, magic); err != nil || !bytes.Equal(magic, bucketMagic) {
+	if _, err = io.ReadFull(r, magic); err != nil || !bytes.Equal(magic, bucketMagic) {
 		return errCorruptIndex
 	}
 	count, err := binary.ReadUvarint(r)
@@ -501,7 +501,7 @@ func blankWords(p string, gone map[string]bool) error {
 			tb = make([]byte, ln)
 		}
 		tb = tb[:ln]
-		if _, err := io.ReadFull(r, tb); err != nil {
+		if _, err = io.ReadFull(r, tb); err != nil {
 			return err
 		}
 		if gone[string(tb)] {

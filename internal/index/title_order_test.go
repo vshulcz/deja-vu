@@ -12,8 +12,8 @@ import (
 // imported elsewhere could disagree (#769).
 func TestSessionTitleTakesTheEarliestTurn(t *testing.T) {
 	at := time.Date(2026, 7, 30, 10, 0, 0, 0, time.UTC)
-	msg := func(role, text string, min int) model.Message {
-		return model.Message{Role: role, Text: text, Time: at.Add(time.Duration(min) * time.Minute)}
+	msg := func(role, text string, minute int) model.Message {
+		return model.Message{Role: role, Text: text, Time: at.Add(time.Duration(minute) * time.Minute)}
 	}
 	cases := []struct {
 		name string

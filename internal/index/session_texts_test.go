@@ -23,7 +23,7 @@ func TestSessionTextsRowIsMetaForSession(t *testing.T) {
 		strings.Repeat("x", maxIndexedText-10) + " password: hunter2hunter2",
 		"",
 	}
-	var ss []model.Session
+	ss := make([]model.Session, 0, len(openings))
 	for i, o := range openings {
 		s := model.Session{Harness: "codex", ID: "s" + string(rune('a'+i)), Path: "/tmp/s.jsonl", Project: "p", Started: at, Updated: at,
 			Messages: []model.Message{

@@ -20,6 +20,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
+// ForgetOptions selects what Forget drops; DryRun counts without dropping.
 type ForgetOptions struct {
 	Session string
 	Project string
@@ -27,6 +28,7 @@ type ForgetOptions struct {
 	DryRun  bool
 }
 
+// ForgetResult counts what Forget dropped.
 type ForgetResult struct {
 	Sessions int
 	// Attached is how many of Sessions are sub-agent runs kept in a matched
@@ -423,14 +425,14 @@ func PastedSelector(raw string) string {
 			continue
 		}
 		if q, ok := strings.CutPrefix(s, "\u201c"); ok {
-			if q, ok := strings.CutSuffix(q, "\u201d"); ok {
-				s = strings.TrimSpace(q)
+			if inner, ok := strings.CutSuffix(q, "\u201d"); ok {
+				s = strings.TrimSpace(inner)
 				continue
 			}
 		}
 		if q, ok := strings.CutPrefix(s, "\u2018"); ok {
-			if q, ok := strings.CutSuffix(q, "\u2019"); ok {
-				s = strings.TrimSpace(q)
+			if inner, ok := strings.CutSuffix(q, "\u2019"); ok {
+				s = strings.TrimSpace(inner)
 				continue
 			}
 		}
@@ -697,6 +699,7 @@ func readRecordsForForget(dir string) []OffsetRecord {
 	return r
 }
 
+// Tombstones lists the forgotten harness:id keys, sorted.
 func Tombstones() []string {
 	set := readTombstones()
 	out := make([]string, 0, len(set))
@@ -838,4 +841,5 @@ func Unforget(dir, prefix string, progress io.Writer) (int, error) {
 	return lifted, nil
 }
 
+// RedactionReport is Redactions.
 func RedactionReport(dir string) (RedactionStats, error) { return Redactions(dir) }

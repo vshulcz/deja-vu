@@ -33,8 +33,9 @@ func TestRandomHistoriesWithSameDayCopiesMatchARebuild(t *testing.T) {
 }
 
 func runCopiesHistory(t *testing.T, seed int64, sameDay bool) {
+	t.Helper()
 	h := newTwoWayEnv(t)
-	r := &historyRun{t: t, h: h, rng: rand.New(rand.NewSource(seed)), index: filepath.Join(h.tmp, "a.db"), walls: true}
+	r := &historyRun{t: t, h: h, rng: rand.New(rand.NewSource(seed)), index: filepath.Join(h.tmp, "a.db"), walls: true} //nolint:gosec // a seeded fixture, not crypto
 	r.openStores()
 	var copies []*historySession
 	copyStep := func() {

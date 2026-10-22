@@ -51,11 +51,11 @@ func TestTheHealthMapSurvivesAnUnrelatedPass(t *testing.T) {
 
 	// A new session in the same store — a change that does not touch the file
 	// holding the bad line. This is the merge path.
-	if err := os.WriteFile(filepath.Join(proj, "s2.jsonl"), []byte(
+	if err = os.WriteFile(filepath.Join(proj, "s2.jsonl"), []byte(
 		turn("s2", "2026-02-02T03:04:05Z", "user", "unrelated question about retries")), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := Ensure(dir, "", false, nil); err != nil {
+	if err = Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	m, err = readManifest(dir)
@@ -71,13 +71,13 @@ func TestTheHealthMapSurvivesAnUnrelatedPass(t *testing.T) {
 
 	// The other half: a file rewritten without its bad line clears its own
 	// count, or carrying counts forward would make them permanent.
-	if err := os.WriteFile(filepath.Join(proj, "s1.jsonl"), []byte(
+	if err = os.WriteFile(filepath.Join(proj, "s1.jsonl"), []byte(
 		turn("s1", "2026-01-02T03:04:05Z", "user", "why does pgbouncer time out")+
 			turn("s1", "2026-01-02T03:04:06Z", "user", "the pool timed out")+
 			turn("s1", "2026-01-02T03:04:07Z", "assistant", "raised it to 40")), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := Ensure(dir, "", false, nil); err != nil {
+	if err = Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	m, err = readManifest(dir)
@@ -110,7 +110,7 @@ func healthFixture(t *testing.T) (dir, proj string, turn func(id, ts, role, text
 	return filepath.Join(tmp, "index.db"), proj, turn
 }
 
-func malformedFor(t *testing.T, dir, harness string) int {
+func malformedFor(t *testing.T, dir, harness string) int { //nolint:unparam // the call names the harness it counts
 	t.Helper()
 	m, err := readManifest(dir)
 	if err != nil {
@@ -287,7 +287,7 @@ func TestAFileThatOpensAgainStopsBeingReportedUnreadable(t *testing.T) {
 	}
 }
 
-func clippedFor(t *testing.T, dir, harness string) int {
+func clippedFor(t *testing.T, dir, harness string) int { //nolint:unparam // the call names the harness it counts
 	t.Helper()
 	m, err := readManifest(dir)
 	if err != nil {

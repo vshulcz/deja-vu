@@ -10,9 +10,9 @@ import (
 	"time"
 )
 
-func claudeHistoryEntry(t *testing.T, id, cwd, display string, at time.Time) string {
+func claudeHistoryEntry(t *testing.T, id, display string, at time.Time) string {
 	t.Helper()
-	b, err := json.Marshal(map[string]any{"display": display, "pastedContents": map[string]any{}, "timestamp": at.UnixMilli(), "project": cwd, "sessionId": id})
+	b, err := json.Marshal(map[string]any{"display": display, "pastedContents": map[string]any{}, "timestamp": at.UnixMilli(), "project": "/tmp/proj", "sessionId": id})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,10 +25,10 @@ func TestClaudeHistoryAppendMatchesARebuild(t *testing.T) {
 	tmp := parityEnv(t, map[string]string{"DEJA_CLAUDE_ROOT": "claude", "DEJA_CLAUDE_HISTORY_FILE": "history.jsonl"})
 	h := filepath.Join(tmp, "history.jsonl")
 	at := time.Date(2026, 7, 17, 9, 0, 0, 0, time.UTC)
-	parityWrite(t, h, claudeHistoryEntry(t, "gone-1", "/tmp/proj", "why does the retry loop spin", at), false)
+	parityWrite(t, h, claudeHistoryEntry(t, "gone-1", "why does the retry loop spin", at), false)
 	inc := filepath.Join(tmp, "inc")
 	parityPass(t, inc, false)
-	parityWrite(t, h, claudeHistoryEntry(t, "gone-1", "/tmp/proj", "and why does the backoff never reset", at.Add(time.Minute)), true)
+	parityWrite(t, h, claudeHistoryEntry(t, "gone-1", "and why does the backoff never reset", at.Add(time.Minute)), true)
 	parityPass(t, inc, false)
 	sameAsRebuild(t, inc)
 	s, ok, err := FindByIdentity(inc, "claude", "gone-1")
@@ -48,7 +48,7 @@ func TestAKeptTranscriptIsNotShadowedByItsPrompts(t *testing.T) {
 	parityWrite(t, tr, parityClaudeLine("kept-1", "00:00Z", "user", `"fix the flaky pool test"`)+
 		parityClaudeLine("kept-1", "00:05Z", "assistant", `"the conn was never closed, closing it in the defer"`), false)
 	asked := time.Date(2026, 7, 17, 9, 0, 0, 400_000_000, time.UTC)
-	parityWrite(t, h, claudeHistoryEntry(t, "kept-1", "/tmp/proj", "fix the flaky pool test", asked), false)
+	parityWrite(t, h, claudeHistoryEntry(t, "kept-1", "fix the flaky pool test", asked), false)
 	inc := filepath.Join(tmp, "inc")
 	parityPass(t, inc, false)
 	if err := os.Remove(tr); err != nil {
@@ -80,8 +80,8 @@ func TestAKeptTranscriptIsNotShadowedByItsPrompts(t *testing.T) {
 	}
 	// A line the log gains for the same id reaches the append path, where the
 	// kept row's path no longer exists.
-	parityWrite(t, h, claudeHistoryEntry(t, "kept-1", "/tmp/proj", "fix the flaky pool test", asked.Add(time.Second))+
-		claudeHistoryEntry(t, "gone-2", "/tmp/proj", "what did the pool fix change", asked.Add(time.Hour)), true)
+	parityWrite(t, h, claudeHistoryEntry(t, "kept-1", "fix the flaky pool test", asked.Add(time.Second))+
+		claudeHistoryEntry(t, "gone-2", "what did the pool fix change", asked.Add(time.Hour)), true)
 	parityPass(t, inc, false)
 	check("after an append")
 	// A rebuild reads every line of the log again, the kept one's included.
@@ -151,7 +151,7 @@ func TestATranscriptArrivingAfterItsPromptTakesTheSessionOver(t *testing.T) {
 	tmp := parityEnv(t, map[string]string{"DEJA_CLAUDE_ROOT": "claude", "DEJA_CLAUDE_HISTORY_FILE": "history.jsonl"})
 	h := filepath.Join(tmp, "history.jsonl")
 	asked := time.Date(2026, 7, 17, 9, 0, 0, 0, time.UTC)
-	parityWrite(t, h, claudeHistoryEntry(t, "new-1", "/tmp/proj", "fix the flaky pool test", asked), false)
+	parityWrite(t, h, claudeHistoryEntry(t, "new-1", "fix the flaky pool test", asked), false)
 	inc := filepath.Join(tmp, "inc")
 	parityPass(t, inc, false)
 	if n, _ := countPrompt(t, inc, "claude", "new-1", "fix the flaky pool test"); n != 1 {
@@ -194,7 +194,7 @@ func TestAPromptLoggedAfterItsTranscriptIsLeftToIt(t *testing.T) {
 		parityClaudeLine("first-1", "00:05Z", "assistant", `"the key carries the port"`), false)
 	inc := filepath.Join(tmp, "inc")
 	parityPass(t, inc, false)
-	parityWrite(t, filepath.Join(tmp, "history.jsonl"), claudeHistoryEntry(t, "first-1", "/tmp/proj", "why does the cache miss", time.Date(2026, 7, 17, 9, 0, 0, 300_000_000, time.UTC)), false)
+	parityWrite(t, filepath.Join(tmp, "history.jsonl"), claudeHistoryEntry(t, "first-1", "why does the cache miss", time.Date(2026, 7, 17, 9, 0, 0, 300_000_000, time.UTC)), false)
 	parityPass(t, inc, false)
 	if n, path := countPrompt(t, inc, "claude", "first-1", "why does the cache miss"); n != 1 || path != tr {
 		t.Errorf("the prompt is held %d times, row %s", n, path)
@@ -213,7 +213,7 @@ func TestAFreshPromptWaitsForItsTranscript(t *testing.T) {
 	// A store built first, so the passes below are appends.
 	parityWrite(t, filepath.Join(tmp, "claude", "-tmp-proj", "old-1.jsonl"), parityClaudeLine("old-1", "00:00Z", "user", `"an older question"`), false)
 	parityPass(t, inc, false)
-	parityWrite(t, h, claudeHistoryEntry(t, "live-1", "/tmp/proj", "why does the queue stall", now), false)
+	parityWrite(t, h, claudeHistoryEntry(t, "live-1", "why does the queue stall", now), false)
 	parityPass(t, inc, false)
 	if _, ok, _ := FindByIdentity(inc, "claude", "live-1"); ok {
 		t.Fatal("a prompt seconds old was indexed from the log before its transcript could land")

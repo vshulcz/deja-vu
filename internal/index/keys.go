@@ -116,7 +116,7 @@ func (k *keyer) splitCompound(word []rune, emit func([]byte)) {
 	boundaries := 0
 	part := func(end int) {
 		if end-start >= 3 {
-			b := append(k.part[:0], 't')
+			b := append(k.part[:0], 't') //nolint:gocritic // reuses k.part's buffer
 			for _, r := range word[start:end] {
 				b = utf8.AppendRune(b, query.LowerRune(r))
 			}
@@ -154,7 +154,7 @@ func (k *keyer) cjkKeys(s string, emit func([]byte)) {
 	// A CJK rune is never a single UTF-8 byte, so this guard preserves the
 	// cjkBigrams fast path without decoding an ASCII-only message.
 	ascii := true
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		if s[i] >= utf8.RuneSelf {
 			ascii = false
 			break
@@ -185,7 +185,7 @@ func (k *keyer) cjkKeys(s string, emit func([]byte)) {
 		if r1 != 0 && query.CJKFunctionRune(r1) && query.CJKFunctionRune(r2) {
 			return
 		}
-		key := (uint64(r1) << 21) | uint64(r2)
+		key := (uint64(r1) << 21) | uint64(r2) //nolint:gosec // runes are non-negative
 		if _, ok := seen[key]; ok {
 			return
 		}

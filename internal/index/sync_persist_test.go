@@ -97,21 +97,21 @@ func TestImportedRecordsSurviveRebuildAndUpdate(t *testing.T) {
 
 	// Non-append update: one source removed, one added. This is the path that
 	// used to purge imported records via the phantom removed entry.
-	if err := os.Remove(filepath.Join(proj, "local1.jsonl")); err != nil {
+	if err = os.Remove(filepath.Join(proj, "local1.jsonl")); err != nil {
 		t.Fatal(err)
 	}
 	local2 := `{"type":"user","sessionId":"local2","timestamp":"2026-01-03T03:04:05Z","message":{"role":"user","content":"othertext here"}}` + "\n"
-	if err := os.WriteFile(filepath.Join(proj, "local2.jsonl"), []byte(local2), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(proj, "local2.jsonl"), []byte(local2), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := EnsureForSearch(dir, search.Options{Query: "importneedle"}, false, nil); err != nil {
+	if err = EnsureForSearch(dir, search.Options{Query: "importneedle"}, false, nil); err != nil {
 		t.Fatal(err)
 	}
 	findImported("after non-append update")
 
 	// Dedupe map and watermarks must survive both paths.
-	if n, err := Import(dir, batchDir); err != nil || n != 0 {
-		t.Fatalf("re-import n=%d err=%v", n, err)
+	if n, importErr := Import(dir, batchDir); importErr != nil || n != 0 {
+		t.Fatalf("re-import n=%d err=%v", n, importErr)
 	}
 	findImported("after re-import")
 
@@ -133,9 +133,9 @@ func TestImportedRecordsSurviveRebuildAndUpdate(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, p := range matches {
-		b, err := os.ReadFile(p)
-		if err != nil {
-			t.Fatal(err)
+		b, readErr := os.ReadFile(p)
+		if readErr != nil {
+			t.Fatal(readErr)
 		}
 		if strings.Contains(string(b), "importneedle") {
 			t.Fatalf("exported batch %s echoes imported records", p)

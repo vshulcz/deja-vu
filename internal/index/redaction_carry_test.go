@@ -116,14 +116,14 @@ func TestAStaleKindKeyIsDroppedWhenItsFileIsReRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	m.RedactionRules = map[string]int{"cline-sdk:github-token": 1}
-	if err := writeManifest(dir, m); err != nil {
+	if err = writeManifest(dir, m); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(path, []byte(`{"agent":"lead","messages":[`+turn(0)+`,`+turn(1)+`]}`), 0o644); err != nil {
+	if err = os.WriteFile(path, []byte(`{"agent":"lead","messages":[`+turn(0)+`,`+turn(1)+`]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := Ensure(dir, "", false, nil); err != nil {
+	if err = Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	stats, err := Redactions(dir)

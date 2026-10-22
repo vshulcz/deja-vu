@@ -27,7 +27,7 @@ func TestOneNoisySessionDoesNotCrowdOutARealWall(t *testing.T) {
 		t.Fatalf("the fixture is not friction at all: %s", repeated)
 	}
 
-	var sessions []model.Session
+	sessions := make([]model.Session, 0, 4)
 	for k := range 3 {
 		sessions = append(sessions, model.Session{
 			ID: fmt.Sprintf("real%d", k), Harness: "claude", Project: "work/app",

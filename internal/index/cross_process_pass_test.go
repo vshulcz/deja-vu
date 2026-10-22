@@ -77,7 +77,7 @@ func TestTwoIndexProcessesLeaveOneGoodStore(t *testing.T) {
 			// rather than hanging the package.
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 			defer cancel()
-			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=TestCrossProcessIndexChild")
+			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=TestCrossProcessIndexChild") //nolint:gosec // the test binary running itself
 			cmd.Env = append(append([]string{}, env...), fmt.Sprintf("DEJA_PASS_FULL=%d", boolToInt(i == 0)))
 			<-start
 			out, err := cmd.CombinedOutput()
@@ -170,9 +170,7 @@ func TestCrossProcessIndexChild(t *testing.T) {
 		"XDG_CONFIG_HOME":  os.Getenv("DEJA_PASS_XDG_CONFIG"),
 		"APPDATA":          os.Getenv("DEJA_PASS_APPDATA"),
 	} {
-		if err := os.Setenv(k, v); err != nil {
-			t.Fatal(err)
-		}
+		t.Setenv(k, v)
 	}
 	// The lock's own signal, which is what says the two passes met.
 	LockWaitNotice = func() { fmt.Fprintln(os.Stdout, "waited-for-lock") }

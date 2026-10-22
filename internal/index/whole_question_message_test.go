@@ -21,7 +21,7 @@ import (
 func TestTheOneSessionSayingTheWholeQuestionReachesThePageOnACommonWordStore(t *testing.T) {
 	tmp := hermeticIndexEnv(t)
 	dir := filepath.Join(tmp, "idx")
-	var sessions []model.Session
+	sessions := make([]model.Session, 0, 421)
 	for i := range 120 {
 		s := model.Session{ID: fmt.Sprintf("decoy%03d", i), Harness: "claude", Project: "p", Updated: time.Now()}
 		for j := range 30 {
@@ -49,7 +49,7 @@ func TestTheOneSessionSayingTheWholeQuestionReachesThePageOnACommonWordStore(t *
 	if err != nil {
 		t.Fatal(err)
 	}
-	var ids []string
+	ids := make([]string, 0, len(result.Sessions))
 	for _, s := range result.Sessions {
 		ids = append(ids, s.ID)
 	}

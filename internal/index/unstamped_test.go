@@ -23,14 +23,14 @@ func TestZeroTimeRoundTripsAsZero(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := rw.write(Record{Key: "claude:s1", SourcePath: "/tmp/s1.jsonl", Role: "user", Text: "unstamped message"}); err != nil {
+	if _, err = rw.write(Record{Key: "claude:s1", SourcePath: "/tmp/s1.jsonl", Role: "user", Text: "unstamped message"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := rw.Close(); err != nil {
+	if err = rw.Close(); err != nil {
 		t.Fatal(err)
 	}
 	var got Record
-	if err := eachRecord(p, newRecordTables(), func(r Record) { got = r }); err != nil {
+	if err = eachRecord(p, newRecordTables(), func(r Record) { got = r }); err != nil {
 		t.Fatal(err)
 	}
 	if !got.Time.IsZero() {

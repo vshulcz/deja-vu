@@ -20,7 +20,7 @@ func TestARoleScanReturnsWhatAFullScanWouldFilter(t *testing.T) {
 	tmp := hermeticIndexEnv(t)
 	dir := filepath.Join(tmp, "role-index")
 	now := time.Now().UTC().Truncate(time.Second)
-	var ss []model.Session
+	ss := make([]model.Session, 0, 12)
 	for i := range 12 {
 		ss = append(ss, model.Session{
 			Harness: "claude", ID: fmt.Sprintf("s%02d", i), Project: "app", Updated: now,

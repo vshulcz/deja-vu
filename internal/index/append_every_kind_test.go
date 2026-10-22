@@ -77,11 +77,11 @@ func TestEveryAppendableKindKeepsWhatItAlreadyHad(t *testing.T) {
 			if err != nil {
 				t.Skipf("no fixture for %s: %v", c.harness, err)
 			}
-			if err := os.WriteFile(path, body, 0o644); err != nil {
+			if err = os.WriteFile(path, body, 0o644); err != nil {
 				t.Fatal(err)
 			}
 			dir := filepath.Join(tmp, "index.db")
-			if err := Ensure(dir, "", true, nil); err != nil {
+			if err = Ensure(dir, "", true, nil); err != nil {
 				t.Fatal(err)
 			}
 			was := sessionsOf(t, dir, c.harness)
@@ -90,11 +90,11 @@ func TestEveryAppendableKindKeepsWhatItAlreadyHad(t *testing.T) {
 			}
 
 			// One more record, the way the harness writes them.
-			if err := os.WriteFile(path, append(body, []byte(c.line+"\n")...), 0o644); err != nil {
+			if err = os.WriteFile(path, append(body, []byte(c.line+"\n")...), 0o644); err != nil {
 				t.Fatal(err)
 			}
 			var progress bytes.Buffer
-			if err := Ensure(dir, "", false, &progress); err != nil {
+			if err = Ensure(dir, "", false, &progress); err != nil {
 				t.Fatal(err)
 			}
 			// The append path, not a re-read that happens to give the same

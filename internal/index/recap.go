@@ -147,10 +147,10 @@ func ScanRecap(dir string, since time.Duration, perSession int) (Recap, error) {
 }
 
 // recapLines is the pipeline for one session: extract, trim, dedupe, mask.
-func recapLines(s model.Session, max int, masked redact.Counts) []string {
+func recapLines(s model.Session, most int, masked redact.Counts) []string {
 	// Asked for more than the cap, because trimming drops some of what comes
 	// back and a session that concluded three things should still show three.
-	raw := digest.SubstantialConclusions(s, recapLineMax*max*4, max*4)
+	raw := digest.SubstantialConclusions(s, recapLineMax*most*4, most*4)
 	var out []string
 	var kept []map[string]bool
 	for _, line := range raw {
@@ -163,12 +163,12 @@ func recapLines(s model.Session, max int, masked redact.Counts) []string {
 			continue
 		}
 		kept = append(kept, words)
-		line, c := redact.Outbound(line)
+		clean, c := redact.Outbound(line)
 		for kind, n := range c {
 			masked.Add(kind, n)
 		}
-		out = append(out, line)
-		if len(out) >= max {
+		out = append(out, clean)
+		if len(out) >= most {
 			break
 		}
 	}

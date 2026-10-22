@@ -151,8 +151,7 @@ func sessionFactOf(msgs []model.Message) (SessionFact, bool) {
 	// usually the ones it abandoned.
 	for _, m := range slices.Backward(msgs) {
 
-		switch m.Role {
-		case roleCommand:
+		if m.Role == roleCommand {
 			if len(f.Commands) >= sessionFactsCommands && keptVerify {
 				continue
 			}

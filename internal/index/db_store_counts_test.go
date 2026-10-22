@@ -22,7 +22,7 @@ insert into session values ('%[1]s','/tmp/app',%[2]d,%[2]d);
 insert into message values ('m-%[1]s','%[1]s','{"role":"user","time":{"created":%[2]d}}',%[2]d);
 insert into part values ('p-%[1]s','m-%[1]s',json_object('type','text','text','%[3]s','time',json_object('start',%[2]d)));
 `, session, createdMillis, text)
-	if out, err := exec.Command("sqlite3", db, stmts).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, stmts).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}
 }
@@ -92,7 +92,7 @@ func TestADatabaseThatGrowsKeepsItsIngestCounts(t *testing.T) {
 
 // seedGooseTurn adds one message to a goose store, creating the tables if the
 // file is new and moving the session's updated_at with it.
-func seedGooseTurn(t *testing.T, db, session, role, text string, created int64) {
+func seedGooseTurn(t *testing.T, db, session, role, text string, created int64) { //nolint:unparam // the call names the session it extends
 	t.Helper()
 	stmts := fmt.Sprintf(`
 create table if not exists sessions (id text primary key, name text, description text, working_dir text, created_at text, updated_at text);
@@ -101,7 +101,7 @@ insert or ignore into sessions values ('%[1]s','g','a goose session','/tmp/app',
 update sessions set updated_at = datetime(%[4]d,'unixepoch') where id='%[1]s';
 insert into messages (session_id,role,content_json,created_timestamp) values ('%[1]s','%[2]s',json_array(json_object('type','text','text','%[3]s')),%[4]d);
 `, session, role, text, created)
-	if out, err := exec.Command("sqlite3", db, stmts).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, stmts).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}
 }

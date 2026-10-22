@@ -197,12 +197,12 @@ func TestDeferredRolloutReadWhenFingerprintHadZstd(t *testing.T) {
 	// As a terminal pass with zstd would have left it.
 	hadSQLite, _ := parseToolFingerprint(m.ToolFingerprint)
 	m.ToolFingerprint = toolFingerprint(hadSQLite, true)
-	if err := writeManifestOnly(idx, m); err != nil {
+	if err = writeManifestOnly(idx, m); err != nil {
 		t.Fatal(err)
 	}
 
 	installZstdStub(t, tmp, bin, "zstd-hook-thread")
-	if err := Ensure(idx, "", false, nil); err != nil {
+	if err = Ensure(idx, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	m, err = readManifest(idx)

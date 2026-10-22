@@ -175,7 +175,7 @@ func TestTwoPassesAtOnceKeepTheCountsAndTheAnswers(t *testing.T) {
 	}
 
 	// And the state one pass left behind does not move the next one.
-	if err := Ensure(dir, "", false, nil); err != nil {
+	if err = Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	after, err := readManifest(dir)

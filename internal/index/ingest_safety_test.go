@@ -73,10 +73,10 @@ func TestTornTailLineIndexedOnce(t *testing.T) {
 			break
 		}
 	}
-	if err := os.WriteFile(file, append(b[:safe], []byte(full+"\n")...), 0o644); err != nil {
+	if err = os.WriteFile(file, append(b[:safe], []byte(full+"\n")...), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := EnsureForSearch(dir, o, false, nil); err != nil {
+	if err = EnsureForSearch(dir, o, false, nil); err != nil {
 		t.Fatal(err)
 	}
 	ss, err = Search(dir, o)

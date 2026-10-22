@@ -14,8 +14,8 @@ import (
 // handed the row to the snapshot (~/.zcode sorts before most project paths),
 // so resume kept refusing the restored session (#4432).
 func TestAZCodeSnapshotYieldsToItsRestoredSession(t *testing.T) {
-	snap := filepath.Join("/Users", "x", ".zcode", "v2", "sessions", "5f0c", "task-1.json")
-	dir := filepath.Join("/Users", "x", "proj")
+	snap := filepath.FromSlash("/Users/x/.zcode/v2/sessions/5f0c/task-1.json")
+	dir := filepath.FromSlash("/Users/x/proj")
 
 	held := SessionMeta{Harness: "zcode", ID: "acp-9", Path: snap}
 	owns, collided := attributeSession(held, model.Session{Harness: "zcode", ID: "acp-9", Path: dir})

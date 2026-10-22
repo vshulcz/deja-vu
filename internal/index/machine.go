@@ -15,7 +15,7 @@ import (
 // name they will recognise; DEJA_MACHINE overrides it for anyone whose
 // hostname is not something they want stamped on every record.
 func MachineName() string {
-	if n := sanitizeSyncField(os.Getenv("DEJA_MACHINE"), syncFieldMax); n != "" {
+	if n := sanitizeSyncField(os.Getenv("DEJA_MACHINE")); n != "" {
 		return n
 	}
 	host, err := os.Hostname()
@@ -25,5 +25,5 @@ func MachineName() string {
 	// macOS hands back "name.local" and DHCP hands back fully qualified names;
 	// the first label is the part someone recognises.
 	host, _, _ = strings.Cut(host, ".")
-	return sanitizeSyncField(host, syncFieldMax)
+	return sanitizeSyncField(host)
 }

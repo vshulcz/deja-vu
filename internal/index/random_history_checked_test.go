@@ -23,7 +23,7 @@ func TestRandomCheckedHistoriesMatchARebuild(t *testing.T) {
 		seeds = []int64{*historySeed}
 	} else if *checkedHistories > 0 {
 		seeds = seeds[:0]
-		for i := 0; i < *checkedHistories; i++ {
+		for i := range *checkedHistories {
 			seeds = append(seeds, int64(2000+i))
 		}
 	}
@@ -33,11 +33,12 @@ func TestRandomCheckedHistoriesMatchARebuild(t *testing.T) {
 }
 
 func runCheckedHistory(t *testing.T, seed int64) {
+	t.Helper()
 	h := newTwoWayEnv(t)
-	r := &historyRun{t: t, h: h, rng: rand.New(rand.NewSource(seed)), index: filepath.Join(h.tmp, "a.db"), walls: seed%3 == 0}
+	r := &historyRun{t: t, h: h, rng: rand.New(rand.NewSource(seed)), index: filepath.Join(h.tmp, "a.db"), walls: seed%3 == 0} //nolint:gosec // a seeded fixture, not crypto
 	// The fixed seeds replay #5503's histories as they were found.
 	if seed != 2123 && seed != 5016 {
-		r.shapes = rand.New(rand.NewSource(-seed))
+		r.shapes = rand.New(rand.NewSource(-seed)) //nolint:gosec // a seeded fixture, not crypto
 	}
 	r.openStores()
 	// The sweep that found the seeds above made a copy of a session on one
@@ -70,7 +71,7 @@ func runCheckedHistory(t *testing.T, seed int64) {
 			fresh, _, c := CheckUpToDate(r.index, "")
 			step()
 			r.log[len(r.log)-1] += " (another pass between check and pass)"
-			if err := Ensure(r.index, "", false, nil); err != nil {
+			if err = Ensure(r.index, "", false, nil); err != nil {
 				t.Fatal(err)
 			}
 			if !fresh && c != nil {

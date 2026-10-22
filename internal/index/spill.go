@@ -3,6 +3,7 @@ package index
 import (
 	"bufio"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -304,12 +305,12 @@ func newSpillGroups() *spillGroups {
 // it, and looking it up converts nothing.
 func (g *spillGroups) add(key []byte, off int64, sid uint32, tool bool) {
 	i, ok := g.idx[string(key)]
-	if ok && g.groups[i].last == uint64(off) {
+	if ok && g.groups[i].last == uint64(off) { //nolint:gosec // record offsets are non-negative
 		return
 	}
 	if !ok {
 		tok := string(key)
-		i = int32(len(g.idx))
+		i = int32(len(g.idx)) //nolint:gosec // a batch holds far fewer than 2^31 tokens
 		g.idx[tok] = i
 		if int(i) == len(g.groups) {
 			g.groups = append(g.groups, spillGroup{})
@@ -322,14 +323,14 @@ func (g *spillGroups) add(key []byte, off int64, sid uint32, tool bool) {
 	// Both as differences modulo 2^64 and 2^32, so a value that steps back
 	// still round-trips. In feed order offsets only rise and the session
 	// mostly repeats; the session goes zigzag, as in encodePostings.
-	gr.posts = binary.AppendUvarint(gr.posts, uint64(off)-gr.last)
-	d := int32(sid - gr.lastSid)
-	v := uint64(uint32((d<<1)^(d>>31))) << 1
+	gr.posts = binary.AppendUvarint(gr.posts, uint64(off)-gr.last) //nolint:gosec // record offsets are non-negative
+	d := int32(sid - gr.lastSid)                                   //nolint:gosec // zigzag: the delta's bits read as signed
+	v := uint64(uint32((d<<1)^(d>>31))) << 1                       //nolint:gosec // zigzag reinterprets the bits
 	if tool {
 		v |= 1
 	}
 	gr.posts = binary.AppendUvarint(gr.posts, v)
-	gr.last = uint64(off)
+	gr.last = uint64(off) //nolint:gosec // record offsets are non-negative
 	gr.lastSid = sid
 	gr.n++
 }
@@ -348,7 +349,7 @@ func (g *spillGroups) encode(seen map[string]bool) [][]byte {
 		sh := shardFor(b)
 		buf := binary.AppendUvarint(g.bufs[sh], uint64(len(gr.tok)))
 		buf = append(buf, gr.tok...)
-		buf = binary.AppendUvarint(buf, uint64(gr.n))
+		buf = binary.AppendUvarint(buf, uint64(gr.n)) //nolint:gosec // counts are non-negative
 		g.bufs[sh] = append(buf, gr.posts...)
 		gr.tok = ""
 	}
@@ -365,7 +366,7 @@ func readSpill(f *os.File) (map[string][]posting, error) {
 	var tok []byte
 	for {
 		n, err := binary.ReadUvarint(r)
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return lists, nil
 		}
 		if err != nil {
@@ -375,7 +376,7 @@ func readSpill(f *os.File) (map[string][]posting, error) {
 			tok = make([]byte, n)
 		}
 		tok = tok[:n]
-		if _, err := io.ReadFull(r, tok); err != nil {
+		if _, err = io.ReadFull(r, tok); err != nil {
 			return nil, err
 		}
 		count, err := binary.ReadUvarint(r)
@@ -397,9 +398,9 @@ func readSpill(f *os.File) (map[string][]posting, error) {
 				return nil, err
 			}
 			off += d
-			z := uint32(v >> 1)
-			sid += uint32(int32(z>>1) ^ -int32(z&1))
-			posts = append(posts, posting{Off: int64(off), Sid: sid, Tool: v&1 == 1})
+			z := uint32(v >> 1)                                                       //nolint:gosec // zigzag reinterprets the bits
+			sid += uint32(int32(z>>1) ^ -int32(z&1))                                  //nolint:gosec // zigzag reinterprets the bits
+			posts = append(posts, posting{Off: int64(off), Sid: sid, Tool: v&1 == 1}) //nolint:gosec // written from a non-negative offset
 		}
 		lists[string(tok)] = posts
 	}

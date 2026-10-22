@@ -18,7 +18,7 @@ func TestANewSessionBetweenCheckAndPassMatchesARebuild(t *testing.T) {
 	for _, how := range []string{"EnsureChecked", "Ensure", "walk-then-updateIndex"} {
 		t.Run(how, func(t *testing.T) {
 			h := newTwoWayEnv(t)
-			r := &historyRun{t: t, h: h, rng: rand.New(rand.NewSource(5)), index: filepath.Join(h.tmp, "a.db")}
+			r := &historyRun{t: t, h: h, rng: rand.New(rand.NewSource(5)), index: filepath.Join(h.tmp, "a.db")} //nolint:gosec // a seeded fixture, not crypto
 			r.openStores()
 			s1 := &historySession{project: "svc", sid: "s1", day: 3}
 			r.promptLogged(s1, "start: pool ledger")
@@ -90,7 +90,7 @@ func TestAPromptLogLineIsDroppedForATranscriptReadInTheSamePass(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			h := newTwoWayEnv(t)
-			r := &historyRun{t: t, h: h, rng: rand.New(rand.NewSource(5)), index: filepath.Join(h.tmp, "a.db")}
+			r := &historyRun{t: t, h: h, rng: rand.New(rand.NewSource(5)), index: filepath.Join(h.tmp, "a.db")} //nolint:gosec // a seeded fixture, not crypto
 			r.openStores()
 			s1 := &historySession{project: "svc", sid: "s1", day: 3}
 			r.promptLogged(s1, "start: pool ledger")
@@ -124,7 +124,7 @@ func TestAPromptLogLineIsDroppedForATranscriptReadInTheSamePass(t *testing.T) {
 // session from the log (#5046); the pass now walks again (#5503).
 func TestATranscriptLandingAfterTheCheckIsNotLost(t *testing.T) {
 	h := newTwoWayEnv(t)
-	r := &historyRun{t: t, h: h, rng: rand.New(rand.NewSource(5)), index: filepath.Join(h.tmp, "a.db")}
+	r := &historyRun{t: t, h: h, rng: rand.New(rand.NewSource(5)), index: filepath.Join(h.tmp, "a.db")} //nolint:gosec // a seeded fixture, not crypto
 	r.openStores()
 	s1 := &historySession{project: "svc", sid: "s1", day: 3}
 	r.promptLogged(s1, "start: pool ledger")
@@ -160,7 +160,7 @@ func TestATranscriptLandingAfterTheCheckIsNotLost(t *testing.T) {
 // directory that changes is two above the ones the walk listed.
 func TestARolloutInANewMonthAfterTheCheckIsNotLost(t *testing.T) {
 	h := newTwoWayEnv(t)
-	r := &historyRun{t: t, h: h, rng: rand.New(rand.NewSource(5)), index: filepath.Join(h.tmp, "a.db")}
+	r := &historyRun{t: t, h: h, rng: rand.New(rand.NewSource(5)), index: filepath.Join(h.tmp, "a.db")} //nolint:gosec // a seeded fixture, not crypto
 	r.openStores()
 	rollout := func(c *codexRollout, month int) string {
 		p := filepath.Join(r.more.codexRoot, "sessions", "2026", fmt.Sprintf("%02d", month), fmt.Sprintf("%02d", c.day),

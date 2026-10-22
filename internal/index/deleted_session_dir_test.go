@@ -18,7 +18,7 @@ func TestADeletedSessionDirectoryStaysInTheIndex(t *testing.T) {
 	tmp := t.TempDir()
 	cli := filepath.Join(tmp, "cursor-cli")
 	chats := filepath.Join(cli, "projects", "Users-me-app", "agent-transcripts")
-	write := func(id, text string) string {
+	write := func(id, text string) {
 		p := filepath.Join(chats, id, id+".jsonl")
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			t.Fatal(err)
@@ -26,7 +26,6 @@ func TestADeletedSessionDirectoryStaysInTheIndex(t *testing.T) {
 		if err := os.WriteFile(p, []byte(`{"role":"user","message":{"content":[{"type":"text","text":"`+text+`"}]}}`+"\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		return p
 	}
 	gone := "bbbbbbbb-1111-4222-8333-444444444444"
 	write(gone, "the quarnex cache went stale")
@@ -114,7 +113,7 @@ func TestAMovedSessionDirectoryIsNotKeptTwice(t *testing.T) {
 	tmp := t.TempDir()
 	cli := filepath.Join(tmp, "cursor-cli")
 	id := "bbbbbbbb-1111-4222-8333-444444444444"
-	at := func(project, text string) string {
+	at := func(project, text string) {
 		p := filepath.Join(cli, "projects", project, "agent-transcripts", id, id+".jsonl")
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			t.Fatal(err)
@@ -122,7 +121,6 @@ func TestAMovedSessionDirectoryIsNotKeptTwice(t *testing.T) {
 		if err := os.WriteFile(p, []byte(`{"role":"user","message":{"content":[{"type":"text","text":"`+text+`"}]}}`+"\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		return p
 	}
 	at("Users-me-app", "the vorplex migration stalled")
 	at("Users-me-other", "beta stable")

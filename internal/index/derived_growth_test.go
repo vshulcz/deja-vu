@@ -63,7 +63,7 @@ func TestATailWithNoOverlapIsFoldedWhole(t *testing.T) {
 func TestDerivedFieldsStayCapped(t *testing.T) {
 	var meta SessionMeta
 	for round := range 6 {
-		var ms []model.Message
+		ms := make([]model.Message, 0, 6)
 		for i := range 6 {
 			ms = append(ms, model.Message{
 				Role: "user",
@@ -135,10 +135,10 @@ func TestGrowingACollidingSessionLeavesTheOwnerAlone(t *testing.T) {
 	was := before.Sessions["claude:same"]
 	// The loser grows.
 	grown := line("the other session discusses billing") + line("i gave up on the billing migration and reverted it")
-	if err := os.WriteFile(filepath.Join(loser, "a.jsonl"), []byte(grown), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(loser, "a.jsonl"), []byte(grown), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := Ensure(dir, "", false, nil); err != nil {
+	if err = Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	after, err := readManifest(dir)

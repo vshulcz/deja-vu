@@ -88,7 +88,7 @@ func paritySQL(t *testing.T, db, stmts string) {
 	if err := os.MkdirAll(filepath.Dir(db), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("sqlite3", db)
+	cmd := exec.CommandContext(t.Context(), "sqlite3", db)
 	cmd.Stdin = strings.NewReader(stmts)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 %s: %v\n%s", db, err, out)
@@ -104,7 +104,7 @@ func paritySnapshot(t *testing.T, dir string) map[string]string {
 		t.Fatalf("AllMeta %s: %v", dir, err)
 	}
 	out := map[string]string{}
-	var ids []Identity
+	ids := make([]Identity, 0, len(metas))
 	for _, m := range metas {
 		out[m.Harness+":"+m.ID] = fmt.Sprintf("title=%q project=%q counted=%d asked=%v words=%d touched=%v",
 			m.Title, m.Project, m.Counted, m.Asked, m.Words, m.Touched)

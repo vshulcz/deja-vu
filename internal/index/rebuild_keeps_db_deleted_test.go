@@ -38,7 +38,7 @@ func TestAFullRebuildKeepsAChatDeletedFromTheCursorDatabase(t *testing.T) {
 	t.Setenv("DEJA_CURSOR_ROOT", root)
 	sql := func(stmt string) {
 		t.Helper()
-		if out, err := exec.Command("sqlite3", db, stmt).CombinedOutput(); err != nil {
+		if out, err := exec.CommandContext(t.Context(), "sqlite3", db, stmt).CombinedOutput(); err != nil {
 			t.Fatalf("sqlite3: %v: %s", err, out)
 		}
 	}

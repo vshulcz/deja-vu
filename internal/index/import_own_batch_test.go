@@ -60,7 +60,7 @@ func TestImportSkipsThisMachinesOwnBatch(t *testing.T) {
 	// The backside: a peer sends genuinely new lines for a session id this
 	// machine also holds, and those must still land.
 	peer := filepath.Join(tmp, "from-peer")
-	if err := os.MkdirAll(peer, 0o755); err != nil {
+	if err = os.MkdirAll(peer, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	b, err := json.Marshal(SyncRecord{Harness: "claude", SessionID: "b31", Project: "tmp/x31", Role: "user",

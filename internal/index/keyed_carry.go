@@ -128,7 +128,7 @@ func eachStoredRecordOfKeys(dir string, size int64, t *recordTables, keys map[st
 			j++
 		}
 		start := offs[i]
-		n := min(int64(offs[j-1]-start)+readAheadSize, ro.covered-start)
+		n := min(offs[j-1]-start+readAheadSize, ro.covered-start)
 		if int64(cap(buf)) < n {
 			buf = make([]byte, n)
 		}
@@ -205,7 +205,7 @@ func walkStored(r io.Reader, t *recordTables, from int64, fn func(off int64, pay
 	for {
 		off, payload, err := w.next()
 		if err != nil {
-			if err == io.EOF || err == io.ErrUnexpectedEOF {
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 				return nil
 			}
 			return err
@@ -229,7 +229,7 @@ func verifyKeyedCarry(dir string, size int64, t *recordTables, handled, rested m
 	for {
 		off, payload, err := w.next()
 		if err != nil {
-			if err == io.EOF || err == io.ErrUnexpectedEOF {
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 				return nil
 			}
 			return err

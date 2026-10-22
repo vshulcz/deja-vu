@@ -32,7 +32,7 @@ func TestOpenBucketDirRejectsImpossibleCounts(t *testing.T) {
 			}
 			entries, f, err := openBucketDir(path)
 			if f != nil {
-				f.Close()
+				_ = f.Close()
 			}
 			if err == nil {
 				t.Fatalf("accepted a corrupt bucket: %d entries", len(entries))

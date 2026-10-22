@@ -1,6 +1,7 @@
 package index
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -101,14 +102,14 @@ func TestTheIndexingPhaseCountsMessagesAsTheyAreIndexed(t *testing.T) {
 	at := time.Now().Add(-48 * time.Hour).UTC().Format(time.RFC3339)
 	const sessions, msgs = 3, 40
 	for i := range sessions {
-		var lines []byte
+		var lines bytes.Buffer
 		for k := range msgs {
-			lines = append(lines, []byte(fmt.Sprintf(
+			fmt.Fprintf(&lines,
 				`{"type":"user","sessionId":"quokkabloom-%d","timestamp":%q,`+
 					`"message":{"role":"user","content":"quokkabloom span %d of session %d"}}`+"\n",
-				i, at, k, i))...)
+				i, at, k, i)
 		}
-		if err := os.WriteFile(filepath.Join(claude, fmt.Sprintf("quokkabloom-%d.jsonl", i)), lines, 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(claude, fmt.Sprintf("quokkabloom-%d.jsonl", i)), lines.Bytes(), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}

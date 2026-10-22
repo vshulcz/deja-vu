@@ -87,7 +87,7 @@ func gluedCatalog(r *rand.Rand, fillers int) map[string]bool {
 	set := map[string]bool{}
 	// Fillers from a stream of their own, so the glued tokens below are the
 	// same whatever the number of fillers.
-	for _, tok := range fillerTokens(rand.New(rand.NewSource(r.Int63())), fillers) {
+	for _, tok := range fillerTokens(rand.New(rand.NewSource(r.Int63())), fillers) { //nolint:gosec // a seeded fixture, not crypto
 		set[tok] = true
 	}
 	glue := []string{"k8s", "v2", "x", "под", "пере", "_", "ё", "\xff", "-"}
@@ -116,7 +116,7 @@ func gluedCatalog(r *rand.Rand, fillers int) map[string]bool {
 
 func TestGluedLookupFindsWhatTheWalkFound(t *testing.T) {
 	for seed := int64(1); seed <= 40; seed++ {
-		r := rand.New(rand.NewSource(seed))
+		r := rand.New(rand.NewSource(seed)) //nolint:gosec // a seeded fixture, not crypto
 		set := gluedCatalog(r, 300)
 		idx := newTokenIndex(set)
 		terms := gluedTerms
@@ -130,7 +130,7 @@ func TestGluedLookupFindsWhatTheWalkFound(t *testing.T) {
 	}
 	// Not vacuous: the catalog does hold glued forms.
 	got := make([][]string, len(gluedTerms))
-	fillGluedMatches(gluedTerms, got, newTokenIndex(gluedCatalog(rand.New(rand.NewSource(1)), 0)))
+	fillGluedMatches(gluedTerms, got, newTokenIndex(gluedCatalog(rand.New(rand.NewSource(1)), 0))) //nolint:gosec // a seeded fixture, not crypto
 	if len(got[0]) == 0 {
 		t.Fatal("no glued form of настройки found; the comparison above proves nothing")
 	}
@@ -138,8 +138,8 @@ func TestGluedLookupFindsWhatTheWalkFound(t *testing.T) {
 
 func TestGluedStepDoesNotGrowWithTheCatalog(t *testing.T) {
 	compared := func(fillers int) int64 {
-		idx := newTokenIndex(gluedCatalog(rand.New(rand.NewSource(7)), fillers))
-		idx.gluedKeys() // built once per catalog, then reused by every query
+		idx := newTokenIndex(gluedCatalog(rand.New(rand.NewSource(7)), fillers)) //nolint:gosec // a seeded fixture, not crypto
+		idx.gluedKeys()                                                          // built once per catalog, then reused by every query
 		before := gluedCompared.Load()
 		fillGluedMatches(gluedTerms, make([][]string, len(gluedTerms)), idx)
 		return gluedCompared.Load() - before
@@ -190,7 +190,7 @@ func TestStatFilesSharedOutMatchesOneByOne(t *testing.T) {
 	want := map[string]FileState{}
 	for p := range paths {
 		if fi, err := os.Lstat(p); err == nil && !fi.IsDir() {
-			want[p] = walkFileState(p, fi, nil)
+			want[p] = walkFileState(p, fi)
 		}
 	}
 	got := statFiles(paths, nil)

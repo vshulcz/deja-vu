@@ -126,7 +126,7 @@ func TestPostingSessionDeltaWireShrinks(t *testing.T) {
 	var prevOff int64
 	absoluteLen := 0
 	for _, p := range posts {
-		absoluteLen += binary.PutUvarint(scratch[:], uint64(p.Off-prevOff))
+		absoluteLen += binary.PutUvarint(scratch[:], uint64(p.Off-prevOff)) //nolint:gosec // postings ascend by offset
 		absoluteLen += binary.PutUvarint(scratch[:], uint64(p.Sid)<<1)
 		prevOff = p.Off
 	}

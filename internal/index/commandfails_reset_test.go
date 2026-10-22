@@ -1,7 +1,6 @@
 package index
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -23,8 +22,8 @@ func TestACommandFailureUpdateEndsARunWhereAFullBuildDoes(t *testing.T) {
 			"role": "assistant", "content": []any{map[string]any{"type": "tool_use", "id": id, "name": "Read", "input": map[string]any{"file_path": "/tmp/app/log.txt"}}}}}
 		r := map[string]any{"type": "user", "sessionId": sid, "timestamp": ts, "cwd": "/tmp/app", "message": map[string]any{
 			"role": "user", "content": []any{map[string]any{"type": "tool_result", "tool_use_id": id, "content": "--- FAIL: TestStoreRejectsStaleWrites (0.01s)\nFAIL"}}}}
-		ab, _ := json.Marshal(a)
-		rb, _ := json.Marshal(r)
+		ab := mustJSON(a)
+		rb := mustJSON(r)
 		return string(ab) + "\n" + string(rb) + "\n"
 	}
 	write := func(i int, body string) {

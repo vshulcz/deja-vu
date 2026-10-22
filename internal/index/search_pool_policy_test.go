@@ -31,7 +31,7 @@ func TestCommonWordPoolLeavesOutWhatThePolicyWithholds(t *testing.T) {
 	ss := make([]model.Session, 0, imported+local)
 	// The imported sessions are newer and say the word more often, so a pool
 	// drawn without the policy is made of them.
-	for i := 0; i < imported+local; i++ {
+	for i := range imported + local {
 		project, at, says := "shop", now.Add(-time.Duration(30+i)*time.Hour), 1
 		if i < imported {
 			project, at, says = "imported:peer/shop", now.Add(-time.Duration(i)*time.Minute), 4

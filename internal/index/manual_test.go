@@ -37,6 +37,7 @@ func manualStore(t *testing.T) (dir, transcript string) {
 }
 
 func growTranscript(t *testing.T, transcript string) {
+	t.Helper()
 	growTranscriptWith(t, transcript, "zanzibarquux")
 }
 
@@ -164,7 +165,7 @@ func TestManualModeWithNoIndexSaysHowToBuildIt(t *testing.T) {
 	t.Setenv(ManualEnv, "1")
 	dir := filepath.Join(t.TempDir(), "none")
 	err := Ensure(dir, "", false, io.Discard)
-	if !IsManualStop(err) || !bytes.Contains([]byte(err.Error()), []byte("deja index")) {
+	if !IsManualStop(err) || !strings.Contains(err.Error(), "deja index") {
 		t.Fatalf("Ensure over no index = %v, want the command that builds it", err)
 	}
 	if _, err := EnsureForSearchStale(dir, query.Options{All: true}, io.Discard); !IsManualStop(err) {

@@ -29,7 +29,7 @@ func TestPostingRoundTripCarriesTheToolBit(t *testing.T) {
 func TestCapKeepsSpeechBeforeToolRecords(t *testing.T) {
 	// One session, four sentences and ninety-six command lines. Reading only
 	// half the session's postings must not spend the whole budget on commands.
-	var posts []posting
+	posts := make([]posting, 0, 100)
 	for i := range 4 {
 		posts = append(posts, posting{Off: int64(i), Sid: 7})
 	}
@@ -54,7 +54,7 @@ func TestCapKeepsSpeechBeforeToolRecords(t *testing.T) {
 }
 
 func TestCapSpendsEverythingOnSpeechWhenThereIsEnoughOfIt(t *testing.T) {
-	var posts []posting
+	posts := make([]posting, 0, 160)
 	for i := range 80 {
 		posts = append(posts, posting{Off: int64(i), Sid: 3})
 	}

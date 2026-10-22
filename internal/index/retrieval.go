@@ -28,11 +28,13 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
+// Search returns the sessions in the index at dir that answer o.
 func Search(dir string, o query.Options) ([]model.Session, error) {
 	r, err := SearchDetailed(dir, o)
 	return r.Sessions, err
 }
 
+// SearchDetailed is Search with how the answer was found.
 func SearchDetailed(dir string, o query.Options) (SearchResult, error) {
 	r, err := searchDetailedOnce(dir, o)
 	if err != nil || o.Regex {
@@ -263,8 +265,8 @@ func searchDetailedRead(dir string, o query.Options) (SearchResult, error) {
 			// makes it readable by a sentence (#2331).
 			return cooccurNarrowedSearch(dir, m, o)
 		}
-		ss, err := scanRecords(dir, m, o, nil)
-		return SearchResult{Sessions: ss, Tier: fallbackTier, Variants: fallbackVariants}, err
+		ss, scanErr := scanRecords(dir, m, o, nil)
+		return SearchResult{Sessions: ss, Tier: fallbackTier, Variants: fallbackVariants}, scanErr
 	}
 	// When every session holding the words is filtered out — most often the
 	// agent's own live session, which holds them because the question came
@@ -435,7 +437,7 @@ func withRelevanceTail(once *relevanceOnce, dir string, m Manifest, o query.Opti
 	if err != nil || len(rel.Sessions) == 0 {
 		// A tail is an improvement, not a requirement: if ranking the whole
 		// store fails, the strict answer is still a correct answer.
-		return res, nil
+		return res, nil //nolint:nilerr // the tail is optional, the strict answer stands
 	}
 	seen := make(map[string]bool, len(ss))
 	for _, s := range ss {
@@ -1817,8 +1819,8 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		// questions phrased from real PR titles the marathon took the top
 		// place twice (#3214). Counted in messages, which is the unit the
 		// match is already measured in.
-		if n := inProject[ord].Counted; n > 0 {
-			share := float64(len(perMessage[ord])) / float64(n)
+		if counted := inProject[ord].Counted; counted > 0 {
+			share := float64(len(perMessage[ord])) / float64(counted)
 			if share > 1 {
 				share = 1
 			}
@@ -2030,13 +2032,15 @@ func SearchWithRecovery(dir string, o query.Options, progress io.Writer) ([]mode
 	return r.Sessions, err
 }
 
+// SearchWithRecoveryDetailed is SearchWithRecovery with how the answer was
+// found.
 func SearchWithRecoveryDetailed(dir string, o query.Options, progress io.Writer) (SearchResult, error) {
 	r, err := SearchDetailed(dir, o)
 	if err == nil || !IsCorrupt(err) {
 		return r, err
 	}
 	if autoUpdatesOff() {
-		return SearchResult{}, &ManualStop{damagedOrOutdated(err) + ", and automatic indexing is off — rebuild it with: deja index --rebuild"}
+		return SearchResult{}, &ManualStopError{damagedOrOutdated(err) + ", and automatic indexing is off — rebuild it with: deja index --rebuild"}
 	}
 	if progress != nil {
 		fmt.Fprintf(progress, "deja: %s (%v), rebuilding ...\n", damagedOrOutdated(err), err)
@@ -2075,10 +2079,12 @@ func newestFirstSession(a, b model.Session) bool {
 	return a.ID < b.ID
 }
 
+// Recent returns the n most recently updated sessions.
 func Recent(dir string, n int) ([]model.Session, error) {
 	return RecentMatching(dir, n, query.Options{})
 }
 
+// RecentMatching is Recent over the sessions o lets through.
 func RecentMatching(dir string, n int, o query.Options) ([]model.Session, error) {
 	ss, _, err := RecentMatchingCounted(dir, n, o)
 	return ss, err
@@ -2688,6 +2694,7 @@ func homeDir() string {
 	return h
 }
 
+// FindByPrefix is FindByPrefixIn over every harness.
 func FindByPrefix(dir, p string) (model.Session, bool, error) {
 	return FindByPrefixIn(dir, p, "")
 }
@@ -3647,9 +3654,9 @@ func cutRoleOnlyUnread(dir string, m Manifest, o query.Options, variants map[str
 	}
 	byOrd := sessionMetaByOrd(m)
 	failed := func(posts []posting) (map[string]bool, error) {
-		held, err := sessionsBorneOut(dir, m, o, variants, posts)
-		if err != nil {
-			return nil, err
+		held, heldErr := sessionsBorneOut(dir, m, o, variants, posts)
+		if heldErr != nil {
+			return nil, heldErr
 		}
 		ok := map[string]bool{}
 		for _, s := range held {
@@ -4261,13 +4268,13 @@ func substringPostingsFrom(dirs []bucketDir, bare []string, dead []int64) (_ []p
 				if f == nil {
 					var err error
 					if f, err = openIndexFile(bd.path); err != nil {
-						return nil, nil, false, nil
+						return nil, nil, false, nil //nolint:nilerr // not ok: the caller reads the slow way
 					}
 					// The same file, not one of the same size: a rebuild renames a
 					// new bucket in, and a coarse clock can give it the old time.
 					if fi, err := f.Stat(); err != nil || !os.SameFile(fi, bd.stat) || fi.Size() != bd.stat.Size() || !fi.ModTime().Equal(bd.stat.ModTime()) {
-						f.Close()
-						return nil, nil, false, nil
+						_ = f.Close()
+						return nil, nil, false, nil //nolint:nilerr // not ok: the caller reads the slow way
 					}
 				}
 				// Once, though an overlay can hold the token beside its bucket.
@@ -4275,15 +4282,15 @@ func substringPostingsFrom(dirs []bucketDir, bare []string, dead []int64) (_ []p
 					variants[b] = append(variants[b], tok)
 				}
 				buf := make([]byte, e.n)
-				if _, err := f.ReadAt(buf, int64(e.off)); err != nil {
+				if _, err := f.ReadAt(buf, int64(e.off)); err != nil { //nolint:gosec // offsets are checked against the bucket size on open
 					// The bucket directory validated but the block it points to
 					// will not read: corruption, not a missing token. Surface it.
-					f.Close()
-					return nil, nil, false, fmt.Errorf("%w: %v", errCorruptIndex, err)
+					_ = f.Close()
+					return nil, nil, false, fmt.Errorf("%w: %w", errCorruptIndex, err)
 				}
 				posts, err := decodePostingBlock(buf)
 				if err != nil {
-					f.Close()
+					_ = f.Close()
 					return nil, nil, false, err
 				}
 				for _, p := range posts {
@@ -4292,7 +4299,7 @@ func substringPostingsFrom(dirs []bucketDir, bare []string, dead []int64) (_ []p
 			}
 		}
 		if f != nil {
-			f.Close()
+			_ = f.Close()
 		}
 	}
 	set := perTok[0]
@@ -4340,7 +4347,7 @@ func fuzzyPostings(dir string, terms, phrases []string) ([]posting, map[string][
 		cat, err := tokenIndexCached(dir)
 		// A catalog that will not read means no, as it did before.
 		if err != nil || !hasFuzzyToken(terms, cat) {
-			return nil, nil, nil
+			return nil, nil, nil //nolint:nilerr // a catalog that will not read means no
 		}
 		idx = cat
 	}
@@ -5121,7 +5128,7 @@ func closeTokens(query string, idx *tokenIndex) []string {
 // isASCIIString reports whether every byte is one rune, so the byte length is
 // the rune count.
 func isASCIIString(s string) bool {
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		if s[i] >= utf8.RuneSelf {
 			return false
 		}
@@ -5129,7 +5136,7 @@ func isASCIIString(s string) bool {
 	return true
 }
 
-func damerauDistance(a, b string, max int) int {
+func damerauDistance(a, b string, limit int) int {
 	if len(a) <= 64 && len(b) <= 64 && utf8.ValidString(a) && utf8.ValidString(b) && utf8.RuneCountInString(a) == len(a) && utf8.RuneCountInString(b) == len(b) {
 		var prev, prevPrev, cur [65]int
 		for j := 0; j <= len(b); j++ {
@@ -5144,22 +5151,22 @@ func damerauDistance(a, b string, max int) int {
 				}
 				cur[j] = min(cur[j-1]+1, min(prev[j]+1, prev[j-1]+cost))
 				if i > 1 && j > 1 && a[i-1] == b[j-2] && a[i-2] == b[j-1] {
-					cur[j] = min(cur[j], prevPrev[j-2]+1)
+					cur[j] = min(cur[j], prevPrev[j-2]+1) //nolint:gosec // j <= len(b) <= 64 and the arrays hold 65
 				}
 			}
 			prevPrev, prev, cur = prev, cur, prevPrev
 		}
 		return prev[len(b)]
 	}
-	return damerauDistanceRunes(a, b, max)
+	return damerauDistanceRunes(a, b, limit)
 }
 
-func damerauDistanceRunes(a, b string, max int) int {
+func damerauDistanceRunes(a, b string, limit int) int {
 	// Before the conversion: an edit changes the length by one, so a pair too
 	// far apart in runes cannot match however it is spelled, and counting
 	// costs no allocation.
-	if abs(utf8.RuneCountInString(a)-utf8.RuneCountInString(b)) > max {
-		return max + 1
+	if abs(utf8.RuneCountInString(a)-utf8.RuneCountInString(b)) > limit {
+		return limit + 1
 	}
 	// On the stack for a word of ordinary length. The close tier runs this
 	// against every catalog token within two runes of the query's length, and
@@ -5197,8 +5204,8 @@ func damerauDistanceRunes(a, b string, max int) int {
 		// nothing or one, so once two rows in a row are past max no later
 		// row comes back under it. The callers only ask whether a token is
 		// within max, and past it any number above max answers that.
-		if rowMin > max && prevMin > max {
-			return max + 1
+		if rowMin > limit && prevMin > limit {
+			return limit + 1
 		}
 		prevMin = rowMin
 		prevPrev, prev, cur = prev, cur, prevPrev

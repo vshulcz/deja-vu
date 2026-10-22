@@ -47,7 +47,7 @@ func bruteCloseTokens(query string, catalog map[string]bool) []string {
 // length, the overflow bucket for very long tokens — is where it would go
 // wrong quietly.
 func TestFuzzyLengthBucketsMatchBruteForce(t *testing.T) {
-	rng := rand.New(rand.NewSource(3))
+	rng := rand.New(rand.NewSource(3)) //nolint:gosec // a seeded fixture, not crypto
 	al := []rune("abcdefghijklmnopqrstuvwxyz")
 	cyr := []rune("абвгдеёжзийклмнопрстуфхцчшщыэюя")
 	catalog := map[string]bool{}
@@ -69,7 +69,7 @@ func TestFuzzyLengthBucketsMatchBruteForce(t *testing.T) {
 	catalog[word(cyr, maxIndexedTokenLen+3)] = true
 
 	idx := newTokenIndex(catalog)
-	queries := []string{"a", "ab", "abcdefgh", "мосты", "конфигурация", long, long[:20], strings.Repeat("z", 40)}
+	queries := []string{"a", "ab", "abcdefgh", "мосты", "конфигурация", long, long[:20], strings.Repeat("z", 40)} //nolint:prealloc // a fixture literal the loop below grows
 	for range 40 {
 		queries = append(queries, word(al, 1+rng.Intn(20)), word(cyr, 1+rng.Intn(16)))
 	}

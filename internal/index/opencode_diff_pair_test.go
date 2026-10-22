@@ -15,8 +15,8 @@ import (
 // One conversation in two stores is the goose case, and it is not reported
 // either (#3791).
 func TestADiffFileIsNotACollisionWithItsOwnSession(t *testing.T) {
-	db := filepath.Join("/data", "opencode", "opencode.db")
-	diff := filepath.Join("/data", "opencode", "storage", "session_diff", "ses_a.json")
+	db := filepath.FromSlash("/data/opencode/opencode.db")
+	diff := filepath.FromSlash("/data/opencode/storage/session_diff/ses_a.json")
 
 	// The diff arriving second: the database row keeps the session.
 	held := SessionMeta{Harness: "opencode", ID: "ses_a", Path: db, Project: "pool"}
@@ -40,7 +40,7 @@ func TestADiffFileIsNotACollisionWithItsOwnSession(t *testing.T) {
 
 	// Two genuinely different transcripts under one id still are a collision:
 	// that is what the report exists for.
-	other := SessionMeta{Harness: "opencode", ID: "ses_a", Path: filepath.Join("/data", "opencode", "other.db")}
+	other := SessionMeta{Harness: "opencode", ID: "ses_a", Path: filepath.FromSlash("/data/opencode/other.db")}
 	if _, collided = attributeSession(other, model.Session{Harness: "opencode", ID: "ses_a", Path: db}); !collided {
 		t.Error("two databases under one id stopped being reported")
 	}

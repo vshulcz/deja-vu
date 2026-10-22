@@ -18,7 +18,7 @@ func TestASessionRecordsTheFilesItReallyWorkedOn(t *testing.T) {
 		// Recurrence decides the order, so give the later files fewer touches:
 		// what is pinned is that the tail is kept at all, not that it is ranked
 		// differently than before.
-		for r := 0; r < 30-i; r++ {
+		for range 30 - i {
 			ms = append(ms, model.Message{
 				Role: roleFiles,
 				Text: fmt.Sprintf("internal/index/file%02d.go", i),
@@ -45,7 +45,7 @@ func TestASessionRecordsTheFilesItReallyWorkedOn(t *testing.T) {
 // And the bound still bounds: a session that touched hundreds does not carry
 // hundreds into every hook that reads the manifest.
 func TestTheRecordedListIsStillBounded(t *testing.T) {
-	var ms []model.Message
+	ms := make([]model.Message, 0, 500)
 	for i := range 500 {
 		ms = append(ms, model.Message{Role: roleFiles, Text: fmt.Sprintf("pkg/f%03d.go", i)})
 	}

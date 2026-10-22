@@ -19,7 +19,7 @@ func TestTheEarlySliceKnowsWhatItIsASliceOf(t *testing.T) {
 	tmp := hermeticIndexEnv(t)
 	dir := filepath.Join(tmp, "idx")
 	now := time.Now()
-	var ss []model.Session
+	ss := make([]model.Session, 0, 450)
 	for i := range 450 {
 		ss = append(ss, model.Session{
 			ID: fmt.Sprintf("s%03d", i), Harness: "claude", Project: "p",

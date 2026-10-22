@@ -52,7 +52,7 @@ func buildCooccur(tmp string, ss []model.Session) {
 		// A copy: the token came out of a strings.Builder and carries its
 		// spare capacity, which would otherwise live as long as the map.
 		t = strings.Clone(t)
-		v := uint32(len(toks))
+		v := uint32(len(toks)) //nolint:gosec // distinct tokens are far fewer than 2^32
 		ids[t] = v
 		toks = append(toks, t)
 		return v
@@ -162,7 +162,7 @@ func buildCooccur(tmp string, ss []model.Session) {
 			if c < cooccurMinPair {
 				continue
 			}
-			a, b := toks[uint32(key>>32)], toks[uint32(key)]
+			a, b := toks[uint32(key>>32)], toks[uint32(key)] //nolint:gosec // the key's halves are 32-bit token ids
 			cand[a] = append(cand[a], nc{b, c})
 			cand[b] = append(cand[b], nc{a, c})
 		}

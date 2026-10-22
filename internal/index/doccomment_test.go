@@ -42,7 +42,7 @@ func TestDocCommentsNameWhatTheyDocument(t *testing.T) {
 			fset := token.NewFileSet()
 			f, perr := parser.ParseFile(fset, path, nil, parser.ParseComments)
 			if perr != nil {
-				return nil // not this test's business
+				return nil //nolint:nilerr // not this test's business
 			}
 			for _, decl := range f.Decls {
 				name, doc := declNameAndDoc(decl)
@@ -177,7 +177,7 @@ func TestNoDocCommentRepeatsItsOwnHead(t *testing.T) {
 			fset := token.NewFileSet()
 			f, perr := parser.ParseFile(fset, path, nil, parser.ParseComments)
 			if perr != nil {
-				return nil
+				return nil //nolint:nilerr // not this test's business
 			}
 			for _, group := range f.Comments {
 				for _, c := range group.List {

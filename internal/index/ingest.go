@@ -517,6 +517,8 @@ func leftBehind(dir string) bool {
 	return len(parkedDirs(dir)) > 0
 }
 
+// Ensure brings the index in dir up to date with the transcripts on disk,
+// holding the index lock while it does.
 func Ensure(dir string, harness string, force bool, progress io.Writer) error {
 	if dir == "" {
 		dir = DefaultDir()
@@ -623,6 +625,8 @@ func EnsureUnlessBusy(dir string, progress io.Writer) (bool, error) {
 	return false, Ensure(dir, "", false, progress)
 }
 
+// EnsureForSearch is Ensure before a search: an index it cannot write is
+// served as it is rather than refused.
 func EnsureForSearch(dir string, o query.Options, force bool, progress io.Writer) error {
 	if dir == "" {
 		dir = DefaultDir()
@@ -890,7 +894,7 @@ const redactionFloor = 46
 // that is what onDiskFormat is for — and text written before deja knew how to
 // redact something must not be quoted while it is being re-read. An index a
 // newer deja wrote in the same layout is neither: see newerIndex.
-func mustRebuildBeforeAnswering(m Manifest, build int) bool {
+func mustRebuildBeforeAnswering(m Manifest, _ int) bool {
 	return m.Format != onDiskFormat || m.Version < redactionFloor
 }
 
@@ -1158,9 +1162,9 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 				if strings.TrimSpace(text) == "" {
 					continue
 				}
-				off, err := rw.write(Record{Key: key, SourcePath: src, Role: msg.Role, Text: text, Time: msg.Time})
-				if err != nil {
-					return err
+				off, writeErr := rw.write(Record{Key: key, SourcePath: src, Role: msg.Role, Text: text, Time: msg.Time})
+				if writeErr != nil {
+					return writeErr
 				}
 				if msg.Role == roleCommand {
 					cmdState.add(key, tbl.intern(src), text, msg.Time, off)
@@ -1229,7 +1233,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	// before the bucket files are assembled, rather than sitting beside the
 	// postings as the larger half of the build's peak.
 	summary := buildSummary(initialBuild, len(m.Sessions), writtenMessages, ss)
-	ss, imported.sessions, orphans.sessions, vanished = nil, nil, nil, nil
+	ss, imported.sessions, orphans.sessions = nil, nil, nil
 	cmdState, seenMsgs, keptTurns = nil, nil, nil
 	reportPhase("writing index", sp.bucketCount())
 	if err := sp.writeBuckets(filepath.Join(tmp, "buckets")); err != nil {
@@ -2459,9 +2463,9 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 				if strings.TrimSpace(text) == "" {
 					continue
 				}
-				off, err := rw.write(Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
-				if err != nil {
-					return err
+				off, writeErr := rw.write(Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
+				if writeErr != nil {
+					return writeErr
 				}
 				wroteMu.Lock()
 				wrote[key] = true
@@ -2815,8 +2819,8 @@ var seenSeeds = [2]maphash.Seed{maphash.MakeSeed(), maphash.MakeSeed()}
 func seenKey(key, role string, ts time.Time, text string) seenK {
 	var k seenK
 	var stamp [12]byte
-	binary.LittleEndian.PutUint64(stamp[:8], uint64(ts.Unix()))
-	binary.LittleEndian.PutUint32(stamp[8:], uint32(ts.Nanosecond()))
+	binary.LittleEndian.PutUint64(stamp[:8], uint64(ts.Unix()))       //nolint:gosec // the stamp keeps the bits, it is only hashed
+	binary.LittleEndian.PutUint32(stamp[8:], uint32(ts.Nanosecond())) //nolint:gosec // nanoseconds are below 1e9
 	for i, seed := range seenSeeds {
 		var h maphash.Hash
 		h.SetSeed(seed)
@@ -4373,7 +4377,7 @@ func recordsForKey(path string, t *recordTables, key string) ([]Record, error) {
 	return out, err
 }
 
-func redactForIngest(m *Manifest, sourcePath, text string) string {
+func redactForIngest(m *Manifest, sourcePath, text string) string { //nolint:unparam // the result is the stored text; tests read only the counts
 	// Drop deja's own injected recall before anything else looks at the text,
 	// so it is never counted, tokenized or stored.
 	text = stripSelfRecall(text)
@@ -4655,7 +4659,9 @@ func storeHarness(p string) string {
 	// the same database, and asking the registry again for each one was a
 	// third of a one-message pass over 5,000 sessions (#4272).
 	if h, ok := passStoreHarness.Load(p); ok {
-		return h.(string)
+		if s, isString := h.(string); isString {
+			return s
+		}
 	}
 	h := resolveStoreHarness(p)
 	passStoreHarness.Store(p, h)
@@ -5139,7 +5145,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		// outside this run's view — a hook started with a stripped environment
 		// (#4738), a root no longer set — and that is no reason to drop the
 		// store's sessions, so they stay.
-		if _, err := os.Lstat(p); err == nil {
+		if _, lstatErr := os.Lstat(p); lstatErr == nil {
 			if view == nil {
 				view = newListedView(files, old.Sessions)
 			}
@@ -5153,7 +5159,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 				unseen[p] = true
 			}
 			continue
-		} else if os.IsPermission(err) {
+		} else if os.IsPermission(lstatErr) {
 			// Behind a directory this run may not enter: not deleted, and
 			// not outside the stores read either. The unreadable line names
 			// the directory (#5393).
@@ -5291,15 +5297,15 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		return nil
 	}
 	appendPass := func(files, changed map[string]FileState, last bool) error {
-		filesTouched, messages, unreadable, err := appendIncremental(dir, harness, scope, old, files, changed)
-		if IsCorrupt(err) {
+		filesTouched, messages, unreadable, appendErr := appendIncremental(dir, harness, scope, old, files, changed)
+		if IsCorrupt(appendErr) {
 			if progress != nil {
-				fmt.Fprintf(progress, "deja: %s (%v), rebuilding ...\n", damagedOrOutdated(err), err)
+				fmt.Fprintf(progress, "deja: %s (%v), rebuilding ...\n", damagedOrOutdated(appendErr), appendErr)
 			}
 			return rebuild(dir, harness, scope, files, progress)
 		}
-		if err != nil {
-			return fmt.Errorf("append: %w", err)
+		if appendErr != nil {
+			return fmt.Errorf("append: %w", appendErr)
 		}
 		if last {
 			sayKept()
@@ -5325,8 +5331,8 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		// Decided per file: the appendable ones are appended, and the pass
 		// after it, over the same walk, replaces only the rest (#5324).
 		if appendable, rest := splitAppendable(changed, old.Files, old.Sessions); split && len(appendable) > 0 && len(rest) > 0 {
-			if err := appendPass(withoutRest(files, rest, old.Files), appendable, false); err != nil {
-				return err
+			if passErr := appendPass(withoutRest(files, rest, old.Files), appendable, false); passErr != nil {
+				return passErr
 			}
 			return updateIndexPass(dir, harness, scope, walked, false, false, progress)
 		}
@@ -5385,9 +5391,9 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 			diffs = append(diffs, p)
 			return
 		}
-		ss, f, again, err := readSettled(p, f, func() ([]model.Session, error) { return parseChangedFile(harness, p, old.Files[p]) })
-		if err != nil {
-			skip(p, err)
+		ss, f, again, readErr := readSettled(p, f, func() ([]model.Session, error) { return parseChangedFile(harness, p, old.Files[p]) })
+		if readErr != nil {
+			skip(p, readErr)
 			return
 		}
 		if _, ok := changed[p]; ok {
@@ -5467,10 +5473,10 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	if len(pending) > 0 {
 		// Read together: one query rather than one a file, each paying for
 		// every session's parent and title again.
-		ss, err := sources.ParseOpencodeDiffSessions(pending)
-		if err != nil {
+		ss, parseErr := sources.ParseOpencodeDiffSessions(pending)
+		if parseErr != nil {
 			for _, p := range pending {
-				skip(p, err)
+				skip(p, parseErr)
 			}
 		} else {
 			at := map[string]string{}
@@ -5583,9 +5589,9 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 		fmt.Fprintln(progress, line)
 	}
 	tmp := dir + ".tmp"
-	os.RemoveAll(tmp)
-	if err := os.MkdirAll(filepath.Join(tmp, "buckets"), 0o700); err != nil {
-		return err
+	_ = os.RemoveAll(tmp)
+	if mkErr := os.MkdirAll(filepath.Join(tmp, "buckets"), 0o700); mkErr != nil {
+		return mkErr
 	}
 	// Appended to the log the old index holds, or the log written anew: see
 	// append_replace.go (#5387).
@@ -5606,21 +5612,21 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	}
 	swap := func(m Manifest) error {
 		if appending && beforeAppendSwap != nil {
-			if err := beforeAppendSwap(); err != nil {
-				return err
+			if hookErr := beforeAppendSwap(); hookErr != nil {
+				return hookErr
 			}
 		}
 		if appending && len(dead) > 0 {
-			if err := markScrubPending(tmp); err != nil {
-				return err
+			if markErr := markScrubPending(tmp); markErr != nil {
+				return markErr
 			}
 		}
-		err := swapIndexDir(dir, tmp)
-		swapped = err == nil
+		swapErr := swapIndexDir(dir, tmp)
+		swapped = swapErr == nil
 		if swapped && len(dead) > 0 {
 			scrubSwapped(dir, m, dead)
 		}
-		return err
+		return swapErr
 	}
 	var rf *os.File
 	tbl := newRecordTables()
@@ -5824,7 +5830,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 			return errShortRecord
 		}
 		r := Record{Key: oldTables.lookup(kid), SourcePath: oldTables.lookup(pid), Role: oldTables.lookup(rid)}
-		if _, ok := compacted[r.Key]; ok || rederive[r.Key] {
+		if _, inCompacted := compacted[r.Key]; inCompacted || rederive[r.Key] {
 			full, err := decodeRecord(payload, oldTables)
 			if err != nil {
 				return err
@@ -5953,7 +5959,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 			var listed bool
 			if held, listed = old.Sessions[key]; !listed {
 				// Set aside without an Ord; the one this pass gives it.
-				if row, ok := old.Empty[key]; ok {
+				if row, empty := old.Empty[key]; empty {
 					held = metaWithOrd(row, ord)
 				}
 			}
@@ -6351,7 +6357,7 @@ func readSettled(p string, f FileState, parse func() ([]model.Session, error)) (
 		}
 		f = walkFileStateIn(sources.Registry(), p, fi, nil)
 		if strings.HasSuffix(p, ".jsonl") {
-			defer sources.LimitReads(map[string]int64{p: f.Size})()
+			defer sources.LimitReads(map[string]int64{p: f.Size})() //nolint:gocritic // two at most, each held until the read returns
 		}
 	}
 }
@@ -6403,14 +6409,14 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	var rowMoved map[string]bool
 	// Only what this pass adds: it goes into an overlay beside each bucket
 	// rather than into the bucket written whole again (#5387).
-	loadBucket := func(tok string) (map[string][]posting, error) {
+	loadBucket := func(tok string) map[string][]posting {
 		b := bucket(tok)
 		data, ok := buckets[b]
 		if !ok {
 			data = map[string][]posting{}
 			buckets[b] = data
 		}
-		return data, nil
+		return data
 	}
 	m := old
 	m.Version = version
@@ -6450,22 +6456,22 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	for _, p := range order {
 		of, known := old.Files[p]
 		var ss []model.Session
-		var err error
+		var parseErr error
 		if known {
 			// Appended to from where the last pass stopped, which a rewrite
 			// moves: the next pass decides how to read it.
-			ss, err = parseAppendedFile(harness, p, of, false)
-			if err == nil && !readAsWalked(p, changed[p]) {
-				err = errChangedWhileRead
+			ss, parseErr = parseAppendedFile(harness, p, of, false)
+			if parseErr == nil && !readAsWalked(p, changed[p]) {
+				parseErr = errChangedWhileRead
 			}
 		} else {
 			var f FileState
-			ss, f, _, err = readSettled(p, changed[p], func() ([]model.Session, error) { return parseAppendedFile(harness, p, of, true) })
-			if err == nil {
+			ss, f, _, parseErr = readSettled(p, changed[p], func() ([]model.Session, error) { return parseAppendedFile(harness, p, of, true) })
+			if parseErr == nil {
 				m.Files[p], changed[p] = f, f
 			}
 		}
-		if err != nil {
+		if parseErr != nil {
 			if known {
 				m.Files[p] = of // retry this file on the next pass
 			} else {
@@ -6534,7 +6540,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 			// Not for an arrival with nothing to index: that is Gemini's resume
 			// stub beside a deleted transcript, not the transcript moving (#4213).
 			if meta.Path != "" && s.Path != "" && meta.Path != s.Path && holdsText(s) && !m.Files[meta.Path].Kept {
-				if _, err := os.Lstat(meta.Path); err != nil {
+				if _, lstatErr := os.Lstat(meta.Path); lstatErr != nil {
 					meta.Path = ""
 				}
 			}
@@ -6673,35 +6679,24 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 				if seenMsgs.dup(key, msg.Role, msg.Time, text) {
 					continue
 				}
-				off, err := rw.write(Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
-				if err != nil {
-					return filesTouched, messages, 0, err
+				off, writeErr := rw.write(Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
+				if writeErr != nil {
+					return filesTouched, messages, 0, writeErr
 				}
 				messages++
 				wroteUnder[key] = true
 				// Keyed the way a rebuild keys it: only the part that earns
 				// postings, its date keys, and the tool bit.
-				var keyErr error
 				tool := isToolRole(msg.Role)
 				eachIndexKey(tokenizedPart(msg.Role, text), msg.Time, func(tok string) {
-					if keyErr != nil {
-						return
-					}
-					data, err := loadBucket(tok)
-					if err != nil {
-						keyErr = err
-						return
-					}
+					data := loadBucket(tok)
 					data[tok] = append(data[tok], posting{Off: off, Sid: meta.Ord, Tool: tool})
 				})
-				if keyErr != nil {
-					return filesTouched, messages, 0, keyErr
-				}
 			}
 		}
 	}
-	if err := rw.Close(); err != nil {
-		return filesTouched, messages, 0, err
+	if closeErr := rw.Close(); closeErr != nil {
+		return filesTouched, messages, 0, closeErr
 	}
 	for key := range emptyBefore {
 		if !wroteUnder[key] {
@@ -6906,7 +6901,7 @@ func kindIn(reg []sources.Harness, p string) (sources.FileKind, bool) {
 	return sources.FileKind{}, false
 }
 
-func parseChangedFile(harness, p string, old FileState) ([]model.Session, error) {
+func parseChangedFile(_, p string, old FileState) ([]model.Session, error) {
 	k, ok := kindForPath(p)
 	if !ok {
 		return nil, nil
@@ -6914,7 +6909,7 @@ func parseChangedFile(harness, p string, old FileState) ([]model.Session, error)
 	return sources.ReadWatched(p, func() ([]model.Session, error) { return k.Parse(p, old.LastUpdated) })
 }
 
-func parseAppendedFile(harness, p string, old FileState, isNew bool) (ss []model.Session, err error) {
+func parseAppendedFile(_, p string, old FileState, isNew bool) (ss []model.Session, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			ss, err = nil, fmt.Errorf("parser panic on %s: %v", p, r)
@@ -7432,7 +7427,7 @@ func dirListable(p string) bool {
 		return false
 	}
 	defer func() { _ = f.Close() }()
-	if fi, err := f.Stat(); err != nil || !fi.IsDir() {
+	if fi, statErr := f.Stat(); statErr != nil || !fi.IsDir() {
 		return false
 	}
 	_, err = f.Readdirnames(1)
@@ -7508,8 +7503,8 @@ const (
 )
 
 // walkFileState is what the walk records for a transcript file.
-func walkFileState(p string, fi os.FileInfo, old map[string]FileState) FileState {
-	return walkFileStateIn(sources.Registry(), p, fi, old)
+func walkFileState(p string, fi os.FileInfo) FileState {
+	return walkFileStateIn(sources.Registry(), p, fi, nil)
 }
 
 // walkFileStateIn is walkFileState against a registry the caller built once.

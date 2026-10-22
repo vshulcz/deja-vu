@@ -378,6 +378,7 @@ func HarnessKeptCounts(dir string) map[string]int {
 	return out
 }
 
+// Redactions reports what redaction masked in the index at dir.
 func Redactions(dir string) (RedactionStats, error) {
 	if dir == "" {
 		dir = DefaultDir()

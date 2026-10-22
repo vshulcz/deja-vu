@@ -107,14 +107,14 @@ func TestRereadingASharedIDsOwnerKeepsTheOtherFilesSpan(t *testing.T) {
 	for _, stub := range []string{"session-z-008140a7.jsonl", "session-a-008140a7.jsonl"} {
 		t.Run(stub, func(t *testing.T) {
 			tmp := hermeticIndexEnv(t)
-			real := filepath.Join(geminiChats(), "session-b-008140a7.jsonl")
-			write(t, real, geminiOriginal())
+			realPath := filepath.Join(geminiChats(), "session-b-008140a7.jsonl")
+			write(t, realPath, geminiOriginal())
 			write(t, filepath.Join(geminiChats(), stub), geminiStub())
 			dir := filepath.Join(tmp, "idx")
 			if err := Ensure(dir, "", true, nil); err != nil {
 				t.Fatal(err)
 			}
-			f, err := os.OpenFile(real, os.O_APPEND|os.O_WRONLY, 0o644)
+			f, err := os.OpenFile(realPath, os.O_APPEND|os.O_WRONLY, 0o644)
 			if err != nil {
 				t.Fatal(err)
 			}

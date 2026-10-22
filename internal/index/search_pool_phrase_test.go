@@ -18,7 +18,7 @@ func phraseStore(t *testing.T, apart int) string {
 	dir := filepath.Join(t.TempDir(), "index.db")
 	now := time.Now()
 	ss := make([]model.Session, 0, apart+5)
-	for i := 0; i < apart+5; i++ {
+	for i := range apart + 5 {
 		at := now.Add(-time.Duration(i) * time.Minute)
 		text := fmt.Sprintf("alpha went out first and beta followed in run %d", i)
 		if i%(apart/5+1) == 0 && i/(apart/5+1) < 5 {

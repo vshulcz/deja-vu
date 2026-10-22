@@ -37,10 +37,10 @@ func TestManifestCacheInvalidatesOnReindex(t *testing.T) {
 	}
 	// Reindex swaps manifest.gob; the cache must notice the new mtime/size.
 	line2 := `{"type":"user","sessionId":"c2","timestamp":"2026-01-03T03:04:05Z","message":{"role":"user","content":"second session"}}` + "\n"
-	if err := os.WriteFile(filepath.Join(proj, "c2.jsonl"), []byte(line2), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(proj, "c2.jsonl"), []byte(line2), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := Ensure(dir, "", true, nil); err != nil {
+	if err = Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	m3, err := readManifestCached(dir)

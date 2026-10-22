@@ -106,8 +106,9 @@ type awaitingTranscript struct {
 }
 
 func runRandomHistory(t *testing.T, seed int64, walls bool) {
+	t.Helper()
 	h := newTwoWayEnv(t)
-	r := &historyRun{t: t, h: h, rng: rand.New(rand.NewSource(seed)), index: filepath.Join(h.tmp, "a.db"), walls: walls, shapes: rand.New(rand.NewSource(-seed))}
+	r := &historyRun{t: t, h: h, rng: rand.New(rand.NewSource(seed)), index: filepath.Join(h.tmp, "a.db"), walls: walls, shapes: rand.New(rand.NewSource(-seed))} //nolint:gosec // a seeded fixture, not crypto
 	r.openStores()
 	// Even seeds extend the offset table on every pass; odd ones leave the
 	// tail to the readers' walk, as a small append does on a real store.

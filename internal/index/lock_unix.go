@@ -33,7 +33,7 @@ func lockDir(dir string) (func(), error) {
 		err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX)
 		ended()
 		if err != nil {
-			f.Close()
+			_ = f.Close()
 			return nil, fmt.Errorf("lock index: %w", err)
 		}
 	}
@@ -78,8 +78,8 @@ func tryLockDir(dir string) (func(), bool, error) {
 		return nil, false, err
 	}
 	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
-		f.Close()
-		return nil, false, nil
+		_ = f.Close()
+		return nil, false, nil //nolint:nilerr // another process holds the lock
 	}
 	recoverIndexDir(dir)
 	return func() {

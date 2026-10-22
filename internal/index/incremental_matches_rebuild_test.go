@@ -72,36 +72,45 @@ func (h *twoWayEnv) add(project, sid, body string) {
 	}
 }
 
+// mustJSON is json.Marshal for fixtures, which always encode.
+func mustJSON(v any) []byte {
+	b, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
 func hjson(v any) string {
-	b, _ := json.Marshal(v)
+	b := mustJSON(v)
 	return string(b) + "\n"
 }
 
-func hts(day, min int) string { return fmt.Sprintf("2026-06-%02dT10:%02d:00Z", day, min) }
+func hts(day, minute int) string { return fmt.Sprintf("2026-06-%02dT10:%02d:00Z", day, minute) }
 
-func hPrompt(project, sid string, day, min int, text string) string {
-	return hjson(map[string]any{"type": "user", "sessionId": sid, "timestamp": hts(day, min), "cwd": "/Users/me/" + project,
+func hPrompt(project, sid string, day, minute int, text string) string {
+	return hjson(map[string]any{"type": "user", "sessionId": sid, "timestamp": hts(day, minute), "cwd": "/Users/me/" + project,
 		"message": map[string]any{"role": "user", "content": text}})
 }
 
-func hSay(project, sid string, day, min int, text string) string {
-	return hjson(map[string]any{"type": "assistant", "sessionId": sid, "timestamp": hts(day, min), "cwd": "/Users/me/" + project,
+func hSay(project, sid string, day, minute int, text string) string {
+	return hjson(map[string]any{"type": "assistant", "sessionId": sid, "timestamp": hts(day, minute), "cwd": "/Users/me/" + project,
 		"message": map[string]any{"role": "assistant", "content": []any{map[string]any{"type": "text", "text": text}}}})
 }
 
-func hBash(project, sid string, day, min int, id, cmd, out string, failed bool) string {
-	a := map[string]any{"type": "assistant", "sessionId": sid, "timestamp": hts(day, min), "cwd": "/Users/me/" + project,
+func hBash(project, sid string, day, minute int, id, cmd, out string, failed bool) string {
+	a := map[string]any{"type": "assistant", "sessionId": sid, "timestamp": hts(day, minute), "cwd": "/Users/me/" + project,
 		"message": map[string]any{"role": "assistant", "content": []any{map[string]any{"type": "tool_use", "id": id, "name": "Bash", "input": map[string]any{"command": cmd}}}}}
-	r := map[string]any{"type": "user", "sessionId": sid, "timestamp": hts(day, min), "cwd": "/Users/me/" + project,
+	r := map[string]any{"type": "user", "sessionId": sid, "timestamp": hts(day, minute), "cwd": "/Users/me/" + project,
 		"message": map[string]any{"role": "user", "content": []any{map[string]any{"type": "tool_result", "tool_use_id": id, "is_error": failed, "content": out}}}}
 	return hjson(a) + hjson(r)
 }
 
-func hEdit(project, sid string, day, min int, id, file, old, new string) string {
-	a := map[string]any{"type": "assistant", "sessionId": sid, "timestamp": hts(day, min), "cwd": "/Users/me/" + project,
+func hEdit(project, sid string, day, minute int, id, file, old, updated string) string {
+	a := map[string]any{"type": "assistant", "sessionId": sid, "timestamp": hts(day, minute), "cwd": "/Users/me/" + project,
 		"message": map[string]any{"role": "assistant", "content": []any{map[string]any{"type": "tool_use", "id": id, "name": "Edit",
-			"input": map[string]any{"file_path": "/Users/me/" + project + "/" + file, "old_string": old, "new_string": new}}}}}
-	r := map[string]any{"type": "user", "sessionId": sid, "timestamp": hts(day, min), "cwd": "/Users/me/" + project,
+			"input": map[string]any{"file_path": "/Users/me/" + project + "/" + file, "old_string": old, "new_string": updated}}}}}
+	r := map[string]any{"type": "user", "sessionId": sid, "timestamp": hts(day, minute), "cwd": "/Users/me/" + project,
 		"message": map[string]any{"role": "user", "content": []any{map[string]any{"type": "tool_result", "tool_use_id": id, "content": "The file has been updated."}}}}
 	return hjson(a) + hjson(r)
 }
@@ -138,7 +147,7 @@ func takeSnap(t *testing.T, dir string) snap {
 	for k, meta := range m.Sessions {
 		byOrd[meta.Ord] = k
 		meta.Ord = 0
-		b, _ := json.Marshal(meta)
+		b := mustJSON(meta)
 		s.sessions[k] = inUTC(string(b))
 	}
 	recs, err := ReadRecords(dir)
@@ -179,7 +188,7 @@ func takeSnap(t *testing.T, dir string) snap {
 		}
 	}
 	add := func(name string, v any) {
-		b, _ := json.Marshal(v)
+		b := mustJSON(v)
 		s.sidecars[name] = inUTC(string(b))
 	}
 	add("compactions", m.Compactions)
@@ -193,33 +202,33 @@ func takeSnap(t *testing.T, dir string) snap {
 	sort.Strings(kept)
 	add("kept files", kept)
 	fx := ReadFixes(dir)
-	var fxs []string
+	fxs := make([]string, 0, len(fx))
 	for _, p := range fx {
-		b, _ := json.Marshal(p)
+		b := mustJSON(p)
 		fxs = append(fxs, string(b))
 	}
 	sort.Strings(fxs)
 	add("fixes", fxs)
 	raw, _ := readFixRaw(dir)
-	var rws []string
+	rws := make([]string, 0, len(raw))
 	for _, p := range raw {
-		b, _ := json.Marshal(p)
+		b := mustJSON(p)
 		rws = append(rws, string(b))
 	}
 	sort.Strings(rws)
 	add("fixraw", rws)
 	cmds := ReadCommands(dir)
-	var cs []string
+	cs := make([]string, 0, len(cmds))
 	for _, c := range cmds {
-		b, _ := json.Marshal(c)
+		b := mustJSON(c)
 		cs = append(cs, string(b))
 	}
 	sort.Strings(cs)
 	add("commands", cs)
 	cf := ReadCommandFails(dir)
-	var cfs []string
+	cfs := make([]string, 0, len(cf))
 	for _, c := range cf {
-		b, _ := json.Marshal(c)
+		b := mustJSON(c)
 		cfs = append(cfs, string(b))
 	}
 	sort.Strings(cfs)
@@ -307,7 +316,7 @@ func inUTC(s string) string {
 
 func copyDir(t *testing.T, from, to string) {
 	t.Helper()
-	if out, err := exec.Command("cp", "-R", from, to).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "cp", "-R", from, to).CombinedOutput(); err != nil {
 		t.Fatalf("cp: %v %s", err, out)
 	}
 }
@@ -489,7 +498,7 @@ func TestImportSidecarsMatchRebuild(t *testing.T) {
 
 func cursorSQL(t *testing.T, db, sql string) {
 	t.Helper()
-	if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, sql).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3: %v: %s", err, out)
 	}
 }

@@ -38,12 +38,12 @@ func TestSearchRecoversFromCorruptBucket(t *testing.T) {
 		t.Fatalf("buckets glob err=%v n=%d", err, len(buckets))
 	}
 	for _, b := range buckets {
-		if err := os.Truncate(b, 3); err != nil {
+		if err = os.Truncate(b, 3); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	if _, err := Search(dir, o); !IsCorrupt(err) {
+	if _, err = Search(dir, o); !IsCorrupt(err) {
 		t.Fatalf("Search error = %v, want corrupt index", err)
 	}
 	ss, err := SearchWithRecovery(dir, o, nil)

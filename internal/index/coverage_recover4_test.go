@@ -182,7 +182,7 @@ func TestAppendIncrementalUnreadableGrownFileKeepsOldState(t *testing.T) {
 	if _, err := f.WriteString(claudeLine("s1", "2026-01-02T03:05:05Z", "keepold second")); err != nil {
 		t.Fatal(err)
 	}
-	f.Close()
+	_ = f.Close()
 	if err := os.Chmod(file, 0o000); err != nil {
 		t.Fatal(err)
 	}
@@ -214,11 +214,11 @@ func TestAppendIncrementalNewSessionMidFile(t *testing.T) {
 	}
 	// A distinct sessionId appended to the same file: the append parses a
 	// brand-new session with no prior manifest entry.
-	if _, err := f.WriteString(claudeLine("s2-brand-new", "2026-01-02T04:00:00Z", "midfile second session")); err != nil {
+	if _, err = f.WriteString(claudeLine("s2-brand-new", "2026-01-02T04:00:00Z", "midfile second session")); err != nil {
 		t.Fatal(err)
 	}
-	f.Close()
-	if err := Ensure(dir, "", false, nil); err != nil {
+	_ = f.Close()
+	if err = Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	ss, err := Search(dir, search.Options{Query: "midfile second session", All: true})
@@ -264,11 +264,11 @@ func TestAppendIncrementalBucketAndManifestWriteErrors(t *testing.T) {
 	}
 	// A brand-new token forces a brand-new bucket file, which requires
 	// creating a new entry in the now read-only buckets directory.
-	if _, err := f.WriteString(claudeLine("s1", "2026-01-02T03:06:05Z", "zzzneverseenbeforetoken")); err != nil {
+	if _, err = f.WriteString(claudeLine("s1", "2026-01-02T03:06:05Z", "zzzneverseenbeforetoken")); err != nil {
 		t.Fatal(err)
 	}
-	f.Close()
-	if err := Ensure(dir, "", false, nil); err == nil {
+	_ = f.Close()
+	if err = Ensure(dir, "", false, nil); err == nil {
 		t.Fatal("Ensure with unwritable buckets dir for a new token returned nil")
 	}
 	_ = os.Chmod(filepath.Join(dir, "buckets"), 0o755)
@@ -276,12 +276,12 @@ func TestAppendIncrementalBucketAndManifestWriteErrors(t *testing.T) {
 	file2 := filepath.Join(claudeRoot, "p2", "s2.jsonl")
 	write(t, file2, claudeLine("s2", "2026-01-02T03:04:05Z", "manifesterr existingtoken"))
 	dir2 := filepath.Join(tmp, "idx2")
-	if err := Ensure(dir2, "", false, nil); err != nil {
+	if err = Ensure(dir2, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	// Block the manifest tmp path instead of chmod: lockDir re-tightens the
 	// directory to 0700, so permission games no longer stick.
-	if err := os.MkdirAll(filepath.Join(dir2, "manifest.gob.tmp", "block"), 0o700); err != nil {
+	if err = os.MkdirAll(filepath.Join(dir2, "manifest.gob.tmp", "block"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	f2, err := os.OpenFile(file2, os.O_APPEND|os.O_WRONLY, 0o644)
@@ -294,7 +294,7 @@ func TestAppendIncrementalBucketAndManifestWriteErrors(t *testing.T) {
 	if _, err := f2.WriteString(claudeLine("s2", "2026-01-02T03:06:05Z", "manifesterr existingtoken")); err != nil {
 		t.Fatal(err)
 	}
-	f2.Close()
+	_ = f2.Close()
 	if err := Ensure(dir2, "", false, nil); err == nil {
 		t.Fatal("Ensure with unwritable index dir for manifest returned nil")
 	}

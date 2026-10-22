@@ -36,14 +36,14 @@ func TestAManifestRewriteIsVisibleEvenWhenMtimeAndSizeRepeat(t *testing.T) {
 	// Same encoded size (one integer differs, same number of digits), then the
 	// clock put back where it was.
 	second := Manifest{Version: version, Format: onDiskFormat + 1, Sessions: map[string]SessionMeta{}}
-	if err := writeManifest(dir, second); err != nil {
+	if err = writeManifest(dir, second); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chtimes(path, fi.ModTime(), fi.ModTime()); err != nil {
+	if err = os.Chtimes(path, fi.ModTime(), fi.ModTime()); err != nil {
 		t.Fatal(err)
 	}
-	if again, err := os.Stat(path); err != nil {
-		t.Fatal(err)
+	if again, statErr := os.Stat(path); statErr != nil {
+		t.Fatal(statErr)
 	} else if again.Size() != fi.Size() || !again.ModTime().Equal(fi.ModTime()) {
 		t.Skipf("the two manifests differ in size (%d against %d) — the collision this test needs is gone",
 			again.Size(), fi.Size())

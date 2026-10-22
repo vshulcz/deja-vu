@@ -41,7 +41,7 @@ func toolDumpIndex(t *testing.T) string {
 		b.WriteString("{}]")
 		huge.Messages = append(huge.Messages, model.Message{Role: roleToolOutput, Text: b.String()})
 	}
-	sessions := []model.Session{
+	sessions := []model.Session{ //nolint:prealloc // a fixture literal the loop below grows
 		huge,
 		{ID: "answer", Harness: "claude", Project: "ledgerd", Updated: now.Add(-48 * time.Hour),
 			Messages: []model.Message{

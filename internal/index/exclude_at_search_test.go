@@ -27,7 +27,7 @@ func TestAnExcludedHarnessIsKeptOutOfTheAnswersToo(t *testing.T) {
 	t.Setenv("DEJA_EXCLUDE_HARNESSES", "opencode")
 	got := ignoredByPolicy(ss)
 	if len(got) != 1 || got[0].Harness != "claude" {
-		var names []string
+		names := make([]string, 0, len(got))
 		for _, s := range got {
 			names = append(names, s.Harness+":"+s.ID)
 		}

@@ -78,8 +78,8 @@ func TestReadBucketAndTokenReadAtError(t *testing.T) {
 		t.Fatal(err)
 	}
 	dataStart := entries[0].off
-	f.Close()
-	if err := os.Truncate(p, int64(dataStart)); err != nil {
+	_ = f.Close()
+	if err := os.Truncate(p, int64(dataStart)); err != nil { //nolint:gosec // dataStart is a small offset
 		t.Fatal(err)
 	}
 	if _, err := readBucket(p); err == nil {
@@ -157,10 +157,10 @@ func TestScanRecordsMetaMissingAndOpenError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := rw.write(Record{Key: "nope:1", SourcePath: "s", Role: "user", Text: "x", Time: time.Now()}); err != nil {
+	if _, err = rw.write(Record{Key: "nope:1", SourcePath: "s", Role: "user", Text: "x", Time: time.Now()}); err != nil {
 		t.Fatal(err)
 	}
-	if err := rw.Close(); err != nil {
+	if err = rw.Close(); err != nil {
 		t.Fatal(err)
 	}
 	got, err := scanRecords(tmp, Manifest{Sessions: map[string]SessionMeta{}}, search.Options{}, nil)

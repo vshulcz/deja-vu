@@ -13,7 +13,7 @@ import (
 // and the steps between them (#492).
 func TestAnyBlockOfPostingsSurvivesTheRoundTrip(t *testing.T) {
 	extremes := []uint32{0, 1, 2, math.MaxUint32, math.MaxUint32 - 1, 1 << 31, (1 << 31) - 1, 1<<31 + 1}
-	rng := rand.New(rand.NewSource(11))
+	rng := rand.New(rand.NewSource(11)) //nolint:gosec // a seeded fixture, not crypto
 	for round := range 300 {
 		n := 1 + rng.Intn(12)
 		posts := make([]posting, 0, n)
@@ -27,7 +27,7 @@ func TestAnyBlockOfPostingsSurvivesTheRoundTrip(t *testing.T) {
 			case 0:
 				sid = extremes[rng.Intn(len(extremes))]
 			case 1:
-				sid = uint32(rng.Intn(50))
+				sid = uint32(rng.Intn(50)) //nolint:gosec // Intn(50) fits
 			default:
 				sid = rng.Uint32()
 			}

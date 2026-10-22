@@ -58,7 +58,7 @@ func TestCommandListingKeepsDifferentInvocationsApart(t *testing.T) {
 	msg := func(text string) model.Message {
 		return model.Message{Role: roleCommand, Text: text, Time: at}
 	}
-	var ss []model.Session
+	ss := make([]model.Session, 0, 2)
 	for _, id := range []string{"d1", "d2"} {
 		ss = append(ss, model.Session{
 			Harness: "codex", ID: id, Project: "work",

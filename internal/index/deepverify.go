@@ -18,11 +18,13 @@ import (
 // deterministic sample, and resolve a sample of postings to live records.
 // It never mutates anything — it reports drift and the command that fixes it.
 
+// DeepFinding is one drift a deep verification found.
 type DeepFinding struct {
 	Kind   string `json:"kind"` // shrunk-file, orphan-file, parse-drift, dead-posting, torn-log
 	Detail string `json:"detail"`
 }
 
+// DeepReport is what a deep verification checked and found.
 type DeepReport struct {
 	FilesChecked    int `json:"files_checked"`
 	SessionsIndexed int `json:"sessions_indexed"`
@@ -39,6 +41,7 @@ type DeepReport struct {
 	Kept []string `json:"kept,omitempty"`
 }
 
+// Clean reports whether the verification found nothing.
 func (r DeepReport) Clean() bool { return len(r.Findings) == 0 }
 
 const (

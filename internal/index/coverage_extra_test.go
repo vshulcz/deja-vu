@@ -88,7 +88,7 @@ func BenchmarkFuzzyTokenEnumeration(b *testing.B) {
 		catalog[fmt.Sprintf("synthetic-token-%05d", i)] = true
 	}
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = closeTokens("synthetic-token-12345", newTokenIndex(catalog))
 	}
 }
@@ -99,7 +99,7 @@ func BenchmarkStemTokenEnumeration(b *testing.B) {
 		catalog[fmt.Sprintf("synthetic-token-%05d", i)] = true
 	}
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = stemMatches("synthetic-token-12345", catalog)
 	}
 }
@@ -251,11 +251,11 @@ func TestIndexReadWriteAndQueryEdgeBranches(t *testing.T) {
 	if err != nil || len(got) != 1 || got[0].ID != "s1" {
 		t.Fatalf("substring postings got=%#v err=%v", got, err)
 	}
-	if recent, err := Recent(dir, 1); err != nil || len(recent) != 1 {
-		t.Fatalf("Recent default recent=%#v err=%v", recent, err)
+	if recent, recentErr := Recent(dir, 1); recentErr != nil || len(recent) != 1 {
+		t.Fatalf("Recent default recent=%#v err=%v", recent, recentErr)
 	}
-	if recent, err := RecentProject(dir, "PROJ", 1); err != nil || len(recent) != 1 || len(recent[0].Messages) == 0 {
-		t.Fatalf("RecentProject contains/limit=%#v err=%v", recent, err)
+	if recent, projectErr := RecentProject(dir, "PROJ", 1); projectErr != nil || len(recent) != 1 || len(recent[0].Messages) == 0 {
+		t.Fatalf("RecentProject contains/limit=%#v err=%v", recent, projectErr)
 	}
 	found, ok, err := FindByPrefix(dir, "missing")
 	if err != nil || ok || found.ID != "" {
@@ -288,22 +288,22 @@ func TestBucketRecordGobAndRecoveryErrors(t *testing.T) {
 	var progress bytes.Buffer
 	// The rebuild keeps the session whose transcript is gone, the way
 	// `deja index --force` does.
-	if ss, err := SearchWithRecovery(dir, search.Options{Query: "alpha"}, &progress); err != nil || len(ss) != 1 || ss[0].ID != "s1" {
-		t.Fatalf("recovery ss=%#v err=%v", ss, err)
+	if ss, searchErr := SearchWithRecovery(dir, search.Options{Query: "alpha"}, &progress); searchErr != nil || len(ss) != 1 || ss[0].ID != "s1" {
+		t.Fatalf("recovery ss=%#v err=%v", ss, searchErr)
 	}
 	if !strings.Contains(progress.String(), "index damaged") {
 		t.Fatalf("missing recovery progress: %q", progress.String())
 	}
 
-	if err := writeBucket(filepath.Join(tmp, "bucket.bin"), map[string][]posting{"tok": {{Off: 2, Sid: 1}, {Off: 2, Sid: 1}, {Off: 9, Sid: 3}}}); err != nil {
+	if err = writeBucket(filepath.Join(tmp, "bucket.bin"), map[string][]posting{"tok": {{Off: 2, Sid: 1}, {Off: 2, Sid: 1}, {Off: 9, Sid: 3}}}); err != nil {
 		t.Fatal(err)
 	}
 	posts, err := readBucketToken(filepath.Join(tmp, "bucket.bin"), "tok", nil)
 	if err != nil || len(posts) != 2 || posts[1].Off != 9 {
 		t.Fatalf("readBucketToken posts=%#v err=%v", posts, err)
 	}
-	if none, err := readBucketToken(filepath.Join(tmp, "bucket.bin"), "none", nil); err != nil || none != nil {
-		t.Fatalf("missing token posts=%#v err=%v", none, err)
+	if none, tokenErr := readBucketToken(filepath.Join(tmp, "bucket.bin"), "none", nil); tokenErr != nil || none != nil {
+		t.Fatalf("missing token posts=%#v err=%v", none, tokenErr)
 	}
 	if got := decodePostings([]byte{0x80}); len(got) != 0 {
 		t.Fatalf("truncated postings=%#v", got)
@@ -877,22 +877,22 @@ func TestRequestedCodecLineAndSubstringBranches(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer f.Close()
-	if _, err := readRecordAt(f, 99, newRecordTables()); !errors.Is(err, io.EOF) {
+	if _, err = readRecordAt(f, 99, newRecordTables()); !errors.Is(err, io.EOF) {
 		t.Fatalf("readRecordAt bad offset err=%v", err)
 	}
 
-	if got, err := intersectSubstringPostings(filepath.Join(tmp, "missing-index"), []string{"nope"}); err != nil || got != nil {
-		t.Fatalf("missing substring postings=%#v err=%v", got, err)
+	if got, postErr := intersectSubstringPostings(filepath.Join(tmp, "missing-index"), []string{"nope"}); postErr != nil || got != nil {
+		t.Fatalf("missing substring postings=%#v err=%v", got, postErr)
 	}
 	dir := filepath.Join(tmp, "substring-index")
-	if err := os.MkdirAll(filepath.Join(dir, "buckets"), 0o755); err != nil {
+	if err = os.MkdirAll(filepath.Join(dir, "buckets"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if got, err := intersectSubstringPostings(dir, nil); err != nil || got != nil {
-		t.Fatalf("empty substring postings=%#v err=%v", got, err)
+	if got, postErr := intersectSubstringPostings(dir, nil); postErr != nil || got != nil {
+		t.Fatalf("empty substring postings=%#v err=%v", got, postErr)
 	}
 	bp := filepath.Join(dir, "buckets", bucket("talpha")+".bin")
-	if err := writeBucket(bp, map[string][]posting{
+	if err = writeBucket(bp, map[string][]posting{
 		"talpha": {{Off: 1, Sid: 1}, {Off: 2, Sid: 2}},
 		"tbeta":  {{Off: 2, Sid: 2}, {Off: 3, Sid: 3}},
 		"tgamma": {{Off: 2, Sid: 2}},

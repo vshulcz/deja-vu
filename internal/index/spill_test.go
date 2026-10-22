@@ -14,7 +14,7 @@ import (
 // spillJobs is a corpus with a shared vocabulary, sessions that come back out
 // of order, tool records, and more messages than one worker batch.
 func spillJobs() []tokenJob {
-	var jobs []tokenJob
+	jobs := make([]tokenJob, 0, 5000)
 	when := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
 	off := int64(0)
 	for i := range 5000 {
@@ -49,7 +49,7 @@ func spillDirFiles(t *testing.T, dir string) map[string][]byte {
 // distinctJobs are messages of words that never repeat, enough of them that a
 // worker has to spill before its batch ends.
 func distinctJobs() []tokenJob {
-	var jobs []tokenJob
+	jobs := make([]tokenJob, 0, 300)
 	when := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
 	off := int64(0)
 	for i := range 300 {
@@ -71,6 +71,7 @@ func TestSpilledBucketsMatchTheInMemoryOnes(t *testing.T) {
 }
 
 func checkSpillMatchesMemory(t *testing.T, jobs []tokenJob) {
+	t.Helper()
 	mem := bucketPostings{}
 	for _, j := range jobs {
 		addIndexKeys(mem, j.text, j.offset, j.sid, j.when, j.tool)

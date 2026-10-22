@@ -263,13 +263,14 @@ func (r *historyRun) codexHistoryStep(op int) {
 				withRollout = append(withRollout, c.id)
 			}
 		}
-		if len(withRollout) > 0 && r.rng.Intn(4) == 0 {
+		switch {
+		case len(withRollout) > 0 && r.rng.Intn(4) == 0:
 			id = withRollout[r.rng.Intn(len(withRollout))]
-		} else if len(m.codexLogged) < 3 || r.rng.Intn(3) == 0 {
+		case len(m.codexLogged) < 3 || r.rng.Intn(3) == 0:
 			r.next++
 			id = fmt.Sprintf("019a0000-0000-7000-8000-%012d", r.next)
 			m.codexLogged = append(m.codexLogged, id)
-		} else {
+		default:
 			id = m.codexLogged[r.rng.Intn(len(m.codexLogged))]
 		}
 		m.codexLines++
@@ -326,7 +327,7 @@ func (r *historyRun) sql(stmts string) {
 
 func (r *historyRun) sqlOn(db, stmts string) {
 	r.t.Helper()
-	if out, err := exec.Command("sqlite3", db, stmts).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(r.t.Context(), "sqlite3", db, stmts).CombinedOutput(); err != nil {
 		r.t.Fatalf("sqlite3: %v %s", err, out)
 	}
 	// The store is noticed by its mtime, and two writes in one second would

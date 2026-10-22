@@ -100,7 +100,7 @@ func TestGrokGrowthAppendsInsteadOfRewriting(t *testing.T) {
 		t.Fatal("rewound fixture must regrow past the indexed size")
 	}
 	write(updates, rewound, tick)
-	if err := EnsureForSearch(indexDir, search.Options{Query: "appendrewoundneedle", Harness: "grok"}, false, nil); err != nil {
+	if err = EnsureForSearch(indexDir, search.Options{Query: "appendrewoundneedle", Harness: "grok"}, false, nil); err != nil {
 		t.Fatal(err)
 	}
 	ss, err := Search(indexDir, search.Options{Query: "appendfirstneedle", Harness: "grok"})

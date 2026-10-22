@@ -12,6 +12,7 @@ import (
 // A Russian corpus exercises the widest fold: every inflected form of a term
 // shares its opening runes, so they all land in one bucket.
 func benchRussianIndex(b *testing.B) string {
+	b.Helper()
 	tmp := b.TempDir()
 	claudeRoot := filepath.Join(tmp, "claude")
 	b.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
@@ -24,7 +25,7 @@ func benchRussianIndex(b *testing.B) string {
 	stems := []string{"миграц", "репликац", "конфигурац", "авторизац", "оптимизац", "документац", "интеграц", "валидац", "сериализац", "агрегац"}
 	ends := []string{"ия", "ии", "ию", "ией", "иями", "иях"}
 	other := []string{"сервер", "клиент", "запрос", "ответ", "ошибка", "таблица", "индекс", "кластер", "очередь", "кеш"}
-	rng := rand.New(rand.NewSource(7))
+	rng := rand.New(rand.NewSource(7)) //nolint:gosec // a seeded fixture, not crypto
 	for i := range 3000 {
 		text := ""
 		var textSb29 strings.Builder
@@ -36,7 +37,7 @@ func benchRussianIndex(b *testing.B) string {
 			}
 		}
 		text += textSb29.String()
-		line := fmt.Sprintf(`{"type":"user","sessionId":"s%d","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"%s"}}`, i, text) + "\n"
+		line := fmt.Sprintf(`{"type":"user","sessionId":"s%d","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"%s"}}`, i, text) + "\n" //nolint:gocritic // JSON quoting, not Go's
 		if err := os.WriteFile(filepath.Join(proj, fmt.Sprintf("s%d.jsonl", i)), []byte(line), 0o644); err != nil {
 			b.Fatal(err)
 		}
@@ -52,7 +53,7 @@ func BenchmarkRussianRelevance(b *testing.B) {
 	terms := []string{"миграция", "репликация", "конфигурация", "оптимизация"}
 	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		if _, _, _, _, err := ProjectRelevant(dir, []string{"tmp/app"}, terms, 10); err != nil {
 			b.Fatal(err)
 		}

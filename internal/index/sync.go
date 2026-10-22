@@ -2,9 +2,10 @@ package index
 
 import (
 	"bufio"
-	"crypto/sha1"
+	"crypto/sha1" //nolint:gosec // a short id, not a security hash
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -26,6 +27,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
+// SyncRecord is one message as a sync batch carries it.
 type SyncRecord struct {
 	Harness   string    `json:"harness"`
 	SessionID string    `json:"session_id"`
@@ -90,6 +92,7 @@ func Export(dir, outDir string) (int, error) {
 	return exportRecords(dir, outDir, "", false, false)
 }
 
+// ExportFull is Export without the watermarks.
 func ExportFull(dir, outDir string) (int, error) {
 	return exportRecords(dir, outDir, "", true, false)
 }
@@ -174,7 +177,7 @@ func exportRecordsWith(dir, outDir, peer string, full, relay bool) (int, func() 
 	if err != nil {
 		return 0, nil, err
 	}
-	if err := os.MkdirAll(outDir, 0o700); err != nil {
+	if err = os.MkdirAll(outDir, 0o700); err != nil {
 		// The import side of the same mistake is worded; this one handed back
 		// `mkdir /…/file: not a directory` (#1112).
 		if fi, statErr := os.Stat(outDir); statErr == nil && !fi.IsDir() {
@@ -555,14 +558,14 @@ func Import(dir, inDir string) (int, error) {
 	// Glob swallows a directory it cannot open, so a locked source imported
 	// "0 records" — the same words an already-imported batch prints, and the
 	// records were there the whole time (#1042).
-	if f, oerr := os.Open(inDir); oerr != nil {
+	f, oerr := os.Open(inDir)
+	if oerr != nil {
 		if os.IsPermission(oerr) {
 			return 0, fmt.Errorf("cannot read %s — permission denied; check that directory's permissions (on macOS, also Full Disk Access for your terminal)", search.SafeLine(inDir))
 		}
 		return 0, oerr
-	} else {
-		_ = f.Close()
 	}
+	_ = f.Close()
 	unlock, err := lockDir(dir)
 	if err != nil {
 		return 0, err
@@ -588,8 +591,8 @@ func Import(dir, inDir string) (int, error) {
 	offHarnesses := sources.ExcludedHarnesses()
 	pol := policy.Load()
 	if !HasManifest(dir) {
-		if err := initEmptyIndex(dir); err != nil {
-			return 0, err
+		if initErr := initEmptyIndex(dir); initErr != nil {
+			return 0, initErr
 		}
 	}
 	m, err := readManifest(dir)
@@ -1099,18 +1102,18 @@ func readSyncFile(path string, fn func(SyncRecord) error) error {
 		// work (#1080). The role is rendered the same way (view.go writes it
 		// into the preview) and is the same forgery vector, so it gets the same
 		// flattening. Message text is redacted further down.
-		rec.Project = sanitizeSyncField(rec.Project, syncFieldMax)
-		rec.Harness = sanitizeSyncField(rec.Harness, syncFieldMax)
-		rec.Role = sanitizeSyncField(rec.Role, syncFieldMax)
+		rec.Project = sanitizeSyncField(rec.Project)
+		rec.Harness = sanitizeSyncField(rec.Harness)
+		rec.Role = sanitizeSyncField(rec.Role)
 		// The origin is rendered into the same result lines, from the same
 		// other machine's text, so it takes the same flattening.
-		rec.Origin = syncName(sanitizeSyncField(string(rec.Origin), syncFieldMax))
+		rec.Origin = syncName(sanitizeSyncField(string(rec.Origin)))
 		if err := fn(rec); err != nil {
 			return err
 		}
 		have = next
 	}
-	if err := s.Err(); err != nil && err != io.EOF {
+	if err := s.Err(); err != nil && !errors.Is(err, io.EOF) {
 		return err
 	}
 	return nil
@@ -1167,14 +1170,14 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 	buckets := bucketPostings{}
 	// Only what this pass adds: it goes into an overlay beside each bucket
 	// rather than into the bucket written whole again (#5387).
-	loadBucket := func(tok string) (map[string][]posting, error) {
+	loadBucket := func(tok string) map[string][]posting {
 		b := bucket(tok)
 		data, ok := buckets[b]
 		if !ok {
 			data = map[string][]posting{}
 			buckets[b] = data
 		}
-		return data, nil
+		return data
 	}
 	keys := make([]string, 0, len(recsByKey))
 	for k := range recsByKey {
@@ -1201,7 +1204,7 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 	}
 	earlier := map[string][]model.Message{}
 	if len(firstRun) > 0 {
-		if err := eachRecordForKeys(filepath.Join(dir, "records.bin"), tbl, firstRun, func(r Record) {
+		if err = eachRecordForKeys(filepath.Join(dir, "records.bin"), tbl, firstRun, func(r Record) {
 			earlier[r.Key] = append(earlier[r.Key], model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
 		}); err != nil {
 			_ = rw.Close()
@@ -1260,10 +1263,10 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 		}
 		m.Sessions[key] = meta
 		for _, r := range recsByKey[key] {
-			off, err := rw.write(r)
-			if err != nil {
+			off, writeErr := rw.write(r)
+			if writeErr != nil {
 				_ = rw.Close()
-				return err
+				return writeErr
 			}
 			// Index an imported record exactly as ingestion would: the same
 			// slice of the text earns postings (tokenizedPart), the same date
@@ -1271,26 +1274,14 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 			// through bare indexKeys left synced stores without date keys and
 			// with unfiltered tool output — the route a record takes into an
 			// index must not change what it indexes to.
-			var bucketErr error
 			eachIndexKey(tokenizedPart(r.Role, r.Text), r.Time, func(tok string) {
-				if bucketErr != nil {
-					return
-				}
-				data, err := loadBucket(tok)
-				if err != nil {
-					bucketErr = err
-					return
-				}
+				data := loadBucket(tok)
 				data[tok] = append(data[tok], posting{Off: off, Sid: meta.Ord, Tool: isToolRole(r.Role)})
 			})
-			if bucketErr != nil {
-				_ = rw.Close()
-				return bucketErr
-			}
 		}
 	}
-	if err := rw.Close(); err != nil {
-		return err
+	if closeErr := rw.Close(); closeErr != nil {
+		return closeErr
 	}
 	m.RecordStrings = tbl.strs
 	stale, err := addOverlays(filepath.Join(dir, "buckets"), filepath.Join(dir, "buckets"), buckets, m.DeadRecords)
@@ -1308,7 +1299,7 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 }
 
 func shortHash(s string) string {
-	h := sha1.Sum([]byte(s))
+	h := sha1.Sum([]byte(s)) //nolint:gosec // a short id, not a security hash
 	return strings.TrimLeft(hex.EncodeToString(h[:])[:12], "-")
 }
 
@@ -1325,6 +1316,7 @@ var lastImportSkippedOwn int
 // ImportSkippedOwn reports that count.
 func ImportSkippedOwn() int { return lastImportSkippedOwn }
 
+// ImportedSessionID is the id an imported session is stored under.
 func ImportedSessionID(harness, sessionID string) string {
 	return "imported-" + shortHash(harness+":"+sessionID)
 }
@@ -1340,7 +1332,7 @@ const syncFieldMax = 120
 // U+202E, which reverses everything rendered after it, and the zero-width
 // spaces that pad a label invisibly. Both become spaces rather than vanishing,
 // so words on either side do not run together.
-func sanitizeSyncField(s string, max int) string {
+func sanitizeSyncField(s string) string {
 	s = strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
 			return ' '
@@ -1349,8 +1341,8 @@ func sanitizeSyncField(s string, max int) string {
 	}, s)
 	s = strings.Join(strings.Fields(s), " ")
 	r := []rune(s)
-	if len(r) > max {
-		return strings.TrimSpace(string(r[:max])) + "…"
+	if len(r) > syncFieldMax {
+		return strings.TrimSpace(string(r[:syncFieldMax])) + "…"
 	}
 	return s
 }

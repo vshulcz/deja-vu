@@ -37,19 +37,19 @@ func TestEnsureForSearchStaleDecidesWhatToServe(t *testing.T) {
 	}
 
 	// Nothing changed: no work, nothing stale.
-	if stale, err := EnsureForSearchStale(dir, query.Options{All: true}, io.Discard); err != nil || stale {
+	if stale, err = EnsureForSearchStale(dir, query.Options{All: true}, io.Discard); err != nil || stale {
 		t.Fatalf("unchanged store: stale=%v err=%v", stale, err)
 	}
 
 	// A plain append is cheap enough to absorb synchronously.
 	writeLines(t, path, claudeLine("s1", "2026-01-01T00:01:00Z", "first"), claudeLine("s1", "2026-01-01T00:02:00Z", "second"))
-	if stale, err := EnsureForSearchStale(dir, query.Options{All: true}, io.Discard); err != nil || stale {
+	if stale, err = EnsureForSearchStale(dir, query.Options{All: true}, io.Discard); err != nil || stale {
 		t.Fatalf("append should be absorbed in place: stale=%v err=%v", stale, err)
 	}
 
 	// A removed file cannot be absorbed by appending: the caller has to
 	// rebuild, and until it does the current snapshot is what gets served.
-	if err := os.Remove(path); err != nil {
+	if err = os.Remove(path); err != nil {
 		t.Fatal(err)
 	}
 	stale, err = EnsureForSearchStale(dir, query.Options{All: true}, io.Discard)

@@ -27,7 +27,7 @@ func TestAStoreThatWroteOnlyItsWALReadsAsChanged(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		return walkFileState(db, fi, nil)
+		return walkFileState(db, fi)
 	}
 	before := walk()
 	if !sameFile(before, walk()) {
@@ -61,11 +61,11 @@ func TestAStoreThatWroteOnlyItsWALReadsAsChanged(t *testing.T) {
 		t.Fatal(err)
 	}
 	fi, _ := os.Lstat(j)
-	first := walkFileState(j, fi, nil)
+	first := walkFileState(j, fi)
 	if err := os.WriteFile(j+"-wal", []byte("something else"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if !sameFile(first, walkFileState(j, fi, nil)) {
+	if !sameFile(first, walkFileState(j, fi)) {
 		t.Error("a jsonl transcript took a -wal file beside it as its log")
 	}
 }

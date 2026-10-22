@@ -86,7 +86,7 @@ func TestFrictionHashesFingerprintsToolOutputOnly(t *testing.T) {
 }
 
 func TestFrictionHashesCapped(t *testing.T) {
-	var ms []model.Message
+	ms := make([]model.Message, 0, frictionSessionCap+20)
 	for i := range frictionSessionCap + 20 {
 		ms = append(ms, model.Message{
 			Role: roleToolOutput,

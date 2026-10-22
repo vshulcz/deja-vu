@@ -14,7 +14,7 @@ func nlIndex(t *testing.T, texts ...string) string {
 	t.Helper()
 	tmp := hermeticIndexEnv(t)
 	dir := filepath.Join(tmp, "idx")
-	var sessions []model.Session
+	sessions := make([]model.Session, 0, len(texts))
 	for i, text := range texts {
 		sessions = append(sessions, model.Session{
 			ID: string(rune('a' + i)), Harness: "claude", Project: "p", Updated: time.Now(),

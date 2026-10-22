@@ -361,7 +361,7 @@ func commandTablesBehind(dir string, m Manifest) bool {
 		return false
 	}
 	defer func() { _ = f.Close() }()
-	if _, err := f.Seek(from, io.SeekStart); err != nil {
+	if _, err = f.Seek(from, io.SeekStart); err != nil {
 		return false
 	}
 	t := tablesFromManifest(m)
@@ -399,15 +399,15 @@ func commandsStateHead(dir string) (gen string, size int64, ok bool) {
 	}
 	b = b[8:]
 	l, k := binary.Uvarint(b)
-	if k <= 0 || l > uint64(len(b)-k) {
+	if k <= 0 || l > uint64(len(b)-k) { //nolint:gosec // Uvarint used at most len(b) bytes
 		return "", 0, false
 	}
-	gen, b = string(b[k:k+int(l)]), b[k+int(l):]
+	gen, b = string(b[k:k+int(l)]), b[k+int(l):] //nolint:gosec // l is checked against len(b) above
 	v, k := binary.Uvarint(b)
 	if k <= 0 {
 		return "", 0, false
 	}
-	return gen, int64(v), true
+	return gen, int64(v), true //nolint:gosec // written from a non-negative size
 }
 
 // commandsTail adds to redo the sessions with a command in the log at path
@@ -426,7 +426,7 @@ func commandsTail(path string, t *recordTables, from, to int64, redo map[string]
 		return nil
 	}
 	defer func() { _ = f.Close() }()
-	if _, err := f.Seek(from, io.SeekStart); err != nil {
+	if _, err = f.Seek(from, io.SeekStart); err != nil {
 		return nil
 	}
 	err = walkStored(io.LimitReader(f, to-from), t, from, func(_ int64, payload []byte) error {
@@ -492,8 +492,8 @@ func writeCommandsStateFile(dir string, st *commandsState) error {
 				r := s.Runs[i][low]
 				body = binary.AppendUvarint(body, text(low))
 				body = binary.AppendUvarint(body, text(r.Cmd))
-				body = binary.AppendUvarint(body, uint64(r.First))
-				body = binary.AppendUvarint(body, uint64(r.Runs))
+				body = binary.AppendUvarint(body, uint64(r.First)) //nolint:gosec // record offsets are non-negative
+				body = binary.AppendUvarint(body, uint64(r.Runs))  //nolint:gosec // run counts are non-negative
 				body = binary.AppendVarint(body, recordNanos(r.Last))
 			}
 		}
@@ -501,8 +501,8 @@ func writeCommandsStateFile(dir string, st *commandsState) error {
 	out := append([]byte{}, commandsStateMagic[:]...)
 	out = binary.AppendUvarint(out, uint64(len(st.Generation)))
 	out = append(out, st.Generation...)
-	out = binary.AppendUvarint(out, uint64(st.Size))
-	out = binary.AppendUvarint(out, uint64(st.Dead))
+	out = binary.AppendUvarint(out, uint64(st.Size)) //nolint:gosec // file sizes are non-negative
+	out = binary.AppendUvarint(out, uint64(st.Dead)) //nolint:gosec // dead counts are non-negative
 	out = binary.AppendVarint(out, st.Facts)
 	out = binary.AppendUvarint(out, uint64(len(texts)))
 	out = append(out, tb...)
@@ -539,7 +539,7 @@ func readCommandsStateFile(dir string) (*commandsState, bool) {
 	}
 	st := newCommandsState()
 	st.Generation = str()
-	st.Size, st.Dead = int64(num()), int(num())
+	st.Size, st.Dead = int64(num()), int(num()) //nolint:gosec // written from non-negative values
 	facts, n := binary.Varint(b)
 	if bad || n <= 0 {
 		return nil, false
@@ -574,7 +574,7 @@ func readCommandsStateFile(dir string) (*commandsState, bool) {
 			nr := num()
 			for k := uint64(0); k < nr && !bad; k++ {
 				low, cmd := textAt(), textAt()
-				r := &commandsRun{Cmd: cmd, First: int64(num()), Runs: int(num())}
+				r := &commandsRun{Cmd: cmd, First: int64(num()), Runs: int(num())} //nolint:gosec // written from non-negative values
 				ns, n := binary.Varint(b)
 				if n <= 0 {
 					bad = true
