@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `deja blame` attributes a line a Copilot agent wrote with
+  `insert_edit_into_file`. The transcript reader kept only the file's path
+  (#595).
 - A transcript with nothing to index, such as one tool result that was only a
   `<deja-recall>` block, no longer gets an empty session in `deja last` from
   an incremental pass. A rebuild never listed it (#5563).

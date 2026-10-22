@@ -807,7 +807,9 @@ import (
 // empty, as a rebuild does (#5555).
 // 103: an incremental pass gives no row to a session it holds no record of
 // (#5563).
-const version = 103
+// 104: a Copilot agent transcript's insert_edit_into_file records what it
+// wrote (#595).
+const version = 104
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
