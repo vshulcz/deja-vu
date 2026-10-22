@@ -144,6 +144,7 @@ func TestCompactionFreshnessBudgetIsSizedForTheSlowPlatform(t *testing.T) {
 	ratio := last[len(last)/2]
 	t.Logf("freshness at best %v of a %v budget; against %d bare git processes run just before it, ratios by batch %.2f",
 		best.Round(time.Millisecond), compactionGitBudget, gitCalls, batches)
+	t.Errorf("DIAG %s: best %v budget %v ratios %.2f", runtime.GOOS, best, compactionGitBudget, batches)
 	// Half the budget spent on the smallest repository there is means the
 	// margin is gone for a real one.
 	if best > compactionGitBudget/2 {
