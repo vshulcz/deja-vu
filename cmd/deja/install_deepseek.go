@@ -943,50 +943,13 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 	var status, notes installResult
 	var foreign []string
 	if withAuto {
-		autoPath := dshAutoPath()
-		oldAuto, rerr := readConfig(autoPath)
-		if rerr != nil {
-			return installResult{}, rerr
-		}
-		autoAction, aerr := writeIfChanged(autoPath, oldAuto, []byte(dshAutoJS(hookExe)))
+		var aerr error
+		cmdAction, status, notes, foreign, aerr = writeDSHAutoParts(hookExe, cmdAction)
 		if aerr != nil {
 			return installResult{}, aerr
 		}
-		if autoAction != "unchanged" {
-			cmdAction = autoAction
-		}
-		if dshPackageIsOurs(dshStatusDir()) {
-			statusAction, serr := writeDSHStatus(hookExe)
-			if serr != nil {
-				return installResult{}, serr
-			}
-			status = installResult{Path: dshStatusDir(), Action: statusAction}
-		} else {
-			foreign = append(foreign, dshStatusDir())
-		}
-		notesAction, nerr := writeDSHNotes()
-		if nerr != nil {
-			return installResult{}, nerr
-		}
-		if dshPackageIsOurs(dshNotesDir()) {
-			notes = installResult{Path: dshNotesDir(), Action: notesAction}
-		} else {
-			// Only lib.js was written, and it lives in plugins/deja.
-			if notesAction != "unchanged" {
-				cmdAction = notesAction
-			}
-			foreign = append(foreign, dshNotesDir())
-		}
-	} else {
-		if rerr := os.Remove(dshAutoPath()); rerr != nil && !os.IsNotExist(rerr) {
-			return installResult{}, rerr
-		}
-		if rerr := removeDSHPackage(dshStatusDir()); rerr != nil {
-			return installResult{}, rerr
-		}
-		if rerr := removeDSHNotes(); rerr != nil {
-			return installResult{}, rerr
-		}
+	} else if rerr := removeDSHAutoParts(); rerr != nil {
+		return installResult{}, rerr
 	}
 	a, err := writeIfChanged(path, old, []byte(patched))
 	if err != nil {
@@ -1013,6 +976,60 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 		}
 	}
 	return wroteAll(results...), nil
+}
+
+// writeDSHAutoParts writes the hook plugin, the status line and the notes that
+// deepseek-auto adds over the command plugin. cmdAction comes back as the
+// action the plugin directory reports.
+func writeDSHAutoParts(hookExe, cmdAction string) (string, installResult, installResult, []string, error) {
+	var status, notes installResult
+	var foreign []string
+	autoPath := dshAutoPath()
+	oldAuto, rerr := readConfig(autoPath)
+	if rerr != nil {
+		return "", status, notes, nil, rerr
+	}
+	autoAction, aerr := writeIfChanged(autoPath, oldAuto, []byte(dshAutoJS(hookExe)))
+	if aerr != nil {
+		return "", status, notes, nil, aerr
+	}
+	if autoAction != "unchanged" {
+		cmdAction = autoAction
+	}
+	if dshPackageIsOurs(dshStatusDir()) {
+		statusAction, serr := writeDSHStatus(hookExe)
+		if serr != nil {
+			return "", status, notes, nil, serr
+		}
+		status = installResult{Path: dshStatusDir(), Action: statusAction}
+	} else {
+		foreign = append(foreign, dshStatusDir())
+	}
+	notesAction, nerr := writeDSHNotes()
+	if nerr != nil {
+		return "", status, notes, nil, nerr
+	}
+	if dshPackageIsOurs(dshNotesDir()) {
+		notes = installResult{Path: dshNotesDir(), Action: notesAction}
+	} else {
+		// Only lib.js was written, and it lives in plugins/deja.
+		if notesAction != "unchanged" {
+			cmdAction = notesAction
+		}
+		foreign = append(foreign, dshNotesDir())
+	}
+	return cmdAction, status, notes, foreign, nil
+}
+
+// removeDSHAutoParts takes out what writeDSHAutoParts writes.
+func removeDSHAutoParts() error {
+	if rerr := os.Remove(dshAutoPath()); rerr != nil && !os.IsNotExist(rerr) {
+		return rerr
+	}
+	if rerr := removeDSHPackage(dshStatusDir()); rerr != nil {
+		return rerr
+	}
+	return removeDSHNotes()
 }
 
 // dshKeepSwitches carries a `disabled: true` the reader put on one of deja's

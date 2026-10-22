@@ -165,58 +165,20 @@ type hermesPluginsEdit struct {
 
 func (e *hermesPluginsEdit) apply(s string) (string, int) {
 	lines := strings.Split(s, "\n")
-	p := -1
-	for i, line := range lines {
-		if yamlIndentWidth(line) != 0 {
-			continue
-		}
-		key, rest, ok := hermesKeyLine(line)
-		if !ok || hermesKeyName(key) != "plugins" {
-			continue
-		}
-		if key != "plugins" || strings.TrimSpace(stripYAMLComment(rest)) != "" || p >= 0 {
-			return s, hermesPluginsUnreadable
-		}
-		p = i
+	p, ok := hermesPluginsKey(lines)
+	if !ok {
+		return s, hermesPluginsUnreadable
 	}
 	if p < 0 {
 		return s, hermesPluginsMissing
 	}
-	end := len(lines)
-	child := ""
-	for i := p + 1; i < len(lines); i++ {
-		t := strings.TrimSpace(lines[i])
-		if t == "" || strings.HasPrefix(t, "#") {
-			continue
-		}
-		w := yamlIndentWidth(lines[i])
-		if child == "" && (strings.HasPrefix(t, "-") || w > 0 && !hermesIsKeyLine(lines[i])) {
-			// A list or a scalar where the keys go: an `enabled:` put in
-			// there makes the file one Hermes cannot load.
-			return s, hermesPluginsUnreadable
-		}
-		if w == 0 {
-			end = i
-			break
-		}
-		if child == "" {
-			child = lines[i][:w]
-		}
+	end, child, ok := hermesPluginsBlockEnd(lines, p)
+	if !ok {
+		return s, hermesPluginsUnreadable
 	}
-	if child == "" {
-		child = "  "
-	}
-	k := -1
-	val := ""
-	for i := p + 1; i < end; i++ {
-		key, rest, ok := hermesKeyLine(lines[i])
-		if !ok || lines[i][:yamlIndentWidth(lines[i])] != child || hermesKeyName(key) != "enabled" {
-			continue
-		}
-		if key != "enabled" || k >= 0 {
-			return s, hermesPluginsUnreadable
-		}
-		k, val = i, strings.TrimSpace(stripYAMLComment(rest))
+	k, val, ok := hermesPluginsEnabledKey(lines, p, end, child)
+	if !ok {
+		return s, hermesPluginsUnreadable
 	}
 	if k < 0 {
 		if !e.on {
@@ -233,7 +195,92 @@ func (e *hermesPluginsEdit) apply(s string) (string, int) {
 		}
 		return e.flow(s, lines, k)
 	}
-	last, mine, others := k, -1, 0
+	last, mine, others, ok := hermesPluginsBlockItems(lines, k, end, child)
+	if !ok {
+		return s, hermesPluginsUnreadable
+	}
+	if val != "" && last != k {
+		return s, hermesPluginsUnreadable
+	}
+	if e.on && mine >= 0 || !e.on && mine < 0 {
+		return s, hermesPluginsEdited
+	}
+	lines = e.blockEdit(lines, hermesPluginsBlock{p: p, end: end, k: k, last: last, mine: mine, others: others, val: val, child: child})
+	return strings.Join(lines, "\n"), hermesPluginsEdited
+}
+
+// hermesPluginsKey finds the top-level `plugins:` line: -1 when there is
+// none, and ok false when it is one deja cannot edit or there are two.
+func hermesPluginsKey(lines []string) (int, bool) {
+	p := -1
+	for i, line := range lines {
+		if yamlIndentWidth(line) != 0 {
+			continue
+		}
+		key, rest, ok := hermesKeyLine(line)
+		if !ok || hermesKeyName(key) != "plugins" {
+			continue
+		}
+		if key != "plugins" || strings.TrimSpace(stripYAMLComment(rest)) != "" || p >= 0 {
+			return -1, false
+		}
+		p = i
+	}
+	return p, true
+}
+
+// hermesPluginsBlockEnd finds where the plugins block at p ends and the
+// indent of its keys; ok is false when the block holds no keys to edit.
+func hermesPluginsBlockEnd(lines []string, p int) (int, string, bool) {
+	end := len(lines)
+	child := ""
+	for i := p + 1; i < len(lines); i++ {
+		t := strings.TrimSpace(lines[i])
+		if t == "" || strings.HasPrefix(t, "#") {
+			continue
+		}
+		w := yamlIndentWidth(lines[i])
+		if child == "" && (strings.HasPrefix(t, "-") || w > 0 && !hermesIsKeyLine(lines[i])) {
+			// A list or a scalar where the keys go: an `enabled:` put in
+			// there makes the file one Hermes cannot load.
+			return 0, "", false
+		}
+		if w == 0 {
+			end = i
+			break
+		}
+		if child == "" {
+			child = lines[i][:w]
+		}
+	}
+	if child == "" {
+		child = "  "
+	}
+	return end, child, true
+}
+
+// hermesPluginsEnabledKey finds the `enabled:` key in the plugins block and
+// its value: -1 when there is none, ok false when it cannot be edited.
+func hermesPluginsEnabledKey(lines []string, p, end int, child string) (int, string, bool) {
+	k := -1
+	val := ""
+	for i := p + 1; i < end; i++ {
+		key, rest, ok := hermesKeyLine(lines[i])
+		if !ok || lines[i][:yamlIndentWidth(lines[i])] != child || hermesKeyName(key) != "enabled" {
+			continue
+		}
+		if key != "enabled" || k >= 0 {
+			return -1, "", false
+		}
+		k, val = i, strings.TrimSpace(stripYAMLComment(rest))
+	}
+	return k, val, true
+}
+
+// hermesPluginsBlockItems walks the block list under `enabled:` at k: the
+// last item's line, deja's line (-1 without one) and how many others there are.
+func hermesPluginsBlockItems(lines []string, k, end int, child string) (last, mine, others int, ok bool) {
+	last, mine = k, -1
 	for i := k + 1; i < end; i++ {
 		t := strings.TrimSpace(lines[i])
 		if t == "" || strings.HasPrefix(t, "#") {
@@ -246,7 +293,7 @@ func (e *hermesPluginsEdit) apply(s string) (string, int) {
 		if t != "-" && !strings.HasPrefix(t, "- ") && !strings.HasPrefix(t, "-\t") {
 			// A mapping or a scalar under the key, or an item running on
 			// past its line: nothing a `- deja` can be put beside.
-			return s, hermesPluginsUnreadable
+			return 0, 0, 0, false
 		}
 		last = i
 		if hermesYAMLScalar(t[1:]) == "deja" {
@@ -255,35 +302,42 @@ func (e *hermesPluginsEdit) apply(s string) (string, int) {
 			others++
 		}
 	}
-	if val != "" && last != k {
-		return s, hermesPluginsUnreadable
-	}
+	return last, mine, others, true
+}
+
+// hermesPluginsBlock is where apply found the pieces of a block-style list.
+type hermesPluginsBlock struct {
+	p, end, k, last, mine, others int
+	val, child                    string
+}
+
+// blockEdit puts deja into a block-style list, or takes it out.
+func (e *hermesPluginsEdit) blockEdit(lines []string, b hermesPluginsBlock) []string {
+	k, last, mine := b.k, b.last, b.mine
 	// The key line split after its colon, for the null that goes or comes back.
 	at := strings.Index(lines[k], "enabled:") + len("enabled:")
 	head, rest := lines[k][:at], lines[k][at:]
 	switch {
-	case e.on && mine >= 0, !e.on && mine < 0:
-		return s, hermesPluginsEdited
 	case e.on:
-		if val != "" {
+		if b.val != "" {
 			// `null` and `~` are the empty value a bare key is; the key
 			// takes the list the same way, and the token is kept for
 			// uninstall to put back.
-			e.nullWas = rest[:len(rest)-len(strings.TrimLeft(rest, " \t"))+len(val)]
+			e.nullWas = rest[:len(rest)-len(strings.TrimLeft(rest, " \t"))+len(b.val)]
 			lines[k] = head + rest[len(e.nullWas):]
 		}
-		indent := child + child
+		indent := b.child + b.child
 		if last != k {
 			indent = lines[last][:yamlIndentWidth(lines[last])]
 		}
 		lines = slices.Insert(lines, last+1, indent+"- deja")
-	case others > 0 || !e.keyAdded:
+	case b.others > 0 || !e.keyAdded:
 		lines = slices.Delete(lines, mine, mine+1)
-		if others == 0 && e.nullWas != "" && strings.TrimSpace(stripYAMLComment(rest)) == "" {
+		if b.others == 0 && e.nullWas != "" && strings.TrimSpace(stripYAMLComment(rest)) == "" {
 			lines[k] = head + e.nullWas + rest
 		}
-	case e.blockAdded && hermesBlockHoldsOnly(lines, p, end, k, mine):
-		from := p
+	case e.blockAdded && hermesBlockHoldsOnly(lines, b.p, b.end, k, mine):
+		from := b.p
 		if from > 0 && strings.TrimSpace(lines[from-1]) == "" {
 			from--
 		}
@@ -292,7 +346,7 @@ func (e *hermesPluginsEdit) apply(s string) (string, int) {
 		lines = slices.Delete(lines, mine, mine+1)
 		lines = slices.Delete(lines, k, k+1)
 	}
-	return strings.Join(lines, "\n"), hermesPluginsEdited
+	return lines
 }
 
 // hermesBlockHoldsOnly reports whether the plugins block from p to end has

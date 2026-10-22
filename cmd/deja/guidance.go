@@ -483,32 +483,7 @@ func installGuidance(harness string, uninstall bool) (installResult, error) {
 	var next []byte
 	if guidanceOwnsWholeFile(harness) {
 		if uninstall {
-			if len(old) == 0 {
-				return installResult{Path: path, Action: "unchanged", Note: retiredNote}, nil
-			}
-			// One file serves several harnesses, so removing it because one of
-			// them was uninstalled would take the memory away from the rest.
-			if sharedSkillHarnesses[harness] && sharedSkillStillWanted(harness) {
-				return installResult{Path: path, Action: "kept", Note: retiredNote}, nil
-			}
-			if restoredGuidance[path] {
-				return installResult{Path: path, Action: "kept", Note: retiredNote}, nil
-			}
-			if removeErr := os.Remove(path); removeErr != nil {
-				return installResult{}, removeErr
-			}
-			// And put back what install replaced. It said where the copy went
-			// — "your copy is at …SKILL.md.bak" — and removing deja's file
-			// without restoring it left the reader's own skill as a backup
-			// beside nothing (#2581).
-			restored, rerr := restoreReplacedGuidance(path, harness)
-			if rerr != nil {
-				return installResult{}, rerr
-			}
-			if restored {
-				return installResult{Path: path, Action: "restored", Note: retiredNote}, nil
-			}
-			return installResult{Path: path, Action: "removed", Note: retiredNote}, nil
+			return uninstallWholeGuidance(harness, path, old, retiredNote)
 		}
 		next = []byte(guidanceText(harness))
 		// A skill inside an antigravity plugin directory is ingested only
@@ -523,40 +498,10 @@ func installGuidance(harness string, uninstall bool) (installResult, error) {
 			}
 		}
 	} else {
-		// grok writes a twin below; check its markers before touching this
-		// file, or a refusal there leaves this one already rewritten (#1705).
-		//
-		// Only on the way in. Removing is the other direction: the two blocks
-		// are bounded independently, and refusing to take out the one that can
-		// be taken out left a complete deja block in a file nobody had been
-		// told about (#2210).
-		if harness == "grok" && !uninstall {
-			b, rerr := os.ReadFile(filepath.Join(sources.GrokHome(), "AGENTS.md"))
-			if rerr != nil && !os.IsNotExist(rerr) {
-				return installResult{}, rerr
-			}
-			if cerr := checkGuidanceMarkers(string(b)); cerr != nil {
-				return installResult{}, markerErrorFor(filepath.Join(sources.GrokHome(), "AGENTS.md"), cerr)
-			}
+		next, err = guidanceBlockNext(harness, path, old, uninstall)
+		if err != nil {
+			return installResult{}, err
 		}
-		updated, uerr := updateGuidanceBlock(string(old), uninstall)
-		if uerr != nil {
-			// The twin still has to be dealt with: this file is the one that
-			// cannot be bounded, and the other one's block is nobody's hostage.
-			if harness == "grok" && uninstall {
-				twin, terr := removeGrokTwinBlock()
-				if terr != nil {
-					return installResult{}, terr
-				}
-				// Both unbounded is the case where saying only one path sends
-				// the reader to fix half of it and run into the other half.
-				if twin != "" {
-					return installResult{}, fmt.Errorf("%s: %w (and the same in %s)", path, uerr, twin)
-				}
-			}
-			return installResult{}, markerErrorFor(path, uerr)
-		}
-		next = []byte(updated)
 	}
 	a, err := writeGuidanceFile(path, old, next)
 	if err != nil {
@@ -590,6 +535,76 @@ func installGuidance(harness string, uninstall bool) (installResult, error) {
 			installResult{Path: sharedSkillPath(), Action: altAction}), nil
 	}
 	return installResult{Path: path, Action: a, Note: retiredNote}, nil
+}
+
+// uninstallWholeGuidance removes a guidance file deja owns whole, or keeps it
+// for the harnesses that still read it.
+func uninstallWholeGuidance(harness, path string, old []byte, retiredNote string) (installResult, error) {
+	if len(old) == 0 {
+		return installResult{Path: path, Action: "unchanged", Note: retiredNote}, nil
+	}
+	// One file serves several harnesses, so removing it because one of
+	// them was uninstalled would take the memory away from the rest.
+	if sharedSkillHarnesses[harness] && sharedSkillStillWanted(harness) {
+		return installResult{Path: path, Action: "kept", Note: retiredNote}, nil
+	}
+	if restoredGuidance[path] {
+		return installResult{Path: path, Action: "kept", Note: retiredNote}, nil
+	}
+	if removeErr := os.Remove(path); removeErr != nil {
+		return installResult{}, removeErr
+	}
+	// And put back what install replaced. It said where the copy went
+	// — "your copy is at …SKILL.md.bak" — and removing deja's file
+	// without restoring it left the reader's own skill as a backup
+	// beside nothing (#2581).
+	restored, rerr := restoreReplacedGuidance(path, harness)
+	if rerr != nil {
+		return installResult{}, rerr
+	}
+	if restored {
+		return installResult{Path: path, Action: "restored", Note: retiredNote}, nil
+	}
+	return installResult{Path: path, Action: "removed", Note: retiredNote}, nil
+}
+
+// guidanceBlockNext is the file with deja's block put in or taken out, for a
+// harness whose guidance is a block inside the reader's own file.
+func guidanceBlockNext(harness, path string, old []byte, uninstall bool) ([]byte, error) {
+	// grok writes a twin below; check its markers before touching this
+	// file, or a refusal there leaves this one already rewritten (#1705).
+	//
+	// Only on the way in. Removing is the other direction: the two blocks
+	// are bounded independently, and refusing to take out the one that can
+	// be taken out left a complete deja block in a file nobody had been
+	// told about (#2210).
+	if harness == "grok" && !uninstall {
+		b, rerr := os.ReadFile(filepath.Join(sources.GrokHome(), "AGENTS.md"))
+		if rerr != nil && !os.IsNotExist(rerr) {
+			return nil, rerr
+		}
+		if cerr := checkGuidanceMarkers(string(b)); cerr != nil {
+			return nil, markerErrorFor(filepath.Join(sources.GrokHome(), "AGENTS.md"), cerr)
+		}
+	}
+	updated, uerr := updateGuidanceBlock(string(old), uninstall)
+	if uerr != nil {
+		// The twin still has to be dealt with: this file is the one that
+		// cannot be bounded, and the other one's block is nobody's hostage.
+		if harness == "grok" && uninstall {
+			twin, terr := removeGrokTwinBlock()
+			if terr != nil {
+				return nil, terr
+			}
+			// Both unbounded is the case where saying only one path sends
+			// the reader to fix half of it and run into the other half.
+			if twin != "" {
+				return nil, fmt.Errorf("%s: %w (and the same in %s)", path, uerr, twin)
+			}
+		}
+		return nil, markerErrorFor(path, uerr)
+	}
+	return []byte(updated), nil
 }
 
 // markerErrorFor names the file a marker refusal is about. The refusal is the
