@@ -550,6 +550,16 @@ func textPass(s string, allow map[string]bool, fast bool) (string, Counts) {
 		p.v = &view{}
 	}
 	lower := strings.ToLower(s)
+	s = redactKeyShapes(s, lower, p)
+	s = redactAssignments(s, lower, p)
+	s = redactCommandPasswords(s, lower, p)
+	s = redactEntropy(s, p)
+	return s, counts
+}
+
+// redactKeyShapes masks the values that say what they are: key blocks, URL
+// credentials, provider keys, tokens and JWTs. lower is s lowered before any rule ran.
+func redactKeyShapes(s, lower string, p kindPass) string {
 	if strings.Contains(s, "-----BEGIN") {
 		s = replaceWhole(s, pemPrivateRE, "private-key", p)
 		s = replaceWhole(s, pemPrivateOpenRE, "private-key", p)
@@ -627,6 +637,11 @@ func textPass(s string, allow map[string]bool, fast bool) (string, Counts) {
 	if strings.Contains(s, "eyJ") {
 		s = replaceWhole(s, jwtRE, "jwt", p)
 	}
+	return s
+}
+
+// redactAssignments masks values assigned to a key word, quoted, flagged or in prose.
+func redactAssignments(s, lower string, p kindPass) string {
 	if kvAssignmentNearby(lower) {
 		s = replaceSubmatch(s, genericKVRE, "credential", p, func(m []string) string {
 			return m[1] + m[2] + m[3] + "[redacted:credential]" + closingQuote(m[3], m[5])
@@ -698,6 +713,12 @@ func textPass(s string, allow map[string]bool, fast bool) (string, Counts) {
 			return !worthRedactingIntl(m[4])
 		})
 	}
+	return s
+}
+
+// redactCommandPasswords masks passwords passed on a command line, in a netrc
+// and in a cookie header.
+func redactCommandPasswords(s, lower string, p kindPass) string {
 	if strings.Contains(lower, "sshpass") {
 		s = replaceGroup(s, sshpassRE, 1, "command-password", p, nil)
 	}
@@ -725,8 +746,7 @@ func textPass(s string, allow map[string]bool, fast bool) (string, Counts) {
 	if strings.Contains(lower, "cookie:") {
 		s = replaceGroup(s, cookieRE, 1, "cookie", p, nil)
 	}
-	s = redactEntropy(s, p)
-	return s, counts
+	return s
 }
 
 // kindPass is what one redaction pass may write: the counts it fills in, and

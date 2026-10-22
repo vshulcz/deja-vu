@@ -659,89 +659,7 @@ func readOpencodeRows(harness, db, q string, by map[string]*model.Session) (int,
 				continue
 			}
 		}
-		if cmd := str(r["cmd"]); cmd != "" {
-			t := partTime(r)
-			out := str(r["out"])
-			if r["exit"] == nil && harness == "zcode" {
-				// ZCode records no exit field and writes a failed run's code
-				// Claude's way, "Exit code N" as the output's first line, and
-				// only for a non-zero N (#4536).
-				head, rest, _ := strings.Cut(out, "\n")
-				if code, ok := statusCode(head, "Exit code ", ""); ok && code != 0 {
-					r["exit"] = float64(code)
-					out = rest
-				}
-			}
-			if IndexCommands() && worthIndexing(cmd) {
-				// A non-zero exit rides with the command. opencode records it on
-				// 99% of runs, which is the one thing Claude's transcripts
-				// cannot give: there the verdict has to be inferred from output
-				// text and only ~17% of runs can be scored. Zero is left off —
-				// it is the common case, and saying so on 18,000 records would
-				// be noise rather than information.
-				line := "$ " + cmd
-				if code := exitCode(r["exit"]); code > 0 {
-					line += fmt.Sprintf("  → exit %d", code)
-				}
-				s.Touch(t)
-				s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: line, Time: t})
-			}
-			// The output is a separate record under the same role Claude's tool
-			// results use, so `--role tool-output` means the same thing on both.
-			if out != "" && IndexToolOutput() {
-				s.Touch(t)
-				s.Messages = append(s.Messages, model.Message{Role: RoleToolOutput, Text: out, Time: t})
-			}
-			continue
-		}
-		// An `edit` call hands back the text it replaced and the text it wrote,
-		// so both sides are recorded the way every other harness's edit is.
-		if old, nw := str(r["old"]), str(r["new"]); old != "" || nw != "" {
-			if opencodeSynthetic(r["refused"]) {
-				continue
-			}
-			path := kiloNotebookPath(harness, str(r["editpath"]), s.Path)
-			t := partTime(r)
-			if path != "" && old != "" && IndexEdits() {
-				span := old
-				if len(span) > editSpanMax {
-					span = span[:editSpanMax]
-				}
-				s.Touch(t)
-				s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: path + "\n" + span, Time: t})
-			}
-			if path != "" && nw != "" && IndexWrites() {
-				if rec := WroteRecord(path, nw); rec != "" {
-					s.Touch(t)
-					s.Messages = append(s.Messages, model.Message{Role: RoleWrote, Text: rec, Time: t})
-				}
-			}
-			continue
-		}
-		if patch := str(r["patch"]); patch != "" {
-			t := partTime(r)
-			// The tool resolves a relative header against the session's
-			// directory; kept bare, "notes.txt" matched no file blame asked
-			// about.
-			resolve := func(rec string) string {
-				p, rest, _ := strings.Cut(rec, "\n")
-				return resolveToolPath(p, s.Path) + "\n" + rest
-			}
-			if IndexEdits() {
-				for _, span := range patchSpans(patch) {
-					s.Touch(t)
-					s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: resolve(span), Time: t})
-				}
-			}
-			// apply_patch is opencode's main editing tool, and the payload it
-			// already ships carries both sides of the change — so the written
-			// side costs nothing more to read.
-			if IndexWrites() {
-				for _, rec := range addedLinesOfPatch(patch) {
-					s.Touch(t)
-					s.Messages = append(s.Messages, model.Message{Role: RoleWrote, Text: resolve(rec), Time: t})
-				}
-			}
+		if opencodeToolRow(harness, s, r) {
 			continue
 		}
 		if txt == "" {
@@ -782,6 +700,97 @@ func readOpencodeRows(harness, db, q string, by map[string]*model.Session) (int,
 		return rows, err
 	}
 	return rows, nil
+}
+
+// opencodeToolRow records a row that is a command, an edit or a patch, and
+// reports whether the row was one.
+func opencodeToolRow(harness string, s *model.Session, r map[string]any) bool {
+	if cmd := str(r["cmd"]); cmd != "" {
+		t := partTime(r)
+		out := str(r["out"])
+		if r["exit"] == nil && harness == "zcode" {
+			// ZCode records no exit field and writes a failed run's code
+			// Claude's way, "Exit code N" as the output's first line, and
+			// only for a non-zero N (#4536).
+			head, rest, _ := strings.Cut(out, "\n")
+			if code, ok := statusCode(head, "Exit code ", ""); ok && code != 0 {
+				r["exit"] = float64(code)
+				out = rest
+			}
+		}
+		if IndexCommands() && worthIndexing(cmd) {
+			// A non-zero exit rides with the command. opencode records it on
+			// 99% of runs, which is the one thing Claude's transcripts
+			// cannot give: there the verdict has to be inferred from output
+			// text and only ~17% of runs can be scored. Zero is left off —
+			// it is the common case, and saying so on 18,000 records would
+			// be noise rather than information.
+			line := "$ " + cmd
+			if code := exitCode(r["exit"]); code > 0 {
+				line += fmt.Sprintf("  → exit %d", code)
+			}
+			s.Touch(t)
+			s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: line, Time: t})
+		}
+		// The output is a separate record under the same role Claude's tool
+		// results use, so `--role tool-output` means the same thing on both.
+		if out != "" && IndexToolOutput() {
+			s.Touch(t)
+			s.Messages = append(s.Messages, model.Message{Role: RoleToolOutput, Text: out, Time: t})
+		}
+		return true
+	}
+	// An `edit` call hands back the text it replaced and the text it wrote,
+	// so both sides are recorded the way every other harness's edit is.
+	if old, nw := str(r["old"]), str(r["new"]); old != "" || nw != "" {
+		if opencodeSynthetic(r["refused"]) {
+			return true
+		}
+		path := kiloNotebookPath(harness, str(r["editpath"]), s.Path)
+		t := partTime(r)
+		if path != "" && old != "" && IndexEdits() {
+			span := old
+			if len(span) > editSpanMax {
+				span = span[:editSpanMax]
+			}
+			s.Touch(t)
+			s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: path + "\n" + span, Time: t})
+		}
+		if path != "" && nw != "" && IndexWrites() {
+			if rec := WroteRecord(path, nw); rec != "" {
+				s.Touch(t)
+				s.Messages = append(s.Messages, model.Message{Role: RoleWrote, Text: rec, Time: t})
+			}
+		}
+		return true
+	}
+	if patch := str(r["patch"]); patch != "" {
+		t := partTime(r)
+		// The tool resolves a relative header against the session's
+		// directory; kept bare, "notes.txt" matched no file blame asked
+		// about.
+		resolve := func(rec string) string {
+			p, rest, _ := strings.Cut(rec, "\n")
+			return resolveToolPath(p, s.Path) + "\n" + rest
+		}
+		if IndexEdits() {
+			for _, span := range patchSpans(patch) {
+				s.Touch(t)
+				s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: resolve(span), Time: t})
+			}
+		}
+		// apply_patch is opencode's main editing tool, and the payload it
+		// already ships carries both sides of the change — so the written
+		// side costs nothing more to read.
+		if IndexWrites() {
+			for _, rec := range addedLinesOfPatch(patch) {
+				s.Touch(t)
+				s.Messages = append(s.Messages, model.Message{Role: RoleWrote, Text: resolve(rec), Time: t})
+			}
+		}
+		return true
+	}
+	return false
 }
 
 // kiloNotebookPath puts a Kilo CLI path relative to the session directory

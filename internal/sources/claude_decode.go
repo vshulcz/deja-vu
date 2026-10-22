@@ -140,18 +140,7 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 		if v.Type == "user" && v.IsMeta {
 			return
 		}
-		if v.IsSidechain && v.AgentID != "" {
-			// The child is its own session, spawned by the parent whose id
-			// every one of these lines carries.
-			s.ID = v.AgentID
-			s.Kind = "sidechain"
-			s.Parent = v.SessionID
-			if v.AttributionAgent != "" {
-				s.Agent = v.AttributionAgent
-			}
-		} else if v.SessionID != "" {
-			s.ID = v.SessionID
-		}
+		claudeStampIdentity(&s, &v)
 		t := claudeTime(v.Timestamp)
 		s.Touch(t)
 		role := v.Type
@@ -193,43 +182,7 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 			s.Messages = append(s.Messages, model.Message{Role: role, Text: txt, Time: t})
 		}
 		if v.Message != nil {
-			if IndexToolPaths() {
-				if p := claudeToolPathsIn(content); p != "" {
-					s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: p, Time: t})
-				}
-			}
-			if IndexEdits() {
-				for _, e := range claudeEditSpansIn(content) {
-					s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: e, Time: t})
-				}
-			}
-			if IndexWrites() {
-				for _, w := range claudeWroteRecordsIn(content) {
-					s.Messages = append(s.Messages, model.Message{Role: RoleWrote, Text: w, Time: t})
-				}
-			}
-			if IndexCommands() {
-				for _, cmd := range claudeCommandsIn(content) {
-					if cmd.ID != "" {
-						// One call can carry a batch of commands, and the
-						// filter drops some of them, so the indexes under one
-						// id are neither one nor contiguous.
-						commandAt[cmd.ID] = append(commandAt[cmd.ID], len(s.Messages))
-					}
-					s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: cmd.Text, Time: t})
-				}
-				// The result arrives in a later record and names the call, in
-				// the marker every other harness writes. A failure is stamped
-				// only with the code its result names; nothing is invented for
-				// one that names none.
-				for _, res := range claudeToolOutcomesIn(content) {
-					if _, ok := commandAt[res.ID]; !ok || !res.Known {
-						continue
-					}
-					commandExits(commandAt).stamp(s.Messages, res.ID, "", res.Code)
-					delete(commandAt, res.ID)
-				}
-			}
+			claudeAppendToolRecords(&s, content, t, commandAt)
 		}
 	})
 	if len(s.Messages) == 0 {
@@ -250,6 +203,66 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 		s.ProjectFromDir = true
 	}
 	return []model.Session{s}, err
+}
+
+// claudeStampIdentity takes the session's id from a line, and for a subagent's
+// line the parent that spawned it.
+func claudeStampIdentity(s *model.Session, v *claudeLine) {
+	if v.IsSidechain && v.AgentID != "" {
+		// The child is its own session, spawned by the parent whose id
+		// every one of these lines carries.
+		s.ID = v.AgentID
+		s.Kind = "sidechain"
+		s.Parent = v.SessionID
+		if v.AttributionAgent != "" {
+			s.Agent = v.AttributionAgent
+		}
+	} else if v.SessionID != "" {
+		s.ID = v.SessionID
+	}
+}
+
+// claudeAppendToolRecords appends the paths, edits, writes and commands a
+// record's content carries, and stamps the outcome of earlier commands whose
+// results it holds.
+func claudeAppendToolRecords(s *model.Session, content *claudeContent, t time.Time, commandAt map[string][]int) {
+	if IndexToolPaths() {
+		if p := claudeToolPathsIn(content); p != "" {
+			s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: p, Time: t})
+		}
+	}
+	if IndexEdits() {
+		for _, e := range claudeEditSpansIn(content) {
+			s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: e, Time: t})
+		}
+	}
+	if IndexWrites() {
+		for _, w := range claudeWroteRecordsIn(content) {
+			s.Messages = append(s.Messages, model.Message{Role: RoleWrote, Text: w, Time: t})
+		}
+	}
+	if IndexCommands() {
+		for _, cmd := range claudeCommandsIn(content) {
+			if cmd.ID != "" {
+				// One call can carry a batch of commands, and the
+				// filter drops some of them, so the indexes under one
+				// id are neither one nor contiguous.
+				commandAt[cmd.ID] = append(commandAt[cmd.ID], len(s.Messages))
+			}
+			s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: cmd.Text, Time: t})
+		}
+		// The result arrives in a later record and names the call, in
+		// the marker every other harness writes. A failure is stamped
+		// only with the code its result names; nothing is invented for
+		// one that names none.
+		for _, res := range claudeToolOutcomesIn(content) {
+			if _, ok := commandAt[res.ID]; !ok || !res.Known {
+				continue
+			}
+			commandExits(commandAt).stamp(s.Messages, res.ID, "", res.Code)
+			delete(commandAt, res.ID)
+		}
+	}
 }
 
 // markClaudeBranch records a /branch's source, which the harness wrote on the

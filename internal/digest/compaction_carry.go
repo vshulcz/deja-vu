@@ -149,31 +149,7 @@ func carryBuild(ev []carryEvent, prev []model.ContextCarry) []model.ContextCarry
 		}
 	}
 	// "Fixes #12" on a line whose PR is closed closes #12 with it.
-	for _, low := range texts {
-		// Matched on the lowered text with a case-sensitive pattern: the
-		// case-folding one was half the extractor's time on 189 real segments.
-		if !carryHasLinkWord(low) {
-			continue
-		}
-		for line := range strings.SplitSeq(low, "\n") {
-			var linked []int
-			for _, m := range carryLinksRE.FindAllStringSubmatch(line, -1) {
-				linked = append(linked, atoiCarry(m[1]))
-			}
-			if len(linked) == 0 {
-				continue
-			}
-			for _, m := range carryNumRE.FindAllStringSubmatch(line, -1) {
-				a := atoiCarry(m[1])
-				if slices.Contains(linked, a) || len(closed[a]) == 0 {
-					continue
-				}
-				for _, b := range linked {
-					closed[b] = append(closed[b], slices.Max(closed[a]))
-				}
-			}
-		}
-	}
+	carryCloseLinked(texts, closed)
 	// The pairing a carried line was opened with holds after the compaction too.
 	for _, p := range prev {
 		for issue, pr := range carryIssuePRPairs(carryBNorm(p.Text)) {
@@ -193,6 +169,44 @@ func carryBuild(ev []carryEvent, prev []model.ContextCarry) []model.ContextCarry
 	}
 
 	items := carryForward(prev, lastU >= 0, closed, texts, len(userMerged) > 0)
+	items = carryFreshItems(ev, items, lastU, closedAfter, mergedAfter)
+	return carryAssemble(items)
+}
+
+// carryCloseLinked closes the issues a line links to when a number on that
+// line is closed.
+func carryCloseLinked(texts []string, closed map[int][]int) {
+	for _, low := range texts {
+		// Matched on the lowered text with a case-sensitive pattern: the
+		// case-folding one was half the extractor's time on 189 real segments.
+		if !carryHasLinkWord(low) {
+			continue
+		}
+		for line := range strings.SplitSeq(low, "\n") {
+			lm := carryLinksRE.FindAllStringSubmatch(line, -1)
+			linked := make([]int, 0, len(lm))
+			for _, m := range lm {
+				linked = append(linked, atoiCarry(m[1]))
+			}
+			if len(linked) == 0 {
+				continue
+			}
+			for _, m := range carryNumRE.FindAllStringSubmatch(line, -1) {
+				a := atoiCarry(m[1])
+				if slices.Contains(linked, a) || len(closed[a]) == 0 {
+					continue
+				}
+				for _, b := range linked {
+					closed[b] = append(closed[b], slices.Max(closed[a]))
+				}
+			}
+		}
+	}
+}
+
+// carryFreshItems adds what each assistant unit of this segment left open,
+// waiting or to recheck.
+func carryFreshItems(ev []carryEvent, items []carryItem, lastU int, closedAfter func(n, j int) bool, mergedAfter func(j int) bool) []carryItem {
 	for j, e := range ev {
 		if e.kind != 'a' {
 			continue
@@ -228,7 +242,7 @@ func carryBuild(ev []carryEvent, prev []model.ContextCarry) []model.ContextCarry
 			}
 		}
 	}
-	return carryAssemble(items)
+	return items
 }
 
 func carryHasLinkWord(low string) bool {

@@ -214,6 +214,17 @@ type carryGroup struct {
 // closing word binds to the nearest #N run within carryNear runes.
 func carryBState(s string) []carryNum {
 	qs := carryQuoteSpans(s)
+	groups := carryGroups(s, qs)
+	if len(groups) == 0 {
+		return nil
+	}
+	carryBindVerbs(s, qs, groups)
+	return carryGroupStates(s, qs, groups)
+}
+
+// carryGroups collects the unquoted #N matches into runs; a reference stays a
+// group of its own.
+func carryGroups(s string, qs [][2]int) []*carryGroup {
 	var ms [][]int
 	for _, m := range carryNumRE.FindAllStringSubmatchIndex(s, -1) {
 		if !carryQuoted(qs, m[0]) {
@@ -246,9 +257,11 @@ func carryBState(s string) []carryNum {
 			groups = append(groups, &carryGroup{a: a, b: b, ns: []int{n}, ref: ref})
 		}
 	}
-	if len(groups) == 0 {
-		return nil
-	}
+	return groups
+}
+
+// carryBindVerbs binds each pending or closing word to the nearest group.
+func carryBindVerbs(s string, qs [][2]int, groups []*carryGroup) {
 	cyr := len(carryCyrRE.FindAllStringIndex(s, -1)) > len(carryLatRE.FindAllStringIndex(s, -1))
 	for kind, rx := range []*regexp.Regexp{carryPendRE, carryCloseRE} {
 		for _, w := range rx.FindAllStringSubmatchIndex(s, -1) {
@@ -284,6 +297,11 @@ func carryBState(s string) []carryNum {
 			}
 		}
 	}
+}
+
+// carryGroupStates resolves each group's bound words and the unit's heading
+// into the state of every #N it holds.
+func carryGroupStates(s string, qs [][2]int, groups []*carryGroup) []carryNum {
 	hm := carryHeadRE.FindStringSubmatchIndex(s)
 	head := len(hm) > 3 && !carryNegPendRE.MatchString(s[hm[0]:hm[1]]) && !carryQuoted(qs, hm[2])
 	cm := carryCHeadRE.FindStringSubmatchIndex(s)
