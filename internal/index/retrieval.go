@@ -128,142 +128,17 @@ func searchDetailedRead(dir string, o query.Options) (SearchResult, error) {
 	// answer both ask for it with the same query, and each read and scored
 	// fifty sessions (#5378).
 	ranking := &relevanceOnce{}
-	var posts []posting
-	var fallbackVariants map[string][]string
-	fallbackTier := query.TierExact
-	usedPostings := false
-	if !o.Regex {
-		if keys := queryKeys(o.Query); len(keys) > 0 {
-			usedPostings = true
-			posts, err = intersectPostings(dir, retrievalKeys(keys))
-			if err != nil {
-				return SearchResult{}, fmt.Errorf("postings: %w", err)
-			}
-			if len(posts) == 0 {
-				// grep expectation: "code" should find "opencode". Expand each query
-				// token to all indexed tokens containing it (bucket directories only,
-				// no record scan), then intersect.
-				var variants map[string][]string
-				bare, spelledApart := compoundQueryTokens(tokens(o.Query))
-
-				posts, variants, err = intersectSubstringPostingsDetailed(dir, bare)
-				if err != nil {
-					return SearchResult{}, fmt.Errorf("substr postings: %w", err)
-				}
-				// The postings above found the parts; the record check below
-				// counts what the reader typed, and the text does not hold the
-				// compound. Hand it the words spelled apart as this term's
-				// other spelling, which is what the store actually says (#2125).
-				if len(spelledApart) > 0 {
-					if variants == nil {
-						variants = map[string][]string{}
-					}
-					for tok, apart := range spelledApart {
-						variants[tok] = append(variants[tok], apart)
-					}
-				}
-				if len(posts) > 0 {
-					fallbackVariants = variants
-					fallbackTier = query.TierClose
-					// A natural-language query that degraded to substring
-					// intersection often lands on one incidental session and
-					// the ladder used to stop there. When the query carries
-					// enough informative words to rank by relevance, prefer
-					// that ranking and keep the substring hits as the tail.
-					if rel, rerr := ranking.get(dir, m, o); rerr == nil && len(rel.Sessions) > 0 {
-						// With the variants too, for the reason the scan below
-						// takes them: a compound spelled apart is not a
-						// substring of what the store wrote, so this
-						// comparison would call the close tier empty and hand
-						// the answer to relevance (#2125).
-						//
-						// Only when a candidate survives the filters: no offsets
-						// hands the scan the whole record log, and a recall whose
-						// project or session filters left none of the hits read
-						// all of it, 13 s on a 4050-session store (#5370).
-						var closeSS []model.Session
-						var serr error
-						if cut := cutPostingsBySession(posts, m, o); len(cut) > 0 {
-							closeSS, serr = scanRecordsWithVariants(dir, m, o, postingOffsets(cut), variants)
-						}
-						agree := false
-						if serr == nil {
-							top := rel.Sessions[0].Harness + ":" + rel.Sessions[0].ID
-							for _, c := range closeSS {
-								if c.Harness+":"+c.ID == top {
-									agree = true
-									break
-								}
-							}
-						}
-						// Substring hits that contain relevance's own best
-						// candidate are trustworthy — keep the close tier
-						// (and its variant annotations). When they disagree,
-						// the intersection landed on an incidental session;
-						// serve the relevance ranking with close as a tail.
-						if serr == nil && len(closeSS) > 0 && !agree {
-							seen := map[string]bool{}
-							for _, r := range rel.Sessions {
-								seen[r.Harness+":"+r.ID] = true
-							}
-							merged := rel.Sessions
-							for _, c := range closeSS {
-								if !seen[c.Harness+":"+c.ID] {
-									merged = append(merged, c)
-								}
-							}
-							// The tail carries sessions the relevance pool did
-							// not hold, so they are matches too and count
-							// toward the total. Adding them on both sides
-							// leaves `capped` reading the relevance window,
-							// which is still the only thing that withheld
-							// anything here.
-							tail := len(merged) - len(rel.Sessions)
-							return relevanceResult(merged, rel.Total+tail, rel.TermIDF), nil
-						}
-					}
-				}
-			}
-		}
+	hit, served, err := postingsRung(dir, m, o, ranking)
+	if err != nil {
+		return SearchResult{}, err
 	}
+	if served != nil {
+		return *served, nil
+	}
+	posts, fallbackVariants, fallbackTier := hit.posts, hit.variants, hit.tier
 	if len(posts) == 0 {
-		if usedPostings {
-			if result, ferr := stemSearch(dir, m, o); ferr != nil {
-				return SearchResult{}, fmt.Errorf("stem postings: %w", ferr)
-			} else if result.Stemmed {
-				return withRelevanceTail(ranking, dir, m, o, result)
-			}
-			if result, ferr := fuzzySearch(dir, m, o); ferr != nil {
-				return SearchResult{}, fmt.Errorf("fuzzy postings: %w", ferr)
-			} else if result.Fuzzy {
-				return withRelevanceTail(ranking, dir, m, o, result)
-			}
-			// Two words that never appear together is the state the
-			// co-occurrence rescue was written for — "login" next to "jwks"
-			// — and it was called only in the other zero-result branch, so
-			// the case it exists for never reached it (#1786).
-			if result, ferr := cooccurSearch(dir, m, o); ferr != nil {
-				return SearchResult{}, fmt.Errorf("cooccur postings: %w", ferr)
-			} else if len(result.Sessions) > 0 {
-				return withRelevanceTail(ranking, dir, m, o, result)
-			}
-			// A pasted error that matched no postings is the case the word
-			// ladder cannot win: its identifiers are line numbers and hashes.
-			// The friction hashes the store already keeps answer it exactly.
-			if result, ferr := errorSigSearch(dir, m, o); ferr != nil {
-				return SearchResult{}, fmt.Errorf("error signature: %w", ferr)
-			} else if len(result.Sessions) > 0 {
-				return result, nil
-			}
-			ranked, rerr := ranking.get(dir, m, o)
-			if rerr != nil || len(ranked.Sessions) > 0 {
-				return ranked, rerr
-			}
-			// Nothing anywhere. The neighbour map holds the one link left to
-			// try — the project's own word for what the reader asked about —
-			// and asking it over the question's identifying words is what
-			// makes it readable by a sentence (#2331).
-			return cooccurNarrowedSearch(dir, m, o)
+		if hit.used {
+			return noPostingsLadder(ranking, dir, m, o)
 		}
 		ss, scanErr := scanRecords(dir, m, o, nil)
 		return SearchResult{Sessions: ss, Tier: fallbackTier, Variants: fallbackVariants}, scanErr
@@ -298,57 +173,22 @@ func searchDetailedRead(dir string, o query.Options) (SearchResult, error) {
 		}
 	}
 	if err == nil && len(ss) == 0 {
-		if result, ferr := stemSearch(dir, m, o); ferr != nil {
-			return SearchResult{}, fmt.Errorf("stem postings: %w", ferr)
-		} else if result.Stemmed {
-			return withRelevanceTail(ranking, dir, m, o, result)
-		}
-		if result, ferr := fuzzySearch(dir, m, o); ferr != nil {
-			return SearchResult{}, fmt.Errorf("fuzzy postings: %w", ferr)
-		} else if result.Fuzzy {
-			return withRelevanceTail(ranking, dir, m, o, result)
-		}
-		if result, ferr := cooccurSearch(dir, m, o); ferr != nil {
-			return SearchResult{}, fmt.Errorf("cooccur postings: %w", ferr)
-		} else if len(result.Sessions) > 0 {
-			return withRelevanceTail(ranking, dir, m, o, result)
-		}
-		// A pasted error that matched no postings is the case the word
-		// ladder cannot win: its identifiers are line numbers and hashes.
-		// The friction hashes the store already keeps answer it exactly.
-		if result, ferr := errorSigSearch(dir, m, o); ferr != nil {
-			return SearchResult{}, fmt.Errorf("error signature: %w", ferr)
-		} else if len(result.Sessions) > 0 {
-			return result, nil
+		if res, done, ferr := wordLadder(ranking, dir, m, o); done {
+			return res, ferr
 		}
 		return ranking.get(dir, m, o)
 	}
 	if err != nil {
 		return SearchResult{}, err
 	}
-	res, err := withRelevanceTail(ranking, dir, m, o, SearchResult{Sessions: ss, Tier: fallbackTier, Variants: fallbackVariants, Unread: unread})
+	res := withRelevanceTail(ranking, dir, m, o, SearchResult{Sessions: ss, Tier: fallbackTier, Variants: fallbackVariants, Unread: unread})
 	// What o.PoolScope asked for is read after this search settled its own
 	// answer, and only onto a plain exact one: that is the only answer a
 	// narrower one is cut from.
-	if err == nil && scopeWhole && res.Unread == unread && res.Tier == query.TierExact {
-		// No offsets would scan the whole record log.
-		var extra []model.Session
-		if len(scoped) > 0 {
-			var serr error
-			if extra, serr = scanRecordsWithVariants(dir, m, o, postingOffsets(scoped), fallbackVariants); serr != nil {
-				return res, nil
-			}
-		}
-		for _, s := range extra {
-			if unread.Scoped == nil {
-				unread.Scoped = map[string]bool{}
-			}
-			unread.Scoped[s.Harness+":"+s.ID] = true
-		}
-		res.Sessions = append(res.Sessions, extra...)
-		unread.ScopeWhole = true
+	if scopeWhole && res.Unread == unread && res.Tier == query.TierExact {
+		return withPoolScope(dir, m, o, res, unread, scoped, fallbackVariants), nil
 	}
-	return res, err
+	return res, nil
 }
 
 // sessionKeySet keys sessions the way StrictIDs is keyed, for the paths that
@@ -420,10 +260,10 @@ func fusedPlace(relevanceRank int, strict bool) int {
 // the merged order survives to the caller untouched; anything that re-sorts
 // this by exact-match scoring would undo the point. once is the pass's ranking,
 // shared with the part-of-word step that may already have run it.
-func withRelevanceTail(once *relevanceOnce, dir string, m Manifest, o query.Options, res SearchResult) (SearchResult, error) {
+func withRelevanceTail(once *relevanceOnce, dir string, m Manifest, o query.Options, res SearchResult) SearchResult {
 	ss := res.Sessions
 	if len(ss) == 0 || len(ss) >= thinAND {
-		return res, nil
+		return res
 	}
 	// A store no bigger than the window the tail is drawn from used to get no
 	// tail at all, on the reading that ranking a store that size hands back
@@ -437,7 +277,7 @@ func withRelevanceTail(once *relevanceOnce, dir string, m Manifest, o query.Opti
 	if err != nil || len(rel.Sessions) == 0 {
 		// A tail is an improvement, not a requirement: if ranking the whole
 		// store fails, the strict answer is still a correct answer.
-		return res, nil //nolint:nilerr // the tail is optional, the strict answer stands
+		return res
 	}
 	seen := make(map[string]bool, len(ss))
 	for _, s := range ss {
@@ -522,7 +362,7 @@ func withRelevanceTail(once *relevanceOnce, dir string, m Manifest, o query.Opti
 	tailCap := 0
 	if small {
 		if len(m.Sessions) < tailFloor {
-			return res, nil
+			return res
 		}
 		tailCap = min(thinAND, len(m.Sessions)/5)
 	}
@@ -545,7 +385,7 @@ func withRelevanceTail(once *relevanceOnce, dir string, m Manifest, o query.Opti
 		return at[merged[i].Harness+":"+merged[i].ID] < at[merged[j].Harness+":"+merged[j].ID]
 	})
 	if added == 0 {
-		return res, nil
+		return res
 	}
 	// A session that satisfies the AND carries every query key, so it is
 	// already inside the pool relevance scored, and adding the strict count on
@@ -574,7 +414,7 @@ func withRelevanceTail(once *relevanceOnce, dir string, m Manifest, o query.Opti
 	if droppedAWord(out.Variants) {
 		out.Strict, out.StrictIDs = 0, nil
 	}
-	return out, nil
+	return out
 }
 
 // relevanceOnce is relevanceSearch for one pass of the ladder, run the first
@@ -1398,11 +1238,6 @@ func ProjectInScope(project, want string) bool { return projectInScope(project, 
 // any-frequency term counts, how many query terms the corpus knows at all,
 // and that pre-truncation total.
 func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int, keep func(SessionMeta) bool) (relevanceRanking, error) {
-	// A real bucket read error (a corrupt or unreadable postings file) must not
-	// pass as "the term is absent": that silently drops the term from the
-	// ranking. Remember the first one and hand it back so the caller triggers
-	// the same self-heal the exact tier already does.
-	var readErr error
 	inProject := map[uint32]SessionMeta{}
 	scope := newProjectScope(projects...)
 	for _, meta := range m.Sessions {
@@ -1418,341 +1253,15 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		}
 	}
 	if len(inProject) == 0 {
-		return relevanceRanking{}, readErr
+		return relevanceRanking{}, nil
 	}
 	br := newBucketReader(dir)
 	defer br.close()
-	totalDocs := float64(countedDocs(m)) + 1
-	idfOf := map[string]float64{}
-	score := map[uint32]float64{}
-	// focus is the same scoring restricted to the words that distinguish. A
-	// question asked in plain speech carries filler that is a content word to
-	// the index — "how many bikes do I own" ranks on many, bikes and own — and
-	// the session that answers it often holds only the rare one. Scored on the
-	// whole query it loses to sessions carrying more of the filler; scored on
-	// the rare part alone it wins. Neither view is right on its own, so both are
-	// kept and the better place of the two is used, at a price.
-	focus := map[uint32]float64{}
-	matchedTerms := map[uint32]int{}
-	// Coverage counted over the terms that identify something on their own,
-	// kept alongside so the choice between the two can be made once the whole
-	// query has been read rather than term by term.
-	identifyingTerms := 0
-	matchedIdentifying := map[uint32]int{}
-	// The rarest term this session matched, against the rarest the question
-	// holds. A short question skips the store check entirely — "a short
-	// question is all subject" — so `decide saltmarsh` asked where saltmarsh
-	// has never been said fired on `decide`, and nothing downstream could tell
-	// the subject from the verb beside it (#3351).
-	bestMatched := map[uint32]float64{}
-	queryBest := 0.0
-	// noteQuerySubject raises that mark for a word that names something. df is
-	// counted over the whole store, before the project scope drops the term, so
-	// a subject that lives somewhere else still counts as the subject — which
-	// is the case this exists for.
-	noteQuerySubject := func(term string, sessions int) {
-		// A word this store has never seen says nothing about what the
-		// question is about here: counting it set a mark no session could
-		// reach, and the recall went silent whenever a question carried one
-		// unseen word — which is most questions.
-		if sessions <= 0 || !search.HasIdentifierTerm([]string{term}) {
-			return
-		}
-		if r := rankIDF(len(m.Sessions), sessions); r > queryBest {
-			queryBest = r
-		}
-	}
-	strongTerms := map[uint32]int{}
-	anyTerms := map[uint32]int{}
-	// perMessage tracks how many distinct terms hit each message (record
-	// offset) of a session: co-occurrence inside one message is a far
-	// stronger topical signal than terms scattered across a long session.
-	perMessage := map[uint32]map[int64]int{}
-	// msgIDF accumulates the idf mass of distinct terms per message, so a
-	// session can be ranked by its best single message rather than by the
-	// total it collects across thousands of them.
-	msgIDF := map[uint32]map[int64]float64{}
-	// toolOff marks the matched records that are tool records rather than
-	// speech, so their credit can be weighed at toolMatchWeight below.
-	toolOff := map[int64]bool{}
-	// Counted over the whole store, not the sessions being ranked: the guard
-	// that reads it is telling a typo from a real word, and a word another
-	// project uses is a real word. Counted over the project, a question with
-	// one word this project shares and two it never said read as one known
-	// word among typos, and the project-scoped recall answered nothing (#4789).
-	termsKnown := 0
+	a := newRelevanceAcc(m, inProject, br)
 	for _, term := range terms {
-		keys := queryKeys(term)
-		if len(keys) == 0 {
-			continue
-		}
-		// A single-token term folds its stem forms in as OR-variants:
-		// "camped" must score sessions that say "camping". Multi-token
-		// terms keep strict AND semantics below.
-		var orKeys []string
-		if len(keys) == 1 {
-			seenForm := map[string]bool{keys[0]: true}
-			orKeys = []string{keys[0]}
-			for _, form := range stemMatchForms(term) {
-				k := "t" + form
-				if !seenForm[k] {
-					seenForm[k] = true
-					orKeys = append(orKeys, k)
-				}
-			}
-		}
-		// A dotted or slashed term ("203.0.113.51", "pkg/index") tokenizes
-		// into several index keys. Matching only the first key made an IP
-		// degrade to its first octet — a bare small number that lives in
-		// half the corpus — so déjà vu fired on unrelated sessions. The
-		// term counts only where every sub-token is present; idf comes from
-		// the rarest sub-token, which is the one that actually identifies.
-		var (
-			hit map[uint32]bool
-			tf  map[uint32]int
-			// minDF is in capped messages, minSess in whole sessions. Neither
-			// unit is right alone: sessions call a subject word common because
-			// the marathons everything lives in all mention it, and capped
-			// messages call a word that saturates one long session filler —
-			// which is exactly what the name of the thing you have been working
-			// on all month looks like. The rarer of the two verdicts wins, so a
-			// term has to read as ordinary under BOTH before it is treated as
-			// filler.
-			minDF   = -1
-			minSess = -1
-			offs    map[uint32]map[int64]bool
-			missed  bool
-		)
-		if len(orKeys) > 1 && !isCyrToken(term) {
-			// Fold stem forms in ONLY when the exact token is absent from the
-			// sessions being ranked: "camped" with no postings tries "camping",
-			// but an exact hit is never diluted by its variants. Russian
-			// inflects too heavily for that gate — a Cyrillic term keeps its
-			// whole form union, matching сеть against сетью and сети alike.
-			//
-			// Absent from *these* sessions, not from the whole store. Asking
-			// the store meant that unrelated work decided it: with "write"
-			// somewhere in the index the fold switched off, and "how often do
-			// we write parquet?" stopped matching the session that says
-			// "parquet writes are batched per hour". Measured on the benchmark,
-			// that lost the haystack arm a case — a question missing the one
-			// session that answers it because of sessions in other projects.
-			if exact, err := br.postings(orKeys[0]); err == nil && len(exact) > 0 {
-				for _, pp := range exact {
-					if _, ok := inProject[pp.Sid]; ok {
-						orKeys = orKeys[:1]
-						break
-					}
-				}
-			}
-		}
-		if len(orKeys) > 1 {
-			// OR path: union postings across the term's stem forms.
-			df := map[uint32]map[int64]bool{}
-			hit = map[uint32]bool{}
-			tf = map[uint32]int{}
-			offs = map[uint32]map[int64]bool{}
-			for _, key := range orKeys {
-				posts, err := br.postings(key)
-				if err != nil && readErr == nil {
-					readErr = err
-				}
-				if err != nil || len(posts) == 0 {
-					continue
-				}
-				for _, pp := range posts {
-					noteDF(df, pp.Sid, pp.Off)
-					if _, ok := inProject[pp.Sid]; ok {
-						if pp.Tool {
-							toolOff[pp.Off] = true
-						}
-						hit[pp.Sid] = true
-						tf[pp.Sid]++
-						oo := offs[pp.Sid]
-						if oo == nil {
-							oo = map[int64]bool{}
-							offs[pp.Sid] = oo
-						}
-						oo[pp.Off] = true
-					}
-				}
-			}
-			if len(df) > 0 {
-				termsKnown++
-			}
-			if len(hit) == 0 {
-				noteQuerySubject(term, len(df))
-				continue
-			}
-			minDF, minSess = countDF(df), len(df)
-			// fallthrough to idf/scoring below
-		} else {
-			// Every sub-token of the term is somewhere in the store.
-			inStore := true
-			for _, key := range keys {
-				posts, err := br.postings(key)
-				if err != nil && readErr == nil {
-					readErr = err
-				}
-				if err != nil || len(posts) == 0 {
-					missed, inStore = true, false
-					break
-				}
-				// Document frequency in sessions, not postings: one marathon
-				// session repeating a term 300 times must not make it common.
-				df := map[uint32]map[int64]bool{}
-				keyHit := map[uint32]bool{}
-				keyTF := map[uint32]int{}
-				keyOffs := map[uint32]map[int64]bool{}
-				for _, pp := range posts {
-					noteDF(df, pp.Sid, pp.Off)
-					if _, ok := inProject[pp.Sid]; ok {
-						if pp.Tool {
-							toolOff[pp.Off] = true
-						}
-						keyHit[pp.Sid] = true
-						keyTF[pp.Sid]++
-						oo := keyOffs[pp.Sid]
-						if oo == nil {
-							oo = map[int64]bool{}
-							keyOffs[pp.Sid] = oo
-						}
-						oo[pp.Off] = true
-					}
-				}
-				if hit == nil {
-					hit, tf = keyHit, keyTF
-				} else {
-					for ord := range hit {
-						if !keyHit[ord] {
-							delete(hit, ord)
-							delete(tf, ord)
-						} else if keyTF[ord] < tf[ord] {
-							tf[ord] = keyTF[ord]
-						}
-					}
-				}
-				// Message credit follows the rarest sub-token — the one whose df
-				// sets the term's idf. A union would let a message containing
-				// only a common sub-token ("index" of "pkg/index") collect the
-				// full term mass, and best-message ranking amplifies that.
-				if minDF == -1 || countDF(df) < minDF {
-					minDF, minSess = countDF(df), len(df)
-					offs = keyOffs
-				}
-				if len(hit) == 0 {
-					noteQuerySubject(term, len(df))
-					missed = true
-					break
-				}
-			}
-			if inStore {
-				termsKnown++
-			}
-			if missed || len(hit) == 0 {
-				continue
-			}
-		}
-		// Two verdicts on how rare the term is, and they answer two different
-		// questions. Whether the term is worth speaking up about is the rarer
-		// of the two: sessions alone call a subject word common because the
-		// marathons that hold most of a store all mention it, and capped
-		// messages alone call the topic of one long session filler.
-		//
-		// What a term is WORTH once it matched is a different question, and
-		// the capped-message view is the wrong answer to it: it lifts every
-		// term that a few long sessions happen to concentrate, which reorders
-		// the top of the ranking. Measured on LongMemEval-S, weighting by the
-		// rarer verdict cost 1.7 points of hit@1 — preference questions fell
-		// from 36.7% to 26.7% — while the gate it was introduced for kept its
-		// gain. So the score keeps counting documents in sessions.
-		rank := rankIDF(len(m.Sessions), minSess)
-		idf := gateIDF(totalDocs, minDF, rank)
-		idfOf[term] = idf
-		if idf <= 0 {
-			// In a tiny corpus every ratio collapses to zero; a term living
-			// in only a couple of sessions still identifies them.
-			if minSess > 2 {
-				continue
-			}
-			idf = 0.1
-		}
-		if rank <= 0 {
-			rank = 0.1
-		}
-		informative := idf >= dejaVuIDFFloor || minSess <= 2
-		// Identifying is the same bar read against the number the score itself
-		// uses: rare counted in whole sessions. gateIDF deliberately takes the
-		// more generous of its two verdicts so that a subject word is never
-		// called filler, which is what a term has to clear to be spoken about
-		// at all. Coverage is a different question — it multiplies a session's
-		// score by how much of the query it covers — and answering it
-		// generously pays a session for the ordinary words a question is
-		// phrased with. "Can you suggest a hotel for my trip" is four such
-		// words and one that matters.
-		identifying := rank >= dejaVuIDFFloor || minSess <= 2
-		if identifying {
-			identifyingTerms++
-		}
-		// Rare enough to identify something on its own: either well past the
-		// ordinary bar, or living in a single session of the whole corpus.
-		strong := idf >= dejaVuStrongIDFFloor || minSess <= 1
-		// The question's own high-water mark: its rarest word is what it is
-		// about, whether or not any session here holds it (#3351).
-		noteQuerySubject(term, minSess)
-		for ord := range hit {
-			mm := perMessage[ord]
-			if mm == nil {
-				mm = map[int64]int{}
-				perMessage[ord] = mm
-			}
-			mi := msgIDF[ord]
-			if mi == nil {
-				mi = map[int64]float64{}
-				msgIDF[ord] = mi
-			}
-			for off := range offs[ord] {
-				mm[off]++
-				mi[off] += rank
-			}
-		}
-		for ord := range hit {
-			// Saturated term frequency: repeated mentions add confidence
-			// with quickly diminishing returns, so a marathon session cannot
-			// bury a focused one through sheer repetition.
-			weighted := rank * (1 + 0.25*math.Log2(float64(tf[ord])))
-			// A term the session only ever held in tool records was not said
-			// by anyone there; it sat in a file it read or a command's output.
-			spoken := false
-			for off := range offs[ord] {
-				if !toolOff[off] {
-					spoken = true
-					break
-				}
-			}
-			if !spoken {
-				weighted *= toolMatchWeight
-			}
-			score[ord] += weighted
-			if informative {
-				focus[ord] += weighted
-			}
-			anyTerms[ord]++
-			if informative {
-				matchedTerms[ord]++
-			}
-			if identifying {
-				matchedIdentifying[ord]++
-			}
-			if rank > bestMatched[ord] {
-				bestMatched[ord] = rank
-			}
-			if strong {
-				strongTerms[ord]++
-			}
-		}
+		a.addTerm(term)
 	}
-	matchedTerms = coverageCounts(matchedTerms, matchedIdentifying, identifyingTerms)
+	a.matchedTerms = coverageCounts(a.matchedTerms, a.matchedIdentifying, a.identifyingTerms)
 	// A query this long is a pasted document — an issue, a log, a spec — and
 	// ranking it is finding the documents most like it, so a session's score
 	// pays for its length the way BM25 does and is summed over the session
@@ -1767,91 +1276,15 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			}
 		}
 	}
-	ranked := make([]relevanceScored, 0, len(score))
-	for ord, sc := range score {
+	ranked := make([]relevanceScored, 0, len(a.score))
+	for ord, sc := range a.score {
 		if sc <= 0 {
 			continue
 		}
-		// Same-message co-occurrence bonus: the best single message covering
-		// k distinct query terms scales the session's score. A session where
-		// one message answers the whole question outranks one that merely
-		// mentions every word somewhere.
-		//
-		// A tool record co-occurs at toolMatchWeight: a 50 KB file read or
-		// JSON dump holds most words of any question, so one such record
-		// made a session that only ever read files look like it answered
-		// (#4780). Speech is weighed exactly as before.
-		best := 1.0
-		for off, k := range perMessage[ord] {
-			kk := float64(k)
-			if toolOff[off] {
-				kk = 1 + (kk-1)*toolMatchWeight
-			}
-			if kk > best {
-				best = kk
-			}
-		}
-		// A focused message beats diffuse mentions: the session's score is
-		// its best message's idf mass (scaled by same-message co-occurrence),
-		// with the session-wide total only as a dampened tail. Without this,
-		// one marathon session that brushes every query word somewhere
-		// outranks the short session that actually answers.
-		var bestMsg float64
-		for off, v := range msgIDF[ord] {
-			if toolOff[off] {
-				v *= toolMatchWeight
-			}
-			if v > bestMsg {
-				bestMsg = v
-			}
-		}
-		coocc := 1 + 0.2*(best-1)
-		if !long {
-			sc = bestMsg*coocc + 0.25*(sc-bestMsg)
-		}
-		// Coverage: distinct informative terms beat repetition.
-		if matchedTerms[ord] > 1 {
-			sc *= 1 + 0.15*float64(matchedTerms[ord]-1)
-		}
-		// How much of the session the match is. A marathon that brushes the
-		// question across hundreds of turns and a short session where the
-		// matching turns are most of what it holds scored alike, and on ten
-		// questions phrased from real PR titles the marathon took the top
-		// place twice (#3214). Counted in messages, which is the unit the
-		// match is already measured in.
-		if counted := inProject[ord].Counted; counted > 0 {
-			share := float64(len(perMessage[ord])) / float64(counted)
-			if share > 1 {
-				share = 1
-			}
-			sc *= 1 + marathonShare*share
-		}
-		// Did this session match what the question is about, rather than the
-		// working word beside it. The subject is the question's rarest naming
-		// word, read over the whole store so one that lives in another project
-		// still counts; a session that matched only commoner words matched
-		// around it. Half the mark, not all of it: a rephrasing reaches the
-		// subject through a neighbouring word, and demanding the exact one cost
-		// the reworded arm nine of twenty (#3351).
-		named := 0
-		if queryBest <= 0 || bestMatched[ord] >= queryBest*subjectShare {
-			named = 1
-		}
-		if long && sumWords > 0 {
-			// A session indexed before lengths were counted is taken as
-			// average: neither paid nor charged for a length nobody knows.
-			w := float64(inProject[ord].Words)
-			if w == 0 {
-				w = sumWords / nWords
-			}
-			norm := 1 - longQueryLengthB + longQueryLengthB*w/(sumWords/nWords)
-			sc /= norm
-			focus[ord] /= norm
-		}
-		ranked = append(ranked, relevanceScored{inProject[ord], sc, matchedTerms[ord], anyTerms[ord], strongTerms[ord], named, focus[ord]})
+		ranked = append(ranked, a.scoreSession(ord, sc, long, sumWords, nWords))
 	}
 	if len(ranked) == 0 {
-		return relevanceRanking{termsKnown: termsKnown}, readErr
+		return relevanceRanking{termsKnown: a.termsKnown}, a.readErr
 	}
 	sort.Slice(ranked, func(i, j int) bool {
 		if ranked[i].score != ranked[j].score {
@@ -1891,7 +1324,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 	// every record of every candidate (#3491).
 	offsets := make(map[uint32][]int64, len(ranked))
 	for _, r := range ranked {
-		if mm := perMessage[r.meta.Ord]; len(mm) > 0 {
+		if mm := a.perMessage[r.meta.Ord]; len(mm) > 0 {
 			offs := make([]int64, 0, len(mm))
 			for off := range mm {
 				offs = append(offs, off)
@@ -1905,12 +1338,12 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		any:         anyMatched,
 		strong:      strong,
 		naming:      naming,
-		termsKnown:  termsKnown,
+		termsKnown:  a.termsKnown,
 		total:       matchedTotal,
-		idf:         idfOf,
+		idf:         a.idfOf,
 		offsets:     offsets,
 		scores:      scores,
-	}, readErr
+	}, a.readErr
 }
 
 // sessionsAtOffsets loads the records at the given offsets and groups them by
