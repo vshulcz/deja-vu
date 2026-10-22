@@ -119,3 +119,84 @@ func TestClineAutoRefusesAnUnwritablePluginDirBeforeWriting(t *testing.T) {
 		}
 	})
 }
+
+// Uninstall removed the three files and then failed to unlink the emptied
+// directory from a read-only plugins/, so the target was refused with the
+// plugin already gone. Now the files go, the empty directory may stay, and the
+// uninstall succeeds (#5300).
+func TestClineAutoUninstallWithAReadOnlyPluginsDir(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("needs unix permissions that bind the test user")
+	}
+	for _, tc := range []struct {
+		name     string
+		userFile bool
+	}{
+		{"no user files", false},
+		{"user file", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			hermeticEnv(t)
+			t.Setenv("CLINE_MCP_SETTINGS_PATH", "")
+			dir, entry, manifest, skill := clineTestPaths(t)
+			if out, err := captureRun(t, "install", "cline-auto", "--no-index", "--no-guidance"); err != nil {
+				t.Fatalf("install: %v\n%s", err, out)
+			}
+			user := filepath.Join(dir, "notes", "todo.md")
+			if tc.userFile {
+				writeClineTestFile(t, user, "mine\n")
+			}
+			plugins := sources.ClinePluginsDir()
+			if err := os.Chmod(plugins, 0o555); err != nil {
+				t.Fatalf("lock %s: %v", plugins, err)
+			}
+			t.Cleanup(func() {
+				if err := os.Chmod(plugins, 0o755); err != nil {
+					t.Errorf("restore %s mode: %v", plugins, err)
+				}
+			})
+			out, err := captureRun(t, "uninstall", "cline-auto", "--no-index", "--no-guidance")
+			if err != nil {
+				t.Fatalf("uninstall over a read-only plugins dir was refused: %v\n%s", err, out)
+			}
+			if strings.Contains(out, "refused") {
+				t.Errorf("uninstall over a read-only plugins dir reported a refusal:\n%s", out)
+			}
+			requireClineTestGone(t, entry, manifest, skill)
+			if tc.userFile {
+				requireClineTestFile(t, user, "mine\n")
+				return
+			}
+			requireClineTestEmptyDir(t, dir)
+		})
+	}
+}
+
+// The mirror of the test above: a file that really cannot be removed is a
+// refusal, not an unchanged plugin.
+func TestClineUninstallReportsAnUnwritablePluginDir(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("needs unix permissions that bind the test user")
+	}
+	hermeticEnv(t)
+	dir, entry, _, _ := clineTestPaths(t)
+	if _, err := installClineAuto("/bin/deja", false); err != nil {
+		t.Fatalf("install: %v", err)
+	}
+	if err := os.Chmod(dir, 0o555); err != nil {
+		t.Fatalf("lock %s: %v", dir, err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chmod(dir, 0o755); err != nil {
+			t.Errorf("restore %s mode: %v", dir, err)
+		}
+	})
+	if _, err := installClineAuto("/bin/deja", true); err == nil {
+		t.Fatal("uninstall reported success with a file it could not remove")
+	} else if !strings.Contains(err.Error(), entry) {
+		t.Errorf("the error does not name %s: %v", entry, err)
+	}
+	if _, err := os.Lstat(entry); err != nil {
+		t.Errorf("the file reported as unremovable is gone: %v", err)
+	}
+}

@@ -34,16 +34,7 @@ func installClineAuto(exe string, uninstall bool) (installResult, error) {
 	dir := filepath.Join(sources.ClinePluginsDir(), "deja")
 	path := filepath.Join(dir, "index.js")
 	if uninstall {
-		if _, err := os.Stat(path); err != nil {
-			return installResult{Path: path, Action: "unchanged"}, nil
-		}
-		if err := os.RemoveAll(dir); err != nil {
-			return installResult{}, err
-		}
-		// And the directories deja made above it, while each is empty and
-		// the record says it is deja's (#3698).
-		pruneCreatedDir(filepath.Dir(dir))
-		return installResult{Path: path, Action: "removed"}, nil
+		return uninstallClinePlugin(dir)
 	}
 	noteCreatedDirs(dir)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -97,6 +88,190 @@ func installClineAuto(exe string, uninstall bool) (installResult, error) {
 	}
 	return wroteAll(installResult{Path: path, Action: a},
 		installResult{Path: dir, Action: skillAction}), nil
+}
+
+// uninstallClinePlugin takes out the three files install wrote and then the
+// directories it recorded making. The directory is never emptied recursively:
+// a note, another skill or a backup the reader keeps beside those files is
+// theirs and stays (#5300). The plugin root and the two skill directories are
+// checked before anything is touched, because a directory symlink would make a
+// path inside the plugin name a file outside it. A directory left behind
+// because its parent is read-only is not a failed uninstall; a file that
+// cannot be removed is, and its path and reason come back in the error.
+func uninstallClinePlugin(dir string) (installResult, error) {
+	entry := filepath.Join(dir, "index.js")
+	manifest := filepath.Join(dir, "package.json")
+	skill := clineSkillPath()
+	tree, err := inspectClineTree(dir, skill)
+	if err != nil {
+		return installResult{}, err
+	}
+	// Check every safely reachable candidate before deleting any of them, so a
+	// known type conflict does not take half the plugin away first.
+	var candidates []string
+	for _, path := range []string{entry, manifest} {
+		ok, err := clineFileForRemoval(path)
+		if err != nil {
+			return installResult{}, err
+		}
+		if ok {
+			candidates = append(candidates, path)
+		}
+	}
+	note := ""
+	if tree.skillDirOK {
+		ok, err := clineFileForRemoval(skill)
+		if err != nil {
+			return installResult{}, err
+		}
+		if ok {
+			candidates = append(candidates, skill)
+		}
+	} else if tree.skillLink != "" {
+		note = fmt.Sprintf("kept %s — %s is a symbolic link, so it was not followed",
+			shortHome(skill), shortHome(tree.skillLink))
+	}
+	var removed []installResult
+	for _, path := range candidates {
+		err := os.Remove(path)
+		switch {
+		case err == nil:
+			removed = append(removed, installResult{Path: path, Action: "removed"})
+		case os.IsNotExist(err):
+			// It went between the check and the remove; nothing to claim.
+		default:
+			return installResult{}, err
+		}
+	}
+	// Only start pruning at directories whose whole chain below the plugin
+	// root is made of real directories. A link left in place keeps its parent
+	// non-empty, so the link itself is never removed to make a parent go.
+	for _, d := range tree.pruneStarts() {
+		pruneCreatedDir(d)
+	}
+	pruneCreatedDir(filepath.Dir(dir))
+	result := installResult{Path: entry, Action: "unchanged"}
+	if len(removed) > 0 {
+		result = wroteAll(removed...)
+	}
+	if note != "" {
+		if result.Note != "" {
+			result.Note += "; "
+		}
+		result.Note += note
+	}
+	return result, nil
+}
+
+// clineTree is the part of the plugin directory a Cline uninstall may touch.
+// A missing level is false; a symlink inside the tree stops the walk and is
+// recorded in skillLink so the result can say what it kept.
+type clineTree struct {
+	dir, skills, skillDir        string
+	rootOK, skillsOK, skillDirOK bool
+	skillLink                    string
+}
+
+// inspectClineTree checks only the directories inside the plugin root. A
+// symlink above the root — CLINE_DIR itself, or plugins/ — is a layout the
+// reader may legitimately have, so it is followed as before; only the tree
+// deja writes is bounded.
+func inspectClineTree(dir, skill string) (clineTree, error) {
+	t := clineTree{dir: dir, skills: filepath.Dir(filepath.Dir(skill)), skillDir: filepath.Dir(skill)}
+	exists, link, err := clineDirEntry(dir)
+	if err != nil {
+		return t, err
+	}
+	if link {
+		return t, fmt.Errorf("%s is a symbolic link; refusing to uninstall the Cline plugin through it", dir)
+	}
+	if !exists {
+		return t, nil
+	}
+	t.rootOK = true
+	exists, link, err = clineDirEntry(t.skills)
+	if err != nil {
+		return t, err
+	}
+	if link {
+		t.skillLink = t.skills
+		return t, nil
+	}
+	if !exists {
+		return t, nil
+	}
+	t.skillsOK = true
+	exists, link, err = clineDirEntry(t.skillDir)
+	if err != nil {
+		return t, err
+	}
+	if link {
+		t.skillLink = t.skillDir
+		return t, nil
+	}
+	t.skillDirOK = exists
+	return t, nil
+}
+
+// clineDirEntry classifies one directory component. link is true for a
+// symbolic link, dangling or not; the caller decides whether that is an error
+// (the plugin root) or a boundary to keep (inside it).
+func clineDirEntry(path string) (exists, link bool, err error) {
+	fi, err := os.Lstat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, false, nil
+		}
+		return false, false, err
+	}
+	if fi.Mode()&os.ModeSymlink != 0 {
+		return true, true, nil
+	}
+	if !fi.IsDir() {
+		return false, false, fmt.Errorf("%s is not a directory; it was left alone", path)
+	}
+	return true, false, nil
+}
+
+// pruneStarts is the inside-out list of plugin directories whose whole chain
+// is safe to prune. A missing or linked level takes itself and everything
+// below it out of the list; real ancestors stay.
+func (t clineTree) pruneStarts() []string {
+	if !t.rootOK {
+		return nil
+	}
+	var dirs []string
+	if t.skillDirOK {
+		dirs = append(dirs, t.skillDir)
+	}
+	if t.skillsOK {
+		dirs = append(dirs, t.skills)
+	}
+	return append(dirs, t.dir)
+}
+
+// clineFileForRemoval says whether path is a regular file uninstall may delete.
+// A directory here is the reader's, not a file deja wrote, even when it is
+// empty: os.Remove would take it, and that bypasses the created-directory
+// record pruneCreatedDir enforces. A symlink is kept rather than unlinked so
+// the decision does not depend on what it points at.
+func clineFileForRemoval(path string) (bool, error) {
+	fi, err := os.Lstat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	switch {
+	case fi.Mode()&os.ModeSymlink != 0:
+		return false, fmt.Errorf("%s is a symbolic link, not a regular file; it was left alone", path)
+	case fi.IsDir():
+		return false, fmt.Errorf("%s is a directory, not a file; it was left alone", path)
+	case !fi.Mode().IsRegular():
+		return false, fmt.Errorf("%s is not a regular file; it was left alone", path)
+	}
+	return true, nil
 }
 
 // clineAutoPreflight refuses, before the MCP entry is written, a plugin
