@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `deja fix`, `deja friction` and the hook at a failed command now know the
+  errors a package install hits behind a mirror or a proxy: pip's "No matching
+  distribution found", an HTTP 403 or 401 from an index, an unresolvable host,
+  an untrusted certificate, a failed docker build step and npm's error codes.
+  `pip3`, `pip config`, conda and apt installs are kept as remedies, so the
+  install that worked against the mirror is what `deja fix` names (#5599).
 - A first build large enough to answer early no longer forgets the malformed
   lines, unreadable files and rollouts waiting for zstd it found, so doctor
   still reports them (#5110).

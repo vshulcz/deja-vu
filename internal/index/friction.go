@@ -516,6 +516,21 @@ var frictionPhrases = []string{
 	// alone.
 	"jsondecodeerror", "valueerror:", "runtimeerror:", "oserror:",
 	"filenotfounderror:", "importerror:", "unicodedecodeerror:",
+	// A package install behind a mirror or a proxy: the index has no such
+	// package, refuses it, cannot be reached or is not trusted. None of these
+	// was recognised, so the session that found the mirror that works left
+	// nothing for the next one to reuse (#5599).
+	// Each in the tool's own shape, so a sentence about a 403 is not one:
+	// go and curl put the status after a colon, docker the exit code after
+	// "successfully".
+	"no matching distribution found", "could not find a version that satisfies",
+	"http error 403", ": 403 forbidden", ": 401 unauthorized",
+	"407 proxy authentication required", "npm error code", "npm error 40",
+	"could not resolve host", "temporary failure in name resolution",
+	": no such host", "certificate verify failed",
+	"certificate signed by unknown authority",
+	"did not complete successfully: exit code", "externally-managed-environment",
+	"manifest unknown", "pull access denied for",
 }
 
 // noSuchTableRE is the driver's own shape: the table is named right after the
