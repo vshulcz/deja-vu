@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.1] - 2026-10-22
+
+Big stores build and search for less. A cold build peaks at half the memory
+it did (4.7 GB instead of 9.4 GB on 40,000 sessions, 2.4 GB instead of 4.0 GB
+on a 12,000-session Codex store), redacts with 17x less CPU and writes a
+quarter of the scratch data. The slowest searches answer in under 200 ms in
+process instead of up to 800, and a search over many copies or look-alike
+sessions is no longer quadratic, a slowdown 0.23.0 made worse. A pass and a
+rebuild now agree on copies of one session in several projects. The index is
+rebuilt once on upgrade.
+
 ### Changed
 
 - A question with a word the store never saw reads each word's postings once
