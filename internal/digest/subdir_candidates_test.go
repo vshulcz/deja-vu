@@ -24,7 +24,7 @@ func TestProjectNameCandidatesNameTheRepositoryFromASubdirectory(t *testing.T) {
 	if err := os.MkdirAll(sub, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := exec.Command("git", "-C", repo, "init", "-q").CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "git", "-C", repo, "init", "-q").CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v %s", err, out)
 	}
 
@@ -33,7 +33,7 @@ func TestProjectNameCandidatesNameTheRepositoryFromASubdirectory(t *testing.T) {
 	// The windows runner missed the budget on a cold `git.exe` and the failure
 	// read as a wrong answer (#3624), so the speed is measured first and named.
 	start := time.Now()
-	if out, err := exec.Command("git", "-C", sub, "worktree", "list", "--porcelain").CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "git", "-C", sub, "worktree", "list", "--porcelain").CombinedOutput(); err != nil {
 		t.Skipf("git cannot list worktrees here: %v %s", err, out)
 	}
 	if took := time.Since(start); took > worktreeListBudget {
@@ -77,7 +77,7 @@ func TestProjectNameCandidatesSkipTheSubmoduleGitdir(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, args := range [][]string{{"init", "-q"}, {"config", "user.email", "t@t"}, {"config", "user.name", "t"}} {
-			if out, err := exec.Command("git", append([]string{"-C", d}, args...)...).CombinedOutput(); err != nil {
+			if out, err := exec.CommandContext(t.Context(), "git", append([]string{"-C", d}, args...)...).CombinedOutput(); err != nil {
 				t.Fatalf("git %v: %v %s", args, err, out)
 			}
 		}
@@ -86,11 +86,11 @@ func TestProjectNameCandidatesSkipTheSubmoduleGitdir(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, args := range [][]string{{"add", "f.txt"}, {"commit", "-q", "-m", "seed"}} {
-		if out, err := exec.Command("git", append([]string{"-C", child}, args...)...).CombinedOutput(); err != nil {
+		if out, err := exec.CommandContext(t.Context(), "git", append([]string{"-C", child}, args...)...).CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v %s", args, err, out)
 		}
 	}
-	add := exec.Command("git", "-C", parent, "-c", "protocol.file.allow=always", "submodule", "add", "-q", child, "sub")
+	add := exec.CommandContext(t.Context(), "git", "-C", parent, "-c", "protocol.file.allow=always", "submodule", "add", "-q", child, "sub")
 	if out, err := add.CombinedOutput(); err != nil {
 		t.Skipf("submodules unavailable here: %v %s", err, out)
 	}

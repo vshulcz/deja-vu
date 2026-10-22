@@ -17,16 +17,16 @@ func TestCutAgreesWithColumns(t *testing.T) {
 		"🚀rocket-launcher",
 		"plain-ascii-name",
 	} {
-		for _, max := range []int{1, 4, 8, 12, 20} {
-			cut := Cut(s, max)
-			if got := Columns(cut); got > max {
-				t.Errorf("Cut(%q, %d) measures %d columns", s, max, got)
+		for _, most := range []int{1, 4, 8, 12, 20} {
+			cut := Cut(s, most)
+			if got := Columns(cut); got > most {
+				t.Errorf("Cut(%q, %d) measures %d columns", s, most, got)
 			}
 			// A string that fits comes back whole. It comes back composed —
 			// the cut normalises what it measures, so the two cannot disagree
 			// about where a character ends.
-			if Columns(s) <= max && cut != nfcfold.Compose(s) {
-				t.Errorf("Cut(%q, %d) shortened a string that already fits: %q", s, max, cut)
+			if Columns(s) <= most && cut != nfcfold.Compose(s) {
+				t.Errorf("Cut(%q, %d) shortened a string that already fits: %q", s, most, cut)
 			}
 		}
 	}

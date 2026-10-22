@@ -196,7 +196,10 @@ func main() {
 				"top10":       detail.top10,
 				"scores":      detail.scores,
 			}
-			b, _ := json.Marshal(rec)
+			b, merr := json.Marshal(rec)
+			if merr != nil {
+				fatal(merr)
+			}
 			_, _ = missFile.Write(append(b, '\n'))
 		}
 		if *verbose {
@@ -312,8 +315,8 @@ func runQuestion(q lmeQuestion) (int, questionDetail, time.Duration, error) {
 	defer os.RemoveAll(tmp)
 	claudeRoot := filepath.Join(tmp, "claude")
 	proj := filepath.Join(claudeRoot, "-work-lme")
-	if err := os.MkdirAll(proj, 0o755); err != nil {
-		return 0, questionDetail{}, 0, err
+	if merr := os.MkdirAll(proj, 0o755); merr != nil {
+		return 0, questionDetail{}, 0, merr
 	}
 	// One transcript file per haystack session, in Claude Code's on-disk
 	// format, timestamped with the haystack dates so freshness decay applies
@@ -321,9 +324,9 @@ func runQuestion(q lmeQuestion) (int, questionDetail, time.Duration, error) {
 	for si, turns := range q.HaystackSessions {
 		id := q.HaystackSessionID[si]
 		ts := parseLMEDate(q.HaystackDates[si])
-		f, err := os.Create(filepath.Join(proj, id+".jsonl"))
-		if err != nil {
-			return 0, questionDetail{}, 0, err
+		f, cerr := os.Create(filepath.Join(proj, id+".jsonl"))
+		if cerr != nil {
+			return 0, questionDetail{}, 0, cerr
 		}
 		enc := json.NewEncoder(f)
 		for ti, turn := range turns {
@@ -340,24 +343,24 @@ func runQuestion(q lmeQuestion) (int, questionDetail, time.Duration, error) {
 				"timestamp": ts.Add(time.Duration(ti) * time.Minute).UTC().Format(time.RFC3339),
 				"message":   map[string]any{"role": turn.Role, "content": content},
 			}
-			if err := enc.Encode(line); err != nil {
+			if eerr := enc.Encode(line); eerr != nil {
 				_ = f.Close()
-				return 0, questionDetail{}, 0, err
+				return 0, questionDetail{}, 0, eerr
 			}
 		}
-		if err := f.Close(); err != nil {
-			return 0, questionDetail{}, 0, err
+		if cerr := f.Close(); cerr != nil {
+			return 0, questionDetail{}, 0, cerr
 		}
 	}
 	dir := filepath.Join(tmp, "index.db")
 	_ = os.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
 	_ = os.Setenv("DEJA_INDEX_DIR", dir)
-	if err := index.Ensure(dir, "claude", true, nil); err != nil {
-		return 0, questionDetail{}, 0, err
+	if ierr := index.Ensure(dir, "claude", true, nil); ierr != nil {
+		return 0, questionDetail{}, 0, ierr
 	}
 
 	o := search.Options{Query: q.Question, All: true}
-	if t, err := time.Parse("2006/01/02 (Mon) 15:04", q.QuestionDate); err == nil {
+	if t, perr := time.Parse("2006/01/02 (Mon) 15:04", q.QuestionDate); perr == nil {
 		o.Now = t
 	}
 	t0 := time.Now()
@@ -388,7 +391,7 @@ func runQuestion(q lmeQuestion) (int, questionDetail, time.Duration, error) {
 	}
 	elapsed := time.Since(t0)
 	hitCounts = append(hitCounts, len(ranked))
-	detail := questionDetail{tier: string(result.Tier)}
+	detail := questionDetail{tier: result.Tier}
 	if len(hits) > 0 {
 		detail.topCount = hits[0].Count
 	}
@@ -637,16 +640,16 @@ func runTermWeights(questions []lmeQuestion, kind string) {
 			continue
 		}
 		if counting {
-			dir, cleanup, err := buildHaystackIndex(q)
-			if err != nil {
+			dir, cleanup, herr := buildHaystackIndex(q)
+			if herr != nil {
 				cleanup()
-				fatal(err)
+				fatal(herr)
 			}
 			terms := index.RelevanceTerms(q.Question)
-			_, _, _, idf, err := index.ProjectRelevant(dir, nil, terms, 50)
+			_, _, _, idf, perr := index.ProjectRelevant(dir, nil, terms, 50)
 			cleanup()
-			if err != nil {
-				fatal(err)
+			if perr != nil {
+				fatal(perr)
 			}
 			rarest, best := "", 0.0
 			for _, t := range terms {
@@ -790,8 +793,8 @@ func runAgentCases(questions []lmeQuestion, n int) {
 		}
 		answerN := 0
 		for _, c := range detail.cands {
-			if c["is_answer"] == true {
-				answerN = c["n"].(int)
+			if pos, ok := c["n"].(int); ok && c["is_answer"] == true {
+				answerN = pos
 			}
 		}
 		if answerN == 0 {
@@ -804,7 +807,10 @@ func runAgentCases(questions []lmeQuestion, n int) {
 			"answer_pos": answerN,
 			"candidates": detail.cands,
 		}
-		b, _ := json.Marshal(rec)
+		b, merr := json.Marshal(rec)
+		if merr != nil {
+			fatal(merr)
+		}
 		fmt.Println(string(b))
 		dumped++
 		if dumped >= n {
@@ -1116,7 +1122,7 @@ func runGateSignals(questions []lmeQuestion, limit int) {
 			100*float64(row.d.injects)/float64(row.d.cases),
 			float64(row.d.matched)/float64(row.d.cases),
 			float64(row.d.strong)/float64(row.d.cases))
-		for k := 0; k <= 5; k++ {
+		for k := range 6 {
 			fmt.Printf("    matched==%d: %d\n", k, row.hist[k])
 		}
 	}

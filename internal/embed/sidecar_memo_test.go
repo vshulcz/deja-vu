@@ -14,7 +14,7 @@ import (
 func TestReadIsMemoisedUntilTheFileChanges(t *testing.T) {
 	dir, records := threeSessionStore(t)
 	mk := func(n int) Sidecar {
-		var vs []Vector
+		vs := make([]Vector, 0, n)
 		for _, r := range records[:n] {
 			vs = append(vs, Vector{Offset: r.Offset, Key: r.Record.Key, Values: []float32{1, 0}})
 		}
@@ -91,7 +91,7 @@ func TestMadeMatchesModelAndPassagePrefix(t *testing.T) {
 // memoSidecar is a sidecar of n two-value vectors over the first n records; the
 // byte size of the file depends on n alone, not on x.
 func memoSidecar(records []index.OffsetRecord, n int, x float32) Sidecar {
-	var vs []Vector
+	vs := make([]Vector, 0, n)
 	for _, r := range records[:n] {
 		vs = append(vs, Vector{Offset: r.Offset, Key: r.Record.Key, Values: []float32{x, 0}})
 	}

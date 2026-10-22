@@ -12,7 +12,7 @@ import (
 // stripped. Recall printed it as an empty bullet, then quoted the credit back
 // as the answer on the line under it (#4247).
 func TestACreditOnlyReplyIsNeitherAnExcerptNorTheAnswer(t *testing.T) {
-	credit := "déjà vu: Updated `/tmp/proj/retry.py` to return `i` inside the loop — reusing it (deja:20261001_…749_4f5443)"
+	credit := "déjà vu: Updated `/tmp/proj/retry.py` to return `i` inside the loop — reusing it (deja:20261001_…749_4f5443)" //nolint:gosec // a reply fixture, not a credential
 	msgs := []model.Message{
 		{Role: "user", Text: "what did we do about the retry loop? one line."},
 		{Role: "assistant", Text: credit},

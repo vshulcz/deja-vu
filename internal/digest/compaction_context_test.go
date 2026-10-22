@@ -189,7 +189,8 @@ func TestExtractCompactionContextSkipsLatestOversizedToolOutput(t *testing.T) {
 }
 
 func TestExtractCompactionContextFindsObjectiveBehindToolStream(t *testing.T) {
-	messages := []model.Message{{Role: "user", Text: "Repair the parser and add the fixture."}}
+	messages := make([]model.Message, 0, 82)
+	messages = append(messages, model.Message{Role: "user", Text: "Repair the parser and add the fixture."})
 	for range 80 {
 		messages = append(messages, model.Message{Role: sources.RoleToolOutput, Text: "ordinary tool output"})
 	}
@@ -321,15 +322,17 @@ func TestRenderCompactionContextNamesMissingFreshness(t *testing.T) {
 }
 
 func TestExtractCompactionContextDedupesAndCapsRecordedEvidence(t *testing.T) {
-	messages := []model.Message{
-		{Role: "user", Text: "Keep recovery bounded."},
-		{Role: sources.RoleCommand, Text: "$ echo not-a-test"},
-		{Role: sources.RoleCommand, Text: "$ go test ./... → exit 0"},
-		{Role: sources.RoleCommand, Text: "$ go test ./... → exit 0"},
-	}
+	messages := make([]model.Message, 0, 4+2*(defaultContextItems+2))
+	messages = append(messages,
+		model.Message{Role: "user", Text: "Keep recovery bounded."},
+		model.Message{Role: sources.RoleCommand, Text: "$ echo not-a-test"},
+		model.Message{Role: sources.RoleCommand, Text: "$ go test ./... → exit 0"},
+		model.Message{Role: sources.RoleCommand, Text: "$ go test ./... → exit 0"},
+	)
 	for i := range defaultContextItems + 2 {
-		messages = append(messages, model.Message{Role: "assistant", Text: "Decision: keep item " + string(rune('a'+i)) + "."})
-		messages = append(messages, model.Message{Role: "assistant", Text: "Gap: validate item " + string(rune('a'+i)) + "."})
+		messages = append(messages,
+			model.Message{Role: "assistant", Text: "Decision: keep item " + string(rune('a'+i)) + "."},
+			model.Message{Role: "assistant", Text: "Gap: validate item " + string(rune('a'+i)) + "."})
 	}
 	c := ExtractCompactionContext(model.Session{ID: "s", Harness: "codex", Messages: messages}, ExtractOptions{})
 	if len(c.Tests) != 1 || len(c.Conclusions) != defaultContextItems || len(c.Gaps) != defaultContextItems || !c.Truncated {

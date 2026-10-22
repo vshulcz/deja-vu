@@ -21,8 +21,10 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
+// ShareBudget is the byte budget Share uses when given none.
 const ShareBudget = 6 * 1024
 
+// Share renders a session as text to paste elsewhere, within budget bytes.
 func Share(s model.Session, budget int) string {
 	if budget <= 0 {
 		budget = ShareBudget
@@ -121,6 +123,8 @@ func Share(s model.Session, budget int) string {
 	return strings.TrimSpace(b.String()) + "\n"
 }
 
+// MessageText is the readable prose of one message: redacted, noise lines
+// dropped, and capped. Text with a code fence is kept whole.
 func MessageText(s string) string {
 	s = strings.TrimSpace(redact.SafeForDisplay(s))
 	if s == "" {
@@ -487,6 +491,7 @@ func cutMarked(s string, n int) string {
 	return t + cutMarker
 }
 
+// UTF8SafeCut cuts s to at most n bytes without splitting a rune.
 func UTF8SafeCut(s string, n int) string {
 	if n <= 0 {
 		return ""
@@ -500,6 +505,8 @@ func UTF8SafeCut(s string, n int) string {
 	return s[:n]
 }
 
+// ProjectNameCandidates lists the names sessions of the project at cwd may be
+// recorded under, worktrees included.
 func ProjectNameCandidates(cwd string) []string {
 	cwd = projectRoot(cwd)
 	names := []string{sources.ClaudeProjectName(cwd)}
@@ -636,6 +643,7 @@ func isReviewVerdict(trimmed string) bool {
 	return false
 }
 
+// IsAgentArtifact reports whether text carries one of agentArtifactMarkers.
 func IsAgentArtifact(text string) bool {
 	for _, m := range agentArtifactMarkers {
 		if strings.Contains(text, m) {
@@ -833,6 +841,7 @@ const (
 	handoffQuoteClose = "--- end quoted session ---"
 )
 
+// Handoff renders a session for another agent to pick up, within budget bytes.
 func Handoff(s model.Session, budget int) string {
 	earlier := compactedHalf(s)
 	whole := s
@@ -1352,8 +1361,8 @@ func dedupeStatus(ms []model.Message) []model.Message {
 // what came of it. These are the assistant's decision-carrying sentences, the
 // same ones `share` puts under "What the assistant concluded", trimmed to one or
 // two lines each so the whole block costs a few hundred bytes.
-func Conclusions(s model.Session, budget int, max int) []string {
-	return conclusions(s, budget, max, false)
+func Conclusions(s model.Session, budget int, limit int) []string {
+	return conclusions(s, budget, limit, false)
 }
 
 // SubstantialConclusions is Conclusions for a reader who has nothing else from
@@ -1364,12 +1373,12 @@ func Conclusions(s model.Session, budget int, max int) []string {
 // The surfaces that pair the line with something the reader already holds keep
 // Conclusions: under the command an agent is about to run, "tests pass" is the
 // answer, not filler.
-func SubstantialConclusions(s model.Session, budget int, max int) []string {
-	return conclusions(s, budget, max, true)
+func SubstantialConclusions(s model.Session, budget int, limit int) []string {
+	return conclusions(s, budget, limit, true)
 }
 
-func conclusions(s model.Session, budget int, max int, substantial bool) []string {
-	if budget <= 0 || max <= 0 {
+func conclusions(s model.Session, budget int, limit int, substantial bool) []string {
+	if budget <= 0 || limit <= 0 {
 		return nil
 	}
 	var assistants []model.Message
@@ -1394,7 +1403,7 @@ func conclusions(s model.Session, budget int, max int, substantial bool) []strin
 	// Newest first: the last thing concluded outranks the first thing tried.
 	var out []string
 	spent := 0
-	for i := len(picked) - 1; i >= 0 && len(out) < max; i-- {
+	for i := len(picked) - 1; i >= 0 && len(out) < limit; i-- {
 		line := decisionLead(MessageText(picked[i].Text), substantial)
 		if line == "" {
 			continue
@@ -1420,9 +1429,9 @@ func conclusions(s model.Session, budget int, max int, substantial bool) []strin
 				// one; a caller asking for several keeps the old rule, since
 				// there text would follow the marker.
 				// The condition is that nothing follows the marker, and an
-				// empty out is that whatever max was asked for: this breaks
+				// empty out is that whatever limit was asked for: this breaks
 				// immediately after, so the cut is the last line either way.
-				// Keyed on max alone, a session whose only conclusion is one
+				// Keyed on limit alone, a session whose only conclusion is one
 				// long sentence answered a caller asking for three lines with
 				// silence and a caller asking for one with the sentence —
 				// 9 of 452 sessions on a real store.
@@ -1602,9 +1611,9 @@ func firstSentences(s string, n int) string {
 			return strings.TrimSpace(s[:i+utf8.RuneLen(r)])
 		}
 	}
-	const cap = 240
-	if len(s) > cap {
-		return strings.TrimSpace(UTF8SafeCut(s, cap)) + "…"
+	const most = 240
+	if len(s) > most {
+		return strings.TrimSpace(UTF8SafeCut(s, most)) + "…"
 	}
 	return s
 }

@@ -115,7 +115,7 @@ func BenchmarkBlameVerification1000Candidates(b *testing.B) {
 	target := BlameTarget{FullPath: "/repo/internal/parser.go", Base: "parser.go", Stem: "parser"}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		if got := Blame(ss, target, BlameOptions{All: true}); len(got) != len(ss) {
 			b.Fatalf("hits=%d", len(got))
 		}
@@ -127,7 +127,7 @@ func BenchmarkBlameVerification1000Candidates(b *testing.B) {
 // — five runs, five different top hits (#688).
 func TestBlameRanksTheSameWayEveryRun(t *testing.T) {
 	day := time.Date(2026, 6, 28, 10, 0, 0, 0, time.UTC)
-	var ss []model.Session
+	ss := make([]model.Session, 0, 40)
 	for i := range 40 {
 		id := fmt.Sprintf("s%02d", i)
 		ss = append(ss, model.Session{

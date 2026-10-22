@@ -11,7 +11,7 @@ import (
 // session was the other half of a 2.4 s recall answer. The page an agent reads
 // has to be the same one either way, snippets included.
 func TestRelevanceHitsAreTheSameOnOneCoreAndMany(t *testing.T) {
-	var ss []model.Session
+	ss := make([]model.Session, 0, 20)
 	for i := range 20 {
 		ss = append(ss, model.Session{
 			Harness: "claude", ID: fmt.Sprintf("s%02d", i),

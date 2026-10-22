@@ -169,8 +169,8 @@ func TestWhichClauseCountsAsTheAsk(t *testing.T) {
 	if rest != "is this thing on? no tools: answer briefly" {
 		t.Errorf("rest = %q, want every other clause kept", rest)
 	}
-	if ask, _ := splitAsk("Without reading any files: start the quokkabloom retry now"); ask != "start the quokkabloom retry now" {
-		t.Errorf("ask = %q, want the clause after the instruction", ask)
+	if first, _ := splitAsk("Without reading any files: start the quokkabloom retry now"); first != "start the quokkabloom retry now" {
+		t.Errorf("ask = %q, want the clause after the instruction", first)
 	}
 	ask, rest = splitAsk("cmd/deja main.go\nno tools: why does the zebraquux fetcher time out?\ntrailing note")
 	if ask != "why does the zebraquux fetcher time out?" || rest != "cmd/deja main.go\nno tools:\ntrailing note" {

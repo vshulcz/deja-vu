@@ -11,7 +11,7 @@ import (
 // tool dump printed into a digest, and the other way round loses a real line.
 func TestFastLineFiltersMatchTheirPatterns(t *testing.T) {
 	alphabet := []string{" ", "\t", "\r", "\v", "\f", "0", "5", "9", ":", "|", "a", "Z", "é", "٣", "tool_use", "TOOL_RESULT", "npm ERR!", "npm err!", "NPM Err!", "goroutine 5", "GOROUTINE 12", "goroutine x", "panic:", "PANIC:", "netcat", "<local-command", "12345:", "123456:", "1:", " 12| ", " "}
-	r := rand.New(rand.NewSource(7))
+	r := rand.New(rand.NewSource(7)) //nolint:gosec // seeded fuzz input, not crypto
 	bad := 0
 	for range 400000 {
 		n := 1 + r.Intn(4)

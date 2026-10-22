@@ -33,6 +33,7 @@ type Canvas struct {
 	cells []cell
 }
 
+// NewCanvas is a blank w by h canvas, at least one cell each way.
 func NewCanvas(w, h int) *Canvas {
 	if w < 1 {
 		w = 1
@@ -87,11 +88,11 @@ func (c *Canvas) Fill(x, y, w, h int, bg Color) {
 	}
 }
 
-// Put writes s at (x, y), stopping before column max, and returns the column
+// Put writes s at (x, y), stopping before column end, and returns the column
 // after the last one written. It does not wrap.
-func (c *Canvas) Put(x, y int, s string, st Style, max int) int {
-	if max > c.W {
-		max = c.W
+func (c *Canvas) Put(x, y int, s string, st Style, end int) int {
+	if end > c.W {
+		end = c.W
 	}
 	prev := (*cell)(nil)
 	for _, r := range nfcfold.Compose(s) {
@@ -106,7 +107,7 @@ func (c *Canvas) Put(x, y int, s string, st Style, max int) int {
 			continue
 		}
 		w := termwidth.RuneColumns(r)
-		if x+w > max {
+		if x+w > end {
 			break
 		}
 		c.unpair(x, y)
@@ -129,16 +130,16 @@ func (c *Canvas) Put(x, y int, s string, st Style, max int) int {
 	return x
 }
 
-// PutClip is Put that ends in "…" when s does not fit before max.
-func (c *Canvas) PutClip(x, y int, s string, st Style, max int) int {
-	if termwidth.Columns(s) <= max-x {
-		return c.Put(x, y, s, st, max)
+// PutClip is Put that ends in "…" when s does not fit before end.
+func (c *Canvas) PutClip(x, y int, s string, st Style, end int) int {
+	if termwidth.Columns(s) <= end-x {
+		return c.Put(x, y, s, st, end)
 	}
-	if max-x < 1 {
+	if end-x < 1 {
 		return x
 	}
 	// No space before the ellipsis: "Fixed by …" reads as a gap, not a cut.
-	return c.Put(x, y, strings.TrimRight(termwidth.Cut(s, max-x-1), " ")+"…", st, max)
+	return c.Put(x, y, strings.TrimRight(termwidth.Cut(s, end-x-1), " ")+"…", st, end)
 }
 
 func (c *Canvas) style(p *cell, st Style) {
@@ -166,7 +167,7 @@ func (c *Canvas) Recolor(x, y, w, h int, fg, bg Color) {
 // Text returns the plain text of a row, for tests.
 func (c *Canvas) Text(y int) string {
 	var b strings.Builder
-	for x := 0; x < c.W; x++ {
+	for x := range c.W {
 		b.WriteString(c.cells[y*c.W+x].s)
 	}
 	return b.String()
@@ -176,10 +177,10 @@ func (c *Canvas) Text(y int) string {
 // so any row can be written on its own.
 func (c *Canvas) Lines(m Mode) []string {
 	out := make([]string, c.H)
-	for y := 0; y < c.H; y++ {
+	for y := range c.H {
 		var b strings.Builder
 		var last *cell
-		for x := 0; x < c.W; x++ {
+		for x := range c.W {
 			p := &c.cells[y*c.W+x]
 			if p.s == "" {
 				continue

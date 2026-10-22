@@ -85,11 +85,11 @@ func firstSentence(text string) string {
 	if i := strings.IndexAny(text, "\n"); i > 0 {
 		text = text[:i]
 	}
-	const max = 120
-	if len(text) <= max {
+	const most = 120
+	if len(text) <= most {
 		return text
 	}
-	cut := max
+	cut := most
 	for cut > 0 && !isRuneStart(text[cut]) {
 		cut--
 	}

@@ -11,6 +11,8 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
+// PromptChain is one chain of the prompt corpus.
+//
 // The context corpus gives every chain the same vocabulary, which makes it
 // useless for scoring per-prompt recall: a term that appears in all thirty
 // chains identifies none of them, so the relevance pass counts zero matches
@@ -107,6 +109,7 @@ const promptRussianProject = "promptbenchru"
 // a question it never answered.
 const PromptHaystackProject = promptHaystackProject
 
+// PromptCorpus is the generated prompt chains and a hash of what they ask.
 type PromptCorpus struct {
 	Chains []PromptChain
 	Hash   string
@@ -181,6 +184,7 @@ func promptTopics() []promptTopic {
 	}
 }
 
+// PromptNegativeCount is how many chains have no answer to find.
 const PromptNegativeCount = 3
 
 // promptCorpusHash fingerprints what the corpus asks, not when it was built.
@@ -204,7 +208,10 @@ func promptCorpusHash(chains []PromptChain) string {
 		}
 		out = append(out, s)
 	}
-	b, _ := json.Marshal(out)
+	b, err := json.Marshal(out) //nolint:musttag // field names are the hash input, tags would add nothing
+	if err != nil {
+		panic(err)
+	}
 	h := sha256.Sum256(b)
 	return hex.EncodeToString(h[:])
 }
@@ -321,7 +328,8 @@ func promptShapeChain(rng *rand.Rand, i int, kind string, topic promptTopic, sta
 		Paraphrase: topic.paraphrase,
 		Kind:       kind,
 	}
-	msgs := []model.Message{{Role: "user", Text: "we decided " + topic.fact, Time: start}}
+	msgs := make([]model.Message, 0, 1+2*turns)
+	msgs = append(msgs, model.Message{Role: "user", Text: "we decided " + topic.fact, Time: start})
 	for k := range turns {
 		msgs = append(msgs,
 			model.Message{Role: "user", Text: fillerText(rng, "started it over and watched what happened"), Time: start.Add(time.Duration(2*k+2) * time.Minute)},
@@ -349,7 +357,7 @@ const PromptPriorCount = 7
 // fact under working noise, and no task session — the question comes from the
 // caller, the way a prompt does.
 func GeneratePrompt(seed int64) PromptCorpus {
-	rng := rand.New(rand.NewSource(seed))
+	rng := rand.New(rand.NewSource(seed)) //nolint:gosec // seeded so the fixture is the same on every run
 	topics := promptTopics()
 	// A fixed date in the past: the freshness gate measures how long ago a
 	// session was touched, and a corpus dated in the future reads as newer
@@ -367,7 +375,7 @@ func GeneratePrompt(seed int64) PromptCorpus {
 		for j := range PromptPriorCount {
 			t := base.Add(time.Duration(i*10+j) * time.Minute)
 			msgs := []model.Message{{Role: "user", Text: "we decided " + topic.fact, Time: t}}
-			for k := 0; k < 4+rng.Intn(6); k++ {
+			for k := 0; k < 4+rng.Intn(6); k++ { //nolint:intrange // the bound redraws from rng each pass and the corpus is pinned to that sequence
 				msgs = append(msgs,
 					model.Message{Role: "user", Text: fillerText(rng, "started it over and watched what happened"), Time: t.Add(time.Duration(2*k+2) * time.Minute)},
 					model.Message{Role: "assistant", Text: fillerText(rng, "followed it down and rewrote the middle part"), Time: t.Add(time.Duration(2*k+3) * time.Minute)},
@@ -383,14 +391,15 @@ func GeneratePrompt(seed int64) PromptCorpus {
 	// Two shapes the plain chains cannot express, and the two the gates
 	// actually turn away: a session too long to be read as one episode, and
 	// one worked on minutes ago.
-	chains = append(chains, promptShapeChain(rng, len(topics), "marathon", promptTopic{
-		"backpressure", "the queue got backpressure so producers block instead of dropping", "what did we do about queue backpressure?",
-		"how did we stop the queue from throwing messages away",
-	}, base, 400))
-	chains = append(chains, promptShapeChain(rng, len(topics)+1, "fresh", promptTopic{
-		"idempotency", "the import path became idempotent by keying on the source hash", "how did we make the import idempotent?",
-		"what stops a repeated import from writing the same rows twice",
-	}, time.Now().Add(-2*time.Minute).UTC(), 3))
+	chains = append(chains,
+		promptShapeChain(rng, len(topics), "marathon", promptTopic{
+			"backpressure", "the queue got backpressure so producers block instead of dropping", "what did we do about queue backpressure?",
+			"how did we stop the queue from throwing messages away",
+		}, base, 400),
+		promptShapeChain(rng, len(topics)+1, "fresh", promptTopic{
+			"idempotency", "the import path became idempotent by keying on the source hash", "how did we make the import idempotent?",
+			"what stops a repeated import from writing the same rows twice",
+		}, time.Now().Add(-2*time.Minute).UTC(), 3))
 	// The bucket case. An agent started from a parent directory — a home
 	// directory, a workspace root — gets a project scope that holds everything
 	// ever launched from there, and not the repository actually being worked
@@ -446,10 +455,11 @@ func GeneratePrompt(seed int64) PromptCorpus {
 		// stays invisible.
 		project := promptRussianProject
 		t := base.Add(time.Duration(2000+i*10) * time.Minute)
-		msgs := []model.Message{
-			{Role: "user", Text: "погоди, а что там дальше по задаче", Time: t},
-			{Role: "assistant", Text: "смотрю, сейчас продолжу", Time: t.Add(time.Minute)},
-		}
+		msgs := make([]model.Message, 0, 86)
+		msgs = append(msgs,
+			model.Message{Role: "user", Text: "погоди, а что там дальше по задаче", Time: t},
+			model.Message{Role: "assistant", Text: "смотрю, сейчас продолжу", Time: t.Add(time.Minute)},
+		)
 		for k := range 40 {
 			at := t.Add(time.Duration(k+2) * time.Minute)
 			msgs = append(msgs,
@@ -495,7 +505,7 @@ func GeneratePrompt(seed int64) PromptCorpus {
 		id := fmt.Sprintf("prompt-concluded-%02d", i)
 		project := fmt.Sprintf("promptbenchconcluded%02d", i)
 		t := base.Add(time.Duration(2700+i*10) * time.Minute)
-		var chatter []model.Message
+		chatter := make([]model.Message, 0, 60)
 		for k := range 60 {
 			chatter = append(chatter, model.Message{
 				Role: "assistant",
@@ -579,7 +589,7 @@ func GeneratePrompt(seed int64) PromptCorpus {
 	}
 	const marathonProject = "promptbenchmarathonvs"
 	marathonStart := base.Add(3300 * time.Minute)
-	var longSession []model.Message
+	longSession := make([]model.Message, 0, (2+2*len(marathonTopics))*90)
 	for k := range 90 {
 		at := marathonStart.Add(time.Duration(k) * time.Minute)
 		longSession = append(longSession,
@@ -850,7 +860,7 @@ func GeneratePrompt(seed int64) PromptCorpus {
 		{"escrow", "escrow release waits on the second signature", "what does escrow release wait for?", ""},
 		{"parquet", "parquet writes are batched per hour, not per row", "how often do we write parquet?", ""},
 	}
-	var noise []model.Message
+	noise := make([]model.Message, 0, (2+len(hay))*200)
 	for k := range 200 {
 		t := base.Add(time.Duration(1200+k) * time.Minute)
 		noise = append(noise,
@@ -919,7 +929,7 @@ func GeneratePrompt(seed int64) PromptCorpus {
 		// something, which is the very thing being measured.
 		a := promptWorkingTalk[(i*7)%len(promptWorkingTalk)]
 		b := promptWorkingTalk[(i*11+5)%len(promptWorkingTalk)]
-		var msgs []model.Message
+		msgs := make([]model.Message, 0, 12)
 		for k := range 6 {
 			at := t.Add(time.Duration(k) * time.Minute)
 			msgs = append(msgs,

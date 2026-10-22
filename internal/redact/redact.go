@@ -1,3 +1,4 @@
+// Package redact masks secrets in transcript text before it is indexed or shown.
 package redact
 
 import (
@@ -12,14 +13,17 @@ import (
 	"strings"
 )
 
+// Counts is how many matches each kind of secret had.
 type Counts map[string]int
 
+// Add counts n more of kind, ignoring n <= 0.
 func (c Counts) Add(kind string, n int) {
 	if n > 0 {
 		c[kind] += n
 	}
 }
 
+// Total is the sum over every kind.
 func (c Counts) Total() int {
 	total := 0
 	for _, n := range c {
@@ -279,7 +283,7 @@ func worthRedactingIntl(v string) bool {
 // hasNonASCII reports whether the text carries a byte outside ASCII, which is
 // the necessary condition for intlValueRE to match anything.
 func hasNonASCII(s string) bool {
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		if s[i] >= 0x80 {
 			return true
 		}
@@ -375,6 +379,7 @@ func proseWordAfterFlag(sep, v string) bool {
 	return v != ""
 }
 
+// Disabled reports whether DEJA_NO_REDACT=1 turned redaction off.
 func Disabled() bool { return os.Getenv("DEJA_NO_REDACT") == "1" }
 
 // kvAssignmentNearby reports whether any key-ish word in the text is followed
@@ -860,7 +865,7 @@ func allDigits(s string) bool {
 	if s == "" {
 		return false
 	}
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		if s[i] < '0' || s[i] > '9' {
 			return false
 		}
@@ -910,11 +915,11 @@ func providerMask(v string, p kindPass) string {
 	return "[redacted:" + kind + "]"
 }
 
-func closingQuote(open, close string) string {
+func closingQuote(open, closer string) string {
 	if open == "" {
 		return ""
 	}
-	return close
+	return closer
 }
 
 // ── entropy pass ────────────────────────────────────────────────────────────
@@ -967,7 +972,7 @@ const (
 
 func shannonBits(s string) float64 {
 	counts := map[byte]int{}
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		counts[s[i]]++
 	}
 	var h float64
@@ -981,7 +986,7 @@ func shannonBits(s string) float64 {
 
 func charClasses(s string) int {
 	var lower, upper, digit, other bool
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		switch c := s[i]; {
 		case c >= 'a' && c <= 'z':
 			lower = true
@@ -1003,7 +1008,7 @@ func charClasses(s string) int {
 }
 
 func isHexish(s string) bool {
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		c := s[i]
 		hexish := c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F' || c == '-'
 		if !hexish {
@@ -1076,7 +1081,7 @@ func assignmentValue(s string, start int) bool {
 	}
 	key := s[i+1 : end]
 	digitsOnly := true
-	for k := 0; k < len(key); k++ {
+	for k := range len(key) {
 		if key[k] < '0' || key[k] > '9' {
 			digitsOnly = false
 			break

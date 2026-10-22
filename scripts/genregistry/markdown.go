@@ -108,7 +108,7 @@ func renderMarkdown(src string) (body, title string) {
 				// The h1 becomes the page heading below, once, from the title.
 				continue
 			}
-			tag := "h" + string(rune('0'+level))
+			tag := "h" + string(rune('0'+level)) //nolint:gosec // level is a heading depth, one to six
 			b.WriteString("<" + tag + ` id="` + slug(text) + `">` + inline(text) + "</" + tag + ">\n")
 		case strings.HasPrefix(trimmed, "> "):
 			flushList()

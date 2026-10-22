@@ -35,7 +35,7 @@ func Index(h string) int {
 	}
 	f := fnv.New32a()
 	_, _ = f.Write([]byte(h))
-	return fallback[f.Sum32()%uint32(len(fallback))]
+	return fallback[f.Sum32()%uint32(len(fallback))] //nolint:gosec // fallback is a short fixed table
 }
 
 // ANSI is the escape that starts h's colour in a terminal.

@@ -10,8 +10,8 @@ import (
 
 func toolHeavySession() model.Session {
 	base := time.Date(2026, 1, 2, 3, 0, 0, 0, time.UTC)
-	msg := func(role, text string, min int) model.Message {
-		return model.Message{Role: role, Text: text, Time: base.Add(time.Duration(min) * time.Minute)}
+	msg := func(role, text string, minute int) model.Message {
+		return model.Message{Role: role, Text: text, Time: base.Add(time.Duration(minute) * time.Minute)}
 	}
 	return model.Session{
 		ID: "agent-run", Harness: "claude", Project: "app", Updated: base.Add(time.Hour),

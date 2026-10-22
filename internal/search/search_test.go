@@ -114,7 +114,7 @@ func TestRunInvalidRegexAndResultLimit(t *testing.T) {
 	if _, err := Run(nil, Options{Query: "(", Regex: true}); err == nil {
 		t.Fatal("expected invalid regex error")
 	}
-	var ss []model.Session
+	ss := make([]model.Session, 0, 20)
 	for i := range 20 {
 		ss = append(ss, model.Session{ID: string(rune('a' + i)), Harness: "claude", Project: "p", Updated: time.Now().Add(time.Duration(i) * time.Minute), Messages: []model.Message{{Role: "user", Text: "needle"}}})
 	}
@@ -452,7 +452,7 @@ func BenchmarkPhraseVerification(b *testing.B) {
 	text := strings.Repeat("prefix words ", 200) + "connection pool exhausted" + strings.Repeat(" suffix words", 200)
 	terms, phrases := QueryParts(`"connection pool exhausted"`)
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		if !MatchesParts(text, terms, phrases, nil) {
 			b.Fatal("phrase did not match")
 		}
@@ -679,7 +679,7 @@ func BenchmarkBM25Scoring1000Candidates(b *testing.B) {
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		hits := scoreBM25(documents, []int{1000, 1000}, 1000, 6, 2, nil)
 		if len(hits) != len(documents) {
 			b.Fatalf("hits=%d", len(hits))
@@ -732,7 +732,7 @@ func TestSearchRoleFilterAcceptsTool(t *testing.T) {
 // walking from the top let earlier scaffolding eat the budget and drop the very
 // turns the query matched (#R8-budget).
 func TestPrintContextAnchorsBudgetOnTheMatch(t *testing.T) {
-	var msgs []model.Message
+	msgs := make([]model.Message, 0, 82)
 	for range 40 {
 		msgs = append(msgs,
 			model.Message{Role: "user", Text: strings.Repeat("unrelated bulk chatter ", 20)},

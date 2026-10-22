@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -140,13 +141,13 @@ func (t *Term) readLoop() {
 				}
 				rest = nil
 			}
-			if err != nil && err != io.EOF && err != errTimeout {
+			if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, errTimeout) {
 				return
 			}
 			continue
 		}
 		idle = 0
-		data := append(rest, buf[:n]...)
+		data := slices.Concat(rest, buf[:n])
 		evs, r := Decode(data)
 		rest = append([]byte(nil), r...)
 		// A read that ends on a bare ESC is the key: terminals write a whole

@@ -108,7 +108,11 @@ func TestAChangedPassagePrefixEmbedsEverythingAgain(t *testing.T) {
 	}
 	prefixed := false
 	seen.Range(func(k, _ any) bool {
-		if strings.HasPrefix(k.(string), "passage: ") {
+		text, ok := k.(string)
+		if !ok {
+			t.Fatalf("seen key %T is not a string", k)
+		}
+		if strings.HasPrefix(text, "passage: ") {
 			prefixed = true
 		}
 		return true

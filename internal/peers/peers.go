@@ -26,8 +26,8 @@ import (
 // sends but has stopped sending back is a broken sync that looks fine.
 type Peer struct {
 	Host     string    `json:"host"`
-	LastPush time.Time `json:"last_push,omitempty"`
-	LastPull time.Time `json:"last_pull,omitempty"`
+	LastPush time.Time `json:"last_push"`
+	LastPull time.Time `json:"last_pull"`
 	// LastError is why the most recent exchange failed, empty once one
 	// succeeds. A peer that has been failing for a week is the thing this file
 	// exists to make visible.
@@ -224,15 +224,16 @@ func recordLocked(host string, pulled bool, when time.Time, err error) error {
 		list = append(list, Peer{Host: host})
 		i = len(list) - 1
 	}
-	if err != nil {
+	switch {
+	case err != nil:
 		// The failure is recorded, the timestamp is not: "last exchanged
 		// tuesday" has to mean memory actually moved.
 		list[i].LastError = trimError(err.Error())
-	} else if when.IsZero() {
+	case when.IsZero():
 		// A caller with nothing to report — a push that found nothing to send,
 		// so no connection was opened. The host is remembered; what it did
 		// last time is not overwritten with a zero (#1780).
-	} else {
+	default:
 		list[i].LastError = ""
 		if pulled {
 			list[i].LastPull = when.UTC()
@@ -343,9 +344,9 @@ func save(list []Peer) error {
 // whole of an ssh failure is several lines of remote banner.
 func trimError(s string) string {
 	s = strings.Join(strings.Fields(s), " ")
-	const max = 160
-	if r := []rune(s); len(r) > max {
-		return strings.TrimSpace(string(r[:max])) + "…"
+	const most = 160
+	if r := []rune(s); len(r) > most {
+		return strings.TrimSpace(string(r[:most])) + "…"
 	}
 	return s
 }

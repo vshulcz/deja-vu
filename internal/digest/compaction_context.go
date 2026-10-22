@@ -89,15 +89,16 @@ func ExtractCompactionContext(s model.Session, opts ExtractOptions) model.Compac
 				}
 			}
 			for _, item := range open {
-				if item.Kind == "gap" {
+				switch {
+				case item.Kind == "gap":
 					if len(c.Gaps) == opts.MaxItems {
 						c.Truncated = true
 					} else if !hasOpenItem(c.Gaps, item.Text) {
 						c.Gaps = append(c.Gaps, item.ContextOpenItem)
 					}
-				} else if len(c.Conflicts) == opts.MaxItems {
+				case len(c.Conflicts) == opts.MaxItems:
 					c.Truncated = true
-				} else if !hasOpenItem(c.Conflicts, item.Text) {
+				case !hasOpenItem(c.Conflicts, item.Text):
 					c.Conflicts = append(c.Conflicts, item.ContextOpenItem)
 				}
 			}
@@ -688,16 +689,15 @@ func renderContext(c model.CompactionContext, byteBudget int, header string, com
 	limit := max(byteBudget-len(omitted), 0)
 	var b strings.Builder
 	omittedAny := c.Truncated
-	add := func(chunk string) bool {
+	add := func(chunk string) {
 		if chunk == "" {
-			return true
+			return
 		}
 		if b.Len()+len(chunk) > limit {
 			omittedAny = true
-			return false
+			return
 		}
 		b.WriteString(chunk)
-		return true
 	}
 	add(header)
 	latest := "Latest request"

@@ -32,7 +32,7 @@ func TestByDateKeepsStrictHitsAhead(t *testing.T) {
 // skip those, so they count in the total and stay off it.
 func TestDatePageLeavesTheSampleOff(t *testing.T) {
 	now := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
-	var ss []model.Session
+	ss := make([]model.Session, 0, 7)
 	for i := range 6 {
 		ss = append(ss, model.Session{ID: fmt.Sprintf("s%d", i), Harness: "claude", Project: "p",
 			Updated:  now.Add(-time.Duration(i) * time.Hour),

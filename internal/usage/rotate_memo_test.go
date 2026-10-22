@@ -55,7 +55,10 @@ func TestAShrunkLogIsReadAgain(t *testing.T) {
 	if !ok {
 		t.Fatal("no memo was stored for a log with nothing to drop")
 	}
-	m := before.(rotationMemo)
+	m, ok := before.(rotationMemo)
+	if !ok {
+		t.Fatalf("memo is a %T", before)
+	}
 	if skipRotation(Path(dir), m.size-1) {
 		t.Error("a log that shrank under this process was taken on trust")
 	}

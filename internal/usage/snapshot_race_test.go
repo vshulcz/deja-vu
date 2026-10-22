@@ -39,12 +39,12 @@ func TestConcurrentWritersNeverInterleaveASnapshot(t *testing.T) {
 				writers, each = 8, 4
 			}
 			var wg sync.WaitGroup
-			for w := 0; w < writers; w++ {
+			for w := range writers {
 				wg.Add(1)
 				go func(w int) {
 					defer wg.Done()
-					body := strings.Repeat(string(rune('a'+w)), size)
-					for i := 0; i < each; i++ {
+					body := strings.Repeat(string(rune('a'+w)), size) //nolint:gosec // w is under eight
+					for range each {
 						RecordDigestPolicy(dir, KindHook, body, 1, 0, "local-only")
 					}
 				}(w)

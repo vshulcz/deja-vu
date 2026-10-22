@@ -62,7 +62,7 @@ func TestEmbedAuthorization(t *testing.T) {
 }
 
 func TestEmbedErrorsDoNotLeakCredential(t *testing.T) {
-	const secret = "credential-that-must-not-appear"
+	const secret = "credential-that-must-not-appear" //nolint:gosec // a marker the test looks for, not a credential
 	t.Setenv("DEJA_EMBED_URL", "https://example.com/v1/embeddings")
 	t.Setenv("DEJA_EMBED_KEY", secret)
 

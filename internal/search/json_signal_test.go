@@ -50,7 +50,7 @@ func TestJSONAlwaysSaysWhichTierAnswered(t *testing.T) {
 // Counting the hits that survive the cap measures the cap. RunDetailed reports
 // how many matched before it.
 func TestRunDetailedReportsWhatTheCapHides(t *testing.T) {
-	var ss []model.Session
+	ss := make([]model.Session, 0, 40)
 	for i := range 40 {
 		ss = append(ss, model.Session{
 			ID: fmt.Sprintf("s%02d", i), Harness: "claude",

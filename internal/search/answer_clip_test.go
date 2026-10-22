@@ -95,8 +95,8 @@ func TestAnswerClipNeverEmitsInvalidUTF8(t *testing.T) {
 	}
 	// And a real line keeps its content: the guard above must not be reached
 	// by ordinary text.
-	real := strings.Repeat("重试队列在预发环境卡住了工作进程同时醒来", 12)
-	if got := clip(real); len(got) < answerCap-8 {
+	ordinary := strings.Repeat("重试队列在预发环境卡住了工作进程同时醒来", 12)
+	if got := clip(ordinary); len(got) < answerCap-8 {
 		t.Errorf("an ordinary line came back as %d bytes: %q", len(got), got)
 	}
 }

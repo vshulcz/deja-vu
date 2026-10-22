@@ -88,7 +88,7 @@ func run() error {
 		return err
 	}
 	var sm sitemap
-	if err := xml.Unmarshal(b, &sm); err != nil {
+	if err = xml.Unmarshal(b, &sm); err != nil {
 		return fmt.Errorf("docs/sitemap.xml: %w", err)
 	}
 
@@ -99,9 +99,9 @@ func run() error {
 		if loc == "" || day == "" {
 			continue
 		}
-		title, summary, err := pageText(loc)
-		if err != nil {
-			return err
+		title, summary, perr := pageText(loc)
+		if perr != nil {
+			return perr
 		}
 		if title == "" {
 			continue // not a page this repository serves

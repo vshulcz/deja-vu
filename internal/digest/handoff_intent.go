@@ -136,7 +136,7 @@ func handoffHarnessPlaced(words []string, nounAt []int, i int) bool {
 }
 
 // wordIndexes is where in the word list each stem or phrase starts.
-func wordIndexes(words []string, low string, stems []string) []int {
+func wordIndexes(words []string, _ string, stems []string) []int {
 	var at []int
 	for i, w := range words {
 		for _, s := range stems {

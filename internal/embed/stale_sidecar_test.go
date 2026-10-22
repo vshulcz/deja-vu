@@ -60,7 +60,7 @@ func threeSessionStore(t *testing.T) (dir string, records []index.OffsetRecord) 
 
 func fakeEmbedClient(t *testing.T) *Client {
 	t.Helper()
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"embeddings":[[1,0]]}`))
 	}))
 	t.Cleanup(ts.Close)
@@ -121,7 +121,7 @@ func TestSemanticSearchUsesACurrentSidecar(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var fresh []Vector
+	fresh := make([]Vector, 0, len(records))
 	for _, r := range records {
 		fresh = append(fresh, Vector{Offset: r.Offset, Key: r.Record.Key, Values: []float32{1, 0}})
 	}

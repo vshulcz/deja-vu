@@ -1,3 +1,4 @@
+// Package bench generates the seeded corpora the benchmarks score against.
 package bench
 
 import (
@@ -54,7 +55,7 @@ type BlockCorpus struct {
 //   - The other sessions say the subject's words at length. A block that ranks
 //     on how often the words appear picks one of them.
 func GenerateBlock(seed int64) BlockCorpus {
-	rng := rand.New(rand.NewSource(seed))
+	rng := rand.New(rand.NewSource(seed)) //nolint:gosec // seeded so the fixture is the same on every run
 	base := time.Date(2099, time.March, 2, 9, 0, 0, 0, time.UTC)
 	chains := make([]BlockChain, 0, BlockChainCount)
 	for i := range BlockChainCount {
@@ -79,7 +80,7 @@ func GenerateBlock(seed int64) BlockCorpus {
 			if j == BlockSettledAt {
 				says = 1
 			}
-			for k := 0; k < says; k++ {
+			for k := range says {
 				msgs = append(msgs,
 					model.Message{
 						Role: "assistant",

@@ -343,7 +343,7 @@ func TestWriteStreamLeavesNoTempWhenTheRenameFails(t *testing.T) {
 func TestWriteStreamToAMissingDirectoryFailsCleanly(t *testing.T) {
 	dir := t.TempDir()
 	called := false
-	err := WriteStream(filepath.Join(dir, "gone", "sidecar.bin"), 0o600, func(w io.Writer) error {
+	err := WriteStream(filepath.Join(dir, "gone", "sidecar.bin"), 0o600, func(_ io.Writer) error {
 		called = true
 		return nil
 	})

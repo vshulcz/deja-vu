@@ -22,7 +22,7 @@ func TestBlameHitShapeIsStable(t *testing.T) {
 	}
 	got := map[string]bool{}
 	rt := reflect.TypeFor[BlameHit]()
-	for i := 0; i < rt.NumField(); i++ {
+	for i := range rt.NumField() {
 		name, _, _ := strings.Cut(rt.Field(i).Tag.Get("json"), ",")
 		if name != "" && name != "-" {
 			got[name] = true

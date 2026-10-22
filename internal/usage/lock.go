@@ -45,7 +45,7 @@ func withLogLock(path string, fn func()) {
 		f, err := os.OpenFile(lock, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 		if err == nil {
 			_ = f.Close()
-			defer func() { _ = os.Remove(lock) }()
+			defer func() { _ = os.Remove(lock) }() //nolint:gocritic // returns right after fn
 			fn()
 			return
 		}

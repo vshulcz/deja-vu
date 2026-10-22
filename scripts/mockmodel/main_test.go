@@ -10,7 +10,7 @@ import (
 
 func post(t *testing.T, s *server, path, body string) *httptest.ResponseRecorder {
 	t.Helper()
-	r := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, path, strings.NewReader(body))
 	w := httptest.NewRecorder()
 	s.post(w, r)
 	return w

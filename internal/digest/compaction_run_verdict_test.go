@@ -29,7 +29,7 @@ func TestARunWithoutAnExitCodeTakesTheVerdictOfItsOutput(t *testing.T) {
 		},
 	}
 	c := ExtractCompactionContext(s, ExtractOptions{})
-	var got []string
+	got := make([]string, 0, len(c.Tests))
 	for _, tc := range c.Tests {
 		got = append(got, tc.Outcome)
 	}

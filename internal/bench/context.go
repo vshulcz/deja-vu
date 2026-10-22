@@ -13,9 +13,12 @@ import (
 )
 
 const (
-	ContextChainCount    = 30
+	// ContextChainCount is how many chains carry facts.
+	ContextChainCount = 30
+	// ContextNegativeCount is how many chains carry none.
 	ContextNegativeCount = 5
-	// Fourteen priors and eight facts, the facts in the oldest eight sessions
+	// ContextPriorCount is the number of prior sessions per chain. Fourteen
+	// priors and eight facts, the facts in the oldest eight sessions
 	// and the six newest settling nothing. Two properties the column needs: a
 	// block that reads the newest sessions finds nothing, and a block that
 	// prefers the sessions which settled something still cannot carry all eight
@@ -29,6 +32,8 @@ const (
 	contextFactEvery = 1
 )
 
+// ContextChain is one chain of prior sessions, the task that asks about them
+// and the facts a block should carry.
 type ContextChain struct {
 	ID       string
 	Sessions []model.Session
@@ -38,6 +43,7 @@ type ContextChain struct {
 	Negative bool
 }
 
+// ContextCorpus is the generated chains and a hash of them.
 type ContextCorpus struct {
 	Chains []ContextChain
 	Hash   string
@@ -45,7 +51,7 @@ type ContextCorpus struct {
 
 // GenerateContext creates chains whose fact text is the benchmark ground truth.
 func GenerateContext(seed int64) ContextCorpus {
-	rng := rand.New(rand.NewSource(seed))
+	rng := rand.New(rand.NewSource(seed)) //nolint:gosec // seeded so the fixture is the same on every run
 	chains := make([]ContextChain, 0, ContextChainCount+ContextNegativeCount)
 	base := time.Date(2099, time.January, 3, 0, 0, 0, 0, time.UTC)
 	for i := range ContextChainCount + ContextNegativeCount {
@@ -124,7 +130,10 @@ func GenerateContext(seed int64) ContextCorpus {
 		chain.Sessions = append(chain.Sessions, model.Session{ID: id + "-task", Harness: "claude", Project: project, Started: t, Updated: t, Messages: []model.Message{{Role: "user", Text: chain.Task, Time: t}}})
 		chains = append(chains, chain)
 	}
-	b, _ := json.Marshal(chains)
+	b, err := json.Marshal(chains) //nolint:musttag // field names are the hash input, tags would add nothing
+	if err != nil {
+		panic(err)
+	}
 	h := sha256.Sum256(b)
 	return ContextCorpus{Chains: chains, Hash: hex.EncodeToString(h[:])}
 }
@@ -171,7 +180,10 @@ func GenerateContextMarathon(seed int64) ContextCorpus {
 		}
 		chains = append(chains, foldChain(chain))
 	}
-	b, _ := json.Marshal(chains)
+	b, err := json.Marshal(chains) //nolint:musttag // field names are the hash input, tags would add nothing
+	if err != nil {
+		panic(err)
+	}
 	h := sha256.Sum256(b)
 	return ContextCorpus{Chains: chains, Hash: hex.EncodeToString(h[:])}
 }

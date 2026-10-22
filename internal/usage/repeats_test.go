@@ -84,7 +84,7 @@ func TestRepeatedInjectionsIsSilentOnAHealthyLog(t *testing.T) {
 func TestRepeatedInjectionsOrdersWhatMatters(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "index.db")
 	at := time.Date(2026, 9, 9, 10, 0, 0, 0, time.UTC)
-	var events []Event
+	events := make([]Event, 0, 5)
 	for range 3 {
 		events = append(events, Event{Time: at, Kind: KindDejaVu, Bytes: 800, Into: "old"})
 	}

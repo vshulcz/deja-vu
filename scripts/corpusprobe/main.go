@@ -40,7 +40,7 @@ func main() {
 	}
 
 	// 2. Command runs and their output (#539, #546, #541).
-	cmdRe := regexp.MustCompile(`(?m)^\s*\$ |(?m)^\s*(go test|go build|npm |pnpm |yarn |cargo |pytest|make |git |docker |kubectl )`)
+	cmdRe := regexp.MustCompile(`(?m)^\s*\$ |^\s*(go test|go build|npm |pnpm |yarn |cargo |pytest|make |git |docker |kubectl )`)
 	exitRe := regexp.MustCompile(`(?i)(exit code|exit status|command failed|non-zero)`)
 	testRe := regexp.MustCompile(`(?i)(--- FAIL|--- PASS|\bok\s+github|PASS\b|FAIL\b|\d+ passed|\d+ failed)`)
 	var withCmd, withExit, withTest int

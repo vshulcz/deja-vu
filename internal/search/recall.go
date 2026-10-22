@@ -14,12 +14,14 @@ import (
 	"github.com/vshulcz/deja-vu/internal/prompt"
 )
 
+// The auto-recall modes.
 const (
 	RecallOff        = "off"
 	RecallSafe       = "safe"
 	RecallAggressive = "aggressive"
 )
 
+// AutoRecallOptions picks and orders the sessions an auto-recall block draws on.
 type AutoRecallOptions struct {
 	Mode         string
 	ProjectNames []string
@@ -37,6 +39,7 @@ type AutoRecallOptions struct {
 	Unseen map[string]bool
 }
 
+// AutoRecallResult is a rendered auto-recall block and what went into it.
 type AutoRecallResult struct {
 	Text     string
 	Sessions int
@@ -52,6 +55,7 @@ type AutoRecallResult struct {
 	IDs []string
 }
 
+// AutoRecallDigest renders the session-start block within budget.
 func AutoRecallDigest(ss []model.Session, budget int) string {
 	return AutoRecallDigestFor(ss, budget, nil)
 }
@@ -452,7 +456,7 @@ func autoRecallSessionForAsked(s model.Session, now time.Time, provenance bool, 
 	}
 	var problem string
 	var conclusions []string
-	matched := false
+	var matched bool
 	if len(terms) > 0 {
 		problem, conclusions = matchedLinesAsked(s, terms, asked)
 		matched = len(conclusions) > 0

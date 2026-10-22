@@ -16,7 +16,7 @@ func TestGeneratePromptShape(t *testing.T) {
 	}
 	topics := map[string]bool{}
 	projects := map[string]bool{}
-	var real, negative, marathon, fresh int
+	var plain, negative, marathon, fresh int
 	for _, c := range corpus.Chains {
 		// One project is shared on purpose. Everywhere else a shared project
 		// would make a query match two chains and blur the measurement; the
@@ -43,7 +43,7 @@ func TestGeneratePromptShape(t *testing.T) {
 			}
 			continue
 		}
-		real++
+		plain++
 		// One topic per chain: the context corpus gives them all the same
 		// vocabulary, and a term in every chain identifies none of them.
 		// Filler for the catch-all scope carries no question of its own: it is
@@ -81,8 +81,8 @@ func TestGeneratePromptShape(t *testing.T) {
 			}
 		}
 	}
-	if real < 12 || negative != PromptNegativeCount {
-		t.Fatalf("chains: %d real, %d negative", real, negative)
+	if plain < 12 || negative != PromptNegativeCount {
+		t.Fatalf("chains: %d real, %d negative", plain, negative)
 	}
 	if marathon != 1 || fresh != 1 {
 		t.Fatalf("gated shapes: %d marathon, %d fresh — both are needed to measure the gates", marathon, fresh)

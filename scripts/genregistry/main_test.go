@@ -20,7 +20,7 @@ func TestLastmodIsTheUTCDayInEveryZone(t *testing.T) {
 	t.Setenv("USERPROFILE", repo)
 	git := func(env []string, args ...string) {
 		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		cmd := exec.CommandContext(t.Context(), "git", append([]string{"-C", repo}, args...)...)
 		cmd.Env = append(os.Environ(),
 			"GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1",
 			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",

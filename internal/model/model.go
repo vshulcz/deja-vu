@@ -7,6 +7,7 @@ import (
 	"unicode/utf8"
 )
 
+// Message is one turn of a session.
 type Message struct {
 	Role string    `json:"role"`
 	Text string    `json:"text"`
@@ -35,6 +36,7 @@ func (m Message) MarshalJSON() ([]byte, error) {
 	return json.Marshal(message(m))
 }
 
+// Session is one transcript as deja indexes it.
 type Session struct {
 	ID       string    `json:"id"`
 	Harness  string    `json:"harness"`
@@ -127,6 +129,7 @@ func (s *Session) SetSource(localInstance string) {
 	s.Source = &Source{Origin: "local", Instance: localInstance}
 }
 
+// Touch widens the session's Started..Updated span to cover t.
 func (s *Session) Touch(t time.Time) {
 	if t.IsZero() {
 		return

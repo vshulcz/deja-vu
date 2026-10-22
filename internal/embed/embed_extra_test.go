@@ -10,7 +10,7 @@ import (
 )
 
 func TestEmbedRejectsCountMismatchOnOllamaShape(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"embeddings":[[1,0],[1,0],[1,0]]}`))
 	}))
 	defer srv.Close()
@@ -21,7 +21,7 @@ func TestEmbedRejectsCountMismatchOnOllamaShape(t *testing.T) {
 }
 
 func TestSemanticSearchBadQueryVector(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		// Two vectors for a single query text: len(query) != 1 downstream.
 		_, _ = w.Write([]byte(`{"data":[{"embedding":[1,0]},{"embedding":[0,1]}]}`))
 	}))

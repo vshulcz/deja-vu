@@ -38,7 +38,7 @@ func TestHoldsLastTurnMatchesReviewedPredicate(t *testing.T) {
 	times := []time.Time{{}, at, at.In(time.FixedZone("offset", 3600)), at.Add(time.Nanosecond)}
 	roles := []string{"user", "assistant", roleSummary, "tool"}
 	texts := []string{"same", "own", "", " \t", "No response requested.", "nul\x00text"}
-	rng := rand.New(rand.NewSource(5320))
+	rng := rand.New(rand.NewSource(5320)) //nolint:gosec // seeded fuzz input, not crypto
 	for i := range 1000 {
 		pair := make([]model.Session, 2)
 		for j := range pair {

@@ -11,20 +11,24 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
+// Seed is the seed the benchmarks generate their corpus from.
 const Seed int64 = 1
 
 const (
+	// SessionCount is how many sessions the corpus holds.
 	SessionCount = 500
-	// Five variants for each topic in the table, which is what makes every
+	// QueryCount is how many queries it asks. Five variants for each topic in the table, which is what makes every
 	// query name one session (#3481).
 	QueryCount = 100
 )
 
+// Query is one benchmark question and the IDs of the sessions that answer it.
 type Query struct {
 	Text     string
 	Relevant []string
 }
 
+// Corpus is the generated sessions, their queries and a hash of both.
 type Corpus struct {
 	Sessions []model.Session
 	Queries  []Query
@@ -75,7 +79,7 @@ var topics = []topic{
 // Generate is the benchmark fixture. Every value, including timestamps and
 // IDs, comes from the fixed seed or the constants above.
 func Generate(seed int64) Corpus {
-	rng := rand.New(rand.NewSource(seed))
+	rng := rand.New(rand.NewSource(seed)) //nolint:gosec // seeded so the fixture is the same on every run
 	base := time.Date(2099, time.January, 2, 3, 4, 5, 0, time.UTC)
 	sessions := make([]model.Session, 0, SessionCount)
 	queries := make([]Query, 0, QueryCount)
@@ -129,10 +133,13 @@ func Generate(seed int64) Corpus {
 			},
 		})
 	}
-	b, _ := json.Marshal(struct {
+	b, err := json.Marshal(struct { //nolint:musttag // field names are the hash input, tags would add nothing
 		Sessions []model.Session
 		Queries  []Query
 	}{sessions, queries})
+	if err != nil {
+		panic(err)
+	}
 	h := sha256.Sum256(b)
 	return Corpus{Sessions: sessions, Queries: queries, Hash: hex.EncodeToString(h[:])}
 }

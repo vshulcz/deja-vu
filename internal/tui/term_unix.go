@@ -23,7 +23,7 @@ func makeRaw(in, out *os.File) (func(), error) {
 		return nil, ErrNotTerminal
 	}
 	var old syscall.Termios
-	if e := ioctl(in, ioctlGetTermios, unsafe.Pointer(&old)); e != 0 {
+	if e := ioctl(in, ioctlGetTermios, unsafe.Pointer(&old)); e != 0 { //nolint:gosec // ioctl takes the struct's address
 		return nil, ErrNotTerminal
 	}
 	raw := old
@@ -34,15 +34,15 @@ func makeRaw(in, out *os.File) (func(), error) {
 	raw.Cflag |= syscall.CS8
 	raw.Cc[syscall.VMIN] = 0
 	raw.Cc[syscall.VTIME] = 1
-	if e := ioctl(in, ioctlSetTermios, unsafe.Pointer(&raw)); e != 0 {
+	if e := ioctl(in, ioctlSetTermios, unsafe.Pointer(&raw)); e != 0 { //nolint:gosec // ioctl takes the struct's address
 		return nil, ErrNotTerminal
 	}
-	return func() { _ = ioctl(in, ioctlSetTermios, unsafe.Pointer(&old)) }, nil
+	return func() { _ = ioctl(in, ioctlSetTermios, unsafe.Pointer(&old)) }, nil //nolint:gosec // ioctl takes the struct's address
 }
 
 func size(f *os.File) (int, int, bool) {
 	var ws struct{ rows, cols, xpixel, ypixel uint16 }
-	if e := ioctl(f, syscall.TIOCGWINSZ, unsafe.Pointer(&ws)); e != 0 || ws.cols == 0 {
+	if e := ioctl(f, syscall.TIOCGWINSZ, unsafe.Pointer(&ws)); e != 0 || ws.cols == 0 { //nolint:gosec // ioctl takes the struct's address
 		return 0, 0, false
 	}
 	return int(ws.cols), int(ws.rows), true

@@ -79,7 +79,7 @@ func TestPathsCoverEveryCellExactlyOnce(t *testing.T) {
 		want := map[string]int{}
 		for _, row := range Grid(m) {
 			for _, ch := range row {
-				if col, ok := Colour(byte(ch), m.CoatColour); ok {
+				if col, ok := Colour(ch, m.CoatColour); ok {
 					want[Hex[col]]++
 				}
 			}

@@ -111,9 +111,9 @@ var closedHarnessBlockREs = func() []*regexp.Regexp {
 // tag inside what it handed back (review of #3323). An open with no close is
 // a person naming the tag, and is left where it is.
 func unwrapUserQuery(text string) string {
-	const open, close = "<user_query>", "</user_query>"
+	const open, closer = "<user_query>", "</user_query>"
 	for {
-		end := strings.Index(text, close)
+		end := strings.Index(text, closer)
 		if end < 0 {
 			return text
 		}
@@ -122,7 +122,7 @@ func unwrapUserQuery(text string) string {
 			// A close with nothing open before it: the orphan rule owns that.
 			return text
 		}
-		text = text[:start] + text[start+len(open):end] + text[end+len(close):]
+		text = text[:start] + text[start+len(open):end] + text[end+len(closer):]
 	}
 }
 

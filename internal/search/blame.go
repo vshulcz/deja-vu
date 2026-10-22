@@ -22,6 +22,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/query"
 )
 
+// BlameTarget is the file a blame question names, resolved to an absolute path.
 type BlameTarget struct {
 	FullPath string
 	Base     string
@@ -39,6 +40,7 @@ type BlameTarget struct {
 	LineNote string
 }
 
+// BlameOptions narrows which sessions a blame search reads.
 type BlameOptions struct {
 	Harness string
 	Project string
@@ -46,6 +48,7 @@ type BlameOptions struct {
 	All     bool
 }
 
+// BlameHit is one session that mentions the blamed file.
 type BlameHit struct {
 	Session  model.Session `json:"session"`
 	Title    string        `json:"title"`
@@ -117,6 +120,8 @@ func allDigits(s string) bool {
 // maxBlamePath is PATH_MAX on Linux, the longest of the common limits.
 const maxBlamePath = 4096
 
+// ResolveBlamePath turns what the reader typed, with an optional :line suffix,
+// into a BlameTarget.
 func ResolveBlamePath(name string) (BlameTarget, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -666,6 +671,7 @@ func boundedBlameHit(h BlameHit) BlameHit {
 	return h
 }
 
+// PrintBlame writes blame hits as rows, or as one JSON array.
 func PrintBlame(w io.Writer, hits []BlameHit, jsonOutput bool) {
 	for i := range hits {
 		if hits[i].Tier == "" {
@@ -684,7 +690,7 @@ func PrintBlame(w io.Writer, hits []BlameHit, jsonOutput bool) {
 			out[i].Snippets = SafeStrings(out[i].Snippets)
 			out[i].LifecycleNote = SafeText(out[i].LifecycleNote)
 		}
-		_ = json.NewEncoder(w).Encode(out)
+		_ = json.NewEncoder(w).Encode(out) //nolint:errchkjson // no error return here; write errors are ignored like the text rows
 		return
 	}
 	PrintBlameWidth(w, hits, 0)

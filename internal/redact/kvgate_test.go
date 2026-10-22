@@ -11,7 +11,7 @@ import (
 // stays in the index — so this proves the gate is a necessary condition rather
 // than a heuristic: whenever the regex matches, the gate must have passed.
 func TestKVGateNeverHidesAMatch(t *testing.T) {
-	rng := rand.New(rand.NewSource(20260729))
+	rng := rand.New(rand.NewSource(20260729)) //nolint:gosec // seeded so a failure reproduces
 	// Fragments chosen to land near the boundary: hint words, assignment
 	// punctuation, quoting, and values just under and just over the length the
 	// pattern requires.

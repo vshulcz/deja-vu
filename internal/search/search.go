@@ -1,3 +1,4 @@
+// Package search ranks sessions against a query and prints what it finds.
 package search
 
 import (
@@ -41,6 +42,7 @@ const (
 // search (index) can use them without importing the ranking engine.
 type Options = query.Options
 
+// The tier names and sort orders, re-exported from internal/query.
 const (
 	TierExact    = query.TierExact
 	TierClose    = query.TierClose
@@ -65,12 +67,16 @@ func ByDate(hits []Hit) {
 	})
 }
 
+// QueryParts is query.QueryParts.
 func QueryParts(q string) (terms []string, phrases []string) { return query.QueryParts(q) }
 
+// IsStopWord is query.IsStopWord.
 func IsStopWord(term string) bool { return query.IsStopWord(term) }
 
+// MatchesQuery is query.MatchesQuery.
 func MatchesQuery(text, q string) bool { return query.MatchesQuery(text, q) }
 
+// MatchesParts is query.MatchesParts.
 func MatchesParts(text string, terms, phrases []string, variants map[string][]string) bool {
 	return query.MatchesParts(text, terms, phrases, variants)
 }
@@ -105,6 +111,7 @@ type searchJSONEnvelope struct {
 	Variants map[string][]string `json:"variants,omitempty"`
 }
 
+// Hit is one session that matched a search.
 type Hit struct {
 	Session    model.Session `json:"session"`
 	Count      int           `json:"count"`
@@ -183,7 +190,7 @@ type bm25Document struct {
 // countIn scores one message against the query the way the exact tier does:
 // a parts match first, then either a whole-query substring count for a single
 // bare token or a per-token count, plus any quoted phrases.
-func countIn(text, low string, qtoks, phrases []string, variants map[string][]string) int {
+func countIn(_, low string, qtoks, phrases []string, variants map[string][]string) int {
 	if !query.MatchesLowered(low, qtoks, phrases, variants) {
 		return 0
 	}
@@ -312,7 +319,7 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 			// in the transcript for `deja how` and `deja fix`.
 			text := withoutOwnCallLog(m.Text)
 			low := lower(text)
-			c := 0
+			var c int
 			// windowText and windowToks are the pair proximity is measured on: the
 			// surface text and the query's own words, except where the match came from
 			// folding — measuring the unfolded pair there finds nothing and reports a
@@ -527,7 +534,7 @@ func renderSnippets(hits []Hit, o Options, n int) {
 	if n < 0 || n > len(hits) {
 		n = len(hits)
 	}
-	for i := 0; i < n; i++ {
+	for i := range n {
 		if len(hits[i].snipTexts) == 0 {
 			continue
 		}
@@ -1597,6 +1604,7 @@ func safeHit(h Hit) Hit {
 	return h
 }
 
+// Print writes search hits as text, or as the JSON envelope with o.JSON.
 func Print(w io.Writer, hits []Hit, o Options) {
 	for i := range hits {
 		if hits[i].Tier == "" {
@@ -1616,7 +1624,7 @@ func Print(w io.Writer, hits []Hit, o Options) {
 		// One shape, always. The exact path used to emit a bare array while
 		// every fallback path emitted an object, so a consumer had to handle
 		// two contracts and could not tell which it had until it looked.
-		_ = json.NewEncoder(w).Encode(searchJSONEnvelope{
+		_ = json.NewEncoder(w).Encode(searchJSONEnvelope{ //nolint:errchkjson // no error return here; write errors are ignored like the text path
 			SchemaVersion:  jsonout.Version,
 			Tier:           setTier(o),
 			Total:          o.Total,
@@ -1868,6 +1876,7 @@ func repeatedStamps(ms []model.Message) map[string]bool {
 	return repeated
 }
 
+// PrintSession writes a whole session as plain text.
 func PrintSession(w io.Writer, s model.Session) {
 	PrintSessionStyled(w, s, false, 0)
 }
@@ -2001,6 +2010,8 @@ func withoutHarnessEnvelopes(s model.Session) model.Session {
 	return s
 }
 
+// PrintContext writes the plain-text briefing for one session: a header line,
+// then the turns around what query matched.
 func PrintContext(w io.Writer, s model.Session, query string) {
 	// Project and id are transcript text a harness wrote, and this is one line:
 	// an escape byte in either recolours the header and a carriage return
@@ -2099,7 +2110,7 @@ func printContextBody(w io.Writer, s model.Session, query string) {
 	if qlow != "" {
 		fmt.Fprintf(w, "\nNo single message contains the full query; showing the session's opening exchange.\n")
 	}
-	printContextChunks(w, s, budget, func(m model.Message) (bool, []int) { return true, nil },
+	printContextChunks(w, s, budget, func(model.Message) (bool, []int) { return true, nil },
 		func(m model.Message) string { return clipCompactionSummary(m.Text, parts) })
 }
 
@@ -2497,6 +2508,7 @@ func approxSize(n int) string {
 	return fmt.Sprintf("%d KB", (n+512)/1024)
 }
 
+// Recent returns the sessions newest first, at most n of them when n > 0.
 func Recent(ss []model.Session, n int) []model.Session {
 	out := mergeSessions(ss)
 	sort.Slice(out, func(i, j int) bool { return out[i].Updated.After(out[j].Updated) })
@@ -3015,7 +3027,7 @@ var toolDumpEngineCalls atomic.Int64
 // holding none of them cannot match. Rendering a digest ran this per line over
 // the whole session — 16.5 s of the 17 s a 240 MB render took (#1742).
 func looksToolDump(line string) bool {
-	for i := 0; i < len(line); i++ {
+	for i := range len(line) {
 		if line[i] >= 0x80 {
 			// Case folding is Unicode-wide in the engine (ſ folds to s), and
 			// this prefilter is ASCII. A line with any byte outside ASCII goes
@@ -3270,14 +3282,13 @@ func ErrorHits(ss []model.Session, paste string) []Hit {
 // the first message that has it. Joining a session's text into one string to
 // ask this is quadratic in the number of messages, and these are transcripts.
 func sessionHolds(s model.Session, t string) bool {
-	folded := ""
 	for _, m := range s.Messages {
 		low := lower(m.Text)
 		if strings.Contains(low, t) {
 			return true
 		}
 		if ft := cjkfold.String(t); ft != t || cjkfold.HasCJK(t) {
-			if folded = cjkfold.String(low); strings.Contains(folded, ft) {
+			if folded := cjkfold.String(low); strings.Contains(folded, ft) {
 				return true
 			}
 		}

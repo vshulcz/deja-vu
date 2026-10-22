@@ -25,7 +25,7 @@ func TestASidebarOnlyCommitDoesNotDateThePage(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, args := range [][]string{{"add", "docs"}, {"commit", "-qm", "c"}} {
-			cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+			cmd := exec.CommandContext(t.Context(), "git", append([]string{"-C", repo}, args...)...)
 			cmd.Env = append(os.Environ(),
 				"GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1",
 				"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
@@ -36,7 +36,7 @@ func TestASidebarOnlyCommitDoesNotDateThePage(t *testing.T) {
 			}
 		}
 	}
-	if out, err := exec.Command("git", "-C", repo, "init", "-q").CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "git", "-C", repo, "init", "-q").CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v\n%s", err, out)
 	}
 

@@ -20,7 +20,7 @@ func collectJSONKeys(t reflect.Type, into map[string]bool) {
 	if t.Kind() != reflect.Struct {
 		return
 	}
-	for i := 0; i < t.NumField(); i++ {
+	for i := range t.NumField() {
 		f := t.Field(i)
 		name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
 		if name == "-" {

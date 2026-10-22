@@ -88,7 +88,7 @@ func main() {
 			continue
 		}
 		path := filepath.Join(*out, fmt.Sprintf("deja-vu_%s_%s.mcpb", *version, t.suffix))
-		if err := pack(path, template, binary, t, *version); err != nil {
+		if err = pack(path, template, binary, t, *version); err != nil {
 			fail(fmt.Errorf("%s: %w", t.suffix, err))
 		}
 		info, err := os.Stat(path)

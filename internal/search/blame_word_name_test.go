@@ -39,7 +39,7 @@ func TestBlameRefusesAPathLongerThanAnyFileSystemAllows(t *testing.T) {
 }
 
 func blameIDs(hits []BlameHit) []string {
-	var ids []string
+	ids := make([]string, 0, len(hits))
 	for _, h := range hits {
 		ids = append(ids, h.Session.ID)
 	}

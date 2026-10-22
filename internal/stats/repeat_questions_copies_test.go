@@ -1,6 +1,7 @@
 package stats
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -27,7 +28,7 @@ func TestRepeatQuestionsSkipsACopiedConversation(t *testing.T) {
 	}
 
 	// Control: the same question asked again months later is the repeat.
-	again := append(resumed, session("later", july))
+	again := slices.Concat(resumed, []model.Session{session("later", july)})
 	if got := RepeatQuestions(again); got != 1 {
 		t.Fatalf("asked again in July: got %d, want 1", got)
 	}

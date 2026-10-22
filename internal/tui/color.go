@@ -43,12 +43,13 @@ func Hex(s string) Color {
 }
 
 func (c Color) rgb() (r, g, b int) {
-	return int(c>>16) & 0xff, int(c>>8) & 0xff, int(c) & 0xff
+	return int(c>>16) & 0xff, int(c>>8) & 0xff, int(c) & 0xff //nolint:gosec // each is masked to a byte
 }
 
 // Mode is how many colours the terminal can show.
 type Mode int
 
+// The modes, from most colours to none.
 const (
 	ModeTrue Mode = iota
 	Mode256
@@ -119,11 +120,11 @@ func Index256(n int) Color {
 	}
 	if n >= 232 {
 		v := 8 + (n-232)*10
-		return Color(v<<16|v<<8|v) | colorSet
+		return Color(v<<16|v<<8|v) | colorSet //nolint:gosec // v is at most 238
 	}
 	i := n - 16
 	r, g, b := cubeLevels[i/36], cubeLevels[(i/6)%6], cubeLevels[i%6]
-	return Color(r<<16|g<<8|b) | colorSet
+	return Color(r<<16|g<<8|b) | colorSet //nolint:gosec // cube levels are bytes
 }
 
 func sgrColor(b *strings.Builder, c Color, bg bool, m Mode) {

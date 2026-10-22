@@ -66,7 +66,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "semanticgap:", err)
 		os.Exit(1)
 	}
-	if _, err := embed.EmbedIndex(dir, client, nil); err != nil {
+	if _, err = embed.EmbedIndex(dir, client, nil); err != nil {
 		fmt.Fprintln(os.Stderr, "semanticgap: embedding the store:", err)
 		os.Exit(1)
 	}

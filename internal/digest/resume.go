@@ -8,6 +8,8 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
+// Resume is the working state a session had reached at a point.
+//
 // A compaction is where a session's working state goes, and it is the most
 // expensive moment deja can see.
 //

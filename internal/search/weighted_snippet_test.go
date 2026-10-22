@@ -17,7 +17,7 @@ import (
 // The ranking already knows what the words are worth against the whole corpus.
 // Handing that down is what this checks.
 func TestTheRankingsOwnWeightsBeatEstimatingThemFromTheAnswerSet(t *testing.T) {
-	var ss []model.Session
+	ss := make([]model.Session, 0, 5)
 	for i := range 4 {
 		ss = append(ss, model.Session{
 			ID: string(rune('a' + i)), Harness: "claude", Project: "p",

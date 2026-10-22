@@ -68,12 +68,12 @@ func main() {
 	defer func() { _ = os.RemoveAll(tmp) }()
 	claudeRoot := filepath.Join(tmp, "claude")
 	proj := filepath.Join(claudeRoot, "-work-miracl")
-	if err := os.MkdirAll(proj, 0o755); err != nil {
+	if err = os.MkdirAll(proj, 0o755); err != nil {
 		fatal(err)
 	}
 
 	t0 := time.Now()
-	written, haveGold, err := writePool(filepath.Join(*dir), *lang, proj, gold, *pool, *seed)
+	written, haveGold, err := writePool(filepath.Clean(*dir), *lang, proj, gold, *pool, *seed)
 	if err != nil {
 		fatal(err)
 	}
@@ -85,7 +85,7 @@ func main() {
 	_ = os.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
 	_ = os.Setenv("DEJA_INDEX_DIR", idx)
 	t1 := time.Now()
-	if err := index.Ensure(idx, "claude", true, nil); err != nil {
+	if err = index.Ensure(idx, "claude", true, nil); err != nil {
 		fatal(err)
 	}
 	buildFor := time.Since(t1)
@@ -173,7 +173,10 @@ func main() {
 				top = top[:5]
 			}
 			rec := map[string]any{"qid": qid, "query": topics[qid], "rank": rank, "gold": keys(want), "top5": top}
-			b, _ := json.Marshal(rec)
+			b, merr := json.Marshal(rec)
+			if merr != nil {
+				fatal(merr)
+			}
 			_, _ = missFile.Write(append(b, '\n'))
 		}
 	}
@@ -238,10 +241,10 @@ func ask(dir, q string, want map[string]bool) (int, []string, string, time.Durat
 	}
 	for i, id := range ranked {
 		if want[id] {
-			return i + 1, ranked, string(result.Tier), elapsed, nil
+			return i + 1, ranked, result.Tier, elapsed, nil
 		}
 	}
-	return 0, ranked, string(result.Tier), elapsed, nil
+	return 0, ranked, result.Tier, elapsed, nil
 }
 
 // writePool writes every relevant passage plus a random sample of the rest as
@@ -256,7 +259,7 @@ func writePool(dir, lang, proj string, gold map[string]bool, pool int, seed int6
 		return 0, have, fmt.Errorf("no %s-*.jsonl.gz shards in %s", lang, dir)
 	}
 	sort.Strings(shards)
-	rng := rand.New(rand.NewSource(seed))
+	rng := rand.New(rand.NewSource(seed)) //nolint:gosec // seeded sample, not a secret
 	// Reservoir-free two-pass-free approach: golds always kept, others kept
 	// with a probability that fills the remaining budget on a corpus of
 	// unknown size — a light bias toward early shards is acceptable for a

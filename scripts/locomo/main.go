@@ -63,7 +63,7 @@ func main() {
 		fatal(err)
 	}
 	var samples []locomoSample
-	if err := json.Unmarshal(raw, &samples); err != nil {
+	if err = json.Unmarshal(raw, &samples); err != nil {
 		fatal(err)
 	}
 
@@ -77,9 +77,9 @@ func main() {
 	var searchTimes []time.Duration
 
 	for _, sample := range samples {
-		dir, cleanup, err := buildDialogIndex(sample)
-		if err != nil {
-			fatal(fmt.Errorf("%s: %w", sample.SampleID, err))
+		dir, cleanup, berr := buildDialogIndex(sample)
+		if berr != nil {
+			fatal(fmt.Errorf("%s: %w", sample.SampleID, berr))
 		}
 		for _, qa := range sample.QA {
 			gold := map[string]bool{}
@@ -89,9 +89,9 @@ func main() {
 			if len(gold) == 0 {
 				continue
 			}
-			rank, detail, elapsed, err := askDialog(dir, qa.Question, gold)
-			if err != nil {
-				fatal(err)
+			rank, detail, elapsed, aerr := askDialog(dir, qa.Question, gold)
+			if aerr != nil {
+				fatal(aerr)
 			}
 			if missFile != nil && (rank != 1 || *dumpAll) {
 				goldIDs := make([]string, 0, len(gold))
@@ -104,7 +104,10 @@ func main() {
 					"question": qa.Question, "rank": rank, "tier": detail.tier,
 					"gold": goldIDs, "top5": detail.top5, "scores": detail.scores,
 				}
-				bb, _ := json.Marshal(rec)
+				bb, merr := json.Marshal(rec)
+				if merr != nil {
+					fatal(merr)
+				}
 				_, _ = missFile.Write(append(bb, 10))
 			}
 			searchTimes = append(searchTimes, elapsed)
@@ -302,7 +305,7 @@ func askDialog(dir, question string, gold map[string]bool) (int, dialogDetail, t
 		return 0, dialogDetail{}, 0, err
 	}
 	elapsed := time.Since(t0)
-	detail := dialogDetail{tier: string(result.Tier)}
+	detail := dialogDetail{tier: result.Tier}
 	for i, h := range hits {
 		if i >= 5 {
 			break

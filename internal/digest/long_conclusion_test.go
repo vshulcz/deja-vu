@@ -22,16 +22,16 @@ func TestOneOverlongConclusionIsMarkedRatherThanDropped(t *testing.T) {
 		strings.Repeat("after weighing the options against the replica load ", 8) +
 		". Revisit when the replica catches up."
 
-	for _, max := range []int{1, 3} {
-		got := Conclusions(conclusionSession(long), 300, max)
+	for _, limit := range []int{1, 3} {
+		got := Conclusions(conclusionSession(long), 300, limit)
 		if len(got) == 0 {
-			t.Fatalf("max=%d: a session that settled something got no block", max)
+			t.Fatalf("max=%d: a session that settled something got no block", limit)
 		}
 		if !strings.HasSuffix(got[0], "…") {
-			t.Errorf("max=%d: the line was not marked as cut:\n%s", max, got[0])
+			t.Errorf("max=%d: the line was not marked as cut:\n%s", limit, got[0])
 		}
 		if len(got[0]) > 300 {
-			t.Errorf("max=%d: the cut line is %d bytes, over the 300 budget", max, len(got[0]))
+			t.Errorf("max=%d: the cut line is %d bytes, over the 300 budget", limit, len(got[0]))
 		}
 	}
 }

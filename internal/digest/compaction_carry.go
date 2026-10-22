@@ -243,7 +243,7 @@ func carryHasLinkWord(low string) bool {
 // carryForward keeps what the last compaction listed and this segment did not
 // close. Carried lines sort before every fresh one.
 func carryForward(prev []model.ContextCarry, hasUser bool, closed map[int][]int, texts []string, userMerged bool) []carryItem {
-	var items []carryItem
+	items := make([]carryItem, 0, len(prev))
 	for _, p := range prev {
 		it := carryItem{kind: p.Kind, text: p.Text, j: -1, age: p.Age + 1}
 		switch p.Kind {
@@ -276,8 +276,9 @@ func carryForward(prev []model.ContextCarry, hasUser bool, closed map[int][]int,
 // carryMentioned reports a recheck the segment already came back to: its #N
 // appears anywhere, or most of its long words appear in one message.
 func carryMentioned(text string, texts []string) bool {
-	var ns []string
-	for _, m := range carryNumRE.FindAllStringSubmatch(text, -1) {
+	ms := carryNumRE.FindAllStringSubmatch(text, -1)
+	ns := make([]string, 0, len(ms))
+	for _, m := range ms {
 		ns = append(ns, m[1])
 	}
 	words := map[string]bool{}
@@ -356,7 +357,7 @@ func carryAssemble(items []carryItem) []model.ContextCarry {
 	if len(order) > carryMaxLines {
 		order = order[:carryMaxLines]
 	}
-	var out []model.ContextCarry
+	var out []model.ContextCarry //nolint:prealloc // nothing carried stays nil
 	for _, it := range order {
 		c := model.ContextCarry{Kind: it.kind, Text: it.text, Age: it.age, Key: normalizedContextText(it.text)}
 		if it.kind == carryOpen {

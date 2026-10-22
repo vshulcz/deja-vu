@@ -34,16 +34,16 @@ func TestRenderDeclaresOnlyTheePlatformItShips(t *testing.T) {
 		if m["version"] != "1.2.3" {
 			t.Fatalf("%s: version = %v", tc.suffix, m["version"])
 		}
-		platforms := m["compatibility"].(map[string]any)["platforms"].([]any)
+		platforms := listAt(t, objAt(t, m, "compatibility"), "platforms")
 		if len(platforms) != 1 || platforms[0] != tc.platform {
 			t.Fatalf("%s: platforms = %v, want exactly [%s]", tc.suffix, platforms, tc.platform)
 		}
-		server := m["server"].(map[string]any)
+		server := objAt(t, m, "server")
 		wantEntry := "server/" + tc.exe
 		if server["entry_point"] != wantEntry {
 			t.Fatalf("%s: entry_point = %v, want %s", tc.suffix, server["entry_point"], wantEntry)
 		}
-		cfg := server["mcp_config"].(map[string]any)
+		cfg := objAt(t, server, "mcp_config")
 		if cfg["command"] != "${__dirname}/"+wantEntry {
 			t.Fatalf("%s: command = %v", tc.suffix, cfg["command"])
 		}
@@ -184,11 +184,11 @@ func TestRegistryBundleIsCrossPlatformAndToolless(t *testing.T) {
 	if _, ok := manifest["tools"]; ok {
 		t.Fatal("registry bundle declares tools; Smithery rejects those outright")
 	}
-	platforms := manifest["compatibility"].(map[string]any)["platforms"].([]any)
+	platforms := listAt(t, objAt(t, manifest, "compatibility"), "platforms")
 	if len(platforms) != 3 {
 		t.Fatalf("platforms = %v, want all three", platforms)
 	}
-	cfg := manifest["server"].(map[string]any)["mcp_config"].(map[string]any)
+	cfg := objAt(t, objAt(t, manifest, "server"), "mcp_config")
 	if cfg["command"] != "node" {
 		t.Fatalf("command = %v, want node running the bundled entry point", cfg["command"])
 	}
@@ -213,4 +213,22 @@ func TestRegistryEntryPointLaunchesTheServer(t *testing.T) {
 	if !strings.Contains(js, "npx.cmd") {
 		t.Fatalf("entry point will not start on windows:\n%s", js)
 	}
+}
+
+func objAt(t *testing.T, m map[string]any, key string) map[string]any {
+	t.Helper()
+	v, ok := m[key].(map[string]any)
+	if !ok {
+		t.Fatalf("%s is a %T, want an object", key, m[key])
+	}
+	return v
+}
+
+func listAt(t *testing.T, m map[string]any, key string) []any {
+	t.Helper()
+	v, ok := m[key].([]any)
+	if !ok {
+		t.Fatalf("%s is a %T, want a list", key, m[key])
+	}
+	return v
 }

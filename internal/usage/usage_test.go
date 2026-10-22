@@ -10,6 +10,15 @@ import (
 	"time"
 )
 
+func mustMarshal(t *testing.T, v any) []byte {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
+
 func TestPathTrimsTrailingSeparator(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "index.db") + string(filepath.Separator)
 	if got, want := Path(dir), strings.TrimSuffix(dir, string(filepath.Separator))+".usage.jsonl"; got != want {
@@ -37,7 +46,7 @@ func TestRecordAndToday(t *testing.T) {
 func TestTodayIgnoresYesterday(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "index.db")
 	old := Event{Time: time.Now().UTC().Add(-48 * time.Hour), Kind: KindRecall, Bytes: 700}
-	b, _ := json.Marshal(old)
+	b := mustMarshal(t, old)
 	if err := os.WriteFile(Path(dir), append(b, '\n'), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +59,7 @@ func TestTodayIgnoresYesterday(t *testing.T) {
 
 func TestCorruptLinesIgnored(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "index.db")
-	zero, _ := json.Marshal(Event{Kind: KindRecall, Bytes: 99})
+	zero := mustMarshal(t, Event{Kind: KindRecall, Bytes: 99})
 	if err := os.WriteFile(Path(dir), []byte("{broken\n\n"+string(zero)+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -136,8 +145,8 @@ func TestRotateKeepsRecentWindow(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "index.db")
 	p := Path(dir)
 	var sb strings.Builder
-	oldEvent, _ := json.Marshal(Event{Time: time.Now().UTC().Add(-30 * 24 * time.Hour), Kind: KindRecall, Bytes: 1})
-	newEvent, _ := json.Marshal(Event{Time: time.Now().UTC(), Kind: KindRecall, Bytes: 2})
+	oldEvent := mustMarshal(t, Event{Time: time.Now().UTC().Add(-30 * 24 * time.Hour), Kind: KindRecall, Bytes: 1})
+	newEvent := mustMarshal(t, Event{Time: time.Now().UTC(), Kind: KindRecall, Bytes: 2})
 	for sb.Len() < rotateAt {
 		sb.Write(oldEvent)
 		sb.WriteByte('\n')
@@ -232,7 +241,7 @@ func TestRecordSkipsRotationWhenNothingWouldBeDropped(t *testing.T) {
 	// its survival says the file was appended to rather than rebuilt.
 	var sb strings.Builder
 	for sb.Len() < rotateAt {
-		e, _ := json.Marshal(Event{Time: time.Now().UTC().Add(-time.Hour), Kind: KindRecall, Bytes: 1})
+		e := mustMarshal(t, Event{Time: time.Now().UTC().Add(-time.Hour), Kind: KindRecall, Bytes: 1})
 		sb.Write(append(e[:len(e)-1], []byte(`,"probe":1}`)...))
 		sb.WriteByte('\n')
 	}

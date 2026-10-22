@@ -167,7 +167,7 @@ func Bigrams(s string) []string {
 	// to build nothing. A CJK rune is never a single UTF-8 byte, so one byte scan
 	// answers the question before any decoding starts.
 	ascii := true
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		if s[i] >= utf8.RuneSelf {
 			ascii = false
 			break

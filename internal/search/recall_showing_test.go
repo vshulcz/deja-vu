@@ -14,11 +14,11 @@ import (
 func TestDigestSaysWhichSessionsItShowed(t *testing.T) {
 	now := time.Now()
 	empty := model.Session{ID: "top", Harness: "claude", Updated: now}
-	real := model.Session{ID: "shown", Harness: "claude", Updated: now, Messages: []model.Message{
+	shownSession := model.Session{ID: "shown", Harness: "claude", Updated: now, Messages: []model.Message{
 		{Role: "user", Text: "why does the reconciler double count refunds", Time: now},
 		{Role: "assistant", Text: "the reconciler double counts refunds because the cursor is reset per page", Time: now},
 	}}
-	text, shown := AutoRecallDigestShowing([]model.Session{empty, real}, 0, []string{"reconciler", "refunds"}, "")
+	text, shown := AutoRecallDigestShowing([]model.Session{empty, shownSession}, 0, []string{"reconciler", "refunds"}, "")
 	if text == "" {
 		t.Fatal("digest empty")
 	}

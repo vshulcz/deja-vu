@@ -14,7 +14,7 @@ import (
 func TestTermSetMatchesASearchPerTerm(t *testing.T) {
 	stems := []string{"сервер", "ошибк", "мост", "при"}
 	suffixes := []string{"", "а", "у", "ом", "ами", "ах", "ов", "е", "и", "ы", "ей", "ями"}
-	var terms []string
+	terms := make([]string, 0, len(suffixes)*len(stems)+5)
 	for _, s := range stems {
 		for _, x := range suffixes {
 			terms = append(terms, s+x)
@@ -53,7 +53,7 @@ func TestTermSetMatchesASearchPerTerm(t *testing.T) {
 // One search over the text per stem, not per form: a message that does not
 // hold «сервер» is not searched again for «серверами».
 func TestTermSetSearchesOncePerStem(t *testing.T) {
-	var terms []string
+	terms := make([]string, 0, 27)
 	for _, stem := range []string{"сервер", "кластер", "запрос"} {
 		for _, x := range []string{"", "а", "у", "ом", "ами", "ах", "ов", "е", "ы"} {
 			terms = append(terms, stem+x)

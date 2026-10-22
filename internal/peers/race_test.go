@@ -35,7 +35,7 @@ func TestConcurrentRecordsKeepEveryMachine(t *testing.T) {
 
 	got := Load()
 	if len(got) != len(hosts) {
-		var names []string
+		names := make([]string, 0, len(got))
 		for _, p := range got {
 			names = append(names, p.Host)
 		}

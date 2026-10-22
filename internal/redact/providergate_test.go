@@ -11,7 +11,7 @@ import (
 // necessary condition rather than a heuristic: whenever the regex matches, the
 // gate must have passed.
 func TestProviderGateNeverHidesAMatch(t *testing.T) {
-	rng := rand.New(rand.NewSource(20260813))
+	rng := rand.New(rand.NewSource(20260813)) //nolint:gosec // seeded so a failure reproduces
 	// Fragments that land on and around every alternative in the pattern,
 	// including the prefixes the gate was tightened to, near-misses of them,
 	// and values just under and just over the length each one requires.

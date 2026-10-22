@@ -23,7 +23,7 @@ import (
 func TestTheSnippetComesFromTheMessageThatEarnedTheRank(t *testing.T) {
 	// The filler words have to be common across the returned set for this to be
 	// the real situation; a term is only worth little because everything has it.
-	var sessions []model.Session
+	sessions := make([]model.Session, 0, 7)
 	for i := range 6 {
 		sessions = append(sessions, model.Session{
 			ID: string(rune('a' + i)), Harness: "claude", Project: "p",

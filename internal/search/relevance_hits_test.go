@@ -46,7 +46,7 @@ func TestRelevanceHitsKeepsTheIndexOrder(t *testing.T) {
 // session that mentions a term in every message must not spend the whole
 // screen on one result.
 func TestRelevanceHitsCapsSnippets(t *testing.T) {
-	var msgs []model.Message
+	msgs := make([]model.Message, 0, 10)
 	for range 10 {
 		msgs = append(msgs, msg("the etag check failed again"))
 	}

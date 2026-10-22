@@ -30,7 +30,7 @@ func TestAPathIsNotRedactedAsASecret(t *testing.T) {
 // blob is not rooted, and anything carrying '=' or ':' is an assignment, a
 // scheme or base64 padding rather than a bare path.
 func TestThePathExemptionDoesNotCoverBlobs(t *testing.T) {
-	for name, tok := range map[string]string{
+	for name, tok := range map[string]string{ //nolint:gosec // fake tokens the test redacts
 		"base64 with slashes":  "dGhpcy9pcy9hL2Jsb2IvY29udGVudA==",
 		"rooted assignment":    "/etc/key=aB3dEf9hIjKlMnOpQrStUvWxYz012345",
 		"url with credentials": "https://user:aB3dEf9hIjKlMnOpQrStUvWx@example.com/path",

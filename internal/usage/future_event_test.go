@@ -64,7 +64,7 @@ func TestTodayRawIgnoresTheFuture(t *testing.T) {
 	if _, err := f.Write(append(b, '\n')); err != nil {
 		t.Fatal(err)
 	}
-	f.Close()
+	_ = f.Close()
 	if got := TodayRaw(dir); got != 5000 {
 		t.Errorf("TodayRaw = %d, want 5000", got)
 	}

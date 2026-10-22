@@ -148,7 +148,7 @@ func main() {
 
 	cases, controls := collect(ss)
 	population := map[string]int{"denial": len(cases), "control": len(controls)}
-	rng := rand.New(rand.NewSource(*seed))
+	rng := rand.New(rand.NewSource(*seed)) //nolint:gosec // seeded sample, not a secret
 	cases = sample(rng, cases, *limit)
 	controls = sample(rng, controls, *control)
 
@@ -171,10 +171,11 @@ type turn struct {
 }
 
 func loadCorpus() []model.Session {
-	var ss []model.Session
-	ss = append(ss, sources.LoadClaude()...)
-	ss = append(ss, sources.LoadCodex()...)
-	ss = append(ss, sources.LoadOpencode()...)
+	claude, codex, opencode := sources.LoadClaude(), sources.LoadCodex(), sources.LoadOpencode()
+	ss := make([]model.Session, 0, len(claude)+len(codex)+len(opencode))
+	ss = append(ss, claude...)
+	ss = append(ss, codex...)
+	ss = append(ss, opencode...)
 	return ss
 }
 
@@ -248,7 +249,7 @@ func judge(dir string, t turn, arm, rule string) verdict {
 	v := verdict{arm: arm, query: t.antecedent, session: t.session.ID, harness: t.session.Harness, whenTurn: t.when}
 	entity, from := deniedEntity(t, rule)
 	if rule == "rare" {
-		entity, from = rareQuestionTerm(dir, t)
+		entity, from = rareQuestionTerm(dir, t), "question"
 	}
 	v.from = from
 	if entity == "" {
@@ -293,10 +294,10 @@ const rareIDFFloor = 3.0
 // rareQuestionTerm is the antecedent's rarest word that the store itself
 // weighs as identifying. Same rule in both arms, so the control measures the
 // same thing.
-func rareQuestionTerm(dir string, t turn) (string, string) {
+func rareQuestionTerm(dir string, t turn) string {
 	terms := identifying(prompt.Terms(t.antecedent))
 	if len(terms) == 0 {
-		return "", "question"
+		return ""
 	}
 	res, err := index.SearchWithRecoveryDetailed(dir, query.Options{
 		Query:           t.antecedent,
@@ -306,7 +307,7 @@ func rareQuestionTerm(dir string, t turn) (string, string) {
 		Now:             t.when,
 	}, nil)
 	if err != nil {
-		return "", "question"
+		return ""
 	}
 	best, bestIDF := "", rareIDFFloor
 	for _, term := range terms {
@@ -314,7 +315,7 @@ func rareQuestionTerm(dir string, t turn) (string, string) {
 			best, bestIDF = term, w
 		}
 	}
-	return best, "question"
+	return best
 }
 
 // named is what a denial sentence points at: a backticked or quoted name, or
@@ -460,7 +461,10 @@ func report(vs []verdict, sessions int, population map[string]int, quote, asJSON
 	if asJSON {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
-		_ = enc.Encode(out)
+		if err := enc.Encode(out); err != nil {
+			fmt.Fprintln(os.Stderr, "denialrate:", err)
+			os.Exit(1)
+		}
 		return
 	}
 	fmt.Printf("sessions read: %d\n\n", sessions)

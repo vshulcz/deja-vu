@@ -53,7 +53,7 @@ func main() {
 		}
 		var ds []time.Duration
 		hits := 0
-		for i := 0; i < *runs; i++ {
+		for range *runs {
 			start := time.Now()
 			r, err := index.Search(dir, o)
 			ds = append(ds, time.Since(start))

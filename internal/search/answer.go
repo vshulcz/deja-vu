@@ -8,7 +8,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
-// answerAfter returns the assistant reply that followed a matched user turn,
+// AnswerAfter returns the assistant reply that followed a matched user turn,
 // trimmed to the part worth carrying.
 //
 // A recall query describes a symptom, so the user turn always scores highest on
@@ -87,7 +87,7 @@ func carriesDecisionSentence(low string) bool {
 	return false
 }
 
-// decisionText picks the sentence that records the outcome, falling back to the
+// DecisionText picks the sentence that records the outcome, falling back to the
 // opening of the reply. A reply is usually diagnosis-first, so the opening is a
 // reasonable second choice — but a decision sentence anywhere in it beats it.
 func DecisionText(text string) string {
@@ -173,7 +173,7 @@ func isBoundary(b byte) bool { return b == ' ' || b == '\n' || b == '\t' }
 func splitSentences(text string) []string {
 	var out []string
 	start := 0
-	for i := 0; i < len(text); i++ {
+	for i := range len(text) {
 		if text[i] != '.' && text[i] != '!' && text[i] != '?' && text[i] != '\n' {
 			continue
 		}

@@ -49,7 +49,7 @@ func TestEveryNameLandsInExactlyOneShard(t *testing.T) {
 	// Names the scanner never saw must land somewhere too: a test it misses
 	// still has to run.
 	probe := append([]string{}, names...)
-	rng := rand.New(rand.NewSource(1))
+	rng := rand.New(rand.NewSource(1)) //nolint:gosec // seeded test input
 	const alphabet = "09AZ_azé日"
 	for range 2000 {
 		b := []rune(names[rng.Intn(len(names))])
@@ -183,8 +183,9 @@ func TestAtOrAfterAgreesWithStringOrder(t *testing.T) {
 
 func TestTopLevelSkipsMethodsAndHelpers(t *testing.T) {
 	src := "func TestA(t *testing.T) {}\nfunc (s) TestB() {}\nfunc helper() {}\nfunc FuzzC(f *testing.F) {}\nfunc ExampleD() {}\n  func TestIndented() {}\nfunc TestG[T any](t *testing.T) {}\n"
-	var got []string
-	for _, m := range topLevel.FindAllStringSubmatch(src, -1) {
+	matches := topLevel.FindAllStringSubmatch(src, -1)
+	got := make([]string, 0, len(matches))
+	for _, m := range matches {
 		got = append(got, m[1])
 	}
 	want := []string{"TestA", "FuzzC", "ExampleD", "TestG"}

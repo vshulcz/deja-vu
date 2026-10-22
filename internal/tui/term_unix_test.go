@@ -3,6 +3,7 @@
 package tui
 
 import (
+	"errors"
 	"os"
 	"strings"
 	"syscall"
@@ -59,7 +60,7 @@ func TestReadLoopAndClose(t *testing.T) {
 	if ev := next(t, term); ev.Kind != EvResize || ev.W != 80 || ev.H != 24 {
 		t.Errorf("resize = %+v", ev)
 	}
-	w.Close()
+	_ = w.Close()
 	term.Close()
 	term.Close()
 	if !restored {
@@ -95,7 +96,7 @@ func TestReadLoopWaitsForASlowPaste(t *testing.T) {
 	if ev := next(t, term); ev.Kind != EvPaste || ev.Text != "line one\rrm -rf x\r" {
 		t.Errorf("slow paste = %+v", ev)
 	}
-	w.Close()
+	_ = w.Close()
 	close(term.stop)
 	term.wg.Wait()
 }
@@ -105,13 +106,13 @@ func TestOpenRefusesAFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := makeRaw(f, f); err != ErrNotTerminal {
+	if _, err := makeRaw(f, f); !errors.Is(err, ErrNotTerminal) {
 		t.Errorf("makeRaw on a file = %v", err)
 	}
 	old := os.Stdout
 	os.Stdout = f
 	defer func() { os.Stdout = old }()
-	if _, err := Open(); err != ErrNotTerminal {
+	if _, err := Open(); !errors.Is(err, ErrNotTerminal) {
 		t.Errorf("Open with a file for stdout = %v", err)
 	}
 }

@@ -15,7 +15,7 @@ import (
 // that matched — its own excerpts are in `snippets`, and `show --json` is the
 // surface for a whole session (#3620).
 func TestAJSONHitCarriesTheMatchedPassagesOnly(t *testing.T) {
-	var ms []model.Message
+	ms := make([]model.Message, 0, 400)
 	for i := range 400 {
 		text := fmt.Sprintf("ordinary line %d about nothing much", i)
 		if i == 17 || i == 392 {

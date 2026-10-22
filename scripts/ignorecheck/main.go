@@ -40,9 +40,9 @@ func main() {
 		// claim a file that cannot exist.
 		matches, _ := filepath.Glob(filepath.Join("scripts", e.Name(), "*.go"))
 		for _, m := range matches {
-			b, err := os.ReadFile(m)
-			if err != nil {
-				fmt.Fprintln(os.Stderr, err)
+			b, rerr := os.ReadFile(m)
+			if rerr != nil {
+				fmt.Fprintln(os.Stderr, rerr)
 				os.Exit(1)
 			}
 			if mainPackage.Match(b) {

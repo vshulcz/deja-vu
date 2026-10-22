@@ -225,8 +225,8 @@ func CutRight(s string, width int) string {
 	s = nfcfold.Compose(s)
 	n := 0
 	runes := []rune(s)
-	for i, rune := range slices.Backward(runes) {
-		w := RuneColumns(rune)
+	for i, r := range slices.Backward(runes) {
+		w := RuneColumns(r)
 		if n+w > width {
 			return string(runes[i+1:])
 		}

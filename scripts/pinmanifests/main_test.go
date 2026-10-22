@@ -135,11 +135,11 @@ func TestRenderScoopIsStableAndComplete(t *testing.T) {
 	if m["version"] != "1.2.3" || m["bin"] != "deja.exe" || m["checkver"] != "github" {
 		t.Fatalf("manifest lost a field: %v", m)
 	}
-	arch := m["architecture"].(map[string]any)
-	if arch["64bit"].(map[string]any)["hash"] != p.amd64 {
+	arch := objAt(t, m, "architecture")
+	if objAt(t, arch, "64bit")["hash"] != p.amd64 {
 		t.Fatal("64bit hash is not the amd64 one")
 	}
-	if arch["arm64"].(map[string]any)["hash"] != p.arm64 {
+	if objAt(t, arch, "arm64")["hash"] != p.arm64 {
 		t.Fatal("arm64 hash is not the arm64 one")
 	}
 }
@@ -176,4 +176,13 @@ ShortDescription: memory for coding agents
 	if strings.Contains(got, "v0.0.1") {
 		t.Errorf("a stale tag reference is left behind:\n%s", got)
 	}
+}
+
+func objAt(t *testing.T, m map[string]any, key string) map[string]any {
+	t.Helper()
+	v, ok := m[key].(map[string]any)
+	if !ok {
+		t.Fatalf("%s is a %T, want an object", key, m[key])
+	}
+	return v
 }

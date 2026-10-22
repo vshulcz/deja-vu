@@ -14,6 +14,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -55,8 +56,8 @@ func run() error {
 		return err
 	}
 	var reg registry
-	if err := json.Unmarshal(b, &reg); err != nil {
-		return err
+	if jerr := json.Unmarshal(b, &reg); jerr != nil {
+		return jerr
 	}
 	name := map[string]string{}
 	for _, h := range reg.Harnesses {
@@ -291,8 +292,8 @@ func render(m meta, body string, others []link) string {
 		// The body is HTML this generator built from markdown it escaped on
 		// the way through; the sidebar is built from registry names, escaped
 		// there. Both are already safe, which is what template.HTML asserts.
-		Sidebar: template.HTML(sidebar(m.Slug, others)),
-		Body:    template.HTML(body),
+		Sidebar: template.HTML(sidebar(m.Slug, others)), //nolint:gosec // names are escaped in sidebar
+		Body:    template.HTML(body),                    //nolint:gosec // built from escaped markdown
 	})
 	if err != nil {
 		panic(err)
@@ -333,12 +334,12 @@ func writeSitemap(registryPages []string) error {
 		}
 		text = text[:i] + add.String() + text[i:]
 	}
-	if err := requireFullHistory(); err != nil {
-		return err
+	if herr := requireFullHistory(); herr != nil {
+		return herr
 	}
 	text = dedupe(text)
-	if err := refreshDateModified(); err != nil {
-		return err
+	if derr := refreshDateModified(); derr != nil {
+		return derr
 	}
 	text, err = refreshLastmod(text)
 	if err != nil {
@@ -437,7 +438,7 @@ func refreshDateModified() error {
 			if err != nil {
 				return err
 			}
-			if m := publishedRe.FindSubmatch(b); m != nil && string(m[1]) > day {
+			if m := publishedRe.FindSubmatch(b); len(m) > 1 && string(m[1]) > day {
 				day = string(m[1])
 			}
 			out := modifiedRe.ReplaceAll(b, []byte(`"dateModified": "`+day+`"`))
@@ -513,7 +514,7 @@ func requireFullHistory() error {
 }
 
 func isShallow() (bool, error) {
-	out, err := exec.Command("git", "rev-parse", "--is-shallow-repository").Output()
+	out, err := exec.CommandContext(context.Background(), "git", "rev-parse", "--is-shallow-repository").Output()
 	if err != nil {
 		return false, fmt.Errorf("git rev-parse --is-shallow-repository: %w", err)
 	}

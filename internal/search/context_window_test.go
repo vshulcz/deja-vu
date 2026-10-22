@@ -13,7 +13,7 @@ import (
 // identifying word appears only late. The window must land on the identifying
 // word: that is the one that picked this session out of the index.
 func TestContextWindowPrefersIdentifyingWord(t *testing.T) {
-	var msgs []model.Message
+	msgs := make([]model.Message, 0, 41)
 	for i := range 40 {
 		msgs = append(msgs, model.Message{
 			Role: "user",
@@ -41,7 +41,7 @@ func TestContextWindowPrefersIdentifyingWord(t *testing.T) {
 // sit far enough apart that only one fits the budget.
 func TestContextWindowPrefersTheTurnCoveringTheWholeQuery(t *testing.T) {
 	filler := func(tag string, n int) []model.Message {
-		var out []model.Message
+		out := make([]model.Message, 0, n)
 		for i := range n {
 			out = append(out, model.Message{
 				Role: "user",
@@ -50,7 +50,7 @@ func TestContextWindowPrefersTheTurnCoveringTheWholeQuery(t *testing.T) {
 		}
 		return out
 	}
-	var msgs []model.Message
+	msgs := make([]model.Message, 0, 82)
 	msgs = append(msgs, model.Message{
 		Role: "assistant",
 		Text: "http " + strings.Repeat("http ", 50),

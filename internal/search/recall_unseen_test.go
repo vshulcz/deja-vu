@@ -15,7 +15,7 @@ import (
 // three consecutive starts, one block, three sessions, every time.
 func TestUnseenSessionsOutrankRecency(t *testing.T) {
 	now := time.Now()
-	var ss []model.Session
+	ss := make([]model.Session, 0, 6)
 	for i := range 6 {
 		ss = append(ss, model.Session{
 			ID:      string(rune('a' + i)),
@@ -61,7 +61,7 @@ func TestUnseenSessionsOutrankRecency(t *testing.T) {
 // caller of this builder is untouched.
 func TestNoUnseenSetLeavesTheOrderAlone(t *testing.T) {
 	now := time.Now()
-	var ss []model.Session
+	ss := make([]model.Session, 0, 5)
 	for i := range 5 {
 		ss = append(ss, model.Session{
 			ID:      string(rune('a' + i)),
