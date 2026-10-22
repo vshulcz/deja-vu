@@ -333,7 +333,7 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | Reasonix | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | zstd for 1.x sessions |
 | TRAE CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
 | Muse Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
-| MiniMax Code | ✅ | ✅ | ✅ | ✕ | ✕ | ✅ | the MiniMax Code CLI (`mcode`) for `deja handoff --to mcode --exec` |
+| MiniMax Code | ✅ | ✅ | ✅ | ✕ | ✅ | ✅ | the MiniMax Code CLI (`mcode`) for `deja resume` and `deja handoff --to mcode --exec` |
 
 ✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ waiting on the harness itself &middot; ? not investigated
 

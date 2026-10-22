@@ -67,10 +67,26 @@
 <p>words the person never said.</p>
 <p>A person&#39;s turn does not hold only what the person wrote. The runtime</p>
 <p>assembles the turn around it: the agent banner, the permission notice, the</p>
-<p>skill catalogue, the media reminder. <code>canonicalTextRange</code> says which part of</p>
-<p>that text was typed, and deja keeps that part alone — the rest is the</p>
-<p>harness talking to itself, and indexing it would put the runtime&#39;s own words</p>
-<p>at the head of every session on the machine.</p>
+<p>skill catalogue, the media reminder. deja reads the typed part the way the</p>
+<p>runtime itself reads it back:</p>
+<ol>
+<li><code>genuineUserQueryText</code>, when the turn has it, is the typed text. The runtime</li>
+</ol>
+<p>writes it, beside an empty <code>canonicalTextRange</code>, whenever the typed text is</p>
+<p>not the tail of the assembled one.</p>
+<ol>
+<li>Otherwise <code>canonicalTextRange</code> (UTF-16 offsets) is cut out of every text</li>
+</ol>
+<p>block joined with a newline.</p>
+<ol>
+<li>Otherwise the turn is the assembled text without its <code>&lt;system-reminder&gt;</code></li>
+</ol>
+<p>and <code>&lt;background-task-finished&gt;</code> blocks, and a turn that opens</p>
+<p><code>[System CronTask …]</code> or <code>[Cron Report …]</code> is a scheduled task, not a person.</p>
+<p>A <code>user</code> line that carries <code>archonCompaction</code> is a compaction marker, not a</p>
+<p>turn. Its <code>summary</code> is indexed under the summary role, except for the marker a</p>
+<p>migration leaves when the older history could not be recovered</p>
+<p>(<code>archonLegacyContextBoundary</code>), which says only that.</p>
 <p>The <code>thinking</code> block is the model reasoning out loud, not what it told the</p>
 <p>person, so it stays out of the transcript the way it does in every other</p>
 <p>harness here.</p>
@@ -78,12 +94,15 @@
 <p>the session&#39;s own file activity was — the same evidence the other harnesses</p>
 <p>without a recorded cwd are filed under.</p>
 <p>The session id is the one <code>manifest.json</code> records; the directory name carries</p>
-<p>it base64-encoded, and is read when the manifest is missing.</p>
-<p><strong>Last verified:</strong> 2026-10-20</p>
+<p>it base64url-encoded, and is read when the manifest is missing.</p>
+<p><strong>Last verified:</strong> 2026-10-22</p>
 <h2 id="sources">Sources</h2>
-<p>The shape was read off MiniMax Code&#39;s own local runtime v2 sessions</p>
-<p>(<code>~/.minimax/v2/sessions</code>), not off documentation: the runtime ships no</p>
-<p>published format for its transcripts. The fixture is synthetic.</p>
+<p>The layout was read off MiniMax Code&#39;s own local runtime v2 sessions</p>
+<p>(<code>~/.minimax/v2/sessions</code>); the runtime ships no published format for its</p>
+<p>transcripts. The user-text rules, the compaction marker, the base64url</p>
+<p>directory name and <code>--session</code> were checked against the shipped bundle,</p>
+<p><code>@minimax-ai/code</code> 0.6.12 (<code>J4n</code>, <code>bK</code>, <code>KJ</code>, <code>JDe</code> in its chunks). The fixture</p>
+<p>is synthetic.</p>
 <h2 id="wiring">Wiring</h2>
 <p><code>deja install mcode</code> writes the server into <code>~/.minimax/mcp.json</code>, the file</p>
 <p>MCode&#39;s own MCP page writes:</p>
@@ -107,6 +126,9 @@
 <p><code>deja handoff --to mcode --exec</code> runs the MiniMax Code CLI with the digest as</p>
 <p>its first prompt. The desktop app is not a command line, so the handoff needs</p>
 <p>the CLI (<code>mcode</code>) on the machine.</p>
+<p><code>deja resume &lt;id&gt;</code> prints <code>mcode --session &lt;id&gt;</code>, which opens the session by</p>
+<p>the id its manifest records. The runtime keeps the session&#39;s workspace in its</p>
+<p>own database, so no directory comes with it.</p>
 
 <hr>
 <p>deja reads this format and 42 others, and turns what it finds into memory your

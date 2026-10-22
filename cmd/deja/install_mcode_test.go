@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/model"
 )
 
 // The package MCode loads: a manifest, the hook document, and the icon the
@@ -201,5 +203,14 @@ func TestMcodeAutoNamesEveryFileItWrote(t *testing.T) {
 		if !strings.Contains(out, shortHome(p)) {
 			t.Errorf("the report does not name %s:\n%s", shortHome(p), out)
 		}
+	}
+}
+
+// `mcode --session <id>` opens a session by the manifest's id (0.6.12
+// --help); the registry used to call resume impossible (#5593).
+func TestMcodeResumeOpensTheSessionByID(t *testing.T) {
+	dir, cmd, err := resumeCommand(model.Session{Harness: "mcode", ID: "mvs_0f1e2d3c", Project: "p"})
+	if err != nil || dir != "" || cmd != "mcode --session mvs_0f1e2d3c" {
+		t.Fatalf("resume = %q %q %v", dir, cmd, err)
 	}
 }

@@ -3600,25 +3600,21 @@
         "fixtures/registry/mcode/v2/sessions/2026/10/20/02-57-27-477-session_bXZzXzBmMWUyZDNjNGI1YTY5Nzg4Nzk2YTViNGMzZDJlMWYw/messages.jsonl"
       ],
       "parser_source": "internal/sources/mcode.go",
-      "last_verified": "2026-10-20",
+      "last_verified": "2026-10-22",
       "display_name": "MiniMax Code",
       "capabilities": {
         "mcp": true,
         "auto": true,
         "skill": true,
         "command": false,
-        "resume": false,
+        "resume": true,
         "handoff": "exec",
-        "prereq": "the MiniMax Code CLI (`mcode`) for `deja handoff --to mcode --exec`"
+        "prereq": "the MiniMax Code CLI (`mcode`) for `deja resume` and `deja handoff --to mcode --exec`"
       },
       "gaps": {
         "command": {
           "state": "impossible",
           "why": "No slash-command surface for a third party: the V1 plugin package carries skills, agents, hooks and scripts, and the manifest has no field for a command, so a /deja command has nowhere to be written (MiniMax plugin reference, package structure and manifest fields)."
-        },
-        "resume": {
-          "state": "impossible",
-          "why": "MiniMax Code has no command that reopens a session from outside the app: a conversation is picked from the desktop app's own task panel, and the runtime's session id is an argument no documented entry point takes, so `deja resume` can name the session but cannot hand back a command that opens it."
         }
       },
       "surfaces": {

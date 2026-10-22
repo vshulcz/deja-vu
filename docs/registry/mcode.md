@@ -39,10 +39,22 @@ words the person never said.
 
 A person's turn does not hold only what the person wrote. The runtime
 assembles the turn around it: the agent banner, the permission notice, the
-skill catalogue, the media reminder. `canonicalTextRange` says which part of
-that text was typed, and deja keeps that part alone — the rest is the
-harness talking to itself, and indexing it would put the runtime's own words
-at the head of every session on the machine.
+skill catalogue, the media reminder. deja reads the typed part the way the
+runtime itself reads it back:
+
+1. `genuineUserQueryText`, when the turn has it, is the typed text. The runtime
+   writes it, beside an empty `canonicalTextRange`, whenever the typed text is
+   not the tail of the assembled one.
+2. Otherwise `canonicalTextRange` (UTF-16 offsets) is cut out of every text
+   block joined with a newline.
+3. Otherwise the turn is the assembled text without its `<system-reminder>`
+   and `<background-task-finished>` blocks, and a turn that opens
+   `[System CronTask …]` or `[Cron Report …]` is a scheduled task, not a person.
+
+A `user` line that carries `archonCompaction` is a compaction marker, not a
+turn. Its `summary` is indexed under the summary role, except for the marker a
+migration leaves when the older history could not be recovered
+(`archonLegacyContextBoundary`), which says only that.
 
 The `thinking` block is the model reasoning out loud, not what it told the
 person, so it stays out of the transcript the way it does in every other
@@ -53,15 +65,18 @@ the session's own file activity was — the same evidence the other harnesses
 without a recorded cwd are filed under.
 
 The session id is the one `manifest.json` records; the directory name carries
-it base64-encoded, and is read when the manifest is missing.
+it base64url-encoded, and is read when the manifest is missing.
 
-**Last verified:** 2026-10-20
+**Last verified:** 2026-10-22
 
 ## Sources
 
-The shape was read off MiniMax Code's own local runtime v2 sessions
-(`~/.minimax/v2/sessions`), not off documentation: the runtime ships no
-published format for its transcripts. The fixture is synthetic.
+The layout was read off MiniMax Code's own local runtime v2 sessions
+(`~/.minimax/v2/sessions`); the runtime ships no published format for its
+transcripts. The user-text rules, the compaction marker, the base64url
+directory name and `--session` were checked against the shipped bundle,
+`@minimax-ai/code` 0.6.12 (`J4n`, `bK`, `KJ`, `JDe` in its chunks). The fixture
+is synthetic.
 
 ## Wiring
 
@@ -93,3 +108,7 @@ which is the only place that runtime reads it from.
 `deja handoff --to mcode --exec` runs the MiniMax Code CLI with the digest as
 its first prompt. The desktop app is not a command line, so the handoff needs
 the CLI (`mcode`) on the machine.
+
+`deja resume <id>` prints `mcode --session <id>`, which opens the session by
+the id its manifest records. The runtime keeps the session's workspace in its
+own database, so no directory comes with it.
