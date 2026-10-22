@@ -362,28 +362,50 @@ func jsoncCutListStrings(text string, at [2]int, match func(string) bool) (strin
 			i = end - 1
 		}
 	}
+	space := func(c byte) bool { return c == ' ' || c == '\t' }
 	for k := len(hits) - 1; k >= 0; k-- {
 		from, to := hits[k][0], hits[k][1]
-		if p := prevSig(from); blank[p] == ',' {
-			// The comma before it, and the space between.
-			from = p
-		} else {
-			// The first element: the comma after it, and the space up to the
-			// next one.
-			j := to
-			for j < at[1]-1 && (blank[j] == ' ' || blank[j] == '\t' || blank[j] == '\n' || blank[j] == '\r') {
-				j++
-			}
-			if blank[j] == ',' {
-				to = j + 1
-				for to < at[1]-1 && (blank[to] == ' ' || blank[to] == '\t') {
-					to++
-				}
-			}
+		comma := -1
+		j := to
+		for j < at[1]-1 && (space(blank[j]) || blank[j] == '\n' || blank[j] == '\r') {
+			j++
 		}
+		if blank[j] == ',' {
+			// The comma after it, and the space up to the next element.
+			to = j + 1
+			for to < at[1]-1 && space(text[to]) {
+				to++
+			}
+		} else if p := prevSig(from); blank[p] == ',' {
+			// The last element: the comma before it goes, and only the
+			// comma. A comment the reader put between it and deja's entry
+			// is theirs and stays where they wrote it.
+			comma = p
+		}
+		// The entry's line goes whole when nothing else is left on it.
+		s, e := from, to
+		for s > 0 && space(text[s-1]) {
+			s--
+		}
+		for e < len(text) && space(text[e]) {
+			e++
+		}
+		if s > 0 && text[s-1] == '\n' && e < len(text) && (text[e] == '\n' || text[e] == '\r') {
+			if text[e] == '\r' && e+1 < len(text) && text[e+1] == '\n' {
+				e++
+			}
+			from, to = s, e+1
+		} else if comma >= 0 {
+			from = s
+		}
+		cut := to - from
 		text = text[:from] + text[to:]
+		if comma >= 0 {
+			text = text[:comma] + text[comma+1:]
+			cut++
+		}
 		blank = stripJSONComments(text)
-		at[1] -= to - from
+		at[1] -= cut
 	}
 	return text, nil
 }
