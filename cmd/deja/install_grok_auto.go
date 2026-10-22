@@ -53,8 +53,8 @@ func installGrokAuto(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	if remove {
-		if err := os.Remove(path); err != nil {
-			return installResult{}, err
+		if rerr := os.Remove(path); rerr != nil {
+			return installResult{}, rerr
 		}
 		// And the hooks directory deja made for it (#3698).
 		pruneCreatedDir(filepath.Dir(path))
@@ -65,8 +65,8 @@ func installGrokAuto(exe string, uninstall bool) (installResult, error) {
 	}
 	if !uninstall {
 		noteCreatedDirs(filepath.Dir(path))
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			return installResult{}, err
+		if merr := os.MkdirAll(filepath.Dir(path), 0o755); merr != nil {
+			return installResult{}, merr
 		}
 	}
 	a, err := writeIfChanged(path, old, next)
@@ -84,14 +84,14 @@ func grokHooksUpdate(exe string, uninstall bool) (path string, old, next []byte,
 	var root map[string]any
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
-	} else if err := json.Unmarshal(old, &root); err != nil {
+	} else if uerr := json.Unmarshal(old, &root); uerr != nil {
 		if uninstall {
 			// A file deja cannot read is still one the uninstall has to take,
 			// or grok keeps calling a binary wired nowhere else — the contract
 			// TestUninstallStillTakesAHookFileTheInstallWouldRefuse pins.
 			return path, old, nil, true, nil
 		}
-		return path, old, nil, false, configParseError(path, err)
+		return path, old, nil, false, configParseError(path, uerr)
 	}
 	if uninstall {
 		if len(old) == 0 {
@@ -113,11 +113,11 @@ func grokHooksUpdate(exe string, uninstall bool) (path string, old, next []byte,
 		if len(root) == 0 {
 			return path, old, nil, true, nil
 		}
-		next, err := marshalConfigLike(old, root)
-		if err != nil {
-			return path, old, nil, false, err
+		next2, merr := marshalConfigLike(old, root)
+		if merr != nil {
+			return path, old, nil, false, merr
 		}
-		return path, old, append(next, '\n'), false, nil
+		return path, old, append(next2, '\n'), false, nil
 	}
 	// No matcher. Grok's own docs name the session sources `startup` and
 	// `resume`, but 1.0.5 sends `new` for a fresh session and `load` for a

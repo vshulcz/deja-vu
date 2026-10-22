@@ -230,8 +230,8 @@ func TestKimiStatusLineKeepsTheItemsBesideIt(t *testing.T) {
 	if _, err := captureRun(t, "install", "kimi-auto", "--no-index"); err != nil {
 		t.Fatal(err)
 	}
-	if b, _ := os.ReadFile(tui); string(b) != withItems {
-		t.Errorf("reinstall changed the table:\n%s\nwant:\n%s", b, withItems)
+	if b2, _ := os.ReadFile(tui); string(b2) != withItems {
+		t.Errorf("reinstall changed the table:\n%s\nwant:\n%s", b2, withItems)
 	}
 	if _, err := captureRun(t, "uninstall", "kimi-auto"); err != nil {
 		t.Fatal(err)

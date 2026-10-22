@@ -14,7 +14,7 @@ import (
 
 // ranStoreFor writes sessions that all edit one file and all run one command,
 // with the outcome the caller asks for, and returns the built index.
-func ranStoreFor(t *testing.T, cmd string, clean bool, sessions int) string {
+func ranStoreFor(t *testing.T, clean bool, sessions int) string {
 	t.Helper()
 	tmp := hermeticEnv(t)
 	root := filepath.Join(tmp, "claude")
@@ -34,7 +34,7 @@ func ranStoreFor(t *testing.T, cmd string, clean bool, sessions int) string {
 		lines := []string{
 			`{"type":"user","sessionId":"` + sid + `","timestamp":"` + at(300-20*k) + `","cwd":"/work/app","message":{"role":"user","content":"the golden files under internal/store are stale again"}}`,
 			`{"type":"assistant","sessionId":"` + sid + `","timestamp":"` + at(299-20*k) + `","cwd":"/work/app","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/work/app/internal/store/store.go","old_string":"x","new_string":"y"}}]}}`,
-			`{"type":"assistant","sessionId":"` + sid + `","timestamp":"` + at(298-20*k) + `","cwd":"/work/app","message":{"role":"assistant","content":[{"type":"tool_use","id":"c1","name":"Bash","input":{"command":"` + cmd + `"}}]}}`,
+			`{"type":"assistant","sessionId":"` + sid + `","timestamp":"` + at(298-20*k) + `","cwd":"/work/app","message":{"role":"assistant","content":[{"type":"tool_use","id":"c1","name":"Bash","input":{"command":"go test -tags golden ./internal/store"}}]}}`,
 			`{"type":"user","sessionId":"` + sid + `","timestamp":"` + at(297-20*k) + `","cwd":"/work/app","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"c1",` + bad + `"content":"ok"}]}}`,
 			// An inspection command that also passed, which must not be what the
 			// line hands over.
@@ -58,7 +58,7 @@ func ranStoreFor(t *testing.T, cmd string, clean bool, sessions int) string {
 // finding it again is the expensive part: on a 325-file fixture, ten to sixteen
 // reads went into it after the answer had already arrived.
 func TestTheFileLineHandsOverTheCommandThatPassedHere(t *testing.T) {
-	dir := ranStoreFor(t, "go test -tags golden ./internal/store", true, 5)
+	dir := ranStoreFor(t, true, 5)
 	line := fileHookLine(dir, "/work/app", "/work/app/internal/store/store.go")
 	if line == "" {
 		t.Fatal("the fixture produced no line at all")
@@ -80,7 +80,7 @@ func TestTheFileLineHandsOverTheCommandThatPassedHere(t *testing.T) {
 // The claim is that the command passed, so a command the transcript recorded as
 // failing must not become one.
 func TestAFailingCommandIsNotOfferedAsTheWayToCheckAnEdit(t *testing.T) {
-	dir := ranStoreFor(t, "go test -tags golden ./internal/store", false, 5)
+	dir := ranStoreFor(t, false, 5)
 	line := fileHookLine(dir, "/work/app", "/work/app/internal/store/store.go")
 	if strings.Contains(line, "go test -tags golden") {
 		t.Errorf("a command nobody saw pass is offered as one that did:\n  %s", line)
@@ -92,12 +92,12 @@ func TestAFailingCommandIsNotOfferedAsTheWayToCheckAnEdit(t *testing.T) {
 // A file with no such pattern stays silent rather than printing the count the
 // bar exists to withhold.
 func TestBelowTheCountBarTheCommandStandsInForADecision(t *testing.T) {
-	dir := ranStoreFor(t, "go test -tags golden ./internal/store", true, 2)
+	dir := ranStoreFor(t, true, 2)
 	line := fileHookLine(dir, "/work/app", "/work/app/internal/store/store.go")
 	if !strings.Contains(line, "go test -tags golden ./internal/store") {
 		t.Errorf("two sessions that agree on a passing command said nothing:\n  %s", line)
 	}
-	dir = ranStoreFor(t, "go test -tags golden ./internal/store", false, 2)
+	dir = ranStoreFor(t, false, 2)
 	if line := fileHookLine(dir, "/work/app", "/work/app/internal/store/store.go"); line != "" {
 		t.Errorf("a file with no decision and no evidence still produced a line:\n  %s", line)
 	}
@@ -108,7 +108,7 @@ func TestBelowTheCountBarTheCommandStandsInForADecision(t *testing.T) {
 // twice, and counting it twice would put a second session in a sentence that
 // has one.
 func TestOneSessionIsCountedOnceHoweverOftenItIsHandedOver(t *testing.T) {
-	dir := ranStoreFor(t, "go test -tags golden ./internal/store", true, 2)
+	dir := ranStoreFor(t, true, 2)
 	metas := index.FileSessions(dir, "/work/app/internal/store/store.go")
 	if len(metas) != 2 {
 		t.Fatalf("the fixture produced %d sessions", len(metas))
@@ -126,8 +126,8 @@ func TestOneSessionIsCountedOnceHoweverOftenItIsHandedOver(t *testing.T) {
 func TestARedCheckIsSaidAndAGreenOneOutranksIt(t *testing.T) {
 	hermeticEnv(t)
 	dir := t.TempDir()
-	var ss []model.Session
-	var metas []index.SessionMeta
+	ss := make([]model.Session, 0, 2)
+	metas := make([]index.SessionMeta, 0, 2)
 	for i, id := range []string{"r1", "r2"} {
 		ss = append(ss, model.Session{Harness: "codex", ID: id, Messages: []model.Message{
 			{Role: "command", Text: "$ go test ./internal/store  → exit 2"},
@@ -156,6 +156,6 @@ func TestARedCheckIsSaidAndAGreenOneOutranksIt(t *testing.T) {
 }
 
 // at is a fixed clock for the manifest rows these tests build by hand.
-func at(min int) time.Time {
-	return time.Date(2026, 9, 1, 10, min, 0, 0, time.UTC)
+func at(minute int) time.Time {
+	return time.Date(2026, 9, 1, 10, minute, 0, 0, time.UTC)
 }

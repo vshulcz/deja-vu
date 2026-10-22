@@ -188,8 +188,9 @@ func kiroTestAgent(t *testing.T, path string) map[string]any {
 // kiroTestHookExe is the hook binary the install wrote into the agent.
 func kiroTestHookExe(t *testing.T, path string) string {
 	t.Helper()
-	hooks := kiroTestAgent(t, path)["hooks"].(map[string]any)
-	cmd := hooks["agentSpawn"].([]any)[0].(map[string]any)["command"].(string)
+	hooks := typedOrFatal[map[string]any](t, kiroTestAgent(t, path)["hooks"])
+	spawn := typedOrFatal[map[string]any](t, typedOrFatal[[]any](t, hooks["agentSpawn"])[0])
+	cmd := typedOrFatal[string](t, spawn["command"])
 	exe, _, _ := strings.Cut(cmd, " hook-context")
 	return filepath.ToSlash(exe)
 }

@@ -46,8 +46,8 @@ func quoteAll(in []string) []string {
 	return out
 }
 
-func gooseBlockEntry(key, exe string) string {
-	cmd, args := mcpCommandArgs(exe)
+func gooseBlockEntry(key string) string {
+	cmd, args := mcpCommandArgs("/bin/deja")
 	s := "  " + key + "\n    enabled: true\n    type: stdio\n    name: deja\n    cmd: " + yamlQuote(cmd) + "\n    args:\n"
 	var sSb52 strings.Builder
 	for _, a := range args {
@@ -64,10 +64,10 @@ func TestInstallGooseEditsADejaKeySpelledAnyWay(t *testing.T) {
 	const exe = "/bin/deja"
 	mine := "  mine:\n    enabled: true\n    type: stdio\n    name: mine\n    cmd: /opt/mine/server\n    args: []\n"
 	for _, tc := range []struct{ name, entry string }{
-		{"double quoted", gooseBlockEntry(`"deja":`, exe)},
-		{"single quoted", gooseBlockEntry(`'deja':`, exe)},
-		{"comment after", gooseBlockEntry(`deja:   # memory`, exe)},
-		{"space before colon", gooseBlockEntry(`deja :`, exe)},
+		{"double quoted", gooseBlockEntry(`"deja":`)},
+		{"single quoted", gooseBlockEntry(`'deja':`)},
+		{"comment after", gooseBlockEntry(`deja:   # memory`)},
+		{"space before colon", gooseBlockEntry(`deja :`)},
 		{"flow", "  deja: " + gooseFlowEntry(exe) + "\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

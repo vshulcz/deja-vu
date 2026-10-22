@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -254,7 +255,7 @@ func yamlFlowItems(v string) ([]string, bool) {
 	var items []string
 	var cur strings.Builder
 	quote := byte(0)
-	for i := 0; i < len(inner); i++ {
+	for i := range len(inner) {
 		c := inner[i]
 		switch {
 		case quote != 0:
@@ -572,7 +573,7 @@ func cmdAider(dir string, rest []string, sourceInstance string) error {
 			args = append(slices.Clone(rest), aiderReadArgs(rest, wd, aiderContextPath())...)
 		}
 	}
-	cmd := exec.Command(bin, args...)
+	cmd := exec.CommandContext(context.Background(), bin, args...) //nolint:gosec // runs the user's own aider with their arguments
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return runOutlivingSignals(cmd)
 }

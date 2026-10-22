@@ -251,7 +251,7 @@ func docSentences(section string) []string {
 	prose = strings.Join(strings.Fields(prose), " ")
 	var out []string
 	start := 0
-	for i := 0; i < len(prose); i++ {
+	for i := range len(prose) {
 		switch prose[i] {
 		case '.', '!', '?', ';':
 			// A dot inside a backticked name (`recall.since`) does not end a

@@ -29,8 +29,8 @@ func TestGrokAutoWritesEveryHookEvent(t *testing.T) {
 			} `json:"hooks"`
 		} `json:"hooks"`
 	}
-	if err := json.Unmarshal(b, &root); err != nil {
-		t.Fatalf("hooks file is not valid JSON: %v\n%s", err, b)
+	if uerr := json.Unmarshal(b, &root); uerr != nil {
+		t.Fatalf("hooks file is not valid JSON: %v\n%s", uerr, b)
 	}
 	want := map[string]string{
 		"SessionStart":     "hook-context",

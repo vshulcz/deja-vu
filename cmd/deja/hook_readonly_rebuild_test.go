@@ -59,7 +59,7 @@ func TestHookNamesAnUnwritableIndexDirWithoutTheSentinel(t *testing.T) {
 	var resp struct {
 		SystemMessage string `json:"systemMessage"`
 	}
-	if err := json.Unmarshal([]byte(out), &resp); err != nil {
+	if uerr := json.Unmarshal([]byte(out), &resp); uerr != nil {
 		t.Fatalf("hook output is not JSON: %q", out)
 	}
 	if !strings.Contains(resp.SystemMessage, "is not writable") {
@@ -68,14 +68,14 @@ func TestHookNamesAnUnwritableIndexDirWithoutTheSentinel(t *testing.T) {
 
 	// A healthy index in a writable directory keeps its silence: the notice
 	// must not become something every session start carries.
-	if err := os.Chmod(parent, 0o700); err != nil {
-		t.Fatal(err)
+	if cerr := os.Chmod(parent, 0o700); cerr != nil {
+		t.Fatal(cerr)
 	}
-	if err := os.Chmod(dir, 0o700); err != nil {
-		t.Fatal(err)
+	if cerr := os.Chmod(dir, 0o700); cerr != nil {
+		t.Fatal(cerr)
 	}
-	if _, err := captureRunStderr(t, "index"); err != nil {
-		t.Fatal(err)
+	if _, cerr := captureRunStderr(t, "index"); cerr != nil {
+		t.Fatal(cerr)
 	}
 	out, err = captureRun(t, "hook-context")
 	if err != nil {

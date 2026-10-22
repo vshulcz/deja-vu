@@ -50,8 +50,8 @@ func TestCursorEntryDisabledKeyIsNotASwitch(t *testing.T) {
 	var report struct {
 		MCP []doctorMCPStatus `json:"mcp"`
 	}
-	if err := json.Unmarshal([]byte(js), &report); err != nil {
-		t.Fatalf("doctor --json: %v: %s", err, js)
+	if uerr := json.Unmarshal([]byte(js), &report); uerr != nil {
+		t.Fatalf("doctor --json: %v: %s", uerr, js)
 	}
 	seen := false
 	for _, r := range report.MCP {

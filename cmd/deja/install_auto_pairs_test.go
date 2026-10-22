@@ -69,11 +69,11 @@ func installedFiles(t *testing.T, target string) map[string]string {
 	out := map[string]string{}
 	_ = filepath.WalkDir(home, func(path string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
-			return nil
+			return nil //nolint:nilerr // unreadable entries are skipped
 		}
-		b, rerr := os.ReadFile(path)
+		b, rerr := os.ReadFile(path) //nolint:gosec // the walk is over the test's own temp home
 		if rerr != nil {
-			return nil
+			return nil //nolint:nilerr // unreadable files are skipped
 		}
 		rel, rerr := filepath.Rel(home, path)
 		if rerr != nil {

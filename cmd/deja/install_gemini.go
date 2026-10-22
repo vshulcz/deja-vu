@@ -55,7 +55,7 @@ func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 			return installResult{}, err
 		}
 		if statErr != nil {
-			return installResult{Path: dir, Action: "unchanged", Note: note}, nil
+			return installResult{Path: dir, Action: "unchanged", Note: note}, nil //nolint:nilerr // nothing to remove
 		}
 		return installResult{Path: dir, Action: "removed", Note: note}, nil
 	}
@@ -174,7 +174,7 @@ func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 }
 
 func geminiManifest() []byte {
-	b, _ := json.MarshalIndent(map[string]any{
+	b, _ := json.MarshalIndent(map[string]any{ //nolint:errchkjson // a map of strings always marshals
 		"name":        geminiExtensionName,
 		"version":     "0.1.0",
 		"description": "Recall your own past coding sessions before you ask.",
@@ -273,11 +273,11 @@ func restoreGeminiGalleryManifest(dir string) error {
 	bak := manifest + ".bak"
 	b, err := os.ReadFile(manifest)
 	if err != nil || !bytes.Equal(bytes.TrimSpace(b), bytes.TrimSpace(geminiManifest())) {
-		return nil
+		return nil //nolint:nilerr // no gallery manifest of deja's to restore
 	}
 	kept, err := os.ReadFile(bak)
 	if err != nil || !json.Valid(kept) {
-		return nil
+		return nil //nolint:nilerr // no usable backup to restore
 	}
 	if err := os.WriteFile(manifest, kept, 0o644); err != nil {
 		return err
@@ -414,7 +414,7 @@ func disableGeminiHooksIfOurs() error {
 	}
 	var root map[string]any
 	if json.Unmarshal([]byte(jsoncToJSON(string(old))), &root) != nil {
-		return nil
+		return nil //nolint:nilerr // an unparsable file is left to the writer to report
 	}
 	// Only the switch deja wrote: a key the reader added beside it since
 	// makes the object theirs as well.

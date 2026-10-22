@@ -13,7 +13,7 @@ import (
 // that goes quiet about failure is worse than one that prints a line, so the
 // tests below pin both halves.
 
-func indexEnv(t *testing.T) string {
+func indexEnv(t *testing.T) {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", "..", "fixtures", "synthetic", "claude"))
 	if err != nil {
@@ -27,7 +27,6 @@ func indexEnv(t *testing.T) string {
 	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(t.TempDir(), "opencode.db"))
 	dir := filepath.Join(t.TempDir(), "index.db")
 	t.Setenv("DEJA_INDEX_DIR", dir)
-	return dir
 }
 
 func TestIndexQuietSaysNothingOnSuccess(t *testing.T) {

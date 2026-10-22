@@ -48,7 +48,7 @@ func installPiShapedExtension(agentDir, exe string, uninstall bool) (installResu
 	path := filepath.Join(dir, "deja.ts")
 	if uninstall {
 		if _, err := os.Stat(path); err != nil {
-			return installResult{Path: path, Action: "unchanged"}, nil
+			return installResult{Path: path, Action: "unchanged"}, nil //nolint:nilerr // nothing to remove
 		}
 		if err := os.Remove(path); err != nil {
 			return installResult{}, err
@@ -171,8 +171,8 @@ func piProjectTrusted(dir string) bool {
 	if b, err := readConfig(filepath.Join(sources.PiConfigDir(), "trust.json")); err == nil {
 		_ = json.Unmarshal(bytes.TrimPrefix(b, []byte("\xef\xbb\xbf")), &data)
 	}
-	if real, err := filepath.EvalSymlinks(dir); err == nil {
-		dir = real
+	if resolved, err := filepath.EvalSymlinks(dir); err == nil {
+		dir = resolved
 	}
 	for d := filepath.Clean(dir); ; d = filepath.Dir(d) {
 		if v, ok := data[d].(bool); ok {
@@ -220,13 +220,14 @@ func piGlobMatch(glob, name string) bool {
 	for i := 0; i < len(glob); i++ {
 		switch c := glob[i]; c {
 		case '*':
-			if strings.HasPrefix(glob[i:], "**/") {
+			switch {
+			case strings.HasPrefix(glob[i:], "**/"):
 				re.WriteString("(?:.*/)?")
 				i += 2
-			} else if strings.HasPrefix(glob[i:], "**") {
+			case strings.HasPrefix(glob[i:], "**"):
 				re.WriteString(".*")
 				i++
-			} else {
+			default:
 				re.WriteString("[^/]*")
 			}
 		case '?':
@@ -321,8 +322,8 @@ var (
 
 func piVersionAt(bin string) string {
 	var dirs []string
-	if real, err := filepath.EvalSymlinks(bin); err == nil {
-		for d := filepath.Dir(real); len(dirs) < 4; d = filepath.Dir(d) {
+	if resolved, err := filepath.EvalSymlinks(bin); err == nil {
+		for d := filepath.Dir(resolved); len(dirs) < 4; d = filepath.Dir(d) {
 			dirs = append(dirs, d)
 			if filepath.Dir(d) == d {
 				break
@@ -337,14 +338,17 @@ func piVersionAt(bin string) string {
 		if err != nil {
 			continue
 		}
-		var pkg struct{ Name, Version string }
+		var pkg struct {
+			Name    string `json:"name"`
+			Version string `json:"version"`
+		}
 		if json.Unmarshal(b, &pkg) == nil && slices.Contains(piPackages, pkg.Name) {
 			return pkg.Version
 		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, bin, "--version")
+	cmd := exec.CommandContext(ctx, bin, "--version") //nolint:gosec // bin is the pi found on PATH
 	// A wrapper that starts node without exec keeps stdout open after the
 	// kill; WaitDelay stops waiting for it.
 	cmd.WaitDelay = 200 * time.Millisecond

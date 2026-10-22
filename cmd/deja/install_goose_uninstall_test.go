@@ -32,8 +32,8 @@ func TestGooseUninstallNamesThePluginItRemoved(t *testing.T) {
 	if !strings.Contains(said, "removed") {
 		t.Errorf("uninstall did not say the plugin was removed: %q", said)
 	}
-	if _, err := os.Stat(plugin); !os.IsNotExist(err) {
-		t.Errorf("the plugin survived: %v", err)
+	if _, serr := os.Stat(plugin); !os.IsNotExist(serr) {
+		t.Errorf("the plugin survived: %v", serr)
 	}
 
 	// A second uninstall has nothing to remove and must not claim it did.

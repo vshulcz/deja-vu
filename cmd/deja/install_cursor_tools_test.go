@@ -32,8 +32,8 @@ func TestInstallCursorWiresTheMomentOfTheAction(t *testing.T) {
 			Matcher string `json:"matcher"`
 		} `json:"hooks"`
 	}
-	if err := json.Unmarshal(b, &root); err != nil {
-		t.Fatal(err)
+	if uerr := json.Unmarshal(b, &root); uerr != nil {
+		t.Fatal(uerr)
 	}
 	// The tool events carry a matcher, which cursor tests against tool_name,
 	// so deja does not start on every read and grep.
@@ -63,8 +63,8 @@ func TestInstallCursorWiresTheMomentOfTheAction(t *testing.T) {
 		t.Errorf("command = %q, want the same string the claude wiring writes", got)
 	}
 	// And uninstall takes all five back out.
-	if _, err := installCursorHooks("/usr/local/bin/deja", true); err != nil {
-		t.Fatal(err)
+	if _, ierr := installCursorHooks("/usr/local/bin/deja", true); ierr != nil {
+		t.Fatal(ierr)
 	}
 	b2, err := os.ReadFile(path)
 	if err != nil {

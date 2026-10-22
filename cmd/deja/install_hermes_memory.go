@@ -33,7 +33,7 @@ func installHermesMemoryProvider(exe string, uninstall bool) (installResult, err
 	}
 	if uninstall {
 		if _, err := os.Stat(dir); err != nil {
-			return installResult{Path: dir, Action: "unchanged"}, nil
+			return installResult{Path: dir, Action: "unchanged"}, nil //nolint:nilerr // nothing to remove
 		}
 		if err := os.RemoveAll(dir); err != nil {
 			return installResult{}, err
@@ -52,8 +52,8 @@ func installHermesMemoryProvider(exe string, uninstall bool) (installResult, err
 	if err != nil {
 		return installResult{}, err
 	}
-	if _, err := writeIfChanged(manifestPath, oldManifest, []byte(hermesMemoryManifest)); err != nil {
-		return installResult{}, err
+	if _, werr := writeIfChanged(manifestPath, oldManifest, []byte(hermesMemoryManifest)); werr != nil {
+		return installResult{}, werr
 	}
 	codePath := filepath.Join(dir, "__init__.py")
 	oldCode, err := readConfig(codePath)

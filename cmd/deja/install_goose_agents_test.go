@@ -129,8 +129,8 @@ func TestGooseRecallLeavesTheRestOfAgentsAlone(t *testing.T) {
 		t.Errorf("no recall block was added:\n%s", b)
 	}
 
-	if _, err := installGooseAuto("/bin/deja", true); err != nil {
-		t.Fatal(err)
+	if _, ierr := installGooseAuto("/bin/deja", true); ierr != nil {
+		t.Fatal(ierr)
 	}
 	after, err := os.ReadFile(path)
 	if err != nil {

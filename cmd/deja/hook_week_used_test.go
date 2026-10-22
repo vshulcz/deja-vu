@@ -46,7 +46,8 @@ func seedWeekUsedStore(t *testing.T, titles map[string]string, replies ...string
 		writeClaudeFixture(t, filepath.Join(claude, id+".jsonl"), id, []string{user(id, old, title), assistant(id, old, "done")})
 	}
 	const now = "c0ffee00-1111-4222-8333-0000000000d4"
-	lines := []string{user(now, recent, "the auth tests fail again on token expiry")}
+	lines := make([]string, 0, 1+len(replies))
+	lines = append(lines, user(now, recent, "the auth tests fail again on token expiry"))
 	for _, r := range replies {
 		lines = append(lines, assistant(now, recent, r))
 	}

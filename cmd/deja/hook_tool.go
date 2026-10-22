@@ -316,13 +316,14 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 			Context string `json:"context"`
 		}{Version: 1, Context: out})
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // a reply that cannot marshal means no reply
 		}
 		fmt.Fprintln(stdout, string(b))
 		return nil
 	case hookToolCopilot:
 		emitCopilotContext(stdout, out)
 		return nil
+	case hookToolClaude:
 	}
 	var resp sessionStartHookResponse
 	// A host that reads the context only after the tool wants the event
@@ -332,7 +333,7 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 	resp.HookSpecificOutput.AdditionalContext = out
 	b, err := json.Marshal(resp)
 	if err != nil {
-		return nil
+		return nil //nolint:nilerr // a reply that cannot marshal means no reply
 	}
 	fmt.Fprintln(stdout, string(b))
 	return nil
@@ -921,7 +922,7 @@ func normalizedCommandText(cmd string) string {
 	return strings.Join(out, " ")
 }
 
-func fileHookLine(dir, cwd, path string) string {
+func fileHookLine(dir, cwd, path string) string { //nolint:unparam // the cwd is part of the payload it builds
 	return fileHookLineOutside(dir, cwd, path, nil)
 }
 
@@ -1291,11 +1292,11 @@ func baseName(p string) string { return index.CrossBase(p) }
 
 // truncateToolLine caps the line at max bytes on a rune boundary, so a
 // non-ASCII filename near the limit is not split mid-rune into a U+FFFD.
-func truncateToolLine(s string, max int) string {
-	if len(s) <= max {
+func truncateToolLine(s string, limit int) string {
+	if len(s) <= limit {
 		return s
 	}
-	cut := max
+	cut := limit
 	for cut > 0 && !utf8.RuneStart(s[cut]) {
 		cut--
 	}

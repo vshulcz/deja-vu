@@ -55,7 +55,7 @@ func TestTOMLMultilineStringLinesAreText(t *testing.T) {
 				got, _ := os.ReadFile(p)
 				s := string(got)
 				// The string survives whole, and deja's table follows it.
-				str := seed[:strings.Index(seed, "\n\n")]
+				str, _, _ := strings.Cut(seed, "\n\n")
 				if !strings.HasPrefix(s, str+"\n") {
 					t.Errorf("the string changed:\n%s", s)
 				}

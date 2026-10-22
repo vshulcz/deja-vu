@@ -36,11 +36,11 @@ func TestSpaceInTheBinaryPathIsQuotedWhereItMustBe(t *testing.T) {
 
 			_ = filepath.WalkDir(home, func(path string, d os.DirEntry, err error) error {
 				if err != nil || d.IsDir() || strings.HasPrefix(path, filepath.Join(home, "index.db")) {
-					return nil
+					return nil //nolint:nilerr // unreadable entries are skipped
 				}
-				b, rerr := os.ReadFile(path)
+				b, rerr := os.ReadFile(path) //nolint:gosec // the walk is over the test's own temp home
 				if rerr != nil {
-					return nil
+					return nil //nolint:nilerr // unreadable files are skipped
 				}
 				body := string(b)
 				if !strings.Contains(body, "John Smith") {

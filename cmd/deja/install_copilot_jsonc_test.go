@@ -195,7 +195,7 @@ func TestClearingCopilotHooksKeepsTheReadersComment(t *testing.T) {
 		t.Fatal(err)
 	}
 	root := map[string]any{"hooks": map[string]any{"a": []any{map[string]any{"bash": "a && b"}}}}
-	got, err := dropCopilotHooksJSONC(text, was["hooks"].(map[string]any), root)
+	got, err := dropCopilotHooksJSONC(text, typedOrFatal[map[string]any](t, was["hooks"]), root)
 	if err != nil {
 		t.Fatal(err)
 	}

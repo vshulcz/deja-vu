@@ -40,9 +40,9 @@ func TestEveryTargetWritesReadableFiles(t *testing.T) {
 			wrote := 0
 			err := filepath.WalkDir(home, func(path string, d fs.DirEntry, err error) error {
 				if err != nil || d.IsDir() {
-					return nil
+					return nil //nolint:nilerr // unreadable entries are skipped
 				}
-				raw, rerr := os.ReadFile(path)
+				raw, rerr := os.ReadFile(path) //nolint:gosec // the walk is over the test's own temp home
 				if rerr != nil {
 					t.Errorf("%s: unreadable: %v", rel(home, path), rerr)
 					return nil

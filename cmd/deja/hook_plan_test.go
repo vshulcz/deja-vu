@@ -221,7 +221,7 @@ func TestPlanHookBudgetIncludesRecallFrame(t *testing.T) {
 	if len(budgeted) == 0 {
 		t.Fatal("oversized finding was dropped rather than truncated")
 	}
-	var lines []string
+	lines := make([]string, 0, len(budgeted))
 	for _, finding := range budgeted {
 		lines = append(lines, finding.line)
 	}

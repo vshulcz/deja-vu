@@ -83,9 +83,9 @@ func TestHowHonoursTheChannelsOwnPolicy(t *testing.T) {
 	// The other direction, which absence alone cannot prove: with the mcp rule
 	// allowing, the command must come back. Without this the test still passes
 	// if how simply stops answering anyone.
-	if err := os.WriteFile(filepath.Join(cfg, "policy.json"),
-		[]byte(`{"activations":{"mcp":{"local":true},"search":{"local":true}}}`), 0o600); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(filepath.Join(cfg, "policy.json"),
+		[]byte(`{"activations":{"mcp":{"local":true},"search":{"local":true}}}`), 0o600); werr != nil {
+		t.Fatal(werr)
 	}
 	out, err = callMCPTool(dir, "how", json.RawMessage(`{"what":"zonkomatic"}`))
 	if err != nil {

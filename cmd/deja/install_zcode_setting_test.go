@@ -135,8 +135,8 @@ func TestInstallZCodeWritesTheRuntimeSettingFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := json.Unmarshal(b, &cfg); err != nil {
-		t.Fatalf("setting.json is not JSON after install: %v", err)
+	if uerr := json.Unmarshal(b, &cfg); uerr != nil {
+		t.Fatalf("setting.json is not JSON after install: %v", uerr)
 	}
 	if _, ok := cfg.MCP.Servers["deja"]; !ok {
 		t.Errorf("no deja server under mcp.servers in setting.json: %s", b)
@@ -150,7 +150,7 @@ func TestInstallZCodeWritesTheRuntimeSettingFile(t *testing.T) {
 		}
 	}
 	var top map[string]map[string]json.RawMessage
-	if err := json.Unmarshal(b, &top); err == nil {
+	if uerr := json.Unmarshal(b, &top); uerr == nil {
 		if _, ok := top["hooks"]["SessionStart"]; ok {
 			t.Errorf("a hook directly under hooks, where the runtime does not look: %s", b)
 		}
@@ -221,8 +221,8 @@ func TestUninstallZCodePutsTheHooksSwitchBack(t *testing.T) {
 	if !strings.Contains(out, "hooks.enabled") {
 		t.Errorf("install turned on hooks the reader had off and did not say so:\n%s", out)
 	}
-	if _, err := captureRun(t, "uninstall", "zcode-auto"); err != nil {
-		t.Fatalf("uninstall: %v", err)
+	if _, cerr := captureRun(t, "uninstall", "zcode-auto"); cerr != nil {
+		t.Fatalf("uninstall: %v", cerr)
 	}
 	got, err := os.ReadFile(setting)
 	if err != nil {

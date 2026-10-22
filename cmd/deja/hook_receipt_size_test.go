@@ -39,7 +39,7 @@ type hookResp struct {
 	} `json:"hookSpecificOutput"`
 }
 
-func sessionStart(t *testing.T, dir, cwd, session string) hookResp {
+func sessionStart(t *testing.T, _, cwd, _ string) hookResp {
 	t.Helper()
 	t.Setenv("CLAUDE_PROJECT_DIR", cwd)
 	out, err := captureRun(t, "hook-context")

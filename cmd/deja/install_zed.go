@@ -54,8 +54,8 @@ func installZedMCP(path, exe string, uninstall bool) (installResult, error) {
 			return installResult{Path: path, Action: "unchanged"}, nil
 		}
 		noteCreatedDirs(filepath.Dir(path))
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			return installResult{}, err
+		if merr := os.MkdirAll(filepath.Dir(path), 0o755); merr != nil {
+			return installResult{}, merr
 		}
 		fresh := fmt.Sprintf("{\n  %q: {\n    %q: %s\n  }\n}\n", zedServerKey, zedServerID, entry)
 		a, werr := writeIfChanged(path, old, []byte(fresh))
@@ -308,11 +308,11 @@ func zedFindKey(text string, from int, key string) *zedSpan {
 				if open < 0 {
 					return nil
 				}
-				close := zedObjectEnd(text, open)
-				if close < 0 {
+				closeAt := zedObjectEnd(text, open)
+				if closeAt < 0 {
 					return nil
 				}
-				return &zedSpan{keyStart: i, valueOpen: open, valueEnd: close}
+				return &zedSpan{keyStart: i, valueOpen: open, valueEnd: closeAt}
 			}
 			i = end - 1
 		case '{', '[':

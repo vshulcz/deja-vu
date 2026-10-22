@@ -28,12 +28,12 @@ func TestDeepSeekAutoNotesTheFileAndTheFailedCommand(t *testing.T) {
 	calls := filepath.Join(home, "calls")
 	script := "#!/bin/sh\nin=$(cat)\nprintf '%s %s %s\\n' \"$1\" \"$2\" \"$in\" >> " + calls + "\n" +
 		"case \"$1\" in hook-tool) printf 'NOTE about the file' ;; hook-tool-after) printf 'FIX seen before' ;; esac\n"
-	if err := os.WriteFile(stub, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(stub, []byte(script), 0o755); werr != nil {
+		t.Fatal(werr)
 	}
 	plugin := filepath.Join(home, "auto.js")
-	if err := os.WriteFile(plugin, []byte(dshAutoJS(stub)), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(plugin, []byte(dshAutoJS(stub)), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	driver := `
 import plugin from "` + plugin + `";
@@ -55,10 +55,10 @@ show(await post({ name: "pwsh", arguments: { command: "dotnet build" }, agent },
 show(await post({ name: "str_replace_editor", arguments: { command: "str_replace", path: "/w/proj/retry.go" }, agent }, text("edited"), accept));
 `
 	run := filepath.Join(home, "drive.mjs")
-	if err := os.WriteFile(run, []byte(driver), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(run, []byte(driver), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
-	out, err := exec.Command(node, run).CombinedOutput()
+	out, err := exec.CommandContext(t.Context(), node, run).CombinedOutput()
 	if err != nil {
 		t.Fatalf("driving the plugin: %v\n%s", err, out)
 	}
@@ -131,12 +131,12 @@ func TestDeepSeekAutoToolNoteDoesNotBlockTheHost(t *testing.T) {
 	}
 	home := t.TempDir()
 	stub := filepath.Join(home, "deja")
-	if err := os.WriteFile(stub, []byte("#!/bin/sh\ncat >/dev/null\nsleep 0.5\nprintf 'NOTE'\n"), 0o755); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(stub, []byte("#!/bin/sh\ncat >/dev/null\nsleep 0.5\nprintf 'NOTE'\n"), 0o755); werr != nil {
+		t.Fatal(werr)
 	}
 	plugin := filepath.Join(home, "auto.js")
-	if err := os.WriteFile(plugin, []byte(dshAutoJS(stub)), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(plugin, []byte(dshAutoJS(stub)), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	driver := `
 import plugin from "` + plugin + `";
@@ -149,10 +149,10 @@ clearInterval(timer);
 console.log(ticks + " " + (d.additionalContexts || []).length);
 `
 	run := filepath.Join(home, "drive.mjs")
-	if err := os.WriteFile(run, []byte(driver), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(run, []byte(driver), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
-	out, err := exec.Command(node, run).CombinedOutput()
+	out, err := exec.CommandContext(t.Context(), node, run).CombinedOutput()
 	if err != nil {
 		t.Fatalf("driving the plugin: %v\n%s", err, out)
 	}

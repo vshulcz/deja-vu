@@ -48,7 +48,9 @@ func TestAutoRecallLocalOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	enc := json.NewEncoder(f)
-	_ = enc.Encode(index.SyncRecord{Harness: "claude", SessionID: "rem1", Project: "tmp/isoproj", Role: "user", Text: "remote isoproj work", Time: time.Date(2026, 1, 3, 0, 0, 0, 0, time.UTC)})
+	if jerr := enc.Encode(index.SyncRecord{Harness: "claude", SessionID: "rem1", Project: "tmp/isoproj", Role: "user", Text: "remote isoproj work", Time: time.Date(2026, 1, 3, 0, 0, 0, 0, time.UTC)}); jerr != nil {
+		t.Fatal(jerr)
+	}
 	if err := f.Close(); err != nil {
 		t.Fatal(err)
 	}

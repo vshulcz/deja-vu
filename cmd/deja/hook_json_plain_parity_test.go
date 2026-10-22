@@ -55,8 +55,12 @@ func TestJSONReplyCarriesWhatPlainPrints(t *testing.T) {
 	}
 
 	prompt := func(t *testing.T, plain bool) string {
+		t.Helper()
 		cwd := seed(t)
-		payload, _ := json.Marshal(map[string]any{"prompt": "how do we drain the zorbit queue", "cwd": cwd, "session_id": "parity-1"})
+		payload, jerr := json.Marshal(map[string]any{"prompt": "how do we drain the zorbit queue", "cwd": cwd, "session_id": "parity-1"})
+		if jerr != nil {
+			t.Fatal(jerr)
+		}
 		var out bytes.Buffer
 		if err := runHookPromptMode(index.DefaultDir(), bytes.NewReader(payload), &out, plain); err != nil {
 			t.Fatal(err)
@@ -78,8 +82,12 @@ func TestJSONReplyCarriesWhatPlainPrints(t *testing.T) {
 	}
 
 	start := func(t *testing.T, plain bool) string {
+		t.Helper()
 		cwd := seed(t)
-		payload, _ := json.Marshal(map[string]any{"session_id": "parity-2", "cwd": cwd, "source": "startup", "deja_once": true})
+		payload, jerr := json.Marshal(map[string]any{"session_id": "parity-2", "cwd": cwd, "source": "startup", "deja_once": true})
+		if jerr != nil {
+			t.Fatal(jerr)
+		}
 		withHookStdin(t, string(payload))
 		return captureStdout(t, func() { _ = runHookContext(index.DefaultDir(), plain) })
 	}
@@ -103,6 +111,7 @@ func TestJSONReplyCarriesWhatPlainPrints(t *testing.T) {
 // own plain and JSON branch.
 func TestJSONReplyCarriesWhatPlainPrintsForThePacketAndTheNudge(t *testing.T) {
 	packet := func(t *testing.T, shape hookToolShape) string {
+		t.Helper()
 		dir, workspace, _ := prepareCompaction(t)
 		var out bytes.Buffer
 		if delivered, err := emitCompactionRecovery(dir, "compaction-fixture", workspace, "UserPromptSubmit", shape, &out); err != nil || !delivered {

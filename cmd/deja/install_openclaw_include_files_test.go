@@ -64,8 +64,8 @@ func TestOpenClawIncludeRefusalWritesWhatItNames(t *testing.T) {
 				t.Fatalf("the refusal names no MCP entry:\n%s", msg)
 			}
 			var e struct {
-				Command string
-				Args    []string
+				Command string   `json:"command"`
+				Args    []string `json:"args"`
 			}
 			if err := json.Unmarshal([]byte(m[1]), &e); err != nil {
 				t.Fatal(err)
@@ -140,7 +140,10 @@ func TestOpenClawDoctorReadsIncludedWiring(t *testing.T) {
 	dir := filepath.Dir(openclawConfigPath())
 	hook := hookCommandExe(exe)
 	write := func(name string, v any) {
-		b, _ := json.Marshal(v)
+		b, jerr := json.Marshal(v)
+		if jerr != nil {
+			t.Fatal(jerr)
+		}
 		if err := os.WriteFile(filepath.Join(dir, name), b, 0o644); err != nil {
 			t.Fatal(err)
 		}

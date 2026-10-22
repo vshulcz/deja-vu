@@ -378,7 +378,7 @@ func hermesKeyLine(line string) (key, rest string, ok bool) {
 		return "", "", false
 	}
 	quote := byte(0)
-	for i := 0; i < len(t); i++ {
+	for i := range len(t) {
 		switch c := t[i]; {
 		case quote != 0:
 			if c == quote {
@@ -407,7 +407,7 @@ func hermesKeyName(key string) string {
 // or a tab, outside quotes.
 func stripYAMLComment(v string) string {
 	quote := byte(0)
-	for i := 0; i < len(v); i++ {
+	for i := range len(v) {
 		switch c := v[i]; {
 		case quote != 0:
 			if c == quote {

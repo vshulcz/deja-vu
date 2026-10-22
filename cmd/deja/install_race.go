@@ -73,7 +73,7 @@ func changedSinceRead(path string, old []byte) error {
 			return nil
 		}
 	case err != nil:
-		return nil
+		return nil //nolint:nilerr // an unreadable file has nothing to compare against
 	case was != nil && bytes.Equal(now, was):
 		return nil
 	}
@@ -87,4 +87,4 @@ const configRaceRetries = 3
 
 // beforeConfigReplace runs just before writeIfChanged puts its file in place.
 // Tests use it to stand in for a client saving the same config at that moment.
-var beforeConfigReplace = func(path string) {}
+var beforeConfigReplace = func(string) {}

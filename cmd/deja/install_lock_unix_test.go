@@ -57,8 +57,8 @@ func TestTheRepairStandsDownWhileAnInstallHoldsTheLock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(wiringStatePath(), b, 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(wiringStatePath(), b, 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	claudeJSON := filepath.Join(home, ".claude.json")
 	before, err := os.ReadFile(claudeJSON)
@@ -66,8 +66,8 @@ func TestTheRepairStandsDownWhileAnInstallHoldsTheLock(t *testing.T) {
 		t.Fatal(err)
 	}
 	stale := strings.ReplaceAll(string(before), moved, wired.Exe)
-	if err := os.WriteFile(claudeJSON, []byte(stale), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(claudeJSON, []byte(stale), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 
 	holdTheInstallLock(t)

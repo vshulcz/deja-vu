@@ -42,14 +42,14 @@ func TestIndexSaysWhenThereIsNothingToDo(t *testing.T) {
 	// The warmup child runs this command; returning before the sentinel is
 	// cleared leaves a build that is not running (#839).
 	sentinel := filepath.Join(t.TempDir(), "warmup.sentinel")
-	if err := os.WriteFile(sentinel, []byte("1\n"), 0o600); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(sentinel, []byte("1\n"), 0o600); werr != nil {
+		t.Fatal(werr)
 	}
 	t.Setenv("DEJA_WARMUP_SENTINEL", sentinel)
-	if _, err := captureRunStderr(t, "index"); err != nil {
-		t.Fatal(err)
+	if _, cerr := captureRunStderr(t, "index"); cerr != nil {
+		t.Fatal(cerr)
 	}
-	if _, err := os.Stat(sentinel); err == nil {
+	if _, serr := os.Stat(sentinel); serr == nil {
 		t.Error("a run with nothing to do left its warmup sentinel behind")
 	}
 

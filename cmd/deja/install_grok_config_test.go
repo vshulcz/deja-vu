@@ -37,11 +37,11 @@ func TestGrokInstallKeepsGrokDevsSwitch(t *testing.T) {
 
 	// The entry keyed "deja" decides over another labelled deja.
 	both := `{"mcp": {"servers": [{"id": "deja-2", "label": "deja", "command": "/bin/deja", "args": ["mcp"], "enabled": false}, {"id": "deja", "label": "deja", "command": "/bin/deja", "args": ["mcp"], "enabled": true}]}}`
-	if err := os.WriteFile(path, []byte(both), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(path, []byte(both), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
-	if _, err := captureRun(t, "install", "grok", "--no-index"); err != nil {
-		t.Fatal(err)
+	if _, cerr := captureRun(t, "install", "grok", "--no-index"); cerr != nil {
+		t.Fatal(cerr)
 	}
 	if got := grokDevDejaEnabled(t, path); got != true {
 		t.Errorf("enabled = %v, want the id-keyed entry's true", got)
@@ -49,8 +49,8 @@ func TestGrokInstallKeepsGrokDevsSwitch(t *testing.T) {
 
 	// Control: an entry that was on stays on, and nothing is said.
 	seed = strings.Replace(seed, `"enabled": false`, `"enabled": true`, 1)
-	if err := os.WriteFile(path, []byte(seed), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(path, []byte(seed), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	out, err = captureRun(t, "install", "grok", "--no-index")
 	if err != nil {
@@ -136,14 +136,14 @@ func TestGrokRefusesAnUnwritableLaterFileBeforeWriting(t *testing.T) {
 		if err := os.MkdirAll(repo, 0o755); err != nil {
 			t.Fatal(err)
 		}
-		real := filepath.Join(repo, "user-settings.json")
-		if err := os.WriteFile(real, []byte("{\"model\": \"grok-4\"}\n"), 0o644); err != nil {
+		realPath := filepath.Join(repo, "user-settings.json")
+		if err := os.WriteFile(realPath, []byte("{\"model\": \"grok-4\"}\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		if err := os.MkdirAll(sources.GrokHome(), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.Symlink(real, filepath.Join(sources.GrokHome(), "user-settings.json")); err != nil {
+		if err := os.Symlink(realPath, filepath.Join(sources.GrokHome(), "user-settings.json")); err != nil {
 			t.Fatal(err)
 		}
 		if err := os.Chmod(repo, 0o555); err != nil {

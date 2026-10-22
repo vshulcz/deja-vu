@@ -88,7 +88,7 @@ func decodeKeyOrder(dec *json.Decoder) (*keyOrder, error) {
 	}
 	d, ok := tok.(json.Delim)
 	if !ok {
-		return nil, nil
+		return nil, nil //nolint:nilnil // a scalar has no key order, and nil is that order
 	}
 	o := &keyOrder{sub: map[string]*keyOrder{}}
 	for dec.More() {
@@ -211,7 +211,7 @@ func marshalInOrder(v reflect.Value, o *keyOrder) ([]byte, error) {
 		orders := entryOrders(v, o)
 		var b bytes.Buffer
 		b.WriteByte('[')
-		for i := 0; i < v.Len(); i++ {
+		for i := range v.Len() {
 			if i > 0 {
 				b.WriteByte(',')
 			}

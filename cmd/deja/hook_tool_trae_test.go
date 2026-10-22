@@ -28,13 +28,16 @@ func TestTraeEditHookSpeaks(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tool := range []string{"Edit", "Write"} {
-		b, _ := json.Marshal(map[string]any{
+		b, jerr := json.Marshal(map[string]any{
 			"hook_event_name": "PreToolUse",
 			"tool_name":       tool,
 			"tool_input":      map[string]any{"command": tool + " /work/alpha/config.go"},
 			"session_id":      "trae-" + tool,
 			"cwd":             "/work/alpha",
 		})
+		if jerr != nil {
+			t.Fatal(jerr)
+		}
 		out := toolHookRun(t, string(b))
 		if !strings.Contains(out, "config.go") {
 			t.Errorf("%s on a file with history: %q, want the file's line", tool, out)

@@ -87,7 +87,7 @@ func museMCPKey(path string) (string, error) {
 	var root map[string]any
 	if json.Unmarshal([]byte(jsoncToJSON(string(old))), &root) != nil {
 		// Not ours to diagnose here: the writer reports the parse error.
-		return "mcpServers", nil
+		return "mcpServers", nil //nolint:nilerr // the writer reports the parse error
 	}
 	// A key set to null holds no servers, so it counts as absent, as it
 	// does for doctor.

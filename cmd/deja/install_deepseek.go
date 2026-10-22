@@ -830,8 +830,8 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 		// with no end runs to end of file and takes the user's own patch with
 		// it, and uninstall is exactly when someone with a hand-edited file
 		// needs their content left alone (#1701).
-		if err := checkDSHMarkers(lfText(old)); err != nil {
-			return installResult{}, err
+		if cerr := checkDSHMarkers(lfText(old)); cerr != nil {
+			return installResult{}, cerr
 		}
 		rest := stripDSHBlock(lfText(old))
 		if !dshLayerHasEntry(rest) && (strings.TrimSpace(rest) == "" || strings.Contains(string(old), dshArrayNote)) {
@@ -854,20 +854,20 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 				rest += "[]"
 			}
 		}
-		a, err := writeIfChanged(path, old, []byte(rest+"\n"))
-		if err != nil {
-			return installResult{}, err
+		a, werr := writeIfChanged(path, old, []byte(rest+"\n"))
+		if werr != nil {
+			return installResult{}, werr
 		}
 		// The layer stops naming the plugin before the plugin goes, so a
 		// profile is never left pointing at a file that is not there.
-		if err := os.RemoveAll(filepath.Dir(dshCommandPath())); err != nil {
-			return installResult{}, err
+		if reerr := os.RemoveAll(filepath.Dir(dshCommandPath())); reerr != nil {
+			return installResult{}, reerr
 		}
-		if err := removeDSHPackage(dshStatusDir()); err != nil {
-			return installResult{}, err
+		if reerr := removeDSHPackage(dshStatusDir()); reerr != nil {
+			return installResult{}, reerr
 		}
-		if err := removeDSHPackage(dshNotesDir()); err != nil {
-			return installResult{}, err
+		if reerr := removeDSHPackage(dshNotesDir()); reerr != nil {
+			return installResult{}, reerr
 		}
 		// And the plugins directory above it, when deja made it (#3698).
 		pruneCreatedDir(filepath.Dir(filepath.Dir(dshCommandPath())))
@@ -885,8 +885,8 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 	// uninstall, finding no block, left behind (#5182). A layer that already
 	// holds this block is not written at all, so the plugins still refresh.
 	if !bytes.Equal(matchFinalNewline(old, matchLineEndings(old, []byte(patched))), old) {
-		if err := configWritable(path); err != nil {
-			return installResult{}, err
+		if cerr := configWritable(path); cerr != nil {
+			return installResult{}, cerr
 		}
 	}
 	// The note says deja stays off; a row of the user's below the block may
@@ -894,19 +894,19 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 	if note != "" && !dshAnyRowDisabled(patched) {
 		note = ""
 	}
-	if err := yamlWriteBreaks(path, old, []byte(patched)); err != nil {
-		return installResult{}, err
+	if yerr := yamlWriteBreaks(path, old, []byte(patched)); yerr != nil {
+		return installResult{}, yerr
 	}
 	noteCreatedDirs(filepath.Dir(path))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return installResult{}, err
+	if merr := os.MkdirAll(filepath.Dir(path), 0o755); merr != nil {
+		return installResult{}, merr
 	}
 	// The command plugin first: a profile row naming a file that is not there
 	// fails the whole profile load, so the layer is written last.
 	cmdPath := dshCommandPath()
 	noteCreatedDirs(filepath.Dir(cmdPath))
-	if err := os.MkdirAll(filepath.Dir(cmdPath), 0o755); err != nil {
-		return installResult{}, err
+	if merr := os.MkdirAll(filepath.Dir(cmdPath), 0o755); merr != nil {
+		return installResult{}, merr
 	}
 	// The plugins are ES modules, and Node takes a file's module type from the
 	// nearest package.json above it. A home directory whose own package.json
@@ -944,9 +944,9 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 	var foreign []string
 	if withAuto {
 		autoPath := dshAutoPath()
-		oldAuto, err := readConfig(autoPath)
-		if err != nil {
-			return installResult{}, err
+		oldAuto, rerr := readConfig(autoPath)
+		if rerr != nil {
+			return installResult{}, rerr
 		}
 		autoAction, aerr := writeIfChanged(autoPath, oldAuto, []byte(dshAutoJS(hookExe)))
 		if aerr != nil {
@@ -978,14 +978,14 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 			foreign = append(foreign, dshNotesDir())
 		}
 	} else {
-		if err := os.Remove(dshAutoPath()); err != nil && !os.IsNotExist(err) {
-			return installResult{}, err
+		if rerr := os.Remove(dshAutoPath()); rerr != nil && !os.IsNotExist(rerr) {
+			return installResult{}, rerr
 		}
-		if err := removeDSHPackage(dshStatusDir()); err != nil {
-			return installResult{}, err
+		if rerr := removeDSHPackage(dshStatusDir()); rerr != nil {
+			return installResult{}, rerr
 		}
-		if err := removeDSHNotes(); err != nil {
-			return installResult{}, err
+		if rerr := removeDSHNotes(); rerr != nil {
+			return installResult{}, rerr
 		}
 	}
 	a, err := writeIfChanged(path, old, []byte(patched))

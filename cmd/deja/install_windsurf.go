@@ -90,14 +90,14 @@ func installWindsurfRules(uninstall bool) (installResult, error) {
 			return installResult{Path: path, Action: "unchanged"}, nil
 		}
 		if strings.TrimSpace(next) == "" {
-			if err := os.Remove(path); err != nil {
-				return installResult{}, err
+			if rerr := os.Remove(path); rerr != nil {
+				return installResult{}, rerr
 			}
 			pruneCreatedDir(filepath.Dir(path))
 			return installResult{Path: path, Action: "removed"}, nil
 		}
-		a, err := writeIfChanged(path, old, []byte(next))
-		return installResult{Path: path, Action: a}, err
+		a, werr := writeIfChanged(path, old, []byte(next))
+		return installResult{Path: path, Action: a}, werr
 	}
 	if n := utf8.RuneCountInString(next); n > windsurfRulesCap {
 		return installResult{Path: path, Action: "unchanged", Note: windsurfRulesOverNote(n)}, nil

@@ -35,7 +35,7 @@ func installClineAuto(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(dir, "index.js")
 	if uninstall {
 		if _, err := os.Stat(path); err != nil {
-			return installResult{Path: path, Action: "unchanged"}, nil
+			return installResult{Path: path, Action: "unchanged"}, nil //nolint:nilerr // nothing to remove
 		}
 		if err := os.RemoveAll(dir); err != nil {
 			return installResult{}, err
@@ -77,8 +77,8 @@ func installClineAuto(exe string, uninstall bool) (installResult, error) {
 	// uninstall path would not recognise.
 	skill := filepath.Join(dir, "skills", "deja-history")
 	noteCreatedDirs(skill)
-	if err := os.MkdirAll(skill, 0o755); err != nil {
-		return installResult{}, err
+	if merr := os.MkdirAll(skill, 0o755); merr != nil {
+		return installResult{}, merr
 	}
 	oldSkill, err := readConfig(filepath.Join(skill, "SKILL.md"))
 	if err != nil {

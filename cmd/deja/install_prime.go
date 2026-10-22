@@ -55,8 +55,8 @@ func installPrimeMCPAt(path, exe string, uninstall bool) (installResult, error) 
 			return installResult{Path: path, Action: "unchanged"}, nil
 		}
 		root = map[string]any{}
-	} else if err := json.Unmarshal([]byte(jsoncToJSON(string(old))), &root); err != nil {
-		return installResult{}, configParseError(path, err)
+	} else if uerr := json.Unmarshal([]byte(jsoncToJSON(string(old))), &root); uerr != nil {
+		return installResult{}, configParseError(path, uerr)
 	}
 	servers, _ := root["mcpServers"].(map[string]any)
 	if servers == nil {
@@ -94,8 +94,8 @@ func installPrimeMCPAt(path, exe string, uninstall bool) (installResult, error) 
 	}
 	next = append(next, '\n')
 	noteCreatedDirs(filepath.Dir(path))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return installResult{}, err
+	if merr := os.MkdirAll(filepath.Dir(path), 0o755); merr != nil {
+		return installResult{}, merr
 	}
 	a, err := writeIfChanged(path, old, next)
 	return installResult{Path: path, Action: a, Note: note}, err
@@ -127,7 +127,7 @@ func installPrimeExtension(exe string, uninstall bool) (installResult, error) {
 	path := primeExtensionPath()
 	if uninstall {
 		if _, err := os.Stat(path); err != nil {
-			return installResult{Path: path, Action: "unchanged"}, nil
+			return installResult{Path: path, Action: "unchanged"}, nil //nolint:nilerr // nothing to remove
 		}
 		if err := os.Remove(path); err != nil {
 			return installResult{}, err
@@ -141,8 +141,8 @@ func installPrimeExtension(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	noteCreatedDirs(filepath.Dir(path))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return installResult{}, err
+	if merr := os.MkdirAll(filepath.Dir(path), 0o755); merr != nil {
+		return installResult{}, merr
 	}
 	a, err := writeIfChanged(path, old, []byte(primeExtensionTS(exe)))
 	return installResult{Path: path, Action: a}, err

@@ -46,7 +46,7 @@ func installOpenClawHooks(exe string, uninstall bool) (installResult, error) {
 		if err := os.RemoveAll(dir); err != nil {
 			return installResult{}, err
 		}
-		if _, err := setOpenClawHookEnabled(false); err != nil {
+		if err := setOpenClawHookEnabled(false); err != nil {
 			return installResult{}, err
 		}
 		if !had {
@@ -70,7 +70,7 @@ func installOpenClawHooks(exe string, uninstall bool) (installResult, error) {
 		if openclawHooksSwitchOff() {
 			note = "turned hooks.internal.enabled on in " + shortHome(openclawConfigPath()) + ", which was off, so its other hooks run too; uninstall turns it back off"
 		}
-		if _, err := setOpenClawHookEnabled(true); err != nil {
+		if err := setOpenClawHookEnabled(true); err != nil {
 			return installResult{}, err
 		}
 	}
@@ -95,8 +95,8 @@ func writeOpenClawHookFiles(exe string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if _, err := writeIfChanged(docPath, oldDoc, []byte(openclawHookDoc())); err != nil {
-		return "", err
+	if _, werr := writeIfChanged(docPath, oldDoc, []byte(openclawHookDoc())); werr != nil {
+		return "", werr
 	}
 	handlerPath := filepath.Join(dir, "handler.js")
 	oldHandler, err := readConfig(handlerPath)
@@ -143,32 +143,34 @@ func openclawHooksSwitchOff() bool {
 
 // setOpenClawHookEnabled flips hooks.internal.enabled and our entry. Without
 // both, the pack is discovered and listed as ready but never invoked.
-func setOpenClawHookEnabled(on bool) (string, error) {
+func setOpenClawHookEnabled(on bool) error {
 	path := filepath.Join(sources.OpenClawStateDir(), "openclaw.json")
 	old, err := readConfig(path)
 	if err != nil {
-		return "", err
+		return err
 	}
 	var root map[string]any
-	if len(bytes.TrimSpace(old)) == 0 {
+	switch {
+	case len(bytes.TrimSpace(old)) == 0:
 		if !on {
-			return "unchanged", nil
+			return nil
 		}
 		root = map[string]any{}
-	} else if configIsJSONC(old) {
+	case configIsJSONC(old):
 		// A comment is not a broken file, and this writer shares openclaw.json
 		// with the MCP one — so refusing here left a target that wrote half its
 		// wiring, or could not take its own hook back out (#2811).
-		return setOpenClawEntryJSONC(path, old, openclawHookEntries, openclawHookName, openclawHookSwitch, on, nil)
-	} else if json.Unmarshal(old, &root) != nil {
-		return "", openclawParseError(path, old)
+		_, err = setOpenClawEntryJSONC(path, old, openclawHookEntries, openclawHookName, openclawHookSwitch, on, nil)
+		return err
+	case json.Unmarshal(old, &root) != nil:
+		return openclawParseError(path, old)
 	}
 	hooks, _ := root["hooks"].(map[string]any)
 	internal, _ := mapAt(hooks, "internal")
 	entries, _ := mapAt(internal, "entries")
 	if !on {
 		if entries == nil {
-			return "unchanged", nil
+			return nil
 		}
 		delete(entries, openclawHookName)
 		// Leave the user's other hooks alone — and the switch, unless deja is
@@ -216,10 +218,11 @@ func setOpenClawHookEnabled(on bool) (string, error) {
 	}
 	next, err := marshalConfigLike(old, root)
 	if err != nil {
-		return "", err
+		return err
 	}
 	next = append(next, '\n')
-	return writeIfChanged(path, old, next)
+	_, err = writeIfChanged(path, old, next)
+	return err
 }
 
 // hookSwitchKeys name what deja found under the switch, in the wiring state
@@ -313,7 +316,7 @@ func openclawParseError(path string, old []byte) error {
 		var root map[string]any
 		err = json.Unmarshal([]byte(jsoncToJSON(string(old))), &root)
 	}
-	return configParseError(path, fmt.Errorf("%v — OpenClaw reads this file as JSON5, and deja edits it as JSON with comments: quote its keys and strings, or add deja by hand", err))
+	return configParseError(path, fmt.Errorf("%w — OpenClaw reads this file as JSON5, and deja edits it as JSON with comments: quote its keys and strings, or add deja by hand", err))
 }
 
 // setOpenClawEntryJSONC writes one of openclaw's entries — the bootstrap hook,
@@ -457,7 +460,7 @@ func setOpenClawEntryJSONC(path string, old []byte, blockKey, id, flagKey string
 	return writeIfChanged(path, old, []byte(next))
 }
 
-func mapAt(parent map[string]any, key string) (map[string]any, bool) {
+func mapAt(parent map[string]any, key string) (map[string]any, bool) { //nolint:unparam // the comma-ok shape of a lookup
 	if parent == nil {
 		return nil, false
 	}

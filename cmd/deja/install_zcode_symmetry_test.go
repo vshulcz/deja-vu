@@ -58,15 +58,15 @@ func TestUninstallZCodeKeepsWhatTheReaderHad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, b, 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(path, b, 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	for _, target := range []string{"zcode", "zcode-auto"} {
-		if _, err := captureRun(t, "install", target, "--no-index"); err != nil {
-			t.Fatalf("install %s: %v", target, err)
+		if _, cerr := captureRun(t, "install", target, "--no-index"); cerr != nil {
+			t.Fatalf("install %s: %v", target, cerr)
 		}
-		if _, err := captureRun(t, "uninstall", target); err != nil {
-			t.Fatalf("uninstall %s: %v", target, err)
+		if _, cerr := captureRun(t, "uninstall", target); cerr != nil {
+			t.Fatalf("uninstall %s: %v", target, cerr)
 		}
 	}
 	got, err := os.ReadFile(path)

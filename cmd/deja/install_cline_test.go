@@ -115,8 +115,8 @@ func TestInstallClineWritesAPackageManifest(t *testing.T) {
 			Plugins []string `json:"plugins"`
 		} `json:"cline"`
 	}
-	if err := json.Unmarshal(b, &pkg); err != nil {
-		t.Fatalf("package.json: %v\n%s", err, b)
+	if uerr := json.Unmarshal(b, &pkg); uerr != nil {
+		t.Fatalf("package.json: %v\n%s", uerr, b)
 	}
 	if pkg.Name != "deja" || len(pkg.Cline.Plugins) != 1 || pkg.Cline.Plugins[0] != "./index.js" {
 		t.Fatalf("package.json does not name the plugin entry: %s", b)

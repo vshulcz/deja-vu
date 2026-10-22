@@ -24,8 +24,8 @@ func TestInstallWithoutATargetNamesWhatIsHere(t *testing.T) {
 	// Agents present: name them, and the two bulk flags the README uses.
 	home := os.Getenv("HOME")
 	for _, d := range []string{".claude", ".codex"} {
-		if err := os.MkdirAll(filepath.Join(home, d), 0o755); err != nil {
-			t.Fatal(err)
+		if merr := os.MkdirAll(filepath.Join(home, d), 0o755); merr != nil {
+			t.Fatal(merr)
 		}
 	}
 	err = runInstall(t.TempDir(), nil, false)

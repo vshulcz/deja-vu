@@ -72,8 +72,8 @@ func TestInstallDeepSeekWritesTheHomeLayer(t *testing.T) {
 
 	// Uninstall leaves the file loadable rather than empty: a patch file with
 	// nothing in it fails the profile load.
-	if _, err := installDeepSeekMCP("/usr/local/bin/deja", true); err != nil {
-		t.Fatal(err)
+	if _, ierr := installDeepSeekMCP("/usr/local/bin/deja", true); ierr != nil {
+		t.Fatal(ierr)
 	}
 	body, err = os.ReadFile(r.Path)
 	if err != nil {
@@ -164,7 +164,7 @@ func TestInstallDeepSeekWritesTheAutoRecallPlugin(t *testing.T) {
 	if parts := strings.Split(js, `ctx.on("agent/pre-step"`); len(parts) > 2 {
 		t.Errorf("more than one pre-step listener:\n%s", js)
 	} else if len(parts) == 2 {
-		handler := parts[1][:strings.Index(parts[1], "});")]
+		handler, _, _ := strings.Cut(parts[1], "});")
 		if strings.Contains(handler, "messages") || !strings.Contains(handler, "return decision;") {
 			t.Errorf("the plugin injects where the addition is silently dropped:\n%s", handler)
 		}

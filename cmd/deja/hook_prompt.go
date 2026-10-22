@@ -88,7 +88,7 @@ func (i *promptHookInput) adopt() {
 // matches, so both are accepted rather than assumed.
 type hookPromptText string
 
-func (h *hookPromptText) UnmarshalJSON(b []byte) error {
+func (h *hookPromptText) UnmarshalJSON(b []byte) error { //nolint:unparam // json.Unmarshaler fixes the signature
 	var s string
 	if err := json.Unmarshal(b, &s); err == nil {
 		*h = hookPromptText(withoutInjectedContext(s))
@@ -99,7 +99,7 @@ func (h *hookPromptText) UnmarshalJSON(b []byte) error {
 		Text string `json:"text"`
 	}
 	if err := json.Unmarshal(b, &parts); err != nil {
-		return nil // an unknown shape means no prompt, not a broken hook
+		return nil //nolint:nilerr // an unknown shape means no prompt, not a broken hook
 	}
 	var sb strings.Builder
 	for _, p := range parts {
@@ -864,7 +864,7 @@ func matchedTitle(s model.Session, terms []string) string {
 			if tt == "" || strings.HasPrefix(tt, "Exit code") {
 				continue
 			}
-			r := []rune(tt)[0]
+			r, _ := utf8.DecodeRuneInString(tt)
 			alpha := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r >= 0x400
 			if !alpha {
 				continue
@@ -1552,7 +1552,7 @@ func presentableTopic(t string) bool {
 	if digest.IsAgentArtifact(t) {
 		return false
 	}
-	r := []rune(t)[0]
+	r, _ := utf8.DecodeRuneInString(t)
 	if r == '#' || r == '<' || r == '{' || r == '[' {
 		return false
 	}
@@ -1667,7 +1667,7 @@ func parallelChunks(n int, fn func(i int)) {
 
 // densestMessages keeps the cap best messages by how many distinct terms each
 // one carries, in original order so the exchange still reads as a conversation.
-func densestMessages(msgs []model.Message, low, terms []string, cap int) []model.Message {
+func densestMessages(msgs []model.Message, low, terms []string, limit int) []model.Message {
 	type scored struct {
 		i, hits int
 	}
@@ -1686,8 +1686,8 @@ func densestMessages(msgs []model.Message, low, terms []string, cap int) []model
 		}
 	}
 	sort.SliceStable(ranked, func(a, b int) bool { return ranked[a].hits > ranked[b].hits })
-	if len(ranked) > cap {
-		ranked = ranked[:cap]
+	if len(ranked) > limit {
+		ranked = ranked[:limit]
 	}
 	keep := make(map[int]bool, len(ranked))
 	for _, r := range ranked {

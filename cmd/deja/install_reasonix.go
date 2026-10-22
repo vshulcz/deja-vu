@@ -101,7 +101,7 @@ func reasonixManifest(exe string, auto bool) []byte {
 			"capabilities": []string{"interceptors", "ui"},
 		}
 	}
-	b, _ := json.MarshalIndent(m, "", "  ")
+	b, _ := json.MarshalIndent(m, "", "  ") //nolint:errchkjson // strings, bools and maps of them always marshal
 	return append(b, '\n')
 }
 
@@ -204,7 +204,7 @@ func (st reasonixState) marshal() []byte {
 	sort.SliceStable(st.Plugins, func(i, j int) bool {
 		return reasonixEntryName(st.Plugins[i]) < reasonixEntryName(st.Plugins[j])
 	})
-	b, _ := json.MarshalIndent(st, "", "  ")
+	b, _ := json.MarshalIndent(st, "", "  ") //nolint:errchkjson // the entries are raw JSON read from the file
 	return append(b, '\n')
 }
 
@@ -398,8 +398,8 @@ func reasonixSwitchOff() error {
 	}
 	// Through the struct, which marshals in Reasonix's own field order.
 	var rec reasonixEntry
-	if err := json.Unmarshal(st.Plugins[i], &rec); err != nil {
-		return err
+	if uerr := json.Unmarshal(st.Plugins[i], &rec); uerr != nil {
+		return uerr
 	}
 	rec.Enabled = false
 	b, err := json.Marshal(rec)
@@ -471,7 +471,7 @@ func installReasonixViaCLI(cli, src string) error {
 	}()
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, cli, "plugin", "install", src, "--name", reasonixPluginName, "--replace", "--yes")
+	cmd := exec.CommandContext(ctx, cli, "plugin", "install", src, "--name", reasonixPluginName, "--replace", "--yes") //nolint:gosec // cli is the reasonix found on PATH
 	cmd.Env = append(os.Environ(), "REASONIX_HOME="+sources.ReasonixHome())
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -479,7 +479,7 @@ func installReasonixViaCLI(cli, src string) error {
 		if len(tail) > 600 {
 			tail = "…" + tail[len(tail)-600:]
 		}
-		return fmt.Errorf("reasonix plugin install failed: %v: %s", err, tail)
+		return fmt.Errorf("reasonix plugin install failed: %w: %s", err, tail)
 	}
 	return nil
 }
@@ -492,7 +492,10 @@ func installReasonixByHand(files map[string][]byte, st reasonixState, off bool) 
 	}
 	want := wantReasonixEntry()
 	want.Enabled = !off
-	entry, _ := json.Marshal(want)
+	entry, err := json.Marshal(want)
+	if err != nil {
+		return err
+	}
 	if i, _ := st.ours(); i >= 0 {
 		st.Plugins[i] = entry
 	} else {

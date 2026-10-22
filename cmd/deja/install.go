@@ -346,12 +346,13 @@ func runInstall(dir string, args []string, uninstall bool) error {
 		if banner {
 			done = append(done, lineItem{t, r.Action, shortHome(r.Path), r.Note, aside})
 		} else {
-			if uninstall && r.Action == "unchanged" && r.Note == "" && !guidanceMoved {
+			switch {
+			case uninstall && r.Action == "unchanged" && r.Note == "" && !guidanceMoved:
 				// Nothing of deja's was in this agent's files.
 				fmt.Printf("%s: not installed\n", t)
-			} else if r.Path == "" {
+			case r.Path == "":
 				fmt.Printf("%s: %s\n", t, r.Action)
-			} else {
+			default:
 				fmt.Printf("%s: %s %s\n", t, r.Action, shortHome(r.Path))
 			}
 			// Under the action rather than in place of it, the way guidance
@@ -741,7 +742,7 @@ func recurringErrorLine(dir string) string {
 	if r.n < index.FrictionMinSessions {
 		return ""
 	}
-	return fmt.Sprintf("this machine has hit `%s` in %d sessions (%s) — your agent will be told before it runs into it again",
+	return fmt.Sprintf("this machine has hit `%s` in %d sessions (%s) — your agent will be told before it runs into it again", //nolint:gocritic // %#q falls back to double quotes for text with a backquote
 		trimFriction(r.line), r.n, strings.Join(r.harnesses, ", "))
 }
 
@@ -1539,7 +1540,7 @@ func noteCreatedDirs(dir string) {
 // its own back out afterwards without touching one the user made.
 func backupOnce(path string) (bool, error) {
 	if _, err := os.Stat(path); err != nil {
-		return false, nil
+		return false, nil //nolint:nilerr // no file, nothing to back up
 	}
 	bak := path + ".bak"
 	if _, err := os.Stat(bak); err == nil {
@@ -1620,7 +1621,7 @@ func configParseError(path string, err error) error {
 // object over it dropped whatever was there and reported an ordinary write
 // (#2399). A config that will not parse is already refused this way, and the
 // wrong shape is the case where something is actually lost.
-func mcpBlock(root map[string]any, key, path string) (map[string]any, bool, error) {
+func mcpBlock(root map[string]any, key, path string) (map[string]any, bool, error) { //nolint:unparam // the bool says the block exists, which no caller asks yet
 	v, ok := root[key]
 	if !ok || v == nil {
 		return nil, false, nil
@@ -2281,13 +2282,13 @@ func installClaude(exe string, uninstall bool) (installResult, error) {
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
 	} else if configIsJSONC(old) {
-		res, err := writeJSONCEntry(path, old, "mcpServers", mcpServerEntry(exe), uninstall)
+		res, werr := writeJSONCEntry(path, old, "mcpServers", mcpServerEntry(exe), uninstall)
 		if !entrySwitchHonored("claude-code") {
 			res.Note = dropNotePart(res.Note, switchedOffNote)
 		}
-		return res, err
-	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, configParseError(path, err)
+		return res, werr
+	} else if uerr := json.Unmarshal(old, &root); uerr != nil {
+		return installResult{}, configParseError(path, uerr)
 	}
 	m, _, err := mcpBlock(root, "mcpServers", path)
 	if err != nil {
@@ -2374,8 +2375,9 @@ var claudeHookWiring = []struct{ Event, Sub, Matcher string }{
 }
 
 func installClaudeHook(exe string, uninstall bool) (installResult, error) {
-	var events []string
-	for _, h := range claudeWiring() {
+	wiring := claudeWiring()
+	events := make([]string, 0, len(wiring))
+	for _, h := range wiring {
 		events = append(events, h.Event)
 	}
 	return installClaudeHooksAt(filepath.Join(sources.ClaudeConfigDir(), "settings.json"), exe, events, uninstall)
@@ -2392,8 +2394,8 @@ func installClaudeHooksAt(path, exe string, events []string, uninstall bool) (in
 	var root map[string]any
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
-	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, configParseError(path, err)
+	} else if uerr := json.Unmarshal(old, &root); uerr != nil {
+		return installResult{}, configParseError(path, uerr)
 	}
 	nextRoot := root
 	// An event the installed Claude Code would reject is taken out, not
@@ -2973,8 +2975,8 @@ func installStatusline(exe string, uninstall bool) (installResult, error) {
 	var root map[string]any
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
-	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, configParseError(path, err)
+	} else if uerr := json.Unmarshal(old, &root); uerr != nil {
+		return installResult{}, configParseError(path, uerr)
 	}
 	cmd := exe + " statusline"
 	existing, _ := root["statusLine"].(map[string]any)
@@ -3211,12 +3213,12 @@ func installTOML(path, block string, uninstall bool) (installResult, error) {
 	// and say where; this path spliced its block in regardless, so deja's entry
 	// landed in a file the harness cannot load and the harness's own error
 	// named deja's lines (#3576).
-	if err := tomlHeadersClose(text); err != nil {
-		return installResult{}, configParseError(path, err)
+	if terr := tomlHeadersClose(text); terr != nil {
+		return installResult{}, configParseError(path, terr)
 	}
 	if !uninstall {
-		if err := tomlInlineKey(text, "[mcp_servers.deja]"); err != nil {
-			return installResult{}, configParseError(path, err)
+		if terr := tomlInlineKey(text, "[mcp_servers.deja]"); terr != nil {
+			return installResult{}, configParseError(path, terr)
 		}
 	}
 	blocks := tomlMCPBlocks(text)
@@ -3231,15 +3233,15 @@ func installTOML(path, block string, uninstall bool) (installResult, error) {
 		if key := foreignTOMLDejaKey(text); key != "" {
 			noteBlockAdded(path, "mcp_servers."+key)
 			next := []byte(updateTOMLMCPBlock(text, key, block))
-			a, err := writeIfChanged(path, old, next)
+			a, werr := writeIfChanged(path, old, next)
 			res := installResult{Path: path, Action: a}
 			// Said on the run that adopted the entry, not on every run after it
 			// (#5298). key keeps the quotes it was written with, so trim them
 			// before %q or a quoted key is quoted twice.
-			if err == nil && a != "unchanged" {
+			if werr == nil && a != "unchanged" {
 				res.Note = fmt.Sprintf("updated %q, which already ran deja, instead of adding a second entry", strings.Trim(key, `"'`))
 			}
-			return res, err
+			return res, werr
 		}
 	}
 
@@ -3454,7 +3456,7 @@ func tomlCode(line string) string {
 	var out strings.Builder
 	var quote byte
 	escaped := false
-	for i := 0; i < len(line); i++ {
+	for i := range len(line) {
 		c := line[i]
 		if quote != 0 {
 			out.WriteByte(c)
@@ -3504,7 +3506,7 @@ func tomlArrayDelta(s string) int {
 	depth := 0
 	var quote byte
 	escaped := false
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		c := s[i]
 		if quote != 0 {
 			if quote == '"' && escaped {
@@ -4091,7 +4093,7 @@ func entrySwitchedOffFor(client string, entry map[string]any) bool {
 }
 
 // dropNotePart removes one "; "-joined part from an install note.
-func dropNotePart(note, part string) string {
+func dropNotePart(note, part string) string { //nolint:unparam // the part to drop is the caller's to name
 	var keep []string
 	for p := range strings.SplitSeq(note, "; ") {
 		if p != part {
@@ -4207,8 +4209,8 @@ func installCopilotMCP(exe string, uninstall bool) (installResult, error) {
 		command, args := mcpCommandArgs(exe)
 		return writeJSONCEntry(path, old, "mcpServers",
 			map[string]any{"type": "local", "command": command, "args": args, "tools": []string{"*"}}, uninstall)
-	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, configParseError(path, err)
+	} else if uerr := json.Unmarshal(old, &root); uerr != nil {
+		return installResult{}, configParseError(path, uerr)
 	}
 	m, _, err := mcpBlock(root, "mcpServers", path)
 	if err != nil {
@@ -4279,15 +4281,16 @@ func installOpenClawMCPEntry(exe string, uninstall bool) (installResult, error) 
 	}
 	var root map[string]any
 	var note string
-	if len(bytes.TrimSpace(old)) == 0 {
+	switch {
+	case len(bytes.TrimSpace(old)) == 0:
 		root = map[string]any{}
-	} else if configIsJSONC(old) {
+	case configIsJSONC(old):
 		// Two keys deep, which the text writer takes as a dotted block key
 		// (#2783).
 		command, args := mcpLaunchCommandArgs(exe, uninstall)
 		return writeJSONCEntry(path, old, "mcp.servers",
 			map[string]any{"command": command, "args": args}, uninstall)
-	} else if json.Unmarshal(old, &root) != nil {
+	case json.Unmarshal(old, &root) != nil:
 		return installResult{}, openclawParseError(path, old)
 	}
 	mcp, _, err := mcpBlock(root, "mcp", path)
@@ -4454,8 +4457,8 @@ func installMCPJSONEntry(path, blockKey string, entry map[string]any, uninstall 
 		// how somebody who annotated their config could not install deja at
 		// all (#1664).
 		return writeJSONCEntry(path, old, blockKey, entry, uninstall)
-	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, configParseError(path, err)
+	} else if uerr := json.Unmarshal(old, &root); uerr != nil {
+		return installResult{}, configParseError(path, uerr)
 	}
 	m, _, err := mcpBlock(root, blockKey, path)
 	if err != nil {
@@ -5043,7 +5046,7 @@ func matchingBrace(line string, open int) int {
 // would read as structure — a path holding one is ordinary (#2475).
 func braceOutsideString(line string, want byte) int {
 	inString, escaped := false, false
-	for i := 0; i < len(line); i++ {
+	for i := range len(line) {
 		switch c := line[i]; {
 		case escaped:
 			escaped = false
@@ -5070,7 +5073,7 @@ func braceOutsideString(line string, want byte) int {
 func jsoncBraceDelta(code string) int {
 	depth := 0
 	inString, escaped := false, false
-	for i := 0; i < len(code); i++ {
+	for i := range len(code) {
 		switch c := code[i]; {
 		case escaped:
 			escaped = false
@@ -5270,7 +5273,7 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 				body[i] = body[i][:code-1] + body[i][code:]
 			}
 		}
-		note := ""
+		var note string
 		// This path merges the whole entry (mergedJSONCEntryLine above), so
 		// whatever the reader had on it — an env pointing at a store on
 		// another disk, a switch they set — comes across with it, and
@@ -5532,13 +5535,13 @@ func withAutoTargets(targets []string) []string {
 	return out
 }
 
-// unknownTargetErr marks a refusal for a name that is no target at all, so a
+// targetUnknownError marks a refusal for a name that is no target at all, so a
 // run made only of those can say so without the partial-run summary.
-type unknownTargetErr struct{ error }
+type targetUnknownError struct{ error }
 
 func allUnknownTargets(errs []error) bool {
 	for _, e := range errs {
-		var u unknownTargetErr
+		var u targetUnknownError
 		if !errors.As(e, &u) {
 			return false
 		}
@@ -5551,7 +5554,7 @@ func allUnknownTargets(errs []error) bool {
 // target" leaves someone who typed `claud` guessing — while `deja completion`
 // two commands away lists its three valid values.
 func unknownTargetError(target string) error {
-	return unknownTargetErr{unknownTargetMessage(target)}
+	return targetUnknownError{unknownTargetMessage(target)}
 }
 
 func unknownTargetMessage(target string) error {

@@ -27,7 +27,7 @@ func TestTheEditLineCarriesThePromotedDecision(t *testing.T) {
 	}
 	now := time.Now().UTC()
 	write := func(sid string, minutes int, msgs [][2]any) {
-		var lines []string
+		lines := make([]string, 0, len(msgs))
 		for i, m := range msgs {
 			rec := map[string]any{"type": m[0], "sessionId": sid,
 				"timestamp": now.Add(-time.Duration(minutes-i) * time.Minute).Format(time.RFC3339),

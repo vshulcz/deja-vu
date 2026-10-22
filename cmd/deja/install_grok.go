@@ -49,8 +49,8 @@ func grokUserSettingsUpdate(exe string, uninstall bool) (path string, old, next 
 	// deja knows nothing about.
 	root := map[string]any{}
 	if len(old) > 0 {
-		if err := json.Unmarshal(old, &root); err != nil {
-			return path, old, nil, "", configParseError(path, err)
+		if uerr := json.Unmarshal(old, &root); uerr != nil {
+			return path, old, nil, "", configParseError(path, uerr)
 		}
 	}
 	mcp, _ := root["mcp"].(map[string]any)
@@ -135,8 +135,8 @@ func grokPreflight(exe string, auto bool) error {
 	if err != nil {
 		return err
 	}
-	if err := writeWouldFail(path, old, next); err != nil {
-		return err
+	if werr := writeWouldFail(path, old, next); werr != nil {
+		return werr
 	}
 	if !auto {
 		return nil

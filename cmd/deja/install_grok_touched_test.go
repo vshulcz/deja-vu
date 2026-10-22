@@ -32,7 +32,7 @@ func TestGrokInstallReportsBothFilesItWrote(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var named []string
+	named := make([]string, 0, len(res.touched()))
 	for _, p := range res.touched() {
 		named = append(named, filepath.Base(p))
 	}

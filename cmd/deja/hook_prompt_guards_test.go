@@ -24,7 +24,7 @@ func TestHookPromptNarrowsAMarathonItShows(t *testing.T) {
 	lines := make([]string, 0, dejaVuMaxMessages+3)
 	for i := range dejaVuMaxMessages + 1 {
 		lines = append(lines, fmt.Sprintf(
-			`{"type":"assistant","sessionId":"marathon","timestamp":"%s","message":{"role":"assistant","content":"routine step %d, nothing to see"}}`,
+			`{"type":"assistant","sessionId":"marathon","timestamp":%q,"message":{"role":"assistant","content":"routine step %d, nothing to see"}}`,
 			ts, i))
 	}
 	lines = append(lines, `{"type":"assistant","sessionId":"marathon","timestamp":"`+ts+
@@ -76,8 +76,8 @@ func TestHookPromptPointsRatherThanQuotesOnOneOrdinaryWord(t *testing.T) {
 	// question shares exactly that one word with them.
 	for i, name := range []string{"one", "two"} {
 		writeClaudeFixture(t, filepath.Join(claudeRoot, "beta", name+".jsonl"), name, []string{
-			fmt.Sprintf(`{"type":"user","sessionId":"%s","timestamp":"%s","message":{"role":"user","content":"the migration ran fine on shard %d"}}`, name, ts, i),
-			fmt.Sprintf(`{"type":"assistant","sessionId":"%s","timestamp":"%s","message":{"role":"assistant","content":"migration %d finished, nothing else changed"}}`, name, ts, i),
+			fmt.Sprintf(`{"type":"user","sessionId":%q,"timestamp":%q,"message":{"role":"user","content":"the migration ran fine on shard %d"}}`, name, ts, i),
+			fmt.Sprintf(`{"type":"assistant","sessionId":%q,"timestamp":%q,"message":{"role":"assistant","content":"migration %d finished, nothing else changed"}}`, name, ts, i),
 		})
 	}
 	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {

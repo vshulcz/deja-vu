@@ -31,18 +31,21 @@ func TestDeepSeekAutoAddsTheWebStatusPlugin(t *testing.T) {
 	}
 	dir := filepath.Join(home, ".dsh", "plugins", "deja-status")
 	var pkg struct {
-		Name, Version string
-		Exports       map[string]string
-		Dsh           struct {
-			Client struct{ Platform string }
-		}
+		Name    string            `json:"name"`
+		Version string            `json:"version"`
+		Exports map[string]string `json:"exports"`
+		Dsh     struct {
+			Client struct {
+				Platform string `json:"platform"`
+			} `json:"client"`
+		} `json:"dsh"`
 	}
 	b, err := os.ReadFile(filepath.Join(dir, "package.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := json.Unmarshal(b, &pkg); err != nil {
-		t.Fatal(err)
+	if uerr := json.Unmarshal(b, &pkg); uerr != nil {
+		t.Fatal(uerr)
 	}
 	if pkg.Name != "deja-status" || pkg.Version == "" || pkg.Exports["./client"] != "./client.js" || pkg.Dsh.Client.Platform != "web" {
 		t.Errorf("status package.json = %+v", pkg)
@@ -51,7 +54,10 @@ func TestDeepSeekAutoAddsTheWebStatusPlugin(t *testing.T) {
 	if err != nil || !strings.Contains(string(client), `id: "deja-status"`) || !strings.Contains(string(client), `"conversation.composer.dock"`) {
 		t.Errorf("client.js does not register the slot item (%v):\n%s", err, client)
 	}
-	var cmdPkg struct{ Name, Version string }
+	var cmdPkg struct {
+		Name    string `json:"name"`
+		Version string `json:"version"`
+	}
 	b, _ = os.ReadFile(filepath.Join(home, ".dsh", "plugins", "deja", "package.json"))
 	if err := json.Unmarshal(b, &cmdPkg); err != nil || cmdPkg.Version == "" {
 		t.Errorf("the command plugin's package.json has no version (%v):\n%s", err, b)
@@ -97,11 +103,11 @@ func TestDeepSeekStatusPluginServesTheLine(t *testing.T) {
 	}
 	home := dshStatusHome(t)
 	fake := filepath.Join(home, "deja")
-	if err := os.WriteFile(fake, []byte("#!/bin/sh\n[ \"$1\" = statusline ] && echo 'deja · 3 recalls · 2 KB ctx today'\n"), 0o755); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(fake, []byte("#!/bin/sh\n[ \"$1\" = statusline ] && echo 'deja · 3 recalls · 2 KB ctx today'\n"), 0o755); werr != nil {
+		t.Fatal(werr)
 	}
-	if _, err := installDeepSeekAuto(fake, false); err != nil {
-		t.Fatal(err)
+	if _, ierr := installDeepSeekAuto(fake, false); ierr != nil {
+		t.Fatal(ierr)
 	}
 	const drive = `
 const { default: apply } = await import(process.argv[1]);
@@ -117,7 +123,7 @@ const ok = await ask("127.0.0.1:3080");
 const far = await ask("attacker.example");
 console.log(JSON.stringify({ waited, path: route.path, ok: [ok.code, ok.body], far: far.code }));
 `
-	cmd := exec.Command(node, "--input-type=module", "-e", drive, "file://"+dshStatusPath())
+	cmd := exec.CommandContext(t.Context(), node, "--input-type=module", "-e", drive, "file://"+dshStatusPath())
 	cmd.Dir = home
 	out, err := cmd.CombinedOutput()
 	if err != nil {

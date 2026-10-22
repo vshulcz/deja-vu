@@ -113,17 +113,17 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 				return errors.New("how: --limit needs value")
 			}
 			i++
-			n, err := strconv.Atoi(args[i])
+			n, err := strconv.Atoi(args[i]) //nolint:gosec // i+1 < len(args) is checked above
 			if err != nil || n <= 0 {
-				return fmt.Errorf("how: --limit wants a positive number, got %q", args[i])
+				return fmt.Errorf("how: --limit wants a positive number, got %q", args[i]) //nolint:gosec // i+1 < len(args) is checked above
 			}
 			limit = n
 		case "--project":
-			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" { //nolint:gosec // the left operand checks the bound
 				return errors.New("how: --project needs value")
 			}
 			i++
-			project = args[i]
+			project = args[i] //nolint:gosec // i+1 < len(args) is checked above
 		case "--all-projects":
 			// The answer is scoped to this project by default (#3705); this
 			// asks the machine instead.

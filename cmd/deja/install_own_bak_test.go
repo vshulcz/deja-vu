@@ -136,12 +136,12 @@ func TestUninstallKeepsASnapshotDejaDidNotTake(t *testing.T) {
 // asked, or deja would keep its own snapshot forever (second review of #3340).
 func TestUninstallDropsItsOwnSnapshotThroughASymlink(t *testing.T) {
 	tmp := t.TempDir()
-	real := filepath.Join(tmp, "real")
-	if err := os.MkdirAll(real, 0o755); err != nil {
+	target := filepath.Join(tmp, "real")
+	if err := os.MkdirAll(target, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	link := filepath.Join(tmp, "link")
-	if err := os.Symlink(real, link); err != nil {
+	if err := os.Symlink(target, link); err != nil {
 		t.Skipf("symlinks unavailable: %v", err)
 	}
 	path := filepath.Join(link, "cordis.patch.yml")
@@ -177,12 +177,12 @@ func TestUninstallDropsItsOwnSnapshotThroughASymlink(t *testing.T) {
 // the link that pointed at it (second review of #3340).
 func TestUninstallDropsASnapshotRecordedUnderTheOtherSpelling(t *testing.T) {
 	tmp := t.TempDir()
-	real := filepath.Join(tmp, "real")
-	if err := os.MkdirAll(real, 0o755); err != nil {
+	target := filepath.Join(tmp, "real")
+	if err := os.MkdirAll(target, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	link := filepath.Join(tmp, "link")
-	if err := os.Symlink(real, link); err != nil {
+	if err := os.Symlink(target, link); err != nil {
 		t.Skipf("symlinks unavailable: %v", err)
 	}
 	own := "# deja mcp:start\n- insert:\n    - id: mcp-deja\n      command: \"deja\"\n# deja mcp:end\n"
@@ -199,7 +199,7 @@ func TestUninstallDropsASnapshotRecordedUnderTheOtherSpelling(t *testing.T) {
 	rememberSnapshot(viaLink + ".bak")
 
 	// The uninstall arrives with the real path, not the link.
-	viaReal := filepath.Join(real, "cordis.patch.yml")
+	viaReal := filepath.Join(target, "cordis.patch.yml")
 	removingWiring = true
 	createdByThisRun = append(createdByThisRun, viaReal)
 	defer func() { removingWiring = false; createdByThisRun = nil; snapshotsByThisRun = nil }()

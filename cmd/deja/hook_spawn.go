@@ -53,7 +53,7 @@ func runHookSpawn(dir string, input toolHookInput, raw []byte, stdout io.Writer)
 		ToolInputCamel map[string]json.RawMessage `json:"toolInput"`
 	}
 	if err := json.Unmarshal(raw, &payload); err != nil {
-		return nil
+		return nil //nolint:nilerr // an unreadable payload means no reply
 	}
 	if len(payload.ToolInput) == 0 {
 		payload.ToolInput = payload.ToolInputCamel
@@ -75,7 +75,7 @@ func runHookSpawn(dir string, input toolHookInput, raw []byte, stdout io.Writer)
 	block = defuseHostTriggers(block)
 	extended, err := json.Marshal(text + "\n\n" + block)
 	if err != nil {
-		return nil
+		return nil //nolint:nilerr // a reply that cannot marshal means no reply
 	}
 	payload.ToolInput[field] = extended
 
@@ -94,7 +94,7 @@ func runHookSpawn(dir string, input toolHookInput, raw []byte, stdout io.Writer)
 	resp.HookSpecificOutput.UpdatedInput = payload.ToolInput
 	b, err := json.Marshal(resp)
 	if err != nil {
-		return nil
+		return nil //nolint:nilerr // a reply that cannot marshal means no reply
 	}
 	fmt.Fprintln(stdout, string(b))
 	return nil

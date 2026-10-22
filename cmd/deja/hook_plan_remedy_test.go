@@ -25,8 +25,8 @@ func TestAPlanFindingNamesTheRemedyDejaKnows(t *testing.T) {
 		t.Fatal(err)
 	}
 	wall := "pgbouncer: error: connection refused while starting the migration runner pool"
-	at := func(min int) string {
-		return time.Now().Add(-time.Duration(min) * time.Minute).UTC().Format(time.RFC3339)
+	at := func(mins int) string {
+		return time.Now().Add(-time.Duration(mins) * time.Minute).UTC().Format(time.RFC3339)
 	}
 	for k := range 4 {
 		sid := fmt.Sprintf("pool%d", k)

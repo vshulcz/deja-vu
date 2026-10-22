@@ -56,14 +56,14 @@ func treeOf(t *testing.T, root string) map[string]string {
 	out := map[string]string{}
 	_ = filepath.Walk(root, func(p string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // unreadable entries are skipped
 		}
 		rel, _ := filepath.Rel(root, p)
 		if info.IsDir() {
 			out[rel+"/"] = ""
 			return nil
 		}
-		b, _ := os.ReadFile(p)
+		b, _ := os.ReadFile(p) //nolint:gosec // the walk is over the test's own temp home
 		out[rel] = string(b)
 		return nil
 	})
@@ -269,6 +269,7 @@ func TestInstallReasonixHandsThePackageToTheCLI(t *testing.T) {
 }
 
 func reasonixViaFakeCLI(t *testing.T, other bool, used string) {
+	t.Helper()
 	home := reasonixTestHome(t, other)
 	bin := filepath.Join(t.TempDir(), "reasonix")
 	log := filepath.Join(t.TempDir(), "calls")
@@ -417,8 +418,11 @@ func TestDoctorReadsTheReasonixWiring(t *testing.T) {
 		t.Fatal(err)
 	}
 	gone := filepath.Join(t.TempDir(), "gone", "deja")
-	doc["runtime"].(map[string]any)["command"] = gone
-	edited, _ := json.MarshalIndent(doc, "", "  ")
+	typedOrFatal[map[string]any](t, doc["runtime"])["command"] = gone
+	edited, jerr := json.MarshalIndent(doc, "", "  ")
+	if jerr != nil {
+		t.Fatal(jerr)
+	}
 	writeTestFile(t, manifest, string(edited))
 	if _, missing := wiring(); !missing {
 		t.Errorf("runtime pointing at %s: doctor did not report it missing", gone)

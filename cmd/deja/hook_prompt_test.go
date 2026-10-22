@@ -217,7 +217,7 @@ func TestLimitHandoffTipSkipsTheStartingSession(t *testing.T) {
 
 func TestSSHSyncTipThresholdAndOnce(t *testing.T) {
 	withStatsStores(t)
-	var ss []model.Session
+	ss := make([]model.Session, 0, 6)
 	for i := range 6 {
 		ss = append(ss, model.Session{ID: strconv.Itoa(i), Messages: []model.Message{{Role: "user", Text: "run ssh mini and check"}}})
 	}
@@ -432,7 +432,7 @@ func TestHookPromptSkipsMarathonSessions(t *testing.T) {
 	hermeticEnv(t)
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
 	old := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
-	var lines []string
+	lines := make([]string, 0, dejaVuMaxMessages+10)
 	for i := range dejaVuMaxMessages + 10 {
 		lines = append(lines, `{"type":"user","sessionId":"hay","timestamp":"`+old+`","message":{"role":"user","content":"quetzalcoatl stampede msg `+strconv.Itoa(i)+`"}}`)
 	}

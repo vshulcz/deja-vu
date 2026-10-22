@@ -19,16 +19,9 @@ func TestInstallRefusesWhenHomeIsUnknown(t *testing.T) {
 	t.Setenv("HOME", "")
 
 	wd := t.TempDir()
-	prev, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(wd); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(prev) })
+	t.Chdir(wd)
 
-	_, err = captureRun(t, "install", "claude-code")
+	_, err := captureRun(t, "install", "claude-code")
 	if err == nil {
 		t.Error("install accepted a run with no home directory")
 	} else if !strings.Contains(err.Error(), "home") {

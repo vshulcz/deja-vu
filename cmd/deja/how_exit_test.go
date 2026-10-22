@@ -19,9 +19,9 @@ func TestHowCountsACommandOnceWhateverItExitedWith(t *testing.T) {
 		t.Fatal(err)
 	}
 	at := time.Date(2026, 8, 1, 10, 0, 0, 0, time.UTC)
-	line := func(text string, min int) string {
+	line := func(text string, mins int) string {
 		return `{"type":"function_call","name":"shell","arguments":"{\"command\":[\"bash\",\"-lc\",\"` + text +
-			`\"]}","timestamp":"` + at.Add(time.Duration(min)*time.Minute).Format(time.RFC3339) + `"}`
+			`\"]}","timestamp":"` + at.Add(time.Duration(mins)*time.Minute).Format(time.RFC3339) + `"}`
 	}
 	_ = line
 	// The reader-visible shape is what matters here, so write the records the

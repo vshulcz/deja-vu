@@ -20,7 +20,7 @@ func TestInstallCopilotChatPromptWritesPerHost(t *testing.T) {
 	t.Setenv("DEJA_COPILOT_CHAT_ROOTS", "")
 
 	// Two hosts present, one absent: the absent one must not be created.
-	var hosts []string
+	hosts := make([]string, 0, 2)
 	for _, name := range []string{"Code", "VSCodium"} {
 		dir := vsCodeUserDirForTest(t, home, name)
 		if err := os.MkdirAll(dir, 0o755); err != nil {

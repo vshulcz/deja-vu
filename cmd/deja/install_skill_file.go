@@ -73,7 +73,7 @@ func dropRetiredSkillFile(path string) error {
 	retired := filepath.Join(filepath.Dir(dir), cliSkillName, "SKILL.md")
 	b, err := os.ReadFile(retired)
 	if err != nil {
-		return nil
+		return nil //nolint:nilerr // no retired skill to remove
 	}
 	if !bytes.Contains(b, []byte("\nname: deja-history\n")) {
 		return nil

@@ -24,15 +24,15 @@ func TestEveryInstalledConfigIsRecognisableAsDejas(t *testing.T) {
 	walk := func(fn func(path string, body []byte)) {
 		_ = filepath.Walk(home, func(p string, fi os.FileInfo, err error) error {
 			if err != nil || !fi.Mode().IsRegular() {
-				return nil
+				return nil //nolint:nilerr // unreadable entries are skipped
 			}
 			// deja's own state and guidance are not a harness config.
 			if strings.Contains(p, filepath.Join(".config", "deja")) {
 				return nil
 			}
-			b, rerr := os.ReadFile(p)
+			b, rerr := os.ReadFile(p) //nolint:gosec // the walk is over the test's own temp home
 			if rerr != nil {
-				return nil
+				return nil //nolint:nilerr // unreadable files are skipped
 			}
 			fn(p, b)
 			return nil

@@ -174,7 +174,7 @@ func TestTraeIDECNEdition(t *testing.T) {
 func TestInstallTraeIDEBothEditions(t *testing.T) {
 	home := filepath.Join(hermeticEnv(t), "home")
 	type files struct{ mcp, hooks, skill string }
-	var eds []files
+	eds := make([]files, 0, len(traeIDEEditions))
 	for _, e := range traeIDEEditions {
 		f := files{
 			filepath.Join(traeIDEAppDir(e.app), "User", "mcp.json"),

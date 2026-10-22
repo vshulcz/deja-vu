@@ -63,16 +63,16 @@ func snapshotHome(t *testing.T, home string) map[string]string {
 	out := map[string]string{}
 	err := filepath.WalkDir(home, func(path string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() || strings.HasSuffix(path, ".bak") {
-			return nil
+			return nil //nolint:nilerr // unreadable entries are skipped
 		}
 		// deja's own state records when it last wired, which is allowed to
 		// differ between two runs.
 		if strings.Contains(path, filepath.Join(".config", "deja")) {
 			return nil
 		}
-		b, rerr := os.ReadFile(path)
+		b, rerr := os.ReadFile(path) //nolint:gosec // the walk is over the test's own temp home
 		if rerr != nil {
-			return nil
+			return nil //nolint:nilerr // unreadable files are skipped
 		}
 		rel, rerr := filepath.Rel(home, path)
 		if rerr != nil {

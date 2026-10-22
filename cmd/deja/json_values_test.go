@@ -46,10 +46,20 @@ func fixtureEnv(t *testing.T) string {
 	// Claude names the folder after the cwd with every other character a dash,
 	// which on Windows also takes the drive's colon and the backslashes.
 	defer func() { fixtureProjectDir = nonAlnum.ReplaceAllString(cwd, "-") }()
-	if real, err := filepath.EvalSymlinks(cwd); err == nil {
-		cwd = real
+	if resolved, err := filepath.EvalSymlinks(cwd); err == nil {
+		cwd = resolved
 	}
 	return cwd
+}
+
+// typedOrFatal is v as a T, or the test stops.
+func typedOrFatal[T any](tb testing.TB, v any) T {
+	tb.Helper()
+	x, ok := v.(T)
+	if !ok {
+		tb.Fatalf("%v is %T, not %T", v, v, x)
+	}
+	return x
 }
 
 // fixtureRow is one Claude transcript line. content is a string or a list of
@@ -62,7 +72,10 @@ func fixtureRow(id, role, ts, cwd string, content any) string {
 	if ts != "" {
 		r["timestamp"] = ts
 	}
-	b, _ := json.Marshal(r)
+	b, err := json.Marshal(r)
+	if err != nil {
+		panic(err)
+	}
 	return string(b)
 }
 
@@ -123,12 +136,12 @@ func TestSearchJSONMessagesTotalIsTheSessionsCount(t *testing.T) {
 	if len(hits) != 1 {
 		t.Fatalf("want 1 hit, got %d: %v", len(hits), m)
 	}
-	h := hits[0].(map[string]any)
-	msgs := h["session"].(map[string]any)["messages"].([]any)
+	h := typedOrFatal[map[string]any](t, hits[0])
+	msgs := typedOrFatal[[]any](t, typedOrFatal[map[string]any](t, h["session"])["messages"])
 	total, hasTotal := h["messages_total"]
 	_, capped := h["messages_capped"]
 	if len(msgs) < 2 {
-		if !hasTotal || total.(float64) != 2 {
+		if n, ok := total.(float64); !hasTotal || !ok || n != 2 {
 			t.Errorf("messages_total = %v (present=%v), want 2: the session holds two messages", total, hasTotal)
 		}
 		if !capped {
@@ -246,7 +259,7 @@ func TestWipAndRecapJSONFilterBidiAndTags(t *testing.T) {
 		fixtureRow("bidi1", "assistant", ts, cwd, "root cause: the \u202ereversed\u202c parser dropped the BOM. Fixed by stripping it first."),
 	}})
 	t.Chdir(cwd)
-	bad := regexp.MustCompile("[\u202a-\u202e\u2066-\u2069\U000E0000-\U000E007F]")
+	bad := regexp.MustCompile("[\u202a-\u202e\u2066-\u2069\U000E0000-\U000E007F]") //nolint:gocritic // the ranges are the bidi and tag controls
 	for _, args := range [][]string{{"wip", "--json"}, {"recap", "--json"}, {"search", "importer", "--json"}} {
 		out := runJSONOut(t, args...)
 		if bad.MatchString(out) {
@@ -277,7 +290,7 @@ func TestBlameJSONSessionCarriesSource(t *testing.T) {
 		t.Fatalf("blame --json: %v %q", err, out)
 	}
 	for _, r := range rows {
-		s := r["session"].(map[string]any)
+		s := typedOrFatal[map[string]any](t, r["session"])
 		src, _ := s["source"].(map[string]any)
 		if src["origin"] != "local" {
 			t.Errorf("blame row session %v has source %v, want origin local", s["id"], s["source"])

@@ -172,8 +172,8 @@ func zcodeServerAt(path, exe string, uninstall bool) (installResult, error) {
 	}
 	next = append(next, '\n')
 	noteCreatedDirs(filepath.Dir(path))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return installResult{}, err
+	if merr := os.MkdirAll(filepath.Dir(path), 0o755); merr != nil {
+		return installResult{}, merr
 	}
 	action, err := writeIfChanged(path, old, next)
 	if err != nil {
@@ -332,14 +332,14 @@ func zcodeHooksAt(path, exe string, uninstall bool) (installResult, error) {
 		if !blockWasAdded(path, "hooks") && len(blocksAddedWithPrefix(path, zcodeSwitchRecord)) == 0 {
 			was := ""
 			if v, ok := hooks["enabled"]; ok {
-				b, _ := json.Marshal(v)
-				was = string(b)
+				if b, merr := json.Marshal(v); merr == nil {
+					was = string(b)
+				}
 			}
 			noteBlockAdded(path, zcodeSwitchRecord+was)
 			note = "turned hooks.enabled on in " + shortHome(path) + ", which was off, so its other hooks run too; uninstall turns it back off"
 		}
 		hooks["enabled"] = true
-		changed = true
 	}
 	if events != nil {
 		hooks["events"] = events
@@ -362,8 +362,8 @@ func zcodeHooksAt(path, exe string, uninstall bool) (installResult, error) {
 	}
 	next = append(next, '\n')
 	noteCreatedDirs(filepath.Dir(path))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return installResult{}, err
+	if merr := os.MkdirAll(filepath.Dir(path), 0o755); merr != nil {
+		return installResult{}, merr
 	}
 	action, err := writeIfChanged(path, old, next)
 	if err != nil {

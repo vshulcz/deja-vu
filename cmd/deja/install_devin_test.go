@@ -31,9 +31,9 @@ func TestDevinConfigDirFollowsThePlatformConventions(t *testing.T) {
 		want string
 	}{
 		{"linux default", "linux", "", "", filepath.Join(home, ".config", "devin")},
-		{"linux xdg", "linux", "/tmp/xdg-test", "", filepath.Join("/tmp/xdg-test", "devin")},
-		{"macos xdg honoured", "darwin", "/tmp/xdg-mac", "", filepath.Join("/tmp/xdg-mac", "devin")},
-		{"windows appdata", "windows", "", "C:\\win\\roaming", filepath.Join("C:\\win\\roaming", "devin")},
+		{"linux xdg", "linux", "/tmp/xdg-test", "", filepath.Join("/tmp/xdg-test", "devin")},               //nolint:gocritic // the want is joined the way the code joins it
+		{"macos xdg honoured", "darwin", "/tmp/xdg-mac", "", filepath.Join("/tmp/xdg-mac", "devin")},       //nolint:gocritic // the want is joined the way the code joins it
+		{"windows appdata", "windows", "", "C:\\win\\roaming", filepath.Join("C:\\win\\roaming", "devin")}, //nolint:gocritic // the want is joined the way the code joins it
 		{"windows fallback", "windows", "", "", filepath.Join(home, "AppData", "Roaming", "devin")},
 	} {
 		t.Setenv("XDG_CONFIG_HOME", c.xdg)
@@ -60,8 +60,8 @@ func TestInstallDevinHooksRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	var root map[string]any
-	if err := json.Unmarshal(raw, &root); err != nil {
-		t.Fatal(err)
+	if uerr := json.Unmarshal(raw, &root); uerr != nil {
+		t.Fatal(uerr)
 	}
 	hooks, ok := root["hooks"].(map[string]any)
 	if !ok {
@@ -73,7 +73,10 @@ func TestInstallDevinHooksRoundTrip(t *testing.T) {
 			t.Errorf("event %s missing from config.json", h.Event)
 			continue
 		}
-		blob, _ := json.Marshal(entries)
+		blob, jerr := json.Marshal(entries)
+		if jerr != nil {
+			t.Fatal(jerr)
+		}
 		if h.Matcher != "" && !strings.Contains(string(blob), h.Matcher) {
 			t.Errorf("event %s lost its matcher %q", h.Event, h.Matcher)
 		}

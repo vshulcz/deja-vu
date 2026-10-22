@@ -61,15 +61,15 @@ func TestTheViewPageDoesNotCarryControlOrBidiCharacters(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(notes, append(line, '\n'), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(notes, append(line, '\n'), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
-	if _, err := captureRun(t, "index"); err != nil {
-		t.Fatal(err)
+	if _, cerr := captureRun(t, "index"); cerr != nil {
+		t.Fatal(cerr)
 	}
 	out := filepath.Join(t.TempDir(), "view.html")
-	if _, err := captureRun(t, "view", "--no-open", "--out", out); err != nil {
-		t.Fatal(err)
+	if _, cerr := captureRun(t, "view", "--no-open", "--out", out); cerr != nil {
+		t.Fatal(cerr)
 	}
 	b, err := os.ReadFile(out)
 	if err != nil {

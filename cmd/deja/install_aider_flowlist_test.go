@@ -31,13 +31,13 @@ func TestAiderKeepsAFlowListOfReadFiles(t *testing.T) {
 		"read: [a.md,b.md]",
 		"read: [ a.md , b.md ]",
 	} {
-		got, err := addAiderReadEntry(in+"\n", ctx)
-		if err != nil {
-			t.Errorf("%s was refused: %v", in, err)
+		got2, aderr := addAiderReadEntry(in+"\n", ctx)
+		if aderr != nil {
+			t.Errorf("%s was refused: %v", in, aderr)
 			continue
 		}
-		if strings.Contains(got, "- [") || !strings.Contains(got, "  - "+ctx) {
-			t.Errorf("%s came out wrong:\n%s", in, got)
+		if strings.Contains(got2, "- [") || !strings.Contains(got2, "  - "+ctx) {
+			t.Errorf("%s came out wrong:\n%s", in, got2)
 		}
 	}
 
@@ -52,7 +52,7 @@ func TestAiderKeepsAFlowListOfReadFiles(t *testing.T) {
 		// closing bracket on this one, so what the list holds is not here.
 		"read: [a.md, b.md",
 	} {
-		if _, err := addAiderReadEntry(in+"\n", ctx); err == nil {
+		if _, aerr := addAiderReadEntry(in+"\n", ctx); aerr == nil {
 			t.Errorf("%s was rewritten instead of refused", in)
 		}
 	}

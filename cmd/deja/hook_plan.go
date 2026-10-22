@@ -94,7 +94,7 @@ func runHookPlan(dir string, stdin io.Reader, stdout io.Writer) error {
 	resp.HookSpecificOutput.AdditionalContext = frameRecall(strings.Join(lines, "\n"))
 	b, err := json.Marshal(resp)
 	if err != nil {
-		return nil
+		return nil //nolint:nilerr // a reply that cannot marshal means no reply
 	}
 	fmt.Fprintln(stdout, string(b))
 	return nil

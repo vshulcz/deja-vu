@@ -86,8 +86,8 @@ func TestDoctorMarksASwitchedOffMCPEntry(t *testing.T) {
 	var report struct {
 		MCP []doctorMCPStatus `json:"mcp"`
 	}
-	if err := json.Unmarshal([]byte(out), &report); err != nil {
-		t.Fatalf("doctor --json: %v: %s", err, out)
+	if uerr := json.Unmarshal([]byte(out), &report); uerr != nil {
+		t.Fatalf("doctor --json: %v: %s", uerr, out)
 	}
 	seen := 0
 	for _, r := range report.MCP {
@@ -127,10 +127,11 @@ func switchOffDeja(t *testing.T, cfg string) {
 		t.Fatal(err)
 	}
 	var root map[string]any
-	if err := json.Unmarshal(b, &root); err != nil {
-		t.Fatal(err)
+	if uerr := json.Unmarshal(b, &root); uerr != nil {
+		t.Fatal(uerr)
 	}
-	root["mcpServers"].(map[string]any)["deja"].(map[string]any)["disabled"] = true
+	servers := typedOrFatal[map[string]any](t, root["mcpServers"])
+	typedOrFatal[map[string]any](t, servers["deja"])["disabled"] = true
 	out, err := json.MarshalIndent(root, "", "  ")
 	if err != nil {
 		t.Fatal(err)

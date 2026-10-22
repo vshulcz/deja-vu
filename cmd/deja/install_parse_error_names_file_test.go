@@ -28,12 +28,12 @@ func TestInstallNamesTheConfigItCannotParse(t *testing.T) {
 	}
 	// The premise: this file parses today, so the refusal below is about the
 	// damage and not about the fixture.
-	if _, err := installTarget("claude", "/some/deja", false); err != nil {
-		t.Fatalf("a config deja just wrote does not parse: %v", err)
+	if _, ierr := installTarget("claude", "/some/deja", false); ierr != nil {
+		t.Fatalf("a config deja just wrote does not parse: %v", ierr)
 	}
 
-	if err := os.WriteFile(claudeJSON, good[:len(good)/2], 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(claudeJSON, good[:len(good)/2], 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	_, err = installTarget("claude", "/some/deja", false)
 	if err == nil {

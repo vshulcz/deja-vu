@@ -25,12 +25,12 @@ func TestOpenClawPluginServesTheStatusLineToItsTab(t *testing.T) {
 	home := t.TempDir()
 	stub := filepath.Join(home, "deja")
 	script := "#!/bin/sh\ncat >/dev/null\n[ \"$1\" = statusline ] && printf 'deja · 3 recalls · <b>today</b>'\n"
-	if err := os.WriteFile(stub, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(stub, []byte(script), 0o755); werr != nil {
+		t.Fatal(werr)
 	}
 	plugin := filepath.Join(home, "index.mjs")
-	if err := os.WriteFile(plugin, []byte(openclawPluginJS(stub)), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(plugin, []byte(openclawPluginJS(stub)), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	driver := `
 import plugin from "` + plugin + `";
@@ -45,19 +45,26 @@ const handled = await route.handler({}, res);
 console.log(JSON.stringify({ route: { path: route.path, auth: route.auth }, tab, handled, status: res.statusCode, body: res.body }));
 `
 	run := filepath.Join(home, "drive.mjs")
-	if err := os.WriteFile(run, []byte(driver), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(run, []byte(driver), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
-	out, err := exec.Command(node, run).CombinedOutput()
+	out, err := exec.CommandContext(t.Context(), node, run).CombinedOutput()
 	if err != nil {
 		t.Fatalf("driving the plugin: %v\n%s", err, out)
 	}
 	var got struct {
-		Route   struct{ Path, Auth string }
-		Tab     struct{ Surface, Path, Label string }
-		Handled bool
-		Status  int
-		Body    string
+		Route struct {
+			Path string `json:"path"`
+			Auth string `json:"auth"`
+		} `json:"route"`
+		Tab struct {
+			Surface string `json:"surface"`
+			Path    string `json:"path"`
+			Label   string `json:"label"`
+		} `json:"tab"`
+		Handled bool   `json:"handled"`
+		Status  int    `json:"status"`
+		Body    string `json:"body"`
 	}
 	if err := json.Unmarshal(out, &got); err != nil {
 		t.Fatalf("driver said %s", out)

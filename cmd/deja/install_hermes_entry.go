@@ -144,8 +144,9 @@ func hermesFields(lines []string, e hermesEntry) (map[string]hermesField, string
 // hermesArgs is the list an `args:` holds, flow or block.
 func hermesArgs(lines []string, f hermesField) []string {
 	if strings.HasPrefix(f.value, "[") && strings.HasSuffix(f.value, "]") {
-		var out []string
-		for _, item := range hermesFlowSplit(f.value[1 : len(f.value)-1]) {
+		items := hermesFlowSplit(f.value[1 : len(f.value)-1])
+		out := make([]string, 0, len(items))
+		for _, item := range items {
 			out = append(out, yamlScalar(item))
 		}
 		return out
@@ -328,11 +329,11 @@ func hermesEditEntry(lines []string, exe string) (out []string, note string, don
 		if !ok {
 			return nil, "", false, fmt.Errorf("mcp_servers.deja is written on one line (%s), and deja edits only the block form — rewrite it that way and run this again", strings.TrimSpace(lines[e.start]))
 		}
-		out, n, done, err := hermesEditEntry(block, exe)
+		out2, n, done, err := hermesEditEntry(block, exe)
 		if err == nil && done {
 			n = strings.TrimPrefix(n+"; ", "; ") + hermesFlowRewrittenNote
 		}
-		return out, n, done, err
+		return out2, n, done, err
 	}
 	if !hermesSpanPlain(lines, e.start, e.end) {
 		return nil, "", false, errors.New("mcp_servers.deja holds a value that runs over several lines (a flow collection or a quoted string), and deja edits only one-line values — rewrite it that way and run this again")

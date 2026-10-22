@@ -174,8 +174,8 @@ func writeCrushRoot(path string, old []byte, root map[string]any, note string) (
 	}
 	next = append(next, '\n')
 	noteCreatedDirs(filepath.Dir(path))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return installResult{}, err
+	if merr := os.MkdirAll(filepath.Dir(path), 0o755); merr != nil {
+		return installResult{}, merr
 	}
 	a, err := writeIfChanged(path, old, next)
 	return installResult{Path: path, Action: a, Note: note}, err

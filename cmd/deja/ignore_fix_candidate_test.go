@@ -42,8 +42,8 @@ func TestFixDoesNotServeASightingFromTheIgnoredTree(t *testing.T) {
 	}
 	// And the same store answers once the rule is lifted, so this is the rule
 	// working rather than the fixture never having had anything to serve.
-	if err := os.WriteFile(policyFile, []byte(`{}`), 0o600); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(policyFile, []byte(`{}`), 0o600); werr != nil {
+		t.Fatal(werr)
 	}
 	out, err = captureRun(t, "fix", "zarnakctl: FATAL: could not bind sprocket bus at 192.0.2.7:7788")
 	if err != nil {

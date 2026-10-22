@@ -84,11 +84,14 @@ func jsonStatuslineUpdate(path string, keys []string, entry map[string]any, unin
 	}
 	root := map[string]any{}
 	if len(bytes.TrimSpace(source)) > 0 {
-		if err := json.Unmarshal(source, &root); err != nil {
-			return installResult{}, configParseError(path, err)
+		if uerr := json.Unmarshal(source, &root); uerr != nil {
+			return installResult{}, configParseError(path, uerr)
 		}
 	}
-	before, _ := json.Marshal(root)
+	before, err := json.Marshal(root)
+	if err != nil {
+		return installResult{}, err
+	}
 	cmd, _ := entry["command"].(string)
 	last := keys[len(keys)-1]
 	// A null parent in a commented file: the text writer would put a second
@@ -147,7 +150,11 @@ func jsonStatuslineUpdate(path string, keys []string, entry map[string]any, unin
 		return writeJSONCStatusline(path, old, root, keys, entry, uninstall, nullHeld, write)
 	}
 	if !write {
-		if after, _ := json.Marshal(root); bytes.Equal(after, before) {
+		after, merr := json.Marshal(root)
+		if merr != nil {
+			return installResult{}, merr
+		}
+		if bytes.Equal(after, before) {
 			return installResult{Path: path, Action: "unchanged"}, nil
 		}
 		return installResult{Path: path}, configWritable(path)

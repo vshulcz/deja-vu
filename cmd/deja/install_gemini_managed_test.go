@@ -49,7 +49,7 @@ func TestGeminiAutoKeepsTheExtensionGeminiInstalled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("uninstall deleted the extension gemini installed: %v", err)
 	}
-	var names []string
+	names := make([]string, 0, len(entries))
 	for _, e := range entries {
 		names = append(names, e.Name())
 	}

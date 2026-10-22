@@ -65,7 +65,7 @@ func hostStatuslineCases(home string) []struct {
 		}
 	}
 	tomlAt := func(table string) func(t *testing.T, path string) string {
-		return func(t *testing.T, path string) string {
+		return func(_ *testing.T, path string) string {
 			b, _ := os.ReadFile(path)
 			return strings.Trim(tomlTableValue(string(b), table, "command"), `"`)
 		}
@@ -129,7 +129,10 @@ func seedStatusline(t *testing.T, target, path, cmd string) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	q, _ := json.Marshal(cmd)
+	q, jerr := json.Marshal(cmd)
+	if jerr != nil {
+		t.Fatal(jerr)
+	}
 	var seed string
 	switch {
 	case strings.HasSuffix(path, "tui.toml"):

@@ -166,7 +166,7 @@ func TestWeekDeletedLineGroupsAgentsAndOffersWhatEachCanDo(t *testing.T) {
 	}
 	// The widest line a real month gives still carries the command: a
 	// three-digit count, the longer window wording, Claude Code's short id.
-	var many []index.KeptSession
+	many := make([]index.KeptSession, 0, 437)
 	for range 437 {
 		many = append(many, k("claude", seedGone, time.Hour))
 	}

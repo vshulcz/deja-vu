@@ -154,11 +154,13 @@ func TestUninstallLeavesValidJSONWhenTheSwitchIsLast(t *testing.T) {
 func TestUninstallKeepsTheGeminiSwitchOtherHooksNeed(t *testing.T) {
 	for name, seed := range map[string]func(t *testing.T, path string){
 		"settings hooks": func(t *testing.T, path string) {
+			t.Helper()
 			if err := os.WriteFile(path, []byte(`{"hooks":{"BeforeTool":[]}}`), 0o644); err != nil {
 				t.Fatal(err)
 			}
 		},
-		"linked extension": func(t *testing.T, path string) {
+		"linked extension": func(t *testing.T, _ string) {
+			t.Helper()
 			meta := filepath.Join(sources.GeminiHome(), "extensions", "mine", ".gemini-extension-install.json")
 			if err := os.MkdirAll(filepath.Dir(meta), 0o755); err != nil {
 				t.Fatal(err)

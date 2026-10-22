@@ -109,8 +109,8 @@ func TestHookPromptShrinksToPointerPastTheDigestBudget(t *testing.T) {
 
 	// A question asked before is the strong claim and keeps its full block.
 	spend("long-2")
-	if got := askAbout("long-2", "why does rsync hang in the nightly deploy script"); !strings.Contains(got, "StrictHostKeyChecking") {
-		t.Errorf("a repeated question past the budget lost its full block:\n%q", got)
+	if got2 := askAbout("long-2", "why does rsync hang in the nightly deploy script"); !strings.Contains(got2, "StrictHostKeyChecking") {
+		t.Errorf("a repeated question past the budget lost its full block:\n%q", got2)
 	}
 
 	// A spawned agent gets the pointer from its first block, and the full one
