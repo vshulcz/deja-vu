@@ -46,7 +46,7 @@ func lockDir(dir string) (func(), error) {
 	// ambiguous, and the blocking call that follows never returned. Only to
 	// learn whether there is a wait worth reporting — see lock_unix.go (#994).
 	ended := func() {}
-	if probe, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600); err == nil {
+	if probe, perr := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600); perr == nil {
 		var pol syscall.Overlapped
 		if lockFileEx(syscall.Handle(probe.Fd()), lockfileExclusiveLock|lockfileFailImmediately, 0, 1, 0, &pol) != nil {
 			ended = noteLockWait()
@@ -58,7 +58,7 @@ func lockDir(dir string) (func(), error) {
 	err = lockFileEx(h, lockfileExclusiveLock, 0, 1, 0, &ol)
 	ended()
 	if err != nil {
-		f.Close()
+		_ = f.Close()
 		return nil, fmt.Errorf("lock index: %w", err)
 	}
 	// Under the lock: finish any swap interrupted mid-rename. Running this
@@ -71,9 +71,9 @@ func lockDir(dir string) (func(), error) {
 }
 
 func lockFileEx(h syscall.Handle, flags, reserved, low, high uint32, ol *syscall.Overlapped) error {
-	r1, _, e1 := procLockFileEx.Call(uintptr(h), uintptr(flags), uintptr(reserved), uintptr(low), uintptr(high), uintptr(unsafe.Pointer(ol)))
+	r1, _, e1 := procLockFileEx.Call(uintptr(h), uintptr(flags), uintptr(reserved), uintptr(low), uintptr(high), uintptr(unsafe.Pointer(ol))) //nolint:gosec // LockFileEx takes the OVERLAPPED by pointer
 	if r1 == 0 {
-		if e1 != syscall.Errno(0) {
+		if !errors.Is(e1, syscall.Errno(0)) {
 			return e1
 		}
 		return syscall.EINVAL
@@ -82,9 +82,9 @@ func lockFileEx(h syscall.Handle, flags, reserved, low, high uint32, ol *syscall
 }
 
 func unlockFileEx(h syscall.Handle, reserved, low, high uint32, ol *syscall.Overlapped) error {
-	r1, _, e1 := procUnlockFileEx.Call(uintptr(h), uintptr(reserved), uintptr(low), uintptr(high), uintptr(unsafe.Pointer(ol)))
+	r1, _, e1 := procUnlockFileEx.Call(uintptr(h), uintptr(reserved), uintptr(low), uintptr(high), uintptr(unsafe.Pointer(ol))) //nolint:gosec // UnlockFileEx takes the OVERLAPPED by pointer
 	if r1 == 0 {
-		if e1 != syscall.Errno(0) {
+		if !errors.Is(e1, syscall.Errno(0)) {
 			return e1
 		}
 		return syscall.EINVAL
@@ -123,8 +123,8 @@ func tryLockDir(dir string) (func(), bool, error) {
 	h := syscall.Handle(f.Fd())
 	var ol syscall.Overlapped
 	if err := lockFileEx(h, lockfileExclusiveLock|lockfileFailImmediately, 0, 1, 0, &ol); err != nil {
-		f.Close()
-		return nil, false, nil
+		_ = f.Close()
+		return nil, false, nil //nolint:nilerr // a lock held elsewhere is "not taken", not an error
 	}
 	recoverIndexDir(dir)
 	return func() {

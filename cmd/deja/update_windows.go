@@ -18,7 +18,7 @@ func replaceExecutable(staged, destination string) error {
 	}
 	if err := os.Rename(staged, destination); err != nil {
 		if rollbackErr := os.Rename(backup, destination); rollbackErr != nil {
-			return fmt.Errorf("install update: %v (rollback failed: %v)", err, rollbackErr)
+			return fmt.Errorf("install update: %w (rollback failed: %w)", err, rollbackErr)
 		}
 		return err
 	}

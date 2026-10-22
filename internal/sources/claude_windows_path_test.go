@@ -3,6 +3,7 @@
 package sources
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -71,7 +72,7 @@ func TestADriveRootRepoIsOneProjectOnWindows(t *testing.T) {
 	drive := ""
 	for c := 'Z'; c >= 'M'; c-- {
 		d := string(c) + ":"
-		if _, err := os.Stat(d + `\`); err != nil && exec.Command("subst", d, dir).Run() == nil {
+		if _, err := os.Stat(d + `\`); err != nil && exec.CommandContext(t.Context(), "subst", d, dir).Run() == nil {
 			drive = d
 			break
 		}
@@ -79,7 +80,7 @@ func TestADriveRootRepoIsOneProjectOnWindows(t *testing.T) {
 	if drive == "" {
 		t.Skip("no free drive letter for subst")
 	}
-	t.Cleanup(func() { _ = exec.Command("subst", drive, "/D").Run() })
+	t.Cleanup(func() { _ = exec.CommandContext(context.Background(), "subst", drive, "/D").Run() })
 	repo := drive + `\proj`
 	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
 		t.Fatal(err)

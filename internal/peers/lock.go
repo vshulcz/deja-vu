@@ -50,7 +50,7 @@ const (
 // let a second writer through: measured under sixteen concurrent writers, one
 // machine's row was lost from the peer list every run. Elsewhere the create is
 // atomic and this never fires.
-func lockHeldElsewhere(err error) bool { //nolint:unparam // true only on windows
+func lockHeldElsewhere(err error) bool { //nolint:unparam,nolintlint // true only on windows, so unparam fires everywhere else
 	var errno syscall.Errno
 	if !errors.As(err, &errno) {
 		return false

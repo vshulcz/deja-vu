@@ -2,7 +2,10 @@
 
 package main
 
-import "syscall"
+import (
+	"errors"
+	"syscall"
+)
 
 // processAlive reports whether pid still names a running process. OpenProcess
 // succeeding is not enough — a pid stays openable after exit while any handle
@@ -15,13 +18,13 @@ func processAlive(pid int) bool {
 		return false
 	}
 	const processQueryLimitedInformation = 0x1000
-	h, err := syscall.OpenProcess(processQueryLimitedInformation, false, uint32(pid))
+	h, err := syscall.OpenProcess(processQueryLimitedInformation, false, uint32(pid)) //nolint:gosec // pid > 0 is checked above and windows pids fit in a DWORD
 	if err != nil {
 		// A process this one may not open still exists — the unix side reads
 		// EPERM the same way.
-		return err == syscall.ERROR_ACCESS_DENIED
+		return errors.Is(err, syscall.ERROR_ACCESS_DENIED)
 	}
-	defer syscall.CloseHandle(h)
+	defer func() { _ = syscall.CloseHandle(h) }()
 	var code uint32
 	if err := syscall.GetExitCodeProcess(h, &code); err != nil {
 		return true

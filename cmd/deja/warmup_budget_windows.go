@@ -20,13 +20,7 @@ func takeWarmupBudget() {
 	if os.Getenv("GOMAXPROCS") != "" {
 		return
 	}
-	n := runtime.NumCPU() / 2
-	if n < 1 {
-		n = 1
-	}
-	if n > 8 {
-		n = 8
-	}
+	n := min(max(runtime.NumCPU()/2, 1), 8)
 	runtime.GOMAXPROCS(n)
 	_ = os.Setenv("GOMAXPROCS", strconv.Itoa(n))
 }
