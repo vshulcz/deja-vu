@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--json`, and `^s` in the search screen turns the list newest first under
   day headings and back. On a common word the page is the newest of the whole
   match, not the newest of the best-ranked thousand (#5577).
+- A cold build reads each transcript line once instead of handing it to six
+  readers that each decoded it again, and checks tool output for known errors
+  in one pass per line. On 40,000 sessions it takes 60 s instead of 87 s and
+  353 CPU-seconds instead of 551 (#5586).
 
 ### Fixed
 
