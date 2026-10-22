@@ -81,8 +81,9 @@ func TestCompactionFreshnessMarksLargeUntrackedFilesPartial(t *testing.T) {
 // sample against a fixed share of the budget flaked (#5551: 2.4 s of 4 s on a
 // loaded windows leg). Each round now times seven bare git processes, the
 // count the check makes, right before the check itself. Load slows both alike,
-// so the middle ratio of five rounds holds where the wall time does not, and a
-// check that starts doing more than seven processes' worth of work still fails.
+// so the middle ratio of five rounds holds where the wall time does not. A
+// check costing more than 1.6 times those seven processes fails: about four
+// more git calls, or a stall of half what seven processes take.
 func TestCompactionFreshnessBudgetIsSizedForTheSlowPlatform(t *testing.T) {
 	repo := compactionGitRepo(t)
 	compactionWrite(t, filepath.Join(repo, "tracked.txt"), "base\n")
@@ -104,22 +105,29 @@ func TestCompactionFreshnessBudgetIsSizedForTheSlowPlatform(t *testing.T) {
 	}
 	sevenBare() // the first git of a run pays for a cold binary
 	best := time.Duration(1 << 62)
-	// batch is the middle ratio of five rounds. A burst of load can still
+	// batch returns the sorted ratios of five rounds. A burst of load can still
 	// land on most of one batch, so a batch over the line gets two more
 	// chances; a check that really does more work is over in every one.
 	batch := func() []float64 {
 		ratios := make([]float64, 0, rounds)
-		for round := range rounds {
+		var partial []time.Duration
+		for range rounds {
 			bare := sevenBare()
 			start := time.Now()
 			freshness := compactionFreshness(repo)
 			took := time.Since(start)
 			if freshness.Error != "" || strings.HasPrefix(freshness.WorktreeState, "partial:") {
-				t.Fatalf("a repository with one dirty file did not fingerprint in %v (round %d took %v): %#v",
-					compactionGitBudget, round+1, took.Round(time.Millisecond), freshness)
+				// One round past the budget is the runner; most of them is
+				// the check (#3645).
+				partial = append(partial, took.Round(time.Millisecond))
+				continue
 			}
 			best = min(best, took)
 			ratios = append(ratios, float64(took)/float64(bare))
+		}
+		if len(ratios) <= rounds/2 {
+			t.Fatalf("a repository with one dirty file did not fingerprint in %v in %d of %d rounds (they took %v)",
+				compactionGitBudget, rounds-len(ratios), rounds, partial)
 		}
 		slices.Sort(ratios)
 		return ratios
@@ -128,12 +136,13 @@ func TestCompactionFreshnessBudgetIsSizedForTheSlowPlatform(t *testing.T) {
 	for len(batches) < batchesAllowed {
 		ratios := batch()
 		batches = append(batches, ratios)
-		if ratios[rounds/2] <= maxRatio {
+		if ratios[len(ratios)/2] <= maxRatio {
 			break
 		}
 	}
-	ratio := batches[len(batches)-1][rounds/2]
-	t.Logf("freshness at best %v of a %v budget; against %d bare git processes run just before it, middle ratios %.2f",
+	last := batches[len(batches)-1]
+	ratio := last[len(last)/2]
+	t.Logf("freshness at best %v of a %v budget; against %d bare git processes run just before it, ratios by batch %.2f",
 		best.Round(time.Millisecond), compactionGitBudget, gitCalls, batches)
 	// Half the budget spent on the smallest repository there is means the
 	// margin is gone for a real one.
