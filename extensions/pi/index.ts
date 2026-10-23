@@ -187,7 +187,9 @@ export default function (pi: any) {
           // quiet reminder that memory is on rather than a one-off toast.
           const stats = run(["statusline"], "");
           if (stats) ctx.ui.setStatus("deja", stats);
-          return { message: { customType: "deja-recall", content: digest, display: false } };
+          // Marked, so a resume can tell the digest from a prompt's recall
+          // (#5314).
+          return { message: { customType: "deja-recall", content: digest, display: false, details: { digest: true } } };
         }
         // Nothing to recall: either there is no history yet, or the first
         // index is still building. Only the second is worth saying, once.

@@ -88,6 +88,17 @@ const kept = [{ type: "message", id: "e1" }, { type: "custom_message", customTyp
 console.log("kept", tag(await prompt(sm("kept-1", kept, { id: "kept-1" }))));
 // A fork at the first message copies nothing: its source is no part of it.
 console.log("empty fork", tag(await prompt(sm("efork-1", [], { id: "efork-1", parentSession: process.argv[3] }))));
+// A compaction that kept a prompt's recall but not the marked digest: pi
+// sends no digest, so the resume needs one (#5314).
+const digestKept = [{ type: "custom_message", customType: "deja-recall", id: "a1", details: { digest: true } }, { type: "message", id: "a2" }, { type: "custom_message", customType: "deja-recall", id: "a3" }, { type: "message", id: "a4" }, { type: "compaction", firstKeptEntryId: "a3" }];
+console.log("recall kept", tag(await prompt(sm("rk-1", digestKept, { id: "rk-1" }))));
+// And the digest the extension sends is marked, so the next resume can tell.
+let sent = null;
+for (const fn of handlers.before_agent_start || []) {
+  const r = await fn({ prompt: "p" }, { ui, sessionManager: sm("mark-1", [], { id: "mark-1" }) });
+  if (r && r.message) sent = r.message;
+}
+console.log("marked", sent && sent.details && sent.details.digest === true ? "yes" : "no");
 `), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +111,7 @@ console.log("empty fork", tag(await prompt(sm("efork-1", [], { id: "efork-1", pa
 		if err != nil {
 			t.Fatalf("%s: node: %v\n%s", name, err, out)
 		}
-		if got, want := strings.TrimSpace(string(out)), "new digest\nresume none\nfork none\ncompacted digest\nkept none\nempty fork digest"; got != want {
+		if got, want := strings.TrimSpace(string(out)), "new digest\nresume none\nfork none\ncompacted digest\nkept none\nempty fork digest\nrecall kept digest\nmarked yes"; got != want {
 			t.Errorf("%s: digests got:\n%s\nwant:\n%s", name, got, want)
 		}
 		calls, _ := os.ReadFile(log)

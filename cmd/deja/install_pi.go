@@ -437,9 +437,17 @@ export default function (pi: any) {
   // model again with the rest of the session; a fork holds a copy of its
   // source's. Asking for another put a second copy in front of the model, and
   // in a fork one that led with the source itself.
+  // What counts is the digest, not any recall: a prompt's recall goes under
+  // the same customType, and a compaction that kept one but not the digest
+  // left a resumed session with none (#5314). The digest carries
+  // details.digest; a branch with no marked digest was written before the
+  // mark, and any block of ours still counts there.
+  const isDigest = (e: any) =>
+    !!e && e.type === "custom_message" && e.customType === "deja-recall" && !!(e.details && e.details.digest);
   const holdsRecall = (ctx: any) => {
     try {
       const branch = ctx.sessionManager.getBranch() || [];
+      const marked = branch.some(isDigest);
       // pi sends what follows a compaction and the entries it kept from
       // before it, firstKeptEntryId on.
       let keep = "";
@@ -450,7 +458,7 @@ export default function (pi: any) {
           if (!keep) return false;
           continue;
         }
-        if (e.type === "custom_message" && e.customType === "deja-recall") return true;
+        if (marked ? isDigest(e) : e.type === "custom_message" && e.customType === "deja-recall") return true;
         if (keep && e.id === keep) return false;
       }
     } catch {}
@@ -566,7 +574,9 @@ export default function (pi: any) {
           // quiet reminder that memory is on rather than a one-off toast.
           const stats = run(["statusline"], "");
           if (stats) ctx.ui.setStatus("deja", stats);
-          return { message: { customType: "deja-recall", content: digest, display: false } };
+          // Marked, so a resume can tell the digest from a prompt's recall
+          // (#5314).
+          return { message: { customType: "deja-recall", content: digest, display: false, details: { digest: true } } };
         }
         // Nothing to recall: either there is no history yet, or the first
         // index is still building. Only the second is worth saying, once.

@@ -73,8 +73,16 @@ export function sessionKey(event, ctx) {
 // compaction, and the entries it kept from before it, firstKeptEntryId on.
 // pi keeps the block as a custom_message and sends it again on a resume, and
 // a fork copies it from its source.
+//
+// What counts is the start digest, not any recall: a prompt's recall goes
+// under the same customType, and a compaction that kept a later one but not
+// the digest left a resumed session with no digest (#5314). The digest
+// carries details.digest; a branch with no marked digest anywhere was written
+// before the mark, and any block of ours still counts there.
 export function branchHoldsRecall(branch) {
   const entries = Array.isArray(branch) ? branch : []
+  const marked = entries.some(isDigest)
+  const counts = (e) => (marked ? isDigest(e) : e.type === "custom_message" && e.customType === "deja-recall")
   let keep = ""
   for (let i = entries.length - 1; i >= 0; i--) {
     const e = entries[i] || {}
@@ -83,8 +91,14 @@ export function branchHoldsRecall(branch) {
       if (!keep) return false
       continue
     }
-    if (e.type === "custom_message" && e.customType === "deja-recall") return true
+    if (counts(e)) return true
     if (keep && e.id === keep) return false
   }
   return false
+}
+
+// isDigest reports whether a branch entry is the start digest this package
+// sent, which it marks with details.digest.
+function isDigest(e) {
+  return !!e && e.type === "custom_message" && e.customType === "deja-recall" && !!(e.details && e.details.digest)
 }
