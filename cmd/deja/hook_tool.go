@@ -432,6 +432,8 @@ func toolHookLineSkipping(dir, cwd string, input toolHookInput, used func(string
 // applyPatchLine is the file line for the first file in a patch that has one.
 func applyPatchLine(dir, cwd, patch string, self func(index.SessionMeta, string) bool) string {
 	for _, path := range applyPatchFiles(patch) {
+		// A shell `cd sub && apply_patch` edits sub/<header> (#5306).
+		path = sources.ShellPatchPath(patch, cwd, path)
 		if line := fileHookLineOutside(dir, cwd, path, self); line != "" {
 			return line
 		}
