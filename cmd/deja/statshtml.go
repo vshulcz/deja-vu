@@ -123,6 +123,7 @@ func newStatsHTMLPage(report stats.Report, sessions []model.Session) (statsHTMLP
 		Harnesses: len(report.Harnesses), DateStart: report.DateRange.Start,
 		DateEnd: report.DateRange.End, Heatmap: report.Heatmap,
 		BusiestDay: report.BusiestDay.Date, BusiestCount: report.BusiestDay.Messages,
+		//nolint:gosec // json.Marshal escapes <, > and & so the script block cannot be closed early
 		SessionsJSON: template.JS(data), HarnessColorsJSON: template.JS(hc), SessionCount: len(rows), Truncated: truncated,
 		Punchline: cardPunchline(report),
 	}, nil
@@ -158,14 +159,14 @@ function esc(value){const node=document.createElement('span');node.textContent=v
 // heatOpacity maps a day's count onto four visible steps. A linear ramp
 // against the busiest day flattens an ordinary week into nothing, because
 // one outlier sets the scale for the whole year.
-func heatOpacity(count, max int) string {
+func heatOpacity(count, most int) string {
 	if count <= 0 {
 		return "0.06"
 	}
-	if max < 1 {
-		max = 1
+	if most < 1 {
+		most = 1
 	}
-	switch r := float64(count) / float64(max); {
+	switch r := float64(count) / float64(most); {
 	case r > 0.66:
 		return "1"
 	case r > 0.33:

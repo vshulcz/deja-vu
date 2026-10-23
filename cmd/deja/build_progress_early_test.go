@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -68,10 +69,5 @@ func (p *phaseRecorder) Phase(name string, _ int) { p.phases = append(p.phases, 
 func (p *phaseRecorder) Advance(int)              {}
 func (p *phaseRecorder) Harness(string, int, int) {}
 func (p *phaseRecorder) seen(name string) bool {
-	for _, s := range p.phases {
-		if s == name {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(p.phases, name)
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"runtime"
@@ -10,7 +11,7 @@ import (
 	"time"
 )
 
-func TestMCPOrphanHelperProcess(t *testing.T) {
+func TestMCPOrphanHelperProcess(_ *testing.T) {
 	switch os.Getenv("DEJA_MCP_ORPHAN_HELPER") {
 	case "":
 		return
@@ -21,7 +22,7 @@ func TestMCPOrphanHelperProcess(t *testing.T) {
 }
 
 func mcpOrphanHelper(mode string) *exec.Cmd {
-	cmd := exec.Command(os.Args[0], "-test.run=^TestMCPOrphanHelperProcess$")
+	cmd := exec.CommandContext(context.Background(), os.Args[0], "-test.run=^TestMCPOrphanHelperProcess$")
 	cmd.Env = append(os.Environ(), "DEJA_MCP_ORPHAN_HELPER="+mode)
 	return cmd
 }

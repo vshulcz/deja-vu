@@ -20,7 +20,7 @@ func TestImportedOrdinalsAreDistinctAndCheap(t *testing.T) {
 	}
 	var body []byte
 	const n = 300
-	for i := 0; i < n; i++ {
+	for i := range n {
 		b, err := json.Marshal(SyncRecord{Harness: "claude", SessionID: fixedID(i), Project: "work/api",
 			Role: "user", Text: "record about the pool cap"})
 		if err != nil {
@@ -58,14 +58,14 @@ func TestImportedOrdinalsAreDistinctAndCheap(t *testing.T) {
 	// A second batch continues above the first rather than colliding with it.
 	body = nil
 	for i := n; i < n+50; i++ {
-		b, _ := json.Marshal(SyncRecord{Harness: "claude", SessionID: fixedID(i), Project: "work/api",
+		b := mustJSON(SyncRecord{Harness: "claude", SessionID: fixedID(i), Project: "work/api",
 			Role: "user", Text: "another record"})
 		body = append(append(body, b...), '\n')
 	}
-	if err := os.WriteFile(filepath.Join(exp, "deja-sync-2.jsonl"), body, 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(exp, "deja-sync-2.jsonl"), body, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Import(dir, exp); err != nil {
+	if _, err = Import(dir, exp); err != nil {
 		t.Fatal(err)
 	}
 	metas, err = AllMeta(dir)

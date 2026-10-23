@@ -36,7 +36,7 @@ create table if not exists messages (id integer primary key autoincrement, sessi
 insert or replace into sessions values ('20250724_old','old','Old chat','/w/app',datetime(1784278801,'unixepoch'),datetime(1784278802,'unixepoch'));
 insert or replace into messages values (1,'20250724_old','user','[{"type":"text","text":"oldgoosefact about the pager"}]',1784278801);
 insert or replace into messages values (2,'20250724_old','assistant','[{"type":"text","text":"oldgoose reply"}]',1784278802)` + extra + `;`
-		if out, err := exec.Command("sqlite3", db, schema).CombinedOutput(); err != nil {
+		if out, err := exec.CommandContext(t.Context(), "sqlite3", db, schema).CombinedOutput(); err != nil {
 			t.Fatalf("seed: %v: %s", err, out)
 		}
 	}

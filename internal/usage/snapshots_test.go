@@ -43,7 +43,7 @@ func TestRecordDigestEmptySkipsSnapshot(t *testing.T) {
 func TestSnapshotRotationKeepsNewest(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "index.db")
 	big := strings.Repeat("x", 60<<10)
-	for i := 0; i < 12; i++ {
+	for i := range 12 {
 		RecordDigest(dir, KindHook, big+string(rune('a'+i)), 1, 2048)
 	}
 	snaps := Snapshots(dir, 0)
@@ -57,7 +57,7 @@ func TestSnapshotRotationKeepsNewest(t *testing.T) {
 
 func TestEventsLimitAndOrder(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "index.db")
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		RecordResult(dir, KindSearch, i, 0, false)
 	}
 	events := Events(dir, 3)

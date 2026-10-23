@@ -30,16 +30,16 @@ func TestOpenClawPluginOpensWithTheProjectDigest(t *testing.T) {
 	calls := filepath.Join(home, "calls")
 	script := "#!/bin/sh\nin=$(cat)\nprintf '%s\\n' \"$in\" >> " + calls + "\n" +
 		"case \"$1\" in hook-context) printf 'DIGEST for this project' ;; esac\n"
-	if err := os.WriteFile(stub, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(stub, []byte(script), 0o755); werr != nil {
+		t.Fatal(werr)
 	}
 	plugin := filepath.Join(home, "index.mjs")
-	if err := os.WriteFile(plugin, []byte(openclawPluginJS(stub)), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(plugin, []byte(openclawPluginJS(stub)), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	pack := filepath.Join(home, "handler.mjs")
-	if err := os.WriteFile(pack, []byte(openclawHandlerJS(stub)), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(pack, []byte(openclawHandlerJS(stub)), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	// The context OpenClaw 2026.9.8 builds for agent:bootstrap.
 	driver := `
@@ -62,27 +62,31 @@ console.log(JSON.stringify({
 }));
 `
 	run := filepath.Join(home, "drive.mjs")
-	if err := os.WriteFile(run, []byte(driver), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(run, []byte(driver), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
-	out, err := exec.Command(node, run).CombinedOutput()
+	out, err := exec.CommandContext(t.Context(), node, run).CombinedOutput()
 	if err != nil {
 		t.Fatalf("driving the plugin: %v\n%s", err, out)
 	}
 	var got struct {
-		TurnPrepare bool
-		Plugin      []map[string]any
-		Pack        []map[string]any
-		Fallback    map[string]string
+		TurnPrepare bool              `json:"turnPrepare"`
+		Plugin      []map[string]any  `json:"plugin"`
+		Pack        []map[string]any  `json:"pack"`
+		Fallback    map[string]string `json:"fallback"`
 	}
-	if err := json.Unmarshal([]byte(strings.TrimSpace(string(out))), &got); err != nil {
+	if uerr := json.Unmarshal([]byte(strings.TrimSpace(string(out))), &got); uerr != nil {
 		t.Fatalf("driver printed %s", out)
 	}
 	if got.TurnPrepare {
 		t.Error("the plugin also answers agent_turn_prepare where plugin hooks run, a second digest path")
 	}
 	for name, files := range map[string][]map[string]any{"plugin": got.Plugin, "pack": got.Pack} {
-		if len(files) != 1 || !strings.Contains(files[0]["content"].(string), "DIGEST") || files[0]["path"] != "deja://recall" {
+		content := ""
+		if len(files) == 1 {
+			content = typedOrFatal[string](t, files[0]["content"])
+		}
+		if len(files) != 1 || !strings.Contains(content, "DIGEST") || files[0]["path"] != "deja://recall" {
 			t.Errorf("the %s's bootstrap hook did not add the digest to the Project Context: %v", name, files)
 		}
 	}

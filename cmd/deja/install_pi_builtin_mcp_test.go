@@ -108,8 +108,8 @@ func TestPiBuiltinMCPSwitchedOff(t *testing.T) {
 			write(filepath.Join(sources.PiConfigDir(), "settings.json"), tc.user)
 			write(filepath.Join(proj, ".pi", "settings.json"), tc.project)
 			if tc.project != "" && !strings.HasPrefix(tc.name, "untrusted") {
-				real, _ := filepath.EvalSymlinks(proj)
-				trust, _ := json.Marshal(map[string]bool{real: true})
+				resolved, _ := filepath.EvalSymlinks(proj)
+				trust, _ := json.Marshal(map[string]bool{resolved: true})
 				if err := os.MkdirAll(sources.PiConfigDir(), 0o755); err != nil {
 					t.Fatal(err)
 				}

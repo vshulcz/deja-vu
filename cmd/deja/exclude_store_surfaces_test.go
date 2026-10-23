@@ -56,7 +56,7 @@ func TestEverySurfaceKnowsAStoreIsExcluded(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		if !strings.HasPrefix(line, "claude\t") {
 			continue
 		}

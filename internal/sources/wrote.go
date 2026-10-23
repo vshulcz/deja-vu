@@ -4,6 +4,7 @@ import (
 	"hash/fnv"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -99,7 +100,7 @@ func WroteRecord(path, written string) string {
 	}
 	seen := make(map[uint64]bool)
 	var b strings.Builder
-	for _, line := range strings.Split(written, "\n") {
+	for line := range strings.SplitSeq(written, "\n") {
 		h, ok := HashWrittenLine(line)
 		if !ok || seen[h] {
 			continue
@@ -128,12 +129,7 @@ func WroteRecordHas(record string, want uint64) (path string, has bool) {
 		return "", false
 	}
 	target := strconv.FormatUint(want, 16)
-	for _, h := range strings.Fields(hashes) {
-		if h == target {
-			return path, true
-		}
-	}
-	return path, false
+	return path, slices.Contains(strings.Fields(hashes), target)
 }
 
 // withoutElisions drops the placeholder lines a model writes for the code it
@@ -174,7 +170,7 @@ func addedLinesOfPatch(patch string) []string {
 		}
 		added = nil
 	}
-	for _, line := range strings.Split(patch, "\n") {
+	for line := range strings.SplitSeq(patch, "\n") {
 		switch {
 		case strings.HasPrefix(line, "*** Update File:"),
 			strings.HasPrefix(line, "*** Delete File:"),

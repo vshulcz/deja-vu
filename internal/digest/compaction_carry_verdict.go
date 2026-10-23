@@ -177,10 +177,10 @@ func carryDeferred(s string) bool {
 	if utf8.RuneCountInString(p[min(v[0], t[0]):max(v[0], t[0])]) > 80 {
 		return false
 	}
-	if c := carryDCondRE.FindStringIndex(p); c != nil && c[0] < max(v[0], t[0]) {
+	if c := carryDCondRE.FindStringIndex(p); len(c) > 0 && c[0] < max(v[0], t[0]) {
 		return false
 	}
-	if n := carryNowRE.FindStringIndex(p); n != nil && n[0] < max(v[1], t[1]) {
+	if n := carryNowRE.FindStringIndex(p); len(n) > 0 && n[0] < max(v[1], t[1]) {
 		return false
 	}
 	return true

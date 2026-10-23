@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -61,12 +62,12 @@ func runSecrets(dir string, args []string, stdout io.Writer) error {
 			dryRun = true
 		case "--limit":
 			if i+1 >= len(args) {
-				return fmt.Errorf("secrets: --limit needs value")
+				return errors.New("secrets: --limit needs value")
 			}
 			i++
-			n, err := strconv.Atoi(args[i])
+			n, err := strconv.Atoi(args[i]) //nolint:gosec // G602: i+1 < len(args) checked above
 			if err != nil || n < 0 {
-				return fmt.Errorf("secrets: --limit wants a number, got %q", args[i])
+				return fmt.Errorf("secrets: --limit wants a number, got %q", args[i]) //nolint:gosec // G602: i+1 < len(args) checked above
 			}
 			limit = n
 		default:
@@ -75,12 +76,12 @@ func runSecrets(dir string, args []string, stdout io.Writer) error {
 	}
 	if scrub {
 		if asJSON {
-			return fmt.Errorf("secrets: --scrub rewrites files and reports what it did; it has no --json form")
+			return errors.New("secrets: --scrub rewrites files and reports what it did; it has no --json form")
 		}
 		return runSecretsScrub(dir, dryRun, stdout)
 	}
 	if dryRun {
-		return fmt.Errorf("secrets: --dry-run belongs to --scrub; the report changes nothing on its own")
+		return errors.New("secrets: --dry-run belongs to --scrub; the report changes nothing on its own")
 	}
 	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
 		return ensureError(dir, err)

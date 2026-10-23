@@ -15,7 +15,7 @@ import (
 // its log.
 func zstdFrame(t *testing.T, chunk string) []byte {
 	t.Helper()
-	cmd := exec.Command("zstd", "-q", "-c")
+	cmd := exec.CommandContext(t.Context(), "zstd", "-q", "-c")
 	cmd.Stdin = strings.NewReader(chunk)
 	out, err := cmd.Output()
 	if err != nil {

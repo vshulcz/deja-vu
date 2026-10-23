@@ -14,7 +14,7 @@ import (
 func quotableCorpus(n int) []model.Session {
 	now := time.Now()
 	ss := make([]model.Session, 0, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		text := fmt.Sprintf("session %d: the billing exporter drops every third retry, and the backoff counted from zero", i)
 		ss = append(ss, model.Session{
 			ID: fmt.Sprintf("s%03d", i), Harness: "claude", Project: fmt.Sprintf("proj%d", i),
@@ -77,7 +77,7 @@ func TestABigSearchDoesNotQuoteWhatItWillNotServe(t *testing.T) {
 	if len(hits) < earlierAttemptWindow+10 {
 		t.Fatalf("corpus produced %d hits, too few to show the difference", len(hits))
 	}
-	for i := 0; i < earlierAttemptWindow; i++ {
+	for i := range earlierAttemptWindow {
 		if len(hits[i].Snippets) == 0 {
 			t.Fatalf("hit %d is inside the comparison window and was not quoted", i)
 		}

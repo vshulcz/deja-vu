@@ -55,10 +55,10 @@ func TestFrictionCountsTheWithheldSessionsItWouldHaveReported(t *testing.T) {
 	// And a hidden session that does hold a failure is still counted: the
 	// sentence has to keep working where it is true.
 	loud := `{"type":"user","timestamp":"2026-07-10T11:00:00Z","sessionId":"cccc0001-1111-4000-8000-d6e7f8a9b0c1","cwd":"/api","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"a2","content":"connection refused on port 5432"}]}}`
-	if err := os.WriteFile(filepath.Join(store, "loud.jsonl"), []byte(loud+"\n"), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(store, "loud.jsonl"), []byte(loud+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := index.Ensure(dir, "", false, nil); err != nil {
+	if err = index.Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	note, err = captureRunStderr(t, "friction")

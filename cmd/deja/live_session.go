@@ -153,7 +153,7 @@ func readLiveSessions(dir string) map[string]time.Time {
 	if err != nil {
 		return out
 	}
-	for _, line := range strings.Split(string(b), "\n") {
+	for line := range strings.SplitSeq(string(b), "\n") {
 		parts := strings.Fields(line)
 		if len(parts) != 2 {
 			continue

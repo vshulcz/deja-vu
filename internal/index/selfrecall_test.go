@@ -89,9 +89,9 @@ func TestIndexDoesNotSwallowItsOwnRecall(t *testing.T) {
 
 	// deja's injection is not.
 	for _, term := range []string{"INJECTEDTOKEN", "deja-recall"} {
-		hits, err := Search(dir, query.Options{Query: term, All: true})
-		if err != nil {
-			t.Fatal(err)
+		hits, searchErr := Search(dir, query.Options{Query: term, All: true})
+		if searchErr != nil {
+			t.Fatal(searchErr)
 		}
 		if len(hits) > 0 {
 			t.Fatalf("%q was indexed from deja's own recall block: %d hits", term, len(hits))
@@ -127,7 +127,7 @@ func TestStripsCodexPreambleOnlyAtTheHead(t *testing.T) {
 		t.Fatalf("a message that is nothing but preamble should strip to empty, got %q", got)
 	}
 	// A person discussing the tag keeps their sentence.
-	for _, real := range []string{
+	for _, genuine := range []string{
 		"why does <environment_context> outrank everything?",
 		"the parser should drop <user_instructions> blocks",
 		"see the note about # AGENTS.md instructions in the issue",
@@ -137,8 +137,8 @@ func TestStripsCodexPreambleOnlyAtTheHead(t *testing.T) {
 		"the injected block is <environment_context><cwd>/w</cwd></environment_context> and it wins on match count",
 		"codex sends <recommended_plugins>a list</recommended_plugins> before the first turn",
 	} {
-		if got := stripSelfRecall(real); got != real {
-			t.Errorf("ate a real message:\n  in  %q\n  out %q", real, got)
+		if got := stripSelfRecall(genuine); got != genuine {
+			t.Errorf("ate a real message:\n  in  %q\n  out %q", genuine, got)
 		}
 	}
 }
@@ -149,12 +149,12 @@ func TestStripsCodexPreambleOnlyAtTheHead(t *testing.T) {
 // Codex injecting these lost their entire question — the exact message someone
 // writes when reporting this.
 func TestAgentsHeadingNeedsItsBlockToFollow(t *testing.T) {
-	real := []string{
+	genuine := []string{
 		"# AGENTS.md instructions\n\nHow do I stop Codex injecting these? Mine is:\n<INSTRUCTIONS>be terse</INSTRUCTIONS>\n",
 		"# AGENTS.md instructions are confusing.\n\nWhy does the block end with </INSTRUCTIONS>?",
 		"# AGENTS.md instructions\n\nno block at all here",
 	}
-	for _, in := range real {
+	for _, in := range genuine {
 		if got := stripSelfRecall(in); got != in {
 			t.Errorf("ate a real message:\n  in  %q\n  out %q", in, got)
 		}
@@ -357,9 +357,11 @@ func TestAPassGivesNoRowToATranscriptWithNothingToIndex(t *testing.T) {
 		change           func(t *testing.T, root string)
 	}{
 		{"a new file, appended", "s-c", "updated 1 file", func(t *testing.T, root string) {
+			t.Helper()
 			write(t, filepath.Join(root, "p", "c.jsonl"), recallOnly("s-c"))
 		}},
 		{"a file that held text, read again", "s-b", replacementPassMarker, func(t *testing.T, root string) {
+			t.Helper()
 			p := filepath.Join(root, "p", "b.jsonl")
 			write(t, p, recallOnly("s-b"))
 			bumpMTime(t, p)

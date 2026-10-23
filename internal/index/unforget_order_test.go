@@ -4,18 +4,14 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
 func contains(keys []string, want string) bool {
-	for _, k := range keys {
-		if k == want {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(keys, want)
 }
 
 // Interrupted the other way round, the tombstone that would let a retry work

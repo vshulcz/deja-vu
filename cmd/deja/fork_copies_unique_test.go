@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"math/rand"
 	"reflect"
 	"strconv"
@@ -37,7 +36,7 @@ func TestDropCopiedHitsUniquePeersCompareLinearly(t *testing.T) {
 // Asking only the holders of the rarest turn finds the same sources as asking
 // every position, over random turn sets, ancestry and starts.
 func TestCopySourcesRarestTurnMatchesEveryPair(t *testing.T) {
-	rng := rand.New(rand.NewSource(5))
+	rng := rand.New(rand.NewSource(5)) //nolint:gosec // seeded for a reproducible differential
 	at := time.Date(2026, 10, 22, 0, 0, 0, 0, time.UTC)
 	starts := []time.Time{{}, at, at.Add(time.Second)}
 	kinds := []string{"", "fork", "subagent"}
@@ -46,7 +45,7 @@ func TestCopySourcesRarestTurnMatchesEveryPair(t *testing.T) {
 		ss := make([]model.Session, 2+rng.Intn(10))
 		turns := make([]map[string]bool, len(ss))
 		for i := range ss {
-			ss[i] = model.Session{ID: fmt.Sprint(i), Harness: "codex", Kind: kinds[rng.Intn(len(kinds))], Parent: fmt.Sprint(rng.Intn(len(ss))), Started: starts[rng.Intn(len(starts))]}
+			ss[i] = model.Session{ID: strconv.Itoa(i), Harness: "codex", Kind: kinds[rng.Intn(len(kinds))], Parent: strconv.Itoa(rng.Intn(len(ss))), Started: starts[rng.Intn(len(starts))]}
 			if i > 0 && rng.Intn(3) == 0 {
 				ss[i].Messages = ss[rng.Intn(i)].Messages
 			} else {

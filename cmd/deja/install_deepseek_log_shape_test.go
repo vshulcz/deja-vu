@@ -26,12 +26,12 @@ func TestDeepSeekAutoFindsThePromptInTheDsh020Log(t *testing.T) {
 	calls := filepath.Join(home, "calls")
 	script := "#!/bin/sh\nin=$(cat)\nprintf '%s %s\\n' \"$1\" \"$in\" >> " + calls + "\n" +
 		"case \"$1\" in hook-prompt) printf 'RECALLED' ;; esac\n"
-	if err := os.WriteFile(stub, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(stub, []byte(script), 0o755); werr != nil {
+		t.Fatal(werr)
 	}
 	plugin := filepath.Join(home, "auto.js")
-	if err := os.WriteFile(plugin, []byte(dshAutoJS(stub)), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(plugin, []byte(dshAutoJS(stub)), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	driver := `
 import plugin from "` + plugin + `";
@@ -47,10 +47,10 @@ const session = { id: "session-s1", header: { cwd: "/w/proj" }, get seq() { retu
 console.log(contexts["deja:recall"]({ agent: { sessionId: "session-s1", session } }) || "SILENT");
 `
 	run := filepath.Join(home, "drive.mjs")
-	if err := os.WriteFile(run, []byte(driver), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(run, []byte(driver), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
-	out, err := exec.Command(node, run).CombinedOutput()
+	out, err := exec.CommandContext(t.Context(), node, run).CombinedOutput()
 	if err != nil {
 		t.Fatalf("driving the plugin: %v\n%s", err, out)
 	}

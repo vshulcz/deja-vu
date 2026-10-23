@@ -21,7 +21,7 @@ import (
 func TestDigestShowsAtMostThreeAssistantLinesPerSession(t *testing.T) {
 	now := time.Now().Add(-48 * time.Hour)
 	msgs := make([]model.Message, 0, 21)
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		msgs = append(msgs, model.Message{
 			Role: "assistant",
 			Text: fmt.Sprintf("kestrel retries look wrong in case %d, still kestrel", i),
@@ -35,7 +35,7 @@ func TestDigestShowsAtMostThreeAssistantLinesPerSession(t *testing.T) {
 
 	block := AutoRecallDigestFor([]model.Session{s}, 4000, []string{"kestrel", "retries"})
 	quoted := 0
-	for _, ln := range strings.Split(block, "\n") {
+	for ln := range strings.SplitSeq(block, "\n") {
 		t := strings.TrimSpace(ln)
 		if strings.HasPrefix(t, "- User:") || strings.HasPrefix(t, "- Assistant:") {
 			quoted++

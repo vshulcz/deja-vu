@@ -29,7 +29,7 @@ func TestTheEmptyScreenDoesNotParseEveryStore(t *testing.T) {
 	for i := range long {
 		long[i] = 'x'
 	}
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		seedClaude(t, claude, "app", string(rune('a'+i)), "the pgbouncer pool kept timing out "+string(long), "we retried")
 	}
 
@@ -46,9 +46,9 @@ func TestTheEmptyScreenDoesNotParseEveryStore(t *testing.T) {
 	const batch = 20
 	enumerate, asked := time.Duration(1<<62-1), time.Duration(1<<62-1)
 	var checks []doctorStoreCheck
-	for round := 0; round < 3; round++ {
+	for range 3 {
 		start := time.Now()
-		for i := 0; i < batch; i++ {
+		for range batch {
 			checks = doctorStoreChecks()
 		}
 		if took := time.Since(start); took < enumerate {
@@ -56,7 +56,7 @@ func TestTheEmptyScreenDoesNotParseEveryStore(t *testing.T) {
 		}
 		answer := false
 		start = time.Now()
-		for i := 0; i < batch; i++ {
+		for range batch {
 			answer = noAgentHistoryFound()
 		}
 		if took := time.Since(start); took < asked {

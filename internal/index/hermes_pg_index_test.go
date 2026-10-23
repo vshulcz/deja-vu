@@ -21,7 +21,7 @@ func TestHermesPostgresIsIndexedAndIncremental(t *testing.T) {
 	t.Setenv("DEJA_HERMES_PG_DSN", "postgres://fake/hermes")
 
 	// A tiny fake store: two rows, growing to three between reads.
-	rows := []string{
+	rows := []string{ //nolint:prealloc // a fixture literal the loop below grows
 		`{"session_id":"h1","role":"user","content":"we chose bounded channels for backpressure","timestamp":1785000000}`,
 		`{"session_id":"h1","role":"assistant","content":"pgx was pinned instead","timestamp":1785000060}`,
 	}
@@ -49,7 +49,7 @@ func TestHermesPostgresIsIndexedAndIncremental(t *testing.T) {
 
 	// A new row lands; an incremental pass must find it without a forced rebuild.
 	rows = append(rows, `{"session_id":"h2","role":"user","content":"the retry queue overflowed under load","timestamp":1785000120}`)
-	if err := Ensure(dir, "", false, nil); err != nil {
+	if err = Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	hits, err = Search(dir, query.Options{Query: "retry queue overflowed"})

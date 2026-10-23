@@ -19,6 +19,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -33,17 +34,18 @@ import (
 // whether the 1.5× ceiling on it does anything at all.
 func reportUsage(sessions []model.Session, verbose bool) {
 	// Two equally-worded sessions per topic, one of them worn.
-	var corpus []model.Session
-	var probes []probe
+	corpus := make([]model.Session, 0, 8+len(sessions))
+	probes := make([]probe, 0, 4)
 	worn := map[string]int{}
 	base := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	for i, t := range []string{"retry budget", "cache stampede", "leader election", "schema drift"} {
 		day := base.AddDate(0, 0, -i)
-		a := "used-" + fmt.Sprint(i)
-		b := "unused-" + fmt.Sprint(i)
+		a := "used-" + strconv.Itoa(i)
+		b := "unused-" + strconv.Itoa(i)
 		text := t + " is the thing we keep hitting; here is what happens and why"
-		corpus = append(corpus, session(a, day, []string{text, "and a second turn about " + t}))
-		corpus = append(corpus, session(b, day, []string{text, "and a second turn about " + t}))
+		corpus = append(corpus,
+			session(a, day, []string{text, "and a second turn about " + t}),
+			session(b, day, []string{text, "and a second turn about " + t}))
 		worn[a] = 6
 		probes = append(probes, probe{query: t, decision: a})
 	}
@@ -76,23 +78,24 @@ func reportUsage(sessions []model.Session, verbose bool) {
 	// The ceiling question is not "is it enough for a tie" but "can it win one
 	// it should lose". A heavily-used session that barely matches must not
 	// outrank one that answers the question squarely.
-	var risk []model.Session
+	risk := make([]model.Session, 0, 9)
 	riskWorn := map[string]int{}
 	kept := 0
 	for i, t := range []string{"connection pool", "index rebuild", "token refresh"} {
 		day := base.AddDate(0, 0, -i)
-		strong := "strong-" + fmt.Sprint(i)
-		wornWeak := "worn-weak-" + fmt.Sprint(i)
-		risk = append(risk, session(strong, day, []string{
-			t + " " + t + " keeps failing, and here is the whole story of " + t,
-			"more about " + t,
-		}))
-		risk = append(risk, session(wornWeak, day, []string{
-			"mostly about something else entirely, though " + t + " came up once",
-			"the rest is unrelated",
-		}))
+		strong := "strong-" + strconv.Itoa(i)
+		wornWeak := "worn-weak-" + strconv.Itoa(i)
+		risk = append(risk,
+			session(strong, day, []string{
+				t + " " + t + " keeps failing, and here is the whole story of " + t,
+				"more about " + t,
+			}),
+			session(wornWeak, day, []string{
+				"mostly about something else entirely, though " + t + " came up once",
+				"the rest is unrelated",
+			}))
 		riskWorn[wornWeak] = 40 // far past anything the cap allows
-		risk = append(risk, session("filler-"+fmt.Sprint(i), day, []string{"unrelated chatter"}))
+		risk = append(risk, session("filler-"+strconv.Itoa(i), day, []string{"unrelated chatter"}))
 		hits, _ := search.Run(risk, search.Options{Query: t, All: true, RecallWorn: riskWorn})
 		if len(hits) > 0 && hits[0].Session.ID == strong {
 			kept++
@@ -185,14 +188,14 @@ func main() {
 // the first honest number for outcome-aware ranking.
 func reportOutcome(verbose bool) {
 	base := time.Date(2026, 2, 1, 3, 4, 5, 0, time.UTC)
-	var corpus []model.Session
-	var probes []probe
 	topics := []struct{ id, terms, held, reverted string }{
 		{"retry", "retry budget backoff", "We capped retries at 3 with jitter; the pool stopped saturating.", "We tried capping retries at 3 but reverted it — it did not help and we backed it out."},
 		{"cache", "cache stampede lock", "We added a per-key lock on the cache fill; stampedes stopped.", "We tried a per-key lock on the cache fill but gave up — it deadlocked, reverted."},
 		{"index", "search index rebuild", "We rebuilt the index incrementally; the memory spike is gone.", "We tried an incremental rebuild, abandoned it — it corrupted the index, backed out."},
 		{"schema", "schema migration lock", "We ran the migration in batches; no more lock timeouts.", "We tried a batched migration but reverted — it left half-migrated rows, gave up."},
 	}
+	corpus := make([]model.Session, 0, 2*len(topics))
+	probes := make([]probe, 0, len(topics))
 	for i, t := range topics {
 		day := base.AddDate(0, 0, -i*3)
 		// The trap: the session that backed out is the LOUDER one — it repeats
@@ -230,8 +233,6 @@ func reportOutcome(verbose bool) {
 // most sessions that mention a topic never settled anything about it.
 func corpus() ([]model.Session, []probe, []probe) {
 	base := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
-	var out []model.Session
-	var probes, noise []probe
 
 	topics := []struct {
 		id       string
@@ -248,26 +249,30 @@ func corpus() ([]model.Session, []probe, []probe) {
 		{"backup", "backup restore flaky", "The fix was waiting on the archive marker rather than a fixed sleep."},
 	}
 
+	out := make([]model.Session, 0, 6*len(topics))
+	probes := make([]probe, 0, len(topics))
+	noise := make([]probe, 0, len(topics))
 	for i, t := range topics {
 		day := base.AddDate(0, 0, -i*3)
-		// The session that concluded something. It says the terms once.
-		out = append(out, session(t.id+"-decided", day, []string{
-			t.terms + " keeps failing",
-			t.decision,
-		}))
-		// Louder sessions that decide nothing.
-		out = append(out, session(t.id+"-asking", day.AddDate(0, 0, -1), []string{
-			"anyone seen " + t.terms + "? " + t.terms + " again today",
-			"still looking at " + t.terms + ", no idea yet",
-		}))
-		out = append(out, session(t.id+"-log", day.AddDate(0, 0, -2), []string{
-			"dumping the log for " + t.terms,
-			strings.Repeat(t.terms+" warn ", 6),
-		}))
-		out = append(out, session(t.id+"-link", day.AddDate(0, 0, -4), []string{
-			"docs about " + t.terms,
-			"see the upstream page on " + t.terms + " and the " + t.terms + " faq",
-		}))
+		out = append(out,
+			// The session that concluded something. It says the terms once.
+			session(t.id+"-decided", day, []string{
+				t.terms + " keeps failing",
+				t.decision,
+			}),
+			// Louder sessions that decide nothing.
+			session(t.id+"-asking", day.AddDate(0, 0, -1), []string{
+				"anyone seen " + t.terms + "? " + t.terms + " again today",
+				"still looking at " + t.terms + ", no idea yet",
+			}),
+			session(t.id+"-log", day.AddDate(0, 0, -2), []string{
+				"dumping the log for " + t.terms,
+				strings.Repeat(t.terms+" warn ", 6),
+			}),
+			session(t.id+"-link", day.AddDate(0, 0, -4), []string{
+				"docs about " + t.terms,
+				"see the upstream page on " + t.terms + " and the " + t.terms + " faq",
+			}))
 		probes = append(probes, probe{query: t.terms, decision: t.id + "-decided"})
 
 		// A second shape, where nobody concluded anything: a human answer with
@@ -278,14 +283,15 @@ func corpus() ([]model.Session, []probe, []probe) {
 		// not merely inside one session — cross-message co-occurrence is what
 		// the relevance tier is for. A fixture that spreads them across turns
 		// measures the ladder, not the ranking.
-		out = append(out, session(t.id+"-answer", day.AddDate(0, 0, -6), []string{
-			"what is going on with " + t.terms + "?",
-			t.terms + " only happens on staging after a deploy, never locally",
-		}))
-		out = append(out, session(t.id+"-paste", day.AddDate(0, 0, -7), []string{
-			"pasting the output",
-			strings.Repeat("WARN "+t.terms+" staging deploy retry=3 conn=17 elapsed=812ms\n", 14),
-		}))
+		out = append(out,
+			session(t.id+"-answer", day.AddDate(0, 0, -6), []string{
+				"what is going on with " + t.terms + "?",
+				t.terms + " only happens on staging after a deploy, never locally",
+			}),
+			session(t.id+"-paste", day.AddDate(0, 0, -7), []string{
+				"pasting the output",
+				strings.Repeat("WARN "+t.terms+" staging deploy retry=3 conn=17 elapsed=812ms\n", 14),
+			}))
 		noise = append(noise, probe{query: t.terms + " staging deploy", decision: t.id + "-answer"})
 	}
 	return out, probes, noise

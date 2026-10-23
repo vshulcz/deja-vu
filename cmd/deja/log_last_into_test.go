@@ -23,7 +23,7 @@ func TestLogLastNamesTheRecipientAndTheTerms(t *testing.T) {
 	if err := runLogTo(&out, dir, []string{"--last"}); err != nil {
 		t.Fatal(err)
 	}
-	head := strings.SplitN(out.String(), "\n", 2)[0]
+	head, _, _ := strings.Cut(out.String(), "\n")
 	if !strings.Contains(head, "agent3") {
 		t.Errorf("header does not say which session received it: %q", head)
 	}

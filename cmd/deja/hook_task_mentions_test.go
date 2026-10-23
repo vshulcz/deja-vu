@@ -26,7 +26,7 @@ func TestSessionMentionsMatchesTheJoinedText(t *testing.T) {
 		}
 		return out
 	}
-	var msgs []model.Message
+	msgs := make([]model.Message, 0, 702)
 	for i := range 700 {
 		msgs = append(msgs, model.Message{Role: "user", Text: fmt.Sprintf("Step %d touched Store_%d.GO and KELVINK", i, i%50)})
 	}

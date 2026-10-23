@@ -1,11 +1,12 @@
 package main
 
 import (
-	"github.com/vshulcz/deja-vu/internal/index"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/index"
 )
 
 // An id copied off a result line can stand for more than one session, and the
@@ -81,10 +82,10 @@ func TestAnAmbiguousElidedIdIsRefusedAndExplained(t *testing.T) {
 
 	// An elided id that stands for exactly one session is not ambiguous and
 	// must still work — refusing every elision would undo #855.
-	if _, err := captureRun(t, "remember", "note about the davit ram seal", "--project", "payments-api"); err != nil {
+	if _, err = captureRun(t, "remember", "note about the davit ram seal", "--project", "payments-api"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := captureRunStderr(t, "index"); err != nil {
+	if _, err = captureRunStderr(t, "index"); err != nil {
 		t.Fatal(err)
 	}
 	out, err = captureRun(t, "forget", "--session", "deja-2026…ments-api", "--dry-run")

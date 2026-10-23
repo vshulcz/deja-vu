@@ -31,7 +31,7 @@ func TestFilesCapKeepsTheNewestSessions(t *testing.T) {
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
 	const old = 40
 	total := filesMaxSessions + old
-	for i := 0; i < total; i++ {
+	for i := range total {
 		id := fmt.Sprintf("s%04d", i)
 		// i < old are the oldest; each touches a file of its own.
 		touched := shared

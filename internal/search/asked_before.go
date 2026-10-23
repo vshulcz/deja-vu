@@ -1,8 +1,9 @@
 package search
 
 import (
-	"github.com/vshulcz/deja-vu/internal/digest"
 	"strings"
+
+	"github.com/vshulcz/deja-vu/internal/digest"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/prompt"
@@ -65,10 +66,7 @@ func AskedBefore(s model.Session, terms []string) string {
 				shared++
 			}
 		}
-		small := len(past)
-		if len(terms) < small {
-			small = len(terms)
-		}
+		small := min(len(terms), len(past))
 		if float64(shared)/float64(small) < askedAgainOverlap {
 			continue
 		}
@@ -87,11 +85,11 @@ func firstSentence(text string) string {
 	if i := strings.IndexAny(text, "\n"); i > 0 {
 		text = text[:i]
 	}
-	const max = 120
-	if len(text) <= max {
+	const most = 120
+	if len(text) <= most {
 		return text
 	}
-	cut := max
+	cut := most
 	for cut > 0 && !isRuneStart(text[cut]) {
 		cut--
 	}

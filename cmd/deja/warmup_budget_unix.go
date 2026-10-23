@@ -36,13 +36,7 @@ func takeWarmupBudget() {
 	// Half the cores, at least one, and never more than the eight a bucket
 	// write already uses: past that the index pass is waiting on the disk.
 	if os.Getenv("GOMAXPROCS") == "" {
-		n := runtime.NumCPU() / 2
-		if n < 1 {
-			n = 1
-		}
-		if n > 8 {
-			n = 8
-		}
+		n := min(max(runtime.NumCPU()/2, 1), 8)
 		runtime.GOMAXPROCS(n)
 		// For anything this process spawns of its own.
 		_ = os.Setenv("GOMAXPROCS", strconv.Itoa(n))

@@ -9,6 +9,7 @@ import (
 	"unicode"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/nfcfold"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -63,9 +64,9 @@ func runBrief(dir string, w io.Writer) error {
 		// one fact about their own work. Build the index — the progress display
 		// and the per-harness summary already exist — and show the brief.
 		if !index.HasManifest(dir) {
-			greeted, err := buildForFirstRun(dir)
-			if err != nil {
-				return err
+			greeted, buildErr := buildForFirstRun(dir)
+			if buildErr != nil {
+				return buildErr
 			}
 			justGreeted = greeted
 			if ov, err = index.OverviewServable(dir); err != nil {
@@ -102,6 +103,87 @@ func runBrief(dir string, w io.Writer) error {
 		fmt.Fprintf(w, "wire       %sno agent wired yet%s — `deja install --auto`\n", bold, reset)
 	}
 
+	printBriefActivity(w, dir, ov, bold, reset)
+
+	// Sessions ahead of the clock sit at the top of "recent" with dates that
+	// have not happened, and the counters above deliberately leave them out —
+	// so the screen has to say they exist, or the two disagree with no
+	// explanation (#696).
+	if ov.Future > 0 {
+		fmt.Fprintf(w, "ahead      %d session%s stamped later than this machine's clock\n", ov.Future, pluralS(ov.Future))
+	}
+
+	// The top line counts what is indexed; the auto rule decides what an agent
+	// actually gets. When it withholds every session the two disagree
+	// completely — the screen says the memory is there and no agent will ever
+	// see any of it — and the reader who set the rule has no reason to suspect
+	// it, because search and the listing below still answer. doctor has the
+	// number (#978); it is the fifth screen someone reaches for, not the first
+	// (#1067). Partial withholding stays quiet: the counters are still broadly
+	// true, and a caveat on every line is wallpaper.
+	// Every activation, not just auto: a rule on `search` withholds the
+	// reader's own queries, search says so on its own screen, and this one
+	// stayed silent (#1103, the shape #1102 fixed on the status line).
+	if withheld, total := policyWithheldCounts(dir); total > 0 && withheld[briefWithholdingRule(withheld, total)] == total {
+		fmt.Fprintf(w, "withheld   %sall %d session%s%s — your trust policy's "+briefWithholdingReach(briefWithholdingRule(withheld, total))+" (`deja doctor`)\n",
+			bold, total, pluralS(total), reset)
+	}
+
+	// Read the index as-is: the brief must never trigger a rebuild or let
+	// indexing narration tear through its layout.
+	// Filtered like every other browsing surface: `last`, search and the status
+	// line all refuse a session a rule withholds, and this screen named the
+	// project and the first line of it three times over (#1350, the shape #1026
+	// fixed on the status line). Asked for more than three so the block still
+	// fills when some are withheld.
+	//
+	// The search activation, while the asked-twice line below uses auto: the two
+	// serve different readers. This block is what the person is looking at, and
+	// browsing is what the search rule governs; that line is about what an agent
+	// would be handed, which is the auto rule's business.
+	recent, err := index.RecentMatching(dir, briefRecentLines*8, search.Options{})
+	if err == nil {
+		recent, _ = policyFilterSessionsCounted(policy.ActivationSearch, recent)
+		if len(recent) > briefRecentLines {
+			recent = recent[:briefRecentLines]
+		}
+	}
+	if err == nil && len(recent) > 0 {
+		printBriefRecent(w, recent, dim, reset)
+	}
+
+	printBriefRepeats(w, dir, bold, dim, reset)
+
+	// The greeting printed on a first build already ends with this exact
+	// suggestion. Printing it twice on the one screen that has to be legible
+	// is worse than not printing it at all.
+	if q := suggestFirstQuery(dir); q != "" && !justGreeted {
+		// The line is a command to copy, so it is never cut: an ellipsis inside
+		// it searches for a truncated word and a literal "…". What goes first
+		// is the note, and if the command alone still does not fit, the whole
+		// suggestion — the screen has other lines that say more (#1588).
+		room := printableWidth(w)
+		command := fmt.Sprintf("try        deja %q", q)
+		const note = " (from your own history)"
+		switch {
+		case room == 0 || barColumns(command+note) <= room:
+			fmt.Fprintf(w, "try        %sdeja %q%s %s(from your own history)%s\n", bold, q, reset, dim, reset)
+		case barColumns(command) <= room:
+			fmt.Fprintf(w, "try        %sdeja %q%s\n", bold, q, reset)
+		}
+	}
+	// Last, and only when it has something to say: a machine whose hooks point
+	// at a binary that is gone gets no memory at all, and the surfaces that
+	// would report that are the hooks themselves (#3502).
+	if note := deadHookNotice(dir); note != "" {
+		fmt.Fprintf(w, "%shooks      %s%s\n", bold, note, reset)
+	}
+	fmt.Fprintf(w, "%smore       deja log · deja stats · deja help%s\n", dim, reset)
+	return nil
+}
+
+// printBriefActivity prints the today and week lines from the usage counters.
+func printBriefActivity(w io.Writer, dir string, ov index.OverviewStats, bold, reset string) {
 	// One walk of the usage log for all four figures this screen prints. It
 	// took four, one per figure, and besides the cost they were four separate
 	// snapshots: an event recorded between two of them landed in the second
@@ -163,112 +245,74 @@ func runBrief(dir string, w io.Writer) error {
 		}
 		fmt.Fprintln(w, week)
 	}
+}
 
-	// Sessions ahead of the clock sit at the top of "recent" with dates that
-	// have not happened, and the counters above deliberately leave them out —
-	// so the screen has to say they exist, or the two disagree with no
-	// explanation (#696).
-	if ov.Future > 0 {
-		fmt.Fprintf(w, "ahead      %d session%s stamped later than this machine's clock\n", ov.Future, pluralS(ov.Future))
-	}
-
-	// The top line counts what is indexed; the auto rule decides what an agent
-	// actually gets. When it withholds every session the two disagree
-	// completely — the screen says the memory is there and no agent will ever
-	// see any of it — and the reader who set the rule has no reason to suspect
-	// it, because search and the listing below still answer. doctor has the
-	// number (#978); it is the fifth screen someone reaches for, not the first
-	// (#1067). Partial withholding stays quiet: the counters are still broadly
-	// true, and a caveat on every line is wallpaper.
-	// Every activation, not just auto: a rule on `search` withholds the
-	// reader's own queries, search says so on its own screen, and this one
-	// stayed silent (#1103, the shape #1102 fixed on the status line).
-	if withheld, total := policyWithheldCounts(dir); total > 0 && withheld[briefWithholdingRule(withheld, total)] == total {
-		fmt.Fprintf(w, "withheld   %sall %d session%s%s — your trust policy's "+briefWithholdingReach(briefWithholdingRule(withheld, total))+" (`deja doctor`)\n",
-			bold, total, pluralS(total), reset)
-	}
-
-	// Read the index as-is: the brief must never trigger a rebuild or let
-	// indexing narration tear through its layout.
-	// Filtered like every other browsing surface: `last`, search and the status
-	// line all refuse a session a rule withholds, and this screen named the
-	// project and the first line of it three times over (#1350, the shape #1026
-	// fixed on the status line). Asked for more than three so the block still
-	// fills when some are withheld.
-	//
-	// The search activation, while the asked-twice line below uses auto: the two
-	// serve different readers. This block is what the person is looking at, and
-	// browsing is what the search rule governs; that line is about what an agent
-	// would be handed, which is the auto rule's business.
-	recent, err := index.RecentMatching(dir, briefRecentLines*8, search.Options{})
-	if err == nil {
-		recent, _ = policyFilterSessionsCounted(policy.ActivationSearch, recent)
-		if len(recent) > briefRecentLines {
-			recent = recent[:briefRecentLines]
+// printBriefRecent prints the recent block, one line per session.
+func printBriefRecent(w io.Writer, recent []model.Session, dim, reset string) {
+	label := "recent    "
+	// The project is budgeted once for the whole block, against the widest
+	// line in it — usually the widest date, and a longer harness name where
+	// the block mixes harnesses. The line with no project in it is what
+	// gets measured, so the two separators and the date are all counted
+	// exactly once, and both separators are counted because the project is
+	// measured as if it were there — that is the line it has to fit. The
+	// continuation label below is the same width as this one, so measuring
+	// with the first line's label measures them all.
+	// Budgeting per line spelled one project three ways: a date carrying
+	// its year is five columns wider, so the tail was cut further on those
+	// lines and vanished from the widest one, and the block #1073 put
+	// together read as three different projects (#2128). A block of
+	// different projects pays for it — a short one on a narrow-date line is
+	// cut to a budget some other line set — which is the price of the block
+	// reading as a block.
+	blockRest := 0
+	for _, s := range recent {
+		bare := fmt.Sprintf("%s [%s] %s · %s · ", label, s.Harness, "", search.RelativeDate(s.Updated))
+		if r := barColumns(bare); r > blockRest {
+			blockRest = r
 		}
 	}
-	if err == nil && len(recent) > 0 {
-		label := "recent    "
-		// The project is budgeted once for the whole block, against the widest
-		// line in it — usually the widest date, and a longer harness name where
-		// the block mixes harnesses. The line with no project in it is what
-		// gets measured, so the two separators and the date are all counted
-		// exactly once, and both separators are counted because the project is
-		// measured as if it were there — that is the line it has to fit. The
-		// continuation label below is the same width as this one, so measuring
-		// with the first line's label measures them all.
-		// Budgeting per line spelled one project three ways: a date carrying
-		// its year is five columns wider, so the tail was cut further on those
-		// lines and vanished from the widest one, and the block #1073 put
-		// together read as three different projects (#2128). A block of
-		// different projects pays for it — a short one on a narrow-date line is
-		// cut to a budget some other line set — which is the price of the block
-		// reading as a block.
-		blockRest := 0
-		for _, s := range recent {
-			bare := fmt.Sprintf("%s [%s] %s · %s · ", label, s.Harness, "", search.RelativeDate(s.Updated))
-			if r := barColumns(bare); r > blockRest {
-				blockRest = r
-			}
+	for _, s := range recent {
+		title := s.Title
+		if title == "" {
+			title = firstUserTitle(s)
 		}
-		for _, s := range recent {
-			title := s.Title
-			if title == "" {
-				title = firstUserTitle(s)
-			}
-			// Budgeted against what is already on the line, not against a
-			// constant. Every other line on this screen has a fixed 11-column
-			// prefix; this one carries the harness, the project and a date,
-			// and a fixed 44-rune title on top of that overflowed 80 columns
-			// in every store state — worst on an old store, where "Jun 27
-			// 2025" is six columns longer than "today" and the three lines
-			// came out three different lengths (#1073).
-			// The project is the only part of this prefix that grows without
-			// bound, and a CJK name is two columns per character: at 60 columns
-			// the prefix alone reached 58, the budget fell to its floor and the
-			// line ran to 71 — a wrapped row rather than a ragged end (#1592).
-			// Shorten the path first, then budget the title against what is
-			// left. The title is still budgeted per line: that is what keeps
-			// the lines the same length when the dates are not.
-			project := fitBriefProject(s.Project, blockRest)
-			head := fmt.Sprintf("%s [%s] %s · ", label, s.Harness, search.RelativeDate(s.Updated))
-			if project != "" {
-				head = fmt.Sprintf("%s [%s] %s · %s · ", label, s.Harness, project, search.RelativeDate(s.Updated))
-			}
-			title = trimBriefTitleTo(title, briefTitleBudget(barColumns(head)))
-			if project != "" {
-				fmt.Fprintf(w, "%s %s[%s]%s %s · %s%s%s", label, dim, s.Harness, reset, project, dim, search.RelativeDate(s.Updated), reset)
-			} else {
-				fmt.Fprintf(w, "%s %s[%s]%s %s%s%s", label, dim, s.Harness, reset, dim, search.RelativeDate(s.Updated), reset)
-			}
-			if title != "" {
-				fmt.Fprintf(w, " · %s", title)
-			}
-			fmt.Fprintln(w)
-			label = "          "
+		// Budgeted against what is already on the line, not against a
+		// constant. Every other line on this screen has a fixed 11-column
+		// prefix; this one carries the harness, the project and a date,
+		// and a fixed 44-rune title on top of that overflowed 80 columns
+		// in every store state — worst on an old store, where "Jun 27
+		// 2025" is six columns longer than "today" and the three lines
+		// came out three different lengths (#1073).
+		// The project is the only part of this prefix that grows without
+		// bound, and a CJK name is two columns per character: at 60 columns
+		// the prefix alone reached 58, the budget fell to its floor and the
+		// line ran to 71 — a wrapped row rather than a ragged end (#1592).
+		// Shorten the path first, then budget the title against what is
+		// left. The title is still budgeted per line: that is what keeps
+		// the lines the same length when the dates are not.
+		project := fitBriefProject(s.Project, blockRest)
+		head := fmt.Sprintf("%s [%s] %s · ", label, s.Harness, search.RelativeDate(s.Updated))
+		if project != "" {
+			head = fmt.Sprintf("%s [%s] %s · %s · ", label, s.Harness, project, search.RelativeDate(s.Updated))
 		}
+		title = trimBriefTitleTo(title, briefTitleBudget(barColumns(head)))
+		if project != "" {
+			fmt.Fprintf(w, "%s %s[%s]%s %s · %s%s%s", label, dim, s.Harness, reset, project, dim, search.RelativeDate(s.Updated), reset)
+		} else {
+			fmt.Fprintf(w, "%s %s[%s]%s %s%s%s", label, dim, s.Harness, reset, dim, search.RelativeDate(s.Updated), reset)
+		}
+		if title != "" {
+			fmt.Fprintf(w, " · %s", title)
+		}
+		fmt.Fprintln(w)
+		label = "          "
 	}
+}
 
+// printBriefRepeats prints the lines drawn from the reader's own data: the
+// question asked twice, the memory re-used and the wall hit again.
+func printBriefRepeats(w io.Writer, dir, bold, dim, reset string) {
 	// The one line on this screen that says something a person could not have
 	// noticed themselves: a question they asked in more than one session. A
 	// count of sessions is reporting; this is the thing the tool is for.
@@ -332,33 +376,6 @@ func runBrief(dir string, w io.Writer) error {
 		fmt.Fprintf(w, "again      %s%d sessions · last %s · deja friction%s\n",
 			dim, len(f.Sessions), search.RelativeDate(f.Last), reset)
 	}
-
-	// The greeting printed on a first build already ends with this exact
-	// suggestion. Printing it twice on the one screen that has to be legible
-	// is worse than not printing it at all.
-	if q := suggestFirstQuery(dir); q != "" && !justGreeted {
-		// The line is a command to copy, so it is never cut: an ellipsis inside
-		// it searches for a truncated word and a literal "…". What goes first
-		// is the note, and if the command alone still does not fit, the whole
-		// suggestion — the screen has other lines that say more (#1588).
-		room := printableWidth(w)
-		command := fmt.Sprintf("try        deja %q", q)
-		const note = " (from your own history)"
-		switch {
-		case room == 0 || barColumns(command+note) <= room:
-			fmt.Fprintf(w, "try        %sdeja %q%s %s(from your own history)%s\n", bold, q, reset, dim, reset)
-		case barColumns(command) <= room:
-			fmt.Fprintf(w, "try        %sdeja %q%s\n", bold, q, reset)
-		}
-	}
-	// Last, and only when it has something to say: a machine whose hooks point
-	// at a binary that is gone gets no memory at all, and the surfaces that
-	// would report that are the hooks themselves (#3502).
-	if note := deadHookNotice(dir); note != "" {
-		fmt.Fprintf(w, "%shooks      %s%s\n", bold, note, reset)
-	}
-	fmt.Fprintf(w, "%smore       deja log · deja stats · deja help%s\n", dim, reset)
-	return nil
 }
 
 // plural and verbS keep "1 session mentions" from reading as "1 sessions
@@ -416,7 +433,7 @@ func briefRowMax(w io.Writer) int {
 	return briefTitleMax
 }
 
-func trimBriefTitleTo(t string, max int) string {
+func trimBriefTitleTo(t string, most int) string {
 	t = strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
 			return ' '
@@ -431,8 +448,8 @@ func trimBriefTitleTo(t string, max int) string {
 	// and a Chinese title is one rune and two columns per character, so a
 	// 44-rune cap printed 88 columns and the line the budget exists to fit
 	// ran off the edge (#1073 fixed the same overflow for Latin text).
-	if termwidth.Columns(t) > max {
-		return termwidth.Cut(t, max) + "…"
+	if termwidth.Columns(t) > most {
+		return termwidth.Cut(t, most) + "…"
 	}
 	return t
 }

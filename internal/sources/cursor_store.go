@@ -63,7 +63,7 @@ func (rs *cursorToolResults) take(name string, args map[string]any) (string, boo
 // sides decode numbers as json.Number, so `1e21` marshals back as written on
 // each, and map keys marshal sorted.
 func cursorCallKey(name string, args map[string]any) string {
-	b, _ := json.Marshal(args)
+	b, _ := json.Marshal(args) //nolint:errchkjson // args were decoded from JSON, so they encode
 	return name + "\x00" + string(b)
 }
 
@@ -228,11 +228,11 @@ func protoChildIDs(b []byte) []string {
 			b = b[4:]
 		case 2:
 			l, n := protoVarint(b)
-			if n == 0 || uint64(len(b)-n) < l {
+			if n == 0 || uint64(len(b)-n) < l { //nolint:gosec // n <= len(b)
 				return out
 			}
-			v := b[n : n+int(l)]
-			b = b[n+int(l):]
+			v := b[n : n+int(l)] //nolint:gosec // l <= len(b)-n, checked above
+			b = b[n+int(l):]     //nolint:gosec // l <= len(b)-n, checked above
 			if field == 1 && len(v) == 32 {
 				out = append(out, hex.EncodeToString(v))
 			}

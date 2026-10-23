@@ -24,7 +24,7 @@ func TestAHermesBranchsRecallLeavesOutItsSource(t *testing.T) {
 	t.Setenv("DEJA_HERMES_DB", db)
 	sqlite := func(script string) {
 		t.Helper()
-		if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+		if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 			t.Fatalf("sqlite: %v %s", err, out)
 		}
 	}

@@ -33,7 +33,7 @@ func projectFromPaths(ms []model.Message) string {
 		if m.Role != RoleFiles {
 			continue
 		}
-		for _, p := range strings.Split(m.Text, "\n") {
+		for p := range strings.SplitSeq(m.Text, "\n") {
 			p = strings.TrimSpace(p)
 			if p == "" {
 				continue
@@ -97,7 +97,8 @@ func repoRoot(dir string) string {
 		return ""
 	}
 	if v, ok := repoRootCache.Load(dir); ok {
-		return v.(string)
+		root, _ := v.(string)
+		return root
 	}
 	root := ""
 	// Stop when the parent stops changing rather than on "/": on Windows the

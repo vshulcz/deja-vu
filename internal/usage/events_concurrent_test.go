@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -29,11 +30,11 @@ func TestTheEventsLogStaysReadableUnderWriters(t *testing.T) {
 	wide := strings.Repeat("id", 400)
 	const writers, each = 4, 200
 	var wg sync.WaitGroup
-	for w := 0; w < writers; w++ {
+	for w := range writers {
 		wg.Add(1)
 		go func(w int) {
 			defer wg.Done()
-			for i := 0; i < each; i++ {
+			for i := range each {
 				RecordServedSessions(dir, KindSearch, 4000, 1, false, 40000,
 					[]string{fmt.Sprintf("%s-w%d-%d", wide, w, i)})
 			}
@@ -103,7 +104,7 @@ func seedOldEvents(t *testing.T, dir string) int64 {
 	var buf bytes.Buffer
 	for i := 0; buf.Len() < rotateAt+(1<<16); i++ {
 		e := Event{Time: old.Add(time.Duration(i) * time.Second), Kind: "seed", Bytes: 4000,
-			Sessions: 1, SessionIDs: []string{strings.Repeat("s", 800) + fmt.Sprint(i)}}
+			Sessions: 1, SessionIDs: []string{strings.Repeat("s", 800) + strconv.Itoa(i)}}
 		b, err := json.Marshal(e)
 		if err != nil {
 			t.Fatal(err)

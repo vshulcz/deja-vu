@@ -33,7 +33,7 @@ func TestQwenWiresTheFixPairToTheFailureEvent(t *testing.T) {
 			} `json:"hooks"`
 		} `json:"hooks"`
 	}
-	if err := json.Unmarshal(b, &cfg); err != nil {
+	if err = json.Unmarshal(b, &cfg); err != nil {
 		t.Fatalf("settings are not JSON qwen can read: %v\n%s", err, b)
 	}
 	find := func(event string) (string, string, bool) {
@@ -70,14 +70,14 @@ func TestQwenWiresTheFixPairToTheFailureEvent(t *testing.T) {
 		t.Errorf("PreToolUse is wired, and its output is not context:\n%s", b)
 	}
 	// Reinstalling must not double any of them.
-	if _, err := installQwenAuto("/bin/deja", false); err != nil {
+	if _, err = installQwenAuto("/bin/deja", false); err != nil {
 		t.Fatal(err)
 	}
 	b2, err := os.ReadFile(filepath.Join(home, ".qwen", "settings.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(b) != string(b2) {
+	if !bytes.Equal(b, b2) {
 		t.Errorf("a second install changed the file:\n%s\n%s", b, b2)
 	}
 }

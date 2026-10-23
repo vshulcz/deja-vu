@@ -16,12 +16,12 @@ import (
 // Recent history only, because CI checks out a shallow clone; what it
 // measures is the commits a PR would land, not the archive.
 func TestNoCommitCarriesAnAITrailer(t *testing.T) {
-	out, err := exec.Command("git", "log", "-60", "--format=%H%x00%B%x01").Output()
+	out, err := exec.CommandContext(t.Context(), "git", "log", "-60", "--format=%H%x00%B%x01").Output()
 	if err != nil {
 		t.Skipf("git log unavailable here: %v", err)
 	}
 	trailer := regexp.MustCompile(`(?im)^\s*(co-authored-by:.*anthropic\.com|claude-session:|.*claude\.ai/code/session_|.*generated with \[?claude code)`)
-	for _, rec := range strings.Split(string(out), "\x01") {
+	for rec := range strings.SplitSeq(string(out), "\x01") {
 		hash, body, ok := strings.Cut(rec, "\x00")
 		if !ok {
 			continue

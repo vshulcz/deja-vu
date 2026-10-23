@@ -27,7 +27,7 @@ func TestResumeKiroDBSessionRunsInItsDirectory(t *testing.T) {
 	q := func(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
 	seed := "CREATE TABLE conversations_v2 (key TEXT NOT NULL, conversation_id TEXT NOT NULL, value TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (key, conversation_id));\n" +
 		"INSERT INTO conversations_v2 VALUES (" + q(proj) + ",'bf73e1f5-0000-4000-8000-000000000002','{}',1,1);"
-	cmd := exec.Command("sqlite3", db)
+	cmd := exec.CommandContext(t.Context(), "sqlite3", db)
 	cmd.Stdin = strings.NewReader(seed)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("seed: %v: %s", err, out)

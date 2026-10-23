@@ -49,15 +49,15 @@ func autoUpdatesOff() bool {
 	return explicitBuilds.Load() == 0 && Manual()
 }
 
-// ManualStop is the error an Ensure returns when automatic updates are off
+// ManualStopError is the error an Ensure returns when automatic updates are off
 // and the index on disk cannot answer. Its text names the command to run.
-type ManualStop struct{ msg string }
+type ManualStopError struct{ msg string }
 
-func (e *ManualStop) Error() string { return e.msg }
+func (e *ManualStopError) Error() string { return e.msg }
 
 // IsManualStop reports an error from a build the switch refused.
 func IsManualStop(err error) bool {
-	var m *ManualStop
+	var m *ManualStopError
 	return errors.As(err, &m)
 }
 
@@ -65,14 +65,14 @@ func IsManualStop(err error) bool {
 // and the index on disk either answers or the error says how to build it.
 func manualCheck(dir string) error {
 	if !HasManifest(dir) {
-		return &ManualStop{"no index yet, and automatic indexing is off — build it with: deja index"}
+		return &ManualStopError{"no index yet, and automatic indexing is off — build it with: deja index"}
 	}
 	m, err := readManifestCached(dir)
 	if err != nil || !recordsReadable(dir, m) {
-		return &ManualStop{"the index could not be read, and automatic indexing is off — rebuild it with: deja index --rebuild"}
+		return &ManualStopError{"the index could not be read, and automatic indexing is off — rebuild it with: deja index --rebuild"}
 	}
 	if mustRebuildBeforeAnswering(m, version) {
-		return &ManualStop{"the index was written by an older deja and must be rebuilt, and automatic indexing is off — run: deja index"}
+		return &ManualStopError{"the index was written by an older deja and must be rebuilt, and automatic indexing is off — run: deja index"}
 	}
 	return nil
 }

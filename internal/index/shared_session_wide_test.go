@@ -31,7 +31,8 @@ func TestWideRandomPassesOverSharedSessionsMatchRebuild(t *testing.T) {
 }
 
 func wideSharedRun(t *testing.T, seed int64) {
-	rng := rand.New(rand.NewSource(seed))
+	t.Helper()
+	rng := rand.New(rand.NewSource(seed)) //nolint:gosec // a seeded fixture, not crypto
 	tmp := hermeticIndexEnv(t)
 	claude := os.Getenv("DEJA_CLAUDE_ROOT")
 	dir := filepath.Join(tmp, "idx")
@@ -192,9 +193,11 @@ func copiesView(t *testing.T, dir, harness, id string) string {
 }
 
 type wideLine struct {
-	SessionID string
-	Timestamp string
-	Message   struct{ Content string }
+	SessionID string `json:"sessionId"`
+	Timestamp string `json:"timestamp"`
+	Message   struct {
+		Content string `json:"content"`
+	} `json:"message"`
 }
 
 func parseWideLine(t *testing.T, l string) wideLine {
@@ -206,15 +209,20 @@ func parseWideLine(t *testing.T, l string) wideLine {
 	return w
 }
 
-func lineID(t *testing.T, l string) string { return parseWideLine(t, l).SessionID }
+func lineID(t *testing.T, l string) string {
+	t.Helper()
+	return parseWideLine(t, l).SessionID
+}
 
 // lineTurn is the line as sessionView prints it.
 func lineTurn(t *testing.T, l string) string {
+	t.Helper()
 	w := parseWideLine(t, l)
 	return "user|" + w.Timestamp + "|" + w.Message.Content
 }
 
 func holdsTurns(t *testing.T, have, want []string) bool {
+	t.Helper()
 	in := map[string]bool{}
 	for _, l := range have {
 		in[lineTurn(t, l)] = true

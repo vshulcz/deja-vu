@@ -61,11 +61,11 @@ func TestASecondBuildAdoptsEveryTargetsHookEntries(t *testing.T) {
 	replaced := 0
 	_ = filepath.Walk(home, func(p string, fi os.FileInfo, err error) error {
 		if err != nil || !fi.Mode().IsRegular() {
-			return nil
+			return nil //nolint:nilerr // unreadable entries are skipped
 		}
-		b, rerr := os.ReadFile(p)
+		b, rerr := os.ReadFile(p) //nolint:gosec // the test walks its own temp tree
 		if rerr != nil {
-			return nil
+			return nil //nolint:nilerr // unreadable entries are skipped
 		}
 		text := string(b)
 		for _, was := range []string{planted, jsonEscapedPath(planted)} {
@@ -78,7 +78,7 @@ func TestASecondBuildAdoptsEveryTargetsHookEntries(t *testing.T) {
 		if text == string(b) {
 			return nil
 		}
-		return os.WriteFile(p, []byte(text), fi.Mode().Perm())
+		return os.WriteFile(p, []byte(text), fi.Mode().Perm()) //nolint:gosec // the test walks its own temp tree
 	})
 	if replaced == 0 {
 		t.Fatal("no file named the binary the install wrote, so there is no stranger to plant")
@@ -111,15 +111,15 @@ func dejaHookLineCounts(t *testing.T, home string) map[string]int {
 	out := map[string]int{}
 	_ = filepath.Walk(home, func(p string, fi os.FileInfo, err error) error {
 		if err != nil || !fi.Mode().IsRegular() {
-			return nil
+			return nil //nolint:nilerr // unreadable entries are skipped
 		}
-		b, rerr := os.ReadFile(p)
+		b, rerr := os.ReadFile(p) //nolint:gosec // the test walks its own temp tree
 		if rerr != nil {
-			return nil
+			return nil //nolint:nilerr // unreadable entries are skipped
 		}
 		n := 0
 		for _, cmd := range hookCommandLinesIn(string(b)) {
-			for _, field := range strings.Fields(cmd) {
+			for field := range strings.FieldsSeq(cmd) {
 				if hookNames[strings.Trim(field, `"'`)] {
 					n++
 					break

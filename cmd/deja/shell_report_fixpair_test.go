@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -42,10 +43,11 @@ func assertShellReportPair(t *testing.T, errLine string, response map[string]any
 		"session_id": "live", "cwd": "/work/app",
 		"tool_name": "run_shell_command", "tool_input": map[string]any{"command": "go vet ./..."},
 	}
-	for k, v := range response {
-		payload[k] = v
+	maps.Copy(payload, response)
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
 	}
-	raw, _ := json.Marshal(payload)
 	var out bytes.Buffer
 	if err := runHookToolAfterMode(dir, bytes.NewReader(raw), &out, true); err != nil {
 		t.Fatal(err)
@@ -72,7 +74,7 @@ func qwenShellSessions(t *testing.T, fixOut string, fixCode int) {
 	result := func(id, sid, report string, i int) string {
 		return fmt.Sprintf(`{"sessionId":%q,"timestamp":%q,"type":"tool_result","cwd":"/work/app","message":{"role":"user","parts":[{"functionResponse":{"id":%q,"name":"run_shell_command","response":{"output":%q}}}]}}`, sid, ts(i), id, report)
 	}
-	for n := 0; n < 2; n++ {
+	for n := range 2 {
 		sid := fmt.Sprintf("qwen-%d", n)
 		rows := []string{
 			fmt.Sprintf(`{"sessionId":%q,"timestamp":%q,"type":"user","cwd":"/work/app","message":{"role":"user","parts":[{"text":"vet the project"}]}}`, sid, ts(0)),
@@ -120,7 +122,7 @@ func geminiShellSessions(t *testing.T, errOut string) string {
 			fmt.Sprintf(`{"id":"u%d","timestamp":%q,"type":"user","content":[%s]}`, i, ts(i), resp)
 	}
 	failed := "<untrusted_context>\nOutput: " + errOut + "\nExit Code: 1\nProcess Group PGID: 98713\n</untrusted_context>"
-	for n := 0; n < 2; n++ {
+	for n := range 2 {
 		sid := fmt.Sprintf("gemini-%d", n)
 		rows := []string{
 			fmt.Sprintf(`{"sessionId":%q,"projectHash":"abc","startTime":%q,"lastUpdated":%q,"kind":"main"}`, sid, ts(0), ts(5)),

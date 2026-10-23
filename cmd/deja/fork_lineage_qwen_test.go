@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -35,7 +34,7 @@ func qwenForkStore(t *testing.T) (dir, source, fork, forkPath string) {
 		if from != "" {
 			r["forkedFrom"] = map[string]any{"sessionId": from, "messageUuid": r["uuid"]}
 		}
-		b, _ := json.Marshal(r)
+		b := mustMarshal(t, r)
 		return string(b) + "\n"
 	}
 	turn := func(id, from, user, reply string, d time.Duration) string {
@@ -49,7 +48,7 @@ func qwenForkStore(t *testing.T) (dir, source, fork, forkPath string) {
 		}
 		return p
 	}
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		id := fmt.Sprintf("%08d-0000-4000-8000-000000000000", i)
 		d := -time.Duration(i+2) * time.Hour
 		write(id, turn(id, "", fmt.Sprintf("rename table%d in the billing schema", i), "done", d))
@@ -74,7 +73,7 @@ func qwenForkStore(t *testing.T) (dir, source, fork, forkPath string) {
 func TestAQwenBranchsDigestLeavesOutItsSource(t *testing.T) {
 	dir, source, fork, forkPath := qwenForkStore(t)
 	digest := func(sid, transcript string) string {
-		payload, _ := json.Marshal(map[string]string{"session_id": sid, "transcript_path": transcript, "cwd": "/w/p", "hook_event_name": "SessionStart", "source": "branch"})
+		payload := mustMarshal(t, map[string]string{"session_id": sid, "transcript_path": transcript, "cwd": "/w/p", "hook_event_name": "SessionStart", "source": "branch"})
 		withHookStdin(t, string(payload))
 		return captureStdout(t, func() {
 			if err := runHookContext(dir, true); err != nil {
@@ -96,7 +95,7 @@ func TestAQwenBranchsDigestLeavesOutItsSource(t *testing.T) {
 func TestAQwenBranchsPromptRecallLeavesOutItsSource(t *testing.T) {
 	dir, source, fork, forkPath := qwenForkStore(t)
 	ask := func(sid, transcript string) string {
-		payload, _ := json.Marshal(map[string]string{"session_id": sid, "transcript_path": transcript, "cwd": "/w/p", "prompt": forkQuestion})
+		payload := mustMarshal(t, map[string]string{"session_id": sid, "transcript_path": transcript, "cwd": "/w/p", "prompt": forkQuestion})
 		var out strings.Builder
 		if err := runHookPrompt(dir, strings.NewReader(string(payload)), &out); err != nil {
 			t.Fatal(err)

@@ -326,7 +326,7 @@ insert into cursorDiskKV values
  ('bubbleId:wrong', json('{"type":1,"text":"skip","timestamp":1752600001000}')),
  ('bubbleId:fallback:b1', json('{"type":1.0,"text":"` + long + `","timestamp":0,"workspaceProjectDir":"projdir"}'));
 `
-	cmd := exec.Command("sqlite3", db, schema)
+	cmd := exec.CommandContext(t.Context(), "sqlite3", db, schema)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}

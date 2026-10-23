@@ -3,6 +3,7 @@ package sources
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,12 +12,14 @@ import (
 
 func filesMsg(paths ...string) model.Message {
 	t := ""
+	var tSb14 strings.Builder
 	for i, p := range paths {
 		if i > 0 {
-			t += "\n"
+			tSb14.WriteString("\n")
 		}
-		t += p
+		tSb14.WriteString(p)
 	}
+	t += tSb14.String()
 	return model.Message{Role: RoleFiles, Text: t}
 }
 

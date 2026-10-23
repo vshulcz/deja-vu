@@ -70,8 +70,8 @@ func TestKimiForkKeepsOnlyItsOwnTurnsUnderItsSource(t *testing.T) {
 	if got := f.Started.UnixMilli(); got != 1792304313000 {
 		t.Errorf("fork starts at %d, want its own first turn 1792304313000", got)
 	}
-	if ss, _ := ParseKimiFile(copiedChild); len(ss) != 0 {
-		t.Errorf("a copied, unresumed sub-agent log reads as %d sessions of the fork: %#v", len(ss), ss)
+	if copied, _ := ParseKimiFile(copiedChild); len(copied) != 0 {
+		t.Errorf("a copied, unresumed sub-agent log reads as %d sessions of the fork: %#v", len(copied), copied)
 	}
 
 	// The source is untouched by the rule: it carries no forkedFrom.
@@ -200,7 +200,7 @@ func TestKimiSubagentIsReadByDefaultAsTaskAnswerAndChanges(t *testing.T) {
 	var b strings.Builder
 	b.WriteString(`{"type":"context.append_message","agentId":"agent-0","message":{"role":"user","content":[{"type":"text","text":"Ticket KQC-12 child task: create child2.txt"}],"origin":{"kind":"system_trigger","name":"subagent"}},"time":1792304060100}` + "\n")
 	b.WriteString(`{"type":"context.append_loop_event","agentId":"agent-0","event":{"type":"tool.call","toolCallId":"w1","name":"Write","args":{"path":"child2.txt","content":"the coder sub agent wrote this particular line KQC-12\n"}},"time":1792304060200}` + "\n")
-	for i := 0; i < 8; i++ {
+	for range 8 {
 		b.WriteString(`{"type":"context.append_loop_event","agentId":"agent-0","event":{"type":"tool.result","toolCallId":"r","result":{"output":"middleneedle reading"}},"time":1792304060300}` + "\n")
 	}
 	b.WriteString(`{"type":"context.append_message","agentId":"agent-0","message":{"role":"assistant","content":[{"type":"text","text":"created child2.txt"}]},"time":1792304060400}` + "\n")
@@ -217,7 +217,7 @@ func TestKimiSubagentIsReadByDefaultAsTaskAnswerAndChanges(t *testing.T) {
 	if err != nil || len(ss) != 1 {
 		t.Fatalf("parsed %d sessions: %v", len(ss), err)
 	}
-	var roles []string
+	roles := make([]string, 0, len(ss[0].Messages))
 	wrote := false
 	for _, m := range ss[0].Messages {
 		roles = append(roles, m.Role)

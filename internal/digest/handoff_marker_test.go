@@ -23,7 +23,7 @@ func TestAHandoffDoesNotContinuePastACutMarker(t *testing.T) {
 		})
 	}
 	add("user", "we need to cut the p99 on the orders endpoint from 900ms to under 300ms", 0)
-	for i := 0; i < 96; i++ {
+	for i := range 96 {
 		add("assistant", fmt.Sprintf("step %d: reading handler_%d.go and measuring the %dth span, weighing whether the pool or the retries explain it", i, i, i), 1+2*i)
 		add("user", fmt.Sprintf("go on (%d)", i), 2+2*i)
 	}
@@ -33,11 +33,11 @@ func TestAHandoffDoesNotContinuePastACutMarker(t *testing.T) {
 
 	for budget := 2000; budget <= 8000; budget += 500 {
 		block := Handoff(s, budget)
-		i := strings.Index(block, "…")
-		if i < 0 {
+		_, after, ok := strings.Cut(block, "…")
+		if !ok {
 			continue
 		}
-		rest := strings.TrimSpace(block[i+len("…"):])
+		rest := strings.TrimSpace(after)
 		// The closing sentence is deja's own framing and always ends the block;
 		// what must not follow the marker is more of the session.
 		rest = strings.TrimSpace(strings.TrimPrefix(rest, closingLine(s)))

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -54,14 +55,12 @@ func TestTheOptionalSessionKeysAreDocumentedToo(t *testing.T) {
 	var report struct {
 		Sessions []map[string]any `json:"sessions"`
 	}
-	if err := json.Unmarshal([]byte(out), &report); err != nil {
+	if err = json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatal(err)
 	}
 	emitted := map[string]any{}
 	for _, s := range report.Sessions {
-		for k, v := range s {
-			emitted[k] = v
-		}
+		maps.Copy(emitted, s)
 	}
 
 	// The fixture is worth nothing if it stops producing these.

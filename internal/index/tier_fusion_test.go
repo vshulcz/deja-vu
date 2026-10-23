@@ -18,23 +18,25 @@ func fusionIndex(t *testing.T) string {
 	t.Helper()
 	tmp := hermeticIndexEnv(t)
 	dir := filepath.Join(tmp, "idx")
-	var sessions []model.Session
-	for i := 0; i < 80; i++ {
+	sessions := make([]model.Session, 0, 82)
+	for i := range 80 {
 		sessions = append(sessions, model.Session{
 			ID: fmt.Sprintf("filler%02d", i), Harness: "claude", Project: "p", Updated: time.Now(),
 			Messages: []model.Message{{Role: "user", Text: "notes about the weekly planning meeting"}},
 		})
 	}
-	// Carries every word of the question and answers none of it.
-	sessions = append(sessions, model.Session{
-		ID: "incidental", Harness: "claude", Project: "p", Updated: time.Now(),
-		Messages: []model.Message{{Role: "user", Text: "many people own a bicycle; how many own a car is another question"}},
-	})
-	// Answers it, and is missing two of the question's words.
-	sessions = append(sessions, model.Session{
-		ID: "answer", Harness: "claude", Project: "p", Updated: time.Now(),
-		Messages: []model.Message{{Role: "user", Text: "I keep three bicycles in the garage, the blue one is my commuter"}},
-	})
+	sessions = append(sessions,
+		// Carries every word of the question and answers none of it.
+		model.Session{
+			ID: "incidental", Harness: "claude", Project: "p", Updated: time.Now(),
+			Messages: []model.Message{{Role: "user", Text: "many people own a bicycle; how many own a car is another question"}},
+		},
+		// Answers it, and is missing two of the question's words.
+		model.Session{
+			ID: "answer", Harness: "claude", Project: "p", Updated: time.Now(),
+			Messages: []model.Message{{Role: "user", Text: "I keep three bicycles in the garage, the blue one is my commuter"}},
+		},
+	)
 	if err := os.MkdirAll(filepath.Join(dir+".tmp", "buckets"), 0o700); err != nil {
 		t.Fatal(err)
 	}

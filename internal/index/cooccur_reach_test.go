@@ -1,7 +1,6 @@
 package index
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -19,15 +18,15 @@ func TestCooccurRescueRunsWhenThePostingsDoNotIntersect(t *testing.T) {
 	root := t.TempDir()
 	writeSession := func(i int, text string) {
 		line := func(role, body string) string {
-			b, _ := json.Marshal(map[string]any{
-				"type": role, "sessionId": "s" + string(rune('a'+i%26)) + string(rune('a'+i/26)),
+			b := mustJSON(map[string]any{
+				"type": role, "sessionId": "s" + string(rune('a'+i%26)) + string(rune('a'+i/26)), //nolint:gosec // i is a small loop index
 				"cwd": "/w", "timestamp": "2026-08-20T01:00:00Z",
 				"message": map[string]any{"role": role, "content": body},
 			})
 			return string(b)
 		}
 		body := line("user", text) + "\n" + line("assistant", "resolved: "+text) + "\n"
-		if err := os.WriteFile(filepath.Join(root, "s"+string(rune('a'+i%26))+string(rune('a'+i/26))+".jsonl"), []byte(body), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(root, "s"+string(rune('a'+i%26))+string(rune('a'+i/26))+".jsonl"), []byte(body), 0o644); err != nil { //nolint:gosec // i is a small loop index
 			t.Fatal(err)
 		}
 	}

@@ -20,9 +20,9 @@ func seedQuerySideCorpus(t *testing.T, sessions int) string {
 		t.Fatal(err)
 	}
 	const word = "cafe\u0301" // e + combining acute, written as escapes on purpose
-	for s := 0; s < sessions; s++ {
-		var lines []string
-		for i := 0; i < 20; i++ {
+	for s := range sessions {
+		lines := make([]string, 0, 20)
+		for i := range 20 {
 			text := fmt.Sprintf("the %s parser retried %d times before the pool was exhausted", word, i)
 			lines = append(lines, fmt.Sprintf(`{"type":"user","sessionId":"s%d","cwd":"/proj","timestamp":"2026-08-20T10:%02d:00Z","message":{"role":"user","content":%q}}`, s, i%60, text))
 		}

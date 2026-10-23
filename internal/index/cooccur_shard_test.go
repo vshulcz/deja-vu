@@ -37,10 +37,7 @@ func referenceCooccur(ss []model.Session) map[string][]string {
 		}
 		perSession = append(perSession, list)
 	}
-	maxDF := len(ss) / 4
-	if maxDF < 8 {
-		maxDF = 8
-	}
+	maxDF := max(len(ss)/4, 8)
 	type pair struct{ a, b string }
 	pairs := map[pair]int{}
 	for _, list := range perSession {
@@ -59,7 +56,7 @@ func referenceCooccur(ss []model.Session) map[string][]string {
 		if len(kept) > cooccurTokensPerSn {
 			kept = kept[:cooccurTokensPerSn]
 		}
-		for i := 0; i < len(kept); i++ {
+		for i := range kept {
 			for j := i + 1; j < len(kept); j++ {
 				a, b := kept[i], kept[j]
 				if a > b {
@@ -111,10 +108,10 @@ func referenceCooccur(ss []model.Session) map[string][]string {
 // 23475 above it.
 func shardTestCorpus(sessions int) []model.Session {
 	ss := make([]model.Session, 0, sessions)
-	for i := 0; i < sessions; i++ {
+	for i := range sessions {
 		var b strings.Builder
-		x := uint32(i*2654435761 + 999)
-		for j := 0; j < 40; j++ {
+		x := uint32(i*2654435761 + 999) //nolint:gosec // wraps on purpose, it seeds a hash
+		for range 40 {
 			x = x*1664525 + 1013904223
 			fmt.Fprintf(&b, "token%05d ", x%400)
 		}

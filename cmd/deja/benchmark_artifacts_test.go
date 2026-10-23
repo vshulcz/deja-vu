@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -86,7 +87,7 @@ func TestBenchmarkPageMatchesTheCommittedRuns(t *testing.T) {
 		{"the full-set questions", fmt.Sprintf("(%d questions, abstention included)", full.Total.N)},
 		{"the full-set hit@1", "hit@1 " + pct1(full.Total.Hit1)},
 		{"the full-set MRR", "MRR " + mrr3(full.Total.MRR)},
-		{"LoCoMo questions", fmt.Sprintf("%s questions", withThousands(locomo.Total.N))},
+		{"LoCoMo questions", withThousands(locomo.Total.N) + " questions"},
 		{"LoCoMo hit@1", "hit@1 " + pct1(locomo.Total.Hit1)},
 		{"LoCoMo hit@5", "hit@5 " + pct1(locomo.Total.Hit5)},
 		{"LoCoMo MRR", "MRR " + mrr3(locomo.Total.MRR)},
@@ -142,7 +143,7 @@ func TestQuotedHeadlineNumbersComeFromTheRuns(t *testing.T) {
 		t.Fatal(err)
 	}
 	var lme benchArtifact
-	if err := json.Unmarshal(b, &lme); err != nil {
+	if err = json.Unmarshal(b, &lme); err != nil {
 		t.Fatal(err)
 	}
 	locomoRaw, err := os.ReadFile(filepath.Join(root, "docs", "benchmarks", "locomo.json"))
@@ -150,7 +151,7 @@ func TestQuotedHeadlineNumbersComeFromTheRuns(t *testing.T) {
 		t.Fatal(err)
 	}
 	var locomo benchArtifact
-	if err := json.Unmarshal(locomoRaw, &locomo); err != nil {
+	if err = json.Unmarshal(locomoRaw, &locomo); err != nil {
 		t.Fatal(err)
 	}
 
@@ -159,7 +160,7 @@ func TestQuotedHeadlineNumbersComeFromTheRuns(t *testing.T) {
 		t.Fatal(err)
 	}
 	var full benchArtifact
-	if err := json.Unmarshal(fullRaw, &full); err != nil {
+	if err = json.Unmarshal(fullRaw, &full); err != nil {
 		t.Fatal(err)
 	}
 
@@ -182,9 +183,9 @@ func TestQuotedHeadlineNumbersComeFromTheRuns(t *testing.T) {
 		"docs/llms.txt",
 		"docs/guide/compare.html",
 	} {
-		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name)))
-		if err != nil {
-			t.Fatalf("%s: %v", name, err)
+		raw, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(name)))
+		if readErr != nil {
+			t.Fatalf("%s: %v", name, readErr)
 		}
 		text := string(raw)
 		// By offset, not by the matched text: two quotes in one file can read
@@ -248,49 +249,40 @@ func TestQuotedHeadlineNumbersComeFromTheRuns(t *testing.T) {
 // looking after the figure as well would read the READMEs' "88.1% hit@1 ·
 // LoCoMo 70.6%" as one claim about LoCoMo.
 func namesBefore(text string, start int, word string) bool {
-	lo := start - 25
-	if lo < 0 {
-		lo = 0
-	}
+	lo := max(start-25, 0)
 	return strings.Contains(text[lo:start], word)
 }
 
 func namesTheFullSet(text string, start, end, n int) bool {
 	// A narrow window on purpose: one cell states both runs, so a wide one
 	// reads the full set's denominator as the cleaned figure's too.
-	lo := start - 40
-	if lo < 0 {
-		lo = 0
-	}
-	hi := end + 40
-	if hi > len(text) {
-		hi = len(text)
-	}
-	return strings.Contains(text[lo:hi], fmt.Sprint(n))
+	lo := max(start-40, 0)
+	hi := min(end+40, len(text))
+	return strings.Contains(text[lo:hi], strconv.Itoa(n))
 }
 
 // countedBefore returns the data-count value of the counter a label belongs to.
 func countedBefore(html, label string) (string, bool) {
-	at := strings.Index(html, label)
-	if at < 0 {
+	before, _, ok := strings.Cut(html, label)
+	if !ok {
 		return "", false
 	}
 	const attr = `data-count="`
-	open := strings.LastIndex(html[:at], attr)
+	open := strings.LastIndex(before, attr)
 	if open < 0 {
 		return "", false
 	}
 	rest := html[open+len(attr):]
-	end := strings.IndexByte(rest, '"')
-	if end < 0 {
+	before0, _, ok0 := strings.Cut(rest, "\"")
+	if !ok0 {
 		return "", false
 	}
-	return rest[:end], true
+	return before0, true
 }
 
 // withThousands writes 1982 the way the page does.
 func withThousands(n int) string {
-	s := fmt.Sprint(n)
+	s := strconv.Itoa(n)
 	for i := len(s) - 3; i > 0; i -= 3 {
 		s = s[:i] + "," + s[i:]
 	}

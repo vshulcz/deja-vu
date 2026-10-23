@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -26,6 +27,7 @@ const sidecarVersion uint16 = 3
 
 var magic = [4]byte{'D', 'J', 'V', '1'}
 
+// Vector is one record's embedding and where to find the record.
 type Vector struct {
 	Offset int64
 	// Ident is the record's identity (RecordIdent), what finds the record
@@ -88,14 +90,14 @@ func identHash() *fnv { h := fnv(14695981039346656037); return &h }
 const fnvPrime = 1099511628211
 
 func (h *fnv) str(s string) {
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		*h = (*h ^ fnv(s[i])) * fnvPrime
 	}
 	*h *= fnvPrime
 }
 
 func (h *fnv) num(n uint64) {
-	for i := 0; i < 8; i++ {
+	for range 8 {
 		*h = (*h ^ fnv(n&0xff)) * fnvPrime
 		n >>= 8
 	}
@@ -172,6 +174,7 @@ func (l *recordLookup) find(v Vector) (index.OffsetRecord, bool) {
 	return r, ok && r.Record.Key == v.Key
 }
 
+// Sidecar is the vectors file kept beside an index.
 type Sidecar struct {
 	Model, Generation string
 	Dim               int
@@ -237,6 +240,7 @@ func splitGeneration(gen string) (stamp string, size int64, ok bool) {
 	return gen[:i], n, true
 }
 
+// Path is where the sidecar for the index in dir lives.
 func Path(dir string) string {
 	return strings.TrimSuffix(dir, string(os.PathSeparator)) + ".vectors.bin"
 }
@@ -245,7 +249,7 @@ func Path(dir string) string {
 // keep decides which records are sent: it is how the caller keeps content the
 // trust policy withholds off the wire to an external endpoint. A nil keep
 // embeds every record.
-func EmbedIndex(dir string, client *Client, keep func(index.Record) bool) (Sidecar, error) {
+func EmbedIndex(dir string, client *Client, keep func(index.Record) bool) (Sidecar, error) { //nolint:revive // the name is used from cmd/deja
 	recs, err := index.ReadRecords(dir)
 	if err != nil {
 		return Sidecar{}, fmt.Errorf("read index records: %w", err)
@@ -295,10 +299,7 @@ func EmbedIndex(dir string, client *Client, keep func(index.Record) bool) (Sidec
 	pending := toEmbed(recs, covered)
 	batches := 0
 	for len(pending) > 0 {
-		n := len(pending)
-		if n > embedBatch {
-			n = embedBatch
-		}
+		n := min(len(pending), embedBatch)
 		texts := make([]string, n)
 		for i := range pending[:n] {
 			texts[i] = client.PassagePrefix + truncate(pending[i].Record.Text)
@@ -433,6 +434,7 @@ func Read(dir string) (Sidecar, error) {
 	return car, nil
 }
 
+//nolint:gocritic // one err carries through the fixed field sequence
 func readFile(path string) (Sidecar, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -445,13 +447,13 @@ func readFile(path string) (Sidecar, error) {
 	r := bufio.NewReaderSize(f, 1<<16)
 	var got [4]byte
 	if _, err = io.ReadFull(r, got[:]); err != nil || got != magic {
-		return Sidecar{}, fmt.Errorf("invalid vector sidecar")
+		return Sidecar{}, errors.New("invalid vector sidecar")
 	}
 	var version, dim uint16
 	var count, covered uint64
 	var model, gen string
 	if err = binary.Read(r, binary.LittleEndian, &version); err != nil || version < 1 || version > sidecarVersion {
-		return Sidecar{}, fmt.Errorf("unsupported vector sidecar")
+		return Sidecar{}, errors.New("unsupported vector sidecar")
 	}
 	if err = binary.Read(r, binary.LittleEndian, &dim); err != nil {
 		return Sidecar{}, err
@@ -466,7 +468,7 @@ func readFile(path string) (Sidecar, error) {
 		return Sidecar{}, err
 	}
 	if count > 10_000_000 || dim > 16_384 {
-		return Sidecar{}, fmt.Errorf("invalid vector sidecar dimensions")
+		return Sidecar{}, errors.New("invalid vector sidecar dimensions")
 	}
 	if err = binary.Read(r, binary.LittleEndian, &covered); err != nil {
 		return Sidecar{}, err
@@ -507,11 +509,11 @@ func write(dir string, s Sidecar) error {
 		ew := &errWriter{w: w}
 		ew.write(magic[:])
 		ew.num(sidecarVersion)
-		ew.num(uint16(s.Dim))
+		ew.num(uint16(s.Dim)) //nolint:gosec // model dimensions are far below 65536, and readFile refuses above 16384
 		ew.str(s.Model)
 		ew.str(s.Generation)
 		ew.num(uint64(len(s.Vectors)))
-		ew.num(uint64(s.Covered))
+		ew.num(uint64(s.Covered)) //nolint:gosec // a count, never negative
 		for _, v := range s.Vectors {
 			ew.num(v.Offset)
 			ew.num(v.Ident)
@@ -547,7 +549,7 @@ func (e *errWriter) str(v string) {
 }
 
 func writeString(w interface{ Write([]byte) (int, error) }, s string) error {
-	if err := binary.Write(w, binary.LittleEndian, uint32(len(s))); err != nil {
+	if err := binary.Write(w, binary.LittleEndian, uint32(len(s))); err != nil { //nolint:gosec // model names and session keys are far below 4 GiB
 		return err
 	}
 	_, err := w.Write([]byte(s))
@@ -564,6 +566,9 @@ func readString(r io.Reader) (string, error) {
 	}
 	return string(b), nil
 }
+
+// Cosine is the cosine similarity of a and b, zero when they differ in length
+// or either is empty or all zeros.
 func Cosine(a, b []float32) float64 {
 	if len(a) != len(b) || len(a) == 0 {
 		return 0

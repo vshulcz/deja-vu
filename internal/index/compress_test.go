@@ -89,9 +89,11 @@ func TestCompressedDumpsStaySearchable(t *testing.T) {
 		t.Fatalf("compressed dump not found: %d sessions", len(ss))
 	}
 	var full string
+	var fullSb92 strings.Builder
 	for _, m := range ss[0].Messages {
-		full += m.Text
+		fullSb92.WriteString(m.Text)
 	}
+	full += fullSb92.String()
 	if !strings.Contains(full, "quetzalcoatlmarker") || len(full) < len(dump) {
 		t.Fatalf("compressed dump came back truncated: %d bytes, want >= %d", len(full), len(dump))
 	}

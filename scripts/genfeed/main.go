@@ -17,6 +17,7 @@ package main
 
 import (
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -87,7 +88,7 @@ func run() error {
 		return err
 	}
 	var sm sitemap
-	if err := xml.Unmarshal(b, &sm); err != nil {
+	if err = xml.Unmarshal(b, &sm); err != nil {
 		return fmt.Errorf("docs/sitemap.xml: %w", err)
 	}
 
@@ -98,9 +99,9 @@ func run() error {
 		if loc == "" || day == "" {
 			continue
 		}
-		title, summary, err := pageText(loc)
-		if err != nil {
-			return err
+		title, summary, perr := pageText(loc)
+		if perr != nil {
+			return perr
 		}
 		if title == "" {
 			continue // not a page this repository serves
@@ -114,7 +115,7 @@ func run() error {
 		})
 	}
 	if len(all) == 0 {
-		return fmt.Errorf("docs/sitemap.xml named no pages")
+		return errors.New("docs/sitemap.xml named no pages")
 	}
 	// Newest first, and by URL inside a day so a run twice over the same tree
 	// writes the same file.

@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -29,7 +30,7 @@ func writeHermesDB(t *testing.T, dir string, rows string) string {
 		timestamp REAL NOT NULL,
 		token_count INTEGER,
 		finish_reason TEXT);` + rows
-	cmd := exec.Command("sqlite3", db)
+	cmd := exec.CommandContext(t.Context(), "sqlite3", db)
 	cmd.Stdin = strings.NewReader(schema)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3: %v\n%s", err, out)
@@ -161,7 +162,7 @@ func TestHermesFindsTheRootStore(t *testing.T) {
 		t.Fatalf("sessions = %d, want one from each store", len(ss))
 	}
 	// The root store has no profile directory to be named after.
-	var names []string
+	names := make([]string, 0, len(ss))
 	for _, s := range ss {
 		names = append(names, s.Project)
 	}
@@ -181,10 +182,5 @@ func TestHermesFindsTheRootStore(t *testing.T) {
 }
 
 func contains(ss []string, want string) bool {
-	for _, s := range ss {
-		if s == want {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(ss, want)
 }

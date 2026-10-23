@@ -63,7 +63,7 @@ func TestDoctorCallsNoStoreOnABareHomeUnplugged(t *testing.T) {
 
 	var out bytes.Buffer
 	doctorHarnesses(&out, filepath.Join(tmp, "index.db"))
-	for _, line := range strings.Split(out.String(), "\n") {
+	for line := range strings.SplitSeq(out.String(), "\n") {
 		if strings.Contains(line, "unplugged") {
 			t.Errorf("row on a bare home: %q", line)
 		}

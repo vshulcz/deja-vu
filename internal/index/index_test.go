@@ -68,7 +68,7 @@ func TestIndexIngestSkipAndSearch(t *testing.T) {
 		t.Fatalf("unexpected filtered recent sessions: %#v", filteredRecent)
 	}
 	var second bytes.Buffer
-	if err := Ensure(dir, "claude", false, &second); err != nil {
+	if err = Ensure(dir, "claude", false, &second); err != nil {
 		t.Fatal(err)
 	}
 	if second.Len() != 0 {
@@ -102,7 +102,7 @@ func TestReadRecordsAndGeneration(t *testing.T) {
 	if off != 0 || f.Close() != nil {
 		t.Fatal("record write did not start at zero")
 	}
-	if err := writeManifest(dir, Manifest{Version: version, Sessions: map[string]SessionMeta{}, RecordStrings: wtbl.strs}); err != nil {
+	if err = writeManifest(dir, Manifest{Version: version, Sessions: map[string]SessionMeta{}, RecordStrings: wtbl.strs}); err != nil {
 		t.Fatal(err)
 	}
 	got, err := ReadRecords(dir)
@@ -194,7 +194,7 @@ func TestSyncExportImportSearchIdempotent(t *testing.T) {
 	}
 	// A second export may resend the records sitting exactly on the
 	// watermark; what must hold is that importing twice changes nothing.
-	if _, err := Export(dirA, batchDir); err != nil {
+	if _, err = Export(dirA, batchDir); err != nil {
 		t.Fatal(err)
 	}
 	dirB := filepath.Join(tmp, "b.db")
@@ -336,7 +336,7 @@ func TestMultiWordSearchUsesAllPostingsAndDoesNotFullScan(t *testing.T) {
 	}
 	// Manifest committed after the append: the size stamp covers the record,
 	// but no posting points at it — the full-scan bait stays in place.
-	if err := writeManifest(dir, m); err != nil {
+	if err = writeManifest(dir, m); err != nil {
 		t.Fatal(err)
 	}
 	ss, err = Search(dir, search.Options{Query: "jwt only refresh", Harness: "claude"})
@@ -387,14 +387,14 @@ func TestIncrementalOnlyReingestsChangedFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = f.WriteString(`{"type":"assistant","sessionId":"s1","timestamp":"2026-01-02T03:06:05Z","message":{"role":"assistant","content":"gamma appended"}}` + "\n")
-	f.Close()
+	_ = f.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
 	now := time.Now().Add(time.Second)
 	_ = os.Chtimes(s1, now, now)
 	var log bytes.Buffer
-	if err := Ensure(dir, "claude", false, &log); err != nil {
+	if err = Ensure(dir, "claude", false, &log); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(log.String(), "deja: updated 1 file (1 new message)") {
@@ -430,10 +430,10 @@ func TestIncrementalAppendOneFileBenchmarkStyle(t *testing.T) {
 		t.Fatal(err)
 	}
 	const fileCount = 30
-	for i := 0; i < fileCount; i++ {
+	for i := range fileCount {
 		p := filepath.Join(proj, fmt.Sprintf("s%02d.jsonl", i))
 		var b strings.Builder
-		for j := 0; j < 30; j++ {
+		for j := range 30 {
 			fmt.Fprintf(&b, `{"type":"user","sessionId":"s%02d","timestamp":"2026-01-02T03:%02d:05Z","message":{"role":"user","content":"fixture stable-%02d message-%02d"}}`+"\n", i, j%60, i, j)
 		}
 		if err := os.WriteFile(p, []byte(b.String()), 0o644); err != nil {
@@ -462,16 +462,16 @@ func TestIncrementalAppendOneFileBenchmarkStyle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 12; i++ {
+	for i := range 12 {
 		fmt.Fprintf(f, `{"type":"assistant","sessionId":"s17","timestamp":"2026-01-02T04:%02d:05Z","message":{"role":"assistant","content":"one-file incremental-needle new-%02d"}}`+"\n", i, i)
 	}
-	if err := f.Close(); err != nil {
+	if err = f.Close(); err != nil {
 		t.Fatal(err)
 	}
 	now := time.Now().Add(2 * time.Second)
 	_ = os.Chtimes(changed, now, now)
 	var log bytes.Buffer
-	if err := EnsureForSearch(dir, search.Options{Query: "incremental-needle", Harness: "claude"}, false, &log); err != nil {
+	if err = EnsureForSearch(dir, search.Options{Query: "incremental-needle", Harness: "claude"}, false, &log); err != nil {
 		t.Fatal(err)
 	}
 	if lastIngestFiles != 1 {
@@ -671,10 +671,10 @@ func BenchmarkColdEnsureSynthetic(b *testing.B) {
 	}
 	const fileCount = 200
 	const messagesPerFile = 200
-	for i := 0; i < fileCount; i++ {
+	for i := range fileCount {
 		p := filepath.Join(proj, fmt.Sprintf("s%03d.jsonl", i))
 		var sb strings.Builder
-		for j := 0; j < messagesPerFile; j++ {
+		for j := range messagesPerFile {
 			role := "user"
 			if j%2 == 1 {
 				role = "assistant"
@@ -688,7 +688,7 @@ func BenchmarkColdEnsureSynthetic(b *testing.B) {
 	b.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := range b.N {
 		dir := filepath.Join(tmp, fmt.Sprintf("index-%d.db", i))
 		start := time.Now()
 		if err := Ensure(dir, "claude", false, nil); err != nil {
@@ -707,10 +707,10 @@ func BenchmarkWarmSearchSynthetic(b *testing.B) {
 	}
 	const fileCount = 1250
 	const messagesPerFile = 12
-	for i := 0; i < fileCount; i++ {
+	for i := range fileCount {
 		p := filepath.Join(proj, fmt.Sprintf("s%04d.jsonl", i))
 		var sb strings.Builder
-		for j := 0; j < messagesPerFile; j++ {
+		for j := range messagesPerFile {
 			role := "user"
 			if j%2 == 1 {
 				role = "assistant"
@@ -735,7 +735,7 @@ func BenchmarkWarmSearchSynthetic(b *testing.B) {
 		b.Run(name, func(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for range b.N {
 				start := time.Now()
 				ss, err := Search(dir, o)
 				if err != nil {
@@ -905,9 +905,9 @@ func TestRedactsSecretsAtIngest(t *testing.T) {
 		// relevance tier may legitimately surface the session via the
 		// non-secret words around a masked value (postgres, localhost), so
 		// the invariant is value absence in results, not result emptiness.
-		ss, err := Search(dir, search.Options{Query: secret, Harness: "claude"})
-		if err != nil {
-			t.Fatal(err)
+		ss, searchErr := Search(dir, search.Options{Query: secret, Harness: "claude"})
+		if searchErr != nil {
+			t.Fatal(searchErr)
 		}
 		for _, sess := range ss {
 			for _, m := range sess.Messages {
@@ -920,9 +920,9 @@ func TestRedactsSecretsAtIngest(t *testing.T) {
 	// The secret VALUES themselves must stay unfindable: no session should
 	// match a query made of the masked value alone.
 	for _, value := range []string{"pass1234567890", "1234567890abcdefghijklmnop", "MIIEpAIBAAKCAQEAfakefakefakefakefake"} {
-		ss, err := Search(dir, search.Options{Query: value, Harness: "claude"})
-		if err != nil {
-			t.Fatal(err)
+		ss, searchErr := Search(dir, search.Options{Query: value, Harness: "claude"})
+		if searchErr != nil {
+			t.Fatal(searchErr)
 		}
 		if len(ss) != 0 {
 			t.Fatalf("masked value %q still findable: %#v", value, ss)

@@ -30,7 +30,7 @@ func encodeLikeClaude(p string) string {
 // returns what the next prompt answers for the same session.
 func precompactThen(t *testing.T, dir, workspace string, payload map[string]any, harnessArg string) string {
 	t.Helper()
-	b, _ := json.Marshal(payload)
+	b := mustMarshal(t, payload)
 	withHookStdin(t, string(b))
 	runHookPrecompactFor(dir, harnessArg)
 	id, _ := payload["session_id"].(string)
@@ -64,7 +64,7 @@ func TestQwenCompactionIsReadByItsOwnReader(t *testing.T) {
 	workspace := compactionGitRepo(t)
 	dir := index.DefaultDir()
 	const id = "6b1135fe-cb54-43e4-baf1-da67b80b22f3"
-	cwd, _ := json.Marshal(workspace)
+	cwd := mustMarshal(t, workspace)
 	rec := func(s string) string { return strings.ReplaceAll(s, "@CWD@", string(cwd)) }
 	path := filepath.Join(sources.QwenRoot(), "projects", encodeLikeClaude(workspace), "chats", id+".jsonl")
 	compactionWrite(t, path, strings.Join([]string{
@@ -101,9 +101,9 @@ func TestTraeRolloutCompactionIsReadByTheTraeReader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	quoted, _ := json.Marshal(workspace)
+	quoted := mustMarshal(t, workspace)
 	rollout := strings.ReplaceAll(string(b), "WORKSPACE_PATH", strings.Trim(string(quoted), `"`))
-	if _, err := sources.ReadCompactionTranscript(writeTemp(t, rollout), id); err == nil {
+	if _, err = sources.ReadCompactionTranscript(writeTemp(t, rollout), id); err == nil {
 		t.Fatal("the Codex tail reader took a TRAE 0.207 rollout; the fixture no longer shows the case")
 	}
 	path := filepath.Join(sources.TraeRoot(), "sessions", "2026", "10", "07", "rollout-2026-10-07T13-12-58-"+id+".jsonl")
@@ -123,7 +123,7 @@ func TestTraeRolloutCompactionIsReadByTheTraeReader(t *testing.T) {
 		t.Fatal(err)
 	}
 	var capture *usage.Event
-	for _, line := range strings.Split(strings.TrimSpace(string(journal)), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(string(journal)), "\n") {
 		var e usage.Event
 		if json.Unmarshal([]byte(line), &e) == nil && e.Kind == usage.KindCompactionCapture {
 			capture = &e

@@ -65,7 +65,7 @@ func TestAnUnwritableIndexReadsTheSameEverywhere(t *testing.T) {
 	var out bytes.Buffer
 	doctorIndexSection(t, &out, dir)
 	line := ""
-	for _, l := range strings.Split(out.String(), "\n") {
+	for l := range strings.SplitSeq(out.String(), "\n") {
 		if strings.Contains(l, "freshness") {
 			line = l
 		}

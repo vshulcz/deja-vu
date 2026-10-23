@@ -9,6 +9,7 @@ import (
 // Key names a key that is not a printable rune.
 type Key int
 
+// The keys. KeyRune is a printable rune, held in Event.Rune.
 const (
 	KeyRune Key = iota
 	KeyEnter
@@ -31,6 +32,7 @@ const (
 // Kind tells an Event's fields apart.
 type Kind int
 
+// The kinds of event.
 const (
 	EvKey Kind = iota
 	EvMouse
@@ -45,6 +47,7 @@ const (
 	MouseWheelDown = 65
 )
 
+// Event is one thing the terminal reported: a key, a mouse action, a paste or a resize.
 type Event struct {
 	Kind Kind
 	Key  Key

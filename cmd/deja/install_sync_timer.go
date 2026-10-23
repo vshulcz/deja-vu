@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -66,8 +67,8 @@ func installSyncTimerLaunchd(exe string, uninstall bool) (installResult, error) 
 		return installResult{}, err
 	}
 	noteCreatedDirs(filepath.Dir(path))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return installResult{}, err
+	if merr := os.MkdirAll(filepath.Dir(path), 0o755); merr != nil {
+		return installResult{}, merr
 	}
 	next := []byte(syncAutoPlist(exe))
 	action, err := writeIfChanged(path, old, next)
@@ -82,7 +83,7 @@ func installSyncTimerLaunchd(exe string, uninstall bool) (installResult, error) 
 			_, _ = runLaunchctl("unload", path)
 		}
 		if out, err := runLaunchctl("load", path); err != nil {
-			return installResult{}, fmt.Errorf("wrote %s but launchctl refused it: %v: %s", path, err, out)
+			return installResult{}, fmt.Errorf("wrote %s but launchctl refused it: %w: %s", path, err, out)
 		}
 	}
 	return installResult{Path: path, Action: action}, nil
@@ -184,11 +185,11 @@ func installSyncTimerSystemd(exe string, uninstall bool) (installResult, error) 
 		return installResult{}, err
 	}
 	noteCreatedDirs(dir)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return installResult{}, err
+	if merr := os.MkdirAll(dir, 0o755); merr != nil {
+		return installResult{}, merr
 	}
-	if _, err := writeIfChanged(service, oldService, []byte(syncAutoService(exe))); err != nil {
-		return installResult{}, err
+	if _, werr := writeIfChanged(service, oldService, []byte(syncAutoService(exe))); werr != nil {
+		return installResult{}, werr
 	}
 	action, err := writeIfChanged(timer, oldTimer, []byte(syncAutoTimer()))
 	if err != nil {
@@ -197,7 +198,7 @@ func installSyncTimerSystemd(exe string, uninstall bool) (installResult, error) 
 	if action != "unchanged" {
 		_, _ = runSystemctl("--user", "daemon-reload")
 		if out, err := runSystemctl("--user", "enable", "--now", "deja-sync.timer"); err != nil {
-			return installResult{}, fmt.Errorf("wrote %s but systemctl refused it: %v: %s", timer, err, out)
+			return installResult{}, fmt.Errorf("wrote %s but systemctl refused it: %w: %s", timer, err, out)
 		}
 	}
 	return installResult{Path: timer, Action: action}, nil
@@ -250,7 +251,7 @@ func runServiceManager(name string, args ...string) (string, error) {
 	if underTestBinary() {
 		return "", nil
 	}
-	out, err := exec.Command(name, args...).CombinedOutput()
+	out, err := exec.CommandContext(context.Background(), name, args...).CombinedOutput()
 	return strings.TrimSpace(string(out)), err
 }
 
@@ -320,7 +321,7 @@ func syncTimerBinary(goos string) (exe string, scheduled bool) {
 		if err != nil {
 			return "", false
 		}
-		for _, line := range strings.Split(string(b), "\n") {
+		for line := range strings.SplitSeq(string(b), "\n") {
 			if !strings.HasPrefix(line, "ExecStart=") {
 				continue
 			}

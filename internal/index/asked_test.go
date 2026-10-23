@@ -75,8 +75,8 @@ func TestAskedHashesAreStableAndBounded(t *testing.T) {
 	if got := askedHashes([]model.Message{{Role: "assistant", Text: q}}); len(got) != 0 {
 		t.Fatalf("got %v", got)
 	}
-	var many []model.Message
-	for i := 0; i < 30; i++ {
+	many := make([]model.Message, 0, 30)
+	for i := range 30 {
 		many = append(many, model.Message{Role: "user", Text: "why does thing number " + string(rune('a'+i)) + " fail here?"})
 	}
 	if got := askedHashes(many); len(got) != askedQuestionCap {
@@ -293,12 +293,12 @@ func TestForgetDryRunPredictsWhatTheRealRunDoes(t *testing.T) {
 	if _, ok, _ := FindByID(dir, "drop"); !ok {
 		t.Fatal("a dry run must leave the session in place")
 	}
-	real, err := Forget(dir, ForgetOptions{Session: "drop"})
+	dropped, err := Forget(dir, ForgetOptions{Session: "drop"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if real.Sessions != dry.Sessions || real.Messages != dry.Messages {
-		t.Fatalf("the dry run promised %+v and the real run did %+v", dry, real)
+	if dropped.Sessions != dry.Sessions || dropped.Messages != dry.Messages {
+		t.Fatalf("the dry run promised %+v and the real run did %+v", dry, dropped)
 	}
 }
 

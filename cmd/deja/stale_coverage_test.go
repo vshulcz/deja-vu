@@ -59,7 +59,7 @@ func copyIndexTree(t *testing.T, from, to string) {
 		if d.IsDir() {
 			return os.MkdirAll(dst, 0o700)
 		}
-		b, err := os.ReadFile(p)
+		b, err := os.ReadFile(p) //nolint:gosec // copies a temp index tree the test built
 		if err != nil {
 			return err
 		}

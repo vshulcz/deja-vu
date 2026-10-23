@@ -45,7 +45,7 @@ func TestUninstallNamesTheFileItRefusesAndClearsTheOther(t *testing.T) {
 		t.Fatal(err)
 	}
 	broken := strings.Replace(string(b), guidanceEnd+"\n", "", 1) + "\nsomething the user wrote afterwards\n"
-	if err := os.WriteFile(grokMD, []byte(broken), 0o644); err != nil {
+	if err = os.WriteFile(grokMD, []byte(broken), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

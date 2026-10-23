@@ -17,8 +17,8 @@ func TestContinueTurnsNeverPassTheFileMtime(t *testing.T) {
 	t.Setenv("DEJA_CONTINUE_ROOT", root)
 	sid := "8f1c2a3e-0000-4000-8000-000000000000"
 	created := time.Date(2026, 10, 1, 20, 33, 0, 0, time.UTC)
-	var history []any
-	for i := 0; i < 17; i++ {
+	history := make([]any, 0, 17)
+	for i := range 17 {
 		role := "user"
 		if i%2 == 1 {
 			role = "assistant"
@@ -59,7 +59,7 @@ func TestContinueTurnsWithoutADateStayApart(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("DEJA_CONTINUE_ROOT", root)
 	sid := "8f1c2a3e-0000-4000-8000-000000000000"
-	var history []any
+	history := make([]any, 0, 4)
 	for _, text := range []string{"continue", "done one", "continue", "done two"} {
 		role := "user"
 		if strings.HasPrefix(text, "done") {

@@ -27,9 +27,9 @@ import (
 // and a soft hyphen is a hyphenation hint.
 func isBidiControl(r rune) bool {
 	switch r {
-	case '‪', '‫', '‬', '‭', '‮', // embeddings and overrides
-		'⁦', '⁧', '⁨', '⁩', // isolates
-		'‎', '‏': // left-to-right and right-to-left marks
+	case '\u202a', '\u202b', '\u202c', '\u202d', '\u202e', // embeddings and overrides
+		'\u2066', '\u2067', '\u2068', '\u2069', // isolates
+		'\u200e', '\u200f': // left-to-right and right-to-left marks
 		return true
 	}
 	return false

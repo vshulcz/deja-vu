@@ -91,8 +91,9 @@ func TestTheNotesTabIsRenderedNewestFirst(t *testing.T) {
 func noteTitlesInPageOrder(t *testing.T, page string) []string {
 	t.Helper()
 	re := regexp.MustCompile(`"title":"([^"]*)","text"`)
-	var out []string
-	for _, m := range re.FindAllStringSubmatch(page, -1) {
+	matches := re.FindAllStringSubmatch(page, -1)
+	out := make([]string, 0, len(matches))
+	for _, m := range matches {
 		out = append(out, m[1])
 	}
 	return out

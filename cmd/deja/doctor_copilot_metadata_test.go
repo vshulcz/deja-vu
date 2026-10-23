@@ -35,7 +35,7 @@ func TestDoctorDoesNotCallCopilotsMetadataUnrecognised(t *testing.T) {
 	t.Setenv("DEJA_COPILOT_ROOT", filepath.Join(tmp, "copilot", "session-state"))
 	var buf bytes.Buffer
 	doctorHarnesses(&buf, t.TempDir())
-	for _, line := range strings.Split(buf.String(), "\n") {
+	for line := range strings.SplitSeq(buf.String(), "\n") {
 		if strings.Contains(line, "copilot") && strings.Contains(line, "not recognised") {
 			t.Errorf("the IDE's metadata is counted as a transcript deja failed to read: %q", line)
 		}

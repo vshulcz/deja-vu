@@ -46,7 +46,7 @@ func zedThread(t *testing.T, db, id, updated string, texts []string) {
 	}
 	body := fmt.Sprintf(`{"version":"0.3.0","title":"pool timeouts","updated_at":%q,"messages":[%s]}`,
 		updated, strings.Join(msgs, ","))
-	cmd := exec.Command("zstd", "-q", "-3", "-c")
+	cmd := exec.CommandContext(t.Context(), "zstd", "-q", "-3", "-c")
 	cmd.Stdin = strings.NewReader(body)
 	var out bytes.Buffer
 	cmd.Stdout = &out
@@ -59,7 +59,7 @@ func zedThread(t *testing.T, db, id, updated string, texts []string) {
     folder_paths text, folder_paths_order text, created_at text);
 ` + fmt.Sprintf("insert or replace into threads (id,summary,updated_at,data_type,data,folder_paths) values (%s,'pool timeouts',%s,'zstd',x'%s','[\"/work/app\"]');",
 		sqliteLiteral(id), sqliteLiteral(updated), hex.EncodeToString(out.Bytes()))
-	c := exec.Command("sqlite3", db)
+	c := exec.CommandContext(t.Context(), "sqlite3", db)
 	c.Stdin = strings.NewReader(stmts)
 	if o, err := c.CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, o)

@@ -20,6 +20,7 @@ package main
 import (
 	"archive/zip"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io/fs"
@@ -53,7 +54,7 @@ func main() {
 	flag.Parse()
 
 	if *version == "" {
-		fail(fmt.Errorf("-version is required"))
+		fail(errors.New("-version is required"))
 	}
 	template, err := os.ReadFile(*manifestPath)
 	if err != nil {
@@ -87,7 +88,7 @@ func main() {
 			continue
 		}
 		path := filepath.Join(*out, fmt.Sprintf("deja-vu_%s_%s.mcpb", *version, t.suffix))
-		if err := pack(path, template, binary, t, *version); err != nil {
+		if err = pack(path, template, binary, t, *version); err != nil {
 			fail(fmt.Errorf("%s: %w", t.suffix, err))
 		}
 		info, err := os.Stat(path)
@@ -272,7 +273,7 @@ func render(template []byte, t target, version string) ([]byte, error) {
 	}
 	server, ok := m["server"].(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("manifest template has no server object")
+		return nil, errors.New("manifest template has no server object")
 	}
 
 	entry := "server/" + t.exe

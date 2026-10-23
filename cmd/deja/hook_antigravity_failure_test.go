@@ -110,7 +110,7 @@ func seedClaudeFixPair(t *testing.T, root, project string) {
 	}
 	cwd := filepath.Join(os.TempDir(), project)
 	rec := func(kind string, content any, at string) string {
-		b, _ := json.Marshal(map[string]any{
+		b := mustMarshal(t, map[string]any{
 			"type": kind, "sessionId": "fix1", "cwd": cwd, "timestamp": at,
 			"message": map[string]any{"role": kind, "content": content},
 		})

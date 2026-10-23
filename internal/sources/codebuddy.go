@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -171,7 +172,7 @@ func CodeBuddySubagentFile(p string) bool { return codeBuddySubagentParts(codeBu
 // CodeBuddySessionFiles lists the transcripts.
 func CodeBuddySessionFiles() []string {
 	subagents := !SubagentsOff()
-	var out []string
+	var out []string //nolint:prealloc // each root adds an unknown number of files
 	for _, root := range CodeBuddyRoots() {
 		out = append(out, walkFiles(root, func(p string) bool {
 			parts := codeBuddyRelTo(root, p)
@@ -188,7 +189,7 @@ func CodeBuddySessionFiles() []string {
 // file anywhere else under a project is still reported, which is how drift in
 // the store shows up.
 func CodeBuddySidecarFiles() []string {
-	var out []string
+	var out []string //nolint:prealloc // each root adds an unknown number of files
 	for _, root := range CodeBuddyRoots() {
 		out = append(out, walkFiles(root, func(p string) bool {
 			parts := codeBuddyRelTo(root, p)
@@ -205,6 +206,7 @@ func CodeBuddySidecarFiles() []string {
 	return out
 }
 
+// LoadCodeBuddy reads every CodeBuddy session on this machine.
 func LoadCodeBuddy() []model.Session {
 	return parseFiles(CodeBuddySessionFiles(), ParseCodeBuddyFile)
 }
@@ -345,8 +347,8 @@ func codeBuddyExitCode(out string) (int, bool) {
 	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
 	// From the end: the status lines follow the output, which may itself print
 	// a line that looks like one.
-	for i := len(lines) - 1; i >= 0; i-- {
-		rest, ok := strings.CutPrefix(strings.TrimSpace(lines[i]), "Exit Code: ")
+	for _, line := range slices.Backward(lines) {
+		rest, ok := strings.CutPrefix(strings.TrimSpace(line), "Exit Code: ")
 		if !ok {
 			continue
 		}
@@ -363,8 +365,8 @@ func codeBuddyExitCode(out string) (int, bool) {
 	if len(lines) < 2 || !strings.HasPrefix(lines[1], "Stdout: ") {
 		return 0, false
 	}
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := strings.TrimSpace(lines[i])
+	for _, line := range slices.Backward(lines) {
+		line = strings.TrimSpace(line)
 		switch {
 		case line == "" || line == "Signal: (none)":
 		case strings.HasPrefix(line, "Signal: "), strings.HasPrefix(line, "(command "):

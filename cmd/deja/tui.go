@@ -202,11 +202,9 @@ func (a *tuiApp) post(f func()) {
 // spawn runs f off the event loop and counts it, so a test can wait for the
 // screen's background reads and writes to end before its temp dirs go.
 func (a *tuiApp) spawn(f func()) {
-	a.bg.Add(1)
-	go func() {
-		defer a.bg.Done()
+	a.bg.Go(func() {
 		f()
-	}()
+	})
 }
 
 func (a *tuiApp) run() {
@@ -353,7 +351,7 @@ func (a *tuiApp) loadHome() {
 		a.agentsHere = tuiAgentCounts(here)
 	}
 	var ss []model.Session
-	total := 0
+	var total int
 	switch a.scope {
 	case scopeKept:
 		ss, total = a.kept, len(a.kept)

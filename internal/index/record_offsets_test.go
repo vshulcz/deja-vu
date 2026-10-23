@@ -31,11 +31,11 @@ func TestSessionLoadsThroughTheOffsetTable(t *testing.T) {
 	}
 	load := func() ([]string, int64) {
 		before := atomic.LoadInt64(&recordOffsetReads)
-		s, ok, err := FindByIdentity(dir, "claude", "s2")
-		if err != nil || !ok {
-			t.Fatalf("load s2: %v %v", ok, err)
+		s, ok, findErr := FindByIdentity(dir, "claude", "s2")
+		if findErr != nil || !ok {
+			t.Fatalf("load s2: %v %v", ok, findErr)
 		}
-		var out []string
+		out := make([]string, 0, len(s.Messages))
 		for _, m := range s.Messages {
 			out = append(out, m.Role+"|"+m.Text)
 		}
@@ -57,7 +57,7 @@ func TestSessionLoadsThroughTheOffsetTable(t *testing.T) {
 	for name, b := range broken {
 		if b == nil {
 			_ = os.Remove(table)
-		} else if err := os.WriteFile(table, b, 0o600); err != nil {
+		} else if err = os.WriteFile(table, b, 0o600); err != nil {
 			t.Fatal(err)
 		}
 		if got, _ := load(); !slices.Equal(got, want) {
@@ -66,11 +66,11 @@ func TestSessionLoadsThroughTheOffsetTable(t *testing.T) {
 	}
 
 	// A log written again under a table built for the old one.
-	if err := os.WriteFile(table, good, 0o600); err != nil {
+	if err = os.WriteFile(table, good, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	h.put("app", "s2", richSession("app", "s2", 3, "worker"))
-	if err := Ensure(dir, "claude", false, nil); err != nil {
+	if err = Ensure(dir, "claude", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	walked := map[string]bool{}
@@ -97,10 +97,10 @@ func shiftFirstOffset(b []byte) []byte {
 	out := append([]byte(nil), b...)
 	n := int(binary.LittleEndian.Uint32(out[24+sha256.Size:]))
 	data := recordOffsetsHeaderSize + 16*n
-	for i := 0; i < n; i++ {
-		p := data + int(binary.LittleEndian.Uint64(out[recordOffsetsHeaderSize+16*i+8:]))
+	for i := range n {
+		p := data + int(binary.LittleEndian.Uint64(out[recordOffsetsHeaderSize+16*i+8:])) //nolint:gosec // offsets the writer just wrote
 		kl, w := binary.Uvarint(out[p:])
-		p += w + int(kl)
+		p += w + int(kl) //nolint:gosec // a key length the writer just wrote
 		_, w = binary.Uvarint(out[p:])
 		p += w
 		out[p]++

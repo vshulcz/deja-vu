@@ -122,7 +122,7 @@ func legacyCJKIndexKeys(s string, emit func(tok string)) {
 	// A CJK rune is never a single UTF-8 byte, so this guard preserves the
 	// cjkBigrams fast path without decoding an ASCII-only message.
 	ascii := true
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		if s[i] >= utf8.RuneSelf {
 			ascii = false
 			break
@@ -142,7 +142,7 @@ func legacyCJKIndexKeys(s string, emit func(tok string)) {
 		if r1 != 0 && query.CJKFunctionRune(r1) && query.CJKFunctionRune(r2) {
 			return
 		}
-		key := (uint64(r1) << 21) | uint64(r2)
+		key := (uint64(r1) << 21) | uint64(r2) //nolint:gosec // runes are non-negative
 		if _, ok := seen[key]; ok {
 			return
 		}
@@ -209,7 +209,7 @@ func legacyTextKeys(text string) []string {
 // with no precomposed form, variation selectors, identifiers, words cut at 64
 // bytes, CJK runs, fullwidth and halfwidth forms, and bytes that are not UTF-8.
 func keyerTexts() []string {
-	texts := []string{
+	texts := []string{ //nolint:prealloc // a fixture literal the loop below grows
 		"",
 		"a",
 		"Go build FAILED: undefined: zorbleFrobnicate in getUserProfileById",
@@ -225,9 +225,9 @@ func keyerTexts() []string {
 		"--- FAIL: TestFoo (0.00s)\n\tfoo_test.go:12: got 1, want 2\nexit status 1",
 		"İstanbul ǅemal ẞtraße ΣΊΣΥΦΟΣ",
 	}
-	r := rand.New(rand.NewSource(5567))
+	r := rand.New(rand.NewSource(5567)) //nolint:gosec // a seeded fixture, not crypto
 	alphabet := []string{"a", "Z", "_", "-", " ", "ё", "Ё", "é", "́", "中", "國", "的", "了", "ｱ", "\xff", "1", "️", "ب", "َ", "\n", "Σ", "ß"}
-	for i := 0; i < 2000; i++ {
+	for range 2000 {
 		var b strings.Builder
 		for n := r.Intn(120); n > 0; n-- {
 			b.WriteString(alphabet[r.Intn(len(alphabet))])
@@ -294,10 +294,10 @@ func distinctSorted(keys []string) []string {
 // a fifth of their CPU on the heap lock that garbage takes (#5567). A word the
 // batch has already seen costs nothing now.
 func TestSpillWorkersAllocateNothingPerRepeatedWord(t *testing.T) {
-	var jobs []tokenJob
+	jobs := make([]tokenJob, 0, 20000)
 	when := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
 	off := int64(0)
-	for i := 0; i < 20000; i++ {
+	for i := range 20000 {
 		text := fmt.Sprintf("The build FAILED on runSpillWorker: undefined zorbleFrobnicate in package main, step %d of the deploy pipeline 日本語のテスト", i%50)
 		jobs = append(jobs, tokenJob{text: text, offset: off, sid: uint32(i/40 + 1), when: when})
 		off += int64(len(text))

@@ -23,9 +23,9 @@ func TestHookPromptDoesNotNarrowASessionItWillDiscard(t *testing.T) {
 
 	// Long enough to be narrowed, and it is the session asking.
 	lines := make([]string, 0, dejaVuMaxMessages+2)
-	for i := 0; i < dejaVuMaxMessages+1; i++ {
+	for i := range dejaVuMaxMessages + 1 {
 		lines = append(lines, fmt.Sprintf(
-			`{"type":"assistant","sessionId":"selflong","timestamp":"%s","message":{"role":"assistant","content":"kestrel notes %d"}}`,
+			`{"type":"assistant","sessionId":"selflong","timestamp":%q,"message":{"role":"assistant","content":"kestrel notes %d"}}`,
 			ts, i))
 	}
 	writeClaudeFixture(t, filepath.Join(claudeRoot, "beta", "selflong.jsonl"), "selflong", lines)

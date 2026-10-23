@@ -38,12 +38,12 @@ func TestStaleFormatRederivesTitles(t *testing.T) {
 	meta.Title = ""
 	m.Sessions["claude:s1"] = meta
 	m.Version = version - 1
-	if err := writeManifest(dir, m); err != nil {
+	if err = writeManifest(dir, m); err != nil {
 		t.Fatal(err)
 	}
 	// Touching nothing else: the transcript is unchanged, which is exactly the
 	// case incremental ingest skips.
-	if err := EnsureForSearch(dir, o, false, nil); err != nil {
+	if err = EnsureForSearch(dir, o, false, nil); err != nil {
 		t.Fatal(err)
 	}
 	m, err = readManifest(dir)

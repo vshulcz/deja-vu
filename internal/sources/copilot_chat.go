@@ -25,6 +25,7 @@ import (
 // A sibling .json is the pre-1.109 flat form. VS Code reads the log first, so
 // when both exist the index lists only the .jsonl.
 
+// CopilotChatRoots lists the VS Code user dirs that may hold Copilot Chat sessions.
 func CopilotChatRoots() []string {
 	if list := os.Getenv("DEJA_COPILOT_CHAT_ROOTS"); list != "" {
 		var out []string
@@ -69,6 +70,7 @@ func CopilotChatRoots() []string {
 	return out
 }
 
+// CopilotChatSessionFiles lists every Copilot Chat session file.
 func CopilotChatSessionFiles() []string {
 	var files []string
 	for _, root := range CopilotChatRoots() {
@@ -116,12 +118,12 @@ func copilotChatStoreDirs(root string) []string {
 		}
 		for _, e := range entries {
 			if e.IsDir() {
-				out = append(out, filepath.Join(base, "workspaceStorage", e.Name(), "chatSessions"))
-				// The extension's own transcripts, which on a newer Copilot
-				// Chat are the only place the history is (copilot_agent.go,
-				// #3637). One more failed open per workspace directory, which
-				// is the same term #3167 replaced the walk with.
-				out = append(out, filepath.Join(base, "workspaceStorage", e.Name(), copilotAgentParentDir, copilotAgentDirName))
+				out = append(out, filepath.Join(base, "workspaceStorage", e.Name(), "chatSessions"),
+					// The extension's own transcripts, which on a newer Copilot
+					// Chat are the only place the history is (copilot_agent.go,
+					// #3637). One more failed open per workspace directory, which
+					// is the same term #3167 replaced the walk with.
+					filepath.Join(base, "workspaceStorage", e.Name(), copilotAgentParentDir, copilotAgentDirName))
 			}
 		}
 		return out
@@ -148,10 +150,12 @@ func copilotChatStoreDirs(root string) []string {
 	return dirs
 }
 
+// LoadCopilotChat reads every Copilot Chat session on this machine.
 func LoadCopilotChat() []model.Session {
 	return parseFiles(CopilotChatSessionFiles(), ParseCopilotChatFile)
 }
 
+// ParseCopilotChatFile reads one Copilot Chat session file.
 func ParseCopilotChatFile(path string) ([]model.Session, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -179,7 +183,7 @@ func ParseCopilotChatFile(path string) ([]model.Session, error) {
 	d.UseNumber()
 	if err := d.Decode(&state); err != nil {
 		diagMalformedLine(path)
-		return nil, nil
+		return nil, nil //nolint:nilerr // a malformed file is recorded, not fatal
 	}
 	return copilotChatSession(path, state)
 }
@@ -212,8 +216,8 @@ func copilotChatMatch(p string) bool {
 func copilotChatDropJSONSiblings(files []string) []string {
 	hasLog := make(map[string]bool)
 	for _, p := range files {
-		if strings.HasSuffix(p, ".jsonl") {
-			hasLog[strings.TrimSuffix(p, ".jsonl")] = true
+		if before, ok := strings.CutSuffix(p, ".jsonl"); ok {
+			hasLog[before] = true
 		}
 	}
 	var out []string
@@ -651,7 +655,7 @@ func copilotChatAppendRequest(s *model.Session, req map[string]any) {
 		s.Messages = append(s.Messages, model.Message{Role: RoleSummary, Text: txt, Time: at})
 	}
 	var speech []string
-	var extras []model.Message
+	var extras []model.Message //nolint:prealloc // filled through a pointer by the walk below
 	copilotChatWalkResponse(req["response"], at, &speech, &extras)
 	extras = append(extras, copilotChatRoundEdits(req, at)...)
 	if txt := strings.TrimSpace(strings.Join(speech, "")); txt != "" {

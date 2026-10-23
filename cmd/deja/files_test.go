@@ -46,13 +46,13 @@ func TestTopicTimesSkipsFileAndCommandRecords(t *testing.T) {
 
 func TestWithinTime(t *testing.T) {
 	at := time.Date(2026, 7, 25, 12, 0, 0, 0, time.UTC)
-	if !withinTime(at.Add(5*time.Minute), []time.Time{at}, filesWindow) {
+	if !withinTime(at.Add(5*time.Minute), []time.Time{at}) {
 		t.Fatal("five minutes is inside a twenty minute window")
 	}
-	if withinTime(at.Add(time.Hour), []time.Time{at}, filesWindow) {
+	if withinTime(at.Add(time.Hour), []time.Time{at}) {
 		t.Fatal("an hour later is different work")
 	}
-	if withinTime(time.Time{}, []time.Time{at}, filesWindow) {
+	if withinTime(time.Time{}, []time.Time{at}) {
 		t.Fatal("a record with no time cannot be placed")
 	}
 }

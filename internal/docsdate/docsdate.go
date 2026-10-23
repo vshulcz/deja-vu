@@ -12,6 +12,7 @@ package docsdate
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -38,7 +39,7 @@ type Dater struct {
 
 // New starts the reader for the repository at root.
 func New(root string) (*Dater, error) {
-	cmd := exec.Command("git", "-C", root, "cat-file", "--batch")
+	cmd := exec.CommandContext(context.Background(), "git", "-C", root, "cat-file", "--batch")
 	in, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err
@@ -68,15 +69,15 @@ func (d *Dater) Close() error {
 func (d *Dater) Day(file string) (string, error) {
 	cur, err := os.ReadFile(filepath.Join(d.root, filepath.FromSlash(file)))
 	if err != nil {
-		return "", nil
+		return "", nil //nolint:nilerr // a file that is not there has no date
 	}
-	log, err := exec.Command("git", "-C", d.root, "log", "--format=%H %at", "--", file).Output()
+	log, err := exec.CommandContext(context.Background(), "git", "-C", d.root, "log", "--format=%H %at", "--", file).Output()
 	if err != nil {
 		return "", fmt.Errorf("git log %s: %w", file, err)
 	}
 	lines := strings.Fields(strings.TrimSpace(string(log)))
 	if len(lines) == 0 {
-		tracked, _ := exec.Command("git", "-C", d.root, "ls-files", "--", file).Output()
+		tracked, _ := exec.CommandContext(context.Background(), "git", "-C", d.root, "ls-files", "--", file).Output()
 		if len(bytes.TrimSpace(tracked)) == 0 {
 			return today(), nil // never committed
 		}
@@ -88,8 +89,8 @@ func (d *Dater) Day(file string) (string, error) {
 	}
 	var revs []rev
 	for i := 0; i+1 < len(lines); i += 2 {
-		at, err := strconv.ParseInt(lines[i+1], 10, 64)
-		if err != nil {
+		at, perr := strconv.ParseInt(lines[i+1], 10, 64)
+		if perr != nil {
 			return "", fmt.Errorf("git log %s: %q is not a Unix time", file, lines[i+1])
 		}
 		revs = append(revs, rev{lines[i], at})

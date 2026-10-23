@@ -21,25 +21,25 @@ func TestAmpPluginInjectsTheDigestOncePerThread(t *testing.T) {
 	if err != nil {
 		t.Skip("node is not installed")
 	}
-	if err := exec.Command(node, "--experimental-strip-types", "-e", "").Run(); err != nil {
+	if rerr := exec.CommandContext(t.Context(), node, "--experimental-strip-types", "-e", "").Run(); rerr != nil {
 		t.Skip("this node cannot strip types")
 	}
 	dir := t.TempDir()
 	stub := filepath.Join(dir, "deja")
-	if err := os.WriteFile(stub, []byte("#!/bin/sh\n"+
+	if werr := os.WriteFile(stub, []byte("#!/bin/sh\n"+
 		// The stub drains stdin on every branch: the plugin hands hook-context a
 		// JSON payload since #3264, and a child that exits without reading it
 		// gives execFileSync EPIPE on the runners, which the plugin swallows
 		// into "nothing" (#3283).
-		`cat >/dev/null; case "$1" in hook-context) echo '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"<deja-recall>\nrecent history\n</deja-recall>"},"systemMessage":"deja recalled 1 session"}';; *) echo "";; esac`+"\n"), 0o755); err != nil {
-		t.Fatal(err)
+		`cat >/dev/null; case "$1" in hook-context) echo '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"<deja-recall>\nrecent history\n</deja-recall>"},"systemMessage":"deja recalled 1 session"}';; *) echo "";; esac`+"\n"), 0o755); werr != nil {
+		t.Fatal(werr)
 	}
 	plugin := filepath.Join(dir, "deja.ts")
-	if err := os.WriteFile(plugin, []byte(ampPluginTS(stub)), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(plugin, []byte(ampPluginTS(stub)), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	drive := filepath.Join(dir, "drive.mjs")
-	if err := os.WriteFile(drive, []byte(`
+	if werr := os.WriteFile(drive, []byte(`
 const mod = await import(process.argv[2]);
 const handlers = {};
 const amp = { on(n, f) { (handlers[n] ||= []).push(f); }, registerCommand() { return { dispose() {} }; } };
@@ -59,10 +59,10 @@ for (const id of ["T-A", "T-B"]) {
   const second = await fire("agent.start", { thread: { id }, message: "hello again", id: id + "-2" });
   console.log(id, first.includes("recent history") ? "digest" : "nothing", second.includes("recent history") ? "digest" : "nothing");
 }
-`), 0o644); err != nil {
-		t.Fatal(err)
+`), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
-	cmd := exec.Command(node, "--experimental-strip-types", "--no-warnings", drive, plugin)
+	cmd := exec.CommandContext(t.Context(), node, "--experimental-strip-types", "--no-warnings", drive, plugin)
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
 	if err != nil {

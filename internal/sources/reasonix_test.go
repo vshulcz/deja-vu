@@ -57,7 +57,10 @@ func writeReasonixFile(t *testing.T, path, body string) {
 }
 
 func toolCall(id, name string, args map[string]any) map[string]any {
-	a, _ := json.Marshal(args)
+	a, err := json.Marshal(args)
+	if err != nil {
+		panic(err)
+	}
 	return map[string]any{"id": id, "name": name, "arguments": string(a)}
 }
 
@@ -154,7 +157,7 @@ func TestParseReasonixLegacySession(t *testing.T) {
 	clearReasonixEnv(t, root)
 	dir := filepath.Join(root, "sessions")
 	path := filepath.Join(dir, "code-scripts-202606200404.jsonl")
-	args, _ := json.Marshal(map[string]any{"command": "npm run build"})
+	args := mustJSON(t, map[string]any{"command": "npm run build"})
 	writeJSONLines(t, path,
 		map[string]any{"role": "user", "content": "the build script fails on windows"},
 		map[string]any{"role": "assistant", "content": "", "tool_calls": []any{map[string]any{
@@ -243,8 +246,9 @@ func TestReasonixSessionFilesSkipSidecars(t *testing.T) {
 	} {
 		writeReasonixFile(t, p, "{}\n")
 	}
-	var got []string
-	for _, p := range ReasonixSessionFiles() {
+	files := ReasonixSessionFiles()
+	got := make([]string, 0, len(files))
+	for _, p := range files {
 		got = append(got, filepath.Base(p))
 	}
 	slices.Sort(got)
@@ -273,7 +277,7 @@ func TestReasonixStateRootChain(t *testing.T) {
 	}
 
 	moved := filepath.Join(home, "big-disk", "reasonix-state")
-	cfg, _ := json.Marshal(moved) // a TOML basic string is a JSON string
+	cfg := mustJSON(t, moved) // a TOML basic string is a JSON string
 	writeReasonixFile(t, filepath.Join(want, "config.toml"),
 		"[ui]\nstate = \"ignored\"\n\n[storage]\nstate = "+string(cfg)+"\n")
 	if got := ReasonixStateRoot(); got != moved {
@@ -306,8 +310,9 @@ func TestReasonixLegacyRootIsReadWithoutDuplicates(t *testing.T) {
 	writeReasonixFile(t, filepath.Join(legacy, "sessions", "imported.jsonl"), "{}\n")
 	writeReasonixFile(t, filepath.Join(legacy, "sessions", "old-only.jsonl"), "{}\n")
 
-	var got []string
-	for _, p := range ReasonixSessionFiles() {
+	files := ReasonixSessionFiles()
+	got := make([]string, 0, len(files))
+	for _, p := range files {
 		rel, _ := filepath.Rel(home, p)
 		got = append(got, filepath.ToSlash(rel))
 	}

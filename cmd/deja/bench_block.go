@@ -138,7 +138,7 @@ func blockHits(dir string, chain bench.BlockChain) ([]model.Session, error) {
 
 // blockArmBlock is the session-start block, the thing an agent is handed
 // before it has asked anything.
-func blockArmBlock(hits []model.Session, chain bench.BlockChain) string {
+func blockArmBlock(hits []model.Session, _ bench.BlockChain) string {
 	if len(hits) == 0 {
 		return ""
 	}

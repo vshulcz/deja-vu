@@ -23,7 +23,7 @@ func TestGooseStopCarriesTheEditedFilesLine(t *testing.T) {
 	dir := filepath.Join(tmp, "index.db")
 	t.Setenv("DEJA_INDEX_DIR", dir)
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		id := "s" + string(rune('0'+i))
 		writeClaudeFixture(t, filepath.Join(root, "alpha", id+".jsonl"), id, []string{
 			`{"type":"user","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"edit"}}`,
@@ -44,7 +44,7 @@ insert into sessions values ('g1','n','d','/work/alpha','2026-10-07T10:00:00Z','
 insert into messages values (1,'g1','user','[{"type":"text","text":"tidy the loader"}]',100);
 insert into messages values (2,'g1','assistant','[{"type":"toolRequest","id":"c","toolCall":{"status":"success","value":{"name":"edit","arguments":{"path":"/work/alpha/config.go","before":"a","after":"b"}}}}]',101);
 insert into messages values (3,'g1','user','[{"type":"toolResponse","id":"c","toolResult":{"status":"success","value":{"content":[{"type":"text","text":"ok"}]}}}]',102);`
-	if out, err := exec.Command("sqlite3", filepath.Join(store, "sessions", "sessions.db"), sql).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", filepath.Join(store, "sessions", "sessions.db"), sql).CombinedOutput(); err != nil {
 		t.Fatalf("create db: %v: %s", err, out)
 	}
 	stop := `{"event":"Stop","session_id":"g1","working_dir":"/work/alpha"}`

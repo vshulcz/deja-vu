@@ -152,7 +152,10 @@ func TestHookCodeWhaleMessageSubmitCutsInsideTheFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 	typed := "please look at this log " + strings.Repeat("x", 31000)
-	in, _ := json.Marshal(map[string]string{"text": typed, "session_id": "cw-1", "workspace": "/w"})
+	in, jerr := json.Marshal(map[string]string{"text": typed, "session_id": "cw-1", "workspace": "/w"})
+	if jerr != nil {
+		t.Fatal(jerr)
+	}
 	var out bytes.Buffer
 	if err := runHookCodeWhale(dir, []string{"message_submit"}, bytes.NewReader(in), &out); err != nil {
 		t.Fatal(err)

@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -44,7 +45,7 @@ func devinTestDB(t *testing.T, sql string) (db, dataDir string) {
 	}
 	// The script goes in on stdin, not as an argument: the fixture opens with
 	// a `--` comment and the sqlite3 CLI reads a leading `--` as an option.
-	cmd := exec.Command("sqlite3", db)
+	cmd := exec.CommandContext(t.Context(), "sqlite3", db)
 	cmd.Stdin = strings.NewReader(sql)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("create sqlite fixture: %v: %s", err, out)
@@ -78,8 +79,8 @@ func TestParseDevinDBReadsMainChainAndDedupes(t *testing.T) {
 	if s.Started.IsZero() || s.Updated.IsZero() || !s.Started.Before(s.Updated) {
 		t.Fatalf("window = %v..%v", s.Started, s.Updated)
 	}
-	var roles []string
-	var texts []string
+	roles := make([]string, 0, len(s.Messages))
+	texts := make([]string, 0, len(s.Messages))
 	for _, m := range s.Messages {
 		roles = append(roles, m.Role)
 		texts = append(texts, m.Text)
@@ -319,7 +320,7 @@ func TestDevinFilesHonoursEnvAndDiscovers(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_DEVIN_DB", "")
-	cmd := exec.Command("sqlite3", legacy)
+	cmd := exec.CommandContext(t.Context(), "sqlite3", legacy)
 	cmd.Stdin = strings.NewReader("create table sessions(id text);")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("create legacy fixture: %v: %s", err, out)
@@ -392,12 +393,12 @@ func TestDevinContentTextReadsStringsAndParts(t *testing.T) {
 }
 
 func TestDevinExitCodeReadsTerminalMetadata(t *testing.T) {
-	msg := map[string]any{"metadata": map[string]any{"extensions": map[string]any{
-		"chisel/terminal_output": map[string]any{"exit": map[string]any{"exit_code": float64(7)}}}}}
+	term := map[string]any{"exit": map[string]any{"exit_code": float64(7)}}
+	msg := map[string]any{"metadata": map[string]any{"extensions": map[string]any{"chisel/terminal_output": term}}}
 	if c, ok := devinExitCode(msg); !ok || c != 7 {
 		t.Fatalf("exit code = %d, %v", c, ok)
 	}
-	msg["metadata"].(map[string]any)["extensions"].(map[string]any)["chisel/terminal_output"].(map[string]any)["exit"] = map[string]any{"exit_code": json.Number("3")}
+	term["exit"] = map[string]any{"exit_code": json.Number("3")}
 	if c, ok := devinExitCode(msg); !ok || c != 3 {
 		t.Fatalf("json.Number exit code = %d, %v", c, ok)
 	}
@@ -689,10 +690,10 @@ func TestParseDevinDBManyBranchesGetDistinctIDs(t *testing.T) {
 			role = "assistant"
 		}
 		if i > 1 {
-			parent = fmt.Sprint(i - 1)
+			parent = strconv.Itoa(i - 1)
 		}
 		rows = append(rows, fmt.Sprintf(
-			`('big',%d,%s,'{"message_id":"m%d","role":"%s","content":"trunk %d"}',%d,'{}')`,
+			`('big',%d,%s,'{"message_id":"m%d","role":%q,"content":"trunk %d"}',%d,'{}')`,
 			i, parent, i, role, i, 1785600000+i))
 	}
 	for i := 1; i <= 1000; i++ {

@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -33,10 +34,12 @@ func TestHookRawCountsOnlyTheSessionsItServed(t *testing.T) {
 	var total int64
 	for _, s := range sessions {
 		body := ""
-		for i := 0; i < s.lines; i++ {
-			body += `{"type":"user","message":{"role":"user","content":"` + text + `"},"timestamp":"` + s.when + `","sessionId":"` + s.id + `","cwd":"/proj"}` + "\n"
+		var bodySb36 strings.Builder
+		for range s.lines {
+			bodySb36.WriteString(`{"type":"user","message":{"role":"user","content":"` + text + `"},"timestamp":"` + s.when + `","sessionId":"` + s.id + `","cwd":"/proj"}` + "\n")
 			total += int64(len(text))
 		}
+		body += bodySb36.String()
 		if err := os.WriteFile(filepath.Join(store, s.id+".jsonl"), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}
@@ -49,14 +52,7 @@ func TestHookRawCountsOnlyTheSessionsItServed(t *testing.T) {
 	if err := os.MkdirAll(work, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	back, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(work); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(back) })
+	t.Chdir(work)
 
 	digest, served, raw, _, _, _, _ := hookDigestResult(dir)
 	if digest == "" || served == 0 {

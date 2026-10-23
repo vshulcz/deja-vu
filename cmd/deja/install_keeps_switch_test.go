@@ -31,7 +31,10 @@ func switchJSON(t *testing.T, path string, value any, keys ...string) {
 		m = next
 	}
 	m[keys[len(keys)-1]] = value
-	out, _ := json.MarshalIndent(root, "", "  ")
+	out, jerr := json.MarshalIndent(root, "", "  ")
+	if jerr != nil {
+		t.Fatal(jerr)
+	}
 	if err := os.WriteFile(path, append(out, '\n'), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -95,79 +98,101 @@ func TestInstallKeepsTheReadersOffSwitch(t *testing.T) {
 			// not cursor: cursor-agent has no switch on the entry (#5162).
 			target: "kiro",
 			off: func(t *testing.T) {
+				t.Helper()
 				switchJSON(t, kiroMCPSettingsPath(), true, "mcpServers", "deja", "disabled")
 			},
 			stillOff: func(t *testing.T) bool {
+				t.Helper()
 				return readJSONPath(t, kiroMCPSettingsPath(), "mcpServers", "deja", "disabled") == true
 			},
 		},
 		{
 			target: "prime",
-			off:    func(t *testing.T) { switchJSON(t, primeSettingsPath(), false, "mcpServers", "deja", "enabled") },
+			off: func(t *testing.T) {
+				t.Helper()
+				switchJSON(t, primeSettingsPath(), false, "mcpServers", "deja", "enabled")
+			},
 			stillOff: func(t *testing.T) bool {
+				t.Helper()
 				return readJSONPath(t, primeSettingsPath(), "mcpServers", "deja", "enabled") == false
 			},
 		},
 		{
 			target: "zed",
 			off: func(t *testing.T) {
+				t.Helper()
 				switchJSON(t, sources.ZedSettingsPath(), false, zedServerKey, zedServerID, "enabled")
 			},
 			stillOff: func(t *testing.T) bool {
+				t.Helper()
 				return readJSONPath(t, sources.ZedSettingsPath(), zedServerKey, zedServerID, "enabled") == false
 			},
 		},
 		{
 			target: "zcode",
-			off:    func(t *testing.T) { switchJSON(t, zcodeConfigPath(), false, "mcp", "servers", "deja", "enabled") },
+			off: func(t *testing.T) {
+				t.Helper()
+				switchJSON(t, zcodeConfigPath(), false, "mcp", "servers", "deja", "enabled")
+			},
 			stillOff: func(t *testing.T) bool {
+				t.Helper()
 				return readJSONPath(t, zcodeConfigPath(), "mcp", "servers", "deja", "enabled") == false
 			},
 		},
 		{
 			target: "goose",
 			off: func(t *testing.T) {
+				t.Helper()
 				switchText(t, filepath.Join(gooseConfigDir(), "config.yaml"), "enabled: true", "enabled: false")
 			},
 			stillOff: func(t *testing.T) bool {
+				t.Helper()
 				return strings.Contains(fileText(t, filepath.Join(gooseConfigDir(), "config.yaml")), "enabled: false")
 			},
 		},
 		{
 			target: "hermes",
 			off: func(t *testing.T) {
+				t.Helper()
 				switchText(t, filepath.Join(sources.HermesHome(), "config.yaml"), "enabled: true", "enabled: false")
 			},
 			stillOff: func(t *testing.T) bool {
+				t.Helper()
 				return strings.Contains(fileText(t, filepath.Join(sources.HermesHome(), "config.yaml")), "enabled: false")
 			},
 		},
 		{
 			target: "codex",
 			off: func(t *testing.T) {
+				t.Helper()
 				switchText(t, filepath.Join(sources.CodexHome(), "config.toml"), "[mcp_servers.deja]\n", "[mcp_servers.deja]\nenabled = false\n")
 			},
 			stillOff: func(t *testing.T) bool {
+				t.Helper()
 				return strings.Contains(fileText(t, filepath.Join(sources.CodexHome(), "config.toml")), "enabled = false")
 			},
 		},
 		{
 			target: "grok",
 			off: func(t *testing.T) {
+				t.Helper()
 				switchText(t, filepath.Join(sources.GrokHome(), "config.toml"), "[mcp_servers.deja]\n", "[mcp_servers.deja]\nenabled = false\n")
 			},
 			stillOff: func(t *testing.T) bool {
+				t.Helper()
 				return strings.Contains(fileText(t, filepath.Join(sources.GrokHome(), "config.toml")), "enabled = false")
 			},
 		},
 		{
 			target: "deepseek-auto",
 			off: func(t *testing.T) {
+				t.Helper()
 				path := filepath.Join(sources.DSHHome(), "cordis.patch.yml")
 				switchText(t, path, "    - id: mcp-deja\n", "    - id: mcp-deja\n      disabled: true\n")
 				switchText(t, path, "    - id: deja-auto\n", "    - id: deja-auto\n      disabled: true\n")
 			},
 			stillOff: func(t *testing.T) bool {
+				t.Helper()
 				return strings.Count(fileText(t, filepath.Join(sources.DSHHome(), "cordis.patch.yml")), "disabled: true") == 2
 			},
 		},
@@ -176,11 +201,13 @@ func TestInstallKeepsTheReadersOffSwitch(t *testing.T) {
 			// deja-recall`.
 			target: "openclaw-auto",
 			off: func(t *testing.T) {
+				t.Helper()
 				path := filepath.Join(sources.OpenClawStateDir(), "openclaw.json")
 				switchJSON(t, path, false, "plugins", "entries", openclawPluginID, "enabled")
 				switchJSON(t, path, false, "hooks", "internal", "entries", openclawHookName, "enabled")
 			},
 			stillOff: func(t *testing.T) bool {
+				t.Helper()
 				path := filepath.Join(sources.OpenClawStateDir(), "openclaw.json")
 				return readJSONPath(t, path, "plugins", "entries", openclawPluginID, "enabled") == false &&
 					readJSONPath(t, path, "hooks", "internal", "entries", openclawHookName, "enabled") == false
@@ -191,10 +218,12 @@ func TestInstallKeepsTheReadersOffSwitch(t *testing.T) {
 			// the other.
 			target: "hermes-auto",
 			off: func(t *testing.T) {
+				t.Helper()
 				switchText(t, filepath.Join(sources.HermesHome(), "config.yaml"),
 					"plugins:\n  enabled:\n    - deja\n", "plugins:\n  enabled: []\n  disabled:\n  - deja\n")
 			},
 			stillOff: func(t *testing.T) bool {
+				t.Helper()
 				return strings.Contains(fileText(t, filepath.Join(sources.HermesHome(), "config.yaml")), "  enabled: []\n  disabled:\n  - deja\n")
 			},
 		},
@@ -202,9 +231,11 @@ func TestInstallKeepsTheReadersOffSwitch(t *testing.T) {
 			// `reasonix plugin disable deja`.
 			target: "reasonix-auto",
 			off: func(t *testing.T) {
+				t.Helper()
 				switchText(t, reasonixStatePath(), `"enabled": true`, `"enabled": false`)
 			},
 			stillOff: func(t *testing.T) bool {
+				t.Helper()
 				return strings.Contains(fileText(t, reasonixStatePath()), `"enabled": false`)
 			},
 		},

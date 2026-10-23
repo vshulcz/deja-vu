@@ -29,6 +29,7 @@ const (
 	compactionHeaderBytes int64 = 64 << 10
 )
 
+// Errors a compaction transcript read can return.
 var (
 	ErrUnsupportedCompactionTranscript = errors.New("unsupported compaction transcript")
 	ErrTranscriptIdentity              = errors.New("compaction transcript identity does not match")
@@ -174,9 +175,9 @@ func readCompactionParts(path string, size int64) (header, tail []byte, tailOffs
 	}
 	defer func() { _ = f.Close() }()
 	if size <= CompactionTailBytes {
-		all, err := io.ReadAll(io.LimitReader(f, CompactionTailBytes+1))
-		if err != nil {
-			return nil, nil, 0, false, err
+		all, readErr := io.ReadAll(io.LimitReader(f, CompactionTailBytes+1))
+		if readErr != nil {
+			return nil, nil, 0, false, readErr
 		}
 		if int64(len(all)) != size {
 			return nil, nil, 0, false, ErrTranscriptChanging
@@ -334,11 +335,12 @@ func parseCompactionSession(originalPath, harness, workspace string, data []byte
 	s.Path = originalPath
 	// The temporary bounded file is only a parser transport. Never let its
 	// random /tmp parent become persistent project attribution.
-	if workspace != "" {
+	switch {
+	case workspace != "":
 		s.Project = projectName(workspace)
-	} else if harness == "claude" {
+	case harness == "claude":
 		s.Project = claudeProjectNameFor(originalPath)
-	} else {
+	default:
 		s.Project = filepath.Base(filepath.Dir(originalPath))
 	}
 	return s, nil
@@ -475,7 +477,7 @@ func claudeCompactionToolCalls(line []byte, start, end int64, nativeSessionID st
 		} `json:"message"`
 	}
 	if json.Unmarshal(line, &record) != nil {
-		return nil, "", nil
+		return nil, "", nil //nolint:nilerr // a line that does not decode carries no calls
 	}
 	id := record.SessionID
 	if record.IsSidechain && record.AgentID != "" {
@@ -493,7 +495,7 @@ func claudeCompactionToolCalls(line []byte, start, end int64, nativeSessionID st
 	var out []TranscriptToolCall
 	var content []json.RawMessage
 	if json.Unmarshal(record.Message.Content, &content) != nil {
-		return nil, record.CWD, nil
+		return nil, record.CWD, nil //nolint:nilerr // a line that does not decode carries no calls
 	}
 	for n, raw := range content {
 		var item struct {
@@ -522,7 +524,7 @@ func codeBuddyCompactionToolCalls(line []byte, start, end int64, nativeSessionID
 		CallID    string          `json:"callId"`
 	}
 	if json.Unmarshal(line, &record) != nil {
-		return nil, "", nil
+		return nil, "", nil //nolint:nilerr // a line that does not decode carries no calls
 	}
 	if record.SessionID != "" && record.SessionID != nativeSessionID {
 		return nil, "", ErrTranscriptIdentity
@@ -551,7 +553,7 @@ func codexCompactionToolCalls(line []byte, start, end int64, nativeSessionID str
 		} `json:"payload"`
 	}
 	if json.Unmarshal(line, &record) != nil {
-		return nil, "", nil
+		return nil, "", nil //nolint:nilerr // a line that does not decode carries no calls
 	}
 	if record.Type == "session_meta" {
 		id := record.Payload.ID
@@ -600,10 +602,7 @@ func compactionBoundaryFingerprint(tail []byte, tailOffset, at int64) string {
 	if at < 0 || tailOffset < 0 || tailOffset+int64(len(tail)) < at {
 		return ""
 	}
-	start := at - compactionBoundaryBytes
-	if start < 0 {
-		start = 0
-	}
+	start := max(at-compactionBoundaryBytes, 0)
 	if start < tailOffset {
 		return ""
 	}

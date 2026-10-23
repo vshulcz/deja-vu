@@ -36,7 +36,7 @@ func TestAnIndexFromAnotherVersionIsNotCalledDamaged(t *testing.T) {
 	}
 
 	// And a bucket that really is corrupt still reads as damage.
-	if err := os.WriteFile(buckets, []byte{0x01, 0x02, 0x03, 0x04, 0x00}, 0o644); err != nil {
+	if err = os.WriteFile(buckets, []byte{0x01, 0x02, 0x03, 0x04, 0x00}, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	_, _, err = openBucketDir(buckets)

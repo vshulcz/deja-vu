@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -43,8 +45,16 @@ func TestInstallMuseMCP(t *testing.T) {
 	if entry["type"] != "stdio" || entry["command"] != command || entry["mode"] != "optional" {
 		t.Fatalf("mcpServers.deja = %v", entry)
 	}
-	if got, _ := json.Marshal(entry["args"]); string(got) != func() string { b, _ := json.Marshal(args); return string(b) }() {
-		t.Fatalf("args = %s, want %v", got, args)
+	gotArgs, jerr := json.Marshal(entry["args"])
+	if jerr != nil {
+		t.Fatal(jerr)
+	}
+	wantArgs, jerr := json.Marshal(args)
+	if jerr != nil {
+		t.Fatal(jerr)
+	}
+	if !bytes.Equal(gotArgs, wantArgs) {
+		t.Fatalf("args = %s, want %v", gotArgs, args)
 	}
 
 	// XDG_CONFIG_HOME moves it, as it moves Muse's own settings.
@@ -118,12 +128,12 @@ func TestInstallMuseAuto(t *testing.T) {
 		if len(entries) != 1 {
 			t.Fatalf("%s: %d entries, want 1", w.event, len(entries))
 		}
-		entry := entries[0].(map[string]any)
+		entry := typedOrFatal[map[string]any](t, entries[0])
 		if m, _ := entry["matcher"].(string); m != w.matcher {
 			t.Fatalf("%s matcher = %q, want %q", w.event, m, w.matcher)
 		}
-		h := entry["hooks"].([]any)[0].(map[string]any)
-		if h["type"] != "command" || !strings.HasSuffix(h["command"].(string), " "+w.sub) {
+		h := typedOrFatal[map[string]any](t, typedOrFatal[[]any](t, entry["hooks"])[0])
+		if h["type"] != "command" || !strings.HasSuffix(typedOrFatal[string](t, h["command"]), " "+w.sub) {
 			t.Fatalf("%s hook = %v", w.event, h)
 		}
 		if h["timeout"] != float64(60) {
@@ -159,12 +169,7 @@ func TestMuseIsAnInstallTarget(t *testing.T) {
 	// --auto finds Muse by its session store, not by the config directory
 	// deja creates when it installs.
 	has := func() bool {
-		for _, n := range existingTargets() {
-			if n == "muse" {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(existingTargets(), "muse")
 	}
 	if err := os.MkdirAll(filepath.Join(home, ".config", "muse"), 0o755); err != nil {
 		t.Fatal(err)
@@ -198,12 +203,15 @@ func writeMuseResumeLog(t *testing.T, path, id, workspace string) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	rec, _ := json.Marshal(map[string]any{
+	rec, jerr := json.Marshal(map[string]any{
 		"stream":       map[string]any{"kind": "session", "id": id},
 		"recorded_at":  1789790400000000,
 		"payload_type": "runtime.session.metadata",
 		"payload":      map[string]any{"kind": "metadata", "record": map[string]any{"workspace_root": workspace}},
 	})
+	if jerr != nil {
+		t.Fatal(jerr)
+	}
 	if err := os.WriteFile(path, append(rec, '\n'), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -229,8 +237,8 @@ func TestResumeMuseRunsInTheWorkspace(t *testing.T) {
 	}
 
 	// The workspace is gone: the conversation still reopens, without the cd.
-	if err := os.RemoveAll(ws); err != nil {
-		t.Fatal(err)
+	if rerr := os.RemoveAll(ws); rerr != nil {
+		t.Fatal(rerr)
 	}
 	if dir, cmd, err = resumeCommand(model.Session{Harness: "muse", ID: id, Path: path}); err != nil || dir != "" || cmd != "muse resume "+id {
 		t.Fatalf("gone workspace: %q, %q, %v", dir, cmd, err)
@@ -271,7 +279,10 @@ func TestInstallMuseAutoRefusesWhole(t *testing.T) {
 	}
 	root := readMuseSettings(t, path)
 	root["mcp_servers"] = map[string]any{"docs": map[string]any{"command": "docs-mcp"}}
-	b, _ := json.Marshal(root)
+	b, jerr := json.Marshal(root)
+	if jerr != nil {
+		t.Fatal(jerr)
+	}
 	if err := os.WriteFile(path, b, 0o644); err != nil {
 		t.Fatal(err)
 	}

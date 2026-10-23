@@ -30,7 +30,7 @@ func TestDerivedTitleRedactsBeforeItCuts(t *testing.T) {
 			{Role: "user", Text: straddling, Time: at},
 		}, "hunter2swordfish"},
 		{"secret before the cut", []model.Message{
-			{Role: "user", Text: "ship it with AKIAIOSFODNN7EXAMPLE now", Time: at},
+			{Role: "user", Text: "ship it with AKIAIOSFODNN7EXAMPLE now", Time: at}, //nolint:gosec // a fake secret the redaction test plants
 		}, "AKIAIOSFODNN7EXAMPLE"},
 	}
 	for _, c := range cases {
@@ -74,11 +74,11 @@ func TestIncrementalTitleFallbackRedacts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.WriteString(claudeLine("s1", "2026-08-07T10:01:00Z", "ship it with AKIAIOSFODNN7EXAMPLE now")); err != nil {
+	if _, err = f.WriteString(claudeLine("s1", "2026-08-07T10:01:00Z", "ship it with AKIAIOSFODNN7EXAMPLE now")); err != nil {
 		t.Fatal(err)
 	}
-	f.Close()
-	if err := Ensure(dir, "", false, nil); err != nil {
+	_ = f.Close()
+	if err = Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	m, err = readManifest(dir)

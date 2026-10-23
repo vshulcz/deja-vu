@@ -54,9 +54,6 @@ func pageStatsBlock(page string) string {
 	if i < 0 {
 		return "(no stats block)"
 	}
-	end := i + 600
-	if end > len(page) {
-		end = len(page)
-	}
+	end := min(i+600, len(page))
 	return page[i:end]
 }

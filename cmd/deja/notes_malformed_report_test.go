@@ -46,7 +46,7 @@ func TestAHandWrittenNoteLineDejaCannotReadIsReported(t *testing.T) {
 	}
 	// On the store's own line, so a reader can carry the number from here to
 	// doctor's JSON, where the same count is filed under the harness name.
-	for _, line := range strings.Split(said, "\n") {
+	for line := range strings.SplitSeq(said, "\n") {
 		if strings.Contains(line, "4 lines skipped") && !strings.Contains(line, "notes:") {
 			t.Errorf("the count is not on the notes store's line, so nothing says whose lines they are:\n%s", line)
 		}

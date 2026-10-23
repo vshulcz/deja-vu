@@ -128,14 +128,14 @@ func TestGrokIndexGrowthRenameAndRewind(t *testing.T) {
 	if len(renamedSummary) != len(summary) {
 		t.Fatal("renamed summary must preserve size to exercise mtime freshness")
 	}
-	if err := os.WriteFile(summaryPath, []byte(renamedSummary), 0o644); err != nil {
+	if err = os.WriteFile(summaryPath, []byte(renamedSummary), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	tick := time.Now().Add(10 * time.Second)
-	if err := os.Chtimes(summaryPath, tick, tick); err != nil {
+	if err = os.Chtimes(summaryPath, tick, tick); err != nil {
 		t.Fatal(err)
 	}
-	if err := EnsureForSearch(indexDir, search.Options{Query: "grokindexneedle", Harness: "grok"}, false, nil); err != nil {
+	if err = EnsureForSearch(indexDir, search.Options{Query: "grokindexneedle", Harness: "grok"}, false, nil); err != nil {
 		t.Fatal(err)
 	}
 	recent, err = Recent(indexDir, 1)
@@ -149,28 +149,28 @@ func TestGrokIndexGrowthRenameAndRewind(t *testing.T) {
 	if len(firstCWD) != len(secondCWD) {
 		t.Fatal("cwd fixtures must have equal size to exercise mtime freshness")
 	}
-	if err := os.WriteFile(cwdPath, []byte(firstCWD), 0o644); err != nil {
+	if err = os.WriteFile(cwdPath, []byte(firstCWD), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	tick = tick.Add(time.Second)
-	if err := os.Chtimes(cwdPath, tick, tick); err != nil {
+	if err = os.Chtimes(cwdPath, tick, tick); err != nil {
 		t.Fatal(err)
 	}
-	if err := EnsureForSearch(indexDir, search.Options{Query: "grokindexneedle", Harness: "grok"}, false, nil); err != nil {
+	if err = EnsureForSearch(indexDir, search.Options{Query: "grokindexneedle", Harness: "grok"}, false, nil); err != nil {
 		t.Fatal(err)
 	}
 	recent, err = Recent(indexDir, 1)
 	if err != nil || len(recent) != 1 || recent[0].Project != "work/moved-project" {
 		t.Fatalf("new Grok cwd marker was not indexed: %#v err=%v", recent, err)
 	}
-	if err := os.WriteFile(cwdPath, []byte(secondCWD), 0o644); err != nil {
+	if err = os.WriteFile(cwdPath, []byte(secondCWD), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	tick = tick.Add(time.Second)
-	if err := os.Chtimes(cwdPath, tick, tick); err != nil {
+	if err = os.Chtimes(cwdPath, tick, tick); err != nil {
 		t.Fatal(err)
 	}
-	if err := EnsureForSearch(indexDir, search.Options{Query: "grokindexneedle", Harness: "grok"}, false, nil); err != nil {
+	if err = EnsureForSearch(indexDir, search.Options{Query: "grokindexneedle", Harness: "grok"}, false, nil); err != nil {
 		t.Fatal(err)
 	}
 	ss, err = Search(indexDir, search.Options{Query: "grokindexneedle", Harness: "grok", Project: "other-project"})
@@ -183,18 +183,18 @@ func TestGrokIndexGrowthRenameAndRewind(t *testing.T) {
 		t.Fatal(err)
 	}
 	second := `{"timestamp":1782900002,"params":{"update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"replacementneedle answer"}},"_meta":{"promptId":"p1"}}}` + "\n"
-	if _, err := f.WriteString(second); err != nil {
+	if _, err = f.WriteString(second); err != nil {
 		_ = f.Close()
 		t.Fatal(err)
 	}
-	if err := f.Close(); err != nil {
+	if err = f.Close(); err != nil {
 		t.Fatal(err)
 	}
 	tick = tick.Add(time.Second)
-	if err := os.Chtimes(updates, tick, tick); err != nil {
+	if err = os.Chtimes(updates, tick, tick); err != nil {
 		t.Fatal(err)
 	}
-	if err := EnsureForSearch(indexDir, search.Options{Query: "replacementneedle", Harness: "grok"}, false, nil); err != nil {
+	if err = EnsureForSearch(indexDir, search.Options{Query: "replacementneedle", Harness: "grok"}, false, nil); err != nil {
 		t.Fatal(err)
 	}
 	ss, err = Search(indexDir, search.Options{Query: "replacementneedle", Harness: "grok"})
@@ -213,14 +213,14 @@ func TestGrokIndexGrowthRenameAndRewind(t *testing.T) {
 	if len(rewound) <= len(first)+len(second) {
 		t.Fatal("rewound fixture must regrow past the previously indexed size")
 	}
-	if err := os.WriteFile(updates, []byte(rewound), 0o644); err != nil {
+	if err = os.WriteFile(updates, []byte(rewound), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	tick = tick.Add(time.Second)
-	if err := os.Chtimes(updates, tick, tick); err != nil {
+	if err = os.Chtimes(updates, tick, tick); err != nil {
 		t.Fatal(err)
 	}
-	if err := EnsureForSearch(indexDir, search.Options{Query: "replacementneedle", Harness: "grok"}, false, nil); err != nil {
+	if err = EnsureForSearch(indexDir, search.Options{Query: "replacementneedle", Harness: "grok"}, false, nil); err != nil {
 		t.Fatal(err)
 	}
 	ss, err = Search(indexDir, search.Options{Query: "replacementneedle", Harness: "grok"})

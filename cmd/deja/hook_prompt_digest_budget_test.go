@@ -14,7 +14,7 @@ import (
 
 func TestDigestBudgetSpentCountsOnlyFullDigests(t *testing.T) {
 	seen := map[string]bool{"sess-a": true, "q:abc": true}
-	for i := 0; i < digestsPerSession-1; i++ {
+	for i := range digestsPerSession - 1 {
 		seen[digestSeenPrefix+strconv.Itoa(i)] = true
 	}
 	if digestBudgetSpent(seen, "agent") {
@@ -67,7 +67,7 @@ func TestHookPromptShrinksToPointerPastTheDigestBudget(t *testing.T) {
 			t.Fatal(err)
 		}
 		var b strings.Builder
-		for i := 0; i < digestsPerSession; i++ {
+		for i := range digestsPerSession {
 			b.WriteString(hookseenKey(sid) + " " + digestSeenPrefix + "f" + strconv.Itoa(i) + "\n")
 		}
 		f, err := os.OpenFile(index.DefaultDir()+".hookseen", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
@@ -109,8 +109,8 @@ func TestHookPromptShrinksToPointerPastTheDigestBudget(t *testing.T) {
 
 	// A question asked before is the strong claim and keeps its full block.
 	spend("long-2")
-	if got := askAbout("long-2", "why does rsync hang in the nightly deploy script"); !strings.Contains(got, "StrictHostKeyChecking") {
-		t.Errorf("a repeated question past the budget lost its full block:\n%q", got)
+	if got2 := askAbout("long-2", "why does rsync hang in the nightly deploy script"); !strings.Contains(got2, "StrictHostKeyChecking") {
+		t.Errorf("a repeated question past the budget lost its full block:\n%q", got2)
 	}
 
 	// A spawned agent gets the pointer from its first block, and the full one

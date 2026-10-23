@@ -27,8 +27,9 @@ import (
 // 7.8.7: the digest and per-prompt recall reached the model from a session the
 // extension's own server ran (#4795).
 func kilocodeMCPSettingsPaths() []string {
-	var out []string
-	for _, root := range sources.KiloRoots() {
+	roots := sources.KiloRoots()
+	out := make([]string, 0, len(roots))
+	for _, root := range roots {
 		out = append(out, filepath.Join(root, "settings", "mcp_settings.json"))
 	}
 	return out

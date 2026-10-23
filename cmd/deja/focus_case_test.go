@@ -12,7 +12,7 @@ import (
 // the user typed in another case, in either alphabet.
 func TestFocusSessionIgnoresCase(t *testing.T) {
 	msgs := make([]model.Message, 0, 12)
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		msgs = append(msgs, model.Message{Role: "assistant", Text: "unrelated chatter"})
 	}
 	msgs = append(msgs,

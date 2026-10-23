@@ -138,7 +138,7 @@ func TestSessionMetadataIsTheSameWhicheverWayTheIndexGotThere(t *testing.T) {
 		}
 		va, vb := reflect.ValueOf(a), reflect.ValueOf(b)
 		var diffs []string
-		for i := 0; i < va.NumField(); i++ {
+		for i := range va.NumField() {
 			if !reflect.DeepEqual(va.Field(i).Interface(), vb.Field(i).Interface()) {
 				diffs = append(diffs, fmt.Sprintf("%s: whole=%v grown=%v",
 					va.Type().Field(i).Name, va.Field(i).Interface(), vb.Field(i).Interface()))

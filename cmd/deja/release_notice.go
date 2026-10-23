@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -162,7 +163,7 @@ func spawnReleaseLook(stamp string) error {
 		return err
 	}
 	defer func() { _ = devNull.Close() }()
-	cmd := exec.Command(exe, "version")
+	cmd := exec.CommandContext(context.Background(), exe, "version")
 	cmd.Env = append(os.Environ(), releaseLookEnv+"="+stamp)
 	cmd.Stdout = devNull
 	cmd.Stderr = devNull
@@ -209,5 +210,5 @@ func releaseNoticeLine(current, latest, exe string) string {
 	if _, managed := packageManagerOwning(exe); managed != "" {
 		command = managed
 	}
-	return fmt.Sprintf("deja v%s is out (this is v%s) — `%s` upgrades it; %s=1 hides this line", latest, current, command, releaseNoticeOff)
+	return fmt.Sprintf("deja v%s is out (this is v%s) — %#q upgrades it; %s=1 hides this line", latest, current, command, releaseNoticeOff)
 }

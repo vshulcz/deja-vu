@@ -85,7 +85,8 @@ func main() {
 	if s.token == "" {
 		log.Print("amlserve: AML_TOKEN is empty, requests are not authenticated")
 	}
-	log.Fatal(http.ListenAndServe(*addr, s.routes()))
+	srv := &http.Server{Addr: *addr, Handler: s.routes(), ReadHeaderTimeout: 10 * time.Second}
+	log.Fatal(srv.ListenAndServe())
 }
 
 func (s *server) routes() http.Handler {
@@ -102,8 +103,8 @@ func (s *server) authed(h http.HandlerFunc) http.HandlerFunc {
 			got := r.Header.Get("X-Api-Key")
 			if a := r.Header.Get("Authorization"); got == "" && a != "" {
 				for _, p := range []string{"Bearer ", "Token "} {
-					if strings.HasPrefix(a, p) {
-						got = strings.TrimPrefix(a, p)
+					if after, ok := strings.CutPrefix(a, p); ok {
+						got = after
 					}
 				}
 			}
@@ -120,12 +121,16 @@ func (s *server) authed(h http.HandlerFunc) http.HandlerFunc {
 func fail(w http.ResponseWriter, code int, reason string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(map[string]any{"detail": map[string]string{"reason": reason}})
+	if err := json.NewEncoder(w).Encode(map[string]any{"detail": map[string]string{"reason": reason}}); err != nil {
+		log.Printf("amlserve: write reply: %v", err)
+	}
 }
 
 func reply(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(v)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		log.Printf("amlserve: write reply: %v", err)
+	}
 }
 
 // nameOf is the on-disk name of an id the caller sent, numbered in the order
@@ -137,8 +142,8 @@ func (s *server) nameOf(table, prefix, id string, create bool) (string, bool, er
 	if !ok {
 		t = map[string]string{}
 		if b, err := os.ReadFile(table); err == nil {
-			if err := json.Unmarshal(b, &t); err != nil {
-				return "", false, err
+			if jerr := json.Unmarshal(b, &t); jerr != nil {
+				return "", false, jerr
 			}
 		} else if !errors.Is(err, os.ErrNotExist) {
 			return "", false, err
@@ -153,7 +158,10 @@ func (s *server) nameOf(table, prefix, id string, create bool) (string, bool, er
 	}
 	name := fmt.Sprintf("%s%d", prefix, len(t)+1)
 	t[id] = name
-	b, _ := json.Marshal(t)
+	b, err := json.Marshal(t)
+	if err != nil {
+		return "", false, err
+	}
 	if err := os.MkdirAll(filepath.Dir(table), 0o755); err != nil {
 		return "", false, err
 	}
@@ -233,7 +241,10 @@ func (s *server) write(root, proj string, req addRequest) error {
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	mark, _ := json.Marshal(req.RequestID)
+	mark, err := json.Marshal(req.RequestID)
+	if err != nil {
+		return err
+	}
 	if bytes.Contains(old, append([]byte(`"amlRequest":`), mark...)) {
 		return nil
 	}

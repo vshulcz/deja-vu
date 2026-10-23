@@ -187,10 +187,8 @@ func addOverlays(src, dst string, adds bucketPostings, dead []int64) (stale [][]
 		next++
 		return names[next-1], true
 	}
-	for w := 0; w < workers; w++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range workers {
+		wg.Go(func() {
 			for {
 				b, ok := take()
 				if !ok {
@@ -207,7 +205,7 @@ func addOverlays(src, dst string, adds bucketPostings, dead []int64) (stale [][]
 				}
 				mu.Unlock()
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	return stale, failed
@@ -365,9 +363,7 @@ func blankDeadWords(dir string, words bucketPostings, dead []int64) (map[string]
 	)
 	work := make(chan string)
 	for range min(runtime.NumCPU(), 8, len(names)) {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for b := range work {
 				blanked, err := blankDeadBucketWords(filepath.Join(dir, "buckets", b+".bin"), words[b], dead)
 				mu.Lock()
@@ -377,7 +373,7 @@ func blankDeadWords(dir string, words bucketPostings, dead []int64) (map[string]
 				}
 				mu.Unlock()
 			}
-		}()
+		})
 	}
 	for _, b := range names {
 		work <- b
@@ -407,7 +403,7 @@ func blankDeadBucketWords(base string, toks map[string][]posting, dead []int64) 
 		}
 	}
 	if len(gone) == 0 {
-		return nil, nil
+		return nil, nil //nolint:nilnil // a nil set is the empty set
 	}
 	for _, p := range files {
 		if err := blankWords(p, gone); err != nil && !os.IsNotExist(err) {
@@ -451,7 +447,7 @@ func markLiveWords(p string, toks map[string][]posting, dead []int64, live map[s
 				buf = make([]byte, n)
 			}
 			b := buf[:n]
-			if _, err := f.ReadAt(b, int64(e.off)); err != nil {
+			if _, err := f.ReadAt(b, int64(e.off)); err != nil { //nolint:gosec // offsets are checked against the bucket size on open
 				return err
 			}
 			postingBytesProbed.Add(int64(n))
@@ -478,7 +474,7 @@ func blankWords(p string, gone map[string]bool) error {
 	defer func() { _ = f.Close() }()
 	r := bufio.NewReader(f)
 	magic := make([]byte, len(bucketMagic))
-	if _, err := io.ReadFull(r, magic); err != nil || !bytes.Equal(magic, bucketMagic) {
+	if _, err = io.ReadFull(r, magic); err != nil || !bytes.Equal(magic, bucketMagic) {
 		return errCorruptIndex
 	}
 	count, err := binary.ReadUvarint(r)
@@ -492,7 +488,7 @@ func blankWords(p string, gone map[string]bool) error {
 	}
 	var hits []span
 	tb := []byte{}
-	for i := uint64(0); i < count; i++ {
+	for range count {
 		ln, err := binary.ReadUvarint(r)
 		if err != nil {
 			return err
@@ -505,7 +501,7 @@ func blankWords(p string, gone map[string]bool) error {
 			tb = make([]byte, ln)
 		}
 		tb = tb[:ln]
-		if _, err := io.ReadFull(r, tb); err != nil {
+		if _, err = io.ReadFull(r, tb); err != nil {
 			return err
 		}
 		if gone[string(tb)] {
@@ -556,7 +552,7 @@ func blankedWord(tok string) (_ []byte, ok bool) {
 		copy(b, f[:])
 		return b, true
 	case len(b) == 2:
-		for c := byte(0); c < utf8.RuneSelf; c++ {
+		for c := range byte(utf8.RuneSelf) {
 			for _, f := range [][]byte{{0xff, c}, {c, 0xff}} {
 				if bucket(string(f)) == want {
 					return f, true
@@ -572,7 +568,7 @@ func blankedWord(tok string) (_ []byte, ok bool) {
 var hashedFillers = sync.OnceValue(func() map[string][3]byte {
 	out := make(map[string][3]byte, len(hexBuckets))
 	for c1 := byte(0); c1 < utf8.RuneSelf && len(out) < len(hexBuckets); c1++ {
-		for c2 := byte(0); c2 < utf8.RuneSelf; c2++ {
+		for c2 := range byte(utf8.RuneSelf) {
 			f := [3]byte{0xff, c1, c2}
 			if name := bucket(string(f[:])); out[name] == ([3]byte{}) {
 				out[name] = f

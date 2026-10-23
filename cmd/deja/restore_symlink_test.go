@@ -20,8 +20,8 @@ func TestRestoreMatchesAPathThroughASymlink(t *testing.T) {
 		t.Skip("symlinks need privileges on Windows")
 	}
 	tmp := hermeticEnv(t)
-	real := filepath.Join(tmp, "private", "tmp", "proj")
-	if err := os.MkdirAll(real, 0o755); err != nil {
+	realDir := filepath.Join(tmp, "private", "tmp", "proj")
+	if err := os.MkdirAll(realDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	link := filepath.Join(tmp, "tmp")
@@ -46,7 +46,7 @@ func TestRestoreMatchesAPathThroughASymlink(t *testing.T) {
 	if err != nil || !strings.Contains(out, "1 replaced span") {
 		t.Fatalf("the recorded spelling finds nothing, so this measures nothing: %v\n%s", err, out)
 	}
-	out, err = captureRun(t, "restore", filepath.Join(real, "retry.go"))
+	out, err = captureRun(t, "restore", filepath.Join(realDir, "retry.go"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,14 +55,14 @@ func TestRestoreMatchesAPathThroughASymlink(t *testing.T) {
 	}
 
 	// Written back over its own file, under the name the edit did not use.
-	if err := os.WriteFile(filepath.Join(real, "retry.go"), []byte("live work\n"), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(realDir, "retry.go"), []byte("live work\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, err = captureRun(t, "restore", recorded, "-o", filepath.Join(real, "retry.go"), "--force")
+	_, err = captureRun(t, "restore", recorded, "-o", filepath.Join(realDir, "retry.go"), "--force")
 	if err == nil || !strings.Contains(err.Error(), "refusing to write over") {
 		t.Errorf("restore wrote over the file the span came from through its other name: %v", err)
 	}
-	if b, _ := os.ReadFile(filepath.Join(real, "retry.go")); string(b) != "live work\n" {
+	if b, _ := os.ReadFile(filepath.Join(realDir, "retry.go")); string(b) != "live work\n" {
 		t.Errorf("the live file was overwritten: %q", b)
 	}
 }

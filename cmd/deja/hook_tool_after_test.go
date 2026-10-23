@@ -35,7 +35,7 @@ func seedFixPair(t *testing.T, errLine, fixCmd string) string {
 	// Twice, in two sessions. One session running something after an error is
 	// half the evidence — deja keeps it as a candidate and does not serve it
 	// until a second session confirms the same remedy.
-	for n := 0; n < 2; n++ {
+	for n := range 2 {
 		body := line("user", "the build is broken", 0) +
 			line("assistant", "ran it and got:\n"+errLine, 1) +
 			toolUse(fixCmd, 2) +
@@ -53,7 +53,7 @@ func seedFixPair(t *testing.T, errLine, fixCmd string) string {
 }
 
 func postToolPayload(tool, command, stdout, stderr, session string) string {
-	b, _ := json.Marshal(map[string]any{
+	b, err := json.Marshal(map[string]any{
 		"hook_event_name": "PostToolUse",
 		"tool_name":       tool,
 		"tool_input":      map[string]any{"command": command},
@@ -61,6 +61,9 @@ func postToolPayload(tool, command, stdout, stderr, session string) string {
 		"session_id":      session,
 		"cwd":             "/work/app",
 	})
+	if err != nil {
+		panic(err)
+	}
 	return string(b)
 }
 
@@ -142,7 +145,7 @@ func TestFixPairReadsWhateverTheHarnessCallsOutput(t *testing.T) {
 	i := 0
 	for name, resp := range shapes {
 		i++
-		b, _ := json.Marshal(map[string]any{
+		b, jerr := json.Marshal(map[string]any{
 			"hook_event_name": "PostToolUse",
 			"tool_name":       "Bash",
 			"tool_input":      map[string]any{"command": "make"},
@@ -150,6 +153,9 @@ func TestFixPairReadsWhateverTheHarnessCallsOutput(t *testing.T) {
 			"session_id":      fmt.Sprintf("shape-%d", i),
 			"cwd":             "/work/app",
 		})
+		if jerr != nil {
+			t.Fatal(jerr)
+		}
 		var out bytes.Buffer
 		if err := runHookToolAfter(os.Getenv("DEJA_INDEX_DIR"), strings.NewReader(string(b)), &out); err != nil {
 			t.Fatalf("%s: %v", name, err)

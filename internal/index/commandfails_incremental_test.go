@@ -1,7 +1,6 @@
 package index
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -43,13 +42,13 @@ func (c *cfStore) turn(project string, i, k int, cmd, out string, failed bool) s
 		"role": "assistant", "content": []any{map[string]any{"type": "tool_use", "id": id, "name": "Bash", "input": map[string]any{"command": cmd}}}}}
 	r := map[string]any{"type": "user", "sessionId": sid, "timestamp": ts, "cwd": cwd, "message": map[string]any{
 		"role": "user", "content": []any{map[string]any{"type": "tool_result", "tool_use_id": id, "is_error": failed, "content": out}}}}
-	ab, _ := json.Marshal(a)
-	rb, _ := json.Marshal(r)
+	ab := mustJSON(a)
+	rb := mustJSON(r)
 	return string(ab) + "\n" + string(rb) + "\n"
 }
 
 func (c *cfStore) prompt(project string, i int, text string) string {
-	b, _ := json.Marshal(map[string]any{"type": "user", "sessionId": c.sid(i), "timestamp": fmt.Sprintf("2026-09-%02dT09:59:00Z", 1+i%28),
+	b := mustJSON(map[string]any{"type": "user", "sessionId": c.sid(i), "timestamp": fmt.Sprintf("2026-09-%02dT09:59:00Z", 1+i%28),
 		"cwd": "/tmp/" + project, "message": map[string]any{"role": "user", "content": text}})
 	return string(b) + "\n"
 }
@@ -97,6 +96,7 @@ func (c *cfStore) appendRaw(project string, i int, text string) {
 }
 
 func countOutputsRead(t *testing.T) *int {
+	t.Helper()
 	n := new(int)
 	commandFailOutputRead = func() { *n++ }
 	t.Cleanup(func() { commandFailOutputRead = nil })
@@ -109,7 +109,7 @@ func countOutputsRead(t *testing.T) *int {
 func TestACommandFailureUpdateReadsOnlyWhatChanged(t *testing.T) {
 	c, tmp := newCFStore(t)
 	const n = 40
-	for i := 0; i < n; i++ {
+	for i := range n {
 		c.write("app", i, fmt.Sprintf("fix the store test %d", i))
 	}
 	dir := filepath.Join(tmp, "index.db")
@@ -183,7 +183,7 @@ func TestACommandFailureUpdateReadsOnlyWhatChanged(t *testing.T) {
 func TestACommandFailureUpdateEndsWhereAFullBuildDoes(t *testing.T) {
 	c, tmp := newCFStore(t)
 	projects := []string{"app", "web"}
-	for i := 0; i < 24; i++ {
+	for i := range 24 {
 		c.write(projects[i%2], i, fmt.Sprintf("fix the store test %d", i))
 	}
 	// Four sessions in a project of their own, the only ones whose builds

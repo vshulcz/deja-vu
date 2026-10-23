@@ -29,17 +29,16 @@ create table messages (id text primary key, session_id text not null, role text 
   parts text not null default '[]', model text, created_at integer not null, updated_at integer not null,
   finished_at integer, provider text, is_summary_message integer default 0 not null);
 `
-	store := func(project, sql string) string {
+	store := func(project, sql string) {
 		db := filepath.Join(tmp, project, ".crush", "crush.db")
 		if err := os.MkdirAll(filepath.Dir(db), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		cmd := exec.Command("sqlite3", db)
+		cmd := exec.CommandContext(t.Context(), "sqlite3", db)
 		cmd.Stdin = strings.NewReader(schema + sql)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("build store: %v: %s", err, out)
 		}
-		return db
 	}
 	store("full", `insert into sessions values ('s1',null,'retry',1,0,0,0,1790000000,1790000000,null,null);
 insert into messages values ('m1','s1','user','[{"type":"text","data":{"text":"fix the retry loop"}}]','m',1790000000,1790000000,null,'p',0);
@@ -59,7 +58,7 @@ insert into messages values ('m1','s1','user','[{"type":"text","data":{"text":"f
 		var buf bytes.Buffer
 		doctorHarnesses(&buf, dir)
 		var out []string
-		for _, line := range strings.Split(buf.String(), "\n") {
+		for line := range strings.SplitSeq(buf.String(), "\n") {
 			if strings.HasPrefix(strings.TrimSpace(line), "crush ") {
 				out = append(out, line)
 			}

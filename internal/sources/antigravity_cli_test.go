@@ -154,7 +154,7 @@ func TestParseAntigravityCLISessionGetsAProject(t *testing.T) {
 ` + string(viewed) + `
 {"source":"MODEL","type":"PLANNER_RESPONSE","content":"the pool is capped at 4","created_at":"2026-08-14T09:00:02Z"}
 `
-	if err := os.WriteFile(transcript, []byte(body), 0o644); err != nil {
+	if err = os.WriteFile(transcript, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	sessions, err := ParseAntigravityFile(transcript)

@@ -31,8 +31,8 @@ func TestInstallDeepSeekDeclaresThePluginsAsModules(t *testing.T) {
 	var pkg struct {
 		Type string `json:"type"`
 	}
-	if err := json.Unmarshal(body, &pkg); err != nil {
-		t.Fatalf("package.json: %v\n%s", err, body)
+	if uerr := json.Unmarshal(body, &pkg); uerr != nil {
+		t.Fatalf("package.json: %v\n%s", uerr, body)
 	}
 	if pkg.Type != "module" {
 		t.Errorf("package.json type = %q, want module", pkg.Type)
@@ -77,16 +77,16 @@ func TestDeepSeekAutoPluginAsksAboutTheSessionsWorkspace(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("DSH_HOME", filepath.Join(home, ".dsh"))
-	if err := os.WriteFile(filepath.Join(home, "package.json"), []byte(`{"type": "commonjs"}`+"\n"), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(filepath.Join(home, "package.json"), []byte(`{"type": "commonjs"}`+"\n"), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	calls := filepath.Join(home, "calls.jsonl")
 	fake := filepath.Join(home, "deja")
-	if err := os.WriteFile(fake, []byte("#!/bin/sh\ncat >> '"+calls+"'\necho >> '"+calls+"'\n"), 0o755); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(fake, []byte("#!/bin/sh\ncat >> '"+calls+"'\necho >> '"+calls+"'\n"), 0o755); werr != nil {
+		t.Fatal(werr)
 	}
-	if _, err := installDeepSeekAuto(fake, false); err != nil {
-		t.Fatal(err)
+	if _, ierr := installDeepSeekAuto(fake, false); ierr != nil {
+		t.Fatal(ierr)
 	}
 
 	const drive = `
@@ -106,10 +106,10 @@ for (const [id, cwd] of [["s1", "/work/alpha"], ["s2", "/work/beta"]]) {
   contexts["deja:recall"].text({ agent: agent(id, cwd) });
 }
 `
-	cmd := exec.Command(node, "--input-type=module", "-e", drive, "file://"+dshAutoPath())
+	cmd := exec.CommandContext(t.Context(), node, "--input-type=module", "-e", drive, "file://"+dshAutoPath())
 	cmd.Dir = home
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("node could not run the plugin: %v\n%s", err, out)
+	if out, cerr := cmd.CombinedOutput(); cerr != nil {
+		t.Fatalf("node could not run the plugin: %v\n%s", cerr, out)
 	}
 
 	body, err := os.ReadFile(calls)
@@ -117,7 +117,7 @@ for (const [id, cwd] of [["s1", "/work/alpha"], ["s2", "/work/beta"]]) {
 		t.Fatalf("deja was never asked: %v", err)
 	}
 	var got []string
-	for _, line := range strings.Split(strings.TrimSpace(string(body)), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(string(body)), "\n") {
 		var payload struct {
 			CWD string `json:"cwd"`
 		}

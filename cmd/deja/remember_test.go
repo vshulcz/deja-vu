@@ -24,7 +24,7 @@ func TestRememberCLIAndMCP(t *testing.T) {
 	if !strings.HasPrefix(result, "Remembered under ") || strings.Contains(result, "under notes") {
 		t.Fatalf("mcp result=%q", result)
 	}
-	if err := index.EnsureForSearch(index.DefaultDir(), search.Options{All: true}, false, nil); err != nil {
+	if err = index.EnsureForSearch(index.DefaultDir(), search.Options{All: true}, false, nil); err != nil {
 		t.Fatal(err)
 	}
 	ss, err := index.Search(index.DefaultDir(), search.Options{Query: "durable", All: true})

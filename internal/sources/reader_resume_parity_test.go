@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -75,15 +76,15 @@ func TestCommandCodeResumeDoesNotReplayTheFirstPrompt(t *testing.T) {
 	want := readerMessages(whole)
 
 	// The first pass saw only line 1; the client then appended the rest.
-	off := strings.IndexByte(string(full), '\n') + 1
-	if err := os.WriteFile(path, full[:off], 0o644); err != nil {
+	off := bytes.IndexByte(full, '\n') + 1
+	if err = os.WriteFile(path, full[:off], 0o644); err != nil {
 		t.Fatal(err)
 	}
 	first, err := ParseCommandCodeFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, full, 0o644); err != nil {
+	if err = os.WriteFile(path, full, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if !commandCodeExitResumes(path, int64(off)) {
@@ -242,7 +243,7 @@ func TestCodexEventOnlyTailIsNotStoredTwice(t *testing.T) {
 	p2, _ := ParseCodexRolloutFromOffset(path, int64(len(l1)))
 	readerWrite(t, path, l1+l2+l3)
 	p3, _ := ParseCodexRolloutFromOffset(path, int64(len(l1+l2)))
-	var got []string
+	var got []string //nolint:prealloc // each pass adds an unknown number of texts
 	for _, ss := range [][]model.Session{p1, p2, p3} {
 		got = append(got, readerTexts(ss)...)
 	}
@@ -330,7 +331,7 @@ func readerSQLite(t *testing.T, db, stmts string) {
 	if _, err := exec.LookPath("sqlite3"); err != nil {
 		t.Skip("sqlite3 CLI not available")
 	}
-	if out, err := exec.Command("sqlite3", db, stmts).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, stmts).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3: %v %s", err, out)
 	}
 }
@@ -430,7 +431,7 @@ func readerSplit(t *testing.T, kind FileKind, path string, lines []string, n int
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+	if err = os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	off := int64(len(prefix))

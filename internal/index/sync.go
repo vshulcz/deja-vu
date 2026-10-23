@@ -2,15 +2,18 @@ package index
 
 import (
 	"bufio"
-	"crypto/sha1"
+	"crypto/sha1" //nolint:gosec // a short id, not a security hash
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,6 +27,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
+// SyncRecord is one message as a sync batch carries it.
 type SyncRecord struct {
 	Harness   string    `json:"harness"`
 	SessionID string    `json:"session_id"`
@@ -88,6 +92,7 @@ func Export(dir, outDir string) (int, error) {
 	return exportRecords(dir, outDir, "", false, false)
 }
 
+// ExportFull is Export without the watermarks.
 func ExportFull(dir, outDir string) (int, error) {
 	return exportRecords(dir, outDir, "", true, false)
 }
@@ -172,7 +177,7 @@ func exportRecordsWith(dir, outDir, peer string, full, relay bool) (int, func() 
 	if err != nil {
 		return 0, nil, err
 	}
-	if err := os.MkdirAll(outDir, 0o700); err != nil {
+	if err = os.MkdirAll(outDir, 0o700); err != nil {
 		// The import side of the same mistake is worded; this one handed back
 		// `mkdir /…/file: not a directory` (#1112).
 		if fi, statErr := os.Stat(outDir); statErr == nil && !fi.IsDir() {
@@ -186,9 +191,7 @@ func exportRecordsWith(dir, outDir, peer string, full, relay bool) (int, func() 
 	bySource := map[string][]SyncRecord{}
 	self := MachineName()
 	nextWatermarks := map[string]int64{}
-	for k, v := range m.ExportWatermarks {
-		nextWatermarks[k] = v
-	}
+	maps.Copy(nextWatermarks, m.ExportWatermarks)
 	// Records that already went out at exactly the watermark instant. Time
 	// alone cannot resume precisely when a harness stamps a whole session
 	// with one timestamp, so the boundary is remembered by record identity.
@@ -279,16 +282,7 @@ func exportRecordsWith(dir, outDir, peer string, full, relay bool) (int, func() 
 		// straight from that machine rather than growing a second copy — and
 		// so the privacy rules below, which are written against real project
 		// names, match it at all.
-		project, sessionID, origin := meta.Project, meta.ID, syncName(self)
-		if relayed {
-			project = strings.TrimPrefix(meta.Project, importedProjectPrefix)
-			if meta.OrigID != "" {
-				sessionID = meta.OrigID
-			}
-			if meta.From != "" {
-				origin = syncName(meta.From)
-			}
-		}
+		project, sessionID, origin := exportNames(meta, relayed, self)
 		if (!ex.Empty() && ex.Match(project)) || pol.Ignored(meta.Path, project) || offHarnesses[strings.ToLower(meta.Harness)] {
 			// Held, not settled, for both: a watermark that ran past a
 			// withheld record would settle it forever, so lifting the rule
@@ -309,37 +303,11 @@ func exportRecordsWith(dir, outDir, peer string, full, relay bool) (int, func() 
 			rec.Kind = syncName(meta.Kind)
 		}
 		if meta.Harness == "deja" && strings.HasPrefix(sessionID, "deja-note-") {
-			if relayed {
-				rec.Lifecycle, rec.LifecycleNote, rec.LifecycleAt = syncName(meta.Lifecycle), syncName(meta.LifecycleNote), syncName(meta.LifecycleAt)
-			} else {
-				if noteStates == nil {
-					noteStates = promotedStatesByNoteID()
-				}
-				if lc, ok := noteStates[sessionID]; ok {
-					note, _ := redact.Text(lc.Note)
-					rec.Lifecycle, rec.LifecycleNote = syncName(lc.State), syncName(note)
-					if !lc.At.IsZero() {
-						rec.LifecycleAt = syncName(lc.At.UTC().Format(lifecycleDay))
-					}
-				}
-			}
+			exportNoteLifecycle(&rec, meta, sessionID, relayed, &noteStates)
 		}
 		bySource[source] = append(bySource[source], rec)
 		touched[wk] = true
-		tn := r.Time.UnixNano()
-		switch {
-		case tn > nextWatermarks[wk]:
-			nextWatermarks[wk] = tn
-			nextBoundary[wk] = map[uint64]bool{rh: true}
-		case tn == nextWatermarks[wk]:
-			if nextBoundary[wk] == nil {
-				nextBoundary[wk] = map[uint64]bool{}
-				for h := range sentAtBoundary[wk] {
-					nextBoundary[wk][h] = true
-				}
-			}
-			nextBoundary[wk][rh] = true
-		}
+		advanceExportWatermark(nextWatermarks, nextBoundary, sentAtBoundary, wk, rh, r.Time.UnixNano())
 	})
 	if err != nil {
 		return 0, nil, err
@@ -351,6 +319,67 @@ func exportRecordsWith(dir, outDir, peer string, full, relay bool) (int, func() 
 			delete(nextBoundary, wk)
 		}
 	}
+	total, err := writeSyncBatches(outDir, bySource)
+	if err != nil {
+		return total, nil, err
+	}
+	commit := func() error { return commitExportWatermarks(dir, touched, nextWatermarks, nextBoundary) }
+	return total, commit, nil
+}
+
+// exportNames is the project, session id and origin a record goes out under.
+func exportNames(meta SessionMeta, relayed bool, self string) (project, sessionID string, origin syncName) {
+	project, sessionID, origin = meta.Project, meta.ID, syncName(self)
+	if relayed {
+		project = strings.TrimPrefix(meta.Project, importedProjectPrefix)
+		if meta.OrigID != "" {
+			sessionID = meta.OrigID
+		}
+		if meta.From != "" {
+			origin = syncName(meta.From)
+		}
+	}
+	return project, sessionID, origin
+}
+
+// exportNoteLifecycle puts a promoted note's state on the record that carries it.
+func exportNoteLifecycle(rec *SyncRecord, meta SessionMeta, sessionID string, relayed bool, noteStates *map[string]sources.Lifecycle) {
+	if relayed {
+		rec.Lifecycle, rec.LifecycleNote, rec.LifecycleAt = syncName(meta.Lifecycle), syncName(meta.LifecycleNote), syncName(meta.LifecycleAt)
+		return
+	}
+	if *noteStates == nil {
+		*noteStates = promotedStatesByNoteID()
+	}
+	if lc, ok := (*noteStates)[sessionID]; ok {
+		note, _ := redact.Text(lc.Note)
+		rec.Lifecycle, rec.LifecycleNote = syncName(lc.State), syncName(note)
+		if !lc.At.IsZero() {
+			rec.LifecycleAt = syncName(lc.At.UTC().Format(lifecycleDay))
+		}
+	}
+}
+
+// advanceExportWatermark moves a source's next watermark and boundary set
+// past a record this export sends.
+func advanceExportWatermark(nextWatermarks map[string]int64, nextBoundary, sentAtBoundary map[string]map[uint64]bool, wk string, rh uint64, tn int64) {
+	switch {
+	case tn > nextWatermarks[wk]:
+		nextWatermarks[wk] = tn
+		nextBoundary[wk] = map[uint64]bool{rh: true}
+	case tn == nextWatermarks[wk]:
+		if nextBoundary[wk] == nil {
+			nextBoundary[wk] = map[uint64]bool{}
+			for h := range sentAtBoundary[wk] {
+				nextBoundary[wk][h] = true
+			}
+		}
+		nextBoundary[wk][rh] = true
+	}
+}
+
+// writeSyncBatches writes one batch file per source and counts the records.
+func writeSyncBatches(outDir string, bySource map[string][]SyncRecord) (int, error) {
 	total := 0
 	for source, recs := range bySource {
 		if len(recs) == 0 {
@@ -359,58 +388,61 @@ func exportRecordsWith(dir, outDir, peer string, full, relay bool) (int, func() 
 		name := fmt.Sprintf("deja-sync-%s-%d.jsonl", shortHash(source), time.Now().UnixNano())
 		f, err := os.Create(filepath.Join(outDir, name))
 		if err != nil {
-			return total, nil, err
+			return total, err
 		}
 		enc := json.NewEncoder(f)
 		for _, rec := range recs {
 			if err := enc.Encode(rec); err != nil {
 				_ = f.Close()
-				return total, nil, err
+				return total, err
 			}
 			total++
 		}
 		if err := f.Close(); err != nil {
-			return total, nil, err
+			return total, err
 		}
 	}
-	commit := func() error {
-		unlock, err := lockDir(dir)
-		if err != nil {
-			return err
-		}
-		defer unlock()
-		cur, err := readManifest(dir)
-		if err != nil {
-			return err
-		}
-		if cur.ExportWatermarks == nil {
-			cur.ExportWatermarks = map[string]int64{}
-		}
-		if cur.ExportBoundary == nil {
-			cur.ExportBoundary = map[string][]uint64{}
-		}
-		for source := range touched {
-			wm := nextWatermarks[source]
-			if wm < cur.ExportWatermarks[source] {
-				continue
-			}
-			cur.ExportWatermarks[source] = wm
-			// Above the cap the boundary set stops being cheap; drop it and
-			// let the next push resend that instant — import dedupes.
-			if set := nextBoundary[source]; len(set) > 0 && len(set) <= exportBoundaryCap {
-				hashes := make([]uint64, 0, len(set))
-				for h := range set {
-					hashes = append(hashes, h)
-				}
-				sort.Slice(hashes, func(i, j int) bool { return hashes[i] < hashes[j] })
-				cur.ExportBoundary[source] = hashes
-			} else {
-				delete(cur.ExportBoundary, source)
-			}
-		}
-		return writeManifestOnly(dir, cur)
+	return total, nil
+}
+
+// commitExportWatermarks stores the watermarks of the sources an export
+// touched, once the batch it wrote has been handed over.
+func commitExportWatermarks(dir string, touched map[string]bool, nextWatermarks map[string]int64, nextBoundary map[string]map[uint64]bool) error {
+	unlock, err := lockDir(dir)
+	if err != nil {
+		return err
 	}
-	return total, commit, nil
+	defer unlock()
+	cur, err := readManifest(dir)
+	if err != nil {
+		return err
+	}
+	if cur.ExportWatermarks == nil {
+		cur.ExportWatermarks = map[string]int64{}
+	}
+	if cur.ExportBoundary == nil {
+		cur.ExportBoundary = map[string][]uint64{}
+	}
+	for source := range touched {
+		wm := nextWatermarks[source]
+		if wm < cur.ExportWatermarks[source] {
+			continue
+		}
+		cur.ExportWatermarks[source] = wm
+		// Above the cap the boundary set stops being cheap; drop it and
+		// let the next push resend that instant — import dedupes.
+		if set := nextBoundary[source]; len(set) > 0 && len(set) <= exportBoundaryCap {
+			hashes := make([]uint64, 0, len(set))
+			for h := range set {
+				hashes = append(hashes, h)
+			}
+			slices.Sort(hashes)
+			cur.ExportBoundary[source] = hashes
+		} else {
+			delete(cur.ExportBoundary, source)
+		}
+	}
+	return writeManifestOnly(dir, cur)
 }
 
 // lastImportSkippedForgotten holds how many records the last Import dropped
@@ -528,6 +560,8 @@ func dayBucketKey(sr SyncRecord, textHash uint64) string {
 	return "deja-note-day:" + sr.Project + ":" + sr.Time.UTC().Format(time.RFC3339Nano) + ":" + sr.Role + ":" + strconv.FormatUint(textHash, 16)
 }
 
+// Import reads the sync batches in inDir into the index at dir and returns
+// how many records it added.
 func Import(dir, inDir string) (int, error) {
 	if dir == "" {
 		dir = DefaultDir()
@@ -555,41 +589,23 @@ func Import(dir, inDir string) (int, error) {
 	// Glob swallows a directory it cannot open, so a locked source imported
 	// "0 records" — the same words an already-imported batch prints, and the
 	// records were there the whole time (#1042).
-	if f, oerr := os.Open(inDir); oerr != nil {
+	f, oerr := os.Open(inDir)
+	if oerr != nil {
 		if os.IsPermission(oerr) {
 			return 0, fmt.Errorf("cannot read %s — permission denied; check that directory's permissions (on macOS, also Full Disk Access for your terminal)", search.SafeLine(inDir))
 		}
 		return 0, oerr
-	} else {
-		_ = f.Close()
 	}
+	_ = f.Close()
 	unlock, err := lockDir(dir)
 	if err != nil {
 		return 0, err
 	}
 	defer unlock()
-	dead := readTombstones()
-	// Content tombstones are recorded against the session they came from, so
-	// they are read back once here rather than scanned per record.
-	deadContent := map[string]bool{}
-	for k := range dead {
-		if _, content, ok := strings.Cut(k, "\x00"); ok {
-			deadContent[content] = true
-		}
-	}
-	ex := sources.NewExcluder()
-	// The switches a reader on this machine runs under hold for what a peer
-	// indexed under its own: the batch carries every role the other machine
-	// kept (#5425).
-	offRoles := sources.SwitchedOffRoles()
-	subagentsOff := sources.SubagentsOff()
-	// So do the other two rules that keep work out of this machine's memory:
-	// a store it does not read, and a tree it does not recall from (#5435).
-	offHarnesses := sources.ExcludedHarnesses()
-	pol := policy.Load()
+	imp := newImporter(dir)
 	if !HasManifest(dir) {
-		if err := initEmptyIndex(dir); err != nil {
-			return 0, err
+		if initErr := initEmptyIndex(dir); initErr != nil {
+			return 0, initErr
 		}
 	}
 	m, err := readManifest(dir)
@@ -610,342 +626,36 @@ func Import(dir, inDir string) (int, error) {
 		return 0, err
 	}
 	sort.Strings(paths)
-	recsByKey := map[string][]Record{}
-	metas := map[string]SessionMeta{}
-	titleAt := map[string]time.Time{} // key -> time of the turn the title came from
-	titleRankOf := map[string]int{}   // key -> how good that turn was as a title
-	// A shared folder is both an outbox and an inbox: the machine that wrote a
-	// batch also runs `sync import` on that directory, and its own records came
-	// back as a second, "imported" copy of every session and note it had
-	// (#987). Recognised by content, so a peer's genuinely new lines in a
-	// session this machine also holds still land.
-	localContent := map[string]bool{}
-	localSessions := map[string]bool{}
+	imp.m = &m
 	for _, meta := range m.Sessions {
 		if meta.OrigID == "" {
-			localSessions[meta.Harness+":"+meta.ID] = true
+			imp.localSessions[meta.Harness+":"+meta.ID] = true
 		}
 	}
-	localContentLoaded := false
-	loadLocalContent := func() {
-		if localContentLoaded {
-			return
-		}
-		localContentLoaded = true
-		for _, r := range readRecordsForForget(dir) {
-			meta, ok := m.Sessions[r.Record.Key]
-			if !ok || meta.OrigID != "" {
-				continue
-			}
-			th := fnv.New64a()
-			_, _ = th.Write([]byte(r.Record.Text))
-			localContent[recordContentKey(meta.Harness, meta.ID, r.Record.Role, r.Record.Time, th.Sum64())] = true
-		}
-	}
-	added := 0
 	var skipped []string
-	ownSkipped := 0
-	forgottenSkipped := 0
-	incompleteSkipped := 0
-	excludedSkipped := 0
-	switchedSkipped := 0
-	harnessSkipped := 0
-	ignoredSkipped := 0
-	defer func() { lastImportSkippedForgotten = forgottenSkipped }()
-	defer func() { lastImportSkippedOwn = ownSkipped }()
-	defer func() { lastImportSkippedIncomplete = incompleteSkipped }()
-	defer func() { lastImportSkippedExcluded = excludedSkipped }()
-	defer func() { lastImportSkippedSwitched = switchedSkipped }()
-	defer func() { lastImportSkippedHarness = harnessSkipped }()
-	defer func() { lastImportSkippedIgnored = ignoredSkipped }()
+	defer func() { lastImportSkippedForgotten = imp.forgottenSkipped }()
+	defer func() { lastImportSkippedOwn = imp.ownSkipped }()
+	defer func() { lastImportSkippedIncomplete = imp.incompleteSkipped }()
+	defer func() { lastImportSkippedExcluded = imp.excludedSkipped }()
+	defer func() { lastImportSkippedSwitched = imp.switchedSkipped }()
+	defer func() { lastImportSkippedHarness = imp.harnessSkipped }()
+	defer func() { lastImportSkippedIgnored = imp.ignoredSkipped }()
 	for _, p := range paths {
-		// A file is imported whole or not at all, so what it contributed is
-		// remembered before it is read and rolled back if it turns out to be
-		// truncated: half a transfer is the one outcome nobody can reason
-		// about afterwards (#891).
-		before := importSnapshot{
-			counts: make(map[string]int, len(recsByKey)),
-			metas:  make(map[string]SessionMeta, len(metas)),
-			at:     make(map[string]time.Time, len(titleAt)),
-			rank:   make(map[string]int, len(titleRankOf)),
-			added:  added,
-		}
-		fileDedupe := &before.dedupe
-		// Redactions this file contributed, applied to the manifest only once
-		// the file has been read whole: a truncated file is rolled back below,
-		// and its redaction count must not survive the records it counted.
-		fileRedacted := 0
-		fileRules := map[string]int{}
-		for k, v := range recsByKey {
-			before.counts[k] = len(v)
-		}
-		for k, v := range metas {
-			before.metas[k] = v
-		}
-		for k, v := range titleAt {
-			before.at[k] = v
-		}
-		for k, v := range titleRankOf {
-			before.rank[k] = v
-		}
-		if err := readSyncFile(p, func(sr SyncRecord) error {
-			origID := sr.SessionID
-			if sr.Harness == "" || origID == "" {
-				// No session to attribute it to. Count it so the summary does not
-				// call a partial transfer complete (#1118).
-				incompleteSkipped++
-				return nil
-			}
-			// The same rule the local ingest applies: a message that strips to
-			// empty is not a message, and a session with nothing but those is
-			// not a session. deja's own exports never carry them, but a
-			// hand-made batch or one from a build older than #868 does — and
-			// they came back in as blank lines in `last` and rows in every
-			// counter (#896).
-			if strings.TrimSpace(sr.Text) == "" {
-				// A record with no text at all is not an empty message: it is
-				// a shape this build does not read, a field renamed by a newer
-				// one. Counted, or the batch it empties reads as up to date.
-				if sr.Text == "" {
-					incompleteSkipped++
-				}
-				return nil
-			}
-			importID := ImportedSessionID(sr.Harness, origID)
-			// Forgetting is primary data, not cache: a tombstoned session
-			// must stay dead even when the peer still holds the batch and
-			// this index was wiped and rebuilt.
-			//
-			// Both keys, because a session forgotten here was forgotten under
-			// its own id: checking only the imported one let a peer's copy walk
-			// the same text back into local search under a new id, while
-			// `forget --list` still called it forgotten (#968).
-			//
-			// Ahead of the dedupe ledger, which answers first for the ordinary
-			// case — the same batch handed over twice. Both drop the record;
-			// only this one knows why, and behind the ledger the import went
-			// silent exactly when the peer re-sent what you forgot (#980).
-			if dead[sr.Harness+":"+importID] || dead[sr.Harness+":"+origID] {
-				forgottenSkipped++
-				return nil
-			}
-			if parent := string(sr.Parent); parent != "" && (dead[sr.Harness+":"+ImportedSessionID(sr.Harness, parent)] || dead[sr.Harness+":"+parent]) {
-				forgottenSkipped++
-				return nil
-			}
-			// Key includes role and a text hash: two messages can legally share
-			// a timestamp (aider stamps a whole session with its start time).
-			// The legacy time-only key is still honored so batches imported by
-			// older versions stay idempotent.
-			legacy := sr.Harness + ":" + origID + ":" + sr.Time.UTC().Format(time.RFC3339Nano)
-			// Keyed on the text as this machine stores it, redacted here. A
-			// peer whose rules widened re-sends the same record with a marker
-			// where the value was, and keyed on what it sent the record landed
-			// twice. The key on the sent text is what older builds wrote, and
-			// is still honoured.
-			text, cnt := redact.Text(carriedText(sr.Harness, sr.Role, sr.Text))
-			th := fnv.New64a()
-			_, _ = th.Write([]byte(text))
-			rawHash := th.Sum64()
-			if text != sr.Text {
-				rh := fnv.New64a()
-				_, _ = rh.Write([]byte(sr.Text))
-				rawHash = rh.Sum64()
-			}
-			dedupe := legacy + ":" + sr.Role + ":" + strconv.FormatUint(th.Sum64(), 16)
-			sent := legacy + ":" + sr.Role + ":" + strconv.FormatUint(rawHash, 16)
-			// A day bucket's id is the sending machine's rendering of a date,
-			// not the identity of what it holds: after that machine changes
-			// zone the same note arrives under a new bucket and every peer
-			// grew a second copy (#977). Key those on what does not move.
-			if localSessions[sr.Harness+":"+sr.SessionID] {
-				loadLocalContent()
-				if localContent[recordContentKey(sr.Harness, sr.SessionID, sr.Role, sr.Time, th.Sum64())] ||
-					localContent[recordContentKey(sr.Harness, sr.SessionID, sr.Role, sr.Time, rawHash)] {
-					ownSkipped++
-					return nil
-				}
-			}
-			if bucket := dayBucketKey(sr, th.Sum64()); bucket != "" {
-				sentBucket := dayBucketKey(sr, rawHash)
-				if m.ImportedRecords[bucket] || m.ImportedRecords[sentBucket] {
-					return nil
-				}
-				// Forgotten as text: the sending machine renders the day its
-				// own way, so a note this machine dropped arrives under a
-				// bucket id no tombstone here has ever named (#985).
-				if deadContent[bucket] || deadContent[sentBucket] {
-					forgottenSkipped++
-					return nil
-				}
-				dedupe, sent = bucket, sentBucket
-			}
-			// The ledger is an optimisation over the manifest, not authority
-			// over it: it says a record already arrived, so re-importing the
-			// same batch is a no-op. But forgetting an imported session drops
-			// it from the manifest while leaving its rows in the ledger, and a
-			// tombstone (checked above) only holds until unforget lifts it —
-			// after which the stale ledger silently ate the very re-import
-			// unforget tells the user to run, and the "only copy" was
-			// unrecoverable. Skip only while the session it belongs to still
-			// lives; a ledger row whose session is gone is stale, not a dupe.
-			if m.ImportedRecords[dedupe] || m.ImportedRecords[sent] || m.ImportedRecords[legacy] {
-				if _, live := m.Sessions[sr.Harness+":"+importID]; live {
-					return nil
-				}
-			}
-			// The exclude list keeps a project out of this machine's memory;
-			// a sync from another machine must not put it back. Counted, so
-			// the batch it empties does not read as an empty batch (#2666).
-			if ex.Match(sr.Project) {
-				excludedSkipped++
-				return nil
-			}
-			if offHarnesses[strings.ToLower(sr.Harness)] {
-				harnessSkipped++
-				return nil
-			}
-			// Matched as recall would see it once stored, and as the peer
-			// named it, so a glob written for the local name holds too.
-			if pol.Ignored(syncImportPath, importedProjectPrefix+sr.Project) || pol.Ignored("", sr.Project) {
-				ignoredSkipped++
-				return nil
-			}
-			spawned := spawnedKind(string(sr.Kind)) || sr.Parent != ""
-			if offRoles[sr.Role] || (spawned && subagentsOff) {
-				switchedSkipped++
-				return nil
-			}
-			key := sr.Harness + ":" + importID
-			// Count what redaction removed, the way local ingest does — the
-			// import path redacted the text but threw the count away, so
-			// `stats --redaction` under-reported protection on an imported
-			// store (measured: two secrets redacted, total said one).
-			if n := cnt.Total(); n > 0 {
-				fileRedacted += n
-				for rule, c := range cnt {
-					fileRules[sr.Harness+":"+rule] += c
-				}
-			}
-			recsByKey[key] = append(recsByKey[key], Record{Key: key, Role: sr.Role, Text: text, Time: sr.Time, SourcePath: syncImportPath})
-			meta := metas[key]
-			if meta.ID == "" {
-				meta = SessionMeta{ID: importID, Harness: sr.Harness, Project: importedProjectPrefix + sr.Project, Path: syncImportPath, OrigID: origID, From: string(sr.Origin)}
-			}
-			if spawnedKind(string(sr.Kind)) {
-				meta.Kind = string(sr.Kind)
-			} else if sr.Parent != "" {
-				meta.Kind = "sidechain" // a run in its parent's log, from a build that sends no kind
-			}
-			if meta.Started.IsZero() || (!sr.Time.IsZero() && sr.Time.Before(meta.Started)) {
-				meta.Started = sr.Time
-			}
-			if sr.Time.After(meta.Updated) {
-				meta.Updated = sr.Time
-			}
-			// The title does not travel in the record stream, and without it the
-			// receiving machine's `last` is a column of hashes — the content
-			// arrived, the one line that makes the list readable did not (#670).
-			// Derive it the way ingest does, from the earliest user turn that is
-			// speech rather than harness plumbing.
-			// A user turn always wins; the assistant's first sentence fills in
-			// when there is none, the same order ingest uses (#692).
-			if rank := titleRank(sr.Role); rank > 0 && titleWorthy(strings.TrimSpace(text)) {
-				better := rank > titleRankOf[key]
-				sameRank := rank == titleRankOf[key] && !sr.Time.IsZero() && sr.Time.Before(titleAt[key])
-				if _, seen := titleAt[key]; !seen || better || sameRank {
-					if rank == titleRank(roleToolOutput) {
-						meta.Title = toolOutputTitle(strings.TrimSpace(text))
-					} else {
-						meta.Title = truncateTitle(strings.TrimSpace(text), 60)
-					}
-					// The listing marks a title that is the agent's own words
-					// rather than the reader's question (#1100); the import
-					// path derived the title the same way and lost the mark.
-					meta.AgentTitle = rank == titleRank("assistant")
-					titleAt[key] = sr.Time
-					titleRankOf[key] = rank
-				}
-			} else if meta.Title == "" && titleRank(sr.Role) > 0 {
-				// The same last resort ingest has: a session of nothing but
-				// harness plumbing arrives titleless and lists as a bare id
-				// here too. A real turn later in the stream replaces the
-				// stand-in, which is what the branch above does (#2548).
-				if t := strings.TrimSpace(text); t != "" {
-					meta.Title = harnessOutputTitle(t)
-					meta.AgentTitle = false
-				}
-			}
-			// A promoted note carries its state in the text: "[rejected] …".
-			// The states themselves live in the other machine's notes.jsonl,
-			// which never travels, so without reading them here a decision
-			// retracted there reads as accepted on this machine (#975).
-			//
-			// The state the sender filed wins over the line's own. The date is
-			// the filing day in UTC; a batch from before the fields has only
-			// the evidence time, taken as its UTC day so every peer and every
-			// rebuild store the same string (#5053). Read from the redacted
-			// text: the note lands in the manifest.
-			if strings.HasPrefix(origID, "deja-note-") {
-				if st, note, at, ok := carriedNoteState(sr); ok {
-					meta.Lifecycle, meta.LifecycleNote, meta.LifecycleAt = st, note, at
-				} else if st, note, ok := noteStateFromText(text); ok {
-					meta.Lifecycle, meta.LifecycleNote = st, note
-					if !sr.Time.IsZero() {
-						meta.LifecycleAt = sr.Time.UTC().Format(lifecycleDay)
-					}
-				}
-			}
-			metas[key] = meta
-			m.ImportedRecords[dedupe] = true
-			*fileDedupe = append(*fileDedupe, dedupe)
-			added++
-			return nil
-		}); err != nil {
-			// One unreadable file used to stop the whole directory, so a valid
-			// export sitting beside a truncated one never arrived and the
-			// reader was told only about a stray character (#891). The file is
-			// still refused whole; the others are not held hostage to it.
+		if err := imp.readFile(p); err != nil {
 			skipped = append(skipped, err.Error())
-			for k := range recsByKey {
-				n := before.counts[k]
-				if n == 0 {
-					delete(recsByKey, k)
-					continue
-				}
-				recsByKey[k] = recsByKey[k][:n]
-			}
-			for _, k := range before.dedupe {
-				delete(m.ImportedRecords, k)
-			}
-			restoreMap(metas, before.metas)
-			restoreMap(titleAt, before.at)
-			restoreMap(titleRankOf, before.rank)
-			added = before.added
-			continue
-		}
-		// The file was read whole: its redactions are real and stay counted.
-		if fileRedacted > 0 {
-			m.Redacted += fileRedacted
-			if m.RedactionRules == nil {
-				m.RedactionRules = map[string]int{}
-			}
-			for rule, c := range fileRules {
-				m.RedactionRules[rule] += c
-			}
 		}
 	}
-	if added == 0 {
+	if imp.added == 0 {
 		if err := writeManifest(dir, m); err != nil {
 			return 0, err
 		}
 		return 0, skippedError(skipped)
 	}
-	if err := appendImportedRecords(dir, &m, recsByKey, metas); err != nil {
-		return added, err
+	if err := appendImportedRecords(dir, &m, imp.recsByKey, imp.metas); err != nil {
+		return imp.added, err
 	}
-	refreshImportSidecars(dir, m, recsByKey)
-	return added, skippedError(skipped)
+	refreshImportSidecars(dir, m, imp.recsByKey)
+	return imp.added, skippedError(skipped)
 }
 
 // refreshImportSidecars brings the tables mined from sessions up to the batch,
@@ -995,9 +705,7 @@ func restoreMap[V any](live, saved map[string]V) {
 			delete(live, k)
 		}
 	}
-	for k, v := range saved {
-		live[k] = v
-	}
+	maps.Copy(live, saved)
 }
 
 // batchName is how a batch file is named on screen. The name comes from the
@@ -1050,6 +758,7 @@ func initEmptyIndex(dir string) error {
 	m := Manifest{Version: version, KeptDated: true, Format: onDiskFormat, SearchOnly: searchOnlyFor(dir), Files: map[string]FileState{}, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), ExportWatermarks: map[string]int64{}, ImportedRecords: map[string]bool{},
 		Compactions:        compactionsForRebuild(dir, readTombstones()),
 		ExcludeFingerprint: sources.ExclusionFingerprint(),
+		AliasFingerprint:   sources.ProjectAliasFingerprint(),
 		ToolFingerprint:    mergedToolFingerprint(priorToolFingerprint(dir))}
 	return writeManifest(dir, m)
 }
@@ -1107,18 +816,18 @@ func readSyncFile(path string, fn func(SyncRecord) error) error {
 		// work (#1080). The role is rendered the same way (view.go writes it
 		// into the preview) and is the same forgery vector, so it gets the same
 		// flattening. Message text is redacted further down.
-		rec.Project = sanitizeSyncField(rec.Project, syncFieldMax)
-		rec.Harness = sanitizeSyncField(rec.Harness, syncFieldMax)
-		rec.Role = sanitizeSyncField(rec.Role, syncFieldMax)
+		rec.Project = sanitizeSyncField(rec.Project)
+		rec.Harness = sanitizeSyncField(rec.Harness)
+		rec.Role = sanitizeSyncField(rec.Role)
 		// The origin is rendered into the same result lines, from the same
 		// other machine's text, so it takes the same flattening.
-		rec.Origin = syncName(sanitizeSyncField(string(rec.Origin), syncFieldMax))
+		rec.Origin = syncName(sanitizeSyncField(string(rec.Origin)))
 		if err := fn(rec); err != nil {
 			return err
 		}
 		have = next
 	}
-	if err := s.Err(); err != nil && err != io.EOF {
+	if err := s.Err(); err != nil && !errors.Is(err, io.EOF) {
 		return err
 	}
 	return nil
@@ -1175,14 +884,14 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 	buckets := bucketPostings{}
 	// Only what this pass adds: it goes into an overlay beside each bucket
 	// rather than into the bucket written whole again (#5387).
-	loadBucket := func(tok string) (map[string][]posting, error) {
+	loadBucket := func(tok string) map[string][]posting {
 		b := bucket(tok)
 		data, ok := buckets[b]
 		if !ok {
 			data = map[string][]posting{}
 			buckets[b] = data
 		}
-		return data, nil
+		return data
 	}
 	keys := make([]string, 0, len(recsByKey))
 	for k := range recsByKey {
@@ -1209,7 +918,7 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 	}
 	earlier := map[string][]model.Message{}
 	if len(firstRun) > 0 {
-		if err := eachRecordForKeys(filepath.Join(dir, "records.bin"), tbl, firstRun, func(r Record) {
+		if err = eachRecordForKeys(filepath.Join(dir, "records.bin"), tbl, firstRun, func(r Record) {
 			earlier[r.Key] = append(earlier[r.Key], model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
 		}); err != nil {
 			_ = rw.Close()
@@ -1268,10 +977,10 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 		}
 		m.Sessions[key] = meta
 		for _, r := range recsByKey[key] {
-			off, err := rw.write(r)
-			if err != nil {
+			off, writeErr := rw.write(r)
+			if writeErr != nil {
 				_ = rw.Close()
-				return err
+				return writeErr
 			}
 			// Index an imported record exactly as ingestion would: the same
 			// slice of the text earns postings (tokenizedPart), the same date
@@ -1279,26 +988,14 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 			// through bare indexKeys left synced stores without date keys and
 			// with unfiltered tool output — the route a record takes into an
 			// index must not change what it indexes to.
-			var bucketErr error
 			eachIndexKey(tokenizedPart(r.Role, r.Text), r.Time, func(tok string) {
-				if bucketErr != nil {
-					return
-				}
-				data, err := loadBucket(tok)
-				if err != nil {
-					bucketErr = err
-					return
-				}
+				data := loadBucket(tok)
 				data[tok] = append(data[tok], posting{Off: off, Sid: meta.Ord, Tool: isToolRole(r.Role)})
 			})
-			if bucketErr != nil {
-				_ = rw.Close()
-				return bucketErr
-			}
 		}
 	}
-	if err := rw.Close(); err != nil {
-		return err
+	if closeErr := rw.Close(); closeErr != nil {
+		return closeErr
 	}
 	m.RecordStrings = tbl.strs
 	stale, err := addOverlays(filepath.Join(dir, "buckets"), filepath.Join(dir, "buckets"), buckets, m.DeadRecords)
@@ -1316,7 +1013,7 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 }
 
 func shortHash(s string) string {
-	h := sha1.Sum([]byte(s))
+	h := sha1.Sum([]byte(s)) //nolint:gosec // a short id, not a security hash
 	return strings.TrimLeft(hex.EncodeToString(h[:])[:12], "-")
 }
 
@@ -1333,6 +1030,7 @@ var lastImportSkippedOwn int
 // ImportSkippedOwn reports that count.
 func ImportSkippedOwn() int { return lastImportSkippedOwn }
 
+// ImportedSessionID is the id an imported session is stored under.
 func ImportedSessionID(harness, sessionID string) string {
 	return "imported-" + shortHash(harness+":"+sessionID)
 }
@@ -1348,7 +1046,7 @@ const syncFieldMax = 120
 // U+202E, which reverses everything rendered after it, and the zero-width
 // spaces that pad a label invisibly. Both become spaces rather than vanishing,
 // so words on either side do not run together.
-func sanitizeSyncField(s string, max int) string {
+func sanitizeSyncField(s string) string {
 	s = strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
 			return ' '
@@ -1357,8 +1055,8 @@ func sanitizeSyncField(s string, max int) string {
 	}, s)
 	s = strings.Join(strings.Fields(s), " ")
 	r := []rune(s)
-	if len(r) > max {
-		return strings.TrimSpace(string(r[:max])) + "…"
+	if len(r) > syncFieldMax {
+		return strings.TrimSpace(string(r[:syncFieldMax])) + "…"
 	}
 	return s
 }

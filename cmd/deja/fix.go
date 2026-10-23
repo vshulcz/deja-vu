@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -38,12 +39,12 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 			asJSON = true
 		case "--limit":
 			if i+1 >= len(args) {
-				return fmt.Errorf("fix: --limit wants a number")
+				return errors.New("fix: --limit wants a number")
 			}
 			i++
-			n, err := strconv.Atoi(args[i])
+			n, err := strconv.Atoi(args[i]) //nolint:gosec // the bound is checked above
 			if err != nil || n <= 0 {
-				return fmt.Errorf("fix: --limit wants a positive number, got %q", args[i])
+				return fmt.Errorf("fix: --limit wants a positive number, got %q", args[i]) //nolint:gosec // the bound is checked above
 			}
 			limit = n
 		case "--":
@@ -80,7 +81,7 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 		}
 	}
 	if text == "" {
-		return fmt.Errorf("fix: give the error text as an argument, or pipe the failing output in")
+		return errors.New("fix: give the error text as an argument, or pipe the failing output in")
 	}
 	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
 		return ensureError(dir, err)

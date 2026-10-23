@@ -20,9 +20,9 @@ func collectJSONKeys(t reflect.Type, into map[string]bool) {
 	if t.Kind() != reflect.Struct {
 		return
 	}
-	for i := 0; i < t.NumField(); i++ {
+	for i := range t.NumField() {
 		f := t.Field(i)
-		name := strings.Split(f.Tag.Get("json"), ",")[0]
+		name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
 		if name == "-" {
 			continue
 		}
@@ -62,7 +62,7 @@ func TestStatsJSONKeysMatchTheDocumentedContract(t *testing.T) {
 		"pending": true, "unmeasured": true, "median_actions": true, "p75_actions": true,
 	}
 	emitted := map[string]bool{}
-	collectJSONKeys(reflect.TypeOf(Report{}), emitted)
+	collectJSONKeys(reflect.TypeFor[Report](), emitted)
 	// usage.Summary writes its own JSON so a zero timestamp does not print as
 	// year 1 (#1874), and a key written that way is invisible to the tag walk
 	// above. Marshal a filled one and take the keys from the output.

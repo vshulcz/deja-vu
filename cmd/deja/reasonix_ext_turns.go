@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -259,10 +260,11 @@ func rxString(fields map[string]json.RawMessage, key string) string {
 // does not know about is still one it must hand back.
 func withString(fields map[string]json.RawMessage, key, value string) map[string]json.RawMessage {
 	out := make(map[string]json.RawMessage, len(fields))
-	for k, v := range fields {
-		out[k] = v
+	maps.Copy(out, fields)
+	b, err := json.Marshal(value)
+	if err != nil {
+		return fields
 	}
-	b, _ := json.Marshal(value)
 	out[key] = b
 	return out
 }
@@ -304,13 +306,11 @@ func (x *rxExt) onInput(ctx context.Context, fields map[string]json.RawMessage) 
 	var digestText string
 	var wg sync.WaitGroup
 	if first {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			digestText = x.hook(ctx, map[string]any{
 				"session_id": key, "cwd": cwd, "source": "startup", "deja_once": true,
 			}, "hook-context", "--plain")
-		}()
+		})
 	}
 	recall := x.hook(ctx, map[string]any{"prompt": typed, "session_id": key, "cwd": cwd}, "hook-prompt", "--plain")
 	wg.Wait()
@@ -404,14 +404,12 @@ func (x *rxExt) onToolAfter(ctx context.Context, fields map[string]json.RawMessa
 	key := x.sessionKey()
 	var note, fix string
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		note = x.hook(ctx, map[string]any{
 			"hook_event_name": "PreToolUse", "tool_name": tool, "tool_input": input,
 			"session_id": key, "cwd": cwd,
 		}, "hook-tool", "--plain")
-	}()
+	})
 	if isError && tool == "Bash" {
 		fix = x.hook(ctx, map[string]any{
 			"hook_event_name": "PostToolUseFailure", "tool_name": "Bash", "tool_input": input,
@@ -479,12 +477,12 @@ func (x *rxExt) onCompaction(ctx context.Context, fields map[string]json.RawMess
 	// hosts: the summarizer may drop the guidance, and the next turn's
 	// hook-prompt hands the stored packet out once.
 	if raw, err := json.Marshal(folded); err == nil {
-		captureCompaction(x.dir, precompactHookInput{SessionID: key, CWD: cwd, Harness: "reasonix", Messages: raw})
+		captureCompaction(x.dir, precompactHookInput{SessionID: key, CWD: cwd, Harness: "reasonix", Messages: raw}) //nolint:contextcheck // the PreCompact path every hook shares takes no context
 	}
 	data := digest.ExtractCompactionContext(session, digest.ExtractOptions{})
 	withCommandOutcomes(&data, session)
 	data.Carry = digest.ExtractCarry(session.Messages, nil)
-	data.Freshness = compactionFreshness(compactionWorkspace(cwd))
+	data.Freshness = compactionFreshness(compactionWorkspace(cwd)) //nolint:contextcheck // shared with the PreCompact hook, which has no context
 	if ctx.Err() != nil {
 		return nil
 	}

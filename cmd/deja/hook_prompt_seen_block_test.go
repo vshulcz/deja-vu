@@ -37,7 +37,7 @@ func TestRecentlyInjectedCountsTheLastFew(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "index.db")
 	var b strings.Builder
 	b.WriteString("agent old-1 2020-01-01T00:00:00Z\n")
-	for i := 0; i < injectionCooldown; i++ {
+	for range injectionCooldown {
 		b.WriteString("agent filler 2020-01-01T00:00:00Z\n")
 	}
 	b.WriteString("agent fresh-1 2020-01-01T00:00:00Z\n")
@@ -108,7 +108,7 @@ func TestHookPromptDoesNotRepeatTheSameBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < injectionCooldown+2; i++ {
+	for i := range injectionCooldown + 2 {
 		if _, err := f.WriteString("agent-1 filler-" + strconv.Itoa(i) + "\n"); err != nil {
 			t.Fatal(err)
 		}

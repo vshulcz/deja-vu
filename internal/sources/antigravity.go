@@ -26,6 +26,7 @@ var antigravityUserBlockREs = []*regexp.Regexp{
 	regexp.MustCompile(`(?s)<USER_SETTINGS_CHANGE>.*?</USER_SETTINGS_CHANGE>`),
 }
 
+// AntigravityRoots lists the Antigravity data dirs under ~/.gemini.
 func AntigravityRoots() []string {
 	if v := os.Getenv("DEJA_ANTIGRAVITY_ROOT"); v != "" {
 		return []string{v}
@@ -49,7 +50,7 @@ func AntigravityRoots() []string {
 // `.system_generated`, so the row could say nothing about any of it until
 // #3377.
 func AntigravitySidecarFiles() []string {
-	var out []string
+	var out []string //nolint:prealloc // each root adds an unknown number of files
 	for _, root := range AntigravityRoots() {
 		out = append(out, walkFiles(root, func(p string) bool {
 			rel, err := filepath.Rel(root, p)
@@ -93,6 +94,7 @@ func AntigravitySidecarFiles() []string {
 	return out
 }
 
+// AntigravityTranscripts lists every Antigravity transcript.jsonl.
 func AntigravityTranscripts() []string {
 	var out []string
 	for _, root := range AntigravityRoots() {
@@ -104,10 +106,12 @@ func AntigravityTranscripts() []string {
 	return out
 }
 
+// LoadAntigravity reads every Antigravity session on this machine.
 func LoadAntigravity() []model.Session {
 	return parseFiles(AntigravityTranscripts(), ParseAntigravityFile)
 }
 
+// ParseAntigravityFile reads one Antigravity transcript.
 func ParseAntigravityFile(path string) ([]model.Session, error) {
 	return parseAntigravityWith(path, func(fn func(map[string]any)) error {
 		return scanJSONLFromOffset(path, 0, fn)
@@ -135,7 +139,7 @@ func parseAntigravityWith(path string, scan func(func(map[string]any)) error) ([
 	var running []int
 	asked := 0
 	err := scan(func(m map[string]any) {
-		role := ""
+		var role string
 		source, _ := m["source"].(string)
 		switch source {
 		case "USER_EXPLICIT":
@@ -358,7 +362,7 @@ func antigravityExitCode(kind, text string) (int, bool) {
 	if kind != "GENERIC" && kind != "RUN_COMMAND" {
 		return 0, false
 	}
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		line = strings.TrimSpace(line)
 		// The header ends where the output starts, "Output:" or the
 		// Stdout:/Stderr: pair; a line in the output is not the status.
@@ -507,7 +511,7 @@ func antigravityTakeCalls(calls []model.Message, seen map[model.Message]int) []m
 
 // antigravityField reads a labelled line out of a step's header.
 func antigravityField(text, label string) string {
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		line = strings.TrimSpace(line)
 		if v, ok := strings.CutPrefix(line, label); ok {
 			return strings.TrimSpace(v)
@@ -527,7 +531,7 @@ var antigravityEditSentence = regexp.MustCompile(`changes were made by the \S+ t
 func antigravityAddedLines(text string) string {
 	var lines []string
 	in := false
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		switch {
 		case strings.HasPrefix(line, "[diff_block_start]"):
 			in = true
@@ -545,7 +549,7 @@ func antigravityAddedLines(text string) string {
 func antigravityRemovedLines(text string) string {
 	var lines []string
 	in := false
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		switch {
 		case strings.HasPrefix(line, "[diff_block_start]"):
 			in = true

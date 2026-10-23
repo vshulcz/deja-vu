@@ -26,8 +26,8 @@ func TestTheEnvironmentBlockNamesTheRemedyItKnows(t *testing.T) {
 		t.Fatal(err)
 	}
 	fail := `psql: error: connection to server at "db.internal.example.com" (198.51.100.7), port 5432 failed: Connection refused`
-	for k := 0; k < 4; k++ {
-		var lines []string
+	for k := range 4 {
+		lines := make([]string, 0, 4)
 		at := func(m int) string {
 			return time.Now().Add(-time.Duration(300-40*k-m) * time.Minute).UTC().Format(time.RFC3339)
 		}

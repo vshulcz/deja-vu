@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -53,7 +55,7 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 		return idPrefixNeeded(dir, "resume needs an id prefix", "resume needs an id prefix (see `deja last`)")
 	}
 	if app && (doExec || writeBack) {
-		return fmt.Errorf("resume: --app opens the session in the ChatGPT app, so it takes neither --exec nor --write-back")
+		return errors.New("resume: --app opens the session in the ChatGPT app, so it takes neither --exec nor --write-back")
 	}
 	s, ok, err := findByPrefix(dir, prefix)
 	if pickedOnScreen == nil || pickedOnScreen.ID != prefix {
@@ -68,12 +70,12 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 	// Naming an exact id is still browsing under the search activation, so a
 	// session a trust rule withholds must not be reopenable here any more than
 	// through show, share, promote or handoff (#1026).
-	if err := denyPolicyHidden(prefix, s, os.Stderr); err != nil {
-		return err
+	if denyErr := denyPolicyHidden(prefix, s, os.Stderr); denyErr != nil {
+		return denyErr
 	}
 	if app {
-		if err := resumeGoneError(s); err != nil {
-			return err
+		if goneErr := resumeGoneError(s); goneErr != nil {
+			return goneErr
 		}
 		return openInCodexApp(s, runtime.GOOS)
 	}
@@ -94,8 +96,8 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 		}
 		return err
 	}
-	if err := resumeGoneError(s); err != nil {
-		return err
+	if goneErr := resumeGoneError(s); goneErr != nil {
+		return goneErr
 	}
 	if note := resumeDirGoneNote(s, dir); note != "" {
 		fmt.Fprintf(os.Stderr, "deja: %s\n", note)
@@ -125,7 +127,7 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	c := exec.Command(parts[0], parts[1:]...)
+	c := exec.CommandContext(context.Background(), parts[0], parts[1:]...)
 	if dir != "" {
 		c.Dir = dir
 	}
@@ -141,10 +143,10 @@ func openInCodexApp(s model.Session, goos string) error {
 		return err
 	}
 	fmt.Fprintf(os.Stderr, "deja: opening %s in the ChatGPT app\n", digest.Short(s.ID))
-	c := exec.Command(argv[0], argv[1:]...)
+	c := exec.CommandContext(context.Background(), argv[0], argv[1:]...)
 	c.Stderr = os.Stderr
 	if err := c.Run(); err != nil {
-		return fmt.Errorf("the ChatGPT app did not open it (%v) — an app too old to take codex:// links does this; `deja resume %s` prints the codex command", err, s.ID)
+		return fmt.Errorf("the ChatGPT app did not open it (%w) — an app too old to take codex:// links does this; `deja resume %s` prints the codex command", err, s.ID)
 	}
 	return nil
 }
@@ -230,7 +232,7 @@ func resumeArgv(cmdline string) ([]string, error) {
 		out = append(out, cur.String())
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("resume: empty command")
+		return nil, errors.New("resume: empty command")
 	}
 	return out, nil
 }
@@ -362,6 +364,14 @@ func resumeCommand(s model.Session) (string, string, error) {
 	if s.Kind == "fork" && s.Harness == "kimi" && s.Parent != "" && sources.KimiSubagentFile(s.Path) {
 		return "", "", fmt.Errorf("session %s is a /btw side question, which kimi does not reopen on its own — `deja resume %s` reopens the session it was asked in", digest.Short(s.ID), s.Parent)
 	}
+	return resumeHarnessCommand(s)
+}
+
+// resumeHarnessCommand is the per-harness half of resumeCommand, once the
+// session is one deja can place in a command at all.
+//
+//nolint:gocyclo,gocognit,funlen // one case per harness, each its own resume rule
+func resumeHarnessCommand(s model.Session) (string, string, error) {
 	switch s.Harness {
 	case "claude":
 		// Claude Code deleted the transcript and only the prompts were left in
@@ -553,7 +563,7 @@ func resumeCommand(s model.Session) (string, string, error) {
 			}
 			return dir, "cursor-agent --resume " + s.ID, nil
 		}
-		return "", "", fmt.Errorf("cursor IDE chats reopen from the Cursor UI, not the terminal")
+		return "", "", errors.New("cursor IDE chats reopen from the Cursor UI, not the terminal")
 	case "grok":
 		// Grok Build resumes by session id and scopes its session list by the
 		// working directory, so this runs in the original project. It reopens
@@ -567,7 +577,7 @@ func resumeCommand(s model.Session) (string, string, error) {
 		return existingDir(resumeRecordedDir(s)), "grok --resume " + s.ID, nil
 	case "cline":
 		if strings.HasPrefix(s.ID, "cline-task-") {
-			return "", "", fmt.Errorf("legacy Cline VS Code tasks reopen from the extension's history UI, not the terminal")
+			return "", "", errors.New("legacy Cline VS Code tasks reopen from the extension's history UI, not the terminal")
 		}
 		// cline reopens the transcript from anywhere but runs its tools in
 		// the current directory, so the command runs where the session did
@@ -598,12 +608,12 @@ func resumeCommand(s model.Session) (string, string, error) {
 			}
 			return dir, "roo --session-id " + id, nil
 		}
-		return "", "", fmt.Errorf("roo tasks from the VS Code extension reopen from its history UI; only the ones the roo CLI created take --session-id")
+		return "", "", errors.New("roo tasks from the VS Code extension reopen from its history UI; only the ones the roo CLI created take --session-id")
 	case "zed":
 		// These two used to fall through to "don't know how to resume", which
 		// reads like deja is missing something. Both are settled answers, and
 		// the registry has carried the reason all along.
-		return "", "", fmt.Errorf("zed threads reopen from the editor's own history — no zed flag takes a thread id")
+		return "", "", errors.New("zed threads reopen from the editor's own history — no zed flag takes a thread id")
 	case "devin":
 		// `devin --resume <id>` finds the session in its one global store, so
 		// the recorded directory is a preference, not a requirement: reopen
@@ -613,9 +623,9 @@ func resumeCommand(s model.Session) (string, string, error) {
 		// `devin-desktop --sessions` opens the Sessions window with Cascade's
 		// history in it and takes no id; the extension's own RPCs that do are
 		// private (#308).
-		return "", "", fmt.Errorf("windsurf conversations reopen from Devin Desktop's Sessions window (`devin-desktop --sessions`); no command takes a conversation id")
+		return "", "", errors.New("windsurf conversations reopen from Devin Desktop's Sessions window (`devin-desktop --sessions`); no command takes a conversation id")
 	case "deepseek":
-		return "", "", fmt.Errorf("neither of DeepSeek Harness's two apps takes a session id, so there is nothing to reopen by")
+		return "", "", errors.New("neither of DeepSeek Harness's two apps takes a session id, so there is nothing to reopen by")
 	case "codewhale":
 		// Its sessions are per-workspace — `--continue` refuses in a directory
 		// that has none — so the command goes with the workspace it was worked
@@ -771,7 +781,7 @@ func resumeCommand(s model.Session) (string, string, error) {
 		if dir := sources.CopilotChatWorkspaceDir(s.Path); dir != "" {
 			return "", "", fmt.Errorf("copilot-chat sessions reopen in VS Code: open the workspace (code %s), then Chat: Show Chats", shellQuoteIfNeeded(dir))
 		}
-		return "", "", fmt.Errorf("copilot-chat sessions reopen from Chat: Show Chats, not the terminal")
+		return "", "", errors.New("copilot-chat sessions reopen from Chat: Show Chats, not the terminal")
 	default:
 		return "", "", fmt.Errorf("don't know how to resume %q sessions", s.Harness)
 	}

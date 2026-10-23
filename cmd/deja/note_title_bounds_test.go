@@ -33,10 +33,10 @@ func TestEverySurfaceThatPrintsANoteTitleBoundsIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(notes, append(line, '\n'), 0o644); err != nil {
+	if err = os.WriteFile(notes, append(line, '\n'), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := captureRun(t, "index"); err != nil {
+	if _, err = captureRun(t, "index"); err != nil {
 		t.Fatal(err)
 	}
 	// The premise: the title really is unbounded in the index, which is what
@@ -64,7 +64,7 @@ func TestEverySurfaceThatPrintsANoteTitleBoundsIt(t *testing.T) {
 		if strings.Contains(out, "deepmarker") {
 			t.Errorf("%v printed the whole note title, marker and all", args)
 		}
-		for _, l := range strings.Split(out, "\n") {
+		for l := range strings.SplitSeq(out, "\n") {
 			if n := len([]rune(l)); n > roomForARow {
 				t.Errorf("%v printed a %d-rune line from a note title", args, n)
 			}

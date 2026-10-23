@@ -24,17 +24,17 @@ func TestHermesCronRunRecallsNothingOnItsOwn(t *testing.T) {
 	root := t.TempDir()
 	log := filepath.Join(root, "calls")
 	fake := filepath.Join(root, "deja")
-	if err := os.WriteFile(fake, []byte("#!/bin/sh\nprintf '%s\\n' \"$1\" >> "+log+"\ncat >/dev/null\necho recalled\n"), 0o755); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(fake, []byte("#!/bin/sh\nprintf '%s\\n' \"$1\" >> "+log+"\ncat >/dev/null\necho recalled\n"), 0o755); werr != nil {
+		t.Fatal(werr)
 	}
 	write := func(rel, body string) {
 		t.Helper()
 		p := filepath.Join(root, rel)
-		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-			t.Fatal(err)
+		if merr := os.MkdirAll(filepath.Dir(p), 0o755); merr != nil {
+			t.Fatal(merr)
 		}
-		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
-			t.Fatal(err)
+		if werr := os.WriteFile(p, []byte(body), 0o644); werr != nil {
+			t.Fatal(werr)
 		}
 	}
 	write("plugins/deja/__init__.py", hermesPluginPy(fake))
@@ -44,8 +44,8 @@ func TestHermesCronRunRecallsNothingOnItsOwn(t *testing.T) {
 	t.Setenv("HERMES_HOME", home)
 	hermeticEnv(t)
 	t.Setenv("HERMES_HOME", home)
-	if _, err := installHermesMemoryProvider(fake, false); err != nil {
-		t.Fatal(err)
+	if _, ierr := installHermesMemoryProvider(fake, false); ierr != nil {
+		t.Fatal(ierr)
 	}
 	b, err := os.ReadFile(filepath.Join(home, "plugins", "deja-memory", "__init__.py"))
 	if err != nil {
@@ -74,7 +74,7 @@ func TestHermesCronRunRecallsNothingOnItsOwn(t *testing.T) {
 			"p.initialize('s2', platform='" + platform + "')\n" +
 			"out.append('provider:' + p.prefetch('look up the retry loop').strip())\n" +
 			"print('|'.join(out))\n"
-		cmd := exec.Command(py, "-c", script)
+		cmd := exec.CommandContext(t.Context(), py, "-c", script)
 		cmd.Dir = root
 		out, err := cmd.CombinedOutput()
 		if err != nil {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,7 +34,7 @@ func TestInstallGooseTwiceChangesNothingTheSecondTime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(first) != string(second) {
+	if !bytes.Equal(first, second) {
 		t.Errorf("a repeat install rewrote config.yaml:\n--- first\n%s\n--- second\n%s", first, second)
 	}
 	// And it says so: an "updated" nobody can point at a change for is the

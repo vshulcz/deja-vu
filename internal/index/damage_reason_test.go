@@ -47,26 +47,31 @@ func TestDamageReasonNamesWhatBroke(t *testing.T) {
 		want  string
 	}{
 		{"a manifest that will not decode", func(t *testing.T, dir string) {
+			t.Helper()
 			if err := os.WriteFile(filepath.Join(dir, "manifest.gob"), []byte("not a gob"), 0o644); err != nil {
 				t.Fatal(err)
 			}
 		}, "manifest"},
 		{"a session table that will not decode", func(t *testing.T, dir string) {
+			t.Helper()
 			if err := os.WriteFile(filepath.Join(dir, "sessions.gob"), []byte("not a gob"), 0o644); err != nil {
 				t.Fatal(err)
 			}
 		}, "session table"},
 		{"a record log cut short", func(t *testing.T, dir string) {
+			t.Helper()
 			if err := os.WriteFile(filepath.Join(dir, "records.bin"), nil, 0o644); err != nil {
 				t.Fatal(err)
 			}
 		}, "record log"},
 		{"postings that went missing", func(t *testing.T, dir string) {
+			t.Helper()
 			if err := os.RemoveAll(filepath.Join(dir, "buckets")); err != nil {
 				t.Fatal(err)
 			}
 		}, "the postings directory is not there"},
 		{"a postings directory left empty", func(t *testing.T, dir string) {
+			t.Helper()
 			// What `rm buckets/*.bin` and a copy that skipped the contents
 			// leave behind, which is not the same as losing the directory.
 			buckets := filepath.Join(dir, "buckets")
@@ -81,11 +86,12 @@ func TestDamageReasonNamesWhatBroke(t *testing.T) {
 			}
 		}, "the postings directory is empty"},
 		{"a record log with a tail the manifest never committed", func(t *testing.T, dir string) {
+			t.Helper()
 			f, err := os.OpenFile(filepath.Join(dir, "records.bin"), os.O_APPEND|os.O_WRONLY, 0o644)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := f.Write([]byte("a record from a build that crashed")); err != nil {
+			if _, err := f.WriteString("a record from a build that crashed"); err != nil {
 				t.Fatal(err)
 			}
 			if err := f.Close(); err != nil {

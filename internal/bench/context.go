@@ -1,9 +1,6 @@
 package bench
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -13,9 +10,12 @@ import (
 )
 
 const (
-	ContextChainCount    = 30
+	// ContextChainCount is how many chains carry facts.
+	ContextChainCount = 30
+	// ContextNegativeCount is how many chains carry none.
 	ContextNegativeCount = 5
-	// Fourteen priors and eight facts, the facts in the oldest eight sessions
+	// ContextPriorCount is the number of prior sessions per chain. Fourteen
+	// priors and eight facts, the facts in the oldest eight sessions
 	// and the six newest settling nothing. Two properties the column needs: a
 	// block that reads the newest sessions finds nothing, and a block that
 	// prefers the sessions which settled something still cannot carry all eight
@@ -29,6 +29,8 @@ const (
 	contextFactEvery = 1
 )
 
+// ContextChain is one chain of prior sessions, the task that asks about them
+// and the facts a block should carry.
 type ContextChain struct {
 	ID       string
 	Sessions []model.Session
@@ -38,6 +40,7 @@ type ContextChain struct {
 	Negative bool
 }
 
+// ContextCorpus is the generated chains and a hash of them.
 type ContextCorpus struct {
 	Chains []ContextChain
 	Hash   string
@@ -45,10 +48,10 @@ type ContextCorpus struct {
 
 // GenerateContext creates chains whose fact text is the benchmark ground truth.
 func GenerateContext(seed int64) ContextCorpus {
-	rng := rand.New(rand.NewSource(seed))
+	rng := rand.New(rand.NewSource(seed)) //nolint:gosec // seeded so the fixture is the same on every run
 	chains := make([]ContextChain, 0, ContextChainCount+ContextNegativeCount)
 	base := time.Date(2099, time.January, 3, 0, 0, 0, 0, time.UTC)
-	for i := 0; i < ContextChainCount+ContextNegativeCount; i++ {
+	for i := range ContextChainCount + ContextNegativeCount {
 		id := fmt.Sprintf("context-chain-%02d", i)
 		project := fmt.Sprintf("context-project-%02d", i)
 		chain := ContextChain{ID: id, Negative: i >= ContextChainCount}
@@ -58,14 +61,14 @@ func GenerateContext(seed int64) ContextCorpus {
 		} else {
 			noise := rng.Intn(900) + 100
 			chain.Facts = []string{
-				fmt.Sprintf("%s fact: error fixed by replacing stale etag reuse with generation checks", id),
-				fmt.Sprintf("%s fact: option chosen was bounded refresh with jitter because retries must spread load", id),
+				id + " fact: error fixed by replacing stale etag reuse with generation checks",
+				id + " fact: option chosen was bounded refresh with jitter because retries must spread load",
 				fmt.Sprintf("%s fact: config value settled at context_ttl=%dm", id, 10+i%7),
-				fmt.Sprintf("%s fact: we decided the retry budget stops at three attempts", id),
-				fmt.Sprintf("%s fact: the scheduler stays single-writer, so the failover drains first", id),
-				fmt.Sprintf("%s fact: agreed to key the cache on generation rather than on mtime", id),
-				fmt.Sprintf("%s fact: settled that the nightly compaction runs after the export", id),
-				fmt.Sprintf("%s fact: chose to drop the second index instead of widening the first", id),
+				id + " fact: we decided the retry budget stops at three attempts",
+				id + " fact: the scheduler stays single-writer, so the failover drains first",
+				id + " fact: agreed to key the cache on generation rather than on mtime",
+				id + " fact: settled that the nightly compaction runs after the export",
+				id + " fact: chose to drop the second index instead of widening the first",
 			}
 			chain.Task = fmt.Sprintf("Handle %s using the prior error, chosen option, and settled context_ttl value.", id)
 			chain.Terms = []string{id}
@@ -76,7 +79,7 @@ func GenerateContext(seed int64) ContextCorpus {
 		// full-history arm looks artificially cheap and the whole
 		// comparison is meaningless, so each prior session carries a
 		// realistic filler load around its one durable fact.
-		for j := 0; j < ContextPriorCount; j++ {
+		for j := range ContextPriorCount {
 			// One fact per session, and the sessions past them carry none:
 			// the number of prior sessions is what makes the facts hard to
 			// reach, and indexing Facts by j made the constant unchangeable —
@@ -87,7 +90,7 @@ func GenerateContext(seed int64) ContextCorpus {
 			// unchangeable (it panicked above three), and filler that did not
 			// name the chain was never retrieved, so raising it changed
 			// nothing either (#2933).
-			text := fmt.Sprintf("%s routine update, nothing settled here", id)
+			text := id + " routine update, nothing settled here"
 			fact := -1
 			if chain.Negative {
 				text = "routine update with no prior fact"
@@ -100,7 +103,7 @@ func GenerateContext(seed int64) ContextCorpus {
 			t := base.Add(time.Duration(i*10+j) * time.Minute)
 			msgs := []model.Message{{Role: "user", Text: text, Time: t}}
 			fillerBlocks := 6 + rng.Intn(10)
-			for k := 0; k < fillerBlocks; k++ {
+			for k := range fillerBlocks {
 				msgs = append(msgs,
 					model.Message{Role: "user", Text: fillerText(rng, "ran the reproduction again and pasted the output"), Time: t.Add(time.Duration(2*k+2) * time.Minute)},
 					model.Message{Role: "assistant", Text: fillerText(rng, "walked through the trace and adjusted the patch"), Time: t.Add(time.Duration(2*k+3) * time.Minute)},
@@ -124,9 +127,7 @@ func GenerateContext(seed int64) ContextCorpus {
 		chain.Sessions = append(chain.Sessions, model.Session{ID: id + "-task", Harness: "claude", Project: project, Started: t, Updated: t, Messages: []model.Message{{Role: "user", Text: chain.Task, Time: t}}})
 		chains = append(chains, chain)
 	}
-	b, _ := json.Marshal(chains)
-	h := sha256.Sum256(b)
-	return ContextCorpus{Chains: chains, Hash: hex.EncodeToString(h[:])}
+	return ContextCorpus{Chains: chains, Hash: hashOf(chains)}
 }
 
 // fillerText builds a deterministic block of session noise: log-like lines
@@ -136,7 +137,7 @@ func fillerText(rng *rand.Rand, lead string) string {
 	var b strings.Builder
 	b.WriteString(lead)
 	lines := 4 + rng.Intn(10)
-	for i := 0; i < lines; i++ {
+	for range lines {
 		fmt.Fprintf(&b, "\n2099-01-%02d %02d:%02d:%02d worker-%d request=%08x latency=%dms status=%d retrying with backoff attempt %d of queue depth %d",
 			1+rng.Intn(27), rng.Intn(24), rng.Intn(60), rng.Intn(60), rng.Intn(8), rng.Uint32(), rng.Intn(900), 200+rng.Intn(4)*100, rng.Intn(5), rng.Intn(40))
 	}
@@ -171,9 +172,7 @@ func GenerateContextMarathon(seed int64) ContextCorpus {
 		}
 		chains = append(chains, foldChain(chain))
 	}
-	b, _ := json.Marshal(chains)
-	h := sha256.Sum256(b)
-	return ContextCorpus{Chains: chains, Hash: hex.EncodeToString(h[:])}
+	return ContextCorpus{Chains: chains, Hash: hashOf(chains)}
 }
 
 // foldChain merges a chain's prior sessions into one, keeping the task session

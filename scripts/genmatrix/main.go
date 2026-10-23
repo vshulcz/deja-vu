@@ -41,11 +41,11 @@ type surface struct {
 // gapMark distinguishes the four reasons a capability is missing. A single dash
 // for all of them is what let coverage this thin go unnoticed: work and dead
 // ends looked identical.
-func gapMark(e entry, cap string, have bool) string {
+func gapMark(e entry, capability string, have bool) string {
 	if have {
 		return "✅"
 	}
-	switch e.Gaps[cap].State {
+	switch e.Gaps[capability].State {
 	case "impossible":
 		return "✕"
 	case "blocked":
@@ -121,14 +121,14 @@ func notes(r registry, code, esc func(string) string) string {
 		if e.ID == "deja" {
 			continue
 		}
-		for _, cap := range []string{"mcp", "auto", "skill", "command"} {
-			g, ok := e.Gaps[cap]
+		for _, capability := range []string{"mcp", "auto", "skill", "command"} {
+			g, ok := e.Gaps[capability]
 			if !ok || (g.State != "impossible" && g.State != "blocked") {
 				continue
 			}
 			// esc guards the registry-authored halves only: the display name,
 			// the reason and the link. The markup around them is ours.
-			line := fmt.Sprintf("\n- %s %s — %s", esc(e.DisplayName), code(cap), esc(g.Why))
+			line := fmt.Sprintf("\n- %s %s — %s", esc(e.DisplayName), code(capability), esc(g.Why))
 			if g.Source != "" {
 				line += " (" + esc(g.Source) + ")"
 			}
@@ -173,7 +173,7 @@ func htmlTable(r registry) string {
 	b.WriteString("<p>✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ waiting on the harness itself &middot; ? not investigated</p>")
 	if n := notes(r, func(s string) string { return "<code>" + s + "</code>" }, html.EscapeString); n != "" {
 		b.WriteString("\n<ul>")
-		for _, line := range strings.Split(strings.TrimSpace(n), "\n") {
+		for line := range strings.SplitSeq(strings.TrimSpace(n), "\n") {
 			line = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "- "))
 			if line == "" {
 				continue

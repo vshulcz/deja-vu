@@ -1,6 +1,7 @@
 package digest
 
 import (
+	"maps"
 	"regexp"
 	"slices"
 	"sort"
@@ -79,8 +80,8 @@ type carryItem struct {
 func ExtractCarry(messages []model.Message, prev []model.ContextCarry) []model.ContextCarry {
 	var ev []carryEvent
 	scanned := 0
-	for i := len(messages) - 1; i >= 0; i-- {
-		m := messages[i]
+	for _, m := range slices.Backward(messages) {
+
 		scanned += len(m.Text)
 		if scanned > maxContextScanBytes {
 			break
@@ -115,12 +116,10 @@ func carryBuild(ev []carryEvent, prev []model.ContextCarry) []model.ContextCarry
 	for j, e := range ev {
 		texts = append(texts, strings.ToLower(e.text))
 		if e.kind != 't' {
-			for issue, pr := range carryIssuePRPairs(carryBNorm(e.text)) {
-				closedBy[issue] = pr
-			}
+			maps.Copy(closedBy, carryIssuePRPairs(carryBNorm(e.text)))
 		}
 		if e.kind == 't' {
-			for _, line := range strings.Split(e.text, "\n") {
+			for line := range strings.SplitSeq(e.text, "\n") {
 				if carryCloseCmdRE.MatchString(line) { // "for n in 12 34; do gh pr merge $n" too
 					for _, m := range carryCmdNumRE.FindAllStringSubmatch(line, -1) {
 						closed[atoiCarry(m[1])] = append(closed[atoiCarry(m[1])], j)
@@ -150,31 +149,7 @@ func carryBuild(ev []carryEvent, prev []model.ContextCarry) []model.ContextCarry
 		}
 	}
 	// "Fixes #12" on a line whose PR is closed closes #12 with it.
-	for _, low := range texts {
-		// Matched on the lowered text with a case-sensitive pattern: the
-		// case-folding one was half the extractor's time on 189 real segments.
-		if !carryHasLinkWord(low) {
-			continue
-		}
-		for _, line := range strings.Split(low, "\n") {
-			var linked []int
-			for _, m := range carryLinksRE.FindAllStringSubmatch(line, -1) {
-				linked = append(linked, atoiCarry(m[1]))
-			}
-			if len(linked) == 0 {
-				continue
-			}
-			for _, m := range carryNumRE.FindAllStringSubmatch(line, -1) {
-				a := atoiCarry(m[1])
-				if slices.Contains(linked, a) || len(closed[a]) == 0 {
-					continue
-				}
-				for _, b := range linked {
-					closed[b] = append(closed[b], slices.Max(closed[a]))
-				}
-			}
-		}
-	}
+	carryCloseLinked(texts, closed)
 	// The pairing a carried line was opened with holds after the compaction too.
 	for _, p := range prev {
 		for issue, pr := range carryIssuePRPairs(carryBNorm(p.Text)) {
@@ -194,6 +169,44 @@ func carryBuild(ev []carryEvent, prev []model.ContextCarry) []model.ContextCarry
 	}
 
 	items := carryForward(prev, lastU >= 0, closed, texts, len(userMerged) > 0)
+	items = carryFreshItems(ev, items, lastU, closedAfter, mergedAfter)
+	return carryAssemble(items)
+}
+
+// carryCloseLinked closes the issues a line links to when a number on that
+// line is closed.
+func carryCloseLinked(texts []string, closed map[int][]int) {
+	for _, low := range texts {
+		// Matched on the lowered text with a case-sensitive pattern: the
+		// case-folding one was half the extractor's time on 189 real segments.
+		if !carryHasLinkWord(low) {
+			continue
+		}
+		for line := range strings.SplitSeq(low, "\n") {
+			lm := carryLinksRE.FindAllStringSubmatch(line, -1)
+			linked := make([]int, 0, len(lm))
+			for _, m := range lm {
+				linked = append(linked, atoiCarry(m[1]))
+			}
+			if len(linked) == 0 {
+				continue
+			}
+			for _, m := range carryNumRE.FindAllStringSubmatch(line, -1) {
+				a := atoiCarry(m[1])
+				if slices.Contains(linked, a) || len(closed[a]) == 0 {
+					continue
+				}
+				for _, b := range linked {
+					closed[b] = append(closed[b], slices.Max(closed[a]))
+				}
+			}
+		}
+	}
+}
+
+// carryFreshItems adds what each assistant unit of this segment left open,
+// waiting or to recheck.
+func carryFreshItems(ev []carryEvent, items []carryItem, lastU int, closedAfter func(n, j int) bool, mergedAfter func(j int) bool) []carryItem {
 	for j, e := range ev {
 		if e.kind != 'a' {
 			continue
@@ -229,7 +242,7 @@ func carryBuild(ev []carryEvent, prev []model.ContextCarry) []model.ContextCarry
 			}
 		}
 	}
-	return carryAssemble(items)
+	return items
 }
 
 func carryHasLinkWord(low string) bool {
@@ -244,7 +257,7 @@ func carryHasLinkWord(low string) bool {
 // carryForward keeps what the last compaction listed and this segment did not
 // close. Carried lines sort before every fresh one.
 func carryForward(prev []model.ContextCarry, hasUser bool, closed map[int][]int, texts []string, userMerged bool) []carryItem {
-	var items []carryItem
+	items := make([]carryItem, 0, len(prev))
 	for _, p := range prev {
 		it := carryItem{kind: p.Kind, text: p.Text, j: -1, age: p.Age + 1}
 		switch p.Kind {
@@ -253,7 +266,7 @@ func carryForward(prev []model.ContextCarry, hasUser bool, closed map[int][]int,
 				continue
 			}
 		case carryOpen:
-			for _, k := range strings.Split(p.Key, ",") {
+			for k := range strings.SplitSeq(p.Key, ",") {
 				if n, err := strconv.Atoi(strings.TrimPrefix(strings.TrimSpace(k), "#")); err == nil && len(closed[n]) == 0 {
 					it.ns = append(it.ns, n)
 				}
@@ -277,8 +290,9 @@ func carryForward(prev []model.ContextCarry, hasUser bool, closed map[int][]int,
 // carryMentioned reports a recheck the segment already came back to: its #N
 // appears anywhere, or most of its long words appear in one message.
 func carryMentioned(text string, texts []string) bool {
-	var ns []string
-	for _, m := range carryNumRE.FindAllStringSubmatch(text, -1) {
+	ms := carryNumRE.FindAllStringSubmatch(text, -1)
+	ns := make([]string, 0, len(ms))
+	for _, m := range ms {
 		ns = append(ns, m[1])
 	}
 	words := map[string]bool{}
@@ -357,7 +371,7 @@ func carryAssemble(items []carryItem) []model.ContextCarry {
 	if len(order) > carryMaxLines {
 		order = order[:carryMaxLines]
 	}
-	var out []model.ContextCarry
+	var out []model.ContextCarry //nolint:prealloc // nothing carried stays nil
 	for _, it := range order {
 		c := model.ContextCarry{Kind: it.kind, Text: it.text, Age: it.age, Key: normalizedContextText(it.text)}
 		if it.kind == carryOpen {
@@ -389,7 +403,7 @@ func carryLine(c model.ContextCarry) string {
 	}
 	if c.Kind == carryOpen {
 		var missing []string
-		for _, k := range strings.Split(c.Key, ",") {
+		for k := range strings.SplitSeq(c.Key, ",") {
 			if k != "" && !strings.Contains(text, k) {
 				missing = append(missing, k)
 			}

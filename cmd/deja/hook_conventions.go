@@ -25,8 +25,9 @@ import (
 // and bytes. rejected/superseded/stale states are left out: LoadPromotedNotes
 // keeps the latest state per source, so a decision that was later reversed
 // carries a non-accepted state and never reaches here.
-func projectConventions(names []string, maxNotes, budget int) string {
-	if len(names) == 0 || maxNotes <= 0 || budget <= 0 {
+func projectConventions(names []string) string {
+	const maxNotes, budget = 6, 800
+	if len(names) == 0 {
 		return ""
 	}
 	want := map[string]bool{}

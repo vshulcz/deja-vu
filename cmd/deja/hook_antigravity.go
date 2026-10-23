@@ -113,7 +113,7 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 		b, err := json.Marshal(antigravityHookResponse{InjectSteps: steps})
 		if err != nil {
 			fmt.Fprintln(stdout, "{}")
-			return nil
+			return nil //nolint:nilerr // a hook never fails the host
 		}
 		fmt.Fprintln(stdout, string(b))
 		return nil
@@ -140,7 +140,7 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	b, err := json.Marshal(antigravityHookResponse{InjectSteps: steps})
 	if err != nil {
 		fmt.Fprintln(stdout, "{}")
-		return nil
+		return nil //nolint:nilerr // a hook never fails the host
 	}
 	fmt.Fprintln(stdout, string(b))
 	return nil

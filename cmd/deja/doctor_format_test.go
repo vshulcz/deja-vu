@@ -66,7 +66,7 @@ func TestDoctorTellsWhatItMayDoWithTheIndex(t *testing.T) {
 		indexReadState = func(string) index.ReadState { return state }
 		var out bytes.Buffer
 		doctorIndex(&out, doctorIndexReport{State: "ok", Path: dir}, dir)
-		for _, l := range strings.Split(out.String(), "\n") {
+		for l := range strings.SplitSeq(out.String(), "\n") {
 			if strings.Contains(l, "format ") {
 				return l
 			}

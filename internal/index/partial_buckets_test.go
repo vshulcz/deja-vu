@@ -73,7 +73,7 @@ func TestAnUncountedManifestIsNotDamaged(t *testing.T) {
 		t.Fatal(err)
 	}
 	m.BucketFiles = 0
-	if err := writeManifestOnly(dir, m); err != nil {
+	if err = writeManifestOnly(dir, m); err != nil {
 		t.Fatal(err)
 	}
 	// writeManifestOnly restamps the count, so drop it the way an old build

@@ -22,11 +22,11 @@ func TestForgetSaysTheSameThingWhetherOrNotItActs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	real, err := captureRun(t, "forget", "--session", id)
+	said, err := captureRun(t, "forget", "--session", id)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, c := range []struct{ label, out string }{{"dry run", dry}, {"the run that acts", real}} {
+	for _, c := range []struct{ label, out string }{{"dry run", dry}, {"the run that acts", said}} {
 		if !strings.Contains(c.out, "your own notes") {
 			t.Errorf("%s does not call a remember note what it is:\n%s", c.label, c.out)
 		}
@@ -45,11 +45,11 @@ func onlyNoteID(t *testing.T) string {
 		t.Fatal(err)
 	}
 	const key = `"id":"`
-	i := strings.Index(out, key)
-	if i < 0 {
+	_, after, ok := strings.Cut(out, key)
+	if !ok {
 		t.Fatalf("the note is not in the index:\n%s", out)
 	}
-	rest := out[i+len(key):]
+	rest := after
 	j := strings.Index(rest, `"`)
 	if j < 0 {
 		t.Fatalf("unreadable hit:\n%s", out)

@@ -43,7 +43,9 @@ var (
 	carryNegPendRE  = regexp.MustCompile(`(?i)` + carryNegPend)
 	carryNegPendAt  = regexp.MustCompile(`(?i)^(?:` + carryNegPend + `)`)
 	carryContrastRE = regexp.MustCompile(`(?i)(?:,\s*(?:а|но|однако|but|while)\s)`)
-	carryHeadRE     = regexp.MustCompile(`(?i)^.{0,25}?` + carryLB + `(` + carryPendWords + `)(?:$|[^\p{L}\p{N}_-])[^:—]{0,30}(?::|—)`)
+	//nolint:gocritic // the ^ inside carryLB is a start-or-boundary alternative
+	carryHeadRE = regexp.MustCompile(`(?i)^.{0,25}?` + carryLB + `(` + carryPendWords + `)(?:$|[^\p{L}\p{N}_-])[^:—]{0,30}(?::|—)`)
+	//nolint:gocritic // the ^ inside carryLB is a start-or-boundary alternative
 	carryCHeadRE    = regexp.MustCompile(`(?i)^.{0,25}?` + carryLB + `(` + carryCloseWords + `)` + carryRB + `[^:—]{0,30}(?::|—)`)
 	carryRefPreRE   = regexp.MustCompile(`(?i)(?:(?:^|[^\p{L}])(?:из|с|со|от|после|благодаря|через|since|from|per|see|thanks to|via|см\.?)\s*(?:PR|issue)?\s*|(?:^|[^\p{L}])(?:из|от|from|see|cf\.?|ссылк\p{L}*\s+на)\s+[\w.-]+(?:/[\w.-]+)?|(?:^|[^\p{L}])(?:из|от|from)\s+(?:\p{L}+\s+){1,2}|(?:^|[^\p{L}])(?:как в|как и в|ссылк\p{L}*\s+на|as in|like in)\s*(?:PR|issue)?\s*)$`)
 	carryPendRefRE  = regexp.MustCompile(`(?i)(?:осталось|остаётся|остается|остался|осталась|в очереди|вопрос|left|remaining|queued|question)\s+(?:из|от|с|со|from|of|with)\s*(?:PR|issue)?\s*$`)
@@ -65,12 +67,12 @@ func carryUnits(text string, fences bool) []string {
 		text = carryFenceRE.ReplaceAllString(text, " ")
 	}
 	var out []string
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		line = strings.TrimSpace(carryLeadRE.ReplaceAllString(line, ""))
 		if line == "" {
 			continue
 		}
-		for _, s := range strings.Split(carrySplitRE.ReplaceAllString(line, "${1}\n${2}"), "\n") {
+		for s := range strings.SplitSeq(carrySplitRE.ReplaceAllString(line, "${1}\n${2}"), "\n") {
 			s = strings.TrimSpace(strings.Trim(strings.TrimSpace(s), "|"))
 			if n := utf8.RuneCountInString(s); n > 12 && n < 400 {
 				out = append(out, s)
@@ -171,7 +173,7 @@ func carryQuoteSpans(s string) [][2]int {
 		}
 	}
 	var straight []int
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		if s[i] == '"' {
 			straight = append(straight, i)
 		}
@@ -212,6 +214,17 @@ type carryGroup struct {
 // closing word binds to the nearest #N run within carryNear runes.
 func carryBState(s string) []carryNum {
 	qs := carryQuoteSpans(s)
+	groups := carryGroups(s, qs)
+	if len(groups) == 0 {
+		return nil
+	}
+	carryBindVerbs(s, qs, groups)
+	return carryGroupStates(s, qs, groups)
+}
+
+// carryGroups collects the unquoted #N matches into runs; a reference stays a
+// group of its own.
+func carryGroups(s string, qs [][2]int) []*carryGroup {
 	var ms [][]int
 	for _, m := range carryNumRE.FindAllStringSubmatchIndex(s, -1) {
 		if !carryQuoted(qs, m[0]) {
@@ -225,7 +238,7 @@ func carryBState(s string) []carryNum {
 		ref := (carryRefPreRE.MatchString(pre) && !carryPendRefRE.MatchString(pre)) ||
 			carryPastBefore.MatchString(pre) || carryPastAfter.MatchString(post) ||
 			(strings.HasSuffix(strings.TrimRightFunc(pre, unicode.IsSpace), "(") && carryCiteRE.MatchString(post)) || // "(#840 — why)"
-			(cp != nil && !carryNumRE.MatchString(cp[1]) && strings.HasPrefix(strings.TrimLeftFunc(post, unicode.IsSpace), ")")) // "(cause, #2019)"
+			(len(cp) > 1 && !carryNumRE.MatchString(cp[1]) && strings.HasPrefix(strings.TrimLeftFunc(post, unicode.IsSpace), ")")) // "(cause, #2019)"
 		n := atoiCarry(s[m[2]:m[3]])
 		// A reference can still be closed ("#3878 merged"), never opened.
 		a, b := m[0], m[1]
@@ -244,9 +257,11 @@ func carryBState(s string) []carryNum {
 			groups = append(groups, &carryGroup{a: a, b: b, ns: []int{n}, ref: ref})
 		}
 	}
-	if len(groups) == 0 {
-		return nil
-	}
+	return groups
+}
+
+// carryBindVerbs binds each pending or closing word to the nearest group.
+func carryBindVerbs(s string, qs [][2]int, groups []*carryGroup) {
 	cyr := len(carryCyrRE.FindAllStringIndex(s, -1)) > len(carryLatRE.FindAllStringIndex(s, -1))
 	for kind, rx := range []*regexp.Regexp{carryPendRE, carryCloseRE} {
 		for _, w := range rx.FindAllStringSubmatchIndex(s, -1) {
@@ -282,10 +297,15 @@ func carryBState(s string) []carryNum {
 			}
 		}
 	}
+}
+
+// carryGroupStates resolves each group's bound words and the unit's heading
+// into the state of every #N it holds.
+func carryGroupStates(s string, qs [][2]int, groups []*carryGroup) []carryNum {
 	hm := carryHeadRE.FindStringSubmatchIndex(s)
-	head := hm != nil && !carryNegPendRE.MatchString(s[hm[0]:hm[1]]) && !carryQuoted(qs, hm[2])
+	head := len(hm) > 3 && !carryNegPendRE.MatchString(s[hm[0]:hm[1]]) && !carryQuoted(qs, hm[2])
 	cm := carryCHeadRE.FindStringSubmatchIndex(s)
-	chead := cm != nil && !carryQuoted(qs, cm[2])
+	chead := len(cm) > 2 && !carryQuoted(qs, cm[2])
 	var out []carryNum
 	at := map[int]int{}
 	for _, g := range groups {
@@ -359,11 +379,12 @@ func carryGap(s string, g *carryGroup, a, b int) (int, bool) {
 		return 0, true
 	}
 	var d int
-	if a >= g.b {
+	switch {
+	case a >= g.b:
 		d = utf8.RuneCountInString(s[g.b:a])
-	} else if b <= g.a {
+	case b <= g.a:
 		d = utf8.RuneCountInString(s[b:g.a])
-	} else {
+	default:
 		d = -utf8.RuneCountInString(s[g.a:b])
 	}
 	lo, hi := min(g.b, b), max(g.a, a)

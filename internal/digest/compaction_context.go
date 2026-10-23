@@ -3,6 +3,7 @@ package digest
 import (
 	"encoding/json"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -63,8 +64,8 @@ func ExtractCompactionContext(s model.Session, opts ExtractOptions) model.Compac
 	c.Rules = ExtractStandingRules(s, nil)
 	verdicts := runOutputVerdicts(s.Messages)
 
-	for i := len(window) - 1; i >= 0; i-- {
-		m := window[i]
+	for _, m := range slices.Backward(window) {
+
 		ref := contextRef(s, m)
 		switch m.Role {
 		case "assistant":
@@ -88,15 +89,16 @@ func ExtractCompactionContext(s model.Session, opts ExtractOptions) model.Compac
 				}
 			}
 			for _, item := range open {
-				if item.Kind == "gap" {
+				switch {
+				case item.Kind == "gap":
 					if len(c.Gaps) == opts.MaxItems {
 						c.Truncated = true
 					} else if !hasOpenItem(c.Gaps, item.Text) {
 						c.Gaps = append(c.Gaps, item.ContextOpenItem)
 					}
-				} else if len(c.Conflicts) == opts.MaxItems {
+				case len(c.Conflicts) == opts.MaxItems:
 					c.Truncated = true
-				} else if !hasOpenItem(c.Conflicts, item.Text) {
+				case !hasOpenItem(c.Conflicts, item.Text):
 					c.Conflicts = append(c.Conflicts, item.ContextOpenItem)
 				}
 			}
@@ -134,8 +136,8 @@ func contextWindow(messages []model.Message, opts ExtractOptions) ([]model.Messa
 	var reverse []model.Message
 	keptBytes, scannedBytes := 0, 0
 	truncated := false
-	for i := len(messages) - 1; i >= 0; i-- {
-		m := messages[i]
+	for _, m := range slices.Backward(messages) {
+
 		scannedBytes += len(m.Text)
 		if scannedBytes > maxContextScanBytes {
 			return reverseMessages(reverse), true
@@ -178,8 +180,8 @@ func reverseMessages(in []model.Message) []model.Message {
 }
 
 func contextObjective(s model.Session, window []model.Message) model.ContextFact {
-	for i := len(window) - 1; i >= 0; i-- {
-		m := window[i]
+	for _, m := range slices.Backward(window) {
+
 		if m.Role != "user" || IsAgentArtifact(m.Text) || IsCompactionSummary(strings.TrimSpace(m.Text)) {
 			continue
 		}
@@ -193,8 +195,8 @@ func contextObjective(s model.Session, window []model.Message) model.ContextFact
 	// newest substantive user objective rather than letting a tool stream erase
 	// the task being resumed.
 	scanned := 0
-	for i := len(s.Messages) - 1; i >= 0; i-- {
-		m := s.Messages[i]
+	for _, m := range slices.Backward(s.Messages) {
+
 		scanned += len(m.Text)
 		if scanned > maxContextScanBytes {
 			break
@@ -329,7 +331,7 @@ func withoutOpenLines(text string, open []classifiedOpenItem) string {
 		drop[item.Text] = true
 	}
 	var kept []string
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		if drop[contextProse(line, contextFactBytes)] {
 			continue
 		}
@@ -340,7 +342,7 @@ func withoutOpenLines(text string, open []classifiedOpenItem) string {
 
 func explicitOpenItems(text string, ref model.ContextRef) []classifiedOpenItem {
 	var out []classifiedOpenItem
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		line = contextProse(line, contextFactBytes)
 		if line == "" {
 			continue
@@ -684,22 +686,18 @@ func renderContext(c model.CompactionContext, byteBudget int, header string, com
 	}
 	c = RedactCompactionContext(c)
 	const omitted = "\nOmitted transcript records are not represented here.\n"
-	limit := byteBudget - len(omitted)
-	if limit < 0 {
-		limit = 0
-	}
+	limit := max(byteBudget-len(omitted), 0)
 	var b strings.Builder
 	omittedAny := c.Truncated
-	add := func(chunk string) bool {
+	add := func(chunk string) {
 		if chunk == "" {
-			return true
+			return
 		}
 		if b.Len()+len(chunk) > limit {
 			omittedAny = true
-			return false
+			return
 		}
 		b.WriteString(chunk)
-		return true
 	}
 	add(header)
 	latest := "Latest request"

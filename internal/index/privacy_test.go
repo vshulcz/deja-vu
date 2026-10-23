@@ -26,16 +26,16 @@ func TestForgetTombstoneLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	ptbl := newRecordTables()
-	if _, err := writeRecord(f, Record{Key: "claude:abc123", Role: "user", Text: "one", Time: time.Now()}, ptbl); err != nil {
+	if _, err = writeRecord(f, Record{Key: "claude:abc123", Role: "user", Text: "one", Time: time.Now()}, ptbl); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := writeRecord(f, Record{Key: "claude:keep", Role: "user", Text: "two", Time: time.Now()}, ptbl); err != nil {
+	if _, err = writeRecord(f, Record{Key: "claude:keep", Role: "user", Text: "two", Time: time.Now()}, ptbl); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.Close(); err != nil {
+	if err = f.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if err := writeManifest(dir, Manifest{Version: version, Files: map[string]FileState{}, RecordStrings: ptbl.strs, Sessions: map[string]SessionMeta{
+	if err = writeManifest(dir, Manifest{Version: version, Files: map[string]FileState{}, RecordStrings: ptbl.strs, Sessions: map[string]SessionMeta{
 		"claude:abc123": {ID: "abc123", Harness: "claude", Project: "secret", Updated: time.Now()},
 		"claude:keep":   {ID: "keep", Harness: "claude", Project: "public", Updated: time.Now()},
 	}}); err != nil {
@@ -251,8 +251,8 @@ func TestUnforgetReportsHowManyItLifted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n, err := Unforget("", "nosuch", nil); err != nil || n != 0 {
-		t.Fatalf("a prefix matching nothing lifted %d err=%v", n, err)
+	if n, unforgetErr := Unforget("", "nosuch", nil); unforgetErr != nil || n != 0 {
+		t.Fatalf("a prefix matching nothing lifted %d err=%v", n, unforgetErr)
 	}
 	after, err := os.Stat(tombstonePath())
 	if err != nil {

@@ -3,6 +3,7 @@ package index
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -148,10 +149,9 @@ func sessionFactOf(msgs []model.Message) (SessionFact, bool) {
 	// Backwards: the file a session ended in and the command that finally ran
 	// are the ones worth handing back, and a long session's opening moves are
 	// usually the ones it abandoned.
-	for i := len(msgs) - 1; i >= 0; i-- {
-		m := msgs[i]
-		switch m.Role {
-		case roleCommand:
+	for _, m := range slices.Backward(msgs) {
+
+		if m.Role == roleCommand {
 			if len(f.Commands) >= sessionFactsCommands && keptVerify {
 				continue
 			}

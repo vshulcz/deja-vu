@@ -17,8 +17,8 @@ import (
 func TestTheCommandsTableIgnoresTheExitStatus(t *testing.T) {
 	dir := t.TempDir()
 	at := time.Date(2026, 8, 1, 10, 0, 0, 0, time.UTC)
-	msg := func(text string, min int) model.Message {
-		return model.Message{Role: roleCommand, Text: text, Time: at.Add(time.Duration(min) * time.Minute)}
+	msg := func(text string, minute int) model.Message {
+		return model.Message{Role: roleCommand, Text: text, Time: at.Add(time.Duration(minute) * time.Minute)}
 	}
 	sessions := []model.Session{
 		{ID: "s1", Harness: "codex", Project: "app", Messages: []model.Message{
@@ -38,7 +38,7 @@ func TestTheCommandsTableIgnoresTheExitStatus(t *testing.T) {
 		}
 	}
 	if len(found) != 1 {
-		var got []string
+		got := make([]string, 0, len(found))
 		for _, u := range found {
 			got = append(got, u.Command)
 		}

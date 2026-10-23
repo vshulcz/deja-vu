@@ -25,7 +25,7 @@ func TestTheRelevanceTierReadsTheRecordsThatMatched(t *testing.T) {
 	// One session with the answer buried in the middle of a long transcript,
 	// and a pile of others so the query has a corpus to be ranked against.
 	var b strings.Builder
-	for i := 0; i < 300; i++ {
+	for i := range 300 {
 		text := fmt.Sprintf("ordinary line %d about the sidebar layout", i)
 		switch i {
 		case 150:
@@ -39,7 +39,7 @@ func TestTheRelevanceTierReadsTheRecordsThatMatched(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(proj, "long.jsonl"), []byte(b.String()), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	for k := 0; k < 12; k++ {
+	for k := range 12 {
 		id := fmt.Sprintf("other%d", k)
 		line := fmt.Sprintf(`{"type":"user","sessionId":%q,"cwd":"/work/app","timestamp":"2026-09-02T11:%02d:00Z","message":{"role":"user","content":"work on the invoice renderer and the webpack config"}}`+"\n", id, k)
 		if err := os.WriteFile(filepath.Join(proj, id+".jsonl"), []byte(line), 0o644); err != nil {
@@ -80,9 +80,11 @@ func TestTheRelevanceTierReadsTheRecordsThatMatched(t *testing.T) {
 		// The matched message is there, and the 299 that matched nothing are
 		// not: that is the whole of the change.
 		joined := ""
+		var joinedSb83 strings.Builder
 		for _, m := range s.Messages {
-			joined += m.Text + "\n"
+			joinedSb83.WriteString(m.Text + "\n")
 		}
+		joined += joinedSb83.String()
 		for _, want := range []string{"billing exporter drops every third retry", "backoff counted from zero in the scheduler"} {
 			if !strings.Contains(joined, want) {
 				t.Errorf("the matched message %q is missing:\n%s", want, joined)

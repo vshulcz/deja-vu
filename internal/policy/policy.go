@@ -17,6 +17,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
+// Activations a policy can restrict.
 const (
 	ActivationSearch = "search"
 	ActivationMCP    = "mcp"
@@ -58,6 +59,7 @@ func AutoIndexOff() bool {
 	return p.AutoIndex != nil && !*p.AutoIndex
 }
 
+// Path is where the policy file lives.
 func Path() string {
 	if p := os.Getenv("DEJA_POLICY_FILE"); p != "" {
 		return p

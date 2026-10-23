@@ -61,12 +61,12 @@ func TestCrushToolHookCarriesTheDigestAndTheNewestMessagesRecall(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(cwd)
-	reg, _ := json.Marshal(map[string]any{"projects": []map[string]string{{"path": cwd, "data_dir": data}}})
+	reg := mustMarshal(t, map[string]any{"projects": []map[string]string{{"path": cwd, "data_dir": data}}})
 	if err := os.WriteFile(filepath.Join(crushHome, "projects.json"), reg, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	text := func(s string) string {
-		b, _ := json.Marshal([]map[string]any{{"type": "text", "data": map[string]any{"text": s}}})
+		b := mustMarshal(t, []map[string]any{{"type": "text", "data": map[string]any{"text": s}}})
 		return "'" + strings.ReplaceAll(string(b), "'", "''") + "'"
 	}
 	sql := `create table sessions (id text primary key, parent_session_id text, title text not null,
@@ -79,12 +79,12 @@ create table messages (id text primary key, session_id text not null, role text 
 insert into sessions values ('c3',null,'t',1,0,0,0,100,100,null,null);
 insert into messages values ('u1','c3','user',` + text("what did we change in the retry_loop in fetcher") + `,'m',100,100,null,'p',0);
 `
-	cmd := exec.Command("sqlite3", filepath.Join(data, "crush.db"))
+	cmd := exec.CommandContext(t.Context(), "sqlite3", filepath.Join(data, "crush.db"))
 	cmd.Stdin = strings.NewReader(sql)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("build store: %v: %s", err, out)
 	}
-	tool, _ := json.Marshal(map[string]any{"event": "PreToolUse", "session_id": "c3", "cwd": cwd,
+	tool := mustMarshal(t, map[string]any{"event": "PreToolUse", "session_id": "c3", "cwd": cwd,
 		"tool_name": "view", "tool_input": map[string]any{"file_path": filepath.Join(cwd, "fetcher.go")}})
 	got := runDeferredHook(t, dir, "hook-tool", []string{"--crush"}, string(tool))
 	var resp struct {

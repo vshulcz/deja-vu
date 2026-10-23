@@ -163,7 +163,7 @@ func fileHookRanLine(dir string, metas []index.SessionMeta) string {
 	// is a different test filter from `-run "Pool Size"` (#2052).
 	cmd := truncateToolLine(search.SafeCommand(best.text), toolHookRanMax)
 	if best.failed {
-		return fmt.Sprintf("%s`%s` — exit %d in %s", failLabel, cmd, best.exit, toolSessionCount(best.sessions))
+		return fmt.Sprintf("%s`%s` — exit %d in %s", failLabel, cmd, best.exit, toolSessionCount(best.sessions)) //nolint:gocritic // %#q falls back to double quotes for a command with a backquote
 	}
-	return fmt.Sprintf("%s`%s` (%s)", ranLabel, cmd, toolSessionCount(best.sessions))
+	return fmt.Sprintf("%s`%s` (%s)", ranLabel, cmd, toolSessionCount(best.sessions)) //nolint:gocritic // %#q falls back to double quotes for a command with a backquote
 }

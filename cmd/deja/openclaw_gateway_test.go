@@ -28,11 +28,16 @@ func TestOpenClawResumeAndHandoffUseTheGatewayTUI(t *testing.T) {
 	}
 	s := model.Session{Harness: "openclaw", ID: "7de16196", Project: "openclaw-main", Path: filepath.Join(dir, "7de16196.jsonl")}
 
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	var lc net.ListenConfig
+	ln, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	port := strconv.Itoa(ln.Addr().(*net.TCPAddr).Port)
+	tcp, ok := ln.Addr().(*net.TCPAddr)
+	if !ok {
+		t.Fatalf("listener address %v is not TCP", ln.Addr())
+	}
+	port := strconv.Itoa(tcp.Port)
 	saved := openclawGatewayUp
 	t.Cleanup(func() { openclawGatewayUp = saved })
 	openclawGatewayUp = openclawGatewayAnswers

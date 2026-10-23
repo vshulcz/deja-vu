@@ -40,7 +40,7 @@ func DidYouMean(dir, q string) string {
 		idx.candidates(n, limit, func(tok string) {
 			switch d := damerauDistance(t, tok, limit); {
 			case d < bestD:
-				best, bestD = []string{tok}, d
+				best, bestD = []string{tok}, d //nolint:prealloc // a fresh list on each new best distance
 			case d == bestD && d <= limit:
 				best = append(best, tok)
 			}

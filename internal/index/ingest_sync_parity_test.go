@@ -67,12 +67,12 @@ func TestIngestAndSyncProduceSamePostings(t *testing.T) {
 		t.Fatal(err)
 	}
 	toolLine := `{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":` + string(toolJSON) + `}]},"timestamp":"2026-04-05T06:07:08Z","sessionId":"tool-session","cwd":"/tmp/parity"}` + "\n"
-	if err := os.WriteFile(filepath.Join(projectA, "tool.jsonl"), []byte(toolLine), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(projectA, "tool.jsonl"), []byte(toolLine), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	dirA := filepath.Join(tmp, "index-a.db")
-	if err := Ensure(dirA, "", false, nil); err != nil {
+	if err = Ensure(dirA, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -109,7 +109,7 @@ func TestIngestAndSyncProduceSamePostings(t *testing.T) {
 	}
 
 	batchDir := filepath.Join(tmp, "batch")
-	if err := os.MkdirAll(batchDir, 0o755); err != nil {
+	if err = os.MkdirAll(batchDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	exported, err := Export(dirA, batchDir)
@@ -123,7 +123,7 @@ func TestIngestAndSyncProduceSamePostings(t *testing.T) {
 	// Use a separate config root so the destination represents another machine
 	// and does not reject the exported batch as its own returning outbox.
 	claudeB := filepath.Join(tmp, "claude-b")
-	if err := os.MkdirAll(claudeB, 0o755); err != nil {
+	if err = os.MkdirAll(claudeB, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "config-b"))
@@ -131,7 +131,7 @@ func TestIngestAndSyncProduceSamePostings(t *testing.T) {
 	t.Setenv("DEJA_NOTES_FILE", filepath.Join(tmp, "notes-b.jsonl"))
 
 	dirB := filepath.Join(tmp, "index-b.db")
-	if err := Ensure(dirB, "", false, nil); err != nil {
+	if err = Ensure(dirB, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	imported, err := Import(dirB, batchDir)

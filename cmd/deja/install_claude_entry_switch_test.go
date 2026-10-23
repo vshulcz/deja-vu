@@ -53,8 +53,8 @@ func TestClaudeEntryDisabledFlagIsNotASwitch(t *testing.T) {
 	var report struct {
 		MCP []doctorMCPStatus `json:"mcp"`
 	}
-	if err := json.Unmarshal([]byte(out), &report); err != nil {
-		t.Fatalf("doctor --json: %v: %s", err, out)
+	if uerr := json.Unmarshal([]byte(out), &report); uerr != nil {
+		t.Fatalf("doctor --json: %v: %s", uerr, out)
 	}
 	seen := false
 	for _, r := range report.MCP {
@@ -79,8 +79,8 @@ func TestClaudeEntryDisabledFlagIsNotASwitch(t *testing.T) {
 
 	// A ~/.claude.json with a trailing comma goes through the JSONC writer.
 	jsonc := `{"mcpServers":{"deja":{"command":"` + filepath.ToSlash(bin) + `","args":["mcp"],"disabled":true,},}}`
-	if err := os.WriteFile(cfg, []byte(jsonc), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(cfg, []byte(jsonc), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	res, err = installClaude(bin, false)
 	if err != nil {

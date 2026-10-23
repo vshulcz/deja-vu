@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"io"
 	"os"
 	"path/filepath"
@@ -90,7 +91,7 @@ func TestTheHookCacheIsReplacedNotRewritten(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(got) != string(old) {
+	if !bytes.Equal(got, old) {
 		t.Fatalf("a reader that opened the old entry read:\n%s\nwant the old entry whole:\n%s", got, old)
 	}
 }

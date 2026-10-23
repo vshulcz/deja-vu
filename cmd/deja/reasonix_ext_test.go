@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -130,16 +131,17 @@ func (h *fakeRxHost) handle(f rxFrame) {
 		h.mu.Lock()
 		data := h.content[p.ContentRef]
 		h.mu.Unlock()
-		end := p.Offset + 5
-		if end > int64(len(data)) {
-			end = int64(len(data))
-		}
+		end := min(p.Offset+5, int64(len(data)))
 		page := map[string]any{"contentRef": p.ContentRef, "offset": p.Offset, "encoding": "utf8",
 			"dataBase64": base64.StdEncoding.EncodeToString(data[p.Offset:end]), "totalBytes": len(data)}
 		if end < int64(len(data)) {
 			page["nextOffset"] = end
 		}
-		b, _ := json.Marshal(page)
+		b, err := json.Marshal(page)
+		if err != nil {
+			h.t.Errorf("encode page: %v", err)
+			return
+		}
 		h.write(rxFrame{ID: f.ID, Result: b})
 	default:
 		h.frames <- f
@@ -148,7 +150,11 @@ func (h *fakeRxHost) handle(f rxFrame) {
 
 func (h *fakeRxHost) write(f rxFrame) {
 	f.JSONRPC = "2.0"
-	b, _ := json.Marshal(f)
+	b, err := json.Marshal(f)
+	if err != nil {
+		h.t.Errorf("encode frame: %v", err)
+		return
+	}
 	if _, err := h.toExt.Write(append(b, '\n')); err != nil {
 		h.t.Errorf("write to sidecar: %v", err)
 	}
@@ -164,8 +170,11 @@ func (h *fakeRxHost) raw(line string) {
 func (h *fakeRxHost) request(method string, params any) rxFrame {
 	h.t.Helper()
 	h.nextID++
-	id := json.RawMessage(fmt.Sprint(h.nextID))
-	b, _ := json.Marshal(params)
+	id := json.RawMessage(strconv.Itoa(h.nextID))
+	b, err := json.Marshal(params)
+	if err != nil {
+		h.t.Fatalf("encode params: %v", err)
+	}
 	h.write(rxFrame{ID: id, Method: method, Params: b})
 	return h.await(id)
 }
@@ -190,7 +199,10 @@ func (h *fakeRxHost) await(id json.RawMessage) rxFrame {
 }
 
 func (h *fakeRxHost) notify(method string, params any) {
-	b, _ := json.Marshal(params)
+	b, err := json.Marshal(params)
+	if err != nil {
+		h.t.Fatalf("encode params: %v", err)
+	}
 	h.write(rxFrame{Method: method, Params: b})
 }
 
@@ -267,7 +279,10 @@ func TestReasonixExtHandshakeSubscribesWithinTheManifest(t *testing.T) {
 			t.Errorf("handshake answer carries %q, which the host's InitializeResult does not have", k)
 		}
 	}
-	got, _ := json.Marshal(res["subscriptions"])
+	got, err := json.Marshal(res["subscriptions"])
+	if err != nil {
+		t.Fatal(err)
+	}
 	if string(got) != `["input.receive","tool.after"]` {
 		t.Errorf("subscriptions = %s, want only what both deja and the manifest name", got)
 	}
@@ -304,10 +319,10 @@ func TestReasonixExtSurvivesMalformedFrames(t *testing.T) {
 		t.Errorf("unknown method answer = %+v, want -32601", f.Error)
 	}
 	h.nextID++
-	id := json.RawMessage(fmt.Sprint(h.nextID))
+	id := json.RawMessage(strconv.Itoa(h.nextID))
 	h.write(rxFrame{ID: id, Method: "extension/intercept", Params: json.RawMessage(`"not an object"`)})
-	if f := h.await(id); f.Error == nil || f.Error.Code != -32602 {
-		t.Errorf("unreadable intercept answer = %+v, want -32602", f.Error)
+	if answer := h.await(id); answer.Error == nil || answer.Error.Code != -32602 {
+		t.Errorf("unreadable intercept answer = %+v, want -32602", answer.Error)
 	}
 	if r := h.intercept("input.receive", map[string]any{"text": "still here"}); r.Decision != "continue" {
 		t.Errorf("after the garbage the sidecar answered %+v", r)

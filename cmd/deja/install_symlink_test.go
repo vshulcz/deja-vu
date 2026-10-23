@@ -30,15 +30,15 @@ func TestInstallWritesThroughASymlink(t *testing.T) {
 			if err := os.MkdirAll(repo, 0o755); err != nil {
 				t.Fatal(err)
 			}
-			real := filepath.Join(repo, filepath.Base(tc.rel))
-			if err := os.WriteFile(real, []byte(tc.seed), 0o644); err != nil {
+			realPath := filepath.Join(repo, filepath.Base(tc.rel))
+			if err := os.WriteFile(realPath, []byte(tc.seed), 0o644); err != nil {
 				t.Fatal(err)
 			}
 			link := homeConfigPath(home, tc.rel)
 			if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
 				t.Fatal(err)
 			}
-			if err := os.Symlink(real, link); err != nil {
+			if err := os.Symlink(realPath, link); err != nil {
 				t.Skipf("symlinks unavailable: %v", err)
 			}
 
@@ -53,7 +53,7 @@ func TestInstallWritesThroughASymlink(t *testing.T) {
 			if fi.Mode()&os.ModeSymlink == 0 {
 				t.Fatalf("%s is no longer a symlink; the dotfiles repo has lost the file", tc.rel)
 			}
-			b, err := os.ReadFile(real)
+			b, err := os.ReadFile(realPath)
 			if err != nil {
 				t.Fatal(err)
 			}

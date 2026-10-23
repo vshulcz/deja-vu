@@ -174,7 +174,7 @@ func TestPreToolUseWiresHookTool(t *testing.T) {
 	claudePath := filepath.Join(home, ".claude", "settings.json")
 
 	// Install twice: the PreToolUse hook-tool entry lands once, not twice.
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		if _, err := installCodexHooks("/usr/local/bin/deja", false); err != nil {
 			t.Fatalf("codex install: %v", err)
 		}

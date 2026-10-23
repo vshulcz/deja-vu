@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -348,7 +349,7 @@ func piRules(dir string, overrides ...string) rulesFile {
 // block goes into whichever already wins. $CODEWHALE_HOME does not move it: a
 // stand with it set loaded nothing from the moved directory.
 func codeWhaleRulesPath() string {
-	var others []string
+	others := make([]string, 0, 6)
 	for _, name := range []string{"AGENTS.md", "instructions.md"} {
 		for _, dir := range []string{".codewhale", ".agents", ".deepseek"} {
 			others = append(others, filepath.Join(homeDir(), dir, name))
@@ -445,7 +446,7 @@ func rulesState(path, body string) (string, error) {
 	}
 	doc := string(bytes.TrimPrefix(b, utf8BOM))
 	if checkMarkerPairs(doc, rulesStart, rulesEnd, "rules") != nil {
-		return "unbounded", nil
+		return "unbounded", nil //nolint:nilerr // a lost marker is the "unbounded" state, not a failure
 	}
 	start, end := markerLines(doc, rulesStart, rulesEnd)
 	if start < 0 || end < 0 {
@@ -479,7 +480,7 @@ func runRulesTo(w io.Writer, args []string) error {
 			sync = true
 		case "status":
 		case "candidates":
-			return fmt.Errorf("rules: candidates goes first and takes no other subcommand — `deja rules candidates [--json] [--limit n] [--since 90d]`")
+			return errors.New("rules: candidates goes first and takes no other subcommand — `deja rules candidates [--json] [--limit n] [--since 90d]`")
 		default:
 			return unknownFlag("rules", a, []string{"sync", "status", "candidates"})
 		}

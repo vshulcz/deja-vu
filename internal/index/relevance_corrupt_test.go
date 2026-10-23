@@ -39,7 +39,7 @@ func TestRelevanceSurfacesACorruptBucket(t *testing.T) {
 		t.Fatal("no buckets to corrupt")
 	}
 	for _, e := range entries {
-		if err := os.WriteFile(filepath.Join(dir, "buckets", e.Name()), []byte("XXXXXXXX garbage"), 0o600); err != nil {
+		if err = os.WriteFile(filepath.Join(dir, "buckets", e.Name()), []byte("XXXXXXXX garbage"), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}

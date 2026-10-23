@@ -36,7 +36,7 @@ func hermesEnv(t *testing.T) (tmp, home string) {
 func seedHermes(t *testing.T, db string, rows string) {
 	t.Helper()
 	stmts := `create table if not exists messages (id integer primary key, session_id text, role text, content text, timestamp real);` + rows
-	if out, err := exec.Command("sqlite3", db, stmts).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, stmts).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}
 }
@@ -127,7 +127,7 @@ func TestAQuietHermesSessionSurvivesAPassThatDidNotAskForIt(t *testing.T) {
 func TestEachHermesProfileKeepsItsOwnWatermark(t *testing.T) {
 	tmp, home := hermesEnv(t)
 	profiles := filepath.Join(home, "profiles")
-	var dbs []string
+	dbs := make([]string, 0, 2)
 	for i, name := range []string{"busy", "quiet"} {
 		dir := filepath.Join(profiles, name)
 		if err := os.MkdirAll(dir, 0o755); err != nil {

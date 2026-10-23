@@ -92,8 +92,8 @@ func tableRow(readme, tool string) string {
 		return ""
 	}
 	rest := readme[i:]
-	if j := strings.IndexByte(rest, '\n'); j >= 0 {
-		return rest[:j]
+	if before, _, ok := strings.Cut(rest, "\n"); ok {
+		return before
 	}
 	return rest
 }

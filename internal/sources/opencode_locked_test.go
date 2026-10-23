@@ -25,21 +25,21 @@ create table part(id text, message_id text, data text);
 insert into session values('s1','/w','2026-01-02T03:00:00Z','2026-01-03T03:00:00Z');
 insert into message values('m1','s1',1767409200000,'{"role":"user"}');
 insert into part values('p1','m1','{"type":"text","text":"LOCKEDMARK content"}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
 
 	// Hold an exclusive write lock via a background sqlite3 fed through stdin,
 	// released when we close stdin — after the parser has run.
-	holder := exec.Command("sqlite3", db)
+	holder := exec.CommandContext(t.Context(), "sqlite3", db)
 	pipe, err := holder.StdinPipe()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := holder.Start(); err != nil {
+	if err = holder.Start(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pipe.Write([]byte("begin exclusive;\ninsert into part values('p2','m1','x');\n")); err != nil {
+	if _, err = pipe.Write([]byte("begin exclusive;\ninsert into part values('p2','m1','x');\n")); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(200 * time.Millisecond) // let the exclusive lock take hold

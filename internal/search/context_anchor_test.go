@@ -13,10 +13,13 @@ import (
 // actually settles it, with enough conversation between the two to fill the
 // context budget several times over.
 func longSessionAround(turns int) model.Session {
-	msgs := []model.Message{{Role: "user", Text: "before we start, remind me about retries later"}}
-	for i := 0; i < turns; i++ {
-		msgs = append(msgs, model.Message{Role: "user", Text: "unrelated question " + strings.Repeat("x", 200)})
-		msgs = append(msgs, model.Message{Role: "assistant", Text: "unrelated answer " + strings.Repeat("y", 200)})
+	msgs := make([]model.Message, 0, 1+2*turns+2)
+	msgs = append(msgs, model.Message{Role: "user", Text: "before we start, remind me about retries later"})
+	for range turns {
+		msgs = append(msgs,
+			model.Message{Role: "user", Text: "unrelated question " + strings.Repeat("x", 200)},
+			model.Message{Role: "assistant", Text: "unrelated answer " + strings.Repeat("y", 200)},
+		)
 	}
 	msgs = append(msgs,
 		model.Message{Role: "user", Text: "so what did we settle on for retries?"},
@@ -41,13 +44,16 @@ func TestContextCarriesTheExchangeThatAnswers(t *testing.T) {
 // the tail only mentions it in passing. A fix that simply favours the last
 // match would lose the answer here instead.
 func TestContextCarriesAnEarlyExchangeOverALaterMention(t *testing.T) {
-	msgs := []model.Message{
-		{Role: "user", Text: "what should we do about retries?"},
-		{Role: "assistant", Text: "we decided to cap retries at 3 and give up after that"},
-	}
-	for i := 0; i < 60; i++ {
-		msgs = append(msgs, model.Message{Role: "user", Text: "unrelated question " + strings.Repeat("x", 200)})
-		msgs = append(msgs, model.Message{Role: "assistant", Text: "unrelated answer " + strings.Repeat("y", 200)})
+	msgs := make([]model.Message, 0, 123)
+	msgs = append(msgs,
+		model.Message{Role: "user", Text: "what should we do about retries?"},
+		model.Message{Role: "assistant", Text: "we decided to cap retries at 3 and give up after that"},
+	)
+	for range 60 {
+		msgs = append(msgs,
+			model.Message{Role: "user", Text: "unrelated question " + strings.Repeat("x", 200)},
+			model.Message{Role: "assistant", Text: "unrelated answer " + strings.Repeat("y", 200)},
+		)
 	}
 	msgs = append(msgs, model.Message{Role: "user", Text: "anyway, back to retries some other time"})
 

@@ -12,7 +12,7 @@ func TestTUIReaderFindAndTurns(t *testing.T) {
 	dir, _ := tuiStore(t)
 	a := newTestTUI(t, dir)
 	s := model.Session{ID: "turns-1", Harness: "claude"}
-	for i := 0; i < 12; i++ {
+	for i := range 12 {
 		text := "step " + num(i+1) + " of the migration"
 		if i == 4 || i == 9 {
 			text += ", the flaky cutover"

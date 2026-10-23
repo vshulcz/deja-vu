@@ -55,6 +55,7 @@ func continueSessionFile(p string) bool {
 	return filepath.Base(filepath.Dir(p)) == "sessions"
 }
 
+// LoadContinue reads every Continue session on this machine.
 func LoadContinue() []model.Session { return parseFiles(ContinueSessionFiles(), ParseContinueFile) }
 
 type continueListEntry struct {
@@ -111,7 +112,7 @@ func ContinueSessionDir(path string) string {
 			return ""
 		}
 		ws = u.Path
-		// file:///C:/proj is /C:/proj once parsed.
+		// A file:///C:/proj URI is /C:/proj once parsed.
 		if len(ws) > 2 && ws[0] == '/' && ws[2] == ':' {
 			ws = ws[1:]
 		}
@@ -162,6 +163,7 @@ type continueMessage struct {
 	Content json.RawMessage `json:"content"`
 }
 
+// ParseContinueFile reads one Continue session file.
 func ParseContinueFile(path string) ([]model.Session, error) {
 	b, err := readJSONFile(path)
 	if err != nil {

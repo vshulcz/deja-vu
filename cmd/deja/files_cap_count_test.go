@@ -27,7 +27,7 @@ func TestFilesSaysWhenTheReadBudgetBit(t *testing.T) {
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
 	const over = 40
 	total := filesMaxSessions + over
-	for i := 0; i < total; i++ {
+	for i := range total {
 		id := fmt.Sprintf("s%04d", i)
 		day := 1 + i/24
 		hour := i % 24
@@ -56,11 +56,11 @@ func TestFilesSaysWhenTheReadBudgetBit(t *testing.T) {
 	// answer carries a caveat about a cap that never bit.
 	small := hermeticEnv(t)
 	smallRepo := filepath.Join(small, "repo")
-	if err := os.MkdirAll(filepath.Join(smallRepo, ".git"), 0o755); err != nil {
+	if err = os.MkdirAll(filepath.Join(smallRepo, ".git"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	smallFile := filepath.Join(smallRepo, "one.go")
-	if err := os.WriteFile(smallFile, []byte("package repo\n"), 0o644); err != nil {
+	if err = os.WriteFile(smallFile, []byte("package repo\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	smallRoot := os.Getenv("DEJA_CLAUDE_ROOT")
@@ -69,7 +69,7 @@ func TestFilesSaysWhenTheReadBudgetBit(t *testing.T) {
 		fmt.Sprintf(`{"type":"assistant","sessionId":"only","cwd":%q,"timestamp":"2026-07-01T10:05:00Z","message":{"role":"assistant","content":[{"type":"text","text":"on it"},{"type":"tool_use","name":"Edit","input":{"file_path":%q}}]}}`, smallRepo, smallFile),
 	}
 	writeClaudeFixture(t, filepath.Join(smallRoot, "projects", "-repo", "only.jsonl"), "only", lines)
-	if err := index.Ensure(os.Getenv("DEJA_INDEX_DIR"), "", false, nil); err != nil {
+	if err = index.Ensure(os.Getenv("DEJA_INDEX_DIR"), "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	quiet, err := captureRun(t, "files", "migration")

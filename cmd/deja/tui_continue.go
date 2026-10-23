@@ -27,7 +27,7 @@ func loadTUIContinued(dir string) []string {
 		return nil
 	}
 	var out []string
-	for _, l := range strings.Split(string(b), "\n") {
+	for l := range strings.SplitSeq(string(b), "\n") {
 		if l = strings.TrimSpace(l); agentNames[l] != "" && len(out) < tuiContinuedMax {
 			out = append(out, l)
 		}

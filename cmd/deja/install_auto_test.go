@@ -30,10 +30,10 @@ func TestInstallCodexHooksMergeAndUninstall(t *testing.T) {
 	}
 	b, _ := os.ReadFile(path)
 	var root map[string]any
-	if err := json.Unmarshal(b, &root); err != nil {
-		t.Fatal(err)
+	if uerr := json.Unmarshal(b, &root); uerr != nil {
+		t.Fatal(uerr)
 	}
-	entries := root["hooks"].(map[string]any)["SessionStart"].([]any)
+	entries := typedOrFatal[[]any](t, typedOrFatal[map[string]any](t, root["hooks"])["SessionStart"])
 	if len(entries) != 2 {
 		t.Fatalf("entries = %d, want foreign + ours", len(entries))
 	}

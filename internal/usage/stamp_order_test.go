@@ -76,7 +76,7 @@ func TestEventsAndSnapshotsAreNewestByStamp(t *testing.T) {
 }
 
 func kinds(es []Event) []string {
-	var out []string
+	out := make([]string, 0, len(es))
 	for _, e := range es {
 		out = append(out, e.Kind)
 	}
@@ -127,7 +127,7 @@ func TestRotationKeepsWhatArrivedLastNotWhatIsStampedLatest(t *testing.T) {
 	// the end: the last appended carries the oldest stamp of the lot.
 	body := strings.Repeat("x", RecordRoom/2)
 	var b strings.Builder
-	for i := 0; i < snapshotsToKeep*3; i++ {
+	for i := range snapshotsToKeep * 3 {
 		line, err := marshalSnapshot(Snapshot{
 			Time: now.Add(-time.Duration(i) * time.Minute), Kind: "hook",
 			Bytes: len(body), Digest: fmt.Sprintf("d%03d ", i) + body,
@@ -147,7 +147,7 @@ func TestRotationKeepsWhatArrivedLastNotWhatIsStampedLatest(t *testing.T) {
 	}
 	b.Write(last)
 	b.WriteByte('\n')
-	if err := os.WriteFile(p, []byte(b.String()), 0o644); err != nil {
+	if err = os.WriteFile(p, []byte(b.String()), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	fi, err := os.Stat(p)

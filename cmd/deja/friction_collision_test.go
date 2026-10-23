@@ -31,7 +31,7 @@ func TestFrictionRowsThatShareTheirHeadStillDiffer(t *testing.T) {
 		t.Fatal(err)
 	}
 	for n, line := range lines {
-		for i := 0; i < index.FrictionMinSessions; i++ {
+		for i := range index.FrictionMinSessions {
 			sid := fmt.Sprintf("s%d%02d", n, i)
 			payload, err := json.Marshal(line + "\nexit status 1")
 			if err != nil {
@@ -51,7 +51,7 @@ func TestFrictionRowsThatShareTheirHeadStillDiffer(t *testing.T) {
 		t.Fatal(err)
 	}
 	var rows []string
-	for _, l := range strings.Split(buf.String(), "\n") {
+	for l := range strings.SplitSeq(buf.String(), "\n") {
 		if strings.Contains(l, "sessions  ") {
 			rows = append(rows, strings.TrimSpace(l))
 		}

@@ -41,7 +41,7 @@ func TestCodexHistoryLeavesOutSessionsThatHaveARollout(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(ss) != 1 || ss[0].ID != alone {
-		var ids []string
+		ids := make([]string, 0, len(ss))
 		for _, s := range ss {
 			ids = append(ids, s.ID)
 		}

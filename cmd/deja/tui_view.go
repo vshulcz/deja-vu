@@ -26,10 +26,7 @@ func newLayout(w, h int) layout {
 	l.bodyH = h - 1 - l.bodyTop
 	l.listX = 1
 	if w >= 96 {
-		l.listW = w * 55 / 100
-		if l.listW > 74 {
-			l.listW = 74
-		}
+		l.listW = min(w*55/100, 74)
 		l.prevX = l.listX + l.listW + 2
 		l.prevW = w - l.prevX - 1
 	} else {
@@ -156,17 +153,17 @@ func (a *tuiApp) drawSearch(l layout, y int) {
 			count += "+"
 		}
 	}
-	max := x1 - termwidth.Columns(count) - 2
+	limit := x1 - termwidth.Columns(count) - 2
 	x := 6
 	if len(a.query) == 0 {
 		if !a.listFocus {
-			x = p.Put(x, y, "▏", fgs(cAcc), max)
+			x = p.Put(x, y, "▏", fgs(cAcc), limit)
 		}
-		p.PutClip(x, y, "Search everything your agents ever did", fgs(cMuted), max)
+		p.PutClip(x, y, "Search everything your agents ever did", fgs(cMuted), limit)
 	} else {
-		x = a.drawQuery(x, y, max)
+		x = a.drawQuery(x, y, limit)
 		if !a.listFocus {
-			p.Put(x, y, "▏", fgs(cAcc), max+1)
+			p.Put(x, y, "▏", fgs(cAcc), limit+1)
 		}
 	}
 	p.Put(x1-termwidth.Columns(count)-1, y, count, fgs(cMuted), x1)
@@ -260,10 +257,7 @@ func (a *tuiApp) drawToast() {
 		mark, mc = "!", cPeach
 	}
 	text := a.toast
-	w := termwidth.Columns(text) + 6
-	if w > p.W-4 {
-		w = p.W - 4
-	}
+	w := min(termwidth.Columns(text)+6, p.W-4)
 	x, y := p.W-w-2, p.H-3
 	p.Fill(x, y, w, 1, cSurf2)
 	p.Put(x+1, y, mark, boldOn(mc, cSurf2), x+w)
@@ -272,7 +266,7 @@ func (a *tuiApp) drawToast() {
 
 // drawCat paints the mascot in half blocks: one cell holds two pixel rows,
 // the upper as foreground and the lower as background.
-func (a *tuiApp) drawCat(x, y int, m mark.Mood) (w, h int) {
+func (a *tuiApp) drawCat(x, y int, m mark.Mood) {
 	g := mark.Grid(m)
 	for row := 0; row+1 < len(g); row += 2 {
 		for col := range g[row] {
@@ -288,11 +282,7 @@ func (a *tuiApp) drawCat(x, y int, m mark.Mood) (w, h int) {
 				a.p.Put(cx, cy, "▄", fgs(tui.Index256(bot)), a.p.W)
 			}
 		}
-		if len(g[row]) > w {
-			w = len(g[row])
-		}
 	}
-	return w, len(g) / 2
 }
 
 func (a *tuiApp) drawEmpty(l layout) {
@@ -328,14 +318,8 @@ func (a *tuiApp) drawEmpty(l layout) {
 		line = "Did you mean “" + b.suggest + "”? It finds " + tuiCount(b.found, "session") + "."
 	}
 	cw, ch := 24, 11
-	x := (l.w - cw - 6 - 50) / 2
-	if x < 2 {
-		x = 2
-	}
-	y := l.bodyTop + (l.bodyH-ch)/2 - 1
-	if y < l.bodyTop {
-		y = l.bodyTop
-	}
+	x := max((l.w-cw-6-50)/2, 2)
+	y := max(l.bodyTop+(l.bodyH-ch)/2-1, l.bodyTop)
 	tx := x + cw + 6
 	if l.w >= 80 {
 		a.drawCat(x, y, mood)

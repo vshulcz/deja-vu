@@ -113,7 +113,7 @@ func TestCursorPromptGetsTheRecallWithoutTheReceipt(t *testing.T) {
 
 	var spent bool
 	cursor := ask(t, func(cwd string) string {
-		root, _ := json.Marshal(cwd)
+		root := mustMarshal(t, cwd)
 		return `{"conversation_id":"c1","generation_id":"g1","hook_event_name":"beforeSubmitPrompt","cursor_version":"2026.09.02-c22c1a3","workspace_roots":[` + string(root) + `],"prompt":"` + prompt + `","attachments":[]}`
 	})
 	if _, err := os.Stat(index.DefaultDir() + ".dejavu"); err == nil {

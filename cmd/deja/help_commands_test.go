@@ -42,7 +42,7 @@ func TestEveryListedCommandHasADescriptionAndAnExample(t *testing.T) {
 // with nothing to fit it to: piped help is what a README or an agent quotes.
 func TestTheHelpPageFitsEightyColumnsAsWritten(t *testing.T) {
 	col := -1
-	for _, line := range strings.Split(usageText(), "\n") {
+	for line := range strings.SplitSeq(usageText(), "\n") {
 		if n := len([]rune(line)); n > 80 {
 			t.Errorf("a line is %d wide: %q", n, line)
 		}

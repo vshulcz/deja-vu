@@ -247,7 +247,7 @@ func TestDoctorReportsCopilotAutoRecall(t *testing.T) {
 		// name column.
 		var lines []string
 		on := false
-		for _, line := range strings.Split(out.String(), "\n") {
+		for line := range strings.SplitSeq(out.String(), "\n") {
 			switch {
 			case strings.HasPrefix(line, "  copilot "):
 				on = true

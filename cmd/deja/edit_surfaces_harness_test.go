@@ -2,9 +2,9 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -50,7 +50,7 @@ func assertEditSurfaces(t *testing.T, harness, id, file, span, topic string) {
 	found := false
 	for n := 1; n <= strings.Count(listing, " B "); n++ {
 		out.Reset()
-		if err := runRestore(dir, []string{base, "--span", fmt.Sprint(n)}, &out); err != nil {
+		if err := runRestore(dir, []string{base, "--span", strconv.Itoa(n)}, &out); err != nil {
 			t.Fatalf("restore --span %d: %v", n, err)
 		}
 		if strings.TrimSuffix(out.String(), "\n") == span {
@@ -78,7 +78,7 @@ func assertEditSurfaces(t *testing.T, harness, id, file, span, topic string) {
 	if err != nil || !ok {
 		t.Fatalf("session %s not in the index: %v", id, err)
 	}
-	line := strings.SplitN(span, "\n", 2)[0]
+	line, _, _ := strings.Cut(span, "\n")
 	commit := lineCommit{SHA: "abcdef12", When: time.Now().Add(24 * 365 * time.Hour)}
 	target := search.BlameTarget{FullPath: file, Base: base, Line: 1}
 	author, ok := attributeLine([]model.Session{s}, target, commit, map[string]bool{blameSpanKey(line): true})

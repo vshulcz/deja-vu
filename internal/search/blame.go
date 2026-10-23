@@ -2,6 +2,7 @@ package search
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -21,6 +22,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/query"
 )
 
+// BlameTarget is the file a blame question names, resolved to an absolute path.
 type BlameTarget struct {
 	FullPath string
 	Base     string
@@ -38,6 +40,7 @@ type BlameTarget struct {
 	LineNote string
 }
 
+// BlameOptions narrows which sessions a blame search reads.
 type BlameOptions struct {
 	Harness string
 	Project string
@@ -45,6 +48,7 @@ type BlameOptions struct {
 	All     bool
 }
 
+// BlameHit is one session that mentions the blamed file.
 type BlameHit struct {
 	Session  model.Session `json:"session"`
 	Title    string        `json:"title"`
@@ -81,7 +85,7 @@ type BlameHit struct {
 // Only trailing digits, and only while something is left in front: a colon is
 // legal in a unix filename, and `C:\src\main.go` carries one that must survive.
 func trimLineSuffix(name string) string {
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		head, tail, ok := lastColon(name)
 		if !ok || tail == "" || !allDigits(tail) || head == "" {
 			return name
@@ -116,10 +120,12 @@ func allDigits(s string) bool {
 // maxBlamePath is PATH_MAX on Linux, the longest of the common limits.
 const maxBlamePath = 4096
 
+// ResolveBlamePath turns what the reader typed, with an optional :line suffix,
+// into a BlameTarget.
 func ResolveBlamePath(name string) (BlameTarget, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return BlameTarget{}, fmt.Errorf("path required")
+		return BlameTarget{}, errors.New("path required")
 	}
 	// Longer than any file system allows, and every directory in it is a form
 	// matched against every message: a pasted 100 KB blob took over 20s.
@@ -134,7 +140,7 @@ func ResolveBlamePath(name string) (BlameTarget, error) {
 	full = filepath.Clean(full)
 	base := filepath.Base(full)
 	if base == "." || base == string(filepath.Separator) || base == "" {
-		return BlameTarget{}, fmt.Errorf("path must name a file")
+		return BlameTarget{}, errors.New("path must name a file")
 	}
 	stem := strings.TrimSuffix(base, filepath.Ext(base))
 	if stem == "" {
@@ -467,7 +473,7 @@ func blameForms(full string) []string {
 	clean := strings.ToLower(filepath.ToSlash(filepath.Clean(full)))
 	parts := strings.Split(strings.TrimPrefix(clean, "/"), "/")
 	forms := make([]string, 0, len(parts))
-	for i := 0; i < len(parts); i++ {
+	for i := range parts {
 		form := strings.Join(parts[i:], "/")
 		forms = append(forms, "/"+form, form)
 	}
@@ -530,7 +536,7 @@ func mentionScore(text, base string, forms []string) (int, float64) {
 // Per line rather than per message, because a diffstat's own summary line
 // would otherwise vouch for every path above it.
 func aLineSaysMoreThanThePath(low, base string) bool {
-	for _, line := range strings.Split(low, "\n") {
+	for line := range strings.SplitSeq(low, "\n") {
 		if strings.Contains(line, base) && saysMoreThanThePath(line) {
 			return true
 		}
@@ -543,7 +549,7 @@ func aLineSaysMoreThanThePath(low, base string) bool {
 // Russian or Chinese is saying it (#2854).
 func saysMoreThanThePath(low string) bool {
 	words, unspaced := 0, 0
-	for _, field := range strings.Fields(low) {
+	for field := range strings.FieldsSeq(low) {
 		if strings.ContainsAny(field, "/\\") {
 			continue
 		}
@@ -665,6 +671,7 @@ func boundedBlameHit(h BlameHit) BlameHit {
 	return h
 }
 
+// PrintBlame writes blame hits as rows, or as one JSON array.
 func PrintBlame(w io.Writer, hits []BlameHit, jsonOutput bool) {
 	for i := range hits {
 		if hits[i].Tier == "" {
@@ -683,7 +690,7 @@ func PrintBlame(w io.Writer, hits []BlameHit, jsonOutput bool) {
 			out[i].Snippets = SafeStrings(out[i].Snippets)
 			out[i].LifecycleNote = SafeText(out[i].LifecycleNote)
 		}
-		_ = json.NewEncoder(w).Encode(out)
+		_ = json.NewEncoder(w).Encode(out) //nolint:errchkjson // no error return here; write errors are ignored like the text rows
 		return
 	}
 	PrintBlameWidth(w, hits, 0)
@@ -816,7 +823,7 @@ func pathLineFor(text string, target BlameTarget) string {
 	base := strings.ToLower(target.Base)
 	full := crossSlash(target.FullPath)
 	fallback := ""
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {
 			continue
@@ -957,7 +964,7 @@ func isDataDump(text string) bool {
 	}
 	seen := map[string]bool{}
 	lines, pathLines := 0, 0
-	for _, line := range strings.Split(t, "\n") {
+	for line := range strings.SplitSeq(t, "\n") {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}

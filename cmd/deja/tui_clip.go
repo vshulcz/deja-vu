@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/base64"
 	"os"
 	"os/exec"
@@ -42,7 +43,7 @@ func clipboardCommand() []string {
 // clipboard of the machine the reader is sitting at, ssh or not.
 func tuiCopy(osc func(string), text string) error {
 	if c := clipboardCommand(); c != nil {
-		cmd := exec.Command(c[0], c[1:]...)
+		cmd := exec.CommandContext(context.Background(), c[0], c[1:]...)
 		cmd.Stdin = strings.NewReader(text)
 		if err := cmd.Run(); err == nil {
 			return nil

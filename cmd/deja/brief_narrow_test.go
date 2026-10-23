@@ -82,7 +82,7 @@ func TestBriefTodayTryAndBeforeFitTheirPane(t *testing.T) {
 			t.Fatal(err)
 		}
 		var seen int
-		for _, line := range strings.Split(strings.TrimRight(buf.String(), "\n"), "\n") {
+		for line := range strings.SplitSeq(strings.TrimRight(buf.String(), "\n"), "\n") {
 			text := visibleText(line)
 			if !strings.HasPrefix(text, "today ") && !strings.HasPrefix(text, "try ") &&
 				!strings.HasPrefix(text, "before ") {

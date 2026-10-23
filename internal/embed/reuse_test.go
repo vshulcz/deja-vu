@@ -243,7 +243,7 @@ func TestAVersion1SidecarIsRekeyedWhileItsLayoutHolds(t *testing.T) {
 	for i := range s.Vectors {
 		s.Vectors[i].Ident = 0
 	}
-	if err := write(dir, s); err != nil {
+	if err = write(dir, s); err != nil {
 		t.Fatal(err)
 	}
 	embedded.Store(0)
@@ -294,7 +294,7 @@ func TestEmbedIndexKeepsVectorsWhenOnlyTheTimeMoved(t *testing.T) {
 	path := filepath.Join(tdir, "cur.jsonl")
 	turns := func(n int, at time.Time) {
 		var b strings.Builder
-		for i := 0; i < n; i++ {
+		for i := range n {
 			fmt.Fprintf(&b, `{"role":"user","message":{"content":[{"type":"text","text":"cursor question %d about the scheduler"}]}}`+"\n", i)
 			fmt.Fprintf(&b, `{"role":"assistant","message":{"content":[{"type":"text","text":"cursor answer %d"}]}}`+"\n", i)
 		}
@@ -348,7 +348,7 @@ func TestAVersion2SidecarIsRekeyedAfterARewrite(t *testing.T) {
 	for i := range s.Vectors {
 		s.Vectors[i].Ident = v2[s.Vectors[i].Offset]
 	}
-	if err := write(dir, s); err != nil {
+	if err = write(dir, s); err != nil {
 		t.Fatal(err)
 	}
 	raw, err := os.ReadFile(Path(dir))
@@ -356,15 +356,15 @@ func TestAVersion2SidecarIsRekeyedAfterARewrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	binary.LittleEndian.PutUint16(raw[4:], 2)
-	if err := os.WriteFile(Path(dir), raw, 0o600); err != nil {
+	if err = os.WriteFile(Path(dir), raw, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
 	rewound := `{"type":"user","sessionId":"a","timestamp":"2026-01-04T00:00:00Z","message":{"role":"user","content":"the scheduler story, rewritten"}}` + "\n"
-	if err := os.WriteFile(filepath.Join(root, "project", "a.jsonl"), []byte(rewound), 0o600); err != nil {
+	if err = os.WriteFile(filepath.Join(root, "project", "a.jsonl"), []byte(rewound), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := index.Ensure(dir, "", true, nil); err != nil {
+	if err = index.Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	embedded.Store(0)

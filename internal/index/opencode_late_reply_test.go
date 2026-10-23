@@ -32,7 +32,7 @@ func TestAnOpencodeReplyWrittenDuringAPassReachesTheIndex(t *testing.T) {
 	t.Setenv("DEJA_OPENCODE_DB", db)
 	run := func(sql string) {
 		t.Helper()
-		if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
+		if out, err := exec.CommandContext(t.Context(), "sqlite3", db, sql).CombinedOutput(); err != nil {
 			t.Fatalf("sqlite3: %v %s", err, out)
 		}
 	}
@@ -79,7 +79,7 @@ update session set time_updated=1790858252010 where id='s1';`)
 	if err != nil || !ok {
 		t.Fatalf("the session is not in the index: %v %v", ok, err)
 	}
-	var texts []string
+	texts := make([]string, 0, len(s.Messages))
 	asked := 0
 	for _, msg := range s.Messages {
 		texts = append(texts, msg.Text)
@@ -135,7 +135,7 @@ func opencodeWithDiff(t *testing.T) (db, diff, dir string, run func(string)) {
 	}
 	run = func(sql string) {
 		t.Helper()
-		if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
+		if out, err := exec.CommandContext(t.Context(), "sqlite3", db, sql).CombinedOutput(); err != nil {
 			t.Fatalf("sqlite3: %v %s", err, out)
 		}
 	}
@@ -333,7 +333,7 @@ func TestChangedOpencodeDiffsAreReadInOneQuery(t *testing.T) {
 		t.Skip("the sqlite3 wrapper is a shell script")
 	}
 	db, _, dir, run := opencodeWithDiff(t)
-	real, err := exec.LookPath("sqlite3")
+	sqlite, err := exec.LookPath("sqlite3")
 	if err != nil {
 		t.Skip("sqlite3 CLI not available")
 	}
@@ -352,7 +352,7 @@ insert into part values('pc','mc','ses_c',1790850000100,1790850000100,'{"type":"
 	// Every sqlite3 run of the next pass, logged and passed through.
 	bin := t.TempDir()
 	log := filepath.Join(bin, "runs.log")
-	wrapper := "#!/bin/sh\nprintf '%s\\n' \"$*\" | tr '\\n' ' ' >> " + log + "\necho >> " + log + "\nexec " + real + " \"$@\"\n"
+	wrapper := "#!/bin/sh\nprintf '%s\\n' \"$*\" | tr '\\n' ' ' >> " + log + "\necho >> " + log + "\nexec " + sqlite + " \"$@\"\n"
 	if err := os.WriteFile(filepath.Join(bin, "sqlite3"), []byte(wrapper), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -379,7 +379,7 @@ update session set time_updated=1790858252010 where id='ses_a';`)
 
 	b, _ := os.ReadFile(log)
 	reads := 0
-	for _, line := range strings.Split(string(b), "\n") {
+	for line := range strings.SplitSeq(string(b), "\n") {
 		if strings.Contains(line, "join message m on m.session_id=s.id") {
 			reads++
 		}

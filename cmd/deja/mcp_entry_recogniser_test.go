@@ -92,7 +92,10 @@ func TestMergingOntoANestedEntryLeavesOneLaunchShape(t *testing.T) {
 		"command": []any{"/usr/local/bin/deja", "mcp"},
 	})
 	if _, ok := out["transport"]; ok {
-		b, _ := json.Marshal(out)
+		b, err := json.Marshal(out)
+		if err != nil {
+			t.Fatal(err)
+		}
 		t.Errorf("the entry carries two ways to launch deja:\n%s", b)
 	}
 	if got := mcpEntryDejaCommand(out); got != "/usr/local/bin/deja" {

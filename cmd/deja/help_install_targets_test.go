@@ -38,7 +38,7 @@ func TestHelpNamesEveryInstallTarget(t *testing.T) {
 func TestHelpTargetListWraps(t *testing.T) {
 	names := installTargetNames()
 	got := wrapTargets(names, "      ", 76)
-	for _, line := range strings.Split(got, "\n") {
+	for line := range strings.SplitSeq(got, "\n") {
 		if len(line) > 76 {
 			t.Errorf("target line is %d columns wide: %q", len(line), line)
 		}
@@ -67,7 +67,7 @@ func TestHelpTargetListFollowsTheTerminal(t *testing.T) {
 			t.Fatal(err)
 		}
 		var widest int
-		for _, line := range strings.Split(out, "\n") {
+		for line := range strings.SplitSeq(out, "\n") {
 			if !strings.HasPrefix(line, "      ") || !strings.Contains(line, "claude-code") && !strings.Contains(line, ",") {
 				continue
 			}

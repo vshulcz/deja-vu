@@ -33,7 +33,7 @@ func threeWordStore(t *testing.T) (*twoWayEnv, string) {
 // zeroRecordContaining zeroes the whole frame (header + payload) of the first
 // record whose text contains word: the hole a crash on a writeback filesystem
 // leaves. File length is unchanged, so the manifest size check passes.
-func zeroRecordContaining(t *testing.T, dir, word string) {
+func zeroRecordContaining(t *testing.T, dir, word string) { //nolint:unparam // the call names the record it tears
 	t.Helper()
 	recs, err := ReadRecords(dir)
 	if err != nil {
@@ -314,7 +314,7 @@ func TestAZeroedPostingBlockIsCorruption(t *testing.T) {
 // interned ids through the wrong table.
 func TestASearchRacingRebuildsKeepsEveryHitInItsSession(t *testing.T) {
 	h := newTwoWayEnv(t)
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		id := fmt.Sprintf("s%02d", i)
 		h.put("app", id, hPrompt("app", id, 2+i%20, 0, fmt.Sprintf("sessword%02d lives only here", i)))
 	}
@@ -392,7 +392,7 @@ func TestASessionAheadOfTheClockDoesNotFreezeTheStoreMark(t *testing.T) {
 	t.Setenv("DEJA_OPENCODE_DB", db)
 	run := func(sql string) {
 		t.Helper()
-		if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
+		if out, err := exec.CommandContext(t.Context(), "sqlite3", db, sql).CombinedOutput(); err != nil {
 			t.Fatalf("sqlite3: %v %s", err, out)
 		}
 	}
@@ -429,7 +429,7 @@ insert into part values('p2','m2','s2',%[1]d,%[1]d,'{"type":"text","text":"punct
 	}
 	// The session ahead of the clock is above the capped mark on every pass;
 	// reading it again must not store it again.
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		later = later.Add(2 * time.Second)
 		_ = os.Chtimes(db, later, later)
 		if err := Ensure(dir, "", false, nil); err != nil {

@@ -51,7 +51,7 @@ func TestANoteTitleStaysOnDejasOwnLine(t *testing.T) {
 	// The premise: the row exists and names a note, or the checks below hold
 	// for a screen that stopped printing it.
 	longest := ""
-	for _, line := range strings.Split(stats, "\n") {
+	for line := range strings.SplitSeq(stats, "\n") {
 		if strings.Contains(line, "Longest session") {
 			longest = line
 		}
@@ -69,7 +69,7 @@ func TestANoteTitleStaysOnDejasOwnLine(t *testing.T) {
 	}
 	// Folded into deja's row is fine; a line of its own is not — that is the
 	// shape a reader takes for deja's own structure.
-	for _, line := range strings.Split(stats, "\n") {
+	for line := range strings.SplitSeq(stats, "\n") {
 		if strings.HasPrefix(strings.TrimSpace(line), "- source:") || strings.HasPrefix(strings.TrimSpace(line), "- state:") {
 			t.Errorf("a title's own line became a row of the stats screen: %q", line)
 		}
@@ -99,7 +99,7 @@ func TestANoteTitleStaysOnDejasOwnLine(t *testing.T) {
 	if !strings.Contains(last, "pool sizing") {
 		t.Fatalf("last printed no note:\n%s", last)
 	}
-	for _, line := range strings.Split(last, "\n") {
+	for line := range strings.SplitSeq(last, "\n") {
 		if strings.HasPrefix(strings.TrimSpace(line), "- source:") || strings.HasPrefix(strings.TrimSpace(line), "- state:") {
 			t.Errorf("a title's own line became a row of the listing: %q", line)
 		}

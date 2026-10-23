@@ -47,7 +47,7 @@ func writeEscapedFriction(t *testing.T, root string) {
 		t.Fatal(err)
 	}
 	bad := "command not found: \x1b[31mshellcheck\x1b[0m\u202eevil"
-	for i := 0; i < index.FrictionMinSessions; i++ {
+	for i := range index.FrictionMinSessions {
 		sid := fmt.Sprintf("esc%02d", i)
 		payload, err := json.Marshal(bad + "\nexit status 127")
 		if err != nil {

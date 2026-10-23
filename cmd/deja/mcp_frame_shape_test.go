@@ -11,7 +11,7 @@ import (
 func decodeRPCFrames(t *testing.T, out string) []map[string]any {
 	t.Helper()
 	var frames []map[string]any
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(out), "\n") {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}

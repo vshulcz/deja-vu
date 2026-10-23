@@ -46,7 +46,7 @@ func TestASearchDoesNotWaitOnALongLiveSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := small.WriteString(turn("2", "the retry is capped at three")); err != nil {
+	if _, err = small.WriteString(turn("2", "the retry is capped at three")); err != nil {
 		t.Fatal(err)
 	}
 	_ = small.Close()
@@ -66,7 +66,7 @@ func TestASearchDoesNotWaitOnALongLiveSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := big.WriteString(turn("3", strings.Repeat("tool output ", 400))); err != nil {
+	if _, err = big.WriteString(turn("3", strings.Repeat("tool output ", 400))); err != nil {
 		t.Fatal(err)
 	}
 	_ = big.Close()

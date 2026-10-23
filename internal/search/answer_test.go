@@ -38,11 +38,11 @@ func TestDecisionTextPrefersTheOutcomeSentence(t *testing.T) {
 		t.Fatalf("did not pick the outcome sentence: %q", got)
 	}
 	// A version number is not a sentence boundary.
-	if got := DecisionText("We pinned pgx to 5.4.3 and moved on."); !strings.Contains(got, "5.4.3 and moved on") {
+	if got = DecisionText("We pinned pgx to 5.4.3 and moved on."); !strings.Contains(got, "5.4.3 and moved on") {
 		t.Fatalf("split on a version number: %q", got)
 	}
 	// With no decision language, the opening of the reply is a fair fallback.
-	if got := DecisionText("Looks like the proxy closes idle connections earlier than the client expects."); !strings.HasPrefix(got, "Looks like") {
+	if got = DecisionText("Looks like the proxy closes idle connections earlier than the client expects."); !strings.HasPrefix(got, "Looks like") {
 		t.Fatalf("fallback lost the opening: %q", got)
 	}
 	if DecisionText("   ") != "" {

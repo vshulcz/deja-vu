@@ -44,15 +44,15 @@ func TestHandoffDoesNotPackageASyncedProjectMatchedByDirectoryName(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(batch, "batch.jsonl"), append(b, '\n'), 0o600); err != nil {
+	if err = os.WriteFile(filepath.Join(batch, "batch.jsonl"), append(b, '\n'), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := runSync(dir, []string{"import", batch}); err != nil {
+	if err = runSync(dir, []string{"import", batch}); err != nil {
 		t.Fatal(err)
 	}
 
 	work := filepath.Join(tmp, "work", "api")
-	if err := os.MkdirAll(work, 0o755); err != nil {
+	if err = os.MkdirAll(work, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	// t.Chdir, so the restore happens before the temp directory is removed:

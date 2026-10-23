@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -91,7 +92,7 @@ func runRecall(dir string, args []string, stdout io.Writer) error {
 	}
 	q := strings.TrimSpace(strings.Join(terms, " "))
 	if q == "" {
-		return fmt.Errorf("recall: what to recall? deja recall <words>")
+		return errors.New("recall: what to recall? deja recall <words>")
 	}
 	if err := checkHarness(&harness); err != nil {
 		return err

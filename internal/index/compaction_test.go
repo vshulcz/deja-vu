@@ -68,7 +68,7 @@ func TestCompactionDeduplicatesAndRejectsOlderCapture(t *testing.T) {
 func TestCompactionBoundsRetentionAndHonorsPrivacy(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "index.db")
 	workspace := t.TempDir()
-	for i := 0; i < compactionStateCap+1; i++ {
+	for i := range compactionStateCap + 1 {
 		state := compactionState("native-"+string(rune('a'+i)), workspace, time.Unix(int64(i+1), 0))
 		if _, err := PutCompaction(dir, state); err != nil {
 			t.Fatal(err)

@@ -35,7 +35,7 @@ insert into part values ('p4', 'm2', '{"type":"tool","callID":"call_85d449f3279f
 insert into part values ('p5', 'm2', '{"type":"tool","callID":"call_094947cf9a78","declarationIndex":0,"tool":"Edit","state":{"status":"completed","input":{"file_path":"/tmp/proj-zcode/retry.cfg","old_string":"max_backoff_seconds = 30  # cap for the retry loop","new_string":"max_backoff_seconds = 120  # cap for the retry loop"},"output":"The file has been updated successfully.","title":"Edit","time":{"start":1790897654455,"end":1790897654465}}}');
 insert into part values ('p6', 'm2', '{"type":"tool","callID":"call_w","declarationIndex":0,"tool":"Write","state":{"status":"completed","input":{"file_path":"/tmp/proj-zcode/NOTES.md","content":"backoff doubles on every failed attempt\n"},"title":"Write","time":{"start":1790897655000,"end":1790897655010}}}');
 `
-	if out, err := exec.Command("sqlite3", db, schema).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, schema).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}
 	ss, err := ParseZCodeDB(db)

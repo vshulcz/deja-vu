@@ -137,7 +137,7 @@ func TestDisabledEscapeHatch(t *testing.T) {
 }
 
 func TestRedactionGapFixes(t *testing.T) {
-	leaks := map[string]string{
+	leaks := map[string]string{ //nolint:gosec // fake secrets the test redacts
 		"empty-user redis url":  "redis://:s3cr3tpassword@cache.example.com:6379",
 		"empty-user pg url":     "postgres://:mypassword123456@db:5432/app",
 		"http basic auth":       "Authorization: Basic dXNlcm5hbWU6cGFzc3dvcmQxMjM0",

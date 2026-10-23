@@ -56,10 +56,10 @@ func TestImportNamesAPlumbingOnlySessionTheSameWay(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), []byte(string(b)+"\n"), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), []byte(string(b)+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Import(filepath.Join(dir, "index"), exp); err != nil {
+	if _, err = Import(filepath.Join(dir, "index"), exp); err != nil {
 		t.Fatal(err)
 	}
 	ss, err := Recent(filepath.Join(dir, "index"), 10)

@@ -24,7 +24,7 @@ func TestWriteBackCodeWhaleRoundTrips(t *testing.T) {
 	if f.Path != path || f.Turns != 3 {
 		t.Fatalf("got %s with %d turns", f.Path, f.Turns)
 	}
-	if err := os.WriteFile(path, f.Data, 0o600); err != nil {
+	if err = os.WriteFile(path, f.Data, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	ss, err := ParseCodeWhaleFile(path)

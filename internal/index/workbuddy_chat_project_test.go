@@ -47,10 +47,10 @@ func TestStaleIndexRefilesAWorkBuddyChatUnderItsRoot(t *testing.T) {
 	meta.Project = "WorkBuddy AI/2026-10-05-14-52-46"
 	m.Sessions[key] = meta
 	m.Version = 66
-	if err := writeManifest(dir, m); err != nil {
+	if err = writeManifest(dir, m); err != nil {
 		t.Fatal(err)
 	}
-	if err := EnsureForSearch(dir, o, false, nil); err != nil {
+	if err = EnsureForSearch(dir, o, false, nil); err != nil {
 		t.Fatal(err)
 	}
 	if m, err = readManifest(dir); err != nil {

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -16,7 +15,7 @@ import (
 // fires after. The turns before that entry stay in the file.
 func pifamilySessionFile(t *testing.T, host, workspace, id string) string {
 	t.Helper()
-	cwd, _ := json.Marshal(workspace)
+	cwd := mustMarshal(t, workspace)
 	header := `{"type":"session","version":3,"id":"` + id + `","timestamp":"2026-10-07T10:18:19.235Z","cwd":` + string(cwd) + `}`
 	call := `{"type":"toolCall","id":"call_1","name":"bash","arguments":{"command":"go test ./parser/..."}}`
 	result := `{"role":"toolResult","toolCallId":"call_1","toolName":"bash","content":[{"type":"text","text":"--- FAIL: TestParseSeed\nwant 3, got 4\nFAIL\n\n\nCommand exited with code 1"}],"details":{},"isError":true,"timestamp":1791368300097}`

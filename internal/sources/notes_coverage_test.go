@@ -61,7 +61,7 @@ func TestNormalizeTagsDropsNoise(t *testing.T) {
 	}
 	// The cap exists so one note cannot flood tag matching.
 	many := make([]string, 0, 12)
-	for i := 0; i < 12; i++ {
+	for i := range 12 {
 		many = append(many, string(rune('a'+i)))
 	}
 	if n := len(NormalizeTags(many)); n > 8 {

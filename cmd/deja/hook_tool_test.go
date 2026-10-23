@@ -95,7 +95,7 @@ func TestToolHookFileLineIsScopedToTheProject(t *testing.T) {
 		})
 	}
 	// Six sessions in each of two projects, both editing a file named config.go.
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		touch("alpha", "/work/alpha", "al"+string(rune('0'+i)))
 		touch("beta", "/work/beta", "be"+string(rune('0'+i)))
 	}
@@ -126,7 +126,7 @@ func TestToolHookIgnoresNonEditingTools(t *testing.T) {
 	tmp := hermeticEnv(t)
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		id := "s" + string(rune('0'+i))
 		writeClaudeFixture(t, filepath.Join(root, "alpha", id+".jsonl"), id, []string{
 			`{"type":"user","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"edit"}}`,
@@ -156,7 +156,7 @@ func TestToolHookSpeaksForALowercaseRead(t *testing.T) {
 	tmp := hermeticEnv(t)
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		id := "s" + string(rune('0'+i))
 		writeClaudeFixture(t, filepath.Join(root, "alpha", id+".jsonl"), id, []string{
 			`{"type":"user","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"edit"}}`,
@@ -196,7 +196,7 @@ func TestToolHookFileScopingIsLoadBearing(t *testing.T) {
 	tmp := hermeticEnv(t)
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		id := "s" + string(rune('0'+i))
 		writeClaudeFixture(t, filepath.Join(root, "alpha", id+".jsonl"), id, []string{
 			`{"type":"user","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"edit"}}`,
@@ -227,7 +227,7 @@ func TestToolHookReadsTheFileFromAnApplyPatch(t *testing.T) {
 	tmp := hermeticEnv(t)
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		id := "s" + string(rune('0'+i))
 		writeClaudeFixture(t, filepath.Join(root, "alpha", id+".jsonl"), id, []string{
 			`{"type":"user","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"edit"}}`,
@@ -239,13 +239,16 @@ func TestToolHookReadsTheFileFromAnApplyPatch(t *testing.T) {
 	}
 	t.Setenv("CLAUDE_PROJECT_DIR", "/work/alpha")
 	patch := "*** Begin Patch\n*** Update File: /work/alpha/config.go\n@@\n+x\n*** End Patch\n"
-	payloadBytes, _ := json.Marshal(map[string]any{
+	payloadBytes, jerr := json.Marshal(map[string]any{
 		"hook_event_name": "PreToolUse",
 		"tool_name":       "apply_patch",
 		"tool_input":      map[string]any{"command": patch},
 		"session_id":      "now",
 		"cwd":             "/work/alpha",
 	})
+	if jerr != nil {
+		t.Fatal(jerr)
+	}
 	out := toolHookRun(t, string(payloadBytes))
 	if out == "" {
 		t.Fatal("apply_patch on a file with history produced no line")
@@ -262,10 +265,13 @@ func TestToolHookReadsTheFileFromAnApplyPatch(t *testing.T) {
 	}
 	// A patch that only touches a file with no history stays silent.
 	noHist := "*** Begin Patch\n*** Add File: /work/alpha/brandnew.go\n@@\n+package p\n*** End Patch\n"
-	nb, _ := json.Marshal(map[string]any{
+	nb, jerr := json.Marshal(map[string]any{
 		"hook_event_name": "PreToolUse", "tool_name": "apply_patch",
 		"tool_input": map[string]any{"command": noHist}, "session_id": "now2", "cwd": "/work/alpha",
 	})
+	if jerr != nil {
+		t.Fatal(jerr)
+	}
 	if got := toolHookRun(t, string(nb)); got != "" {
 		t.Errorf("apply_patch on a file with no history spoke: %q", got)
 	}
@@ -279,7 +285,7 @@ func TestToolHookReadsTheFileFromAShellApplyPatch(t *testing.T) {
 	tmp := hermeticEnv(t)
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		id := "s" + string(rune('0'+i))
 		writeClaudeFixture(t, filepath.Join(root, "alpha", id+".jsonl"), id, []string{
 			`{"type":"user","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"edit"}}`,
@@ -291,10 +297,13 @@ func TestToolHookReadsTheFileFromAShellApplyPatch(t *testing.T) {
 	}
 	t.Setenv("CLAUDE_PROJECT_DIR", "/work/alpha")
 	run := func(cmd string) string {
-		b, _ := json.Marshal(map[string]any{
+		b, jerr := json.Marshal(map[string]any{
 			"hook_event_name": "PreToolUse", "tool_name": "Bash",
 			"tool_input": map[string]any{"command": cmd}, "session_id": "now", "cwd": "/work/alpha",
 		})
+		if jerr != nil {
+			t.Fatal(jerr)
+		}
 		return toolHookRun(t, string(b))
 	}
 	out := run("apply_patch <<'EOF'\n*** Begin Patch\n*** Update File: config.go\n@@\n+x\n*** End Patch\nEOF")
@@ -316,7 +325,7 @@ func TestToolHookFileLineCarriesThePriorDecision(t *testing.T) {
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
 	// Five plain edits so the file clears the history threshold.
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		id := "s" + string(rune('0'+i))
 		writeClaudeFixture(t, filepath.Join(root, "alpha", id+".jsonl"), id, []string{
 			`{"type":"user","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"edit"}}`,
@@ -356,7 +365,7 @@ func TestToolHookFileLineSkipsARevertedDecision(t *testing.T) {
 	tmp := hermeticEnv(t)
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		id := "s" + string(rune('0'+i))
 		writeClaudeFixture(t, filepath.Join(root, "alpha", id+".jsonl"), id, []string{
 			`{"type":"user","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"edit"}}`,

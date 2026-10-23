@@ -28,7 +28,7 @@ func TestCursorIncrementalKeepsUntouchedSessions(t *testing.T) {
 insert or replace into cursorDiskKV values
  ('composerData:old', json('{"composerId":"old","name":"Old chat","createdAt":1752600000000,"lastUpdatedAt":1752600100000,"fullConversationHeadersOnly":[{"bubbleId":"b1","type":1}]}')),
  ('bubbleId:old:b1', json('{"type":1,"text":"oldsessionfact about the pager","timestamp":1752600001000,"workspaceProjectDir":"/w/app"}'))` + extra + `;`
-		if out, err := exec.Command("sqlite3", db, schema).CombinedOutput(); err != nil {
+		if out, err := exec.CommandContext(t.Context(), "sqlite3", db, schema).CombinedOutput(); err != nil {
 			t.Fatalf("seed: %v: %s", err, out)
 		}
 	}

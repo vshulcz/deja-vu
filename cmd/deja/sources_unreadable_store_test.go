@@ -27,7 +27,7 @@ create table part(id text, message_id text, data text);
 insert into session values('s1','/w','2026-01-02T03:00:00Z','2026-01-03T03:00:00Z');
 insert into message values('m1','s1',1767409200000,'{"role":"user"}');
 insert into part values('p1','m1','{"type":"text","text":"why does the pager stall"}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
 	home := filepath.Join(tmp, "home")
@@ -41,7 +41,7 @@ insert into part values('p1','m1','{"type":"text","text":"why does the pager sta
 		t.Fatal(err)
 	}
 	out := captureStdout(t, func() { printSources(filepath.Join(tmp, "index.db")) })
-	for _, l := range strings.Split(out, "\n") {
+	for l := range strings.SplitSeq(out, "\n") {
 		if !strings.HasPrefix(l, "opencode\t") {
 			continue
 		}

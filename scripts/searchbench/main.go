@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -53,7 +53,7 @@ func main() {
 		}
 		var ds []time.Duration
 		hits := 0
-		for i := 0; i < *runs; i++ {
+		for range *runs {
 			start := time.Now()
 			r, err := index.Search(dir, o)
 			ds = append(ds, time.Since(start))
@@ -63,12 +63,12 @@ func main() {
 			}
 			hits = len(r)
 		}
-		sort.Slice(ds, func(i, j int) bool { return ds[i] < ds[j] })
+		slices.Sort(ds)
 		all = append(all, ds...)
 		fmt.Printf("  %-38q %4d hits · median %7.2f ms · p90 %7.2f ms\n",
 			q, hits, ms(ds[len(ds)/2]), ms(ds[len(ds)*9/10]))
 	}
-	sort.Slice(all, func(i, j int) bool { return all[i] < all[j] })
+	slices.Sort(all)
 	fmt.Printf("overall median %.2f ms · p90 %.2f ms · %d samples\n",
 		ms(all[len(all)/2]), ms(all[len(all)*9/10]), len(all))
 }

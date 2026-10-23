@@ -112,6 +112,7 @@ func injectedKind(kind string) bool {
 // why an empty recall still serves the sentence that says so.
 func (e Event) FoundNothing() bool { return e.Empty && !injectedKind(e.Kind) }
 
+// Event is one line of the usage log.
 type Event struct {
 	Time     time.Time `json:"t"`
 	Kind     string    `json:"kind"`
@@ -162,6 +163,7 @@ type Event struct {
 	CompactionError string `json:"compaction_error,omitempty"`
 }
 
+// Summary is the usage log totalled.
 type Summary struct {
 	// Recalls counts agent-initiated recalls only. Injections are counted
 	// separately and printed on their own line — folding them into Recalls
@@ -715,11 +717,11 @@ func stampPrefix(line string) (string, bool) {
 		return "", false
 	}
 	rest := line[len(prefix):]
-	end := strings.IndexByte(rest, '"')
-	if end < 0 {
+	before, _, ok := strings.Cut(rest, "\"")
+	if !ok {
 		return "", false
 	}
-	stamp := rest[:end]
+	stamp := before
 	// Only the shape the writer emits: UTC, with the trailing Z, and long
 	// enough to carry whole seconds. An offset like +02:00 sorts by its digits
 	// rather than by when it happened.
@@ -902,7 +904,10 @@ func skipRotation(p string, size int64) bool {
 	if !ok {
 		return false
 	}
-	m := v.(rotationMemo)
+	m, ok := v.(rotationMemo)
+	if !ok {
+		return false
+	}
 	now := time.Now().UTC()
 	// A memo is about the events one read saw. An event stamped in the past —
 	// a clock that stepped back, a log carried from another machine — arrives

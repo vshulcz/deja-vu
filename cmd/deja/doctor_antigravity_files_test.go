@@ -44,7 +44,7 @@ func TestDoctorNamesAnUnreadAntigravityTranscriptButNotItsBookkeeping(t *testing
 		t.Helper()
 		var buf bytes.Buffer
 		doctorHarnesses(&buf, t.TempDir())
-		for _, l := range strings.Split(buf.String(), "\n") {
+		for l := range strings.SplitSeq(buf.String(), "\n") {
 			if strings.Contains(l, "antigravity") && strings.Contains(l, "file") {
 				return l
 			}
@@ -96,7 +96,7 @@ func TestDoctorNamesAnAntigravityTranscriptInTheWrongPlace(t *testing.T) {
 
 	var buf bytes.Buffer
 	doctorHarnesses(&buf, t.TempDir())
-	for _, l := range strings.Split(buf.String(), "\n") {
+	for l := range strings.SplitSeq(buf.String(), "\n") {
 		if strings.Contains(l, "antigravity") && strings.Contains(l, "file") {
 			if !strings.Contains(l, "2 not recognised here") {
 				t.Errorf("row = %q, want both the restored transcript and the session whose only log is the full one", l)

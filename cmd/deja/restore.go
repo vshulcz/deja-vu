@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -60,20 +61,20 @@ func runRestore(dir string, args []string, stdout io.Writer) error {
 			// went to stdout while the reader believed it had been written
 			// (#2253).
 			if i+1 >= len(args) {
-				return fmt.Errorf("restore: --span needs value")
+				return errors.New("restore: --span needs value")
 			}
 			i++
-			n, err := strconv.Atoi(args[i])
+			n, err := strconv.Atoi(args[i]) //nolint:gosec // G602: i+1 < len(args) checked above
 			if err != nil || n <= 0 {
-				return fmt.Errorf("restore: --span wants a positive number, got %q", args[i])
+				return fmt.Errorf("restore: --span wants a positive number, got %q", args[i]) //nolint:gosec // G602: i+1 < len(args) checked above
 			}
 			want = n
 		case "-o", "--out":
 			if i+1 >= len(args) {
-				return fmt.Errorf("restore: -o needs value")
+				return errors.New("restore: -o needs value")
 			}
 			i++
-			out = args[i]
+			out = args[i] //nolint:gosec // G602: i+1 < len(args) checked above
 		default:
 			if strings.HasPrefix(args[i], "-") {
 				return unknownFlag("restore", args[i], restoreFlags)
@@ -88,7 +89,7 @@ func runRestore(dir string, args []string, stdout io.Writer) error {
 		}
 	}
 	if path == "" {
-		return fmt.Errorf("usage: deja restore <path> [--span n] [-o file] [--force] [--all]")
+		return errors.New("usage: deja restore <path> [--span n] [-o file] [--force] [--all]")
 	}
 
 	spans, err := findRestoreSpans(dir, path)
@@ -334,7 +335,7 @@ func printRestoreRows(w io.Writer, spans []restoreSpan) {
 // restorePreview is the first line of a span with something on it, folded to
 // one line and kept short: enough to tell the spans apart.
 func restorePreview(body string) string {
-	for _, l := range strings.Split(body, "\n") {
+	for l := range strings.SplitSeq(body, "\n") {
 		if l = strings.Join(strings.Fields(l), " "); l != "" {
 			return cutToWidth(search.SafeLine(l), 60)
 		}

@@ -19,6 +19,7 @@ func ExcludePath() string {
 	return filepath.Join(ConfigDir(), "exclude")
 }
 
+// ExclusionPatterns reads the project globs the user excluded from the index.
 func ExclusionPatterns() []string {
 	var out []string
 	read := func(path string) {
@@ -36,7 +37,7 @@ func ExclusionPatterns() []string {
 		}
 	}
 	read(ExcludePath())
-	for _, pattern := range strings.Split(os.Getenv("DEJA_EXCLUDE_PROJECTS"), ",") {
+	for pattern := range strings.SplitSeq(os.Getenv("DEJA_EXCLUDE_PROJECTS"), ",") {
 		if pattern = strings.TrimSpace(pattern); pattern != "" {
 			out = append(out, strings.ToLower(pattern))
 		}
@@ -72,13 +73,13 @@ const harnessExcludePrefix = "harness:"
 func ExcludedHarnesses() map[string]bool {
 	out := map[string]bool{}
 	for _, pattern := range ExclusionPatterns() {
-		if name := strings.TrimPrefix(pattern, harnessExcludePrefix); name != pattern {
+		if name, ok := strings.CutPrefix(pattern, harnessExcludePrefix); ok {
 			if name = strings.TrimSpace(name); name != "" {
 				out[name] = true
 			}
 		}
 	}
-	for _, name := range strings.Split(os.Getenv("DEJA_EXCLUDE_HARNESSES"), ",") {
+	for name := range strings.SplitSeq(os.Getenv("DEJA_EXCLUDE_HARNESSES"), ",") {
 		if name = strings.ToLower(strings.TrimSpace(name)); name != "" {
 			out[name] = true
 		}
@@ -94,10 +95,13 @@ func HarnessExcluded(name string) bool { return ExcludedHarnesses()[strings.ToLo
 // on a large batch.
 type Excluder struct{ patterns []string }
 
+// NewExcluder builds an Excluder from the current exclusion patterns.
 func NewExcluder() Excluder { return Excluder{patterns: ExclusionPatterns()} }
 
+// Empty reports whether no pattern is set.
 func (e Excluder) Empty() bool { return len(e.patterns) == 0 }
 
+// Match reports whether project matches an exclusion pattern.
 func (e Excluder) Match(project string) bool {
 	// Sync-imported sessions are stored as "imported:<project>"; a glob
 	// written for the local name must still match after the trip.
@@ -124,6 +128,7 @@ func (e Excluder) Match(project string) bool {
 	return false
 }
 
+// ExcludedProject reports whether project is excluded.
 func ExcludedProject(project string) bool { return NewExcluder().Match(project) }
 
 // ExclusionFingerprint identifies the pattern set in force, so an index can
@@ -214,6 +219,7 @@ func CountMessages(ss []model.Session) int {
 	return n
 }
 
+// FilterSessions drops the sessions whose project is excluded.
 func FilterSessions(ss []model.Session) []model.Session {
 	ex := NewExcluder()
 	if ex.Empty() {

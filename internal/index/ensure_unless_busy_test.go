@@ -38,9 +38,9 @@ func TestEnsureUnlessBusyWaitsOnlyWhenThereIsNothingToRead(t *testing.T) {
 	}
 	done := make(chan bool, 1)
 	go func() {
-		busy, err := EnsureUnlessBusy(built, nil)
-		if err != nil {
-			t.Errorf("held lock over a built index: %v", err)
+		busy, ensureErr := EnsureUnlessBusy(built, nil)
+		if ensureErr != nil {
+			t.Errorf("held lock over a built index: %v", ensureErr)
 		}
 		done <- busy
 	}()
@@ -60,9 +60,9 @@ func TestEnsureUnlessBusyWaitsOnlyWhenThereIsNothingToRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	go func() {
-		busy, err := EnsureUnlessBusy(empty, nil)
-		if err != nil {
-			t.Errorf("first build: %v", err)
+		busy, ensureErr := EnsureUnlessBusy(empty, nil)
+		if ensureErr != nil {
+			t.Errorf("first build: %v", ensureErr)
 		}
 		done <- busy
 	}()
@@ -87,7 +87,7 @@ func TestEnsureUnlessBusyWaitsOnlyWhenThereIsNothingToRead(t *testing.T) {
 
 	// A record log shorter than the manifest says: the sessions are listed but
 	// their messages are gone, so `show` would print an empty session.
-	if err := os.Truncate(filepath.Join(built, "records.bin"), 0); err != nil {
+	if err = os.Truncate(filepath.Join(built, "records.bin"), 0); err != nil {
 		t.Fatal(err)
 	}
 	unlock, err = lockDir(built)
@@ -95,9 +95,9 @@ func TestEnsureUnlessBusyWaitsOnlyWhenThereIsNothingToRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	go func() {
-		busy, err := EnsureUnlessBusy(built, nil)
-		if err != nil {
-			t.Errorf("torn record log: %v", err)
+		busy, ensureErr := EnsureUnlessBusy(built, nil)
+		if ensureErr != nil {
+			t.Errorf("torn record log: %v", ensureErr)
 		}
 		done <- busy
 	}()

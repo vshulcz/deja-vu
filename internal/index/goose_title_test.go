@@ -3,6 +3,7 @@ package index
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -33,9 +34,11 @@ func TestGooseDescriptionArrivesAfterTheFirstPass(t *testing.T) {
 	}
 	write := func(lines ...string) {
 		body := ""
+		var bodySb36 strings.Builder
 		for _, l := range lines {
-			body += l + "\n"
+			bodySb36.WriteString(l + "\n")
 		}
+		body += bodySb36.String()
 		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -57,7 +60,7 @@ func TestGooseDescriptionArrivesAfterTheFirstPass(t *testing.T) {
 	write(header("pgbouncer pool sizing"),
 		turn("user", "the pool starves under load", "2026-08-01T10:00:00Z"),
 		turn("assistant", "raised pool_size to 40", "2026-08-01T10:05:00Z"))
-	if err := Ensure(dir, "", false, nil); err != nil {
+	if err = Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	m, err = readManifest(dir)
@@ -67,7 +70,7 @@ func TestGooseDescriptionArrivesAfterTheFirstPass(t *testing.T) {
 	incremental := m.Sessions["goose:g1"].Title
 
 	// What the same store says after a rebuild, which reads the header again.
-	if err := Ensure(dir, "", true, nil); err != nil {
+	if err = Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	m, err = readManifest(dir)

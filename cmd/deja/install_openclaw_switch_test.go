@@ -53,10 +53,10 @@ func TestOpenClawUninstallGivesTheSwitchBack(t *testing.T) {
 			if err := os.WriteFile(path, []byte(tc.seed+"\n"), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := setOpenClawHookEnabled(true); err != nil {
+			if err := setOpenClawHookEnabled(true); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := setOpenClawHookEnabled(false); err != nil {
+			if err := setOpenClawHookEnabled(false); err != nil {
 				t.Fatal(err)
 			}
 			b, err := os.ReadFile(path)

@@ -146,8 +146,8 @@ func setVSCodeExtensionEntry(extDir, dirName string, uninstall bool) (string, er
 	}
 	var entries []json.RawMessage
 	if len(strings.TrimSpace(string(old))) > 0 {
-		if err := json.Unmarshal(old, &entries); err != nil {
-			return "", configParseError(path, err)
+		if uerr := json.Unmarshal(old, &entries); uerr != nil {
+			return "", configParseError(path, uerr)
 		}
 	}
 	entry, err := json.Marshal(map[string]any{

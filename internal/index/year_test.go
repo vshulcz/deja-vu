@@ -55,7 +55,7 @@ func yearStore(t *testing.T) (dir string, from time.Time) {
 	// Older than the window, and a tree the ignore rule covers: neither is in
 	// any figure.
 	write("keep", "k4", old, edit("/w/keep/ancient.go")+","+bash("make release"))
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		write("scratch", fmt.Sprintf("s%d", i), recent,
 			edit("/w/scratch/tmp.go")+","+bash("rm -rf /w/scratch/build"))
 	}

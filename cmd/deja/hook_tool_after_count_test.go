@@ -26,7 +26,7 @@ func TestTheAfterHookSaysHowOftenTheErrorCameUp(t *testing.T) {
 	}
 	wall := "psql: error: connection to the orders migration database failed: Connection refused"
 	now := time.Now().UTC()
-	for k := 0; k < 12; k++ {
+	for k := range 12 {
 		at := now.Add(-time.Duration(600-20*k) * time.Minute).Format(time.RFC3339)
 		var lines []string
 		add := func(role string, content any) {

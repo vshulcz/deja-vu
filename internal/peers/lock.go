@@ -50,7 +50,7 @@ const (
 // let a second writer through: measured under sixteen concurrent writers, one
 // machine's row was lost from the peer list every run. Elsewhere the create is
 // atomic and this never fires.
-func lockHeldElsewhere(err error) bool {
+func lockHeldElsewhere(err error) bool { //nolint:unparam,nolintlint // true only on windows, so unparam fires everywhere else
 	var errno syscall.Errno
 	if !errors.As(err, &errno) {
 		return false
@@ -79,7 +79,7 @@ func withLock(fn func() error) error {
 		f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 		if err == nil {
 			_ = f.Close()
-			defer func() { _ = os.Remove(path) }()
+			defer func() { _ = os.Remove(path) }() //nolint:gocritic // returns on the next line
 			return fn()
 		}
 		if !errors.Is(err, fs.ErrExist) && !lockHeldElsewhere(err) {

@@ -54,7 +54,7 @@ func TestClientShapesAndErrors(t *testing.T) {
 	}
 	for name, body := range map[string]string{"bad json": "{", "wrong count": `{"data":[]}`} {
 		t.Run(name, func(t *testing.T) {
-			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(body)) }))
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(body)) }))
 			defer ts.Close()
 			if _, err := (&Client{URL: ts.URL, Model: "test"}).Embed(context.Background(), []string{"x"}); err == nil {
 				t.Fatal("expected response error")
@@ -83,16 +83,16 @@ func TestNewExplicitAndProbeOrder(t *testing.T) {
 		t.Fatal("IsOllama classified endpoint incorrectly")
 	}
 	for body, wantErr := range map[string]bool{`{"embeddings":[]}`: true, `{"embeddings":[[]]}`: true, `{"embeddings":[[1]]}`: false} {
-		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(body)) }))
-		c := &Client{URL: ts.URL, Model: "m"}
-		err := c.probe()
-		if (err != nil) != wantErr {
-			t.Fatalf("probe body %s err=%v", body, err)
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(body)) }))
+		probeClient := &Client{URL: ts.URL, Model: "m"}
+		probeErr := probeClient.probe()
+		if (probeErr != nil) != wantErr {
+			t.Fatalf("probe body %s err=%v", body, probeErr)
 		}
 		ts.Close()
 	}
 	first := httptest.NewServer(http.NotFoundHandler())
-	second := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(`{"embeddings":[[1]]}`)) }))
+	second := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(`{"embeddings":[[1]]}`)) }))
 	defer first.Close()
 	defer second.Close()
 	t.Setenv("DEJA_EMBED_URL", "")
@@ -123,7 +123,7 @@ func TestSidecarRoundTripCorruptAndRerank(t *testing.T) {
 	}
 	hits := []search.Hit{{Session: session("a"), Score: 2}, {Session: session("b"), Score: 1}}
 	client := &Client{URL: "", Model: "m", HTTP: http.DefaultClient}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(`{"data":[{"embedding":[1,0]}]}`)) }))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(`{"data":[{"embedding":[1,0]}]}`)) }))
 	defer server.Close()
 	client.URL = server.URL
 	ranked, err := Rerank(context.Background(), hits, "q", got, client)
@@ -217,7 +217,7 @@ func TestEmbedIndexRoundTripAndWatermark(t *testing.T) {
 }
 
 func TestRerankUsesBestDuplicateAndRejectsEmptyQueryVector(t *testing.T) {
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(`{"data":[{"embedding":[1,0]}]}`)) }))
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(`{"data":[{"embedding":[1,0]}]}`)) }))
 	defer s.Close()
 	hits := []search.Hit{{Session: session("a"), Score: 10}, {Session: session("b"), Score: 0}}
 	sidecar := Sidecar{Vectors: []Vector{{Key: "claude:a", Values: []float32{-1, 0}}, {Key: "claude:a", Values: []float32{1, 0}}, {Key: "claude:b", Values: []float32{0, 1}}}}
@@ -225,14 +225,14 @@ func TestRerankUsesBestDuplicateAndRejectsEmptyQueryVector(t *testing.T) {
 	if err != nil || got[0].Session.ID != "a" || got[0].Score != 1 {
 		t.Fatalf("rerank = %#v, %v", got, err)
 	}
-	var many []search.Hit
-	for i := 0; i < 65; i++ {
+	many := make([]search.Hit, 0, 65)
+	for i := range 65 {
 		many = append(many, search.Hit{Session: session("a"), Score: float64(i)})
 	}
 	if _, err := Rerank(context.Background(), many, "q", sidecar, &Client{URL: s.URL}); err != nil {
 		t.Fatal(err)
 	}
-	empty := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(`{"data":[]}`)) }))
+	empty := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(`{"data":[]}`)) }))
 	defer empty.Close()
 	if _, err := Rerank(context.Background(), hits, "q", sidecar, &Client{URL: empty.URL}); err == nil {
 		t.Fatal("expected empty query vector error")
@@ -279,13 +279,13 @@ func TestSemanticSearchFiltersRanksAndCaps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := write(dir, Sidecar{Generation: gen, Dim: 2, Vectors: []Vector{
+	if err = write(dir, Sidecar{Generation: gen, Dim: 2, Vectors: []Vector{
 		{Offset: records[0].Offset, Key: records[0].Record.Key, Values: []float32{1, 0}},
 		{Offset: records[1].Offset, Key: records[1].Record.Key, Values: []float32{0.8, 0.6}},
 	}}); err != nil {
 		t.Fatal(err)
 	}
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"embeddings":[[1,0]]}`))
 	}))
 	defer ts.Close()
@@ -299,7 +299,7 @@ func TestSemanticSearchFiltersRanksAndCaps(t *testing.T) {
 	if _, err := SemanticSearch(context.Background(), dir, search.Options{Query: "q", All: true}, Sidecar{}, &Client{URL: "http://127.0.0.1:1", HTTP: &http.Client{}}); err == nil {
 		t.Fatal("endpoint failure was ignored")
 	}
-	badVector := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	badVector := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"embeddings":[[1],[2]]}`))
 	}))
 	defer badVector.Close()

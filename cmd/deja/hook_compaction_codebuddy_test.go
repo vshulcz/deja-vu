@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -21,7 +20,7 @@ func TestCodeBuddyCompactionPacketWaitsForThePrompt(t *testing.T) {
 	hostsNoWarmup(t)
 	workspace := compactionGitRepo(t)
 	dir := index.DefaultDir()
-	ws, _ := json.Marshal(workspace)
+	ws := mustMarshal(t, workspace)
 	transcript := filepath.Join(sources.CodeBuddyRoot(), "-work-app", "cb-1.jsonl")
 	compactionWrite(t, transcript, strings.ReplaceAll(strings.Join([]string{
 		`{"id":"u1","timestamp":1791187200000,"type":"message","role":"user","content":[{"type":"input_text","text":"fix the parser test"}],"sessionId":"cb-1","cwd":WS}`,
@@ -30,7 +29,7 @@ func TestCodeBuddyCompactionPacketWaitsForThePrompt(t *testing.T) {
 		`{"id":"m2","timestamp":1791187203000,"type":"message","role":"assistant","content":[{"type":"output_text","text":"The parser test fails: want 3, got 4. I decided to fix parse.go next."}],"sessionId":"cb-1","cwd":WS}`,
 	}, "\n")+"\n", "WS", string(ws)))
 
-	pre, _ := json.Marshal(map[string]any{"session_id": "cb-1", "transcript_path": transcript, "cwd": workspace, "hook_event_name": "PreCompact", "trigger": "manual"})
+	pre := mustMarshal(t, map[string]any{"session_id": "cb-1", "transcript_path": transcript, "cwd": workspace, "hook_event_name": "PreCompact", "trigger": "manual"})
 	withHookStdin(t, string(pre))
 	runHookPrecompact(dir)
 	if _, found, err := index.Compaction(dir, "cb-1", workspace); err != nil || !found {
@@ -39,7 +38,7 @@ func TestCodeBuddyCompactionPacketWaitsForThePrompt(t *testing.T) {
 
 	// CodeBuddy's SessionStart payload carries no cwd; the hook runs in it.
 	t.Chdir(workspace)
-	start, _ := json.Marshal(map[string]any{"session_id": "cb-1", "transcript_path": transcript, "hook_event_name": "SessionStart", "source": "compact"})
+	start := mustMarshal(t, map[string]any{"session_id": "cb-1", "transcript_path": transcript, "hook_event_name": "SessionStart", "source": "compact"})
 	withHookStdin(t, string(start))
 	out := captureStdout(t, func() {
 		if err := runHookContextMode(dir, false, false); err != nil {

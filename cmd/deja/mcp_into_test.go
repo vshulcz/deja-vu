@@ -28,7 +28,7 @@ func TestAnMCPAnswerNamesTheConnectionItWentTo(t *testing.T) {
 	t.Setenv("DEJA_INDEX_DIR", dir)
 
 	call := `{"jsonrpc":"2.0","id":"r","method":"tools/call","params":{"name":"recall","arguments":{"query":"frobnicator"}}}` + "\n"
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		var out bytes.Buffer
 		if err := serveMCP(index.DefaultDir(), strings.NewReader(call), &out); err != nil {
 			t.Fatal(err)
@@ -58,7 +58,7 @@ func recallReceivers(t *testing.T, dir string) []string {
 		t.Fatalf("no usage log: %v", err)
 	}
 	var out []string
-	for _, line := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(string(b)), "\n") {
 		var e struct {
 			Kind string `json:"kind"`
 			Into string `json:"into"`

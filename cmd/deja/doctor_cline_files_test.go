@@ -35,7 +35,7 @@ func TestDoctorNamesAnUnreadClineTranscriptButNotItsManifest(t *testing.T) {
 		t.Helper()
 		var buf bytes.Buffer
 		doctorHarnesses(&buf, t.TempDir())
-		for _, l := range strings.Split(buf.String(), "\n") {
+		for l := range strings.SplitSeq(buf.String(), "\n") {
 			if strings.Contains(l, "cline") && strings.Contains(l, "file") {
 				return l
 			}
@@ -77,7 +77,7 @@ func TestDoctorCountsAStrayFileUnderAClineLegacyRoot(t *testing.T) {
 
 	var buf bytes.Buffer
 	doctorHarnesses(&buf, t.TempDir())
-	for _, l := range strings.Split(buf.String(), "\n") {
+	for l := range strings.SplitSeq(buf.String(), "\n") {
 		if strings.Contains(l, "cline") && strings.Contains(l, "file") {
 			if !strings.Contains(l, "1 not recognised here") {
 				t.Errorf("row = %q, want the stray file under the legacy root counted", l)

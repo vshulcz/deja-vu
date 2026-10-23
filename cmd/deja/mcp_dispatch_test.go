@@ -116,6 +116,7 @@ func (h *slowHandler) gate(q string) chan struct{} {
 }
 
 func (h *slowHandler) install(t *testing.T) {
+	t.Helper()
 	saved := mcpHandler
 	mcpHandler = func(dir string, req rpcRequest) (any, int, string) {
 		if req.Method != "tools/call" {
@@ -135,6 +136,7 @@ func (h *slowHandler) install(t *testing.T) {
 }
 
 func setDeadline(t *testing.T, d time.Duration) {
+	t.Helper()
 	saved := mcpDeadline
 	mcpDeadline = d
 	t.Cleanup(func() { mcpDeadline = saved })
@@ -207,7 +209,7 @@ func TestACancelledCallIsNotRunAndNotAnswered(t *testing.T) {
 	setDeadline(t, 0)
 	s := openMCPSession(t, t.TempDir())
 	// Fill every worker so the next call queues.
-	for i := 0; i < mcpWorkers; i++ {
+	for i := range mcpWorkers {
 		s.call(10+i, fmt.Sprintf(`{"mode":"recall","query":"busy%d"}`, i))
 	}
 	deadline := time.Now().Add(2 * time.Minute)
@@ -223,11 +225,11 @@ func TestACancelledCallIsNotRunAndNotAnswered(t *testing.T) {
 		t.Fatalf("ping reply = %#v", got)
 	}
 	close(h.gate("queued"))
-	for i := 0; i < mcpWorkers; i++ {
+	for i := range mcpWorkers {
 		close(h.gate(fmt.Sprintf("busy%d", i)))
 	}
 	seen := map[int]bool{}
-	for i := 0; i < mcpWorkers; i++ {
+	for range mcpWorkers {
 		got := s.next(2 * time.Minute)
 		if got == nil {
 			t.Fatalf("missing reply after %v", seen)

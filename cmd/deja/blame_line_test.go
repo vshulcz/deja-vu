@@ -102,7 +102,7 @@ func TestBlameLineNamesTheSessionBehindTheLine(t *testing.T) {
 	}
 	git := func(args ...string) {
 		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		cmd := exec.CommandContext(t.Context(), "git", append([]string{"-C", repo}, args...)...)
 		cmd.Env = append(os.Environ(),
 			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
 			"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com")
@@ -179,12 +179,12 @@ func TestBlameLineNamesTheSessionBehindTheLine(t *testing.T) {
 	// The control, in the same repository: a commit whose removed lines no
 	// session wrote must say so rather than name the nearest session.
 	readme := filepath.Join(repo, "README.md")
-	if err := os.WriteFile(readme, []byte("# app\n\nrun it with make, and read docs/pool.md first\n"), 0o600); err != nil {
+	if err = os.WriteFile(readme, []byte("# app\n\nrun it with make, and read docs/pool.md first\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	git("add", "README.md")
 	git("commit", "-qm", "docs: a readme")
-	if err := os.WriteFile(readme, []byte("# app\n\nrun it with make, and read docs/shards.md first\n"), 0o600); err != nil {
+	if err = os.WriteFile(readme, []byte("# app\n\nrun it with make, and read docs/shards.md first\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	git("commit", "-aqm", "chore(deps): bump the docs link")

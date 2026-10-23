@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -19,11 +20,13 @@ func seedGrokDB(t *testing.T, db string, msgs [][2]string) {
 create table if not exists messages (session_id text, seq integer, role text, message_json text, created_at text);
 insert or replace into sessions values ('s1','w1','pool timeouts','/work/api','2026-01-01T10:00:00.000Z');
 `
+	var stmtsSb22 strings.Builder
 	for i, m := range msgs {
-		stmts += fmt.Sprintf("insert into messages values ('s1',%d,'user',json('{\"role\":\"user\",\"content\":\"%s\"}'),'%s');\n",
+		fmt.Fprintf(&stmtsSb22, "insert into messages values ('s1',%d,'user',json('{\"role\":\"user\",\"content\":\"%s\"}'),'%s');\n",
 			i, m[0], m[1])
 	}
-	if out, err := exec.Command("sqlite3", db, stmts).CombinedOutput(); err != nil {
+	stmts += stmtsSb22.String()
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, stmts).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}
 }
@@ -124,7 +127,7 @@ insert into sessions values ('busy','w1','busy','/work/api','2026-01-01T10:00:00
 insert into messages values ('quiet',0,'user',json('{"role":"user","content":"marker-grok-quiet"}'),'2026-01-01T09:00:00.000Z');
 insert into messages values ('busy',0,'user',json('{"role":"user","content":"marker-grok-busy"}'),'2026-01-01T10:00:00.000Z');
 `
-	if out, err := exec.Command("sqlite3", db, stmts).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, stmts).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}
 	dir := filepath.Join(tmp, "index.db")
@@ -146,7 +149,7 @@ insert into messages values ('busy',0,'user',json('{"role":"user","content":"mar
 	// Only the busy session gains a turn. The quiet one is not in what the
 	// store hands back, and it has to still be there afterwards.
 	add := `insert into messages values ('busy',1,'user',json('{"role":"user","content":"marker-grok-added"}'),'2026-01-01T11:00:00.000Z');`
-	if out, err := exec.Command("sqlite3", db, add).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, add).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 add: %v %s", err, out)
 	}
 	if err := Ensure(dir, "", false, nil); err != nil {
@@ -219,7 +222,7 @@ func TestATouchedGrokFileDoesNotCostTheDatabaseItsEarlierTurns(t *testing.T) {
 		t.Fatal(err)
 	}
 	add := `insert into messages values ('s1',9,'user',json('{"role":"user","content":"marker-grok-later"}'),'2026-01-01T12:00:00.000Z');`
-	if out, err := exec.Command("sqlite3", db, add).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, add).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 add: %v %s", err, out)
 	}
 	if err := Ensure(dir, "", false, nil); err != nil {

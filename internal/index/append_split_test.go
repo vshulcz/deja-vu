@@ -96,7 +96,7 @@ func TestATouchedTranscriptIsRecordedNotReread(t *testing.T) {
 		t.Fatal("control: a new mtime should make the index look stale before the pass")
 	}
 	var progress bytes.Buffer
-	if err := Ensure(dir, "", false, &progress); err != nil {
+	if err = Ensure(dir, "", false, &progress); err != nil {
 		t.Fatal(err)
 	}
 	if got := progress.String(); strings.Contains(got, replacementPassMarker) || strings.Contains(got, "updated") {
@@ -107,15 +107,15 @@ func TestATouchedTranscriptIsRecordedNotReread(t *testing.T) {
 	}
 	// What the read derived is still the index's: recording the mtime is not
 	// a reason to forget the file's redactions.
-	if after, err := Redactions(dir); err != nil || after.Files[same] != before.Files[same] {
-		t.Errorf("redactions for the touched file: %d, was %d (%v)", after.Files[same], before.Files[same], err)
+	if after, redactErr := Redactions(dir); redactErr != nil || after.Files[same] != before.Files[same] {
+		t.Errorf("redactions for the touched file: %d, was %d (%v)", after.Files[same], before.Files[same], redactErr)
 	}
 
 	// Touched beside a grown file: the pass is a plain append.
 	bumpMTime(t, same)
 	appendTo(t, grown, claudeLine("s-grown", "2026-01-02T04:00:00Z", "the billing webhook retries twice"))
 	progress.Reset()
-	if err := Ensure(dir, "", false, &progress); err != nil {
+	if err = Ensure(dir, "", false, &progress); err != nil {
 		t.Fatal(err)
 	}
 	if got := progress.String(); strings.Contains(got, replacementPassMarker) || !strings.Contains(got, "updated 1 file") {
@@ -211,11 +211,13 @@ func TestAMixedBatchSharingASessionMatchesRebuild(t *testing.T) {
 		{
 			name: "grown and rewritten",
 			id:   "s-x",
-			setup: func(t *testing.T, a, b, c string) {
+			setup: func(t *testing.T, a, b, _ string) {
+				t.Helper()
 				write(t, a, claudeLine("s-x", t0, "alpha one"))
 				write(t, b, claudeLine("s-x", t0, "alpha one")+claudeLine("s-x", t1, "beta cache"))
 			},
-			change: func(t *testing.T, a, b, c string) {
+			change: func(t *testing.T, a, b, _ string) {
+				t.Helper()
 				appendTo(t, a, claudeLine("s-x", t2, "alpha three"))
 				write(t, b, claudeLine("s-x", t0, "alpha one")+claudeLine("s-x", t1, "beta queue"))
 				bumpMTime(t, b)
@@ -224,12 +226,14 @@ func TestAMixedBatchSharingASessionMatchesRebuild(t *testing.T) {
 		{
 			name: "grown and a torn line finished",
 			id:   "s-x",
-			setup: func(t *testing.T, a, b, c string) {
+			setup: func(t *testing.T, a, b, _ string) {
+				t.Helper()
 				write(t, a, claudeLine("s-x", t0, "alpha one"))
 				line := claudeLine("s-x", t1, "beta cache")
 				write(t, b, claudeLine("s-x", t0, "alpha one")+line[:len(line)-10])
 			},
-			change: func(t *testing.T, a, b, c string) {
+			change: func(t *testing.T, a, b, _ string) {
+				t.Helper()
 				appendTo(t, a, claudeLine("s-x", t2, "alpha three"))
 				write(t, b, claudeLine("s-x", t0, "alpha one")+claudeLine("s-x", t1, "beta cache"))
 				bumpMTime(t, b)
@@ -238,11 +242,13 @@ func TestAMixedBatchSharingASessionMatchesRebuild(t *testing.T) {
 		{
 			name: "new copy beside a rewrite",
 			id:   "s-b",
-			setup: func(t *testing.T, a, b, c string) {
+			setup: func(t *testing.T, a, b, _ string) {
+				t.Helper()
 				write(t, a, claudeLine("s-a", t0, "alpha one"))
 				write(t, b, claudeLine("s-b", t0, "bravo two"))
 			},
-			change: func(t *testing.T, a, b, c string) {
+			change: func(t *testing.T, _, b, c string) {
+				t.Helper()
 				write(t, c, claudeLine("s-b", t0, "bravo two")+claudeLine("s-b", t2, "charlie four"))
 				write(t, b, claudeLine("s-b", t0, "bravo too"))
 				bumpMTime(t, b)

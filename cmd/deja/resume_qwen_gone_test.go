@@ -25,7 +25,10 @@ func qwenTranscriptIn(t *testing.T, root, cwd, id string, record bool) string {
 	if record {
 		rec["cwd"] = cwd
 	}
-	line, _ := json.Marshal(rec)
+	line, err := json.Marshal(rec)
+	if err != nil {
+		t.Fatal(err)
+	}
 	path := filepath.Join(chats, id+".jsonl")
 	if err := os.WriteFile(path, append(line, '\n'), 0o644); err != nil {
 		t.Fatal(err)
@@ -55,7 +58,7 @@ func TestResumeQwenRefusesWhenItsDirectoryIsGone(t *testing.T) {
 	}
 
 	// Control: with the directory back, the same transcript resumes there.
-	if err := os.MkdirAll(gone, 0o755); err != nil {
+	if err = os.MkdirAll(gone, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	dir, cmd, err = resumeCommand(model.Session{Harness: "qwen", ID: "555a7310", Path: path})
@@ -115,17 +118,17 @@ func TestResumeQwenWithoutARecordedCWDUsesTheFolder(t *testing.T) {
 	}
 	root := filepath.Join(tmp, "qwen")
 	t.Setenv("DEJA_QWEN_ROOT", root)
-	real := filepath.Join(tmp, "projects", "app")
-	if err := os.MkdirAll(real, 0o755); err != nil {
+	realDir := filepath.Join(tmp, "projects", "app")
+	if err = os.MkdirAll(realDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	path := qwenTranscriptIn(t, root, real, "a2d5a292", false)
+	path := qwenTranscriptIn(t, root, realDir, "a2d5a292", false)
 
 	dir, cmd, err := resumeCommand(model.Session{Harness: "qwen", ID: "a2d5a292", Path: path})
 	if err != nil || cmd != "qwen -r a2d5a292" {
 		t.Fatalf("an old transcript no longer resumes: %q %v", cmd, err)
 	}
-	if runtime.GOOS != "windows" && dir != real {
-		t.Fatalf("dir = %q, want %q", dir, real)
+	if runtime.GOOS != "windows" && dir != realDir {
+		t.Fatalf("dir = %q, want %q", dir, realDir)
 	}
 }

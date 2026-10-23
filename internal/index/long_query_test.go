@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -18,11 +19,12 @@ func TestPastedIssueFindsTheSameBugOverALongSession(t *testing.T) {
 	// Past bestMessageStore sessions the result is re-read by its best
 	// message, which must not undo what the long query ranked.
 	for _, filler := range []int{80, bestMessageStore} {
-		t.Run(fmt.Sprint(filler), func(t *testing.T) { pastedIssue(t, filler) })
+		t.Run(strconv.Itoa(filler), func(t *testing.T) { pastedIssue(t, filler) })
 	}
 }
 
 func pastedIssue(t *testing.T, filler int) {
+	t.Helper()
 	tmp := t.TempDir()
 	root := filepath.Join(tmp, "claude")
 	setHome(t, filepath.Join(tmp, "home"))
@@ -62,7 +64,7 @@ fixed in the writer buffering refactor: flush the quote state before the gzip st
 		t.Fatal(err)
 	}
 	if len(r.Sessions) == 0 || r.Sessions[0].ID != "same-bug" {
-		var ids []string
+		ids := make([]string, 0, len(r.Sessions))
 		for _, s := range r.Sessions {
 			ids = append(ids, s.ID)
 		}

@@ -32,7 +32,7 @@ func TestProfilingWritesWhenAskedAndStaysOutOfTheWayOtherwise(t *testing.T) {
 	// Something for the CPU profile to sample; an empty profile is still a
 	// valid file, so the assertion below is only that both were written.
 	sum := 0
-	for i := 0; i < 200000; i++ {
+	for i := range 200000 {
 		sum += i % 7
 	}
 	_ = sum

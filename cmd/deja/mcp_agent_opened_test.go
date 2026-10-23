@@ -34,7 +34,7 @@ func TestRecallSaysWhenASessionHasNoHumanTurn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, line := range strings.Split(answer, "\n") {
+	for line := range strings.SplitSeq(answer, "\n") {
 		switch {
 		case strings.Contains(line, "agentopened"):
 			if !strings.Contains(line, "agent-opened, no human turn") {

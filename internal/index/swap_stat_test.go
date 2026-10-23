@@ -29,12 +29,10 @@ func TestHasManifestWaitsOutTheSwap(t *testing.T) {
 		t.Fatal(err)
 	}
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		time.Sleep(40 * time.Millisecond)
 		_ = os.Rename(parked, dir)
-	}()
+	})
 	if !HasManifest(dir) {
 		t.Error("a hook landing in the swap window was told there is no index")
 	}

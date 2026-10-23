@@ -61,7 +61,7 @@ func replaceMarkedBlock(old, startMarker, endMarker, what, block string) (string
 // between, which is how an uninstall came to delete the file (#1705).
 func checkMarkerPairs(doc, startMarker, endMarker, what string) error {
 	open := false
-	for _, line := range strings.Split(doc, "\n") {
+	for line := range strings.SplitSeq(doc, "\n") {
 		switch strings.TrimSuffix(line, "\r") {
 		case startMarker:
 			if open {

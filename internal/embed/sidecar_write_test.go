@@ -1,6 +1,7 @@
 package embed
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
@@ -30,7 +31,7 @@ func TestWriteLeavesTheOldSidecarWhenItCannotFinish(t *testing.T) {
 	// The parent is where the temp file goes, so a read-only one stops the
 	// write before anything is published.
 	parent := filepath.Dir(Path(dir))
-	if err := os.Chmod(parent, 0o500); err != nil {
+	if err = os.Chmod(parent, 0o500); err != nil {
 		t.Skip("cannot make the directory read-only here")
 	}
 	t.Cleanup(func() { _ = os.Chmod(parent, 0o700) })
@@ -39,19 +40,19 @@ func TestWriteLeavesTheOldSidecarWhenItCannotFinish(t *testing.T) {
 	}
 	// Chmod succeeds on Windows and changes nothing, so the mode bits are not
 	// evidence — whether the directory actually refuses a new file is.
-	if probe, err := os.Create(filepath.Join(parent, "probe")); err == nil {
-		probe.Close()
+	if probe, probeErr := os.Create(filepath.Join(parent, "probe")); probeErr == nil {
+		_ = probe.Close()
 		_ = os.Remove(probe.Name())
 		t.Skip("the directory still accepts writes when read-only")
 	}
-	if err := write(dir, Sidecar{Model: "m", Dim: 1, Generation: "g2"}); err == nil {
+	if err = write(dir, Sidecar{Model: "m", Dim: 1, Generation: "g2"}); err == nil {
 		t.Error("a write into a read-only directory reported success")
 	}
 	after, err := os.ReadFile(Path(dir))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(after) != string(before) {
+	if !bytes.Equal(after, before) {
 		t.Error("the sidecar changed on a write that failed")
 	}
 }

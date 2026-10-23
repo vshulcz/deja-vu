@@ -46,7 +46,7 @@ func TestRelevanceEnvelopeReportsThePreCapTotal(t *testing.T) {
 	// fourth: every term resolves in the corpus, no session holds them all —
 	// which is what drops the ladder to the relevance tier — and the scored
 	// pool is 61, deeper than the window it is served through.
-	for i := 0; i < 60; i++ {
+	for i := range 60 {
 		id := fmt.Sprintf("rel%02d", i)
 		writeClaudeFixture(t, filepath.Join(root, "relevance", id+".jsonl"), id, []string{
 			`{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"kubernetes autoscaler telemetry notes ` + id + `"}}`,
@@ -111,7 +111,7 @@ func TestRelevanceEnvelopeReportsThePreCapTotal(t *testing.T) {
 func TestLimitBindsTheRankedTier(t *testing.T) {
 	hermeticEnv(t)
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
-	for i := 0; i < 60; i++ {
+	for i := range 60 {
 		id := fmt.Sprintf("lim%02d", i)
 		writeClaudeFixture(t, filepath.Join(root, "relevance", id+".jsonl"), id, []string{
 			`{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"kubernetes autoscaler telemetry notes ` + id + `"}}`,
@@ -142,7 +142,7 @@ func TestLimitBindsTheRankedTier(t *testing.T) {
 func TestAllWithALimitStillBindsTheRankedTier(t *testing.T) {
 	hermeticEnv(t)
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
-	for i := 0; i < 60; i++ {
+	for i := range 60 {
 		id := fmt.Sprintf("alim%02d", i)
 		writeClaudeFixture(t, filepath.Join(root, "relevance", id+".jsonl"), id, []string{
 			`{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"kubernetes autoscaler telemetry notes ` + id + `"}}`,

@@ -47,8 +47,8 @@ func TestInstallAdoptsAndUninstallRemovesAnEntryNamingAnotherBuild(t *testing.T)
 		t.Errorf("the install stacked a second entry beside it (%d):\n%s", n, after)
 	}
 
-	if _, err := captureRun(t, "uninstall", "hermes"); err != nil {
-		t.Fatalf("uninstall hermes: %v", err)
+	if _, cerr := captureRun(t, "uninstall", "hermes"); cerr != nil {
+		t.Fatalf("uninstall hermes: %v", cerr)
 	}
 	final, err := os.ReadFile(path)
 	if err != nil {

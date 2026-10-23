@@ -27,11 +27,14 @@ func TestThePlanFindingCarriesTheRemedyBesideTheCensusCommand(t *testing.T) {
 	now := time.Now().UTC()
 	at := func(m int) string { return now.Add(-time.Duration(m) * time.Minute).Format(time.RFC3339) }
 	write := func(sid string, msgs [][2]any, base int) {
-		var lines []string
+		lines := make([]string, 0, len(msgs))
 		for i, m := range msgs {
 			rec := map[string]any{"type": m[0], "sessionId": sid, "timestamp": at(base - i), "cwd": "/work/app",
 				"message": map[string]any{"role": m[0], "content": m[1]}}
-			b, _ := json.Marshal(rec)
+			b, jerr := json.Marshal(rec)
+			if jerr != nil {
+				t.Fatal(jerr)
+			}
 			lines = append(lines, string(b))
 		}
 		if err := os.WriteFile(filepath.Join(store, sid+".jsonl"), []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
@@ -49,7 +52,7 @@ func TestThePlanFindingCarriesTheRemedyBesideTheCensusCommand(t *testing.T) {
 			{"assistant", "looked at " + top + ", changed what was needed and the tests pass"},
 		}, 900-10*i)
 	}
-	for k := 0; k < 4; k++ {
+	for k := range 4 {
 		write(fmt.Sprintf("m%d", k), [][2]any{
 			{"user", fmt.Sprintf("run the orders migration (%d) against the production database", k)},
 			{"assistant", []any{map[string]any{"type": "tool_use", "name": "Bash", "input": map[string]any{"command": "make migrate-orders"}}}},

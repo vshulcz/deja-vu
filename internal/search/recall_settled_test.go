@@ -17,7 +17,7 @@ import (
 // did not, whatever their dates.
 func TestTheStartBlockPrefersSessionsThatSettledSomething(t *testing.T) {
 	now := time.Now()
-	var ss []model.Session
+	ss := make([]model.Session, 0, 6)
 	// Newest first: four that settled nothing, then the two that did.
 	for i := range 4 {
 		ss = append(ss, model.Session{
@@ -36,8 +36,7 @@ func TestTheStartBlockPrefersSessionsThatSettledSomething(t *testing.T) {
 			{Role: "user", Text: "what do we do about the etag cache refresh"},
 			{Role: "assistant", Text: "we decided to use bounded refresh with jitter because retries must spread load"},
 		},
-	})
-	ss = append(ss, model.Session{
+	}, model.Session{
 		Harness: "claude", ID: "fixed", Project: "org/app",
 		Updated: now.Add(-20 * time.Hour),
 		Messages: []model.Message{

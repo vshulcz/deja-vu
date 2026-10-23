@@ -92,10 +92,10 @@ func TestFindByPrefixResolvesTheIdTheSessionCameWith(t *testing.T) {
 	// And an exact match on the imported id beats a local id that merely
 	// contains it: typing the whole thing should not hand over something else.
 	near := `{"type":"user","sessionId":"zz-` + origID + `-zz","cwd":"/w","timestamp":"2026-09-03T09:00:00Z","message":{"role":"user","content":"a local session whose id contains the other one"}}` + "\n"
-	if err := os.WriteFile(filepath.Join(claudeB, "near.jsonl"), []byte(near), 0o600); err != nil {
+	if err = os.WriteFile(filepath.Join(claudeB, "near.jsonl"), []byte(near), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := Ensure(dirB, "", false, nil); err != nil {
+	if err = Ensure(dirB, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	got, ok, err = FindByPrefix(dirB, origID)

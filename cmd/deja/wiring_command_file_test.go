@@ -37,12 +37,12 @@ func TestTheRepairRewritesTheCommandFile(t *testing.T) {
 
 	// The state by hand, the way the other wiring tests seed it: what install
 	// records depends on which harnesses the machine running the test has.
-	if err := os.MkdirAll(filepath.Dir(wiringStatePath()), 0o755); err != nil {
+	if err = os.MkdirAll(filepath.Dir(wiringStatePath()), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	state := `{"version":"0.0.1","targets":["cursor-auto"],"exe":` + strconv.Quote(old) +
 		`,"home":` + strconv.Quote(homeDir()) + `}`
-	if err := os.WriteFile(wiringStatePath(), []byte(state), 0o644); err != nil {
+	if err = os.WriteFile(wiringStatePath(), []byte(state), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	restore := exeIsTemporary

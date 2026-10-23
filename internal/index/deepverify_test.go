@@ -69,7 +69,7 @@ func TestDeepVerifyTreatsNewAndGrownFilesAsStale(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.WriteString(`{"type":"user","sessionId":"s1","timestamp":"2026-01-02T03:05:05Z","message":{"role":"user","content":"appended after the index pass"}}` + "\n"); err != nil {
+	if _, err = f.WriteString(`{"type":"user","sessionId":"s1","timestamp":"2026-01-02T03:05:05Z","message":{"role":"user","content":"appended after the index pass"}}` + "\n"); err != nil {
 		t.Fatal(err)
 	}
 	_ = f.Close()
@@ -91,7 +91,7 @@ func TestDeepVerifyFlagsShrunkSource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Truncate(src, fi.Size()/2); err != nil {
+	if err = os.Truncate(src, fi.Size()/2); err != nil {
 		t.Fatal(err)
 	}
 	r, err := DeepVerify(dir)
@@ -122,7 +122,7 @@ func TestDeepVerifyFlagsDeletedSource(t *testing.T) {
 	if len(r.Kept) != 1 || r.Kept[0] != src {
 		t.Fatalf("kept = %v, want the deleted transcript", r.Kept)
 	}
-	if err := os.RemoveAll(filepath.Dir(src)); err != nil {
+	if err = os.RemoveAll(filepath.Dir(src)); err != nil {
 		t.Fatal(err)
 	}
 	r, err = DeepVerify(dir)
@@ -143,7 +143,7 @@ func TestDeepVerifyFlagsSessionMissingFromIndex(t *testing.T) {
 	for k := range m.Sessions {
 		delete(m.Sessions, k)
 	}
-	if err := writeManifest(dir, m); err != nil {
+	if err = writeManifest(dir, m); err != nil {
 		t.Fatal(err)
 	}
 	r, err := DeepVerify(dir)
@@ -210,7 +210,7 @@ func TestDeepVerifyFlagsUnreadableBucket(t *testing.T) {
 	var truncated bool
 	for _, de := range entries {
 		if strings.HasSuffix(de.Name(), ".bin") {
-			if err := os.Truncate(filepath.Join(dir, "buckets", de.Name()), 7); err != nil {
+			if err = os.Truncate(filepath.Join(dir, "buckets", de.Name()), 7); err != nil {
 				t.Fatal(err)
 			}
 			truncated = true

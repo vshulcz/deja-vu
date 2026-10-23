@@ -46,7 +46,7 @@ func TestAnEmptyBucketDirectoryCountsAsDamage(t *testing.T) {
 		t.Fatal("no bucket files to remove")
 	}
 	for _, e := range entries {
-		if err := os.Remove(filepath.Join(dir, "buckets", e.Name())); err != nil {
+		if err = os.Remove(filepath.Join(dir, "buckets", e.Name())); err != nil {
 			t.Fatal(err)
 		}
 	}

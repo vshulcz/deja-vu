@@ -83,7 +83,7 @@ func floor(n int) int {
 func wrap(s string, first, rest int) []string {
 	var out []string
 	cur, curW, limit := "", 0, first
-	for _, word := range strings.Fields(s) {
+	for word := range strings.FieldsSeq(s) {
 		w := Columns(word)
 		switch {
 		case cur == "":

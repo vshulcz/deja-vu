@@ -51,7 +51,7 @@ func TestHermesPluginCapturesACompactionWithoutTheProvider(t *testing.T) {
 		"cut = [{'role': 'user', 'content': '[CONTEXT COMPACTION — REFERENCE ONLY] Earlier turns were compacted', '_compressed_summary': True}]\n" +
 		"m.watch(session_id='s1', conversation_history=cut)\n" +
 		"m.watch(session_id='s1', conversation_history=cut + [{'role': 'assistant', 'content': 'next'}])\n"
-	cmd := exec.Command(py, "-c", probe)
+	cmd := exec.CommandContext(t.Context(), py, "-c", probe)
 	cmd.Dir = root
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("plugin: %v\n%s", err, out)

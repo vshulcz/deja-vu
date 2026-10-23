@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -41,13 +42,13 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 			// `target != ""` gate below and printed the paste-only handoff, so
 			// a scripted `--to "$AGENT"` with the variable unset read like a
 			// handoff to an agent (#1647).
-			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" { //nolint:gosec // the bound is checked first
 				// Named targets, like the refusal below: the reader who typed
 				// an empty --to needs the same list as the one who typed a
 				// wrong name.
 				return fmt.Errorf("handoff: --to needs an agent name: %s", strings.Join(handoffTargets(), ", "))
 			}
-			target = args[i+1]
+			target = args[i+1] //nolint:gosec // the bound is checked above
 			i++
 		case "--exec":
 			doExec = true
@@ -135,7 +136,7 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 	if _, err := exec.LookPath(argv[0]); err != nil {
 		return fmt.Errorf("handoff: %s is not installed (looked for %q in PATH)", target, argv[0])
 	}
-	c := exec.Command(argv[0], argv[1:]...)
+	c := exec.CommandContext(context.Background(), argv[0], argv[1:]...)
 	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return c.Run()
 }
@@ -473,7 +474,7 @@ func pasteOnlyFooter(prefix string) string {
 				width = 76
 			}
 			more := fmt.Sprintf("(%d more: %s)", len(found)-shown, strings.Join(found[shown:], ", "))
-			for _, line := range strings.Split(wrapProse(more, width-2), "\n") {
+			for line := range strings.SplitSeq(wrapProse(more, width-2), "\n") {
 				b.WriteString("  " + line + "\n")
 			}
 			break

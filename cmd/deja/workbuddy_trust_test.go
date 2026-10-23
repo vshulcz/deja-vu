@@ -54,12 +54,23 @@ func approveDeja(t *testing.T, wb string) {
 		t.Fatalf("no deja entry in %v", servers)
 	}
 	command, _ := entry["command"].(string)
-	var args []string
-	for _, a := range entry["args"].([]any) {
-		args = append(args, a.(string))
+	raw, ok := entry["args"].([]any)
+	if !ok {
+		t.Fatalf("deja entry args are not a list: %v", entry)
 	}
-	b, _ := json.Marshal(map[string]int64{workBuddyApprovalKey("deja", command, args, nil, ""): 1759600000000})
-	if err := os.WriteFile(filepath.Join(wb, "mcp-approvals.json"), b, 0o644); err != nil {
+	args := make([]string, 0, len(raw))
+	for _, a := range raw {
+		arg, ok := a.(string)
+		if !ok {
+			t.Fatalf("deja entry arg is not a string: %v", a)
+		}
+		args = append(args, arg)
+	}
+	b, err := json.Marshal(map[string]int64{workBuddyApprovalKey("deja", command, args, nil, ""): 1759600000000})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(wb, "mcp-approvals.json"), b, 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -135,7 +146,7 @@ func TestDoctorWorkBuddyTrust(t *testing.T) {
 	text := func() string {
 		var buf bytes.Buffer
 		doctorMCP(&buf)
-		for _, line := range strings.Split(buf.String(), "\n") {
+		for line := range strings.SplitSeq(buf.String(), "\n") {
 			if strings.HasPrefix(strings.TrimSpace(line), "workbuddy ") {
 				return line
 			}
@@ -163,8 +174,11 @@ func TestDoctorWorkBuddyTrust(t *testing.T) {
 	}
 
 	// An approval for another command is not one for this entry.
-	b, _ := json.Marshal(map[string]int64{workBuddyApprovalKey("deja", "/old/deja", []string{"mcp"}, nil, ""): 1})
-	if err := os.WriteFile(filepath.Join(wb, "mcp-approvals.json"), b, 0o644); err != nil {
+	b, err := json.Marshal(map[string]int64{workBuddyApprovalKey("deja", "/old/deja", []string{"mcp"}, nil, ""): 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(wb, "mcp-approvals.json"), b, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if r := row(); r.State != "untrusted" {

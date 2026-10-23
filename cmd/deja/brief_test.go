@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -145,13 +146,13 @@ func TestBriefNamesTheWallAndAgreesWithTheCommand(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
-	for i := 0; i < index.FrictionMinSessions; i++ {
+	for i := range index.FrictionMinSessions {
 		sid := fmt.Sprintf("wf%02d", i)
 		body := `{"type":"user","sessionId":"` + sid + `","cwd":"/w/f","timestamp":"2026-07-2` +
-			fmt.Sprint(i) + `T10:00:00Z","message":{"role":"user","content":"run the linters"}}` + "\n" +
+			strconv.Itoa(i) + `T10:00:00Z","message":{"role":"user","content":"run the linters"}}` + "\n" +
 			`{"type":"user","sessionId":"` + sid + `","cwd":"/w/f","timestamp":"2026-07-2` +
-			fmt.Sprint(i) + `T10:05:00Z","message":{"role":"user","content":[{"type":"tool_result",` +
-			`"content":"zsh:` + fmt.Sprint(i+1) + `: command not found: shellcheck"}]}}` + "\n"
+			strconv.Itoa(i) + `T10:05:00Z","message":{"role":"user","content":[{"type":"tool_result",` +
+			`"content":"zsh:` + strconv.Itoa(i+1) + `: command not found: shellcheck"}]}}` + "\n"
 		if err := os.WriteFile(filepath.Join(root, sid+".jsonl"), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}

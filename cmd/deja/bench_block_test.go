@@ -104,7 +104,7 @@ func TestBlockJSONAndIsolation(t *testing.T) {
 		t.Fatal(err)
 	}
 	var report blockReport
-	if err := json.Unmarshal([]byte(out), &report); err != nil {
+	if err = json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("invalid block JSON %q: %v", out, err)
 	}
 	if report.Chains != bench.BlockChainCount || report.Priors != bench.BlockPriorCount {

@@ -36,7 +36,7 @@ func streamedBytes(t *testing.T, line string) []byte {
 // handed on as bytes that do not either, so its caller still counts it.
 // Strings stay under the cap here; the cut is TestScanJSONLBytesHoldsALongLineByItsCut.
 func TestStreamedBytesDecodeAsTheLineReadWhole(t *testing.T) {
-	cases := []string{
+	cases := []string{ //nolint:prealloc // the fuzz loop below grows the seeds
 		`{}`, `{"a":1}`, `{"a" : [1, 2.5e3, -0, true, false, null, {"b":"c"}]}`,
 		`{"s":"tab\tquote\" slash\/ back\\ \b\f\n\r <tag> & amp"}`,
 		`{"u":"\u00e9\u20ac\ud83d\ude00\u2028"}`, `{"u":"\ud83d"}`, `{"u":"\ude00"}`,
@@ -47,10 +47,10 @@ func TestStreamedBytesDecodeAsTheLineReadWhole(t *testing.T) {
 		// The 16-byte head of this one is a record on its own.
 		`{"a":1}` + strings.Repeat(" ", 40) + `{"b":2}`,
 	}
-	rng := rand.New(rand.NewSource(2))
+	rng := rand.New(rand.NewSource(2)) //nolint:gosec // seeded fuzz input
 	words := []string{"a", "é", "\\", "\"", "\x00", "\xff", "{", "}", "[", "]", ":", ",", "1", "-", "e", " ", "\\u00", "\\ud83d"}
-	for i := 0; i < 3000; i++ {
-		b, _ := json.Marshal(map[string]any{"k": randValue(rng, 3)})
+	for range 3000 {
+		b := mustJSON(t, map[string]any{"k": randValue(rng, 3)})
 		cases = append(cases, string(b))
 		mut := []byte(string(b))
 		for j := rng.Intn(3); j >= 0 && len(mut) > 0; j-- {
@@ -148,7 +148,7 @@ func TestScanJSONLBytesHoldsALongLineByItsCut(t *testing.T) {
 		if err != nil || len(ss) != 1 {
 			t.Fatalf("parse: %v, %d sessions", err, len(ss))
 		}
-		var roles []string
+		roles := make([]string, 0, len(ss[0].Messages))
 		var out string
 		for _, m := range ss[0].Messages {
 			roles = append(roles, m.Role)
@@ -205,9 +205,9 @@ func TestScanJSONLBytesLeavesALongPartialLastLine(t *testing.T) {
 // lineMatch finds what bytes.Contains finds in the whole line, however the
 // line is cut into pieces.
 func TestLineMatchFindsAWordAcrossPieces(t *testing.T) {
-	rng := rand.New(rand.NewSource(3))
+	rng := rand.New(rand.NewSource(3)) //nolint:gosec // seeded fuzz input
 	pat := []byte(`"response_item"`)
-	for i := 0; i < 5000; i++ {
+	for range 5000 {
 		line := make([]byte, rng.Intn(80))
 		for j := range line {
 			line[j] = `"response_itm`[rng.Intn(13)]
@@ -466,7 +466,7 @@ func TestEachLineFromHoldsALongLineByItsCut(t *testing.T) {
 		gc, procs := debug.SetGCPercent(-1), runtime.GOMAXPROCS(1)
 		runtime.ReadMemStats(&before)
 		count := 0
-		eachLineFrom(p, 0, func(line []byte) bool {
+		eachLineFrom(p, 0, func(_ []byte) bool {
 			count++
 			return true
 		})

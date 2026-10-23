@@ -35,7 +35,7 @@ func TestConcurrentRecordsKeepEveryMachine(t *testing.T) {
 
 	got := Load()
 	if len(got) != len(hosts) {
-		var names []string
+		names := make([]string, 0, len(got))
 		for _, p := range got {
 			names = append(names, p.Host)
 		}
@@ -90,18 +90,16 @@ func TestSustainedContentionKeepsEveryMachine(t *testing.T) {
 	when := time.Date(2026, 8, 25, 10, 0, 0, 0, time.UTC)
 
 	var wg sync.WaitGroup
-	for i := 0; i < writers; i++ {
+	for i := range writers {
 		host := fmt.Sprintf("host-%02d", i)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for k := 0; k < each; k++ {
+		wg.Go(func() {
+			for k := range each {
 				if err := Record(host, k%2 == 0, when, nil); err != nil {
 					t.Errorf("%s: %v", host, err)
 					return
 				}
 			}
-		}()
+		})
 	}
 	wg.Wait()
 

@@ -48,17 +48,17 @@ func runRemember(dir string, args []string) error {
 	for i := 0; i < len(args); i++ {
 		if args[i] == "--project" {
 			if i+1 >= len(args) {
-				return fmt.Errorf("remember: --project needs value")
+				return errors.New("remember: --project needs value")
 			}
-			project = args[i+1]
+			project = args[i+1] //nolint:gosec // G602: i+1 < len(args) checked above
 			i++
 			continue
 		}
 		if args[i] == "--tag" {
 			if i+1 >= len(args) {
-				return fmt.Errorf("remember: --tag needs value")
+				return errors.New("remember: --tag needs value")
 			}
-			tags = append(tags, args[i+1])
+			tags = append(tags, args[i+1]) //nolint:gosec // G602: i+1 < len(args) checked above
 			i++
 			continue
 		}
@@ -67,12 +67,12 @@ func runRemember(dir string, args []string) error {
 		// with a dash was otherwise refused as a flag.
 		if args[i] == "--" {
 			if i+1 >= len(args) {
-				return fmt.Errorf("remember: text required — deja remember \"the note\"")
+				return errors.New("remember: text required — deja remember \"the note\"")
 			}
 			if text != "" {
-				return fmt.Errorf("remember: expected one text argument — quote the note: deja remember \"the whole note\"")
+				return errors.New("remember: expected one text argument — quote the note: deja remember \"the whole note\"")
 			}
-			text = args[i+1]
+			text = args[i+1] //nolint:gosec // G602: i+1 < len(args) checked above
 			i++
 			continue
 		}
@@ -80,12 +80,12 @@ func runRemember(dir string, args []string) error {
 			return unknownFlag("remember", args[i], rememberFlags)
 		}
 		if text != "" {
-			return fmt.Errorf("remember: expected one text argument — quote the note: deja remember \"the whole note\"")
+			return errors.New("remember: expected one text argument — quote the note: deja remember \"the whole note\"")
 		}
 		text = args[i]
 	}
 	if strings.TrimSpace(text) == "" {
-		return fmt.Errorf("remember: text required — deja remember \"the note\"")
+		return errors.New("remember: text required — deja remember \"the note\"")
 	}
 	if strings.TrimSpace(project) == "" {
 		cwd, err := os.Getwd()

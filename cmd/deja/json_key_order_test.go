@@ -44,11 +44,11 @@ func TestInstallUninstallGivesTheConfigBackByteForByte(t *testing.T) {
 			if !strings.Contains(string(installed), `"deja"`) {
 				t.Fatalf("install wrote no entry:\n%s", installed)
 			}
-			if strings.Index(string(installed), `"command": "/bin/echo"`) > strings.Index(string(installed), `"args"`) {
+			if bytes.Index(installed, []byte(`"command": "/bin/echo"`)) > bytes.Index(installed, []byte(`"args"`)) {
 				t.Errorf("install re-sorted the other server's keys:\n%s", installed)
 			}
-			if _, err := installTarget(tc.target, "/bin/deja", true); err != nil {
-				t.Fatalf("uninstall: %v", err)
+			if _, ierr := installTarget(tc.target, "/bin/deja", true); ierr != nil {
+				t.Fatalf("uninstall: %v", ierr)
 			}
 			got, err := os.ReadFile(path)
 			if err != nil {
@@ -96,11 +96,11 @@ func TestMarshalConfigLikeKeepsEachArrayEntrysOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(got) != string(old) {
+	if !bytes.Equal(got, old) {
 		t.Errorf("round trip changed the file:\n%s", got)
 	}
 
-	hooks := root["hooks"].([]any)
+	hooks := typedOrFatal[[]any](t, root["hooks"])
 	root["hooks"] = append([]any{map[string]any{"type": "command", "command": "deja hook"}}, hooks...)
 	got, err = marshalConfigLike(old, root)
 	if err != nil {
@@ -119,8 +119,8 @@ func TestMarshalConfigLikeKeepsAnEditedEntrysOrder(t *testing.T) {
 	if err := json.Unmarshal(old, &root); err != nil {
 		t.Fatal(err)
 	}
-	group := root["PreToolUse"].([]any)[1].(map[string]any)
-	group["hooks"] = append(group["hooks"].([]any), map[string]any{"type": "command", "command": "deja hook"})
+	group := typedOrFatal[map[string]any](t, typedOrFatal[[]any](t, root["PreToolUse"])[1])
+	group["hooks"] = append(typedOrFatal[[]any](t, group["hooks"]), map[string]any{"type": "command", "command": "deja hook"})
 	got, err := marshalConfigLike(old, root)
 	if err != nil {
 		t.Fatal(err)

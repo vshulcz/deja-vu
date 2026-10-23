@@ -15,6 +15,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
@@ -127,10 +128,8 @@ func sessionSettledSomething(s model.Session) bool {
 		if m.Role != "assistant" {
 			continue
 		}
-		for _, line := range strings.Split(m.Text, "\n") {
-			if digest.CarriesDecision(line) {
-				return true
-			}
+		if slices.ContainsFunc(strings.Split(m.Text, "\n"), digest.CarriesDecision) {
+			return true
 		}
 	}
 	return false
@@ -153,12 +152,7 @@ func openingQuestion(s model.Session) string {
 }
 
 func blockCarriesDecision(block string) bool {
-	for _, line := range strings.Split(block, "\n") {
-		if digest.CarriesDecision(line) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(strings.Split(block, "\n"), digest.CarriesDecision)
 }
 
 // whereTheDecisionWas attributes a miss to the role of the line that settled
@@ -168,7 +162,7 @@ func blockCarriesDecision(block string) bool {
 func whereTheDecisionWas(s model.Session, terms []string) string {
 	best := "tool/other"
 	for _, m := range s.Messages {
-		for _, line := range strings.Split(m.Text, "\n") {
+		for line := range strings.SplitSeq(m.Text, "\n") {
 			if !digest.CarriesDecision(line) || search.TermHitsLowered(strings.ToLower(line), terms) == 0 {
 				continue
 			}

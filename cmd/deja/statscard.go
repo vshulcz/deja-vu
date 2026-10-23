@@ -137,10 +137,10 @@ func renderAgents(b *strings.Builder, r stats.Report, x, y int) {
 		}
 		harnesses = harnesses[:3:3]
 	}
-	max := 1
+	most := 1
 	for _, hh := range harnesses {
-		if hh.Sessions > max {
-			max = hh.Sessions
+		if hh.Sessions > most {
+			most = hh.Sessions
 		}
 	}
 
@@ -158,7 +158,7 @@ func renderAgents(b *strings.Builder, r stats.Report, x, y int) {
 		fmt.Fprintf(b, `<rect x="%d" y="%d" width="%d" height="8" rx="4" fill="#161c1f"/>`+"\n",
 			x+barX, row-8, track)
 		fmt.Fprintf(b, `<rect x="%d" y="%d" width="%d" height="8" rx="4" fill="#8787af"/>`+"\n",
-			x+barX, row-8, track*hh.Sessions/max)
+			x+barX, row-8, track*hh.Sessions/most)
 		cardText(b, 760, row, 12, "700", formatStatNumber(hh.Sessions), "#f4f7f7",
 			"text-anchor=\"end\"")
 	}
@@ -192,7 +192,7 @@ func renderHeatmap(b *strings.Builder, hm stats.HeatmapStats, x0, y0 int) {
 		cardText(b, x0+mt.Col*step, y0-6, 10, "400", mt.Label, "#55626a")
 	}
 	for col, week := range hm.Weeks {
-		for d := 0; d < 7; d++ {
+		for d := range 7 {
 			c := week[d]
 			if c < 0 {
 				continue
@@ -204,13 +204,13 @@ func renderHeatmap(b *strings.Builder, hm stats.HeatmapStats, x0, y0 int) {
 	}
 }
 
-func heatFill(c, max int) (string, float64) {
+func heatFill(c, most int) (string, float64) {
 	if c <= 0 {
 		return "#141a1d", 1
 	}
 	ratio := 1.0
-	if max > 0 {
-		ratio = float64(c) / float64(max)
+	if most > 0 {
+		ratio = float64(c) / float64(most)
 	}
 	switch {
 	case ratio <= 0.25:

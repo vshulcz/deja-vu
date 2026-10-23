@@ -215,7 +215,7 @@ func background(n int) []session {
 	harnesses := []string{"claude", "codex", "cursor"}
 
 	out := make([]session, 0, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		c := components[i%len(components)]
 		sym := symptoms[(i/3)%len(symptoms)]
 		cause := causes[(i/7)%len(causes)]
@@ -227,7 +227,7 @@ func background(n int) []session {
 		// Real stores hold a few long sessions among the short ones, and the
 		// stats screen reports the longest.
 		if i%23 == 0 {
-			for k := 0; k < 9+i%11; k++ {
+			for k := range 9 + i%11 {
 				turns = append(turns,
 					turn{"user", "still seeing it after " + fixes[(i+k)%len(fixes)]},
 					turn{"assistant", "That path is different: " + causes[(i+k+3)%len(causes)] + ". Try " + fixes[(i+k+5)%len(fixes)] + "."})
@@ -308,11 +308,12 @@ func writeCodex(root string, s session, start time.Time) error {
 		start.Format("2006"), start.Format("01"), start.Format("02"),
 		"rollout-"+stamp+"-"+s.id+".jsonl")
 
-	rows := []map[string]any{{
+	rows := make([]map[string]any, 0, 1+len(s.turns))
+	rows = append(rows, map[string]any{
 		"timestamp": start.Format(time.RFC3339),
 		"type":      "session_meta",
 		"payload":   map[string]any{"session_id": s.id, "cwd": "/work/" + s.project},
-	}}
+	})
 	for i, t := range s.turns {
 		kind := "input_text"
 		if t.role == "assistant" {
@@ -332,7 +333,7 @@ func writeCodex(root string, s session, start time.Time) error {
 
 func writeCursor(root string, s session, start time.Time) error {
 	path := filepath.Join(root, ".cursor", "projects", s.project, "agent-transcripts", s.id+".jsonl")
-	var rows []map[string]any
+	rows := make([]map[string]any, 0, len(s.turns)+1)
 	for _, t := range s.turns {
 		rows = append(rows, map[string]any{
 			"role":    t.role,

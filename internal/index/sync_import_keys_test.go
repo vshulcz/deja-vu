@@ -9,6 +9,7 @@ import (
 // Every value below is synthetic.
 
 func importKeysEnv(t *testing.T) string {
+	t.Helper()
 	tmp := t.TempDir()
 	setHome(t, filepath.Join(tmp, "home"))
 	t.Setenv("USERPROFILE", filepath.Join(tmp, "home"))

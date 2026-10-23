@@ -23,7 +23,7 @@ func TestARedeliveredSessionIsFoldedOnce(t *testing.T) {
 	if first == 0 {
 		t.Fatal("nothing was counted")
 	}
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		extendDerived(&meta, ms)
 	}
 	if meta.Words != first {
@@ -62,9 +62,9 @@ func TestATailWithNoOverlapIsFoldedWhole(t *testing.T) {
 // search. A plain union grew on every append (#1304, defect 4).
 func TestDerivedFieldsStayCapped(t *testing.T) {
 	var meta SessionMeta
-	for round := 0; round < 6; round++ {
-		var ms []model.Message
-		for i := 0; i < 6; i++ {
+	for round := range 6 {
+		ms := make([]model.Message, 0, 6)
+		for i := range 6 {
 			ms = append(ms, model.Message{
 				Role: "user",
 				Text: "how do I wire the " + string(rune('a'+round)) + string(rune('a'+i)) + " adapter into the pipeline, and what should it return?",
@@ -91,7 +91,7 @@ func TestTheHardestWorkedFileSurvivesTheMerge(t *testing.T) {
 	var meta SessionMeta
 	extendDerived(&meta, head)
 	tail := make([]model.Message, 0, 12)
-	for i := 0; i < 12; i++ {
+	for range 12 {
 		tail = append(tail, model.Message{Role: roleFiles, Text: "hot.go"})
 	}
 	extendDerived(&meta, tail)
@@ -135,10 +135,10 @@ func TestGrowingACollidingSessionLeavesTheOwnerAlone(t *testing.T) {
 	was := before.Sessions["claude:same"]
 	// The loser grows.
 	grown := line("the other session discusses billing") + line("i gave up on the billing migration and reverted it")
-	if err := os.WriteFile(filepath.Join(loser, "a.jsonl"), []byte(grown), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(loser, "a.jsonl"), []byte(grown), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := Ensure(dir, "", false, nil); err != nil {
+	if err = Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	after, err := readManifest(dir)

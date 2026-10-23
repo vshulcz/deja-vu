@@ -19,7 +19,7 @@ func wrapUsage(text string, width int) string {
 		return text
 	}
 	var out []string
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		out = append(out, wrapUsageLine(line, width)...)
 	}
 	return strings.Join(out, "\n")
@@ -64,7 +64,7 @@ func wrapUsageLine(line string, width int) []string {
 		// sentence after a hook command. Keeping it whole would put the line
 		// back over the width this exists to respect, so it breaks at its own
 		// spaces, which is where a sentence can be broken.
-		for _, word := range strings.Fields(f) {
+		for word := range strings.FieldsSeq(f) {
 			try := cur
 			if strings.TrimSpace(try) != "" {
 				try += " "
@@ -90,7 +90,7 @@ func usageGroups(s string) []string {
 	var out []string
 	depth := 0
 	start := -1
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		switch c := s[i]; {
 		case c == '[' || c == '(':
 			if depth == 0 && start < 0 {
@@ -135,7 +135,7 @@ func wrapColumnRow(line, indent string, width int) []string {
 	head, pad := line[:col], strings.Repeat(" ", len([]rune(line[:col])))
 	var out []string
 	cur, fresh := head, true
-	for _, word := range strings.Fields(line[col:]) {
+	for word := range strings.FieldsSeq(line[col:]) {
 		if !fresh && len([]rune(cur))+1+len([]rune(word)) > width {
 			out = append(out, cur)
 			cur = pad + word

@@ -28,17 +28,17 @@ func TestSearchOnAnEmptyStorePointsAtTheStores(t *testing.T) {
 	// cannot bring back a tombstoned session, and the forgotten count is the
 	// line that ends the search (#844).
 	forgetStore := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-gone")
-	if err := os.MkdirAll(forgetStore, 0o755); err != nil {
+	if err = os.MkdirAll(forgetStore, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	gone := `{"type":"user","message":{"role":"user","content":"the winch brake pads"},"timestamp":"2026-07-02T10:00:00Z","sessionId":"g1","cwd":"/gone"}`
-	if err := os.WriteFile(filepath.Join(forgetStore, "g.jsonl"), []byte(gone+"\n"), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(forgetStore, "g.jsonl"), []byte(gone+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := captureRunStderr(t, "index"); err != nil {
+	if _, err = captureRunStderr(t, "index"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := captureRun(t, "forget", "--session", "g1"); err != nil {
+	if _, err = captureRun(t, "forget", "--session", "g1"); err != nil {
 		t.Fatal(err)
 	}
 	emptied, err := captureRunStderr(t, "winch", "brake")
@@ -54,14 +54,14 @@ func TestSearchOnAnEmptyStorePointsAtTheStores(t *testing.T) {
 
 	// With history indexed, an ordinary miss keeps the ordinary answer.
 	store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
-	if err := os.MkdirAll(store, 0o755); err != nil {
+	if err = os.MkdirAll(store, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	line := `{"type":"user","message":{"role":"user","content":"the hydraulic pump bearing failed"},"timestamp":"2026-07-01T10:00:00Z","sessionId":"a1","cwd":"/proj"}`
-	if err := os.WriteFile(filepath.Join(store, "a.jsonl"), []byte(line+"\n"), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(store, "a.jsonl"), []byte(line+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := captureRunStderr(t, "index"); err != nil {
+	if _, err = captureRunStderr(t, "index"); err != nil {
 		t.Fatal(err)
 	}
 	miss, err := captureRunStderr(t, "zzzqqq")

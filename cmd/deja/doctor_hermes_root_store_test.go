@@ -25,7 +25,7 @@ func TestDoctorFindsTheHermesStoreAtTheRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 	var row string
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		if f := strings.Fields(line); len(f) > 1 && f[0] == "hermes" && strings.Contains(line, "store") {
 			row = line
 			break
@@ -58,7 +58,7 @@ func TestDoctorDoesNotCallAHermesConfigDirAStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		if f := strings.Fields(line); len(f) > 1 && f[0] == "hermes" && strings.Contains(line, "store") {
 			if f[1] != "missing" {
 				t.Errorf("a config-only ~/.hermes reads as %q", strings.TrimSpace(line))

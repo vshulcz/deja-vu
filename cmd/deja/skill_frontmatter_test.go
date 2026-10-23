@@ -39,11 +39,11 @@ func skillNamesMatchTheirDirectories(t *testing.T, home string) {
 	found := 0
 	_ = filepath.Walk(home, func(p string, fi os.FileInfo, err error) error {
 		if err != nil || !fi.Mode().IsRegular() || filepath.Base(p) != "SKILL.md" {
-			return nil
+			return nil //nolint:nilerr // an unreadable entry is skipped, not a failure
 		}
-		b, rerr := os.ReadFile(p)
+		b, rerr := os.ReadFile(p) //nolint:gosec // reads a temp home the test built
 		if rerr != nil {
-			return nil
+			return nil //nolint:nilerr // an unreadable file is skipped, not a failure
 		}
 		found++
 		name := frontmatterField(string(b), "name")
@@ -74,9 +74,9 @@ func frontmatterField(text, key string) string {
 	if end < 0 {
 		return ""
 	}
-	for _, line := range strings.Split(text[3:3+end], "\n") {
-		if strings.HasPrefix(line, key+":") {
-			return strings.TrimSpace(strings.TrimPrefix(line, key+":"))
+	for line := range strings.SplitSeq(text[3:3+end], "\n") {
+		if after0, ok := strings.CutPrefix(line, key+":"); ok {
+			return strings.TrimSpace(after0)
 		}
 	}
 	return ""

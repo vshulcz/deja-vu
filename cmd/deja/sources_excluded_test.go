@@ -29,7 +29,7 @@ insert into message values('m1','s1',1,'{"role":"user"}');
 insert into message values('m2','s2',1,'{"role":"user"}');
 insert into part values('p1','m1','{"type":"text","text":"hello from keep"}');
 insert into part values('p2','m2','{"type":"text","text":"hello from secret"}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("seed: %v %s", err, out)
 	}
 
@@ -61,7 +61,7 @@ insert into part values('p2','m2','{"type":"text","text":"hello from secret"}');
 
 	out := captureStdout(t, func() { printSources(filepath.Join(tmp, "index.db")) })
 	row := func(name string) string {
-		for _, l := range strings.Split(out, "\n") {
+		for l := range strings.SplitSeq(out, "\n") {
 			if strings.HasPrefix(l, name+"\t") {
 				return l
 			}
@@ -99,7 +99,7 @@ insert into session values('s1','/work/keep','2026-01-02T03:00:00Z','2026-01-02T
 insert into session values('s2','/work/empty','2026-01-02T03:00:00Z','2026-01-02T03:00:00Z');
 insert into message values('m1','s1',1,'{"role":"user"}');
 insert into part values('p1','m1','{"type":"text","text":"hello from keep"}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("seed: %v %s", err, out)
 	}
 	home := filepath.Join(tmp, "home")
@@ -115,7 +115,7 @@ insert into part values('p1','m1','{"type":"text","text":"hello from keep"}');`
 
 	row := func() string {
 		out := captureStdout(t, func() { printSources(filepath.Join(tmp, "index.db")) })
-		for _, l := range strings.Split(out, "\n") {
+		for l := range strings.SplitSeq(out, "\n") {
 			if strings.HasPrefix(l, "opencode\t") {
 				return l
 			}

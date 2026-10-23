@@ -48,8 +48,8 @@ func quietWeekIndex(t *testing.T, n int) string {
 	t.Helper()
 	tmp := hermeticEnv(t)
 	dir := filepath.Join(tmp, "index.db")
-	var lines []string
-	for i := 0; i < n; i++ {
+	lines := make([]string, 0, n)
+	for range n {
 		e := usage.Event{Time: time.Now().Add(-48 * time.Hour), Kind: usage.KindRecall, Bytes: 1500, Sessions: 1}
 		b, err := json.Marshal(e)
 		if err != nil {

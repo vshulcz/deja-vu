@@ -93,13 +93,13 @@ func TestDeepSeekInstallKeepsTheLayerOneParseableList(t *testing.T) {
 				t.Errorf("the block is not inside the document:\n%s", got)
 			}
 			want := ""
-			for _, line := range strings.Split(tc.seed, "\n") {
+			for line := range strings.SplitSeq(tc.seed, "\n") {
 				if strings.HasPrefix(strings.TrimSpace(line), "- ") {
 					want = line[:yamlIndentWidth(line)]
 					break
 				}
 			}
-			for _, line := range strings.Split(got, "\n") {
+			for line := range strings.SplitSeq(got, "\n") {
 				if strings.HasPrefix(strings.TrimSpace(line), "- insert:") && !strings.HasPrefix(line, want+"- insert:") {
 					t.Errorf("deja's row is at %q, the list is at %q:\n%s", line, want, got)
 				}

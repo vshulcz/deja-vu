@@ -131,7 +131,7 @@ func TestCodexOutputWithoutCallIDDoesNotPanic(t *testing.T) {
 // (#635).
 func TestCodexRolloutKeysOnThreadNotSession(t *testing.T) {
 	dir := t.TempDir()
-	var ids []string
+	ids := make([]string, 0, 3)
 	for _, tid := range []string{"thread-a", "thread-b", "thread-c"} {
 		p := filepath.Join(dir, "rollout-2026-07-31T00-00-00-"+tid+".jsonl")
 		lines := []string{
@@ -168,7 +168,7 @@ func TestCodexRolloutKeysOnThreadNotSession(t *testing.T) {
 	}
 }
 
-// Codex writes its preamble under its own role as well as as a user turn.
+// Codex writes its preamble under its own role and again as a user turn.
 func TestCodexDropsHarnessAuthoredRoles(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "rollout-2026-07-31T00-00-00-dev.jsonl")
@@ -223,7 +223,7 @@ func TestCodexIncrementalParseKeepsTheThreadID(t *testing.T) {
 		t.Fatalf("full parse: %v %#v", err, full)
 	}
 	extra := `{"timestamp":"2026-07-31T00:00:02Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"text","text":"second"}]}}` + "\n"
-	if err := os.WriteFile(p, []byte(head+extra), 0o644); err != nil {
+	if err = os.WriteFile(p, []byte(head+extra), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	inc, err := ParseCodexRolloutFromOffset(p, int64(len(head)))

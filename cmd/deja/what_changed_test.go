@@ -34,7 +34,7 @@ func TestWhatChangedItemsSaysWhatIsNew(t *testing.T) {
 
 - old thing
 `
-	items := whatChangedItems(changelog, "0.1.0", "0.2.0", 3)
+	items := whatChangedItems(changelog, "0.1.0", "0.2.0")
 	if len(items) != 3 {
 		t.Fatalf("got %d items, want 3: %v", len(items), items)
 	}
@@ -70,7 +70,7 @@ func TestWhatChangedItemsAcrossTwoVersions(t *testing.T) {
 - old thing
 `
 	// Last ran 0.1.0, now on 0.3.0: the top three come from 0.3.0 and 0.2.0.
-	items := whatChangedItems(changelog, "0.1.0", "0.3.0", 3)
+	items := whatChangedItems(changelog, "0.1.0", "0.3.0")
 	if len(items) != 3 {
 		t.Fatalf("got %d items, want 3: %v", len(items), items)
 	}
@@ -89,16 +89,16 @@ func TestWhatChangedShowsOncePerVersion(t *testing.T) {
 
 - a thing
 `
-	if got := whatChangedItems(changelog, "0.2.0", "0.2.0", 3); len(got) != 0 {
+	if got := whatChangedItems(changelog, "0.2.0", "0.2.0"); len(got) != 0 {
 		t.Errorf("same version said %v, want nothing", got)
 	}
-	if got := whatChangedItems(changelog, "0.2.0", "0.1.0", 3); len(got) != 0 {
+	if got := whatChangedItems(changelog, "0.2.0", "0.1.0"); len(got) != 0 {
 		t.Errorf("an older version said %v, want nothing", got)
 	}
-	if got := whatChangedItems(changelog, "", "0.2.0", 3); len(got) != 0 {
+	if got := whatChangedItems(changelog, "", "0.2.0"); len(got) != 0 {
 		t.Errorf("a first run ever said %v, want nothing", got)
 	}
-	if got := whatChangedItems(changelog, "0.1.0", "dev", 3); len(got) != 0 {
+	if got := whatChangedItems(changelog, "0.1.0", "dev"); len(got) != 0 {
 		t.Errorf("a dev build said %v, want nothing", got)
 	}
 }

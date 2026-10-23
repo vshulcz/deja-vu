@@ -136,7 +136,7 @@ func packageTexts(t *testing.T, root string, skip map[string]bool) []string {
 		if !info.Mode().IsRegular() || info.Size() > 8<<20 {
 			return nil
 		}
-		b, err := os.ReadFile(path)
+		b, err := os.ReadFile(path) //nolint:gosec // the test walks the repo checkout
 		if err != nil {
 			return err
 		}

@@ -146,7 +146,7 @@ func writeGeneratedFile(path, body string, uninstall bool) (installResult, error
 	if uninstall {
 		b, err := os.ReadFile(path)
 		if err != nil || !strings.Contains(headLines(string(b), 3), opencodeTUIMarker) {
-			return installResult{Path: path, Action: "unchanged"}, nil
+			return installResult{Path: path, Action: "unchanged"}, nil //nolint:nilerr // nothing of deja's to remove
 		}
 		if err := os.Remove(path); err != nil {
 			return installResult{}, err
@@ -203,8 +203,8 @@ func installTUIPluginList(dir, schema, entry string, uninstall bool) (installRes
 		if commented {
 			text = []byte(jsoncToJSON(lfText(old)))
 		}
-		if err := json.Unmarshal(text, &root); err != nil {
-			return installResult{}, configParseError(path, err)
+		if uerr := json.Unmarshal(text, &root); uerr != nil {
+			return installResult{}, configParseError(path, uerr)
 		}
 	}
 	raw, _ := root["plugin"].([]any)
@@ -216,12 +216,12 @@ func installTUIPluginList(dir, schema, entry string, uninstall bool) (installRes
 		// deja's element comes out as text, so the reader's comments and
 		// entries stay. Left as a note, a reader who followed install's note
 		// kept a list entry naming the file uninstall had just deleted (#5313).
-		next, err := cutTUIPluginEntry(lfText(old), entry)
-		if err != nil {
-			return installResult{}, configParseError(path, err)
+		next, cerr := cutTUIPluginEntry(lfText(old), entry)
+		if cerr != nil {
+			return installResult{}, configParseError(path, cerr)
 		}
-		a, err := writeIfChanged(path, old, []byte(next))
-		return installResult{Path: path, Action: a}, err
+		a, cerr := writeIfChanged(path, old, []byte(next))
+		return installResult{Path: path, Action: a}, cerr
 	}
 	if commented {
 		// Writing the decoded object back would drop the reader's comments, so
@@ -253,15 +253,15 @@ func installTUIPluginList(dir, schema, entry string, uninstall bool) (installRes
 		// through writeIfChanged instead, which hands back deja's snapshot
 		// where only empty blocks differ from it and keeps an empty file empty.
 		if wiringCreated(path) {
-			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-				return installResult{}, err
+			if rerr := os.Remove(path); rerr != nil && !os.IsNotExist(rerr) {
+				return installResult{}, rerr
 			}
 			pruneCreatedDir(dir)
 			return installResult{Path: path, Action: "removed"}, nil
 		}
 		if b, ok := ownSnapshot(path); ok && len(bytes.TrimSpace(b)) == 0 {
-			a, err := writeIfChanged(path, old, nil)
-			return installResult{Path: path, Action: a}, err
+			a, werr := writeIfChanged(path, old, nil)
+			return installResult{Path: path, Action: a}, werr
 		}
 	}
 	if _, ok := root["$schema"]; !ok && len(bytes.TrimSpace(old)) == 0 {

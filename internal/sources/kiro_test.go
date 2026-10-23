@@ -91,7 +91,7 @@ func TestKiroV3ReadsAssistantAndToolRecords(t *testing.T) {
 	if err != nil || len(ss) != 1 {
 		t.Fatalf("sessions = %d, %v", len(ss), err)
 	}
-	var got []string
+	got := make([]string, 0, len(ss[0].Messages))
 	for _, m := range ss[0].Messages {
 		got = append(got, m.Role+": "+strings.TrimSpace(m.Text))
 	}
@@ -110,7 +110,7 @@ func TestKiroV3ReadsAssistantAndToolRecords(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, line := range strings.Split(string(b), "\n") {
+	for line := range strings.SplitSeq(string(b), "\n") {
 		if !strings.Contains(line, `"type":"tool_call"`) {
 			continue
 		}

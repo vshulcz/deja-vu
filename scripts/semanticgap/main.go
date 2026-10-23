@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/embed"
@@ -65,7 +66,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "semanticgap:", err)
 		os.Exit(1)
 	}
-	if _, err := embed.EmbedIndex(dir, client, nil); err != nil {
+	if _, err = embed.EmbedIndex(dir, client, nil); err != nil {
 		fmt.Fprintln(os.Stderr, "semanticgap: embedding the store:", err)
 		os.Exit(1)
 	}
@@ -107,7 +108,7 @@ func place(rank int) string {
 	if rank < 1 {
 		return "—"
 	}
-	return fmt.Sprint(rank)
+	return strconv.Itoa(rank)
 }
 
 func cut(s string, n int) string {
@@ -159,7 +160,7 @@ func seed() (string, error) {
 		}
 		return os.WriteFile(filepath.Join(claude, id+".jsonl"), append(line, '\n'), 0o644)
 	}
-	for i := 0; i < 200; i++ {
+	for i := range 200 {
 		if err := write(fmt.Sprintf("noise%03d", i),
 			fmt.Sprintf("weekly notes %d: deploys, dashboards, a flaky test and the usual queue backlog", i),
 			now.Add(-time.Duration(i+len(pairs))*time.Hour)); err != nil {

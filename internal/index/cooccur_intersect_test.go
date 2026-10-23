@@ -11,16 +11,16 @@ import (
 // the scan exactly what the maps did: the same records, in record order, with
 // the first word's posting for each, the last read when a record repeats.
 func TestSwapIntersectionMatchesTheMapIntersection(t *testing.T) {
-	rng := rand.New(rand.NewSource(5562))
+	rng := rand.New(rand.NewSource(5562)) //nolint:gosec // a seeded fixture, not crypto
 	randomPostings := func() []posting {
 		n := rng.Intn(40)
 		out := make([]posting, n)
 		for i := range out {
-			out[i] = posting{Off: int64(rng.Intn(60)), Sid: uint32(rng.Intn(1000)), Tool: rng.Intn(2) == 0}
+			out[i] = posting{Off: int64(rng.Intn(60)), Sid: uint32(rng.Intn(1000)), Tool: rng.Intn(2) == 0} //nolint:gosec // Intn bounds both values
 		}
 		return out
 	}
-	for round := 0; round < 2000; round++ {
+	for round := range 2000 {
 		terms := make([][]posting, 1+rng.Intn(4))
 		for j := range terms {
 			terms[j] = randomPostings()
@@ -28,7 +28,7 @@ func TestSwapIntersectionMatchesTheMapIntersection(t *testing.T) {
 		neighbour := randomPostings()
 		swap := rng.Intn(len(terms))
 
-		var sets []map[int64]posting
+		sets := make([]map[int64]posting, 0, len(terms))
 		for j, posts := range terms {
 			if j == swap {
 				posts = neighbour

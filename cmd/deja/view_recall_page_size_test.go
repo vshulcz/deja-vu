@@ -32,7 +32,7 @@ func TestThePageIsBoundedByTheInjectionLogsRotation(t *testing.T) {
 	// read over deja://session/… measured 8,216 bytes.
 	body := strings.Repeat("the migration kept failing on the ledger table. ", 170)
 	const wrote = 500
-	for i := 0; i < wrote; i++ {
+	for range wrote {
 		usage.RecordDigestPolicy(dir, usage.KindResource, "<deja-recall>\n"+body+"\n", 1, 400, "local+imported")
 	}
 

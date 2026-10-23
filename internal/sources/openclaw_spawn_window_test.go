@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -95,16 +96,20 @@ func TestOpenClawSpawnWindowReadsEachTranscriptOnce(t *testing.T) {
 	const kids, others = 20, 30
 	store := `{"agent:main:main":{"sessionId":"cur"}`
 	old := `{"type":"session","version":3,"id":"old","timestamp":"2026-07-20T08:00:00Z"}` + "\n"
-	for i := 0; i < kids; i++ {
-		old += fmt.Sprintf(`{"type":"message","id":"r%d","timestamp":"2026-07-20T08:10:00Z","message":{"role":"toolResult","toolName":"sessions_spawn","content":[{"type":"text","text":"{\\"childSessionKey\\":\\"agent:main:subagent:%d\\"}"}]}}`+"\n", i, i)
+	var oldSb98 strings.Builder
+	var storeSb98 strings.Builder
+	for i := range kids {
+		fmt.Fprintf(&oldSb98, `{"type":"message","id":"r%d","timestamp":"2026-07-20T08:10:00Z","message":{"role":"toolResult","toolName":"sessions_spawn","content":[{"type":"text","text":"{\\"childSessionKey\\":\\"agent:main:subagent:%d\\"}"}]}}`+"\n", i, i)
 		write(fmt.Sprintf("kid%d.jsonl", i), fmt.Sprintf(`{"type":"session","version":3,"id":"kid%d","timestamp":"2026-07-20T09:00:00Z"}
 {"type":"message","id":"a","timestamp":"2026-07-20T09:00:01Z","message":{"role":"user","content":"child task"}}
 `, i))
-		store += fmt.Sprintf(`,"agent:main:subagent:%d":{"sessionId":"kid%d","spawnedBy":"agent:main:main"}`, i, i)
+		fmt.Fprintf(&storeSb98, `,"agent:main:subagent:%d":{"sessionId":"kid%d","spawnedBy":"agent:main:main"}`, i, i)
 	}
+	old += oldSb98.String()
+	store += storeSb98.String()
 	write("old.jsonl", old)
 	write("cur.jsonl", `{"type":"session","version":3,"id":"cur","timestamp":"2026-07-20T11:00:00Z"}`+"\n")
-	for i := 0; i < others; i++ {
+	for i := range others {
 		write(fmt.Sprintf("o%d.jsonl", i), fmt.Sprintf(`{"type":"session","version":3,"id":"o%d","timestamp":"2026-07-19T08:00:00Z"}`+"\n", i))
 	}
 	write("sessions.json", store+"}")
@@ -124,7 +129,7 @@ func TestOpenClawSpawnWindowReadsEachTranscriptOnce(t *testing.T) {
 	}
 	// OpenClaw rewrites sessions.json every turn; that alone reads nothing again.
 	before = openclawScanReads.Load()
-	for i := 0; i < kids; i++ {
+	for i := range kids {
 		now := time.Now().Add(time.Duration(i+1) * time.Second)
 		if err := os.Chtimes(filepath.Join(dir, "sessions.json"), now, now); err != nil {
 			t.Fatal(err)

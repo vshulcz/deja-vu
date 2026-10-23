@@ -66,7 +66,7 @@ func TestFilesTableAlignsCJKPaths(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	var paths []string
+	paths := make([]string, 0, 3)
 	for _, rel := range []string{
 		"项目/内部服务/重试队列/退避处理器实现文件.go",
 		"项目/内部服务/重试队列/工作进程唤醒抖动逻辑.go",
@@ -105,7 +105,7 @@ func TestFilesTableAlignsCJKPaths(t *testing.T) {
 
 	var widths []int
 	var rows []string
-	for _, line := range strings.Split(buf.String(), "\n") {
+	for line := range strings.SplitSeq(buf.String(), "\n") {
 		if !strings.HasPrefix(line, "  ") {
 			continue
 		}

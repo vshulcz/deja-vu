@@ -26,11 +26,11 @@ func driveOpenClawPlugin(t *testing.T, hook, event string) []map[string]any {
 	stub := filepath.Join(home, "deja")
 	calls := filepath.Join(home, "calls")
 	script := "#!/bin/sh\nin=$(cat)\nprintf '%s\\n' \"$in\" >> " + calls + "\n"
-	if err := os.WriteFile(stub, []byte(script), 0o755); err != nil {
+	if err = os.WriteFile(stub, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	plugin := filepath.Join(home, "index.mjs")
-	if err := os.WriteFile(plugin, []byte(openclawPluginJS(stub)), 0o644); err != nil {
+	if err = os.WriteFile(plugin, []byte(openclawPluginJS(stub)), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	// The ctx OpenClaw builds for these hooks carries both: the session key,
@@ -44,18 +44,18 @@ const ctx = { sessionKey: "agent:main:main", sessionId: "7efce465-14b2-4671-a4d0
 await handlers[` + "`" + hook + "`" + `](` + event + `, ctx);
 `
 	run := filepath.Join(home, "drive.mjs")
-	if err := os.WriteFile(run, []byte(driver), 0o644); err != nil {
+	if err = os.WriteFile(run, []byte(driver), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := exec.Command(node, run).CombinedOutput(); err != nil {
-		t.Fatalf("driving the plugin: %v\n%s", err, out)
+	if out, runErr := exec.CommandContext(t.Context(), node, run).CombinedOutput(); runErr != nil {
+		t.Fatalf("driving the plugin: %v\n%s", runErr, out)
 	}
 	b, err := os.ReadFile(calls)
 	if err != nil {
 		t.Fatalf("the plugin never ran deja: %v", err)
 	}
 	var got []map[string]any
-	for _, l := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+	for l := range strings.SplitSeq(strings.TrimSpace(string(b)), "\n") {
 		var m map[string]any
 		if err := json.Unmarshal([]byte(l), &m); err != nil {
 			t.Fatalf("payload %q: %v", l, err)

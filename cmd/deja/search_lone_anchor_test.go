@@ -63,19 +63,19 @@ func TestALoneRareAnchorIsServedOnlyAmongWordsTheCorpusKnows(t *testing.T) {
 	}
 	// Asked among words nothing has written, the same anchor is withheld: at
 	// that point deja cannot tell a question from a typo.
-	if out, _ := captureRun(t, "search", "why did retry_budget zzqx wwvv"); strings.Contains(out, "target") {
+	if out, _ = captureRun(t, "search", "why did retry_budget zzqx wwvv"); strings.Contains(out, "target") {
 		t.Errorf("answered on one anchor among words the corpus never saw:\n%s", out)
 	}
 	// The other half of the same condition, and a separate rule: a short query
 	// keeps the silence contract whatever its words are, because one lucky
 	// word out of two is not a question.
-	if out, _ := captureRun(t, "search", "retry_budget kkjh"); strings.Contains(out, "target") {
+	if out, _ = captureRun(t, "search", "retry_budget kkjh"); strings.Contains(out, "target") {
 		t.Errorf("a two-word query was answered on one of them:\n%s", out)
 	}
 	// Both words known, still two of them: the length floor is what withholds
 	// this one, and nothing else does. Without this case the floor can be
 	// lowered to two and every assertion above still passes.
-	if out, _ := captureRun(t, "search", "retry_budget production"); strings.Contains(out, "target") {
+	if out, _ = captureRun(t, "search", "retry_budget production"); strings.Contains(out, "target") {
 		t.Errorf("a two-word query was answered although the floor is three:\n%s", out)
 	}
 	// And the word on its own still answers exactly, which is the tier below.

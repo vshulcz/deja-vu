@@ -112,8 +112,8 @@ const changeContext = 2
 // the unchanged code around them. An edit's two sides share most of their
 // lines — the anchor the agent quoted to place it — and printing both whole
 // spent the budget on the same lines twice.
-func changeDiff(old, new string) string {
-	a, b := strings.Split(old, "\n"), strings.Split(new, "\n")
+func changeDiff(old, updated string) string {
+	a, b := strings.Split(old, "\n"), strings.Split(updated, "\n")
 	pre := 0
 	for pre < len(a) && pre < len(b) && a[pre] == b[pre] {
 		pre++
@@ -122,7 +122,7 @@ func changeDiff(old, new string) string {
 	for suf < len(a)-pre && suf < len(b)-pre && a[len(a)-1-suf] == b[len(b)-1-suf] {
 		suf++
 	}
-	var out []string
+	out := make([]string, 0, len(a)+len(b))
 	for _, l := range a[max(0, pre-changeContext):pre] {
 		out = append(out, "  "+l)
 	}

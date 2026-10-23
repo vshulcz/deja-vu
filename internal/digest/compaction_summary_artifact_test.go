@@ -22,13 +22,13 @@ func TestCompactionSummariesAreArtifacts(t *testing.T) {
 
 	// The control the issue names: an ordinary message that opens with the same
 	// word and carries none of the shape is still a title.
-	for _, real := range []string{
+	for _, plain := range []string{
 		"Summary: the retry queue double-acks under two shards",
 		"Summary: I moved the lock into the outbox writer, tests are green",
 		"summary of what we decided about the shipping queue",
 	} {
-		if IsAgentArtifact(real) {
-			t.Errorf("a real message was discarded as an artifact: %q", real)
+		if IsAgentArtifact(plain) {
+			t.Errorf("a real message was discarded as an artifact: %q", plain)
 		}
 	}
 }

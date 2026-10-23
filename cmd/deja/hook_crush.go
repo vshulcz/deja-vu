@@ -60,19 +60,25 @@ func crushExtras(dir string, raw []byte, sid, cwd string) string {
 	asked := alreadyInjected(dir, sid)
 	if st.FailureID != "" && !asked["crush-failure:"+st.FailureID] {
 		rememberInjectedIDs(dir, sid, "crush-failure:"+st.FailureID)
-		b, _ := json.Marshal(map[string]any{
+		b, err := json.Marshal(map[string]any{
 			"hook_event_name": "PostToolUse", "session_id": sid, "cwd": cwd,
 			"tool_name": "bash", "tool_response": st.Failure,
 		})
+		if err != nil {
+			return strings.Join(parts, "\n\n")
+		}
 		if pair := run("hook-tool-after", []string{"--plain"}, b); pair != "" {
 			parts = append(parts, pair)
 		}
 	}
 	if st.PromptID != "" && !asked["crush-prompt:"+st.PromptID] {
 		rememberInjectedIDs(dir, sid, "crush-prompt:"+st.PromptID)
-		b, _ := json.Marshal(map[string]any{
+		b, err := json.Marshal(map[string]any{
 			"hook_event_name": "UserPromptSubmit", "session_id": sid, "cwd": cwd, "prompt": st.Prompt,
 		})
+		if err != nil {
+			return strings.Join(parts, "\n\n")
+		}
 		if r := run("hook-prompt", []string{"--plain"}, b); r != "" {
 			parts = append(parts, r)
 		}

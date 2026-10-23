@@ -19,7 +19,7 @@ import (
 // checkCanvas fails when a row does not measure exactly the canvas width.
 func checkCanvas(t *testing.T, c *tui.Canvas, ctx string) {
 	t.Helper()
-	for y := 0; y < c.H; y++ {
+	for y := range c.H {
 		if got := termwidth.Columns(c.Text(y)); got != c.W {
 			t.Fatalf("%s: row %d measures %d, canvas %d: %q", ctx, y, got, c.W, c.Text(y))
 		}
@@ -41,19 +41,19 @@ func TestTUIRandomInputKeepsTheFrame(t *testing.T) {
 	dir, _ := tuiStore(t)
 	a := newTestTUI(t, dir)
 	a.forget = func(string) error { return nil }
-	rng := rand.New(rand.NewSource(1))
+	rng := rand.New(rand.NewSource(1)) //nolint:gosec // seeded fuzz input, not crypto
 	runes := []rune("abwebhookretry 支付重试🚀✅?/qjknNtR[]gGo1239:ïé")
 	words := []string{"codex:", "claude:", "today", "yesterday", "week", "last month", "in:payments", "in:", "foo:", "webhook", "支付", "🚀🚀"}
 	keys := []tui.Key{tui.KeyUp, tui.KeyDown, tui.KeyPgUp, tui.KeyPgDn, tui.KeyHome, tui.KeyEnd, tui.KeyTab, tui.KeyBackTab,
 		tui.KeyEnter, tui.KeyEsc, tui.KeyBackspace, tui.KeyLeft, tui.KeyRight}
 	sizes := [][2]int{{80, 24}, {60, 20}, {40, 15}, {300, 80}, {120, 36}, {96, 18}, {95, 17}, {20, 6}}
-	var log []string
+	log := make([]string, 0, 400)
 	defer func() {
 		if r := recover(); r != nil {
 			t.Fatalf("panic %v after:\n%s", r, strings.Join(log[max(0, len(log)-30):], "\n"))
 		}
 	}()
-	for step := 0; step < 400; step++ {
+	for step := range 400 {
 		var ev tui.Event
 		switch rng.Intn(7) {
 		case 0, 1:
@@ -85,16 +85,20 @@ func TestTUIRandomInputKeepsTheFrame(t *testing.T) {
 }
 
 // addClaudeSession adds one Claude session with the given messages to the store.
-func addClaudeSession(t *testing.T, dir, root, project, id, at string, msgs ...[2]string) {
+func addClaudeSession(t *testing.T, dir, root, id, at string, msgs ...[2]string) {
 	t.Helper()
-	var lines []string
+	const project = "payments"
+	lines := make([]string, 0, len(msgs))
 	for _, m := range msgs {
 		var content any = m[1]
 		if m[0] == "assistant" {
 			content = []map[string]any{{"type": "text", "text": m[1]}}
 		}
-		b, _ := json.Marshal(map[string]any{"type": m[0], "sessionId": id, "cwd": "/work/" + project, "timestamp": at,
+		b, err := json.Marshal(map[string]any{"type": m[0], "sessionId": id, "cwd": "/work/" + project, "timestamp": at,
 			"message": map[string]any{"role": m[0], "content": content}})
+		if err != nil {
+			t.Fatal(err)
+		}
 		lines = append(lines, string(b))
 	}
 	writeClaudeFixture(t, filepath.Join(root, project, id+".jsonl"), id, lines)
@@ -120,7 +124,7 @@ func openByID(t *testing.T, a *tuiApp, id string) {
 func TestTUIReaderShowsAHitPastTheEdge(t *testing.T) {
 	dir, root := tuiStore(t)
 	long := strings.Repeat("padding ", 30) + "zanzibarneedle at the end"
-	addClaudeSession(t, dir, root, "payments", "e5555555-long", "2026-03-04T09:00:00Z",
+	addClaudeSession(t, dir, root, "e5555555-long", "2026-03-04T09:00:00Z",
 		[2]string{"user", "where does the log mention it"},
 		[2]string{"assistant", "Here is the line:\n\n    " + long})
 	a := newTestTUI(t, dir)
@@ -136,11 +140,11 @@ func TestTUIReaderShowsAHitPastTheEdge(t *testing.T) {
 func TestTUIFindReachesPastTheUnfoldCap(t *testing.T) {
 	dir, root := tuiStore(t)
 	var b strings.Builder
-	for i := 0; i < 450; i++ {
+	for i := range 450 {
 		fmt.Fprintf(&b, "line %d of the build log\n", i)
 	}
 	b.WriteString("FATAL quokkaerror in the linker\n")
-	addClaudeSession(t, dir, root, "payments", "e5555555-log", "2026-03-04T09:00:00Z",
+	addClaudeSession(t, dir, root, "e5555555-log", "2026-03-04T09:00:00Z",
 		[2]string{"user", "why does the build fail"},
 		[2]string{"assistant", b.String()})
 	a := newTestTUI(t, dir)
@@ -193,7 +197,7 @@ func TestTUIReaderTakesTheNewRead(t *testing.T) {
 		<-a.loadQ
 	}
 	a.loading = map[string]bool{}
-	addClaudeSession(t, dir, root, "payments", "c3333333-hook", "2026-03-04T11:00:00Z",
+	addClaudeSession(t, dir, root, "c3333333-hook", "2026-03-04T11:00:00Z",
 		[2]string{"user", "webhook signature fails after key rotation"},
 		[2]string{"assistant", "Verify against every published key."},
 		[2]string{"user", "and now the brandnewfollowup question"})
@@ -223,7 +227,7 @@ func forgetSessionForTest(dir, id string) error {
 	old := os.Stdout
 	null, _ := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
 	os.Stdout = null
-	defer func() { os.Stdout = old; null.Close() }()
+	defer func() { os.Stdout = old; _ = null.Close() }()
 	return runForget(dir, []string{"--session", id})
 }
 
@@ -242,7 +246,7 @@ func openByIDNoLoad(t *testing.T, a *tuiApp, id string) {
 // Text a macOS tool wrote decomposed is found by / typed composed.
 func TestTUIFindMatchesDecomposedText(t *testing.T) {
 	dir, root := tuiStore(t)
-	addClaudeSession(t, dir, root, "payments", "e5555555-nfd", "2026-03-04T09:00:00Z",
+	addClaudeSession(t, dir, root, "e5555555-nfd", "2026-03-04T09:00:00Z",
 		[2]string{"user", "where is the config"},
 		[2]string{"assistant", "It lives under ~/Documents/Résumé/config.toml now."})
 	a := newTestTUI(t, dir)

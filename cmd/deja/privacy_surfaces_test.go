@@ -13,10 +13,13 @@ import (
 // Every value below is synthetic.
 
 func privacyLine(sid, role, ts, text string) string {
-	b, _ := json.Marshal(map[string]any{
+	b, err := json.Marshal(map[string]any{
 		"type": role, "sessionId": sid, "timestamp": ts, "cwd": "/Users/alicehunt/src/app",
 		"message": map[string]any{"role": role, "content": text},
 	})
+	if err != nil {
+		panic(err)
+	}
 	return string(b)
 }
 
@@ -27,7 +30,7 @@ func TestColoredSecretIsMaskedOnEverySurface(t *testing.T) {
 	tmp := hermeticEnv(t)
 	store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-Users-alicehunt-src-app")
 	const val = "Qx7vR2mK9pL4sT8wZ3nB6yH1jF5dG0cA"
-	const gh = "ghp_FAKEaaaaBBBBccccDDDDeeeeFFFFgggg1234"
+	const gh = "ghp_FAKEaaaaBBBBccccDDDDeeeeFFFFgggg1234" //nolint:gosec // G101: synthetic token the test masks
 	writeClaudeFixture(t, filepath.Join(store, "ansi1.jsonl"), "ansi1", []string{
 		privacyLine("ansi1", "user", "2026-05-01T10:00:00Z", "here is the env:\nDEPLOY_API_TOKEN\x1b[0m=\x1b[33m"+val+"\x1b[0m\nok"),
 		privacyLine("ansi1", "assistant", "2026-05-01T10:01:00Z", "the token ghp_\x1b[1m"+gh[4:]+"\x1b[0m is loaded"),

@@ -31,7 +31,7 @@ func runHookCapturing(t *testing.T, dir, event string) string {
 		done <- string(b)
 	}()
 	go func() {
-		_, _ = inW.Write([]byte(event + "\n"))
+		_, _ = inW.WriteString(event + "\n")
 		_ = inW.Close()
 	}()
 	if err := runHookContext(dir, false); err != nil {
@@ -65,18 +65,11 @@ func TestHookSizeMatchesWhatTheCountersReport(t *testing.T) {
 	if err := index.Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
-	back, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
 	work := filepath.Join(tmp, "proj")
-	if err := os.MkdirAll(work, 0o755); err != nil {
-		t.Fatal(err)
+	if merr := os.MkdirAll(work, 0o755); merr != nil {
+		t.Fatal(merr)
 	}
-	if err := os.Chdir(work); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(back) })
+	t.Chdir(work)
 
 	out := runHookCapturing(t, dir, `{"hook_event_name":"SessionStart","session_id":"probe","cwd":"`+work+`"}`)
 	var resp struct {
@@ -85,8 +78,8 @@ func TestHookSizeMatchesWhatTheCountersReport(t *testing.T) {
 			Context string `json:"additionalContext"`
 		} `json:"hookSpecificOutput"`
 	}
-	if err := json.Unmarshal([]byte(out), &resp); err != nil {
-		t.Fatalf("hook output is not JSON: %v\n%s", err, out)
+	if uerr := json.Unmarshal([]byte(out), &resp); uerr != nil {
+		t.Fatalf("hook output is not JSON: %v\n%s", uerr, out)
 	}
 	if resp.SystemMessage == "" {
 		t.Skip("no memory to recall in this environment")

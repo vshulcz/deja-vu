@@ -21,7 +21,7 @@ func TestAiderSessionIDDoesNotDependOnItsPlaceInTheFile(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		var ids []string
+		ids := make([]string, 0, len(ss))
 		for _, s := range ss {
 			ids = append(ids, s.ID)
 		}

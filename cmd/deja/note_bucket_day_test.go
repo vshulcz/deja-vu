@@ -48,16 +48,16 @@ func TestANoteBucketShowsTheDayItsIdNames(t *testing.T) {
 	// A transcript is still shown in the reader's zone: the rule is about
 	// deja's own day buckets, not about every session (#849).
 	store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
-	if err := os.MkdirAll(store, 0o755); err != nil {
+	if err = os.MkdirAll(store, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	// Its id even looks like a bucket id: the rule keys on the harness, not on
 	// the shape of the string.
 	line := `{"type":"user","message":{"role":"user","content":"pool exhausted"},"timestamp":"2026-07-16T21:01:00Z","sessionId":"deja-2026-07-16-lookalike","cwd":"/proj"}`
-	if err := os.WriteFile(filepath.Join(store, "s1.jsonl"), []byte(line+"\n"), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(store, "s1.jsonl"), []byte(line+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := captureRunStderr(t, "index"); err != nil {
+	if _, err = captureRunStderr(t, "index"); err != nil {
 		t.Fatal(err)
 	}
 	out, err = captureRun(t, "last")
@@ -101,7 +101,7 @@ func TestTheDateColumnRunsOneWayDownTheScreen(t *testing.T) {
 		t.Fatal(err)
 	}
 	dates := []string{}
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(out), "\n") {
 		parts := regexp.MustCompile(`\s{2,}`).Split(line, -1)
 		if len(parts) < 3 {
 			continue

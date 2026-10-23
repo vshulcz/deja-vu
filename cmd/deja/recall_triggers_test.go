@@ -87,9 +87,9 @@ func TestSkillDescriptionsParseAsPlainYAML(t *testing.T) {
 		"registry skill": cliSkillRegistryFile(),
 	} {
 		var desc string
-		for _, line := range strings.Split(file, "\n") {
-			if strings.HasPrefix(line, "description: ") {
-				desc = strings.TrimPrefix(line, "description: ")
+		for line := range strings.SplitSeq(file, "\n") {
+			if after0, ok := strings.CutPrefix(line, "description: "); ok {
+				desc = after0
 			}
 		}
 		if desc == "" {

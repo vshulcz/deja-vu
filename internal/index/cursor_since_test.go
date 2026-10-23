@@ -12,7 +12,7 @@ func cursorBubble(cid, bid string, typ int, text string, at int64) string {
 	return fmt.Sprintf(`insert or replace into cursorDiskKV values ('bubbleId:%s:%s', json('{"type":%d,"text":"%s","timestamp":%d,"workspaceProjectDir":"/tmp/proj"}'));`+"\n", cid, bid, typ, text, at)
 }
 
-func cursorComposer(cid, name string, created, updated int64) string {
+func cursorComposer(cid, name string, created, updated int64) string { //nolint:unparam // the call spells out the row's times
 	return fmt.Sprintf(`insert or replace into cursorDiskKV values ('composerData:%s', json('{"composerId":"%s","name":"%s","createdAt":%d,"lastUpdatedAt":%d}'));`+"\n", cid, cid, name, created, updated)
 }
 
@@ -34,7 +34,7 @@ func TestACursorChatContinuedOrRenamedMatchesARebuild(t *testing.T) {
 	}
 	sql := func(stmts string) {
 		t.Helper()
-		if out, err := exec.Command("sqlite3", db, stmts).CombinedOutput(); err != nil {
+		if out, err := exec.CommandContext(t.Context(), "sqlite3", db, stmts).CombinedOutput(); err != nil {
 			t.Fatalf("sqlite3: %v %s", err, out)
 		}
 	}

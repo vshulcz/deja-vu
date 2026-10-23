@@ -43,7 +43,7 @@ func writeFrictionCorpus(t *testing.T, root string, n int) {
 		}
 		return string(b)
 	}
-	for i := 0; i < n; i++ {
+	for i := range n {
 		sid := fmt.Sprintf("frict%02d", i)
 		rows := []string{
 			line(sid, "user", "run the deploy script for the staging cluster"),

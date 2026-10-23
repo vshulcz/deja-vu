@@ -27,7 +27,7 @@ func TestARealEventFitsItsRoom(t *testing.T) {
 	// number of ids, an answer holds more sessions when each says less, and an
 	// id is as long as a filename may be. Long turns would cut the answer to a
 	// handful of sessions and measure nothing.
-	for i := 0; i < 60; i++ {
+	for i := range 60 {
 		id := strings.Repeat("a", 246) + string(rune('a'+i%26)) + string(rune('a'+(i/26)%26))
 		seedClaude(t, claude, "app", id, "pgbouncer timed out", "we retried")
 	}
@@ -45,7 +45,7 @@ func TestARealEventFitsItsRoom(t *testing.T) {
 	}
 	var widest int
 	var carried int
-	for _, line := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(string(b)), "\n") {
 		var e usage.Event
 		if json.Unmarshal([]byte(line), &e) != nil {
 			continue

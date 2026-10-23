@@ -236,13 +236,13 @@ func foldRune(r rune) rune {
 		}
 		return r
 	}
-	min := r
+	lowest := r
 	for f := unicode.SimpleFold(r); f != r; f = unicode.SimpleFold(f) {
-		if f < min {
-			min = f
+		if f < lowest {
+			lowest = f
 		}
 	}
-	return min
+	return lowest
 }
 
 // foldPages caches foldRune for the Basic Multilingual Plane a page of 256
@@ -264,7 +264,7 @@ func foldCached(r rune) rune {
 			if f > 0xFFFF {
 				f = base + rune(i) // never happens in the BMP; keeps the table honest
 			}
-			pg[i] = uint16(f)
+			pg[i] = uint16(f) //nolint:gosec // f <= 0xFFFF by the check above
 		}
 		foldPages[r>>8].Store(pg)
 	}
@@ -368,10 +368,7 @@ func delimAt(s string, i int, eqOnly bool) (int, bool) {
 
 // firstOf is the first byte of set in s[i:i+limit], or 0.
 func firstOf(s string, i, limit int, set string) (int, byte) {
-	end := i + limit
-	if end > len(s) {
-		end = len(s)
-	}
+	end := min(i+limit, len(s))
 	if j := strings.IndexAny(s[i:end], set); j >= 0 {
 		return i + j, s[i+j]
 	}
@@ -432,7 +429,8 @@ var (
 	genericKVFind = newFinder(genericKVRE, 64, true,
 		[]string{"key", "secret", "token", "passw", "authorization"},
 		func(v *view, k int) (int, int, bool) {
-			start, end := k, -1
+			start := k
+			var end int
 			switch {
 			case hasAt(v.f, k, "KEY"):
 				start = apiKeyBefore(v.f, k, false)
@@ -581,11 +579,8 @@ var (
 		})
 
 	passwordFlagFind = newFinder(passwordFlagRE, 2, true, flagHints,
-		func(v *view, k int) (int, int, bool) {
-			lo := k - 2
-			if lo < 0 {
-				lo = 0
-			}
+		func(_ *view, k int) (int, int, bool) {
+			lo := max(k-2, 0)
 			return lo, k, true
 		})
 
@@ -674,15 +669,15 @@ var (
 	authTokenFind    = newFinder(authTokenRE, 0, true, []string{"authorization"}, wordStart)
 	jwtFind          = newFinder(jwtRE, 0, false, []string{"eyJ"}, wordStart)
 	awsAccessKeyFind = newFinder(awsAccessKeyRE, 0, false, []string{"AKIA", "ASIA"},
-		func(v *view, k int) (int, int, bool) { return unique(k) })
+		func(_ *view, k int) (int, int, bool) { return unique(k) })
 	webhookFind = newFinder(webhookPathRE, 0, false, []string{"/services/", "/workflows/", "/triggers/", "/api/webhooks/"},
-		func(v *view, k int) (int, int, bool) { return unique(k) })
+		func(_ *view, k int) (int, int, bool) { return unique(k) })
 	// `(?:^|\s)(?:-u|--user)`: the space sits one or two bytes before the "-u".
 	userPairFind = newFinder(userPairRE, 2, true, []string{"-u"},
-		func(v *view, k int) (int, int, bool) { return max(k-2, 0), k, true })
+		func(_ *view, k int) (int, int, bool) { return max(k-2, 0), k, true })
 	// `\b(?:set-)?cookie:` starts at the "set-" when there is one.
 	cookieFind = newFinder(cookieRE, 4, true, []string{"cookie:"},
-		func(v *view, k int) (int, int, bool) { return max(k-4, 0), k, true })
+		func(_ *view, k int) (int, int, bool) { return max(k-4, 0), k, true })
 	// The digits before ":A" are the whole run behind a non-digit, five to
 	// sixteen of them.
 	telegramFind = newFinder(telegramBotTokenRE, 0, false, []string{":A"},

@@ -32,7 +32,7 @@ func TestQueryIsRedactedAndSentOnce(t *testing.T) {
 	hits := []search.Hit{{Session: session("a"), Score: 10}, {Session: session("b"), Score: 0}}
 	sidecar := Sidecar{Vectors: []Vector{{Key: "claude:a", Values: []float32{1, 0}}, {Key: "claude:b", Values: []float32{0, 1}}}}
 	client := &Client{URL: s.URL, Model: "m"}
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		if _, err := Rerank(context.Background(), hits, query, sidecar, client); err != nil {
 			t.Fatal(err)
 		}

@@ -7,6 +7,8 @@ import (
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
+// Rerank reorders the top hits by an even blend of their lexical score and
+// their cosine similarity to the query.
 func Rerank(ctx context.Context, hits []search.Hit, query string, sidecar Sidecar, client *Client) ([]search.Hit, error) {
 	if len(hits) == 0 || len(sidecar.Vectors) == 0 {
 		return hits, nil
@@ -15,18 +17,15 @@ func Rerank(ctx context.Context, hits []search.Hit, query string, sidecar Sideca
 	if err != nil {
 		return nil, err
 	}
-	limit := len(hits)
-	if limit > 64 {
-		limit = 64
-	}
-	max := hits[0].Score
-	min := hits[0].Score
+	limit := min(len(hits), 64)
+	hi := hits[0].Score
+	lo := hits[0].Score
 	for _, h := range hits[:limit] {
-		if h.Score > max {
-			max = h.Score
+		if h.Score > hi {
+			hi = h.Score
 		}
-		if h.Score < min {
-			min = h.Score
+		if h.Score < lo {
+			lo = h.Score
 		}
 	}
 	// Only candidate sessions need a similarity; skipping the rest keeps the
@@ -49,8 +48,8 @@ func Rerank(ctx context.Context, hits []search.Hit, query string, sidecar Sideca
 	for i := range hits[:limit] {
 		key := hits[i].Session.Harness + ":" + hits[i].Session.ID
 		bm := 1.0
-		if max != min {
-			bm = (hits[i].Score - min) / (max - min)
+		if hi != lo {
+			bm = (hits[i].Score - lo) / (hi - lo)
 		}
 		hits[i].Score = 0.5*bm + 0.5*cosines[key]
 	}

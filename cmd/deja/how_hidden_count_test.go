@@ -19,8 +19,8 @@ func TestHowCountsWithheldSessionsNotRecords(t *testing.T) {
 	if err := os.MkdirAll(store, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	var lines []string
-	for i := 0; i < 5; i++ {
+	lines := make([]string, 0, 5)
+	for i := range 5 {
 		lines = append(lines, `{"type":"assistant","timestamp":"2026-07-10T10:0`+string(rune('0'+i))+`:00Z","sessionId":"bbbb0002-1111-4000-8000-d6e7f8a9b0c1","cwd":"/api","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"go test ./..."}}]}}`)
 	}
 	if err := os.WriteFile(filepath.Join(store, "bbbb0002.jsonl"), []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {

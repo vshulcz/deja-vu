@@ -1,7 +1,6 @@
 package sources
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -43,8 +42,10 @@ func capParsedMessage(s string) string {
 	return s[:cut]
 }
 
+// Source is a named harness root.
 type Source struct{ Name, Root string }
 
+// Home is the user's home dir, empty when it cannot be found.
 func Home() string { h, _ := os.UserHomeDir(); return h }
 
 // ConfigHome is the XDG config base for deja's own files: the tombstones, the
@@ -65,6 +66,7 @@ func ConfigHome() string {
 // ConfigDir is deja's own directory under ConfigHome.
 func ConfigDir() string { return filepath.Join(ConfigHome(), "deja") }
 
+// EnvPath returns env var k, or def when it is unset or empty.
 func EnvPath(k, def string) string {
 	if v := os.Getenv(k); v != "" {
 		return v
@@ -324,7 +326,7 @@ func leadingJSONLHeader(path string, offset int64, lookahead int, isHeader func(
 		return nil
 	}
 	defer f.Close()
-	r := jsonlReaders.Get().(*bufio.Reader)
+	r := jsonlReader()
 	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
 	r.Reset(io.LimitReader(f, offset))
 	for range lookahead {
@@ -415,7 +417,7 @@ func scanJSONLFromOffset(path string, offset int64, fn func(map[string]any)) err
 // The buffer comes from jsonlReaders: allocated per file it was 11.7 GB of a
 // 12k-session cold build, a megabyte a transcript (#5586).
 func scanJSONLReader(path string, src io.Reader, fn func(map[string]any)) error {
-	r := jsonlReaders.Get().(*bufio.Reader)
+	r := jsonlReader()
 	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
 	r.Reset(src)
 	for {
@@ -571,17 +573,12 @@ func parseFiles(files []string, parse func(string) ([]model.Session, error)) []m
 		ss []model.Session
 	})
 	var wg sync.WaitGroup
-	n := runtime.NumCPU()
-	if len(files) < n {
-		n = len(files)
-	}
+	n := min(len(files), runtime.NumCPU())
 	if n == 0 {
 		return nil
 	}
-	for i := 0; i < n; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range n {
+		wg.Go(func() {
 			for j := range jobs {
 				ss, err := ReadWatched(j.p, func() ([]model.Session, error) { return safeParse(j.p, parse) })
 				diagFileError(j.p, err)
@@ -591,7 +588,7 @@ func parseFiles(files []string, parse func(string) ([]model.Session, error)) []m
 					ss []model.Session
 				}{i: j.i, ss: ss}
 			}
-		}()
+		})
 	}
 	go func() {
 		for i, f := range files {
@@ -744,7 +741,7 @@ func (d toolDialect) callPath(in map[string]any) string {
 	return p
 }
 
-func toolPart(it any, d toolDialect) (name string, in map[string]any, ok bool) {
+func toolPart(it any, _ toolDialect) (name string, in map[string]any, ok bool) {
 	m, ok := it.(map[string]any)
 	if !ok {
 		return "", nil, false
@@ -1120,7 +1117,7 @@ func readJSONFile(path string) ([]byte, error) {
 	}
 	defer func() { _ = f.Close() }()
 	var buf bytes.Buffer
-	if fi, err := f.Stat(); err == nil && fi.Size() > 0 {
+	if fi, statErr := f.Stat(); statErr == nil && fi.Size() > 0 {
 		buf.Grow(int(fi.Size()) + bytes.MinRead)
 	}
 	_, err = buf.ReadFrom(watchedReader(path, f))

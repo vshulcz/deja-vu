@@ -25,10 +25,10 @@ func TestAPlanFindingNamesTheRemedyDejaKnows(t *testing.T) {
 		t.Fatal(err)
 	}
 	wall := "pgbouncer: error: connection refused while starting the migration runner pool"
-	at := func(min int) string {
-		return time.Now().Add(-time.Duration(min) * time.Minute).UTC().Format(time.RFC3339)
+	at := func(mins int) string {
+		return time.Now().Add(-time.Duration(mins) * time.Minute).UTC().Format(time.RFC3339)
 	}
-	for k := 0; k < 4; k++ {
+	for k := range 4 {
 		sid := fmt.Sprintf("pool%d", k)
 		lines := []string{
 			fmt.Sprintf(`{"type":"user","sessionId":%q,"timestamp":%q,"cwd":"/work/app","message":{"role":"user","content":"switch the connection pool to pgbouncer for the migrations"}}`, sid, at(400-30*k)),
@@ -42,7 +42,7 @@ func TestAPlanFindingNamesTheRemedyDejaKnows(t *testing.T) {
 		}
 	}
 	// Enough unrelated history that the plan's words identify something.
-	for i := 0; i < 40; i++ {
+	for i := range 40 {
 		sid := fmt.Sprintf("noise%d", i)
 		line := fmt.Sprintf(`{"type":"user","sessionId":%q,"timestamp":%q,"cwd":"/work/app","message":{"role":"user","content":"unrelated question %d about the css build and postcss"}}`, sid, at(200-2*i), i)
 		if err := os.WriteFile(filepath.Join(store, sid+".jsonl"), []byte(line+"\n"), 0o644); err != nil {

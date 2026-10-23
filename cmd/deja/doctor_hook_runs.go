@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -33,7 +34,7 @@ func claudeHookRunNote(hooks map[string]any) string {
 	if err := exec.CommandContext(ctx, sh, "-c", "command -v "+exe).Run(); err == nil || ctx.Err() != nil {
 		// A shell too slow to answer is not evidence the hook is broken.
 		return ""
-	} else if _, ok := err.(*exec.ExitError); !ok {
+	} else if !errors.As(err, new(*exec.ExitError)) {
 		return ""
 	}
 	// A file that is there and cannot run fails the same lookup; it exits 126,

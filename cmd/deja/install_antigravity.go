@@ -34,7 +34,7 @@ func installAntigravityPlugin(exe string, uninstall bool) (installResult, error)
 	dir := filepath.Join(antigravityConfigHome(), "plugins", antigravityPluginName)
 	if uninstall {
 		if _, err := os.Stat(dir); err != nil {
-			return installResult{Path: dir, Action: "unchanged"}, nil
+			return installResult{Path: dir, Action: "unchanged"}, nil //nolint:nilerr // nothing to remove
 		}
 		if err := os.RemoveAll(dir); err != nil {
 			return installResult{}, err
@@ -58,8 +58,8 @@ func installAntigravityPlugin(exe string, uninstall bool) (installResult, error)
 	if err != nil {
 		return installResult{}, err
 	}
-	if _, err := writeIfChanged(manifestPath, oldManifest, manifest); err != nil {
-		return installResult{}, err
+	if _, werr := writeIfChanged(manifestPath, oldManifest, manifest); werr != nil {
+		return installResult{}, werr
 	}
 	hooksPath := filepath.Join(dir, "hooks.json")
 	oldHooks, err := readConfig(hooksPath)

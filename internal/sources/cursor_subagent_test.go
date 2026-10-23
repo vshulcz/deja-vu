@@ -25,7 +25,7 @@ func TestACursorSubagentNamesItsParentAndKeepsWhatItChanged(t *testing.T) {
 	b.WriteString(`{"role":"user","message":{"content":[{"type":"text","text":"Write the release notes into notes.txt"}]}}` + "\n")
 	b.WriteString(`{"role":"assistant","message":{"content":[{"type":"text","text":"Writing it."},{"type":"tool_use","name":"Write","input":{"path":"/x/app/notes.txt","contents":"zebrafinch release notes, line one of them\n"}}]}}` + "\n")
 	// Enough reading after the write that the tail cut has a middle to drop.
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		fmt.Fprintf(&b, `{"role":"assistant","message":{"content":[{"type":"text","text":"checking step %d"}]}}`+"\n", i)
 	}
 	b.WriteString(`{"role":"assistant","message":{"content":[{"type":"text","text":"Done: notes.txt holds the notes."}]}}` + "\n")

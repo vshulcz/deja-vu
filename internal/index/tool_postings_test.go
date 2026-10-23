@@ -29,11 +29,11 @@ func TestPostingRoundTripCarriesTheToolBit(t *testing.T) {
 func TestCapKeepsSpeechBeforeToolRecords(t *testing.T) {
 	// One session, four sentences and ninety-six command lines. Reading only
 	// half the session's postings must not spend the whole budget on commands.
-	var posts []posting
-	for i := 0; i < 4; i++ {
+	posts := make([]posting, 0, 100)
+	for i := range 4 {
 		posts = append(posts, posting{Off: int64(i), Sid: 7})
 	}
-	for i := 0; i < 96; i++ {
+	for i := range 96 {
 		posts = append(posts, posting{Off: int64(100 + i), Sid: 7, Tool: true})
 	}
 	got := capPostingsPerSession(posts, 50)
@@ -54,11 +54,11 @@ func TestCapKeepsSpeechBeforeToolRecords(t *testing.T) {
 }
 
 func TestCapSpendsEverythingOnSpeechWhenThereIsEnoughOfIt(t *testing.T) {
-	var posts []posting
-	for i := 0; i < 80; i++ {
+	posts := make([]posting, 0, 160)
+	for i := range 80 {
 		posts = append(posts, posting{Off: int64(i), Sid: 3})
 	}
-	for i := 0; i < 80; i++ {
+	for i := range 80 {
 		posts = append(posts, posting{Off: int64(1000 + i), Sid: 3, Tool: true})
 	}
 	got := capPostingsPerSession(posts, 20)
@@ -126,7 +126,7 @@ func TestTopTouchedFilesRanksAndFiltersAgentFiles(t *testing.T) {
 
 func TestTopTouchedFilesIsCapped(t *testing.T) {
 	var b strings.Builder
-	for i := 0; i < 40; i++ {
+	for i := range 40 {
 		fmt.Fprintf(&b, "/w/f%02d.go\n", i)
 	}
 	if got := topTouchedFiles([]model.Message{{Role: roleFiles, Text: b.String()}}); len(got) != touchedFileCap {
@@ -147,7 +147,7 @@ func TestSignalLinesKeepsShortOutputWhole(t *testing.T) {
 
 func TestSignalLinesFiltersLongLogs(t *testing.T) {
 	var b strings.Builder
-	for i := 0; i < 400; i++ {
+	for i := range 400 {
 		fmt.Fprintf(&b, "downloading github.com/example/module/v%d\n", i)
 	}
 	b.WriteString("--- FAIL: TestRetry (0.01s)\n")

@@ -60,7 +60,7 @@ func TestClaudeHookUninstallNeverLeavesNullHooks(t *testing.T) {
 		t.Fatalf("install/uninstall/install left %d entries, want 1: %#v", len(entries), entries)
 	}
 	for _, e := range entries {
-		entry := e.(map[string]any)
+		entry := typedOrFatal[map[string]any](t, e)
 		hs, ok := entry["hooks"].([]any)
 		if !ok || len(hs) == 0 {
 			t.Fatalf("entry with null/empty hooks survived: %#v", entry)

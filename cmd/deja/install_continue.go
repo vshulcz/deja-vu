@@ -79,8 +79,8 @@ func installContinue(exe string, uninstall bool) (installResult, error) {
 	}
 
 	noteCreatedDirs(filepath.Dir(path))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return installResult{}, err
+	if merr := os.MkdirAll(filepath.Dir(path), 0o755); merr != nil {
+		return installResult{}, merr
 	}
 	next = keepTrailingNewline(string(old), next)
 	if crlf {
@@ -141,7 +141,7 @@ func yamlBlockEnd(text string, from int) int {
 // and any comment or blank line after it, an indented line follows: the
 // comment then sits inside the block rather than closing it (#4289).
 func yamlBlockGoesOn(rest string) bool {
-	for _, line := range strings.Split(rest, "\n") {
+	for line := range strings.SplitSeq(rest, "\n") {
 		t := strings.TrimSpace(line)
 		if t == "" || strings.HasPrefix(t, "#") {
 			continue
@@ -154,7 +154,7 @@ func yamlBlockGoesOn(rest string) bool {
 // removeContinueItem drops the list item under key whose mapping opens with the
 // given name. Ours is found by the name rather than by a marker comment,
 // because that is the field Continue itself keys these lists by.
-func removeContinueItem(text, key, name string) string {
+func removeContinueItem(text, key, name string) string { //nolint:unparam // the name is what the item is found by
 	start := yamlKeyLineEnd(text, key+":")
 	if start < 0 {
 		return text

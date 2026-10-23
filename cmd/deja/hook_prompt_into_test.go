@@ -48,7 +48,7 @@ func TestHookPromptRecordsTheSessionItAnswered(t *testing.T) {
 		t.Fatal(err)
 	}
 	var found bool
-	for _, line := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(string(b)), "\n") {
 		var snap usage.Snapshot
 		if json.Unmarshal([]byte(line), &snap) != nil {
 			continue

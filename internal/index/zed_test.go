@@ -20,7 +20,7 @@ func zedThreadRow(t *testing.T, id, title, updated, text string) string {
 	body := `{"version":"0.3.0","title":"` + title + `","updated_at":"` + updated + `","messages":[` +
 		`{"User":{"id":"u-` + id + `","content":[{"Text":"` + text + `"}]}},` +
 		`{"Agent":{"content":[{"Text":"reply to ` + id + `"}],"tool_results":{}}}]}`
-	cmd := exec.Command("zstd", "-q", "-3", "-c")
+	cmd := exec.CommandContext(t.Context(), "zstd", "-q", "-3", "-c")
 	cmd.Stdin = strings.NewReader(body)
 	var out bytes.Buffer
 	cmd.Stdout = &out
@@ -54,7 +54,7 @@ func TestZedIncrementalKeepsUntouchedThreads(t *testing.T) {
     folder_paths text, folder_paths_order text, created_at text);`
 	run := func(sql string) {
 		t.Helper()
-		cmd := exec.Command("sqlite3", db)
+		cmd := exec.CommandContext(t.Context(), "sqlite3", db)
 		cmd.Stdin = strings.NewReader(sql)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("seed: %v: %s", err, out)
@@ -102,7 +102,7 @@ func TestZedStoreIsDiscoveredAndTagged(t *testing.T) {
     id text primary key, summary text not null, updated_at text not null,
     data_type text not null, data blob not null, parent_id text,
     folder_paths text, folder_paths_order text, created_at text);`
-	cmd := exec.Command("sqlite3", db)
+	cmd := exec.CommandContext(t.Context(), "sqlite3", db)
 	cmd.Stdin = strings.NewReader(schema + zedThreadRow(t, "zed-tagged", "tagged", "2026-07-19T12:00:00+00:00", "zedtaggedfact about the parser"))
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("seed: %v: %s", err, out)

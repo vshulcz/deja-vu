@@ -24,7 +24,7 @@ func TestIndexRegroupsNotesGroupedInAnotherZone(t *testing.T) {
 	t.Setenv("DEJA_NOTES_FILE", notes)
 	dir := filepath.Join(tmp, "idx")
 
-	append := func(line string) {
+	addNote := func(line string) {
 		t.Helper()
 		f, err := os.OpenFile(notes, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 		if err != nil {
@@ -46,8 +46,8 @@ func TestIndexRegroupsNotesGroupedInAnotherZone(t *testing.T) {
 
 	// Two days apart in UTC, one day in UTC+14: the index built here splits
 	// them, and carrying the laptop east regroups them.
-	append(`{"ts":"2026-07-20T23:45:00Z","project":"tz","text":"the anemometer drifted"}`)
-	append(`{"ts":"2026-07-21T09:00:00Z","project":"tz","text":"the barometer drifted too"}`)
+	addNote(`{"ts":"2026-07-20T23:45:00Z","project":"tz","text":"the anemometer drifted"}`)
+	addNote(`{"ts":"2026-07-21T09:00:00Z","project":"tz","text":"the barometer drifted too"}`)
 	inZone(time.UTC, func() {
 		if err := index.Ensure(dir, "", false, nil); err != nil {
 			t.Fatal(err)
@@ -75,7 +75,7 @@ func TestIndexRegroupsNotesGroupedInAnotherZone(t *testing.T) {
 	if n != 1 {
 		t.Errorf("deja index left %d note buckets for one day, want 1 — it said:\n%s", n, out)
 	}
-	if !strings.Contains(string(out), "another time zone") {
+	if !strings.Contains(out, "another time zone") {
 		t.Errorf("deja index regrouped without saying why:\n%s", out)
 	}
 }

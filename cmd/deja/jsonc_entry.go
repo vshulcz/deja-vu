@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -335,9 +336,9 @@ func closeEmptied(text string, keys []string) string {
 func nestedBlocks(keys []string, id, entry, indent string) string {
 	entry = strings.ReplaceAll(entry, "\n    ", "\n"+indent+strings.Repeat("  ", len(keys)))
 	body := fmt.Sprintf("%q: %s", id, entry)
-	for i := len(keys) - 1; i >= 0; i-- {
+	for i, key := range slices.Backward(keys) {
 		inner := indent + strings.Repeat("  ", i+1)
-		body = fmt.Sprintf("%q: {\n%s%s\n%s}", keys[i], inner, body, indent+strings.Repeat("  ", i))
+		body = fmt.Sprintf("%q: {\n%s%s\n%s}", key, inner, body, indent+strings.Repeat("  ", i))
 	}
 	return "\n" + indent + body
 }

@@ -196,19 +196,19 @@ func TestReadCompactionTranscriptBoundsLargeClaudeTail(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = f.Close() }()
-	if _, err := f.WriteString(`{"type":"user","sessionId":"claude-1","message":{"role":"user","content":"old"}}` + "\n"); err != nil {
+	if _, err = f.WriteString(`{"type":"user","sessionId":"claude-1","message":{"role":"user","content":"old"}}` + "\n"); err != nil {
 		t.Fatal(err)
 	}
 	padding := strings.Repeat("x", 700)
-	for i := 0; i < 7000; i++ {
-		if _, err := fmt.Fprintf(f, `{"type":"assistant","sessionId":"claude-1","message":{"role":"assistant","content":"%s-%d"}}`+"\n", padding, i); err != nil {
+	for i := range 7000 {
+		if _, err = fmt.Fprintf(f, `{"type":"assistant","sessionId":"claude-1","message":{"role":"assistant","content":"%s-%d"}}`+"\n", padding, i); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := f.WriteString(`{"type":"assistant","sessionId":"claude-1","message":{"role":"assistant","content":[{"type":"tool_use","id":"latest","name":"Read"}]}}` + "\n"); err != nil {
+	if _, err = f.WriteString(`{"type":"assistant","sessionId":"claude-1","message":{"role":"assistant","content":[{"type":"tool_use","id":"latest","name":"Read"}]}}` + "\n"); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.Close(); err != nil {
+	if err = f.Close(); err != nil {
 		t.Fatal(err)
 	}
 	got, err := ReadCompactionTranscript(path, "claude-1")

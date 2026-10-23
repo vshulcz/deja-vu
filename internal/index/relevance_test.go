@@ -130,7 +130,7 @@ func relevancePoolFixture(t *testing.T, n int) string {
 			t.Fatal(err)
 		}
 	}
-	for i := 0; i < n; i++ {
+	for i := range n {
 		id := fmt.Sprintf("c%d", i)
 		write(id+".jsonl", id, fmt.Sprintf("kubernetes autoscaler telemetry notes %d", i))
 	}

@@ -8,18 +8,18 @@ import (
 	"time"
 )
 
-func gitRepoWithCommit(t *testing.T) (root, file string, committed time.Time) {
+func gitRepoWithCommit(t *testing.T) string {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}
-	root = t.TempDir()
-	file = filepath.Join(root, "app.go")
+	root := t.TempDir()
+	file := filepath.Join(root, "app.go")
 	if err := os.WriteFile(file, []byte("package app\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	run := func(args ...string) {
-		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+		cmd := exec.CommandContext(t.Context(), "git", append([]string{"-C", root}, args...)...)
 		cmd.Env = append(os.Environ(),
 			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
 			"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com")
@@ -30,11 +30,11 @@ func gitRepoWithCommit(t *testing.T) (root, file string, committed time.Time) {
 	run("init", "-q")
 	run("add", "app.go")
 	run("commit", "-qm", "first")
-	return root, file, time.Now()
+	return file
 }
 
 func TestFilesMovedSinceCountsCommitsAfterTheSession(t *testing.T) {
-	_, file, _ := gitRepoWithCommit(t)
+	file := gitRepoWithCommit(t)
 	// The session ended a day before the commit, so the file moved under it.
 	since := time.Now().Add(-24 * time.Hour)
 	r := filesMovedSince([]string{file}, since, 5*time.Second)
@@ -47,7 +47,7 @@ func TestFilesMovedSinceCountsCommitsAfterTheSession(t *testing.T) {
 }
 
 func TestFilesMovedSinceStaysSilentOnFreshSessions(t *testing.T) {
-	_, file, _ := gitRepoWithCommit(t)
+	file := gitRepoWithCommit(t)
 	// Nothing can have been committed after a session that ended a minute ago,
 	// and asking would cost a fork on the common search.
 	r := filesMovedSince([]string{file}, time.Now().Add(-time.Minute), 5*time.Second)
@@ -57,7 +57,7 @@ func TestFilesMovedSinceStaysSilentOnFreshSessions(t *testing.T) {
 }
 
 func TestFilesMovedSinceSkipsFilesOlderThanTheSession(t *testing.T) {
-	_, file, _ := gitRepoWithCommit(t)
+	file := gitRepoWithCommit(t)
 	old := time.Now().Add(-48 * time.Hour)
 	if err := os.Chtimes(file, old, old); err != nil {
 		t.Fatal(err)

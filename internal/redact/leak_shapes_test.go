@@ -25,7 +25,7 @@ func TestProviderKeyTailIsMasked(t *testing.T) {
 // A truncated private key whose lines are indented, as in a YAML block
 // scalar (helm values, k8s manifests).
 func TestIndentedTruncatedKeyIsMasked(t *testing.T) {
-	in := "tls:\n  key: |\n    -----BEGIN RSA PRIVATE KEY-----\n    MIIEpAIBAAKCAQEAindentedFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE\n    YYindentedSECONDlineFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE\n(output truncated)"
+	in := "tls:\n  key: |\n    -----BEGIN RSA PRIVATE KEY-----\n    MIIEpAIBAAKCAQEAindentedFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE\n    YYindentedSECONDlineFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE\n(output truncated)" //nolint:gosec // fake key material the test redacts
 	out, _ := Text(in)
 	if strings.Contains(out, "MIIEpAIBAAKCAQEAindented") || strings.Contains(out, "YYindentedSECONDline") {
 		t.Errorf("indented private key body survived: %q", out)
@@ -45,7 +45,7 @@ func TestJSONEscapedTruncatedKeyIsMasked(t *testing.T) {
 // An ASCII-armoured PGP secret key cut short, with header lines and a blank
 // line before the base64.
 func TestTruncatedPGPKeyIsMasked(t *testing.T) {
-	in := "-----BEGIN PGP PRIVATE KEY BLOCK-----\nComment: fake\n\nlQOYBGFAKEpgpBODYlineONEfakefakefakefakefakefakefakefakefake\nPGPsecondLINEfakefakefakefakefakefakefakefakefakefakefakefake\n(truncated)"
+	in := "-----BEGIN PGP PRIVATE KEY BLOCK-----\nComment: fake\n\nlQOYBGFAKEpgpBODYlineONEfakefakefakefakefakefakefakefakefake\nPGPsecondLINEfakefakefakefakefakefakefakefakefakefakefakefake\n(truncated)" //nolint:gosec // fake key material the test redacts
 	out, _ := Text(in)
 	if strings.Contains(out, "lQOYBGFAKEpgpBODYlineONE") {
 		t.Errorf("PGP private key body survived: %q", out)

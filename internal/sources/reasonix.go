@@ -183,6 +183,7 @@ func ReasonixRoots() []string {
 	return append([]string{ReasonixRoot()}, reasonixLegacyRoots()...)
 }
 
+// LoadReasonix reads every Reasonix session on this machine.
 func LoadReasonix() []model.Session {
 	return parseFiles(ReasonixSessionFiles(), ParseReasonixFile)
 }
@@ -486,7 +487,10 @@ type reasonixRangeCalls map[string]string
 
 func (r reasonixRangeCalls) note(toolCalls any) {
 	for _, it := range reasonixToolUses(toolCalls) {
-		m := it.(map[string]any)
+		m, ok := it.(map[string]any)
+		if !ok {
+			continue
+		}
 		in, _ := m["input"].(map[string]any)
 		id, _ := m["id"].(string)
 		if p, _ := in["path"].(string); (m["name"] == "delete_range" || m["name"] == "delete_symbol") && id != "" && p != "" {

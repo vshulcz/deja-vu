@@ -10,17 +10,16 @@ import (
 
 func longSession(t *testing.T) model.Session {
 	t.Helper()
-	msgs := []model.Message{
-		{Role: "user", Text: "let's start on the installer today"},
-		{Role: "assistant", Text: "opened the installer; nothing surprising yet"},
-	}
-	// The region that answers, buried in the middle where a first-three-lines
-	// digest never reaches it.
+	msgs := make([]model.Message, 0, 10)
 	msgs = append(msgs,
+		model.Message{Role: "user", Text: "let's start on the installer today"},
+		model.Message{Role: "assistant", Text: "opened the installer; nothing surprising yet"},
+		// The region that answers, buried in the middle where a first-three-lines
+		// digest never reaches it.
 		model.Message{Role: "user", Text: "why is the provider gate so slow"},
 		model.Message{Role: "assistant", Text: "unrelated preamble about the installer\nthe gate matched every word containing gh, so the regex ran on nearly every message"},
 	)
-	for i := 0; i < 6; i++ {
+	for range 6 {
 		msgs = append(msgs, model.Message{Role: "assistant", Text: "later chatter about packaging"})
 	}
 	return model.Session{

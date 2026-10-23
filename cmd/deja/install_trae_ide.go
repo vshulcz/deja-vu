@@ -158,14 +158,14 @@ func traeIDESkill(path string, uninstall bool) (installResult, error) {
 		if len(old) == 0 || !isOurGuidance(old, "trae-ide") {
 			return installResult{}, nil
 		}
-		if err := os.Remove(path); err != nil {
-			return installResult{}, err
+		if rerr := os.Remove(path); rerr != nil {
+			return installResult{}, rerr
 		}
 		return installResult{Path: path, Action: "removed"}, nil
 	}
 	noteCreatedDirs(filepath.Dir(path))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return installResult{}, err
+	if merr := os.MkdirAll(filepath.Dir(path), 0o755); merr != nil {
+		return installResult{}, merr
 	}
 	a, err := writeGuidanceFile(path, old, []byte(guidanceText("trae-ide")))
 	return installResult{Path: path, Action: a}, err

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -74,10 +75,10 @@ const ingestCopies = 4
 // the store is large enough for the cost of a pass to show.
 func ingestBenchStore(ss []model.Session, n int) []model.Session {
 	out := make([]model.Session, 0, len(ss)*n)
-	for copy := 0; copy < n; copy++ {
+	for pass := range n {
 		for _, s := range ss {
 			dup := s
-			dup.ID = fmt.Sprintf("%s-c%d", s.ID, copy)
+			dup.ID = fmt.Sprintf("%s-c%d", s.ID, pass)
 			out = append(out, dup)
 		}
 	}
@@ -115,7 +116,7 @@ func measureIngest(seed int64) (ingestReport, error) {
 	sessions := append([]model.Session(nil), store...)
 	sort.Slice(sessions, func(i, j int) bool { return sessions[i].ID < sessions[j].ID })
 	if len(sessions) == 0 {
-		return ingestReport{}, fmt.Errorf("the ingest benchmark corpus is empty")
+		return ingestReport{}, errors.New("the ingest benchmark corpus is empty")
 	}
 	target := sessions[0]
 	existing := filepath.Join(claudeRoot, target.Project, target.ID+".jsonl")
@@ -184,18 +185,15 @@ func measureIngestPass(indexDir string) (ingestClass, error) {
 		return ingestClass{}, err
 	}
 	start := time.Now()
-	if err := index.Ensure(indexDir, "", false, io.Discard); err != nil {
-		return ingestClass{}, err
+	if ensureErr := index.Ensure(indexDir, "", false, io.Discard); ensureErr != nil {
+		return ingestClass{}, ensureErr
 	}
 	wall := time.Since(start)
 	after, err := os.ReadFile(records)
 	if err != nil {
 		return ingestClass{}, err
 	}
-	grew := len(after) - len(before)
-	if grew < 0 {
-		grew = 0
-	}
+	grew := max(len(after)-len(before), 0)
 	isFile, err := os.Stat(records)
 	if err != nil {
 		return ingestClass{}, err
@@ -221,10 +219,7 @@ func measureIngestPass(indexDir string) (ingestClass, error) {
 func clearedInPlace(before, after []byte) (cleared int, rewritten bool) {
 	for off := 0; off+4 <= len(before); {
 		n := int(binary.LittleEndian.Uint32(before[off:]))
-		end := off + 4 + n
-		if end > len(before) {
-			end = len(before)
-		}
+		end := min(off+4+n, len(before))
 		if !bytes.Equal(before[off:end], after[off:end]) {
 			if !bytes.Equal(before[off:off+4], after[off:off+4]) || !clearedPayload(after[off+4:end]) {
 				return cleared, true
@@ -238,7 +233,7 @@ func clearedInPlace(before, after []byte) (cleared int, rewritten bool) {
 
 // clearedPayload reports a payload of three ids and nothing after them.
 func clearedPayload(p []byte) bool {
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		_, n := binary.Uvarint(p)
 		if n <= 0 {
 			return false

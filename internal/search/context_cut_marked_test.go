@@ -48,8 +48,8 @@ func TestACutContextSaysWhatItLeftOut(t *testing.T) {
 // A window that keeps the final turn but leaves earlier ones out says how many
 // it showed, and does not call the last one missing.
 func TestAWindowThatLeavesOutEarlierTurnsCountsThem(t *testing.T) {
-	var msgs []model.Message
-	for i := 0; i < 40; i++ {
+	msgs := make([]model.Message, 0, 41)
+	for range 40 {
 		msgs = append(msgs, model.Message{Role: "user", Text: strings.Repeat("an ordinary question about nothing much ", 8)})
 	}
 	msgs = append(msgs, model.Message{Role: "assistant", Text: "the quokkabloom retry is capped at three"})

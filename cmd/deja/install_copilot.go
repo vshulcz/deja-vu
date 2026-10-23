@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -232,14 +233,17 @@ func planCopilotHooks(path, exe string, uninstall bool) (copilotHooksPlan, error
 	}
 	root := map[string]any{}
 	if len(bytes.TrimSpace(source)) > 0 {
-		if err := json.Unmarshal(source, &root); err != nil {
-			return copilotHooksPlan{}, configParseError(path, err)
+		if uerr := json.Unmarshal(source, &root); uerr != nil {
+			return copilotHooksPlan{}, configParseError(path, uerr)
 		}
 		if root == nil {
 			root = map[string]any{}
 		}
 	}
-	before, _ := json.Marshal(root)
+	before, err := json.Marshal(root)
+	if err != nil {
+		return copilotHooksPlan{}, err
+	}
 	// The block as it reads now, apart from root, which the edit below
 	// changes in place: the text path compares the two.
 	var was map[string]any
@@ -278,8 +282,11 @@ func planCopilotHooks(path, exe string, uninstall bool) (copilotHooksPlan, error
 			}
 		}
 	}
-	after, _ := json.Marshal(root)
-	if string(after) == string(before) {
+	after, err := json.Marshal(root)
+	if err != nil {
+		return copilotHooksPlan{}, err
+	}
+	if bytes.Equal(after, before) {
 		return unchanged, nil
 	}
 	if jsonc {
@@ -290,9 +297,9 @@ func planCopilotHooks(path, exe string, uninstall bool) (copilotHooksPlan, error
 		if !uninstall {
 			return copilotHooksPlan{}, fmt.Errorf("%s: deja cannot add hooks to a file that carries comments — add the hook by hand, or take the comments out", path)
 		}
-		text, err := dropCopilotHooksJSONC(lfText(body), was, root)
-		if err != nil {
-			return copilotHooksPlan{}, configParseError(path, err)
+		text, derr := dropCopilotHooksJSONC(lfText(body), was, root)
+		if derr != nil {
+			return copilotHooksPlan{}, configParseError(path, derr)
 		}
 		return copilotHooksPlan{path: path, old: old, next: append([]byte(header), text...)}, nil
 	}
@@ -437,7 +444,7 @@ func dropCopilotHooksJSONC(text string, was, root map[string]any) (string, error
 			open := zedTopLevelOpen(text)
 			block, _ := walkJSONCKeys(text, open, []string{"hooks"})
 			if block == nil {
-				return "", fmt.Errorf("no hooks block to edit")
+				return "", errors.New("no hooks block to edit")
 			}
 			at := jsoncListValue(text, block, event)
 			if at == nil {

@@ -52,7 +52,7 @@ func filesHold(t *testing.T, dir, word string) bool {
 		if err != nil || fi.IsDir() || found {
 			return err
 		}
-		b, err := os.ReadFile(p)
+		b, err := os.ReadFile(p) //nolint:gosec // walks the test's own temp dir
 		if err == nil && bytes.Contains(b, []byte(word)) {
 			found = true
 		}
@@ -69,7 +69,7 @@ func TestRemovedTextLeavesTheIndexFilesOnTheReplacingPass(t *testing.T) {
 		var where []string
 		_ = filepath.Walk(inc, func(p string, fi os.FileInfo, err error) error {
 			if err == nil && !fi.IsDir() {
-				if b, _ := os.ReadFile(p); bytes.Contains(b, []byte("hunter2zanzibarpw")) {
+				if b, _ := os.ReadFile(p); bytes.Contains(b, []byte("hunter2zanzibarpw")) { //nolint:gosec // walks the test's own temp dir
 					where = append(where, p)
 				}
 			}
@@ -97,9 +97,9 @@ func TestADeadRecordIsNoSessionsToAWalkThatIgnoresTheDeadList(t *testing.T) {
 	walked := 0
 	err = eachStoredRecord(filepath.Join(inc, "records.bin"), blind, func(off int64, payload []byte) error {
 		walked++
-		r, err := decodeRecord(payload, blind)
-		if err != nil {
-			return err
+		r, decodeErr := decodeRecord(payload, blind)
+		if decodeErr != nil {
+			return decodeErr
 		}
 		if !dead.isDead(off) {
 			return nil
@@ -131,11 +131,11 @@ func TestALockTakerFinishesAnInterruptedScrub(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The log as it was before the overwrite: the old bytes back in place.
-	if _, err := f.WriteAt(before, 0); err != nil {
+	if _, err = f.WriteAt(before, 0); err != nil {
 		t.Fatal(err)
 	}
 	_ = f.Close()
-	if err := os.WriteFile(filepath.Join(inc, scrubPendingFile), nil, 0o600); err != nil {
+	if err = os.WriteFile(filepath.Join(inc, scrubPendingFile), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if b, _ := os.ReadFile(log); !bytes.Contains(b, []byte("hunter2zanzibarpw")) {
@@ -195,7 +195,7 @@ func TestAnInPlaceMergeLeavesItsRedundantOverlaysToTheCaller(t *testing.T) {
 	base := filepath.Join(d, "ab.bin")
 	layer := func(n, from int) map[string][]posting {
 		out := map[string][]posting{}
-		for i := 0; i < n; i++ {
+		for i := range n {
 			out["ab"+strings.Repeat("x", i%7)+string(rune('a'+i%26))+strings.Repeat("y", i/26)] = []posting{{Off: int64(from + i), Sid: 1}}
 		}
 		return out
@@ -222,7 +222,7 @@ func TestAnInPlaceMergeLeavesItsRedundantOverlaysToTheCaller(t *testing.T) {
 	}
 	for _, g := range stale {
 		for _, p := range g {
-			if _, err := os.Stat(p); err != nil {
+			if _, err = os.Stat(p); err != nil {
 				t.Fatalf("%s went before the caller committed: %v", filepath.Base(p), err)
 			}
 		}
@@ -308,8 +308,8 @@ func TestAReaderHoldingTheLastManifestStillGetsAReplacedSession(t *testing.T) {
 	}
 	rewriteSession(t, proj, "s007")
 	parityPass(t, inc, false)
-	if m, err := readManifest(inc); err != nil || len(m.DeadRecords) == 0 {
-		t.Fatalf("control: the rewrite listed no dead records (err %v)", err)
+	if m, manifestErr := readManifest(inc); manifestErr != nil || len(m.DeadRecords) == 0 {
+		t.Fatalf("control: the rewrite listed no dead records (err %v)", manifestErr)
 	}
 	s, ok, err := loadSessionMeta(inc, pinned, meta)
 	if err != nil || !ok {
@@ -373,7 +373,7 @@ func TestFinishingAScrubRestampsTheSidecarsAKilledPassLeft(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.WriteAt(before, 0); err != nil {
+	if _, err = f.WriteAt(before, 0); err != nil {
 		t.Fatal(err)
 	}
 	_ = f.Close()
@@ -384,7 +384,7 @@ func TestFinishingAScrubRestampsTheSidecarsAKilledPassLeft(t *testing.T) {
 		t.Fatal(err)
 	}
 	restamp(filepath.Join(inc, recordOffsetsFile), after, pre)
-	if err := markScrubPending(inc); err != nil {
+	if err = markScrubPending(inc); err != nil {
 		t.Fatal(err)
 	}
 	m, err := readManifest(inc)
@@ -392,7 +392,7 @@ func TestFinishingAScrubRestampsTheSidecarsAKilledPassLeft(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Killed here: the records zeroed, the sidecars not yet moved.
-	if err := scrubRecords(log, m.DeadRecords); err != nil {
+	if err = scrubRecords(log, m.DeadRecords); err != nil {
 		t.Fatal(err)
 	}
 	unlock, err := lockDir(inc)
@@ -448,7 +448,7 @@ func TestBlankedWordKeepsOnlyTheBucketName(t *testing.T) {
 			t.Errorf("%q: blanked to %q, which moved the bucket's letters", tok, b)
 		}
 		for _, r := range tok[keep:] {
-			if r >= utf8.RuneSelf && bytes.Contains(b, []byte(string(r))) || r < utf8.RuneSelf && keep > 0 && bytes.IndexByte(b[keep:], byte(r)) >= 0 {
+			if r >= utf8.RuneSelf && bytes.Contains(b, []byte(string(r))) || r < utf8.RuneSelf && keep > 0 && bytes.IndexByte(b[keep:], byte(r)) >= 0 { //nolint:gosec // r < utf8.RuneSelf on this side of the ||
 				t.Errorf("%q: blanked to %q, which still holds %q", tok, b, r)
 			}
 		}

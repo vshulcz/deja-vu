@@ -24,7 +24,7 @@ func TestPiResumeAndForkGetNoSecondDigest(t *testing.T) {
 	if err != nil {
 		t.Skip("node is not installed")
 	}
-	if err := exec.Command(node, "--experimental-strip-types", "-e", "").Run(); err != nil {
+	if err = exec.CommandContext(t.Context(), node, "--experimental-strip-types", "-e", "").Run(); err != nil {
 		t.Skip("this node cannot strip types")
 	}
 	pkg, err := os.ReadFile(filepath.Join("..", "..", "extensions", "pi", "index.ts"))
@@ -93,7 +93,7 @@ console.log("empty fork", tag(await prompt(sm("efork-1", [], { id: "efork-1", pa
 	}
 	for name, ext := range map[string]string{"pi-auto": gen, "pi package": npm} {
 		_ = os.Remove(log)
-		cmd := exec.Command(node, "--experimental-strip-types", "--no-warnings", drive, ext, src)
+		cmd := exec.CommandContext(t.Context(), node, "--experimental-strip-types", "--no-warnings", drive, ext, src)
 		cmd.Dir = dir
 		cmd.Env = append(os.Environ(), "DEJA_BIN="+stub, "HOME="+dir)
 		out, err := cmd.CombinedOutput()
@@ -105,7 +105,7 @@ console.log("empty fork", tag(await prompt(sm("efork-1", [], { id: "efork-1", pa
 		}
 		calls, _ := os.ReadFile(log)
 		var forkPrompt string
-		for _, line := range strings.Split(string(calls), "\n") {
+		for line := range strings.SplitSeq(string(calls), "\n") {
 			if strings.HasPrefix(line, "hook-context") && (strings.Contains(line, `"res-1"`) || strings.Contains(line, `"fork-1"`)) {
 				t.Errorf("%s: asked for a start digest for a session that holds one: %s", name, line)
 			}

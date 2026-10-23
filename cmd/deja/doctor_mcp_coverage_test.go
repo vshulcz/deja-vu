@@ -58,11 +58,11 @@ func writesMCPServer(t *testing.T, target string) bool {
 	found := false
 	_ = filepath.Walk(home, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() || found {
-			return nil
+			return nil //nolint:nilerr // unreadable entries are skipped
 		}
-		b, err := os.ReadFile(path)
+		b, err := os.ReadFile(path) //nolint:gosec // the test walks its own temp tree
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // unreadable entries are skipped
 		}
 		text := string(b)
 		if strings.Contains(text, `"deja"`) && strings.Contains(text, "mcp") ||
@@ -288,7 +288,7 @@ func TestTheCommandIsReadableUnderDejasOtherKeys(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(plain, b, 0o600); err != nil {
+	if err = os.WriteFile(plain, b, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if got := dejaCommandIn(plain); got != stray {

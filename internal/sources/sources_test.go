@@ -130,7 +130,7 @@ insert into message values('m3','s2',1767322800000,'{"role":"user"}');
 insert into part values('p1','m1','{"type":"text","text":"opencode needle","time":{"start":"2026-01-02T03:00:00Z"}}');
 insert into part values('p2','m2','{"type":"text","text":"assistant answer","time":{"start":1767409260000}}');
 insert into part values('p3','m3','{"type":"text","text":"other text","time":{"start":"2026-01-01T03:00:00Z"}}');`
-	cmd := exec.Command("sqlite3", db, script)
+	cmd := exec.CommandContext(t.Context(), "sqlite3", db, script)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}

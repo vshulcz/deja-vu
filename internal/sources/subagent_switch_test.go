@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -27,9 +28,9 @@ type switchCase struct {
 
 const switchTurns = 10
 
-func switchJSONL(n int, line func(i int) string) string {
+func switchJSONL(line func(i int) string) string {
 	var b strings.Builder
-	for i := 0; i < n; i++ {
+	for i := range switchTurns {
 		b.WriteString(line(i))
 		b.WriteString("\n")
 	}
@@ -53,7 +54,7 @@ func switchSQLite(t *testing.T, name, script string) string {
 		t.Skip("sqlite3 not installed")
 	}
 	db := filepath.Join(t.TempDir(), name)
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
 	return db
@@ -62,78 +63,85 @@ func switchSQLite(t *testing.T, name, script string) string {
 func switchCases() []switchCase {
 	return []switchCase{
 		{kind: "gemini", child: "24b39ab6-b48a-48e4-80f9-0ba7bb24acc6", long: true, setup: func(t *testing.T) string {
+			t.Helper()
 			_, chats := geminiTree(t)
 			head := `{"sessionId":"24b39ab6-b48a-48e4-80f9-0ba7bb24acc6","projectHash":"abc","startTime":"2026-10-17T21:48:40.460Z","lastUpdated":"2026-10-17T21:48:40.460Z","kind":"subagent","directories":["/w/p"]}` + "\n"
-			body := switchJSONL(switchTurns, func(i int) string {
+			body := switchJSONL(func(i int) string {
 				typ := "user"
 				content := fmt.Sprintf(`[{"text":"zebrafish step %d"}]`, i)
 				if i%2 == 1 {
 					typ, content = "gemini", fmt.Sprintf(`"zebrafish answer %d"`, i)
 				}
-				return fmt.Sprintf(`{"id":"m%d","timestamp":"2026-10-17T21:48:%02d.000Z","type":"%s","content":%s,"model":"gemini-3"}`, i, 41+i, typ, content)
+				return fmt.Sprintf(`{"id":"m%d","timestamp":"2026-10-17T21:48:%02d.000Z","type":%q,"content":%s,"model":"gemini-3"}`, i, 41+i, typ, content)
 			})
 			return writeSwitchFile(t, filepath.Join(chats, "f7b7a064-d884-4582-a228-e95a8c1ac4f3", "24b39ab6-b48a-48e4-80f9-0ba7bb24acc6.jsonl"), head+body)
 		}},
 		{kind: "codex", child: "child", long: true, setup: func(t *testing.T) string {
+			t.Helper()
 			head := `{"timestamp":"2026-10-02T07:01:00Z","type":"session_meta","payload":{"id":"child","cwd":"/w","source":{"subagent":{"thread_spawn":{"parent_thread_id":"parent","depth":1}}}}}` + "\n"
-			body := switchJSONL(switchTurns, func(i int) string {
+			body := switchJSONL(func(i int) string {
 				role, typ := "user", "input_text"
 				if i%2 == 1 {
 					role, typ = "assistant", "output_text"
 				}
-				return fmt.Sprintf(`{"timestamp":"2026-10-02T07:01:%02dZ","type":"response_item","payload":{"type":"message","role":"%s","content":[{"type":"%s","text":"zebrafish turn %d"}]}}`, i+1, role, typ, i)
+				return fmt.Sprintf(`{"timestamp":"2026-10-02T07:01:%02dZ","type":"response_item","payload":{"type":"message","role":%q,"content":[{"type":%q,"text":"zebrafish turn %d"}]}}`, i+1, role, typ, i)
 			})
 			return writeSwitchFile(t, filepath.Join(t.TempDir(), "rollout-2026-10-02T07-01-00-child.jsonl"), head+body)
 		}},
 		{kind: "openclaw", child: "kid", long: true, setup: func(t *testing.T) string {
+			t.Helper()
 			dir := filepath.Join(t.TempDir(), "main", "sessions")
 			writeSwitchFile(t, filepath.Join(dir, "sessions.json"), `{"agent:main:main":{"sessionId":"p"},"agent:main:subagent:1":{"sessionId":"kid","spawnedBy":"agent:main:main"}}`)
 			head := `{"type":"session","version":3,"id":"kid","timestamp":"2026-07-20T09:00:00Z","cwd":"/work/app"}` + "\n"
-			body := switchJSONL(switchTurns, func(i int) string {
+			body := switchJSONL(func(i int) string {
 				role := "user"
 				if i%2 == 1 {
 					role = "assistant"
 				}
-				return fmt.Sprintf(`{"type":"message","id":"m%d","timestamp":"2026-07-20T09:00:%02dZ","message":{"role":"%s","content":"zebrafish turn %d"}}`, i, i+1, role, i)
+				return fmt.Sprintf(`{"type":"message","id":"m%d","timestamp":"2026-07-20T09:00:%02dZ","message":{"role":%q,"content":"zebrafish turn %d"}}`, i, i+1, role, i)
 			})
 			return writeSwitchFile(t, filepath.Join(dir, "kid.jsonl"), head+body)
 		}},
 		{kind: "pi", child: "kid", long: true, setup: func(t *testing.T) string {
+			t.Helper()
 			head := `{"type":"session","version":3,"id":"kid","timestamp":"2026-07-20T09:00:00Z","cwd":"/work/app","rlmDepth":1,"parentSession":"/work/p.jsonl"}` + "\n"
-			body := switchJSONL(switchTurns, func(i int) string {
+			body := switchJSONL(func(i int) string {
 				role := "user"
 				if i%2 == 1 {
 					role = "assistant"
 				}
-				return fmt.Sprintf(`{"type":"message","id":"m%d","timestamp":"2026-07-20T09:00:%02dZ","message":{"role":"%s","content":"zebrafish turn %d"}}`, i, i+1, role, i)
+				return fmt.Sprintf(`{"type":"message","id":"m%d","timestamp":"2026-07-20T09:00:%02dZ","message":{"role":%q,"content":"zebrafish turn %d"}}`, i, i+1, role, i)
 			})
 			return writeSwitchFile(t, filepath.Join(t.TempDir(), "kid.jsonl"), head+body)
 		}},
 		{kind: "kiro-cli", child: "e012b5f2-0f80-45a3-a1f6-eccc522bb35e", long: true, setup: func(t *testing.T) string {
+			t.Helper()
 			dir := t.TempDir()
 			id := "e012b5f2-0f80-45a3-a1f6-eccc522bb35e"
 			writeSwitchFile(t, filepath.Join(dir, id+".json"), `{"session_id":"`+id+`","cwd":"/w/app","parent_session_id":"136cf72a-585d-4047-997f-d37a0d0f194a","session_created_reason":"subagent"}`)
-			body := switchJSONL(switchTurns, func(i int) string {
+			body := switchJSONL(func(i int) string {
 				return fmt.Sprintf(`{"version":"v1","kind":"Prompt","data":{"message_id":"m%d","content":[{"kind":"text","data":"zebrafish step %d"}],"meta":{"timestamp":%d}}}`, i, i, 1792281752+i)
 			})
 			return writeSwitchFile(t, filepath.Join(dir, id+".jsonl"), body)
 		}},
 		{kind: "codewhale", child: "child", long: true, fork: true, setup: func(t *testing.T) string {
+			t.Helper()
 			root := t.TempDir()
 			t.Setenv("DEJA_CODEWHALE_ROOT", root)
-			var msgs []string
-			for i := 0; i < switchTurns; i++ {
+			msgs := make([]string, 0, switchTurns)
+			for i := range switchTurns {
 				role := "user"
 				if i%2 == 1 {
 					role = "assistant"
 				}
-				msgs = append(msgs, fmt.Sprintf(`{"role":"%s","content":[{"type":"text","text":"zebrafish turn %d"}]}`, role, i))
+				msgs = append(msgs, fmt.Sprintf(`{"role":%q,"content":[{"type":"text","text":"zebrafish turn %d"}]}`, role, i))
 			}
 			return writeSwitchFile(t, filepath.Join(root, "child.json"), `{"metadata":{"id":"child","title":"fork","created_at":"2026-09-19T11:00:00Z","updated_at":"2026-09-19T11:01:00Z","workspace":"/w/fork","parent_session_id":"parent-1"},"messages":[`+strings.Join(msgs, ",")+`]}`)
 		}},
 		{kind: "hermes", child: "s-sub", long: true, setup: func(t *testing.T) string {
-			var rows []string
-			for i := 0; i < switchTurns; i++ {
+			t.Helper()
+			rows := make([]string, 0, switchTurns)
+			for i := range switchTurns {
 				role := "user"
 				if i%2 == 1 {
 					role = "assistant"
@@ -147,12 +155,14 @@ func switchCases() []switchCase {
 				 ('s-cli','user','plan the migration',1785000000),`+strings.Join(rows, ",")+`;`)
 		}},
 		{kind: "deepseek", child: "286f51ca-3e5c-437d-8e6b-c9d5cfb5e4d3", setup: func(t *testing.T) string {
+			t.Helper()
 			child := strings.Replace(deepSeekLog,
 				`"id":"session-eaf5c9ac-0e47-4d2f-b982-8bae306062d1","createdAt":1787320263519,"cwd":"/work/pgbouncer-lab","delegationDepth":0}`,
 				`"id":"286f51ca-3e5c-437d-8e6b-c9d5cfb5e4d3","createdAt":1787320263519,"cwd":"/work/pgbouncer-lab","parentSession":"session-c559c777-a703-4cfa-9f2e-f4b9ebf675cc","origin":"subagent","delegationDepth":1}`, 1)
 			return writeDeepSeekSession(t, t.TempDir(), "child", child, false)
 		}},
 		{kind: "grok", child: "c1", setup: func(t *testing.T) string {
+			t.Helper()
 			root := t.TempDir()
 			t.Setenv("DEJA_GROK_ROOT", root)
 			at := time.Now().UTC().Add(-time.Minute).Format(time.RFC3339Nano)
@@ -160,6 +170,7 @@ func switchCases() []switchCase {
 			return grokLineageSession(t, root, "c1", `{"info":{"id":"c1","cwd":"/work/ledger"},"session_kind":"subagent","created_at":"`+at+`"}`, turn)
 		}},
 		{kind: "crush", child: "child", setup: func(t *testing.T) string {
+			t.Helper()
 			sql := "insert into sessions values ('parent',null,'top',1,0,0,0.0,1784282400,1784282400,null,null);\n"
 			sql += "insert into sessions values ('child','parent','sub',1,0,0,0.0,1784282401,1784282401,null,null);\n"
 			sql += crushInsert(t, "m1", "parent", "user", 1784282400, []any{map[string]any{"type": "text", "data": map[string]any{"text": "delegate it"}}})
@@ -167,6 +178,7 @@ func switchCases() []switchCase {
 			return crushStore(t, "demo", sql)
 		}},
 		{kind: "opencode", child: "ses_child", setup: func(t *testing.T) string {
+			t.Helper()
 			return switchSQLite(t, "opencode.db", `create table session(id text, parent_id text, directory text, title text, time_created any, time_updated any);
 create table message(id text, session_id text, time_created any, data text);
 create table part(id text, message_id text, data text);
@@ -178,9 +190,11 @@ insert into message values('m2','ses_child',1767409800000,'{"role":"user","agent
 insert into part values('p2','m2','{"type":"text","text":"zebrafish defects","time":{"start":"2026-01-02T03:10:00Z"}}');`)
 		}},
 		{kind: "goose-db", child: "20261018_2", setup: func(t *testing.T) string {
+			t.Helper()
 			return switchSQLite(t, "sessions.db", gooseLineageStore)
 		}},
 		{kind: "devin", child: "registry-devin-sub:ag-worker", setup: func(t *testing.T) string {
+			t.Helper()
 			devinHome(t)
 			db, _ := devinTestDB(t, devinFixtureSQL(t))
 			return db
@@ -260,7 +274,7 @@ func TestSubagentSwitchMeansTheSameInEveryReader(t *testing.T) {
 func TestApplySubagentSwitchLeavesOtherSessionsAlone(t *testing.T) {
 	msgs := make([]model.Message, 9)
 	for i := range msgs {
-		msgs[i] = model.Message{Role: "user", Text: fmt.Sprint(i)}
+		msgs[i] = model.Message{Role: "user", Text: strconv.Itoa(i)}
 	}
 	in := []model.Session{
 		{ID: "top", Messages: msgs},

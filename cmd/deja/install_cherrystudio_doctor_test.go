@@ -32,8 +32,8 @@ func TestInstallCherryStudioAgainNamesTheImportFile(t *testing.T) {
 	}
 
 	// And a run where only the skill changed still leads with the import file.
-	if err := os.Remove(sharedSkillPath()); err != nil {
-		t.Fatal(err)
+	if rerr := os.Remove(sharedSkillPath()); rerr != nil {
+		t.Fatal(rerr)
 	}
 	third, err := installCherryStudio("/usr/local/bin/deja", false)
 	if err != nil {
@@ -127,10 +127,12 @@ func cherryStudioDBFixture(t *testing.T, rows ...[3]string) string {
 		t.Fatal(err)
 	}
 	sql := "create table mcp_server (id text primary key, name text not null, command text, args text, is_active integer not null default 1);"
+	var sqlSb130 strings.Builder
 	for i, r := range rows {
-		sql += "insert into mcp_server (id, name, command, args) values ('" + string(rune('a'+i)) + "', '" + r[0] + "', '" + r[1] + "', '" + r[2] + "');"
+		sqlSb130.WriteString("insert into mcp_server (id, name, command, args) values ('" + string(rune('a'+i)) + "', '" + r[0] + "', '" + r[1] + "', '" + r[2] + "');")
 	}
-	if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
+	sql += sqlSb130.String()
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, sql).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3: %v %s", err, out)
 	}
 	return db
@@ -153,7 +155,7 @@ func cherryMCPText(t *testing.T) string {
 	doctorMCP(&buf)
 	var keep []string
 	on := false
-	for _, line := range strings.Split(buf.String(), "\n") {
+	for line := range strings.SplitSeq(buf.String(), "\n") {
 		if strings.HasPrefix(line, "  cherrystudio ") {
 			on = true
 		} else if on && !strings.HasPrefix(line, "               ") {
@@ -196,8 +198,8 @@ func TestDoctorCherryStudioReadsTheAppsServers(t *testing.T) {
 	db = cherryStudioDBFixture(t,
 		[3]string{"other-server", "/usr/local/bin/other-mcp", `[]`},
 		[3]string{"deja", exe, `["mcp"]`})
-	if row := cherryMCPRow(t); row.State != "wired" || row.BinaryMissing {
-		t.Fatalf("imported server: %+v, want wired", row)
+	if row2 := cherryMCPRow(t); row2.State != "wired" || row2.BinaryMissing {
+		t.Fatalf("imported server: %+v, want wired", row2)
 	}
 	if text := cherryMCPText(t); strings.Contains(text, "no config file to write") {
 		t.Errorf("the caveat about an unread file stayed once the app was read:\n%s", text)
@@ -238,7 +240,10 @@ func TestDoctorCherryStudioWithoutTheAppsDatabase(t *testing.T) {
 	if row.State != "wired" {
 		t.Fatalf("state %q, want the import file's wired", row.State)
 	}
-	b, _ := json.Marshal(row)
+	b, jerr := json.Marshal(row)
+	if jerr != nil {
+		t.Fatal(jerr)
+	}
 	if !strings.Contains(string(b), "Import from JSON") {
 		t.Errorf("--json row carries no caveat: %s", b)
 	}
@@ -256,7 +261,7 @@ func TestDoctorCherryStudioSaysWhenDejasServerIsOff(t *testing.T) {
 		t.Fatal(err)
 	}
 	db := cherryStudioDBFixture(t, [3]string{"deja", exe, `["mcp"]`})
-	if out, err := exec.Command("sqlite3", db, "update mcp_server set is_active = 0;").CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, "update mcp_server set is_active = 0;").CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3: %v %s", err, out)
 	}
 	if row := cherryMCPRow(t); row.State != "disabled" || row.Path != db {

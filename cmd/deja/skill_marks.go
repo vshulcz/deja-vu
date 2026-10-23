@@ -28,7 +28,7 @@ func skillMarks() map[string]string {
 	if err != nil {
 		return out
 	}
-	for _, line := range strings.Split(string(b), "\n") {
+	for line := range strings.SplitSeq(string(b), "\n") {
 		if sum, path, ok := strings.Cut(strings.TrimSpace(line), " "); ok {
 			out[path] = sum
 		}

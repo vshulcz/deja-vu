@@ -70,11 +70,11 @@ func openclawIncludeRefusal(wrote []string, sections ...openclawSection) error {
 	path := openclawConfigPath()
 	old, err := os.ReadFile(path)
 	if err != nil || len(bytes.TrimSpace(old)) == 0 {
-		return nil
+		return nil //nolint:nilerr // an unreadable config is left to the writers
 	}
 	var root map[string]any
 	if json.Unmarshal([]byte(jsoncToJSON(string(old))), &root) != nil {
-		return nil
+		return nil //nolint:nilerr // an unparsable config is left to the writers
 	}
 	var lines, beside []string
 	for _, s := range sections {
@@ -123,8 +123,9 @@ func openclawIncludeOn(root map[string]any, keys []string) (string, any) {
 // openclawIncludeFiles names what a $include points at, resolved against the
 // config's directory the way OpenClaw resolves it.
 func openclawIncludeFiles(config string, inc any) string {
-	var names []string
-	for _, p := range openclawIncludePaths(filepath.Dir(config), inc) {
+	paths := openclawIncludePaths(filepath.Dir(config), inc)
+	names := make([]string, 0, len(paths))
+	for _, p := range paths {
 		names = append(names, shortHome(p))
 	}
 	if len(names) == 0 {
@@ -170,7 +171,8 @@ func openclawConfigResolved() (root map[string]any, complete bool) {
 		return nil, true
 	}
 	complete = true
-	return openclawResolveIncludes(root, filepath.Dir(path), 0, &complete), complete
+	resolved := openclawResolveIncludes(root, filepath.Dir(path), 0, &complete)
+	return resolved, complete
 }
 
 // doctorReadConfig is readConfig for doctor's readers of a client config:
@@ -190,7 +192,7 @@ func doctorReadConfig(path string) ([]byte, error) {
 	}
 	out, err := json.Marshal(root)
 	if err != nil {
-		return b, nil
+		return b, nil //nolint:nilerr // the bytes go back as read
 	}
 	return out, nil
 }
@@ -222,9 +224,9 @@ func openclawFileFor(keys ...string) string {
 	}
 	rest := keys[strings.Count(at, ".")+1:]
 	ps := openclawIncludePaths(filepath.Dir(path), inc)
-	for i := len(ps) - 1; i >= 0; i-- {
-		if len(rest) > 0 && jsonAt(readJSONConfig(ps[i]), rest...) != nil {
-			return ps[i]
+	for _, p := range slices.Backward(ps) {
+		if len(rest) > 0 && jsonAt(readJSONConfig(p), rest...) != nil {
+			return p
 		}
 	}
 	if len(ps) == 1 {
@@ -306,15 +308,15 @@ func openclawIncludedWiringMissing() string {
 // openclawMCPSection is where `deja install openclaw` writes.
 func openclawMCPSection(exe string) openclawSection {
 	command, args := mcpCommandArgs(exe)
-	entry, _ := json.Marshal(map[string]any{"command": command, "args": args})
+	entry, _ := json.Marshal(map[string]any{"command": command, "args": args}) //nolint:errchkjson // strings always marshal
 	return openclawSection{keys: []string{"mcp", "servers"}, want: `"deja": ` + string(entry)}
 }
 
 // openclawAutoSections are the places openclaw-auto writes besides the MCP
 // entry: the plugin's entry and load path, and the hook pack's switches.
 func openclawAutoSections() []openclawSection {
-	entry, _ := json.Marshal(map[string]any{"enabled": true, "hooks": map[string]any{openclawAccessKey: true}})
-	paths, _ := json.Marshal([]string{openclawPluginDir()})
+	entry, _ := json.Marshal(map[string]any{"enabled": true, "hooks": map[string]any{openclawAccessKey: true}}) //nolint:errchkjson // bools always marshal
+	paths, _ := json.Marshal([]string{openclawPluginDir()})                                                     //nolint:errchkjson // strings always marshal
 	return []openclawSection{
 		{keys: []string{"plugins", "entries"}, want: `"` + openclawPluginID + `": ` + string(entry)},
 		{keys: []string{"plugins", "load"}, want: `"paths": ` + string(paths) + ``},

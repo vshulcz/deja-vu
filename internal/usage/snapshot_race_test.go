@@ -39,12 +39,12 @@ func TestConcurrentWritersNeverInterleaveASnapshot(t *testing.T) {
 				writers, each = 8, 4
 			}
 			var wg sync.WaitGroup
-			for w := 0; w < writers; w++ {
+			for w := range writers {
 				wg.Add(1)
 				go func(w int) {
 					defer wg.Done()
-					body := strings.Repeat(string(rune('a'+w)), size)
-					for i := 0; i < each; i++ {
+					body := strings.Repeat(string(rune('a'+w)), size) //nolint:gosec // w is under eight
+					for range each {
 						RecordDigestPolicy(dir, KindHook, body, 1, 0, "local-only")
 					}
 				}(w)
@@ -95,7 +95,7 @@ func TestConcurrentWritersNeverInterleaveASnapshot(t *testing.T) {
 func TestARotationLeavesTheFileUnderItsOwnThreshold(t *testing.T) {
 	dir := t.TempDir()
 	big := strings.Repeat("y", 40<<10)
-	for i := 0; i < snapshotsToKeep+4; i++ {
+	for range snapshotsToKeep + 4 {
 		RecordDigestPolicy(dir, KindHook, big, 1, 0, "local-only")
 	}
 	fi, err := os.Stat(SnapshotPath(dir))
@@ -113,7 +113,7 @@ func TestARotationLeavesTheFileUnderItsOwnThreshold(t *testing.T) {
 func TestTheNewestDigestSurvivesARotationOfBigRecords(t *testing.T) {
 	dir := t.TempDir()
 	big := strings.Repeat("y", 40<<10)
-	for i := 0; i < snapshotsToKeep+4; i++ {
+	for range snapshotsToKeep + 4 {
 		RecordDigestPolicy(dir, KindHook, big, 1, 0, "local-only")
 	}
 	RecordDigestPolicy(dir, KindHook, "the one just served", 1, 0, "local-only")

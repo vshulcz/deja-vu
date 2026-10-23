@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"strings"
 	"testing"
@@ -19,7 +20,7 @@ func TestTheSyncSectionDescribesTheWatermarkItHas(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	i := strings.Index(string(doc), "## Sync format")
+	i := bytes.Index(doc, []byte("## Sync format"))
 	if i < 0 {
 		t.Fatal("docs/ARCHITECTURE.md no longer has a Sync format section")
 	}

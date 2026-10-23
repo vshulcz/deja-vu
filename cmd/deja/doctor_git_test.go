@@ -23,7 +23,7 @@ func TestDoctorToolsReportsGit(t *testing.T) {
 	_, err := exec.LookPath("git")
 	wantFound := err == nil
 	line := ""
-	for _, l := range strings.Split(got, "\n") {
+	for l := range strings.SplitSeq(got, "\n") {
 		if strings.Contains(l, "git ") {
 			line = l
 		}

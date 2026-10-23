@@ -15,7 +15,7 @@ import (
 // with a `--` comment would otherwise be read as an option.
 func runStoreSQL(t *testing.T, db, sql string) {
 	t.Helper()
-	cmd := exec.Command("sqlite3", db)
+	cmd := exec.CommandContext(t.Context(), "sqlite3", db)
 	cmd.Stdin = strings.NewReader(sql)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3: %v: %s", err, out)
@@ -79,6 +79,7 @@ func TestEveryStampedStoreSurvivesTheSecondPass(t *testing.T) {
 	}{{
 		harness: "grok",
 		seed: func(t *testing.T, tmp string) string {
+			t.Helper()
 			db := filepath.Join(tmp, "grok.db")
 			t.Setenv("DEJA_GROK_DB", db)
 			runStoreSQL(t, db, `CREATE TABLE workspaces (id TEXT PRIMARY KEY, canonical_path TEXT);
@@ -92,6 +93,7 @@ INSERT INTO messages VALUES ('gl',1,'assistant','{"content":[{"type":"text","tex
 			return db
 		},
 		grow: func(t *testing.T, db string) {
+			t.Helper()
 			runStoreSQL(t, db, `INSERT INTO messages VALUES ('gl',2,'user','{"content":"needlelatest the follow up"}','2026-07-27T13:00:00.000Z');
 INSERT INTO sessions VALUES ('gn','w','Brand new','/work/api','2026-07-27T14:00:00.000Z');
 INSERT INTO messages VALUES ('gn',0,'user','{"content":"needlearrival a session that did not exist"}','2026-07-27T14:00:00.000Z');`)
@@ -100,6 +102,7 @@ INSERT INTO messages VALUES ('gn',0,'user','{"content":"needlearrival a session 
 	}, {
 		harness: "zed",
 		seed: func(t *testing.T, tmp string) string {
+			t.Helper()
 			db := filepath.Join(tmp, "threads.db")
 			t.Setenv("DEJA_ZED_DB", db)
 			runStoreSQL(t, db, `create table threads (id text primary key, summary text not null, updated_at text not null, data_type text not null, data blob not null, parent_id text, folder_paths text, folder_paths_order text, created_at text);
@@ -108,6 +111,7 @@ INSERT INTO messages VALUES ('gn',0,'user','{"content":"needlearrival a session 
 			return db
 		},
 		grow: func(t *testing.T, db string) {
+			t.Helper()
 			runStoreSQL(t, db, zedJSONThreadRow("zl", "2026-07-27T13:00:00+00:00",
 				"needleopening the opening question", "needlemiddle the first answer", "needlelatest the follow up")+
 				zedJSONThreadRow("zn", "2026-07-27T14:00:00+00:00", "needlearrival a session that did not exist"))
@@ -116,6 +120,7 @@ INSERT INTO messages VALUES ('gn',0,'user','{"content":"needlearrival a session 
 	}, {
 		harness: "hermes",
 		seed: func(t *testing.T, tmp string) string {
+			t.Helper()
 			// Hermes is found by walking its home, not by a store path, so the
 			// fixture has to live where HermesDBs looks — a DEJA_HERMES_DB the
 			// registry does not match leaves the store unparsed and the test
@@ -134,6 +139,7 @@ INSERT INTO messages (session_id,role,content,timestamp) VALUES
 			return db
 		},
 		grow: func(t *testing.T, db string) {
+			t.Helper()
 			runStoreSQL(t, db, `INSERT INTO messages (session_id,role,content,timestamp) VALUES
  ('hl','user','needlelatest the follow up',1785014400.0),
  ('hn','user','needlearrival a session that did not exist',1785018000.0);`)
@@ -174,7 +180,7 @@ INSERT INTO messages (session_id,role,content,timestamp) VALUES
 			}
 
 			c.grow(t, db)
-			if err := Ensure(dir, "", false, nil); err != nil {
+			if err = Ensure(dir, "", false, nil); err != nil {
 				t.Fatal(err)
 			}
 			for _, needle := range []string{

@@ -43,7 +43,7 @@ func TestUninstallDropsThePluginsBlockItCreated(t *testing.T) {
 	if !strings.Contains(string(b), "- deja") {
 		t.Fatalf("install did not enable the plugin:\n%s", b)
 	}
-	if _, err := installTarget("hermes-auto", "/bin/deja", true); err != nil {
+	if _, err = installTarget("hermes-auto", "/bin/deja", true); err != nil {
 		t.Fatalf("uninstall: %v", err)
 	}
 	after, err := os.ReadFile(path)
@@ -123,13 +123,13 @@ func TestHermesPluginsEnabledKeepsItsListStyle(t *testing.T) {
 			if !strings.Contains(got, tc.installed) {
 				t.Fatalf("install did not add deja to the list as written:\nwant %q in:\n%s", tc.installed, got)
 			}
-			if _, err := installTarget("hermes-auto", "/bin/deja", false); err != nil {
+			if _, err = installTarget("hermes-auto", "/bin/deja", false); err != nil {
 				t.Fatalf("second install: %v", err)
 			}
 			if again, _ := os.ReadFile(path); string(again) != got {
 				t.Fatalf("a second install changed the file:\n%s", again)
 			}
-			if _, err := installTarget("hermes-auto", "/bin/deja", true); err != nil {
+			if _, err = installTarget("hermes-auto", "/bin/deja", true); err != nil {
 				t.Fatalf("uninstall: %v", err)
 			}
 			after, err := os.ReadFile(path)
@@ -147,7 +147,7 @@ func TestHermesPluginsEnabledKeepsItsListStyle(t *testing.T) {
 // on the first one included.
 func topLevelKeys(text, key string) int {
 	n := 0
-	for _, line := range strings.Split(strings.TrimPrefix(text, "\ufeff"), "\n") {
+	for line := range strings.SplitSeq(strings.TrimPrefix(text, "\ufeff"), "\n") {
 		if strings.HasPrefix(line, key) {
 			n++
 		}
@@ -174,10 +174,10 @@ func TestUninstallKeepsWhatTheReaderAddedToDejasPluginsBlock(t *testing.T) {
 				t.Fatal(err)
 			}
 			edited := strings.Replace(string(b), "    - deja\n", "    - deja\n"+tc.add, 1)
-			if err := os.WriteFile(path, []byte(edited), 0o644); err != nil {
+			if err = os.WriteFile(path, []byte(edited), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := installTarget("hermes-auto", "/bin/deja", true); err != nil {
+			if _, err = installTarget("hermes-auto", "/bin/deja", true); err != nil {
 				t.Fatalf("uninstall: %v", err)
 			}
 			after, err := os.ReadFile(path)

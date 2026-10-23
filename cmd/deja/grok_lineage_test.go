@@ -14,12 +14,15 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
+const grokLineageCwd = "/work/billing"
+
 // grokSession writes one Grok Build 1.0.41 session under the sandbox's
 // ~/.grok: summary.json, updates.jsonl with a user turn and a reply, and
 // chat_history.jsonl when chat is given. extra lines go on the end of
 // updates.jsonl.
-func grokSession(t *testing.T, cwd, id, summaryExtra, text, chat string, extra ...string) string {
+func grokSession(t *testing.T, id, summaryExtra, text, chat string, extra ...string) string {
 	t.Helper()
+	const cwd = grokLineageCwd
 	dir := filepath.Join(sources.GrokRoot(), "sessions", url.PathEscape(cwd), id)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -33,9 +36,11 @@ func grokSession(t *testing.T, cwd, id, summaryExtra, text, chat string, extra .
 	ts := now.Add(-30 * time.Second).Unix()
 	lines := `{"timestamp":` + strconv.FormatInt(ts, 10) + `,"method":"session/update","params":{"sessionId":"` + id + `","update":{"sessionUpdate":"user_message_chunk","content":{"type":"text","text":"` + text + `"}}}}` + "\n" +
 		`{"timestamp":` + strconv.FormatInt(ts+1, 10) + `,"method":"session/update","params":{"sessionId":"` + id + `","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"noted: ` + text + `"}}}}` + "\n"
+	var linesSb36 strings.Builder
 	for _, l := range extra {
-		lines += l + "\n"
+		linesSb36.WriteString(l + "\n")
 	}
+	lines += linesSb36.String()
 	updates := filepath.Join(dir, "updates.jsonl")
 	if err := os.WriteFile(updates, []byte(lines), 0o644); err != nil {
 		t.Fatal(err)
@@ -59,7 +64,6 @@ func TestGrokSessionIsNotRecalledToItsOwnLineage(t *testing.T) {
 	withStatsStores(t)
 	t.Setenv("DEJA_GROK_ROOT", t.TempDir())
 	dir := index.DefaultDir()
-	const cwd = "/work/billing"
 	// What Grok writes: the reminder as one JSON string, newlines escaped.
 	chatLine := func(text string) string {
 		var b strings.Builder
@@ -75,15 +79,15 @@ func TestGrokSessionIsNotRecalledToItsOwnLineage(t *testing.T) {
 	plainChat := chatLine("<user_query>hello</user_query>")
 	// A tool's output that quotes the digest, as reading deja's own source
 	// does, is encoded once more inside the tool result.
-	quoted, _ := json.Marshal(frameRecall(sessionStartLead))
+	quoted := mustMarshal(t, frameRecall(sessionStartLead))
 	quotedChat := chatLine("<user_query>read it</user_query>") + `{"type":"tool_result","content":` + strconv.Quote(string(quoted)) + "}\n"
 
-	parent := grokSession(t, cwd, "01a1-parent", `,"session_kind":"headless"`, "invoice rounding is half-even zorblat", digestChat,
+	parent := grokSession(t, "01a1-parent", `,"session_kind":"headless"`, "invoice rounding is half-even zorblat", digestChat,
 		`{"timestamp":1,"method":"_x.ai/session/update","params":{"sessionId":"01a1-parent","update":{"sessionUpdate":"subagent_spawned","subagent_id":"01a1-child","parent_session_id":"01a1-parent","child_session_id":"01a1-child"}}}`)
-	grokSession(t, cwd, "01a1-child", `,"session_kind":"subagent","agent_name":"general-purpose"`, "probe the zorblat rounding", "")
-	other := grokSession(t, cwd, "01a1-other", `,"session_kind":"headless"`, "an unrelated zorblat note", plainChat)
+	grokSession(t, "01a1-child", `,"session_kind":"subagent","agent_name":"general-purpose"`, "probe the zorblat rounding", "")
+	other := grokSession(t, "01a1-other", `,"session_kind":"headless"`, "an unrelated zorblat note", plainChat)
 	// A fork of the parent, sorted first, carries a copy of its spawn record.
-	grokSession(t, cwd, "00a0-fork", `,"session_kind":"headless","parent_session_id":"01a1-parent","forked_at":"2026-10-17T23:40:25Z"`,
+	grokSession(t, "00a0-fork", `,"session_kind":"headless","parent_session_id":"01a1-parent","forked_at":"2026-10-17T23:40:25Z"`,
 		"invoice rounding is half-even zorblat", digestChat,
 		`{"timestamp":1,"method":"_x.ai/session/update","params":{"sessionId":"00a0-fork","update":{"sessionUpdate":"subagent_spawned","subagent_id":"01a1-child","parent_session_id":"01a1-parent","child_session_id":"01a1-child"}}}`)
 	if err := index.Ensure(dir, "", true, nil); err != nil {
@@ -103,7 +107,7 @@ func TestGrokSessionIsNotRecalledToItsOwnLineage(t *testing.T) {
 	}
 
 	// A fork made after the build, which is when its first hooks fire.
-	fork := grokSession(t, cwd, "01a1-fork", `,"session_kind":"headless","parent_session_id":"01a1-parent","forked_at":"2026-10-17T23:40:25Z"`,
+	fork := grokSession(t, "01a1-fork", `,"session_kind":"headless","parent_session_id":"01a1-parent","forked_at":"2026-10-17T23:40:25Z"`,
 		"invoice rounding is half-even zorblat", digestChat)
 	if got := askerLineage(dir, "01a1-fork", fork); !got["01a1-parent"] {
 		t.Errorf("fork's lineage leaves its source in its recall: %v", got)
@@ -123,11 +127,11 @@ func TestGrokSessionIsNotRecalledToItsOwnLineage(t *testing.T) {
 	if threadHasDigest(dir, "load", "01a1-other", other) {
 		t.Error("a resumed grok session that never got a digest is denied one")
 	}
-	wide := grokSession(t, cwd, "01a1-wide", `,"session_kind":"headless"`, "wide recall", wideChat)
+	wide := grokSession(t, "01a1-wide", `,"session_kind":"headless"`, "wide recall", wideChat)
 	if !threadHasDigest(dir, "load", "01a1-wide", wide) {
 		t.Error("a resumed grok session that holds a wide-recall digest gets another")
 	}
-	quote := grokSession(t, cwd, "01a1-quote", `,"session_kind":"headless"`, "reading deja", quotedChat)
+	quote := grokSession(t, "01a1-quote", `,"session_kind":"headless"`, "reading deja", quotedChat)
 	if threadHasDigest(dir, "load", "01a1-quote", quote) {
 		t.Error("a tool output quoting the digest counted as the digest")
 	}

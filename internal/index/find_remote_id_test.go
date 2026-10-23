@@ -45,7 +45,7 @@ func TestFindByPrefixResolvesTheRemoteControlId(t *testing.T) {
 	}
 	_, err = f.WriteString(`{"type":"system","subtype":"bridge_status","content":"/remote-control is active.","url":"https://claude.ai/code/` + remote + `","sessionId":"4be0c2a1-0000-4000-8000-000000000001","timestamp":"2026-09-01T09:05:00Z"}` + "\n" +
 		`{"type":"assistant","sessionId":"4be0c2a1-0000-4000-8000-000000000001","timestamp":"2026-09-01T09:06:00Z","message":{"role":"assistant","content":"the parser now reads flanges"}}` + "\n")
-	f.Close()
+	_ = f.Close()
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -79,8 +79,8 @@ func TestAiderConfigRoundTrips(t *testing.T) {
 			if again := aiderConf(t, home); again != got || res.Action != "unchanged" {
 				t.Errorf("a second install changed the file (%s):\n%q\nthen\n%q", res.Action, got, again)
 			}
-			if _, err := installAider("/bin/echo", true); err != nil {
-				t.Fatalf("uninstall: %v", err)
+			if _, ierr := installAider("/bin/echo", true); ierr != nil {
+				t.Fatalf("uninstall: %v", ierr)
 			}
 			b, err := os.ReadFile(path)
 			if err != nil {
@@ -97,7 +97,7 @@ func TestAiderConfigRoundTrips(t *testing.T) {
 // context file.
 func confReadsDejaContext(s string) bool {
 	inRead := false
-	for _, l := range strings.Split(s, "\n") {
+	for l := range strings.SplitSeq(s, "\n") {
 		t := strings.TrimSpace(l)
 		if t == "" || strings.HasPrefix(t, "#") {
 			continue

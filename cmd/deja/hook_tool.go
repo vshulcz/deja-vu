@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -320,7 +321,7 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 			Context string `json:"context"`
 		}{Version: 1, Context: out})
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // a reply that cannot marshal means no reply
 		}
 		fmt.Fprintln(stdout, string(b))
 		return nil
@@ -330,6 +331,7 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 	case hookToolMcode:
 		emitMcodeContext(stdout, event, out)
 		return nil
+	case hookToolClaude:
 	}
 	var resp sessionStartHookResponse
 	// A host that reads the context only after the tool wants the event
@@ -339,7 +341,7 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 	resp.HookSpecificOutput.AdditionalContext = out
 	b, err := json.Marshal(resp)
 	if err != nil {
-		return nil
+		return nil //nolint:nilerr // a reply that cannot marshal means no reply
 	}
 	fmt.Fprintln(stdout, string(b))
 	return nil
@@ -509,7 +511,7 @@ func commandHintsOn() bool {
 // File: p", and a rename adds "*** Move to: p".
 func applyPatchFiles(patch string) []string {
 	var out []string
-	for _, line := range strings.Split(patch, "\n") {
+	for line := range strings.SplitSeq(patch, "\n") {
 		line = strings.TrimSpace(line)
 		for _, pfx := range []string{"*** Update File: ", "*** Add File: ", "*** Delete File: ", "*** Move to: "} {
 			if strings.HasPrefix(line, pfx) {
@@ -919,7 +921,7 @@ func commandDecisionLine(dir, cwd, cmd, self string, lookupOnly bool) string {
 // ranking.
 func normalizedCommandText(cmd string) string {
 	var out []string
-	for _, f := range strings.Fields(cmd) {
+	for f := range strings.FieldsSeq(cmd) {
 		if strings.HasPrefix(f, "-") {
 			continue
 		}
@@ -928,7 +930,7 @@ func normalizedCommandText(cmd string) string {
 	return strings.Join(out, " ")
 }
 
-func fileHookLine(dir, cwd, path string) string {
+func fileHookLine(dir, cwd, path string) string { //nolint:unparam // the cwd is part of the payload it builds
 	return fileHookLineOutside(dir, cwd, path, nil)
 }
 
@@ -1269,10 +1271,8 @@ func trimTrailingFragment(s string) string {
 // project being worked in now. It is what stops a same-named file in an
 // unrelated repo from being counted.
 func fileMetaInScope(meta index.SessionMeta, path string, projects []string) bool {
-	for _, t := range meta.Touched {
-		if t == path {
-			return true
-		}
+	if slices.Contains(meta.Touched, path) {
+		return true
 	}
 	proj := strings.TrimPrefix(meta.Project, "imported:")
 	for _, cand := range projects {
@@ -1300,11 +1300,11 @@ func baseName(p string) string { return index.CrossBase(p) }
 
 // truncateToolLine caps the line at max bytes on a rune boundary, so a
 // non-ASCII filename near the limit is not split mid-rune into a U+FFFD.
-func truncateToolLine(s string, max int) string {
-	if len(s) <= max {
+func truncateToolLine(s string, limit int) string {
+	if len(s) <= limit {
 		return s
 	}
-	cut := max
+	cut := limit
 	for cut > 0 && !utf8.RuneStart(s[cut]) {
 		cut--
 	}

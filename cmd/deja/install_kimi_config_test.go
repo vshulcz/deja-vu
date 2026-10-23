@@ -105,7 +105,7 @@ func TestKimiAutoFindsItsHooksAfterKimiRewroteTheConfig(t *testing.T) {
 	// What Kimi 2.2 left after /logout from Kimi Code: the same tables, no
 	// comments, a blank line between them.
 	var kept []string
-	for _, line := range strings.Split(string(b), "\n") {
+	for line := range strings.SplitSeq(string(b), "\n") {
 		if !strings.HasPrefix(strings.TrimSpace(line), "#") {
 			kept = append(kept, line)
 		}
@@ -230,8 +230,8 @@ func TestKimiStatusLineKeepsTheItemsBesideIt(t *testing.T) {
 	if _, err := captureRun(t, "install", "kimi-auto", "--no-index"); err != nil {
 		t.Fatal(err)
 	}
-	if b, _ := os.ReadFile(tui); string(b) != withItems {
-		t.Errorf("reinstall changed the table:\n%s\nwant:\n%s", b, withItems)
+	if b2, _ := os.ReadFile(tui); string(b2) != withItems {
+		t.Errorf("reinstall changed the table:\n%s\nwant:\n%s", b2, withItems)
 	}
 	if _, err := captureRun(t, "uninstall", "kimi-auto"); err != nil {
 		t.Fatal(err)

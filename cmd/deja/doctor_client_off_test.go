@@ -22,8 +22,8 @@ func TestDoctorReadsTheClientsOwnOffSwitches(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if real, err := filepath.EvalSymlinks(cwd); err == nil {
-		cwd = real
+	if resolved, err := filepath.EvalSymlinks(cwd); err == nil {
+		cwd = resolved
 	}
 	editJSON := func(t *testing.T, path string, edit func(map[string]any)) {
 		t.Helper()
@@ -34,16 +34,20 @@ func TestDoctorReadsTheClientsOwnOffSwitches(t *testing.T) {
 			}
 		}
 		edit(root)
-		b, _ := json.MarshalIndent(root, "", "  ")
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		b, err := json.MarshalIndent(root, "", "  ")
+		if err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(path, b, 0o644); err != nil {
+		if err = os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err = os.WriteFile(path, b, 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
 	setJSON := func(path string, keys []string, v any) func(*testing.T) {
 		return func(t *testing.T) {
+			t.Helper()
 			editJSON(t, path, func(root map[string]any) {
 				m := root
 				for _, k := range keys[:len(keys)-1] {
@@ -58,8 +62,9 @@ func TestDoctorReadsTheClientsOwnOffSwitches(t *testing.T) {
 			})
 		}
 	}
-	replace := func(path func() string, old, new string) func(*testing.T) {
+	replace := func(path func() string, old, updated string) func(*testing.T) {
 		return func(t *testing.T) {
+			t.Helper()
 			b, err := os.ReadFile(path())
 			if err != nil {
 				t.Fatal(err)
@@ -67,13 +72,14 @@ func TestDoctorReadsTheClientsOwnOffSwitches(t *testing.T) {
 			if !strings.Contains(string(b), old) {
 				t.Fatalf("%s has no %q:\n%s", path(), old, b)
 			}
-			if err := os.WriteFile(path(), []byte(strings.Replace(string(b), old, new, 1)), 0o644); err != nil {
+			if err := os.WriteFile(path(), []byte(strings.Replace(string(b), old, updated, 1)), 0o644); err != nil {
 				t.Fatal(err)
 			}
 		}
 	}
 	appendTo := func(path func() string, text string) func(*testing.T) {
 		return func(t *testing.T) {
+			t.Helper()
 			b, _ := os.ReadFile(path())
 			if err := os.MkdirAll(filepath.Dir(path()), 0o755); err != nil {
 				t.Fatal(err)
@@ -85,6 +91,7 @@ func TestDoctorReadsTheClientsOwnOffSwitches(t *testing.T) {
 	}
 	prepend := func(path func() string, text string) func(*testing.T) {
 		return func(t *testing.T) {
+			t.Helper()
 			b, _ := os.ReadFile(path())
 			if err := os.WriteFile(path(), append([]byte(text), b...), 0o644); err != nil {
 				t.Fatal(err)
@@ -97,6 +104,7 @@ func TestDoctorReadsTheClientsOwnOffSwitches(t *testing.T) {
 	// Codex runs no hook it has not been shown, so its row is wired only with
 	// every event trusted — the control the switch is then measured against.
 	trustCodex := func(t *testing.T) {
+		t.Helper()
 		var pins strings.Builder
 		hooks := filepath.Join(sources.CodexHome(), "hooks.json")
 		for _, h := range codexHookWiring {
@@ -124,57 +132,69 @@ func TestDoctorReadsTheClientsOwnOffSwitches(t *testing.T) {
 		// #4468: deny lists and MCP master switches outside the entry.
 		{name: "gemini mcp disable", target: "gemini", section: "mcp", row: "gemini", key: "mcp-server-enablement.json",
 			off: func(t *testing.T) {
+				t.Helper()
 				setJSON(filepath.Join(sources.GeminiHome(), "mcp-server-enablement.json"), []string{"deja", "enabled"}, false)(t)
 			}},
 		{name: "gemini excluded", target: "gemini", section: "mcp", row: "gemini", key: "mcp.excluded",
 			off: func(t *testing.T) {
+				t.Helper()
 				setJSON(filepath.Join(sources.GeminiHome(), "settings.json"), []string{"mcp", "excluded"}, []any{"deja"})(t)
 			}},
 		{name: "gemini allowed", target: "gemini", section: "mcp", row: "gemini", key: "mcp.allowed",
 			off: func(t *testing.T) {
+				t.Helper()
 				setJSON(filepath.Join(sources.GeminiHome(), "settings.json"), []string{"mcp", "allowed"}, []any{"other"})(t)
 			}},
 		{name: "qwen excluded", target: "qwen", section: "mcp", row: "qwen", key: "mcp.excluded",
 			off: func(t *testing.T) {
+				t.Helper()
 				setJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), []string{"mcp", "excluded"}, []any{"deja"})(t)
 			}},
 		{name: "copilot", target: "copilot", section: "mcp", row: "copilot", key: "disabledMcpServers",
 			off: func(t *testing.T) {
+				t.Helper()
 				setJSON(filepath.Join(filepath.Dir(copilotMCPConfigPath()), "settings.json"), []string{"disabledMcpServers"}, []any{"deja"})(t)
 			}},
 		{name: "grok disable", target: "grok", section: "mcp", row: "grok", key: "disabled_mcp_servers",
 			off: prepend(grokToml, "disabled_mcp_servers = [\"deja\"]\n\n")},
 		{name: "omp", target: "omp", section: "mcp", row: "omp", key: "disabledServers",
 			off: func(t *testing.T) {
+				t.Helper()
 				setJSON(filepath.Join(sources.OmpConfigDir(), "mcp.json"), []string{"disabledServers"}, []any{"deja"})(t)
 			}},
 		{name: "gjc", target: "gjc", section: "mcp", row: "gjc", key: "disabledServers",
-			off: func(t *testing.T) { setJSON(gjcMCPPath(), []string{"disabledServers"}, []any{"deja"})(t) }},
+			off: func(t *testing.T) { t.Helper(); setJSON(gjcMCPPath(), []string{"disabledServers"}, []any{"deja"})(t) }},
 		{name: "vscode", target: "vscode", section: "mcp", row: "vscode", key: "chat.mcp.access",
 			off: func(t *testing.T) {
+				t.Helper()
 				setJSON(filepath.Join(filepath.Dir(doctorVSCodeMCPPath()), "settings.json"), []string{"chat.mcp.access"}, "none")(t)
 			}},
 		{name: "zcode", target: "zcode", section: "mcp", row: "zcode", key: "features.mcp",
-			off: func(t *testing.T) { setJSON(zcodeConfigPath(), []string{"features", "mcp"}, false)(t) }},
+			off: func(t *testing.T) { t.Helper(); setJSON(zcodeConfigPath(), []string{"features", "mcp"}, false)(t) }},
 		{name: "openclaw", target: "openclaw", section: "mcp", row: "openclaw", key: "tools.deny",
 			off: func(t *testing.T) {
+				t.Helper()
 				setJSON(filepath.Join(sources.OpenClawStateDir(), "openclaw.json"), []string{"tools", "deny"}, []any{"bundle-mcp"})(t)
 			}},
 		{name: "opencode", target: "opencode", section: "mcp", row: "opencode", key: "tools",
 			off: func(t *testing.T) {
+				t.Helper()
 				setJSON(doctorOpencodeConfigPath(), []string{"tools", "deja*"}, false)(t)
 			}},
 		{name: "amp", target: "amp", section: "mcp", row: "amp", key: "amp.tools.disable",
 			off: func(t *testing.T) {
+				t.Helper()
 				setJSON(sources.AmpSettingsFile(), []string{"amp.tools.disable"}, []any{"mcp__deja__*"})(t)
 			}},
 		{name: "claude project", target: "claude-code", section: "mcp", row: "claude-code", key: "disabledMcpServers",
 			off: func(t *testing.T) {
+				t.Helper()
 				// The repository's main root, which TestPerProjectListsAreReadForTheDirectoryTheClientKeys pins.
 				setJSON(sources.ClaudeJSONPath(), []string{"projects", doctorProjectDir(true), "disabledMcpServers"}, []any{"deja"})(t)
 			}},
 		{name: "cursor project", target: "cursor", section: "mcp", row: "cursor", key: "mcp-disabled.json",
 			off: func(t *testing.T) {
+				t.Helper()
 				root := gitRootOf(filepath.Join(cwd, "x"))
 				if root == "" {
 					root = cwd
@@ -192,52 +212,63 @@ func TestDoctorReadsTheClientsOwnOffSwitches(t *testing.T) {
 		// #4469: the client's switch for every hook.
 		{name: "claude hooks", target: "claude-auto", section: "auto_recall", row: "claude-code", key: "disableAllHooks",
 			off: func(t *testing.T) {
+				t.Helper()
 				setJSON(filepath.Join(sources.ClaudeConfigDir(), "settings.json"), []string{"disableAllHooks"}, true)(t)
 			}},
 		{name: "qwen hooks", target: "qwen-auto", section: "auto_recall", row: "qwen", key: "disableAllHooks",
 			off: func(t *testing.T) {
+				t.Helper()
 				setJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), []string{"disableAllHooks"}, true)(t)
 			}},
 		{name: "gemini hooks", target: "gemini-auto", section: "auto_recall", row: "gemini", key: "hooksConfig.enabled",
 			off: func(t *testing.T) {
+				t.Helper()
 				setJSON(filepath.Join(sources.GeminiHome(), "settings.json"), []string{"hooksConfig", "enabled"}, false)(t)
 			}},
 		{name: "codex hooks", target: "codex-auto", section: "auto_recall", row: "codex-hook", key: "[features] hooks",
 			before: trustCodex, off: appendTo(codexToml, "\n[features]\nhooks = false\n")},
 		{name: "openclaw internal hooks", target: "openclaw-auto", section: "auto_recall", row: "openclaw", key: "hooks.internal.enabled",
 			off: func(t *testing.T) {
+				t.Helper()
 				setJSON(filepath.Join(sources.OpenClawStateDir(), "openclaw.json"), []string{"hooks", "internal", "enabled"}, false)(t)
 			}},
 		// #4470: deja's own extension or plugin, disabled through the client.
 		{name: "gemini extension", target: "gemini-auto", section: "auto_recall", row: "gemini", key: "extension-enablement.json",
 			off: func(t *testing.T) {
+				t.Helper()
 				setJSON(filepath.Join(sources.GeminiHome(), "extensions", "extension-enablement.json"),
 					[]string{"deja", "overrides"}, []any{"!" + geminiWorkspaceRule(cwd) + "*"})(t)
 			}},
 		{name: "openclaw hook entry", target: "openclaw-auto", section: "auto_recall", row: "openclaw", key: "hooks.internal.entries.deja-recall.enabled",
 			off: func(t *testing.T) {
+				t.Helper()
 				setJSON(filepath.Join(sources.OpenClawStateDir(), "openclaw.json"), []string{"hooks", "internal", "entries", "deja-recall", "enabled"}, false)(t)
 			}},
 		{name: "openclaw plugin", target: "openclaw-auto", section: "auto_recall", row: "openclaw", key: "plugins.entries",
 			off: func(t *testing.T) {
+				t.Helper()
 				setJSON(filepath.Join(sources.OpenClawStateDir(), "openclaw.json"), []string{"plugins", "entries", "deja", "enabled"}, false)(t)
 			}},
 		{name: "goose plugin", target: "goose-auto", section: "auto_recall", row: "goose", key: "disabledPlugins",
 			off: func(t *testing.T) {
+				t.Helper()
 				// ~/.config/goose on every OS, Windows included, where
 				// config.yaml is under %APPDATA% (discovery.rs user_settings_path).
 				setJSON(filepath.Join(sources.Home(), ".config", "goose", "settings.json"), []string{"disabledPlugins"}, []any{"deja"})(t)
 			}},
 		{name: "copilot hooks", target: "copilot-auto", section: "auto_recall", row: "copilot", key: "disableAllHooks",
 			off: func(t *testing.T) {
+				t.Helper()
 				setJSON(filepath.Join(sources.CopilotHome(), "settings.json"), []string{"disableAllHooks"}, true)(t)
 			}},
 		{name: "pi extension", target: "pi-auto", section: "auto_recall", row: "pi", key: "-extensions/deja.ts",
 			off: func(t *testing.T) {
+				t.Helper()
 				setJSON(filepath.Join(sources.PiConfigDir(), "settings.json"), []string{"extensions"}, []any{"-extensions/deja.ts"})(t)
 			}},
 		{name: "senpi extension", target: "senpi-auto", section: "auto_recall", row: "senpi", key: "-extensions/deja.ts",
 			off: func(t *testing.T) {
+				t.Helper()
 				setJSON(filepath.Join(sources.SenpiConfigDir(), "settings.json"), []string{"extensions"}, []any{"-extensions/deja.ts"})(t)
 			}},
 		{name: "omp extension", target: "omp-auto", section: "auto_recall", row: "omp", key: "disabledExtensions",
@@ -248,6 +279,7 @@ func TestDoctorReadsTheClientsOwnOffSwitches(t *testing.T) {
 				"disabledExtensions: [extension-module:deja]\n")},
 		{name: "cline plugin", target: "cline-auto", section: "auto_recall", row: "cline", key: "disabledPlugins",
 			off: func(t *testing.T) {
+				t.Helper()
 				setJSON(filepath.Join(sources.ClineConfigDir(), "settings", "global-settings.json"), []string{"disabledPlugins"},
 					[]any{filepath.Join(sources.ClinePluginsDir(), "deja", "index.js")})(t)
 			}},
@@ -346,7 +378,7 @@ func TestInstallSaysTheClientHasDejaSwitchedOff(t *testing.T) {
 	}
 	// Control: with the switches gone, install has nothing to add.
 	for _, path := range []string{settings, claude} {
-		if err := os.WriteFile(path, []byte(`{}`), 0o644); err != nil {
+		if err = os.WriteFile(path, []byte(`{}`), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -494,35 +526,44 @@ func TestClientPluginAndServerListsMatchOnlyWhatTheClientMatches(t *testing.T) {
 		off          bool
 	}{
 		{"omp bare name", "omp", true, func(t *testing.T) {
+			t.Helper()
 			write(t, filepath.Join(sources.OmpConfigDir(), "config.yml"), "disabledExtensions:\n  - deja\n")
 		}, false},
 		{"omp module id", "omp", true, func(t *testing.T) {
+			t.Helper()
 			write(t, filepath.Join(sources.OmpConfigDir(), "config.yml"), "disabledExtensions:\n  - extension-module:deja\n")
 		}, true},
 		{"cline bare name", "cline", true, func(t *testing.T) {
+			t.Helper()
 			write(t, filepath.Join(sources.ClineConfigDir(), "settings", "global-settings.json"), `{"disabledPlugins":["deja"]}`)
 		}, false},
 		{"cline plugin dir", "cline", true, func(t *testing.T) {
-			b, _ := json.Marshal(map[string]any{"disabledPlugins": []string{filepath.Join(sources.ClinePluginsDir(), "deja")}})
+			t.Helper()
+			b := mustMarshal(t, map[string]any{"disabledPlugins": []string{filepath.Join(sources.ClinePluginsDir(), "deja")}})
 			write(t, filepath.Join(sources.ClineConfigDir(), "settings", "global-settings.json"), string(b))
 		}, false},
 		{"cline module file", "cline", true, func(t *testing.T) {
-			b, _ := json.Marshal(map[string]any{"disabledPlugins": []string{filepath.Join(sources.ClinePluginsDir(), "deja", "index.js")}})
+			t.Helper()
+			b := mustMarshal(t, map[string]any{"disabledPlugins": []string{filepath.Join(sources.ClinePluginsDir(), "deja", "index.js")}})
 			write(t, filepath.Join(sources.ClineConfigDir(), "settings", "global-settings.json"), string(b))
 		}, true},
 		{"copilot other case", "copilot", false, func(t *testing.T) {
+			t.Helper()
 			write(t, filepath.Join(filepath.Dir(copilotMCPConfigPath()), "settings.json"), `{"disabledMcpServers":["Deja"]}`)
 		}, false},
 		{"goose under XDG", "goose", true, func(t *testing.T) {
+			t.Helper()
 			xdg := filepath.Join(os.Getenv("HOME"), "xdg")
 			t.Setenv("XDG_CONFIG_HOME", xdg)
 			write(t, filepath.Join(xdg, "goose", "settings.json"), `{"disabledPlugins":["deja"]}`)
 		}, false},
 		{"goose user file with XDG set", "goose", true, func(t *testing.T) {
+			t.Helper()
 			t.Setenv("XDG_CONFIG_HOME", filepath.Join(os.Getenv("HOME"), "xdg"))
 			write(t, userGoose(), `{"disabledPlugins":["deja"]}`)
 		}, true},
 		{"goose project enables it", "goose", true, func(t *testing.T) {
+			t.Helper()
 			write(t, userGoose(), `{"disabledPlugins":["deja"]}`)
 			project := filepath.Join(os.Getenv("HOME"), "work")
 			write(t, filepath.Join(project, ".config", "goose", "settings.json"), `{"enabledPlugins":["deja"]}`)
@@ -585,13 +626,16 @@ func TestPerProjectListsAreReadForTheDirectoryTheClientKeys(t *testing.T) {
 		}
 	}
 	claudeOff := func(t *testing.T, dir string) {
-		b, _ := json.Marshal(map[string]any{"projects": map[string]any{dir: map[string]any{"disabledMcpServers": []string{"deja"}}}})
+		t.Helper()
+		b := mustMarshal(t, map[string]any{"projects": map[string]any{dir: map[string]any{"disabledMcpServers": []string{"deja"}}}})
 		write(t, sources.ClaudeJSONPath(), string(b))
 	}
 	cursorOff := func(t *testing.T, dir string) {
+		t.Helper()
 		write(t, filepath.Join(cursorDataDir(), "projects", cursorProjectSlug(dir), "mcp-disabled.json"), `["deja"]`)
 	}
 	setup := func(t *testing.T) (main, sub, wt string) {
+		t.Helper()
 		hermeticEnv(t)
 		base, err := filepath.EvalSymlinks(t.TempDir())
 		if err != nil {
@@ -616,14 +660,15 @@ func TestPerProjectListsAreReadForTheDirectoryTheClientKeys(t *testing.T) {
 		run    func(t *testing.T, main, sub, wt string) string // the dir doctor runs in
 		off    bool
 	}{
-		{"claude subdir entry", "claude-code", func(t *testing.T, main, sub, wt string) string { claudeOff(t, sub); return sub }, false},
-		{"claude repo entry from subdir", "claude-code", func(t *testing.T, main, sub, wt string) string { claudeOff(t, main); return sub }, true},
-		{"claude main entry from worktree", "claude-code", func(t *testing.T, main, sub, wt string) string { claudeOff(t, main); return wt }, true},
-		{"claude worktree entry", "claude-code", func(t *testing.T, main, sub, wt string) string { claudeOff(t, wt); return wt }, false},
-		{"cursor subdir entry", "cursor", func(t *testing.T, main, sub, wt string) string { cursorOff(t, sub); return sub }, false},
-		{"cursor repo entry from subdir", "cursor", func(t *testing.T, main, sub, wt string) string { cursorOff(t, main); return sub }, true},
-		{"cursor worktree entry", "cursor", func(t *testing.T, main, sub, wt string) string { cursorOff(t, wt); return wt }, true},
-		{"claude real path through a link", "claude-code", func(t *testing.T, main, sub, wt string) string {
+		{"claude subdir entry", "claude-code", func(t *testing.T, _, sub, _ string) string { t.Helper(); claudeOff(t, sub); return sub }, false},
+		{"claude repo entry from subdir", "claude-code", func(t *testing.T, main, sub, _ string) string { t.Helper(); claudeOff(t, main); return sub }, true},
+		{"claude main entry from worktree", "claude-code", func(t *testing.T, main, _, wt string) string { t.Helper(); claudeOff(t, main); return wt }, true},
+		{"claude worktree entry", "claude-code", func(t *testing.T, _, _, wt string) string { t.Helper(); claudeOff(t, wt); return wt }, false},
+		{"cursor subdir entry", "cursor", func(t *testing.T, _, sub, _ string) string { t.Helper(); cursorOff(t, sub); return sub }, false},
+		{"cursor repo entry from subdir", "cursor", func(t *testing.T, main, sub, _ string) string { t.Helper(); cursorOff(t, main); return sub }, true},
+		{"cursor worktree entry", "cursor", func(t *testing.T, _, _, wt string) string { t.Helper(); cursorOff(t, wt); return wt }, true},
+		{"claude real path through a link", "claude-code", func(t *testing.T, main, _, _ string) string {
+			t.Helper()
 			claudeOff(t, main)
 			link := filepath.Join(filepath.Dir(main), "link")
 			if err := os.Symlink(main, link); err != nil {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -30,8 +31,8 @@ func TestAFleetIsNotSilencedByTheProjectCooldown(t *testing.T) {
 		"the login throttle", "the avatar uploader", "the cron scheduler"} {
 		id := fmt.Sprintf("t%d", i)
 		writeClaudeFixture(t, filepath.Join(root, "app", id+".jsonl"), id, []string{
-			`{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-01T0` + fmt.Sprint(i) + `:00:00Z","message":{"role":"user","content":"work on ` + top + ` today"}}`,
-			`{"type":"assistant","sessionId":"` + id + `","timestamp":"2026-01-01T0` + fmt.Sprint(i) + `:00:01Z","message":{"role":"assistant","content":"changed ` + top + `"}}`,
+			`{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-01T0` + strconv.Itoa(i) + `:00:00Z","message":{"role":"user","content":"work on ` + top + ` today"}}`,
+			`{"type":"assistant","sessionId":"` + id + `","timestamp":"2026-01-01T0` + strconv.Itoa(i) + `:00:01Z","message":{"role":"assistant","content":"changed ` + top + `"}}`,
 		})
 	}
 	if _, err := captureRun(t, "index"); err != nil {

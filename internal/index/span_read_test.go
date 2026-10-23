@@ -21,7 +21,7 @@ func writeSpanFixture(t *testing.T, texts []string) (string, []int64) {
 		t.Fatal(err)
 	}
 	tables := newRecordTables()
-	var offs []int64
+	offs := make([]int64, 0, len(texts))
 	for i, s := range texts {
 		off, err := writeRecord(f, Record{
 			Key:        "k",
@@ -75,7 +75,7 @@ func TestEachRecordAtMatchesIndividualReads(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var want []string
+	want := make([]string, 0, len(offs))
 	for _, off := range offs {
 		r, err := readRecordAt(f, off, newRecordTables())
 		if err != nil {
@@ -108,7 +108,7 @@ func TestEachRecordAtReportsAnUnreadableFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := f.Close(); err != nil {
+	if err = f.Close(); err != nil {
 		t.Fatal(err)
 	}
 	n := 0
@@ -155,17 +155,17 @@ func TestReadRecordAtCorruptHeader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := readRecordAt(f, 0, newRecordTables()); !errors.Is(err, io.ErrUnexpectedEOF) {
+	if _, err = readRecordAt(f, 0, newRecordTables()); !errors.Is(err, io.ErrUnexpectedEOF) {
 		t.Fatalf("partial header err=%v", err)
 	}
-	if err := f.Close(); err != nil {
+	if err = f.Close(); err != nil {
 		t.Fatal(err)
 	}
 
 	huge := filepath.Join(dir, "huge.bin")
 	hdr := make([]byte, 8)
 	binary.LittleEndian.PutUint32(hdr, ^uint32(0))
-	if err := os.WriteFile(huge, hdr, 0o600); err != nil {
+	if err = os.WriteFile(huge, hdr, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	f2, err := os.Open(huge)

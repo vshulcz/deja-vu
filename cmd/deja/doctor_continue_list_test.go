@@ -28,7 +28,7 @@ func TestDoctorDoesNotCallContinuesListUnrecognised(t *testing.T) {
 	t.Setenv("DEJA_CONTINUE_ROOT", filepath.Join(tmp, "continue"))
 	var buf bytes.Buffer
 	doctorHarnesses(&buf, t.TempDir())
-	for _, line := range strings.Split(buf.String(), "\n") {
+	for line := range strings.SplitSeq(buf.String(), "\n") {
 		if strings.Contains(line, "continue") && strings.Contains(line, "not recognised") {
 			t.Errorf("the list file is counted as a transcript deja failed to read: %q", line)
 		}

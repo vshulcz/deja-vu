@@ -23,7 +23,7 @@ func TestDoctorNamesTheAutoTargetForAnMCPOnlyInstall(t *testing.T) {
 	var buf bytes.Buffer
 	doctorAutoRecall(&buf)
 	var line string
-	for _, l := range strings.Split(buf.String(), "\n") {
+	for l := range strings.SplitSeq(buf.String(), "\n") {
 		if strings.HasPrefix(strings.TrimSpace(l), "crush ") {
 			line = l
 		}

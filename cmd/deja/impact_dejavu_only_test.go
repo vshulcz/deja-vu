@@ -17,7 +17,7 @@ import (
 func TestImpactCountsAPromptHookOnlyMachine(t *testing.T) {
 	hermeticEnv(t)
 	dir := index.DefaultDir()
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		usage.RecordDigestInto(dir, usage.KindDejaVu, "<deja-recall>\n  - Session: **a** `1`\n", "agent1", 2, 1160,
 			[]string{"panic", "quaxbolt"}, "r0", "r1")
 	}

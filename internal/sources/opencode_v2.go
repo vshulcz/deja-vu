@@ -73,7 +73,8 @@ func opencodeSchemaOf(db string) opencodeSchema {
 		key = fmt.Sprintf("%s|%d|%d", db, fi.Size(), fi.ModTime().UnixNano())
 	}
 	if v, ok := opencodeSchemaCache.Load(key); ok {
-		return v.(opencodeSchema)
+		schema, _ := v.(opencodeSchema)
+		return schema
 	}
 	got := readOpencodeSchema(db)
 	opencodeSchemaCache.Store(key, got)
@@ -94,7 +95,7 @@ func readOpencodeSchema(db string) opencodeSchema {
 		return out
 	}
 	have := map[string]bool{}
-	for _, name := range strings.Split(strings.TrimSpace(string(b)), ",") {
+	for name := range strings.SplitSeq(strings.TrimSpace(string(b)), ",") {
 		have[name] = true
 	}
 	out.rowsStamped = have["message.time_updated"] && have["part.time_updated"] && have["part.session_id"]

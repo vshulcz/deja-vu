@@ -38,6 +38,7 @@ import (
 // does not affect it because that variable only relocates reads.
 func KimiConfigDir() string { return EnvPath("KIMI_CODE_HOME", filepath.Join(Home(), ".kimi-code")) }
 
+// KimiRoot is the Kimi Code config dir deja reads sessions from.
 func KimiRoot() string { return EnvPath("DEJA_KIMI_ROOT", KimiConfigDir()) }
 
 // KimiSessionFiles takes sub-agent logs by default, read the way Claude's and
@@ -186,12 +187,15 @@ func KimiSubagentFile(p string) bool {
 		filepath.Base(filepath.Dir(dir)) == "agents"
 }
 
+// LoadKimi reads every Kimi Code session on this machine.
 func LoadKimi() []model.Session { return parseFiles(KimiSessionFiles(), ParseKimiFile) }
 
+// ParseKimiFile reads one Kimi Code transcript.
 func ParseKimiFile(path string) ([]model.Session, error) {
 	return parseKimiFileFromOffset(path, 0)
 }
 
+// ParseKimiFileFromOffset reads a Kimi Code transcript from offset on.
 func ParseKimiFileFromOffset(path string, offset int64) ([]model.Session, error) {
 	return parseKimiFileFromOffset(path, offset)
 }
@@ -366,7 +370,6 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 	// in a /btw fork only what follows the side-question reminder is read,
 	// and a fork with none is that copy and nothing else (#4484).
 	fork := child && kimiForkFile(path)
-	btw := false
 	cwd, forkedFrom := "", ""
 	if st, ok := kimiSessionState(path); ok {
 		s.Title = strings.TrimSpace(st.Title)
@@ -394,23 +397,7 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 		// A session /fork made: what it copied is its source's, read there.
 		s.Kind, s.Parent = "fork", forkedFrom
 	}
-	// A Bash call and its result are separate loop events joined by
-	// toolCallId; the command record is kept by id so the exit status the
-	// result reports can ride on it (#4262).
-	shellAt := map[string]int{}
-	// Streamed assistant text accumulates across content.part events and is
-	// flushed on step.end — or at EOF, so a response mid-stream when the
-	// indexer runs is not lost (the remainder lands on the next incremental
-	// pass as its own message).
-	var pending strings.Builder
-	var pendingTime any
-	flush := func() {
-		if text := strings.TrimSpace(pending.String()); text != "" {
-			s.Messages = append(s.Messages, model.Message{Role: "assistant", Text: text, Time: parseTimeAny(pendingTime)})
-		}
-		pending.Reset()
-		pendingTime = nil
-	}
+	w := &kimiWire{s: &s, cwd: cwd, child: child, fork: fork, shellAt: map[string]int{}}
 	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
 		switch m["type"] {
 		case "forked":
@@ -424,9 +411,9 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 			}
 			s.Messages = nil
 			s.Started, s.Updated = time.Time{}, time.Time{}
-			pending.Reset()
-			pendingTime = nil
-			clear(shellAt)
+			w.pending.Reset()
+			w.pendingTime = nil
+			clear(w.shellAt)
 		case "context.apply_compaction":
 			// The summary the compaction left in place of the turns it
 			// dropped (kimi-code 0.28.1). summary is the model's text, an
@@ -440,167 +427,19 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 				text, _ = m["contextSummary"].(string)
 			}
 			if text = strings.TrimSpace(text); text != "" {
-				flush()
+				w.flush()
 				t := parseTimeAny(m["time"])
 				s.Touch(t)
 				s.Messages = append(s.Messages, model.Message{Role: RoleSummary, Text: text, Time: t})
 			}
 		case "context.append_message":
-			msg, _ := m["message"].(map[string]any)
-			if msg == nil {
-				return
-			}
-			role, _ := msg["role"].(string)
-			if role != "user" && role != "assistant" {
-				return
-			}
-			if fork && kimiBtwTrigger(msg) {
-				btw = true
-				s.Messages = nil
-				s.Started, s.Updated = time.Time{}, time.Time{}
-				pending.Reset()
-				pendingTime = nil
-				clear(shellAt)
-				return
-			}
-			// Kimi appends the host's own lines under role user too — an
-			// injected reminder, a hook's wrapped stdout, a background task's
-			// notice — and names the author in origin.kind. Only the person's
-			// are user turns; a message with no origin is an older protocol's
-			// and was always the person's (#3199).
-			if role == "user" && !kimiPersonsOrigin(msg["origin"]) && (!child || !kimiSubagentTask(msg["origin"])) {
-				// The host's line still moves the clock: a session whose
-				// last record is a hook's output ended when that arrived.
-				s.Touch(parseTimeAny(m["time"]))
-				return
-			}
-			if role == "assistant" {
-				// Non-streamed assistant records exist in older protocols;
-				// close any open step first to keep message order stable.
-				flush()
-			}
-			text := kimiText(msg["content"])
-			if role == "user" && child && kimiSubagentTask(msg["origin"]) {
-				text = kimiWithoutGitContext(text)
-			}
-			t := parseTimeAny(m["time"])
-			s.Touch(t)
-			if text != "" {
-				s.Messages = append(s.Messages, model.Message{Role: role, Text: text, Time: t})
-			}
+			w.appendMessage(m)
 		case "context.append_loop_event":
-			e, _ := m["event"].(map[string]any)
-			if e == nil {
-				return
-			}
-			switch e["type"] {
-			case "step.begin":
-				flush()
-			case "content.part":
-				p, _ := e["part"].(map[string]any)
-				if p == nil || p["type"] != "text" {
-					return
-				}
-				text, _ := p["text"].(string)
-				if text == "" {
-					return
-				}
-				if t := parseTimeAny(m["time"]); !t.IsZero() {
-					s.Touch(t)
-					if pendingTime == nil {
-						pendingTime = m["time"]
-					}
-				}
-				pending.WriteString(text)
-			case "step.end":
-				flush()
-			case "tool.call":
-				// A call sits between the text parts of its step, so the
-				// pending stream is flushed before the record to keep the
-				// words that led to the call ahead of it. The flush happens
-				// only when the call yields a record: with every DEJA_INDEX_*
-				// switch off, the messages come out exactly as they did
-				// before tool events were read.
-				name, _ := e["name"].(string)
-				args, _ := e["args"].(map[string]any)
-				if name == "" || args == nil {
-					return
-				}
-				// Kimi resolves a relative path against the session's cwd; kept
-				// bare, blame never matched the record to the file (#5228). A
-				// leading ~, ~/ or ~\ is Kimi's to expand and stays as written.
-				if p, _ := args[kimiDialect.pathKey].(string); p != "" && p != "~" && !strings.HasPrefix(p, "~/") && !strings.HasPrefix(p, `~\`) {
-					if abs := resolveToolPath(p, cwd); abs != p {
-						args = maps.Clone(args)
-						args[kimiDialect.pathKey] = abs
-					}
-				}
-				part := []any{map[string]any{"type": "tool_use", "name": name, "input": args}}
-				t := parseTimeAny(m["time"])
-				var records []model.Message
-				if IndexToolPaths() {
-					if p := toolPathsIn(part, kimiDialect); p != "" {
-						records = append(records, model.Message{Role: RoleFiles, Text: p, Time: t})
-					}
-				}
-				if IndexWrites() {
-					for _, w := range wroteRecordsIn(part, kimiDialect) {
-						records = append(records, model.Message{Role: RoleWrote, Text: w, Time: t})
-					}
-				}
-				if IndexEdits() {
-					for _, span := range editSpansIn(part, kimiDialect) {
-						records = append(records, model.Message{Role: RoleEdit, Text: span, Time: t})
-					}
-				}
-				shell := -1
-				if IndexCommands() {
-					for _, cmd := range commandsIn(part, kimiDialect) {
-						shell = len(records)
-						records = append(records, model.Message{Role: RoleCommand, Text: cmd, Time: t})
-					}
-				}
-				id, _ := e["toolCallId"].(string)
-				// An id seen again belongs to this call now, recorded or not.
-				delete(shellAt, id)
-				if len(records) == 0 {
-					return
-				}
-				flush()
-				s.Touch(t)
-				if shell >= 0 && id != "" {
-					shellAt[id] = len(s.Messages) + shell
-				}
-				s.Messages = append(s.Messages, records...)
-			case "tool.result":
-				// Every observed result shape carries its text under
-				// `output` — plain, with a note, truncated, or flagged
-				// isError. The error ones are kept on purpose: the error a
-				// command hit is exactly what a later search reaches for.
-				r, _ := e["result"].(map[string]any)
-				id, _ := e["toolCallId"].(string)
-				if i, ok := shellAt[id]; ok {
-					if code := kimiExitCode(r); code > 0 {
-						s.Messages[i].Text += fmt.Sprintf("  → exit %d", code)
-					}
-					delete(shellAt, id)
-				}
-				if !IndexToolOutput() {
-					return
-				}
-				out, _ := r["output"].(string)
-				if out = strings.TrimSpace(out); out == "" {
-					return
-				}
-				t := parseTimeAny(m["time"])
-				flush()
-				s.Touch(t)
-				s.Messages = append(s.Messages, model.Message{Role: RoleToolOutput, Text: out, Time: t})
-			}
+			w.loopEvent(m)
 		}
 	})
-	flush()
-	if btw {
+	w.flush()
+	if w.btw {
 		// The person asked it in the session it forked from; it is not a run
 		// that session spawned.
 		s.Kind = "fork"
@@ -614,6 +453,203 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 		return nil, err
 	}
 	return []model.Session{s}, err
+}
+
+// kimiWire is what one read of wire.jsonl carries from record to record.
+type kimiWire struct {
+	s           *model.Session
+	cwd         string
+	child, fork bool
+	// btw is set once a /btw fork reaches its side-question reminder.
+	btw bool
+	// A Bash call and its result are separate loop events joined by
+	// toolCallId; the command record is kept by id so the exit status the
+	// result reports can ride on it (#4262).
+	shellAt map[string]int
+	// Streamed assistant text accumulates across content.part events and is
+	// flushed on step.end — or at EOF, so a response mid-stream when the
+	// indexer runs is not lost (the remainder lands on the next incremental
+	// pass as its own message).
+	pending     strings.Builder
+	pendingTime any
+}
+
+// flush appends the streamed assistant text gathered so far as one message.
+func (w *kimiWire) flush() {
+	if text := strings.TrimSpace(w.pending.String()); text != "" {
+		w.s.Messages = append(w.s.Messages, model.Message{Role: "assistant", Text: text, Time: parseTimeAny(w.pendingTime)})
+	}
+	w.pending.Reset()
+	w.pendingTime = nil
+}
+
+// appendMessage reads a context.append_message record.
+func (w *kimiWire) appendMessage(m map[string]any) {
+	msg, _ := m["message"].(map[string]any)
+	if msg == nil {
+		return
+	}
+	role, _ := msg["role"].(string)
+	if role != "user" && role != "assistant" {
+		return
+	}
+	if w.fork && kimiBtwTrigger(msg) {
+		w.btw = true
+		w.s.Messages = nil
+		w.s.Started, w.s.Updated = time.Time{}, time.Time{}
+		w.pending.Reset()
+		w.pendingTime = nil
+		clear(w.shellAt)
+		return
+	}
+	// Kimi appends the host's own lines under role user too — an
+	// injected reminder, a hook's wrapped stdout, a background task's
+	// notice — and names the author in origin.kind. Only the person's
+	// are user turns; a message with no origin is an older protocol's
+	// and was always the person's (#3199).
+	if role == "user" && !kimiPersonsOrigin(msg["origin"]) && (!w.child || !kimiSubagentTask(msg["origin"])) {
+		// The host's line still moves the clock: a session whose
+		// last record is a hook's output ended when that arrived.
+		w.s.Touch(parseTimeAny(m["time"]))
+		return
+	}
+	if role == "assistant" {
+		// Non-streamed assistant records exist in older protocols;
+		// close any open step first to keep message order stable.
+		w.flush()
+	}
+	text := kimiText(msg["content"])
+	if role == "user" && w.child && kimiSubagentTask(msg["origin"]) {
+		text = kimiWithoutGitContext(text)
+	}
+	t := parseTimeAny(m["time"])
+	w.s.Touch(t)
+	if text != "" {
+		w.s.Messages = append(w.s.Messages, model.Message{Role: role, Text: text, Time: t})
+	}
+}
+
+// loopEvent reads a context.append_loop_event record: streamed text, step
+// boundaries, tool calls and their results.
+func (w *kimiWire) loopEvent(m map[string]any) {
+	e, _ := m["event"].(map[string]any)
+	if e == nil {
+		return
+	}
+	switch e["type"] {
+	case "step.begin":
+		w.flush()
+	case "content.part":
+		p, _ := e["part"].(map[string]any)
+		if p == nil || p["type"] != "text" {
+			return
+		}
+		text, _ := p["text"].(string)
+		if text == "" {
+			return
+		}
+		if t := parseTimeAny(m["time"]); !t.IsZero() {
+			w.s.Touch(t)
+			if w.pendingTime == nil {
+				w.pendingTime = m["time"]
+			}
+		}
+		w.pending.WriteString(text)
+	case "step.end":
+		w.flush()
+	case "tool.call":
+		// A call sits between the text parts of its step, so the
+		// pending stream is flushed before the record to keep the
+		// words that led to the call ahead of it. The flush happens
+		// only when the call yields a record: with every DEJA_INDEX_*
+		// switch off, the messages come out exactly as they did
+		// before tool events were read.
+		records, shell, t, ok := kimiToolRecords(m, e, w.cwd)
+		if !ok {
+			return
+		}
+		id, _ := e["toolCallId"].(string)
+		// An id seen again belongs to this call now, recorded or not.
+		delete(w.shellAt, id)
+		if len(records) == 0 {
+			return
+		}
+		w.flush()
+		w.s.Touch(t)
+		if shell >= 0 && id != "" {
+			w.shellAt[id] = len(w.s.Messages) + shell
+		}
+		w.s.Messages = append(w.s.Messages, records...)
+	case "tool.result":
+		// Every observed result shape carries its text under
+		// `output` — plain, with a note, truncated, or flagged
+		// isError. The error ones are kept on purpose: the error a
+		// command hit is exactly what a later search reaches for.
+		r, _ := e["result"].(map[string]any)
+		id, _ := e["toolCallId"].(string)
+		if i, ok := w.shellAt[id]; ok {
+			if code := kimiExitCode(r); code > 0 {
+				w.s.Messages[i].Text += fmt.Sprintf("  → exit %d", code)
+			}
+			delete(w.shellAt, id)
+		}
+		if !IndexToolOutput() {
+			return
+		}
+		out, _ := r["output"].(string)
+		if out = strings.TrimSpace(out); out == "" {
+			return
+		}
+		t := parseTimeAny(m["time"])
+		w.flush()
+		w.s.Touch(t)
+		w.s.Messages = append(w.s.Messages, model.Message{Role: RoleToolOutput, Text: out, Time: t})
+	}
+}
+
+// kimiToolRecords is what a tool.call yields: its path, write, edit and command
+// records, the index of the last command among them or -1, and the record's
+// time. ok is false for a call with no name or arguments.
+func kimiToolRecords(m, e map[string]any, cwd string) (records []model.Message, shell int, t time.Time, ok bool) {
+	name, _ := e["name"].(string)
+	args, _ := e["args"].(map[string]any)
+	if name == "" || args == nil {
+		return nil, -1, time.Time{}, false
+	}
+	// Kimi resolves a relative path against the session's cwd; kept
+	// bare, blame never matched the record to the file (#5228). A
+	// leading ~, ~/ or ~\ is Kimi's to expand and stays as written.
+	if p, _ := args[kimiDialect.pathKey].(string); p != "" && p != "~" && !strings.HasPrefix(p, "~/") && !strings.HasPrefix(p, `~\`) {
+		if abs := resolveToolPath(p, cwd); abs != p {
+			args = maps.Clone(args)
+			args[kimiDialect.pathKey] = abs
+		}
+	}
+	part := []any{map[string]any{"type": "tool_use", "name": name, "input": args}}
+	t = parseTimeAny(m["time"])
+	if IndexToolPaths() {
+		if p := toolPathsIn(part, kimiDialect); p != "" {
+			records = append(records, model.Message{Role: RoleFiles, Text: p, Time: t})
+		}
+	}
+	if IndexWrites() {
+		for _, w := range wroteRecordsIn(part, kimiDialect) {
+			records = append(records, model.Message{Role: RoleWrote, Text: w, Time: t})
+		}
+	}
+	if IndexEdits() {
+		for _, span := range editSpansIn(part, kimiDialect) {
+			records = append(records, model.Message{Role: RoleEdit, Text: span, Time: t})
+		}
+	}
+	shell = -1
+	if IndexCommands() {
+		for _, cmd := range commandsIn(part, kimiDialect) {
+			shell = len(records)
+			records = append(records, model.Message{Role: RoleCommand, Text: cmd, Time: t})
+		}
+	}
+	return records, shell, t, true
 }
 
 // kimiTailResumes reads wire.jsonl whole when either rule asks: the tail

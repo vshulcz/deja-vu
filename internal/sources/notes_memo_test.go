@@ -37,7 +37,7 @@ func TestTheNotesFileIsParsedOncePerProcess(t *testing.T) {
 	if n := notesParses() - before; n != 2 {
 		t.Errorf("the first pair of reads parsed the file %d times, want 2", n)
 	}
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		LoadPromotedNotes()
 		PromotedLifecycles()
 	}

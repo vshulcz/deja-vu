@@ -14,7 +14,7 @@ func copilotChatRoot(t *testing.T) string {
 	return root
 }
 
-func writeCopilotChatSession(t *testing.T, root, hash, id, workspace, body, ext string) string {
+func writeCopilotChatSession(t *testing.T, root, hash, id, workspace, body string) string {
 	t.Helper()
 	dir := filepath.Join(root, "workspaceStorage", hash, "chatSessions")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -26,7 +26,7 @@ func writeCopilotChatSession(t *testing.T, root, hash, id, workspace, body, ext 
 			t.Fatal(err)
 		}
 	}
-	p := filepath.Join(dir, id+ext)
+	p := filepath.Join(dir, id+".jsonl")
 	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func itoa64(n int64) string {
 	}
 	var b [20]byte
 	i := len(b)
-	u := uint64(n)
+	u := uint64(n) //nolint:gosec // the test passes non-negative values
 	for u > 0 {
 		i--
 		b[i] = byte('0' + u%10)
@@ -258,7 +258,7 @@ func TestParseCopilotChatStringResponseAndV2Title(t *testing.T) {
 	p2 := filepath.Join(dir, "v2.json")
 	v2 := `{"version":2,"computedTitle":"old title` + "\\n" + `second line","sessionId":"v2","creationDate":1763727100000,"customTitle":"ignored","requests":[{` +
 		`"timestamp":1763727104742,"message":"q","response":[{"value":"a"}],"responseTimestamp":1763727400000}]}`
-	if err := os.WriteFile(p2, []byte(v2), 0o644); err != nil {
+	if err = os.WriteFile(p2, []byte(v2), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	ss, err = ParseCopilotChatFile(p2)
@@ -269,7 +269,7 @@ func TestParseCopilotChatStringResponseAndV2Title(t *testing.T) {
 	p3 := filepath.Join(dir, "nover.json")
 	nover := `{"customTitle":"should-not-stick","sessionId":"n","creationDate":1763727100000,"requests":[{` +
 		`"timestamp":1763727104742,"message":"q","response":[{"value":"a"}],"responseTimestamp":1763727400000}]}`
-	if err := os.WriteFile(p3, []byte(nover), 0o644); err != nil {
+	if err = os.WriteFile(p3, []byte(nover), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	ss, err = ParseCopilotChatFile(p3)
@@ -361,8 +361,7 @@ func TestCopilotChatProjectFromWorkspaceJSON(t *testing.T) {
 	posix := writeCopilotChatSession(t, root, "hash1", "s1",
 		`{"folder":"file:///tmp/registry-demo"}`,
 		`{"kind":0,"v":{"version":3,"sessionId":"s1","creationDate":1763727100000,"requests":[`+
-			copilotChatReq("r", "q", "a", 1763727104742, 1763727400000)+`]}}`+"\n",
-		".jsonl")
+			copilotChatReq("r", "q", "a", 1763727104742, 1763727400000)+`]}}`+"\n")
 	ss, err := ParseCopilotChatFile(posix)
 	if err != nil || len(ss) != 1 || ss[0].Project != "tmp/registry-demo" {
 		t.Fatalf("posix project = %#v, %v", ss, err)
@@ -371,8 +370,7 @@ func TestCopilotChatProjectFromWorkspaceJSON(t *testing.T) {
 	win := writeCopilotChatSession(t, root, "hash2", "s2",
 		`{"folder":"file:///c%3A/Users/x/proj/demo"}`,
 		`{"kind":0,"v":{"version":3,"sessionId":"s2","creationDate":1763727100000,"requests":[`+
-			copilotChatReq("r", "q", "a", 1763727104742, 1763727400000)+`]}}`+"\n",
-		".jsonl")
+			copilotChatReq("r", "q", "a", 1763727104742, 1763727400000)+`]}}`+"\n")
 	ss, err = ParseCopilotChatFile(win)
 	if err != nil || len(ss) != 1 || ss[0].Project != "proj/demo" {
 		t.Fatalf("windows c%%3A project = %#v, %v", ss, err)
@@ -381,8 +379,7 @@ func TestCopilotChatProjectFromWorkspaceJSON(t *testing.T) {
 	multi := writeCopilotChatSession(t, root, "hash3", "s3",
 		`{"workspace":"file:///tmp/multi.code-workspace"}`,
 		`{"kind":0,"v":{"version":3,"sessionId":"s3","creationDate":1763727100000,"requests":[`+
-			copilotChatReq("r", "q", "a", 1763727104742, 1763727400000)+`]}}`+"\n",
-		".jsonl")
+			copilotChatReq("r", "q", "a", 1763727104742, 1763727400000)+`]}}`+"\n")
 	ss, err = ParseCopilotChatFile(multi)
 	if err != nil || len(ss) != 1 || ss[0].Project != "tmp/multi.code-workspace" {
 		t.Fatalf("workspace uri project = %#v, %v", ss, err)
@@ -407,7 +404,7 @@ func TestCopilotChatSessionFilesDedupeAndDiscovery(t *testing.T) {
 	root := copilotChatRoot(t)
 	body := `{"kind":0,"v":{"version":3,"sessionId":"s1","creationDate":1763727100000,"requests":[` +
 		copilotChatReq("r", "q", "a", 1763727104742, 1763727400000) + `]}}` + "\n"
-	jsonl := writeCopilotChatSession(t, root, "h", "s1", `{"folder":"file:///tmp/p"}`, body, ".jsonl")
+	jsonl := writeCopilotChatSession(t, root, "h", "s1", `{"folder":"file:///tmp/p"}`, body)
 	flat := strings.TrimSuffix(jsonl, ".jsonl") + ".json"
 	if err := os.WriteFile(flat, []byte(`{"version":3,"sessionId":"s1","requests":[]}`), 0o644); err != nil {
 		t.Fatal(err)
@@ -428,7 +425,7 @@ func TestCopilotChatSessionFilesDedupeAndDiscovery(t *testing.T) {
 	}
 
 	files := CopilotChatSessionFiles()
-	var bases []string
+	bases := make([]string, 0, len(files))
 	for _, f := range files {
 		bases = append(bases, filepath.Base(f))
 		if strings.Contains(f, "transferredChatSessions") {

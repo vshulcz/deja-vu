@@ -81,11 +81,11 @@ func openclawTranscript(root, p string) bool {
 
 // openclawArchiveLive is the transcript an archive was renamed from.
 func openclawArchiveLive(p string) string {
-	at := strings.Index(p, ".jsonl.")
-	if at < 0 {
+	before, _, ok := strings.Cut(p, ".jsonl.")
+	if !ok {
 		return p
 	}
-	return p[:at] + ".jsonl"
+	return before + ".jsonl"
 }
 
 // OpenClawSessionFiles lists live transcript files for all agents.
@@ -224,13 +224,13 @@ func OpenClawSessionKey(path, id string) (string, error) {
 	}
 	b, err := os.ReadFile(filepath.Join(filepath.Dir(path), "sessions.json"))
 	if err != nil {
-		return "", nil
+		return "", nil //nolint:nilerr // no session index means no key
 	}
 	var store map[string]struct {
 		SessionID string `json:"sessionId"`
 	}
 	if err := json.Unmarshal(b, &store); err != nil {
-		return "", nil
+		return "", nil //nolint:nilerr // no session index means no key
 	}
 	for key, rec := range store {
 		if rec.SessionID == id {

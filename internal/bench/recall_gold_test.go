@@ -79,7 +79,7 @@ func TestOneSessionHoldsEachQuerysWords(t *testing.T) {
 // punctuation a phrase query carries taken off.
 func queryWords(text string) []string {
 	var out []string
-	for _, w := range strings.Fields(strings.ToLower(text)) {
+	for w := range strings.FieldsSeq(strings.ToLower(text)) {
 		w = strings.Trim(w, `"'.,;:`)
 		if len(w) > 2 {
 			out = append(out, w)

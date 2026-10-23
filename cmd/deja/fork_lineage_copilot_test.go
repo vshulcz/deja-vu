@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -39,7 +38,7 @@ func copilotForkStore(t *testing.T) (dir, source, fork string) {
 		return fmt.Sprintf(`{"type":"user.message","data":{"content":%q},"timestamp":%q}`, user, at(d)) + "\n" +
 			fmt.Sprintf(`{"type":"assistant.message","data":{"content":%q},"timestamp":%q}`, reply, at(d+5*time.Second)) + "\n"
 	}
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		id := fmt.Sprintf("%08d-0000-4000-8000-000000000000", i)
 		write(id, start(id, at(-time.Duration(i+2)*time.Hour))+turn(fmt.Sprintf("rename table%d in the billing schema", i), "done", -time.Duration(i+2)*time.Hour))
 	}
@@ -87,7 +86,7 @@ func TestACopilotForksDigestLeavesOutItsSource(t *testing.T) {
 func TestACopilotForksPromptRecallLeavesOutItsSource(t *testing.T) {
 	dir, source, fork := copilotForkStore(t)
 	ask := func(sid string) string {
-		payload, _ := json.Marshal(map[string]string{"sessionId": sid, "cwd": "/w/p", "prompt": forkQuestion})
+		payload := mustMarshal(t, map[string]string{"sessionId": sid, "cwd": "/w/p", "prompt": forkQuestion})
 		var out strings.Builder
 		if err := runHookPrompt(dir, strings.NewReader(string(payload)), &out); err != nil {
 			t.Fatal(err)

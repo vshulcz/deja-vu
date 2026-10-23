@@ -74,7 +74,7 @@ func TestFixSaysItIsWaitingRatherThanDenyingTheSighting(t *testing.T) {
 
 	// And a second sighting names the remedy, as before.
 	write("f2", 4)
-	if err := index.Ensure(filepath.Join(tmp, "index.db"), "", true, nil); err != nil {
+	if err = index.Ensure(filepath.Join(tmp, "index.db"), "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	out, err = captureRun(t, "fix", fail)

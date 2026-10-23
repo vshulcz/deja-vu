@@ -23,7 +23,7 @@ func TestDejaAiderPassesSIGTERMToAider(t *testing.T) {
 	home := t.TempDir()
 	pidFile, got := filepath.Join(home, "aider.pid"), filepath.Join(home, "got-term")
 	aiderStandIn(t, home, "echo $$ > '"+pidFile+"'\ntrap \"echo term > '"+got+"'; exit 0\" TERM\nwhile :; do sleep 0.05; done\n")
-	cmd := exec.Command(os.Args[0], "-test.run=^TestDejaAiderSignalHelper$")
+	cmd := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestDejaAiderSignalHelper$")
 	cmd.Env = append(os.Environ(), "DEJA_AIDER_SIGNAL_HELPER="+home)
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)

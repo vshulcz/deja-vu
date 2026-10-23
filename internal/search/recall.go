@@ -14,12 +14,14 @@ import (
 	"github.com/vshulcz/deja-vu/internal/prompt"
 )
 
+// The auto-recall modes.
 const (
 	RecallOff        = "off"
 	RecallSafe       = "safe"
 	RecallAggressive = "aggressive"
 )
 
+// AutoRecallOptions picks and orders the sessions an auto-recall block draws on.
 type AutoRecallOptions struct {
 	Mode         string
 	ProjectNames []string
@@ -37,6 +39,7 @@ type AutoRecallOptions struct {
 	Unseen map[string]bool
 }
 
+// AutoRecallResult is a rendered auto-recall block and what went into it.
 type AutoRecallResult struct {
 	Text     string
 	Sessions int
@@ -52,6 +55,7 @@ type AutoRecallResult struct {
 	IDs []string
 }
 
+// AutoRecallDigest renders the session-start block within budget.
 func AutoRecallDigest(ss []model.Session, budget int) string {
 	return AutoRecallDigestFor(ss, budget, nil)
 }
@@ -244,9 +248,11 @@ func relevanceWords(s model.Session) int {
 
 func sessionWordSet(s model.Session) map[string]bool {
 	text := s.Title
+	var textSb247 strings.Builder
 	for _, m := range s.Messages {
-		text += " " + m.Text
+		textSb247.WriteString(" " + m.Text)
 	}
+	text += textSb247.String()
 	return wordSet(text)
 }
 
@@ -450,7 +456,7 @@ func autoRecallSessionForAsked(s model.Session, now time.Time, provenance bool, 
 	}
 	var problem string
 	var conclusions []string
-	matched := false
+	var matched bool
 	if len(terms) > 0 {
 		problem, conclusions = matchedLinesAsked(s, terms, asked)
 		matched = len(conclusions) > 0
@@ -869,17 +875,19 @@ func densestLine(text string, terms []string) (string, int) {
 	// equal-volume control — one line before the match and one after — falls to
 	// 25, so the gain is the direction and not the size.
 	took := 0
+	var bestSb872 strings.Builder
 	for _, next := range lines[bestAt+1:] {
 		next = strings.TrimSpace(next)
 		if next == "" {
 			continue
 		}
-		best += " " + next
+		bestSb872.WriteString(" " + next)
 		took++
 		if took == 2 {
 			break
 		}
 	}
+	best += bestSb872.String()
 	return best, bestHits
 }
 
@@ -1105,14 +1113,8 @@ func lineAround(s string, n int, terms []string) string {
 	// A little before the match, so the reader lands on a phrase rather than
 	// mid-word, and the rest of the budget after it.
 	const lead = 40
-	start := at - lead
-	if start < 0 {
-		start = 0
-	}
-	end := start + n
-	if end > len(r) {
-		end = len(r)
-	}
+	start := max(at-lead, 0)
+	end := min(start+n, len(r))
 	out := strings.TrimSpace(string(r[start:end]))
 	if start > 0 {
 		out = "…" + out
@@ -1179,7 +1181,7 @@ func EarlierAttempts(ss []model.Session) map[string]string {
 			if isWorkRecord(m.Role) {
 				continue
 			}
-			for _, w := range strings.Fields(lower(m.Text)) {
+			for w := range strings.FieldsSeq(lower(m.Text)) {
 				if len(w) > 3 {
 					set[w] = true
 				}

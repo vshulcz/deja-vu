@@ -36,7 +36,10 @@ func TestTheFirstPromptThatAsksToContinueASessionGetsItsPacket(t *testing.T) {
 
 	ask := func(sid, prompt string) string {
 		t.Helper()
-		payload, _ := json.Marshal(map[string]string{"prompt": prompt, "session_id": sid})
+		payload, jerr := json.Marshal(map[string]string{"prompt": prompt, "session_id": sid})
+		if jerr != nil {
+			t.Fatal(jerr)
+		}
 		var out bytes.Buffer
 		if err := runHookPromptMode(index.DefaultDir(), bytes.NewReader(payload), &out, true); err != nil {
 			t.Fatal(err)

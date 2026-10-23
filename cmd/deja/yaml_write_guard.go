@@ -38,7 +38,7 @@ func yamlWriteBreaks(path string, old, next []byte) error {
 func yamlShapeProblem(text string) string {
 	flow := ""
 	seen := map[string]string{}
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		trimmed := strings.TrimSpace(line)
 		switch {
 		case trimmed == "" || strings.HasPrefix(trimmed, "#"):
@@ -58,7 +58,7 @@ func yamlShapeProblem(text string) string {
 			continue
 		}
 		if flow != "" {
-			return fmt.Sprintf("the document is `%s` on one line, and nothing can follow it", flow)
+			return fmt.Sprintf("the document is %#q on one line, and nothing can follow it", flow)
 		}
 		if line[0] == '{' || line[0] == '[' {
 			code := strings.TrimSpace(stripYAMLComment(line))
@@ -75,7 +75,7 @@ func yamlShapeProblem(text string) string {
 			continue
 		}
 		if first, dup := seen[key]; dup {
-			return fmt.Sprintf("%q would be a top-level key twice (the first is `%s`)", key, first)
+			return fmt.Sprintf("%q would be a top-level key twice (the first is %#q)", key, first)
 		}
 		seen[key] = strings.TrimSpace(stripYAMLComment(line))
 	}
@@ -91,7 +91,7 @@ func yamlRootKey(line string) (string, bool) {
 		}
 		return line[1 : end+1], true
 	}
-	for i := 0; i < len(line); i++ {
+	for i := range len(line) {
 		if line[i] == ':' && (i+1 == len(line) || line[i+1] == ' ' || line[i+1] == '\t') {
 			return line[:i], true
 		}

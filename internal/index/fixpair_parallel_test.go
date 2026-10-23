@@ -15,7 +15,7 @@ import (
 // and the tables are compared row by row.
 func TestMinedPairsAreTheSameOnOneCoreAndMany(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
-	var ss []model.Session
+	ss := make([]model.Session, 0, 40)
 	for i := range 40 {
 		ss = append(ss, model.Session{
 			Harness: "claude", ID: fmt.Sprintf("s%02d", i), Project: "app", Updated: now,

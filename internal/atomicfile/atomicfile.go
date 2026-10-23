@@ -83,11 +83,8 @@ func isOpenRefusal(err error) bool {
 // renameBackoff is how long attempt i waits: doubling from renameWait to
 // renameWaitMax, plus up to half of itself again at random.
 func renameBackoff(i int) time.Duration {
-	d := renameWait << min(i, renameShifts)
-	if d > renameWaitMax {
-		d = renameWaitMax
-	}
-	return d + time.Duration(rand.Int64N(int64(d)/2+1))
+	d := min(renameWait<<min(i, renameShifts), renameWaitMax)
+	return d + time.Duration(rand.Int64N(int64(d)/2+1)) //nolint:gosec // jitter, not a secret
 }
 
 const (

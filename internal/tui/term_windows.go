@@ -33,7 +33,7 @@ const (
 
 func consoleMode(f *os.File) (uint32, bool) {
 	var m uint32
-	r, _, _ := procGetMode.Call(f.Fd(), uintptr(unsafe.Pointer(&m)))
+	r, _, _ := procGetMode.Call(f.Fd(), uintptr(unsafe.Pointer(&m))) //nolint:gosec // the console API writes the mode through a pointer
 	return m, r != 0
 }
 
@@ -74,7 +74,7 @@ func size(f *os.File) (int, int, bool) {
 		right, bottom     int16
 		maximumWindowSize struct{ x, y int16 }
 	}
-	r, _, _ := procBufferInfo.Call(f.Fd(), uintptr(unsafe.Pointer(&info)))
+	r, _, _ := procBufferInfo.Call(f.Fd(), uintptr(unsafe.Pointer(&info))) //nolint:gosec // the console API fills the struct through a pointer
 	if r == 0 {
 		return 0, 0, false
 	}
@@ -109,17 +109,17 @@ const keyEvent = 0x1
 // off the queue here, and the read happens only when one is waiting.
 func readTimeout(f *os.File, buf []byte, d time.Duration) (int, error) {
 	const waitObject0 = 0
-	r, _, _ := procWaitForInput.Call(f.Fd(), uintptr(d.Milliseconds()))
+	r, _, _ := procWaitForInput.Call(f.Fd(), uintptr(d.Milliseconds())) //nolint:gosec // callers pass a short positive timeout
 	if r != waitObject0 {
 		return 0, errTimeout
 	}
 	var recs [64]inputRecord
 	var n uint32
-	if ok, _, _ := procPeekInput.Call(f.Fd(), uintptr(unsafe.Pointer(&recs[0])), uintptr(len(recs)), uintptr(unsafe.Pointer(&n))); ok == 0 {
+	if ok, _, _ := procPeekInput.Call(f.Fd(), uintptr(unsafe.Pointer(&recs[0])), uintptr(len(recs)), uintptr(unsafe.Pointer(&n))); ok == 0 { //nolint:gosec // the console API fills the records through a pointer
 		return f.Read(buf)
 	}
 	first := -1
-	for i := 0; i < int(n); i++ {
+	for i := range int(n) {
 		if recs[i].eventType == keyEvent && recs[i].keyDown != 0 && recs[i].char != 0 {
 			first = i
 			break
@@ -128,7 +128,7 @@ func readTimeout(f *os.File, buf []byte, d time.Duration) (int, error) {
 	drop := func(k int) {
 		if k > 0 {
 			var got uint32
-			_, _, _ = procReadInput.Call(f.Fd(), uintptr(unsafe.Pointer(&recs[0])), uintptr(k), uintptr(unsafe.Pointer(&got)))
+			_, _, _ = procReadInput.Call(f.Fd(), uintptr(unsafe.Pointer(&recs[0])), uintptr(k), uintptr(unsafe.Pointer(&got))) //nolint:gosec // the console API fills the records through a pointer
 		}
 	}
 	if first < 0 {
@@ -138,7 +138,7 @@ func readTimeout(f *os.File, buf []byte, d time.Duration) (int, error) {
 	drop(first)
 	// The runtime's console read takes ctrl-z for end of input and returns
 	// nothing, so the key is read here.
-	if recs[first].char == 0x1a {
+	if recs[first].char == 0x1a { //nolint:gosec // first is an index the loop above found in recs
 		drop(1)
 		buf[0] = 0x1a
 		return 1, nil

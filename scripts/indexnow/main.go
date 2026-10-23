@@ -16,6 +16,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"encoding/xml"
 	"flag"
@@ -91,7 +92,7 @@ func readList(path string) ([]string, error) {
 	}
 	seen := map[string]bool{}
 	var urls []string
-	for _, line := range strings.Split(string(b), "\n") {
+	for line := range strings.SplitSeq(string(b), "\n") {
 		u := strings.TrimSpace(line)
 		if u == "" || strings.HasPrefix(u, "#") || seen[u] {
 			continue
@@ -111,7 +112,7 @@ func run(root, only string, dryRun bool) error {
 		return err
 	}
 	var set urlset
-	if err := xml.Unmarshal(b, &set); err != nil {
+	if err = xml.Unmarshal(b, &set); err != nil {
 		return fmt.Errorf("sitemap: %w", err)
 	}
 
@@ -137,9 +138,9 @@ func run(root, only string, dryRun bool) error {
 		// all — a rename, a deleted page, a path built by hand. Announcing it
 		// spends the batch on a 404, so the list is intersected rather than
 		// trusted.
-		picked, err := readList(only)
-		if err != nil {
-			return err
+		picked, lerr := readList(only)
+		if lerr != nil {
+			return lerr
 		}
 		urls = onlyPublished(picked, published, os.Stderr)
 		if len(urls) == 0 {
@@ -166,16 +167,20 @@ func run(root, only string, dryRun bool) error {
 	// The key file has to be live before submitting: IndexNow fetches it to
 	// verify ownership, and a 404 there fails the whole batch.
 	client := &http.Client{Timeout: 20 * time.Second}
-	if resp, err := client.Get(keyLocation); err != nil {
+	keyReq, err := http.NewRequestWithContext(context.Background(), http.MethodGet, keyLocation, nil)
+	if err != nil {
+		return err
+	}
+	keyResp, err := client.Do(keyReq)
+	if err != nil {
 		return fmt.Errorf("key file: %w", err)
-	} else {
-		_ = resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("key file at %s returns %d — publish it before submitting", keyLocation, resp.StatusCode)
-		}
+	}
+	_ = keyResp.Body.Close()
+	if keyResp.StatusCode != http.StatusOK {
+		return fmt.Errorf("key file at %s returns %d — publish it before submitting", keyLocation, keyResp.StatusCode)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, endpoint, bytes.NewReader(payload))
 	if err != nil {
 		return err
 	}

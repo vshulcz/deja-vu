@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -25,7 +26,7 @@ var (
 
 func TestRandomHistoriesMatchARebuild(t *testing.T) {
 	for _, seed := range historySeeds() {
-		t.Run(fmt.Sprint(seed), func(t *testing.T) { runRandomHistory(t, seed, false) })
+		t.Run(strconv.FormatInt(seed, 10), func(t *testing.T) { runRandomHistory(t, seed, false) })
 	}
 }
 
@@ -33,7 +34,7 @@ func TestRandomHistoriesMatchARebuild(t *testing.T) {
 // frictext.bin have something to hold.
 func TestRandomHistoriesWithWallsMatchARebuild(t *testing.T) {
 	for _, seed := range historySeeds() {
-		t.Run(fmt.Sprint(seed), func(t *testing.T) { runRandomHistory(t, seed, true) })
+		t.Run(strconv.FormatInt(seed, 10), func(t *testing.T) { runRandomHistory(t, seed, true) })
 	}
 }
 
@@ -105,8 +106,9 @@ type awaitingTranscript struct {
 }
 
 func runRandomHistory(t *testing.T, seed int64, walls bool) {
+	t.Helper()
 	h := newTwoWayEnv(t)
-	r := &historyRun{t: t, h: h, rng: rand.New(rand.NewSource(seed)), index: filepath.Join(h.tmp, "a.db"), walls: walls, shapes: rand.New(rand.NewSource(-seed))}
+	r := &historyRun{t: t, h: h, rng: rand.New(rand.NewSource(seed)), index: filepath.Join(h.tmp, "a.db"), walls: walls, shapes: rand.New(rand.NewSource(-seed))} //nolint:gosec // a seeded fixture, not crypto
 	r.openStores()
 	// Even seeds extend the offset table on every pass; odd ones leave the
 	// tail to the readers' walk, as a small append does on a real store.
@@ -115,7 +117,7 @@ func runRandomHistory(t *testing.T, seed int64, walls bool) {
 		recordOffsetsRefreshFloor, recordOffsetsRefreshShare = 0, 1<<62
 	}
 	steps := 24
-	for i := 0; i < steps; i++ {
+	for i := range steps {
 		r.anyStep()
 		if err := Ensure(r.index, "", false, nil); err != nil {
 			t.Fatalf("seed %d, pass after %q: %v", seed, r.log[len(r.log)-1], err)

@@ -42,7 +42,7 @@ func TestHookAsksForARebuildWhenTheIndexIsGone(t *testing.T) {
 
 	spawned := 0
 	saved := spawnWarmup
-	spawnWarmup = func(exe, sentinel string) error { spawned++; return nil }
+	spawnWarmup = func(_, _ string) error { spawned++; return nil }
 	t.Cleanup(func() { spawnWarmup = saved })
 
 	digest, sessions, _, _, _, _, _ := cachedHookDigest(dir)

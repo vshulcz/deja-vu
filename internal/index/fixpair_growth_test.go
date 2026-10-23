@@ -25,7 +25,7 @@ func pairStore(t *testing.T) (dir, proj string) {
 }
 
 // writePairSession puts an error and the command run after it into one session.
-func writePairSession(t *testing.T, proj, id, errText, cmd string) {
+func writePairSession(t *testing.T, proj, id, errText, cmd string) { //nolint:unparam // the call names the error the session holds
 	t.Helper()
 	line := func(role, text string) string {
 		switch role {

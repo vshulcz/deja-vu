@@ -51,7 +51,7 @@ func TestEveryFileCountedInTheBarAlsoMovesIt(t *testing.T) {
 	t.Setenv("DEJA_CLINE_ROOT", cline)
 
 	stamp := time.Now().Add(-time.Hour).UnixMilli()
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		body := fmt.Sprintf(`{"agent":"lead","messages":[{"ts":%d,"role":"user","content":"hello there"}]}`, stamp)
 		name := fmt.Sprintf("s%d.messages.json", i)
 		if err := os.WriteFile(filepath.Join(cline, name), []byte(body), 0o644); err != nil {

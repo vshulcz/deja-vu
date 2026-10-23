@@ -12,15 +12,16 @@ import (
 )
 
 // importedStore builds a machine on the receiving end of `deja sync import`:
-// n sessions, every one of them arrived from somewhere else.
-func importedStore(t *testing.T, n int) string {
+// three sessions, every one of them arrived from somewhere else.
+func importedStore(t *testing.T) string {
+	t.Helper()
 	tmp := hermeticEnv(t)
 	exp := filepath.Join(tmp, "transfer")
 	if err := os.MkdirAll(exp, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	var batch []byte
-	for i := 0; i < n; i++ {
+	for i := range 3 {
 		b, err := json.Marshal(index.SyncRecord{
 			Harness: "claude", SessionID: "peer" + string(rune('1'+i)), Project: "tmp/projx",
 			Role: "user", Text: "the kafka consumer rebalance keeps flapping, take " + string(rune('1'+i)),
@@ -58,7 +59,7 @@ func writePolicy(t *testing.T, body string) {
 // the sessions as the memory and said nothing about the rule; doctor had the
 // number all along, five screens later (#1067).
 func TestBriefSaysWhenThePolicyWithholdsEverything(t *testing.T) {
-	dir := importedStore(t, 3)
+	dir := importedStore(t)
 	writePolicy(t, `{"activations":{"auto":{"local":true,"imported":false}}}`)
 
 	var buf bytes.Buffer
@@ -80,7 +81,7 @@ func TestBriefSaysWhenThePolicyWithholdsEverything(t *testing.T) {
 // rule: a store the rule lets through says nothing extra, and neither does one
 // with no rule at all.
 func TestBriefStaysQuietWhenThePolicyWithholdsNothing(t *testing.T) {
-	dir := importedStore(t, 3)
+	dir := importedStore(t)
 
 	var buf bytes.Buffer
 	if err := runBrief(dir, &buf); err != nil {
@@ -138,7 +139,7 @@ func TestBriefStaysQuietWhenThePolicyWithholdsNothing(t *testing.T) {
 
 // askedLine returns the "asked" row of the brief, or "" if there is none.
 func askedLine(out string) string {
-	for _, ln := range strings.Split(out, "\n") {
+	for ln := range strings.SplitSeq(out, "\n") {
 		if strings.HasPrefix(ln, "asked ") {
 			return ln
 		}
@@ -219,7 +220,7 @@ func TestBriefAskedTwiceCountsImportedAndHonoursPolicy(t *testing.T) {
 
 // hitLine returns the "hit" (friction) row of the brief, or "" if there is none.
 func hitLine(out string) string {
-	for _, ln := range strings.Split(out, "\n") {
+	for ln := range strings.SplitSeq(out, "\n") {
 		if strings.HasPrefix(ln, "hit ") {
 			return ln
 		}

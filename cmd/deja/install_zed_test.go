@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -106,7 +107,7 @@ func zedStripForTest(b []byte) []byte {
 	}
 	// Trailing commas.
 	var clean []byte
-	for i := 0; i < len(out); i++ {
+	for i := range out {
 		if out[i] == ',' {
 			j := i + 1
 			for j < len(out) && (out[j] == ' ' || out[j] == '\n' || out[j] == '\t' || out[j] == '\r') {
@@ -174,7 +175,7 @@ func TestInstallZedIsIdempotentAndReversible(t *testing.T) {
 	if second.Action != "unchanged" {
 		t.Errorf("a second install rewrote the file: %s", second.Action)
 	}
-	if string(afterFirst) != string(afterSecond) {
+	if !bytes.Equal(afterFirst, afterSecond) {
 		t.Errorf("installing twice is not the same as once:\n%s\n---\n%s", afterFirst, afterSecond)
 	}
 

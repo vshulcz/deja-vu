@@ -36,7 +36,7 @@ func TestThePointOfActionKeepsWhatItSaid(t *testing.T) {
 		t.Fatalf("no injections file: %v", err)
 	}
 	var kept, into string
-	for _, line := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(string(b)), "\n") {
 		var row struct {
 			Kind   string `json:"kind"`
 			Digest string `json:"digest"`

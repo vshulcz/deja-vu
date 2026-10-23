@@ -3,7 +3,6 @@ package index
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -104,7 +103,7 @@ func recordPrefix(b []byte) (kid, pid, rid uint64, rest []byte, ok bool) {
 		if len(b) < 9 {
 			return 0, 0, 0, nil, false
 		}
-		if _, _, ok := consumeField(b[9:]); !ok {
+		if _, ok := consumeField(b[9:]); !ok {
 			return 0, 0, 0, nil, false
 		}
 	default:
@@ -122,7 +121,7 @@ func (rw *recordWriter) writeStored(key, path, role string, rest []byte) (int64,
 	p = binary.AppendUvarint(p, rw.tables.intern(role))
 	size := len(p) + len(rest)
 	if size > 1<<31 {
-		return 0, fmt.Errorf("record too large")
+		return 0, errors.New("record too large")
 	}
 	var hdr [4]byte
 	binary.LittleEndian.PutUint32(hdr[:], uint32(size))
@@ -153,7 +152,7 @@ func eachStoredRecord(path string, t *recordTables, fn func(off int64, payload [
 	for {
 		off, payload, err := w.next()
 		if err != nil {
-			if err == io.EOF || err == io.ErrUnexpectedEOF {
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 				return nil
 			}
 			return err
@@ -228,10 +227,8 @@ func movedPostings(bdir string, want int, c *carriedRecords) (bucketPostings, er
 		return failed != nil
 	}
 	var wg sync.WaitGroup
-	for w := 0; w < workers; w++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range workers {
+		wg.Go(func() {
 			for {
 				i := int(next.Add(1)) - 1
 				if i >= len(names) || stopped() {
@@ -244,7 +241,7 @@ func movedPostings(bdir string, want int, c *carriedRecords) (bucketPostings, er
 				}
 				parts[i] = c.move(data)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	if failed != nil {

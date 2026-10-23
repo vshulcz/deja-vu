@@ -15,7 +15,7 @@ func walDB(t *testing.T, dir, name string) string {
 		t.Skip("no sqlite3")
 	}
 	db := filepath.Join(dir, name)
-	mk := exec.Command("sqlite3", db,
+	mk := exec.CommandContext(t.Context(), "sqlite3", db,
 		"pragma journal_mode=wal; create table t(x); insert into t values(42);")
 	if out, err := mk.CombinedOutput(); err != nil {
 		t.Fatalf("fixture: %v: %s", err, out)
@@ -37,7 +37,7 @@ func TestAWalStoreAtRestIsReadThroughImmutable(t *testing.T) {
 	if !strings.Contains(target, "immutable=1") {
 		t.Fatalf("a WAL store with no sidecar was handed over as %q", target)
 	}
-	out, err := exec.Command("sqlite3", "-readonly", target, "select x from t").CombinedOutput()
+	out, err := exec.CommandContext(t.Context(), "sqlite3", "-readonly", target, "select x from t").CombinedOutput()
 	if err != nil {
 		t.Fatalf("the store did not read: %v: %s", err, out)
 	}
@@ -66,7 +66,7 @@ func TestARollbackJournalStoreIsLeftAlone(t *testing.T) {
 		t.Skip("no sqlite3")
 	}
 	db := filepath.Join(t.TempDir(), "plain.db")
-	mk := exec.Command("sqlite3", db, "create table t(x); insert into t values(1);")
+	mk := exec.CommandContext(t.Context(), "sqlite3", db, "create table t(x); insert into t values(1);")
 	if out, err := mk.CombinedOutput(); err != nil {
 		t.Fatalf("fixture: %v: %s", err, out)
 	}
@@ -112,7 +112,7 @@ func TestAPathWithAwkwardCharactersSurvivesTheURI(t *testing.T) {
 	if strings.Contains(target, " ") || strings.Contains(target, "#v2") {
 		t.Fatalf("the path went out unescaped: %q", target)
 	}
-	out, err := exec.Command("sqlite3", "-readonly", target, "select x from t").CombinedOutput()
+	out, err := exec.CommandContext(t.Context(), "sqlite3", "-readonly", target, "select x from t").CombinedOutput()
 	if err != nil {
 		t.Fatalf("the store did not read: %v: %s", err, out)
 	}

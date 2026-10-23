@@ -48,8 +48,9 @@ func TestAHeldLockIsWaitedOutRatherThanWrittenOver(t *testing.T) {
 	case <-time.After(10 * time.Second):
 		t.Fatal("Record never finished after the lock was released")
 	}
-	var hosts []string
-	for _, p := range Load() {
+	loaded := Load()
+	hosts := make([]string, 0, len(loaded))
+	for _, p := range loaded {
 		hosts = append(hosts, p.Host)
 	}
 	if len(hosts) != 2 {

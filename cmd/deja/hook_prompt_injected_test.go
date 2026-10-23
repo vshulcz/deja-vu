@@ -73,7 +73,7 @@ func TestSearchTermsComeFromTheUserNotTheLastRecall(t *testing.T) {
 		t.Fatal("the user's own question produced no search terms")
 	}
 	for _, term := range terms {
-		if strings.Contains("retrieval.go internal/index deja-recall hook_context", term) {
+		if strings.Contains("retrieval.go internal/index deja-recall hook_context", term) { //nolint:gocritic // asks whether term is one of these words
 			t.Errorf("term %q came from the block a previous hook injected, not "+
 				"from the question: %v", term, terms)
 		}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 )
 
@@ -95,12 +96,7 @@ func nameIsDeja(s string) bool {
 }
 
 func anyDeja(list []string) bool {
-	for _, s := range list {
-		if nameIsDeja(s) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(list, nameIsDeja)
 }
 
 // openclawPluginList is plugins.<key> in openclaw.json the way OpenClaw reads
@@ -144,7 +140,7 @@ func yamlLookup(text string, keys ...string) (scalar string, items []string, fou
 	// until it closes are text, not keys.
 	var quote byte
 	content := false
-	for _, raw := range strings.Split(strings.TrimPrefix(text, string(utf8BOM)), "\n") {
+	for raw := range strings.SplitSeq(strings.TrimPrefix(text, string(utf8BOM)), "\n") {
 		line := strings.TrimRight(raw, " \t\r")
 		if quote != 0 {
 			if yamlQuoteEnd(line, quote) >= 0 {
@@ -193,7 +189,7 @@ func yamlLookup(text string, keys ...string) (scalar string, items []string, fou
 			v := strings.TrimSpace(stripYAMLComment(rest))
 			found, scalar, items = !strings.HasPrefix(v, "[") || strings.HasSuffix(v, "]"), "", nil
 			if strings.HasPrefix(v, "[") {
-				for _, s := range strings.Split(strings.Trim(v, "[]"), ",") {
+				for s := range strings.SplitSeq(strings.Trim(v, "[]"), ",") {
 					if s = hermesYAMLScalar(s); s != "" {
 						items = append(items, s)
 					}

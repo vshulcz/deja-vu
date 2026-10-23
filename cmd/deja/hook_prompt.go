@@ -88,7 +88,7 @@ func (i *promptHookInput) adopt() {
 // matches, so both are accepted rather than assumed.
 type hookPromptText string
 
-func (h *hookPromptText) UnmarshalJSON(b []byte) error {
+func (h *hookPromptText) UnmarshalJSON(b []byte) error { //nolint:unparam // json.Unmarshaler fixes the signature
 	var s string
 	if err := json.Unmarshal(b, &s); err == nil {
 		*h = hookPromptText(withoutInjectedContext(s))
@@ -99,7 +99,7 @@ func (h *hookPromptText) UnmarshalJSON(b []byte) error {
 		Text string `json:"text"`
 	}
 	if err := json.Unmarshal(b, &parts); err != nil {
-		return nil // an unknown shape means no prompt, not a broken hook
+		return nil //nolint:nilerr // an unknown shape means no prompt, not a broken hook
 	}
 	var sb strings.Builder
 	for _, p := range parts {
@@ -311,13 +311,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	if !isSpawnedReader(input.SessionID) {
 		inProject = seenFile.recentInProject(projectKey, injectionCooldown)
 	}
-	skip := make(map[string]bool, len(recent)+len(inProject)+1)
-	for id := range recent {
-		skip[id] = true
-	}
-	for id := range inProject {
-		skip[id] = true
-	}
+	skip := promptHookSkipSet(recent, inProject)
 	// The asker and what counts as it: a spawn's parent, a sub-agent's parent,
 	// the sub-agents it spawned (#4548), a fork's source (#4549).
 	self, cut := askerLineageCut(dir, input.SessionID, input.TranscriptPath, input.ParentSessionID)
@@ -340,13 +334,6 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	if err != nil || len(ranked) == 0 {
 		return emitNudgeOnly(stdout, plain, nudge)
 	}
-	ss := make([]model.Session, 0, 2)
-	confident := false
-	// worthDigest is the payload decision, kept apart from the announcement.
-	// A word rare enough to identify something is a real match — the bar above
-	// says so and lets such a question through — but saying "you have been here"
-	// on one word teaches the reader to ignore the line, so that stays at two.
-	worthDigest := false
 	// The one word of the question that identifies something, kept apart for
 	// the test below: asking whether any term was spoken lets "показал" answer
 	// for "v11", and nearly every session says a word like that.
@@ -366,121 +353,20 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		leadTerms = ordered[:min(len(ordered), leadTermsKept)]
 	}
 	pol := policy.Load()
-	// How many candidates were dropped for saying what one already chosen
-	// says. A store repeats itself — the same complaint filed against forty
-	// shards — and those copies take the ranking's window with them, so the
-	// answer to the question can sit outside it (#1556).
-	crowdedOut := 0
-	pick := func(ranked []model.Session, matched, strong, naming []int) {
-		for i, s := range ranked {
-			// Every other injection path asks the policy first; this one is a
-			// per-prompt injection like any other, and imported projects reach
-			// it (a local project name is a substring of "imported:<name>").
-			if !pol.Allows(policy.ActivationAuto, s.Project) {
-				continue
-			}
-			// A scheduled job's run is searchable, not offered unasked: its
-			// prompt is the same every fire, and what it carries in the user
-			// role is often someone else's text (#4948).
-			if s.Kind == "cron" {
-				continue
-			}
-			// matched counts informative terms; strong counts the rare ones — a
-			// term that identifies something on its own rather than merely beating
-			// the corpus average. Two informative terms earn the announcement. A
-			// single term is a weak claim, so it only injects when that term is
-			// strong: "pgbouncer" answers a question, "problem" does not, and this
-			// hook pays its cost on every message the user sends. Measured on
-			// cross-paired prompts whose answer is absent, the old bar injected on
-			// 94% of them; half of those rested on one ordinary word.
-			named := -1
-			if i < len(naming) {
-				named = naming[i]
-			}
-			if !search.RecallWorthShowingNaming(terms, matched[i], strong[i], named, idfOf) {
-				continue
-			}
-			// A word rare enough to identify something is a real match on its own —
-			// the bar just above says so in as many words, and lets such a question
-			// through. The payload rule did not: it asked only for two informative
-			// terms, so whether the reader got the memory or a pointer to it turned
-			// on whether some ordinary word of the question happened to also appear
-			// in that session.
-			//
-			// Measured on a real store over sixty subjects the project holds:
-			// "напомни, что мы решали про X" returned content 63% of the time and
-			// "what did we decide about X" returned it never — the same question,
-			// the same answer sitting in the same session.
-			if matched[i] >= 2 {
-				confident = true
-			}
-			if matched[i] >= 2 || strong[i] >= 1 {
-				worthDigest = true
-			}
-			// The session being written right now is never worth recalling to
-			// itself. Work merely fresh is a different case: "what did we just
-			// change" is a question about the last ten minutes, so age alone no
-			// longer withholds an answer — it only withholds the unprompted
-			// déjà vu line below.
-			//
-			// Asked before the narrowing below, not after: narrowing scans every
-			// message, the session being written is usually the longest one on the
-			// store, and it was scanned in full only to be dropped on the next
-			// line. Measured on a 1149-session store, moving these two checks up
-			// takes the hook's median from 181 ms to 136 ms.
-			if self[s.ID] {
-				continue
-			}
-			if !search.SpeechCarriesAnyTerm(s, leadTerms) {
-				// The subject matched, but only where a tool printed it: a
-				// failing job line, a bumped dependency, a pinned action
-				// version. Nobody in that session said anything about it, and a
-				// block built from those lines answers a different question
-				// than the one asked.
-				continue
-			}
-
-			// A marathon session that touched everything matches everything, so
-			// it used to be skipped whole. But the sessions people ask about are
-			// exactly the long ones — measured here, only 2% of sessions cross
-			// the line and they are the current work. The haystack argument is
-			// about the session as a whole and not about the part that matched,
-			// so narrow it to that part instead of dropping the answer.
-			if len(s.Messages) > dejaVuMaxMessages {
-				s = focusSession(s, terms)
-				if len(s.Messages) == 0 {
-					continue
-				}
-			}
-			// Two slots, two answers. The same content reaches the block from
-			// several sessions all the time — a marathon that was split, a
-			// resumed session, a workflow run again — and spending both slots on
-			// it costs the reader the second answer entirely. Measured on a
-			// seeded store where the question drifted from the wording of the
-			// session that settled it, both slots went to two copies of one
-			// neighbour on every framing but the near-verbatim one.
-			if sameAnswerAs(ss, s, terms) {
-				crowdedOut++
-				continue
-			}
-			ss = append(ss, s)
-			if len(ss) == 2 {
-				return
-			}
-		}
-	}
-	pick(ranked, matched, strong, naming)
+	pk := &promptPicker{pol: pol, terms: terms, idfOf: idfOf, self: self, leadTerms: leadTerms, ss: make([]model.Session, 0, 2)}
+	pk.pick(ranked, matched, strong, naming)
 	// One slot left and duplicates took the window: ask for a wider one. The
 	// second pass costs a ranking read and happens only when the store said
 	// the same thing several times, which is exactly when the answer is
 	// further down than the window reached.
-	if len(ss) < 2 && crowdedOut > 0 {
+	if len(pk.ss) < 2 && pk.crowdedOut > 0 {
 		wider, wmatched, wstrong, wnaming, _, werr := index.ProjectRelevantNamingCut(
 			dir, names, terms, prompt.Candidates*widerWindow, skip, cut)
 		if werr == nil {
-			pick(wider, wmatched, wstrong, wnaming)
+			pk.pick(wider, wmatched, wstrong, wnaming)
 		}
 	}
+	ss, confident, worthDigest := pk.ss, pk.confident, pk.worthDigest
 	if len(ss) == 0 {
 		return nil
 	}
@@ -532,61 +418,11 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	}
 	fullDigest := worthDigest
 	if worthDigest {
-		// Hand the digest the query's words most-identifying first. It has no
-		// way of its own to tell "mm_status" from "decide", and the session
-		// that answers often says both — measured live, ten of the answers
-		// this hook newly returns open on the ordinary word.
-		digest, shown := search.AutoRecallDigestShowing(ss, digestBudget(confident), byIdentifying(terms, idfOf), asked)
-		if strings.TrimSpace(digest) == "" {
+		full, ok := promptDigestBody(dir, input.SessionID, ss, confident, terms, idfOf, asked, nudge, rejectedWarning)
+		if !ok {
 			return emitNudgeOnly(stdout, plain, nudge)
 		}
-		// The line the agent is asked to say names a session; it has to be one
-		// the digest shows. The top of the ranking is skipped when it has
-		// nothing quotable, and the opener then credited a session that was
-		// not in the block.
-		cite := ss[0]
-		if len(shown) > 0 {
-			cite = shown[0]
-		}
-		tail := openerLine(cite, terms)
-		if nudge != "" {
-			tail += "\n" + nudge
-		}
-		lead := promptHookLead
-		// After the first block of a session the two explanatory sentences are
-		// words the agent has already read, and the third repeats the line this
-		// block ends with. Measured on a real store: a session receives a median
-		// of 23 per-prompt blocks, the lead is 301 bytes of a 1439-byte block,
-		// so 22 of those blocks carried 6.6 KB of the same sentences.
-		//
-		// The one line that survived the first cut does not survive this one. It
-		// was kept as a caution against taking a wording match for an answer, and
-		// measured against exactly that: a later block whose history is about a
-		// sibling subject and carries a value nothing else holds, quoted as the
-		// answer with no hedge. On the local 9B, 40 such cases: false trust 12/40
-		// with the caution and 10/40 without it. It is not buying the care it was
-		// there for, and it is 78 bytes on every block after the first.
-		//
-		// The untrusted-data frame is a different matter and stays on every
-		// block: dropping its sentence doubled how often a directive planted in
-		// the recalled text was obeyed (8/48 against 19/48).
-		if blockAlreadySentThisSession(dir, input.SessionID) {
-			lead = ""
-		}
-		// A repeat of the question itself is a different claim than a session
-		// about the subject, and a stronger one: the agent does not have to
-		// decide whether the history is relevant, only whether the answer
-		// still holds. Measured over this machine's own sessions, 6.5% of
-		// substantial questions are asked again in a later session, and the
-		// exact-match counter in `deja stats` sees a fifth of them.
-		if again := search.AskedBefore(cite, terms); again != "" {
-			lead = repeatLead(cite, again)
-			tail = repeatOpener(cite, again)
-			if nudge != "" {
-				tail += "\n" + nudge
-			}
-		}
-		body = lead + rejectedWarning + digest + tail
+		body = full
 	} else {
 		body = weakRecallPointer(ss, terms) + rejectedWarning
 		if nudge != "" {
@@ -629,11 +465,29 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// where a block fingerprint holds for the life of the session.
 	rememberInjectedIDsFor(dir, input.SessionID, "", []string{askKey(terms)})
 	rememberInjectedFor(dir, input.SessionID, projectKey, ss)
+	return emitPromptBlock(stdout, dir, input.SessionID, out, ss, terms, unreadable, plain, showLine)
+}
+
+// promptHookSkipSet is the sessions shown a moment ago, to this reader or in
+// this project, which the ranking leaves out unread.
+func promptHookSkipSet(recent, inProject map[string]bool) map[string]bool {
+	skip := make(map[string]bool, len(recent)+len(inProject)+1)
+	for id := range recent {
+		skip[id] = true
+	}
+	for id := range inProject {
+		skip[id] = true
+	}
+	return skip
+}
+
+// emitPromptBlock logs the block and writes it out in the shape the host reads.
+func emitPromptBlock(stdout io.Writer, dir, sessionID, out string, ss []model.Session, terms []string, unreadable, plain, showLine bool) error {
 	if unreadable {
-		usage.RecordDigestFromUnread(dir, usage.KindDejaVu, out, input.SessionID, len(ss), rawSize(ss),
+		usage.RecordDigestFromUnread(dir, usage.KindDejaVu, out, sessionID, len(ss), rawSize(ss),
 			terms, sessionProjects(ss), sessionIDs(ss))
 	} else {
-		usage.RecordDigestFrom(dir, usage.KindDejaVu, out, input.SessionID, len(ss), rawSize(ss),
+		usage.RecordDigestFrom(dir, usage.KindDejaVu, out, sessionID, len(ss), rawSize(ss),
 			terms, sessionProjects(ss), sessionIDs(ss))
 	}
 	if plain {
@@ -650,6 +504,189 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// silently rather than flashing harness plumbing at the user.
 	writePromptResponse(stdout, resp)
 	return nil
+}
+
+// promptDigestBody builds the full block for a prompt that earned a digest. It
+// reports false when the digest came out empty.
+func promptDigestBody(dir, sessionID string, ss []model.Session, confident bool, terms []string, idfOf map[string]float64, asked, nudge, rejectedWarning string) (string, bool) {
+	// Hand the digest the query's words most-identifying first. It has no
+	// way of its own to tell "mm_status" from "decide", and the session
+	// that answers often says both — measured live, ten of the answers
+	// this hook newly returns open on the ordinary word.
+	digest, shown := search.AutoRecallDigestShowing(ss, digestBudget(confident), byIdentifying(terms, idfOf), asked)
+	if strings.TrimSpace(digest) == "" {
+		return "", false
+	}
+	// The line the agent is asked to say names a session; it has to be one
+	// the digest shows. The top of the ranking is skipped when it has
+	// nothing quotable, and the opener then credited a session that was
+	// not in the block.
+	cite := ss[0]
+	if len(shown) > 0 {
+		cite = shown[0]
+	}
+	tail := openerLine(cite, terms)
+	if nudge != "" {
+		tail += "\n" + nudge
+	}
+	lead := promptHookLead
+	// After the first block of a session the two explanatory sentences are
+	// words the agent has already read, and the third repeats the line this
+	// block ends with. Measured on a real store: a session receives a median
+	// of 23 per-prompt blocks, the lead is 301 bytes of a 1439-byte block,
+	// so 22 of those blocks carried 6.6 KB of the same sentences.
+	//
+	// The one line that survived the first cut does not survive this one. It
+	// was kept as a caution against taking a wording match for an answer, and
+	// measured against exactly that: a later block whose history is about a
+	// sibling subject and carries a value nothing else holds, quoted as the
+	// answer with no hedge. On the local 9B, 40 such cases: false trust 12/40
+	// with the caution and 10/40 without it. It is not buying the care it was
+	// there for, and it is 78 bytes on every block after the first.
+	//
+	// The untrusted-data frame is a different matter and stays on every
+	// block: dropping its sentence doubled how often a directive planted in
+	// the recalled text was obeyed (8/48 against 19/48).
+	if blockAlreadySentThisSession(dir, sessionID) {
+		lead = ""
+	}
+	// A repeat of the question itself is a different claim than a session
+	// about the subject, and a stronger one: the agent does not have to
+	// decide whether the history is relevant, only whether the answer
+	// still holds. Measured over this machine's own sessions, 6.5% of
+	// substantial questions are asked again in a later session, and the
+	// exact-match counter in `deja stats` sees a fifth of them.
+	if again := search.AskedBefore(cite, terms); again != "" {
+		lead = repeatLead(cite, again)
+		tail = repeatOpener(cite, again)
+		if nudge != "" {
+			tail += "\n" + nudge
+		}
+	}
+	return lead + rejectedWarning + digest + tail, true
+}
+
+// promptPicker chooses the sessions the prompt hook injects, at most two,
+// and keeps what the choice says about the match.
+type promptPicker struct {
+	pol       policy.Policy
+	terms     []string
+	idfOf     map[string]float64
+	self      map[string]bool
+	leadTerms []string
+
+	ss        []model.Session
+	confident bool
+	// worthDigest is the payload decision, kept apart from the announcement.
+	// A word rare enough to identify something is a real match — the bar above
+	// says so and lets such a question through — but saying "you have been here"
+	// on one word teaches the reader to ignore the line, so that stays at two.
+	worthDigest bool
+	// How many candidates were dropped for saying what one already chosen
+	// says. A store repeats itself — the same complaint filed against forty
+	// shards — and those copies take the ranking's window with them, so the
+	// answer to the question can sit outside it (#1556).
+	crowdedOut int
+}
+
+// pick walks one ranking and takes the sessions worth injecting.
+func (p *promptPicker) pick(ranked []model.Session, matched, strong, naming []int) {
+	for i, s := range ranked {
+		// Every other injection path asks the policy first; this one is a
+		// per-prompt injection like any other, and imported projects reach
+		// it (a local project name is a substring of "imported:<name>").
+		if !p.pol.Allows(policy.ActivationAuto, s.Project) {
+			continue
+		}
+		// A scheduled job's run is searchable, not offered unasked: its
+		// prompt is the same every fire, and what it carries in the user
+		// role is often someone else's text (#4948).
+		if s.Kind == "cron" {
+			continue
+		}
+		// matched counts informative terms; strong counts the rare ones — a
+		// term that identifies something on its own rather than merely beating
+		// the corpus average. Two informative terms earn the announcement. A
+		// single term is a weak claim, so it only injects when that term is
+		// strong: "pgbouncer" answers a question, "problem" does not, and this
+		// hook pays its cost on every message the user sends. Measured on
+		// cross-paired prompts whose answer is absent, the old bar injected on
+		// 94% of them; half of those rested on one ordinary word.
+		named := -1
+		if i < len(naming) {
+			named = naming[i]
+		}
+		if !search.RecallWorthShowingNaming(p.terms, matched[i], strong[i], named, p.idfOf) {
+			continue
+		}
+		// A word rare enough to identify something is a real match on its own —
+		// the bar just above says so in as many words, and lets such a question
+		// through. The payload rule did not: it asked only for two informative
+		// terms, so whether the reader got the memory or a pointer to it turned
+		// on whether some ordinary word of the question happened to also appear
+		// in that session.
+		//
+		// Measured on a real store over sixty subjects the project holds:
+		// "напомни, что мы решали про X" returned content 63% of the time and
+		// "what did we decide about X" returned it never — the same question,
+		// the same answer sitting in the same session.
+		if matched[i] >= 2 {
+			p.confident = true
+		}
+		if matched[i] >= 2 || strong[i] >= 1 {
+			p.worthDigest = true
+		}
+		// The session being written right now is never worth recalling to
+		// itself. Work merely fresh is a different case: "what did we just
+		// change" is a question about the last ten minutes, so age alone no
+		// longer withholds an answer — it only withholds the unprompted
+		// déjà vu line below.
+		//
+		// Asked before the narrowing below, not after: narrowing scans every
+		// message, the session being written is usually the longest one on the
+		// store, and it was scanned in full only to be dropped on the next
+		// line. Measured on a 1149-session store, moving these two checks up
+		// takes the hook's median from 181 ms to 136 ms.
+		if p.self[s.ID] {
+			continue
+		}
+		if !search.SpeechCarriesAnyTerm(s, p.leadTerms) {
+			// The subject matched, but only where a tool printed it: a
+			// failing job line, a bumped dependency, a pinned action
+			// version. Nobody in that session said anything about it, and a
+			// block built from those lines answers a different question
+			// than the one asked.
+			continue
+		}
+
+		// A marathon session that touched everything matches everything, so
+		// it used to be skipped whole. But the sessions people ask about are
+		// exactly the long ones — measured here, only 2% of sessions cross
+		// the line and they are the current work. The haystack argument is
+		// about the session as a whole and not about the part that matched,
+		// so narrow it to that part instead of dropping the answer.
+		if len(s.Messages) > dejaVuMaxMessages {
+			s = focusSession(s, p.terms)
+			if len(s.Messages) == 0 {
+				continue
+			}
+		}
+		// Two slots, two answers. The same content reaches the block from
+		// several sessions all the time — a marathon that was split, a
+		// resumed session, a workflow run again — and spending both slots on
+		// it costs the reader the second answer entirely. Measured on a
+		// seeded store where the question drifted from the wording of the
+		// session that settled it, both slots went to two copies of one
+		// neighbour on every framing but the near-verbatim one.
+		if sameAnswerAs(p.ss, s, p.terms) {
+			p.crowdedOut++
+			continue
+		}
+		p.ss = append(p.ss, s)
+		if len(p.ss) == 2 {
+			return
+		}
+	}
 }
 
 // writePromptResponse prints the per-prompt answer in the shape the host
@@ -868,7 +905,7 @@ func matchedTitle(s model.Session, terms []string) string {
 			if tt == "" || strings.HasPrefix(tt, "Exit code") {
 				continue
 			}
-			r := []rune(tt)[0]
+			r, _ := utf8.DecodeRuneInString(tt)
 			alpha := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r >= 0x400
 			if !alpha {
 				continue
@@ -1041,8 +1078,8 @@ func (sl seenLines) asked(sid, key string, window time.Duration) bool {
 	}
 	want := hookseenKey(sid)
 	cutoff := time.Now().UTC().Add(-window)
-	for i := len(sl) - 1; i >= 0; i-- {
-		parts := strings.Fields(sl[i])
+	for _, s := range slices.Backward(sl) {
+		parts := strings.Fields(s)
 		if len(parts) < 3 || parts[0] != want || parts[1] != key {
 			continue
 		}
@@ -1156,7 +1193,7 @@ func forgetInjected(dir, sid string) {
 		keys[hookseenKey(onceDigestKey(sid))] = true
 	}
 	var kept []string
-	for _, line := range strings.Split(string(b), "\n") {
+	for line := range strings.SplitSeq(string(b), "\n") {
 		if line == "" {
 			continue
 		}
@@ -1345,7 +1382,7 @@ func dejaVuLineDue(dir, sid string) bool {
 	now := time.Now()
 	key := dejaVuKey(sid)
 	if b, err := os.ReadFile(p); err == nil {
-		for _, line := range strings.Split(string(b), "\n") {
+		for line := range strings.SplitSeq(string(b), "\n") {
 			fields := strings.Fields(line)
 			if len(fields) != 2 || fields[0] != key {
 				continue
@@ -1391,7 +1428,7 @@ const (
 func recordDejaVuLine(path, sid string, now time.Time) bool {
 	kept := []string{sid + " " + strconv.FormatInt(now.Unix(), 10)}
 	if b, err := os.ReadFile(path); err == nil {
-		for _, line := range strings.Split(string(b), "\n") {
+		for line := range strings.SplitSeq(string(b), "\n") {
 			fields := strings.Fields(line)
 			if len(fields) != 2 || fields[0] == sid {
 				continue
@@ -1556,7 +1593,7 @@ func presentableTopic(t string) bool {
 	if digest.IsAgentArtifact(t) {
 		return false
 	}
-	r := []rune(t)[0]
+	r, _ := utf8.DecodeRuneInString(t)
 	if r == '#' || r == '<' || r == '{' || r == '[' {
 		return false
 	}
@@ -1671,7 +1708,7 @@ func parallelChunks(n int, fn func(i int)) {
 
 // densestMessages keeps the cap best messages by how many distinct terms each
 // one carries, in original order so the exchange still reads as a conversation.
-func densestMessages(msgs []model.Message, low, terms []string, cap int) []model.Message {
+func densestMessages(msgs []model.Message, low, terms []string, limit int) []model.Message {
 	type scored struct {
 		i, hits int
 	}
@@ -1690,8 +1727,8 @@ func densestMessages(msgs []model.Message, low, terms []string, cap int) []model
 		}
 	}
 	sort.SliceStable(ranked, func(a, b int) bool { return ranked[a].hits > ranked[b].hits })
-	if len(ranked) > cap {
-		ranked = ranked[:cap]
+	if len(ranked) > limit {
+		ranked = ranked[:limit]
 	}
 	keep := make(map[int]bool, len(ranked))
 	for _, r := range ranked {

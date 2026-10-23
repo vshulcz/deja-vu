@@ -89,6 +89,7 @@ func PromptLogSessionIDs(path string, from, to int64) (map[string]bool, error) {
 	}
 }
 
+// ParseClaudeHistory reads a Claude Code history.jsonl from the start.
 func ParseClaudeHistory(path string) ([]model.Session, error) {
 	return ParseClaudeHistoryFromOffset(path, 0)
 }
@@ -174,11 +175,13 @@ func claudeHistoryText(m map[string]any) string {
 		b, _ := strconv.Atoi(keys[j])
 		return a < b
 	})
+	var textSb177 strings.Builder
 	for _, k := range keys {
 		if !used[k] {
-			text += "\n\n" + content[k]
+			textSb177.WriteString("\n\n" + content[k])
 		}
 	}
+	text += textSb177.String()
 	return text
 }
 

@@ -14,6 +14,7 @@ import (
 // trailing commas installed and then could not be uninstalled (#4557).
 func TestOpenClawJSON5Config(t *testing.T) {
 	seed := func(t *testing.T, text string) string {
+		t.Helper()
 		hermeticEnv(t)
 		p := filepath.Join(sources.OpenClawStateDir(), "openclaw.json")
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {

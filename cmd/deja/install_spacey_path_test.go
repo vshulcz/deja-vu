@@ -36,11 +36,11 @@ func TestSpaceInTheBinaryPathIsQuotedWhereItMustBe(t *testing.T) {
 
 			_ = filepath.WalkDir(home, func(path string, d os.DirEntry, err error) error {
 				if err != nil || d.IsDir() || strings.HasPrefix(path, filepath.Join(home, "index.db")) {
-					return nil
+					return nil //nolint:nilerr // unreadable entries are skipped
 				}
-				b, rerr := os.ReadFile(path)
+				b, rerr := os.ReadFile(path) //nolint:gosec // the walk is over the test's own temp home
 				if rerr != nil {
-					return nil
+					return nil //nolint:nilerr // unreadable files are skipped
 				}
 				body := string(b)
 				if !strings.Contains(body, "John Smith") {
@@ -50,7 +50,7 @@ func TestSpaceInTheBinaryPathIsQuotedWhereItMustBe(t *testing.T) {
 				// A shell-quoted or JSON-quoted path is fine. What is not is
 				// the path sitting bare in a YAML scalar or a shell line,
 				// where the space ends the word.
-				for _, line := range strings.Split(body, "\n") {
+				for line := range strings.SplitSeq(body, "\n") {
 					if !strings.Contains(line, "John Smith") {
 						continue
 					}

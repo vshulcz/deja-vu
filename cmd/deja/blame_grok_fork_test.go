@@ -38,7 +38,7 @@ func TestGrokForkKeepsOnlyItsOwnRecords(t *testing.T) {
 	t0 := time.Date(2026, 10, 18, 2, 20, 0, 0, time.UTC)
 	tf := t0.Add(100 * time.Second)
 	event := func(sid, eid string, at time.Time, update map[string]any) string {
-		b, _ := json.Marshal(map[string]any{"timestamp": at.Unix(), "method": "session/update", "params": map[string]any{
+		b := mustMarshal(t, map[string]any{"timestamp": at.Unix(), "method": "session/update", "params": map[string]any{
 			"sessionId": sid, "update": update,
 			"_meta": map[string]any{"eventId": eid, "agentTimestampMs": at.UnixMilli(), "promptId": eid}}})
 		return string(b) + "\n"
@@ -61,7 +61,7 @@ func TestGrokForkKeepsOnlyItsOwnRecords(t *testing.T) {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
 		}
-		b, _ := json.Marshal(summary)
+		b := mustMarshal(t, summary)
 		if err := os.WriteFile(filepath.Join(dir, "summary.json"), b, 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -77,8 +77,12 @@ func TestGrokForkKeepsOnlyItsOwnRecords(t *testing.T) {
 		var m map[string]any
 		_ = json.Unmarshal([]byte(l), &m)
 		m["timestamp"] = tf.Unix()
-		m["params"].(map[string]any)["sessionId"] = fork
-		b, _ := json.Marshal(m)
+		params, ok := m["params"].(map[string]any)
+		if !ok {
+			t.Fatalf("no params in %s", l)
+		}
+		params["sessionId"] = fork
+		b := mustMarshal(t, m)
 		copied = append(copied, string(b)+"\n")
 	}
 	srcPath := write(src, map[string]any{"info": map[string]any{"id": src, "cwd": proj}, "session_kind": "headless",

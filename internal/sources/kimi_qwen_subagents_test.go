@@ -3,6 +3,7 @@ package sources
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -43,14 +44,7 @@ func TestKimiAndQwenSubagentsComeInUnderTheSwitch(t *testing.T) {
 	qwenChild := put(filepath.Join(qwenProject, "subagents", "q-1", "agent-a1.jsonl"),
 		`{"type":"user","sessionId":"q-1","timestamp":"2026-01-02T03:05:05Z","cwd":"/tmp/proj","message":{"role":"user","parts":[{"text":"trace the qwenchild backoff jitter"}]}}`+"\n")
 
-	has := func(files []string, p string) bool {
-		for _, f := range files {
-			if f == p {
-				return true
-			}
-		}
-		return false
-	}
+	has := slices.Contains[[]string]
 	// Both are read by default now (#5223, #5229); =0 keeps them out.
 	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "0")
 	if has(KimiSessionFiles(), kimiChild) {

@@ -11,7 +11,7 @@ import (
 // byte length (both letters are two bytes), so offsets found in the folded copy
 // are valid in the original. Display text is never passed through here.
 func Lower(s string) string {
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		if s[i] >= utf8.RuneSelf {
 			// What strings.ToLower does past ASCII, with the fold in the same
 			// pass: a second pass and a second copy for ё was a fifth of what

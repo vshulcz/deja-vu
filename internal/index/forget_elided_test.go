@@ -31,15 +31,15 @@ func TestForgetAndUnforgetTakeAnElidedId(t *testing.T) {
 	}
 
 	// An elision that belongs to no session still matches nothing.
-	if miss, err := Forget(dir, ForgetOptions{Session: "zzzz…zzzz", DryRun: true}); err != nil {
-		t.Fatal(err)
+	if miss, forgetErr := Forget(dir, ForgetOptions{Session: "zzzz…zzzz", DryRun: true}); forgetErr != nil {
+		t.Fatal(forgetErr)
 	} else if miss.Sessions != 0 {
 		t.Errorf("an elision matching nothing dropped %d sessions", miss.Sessions)
 	}
 
 	// And the round trip: forget by the printed id, restore by the same string.
-	if got, err := Forget(dir, ForgetOptions{Session: elided}); err != nil {
-		t.Fatal(err)
+	if got, forgetErr := Forget(dir, ForgetOptions{Session: elided}); forgetErr != nil {
+		t.Fatal(forgetErr)
 	} else if got.Sessions != 1 {
 		t.Fatalf("forget matched %d sessions", got.Sessions)
 	}

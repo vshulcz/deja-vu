@@ -25,7 +25,7 @@ func TestTheContextBenchMeasuresOneLongSessionToo(t *testing.T) {
 		t.Fatal(err)
 	}
 	var report contextReport
-	if err := json.Unmarshal([]byte(out), &report); err != nil {
+	if err = json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("invalid context JSON %q: %v", out, err)
 	}
 	if report.MarathonChains != bench.ContextMarathonCount {

@@ -62,7 +62,7 @@ func TestMCPEntriesOfStrippingClientsKeepTheIndexDir(t *testing.T) {
 			if command == "" {
 				t.Fatalf("no command in the deja entry:\n%s", text)
 			}
-			cmd := exec.Command(command, "mcp")
+			cmd := exec.CommandContext(t.Context(), command, "mcp")
 			cmd.Env = []string{"HOME=" + filepath.Join(tmp, "home"), "PATH=/usr/bin:/bin"}
 			out, err := cmd.Output()
 			if err != nil {

@@ -35,7 +35,7 @@ func TestTwoIndexProcessesLeaveOneGoodStore(t *testing.T) {
 	}
 	stamp := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
 	const sessions = 120
-	for i := 0; i < sessions; i++ {
+	for i := range sessions {
 		line := fmt.Sprintf(`{"type":"user","sessionId":"s%03d","timestamp":%q,"cwd":"/work/app",`+
 			`"message":{"role":"user","content":"turn %d: the pool timed out during the migration"}}`, i, stamp, i)
 		if err := os.WriteFile(filepath.Join(proj, fmt.Sprintf("s%03d.jsonl", i)), []byte(line+"\n"), 0o644); err != nil {
@@ -134,7 +134,7 @@ func TestTwoIndexProcessesLeaveOneGoodStore(t *testing.T) {
 
 // childWindow reads the stamps the child printed around its pass.
 func childWindow(out string) (from, upto time.Time) {
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		if !strings.HasPrefix(line, "pass-ok ") {
 			continue
 		}
@@ -170,9 +170,7 @@ func TestCrossProcessIndexChild(t *testing.T) {
 		"XDG_CONFIG_HOME":  os.Getenv("DEJA_PASS_XDG_CONFIG"),
 		"APPDATA":          os.Getenv("DEJA_PASS_APPDATA"),
 	} {
-		if err := os.Setenv(k, v); err != nil {
-			t.Fatal(err)
-		}
+		t.Setenv(k, v)
 	}
 	// The lock's own signal, which is what says the two passes met.
 	LockWaitNotice = func() { fmt.Fprintln(os.Stdout, "waited-for-lock") }

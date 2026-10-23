@@ -32,28 +32,28 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 		switch args[i] {
 		case "--state":
 			if i+1 >= len(args) {
-				return fmt.Errorf("promote: --state needs a value")
+				return errors.New("promote: --state needs a value")
 			}
 			i++
-			state = strings.ToLower(args[i])
+			state = strings.ToLower(args[i]) //nolint:gosec // G602: i+1 < len(args) checked above
 		case "--note":
 			if i+1 >= len(args) {
-				return fmt.Errorf("promote: --note needs text")
+				return errors.New("promote: --note needs text")
 			}
 			i++
-			noteText = args[i]
+			noteText = args[i] //nolint:gosec // G602: i+1 < len(args) checked above
 		case "--to":
 			if i+1 >= len(args) {
-				return fmt.Errorf("promote: --to needs a path")
+				return errors.New("promote: --to needs a path")
 			}
 			i++
-			exportPath = args[i]
+			exportPath = args[i] //nolint:gosec // G602: i+1 < len(args) checked above
 		case "--tag":
 			if i+1 >= len(args) {
-				return fmt.Errorf("promote: --tag needs a value")
+				return errors.New("promote: --tag needs a value")
 			}
 			i++
-			tags = append(tags, args[i])
+			tags = append(tags, args[i]) //nolint:gosec // G602: i+1 < len(args) checked above
 		default:
 			if strings.HasPrefix(args[i], "-") {
 				return unknownFlag("promote", args[i], promoteFlags)
@@ -71,7 +71,7 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 		// Taking a mark back is the state nobody guesses: users reach for
 		// --state none, --state clear or --unpromote, get this line, and read
 		// four states none of which sounds like an undo (#845).
-		return fmt.Errorf("promote: state must be accepted, rejected, superseded or stale — `--state accepted` takes an earlier mark back, and `deja forget --session deja-note-<harness>-<id>` removes the note itself")
+		return errors.New("promote: state must be accepted, rejected, superseded or stale — `--state accepted` takes an earlier mark back, and `deja forget --session deja-note-<harness>-<id>` removes the note itself")
 	}
 	s, ok, err := findByPrefix(dir, prefix)
 	noteAmbiguousPrefix(dir, prefix, "promoting")

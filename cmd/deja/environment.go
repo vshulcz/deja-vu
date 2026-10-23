@@ -126,6 +126,7 @@ func environmentBlockFrom(dir, activation string) (string, []string) {
 	switch environmentReadState(dir) {
 	case index.ReadStateWithheld, index.ReadStateUnreadable:
 		return "", nil
+	case index.ReadStateCurrent, index.ReadStateOlderRules, index.ReadStateNewer:
 	}
 	// Origin is a property of the sessions the walls came from, so the gate has
 	// to be per wall rather than one check up front: a machine can hold both

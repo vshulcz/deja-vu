@@ -112,7 +112,7 @@ func TestStreamedRemoteLinesAreBoundedAndCounted(t *testing.T) {
 		}
 		sink("deja: imported 5 records\x1b[31m")
 		sink("   ")
-		for i := 0; i < remoteStreamLineMax+10; i++ {
+		for range remoteStreamLineMax + 10 {
 			sink("chatter")
 		}
 		counted = stop()

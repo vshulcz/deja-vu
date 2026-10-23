@@ -31,7 +31,7 @@ func museRun(stream string, event map[string]any, secs int64) map[string]any {
 
 func museFrame(t *testing.T, children ...map[string]any) map[string]any {
 	t.Helper()
-	var cs []any
+	cs := make([]any, 0, len(children))
 	for i, c := range children {
 		b, err := json.Marshal(c)
 		if err != nil {
@@ -64,6 +64,7 @@ func writeMuseLog(t *testing.T, dir string, lines ...map[string]any) string {
 }
 
 func museConversation(t *testing.T) []map[string]any {
+	t.Helper()
 	return []map[string]any{
 		museRec(museTestID, "runtime.session.metadata", map[string]any{
 			"kind": "metadata", "record": map[string]any{"workspace_root": "/w/poollab", "model_id": "muse-spark-1.3"},
@@ -270,9 +271,10 @@ func TestMuseSessionFiles(t *testing.T) {
 // A child's log is a session of its own, naming the one that spawned it.
 func TestParseMuseSubagent(t *testing.T) {
 	childID := "a8234fe2-23ee-4cc5-8e81-8908fe89b18d"
-	var lines []map[string]any
-	for _, l := range museConversation(t) {
-		b, _ := json.Marshal(l)
+	conv := museConversation(t)
+	lines := make([]map[string]any, 0, len(conv))
+	for _, l := range conv {
+		b := mustJSON(t, l)
 		var c map[string]any
 		_ = json.Unmarshal([]byte(strings.ReplaceAll(string(b), museTestID, childID)), &c)
 		lines = append(lines, c)
@@ -288,6 +290,7 @@ func TestParseMuseSubagent(t *testing.T) {
 // records, then the run. A workflow child also records its task kind and the
 // workspace it runs in; a reminder or verification observer records neither.
 func museChildLog(t *testing.T, childID string, workflow bool, prompt string) []map[string]any {
+	t.Helper()
 	lines := []map[string]any{
 		museFrame(t, museRec(childID, "runtime.session.permission_format_declared", map[string]any{"format": "profile_v1"}, 1)),
 		museRec(childID, "runtime.session.metadata", map[string]any{"kind": "metadata", "record": map[string]any{"provider_id": "meta", "model_id": "muse-spark-1.3"}}, 2),

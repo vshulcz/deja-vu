@@ -3,6 +3,7 @@ package index
 import (
 	"hash/fnv"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -81,35 +82,8 @@ func lineage(dir string, ids map[string]bool, heads, wholes []model.Session) (ma
 			out[parent] = true
 		}
 	}
-	type wholeFork struct {
-		harness, parent string
-		turns           map[string]bool
-		started         time.Time
-	}
-	var wholeForks []wholeFork
 	var metaForks []SessionMeta
-	for _, h := range heads {
-		if ids[h.ID] {
-			parentOf(h.Kind, h.Parent)
-			if o := SessionOpening(h); o != 0 {
-				headOpenings[o] = true
-			}
-		}
-	}
-	wholeOpenings := map[uint64][]map[string]bool{}
-	for _, w := range wholes {
-		if !ids[w.ID] {
-			continue
-		}
-		if w.Kind == "fork" && w.Parent != "" {
-			wholeForks = append(wholeForks, wholeFork{w.Harness, w.Parent, wholeTurns(w), firstTimed(w)})
-		} else {
-			parentOf(w.Kind, w.Parent)
-		}
-		if o := SessionOpening(w); o != 0 {
-			wholeOpenings[o] = append(wholeOpenings[o], wholeTurns(w))
-		}
-	}
+	wholeForks, wholeOpenings := unindexedAskers(ids, heads, wholes, headOpenings, parentOf)
 	m, err := readManifestCached(dir)
 	if err != nil {
 		// Nothing indexed to hide, so a named source costs nothing.
@@ -187,6 +161,51 @@ func lineage(dir string, ids map[string]bool, heads, wholes []model.Session) (ma
 			}
 		}
 	}
+	return out, lineageCuts(dir, m, out, metaForks, wholeForks, askers, wholeOpenings, parentMeta)
+}
+
+// wholeFork is a fork read off its store in full: the source it names and the
+// turns it holds.
+type wholeFork struct {
+	harness, parent string
+	turns           map[string]bool
+	started         time.Time
+}
+
+// unindexedAskers reads the askers the index does not hold yet: each head's
+// opening goes into headOpenings, and the whole ones come back as forks that
+// name a source and as turns by opening. parentOf is called for each asker's
+// parent as lineage counts it.
+func unindexedAskers(ids map[string]bool, heads, wholes []model.Session, headOpenings map[uint64]bool, parentOf func(kind, parent string)) ([]wholeFork, map[uint64][]map[string]bool) {
+	var wholeForks []wholeFork
+	for _, h := range heads {
+		if ids[h.ID] {
+			parentOf(h.Kind, h.Parent)
+			if o := SessionOpening(h); o != 0 {
+				headOpenings[o] = true
+			}
+		}
+	}
+	wholeOpenings := map[uint64][]map[string]bool{}
+	for _, w := range wholes {
+		if !ids[w.ID] {
+			continue
+		}
+		if w.Kind == "fork" && w.Parent != "" {
+			wholeForks = append(wholeForks, wholeFork{w.Harness, w.Parent, wholeTurns(w), firstTimed(w)})
+		} else {
+			parentOf(w.Kind, w.Parent)
+		}
+		if o := SessionOpening(w); o != 0 {
+			wholeOpenings[o] = append(wholeOpenings[o], wholeTurns(w))
+		}
+	}
+	return wholeForks, wholeOpenings
+}
+
+// lineageCuts is where each session left out of out is cut for the askers it
+// shares turns with.
+func lineageCuts(dir string, m Manifest, out map[string]bool, metaForks []SessionMeta, wholeForks []wholeFork, askers map[uint64][]SessionMeta, wholeOpenings map[uint64][]map[string]bool, parentMeta func(harness, id string) (SessionMeta, bool)) map[string]time.Time {
 	// What stays on the page and shares turns with an asker is cut at the
 	// last turn they share: a source that went on after the fork, a sibling
 	// fork. The asker holds everything up to there already (#5335).
@@ -231,7 +250,7 @@ func lineage(dir string, ids map[string]bool, heads, wholes []model.Session) (ma
 			cutAt(meta.ID, wholeShared(dir, m, w, meta))
 		}
 	}
-	return out, cuts
+	return cuts
 }
 
 // heldRecords answers whether asker holds other's last record, the same role,
@@ -269,9 +288,9 @@ func heldRecords(dir string, m Manifest) func(asker, other SessionMeta) bool {
 		// a backgrounded session gains "No response requested." and a task
 		// notification, and the fork that holds every turn before them got
 		// its source back as recall (#4251).
-		for i := len(recs) - 1; i >= 0; i-- {
-			if !afterForkNoise(recs[i]) {
-				return set[key(recs[i])]
+		for _, rec := range slices.Backward(recs) {
+			if !afterForkNoise(rec) {
+				return set[key(rec)]
 			}
 		}
 		return false
@@ -279,7 +298,7 @@ func heldRecords(dir string, m Manifest) func(asker, other SessionMeta) bool {
 }
 
 // endedBy reports whether src's last turn came no later than at, so a fork
-// that started at at was made after everything src holds. A fork read with no
+// that started at that moment was made after everything src holds. A fork read with no
 // times says nothing either way, and its source is left out as it always was;
 // a read that fails answers no.
 func endedBy(dir string, m Manifest, src SessionMeta, at time.Time) bool {
@@ -290,12 +309,12 @@ func endedBy(dir string, m Manifest, src SessionMeta, at time.Time) bool {
 	if err != nil {
 		return false
 	}
-	for i := len(recs) - 1; i >= 0; i-- {
-		switch r := recs[i]; {
+	for _, rec := range slices.Backward(recs) {
+		switch r := rec; {
 		case afterForkNoise(r), r.Role == roleEdit, r.Role == roleWrote, r.Role == roleFiles, r.Time.IsZero():
 			continue
 		}
-		return !recs[i].Time.After(at)
+		return !rec.Time.After(at)
 	}
 	return false
 }
@@ -351,12 +370,12 @@ func wholeHolds(dir string, m Manifest, wholes []map[string]bool, other SessionM
 	if err != nil {
 		return false
 	}
-	for i := len(recs) - 1; i >= 0; i-- {
-		switch r := recs[i]; {
+	for _, rec := range slices.Backward(recs) {
+		switch r := rec; {
 		case afterForkNoise(r), r.Role == roleEdit, r.Role == roleWrote, r.Role == roleFiles:
 			continue
 		}
-		k := turnKey(recs[i].Role, recs[i].Time.UnixMilli())
+		k := turnKey(rec.Role, rec.Time.UnixMilli())
 		for _, w := range wholes {
 			if w[k] {
 				return true

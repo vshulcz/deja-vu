@@ -23,6 +23,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -152,7 +153,7 @@ func harnesses() []harness {
 // all — only MCP — so deja's hooks sit in ~/.grok unread, and a sweep that
 // does not say so reports a defect against the wrong program.
 func grokIsTheOtherProduct() string {
-	out, err := exec.Command("grok", "--help").CombinedOutput()
+	out, err := exec.CommandContext(context.Background(), "grok", "--help").CombinedOutput()
 	if err != nil {
 		return ""
 	}
@@ -209,12 +210,12 @@ display_name = "Mock Model"
 func setupCline(home, base, model string) error {
 	// cline keeps provider credentials in its own store, written by its own
 	// command; there is no file to drop in.
-	cmd := exec.Command("cline", "auth", "-p", "openai", "-k", "local",
+	cmd := exec.CommandContext(context.Background(), "cline", "auth", "-p", "openai", "-k", "local",
 		"-b", base, "-m", model)
 	cmd.Env = append(os.Environ(), "HOME="+home, "USERPROFILE="+home)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("cline auth: %v: %s", err, firstLine(string(out)))
+		return fmt.Errorf("cline auth: %w: %s", err, firstLine(string(out)))
 	}
 	return nil
 }
@@ -237,7 +238,10 @@ func setupOpenClaw(home, base, model string) error {
 			"models": []any{map[string]any{"id": model, "name": "mock"}},
 		},
 	}}
-	b, _ := json.MarshalIndent(cfg, "", "  ")
+	b, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
 	return os.WriteFile(path, b, 0o644)
 }
 
@@ -258,7 +262,10 @@ func setupOpencode(home, base, model string) error {
 		"options": map[string]any{"baseURL": base, "apiKey": "local"},
 		"models":  map[string]any{model: map[string]any{"name": "mock"}},
 	}}
-	b, _ := json.MarshalIndent(cfg, "", "  ")
+	b, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
 	return os.WriteFile(path, b, 0o644)
 }
 
@@ -271,7 +278,7 @@ func setupCodex(home, base, model string) error {
 	// Keep whatever deja wrote (its MCP block) and add only the provider.
 	var keep []string
 	if b, err := os.ReadFile(path); err == nil {
-		for _, line := range strings.Split(string(b), "\n") {
+		for line := range strings.SplitSeq(string(b), "\n") {
 			if !strings.HasPrefix(line, "model =") && !strings.HasPrefix(line, "model_provider =") &&
 				!strings.HasPrefix(line, "approval_policy") && !strings.HasPrefix(line, "sandbox_mode") &&
 				!strings.HasPrefix(line, "[model_providers.") {
@@ -375,17 +382,18 @@ func main() {
 			fmt.Fprintln(os.Stderr, "harnesssweep:", err)
 			os.Exit(1)
 		}
-		defer os.RemoveAll(out)
 		exe = filepath.Join(out, "deja")
-		build := exec.Command("go", "build", "-o", exe, "./cmd/deja")
+		build := exec.CommandContext(context.Background(), "go", "build", "-o", exe, "./cmd/deja")
 		build.Stderr = os.Stderr
 		if err := build.Run(); err != nil {
+			_ = os.RemoveAll(out)
 			fmt.Fprintln(os.Stderr, "harnesssweep: build:", err)
 			os.Exit(1)
 		}
+		defer os.RemoveAll(out)
 	}
 	wanted := map[string]bool{}
-	for _, n := range strings.Split(*only, ",") {
+	for n := range strings.SplitSeq(*only, ",") {
 		if n = strings.TrimSpace(n); n != "" {
 			wanted[n] = true
 		}
@@ -505,7 +513,7 @@ func run(h harness, exe, corpus, logPath, base, model, repo, prompt, answer, pro
 		"DO_NOT_TRACK=1")
 
 	deja := func(args ...string) {
-		cmd := exec.Command(exe, args...)
+		cmd := exec.CommandContext(context.Background(), exe, args...)
 		cmd.Env = env
 		// From the repo: recall is scoped to the project, so an install run
 		// from anywhere else finds nothing and writes an empty context.
@@ -533,7 +541,7 @@ func run(h harness, exe, corpus, logPath, base, model, repo, prompt, answer, pro
 	if wrapper {
 		bin, args = exe, append([]string{h.bin}, args...)
 	}
-	cmd := exec.Command(bin, args...)
+	cmd := exec.CommandContext(context.Background(), bin, args...)
 	cmd.Env = env
 	cmd.Dir = repo
 	stdout, runErr := cmd.CombinedOutput()
@@ -574,7 +582,7 @@ func secondTurn(h harness, env []string, logPath, base, model, repo, prompt, ans
 	if fi, err := os.Stat(logPath); err == nil {
 		start = fi.Size()
 	}
-	cmd := exec.Command(h.bin, h.resume(prompt, base, model)...)
+	cmd := exec.CommandContext(context.Background(), h.bin, h.resume(prompt, base, model)...)
 	cmd.Env = env
 	cmd.Dir = repo
 	stdout, runErr := cmd.CombinedOutput()
@@ -603,8 +611,8 @@ func recallBlocks(sent string) string {
 		}
 		rest = rest[i+len("deja-recall"):]
 		end := len(rest)
-		for _, close := range []string{"/deja-recall", `</deja-recall`} {
-			if j := strings.Index(rest, close); j >= 0 && j < end {
+		for _, marker := range []string{"/deja-recall", `</deja-recall`} {
+			if j := strings.Index(rest, marker); j >= 0 && j < end {
 				end = j
 			}
 		}
@@ -648,7 +656,7 @@ func checkReinstall(h harness, exe, corpus, repo string) []string {
 		"DEJA_CLAUDE_ROOT="+corpus,
 		"DEJA_INDEX_DIR="+filepath.Join(home, "idx"))
 	install := func(bin string) {
-		cmd := exec.Command(bin, "install", h.target, "--no-index")
+		cmd := exec.CommandContext(context.Background(), bin, "install", h.target, "--no-index")
 		cmd.Env = env
 		cmd.Dir = repo
 		_ = cmd.Run()
@@ -688,9 +696,9 @@ func snapshot(home string) map[string]string {
 			strings.HasPrefix(path, filepath.Join(home, "idx")) ||
 			strings.HasPrefix(path, filepath.Join(home, ".config", "deja")) ||
 			strings.HasSuffix(path, ".bak") {
-			return nil
+			return nil //nolint:nilerr // what cannot be read is left out
 		}
-		if b, rerr := os.ReadFile(path); rerr == nil {
+		if b, rerr := os.ReadFile(path); rerr == nil { //nolint:gosec // a temp home this sweep made
 			if rel, rerr := filepath.Rel(home, path); rerr == nil {
 				out[rel] = string(b)
 			}
@@ -700,7 +708,7 @@ func snapshot(home string) map[string]string {
 	return out
 }
 
-func checkUninstall(h harness, exe, corpus, base, model, repo string) ([]string, bool) {
+func checkUninstall(h harness, exe, corpus, _, _, repo string) ([]string, bool) {
 	home, err := os.MkdirTemp("", "sweep-uninstall-"+h.name)
 	if err != nil {
 		return nil, true
@@ -712,7 +720,7 @@ func checkUninstall(h harness, exe, corpus, base, model, repo string) ([]string,
 		"DEJA_CLAUDE_ROOT="+corpus,
 		"DEJA_INDEX_DIR="+filepath.Join(home, "idx"))
 	deja := func(args ...string) {
-		cmd := exec.Command(exe, args...)
+		cmd := exec.CommandContext(context.Background(), exe, args...)
 		cmd.Env = env
 		cmd.Dir = repo
 		_ = cmd.Run()
@@ -727,11 +735,11 @@ func checkUninstall(h harness, exe, corpus, base, model, repo string) ([]string,
 		if err != nil || d.IsDir() ||
 			strings.HasPrefix(path, filepath.Join(home, "idx")) ||
 			strings.HasPrefix(path, filepath.Join(home, ".config", "deja")) {
-			return nil
+			return nil //nolint:nilerr // what cannot be read is left out
 		}
-		b, rerr := os.ReadFile(path)
+		b, rerr := os.ReadFile(path) //nolint:gosec // a temp home this sweep made
 		if rerr != nil {
-			return nil
+			return nil //nolint:nilerr // what cannot be read is left out
 		}
 		// The binary's own path is what a stale hook would still be calling.
 		if strings.Contains(string(b), exe) || strings.Contains(string(b), "deja hook-") {

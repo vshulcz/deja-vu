@@ -23,7 +23,7 @@ func writeFramedLog(t *testing.T, path, body string) {
 		if line == "" {
 			continue
 		}
-		cmd := exec.Command("zstd", "-q", "-c")
+		cmd := exec.CommandContext(t.Context(), "zstd", "-q", "-c")
 		cmd.Stdin = strings.NewReader(line)
 		frame, err := cmd.Output()
 		if err != nil {
@@ -81,8 +81,9 @@ func TestDeepSeekReadsTheNewestLogGeneration(t *testing.T) {
 	writeFramedLog(t, filepath.Join(future, "session.v5.jsonl.zstd"),
 		strings.ReplaceAll(strings.ReplaceAll(deepSeekV4Log, `"version":4`, `"version":5`), "session-7c2e9f40-3b1a-4d5e-8f60-1a2b3c4d5e6f", "session-v5"))
 
-	var got []string
-	for _, f := range DeepSeekSessionFiles() {
+	files := DeepSeekSessionFiles()
+	got := make([]string, 0, len(files))
+	for _, f := range files {
 		got = append(got, filepath.Join(filepath.Base(filepath.Dir(f)), filepath.Base(f)))
 	}
 	slices.Sort(got)

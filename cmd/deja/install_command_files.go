@@ -183,7 +183,7 @@ func installCommandFile(harness, exe string, uninstall bool) (installResult, err
 	}
 	if uninstall {
 		if _, err := os.Stat(path); err != nil {
-			return installResult{Path: path, Action: "unchanged"}, nil
+			return installResult{Path: path, Action: "unchanged"}, nil //nolint:nilerr // nothing to remove
 		}
 		// `uninstall cursor` runs cursor-auto too, and the second pass met the
 		// file the first pass had just put back (#2600, the shape #2581 hit).

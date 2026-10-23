@@ -1,7 +1,6 @@
 package index
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,7 +11,7 @@ import (
 )
 
 func gooseHeaderLine() string {
-	b, _ := json.Marshal(map[string]any{
+	b := mustJSON(map[string]any{
 		"id": "g1", "description": "the ingest watermark work",
 		"working_dir": "/work/app",
 		"created_at":  "2026-08-30T09:00:00Z", "updated_at": "2026-08-30T09:00:00Z",
@@ -25,7 +24,7 @@ func gooseTurn(i int, text string) string {
 	if i%2 == 1 {
 		role = "assistant"
 	}
-	b, _ := json.Marshal(map[string]any{"role": role, "content": text, "created": "2026-08-30T09:00:00Z"})
+	b := mustJSON(map[string]any{"role": role, "content": text, "created": "2026-08-30T09:00:00Z"})
 	return string(b)
 }
 
@@ -58,8 +57,8 @@ func TestAGrowingGooseSessionKeepsItsProject(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	seed := []string{gooseHeaderLine()}
-	for i := 0; i < 6; i++ {
+	seed := []string{gooseHeaderLine()} //nolint:prealloc // a fixture literal the loop below grows
+	for i := range 6 {
 		seed = append(seed, gooseTurn(i, fmt.Sprintf("seed %d zonkomatic", i)))
 	}
 	write(seed)
@@ -74,7 +73,7 @@ func TestAGrowingGooseSessionKeepsItsProject(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		var projects []string
+		projects := make([]string, 0, len(got))
 		for _, s := range got {
 			projects = append(projects, s.Project)
 		}
@@ -115,8 +114,8 @@ func TestAGrowingGooseSessionKeepsItsProject(t *testing.T) {
 	}
 
 	// The rewind the prefix comparison exists for.
-	rewritten := []string{gooseHeaderLine()}
-	for i := 0; i < 9; i++ {
+	rewritten := []string{gooseHeaderLine()} //nolint:prealloc // a fixture literal the loop below grows
+	for i := range 9 {
 		rewritten = append(rewritten, gooseTurn(i, fmt.Sprintf("rewritten %d zonkomatic", i)))
 	}
 	write(rewritten)

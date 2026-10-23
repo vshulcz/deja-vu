@@ -56,7 +56,7 @@ func TestNoTrackedFileNamesTheAccountItWasWrittenOn(t *testing.T) {
 	// Tracked files only: what a working tree holds beside them is the
 	// developer's own — a local tool's output cache is where this first fired,
 	// and it is ignored precisely because it belongs to nobody else.
-	out, err := exec.Command("git", "-C", root, "ls-files", "-z").Output()
+	out, err := exec.CommandContext(t.Context(), "git", "-C", root, "ls-files", "-z").Output()
 	if err != nil {
 		t.Skipf("git ls-files: %v", err)
 	}

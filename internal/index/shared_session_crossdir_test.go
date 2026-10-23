@@ -34,7 +34,8 @@ func TestRandomPassesOverCopiesInSeveralProjectsMatchRebuild(t *testing.T) {
 }
 
 func crossDirRun(t *testing.T, seed int64) {
-	rng := rand.New(rand.NewSource(seed))
+	t.Helper()
+	rng := rand.New(rand.NewSource(seed)) //nolint:gosec // a seeded fixture, not crypto
 	tmp := hermeticIndexEnv(t)
 	loc := time.Local
 	t.Cleanup(func() { time.Local = loc })
@@ -204,11 +205,13 @@ func crossDirRun(t *testing.T, seed int64) {
 func crossDirPrompts(t *testing.T, body string) []string {
 	t.Helper()
 	var out []string
-	for _, l := range strings.Split(strings.TrimSpace(body), "\n") {
+	for l := range strings.SplitSeq(strings.TrimSpace(body), "\n") {
 		var w struct {
-			SessionID string
-			Timestamp string
-			Message   struct{ Content json.RawMessage }
+			SessionID string `json:"sessionId"`
+			Timestamp string `json:"timestamp"`
+			Message   struct {
+				Content json.RawMessage `json:"content"`
+			} `json:"message"`
 		}
 		if err := json.Unmarshal([]byte(l), &w); err != nil {
 			t.Fatal(err)

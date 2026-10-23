@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"unicode/utf8"
@@ -227,7 +228,7 @@ func ReasonixSidecarFiles() []string {
 	for _, dir := range ReasonixSessionDirsAll() {
 		_ = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 			if err != nil {
-				return nil
+				return nil //nolint:nilerr // the walk goes past entries it cannot read
 			}
 			if d.IsDir() {
 				if p != dir && strings.HasPrefix(d.Name(), ".") {
@@ -353,10 +354,8 @@ func reasonixDesktopWorkspace(root, id string) string {
 		return ""
 	}
 	for _, w := range st.Workspaces {
-		for _, sid := range w.SessionIDs {
-			if sid == id {
-				return w.Root
-			}
+		if slices.Contains(w.SessionIDs, id) {
+			return w.Root
 		}
 	}
 	return ""

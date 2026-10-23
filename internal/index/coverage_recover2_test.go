@@ -23,11 +23,11 @@ func TestRecordIOErrorsViaClosedFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := f.Close(); err != nil {
+	if err = f.Close(); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := newRecordWriter(f, newRecordTables()); err == nil {
+	if _, err = newRecordWriter(f, newRecordTables()); err == nil {
 		t.Fatal("newRecordWriter on closed file returned nil error")
 	}
 
@@ -39,14 +39,14 @@ func TestRecordIOErrorsViaClosedFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	rec := Record{Key: "k", SourcePath: "s", Role: "user", Text: "hello world this is long enough to overflow", Time: time.Now()}
-	if err := f2.Close(); err != nil {
+	if err = f2.Close(); err != nil {
 		t.Fatal(err)
 	}
 	rw := &recordWriter{f: f2, w: bufio.NewWriterSize(f2, 1), tables: newRecordTables()}
-	if _, err := rw.write(rec); err == nil {
+	if _, err = rw.write(rec); err == nil {
 		t.Fatal("write on closed file returned nil error")
 	}
-	if err := rw.Close(); err == nil {
+	if err = rw.Close(); err == nil {
 		t.Fatal("Close on already-closed file returned nil error")
 	}
 
@@ -56,17 +56,17 @@ func TestRecordIOErrorsViaClosedFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := f2b.Close(); err != nil {
+	if err = f2b.Close(); err != nil {
 		t.Fatal(err)
 	}
 	rwBig := &recordWriter{f: f2b, w: bufio.NewWriterSize(f2b, 8), tables: newRecordTables()}
-	if _, err := rwBig.write(rec); err == nil {
+	if _, err = rwBig.write(rec); err == nil {
 		t.Fatal("write (body) on closed file returned nil error")
 	}
 
 	// writeRecord's Seek succeeds on a read-only fd; only the subsequent
 	// Write fails, since the fd was never opened for writing.
-	if err := os.WriteFile(p, []byte("x"), 0o644); err != nil {
+	if err = os.WriteFile(p, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	f3, err := os.Open(p)
@@ -74,7 +74,7 @@ func TestRecordIOErrorsViaClosedFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer f3.Close()
-	if _, err := writeRecord(f3, rec, newRecordTables()); err == nil {
+	if _, err = writeRecord(f3, rec, newRecordTables()); err == nil {
 		t.Fatal("writeRecord on a read-only file returned nil error")
 	}
 
@@ -186,8 +186,8 @@ func TestIntersectSubstringPostingsSkipBranches(t *testing.T) {
 			t.Fatal(err)
 		}
 		dataStart := entries[0].off
-		gf.Close()
-		if err := os.Truncate(goodPath, int64(dataStart)); err != nil {
+		_ = gf.Close()
+		if err := os.Truncate(goodPath, int64(dataStart)); err != nil { //nolint:gosec // dataStart is a small offset
 			t.Fatal(err)
 		}
 		if _, err := intersectSubstringPostings(tmp, []string{"alp"}); !IsCorrupt(err) {
@@ -256,13 +256,13 @@ func TestExportDefaultDirSourceFallbackAndOrphanSkip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := rw.write(Record{Key: "claude:s1", SourcePath: "", Role: "user", Text: "no source path text", Time: base}); err != nil {
+	if _, err = rw.write(Record{Key: "claude:s1", SourcePath: "", Role: "user", Text: "no source path text", Time: base}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := rw.write(Record{Key: "ghost:nope", SourcePath: "orphan-source", Role: "user", Text: "orphan text", Time: base}); err != nil {
+	if _, err = rw.write(Record{Key: "ghost:nope", SourcePath: "orphan-source", Role: "user", Text: "orphan text", Time: base}); err != nil {
 		t.Fatal(err)
 	}
-	if err := rw.Close(); err != nil {
+	if err = rw.Close(); err != nil {
 		t.Fatal(err)
 	}
 	am, err := readManifest(dir)
@@ -270,7 +270,7 @@ func TestExportDefaultDirSourceFallbackAndOrphanSkip(t *testing.T) {
 		t.Fatal(err)
 	}
 	am.RecordStrings = atbl.strs
-	if err := writeManifest(dir, am); err != nil {
+	if err = writeManifest(dir, am); err != nil {
 		t.Fatal(err)
 	}
 
@@ -280,10 +280,12 @@ func TestExportDefaultDirSourceFallbackAndOrphanSkip(t *testing.T) {
 	}
 	matches, _ := filepath.Glob(filepath.Join(tmp, "batch-out", "*.jsonl"))
 	var all string
+	var allSb283 strings.Builder
 	for _, p := range matches {
 		b, _ := os.ReadFile(p)
-		all += string(b)
+		allSb283.Write(b)
 	}
+	all += allSb283.String()
 	if strings.Contains(all, "orphan text") {
 		t.Fatal("orphan record with no manifest session was exported")
 	}

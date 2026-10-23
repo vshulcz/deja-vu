@@ -24,7 +24,7 @@ func TestRecallByIDKeepsToABudget(t *testing.T) {
 	const id = "jjjj0004-4444-4000-8000-c3d4e5f6a7b8"
 	words := []string{"vacuum", "reindex", "partition", "backfill", "rollover", "compaction", "failover"}
 	var b strings.Builder
-	for i := 0; i < 80; i++ {
+	for i := range 80 {
 		role := "user"
 		if i%2 == 1 {
 			role = "assistant"

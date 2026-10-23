@@ -35,7 +35,7 @@ func TestImportFlattensForgedMetadataFields(t *testing.T) {
 	if err := os.MkdirAll(shared, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	var lines []string
+	lines := make([]string, 0, len(batch))
 	for _, r := range batch {
 		b, err := json.Marshal(r)
 		if err != nil {

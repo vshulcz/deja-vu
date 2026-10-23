@@ -37,16 +37,16 @@ func TestOlderIndexVersionIsRebuiltBeforeSearch(t *testing.T) {
 		t.Fatal(err)
 	}
 	m.Version = 11
-	if err := writeManifest(dir, m); err != nil {
+	if err = writeManifest(dir, m); err != nil {
 		t.Fatal(err)
 	}
 	// The manifest cache keys on mtime+size, and a version field is the same
 	// size either way — move the mtime so the cache cannot serve the old copy.
 	tick := time.Now().Add(2 * time.Second)
-	if err := os.Chtimes(filepath.Join(dir, "manifest.gob"), tick, tick); err != nil {
+	if err = os.Chtimes(filepath.Join(dir, "manifest.gob"), tick, tick); err != nil {
 		t.Fatal(err)
 	}
-	if err := EnsureForSearch(dir, search.Options{Query: "миграцию", All: true}, false, nil); err != nil {
+	if err = EnsureForSearch(dir, search.Options{Query: "миграцию", All: true}, false, nil); err != nil {
 		t.Fatal(err)
 	}
 	got, err := readManifest(dir)

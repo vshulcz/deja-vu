@@ -51,7 +51,7 @@ func TestHowAndFixReachTheJournal(t *testing.T) {
 		if err != nil {
 			return out
 		}
-		for _, line := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+		for line := range strings.SplitSeq(strings.TrimSpace(string(b)), "\n") {
 			var ev struct {
 				Kind string `json:"kind"`
 			}

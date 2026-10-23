@@ -31,8 +31,8 @@ func UnwrapPastedContent(text string) string {
 			break
 		}
 		openStart, openEnd := from+loc[0], from+loc[1]
-		close := `</pasted_content id="` + text[from+loc[2]:from+loc[3]] + `">`
-		rel := strings.Index(text[openEnd:], close)
+		closeTag := `</pasted_content id="` + text[from+loc[2]:from+loc[3]] + `">`
+		rel := strings.Index(text[openEnd:], closeTag)
 		if rel < 0 {
 			from = openEnd
 			continue
@@ -41,7 +41,7 @@ func UnwrapPastedContent(text string) string {
 		// A newline where each tag stood: a paste closed mid-line,
 		// `session?</pasted_content id="cc08">Can you`, must not glue the last
 		// pasted word to the first typed one.
-		text = text[:openStart] + "\n" + text[openEnd:closeStart] + "\n" + text[closeStart+len(close):]
+		text = text[:openStart] + "\n" + text[openEnd:closeStart] + "\n" + text[closeStart+len(closeTag):]
 		changed = true
 		from = openStart
 	}

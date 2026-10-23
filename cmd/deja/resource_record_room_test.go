@@ -29,8 +29,8 @@ func TestAWholeSessionReadAsAResourceFitsTheLogsRoom(t *testing.T) {
 	}
 	// Far more session than any budget will serve, so what comes back is the
 	// budget's doing rather than the fixture's.
-	var lines []string
-	for i := 0; i < 200; i++ {
+	lines := make([]string, 0, 200)
+	for i := range 200 {
 		body, err := json.Marshal(map[string]any{
 			"type": "user", "sessionId": "big1", "cwd": "/tmp/app",
 			"timestamp": time.Now().Add(-time.Duration(200-i) * time.Minute).UTC().Format(time.RFC3339),

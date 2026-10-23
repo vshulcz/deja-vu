@@ -12,7 +12,7 @@ import (
 // substringStore holds one session with the literal word and one with the
 // longer word that contains it, which is the case that tells a matching
 // property apart from a zero-result fallback.
-func substringStore(t *testing.T, withLiteral bool) string {
+func substringStore(t *testing.T, withLiteral bool) {
 	t.Helper()
 	tmp := hermeticEnv(t)
 	root := filepath.Join(tmp, "claude", "-tmp-projj")
@@ -34,7 +34,6 @@ func substringStore(t *testing.T, withLiteral bool) string {
 	if err := index.Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
-	return dir
 }
 
 // README's CLI table listed substring matching beside AND-semantics and phrase
@@ -47,7 +46,7 @@ func substringStore(t *testing.T, withLiteral bool) string {
 // together.
 func TestSubstringReachesItsWordOnlyWithoutAnExactMatch(t *testing.T) {
 	// With a literal `code` in the store, `code` is not a zero-result query.
-	_ = substringStore(t, true)
+	substringStore(t, true)
 	out, err := captureRun(t, "search", "code")
 	if err != nil {
 		t.Fatal(err)
@@ -59,13 +58,13 @@ func TestSubstringReachesItsWordOnlyWithoutAnExactMatch(t *testing.T) {
 		t.Fatalf("`code` did not return its literal match, wrong fixture:\n%s", out)
 	}
 	// Both are indexed: the miss above is about matching, not about the store.
-	if out, err := captureRun(t, "search", "opencode"); err != nil || !strings.Contains(out, "opencode config") {
-		t.Fatalf("`opencode` is not searchable: %v\n%s", err, out)
+	if found, findErr := captureRun(t, "search", "opencode"); findErr != nil || !strings.Contains(found, "opencode config") {
+		t.Fatalf("`opencode` is not searchable: %v\n%s", findErr, found)
 	}
 
 	// Without the literal, the same query falls through to the close tier and
 	// the README's example works — which is the only state in which it does.
-	_ = substringStore(t, false)
+	substringStore(t, false)
 	out, err = captureRun(t, "search", "code")
 	if err != nil {
 		t.Fatal(err)

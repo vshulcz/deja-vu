@@ -40,8 +40,8 @@ func TestCooccurTierSubstitutesANeighbouringTerm(t *testing.T) {
 	}
 
 	// A query needs at least two terms: one lucky word is not a co-occurrence.
-	if got, err := cooccurSearch(dir, m, query.Options{Query: "postgres", All: true}); err != nil || len(got.Sessions) != 0 {
-		t.Fatalf("single term produced %d sessions (%v)", len(got.Sessions), err)
+	if got, searchErr := cooccurSearch(dir, m, query.Options{Query: "postgres", All: true}); searchErr != nil || len(got.Sessions) != 0 {
+		t.Fatalf("single term produced %d sessions (%v)", len(got.Sessions), searchErr)
 	}
 
 	// Both words present is the exact tier's job, not this one's — but asking

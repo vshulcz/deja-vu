@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -109,20 +110,20 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 			// an unknown flag and an empty argument all used to pass through in
 			// silence, the same holes files had (#1630, #1628).
 			if i+1 >= len(args) {
-				return fmt.Errorf("how: --limit needs value")
+				return errors.New("how: --limit needs value")
 			}
 			i++
-			n, err := strconv.Atoi(args[i])
+			n, err := strconv.Atoi(args[i]) //nolint:gosec // i+1 < len(args) is checked above
 			if err != nil || n <= 0 {
-				return fmt.Errorf("how: --limit wants a positive number, got %q", args[i])
+				return fmt.Errorf("how: --limit wants a positive number, got %q", args[i]) //nolint:gosec // i+1 < len(args) is checked above
 			}
 			limit = n
 		case "--project":
-			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
-				return fmt.Errorf("how: --project needs value")
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" { //nolint:gosec // the left operand checks the bound
+				return errors.New("how: --project needs value")
 			}
 			i++
-			project = args[i]
+			project = args[i] //nolint:gosec // i+1 < len(args) is checked above
 		case "--all-projects":
 			// The answer is scoped to this project by default (#3705); this
 			// asks the machine instead.
@@ -141,7 +142,7 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 		}
 	}
 	if len(terms) == 0 {
-		return fmt.Errorf("usage: deja how <what> [--project name] [--limit n] [--json]")
+		return errors.New("usage: deja how <what> [--project name] [--limit n] [--json]")
 	}
 	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
 		return ensureError(dir, err)

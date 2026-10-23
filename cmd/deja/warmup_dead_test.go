@@ -23,7 +23,7 @@ func TestAKilledWarmupIsRetriedWithoutWaitingOutTheWindow(t *testing.T) {
 
 	spawned := 0
 	saved := spawnWarmup
-	spawnWarmup = func(exe, s string) error { spawned++; return nil }
+	spawnWarmup = func(_, _ string) error { spawned++; return nil }
 	t.Cleanup(func() { spawnWarmup = saved })
 
 	writeSentinel := func(age time.Duration) {

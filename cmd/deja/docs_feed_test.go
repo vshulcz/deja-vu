@@ -150,7 +150,7 @@ func TestTheFeedIsTheNewestPagesTheSitemapLists(t *testing.T) {
 		// The same test genfeed applies: the title's content, not the tag.
 		// An empty <title></title> is a page it drops and this would keep.
 		m := feedTitle.FindSubmatch(b)
-		if m == nil || strings.TrimSpace(string(m[1])) == "" {
+		if len(m) < 2 || strings.TrimSpace(string(m[1])) == "" {
 			continue
 		}
 		served = append(served, page{loc, day})

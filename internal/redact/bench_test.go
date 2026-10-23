@@ -37,10 +37,11 @@ func BenchmarkTextHashy(b *testing.B)  { benchText(b, hashy) }
 func BenchmarkTextSecret(b *testing.B) { benchText(b, withSecret) }
 
 func benchText(b *testing.B, s string) {
+	b.Helper()
 	b.SetBytes(int64(len(s)))
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		if _, c := Text(s); c.Total() < 0 {
 			b.Fatal("impossible")
 		}
@@ -76,14 +77,14 @@ func BenchmarkTextMixed(b *testing.B) { benchText(b, mixed) }
 // The same inputs through the plain regexes, so one run shows the ratio.
 func BenchmarkTextMixedRegex(b *testing.B) {
 	b.SetBytes(int64(len(mixed)))
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		text(mixed, false)
 	}
 }
 
 func BenchmarkTextChattyRegex(b *testing.B) {
 	b.SetBytes(int64(len(chatty)))
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		text(chatty, false)
 	}
 }

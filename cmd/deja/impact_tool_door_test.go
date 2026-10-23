@@ -16,7 +16,7 @@ import (
 func TestImpactNamesTheToolDoor(t *testing.T) {
 	hermeticEnv(t)
 	dir := index.DefaultDir()
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		usage.RecordResult(dir, usage.KindTool, 236, 1, false)
 	}
 

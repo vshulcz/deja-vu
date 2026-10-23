@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/vshulcz/deja-vu/internal/prompt"
-	"github.com/vshulcz/deja-vu/internal/search"
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/prompt"
+	"github.com/vshulcz/deja-vu/internal/search"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -21,8 +22,8 @@ func msgs(texts ...string) []model.Message {
 // sessions people ask about — measured here, the 2% that cross the line are
 // the current work.
 func TestFocusSessionKeepsTheMatchingPart(t *testing.T) {
-	var texts []string
-	for i := 0; i < 400; i++ {
+	texts := make([]string, 0, 400)
+	for range 400 {
 		texts = append(texts, "routine chatter with nothing to recall")
 	}
 	texts[200] = "we replaced the stale etag reuse with generation checks"
@@ -52,8 +53,8 @@ func TestFocusSessionKeepsTheMatchingPart(t *testing.T) {
 // A term common enough to appear throughout keeps most of the session. Giving
 // up there sends nothing; the densest windows are the answer.
 func TestFocusSessionFallsBackToTheDensestWindows(t *testing.T) {
-	var texts []string
-	for i := 0; i < 800; i++ {
+	texts := make([]string, 0, 800)
+	for range 800 {
 		texts = append(texts, "the queue drained again")
 	}
 	texts[400] = "the queue got backpressure so producers block instead of dropping"

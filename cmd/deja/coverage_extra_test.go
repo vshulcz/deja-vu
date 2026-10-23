@@ -185,7 +185,7 @@ func TestInstallGrokTOML(t *testing.T) {
 	}
 	// merge into an existing config without touching other sections
 	existing := "[cli]\nauto_update = false\n\n[mcp_servers.other]\ncommand = \"x\"\n"
-	if err := os.WriteFile(cfg, []byte(existing), 0o644); err != nil {
+	if err = os.WriteFile(cfg, []byte(existing), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if r, err = installTarget("grok", "/bin/deja", false); err != nil || r.Action != "updated" {
@@ -293,7 +293,7 @@ func TestShareDigestBudgetNoiseAndRunErrors(t *testing.T) {
 }
 
 func TestStatsHelperBranches(t *testing.T) {
-	var sessions []model.Session
+	sessions := make([]model.Session, 0, 7)
 	now := time.Date(2026, 7, 16, 12, 0, 0, 0, time.UTC)
 	for i, p := range []string{"b", "a", "c", "d", "e", "f"} {
 		sessions = append(sessions, model.Session{ID: p, Harness: "claude", Project: p, Updated: now.Add(time.Duration(i) * time.Hour), Messages: []model.Message{{Role: "user", Text: p, Time: now}}})
@@ -325,7 +325,7 @@ func TestRunSyncImportAndExportBranches(t *testing.T) {
 	hermeticEnv(t)
 	in := t.TempDir()
 	rec := index.SyncRecord{Harness: "claude", SessionID: "remote", Project: "proj", Role: "user", Text: "hello", Time: time.Now().UTC()}
-	b, _ := json.Marshal(rec)
+	b := mustMarshal(t, rec)
 	if err := os.WriteFile(filepath.Join(in, "batch.jsonl"), append(b, '\n'), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -404,10 +404,10 @@ func TestMainHelpersFallbackAndSourcesBranches(t *testing.T) {
 	}
 	aiderDir := filepath.Join(tmp, "aider-root")
 	aiderFile := filepath.Join(aiderDir, ".aider.chat.history.md")
-	if err := os.MkdirAll(aiderDir, 0o755); err != nil {
+	if err = os.MkdirAll(aiderDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(aiderFile, []byte("12345"), 0o644); err != nil {
+	if err = os.WriteFile(aiderFile, []byte("12345"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_AIDER_ROOTS", aiderDir)
@@ -415,7 +415,7 @@ func TestMainHelpersFallbackAndSourcesBranches(t *testing.T) {
 		t.Fatalf("aider pathSize = %d", got)
 	}
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "real"), []byte("123"), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(dir, "real"), []byte("123"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	_ = os.Symlink(filepath.Join(dir, "real"), filepath.Join(dir, "link"))
@@ -516,14 +516,14 @@ func TestSyncSSHErrorBranches(t *testing.T) {
 	setupLocalIndex(t)
 	old := sshRunner
 	defer func() { sshRunner = old }()
-	sshRunner = func(name string, args ...string) (string, error) { return "", os.ErrPermission }
+	sshRunner = func(_ string, _ ...string) (string, error) { return "", os.ErrPermission }
 	if err := runSyncSSH(index.DefaultDir(), []string{"host", "--pull"}); err == nil || !strings.Contains(err.Error(), "ssh host") {
 		t.Fatalf("pull mktemp err=%v", err)
 	}
 	if _, err := sshCapture("host", "cmd"); err == nil || !strings.Contains(err.Error(), "permission") {
 		t.Fatalf("sshCapture err=%v", err)
 	}
-	sshRunner = func(name string, args ...string) (string, error) { return "/tmp/bad'quote", nil }
+	sshRunner = func(_ string, _ ...string) (string, error) { return "/tmp/bad'quote", nil }
 	if _, err := sshCapture("host", "cmd"); err == nil || !strings.Contains(err.Error(), "unexpected output") {
 		t.Fatalf("sshCapture quote err=%v", err)
 	}
@@ -547,37 +547,37 @@ func TestAdditionalDispatchAndHelperBranches(t *testing.T) {
 	}
 	_ = wIn.Close()
 	os.Stdin = rIn
-	if out, err := captureRun(t, "mcp"); err != nil || out != "" {
-		t.Fatalf("mcp dispatch out=%q err=%v", out, err)
+	if out, runErr := captureRun(t, "mcp"); runErr != nil || out != "" {
+		t.Fatalf("mcp dispatch out=%q err=%v", out, runErr)
 	}
 	os.Stdin = oldStdin
 	_ = rIn.Close()
-	if out, err := captureRun(t, "resume", "nope"); err == nil || !strings.Contains(err.Error(), "no session matches") || out != "" {
-		t.Fatalf("resume dispatch out=%q err=%v", out, err)
+	if out, runErr := captureRun(t, "resume", "nope"); runErr == nil || !strings.Contains(runErr.Error(), "no session matches") || out != "" {
+		t.Fatalf("resume dispatch out=%q err=%v", out, runErr)
 	}
-	if out, err := captureRun(t, "sync", "ssh", "--evil"); err == nil || !strings.Contains(err.Error(), "unknown flag") || out != "" {
-		t.Fatalf("sync ssh dispatch out=%q err=%v", out, err)
+	if out, runErr := captureRun(t, "sync", "ssh", "--evil"); runErr == nil || !strings.Contains(runErr.Error(), "unknown flag") || out != "" {
+		t.Fatalf("sync ssh dispatch out=%q err=%v", out, runErr)
 	}
-	if out, err := captureRun(t, "--rebuild", "definitely-no-match"); err != nil || out != "" {
-		t.Fatalf("rebuild no match out=%q err=%v", out, err)
+	if out, runErr := captureRun(t, "--rebuild", "definitely-no-match"); runErr != nil || out != "" {
+		t.Fatalf("rebuild no match out=%q err=%v", out, runErr)
 	}
-	if _, err := parseSearch([]string{"--all", "needle"}); err != nil {
+	if _, err = parseSearch([]string{"--all", "needle"}); err != nil {
 		t.Fatalf("parse --all: %v", err)
 	}
 	// The refusal names the input rather than the function it came from (#2286).
-	if out, err := captureRun(t, "--re", "("); err == nil || !strings.Contains(err.Error(), `--re "("`) || out != "" {
-		t.Fatalf("bad regex out=%q err=%v", out, err)
+	if out, runErr := captureRun(t, "--re", "("); runErr == nil || !strings.Contains(runErr.Error(), `--re "("`) || out != "" {
+		t.Fatalf("bad regex out=%q err=%v", out, runErr)
 	}
 	badRoot := t.TempDir()
 	badIndex := filepath.Join(badRoot, "index-as-file")
-	if err := os.WriteFile(badIndex, []byte("x"), 0o644); err != nil {
+	if err = os.WriteFile(badIndex, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(badIndex, "child"))
 	// An index path inside a file is neither a raw syscall nor an unmounted
 	// disk: unix reports ENOTDIR, windows ENOENT, and the message has to be
 	// the same shape on both.
-	if _, err := captureRun(t, "needle"); err == nil || !strings.Contains(err.Error(), "which is a file") {
+	if _, err = captureRun(t, "needle"); err == nil || !strings.Contains(err.Error(), "which is a file") {
 		t.Fatalf("ensure error err=%v", err)
 	}
 	if got := firstUserTitle(model.Session{Messages: []model.Message{{Role: "user", Text: " digest.Short title "}}}); got != "digest.Short title" {
@@ -617,8 +617,8 @@ func TestShareStatsResumeAndSyncEdgeBranches(t *testing.T) {
 		t.Fatalf("default share digest = %q", got)
 	}
 	msg := strings.Repeat("word ", 20) + "\n"
-	var many []string
-	for i := 0; i < 20; i++ {
+	many := make([]string, 0, 20)
+	for range 20 {
 		many = append(many, msg)
 	}
 	if got := digest.MessageText(strings.Join(many, "")); strings.Count(got, "word") > 16*20 {
@@ -756,7 +756,7 @@ func TestMoreErrorBranches(t *testing.T) {
 	}
 	old := sshRunner
 	defer func() { sshRunner = old }()
-	sshRunner = func(name string, args ...string) (string, error) { return "", nil }
+	sshRunner = func(_ string, _ ...string) (string, error) { return "", nil }
 	_ = runSyncSSH(index.DefaultDir(), []string{"host", "--pull"})
 }
 
@@ -863,7 +863,23 @@ func TestClaudeHookUpdateEdgeBranches(t *testing.T) {
 	}
 }
 
-func jsonString(v any) string { b, _ := json.Marshal(v); return string(b) }
+func jsonString(v any) string {
+	b, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return string(b)
+}
+
+// mustMarshal is json.Marshal for fixtures, failing the test on an error.
+func mustMarshal(tb testing.TB, v any) []byte {
+	tb.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	return b
+}
 
 func TestHookDigestPlainAndLimitBranches(t *testing.T) {
 	tmp := hermeticEnv(t)
@@ -874,12 +890,12 @@ func TestHookDigestPlainAndLimitBranches(t *testing.T) {
 	// gives it: spelled out rather than written by hand, since the encoding
 	// differs by platform and a fixture under the wrong name is memory the
 	// hook never finds (#2808).
-	work := filepath.Join("/tmp", "many")
+	work := "/tmp/many"
 	if runtime.GOOS == "windows" {
 		work = filepath.Join(tmp, "many")
 	}
 	projDir := filepath.Join(claudeRoot, encodedProjectDir(work))
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		id := string(rune('a'+i)) + "many"
 		writeClaudeFixture(t, filepath.Join(projDir, id+".jsonl"), id, []string{`{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"many project memory ` + id + `"}}`})
 	}

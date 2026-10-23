@@ -2,7 +2,7 @@ package sources
 
 import (
 	"bufio"
-	"crypto/sha1"
+	"crypto/sha1" //nolint:gosec // names a session, not a security hash
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -100,7 +100,7 @@ func aiderProjects() []string {
 		return nil
 	}
 	var out []string
-	for _, l := range strings.Split(string(b), "\n") {
+	for l := range strings.SplitSeq(string(b), "\n") {
 		if l = strings.TrimRight(l, "\r"); l != "" {
 			out = append(out, l)
 		}
@@ -123,18 +123,18 @@ func RecordAiderProject(dir string) error {
 	keep := make([]string, 0, len(listed)+1)
 	found := false
 	for _, p := range listed {
-		pi, err := os.Stat(p)
-		if os.IsNotExist(err) {
+		pi, statErr := os.Stat(p)
+		if os.IsNotExist(statErr) {
 			continue
 		}
-		if err == nil && os.SameFile(pi, fi) {
+		if statErr == nil && os.SameFile(pi, fi) {
 			found = true
 		}
 		keep = append(keep, p)
 	}
 	path := AiderProjectsPath()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
+	if mkErr := os.MkdirAll(filepath.Dir(path), 0o755); mkErr != nil {
+		return mkErr
 	}
 	if len(keep) == len(listed) {
 		if found {
@@ -142,13 +142,13 @@ func RecordAiderProject(dir string) error {
 		}
 		// An append, not a rewrite, so two `deja aider` starting at once
 		// both land.
-		f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-		if err != nil {
-			return err
+		f, openErr := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+		if openErr != nil {
+			return openErr
 		}
-		if _, err := f.WriteString(dir + "\n"); err != nil {
+		if _, werr := f.WriteString(dir + "\n"); werr != nil {
 			_ = f.Close()
-			return err
+			return werr
 		}
 		return f.Close()
 	}
@@ -170,6 +170,7 @@ func RecordAiderProject(dir string) error {
 	return os.Rename(tmp.Name(), path)
 }
 
+// LoadAider reads every Aider chat history on this machine.
 func LoadAider() []model.Session {
 	return parseFiles(AiderFiles(), ParseAiderFile)
 }
@@ -264,6 +265,7 @@ func aiderSlashCommand(line string) bool {
 	return known && drop
 }
 
+// ParseAiderFile reads one .aider.chat.history.md file.
 func ParseAiderFile(path string) ([]model.Session, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -458,7 +460,7 @@ func ParseAiderFile(path string) ([]model.Session, error) {
 // is the same collision in time. A second launch in the same second gets a
 // suffix; a header that does not parse keeps the ordinal.
 func aiderSessionID(path string, started time.Time, idx int, starts map[string]int) string {
-	h := sha1.Sum([]byte(path))
+	h := sha1.Sum([]byte(path)) //nolint:gosec // names a session, not a security hash
 	base := "aider-" + hex.EncodeToString(h[:6]) + "-"
 	if started.IsZero() {
 		return base + itoa(idx)

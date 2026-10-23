@@ -52,7 +52,7 @@ func TestRecallDoesNotPayTwiceForOneAnswer(t *testing.T) {
 		t.Fatal(err)
 	}
 	seen := map[string]int{}
-	for _, ln := range strings.Split(text, "\n") {
+	for ln := range strings.SplitSeq(text, "\n") {
 		ln = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(ln), "- "))
 		if !strings.HasPrefix(ln, "→ ") {
 			continue
@@ -140,7 +140,11 @@ func TestTheFreedSlotIsFilled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	block := text[strings.Index(text, "what this session concluded:"):]
+	at := strings.Index(text, "what this session concluded:")
+	if at < 0 {
+		t.Fatalf("no conclusions block:\n%s", text)
+	}
+	block := text[at:]
 	if n := strings.Count(block, "→ "); n != 3 {
 		t.Errorf("the block shows %d conclusions, want 3:\n%s", n, block)
 	}

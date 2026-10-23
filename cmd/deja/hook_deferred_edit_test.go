@@ -16,7 +16,7 @@ func seedEditHistory(t *testing.T) string {
 	tmp := hermeticEnv(t)
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		id := "s" + string(rune('0'+i))
 		writeClaudeFixture(t, filepath.Join(root, "alpha", id+".jsonl"), id, []string{
 			`{"type":"user","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"edit"}}`,
@@ -34,7 +34,7 @@ func seedEditHistory(t *testing.T) string {
 // payload is Kimi's: snake_case, the file under `path`.
 func TestKimiEditLineRidesTheNextPrompt(t *testing.T) {
 	dir := seedEditHistory(t)
-	pre, _ := json.Marshal(map[string]any{
+	pre := mustMarshal(t, map[string]any{
 		"hook_event_name": "PreToolUse", "session_id": "kimi-1", "cwd": "/work/alpha",
 		"tool_name": "Edit", "tool_input": map[string]any{"path": "config.go", "old_string": "a", "new_string": "b"},
 		"tool_call_id": "call_1",
@@ -43,7 +43,7 @@ func TestKimiEditLineRidesTheNextPrompt(t *testing.T) {
 		t.Fatalf("a deferred hook printed what Kimi would drop: %q", out)
 	}
 	prompt := func() string {
-		p, _ := json.Marshal(map[string]any{"hook_event_name": "UserPromptSubmit", "session_id": "kimi-1", "cwd": "/work/alpha", "prompt": "ok"})
+		p := mustMarshal(t, map[string]any{"hook_event_name": "UserPromptSubmit", "session_id": "kimi-1", "cwd": "/work/alpha", "prompt": "ok"})
 		return runDeferredHook(t, dir, "hook-prompt", []string{"--plain"}, string(p))
 	}
 	if got := prompt(); !strings.Contains(got, "sentinel") {
@@ -58,14 +58,14 @@ func TestKimiEditLineRidesTheNextPrompt(t *testing.T) {
 // name no session. fs_write is the CLI's writer in --no-interactive.
 func TestKiroEditLineRidesTheNextPromptByDirectory(t *testing.T) {
 	dir := seedEditHistory(t)
-	pre, _ := json.Marshal(map[string]any{
+	pre := mustMarshal(t, map[string]any{
 		"hook_event_name": "preToolUse", "cwd": "/work/alpha", "tool_name": "fs_write",
 		"tool_input": map[string]any{"command": "str_replace", "path": "/work/alpha/config.go", "old_str": "a", "new_str": "b"},
 	})
 	if out := runDeferredHook(t, dir, "hook-tool", []string{"--defer"}, string(pre)); strings.TrimSpace(out) != "" {
 		t.Fatalf("a deferred hook printed what Kiro would drop: %q", out)
 	}
-	p, _ := json.Marshal(map[string]any{"hook_event_name": "userPromptSubmit", "cwd": "/work/alpha", "prompt": "ok"})
+	p := mustMarshal(t, map[string]any{"hook_event_name": "userPromptSubmit", "cwd": "/work/alpha", "prompt": "ok"})
 	if got := runDeferredHook(t, dir, "hook-prompt", []string{"--plain"}, string(p)); !strings.Contains(got, "sentinel") {
 		t.Fatalf("the next prompt did not carry the edit line: %q", got)
 	}

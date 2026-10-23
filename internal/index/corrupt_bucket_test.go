@@ -5,18 +5,19 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
 func TestCorruptBucketDoesNotPanic(t *testing.T) {
 	dir := t.TempDir()
 	cases := map[string][]byte{
-		"huge count":   append(append([]byte(bucketMagic), encodeUvarint(1<<62)...), 0),
-		"huge token":   append(append([]byte(bucketMagic), encodeUvarint(1)...), encodeUvarint(1<<62)...),
-		"truncated":    []byte(bucketMagic),
+		"huge count":   append(append(slices.Clone(bucketMagic), encodeUvarint(1<<62)...), 0),
+		"huge token":   append(append(slices.Clone(bucketMagic), encodeUvarint(1)...), encodeUvarint(1<<62)...),
+		"truncated":    slices.Clone(bucketMagic),
 		"bad magic":    []byte("XXXXXXXX"),
 		"empty file":   {},
-		"garbage tail": append([]byte(bucketMagic), 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff),
+		"garbage tail": append(slices.Clone(bucketMagic), 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff),
 	}
 	for name, body := range cases {
 		p := filepath.Join(dir, name)
@@ -31,7 +32,7 @@ func TestCorruptBucketDoesNotPanic(t *testing.T) {
 			}()
 			_, f, err := openBucketDir(p)
 			if f != nil {
-				f.Close()
+				_ = f.Close()
 			}
 			if err == nil {
 				t.Fatalf("%s: accepted as valid", name)
@@ -53,7 +54,7 @@ func encodeUvarint(v uint64) []byte {
 func TestBucketBlockLengthBoundedByFile(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "big.bin")
-	body := append([]byte(bucketMagic), encodeUvarint(1)...)
+	body := append(slices.Clone(bucketMagic), encodeUvarint(1)...)
 	body = append(body, encodeUvarint(1)...)
 	body = append(body, 'x')
 	body = append(body, encodeUvarint(4_000_000_000)...)
@@ -62,7 +63,7 @@ func TestBucketBlockLengthBoundedByFile(t *testing.T) {
 	}
 	_, f, err := openBucketDir(p)
 	if f != nil {
-		f.Close()
+		_ = f.Close()
 	}
 	if err == nil {
 		t.Fatal("a four-gigabyte posting block in a 20-byte file was accepted")

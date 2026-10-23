@@ -43,7 +43,7 @@ func TestAStoreThatYieldedNothingButRefusedLinesIsNarrated(t *testing.T) {
 	}
 	var b strings.Builder
 	b.WriteString("[")
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		fmt.Fprintf(&b, `{"ts":%d,"type":"say","say":"text","text":"turn %d about the pool"},`, 1782900000+i, i)
 	}
 	truncated := strings.TrimSuffix(b.String(), ",") // no closing bracket

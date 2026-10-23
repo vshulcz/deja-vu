@@ -37,11 +37,11 @@ func installOmpAuto(exe string, uninstall bool) (installResult, error) {
 	dir := ompExtensionDir()
 	path := filepath.Join(dir, "index.js")
 	if uninstall {
-		if _, err := os.Stat(path); err != nil {
-			return wroteAll(installResult{Path: path, Action: "unchanged"}, mcp), nil
+		if _, serr := os.Stat(path); serr != nil {
+			return wroteAll(installResult{Path: path, Action: "unchanged"}, mcp), nil //nolint:nilerr // nothing to remove
 		}
-		if err := os.RemoveAll(dir); err != nil {
-			return installResult{}, err
+		if rerr := os.RemoveAll(dir); rerr != nil {
+			return installResult{}, rerr
 		}
 		// And the directories deja made above it, while each is empty and
 		// the record says it is deja's (#3698).
@@ -49,8 +49,8 @@ func installOmpAuto(exe string, uninstall bool) (installResult, error) {
 		return wroteAll(installResult{Path: path, Action: "removed"}, mcp), nil
 	}
 	noteCreatedDirs(dir)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return installResult{}, err
+	if merr := os.MkdirAll(dir, 0o755); merr != nil {
+		return installResult{}, merr
 	}
 	old, err := readConfig(path)
 	if err != nil {

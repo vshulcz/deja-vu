@@ -83,8 +83,8 @@ func TestDoctorReportsAnUnreadableStore(t *testing.T) {
 	}
 }
 
-var errUnreadableStore = errStore("query failed, the store schema may have changed")
+var errUnreadableStore = storeError("query failed, the store schema may have changed")
 
-type errStore string
+type storeError string
 
-func (e errStore) Error() string { return string(e) }
+func (e storeError) Error() string { return string(e) }

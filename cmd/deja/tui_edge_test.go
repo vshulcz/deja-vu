@@ -101,8 +101,11 @@ func TestTUIReaderHitAfterResize(t *testing.T) {
 func TestTUIHandsOnWithoutARefresh(t *testing.T) {
 	dir, root := tuiStore(t)
 	write := func(id, at, text string) {
-		user, _ := json.Marshal(map[string]any{"type": "user", "sessionId": id, "cwd": "/work/payments", "timestamp": at,
+		user, err := json.Marshal(map[string]any{"type": "user", "sessionId": id, "cwd": "/work/payments", "timestamp": at,
 			"message": map[string]any{"role": "user", "content": text}})
+		if err != nil {
+			t.Fatal(err)
+		}
 		writeClaudeFixture(t, filepath.Join(root, "payments", id+".jsonl"), id, []string{string(user)})
 	}
 	// A newer session whose id the picked one's is a prefix of.
@@ -152,8 +155,11 @@ func TestTUIPasteIntoModal(t *testing.T) {
 func TestTUIRefreshKeepsWhatIsOnScreen(t *testing.T) {
 	dir, root := tuiStore(t)
 	// Asked twice, so the search names the newest and selects it.
-	user, _ := json.Marshal(map[string]any{"type": "user", "sessionId": "e5555555-again", "cwd": "/work/payments", "timestamp": "2026-03-04T10:00:00Z",
+	user, err := json.Marshal(map[string]any{"type": "user", "sessionId": "e5555555-again", "cwd": "/work/payments", "timestamp": "2026-03-04T10:00:00Z",
 		"message": map[string]any{"role": "user", "content": "the retry double charges the card again"}})
+	if err != nil {
+		t.Fatal(err)
+	}
 	writeClaudeFixture(t, filepath.Join(root, "payments", "e5555555-again.jsonl"), "e5555555-again", []string{string(user)})
 	if err := index.Ensure(dir, "", false, io.Discard); err != nil {
 		t.Fatal(err)
@@ -209,8 +215,11 @@ func TestTUIHeaderCountFollowsTheIndex(t *testing.T) {
 	if len(a.allMeta) != before {
 		t.Fatalf("a tab switch changed the count: %d, was %d", len(a.allMeta), before)
 	}
-	user, _ := json.Marshal(map[string]any{"type": "user", "sessionId": "d4444444-new", "cwd": "/work/billing", "timestamp": "2026-03-04T10:00:00Z",
+	user, err := json.Marshal(map[string]any{"type": "user", "sessionId": "d4444444-new", "cwd": "/work/billing", "timestamp": "2026-03-04T10:00:00Z",
 		"message": map[string]any{"role": "user", "content": "invoices round to the wrong cent"}})
+	if err != nil {
+		t.Fatal(err)
+	}
 	writeClaudeFixture(t, filepath.Join(root, "billing", "d4444444-new.jsonl"), "d4444444-new", []string{string(user)})
 	if err := index.Ensure(dir, "", false, io.Discard); err != nil {
 		t.Fatal(err)

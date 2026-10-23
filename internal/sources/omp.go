@@ -101,7 +101,7 @@ func underOmpRoot(p string) bool {
 
 // OmpSessionFiles lists transcript files under every omp session root.
 func OmpSessionFiles() []string {
-	var files []string
+	var files []string //nolint:prealloc // each root adds an unknown number of files
 	for _, root := range OmpSessionRoots() {
 		files = append(files, walkFiles(root, func(p string) bool {
 			return strings.HasSuffix(p, ".jsonl")

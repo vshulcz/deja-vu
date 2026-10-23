@@ -53,10 +53,10 @@ func TestClineManifestRenameIsIndexed(t *testing.T) {
 	// Same size, so only the mtime says the manifest changed.
 	write("renamed: pytest")
 	tick := time.Now().Add(10 * time.Second)
-	if err := os.Chtimes(manifest, tick, tick); err != nil {
+	if err = os.Chtimes(manifest, tick, tick); err != nil {
 		t.Fatal(err)
 	}
-	if err := EnsureForSearch(indexDir, opts, false, nil); err != nil {
+	if err = EnsureForSearch(indexDir, opts, false, nil); err != nil {
 		t.Fatal(err)
 	}
 	recent, err = Recent(indexDir, 1)

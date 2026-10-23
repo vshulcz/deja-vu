@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -75,7 +76,7 @@ func fillerTokens(r *rand.Rand, n int) []string {
 		for j := range b {
 			b[j] = letters[r.Intn(len(letters))]
 		}
-		out[i] = string(b) + fmt.Sprint(i)
+		out[i] = string(b) + strconv.Itoa(i)
 	}
 	return out
 }
@@ -86,13 +87,13 @@ func gluedCatalog(r *rand.Rand, fillers int) map[string]bool {
 	set := map[string]bool{}
 	// Fillers from a stream of their own, so the glued tokens below are the
 	// same whatever the number of fillers.
-	for _, tok := range fillerTokens(rand.New(rand.NewSource(r.Int63())), fillers) {
+	for _, tok := range fillerTokens(rand.New(rand.NewSource(r.Int63())), fillers) { //nolint:gosec // a seeded fixture, not crypto
 		set[tok] = true
 	}
 	glue := []string{"k8s", "v2", "x", "под", "пере", "_", "ё", "\xff", "-"}
 	for _, term := range gluedTerms {
 		forms := append(stemMatchForms(term), term)
-		for k := 0; k < 12; k++ {
+		for range 12 {
 			f := forms[r.Intn(len(forms))]
 			g := glue[r.Intn(len(glue))]
 			switch r.Intn(4) {
@@ -115,7 +116,7 @@ func gluedCatalog(r *rand.Rand, fillers int) map[string]bool {
 
 func TestGluedLookupFindsWhatTheWalkFound(t *testing.T) {
 	for seed := int64(1); seed <= 40; seed++ {
-		r := rand.New(rand.NewSource(seed))
+		r := rand.New(rand.NewSource(seed)) //nolint:gosec // a seeded fixture, not crypto
 		set := gluedCatalog(r, 300)
 		idx := newTokenIndex(set)
 		terms := gluedTerms
@@ -129,7 +130,7 @@ func TestGluedLookupFindsWhatTheWalkFound(t *testing.T) {
 	}
 	// Not vacuous: the catalog does hold glued forms.
 	got := make([][]string, len(gluedTerms))
-	fillGluedMatches(gluedTerms, got, newTokenIndex(gluedCatalog(rand.New(rand.NewSource(1)), 0)))
+	fillGluedMatches(gluedTerms, got, newTokenIndex(gluedCatalog(rand.New(rand.NewSource(1)), 0))) //nolint:gosec // a seeded fixture, not crypto
 	if len(got[0]) == 0 {
 		t.Fatal("no glued form of настройки found; the comparison above proves nothing")
 	}
@@ -137,8 +138,8 @@ func TestGluedLookupFindsWhatTheWalkFound(t *testing.T) {
 
 func TestGluedStepDoesNotGrowWithTheCatalog(t *testing.T) {
 	compared := func(fillers int) int64 {
-		idx := newTokenIndex(gluedCatalog(rand.New(rand.NewSource(7)), fillers))
-		idx.gluedKeys() // built once per catalog, then reused by every query
+		idx := newTokenIndex(gluedCatalog(rand.New(rand.NewSource(7)), fillers)) //nolint:gosec // a seeded fixture, not crypto
+		idx.gluedKeys()                                                          // built once per catalog, then reused by every query
 		before := gluedCompared.Load()
 		fillGluedMatches(gluedTerms, make([][]string, len(gluedTerms)), idx)
 		return gluedCompared.Load() - before
@@ -157,7 +158,7 @@ func TestGluedStepDoesNotGrowWithTheCatalog(t *testing.T) {
 // registry twice per file, which was most of 190 ms on 12k files.
 func TestStoreWalkDoesNotRebuildTheRegistryPerFile(t *testing.T) {
 	h := newTwoWayEnv(t)
-	for i := 0; i < 400; i++ {
+	for i := range 400 {
 		sid := fmt.Sprintf("w%03d", i)
 		h.put("app", sid, hPrompt("app", sid, 1, 0, "walk me"))
 	}
@@ -175,7 +176,7 @@ func TestStoreWalkDoesNotRebuildTheRegistryPerFile(t *testing.T) {
 func TestStatFilesSharedOutMatchesOneByOne(t *testing.T) {
 	h := newTwoWayEnv(t)
 	paths := map[string]bool{}
-	for i := 0; i < 3*statPerWorker; i++ {
+	for i := range 3 * statPerWorker {
 		sid := fmt.Sprintf("p%04d", i)
 		h.put("app", sid, hPrompt("app", sid, 1, 0, strings.Repeat("x", i%50)))
 		paths[h.path("app", sid)] = true
@@ -189,7 +190,7 @@ func TestStatFilesSharedOutMatchesOneByOne(t *testing.T) {
 	want := map[string]FileState{}
 	for p := range paths {
 		if fi, err := os.Lstat(p); err == nil && !fi.IsDir() {
-			want[p] = walkFileState(p, fi, nil)
+			want[p] = walkFileState(p, fi)
 		}
 	}
 	got := statFiles(paths, nil)
@@ -238,7 +239,7 @@ func TestSearchDecodesTheManifestOnce(t *testing.T) {
 func TestDamagedSessionsFileStillRebuildsThroughTheCache(t *testing.T) {
 	dir := recallReadsStore(t)
 	o := query.Options{Query: "frobnicator handshake"}
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		if err := EnsureForSearch(dir, o, false, nil); err != nil {
 			t.Fatal(err)
 		}

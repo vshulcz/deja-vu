@@ -15,7 +15,7 @@ func TestNeighbourMapIsTheSameOnOneCoreAndMany(t *testing.T) {
 	// A word has to appear in at least three sessions and in at most a quarter
 	// of them to be banded at all, so the corpus is twelve clusters of five
 	// sessions, each cluster with its own pair of words.
-	var ss []model.Session
+	ss := make([]model.Session, 0, 60)
 	for cluster := range 12 {
 		for n := range 5 {
 			ss = append(ss, model.Session{

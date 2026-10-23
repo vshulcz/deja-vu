@@ -25,46 +25,18 @@ func copySources(dir string, ss []model.Session, maybe func(src, c int, sameShap
 func copySourcesAmong(dir string, ss []model.Session, maybe func(src, c int, sameShape bool) bool, buckets [][]int, bucketOf func(c int) int) map[int]int {
 	out := map[int]int{}
 	shapes := copyMessageShapes(ss)
-	type classKey struct {
-		harness string
-		shape   int
-		fork    bool
-		started time.Time
-	}
-	type peerClass struct {
-		at    []int
-		equal bool
-		class int
-	}
-	classes := map[classKey]int{}
-	var peers []peerClass
-	classOf := make([]int, len(ss))
-	identities := make([]index.Identity, len(ss))
-	for i, s := range ss {
-		identities[i] = index.Identity{Harness: s.Harness, ID: s.ID}
-		key := classKey{s.Harness, shapes[i], s.Kind == "fork", s.Started.Round(0).UTC()}
-		k, ok := classes[key]
-		if !ok {
-			k = len(peers)
-			classes[key] = k
-			peers = append(peers, peerClass{equal: s.Kind != "fork", class: k})
-		} else if !ss[peers[k].at[0]].Started.Equal(s.Started) {
-			peers[k].equal = false
-		}
-		peers[k].at = append(peers[k].at, i)
-		classOf[i] = k
-	}
+	peers, classOf, identities := forkPeerClasses(ss, shapes)
 	eligible := func(i, j int) bool {
 		return i != j && ss[i].Harness == ss[j].Harness && maybe(j, i, shapes[i] == shapes[j])
 	}
 	// A bucket split by peer class, so an equal class is passed over whole
 	// rather than walked by each of its members.
-	split := map[int][]peerClass{}
-	bucketPeers := func(b int) []peerClass {
+	split := map[int][]forkPeerClass{}
+	bucketPeers := func(b int) []forkPeerClass {
 		if got, ok := split[b]; ok {
 			return got
 		}
-		var got []peerClass
+		var got []forkPeerClass
 		at := map[int]int{}
 		for _, j := range buckets[b] {
 			k := classOf[j]
@@ -72,7 +44,7 @@ func copySourcesAmong(dir string, ss []model.Session, maybe func(src, c int, sam
 			if !ok {
 				g = len(got)
 				at[k] = g
-				got = append(got, peerClass{equal: peers[k].equal, class: k})
+				got = append(got, forkPeerClass{equal: peers[k].equal, class: k})
 			}
 			got[g].at = append(got[g].at, j)
 		}
@@ -117,6 +89,54 @@ func copySourcesAmong(dir string, ss []model.Session, maybe func(src, c int, sam
 	if dir == "" {
 		return out
 	}
+	forkWitnessEqualPeers(peers, out, needed, eligible)
+	forkCopiesFromFull(dir, ss, identities, needed, out, eligible)
+	return out
+}
+
+// forkClassKey groups sessions that look alike before they are read whole.
+type forkClassKey struct {
+	harness string
+	shape   int
+	fork    bool
+	started time.Time
+}
+
+// forkPeerClass is the positions of one class; equal says they all started at
+// the same instant and none is a marked fork.
+type forkPeerClass struct {
+	at    []int
+	equal bool
+	class int
+}
+
+// forkPeerClasses sorts ss into peer classes and names each session's
+// identity.
+func forkPeerClasses(ss []model.Session, shapes []int) ([]forkPeerClass, []int, []index.Identity) {
+	classes := map[forkClassKey]int{}
+	var peers []forkPeerClass
+	classOf := make([]int, len(ss))
+	identities := make([]index.Identity, len(ss))
+	for i, s := range ss {
+		identities[i] = index.Identity{Harness: s.Harness, ID: s.ID}
+		key := forkClassKey{s.Harness, shapes[i], s.Kind == "fork", s.Started.Round(0).UTC()}
+		k, ok := classes[key]
+		if !ok {
+			k = len(peers)
+			classes[key] = k
+			peers = append(peers, forkPeerClass{equal: s.Kind != "fork", class: k})
+		} else if !ss[peers[k].at[0]].Started.Equal(s.Started) {
+			peers[k].equal = false
+		}
+		peers[k].at = append(peers[k].at, i)
+		classOf[i] = k
+	}
+	return peers, classOf, identities
+}
+
+// forkWitnessEqualPeers marks as needed the members of an equal class that
+// may be a copy of, or the source of, another member.
+func forkWitnessEqualPeers(peers []forkPeerClass, out map[int]int, needed []bool, eligible func(i, j int) bool) {
 	for _, group := range peers {
 		if !group.equal {
 			continue
@@ -146,6 +166,11 @@ func copySourcesAmong(dir string, ss []model.Session, maybe func(src, c int, sam
 			}
 		}
 	}
+}
+
+// forkCopiesFromFull reads the needed sessions whole and adds to out the ones
+// that are copies of another by what they hold.
+func forkCopiesFromFull(dir string, ss []model.Session, identities []index.Identity, needed []bool, out map[int]int, eligible func(i, j int) bool) {
 	var ids []index.Identity
 	seen := map[index.Identity]bool{}
 	for i, id := range identities {
@@ -156,7 +181,7 @@ func copySourcesAmong(dir string, ss []model.Session, maybe func(src, c int, sam
 	}
 	full, err := index.FindManyByIdentity(dir, ids)
 	if err != nil {
-		return out
+		return
 	}
 	whole := map[index.Identity]int{}
 	fullShapes := copyMessageShapes(full)
@@ -165,7 +190,7 @@ func copySourcesAmong(dir string, ss []model.Session, maybe func(src, c int, sam
 	}
 	// Partial peers can have different full records: regroup only after each
 	// needed identity has been read. CopyOf depends on the message shape alone.
-	classes = map[classKey]int{}
+	classes := map[forkClassKey]int{}
 	var complete [][]int
 	var representatives []int
 	fixed := make([]bool, len(ss))
@@ -175,7 +200,7 @@ func copySourcesAmong(dir string, ss []model.Session, maybe func(src, c int, sam
 		if !ok {
 			continue
 		}
-		key := classKey{harness: ss[i].Harness, shape: fullShapes[f]}
+		key := forkClassKey{harness: ss[i].Harness, shape: fullShapes[f]}
 		k, ok := classes[key]
 		if !ok {
 			k = len(complete)
@@ -185,20 +210,28 @@ func copySourcesAmong(dir string, ss []model.Session, maybe func(src, c int, sam
 		}
 		complete[k] = append(complete[k], i)
 	}
+	forkMatchByLastTurn(full, complete, representatives, fixed, out, eligible)
+}
+
+// forkTurnKey is one message as a copy and its source both hold it.
+type forkTurnKey struct {
+	harness, role, text string
+	at                  int64
+}
+
+// forkMatchByLastTurn compares each class of whole sessions with the classes
+// whose last turn it holds, and records the earliest source of each copy.
+func forkMatchByLastTurn(full []model.Session, complete [][]int, representatives []int, fixed []bool, out map[int]int, eligible func(i, j int) bool) {
 	// A copy holds its source's last turn, so a class is only compared with
 	// the classes whose last turn it holds: a map hit per message instead of
 	// every pair of classes (#5523). A source with the copy's own last turn
 	// holds that turn too, so it is never one.
-	type turnKey struct {
-		harness, role, text string
-		at                  int64
+	keyOf := func(harness string, m model.Message) forkTurnKey {
+		return forkTurnKey{harness, m.Role, m.Text, m.Time.UnixNano()}
 	}
-	keyOf := func(harness string, m model.Message) turnKey {
-		return turnKey{harness, m.Role, m.Text, m.Time.UnixNano()}
-	}
-	lasts := make([]turnKey, len(complete))
+	lasts := make([]forkTurnKey, len(complete))
 	hasLast := make([]bool, len(complete))
-	byLast := map[turnKey][]int{}
+	byLast := map[forkTurnKey][]int{}
 	for k, f := range representatives {
 		if m, ok := search.LastTurn(full[f]); ok {
 			lasts[k], hasLast[k] = keyOf(full[f].Harness, m), true
@@ -221,24 +254,29 @@ func copySourcesAmong(dir string, ss []model.Session, maybe func(src, c int, sam
 				if !copyOf(rep, full[representatives[src]]) {
 					continue
 				}
-				for _, i := range candidates {
-					if fixed[i] {
-						continue
-					}
-					for _, j := range complete[src] {
-						if previous, done := out[i]; done && previous <= j {
-							break
-						}
-						if eligible(i, j) {
-							out[i] = j
-							break
-						}
-					}
-				}
+				forkAssignSource(candidates, complete[src], fixed, out, eligible)
 			}
 		}
 	}
-	return out
+}
+
+// forkAssignSource gives each candidate not already fixed the earliest
+// eligible position in its source class.
+func forkAssignSource(candidates, srcs []int, fixed []bool, out map[int]int, eligible func(i, j int) bool) {
+	for _, i := range candidates {
+		if fixed[i] {
+			continue
+		}
+		for _, j := range srcs {
+			if previous, done := out[i]; done && previous <= j {
+				break
+			}
+			if eligible(i, j) {
+				out[i] = j
+				break
+			}
+		}
+	}
 }
 
 // copyOf is search.CopyOf; a test counts the comparisons through it.

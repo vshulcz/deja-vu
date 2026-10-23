@@ -21,8 +21,8 @@ func TestHookReportsTheBuildEvenWhenItHasOnlyEnvironmentFacts(t *testing.T) {
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
 	// One directory per project: a wall of one repository is no longer a fact
 	// about the machine, and this block is built from other projects' walls.
-	var stores []string
-	for i := 0; i < environmentMinProjects; i++ {
+	stores := make([]string, 0, environmentMinProjects)
+	for i := range environmentMinProjects {
 		store := filepath.Join(root, "-elsewhere"+strconv.Itoa(i))
 		if err := os.MkdirAll(store, 0o755); err != nil {
 			t.Fatal(err)
@@ -33,7 +33,7 @@ func TestHookReportsTheBuildEvenWhenItHasOnlyEnvironmentFacts(t *testing.T) {
 	// is what the environment block is built from, and none of it is this
 	// project's memory.
 	var b strings.Builder
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		id := "env" + strconv.Itoa(i)
 		b.Reset()
 		b.WriteString(`{"type":"user","message":{"role":"user","content":"run the thing"},"timestamp":"2026-07-0` + strconv.Itoa(i+1) + `T10:00:00Z","sessionId":"` + id + `","cwd":"/elsewhere` + strconv.Itoa(i%environmentMinProjects) + `"}` + "\n")

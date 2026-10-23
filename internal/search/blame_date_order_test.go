@@ -14,7 +14,7 @@ func TestBlameListsPathSessionsNewestFirst(t *testing.T) {
 	target := BlameTarget{FullPath: "/repo/internal/pool/pool.go", Base: "pool.go", Stem: "pool"}
 	day := func(d int) time.Time { return time.Date(2026, 6, d, 10, 0, 0, 0, time.UTC) }
 	say := func(n int) []model.Message {
-		var ms []model.Message
+		ms := make([]model.Message, 0, n)
 		for range n {
 			ms = append(ms, model.Message{Role: "assistant", Text: "changed internal/pool/pool.go to retire idle connections sooner"})
 		}
@@ -26,7 +26,7 @@ func TestBlameListsPathSessionsNewestFirst(t *testing.T) {
 		{ID: "middle", Harness: "claude", Project: "/repo", Updated: day(28), Messages: say(1)},
 	}
 	hits := Blame(ss, target, BlameOptions{All: true})
-	var got []string
+	got := make([]string, 0, len(hits))
 	for _, h := range hits {
 		got = append(got, h.Session.ID)
 	}

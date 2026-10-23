@@ -21,9 +21,9 @@ func TestBlameHitShapeIsStable(t *testing.T) {
 		"messages_total": true, "messages_capped": true,
 	}
 	got := map[string]bool{}
-	rt := reflect.TypeOf(BlameHit{})
-	for i := 0; i < rt.NumField(); i++ {
-		name := strings.Split(rt.Field(i).Tag.Get("json"), ",")[0]
+	rt := reflect.TypeFor[BlameHit]()
+	for i := range rt.NumField() {
+		name, _, _ := strings.Cut(rt.Field(i).Tag.Get("json"), ",")
 		if name != "" && name != "-" {
 			got[name] = true
 		}

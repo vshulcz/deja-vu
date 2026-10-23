@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -81,13 +82,7 @@ func TestRussianInflectionsFoldInRelevanceTier(t *testing.T) {
 		{"власть", "власти"},
 	} {
 		forms := stemMatchForms(c.query)
-		found := false
-		for _, f := range forms {
-			if f == c.indexed {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(forms, c.indexed)
 		if !found {
 			t.Errorf("stemMatchForms(%q) does not reach %q: %v", c.query, c.indexed, forms)
 		}
@@ -131,11 +126,8 @@ func TestRussianFoldDoesNotReachUnrelatedWords(t *testing.T) {
 		{"весть", "веса"},
 		{"лесть", "лес"},
 	} {
-		for _, f := range stemMatchForms(c.query) {
-			if f == c.unrelated {
-				t.Errorf("stemMatchForms(%q) reaches the unrelated %q", c.query, c.unrelated)
-				break
-			}
+		if slices.Contains(stemMatchForms(c.query), c.unrelated) {
+			t.Errorf("stemMatchForms(%q) reaches the unrelated %q", c.query, c.unrelated)
 		}
 	}
 }
@@ -150,11 +142,8 @@ func TestStemTierFoldsLikeTheRelevanceTier(t *testing.T) {
 		{"часть", "часто"},
 		{"цель", "целая"},
 	} {
-		for _, f := range cyrSuffixForms(c.query) {
-			if f == c.unrelated {
-				t.Errorf("stem tier folds %q onto the unrelated %q", c.query, c.unrelated)
-				break
-			}
+		if slices.Contains(cyrSuffixForms(c.query), c.unrelated) {
+			t.Errorf("stem tier folds %q onto the unrelated %q", c.query, c.unrelated)
 		}
 	}
 	for _, c := range []struct{ query, want string }{
@@ -164,13 +153,7 @@ func TestStemTierFoldsLikeTheRelevanceTier(t *testing.T) {
 		{"часть", "части"},
 		{"миграция", "миграциями"},
 	} {
-		found := false
-		for _, f := range cyrSuffixForms(c.query) {
-			if f == c.want {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(cyrSuffixForms(c.query), c.want)
 		if !found {
 			t.Errorf("stem tier lost %q -> %q", c.query, c.want)
 		}
@@ -198,7 +181,7 @@ func TestRussianRelevanceFoldsInflections(t *testing.T) {
 	}
 	mk("s1", "обсуждали миграциями базы данных и чинили репликациями слейва")
 	// Filler so the target is not the only session in the corpus.
-	for i := 0; i < 12; i++ {
+	for i := range 12 {
 		mk(fmt.Sprintf("f%d", i), "обычная рабочая сессия про сборку и деплой контейнеров")
 	}
 	if err := Ensure(dir, "", true, nil); err != nil {

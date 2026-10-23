@@ -115,9 +115,9 @@ func TestGuidePagesSayWhenAndWhoseTheyAre(t *testing.T) {
 	date := regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 
 	for _, p := range pages {
-		b, err := os.ReadFile(p)
-		if err != nil {
-			t.Fatal(err)
+		b, readErr := os.ReadFile(p)
+		if readErr != nil {
+			t.Fatal(readErr)
 		}
 		name := filepath.Base(p)
 		for _, field := range []string{"datePublished", "dateModified"} {

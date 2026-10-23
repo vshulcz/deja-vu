@@ -27,7 +27,7 @@ func TestATargetThatWillRefuseWritesNothing(t *testing.T) {
 			func() string { return filepath.Join(sources.CursorCLIHome(), "mcp.json") }},
 		{"claude-auto",
 			func() string { return filepath.Join(sources.ClaudeConfigDir(), "settings.json") },
-			func() string { return sources.ClaudeJSONPath() }},
+			sources.ClaudeJSONPath},
 		{"codex-auto",
 			func() string { return filepath.Join(sources.CodexHome(), "hooks.json") },
 			func() string { return filepath.Join(sources.CodexHome(), "config.toml") }},

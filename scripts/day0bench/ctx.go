@@ -11,6 +11,7 @@ package main
 // and what deja ranks, so neither side is being scored on the other's unit.
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -71,14 +72,14 @@ func runCtx(bin string, all, qs []question, control bool) (runResult, error) {
 			if control {
 				continue
 			}
-			if err := writeClaude(projects, id, parseDate(q.Dates[i]), turns); err != nil {
-				return out, err
+			if werr := writeClaude(projects, id, parseDate(q.Dates[i]), turns); werr != nil {
+				return out, werr
 			}
 		}
 	}
 
 	ctx := func(quiet bool, args ...string) (string, error) {
-		cmd := exec.Command(bin, args...)
+		cmd := exec.CommandContext(context.Background(), bin, args...)
 		// The environment is built from nothing rather than inherited: ctx reads
 		// CTX_DATA_ROOT, and a machine that has it set would answer these
 		// questions out of the real index instead of the corpus under test,
@@ -87,14 +88,14 @@ func runCtx(bin string, all, qs []question, control bool) (runResult, error) {
 		if quiet {
 			cmd.Env = append(cmd.Env, "CTX_QUIET=1")
 		}
-		b, err := cmd.Output()
-		return string(b), err
+		b, cerr := cmd.Output()
+		return string(b), cerr
 	}
 
 	t0 := time.Now()
 	// 1.3 hands the index refresh to a daemon it starts; --wait returns once
 	// that refresh has published, so the searches below read a full index.
-	if _, err := ctx(true, "setup", "--wait"); err != nil {
+	if _, err = ctx(true, "setup", "--wait"); err != nil {
 		return out, fmt.Errorf("ctx setup: %w", err)
 	}
 	out.build = time.Since(t0)

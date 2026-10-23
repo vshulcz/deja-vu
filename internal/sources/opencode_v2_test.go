@@ -36,7 +36,7 @@ insert into session_message values('m2','s1','assistant',2,1767409201000,1767409
 		`]}');
 insert into session_message values('m3','s1','synthetic',3,1767409206000,1767409206000,'{"time":{"created":1767409206000},"text":"Continue if you have next steps"}');
 insert into session_message values('m4','s1','model-switched',4,1767409207000,1767409207000,'{"time":{"created":1767409207000},"text":"switched to another model"}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
 	return db
@@ -145,7 +145,7 @@ create table part(id text, message_id text, data text);
 insert into session values('s1','/w','2026-01-02T03:00:00Z','2026-01-03T03:00:00Z');
 insert into message values('m1','s1',1767409200000,'{"role":"assistant"}');
 insert into part values('p1','m1','{"type":"text","text":"the timeout is too short","time":{"start":"2026-01-02T03:00:00Z"}}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
 	if opencodeV2(db) {
@@ -173,7 +173,7 @@ create table session_message(id text primary key, session_id text, type text, se
 insert into session values('s1','/w','the payments suite','2026-01-02T03:00:00Z','2026-01-03T03:00:00Z');
 insert into message values('m1','s1',1767409200000,'{"role":"assistant"}');
 insert into part values('p1','m1','{"type":"text","text":"the timeout is too short","time":{"start":"2026-01-02T03:00:00Z"}}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
 	if opencodeV2(db) {
@@ -199,7 +199,7 @@ create table part(id text, message_id text, data text);
 create table session_message(id text primary key, session_id text, type text, seq integer, time_created integer, time_updated integer, data text);
 insert into session values('s1','/w','the payments suite',1767409200000,1767409300000);
 insert into session_message values('m1','s1','user',1,1767409200000,1767409200000,'{"time":{"created":1767409200000},"text":"why does TestRetry flake"}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
 	if !opencodeV2(db) {
@@ -252,7 +252,7 @@ insert into session_message values('m1','s1','assistant',1,1767409201000,1767409
 		`{"type":"tool","id":"c2","name":"bash","state":{"status":"completed","input":{"command":"go test ./pkg/ -run Retry"},"content":[{"type":"text","text":"--- FAIL: TestRetry"}],"structured":{"exit":2,"truncated":false}},"time":{"created":1767409202000}}` +
 		`]}');
 insert into session_message values('m2','s1','compaction',2,1767409203000,1767409203000,'{"time":{"created":1767409203000},"reason":"auto","summary":"we pinned pgx 5.4.3 for the pgbouncer issue","recent":""}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
 	ss, err := ParseOpencodeDB(db)
@@ -302,7 +302,7 @@ insert into session_message values('m2','s1','assistant',2,1790102977894,1790102
 		`{"type":"text","text":"add now returns a+b+1"}` +
 		`]}');
 insert into session_message values('m3','s1','idle',3,1790102983000,1790102983000,'{"time":{"created":1790102983000}}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
 	ss, err := ParseOpencodeDB(db)
@@ -353,7 +353,7 @@ insert into message values('m2','s1',1767409202000,'{"role":"assistant","time":{
 insert into part values('p2','m2','{"type":"text","text":"the timeout is too short","time":{"start":1767409202000}}');
 insert into session_message values('e1','s1','model-switched',1,1767409200500,1767409200500,'{}');
 insert into session_message values('e2','s1','agent-switched',2,1767409201500,1767409201500,'{}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
 	if opencodeV2(db) {
@@ -393,7 +393,7 @@ insert into session values('s3','/w','split across both layouts',1767409600000,1
 insert into session_message values('t3','s3','user',1,1767409601000,1767409601000,'{"time":{"created":1767409601000},"text":"bump the backoff cap"}');
 insert into message values('m3','s3',1767409602000,'{"role":"user","time":{"created":1767409602000}}');
 insert into part values('p3','m3','{"type":"text","text":"and log each retry","time":{"start":1767409602000}}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
 	ss, err := ParseOpencodeDB(db)
@@ -435,7 +435,7 @@ insert into session values('s3','/w','split',1767409600000,1767409600000);
 insert into session_message values('t3','s3','user',1,1767409601000,1767409601000,'{"time":{"created":1767409601000},"text":"bump the backoff cap"}');
 insert into message values('m3','s3',1770000000000,1770000000000,'{"role":"user","time":{"created":1770000000000}}');
 insert into part values('p3','m3','s3',1770000000000,1770000000000,'{"type":"text","text":"and log each retry","time":{"start":1770000000000}}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
 	// After the API turn, before the one sent with `kilo run -s`.
@@ -461,7 +461,7 @@ func TestSortTurnsByTimeKeepsUnstampedTurnsInPlace(t *testing.T) {
 		{Text: "api 2", Time: at(3)},
 	}
 	sortTurnsByTime(ms)
-	var got []string
+	got := make([]string, 0, len(ms))
 	for _, m := range ms {
 		got = append(got, m.Text)
 	}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -55,14 +56,14 @@ func treeOf(t *testing.T, root string) map[string]string {
 	out := map[string]string{}
 	_ = filepath.Walk(root, func(p string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // unreadable entries are skipped
 		}
 		rel, _ := filepath.Rel(root, p)
 		if info.IsDir() {
 			out[rel+"/"] = ""
 			return nil
 		}
-		b, _ := os.ReadFile(p)
+		b, _ := os.ReadFile(p) //nolint:gosec // the walk is over the test's own temp home
 		out[rel] = string(b)
 		return nil
 	})
@@ -103,9 +104,7 @@ func sameTree(t *testing.T, what string, before, after map[string]string) {
 
 func cloneTree(m map[string]string) map[string]string {
 	out := make(map[string]string, len(m))
-	for k, v := range m {
-		out[k] = v
-	}
+	maps.Copy(out, m)
 	return out
 }
 
@@ -270,6 +269,7 @@ func TestInstallReasonixHandsThePackageToTheCLI(t *testing.T) {
 }
 
 func reasonixViaFakeCLI(t *testing.T, other bool, used string) {
+	t.Helper()
 	home := reasonixTestHome(t, other)
 	bin := filepath.Join(t.TempDir(), "reasonix")
 	log := filepath.Join(t.TempDir(), "calls")
@@ -418,8 +418,11 @@ func TestDoctorReadsTheReasonixWiring(t *testing.T) {
 		t.Fatal(err)
 	}
 	gone := filepath.Join(t.TempDir(), "gone", "deja")
-	doc["runtime"].(map[string]any)["command"] = gone
-	edited, _ := json.MarshalIndent(doc, "", "  ")
+	typedOrFatal[map[string]any](t, doc["runtime"])["command"] = gone
+	edited, jerr := json.MarshalIndent(doc, "", "  ")
+	if jerr != nil {
+		t.Fatal(jerr)
+	}
 	writeTestFile(t, manifest, string(edited))
 	if _, missing := wiring(); !missing {
 		t.Errorf("runtime pointing at %s: doctor did not report it missing", gone)
@@ -447,7 +450,7 @@ func TestInstallReasonixPlainKeepsAnInstalledRuntime(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		if strings.HasPrefix(line, "reasonix") && !strings.Contains(line, "unchanged") {
 			t.Errorf("install --all rewrote the package: %s", line)
 		}

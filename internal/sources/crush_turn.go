@@ -71,7 +71,7 @@ func crushDBFor(cwd string) string {
 		return ""
 	}
 	best, bestLen := "", -1
-	for _, p := range CrushProjects() {
+	for _, p := range crushProjects() {
 		if p.Path == "" || !pathWithin(cwd, p.Path) || len(p.Path) <= bestLen {
 			continue
 		}

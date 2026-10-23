@@ -28,7 +28,7 @@ func TestTheLegacyGooseFileKeepsCommandsAndOutput(t *testing.T) {
 	if len(ss) != 1 {
 		t.Fatalf("sessions = %d, want 1", len(ss))
 	}
-	var roles []string
+	roles := make([]string, 0, len(ss[0].Messages))
 	byRole := map[string]string{}
 	for _, m := range ss[0].Messages {
 		roles = append(roles, m.Role)

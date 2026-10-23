@@ -39,7 +39,7 @@ func (a *tuiApp) handle(ev tui.Event) {
 }
 
 func (a *tuiApp) handleList(ev tui.Event) {
-	switch ev.Kind {
+	switch ev.Kind { //nolint:exhaustive // keys and resizes go on to the switch below
 	case tui.EvPaste:
 		text := strings.Join(strings.Fields(ev.Text), " ")
 		a.query = append(a.query, []rune(text)...)
@@ -53,7 +53,7 @@ func (a *tuiApp) handleList(ev tui.Event) {
 	if ev.Key != tui.KeyUp {
 		a.histAt = -1
 	}
-	switch ev.Key {
+	switch ev.Key { //nolint:exhaustive // other keys do nothing in the list
 	case tui.KeyUp:
 		// At the top of the box, ↑ walks back through past searches, the
 		// way a shell does.

@@ -52,7 +52,7 @@ func TestSessionsSharingAnIDAreAttributedTheSameWayEveryBuild(t *testing.T) {
 	}
 	dir := filepath.Join(tmp, "index.db")
 	var first []SessionMeta
-	for run := 0; run < 5; run++ {
+	for run := range 5 {
 		if err := os.RemoveAll(dir); err != nil {
 			t.Fatal(err)
 		}

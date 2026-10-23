@@ -40,7 +40,7 @@ func TestInstallClaudeUpdatesDejaUnderItsExistingName(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	servers := issue2269JSONServers(t, path, "mcpServers")
+	servers := issue2269JSONServers(t, path)
 	if len(servers) != 1 {
 		t.Fatalf("install left %d entries, want one: %#v", len(servers), servers)
 	}
@@ -87,7 +87,7 @@ func TestInstallClaudePrefersTheLiteralDejaEntry(t *testing.T) {
 	if err := os.WriteFile(path, []byte(before), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	beforeServers := issue2269JSONServers(t, path, "mcpServers")
+	beforeServers := issue2269JSONServers(t, path)
 	foreignBefore := beforeServers["deja-vu"]
 
 	exe := filepath.Join(t.TempDir(), "deja")
@@ -95,7 +95,7 @@ func TestInstallClaudePrefersTheLiteralDejaEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	servers := issue2269JSONServers(t, path, "mcpServers")
+	servers := issue2269JSONServers(t, path)
 	if len(servers) != 2 {
 		t.Fatalf("install left %d entries, want two: %#v", len(servers), servers)
 	}
@@ -302,7 +302,7 @@ func TestUninstallClaudeLeavesAndNamesTheForeignEntry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	servers := issue2269JSONServers(t, path, "mcpServers")
+	servers := issue2269JSONServers(t, path)
 	if _, ok := servers["deja"]; ok {
 		t.Fatal("uninstall left the literal deja entry")
 	}
@@ -315,7 +315,7 @@ func TestUninstallClaudeLeavesAndNamesTheForeignEntry(t *testing.T) {
 	}
 }
 
-func issue2269JSONServers(t *testing.T, path, key string) map[string]any {
+func issue2269JSONServers(t *testing.T, path string) map[string]any {
 	t.Helper()
 	body, err := os.ReadFile(path)
 	if err != nil {
@@ -325,9 +325,9 @@ func issue2269JSONServers(t *testing.T, path, key string) map[string]any {
 	if err := json.Unmarshal(body, &root); err != nil {
 		t.Fatalf("%s: %v\n%s", path, err, body)
 	}
-	servers, ok := root[key].(map[string]any)
+	servers, ok := root["mcpServers"].(map[string]any)
 	if !ok {
-		t.Fatalf("%s is not an object in %s: %#v", key, path, root[key])
+		t.Fatalf("mcpServers is not an object in %s: %#v", path, root["mcpServers"])
 	}
 	return servers
 }

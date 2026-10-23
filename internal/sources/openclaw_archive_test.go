@@ -111,7 +111,7 @@ func TestOpenClawReadsACompressedDeletedTranscript(t *testing.T) {
 	if err := os.WriteFile(plain, []byte(openclawArchiveBody("cccc3333", "we settled on one shard")), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := exec.Command("zstd", "-q", "--rm", plain).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "zstd", "-q", "--rm", plain).CombinedOutput(); err != nil {
 		t.Fatalf("zstd: %v: %s", err, out)
 	}
 	archive := plain + ".zst"

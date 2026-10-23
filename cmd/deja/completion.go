@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -16,7 +17,7 @@ func runCompletion(args []string) error {
 		return fmt.Errorf("completion takes one shell, got %q and %q", args[0], args[1])
 	}
 	if len(args) != 1 {
-		return fmt.Errorf("completion needs bash, zsh, fish, or powershell")
+		return errors.New("completion needs bash, zsh, fish, or powershell")
 	}
 	script, ok := completionScripts[args[0]]
 	if !ok {

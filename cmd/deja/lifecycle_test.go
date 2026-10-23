@@ -37,7 +37,7 @@ func TestRecallSaysWhenADecisionWasReverted(t *testing.T) {
 		t.Fatalf("nothing was promoted yet:\n%s", before)
 	}
 
-	if err := runPromote(dir, []string{"s1", "--state", "rejected", "--note", "the pin was reverted; pgbouncer 1.24 handles it natively"}, os.Stdout); err != nil {
+	if err = runPromote(dir, []string{"s1", "--state", "rejected", "--note", "the pin was reverted; pgbouncer 1.24 handles it natively"}, os.Stdout); err != nil {
 		t.Fatal(err)
 	}
 
@@ -164,9 +164,9 @@ func TestDemoteRejectedLeavesOtherStatesAlone(t *testing.T) {
 func TestDemoteRejectedKeepsTheRankingOrder(t *testing.T) {
 	// Long enough that an unstable sort actually reorders: Go's pattern-defeating
 	// quicksort falls back to insertion sort — which is stable — below twelve.
-	var hits []search.Hit
+	hits := make([]search.Hit, 0, 24)
 	var want []string
-	for i := 0; i < 24; i++ {
+	for i := range 24 {
 		id := fmt.Sprintf("h%02d", i)
 		h := search.Hit{Session: model.Session{ID: id, Project: "p"}}
 		if i%5 == 3 {

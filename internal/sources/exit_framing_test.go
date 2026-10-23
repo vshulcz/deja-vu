@@ -56,6 +56,7 @@ func runExitRows(t *testing.T, rows []exitRow) {
 // came back with result.
 func rooExitTask(result string) func(*testing.T, string) string {
 	return func(t *testing.T, dir string) string {
+		t.Helper()
 		task := filepath.Join(dir, "tasks", "1788845325718")
 		writeExitFixture(t, filepath.Join(task, "history_item.json"), `{"id":"1788845325718","ts":1788845325718,"task":"fix the retry loop","workspace":"/tmp/proj"}`)
 		return writeExitFixture(t, filepath.Join(task, "api_conversation_history.json"), `[
@@ -67,6 +68,7 @@ func rooExitTask(result string) func(*testing.T, string) string {
 
 func continueExitStore(state string) func(*testing.T, string) string {
 	return func(t *testing.T, dir string) string {
+		t.Helper()
 		return writeExitFixture(t, filepath.Join(dir, "sessions", "s1.json"), `{"sessionId":"s1","title":"fix the retry loop","workspaceDirectory":"/tmp/proj","history":[`+
 			`{"message":{"role":"user","content":"fix the retry loop"},"contextItems":[]},`+
 			`{"message":{"role":"assistant","content":"","toolCalls":[]},"contextItems":[],"toolCallStates":[`+state+`]}]}`)
@@ -75,6 +77,7 @@ func continueExitStore(state string) func(*testing.T, string) string {
 
 func ampExitThread(run string) func(*testing.T, string) string {
 	return func(t *testing.T, dir string) string {
+		t.Helper()
 		return writeExitFixture(t, filepath.Join(dir, "T-0f3c.json"), `{"v":7,"id":"T-0f3c","created":1774950000000,"title":"Fix the retry loop","env":{"initial":{"trees":[{"uri":"file:///tmp/proj"}]}},"messages":[`+
 			`{"role":"user","content":[{"type":"text","text":"fix the retry loop"}],"meta":{"sentAt":1774950001000}},`+
 			`{"role":"assistant","content":[{"type":"tool_use","id":"toolu_01","name":"Bash","complete":true,"input":{"cmd":"go test ./...","cwd":"/tmp/proj"}}],"usage":{"timestamp":"2026-03-31T09:40:05Z"}},`+
@@ -84,11 +87,14 @@ func ampExitThread(run string) func(*testing.T, string) string {
 
 func antigravityExitTranscript(steps ...string) func(*testing.T, string) string {
 	return func(t *testing.T, dir string) string {
+		t.Helper()
 		lines := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-09-30T10:00:00Z","content":"<USER_REQUEST>\nfix the retry loop\n</USER_REQUEST>"}` + "\n" +
 			`{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-09-30T10:00:05Z","content":"","tool_calls":[{"name":"run_command","args":{"CommandLine":"\"go test ./...\"","Cwd":"\"/tmp/proj\""}}]}` + "\n"
+		var linesSb89 strings.Builder
 		for _, s := range steps {
-			lines += `{"step_index":2,"source":"MODEL","type":"GENERIC","status":"DONE","created_at":"2026-09-30T10:00:09Z","content":` + vocabJSON(s) + `}` + "\n"
+			linesSb89.WriteString(`{"step_index":2,"source":"MODEL","type":"GENERIC","status":"DONE","created_at":"2026-09-30T10:00:09Z","content":` + vocabJSON(s) + `}` + "\n")
 		}
+		lines += linesSb89.String()
 		return writeExitFixture(t, filepath.Join(dir, "brain", "b0c1d2e3", ".system_generated", "logs", "transcript.jsonl"), lines)
 	}
 }
@@ -127,6 +133,7 @@ func TestRooContinueAmpAntigravityKeepTheExitCode(t *testing.T) {
 		{"antigravity failed", "antigravity", antigravityExitTranscript("Created At: 2026-09-30T10:00:05Z\nCompleted At: 2026-09-30T10:00:09Z\n\nThe command exited with code 1.\nOutput:\n./retry.go:12:5: undefined: backoffJitter"), "$ go test ./...  → exit 1"},
 		{"antigravity clean", "antigravity", antigravityExitTranscript("Created At: 2026-09-30T10:00:05Z\n\nThe command exited with code 0.\nOutput:\nok"), "$ go test ./...  → exit 0"},
 		{"antigravity planner speaking first", "antigravity", func(t *testing.T, dir string) string {
+			t.Helper()
 			p := antigravityExitTranscript("The command exited with code 1.\nOutput:\nFAIL")(t, dir)
 			b, _ := os.ReadFile(p)
 			return writeExitFixture(t, p, strings.Replace(string(b), `"content":"","tool_calls"`, `"content":"Running the tests.","tool_calls"`, 1))
@@ -156,15 +163,17 @@ func TestCrushJoinsACallToItsResult(t *testing.T) {
 		{"edit_unanswered", "edit", edit, "", false, []string{"files /tmp/proj/retry.go", "edit /tmp/proj/retry.go\n" + oldLoop, "wrote"}},
 	}
 	sql := ""
+	var sqlSb159 strings.Builder
 	for i, c := range cases {
-		sql += "insert into sessions values ('" + c.id + "',null,'retry',2,0,0,0.0," + itoa(1784282405+i*10) + "," + itoa(1784282400+i*10) + ",null,null);\n"
-		sql += crushInsert(t, "a_"+c.id, c.id, "assistant", int64(1784282400+i*10), []any{
-			map[string]any{"type": "tool_call", "data": map[string]any{"id": "c_" + c.id, "name": c.tool, "input": c.input, "finished": true}}})
+		sqlSb159.WriteString("insert into sessions values ('" + c.id + "',null,'retry',2,0,0,0.0," + itoa(1784282405+i*10) + "," + itoa(1784282400+i*10) + ",null,null);\n")
+		sqlSb159.WriteString(crushInsert(t, "a_"+c.id, c.id, "assistant", int64(1784282400+i*10), []any{
+			map[string]any{"type": "tool_call", "data": map[string]any{"id": "c_" + c.id, "name": c.tool, "input": c.input, "finished": true}}}))
 		if c.result != "" {
-			sql += crushInsert(t, "t_"+c.id, c.id, "tool", int64(1784282401+i*10), []any{
-				map[string]any{"type": "tool_result", "data": map[string]any{"tool_call_id": "c_" + c.id, "name": c.tool, "content": c.result, "is_error": c.isErr}}})
+			sqlSb159.WriteString(crushInsert(t, "t_"+c.id, c.id, "tool", int64(1784282401+i*10), []any{
+				map[string]any{"type": "tool_result", "data": map[string]any{"tool_call_id": "c_" + c.id, "name": c.tool, "content": c.result, "is_error": c.isErr}}}))
 		}
 	}
+	sql += sqlSb159.String()
 	ss, err := ParseCrushDB(crushStore(t, "proj", sql))
 	if err != nil {
 		t.Fatal(err)
@@ -229,6 +238,7 @@ create table part(id text, message_id text, data text);
 // with result.
 func codeWhaleSaved(result string) func(*testing.T, string) string {
 	return func(t *testing.T, dir string) string {
+		t.Helper()
 		return writeExitFixture(t, filepath.Join(dir, "cw-1.json"), `{"schema_version":3,
 "metadata":{"id":"cw-1","title":"fix the retry loop","created_at":"2026-10-01T10:00:00Z","updated_at":"2026-10-01T10:05:00Z","workspace":"/tmp/proj"},
 "messages":[
@@ -258,6 +268,7 @@ func commandCodeResult(text string) string {
 
 func commandCodeExitStore(result string) func(*testing.T, string) string {
 	return func(t *testing.T, dir string) string {
+		t.Helper()
 		return writeExitFixture(t, filepath.Join(dir, "-tmp-proj", "s1.jsonl"),
 			`{"type":"session","version":3,"id":"s1","timestamp":"2026-10-01T20:09:14.839Z","cwd":"/tmp/proj"}`+"\n"+commandCodeCall+commandCodeResult(result))
 	}

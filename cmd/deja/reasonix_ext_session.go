@@ -102,7 +102,7 @@ const rxIndexReady = "index ready — recall is on"
 func recalledSessionCount(blocks []string) int {
 	n := 0
 	for _, b := range blocks {
-		for _, line := range strings.Split(b, "\n") {
+		for line := range strings.SplitSeq(b, "\n") {
 			line = strings.TrimSpace(line)
 			if (strings.HasPrefix(line, "- **") || strings.HasPrefix(line, "- Session: **")) && strings.Contains(line, "`") {
 				n++

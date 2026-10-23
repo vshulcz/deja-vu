@@ -37,33 +37,26 @@ func TestHandoffWithNoIdObeysTheTrustPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), append(b, '\n'), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), append(b, '\n'), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	dir := filepath.Join(tmp, "index.db")
-	if err := index.Ensure(dir, "", false, nil); err != nil {
+	if err = index.Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := captureRun(t, "sync", "import", exp); err != nil {
+	if _, err = captureRun(t, "sync", "import", exp); err != nil {
 		t.Fatal(err)
 	}
 	// handoff takes the project from the working directory, so the test has to
 	// stand in one whose name matches.
 	work := filepath.Join(tmp, "work", "proj")
-	if err := os.MkdirAll(work, 0o755); err != nil {
+	if err = os.MkdirAll(work, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	back, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(work); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(back) })
+	t.Chdir(work)
 
 	policyFile := filepath.Join(tmp, "policy.json")
-	if err := os.WriteFile(policyFile, []byte(`{"activations":{"search":{"local":true,"imported":false}}}`), 0o644); err != nil {
+	if err = os.WriteFile(policyFile, []byte(`{"activations":{"search":{"local":true,"imported":false}}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_POLICY_FILE", policyFile)
@@ -79,13 +72,13 @@ func TestHandoffWithNoIdObeysTheTrustPolicy(t *testing.T) {
 	// With the local session gone, every candidate is hidden: the reader gets
 	// the rule, not someone else's work. Gone means forgotten — a rebuild
 	// keeps a session whose transcript was merely deleted (#3529).
-	if err := os.Remove(filepath.Join(store, "loc.jsonl")); err != nil {
+	if err = os.Remove(filepath.Join(store, "loc.jsonl")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := index.Forget(dir, index.ForgetOptions{Session: "loc"}); err != nil {
+	if _, err = index.Forget(dir, index.ForgetOptions{Session: "loc"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := index.Ensure(dir, "", true, nil); err != nil {
+	if err = index.Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	_, err = handoffSource(dir, "")
@@ -123,31 +116,24 @@ func TestHandoffSaysWhenNewerWorkIsWithheld(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), append(b, '\n'), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), append(b, '\n'), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	dir := filepath.Join(tmp, "index.db")
-	if err := index.Ensure(dir, "", false, nil); err != nil {
+	if err = index.Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := captureRun(t, "sync", "import", exp); err != nil {
+	if _, err = captureRun(t, "sync", "import", exp); err != nil {
 		t.Fatal(err)
 	}
 	work := filepath.Join(tmp, "proj")
-	if err := os.MkdirAll(work, 0o755); err != nil {
+	if err = os.MkdirAll(work, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	back, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(work); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(back) })
+	t.Chdir(work)
 
 	policyFile := filepath.Join(tmp, "policy.json")
-	if err := os.WriteFile(policyFile, []byte(`{"activations":{"search":{"local":true,"imported":false}}}`), 0o644); err != nil {
+	if err = os.WriteFile(policyFile, []byte(`{"activations":{"search":{"local":true,"imported":false}}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_POLICY_FILE", policyFile)

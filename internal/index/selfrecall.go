@@ -214,11 +214,11 @@ func stripAgentsBlock(trimmed string) (string, bool) {
 // at the head of text, counting nested copies of the same tag. Without the
 // count, `<T>a<T>b</T>c</T>tail` strips to `c</T>tail` and leaves a dangling
 // closer in the index.
-func closerAfter(text, open, close string) (int, bool) {
+func closerAfter(text, open, closeTag string) (int, bool) {
 	depth := 1
 	i := len(open)
 	for i < len(text) {
-		nextClose := strings.Index(text[i:], close)
+		nextClose := strings.Index(text[i:], closeTag)
 		if nextClose < 0 {
 			return 0, false
 		}
@@ -229,7 +229,7 @@ func closerAfter(text, open, close string) (int, bool) {
 			continue
 		}
 		depth--
-		i += nextClose + len(close)
+		i += nextClose + len(closeTag)
 		if depth == 0 {
 			return i, true
 		}
@@ -238,21 +238,21 @@ func closerAfter(text, open, close string) (int, bool) {
 }
 
 // unwrapBlock removes a wrapper's tags and keeps what is between them.
-func unwrapBlock(text, open, close string) string {
+func unwrapBlock(text, open, closeTag string) string {
 	for {
 		start := strings.Index(text, open)
 		if start < 0 {
 			return text
 		}
 		rest := text[start+len(open):]
-		end := strings.Index(rest, close)
-		if end < 0 {
+		before, after, ok := strings.Cut(rest, closeTag)
+		if !ok {
 			return text
 		}
 		// A wrapper writes its own line breaks around what a person typed:
 		// Cursor's <user_query> puts the question on its own line. Those two
 		// belong to the tags, not to the words.
-		text = text[:start] + strings.Trim(rest[:end], "\n") + rest[end+len(close):]
+		text = text[:start] + strings.Trim(before, "\n") + after
 	}
 }
 
@@ -261,21 +261,21 @@ func unwrapBlock(text, open, close string) string {
 // truncated <deja-recall> is still ours, but a sentence mentioning
 // <system-reminder> — a bug report, this file's own tests — is not, and
 // swallowing the rest of it loses what the person actually wrote.
-func stripBetweenClosed(text, open, close string) string {
+func stripBetweenClosed(text, open, closeTag string) string {
 	for {
 		start := strings.Index(text, open)
 		if start < 0 {
 			return text
 		}
-		rel := strings.Index(text[start+len(open):], close)
+		rel := strings.Index(text[start+len(open):], closeTag)
 		if rel < 0 {
 			return text
 		}
-		text = text[:start] + text[start+len(open)+rel+len(close):]
+		text = text[:start] + text[start+len(open)+rel+len(closeTag):]
 	}
 }
 
-func stripBetween(text, open, close string) string {
+func stripBetween(text, open, closeTag string) string {
 	if !strings.Contains(text, open) {
 		return text
 	}
@@ -289,14 +289,14 @@ func stripBetween(text, open, close string) string {
 		}
 		b.WriteString(rest[:start])
 		after := rest[start+len(open):]
-		end := strings.Index(after, close)
-		if end < 0 {
+		_, after0, ok := strings.Cut(after, closeTag)
+		if !ok {
 			// An unclosed marker means the block was truncated — by a context
 			// cap, a crash, or a harness that stores a prefix. Everything from
 			// the marker on is ours, so none of it should be indexed.
 			break
 		}
-		rest = after[end+len(close):]
+		rest = after0
 	}
 	out := b.String()
 	// Collapse the blank lines the removal leaves behind, so a message that was

@@ -1,12 +1,13 @@
 package main
 
 import (
-	"github.com/vshulcz/deja-vu/internal/model"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/model"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/policy"
@@ -49,7 +50,7 @@ func TestBlameReadsWithoutWaitingForARebuild(t *testing.T) {
 		t.Fatal(err)
 	}
 	found := false
-	for _, block := range strings.Split(string(src), "case \"") {
+	for block := range strings.SplitSeq(string(src), "case \"") {
 		if !strings.HasPrefix(block, "blame\"") {
 			continue
 		}
@@ -114,7 +115,7 @@ func blameBodyFor(hits []search.BlameHit, refreshing bool) string {
 // countBlameSessions counts the numbered rows of a blame page.
 func countBlameSessions(body string) int {
 	n := 0
-	for _, line := range strings.Split(body, "\n") {
+	for line := range strings.SplitSeq(body, "\n") {
 		if blameRowRE.MatchString(line) {
 			n++
 		}

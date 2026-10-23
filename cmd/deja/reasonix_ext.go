@@ -75,8 +75,11 @@ type rxErrorData struct {
 }
 
 func rxDomainError(reason, message string) *rxRPCError {
-	data, _ := json.Marshal(rxErrorData{Reason: reason})
-	return &rxRPCError{Code: rxDomainErrorCode, Message: message, Data: data}
+	e := &rxRPCError{Code: rxDomainErrorCode, Message: message}
+	if data, err := json.Marshal(rxErrorData{Reason: reason}); err == nil {
+		e.Data = data
+	}
+	return e
 }
 
 type rxExternalized struct {
@@ -258,8 +261,8 @@ func (c *rxConn) readContent(ctx context.Context, d rxExternalized) ([]byte, err
 			NextOffset *int64 `json:"nextOffset"`
 			Encoding   string `json:"encoding"`
 		}
-		if err := json.Unmarshal(raw, &page); err != nil {
-			return nil, err
+		if decodeErr := json.Unmarshal(raw, &page); decodeErr != nil {
+			return nil, decodeErr
 		}
 		if page.Encoding != "" && page.Encoding != "utf8" {
 			return nil, fmt.Errorf("content ref in unknown encoding %q", page.Encoding)

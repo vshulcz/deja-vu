@@ -1,10 +1,10 @@
 package index
 
 import (
-	"fmt"
 	"math/rand"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 )
 
@@ -14,7 +14,7 @@ import (
 // pass left them in the log, which a rebuild does not (#5504).
 func TestRandomHistoriesWithSharedCopiesMatchARebuild(t *testing.T) {
 	for _, seed := range historySeeds() {
-		t.Run(fmt.Sprint(seed), func(t *testing.T) { runCopiesHistory(t, seed, false) })
+		t.Run(strconv.FormatInt(seed, 10), func(t *testing.T) { runCopiesHistory(t, seed, false) })
 	}
 }
 
@@ -28,13 +28,14 @@ func TestRandomHistoriesWithSameDayCopiesMatchARebuild(t *testing.T) {
 		seeds = []int64{*historySeed}
 	}
 	for _, seed := range seeds {
-		t.Run(fmt.Sprint(seed), func(t *testing.T) { runCopiesHistory(t, seed, true) })
+		t.Run(strconv.FormatInt(seed, 10), func(t *testing.T) { runCopiesHistory(t, seed, true) })
 	}
 }
 
 func runCopiesHistory(t *testing.T, seed int64, sameDay bool) {
+	t.Helper()
 	h := newTwoWayEnv(t)
-	r := &historyRun{t: t, h: h, rng: rand.New(rand.NewSource(seed)), index: filepath.Join(h.tmp, "a.db"), walls: true}
+	r := &historyRun{t: t, h: h, rng: rand.New(rand.NewSource(seed)), index: filepath.Join(h.tmp, "a.db"), walls: true} //nolint:gosec // a seeded fixture, not crypto
 	r.openStores()
 	var copies []*historySession
 	copyStep := func() {
@@ -80,7 +81,7 @@ func runCopiesHistory(t *testing.T, seed int64, sameDay bool) {
 		r.log = append(r.log, "copy of "+s.sid+" in "+proj)
 	}
 	steps := 36
-	for i := 0; i < steps; i++ {
+	for i := range steps {
 		if r.rng.Intn(5) == 0 {
 			copyStep()
 		} else {

@@ -123,9 +123,11 @@ func TestEveryJSONSurfaceMatchesItsSection(t *testing.T) {
 			}
 			section := docSection(t, doc, s.heading)
 			named := section
+			var namedSb126 strings.Builder
 			for _, h := range s.shared {
-				named += docSection(t, doc, h)
+				namedSb126.WriteString(docSection(t, doc, h))
 			}
+			named += namedSb126.String()
 			emitted := map[string]bool{}
 			collectJSONKeys(v, s.dynamic, s.data, emitted)
 			for _, k := range sortedSet(emitted) {
@@ -249,7 +251,7 @@ func docSentences(section string) []string {
 	prose = strings.Join(strings.Fields(prose), " ")
 	var out []string
 	start := 0
-	for i := 0; i < len(prose); i++ {
+	for i := range len(prose) {
 		switch prose[i] {
 		case '.', '!', '?', ';':
 			// A dot inside a backticked name (`recall.since`) does not end a

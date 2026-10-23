@@ -27,7 +27,7 @@ func TestEveryInstallTargetTheDocsPrintResolves(t *testing.T) {
 	named := map[string][]string{}
 	err := filepath.Walk(root, func(p string, fi os.FileInfo, err error) error {
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // unreadable entries are skipped
 		}
 		if fi.IsDir() {
 			switch fi.Name() {
@@ -45,9 +45,9 @@ func TestEveryInstallTargetTheDocsPrintResolves(t *testing.T) {
 		if strings.Contains(filepath.Base(p), "CHANGELOG") {
 			return nil
 		}
-		b, rerr := os.ReadFile(p)
+		b, rerr := os.ReadFile(p) //nolint:gosec // the walk is over the repo's own docs
 		if rerr != nil {
-			return nil
+			return nil //nolint:nilerr // unreadable files are skipped
 		}
 		rel := filepath.ToSlash(strings.TrimPrefix(strings.TrimPrefix(p, root), string(filepath.Separator)))
 		for _, m := range docInstallTarget.FindAllStringSubmatch(string(b), -1) {
@@ -94,15 +94,15 @@ func TestEveryInstallTargetTheDocsPrintResolves(t *testing.T) {
 // Every alias has to name a real target, or it resolves to a switch label that
 // is not there and the refusal is worse than the one it was added to fix.
 func TestEveryInstallAliasNamesARealTarget(t *testing.T) {
-	real := map[string]bool{}
+	isTarget := map[string]bool{}
 	for _, n := range installTargetNames() {
-		real[n] = true
+		isTarget[n] = true
 	}
 	for alias, canonical := range installTargetAliases {
-		if !real[canonical] {
+		if !isTarget[canonical] {
 			t.Errorf("alias %q points at %q, which is not a target", alias, canonical)
 		}
-		if real[alias] {
+		if isTarget[alias] {
 			t.Errorf("alias %q is also a listed target — one of the two is wrong", alias)
 		}
 	}

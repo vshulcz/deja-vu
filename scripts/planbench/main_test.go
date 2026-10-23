@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -15,7 +16,7 @@ import (
 // reads a plan on stdin and prints one finding per line marked FIRE, which is
 // all planbench needs from it, and it exits on EXIT so the failure path can be
 // exercised without a broken install.
-func TestHelperDeja(t *testing.T) {
+func TestHelperDeja(_ *testing.T) {
 	if os.Getenv("PLANBENCH_HELPER") != "1" {
 		return
 	}
@@ -23,9 +24,9 @@ func TestHelperDeja(t *testing.T) {
 	defer os.Exit(0)
 	plan, err := io.ReadAll(os.Stdin)
 	if err != nil {
-		os.Exit(2)
+		os.Exit(2) //nolint:gocritic // the deferred exit is the success path of this stand-in
 	}
-	for _, line := range strings.Split(string(plan), "\n") {
+	for line := range strings.SplitSeq(string(plan), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "EXIT" {
 			fmt.Fprintln(os.Stderr, "deja: check failed")
@@ -48,7 +49,7 @@ func useHelper(t *testing.T) {
 	t.Helper()
 	original := newCheckCmd
 	newCheckCmd = func(string) *exec.Cmd {
-		cmd := exec.Command(os.Args[0], "-test.run=TestHelperDeja")
+		cmd := exec.CommandContext(context.Background(), os.Args[0], "-test.run=TestHelperDeja")
 		cmd.Env = append(os.Environ(), "PLANBENCH_HELPER=1")
 		return cmd
 	}

@@ -24,11 +24,11 @@ func TestRememberingTheSameNoteTwiceIsANoOp(t *testing.T) {
 		t.Errorf("a duplicate was accepted: %v", err)
 	}
 	// Same text, different project, is a different note.
-	if err := AppendNote("web", "pgbouncer needs prepared statements off", when); err != nil {
+	if err = AppendNote("web", "pgbouncer needs prepared statements off", when); err != nil {
 		t.Errorf("another project was refused: %v", err)
 	}
 	// A near-duplicate is not a duplicate.
-	if err := AppendNote("api", "pgbouncer needs prepared statements off for now", when); err != nil {
+	if err = AppendNote("api", "pgbouncer needs prepared statements off for now", when); err != nil {
 		t.Errorf("a longer note was refused: %v", err)
 	}
 	b, err := os.ReadFile(NotesFile())

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -36,7 +37,7 @@ func TestUnplacedFiles(t *testing.T) {
 		t.Errorf("unplaced = %d, want 2", got)
 	}
 	// Everything accounted for: nothing to report.
-	all := append(seen, filepath.Join(root, "proj", "stray.jsonl"), filepath.Join(root, "proj", "other", "deeper.json"))
+	all := slices.Concat(seen, []string{filepath.Join(root, "proj", "stray.jsonl"), filepath.Join(root, "proj", "other", "deeper.json")})
 	if got, _ := unplacedFiles(root, all, nil); got != 0 {
 		t.Errorf("unplaced = %d with every file seen", got)
 	}
@@ -63,7 +64,7 @@ func TestDoctorHarnessRowSaysNothingWhenEverythingIsPlaced(t *testing.T) {
 	t.Setenv("DEJA_QWEN_ROOT", filepath.Join(tmp, "qwen"))
 	var buf bytes.Buffer
 	doctorHarnesses(&buf, t.TempDir())
-	for _, line := range strings.Split(buf.String(), "\n") {
+	for line := range strings.SplitSeq(buf.String(), "\n") {
 		if strings.Contains(line, "qwen") && strings.Contains(line, "not recognised") {
 			t.Errorf("clean store complains: %q", line)
 		}
@@ -76,7 +77,7 @@ func TestDoctorHarnessRowSaysNothingWhenEverythingIsPlaced(t *testing.T) {
 	buf.Reset()
 	doctorHarnesses(&buf, t.TempDir())
 	found := false
-	for _, line := range strings.Split(buf.String(), "\n") {
+	for line := range strings.SplitSeq(buf.String(), "\n") {
 		if strings.Contains(line, "qwen") && strings.Contains(line, "1 not recognised here") {
 			found = true
 		}

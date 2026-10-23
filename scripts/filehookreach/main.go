@@ -11,6 +11,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -118,7 +119,7 @@ func hookSpeaks(bin, path string) bool {
 	if err != nil {
 		return false
 	}
-	cmd := exec.Command(bin, "hook-tool")
+	cmd := exec.CommandContext(context.Background(), bin, "hook-tool")
 	cmd.Stdin = strings.NewReader(string(payload))
 	out, err := cmd.Output()
 	return err == nil && strings.TrimSpace(string(out)) != ""

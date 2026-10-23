@@ -2,6 +2,7 @@ package digest
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -94,7 +95,7 @@ func standingLines(text string) []string {
 	text = stripTagBlocks(text)
 	var items, hits []string
 	listHits := 0
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		raw := strings.TrimSpace(line)
 		if raw == "" || strings.HasPrefix(raw, ">") || strings.HasPrefix(raw, "|") {
 			continue
@@ -102,13 +103,7 @@ func standingLines(text string) []string {
 		item := standingItemRE.MatchString(raw)
 		line := strings.TrimSpace(standingItemRE.ReplaceAllString(raw, ""))
 		line = strings.ReplaceAll(line, "**", "")
-		hit := false
-		for _, sentence := range standingSentences(line) {
-			if standingRule(sentence) {
-				hit = true
-				break
-			}
-		}
+		hit := slices.ContainsFunc(standingSentences(line), standingRule)
 		switch {
 		case item && fitsStanding(line):
 			items = append(items, line)
@@ -144,7 +139,7 @@ func standingLines(text string) []string {
 
 func standingSentences(line string) []string {
 	var out []string
-	for _, s := range strings.Split(standingSentRE.ReplaceAllString(line, "$1\n"), "\n") {
+	for s := range strings.SplitSeq(standingSentRE.ReplaceAllString(line, "$1\n"), "\n") {
 		if s = strings.TrimSpace(s); s != "" {
 			out = append(out, s)
 		}
@@ -169,7 +164,7 @@ func fitsStanding(s string) bool {
 // — a reminder, a pasted block, a command echo — whose wording is not the
 // user's.
 func stripTagBlocks(text string) string {
-	for i := 0; i < 8; i++ {
+	for range 8 {
 		loc := standingTagRE.FindStringSubmatchIndex(text)
 		if loc == nil {
 			return text

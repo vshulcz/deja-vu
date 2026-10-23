@@ -48,7 +48,7 @@ func TestADeletedCopyOwningTheRowKeepsWhatThePassReadOffIt(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	steps := []func(){func() {
+	steps := []func(){func() { //nolint:prealloc // a fixture literal the loop below grows
 		h.put("svc", "s8", day("svc", 8, "start: why does the build fail", "The ledger needs a fix."))
 	}, func() {
 		h.put("svc", "s8", day("svc", 9, "again: why does the build fail", "The worker needs a fix."))
@@ -107,11 +107,11 @@ func TestAVersionBumpRereadsADeletedTranscriptsConclusion(t *testing.T) {
 	row.Settled, row.Hit = "stale", []uint64{42}
 	m.Sessions["claude:s2"] = row
 	m.Version = version - 1
-	if err := writeManifestMeta(a, m); err != nil {
+	if err = writeManifestMeta(a, m); err != nil {
 		t.Fatal(err)
 	}
 	invalidateManifestCache(a)
-	if err := Ensure(a, "", false, nil); err != nil {
+	if err = Ensure(a, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	m, err = readManifest(a)

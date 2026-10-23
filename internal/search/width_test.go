@@ -2,10 +2,11 @@ package search
 
 import (
 	"bytes"
-	"github.com/vshulcz/deja-vu/internal/termwidth"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/query"
@@ -29,7 +30,7 @@ func TestHitsFitTheTerminal(t *testing.T) {
 	for _, width := range []int{40, 60, 80, 100} {
 		var buf bytes.Buffer
 		Print(&buf, []Hit{widthHit("app", long)}, query.Options{Width: width})
-		for _, line := range strings.Split(strings.TrimRight(buf.String(), "\n"), "\n") {
+		for line := range strings.SplitSeq(strings.TrimRight(buf.String(), "\n"), "\n") {
 			if strings.HasPrefix(line, "  ") && len([]rune(line)) > width {
 				t.Errorf("width %d: a snippet ran to %d runes: %q", width, len([]rune(line)), line)
 			}
@@ -53,7 +54,7 @@ func TestAPipeIsNotTruncated(t *testing.T) {
 func TestTheProjectGivesWayBeforeTheCount(t *testing.T) {
 	var buf bytes.Buffer
 	Print(&buf, []Hit{widthHit("a-very-long-project-directory-name", "short")}, query.Options{Width: 60})
-	line := strings.Split(buf.String(), "\n")[0]
+	line, _, _ := strings.Cut(buf.String(), "\n")
 	if !strings.Contains(line, "3 matches") {
 		t.Errorf("the count was cut off the header: %q", line)
 	}
@@ -81,7 +82,7 @@ func TestAWideScriptLineFitsToo(t *testing.T) {
 	cjk := strings.Repeat("调度器的重试队列在预发环境卡住", 6)
 	var buf bytes.Buffer
 	Print(&buf, []Hit{widthHit("app", cjk)}, query.Options{Width: 60})
-	for _, line := range strings.Split(strings.TrimRight(buf.String(), "\n"), "\n") {
+	for line := range strings.SplitSeq(strings.TrimRight(buf.String(), "\n"), "\n") {
 		if !strings.HasPrefix(line, "  ") {
 			continue
 		}

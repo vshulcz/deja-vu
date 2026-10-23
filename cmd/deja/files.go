@@ -2,11 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -46,7 +48,17 @@ const (
 
 var filesFlags = []string{"--project", "--all-projects", "--limit", "--json"}
 
-func runFiles(dir string, args []string, stdout io.Writer) error {
+// filesOptions is what `deja files` was asked.
+type filesOptions struct {
+	terms       []string
+	limit       int
+	project     string
+	allProjects bool
+	asJSON      bool
+}
+
+// parseFilesArgs reads the `deja files` arguments.
+func parseFilesArgs(args []string) (filesOptions, error) {
 	var terms []string
 	limit := 10
 	project := ""
@@ -61,17 +73,17 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 			// and so did an unknown one and an empty --project: the answer came
 			// back looking like an answer to what was asked (#1628).
 			if i+1 >= len(args) {
-				return fmt.Errorf("files: --limit needs value")
+				return filesOptions{}, errors.New("files: --limit needs value")
 			}
 			i++
 			n, err := strconv.Atoi(args[i])
 			if err != nil || n <= 0 {
-				return fmt.Errorf("files: --limit wants a positive number, got %q", args[i])
+				return filesOptions{}, fmt.Errorf("files: --limit wants a positive number, got %q", args[i])
 			}
 			limit = n
 		case "--project":
 			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
-				return fmt.Errorf("files: --project needs value")
+				return filesOptions{}, errors.New("files: --project needs value")
 			}
 			i++
 			project = args[i]
@@ -87,17 +99,26 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 			i = len(args)
 		default:
 			if strings.HasPrefix(args[i], "-") {
-				return unknownFlag("files", args[i], filesFlags)
+				return filesOptions{}, unknownFlag("files", args[i], filesFlags)
 			}
 			if strings.TrimSpace(args[i]) != "" {
 				terms = append(terms, args[i])
 			}
 		}
 	}
-	if len(terms) == 0 {
-		return fmt.Errorf("usage: deja files <topic> [--project name] [--all-projects] [--limit n] [--json]")
+	return filesOptions{terms: terms, limit: limit, project: project, allProjects: allProjects, asJSON: asJSON}, nil
+}
+
+func runFiles(dir string, args []string, stdout io.Writer) error {
+	opts, perr := parseFilesArgs(args)
+	if perr != nil {
+		return perr
 	}
-	q := strings.Join(terms, " ")
+	limit, project, allProjects, asJSON := opts.limit, opts.project, opts.allProjects, opts.asJSON
+	if len(opts.terms) == 0 {
+		return errors.New("usage: deja files <topic> [--project name] [--all-projects] [--limit n] [--json]")
+	}
+	q := strings.Join(opts.terms, " ")
 	// The answer is about the repository the question was asked in. Read over
 	// the machine, a generic topic answered with the busiest project's files:
 	// asked in this repository, `deja files "timeout"` named eight paths and
@@ -130,9 +151,9 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		wide := o
 		wide.Projects = nil
 		if again, werr := index.SearchWithRecovery(dir, wide, os.Stderr); werr == nil {
-			again, h2 := policyFilterSessionsCounted(policy.ActivationSearch, again)
-			if len(again) > 0 || h2 > 0 {
-				hits, hidden, widened = again, h2, true
+			kept, h2 := policyFilterSessionsCounted(policy.ActivationSearch, again)
+			if len(kept) > 0 || h2 > 0 {
+				hits, hidden, widened = kept, h2, true
 				scope = nil
 			}
 		}
@@ -176,7 +197,7 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		// An empty store is not a miss on the topic: deja has nothing to look
 		// in, and saying "no sessions mention it" reads as "looked, not there"
 		// (#834).
-		if n, err := index.SessionCount(dir); err == nil && n == 0 {
+		if n, countErr := index.SessionCount(dir); countErr == nil && n == 0 {
 			fmt.Fprintln(stdout, emptyIndexHint(fmt.Sprintf("no sessions mention %q", q)))
 			return nil
 		}
@@ -219,12 +240,6 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 	// as one needle, which no single message carries, so `deja files "a b c"`
 	// answered nothing where `deja files a b c` answered (#3409).
 	needles := lowerAll(strings.Fields(q))
-	filtered := 0                    // recorded paths dropped by the repository filter
-	near := map[string]int{}         // path -> times touched near the topic
-	nearSessions := map[string]int{} // path -> how many sessions touched it near the topic
-	total := map[string]int{}        // path -> times touched anywhere in these sessions
-	sessions := map[string]int{}     // path -> how many sessions touched it
-	scanned := 0
 
 	// One pass for all 250, not one pass each: the per-identity lookup streams
 	// the whole record log every time it is called (#1069).
@@ -237,56 +252,8 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		return fmt.Errorf("read sessions: %w", err)
 	}
 
-	for _, full := range full250 {
-		// The window is counted over speech and file events only. Tool output is
-		// two thirds of the records in a session, so a raw message count would be
-		// a few seconds of one command — far too narrow to connect a subject to
-		// the files it was about.
-		msgs := meaningful(full.Messages)
-		hit := topicTimes(msgs, needles)
-		if len(hit) == 0 {
-			// The search tier that produced this hit can be semantic, so a session
-			// can arrive without the words ever being said in it. Counting its
-			// files would put a one-off touch from an unrelated project at the top
-			// on perfect specificity.
-			continue
-		}
-		scanned++
-		seenHere := map[string]bool{}
-		nearHere := map[string]bool{}
-		for _, m := range msgs {
-			if m.Role != "files" {
-				continue
-			}
-			for _, p := range strings.Split(m.Text, "\n") {
-				p = strings.TrimSpace(p)
-				if p == "" || isScratch(p) {
-					continue
-				}
-				if !inRepository(p) {
-					// Recorded, but not under a repository on this disk today.
-					// Usually a probe script; sometimes a repo that was
-					// archived, renamed, or lives on a volume that is not
-					// mounted. Counted rather than forgotten, so the empty
-					// answer can say which of the two happened (#664).
-					filtered++
-					continue
-				}
-				total[p]++
-				if !seenHere[p] {
-					seenHere[p] = true
-					sessions[p]++
-				}
-				if withinTime(m.Time, hit, filesWindow) {
-					near[p]++
-					if !nearHere[p] {
-						nearHere[p] = true
-						nearSessions[p]++
-					}
-				}
-			}
-		}
-	}
+	t := tallyFilesNear(full250, needles)
+	filtered, near, nearSessions, total, sessions, scanned := t.filtered, t.near, t.nearSessions, t.total, t.sessions, t.scanned
 	if len(near) == 0 {
 		// Sessions matched and no file sat near the topic. Still an envelope:
 		// the counts beside the empty list are what distinguish this from a
@@ -384,10 +351,7 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		label = max(label, len(pluralSessions(nearSessions[r.path])))
 	}
 	if w := printableWidth(stdout); w > 0 && w-3-label < col {
-		col = w - 3 - label
-		if col < 16 {
-			col = 16
-		}
+		col = max(w-3-label, 16)
 	}
 	for _, r := range rows {
 		// Padded here rather than with %-*s, whose width is runes: a path under
@@ -408,6 +372,78 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		fmt.Fprintf(os.Stderr, "deja: showing %d of %d — raise --limit for the rest\n", len(rows), cut)
 	}
 	return nil
+}
+
+// filesTally is what one pass over the matched sessions counted.
+type filesTally struct {
+	filtered     int            // recorded paths dropped by the repository filter
+	near         map[string]int // path -> times touched near the topic
+	nearSessions map[string]int // path -> how many sessions touched it near the topic
+	total        map[string]int // path -> times touched anywhere in these sessions
+	sessions     map[string]int // path -> how many sessions touched it
+	scanned      int
+}
+
+// tallyFilesNear counts the files each session touched, and which of those
+// touches sat near the topic.
+func tallyFilesNear(full250 []model.Session, needles []string) filesTally {
+	filtered := 0
+	near := map[string]int{}
+	nearSessions := map[string]int{}
+	total := map[string]int{}
+	sessions := map[string]int{}
+	scanned := 0
+	for _, full := range full250 {
+		// The window is counted over speech and file events only. Tool output is
+		// two thirds of the records in a session, so a raw message count would be
+		// a few seconds of one command — far too narrow to connect a subject to
+		// the files it was about.
+		msgs := meaningful(full.Messages)
+		hit := topicTimes(msgs, needles)
+		if len(hit) == 0 {
+			// The search tier that produced this hit can be semantic, so a session
+			// can arrive without the words ever being said in it. Counting its
+			// files would put a one-off touch from an unrelated project at the top
+			// on perfect specificity.
+			continue
+		}
+		scanned++
+		seenHere := map[string]bool{}
+		nearHere := map[string]bool{}
+		for _, m := range msgs {
+			if m.Role != "files" {
+				continue
+			}
+			for p := range strings.SplitSeq(m.Text, "\n") {
+				p = strings.TrimSpace(p)
+				if p == "" || isScratch(p) {
+					continue
+				}
+				if !inRepository(p) {
+					// Recorded, but not under a repository on this disk today.
+					// Usually a probe script; sometimes a repo that was
+					// archived, renamed, or lives on a volume that is not
+					// mounted. Counted rather than forgotten, so the empty
+					// answer can say which of the two happened (#664).
+					filtered++
+					continue
+				}
+				total[p]++
+				if !seenHere[p] {
+					seenHere[p] = true
+					sessions[p]++
+				}
+				if withinTime(m.Time, hit) {
+					near[p]++
+					if !nearHere[p] {
+						nearHere[p] = true
+						nearSessions[p]++
+					}
+				}
+			}
+		}
+	}
+	return filesTally{filtered: filtered, near: near, nearSessions: nearSessions, total: total, sessions: sessions, scanned: scanned}
 }
 
 // projectScopeHint is the line under a `files` or `how` answer that says which
@@ -531,12 +567,12 @@ func topicTimes(ms []model.Message, needles []string) []time.Time {
 	return out
 }
 
-func withinTime(t time.Time, at []time.Time, w time.Duration) bool {
+func withinTime(t time.Time, at []time.Time) bool {
 	if t.IsZero() {
 		return false
 	}
 	for _, p := range at {
-		if d := t.Sub(p); d < w && d > -w {
+		if d := t.Sub(p); d < filesWindow && d > -filesWindow {
 			return true
 		}
 	}
@@ -579,7 +615,9 @@ func isScratch(p string) bool {
 func inRepository(p string) bool {
 	dir := filepath.Dir(p)
 	if v, ok := repoCheck.Load(dir); ok {
-		return v.(bool)
+		if known, isBool := v.(bool); isBool {
+			return known
+		}
 	}
 	found := inRepositoryUncached(p)
 	repoCheck.Store(dir, found)
@@ -634,8 +672,8 @@ func trimPathTo(p string, width int) string {
 func tailToColumns(s string, width int) string {
 	r := []rune(s)
 	n := 0
-	for i := len(r) - 1; i >= 0; i-- {
-		w := termwidth.RuneColumns(r[i])
+	for i, v := range slices.Backward(r) {
+		w := termwidth.RuneColumns(v)
 		if n+w > width {
 			return string(r[i+1:])
 		}

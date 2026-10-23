@@ -25,7 +25,7 @@ var rxTeamcityLine = regexp.MustCompile(`(?m)^##teamcity\[.*\]$`)
 // rxOneLine folds a recall block onto one line, tags included.
 func rxOneLine(block string) string {
 	var kept []string
-	for _, ln := range strings.Split(block, "\n") {
+	for ln := range strings.SplitSeq(block, "\n") {
 		if ln = strings.TrimSpace(ln); ln != "" {
 			kept = append(kept, ln)
 		}
@@ -61,7 +61,10 @@ func withoutOwnRecall(raw json.RawMessage) json.RawMessage {
 		}
 		content = content[:start] + content[start+end+len("</deja-recall>"):]
 	}
-	b, _ := json.Marshal(strings.TrimSpace(content))
+	b, err := json.Marshal(strings.TrimSpace(content))
+	if err != nil {
+		return raw
+	}
 	m["content"] = b
 	out, err := json.Marshal(m)
 	if err != nil {
@@ -106,8 +109,8 @@ var rxHostBlockTags = []string{
 }
 
 // rxStripBlocks drops each closed block that opens with open (a tag name
-// that may carry attributes) and ends with close.
-func rxStripBlocks(text, open, close string) string {
+// that may carry attributes) and ends with closing.
+func rxStripBlocks(text, open, closing string) string {
 	for from := 0; ; {
 		i := strings.Index(text[from:], open)
 		if i < 0 {
@@ -118,11 +121,11 @@ func rxStripBlocks(text, open, close string) string {
 			from = next
 			continue
 		}
-		j := strings.Index(text[i:], close)
+		j := strings.Index(text[i:], closing)
 		if j < 0 {
 			return text
 		}
-		text = text[:i] + text[i+j+len(close):]
+		text = text[:i] + text[i+j+len(closing):]
 		from = i
 	}
 }

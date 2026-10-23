@@ -16,8 +16,8 @@ func TestTheWithheldCountFollowsTheWordFormsSearchDoes(t *testing.T) {
 	home := filepath.Join(tmp, "home")
 	root := filepath.Join(home, "claude")
 	jobs := filepath.Join(root, ".claude", "jobs", "abc", "-w-app")
-	real := filepath.Join(root, "-w-app")
-	for _, d := range []string{jobs, real} {
+	realPath := filepath.Join(root, "-w-app")
+	for _, d := range []string{jobs, realPath} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -31,7 +31,7 @@ func TestTheWithheldCountFollowsTheWordFormsSearchDoes(t *testing.T) {
 	}
 	// The withheld session writes the plural; the reader types the singular.
 	write(jobs, "scratch", "the quokka pools kept starving under load")
-	write(real, "keeper", "the invoice renderer lost its footer")
+	write(realPath, "keeper", "the invoice renderer lost its footer")
 
 	setHome(t, home)
 	t.Setenv("DEJA_CLAUDE_ROOT", root)

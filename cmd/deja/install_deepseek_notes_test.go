@@ -24,12 +24,12 @@ func driveDSHAuto(t *testing.T, web, withLib, card bool) (string, string) {
 		t.Skip("node is needed to run the plugin dsh would run")
 	}
 	home := dshStatusHome(t)
-	if _, err := installDeepSeekAuto("/usr/local/bin/deja", false); err != nil {
-		t.Fatal(err)
+	if _, ierr := installDeepSeekAuto("/usr/local/bin/deja", false); ierr != nil {
+		t.Fatal(ierr)
 	}
 	if !withLib {
-		if err := os.Remove(dshLibPath()); err != nil {
-			t.Fatal(err)
+		if rerr := os.Remove(dshLibPath()); rerr != nil {
+			t.Fatal(rerr)
 		}
 	}
 	stub := filepath.Join(home, "deja")
@@ -42,11 +42,11 @@ func driveDSHAuto(t *testing.T, web, withLib, card bool) (string, string) {
 		"  hook-prompt) printf '{\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":\"MODEL TEXT hook-prompt\"},\"systemMessage\":\"deja-vu — you have been here: \\\\\"zorbit drain\\\\\" (4d ago · via: drain)\"}' ;;\n" +
 		"  hook-context) printf '{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"MODEL TEXT hook-context\"},\"systemMessage\":\"deja: first build done\"}' ;;\n" +
 		"esac\n"
-	if err := os.WriteFile(stub, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(stub, []byte(script), 0o755); werr != nil {
+		t.Fatal(werr)
 	}
-	if err := os.WriteFile(dshAutoPath(), []byte(dshAutoJS(stub)), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(dshAutoPath(), []byte(dshAutoJS(stub)), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	loadCard := ""
 	if card {
@@ -82,10 +82,10 @@ for (const r of routes) {
 }
 `
 	run := filepath.Join(home, "drive.mjs")
-	if err := os.WriteFile(run, []byte(driver), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(run, []byte(driver), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
-	out, err := exec.Command(node, run, dshAutoPath(), dshNotesPath()).CombinedOutput()
+	out, err := exec.CommandContext(t.Context(), node, run, dshAutoPath(), dshNotesPath()).CombinedOutput()
 	if err != nil {
 		t.Fatalf("driving auto.js: %v\n%s", err, out)
 	}
@@ -153,11 +153,14 @@ func TestDeepSeekAutoWritesTheNotesCard(t *testing.T) {
 	}
 	dir := filepath.Join(home, ".dsh", "plugins", "deja-notes")
 	var pkg struct {
-		Name, Version string
-		Exports       map[string]string
-		Dsh           struct {
-			Client struct{ Platform string }
-		}
+		Name    string            `json:"name"`
+		Version string            `json:"version"`
+		Exports map[string]string `json:"exports"`
+		Dsh     struct {
+			Client struct {
+				Platform string `json:"platform"`
+			} `json:"client"`
+		} `json:"dsh"`
 	}
 	b, err := os.ReadFile(filepath.Join(dir, "package.json"))
 	if err != nil {

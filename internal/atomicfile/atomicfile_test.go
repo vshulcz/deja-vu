@@ -64,9 +64,7 @@ func TestConcurrentWritersNeverPublishAMix(t *testing.T) {
 		}(w)
 	}
 	var reads, mixed int64
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for !stop.Load() {
 			got, err := os.ReadFile(path)
 			if err != nil {
@@ -84,7 +82,7 @@ func TestConcurrentWritersNeverPublishAMix(t *testing.T) {
 				atomic.AddInt64(&mixed, 1)
 			}
 		}
-	}()
+	})
 	// The writers finish first, then the reader is told to stop: waiting on the
 	// reader before setting the flag is a deadlock, which is how the first cut
 	// of this test hung.
@@ -265,10 +263,7 @@ func TestWriteStreamPublishesWhatItWroteAndKeepsTheMode(t *testing.T) {
 
 	if err := WriteStream(path, 0o640, func(w io.Writer) error {
 		for off := 0; off < len(body); off += 512 {
-			end := off + 512
-			if end > len(body) {
-				end = len(body)
-			}
+			end := min(off+512, len(body))
 			if _, err := w.Write(body[off:end]); err != nil {
 				return err
 			}
@@ -348,7 +343,7 @@ func TestWriteStreamLeavesNoTempWhenTheRenameFails(t *testing.T) {
 func TestWriteStreamToAMissingDirectoryFailsCleanly(t *testing.T) {
 	dir := t.TempDir()
 	called := false
-	err := WriteStream(filepath.Join(dir, "gone", "sidecar.bin"), 0o600, func(w io.Writer) error {
+	err := WriteStream(filepath.Join(dir, "gone", "sidecar.bin"), 0o600, func(_ io.Writer) error {
 		called = true
 		return nil
 	})

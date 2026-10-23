@@ -5,6 +5,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -89,10 +90,8 @@ func clientMCPDenied(name string) string {
 	case "grok":
 		p := filepath.Join(sources.GrokHome(), "config.toml")
 		if b, err := readConfig(p); err == nil {
-			for _, s := range tomlTopLevelStrings(string(b), "disabled_mcp_servers") {
-				if nameIsDeja(s) {
-					return mcpOffNote(name, "`disabled_mcp_servers` lists deja", p)
-				}
+			if slices.ContainsFunc(tomlTopLevelStrings(string(b), "disabled_mcp_servers"), nameIsDeja) {
+				return mcpOffNote(name, "`disabled_mcp_servers` lists deja", p)
 			}
 		}
 	case "omp", "gjc":
@@ -191,23 +190,7 @@ func clientHooksOff(name string) string {
 			return hooksOffNote(name, "`disableAllHooks: true`", p)
 		}
 	case "gemini":
-		p := filepath.Join(sources.GeminiHome(), "settings.json")
-		if jsonAt(readJSONConfig(p), "hooksConfig", "enabled") == false &&
-			!projectSettingSays([]string{".gemini/settings.json"}, true, "hooksConfig", "enabled") {
-			return hooksOffNote(name, "`hooksConfig.enabled: false`", p)
-		}
-		// What `gemini extensions disable deja` writes: rules over the
-		// workspace path, the last one that matches winning.
-		p = filepath.Join(sources.GeminiHome(), "extensions", "extension-enablement.json")
-		if cwd, err := os.Getwd(); err == nil {
-			if real, err := filepath.EvalSymlinks(cwd); err == nil {
-				cwd = real
-			}
-			if geminiExtensionEnabled(jsonStrings(jsonAt(readJSONConfig(p), "deja", "overrides")), cwd) {
-				return ""
-			}
-			return pluginOffNote(name, "deja's extension is disabled for this directory", p)
-		}
+		return clientHooksOffGemini(name)
 	case "codex-hook":
 		p := filepath.Join(sources.CodexHome(), "config.toml")
 		if b, err := readConfig(p); err == nil {
@@ -221,71 +204,9 @@ func clientHooksOff(name string) string {
 			}
 		}
 	case "openclaw":
-		root := openclawDoctorRoot()
-		switch {
-		case jsonAt(root, "hooks", "internal", "enabled") == false:
-			return hooksOffNote(name, "`hooks.internal.enabled: false`", openclawFileFor("hooks", "internal", "enabled"))
-		case jsonAt(root, "hooks", "internal", "entries", openclawHookName, "enabled") == false:
-			return pluginOffNote(name, "`hooks.internal.entries."+openclawHookName+".enabled: false`", openclawFileFor("hooks", "internal", "entries", openclawHookName, "enabled"))
-		}
-		// The plugin is the per-prompt half; the hook pack above still runs
-		// at bootstrap without it.
-		// OpenClaw's own order: the master switch, the deny list, the entry,
-		// then a non-empty allow list that does not name the plugin.
-		if jsonAt(root, "plugins", "enabled") == false {
-			return "switched off: `plugins.enabled: false` in " + reportPath(openclawFileFor("plugins", "enabled")) +
-				" — openclaw loads no plugins, so deja's recall on each prompt never runs"
-		}
-		if jsonAt(root, "plugins", "entries", openclawPluginID, "enabled") == false || anyDeja(openclawPluginList(root, "deny")) {
-			return "switched off: deja's plugin, by `plugins.entries` or `plugins.deny` in " + reportPath(openclawFileFor("plugins", "entries")) +
-				" — openclaw will not run its recall on each prompt"
-		}
-		// A memory or context-engine slot naming deja loads it past the list.
-		slot := func(k string) bool {
-			s, _ := jsonAt(root, "plugins", "slots", k).(string)
-			return strings.TrimSpace(s) == openclawPluginID
-		}
-		if allow := openclawPluginList(root, "allow"); len(allow) > 0 && !anyDeja(allow) && !slot("memory") && !slot("contextEngine") {
-			return "blocked: `plugins.allow` in " + reportPath(openclawFileFor("plugins", "allow")) + " does not name deja, so openclaw keeps deja's plugin off" +
-				" and runs no recall on each prompt — add \"deja\" to it"
-		}
-		// From 2026.8.1 the gateway drops the plugin's prompt hooks without the
-		// grant, and says so only in its own log.
-		grant := jsonAt(root, "plugins", "entries", openclawPluginID, "hooks", openclawAccessKey)
-		if jsonAt(root, "plugins", "entries", openclawPluginID) != nil && grant != true {
-			if v := openclawVersion(); v == "" || openclawVersionAtLeast(v, openclawAccessGate) {
-				what := "`plugins.entries.deja.hooks." + openclawAccessKey + "`"
-				p := openclawFileFor("plugins", "entries", openclawPluginID, "hooks", openclawAccessKey)
-				if grant == false {
-					return "switched off: " + what + " is false in " + reportPath(p) +
-						" — OpenClaw " + openclawAccessGate + "+ then drops deja's per-prompt recall"
-				}
-				return "blocked: no " + what + " in " + reportPath(p) +
-					" — OpenClaw " + openclawAccessGate + "+ drops deja's per-prompt recall; `deja install openclaw-auto` sets it"
-			}
-		}
+		return clientHooksOffOpenClaw(name)
 	case "goose":
-		// Goose reads plugin settings from ~/.config/goose (or under
-		// GOOSE_PATH_ROOT) whatever XDG says, and the project's local and
-		// shared files first: the first one naming deja decides.
-		user := filepath.Join(sources.Home(), ".config", "goose", "settings.json")
-		if root := os.Getenv("GOOSE_PATH_ROOT"); filepath.IsAbs(root) {
-			user = filepath.Join(root, ".config", "goose", "settings.json")
-		}
-		files := []string{user}
-		if cwd, err := os.Getwd(); err == nil {
-			project := filepath.Join(cwd, ".config", "goose")
-			files = []string{filepath.Join(project, "settings.local.json"), filepath.Join(project, "settings.json"), user}
-		}
-		for _, p := range files {
-			root := readJSONConfig(p)
-			if listHasDeja(jsonAt(root, "disabledPlugins")) {
-				return pluginOffNote(name, "`disabledPlugins` lists deja", p)
-			}
-			if listHasDeja(jsonAt(root, "enabledPlugins")) {
-				break
-			}
-		}
+		return clientHooksOffGoose(name)
 	case "pi", "senpi":
 		dir := sources.PiConfigDir()
 		if name == "senpi" {
@@ -296,20 +217,7 @@ func clientHooksOff(name string) string {
 			return pluginOffNote(name, "`"+s+"` in `extensions`", p)
 		}
 	case "omp", "gjc":
-		dir := sources.OmpConfigDir()
-		if name == "gjc" {
-			dir = sources.GjcConfigDir()
-		}
-		p := filepath.Join(dir, "config.yml")
-		if b, err := readConfig(p); err == nil {
-			_, items, _ := yamlLookup(string(b), "disabledExtensions")
-			for _, s := range items {
-				// The id is extension-module:<name>; a bare name is not read.
-				if s == "extension-module:deja" {
-					return pluginOffNote(name, "`disabledExtensions` lists "+s, p)
-				}
-			}
-		}
+		return clientHooksOffOmp(name)
 	case "cline":
 		// Cline filters plugin module files by exact path, and its toggle
 		// writes the module's path: a name or the plugin's directory is not
@@ -339,6 +247,123 @@ func clientHooksOff(name string) string {
 	case "deepseek":
 		if b, err := readConfig(dshPatchPath()); err == nil && dshRowDisabled(string(b), "deja-auto") {
 			return pluginOffNote("dsh", "`disabled: true` on the deja-auto row", dshPatchPath())
+		}
+	}
+	return ""
+}
+
+// clientHooksOffGemini is clientHooksOff for gemini: the hooks switch, then
+// the extension's enablement rules.
+func clientHooksOffGemini(name string) string {
+	p := filepath.Join(sources.GeminiHome(), "settings.json")
+	if jsonAt(readJSONConfig(p), "hooksConfig", "enabled") == false &&
+		!projectSettingSays([]string{".gemini/settings.json"}, true, "hooksConfig", "enabled") {
+		return hooksOffNote(name, "`hooksConfig.enabled: false`", p)
+	}
+	// What `gemini extensions disable deja` writes: rules over the
+	// workspace path, the last one that matches winning.
+	p = filepath.Join(sources.GeminiHome(), "extensions", "extension-enablement.json")
+	if cwd, err := os.Getwd(); err == nil {
+		if resolved, err := filepath.EvalSymlinks(cwd); err == nil {
+			cwd = resolved
+		}
+		if geminiExtensionEnabled(jsonStrings(jsonAt(readJSONConfig(p), "deja", "overrides")), cwd) {
+			return ""
+		}
+		return pluginOffNote(name, "deja's extension is disabled for this directory", p)
+	}
+	return ""
+}
+
+// clientHooksOffOpenClaw is clientHooksOff for openclaw: the hook pack, then
+// the plugin.
+func clientHooksOffOpenClaw(name string) string {
+	root := openclawDoctorRoot()
+	switch {
+	case jsonAt(root, "hooks", "internal", "enabled") == false:
+		return hooksOffNote(name, "`hooks.internal.enabled: false`", openclawFileFor("hooks", "internal", "enabled"))
+	case jsonAt(root, "hooks", "internal", "entries", openclawHookName, "enabled") == false:
+		return pluginOffNote(name, "`hooks.internal.entries."+openclawHookName+".enabled: false`", openclawFileFor("hooks", "internal", "entries", openclawHookName, "enabled"))
+	}
+	// The plugin is the per-prompt half; the hook pack above still runs
+	// at bootstrap without it.
+	// OpenClaw's own order: the master switch, the deny list, the entry,
+	// then a non-empty allow list that does not name the plugin.
+	if jsonAt(root, "plugins", "enabled") == false {
+		return "switched off: `plugins.enabled: false` in " + reportPath(openclawFileFor("plugins", "enabled")) +
+			" — openclaw loads no plugins, so deja's recall on each prompt never runs"
+	}
+	if jsonAt(root, "plugins", "entries", openclawPluginID, "enabled") == false || anyDeja(openclawPluginList(root, "deny")) {
+		return "switched off: deja's plugin, by `plugins.entries` or `plugins.deny` in " + reportPath(openclawFileFor("plugins", "entries")) +
+			" — openclaw will not run its recall on each prompt"
+	}
+	// A memory or context-engine slot naming deja loads it past the list.
+	slot := func(k string) bool {
+		s, _ := jsonAt(root, "plugins", "slots", k).(string)
+		return strings.TrimSpace(s) == openclawPluginID
+	}
+	if allow := openclawPluginList(root, "allow"); len(allow) > 0 && !anyDeja(allow) && !slot("memory") && !slot("contextEngine") {
+		return "blocked: `plugins.allow` in " + reportPath(openclawFileFor("plugins", "allow")) + " does not name deja, so openclaw keeps deja's plugin off" +
+			" and runs no recall on each prompt — add \"deja\" to it"
+	}
+	// From 2026.8.1 the gateway drops the plugin's prompt hooks without the
+	// grant, and says so only in its own log.
+	grant := jsonAt(root, "plugins", "entries", openclawPluginID, "hooks", openclawAccessKey)
+	if jsonAt(root, "plugins", "entries", openclawPluginID) != nil && grant != true {
+		if v := openclawVersion(); v == "" || openclawVersionAtLeast(v, openclawAccessGate) {
+			what := "`plugins.entries.deja.hooks." + openclawAccessKey + "`"
+			p := openclawFileFor("plugins", "entries", openclawPluginID, "hooks", openclawAccessKey)
+			if grant == false {
+				return "switched off: " + what + " is false in " + reportPath(p) +
+					" — OpenClaw " + openclawAccessGate + "+ then drops deja's per-prompt recall"
+			}
+			return "blocked: no " + what + " in " + reportPath(p) +
+				" — OpenClaw " + openclawAccessGate + "+ drops deja's per-prompt recall; `deja install openclaw-auto` sets it"
+		}
+	}
+	return ""
+}
+
+// clientHooksOffGoose is clientHooksOff for goose's plugin settings.
+func clientHooksOffGoose(name string) string {
+	// Goose reads plugin settings from ~/.config/goose (or under
+	// GOOSE_PATH_ROOT) whatever XDG says, and the project's local and
+	// shared files first: the first one naming deja decides.
+	user := filepath.Join(sources.Home(), ".config", "goose", "settings.json")
+	if root := os.Getenv("GOOSE_PATH_ROOT"); filepath.IsAbs(root) {
+		user = filepath.Join(root, ".config", "goose", "settings.json")
+	}
+	files := []string{user}
+	if cwd, err := os.Getwd(); err == nil {
+		project := filepath.Join(cwd, ".config", "goose")
+		files = []string{filepath.Join(project, "settings.local.json"), filepath.Join(project, "settings.json"), user}
+	}
+	for _, p := range files {
+		root := readJSONConfig(p)
+		if listHasDeja(jsonAt(root, "disabledPlugins")) {
+			return pluginOffNote(name, "`disabledPlugins` lists deja", p)
+		}
+		if listHasDeja(jsonAt(root, "enabledPlugins")) {
+			break
+		}
+	}
+	return ""
+}
+
+// clientHooksOffOmp is clientHooksOff for omp and gjc's disabledExtensions.
+func clientHooksOffOmp(name string) string {
+	dir := sources.OmpConfigDir()
+	if name == "gjc" {
+		dir = sources.GjcConfigDir()
+	}
+	p := filepath.Join(dir, "config.yml")
+	if b, err := readConfig(p); err == nil {
+		_, items, _ := yamlLookup(string(b), "disabledExtensions")
+		for _, s := range items {
+			// The id is extension-module:<name>; a bare name is not read.
+			if s == "extension-module:deja" {
+				return pluginOffNote(name, "`disabledExtensions` lists "+s, p)
+			}
 		}
 	}
 	return ""
@@ -389,8 +414,8 @@ func doctorProjectDir(mainRepo bool) string {
 	if err != nil {
 		return ""
 	}
-	if real, err := filepath.EvalSymlinks(cwd); err == nil {
-		cwd = real
+	if resolved, err := filepath.EvalSymlinks(cwd); err == nil {
+		cwd = resolved
 	}
 	root := gitRootOf(filepath.Join(cwd, "x"))
 	if root == "" {

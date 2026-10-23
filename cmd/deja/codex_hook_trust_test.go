@@ -143,8 +143,8 @@ func TestRewriteCodexHookTrustKeepsWhatIsNotAPin(t *testing.T) {
 // Matching positions stays linear in the hooks: an insertion sort inside the
 // loop made 1,500 hooks take seconds.
 func TestCodexTrustMovesIsFastOnALongHooksFile(t *testing.T) {
-	var groups []any
-	for i := 0; i < 3000; i++ {
+	groups := make([]any, 0, 3000)
+	for i := range 3000 {
 		groups = append(groups, map[string]any{"hooks": []any{map[string]any{"type": "command", "command": "c" + strconv.Itoa(i)}}})
 	}
 	before := map[string]any{"hooks": map[string]any{"SessionStart": groups}}
@@ -202,12 +202,21 @@ func TestInstallDroppingADuplicateMovesTheReadersPin(t *testing.T) {
 	if err := json.Unmarshal([]byte(readString(t, hooksPath)), &root); err != nil {
 		t.Fatal(err)
 	}
-	hooks := root["hooks"].(map[string]any)
-	ups := hooks["UserPromptSubmit"].([]any)
+	hooks, ok := root["hooks"].(map[string]any)
+	if !ok {
+		t.Fatalf("no hooks in %s", hooksPath)
+	}
+	ups, ok := hooks["UserPromptSubmit"].([]any)
+	if !ok || len(ups) == 0 {
+		t.Fatalf("no UserPromptSubmit hooks in %s", hooksPath)
+	}
 	mine := map[string]any{"hooks": []any{map[string]any{"type": "command", "command": "~/bin/mine.sh"}}}
 	hooks["UserPromptSubmit"] = []any{ups[0], ups[0], mine}
-	b, _ := json.MarshalIndent(root, "", "  ")
-	if err := os.WriteFile(hooksPath, b, 0o600); err != nil {
+	b, err := json.MarshalIndent(root, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(hooksPath, b, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	pin := func(g int, hash string) string {

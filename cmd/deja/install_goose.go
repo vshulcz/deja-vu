@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -33,7 +34,7 @@ import (
 // inlineYAMLValue returns the value written on the same line as a top-level
 // key, or "" when the key is absent or opens a block.
 func inlineYAMLValue(doc, key string) string {
-	for _, line := range strings.Split(doc, "\n") {
+	for line := range strings.SplitSeq(doc, "\n") {
 		if !strings.HasPrefix(line, key) {
 			continue
 		}
@@ -50,7 +51,7 @@ func inlineYAMLValue(doc, key string) string {
 // a sequence item rather than a mapping entry, skipping blank lines and
 // comments. A block that is empty, or holds mapping entries, is not one.
 func yamlBlockIsSequence(block string) bool {
-	for _, line := range strings.Split(block, "\n") {
+	for line := range strings.SplitSeq(block, "\n") {
 		if strings.TrimSpace(line) == "" || strings.HasPrefix(strings.TrimSpace(line), "#") {
 			continue
 		}
@@ -384,7 +385,7 @@ func yamlKeyLineEnd(s, key string) int {
 // nested inside ours rather than beside it (#2614). An empty block has no
 // indent to follow and gives "".
 func yamlBlockIndent(block string) string {
-	for _, line := range strings.Split(block, "\n") {
+	for line := range strings.SplitSeq(block, "\n") {
 		if strings.TrimSpace(line) == "" || strings.HasPrefix(strings.TrimSpace(line), "#") {
 			continue
 		}
@@ -493,11 +494,11 @@ func installGooseAuto(exe string, uninstall bool) (installResult, error) {
 	// there, and uninstall left its snapshot off the closing line (#4269).
 	hintsBefore, hintsErr := os.ReadFile(path)
 	hints := func() installResult {
-		after, err := os.ReadFile(path)
+		after, reerr := os.ReadFile(path)
 		switch {
-		case hintsErr != nil && err == nil:
+		case hintsErr != nil && reerr == nil:
 			return installResult{Path: path, Action: "created"}
-		case hintsErr == nil && err != nil:
+		case hintsErr == nil && reerr != nil:
 			return installResult{Path: path, Action: "removed"}
 		case hintsErr == nil && !bytes.Equal(hintsBefore, after):
 			return installResult{Path: path, Action: "updated"}
@@ -510,8 +511,8 @@ func installGooseAuto(exe string, uninstall bool) (installResult, error) {
 		plugin := filepath.Dir(filepath.Dir(gooseHookPath()))
 		removed := isRealDir(plugin)
 		_ = os.RemoveAll(plugin)
-		if dropped, err := dropGoosePluginEntryIn(plugin); err != nil {
-			return installResult{}, err
+		if dropped, derr := dropGoosePluginEntryIn(plugin); derr != nil {
+			return installResult{}, derr
 		} else if dropped && res.Action == "unchanged" {
 			res.Action = "updated"
 		}
@@ -536,8 +537,8 @@ func installGooseAuto(exe string, uninstall bool) (installResult, error) {
 		}
 		return wroteAll(res, hints()), nil
 	}
-	if err := refreshGooseHints(); err != nil {
-		return installResult{}, err
+	if reerr := refreshGooseHints(); reerr != nil {
+		return installResult{}, reerr
 	}
 	// The hook is the whole of what -auto adds over the plain target, and it
 	// was written without a word: run `deja install goose` and then
@@ -633,8 +634,8 @@ func writeGooseHook(exe string) (string, error) {
 	body = append(body, '\n')
 	path := gooseHookPath()
 	noteCreatedDirs(filepath.Dir(path))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return "", err
+	if merr := os.MkdirAll(filepath.Dir(path), 0o755); merr != nil {
+		return "", merr
 	}
 	old, err := readConfig(path)
 	if err != nil {
@@ -760,7 +761,7 @@ func refreshSharedGooseDigest(dir, session string) error {
 	path := gooseHintsPath()
 	old, err := readConfig(path)
 	if err != nil {
-		return nil
+		return nil //nolint:nilerr // no hints file, nothing to clear
 	}
 	doc := string(old)
 	start := strings.Index(doc, gooseRecallStart)
@@ -814,7 +815,7 @@ func clearGooseRecall() error {
 	if path != gooseHintsPath() {
 		// The MOIM file is deja's own; emptying it is the whole of it.
 		if _, err := os.Stat(path); err != nil {
-			return nil
+			return nil //nolint:nilerr // nothing to clear
 		}
 		return os.Remove(path)
 	}
@@ -908,17 +909,17 @@ func refreshGooseHintsFor(cwd, session string) error {
 func dropGooseRecallBlock(path string) error {
 	old, err := readConfig(path)
 	if err != nil || len(old) == 0 {
-		return nil
+		return nil //nolint:nilerr // nothing to drop
 	}
-	start := strings.Index(string(old), gooseRecallStart)
+	start := bytes.Index(old, []byte(gooseRecallStart))
 	if start < 0 {
 		return nil
 	}
 	rest := string(old)[start:]
-	end := strings.Index(rest, gooseRecallEnd)
+	_, after0, ok := strings.Cut(rest, gooseRecallEnd)
 	before, after := string(old)[:start], ""
-	if end >= 0 {
-		after = strings.TrimLeft(rest[end+len(gooseRecallEnd):], "\n")
+	if ok {
+		after = strings.TrimLeft(after0, "\n")
 	}
 	// The block went in after the reader's text and a blank line; at the end
 	// of the file that blank line leaves with it, or every round trip gave the
@@ -951,7 +952,7 @@ func dropRetiredGooseHints() error {
 	path := retiredGooseHintsPath()
 	old, err := readConfig(path)
 	if err != nil || len(old) == 0 {
-		return nil
+		return nil //nolint:nilerr // nothing to drop
 	}
 	if strings.Contains(string(old), gooseRecallStart) {
 		return dropGooseRecallBlock(path)
@@ -1018,7 +1019,7 @@ func cmdGoose(dir string, rest []string, sourceInstance string) error {
 	if err != nil {
 		return fmt.Errorf("goose is not on PATH: %w", err)
 	}
-	cmd := exec.Command(bin, rest...)
+	cmd := exec.CommandContext(context.Background(), bin, rest...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	// Waited for through Ctrl-C, so the file goes with the session.
 	return runOutlivingSignals(cmd)

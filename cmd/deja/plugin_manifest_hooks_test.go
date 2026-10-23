@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -41,9 +42,7 @@ func TestPluginManifestHooksWhatTheInstallerHooks(t *testing.T) {
 		"deja.sh")
 	// Claude Code loads hooks/hooks.json beside the manifest's own; the events
 	// an older Claude rejects live there (#4488).
-	for event, matcher := range hookMatchers(t, repoFile(t, "claude-plugin/hooks/hooks.json"), "deja.sh") {
-		manifest[event] = matcher
-	}
+	maps.Copy(manifest, hookMatchers(t, repoFile(t, "claude-plugin/hooks/hooks.json"), "deja.sh"))
 
 	for _, event := range sortedKeys(wired) {
 		got, ok := manifest[event]

@@ -44,12 +44,12 @@ func TestTheSessionStartBlockCarriesAllThreePieces(t *testing.T) {
 	notes := filepath.Join(tmp, "notes.jsonl")
 	t.Setenv("DEJA_NOTES_FILE", notes)
 
-	at := func(min int) string {
-		return time.Now().Add(-time.Duration(min) * time.Minute).UTC().Format(time.RFC3339)
+	at := func(least int) string {
+		return time.Now().Add(-time.Duration(least) * time.Minute).UTC().Format(time.RFC3339)
 	}
 	wall := "psql: error: connection refused while starting the migration runner pool"
 	var lines []string
-	for k := 0; k < 4; k++ {
+	for k := range 4 {
 		sid := fmt.Sprintf("w%d", k)
 		lines = []string{
 			fmt.Sprintf(`{"type":"user","sessionId":%q,"timestamp":%q,"cwd":`+string(workJSON)+`,"message":{"role":"user","content":"the migration runner keeps stalling on the pool"}}`, sid, at(300-10*k)),

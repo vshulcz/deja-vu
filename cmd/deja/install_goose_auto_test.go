@@ -46,8 +46,8 @@ func TestGooseAutoSaysItWroteTheHook(t *testing.T) {
 	// Reporting the hook blind would say "unchanged" over a config deja just
 	// put back.
 	config := filepath.Join(gooseConfigDir(), "config.yaml")
-	if err := os.WriteFile(config, []byte("GOOSE_PROVIDER: openai\n"), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(config, []byte("GOOSE_PROVIDER: openai\n"), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	back, err := installTarget("goose-auto", exe, false)
 	if err != nil {

@@ -13,7 +13,7 @@ import (
 func TestShowNamesTheSessionsAroundASpawn(t *testing.T) {
 	old := ChildrenOfSession
 	t.Cleanup(func() { ChildrenOfSession = old })
-	ChildrenOfSession = func(dir, id string) ([]model.Session, error) {
+	ChildrenOfSession = func(_, id string) ([]model.Session, error) {
 		if id != "01a00a65-7a72-7102-9574-0de51ab0d0ee" {
 			return nil, nil
 		}
@@ -42,10 +42,10 @@ func TestShowNamesTheSessionsAroundASpawn(t *testing.T) {
 	// One long session spawns a hundred agents. Naming every child buries the
 	// count, which is the part a reader can act on.
 	many := make([]model.Session, 0, 161)
-	for i := 0; i < 161; i++ {
+	for i := range 161 {
 		many = append(many, model.Session{ID: "aa" + strings.Repeat("b", 8) + string(rune('a'+i%26))})
 	}
-	ChildrenOfSession = func(dir, id string) ([]model.Session, error) { return many, nil }
+	ChildrenOfSession = func(_, _ string) ([]model.Session, error) { return many, nil }
 	w.Reset()
 	printSpawnEdges(&w, "", model.Session{ID: "busy-parent"})
 	got = w.String()
@@ -55,7 +55,7 @@ func TestShowNamesTheSessionsAroundASpawn(t *testing.T) {
 	if len(got) > 200 {
 		t.Errorf("the children line is %d characters long:\n%s", len(got), got)
 	}
-	ChildrenOfSession = func(dir, id string) ([]model.Session, error) {
+	ChildrenOfSession = func(_, id string) ([]model.Session, error) {
 		if id != "01a00a65-7a72-7102-9574-0de51ab0d0ee" {
 			return nil, nil
 		}

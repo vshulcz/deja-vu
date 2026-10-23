@@ -100,7 +100,7 @@ func TestGooseCommandRoundTripsAtEveryIndent(t *testing.T) {
 			}
 			// One list, one indent: an entry spliced in at another width is a
 			// file no YAML parser will read.
-			for _, line := range strings.Split(string(wired), "\n") {
+			for line := range strings.SplitSeq(string(wired), "\n") {
 				if strings.HasPrefix(strings.TrimLeft(line, " \t"), "- command:") &&
 					line[:len(line)-len(strings.TrimLeft(line, " \t"))] != c.indent {
 					t.Errorf("an entry was written at another indent than the list:\n%s", wired)
@@ -108,7 +108,7 @@ func TestGooseCommandRoundTripsAtEveryIndent(t *testing.T) {
 				}
 			}
 
-			if _, err := installGooseCommand("/opt/deja", true); err != nil {
+			if _, err = installGooseCommand("/opt/deja", true); err != nil {
 				t.Fatal(err)
 			}
 			back, err := os.ReadFile(path)
@@ -135,7 +135,7 @@ func TestGooseCommandSurvivesWindowsLineEndings(t *testing.T) {
 	if err := os.WriteFile(path, []byte("other: 1\r\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		if _, err := installGooseCommand("/opt/deja", false); err != nil {
 			t.Fatal(err)
 		}
@@ -147,7 +147,7 @@ func TestGooseCommandSurvivesWindowsLineEndings(t *testing.T) {
 	if n := strings.Count(string(wired), "slash_commands:"); n != 1 {
 		t.Errorf("%d slash_commands keys after two installs:\n%s", n, wired)
 	}
-	if _, err := installGooseCommand("/opt/deja", true); err != nil {
+	if _, err = installGooseCommand("/opt/deja", true); err != nil {
 		t.Fatal(err)
 	}
 	back, err := os.ReadFile(path)

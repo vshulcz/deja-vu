@@ -16,8 +16,8 @@ import (
 // indexing.
 func TestWalkFilesSkipsNamedPipes(t *testing.T) {
 	dir := t.TempDir()
-	real := filepath.Join(dir, "real.jsonl")
-	if err := os.WriteFile(real, []byte("{}\n"), 0o644); err != nil {
+	resolved := filepath.Join(dir, "real.jsonl")
+	if err := os.WriteFile(resolved, []byte("{}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	pipe := filepath.Join(dir, "pipe.jsonl")
@@ -29,7 +29,7 @@ func TestWalkFilesSkipsNamedPipes(t *testing.T) {
 
 	var sawReal, sawPipe bool
 	for _, p := range got {
-		if p == real {
+		if p == resolved {
 			sawReal = true
 		}
 		if p == pipe {

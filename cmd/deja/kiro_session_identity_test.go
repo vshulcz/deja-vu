@@ -31,7 +31,10 @@ func seedKiroCLI(t *testing.T, id, cwd, parent, prompt, reply string, at time.Ti
 	if parent != "" {
 		header["parent_session_id"] = parent
 	}
-	b, _ := json.Marshal(header)
+	b, err := json.Marshal(header)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(root, id+".json"), b, 0o644); err != nil {
 		t.Fatal(err)
 	}

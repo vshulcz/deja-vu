@@ -55,7 +55,7 @@ func (a *tuiApp) drawNews() {
 	if p.W < 70 {
 		tw = w - 4
 	}
-	var lines [][]string
+	lines := make([][]string, 0, len(a.news))
 	h := 7
 	for _, it := range a.news {
 		l := wrapLines(strings.ReplaceAll(it, "`", ""), max(10, tw-2), 3)

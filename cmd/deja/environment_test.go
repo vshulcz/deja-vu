@@ -27,8 +27,8 @@ func seedWallsHitting(t *testing.T, n int, output string) string {
 	tmp := hermeticEnv(t)
 	// Three project directories, because the block claims something about the
 	// machine and a wall of one repository no longer qualifies.
-	var roots []string
-	for i := 0; i < environmentMinProjects; i++ {
+	roots := make([]string, 0, environmentMinProjects)
+	for i := range environmentMinProjects {
 		root := filepath.Join(tmp, "claude", fmt.Sprintf("proj-w%d", i))
 		if err := os.MkdirAll(root, 0o755); err != nil {
 			t.Fatal(err)
@@ -36,15 +36,15 @@ func seedWallsHitting(t *testing.T, n int, output string) string {
 		roots = append(roots, root)
 	}
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
-	for i := 0; i < n; i++ {
+	for i := range n {
 		sid := fmt.Sprintf("w%02d", i)
 		// Spread over projects: the block claims something about the machine,
 		// and a wall of one repository no longer qualifies.
 		cwd := fmt.Sprintf("/w/proj%d", i%3)
 		body := `{"type":"user","sessionId":"` + sid + `","cwd":"` + cwd + `","timestamp":"2026-07-2` +
-			fmt.Sprint(i%10) + `T10:00:00Z","message":{"role":"user","content":"run the checks"}}` + "\n" +
+			strconv.Itoa(i%10) + `T10:00:00Z","message":{"role":"user","content":"run the checks"}}` + "\n" +
 			`{"type":"user","sessionId":"` + sid + `","cwd":"` + cwd + `","timestamp":"2026-07-2` +
-			fmt.Sprint(i%10) + `T10:05:00Z","message":{"role":"user","content":[{"type":"tool_result",` +
+			strconv.Itoa(i%10) + `T10:05:00Z","message":{"role":"user","content":[{"type":"tool_result",` +
 			`"content":"` + output + `"}]}}` + "\n"
 		if err := os.WriteFile(filepath.Join(roots[i%len(roots)], sid+".jsonl"), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
@@ -234,7 +234,17 @@ func TestEnvironmentBlockIsFramedInMCPRecall(t *testing.T) {
 			if code != 0 {
 				t.Fatal(msg)
 			}
-			out = res.(map[string]any)["messages"].([]map[string]any)[0]["content"].(map[string]any)["text"].(string)
+			reply, _ := res.(map[string]any)
+			msgs, _ := reply["messages"].([]map[string]any)
+			if len(msgs) == 0 {
+				t.Fatalf("prompts/get returned no messages: %#v", res)
+			}
+			content, _ := msgs[0]["content"].(map[string]any)
+			text, ok := content["text"].(string)
+			if !ok {
+				t.Fatalf("prompts/get message has no text: %#v", msgs[0])
+			}
+			out = text
 		}
 		if !strings.Contains(out, "ERRINJ") {
 			t.Fatalf("%s: the fixture produced no environment block, so this proves nothing:\n%s", via, out)

@@ -20,13 +20,13 @@ import (
 func TestResumeCommandPerHarness(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("DEJA_ZCODE_LEGACY_ROOT", filepath.Join(tmp, "zcode-legacy"))
-	real := filepath.Join(tmp, "projects", "my-app")
-	if err := os.MkdirAll(real, 0o755); err != nil {
+	realDir := filepath.Join(tmp, "projects", "my-app")
+	if err := os.MkdirAll(realDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	encoded := strings.ReplaceAll(real, string(filepath.Separator), "-")
-	claudePath := filepath.Join("/claude/projects", encoded, "abc.jsonl")
-	grokPath := filepath.Join(tmp, "grok-sessions", url.PathEscape(real), "019f-grok", "updates.jsonl")
+	encoded := strings.ReplaceAll(realDir, string(filepath.Separator), "-")
+	claudePath := filepath.Join(string(filepath.Separator), "claude", "projects", encoded, "abc.jsonl")
+	grokPath := filepath.Join(tmp, "grok-sessions", url.PathEscape(realDir), "019f-grok", "updates.jsonl")
 
 	aFile := filepath.Join(tmp, "ses_3.json")
 	if err := os.WriteFile(aFile, []byte("{}"), 0o644); err != nil {
@@ -39,12 +39,12 @@ func TestResumeCommandPerHarness(t *testing.T) {
 		wantCmd string
 		wantErr string
 	}{
-		{"claude with resolvable dir", model.Session{Harness: "claude", ID: "abc-123", Project: "projects/my-app", Path: claudePath}, real, "claude --resume abc-123", ""},
+		{"claude with resolvable dir", model.Session{Harness: "claude", ID: "abc-123", Project: "projects/my-app", Path: claudePath}, realDir, "claude --resume abc-123", ""},
 		{"codex rollout", model.Session{Harness: "codex", ID: "uuid-1", Project: "my-app"}, "", "codex resume uuid-1", ""},
 		{"codex history entry", model.Session{Harness: "codex", ID: "uuid-2", Project: "history"}, "", "", "nothing to resume"},
 		// Claude Code deleted the transcript; its prompt log is all that is left (#5046).
 		{"claude prompts only", model.Session{Harness: "claude", ID: "abc-124", Project: "proj/app", Path: filepath.Join(tmp, ".claude", "history.jsonl")}, "", "", "nothing to resume"},
-		{"opencode with dir", model.Session{Harness: "opencode", ID: "ses_1", Project: "my-app", Path: real}, real, "opencode -s ses_1", ""},
+		{"opencode with dir", model.Session{Harness: "opencode", ID: "ses_1", Project: "my-app", Path: realDir}, realDir, "opencode -s ses_1", ""},
 		// opencode reopens a session from any directory; a cd into a deleted one
 		// stopped the command before it started (#4201).
 		{"opencode with its dir gone", model.Session{Harness: "opencode", ID: "ses_2", Project: "gone", Path: filepath.Join(tmp, "projects", "gone")}, "", "opencode -s ses_2", ""},
@@ -52,11 +52,11 @@ func TestResumeCommandPerHarness(t *testing.T) {
 		{"kilo with its dir gone", model.Session{Harness: "kilocode", ID: "ses_4", Project: "gone", Path: filepath.Join(tmp, "projects", "gone")}, "", "kilo -s ses_4", ""},
 		// The ZCode terminal client takes the sess_ id its database stores, and
 		// reopens it from anywhere; the cd keeps the agent in the project (#4430).
-		{"zcode cli session", model.Session{Harness: "zcode", ID: "sess_319135bc-f58b-40b8-b7df-4c32660105f1", Project: "my-app", Path: real}, real, "zcode --resume sess_319135bc-f58b-40b8-b7df-4c32660105f1", ""},
+		{"zcode cli session", model.Session{Harness: "zcode", ID: "sess_319135bc-f58b-40b8-b7df-4c32660105f1", Project: "my-app", Path: realDir}, realDir, "zcode --resume sess_319135bc-f58b-40b8-b7df-4c32660105f1", ""},
 		{"zcode with its dir gone", model.Session{Harness: "zcode", ID: "sess_2", Project: "gone", Path: filepath.Join(tmp, "projects", "gone")}, "", "zcode --resume sess_2", ""},
 		{"zcode legacy snapshot", model.Session{Harness: "zcode", ID: "acp-9", Project: "my-app", Path: filepath.Join(tmp, "zcode-legacy", "ab12", "task-1.json")}, "", "", "restore-legacy-sessions"},
 		{"zcode desktop transcript", model.Session{Harness: "zcode", ID: "abc", Project: "my-app", Path: filepath.Join(tmp, "zcode", "projects", encoded, "abc.jsonl")}, "", "", "CLI database"},
-		{"grok build session", model.Session{Harness: "grok", ID: "019f-grok", Project: "my-app", Path: grokPath}, real, "grok --resume 019f-grok", ""},
+		{"grok build session", model.Session{Harness: "grok", ID: "019f-grok", Project: "my-app", Path: grokPath}, realDir, "grok --resume 019f-grok", ""},
 		{"grok-dev row", model.Session{Harness: "grok", ID: "019f-dev", Project: "my-app", Path: filepath.Join(tmp, "grok.db")}, "", "", "grok-dev store"},
 		{"imported", model.Session{Harness: "claude", ID: "imported-9f5", Project: "imported:my-app"}, "", "", "another machine"},
 		{"unknown harness", model.Session{Harness: "mystery", ID: "x"}, "", "", "don't know how"},
@@ -146,12 +146,12 @@ func TestRunResumePrintAndErrors(t *testing.T) {
 // not enough: run the command anywhere else and it reopens nothing.
 func TestResumeQwenRunsInTheProjectDirectory(t *testing.T) {
 	tmp := t.TempDir()
-	real := filepath.Join(tmp, "projects", "my-app")
-	if err := os.MkdirAll(real, 0o755); err != nil {
+	realDir := filepath.Join(tmp, "projects", "my-app")
+	if err := os.MkdirAll(realDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_QWEN_ROOT", filepath.Join(tmp, "qwen"))
-	path := qwenTranscriptIn(t, filepath.Join(tmp, "qwen"), real, "a2d5a292", true)
+	path := qwenTranscriptIn(t, filepath.Join(tmp, "qwen"), realDir, "a2d5a292", true)
 
 	dir, cmd, err := resumeCommand(model.Session{Harness: "qwen", ID: "a2d5a292", Project: "my-app", Path: path})
 	if err != nil {
@@ -160,8 +160,8 @@ func TestResumeQwenRunsInTheProjectDirectory(t *testing.T) {
 	if cmd != "qwen -r a2d5a292" {
 		t.Fatalf("cmd = %q", cmd)
 	}
-	if runtime.GOOS != "windows" && dir != real {
-		t.Fatalf("dir = %q, want the project directory %q", dir, real)
+	if runtime.GOOS != "windows" && dir != realDir {
+		t.Fatalf("dir = %q, want the project directory %q", dir, realDir)
 	}
 }
 
@@ -169,28 +169,31 @@ func TestResumeQwenRunsInTheProjectDirectory(t *testing.T) {
 // comes from the cwd the transcript records (#4258).
 func TestResumeQwenRunsInANonASCIIProjectDirectory(t *testing.T) {
 	tmp := t.TempDir()
-	real := filepath.Join(tmp, "проект q")
-	if err := os.MkdirAll(real, 0o755); err != nil {
+	realDir := filepath.Join(tmp, "проект q")
+	if err := os.MkdirAll(realDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_QWEN_ROOT", filepath.Join(tmp, "qwen"))
-	encoded := regexp.MustCompile(`[^A-Za-z0-9]`).ReplaceAllString(real, "-")
+	encoded := regexp.MustCompile(`[^A-Za-z0-9]`).ReplaceAllString(realDir, "-")
 	chats := filepath.Join(tmp, "qwen", "projects", encoded, "chats")
 	if err := os.MkdirAll(chats, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	path := filepath.Join(chats, "ee561e79.jsonl")
-	cwd, _ := json.Marshal(real)
+	cwd, err := json.Marshal(realDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 	line := `{"sessionId":"ee561e79","type":"user","cwd":` + string(cwd) + `,"message":{"role":"user","parts":[{"text":"hi"}]}}` + "\n"
-	if err := os.WriteFile(path, []byte(line), 0o644); err != nil {
+	if err = os.WriteFile(path, []byte(line), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	dir, cmd, err := resumeCommand(model.Session{Harness: "qwen", ID: "ee561e79", Path: path})
 	if err != nil || cmd != "qwen -r ee561e79" {
 		t.Fatalf("qwen resume: %q %v", cmd, err)
 	}
-	if dir != real {
-		t.Fatalf("dir = %q, want %q", dir, real)
+	if dir != realDir {
+		t.Fatalf("dir = %q, want %q", dir, realDir)
 	}
 }
 
@@ -239,7 +242,10 @@ func TestResumeKimiRunsInTheSessionDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 	writeState := func(workDir string) {
-		b, _ := json.Marshal(map[string]string{"title": "t", "workDir": workDir})
+		b, err := json.Marshal(map[string]string{"title": "t", "workDir": workDir})
+		if err != nil {
+			t.Fatal(err)
+		}
 		if err := os.WriteFile(filepath.Join(sessionDir, "state.json"), b, 0o644); err != nil {
 			t.Fatal(err)
 		}
@@ -276,7 +282,10 @@ func TestResumePrimeRunsInTheSessionDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 	writeHeader := func(cwd string) {
-		head, _ := json.Marshal(map[string]any{"type": "session", "version": 3, "id": id, "cwd": cwd, "rlmDepth": 0})
+		head, err := json.Marshal(map[string]any{"type": "session", "version": 3, "id": id, "cwd": cwd, "rlmDepth": 0})
+		if err != nil {
+			t.Fatal(err)
+		}
 		turn := `{"type":"message","id":"u1","message":{"role":"user","content":[{"type":"text","text":"fix the retry loop"}]}}`
 		if err := os.WriteFile(path, []byte(string(head)+"\n"+turn+"\n"), 0o644); err != nil {
 			t.Fatal(err)
@@ -302,18 +311,18 @@ func TestResumePrimeRunsInTheSessionDirectory(t *testing.T) {
 // IDE chats come out of a different store and reopen only in the editor.
 func TestResumeCursorSplitsCLIFromIDE(t *testing.T) {
 	tmp := t.TempDir()
-	real := filepath.Join(tmp, "app")
-	if err := os.MkdirAll(real, 0o755); err != nil {
+	realDir := filepath.Join(tmp, "app")
+	if err := os.MkdirAll(realDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	// Cursor encodes without the leading separator: Users-x-app, not -Users-x-app.
-	encoded := strings.TrimPrefix(strings.ReplaceAll(real, string(filepath.Separator), "-"), "-")
+	encoded := strings.TrimPrefix(strings.ReplaceAll(realDir, string(filepath.Separator), "-"), "-")
 	id := "de875c53-88ae-4e73-8953-9813479364d8"
 	path := filepath.Join(tmp, "projects", encoded, "agent-transcripts", id, id+".jsonl")
 	// cursor-agent opens the chat from chats/<md5 of the directory>/<id>.
 	t.Setenv("CURSOR_CONFIG_DIR", tmp)
 	t.Setenv("DEJA_CURSOR_CLI_ROOT", tmp)
-	store := filepath.Join(tmp, "chats", sources.CursorChatBucket(real), id, "store.db")
+	store := filepath.Join(tmp, "chats", sources.CursorChatBucket(realDir), id, "store.db")
 	if err := os.MkdirAll(filepath.Dir(store), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -321,8 +330,11 @@ func TestResumeCursorSplitsCLIFromIDE(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The folder name does not decode back to a Windows path; meta.json names it.
-	meta, _ := json.Marshal(map[string]string{"cwd": real})
-	if err := os.WriteFile(filepath.Join(filepath.Dir(store), "meta.json"), meta, 0o644); err != nil {
+	meta, err := json.Marshal(map[string]string{"cwd": realDir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(filepath.Dir(store), "meta.json"), meta, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -333,8 +345,8 @@ func TestResumeCursorSplitsCLIFromIDE(t *testing.T) {
 	if cmd != "cursor-agent --resume "+id {
 		t.Fatalf("cmd = %q", cmd)
 	}
-	if dir != real {
-		t.Fatalf("dir = %q, want the project directory %q", dir, real)
+	if dir != realDir {
+		t.Fatalf("dir = %q, want the project directory %q", dir, realDir)
 	}
 
 	// An IDE chat carries a composer id from state.vscdb, which cursor-agent
@@ -452,7 +464,7 @@ func TestResumeOpenClawSQLiteUsesTheCurrentSessionKey(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(db), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	create := exec.Command("sqlite3", db)
+	create := exec.CommandContext(t.Context(), "sqlite3", db)
 	create.Stdin = bytes.NewReader(sql)
 	if out, err := create.CombinedOutput(); err != nil {
 		t.Fatalf("create OpenClaw store: %v: %s", err, out)
@@ -493,13 +505,13 @@ func TestResumeOpenClawSQLiteUsesTheCurrentSessionKey(t *testing.T) {
 	second := "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e"
 	stmt := "CREATE TABLE session_nodes (session_key TEXT PRIMARY KEY, current_session_id TEXT NOT NULL); " +
 		"INSERT INTO session_nodes VALUES ('agent:main:main', '" + second + "');"
-	if out, err := exec.Command("sqlite3", db, stmt).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, stmt).CombinedOutput(); err != nil {
 		t.Fatalf("add current-session pointer: %v: %s", err, out)
 	}
 	check(second, first)
 	// Changing the authoritative pointer must change which window is safe to resume.
 	stmt = "UPDATE session_nodes SET current_session_id = '" + first + "' WHERE session_key = 'agent:main:main'"
-	if out, err := exec.Command("sqlite3", db, stmt).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, stmt).CombinedOutput(); err != nil {
 		t.Fatalf("update current-session pointer: %v: %s", err, out)
 	}
 	check(first, second)

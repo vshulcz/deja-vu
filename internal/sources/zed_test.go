@@ -37,7 +37,7 @@ func zedTestDB(t *testing.T, sql string) string {
 	db := filepath.Join(t.TempDir(), "threads.db")
 	// The script goes in on stdin, not as an argument: the fixture opens with a
 	// `--` comment and the sqlite3 CLI reads a leading `--` as an option.
-	cmd := exec.Command("sqlite3", db)
+	cmd := exec.CommandContext(t.Context(), "sqlite3", db)
 	cmd.Stdin = strings.NewReader(sql)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("create sqlite fixture: %v: %s", err, out)
@@ -52,7 +52,7 @@ func zedZstdHex(t *testing.T, plain string) string {
 	if !ZstdAvailable() {
 		t.Skip("zstd not installed")
 	}
-	cmd := exec.Command("zstd", "-q", "-3", "-c")
+	cmd := exec.CommandContext(t.Context(), "zstd", "-q", "-3", "-c")
 	cmd.Stdin = strings.NewReader(plain)
 	var out bytes.Buffer
 	cmd.Stdout = &out
@@ -184,7 +184,7 @@ insert into threads (id,summary,updated_at,data_type,data,folder_paths,created_a
 	if err != nil {
 		t.Fatal(err)
 	}
-	var ids []string
+	ids := make([]string, 0, len(sessions))
 	for _, s := range sessions {
 		ids = append(ids, s.ID)
 	}
@@ -510,7 +510,7 @@ func TestParseZedDBSurvivesASqlite3ThatDoesNotAnswerInRows(t *testing.T) {
 		t.Skip("the stub is a shell script")
 	}
 	zedHome(t)
-	real := zedTestDB(t, zedSchema)
+	resolved := zedTestDB(t, zedSchema)
 	const oneRow = `{"id":"x","summary":"s","updated_at":"","data_type":"json","data":""}`
 	cases := []struct {
 		name, stdout string
@@ -544,7 +544,7 @@ func TestParseZedDBSurvivesASqlite3ThatDoesNotAnswerInRows(t *testing.T) {
 				t.Fatal(err)
 			}
 			t.Setenv("PATH", bin)
-			sessions, err := ParseZedDB(real)
+			sessions, err := ParseZedDB(resolved)
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("err = %v, wantErr = %v", err, tc.wantErr)
 			}
@@ -606,7 +606,7 @@ func TestRegistryFixtureZstdBlobMatchesItsDocumentedPlaintext(t *testing.T) {
 	sql := string(b)
 
 	var documented string
-	for _, line := range strings.Split(sql, "\n") {
+	for line := range strings.SplitSeq(sql, "\n") {
 		if rest, ok := strings.CutPrefix(strings.TrimSpace(line), "-- {"); ok {
 			documented = "{" + rest
 			break

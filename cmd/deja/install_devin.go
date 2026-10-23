@@ -129,8 +129,8 @@ func installDevinHooks(exe string, uninstall bool) (installResult, error) {
 	var root map[string]any
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
-	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, configParseError(path, err)
+	} else if uerr := json.Unmarshal(old, &root); uerr != nil {
+		return installResult{}, configParseError(path, uerr)
 	}
 	nextRoot := root
 	for _, h := range devinHookWiring {

@@ -22,7 +22,7 @@ func TestForcedUpdateOverAManagedBinaryWarnsBeforeWriting(t *testing.T) {
 	archive := makeUpdateArchive(t, "linux", binaryName, []byte("new binary"))
 	sum := fmt.Sprintf("%x", sha256.Sum256(archive))
 	release := []byte(fmt.Sprintf(`{"tag_name":"v2.0.0","assets":[{"name":%q,"browser_download_url":"archive"},{"name":"checksums.txt","browser_download_url":"checksums"}]}`, archiveName))
-	download := func(url string, limit int64, label string) ([]byte, error) {
+	download := func(_ string, _ int64, label string) ([]byte, error) { //nolint:unparam // must match updateDownloader
 		switch label {
 		case "checksums.txt":
 			return []byte(sum + "  " + archiveName + "\n"), nil

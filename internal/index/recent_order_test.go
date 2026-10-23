@@ -57,7 +57,7 @@ func TestRecentIsStableWhenTimestampsTie(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Enough sessions that map order actually varies between reads.
-	for i := 0; i < 60; i++ {
+	for i := range 60 {
 		id := "s" + string(rune('a'+i/26)) + string(rune('a'+i%26))
 		body := `{"type":"user","sessionId":"` + id + `","cwd":"/w/p","timestamp":"2026-08-01T09:00:00Z","message":{"role":"user","content":"work ` + id + `"}}` + "\n"
 		if err := os.WriteFile(filepath.Join(root, id+".jsonl"), []byte(body), 0o644); err != nil {
@@ -72,7 +72,7 @@ func TestRecentIsStableWhenTimestampsTie(t *testing.T) {
 	if err != nil || len(first) != 5 {
 		t.Fatalf("%d sessions err=%v", len(first), err)
 	}
-	for run := 0; run < 20; run++ {
+	for run := range 20 {
 		got, err := RecentMatching(dir, 5, query.Options{})
 		if err != nil {
 			t.Fatal(err)

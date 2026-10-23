@@ -132,8 +132,8 @@ func TestOpencodeJSONCKeepsTrailingCommasValid(t *testing.T) {
 			}
 			// A comma written after a trailing comment goes with the comment,
 			// and the two entries lose their separator.
-			for _, l := range strings.Split(got, "\n") {
-				if i := strings.Index(l, "//"); i >= 0 && !strings.Contains(l[:i], `"`) && strings.HasSuffix(strings.TrimSpace(l), ",") {
+			for l := range strings.SplitSeq(got, "\n") {
+				if before, _, ok := strings.Cut(l, "//"); ok && !strings.Contains(before, `"`) && strings.HasSuffix(strings.TrimSpace(l), ",") {
 					t.Errorf("a comma landed inside a line comment: %q\n%s", l, got)
 				}
 			}

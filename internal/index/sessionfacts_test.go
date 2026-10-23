@@ -13,8 +13,8 @@ func factSession(id string, msgs ...model.Message) model.Session {
 	return model.Session{Harness: "claude", ID: id, Messages: msgs}
 }
 
-func at(min int) time.Time {
-	return time.Date(2026, 9, 1, 10, min, 0, 0, time.UTC)
+func at(minute int) time.Time {
+	return time.Date(2026, 9, 1, 10, minute, 0, 0, time.UTC)
 }
 
 // What the reader runs after a hit is in the session, and the entry keeps the
@@ -61,8 +61,8 @@ func TestACommandWithNoRecordedStatusDoesNotClaimToHavePassed(t *testing.T) {
 // Caps and duplicates: the same command run forty times is one fact.
 func TestASessionFactIsCappedAndDeduped(t *testing.T) {
 	dir := t.TempDir()
-	var msgs []model.Message
-	for i := 0; i < 30; i++ {
+	msgs := make([]model.Message, 0, 30)
+	for i := range 30 {
 		msgs = append(msgs, model.Message{Role: roleCommand, Text: "make test  → exit 0", Time: at(i)})
 	}
 	buildSessionFacts(dir, []model.Session{factSession("s3", msgs...)})
@@ -97,7 +97,7 @@ func TestNoEntryRatherThanAnEmptyOne(t *testing.T) {
 // cap is kept for it.
 func TestTheCommandThatCheckedTheWorkSurvivesTheCap(t *testing.T) {
 	dir := t.TempDir()
-	msgs := []model.Message{
+	msgs := []model.Message{ //nolint:prealloc // a fixture literal the loop below grows
 		{Role: roleCommand, Text: "SVC_FIXTURES=./fixtures make test  → exit 0", Time: at(1)},
 	}
 	for i, c := range []string{"git add -A", "git commit -m wip", "gh pr create", "gh pr checks 1", "pkill -f codex"} {

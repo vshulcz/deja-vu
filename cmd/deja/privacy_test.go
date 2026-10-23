@@ -119,7 +119,7 @@ func TestSourcesHonoursStoresSelection(t *testing.T) {
 		t.Fatal(err)
 	}
 	var names []string
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(out), "\n") {
 		if name, _, ok := strings.Cut(line, "\t"); ok {
 			names = append(names, name)
 		}
@@ -140,7 +140,7 @@ func TestSourcesReportsActiveExclusions(t *testing.T) {
 	// places print this count, so asserting the string alone passed with the
 	// harness loop's copy removed — another line carried it.
 	var checked int
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		name, rest, ok := strings.Cut(line, "\t")
 		if !ok || name == "" || !strings.Contains(rest, "sessions=") {
 			continue
@@ -167,7 +167,7 @@ func TestUnforgetBringsTheSessionBackWithoutAFullRebuild(t *testing.T) {
 	if err != nil || len(before) != 2 {
 		t.Fatalf("seed: %d sessions err=%v", len(before), err)
 	}
-	if _, err := captureRun(t, "forget", "--session", "t00"); err != nil {
+	if _, err = captureRun(t, "forget", "--session", "t00"); err != nil {
 		t.Fatal(err)
 	}
 	gone, err := index.Search(dir, search.Options{Query: "pool sizing", All: true})

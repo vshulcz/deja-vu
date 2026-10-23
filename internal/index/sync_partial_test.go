@@ -170,7 +170,7 @@ func TestRetryAfterAFixedFileBringsExactlyWhatWasMissing(t *testing.T) {
 	}
 
 	// The file is repaired and the transfer retried.
-	if err := os.WriteFile(broken, []byte(rec("b1", "the first record of the broken file")+rec("b2", "the second one")), 0o644); err != nil {
+	if err = os.WriteFile(broken, []byte(rec("b1", "the first record of the broken file")+rec("b2", "the second one")), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	n, err = Import(dir, in)

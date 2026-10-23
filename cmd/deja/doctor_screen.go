@@ -191,7 +191,7 @@ func doctorFoldSection(section string, lines []string, present map[string]bool, 
 			skillNote = l
 			continue
 		}
-		if strings.HasPrefix(l, "  ") && !strings.HasPrefix(l, "   ") && len(blocks) >= 0 {
+		if strings.HasPrefix(l, "  ") && !strings.HasPrefix(l, "   ") {
 			name, rest, _ := strings.Cut(strings.TrimPrefix(l, "  "), " ")
 			blocks = append(blocks, block{lines: []string{l}, name: name, state: strings.TrimLeft(rest, " ")})
 			continue
@@ -232,7 +232,7 @@ func doctorFoldSection(section string, lines []string, present map[string]bool, 
 
 // doctorIndexKeys are the keys the Index section prints, longest first where
 // one is a prefix of another.
-var doctorIndexKeys = []string{"exclusions", "integrity", "freshness", "last sync", "location", "security", "expiring", "status", "format", "ingest", "clock"}
+var doctorIndexKeys = []string{"exclusions", "integrity", "freshness", "last sync", "location", "security", "expiring", "projects", "status", "format", "ingest", "clock"}
 
 // doctorIndexKey pads an Index row's key to the widest one, so the values
 // start in one column.

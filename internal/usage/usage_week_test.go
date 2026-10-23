@@ -1,7 +1,6 @@
 package usage
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -17,7 +16,7 @@ func TestWeekWindowAndEmptySkip(t *testing.T) {
 		{Time: time.Now().Add(-time.Hour), Kind: KindRecall, Bytes: 40},
 		{Time: time.Now().Add(-2 * time.Hour), Kind: KindRecall, Bytes: 7, Empty: true},
 	} {
-		b, _ := json.Marshal(e)
+		b := mustMarshal(t, e)
 		buf = append(append(buf, b...), '\n')
 	}
 	if err := os.WriteFile(Path(idx), buf, 0o644); err != nil {

@@ -200,7 +200,7 @@ func TestAntigravityMarkerIsNotRewritten(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, err := os.ReadFile(filepath.Join(dir, "plugin.json"))
-	if err != nil || string(got) != string(custom) {
+	if err != nil || !bytes.Equal(got, custom) {
 		t.Fatalf("an existing marker belongs to install_antigravity, got %q", got)
 	}
 }

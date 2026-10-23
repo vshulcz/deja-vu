@@ -29,13 +29,14 @@ func TestScriptDoesNotChangeTheScore(t *testing.T) {
 			},
 		}
 	}
-	sessions := []model.Session{
+	sessions := make([]model.Session, 0, 10)
+	sessions = append(sessions,
 		same("simp", "调度器 又坏了，昨天也是", "调度器 的重试设定改过了"),
 		same("trad", "調度器 又壞了，昨天也是", "調度器 的重試設定改過了"),
-	}
+	)
 	// Sessions that never say it: with the word in every document its IDF is
 	// zero and this would measure nothing.
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		sessions = append(sessions, model.Session{
 			ID: fmt.Sprintf("f%d", i), Harness: "claude", Project: "app", Updated: now,
 			Messages: []model.Message{{Role: "user", Text: "今天的部署很順利，沒有問題"}},

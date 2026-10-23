@@ -14,6 +14,7 @@ package main
 //	vhs scripts/demo/blame.tape
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -161,7 +162,7 @@ func gitCommit(repo string, at time.Time, subject string) error {
 }
 
 func git(repo string, at time.Time, args ...string) error {
-	cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+	cmd := exec.CommandContext(context.Background(), "git", append([]string{"-C", repo}, args...)...)
 	stamp := at.Format(time.RFC3339)
 	cmd.Env = append(os.Environ(),
 		"GIT_AUTHOR_DATE="+stamp,
@@ -172,7 +173,7 @@ func git(repo string, at time.Time, args ...string) error {
 		"GIT_CONFIG_SYSTEM=/dev/null",
 	)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("git %s: %v: %s", strings.Join(args, " "), err, strings.TrimSpace(string(out)))
+		return fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(string(out)))
 	}
 	return nil
 }

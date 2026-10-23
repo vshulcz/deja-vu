@@ -58,8 +58,7 @@ import (
 
 // devinDataDir is Devin CLI's local data directory, the platform's own.
 func devinDataDir() string {
-	switch runtime.GOOS {
-	case "windows":
+	if runtime.GOOS == "windows" {
 		app := os.Getenv("LOCALAPPDATA")
 		if app == "" {
 			app = filepath.Join(Home(), "AppData", "Local")
@@ -107,7 +106,7 @@ func DevinFiles() []string {
 // refused — is reported like a transcript that would not parse, so the pass
 // says so and does not record the store as read.
 func LoadDevin() []model.Session {
-	var all []model.Session
+	var all []model.Session //nolint:prealloc // each store adds an unknown number of sessions
 	for _, p := range DevinFiles() {
 		s, err := ParseDevinDB(p)
 		all = append(all, dbRead(p, s, err)...)
@@ -419,9 +418,9 @@ func devinSessionChains(s *model.Session, nodes []devinNode, head *int64, heads 
 	// below cannot do. Their chains are walked here so the leaf pass sees
 	// their message_ids as spoken for.
 	var sides []model.Session
-	emitSub := func(chain []devinNode, id string) bool {
+	emitSub := func(chain []devinNode, id string) {
 		if len(chain) == 0 {
-			return false
+			return
 		}
 		sub := model.Session{
 			Harness: "devin", Kind: "subagent",
@@ -436,7 +435,7 @@ func devinSessionChains(s *model.Session, nodes []devinNode, head *int64, heads 
 		}
 		devinEmitChain(&sub, chain, subExits)
 		if len(sub.Messages) == 0 {
-			return false
+			return
 		}
 		for _, n := range chain {
 			emittedNode[n.nodeID] = true
@@ -445,7 +444,6 @@ func devinSessionChains(s *model.Session, nodes []devinNode, head *int64, heads 
 			}
 		}
 		sides = append(sides, sub)
-		return true
 	}
 	for _, hd := range heads {
 		emitSub(devinChain(byID, hd.Node), hd.Agent)

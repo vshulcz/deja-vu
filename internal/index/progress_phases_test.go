@@ -45,10 +45,10 @@ func seedClaudeCorpus(t *testing.T, root string) {
 	if err := os.MkdirAll(proj, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		var b []byte
 		when := time.Date(2026, 3, 4, 5, 6, 7, 0, time.UTC).Add(time.Duration(i) * time.Hour)
-		for j := 0; j < 4; j++ {
+		for j := range 4 {
 			line, err := json.Marshal(map[string]any{
 				"type":      "user",
 				"sessionId": "s" + string(rune('a'+i)),

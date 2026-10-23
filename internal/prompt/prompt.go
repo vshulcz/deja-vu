@@ -9,6 +9,7 @@
 package prompt
 
 import (
+	"slices"
 	"strings"
 	"unicode"
 
@@ -180,8 +181,8 @@ func askLine(lines []string) int {
 	if q >= 0 {
 		return q
 	}
-	for i := len(lines) - 1; i >= 0; i-- {
-		if hasWordRune(lines[i]) {
+	for i, line := range slices.Backward(lines) {
+		if hasWordRune(line) {
 			return i
 		}
 	}
@@ -292,7 +293,7 @@ func cyrPromptTerm(f string) bool {
 	// Demanding five in one part dropped those compounds entirely, leaving the
 	// question holding a verb — measured on a real store, compound subjects
 	// came back on topic 68% of the time against 100% for plain ones.
-	for _, part := range strings.Split(f, "-") {
+	for part := range strings.SplitSeq(f, "-") {
 		if len([]rune(part)) >= 3 && !cyrPromptStop[part] {
 			return true
 		}

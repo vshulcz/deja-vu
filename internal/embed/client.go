@@ -1,3 +1,5 @@
+// Package embed computes and stores embedding vectors for index records and
+// reranks search hits by them.
 package embed
 
 import (
@@ -14,6 +16,7 @@ import (
 	"time"
 )
 
+// Client talks to an embedding endpoint.
 type Client struct {
 	URL    string
 	Model  string
@@ -67,6 +70,7 @@ var probeURLs = []string{"http://localhost:11434/api/embed", "http://localhost:1
 // CI, which is the worst way round for a contributor to meet it.
 func Off() bool { return os.Getenv("DEJA_EMBED_OFF") == "1" }
 
+// New builds a client from the DEJA_EMBED_* environment.
 func New() (*Client, error) {
 	model := os.Getenv("DEJA_EMBED_MODEL")
 	if model == "" {
@@ -84,7 +88,7 @@ func New() (*Client, error) {
 		return &Client{URL: endpoint, Model: model, apiKey: embedAPIKey(endpoint), HTTP: &http.Client{Timeout: 120 * time.Second}, QueryPrefix: os.Getenv("DEJA_EMBED_QUERY_PREFIX"), PassagePrefix: os.Getenv("DEJA_EMBED_PASSAGE_PREFIX")}, nil
 	}
 	if Off() {
-		return nil, fmt.Errorf("embedding is off (DEJA_EMBED_OFF=1)")
+		return nil, errors.New("embedding is off (DEJA_EMBED_OFF=1)")
 	}
 	for _, endpoint := range probeURLs {
 		c := &Client{URL: endpoint, Model: model, HTTP: &http.Client{Timeout: 120 * time.Second}, QueryPrefix: os.Getenv("DEJA_EMBED_QUERY_PREFIX"), PassagePrefix: os.Getenv("DEJA_EMBED_PASSAGE_PREFIX")}
@@ -99,6 +103,7 @@ func New() (*Client, error) {
 // caller can tell it from a transport failure.
 var errNoEmbedEndpoint = errors.New("embedding endpoint unavailable (set DEJA_EMBED_URL)")
 
+// Embed returns one vector per text.
 func (c *Client) Embed(ctx context.Context, texts []string) ([][]float32, error) {
 	if len(texts) == 0 {
 		return nil, nil
@@ -180,11 +185,12 @@ func (c *Client) probe() error {
 		if err != nil {
 			return err
 		}
-		return fmt.Errorf("empty embedding response")
+		return errors.New("empty embedding response")
 	}
 	return nil
 }
 
+// IsOllama reports whether endpoint is Ollama's /api/embed.
 func IsOllama(endpoint string) bool {
 	return strings.HasSuffix(strings.TrimRight(endpoint, "/"), "/api/embed")
 }

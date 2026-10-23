@@ -40,7 +40,7 @@ func TestRotationKeepsCompactionMarks(t *testing.T) {
 	p := dir + ".hookseen"
 	var b strings.Builder
 	b.WriteString("parent compaction:abc123 2026-10-03T12:08:57Z proj\n")
-	for i := 0; i < 6000; i++ {
+	for i := range 6000 {
 		fmt.Fprintf(&b, "other-%d session-%d 2026-10-04T00:00:00Z proj\n", i%50, i)
 	}
 	if err := os.WriteFile(p, []byte(b.String()), 0o600); err != nil {

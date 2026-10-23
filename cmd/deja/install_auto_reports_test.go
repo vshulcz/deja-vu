@@ -38,8 +38,8 @@ func TestAnAutoTargetReportsTheFileItChanged(t *testing.T) {
 		t.Fatal(err)
 	}
 	var root map[string]any
-	if err := json.Unmarshal(body, &root); err != nil {
-		t.Fatal(err)
+	if uerr := json.Unmarshal(body, &root); uerr != nil {
+		t.Fatal(uerr)
 	}
 	servers, _ := root["mcpServers"].(map[string]any)
 	if servers == nil || servers["deja"] == nil {
@@ -50,8 +50,8 @@ func TestAnAutoTargetReportsTheFileItChanged(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(mcpPath, body, 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(mcpPath, body, 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 
 	r, err := installTarget("claude-auto", "/usr/local/bin/deja", false)

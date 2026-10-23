@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -114,12 +115,12 @@ func deletableFiles(s model.Session, others []model.Session) ([]string, error) {
 	if !fi.Mode().IsRegular() || sharedStore(s.Path) {
 		return nil, errNotFileBacked
 	}
-	var files []string
+	files := make([]string, 0, 2)
 	switch root := sessionDir(s); {
 	case root != "":
-		files = []string{root}
+		files = append(files, root)
 	case namesSession(s.Path, s.ID):
-		files = []string{s.Path}
+		files = append(files, s.Path)
 		// Claude Code keeps subagent runs and large tool results in <id>/.
 		if side := strings.TrimSuffix(s.Path, filepath.Ext(s.Path)); filepath.Base(side) == s.ID {
 			if fi, err := os.Lstat(side); err == nil && fi.IsDir() {
@@ -189,9 +190,9 @@ func dirOfSession(base, id string) bool {
 
 func fresh(p string, now time.Time) bool {
 	recent := false
-	_ = filepath.WalkDir(p, func(q string, d fs.DirEntry, err error) error {
+	_ = filepath.WalkDir(p, func(_ string, d fs.DirEntry, err error) error {
 		if err != nil || recent {
-			return nil
+			return nil //nolint:nilerr // unreadable entries are skipped
 		}
 		if info, err := d.Info(); err == nil && now.Sub(info.ModTime()) < recentlyWritten {
 			recent = true
@@ -324,12 +325,12 @@ type cliStore struct{ bin string }
 var cliStores = map[string]cliStore{"opencode": {"opencode"}}
 
 func (c cliStore) run(args ...string) ([]byte, error) {
-	cmd := exec.Command(c.bin, args...)
+	cmd := exec.CommandContext(context.Background(), c.bin, args...)
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
-		return out, fmt.Errorf("%s %s: %v %s", c.bin, strings.Join(args, " "), err, strings.TrimSpace(stderr.String()))
+		return out, fmt.Errorf("%s %s: %w %s", c.bin, strings.Join(args, " "), err, strings.TrimSpace(stderr.String()))
 	}
 	return out, nil
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -33,9 +34,7 @@ const (
 // and so does an allowConversationAccess the reader set to false.
 func openclawPluginEntry(have map[string]any, grant bool) (map[string]any, string) {
 	entry := map[string]any{}
-	for k, v := range have {
-		entry[k] = v
-	}
+	maps.Copy(entry, have)
 	var note string
 	if entry["enabled"] == false {
 		note = "left deja's plugin switched off, the way it was — `openclaw plugins enable deja` turns it back on"
@@ -44,9 +43,7 @@ func openclawPluginEntry(have map[string]any, grant bool) (map[string]any, strin
 	}
 	hooks := map[string]any{}
 	if h, ok := entry["hooks"].(map[string]any); ok {
-		for k, v := range h {
-			hooks[k] = v
-		}
+		maps.Copy(hooks, h)
 	} else if entry["hooks"] != nil {
 		// Not an object: a config deja does not understand, left as it is.
 		return entry, note
@@ -98,8 +95,8 @@ func openclawPackageVersion() string {
 		return ""
 	}
 	var dirs []string
-	if real, err := filepath.EvalSymlinks(bin); err == nil {
-		for d := filepath.Dir(real); len(dirs) < 4; d = filepath.Dir(d) {
+	if resolved, err := filepath.EvalSymlinks(bin); err == nil {
+		for d := filepath.Dir(resolved); len(dirs) < 4; d = filepath.Dir(d) {
 			dirs = append(dirs, d)
 			if filepath.Dir(d) == d {
 				break
@@ -112,7 +109,10 @@ func openclawPackageVersion() string {
 		if err != nil {
 			continue
 		}
-		var pkg struct{ Name, Version string }
+		var pkg struct {
+			Name    string `json:"name"`
+			Version string `json:"version"`
+		}
 		if json.Unmarshal(b, &pkg) == nil && pkg.Name == "openclaw" {
 			return pkg.Version
 		}
@@ -123,9 +123,9 @@ func openclawPackageVersion() string {
 // openclawVersionAtLeast compares OpenClaw's date versions, 2026.9.8 or
 // 2026.7.1-2, by their first three numbers. One it cannot read counts as
 // new.
-func openclawVersionAtLeast(v, min string) bool {
+func openclawVersionAtLeast(v, least string) bool {
 	a, okA := openclawVersionParts(v)
-	b, okB := openclawVersionParts(min)
+	b, okB := openclawVersionParts(least)
 	if !okA || !okB {
 		return true
 	}

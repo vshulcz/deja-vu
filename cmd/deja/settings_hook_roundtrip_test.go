@@ -148,7 +148,7 @@ func TestALongArrayWithAMovedEntryStaysFast(t *testing.T) {
 		var o, n strings.Builder
 		o.WriteString("{\n  \"list\": [\n")
 		n.WriteString("{\n  \"list\": [\n    {\n      \"deja\": true\n    },\n")
-		for i := 0; i < count; i++ {
+		for i := range count {
 			sep := ","
 			if i == count-1 {
 				sep = ""

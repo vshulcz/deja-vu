@@ -48,7 +48,7 @@ func TestASQLiteReadUnderTheBudgetAnswersWithoutProgressLines(t *testing.T) {
 		t.Skip("this sqlite3 has no .progress")
 	}
 	db := filepath.Join(t.TempDir(), "store.db")
-	if out, err := exec.Command("sqlite3", db, "create table t(a text); insert into t values('one');").CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, "create table t(a text); insert into t values('one');").CombinedOutput(); err != nil {
 		t.Fatalf("building the fixture: %v: %s", err, out)
 	}
 	t.Setenv("DEJA_STORE_TIMEOUT", "250ms")

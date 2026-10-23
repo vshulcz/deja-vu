@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/vshulcz/deja-vu/internal/peers"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/peers"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -54,11 +55,11 @@ func runSync(dir string, args []string) error {
 		case "export", "import":
 			return fmt.Errorf("sync %s needs a directory: deja sync %s <dir>", args[0], args[0])
 		case "ssh":
-			return fmt.Errorf("sync ssh needs a host: deja sync ssh <host>")
+			return errors.New("sync ssh needs a host: deja sync ssh <host>")
 		case "forget":
-			return fmt.Errorf("sync forget needs a host — `deja doctor` lists the machines deja knows")
+			return errors.New("sync forget needs a host — `deja doctor` lists the machines deja knows")
 		}
-		return fmt.Errorf("sync needs export <dir>, import <dir>, ssh <host> — or no argument at all, for every machine deja knows")
+		return errors.New("sync needs export <dir>, import <dir>, ssh <host> — or no argument at all, for every machine deja knows")
 	}
 	switch args[0] {
 	case "ssh":
@@ -81,213 +82,223 @@ func runSync(dir string, args []string) error {
 		fmt.Fprintf(os.Stdout, "deja: %s forgotten — bare `deja sync` will not try it again\n", hostForEcho(host))
 		return nil
 	case "export":
-		full := false
-		relay := false
-		rest := args[1:]
-		out := ""
-		peer := ""
-		for i := 0; i < len(rest); i++ {
-			a := rest[i]
-			if a == "--full" {
-				full = true
-				continue
-			}
-			// What arrived from other machines stays put by default: passing
-			// it on spreads it past whoever agreed to the first hop (#2450).
-			// This is how someone says otherwise about machines that are all
-			// theirs — a chain where this one sits in the middle, or a
-			// migration off it (#2962).
-			if a == "--include-imported" {
-				relay = true
-				full = true
-				continue
-			}
-			// Who this batch is for. Watermarks are per peer: without a name
-			// every export shares one, so a backup taken by hand and a pull
-			// from another machine each settle records the other still needs
-			// — and the second one silently sends almost nothing.
-			if a == "--peer" {
-				if i+1 >= len(rest) {
-					return fmt.Errorf("sync export: --peer needs a name")
-				}
-				i++
-				peer = rest[i]
-				continue
-			}
-			// A dropped flag fell back to the incremental path, which on a
-			// second run has nothing left to send: `--ful` exported zero
-			// records into an empty directory while the reader believed they
-			// had carried their whole memory to another machine (#745).
-			if strings.HasPrefix(a, "-") {
-				return fmt.Errorf("sync export: unknown flag %q — only --full, --include-imported and --peer are accepted", a)
-			}
-			out = a
-		}
-		if out == "" {
-			return fmt.Errorf("sync export needs a directory: deja sync export <dir>")
-		}
-		if err := index.EnsureForSearch(dir, search.Options{All: true}, false, os.Stderr); err != nil {
-			// An index that cannot be written stops the export before a record
-			// is read, and handed back `update: mkdir /…/index.db.tmp:
-			// permission denied` — an internal path, on the same store where
-			// search names the directory to fix (#1046).
-			return ensureError(dir, err)
-		}
-		var n int
-		var err error
-		switch {
-		case relay:
-			n, err = index.ExportRelay(dir, out, peers.Identity(peer))
-		case full:
-			n, err = index.ExportFull(dir, out)
-		default:
-			// Folded, so one machine settles under one watermark whichever way
-			// the name was spelled — a pull runs this on the remote with that
-			// machine's hostname, capitalised on macOS, while the alias someone
-			// types by hand usually is not (#1878).
-			n, err = index.ExportTo(dir, out, peers.Identity(peer))
-		}
-		if err != nil {
-			// `open …/deja-sync-b9849e838232-1785639771368128000.jsonl:
-			// permission denied` names a file deja was about to create, with a
-			// name nobody chose. The directory is what has to change, the same
-			// as for the index (#798) and the notes file (#869) — this was the
-			// last write path still handing back the syscall (#893).
-			// The watermark for what just left is saved into the index, so an
-			// unwritable index fails here too — and arrived as "check that
-			// directory's permissions" for a destination that was writable and
-			// already held the batch (#1046, the shape of #1031).
-			if p := deniedPath(err); p != "" && !strings.HasPrefix(p, out) &&
-				(errors.Is(err, fs.ErrPermission) || writeFailureReason(err) != err.Error()) {
-				if n > 0 {
-					return fmt.Errorf("%d records are written into %s, but deja could not record that they went: %w; the next export sends them again", n, search.SafePath(out), ensureError(dir, err))
-				}
-				return ensureError(dir, err)
-			}
-			if parent := filepath.Dir(out); !dirExists(out) && !dirExists(parent) {
-				return fmt.Errorf("cannot write the export into %s — %s is not there; the disk it lives on may have been unmounted", search.SafePath(out), search.SafePath(parent))
-			}
-			if errors.Is(err, fs.ErrPermission) {
-				return fmt.Errorf("cannot write the export into %s — check that directory's permissions, or choose one you can write", search.SafePath(out))
-			}
-			// A full or vanished disk in the same words as everywhere else
-			// (#906); anything deja does not recognise still comes through
-			// whole rather than being guessed at.
-			if reason := writeFailureReason(err); reason != err.Error() {
-				return fmt.Errorf("cannot write the export into %s — %s", search.SafePath(out), reason)
-			}
-			return err
-		}
-		fmt.Fprintf(os.Stdout, "deja: exported %d record%s\n", n, pluralS(n))
-		// A watermark is per machine, not per destination: the second peer you
-		// hand memory to gets an empty folder and the same "exported 0
-		// records" that means "you are up to date" at the first one (#982).
-		// The path stays as written in the next line: it hands over a command
-		// to paste, and a collapsed path names no directory. Same tension as
-		// the recovery sentence in #1820 and the tombstone id in #1794.
-		if n == 0 && !full && !hasSyncBatches(out) {
-			fmt.Fprintf(os.Stdout, "deja: nothing has changed since the last export, and this folder holds no batch from this machine — `deja sync export %s --full` sends everything\n", pasteSafe(out))
-		}
-		// An export that holds nothing but other machines' work says so.
-		// Without this the reader was told "exported 0 records" by a machine
-		// whose `stats` showed hundreds, and had to guess whether the data was
-		// lost (#2962).
-		if !relay {
-			if held := importedSessionTotal(dir); held > 0 && n == 0 {
-				fmt.Fprintf(os.Stdout, "deja: %d session%s here arrived from other machines and are not passed on — `deja sync export %s --include-imported` sends those too\n",
-					held, pluralS(held), pasteSafe(out))
-			}
-		}
-		// Only when something was written: on a watermarked sync most runs
-		// send nothing, and the line asked the reader to review a file that
-		// does not exist (#1035).
-		if n > 0 {
-			masked := 0
-			if rs, rerr := index.Redactions(dir); rerr == nil {
-				masked = rs.Total
-			}
-			// The count decides the sentence: saying records were redacted
-			// when none were is a claim about secrets that is not true, and
-			// this is the one line deja prints about them leaving the machine
-			// (#2255). The caution holds either way and is the point of it.
-			if masked > 0 {
-				fmt.Fprintf(os.Stderr, "deja: records were redacted at index time (%d masked). pattern redaction is a floor — review the export before moving it; rotate anything that leaked.\n", masked)
-			} else {
-				fmt.Fprintln(os.Stderr, "deja: nothing in these records matched deja's redaction patterns. pattern redaction is a floor — review the export before moving it; rotate anything that leaked.")
-			}
-		}
-		return nil
+		return runSyncExport(dir, args)
 	case "import":
-		for _, a := range args[2:] {
-			return fmt.Errorf("sync import: unexpected argument %q — it takes one directory", a)
-		}
-		sessionsBefore := importedSessionTotal(dir)
-		n, err := index.Import(dir, args[1])
-		// What arrived is printed first even when a file was refused: the
-		// records that made it are in, and the reader needs both halves
-		// (#891).
-		if n > 0 {
-			// Sessions, not only records: "records" is deja's unit, and what
-			// arrived is what doctor and every other surface counts (#929).
-			line := fmt.Sprintf("deja: imported %d record%s", n, pluralS(n))
-			if before, after := sessionsBefore, importedSessionTotal(dir); after > before {
-				line += fmt.Sprintf(" — %d session%s from another machine", after-before, pluralS(after-before))
-			}
-			fmt.Fprintln(os.Stdout, line)
-		}
-		// Whether or not anything arrived: a batch that is entirely someone
-		// else's copy of what this machine forgot imports zero records, and
-		// "imported 0 records" alone reads as an empty batch (#968).
-		// A shared folder is an outbox as well as an inbox, so a batch this
-		// machine wrote comes back to it. Saying nothing made "imported 0
-		// records" read as a failed transfer (#987). The claim is what deja
-		// checked — the same session, instant and text — not who wrote it: a
-		// batch carries no machine id (#955).
-		if own := index.ImportSkippedOwn(); own > 0 {
-			fmt.Fprint(os.Stdout, ownCopyLine(own))
-		}
-		// The count is a fact about this machine's memory, not about one
-		// terminal moment: a peer who keeps sending sessions you forgot drops
-		// records on every sync, and only the line below said so — gone the
-		// moment the terminal scrolls (#1016).
-		recordLastImport(dir, n, index.ImportSkippedForgotten(), index.ImportSkippedOwn())
-		if skipped := index.ImportSkippedForgotten(); skipped > 0 {
-			fmt.Fprintf(os.Stdout, "deja: %d record%s left out — they belong to sessions you forgot here (`deja forget --list`)\n", skipped, pluralS(skipped))
-		}
-		// A record with no session to attribute it to is dropped, and a silent
-		// drop made "imported 2 records" from a 3-record batch read as a
-		// complete transfer (#1118).
-		if inc := index.ImportSkippedIncomplete(); inc > 0 {
-			what := "it"
-			if inc > 1 {
-				what = "them"
-			}
-			fmt.Fprintf(os.Stdout, "deja: %d record%s left out — no session id to attribute %s to; the batch may be from a different tool or damaged\n", inc, pluralS(inc), what)
-		}
-		// The reader's own pattern, and the drop most likely to empty a batch
-		// entirely — after which "imported 0 records" is the whole story they
-		// get (#2666).
-		fmt.Fprint(os.Stdout, excludedByRuleLines())
-		// The switches set here hold for a peer's records too, and a batch of
-		// nothing but tool output imported 0 under DEJA_INDEX_TOOL_OUTPUT=0
-		// with no word of why (#5425).
-		fmt.Fprint(os.Stdout, switchedOffLine(""))
-		if err != nil {
-			return err
-		}
-		if n == 0 {
-			fmt.Fprintln(os.Stdout, "deja: imported 0 records")
-			return nil
-		}
-		// The end of a move to a new machine is the same moment as an install,
-		// and install proves it with real lines rather than a count (#929).
-		printMemoryProofOf(dir, "deja now knows, from the machine you came from:", func(s model.Session) bool {
-			return strings.HasPrefix(s.Project, "imported:")
-		}, "")
-		return nil
+		return runSyncImport(dir, args)
 	default:
 		return fmt.Errorf("unknown sync command %q — `deja sync --help` shows each form", args[0])
 	}
+}
+
+// runSyncExport writes this machine's records into a directory for another one.
+func runSyncExport(dir string, args []string) error {
+	full := false
+	relay := false
+	rest := args[1:]
+	out := ""
+	peer := ""
+	for i := 0; i < len(rest); i++ {
+		a := rest[i]
+		if a == "--full" {
+			full = true
+			continue
+		}
+		// What arrived from other machines stays put by default: passing
+		// it on spreads it past whoever agreed to the first hop (#2450).
+		// This is how someone says otherwise about machines that are all
+		// theirs — a chain where this one sits in the middle, or a
+		// migration off it (#2962).
+		if a == "--include-imported" {
+			relay = true
+			full = true
+			continue
+		}
+		// Who this batch is for. Watermarks are per peer: without a name
+		// every export shares one, so a backup taken by hand and a pull
+		// from another machine each settle records the other still needs
+		// — and the second one silently sends almost nothing.
+		if a == "--peer" {
+			if i+1 >= len(rest) {
+				return errors.New("sync export: --peer needs a name")
+			}
+			i++
+			peer = rest[i]
+			continue
+		}
+		// A dropped flag fell back to the incremental path, which on a
+		// second run has nothing left to send: `--ful` exported zero
+		// records into an empty directory while the reader believed they
+		// had carried their whole memory to another machine (#745).
+		if strings.HasPrefix(a, "-") {
+			return fmt.Errorf("sync export: unknown flag %q — only --full, --include-imported and --peer are accepted", a)
+		}
+		out = a
+	}
+	if out == "" {
+		return errors.New("sync export needs a directory: deja sync export <dir>")
+	}
+	if err := index.EnsureForSearch(dir, search.Options{All: true}, false, os.Stderr); err != nil {
+		// An index that cannot be written stops the export before a record
+		// is read, and handed back `update: mkdir /…/index.db.tmp:
+		// permission denied` — an internal path, on the same store where
+		// search names the directory to fix (#1046).
+		return ensureError(dir, err)
+	}
+	var n int
+	var err error
+	switch {
+	case relay:
+		n, err = index.ExportRelay(dir, out, peers.Identity(peer))
+	case full:
+		n, err = index.ExportFull(dir, out)
+	default:
+		// Folded, so one machine settles under one watermark whichever way
+		// the name was spelled — a pull runs this on the remote with that
+		// machine's hostname, capitalised on macOS, while the alias someone
+		// types by hand usually is not (#1878).
+		n, err = index.ExportTo(dir, out, peers.Identity(peer))
+	}
+	if err != nil {
+		// `open …/deja-sync-b9849e838232-1785639771368128000.jsonl:
+		// permission denied` names a file deja was about to create, with a
+		// name nobody chose. The directory is what has to change, the same
+		// as for the index (#798) and the notes file (#869) — this was the
+		// last write path still handing back the syscall (#893).
+		// The watermark for what just left is saved into the index, so an
+		// unwritable index fails here too — and arrived as "check that
+		// directory's permissions" for a destination that was writable and
+		// already held the batch (#1046, the shape of #1031).
+		if p := deniedPath(err); p != "" && !strings.HasPrefix(p, out) &&
+			(errors.Is(err, fs.ErrPermission) || writeFailureReason(err) != err.Error()) {
+			if n > 0 {
+				return fmt.Errorf("%d records are written into %s, but deja could not record that they went: %w; the next export sends them again", n, search.SafePath(out), ensureError(dir, err))
+			}
+			return ensureError(dir, err)
+		}
+		if parent := filepath.Dir(out); !dirExists(out) && !dirExists(parent) {
+			return fmt.Errorf("cannot write the export into %s — %s is not there; the disk it lives on may have been unmounted", search.SafePath(out), search.SafePath(parent))
+		}
+		if errors.Is(err, fs.ErrPermission) {
+			return fmt.Errorf("cannot write the export into %s — check that directory's permissions, or choose one you can write", search.SafePath(out))
+		}
+		// A full or vanished disk in the same words as everywhere else
+		// (#906); anything deja does not recognise still comes through
+		// whole rather than being guessed at.
+		if reason := writeFailureReason(err); reason != err.Error() {
+			return fmt.Errorf("cannot write the export into %s — %s", search.SafePath(out), reason)
+		}
+		return err
+	}
+	fmt.Fprintf(os.Stdout, "deja: exported %d record%s\n", n, pluralS(n))
+	// A watermark is per machine, not per destination: the second peer you
+	// hand memory to gets an empty folder and the same "exported 0
+	// records" that means "you are up to date" at the first one (#982).
+	// The path stays as written in the next line: it hands over a command
+	// to paste, and a collapsed path names no directory. Same tension as
+	// the recovery sentence in #1820 and the tombstone id in #1794.
+	if n == 0 && !full && !hasSyncBatches(out) {
+		fmt.Fprintf(os.Stdout, "deja: nothing has changed since the last export, and this folder holds no batch from this machine — `deja sync export %s --full` sends everything\n", pasteSafe(out))
+	}
+	// An export that holds nothing but other machines' work says so.
+	// Without this the reader was told "exported 0 records" by a machine
+	// whose `stats` showed hundreds, and had to guess whether the data was
+	// lost (#2962).
+	if !relay {
+		if held := importedSessionTotal(dir); held > 0 && n == 0 {
+			fmt.Fprintf(os.Stdout, "deja: %d session%s here arrived from other machines and are not passed on — `deja sync export %s --include-imported` sends those too\n",
+				held, pluralS(held), pasteSafe(out))
+		}
+	}
+	// Only when something was written: on a watermarked sync most runs
+	// send nothing, and the line asked the reader to review a file that
+	// does not exist (#1035).
+	if n > 0 {
+		masked := 0
+		if rs, rerr := index.Redactions(dir); rerr == nil {
+			masked = rs.Total
+		}
+		// The count decides the sentence: saying records were redacted
+		// when none were is a claim about secrets that is not true, and
+		// this is the one line deja prints about them leaving the machine
+		// (#2255). The caution holds either way and is the point of it.
+		if masked > 0 {
+			fmt.Fprintf(os.Stderr, "deja: records were redacted at index time (%d masked). pattern redaction is a floor — review the export before moving it; rotate anything that leaked.\n", masked)
+		} else {
+			fmt.Fprintln(os.Stderr, "deja: nothing in these records matched deja's redaction patterns. pattern redaction is a floor — review the export before moving it; rotate anything that leaked.")
+		}
+	}
+	return nil
+}
+
+// runSyncImport reads a directory of batches from another machine.
+func runSyncImport(dir string, args []string) error {
+	for _, a := range args[2:] {
+		return fmt.Errorf("sync import: unexpected argument %q — it takes one directory", a)
+	}
+	sessionsBefore := importedSessionTotal(dir)
+	n, err := index.Import(dir, args[1])
+	// What arrived is printed first even when a file was refused: the
+	// records that made it are in, and the reader needs both halves
+	// (#891).
+	if n > 0 {
+		// Sessions, not only records: "records" is deja's unit, and what
+		// arrived is what doctor and every other surface counts (#929).
+		line := fmt.Sprintf("deja: imported %d record%s", n, pluralS(n))
+		if before, after := sessionsBefore, importedSessionTotal(dir); after > before {
+			line += fmt.Sprintf(" — %d session%s from another machine", after-before, pluralS(after-before))
+		}
+		fmt.Fprintln(os.Stdout, line)
+	}
+	// Whether or not anything arrived: a batch that is entirely someone
+	// else's copy of what this machine forgot imports zero records, and
+	// "imported 0 records" alone reads as an empty batch (#968).
+	// A shared folder is an outbox as well as an inbox, so a batch this
+	// machine wrote comes back to it. Saying nothing made "imported 0
+	// records" read as a failed transfer (#987). The claim is what deja
+	// checked — the same session, instant and text — not who wrote it: a
+	// batch carries no machine id (#955).
+	if own := index.ImportSkippedOwn(); own > 0 {
+		fmt.Fprint(os.Stdout, ownCopyLine(own))
+	}
+	// The count is a fact about this machine's memory, not about one
+	// terminal moment: a peer who keeps sending sessions you forgot drops
+	// records on every sync, and only the line below said so — gone the
+	// moment the terminal scrolls (#1016).
+	recordLastImport(dir, n, index.ImportSkippedForgotten(), index.ImportSkippedOwn())
+	if skipped := index.ImportSkippedForgotten(); skipped > 0 {
+		fmt.Fprintf(os.Stdout, "deja: %d record%s left out — they belong to sessions you forgot here (`deja forget --list`)\n", skipped, pluralS(skipped))
+	}
+	// A record with no session to attribute it to is dropped, and a silent
+	// drop made "imported 2 records" from a 3-record batch read as a
+	// complete transfer (#1118).
+	if inc := index.ImportSkippedIncomplete(); inc > 0 {
+		what := "it"
+		if inc > 1 {
+			what = "them"
+		}
+		fmt.Fprintf(os.Stdout, "deja: %d record%s left out — no session id to attribute %s to; the batch may be from a different tool or damaged\n", inc, pluralS(inc), what)
+	}
+	// The reader's own pattern, and the drop most likely to empty a batch
+	// entirely — after which "imported 0 records" is the whole story they
+	// get (#2666).
+	fmt.Fprint(os.Stdout, excludedByRuleLines())
+	// The switches set here hold for a peer's records too, and a batch of
+	// nothing but tool output imported 0 under DEJA_INDEX_TOOL_OUTPUT=0
+	// with no word of why (#5425).
+	fmt.Fprint(os.Stdout, switchedOffLine(""))
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		fmt.Fprintln(os.Stdout, "deja: imported 0 records")
+		return nil
+	}
+	// The end of a move to a new machine is the same moment as an install,
+	// and install proves it with real lines rather than a count (#929).
+	printMemoryProofOf(dir, "deja now knows, from the machine you came from:", func(s model.Session) bool {
+		return strings.HasPrefix(s.Project, "imported:")
+	}, "")
+	return nil
 }
 
 // hasSyncBatches reports whether a directory already holds exported batches.
@@ -345,8 +356,9 @@ func excludedByRuleLines() string {
 			ex, pluralS(ex), reportPath(sources.ExcludePath()))
 	}
 	if n := index.ImportSkippedHarness(); n > 0 {
-		names := make([]string, 0)
-		for name := range sources.ExcludedHarnesses() {
+		excluded := sources.ExcludedHarnesses()
+		names := make([]string, 0, len(excluded))
+		for name := range excluded {
 			names = append(names, name)
 		}
 		sort.Strings(names)

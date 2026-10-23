@@ -4,6 +4,7 @@ import (
 	"hash/fnv"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -178,7 +179,7 @@ func maskIPv4(l string) string {
 // three digits, separated by dots, not running into another digit or dot.
 func ipv4At(l string, i int) (int, bool) {
 	pos := i
-	for group := 0; group < 4; group++ {
+	for group := range 4 {
 		if group > 0 {
 			if pos >= len(l) || l[pos] != '.' {
 				return 0, false
@@ -515,6 +516,21 @@ var frictionPhrases = []string{
 	// alone.
 	"jsondecodeerror", "valueerror:", "runtimeerror:", "oserror:",
 	"filenotfounderror:", "importerror:", "unicodedecodeerror:",
+	// A package install behind a mirror or a proxy: the index has no such
+	// package, refuses it, cannot be reached or is not trusted. None of these
+	// was recognised, so the session that found the mirror that works left
+	// nothing for the next one to reuse (#5599).
+	// Each in the tool's own shape, so a sentence about a 403 is not one:
+	// go and curl put the status after a colon, docker the exit code after
+	// "successfully".
+	"no matching distribution found", "could not find a version that satisfies",
+	"http error 403", ": 403 forbidden", ": 401 unauthorized",
+	"407 proxy authentication required", "npm error code", "npm error 40",
+	"could not resolve host", "temporary failure in name resolution",
+	": no such host", "certificate verify failed",
+	"certificate signed by unknown authority",
+	"did not complete successfully: exit code", "externally-managed-environment",
+	"manifest unknown", "pull access denied for",
 }
 
 // noSuchTableRE is the driver's own shape: the table is named right after the
@@ -546,8 +562,8 @@ func frictionHashes(ms []model.Message) []uint64 {
 		if m.Role != roleToolOutput {
 			continue
 		}
-		for line := range strings.SplitSeq(m.Text, "\n") {
-			line, ok := FrictionLine(line)
+		for raw := range strings.SplitSeq(m.Text, "\n") {
+			line, ok := FrictionLine(raw)
 			if !ok {
 				continue
 			}
@@ -612,11 +628,8 @@ func FrictionSessions(dir string, sig uint64, allow func(project string) bool) i
 		if allow != nil && !allow(meta.Project) {
 			continue
 		}
-		for _, h := range meta.Hit {
-			if h == sig {
-				n++
-				break
-			}
+		if slices.Contains(meta.Hit, sig) {
+			n++
 		}
 	}
 	return n
@@ -775,8 +788,8 @@ func frictionTexts(rd *frictionReader, metas []SessionMeta, want map[uint64]stri
 			continue
 		}
 		for _, text := range outputs {
-			for line := range strings.SplitSeq(text, "\n") {
-				line, ok := FrictionLine(line)
+			for raw := range strings.SplitSeq(text, "\n") {
+				line, ok := FrictionLine(raw)
 				if !ok {
 					continue
 				}

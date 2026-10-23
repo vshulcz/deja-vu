@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -40,7 +41,7 @@ func runWIP(dir string, args []string, stdout io.Writer) error {
 		case "--json":
 			asJSON = true
 		default:
-			return fmt.Errorf("wip takes --json and nothing else")
+			return errors.New("wip takes --json and nothing else")
 		}
 	}
 	// Built first, like every other reader: on a fresh machine the lookup
@@ -74,7 +75,7 @@ func runWIP(dir string, args []string, stdout io.Writer) error {
 	if !ok {
 		if n, err := index.SessionCount(dir); err != nil || n == 0 {
 			fmt.Fprintln(stdout, emptyIndexHint("no session to pick up"))
-			return nil
+			return nil //nolint:nilerr // an unreadable index reads as empty, the hint says so
 		}
 		fmt.Fprintln(stdout, "deja: no session in this project to pick up")
 		return nil

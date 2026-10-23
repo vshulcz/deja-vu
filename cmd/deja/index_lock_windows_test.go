@@ -31,14 +31,14 @@ func holdIndexLock(t *testing.T, dir string) func() {
 	}
 	h := syscall.Handle(f.Fd())
 	var ol syscall.Overlapped
-	if r1, _, e1 := procLockFileEx.Call(uintptr(h), uintptr(lockfileExclusiveLock), 0, 1, 0, uintptr(unsafe.Pointer(&ol))); r1 == 0 {
+	if r1, _, e1 := procLockFileEx.Call(uintptr(h), uintptr(lockfileExclusiveLock), 0, 1, 0, uintptr(unsafe.Pointer(&ol))); r1 == 0 { //nolint:gosec // LockFileEx takes the OVERLAPPED by pointer
 		_ = f.Close()
 		t.Fatalf("lock %s: %v", dir+".lock", e1)
 	}
 	// The same Overlapped the lock was taken with, as lockDir does: the offset
 	// it carries is what names the byte range being released.
 	return func() {
-		_, _, _ = procUnlockFileEx.Call(uintptr(h), 0, 1, 0, uintptr(unsafe.Pointer(&ol)))
+		_, _, _ = procUnlockFileEx.Call(uintptr(h), 0, 1, 0, uintptr(unsafe.Pointer(&ol))) //nolint:gosec // UnlockFileEx takes the OVERLAPPED by pointer
 		_ = f.Close()
 	}
 }

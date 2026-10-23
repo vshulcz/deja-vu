@@ -48,7 +48,7 @@ func TestContextHeaderDatesInTheReadersZone(t *testing.T) {
 
 	var b bytes.Buffer
 	PrintContext(&b, s, "zibbleflux")
-	head := strings.SplitN(b.String(), "\n", 2)[0]
+	head, _, _ := strings.Cut(b.String(), "\n")
 
 	if strings.Contains(head, utcDay) {
 		t.Errorf("the ctx header names the UTC day %s; the reader's screen says %s\n%s", utcDay, localDay, head)

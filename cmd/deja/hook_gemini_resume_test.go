@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -48,7 +47,7 @@ func TestGeminiResumeStartWaitsForTheFirstPrompt(t *testing.T) {
 	}
 	payload := func(fields map[string]any) string {
 		fields["cwd"] = cwd
-		b, _ := json.Marshal(fields)
+		b := mustMarshal(t, fields)
 		return string(b)
 	}
 	chat := func(id string) string {

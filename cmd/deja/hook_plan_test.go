@@ -221,7 +221,7 @@ func TestPlanHookBudgetIncludesRecallFrame(t *testing.T) {
 	if len(budgeted) == 0 {
 		t.Fatal("oversized finding was dropped rather than truncated")
 	}
-	var lines []string
+	lines := make([]string, 0, len(budgeted))
 	for _, finding := range budgeted {
 		lines = append(lines, finding.line)
 	}
@@ -396,7 +396,7 @@ func TestPlanFrictionIndexJoin(t *testing.T) {
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
 	old := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		id := fmt.Sprintf("plan-wall-%d", i)
 		toolID := fmt.Sprintf("tool-plan-%d", i)
 		writeClaudeFixture(t, filepath.Join(claudeRoot, "plan", id+".jsonl"), id, []string{
@@ -417,7 +417,7 @@ func TestPlanFrictionIndexJoin(t *testing.T) {
 
 	// The recurring wall appears in three sessions. Additional unrelated
 	// sessions make its terms clear the same IDF floor used by auto recall.
-	for i := 0; i < 27; i++ {
+	for i := range 27 {
 		id := fmt.Sprintf("plan-noise-%d", i)
 		writeClaudeFixture(t, filepath.Join(claudeRoot, "noise", id+".jsonl"), id, []string{
 			fmt.Sprintf(
@@ -464,7 +464,7 @@ func TestPlanFrictionIndexJoinSingleIdentifierTerm(t *testing.T) {
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
 	old := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		id := fmt.Sprintf("plan-single-wall-%d", i)
 		toolID := fmt.Sprintf("tool-plan-single-%d", i)
 		writeClaudeFixture(t, filepath.Join(claudeRoot, "plan-single", id+".jsonl"), id, []string{
@@ -486,7 +486,7 @@ func TestPlanFrictionIndexJoinSingleIdentifierTerm(t *testing.T) {
 	// Same noise volume as TestPlanFrictionIndexJoin: deploy_probe appears in
 	// exactly the three wall sessions, and this many unrelated sessions is
 	// what clears the IDF floor at that document count.
-	for i := 0; i < 27; i++ {
+	for i := range 27 {
 		id := fmt.Sprintf("plan-single-noise-%d", i)
 		writeClaudeFixture(t, filepath.Join(claudeRoot, "noise-single", id+".jsonl"), id, []string{
 			fmt.Sprintf(
@@ -533,7 +533,7 @@ func TestPlanFrictionIndexJoinWallOnly(t *testing.T) {
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
 	old := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		id := fmt.Sprintf("plan-wallonly-%d", i)
 		toolID := fmt.Sprintf("tool-plan-wallonly-%d", i)
 		writeClaudeFixture(t, filepath.Join(claudeRoot, "plan-wallonly", id+".jsonl"), id, []string{
@@ -557,7 +557,7 @@ func TestPlanFrictionIndexJoinWallOnly(t *testing.T) {
 
 	// Same noise volume as the other join tests: clears the IDF floor for
 	// gateway_timeout at this document count.
-	for i := 0; i < 27; i++ {
+	for i := range 27 {
 		id := fmt.Sprintf("plan-wallonly-noise-%d", i)
 		writeClaudeFixture(t, filepath.Join(claudeRoot, "noise-wallonly", id+".jsonl"), id, []string{
 			fmt.Sprintf(
@@ -623,7 +623,7 @@ func TestPlanFrictionIndexJoinIdentifierMidFloorFires(t *testing.T) {
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
 	old := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		id := fmt.Sprintf("plan-anchor-wall-%d", i)
 		toolID := fmt.Sprintf("tool-plan-anchor-%d", i)
 		writeClaudeFixture(t, filepath.Join(claudeRoot, "plan-anchor", id+".jsonl"), id, []string{
@@ -644,7 +644,7 @@ func TestPlanFrictionIndexJoinIdentifierMidFloorFires(t *testing.T) {
 
 	// 4 more sessions repeat the same word so it clears 7 of 30 total —
 	// idf ≈ 1.35, inside the [1.0, 2.0) band only an identifier gets.
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		id := fmt.Sprintf("plan-anchor-common-%d", i)
 		writeClaudeFixture(t, filepath.Join(claudeRoot, "plan-anchor-common", id+".jsonl"), id, []string{
 			fmt.Sprintf(
@@ -656,7 +656,7 @@ func TestPlanFrictionIndexJoinIdentifierMidFloorFires(t *testing.T) {
 
 	// The remaining 23 sessions carry neither term, bringing the corpus to
 	// 30 and the document count to the 31 the idf figure above assumes.
-	for i := 0; i < 23; i++ {
+	for i := range 23 {
 		id := fmt.Sprintf("plan-anchor-noise-%d", i)
 		writeClaudeFixture(t, filepath.Join(claudeRoot, "plan-anchor-noise", id+".jsonl"), id, []string{
 			fmt.Sprintf(
@@ -703,7 +703,7 @@ func TestPlanFrictionIndexJoinIdentifierBelowFloorSilent(t *testing.T) {
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
 	old := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		id := fmt.Sprintf("plan-anchor-lo-wall-%d", i)
 		toolID := fmt.Sprintf("tool-plan-anchor-lo-%d", i)
 		writeClaudeFixture(t, filepath.Join(claudeRoot, "plan-anchor-lo", id+".jsonl"), id, []string{
@@ -724,7 +724,7 @@ func TestPlanFrictionIndexJoinIdentifierBelowFloorSilent(t *testing.T) {
 
 	// 17 more sessions repeat the same word so it clears 20 of 30 total —
 	// idf = ln(31/21) ≈ 0.39, below planIdentifierIDFFloor (1.0).
-	for i := 0; i < 17; i++ {
+	for i := range 17 {
 		id := fmt.Sprintf("plan-anchor-lo-common-%d", i)
 		writeClaudeFixture(t, filepath.Join(claudeRoot, "plan-anchor-lo-common", id+".jsonl"), id, []string{
 			fmt.Sprintf(
@@ -734,7 +734,7 @@ func TestPlanFrictionIndexJoinIdentifierBelowFloorSilent(t *testing.T) {
 		})
 	}
 
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		id := fmt.Sprintf("plan-anchor-lo-noise-%d", i)
 		writeClaudeFixture(t, filepath.Join(claudeRoot, "plan-anchor-lo-noise", id+".jsonl"), id, []string{
 			fmt.Sprintf(
@@ -774,7 +774,7 @@ func TestPlanFrictionIndexJoinNonIdentifierStillNeedsTheFloor(t *testing.T) {
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
 	old := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		id := fmt.Sprintf("plan-common-wall-%d", i)
 		toolID := fmt.Sprintf("tool-plan-common-%d", i)
 		writeClaudeFixture(t, filepath.Join(claudeRoot, "plan-common", id+".jsonl"), id, []string{
@@ -795,7 +795,7 @@ func TestPlanFrictionIndexJoinNonIdentifierStillNeedsTheFloor(t *testing.T) {
 
 	// Same 20-of-30 spread as the identifier case above, but with two plain
 	// English words instead of an identifier.
-	for i := 0; i < 17; i++ {
+	for i := range 17 {
 		id := fmt.Sprintf("plan-common-noise-%d", i)
 		writeClaudeFixture(t, filepath.Join(claudeRoot, "plan-common-noise", id+".jsonl"), id, []string{
 			fmt.Sprintf(
@@ -805,7 +805,7 @@ func TestPlanFrictionIndexJoinNonIdentifierStillNeedsTheFloor(t *testing.T) {
 		})
 	}
 
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		id := fmt.Sprintf("plan-common-other-%d", i)
 		writeClaudeFixture(t, filepath.Join(claudeRoot, "plan-common-other", id+".jsonl"), id, []string{
 			fmt.Sprintf(

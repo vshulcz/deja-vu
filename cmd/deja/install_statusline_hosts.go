@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -83,11 +84,14 @@ func jsonStatuslineUpdate(path string, keys []string, entry map[string]any, unin
 	}
 	root := map[string]any{}
 	if len(bytes.TrimSpace(source)) > 0 {
-		if err := json.Unmarshal(source, &root); err != nil {
-			return installResult{}, configParseError(path, err)
+		if uerr := json.Unmarshal(source, &root); uerr != nil {
+			return installResult{}, configParseError(path, uerr)
 		}
 	}
-	before, _ := json.Marshal(root)
+	before, err := json.Marshal(root)
+	if err != nil {
+		return installResult{}, err
+	}
 	cmd, _ := entry["command"].(string)
 	last := keys[len(keys)-1]
 	// A null parent in a commented file: the text writer would put a second
@@ -146,7 +150,11 @@ func jsonStatuslineUpdate(path string, keys []string, entry map[string]any, unin
 		return writeJSONCStatusline(path, old, root, keys, entry, uninstall, nullHeld, write)
 	}
 	if !write {
-		if after, _ := json.Marshal(root); string(after) == string(before) {
+		after, merr := json.Marshal(root)
+		if merr != nil {
+			return installResult{}, merr
+		}
+		if bytes.Equal(after, before) {
 			return installResult{Path: path, Action: "unchanged"}, nil
 		}
 		return installResult{Path: path}, configWritable(path)
@@ -215,7 +223,7 @@ func writeJSONCStatusline(path string, old []byte, root map[string]any, keys []s
 func jsoncReplaceNull(text string, parents []string, key, body string) (string, error) {
 	open := zedTopLevelOpen(text)
 	if open < 0 {
-		return "", fmt.Errorf("does not look like a settings object")
+		return "", errors.New("does not look like a settings object")
 	}
 	block := &zedSpan{keyStart: open, valueOpen: open, valueEnd: zedObjectEnd(text, open)}
 	if len(parents) > 0 {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -103,12 +104,7 @@ func TestForgetSnapshotsDropsWhatItIsToldAndNothingElse(t *testing.T) {
 	RecordServedFrom(dir, KindRecall, "my own digest", 1, 100, nil, []string{"work/app"}, "")
 
 	match := func(s Snapshot) bool {
-		for _, p := range s.Projects {
-			if p == "imported:client/api" {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(s.Projects, "imported:client/api")
 	}
 	if n := CountSnapshots(dir, match); n != 1 {
 		t.Fatalf("CountSnapshots = %d, want the one record that matches", n)

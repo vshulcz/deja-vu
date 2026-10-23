@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 )
 
@@ -40,11 +41,11 @@ func ReadAntigravityCompaction(path, conversationID, workspace string) (Compacti
 	records = splitGeminiRecords(records, header, 0)
 	records = splitGeminiRecords(records, tail, tailOffset)
 	cut := -1
-	for i := len(records) - 1; i >= 0; i-- {
+	for i, record := range slices.Backward(records) {
 		var step struct {
 			Type string `json:"type"`
 		}
-		if json.Unmarshal(records[i].line, &step) == nil && step.Type == "CHECKPOINT" {
+		if json.Unmarshal(record.line, &step) == nil && step.Type == "CHECKPOINT" {
 			cut = i
 			break
 		}

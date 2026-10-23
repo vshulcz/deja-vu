@@ -48,7 +48,7 @@ func TestTheAgentsPageNamesEveryMCPMode(t *testing.T) {
 // a mode added there has to reach the page.
 func mcpToolModes(t *testing.T) []string {
 	t.Helper()
-	b, err := os.ReadFile(filepath.Join("mcp.go"))
+	b, err := os.ReadFile("mcp.go")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func mcpToolModes(t *testing.T) []string {
 		t.Fatal("the tool schema no longer declares a mode enum")
 	}
 	var out []string
-	for _, part := range strings.Split(string(m[1]), ",") {
+	for part := range strings.SplitSeq(string(m[1]), ",") {
 		part = strings.TrimSpace(part)
 		if part == "" {
 			continue

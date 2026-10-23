@@ -21,7 +21,7 @@ func TestOpencodePluginEndsTheSessionsItStamped(t *testing.T) {
 	}
 	dir := t.TempDir()
 	plugin := filepath.Join(dir, "deja.mjs")
-	if err := os.WriteFile(plugin, []byte(opencodeLegacyPluginJS("/usr/local/bin/deja")), 0o644); err != nil {
+	if err = os.WriteFile(plugin, []byte(opencodeLegacyPluginJS("/usr/local/bin/deja")), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	// Bun's $ stood in for by a tag that writes down each command line.
@@ -51,10 +51,10 @@ await hooks.dispose();
 console.log("dispose:" + JSON.stringify(ran.filter((c) => c.includes("hook-session-end"))));
 `
 	run := filepath.Join(dir, "drive.mjs")
-	if err := os.WriteFile(run, []byte(driver), 0o644); err != nil {
+	if err = os.WriteFile(run, []byte(driver), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	out, err := exec.Command(node, run).CombinedOutput()
+	out, err := exec.CommandContext(t.Context(), node, run).CombinedOutput()
 	if err != nil {
 		t.Fatalf("driving the plugin: %v\n%s", err, out)
 	}
@@ -70,7 +70,7 @@ console.log("dispose:" + JSON.stringify(ran.filter((c) => c.includes("hook-sessi
 	// not spawn deja for ses_F a second time.
 	for _, c := range []struct{ phase, ends, not string }{{"idle:", "ses_F", ""}, {"dispose:", "ses_G", "ses_F"}} {
 		line := ""
-		for _, l := range strings.Split(got, "\n") {
+		for l := range strings.SplitSeq(got, "\n") {
 			if strings.HasPrefix(l, c.phase) {
 				line = l
 			}

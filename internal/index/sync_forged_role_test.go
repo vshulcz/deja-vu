@@ -36,13 +36,13 @@ func TestImportFlattensForgedRole(t *testing.T) {
 		t.Fatal(err)
 	}
 	shared := filepath.Join(tmp, "shared")
-	if err := os.MkdirAll(shared, 0o755); err != nil {
+	if err = os.MkdirAll(shared, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(shared, "deja-sync-role-1.jsonl"), append(b, '\n'), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(shared, "deja-sync-role-1.jsonl"), append(b, '\n'), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Import(dir, shared); err != nil {
+	if _, err = Import(dir, shared); err != nil {
 		t.Fatal(err)
 	}
 

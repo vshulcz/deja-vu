@@ -13,8 +13,8 @@ import (
 // holding one session, so none reached the three-session floor and the report
 // left out the thing the machine hits most (#2375).
 func TestFrictionGroupsOneFailureAcrossItsNumbers(t *testing.T) {
-	var lines []string
-	for i := 0; i < 4; i++ {
+	lines := make([]string, 0, 4)
+	for i := range 4 {
 		lines = append(lines, fmt.Sprintf(
 			`{"type":"user","sessionId":"s%d","cwd":"/w/p","timestamp":"2026-07-2%dT10:00:00Z",`+
 				`"message":{"role":"user","content":[{"type":"tool_result","content":"dial tcp 192.0.2.%d:%d: connect: connection refused"}]}}`,
@@ -41,16 +41,16 @@ func TestFrictionGroupsOneFailureAcrossItsNumbers(t *testing.T) {
 
 // Two failures that differ in more than a number stay two rows.
 func TestFrictionKeepsDifferentFailuresApart(t *testing.T) {
-	var lines []string
-	for i := 0; i < 3; i++ {
+	lines := make([]string, 0, 6)
+	for i := range 3 {
 		lines = append(lines, fmt.Sprintf(
 			`{"type":"user","sessionId":"a%d","cwd":"/w/p","timestamp":"2026-07-2%dT10:00:00Z",`+
 				`"message":{"role":"user","content":[{"type":"tool_result","content":"dial tcp 192.0.2.%d:5432: connect: connection refused"}]}}`,
-			i, i+1, 7+i))
-		lines = append(lines, fmt.Sprintf(
-			`{"type":"user","sessionId":"b%d","cwd":"/w/p","timestamp":"2026-07-2%dT11:00:00Z",`+
-				`"message":{"role":"user","content":[{"type":"tool_result","content":"psql: FATAL: sorry, too many clients already"}]}}`,
-			i, i+1))
+			i, i+1, 7+i),
+			fmt.Sprintf(
+				`{"type":"user","sessionId":"b%d","cwd":"/w/p","timestamp":"2026-07-2%dT11:00:00Z",`+
+					`"message":{"role":"user","content":[{"type":"tool_result","content":"psql: FATAL: sorry, too many clients already"}]}}`,
+				i, i+1))
 	}
 	seedFrictionStore(t, lines)
 

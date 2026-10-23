@@ -36,17 +36,17 @@ func TestSearchRecoversFromTruncatedRecords(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Truncate(recs, fi.Size()/2); err != nil {
+	if err = os.Truncate(recs, fi.Size()/2); err != nil {
 		t.Fatal(err)
 	}
 
 	// Direct Search must flag corruption rather than return a half-scan.
-	if _, err := Search(dir, o); !IsCorrupt(err) {
+	if _, err = Search(dir, o); !IsCorrupt(err) {
 		t.Fatalf("Search over truncated records.bin err=%v, want corrupt index", err)
 	}
 	// The source files are unchanged, so the only way to heal is the size stamp
 	// forcing a rebuild.
-	if err := EnsureForSearch(dir, o, false, nil); err != nil {
+	if err = EnsureForSearch(dir, o, false, nil); err != nil {
 		t.Fatal(err)
 	}
 	ss, err := Search(dir, o)
@@ -107,21 +107,21 @@ func TestAppendCrashBetweenSessionsAndManifestReindexes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.WriteString(claudeLine("s1", "2026-01-02T03:04:07Z", "appendneedle second")); err != nil {
+	if _, err = f.WriteString(claudeLine("s1", "2026-01-02T03:04:07Z", "appendneedle second")); err != nil {
 		t.Fatal(err)
 	}
-	f.Close()
-	if err := EnsureForSearch(dir, o, false, nil); err != nil {
+	_ = f.Close()
+	if err = EnsureForSearch(dir, o, false, nil); err != nil {
 		t.Fatal(err)
 	}
 
 	// Simulate the crash: manifest.gob reverts to its pre-append contents while
 	// sessions.gob and records.bin already hold the new message.
-	if err := os.WriteFile(filepath.Join(dir, "manifest.gob"), oldManifest, 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(dir, "manifest.gob"), oldManifest, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := EnsureForSearch(dir, o, false, nil); err != nil {
+	if err = EnsureForSearch(dir, o, false, nil); err != nil {
 		t.Fatal(err)
 	}
 	ss, err := Search(dir, search.Options{Query: "appendneedle second", All: true})

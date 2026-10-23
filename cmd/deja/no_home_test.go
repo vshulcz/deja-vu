@@ -16,7 +16,7 @@ import (
 // is not enough here: the writes this is about come from a detached warmup the
 // parent does not wait for, so a glob taken when the call returns sees nothing
 // whether or not the guard is there.
-func TestNoHomeHelperProcess(t *testing.T) {
+func TestNoHomeHelperProcess(_ *testing.T) {
 	args, running := os.LookupEnv("DEJA_NO_HOME_ARGS")
 	if !running {
 		return
@@ -45,7 +45,7 @@ func TestNoHomeHelperProcess(t *testing.T) {
 func runWithNoHome(t *testing.T, args ...string) (int, []string) {
 	t.Helper()
 	wd := t.TempDir()
-	cmd := exec.Command(os.Args[0], "-test.run=^TestNoHomeHelperProcess$")
+	cmd := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestNoHomeHelperProcess$")
 	cmd.Dir = wd
 	cmd.Stdin = strings.NewReader("{}")
 	cmd.Env = append(os.Environ(),
@@ -68,7 +68,7 @@ func runWithNoHome(t *testing.T, args ...string) (int, []string) {
 	// wait, but the arms wait side by side, so it can be long enough for a
 	// warmup slowed by -race on a busy runner.
 	var left []string
-	for i := 0; i < 40; i++ {
+	for range 40 {
 		found, err := filepath.Glob(filepath.Join(wd, "*"))
 		if err != nil {
 			t.Fatal(err)
@@ -91,6 +91,7 @@ func runWithNoHome(t *testing.T, args ...string) (int, []string) {
 // install; the rest of the commands, including the ones an agent runs
 // unattended, still wrote relative (#1692).
 func TestWithNoHomeNothingIsWrittenWhereDejaHappensToRun(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		args []string
 		// A hook must never cost a turn, so it declines quietly; a command

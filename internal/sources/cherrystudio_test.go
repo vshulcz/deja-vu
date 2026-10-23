@@ -228,7 +228,13 @@ func TestCherryStudioFollowsAMovedDataDir(t *testing.T) {
 	}
 }
 
-func strconvQuote(s string) string { b, _ := json.Marshal(s); return string(b) }
+func strconvQuote(s string) string {
+	b, err := json.Marshal(s)
+	if err != nil {
+		panic(err)
+	}
+	return string(b)
+}
 
 // Cherry Studio runs dsh with DSH_HOME inside its data dir, so a deja it starts
 // inherits a DeepSeek root that is Cherry's store. The log belongs to Cherry
@@ -266,7 +272,7 @@ func TestCherryStudioMovedToHomeLeavesClaudesStoreAlone(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(home, ".cherrystudio"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	cfg, _ := json.Marshal(map[string]any{"app.user_data_path": map[string]string{"/Applications/Cherry Studio.app/Contents/MacOS/Cherry Studio": home}})
+	cfg := mustJSON(t, map[string]any{"app.user_data_path": map[string]string{"/Applications/Cherry Studio.app/Contents/MacOS/Cherry Studio": home}})
 	if err := os.WriteFile(filepath.Join(home, ".cherrystudio", "boot-config.json"), cfg, 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -288,7 +294,7 @@ func TestCherryStudioMovedDirComesBeforeTheDefault(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(home, ".cherrystudio"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	cfg, _ := json.Marshal(map[string]any{"app.user_data_path": map[string]string{"/Applications/Cherry Studio.app/Contents/MacOS/Cherry Studio": moved}})
+	cfg := mustJSON(t, map[string]any{"app.user_data_path": map[string]string{"/Applications/Cherry Studio.app/Contents/MacOS/Cherry Studio": moved}})
 	if err := os.WriteFile(filepath.Join(home, ".cherrystudio", "boot-config.json"), cfg, 0o644); err != nil {
 		t.Fatal(err)
 	}

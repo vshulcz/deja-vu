@@ -88,7 +88,7 @@ func decodeKeyOrder(dec *json.Decoder) (*keyOrder, error) {
 	}
 	d, ok := tok.(json.Delim)
 	if !ok {
-		return nil, nil
+		return nil, nil //nolint:nilnil // a scalar has no key order, and nil is that order
 	}
 	o := &keyOrder{sub: map[string]*keyOrder{}}
 	for dec.More() {
@@ -163,7 +163,7 @@ func marshalInOrder(v reflect.Value, o *keyOrder) ([]byte, error) {
 	for v.Kind() == reflect.Interface && !v.IsNil() {
 		v = v.Elem()
 	}
-	if v.IsValid() && v.Type().Implements(reflect.TypeOf((*json.Marshaler)(nil)).Elem()) {
+	if v.IsValid() && v.Type().Implements(reflect.TypeFor[json.Marshaler]()) {
 		return json.Marshal(v.Interface())
 	}
 	switch {
@@ -211,7 +211,7 @@ func marshalInOrder(v reflect.Value, o *keyOrder) ([]byte, error) {
 		orders := entryOrders(v, o)
 		var b bytes.Buffer
 		b.WriteByte('[')
-		for i := 0; i < v.Len(); i++ {
+		for i := range v.Len() {
 			if i > 0 {
 				b.WriteByte(',')
 			}
@@ -300,7 +300,7 @@ func sameKeySet(a []string, b map[string]bool) bool {
 // deja is creating, which has no shape to keep, and for one written on a single
 // line, where there is nothing to read an indent from.
 func jsonIndentOf(old []byte) string {
-	for _, line := range strings.Split(string(old), "\n") {
+	for line := range strings.SplitSeq(string(old), "\n") {
 		trimmed := strings.TrimLeft(line, " \t")
 		if trimmed == "" || trimmed == line {
 			continue

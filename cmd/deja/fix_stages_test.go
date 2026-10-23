@@ -70,7 +70,7 @@ func TestTheFixLadderSpeaksAtTheRightStage(t *testing.T) {
 
 	// Stage two: one session ran something after it. Held, not offered.
 	addSession("one", 6)
-	if err := index.Ensure(dir, "", true, nil); err != nil {
+	if err = index.Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	asked, err = captureRun(t, "fix", wall)
@@ -93,7 +93,7 @@ func TestTheFixLadderSpeaksAtTheRightStage(t *testing.T) {
 
 	// Stage three: a second session did the same, so both doors answer.
 	addSession("two", 3)
-	if err := index.Ensure(dir, "", true, nil); err != nil {
+	if err = index.Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	asked, err = captureRun(t, "fix", wall)

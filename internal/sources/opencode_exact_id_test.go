@@ -25,8 +25,8 @@ create table session_message(id text primary key, session_id text not null, type
 create index session_message_session_type_seq_idx on session_message(session_id,type,seq);
 begin;
 `)
-	var ids []string
-	for i := 0; i < n; i++ {
+	ids := make([]string, 0, n+4)
+	for i := range n {
 		ids = append(ids, fmt.Sprintf("ses_%04d", i))
 	}
 	ids = append(ids, "ses_a_b", "ses_axb", "ses_a%c", "ses_o'q")
@@ -41,7 +41,7 @@ begin;
 		fmt.Fprintf(&b, "insert into session_message values('%s-3','%s','compaction',3,%d,%d,'{\"time\":{\"created\":%d},\"summary\":\"pool %d summary\"}');\n", q, q, at+3000, at+3000, at+3000, i)
 	}
 	b.WriteString("commit;\n")
-	if out, err := exec.Command("sqlite3", db, b.String()).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, b.String()).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
 	return db, ids
@@ -80,7 +80,7 @@ func TestOpencodeV2SessionReadUsesTheMessageIndex(t *testing.T) {
 	db, _ := opencodeV2Many(t, 3)
 	only := "in ('ses_0001','ses_0002')"
 	q := opencodeV2Query("session_v2", " and s.id "+only, 0, only)
-	out, err := exec.Command("sqlite3", "-readonly", db, "explain query plan "+q).CombinedOutput()
+	out, err := exec.CommandContext(t.Context(), "sqlite3", "-readonly", db, "explain query plan "+q).CombinedOutput()
 	if err != nil {
 		t.Fatalf("plan: %v %s", err, out)
 	}

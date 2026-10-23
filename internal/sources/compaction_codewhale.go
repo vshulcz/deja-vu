@@ -63,7 +63,7 @@ func ReadCodeWhaleCompaction(workspace string, since time.Time) (CompactionTrans
 	}
 	var doc codeWhaleSession
 	if err := json.Unmarshal(b, &doc.Messages); err != nil {
-		return CompactionTranscript{}, false, fmt.Errorf("%w: %v", ErrUnsupportedCompactionTranscript, err)
+		return CompactionTranscript{}, false, fmt.Errorf("%w: %w", ErrUnsupportedCompactionTranscript, err)
 	}
 	// The session file has what the history does not: the id, title,
 	// workspace and start.
@@ -101,8 +101,8 @@ func sameDirKey(dir string) string {
 	if err != nil {
 		return ""
 	}
-	if real, err := filepath.EvalSymlinks(abs); err == nil {
-		abs = real
+	if resolved, err := filepath.EvalSymlinks(abs); err == nil {
+		abs = resolved
 	}
 	return filepath.Clean(abs)
 }

@@ -26,8 +26,8 @@ func compactionWorkspace(cwd string) string {
 	if err != nil {
 		return ""
 	}
-	if real, err := filepath.EvalSymlinks(path); err == nil {
-		path = real
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		path = resolved
 	}
 	return filepath.Clean(path)
 }
@@ -318,7 +318,7 @@ func compactionCommandKey(cmd string) string {
 // firstFrictionLine is the line of a command's output that names a failure, if
 // any: a failing run says so on one line and prints many.
 func firstFrictionLine(out string) string {
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
@@ -382,23 +382,27 @@ func emitCompactionRecovery(dir, sessionID, cwd, event string, shape hookToolSha
 		return false, nil
 	}
 	var out []byte
-	switch shape {
+	var err error
+	switch shape { //nolint:exhaustive // Claude and any newer shape take the envelope in default
 	case hookToolPlain:
 		out = []byte(packet)
 	case hookToolCrush:
-		out, _ = json.Marshal(struct {
+		out, err = json.Marshal(struct {
 			Version int    `json:"version"`
 			Context string `json:"context"`
 		}{1, packet})
 	case hookToolCopilot:
-		out, _ = json.Marshal(struct {
+		out, err = json.Marshal(struct {
 			AdditionalContext string `json:"additionalContext"`
 		}{packet})
 	default:
 		var response sessionStartHookResponse
 		response.HookSpecificOutput.HookEventName = event
 		response.HookSpecificOutput.AdditionalContext = packet
-		out, _ = json.Marshal(response)
+		out, err = json.Marshal(response)
+	}
+	if err != nil {
+		return false, err
 	}
 	out = append(out, '\n')
 	n, err := stdout.Write(out)

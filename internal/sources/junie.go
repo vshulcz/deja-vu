@@ -59,8 +59,10 @@ func JunieSessionFiles() []string {
 // index, and each session's state.json and transcript.md, a rendering of the
 // same log.
 func JunieSidecarFiles() []string {
-	out := []string{filepath.Join(JunieRoot(), "index.jsonl")}
-	for _, p := range JunieSessionFiles() {
+	files := JunieSessionFiles()
+	out := make([]string, 0, 1+2*len(files))
+	out = append(out, filepath.Join(JunieRoot(), "index.jsonl"))
+	for _, p := range files {
 		dir := filepath.Dir(p)
 		out = append(out, filepath.Join(dir, "state.json"), filepath.Join(dir, "transcript.md"))
 	}
@@ -84,6 +86,7 @@ func JunieSessionEvents(sessionID string) string {
 	return p
 }
 
+// LoadJunie reads every Junie session on this machine.
 func LoadJunie() []model.Session {
 	return parseFiles(JunieSessionFiles(), ParseJunieFile)
 }

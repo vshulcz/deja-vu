@@ -169,13 +169,13 @@ func parseApplyPatch(patch string) []Change {
 	var out []Change
 	var path string
 	var adding, updating bool
-	var add, old, new []string
+	var add, old, fresh []string
 	hunk := false
 	flushHunk := func() {
-		if updating && hunk && (len(old) > 0 || len(new) > 0) {
-			out = append(out, Change{Path: path, Old: strings.Join(old, "\n"), New: strings.Join(new, "\n")})
+		if updating && hunk && (len(old) > 0 || len(fresh) > 0) {
+			out = append(out, Change{Path: path, Old: strings.Join(old, "\n"), New: strings.Join(fresh, "\n")})
 		}
-		old, new, hunk = nil, nil, false
+		old, fresh, hunk = nil, nil, false
 	}
 	flushFile := func() {
 		flushHunk()
@@ -184,7 +184,7 @@ func parseApplyPatch(patch string) []Change {
 		}
 		path, adding, updating, add = "", false, false, nil
 	}
-	for _, l := range strings.Split(strings.ReplaceAll(patch, "\r\n", "\n"), "\n") {
+	for l := range strings.SplitSeq(strings.ReplaceAll(patch, "\r\n", "\n"), "\n") {
 		switch {
 		case strings.HasPrefix(l, "*** Add File: "):
 			flushFile()
@@ -211,11 +211,11 @@ func parseApplyPatch(patch string) []Change {
 			case strings.HasPrefix(l, "-"):
 				old = append(old, l[1:])
 			case strings.HasPrefix(l, "+"):
-				new = append(new, l[1:])
+				fresh = append(fresh, l[1:])
 			case strings.HasPrefix(l, " "):
-				old, new = append(old, l[1:]), append(new, l[1:])
+				old, fresh = append(old, l[1:]), append(fresh, l[1:])
 			case l == "":
-				old, new = append(old, ""), append(new, "")
+				old, fresh = append(old, ""), append(fresh, "")
 			}
 		}
 	}

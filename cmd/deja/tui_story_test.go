@@ -22,8 +22,11 @@ func TestTUIPreviewTellsHowTheSessionWent(t *testing.T) {
 	const id = "d4444444-sched"
 	var lines []string
 	add := func(typ string, content any) {
-		b, _ := json.Marshal(map[string]any{"type": typ, "sessionId": id, "cwd": "/work/payments",
+		b, err := json.Marshal(map[string]any{"type": typ, "sessionId": id, "cwd": "/work/payments",
 			"timestamp": "2026-03-03T10:00:00Z", "message": map[string]any{"role": typ, "content": content}})
+		if err != nil {
+			t.Fatal(err)
+		}
 		lines = append(lines, string(b))
 	}
 	text := func(s string) []map[string]any { return []map[string]any{{"type": "text", "text": s}} }

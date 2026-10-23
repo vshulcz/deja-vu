@@ -14,7 +14,7 @@ func seedCursorStamped(t *testing.T, db string, stamp int64) {
 insert into cursorDiskKV values
  ('composerData:comp-1', json('{"composerId":"comp-1","name":"pool sizing","createdAt":%[1]d,"lastUpdatedAt":%[1]d,"fullConversationHeadersOnly":[{"bubbleId":"b1","type":1}]}')),
  ('bubbleId:comp-1:b1', json('{"type":1,"text":"the pool was exhausted","timestamp":%[1]d,"workspaceProjectDir":"/tmp/app"}'));`, stamp)
-	if out, err := exec.Command("sqlite3", db, schema).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, schema).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}
 }

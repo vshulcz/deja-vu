@@ -29,7 +29,7 @@ func TestWriteBackClineTakesTheWorkspaceFromTheHookLog(t *testing.T) {
 	}
 	// An absolute path on this OS: cline logs C:\... on Windows.
 	root := filepath.Join(t.TempDir(), "api")
-	rootJSON, _ := json.Marshal(root)
+	rootJSON := mustJSON(t, root)
 	logLine := `{"sessionContext":{"rootSessionId":"` + id + `"},"workspaceRoots":[` + string(rootJSON) + `],"workspaceInfo":{"rootPath":` + string(rootJSON) + `},"hookName":"agent_start"}` + "\n"
 	if err := os.WriteFile(filepath.Join(data, "logs", "hooks.jsonl"), []byte(logLine), 0o600); err != nil {
 		t.Fatal(err)
@@ -48,7 +48,7 @@ func TestWriteBackClineTakesTheWorkspaceFromTheHookLog(t *testing.T) {
 		t.Errorf("manifest at %s, want %s", sidecars[0].Path, want)
 	}
 	var man map[string]any
-	if err := json.Unmarshal(sidecars[0].Data, &man); err != nil {
+	if err = json.Unmarshal(sidecars[0].Data, &man); err != nil {
 		t.Fatal(err)
 	}
 	// Cline 3.0.69 refuses a manifest with any of these empty.
@@ -60,13 +60,13 @@ func TestWriteBackClineTakesTheWorkspaceFromTheHookLog(t *testing.T) {
 	if man["cwd"] != root {
 		t.Errorf("cwd %v, want the hook log's workspace", man["cwd"])
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	if err = os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(sidecars[0].Path, sidecars[0].Data, 0o600); err != nil {
+	if err = os.WriteFile(sidecars[0].Path, sidecars[0].Data, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(f.Path, f.Data, 0o600); err != nil {
+	if err = os.WriteFile(f.Path, f.Data, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	ss, err := ParseClineFile(f.Path)

@@ -128,10 +128,7 @@ func warmupBar(st *warmupStatus) string {
 	const width = 10
 	filled := 0
 	if st.Total > 0 {
-		filled = width * st.Done / st.Total
-		if filled > width {
-			filled = width
-		}
+		filled = min(width*st.Done/st.Total, width)
 	}
 	return "▕" + strings.Repeat("█", filled) + strings.Repeat("░", width-filled) + "▏"
 }

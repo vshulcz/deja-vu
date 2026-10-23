@@ -13,7 +13,7 @@ import (
 // roleStore writes one session carrying a record of every kind the decoder
 // produces: prose, a read path, a replaced span, a shell command and tool
 // output.
-func roleStore(t *testing.T) string {
+func roleStore(t *testing.T) {
 	t.Helper()
 	tmp := hermeticEnv(t)
 	root := filepath.Join(tmp, "claude", "-tmp-projr")
@@ -34,7 +34,6 @@ func roleStore(t *testing.T) string {
 	if err := index.Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
-	return dir
 }
 
 // `deja help` named three of the six --role values, leaving out the four that
@@ -85,7 +84,7 @@ func TestHelpNamesEveryRoleThatMatches(t *testing.T) {
 	// usage line and the search-flag description. Asserting on the whole help
 	// text lets one of them carry the other.
 	lastLine, flagLine := "", ""
-	for _, line := range strings.Split(help, "\n") {
+	for line := range strings.SplitSeq(help, "\n") {
 		if strings.Contains(line, "deja last [n]") {
 			lastLine = line
 		}
@@ -97,7 +96,11 @@ func TestHelpNamesEveryRoleThatMatches(t *testing.T) {
 	if lastLine == "" || flagLine == "" {
 		t.Fatalf("help no longer has both role mentions:\n%s", help)
 	}
-	rolesBlock := help[strings.Index(help, flagLine):]
+	at := strings.Index(help, flagLine)
+	if at < 0 {
+		t.Fatalf("help lost the --role line:\n%s", help)
+	}
+	rolesBlock := help[at:]
 	if i := strings.Index(rolesBlock, "--limit"); i > 0 {
 		rolesBlock = rolesBlock[:i]
 	}
@@ -142,7 +145,7 @@ func TestHelpUsageBlockIsOneColumn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, line := range strings.Split(help, "\n") {
+	for line := range strings.SplitSeq(help, "\n") {
 		if strings.HasPrefix(line, "\t") && strings.Contains(line, "deja ") {
 			t.Errorf("usage line is indented with a tab, not two spaces: %q", line)
 		}

@@ -20,21 +20,21 @@ func TestBoundarySurvivesIncrementalIngest(t *testing.T) {
 	if err != nil || n != 1 {
 		t.Fatalf("first export = %d, %v", n, err)
 	}
-	if err := commit(); err != nil {
+	if err = commit(); err != nil {
 		t.Fatal(err)
 	}
 	// Ordinary incremental ingest: an unrelated project appears. syncSSHPush
 	// runs EnsureForSearch before every export, so this is the common path.
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
 	other := filepath.Join(claudeRoot, "-tmp-other")
-	if err := os.MkdirAll(other, 0o755); err != nil {
+	if err = os.MkdirAll(other, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(other, "s2.jsonl"),
+	if err = os.WriteFile(filepath.Join(other, "s2.jsonl"),
 		[]byte(msgLine("2026-01-03T00:00:00Z", "unrelated work")), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := Ensure(dir, "", true, nil); err != nil {
+	if err = Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	m, err := readManifest(dir)
@@ -74,20 +74,20 @@ func TestUnrelatedPushDoesNotWipeOtherBoundaries(t *testing.T) {
 	// A second project shows up and gets pushed.
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
 	other := filepath.Join(claudeRoot, "-tmp-other")
-	if err := os.MkdirAll(other, 0o755); err != nil {
+	if err = os.MkdirAll(other, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(other, "s2.jsonl"),
+	if err = os.WriteFile(filepath.Join(other, "s2.jsonl"),
 		[]byte(msgLine("2026-01-03T00:00:00Z", "project b message")), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := Ensure(dir, "", true, nil); err != nil {
+	if err = Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, commit, err := ExportDeferred(dir, filepath.Join(tmp, "b1"), "laptop"); err != nil {
-		t.Fatal(err)
-	} else if err := commit(); err != nil {
-		t.Fatal(err)
+	if _, commit, exportErr := ExportDeferred(dir, filepath.Join(tmp, "b1"), "laptop"); exportErr != nil {
+		t.Fatal(exportErr)
+	} else if commitErr := commit(); commitErr != nil {
+		t.Fatal(commitErr)
 	}
 	after, err := readManifest(dir)
 	if err != nil {
@@ -120,7 +120,7 @@ func TestExcludeAppliesToAlreadyImportedSessions(t *testing.T) {
 	}
 	// The user excludes the project afterwards and the index is rebuilt.
 	t.Setenv("DEJA_EXCLUDE_PROJECTS", exportedProject(t, batch))
-	if err := Ensure(peer, "", true, nil); err != nil {
+	if err = Ensure(peer, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	got, err = Search(peer, search.Options{Query: "nda project notes", All: true})

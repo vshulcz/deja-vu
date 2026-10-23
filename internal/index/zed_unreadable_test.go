@@ -16,7 +16,7 @@ import (
 func TestAZedThreadDejaCannotDecodeIsReportedWithWhy(t *testing.T) {
 	tmp, db := zedEnv(t)
 	zedThread(t, db, "good", "2026-01-01T10:00:00Z", []string{"marker-zed-good"})
-	c := exec.Command("sqlite3", db)
+	c := exec.CommandContext(t.Context(), "sqlite3", db)
 	c.Stdin = strings.NewReader(`insert into threads (id,summary,updated_at,data_type,data) values ('later','s','2026-01-01T11:00:00Z','brotli',x'00');`)
 	if o, err := c.CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, o)
@@ -42,7 +42,7 @@ func TestAZedThreadDejaCannotDecodeIsReportedWithWhy(t *testing.T) {
 func TestAZedThreadDejaCannotDecodeStaysCountedPastTheWatermark(t *testing.T) {
 	tmp, db := zedEnv(t)
 	zedThread(t, db, "good", "2026-01-01T10:00:00Z", []string{"marker-zed-good"})
-	c := exec.Command("sqlite3", db)
+	c := exec.CommandContext(t.Context(), "sqlite3", db)
 	c.Stdin = strings.NewReader(`insert into threads (id,summary,updated_at,data_type,data) values ('later','s','2026-01-01T11:00:00Z','brotli',x'00');`)
 	if o, err := c.CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, o)

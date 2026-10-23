@@ -26,10 +26,10 @@ func TestReimportOfAForgottenSessionStillSaysItWasLeftOut(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(exp, "deja-sync.jsonl"), append(b, '\n'), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(exp, "deja-sync.jsonl"), append(b, '\n'), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := Ensure(dir, "", false, nil); err != nil {
+	if err = Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	n, err := Import(dir, exp)
@@ -41,7 +41,7 @@ func TestReimportOfAForgottenSessionStillSaysItWasLeftOut(t *testing.T) {
 	}
 
 	id := ImportedSessionID("claude", "solo")
-	if _, err := Forget(dir, ForgetOptions{Session: "claude:" + id}); err != nil {
+	if _, err = Forget(dir, ForgetOptions{Session: "claude:" + id}); err != nil {
 		t.Fatal(err)
 	}
 

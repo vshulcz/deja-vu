@@ -141,9 +141,6 @@ func tokenOverlap(a, b []string) float64 {
 			shared++
 		}
 	}
-	longer := len(a)
-	if len(b) > longer {
-		longer = len(b)
-	}
+	longer := max(len(b), len(a))
 	return float64(shared) / float64(longer)
 }

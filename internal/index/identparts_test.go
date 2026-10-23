@@ -63,7 +63,7 @@ func TestWiderKeyCapShrinksCandidateSet(t *testing.T) {
 	// candidates for the scan); fetching the rare token's postings too
 	// collapses the AND to 1 before any record is read.
 	texts := make([]string, 0, 40)
-	for i := 0; i < 39; i++ {
+	for range 39 {
 		texts = append(texts, "performance regression investigation deployment pipeline filler")
 	}
 	texts = append(texts, "performance regression investigation deployment pipeline zzq")

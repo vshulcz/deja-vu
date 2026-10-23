@@ -17,6 +17,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
+// Report is what `deja stats` prints, and its --json shape.
 type Report struct {
 	SchemaVersion   int `json:"schema_version"`
 	TotalSessions   int `json:"total_sessions"`
@@ -75,17 +76,20 @@ type Report struct {
 	SpanFiles int `json:"span_files,omitempty"`
 }
 
+// HarnessStats is one harness row of a report.
 type HarnessStats struct {
 	Harness  string `json:"harness"`
 	Sessions int    `json:"sessions"`
 	Messages int    `json:"messages"`
 }
 
+// ProjectStats is one project row of a report.
 type ProjectStats struct {
 	Project  string `json:"project"`
 	Sessions int    `json:"sessions"`
 }
 
+// MonthStats is one month of message counts.
 type MonthStats struct {
 	Month    string `json:"month"`
 	Messages int    `json:"messages"`
@@ -100,16 +104,19 @@ type HeatmapStats struct {
 	Months []HeatMonth `json:"months"`
 }
 
+// HeatMonth labels the heatmap column a month starts in.
 type HeatMonth struct {
 	Col   int    `json:"col"`
 	Label string `json:"label"`
 }
 
+// DateRangeStats is the first and last day a report covers.
 type DateRangeStats struct {
 	Start string `json:"start,omitempty"`
 	End   string `json:"end,omitempty"`
 }
 
+// SessionStat is one session named in a report.
 type SessionStat struct {
 	ID       string `json:"id,omitempty"`
 	Harness  string `json:"harness,omitempty"`
@@ -118,11 +125,13 @@ type SessionStat struct {
 	Messages int    `json:"messages"`
 }
 
+// DayStat is one day named in a report.
 type DayStat struct {
 	Date     string `json:"date,omitempty"`
 	Messages int    `json:"messages"`
 }
 
+// Filter keeps the sessions that match the search options' harness, project, age and role.
 func Filter(ss []model.Session, o search.Options) []model.Session {
 	if o.Harness == "" && o.Project == "" && o.Since <= 0 && o.Role == "" {
 		return ss
@@ -163,6 +172,7 @@ func Filter(ss []model.Session, o search.Options) []model.Session {
 	return out
 }
 
+// Build computes the report for ss as of now.
 func Build(ss []model.Session, now time.Time) Report {
 	byHarness := map[string]*HarnessStats{}
 	byProject := map[string]int{}
@@ -285,7 +295,7 @@ func buildHeatmap(byDay map[string]int, now time.Time) HeatmapStats {
 	for cur := start; !cur.After(end); {
 		var week [7]int
 		colDate := cur
-		for d := 0; d < 7; d++ {
+		for d := range 7 {
 			if cur.After(end) {
 				week[d] = -1
 			} else {
@@ -337,6 +347,7 @@ func Title(s model.Session) string {
 	return ""
 }
 
+// Noise reports whether a message is harness plumbing rather than something a person wrote.
 func Noise(s string) bool {
 	t := strings.TrimSpace(s)
 	for _, p := range []string{"<local-command", "<command-", "<task-notification", "<teammate-message", "<bash-", "Caveat:", "<system-reminder"} {
@@ -383,6 +394,7 @@ func sparkline(months []MonthStats) string {
 	return b.String()
 }
 
+// ScaledBar is how many of width cells n fills against maxN, at least one for any n above zero.
 func ScaledBar(n, maxN, width int) int {
 	if n <= 0 || maxN <= 0 {
 		return 0
@@ -394,6 +406,7 @@ func ScaledBar(n, maxN, width int) int {
 	return scaled
 }
 
+// TrimRunes cuts s to n runes, ending in an ellipsis when it cut anything.
 func TrimRunes(s string, n int) string {
 	r := []rune(s)
 	if len(r) <= n {
@@ -589,7 +602,7 @@ func CreditedRefs(text string) []string {
 	}
 	var out []string
 	seen := map[string]bool{}
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		if !strings.Contains(strings.ToLower(line), "déjà vu") {
 			continue
 		}

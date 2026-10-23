@@ -34,17 +34,17 @@ func TestCopilotWriteBackReadsBack(t *testing.T) {
 	if !strings.Contains(string(f.Data), `"copilotVersion"`) {
 		t.Error("session.start without copilotVersion, which Copilot reads as corrupted")
 	}
-	if err := os.MkdirAll(filepath.Dir(f.Path), 0o700); err != nil {
+	if err = os.MkdirAll(filepath.Dir(f.Path), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(f.Path, f.Data, 0o600); err != nil {
+	if err = os.WriteFile(f.Path, f.Data, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	ss, err := ParseCopilotFile(f.Path)
 	if err != nil || len(ss) != 1 {
 		t.Fatalf("parse back: %v %d", err, len(ss))
 	}
-	var got []string
+	got := make([]string, 0, len(ss[0].Messages))
 	for _, m := range ss[0].Messages {
 		got = append(got, m.Role+":"+m.Text)
 	}

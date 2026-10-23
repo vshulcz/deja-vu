@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -54,7 +55,7 @@ func TestWriteBackPiFamilyReadsBack(t *testing.T) {
 			if f.Path != s.Path || f.Root != root || f.Turns != 3 {
 				t.Fatalf("file = %q in %q with %d turns", f.Path, f.Root, f.Turns)
 			}
-			if err := os.WriteFile(f.Path, f.Data, 0o600); err != nil {
+			if err = os.WriteFile(f.Path, f.Data, 0o600); err != nil {
 				t.Fatal(err)
 			}
 			ss, err := tc.parse(f.Path)
@@ -90,8 +91,8 @@ func TestWriteBackGjcRefusesWithoutItsScopeFile(t *testing.T) {
 		Messages: []model.Message{{Role: "user", Text: "hi", Time: at}},
 	}
 	_, err := RenderWriteBack(s)
-	r, ok := err.(*WriteBackRefusal)
-	if !ok || !strings.Contains(r.Reason, "scope file") {
+	var r *WriteBackRefusal
+	if !errors.As(err, &r) || !strings.Contains(r.Reason, "scope file") {
 		t.Fatalf("err = %v", err)
 	}
 }

@@ -67,7 +67,7 @@ func TestAnExportCarriesOwnWorkAndNotAPeersToo(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, line := range strings.Split(strings.TrimSpace(string(body)), "\n") {
+		for line := range strings.SplitSeq(strings.TrimSpace(string(body)), "\n") {
 			if line == "" {
 				continue
 			}

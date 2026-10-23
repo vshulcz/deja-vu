@@ -43,11 +43,11 @@ func TestInstallKeepsWiringWhenStdoutClosesEarly(t *testing.T) {
 		t.Fatal(err)
 	}
 	var said bytes.Buffer
-	cmd := exec.Command(os.Args[0], "-test.run=^TestInstallPipeHelper$")
+	cmd := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestInstallPipeHelper$")
 	cmd.Env = append(os.Environ(), installPipeHelperEnv+"="+home)
 	cmd.Stdout, cmd.Stdin, cmd.Stderr = stdoutW, stdin, &said
-	if err := cmd.Start(); err != nil {
-		t.Fatal(err)
+	if serr := cmd.Start(); serr != nil {
+		t.Fatal(serr)
 	}
 	// Only the child's ends are in its way now, and a helper that never
 	// reaches the barrier is not worth waiting for.
@@ -70,9 +70,9 @@ func TestInstallKeepsWiringWhenStdoutClosesEarly(t *testing.T) {
 	}
 	// The install runs now, against a stdout nobody is reading.
 	_ = stdinW.Close()
-	if err := cmd.Wait(); err != nil {
+	if werr := cmd.Wait(); werr != nil {
 		t.Fatalf("a closed stdout ended the run before it could record the wiring (%v); stderr:\n%s",
-			err, said.String())
+			werr, said.String())
 	}
 	wiring, err := os.ReadFile(filepath.Join(home, ".config", "deja", "wiring.json"))
 	if err != nil {

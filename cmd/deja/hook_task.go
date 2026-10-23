@@ -68,7 +68,7 @@ func changedTaskFiles(cwd string) []string {
 		}
 	}
 	if b, err := gitread.Command(ctx, "-C", cwd, "status", "--porcelain").Output(); err == nil {
-		for _, line := range strings.Split(string(b), "\n") {
+		for line := range strings.SplitSeq(string(b), "\n") {
 			if len(line) < 4 {
 				continue
 			}
@@ -80,7 +80,7 @@ func changedTaskFiles(cwd string) []string {
 		}
 	}
 	if b, err := gitread.Command(ctx, "-C", cwd, "log", "--no-renames", "--name-only", "-3", "--pretty=format:").Output(); err == nil {
-		for _, line := range strings.Split(string(b), "\n") {
+		for line := range strings.SplitSeq(string(b), "\n") {
 			add(line)
 		}
 	}

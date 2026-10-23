@@ -29,7 +29,7 @@ func writeClaudeSettings(t *testing.T, events ...string) {
 // deja that is no longer on disk.
 func writeClaudeSettingsNaming(t *testing.T, exe string, events ...string) {
 	t.Helper()
-	var entries []string
+	entries := make([]string, 0, len(events))
 	for _, e := range events {
 		// The path goes in as JSON writes it: a Windows exe carries
 		// backslashes, and pasting them raw makes the fixture invalid JSON —
@@ -82,7 +82,7 @@ func TestDoctorNamesTheHookEventsAnOlderInstallLacks(t *testing.T) {
 // a command that would change nothing.
 func TestDoctorIsQuietWhenEveryHookIsWired(t *testing.T) {
 	withStatsStores(t)
-	var all []string
+	all := make([]string, 0, len(claudeHookWiring))
 	for _, h := range claudeHookWiring {
 		all = append(all, h.Event)
 	}

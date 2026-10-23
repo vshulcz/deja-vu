@@ -46,7 +46,7 @@ func zedWorkedStore(t *testing.T) []string {
 	if len(sessions) != 1 {
 		t.Fatalf("sessions = %d, want 1", len(sessions))
 	}
-	var roles []string
+	roles := make([]string, 0, len(sessions[0].Messages))
 	for _, m := range sessions[0].Messages {
 		roles = append(roles, m.Role+"\t"+m.Text)
 	}
@@ -126,7 +126,7 @@ func TestZedIndexesTheFilesAThreadTouched(t *testing.T) {
 			continue
 		}
 		seen := map[string]bool{}
-		for _, p := range strings.Split(text, "\n") {
+		for p := range strings.SplitSeq(text, "\n") {
 			if seen[p] {
 				t.Errorf("%s is listed twice in one record: %q", p, text)
 			}

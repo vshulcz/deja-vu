@@ -34,7 +34,7 @@ func recordingDeja(t *testing.T) (string, func() []pluginCall) {
 	return stub, func() []pluginCall {
 		b, _ := os.ReadFile(log)
 		var out []pluginCall
-		for _, l := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+		for l := range strings.SplitSeq(strings.TrimSpace(string(b)), "\n") {
 			args, in, ok := strings.Cut(l, "|")
 			if !ok {
 				continue
@@ -93,21 +93,21 @@ func runNodeDriver(t *testing.T, name, src, driver string) string {
 	}
 	args := []string{}
 	if strings.HasSuffix(name, ".ts") {
-		if err := exec.Command(node, "--experimental-strip-types", "-e", "").Run(); err != nil {
+		if err = exec.CommandContext(t.Context(), node, "--experimental-strip-types", "-e", "").Run(); err != nil {
 			t.Skip("this node cannot strip types")
 		}
 		args = append(args, "--experimental-strip-types", "--no-warnings")
 	}
 	dir := t.TempDir()
 	plugin := filepath.Join(dir, name)
-	if err := os.WriteFile(plugin, []byte(src), 0o644); err != nil {
+	if err = os.WriteFile(plugin, []byte(src), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	drive := filepath.Join(dir, "drive.mjs")
-	if err := os.WriteFile(drive, []byte(strings.ReplaceAll(driver, "PLUGIN", plugin)), 0o644); err != nil {
+	if err = os.WriteFile(drive, []byte(strings.ReplaceAll(driver, "PLUGIN", plugin)), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command(node, append(args, drive)...)
+	cmd := exec.CommandContext(t.Context(), node, append(args, drive)...)
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -292,7 +292,7 @@ func TestHermesPluginEndsTheSessionOnFinalize(t *testing.T) {
 		"m.register(Ctx())\n" +
 		"hooks['on_session_finalize'](session_id='20261007_132227_1adb27', platform='cli', reason='shutdown')\n" +
 		"hooks['on_session_finalize'](session_id=None, platform='cli', reason='shutdown')\n"
-	cmd := exec.Command(py, "-c", probe)
+	cmd := exec.CommandContext(t.Context(), py, "-c", probe)
 	cmd.Dir = root
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("plugin: %v\n%s", err, out)

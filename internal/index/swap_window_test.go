@@ -30,9 +30,7 @@ func TestReadersWaitOutTheSwapWindow(t *testing.T) {
 		t.Fatal(err)
 	}
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		time.Sleep(40 * time.Millisecond)
 		fresh := filepath.Join(dir, "tmp.db")
 		if err := os.MkdirAll(fresh, 0o755); err != nil {
@@ -41,7 +39,7 @@ func TestReadersWaitOutTheSwapWindow(t *testing.T) {
 		_ = os.WriteFile(filepath.Join(fresh, "manifest.gob"), []byte("rebuilt"), 0o644)
 		_ = os.Rename(fresh, index)
 		_ = os.RemoveAll(parked)
-	}()
+	})
 
 	f, err := openIndexFile(path)
 	if err != nil {
@@ -76,15 +74,13 @@ func TestSearchDoesNotNameAnInternalPathDuringARebuild(t *testing.T) {
 	dir, proj := swapFixture(t)
 	stop := make(chan struct{})
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for i := 0; i < 4; i++ {
+	wg.Go(func() {
+		for range 4 {
 			writeSession(t, proj, "d", "the kafka consumer keeps rebalancing")
 			_ = Ensure(dir, "", true, nil)
 		}
 		close(stop)
-	}()
+	})
 	var bad []string
 	for done := false; !done; {
 		select {
@@ -138,12 +134,10 @@ func TestBucketReadsWaitOutTheSwapWindowToo(t *testing.T) {
 		t.Fatal(err)
 	}
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		time.Sleep(40 * time.Millisecond)
 		_ = os.Rename(parked, idx)
-	}()
+	})
 	f, err := openIndexFile(path)
 	if err != nil {
 		t.Fatalf("a bucket read in the swap window was handed %v", err)

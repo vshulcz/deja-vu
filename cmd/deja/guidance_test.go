@@ -85,20 +85,20 @@ func TestOwnedGuidanceTargetsAndMarkerBoundaries(t *testing.T) {
 	// grok still shares its file with the user, so it stands in for the
 	// marked-block path that qwen took before it moved to a skill.
 	shared := guidancePath("grok")
-	if err := os.MkdirAll(filepath.Dir(shared), 0o755); err != nil {
+	if err = os.MkdirAll(filepath.Dir(shared), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(shared, []byte("# Personal context\n"), 0o644); err != nil {
+	if err = os.WriteFile(shared, []byte("# Personal context\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := installGuidance("grok", false); err != nil {
+	if _, err = installGuidance("grok", false); err != nil {
 		t.Fatal(err)
 	}
 	b, _ := os.ReadFile(shared)
 	if !strings.Contains(string(b), "# Personal context") {
 		t.Fatalf("grok context was not preserved: %s", b)
 	}
-	if _, err := installGuidance("grok", true); err != nil {
+	if _, err = installGuidance("grok", true); err != nil {
 		t.Fatal(err)
 	}
 	b, _ = os.ReadFile(shared)
@@ -107,19 +107,19 @@ func TestOwnedGuidanceTargetsAndMarkerBoundaries(t *testing.T) {
 	}
 
 	squat := filepath.Join(home, ".copilot", "skills", "deja-history")
-	if err := os.RemoveAll(filepath.Dir(squat)); err != nil {
+	if err = os.RemoveAll(filepath.Dir(squat)); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Dir(squat), 0o755); err != nil {
+	if err = os.MkdirAll(filepath.Dir(squat), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(squat, []byte("not a directory"), 0o644); err != nil {
+	if err = os.WriteFile(squat, []byte("not a directory"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := installGuidance("copilot", false); err == nil {
+	if _, err = installGuidance("copilot", false); err == nil {
 		t.Fatal("expected path-squatting error")
 	}
-	if _, err := writeIfChanged(filepath.Join(squat, "SKILL.md"), nil, []byte("skill")); err == nil {
+	if _, err = writeIfChanged(filepath.Join(squat, "SKILL.md"), nil, []byte("skill")); err == nil {
 		t.Fatal("expected atomic write path-squatting error")
 	}
 	entries, err := os.ReadDir(filepath.Dir(squat))

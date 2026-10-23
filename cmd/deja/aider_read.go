@@ -138,7 +138,7 @@ func aiderEnvList(v string) []string {
 	if json.Unmarshal([]byte(v), &items) == nil {
 		return items
 	}
-	for _, it := range strings.Split(v[1:len(v)-1], ",") {
+	for it := range strings.SplitSeq(v[1:len(v)-1], ",") {
 		items = append(items, strings.TrimSpace(it))
 	}
 	return items
@@ -150,8 +150,8 @@ func aiderEnvList(v string) []string {
 func aiderConfValues(s, key string) ([]string, bool) {
 	lines := strings.Split(s, "\n")
 	// PyYAML keeps the last of a key written twice.
-	for i := len(lines) - 1; i >= 0; i-- {
-		rest, ok := strings.CutPrefix(strings.TrimRight(lines[i], " \t"), key+":")
+	for i, line := range slices.Backward(lines) {
+		rest, ok := strings.CutPrefix(strings.TrimRight(line, " \t"), key+":")
 		if !ok || rest != "" && rest[0] != ' ' && rest[0] != '\t' {
 			continue
 		}

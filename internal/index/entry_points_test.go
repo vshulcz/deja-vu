@@ -15,7 +15,7 @@ import (
 // and the trust policy can hide a project's failures.
 func TestCommandFailedBeforeFindsTheShapeThatFailed(t *testing.T) {
 	c, tmp := newCFStore(t)
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		c.write("app", i, "fix the store test")
 	}
 	dir := filepath.Join(tmp, "index.db")
@@ -97,7 +97,7 @@ func TestEnsureForSearchNoWait(t *testing.T) {
 	}
 	_ = os.Remove(dir + ".lock")
 	locked := filepath.Dir(dir)
-	if err := os.Chmod(locked, 0o555); err != nil {
+	if err = os.Chmod(locked, 0o555); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })

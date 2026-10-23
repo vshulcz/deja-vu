@@ -56,17 +56,17 @@ func TestASyncedMachineCanBePulledFrom(t *testing.T) {
 	var relayed []SyncRecord
 	batches, _ := filepath.Glob(filepath.Join(toLaptop, "*.jsonl"))
 	for _, p := range batches {
-		b, err := os.ReadFile(p)
-		if err != nil {
-			t.Fatal(err)
+		b, readErr := os.ReadFile(p)
+		if readErr != nil {
+			t.Fatal(readErr)
 		}
-		for _, line := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+		for line := range strings.SplitSeq(strings.TrimSpace(string(b)), "\n") {
 			if strings.TrimSpace(line) == "" {
 				continue
 			}
 			var sr SyncRecord
-			if err := json.Unmarshal([]byte(line), &sr); err != nil {
-				t.Fatalf("batch line does not decode: %v", err)
+			if decodeErr := json.Unmarshal([]byte(line), &sr); decodeErr != nil {
+				t.Fatalf("batch line does not decode: %v", decodeErr)
 			}
 			relayed = append(relayed, sr)
 		}
@@ -88,8 +88,8 @@ func TestASyncedMachineCanBePulledFrom(t *testing.T) {
 
 	// And the laptop can read it.
 	laptop := filepath.Join(tmp, "laptop.db")
-	if n, err := Import(laptop, toLaptop); err != nil || n != 2 {
-		t.Fatalf("laptop import n=%d err=%v", n, err)
+	if n, importErr := Import(laptop, toLaptop); importErr != nil || n != 2 {
+		t.Fatalf("laptop import n=%d err=%v", n, importErr)
 	}
 	ss, err := Search(laptop, search.Options{Query: "relayneedle", All: true})
 	if err != nil {

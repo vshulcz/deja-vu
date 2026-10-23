@@ -74,11 +74,14 @@ func junieFailurePair(dir, sid, project string) string {
 		return ""
 	}
 	rememberInjectedIDs(dir, sid, key)
-	b, _ := json.Marshal(map[string]any{
+	b, err := json.Marshal(map[string]any{
 		"hook_event_name": "PostToolUse", "session_id": sid, "cwd": project,
 		"tool_name": "Bash", "tool_input": map[string]any{"command": st.FailureCommand},
 		"tool_response": st.Failure,
 	})
+	if err != nil {
+		return ""
+	}
 	var got []byte
 	_ = withStdin(b, func() error {
 		got, _ = captureDeferredStdout(func() error { return commands["hook-tool-after"](dir, []string{"--plain"}) })

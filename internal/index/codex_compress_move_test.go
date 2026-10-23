@@ -25,7 +25,7 @@ func TestACodexRolloutCompressedInPlaceIsAMove(t *testing.T) {
 	if err := Ensure(idx, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := exec.Command("zstd", "-q", "--rm", p).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "zstd", "-q", "--rm", p).CombinedOutput(); err != nil {
 		t.Fatalf("zstd: %v %s", err, out)
 	}
 	if err := Ensure(idx, "", false, nil); err != nil {

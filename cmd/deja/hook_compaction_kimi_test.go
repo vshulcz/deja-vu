@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -17,7 +16,7 @@ import (
 func kimiCompactionSession(t *testing.T, workspace, id string) {
 	t.Helper()
 	session := filepath.Join(sources.KimiRoot(), "sessions", "wd_work_50ec6d22c9dc", id)
-	state, _ := json.Marshal(map[string]any{
+	state := mustMarshal(t, map[string]any{
 		"createdAt": "2026-10-07T10:16:41.259Z", "updatedAt": "2026-10-07T10:16:57.256Z",
 		"title": "fix the parser test", "workDir": workspace,
 		"agents": map[string]any{"main": map[string]any{"type": "main", "parentAgentId": nil}},
@@ -69,7 +68,7 @@ func TestKimiCompactionNeedsTheHarnessFromTheHookEntry(t *testing.T) {
 	dir := index.DefaultDir()
 	const id = "session_dedaa2f2-4daf-4366-b40e-f1dd5ec48842"
 	kimiCompactionSession(t, workspace, id)
-	b, _ := json.Marshal(map[string]any{"hook_event_name": "PreCompact", "session_id": id, "cwd": workspace, "trigger": "auto"})
+	b := mustMarshal(t, map[string]any{"hook_event_name": "PreCompact", "session_id": id, "cwd": workspace, "trigger": "auto"})
 	withHookStdin(t, string(b))
 	runHookPrecompactFor(dir, "")
 	if _, found, _ := index.Compaction(dir, id, workspace); found {
@@ -87,10 +86,10 @@ func TestKimiOnceDigestLeavesThePacketToThePromptHook(t *testing.T) {
 	dir := index.DefaultDir()
 	const id = "session_dedaa2f2-4daf-4366-b40e-f1dd5ec48842"
 	kimiCompactionSession(t, workspace, id)
-	b, _ := json.Marshal(map[string]any{"hook_event_name": "PreCompact", "session_id": id, "cwd": workspace})
+	b := mustMarshal(t, map[string]any{"hook_event_name": "PreCompact", "session_id": id, "cwd": workspace})
 	withHookStdin(t, string(b))
 	runHookPrecompactFor(dir, "kimi")
-	prompt, _ := json.Marshal(map[string]any{"hook_event_name": "UserPromptSubmit", "session_id": id, "cwd": workspace, "prompt": "what next"})
+	prompt := mustMarshal(t, map[string]any{"hook_event_name": "UserPromptSubmit", "session_id": id, "cwd": workspace, "prompt": "what next"})
 	withHookStdin(t, string(prompt))
 	if out := captureStdout(t, func() { _ = runHookContextMode(dir, true, true) }); strings.Contains(out, "Compaction context") {
 		t.Fatalf("hook-context --once handed the packet out: %s", out)

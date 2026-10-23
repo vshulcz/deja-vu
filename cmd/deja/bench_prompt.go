@@ -344,220 +344,8 @@ func measurePrompt(seed int64) (promptReport, error) {
 	report := promptReport{CorpusHash: corpus.Hash, Seed: seed}
 	var realTerms, negTerms []int
 	for _, chain := range corpus.Chains {
-		if chain.Negative {
-			continue
-		}
-		// Filler that only exists to fill the bucket has no question of its
-		// own; it is asked about through the bucket-answer chain below.
-		if chain.Kind == "bucket" || chain.Kind == "haystack-noise" || chain.Kind == "concluded-noise" || chain.Kind == "marathon-vs-noise" ||
-			chain.Kind == "background" {
-			continue
-		}
-		terms := prompt.Terms(chain.Question)
-		// The bucket question is asked against the catch-all scope rather than
-		// against its own project — that is the whole point of the case, and
-		// it is the only arm where the probe is not handed the right answer.
-		scope := chain.Project
-		if chain.Kind == "bucket-answer" {
-			scope = bench.PromptBucketProject
-		}
-		// A tied chain exists for the reworded arm alone: its store carries a
-		// sentence that explains the words without settling anything, which is
-		// the point of it. Counting it as a plain question would report the
-		// bridge's absence as a failure of the ordinary case.
-		if chain.Tied {
-			if chain.Paraphrase != "" {
-				pterms := prompt.Terms(chain.Paraphrase)
-				report.Tied.Cases++
-				if pfired, pcorrect := promptBenchProbeBlock(indexDir, scope, chain.ID, pterms); pfired {
-					report.Tied.Fired++
-					if pcorrect {
-						report.Tied.Correct++
-					} else {
-						report.Tied.FalseFires++
-					}
-				}
-			}
-			continue
-		}
-		fired, correct := promptBenchProbe(indexDir, scope, chain.ID, terms)
-		arm := &report.Real
-		switch chain.Kind {
-		case "marathon":
-			arm = &report.Marathon
-		case "fresh":
-			arm = &report.Fresh
-		case "bucket-answer":
-			arm = &report.Bucket
-		case "haystack":
-			arm = &report.Haystack
-		case "russian":
-			arm = &report.Russian
-			report.Decision.Cases++
-			if blockCarries(indexDir, scope, terms, chain.Fact, chain.Topic) {
-				report.Decision.Fired++
-				report.Decision.Correct++
-			}
-		case "marathon-vs":
-			// Which session is served, not whether the words are in the block:
-			// the long one holds the topic too, so a text test cannot tell the
-			// two apart. Correct is the chain's own session ranking first.
-			arm = &report.SpecificVsMarathon
-		case "concluded":
-			arm = &report.Concluded
-			arm.Cases++
-			if blockCarries(indexDir, scope, terms, chain.Fact, chain.Topic) {
-				arm.Fired++
-				arm.Correct++
-			}
-			continue
-		case "decision-inline":
-			arm = &report.DecisionInline
-			arm.Cases++
-			if blockCarries(indexDir, scope, terms, chain.Fact, chain.Topic) {
-				arm.Fired++
-				arm.Correct++
-			}
-			continue
-		case "decision-en":
-			arm = &report.Decision
-			arm.Cases++
-			if blockCarries(indexDir, scope, terms, chain.Fact, chain.Topic) {
-				arm.Fired++
-				arm.Correct++
-			}
-			continue
-		case "short-subject":
-			arm = &report.ShortSubject
-			arm.Cases++
-			// Through the hook, not the copy of its loop above: measured by
-			// asking both about every chain in the corpus, this is the one arm
-			// of seven where they disagree — "как там pr, смержился?" scored
-			// correct here while the hook answered nothing.
-			if fired, carries := hookEndToEndAs(indexDir, scope, chain.Question, chain.Fact, chain.Topic,
-				"benchshort"); fired {
-				arm.Fired++
-				if carries {
-					arm.Correct++
-				} else {
-					arm.FalseFires++
-				}
-			}
-			continue
-		case "echo-line":
-			arm = &report.Echo
-			arm.Cases++
-			arm.Fired++
-			if blockOpensOnEcho(indexDir, scope, terms, chain.Question) {
-				arm.FalseFires++
-			} else {
-				arm.Correct++
-			}
-			continue
-		case "tool-only":
-			arm = &report.ToolOnly
-			arm.Cases++
-			if fired, _ := hookEndToEndAs(indexDir, scope, chain.Question, chain.Fact, chain.Topic,
-				"benchtoolonly"); fired {
-				arm.Fired++
-				arm.FalseFires++
-			} else {
-				arm.Correct++
-			}
-			continue
-		case "hook-e2e-self":
-			arm = &report.EndToEnd
-			arm.Cases++
-			// Asked from the session that holds the answer: recalling it to
-			// itself spends tokens to say what is already on screen.
-			if fired, carries := hookEndToEndAs(indexDir, scope, chain.Question, chain.Fact, chain.Topic,
-				chain.ID+"-session"); fired && carries {
-				arm.Fired++
-				arm.FalseFires++
-			} else {
-				arm.Correct++
-			}
-			continue
-		case "hook-e2e":
-			arm = &report.EndToEnd
-			arm.Cases++
-			fired, carries := hookEndToEnd(indexDir, scope, chain.Question, chain.Fact, chain.Topic)
-			if fired {
-				arm.Fired++
-				if carries {
-					arm.Correct++
-				} else {
-					arm.FalseFires++
-				}
-			}
-			continue
-		case "compound-subject":
-			arm = &report.Compound
-			arm.Cases++
-			if fired, correct := promptBenchProbe(indexDir, scope, chain.ID, terms); fired {
-				arm.Fired++
-				if correct {
-					arm.Correct++
-				} else {
-					arm.FalseFires++
-				}
-			}
-			continue
-		case "decoy":
-			// Scored with the question's own terms, the way the hook builds the
-			// block. An earlier version of this arm rebuilt it from the topic
-			// alone and so could never see the decoy at all — it read 2/2 while
-			// the block opened on "decide whether to decide this now".
-			arm = &report.Decoy
-			arm.Cases++
-			if firstShownLineCarries(indexDir, scope, terms, chain.Topic) {
-				arm.Fired++
-				arm.Correct++
-			}
-			continue
-		default:
-			realTerms = append(realTerms, len(terms))
-		}
-		// What the block opens with, for the questions that have an answer to
-		// open with. Scored apart from whether the right session was picked:
-		// the two fail independently.
-		if fired && (chain.Kind == "" || chain.Kind == "russian") {
-			report.Shown.Cases++
-			if shownLineCarriesATerm(indexDir, scope, terms) {
-				report.Shown.Fired++
-				report.Shown.Correct++
-			}
-		}
-		if chain.Paraphrase != "" {
-			pterms := prompt.Terms(chain.Paraphrase)
-			arm := &report.Paraphrase
-			arm.Cases++
-			if pfired, pcorrect := promptBenchProbe(indexDir, scope, chain.ID, pterms); pfired {
-				arm.Fired++
-				if pcorrect {
-					arm.Correct++
-				} else {
-					arm.FalseFires++
-				}
-			}
-		}
-		arm.Cases++
-		if fired {
-			arm.Fired++
-			// Nothing in the bucket can be the answer, so anything it returns
-			// is a false fire.
-			if chain.Kind == "bucket-answer" {
-				arm.FalseFires++
-			}
-			// The long session in the same project is not an answer either:
-			// the arm exists to count the times it takes the place of the one
-			// that settled the question (#3214).
-			if chain.Kind == "marathon-vs" && !correct {
-				arm.FalseFires++
-			}
-		}
-		if correct {
-			arm.Correct++
+		if n, plain := measurePromptChain(&report, indexDir, chain); plain {
+			realTerms = append(realTerms, n)
 		}
 	}
 	// Negative questions are asked against every project in turn: firing
@@ -581,58 +369,7 @@ func measurePrompt(seed int64) (promptReport, error) {
 			}
 		}
 	}
-	// Cross-paired: every question asked in a project that is not the one it
-	// belongs to. The answer is somewhere else, so a fire is a false one — and
-	// unlike the hand-written controls these are the corpus's own questions,
-	// so the arm grows with it and cannot be written around.
-	//
-	// Measured this way on a real store of 1696 sessions, 400 prompts asked in
-	// another project fired 84 times while the same questions asked at home
-	// fired 398 of 400. That is the number this arm exists to bring down.
-	var crossed []PromptChainRef
-	for _, chain := range corpus.Chains {
-		if chain.Negative || chain.Question == "" || chain.Kind == "background" ||
-			chain.Kind == "bucket" || chain.Kind == "haystack-noise" ||
-			chain.Kind == "concluded-noise" {
-			continue
-		}
-		crossed = append(crossed, PromptChainRef{chain.Question, chain.Project, chain.ID})
-	}
-	sort.Slice(crossed, func(i, j int) bool { return crossed[i].ID < crossed[j].ID })
-	for i, c := range crossed {
-		away, found := awayFor(crossed, i)
-		if !found {
-			continue
-		}
-		report.CrossPaired.Cases++
-		if fired, _ := promptBenchProbe(indexDir, away.Project, away.ID, prompt.Terms(c.Question)); fired {
-			report.CrossPaired.Fired++
-			report.CrossPaired.FalseFires++
-		}
-	}
-	finishPromptArm(&report.CrossPaired, nil)
-	// The same questions asked at home, each under a paste. The answer is
-	// there and the question is the one that fires without the paste, so
-	// anything below that rate is the term budget going to someone else's
-	// file names.
-	for i, c := range crossed {
-		pre := pastedPreambles()[i%len(pastedPreambles())]
-		report.Pasted.Cases++
-		if fired, _ := promptBenchProbe(indexDir, c.Project, c.ID, prompt.Terms(pre+"\n"+c.Question)); fired {
-			report.Pasted.Fired++
-			report.Pasted.Correct++
-		}
-	}
-	finishPromptArm(&report.Pasted, nil)
-	for i, c := range crossed {
-		lead := leadIns()[i%len(leadIns())]
-		report.LeadIn.Cases++
-		if fired, _ := promptBenchProbe(indexDir, c.Project, c.ID, prompt.Terms(lead+c.Question)); fired {
-			report.LeadIn.Fired++
-			report.LeadIn.Correct++
-		}
-	}
-	finishPromptArm(&report.LeadIn, nil)
+	measurePromptCrossed(&report, indexDir, corpus.Chains)
 	finishPromptArm(&report.Real, realTerms)
 	finishPromptArm(&report.Negative, negTerms)
 	finishPromptArm(&report.Marathon, nil)
@@ -679,6 +416,289 @@ func measurePrompt(seed int64) (promptReport, error) {
 	return report, nil
 }
 
+// measurePromptChain scores one chain's question into its arm. It returns the
+// question's term count and true when the chain counts as a plain real question.
+func measurePromptChain(report *promptReport, indexDir string, chain bench.PromptChain) (int, bool) {
+	if chain.Negative {
+		return 0, false
+	}
+	// Filler that only exists to fill the bucket has no question of its
+	// own; it is asked about through the bucket-answer chain below.
+	if chain.Kind == "bucket" || chain.Kind == "haystack-noise" || chain.Kind == "concluded-noise" || chain.Kind == "marathon-vs-noise" ||
+		chain.Kind == "background" {
+		return 0, false
+	}
+	terms := prompt.Terms(chain.Question)
+	// The bucket question is asked against the catch-all scope rather than
+	// against its own project — that is the whole point of the case, and
+	// it is the only arm where the probe is not handed the right answer.
+	scope := chain.Project
+	if chain.Kind == "bucket-answer" {
+		scope = bench.PromptBucketProject
+	}
+	// A tied chain exists for the reworded arm alone: its store carries a
+	// sentence that explains the words without settling anything, which is
+	// the point of it. Counting it as a plain question would report the
+	// bridge's absence as a failure of the ordinary case.
+	if chain.Tied {
+		if chain.Paraphrase != "" {
+			pterms := prompt.Terms(chain.Paraphrase)
+			report.Tied.Cases++
+			if pfired, pcorrect := promptBenchProbeBlock(indexDir, scope, chain.ID, pterms); pfired {
+				report.Tied.Fired++
+				if pcorrect {
+					report.Tied.Correct++
+				} else {
+					report.Tied.FalseFires++
+				}
+			}
+		}
+		return 0, false
+	}
+	fired, correct := promptBenchProbe(indexDir, scope, chain.ID, terms)
+	if measurePromptOwnArm(report, indexDir, scope, terms, chain) {
+		return 0, false
+	}
+	plain := false
+	arm := &report.Real
+	switch chain.Kind {
+	case "marathon":
+		arm = &report.Marathon
+	case "fresh":
+		arm = &report.Fresh
+	case "bucket-answer":
+		arm = &report.Bucket
+	case "haystack":
+		arm = &report.Haystack
+	case "russian":
+		arm = &report.Russian
+		report.Decision.Cases++
+		if blockCarries(indexDir, scope, terms, chain.Fact, chain.Topic) {
+			report.Decision.Fired++
+			report.Decision.Correct++
+		}
+	case "marathon-vs":
+		// Which session is served, not whether the words are in the block:
+		// the long one holds the topic too, so a text test cannot tell the
+		// two apart. Correct is the chain's own session ranking first.
+		arm = &report.SpecificVsMarathon
+	default:
+		plain = true
+	}
+	// What the block opens with, for the questions that have an answer to
+	// open with. Scored apart from whether the right session was picked:
+	// the two fail independently.
+	if fired && (chain.Kind == "" || chain.Kind == "russian") {
+		report.Shown.Cases++
+		if shownLineCarriesATerm(indexDir, scope, terms) {
+			report.Shown.Fired++
+			report.Shown.Correct++
+		}
+	}
+	if chain.Paraphrase != "" {
+		pterms := prompt.Terms(chain.Paraphrase)
+		para := &report.Paraphrase
+		para.Cases++
+		if pfired, pcorrect := promptBenchProbe(indexDir, scope, chain.ID, pterms); pfired {
+			para.Fired++
+			if pcorrect {
+				para.Correct++
+			} else {
+				para.FalseFires++
+			}
+		}
+	}
+	arm.Cases++
+	if fired {
+		arm.Fired++
+		// Nothing in the bucket can be the answer, so anything it returns
+		// is a false fire.
+		if chain.Kind == "bucket-answer" {
+			arm.FalseFires++
+		}
+		// The long session in the same project is not an answer either:
+		// the arm exists to count the times it takes the place of the one
+		// that settled the question (#3214).
+		if chain.Kind == "marathon-vs" && !correct {
+			arm.FalseFires++
+		}
+	}
+	if correct {
+		arm.Correct++
+	}
+	return len(terms), plain
+}
+
+// measurePromptOwnArm scores the chain kinds that have an arm of their own and
+// skip the shared probe scoring. It reports whether the chain was one of them.
+func measurePromptOwnArm(report *promptReport, indexDir, scope string, terms []string, chain bench.PromptChain) bool {
+	var arm *promptArmReport
+	switch chain.Kind {
+	case "concluded":
+		arm = &report.Concluded
+		arm.Cases++
+		if blockCarries(indexDir, scope, terms, chain.Fact, chain.Topic) {
+			arm.Fired++
+			arm.Correct++
+		}
+	case "decision-inline":
+		arm = &report.DecisionInline
+		arm.Cases++
+		if blockCarries(indexDir, scope, terms, chain.Fact, chain.Topic) {
+			arm.Fired++
+			arm.Correct++
+		}
+	case "decision-en":
+		arm = &report.Decision
+		arm.Cases++
+		if blockCarries(indexDir, scope, terms, chain.Fact, chain.Topic) {
+			arm.Fired++
+			arm.Correct++
+		}
+	case "short-subject":
+		arm = &report.ShortSubject
+		arm.Cases++
+		// Through the hook, not the copy of its loop above: measured by
+		// asking both about every chain in the corpus, this is the one arm
+		// of seven where they disagree — "как там pr, смержился?" scored
+		// correct here while the hook answered nothing.
+		if hooked, carries := hookEndToEndAs(indexDir, scope, chain.Question, chain.Fact, chain.Topic,
+			"benchshort"); hooked {
+			arm.Fired++
+			if carries {
+				arm.Correct++
+			} else {
+				arm.FalseFires++
+			}
+		}
+	case "echo-line":
+		arm = &report.Echo
+		arm.Cases++
+		arm.Fired++
+		if blockOpensOnEcho(indexDir, scope, terms, chain.Question) {
+			arm.FalseFires++
+		} else {
+			arm.Correct++
+		}
+	case "tool-only":
+		arm = &report.ToolOnly
+		arm.Cases++
+		if hooked, _ := hookEndToEndAs(indexDir, scope, chain.Question, chain.Fact, chain.Topic,
+			"benchtoolonly"); hooked {
+			arm.Fired++
+			arm.FalseFires++
+		} else {
+			arm.Correct++
+		}
+	case "hook-e2e-self":
+		arm = &report.EndToEnd
+		arm.Cases++
+		// Asked from the session that holds the answer: recalling it to
+		// itself spends tokens to say what is already on screen.
+		if hooked, carries := hookEndToEndAs(indexDir, scope, chain.Question, chain.Fact, chain.Topic,
+			chain.ID+"-session"); hooked && carries {
+			arm.Fired++
+			arm.FalseFires++
+		} else {
+			arm.Correct++
+		}
+	case "hook-e2e":
+		arm = &report.EndToEnd
+		arm.Cases++
+		hooked, carries := hookEndToEnd(indexDir, scope, chain.Question, chain.Fact, chain.Topic)
+		if hooked {
+			arm.Fired++
+			if carries {
+				arm.Correct++
+			} else {
+				arm.FalseFires++
+			}
+		}
+	case "compound-subject":
+		arm = &report.Compound
+		arm.Cases++
+		if probed, matched := promptBenchProbe(indexDir, scope, chain.ID, terms); probed {
+			arm.Fired++
+			if matched {
+				arm.Correct++
+			} else {
+				arm.FalseFires++
+			}
+		}
+	case "decoy":
+		// Scored with the question's own terms, the way the hook builds the
+		// block. An earlier version of this arm rebuilt it from the topic
+		// alone and so could never see the decoy at all — it read 2/2 while
+		// the block opened on "decide whether to decide this now".
+		arm = &report.Decoy
+		arm.Cases++
+		if firstShownLineCarries(indexDir, scope, terms, chain.Topic) {
+			arm.Fired++
+			arm.Correct++
+		}
+	default:
+		return false
+	}
+	return true
+}
+
+// measurePromptCrossed scores the cross-paired, pasted and lead-in arms, which
+// all ask the corpus's own questions.
+func measurePromptCrossed(report *promptReport, indexDir string, chains []bench.PromptChain) {
+	// Cross-paired: every question asked in a project that is not the one it
+	// belongs to. The answer is somewhere else, so a fire is a false one — and
+	// unlike the hand-written controls these are the corpus's own questions,
+	// so the arm grows with it and cannot be written around.
+	//
+	// Measured this way on a real store of 1696 sessions, 400 prompts asked in
+	// another project fired 84 times while the same questions asked at home
+	// fired 398 of 400. That is the number this arm exists to bring down.
+	var crossed []PromptChainRef
+	for _, chain := range chains {
+		if chain.Negative || chain.Question == "" || chain.Kind == "background" ||
+			chain.Kind == "bucket" || chain.Kind == "haystack-noise" ||
+			chain.Kind == "concluded-noise" {
+			continue
+		}
+		crossed = append(crossed, PromptChainRef{chain.Question, chain.Project, chain.ID})
+	}
+	sort.Slice(crossed, func(i, j int) bool { return crossed[i].ID < crossed[j].ID })
+	for i, c := range crossed {
+		away, found := awayFor(crossed, i)
+		if !found {
+			continue
+		}
+		report.CrossPaired.Cases++
+		if fired, _ := promptBenchProbe(indexDir, away.Project, away.ID, prompt.Terms(c.Question)); fired {
+			report.CrossPaired.Fired++
+			report.CrossPaired.FalseFires++
+		}
+	}
+	finishPromptArm(&report.CrossPaired, nil)
+	// The same questions asked at home, each under a paste. The answer is
+	// there and the question is the one that fires without the paste, so
+	// anything below that rate is the term budget going to someone else's
+	// file names.
+	for i, c := range crossed {
+		pre := pastedPreambles()[i%len(pastedPreambles())]
+		report.Pasted.Cases++
+		if fired, _ := promptBenchProbe(indexDir, c.Project, c.ID, prompt.Terms(pre+"\n"+c.Question)); fired {
+			report.Pasted.Fired++
+			report.Pasted.Correct++
+		}
+	}
+	finishPromptArm(&report.Pasted, nil)
+	for i, c := range crossed {
+		lead := leadIns()[i%len(leadIns())]
+		report.LeadIn.Cases++
+		if fired, _ := promptBenchProbe(indexDir, c.Project, c.ID, prompt.Terms(lead+c.Question)); fired {
+			report.LeadIn.Fired++
+			report.LeadIn.Correct++
+		}
+	}
+	finishPromptArm(&report.LeadIn, nil)
+}
+
 // shownLineCarriesATerm builds the block the hook would inject and reports
 // whether its first content line holds any of the query's terms. A block whose
 // opening line came from the top of a long transcript does not, and that line
@@ -700,7 +720,7 @@ func shownLineCarriesATerm(dir, project string, terms []string) bool {
 		return false
 	}
 	block := search.AutoRecallDigestFor(keep, promptHookBudget-recallFrameOverhead, terms)
-	for _, line := range strings.Split(block, "\n") {
+	for line := range strings.SplitSeq(block, "\n") {
 		line = strings.TrimSpace(line)
 		// The header line names the session; the first line under it is what
 		// frames the block.
@@ -740,7 +760,7 @@ func firstShownLineCarries(dir, project string, terms []string, topic string) bo
 	if len(keep) == 0 {
 		return false
 	}
-	for _, ln := range strings.Split(search.AutoRecallDigestFor(keep, 2000, terms), "\n") {
+	for ln := range strings.SplitSeq(search.AutoRecallDigestFor(keep, 2000, terms), "\n") {
 		ln = strings.TrimSpace(ln)
 		if !strings.HasPrefix(ln, "- User:") && !strings.HasPrefix(ln, "- Assistant:") {
 			continue
@@ -779,7 +799,7 @@ func blockCarries(dir, project string, terms []string, fact, topic string) bool 
 	// which it is either way — rather than whether it carries the conclusion.
 	// An arm that did not skip it read 2/2 even after the conclusion had been
 	// emptied of its content.
-	for _, w := range strings.Fields(fact) {
+	for w := range strings.FieldsSeq(fact) {
 		if len([]rune(w)) < 7 || search.TextCarriesTerm(topic, w) {
 			continue
 		}
@@ -904,7 +924,7 @@ func blockOpensOnEcho(dir, project string, terms []string, question string) bool
 	if len(keep) == 0 {
 		return false
 	}
-	for _, ln := range strings.Split(search.AutoRecallDigestForAsked(keep, 2000, terms, question), "\n") {
+	for ln := range strings.SplitSeq(search.AutoRecallDigestForAsked(keep, 2000, terms, question), "\n") {
 		t := strings.TrimSpace(ln)
 		if !strings.HasPrefix(t, "- User:") && !strings.HasPrefix(t, "- Assistant:") {
 			continue
@@ -945,7 +965,7 @@ func hookEndToEndAs(dir, project, question, fact, topic, sid string) (fired, car
 	// pr went in after the flake was fixed" has no word that long, so the arm
 	// scored a false fire no product change could ever fix. Skip the short
 	// words and the subject instead of the short words alone.
-	for _, w := range strings.Fields(fact) {
+	for w := range strings.FieldsSeq(fact) {
 		w = strings.Trim(w, ".,:;!?()\"'\u00ab\u00bb")
 		if len([]rune(w)) < 5 || strings.EqualFold(w, topic) {
 			continue

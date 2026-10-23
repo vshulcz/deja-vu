@@ -22,7 +22,7 @@ insert into cursorDiskKV values
  ('composerData:comp-empty', json('{"composerId":"comp-empty","name":"draft"}')),
  ('composerData:comp-null', null),
  ('agentKv:blob:x', 'not-json-target');`
-	cmd := exec.Command("sqlite3", db, schema)
+	cmd := exec.CommandContext(t.Context(), "sqlite3", db, schema)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v: %s", err, out)
 	}
@@ -54,11 +54,11 @@ func TestParseCursorTranscript(t *testing.T) {
 	encoded := "Users-x-work-my-app"
 	wantProject := filepath.Join("my", "app") // fallback splits on every hyphen
 	if runtime.GOOS != "windows" {
-		real := filepath.Join(tmp, "work", "my-app")
-		if err := os.MkdirAll(real, 0o755); err != nil {
+		resolved := filepath.Join(tmp, "work", "my-app")
+		if err := os.MkdirAll(resolved, 0o755); err != nil {
 			t.Fatal(err)
 		}
-		encoded = strings.TrimPrefix(strings.ReplaceAll(real, string(filepath.Separator), "-"), "-")
+		encoded = strings.TrimPrefix(strings.ReplaceAll(resolved, string(filepath.Separator), "-"), "-")
 		wantProject = "work/my-app" // resolved against the real directory
 	}
 	dir := filepath.Join(tmp, "cursorcli", "projects", encoded, "agent-transcripts", "sess-1")
@@ -123,7 +123,7 @@ func TestCursorTranscriptProjectWalkUp(t *testing.T) {
 			want string
 		}{
 			name: "windows drive root",
-			path: filepath.Join(`C:\`, "session.jsonl"),
+			path: filepath.Join(`C:\`, "session.jsonl"), //nolint:gocritic // a drive root, joined the way Windows joins it
 			want: "-",
 		})
 	}

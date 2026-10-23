@@ -41,7 +41,7 @@ func TestBlamePathResolutionAndMatching(t *testing.T) {
 func TestBlameFiltersProjectBoostLimitAndJSON(t *testing.T) {
 	now := time.Now()
 	ss := make([]model.Session, 0, 12)
-	for i := 0; i < 12; i++ {
+	for i := range 12 {
 		ss = append(ss, model.Session{ID: string(rune('a' + i)), Harness: "claude", Project: "/repo", Updated: now, Messages: []model.Message{{Role: "user", Text: "parser.go"}}})
 	}
 	target := BlameTarget{FullPath: "/repo/parser.go", Base: "parser.go", Stem: "parser"}
@@ -115,7 +115,7 @@ func BenchmarkBlameVerification1000Candidates(b *testing.B) {
 	target := BlameTarget{FullPath: "/repo/internal/parser.go", Base: "parser.go", Stem: "parser"}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		if got := Blame(ss, target, BlameOptions{All: true}); len(got) != len(ss) {
 			b.Fatalf("hits=%d", len(got))
 		}
@@ -127,8 +127,8 @@ func BenchmarkBlameVerification1000Candidates(b *testing.B) {
 // — five runs, five different top hits (#688).
 func TestBlameRanksTheSameWayEveryRun(t *testing.T) {
 	day := time.Date(2026, 6, 28, 10, 0, 0, 0, time.UTC)
-	var ss []model.Session
-	for i := 0; i < 40; i++ {
+	ss := make([]model.Session, 0, 40)
+	for i := range 40 {
 		id := fmt.Sprintf("s%02d", i)
 		ss = append(ss, model.Session{
 			Harness: "claude", ID: id, Project: "p", Updated: day,
@@ -143,7 +143,7 @@ func TestBlameRanksTheSameWayEveryRun(t *testing.T) {
 	if len(first) == 0 {
 		t.Fatal("no hits")
 	}
-	for run := 0; run < 20; run++ {
+	for run := range 20 {
 		got := Blame(ss, target, BlameOptions{All: true})
 		for i := range got {
 			if got[i].Session.ID != first[i].Session.ID {

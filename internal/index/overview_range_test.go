@@ -37,7 +37,7 @@ func TestOverviewCoversWhenTheOldestWorkBegan(t *testing.T) {
 	// A session whose start never made it into the manifest still has to bound
 	// the range, or an older store reports no coverage at all.
 	m.Sessions = map[string]SessionMeta{"claude:nostart": {ID: "nostart", Harness: "claude", Updated: updated}}
-	if err := writeManifest(dir, m); err != nil {
+	if err = writeManifest(dir, m); err != nil {
 		t.Fatal(err)
 	}
 	ov, err = Overview(dir)

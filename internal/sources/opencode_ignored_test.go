@@ -26,7 +26,7 @@ insert into message values('m2','s1',1767409260000,'{"role":"user","agent":"buil
 insert into part values('p2','m2','{"type":"text","ignored":true,"text":"▣ DCP | -100.3K removed, +9K summary — Compression #1","time":{"start":"2026-01-02T03:01:00Z"}}');
 insert into message values('m3','s1',1767409320000,'{"role":"assistant","agent":"build"}');
 insert into part values('p3','m3','{"type":"text","text":"the backoff counts from zero","time":{"start":"2026-01-02T03:02:00Z"}}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
 	ss, err := ParseOpencodeDB(db)

@@ -20,11 +20,11 @@ func bigToolAfterPayload(t *testing.T, err, cwd string, size int) []byte {
 		"session_id":      "big",
 		"cwd":             cwd,
 	}
-	base, _ := json.Marshal(obj)
-	pad := size - len(base)
-	if pad < 0 {
-		pad = 0
+	base, jerr := json.Marshal(obj)
+	if jerr != nil {
+		t.Fatal(jerr)
 	}
+	pad := max(size-len(base), 0)
 	obj["tool_response"] = map[string]string{"stderr": err + "\n" + strings.Repeat("x", pad)}
 	b, merr := json.Marshal(obj)
 	if merr != nil {

@@ -51,9 +51,9 @@ type crushProject struct {
 	DataDir string `json:"data_dir"`
 }
 
-// CrushProjects reads the registry: each project Crush has been run in, and
+// crushProjects reads the registry: each project Crush has been run in, and
 // the directory it keeps that project's store in.
-func CrushProjects() []crushProject {
+func crushProjects() []crushProject {
 	b, err := os.ReadFile(filepath.Join(CrushDataHome(), "projects.json"))
 	if err != nil {
 		return nil
@@ -72,7 +72,7 @@ func CrushProjects() []crushProject {
 // file is skipped rather than reported.
 func CrushDBs() []string {
 	var out []string
-	for _, p := range CrushProjects() {
+	for _, p := range crushProjects() {
 		dir := p.DataDir
 		if dir == "" && p.Path != "" {
 			dir = filepath.Join(p.Path, ".crush")
@@ -88,8 +88,9 @@ func CrushDBs() []string {
 	return out
 }
 
+// LoadCrush reads every Crush store on this machine.
 func LoadCrush() []model.Session {
-	var out []model.Session
+	var out []model.Session //nolint:prealloc // each store adds an unknown number of sessions
 	for _, db := range CrushDBs() {
 		got, err := ParseCrushDB(db)
 		out = append(out, dbRead(db, got, err)...)
@@ -119,7 +120,7 @@ func crushSummaryExpr(db string) string {
 	out, _ := sqliteOutput(db, "select name from pragma_table_info('sessions') where name='summary_message_id'"+
 		" union all select name from pragma_table_info('messages') where name='is_summary_message'")
 	var conds []string
-	for _, col := range strings.Fields(string(out)) {
+	for col := range strings.FieldsSeq(string(out)) {
 		switch col {
 		case "summary_message_id":
 			conds = append(conds, "m.id = coalesce(s.summary_message_id,'')")
@@ -144,7 +145,7 @@ func ParseCrushDB(db string) ([]model.Session, error) {
 // incremental pass skip a store nothing has happened in.
 func ParseCrushDBSince(db string, t time.Time) ([]model.Session, error) {
 	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
-		return nil, nil
+		return nil, nil //nolint:nilerr // a missing or empty store holds no sessions
 	}
 	where := ""
 	if !t.IsZero() {

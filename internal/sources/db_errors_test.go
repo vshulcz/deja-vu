@@ -21,7 +21,7 @@ func TestDBParsersReportSchemaFailuresRatherThanEmptiness(t *testing.T) {
 
 	// A database that exists but has none of the tables we query.
 	wrong := filepath.Join(dir, "wrong.db")
-	if out, err := exec.Command("sqlite3", wrong, "CREATE TABLE unrelated (id TEXT);").CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", wrong, "CREATE TABLE unrelated (id TEXT);").CombinedOutput(); err != nil {
 		t.Fatalf("seed: %v: %s", err, out)
 	}
 	for name, parse := range map[string]func(string) ([]model.Session, error){

@@ -102,13 +102,13 @@ func TestStatsImpactAgreesWithCount(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := filepath.Join(t.TempDir(), "index.db")
-			for i := 0; i < tt.recalls; i++ {
+			for range tt.recalls {
 				usage.RecordServedSessions(dir, usage.KindRecall, 100, 1, false, 1000, []string{"s1"})
 			}
-			for i := 0; i < tt.starts; i++ {
+			for range tt.starts {
 				usage.RecordResultRaw(dir, usage.KindHook, 100, 1, false, 1000)
 			}
-			for i := 0; i < tt.dejaVus; i++ {
+			for range tt.dejaVus {
 				usage.RecordResult(dir, usage.KindDejaVu, 100, 1, false)
 			}
 

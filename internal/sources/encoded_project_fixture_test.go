@@ -48,19 +48,19 @@ func encodeProjectPath(path string) string {
 // hyphen the encoding lost.
 func TestAnEncodedProjectThatResolvesKeepsItsHyphen(t *testing.T) {
 	root := t.TempDir()
-	real, err := filepath.EvalSymlinks(root)
+	resolved, err := filepath.EvalSymlinks(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	project := filepath.Join(real, "deja-vu")
+	project := filepath.Join(resolved, "deja-vu")
 	if err := os.MkdirAll(project, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
 	encoded := encodeProjectPath(project)
-	if got := decodeProjectBase(encoded); got != filepath.Base(real)+"/deja-vu" {
+	if got := decodeProjectBase(encoded); got != filepath.Base(resolved)+"/deja-vu" {
 		t.Errorf("decodeProjectBase(%q) = %q, want the hyphen kept under %q",
-			encoded, got, filepath.Base(real))
+			encoded, got, filepath.Base(resolved))
 	}
 
 	// And with the directory gone, the same name falls back to the dash rule —

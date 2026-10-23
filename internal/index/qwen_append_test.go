@@ -1,7 +1,6 @@
 package index
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,7 +17,7 @@ func qwenLine(i int, text string) string {
 	if i%2 == 1 {
 		role, inner = "assistant", "model"
 	}
-	b, _ := json.Marshal(map[string]any{
+	b := mustJSON(map[string]any{
 		"type": role, "sessionId": "s1", "timestamp": "2026-08-30T09:00:00.000Z",
 		"message": map[string]any{"role": inner, "parts": []any{map[string]any{"text": text}}},
 	})
@@ -56,8 +55,8 @@ func TestAGrowingQwenSessionIsAppendedNotReread(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	var seed []string
-	for i := 0; i < 6; i++ {
+	seed := make([]string, 0, 6)
+	for i := range 6 {
 		seed = append(seed, qwenLine(i, fmt.Sprintf("seed %d zonkomatic", i)))
 	}
 	write(seed)
@@ -103,8 +102,8 @@ func TestAGrowingQwenSessionIsAppendedNotReread(t *testing.T) {
 	// And a rewind: the file is rewritten with different text and regrows past
 	// its old length, which looks exactly like an append until the prefix is
 	// compared. The old text must not survive.
-	var rewritten []string
-	for i := 0; i < 9; i++ {
+	rewritten := make([]string, 0, 9)
+	for i := range 9 {
 		rewritten = append(rewritten, qwenLine(i, fmt.Sprintf("rewritten %d zonkomatic", i)))
 	}
 	write(rewritten)

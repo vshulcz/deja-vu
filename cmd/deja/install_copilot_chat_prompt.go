@@ -18,8 +18,9 @@ import (
 // to reach for it (#3651). Recall that arrives on its own is vscode-auto's
 // hook file.
 func copilotChatPromptPaths() []string {
-	var out []string
-	for _, user := range sources.CopilotChatRoots() {
+	roots := sources.CopilotChatRoots()
+	out := make([]string, 0, len(roots))
+	for _, user := range roots {
 		out = append(out, filepath.Join(user, "prompts", "deja.prompt.md"))
 	}
 	return out
@@ -77,7 +78,7 @@ func installCopilotChatPrompt(exe string, uninstall bool) (installResult, error)
 func installTextFile(path, body string, uninstall bool) (installResult, error) {
 	if uninstall {
 		if _, err := os.Stat(path); err != nil {
-			return installResult{Path: path, Action: "unchanged"}, nil
+			return installResult{Path: path, Action: "unchanged"}, nil //nolint:nilerr // nothing to remove
 		}
 		if err := os.Remove(path); err != nil {
 			return installResult{}, err

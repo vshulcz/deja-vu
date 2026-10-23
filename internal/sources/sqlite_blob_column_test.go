@@ -38,7 +38,7 @@ create table messages(id integer primary key, session_id text, role text, conten
 insert into sessions values('g1','/w','a goose session','2026-01-02T03:00:00Z','2026-01-02T04:00:00Z');
 insert into messages(session_id,role,content_json,created_timestamp) values('g1','user',
   cast('[{"type":"text","text":"blob store needle"}]' as blob),1767409200);`)
-		ss, err := parseGooseDBWhere(db, "", 0)
+		ss, err := parseGooseDBWhere(db, "")
 		if err != nil || len(ss) != 1 {
 			t.Fatalf("len=%d err=%v", len(ss), err)
 		}
@@ -50,7 +50,7 @@ insert into messages(session_id,role,content_json,created_timestamp) values('g1'
 
 func writeStore(t *testing.T, db, script string) {
 	t.Helper()
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
 }

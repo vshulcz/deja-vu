@@ -6,7 +6,7 @@ import (
 )
 
 func TestStripHarnessBlocksLeavesThePersonsWords(t *testing.T) {
-	cases := map[string]string{
+	cases := map[string]string{ //nolint:gosec // harness tags, not a credential
 		// The host alone: nothing is left.
 		"<task-notification>\n<task-id>br50mykp6</task-id>\n<status>failed</status>\n</task-notification>": "",
 		"<system-reminder>\nCAVEMAN MODE ACTIVE\n</system-reminder>":                                       "",

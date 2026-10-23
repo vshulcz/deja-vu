@@ -114,6 +114,7 @@ func gooseMigratedPair(t *testing.T) (inc, fresh string) {
 	sql := `create table sessions (id text primary key, name text, description text, working_dir text, created_at text, updated_at text);
 create table messages (id integer primary key autoincrement, session_id text, role text, content_json text, created_timestamp integer);
 `
+	var sqlSb117 strings.Builder
 	for i, id := range []string{"20260101_120000", "20260102_120000"} {
 		base := 1767268800 + i*86400
 		jsonl := fmt.Sprintf(`{"id":%q,"description":"pool","working_dir":"/tmp/app"}
@@ -121,11 +122,12 @@ create table messages (id integer primary key autoincrement, session_id text, ro
 {"role":"assistant","content":%s,"created":%d}
 `, id, base, fmt.Sprintf(tool, i), base+10)
 		parityWrite(t, filepath.Join(sessions, id+".jsonl"), jsonl, false)
-		sql += fmt.Sprintf(`insert into sessions values ('%s','n','pool','/tmp/app','2026-01-01 12:00:00','2026-01-01 12:05:00');
+		fmt.Fprintf(&sqlSb117, `insert into sessions values ('%s','n','pool','/tmp/app','2026-01-01 12:00:00','2026-01-01 12:05:00');
 insert into messages (session_id, role, content_json, created_timestamp) values ('%s','user','[{"type":"text","text":"why does pgbouncer time out"}]',%d);
 insert into messages (session_id, role, content_json, created_timestamp) values ('%s','assistant','%s',%d);
 `, id, id, base, id, fmt.Sprintf(tool, i), base+10)
 	}
+	sql += sqlSb117.String()
 	paritySQL(t, db, sql)
 	proj := filepath.Join(tmp, "claude", "-tmp-proj")
 	parityWrite(t, filepath.Join(proj, "a.jsonl"), parityClaudeLine("a", "00:00Z", "user", `"hi there build"`), false)

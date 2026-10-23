@@ -36,12 +36,12 @@ func TestDoctorNamesHooksRunningABinaryThatIsGone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(claude, b, 0o644); err != nil {
+	if err = os.WriteFile(claude, b, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	cursor := filepath.Join(sources.CursorCLIHome(), "hooks.json")
-	if err := os.MkdirAll(filepath.Dir(cursor), 0o755); err != nil {
+	if err = os.MkdirAll(filepath.Dir(cursor), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	hooks := map[string]any{"hooks": map[string]any{
@@ -158,7 +158,7 @@ func TestDoctorNamesPluginHooksRunningABinaryThatIsGone(t *testing.T) {
 	// would pass the line above.
 	for _, c := range cases {
 		wired := false
-		for _, line := range strings.Split(got, "\n") {
+		for line := range strings.SplitSeq(got, "\n") {
 			if strings.HasPrefix(strings.TrimSpace(line), c.name+" ") && strings.Contains(line, "wired") {
 				wired = true
 			}

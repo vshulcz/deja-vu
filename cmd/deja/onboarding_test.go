@@ -203,7 +203,7 @@ func TestRequestWarmupBranches(t *testing.T) {
 	dir := filepath.Join(tmp, "warm-index")
 	spawned := 0
 	oldSpawn := spawnWarmup
-	spawnWarmup = func(exe, sentinel string) error { spawned++; return nil }
+	spawnWarmup = func(_, _ string) error { spawned++; return nil }
 	defer func() { spawnWarmup = oldSpawn }()
 
 	// Inside a warmup child: no recursion.

@@ -41,7 +41,7 @@ func TestOpencodeReadsTheContentNotTheExtension(t *testing.T) {
 			}
 
 			// And out again, leaving the reader's file as it was.
-			if _, err := captureRun(t, "uninstall", "opencode"); err != nil {
+			if _, err = captureRun(t, "uninstall", "opencode"); err != nil {
 				t.Fatal(err)
 			}
 			b, err = os.ReadFile(path)

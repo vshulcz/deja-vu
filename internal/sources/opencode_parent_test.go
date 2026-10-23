@@ -23,7 +23,7 @@ insert into message values('m1','ses_parent',1767409200000,'{"role":"user","agen
 insert into part values('p1','m1','{"type":"text","text":"review the screenshots","time":{"start":"2026-01-02T03:00:00Z"}}');
 insert into message values('m2','ses_child',1767409800000,'{"role":"user","agent":"general"}');
 insert into part values('p2','m2','{"type":"text","text":"Review QA screenshots in /w/shots and list the defects","time":{"start":"2026-01-02T03:10:00Z"}}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
 	ss, err := ParseOpencodeDB(db)

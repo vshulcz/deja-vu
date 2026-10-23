@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -98,6 +99,7 @@ func jetBrainsSidecar(p string) (int64, int64) {
 	return sidecarStat(logs...)
 }
 
+// LoadJetBrains reads every JetBrains AI Assistant chat on this machine.
 func LoadJetBrains() []model.Session {
 	return parseFiles(JetBrainsSessionFiles(), ParseJetBrainsFile)
 }
@@ -193,7 +195,7 @@ func jetBrainsChatComponent(r io.Reader) (xnode, error) {
 	dec := xml.NewDecoder(r)
 	for {
 		tok, err := dec.Token()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return xnode{}, nil
 		}
 		if err != nil {
@@ -206,7 +208,7 @@ func jetBrainsChatComponent(r io.Reader) (xnode, error) {
 		for _, a := range se.Attr {
 			if a.Name.Local == "name" && a.Value == "ChatSessionStateTemp" {
 				var n xnode
-				err := dec.DecodeElement(&n, &se)
+				err := dec.DecodeElement(&n, &se) //nolint:musttag // xnode is a generic tree; XMLName takes the element name untagged
 				return n, err
 			}
 		}

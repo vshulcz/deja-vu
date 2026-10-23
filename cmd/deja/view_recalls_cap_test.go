@@ -17,7 +17,7 @@ import (
 func TestThePageSaysTheRecallsTabIsAWindow(t *testing.T) {
 	hermeticEnv(t)
 	dir := index.DefaultDir()
-	for i := 0; i < 130; i++ {
+	for i := range 130 {
 		usage.RecordDigestInto(dir, usage.KindDejaVu,
 			fmt.Sprintf("<deja-recall>\n  - digest-marker-%03d\n", i), fmt.Sprintf("agent%03d", i), 1, 100,
 			[]string{"quaxbolt"}, "r0")
@@ -52,9 +52,6 @@ func recallNote(page string) string {
 	if i < 0 {
 		return "(no recalls tab)"
 	}
-	end := i + 400
-	if end > len(page) {
-		end = len(page)
-	}
+	end := min(i+400, len(page))
 	return page[i:end]
 }

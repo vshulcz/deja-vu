@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"os"
@@ -108,10 +110,10 @@ func runView(dir string, args []string) error {
 		switch args[i] {
 		case "--out":
 			if i+1 >= len(args) {
-				return fmt.Errorf("view: --out needs a path")
+				return errors.New("view: --out needs a path")
 			}
 			i++
-			out = args[i]
+			out = args[i] //nolint:gosec // i+1 < len(args) checked above
 		case "--no-open":
 			openBrowser = false
 		default:
@@ -216,7 +218,7 @@ func writeViewHTML(dir, out string) (string, int, error) {
 			Updated: s.Updated.Local().Format("2006-01-02 15:04"),
 		}
 		if i < viewTranscripts {
-			if full, ok, err := index.FindByPrefix(dir, s.ID); err == nil && ok {
+			if full, ok, findErr := index.FindByPrefix(dir, s.ID); findErr == nil && ok {
 				v.Preview = sessionPreview(full.Messages)
 				page.PreviewCount++
 			}
@@ -396,11 +398,11 @@ func openInBrowser(path string) {
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "darwin":
-		cmd = exec.Command("open", path)
+		cmd = exec.CommandContext(context.Background(), "open", path)
 	case "windows":
-		cmd = exec.Command("cmd", "/c", "start", "", path)
+		cmd = exec.CommandContext(context.Background(), "cmd", "/c", "start", "", path)
 	default:
-		cmd = exec.Command("xdg-open", path)
+		cmd = exec.CommandContext(context.Background(), "xdg-open", path)
 	}
 	_ = cmd.Start()
 }

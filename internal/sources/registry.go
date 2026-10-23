@@ -1,7 +1,9 @@
+// Package sources reads each AI coding tool's session stores into model.Session values.
 package sources
 
 import (
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -190,7 +192,7 @@ func AllHarnesses() []Harness { return allHarnesses() }
 
 func allHarnesses() []Harness { return withSubagentSwitch(harnessTable()) }
 
-func harnessTable() []Harness {
+func harnessTable() []Harness { //nolint:funlen // one entry per supported harness
 	return []Harness{
 		{
 			Name: "claude", Load: LoadClaude, Files: ClaudeFiles,
@@ -400,8 +402,8 @@ func harnessTable() []Harness {
 				// token and re-reads by timestamp watermark like the other
 				// db-backed kinds.
 				Name:      "hermes-pg",
-				Match:     func(p string) bool { return IsHermesPGStore(p) },
-				Parse:     func(p string, nano int64) ([]model.Session, error) { return hermesPGRead(p, nano) },
+				Match:     IsHermesPGStore,
+				Parse:     hermesPGRead,
 				ParseFrom: func(p string, _, nano int64) ([]model.Session, error) { return hermesPGRead(p, nano) },
 			}},
 		},
@@ -426,12 +428,7 @@ func harnessTable() []Harness {
 			}, {
 				Name: "goose-db",
 				Match: func(p string) bool {
-					for _, db := range GooseDBs() {
-						if p == db {
-							return true
-						}
-					}
-					return false
+					return slices.Contains(GooseDBs(), p)
 				},
 				Parse:     dbParse(ParseGooseDB, ParseGooseDBSince),
 				ParseFrom: dbParseFrom(ParseGooseDB, ParseGooseDBSince),
@@ -659,12 +656,7 @@ func harnessTable() []Harness {
 					if !hasBase(p, "crush.db") {
 						return false
 					}
-					for _, db := range CrushDBs() {
-						if p == db {
-							return true
-						}
-					}
-					return false
+					return slices.Contains(CrushDBs(), p)
 				},
 				Parse:     dbParse(ParseCrushDB, ParseCrushDBSince),
 				ParseFrom: dbParseFrom(ParseCrushDB, ParseCrushDBSince),

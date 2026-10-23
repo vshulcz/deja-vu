@@ -52,7 +52,7 @@ func TestAntigravityRecordsTheWrittenSideOfADiffBlock(t *testing.T) {
 		}
 	}
 	_, hashes, _ := strings.Cut(wrote[0], "\n")
-	for _, got := range strings.Fields(hashes) {
+	for got := range strings.FieldsSeq(hashes) {
 		if !want[got] {
 			t.Errorf("the record holds a hash of something the block did not write: %q", wrote[0])
 		}

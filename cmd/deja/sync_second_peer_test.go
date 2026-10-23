@@ -49,7 +49,7 @@ func TestExportToASecondDestinationSaysWhyItIsEmpty(t *testing.T) {
 	}
 
 	second := filepath.Join(tmp, "to-desktop")
-	if err := os.MkdirAll(second, 0o755); err != nil {
+	if err = os.MkdirAll(second, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	out, err = captureRun(t, "sync", "export", second)
@@ -68,7 +68,7 @@ func TestExportToASecondDestinationSaysWhyItIsEmpty(t *testing.T) {
 	}
 
 	// And --full fills it, after which the folder is up to date like any other.
-	if _, err := captureRun(t, "sync", "export", second, "--full"); err != nil {
+	if _, err = captureRun(t, "sync", "export", second, "--full"); err != nil {
 		t.Fatal(err)
 	}
 	out, err = captureRun(t, "sync", "export", second)

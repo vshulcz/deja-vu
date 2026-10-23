@@ -46,12 +46,14 @@ func quoteAll(in []string) []string {
 	return out
 }
 
-func gooseBlockEntry(key, exe string) string {
-	cmd, args := mcpCommandArgs(exe)
+func gooseBlockEntry(key string) string {
+	cmd, args := mcpCommandArgs("/bin/deja")
 	s := "  " + key + "\n    enabled: true\n    type: stdio\n    name: deja\n    cmd: " + yamlQuote(cmd) + "\n    args:\n"
+	var sSb52 strings.Builder
 	for _, a := range args {
-		s += "      - " + yamlQuote(a) + "\n"
+		sSb52.WriteString("      - " + yamlQuote(a) + "\n")
 	}
+	s += sSb52.String()
 	return s + "    timeout: 300\n"
 }
 
@@ -62,10 +64,10 @@ func TestInstallGooseEditsADejaKeySpelledAnyWay(t *testing.T) {
 	const exe = "/bin/deja"
 	mine := "  mine:\n    enabled: true\n    type: stdio\n    name: mine\n    cmd: /opt/mine/server\n    args: []\n"
 	for _, tc := range []struct{ name, entry string }{
-		{"double quoted", gooseBlockEntry(`"deja":`, exe)},
-		{"single quoted", gooseBlockEntry(`'deja':`, exe)},
-		{"comment after", gooseBlockEntry(`deja:   # memory`, exe)},
-		{"space before colon", gooseBlockEntry(`deja :`, exe)},
+		{"double quoted", gooseBlockEntry(`"deja":`)},
+		{"single quoted", gooseBlockEntry(`'deja':`)},
+		{"comment after", gooseBlockEntry(`deja:   # memory`)},
+		{"space before colon", gooseBlockEntry(`deja :`)},
 		{"flow", "  deja: " + gooseFlowEntry(exe) + "\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -178,9 +180,11 @@ func TestInstallGooseKnowsItsEntriesAfterGooseRewritesThem(t *testing.T) {
 	gooseHomeForTest(t)
 	cmd, args := mcpCommandArgs(exe)
 	ext := "extensions:\n  deja:\n    enabled: true\n    type: stdio\n    name: deja\n    cmd: " + cmd + "\n    args:\n"
+	var extSb181 strings.Builder
 	for _, a := range args {
-		ext += "    - " + a + "\n"
+		extSb181.WriteString("    - " + a + "\n")
 	}
+	ext += extSb181.String()
 	ext += "    timeout: 60\n  developer:\n    enabled: true\n    type: platform\n    name: developer\n"
 	cfg := ext + "slash_commands:\n- command: deja\n  recipe_path: " + gooseRecipePath() + "\nproviders:\n  openai:\n    enabled: true\nactive_provider: openai\n"
 	path := filepath.Join(gooseConfigDir(), "config.yaml")

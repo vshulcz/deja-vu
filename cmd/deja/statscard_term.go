@@ -54,13 +54,13 @@ func termFG(n int) string { return "\x1b[38;5;" + strconv.Itoa(n) + "m" }
 
 func paint(colour int, s string) string { return termFG(colour) + s + logoReset }
 
-func termHeat(count, max int) int {
+func termHeat(count, most int) int {
 	if count <= 0 {
 		return heatEmpty
 	}
 	ratio := 1.0
-	if max > 0 {
-		ratio = float64(count) / float64(max)
+	if most > 0 {
+		ratio = float64(count) / float64(most)
 	}
 	switch {
 	case ratio <= 0.25:
@@ -96,7 +96,7 @@ func cardMood(r stats.Report) catMood {
 func streakDays(hm stats.HeatmapStats) int {
 	var days []int
 	for _, week := range hm.Weeks {
-		for d := 0; d < 7; d++ {
+		for d := range 7 {
 			days = append(days, week[d])
 		}
 	}
@@ -147,11 +147,13 @@ func headBlock(r stats.Report) []string {
 	value, caption := heroStat(r)
 	lines := wrapTo(caption, cardInner-26)
 
-	right := []string{
-		paint(cardBright, "deja-vu") + paint(cardFaint, "  ·  ") + paint(cardDim, "agent history"),
+	big := bigNumber(value, cardAccent, cardInner-26)
+	right := make([]string, 0, 2+len(big)+5)
+	right = append(right,
+		paint(cardBright, "deja-vu")+paint(cardFaint, "  ·  ")+paint(cardDim, "agent history"),
 		"",
-	}
-	right = append(right, bigNumber(value, cardAccent, cardInner-26)...)
+	)
+	right = append(right, big...)
 	right = append(right,
 		paint(cardDim, visibleText(lines[0])),
 		paint(cardDim, visibleText(lines[1])),
@@ -160,7 +162,7 @@ func headBlock(r stats.Report) []string {
 		figureLabels(r),
 	)
 
-	var out []string
+	out := make([]string, 0, len(art))
 	for i, line := range art {
 		text := ""
 		if i < len(right) {
@@ -281,16 +283,18 @@ func cellWidth(value, label string) int {
 }
 
 func figures(r stats.Report) string {
-	var parts []string
-	for _, c := range cardCells(r) {
+	cells := cardCells(r)
+	parts := make([]string, 0, len(cells))
+	for _, c := range cells {
 		parts = append(parts, paint(cardBright, pad(c.value, cellWidth(c.value, c.label))))
 	}
 	return strings.Join(parts, "  ")
 }
 
 func figureLabels(r stats.Report) string {
-	var parts []string
-	for _, c := range cardCells(r) {
+	cells := cardCells(r)
+	parts := make([]string, 0, len(cells))
+	for _, c := range cells {
 		parts = append(parts, paint(cardFaint, pad(c.label, cellWidth(c.value, c.label))))
 	}
 	return strings.Join(parts, "  ")
@@ -313,10 +317,7 @@ func leftPad(s string, w int) string {
 // sectionRule is a heading with a hairline running out to the card's edge, so
 // the eye finds the blocks without either of them shouting.
 func sectionRule(title string) string {
-	rule := cardInner - visibleLen(title) - 1
-	if rule < 0 {
-		rule = 0
-	}
+	rule := max(cardInner-visibleLen(title)-1, 0)
 	return paint(cardDim, title) + " " + paint(cardRule, strings.Repeat("─", rule))
 }
 
@@ -348,10 +349,7 @@ func heatLines(hm stats.HeatmapStats) []string {
 	// A year is 53 weeks and the card is 56 columns, so even a full history
 	// leaves a remainder. Pad on the left: the right edge is today, which is
 	// the end worth anchoring, and the gap lands before the history began.
-	lead := cardInner - len(weeks)*cell
-	if lead < 0 {
-		lead = 0
-	}
+	lead := max(cardInner-len(weeks)*cell, 0)
 
 	var grid []string
 	// Seven days is odd, so the last row carries one day over an empty one.
@@ -367,7 +365,7 @@ func heatLines(hm stats.HeatmapStats) []string {
 			top := termHeat(week[d], hm.Max)
 			bottom := heatEmpty
 			if d+1 < 7 {
-				bottom = termHeat(week[d+1], hm.Max)
+				bottom = termHeat(week[d+1], hm.Max) //nolint:gosec // d+1 < 7 is checked above
 			}
 			b.WriteString(fgColour(top) + bgColour(bottom) + "▀" + logoReset + " ")
 		}
@@ -422,13 +420,13 @@ func agentBlock(r stats.Report) []string {
 		}
 	}
 	bar := cardInner - name - count - 3
-	max := ranked[0].Sessions
+	most := ranked[0].Sessions
 
 	var out []string
 	for _, h := range ranked {
 		width := 0
-		if max > 0 {
-			width = h.Sessions * bar / max
+		if most > 0 {
+			width = h.Sessions * bar / most
 		}
 		if width < 1 && h.Sessions > 0 {
 			width = 1
@@ -500,10 +498,7 @@ func footer() string {
 		visibleLen(left)+visibleLen(span)+visibleLen(right)+6 <= cardInner {
 		left += "  ·  " + span
 	}
-	gap := cardInner - visibleLen(left) - visibleLen(right)
-	if gap < 1 {
-		gap = 1
-	}
+	gap := max(cardInner-visibleLen(left)-visibleLen(right), 1)
 	return paint(cardFaint, left) + strings.Repeat(" ", gap) + paint(mark.Coat, right)
 }
 
@@ -515,7 +510,8 @@ func frame(body []string, foot string) []string {
 	bottom := paint(cardRule, "╰"+strings.Repeat("─", cardInner+2)+"╯")
 	edge := paint(cardRule, "│")
 
-	out := []string{top, edge + strings.Repeat(" ", cardInner+2) + edge}
+	out := make([]string, 0, 2+len(body)+3)
+	out = append(out, top, edge+strings.Repeat(" ", cardInner+2)+edge)
 	for _, line := range body {
 		out = append(out, edge+" "+pad(line, cardInner)+" "+edge)
 	}

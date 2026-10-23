@@ -40,7 +40,7 @@ func seedReuse(t *testing.T, sessions map[string]struct {
 		t.Fatal(err)
 	}
 	for sid, s := range sessions {
-		for i := 0; i < s.times; i++ {
+		for range s.times {
 			usage.RecordServedSessions(dir, usage.KindRecall, 100, 1, false, 1000, []string{sid})
 		}
 	}
@@ -123,7 +123,7 @@ func TestFindReusedMemorySkipsUntitledSessions(t *testing.T) {
 		"r1": {"real title here", 72 * time.Hour, 2},
 	})
 	// A key the manifest has never heard of, recalled more than the real one.
-	for i := 0; i < 9; i++ {
+	for range 9 {
 		usage.RecordServedSessions(dir, usage.KindRecall, 100, 1, false, 1000, []string{"ghost-session"})
 	}
 	got, ok := findReusedMemory(dir, nil)
@@ -181,11 +181,11 @@ func TestFindReusedMemorySkipsAmbiguousIDs(t *testing.T) {
 	if err := index.Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		usage.RecordServedSessions(dir, usage.KindRecall, 100, 1, false, 1000, []string{"dup"})
 	}
 	// Repeatedly, because the defect is non-determinism: a map decides.
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		if got, ok := findReusedMemory(dir, nil); ok {
 			t.Fatalf("named %q on an id two harnesses share; the count belongs to both", got.Title)
 		}
@@ -235,10 +235,10 @@ func TestFindReusedMemorySkipsUndatedSessions(t *testing.T) {
 		t.Skip("this store dated the undated session; the fixture no longer exercises the case")
 	}
 	// The undated one is recalled far more, so only the filter can keep it out.
-	for i := 0; i < 9; i++ {
+	for range 9 {
 		usage.RecordServedSessions(dir, usage.KindRecall, 100, 1, false, 1000, []string{"undated"})
 	}
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		usage.RecordServedSessions(dir, usage.KindRecall, 100, 1, false, 1000, []string{"dated"})
 	}
 	got, ok := findReusedMemory(dir, nil)

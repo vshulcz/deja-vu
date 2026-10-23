@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -333,7 +334,7 @@ func runToolHelp(name string, rest []string) error {
 	if err != nil {
 		return fmt.Errorf("%s is not on PATH: %w — `deja help %s` is deja's page for it", name, err, name)
 	}
-	cmd := exec.Command(bin, rest...)
+	cmd := exec.CommandContext(context.Background(), bin, rest...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return cmd.Run()
 }
@@ -473,7 +474,7 @@ func proseWidth() int {
 func wrapProse(s string, width int) string {
 	var lines []string
 	cur := ""
-	for _, w := range strings.Fields(s) {
+	for w := range strings.FieldsSeq(s) {
 		if cur != "" && len([]rune(cur))+1+len([]rune(w)) > width {
 			lines = append(lines, cur)
 			cur = w

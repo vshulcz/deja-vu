@@ -14,8 +14,8 @@ import (
 // project "history", counted as a clash, and refused by resume as an exec
 // entry (#4180). One conversation in two stores is the goose case.
 func TestACodexRolloutOwnsTheSessionItsHistoryLineShares(t *testing.T) {
-	hist := filepath.Join("/home", "u", ".codex", "history.jsonl")
-	roll := filepath.Join("/home", "u", ".codex", "sessions", "2026", "10", "01", "rollout-2026-10-01T12-31-51-01a0.jsonl")
+	hist := filepath.FromSlash("/home/u/.codex/history.jsonl")
+	roll := filepath.FromSlash("/home/u/.codex/sessions/2026/10/01/rollout-2026-10-01T12-31-51-01a0.jsonl")
 
 	held := SessionMeta{Harness: "codex", ID: "01a0", Path: hist, Project: "history"}
 	owns, collided := attributeSession(held, model.Session{Harness: "codex", ID: "01a0", Path: roll, Project: "work"})

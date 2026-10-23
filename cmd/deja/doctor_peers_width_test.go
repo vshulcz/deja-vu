@@ -38,15 +38,15 @@ func TestTheSyncSectionLinesUpWhateverThePeerIsCalled(t *testing.T) {
 	doctorPeers(&b, t.TempDir(), time.Date(2026, 8, 25, 9, 0, 0, 0, time.UTC))
 
 	var starts []int
-	for _, line := range strings.Split(strings.TrimRight(b.String(), "\n"), "\n") {
+	for line := range strings.SplitSeq(strings.TrimRight(b.String(), "\n"), "\n") {
 		if !strings.HasPrefix(line, "  ") || strings.HasPrefix(line, "Sync") {
 			continue
 		}
-		i := strings.Index(line, "last exchange")
-		if i < 0 {
+		before, _, ok := strings.Cut(line, "last exchange")
+		if !ok {
 			continue
 		}
-		starts = append(starts, termwidth.Columns(line[:i]))
+		starts = append(starts, termwidth.Columns(before))
 	}
 	if len(starts) != 4 {
 		t.Fatalf("want a state line per peer, got %d:\n%s", len(starts), b.String())

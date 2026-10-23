@@ -78,12 +78,13 @@ func diagFileError(path string, err error) {
 	if err == nil {
 		return
 	}
-	if _, stalled := err.(*StalledRead); !stalled && isAbandoned(path) {
+	var stalled *StalledReadError
+	if !errors.As(err, &stalled) && isAbandoned(path) {
 		return
 	}
 	diagMu.Lock()
 	diagFailed[path] = err.Error()
-	var st *StalledRead
+	var st *StalledReadError
 	if errors.As(err, &st) {
 		diagStalled[path] = st.Idle
 	}
@@ -206,9 +207,7 @@ func DiagMalformedCounts() map[string]int {
 	diagMu.Lock()
 	defer diagMu.Unlock()
 	out := make(map[string]int, len(diagMalformed))
-	for p, n := range diagMalformed {
-		out[p] = n
-	}
+	maps.Copy(out, diagMalformed)
 	return out
 }
 
@@ -220,9 +219,7 @@ func DiagFailedPaths() map[string]string {
 	diagMu.Lock()
 	defer diagMu.Unlock()
 	out := make(map[string]string, len(diagFailed))
-	for p, msg := range diagFailed {
-		out[p] = msg
-	}
+	maps.Copy(out, diagFailed)
 	return out
 }
 
@@ -233,9 +230,7 @@ func DiagReasons() map[string]string {
 	diagMu.Lock()
 	defer diagMu.Unlock()
 	out := make(map[string]string, len(diagReasons))
-	for p, r := range diagReasons {
-		out[p] = r
-	}
+	maps.Copy(out, diagReasons)
 	return out
 }
 

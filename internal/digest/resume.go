@@ -8,6 +8,8 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
+// Resume is the working state a session had reached at a point.
+//
 // A compaction is where a session's working state goes, and it is the most
 // expensive moment deja can see.
 //
@@ -71,7 +73,7 @@ func ResumeFrom(s model.Session, readsAsFailure func(output string) bool) Resume
 				r.Decision = firstSentences(text, 1)
 			}
 		case sources.RoleEdit, sources.RoleFiles:
-			for _, f := range strings.Fields(text) {
+			for f := range strings.FieldsSeq(text) {
 				if f = strings.TrimSpace(f); looksLikeAPath(f) && !throwawayPath(f) {
 					files = append(files, f)
 				}
@@ -272,7 +274,7 @@ func lastDistinct(files []string, n int) []string {
 // firstTextLine is the first non-empty line, which is the command itself where
 // a record carries its output under it.
 func firstTextLine(s string) string {
-	for _, line := range strings.Split(s, "\n") {
+	for line := range strings.SplitSeq(s, "\n") {
 		if line = strings.TrimSpace(line); line != "" {
 			return line
 		}

@@ -28,15 +28,15 @@ func TestHermesPluginAppendsTheFixLineToAFailedCommand(t *testing.T) {
 	fake := filepath.Join(root, "deja")
 	script := "#!/bin/sh\nprintf '%s|' \"$*\" >> " + log + "\ncat >> " + log + "\necho >> " + log + "\n" +
 		"[ \"$1\" = hook-tool-after ] && echo '<deja-recall>ran make clean after this before</deja-recall>'\nexit 0\n"
-	if err := os.WriteFile(fake, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(fake, []byte(script), 0o755); werr != nil {
+		t.Fatal(werr)
 	}
 	dir := filepath.Join(root, "plugins", "deja")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
+	if merr := os.MkdirAll(dir, 0o755); merr != nil {
+		t.Fatal(merr)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "__init__.py"), []byte(hermesPluginPy(fake)), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(filepath.Join(dir, "__init__.py"), []byte(hermesPluginPy(fake)), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	probe := "import importlib.util, json\n" +
 		"spec = importlib.util.spec_from_file_location('dejahook', 'plugins/deja/__init__.py')\n" +
@@ -55,7 +55,7 @@ func TestHermesPluginAppendsTheFixLineToAFailedCommand(t *testing.T) {
 		"  'passed': m.repair(tool_name='terminal', result=passed, session_id='s1'),\n" +
 		"  'other': m.repair(tool_name='read_file', result=failed, session_id='s1'),\n" +
 		"}))\n"
-	cmd := exec.Command(py, "-c", probe)
+	cmd := exec.CommandContext(t.Context(), py, "-c", probe)
 	cmd.Dir = root
 	out, err := cmd.Output()
 	if err != nil {
@@ -67,8 +67,8 @@ func TestHermesPluginAppendsTheFixLineToAFailedCommand(t *testing.T) {
 		Passed *string  `json:"passed"`
 		Other  *string  `json:"other"`
 	}
-	if err := json.Unmarshal(out, &got); err != nil {
-		t.Fatalf("probe output %q: %v", out, err)
+	if uerr := json.Unmarshal(out, &got); uerr != nil {
+		t.Fatalf("probe output %q: %v", out, uerr)
 	}
 	if !strings.Contains(strings.Join(got.Hooks, ","), "transform_tool_result") {
 		t.Fatalf("register() did not answer transform_tool_result: %v", got.Hooks)
@@ -100,17 +100,23 @@ func TestHermesPluginAppendsTheFixLineToAFailedCommand(t *testing.T) {
 // out of that shape.
 func TestFixPairReadsHermesTerminalResult(t *testing.T) {
 	seedFixPair(t, "panic: sql: database is closed", "make clean && make CGO_ENABLED=0")
-	result, _ := json.Marshal(map[string]any{
+	result, jerr := json.Marshal(map[string]any{
 		"output":    "goroutine 1 [running]:\npanic: sql: database is closed",
 		"exit_code": 2,
 		"error":     nil,
 	})
-	payload, _ := json.Marshal(map[string]any{
+	if jerr != nil {
+		t.Fatal(jerr)
+	}
+	payload, jerr := json.Marshal(map[string]any{
 		"tool_name":     "terminal",
 		"tool_response": string(result),
 		"session_id":    "hermes-1",
 		"cwd":           "/work/app",
 	})
+	if jerr != nil {
+		t.Fatal(jerr)
+	}
 	var out bytes.Buffer
 	if err := runHookToolAfterMode(os.Getenv("DEJA_INDEX_DIR"), bytes.NewReader(payload), &out, true); err != nil {
 		t.Fatal(err)

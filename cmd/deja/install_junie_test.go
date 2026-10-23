@@ -82,7 +82,7 @@ func TestJunieHookHandsTheProjectAsCwd(t *testing.T) {
 	t.Setenv("DEJA_JUNIE_ROOT", t.TempDir())
 	payload := `{"hook_event_name":"UserPromptSubmit","session_id":"session-261001-090000-ab12","cwd":"/home/u/.junie","project_path":"/work/notes","prompt":"hi"}`
 	var seen string
-	cmd := func(dir string, rest []string) error {
+	cmd := func(_ string, rest []string) error { //nolint:unparam // it stands in for a command, which returns an error
 		raw := readHookStdin()
 		var m map[string]any
 		_ = json.Unmarshal(raw, &m)

@@ -40,13 +40,13 @@ func TestTheHookLooksPastTheCandidatesItWillNotUse(t *testing.T) {
 		})
 	}
 	// Enough history for the shared term to still count as rare.
-	for i := 0; i < 200; i++ {
+	for i := range 200 {
 		write(fmt.Sprintf("noise%03d", i), "notes on the weekly planning meeting and the roadmap")
 	}
 	// Ten sessions that all answer the question, so the ranking has no reason to
 	// prefer one of them and every one clears the bar to be injected.
 	shown := make([]string, 0, 9)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		id := fmt.Sprintf("probe%02d", i)
 		write(id, "the hydrostat_probe reported a stale pressure reading again")
 		if i < 9 {

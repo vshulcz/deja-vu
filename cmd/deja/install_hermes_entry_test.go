@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -322,7 +323,7 @@ func TestInstallHermesEntryShapesFromReview(t *testing.T) {
 			if _, err := installHermesMCP("/bin/deja", false); err != nil {
 				t.Fatal(err)
 			}
-			if b2, _ := os.ReadFile(path); string(b2) != string(b) {
+			if b2, _ := os.ReadFile(path); !bytes.Equal(b2, b) {
 				t.Fatalf("a second install changed the file:\n%s", b2)
 			}
 			if _, err := installHermesMCP("/bin/deja", true); err != nil {
@@ -391,7 +392,7 @@ func TestInstallHermesWritesAOneLineEntryOutAsABlock(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if again, _ := os.ReadFile(path); string(again) != string(b) || strings.Contains(res.Note, hermesFlowRewrittenNote) {
+			if again, _ := os.ReadFile(path); !bytes.Equal(again, b) || strings.Contains(res.Note, hermesFlowRewrittenNote) {
 				t.Fatalf("a second install changed it again (%q):\n%s", res.Note, again)
 			}
 		})

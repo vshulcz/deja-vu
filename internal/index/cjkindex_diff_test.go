@@ -25,8 +25,9 @@ func legacyBucket(tok string) string {
 }
 
 func legacyCJKKeys(s string) []string {
-	var out []string
-	for _, bg := range cjkfold.Bigrams(s) {
+	bgs := cjkfold.Bigrams(s)
+	out := make([]string, 0, len(bgs))
+	for _, bg := range bgs {
 		out = append(out, "t"+cjkfold.String(bg))
 	}
 	return out
@@ -324,7 +325,7 @@ func TestExpandCJKTokensKeepsScript492(t *testing.T) {
 var benchJAText = strings.Repeat("昨日のビルドで漢字の索引が遅くなった原因を調べた。設定を確認し、キャッシュを削除した。", 4)
 
 func BenchmarkCJKKeysLegacy(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		keys := legacyCJKKeys(benchJAText)
 		if len(keys) == 0 {
 			b.Fatal("no keys")
@@ -333,7 +334,7 @@ func BenchmarkCJKKeysLegacy(b *testing.B) {
 }
 
 func BenchmarkCJKKeysNew(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		n := 0
 		cjkIndexKeys(benchJAText, func(string) { n++ })
 		if n == 0 {
@@ -345,7 +346,7 @@ func BenchmarkCJKKeysNew(b *testing.B) {
 var benchBucketToks = []string{"tconfig", "t設定", "t漢字", "tjanuary", "tcache", "t索引", "t2026-01", "tビル"}
 
 func BenchmarkBucketLegacy(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		for _, tok := range benchBucketToks {
 			if legacyBucket(tok) == "" {
 				b.Fatal("empty bucket")
@@ -355,7 +356,7 @@ func BenchmarkBucketLegacy(b *testing.B) {
 }
 
 func BenchmarkBucketNew(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		for _, tok := range benchBucketToks {
 			if bucket(tok) == "" {
 				b.Fatal("empty bucket")
@@ -365,13 +366,13 @@ func BenchmarkBucketNew(b *testing.B) {
 }
 
 func TestCJKIndexDifferentialGenerative492(t *testing.T) {
-	rng := rand.New(rand.NewSource(1))
+	rng := rand.New(rand.NewSource(1)) //nolint:gosec // a seeded fixture, not crypto
 
 	t.Run("bucket random bytes", func(t *testing.T) {
-		for i := 0; i < 1000; i++ {
+		for i := range 1000 {
 			b := make([]byte, rng.Intn(32))
 			for j := range b {
-				b[j] = byte(rng.Intn(256))
+				b[j] = byte(rng.Intn(256)) //nolint:gosec // Intn(256) fits a byte
 			}
 			if len(b) > 0 && i%5 == 0 {
 				b[0] = 0xff
@@ -395,10 +396,10 @@ func TestCJKIndexDifferentialGenerative492(t *testing.T) {
 			'한', '글', '만',
 			'a', 'Z', '0', '_', '-', ' ', '.', '/', '\n',
 		}
-		for i := 0; i < 300; i++ {
+		for range 300 {
 			var text strings.Builder
 			n := rng.Intn(80)
-			for j := 0; j < n; j++ {
+			for range n {
 				text.WriteRune(alphabet[rng.Intn(len(alphabet))])
 			}
 

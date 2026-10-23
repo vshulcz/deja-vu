@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -100,7 +101,7 @@ func TestReasonixExtCarriesToolNotesIntoTheResult(t *testing.T) {
 	calls := fakeRxHooks(t, func(sub string, in map[string]any) (string, error) {
 		switch sub {
 		case "hook-tool":
-			if in, _ := in["tool_input"].(map[string]any); in["command"] != "go test ./..." {
+			if input, _ := in["tool_input"].(map[string]any); input["command"] != "go test ./..." {
 				return "", nil
 			}
 			return "<deja-recall>\nNOTE go test\n</deja-recall>", nil
@@ -156,14 +157,14 @@ func TestReasonixExtCarriesToolNotesIntoTheResult(t *testing.T) {
 
 func TestReasonixExtMapsFileToolsToTheirPaths(t *testing.T) {
 	tool, in := rxHookToolInput("edit_file", `{"path":"internal/a.go","old":"x"}`, "/work")
-	if tool != "Edit" || in["file_path"] != filepath.Join("/work", "internal/a.go") {
+	if tool != "Edit" || in["file_path"] != filepath.FromSlash("/work/internal/a.go") {
 		t.Errorf("edit_file = %s %v, want Edit with the path resolved against the workspace", tool, in)
 	}
 	// tool.after holds an edit that is already made, and Reasonix refuses an
 	// edit on a file the session has not read, so read_file is the step where
 	// the file's history can still change what gets written (#4410). It maps
 	// to the lowercase `read` pi and omp send for the same reason.
-	if tool, in := rxHookToolInput("read_file", `{"path":"a.go"}`, "/work"); tool != "read" || in["file_path"] != filepath.Join("/work", "a.go") {
+	if tool, in := rxHookToolInput("read_file", `{"path":"a.go"}`, "/work"); tool != "read" || in["file_path"] != filepath.FromSlash("/work/a.go") {
 		t.Errorf("read_file = %s %v, want read with the path resolved against the workspace", tool, in)
 	}
 }
@@ -179,8 +180,8 @@ func TestReasonixExtMapsTheOtherFileTools(t *testing.T) {
 		{"move_file", `{"source_path":"jitter.go","destination_path":"backoff/jitter.go"}`, "Edit", "jitter.go"},
 	} {
 		tool, in := rxHookToolInput(c.name, c.args, "/work")
-		if tool != c.tool || in["file_path"] != filepath.Join("/work", c.path) {
-			t.Errorf("%s = %s %v, want %s on %s", c.name, tool, in, c.tool, filepath.Join("/work", c.path))
+		if tool != c.tool || in["file_path"] != filepath.FromSlash("/work/"+c.path) {
+			t.Errorf("%s = %s %v, want %s on %s", c.name, tool, in, c.tool, filepath.FromSlash("/work/"+c.path))
 		}
 	}
 }
@@ -209,9 +210,15 @@ func TestReasonixExtCarriesContextIntoTheCompactionSummary(t *testing.T) {
 	var want, have any
 	_ = json.Unmarshal(messages, &want)
 	_ = json.Unmarshal(got["messages"], &have)
-	wb, _ := json.Marshal(want)
-	hb, _ := json.Marshal(have)
-	if string(wb) != string(hb) {
+	wb, err := json.Marshal(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hb, err := json.Marshal(have)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(wb, hb) {
 		t.Errorf("the fold was changed:\n%s\nwant\n%s", hb, wb)
 	}
 	// The fold took the digest away with it, so the next turn carries it again.

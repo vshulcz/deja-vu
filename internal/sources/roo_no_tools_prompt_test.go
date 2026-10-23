@@ -24,7 +24,7 @@ func TestRooNoToolsRetryPromptIsNotTheUsersWords(t *testing.T) {
 	const env = "<environment_details>\n# VSCode Visible Files\nretry.cfg\n</environment_details>"
 	const mine = "why does deja show \"[ERROR] You did not use a tool in your previous response!\" as mine"
 	turn := func(role string, texts ...string) map[string]any {
-		var blocks []any
+		blocks := make([]any, 0, len(texts))
 		for _, t := range texts {
 			blocks = append(blocks, map[string]any{"type": "text", "text": t})
 		}

@@ -86,7 +86,7 @@ func runHermesProvider(t *testing.T, dir, script string) string {
 		"    def emit(self, message):\n" +
 		"        pass\n" +
 		"agent = Agent()\n"
-	cmd := exec.Command("python3", "-c", prelude+script)
+	cmd := exec.CommandContext(t.Context(), "python3", "-c", prelude+script)
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -232,6 +232,7 @@ func TestHermesProviderModelTextIsWhatPlainPrints(t *testing.T) {
 		t.Fatal(err)
 	}
 	run := func(t *testing.T, platform string) string {
+		t.Helper()
 		withStatsStores(t)
 		t.Setenv(runMainEnv, "1")
 		root := os.Getenv("DEJA_CLAUDE_ROOT")
@@ -265,7 +266,7 @@ func TestHermesProviderModelTextIsWhatPlainPrints(t *testing.T) {
 			"p = provider.DejaMemoryProvider()\n" +
 			"p.initialize('parity-1', platform=" + strconv.Quote(platform) + ", status_callback=Agent().emit)\n" +
 			"sys.stdout.write(p.prefetch('how do we drain the zorbit queue'))\n"
-		cmd := exec.Command("python3", "-c", script)
+		cmd := exec.CommandContext(t.Context(), "python3", "-c", script)
 		cmd.Dir = filepath.Join(dir, "tmp", "beta")
 		out, err := cmd.Output()
 		if err != nil {

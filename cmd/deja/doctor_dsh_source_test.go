@@ -23,7 +23,7 @@ func TestDoctorFlagsADshPluginWithTheRetiredSourceKind(t *testing.T) {
 	row := func() string {
 		var buf bytes.Buffer
 		doctorAutoRecall(&buf)
-		for _, l := range strings.Split(buf.String(), "\n") {
+		for l := range strings.SplitSeq(buf.String(), "\n") {
 			if strings.HasPrefix(strings.TrimSpace(l), "deepseek ") {
 				return l
 			}

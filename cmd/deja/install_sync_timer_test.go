@@ -32,8 +32,8 @@ func TestInstallSyncTimerWritesAUnitTheSystemReads(t *testing.T) {
 	if r.Action == "unchanged" {
 		t.Errorf("the first install wrote nothing")
 	}
-	if _, err := os.Stat(r.Path); err != nil {
-		t.Fatalf("the unit is not where install said it is: %v", err)
+	if _, serr := os.Stat(r.Path); serr != nil {
+		t.Fatalf("the unit is not where install said it is: %v", serr)
 	}
 	// systemd splits the work in two: install reports the timer, because that
 	// is what a person enables, and the command lives in the service beside
@@ -128,7 +128,7 @@ func TestSyncTimerUnitsSurviveAnAwkwardPath(t *testing.T) {
 	}
 
 	service := syncAutoService(exe)
-	for _, line := range strings.Split(service, "\n") {
+	for line := range strings.SplitSeq(service, "\n") {
 		if !strings.HasPrefix(line, "ExecStart=") {
 			continue
 		}
@@ -182,15 +182,17 @@ func TestSyncTimerDoesNotTouchTheRealServiceManager(t *testing.T) {
 func syncTimerArgs(t *testing.T, body string) []string {
 	t.Helper()
 	if strings.Contains(body, "ProgramArguments") {
-		rest := body[strings.Index(body, "ProgramArguments"):]
-		rest = rest[:strings.Index(rest, "</array>")]
-		var out []string
-		for _, part := range strings.Split(rest, "<string>")[1:] {
-			out = append(out, strings.TrimSpace(part[:strings.Index(part, "</string>")]))
+		_, rest, _ := strings.Cut(body, "ProgramArguments")
+		rest, _, _ = strings.Cut(rest, "</array>")
+		parts := strings.Split(rest, "<string>")[1:]
+		out := make([]string, 0, len(parts))
+		for _, part := range parts {
+			arg, _, _ := strings.Cut(part, "</string>")
+			out = append(out, strings.TrimSpace(arg))
 		}
 		return out
 	}
-	for _, line := range strings.Split(body, "\n") {
+	for line := range strings.SplitSeq(body, "\n") {
 		if v, ok := strings.CutPrefix(line, "ExecStart="); ok {
 			return strings.Fields(strings.ReplaceAll(v, `"`, ""))
 		}

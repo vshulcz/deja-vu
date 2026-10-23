@@ -77,10 +77,12 @@ func TestCommandCodeReadsTheV3Transcript(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.WriteString(more); err != nil {
+	if _, err = f.WriteString(more); err != nil {
 		t.Fatal(err)
 	}
-	f.Close()
+	if err = f.Close(); err != nil {
+		t.Fatal(err)
+	}
 	ss, err = ParseCommandCodeFileFromOffset(path, int64(len(commandCodeV3)))
 	if err != nil {
 		t.Fatal(err)

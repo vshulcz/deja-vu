@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -92,7 +93,7 @@ func TestUninstallDoesNotWriteOverAConfigItCannotRead(t *testing.T) {
 	if rerr != nil {
 		t.Fatal(rerr)
 	}
-	if string(after) != string(before) {
+	if !bytes.Equal(after, before) {
 		t.Errorf("the config was written over on the way out:\n%s", after)
 	}
 }
@@ -129,7 +130,7 @@ func TestAMultiFileTargetIsRefusedOnTheFileItCannotRead(t *testing.T) {
 	if rerr != nil {
 		t.Fatal(rerr)
 	}
-	if string(after) != string(before) {
+	if !bytes.Equal(after, before) {
 		t.Errorf("the config was written over:\n%s", after)
 	}
 }

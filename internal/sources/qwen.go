@@ -13,6 +13,7 @@ import (
 // intentionally does not affect it because that variable only relocates reads.
 func QwenConfigDir() string { return filepath.Join(Home(), ".qwen") }
 
+// QwenRoot is the Qwen Code config dir deja reads sessions from.
 func QwenRoot() string { return EnvPath("DEJA_QWEN_ROOT", QwenConfigDir()) }
 
 // QwenSessionFiles takes sub-agent logs by default, read the way Claude's are:
@@ -72,6 +73,7 @@ func qwenUnder(p, dir string) bool {
 	return len(parts) > 2 && parts[1] == dir
 }
 
+// LoadQwen reads every Qwen Code session on this machine.
 func LoadQwen() []model.Session { return parseFiles(QwenSessionFiles(), ParseQwenFile) }
 
 // QwenProjectDirBase returns the encoded project dir name for a transcript
@@ -95,7 +97,7 @@ func QwenProjectDirBase(path string) string {
 // in.
 func qwenFolderIs(cwd, base string) bool {
 	enc := claudeEncodePath(cwd)
-	return enc == base || strings.ToLower(enc) == base
+	return enc == base || strings.EqualFold(enc, base)
 }
 
 // qwenTranscriptCWD is the directory the transcript at path records, when its
@@ -124,10 +126,12 @@ func QwenSessionDir(path string) (dir string, recorded bool) {
 	return ResolveEncodedPath(base), false
 }
 
+// ParseQwenFile reads one Qwen Code transcript.
 func ParseQwenFile(path string) ([]model.Session, error) {
 	return parseQwenFileFromOffset(path, 0)
 }
 
+// ParseQwenFileFromOffset reads a Qwen Code transcript from offset on.
 func ParseQwenFileFromOffset(path string, offset int64) ([]model.Session, error) {
 	return parseQwenFileFromOffset(path, offset)
 }
@@ -489,7 +493,7 @@ func UnwrapShellReport(s string) string {
 	}
 	var kept []string
 	labelled := false
-	for _, line := range strings.Split(s, "\n") {
+	for line := range strings.SplitSeq(s, "\n") {
 		t := strings.TrimSpace(line)
 		// `Error: (none)` is qwen's report saying there was no error. A real
 		// one keeps its label: it is the failure, and a line the command

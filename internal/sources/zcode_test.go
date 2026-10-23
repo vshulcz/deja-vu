@@ -32,7 +32,7 @@ insert into message values ('m-assistant', 'zc-1', 1789650002000, '{"role":"assi
 insert into part values ('p-user', 'm-user', '{"type":"text","text":"why is the glm stream cut short","time":{"start":"2026-09-17T09:00:01Z"}}');
 insert into part values ('p-assistant', 'm-assistant', '{"type":"text","text":"the proxy closed on an idle timeout","time":{"start":"2026-09-17T09:00:02Z"}}');
 `
-	if out, err := exec.Command("sqlite3", db, schema).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, schema).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}
 	ss := LoadZCode()

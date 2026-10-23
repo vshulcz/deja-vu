@@ -136,8 +136,10 @@ func record(in io.Reader, out io.Writer) error {
 	dec := json.NewDecoder(in)
 	for {
 		var e struct {
-			Action, Package, Test string
-			Elapsed               float64
+			Action  string  `json:"Action"`
+			Package string  `json:"Package"`
+			Test    string  `json:"Test"`
+			Elapsed float64 `json:"Elapsed"`
 		}
 		if err := dec.Decode(&e); err == io.EOF {
 			break
@@ -213,7 +215,7 @@ func testNames(root string) ([]string, error) {
 		if !strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
-		src, err := os.ReadFile(path)
+		src, err := os.ReadFile(path) //nolint:gosec // walks the repository's own tree
 		if err != nil {
 			return err
 		}

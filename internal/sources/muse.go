@@ -97,7 +97,7 @@ func isMuseSession(p string) bool {
 // DEJA_INCLUDE_SUBAGENTS=0.
 func MuseSessionFiles() []string {
 	subagents := !SubagentsOff()
-	var out []string
+	var out []string //nolint:prealloc // each root adds an unknown number of files
 	for _, root := range MuseRoots() {
 		out = append(out, walkFiles(root, func(p string) bool {
 			return filepath.Base(p) == museLogName && (subagents || !MuseSubagentFile(p))
@@ -110,13 +110,14 @@ func MuseSessionFiles() []string {
 // tool-outputs spill directory, the session index — so doctor places it rather
 // than counting it as transcripts it could not read.
 func MuseSidecarFiles() []string {
-	var out []string
+	var out []string //nolint:prealloc // each root adds an unknown number of files
 	for _, root := range MuseRoots() {
 		out = append(out, walkFiles(root, func(p string) bool { return filepath.Base(p) != museLogName })...)
 	}
 	return out
 }
 
+// LoadMuse reads every Muse session on this machine.
 func LoadMuse() []model.Session { return parseFiles(MuseSessionFiles(), ParseMuseFile) }
 
 // museDialect is Muse's tool vocabulary: read_file, write_file and
@@ -230,7 +231,8 @@ func parseMuseLog(path string) ([]model.Session, string, error) {
 				results := museToolResults(ev["results"])
 				if IndexToolOutput() {
 					for _, r := range results {
-						if body := strings.TrimSpace(r["content"].(string)); body != "" {
+						content, _ := r["content"].(string)
+						if body := strings.TrimSpace(content); body != "" {
 							s.Messages = append(s.Messages, model.Message{Role: RoleToolOutput, Text: capParsedMessage(body), Time: t})
 						}
 					}
@@ -299,7 +301,7 @@ func museToolCalls(v any) []any {
 // command printed, and its exit_code goes on the command.
 func museToolResults(v any) []map[string]any {
 	items, _ := v.([]any)
-	var out []map[string]any
+	out := make([]map[string]any, 0, len(items))
 	for _, it := range items {
 		r, _ := it.(map[string]any)
 		text := contentText(r["text"])
@@ -382,7 +384,7 @@ func (w *museWorkspaceFacts) take(rec map[string]any) bool {
 	return true
 }
 
-func (w museWorkspaceFacts) root() string {
+func (w *museWorkspaceFacts) root() string {
 	for _, v := range []string{w.metadata, w.cwd, w.branch} {
 		if v != "" {
 			return v

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -115,7 +116,7 @@ func aiderLastAsk(path string, offset int64) string {
 	if st.Size()-offset > aiderHistoryTail {
 		offset = st.Size() - aiderHistoryTail
 	}
-	if _, err := f.Seek(offset, io.SeekStart); err != nil {
+	if _, err = f.Seek(offset, io.SeekStart); err != nil {
 		return ""
 	}
 	b, err := io.ReadAll(f)
@@ -170,7 +171,7 @@ func startAiderLive(dir string, args []string, cwd, digest string) (extra []stri
 	l := newAiderLive(dir, cwd, aiderChatHistory(args, cwd), digest)
 	path, stop, err := serveAiderLive(l.body)
 	if err != nil {
-		if err != errNoAiderLive {
+		if !errors.Is(err, errNoAiderLive) {
 			fmt.Fprintf(os.Stderr, "deja: per-message recall is off for this run: %v\n", err)
 		}
 		return nil, nil, false

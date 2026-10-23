@@ -3,6 +3,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -48,9 +49,9 @@ func takeInstallLock(path string, wait bool) (release func(), ok, busy bool) {
 }
 
 func installLockFileEx(h syscall.Handle, flags, reserved, low, high uint32, ol *syscall.Overlapped) error {
-	r1, _, e1 := procInstallLock.Call(uintptr(h), uintptr(flags), uintptr(reserved), uintptr(low), uintptr(high), uintptr(unsafe.Pointer(ol)))
+	r1, _, e1 := procInstallLock.Call(uintptr(h), uintptr(flags), uintptr(reserved), uintptr(low), uintptr(high), uintptr(unsafe.Pointer(ol))) //nolint:gosec // LockFileEx takes the OVERLAPPED by pointer
 	if r1 == 0 {
-		if e1 != syscall.Errno(0) {
+		if !errors.Is(e1, syscall.Errno(0)) {
 			return e1
 		}
 		return syscall.EINVAL
@@ -59,9 +60,9 @@ func installLockFileEx(h syscall.Handle, flags, reserved, low, high uint32, ol *
 }
 
 func installUnlockFileEx(h syscall.Handle, reserved, low, high uint32, ol *syscall.Overlapped) error {
-	r1, _, e1 := procInstallUnlock.Call(uintptr(h), uintptr(reserved), uintptr(low), uintptr(high), uintptr(unsafe.Pointer(ol)))
+	r1, _, e1 := procInstallUnlock.Call(uintptr(h), uintptr(reserved), uintptr(low), uintptr(high), uintptr(unsafe.Pointer(ol))) //nolint:gosec // UnlockFileEx takes the OVERLAPPED by pointer
 	if r1 == 0 {
-		if e1 != syscall.Errno(0) {
+		if !errors.Is(e1, syscall.Errno(0)) {
 			return e1
 		}
 		return syscall.EINVAL

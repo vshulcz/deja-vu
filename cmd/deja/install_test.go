@@ -49,7 +49,7 @@ func filesUnder(t *testing.T, root string) map[string]bool {
 	out := map[string]bool{}
 	if err := filepath.Walk(root, func(p string, fi os.FileInfo, err error) error {
 		if err != nil || fi.IsDir() {
-			return nil
+			return nil //nolint:nilerr // unreadable entries are skipped
 		}
 		rel, _ := filepath.Rel(root, p)
 		out[filepath.ToSlash(rel)] = true
@@ -166,8 +166,8 @@ func TestUninstallKeepsASkillsDirectoryThatIsNotEmpty(t *testing.T) {
 func TestUninstallKeepsASymlinkedSkillsDirectory(t *testing.T) {
 	hermeticEnv(t)
 	home := os.Getenv("HOME")
-	real := filepath.Join(home, "dotfiles", "skills")
-	theirs := filepath.Join(real, "their-skill", "SKILL.md")
+	realPath := filepath.Join(home, "dotfiles", "skills")
+	theirs := filepath.Join(realPath, "their-skill", "SKILL.md")
 	if err := os.MkdirAll(filepath.Dir(theirs), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +178,7 @@ func TestUninstallKeepsASymlinkedSkillsDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 	link := filepath.Join(home, ".claude", "skills")
-	if err := os.Symlink(real, link); err != nil {
+	if err := os.Symlink(realPath, link); err != nil {
 		t.Skipf("symlink unavailable: %v", err)
 	}
 	if _, err := captureRun(t, "install", "claude", "--no-index"); err != nil {
@@ -200,14 +200,14 @@ func filesMentioning(t *testing.T, root, needle string) []string {
 	var out []string
 	_ = filepath.Walk(root, func(p string, fi os.FileInfo, err error) error {
 		if err != nil || fi.IsDir() || strings.HasSuffix(p, ".bak") {
-			return nil
+			return nil //nolint:nilerr // unreadable entries are skipped
 		}
 		// The store's own state is not wiring: notes, the index, the record of
 		// what was installed.
 		if strings.Contains(filepath.ToSlash(p), "/.config/deja/") || strings.Contains(filepath.ToSlash(p), "/deja/notes") {
 			return nil
 		}
-		b, err := os.ReadFile(p)
+		b, err := os.ReadFile(p) //nolint:gosec // the walk is over the test's own temp home
 		if err == nil && strings.Contains(string(b), needle) {
 			rel, _ := filepath.Rel(root, p)
 			out = append(out, filepath.ToSlash(rel))

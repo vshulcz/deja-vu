@@ -20,7 +20,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
-func withTempStores(t *testing.T) string {
+func withTempStores(t *testing.T) {
 	t.Helper()
 	h := t.TempDir()
 	t.Setenv("HOME", h)
@@ -34,7 +34,6 @@ func withTempStores(t *testing.T) string {
 	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(t.TempDir(), "opencode.db"))
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(t.TempDir(), "index.db"))
 	t.Setenv("NO_COLOR", "1")
-	return h
 }
 
 // captureRunStderr is captureRun for the channel advice goes to.
@@ -195,7 +194,7 @@ func TestCompletionScriptsParseWhenShellIsAvailable(t *testing.T) {
 			if err := os.WriteFile(path, []byte(script), 0o600); err != nil {
 				t.Fatal(err)
 			}
-			cmd := exec.Command(tc.shell, append(tc.args, path)...)
+			cmd := exec.CommandContext(t.Context(), tc.shell, append(tc.args, path)...)
 			if out, err := cmd.CombinedOutput(); err != nil {
 				t.Fatalf("%s rejected completion script: %v\n%s", tc.shell, err, out)
 			}
@@ -216,7 +215,7 @@ func TestPowerShellCompletionScriptParsesWhenAvailable(t *testing.T) {
 			if err := os.WriteFile(path, []byte(powershellCompletion), 0o600); err != nil {
 				t.Fatal(err)
 			}
-			cmd := exec.Command(shell, "-NoProfile", "-NonInteractive", "-File", path)
+			cmd := exec.CommandContext(t.Context(), shell, "-NoProfile", "-NonInteractive", "-File", path)
 			if out, err := cmd.CombinedOutput(); err != nil {
 				t.Fatalf("PowerShell rejected completion script: %v\n%s", err, out)
 			}
@@ -500,7 +499,7 @@ func TestStatsCommandJSONAndNoColor(t *testing.T) {
 		t.Fatal(err)
 	}
 	var report stats.Report
-	if err := json.Unmarshal([]byte(out), &report); err != nil {
+	if err = json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("json: %v\n%s", err, out)
 	}
 	if report.TotalSessions != 4 || report.TotalMessages != 8 {
@@ -763,7 +762,7 @@ func TestMCPHandshakeListRecallRoundTrip(t *testing.T) {
 	if err := json.Unmarshal([]byte(lines[0]), &initResp); err != nil {
 		t.Fatal(err)
 	}
-	res := initResp["result"].(map[string]any)
+	res := typedOrFatal[map[string]any](t, initResp["result"])
 	if res["protocolVersion"] != mcpProtocolVersion {
 		t.Fatalf("bad init: %#v", initResp)
 	}
@@ -840,7 +839,7 @@ func TestInstallClaudeTempHome(t *testing.T) {
 	if !strings.Contains(string(b), `"mcpServers"`) || !strings.Contains(string(b), `"command":"`+wantCommand+`"`) || !strings.Contains(string(b), "/bin/deja") {
 		t.Fatalf("bad claude config: %s", b)
 	}
-	if _, err := os.Stat(path + ".bak"); err != nil {
+	if _, err = os.Stat(path + ".bak"); err != nil {
 		t.Fatal("missing backup", err)
 	}
 	r, err = installTarget("claude-code", "/bin/deja", false)
@@ -902,10 +901,10 @@ func TestHookPrecompactIsQuietAndBestEffort(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := w.WriteString(`{"session_id":"s","transcript_path":"/missing.jsonl","trigger":"auto"}`); err != nil {
+	if _, err = w.WriteString(`{"session_id":"s","transcript_path":"/missing.jsonl","trigger":"auto"}`); err != nil {
 		t.Fatal(err)
 	}
-	if err := w.Close(); err != nil {
+	if err = w.Close(); err != nil {
 		t.Fatal(err)
 	}
 	os.Stdin = r

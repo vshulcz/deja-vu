@@ -44,7 +44,7 @@ func TestApplyPatchMoveFilesTheHunksUnderTheNewName(t *testing.T) {
 			}
 			got := map[string]bool{}
 			for _, rec := range vocabRoles(ss, RoleFiles) {
-				for _, f := range strings.Split(rec, "\n") {
+				for f := range strings.SplitSeq(rec, "\n") {
 					got[f] = true
 				}
 			}
@@ -60,6 +60,7 @@ func TestApplyPatchMoveFilesTheHunksUnderTheNewName(t *testing.T) {
 // Codex 0.149: apply_patch as a custom tool call, the patch its input.
 func vocabCodexPatch(patch string) func(t *testing.T) []model.Session {
 	return func(t *testing.T) []model.Session {
+		t.Helper()
 		rec := func(typ string, payload any) string {
 			return vocabJSON(map[string]any{"timestamp": "2026-10-01T10:00:01.000Z", "type": typ, "payload": payload})
 		}
@@ -75,6 +76,7 @@ func vocabCodexPatch(patch string) func(t *testing.T) []model.Session {
 // opencode 1.18: apply_patch {patchText}.
 func vocabOpencodePatch(patch string) func(t *testing.T) []model.Session {
 	return func(t *testing.T) []model.Session {
+		t.Helper()
 		data := fmt.Sprintf(`{"type":"tool","tool":"apply_patch","callID":"p1","state":{"status":"completed","input":%s,"output":"ok","time":{"start":1790000002000}}}`,
 			vocabJSON(map[string]any{"patchText": patch}))
 		db := vocabSQL(t, `create table session(id text primary key, parent_id text, directory text, title text, time_created integer, time_updated integer);

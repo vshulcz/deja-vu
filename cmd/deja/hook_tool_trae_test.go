@@ -17,7 +17,7 @@ func TestTraeEditHookSpeaks(t *testing.T) {
 	tmp := hermeticEnv(t)
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		id := "s" + string(rune('0'+i))
 		writeClaudeFixture(t, filepath.Join(root, "alpha", id+".jsonl"), id, []string{
 			`{"type":"user","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"edit"}}`,
@@ -28,13 +28,16 @@ func TestTraeEditHookSpeaks(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tool := range []string{"Edit", "Write"} {
-		b, _ := json.Marshal(map[string]any{
+		b, jerr := json.Marshal(map[string]any{
 			"hook_event_name": "PreToolUse",
 			"tool_name":       tool,
 			"tool_input":      map[string]any{"command": tool + " /work/alpha/config.go"},
 			"session_id":      "trae-" + tool,
 			"cwd":             "/work/alpha",
 		})
+		if jerr != nil {
+			t.Fatal(jerr)
+		}
 		out := toolHookRun(t, string(b))
 		if !strings.Contains(out, "config.go") {
 			t.Errorf("%s on a file with history: %q, want the file's line", tool, out)

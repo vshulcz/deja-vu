@@ -38,7 +38,7 @@ func TestDoctorReadsCopilotsMCPConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	delete(cfg["mcpServers"], "deja")
-	b, _ = json.Marshal(cfg)
+	b = mustMarshal(t, cfg)
 	if err := os.WriteFile(want, b, 0o644); err != nil {
 		t.Fatal(err)
 	}

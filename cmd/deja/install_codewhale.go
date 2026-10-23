@@ -59,7 +59,7 @@ func codewhaleAlwaysLoad(uninstall bool) (installResult, error) {
 // out, and leaves every other line as it was. A table without the key gets it
 // under its header; a file without the table gets the table at the end. An
 // array spread over several lines is the reader's to edit.
-func tomlListedUnder(text, table, key, value string, remove bool) (string, error) {
+func tomlListedUnder(text, table, key, value string, remove bool) (string, error) { //nolint:unparam // the table is part of what the helper edits
 	lines := strings.Split(strings.TrimRight(text, "\n"), "\n")
 	if text == "" {
 		lines = nil
@@ -181,8 +181,8 @@ func installCodeWhaleHooks(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	if !uninstall {
-		if err := tomlInlineKey(lfText(old), "[[hooks.hooks]]"); err != nil {
-			return installResult{}, configParseError(path, err)
+		if terr := tomlInlineKey(lfText(old), "[[hooks.hooks]]"); terr != nil {
+			return installResult{}, configParseError(path, terr)
 		}
 	}
 	s := strings.TrimRight(removeMarkedTOMLBlocks(lfText(old), codewhaleHookMarker), "\n")

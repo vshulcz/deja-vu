@@ -2,6 +2,7 @@ package sources
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
@@ -144,7 +145,7 @@ func reasonixV4FramesOneByOne(frames [][]byte, sizes []int) ([][]byte, error) {
 	for i, f := range frames {
 		raw, err := reasonixZstd(f)
 		if err != nil || len(raw) != sizes[i] {
-			return raws, fmt.Errorf("reasonix: frame %d does not decode: %v", i, err)
+			return raws, fmt.Errorf("reasonix: frame %d does not decode: %v", i, err) //nolint:errorlint // err is nil on a size mismatch and must print as <nil>
 		}
 		raws = append(raws, raw)
 	}
@@ -152,7 +153,7 @@ func reasonixV4FramesOneByOne(frames [][]byte, sizes []int) ([][]byte, error) {
 }
 
 func reasonixZstd(in []byte) ([]byte, error) {
-	cmd := exec.Command("zstd", "-d", "-c", "-q")
+	cmd := exec.CommandContext(context.Background(), "zstd", "-d", "-c", "-q")
 	cmd.Stdin = bytes.NewReader(in)
 	var out, errBuf bytes.Buffer
 	cmd.Stdout = &out
@@ -186,7 +187,7 @@ func reasonixV4Commits(raws [][]byte, content string) []reasonixV4Event {
 		switch rec.RecordType {
 		case "batch/begin":
 			r := rec
-			begin, pending = &r, nil
+			begin, pending = &r, nil //nolint:prealloc // a new batch starts with nothing pending
 			digest.Reset()
 			digest.Write(raw)
 			digest.Write([]byte{0})
@@ -375,11 +376,11 @@ func (tr *reasonixV4Transcript) noteWorkspace(m *reasonixV4Message) {
 	}
 	text, _ := m.Content.(string)
 	const marker = "\nCurrent workspace: "
-	i := strings.Index(text, marker)
-	if i < 0 {
+	_, after, ok := strings.Cut(text, marker)
+	if !ok {
 		return
 	}
-	line := text[i+len(marker):]
+	line := after
 	if j := strings.IndexByte(line, '\n'); j >= 0 {
 		line = line[:j]
 	}

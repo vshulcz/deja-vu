@@ -24,9 +24,11 @@ func TestTiedChainsCarryTheSentenceThatTiesTheVocabularies(t *testing.T) {
 		answers, ties := 0, 0
 		for _, s := range c.Sessions {
 			text := ""
+			var textSb27 strings.Builder
 			for _, m := range s.Messages {
-				text += " " + strings.ToLower(m.Text)
+				textSb27.WriteString(" " + strings.ToLower(m.Text))
 			}
+			text += textSb27.String()
 			if !strings.Contains(text, strings.ToLower(c.Topic)) {
 				continue
 			}
@@ -43,7 +45,7 @@ func TestTiedChainsCarryTheSentenceThatTiesTheVocabularies(t *testing.T) {
 			// best lexical match there can be, and an arm it always wins
 			// measures the fixture rather than the search.
 			shared := 0
-			for _, w := range strings.Fields(strings.ToLower(c.Paraphrase)) {
+			for w := range strings.FieldsSeq(strings.ToLower(c.Paraphrase)) {
 				if len(w) > 4 && strings.Contains(text, w) {
 					shared++
 				}

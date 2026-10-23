@@ -14,7 +14,7 @@ import (
 // is appended to the tool result the model reads in the same turn.
 func TestFixPairAnswersCopilotPostToolUse(t *testing.T) {
 	seedFixPair(t, "panic: sql: database is closed", "make clean && make CGO_ENABLED=0")
-	payload, _ := json.Marshal(map[string]any{
+	payload := mustMarshal(t, map[string]any{
 		"sessionId": "copilot-1",
 		"cwd":       "/work/app",
 		"toolName":  "bash",

@@ -37,7 +37,7 @@ insert into message values('m2','ses_a',1767409201000,'{"role":"assistant"}');
 insert into part values('p2','m2','{"type":"tool","tool":"bash","state":{"input":{"command":"go test ./parser/..."},"output":"--- FAIL: TestParseSeed\nwant 3, got 4","metadata":{"exit":1}},"time":{"start":"2026-01-02T03:00:01Z"}}');
 insert into message values('m3','ses_b',1767409202000,'{"role":"user"}');
 insert into part values('p3','m3','{"type":"text","text":"someone else"}');`
-		if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+		if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 			t.Fatalf("sqlite setup: %v %s", err, out)
 		}
 		t.Setenv("DEJA_OPENCODE_DB", db)
@@ -62,8 +62,8 @@ insert into part values('p3','m3','{"type":"text","text":"someone else"}');`
 // Hermes hands its memory provider the turns it compresses, in the shape it
 // keeps in state.db; they read as the store's rows do.
 func TestCompactionMessagesReadHermesTurns(t *testing.T) {
-	result, _ := json.Marshal(map[string]any{"output": "--- FAIL: TestParseSeed\nwant 3, got 4\nFAIL", "exit_code": 1})
-	msgs, _ := json.Marshal([]map[string]any{
+	result := mustJSON(t, map[string]any{"output": "--- FAIL: TestParseSeed\nwant 3, got 4\nFAIL", "exit_code": 1})
+	msgs := mustJSON(t, []map[string]any{
 		{"role": "user", "content": "fix the parser test"},
 		{"role": "assistant", "content": "", "tool_calls": []any{map[string]any{"id": "call_1", "type": "function", "function": map[string]any{"name": "terminal", "arguments": `{"command":"go test ./parser/..."}`}}}},
 		{"role": "tool", "tool_call_id": "call_1", "content": string(result)},

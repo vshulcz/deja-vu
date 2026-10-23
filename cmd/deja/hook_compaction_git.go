@@ -182,8 +182,8 @@ func hashUntrackedFile(h hash.Hash, root, name string, used *int64) bool {
 	}
 	hashWorktreeField(h, info.Mode().String())
 	if info.Mode()&os.ModeSymlink != 0 {
-		target, err := os.Readlink(path)
-		if err != nil {
+		target, linkErr := os.Readlink(path)
+		if linkErr != nil {
 			return false
 		}
 		hashWorktreeField(h, target)
@@ -237,7 +237,7 @@ func safeGitRelativePath(name string) bool {
 	if name == "" || filepath.IsAbs(name) || strings.Contains(name, "\\") {
 		return false
 	}
-	for _, component := range strings.Split(name, "/") {
+	for component := range strings.SplitSeq(name, "/") {
 		if component == "" || component == "." || component == ".." {
 			return false
 		}

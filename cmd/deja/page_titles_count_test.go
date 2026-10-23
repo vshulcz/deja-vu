@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -62,9 +63,9 @@ func TestPageTitlesCountTheRestOfTheHarnesses(t *testing.T) {
 		if e.IsDir() || filepath.Ext(e.Name()) != ".html" || e.Name() == "README.html" {
 			continue
 		}
-		b, err := os.ReadFile(filepath.Join(dir, e.Name()))
-		if err != nil {
-			t.Fatalf("%s: %v", e.Name(), err)
+		b, readErr := os.ReadFile(filepath.Join(dir, e.Name()))
+		if readErr != nil {
+			t.Fatalf("%s: %v", e.Name(), readErr)
 		}
 		pages++
 		if !strings.Contains(string(b), want) {
@@ -98,7 +99,7 @@ func countWordForTest(n int) string {
 		"thirty-three", "thirty-four", "thirty-five", "thirty-six", "thirty-seven",
 		"thirty-eight", "thirty-nine", "forty"}
 	if n < 0 || n >= len(words) {
-		return fmt.Sprint(n)
+		return strconv.Itoa(n)
 	}
 	return words[n]
 }

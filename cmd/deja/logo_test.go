@@ -41,13 +41,14 @@ func TestLogoWanted(t *testing.T) {
 // cut to the mark's height — the last stores simply vanished from the first
 // build greeting.
 func TestLogoLinesKeepsAColumnTallerThanTheMark(t *testing.T) {
-	info := []string{"deja-vu", "", "header"}
-	for i := 0; i < 22; i++ {
+	info := make([]string, 0, 25)
+	info = append(info, "deja-vu", "", "header")
+	for i := range 22 {
 		info = append(info, "store"+strconv.Itoa(i))
 	}
 	out := logoLines(info)
 	plain := strings.Join(out, "\n")
-	for i := 0; i < 22; i++ {
+	for i := range 22 {
 		if !strings.Contains(plain, "store"+strconv.Itoa(i)) {
 			t.Fatalf("store%d was dropped from a %d-line column rendered as %d lines", i, len(info), len(out))
 		}
@@ -65,7 +66,8 @@ func TestLogoLinesKeepsAColumnTallerThanTheMark(t *testing.T) {
 	// Columns are counted in runes: the mark is drawn with three-byte block
 	// glyphs, so a byte offset would compare two different things.
 	runeCol := func(line, want string) int {
-		return len([]rune(ansiRE.ReplaceAllString(line, "")[:strings.Index(ansiRE.ReplaceAllString(line, ""), want)]))
+		before, _, _ := strings.Cut(ansiRE.ReplaceAllString(line, ""), want)
+		return len([]rune(before))
 	}
 	if got, want := runeCol(below, "store21"), runeCol(beside, "store0"); got != want {
 		t.Errorf("overflow line starts at column %d, the ones beside the mark at %d", got, want)

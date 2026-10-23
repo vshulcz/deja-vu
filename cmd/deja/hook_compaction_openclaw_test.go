@@ -19,7 +19,7 @@ import (
 // entry a run appends once it has summarised the turns before it.
 func openclawSession(t *testing.T, id, workspace string) string {
 	t.Helper()
-	cwd, _ := json.Marshal(workspace)
+	cwd := mustMarshal(t, workspace)
 	path := filepath.Join(sources.OpenClawRoot(), "main", "sessions", id+".jsonl")
 	compactionWrite(t, path, strings.Join([]string{
 		`{"type":"session","version":3,"id":"` + id + `","timestamp":"2026-10-07T10:20:45.000Z","cwd":` + string(cwd) + `}`,
@@ -77,11 +77,11 @@ func TestOpenClawPluginNamesTheSessionItCompacts(t *testing.T) {
 	stub := filepath.Join(home, "deja")
 	calls := filepath.Join(home, "calls")
 	script := "#!/bin/sh\nin=$(cat)\nprintf '%s\\t%s\\n' \"$1\" \"$in\" >> " + calls + "\n"
-	if err := os.WriteFile(stub, []byte(script), 0o755); err != nil {
+	if err = os.WriteFile(stub, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	plugin := filepath.Join(home, "index.mjs")
-	if err := os.WriteFile(plugin, []byte(openclawPluginJS(stub)), 0o644); err != nil {
+	if err = os.WriteFile(plugin, []byte(openclawPluginJS(stub)), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	driver := `
@@ -93,18 +93,18 @@ await h.before_prompt_build({ prompt: "fix the parser test", messages: [] }, { s
 await h.before_compaction({ messageCount: 4, messages: [], sessionFile: "/s/sa1.jsonl" }, { sessionKey: key });
 `
 	run := filepath.Join(home, "drive.mjs")
-	if err := os.WriteFile(run, []byte(driver), 0o644); err != nil {
+	if err = os.WriteFile(run, []byte(driver), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := exec.Command(node, run).CombinedOutput(); err != nil {
-		t.Fatalf("driving the plugin: %v\n%s", err, out)
+	if out, runErr := exec.CommandContext(t.Context(), node, run).CombinedOutput(); runErr != nil {
+		t.Fatalf("driving the plugin: %v\n%s", runErr, out)
 	}
 	b, err := os.ReadFile(calls)
 	if err != nil {
 		t.Fatal(err)
 	}
 	got := map[string]map[string]any{}
-	for _, l := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+	for l := range strings.SplitSeq(strings.TrimSpace(string(b)), "\n") {
 		sub, body, _ := strings.Cut(l, "\t")
 		var m map[string]any
 		if err := json.Unmarshal([]byte(body), &m); err != nil {

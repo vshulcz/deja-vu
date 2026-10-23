@@ -50,13 +50,13 @@ func TestTheWrittenSideSurvivesAnIncrementalUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.WriteString(turn("2026-01-02T04:04:05Z", appended) + "\n"); err != nil {
+	if _, err = f.WriteString(turn("2026-01-02T04:04:05Z", appended) + "\n"); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.Close(); err != nil {
+	if err = f.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if err := Ensure(dir, "", false, nil); err != nil {
+	if err = Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -71,7 +71,7 @@ func TestTheWrittenSideSurvivesAnIncrementalUpdate(t *testing.T) {
 			if m.Role != sources.RoleWrote {
 				continue
 			}
-			for _, h := range strings.Fields(strings.SplitN(m.Text, "\n", 2)[1]) {
+			for h := range strings.FieldsSeq(strings.SplitN(m.Text, "\n", 2)[1]) {
 				held[parseHexForTest(t, h)] = true
 			}
 		}

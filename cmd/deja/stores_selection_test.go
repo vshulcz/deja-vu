@@ -18,8 +18,9 @@ func TestDoctorDropsTheStoresDejaStoresSilences(t *testing.T) {
 	}
 
 	t.Setenv(sources.StoresEnv, "claude,notes")
-	var got []string
-	for _, c := range doctorStoreChecks() {
+	checks := doctorStoreChecks()
+	got := make([]string, 0, len(checks))
+	for _, c := range checks {
 		got = append(got, c.name)
 	}
 	if len(got) != 2 {
@@ -45,7 +46,7 @@ func TestDoctorRowsDropTheSilencedStores(t *testing.T) {
 		t.Errorf("doctor does not say which stores it is reading:\n%s", out)
 	}
 	for _, silenced := range []string{"codex", "cursor", "zed"} {
-		for _, line := range strings.Split(out, "\n") {
+		for line := range strings.SplitSeq(out, "\n") {
 			if strings.HasPrefix(strings.TrimSpace(line), silenced+" ") {
 				t.Errorf("doctor prints a row for %s, which DEJA_STORES silences: %q", silenced, line)
 			}

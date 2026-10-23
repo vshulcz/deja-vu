@@ -18,7 +18,7 @@ func TestTheDocumentedPathNamesTheOpencodeException(t *testing.T) {
 		t.Fatal(err)
 	}
 	line := ""
-	for _, l := range strings.Split(string(b), "\n") {
+	for l := range strings.SplitSeq(string(b), "\n") {
 		if strings.HasPrefix(strings.TrimSpace(l), "| `path` |") {
 			line = strings.TrimSpace(l)
 			break
@@ -52,7 +52,7 @@ create table part (id text primary key, message_id text, data text);
 insert into session values ('s1','` + proj + `',1767268800000,1767268800000);
 insert into message values ('m1','s1','{"role":"user"}',1767268800000);
 insert into part values ('p1','m1',json_object('type','text','text','the pool was exhausted'));`
-	if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, sql).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}
 	if _, err := captureRun(t, "index"); err != nil {
@@ -67,7 +67,7 @@ insert into part values ('p1','m1',json_object('type','text','text','the pool wa
 			Path string `json:"path"`
 		} `json:"session"`
 	}
-	if err := json.Unmarshal([]byte(out), &got); err != nil {
+	if err = json.Unmarshal([]byte(out), &got); err != nil {
 		t.Fatalf("show --json: %v: %s", err, out)
 	}
 	fi, err := os.Stat(got.Session.Path)

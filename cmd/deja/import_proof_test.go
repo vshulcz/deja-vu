@@ -64,8 +64,8 @@ func TestImportProofNamesRealSessions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), append(b, '\n'), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), append(b, '\n'), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	proof, err := captureRunStderr(t, "sync", "import", exp)
 	if err != nil {
@@ -90,12 +90,12 @@ func TestImportProofObeysTheTrustPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), append(b, '\n'), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), append(b, '\n'), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	policyFile := filepath.Join(tmp, "policy.json")
-	if err := os.WriteFile(policyFile, []byte(`{"activations":{"search":{"local":true,"imported":false}}}`), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(policyFile, []byte(`{"activations":{"search":{"local":true,"imported":false}}}`), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	t.Setenv("DEJA_POLICY_FILE", policyFile)
 
@@ -130,8 +130,8 @@ func TestImportProofDoesNotLeaveTheDateSlotEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), append(b, '\n'), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), append(b, '\n'), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	proof, err := captureRunStderr(t, "sync", "import", exp)
 	if err != nil {
@@ -170,12 +170,12 @@ func TestImportProofShowsOnlyWhatArrived(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), append(b, '\n'), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), append(b, '\n'), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	dir := filepath.Join(tmp, "index.db")
-	if err := index.Ensure(dir, "", false, nil); err != nil {
-		t.Fatal(err)
+	if eerr := index.Ensure(dir, "", false, nil); eerr != nil {
+		t.Fatal(eerr)
 	}
 
 	proof, err := captureRunStderr(t, "sync", "import", exp)
@@ -198,16 +198,16 @@ func TestImportProofShowsOnlyWhatArrived(t *testing.T) {
 	// With every arrived row hidden by a rule, the reader gets the rule — not
 	// this machine's own sessions under someone else's heading.
 	policyFile := filepath.Join(tmp, "policy.json")
-	if err := os.WriteFile(policyFile, []byte(`{"activations":{"search":{"local":true,"imported":false}}}`), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(policyFile, []byte(`{"activations":{"search":{"local":true,"imported":false}}}`), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	t.Setenv("DEJA_POLICY_FILE", policyFile)
 	b2, err := json.Marshal(index.SyncRecord{Harness: "claude", SessionID: "peer2", Project: "work/api", Role: "user", Text: "another peer line"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(exp, "deja-sync-y.jsonl"), append(b2, '\n'), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(filepath.Join(exp, "deja-sync-y.jsonl"), append(b2, '\n'), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	proof, err = captureRunStderr(t, "sync", "import", exp)
 	if err != nil {

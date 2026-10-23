@@ -17,7 +17,7 @@ type fakePG struct {
 	err               error
 }
 
-func (f *fakePG) run(dsn, sql string) ([]byte, error) {
+func (f *fakePG) run(_, sql string) ([]byte, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -128,7 +128,7 @@ func TestHermesPGFingerprintReadsFractionalEpoch(t *testing.T) {
 // The DSN can carry a password; the token that stands in for the store must not
 // leak it, and it must be stable so the index recognises the same store twice.
 func TestHermesPGStorePathHidesTheDSN(t *testing.T) {
-	dsn := "postgres://user:s3cret@host:55432/hermes"
+	dsn := "postgres://user:s3cret@host:55432/hermes" //nolint:gosec // a made-up DSN the test redacts
 	tok := HermesPGStorePath(dsn)
 	if strings.Contains(tok, "s3cret") || strings.Contains(tok, "host") {
 		t.Fatalf("token leaked the DSN: %q", tok)

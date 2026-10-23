@@ -42,7 +42,7 @@ func TestLastDistinctDropsAgentScratch(t *testing.T) {
 	}
 }
 
-func writeCompactFixture(t *testing.T) string {
+func writeCompactFixture(t *testing.T) {
 	t.Helper()
 	tmp := hermeticEnv(t)
 	proj := filepath.Join(tmp, "claude", "project")
@@ -50,7 +50,7 @@ func writeCompactFixture(t *testing.T) string {
 		t.Fatal(err)
 	}
 	var b strings.Builder
-	line := func(format string, a ...any) { fmt.Fprintf(&b, format+"\n", a...) }
+	line := func(s string) { b.WriteString(s + "\n") }
 	line(`{"type":"user","sessionId":"claude-compact","cwd":"/w","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"make the retry loop stop dropping the last attempt"}}`)
 	line(`{"type":"assistant","sessionId":"claude-compact","cwd":"/w","timestamp":"2026-01-02T03:05:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Read","input":{"file_path":"/w/pkg/retry.go"}}]}}`)
 	line(`{"type":"assistant","sessionId":"claude-compact","cwd":"/w","timestamp":"2026-01-02T03:06:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"go test ./pkg/ -run Retry -count=3"}}]}}`)
@@ -62,7 +62,6 @@ func writeCompactFixture(t *testing.T) string {
 	if err := index.Ensure(index.DefaultDir(), "", false, nil); err != nil {
 		t.Fatal(err)
 	}
-	return tmp
 }
 
 func TestCompactEvidenceNamesWhatTheSummaryDrops(t *testing.T) {

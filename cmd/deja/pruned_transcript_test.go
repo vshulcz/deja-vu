@@ -68,7 +68,7 @@ func TestAPrunedTranscriptStaysInTheIndexAndItsNeighbourToo(t *testing.T) {
 
 	// And nothing keeps naming the file: doctor counts what is there.
 	doc, _ := captureRun(t, "doctor")
-	for _, line := range strings.Split(doc, "\n") {
+	for line := range strings.SplitSeq(doc, "\n") {
 		if strings.Contains(line, "s1.jsonl") {
 			t.Errorf("doctor still names a file nobody can act on: %q", strings.TrimSpace(line))
 		}

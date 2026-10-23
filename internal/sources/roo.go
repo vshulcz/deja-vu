@@ -31,6 +31,7 @@ import (
 // also the directory its settings live in.
 const RooExtensionID = "rooveterinaryinc.roo-cline"
 
+// RooRoots lists the VS Code globalStorage dirs of the Roo extension.
 func RooRoots() []string {
 	if list := os.Getenv("DEJA_ROO_ROOTS"); list != "" {
 		var out []string
@@ -182,7 +183,7 @@ func stripJSONCComments(b []byte) []byte {
 func dropTrailingCommas(b []byte) []byte {
 	out := make([]byte, 0, len(b))
 	inString, escaped := false, false
-	for i := 0; i < len(b); i++ {
+	for i := range b {
 		c := b[i]
 		if inString {
 			out = append(out, c)
@@ -261,8 +262,9 @@ func RooCLITask(path string) (id, workspace string) {
 	return id, item.Workspace
 }
 
+// RooTaskFiles lists every Roo task's api_conversation_history.json.
 func RooTaskFiles() []string {
-	var files []string
+	var files []string //nolint:prealloc // each root adds an unknown number of files
 	for _, root := range RooRoots() {
 		files = append(files, walkFiles(filepath.Join(root, "tasks"), func(p string) bool {
 			return filepath.Base(p) == "api_conversation_history.json"
@@ -271,6 +273,7 @@ func RooTaskFiles() []string {
 	return files
 }
 
+// LoadRoo reads every Roo task on this machine.
 func LoadRoo() []model.Session { return parseFiles(RooTaskFiles(), ParseRooTask) }
 
 type rooHistoryItem struct {
@@ -280,6 +283,7 @@ type rooHistoryItem struct {
 	Workspace string `json:"workspace"`
 }
 
+// ParseRooTask reads one Roo task.
 func ParseRooTask(path string) ([]model.Session, error) {
 	return parseRooShapedTask(path, "roo")
 }

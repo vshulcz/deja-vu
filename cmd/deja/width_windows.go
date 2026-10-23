@@ -25,7 +25,7 @@ func terminalWidth() (int, bool) {
 	}
 	kernel32 := syscall.NewLazyDLL("kernel32.dll")
 	proc := kernel32.NewProc("GetConsoleScreenBufferInfo")
-	ret, _, _ := proc.Call(os.Stdout.Fd(), uintptr(unsafe.Pointer(&info)))
+	ret, _, _ := proc.Call(os.Stdout.Fd(), uintptr(unsafe.Pointer(&info))) //nolint:gosec // the console API fills the struct through a pointer
 	if ret == 0 {
 		return 0, false
 	}

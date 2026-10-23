@@ -127,13 +127,14 @@ func writeLineAnswerJSON(w io.Writer, answer lineAnswerJSON) error {
 func blameLineOnly(w io.Writer, dir string, target search.BlameTarget, hits []search.BlameHit, mode blameMode) error {
 	c, author, found, why := lineAttribution(dir, target, hits)
 	if mode.Attribution {
-		if mode.JSON {
+		switch {
+		case mode.JSON:
 			if err := writeLineAnswerJSON(w, buildLineAnswer(target, c, author, found, why)); err != nil {
 				return err
 			}
-		} else if why != "" {
+		case why != "":
 			fmt.Fprintf(w, "%s:%d — %s\n", target.Base, target.Line, why)
-		} else {
+		default:
 			printLineAuthor(w, target, c, author, found)
 		}
 	}
@@ -152,7 +153,7 @@ func gitStderrLine(err error) string {
 	if !errors.As(err, &ex) {
 		return ""
 	}
-	for _, line := range strings.Split(string(ex.Stderr), "\n") {
+	for line := range strings.SplitSeq(string(ex.Stderr), "\n") {
 		if line = strings.TrimSpace(line); line != "" {
 			return line
 		}
@@ -192,10 +193,10 @@ func gitNoteBody(target search.BlameTarget, a lineAuthor) string {
 // way to read it.
 func writeGitNote(w io.Writer, target search.BlameTarget, c lineCommit, a lineAuthor, found bool) error {
 	if c.SHA == "" {
-		return fmt.Errorf("blame --git-note: no commit to write a note on")
+		return errors.New("blame --git-note: no commit to write a note on")
 	}
 	if !found {
-		return fmt.Errorf("blame --git-note: nothing is attributed to a session, so there is no attribution to record")
+		return errors.New("blame --git-note: nothing is attributed to a session, so there is no attribution to record")
 	}
 	dir := filepath.Dir(target.FullPath)
 	body := gitNoteBody(target, a)

@@ -44,7 +44,7 @@ create table messages (id text primary key, session_id text not null, role text 
 
 func crushSQL(t *testing.T, db, sql string) {
 	t.Helper()
-	c := exec.Command("sqlite3", db)
+	c := exec.CommandContext(t.Context(), "sqlite3", db)
 	c.Stdin = strings.NewReader(sql)
 	if o, err := c.CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3: %v %s", err, o)

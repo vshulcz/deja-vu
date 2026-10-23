@@ -15,12 +15,12 @@ import (
 func viewSessionsEmbedded(t *testing.T, page string) []map[string]any {
 	t.Helper()
 	const marker = "const S="
-	i := strings.Index(page, marker)
-	if i < 0 {
+	_, after, ok := strings.Cut(page, marker)
+	if !ok {
 		t.Fatalf("the view page no longer embeds a session array; this test reads the wrong thing now")
 	}
 	var rows []map[string]any
-	dec := json.NewDecoder(strings.NewReader(page[i+len(marker):]))
+	dec := json.NewDecoder(strings.NewReader(after))
 	if err := dec.Decode(&rows); err != nil {
 		t.Fatalf("decode embedded sessions: %v", err)
 	}

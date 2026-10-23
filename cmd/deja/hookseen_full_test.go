@@ -60,8 +60,8 @@ func TestTheTokenDedupSurvivesAFullHookseen(t *testing.T) {
 	for mine.Len() < (1<<20)+4096 {
 		mine.WriteString("ses1 token-of-my-own 2026-01-01T00:00:00Z\n")
 	}
-	if err := os.WriteFile(p, []byte(mine.String()), 0o600); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(p, []byte(mine.String()), 0o600); werr != nil {
+		t.Fatal(werr)
 	}
 	rememberInjectedIDs(dir, "ses1", "tok-3")
 	fi, err = os.Stat(p)

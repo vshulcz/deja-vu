@@ -86,7 +86,7 @@ func servesTheMarker(t *testing.T, args []string) {
 	if err != nil {
 		t.Fatalf("%v: %v", args, err)
 	}
-	for _, line := range strings.Split(out+"\n"+errOut, "\n") {
+	for line := range strings.SplitSeq(out+"\n"+errOut, "\n") {
 		if !strings.Contains(line, "zonko") || echoesTheQuery(line, args) {
 			continue
 		}

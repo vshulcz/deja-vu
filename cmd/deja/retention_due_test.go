@@ -160,7 +160,7 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, session_id TEXT, role TEXT, conte
 INSERT INTO sessions VALUES ('e85','cli',%[1]d,%[1]d),('e60','cli',%[2]d,%[2]d),('open','cli',%[1]d,NULL),('e85late','cli',%[1]d,%[1]d);
 INSERT INTO messages (session_id,role,content,timestamp) VALUES ('e85','user','x',%[1]d),('e85late','user','y',%[3]d);`,
 		ts(85), ts(60), ts(10))
-	if out, err := exec.Command("sqlite3", db, schema).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, schema).CombinedOutput(); err != nil {
 		t.Fatalf("seed: %v: %s", err, out)
 	}
 	if config != "" {

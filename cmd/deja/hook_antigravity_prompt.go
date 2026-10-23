@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -110,8 +111,8 @@ func transcriptTailSteps(path string) []transcriptStep {
 	}
 	lines := strings.Split(string(buf), "\n")
 	out := make([]transcriptStep, 0, len(lines))
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := strings.TrimSpace(lines[i])
+	for _, line := range slices.Backward(lines) {
+		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
@@ -141,13 +142,13 @@ func latestUserRequest(path string) string {
 // userRequestText pulls the person's words out of the step antigravity writes,
 // which wraps them in a tag and appends metadata blocks of its own.
 func userRequestText(content string) string {
-	open := strings.Index(content, userRequestOpen)
-	if open < 0 {
+	_, after, ok := strings.Cut(content, userRequestOpen)
+	if !ok {
 		return strings.TrimSpace(content)
 	}
-	rest := content[open+len(userRequestOpen):]
-	if close := strings.Index(rest, userRequestClose); close >= 0 {
-		rest = rest[:close]
+	rest := after
+	if end := strings.Index(rest, userRequestClose); end >= 0 {
+		rest = rest[:end]
 	}
 	return strings.TrimSpace(rest)
 }
@@ -269,8 +270,8 @@ func latestToolFailure(path string) string {
 		if strings.Contains(body, exitedWithCode+" 0.") {
 			return ""
 		}
-		if i := strings.Index(body, toolOutputMarker); i >= 0 {
-			return strings.TrimSpace(body[i+len(toolOutputMarker):])
+		if _, after, ok := strings.Cut(body, toolOutputMarker); ok {
+			return strings.TrimSpace(after)
 		}
 		return strings.TrimSpace(body)
 	}

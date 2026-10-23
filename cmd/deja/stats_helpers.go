@@ -40,7 +40,7 @@ func monthChart(months []stats.MonthStats, color bool) []string {
 		if peak > 0 && m.Messages > 0 {
 			h = max(1, m.Messages*rows*8/peak)
 		}
-		for row := 0; row < rows; row++ {
+		for row := range rows {
 			fill := min(max(h-(rows-1-row)*8, 0), 8)
 			cell := eighths[fill]
 			if !color {

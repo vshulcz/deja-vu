@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -46,7 +47,7 @@ func installOpenClawPlugin(exe string, uninstall bool) (installResult, error) {
 		if err := removeOpenClawPluginEntry(); err != nil {
 			return installResult{}, err
 		}
-		if _, err := setOpenClawPluginLoadPath(dir, false); err != nil {
+		if err := setOpenClawPluginLoadPath(dir, false); err != nil {
 			return installResult{}, err
 		}
 		if !had {
@@ -63,7 +64,7 @@ func installOpenClawPlugin(exe string, uninstall bool) (installResult, error) {
 	if err != nil {
 		return installResult{}, err
 	}
-	if _, err := setOpenClawPluginLoadPath(dir, true); err != nil {
+	if err := setOpenClawPluginLoadPath(dir, true); err != nil {
 		return installResult{}, err
 	}
 	// The manifest and package.json beside it are deja's own and went unnamed
@@ -114,7 +115,7 @@ func setOpenClawPluginEntry() (installResult, error) {
 	}
 	var root map[string]any
 	if len(bytes.TrimSpace(old)) > 0 {
-		if err := json.Unmarshal([]byte(jsoncToJSON(string(old))), &root); err != nil {
+		if uerr := json.Unmarshal([]byte(jsoncToJSON(string(old))), &root); uerr != nil {
 			return installResult{}, openclawParseError(path, old)
 		}
 	}
@@ -128,8 +129,8 @@ func setOpenClawPluginEntry() (installResult, error) {
 	if configIsJSONC(old) {
 		// The same file the hook and the MCP entry are written into, and the
 		// same reason not to refuse it over a comment (#2811).
-		a, err := setOpenClawEntryJSONC(path, old, "plugins.entries", openclawPluginID, "", true, entry)
-		return installResult{Path: path, Action: a, Note: note}, err
+		a, serr := setOpenClawEntryJSONC(path, old, "plugins.entries", openclawPluginID, "", true, entry)
+		return installResult{Path: path, Action: a, Note: note}, serr
 	}
 	if plugins == nil {
 		plugins = map[string]any{}
@@ -157,8 +158,8 @@ func removeOpenClawPluginEntry() error {
 		return err
 	}
 	if configIsJSONC(old) {
-		_, err := setOpenClawEntryJSONC(path, old, "plugins.entries", openclawPluginID, "", false, nil)
-		return err
+		_, serr := setOpenClawEntryJSONC(path, old, "plugins.entries", openclawPluginID, "", false, nil)
+		return serr
 	}
 	var root map[string]any
 	if json.Unmarshal(old, &root) != nil {
@@ -186,20 +187,20 @@ func removeOpenClawPluginEntry() error {
 
 // setOpenClawPluginLoadPath adds the plugin's directory to plugins.load.paths,
 // or takes it out, beside whatever paths the user lists there (#4579).
-func setOpenClawPluginLoadPath(dir string, on bool) (string, error) {
+func setOpenClawPluginLoadPath(dir string, on bool) error {
 	path := filepath.Join(sources.OpenClawStateDir(), "openclaw.json")
 	old, err := readConfig(path)
 	if err != nil {
-		return "", err
+		return err
 	}
 	var root map[string]any
 	if len(bytes.TrimSpace(old)) == 0 {
 		if !on {
-			return "unchanged", nil
+			return nil
 		}
 		root = map[string]any{}
-	} else if err := json.Unmarshal([]byte(jsoncToJSON(string(old))), &root); err != nil {
-		return "", configParseError(path, err)
+	} else if uerr := json.Unmarshal([]byte(jsoncToJSON(string(old))), &root); uerr != nil {
+		return configParseError(path, uerr)
 	}
 	plugins, _ := root["plugins"].(map[string]any)
 	load, _ := mapAt(plugins, "load")
@@ -207,11 +208,11 @@ func setOpenClawPluginLoadPath(dir string, on bool) (string, error) {
 	// not understand. The plugin loads from extensions/ without it, so the
 	// cost of leaving it is the warning, not the recall.
 	if _, ok := plugins["load"]; ok && load == nil {
-		return "unchanged", nil
+		return nil
 	}
 	paths, isList := load["paths"].([]any)
 	if _, ok := load["paths"]; ok && !isList {
-		return "unchanged", nil
+		return nil
 	}
 	kept := make([]any, 0, len(paths)+1)
 	for _, p := range paths {
@@ -222,17 +223,18 @@ func setOpenClawPluginLoadPath(dir string, on bool) (string, error) {
 	}
 	had := len(kept) != len(paths)
 	if on == had {
-		return "unchanged", nil
+		return nil
 	}
 	if on {
 		kept = append(kept, dir)
 	}
 	if configIsJSONC(old) {
-		text, err := openclawLoadPathsJSONC(string(old), dir, on, len(kept), len(load), len(plugins), paths != nil)
-		if err != nil {
-			return "", configParseError(path, err)
+		text, oerr := openclawLoadPathsJSONC(string(old), dir, on, len(kept), len(load), len(plugins), paths != nil)
+		if oerr != nil {
+			return configParseError(path, oerr)
 		}
-		return writeIfChanged(path, old, []byte(text))
+		_, err = writeIfChanged(path, old, []byte(text))
+		return err
 	}
 	switch {
 	case len(kept) > 0:
@@ -256,9 +258,10 @@ func setOpenClawPluginLoadPath(dir string, on bool) (string, error) {
 	}
 	next, err := marshalConfigLike(old, root)
 	if err != nil {
-		return "", err
+		return err
 	}
-	return writeIfChanged(path, old, append(next, '\n'))
+	_, err = writeIfChanged(path, old, append(next, '\n'))
+	return err
 }
 
 // openclawLoadPathsJSONC adds dir to plugins.load.paths in a config carrying
@@ -286,15 +289,15 @@ func openclawLoadPathsJSONC(text, dir string, on bool, kept, loadKeys, pluginKey
 	}
 	open := zedTopLevelOpen(text)
 	if open < 0 {
-		return "", fmt.Errorf("does not look like a settings object")
+		return "", errors.New("does not look like a settings object")
 	}
 	block, have := walkJSONCKeys(text, open, []string{"plugins", "load"})
 	if block == nil || have < 2 {
-		return "", fmt.Errorf("plugins.load is not where it parsed")
+		return "", errors.New("plugins.load is not where it parsed")
 	}
 	at := jsoncListValue(text, block, "paths")
 	if at == nil {
-		return "", fmt.Errorf("plugins.load.paths is not where it parsed")
+		return "", errors.New("plugins.load.paths is not where it parsed")
 	}
 	blank := stripJSONComments(text)
 	// The last thing in the list that is not space or a comment.
@@ -324,7 +327,7 @@ func openclawLoadPathsJSONC(text, dir string, on bool, kept, loadKeys, pluginKey
 	return next, nil
 }
 
-// jsoncCutListStrings takes the strings match picks out of the list at at
+// jsoncCutListStrings takes the strings match picks out of the list spanned by at
 // (from its '[' to one past its ']') as text: the other elements keep their
 // comments and commas. Its error names no list: the caller says which.
 // A list left empty stays as `[]`; dropping the key is
@@ -363,8 +366,8 @@ func jsoncCutListStrings(text string, at [2]int, match func(string) bool) (strin
 		}
 	}
 	space := func(c byte) bool { return c == ' ' || c == '\t' }
-	for k := len(hits) - 1; k >= 0; k-- {
-		from, to := hits[k][0], hits[k][1]
+	for _, hit := range slices.Backward(hits) {
+		from, to := hit[0], hit[1]
 		comma := -1
 		j := to
 		for j < at[1]-1 && (space(blank[j]) || blank[j] == '\n' || blank[j] == '\r') {
@@ -457,7 +460,7 @@ func openclawPluginManifest() string {
 `
 }
 
-func openclawPluginJS(exe string) string {
+func openclawPluginJS(exe string) string { //nolint:funlen // the body is the plugin's source text
 	return fmt.Sprintf(`// generated by deja install — safe to delete; regenerate with: deja install openclaw-auto
 import { execFileSync } from "node:child_process";
 

@@ -41,8 +41,8 @@ func TestInstallCherryStudioWritesAnImportableServer(t *testing.T) {
 			Args    []string `json:"args"`
 		} `json:"mcpServers"`
 	}
-	if err := json.Unmarshal(b, &cfg); err != nil {
-		t.Fatalf("the import file is not JSON: %v", err)
+	if uerr := json.Unmarshal(b, &cfg); uerr != nil {
+		t.Fatalf("the import file is not JSON: %v", uerr)
 	}
 	srv, ok := cfg.Servers["deja"]
 	if !ok {

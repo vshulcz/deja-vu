@@ -14,7 +14,7 @@ import (
 // the whole fourteen-day window before anything looked again (#1972).
 func TestABackdatedEventIsStillDropped(t *testing.T) {
 	dir := t.TempDir()
-	for i := 0; i < 12000; i++ {
+	for range 12000 {
 		RecordResultRaw(dir, KindRecall, 900, 2, false, 9000)
 	}
 	// The memo is in hand now: the log is over the threshold with nothing to
@@ -48,14 +48,17 @@ func TestABackdatedEventIsStillDropped(t *testing.T) {
 // was replaced.
 func TestAShrunkLogIsReadAgain(t *testing.T) {
 	dir := t.TempDir()
-	for i := 0; i < 12000; i++ {
+	for range 12000 {
 		RecordResultRaw(dir, KindRecall, 900, 2, false, 9000)
 	}
 	before, ok := nothingToDrop.Load(Path(dir))
 	if !ok {
 		t.Fatal("no memo was stored for a log with nothing to drop")
 	}
-	m := before.(rotationMemo)
+	m, ok := before.(rotationMemo)
+	if !ok {
+		t.Fatalf("memo is a %T", before)
+	}
 	if skipRotation(Path(dir), m.size-1) {
 		t.Error("a log that shrank under this process was taken on trust")
 	}
@@ -81,7 +84,7 @@ func TestAStaleMemoIsNotUsed(t *testing.T) {
 // The counters still answer after all this, which is what the log is for.
 func TestTheLogStillAnswersAfterABusyFortnight(t *testing.T) {
 	dir := t.TempDir()
-	for i := 0; i < 2000; i++ {
+	for range 2000 {
 		RecordResultRaw(dir, KindRecall, 900, 2, false, 9000)
 	}
 	recalls, bytes, _, _ := Week(dir)

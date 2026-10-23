@@ -86,7 +86,7 @@ func TestParseKimiMidStreamAndIncrementalAppend(t *testing.T) {
 	rest := `{"type":"context.append_loop_event","event":{"type":"content.part","part":{"type":"text","text":" continues"}},"time":1782295202300}
 {"type":"context.append_loop_event","event":{"type":"step.end","uuid":"s2","finishReason":"end_turn"},"time":1782295202400}
 `
-	if err := os.WriteFile(wire, []byte(head+rest), 0o644); err != nil {
+	if err = os.WriteFile(wire, []byte(head+rest), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	inc, err := ParseKimiFileFromOffset(wire, offset)

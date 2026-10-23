@@ -199,7 +199,7 @@ func gaveUp(ms []model.Message) bool {
 		if m.Role != "user" && m.Role != "assistant" {
 			continue
 		}
-		for _, line := range strings.Split(m.Text, "\n") {
+		for line := range strings.SplitSeq(m.Text, "\n") {
 			if _, ok := GiveUpLine(line); ok {
 				return true
 			}

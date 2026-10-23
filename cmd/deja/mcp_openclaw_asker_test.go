@@ -15,7 +15,10 @@ import (
 
 // openclawLine is one pi-shaped OpenClaw transcript message.
 func openclawLine(id, role, text string, at time.Time) string {
-	body, _ := json.Marshal(text)
+	body, err := json.Marshal(text)
+	if err != nil {
+		panic(err)
+	}
 	content := string(body)
 	if role == "assistant" {
 		content = `[{"type":"text","text":` + string(body) + `}]`
@@ -36,7 +39,9 @@ func writeOpenClawSession(t *testing.T, id string, started time.Time, lines ...s
 	// Written when its last line was, as OpenClaw appends them.
 	last := started
 	for _, l := range lines {
-		var m struct{ Timestamp time.Time }
+		var m struct {
+			Timestamp time.Time `json:"timestamp"`
+		}
 		if json.Unmarshal([]byte(l), &m) == nil && m.Timestamp.After(last) {
 			last = m.Timestamp
 		}

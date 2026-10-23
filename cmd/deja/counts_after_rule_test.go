@@ -28,10 +28,10 @@ func halvedStore(t *testing.T) {
 			`{"type":"assistant","sessionId":"` + id + `","cwd":"/w/` + strings.TrimPrefix(dir, "-w-") + `","timestamp":"2026-07-` + day + `T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/w/x/widget-` + id + `.go","old_string":"a","new_string":"b"}}]}}`,
 		})
 	}
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		write("-w-keep", "k"+string(rune('a'+i)), "01")
 	}
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		write("-w-scratch", "s"+string(rune('a'+i)), "02")
 	}
 	if _, err := captureRun(t, "index"); err != nil {

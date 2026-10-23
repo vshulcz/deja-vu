@@ -44,7 +44,7 @@ func TestTheWorkspaceIsFoundWhenThePayloadOmitsIt(t *testing.T) {
 	// started in a subdirectory is not filed under its parent. Asked twenty
 	// times, because a map is walked in no particular order and "whichever
 	// came first" would pass a single call about half the time.
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		if got := workspaceFromConversation(transcript, "conv-7"); got != "/Users/probe/app/inner" {
 			t.Fatalf("workspace = %q on attempt %d", got, i+1)
 		}
@@ -99,7 +99,7 @@ func TestTheHookRecallsTheProjectWhenThePayloadOmitsIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(cache, "last_conversations.json"), b, 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(cache, "last_conversations.json"), b, 0o644); err != nil {
 		t.Fatal(err)
 	}
 

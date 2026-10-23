@@ -51,7 +51,7 @@ func recordLogFingerprint(f *os.File, size int64) ([sha256.Size]byte, error) {
 	const window = 4096
 	h := sha256.New()
 	var lenb [8]byte
-	binary.LittleEndian.PutUint64(lenb[:], uint64(size))
+	binary.LittleEndian.PutUint64(lenb[:], uint64(size)) //nolint:gosec // file sizes are non-negative
 	h.Write(lenb[:])
 	buf := make([]byte, window)
 	for _, at := range []int64{0, size / 2, size - window} {
@@ -145,8 +145,8 @@ func writeRecordOffsets(dir string, t *recordTables, size int64) error {
 		return err
 	}
 	defer func() { _ = f.Close() }()
-	if fi, err := f.Stat(); err != nil {
-		return err
+	if fi, statErr := f.Stat(); statErr != nil {
+		return statErr
 	} else if fi.Size() < size {
 		size = fi.Size()
 	}
@@ -156,7 +156,7 @@ func writeRecordOffsets(dir string, t *recordTables, size int64) error {
 		if size-covered < max(recordOffsetsRefreshFloor, covered/recordOffsetsRefreshShare) || size == covered {
 			return nil
 		}
-		if old, err := readRecordOffsetsFor(dir, f, nil); err == nil {
+		if old, offsetsErr := readRecordOffsetsFor(dir, f, nil); offsetsErr == nil {
 			byKey, start, records = old.byKey, old.covered, old.records
 		}
 	}
@@ -194,7 +194,7 @@ func encodeRecordOffsets(covered, records int64, fp [sha256.Size]byte, byKey map
 	var tmp [binary.MaxVarintLen64]byte
 	for _, e := range entries {
 		dir = binary.LittleEndian.AppendUint64(dir, e.hash)
-		dir = binary.LittleEndian.AppendUint64(dir, uint64(data.Len()))
+		dir = binary.LittleEndian.AppendUint64(dir, uint64(data.Len())) //nolint:gosec // lengths are non-negative
 		data.Write(tmp[:binary.PutUvarint(tmp[:], uint64(len(e.key)))])
 		data.WriteString(e.key)
 		offs := byKey[e.key]
@@ -208,16 +208,16 @@ func encodeRecordOffsets(covered, records int64, fp [sha256.Size]byte, byKey map
 		data.Write(tmp[:binary.PutUvarint(tmp[:], uint64(len(offs)))])
 		prev := int64(0)
 		for _, o := range offs {
-			data.Write(tmp[:binary.PutUvarint(tmp[:], uint64(o-prev))])
+			data.Write(tmp[:binary.PutUvarint(tmp[:], uint64(o-prev))]) //nolint:gosec // offsets ascend
 			prev = o
 		}
 	}
 	out := make([]byte, 0, recordOffsetsHeaderSize+len(dir)+data.Len())
 	out = append(out, recordOffsetsMagic[:]...)
-	out = binary.LittleEndian.AppendUint64(out, uint64(covered))
-	out = binary.LittleEndian.AppendUint64(out, uint64(records))
+	out = binary.LittleEndian.AppendUint64(out, uint64(covered)) //nolint:gosec // file sizes are non-negative
+	out = binary.LittleEndian.AppendUint64(out, uint64(records)) //nolint:gosec // record counts are non-negative
 	out = append(out, fp[:]...)
-	out = binary.LittleEndian.AppendUint32(out, uint32(len(entries)))
+	out = binary.LittleEndian.AppendUint32(out, uint32(len(entries))) //nolint:gosec // keys are far fewer than 2^32
 	out = append(out, dir...)
 	return append(out, data.Bytes()...)
 }
@@ -233,11 +233,11 @@ func recordOffsetsCover(dir string, f *os.File) (int64, bool) {
 	}
 	defer func() { _ = tf.Close() }()
 	var b [recordOffsetsHeaderSize]byte
-	if _, err := io.ReadFull(tf, b[:]); err != nil || !bytes.Equal(b[:8], recordOffsetsMagic[:]) {
+	if _, err = io.ReadFull(tf, b[:]); err != nil || !bytes.Equal(b[:8], recordOffsetsMagic[:]) {
 		return 0, false
 	}
-	covered := int64(binary.LittleEndian.Uint64(b[8:]))
-	if fi, err := f.Stat(); err != nil || fi.Size() < covered {
+	covered := int64(binary.LittleEndian.Uint64(b[8:])) //nolint:gosec // written from a non-negative size
+	if fi, statErr := f.Stat(); statErr != nil || fi.Size() < covered {
 		return 0, false
 	}
 	got, err := recordLogFingerprint(f, covered)
@@ -258,8 +258,8 @@ func readRecordOffsetsFor(dir string, f *os.File, keys map[string]bool) (recordO
 	if len(b) < recordOffsetsHeaderSize || !bytes.Equal(b[:8], recordOffsetsMagic[:]) {
 		return recordOffsets{}, errNoRecordOffsets
 	}
-	covered := int64(binary.LittleEndian.Uint64(b[8:]))
-	records := int64(binary.LittleEndian.Uint64(b[16:]))
+	covered := int64(binary.LittleEndian.Uint64(b[8:]))  //nolint:gosec // written from a non-negative size
+	records := int64(binary.LittleEndian.Uint64(b[16:])) //nolint:gosec // written from a non-negative count
 	var fp [sha256.Size]byte
 	copy(fp[:], b[24:24+sha256.Size])
 	nkeys := int(binary.LittleEndian.Uint32(b[24+sha256.Size:]))
@@ -277,7 +277,7 @@ func readRecordOffsetsFor(dir string, f *os.File, keys map[string]bool) (recordO
 	out := recordOffsets{covered: covered, records: records, byKey: map[string][]int64{}}
 	entryAt := func(i int) (uint64, int) {
 		p := dirStart + 16*i
-		return binary.LittleEndian.Uint64(b[p:]), int(binary.LittleEndian.Uint64(b[p+8:]))
+		return binary.LittleEndian.Uint64(b[p:]), int(binary.LittleEndian.Uint64(b[p+8:])) //nolint:gosec // written from a non-negative offset
 	}
 	decode := func(at int, want string) bool {
 		p := dataStart + at
@@ -285,12 +285,12 @@ func readRecordOffsetsFor(dir string, f *os.File, keys map[string]bool) (recordO
 			return false
 		}
 		kl, n := binary.Uvarint(b[p:])
-		if n <= 0 || p+n+int(kl) > len(b) {
+		if n <= 0 || kl > uint64(len(b)-p-n) { //nolint:gosec // n bytes were read from b[p:]
 			return false
 		}
 		p += n
-		key := string(b[p : p+int(kl)])
-		p += int(kl)
+		key := string(b[p : p+int(kl)]) //nolint:gosec // kl is checked against len(b) above
+		p += int(kl)                    //nolint:gosec // kl is checked against len(b) above
 		if want != "" && key != want {
 			return true
 		}
@@ -301,20 +301,20 @@ func readRecordOffsetsFor(dir string, f *os.File, keys map[string]bool) (recordO
 		p += n
 		offs := make([]int64, 0, cnt)
 		prev := int64(0)
-		for i := uint64(0); i < cnt; i++ {
+		for range cnt {
 			d, n := binary.Uvarint(b[p:])
 			if n <= 0 {
 				return false
 			}
 			p += n
-			prev += int64(d)
+			prev += int64(d) //nolint:gosec // deltas of ascending offsets
 			offs = append(offs, prev)
 		}
 		out.byKey[key] = offs
 		return true
 	}
 	if keys == nil {
-		for i := 0; i < nkeys; i++ {
+		for i := range nkeys {
 			_, at := entryAt(i)
 			if !decode(at, "") {
 				return recordOffsets{}, errNoRecordOffsets
@@ -357,7 +357,7 @@ var errOffsetsMismatch = errors.New("record offsets do not match the log")
 func eachRecordForKeysByOffsets(f *os.File, dir string, t *recordTables, want, roles map[string]bool, fn func(Record)) (bool, error) {
 	ro, err := readRecordOffsetsFor(dir, f, want)
 	if err != nil {
-		return false, nil
+		return false, nil //nolint:nilerr // no table: the caller walks the log
 	}
 	var offs []int64
 	for k := range want {
@@ -443,7 +443,7 @@ func recordInSpan(b []byte, rel int, t *recordTables, want, roles map[string]boo
 	}
 	rec, derr := decodeRecord(payload, t)
 	if derr != nil {
-		return Record{}, false, true, fmt.Errorf("%w: %v", errCorruptIndex, derr)
+		return Record{}, false, true, fmt.Errorf("%w: %w", errCorruptIndex, derr)
 	}
 	return rec, true, true, nil
 }
@@ -451,7 +451,7 @@ func recordInSpan(b []byte, rel int, t *recordTables, want, roles map[string]boo
 // readRecordAtInRoles reads the record at off, checking it belongs to a wanted
 // key, and decodes it when its role is wanted.
 func readRecordAtInRoles(f *os.File, off int64, t *recordTables, want, roles map[string]bool) (Record, bool, error) {
-	buf := readAheadPool.Get().(*[]byte)
+	buf := readAheadPool.Get().(*[]byte) //nolint:forcetypeassert // the pool holds only *[]byte
 	defer readAheadPool.Put(buf)
 	b := *buf
 	n, err := f.ReadAt(b, off)
@@ -473,14 +473,14 @@ func readRecordAtInRoles(f *os.File, off int64, t *recordTables, want, roles map
 	if roles != nil && !roles[role] {
 		return Record{}, false, nil
 	}
-	payload := head
+	var payload []byte
 	if size <= len(head) {
 		payload = head[:size]
 	} else {
 		payload = make([]byte, size)
-		m, err := f.ReadAt(payload, off+4)
-		if err != nil && !errors.Is(err, io.EOF) {
-			return Record{}, false, err
+		m, readErr := f.ReadAt(payload, off+4)
+		if readErr != nil && !errors.Is(readErr, io.EOF) {
+			return Record{}, false, readErr
 		}
 		if m < size {
 			return Record{}, false, errOffsetsMismatch
@@ -488,7 +488,7 @@ func readRecordAtInRoles(f *os.File, off int64, t *recordTables, want, roles map
 	}
 	rec, err := decodeRecord(payload, t)
 	if err != nil {
-		return Record{}, false, fmt.Errorf("%w: %v", errCorruptIndex, err)
+		return Record{}, false, fmt.Errorf("%w: %w", errCorruptIndex, err)
 	}
 	return rec, true, nil
 }
@@ -501,7 +501,7 @@ func writeFileAtomic(p string, b []byte) error {
 		_ = os.Remove(tmp)
 		return err
 	}
-	if err := renameWaiting(tmp, p, parkRenameWait); err != nil {
+	if err := renameWaiting(tmp, p); err != nil {
 		_ = os.Remove(tmp)
 		return err
 	}

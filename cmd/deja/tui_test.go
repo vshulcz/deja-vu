@@ -23,10 +23,16 @@ func tuiStore(t *testing.T) (string, string) {
 	t.Setenv("DEJA_CLAUDE_ROOT", root)
 	t.Setenv("PATH", "")
 	write := func(project, id, at, asked, answered string) {
-		user, _ := json.Marshal(map[string]any{"type": "user", "sessionId": id, "cwd": "/work/" + project, "timestamp": at,
+		user, err := json.Marshal(map[string]any{"type": "user", "sessionId": id, "cwd": "/work/" + project, "timestamp": at,
 			"message": map[string]any{"role": "user", "content": asked}})
-		reply, _ := json.Marshal(map[string]any{"type": "assistant", "sessionId": id, "cwd": "/work/" + project, "timestamp": at,
+		if err != nil {
+			t.Fatal(err)
+		}
+		reply, err := json.Marshal(map[string]any{"type": "assistant", "sessionId": id, "cwd": "/work/" + project, "timestamp": at,
 			"message": map[string]any{"role": "assistant", "content": []map[string]any{{"type": "text", "text": answered}}}})
+		if err != nil {
+			t.Fatal(err)
+		}
 		writeClaudeFixture(t, filepath.Join(root, project, id+".jsonl"), id, []string{string(user), string(reply)})
 	}
 	write("checkout", "a1111111-pool", "2026-03-01T10:00:00Z", "every pod loses its database connections five minutes in",
@@ -61,7 +67,7 @@ func newTestTUI(t *testing.T, dir string) *tuiApp {
 
 func screen(c *tui.Canvas) string {
 	var b strings.Builder
-	for y := 0; y < c.H; y++ {
+	for y := range c.H {
 		b.WriteString(c.Text(y) + "\n")
 	}
 	return b.String()

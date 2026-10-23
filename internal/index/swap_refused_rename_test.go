@@ -58,14 +58,14 @@ func TestASwapWaitsOutARefusedRename(t *testing.T) {
 	onWindows(t)
 	var refusals atomic.Int32
 	refusals.Store(3)
-	real := renameFile
+	orig := renameFile
 	renameFile = func(from, to string) error {
 		if refusals.Add(-1) >= 0 {
 			return heldOpen(from, to)
 		}
-		return real(from, to)
+		return orig(from, to)
 	}
-	t.Cleanup(func() { renameFile = real })
+	t.Cleanup(func() { renameFile = orig })
 
 	if err := swapIndexDir(dir, tmp); err != nil {
 		t.Fatalf("the swap gave up on a rename that was only being held: %v", err)
@@ -95,7 +95,7 @@ func TestASwapThatCannotRenameKeepsTheOldIndex(t *testing.T) {
 	onWindows(t)
 	var held atomic.Int32
 	held.Store(2)
-	real := renameFile
+	orig := renameFile
 	renameFile = func(from, to string) error {
 		// Every rename costs a little on a loaded runner, which is time the
 		// swap did not choose to spend (#4160).
@@ -111,9 +111,9 @@ func TestASwapThatCannotRenameKeepsTheOldIndex(t *testing.T) {
 				return heldOpen(from, to)
 			}
 		}
-		return real(from, to)
+		return orig(from, to)
 	}
-	t.Cleanup(func() { renameFile = real })
+	t.Cleanup(func() { renameFile = orig })
 
 	away := swapClock(t)
 	if err := swapIndexDir(dir, tmp); err == nil {
@@ -151,14 +151,14 @@ func TestASwapWaitsOutTheSecondRenameWithinTheReadersWindow(t *testing.T) {
 	onWindows(t)
 	var refusals atomic.Int32
 	refusals.Store(3)
-	real := renameFile
+	orig := renameFile
 	renameFile = func(from, to string) error {
 		if filepath.Base(from) == "index.db.tmp" && refusals.Add(-1) >= 0 {
 			return heldOpen(from, to)
 		}
-		return real(from, to)
+		return orig(from, to)
 	}
-	t.Cleanup(func() { renameFile = real })
+	t.Cleanup(func() { renameFile = orig })
 
 	away := swapClock(t)
 	if err := swapIndexDir(dir, tmp); err != nil {
@@ -187,14 +187,14 @@ func TestASwapDoesNotWaitOutARefusalThatWillNotClear(t *testing.T) {
 		t.Fatal(err)
 	}
 	onWindows(t)
-	real := renameFile
+	orig := renameFile
 	renameFile = func(from, to string) error {
 		if filepath.Base(from) == "index.db.tmp" {
 			return &os.LinkError{Op: "rename", Old: from, New: to, Err: syscall.EROFS}
 		}
-		return real(from, to)
+		return orig(from, to)
 	}
-	t.Cleanup(func() { renameFile = real })
+	t.Cleanup(func() { renameFile = orig })
 
 	away := swapClock(t)
 	if err := swapIndexDir(dir, tmp); err == nil {
@@ -224,14 +224,14 @@ func TestASwapDoesNotWaitOutAnUnrecognisedRefusal(t *testing.T) {
 		t.Fatal(err)
 	}
 	onWindows(t)
-	real := renameFile
+	orig := renameFile
 	renameFile = func(from, to string) error {
 		if filepath.Base(from) == "index.db.tmp" {
 			return errors.New("the volume was dismounted")
 		}
-		return real(from, to)
+		return orig(from, to)
 	}
-	t.Cleanup(func() { renameFile = real })
+	t.Cleanup(func() { renameFile = orig })
 
 	away := swapClock(t)
 	if err := swapIndexDir(dir, tmp); err == nil {
@@ -268,14 +268,14 @@ func TestTheParkingStepWaitsPastTheReadersWindow(t *testing.T) {
 	refusals := int32(swapRenameWait/swapRenameStep) + 5
 	var left atomic.Int32
 	left.Store(refusals)
-	real := renameFile
+	orig := renameFile
 	renameFile = func(from, to string) error {
 		if filepath.Base(from) == "index.db" && left.Add(-1) >= 0 {
 			return heldOpen(from, to)
 		}
-		return real(from, to)
+		return orig(from, to)
 	}
-	t.Cleanup(func() { renameFile = real })
+	t.Cleanup(func() { renameFile = orig })
 
 	if err := swapIndexDir(dir, tmp); err != nil {
 		t.Fatalf("the swap gave up on the parking step: %v", err)
@@ -303,14 +303,14 @@ func TestAManifestWriteWaitsOutAReader(t *testing.T) {
 	swapClock(t)
 	var refusals atomic.Int32
 	refusals.Store(3)
-	real := renameFile
+	orig := renameFile
 	renameFile = func(from, to string) error {
 		if refusals.Add(-1) >= 0 {
 			return heldOpen(from, to)
 		}
-		return real(from, to)
+		return orig(from, to)
 	}
-	t.Cleanup(func() { renameFile = real })
+	t.Cleanup(func() { renameFile = orig })
 
 	if err := writeGobAtomic(p, manifestCore{Version: 2}); err != nil {
 		t.Fatalf("the write gave up on a rename a reader was only holding: %v", err)

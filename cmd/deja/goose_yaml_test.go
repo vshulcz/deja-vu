@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -95,14 +96,14 @@ func TestInstallGooseKeepsAHandWrittenBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := captureRun(t, "install", "goose"); err != nil {
+	if _, err = captureRun(t, "install", "goose"); err != nil {
 		t.Fatal(err)
 	}
 	second, err := os.ReadFile(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(first) != string(second) {
+	if !bytes.Equal(first, second) {
 		t.Errorf("a second install rewrote the config:\n%s\n---\n%s", first, second)
 	}
 	if _, err := captureRun(t, "uninstall", "goose"); err != nil {
@@ -125,7 +126,7 @@ func gooseExtensionNames(t *testing.T, path string) map[string]bool {
 	}
 	names := map[string]bool{}
 	inBlock := false
-	for _, line := range strings.Split(string(b), "\n") {
+	for line := range strings.SplitSeq(string(b), "\n") {
 		if strings.HasPrefix(line, "extensions:") {
 			inBlock = true
 			continue
@@ -168,7 +169,7 @@ func TestInstallGooseFixesTheTypeOfAnEntryWithoutCmd(t *testing.T) {
 	if err := os.WriteFile(cfg, []byte(hand), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		if _, err := captureRun(t, "install", "goose"); err != nil {
 			t.Fatal(err)
 		}

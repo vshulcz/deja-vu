@@ -46,7 +46,7 @@ func TestCherryStudioIndexMidStreamKeepsOneReply(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := Ensure(dir, "cherrystudio", false, nil); err != nil {
+	if err = Ensure(dir, "cherrystudio", false, nil); err != nil {
 		t.Fatal(err)
 	}
 

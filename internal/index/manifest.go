@@ -378,6 +378,7 @@ func HarnessKeptCounts(dir string) map[string]int {
 	return out
 }
 
+// Redactions reports what redaction masked in the index at dir.
 func Redactions(dir string) (RedactionStats, error) {
 	if dir == "" {
 		dir = DefaultDir()
@@ -494,7 +495,7 @@ func readManifest(dir string) (Manifest, error) {
 
 // manifestFromCore is the Manifest that manifest.gob's core and sessions make.
 func manifestFromCore(core manifestCore, sessions map[string]SessionMeta) Manifest {
-	return Manifest{Version: core.Version, Format: core.Format, Files: core.Files, BuiltAt: core.BuiltAt, SourcesReadAt: core.SourcesReadAt, Generation: core.Generation, Scope: core.Scope, Redacted: core.Redacted, RedactionRules: core.RedactionRules, ExportWatermarks: core.ExportWatermarks, ExportBoundary: core.ExportBoundary, ImportedRecords: core.ImportedRecords, RecordStrings: core.RecordStrings, RecordsSize: core.RecordsSize, DeadRecords: core.DeadRecords, DeadBytes: core.DeadBytes, BucketFiles: core.BucketFiles, IngestHealth: core.IngestHealth, IngestFiles: core.IngestFiles, ExcludeFingerprint: core.ExcludeFingerprint, ToolFingerprint: core.ToolFingerprint, Compactions: core.Compactions, KeptDated: core.KeptDated, ReadZone: core.ReadZone, Deferred: core.Deferred, PartialOf: core.PartialOf, SearchOnly: core.SearchOnly, Empty: core.Empty, Sessions: sessions}
+	return Manifest{Version: core.Version, Format: core.Format, Files: core.Files, BuiltAt: core.BuiltAt, SourcesReadAt: core.SourcesReadAt, Generation: core.Generation, Scope: core.Scope, Redacted: core.Redacted, RedactionRules: core.RedactionRules, ExportWatermarks: core.ExportWatermarks, ExportBoundary: core.ExportBoundary, ImportedRecords: core.ImportedRecords, RecordStrings: core.RecordStrings, RecordsSize: core.RecordsSize, DeadRecords: core.DeadRecords, DeadBytes: core.DeadBytes, BucketFiles: core.BucketFiles, IngestHealth: core.IngestHealth, IngestFiles: core.IngestFiles, ExcludeFingerprint: core.ExcludeFingerprint, AliasFingerprint: core.AliasFingerprint, ToolFingerprint: core.ToolFingerprint, Compactions: core.Compactions, KeptDated: core.KeptDated, ReadZone: core.ReadZone, Deferred: core.Deferred, PartialOf: core.PartialOf, SearchOnly: core.SearchOnly, Empty: core.Empty, Sessions: sessions}
 }
 
 // writeManifestOnly persists manifest.gob without rewriting sessions.gob —
@@ -502,7 +503,7 @@ func manifestFromCore(core manifestCore, sessions map[string]SessionMeta) Manife
 // caller has not loaded sessions and must not clobber them. It wrote no
 // records, so it keeps the sizes the manifest committed: see stampStore.
 func writeManifestOnly(dir string, m Manifest) error {
-	core := manifestCore{Version: m.Version, Format: m.Format, Files: m.Files, BuiltAt: m.BuiltAt, SourcesReadAt: m.SourcesReadAt, Generation: m.Generation, Scope: m.Scope, Redacted: m.Redacted, RedactionRules: m.RedactionRules, ExportWatermarks: m.ExportWatermarks, ExportBoundary: m.ExportBoundary, ImportedRecords: m.ImportedRecords, RecordStrings: m.RecordStrings, DeadRecords: m.DeadRecords, DeadBytes: m.DeadBytes, IngestHealth: m.IngestHealth, IngestFiles: m.IngestFiles, ExcludeFingerprint: m.ExcludeFingerprint, ToolFingerprint: m.ToolFingerprint, Compactions: m.Compactions, KeptDated: m.KeptDated, ReadZone: m.ReadZone, Deferred: m.Deferred, PartialOf: m.PartialOf, SearchOnly: m.SearchOnly, Empty: m.Empty}
+	core := manifestCore{Version: m.Version, Format: m.Format, Files: m.Files, BuiltAt: m.BuiltAt, SourcesReadAt: m.SourcesReadAt, Generation: m.Generation, Scope: m.Scope, Redacted: m.Redacted, RedactionRules: m.RedactionRules, ExportWatermarks: m.ExportWatermarks, ExportBoundary: m.ExportBoundary, ImportedRecords: m.ImportedRecords, RecordStrings: m.RecordStrings, DeadRecords: m.DeadRecords, DeadBytes: m.DeadBytes, IngestHealth: m.IngestHealth, IngestFiles: m.IngestFiles, ExcludeFingerprint: m.ExcludeFingerprint, AliasFingerprint: m.AliasFingerprint, ToolFingerprint: m.ToolFingerprint, Compactions: m.Compactions, KeptDated: m.KeptDated, ReadZone: m.ReadZone, Deferred: m.Deferred, PartialOf: m.PartialOf, SearchOnly: m.SearchOnly, Empty: m.Empty}
 	stampStore(dir, &core, m, false)
 	err := writeGobAtomic(filepath.Join(dir, "manifest.gob"), core)
 	invalidateManifestCache(dir)
@@ -553,7 +554,7 @@ func writeManifestMeta(dir string, m Manifest) error {
 
 func commitManifest(dir string, m Manifest, wroteRecords, share bool) error {
 	mergeIngestDiag(&m)
-	core := manifestCore{Version: m.Version, Format: m.Format, Files: m.Files, BuiltAt: m.BuiltAt, SourcesReadAt: m.SourcesReadAt, Generation: m.Generation, Scope: m.Scope, Redacted: m.Redacted, RedactionRules: m.RedactionRules, ExportWatermarks: m.ExportWatermarks, ExportBoundary: m.ExportBoundary, ImportedRecords: m.ImportedRecords, RecordStrings: m.RecordStrings, DeadRecords: m.DeadRecords, DeadBytes: m.DeadBytes, IngestHealth: m.IngestHealth, IngestFiles: m.IngestFiles, ExcludeFingerprint: m.ExcludeFingerprint, ToolFingerprint: m.ToolFingerprint, Compactions: m.Compactions, KeptDated: m.KeptDated, ReadZone: m.ReadZone, Deferred: m.Deferred, PartialOf: m.PartialOf, SearchOnly: m.SearchOnly, Empty: m.Empty}
+	core := manifestCore{Version: m.Version, Format: m.Format, Files: m.Files, BuiltAt: m.BuiltAt, SourcesReadAt: m.SourcesReadAt, Generation: m.Generation, Scope: m.Scope, Redacted: m.Redacted, RedactionRules: m.RedactionRules, ExportWatermarks: m.ExportWatermarks, ExportBoundary: m.ExportBoundary, ImportedRecords: m.ImportedRecords, RecordStrings: m.RecordStrings, DeadRecords: m.DeadRecords, DeadBytes: m.DeadBytes, IngestHealth: m.IngestHealth, IngestFiles: m.IngestFiles, ExcludeFingerprint: m.ExcludeFingerprint, AliasFingerprint: m.AliasFingerprint, ToolFingerprint: m.ToolFingerprint, Compactions: m.Compactions, KeptDated: m.KeptDated, ReadZone: m.ReadZone, Deferred: m.Deferred, PartialOf: m.PartialOf, SearchOnly: m.SearchOnly, Empty: m.Empty}
 	stampStore(dir, &core, m, wroteRecords)
 	sfi, err := writeGobAtomicStat(filepath.Join(dir, "sessions.gob"), m.Sessions)
 	if err != nil {
@@ -602,6 +603,23 @@ func ExclusionsChanged(dir string) bool {
 		return false
 	}
 	return m.ExcludeFingerprint != now
+}
+
+// ProjectAliasesChanged reports whether the project alias file differs from
+// the one this index was built under. It names sessions at ingest, so an edit
+// leaves what is indexed under the old names until `deja index --rebuild`.
+// An index from before the field is taken as built with no file: that deja
+// never read one.
+func ProjectAliasesChanged(dir string) bool {
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return false
+	}
+	was := m.AliasFingerprint
+	if was == "" {
+		was = "none"
+	}
+	return was != sources.ProjectAliasFingerprint()
 }
 
 // toolsChanged reports that this machine can now read stores it could not when

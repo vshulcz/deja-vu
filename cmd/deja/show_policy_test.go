@@ -65,7 +65,7 @@ func TestDirectAccessHonoursTrustPolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 	impID := ""
-	for _, f := range strings.Fields(last) {
+	for f := range strings.FieldsSeq(last) {
 		if strings.HasPrefix(f, "imported-") {
 			impID = strings.Trim(f, "]·")
 			break

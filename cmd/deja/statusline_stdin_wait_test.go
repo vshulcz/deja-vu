@@ -42,7 +42,7 @@ func TestStatuslineStillReadsItsPayload(t *testing.T) {
 	}
 	defer func() { _ = r.Close() }()
 	go func() {
-		_, _ = w.Write([]byte(`{"transcript_path":"/tmp/does-not-exist.jsonl","cwd":"/tmp/x"}`))
+		_, _ = w.WriteString(`{"transcript_path":"/tmp/does-not-exist.jsonl","cwd":"/tmp/x"}`)
 		_ = w.Close()
 	}()
 	in := readStatuslineInput(r)

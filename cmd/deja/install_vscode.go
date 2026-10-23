@@ -124,8 +124,8 @@ func installVSCodeMCPAt(path, exe string, uninstall bool) (installResult, error)
 			return installResult{Path: path, Action: "unchanged"}, nil
 		}
 		root = map[string]any{}
-	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, configParseError(path, err)
+	} else if uerr := json.Unmarshal(old, &root); uerr != nil {
+		return installResult{}, configParseError(path, uerr)
 	}
 	servers, _ := root["servers"].(map[string]any)
 	if servers == nil {
@@ -160,8 +160,8 @@ func installVSCodeMCPAt(path, exe string, uninstall bool) (installResult, error)
 	}
 	next = append(next, '\n')
 	noteCreatedDirs(filepath.Dir(path))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return installResult{}, err
+	if merr := os.MkdirAll(filepath.Dir(path), 0o755); merr != nil {
+		return installResult{}, merr
 	}
 	a, err := writeIfChanged(path, old, next)
 	return installResult{Path: path, Action: a, Note: note}, err

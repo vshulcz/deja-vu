@@ -48,6 +48,7 @@ func TestClineAutoRefusesAnUnwritablePluginDirBeforeWriting(t *testing.T) {
 		setup func(t *testing.T) []string
 	}{
 		{"plugins dir", func(t *testing.T) []string {
+			t.Helper()
 			if err := os.MkdirAll(sources.ClinePluginsDir(), 0o755); err != nil {
 				t.Fatal(err)
 			}
@@ -56,6 +57,7 @@ func TestClineAutoRefusesAnUnwritablePluginDirBeforeWriting(t *testing.T) {
 		// An older install already in place, its directory locked since: the
 		// new plugin text has to go in and cannot.
 		{"older plugin", func(t *testing.T) []string {
+			t.Helper()
 			if err := os.MkdirAll(pluginDir(), 0o755); err != nil {
 				t.Fatal(err)
 			}

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -25,7 +26,7 @@ func TestDownloaderRequestAndReadErrors(t *testing.T) {
 	}
 
 	// A closed local listener makes client.Do fail without touching the network.
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	ln, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +40,7 @@ func TestDownloaderRequestAndReadErrors(t *testing.T) {
 func TestDownloaderReadAllErrorAndOverLimitAfterRead(t *testing.T) {
 	// A handler that declares a Content-Length larger than what it actually
 	// sends, then drops the connection, makes io.ReadAll surface an error.
-	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		hj, ok := w.(http.Hijacker)
 		if !ok {
 			t.Fatal("ResponseWriter does not support hijacking")
@@ -60,12 +61,12 @@ func TestDownloaderReadAllErrorAndOverLimitAfterRead(t *testing.T) {
 
 	// A chunked (unknown Content-Length) response bigger than the limit is
 	// only caught by the post-read size check.
-	chunked := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	chunked := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		flusher, ok := w.(http.Flusher)
 		if !ok {
 			t.Fatal("ResponseWriter does not support flushing")
 		}
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			_, _ = w.Write([]byte("x"))
 			flusher.Flush()
 		}
@@ -87,7 +88,7 @@ func TestDownloaderRedirectChainBranches(t *testing.T) {
 	mux.HandleFunc("/mid", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, srv.URL+"/final", http.StatusFound)
 	})
-	mux.HandleFunc("/final", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/final", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, "done")
 	})
 	mux.HandleFunc("/loop", func(w http.ResponseWriter, r *http.Request) {
@@ -113,7 +114,7 @@ func TestDownloaderRedirectChainBranches(t *testing.T) {
 	// A client with a preexisting CheckRedirect delegates to it.
 	var called bool
 	withPrevious := srv.Client()
-	withPrevious.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+	withPrevious.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
 		called = true
 		return nil
 	}
@@ -149,13 +150,13 @@ func TestPerformUpdateReleaseDecodeAndTagBranches(t *testing.T) {
 	base := updateConfig{currentVersion: "1.0.0", goos: "linux", goarch: "amd64", executable: target, latestURL: testLatestReleaseURL}
 
 	badJSON := base
-	badJSON.download = func(url string, limit int64, label string) ([]byte, error) { return []byte("not json"), nil }
+	badJSON.download = func(_ string, _ int64, _ string) ([]byte, error) { return []byte("not json"), nil }
 	if err := performUpdate(badJSON, io.Discard); err == nil || !strings.Contains(err.Error(), "decode latest release") {
 		t.Fatalf("bad json err = %v", err)
 	}
 
 	noTag := base
-	noTag.download = func(url string, limit int64, label string) ([]byte, error) { return []byte(`{"tag_name":""}`), nil }
+	noTag.download = func(_ string, _ int64, _ string) ([]byte, error) { return []byte(`{"tag_name":""}`), nil }
 	if err := performUpdate(noTag, io.Discard); err == nil || !strings.Contains(err.Error(), "did not include a tag") {
 		t.Fatalf("empty tag err = %v", err)
 	}
@@ -164,7 +165,7 @@ func TestPerformUpdateReleaseDecodeAndTagBranches(t *testing.T) {
 	// SemVer comparison and takes the direct string-equality shortcut.
 	weird := base
 	weird.currentVersion = "weird"
-	weird.download = func(url string, limit int64, label string) ([]byte, error) {
+	weird.download = func(_ string, _ int64, _ string) ([]byte, error) {
 		return []byte(`{"tag_name":"vweird"}`), nil
 	}
 	var out bytes.Buffer
@@ -181,7 +182,7 @@ func TestPerformUpdateAssetAndChecksumLookupErrors(t *testing.T) {
 	cfg := updateConfig{force: true, currentVersion: "dev", goos: "linux", goarch: "amd64", executable: target, latestURL: testLatestReleaseURL}
 
 	noAsset := cfg
-	noAsset.download = func(url string, limit int64, label string) ([]byte, error) {
+	noAsset.download = func(_ string, _ int64, _ string) ([]byte, error) {
 		return []byte(`{"tag_name":"v2.0.0","assets":[]}`), nil
 	}
 	if err := performUpdate(noAsset, io.Discard); err == nil || !strings.Contains(err.Error(), "no asset for") {
@@ -190,7 +191,7 @@ func TestPerformUpdateAssetAndChecksumLookupErrors(t *testing.T) {
 
 	archiveName, _, _ := updateAssetNames("2.0.0", "linux", "amd64")
 	noChecksums := cfg
-	noChecksums.download = func(url string, limit int64, label string) ([]byte, error) {
+	noChecksums.download = func(_ string, _ int64, _ string) ([]byte, error) {
 		return []byte(fmt.Sprintf(`{"tag_name":"v2.0.0","assets":[{"name":%q,"browser_download_url":"u"}]}`, archiveName)), nil
 	}
 	if err := performUpdate(noChecksums, io.Discard); err == nil || !strings.Contains(err.Error(), "no checksums.txt") {
@@ -200,9 +201,9 @@ func TestPerformUpdateAssetAndChecksumLookupErrors(t *testing.T) {
 	release := []byte(fmt.Sprintf(`{"tag_name":"v2.0.0","assets":[{"name":%q,"browser_download_url":"archive"},{"name":"checksums.txt","browser_download_url":"checksums"}]}`, archiveName))
 
 	checksumDownloadFails := cfg
-	checksumDownloadFails.download = func(url string, limit int64, label string) ([]byte, error) {
+	checksumDownloadFails.download = func(_ string, _ int64, label string) ([]byte, error) {
 		if label == "checksums.txt" {
-			return nil, fmt.Errorf("checksum fetch boom")
+			return nil, errors.New("checksum fetch boom")
 		}
 		return release, nil
 	}
@@ -211,7 +212,7 @@ func TestPerformUpdateAssetAndChecksumLookupErrors(t *testing.T) {
 	}
 
 	badChecksumFormat := cfg
-	badChecksumFormat.download = func(url string, limit int64, label string) ([]byte, error) {
+	badChecksumFormat.download = func(_ string, _ int64, label string) ([]byte, error) {
 		if label == "checksums.txt" {
 			return []byte("not-a-checksum-line " + archiveName + "\n"), nil
 		}
@@ -222,12 +223,12 @@ func TestPerformUpdateAssetAndChecksumLookupErrors(t *testing.T) {
 	}
 
 	archiveDownloadFails := cfg
-	archiveDownloadFails.download = func(url string, limit int64, label string) ([]byte, error) {
+	archiveDownloadFails.download = func(_ string, _ int64, label string) ([]byte, error) {
 		if label == "checksums.txt" {
 			return []byte(strings.Repeat("a", 64) + "  " + archiveName + "\n"), nil
 		}
 		if label == archiveName {
-			return nil, fmt.Errorf("archive fetch boom")
+			return nil, errors.New("archive fetch boom")
 		}
 		return release, nil
 	}
@@ -253,7 +254,7 @@ func TestPerformUpdateExtractAndInstallErrors(t *testing.T) {
 		goos:           "linux",
 		goarch:         "amd64",
 		latestURL:      testLatestReleaseURL,
-		download: func(url string, limit int64, label string) ([]byte, error) {
+		download: func(_ string, _ int64, label string) ([]byte, error) {
 			switch label {
 			case "checksums.txt":
 				return []byte(sum + "  " + archiveName + "\n"), nil
@@ -280,7 +281,7 @@ func TestPerformUpdateExtractAndInstallErrors(t *testing.T) {
 	dirTarget := t.TempDir()
 	cfg2 := cfg
 	cfg2.executable = dirTarget
-	cfg2.download = func(url string, limit int64, label string) ([]byte, error) {
+	cfg2.download = func(_ string, _ int64, label string) ([]byte, error) {
 		switch label {
 		case "checksums.txt":
 			return []byte(goodSum + "  " + archiveName + "\n"), nil

@@ -103,7 +103,7 @@ var Ears = map[string][]string{
 	},
 }
 
-// The tail hugs the body and only the tip moves. An arcing tail steps one column
+// Tails are the tail poses. The tail hugs the body and only the tip moves. An arcing tail steps one column
 // per row and those diagonals print as loose shards; a vertical shank stays
 // solid and still reads as a wag, because the tip is what changes. It sits two
 // columns clear of the body: one column reads as a printing fault and none fuses
@@ -145,10 +145,13 @@ type Mood struct {
 var (
 	// Ready is the pose the SVG assets are drawn in, so the banner and the
 	// mark on a page are the same animal in the same position.
-	Ready     = Mood{EyeSet: "tall", EarSet: "up", TailSet: "up", CoatColour: Coat}
+	Ready = Mood{EyeSet: "tall", EarSet: "up", TailSet: "up", CoatColour: Coat}
+	// Surprised is the pose for something unexpected.
 	Surprised = Mood{EyeSet: "wide", EarSet: "up", TailSet: "mid", CoatColour: Coat}
-	Asleep    = Mood{EyeSet: "closed", EarSet: "up", TailSet: "curl", CoatColour: Coat}
-	Nothing   = Mood{EyeSet: "low", EarSet: "flat", TailSet: "down", CoatColour: Coat}
+	// Asleep is the pose for a view with no sessions in it yet.
+	Asleep = Mood{EyeSet: "closed", EarSet: "up", TailSet: "curl", CoatColour: Coat}
+	// Nothing is the pose for a search that found nothing.
+	Nothing = Mood{EyeSet: "low", EarSet: "flat", TailSet: "down", CoatColour: Coat}
 )
 
 // Grid lays a mood over the body and returns the finished pixel grid.

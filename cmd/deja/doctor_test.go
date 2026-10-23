@@ -566,7 +566,7 @@ func TestDoctorHooksMatchAbsolutePathCommands(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Real installs write the absolute binary path, not the bare subcommand.
-	var entries []string
+	entries := make([]string, 0, len(claudeHookWiring))
 	for _, h := range claudeHookWiring {
 		entries = append(entries, `"`+h.Event+`":[{"matcher":"`+h.Matcher+
 			`","hooks":[{"type":"command","command":"/Users/x/.local/bin/deja `+h.Sub+`"}]}]`)
@@ -596,7 +596,7 @@ func TestDoctorCodexHookStates(t *testing.T) {
 	}
 	// Every event deja installs, so what this measures is the trust state and
 	// not whether the wiring is complete.
-	var entries []string
+	entries := make([]string, 0, len(codexHookWiring))
 	for _, h := range codexHookWiring {
 		entries = append(entries, `"`+h.Event+`":[{"matcher":"","hooks":[{"type":"command","command":"/x/deja `+
 			h.Sub+`"}]}]`)

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -17,7 +18,7 @@ func seedFiller(t *testing.T, proj string, n int) {
 	t.Helper()
 	for i := range n {
 		sid := fmt.Sprintf("filler-%d", i)
-		line := `{"type":"user","sessionId":"` + sid + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"routine standup chatter number ` + fmt.Sprint(i) + `"}}` + "\n"
+		line := `{"type":"user","sessionId":"` + sid + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"routine standup chatter number ` + strconv.Itoa(i) + `"}}` + "\n"
 		if err := os.WriteFile(filepath.Join(proj, sid+".jsonl"), []byte(line), 0o644); err != nil {
 			t.Fatal(err)
 		}
@@ -37,7 +38,7 @@ func writeSession(t *testing.T, proj, sid, text string) {
 func writeMessages(t *testing.T, proj, sid, body string) {
 	t.Helper()
 	var b strings.Builder
-	for _, line := range strings.Split(strings.TrimSpace(body), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(body), "\n") {
 		b.WriteString(`{"type":"user","sessionId":"` + sid + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"` + line + `"}}` + "\n")
 	}
 	if err := os.WriteFile(filepath.Join(proj, sid+".jsonl"), []byte(b.String()), 0o644); err != nil {

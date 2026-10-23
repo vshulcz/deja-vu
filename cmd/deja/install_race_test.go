@@ -34,7 +34,10 @@ func TestInstallKeepsAClientSaveMadeDuringTheEdit(t *testing.T) {
 		var m map[string]any
 		_ = json.Unmarshal(b, &m)
 		m["numStartups"] = 1
-		nb, _ := json.MarshalIndent(m, "", "  ")
+		nb, jerr := json.MarshalIndent(m, "", "  ")
+		if jerr != nil {
+			t.Fatal(jerr)
+		}
 		tmp := p + ".client-tmp"
 		if err := os.WriteFile(tmp, nb, 0o644); err != nil {
 			t.Fatal(err)

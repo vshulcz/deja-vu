@@ -78,10 +78,10 @@ func installCommandCodeAuto(exe string, uninstall bool) (installResult, error) {
 		// Seconds here, not milliseconds: Command Code's timeout unit is
 		// seconds (default 30, max 600), so the numbers the other
 		// settings.json targets pass would be ten minutes each.
-		r, err := installSettingsHookCmd(commandCodeSettings(), h.Event, h.Matcher, 30,
+		r, ierr := installSettingsHookCmd(commandCodeSettings(), h.Event, h.Matcher, 30,
 			hookRun(hookExe, h.Sub), uninstall)
-		if err != nil {
-			return installResult{}, err
+		if ierr != nil {
+			return installResult{}, ierr
 		}
 		results = append(results, r)
 	}
@@ -104,7 +104,7 @@ func installCommandCodeMod(exe string, uninstall bool) (installResult, error) {
 	path := commandCodeModPath()
 	if uninstall {
 		if _, err := os.Stat(path); err != nil {
-			return installResult{Path: path, Action: "unchanged"}, nil
+			return installResult{Path: path, Action: "unchanged"}, nil //nolint:nilerr // nothing to remove
 		}
 		if err := os.Remove(path); err != nil {
 			return installResult{}, err
@@ -117,8 +117,8 @@ func installCommandCodeMod(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	noteCreatedDirs(filepath.Dir(path))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return installResult{}, err
+	if merr := os.MkdirAll(filepath.Dir(path), 0o755); merr != nil {
+		return installResult{}, merr
 	}
 	a, err := writeIfChanged(path, old, []byte(commandCodeModTS(exe)))
 	return installResult{Path: path, Action: a}, err

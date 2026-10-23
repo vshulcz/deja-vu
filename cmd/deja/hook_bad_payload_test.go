@@ -72,12 +72,12 @@ func TestAPayloadDejaCannotReadLosesTheProjectItNamed(t *testing.T) {
 		t.Setenv("CLAUDE_PROJECT_DIR", "")
 		before := len(usage.Snapshots(dir, 0))
 		withHookStdin(t, tc.payload)
-		out := captureStdout(t, func() { runHookContextPlain(t) })
-		if strings.Contains(out, "transaction mode") {
-			t.Errorf("%s: a payload deja could not read was answered with a project's memory anyway:\n%q", tc.name, out)
+		said := captureStdout(t, func() { runHookContextPlain(t) })
+		if strings.Contains(said, "transaction mode") {
+			t.Errorf("%s: a payload deja could not read was answered with a project's memory anyway:\n%q", tc.name, said)
 		}
-		if strings.TrimSpace(out) != "" {
-			t.Errorf("%s: the hook said something on a payload it could not read:\n%q", tc.name, out)
+		if strings.TrimSpace(said) != "" {
+			t.Errorf("%s: the hook said something on a payload it could not read:\n%q", tc.name, said)
 		}
 		// And nothing is recorded, so the log does not carry an injection that
 		// never happened — which is the other half of what #2161 asks: an

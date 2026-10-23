@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -79,6 +80,7 @@ func IsGeminiChatPath(p string) bool {
 	return strings.Contains(slash, "/.gemini/tmp/")
 }
 
+// GeminiChatFiles lists every Gemini CLI chat file.
 func GeminiChatFiles() []string {
 	root := filepath.Join(GeminiRoot(), "tmp")
 	var out []string
@@ -104,6 +106,7 @@ func GeminiChatFiles() []string {
 	return out
 }
 
+// LoadGemini reads every Gemini CLI session on this machine.
 func LoadGemini() []model.Session {
 	ss := parseFiles(GeminiChatFiles(), ParseGeminiFile)
 	return dedupeGeminiSessions(ss)
@@ -138,7 +141,7 @@ func dedupeGeminiSessions(ss []model.Session) []model.Session {
 		var jsons []int
 		for _, i := range idx {
 			if strings.HasSuffix(ss[i].Path, ".jsonl") {
-				if bestJ < 0 || larger(ss[i], ss[bestJ]) {
+				if bestJ < 0 || larger(ss[i], ss[bestJ]) { //nolint:gosec // bestJ indexes ss once set
 					bestJ = i
 				}
 				continue
@@ -149,7 +152,7 @@ func dedupeGeminiSessions(ss []model.Session) []model.Session {
 				continue
 			}
 			jsons = append(jsons, i)
-			if bestN < 0 || larger(ss[i], ss[bestN]) {
+			if bestN < 0 || larger(ss[i], ss[bestN]) { //nolint:gosec // bestN indexes ss once set
 				bestN = i
 			}
 		}
@@ -159,7 +162,7 @@ func dedupeGeminiSessions(ss []model.Session) []model.Session {
 		for _, i := range jsons {
 			drop[i] = true
 		}
-		if bestN >= 0 && len(ss[bestN].Messages) > len(ss[bestJ].Messages) {
+		if bestN >= 0 && len(ss[bestN].Messages) > len(ss[bestJ].Messages) { //nolint:gosec // both index ss: bestJ >= 0 past the check above
 			drop[bestN] = false
 			drop[bestJ] = true
 		}
@@ -182,6 +185,7 @@ func larger(a, b model.Session) bool {
 	return a.Path < b.Path
 }
 
+// ParseGeminiFile reads one Gemini CLI chat, .json or .jsonl.
 func ParseGeminiFile(path string) ([]model.Session, error) {
 	if strings.HasSuffix(path, ".jsonl") {
 		return parseGeminiJSONL(path)
@@ -214,7 +218,7 @@ func parseGeminiJSON(path string) ([]model.Session, error) {
 		Messages    []geminiMessage `json:"messages"`
 	}
 	if err := json.Unmarshal(b, &doc); err != nil {
-		return nil, nil // not a session file (e.g. checkpoint) — skip quietly
+		return nil, nil //nolint:nilerr // not a session file (e.g. checkpoint) — skip quietly
 	}
 	if doc.SessionID == "" {
 		return nil, nil
@@ -302,8 +306,8 @@ func parseGeminiJSONLWith(path string, scan func(func(map[string]any)) error) ([
 			return
 		}
 		if rid, ok := m["$rewindTo"].(string); ok {
-			for i := len(msgs) - 1; i >= 0; i-- {
-				if msgs[i].ID == rid {
+			for i, msg := range slices.Backward(msgs) {
+				if msg.ID == rid {
 					msgs = msgs[:i]
 					reindex()
 					break
@@ -311,7 +315,7 @@ func parseGeminiJSONLWith(path string, scan func(func(map[string]any)) error) ([
 			}
 			return
 		}
-		raw, _ := json.Marshal(m)
+		raw, _ := json.Marshal(m) //nolint:errchkjson // m was decoded from JSON, so it encodes
 		var gm geminiMessage
 		if json.Unmarshal(raw, &gm) == nil && gm.Type != "" {
 			if gm.ID != "" && gm.Type == "gemini" && geminiHasCalls(gm.ToolCalls) {
@@ -426,7 +430,7 @@ func appendGeminiMessages(s *model.Session, msgs []geminiMessage) {
 		return dir
 	}
 	for _, m := range msgs {
-		role := ""
+		var role string
 		switch m.Type {
 		case "user":
 			role = "user"
@@ -549,13 +553,13 @@ func geminiFooterRank(l string) int {
 // output that happens to look like a footer line is not taken into it.
 func geminiFooterExit(lines []string) int {
 	below := len(geminiFooterOrder)
-	for i := len(lines) - 1; i >= 0; i-- {
-		r := geminiFooterRank(lines[i])
+	for _, line := range slices.Backward(lines) {
+		r := geminiFooterRank(line)
 		if r < 0 || r >= below {
 			return 0
 		}
 		if r == 0 {
-			m := geminiExit.FindStringSubmatch(lines[i])
+			m := geminiExit.FindStringSubmatch(line)
 			code, err := strconv.Atoi(m[1])
 			if err != nil {
 				return 0

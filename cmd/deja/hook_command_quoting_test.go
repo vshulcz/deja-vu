@@ -33,11 +33,11 @@ func TestEveryHookLineRunsFromAHomeWithASpace(t *testing.T) {
 	lines := 0
 	_ = filepath.Walk(home, func(p string, fi os.FileInfo, err error) error {
 		if err != nil || !fi.Mode().IsRegular() {
-			return nil
+			return nil //nolint:nilerr // unreadable entries are skipped
 		}
-		b, rerr := os.ReadFile(p)
+		b, rerr := os.ReadFile(p) //nolint:gosec // the test walks its own temp tree
 		if rerr != nil {
-			return nil
+			return nil //nolint:nilerr // unreadable entries are skipped
 		}
 		for _, cmd := range hookCommandLinesIn(string(b)) {
 			lines++
@@ -115,7 +115,7 @@ func quotedSpans(text string, quote byte) []string {
 // subcommands, which is what makes it a line deja wrote rather than a path
 // mentioned in prose.
 func hasDejaSubcommand(cmd string) bool {
-	for _, field := range strings.Fields(cmd) {
+	for field := range strings.FieldsSeq(cmd) {
 		if dejaSubcommandInConfigs[strings.Trim(field, `"'`)] {
 			return strings.Contains(cmd, "deja")
 		}

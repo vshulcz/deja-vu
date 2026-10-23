@@ -176,8 +176,9 @@ func TestCopilotForkNamesItsSource(t *testing.T) {
 	}
 
 	// Without startTime the record's own time is the fork's start.
-	var bare []string
-	for _, l := range copilotSubagentLines(copilotForkID, "2026-10-18T05:34:00.000Z") {
+	forkLines := copilotSubagentLines(copilotForkID, "2026-10-18T05:34:00.000Z")
+	bare := make([]string, 0, len(forkLines))
+	for _, l := range forkLines {
 		bare = append(bare, strings.Replace(l, `"startTime":"2026-10-18T05:34:00.000Z",`, "", 1))
 	}
 	bs, _ := ParseCopilotFile(writeCopilotFixture(t, root, "bare", bare))
@@ -201,7 +202,7 @@ func TestCopilotSubagentKeepsItsTaskTailAndEdits(t *testing.T) {
 	t.Setenv("DEJA_COPILOT_ROOT", root)
 	lines := copilotSubagentLines(copilotParentID, "2026-10-18T05:31:46.707Z")
 	run := lines[:8]
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		run = append(run, `{"type":"assistant.message","agentId":"`+copilotChildID+`","data":{"content":"reading more of the repo, step `+string(rune('a'+i))+`"},"timestamp":"2026-10-18T05:31:50.00`+string(rune('0'+i))+`Z"}`)
 	}
 	p := writeCopilotFixture(t, root, copilotParentID, append(run, lines[8:]...))

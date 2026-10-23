@@ -6,8 +6,10 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync/atomic"
@@ -88,7 +90,7 @@ func stampText(h uint64, text string) uint64 {
 	for _, c := range n {
 		h = (h ^ uint64(c)) * fnvPrime64
 	}
-	for i := 0; i < len(text); i++ {
+	for i := range len(text) {
 		h = (h ^ uint64(text[i])) * fnvPrime64
 	}
 	return h
@@ -98,8 +100,8 @@ func stampText(h uint64, text string) uint64 {
 // walls not already there. It is frictionTexts' loop with the wanted set
 // fixed to every wall.
 func firstFrictionLines(text string, walls map[uint64]bool, lines map[uint64]string) {
-	for line := range strings.SplitSeq(text, "\n") {
-		line, ok := FrictionLine(line)
+	for raw := range strings.SplitSeq(text, "\n") {
+		line, ok := FrictionLine(raw)
 		if !ok || line == "" {
 			continue
 		}
@@ -125,8 +127,8 @@ func writeFrictionTexts(dir string, m Manifest, size int64) error {
 		return err
 	}
 	defer func() { _ = f.Close() }()
-	if fi, err := f.Stat(); err != nil {
-		return err
+	if fi, statErr := f.Stat(); statErr != nil {
+		return statErr
 	} else if fi.Size() < size {
 		size = fi.Size()
 	}
@@ -140,7 +142,7 @@ func writeFrictionTexts(dir string, m Manifest, size int64) error {
 	}
 	sameLog := false
 	if haveOld && old.size <= size {
-		if ofp, err := recordLogFingerprint(f, old.size); err == nil && ofp == old.fp {
+		if ofp, fpErr := recordLogFingerprint(f, old.size); fpErr == nil && ofp == old.fp {
 			sameLog = true
 		}
 	}
@@ -170,7 +172,7 @@ func writeFrictionTexts(dir string, m Manifest, size int64) error {
 	changed := map[string]bool{}
 	if sameLog && old.size < size {
 		tail := map[string][]int64{}
-		if _, err := scanRecordOffsets(f, t, old.size, size, tail); err != nil {
+		if _, err = scanRecordOffsets(f, t, old.size, size, tail); err != nil {
 			_ = os.Remove(path)
 			return err
 		}
@@ -237,9 +239,7 @@ func writeFrictionTexts(dir string, m Manifest, size int64) error {
 		_ = os.Remove(path)
 		return err
 	}
-	for k, e := range got {
-		out.entries[k] = e
-	}
+	maps.Copy(out.entries, got)
 	got, err = read(extend, nil, old.size, func(k string) (uint64, map[uint64]string) {
 		e := old.entries[k]
 		return e.stamp, keepWalls(e.lines, walls)
@@ -248,9 +248,7 @@ func writeFrictionTexts(dir string, m Manifest, size int64) error {
 		_ = os.Remove(path)
 		return err
 	}
-	for k, e := range got {
-		out.entries[k] = e
-	}
+	maps.Copy(out.entries, got)
 	return writeFileAtomic(path, encodeFrictionTexts(out))
 }
 
@@ -373,13 +371,13 @@ func encodeFrictionTexts(ft frictionTextFile) []byte {
 	u64 := func(v uint64) { binary.LittleEndian.PutUint64(tmp[:8], v); b.Write(tmp[:8]) }
 	str := func(s string) { uv(uint64(len(s))); b.WriteString(s) }
 	b.Write(frictionTextsMagic[:])
-	u64(uint64(ft.size))
+	u64(uint64(ft.size)) //nolint:gosec // file sizes are non-negative
 	b.Write(ft.fp[:])
 	walls := make([]uint64, 0, len(ft.walls))
 	for h := range ft.walls {
 		walls = append(walls, h)
 	}
-	sort.Slice(walls, func(i, j int) bool { return walls[i] < walls[j] })
+	slices.Sort(walls)
 	uv(uint64(len(walls)))
 	for _, h := range walls {
 		u64(h)
@@ -398,7 +396,7 @@ func encodeFrictionTexts(ft frictionTextFile) []byte {
 		for h := range e.lines {
 			hs = append(hs, h)
 		}
-		sort.Slice(hs, func(i, j int) bool { return hs[i] < hs[j] })
+		slices.Sort(hs)
 		uv(uint64(len(hs)))
 		for _, h := range hs {
 			u64(h)
@@ -443,12 +441,12 @@ func decodeFrictionTexts(b []byte) (frictionTextFile, bool) {
 	}
 	str := func() string {
 		n := uv()
-		if bad || n > uint64(len(b)-p) {
+		if bad || n > uint64(len(b)-p) { //nolint:gosec // p <= len(b)
 			bad = true
 			return ""
 		}
-		s := string(b[p : p+int(n)])
-		p += int(n)
+		s := string(b[p : p+int(n)]) //nolint:gosec // n is checked against len(b) above
+		p += int(n)                  //nolint:gosec // n is checked against len(b) above
 		return s
 	}
 	var ft frictionTextFile
@@ -456,7 +454,7 @@ func decodeFrictionTexts(b []byte) (frictionTextFile, bool) {
 		return frictionTextFile{}, false
 	}
 	p = 8
-	ft.size = int64(u64())
+	ft.size = int64(u64()) //nolint:gosec // written from a non-negative size
 	copy(ft.fp[:], b[p:p+sha256.Size])
 	p += sha256.Size
 	nw := uv()
@@ -581,7 +579,7 @@ func logPrefixIs(path string, size int64, fp [sha256.Size]byte) bool {
 		return false
 	}
 	defer func() { _ = f.Close() }()
-	if fi, err := f.Stat(); err != nil || fi.Size() < size {
+	if fi, statErr := f.Stat(); statErr != nil || fi.Size() < size {
 		return false
 	}
 	got, err := recordLogFingerprint(f, size)

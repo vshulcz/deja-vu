@@ -135,8 +135,8 @@ func TestUninstallOmpAutoRemovesTheModule(t *testing.T) {
 	if r.Action != "removed" {
 		t.Errorf("action = %q, want removed", r.Action)
 	}
-	if _, err := os.Stat(filepath.Dir(r.Path)); !os.IsNotExist(err) {
-		t.Errorf("the extension directory survived uninstall: %v", err)
+	if _, serr := os.Stat(filepath.Dir(r.Path)); !os.IsNotExist(serr) {
+		t.Errorf("the extension directory survived uninstall: %v", serr)
 	}
 
 	// Uninstalling again on a machine that has none must not fail or create one.

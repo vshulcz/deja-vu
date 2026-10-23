@@ -21,20 +21,20 @@ import (
 func TestTheOneSessionSayingTheWholeQuestionReachesThePageOnACommonWordStore(t *testing.T) {
 	tmp := hermeticIndexEnv(t)
 	dir := filepath.Join(tmp, "idx")
-	var sessions []model.Session
-	for i := 0; i < 120; i++ {
+	sessions := make([]model.Session, 0, 421)
+	for i := range 120 {
 		s := model.Session{ID: fmt.Sprintf("decoy%03d", i), Harness: "claude", Project: "p", Updated: time.Now()}
-		for j := 0; j < 30; j++ {
+		for j := range 30 {
 			s.Messages = append(s.Messages, model.Message{Role: "user", Text: fmt.Sprintf("снова лимит запроса и шлюз, заметка %d", j)})
 		}
 		sessions = append(sessions, s)
 	}
-	for i := 0; i < 300; i++ {
+	for i := range 300 {
 		sessions = append(sessions, model.Session{ID: fmt.Sprintf("other%03d", i), Harness: "claude", Project: "p", Updated: time.Now(),
 			Messages: []model.Message{{Role: "user", Text: "заметки о планировании недели"}}})
 	}
 	target := model.Session{ID: "answer", Harness: "claude", Project: "p", Updated: time.Now().Add(-time.Hour)}
-	for j := 0; j < 40; j++ {
+	for j := range 40 {
 		target.Messages = append(target.Messages, model.Message{Role: "user", Text: fmt.Sprintf("пункт планирования %d", j)})
 	}
 	target.Messages = append(target.Messages, model.Message{Role: "user", Text: "лимиты запросов к нашему шлюзу подняли до 500"})
@@ -49,7 +49,7 @@ func TestTheOneSessionSayingTheWholeQuestionReachesThePageOnACommonWordStore(t *
 	if err != nil {
 		t.Fatal(err)
 	}
-	var ids []string
+	ids := make([]string, 0, len(result.Sessions))
 	for _, s := range result.Sessions {
 		ids = append(ids, s.ID)
 	}

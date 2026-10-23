@@ -30,7 +30,7 @@ func TestSourcesNamesAnExcludedStoreWithoutReadingIt(t *testing.T) {
 
 	row := func(name string) string {
 		out := captureStdout(t, func() { printSources(filepath.Join(tmp, "index.db")) })
-		for _, l := range strings.Split(out, "\n") {
+		for l := range strings.SplitSeq(out, "\n") {
 			if strings.HasPrefix(l, name+"\t") {
 				return l
 			}

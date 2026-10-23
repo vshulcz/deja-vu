@@ -66,7 +66,7 @@ func parsePiFileFromOffset(path string, offset int64) ([]model.Session, error) {
 // parsePiShaped parses a pi-format transcript (shared by pi and OpenClaw,
 // whose agent runtime is the same lineage). useHeaderCwd promotes the session
 // header's cwd to the project key when present.
-func parsePiShaped(path string, offset int64, harness, project string, useHeaderCwd bool) ([]model.Session, error) {
+func parsePiShaped(path string, offset int64, harness, project string, useHeaderCwd bool) ([]model.Session, error) { //nolint:unparam // every pi-shaped harness takes the header cwd today; parsePiShapedScan keeps the switch
 	return parsePiShapedScan(path, harness, project, useHeaderCwd, func(fn func(map[string]any)) error {
 		return scanJSONLWithHeaderFromOffsetFunc(path, offset, headerLookahead, isPiHeader, fn)
 	})

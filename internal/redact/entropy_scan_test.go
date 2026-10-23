@@ -15,8 +15,12 @@ import (
 var referenceRE = regexp.MustCompile(`[A-Za-z0-9+/_-]{20,}={0,2}`)
 
 func reference(s string) [][2]int {
-	var out [][2]int
-	for _, m := range referenceRE.FindAllStringIndex(s, -1) {
+	ms := referenceRE.FindAllStringIndex(s, -1)
+	if ms == nil {
+		return nil
+	}
+	out := make([][2]int, 0, len(ms))
+	for _, m := range ms {
 		out = append(out, [2]int{m[0], m[1]})
 	}
 	return out
@@ -49,9 +53,9 @@ func TestEntropySpansMatchesThePatternItReplaced(t *testing.T) {
 func TestEntropySpansMatchesOnRandomInput(t *testing.T) {
 	// A fixed seed: a matcher test that fails only sometimes is worse than no
 	// test, because nobody can reproduce the failure.
-	rng := rand.New(rand.NewSource(20260729))
+	rng := rand.New(rand.NewSource(20260729)) //nolint:gosec // seeded so a failure reproduces
 	alphabet := []byte("abcXYZ019+/_-= \n\t.:\"'{}")
-	for i := 0; i < 4000; i++ {
+	for range 4000 {
 		n := rng.Intn(120)
 		b := make([]byte, n)
 		for j := range b {
@@ -69,7 +73,7 @@ func BenchmarkEntropySpans(b *testing.B) {
 	s := hashy
 	b.SetBytes(int64(len(s)))
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = entropySpans(s)
 	}
 }
@@ -78,7 +82,7 @@ func BenchmarkEntropySpansRegexp(b *testing.B) {
 	s := hashy
 	b.SetBytes(int64(len(s)))
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = referenceRE.FindAllStringIndex(s, -1)
 	}
 }

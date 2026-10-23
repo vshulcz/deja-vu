@@ -13,6 +13,7 @@ import (
 // records, same uuids and times, plus two turns of its own, into a sandbox
 // Claude store. marked adds the forkedFrom a /branch writes.
 func claudeForkStore(t *testing.T, marked bool) string {
+	t.Helper()
 	return claudeForkStoreWent(t, marked, false)
 }
 
@@ -103,7 +104,7 @@ func TestSearchAndLastDoNotRepeatAForksCopiedTurns(t *testing.T) {
 			}
 		})
 		var forkRow string
-		for _, ln := range strings.Split(out, "\n") {
+		for ln := range strings.SplitSeq(out, "\n") {
 			if strings.Contains(ln, "ffffffff") {
 				forkRow = ln
 			}

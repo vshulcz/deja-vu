@@ -41,8 +41,8 @@ func installCherryStudio(exe string, uninstall bool) (installResult, error) {
 	if uninstall {
 		res := installResult{Path: path, Action: "unchanged"}
 		if len(old) > 0 {
-			if err := os.Remove(path); err != nil {
-				return installResult{}, err
+			if rerr := os.Remove(path); rerr != nil {
+				return installResult{}, rerr
 			}
 			res.Action = "removed"
 		}
@@ -51,9 +51,9 @@ func installCherryStudio(exe string, uninstall bool) (installResult, error) {
 		if sharedSkillStillWanted("cherrystudio") {
 			return res, nil
 		}
-		skill, err := installSkillFile(sharedSkillPath(), true)
-		if err != nil {
-			return installResult{}, err
+		skill, ierr := installSkillFile(sharedSkillPath(), true)
+		if ierr != nil {
+			return installResult{}, ierr
 		}
 		return cherryStudioResult(res, skill), nil
 	}
@@ -65,8 +65,8 @@ func installCherryStudio(exe string, uninstall bool) (installResult, error) {
 	}
 	body = append(body, '\n')
 	noteCreatedDirs(filepath.Dir(path))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return installResult{}, err
+	if merr := os.MkdirAll(filepath.Dir(path), 0o755); merr != nil {
+		return installResult{}, merr
 	}
 	action, err := writeIfChanged(path, old, body)
 	if err != nil {
@@ -112,8 +112,8 @@ func installCherryStudioAuto(exe string, uninstall bool) (installResult, error) 
 	path := filepath.Join(sources.CherryStudioClaudeConfigDir(), "settings.json")
 	if !uninstall {
 		noteCreatedDirs(filepath.Dir(path))
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			return installResult{}, err
+		if merr := os.MkdirAll(filepath.Dir(path), 0o755); merr != nil {
+			return installResult{}, merr
 		}
 	}
 	hooks, err := installClaudeHooksAt(path, exe, events, uninstall)

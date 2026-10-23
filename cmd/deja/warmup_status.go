@@ -3,11 +3,12 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/vshulcz/deja-vu/internal/policy"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/policy"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 
@@ -66,7 +67,7 @@ func (f *fileProgress) Advance(units int) {
 	f.flush(false)
 }
 
-func (f *fileProgress) Harness(name string, sessions, messages int) {
+func (f *fileProgress) Harness(_ string, _, messages int) {
 	if messages == 0 {
 		return
 	}
@@ -143,10 +144,7 @@ func (s *warmupStatus) progress() string {
 	if s.Total <= 0 {
 		return s.phaseName()
 	}
-	p := 100 * s.Done / s.Total
-	if p > 100 {
-		p = 100
-	}
+	p := min(100*s.Done/s.Total, 100)
 	return fmt.Sprintf("%s %d%%", s.phaseName(), p)
 }
 
@@ -156,10 +154,7 @@ func (s *warmupStatus) progress() string {
 func (s *warmupStatus) line() string {
 	pct := ""
 	if s.Total > 0 {
-		p := 100 * s.Done / s.Total
-		if p > 100 {
-			p = 100
-		}
+		p := min(100*s.Done/s.Total, 100)
 		pct = fmt.Sprintf(" %d%%", p)
 	}
 	// Not "in a few seconds": a full rebuild of a 177 MB index measured 59

@@ -1,11 +1,13 @@
 package index
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -17,7 +19,7 @@ func replaceStore(t *testing.T, n int) (string, string) {
 	t.Helper()
 	tmp := parityEnv(t, map[string]string{"DEJA_CLAUDE_ROOT": "claude"})
 	proj := filepath.Join(tmp, "claude", "-tmp-proj")
-	for i := 0; i < n; i++ {
+	for i := range n {
 		id := fmt.Sprintf("s%03d", i)
 		parityWrite(t, filepath.Join(proj, id+".jsonl"), replaceBody(id, ""), false)
 	}
@@ -28,7 +30,7 @@ func replaceStore(t *testing.T, n int) (string, string) {
 
 func replaceBody(id, first string) string {
 	var b strings.Builder
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		role, text := "user", fmt.Sprintf(`"%swhy does the %s retry loop spin on ledger%d, take %d"`, first, id, i, i)
 		if i%2 == 1 {
 			role, text = "assistant", fmt.Sprintf(`"the backoff in %s never resets after pgbouncer%d drops, %s"`, id, i, strings.Repeat("cursor wal fsync ", 20))
@@ -207,7 +209,7 @@ func TestFailedAppendLeavesThePreviousIndex(t *testing.T) {
 	proj, inc := replaceStore(t, 12)
 	was := indexFiles(t, inc)["records.bin"].Size()
 	rewriteSession(t, proj, "s003")
-	beforeAppendSwap = func() error { return fmt.Errorf("killed") }
+	beforeAppendSwap = func() error { return errors.New("killed") }
 	err := Ensure(inc, "", false, io.Discard)
 	beforeAppendSwap = nil
 	if err == nil {
@@ -216,7 +218,7 @@ func TestFailedAppendLeavesThePreviousIndex(t *testing.T) {
 	if got := indexFiles(t, inc)["records.bin"].Size(); got != was {
 		t.Fatalf("records.bin is %d bytes after the failed pass, was %d", got, was)
 	}
-	if _, err := os.Stat(filepath.Join(inc, appendPendingFile)); err == nil {
+	if _, statErr := os.Stat(filepath.Join(inc, appendPendingFile)); statErr == nil {
 		t.Error("the pending mark outlived the pass")
 	}
 	if Damaged(inc) {
@@ -250,7 +252,7 @@ func TestKilledAppendIsCutBackUnderTheLock(t *testing.T) {
 		_, _ = f.Write([]byte{9, 0, 0, 0, 1, 2, 3})
 		_ = f.Close()
 	}
-	if err := os.WriteFile(filepath.Join(inc, appendPendingFile), []byte(fmt.Sprint(was)), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(inc, appendPendingFile), []byte(strconv.FormatInt(was, 10)), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	appendGarbage()
@@ -317,7 +319,7 @@ func TestALeftoverStagingLinkNeverTruncatesTheLiveLog(t *testing.T) {
 // generation, not scored from one bucket of each (#5459).
 func TestARankingAcrossAPassAnswersAsOneAfterIt(t *testing.T) {
 	proj, inc := replaceStore(t, 40)
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		rewriteSession(t, proj, "s007")
 		parityPass(t, inc, false)
 	}

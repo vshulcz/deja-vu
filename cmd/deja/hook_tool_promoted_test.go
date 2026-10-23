@@ -27,7 +27,7 @@ func TestTheEditLineCarriesThePromotedDecision(t *testing.T) {
 	}
 	now := time.Now().UTC()
 	write := func(sid string, minutes int, msgs [][2]any) {
-		var lines []string
+		lines := make([]string, 0, len(msgs))
 		for i, m := range msgs {
 			rec := map[string]any{"type": m[0], "sessionId": sid,
 				"timestamp": now.Add(-time.Duration(minutes-i) * time.Minute).Format(time.RFC3339),
@@ -51,7 +51,7 @@ func TestTheEditLineCarriesThePromotedDecision(t *testing.T) {
 		{"assistant", edit("return 3")},
 		{"assistant", "no: the pool change is what fixed the timeouts, the retry budget stays at 5"},
 	})
-	for k := 0; k < 6; k++ {
+	for k := range 6 {
 		write(fmt.Sprintf("f%d", k), 150-10*k, [][2]any{
 			{"user", fmt.Sprintf("work on retry.go and the payments client (%d), the timeouts are back", k)},
 			{"assistant", edit(fmt.Sprintf("x%d", k))},
@@ -89,7 +89,7 @@ func TestAWithheldPromotedDecisionStaysOut(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Now().UTC()
-	for k := 0; k < 6; k++ {
+	for k := range 6 {
 		var lines []string
 		for i, m := range [][2]any{
 			{"user", fmt.Sprintf("work on retry.go (%d)", k)},

@@ -28,7 +28,8 @@ func TestBriefRecentBlockShowsOneProjectSpelling(t *testing.T) {
 	if len(lines) < 3 {
 		t.Fatalf("want three recent lines, got %d:\n%s", len(lines), buf.String())
 	}
-	var spellings, dates []string
+	spellings := make([]string, 0, len(lines))
+	dates := make([]string, 0, len(lines))
 	for _, l := range lines {
 		project, date := briefLineFields(t, visibleText(l))
 		spellings = append(spellings, project)
@@ -63,14 +64,14 @@ func TestBriefRecentBlockShowsOneProjectSpelling(t *testing.T) {
 // field the title follows.
 func briefLineFields(t *testing.T, text string) (project, date string) {
 	t.Helper()
-	i := strings.Index(text, "] ")
-	if i < 0 {
+	_, after, ok := strings.Cut(text, "] ")
+	if !ok {
 		t.Fatalf("no harness on a recent line: %q", text)
 	}
 	// Harness, project and date are separated by " · ", and the title follows
 	// the date. Two fields before the title mean a project is there. The title
 	// may hold a separator of its own, so only the first two are split off.
-	parts := strings.SplitN(text[i+2:], " · ", 3)
+	parts := strings.SplitN(after, " · ", 3)
 	switch len(parts) {
 	case 0, 1:
 		t.Fatalf("no date on a recent line: %q", text)

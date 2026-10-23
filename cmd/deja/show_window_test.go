@@ -33,8 +33,8 @@ func TestShowSaysWhichSliceItPrinted(t *testing.T) {
 	dir := filepath.Join(tmp, "index.db")
 	t.Setenv("DEJA_INDEX_DIR", dir)
 
-	var lines []string
-	for i := 0; i < 20; i++ {
+	lines := make([]string, 0, 20)
+	for i := range 20 {
 		at := time.Now().Add(-time.Duration(60-i) * time.Minute).UTC().Format(time.RFC3339)
 		lines = append(lines, fmt.Sprintf(`{"type":"user","sessionId":"paged","timestamp":%q,"cwd":"/work/project",`+
 			`"message":{"role":"user","content":"marker%02d"}}`, at, i))

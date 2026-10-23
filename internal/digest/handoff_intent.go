@@ -56,7 +56,7 @@ func HandoffIntent(text string) (HandoffAsk, bool) {
 		return HandoffAsk{}, false
 	}
 	var ask HandoffAsk
-	for _, tok := range strings.Fields(text) {
+	for tok := range strings.FieldsSeq(text) {
 		if id := sessionIDToken(tok); id != "" {
 			ask.IDs = append(ask.IDs, id)
 		}
@@ -136,7 +136,7 @@ func handoffHarnessPlaced(words []string, nounAt []int, i int) bool {
 }
 
 // wordIndexes is where in the word list each stem or phrase starts.
-func wordIndexes(words []string, low string, stems []string) []int {
+func wordIndexes(words []string, _ string, stems []string) []int {
 	var at []int
 	for i, w := range words {
 		for _, s := range stems {

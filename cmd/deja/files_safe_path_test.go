@@ -23,7 +23,7 @@ func TestFilesRowStripsWhatTheTerminalActsOn(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	var paths []string
+	paths := make([]string, 0, 4)
 	for _, name := range []string{
 		"retry_\x1b[31mred\x1b[0m_handler.go",
 		"retry_\rrewound_handler.go",
@@ -88,7 +88,7 @@ func TestFilesRowStripsWhatTheTerminalActsOn(t *testing.T) {
 	// before, so the row carrying them ended in a different column.
 	var widths []int
 	var rows []string
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		if strings.HasPrefix(line, "  ") {
 			rows = append(rows, line)
 			widths = append(widths, termwidth.Columns(line))

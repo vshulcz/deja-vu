@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -100,7 +101,7 @@ func reasonixManifest(exe string, auto bool) []byte {
 			"capabilities": []string{"interceptors", "ui"},
 		}
 	}
-	b, _ := json.MarshalIndent(m, "", "  ")
+	b, _ := json.MarshalIndent(m, "", "  ") //nolint:errchkjson // strings, bools and maps of them always marshal
 	return append(b, '\n')
 }
 
@@ -203,7 +204,7 @@ func (st reasonixState) marshal() []byte {
 	sort.SliceStable(st.Plugins, func(i, j int) bool {
 		return reasonixEntryName(st.Plugins[i]) < reasonixEntryName(st.Plugins[j])
 	})
-	b, _ := json.MarshalIndent(st, "", "  ")
+	b, _ := json.MarshalIndent(st, "", "  ") //nolint:errchkjson // the entries are raw JSON read from the file
 	return append(b, '\n')
 }
 
@@ -397,8 +398,8 @@ func reasonixSwitchOff() error {
 	}
 	// Through the struct, which marshals in Reasonix's own field order.
 	var rec reasonixEntry
-	if err := json.Unmarshal(st.Plugins[i], &rec); err != nil {
-		return err
+	if uerr := json.Unmarshal(st.Plugins[i], &rec); uerr != nil {
+		return uerr
 	}
 	rec.Enabled = false
 	b, err := json.Marshal(rec)
@@ -457,14 +458,14 @@ func installReasonixViaCLI(cli, src string) error {
 		missing = append(missing, reasonixCrashDir())
 	}
 	defer func() {
-		for i := len(missing) - 1; i >= 0; i-- {
-			if _, err := os.Lstat(missing[i]); err != nil {
+		for _, m := range slices.Backward(missing) {
+			if _, err := os.Lstat(m); err != nil {
 				continue
 			}
-			if missing[i] == key {
+			if m == key {
 				createdByThisRun = append(createdByThisRun, key)
 			} else {
-				createdDirsByThisRun = append(createdDirsByThisRun, missing[i])
+				createdDirsByThisRun = append(createdDirsByThisRun, m)
 			}
 		}
 	}()
@@ -478,7 +479,7 @@ func installReasonixViaCLI(cli, src string) error {
 		if len(tail) > 600 {
 			tail = "…" + tail[len(tail)-600:]
 		}
-		return fmt.Errorf("reasonix plugin install failed: %v: %s", err, tail)
+		return fmt.Errorf("reasonix plugin install failed: %w: %s", err, tail)
 	}
 	return nil
 }
@@ -491,7 +492,10 @@ func installReasonixByHand(files map[string][]byte, st reasonixState, off bool) 
 	}
 	want := wantReasonixEntry()
 	want.Enabled = !off
-	entry, _ := json.Marshal(want)
+	entry, err := json.Marshal(want)
+	if err != nil {
+		return err
+	}
 	if i, _ := st.ours(); i >= 0 {
 		st.Plugins[i] = entry
 	} else {

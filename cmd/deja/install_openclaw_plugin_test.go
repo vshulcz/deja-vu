@@ -37,8 +37,8 @@ func TestInstallOpenClawPluginWritesWhatTheLoaderNeeds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := json.Unmarshal(b, &pkg); err != nil {
-		t.Fatalf("package.json is not valid JSON: %v", err)
+	if uerr := json.Unmarshal(b, &pkg); uerr != nil {
+		t.Fatalf("package.json is not valid JSON: %v", uerr)
 	}
 	if len(pkg.OpenClaw.Extensions) == 0 {
 		t.Error("package.json declares no openclaw.extensions, which is the field " +
@@ -129,12 +129,12 @@ func TestOpenClawPluginRecallsForThePrompt(t *testing.T) {
 	// on the same stub rather than a second one.
 	script := "#!/bin/sh\nin=$(cat)\nprintf '%s\\n' \"$in\" >> " + calls + "\n" +
 		"case \"$in\" in *rotate*) printf 'RECALLED every 47 days' ;; esac\n"
-	if err := os.WriteFile(stub, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(stub, []byte(script), 0o755); werr != nil {
+		t.Fatal(werr)
 	}
 	plugin := filepath.Join(home, "index.mjs")
-	if err := os.WriteFile(plugin, []byte(openclawPluginJS(stub)), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(plugin, []byte(openclawPluginJS(stub)), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	driver := `
 import plugin from "` + plugin + `";
@@ -147,10 +147,10 @@ console.log(JSON.stringify(asked));
 console.log(JSON.stringify(quiet ?? null));
 `
 	run := filepath.Join(home, "drive.mjs")
-	if err := os.WriteFile(run, []byte(driver), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(run, []byte(driver), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
-	out, err := exec.Command(node, run).CombinedOutput()
+	out, err := exec.CommandContext(t.Context(), node, run).CombinedOutput()
 	if err != nil {
 		t.Fatalf("driving the plugin: %v\n%s", err, out)
 	}
@@ -163,7 +163,7 @@ console.log(JSON.stringify(quiet ?? null));
 			"sees a prompt")
 	}
 	var got map[string]string
-	if err := json.Unmarshal([]byte(lines[0]), &got); err != nil {
+	if uerr := json.Unmarshal([]byte(lines[0]), &got); uerr != nil {
 		t.Fatalf("handler returned %s", lines[0])
 	}
 	if !strings.Contains(got["prependContext"], "RECALLED") {
@@ -244,12 +244,12 @@ func TestOpenClawPluginShowsTheReceiptInAnOwnerDM(t *testing.T) {
 		"  'hook-prompt --plain') printf 'RECALLED drain with --grace 40' ;;\n" +
 		"  hook-prompt) printf '%s\\n' '" + reply + "' ;;\n" +
 		"esac\n"
-	if err := os.WriteFile(stub, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(stub, []byte(script), 0o755); werr != nil {
+		t.Fatal(werr)
 	}
 	plugin := filepath.Join(home, "index.mjs")
-	if err := os.WriteFile(plugin, []byte(openclawPluginJS(stub)), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(plugin, []byte(openclawPluginJS(stub)), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	driver := `
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
@@ -306,10 +306,10 @@ for (const [name, turns] of Object.entries(cases)) {
 console.log(JSON.stringify(out));
 `
 	run := filepath.Join(home, "drive.mjs")
-	if err := os.WriteFile(run, []byte(driver), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(run, []byte(driver), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
-	cmd := exec.Command(node, run)
+	cmd := exec.CommandContext(t.Context(), node, run)
 	cmd.Env = append(os.Environ(), "DEJA_CALLS="+filepath.Join(home, "calls"))
 	raw, err := cmd.CombinedOutput()
 	if err != nil {

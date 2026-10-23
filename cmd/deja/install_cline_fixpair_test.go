@@ -46,12 +46,12 @@ func TestClineFixPairAppendsToTheFailingResult(t *testing.T) {
 	script := "#!/bin/sh\nin=$(cat)\ncase \"$1\" in\n" +
 		"hook-tool-after) case \"$in\" in *glimwrax*) printf 'RAN NEXT: glimwraxctl --sync' ;; esac ;;\n" +
 		"esac\n"
-	if err := os.WriteFile(stub, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(stub, []byte(script), 0o755); werr != nil {
+		t.Fatal(werr)
 	}
 	plugin := filepath.Join(home, "index.mjs")
-	if err := os.WriteFile(plugin, []byte(clinePluginJS(stub)), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(plugin, []byte(clinePluginJS(stub)), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	driver := `
 import plugin from "` + plugin + `";
@@ -85,10 +85,10 @@ console.log("OK_UNTOUCHED:" + !okText.includes("RAN NEXT"));
 console.log("ERROR_KEPT:" + failText.includes("undefined: glimwraxHelper"));
 `
 	run := filepath.Join(home, "drive.mjs")
-	if err := os.WriteFile(run, []byte(driver), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(run, []byte(driver), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
-	out, err := exec.Command(node, run).CombinedOutput()
+	out, err := exec.CommandContext(t.Context(), node, run).CombinedOutput()
 	if err != nil {
 		t.Fatalf("driving the plugin: %v\n%s", err, out)
 	}

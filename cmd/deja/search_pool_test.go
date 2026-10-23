@@ -25,7 +25,7 @@ func TestCommonWordCountsTheSessionsItDidNotRead(t *testing.T) {
 	}
 	n := search.PoolSize(15) + 300
 	at := time.Date(2026, 7, 1, 10, 0, 0, 0, time.UTC)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		id := fmt.Sprintf("%08d-2222-4000-8000-a1b2c3d4e5f6", i)
 		line := `{"type":"user","message":{"role":"user","content":` +
 			quoteJSON(fmt.Sprintf("the deploy of service %d is slow", i)) +
@@ -77,7 +77,7 @@ func TestQuotedPhraseTotalCountsTheSessionsThatSayIt(t *testing.T) {
 	}
 	n := search.PoolSize(15) + 600
 	at := time.Date(2026, 7, 1, 10, 0, 0, 0, time.UTC)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		id := fmt.Sprintf("%08d-2222-4000-8000-a1b2c3d4e5f6", i)
 		text := fmt.Sprintf("alpha went out first and beta followed in run %d", i)
 		if i%(n/5) == n/10 {

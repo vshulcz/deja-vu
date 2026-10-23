@@ -42,3 +42,30 @@ func TestWorthIndexingKeepsTheCommandsThatFixABuild(t *testing.T) {
 		}
 	}
 }
+
+// An install pointed at a mirror is the remedy to an index that refused the
+// package, and `pip3`, `pip config`, conda and apt were dropped (#5599).
+func TestWorthIndexingKeepsTheMirrorInstalls(t *testing.T) {
+	for _, c := range []string{
+		"pip3 install --index-url https://mirror.example.internal/simple vllm",
+		"pip config set global.index-url https://mirror.example.internal/simple",
+		"pip download torch -d wheels",
+		"conda install -c https://mirror.example.internal/conda pytorch",
+		"conda config --add channels https://mirror.example.internal/conda",
+		"mamba install numpy",
+		"sudo apt-get install -y libssl-dev",
+		"apt install build-essential",
+	} {
+		if !worthIndexing(c) {
+			t.Errorf("dropped the remedy: %q", c)
+		}
+	}
+	for _, c := range []string{
+		"grep 'pip3 install' README.md",
+		"echo 'apt install foo'",
+	} {
+		if worthIndexing(c) {
+			t.Errorf("kept navigation: %q", c)
+		}
+	}
+}

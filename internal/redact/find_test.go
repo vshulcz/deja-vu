@@ -64,7 +64,7 @@ var genNoise = []string{
 func genText(r *rand.Rand) string {
 	var b strings.Builder
 	n := 1 + r.Intn(14)
-	for i := 0; i < n; i++ {
+	for range n {
 		switch r.Intn(7) {
 		case 0, 1:
 			b.WriteString(genKeys[r.Intn(len(genKeys))])
@@ -84,8 +84,8 @@ func genText(r *rand.Rand) string {
 		case 6:
 			// raw bytes, sometimes invalid UTF-8
 			k := r.Intn(6)
-			for j := 0; j < k; j++ {
-				b.WriteByte(byte(r.Intn(256)))
+			for range k {
+				b.WriteByte(byte(r.Intn(256))) //nolint:gosec // Intn(256) fits a byte
 			}
 		}
 		if r.Intn(3) == 0 {
@@ -112,9 +112,9 @@ func sameAsRegex(t *testing.T, in string) {
 		}
 	}
 	wo, wc := text(in, false)
-	go_, gc := text(in, true)
-	if wo != go_ || !reflect.DeepEqual(wc, gc) {
-		t.Fatalf("Text differs\n in: %q\nwant %q %v\n got %q %v", in, wo, wc, go_, gc)
+	gs, gc := text(in, true)
+	if wo != gs || !reflect.DeepEqual(wc, gc) {
+		t.Fatalf("Text differs\n in: %q\nwant %q %v\n got %q %v", in, wo, wc, gs, gc)
 	}
 }
 
@@ -125,15 +125,15 @@ func TestFindersMatchRegexes(t *testing.T) {
 	} else if raceEnabled {
 		n = 8000
 	}
-	r := rand.New(rand.NewSource(1))
-	for i := 0; i < n; i++ {
+	r := rand.New(rand.NewSource(1)) //nolint:gosec // seeded so a failure reproduces
+	for range n {
 		sameAsRegex(t, genText(r))
 	}
 }
 
 // One long text, the shape a tool output takes, with secrets far apart.
 func TestFindersMatchRegexesOnHugeText(t *testing.T) {
-	r := rand.New(rand.NewSource(2))
+	r := rand.New(rand.NewSource(2)) //nolint:gosec // seeded so a failure reproduces
 	var b strings.Builder
 	for b.Len() < 400<<10 {
 		b.WriteString(genText(r))
@@ -144,8 +144,8 @@ func TestFindersMatchRegexesOnHugeText(t *testing.T) {
 }
 
 func FuzzFindersMatchRegexes(f *testing.F) {
-	r := rand.New(rand.NewSource(3))
-	for i := 0; i < 64; i++ {
+	r := rand.New(rand.NewSource(3)) //nolint:gosec // seeded so a failure reproduces
+	for range 64 {
 		f.Add(genText(r))
 	}
 	f.Fuzz(func(t *testing.T, in string) { sameAsRegex(t, in) })

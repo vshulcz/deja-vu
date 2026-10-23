@@ -31,8 +31,8 @@ import (
 // homeName is one path segment: anything but a separator, a space or a quote.
 const homeName = `[^/\\\s"'<>:]+`
 
+// OutboundIP and the rest are the marker kinds this pass adds.
 const (
-	// OutboundIP and the rest are the marker kinds this pass adds.
 	OutboundIP    = "ip"
 	OutboundHost  = "internal-host"
 	OutboundEmail = "email"
@@ -82,11 +82,11 @@ func Outbound(s string) (string, Counts) {
 		lead := outEncodedHomeRE.FindStringSubmatch(m)[1]
 		return lead + "~"
 	})
-	s = outEmailRE.ReplaceAllStringFunc(s, func(m string) string {
+	s = outEmailRE.ReplaceAllStringFunc(s, func(_ string) string {
 		c.Add(OutboundEmail, 1)
 		return Marker + OutboundEmail + "]"
 	})
-	s = outHostRE.ReplaceAllStringFunc(s, func(m string) string {
+	s = outHostRE.ReplaceAllStringFunc(s, func(_ string) string {
 		c.Add(OutboundHost, 1)
 		return Marker + OutboundHost + "]"
 	})

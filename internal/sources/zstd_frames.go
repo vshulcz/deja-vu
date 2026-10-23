@@ -2,6 +2,7 @@ package sources
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"os/exec"
@@ -55,7 +56,7 @@ func zstdDecodeFile(path, harness string, raw []byte) ([]byte, error) {
 }
 
 func zstdRun(in []byte) (out []byte, stderr string, err error) {
-	cmd := exec.Command("zstd", "-d", "-c", "-q")
+	cmd := exec.CommandContext(context.Background(), "zstd", "-d", "-c", "-q")
 	cmd.Stdin = bytes.NewReader(in)
 	var o, e bytes.Buffer
 	cmd.Stdout = &o

@@ -2,6 +2,7 @@ package sources
 
 import (
 	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -97,6 +98,7 @@ func kiroUnderSessDir(p string) bool {
 	return strings.HasPrefix(filepath.Base(filepath.Dir(p)), "sess_")
 }
 
+// LoadKiro reads every Kiro session on this machine: CLI, IDE and database.
 func LoadKiro() []model.Session {
 	ss := parseFiles(KiroCLIFiles(), ParseKiroCLIFile)
 	ss = append(ss, parseFiles(KiroIDEFiles(), ParseKiroIDEFile)...)
@@ -252,8 +254,9 @@ var kiroExitResumes = resumesUnlessSettling(`"toolUseId"`, func(m map[string]any
 }, func(line []byte) []string {
 	data, _ := decodeJSONLine(line)["data"].(map[string]any)
 	_, calls, _ := kiroContent(data["content"])
-	var ids []string
-	for _, c := range commandCallsIn(calls, kiroDialect) {
+	cmds := commandCallsIn(calls, kiroDialect)
+	ids := make([]string, 0, len(cmds))
+	for _, c := range cmds {
 		ids = append(ids, c.ID)
 	}
 	return ids
@@ -438,9 +441,7 @@ var kiroDialect = toolDialect{
 // listing rather than a file the session touched.
 func kiroToolCall(name string, args map[string]any) map[string]any {
 	in := make(map[string]any, len(args))
-	for k, v := range args {
-		in[k] = v
-	}
+	maps.Copy(in, args)
 	for from, to := range map[string]string{"oldStr": "old_str", "newStr": "new_str", "file_text": "content",
 		// The v3 engine's write text and delete target (#4506).
 		"text": "content", "targetFile": "path"} {

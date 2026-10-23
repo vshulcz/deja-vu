@@ -23,7 +23,7 @@ func TestOpencodeStoreLacksAsksForTheRow(t *testing.T) {
 		t.Error("a quoted id broke the lookup")
 	}
 	// A session with no turns is still opencode's.
-	if out, err := exec.Command("sqlite3", db, `insert into session_v2 values('empty','p1',null,'/w','',1,1)`).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, `insert into session_v2 values('empty','p1',null,'/w','',1,1)`).CombinedOutput(); err != nil {
 		t.Fatalf("%v %s", err, out)
 	}
 	if OpencodeStoreLacks("opencode", "empty") {

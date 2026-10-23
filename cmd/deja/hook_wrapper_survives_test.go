@@ -68,11 +68,11 @@ func TestAWrapperNamedLikeDejaSurvivesInstallAndUninstall(t *testing.T) {
 					seeded := map[string]int{}
 					_ = filepath.Walk(home, func(p string, fi os.FileInfo, err error) error {
 						if err != nil || !fi.Mode().IsRegular() {
-							return nil
+							return nil //nolint:nilerr // unreadable entries are skipped
 						}
-						b, rerr := os.ReadFile(p)
+						b, rerr := os.ReadFile(p) //nolint:gosec // the walk is over the test's own temp home
 						if rerr != nil {
-							return nil
+							return nil //nolint:nilerr // unreadable files are skipped
 						}
 						text := string(b)
 						// A file deja generates whole, or a block it marks as its
@@ -93,7 +93,7 @@ func TestAWrapperNamedLikeDejaSurvivesInstallAndUninstall(t *testing.T) {
 						text = strings.ReplaceAll(text, named+`\" hook-`, theirs+`\" hook-`)
 						text = strings.ReplaceAll(text, named+`' hook-`, theirs+`' hook-`)
 						if c := strings.Count(text, theirs); c > 0 {
-							if err := os.WriteFile(p, []byte(text), fi.Mode()); err != nil {
+							if err := os.WriteFile(p, []byte(text), fi.Mode()); err != nil { //nolint:gosec // the walk is over the test's own temp home
 								t.Fatal(err)
 							}
 							seeded[p] = c
@@ -126,7 +126,7 @@ func dejaOwnsFile(home, p string) bool {
 	if err != nil {
 		return false
 	}
-	for _, part := range strings.Split(filepath.ToSlash(rel), "/") {
+	for part := range strings.SplitSeq(filepath.ToSlash(rel), "/") {
 		if part == "deja" || strings.HasPrefix(part, "deja.") {
 			return true
 		}

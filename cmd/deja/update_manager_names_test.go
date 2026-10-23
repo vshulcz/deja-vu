@@ -30,7 +30,7 @@ func TestManagerAdviceNamesThePackageTheManifestsShip(t *testing.T) {
 		t.Fatal(err)
 	}
 	id := ""
-	for _, line := range strings.Split(string(winget), "\n") {
+	for line := range strings.SplitSeq(string(winget), "\n") {
 		if rest, ok := strings.CutPrefix(strings.TrimSpace(line), "PackageIdentifier:"); ok {
 			id = strings.TrimSpace(rest)
 			break
@@ -49,7 +49,7 @@ func TestManagerAdviceNamesThePackageTheManifestsShip(t *testing.T) {
 		t.Fatal(err)
 	}
 	name := ""
-	for _, line := range strings.Split(string(pkg), "\n") {
+	for line := range strings.SplitSeq(string(pkg), "\n") {
 		if rest, ok := strings.CutPrefix(strings.TrimSpace(line), `"name":`); ok {
 			name = strings.Trim(strings.TrimSpace(rest), `",`)
 			break

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -165,7 +166,7 @@ func openclawDBSpawns(db string) map[string]string {
 		return nil
 	}
 	have := map[string]bool{}
-	for _, c := range strings.Fields(string(cols)) {
+	for c := range strings.FieldsSeq(string(cols)) {
 		have[c] = true
 	}
 	if !have["session_windows.parent_session_key"] || !have["session_windows.spawned_by"] {
@@ -396,10 +397,10 @@ func openclawScanLines(src io.Reader) openclawSpawnScan {
 	needle := []byte("childSessionKey")
 	for first := true; ; first = false {
 		line, err := r.ReadSlice('\n')
-		if err == bufio.ErrBufferFull {
+		if errors.Is(err, bufio.ErrBufferFull) {
 			// A line longer than the buffer is gathered whole.
 			buf := append([]byte(nil), line...)
-			for err == bufio.ErrBufferFull {
+			for errors.Is(err, bufio.ErrBufferFull) {
 				line, err = r.ReadSlice('\n')
 				buf = append(buf, line...)
 			}

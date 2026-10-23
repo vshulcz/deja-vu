@@ -18,7 +18,7 @@ func TestWriteBackOpenClawReadsBack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if head := strings.SplitN(string(f.Data), "\n", 2)[0]; strings.Contains(head, `"cwd"`) || !strings.Contains(head, `"type":"session"`) {
+	if head, _, _ := strings.Cut(string(f.Data), "\n"); strings.Contains(head, `"cwd"`) || !strings.Contains(head, `"type":"session"`) {
 		t.Errorf("header %s: want a session header with no cwd", head)
 	}
 }

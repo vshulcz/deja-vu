@@ -72,7 +72,7 @@ func TestNoEmittedTimestampReliesOnOmitemptyAloneToVanish(t *testing.T) {
 			if allowed[filepath.ToSlash(path)] {
 				return nil
 			}
-			src, err := os.ReadFile(path)
+			src, err := os.ReadFile(path) //nolint:gosec // test walks the repo's own source
 			if err != nil {
 				return err
 			}

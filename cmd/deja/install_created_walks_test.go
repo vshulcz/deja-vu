@@ -24,7 +24,7 @@ func countEvalSymlinks(t *testing.T) *int {
 // with another name cannot resolve to this one.
 func TestWriteResolvesOnlyCreatedFilesOfTheSameName(t *testing.T) {
 	dir := t.TempDir()
-	createdByThisRun = nil
+	createdByThisRun = make([]string, 0, 50)
 	t.Cleanup(func() { createdByThisRun = nil; snapshotsByThisRun = nil })
 	for i := range 50 {
 		p := filepath.Join(dir, fmt.Sprintf("config-%d.json", i))
@@ -50,15 +50,15 @@ func TestWriteResolvesOnlyCreatedFilesOfTheSameName(t *testing.T) {
 // arrives with the resolved name.
 func TestWriteKnowsACreatedFileThroughALinkedDirectory(t *testing.T) {
 	tmp := t.TempDir()
-	real := filepath.Join(tmp, "dotfiles", "cfg")
-	if err := os.MkdirAll(real, 0o755); err != nil {
+	target := filepath.Join(tmp, "dotfiles", "cfg")
+	if err := os.MkdirAll(target, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	link := filepath.Join(tmp, "cfg")
-	if err := os.Symlink(real, link); err != nil {
+	if err := os.Symlink(target, link); err != nil {
 		t.Skip("symlinks unavailable:", err)
 	}
-	if err := os.WriteFile(filepath.Join(real, "mcp.json"), []byte("{}"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(target, "mcp.json"), []byte("{}"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	createdByThisRun = []string{filepath.Join(link, "other.json"), filepath.Join(link, "mcp.json")}
@@ -80,7 +80,7 @@ func TestWriteKnowsACreatedFileThroughALinkedDirectory(t *testing.T) {
 // call; resolution keeps the file name, so only same-named ones can match.
 func TestSnapshotTakenResolvesOnlySnapshotsOfTheSameName(t *testing.T) {
 	dir := t.TempDir()
-	snapshotsByThisRun = nil
+	snapshotsByThisRun = make([]string, 0, 50)
 	t.Cleanup(func() { snapshotsByThisRun = nil })
 	for i := range 50 {
 		snapshotsByThisRun = append(snapshotsByThisRun, filepath.Join(dir, fmt.Sprintf("config-%d.json.bak", i)))

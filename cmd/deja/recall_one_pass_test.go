@@ -29,7 +29,7 @@ func storeOf(t *testing.T, n int, cwdOf func(int) string, textOf func(int) strin
 	tmp := hermeticEnv(t)
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
 	at := time.Date(2026, 7, 1, 10, 0, 0, 0, time.UTC)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		cwd := cwdOf(i)
 		store := filepath.Join(root, "-work-"+filepath.Base(cwd))
 		if err := os.MkdirAll(store, 0o755); err != nil {
@@ -37,9 +37,12 @@ func storeOf(t *testing.T, n int, cwdOf func(int) string, textOf func(int) strin
 		}
 		id := fmt.Sprintf("%08d-2222-4000-8000-a1b2c3d4e5f6", i)
 		text := textOf(i)
-		line, _ := json.Marshal(map[string]any{"type": "user", "sessionId": id, "cwd": cwd,
+		line, err := json.Marshal(map[string]any{"type": "user", "sessionId": id, "cwd": cwd,
 			"timestamp": at.Add(time.Duration(i) * time.Minute).Format(time.RFC3339),
 			"message":   map[string]any{"role": "user", "content": text}})
+		if err != nil {
+			t.Fatal(err)
+		}
 		if err := os.WriteFile(filepath.Join(store, id+".jsonl"), append(line, '\n'), 0o644); err != nil {
 			t.Fatal(err)
 		}

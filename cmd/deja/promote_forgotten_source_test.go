@@ -62,7 +62,7 @@ func TestCorrectionReachesANoteWhoseSourceIsForgotten(t *testing.T) {
 
 	// The backside: a note someone wrote with `remember` is not a promotion,
 	// and turning it into one would invent a source session.
-	if _, err := captureRun(t, "remember", "plain note about the cert"); err != nil {
+	if _, err = captureRun(t, "remember", "plain note about the cert"); err != nil {
 		t.Fatal(err)
 	}
 	metas, err := index.AllMeta(dir)

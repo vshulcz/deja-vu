@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -77,8 +78,8 @@ func TestTheEnvironmentBlockCutsOnRuneBoundaries(t *testing.T) {
 	tmp := hermeticEnv(t)
 	// Three project directories: a wall of one repository is no longer a fact
 	// about the machine.
-	var roots []string
-	for i := 0; i < environmentMinProjects; i++ {
+	roots := make([]string, 0, environmentMinProjects)
+	for i := range environmentMinProjects {
 		root := filepath.Join(tmp, "claude", fmt.Sprintf("proj-w%d", i))
 		if err := os.MkdirAll(root, 0o755); err != nil {
 			t.Fatal(err)
@@ -92,12 +93,12 @@ func TestTheEnvironmentBlockCutsOnRuneBoundaries(t *testing.T) {
 	// odd offset into two-byte letters — at the obvious phrasing it fell on a
 	// boundary and the test could not fail.
 	wall := "ModuleNotFoundError: No module named очередьповторовпредпродакшенмодуля"
-	for i := 0; i < index.FrictionMinSessions; i++ {
+	for i := range index.FrictionMinSessions {
 		sid := fmt.Sprintf("w%02d", i)
 		body := `{"type":"user","sessionId":"` + sid + `","cwd":"/w/w","timestamp":"2026-07-2` +
-			fmt.Sprint(i%10) + `T10:00:00Z","message":{"role":"user","content":"run the checks"}}` + "\n" +
+			strconv.Itoa(i%10) + `T10:00:00Z","message":{"role":"user","content":"run the checks"}}` + "\n" +
 			`{"type":"user","sessionId":"` + sid + `","cwd":"/w/w","timestamp":"2026-07-2` +
-			fmt.Sprint(i%10) + `T10:05:00Z","message":{"role":"user","content":[{"type":"tool_result",` +
+			strconv.Itoa(i%10) + `T10:05:00Z","message":{"role":"user","content":[{"type":"tool_result",` +
 			`"content":"` + wall + `"}]}}` + "\n"
 		if err := os.WriteFile(filepath.Join(roots[i%len(roots)], sid+".jsonl"), []byte(body), 0o644); err != nil {
 			t.Fatal(err)

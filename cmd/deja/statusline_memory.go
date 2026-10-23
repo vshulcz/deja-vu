@@ -201,11 +201,8 @@ func sessionsTouching(metas []index.SessionMeta, path string, self index.Session
 		if m.ID == self.ID && m.Harness == self.Harness {
 			continue
 		}
-		for _, p := range m.Touched {
-			if p == path {
-				out = append(out, m)
-				break
-			}
+		if slices.Contains(m.Touched, path) {
+			out = append(out, m)
 		}
 	}
 	return out
@@ -269,7 +266,7 @@ func trimStatuslineTitle(t string) string { return safeForStatusline(t, statusli
 // reverses the rendering of everything after it, and a zero-width space pads
 // the bar invisibly. Both become spaces rather than vanishing, so words on
 // either side do not run together.
-func safeForStatusline(s string, max int) string {
+func safeForStatusline(s string, most int) string {
 	s = strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
 			return ' '
@@ -277,8 +274,8 @@ func safeForStatusline(s string, max int) string {
 		return r
 	}, s)
 	s = strings.Join(strings.Fields(s), " ")
-	if termwidth.Columns(s) > max {
-		return strings.TrimSpace(termwidth.Cut(s, max)) + "…"
+	if termwidth.Columns(s) > most {
+		return strings.TrimSpace(termwidth.Cut(s, most)) + "…"
 	}
 	return s
 }

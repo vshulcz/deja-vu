@@ -33,14 +33,14 @@ insert into part values ('p2', 'm2', '{"type":"text","text":"the parser test fai
 insert into part values ('p3', 'm3', '{"type":"text","text":"summary of the work so far","synthetic":true}');
 insert into part values ('p4', 'm4', '{"type":"text","text":"carry on after the summary"}');
 `
-	if out, err := exec.Command("sqlite3", db, schema).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, schema).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}
 	got, found, err := ReadZCodeCompaction("sess_1")
 	if err != nil || !found {
 		t.Fatalf("found=%v err=%v", found, err)
 	}
-	var texts []string
+	texts := make([]string, 0, len(got.Session.Messages))
 	for _, m := range got.Session.Messages {
 		texts = append(texts, m.Text)
 	}

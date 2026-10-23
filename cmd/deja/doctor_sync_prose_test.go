@@ -32,12 +32,12 @@ func TestTheSyncSectionDescribesWhatTheRowsCarry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, body, 0o600); err != nil {
+	if err = os.WriteFile(path, body, 0o600); err != nil {
 		t.Fatal(err)
 	}
 
 	var out strings.Builder
-	if err := runDoctor(&out, []string{"--json", "--offline"}, stubLookup("1.0.0", false), index.DefaultDir()); err != nil {
+	if err = runDoctor(&out, []string{"--json", "--offline"}, stubLookup("1.0.0", false), index.DefaultDir()); err != nil {
 		t.Fatal(err)
 	}
 	var report struct {
@@ -48,7 +48,7 @@ func TestTheSyncSectionDescribesWhatTheRowsCarry(t *testing.T) {
 			} `json:"peers"`
 		} `json:"sync"`
 	}
-	if err := json.Unmarshal([]byte(out.String()), &report); err != nil {
+	if err = json.Unmarshal([]byte(out.String()), &report); err != nil {
 		t.Fatal(err)
 	}
 	if len(report.Sync.Peers) != 1 {

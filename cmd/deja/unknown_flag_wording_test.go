@@ -2,7 +2,6 @@ package main
 
 import (
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -21,7 +20,7 @@ func TestUnknownFlagIsQuotedEverywhere(t *testing.T) {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") || strings.HasSuffix(e.Name(), "_test.go") {
 			continue
 		}
-		b, err := os.ReadFile(filepath.Join("./", e.Name()))
+		b, err := os.ReadFile(e.Name())
 		if err != nil {
 			t.Fatal(err)
 		}

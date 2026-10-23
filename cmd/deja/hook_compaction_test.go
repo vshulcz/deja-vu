@@ -20,7 +20,7 @@ func compactionFixture(t *testing.T, name, workspace string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	encoded, _ := json.Marshal(workspace)
+	encoded := mustMarshal(t, workspace)
 	return strings.ReplaceAll(string(b), `"WORKSPACE"`, string(encoded))
 }
 
@@ -37,7 +37,7 @@ func prepareCompaction(t *testing.T) (dir, workspace, transcript string) {
 	oldSpawn := spawnWarmup
 	spawnWarmup = func(string, string) error { return nil }
 	t.Cleanup(func() { spawnWarmup = oldSpawn })
-	payload, _ := json.Marshal(map[string]string{"session_id": "compaction-fixture", "cwd": workspace, "transcript_path": transcript})
+	payload := mustMarshal(t, map[string]string{"session_id": "compaction-fixture", "cwd": workspace, "transcript_path": transcript})
 	withHookStdin(t, string(payload))
 	runHookPrecompact(dir)
 	state, found, err := index.Compaction(dir, "compaction-fixture", workspace)
@@ -56,7 +56,7 @@ func TestCompactionHooksRecoverBeforeIndexBuildOnceAndMeasureRawActions(t *testi
 		t.Fatal("a packet must not impersonate a searchable index")
 	}
 	rememberSessionDigest(dir, "compaction-fixture")
-	payload, _ := json.Marshal(map[string]any{"session_id": "compaction-fixture", "cwd": workspace, "source": "compact", "deja_once": true})
+	payload := mustMarshal(t, map[string]any{"session_id": "compaction-fixture", "cwd": workspace, "source": "compact", "deja_once": true})
 	withHookStdin(t, string(payload))
 	out := captureStdout(t, func() {
 		// The payload's deja_once, as OpenClaw and dsh send it; the --once
@@ -81,11 +81,11 @@ func TestCompactionHooksRecoverBeforeIndexBuildOnceAndMeasureRawActions(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = io.WriteString(f, compactionFixture(t, "claude-after.jsonl", workspace))
+	_, err = f.WriteString(compactionFixture(t, "claude-after.jsonl", workspace))
 	if closeErr := f.Close(); err != nil || closeErr != nil {
 		t.Fatalf("append fixture: %v %v", err, closeErr)
 	}
-	toolPayload, _ := json.Marshal(map[string]string{"session_id": "compaction-fixture", "cwd": workspace, "transcript_path": transcript, "tool_name": "Edit", "tool_use_id": "edit-after"})
+	toolPayload := mustMarshal(t, map[string]string{"session_id": "compaction-fixture", "cwd": workspace, "transcript_path": transcript, "tool_name": "Edit", "tool_use_id": "edit-after"})
 	for range 2 {
 		if err := runHookTool(dir, bytes.NewReader(toolPayload), io.Discard); err != nil {
 			t.Fatal(err)
@@ -158,7 +158,7 @@ func TestCompactionFailedLaterCaptureSuppressesOldPacket(t *testing.T) {
 	if delivered, err := emitCompactionRecovery(dir, "compaction-fixture", workspace, "SessionStart", hookToolPlain, io.Discard); !delivered || err != nil {
 		t.Fatalf("initial recovery: %t %v", delivered, err)
 	}
-	payload, _ := json.Marshal(map[string]string{"session_id": "compaction-fixture", "cwd": workspace, "transcript_path": transcript})
+	payload := mustMarshal(t, map[string]string{"session_id": "compaction-fixture", "cwd": workspace, "transcript_path": transcript})
 	compactionWrite(t, transcript, "not a supported transcript\n")
 	withHookStdin(t, string(payload))
 	runHookPrecompact(dir)
@@ -217,7 +217,7 @@ func TestCompactionRewrittenTranscriptIsUnmeasured(t *testing.T) {
 // dropped; it waits for a turn that can carry it.
 func TestCompactionRecoveryWaitsOutAnEmptyPrompt(t *testing.T) {
 	dir, workspace, _ := prepareCompaction(t)
-	payload, _ := json.Marshal(map[string]string{"session_id": "compaction-fixture", "cwd": workspace, "prompt": ""})
+	payload := mustMarshal(t, map[string]string{"session_id": "compaction-fixture", "cwd": workspace, "prompt": ""})
 	var out bytes.Buffer
 	if err := runHookPrompt(dir, bytes.NewReader(payload), &out); err != nil {
 		t.Fatal(err)

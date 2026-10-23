@@ -20,8 +20,8 @@ func TestAFirstBuildAnswersBeforeItFinishes(t *testing.T) {
 	tmp := hermeticIndexEnv(t)
 	dir := filepath.Join(tmp, "idx")
 	now := time.Now()
-	var ss []model.Session
-	for i := 0; i < 500; i++ {
+	ss := make([]model.Session, 0, 500)
+	for i := range 500 {
 		ss = append(ss, model.Session{
 			ID: fmt.Sprintf("s%03d", i), Harness: "claude", Project: "p",
 			Updated: now.Add(-time.Duration(i) * time.Hour),
@@ -77,7 +77,7 @@ func TestTheEarlyPublishHoldsBackWhereItWouldNotHelp(t *testing.T) {
 	tmp := hermeticIndexEnv(t)
 	now := time.Now()
 	small := make([]model.Session, 0, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		small = append(small, model.Session{
 			ID: fmt.Sprintf("s%d", i), Harness: "claude", Project: "p", Updated: now,
 			Messages: []model.Message{{Role: "user", Text: "a short store"}},
@@ -92,8 +92,8 @@ func TestTheEarlyPublishHoldsBackWhereItWouldNotHelp(t *testing.T) {
 	// And where an index already exists, replacing it with a slice would be a
 	// regression rather than a head start.
 	dir2 := filepath.Join(tmp, "existing")
-	var many []model.Session
-	for i := 0; i < 500; i++ {
+	many := make([]model.Session, 0, 500)
+	for i := range 500 {
 		many = append(many, model.Session{
 			ID: fmt.Sprintf("s%03d", i), Harness: "claude", Project: "p",
 			Updated:  now.Add(-time.Duration(i) * time.Hour),
@@ -137,7 +137,7 @@ func TestARealFirstBuildSaysItIsSearchableAlready(t *testing.T) {
 	tmp := hermeticIndexEnv(t)
 	claude := filepath.Join(tmp, "claude")
 	now := time.Now()
-	for i := 0; i < 420; i++ {
+	for i := range 420 {
 		at := now.Add(-time.Duration(i) * time.Hour).UTC().Format(time.RFC3339)
 		id := fmt.Sprintf("b%03d", i)
 		writeLines(t, filepath.Join(claude, "-proj", id+".jsonl"),
@@ -170,7 +170,7 @@ func TestFirstBuildKeepsSkippedLinesAcrossNewestFirstPublish(t *testing.T) {
 	dir := filepath.Join(os.Getenv("DEJA_CODEX_ROOT"), "sessions", "2026", "07", "30")
 	bad := filepath.Join(dir, "rollout-2026-07-30T00-00-00-bad-line.jsonl")
 	write(t, bad, strings.ReplaceAll(codexRolloutHead, "cx-1", "bad-line")+"{not json\n")
-	for i := 0; i < partialPublishFrom+10; i++ {
+	for i := range partialPublishFrom + 10 {
 		id := fmt.Sprintf("big-%04d", i)
 		write(t, filepath.Join(dir, "rollout-2026-07-30T00-00-00-"+id+".jsonl"),
 			strings.ReplaceAll(codexRolloutHead, "cx-1", id))

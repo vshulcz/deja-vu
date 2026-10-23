@@ -45,6 +45,7 @@ func SenpiSessionFiles() []string {
 	})
 }
 
+// LoadSenpi reads every Senpi session on this machine.
 func LoadSenpi() []model.Session { return parseFiles(SenpiSessionFiles(), ParseSenpiFile) }
 
 // ParseSenpiFile reads one transcript.
@@ -131,6 +132,7 @@ func KimchiSubagentFile(p string) bool {
 	return m.Type == "custom" && m.CustomType == "kimchi:subagent-session"
 }
 
+// LoadKimchi reads every Kimchi session on this machine.
 func LoadKimchi() []model.Session { return parseFiles(KimchiSessionFiles(), ParseKimchiFile) }
 
 // ParseKimchiFile reads one transcript.

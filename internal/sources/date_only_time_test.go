@@ -17,7 +17,7 @@ func TestADateWithNoTimeKeepsItsDate(t *testing.T) {
 	if y, m, d := got.Date(); y != 2026 || m != time.September || d != 6 {
 		t.Errorf("parsed %s, want 2026-09-06", got.Format(time.RFC3339))
 	}
-	if h, min, s := got.Clock(); h != 0 || min != 0 || s != 0 {
+	if h, m, s := got.Clock(); h != 0 || m != 0 || s != 0 {
 		t.Errorf("a date with no time got a clock reading: %s", got.Format(time.RFC3339))
 	}
 	// And the shapes that are not a stamp at all still return zero, so a

@@ -20,7 +20,7 @@ func TestAWornCountReachesASessionWhoseIDIsNotValidUTF8(t *testing.T) {
 		t.Fatal(err)
 	}
 	var back []string
-	if err := json.Unmarshal(raw, &back); err != nil {
+	if err = json.Unmarshal(raw, &back); err != nil {
 		t.Fatal(err)
 	}
 	logged := back[0]

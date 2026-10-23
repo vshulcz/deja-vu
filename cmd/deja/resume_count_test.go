@@ -29,7 +29,7 @@ func TestTheResumeCountFollowsTheRegistry(t *testing.T) {
 			} `json:"capabilities"`
 		} `json:"harnesses"`
 	}
-	if err := json.Unmarshal(b, &reg); err != nil {
+	if err = json.Unmarshal(b, &reg); err != nil {
 		t.Fatal(err)
 	}
 
@@ -57,9 +57,9 @@ func TestTheResumeCountFollowsTheRegistry(t *testing.T) {
 		"docs/guide/lost-context.html",
 	}
 	for _, page := range pages {
-		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(page)))
-		if err != nil {
-			t.Fatal(err)
+		raw, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(page)))
+		if readErr != nil {
+			t.Fatal(readErr)
 		}
 		text := proseOf(string(raw))
 		found := claim.FindAllStringSubmatchIndex(text, -1)
@@ -71,14 +71,10 @@ func TestTheResumeCountFollowsTheRegistry(t *testing.T) {
 			// before — the FAQ answer names `deja resume` and then counts the
 			// harnesses that "support it" — so the lookback is a paragraph's
 			// worth rather than one sentence.
-			from := loc[0] - 250
-			if from < 0 {
-				from = 0
-			}
-			to := loc[1] + 120 // "…can also be reopened with deja resume."
-			if to > len(text) {
-				to = len(text)
-			}
+			from := max(loc[0]-250, 0)
+			to := min(
+				// "…can also be reopened with deja resume."
+				loc[1]+120, len(text))
 			if !strings.Contains(strings.ToLower(text[from:to]), "resume") {
 				continue
 			}
@@ -121,7 +117,7 @@ func TestTheResumeCountFollowsTheRegistry(t *testing.T) {
 	named := strings.FieldsFunc(m[2], func(r rune) bool { return r == ',' })
 	var listed []string
 	for _, n := range named {
-		for _, part := range strings.Split(n, " and ") {
+		for part := range strings.SplitSeq(n, " and ") {
 			if p := strings.TrimSpace(part); p != "" {
 				listed = append(listed, p)
 			}

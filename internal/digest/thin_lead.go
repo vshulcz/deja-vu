@@ -72,7 +72,7 @@ func namesSomething(s string) bool {
 		}
 		rest = rest[i+1+j+1:]
 	}
-	for _, tok := range strings.Fields(s) {
+	for tok := range strings.FieldsSeq(s) {
 		tok = strings.Trim(tok, ".,;:!?()[]«»\"'*`")
 		if tok == "" {
 			continue
@@ -136,10 +136,7 @@ func substantialLead(text, head string) string {
 		if thinSentence(s) {
 			continue
 		}
-		end := i + 2
-		if end > len(all) {
-			end = len(all)
-		}
+		end := min(i+2, len(all))
 		return strings.Join(all[i:end], " ")
 	}
 	return ""

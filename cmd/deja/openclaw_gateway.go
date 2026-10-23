@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net"
 	"net/url"
 	"os"
@@ -63,7 +64,8 @@ func openclawGatewayAnswers() bool {
 	if addr == "" {
 		return false
 	}
-	c, err := net.DialTimeout("tcp", addr, 400*time.Millisecond)
+	d := net.Dialer{Timeout: 400 * time.Millisecond}
+	c, err := d.DialContext(context.Background(), "tcp", addr)
 	if err != nil {
 		return false
 	}

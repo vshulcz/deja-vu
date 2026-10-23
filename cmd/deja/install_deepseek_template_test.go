@@ -27,12 +27,12 @@ func TestDeepSeekAutoRecallWithTemplateBracesRenders(t *testing.T) {
 	stub := filepath.Join(home, "deja")
 	script := "#!/bin/sh\ncat >/dev/null\n" +
 		"printf '%s\\n' 'last time: unknown prompt variable \"{{cwd}}\" in context \"deja:project\"; {{cwd b {{a b}}'\n"
-	if err := os.WriteFile(stub, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(stub, []byte(script), 0o755); werr != nil {
+		t.Fatal(werr)
 	}
 	plugin := filepath.Join(home, "auto.js")
-	if err := os.WriteFile(plugin, []byte(dshAutoJS(stub)), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(plugin, []byte(dshAutoJS(stub)), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	// render mirrors dsh-system-prompt 0.2.1-rc.2's strict interpolation, with
 	// the interpolate flag ignored the way every dsh before 0.2.1-alpha.2 does.
@@ -63,17 +63,17 @@ for (const c of contexts) {
 }
 `
 	run := filepath.Join(home, "drive.mjs")
-	if err := os.WriteFile(run, []byte(driver), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(run, []byte(driver), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
-	out, err := exec.Command(node, run).CombinedOutput()
+	out, err := exec.CommandContext(t.Context(), node, run).CombinedOutput()
 	if err != nil {
 		t.Fatalf("driving the plugin: %v\n%s", err, out)
 	}
 	got := string(out)
 	for _, name := range []string{"deja:project", "deja:recall"} {
 		line := ""
-		for _, l := range strings.Split(got, "\n") {
+		for l := range strings.SplitSeq(got, "\n") {
 			if strings.HasPrefix(l, name+" ") {
 				line = l
 			}

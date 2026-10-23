@@ -150,14 +150,8 @@ func TestTheResumeClaimMatchesTheRegistry(t *testing.T) {
 				continue // a claim about all of them, not a subset
 			}
 			// A subset claim in a sentence about resuming is the resume count.
-			lo := m[0] - 200
-			if lo < 0 {
-				lo = 0
-			}
-			hi := m[1] + 200
-			if hi > len(text) {
-				hi = len(text)
-			}
+			lo := max(m[0]-200, 0)
+			hi := min(m[1]+200, len(text))
 			if !strings.Contains(strings.ToLower(text[lo:hi]), "resume") {
 				continue
 			}

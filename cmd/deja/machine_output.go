@@ -53,10 +53,7 @@ func sliceMessages(ms []model.Message, offset, limit int) []model.Message {
 	if offset > total {
 		offset = total
 	}
-	end := offset + limit
-	if end > total {
-		end = total
-	}
+	end := min(offset+limit, total)
 	return ms[offset:end]
 }
 

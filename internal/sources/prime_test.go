@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
-func writePrimeSession(t *testing.T, root, id, cwd string) string {
+func writePrimeSession(t *testing.T, root, id, cwd string) {
 	t.Helper()
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		t.Fatal(err)
@@ -21,7 +22,6 @@ func writePrimeSession(t *testing.T, root, id, cwd string) string {
 	if err := os.WriteFile(path, []byte(lines), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	return path
 }
 
 // The root is flat — one file per session, named by uuid7 — so there is no
@@ -143,9 +143,11 @@ func TestPrimeChildrenFollowTheSubagentSwitch(t *testing.T) {
 	child := filepath.Join(sub, "01a0f994-e172-71c9-b9fd-834f9bd5836e.jsonl")
 	lines := `{"type":"session","version":3,"id":"01a0f994-e172-71c9-b9fd-834f9bd5836e","cwd":"/tmp/proj-prime-g","parentSession":"~/.prime/agent/sessions/` + parent + `.jsonl","rlmDepth":1}` + "\n" +
 		`{"type":"message","id":"u1","timestamp":"2026-10-01T22:27:59.000Z","message":{"role":"user","content":[{"type":"text","text":"check the config"}]}}` + "\n"
+	var linesSb146 strings.Builder
 	for i := range 8 {
-		lines += fmt.Sprintf(`{"type":"message","id":"a%d","timestamp":"2026-10-01T22:28:%02d.000Z","message":{"role":"assistant","content":[{"type":"text","text":"looking at part %d"}]}}`, i, i, i) + "\n"
+		linesSb146.WriteString(fmt.Sprintf(`{"type":"message","id":"a%d","timestamp":"2026-10-01T22:28:%02d.000Z","message":{"role":"assistant","content":[{"type":"text","text":"looking at part %d"}]}}`, i, i, i) + "\n")
 	}
+	lines += linesSb146.String()
 	lines += `{"type":"message","id":"z","timestamp":"2026-10-01T22:29:00.000Z","message":{"role":"assistant","content":[{"type":"text","text":"retries is 5"}]}}` + "\n"
 	if err := os.WriteFile(child, []byte(lines), 0o600); err != nil {
 		t.Fatal(err)
@@ -155,7 +157,7 @@ func TestPrimeChildrenFollowTheSubagentSwitch(t *testing.T) {
 		if err != nil || len(ss) != 1 {
 			t.Fatalf("parse child: %v, %d sessions", err, len(ss))
 		}
-		var out []string
+		out := make([]string, 0, len(ss[0].Messages))
 		for _, m := range ss[0].Messages {
 			out = append(out, m.Text)
 		}

@@ -20,6 +20,7 @@ import (
 // message objects) and CLI agent transcripts as Anthropic-shaped JSONL under
 // ~/.cursor/projects/<encoded-path>/agent-transcripts/.
 
+// CursorUserRoot is the Cursor editor's User dir.
 func CursorUserRoot() string {
 	if v := os.Getenv("DEJA_CURSOR_ROOT"); v != "" {
 		return v
@@ -80,6 +81,7 @@ func CursorDBs() []string {
 	return out
 }
 
+// CursorTranscripts lists every Cursor CLI agent transcript.
 func CursorTranscripts() []string {
 	root := filepath.Join(CursorCLIRoot(), "projects")
 	var out []string
@@ -88,7 +90,7 @@ func CursorTranscripts() []string {
 		// Regular files only: a FIFO matching the glob would block the
 		// parser's Open forever (same hang walkFiles guards against).
 		if err != nil || !d.Type().IsRegular() {
-			return nil
+			return nil //nolint:nilerr // the walk goes past entries it cannot read
 		}
 		if !strings.EqualFold(filepath.Ext(p), ".jsonl") {
 			return nil
@@ -124,8 +126,9 @@ func fileExists(p string) bool {
 	return err == nil && !fi.IsDir()
 }
 
+// LoadCursor reads every Cursor store on this machine.
 func LoadCursor() []model.Session {
-	var ss []model.Session
+	var ss []model.Session //nolint:prealloc // each store adds an unknown number of sessions
 	for _, db := range CursorDBs() {
 		got, err := ParseCursorDB(db)
 		ss = append(ss, dbRead(db, got, err)...)
@@ -180,7 +183,7 @@ func cursorComposerKeyList(bubbles []map[string]any) string {
 
 func parseCursorDB(db string, since time.Time) ([]model.Session, error) {
 	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
-		return nil, nil
+		return nil, nil //nolint:nilerr // a missing or empty store holds no sessions
 	}
 	const bubbleSelect = `select json_object('key',cast(key as text),` +
 		`'type',json_extract(value,'$.type'),` +

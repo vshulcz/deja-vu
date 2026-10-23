@@ -55,8 +55,8 @@ func TestInstallHermesJoinsAnMCPBlockOnTheFirstLine(t *testing.T) {
 			if _, err := installHermesMCP("/bin/deja", false); err != nil {
 				t.Fatal(err)
 			}
-			if b, _ := os.ReadFile(path); string(b) != got {
-				t.Fatalf("a second install changed the file:\nfirst  %q\nsecond %q", got, b)
+			if b2, _ := os.ReadFile(path); string(b2) != got {
+				t.Fatalf("a second install changed the file:\nfirst  %q\nsecond %q", got, b2)
 			}
 			if _, err := installHermesMCP("/bin/deja", true); err != nil {
 				t.Fatal(err)
@@ -114,6 +114,7 @@ func TestInstallGooseJoinsACommentedExtensionsKey(t *testing.T) {
 }
 
 func gooseRoundTrip(t *testing.T, cfg string) {
+	t.Helper()
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
@@ -210,7 +211,7 @@ func TestContinueAndGooseKeysWithCommentsRoundTrip(t *testing.T) {
 			if err := os.WriteFile(path, []byte(tc.cfg), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			for i := 0; i < 2; i++ {
+			for range 2 {
 				if _, err := tc.install("/bin/deja", false); err != nil {
 					t.Fatal(err)
 				}

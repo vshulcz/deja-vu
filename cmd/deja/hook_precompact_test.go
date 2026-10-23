@@ -66,10 +66,13 @@ func TestRunHookPrecompactParsesAndGuards(t *testing.T) {
 	t.Setenv("DEJA_WARMUP_SENTINEL", "")
 	spawned := 0
 	oldSpawn := spawnWarmup
-	spawnWarmup = func(exe, sentinel string) error { spawned++; return nil }
+	spawnWarmup = func(_, _ string) error { spawned++; return nil }
 	defer func() { spawnWarmup = oldSpawn }()
 
-	payload, _ := json.Marshal(map[string]any{"session_id": "abc", "trigger": "auto"})
+	payload, jerr := json.Marshal(map[string]any{"session_id": "abc", "trigger": "auto"})
+	if jerr != nil {
+		t.Fatal(jerr)
+	}
 	withHookStdin(t, string(payload))
 	runHookPrecompact(index.DefaultDir())
 	if spawned != 1 {

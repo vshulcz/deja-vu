@@ -34,7 +34,7 @@ func TestTheTwoDatabaseHalvesNameTheirPrereq(t *testing.T) {
 	doctorHarnesses(&out, t.TempDir())
 	for _, name := range []string{"kilocode", "zcode"} {
 		row := ""
-		for _, line := range strings.Split(out.String(), "\n") {
+		for line := range strings.SplitSeq(out.String(), "\n") {
 			if strings.HasPrefix(strings.TrimSpace(line), name+" ") {
 				row = line
 				break

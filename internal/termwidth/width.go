@@ -7,7 +7,11 @@
 // rather than reflowed.
 package termwidth
 
-import "github.com/vshulcz/deja-vu/internal/nfcfold"
+import (
+	"slices"
+
+	"github.com/vshulcz/deja-vu/internal/nfcfold"
+)
 
 // Columns is how wide a string prints. A CJK character is one rune and two
 // columns.
@@ -221,8 +225,8 @@ func CutRight(s string, width int) string {
 	s = nfcfold.Compose(s)
 	n := 0
 	runes := []rune(s)
-	for i := len(runes) - 1; i >= 0; i-- {
-		w := RuneColumns(runes[i])
+	for i, r := range slices.Backward(runes) {
+		w := RuneColumns(r)
 		if n+w > width {
 			return string(runes[i+1:])
 		}

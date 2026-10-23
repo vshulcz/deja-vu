@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -17,7 +18,7 @@ func seedFileHistory(t *testing.T) {
 	tmp := hermeticEnv(t)
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		id := "s" + string(rune('0'+i))
 		writeClaudeFixture(t, filepath.Join(root, "alpha", id+".jsonl"), id, []string{
 			`{"type":"user","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"edit"}}`,
@@ -156,7 +157,7 @@ func TestZCodeWiresTheToolEvents(t *testing.T) {
 		t.Fatal(err)
 	}
 	b2, _ := os.ReadFile(zcodeConfigPath())
-	if string(b2) != string(b) {
+	if !bytes.Equal(b2, b) {
 		t.Errorf("a second install changed the file:\n%s", b2)
 	}
 	if _, err := installZCodeHooks("/bin/deja", true); err != nil {
@@ -311,7 +312,11 @@ const fail = await handlers.tool_result[0]({ toolName: "ipython", toolCallId: "c
 const ok = await handlers.tool_result[0]({ toolName: "ipython", toolCallId: "c3", input: { code: "r = await bash('true')" }, content: [{ type: "text", text: "BashResult(exit_code=0, output='', duration=0.01)" }], isError: false });
 console.log(JSON.stringify({ read, fail, ok }));
 `)
-	var got struct{ Read, Fail, Ok any }
+	var got struct {
+		Read any `json:"read"`
+		Fail any `json:"fail"`
+		Ok   any `json:"ok"`
+	}
 	if err := json.Unmarshal([]byte(strings.TrimSpace(out[strings.LastIndex(strings.TrimSpace(out), "\n")+1:])), &got); err != nil {
 		t.Fatalf("%v: %s", err, out)
 	}
@@ -406,7 +411,7 @@ func TestHermesFileLineOnTransformToolResult(t *testing.T) {
 	}
 	stub, calls := answeringDeja(t)
 	root := t.TempDir()
-	if err := os.WriteFile(filepath.Join(root, "plugin.py"), []byte(hermesPluginPy(stub)), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(root, "plugin.py"), []byte(hermesPluginPy(stub)), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	probe := "import importlib.util, json\n" +
@@ -417,7 +422,7 @@ func TestHermesFileLineOnTransformToolResult(t *testing.T) {
 		"       m.repair(tool_name='patch', args={'mode': 'patch', 'patch': '*** Begin Patch\\n*** Update File: /w/config.go\\n@@\\n+x\\n*** End Patch'}, result='ok', session_id='h1'),\n" +
 		"       m.repair(tool_name='web_search', args={'query': 'x'}, result='ok', session_id='h1')]\n" +
 		"print(json.dumps(out))\n"
-	cmd := exec.Command(py, "-c", probe)
+	cmd := exec.CommandContext(t.Context(), py, "-c", probe)
 	cmd.Dir = root
 	b, err := cmd.CombinedOutput()
 	if err != nil {
@@ -427,7 +432,11 @@ func TestHermesFileLineOnTransformToolResult(t *testing.T) {
 	if err := json.Unmarshal(b, &got); err != nil {
 		t.Fatalf("%v: %s", err, b)
 	}
-	if len(got) != 3 || !strings.HasSuffix(got[0].(string), "\n\nDEJA-LINE-hook-tool") || got[1] == nil || got[2] != nil {
+	var first string
+	if len(got) == 3 {
+		first, _ = got[0].(string)
+	}
+	if len(got) != 3 || !strings.HasSuffix(first, "\n\nDEJA-LINE-hook-tool") || got[1] == nil || got[2] != nil {
 		t.Errorf("repair returned %v", got)
 	}
 	asked := toolCalls(calls(), "hook-tool")

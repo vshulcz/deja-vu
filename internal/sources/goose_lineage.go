@@ -3,6 +3,7 @@ package sources
 import (
 	"bytes"
 	"encoding/json"
+	"slices"
 	"strings"
 )
 
@@ -32,12 +33,7 @@ func gooseColumns(db string) gooseSchema {
 var gooseSubagentTypes = []string{"subagent", "sub_agent"}
 
 func gooseSubagentType(t string) bool {
-	for _, s := range gooseSubagentTypes {
-		if t == s {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(gooseSubagentTypes, t)
 }
 
 // gooseFork is a session `goose session --resume --fork` (or an ACP fork)
@@ -80,8 +76,12 @@ func gooseForks(db string, g gooseSchema, where string) map[string]gooseFork {
 		return nil
 	}
 	forks := map[string]gooseFork{}
-	for _, line := range bytes.Split(out, []byte("\n")) {
-		var r struct{ Fork, Source, IDs string }
+	for line := range bytes.SplitSeq(out, []byte("\n")) {
+		var r struct {
+			Fork   string `json:"fork"`
+			Source string `json:"source"`
+			IDs    string `json:"ids"`
+		}
 		if json.Unmarshal(line, &r) != nil || r.Fork == "" || r.Source == "" {
 			continue
 		}
@@ -89,7 +89,7 @@ func gooseForks(db string, g gooseSchema, where string) map[string]gooseFork {
 			continue // ordered best first
 		}
 		copied := map[string]bool{}
-		for _, id := range strings.Split(r.IDs, "\x1f") {
+		for id := range strings.SplitSeq(r.IDs, "\x1f") {
 			copied[id] = true
 		}
 		forks[r.Fork] = gooseFork{source: r.Source, copied: copied}

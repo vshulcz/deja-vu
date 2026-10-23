@@ -28,7 +28,7 @@ func TestTheAfterHookKeepsToThisProjectsRemedies(t *testing.T) {
 	}
 	wall := "psql: error: connection to the billing database failed: Connection refused"
 	now := time.Now().UTC()
-	for k := 0; k < 2; k++ {
+	for k := range 2 {
 		at := now.Add(-time.Duration(600-20*k) * time.Minute).Format(time.RFC3339)
 		var lines []string
 		add := func(role string, content any) {

@@ -93,27 +93,27 @@ func TestHermesMemoryWritePassesDashTextAfterSeparator(t *testing.T) {
 	argvFile := filepath.Join(dir, "argv.json")
 	stub := filepath.Join(dir, "deja")
 	stubSrc := "#!" + py + "\nimport json, sys\njson.dump(sys.argv[1:], open(" + strconv.Quote(argvFile) + ", 'w'))\n"
-	if err := os.WriteFile(stub, []byte(stubSrc), 0o755); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(stub, []byte(stubSrc), 0o755); werr != nil {
+		t.Fatal(werr)
 	}
 	// Just enough of Hermes for the provider to import.
-	if err := os.MkdirAll(filepath.Join(dir, "agent"), 0o755); err != nil {
-		t.Fatal(err)
+	if merr := os.MkdirAll(filepath.Join(dir, "agent"), 0o755); merr != nil {
+		t.Fatal(merr)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "agent", "__init__.py"), nil, 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(filepath.Join(dir, "agent", "__init__.py"), nil, 0o644); werr != nil {
+		t.Fatal(werr)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "agent", "memory_provider.py"), []byte("class MemoryProvider:\n    pass\n"), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(filepath.Join(dir, "agent", "memory_provider.py"), []byte("class MemoryProvider:\n    pass\n"), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "provider.py"), []byte(hermesMemoryPy(stub)), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(filepath.Join(dir, "provider.py"), []byte(hermesMemoryPy(stub)), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	run := "import provider\nprovider.DejaMemoryProvider().on_memory_write('add', 'user', '- prefers tabs')\n"
-	cmd := exec.Command(py, "-c", run)
+	cmd := exec.CommandContext(t.Context(), py, "-c", run)
 	cmd.Dir = dir
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("provider: %v\n%s", err, out)
+	if out, cerr := cmd.CombinedOutput(); cerr != nil {
+		t.Fatalf("provider: %v\n%s", cerr, out)
 	}
 	got, err := os.ReadFile(argvFile)
 	if err != nil {
@@ -141,7 +141,7 @@ func TestHermesGeneratedPythonCompiles(t *testing.T) {
 		if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		if out, err := exec.Command(py, "-m", "py_compile", path).CombinedOutput(); err != nil {
+		if out, err := exec.CommandContext(t.Context(), py, "-m", "py_compile", path).CombinedOutput(); err != nil {
 			t.Fatalf("%s does not compile: %v\n%s", name, err, out)
 		}
 	}
@@ -163,30 +163,30 @@ func TestHermesToolsAskForFramedOutput(t *testing.T) {
 	argvFile := filepath.Join(dir, "argv.json")
 	stub := filepath.Join(dir, "deja")
 	stubSrc := "#!" + py + "\nimport json, sys\nopen(" + strconv.Quote(argvFile) + ", 'a').write(json.dumps(sys.argv[1:]) + '\\n')\n"
-	if err := os.WriteFile(stub, []byte(stubSrc), 0o755); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(stub, []byte(stubSrc), 0o755); werr != nil {
+		t.Fatal(werr)
 	}
-	if err := os.MkdirAll(filepath.Join(dir, "agent"), 0o755); err != nil {
-		t.Fatal(err)
+	if merr := os.MkdirAll(filepath.Join(dir, "agent"), 0o755); merr != nil {
+		t.Fatal(merr)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "agent", "__init__.py"), nil, 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(filepath.Join(dir, "agent", "__init__.py"), nil, 0o644); werr != nil {
+		t.Fatal(werr)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "agent", "memory_provider.py"), []byte("class MemoryProvider:\n    pass\n"), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(filepath.Join(dir, "agent", "memory_provider.py"), []byte("class MemoryProvider:\n    pass\n"), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "provider.py"), []byte(hermesMemoryPy(stub)), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(filepath.Join(dir, "provider.py"), []byte(hermesMemoryPy(stub)), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	run := "import provider\np = provider.DejaMemoryProvider()\n" +
 		"p.handle_tool_call('deja_recall', {'query': 'q'})\n" +
 		"p.handle_tool_call('deja_recall', {'query': '-q', 'offset': 3})\n" +
 		"p.handle_tool_call('deja_fix', {'error': 'e'})\n" +
 		"p.handle_tool_call('deja_blame', {'path': 'a.go'})\n"
-	cmd := exec.Command(py, "-c", run)
+	cmd := exec.CommandContext(t.Context(), py, "-c", run)
 	cmd.Dir = dir
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("provider: %v\n%s", err, out)
+	if out, cerr := cmd.CombinedOutput(); cerr != nil {
+		t.Fatalf("provider: %v\n%s", cerr, out)
 	}
 	got, err := os.ReadFile(argvFile)
 	if err != nil {

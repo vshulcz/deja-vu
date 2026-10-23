@@ -20,7 +20,7 @@ func TestPrefixSampleCatchesARewriteAtEveryDepth(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "s.jsonl")
 	var b strings.Builder
-	for i := 0; i < 4000; i++ {
+	for range 4000 {
 		b.WriteString(sampleLine("original "))
 	}
 	original := b.String()

@@ -14,10 +14,7 @@ func TestTheWaitGrowsAndStopsGrowing(t *testing.T) {
 	var prev time.Duration
 	for i := range renameTries {
 		got := renameBackoff(i)
-		floor := renameWait << min(i, renameShifts)
-		if floor > renameWaitMax {
-			floor = renameWaitMax
-		}
+		floor := min(renameWait<<min(i, renameShifts), renameWaitMax)
 		if got < floor || got > floor+floor/2 {
 			t.Fatalf("attempt %d waited %v, want between %v and %v", i, got, floor, floor+floor/2)
 		}
@@ -49,10 +46,7 @@ func TestTheWaitIsNotTheSameNumberEveryTime(t *testing.T) {
 func TestTheBudgetOutlastsAPollingReader(t *testing.T) {
 	var floor time.Duration
 	for i := range renameTries {
-		d := renameWait << min(i, renameShifts)
-		if d > renameWaitMax {
-			d = renameWaitMax
-		}
+		d := min(renameWait<<min(i, renameShifts), renameWaitMax)
 		floor += d
 	}
 	if floor < time.Second {

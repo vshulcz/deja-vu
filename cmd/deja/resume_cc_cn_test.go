@@ -28,7 +28,10 @@ func TestResumeCommandCodeRunsInTheSessionDirectory(t *testing.T) {
 	proj := t.TempDir()
 	id := "1583a430-5538-475d-9190-0d726c7a374f"
 	transcript := filepath.Join(t.TempDir(), "projects", "private-tmp-proj-cc", id+".jsonl")
-	cwd, _ := json.Marshal(proj)
+	cwd, err := json.Marshal(proj)
+	if err != nil {
+		t.Fatal(err)
+	}
 	writeResumeFile(t, transcript,
 		`{"type":"session","version":3,"id":"`+id+`","timestamp":"2026-10-01T20:09:14.839Z","cwd":`+string(cwd)+`}`+"\n"+
 			`{"type":"message","id":"f82f93b8","parentId":null,"message":{"role":"user","content":[{"type":"text","text":"fix the retry loop"}]}}`+"\n")
@@ -75,7 +78,10 @@ func TestResumeContinueForksInTheWorkspace(t *testing.T) {
 	proj := t.TempDir()
 	sessions := filepath.Join(t.TempDir(), "sessions")
 	id := "5f38800d-4bfe-4a34-a6f1-b117d8ce618c"
-	ws, _ := json.Marshal(proj)
+	ws, err := json.Marshal(proj)
+	if err != nil {
+		t.Fatal(err)
+	}
 	path := filepath.Join(sessions, id+".json")
 	writeResumeFile(t, path, `{"sessionId":"`+id+`","title":"retry","workspaceDirectory":`+string(ws)+`,"history":[]}`)
 
@@ -96,7 +102,10 @@ func TestResumeContinueForksInTheWorkspace(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		uri = (&url.URL{Scheme: "file", Path: "/" + filepath.ToSlash(proj)}).String()
 	}
-	list, _ := json.Marshal([]map[string]string{{"sessionId": id, "workspaceDirectory": uri}})
+	list, err := json.Marshal([]map[string]string{{"sessionId": id, "workspaceDirectory": uri}})
+	if err != nil {
+		t.Fatal(err)
+	}
 	writeResumeFile(t, filepath.Join(sessions, "sessions.json"), string(list))
 	writeResumeFile(t, path, `{"sessionId":"`+id+`","history":[]}`)
 	if dir, _, _ := resumeCommand(model.Session{Harness: "continue", ID: id, Path: path}); filepath.Clean(dir) != filepath.Clean(proj) {

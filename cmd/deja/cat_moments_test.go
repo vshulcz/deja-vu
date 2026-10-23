@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
@@ -35,7 +34,7 @@ func TestCatMomentsAtTheSearch(t *testing.T) {
 	withTempStores(t)
 	root := t.TempDir()
 	t.Setenv("DEJA_CLAUDE_ROOT", root)
-	user, _ := json.Marshal(map[string]any{"type": "user", "sessionId": "a1", "cwd": "/work/pay", "timestamp": "2026-03-01T10:00:00Z",
+	user := mustMarshal(t, map[string]any{"type": "user", "sessionId": "a1", "cwd": "/work/pay", "timestamp": "2026-03-01T10:00:00Z",
 		"message": map[string]any{"role": "user", "content": "the retry reused the idempotency key"}})
 	writeClaudeFixture(t, filepath.Join(root, "pay", "a1.jsonl"), "a1", []string{string(user)})
 	dir := os.Getenv("DEJA_INDEX_DIR")

@@ -63,7 +63,7 @@ func TestHookToolWritesCrushsOwnEnvelope(t *testing.T) {
 // One naming Claude's "Bash" and "Edit" matches nothing here; one left empty
 // pays an index read on every view, ls, grep and glob.
 func TestCrushHookMatcherNamesTheToolsCrushRuns(t *testing.T) {
-	re, err := regexp.Compile(crushHookMatcher)
+	re, err := regexp.Compile(crushHookMatcher) //nolint:gocritic // a matcher that does not compile is the failure this test reports
 	if err != nil {
 		t.Fatalf("matcher does not compile: %v", err)
 	}
@@ -111,8 +111,8 @@ func TestCrushAutoWritesBothHalvesOfOneFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	var root map[string]any
-	if err := json.Unmarshal(b, &root); err != nil {
-		t.Fatalf("%v: %s", err, b)
+	if uerr := json.Unmarshal(b, &root); uerr != nil {
+		t.Fatalf("%v: %s", uerr, b)
 	}
 	mcp, _ := root["mcp"].(map[string]any)
 	if _, ok := mcp["deja"]; !ok {
@@ -132,8 +132,8 @@ func TestCrushAutoWritesBothHalvesOfOneFile(t *testing.T) {
 	}
 
 	// Uninstall takes both back out and leaves no empty blocks behind.
-	if _, err := installTarget("crush-auto", "/bin/deja", true); err != nil {
-		t.Fatal(err)
+	if _, ierr := installTarget("crush-auto", "/bin/deja", true); ierr != nil {
+		t.Fatal(ierr)
 	}
 	b, err = os.ReadFile(crushConfigPath())
 	if err != nil {

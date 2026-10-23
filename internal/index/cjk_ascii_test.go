@@ -66,7 +66,7 @@ func BenchmarkCJKBigramsASCII(b *testing.B) {
 	body := strings.Repeat("the ingest worker leaks goroutines after a reload. ", 200)
 	b.SetBytes(int64(len(body)))
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		cjkfold.Bigrams(body)
 	}
 }
@@ -75,7 +75,7 @@ func BenchmarkCJKBigramsCJK(b *testing.B) {
 	body := strings.Repeat("摄取工作进程在重载之后泄漏协程。", 100)
 	b.SetBytes(int64(len(body)))
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		cjkfold.Bigrams(body)
 	}
 }

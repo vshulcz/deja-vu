@@ -3,6 +3,7 @@ package query
 import (
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/cjkfold"
 )
@@ -27,7 +28,8 @@ func RelevanceTerms(q string) []string {
 	seen := map[string]bool{}
 	var out []string
 	for _, f := range fields {
-		if len([]rune(f)) < 2 || (len(f) < 3 && !cjkfold.Unspaced([]rune(f)[0])) || IsStopWord(f) || seen[f] {
+		first, _ := utf8.DecodeRuneInString(f)
+		if len([]rune(f)) < 2 || (len(f) < 3 && !cjkfold.Unspaced(first)) || IsStopWord(f) || seen[f] {
 			continue
 		}
 		if CJKFunctionBigram(f) {

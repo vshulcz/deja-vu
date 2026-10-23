@@ -46,14 +46,14 @@ func TestReadmeSidecarSizeMatchesWhatEmbedWrites(t *testing.T) {
 
 	tmp := t.TempDir()
 	root := filepath.Join(tmp, "claude", "-tmp-project")
-	if err := os.MkdirAll(root, 0o755); err != nil {
+	if err = os.MkdirAll(root, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	var lines strings.Builder
-	for i := 0; i < 64; i++ {
+	for i := range 64 {
 		fmt.Fprintf(&lines, `{"type":"user","sessionId":"s","timestamp":"2026-01-01T00:00:00Z","message":{"role":"user","content":"sidecar sizing message %d"}}`+"\n", i)
 	}
-	if err := os.WriteFile(filepath.Join(root, "session.jsonl"), []byte(lines.String()), 0o600); err != nil {
+	if err = os.WriteFile(filepath.Join(root, "session.jsonl"), []byte(lines.String()), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	for key, value := range map[string]string{
@@ -67,7 +67,7 @@ func TestReadmeSidecarSizeMatchesWhatEmbedWrites(t *testing.T) {
 		t.Setenv(key, value)
 	}
 	dir := filepath.Join(tmp, "index.db")
-	if err := index.Ensure(dir, "", false, nil); err != nil {
+	if err = index.Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	records, err := index.ReadRecords(dir)
@@ -82,7 +82,7 @@ func TestReadmeSidecarSizeMatchesWhatEmbedWrites(t *testing.T) {
 		var request struct {
 			Input []string `json:"input"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		if decodeErr := json.NewDecoder(r.Body).Decode(&request); decodeErr != nil {
 			t.Error(err)
 			return
 		}
@@ -95,7 +95,7 @@ func TestReadmeSidecarSizeMatchesWhatEmbedWrites(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	if _, err := EmbedIndex(dir, &Client{URL: ts.URL, Model: "test", HTTP: ts.Client()}, nil); err != nil {
+	if _, err = EmbedIndex(dir, &Client{URL: ts.URL, Model: "test", HTTP: ts.Client()}, nil); err != nil {
 		t.Fatal(err)
 	}
 	info, err := os.Stat(Path(dir))

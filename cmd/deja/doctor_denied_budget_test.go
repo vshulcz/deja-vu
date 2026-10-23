@@ -20,7 +20,7 @@ func TestDeniedDirIsFoundPastTheFileBudget(t *testing.T) {
 	if err := os.MkdirAll(crowd, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 6000; i++ {
+	for i := range 6000 {
 		if err := os.WriteFile(filepath.Join(crowd, fmt.Sprintf("s%d.jsonl", i)), []byte("{}\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
@@ -47,7 +47,7 @@ func TestDeniedDirIsFoundPastTheDirectoryBudget(t *testing.T) {
 		t.Skip("directory permissions do not deny reads here")
 	}
 	root := t.TempDir()
-	for i := 0; i < 6000; i++ {
+	for i := range 6000 {
 		if err := os.MkdirAll(filepath.Join(root, fmt.Sprintf("proj%05d", i)), 0o755); err != nil {
 			t.Fatal(err)
 		}

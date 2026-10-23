@@ -46,10 +46,10 @@ func TestWriteBackCommandCodeRoundTrips(t *testing.T) {
 	if f.Path != path || f.Root != root || f.Turns != 3 {
 		t.Fatalf("got %s under %s with %d turns", f.Path, f.Root, f.Turns)
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	if err = os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, f.Data, 0o600); err != nil {
+	if err = os.WriteFile(path, f.Data, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	ss, err := ParseCommandCodeFile(path)

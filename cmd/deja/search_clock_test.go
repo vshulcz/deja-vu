@@ -43,7 +43,7 @@ func TestSearchSaysWhenAHitIsStampedAhead(t *testing.T) {
 		`{"type":"user","sessionId":"past","timestamp":"2026-09-13T09:00:00Z","cwd":"/work/app",` +
 			`"message":{"role":"user","content":"the api will not start, checked the logs"}}`,
 	})
-	if err := index.Ensure(filepath.Join(tmp2, "index.db"), "", false, nil); err != nil {
+	if err = index.Ensure(filepath.Join(tmp2, "index.db"), "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	note, err = captureRunStderr(t, "search", "api")

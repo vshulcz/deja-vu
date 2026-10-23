@@ -97,22 +97,22 @@ func TestStatsJSONCarriesTheWithheldCount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), append(b, '\n'), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), append(b, '\n'), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
-	if err := os.MkdirAll(store, 0o755); err != nil {
+	if err = os.MkdirAll(store, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	rec := `{"type":"user","message":{"role":"user","content":"local work on the ticker window"},"timestamp":"2026-07-11T10:00:00Z","sessionId":"loc","cwd":"/proj"}` + "\n"
-	if err := os.WriteFile(filepath.Join(store, "loc.jsonl"), []byte(rec), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(store, "loc.jsonl"), []byte(rec), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	dir := filepath.Join(tmp, "index.db")
-	if err := index.Ensure(dir, "", false, nil); err != nil {
+	if err = index.Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := captureRun(t, "sync", "import", exp); err != nil {
+	if _, err = captureRun(t, "sync", "import", exp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -121,7 +121,7 @@ func TestStatsJSONCarriesTheWithheldCount(t *testing.T) {
 		t.Fatal(err)
 	}
 	var m map[string]any
-	if err := json.Unmarshal([]byte(out), &m); err != nil {
+	if err = json.Unmarshal([]byte(out), &m); err != nil {
 		t.Fatalf("stats --json is not JSON: %v", err)
 	}
 	if _, ok := m["policy_withheld"]; ok {
@@ -129,7 +129,7 @@ func TestStatsJSONCarriesTheWithheldCount(t *testing.T) {
 	}
 
 	policyFile := filepath.Join(tmp, "policy.json")
-	if err := os.WriteFile(policyFile, []byte(`{"activations":{"search":{"local":true,"imported":false}}}`), 0o644); err != nil {
+	if err = os.WriteFile(policyFile, []byte(`{"activations":{"search":{"local":true,"imported":false}}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_POLICY_FILE", policyFile)

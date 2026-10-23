@@ -664,8 +664,8 @@ func otherFrictionSigs(text string, first uint64) []uint64 {
 }
 
 func firstLineOf(s string) string {
-	if i := strings.IndexByte(s, '\n'); i >= 0 {
-		return s[:i]
+	if before, _, ok := strings.Cut(s, "\n"); ok {
+		return before
 	}
 	return s
 }
@@ -709,11 +709,8 @@ func mergeFixes(dir, tmp string, live map[string]bool, replacements []model.Sess
 	// leakier build wrote is served until something rewrites it.
 	served, torn := readFixesChecked(dir)
 	changed := torn
-	for _, p := range served {
-		if leaksCredential(p) {
-			changed = true
-			break
-		}
+	if slices.ContainsFunc(served, leaksCredential) {
+		changed = true
 	}
 	kept := make([]FixPair, 0, len(raw))
 	for _, p := range raw {
@@ -1092,10 +1089,8 @@ func remedyIsIrreversible(cmd string) bool {
 		w := strings.Fields(seg)
 		has := func(words ...string) bool {
 			for _, x := range words {
-				for _, y := range w {
-					if y == x {
-						return true
-					}
+				if slices.Contains(w, x) {
+					return true
 				}
 			}
 			return false

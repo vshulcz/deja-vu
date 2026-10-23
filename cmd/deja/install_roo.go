@@ -19,8 +19,9 @@ import (
 // static, and nothing in Roo can refresh them mid-session, so what goes there
 // is the guidance block rather than a digest that would rot.
 func rooMCPSettingsPaths() []string {
-	var out []string
-	for _, root := range sources.RooRoots() {
+	roots := sources.RooRoots()
+	out := make([]string, 0, len(roots))
+	for _, root := range roots {
 		out = append(out, filepath.Join(root, "settings", "mcp_settings.json"))
 	}
 	return out
@@ -166,8 +167,8 @@ func rooAllowDejasTool(path string) (bool, error) {
 		return false, nil
 	}
 	var root map[string]any
-	if err := json.Unmarshal(old, &root); err != nil {
-		return false, nil
+	if uerr := json.Unmarshal(old, &root); uerr != nil {
+		return false, nil //nolint:nilerr // an unparsable file is left to the writer to report
 	}
 	servers, _ := root["mcpServers"].(map[string]any)
 	entry, _ := servers[dejaEntryKey(servers)].(map[string]any)

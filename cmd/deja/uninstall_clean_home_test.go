@@ -41,7 +41,7 @@ func TestUninstallOnACleanHomeCreatesNothing(t *testing.T) {
 			var made []string
 			_ = filepath.WalkDir(home, func(path string, d fs.DirEntry, werr error) error {
 				if werr != nil || d.IsDir() {
-					return nil
+					return nil //nolint:nilerr // an unreadable entry is not one uninstall made
 				}
 				// deja's own state is allowed: it records that an uninstall ran.
 				if strings.Contains(path, filepath.Join(".config", "deja")) {

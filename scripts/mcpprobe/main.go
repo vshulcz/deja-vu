@@ -16,6 +16,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -52,8 +53,11 @@ func (c *client) send(method string, params any, notify bool) (rpc, error) {
 		c.next++
 		msg["id"] = c.next
 	}
-	b, _ := json.Marshal(msg)
-	if _, err := c.in.Write(append(b, '\n')); err != nil {
+	b, err := json.Marshal(msg)
+	if err != nil {
+		return rpc{}, err
+	}
+	if _, err = c.in.Write(append(b, '\n')); err != nil {
 		return rpc{}, err
 	}
 	if notify {
@@ -87,7 +91,7 @@ func main() {
 	query := flag.String("query", "deploy token rotate", "what to recall")
 	flag.Parse()
 
-	cmd := exec.Command(*deja, "mcp")
+	cmd := exec.CommandContext(context.Background(), *deja, "mcp")
 	cmd.Stderr = os.Stderr
 	stdin, err := cmd.StdinPipe()
 	fatal(err)
@@ -138,10 +142,10 @@ func main() {
 		if !strings.Contains(t.Name, "recall") {
 			continue
 		}
-		r, err := c.send("tools/call", map[string]any{
+		r, serr := c.send("tools/call", map[string]any{
 			"name": t.Name, "arguments": map[string]any{"query": *query},
 		}, false)
-		fatal(err)
+		fatal(serr)
 		body := string(r.Result)
 		check(r.Error == nil, t.Name+" answers")
 		check(strings.Contains(body, `"type":"text"`) || strings.Contains(body, `"type": "text"`),
@@ -164,8 +168,8 @@ func main() {
 	}
 
 	if _, ok := initResult.Capabilities["resources"]; ok {
-		res, err := c.send("resources/list", map[string]any{}, false)
-		fatal(err)
+		res, serr := c.send("resources/list", map[string]any{}, false)
+		fatal(serr)
 		check(res.Error == nil, "resources/list answers, since the server advertises resources")
 		var resources struct {
 			Resources []struct {
@@ -174,14 +178,14 @@ func main() {
 		}
 		_ = json.Unmarshal(res.Result, &resources)
 		if len(resources.Resources) > 0 {
-			read, err := c.send("resources/read", map[string]any{"uri": resources.Resources[0].URI}, false)
-			fatal(err)
+			read, rerr := c.send("resources/read", map[string]any{"uri": resources.Resources[0].URI}, false)
+			fatal(rerr)
 			check(read.Error == nil, "a listed resource can be read")
 		}
 		// What a hostile or confused client sends.
 		for _, uri := range []string{"", "not-a-uri", "deja://session/../../etc/passwd", "deja://session/claude:nope"} {
-			bad, err := c.send("resources/read", map[string]any{"uri": uri}, false)
-			fatal(err)
+			bad, berr := c.send("resources/read", map[string]any{"uri": uri}, false)
+			fatal(berr)
 			check(bad.Error != nil, fmt.Sprintf("resources/read refuses %q", uri))
 		}
 	}

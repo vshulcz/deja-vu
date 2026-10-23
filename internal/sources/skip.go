@@ -2,6 +2,7 @@ package sources
 
 import (
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -105,12 +106,7 @@ func SkipReason(harness string) string {
 }
 
 func anyFileExists(paths []string) bool {
-	for _, p := range paths {
-		if fileExists(p) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(paths, fileExists)
 }
 
 // anyZstdFramed reports whether any of these files is a zstd frame rather than

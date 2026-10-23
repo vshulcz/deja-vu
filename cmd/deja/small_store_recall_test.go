@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -123,7 +124,7 @@ func rankLabel(rank int) string {
 	if rank == 0 {
 		return "-"
 	}
-	return fmt.Sprint(rank)
+	return strconv.Itoa(rank)
 }
 
 // seedBigStore writes the dominant harness: 200 sessions of ordinary project
@@ -139,7 +140,7 @@ func seedBigStore(t *testing.T, claudeRoot string) {
 		"the font in the pdf export is fine, the missing glyph is in the ui",
 		"the clock in the ledger dashboard drifts, the skew banner is cosmetic",
 	}
-	for i := 0; i < 200; i++ {
+	for i := range 200 {
 		at := time.Now().Add(-time.Duration(i+2) * time.Hour).UTC().Format(time.RFC3339)
 		id := fmt.Sprintf("big%d", i)
 		writeClaudeFixture(t, filepath.Join(claudeRoot, "-tmp-app", id+".jsonl"), "", []string{

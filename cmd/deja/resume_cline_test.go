@@ -19,12 +19,15 @@ func TestResumeClineRunsInTheSessionDirectory(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	man, _ := json.Marshal(map[string]string{"sessionId": id, "cwd": proj})
-	if err := os.WriteFile(filepath.Join(dir, id+".json"), man, 0o644); err != nil {
+	man, err := json.Marshal(map[string]string{"sessionId": id, "cwd": proj})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(dir, id+".json"), man, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	transcript := filepath.Join(dir, id+".messages.json")
-	if err := os.WriteFile(transcript, []byte(`{"messages":[]}`), 0o644); err != nil {
+	if err = os.WriteFile(transcript, []byte(`{"messages":[]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -40,7 +43,7 @@ func TestResumeClineRunsInTheSessionDirectory(t *testing.T) {
 	}
 
 	// A directory that is gone gets no cd that would fail before cline starts.
-	if err := os.RemoveAll(proj); err != nil {
+	if err = os.RemoveAll(proj); err != nil {
 		t.Fatal(err)
 	}
 	sess := model.Session{Harness: "cline", ID: id, Path: transcript}
@@ -54,7 +57,10 @@ func TestResumeClineRunsInTheSessionDirectory(t *testing.T) {
 	}
 
 	// A relative cwd would be resolved against wherever deja runs.
-	man, _ = json.Marshal(map[string]string{"cwd": "."})
+	man, err = json.Marshal(map[string]string{"cwd": "."})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(dir, id+".json"), man, 0o644); err != nil {
 		t.Fatal(err)
 	}

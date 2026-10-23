@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -48,7 +49,7 @@ func TestOpenClawHeartbeatPollsAreNotTurns(t *testing.T) {
 	if err != nil || len(got) != 1 {
 		t.Fatalf("dm: %v %v", got, err)
 	}
-	var texts []string
+	texts := make([]string, 0, len(got[0].Messages))
 	for _, m := range got[0].Messages {
 		texts = append(texts, m.Text)
 	}
@@ -78,9 +79,11 @@ func TestOpenClawHeartbeatOKIsNotATurn(t *testing.T) {
 {"type":"message","id":"a","timestamp":"2026-07-20T05:00:01Z","message":{"role":"user","content":"the eviction policy is LRU with a 512 MB cap"}}
 {"type":"message","id":"b","timestamp":"2026-07-20T05:00:05Z","message":{"role":"assistant","content":[{"type":"text","text":"Noted."}]}}
 `
+	var bodySb81 strings.Builder
 	for i, ack := range []string{"HEARTBEAT_OK", "**HEARTBEAT_OK**", "HEARTBEAT_OK.", "NO_REPLY NO_REPLY"} {
-		body += fmt.Sprintf(poll, fmt.Sprint("u", i), fmt.Sprint("u", i), ack)
+		fmt.Fprintf(&bodySb81, poll, fmt.Sprint("u", i), fmt.Sprint("u", i), ack)
 	}
+	body += bodySb81.String()
 	report := "HEARTBEAT_OK — but the nightly build failed on main."
 	body += fmt.Sprintf(poll, "u9", "u9", report)
 	p := filepath.Join(dir, "hb.jsonl")
@@ -91,7 +94,7 @@ func TestOpenClawHeartbeatOKIsNotATurn(t *testing.T) {
 	if err != nil || len(got) != 1 {
 		t.Fatalf("hb: %v %v", got, err)
 	}
-	var texts []string
+	texts := make([]string, 0, len(got[0].Messages))
 	for _, m := range got[0].Messages {
 		texts = append(texts, m.Text)
 	}

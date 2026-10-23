@@ -50,8 +50,8 @@ func TestARunnersVerdictIsReadFromItsOwnLine(t *testing.T) {
 func TestASessionRepeatingOneCommandIsCountedTwice(t *testing.T) {
 	dir := t.TempDir() + "/index.db"
 	at := time.Date(2026, 3, 4, 10, 0, 0, 0, time.UTC)
-	msg := func(role, text string, min int) model.Message {
-		return model.Message{Role: role, Text: text, Time: at.Add(time.Duration(min) * time.Minute)}
+	msg := func(role, text string, minute int) model.Message {
+		return model.Message{Role: role, Text: text, Time: at.Add(time.Duration(minute) * time.Minute)}
 	}
 	writeStore(t, dir, []model.Session{{
 		ID: "s1", Harness: "claude", Project: "work/app", Path: "/tmp/s1.jsonl", Updated: at,

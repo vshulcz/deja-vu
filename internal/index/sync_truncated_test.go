@@ -45,7 +45,7 @@ func TestImportNamesATruncatedBatch(t *testing.T) {
 	// A corrupt line in the middle (with lines after it) is a different thing —
 	// it keeps the mistrustful wording.
 	mid := good + `{bad}` + "\n" + good
-	if err := os.WriteFile(filepath.Join(in, "deja-sync-abc-1.jsonl"), []byte(mid), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(in, "deja-sync-abc-1.jsonl"), []byte(mid), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	_, err = Import(dir, in)

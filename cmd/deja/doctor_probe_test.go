@@ -25,7 +25,7 @@ INSERT INTO message VALUES ('m2','new','{"role":"user","time":{"created":2000}}'
 INSERT INTO part VALUES ('p1','m1','{"type":"text","text":"OLDSESSION"}');
 INSERT INTO part VALUES ('p2','m2','{"type":"text","text":"NEWSESSION"}');
 `
-	if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, sql).CombinedOutput(); err != nil {
 		t.Fatalf("seed: %v: %s", err, out)
 	}
 	ss, err := doctorProbeOpencode(db)

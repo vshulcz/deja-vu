@@ -30,7 +30,7 @@ func TestTheCardSaysHowToPostIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(card); err != nil {
+	if _, err = os.Stat(card); err != nil {
 		t.Fatalf("no card was written: %v", err)
 	}
 	if !strings.Contains(out, "vshulcz.github.io/deja-vu/card/") {

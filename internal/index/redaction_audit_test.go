@@ -15,7 +15,7 @@ import (
 // claude tool_result block), then every byte of the built index is scanned.
 func TestNoPlaintextSecretReachesIndex(t *testing.T) {
 	root, dir := allHarnessEnv(t)
-	secrets := map[string]string{
+	secrets := map[string]string{ //nolint:gosec // a fake secret the redaction test plants
 		"claude-text":  "AKIAIOSFODNN7EXAMPL1",
 		"claude-tool":  "ghp_toolresultsecret0123456789abcdef",
 		"grok-title":   "sk-ant-api03-titlesecret0123456789",
@@ -60,9 +60,9 @@ func TestNoPlaintextSecretReachesIndex(t *testing.T) {
 		t.Fatalf("index looks empty: %v", files)
 	}
 	for _, p := range files {
-		b, err := os.ReadFile(p)
-		if err != nil {
-			t.Fatal(err)
+		b, readErr := os.ReadFile(p)
+		if readErr != nil {
+			t.Fatal(readErr)
 		}
 		for name, secret := range secrets {
 			if strings.Contains(string(b), secret) {

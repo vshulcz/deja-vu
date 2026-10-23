@@ -79,7 +79,7 @@ func legacyNamedTestFailure(l string) bool {
 }
 
 func frictionTestLines() []string {
-	lines := []string{
+	lines := []string{ //nolint:prealloc // a fixture literal the loop below grows
 		"",
 		"zsh:1: command not found: timeout",
 		"bash: line 3: COMMAND NOT FOUND: whatever-tool",
@@ -111,12 +111,12 @@ func frictionTestLines() []string {
 		strings.Repeat("x", 199) + " permission denied",
 		"a permission denied b " + strings.Repeat("я", 180),
 	}
-	r := rand.New(rand.NewSource(7))
+	r := rand.New(rand.NewSource(7)) //nolint:gosec // a seeded fixture, not crypto
 	words := []string{"error", "Error", "ERROR", "not", "found", "no", "such", "table:", "does", "exist",
 		"command", "Permission", "denied", "panic:", "--- FAIL:", "TestFoo", "echo", "\"", "$(", "K",
 		"ё", "ß", "x", " ", "  ", ":", "1", "2026-10-22", "[", "]", "fatal:", "cannot", "find", "timed",
 		"out", "after", "symbol(s)", "\xff", "İ", "undefined:", "npm", "err!", "E "}
-	for i := 0; i < 20000; i++ {
+	for range 20000 {
 		var b strings.Builder
 		for n := r.Intn(30); n > 0; n-- {
 			b.WriteString(words[r.Intn(len(words))])

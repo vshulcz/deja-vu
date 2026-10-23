@@ -110,7 +110,7 @@ func TestCrushStoreWithoutTheSummaryFlag(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(db), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	build := exec.Command("sqlite3", db)
+	build := exec.CommandContext(t.Context(), "sqlite3", db)
 	build.Stdin = strings.NewReader(sql)
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build store: %v: %s", err, out)

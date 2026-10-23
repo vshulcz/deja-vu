@@ -17,11 +17,11 @@ import (
 func notesPayload(t *testing.T, page string) string {
 	t.Helper()
 	const marker = ",N="
-	i := strings.Index(page, marker)
-	if i < 0 {
+	_, after, ok := strings.Cut(page, marker)
+	if !ok {
 		t.Fatalf("the view page no longer embeds a notes array; this test reads the wrong thing now")
 	}
-	rest := page[i+len(marker):]
+	rest := after
 	if j := strings.Index(rest, "];"); j >= 0 {
 		return rest[:j+1]
 	}
@@ -56,12 +56,12 @@ func TestNoteTagsCannotCloseThePagesScript(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(notes, append(body, '\n'), 0o600); err != nil {
+	if err = os.WriteFile(notes, append(body, '\n'), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
 	dir := index.DefaultDir()
-	if err := index.Ensure(dir, "", true, nil); err != nil {
+	if err = index.Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	path, _, err := writeViewHTML(dir, filepath.Join(tmp, "view.html"))

@@ -94,9 +94,9 @@ func TestPutClip(t *testing.T) {
 func TestRecolorAndLines(t *testing.T) {
 	c := NewCanvas(3, 1)
 	c.Put(0, 0, "ab", Style{FG: Hex("#ff0000"), BG: Hex("#000000"), Bold: true, Italic: true, Reverse: true}, 3)
-	true_ := c.Lines(ModeTrue)[0]
-	if !strings.Contains(true_, "38;2;255;0;0") || !strings.Contains(true_, ";1;3;7") {
-		t.Errorf("truecolor line = %q", true_)
+	truecolor := c.Lines(ModeTrue)[0]
+	if !strings.Contains(truecolor, "38;2;255;0;0") || !strings.Contains(truecolor, ";1;3;7") {
+		t.Errorf("truecolor line = %q", truecolor)
 	}
 	if l := c.Lines(Mode256)[0]; !strings.Contains(l, "38;5;196") {
 		t.Errorf("256 line = %q", l)

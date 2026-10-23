@@ -16,8 +16,8 @@ func seedFrictionCorpus(t *testing.T) string {
 	tmp := hermeticEnv(t)
 	// One directory per project: the environment block claims something about
 	// the machine, and a wall of one repository no longer qualifies.
-	var stores []string
-	for i := 0; i < environmentMinProjects; i++ {
+	stores := make([]string, 0, environmentMinProjects)
+	for i := range environmentMinProjects {
 		store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj"+string(rune('0'+i)))
 		if err := os.MkdirAll(store, 0o755); err != nil {
 			t.Fatal(err)

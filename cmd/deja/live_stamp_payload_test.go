@@ -24,19 +24,19 @@ func TestHermesProviderNamesTheSessionToHookContext(t *testing.T) {
 	dir := t.TempDir()
 	log := filepath.Join(dir, "calls")
 	stub := filepath.Join(dir, "deja")
-	if err := os.WriteFile(stub, []byte("#!/bin/sh\nprintf '%s|' \"$*\" >> "+log+"\ncat >> "+log+"\necho >> "+log+"\n"), 0o755); err != nil {
+	if err = os.WriteFile(stub, []byte("#!/bin/sh\nprintf '%s|' \"$*\" >> "+log+"\ncat >> "+log+"\necho >> "+log+"\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(dir, "agent"), 0o755); err != nil {
+	if err = os.MkdirAll(filepath.Join(dir, "agent"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "agent", "__init__.py"), nil, 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(dir, "agent", "__init__.py"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "agent", "memory_provider.py"), []byte("class MemoryProvider:\n    pass\n"), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(dir, "agent", "memory_provider.py"), []byte("class MemoryProvider:\n    pass\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "provider.py"), []byte(hermesMemoryPy(stub)), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(dir, "provider.py"), []byte(hermesMemoryPy(stub)), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	// Hermes hands prefetch the session on some paths and only initialize on
@@ -49,10 +49,10 @@ func TestHermesProviderNamesTheSessionToHookContext(t *testing.T) {
 		"p.on_session_switch('20261007_101900_bbbbbb', reset=True)\n" +
 		"p.prefetch('')\n" +
 		"p.on_session_end([])\n"
-	cmd := exec.Command(py, "-c", run)
+	cmd := exec.CommandContext(t.Context(), py, "-c", run)
 	cmd.Dir = dir
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("provider: %v\n%s", err, out)
+	if out, runErr := cmd.CombinedOutput(); runErr != nil {
+		t.Fatalf("provider: %v\n%s", runErr, out)
 	}
 	b, err := os.ReadFile(log)
 	if err != nil {
@@ -60,7 +60,7 @@ func TestHermesProviderNamesTheSessionToHookContext(t *testing.T) {
 	}
 	var ids []string
 	ended := false
-	for _, line := range strings.Split(string(b), "\n") {
+	for line := range strings.SplitSeq(string(b), "\n") {
 		if strings.HasPrefix(line, "hook-session-end") && strings.Contains(line, `"session_id": "20261007_101900_bbbbbb"`) {
 			ended = true
 		}
@@ -174,7 +174,7 @@ func TestPiFamilyDigestFollowsTheSessionAfterNew(t *testing.T) {
 	if err != nil {
 		t.Skip("node is needed to run the extension")
 	}
-	typescript := exec.Command(node, "-e", "process.exit(process.features.typescript ? 0 : 1)").Run() == nil
+	typescript := exec.CommandContext(t.Context(), node, "-e", "process.exit(process.features.typescript ? 0 : 1)").Run() == nil
 	for _, c := range []struct {
 		name, file string
 		ts         bool

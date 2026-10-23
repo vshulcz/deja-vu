@@ -35,7 +35,7 @@ func TestUninstallFinishesTheTargetsItCan(t *testing.T) {
 	}
 
 	guidance := filepath.Join(os.Getenv("HOME"), ".claude", "skills", "deja-history")
-	if err := os.Chmod(guidance, 0o500); err != nil {
+	if err = os.Chmod(guidance, 0o500); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(guidance, 0o700) })

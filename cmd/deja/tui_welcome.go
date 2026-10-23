@@ -159,10 +159,7 @@ func (a *tuiApp) drawWelcome() {
 		}
 	}
 	cw := 24
-	tx := (p.W - cw - 6 - 52) / 2
-	if tx < 2 {
-		tx = 2
-	}
+	tx := max((p.W-cw-6-52)/2, 2)
 	y := max(1, (p.H-16)/2)
 	switch {
 	case p.W >= 84:
@@ -250,7 +247,7 @@ func (a *tuiApp) drawBuilding(tx, ly, right int) {
 // length, drawn as a bead sliding back and forth.
 func (a *tuiApp) drawBar(x, y, w int, frac float64) {
 	p := a.p
-	for i := 0; i < w; i++ {
+	for i := range w {
 		p.Put(x+i, y, "━", fgs(cOver), x+w)
 	}
 	if frac < 0 {
@@ -259,13 +256,13 @@ func (a *tuiApp) drawBar(x, y, w int, frac float64) {
 		if pos >= w-6 {
 			pos = span - pos
 		}
-		for i := 0; i < 6; i++ {
+		for i := range 6 {
 			p.Put(x+pos+i, y, "━", fgs(cAcc), x+w)
 		}
 		return
 	}
 	n := int(frac * float64(w))
-	for i := 0; i < n; i++ {
+	for i := range n {
 		p.Put(x+i, y, "━", fgs(cAcc), x+w)
 	}
 }
@@ -279,9 +276,9 @@ func (a *tuiApp) drawSkeleton(x, y, w, n int) {
 	}
 	widths := []int{90, 75, 95, 60, 85, 40}
 	sweep := int(a.now.UnixMilli()/40) % (w + 20)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		bw := max(3, w*widths[i%len(widths)]/100)
-		for c := 0; c < bw; c++ {
+		for c := range bw {
 			col := cSurf2
 			if d := c - (sweep - 10 - i*2); d >= 0 && d < 6 {
 				col = cOver
@@ -292,7 +289,7 @@ func (a *tuiApp) drawSkeleton(x, y, w, n int) {
 }
 
 // drawStores lists the agents read so far, one row each.
-func (a *tuiApp) drawStores(tx, ly, right int, stores []agentCount, all bool) int {
+func (a *tuiApp) drawStores(tx, ly, right int, stores []agentCount, _ bool) int {
 	p := a.p
 	for i, ac := range stores {
 		if i == 8 {

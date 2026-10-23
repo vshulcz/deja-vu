@@ -40,7 +40,7 @@ func TestUninstallClaudeRemovesAdoptedRenamedEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	servers := issue2269JSONServers(t, path, "mcpServers")
+	servers := issue2269JSONServers(t, path)
 	if _, ok := servers["deja-vu"]; ok {
 		t.Fatalf("uninstall left the adopted deja-vu entry: %#v", servers)
 	}
@@ -76,7 +76,7 @@ func TestUninstallClaudeLeavesUnadoptedRenamedEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	servers := issue2269JSONServers(t, path, "mcpServers")
+	servers := issue2269JSONServers(t, path)
 	if _, ok := servers["deja-vu"]; !ok {
 		t.Fatalf("uninstall removed the unadopted deja-vu entry: %#v", servers)
 	}
@@ -154,7 +154,7 @@ func TestUninstallClaudeRemovesOnlyAdoptedRenamedEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	servers := issue2269JSONServers(t, path, "mcpServers")
+	servers := issue2269JSONServers(t, path)
 	if _, ok := servers["deja-vu"]; ok {
 		t.Fatalf("uninstall left the adopted deja-vu entry: %#v", servers)
 	}

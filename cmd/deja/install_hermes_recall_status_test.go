@@ -18,23 +18,23 @@ func TestTheProviderImportsOnAHermesWithoutRecallStatus(t *testing.T) {
 	}
 	root := t.TempDir()
 	agentDir := filepath.Join(root, "agent")
-	if err := os.MkdirAll(agentDir, 0o755); err != nil {
-		t.Fatal(err)
+	if merr := os.MkdirAll(agentDir, 0o755); merr != nil {
+		t.Fatal(merr)
 	}
 	// The 0.17 interface: the base class, nothing else.
 	stub := "from abc import ABC\n\n\nclass MemoryProvider(ABC):\n    pass\n"
-	if err := os.WriteFile(filepath.Join(agentDir, "memory_provider.py"), []byte(stub), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(filepath.Join(agentDir, "memory_provider.py"), []byte(stub), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
-	if err := os.WriteFile(filepath.Join(agentDir, "__init__.py"), nil, 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(filepath.Join(agentDir, "__init__.py"), nil, 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	provider := filepath.Join(root, "deja_memory.py")
-	if err := os.WriteFile(provider, []byte(hermesMemoryPy(`"/bin/deja"`)), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(provider, []byte(hermesMemoryPy(`"/bin/deja"`)), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 
-	cmd := exec.Command(py, "-c", "import deja_memory; p = deja_memory.DejaMemoryProvider(); print(p.recall_status())")
+	cmd := exec.CommandContext(t.Context(), py, "-c", "import deja_memory; p = deja_memory.DejaMemoryProvider(); print(p.recall_status())")
 	cmd.Dir = root
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -57,29 +57,29 @@ func TestTheHookDoesNotStandDownForAProviderThatCannotLoad(t *testing.T) {
 	hookDir := filepath.Join(plugins, "deja")
 	broken := filepath.Join(plugins, "deja-memory")
 	for _, d := range []string{hookDir, broken} {
-		if err := os.MkdirAll(d, 0o755); err != nil {
-			t.Fatal(err)
+		if merr := os.MkdirAll(d, 0o755); merr != nil {
+			t.Fatal(merr)
 		}
 	}
-	if err := os.WriteFile(filepath.Join(hookDir, "__init__.py"), []byte(hermesPluginPy(`"/bin/deja"`)), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(filepath.Join(hookDir, "__init__.py"), []byte(hermesPluginPy(`"/bin/deja"`)), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	// What an older Hermes gives the provider: a module that raises on import.
-	if err := os.WriteFile(filepath.Join(broken, "__init__.py"),
-		[]byte("from agent.memory_provider import MemoryProvider, RecallStatus\n"), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(filepath.Join(broken, "__init__.py"),
+		[]byte("from agent.memory_provider import MemoryProvider, RecallStatus\n"), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	// The config says deja-memory is the provider.
 	cfg := filepath.Join(root, "hermes_cli")
-	if err := os.MkdirAll(cfg, 0o755); err != nil {
-		t.Fatal(err)
+	if merr := os.MkdirAll(cfg, 0o755); merr != nil {
+		t.Fatal(merr)
 	}
-	if err := os.WriteFile(filepath.Join(cfg, "__init__.py"), nil, 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(filepath.Join(cfg, "__init__.py"), nil, 0o644); werr != nil {
+		t.Fatal(werr)
 	}
-	if err := os.WriteFile(filepath.Join(cfg, "config.py"),
-		[]byte("def load_config():\n    return {}\n\n\ndef cfg_get(cfg, *keys):\n    return \"deja-memory\"\n"), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(filepath.Join(cfg, "config.py"),
+		[]byte("def load_config():\n    return {}\n\n\ndef cfg_get(cfg, *keys):\n    return \"deja-memory\"\n"), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 
 	script := "import importlib.util, sys\n" +
@@ -87,7 +87,7 @@ func TestTheHookDoesNotStandDownForAProviderThatCannotLoad(t *testing.T) {
 		"m = importlib.util.module_from_spec(spec)\n" +
 		"spec.loader.exec_module(m)\n" +
 		"print(m._provider_active())\n"
-	cmd := exec.Command(py, "-c", script)
+	cmd := exec.CommandContext(t.Context(), py, "-c", script)
 	cmd.Dir = root
 	out, err := cmd.CombinedOutput()
 	if err != nil {

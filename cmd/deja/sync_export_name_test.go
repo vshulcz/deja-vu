@@ -28,7 +28,7 @@ func TestTheExportSentencesAreSafeToPrint(t *testing.T) {
 
 	// A parent that cannot be created because a file sits where it would go:
 	// MkdirAll fails, and the sentence names the path.
-	blocker := filepath.Join(tmp, "gone\x1b[31mHACK\rrewound")
+	blocker := filepath.Join(tmp, "gone\x1b[31mHACK\rrewound") //nolint:gocritic // one name with control bytes, no separator
 	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
 		t.Skipf("the filesystem refused the name: %v", err)
 	}

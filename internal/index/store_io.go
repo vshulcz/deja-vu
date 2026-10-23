@@ -36,6 +36,7 @@ var recordLogScans int64
 // RecordLogScans reports how many times this process walked the record log.
 func RecordLogScans() int64 { return atomic.LoadInt64(&recordLogScans) }
 
+// ReadRecords reads every record in the log with its offset.
 func ReadRecords(dir string) ([]OffsetRecord, error) {
 	t, err := loadRecordTables(dir)
 	if err != nil {
@@ -50,7 +51,7 @@ func ReadRecords(dir string) ([]OffsetRecord, error) {
 	w := newLogWalk(f, t, 0)
 	for {
 		off, payload, err := w.next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return out, nil
 		}
 		if err != nil {
@@ -114,6 +115,8 @@ func (w *logWalk) next() (int64, []byte, error) {
 	}
 }
 
+// Generation names the index's current build, or its build time for an
+// index written before builds were named.
 func Generation(dir string) (string, error) {
 	m, err := readManifest(dir)
 	if err != nil {
@@ -143,10 +146,10 @@ func newRecordWriter(f *os.File, t *recordTables) (*recordWriter, error) {
 func (rw *recordWriter) write(r Record) (int64, error) {
 	b := encodeRecord(r, rw.tables)
 	if len(b) > 1<<31 {
-		return 0, fmt.Errorf("record too large")
+		return 0, errors.New("record too large")
 	}
 	var hdr [4]byte
-	binary.LittleEndian.PutUint32(hdr[:], uint32(len(b)))
+	binary.LittleEndian.PutUint32(hdr[:], uint32(len(b))) //nolint:gosec // a record is far below 4 GiB
 	if _, err := rw.w.Write(hdr[:]); err != nil {
 		return 0, err
 	}
@@ -180,11 +183,11 @@ func writeRecord(f *os.File, r Record, t *recordTables) (int64, error) {
 	}
 	b := encodeRecord(r, t)
 	if len(b) > 1<<31 {
-		return 0, fmt.Errorf("record too large")
+		return 0, errors.New("record too large")
 	}
 	var hdr [4]byte
-	binary.LittleEndian.PutUint32(hdr[:], uint32(len(b)))
-	if _, err := f.Write(hdr[:]); err != nil {
+	binary.LittleEndian.PutUint32(hdr[:], uint32(len(b))) //nolint:gosec // a record is far below 4 GiB
+	if _, err = f.Write(hdr[:]); err != nil {
 		return 0, err
 	}
 	_, err = f.Write(b)
@@ -203,7 +206,7 @@ func writeRecord(f *os.File, r Record, t *recordTables) (int64, error) {
 // is a few hundred bytes. A larger record costs a second read, which is the
 // same work the old path did anyway.
 func readRecordAt(f *os.File, off int64, t *recordTables) (Record, error) {
-	buf := readAheadPool.Get().(*[]byte)
+	buf := readAheadPool.Get().(*[]byte) //nolint:forcetypeassert // the pool holds only *[]byte
 	defer readAheadPool.Put(buf)
 	b := *buf
 
@@ -259,7 +262,7 @@ func eachRecordUntil(path string, t *recordTables, fn func(Record) bool) error {
 	w := newLogWalk(f, t, 0)
 	for {
 		_, payload, err := w.next()
-		if err == io.EOF || err == io.ErrUnexpectedEOF {
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 			return nil
 		}
 		if err != nil {
@@ -307,7 +310,7 @@ func eachRecordInRoles(path string, t *recordTables, want map[string]bool, fn fu
 	w := newLogWalk(f, t, 0)
 	for {
 		_, payload, err := w.next()
-		if err == io.EOF || err == io.ErrUnexpectedEOF {
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 			return nil
 		}
 		if err != nil {
@@ -378,13 +381,10 @@ func walkRecordsForKeys(r *bufio.Reader, from int64, t *recordTables, want, role
 		// The key id is the first varint of the payload, so peek it and skip
 		// the rest of the record without touching it. Materializing every
 		// record just to read two bytes copied the whole log per query.
-		peek := int(n)
-		if peek > binary.MaxVarintLen64 {
-			peek = binary.MaxVarintLen64
-		}
+		peek := min(int(n), binary.MaxVarintLen64)
 		head, perr := r.Peek(peek)
 		if perr != nil && len(head) == 0 {
-			if perr == io.EOF || perr == io.ErrUnexpectedEOF {
+			if perr == io.EOF || errors.Is(perr, io.ErrUnexpectedEOF) {
 				return nil
 			}
 			return perr
@@ -407,7 +407,7 @@ func walkRecordsForKeys(r *bufio.Reader, from int64, t *recordTables, want, role
 		}
 		if skip {
 			if _, derr := r.Discard(int(n)); derr != nil {
-				if derr == io.EOF || derr == io.ErrUnexpectedEOF {
+				if derr == io.EOF || errors.Is(derr, io.ErrUnexpectedEOF) {
 					return nil
 				}
 				return derr
@@ -428,7 +428,7 @@ func walkRecordsForKeys(r *bufio.Reader, from int64, t *recordTables, want, role
 			// of the log, not the tolerated in-flight tail that the EOF branches
 			// above return nil for. Surface it like the length-cap check does so
 			// the read path rebuilds instead of silently dropping the message.
-			return fmt.Errorf("%w: %v", errCorruptIndex, derr)
+			return fmt.Errorf("%w: %w", errCorruptIndex, derr)
 		}
 		fn(rec)
 	}
@@ -598,7 +598,7 @@ var inflateReaders = sync.Pool{New: func() any { return flate.NewReader(nil) }}
 // anything — that path never touches a compressed byte.
 func encodeRecord(r Record, t *recordTables) []byte {
 	body := make([]byte, 0, len(r.Text)+24)
-	body = binary.LittleEndian.AppendUint64(body, uint64(recordNanos(r.Time)))
+	body = binary.LittleEndian.AppendUint64(body, uint64(recordNanos(r.Time))) //nolint:gosec // a signed time's bits, read back as int64
 	body = appendField(body, r.Text)
 
 	b := make([]byte, 0, len(body)+16)
@@ -614,7 +614,7 @@ func encodeRecord(r Record, t *recordTables) []byte {
 		return append(append(b, recordRaw), body...)
 	}
 	var buf bytes.Buffer
-	w := deflateWriters.Get().(*flate.Writer)
+	w := deflateWriters.Get().(*flate.Writer) //nolint:forcetypeassert // the pool holds only *flate.Writer
 	w.Reset(&buf)
 	if _, err := w.Write(body); err != nil {
 		deflateWriters.Put(w)
@@ -669,8 +669,8 @@ func decodeRecord(b []byte, t *recordTables) (Record, error) {
 	flag := b[0]
 	b = b[1:]
 	if flag == recordDeflated {
-		zr := inflateReaders.Get().(io.ReadCloser)
-		if err := zr.(flate.Resetter).Reset(bytes.NewReader(b), nil); err != nil {
+		zr := inflateReaders.Get().(io.ReadCloser)                                 //nolint:forcetypeassert // the pool holds only flate readers
+		if err := zr.(flate.Resetter).Reset(bytes.NewReader(b), nil); err != nil { //nolint:forcetypeassert // a flate reader is a Resetter
 			inflateReaders.Put(zr)
 			return rec, err
 		}
@@ -690,26 +690,26 @@ func decodeRecord(b []byte, t *recordTables) (Record, error) {
 	// into the year 1754, so an unstamped message never satisfied IsZero()
 	// again. Sync then read it as older than any watermark and skipped it on
 	// every push — the message could never reach another machine, silently.
-	if n := int64(binary.LittleEndian.Uint64(b[:8])); n == zeroTimeUnixNano {
+	if n := int64(binary.LittleEndian.Uint64(b[:8])); n == zeroTimeUnixNano { //nolint:gosec // a signed time's bits, written as uint64
 		rec.Time = time.Time{}
 	} else {
 		rec.Time = time.Unix(0, n)
 	}
 	b = b[8:]
-	if rec.Text, _, ok = consumeField(b); !ok {
+	if rec.Text, ok = consumeField(b); !ok {
 		return rec, errShortRecord
 	}
 	return rec, nil
 }
 
-func consumeField(b []byte) (string, []byte, bool) {
+func consumeField(b []byte) (string, bool) {
 	n, used := binary.Uvarint(b)
-	if used <= 0 || uint64(len(b)-used) < n {
-		return "", nil, false
+	if used <= 0 || uint64(len(b)-used) < n { //nolint:gosec // used <= len(b)
+		return "", false
 	}
 	start := used
-	end := start + int(n)
-	return string(b[start:end]), b[end:], true
+	end := start + int(n) //nolint:gosec // n is checked against len(b) above
+	return string(b[start:end]), true
 }
 
 // swapIndexDir replaces dir with tmp without a destructive window: the old
@@ -741,7 +741,7 @@ func swapIndexDir(dir, tmp string) error {
 	// look until it succeeds, so nobody is waiting on it, and this is the
 	// rename a pass that spent seconds building tmp would otherwise give up on
 	// for the sake of a search that held a handle for a quarter of a second.
-	if err := renameWaiting(dir, old, parkRenameWait); err != nil && !errors.Is(err, fs.ErrNotExist) {
+	if err := renameWaiting(dir, old); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
 	// From here the index is not where readers look, so this rename and the
@@ -909,8 +909,8 @@ func carryTombstoneMirror(dir, tmp string) {
 // those handles is finishing a read, not doing work, so the wait is short and
 // bounded; a rename still refused at the end is reported rather than retried
 // forever, and the caller puts the previous index back.
-func renameWaiting(from, to string, wait time.Duration) error {
-	return renameWaitingUntil(from, to, swapNow().Add(wait))
+func renameWaiting(from, to string) error {
+	return renameWaitingUntil(from, to, swapNow().Add(parkRenameWait))
 }
 
 // renameWaitingUntil is renameWaiting against a deadline the caller keeps, so a
@@ -1007,7 +1007,7 @@ func recoverIndexDir(dir string) {
 	if p := newestParked(dir); p != "" {
 		// The same wait: this is the crash-recovery path, and a refusal here
 		// leaves the index missing for the whole run.
-		_ = renameWaiting(p, dir, parkRenameWait)
+		_ = renameWaiting(p, dir)
 	}
 	recoverAppendedTail(dir)
 	recoverScrub(dir)
@@ -1031,10 +1031,10 @@ func writeBucket(p string, data map[string][]posting) error {
 		dirLen += uvarintLen(uint64(len(tok))) + len(tok) + uvarintLen(uint64(len(b)))
 	}
 	entries := make([]bucketEntry, 0, len(toks))
-	pos := uint64(dirLen)
+	pos := uint64(dirLen) //nolint:gosec // lengths are non-negative
 	for _, tok := range toks {
 		b := encoded[tok]
-		entries = append(entries, bucketEntry{tok: tok, off: pos, n: uint32(len(b))})
+		entries = append(entries, bucketEntry{tok: tok, off: pos, n: uint32(len(b))}) //nolint:gosec // a token's postings are far below 4 GiB
 		pos += uint64(len(b))
 	}
 	tmp := p + ".tmp"
@@ -1057,7 +1057,7 @@ func writeBucket(p string, data map[string][]posting) error {
 		if _, err := w.Write(scratch[:n]); err != nil {
 			return err
 		}
-		if _, err := w.Write([]byte(e.tok)); err != nil {
+		if _, err := w.WriteString(e.tok); err != nil {
 			return err
 		}
 		n = binary.PutUvarint(scratch[:], uint64(e.n))
@@ -1082,7 +1082,7 @@ func writeBucket(p string, data map[string][]posting) error {
 	// Rename over the live bucket: readers see the old file or the new one,
 	// never a torn write (#181). Waiting out a reader that holds it open, as
 	// Windows refuses the rename until it lets go.
-	return renameWaiting(tmp, p, parkRenameWait)
+	return renameWaiting(tmp, p)
 }
 
 // readBucketFile reads one postings file whole.
@@ -1095,7 +1095,7 @@ func readBucketFile(p string) (map[string][]posting, error) {
 	out := make(map[string][]posting, len(entries))
 	for _, e := range entries {
 		b := make([]byte, e.n)
-		if _, err := f.ReadAt(b, int64(e.off)); err != nil {
+		if _, err := f.ReadAt(b, int64(e.off)); err != nil { //nolint:gosec // offsets are checked against the bucket size on open
 			return nil, err
 		}
 		posts, err := decodePostingBlock(b)
@@ -1119,7 +1119,7 @@ func readBucketFileToken(p, tok string) ([]posting, error) {
 			continue
 		}
 		b := make([]byte, e.n)
-		if _, err := f.ReadAt(b, int64(e.off)); err != nil {
+		if _, err := f.ReadAt(b, int64(e.off)); err != nil { //nolint:gosec // offsets are checked against the bucket size on open
 			return nil, err
 		}
 		return decodePostingBlock(b)
@@ -1139,12 +1139,12 @@ func openBucketDir(p string) ([]bucketEntry, *os.File, error) {
 	}
 	r := bufio.NewReader(f)
 	magic := make([]byte, len(bucketMagic))
-	if _, err := io.ReadFull(r, magic); err != nil {
-		f.Close()
-		return nil, nil, fmt.Errorf("%w: %v", errCorruptIndex, err)
+	if _, err = io.ReadFull(r, magic); err != nil {
+		_ = f.Close()
+		return nil, nil, fmt.Errorf("%w: %w", errCorruptIndex, err)
 	}
-	if string(magic) != string(bucketMagic) {
-		f.Close()
+	if !bytes.Equal(magic, bucketMagic) {
+		_ = f.Close()
 		// Named for what it is. The magic moves when the posting format
 		// changes, and every reader of an index written by another version
 		// lands here — telling them the index is damaged sends them looking
@@ -1153,8 +1153,8 @@ func openBucketDir(p string) ([]bucketEntry, *os.File, error) {
 	}
 	count, err := binary.ReadUvarint(r)
 	if err != nil {
-		f.Close()
-		return nil, nil, fmt.Errorf("%w: %v", errCorruptIndex, err)
+		_ = f.Close()
+		return nil, nil, fmt.Errorf("%w: %w", errCorruptIndex, err)
 	}
 	// count and the token lengths below come straight off disk. A truncated
 	// file, or one written by a different index layout, can name a size no
@@ -1163,47 +1163,47 @@ func openBucketDir(p string) ([]bucketEntry, *os.File, error) {
 	// against the file: no entry occupies fewer than two bytes.
 	fi, err := f.Stat()
 	if err != nil {
-		f.Close()
+		_ = f.Close()
 		return nil, nil, err
 	}
-	fileSize := uint64(fi.Size())
+	fileSize := uint64(fi.Size()) //nolint:gosec // file sizes are non-negative
 	if count > fileSize/2 {
-		f.Close()
+		_ = f.Close()
 		return nil, nil, fmt.Errorf("%w: bucket directory claims %d entries in %d bytes", errCorruptIndex, count, fileSize)
 	}
 	entries := make([]bucketEntry, 0, count)
 	// Offsets are not stored; they are the running sum of the lengths, taken
 	// from where the directory ends.
-	dirLen := uint64(len(bucketMagic)) + uint64(uvarintLen(count))
-	for i := uint64(0); i < count; i++ {
+	dirLen := uint64(len(bucketMagic)) + uint64(uvarintLen(count)) //nolint:gosec // lengths are non-negative
+	for range count {
 		ln, err := binary.ReadUvarint(r)
 		if err != nil {
-			f.Close()
-			return nil, nil, fmt.Errorf("%w: %v", errCorruptIndex, err)
+			_ = f.Close()
+			return nil, nil, fmt.Errorf("%w: %w", errCorruptIndex, err)
 		}
 		if ln > fileSize {
-			f.Close()
+			_ = f.Close()
 			return nil, nil, fmt.Errorf("%w: token length %d exceeds bucket size %d", errCorruptIndex, ln, fileSize)
 		}
 		tb := make([]byte, ln)
-		if _, err := io.ReadFull(r, tb); err != nil {
-			f.Close()
-			return nil, nil, fmt.Errorf("%w: %v", errCorruptIndex, err)
+		if _, err = io.ReadFull(r, tb); err != nil {
+			_ = f.Close()
+			return nil, nil, fmt.Errorf("%w: %w", errCorruptIndex, err)
 		}
 		size, err := binary.ReadUvarint(r)
 		if err != nil {
-			f.Close()
-			return nil, nil, fmt.Errorf("%w: %v", errCorruptIndex, err)
+			_ = f.Close()
+			return nil, nil, fmt.Errorf("%w: %w", errCorruptIndex, err)
 		}
 		// MaxUint32 alone is not a bound: a bucket claiming four gigabytes for
 		// one token is an out-of-memory kill rather than a corrupt-index
 		// error, and the caller can recover from the latter. Postings live in
 		// this same file, so the file's own size is the real ceiling.
 		if size > math.MaxUint32 || size > fileSize {
-			f.Close()
+			_ = f.Close()
 			return nil, nil, fmt.Errorf("%w: posting block of %d bytes in a %d byte bucket", errCorruptIndex, size, fileSize)
 		}
-		dirLen += uint64(uvarintLen(ln)) + ln + uint64(uvarintLen(size))
+		dirLen += uint64(uvarintLen(ln)) + ln + uint64(uvarintLen(size)) //nolint:gosec // lengths are non-negative
 		entries = append(entries, bucketEntry{tok: string(tb), n: uint32(size)})
 	}
 	pos := dirLen
@@ -1269,7 +1269,7 @@ func encodePostings(posts []posting) []byte {
 	var prev int64
 	var prevSid uint32
 	for _, p := range s {
-		b = binary.AppendUvarint(b, uint64(p.Off-prev))
+		b = binary.AppendUvarint(b, uint64(p.Off-prev)) //nolint:gosec // postings ascend by offset
 		// A block is sorted by offset and records.bin is written in session
 		// order, so the session ids in one block are nearly sorted: 99.66% of
 		// postings on a real store carry an id no smaller than the one before
@@ -1280,8 +1280,8 @@ func encodePostings(posts []posting) []byte {
 		// The subtraction is deliberately modulo 2^32, which is what int32 of
 		// a uint32 difference gives: it round-trips the whole id space rather
 		// than the half an int32 could hold.
-		d := int32(p.Sid - prevSid)
-		z := uint32((d << 1) ^ (d >> 31))
+		d := int32(p.Sid - prevSid)       //nolint:gosec // zigzag: the delta's bits read as signed
+		z := uint32((d << 1) ^ (d >> 31)) //nolint:gosec // zigzag reinterprets the bits
 		// The tool bit rides in the low bit, where it has always ridden: a
 		// separate varint would cost a byte on every posting in the store.
 		v := uint64(z) << 1
@@ -1327,15 +1327,15 @@ func decodePostings(b []byte) []posting {
 		if n <= 0 {
 			return out
 		}
-		prev += int64(d)
+		prev += int64(d) //nolint:gosec // deltas of ascending offsets
 		b = b[n:]
 		v, n := binary.Uvarint(b)
 		if n <= 0 {
 			return out
 		}
-		z := uint32(v >> 1)
+		z := uint32(v >> 1) //nolint:gosec // zigzag reinterprets the bits
 		sidDelta := int32(z>>1) ^ -int32(z&1)
-		sid := prevSid + uint32(sidDelta)
+		sid := prevSid + uint32(sidDelta) //nolint:gosec // zigzag reinterprets the bits
 		out = append(out, posting{Off: prev, Sid: sid, Tool: v&1 == 1})
 		prevSid = sid
 		b = b[n:]
@@ -1376,7 +1376,7 @@ func writeGobAtomicStat(p string, v any) (os.FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := gob.NewEncoder(f).Encode(v); err != nil {
+	if err = gob.NewEncoder(f).Encode(v); err != nil {
 		_ = f.Close()
 		_ = os.Remove(tmp)
 		return nil, err
@@ -1384,12 +1384,12 @@ func writeGobAtomicStat(p string, v any) (os.FileInfo, error) {
 	// fsync before rename: manifest.gob is the freshness/RecordsSize authority and
 	// must land durably last, like records.bin and the buckets. Skipping it left a
 	// window where a crash after rename but before flush yields a torn manifest.
-	if err := f.Sync(); err != nil {
+	if err = f.Sync(); err != nil {
 		_ = f.Close()
 		_ = os.Remove(tmp)
 		return nil, err
 	}
-	if err := f.Close(); err != nil {
+	if err = f.Close(); err != nil {
 		_ = os.Remove(tmp)
 		return nil, err
 	}
@@ -1397,7 +1397,7 @@ func writeGobAtomicStat(p string, v any) (os.FileInfo, error) {
 	// reader decoding manifest.gob refuses the rename onto it with "Access is
 	// denied": a recall beside a remember failed that way on windows CI. The
 	// reader is a decode away from closing, so wait it out as the swap does.
-	if err := renameWaiting(tmp, p, parkRenameWait); err != nil {
+	if err = renameWaiting(tmp, p); err != nil {
 		_ = os.Remove(tmp)
 		return nil, err
 	}
@@ -1405,7 +1405,7 @@ func writeGobAtomicStat(p string, v any) (os.FileInfo, error) {
 	fi, err := os.Stat(p)
 	if err != nil {
 		// Written; only the stat failed, and nil caches nothing.
-		return nil, nil
+		return nil, nil //nolint:nilerr,nilnil // written; nil caches nothing
 	}
 	// Windows reads a file's identity from its path when first compared, and
 	// this path moves with the staging directory: read it while it is here.
@@ -1419,7 +1419,7 @@ func readGob(p string, v any) error {
 		return err
 	}
 	defer func() { _ = f.Close() }()
-	if err := gob.NewDecoder(f).Decode(v); err != nil {
+	if err := gob.NewDecoder(f).Decode(v); err != nil { //nolint:gosec,nolintlint // decodes the index's own files; G709's taint pass fires on some runs only
 		return fmt.Errorf("read %s: %w", filepath.Base(p), err)
 	}
 	return nil
@@ -1507,7 +1507,7 @@ func (b *bucketReader) filePostings(p, tok string) ([]posting, error) {
 			return nil, err
 		}
 		buf := make([]byte, e.n)
-		_, err = f.ReadAt(buf, int64(e.off))
+		_, err = f.ReadAt(buf, int64(e.off)) //nolint:gosec // offsets are checked against the bucket size on open
 		_ = f.Close()
 		if err != nil {
 			return nil, err
@@ -1693,15 +1693,15 @@ func walkRecordsStable(dir string, walk func(m Manifest) error) error {
 	if betweenManifestAndRecords != nil {
 		betweenManifestAndRecords()
 	}
-	if err := walk(m); err != nil {
-		return err
+	if walkErr := walk(m); walkErr != nil {
+		return walkErr
 	}
 	if manifestStamp(dir) == before {
 		return nil
 	}
 	after, err := readManifestCached(dir)
 	if err != nil || after.Generation == m.Generation {
-		return nil
+		return nil //nolint:nilerr // an unreadable manifest proves no rebuild
 	}
 	return errors.New("the index was rebuilt while this read was in flight — run it again")
 }

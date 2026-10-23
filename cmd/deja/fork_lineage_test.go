@@ -37,7 +37,7 @@ func forkStore(t *testing.T, unindexed bool) (dir, claudeFork string) {
 	}
 	claude := filepath.Join(tmp, "claude", "-w-p")
 	// Other work, so the question's words are rare enough to identify it.
-	for i := 0; i < 40; i++ {
+	for i := range 40 {
 		id := fmt.Sprintf("other-%d", i)
 		write(filepath.Join(claude, id+".jsonl"),
 			fmt.Sprintf(`{"type":"user","sessionId":%q,"cwd":"/w/p","timestamp":"2026-07-01T09:%02d:00Z","message":{"role":"user","content":"rename table%d and column%d in the billing schema"}}`, id, i, i, i)+"\n")
@@ -123,7 +123,7 @@ func TestAForksPromptRecallLeavesOutItsSource(t *testing.T) {
 	dir, fork := forkStore(t, true)
 	transcript := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-w-p", fork+".jsonl")
 	ask := func(sid, path string) string {
-		payload, _ := json.Marshal(map[string]string{"session_id": sid, "transcript_path": path, "cwd": "/w/p", "prompt": forkQuestion})
+		payload := mustMarshal(t, map[string]string{"session_id": sid, "transcript_path": path, "cwd": "/w/p", "prompt": forkQuestion})
 		var out strings.Builder
 		if err := runHookPrompt(dir, strings.NewReader(string(payload)), &out); err != nil {
 			t.Fatal(err)
@@ -219,7 +219,7 @@ func TestALongHeadedForksPromptRecallLeavesOutItsSource(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for i := 0; i < 40; i++ {
+	for i := range 40 {
 		id := fmt.Sprintf("other-%d", i)
 		write(id+".jsonl", fmt.Sprintf(`{"type":"user","sessionId":%q,"cwd":"/w/p","timestamp":"2026-07-01T09:%02d:00Z","message":{"role":"user","content":"rename table%d and column%d in the billing schema"}}`, id, i, i, i)+"\n")
 	}
@@ -241,7 +241,7 @@ func TestALongHeadedForksPromptRecallLeavesOutItsSource(t *testing.T) {
 	}
 	write(fork+".jsonl", session(fork, fmt.Sprintf(`{"type":"user","uuid":"u-2","sessionId":%q,"cwd":"/w/p","timestamp":%q,"message":{"role":"user","content":%q}}`, fork, at(20*time.Minute), forkQuestion)+"\n"))
 	ask := func(sid, path string) string {
-		payload, _ := json.Marshal(map[string]string{"session_id": sid, "transcript_path": path, "cwd": "/w/p", "prompt": forkQuestion})
+		payload := mustMarshal(t, map[string]string{"session_id": sid, "transcript_path": path, "cwd": "/w/p", "prompt": forkQuestion})
 		var out strings.Builder
 		if err := runHookPrompt(dir, strings.NewReader(string(payload)), &out); err != nil {
 			t.Fatal(err)
@@ -272,17 +272,17 @@ func TestABackgroundedForksRecallLeavesOutASourceThatWentOn(t *testing.T) {
 	t0 := time.Now().UTC().Add(-30 * time.Minute)
 	more := fmt.Sprintf(`{"type":"assistant","uuid":"a-2","sessionId":%q,"cwd":"/w/p","timestamp":%q,"message":{"role":"assistant","content":"No response requested."}}`, source, t0.Add(3*time.Minute).Format(time.RFC3339Nano)) + "\n" +
 		fmt.Sprintf(`{"type":"user","uuid":"u-3","sessionId":%q,"cwd":"/w/p","timestamp":%q,"message":{"role":"user","content":"<task-notification><task-id>b1</task-id><status>completed</status></task-notification>"}}`, source, t0.Add(9*time.Minute).Format(time.RFC3339Nano)) + "\n"
-	if err := os.WriteFile(path, append(b, more...), 0o644); err != nil {
+	if err = os.WriteFile(path, append(b, more...), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := index.Ensure(dir, "", true, io.Discard); err != nil {
+	if err = index.Ensure(dir, "", true, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	q := json.RawMessage(`{"query":"retry loop fetch.go HTTP 500"}`)
 	if before, _ := callMCPTool(dir, "recall", q); !strings.Contains(before, "aaaaaaaa") {
 		t.Fatalf("the fixture never served the source, so this proves nothing:\n%s", before)
 	}
-	if err := runHookPrompt(dir, strings.NewReader(`{"session_id":"`+fork+`","hook_event_name":"UserPromptSubmit","cwd":"/w/p","prompt":"keep going in the background"}`), io.Discard); err != nil {
+	if err = runHookPrompt(dir, strings.NewReader(`{"session_id":"`+fork+`","hook_event_name":"UserPromptSubmit","cwd":"/w/p","prompt":"keep going in the background"}`), io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	runHookSessionEnd(dir, strings.NewReader(`{"session_id":"`+source+`","hook_event_name":"SessionEnd","reason":"prompt_input_exit"}`))

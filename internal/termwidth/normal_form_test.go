@@ -1,6 +1,9 @@
 package termwidth
 
-import "testing"
+import (
+	"testing"
+	"unicode/utf8"
+)
 
 // The same name, typed two ways, has to measure the same: macOS hands paths
 // back decomposed, and project names come from paths, so a column padded from
@@ -58,7 +61,7 @@ func TestACutNeverStartsWithAnOrphanedMark(t *testing.T) {
 			if tail == "" {
 				continue
 			}
-			if r := []rune(tail)[0]; r >= 0x0300 && r <= 0x036F {
+			if r, _ := utf8.DecodeRuneInString(tail); r >= 0x0300 && r <= 0x036F {
 				t.Errorf("CutRight(%q, %d) starts with a combining mark: %q", s, width, tail)
 			}
 		}

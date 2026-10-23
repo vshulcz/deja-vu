@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -120,7 +121,7 @@ func TestInstallKeepsItsBackup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("install did not keep a snapshot of what it edited: %v", err)
 	}
-	if string(b) != string(theirs) {
+	if !bytes.Equal(b, theirs) {
 		t.Fatalf("the snapshot is not what was there before:\n%s", b)
 	}
 }

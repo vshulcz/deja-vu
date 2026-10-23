@@ -36,7 +36,7 @@ func TestChineseResumeClaimMatchesTheRegistry(t *testing.T) {
 		if err != nil || d.IsDir() || filepath.Ext(path) != ".html" {
 			return err
 		}
-		b, err := os.ReadFile(path)
+		b, err := os.ReadFile(path) //nolint:gosec // test walks the repo's own site pages
 		if err != nil {
 			return err
 		}
@@ -75,7 +75,7 @@ func TestChineseResumeClaimMatchesTheRegistry(t *testing.T) {
 			// match reads the sentence as naming a harness that resumes. The
 			// list is separated by 、 and closed with 和.
 			named := map[string]bool{}
-			for _, item := range strings.Split(strings.ReplaceAll(m[2], "和", "、"), "、") {
+			for item := range strings.SplitSeq(strings.ReplaceAll(m[2], "和", "、"), "、") {
 				if item = strings.TrimSpace(item); item != "" {
 					named[item] = true
 				}

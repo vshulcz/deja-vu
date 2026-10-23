@@ -172,15 +172,16 @@ var configStyle = inlineStyle{colon: ": ", comma: ", "}
 // of reads the spacing from the reader's text. A block with one key has no
 // comma to read, so its comma follows its colon: `{"other":true}` is a
 // minified file, not one waiting for ", ".
-func (st inlineStyle) of(was []byte) inlineStyle {
-	colon, comma := st.readFrom(was)
+func (st *inlineStyle) of(was []byte) inlineStyle {
+	read := *st
+	colon, comma := read.readFrom(was)
 	switch {
 	case colon && !comma:
-		st.comma = "," + strings.TrimPrefix(st.colon, ":")
+		read.comma = "," + strings.TrimPrefix(read.colon, ":")
 	case comma && !colon:
-		st.colon = ":" + strings.TrimPrefix(st.comma, ",")
+		read.colon = ":" + strings.TrimPrefix(read.comma, ",")
 	}
-	return st
+	return read
 }
 
 func (st *inlineStyle) readFrom(was []byte) (colon, comma bool) {

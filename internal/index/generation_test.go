@@ -31,7 +31,7 @@ func TestGenerationChangesWhenRecordsMove(t *testing.T) {
 		t.Fatal(err)
 	}
 	writeSession(t, proj, "b", "the kafka consumer keeps flapping")
-	if err := Ensure(dir, "", false, nil); err != nil {
+	if err = Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	after, err := Generation(dir)
@@ -64,7 +64,7 @@ func TestGenerationStaysWhenNothingMoved(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := Ensure(dir, "", false, nil); err != nil {
+	if err = Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	second, err := Generation(dir)

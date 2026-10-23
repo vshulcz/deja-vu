@@ -18,13 +18,16 @@ func TestResumeCodeWhaleRunsInTheWorkspace(t *testing.T) {
 		t.Fatal(err)
 	}
 	id := "eeeeeeee-0000-4000-8000-000000000005"
-	doc, _ := json.Marshal(map[string]any{
+	doc, err := json.Marshal(map[string]any{
 		"schema_version": 1,
 		"metadata":       map[string]string{"id": id, "workspace": ws},
 		"messages":       []any{},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	path := filepath.Join(t.TempDir(), id+".json")
-	if err := os.WriteFile(path, doc, 0o644); err != nil {
+	if err = os.WriteFile(path, doc, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	s := model.Session{Harness: "codewhale", ID: id, Path: path, Project: "src/retry-app"}
@@ -41,7 +44,7 @@ func TestResumeCodeWhaleRunsInTheWorkspace(t *testing.T) {
 	}
 
 	// A workspace that is gone gets no cd that would fail before codewhale starts.
-	if err := os.RemoveAll(ws); err != nil {
+	if err = os.RemoveAll(ws); err != nil {
 		t.Fatal(err)
 	}
 	if dir, cmd, _ := resumeCommand(s); dir != "" || cmd != "codewhale --resume "+id {

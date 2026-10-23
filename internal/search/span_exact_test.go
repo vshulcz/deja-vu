@@ -62,7 +62,7 @@ func TestTheTightestClusterIsFoundWhereverItSits(t *testing.T) {
 		var b strings.Builder
 		const n = 300
 		at := int(float64(n) * where)
-		for i := 0; i < n; i++ {
+		for i := range n {
 			switch {
 			case i == at:
 				b.WriteString("retry queue staging ")
@@ -96,10 +96,10 @@ func TestTheSpanMatchesTheBruteForceMinimum(t *testing.T) {
 	words := []string{"retry", "queue", "staging", "jitter", "worker", "deploy"}
 	toks := []string{"retry", "queue", "staging"}
 	exact := 0
-	for n := 0; n < 100; n++ {
+	for n := range 100 {
 		var b strings.Builder
 		seed := n*7 + 3
-		for i := 0; i < 600; i++ {
+		for i := range 600 {
 			if (i*seed)%23 == 0 {
 				b.WriteString(words[(i*seed)%len(words)] + " ")
 			} else {

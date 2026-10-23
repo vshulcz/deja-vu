@@ -1,7 +1,6 @@
 package sources
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"net/url"
@@ -74,10 +73,10 @@ func transcriptCWD(path string, fits func(cwd string) bool) string {
 	defer f.Close()
 	// A head record past the buffer is streamed, as the parse streams it: a
 	// tool output of a hundred megabytes near the top is not held (#5414).
-	r := jsonlReaders.Get().(*bufio.Reader)
+	r := jsonlReader()
 	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
 	r.Reset(f)
-	for i := 0; i < claudeCWDScanLines; i++ {
+	for range claudeCWDScanLines {
 		line, _, err := readLineBytes(r)
 		if bytes.Contains(line, []byte(`"cwd"`)) {
 			var v struct {
@@ -107,9 +106,10 @@ func claudeProjectNameFor(path string) string {
 	// core at once, and each one that missed the cache listed the folder and
 	// opened its transcripts again, 10.8 CPU-seconds of a 40k-session build
 	// (#5586). The rest wait and take what the first one stored.
-	mu, _ := claudeCWDReading.LoadOrStore(dir, &sync.Mutex{})
-	mu.(*sync.Mutex).Lock()
-	defer mu.(*sync.Mutex).Unlock()
+	v, _ := claudeCWDReading.LoadOrStore(dir, &sync.Mutex{})
+	mu, _ := v.(*sync.Mutex)
+	mu.Lock()
+	defer mu.Unlock()
 	if name, ok := claudeCachedProjectName(dir, path); ok {
 		return name
 	}
@@ -130,9 +130,11 @@ func claudeProjectNameFor(path string) string {
 func claudeCachedProjectName(dir, path string) (string, bool) {
 	// Its own cache, keyed by the folder: the shared one is keyed by an
 	// encoded name other harnesses' folders can share, and an entry decoded
-	// for one of them would answer for this one.
+	// for one of them would answer for this one. An alias file edit drops it.
+	loadProjectAliases()
 	if v, ok := claudeCWDNameCache.Load(dir); ok {
-		return v.(string), true
+		name, _ := v.(string)
+		return name, true
 	}
 	// A folder that named nothing is not read again for each older transcript
 	// in it: with thousands in one folder that was a directory listing per
@@ -141,8 +143,9 @@ func claudeCachedProjectName(dir, path string) (string, bool) {
 	// File times run on a coarser clock than time.Now and some filesystems
 	// keep whole seconds, so a write just after the miss can be stamped
 	// before it; only a transcript older than the slack counts as older.
-	if at, ok := claudeCWDMiss.Load(dir); ok {
-		if fi, err := os.Stat(path); err == nil && fi.ModTime().Before(at.(time.Time).Add(-claudeCWDMissSlack)) {
+	if v, ok := claudeCWDMiss.Load(dir); ok {
+		at, _ := v.(time.Time)
+		if fi, err := os.Stat(path); err == nil && fi.ModTime().Before(at.Add(-claudeCWDMissSlack)) {
 			return claudeProjectName(dir), true
 		}
 	}
@@ -161,8 +164,20 @@ var (
 // last two segments, as a decoded folder name would give them. A file:// URI
 // is read as the path it names, escapes decoded (#4461), and a drive is not a
 // parent: C:\proj is "proj". A WorkBuddy chat folder names the workspace root
-// it sits in (ChatWorkspaceRoot).
+// it sits in (ChatWorkspaceRoot). A directory the alias file covers is the
+// project it names there (ProjectAliasFor).
 func cwdProjectName(cwd string) string {
+	if p, ok := fileURIPath(cwd); ok {
+		cwd = p
+	}
+	if name, ok := ProjectAliasFor(cwd); ok {
+		return name
+	}
+	return plainCWDProjectName(cwd)
+}
+
+// plainCWDProjectName is cwdProjectName without the alias file.
+func plainCWDProjectName(cwd string) string {
 	if p, ok := fileURIPath(cwd); ok {
 		cwd = p
 	}

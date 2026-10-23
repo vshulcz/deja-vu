@@ -25,6 +25,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"maps"
 	"net/http"
 	"os"
 	"strconv"
@@ -245,8 +246,9 @@ func commandArguments(schema json.RawMessage, command string) string {
 			continue
 		}
 		if prop.Type == "array" {
-			argv, _ := json.Marshal([]string{"/bin/sh", "-c", command})
-			return `{"` + key + `":` + string(argv) + `}`
+			if argv, err := json.Marshal([]string{"/bin/sh", "-c", command}); err == nil {
+				return `{"` + key + `":` + string(argv) + `}`
+			}
 		}
 		return `{"` + key + `":` + strconv.Quote(command) + `}`
 	}
@@ -346,9 +348,13 @@ func (s *server) recordWith(path string, msgs []message, tools []string) {
 }
 
 func writeJSON(w http.ResponseWriter, code int, body any) {
-	b, _ := json.Marshal(body)
+	b, err := json.Marshal(body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Content-Length", fmt.Sprint(len(b)))
+	w.Header().Set("Content-Length", strconv.Itoa(len(b)))
 	w.WriteHeader(code)
 	_, _ = w.Write(b)
 }
@@ -356,7 +362,10 @@ func writeJSON(w http.ResponseWriter, code int, body any) {
 // sse writes one server-sent event and flushes: a harness reading a stream
 // receives nothing until the writer flushes, and several of them only stream.
 func sse(w http.ResponseWriter, event string, data any) {
-	b, _ := json.Marshal(data)
+	b, err := json.Marshal(data)
+	if err != nil {
+		return
+	}
 	if event != "" {
 		fmt.Fprintf(w, "event: %s\n", event)
 	}
@@ -452,11 +461,9 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request, req request) {
 		map[string]any{},
 	} {
 		chunk := map[string]any{}
-		for k, v := range base {
-			chunk[k] = v
-		}
+		maps.Copy(chunk, base)
 		finish := any(nil)
-		if len(delta.(map[string]any)) == 0 {
+		if m, _ := delta.(map[string]any); len(m) == 0 {
 			finish = "stop"
 		}
 		chunk["choices"] = []any{map[string]any{"index": 0, "delta": delta, "finish_reason": finish}}
@@ -500,9 +507,7 @@ func (s *server) responses(w http.ResponseWriter, r *http.Request, req request) 
 	}
 	w.Header().Set("Content-Type", "text/event-stream")
 	inProgress := map[string]any{}
-	for k, v := range body {
-		inProgress[k] = v
-	}
+	maps.Copy(inProgress, body)
 	inProgress["status"] = "in_progress"
 	inProgress["output"] = []any{}
 	sse(w, "response.created", map[string]any{"type": "response.created", "response": inProgress})
@@ -560,9 +565,7 @@ func (s *server) messages(w http.ResponseWriter, r *http.Request, req request) {
 	}
 	w.Header().Set("Content-Type", "text/event-stream")
 	start := map[string]any{}
-	for k, v := range body {
-		start[k] = v
-	}
+	maps.Copy(start, body)
 	start["content"] = []any{}
 	sse(w, "message_start", map[string]any{"type": "message_start", "message": start})
 	if block, ok := body["content"].([]any); ok && len(block) > 0 {
@@ -570,7 +573,7 @@ func (s *server) messages(w http.ResponseWriter, r *http.Request, req request) {
 			sse(w, "content_block_start", map[string]any{"type": "content_block_start",
 				"index": 0, "content_block": map[string]any{"type": "tool_use",
 					"id": first["id"], "name": first["name"], "input": map[string]any{}}})
-			raw, _ := json.Marshal(first["input"])
+			raw, _ := json.Marshal(first["input"]) //nolint:errchkjson // input was decoded from the request, so it encodes
 			sse(w, "content_block_delta", map[string]any{"type": "content_block_delta",
 				"index": 0, "delta": map[string]any{"type": "input_json_delta",
 					"partial_json": string(raw)}})
@@ -638,5 +641,6 @@ func main() {
 	})
 	addr := fmt.Sprintf("127.0.0.1:%d", *port)
 	fmt.Printf("mockmodel on http://%s/v1 (log %q)\n", addr, *logPath)
-	log.Fatal(http.ListenAndServe(addr, mux))
+	srv := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
+	log.Fatal(srv.ListenAndServe()) //nolint:gocritic // the process exit closes the log
 }

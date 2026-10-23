@@ -36,7 +36,7 @@ func crushStore(t *testing.T, project, sql string) string {
 	if err := os.MkdirAll(filepath.Dir(db), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("sqlite3", db)
+	cmd := exec.CommandContext(t.Context(), "sqlite3", db)
 	cmd.Stdin = strings.NewReader(crushSchema + sql)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("build store: %v: %s", err, out)

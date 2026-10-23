@@ -45,7 +45,7 @@ func TestSpawnRecallStaysInsideTheProject(t *testing.T) {
 			"my own "+topic+" question", "we settled the "+topic, 30+i)
 	}
 	// Only the client's project knows the rare word.
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		write("-clients-acme-api", fmt.Sprintf("acme%d", i), "/clients/acme/api",
 			"the quaxbolt overflow in the acme ledger",
 			"we decided the acme cutover runs at midnight", 1+i)

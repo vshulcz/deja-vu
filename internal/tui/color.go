@@ -43,12 +43,13 @@ func Hex(s string) Color {
 }
 
 func (c Color) rgb() (r, g, b int) {
-	return int(c>>16) & 0xff, int(c>>8) & 0xff, int(c) & 0xff
+	return int(c>>16) & 0xff, int(c>>8) & 0xff, int(c) & 0xff //nolint:gosec // each is masked to a byte
 }
 
 // Mode is how many colours the terminal can show.
 type Mode int
 
+// The modes, from most colours to none.
 const (
 	ModeTrue Mode = iota
 	Mode256
@@ -98,13 +99,11 @@ func to256(c Color) int {
 	cube := 16 + 36*ri + 6*gi + bi
 	cr, cg, cb := cubeLevels[ri], cubeLevels[gi], cubeLevels[bi]
 	avg := (r + g + b) / 3
-	gi2 := (avg - 3) / 10 // the nearest step of 8, 18, ... 238
-	if gi2 < 0 {
-		gi2 = 0
-	}
-	if gi2 > 23 {
-		gi2 = 23
-	}
+	gi2 := min(
+		// the nearest step of 8, 18, ... 238
+		max(
+
+			(avg-3)/10, 0), 23)
 	gv := 8 + gi2*10
 	dist := func(x, y, z int) int { return (r-x)*(r-x) + (g-y)*(g-y) + (b-z)*(b-z) }
 	if dist(gv, gv, gv) < dist(cr, cg, cb) {
@@ -121,11 +120,11 @@ func Index256(n int) Color {
 	}
 	if n >= 232 {
 		v := 8 + (n-232)*10
-		return Color(v<<16|v<<8|v) | colorSet
+		return Color(v<<16|v<<8|v) | colorSet //nolint:gosec // v is at most 238
 	}
 	i := n - 16
 	r, g, b := cubeLevels[i/36], cubeLevels[(i/6)%6], cubeLevels[i%6]
-	return Color(r<<16|g<<8|b) | colorSet
+	return Color(r<<16|g<<8|b) | colorSet //nolint:gosec // cube levels are bytes
 }
 
 func sgrColor(b *strings.Builder, c Color, bg bool, m Mode) {

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -32,7 +33,7 @@ type autoWiring struct {
 // -auto install target and no entry is a hole in the only report a user has
 // when memory goes quiet.
 func autoWirings() []autoWiring {
-	ws := []autoWiring{
+	ws := []autoWiring{ //nolint:prealloc // a literal table; the loop below adds a row per IDE
 		{"opencode", func() string {
 			return filepath.Join(opencodeConfigHome(), "opencode", "plugins", "deja.js")
 		}, "hook-context", ""},
@@ -69,10 +70,10 @@ func autoWirings() []autoWiring {
 			return filepath.Join(sources.CherryStudioClaudeConfigDir(), "settings.json")
 		}, "hook-context", ""},
 		// CodeWhale's TUI hooks, in the config.toml beside its sessions.
-		{"codewhale", func() string { return codewhaleConfigPath() }, "hook-codewhale", ""},
+		{"codewhale", codewhaleConfigPath, "hook-codewhale", ""},
 		// Junie's user hooks; SessionStart's output never reaches its model,
 		// so the digest rides the first prompt's hook.
-		{"junie", func() string { return junieConfigPath() }, "hook-context", ""},
+		{"junie", junieConfigPath, "hook-context", ""},
 		// Kimchi loads it from its harness directory without a trust prompt.
 		{"kimchi", func() string { return filepath.Join(sources.KimchiConfigDir(), "extensions", "deja.ts") }, "hook-context", ""},
 		{"hermes", func() string {
@@ -85,38 +86,38 @@ func autoWirings() []autoWiring {
 		{"omp", func() string {
 			return filepath.Join(sources.OmpConfigDir(), "extensions", "deja", "index.js")
 		}, "hook-prompt", ""},
-		{"amp", func() string { return ampPluginPath() }, "hook-context", ""},
-		{"prime", func() string { return primeExtensionPath() }, "hook-context", ""},
-		{"deepseek", func() string { return dshAutoPath() }, "hook-prompt", ""},
-		{"goose", func() string { return gooseHookPath() }, "hook-goose", ""},
+		{"amp", ampPluginPath, "hook-context", ""},
+		{"prime", primeExtensionPath, "hook-context", ""},
+		{"deepseek", dshAutoPath, "hook-prompt", ""},
+		{"goose", gooseHookPath, "hook-goose", ""},
 		// PreToolUse is the only event Crush fires, so the tool hook is the
 		// whole of auto-recall here — there is no digest hook to look for.
-		{"crush", func() string { return crushConfigPath() }, "hook-tool", ""},
-		{"grok", func() string { return grokHooksPath() }, "hook-context", ""},
+		{"crush", crushConfigPath, "hook-tool", ""},
+		{"grok", grokHooksPath, "hook-context", ""},
 		// Devin keeps its hooks in the "hooks" key of the same config.json
 		// that holds its other user settings; the file exists whether deja
 		// wrote to it or not.
-		{"devin", func() string { return devinConfigPath() }, "hook-context", ""},
+		{"devin", devinConfigPath, "hook-context", ""},
 		// The global hook file the IDE and kiro-cli's V3 engine read for every
 		// chat; V2 runs the same hooks from deja's agent file (#4304).
-		{"kiro", func() string { return kiroGlobalHooksPath() }, "hook-context", ""},
+		{"kiro", kiroGlobalHooksPath, "hook-context", ""},
 		// Copilot CLI and VS Code Copilot Chat read deja's one hook file. The
 		// marker is the per-prompt line with its flag: a plain line answers in
 		// Claude's envelope, which Copilot CLI runs and drops, and an install
 		// from before the file wired no per-prompt hook at all.
-		{"copilot", func() string { return copilotHooksPath() }, "hook-prompt --copilot", ""},
-		{"vscode", func() string { return copilotHooksPath() }, "hook-prompt --copilot", ""},
+		{"copilot", copilotHooksPath, "hook-prompt --copilot", ""},
+		{"vscode", copilotHooksPath, "hook-prompt --copilot", ""},
 		// ZCode keeps its hooks in the same file as its server map, and the
 		// line deja writes ends in `--strict` — its schema discards a whole
 		// response over one key it does not know.
-		{"zcode", func() string { return zcodeConfigPath() }, "hook-context", ""},
+		{"zcode", zcodeConfigPath, "hook-context", ""},
 		// Command Code keeps its hooks in the same settings.json as its
 		// permissions, and its timeout unit is seconds.
-		{"commandcode", func() string { return commandCodeSettings() }, "hook-context", ""},
+		{"commandcode", commandCodeSettings, "hook-context", ""},
 		// Reasonix hands the model nothing from a hook but SessionStart, so
 		// recall there is the code extension in deja's plugin package.
-		{"reasonix", func() string { return reasonixInstalledManifest() }, "reasonix-ext", ""},
-		{"aider", func() string { return aiderContextPath() }, "",
+		{"reasonix", reasonixInstalledManifest, "reasonix-ext", ""},
+		{"aider", aiderContextPath, "",
 			"context file — refreshed by `deja aider`, not by aider itself"},
 		// Roo's guidance moved out of the always-on rules file into a skill;
 		// checking the old path reported a correctly wired machine as missing.
@@ -175,7 +176,7 @@ func dejaHookIn(text string) bool {
 	}
 	var root any
 	if json.Unmarshal([]byte(jsoncToJSON(strings.TrimPrefix(text, string(utf8BOM)))), &root) != nil {
-		for _, l := range strings.Split(text, "\n") {
+		for l := range strings.SplitSeq(text, "\n") {
 			if runsDeja(quotedPathUnescape.Replace(l)) {
 				return true
 			}
@@ -188,10 +189,8 @@ func dejaHookIn(text string) bool {
 		case string:
 			return runsDeja(v)
 		case []any:
-			for _, e := range v {
-				if walk(e) {
-					return true
-				}
+			if slices.ContainsFunc(v, walk) {
+				return true
 			}
 		case map[string]any:
 			for _, e := range v {
@@ -414,11 +413,11 @@ func doctorAutoRecall(w io.Writer) {
 		if harnessPluginCarriesRecall(a.name) && (err != nil || !strings.Contains(string(b), a.marker)) {
 			// Behind is the line worth the width: what it does is in the
 			// README, what to run is not obvious from anywhere.
-			note, idle := harnessPluginNote(a.name)
-			if note == "" {
-				note = idle
+			pluginNote, idle := harnessPluginNote(a.name)
+			if pluginNote == "" {
+				pluginNote = idle
 			}
-			fmt.Fprintf(w, "  %-12s %-11s %s  (%s)\n", a.name, "plugin", reportPath(path), note)
+			fmt.Fprintf(w, "  %-12s %-11s %s  (%s)\n", a.name, "plugin", reportPath(path), pluginNote)
 			continue
 		}
 		switch {

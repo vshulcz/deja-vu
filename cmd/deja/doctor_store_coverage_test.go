@@ -27,7 +27,7 @@ func TestDoctorNamesEveryStoreTheIndexerReads(t *testing.T) {
 	}
 	rows := map[string]bool{}
 	inStores := false
-	for _, line := range strings.Split(text.String(), "\n") {
+	for line := range strings.SplitSeq(text.String(), "\n") {
 		if strings.HasPrefix(line, "Harness stores:") {
 			inStores = true
 			continue

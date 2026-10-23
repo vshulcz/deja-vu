@@ -15,11 +15,12 @@ import (
 // three lines below — the recall was right and looked worthless.
 func TestRecallBlockDoesNotOpenWithFillerFromTheTop(t *testing.T) {
 	start := time.Date(2026, 5, 1, 9, 0, 0, 0, time.UTC)
-	msgs := []model.Message{
-		{Role: "user", Text: "carry on then", Time: start},
-		{Role: "assistant", Text: "opened the file and looked around", Time: start.Add(time.Minute)},
-	}
-	for i := 0; i < 200; i++ {
+	msgs := make([]model.Message, 0, 403)
+	msgs = append(msgs,
+		model.Message{Role: "user", Text: "carry on then", Time: start},
+		model.Message{Role: "assistant", Text: "opened the file and looked around", Time: start.Add(time.Minute)},
+	)
+	for i := range 200 {
 		at := start.Add(time.Duration(i+2) * time.Minute)
 		msgs = append(msgs,
 			model.Message{Role: "user", Text: "keep going", Time: at},

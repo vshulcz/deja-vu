@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -85,8 +86,8 @@ func TestFrictionHashesFingerprintsToolOutputOnly(t *testing.T) {
 }
 
 func TestFrictionHashesCapped(t *testing.T) {
-	var ms []model.Message
-	for i := 0; i < frictionSessionCap+20; i++ {
+	ms := make([]model.Message, 0, frictionSessionCap+20)
+	for i := range frictionSessionCap + 20 {
 		ms = append(ms, model.Message{
 			Role: roleToolOutput,
 			Text: fmt.Sprintf("zsh:1: command not found: tool-number-%03d", i),
@@ -106,14 +107,14 @@ func writeFrictionSessions(t *testing.T, root string, n int) {
 	if err := os.MkdirAll(proj, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < n; i++ {
+	for i := range n {
 		sid := fmt.Sprintf("fr%02d", i)
 		lines := []string{
 			`{"type":"user","sessionId":"` + sid + `","cwd":"/w","timestamp":"2026-01-0` +
-				fmt.Sprint(i+1) + `T03:04:05Z","message":{"role":"user","content":"run the deploy script"}}`,
+				strconv.Itoa(i+1) + `T03:04:05Z","message":{"role":"user","content":"run the deploy script"}}`,
 			`{"type":"user","sessionId":"` + sid + `","cwd":"/w","timestamp":"2026-01-0` +
-				fmt.Sprint(i+1) + `T03:05:05Z","message":{"role":"user","content":[{"type":"tool_result",` +
-				`"content":"(eval):` + fmt.Sprint(i+1) + `: command not found: shellcheck"}]}}`,
+				strconv.Itoa(i+1) + `T03:05:05Z","message":{"role":"user","content":[{"type":"tool_result",` +
+				`"content":"(eval):` + strconv.Itoa(i+1) + `: command not found: shellcheck"}]}}`,
 		}
 		if err := os.WriteFile(filepath.Join(proj, sid+".jsonl"), []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
 			t.Fatal(err)

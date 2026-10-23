@@ -322,7 +322,8 @@ func TestKiloTaskToolVocabulary(t *testing.T) {
 // whose assistant turn makes each call and gets result back (#4538).
 func cwSaved(t *testing.T, result string, isErr bool, calls ...map[string]any) []model.Session {
 	t.Helper()
-	var uses, results []any
+	uses := make([]any, 0, len(calls))
+	results := make([]any, 0, len(calls))
 	for i, c := range calls {
 		id := fmt.Sprintf("call_%d", i)
 		uses = append(uses, map[string]any{"type": "tool_use", "id": id, "name": c["name"], "input": c["input"]})
@@ -397,9 +398,9 @@ func TestCodeWhaleApplyPatch(t *testing.T) {
 func TestUnifiedPatchReadsHunksByCount(t *testing.T) {
 	// The removed SQL comment reads "--- old" with its diff marker, and is not
 	// the next file's header; the second file has a bare @@.
-	patch := "diff --git a/q.sql b/q.sql\n--- a/q.sql\t2026-06-26 10:00:00 +0000\n+++ b/q.sql\n@@ -1,2 +1,2 @@\n--- old\n+select retries from attempts;\n context\n" +
+	unified := "diff --git a/q.sql b/q.sql\n--- a/q.sql\t2026-06-26 10:00:00 +0000\n+++ b/q.sql\n@@ -1,2 +1,2 @@\n--- old\n+select retries from attempts;\n context\n" +
 		"--- /dev/null\n+++ b/new.go\n@@\n+" + jitter + "\n"
-	files, spans, wrote := unifiedPatch(patch, "", func(p string) string { return "/w/" + p })
+	files, spans, wrote := unifiedPatch(unified, "", func(p string) string { return "/w/" + p })
 	if strings.Join(files, ",") != "/w/q.sql,/w/new.go" {
 		t.Errorf("files = %q", files)
 	}
@@ -416,11 +417,11 @@ func TestUnifiedPatchReadsHunksByCount(t *testing.T) {
 // at the next @@, at diff, or at a --- that a +++ follows, whatever its
 // header promised (apply_patch.rs parse_hunk_header).
 func TestUnifiedPatchOvercountedHunk(t *testing.T) {
-	patch := "--- a/a.go\n+++ b/a.go\n@@ -1,6 +1,6 @@\n-func oldA() {}\n+func newA() error { return nil }\n" +
+	unified := "--- a/a.go\n+++ b/a.go\n@@ -1,6 +1,6 @@\n-func oldA() {}\n+func newA() error { return nil }\n" +
 		"@@ -9,6 +9,6 @@\n-func oldA2() {}\n+func newA2() error { return nil }\n" +
 		"--- a/b.go\n+++ b/b.go\n@@ -1,6 +1,6 @@\n-func oldB() {}\n+func newB() error { return nil }\n" +
 		"diff --git a/c.go b/c.go\n--- a/c.go\n+++ b/c.go\n@@ -1 +1 @@\n-func oldC() {}\n+func newC() error { return nil }\n"
-	files, spans, wrote := unifiedPatch(patch, "", nil)
+	files, spans, wrote := unifiedPatch(unified, "", nil)
 	if got := strings.Join(files, ","); got != "a.go,b.go,c.go" {
 		t.Errorf("files = %q", got)
 	}
@@ -505,7 +506,7 @@ func TestReasonixFileTools(t *testing.T) {
 		vocabCheck(t, ss, want, unwanted)
 		got := map[string]bool{}
 		for _, p := range vocabRoles(ss, RoleFiles) {
-			for _, f := range strings.Split(p, "\n") {
+			for f := range strings.SplitSeq(p, "\n") {
 				got[f] = true
 			}
 		}
@@ -521,10 +522,11 @@ func TestReasonixFileTools(t *testing.T) {
 		clearReasonixEnv(t, root)
 		t.Setenv("DEJA_REASONIX_ROOT", root)
 		p := filepath.Join(root, "projects", "-tmp-proj", "sessions", "20261001-100000.000000000-deepseek-chat.jsonl")
-		lines := []any{
+		lines := make([]any, 0, 2+len(results))
+		lines = append(lines,
 			map[string]any{"role": "user", "content": "fix the retry loop"},
 			map[string]any{"role": "assistant", "content": "", "tool_calls": calls},
-		}
+		)
 		for i, r := range results {
 			lines = append(lines, map[string]any{"role": "tool", "tool_call_id": fmt.Sprintf("c%d", i+1), "content": r})
 		}

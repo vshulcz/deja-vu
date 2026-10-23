@@ -1,3 +1,4 @@
+// Package model holds the session and message types every source normalizes into.
 package model
 
 import "time"
@@ -51,7 +52,7 @@ type RepositoryFreshness struct {
 // provenance. It contains no inference that a test passed or a task remains
 // open beyond what the transcript itself explicitly records.
 type CompactionContext struct {
-	Objective   ContextFact         `json:"objective,omitempty"`
+	Objective   ContextFact         `json:"objective"`
 	Goal        ContextFact         `json:"goal,omitzero"`
 	Rules       []ContextFact       `json:"rules,omitempty"`
 	Conclusions []ContextFact       `json:"conclusions,omitempty"`
@@ -59,7 +60,7 @@ type CompactionContext struct {
 	Gaps        []ContextOpenItem   `json:"gaps,omitempty"`
 	Conflicts   []ContextOpenItem   `json:"conflicts,omitempty"`
 	Sources     []ContextRef        `json:"sources,omitempty"`
-	Freshness   RepositoryFreshness `json:"freshness,omitempty"`
+	Freshness   RepositoryFreshness `json:"freshness"`
 	Carry       []ContextCarry      `json:"carry,omitempty"`
 	Truncated   bool                `json:"truncated,omitempty"`
 }

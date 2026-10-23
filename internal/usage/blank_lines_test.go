@@ -70,7 +70,7 @@ func TestRotationSurvivesBlankLines(t *testing.T) {
 	}
 	now := time.Now().UTC()
 	var b strings.Builder
-	for i := 0; i < 4000; i++ {
+	for i := range 4000 {
 		age := time.Duration(i%30) * 24 * time.Hour
 		e := Event{Time: now.Add(-age), Kind: KindRecall, Bytes: 100, Sessions: 1,
 			SessionIDs: []string{strings.Repeat("x", 200)}}

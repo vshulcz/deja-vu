@@ -101,10 +101,7 @@ func (r *readerState) layout(width int, now func(model.Message) string) {
 	r.layoutW = width
 	r.lines, r.hits, r.turns = nil, nil, nil
 	r.turnTop = -1
-	tw := min(width-8, readerMeasure)
-	if tw < 20 {
-		tw = 20
-	}
+	tw := max(min(width-8, readerMeasure), 20)
 	for _, m := range r.d.full.Messages {
 		look, ok := roleLook(m.Role, r.s.Harness)
 		// As written, line breaks and all: the digest form joins a message into
@@ -120,7 +117,7 @@ func (r *readerState) layout(width int, now func(model.Message) string) {
 		}
 		var body []readerLine
 		matched := false
-		for _, raw := range strings.Split(text, "\n") {
+		for raw := range strings.SplitSeq(text, "\n") {
 			raw = strings.TrimRight(raw, " \t\r")
 			wrapped := []string{raw}
 			if !look.block && !strings.HasPrefix(raw, "    ") && !strings.HasPrefix(raw, "\t") {
@@ -168,7 +165,7 @@ func (r *readerState) layout(width int, now func(model.Message) string) {
 // around each match: a hit the reader counts is one it can go to.
 func foldBody(body []readerLine, fold int, note string, block bool) []readerLine {
 	keep := make([]bool, len(body))
-	for i := 0; i < fold; i++ {
+	for i := range fold {
 		keep[i] = true
 	}
 	budget := readerMaxLines
@@ -255,7 +252,7 @@ func (a *tuiApp) drawReader() {
 	if where = r.position(); where != "" {
 		p.Put(p.W-termwidth.Columns(where)-2, 0, where, on(cMuted, cMantle), p.W)
 	}
-	for i := 0; i < height; i++ {
+	for i := range height {
 		n := r.top + i
 		if n >= len(r.lines) {
 			break
@@ -313,7 +310,7 @@ func (a *tuiApp) handleReader(ev tui.Event) {
 	if ev.Kind != tui.EvKey {
 		return
 	}
-	switch ev.Key {
+	switch ev.Key { //nolint:exhaustive // other keys do nothing here
 	case tui.KeyUp:
 		r.top--
 	case tui.KeyDown:

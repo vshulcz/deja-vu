@@ -20,7 +20,7 @@ func sharedPair(t *testing.T, bodyA, bodyB string) (string, string) {
 
 // keptMatchesRebuild compares the row against a rebuild of a copy of dir, which
 // carries the deleted files' records as a rebuild of dir would.
-func keptMatchesRebuild(t *testing.T, dir, id string) {
+func keptMatchesRebuild(t *testing.T, dir, id string) { //nolint:unparam // the call names the session it compares
 	t.Helper()
 	fresh := filepath.Join(t.TempDir(), "rebuilt")
 	if err := os.CopyFS(fresh, os.DirFS(dir)); err != nil {
@@ -37,7 +37,7 @@ func keptMatchesRebuild(t *testing.T, dir, id string) {
 	}
 }
 
-func holdsTurn(t *testing.T, dir, id, text string) bool {
+func holdsTurn(t *testing.T, dir, id, text string) bool { //nolint:unparam // the call names the session it reads
 	t.Helper()
 	return strings.Contains(sessionView(t, dir, "claude", id), "|"+text+"\n")
 }
@@ -206,7 +206,7 @@ func TestARebuildKeepsTheOrderOfTurnsADeletedCopyShared(t *testing.T) {
 	if err != nil || !ok {
 		t.Fatalf("s-x not found: %v", err)
 	}
-	var got []string
+	got := make([]string, 0, len(s.Messages))
 	for _, m := range s.Messages {
 		got = append(got, m.Text)
 	}

@@ -16,7 +16,7 @@ func installClaudeCommands(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(dir, "deja.md")
 	if uninstall {
 		if _, err := os.Stat(path); err != nil {
-			return installResult{Path: path, Action: "unchanged"}, nil
+			return installResult{Path: path, Action: "unchanged"}, nil //nolint:nilerr // nothing to remove
 		}
 		if err := os.Remove(path); err != nil {
 			return installResult{}, err

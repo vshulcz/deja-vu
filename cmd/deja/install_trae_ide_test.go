@@ -174,7 +174,7 @@ func TestTraeIDECNEdition(t *testing.T) {
 func TestInstallTraeIDEBothEditions(t *testing.T) {
 	home := filepath.Join(hermeticEnv(t), "home")
 	type files struct{ mcp, hooks, skill string }
-	var eds []files
+	eds := make([]files, 0, len(traeIDEEditions))
 	for _, e := range traeIDEEditions {
 		f := files{
 			filepath.Join(traeIDEAppDir(e.app), "User", "mcp.json"),
@@ -260,7 +260,7 @@ func TestDoctorTraeIDERows(t *testing.T) {
 	var auto bytes.Buffer
 	doctorAutoRecall(&auto)
 	var row string
-	for _, l := range strings.Split(auto.String(), "\n") {
+	for l := range strings.SplitSeq(auto.String(), "\n") {
 		if strings.HasPrefix(strings.TrimSpace(l), "trae-ide ") {
 			row = l
 		}

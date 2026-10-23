@@ -28,7 +28,10 @@ func TestResumeGjcAndKimchiRunInTheSessionDirectory(t *testing.T) {
 			// Encoded, as the clients write it: a Windows path spliced in
 			// raw is `C:\Users\…`, an invalid JSON escape, and the header
 			// did not decode at all.
-			enc, _ := json.Marshal(cwd)
+			enc, err := json.Marshal(cwd)
+			if err != nil {
+				t.Fatal(err)
+			}
 			header += `,"cwd":` + string(enc)
 		}
 		body := header + "}\n" + `{"type":"message","message":{"role":"user","content":[{"type":"text","text":"hi"}]}}` + "\n"

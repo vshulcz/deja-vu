@@ -24,7 +24,7 @@ func TestARecordWithNoTextIsNotSent(t *testing.T) {
 		{Offset: 40, Record: index.Record{Key: "claude:a", Text: "raise the timeout"}},
 		{Offset: 50, Record: index.Record{Key: "claude:a", Text: "raise the timeout"}},
 	}
-	var got []int64
+	got := make([]int64, 0, len(recs))
 	covered := map[uint64]bool{RecordIdent(recs[3].Record): true}
 	for _, r := range toEmbed(recs, covered) {
 		got = append(got, r.Offset)
@@ -36,7 +36,7 @@ func TestARecordWithNoTextIsNotSent(t *testing.T) {
 
 // The status alone sent people hunting; the endpoint's own words say why.
 func TestAnEndpointErrorCarriesItsBody(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(`{"error":"empty content"}` + strings.Repeat(" pad", 400)))
 	}))

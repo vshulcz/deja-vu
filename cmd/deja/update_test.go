@@ -7,6 +7,7 @@ import (
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -35,7 +36,7 @@ func TestPerformUpdate(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			download, requests := newUpdateDownloader(t, "1.2.0", goos, "amd64", []byte("new binary"), false)
+			download, requests := newUpdateDownloader(t, goos, []byte("new binary"), false)
 
 			var out bytes.Buffer
 			err = performUpdate(updateConfig{
@@ -80,7 +81,7 @@ func TestPerformUpdateAlreadyCurrent(t *testing.T) {
 	if err := os.WriteFile(target, []byte("current binary"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	download, requests := newUpdateDownloader(t, "1.2.0", "linux", "amd64", []byte("unused"), false)
+	download, requests := newUpdateDownloader(t, "linux", []byte("unused"), false)
 
 	var out bytes.Buffer
 	err := performUpdate(updateConfig{
@@ -108,7 +109,7 @@ func TestPerformUpdateDoesNotDowngrade(t *testing.T) {
 	if err := os.WriteFile(target, []byte("newer binary"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	download, requests := newUpdateDownloader(t, "1.2.0", "linux", "amd64", []byte("older binary"), false)
+	download, requests := newUpdateDownloader(t, "linux", []byte("older binary"), false)
 
 	var out bytes.Buffer
 	err := performUpdate(updateConfig{
@@ -136,7 +137,7 @@ func TestPerformUpdateChecksumFailurePreservesBinary(t *testing.T) {
 	if err := os.WriteFile(target, []byte("old binary"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	download, _ := newUpdateDownloader(t, "1.2.0", "linux", "amd64", []byte("new binary"), true)
+	download, _ := newUpdateDownloader(t, "linux", []byte("new binary"), true)
 
 	err := performUpdate(updateConfig{
 		// The subject here is the checksum guard, not the dev-build policy
@@ -170,7 +171,7 @@ func TestPerformUpdateDownloadFailurePreservesBinary(t *testing.T) {
 		executable:     target,
 		latestURL:      testLatestReleaseURL,
 		download: func(_ string, _ int64, _ string) ([]byte, error) {
-			return nil, fmt.Errorf("service unavailable")
+			return nil, errors.New("service unavailable")
 		},
 	}, io.Discard)
 	if err == nil || !strings.Contains(err.Error(), "service unavailable") {
@@ -269,8 +270,9 @@ func TestHTTPUpdateDownloader(t *testing.T) {
 	}
 }
 
-func newUpdateDownloader(t *testing.T, version, goos, goarch string, binary []byte, badChecksum bool) (updateDownloader, *atomic.Int32) {
+func newUpdateDownloader(t *testing.T, goos string, binary []byte, badChecksum bool) (updateDownloader, *atomic.Int32) {
 	t.Helper()
+	const version, goarch = "1.2.0", "amd64"
 	archiveName, binaryName, err := updateAssetNames(version, goos, goarch)
 	if err != nil {
 		t.Fatal(err)

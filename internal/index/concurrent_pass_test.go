@@ -45,7 +45,7 @@ func TestTwoPassesAtOnceKeepTheCountsAndTheAnswers(t *testing.T) {
 	}
 	stamp := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
 	const sessions = 40
-	for i := 0; i < sessions; i++ {
+	for i := range sessions {
 		line := fmt.Sprintf(`{"type":"user","sessionId":"s%02d","timestamp":%q,"cwd":"/work/app",`+
 			`"message":{"role":"user","content":"turn %d: the pool timed out during the migration"}}`, i, stamp, i)
 		if err := os.WriteFile(filepath.Join(proj, fmt.Sprintf("s%02d.jsonl", i)), []byte(line+"\n"), 0o644); err != nil {
@@ -131,7 +131,7 @@ func TestTwoPassesAtOnceKeepTheCountsAndTheAnswers(t *testing.T) {
 	close(start)
 	// The readers stop once both passes are back.
 	go func() {
-		for i := 0; i < 2; i++ {
+		for i := range 2 {
 			for {
 				mu.Lock()
 				done := !ends[i].IsZero()
@@ -175,7 +175,7 @@ func TestTwoPassesAtOnceKeepTheCountsAndTheAnswers(t *testing.T) {
 	}
 
 	// And the state one pass left behind does not move the next one.
-	if err := Ensure(dir, "", false, nil); err != nil {
+	if err = Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	after, err := readManifest(dir)

@@ -52,12 +52,15 @@ func cursorHooksUpdate(exe string, uninstall, write bool) (installResult, error)
 	}
 	if len(bytes.TrimSpace(source)) == 0 {
 		root = map[string]any{}
-	} else if err := json.Unmarshal(source, &root); err != nil {
-		return installResult{}, configParseError(path, err)
+	} else if uerr := json.Unmarshal(source, &root); uerr != nil {
+		return installResult{}, configParseError(path, uerr)
 	} else if root == nil {
 		return installResult{}, configParseError(path, errors.New("the file holds null, not an object"))
 	}
-	before, _ := json.Marshal(root)
+	before, err := json.Marshal(root)
+	if err != nil {
+		return installResult{}, err
+	}
 	if !uninstall {
 		root["version"] = 1
 	}
@@ -66,7 +69,10 @@ func cursorHooksUpdate(exe string, uninstall, write bool) (installResult, error)
 		hooks = map[string]any{}
 		root["hooks"] = hooks
 	}
-	hooksBefore, _ := json.Marshal(hooks)
+	hooksBefore, err := json.Marshal(hooks)
+	if err != nil {
+		return installResult{}, err
+	}
 	// sessionStart carries the digest. beforeSubmitPrompt only fires in the
 	// interactive TUI — headless `-p` skips it — but costs nothing there.
 	setCursorHook(hooks, "sessionStart", hookRun(exe, "hook-context"), "", uninstall)
@@ -94,7 +100,11 @@ func cursorHooksUpdate(exe string, uninstall, write bool) (installResult, error)
 	setCursorHook(hooks, "sessionEnd", hookRun(exe, "hook-session-end"), "", uninstall)
 	// Nothing of deja's came out: the reader's `version` and empty block are
 	// theirs, and a commented file is not refused for them.
-	if hooksAfter, _ := json.Marshal(hooks); uninstall && string(hooksAfter) == string(hooksBefore) {
+	hooksAfter, err := json.Marshal(hooks)
+	if err != nil {
+		return installResult{}, err
+	}
+	if uninstall && bytes.Equal(hooksAfter, hooksBefore) {
 		return installResult{Path: path, Action: "unchanged"}, nil
 	}
 	if len(hooks) == 0 {
@@ -104,8 +114,11 @@ func cursorHooksUpdate(exe string, uninstall, write bool) (installResult, error)
 	if len(root) == 0 && len(bytes.TrimSpace(old)) == 0 {
 		return installResult{Path: path, Action: "unchanged"}, nil
 	}
-	after, _ := json.Marshal(root)
-	changed := string(after) != string(before)
+	after, err := json.Marshal(root)
+	if err != nil {
+		return installResult{}, err
+	}
+	changed := !bytes.Equal(after, before)
 	if commented {
 		if !changed {
 			return installResult{Path: path, Action: "unchanged"}, nil

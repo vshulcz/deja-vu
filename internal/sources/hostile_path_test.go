@@ -4,7 +4,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 )
 
@@ -16,13 +15,7 @@ import (
 // paths were never percent-decoded, which nobody here could see because every
 // path on this laptop is ASCII with no spaces, and a contributor with
 // `C:\Users\me\my app` hit it immediately (#3498, #3505).
-func hostileDir() string {
-	if runtime.GOOS == "windows" {
-		// Same shapes, minus the characters Windows will not take in a name.
-		return "проект (v2.1) %20 name"
-	}
-	return "проект (v2.1) %20 name"
-}
+const hostileDir = "проект (v2.1) %20 name"
 
 // Every registry fixture parses the same under a path nobody on this machine
 // would have written.
@@ -31,12 +24,12 @@ func TestEveryRegistryFixtureParsesUnderAHostilePath(t *testing.T) {
 	hermeticSourcesEnv(t)
 	registry := readFormatRegistry(t, filepath.Join(root, "docs", "registry", "registry.json"))
 	for _, entry := range registry.Harnesses {
-		entry := entry
+
 		t.Run(entry.ID, func(t *testing.T) {
 			// The whole fixture tree moves, not the one file: several parsers
 			// read a sibling — kimi's state.json, goose's session header — and
 			// copying the file alone would test the copy rather than the path.
-			work := filepath.Join(t.TempDir(), hostileDir())
+			work := filepath.Join(t.TempDir(), hostileDir)
 			copyTree(t, filepath.Join(root, "fixtures"), filepath.Join(work, "fixtures"))
 			for _, fixture := range entry.FixturePaths {
 				copied := filepath.Join(work, filepath.FromSlash(fixture))
@@ -64,7 +57,7 @@ func copyTree(t *testing.T, src, dst string) {
 		if d.IsDir() {
 			return os.MkdirAll(target, 0o755)
 		}
-		b, err := os.ReadFile(p)
+		b, err := os.ReadFile(p) //nolint:gosec // the test copies its own fixture tree
 		if err != nil {
 			return err
 		}

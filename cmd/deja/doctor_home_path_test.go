@@ -40,7 +40,7 @@ func TestDoctorContractsTheHomePath(t *testing.T) {
 		t.Fatal(err)
 	}
 	var report map[string]any
-	if err := json.Unmarshal([]byte(raw), &report); err != nil {
+	if err = json.Unmarshal([]byte(raw), &report); err != nil {
 		t.Fatalf("doctor --json is not JSON: %v", err)
 	}
 	// As JSON writes it: a Windows path is escaped in the encoding, so looking
@@ -58,7 +58,7 @@ func TestDoctorContractsTheHomePath(t *testing.T) {
 // failure.
 func storeLines(out string) string {
 	var keep []string
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		if strings.Contains(line, "claude") || strings.Contains(line, "index") {
 			keep = append(keep, line)
 		}

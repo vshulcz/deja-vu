@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -64,7 +65,7 @@ func TestUninstallLeavesAJSONConfigWithoutDejaAsItIs(t *testing.T) {
 	if _, err := writeIfChanged(path, mine, mine); err != nil {
 		t.Fatal(err)
 	}
-	if b, _ := os.ReadFile(path); string(b) != string(mine) {
+	if b, _ := os.ReadFile(path); !bytes.Equal(b, mine) {
 		t.Errorf("a config with no deja in it became %q, want it left as %q", b, mine)
 	}
 
@@ -80,7 +81,7 @@ func TestUninstallLeavesAJSONConfigWithoutDejaAsItIs(t *testing.T) {
 	if _, err := writeIfChanged(path, old, next); err != nil {
 		t.Fatal(err)
 	}
-	if b, _ := os.ReadFile(path); string(b) != string(next) {
+	if b, _ := os.ReadFile(path); !bytes.Equal(b, next) {
 		t.Errorf("uninstall wrote %q, want %q: the snapshot's id is another number", b, next)
 	}
 }

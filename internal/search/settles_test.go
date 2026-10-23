@@ -91,12 +91,13 @@ func TestBlockTakesTheAnswerThatFollowsTheMention(t *testing.T) {
 // It has to follow a line that matched, though: a conclusion from another part
 // of the session settles another question.
 func TestBlockIgnoresAFarAwayConclusion(t *testing.T) {
-	msgs := []model.Message{{Role: "user", Text: "\u0447\u0442\u043e \u0442\u0430\u043c \u0441 pgbouncer"}}
-	for i := 0; i < 3; i++ {
+	msgs := make([]model.Message, 0, 13)
+	msgs = append(msgs, model.Message{Role: "user", Text: "\u0447\u0442\u043e \u0442\u0430\u043c \u0441 pgbouncer"})
+	for range 3 {
 		msgs = append(msgs, model.Message{Role: "assistant",
 			Text: "pgbouncer pool \u043c\u0435\u0442\u0440\u0438\u043a\u0438 \u0441\u043d\u044f\u043b\u0438"})
 	}
-	for i := 0; i < 8; i++ {
+	for range 8 {
 		msgs = append(msgs, model.Message{Role: "assistant",
 			Text: "\u043f\u0440\u0430\u0432\u0438\u043c \u0441\u043e\u0432\u0441\u0435\u043c \u0434\u0440\u0443\u0433\u043e\u0435 \u043c\u0435\u0441\u0442\u043e"})
 	}

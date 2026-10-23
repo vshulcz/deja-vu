@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"reflect"
 	"strconv"
@@ -80,7 +81,7 @@ func TestInliningLeavesAFileWithNoShapeAlone(t *testing.T) {
 		} else {
 			root = map[string]any{"mcpServers": map[string]any{}}
 		}
-		root["mcpServers"].(map[string]any)["deja"] = map[string]any{"command": "/opt/deja"}
+		typedOrFatal[map[string]any](t, root["mcpServers"])["deja"] = map[string]any{"command": "/opt/deja"}
 		next, err := marshalConfigLike([]byte(c.old), root)
 		if err != nil {
 			t.Fatalf("%s: %v", c.name, err)
@@ -149,8 +150,8 @@ func TestInliningNeverChangesWhatTheConfigSays(t *testing.T) {
 			t.Fatalf("config %d: %v", i, err)
 		}
 		var got map[string]any
-		if err := json.Unmarshal(out, &got); err != nil {
-			t.Fatalf("config %d no longer parses: %v\n%s", i, err, out)
+		if uerr := json.Unmarshal(out, &got); uerr != nil {
+			t.Fatalf("config %d no longer parses: %v\n%s", i, uerr, out)
 		}
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("config %d changed what it says:\nwant %#v\ngot  %#v\n%s", i, want, got, out)
@@ -160,7 +161,7 @@ func TestInliningNeverChangesWhatTheConfigSays(t *testing.T) {
 		if err != nil {
 			t.Fatalf("config %d, second pass: %v", i, err)
 		}
-		if string(again) != string(out) {
+		if !bytes.Equal(again, out) {
 			t.Errorf("config %d is not stable across two writes:\nfirst:\n%s\nsecond:\n%s", i, out, again)
 		}
 	}
@@ -217,7 +218,7 @@ func TestInliningHandlesTheShapesThatBrokeIt(t *testing.T) {
 		if err := json.Unmarshal(old, &root); err != nil {
 			t.Fatal(err)
 		}
-		root["mcpServers"].(map[string]any)["deja"] = map[string]any{"command": "/opt/deja"}
+		typedOrFatal[map[string]any](t, root["mcpServers"])["deja"] = map[string]any{"command": "/opt/deja"}
 		next, err := marshalConfigLike(old, root)
 		if err != nil {
 			t.Fatal(err)
@@ -232,7 +233,7 @@ func TestInliningHandlesTheShapesThatBrokeIt(t *testing.T) {
 	t.Run("a config with a thousand inline blocks", func(t *testing.T) {
 		var b strings.Builder
 		b.WriteString("{\n  \"projects\": {\n")
-		for i := 0; i < 1000; i++ {
+		for i := range 1000 {
 			b.WriteString(`    "/work/repo` + strconv.Itoa(i) +
 				`": {"allowedTools": ["Bash(git:*)", "Read"], "hasTrustDialogAccepted": true},` + "\n")
 		}
@@ -242,7 +243,7 @@ func TestInliningHandlesTheShapesThatBrokeIt(t *testing.T) {
 		if err := json.Unmarshal(old, &root); err != nil {
 			t.Fatal(err)
 		}
-		root["mcpServers"].(map[string]any)["deja"] = map[string]any{"command": "/opt/deja"}
+		typedOrFatal[map[string]any](t, root["mcpServers"])["deja"] = map[string]any{"command": "/opt/deja"}
 
 		done := make(chan []byte, 1)
 		go func() {

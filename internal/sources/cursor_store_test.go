@@ -31,7 +31,7 @@ func seedCursorStore(t *testing.T, db string, msgs []string) {
 	fmt.Fprintf(&sql, "insert into blobs values ('%x', X'%x');\n", rootID, root)
 	meta := hex.EncodeToString([]byte(fmt.Sprintf(`{"agentId":"a","latestRootBlobId":"%x"}`, rootID)))
 	fmt.Fprintf(&sql, "insert into meta values ('0', '%s');\n", meta)
-	if out, err := exec.Command("sqlite3", db, sql.String()).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, sql.String()).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}
 }

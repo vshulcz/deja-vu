@@ -32,7 +32,7 @@ func storesSelection() (map[string]bool, bool) {
 		return nil, false
 	}
 	want := map[string]bool{}
-	for _, name := range strings.Split(raw, ",") {
+	for name := range strings.SplitSeq(raw, ",") {
 		name = strings.ToLower(strings.TrimSpace(name))
 		if name == "" {
 			continue

@@ -39,7 +39,7 @@ func TestSyncRecordsAFailedExchange(t *testing.T) {
 	t.Setenv("DEJA_PEERS_FILE", os.Getenv("DEJA_INDEX_DIR")+"-peers.json")
 	old := sshRunner
 	defer func() { sshRunner = old }()
-	sshRunner = func(name string, args ...string) (string, error) {
+	sshRunner = func(_ string, _ ...string) (string, error) {
 		return "no route to host", errors.New("exit status 255")
 	}
 	if err := runSync(os.Getenv("DEJA_INDEX_DIR"), []string{"ssh", "mini"}); err == nil {

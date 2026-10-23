@@ -46,7 +46,7 @@ func TestImportCountsItsRedactions(t *testing.T) {
 
 	// Re-importing the same batch redacts nothing new — the records dedupe
 	// before they are counted, so the total must not climb.
-	if _, err := Import(dir, in); err != nil {
+	if _, err = Import(dir, in); err != nil {
 		t.Fatal(err)
 	}
 	if m, err = readManifest(dir); err != nil {

@@ -1,12 +1,13 @@
 package index
 
 import (
+	"slices"
 	"testing"
 )
 
 func postingsFrom(sid uint32, n int, base int64) []posting {
 	out := make([]posting, 0, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		out = append(out, posting{Off: base + int64(i), Sid: sid})
 	}
 	return out
@@ -16,11 +17,7 @@ func postingsFrom(sid uint32, n int, base int64) []posting {
 // bounds how much of a session is read, never which sessions are candidates. A
 // session dropped here would vanish from the results entirely.
 func TestCapPostingsKeepsEverySession(t *testing.T) {
-	var posts []posting
-	posts = append(posts, postingsFrom(1, 500, 0)...)
-	posts = append(posts, postingsFrom(2, 3, 1000)...)
-	posts = append(posts, postingsFrom(3, 64, 2000)...)
-	posts = append(posts, postingsFrom(4, 65, 3000)...)
+	posts := slices.Concat(postingsFrom(1, 500, 0), postingsFrom(2, 3, 1000), postingsFrom(3, 64, 2000), postingsFrom(4, 65, 3000))
 
 	got := capPostingsPerSession(posts, 64)
 	bySid := map[uint32]int{}

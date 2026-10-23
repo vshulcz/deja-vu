@@ -1,7 +1,6 @@
 package sources
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,9 +35,9 @@ func TestChangesReadsACodexSessionsPatches(t *testing.T) {
 		"*** End Patch",
 		"",
 	}, "\n")
-	shellArgs, _ := json.Marshal(map[string]any{"command": []string{"apply_patch", "*** Begin Patch\n*** Update File: pkg/d.go\n@@\n-x\n+y\n*** End Patch\n"}})
+	shellArgs := mustJSON(t, map[string]any{"command": []string{"apply_patch", "*** Begin Patch\n*** Update File: pkg/d.go\n@@\n-x\n+y\n*** End Patch\n"}})
 	rec := func(typ string, payload any) string {
-		b, _ := json.Marshal(map[string]any{"type": typ, "payload": payload})
+		b := mustJSON(t, map[string]any{"type": typ, "payload": payload})
 		return string(b)
 	}
 	lines := []string{
@@ -51,8 +50,9 @@ func TestChangesReadsACodexSessionsPatches(t *testing.T) {
 	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	var got []string
-	for _, c := range Changes(model.Session{Harness: "codex", ID: "s", Path: path}) {
+	changes := Changes(model.Session{Harness: "codex", ID: "s", Path: path})
+	got := make([]string, 0, len(changes))
+	for _, c := range changes {
 		got = append(got, c.Path+"|"+c.Old+"|"+c.New+"|"+map[bool]string{true: "new"}[c.Created])
 	}
 	want := []string{
@@ -70,7 +70,7 @@ func TestChangesReadsACodexSessionsPatches(t *testing.T) {
 // session_meta does not move the directory its paths are read against.
 func TestChangesReadsEveryCodexPatchAgainstTheFilesOwnDirectory(t *testing.T) {
 	rec := func(typ string, payload any) string {
-		b, _ := json.Marshal(map[string]any{"type": typ, "payload": payload})
+		b := mustJSON(t, map[string]any{"type": typ, "payload": payload})
 		return string(b)
 	}
 	two := "*** Begin Patch\n*** Update File: /w/child/a.go\n@@\n-1\n+2\n*** End Patch\n*** Begin Patch\n*** Update File: b.go\n@@\n-3\n+4\n*** End Patch\n"
@@ -83,8 +83,9 @@ func TestChangesReadsEveryCodexPatchAgainstTheFilesOwnDirectory(t *testing.T) {
 	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	var got []string
-	for _, c := range Changes(model.Session{Harness: "codex", ID: "child", Path: path}) {
+	changes := Changes(model.Session{Harness: "codex", ID: "child", Path: path})
+	got := make([]string, 0, len(changes))
+	for _, c := range changes {
 		got = append(got, c.Path+":"+c.New)
 	}
 	if strings.Join(got, " ") != "a.go:2 b.go:4" {

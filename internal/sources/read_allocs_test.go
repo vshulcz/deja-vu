@@ -75,8 +75,8 @@ func TestReadingTranscriptsReusesTheLineBuffer(t *testing.T) {
 		t.Skip("sync.Pool drops buffers on purpose under -race")
 	}
 	dir := t.TempDir()
-	var paths []string
-	for i := 0; i < 64; i++ {
+	paths := make([]string, 0, 64)
+	for i := range 64 {
 		p := filepath.Join(dir, fmt.Sprintf("r%d.jsonl", i))
 		line := `{"type":"response_item","payload":{"type":"message","role":"user","content":"hi"}}` + "\n"
 		if err := os.WriteFile(p, []byte(strings.Repeat(line, 3)), 0o600); err != nil {

@@ -20,7 +20,7 @@ func kiroTestDB(t *testing.T, rows ...string) string {
 	db := filepath.Join(t.TempDir(), "data.sqlite3")
 	schema := `CREATE TABLE conversations_v2 (key TEXT NOT NULL, conversation_id TEXT NOT NULL, value TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (key, conversation_id));
 ` + strings.Join(rows, "\n")
-	cmd := exec.Command("sqlite3", db)
+	cmd := exec.CommandContext(t.Context(), "sqlite3", db)
 	cmd.Stdin = strings.NewReader(schema)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("seed: %v: %s", err, out)
@@ -131,7 +131,7 @@ func TestKiroDBWithoutTheTableIsEmpty(t *testing.T) {
 		t.Skip("sqlite3 not installed")
 	}
 	db := filepath.Join(t.TempDir(), "data.sqlite3")
-	cmd := exec.Command("sqlite3", db, "CREATE TABLE state (key TEXT PRIMARY KEY, value BLOB);")
+	cmd := exec.CommandContext(t.Context(), "sqlite3", db, "CREATE TABLE state (key TEXT PRIMARY KEY, value BLOB);")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("seed: %v: %s", err, out)
 	}

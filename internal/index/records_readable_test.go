@@ -32,7 +32,7 @@ func TestSearchToleratesAnInFlightAppend(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.Write([]byte("uncommitted appended tail bytes not in any bucket")); err != nil {
+	if _, err = f.WriteString("uncommitted appended tail bytes not in any bucket"); err != nil {
 		t.Fatal(err)
 	}
 	_ = f.Close()
@@ -47,7 +47,7 @@ func TestSearchToleratesAnInFlightAppend(t *testing.T) {
 	}
 
 	// A SHORTER records.bin is still real truncation.
-	if err := os.Truncate(rp, 10); err != nil {
+	if err = os.Truncate(rp, 10); err != nil {
 		t.Fatal(err)
 	}
 	m, err := readManifest(dir)
@@ -84,7 +84,7 @@ func TestRegexScanToleratesAnInFlightTail(t *testing.T) {
 	}
 	// A 4-byte little-endian length header claiming a small record, then a
 	// truncated payload — decodes to a short read, treated as a clean EOF.
-	if _, err := f.Write([]byte{20, 0, 0, 0, 'u', 'n', 'c', 'o', 'm', 'm'}); err != nil {
+	if _, err = f.Write([]byte{20, 0, 0, 0, 'u', 'n', 'c', 'o', 'm', 'm'}); err != nil {
 		t.Fatal(err)
 	}
 	_ = f.Close()

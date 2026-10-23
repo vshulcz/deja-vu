@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -27,7 +26,7 @@ func seedClaudeAt(t *testing.T, root, project, id, userText, asstText string, at
 			"timestamp": at.UTC().Format(time.RFC3339),
 			"message":   map[string]any{"role": role, "content": text},
 		}
-		b, _ := json.Marshal(rec)
+		b := mustMarshal(t, rec)
 		return string(b)
 	}
 	body := line("user", userText) + "\n" + line("assistant", asstText) + "\n"

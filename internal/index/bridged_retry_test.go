@@ -18,8 +18,8 @@ func bridgedStore(t *testing.T) string {
 	t.Helper()
 	tmp := hermeticIndexEnv(t)
 	dir := filepath.Join(tmp, "idx")
-	var sessions []model.Session
-	for i := 0; i < 80; i++ {
+	sessions := make([]model.Session, 0, 84)
+	for i := range 80 {
 		sessions = append(sessions, model.Session{
 			ID: fmt.Sprintf("filler%02d", i), Harness: "claude", Project: "p", Updated: time.Now(),
 			Messages: []model.Message{{Role: "user", Text: "notes on the weekly planning meeting and the invoice"}},
@@ -27,7 +27,7 @@ func bridgedStore(t *testing.T) string {
 	}
 	// Said in three sessions, which is the evidence the co-occurrence map asks
 	// for before it records a pairing.
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		sessions = append(sessions, model.Session{
 			ID: fmt.Sprintf("explains%02d", i), Harness: "claude", Project: "p", Updated: time.Now(),
 			Messages: []model.Message{{Role: "user",

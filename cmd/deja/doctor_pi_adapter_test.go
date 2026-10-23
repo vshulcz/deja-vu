@@ -23,7 +23,7 @@ func TestDoctorPiMCPRowNeedsTheAdapter(t *testing.T) {
 		var out bytes.Buffer
 		doctorMCP(&out)
 		var line string
-		for _, l := range strings.Split(out.String(), "\n") {
+		for l := range strings.SplitSeq(out.String(), "\n") {
 			if strings.HasPrefix(l, "  pi ") {
 				line = l
 			}

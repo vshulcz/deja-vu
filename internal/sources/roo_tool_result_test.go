@@ -1,7 +1,6 @@
 package sources
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -83,7 +82,7 @@ func TestRooToolResultIsCapped(t *testing.T) {
 		t.Fatal(err)
 	}
 	big := strings.Repeat("line of build output\n", maxParsedMessage/10)
-	quoted, _ := json.Marshal(big)
+	quoted := mustJSON(t, big)
 	body := `[{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":` + string(quoted) + `}]}]`
 	path := filepath.Join(dir, "api_conversation_history.json")
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {

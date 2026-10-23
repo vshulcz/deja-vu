@@ -51,7 +51,7 @@ func TestTheSessionThatAsksForTheBuildIsTold(t *testing.T) {
 	var resp struct {
 		SystemMessage string `json:"systemMessage"`
 	}
-	if err := json.Unmarshal([]byte(out), &resp); err != nil {
+	if err = json.Unmarshal([]byte(out), &resp); err != nil {
 		t.Fatalf("hook output is not JSON: %q", out)
 	}
 	if !strings.Contains(resp.SystemMessage, "indexing your history") {
@@ -61,13 +61,13 @@ func TestTheSessionThatAsksForTheBuildIsTold(t *testing.T) {
 	// The very first build speaks too: requiring a manifest left a machine
 	// with ten thousand transcripts and no index yet in silence (#909). The
 	// line appears once and is true; the next session has a manifest.
-	if err := os.RemoveAll(dir); err != nil {
+	if err = os.RemoveAll(dir); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	if err = os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "warmup.sentinel"),
+	if err = os.WriteFile(filepath.Join(dir, "warmup.sentinel"),
 		[]byte(strconv.FormatInt(time.Now().UnixNano(), 10)+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}

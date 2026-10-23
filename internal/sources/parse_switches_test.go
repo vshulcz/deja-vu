@@ -22,7 +22,10 @@ type switchRow struct {
 
 func parseSwitchRows() []switchRow {
 	file := func(name, body string) func(*testing.T, string) string {
-		return func(t *testing.T, dir string) string { return writeExitFixture(t, filepath.Join(dir, name), body) }
+		return func(t *testing.T, dir string) string {
+			t.Helper()
+			return writeExitFixture(t, filepath.Join(dir, name), body)
+		}
 	}
 	// Speech and a tool result in one user message: the result rode along
 	// with the speech and was kept under it.
@@ -40,6 +43,7 @@ func parseSwitchRows() []switchRow {
 			`{"role":"user","created":1790874402,"content":[{"type":"toolResponse","id":"c1","toolResult":{"status":"success","value":{"content":[{"type":"text","text":"./retry.go:12:5: undefined: backoffJitter\n\nCommand exited with code 1"}],"isError":true}}}]}`,
 		}, "\n")+"\n"), cmd: "go test ./...", out: "backoffJitter"},
 		{name: "goose db", kind: "goose-db", fixture: func(t *testing.T, _ string) string {
+			t.Helper()
 			return seedDB(t, "sessions.db", `create table sessions (id text primary key, name text, description text, working_dir text, created_at text, updated_at text);
 create table messages (id integer primary key autoincrement, session_id text, role text, content_json text, created_timestamp integer);
 insert into sessions values ('20260920_1','n','fix the retry loop','/tmp/proj','2026-09-20T10:00:00Z','2026-09-20T10:05:00Z');
@@ -48,6 +52,7 @@ insert into messages(session_id,role,content_json,created_timestamp) values ('20
 insert into messages(session_id,role,content_json,created_timestamp) values ('20260920_1','user','[{"type":"toolResponse","id":"c1","toolResult":{"status":"success","value":{"content":[{"type":"text","text":"./retry.go:12:5: undefined: backoffJitter"}],"isError":true}}}]',1790874402);`)
 		}, cmd: "go test ./...", out: "backoffJitter"},
 		{name: "grok jsonl", kind: "grok", fixture: func(t *testing.T, dir string) string {
+			t.Helper()
 			t.Setenv("DEJA_GROK_ROOT", dir)
 			const id = "01a03432-4d92-7243-ab6c-8cdd1c697738"
 			return writeExitFixture(t, filepath.Join(dir, "sessions", "%2Fw%2Fapp", id, "updates.jsonl"), strings.Join([]string{
@@ -57,6 +62,7 @@ insert into messages(session_id,role,content_json,created_timestamp) values ('20
 			}, "\n")+"\n")
 		}, cmd: "go test ./...", out: "backoffJitter"},
 		{name: "crush", kind: "crush", fixture: func(t *testing.T, _ string) string {
+			t.Helper()
 			sql := "insert into sessions values ('s1',null,'retry',2,0,0,0.0,1784282405,1784282400,null,null);\n"
 			sql += crushInsert(t, "m1", "s1", "assistant", 1784282400, []any{
 				map[string]any{"type": "tool_call", "data": map[string]any{"id": "c1", "name": "bash", "input": `{"command":"go test ./..."}`, "finished": true}}})
@@ -65,6 +71,7 @@ insert into messages(session_id,role,content_json,created_timestamp) values ('20
 			return crushStore(t, "proj", sql)
 		}, cmd: "go test ./...", out: "backoffJitter"},
 		{name: "copilot agent transcript", kind: "copilot-chat", fixture: func(t *testing.T, _ string) string {
+			t.Helper()
 			return writeCopilotAgentTranscript(t, copilotChatRoot(t), "h1", "s-agent", `{"folder":"file:///work/projA"}`, []string{
 				`{"type":"session.start","data":{"sessionId":"s-agent","version":1,"producer":"copilot-agent","startTime":"2026-09-14T05:46:01.086Z"},"id":"e1","timestamp":"2026-09-14T05:46:01.086Z","parentId":null}`,
 				`{"type":"user.message","data":{"content":"why does the build fail"},"id":"e2","timestamp":"2026-09-14T05:46:10.000Z","parentId":"e1"}`,
@@ -158,7 +165,7 @@ func TestEveryRegisteredParseAppliesTheSwitches(t *testing.T) {
 func TestApplyParseSwitchesDropsOnlyTheSwitchedRoles(t *testing.T) {
 	roles := []string{"user", "assistant", RoleToolOutput, RoleCommand, RoleFiles, RoleEdit, RoleWrote}
 	session := func() []model.Session {
-		var msgs []model.Message
+		msgs := make([]model.Message, 0, len(roles))
 		for _, r := range roles {
 			msgs = append(msgs, model.Message{Role: r, Text: r})
 		}
@@ -173,8 +180,9 @@ func TestApplyParseSwitchesDropsOnlyTheSwitchedRoles(t *testing.T) {
 	} {
 		t.Run(env, func(t *testing.T) {
 			t.Setenv(env, "0")
-			var got []string
-			for _, m := range ApplyParseSwitches(session())[0].Messages {
+			parsed := ApplyParseSwitches(session())[0].Messages
+			got := make([]string, 0, len(parsed))
+			for _, m := range parsed {
 				got = append(got, m.Role)
 			}
 			var want []string
@@ -206,8 +214,8 @@ func TestApplyParseSwitchesDropsOnlyTheSwitchedRoles(t *testing.T) {
 func TestSubagentTailIsCutAfterTheParseSwitches(t *testing.T) {
 	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "")
 	t.Setenv("DEJA_INDEX_TOOL_OUTPUT", "0")
-	var msgs []model.Message
-	for i := 0; i < 6; i++ {
+	msgs := make([]model.Message, 0, 12)
+	for range 6 {
 		msgs = append(msgs, model.Message{Role: "assistant", Text: "turn"}, model.Message{Role: RoleToolOutput, Text: "out"})
 	}
 	ss := applyReadSwitches([]model.Session{{ID: "kid", Kind: "subagent", Messages: append([]model.Message{{Role: "user", Text: "the task"}}, msgs...)}})
@@ -232,7 +240,7 @@ insert into part values('p2','m2','{"type":"text","text":"review the retry loop"
 	t.Setenv("DEJA_OPENCODE_DB", db)
 	diffs := t.TempDir()
 	t.Setenv("DEJA_OPENCODE_DIFFS", diffs)
-	var paths []string
+	paths := make([]string, 0, 2)
 	for _, id := range []string{"ses_parent", "ses_child"} {
 		p := filepath.Join(diffs, id+".json")
 		writeExitFixture(t, p, opencodeDiffFixture)

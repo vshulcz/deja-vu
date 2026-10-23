@@ -18,7 +18,7 @@ func loggedIDsForKind(t *testing.T, dir, kind string) map[string]bool {
 	if err != nil {
 		t.Fatalf("no usage log: %v", err)
 	}
-	for _, line := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(string(b)), "\n") {
 		if line == "" {
 			continue
 		}

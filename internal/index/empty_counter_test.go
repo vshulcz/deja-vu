@@ -8,7 +8,7 @@ import (
 
 // buildWithEmpties writes one real transcript and n empty ones into a fresh
 // store, builds it, and returns the index directory.
-func buildWithEmpties(t *testing.T, empties int) string {
+func buildWithEmpties(t *testing.T, empties int) {
 	t.Helper()
 	home := t.TempDir()
 	setHome(t, home)
@@ -19,8 +19,8 @@ func buildWithEmpties(t *testing.T, empties int) string {
 	if err := os.MkdirAll(proj, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	real := `{"type":"user","sessionId":"real","cwd":"/tmp/g","timestamp":"2026-08-01T10:00:00Z","message":{"role":"user","content":"pool exhausted"}}` + "\n"
-	if err := os.WriteFile(filepath.Join(proj, "real.jsonl"), []byte(real), 0o644); err != nil {
+	realLine := `{"type":"user","sessionId":"real","cwd":"/tmp/g","timestamp":"2026-08-01T10:00:00Z","message":{"role":"user","content":"pool exhausted"}}` + "\n"
+	if err := os.WriteFile(filepath.Join(proj, "real.jsonl"), []byte(realLine), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	for i := range empties {
@@ -34,7 +34,6 @@ func buildWithEmpties(t *testing.T, empties int) string {
 	if err := Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
-	return dir
 }
 
 // The counter says "since the last build" and counted since the last read, so a

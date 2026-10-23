@@ -79,14 +79,14 @@ func TestPathsCoverEveryCellExactlyOnce(t *testing.T) {
 		want := map[string]int{}
 		for _, row := range Grid(m) {
 			for _, ch := range row {
-				if col, ok := Colour(byte(ch), m.CoatColour); ok {
+				if col, ok := Colour(ch, m.CoatColour); ok {
 					want[Hex[col]]++
 				}
 			}
 		}
 		for _, p := range Paths(m, 0, 0, 1, nil) {
 			area := 0
-			for _, rect := range strings.Split(strings.TrimSuffix(p.D, "Z"), "Z") {
+			for rect := range strings.SplitSeq(strings.TrimSuffix(p.D, "Z"), "Z") {
 				var x, y, w, h, back int
 				if _, err := fmt.Sscanf(rect, "M%d %dh%dv%dh-%d", &x, &y, &w, &h, &back); err != nil {
 					t.Fatalf("%s: cannot read rectangle %q: %v", p.Fill, rect, err)

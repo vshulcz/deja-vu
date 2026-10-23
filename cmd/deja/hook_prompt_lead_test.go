@@ -28,7 +28,7 @@ func TestHookPromptLeadsWithTheSessionThatConcluded(t *testing.T) {
 	// Says the subject over and over and never settles it, so ranking puts it
 	// first on sheer weight.
 	talk := make([]string, 0, 6)
-	for i := 0; i < 6; i++ {
+	for range 6 {
 		talk = append(talk, `{"type":"assistant","sessionId":"kestreltalk","timestamp":"`+recent+
 			`","message":{"role":"assistant","content":"looking at kestrel again, still not touching kestrel"}}`)
 	}

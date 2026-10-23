@@ -20,13 +20,15 @@ func gooseStore(t *testing.T, db string, turns []struct {
 	stmts := `create table if not exists sessions (id text primary key, name text, description text, working_dir text, created_at text, updated_at text);
 create table if not exists messages (id integer primary key autoincrement, session_id text, role text, content_json text, created_timestamp integer);
 `
+	var stmtsSb23 strings.Builder
 	for _, turn := range turns {
-		stmts += fmt.Sprintf(
+		fmt.Fprintf(&stmtsSb23,
 			"insert or ignore into sessions values ('%[1]s','n','a goose session','/tmp/app',datetime(%[3]d,'unixepoch'),datetime(%[3]d,'unixepoch'));\n"+
 				"update sessions set updated_at = datetime(%[3]d,'unixepoch') where id='%[1]s';\n"+
 				"insert into messages (session_id,role,content_json,created_timestamp) values ('%[1]s','%[2]s',json_array(json_object('type','text','text','%[4]s')),%[3]d);\n",
 			turn.Session, turn.Role, turn.At, turn.Text)
 	}
+	stmts += stmtsSb23.String()
 	readerSQLite(t, db, stmts)
 }
 
@@ -55,7 +57,7 @@ func TestGooseSinceStillFindsATurnWithNoTimestamp(t *testing.T) {
 	stmts := fmt.Sprintf(
 		"insert into messages (session_id,role,content_json,created_timestamp) values ('g1','assistant',json_array(json_object('type','text','text','the pool is too small')),0);\n"+
 			"update sessions set updated_at = datetime(%d,'unixepoch') where id='g1';\n", later)
-	if out, err := exec.Command("sqlite3", db, stmts).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, stmts).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}
 

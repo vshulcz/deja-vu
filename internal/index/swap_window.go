@@ -45,7 +45,7 @@ func openIndexFile(path string) (*os.File, error) {
 	// absorb. Reading the state first makes the miss decidable — if no swap was
 	// in flight when we looked and the file is still not there, it is not
 	// coming.
-	for i := 0; i < swapWindowTries; i++ {
+	for range swapWindowTries {
 		inFlight := swapInFlight(path)
 		if f, oerr := os.Open(path); oerr == nil {
 			return f, nil
@@ -71,7 +71,7 @@ func statIndexFile(path string) (os.FileInfo, error) {
 	if err == nil || !errors.Is(err, fs.ErrNotExist) {
 		return fi, err
 	}
-	for i := 0; i < swapWindowTries; i++ {
+	for range swapWindowTries {
 		inFlight := swapInFlight(path)
 		if fi, serr := os.Stat(path); serr == nil {
 			return fi, nil
@@ -95,7 +95,7 @@ func statIndexFile(path string) (os.FileInfo, error) {
 // below it.
 func swapInFlight(path string) bool {
 	d := filepath.Dir(path)
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		if len(parkedDirs(d)) > 0 {
 			if _, err := os.Stat(d); errors.Is(err, fs.ErrNotExist) {
 				return true

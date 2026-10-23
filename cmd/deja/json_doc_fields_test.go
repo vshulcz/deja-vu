@@ -20,8 +20,8 @@ func TestJSONDocCoversSessionFields(t *testing.T) {
 	}
 	doc := string(b)
 
-	typ := reflect.TypeOf(model.Session{})
-	for i := 0; i < typ.NumField(); i++ {
+	typ := reflect.TypeFor[model.Session]()
+	for i := range typ.NumField() {
 		name, _, _ := strings.Cut(typ.Field(i).Tag.Get("json"), ",")
 		if name == "" || name == "-" {
 			continue

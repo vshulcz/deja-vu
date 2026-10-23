@@ -41,7 +41,7 @@ func lastInjectionInto(t *testing.T, dir string) string {
 		t.Fatalf("no usage log: %v", err)
 	}
 	last := ""
-	for _, line := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(string(b)), "\n") {
 		var e struct {
 			Kind string `json:"kind"`
 			Into string `json:"into"`

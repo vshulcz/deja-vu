@@ -96,13 +96,13 @@ func TestExtractUpdateBinaryZipBranches(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.Write([]byte("x")); err != nil {
+	if _, err = f.Write([]byte("x")); err != nil {
 		t.Fatal(err)
 	}
-	if err := zw.Close(); err != nil {
+	if err = zw.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := extractUpdateBinary(buf.Bytes(), "deja.exe", "windows"); err == nil || !strings.Contains(err.Error(), "did not contain") {
+	if _, err = extractUpdateBinary(buf.Bytes(), "deja.exe", "windows"); err == nil || !strings.Contains(err.Error(), "did not contain") {
 		t.Fatalf("zip missing binary err = %v", err)
 	}
 
@@ -236,7 +236,7 @@ func TestExtractUpdateBinaryTarOversizedHeader(t *testing.T) {
 
 type errAfterReader struct{}
 
-func (errAfterReader) Read(p []byte) (int, error) {
+func (errAfterReader) Read(_ []byte) (int, error) {
 	return 0, errors.New("boom read")
 }
 
@@ -275,7 +275,7 @@ func TestPerformUpdateSuccessUnknownVersionAndPermissionBranches(t *testing.T) {
 	archive := makeUpdateArchive(t, "linux", binaryName, []byte("new binary"))
 	sum := fmt.Sprintf("%x", sha256.Sum256(archive))
 	release := []byte(fmt.Sprintf(`{"tag_name":"v2.0.0","assets":[{"name":%q,"browser_download_url":"archive"},{"name":"checksums.txt","browser_download_url":"checksums"}]}`, archiveName))
-	download := func(url string, limit int64, label string) ([]byte, error) {
+	download := func(_ string, _ int64, label string) ([]byte, error) {
 		switch label {
 		case "checksums.txt":
 			return []byte(sum + "  " + archiveName + "\n"), nil
@@ -288,11 +288,11 @@ func TestPerformUpdateSuccessUnknownVersionAndPermissionBranches(t *testing.T) {
 
 	// Empty current version takes the "from unknown" branch on success.
 	target := filepath.Join(t.TempDir(), "deja")
-	if err := os.WriteFile(target, []byte("old"), 0o755); err != nil {
+	if err = os.WriteFile(target, []byte("old"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	if err := performUpdate(updateConfig{goos: "linux", goarch: "amd64", executable: target, latestURL: testLatestReleaseURL, download: download}, &out); err != nil {
+	if err = performUpdate(updateConfig{goos: "linux", goarch: "amd64", executable: target, latestURL: testLatestReleaseURL, download: download}, &out); err != nil {
 		t.Fatalf("performUpdate unknown-version err = %v", err)
 	}
 	if !strings.Contains(out.String(), "updated deja unknown -> v2.0.0") {
@@ -307,10 +307,10 @@ func TestPerformUpdateSuccessUnknownVersionAndPermissionBranches(t *testing.T) {
 	}
 	dir := t.TempDir()
 	dest := filepath.Join(dir, "deja")
-	if err := os.WriteFile(dest, []byte("old"), 0o755); err != nil {
+	if err = os.WriteFile(dest, []byte("old"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chmod(dir, 0o555); err != nil {
+	if err = os.Chmod(dir, 0o555); err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = os.Chmod(dir, 0o755) }()

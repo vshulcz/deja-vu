@@ -30,7 +30,7 @@ type WriteBackFile struct {
 
 // WriteBackRefusal says why a session cannot be written back, naming what the
 // index lacks or what the format needs.
-type WriteBackRefusal struct {
+type WriteBackRefusal struct { //nolint:errname // exported name used by cmd/deja
 	Harness string
 	Reason  string
 }
@@ -265,8 +265,9 @@ func renderClaude(s model.Session, turns []model.Message) (string, []byte, error
 // model on resume) and as an event (what its history view shows), the way
 // codex writes them.
 func codexWriteBackRoots() []string {
-	var out []string
-	for _, r := range CodexRoots() {
+	roots := CodexRoots()
+	out := make([]string, 0, 2*len(roots))
+	for _, r := range roots {
 		out = append(out, filepath.Join(r, "sessions"), filepath.Join(r, "archived_sessions"))
 	}
 	return out
@@ -361,7 +362,9 @@ func codexWriteBackCWD(s model.Session) string {
 // sessionDirFromPaths is the directory a session ran in, read off the
 // absolute paths of the files it touched: the nearest parent whose project
 // name is the session's. Most votes wins, so one file outside the checkout
-// does not move it.
+// does not move it. The name is taken without the alias file: an alias names
+// every directory of its tree, so the nearest one would be wherever the file
+// sat, not the checkout.
 func sessionDirFromPaths(s model.Session) string {
 	if s.Project == "" || s.Project == "-" {
 		return ""
@@ -384,7 +387,7 @@ func sessionDirFromPaths(s model.Session) string {
 				continue
 			}
 			for dir := parentPath(p); dir != ""; dir = parentPath(dir) {
-				if cwdProjectName(dir) == s.Project {
+				if plainCWDProjectName(dir) == s.Project {
 					votes[dir]++
 					if votes[dir] > votes[best] {
 						best = dir
@@ -422,9 +425,9 @@ func codexProjectCWD(project string) string {
 			if err != nil {
 				continue
 			}
-			for _, cwd := range strings.Split(string(out), "\n") {
+			for cwd := range strings.SplitSeq(string(out), "\n") {
 				cwd = strings.TrimSpace(cwd)
-				if cwd == "" || cwdProjectName(cwd) != project || cwd == found {
+				if cwd == "" || plainCWDProjectName(cwd) != project || cwd == found {
 					continue
 				}
 				if found != "" {

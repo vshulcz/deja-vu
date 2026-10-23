@@ -105,7 +105,7 @@ func TestSyncSSHPushNothingNew(t *testing.T) {
 	var calls int
 	old := sshRunner
 	defer func() { sshRunner = old }()
-	sshRunner = func(name string, args ...string) (string, error) {
+	sshRunner = func(_ string, _ ...string) (string, error) {
 		calls++
 		return "/tmp/x", nil
 	}
@@ -150,7 +150,10 @@ func TestSyncSSHPull(t *testing.T) {
 				return "", err
 			}
 			enc := json.NewEncoder(f)
-			_ = enc.Encode(index.SyncRecord{Harness: "claude", SessionID: "remote-ssh", Project: "otherbox", Role: "user", Text: "pullneedle from remote", Time: base})
+			if err = enc.Encode(index.SyncRecord{Harness: "claude", SessionID: "remote-ssh", Project: "otherbox", Role: "user", Text: "pullneedle from remote", Time: base}); err != nil {
+				_ = f.Close()
+				return "", err
+			}
 			return "", f.Close()
 		}
 		return "", nil
@@ -194,7 +197,7 @@ func TestRunSyncExportImport(t *testing.T) {
 	}
 	importDir := filepath.Join(t.TempDir(), "import.db")
 	t.Setenv("DEJA_INDEX_DIR", importDir)
-	if err := runSync(index.DefaultDir(), []string{"import", out}); err != nil {
+	if err = runSync(index.DefaultDir(), []string{"import", out}); err != nil {
 		t.Fatal(err)
 	}
 	ss, err := index.Search(importDir, search.Options{Query: "sshneedle", All: true})

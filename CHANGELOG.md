@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   person's own words rather than the runtime's reminders, `deja resume` prints
   `mcode --session <id>`, and `deja install mcode` / `mcode-auto` write the MCP
   entry and a hook plugin (#5593).
+- `~/.config/deja/projects` names a directory tree as one project, one `<path> = <name>` per line. Every checkout and worktree under a listed path is indexed under that name, and the hooks and recall standing anywhere in it scope to all of them. Editing the file renames nothing already indexed: `deja index` and `deja doctor` say a rebuild is due, `deja index --rebuild` renames the sessions whose transcripts are still on disk, and sessions indexed before the file existed still match from their own checkout until then. The exclude file wins over an alias, so a repository excluded by its own name stays out. From @Maweill (#5097, #5373).
 - `deja search --sort date` lists the newest match first, in the text and in
   `--json`, and `^s` in the search screen turns the list newest first under
   day headings and back. On a common word the page is the newest of the whole
@@ -29,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `deja fix`, `deja friction` and the hook at a failed command now know the
+  errors a package install hits behind a mirror or a proxy: pip's "No matching
+  distribution found", an HTTP 403 or 401 from an index, an unresolvable host,
+  an untrusted certificate, a failed docker build step and npm's error codes.
+  `pip3`, `pip config`, conda and apt installs are kept as remedies, so the
+  install that worked against the mirror is what `deja fix` names (#5599).
 - A first build large enough to answer early no longer forgets the malformed
   lines, unreadable files and rollouts waiting for zstd it found, so doctor
   still reports them (#5110).

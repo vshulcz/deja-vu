@@ -21,8 +21,9 @@ func visibleWidth(line string) int { return termwidth.Columns(visibleText(line))
 
 // briefStore writes three sessions whose ages decide how wide the date on the
 // `recent` line is — "today" is five columns, "Jun 27 2025" is eleven.
-func briefStore(t *testing.T, project string, ages ...time.Duration) string {
+func briefStore(t *testing.T, ages ...time.Duration) string {
 	t.Helper()
+	const project = "tmp/projc"
 	tmp := hermeticEnv(t)
 	root := filepath.Join(tmp, "claude", "-"+strings.ReplaceAll(project, "/", "-"))
 	if err := os.MkdirAll(root, 0o755); err != nil {
@@ -47,7 +48,7 @@ func briefStore(t *testing.T, project string, ages ...time.Duration) string {
 
 func recentLines(out string) []string {
 	var got []string
-	for _, l := range strings.Split(out, "\n") {
+	for l := range strings.SplitSeq(out, "\n") {
 		if strings.Contains(l, "[claude]") {
 			got = append(got, l)
 		}
@@ -71,7 +72,7 @@ func TestBriefRecentLinesFitEightyColumns(t *testing.T) {
 		{"old store", []time.Duration{400 * day, 405 * day, 412 * day}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			dir := briefStore(t, "tmp/projc", tc.ages...)
+			dir := briefStore(t, tc.ages...)
 			var buf bytes.Buffer
 			if err := runBrief(dir, &buf); err != nil {
 				t.Fatal(err)
@@ -95,7 +96,7 @@ func TestBriefRecentLinesFitEightyColumns(t *testing.T) {
 func TestBriefRecentLinesDoNotVaryWithTheDateWidth(t *testing.T) {
 	t.Setenv("COLUMNS", "")
 	day := 24 * time.Hour
-	dir := briefStore(t, "tmp/projc", 400*day, 405*day, 412*day)
+	dir := briefStore(t, 400*day, 405*day, 412*day)
 	var buf bytes.Buffer
 	if err := runBrief(dir, &buf); err != nil {
 		t.Fatal(err)
@@ -116,7 +117,7 @@ func TestBriefRecentLinesDoNotVaryWithTheDateWidth(t *testing.T) {
 // not cut the title away entirely.
 func TestBriefRecentLinesHonourColumns(t *testing.T) {
 	day := 24 * time.Hour
-	dir := briefStore(t, "tmp/projc", 12*day, 15*day, 19*day)
+	dir := briefStore(t, 12*day, 15*day, 19*day)
 
 	t.Setenv("COLUMNS", "60")
 	var buf bytes.Buffer
@@ -179,7 +180,7 @@ func TestBriefRecentLinesHonourColumns(t *testing.T) {
 // (#1411). Every line of the brief fits a 60-column pane, this one included.
 func TestBriefWireLineFitsSixtyColumns(t *testing.T) {
 	day := 24 * time.Hour
-	dir := briefStore(t, "tmp/projc", time.Hour, 2*day, 5*day)
+	dir := briefStore(t, time.Hour, 2*day, 5*day)
 
 	for _, cols := range []int{60, 80, 120} {
 		t.Run(strconv.Itoa(cols), func(t *testing.T) {
@@ -189,7 +190,7 @@ func TestBriefWireLineFitsSixtyColumns(t *testing.T) {
 				t.Fatal(err)
 			}
 			var wire string
-			for _, l := range strings.Split(buf.String(), "\n") {
+			for l := range strings.SplitSeq(buf.String(), "\n") {
 				if strings.Contains(l, "install --auto") {
 					wire = l
 				}

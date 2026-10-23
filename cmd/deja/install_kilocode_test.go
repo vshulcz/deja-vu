@@ -41,8 +41,8 @@ func TestInstallKilocodeWiresTheServerAndTheSkill(t *testing.T) {
 			Args    []string `json:"args"`
 		} `json:"mcpServers"`
 	}
-	if err := json.Unmarshal(b, &cfg); err != nil {
-		t.Fatalf("mcp settings are not the shape Kilo reads: %v", err)
+	if uerr := json.Unmarshal(b, &cfg); uerr != nil {
+		t.Fatalf("mcp settings are not the shape Kilo reads: %v", uerr)
 	}
 	srv, ok := cfg.Servers["deja"]
 	if !ok {
@@ -70,8 +70,8 @@ func TestInstallKilocodeWiresTheServerAndTheSkill(t *testing.T) {
 	// And the global slash command, in the directory Kilo's workflows doc
 	// names: a file called deja.md there is invoked as /deja.
 	command := filepath.Join(home, ".config", "kilo", "commands", "deja.md")
-	if cb, err := os.ReadFile(command); err != nil {
-		t.Fatalf("command: %v", err)
+	if cb, rerr := os.ReadFile(command); rerr != nil {
+		t.Fatalf("command: %v", rerr)
 	} else if !strings.Contains(string(cb), "deja") {
 		t.Errorf("the command file does not mention deja: %q", string(cb)[:60])
 	}

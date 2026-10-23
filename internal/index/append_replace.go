@@ -295,7 +295,7 @@ func markScrubPending(dir string) error {
 	if err != nil {
 		return err
 	}
-	b := binary.LittleEndian.AppendUint64(nil, uint64(size))
+	b := binary.LittleEndian.AppendUint64(nil, uint64(size)) //nolint:gosec // file sizes are non-negative
 	return os.WriteFile(filepath.Join(dir, scrubPendingFile), append(b, fp[:]...), 0o600)
 }
 
@@ -306,7 +306,7 @@ func scrubMarked(dir string) (int64, [sha256.Size]byte, error) {
 	b, err := os.ReadFile(filepath.Join(dir, scrubPendingFile))
 	if err == nil && len(b) == 8+sha256.Size {
 		copy(fp[:], b[8:])
-		return int64(binary.LittleEndian.Uint64(b)), fp, nil
+		return int64(binary.LittleEndian.Uint64(b)), fp, nil //nolint:gosec // written from a non-negative size
 	}
 	return logFingerprint(filepath.Join(dir, "records.bin"))
 }
@@ -328,11 +328,9 @@ func deadWords(path string, t *recordTables, offs []int64, unindexed bool) (buck
 	var wg sync.WaitGroup
 	for w := range workers {
 		lo, hi := len(offs)*w/workers, len(offs)*(w+1)/workers
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			parts[w], rests[w], errs[w] = deadWordsOf(path, t, offs[lo:hi], unindexed)
-		}()
+		})
 	}
 	wg.Wait()
 	if err := errors.Join(errs...); err != nil {

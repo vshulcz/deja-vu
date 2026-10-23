@@ -44,7 +44,7 @@ func TestDoctorGjcRowKnowsItsScopeFilesAndPasses(t *testing.T) {
 		t.Helper()
 		var buf bytes.Buffer
 		doctorHarnesses(&buf, t.TempDir())
-		for _, l := range strings.Split(buf.String(), "\n") {
+		for l := range strings.SplitSeq(buf.String(), "\n") {
 			if strings.HasPrefix(strings.TrimSpace(l), "gjc ") {
 				return l
 			}
@@ -93,7 +93,7 @@ func TestDoctorKimchiRowNamesSkippedSubagentRuns(t *testing.T) {
 	}
 	var buf bytes.Buffer
 	doctorHarnesses(&buf, t.TempDir())
-	for _, l := range strings.Split(buf.String(), "\n") {
+	for l := range strings.SplitSeq(buf.String(), "\n") {
 		if !strings.HasPrefix(strings.TrimSpace(l), "kimchi ") {
 			continue
 		}

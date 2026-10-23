@@ -35,7 +35,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/pprof"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -210,11 +210,12 @@ func main() {
 			fmt.Fprintln(os.Stderr, "day0bench:", err)
 			os.Exit(1)
 		}
-		defer f.Close()
 		if err := pprof.StartCPUProfile(f); err != nil {
+			_ = f.Close()
 			fmt.Fprintln(os.Stderr, "day0bench:", err)
 			os.Exit(1)
 		}
+		defer f.Close()
 		defer pprof.StopCPUProfile()
 	}
 	if *skipAbs {
@@ -234,7 +235,7 @@ func main() {
 	if *keep != "" {
 		if err := keepCorpus(*keep, all, qs); err != nil {
 			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
+			os.Exit(1) //nolint:gocritic // a failed run has no profile worth flushing
 		}
 		fmt.Printf("kept: %s/home (claude + codex layout), %s/questions.json\n", *keep, *keep)
 	}
@@ -290,7 +291,7 @@ func percentiles(ds []time.Duration) (time.Duration, time.Duration) {
 		return 0, 0
 	}
 	s := append([]time.Duration(nil), ds...)
-	sort.Slice(s, func(i, j int) bool { return s[i] < s[j] })
+	slices.Sort(s)
 	at := func(q float64) time.Duration {
 		i := int(float64(len(s)-1) * q)
 		return s[i]
@@ -306,8 +307,8 @@ func run(w writer, all, qs []question, control, misses, ranks bool) (runResult, 
 	}
 	defer os.RemoveAll(tmp)
 	root := filepath.Join(tmp, w.harness)
-	if err := os.MkdirAll(root, 0o755); err != nil {
-		return out, err
+	if merr := os.MkdirAll(root, 0o755); merr != nil {
+		return out, merr
 	}
 
 	// One shared corpus for every question, laid down once: this is a machine
@@ -320,8 +321,8 @@ func run(w writer, all, qs []question, control, misses, ranks bool) (runResult, 
 				continue
 			}
 			seen[id] = true
-			if err := w.write(root, id, parseDate(q.Dates[i]), turns); err != nil {
-				return out, err
+			if werr := w.write(root, id, parseDate(q.Dates[i]), turns); werr != nil {
+				return out, werr
 			}
 			out.written++
 		}
@@ -333,16 +334,16 @@ func run(w writer, all, qs []question, control, misses, ranks bool) (runResult, 
 	readRoot := root
 	if control {
 		readRoot = filepath.Join(tmp, "empty")
-		if err := os.MkdirAll(readRoot, 0o755); err != nil {
-			return out, err
+		if merr := os.MkdirAll(readRoot, 0o755); merr != nil {
+			return out, merr
 		}
 	}
 	_ = os.Setenv(w.env, readRoot)
 	_ = os.Setenv("DEJA_INDEX_DIR", dir)
 
 	t0 := time.Now()
-	if err := index.Ensure(dir, w.harness, true, nil); err != nil {
-		return out, err
+	if ierr := index.Ensure(dir, w.harness, true, nil); ierr != nil {
+		return out, ierr
 	}
 	out.build = time.Since(t0)
 

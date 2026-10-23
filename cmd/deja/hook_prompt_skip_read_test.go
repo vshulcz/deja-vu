@@ -26,9 +26,9 @@ func TestHookPromptDoesNotReadASessionItAlreadyShowed(t *testing.T) {
 	ts := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
 
 	lines := make([]string, 0, dejaVuMaxMessages+2)
-	for i := 0; i < dejaVuMaxMessages+1; i++ {
+	for i := range dejaVuMaxMessages + 1 {
 		lines = append(lines, fmt.Sprintf(
-			`{"type":"assistant","sessionId":"longone","timestamp":"%s","message":{"role":"assistant","content":"the fix: kestrel retries are capped at four, note %d"}}`,
+			`{"type":"assistant","sessionId":"longone","timestamp":%q,"message":{"role":"assistant","content":"the fix: kestrel retries are capped at four, note %d"}}`,
 			ts, i))
 	}
 	writeClaudeFixture(t, filepath.Join(claudeRoot, "beta", "longone.jsonl"), "longone", lines)

@@ -98,8 +98,8 @@ func TestGeminiResumeStubDoesNotTakeTheSessionFullBuild(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tmp := hermeticIndexEnv(t)
-			real := filepath.Join(geminiChats(), tc.real)
-			write(t, real, geminiOriginal()+geminiResumedTail())
+			realPath := filepath.Join(geminiChats(), tc.real)
+			write(t, realPath, geminiOriginal()+geminiResumedTail())
 			write(t, filepath.Join(geminiChats(), tc.stub), geminiStub())
 			dir := filepath.Join(tmp, "idx")
 			if err := Ensure(dir, "", false, nil); err != nil {
@@ -113,7 +113,7 @@ func TestGeminiResumeStubDoesNotTakeTheSessionFullBuild(t *testing.T) {
 			if n := ReportEmptySessions(); n != 1 {
 				t.Errorf("reported %d empty transcripts, want the stub", n)
 			}
-			assertResumedSessionHeld(t, dir, real, "schema migration")
+			assertResumedSessionHeld(t, dir, realPath, "schema migration")
 		})
 	}
 }
@@ -122,24 +122,24 @@ func TestGeminiResumeStubDoesNotTakeTheSessionFullBuild(t *testing.T) {
 // it and leaves the stub, and the next pass sees both.
 func TestGeminiResumeStubDoesNotTakeTheSessionIncremental(t *testing.T) {
 	tmp := hermeticIndexEnv(t)
-	real := filepath.Join(geminiChats(), "session-2026-10-01T13-04-008140a7.jsonl")
-	write(t, real, geminiOriginal())
+	realPath := filepath.Join(geminiChats(), "session-2026-10-01T13-04-008140a7.jsonl")
+	write(t, realPath, geminiOriginal())
 	dir := filepath.Join(tmp, "idx")
 	if err := Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
-	assertResumedSessionHeld(t, dir, real, "email column")
+	assertResumedSessionHeld(t, dir, realPath, "email column")
 
-	appendFile(t, real, geminiResumedTail())
+	appendFile(t, realPath, geminiResumedTail())
 	write(t, filepath.Join(geminiChats(), "session-2026-10-01T13-07-008140a7.jsonl"), geminiStub())
-	bumpMtime(t, real)
+	bumpMtime(t, realPath)
 	if err := Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	if n := ReportCollisions(); n != 0 {
 		t.Errorf("reported %d id collisions for one resumed session", n)
 	}
-	assertResumedSessionHeld(t, dir, real, "schema migration")
+	assertResumedSessionHeld(t, dir, realPath, "schema migration")
 }
 
 // The stub on its own in a later pass, with the original unchanged, and the
@@ -147,8 +147,8 @@ func TestGeminiResumeStubDoesNotTakeTheSessionIncremental(t *testing.T) {
 func TestGeminiResumeStubAloneInALaterPass(t *testing.T) {
 	t.Run("stub after", func(t *testing.T) {
 		tmp := hermeticIndexEnv(t)
-		real := filepath.Join(geminiChats(), "session-b-008140a7.jsonl")
-		write(t, real, geminiOriginal()+geminiResumedTail())
+		realPath := filepath.Join(geminiChats(), "session-b-008140a7.jsonl")
+		write(t, realPath, geminiOriginal()+geminiResumedTail())
 		dir := filepath.Join(tmp, "idx")
 		if err := Ensure(dir, "", false, nil); err != nil {
 			t.Fatal(err)
@@ -160,7 +160,7 @@ func TestGeminiResumeStubAloneInALaterPass(t *testing.T) {
 		if n := ReportCollisions(); n != 0 {
 			t.Errorf("reported %d id collisions for one resumed session", n)
 		}
-		assertResumedSessionHeld(t, dir, real, "schema migration")
+		assertResumedSessionHeld(t, dir, realPath, "schema migration")
 	})
 	t.Run("stub first", func(t *testing.T) {
 		tmp := hermeticIndexEnv(t)
@@ -176,15 +176,15 @@ func TestGeminiResumeStubAloneInALaterPass(t *testing.T) {
 		if err := Ensure(dir, "", false, nil); err != nil {
 			t.Fatal(err)
 		}
-		real := filepath.Join(geminiChats(), "session-b-008140a7.jsonl")
-		write(t, real, geminiOriginal()+geminiResumedTail())
+		realPath := filepath.Join(geminiChats(), "session-b-008140a7.jsonl")
+		write(t, realPath, geminiOriginal()+geminiResumedTail())
 		if err := Ensure(dir, "", false, nil); err != nil {
 			t.Fatal(err)
 		}
 		if n := ReportCollisions(); n != 0 {
 			t.Errorf("reported %d id collisions for one resumed session", n)
 		}
-		assertResumedSessionHeld(t, dir, real, "schema migration")
+		assertResumedSessionHeld(t, dir, realPath, "schema migration")
 	})
 }
 
@@ -218,8 +218,8 @@ func TestGeminiResumeStubIsNotARenameOfADeletedTranscript(t *testing.T) {
 	for _, withChange := range []bool{false, true} {
 		t.Run(map[bool]string{false: "append path", true: "replacement path"}[withChange], func(t *testing.T) {
 			tmp := hermeticIndexEnv(t)
-			real := filepath.Join(geminiChats(), "session-2026-10-01T13-04-008140a7.jsonl")
-			write(t, real, geminiOriginal()+geminiResumedTail())
+			realPath := filepath.Join(geminiChats(), "session-2026-10-01T13-04-008140a7.jsonl")
+			write(t, realPath, geminiOriginal()+geminiResumedTail())
 			other := filepath.Join(geminiChats(), "session-2026-09-30T10-00-0badc0de.jsonl")
 			otherHeader := `{"sessionId":"0badc0de","startTime":"2026-09-30T10:00:00Z","lastUpdated":"2026-09-30T10:00:00Z"}` + "\n"
 			write(t, other, otherHeader+`{"id":"o1","timestamp":"2026-09-30T10:00:01Z","type":"user","content":[{"text":"the cache warms on boot"}]}`+"\n")
@@ -227,7 +227,7 @@ func TestGeminiResumeStubIsNotARenameOfADeletedTranscript(t *testing.T) {
 			if err := Ensure(dir, "", false, nil); err != nil {
 				t.Fatal(err)
 			}
-			if err := os.Remove(real); err != nil {
+			if err := os.Remove(realPath); err != nil {
 				t.Fatal(err)
 			}
 			write(t, filepath.Join(geminiChats(), "session-2026-10-01T13-07-008140a7.jsonl"), geminiStub())
@@ -238,11 +238,11 @@ func TestGeminiResumeStubIsNotARenameOfADeletedTranscript(t *testing.T) {
 			if err := Ensure(dir, "", false, nil); err != nil {
 				t.Fatal(err)
 			}
-			assertResumedSessionHeld(t, dir, real, "schema migration")
+			assertResumedSessionHeld(t, dir, realPath, "schema migration")
 			if err := Ensure(dir, "", true, nil); err != nil {
 				t.Fatal(err)
 			}
-			assertResumedSessionHeld(t, dir, real, "schema migration")
+			assertResumedSessionHeld(t, dir, realPath, "schema migration")
 		})
 	}
 }
@@ -278,9 +278,9 @@ func TestGeminiResumedStubIsNotARenameOfTheDeletedTranscript(t *testing.T) {
 	for _, withChange := range []bool{false, true} {
 		t.Run(map[bool]string{false: "append path", true: "replacement path"}[withChange], func(t *testing.T) {
 			tmp := hermeticIndexEnv(t)
-			real := filepath.Join(geminiChats(), "session-2026-10-01T13-04-008140a7.jsonl")
+			realPath := filepath.Join(geminiChats(), "session-2026-10-01T13-04-008140a7.jsonl")
 			stub := filepath.Join(geminiChats(), "session-2026-10-01T13-07-008140a7.jsonl")
-			write(t, real, geminiOriginal()+geminiResumedTail())
+			write(t, realPath, geminiOriginal()+geminiResumedTail())
 			write(t, stub, geminiStub())
 			other := filepath.Join(geminiChats(), "session-2026-09-30T10-00-0badc0de.jsonl")
 			write(t, other, `{"sessionId":"0badc0de","startTime":"2026-09-30T10:00:00Z","lastUpdated":"2026-09-30T10:00:00Z"}`+"\n"+
@@ -289,7 +289,7 @@ func TestGeminiResumedStubIsNotARenameOfTheDeletedTranscript(t *testing.T) {
 			if err := Ensure(dir, "", false, nil); err != nil {
 				t.Fatal(err)
 			}
-			if err := os.Remove(real); err != nil {
+			if err := os.Remove(realPath); err != nil {
 				t.Fatal(err)
 			}
 			if err := Ensure(dir, "", false, nil); err != nil {
@@ -334,14 +334,15 @@ func TestGeminiTranscriptTakingAStubRowMatchesARebuild(t *testing.T) {
 	// The stub sorts first, so the rebuild reads it first and merges its span.
 	// The stub's row has no record, so it is set aside rather than listed,
 	// whichever pass read the stub (#5563).
-	for name, real := range map[string]string{"resumed": geminiOriginal() + geminiResumedTail(), "ends before the stub": geminiOriginal()} {
+	for name, transcript := range map[string]string{"resumed": geminiOriginal() + geminiResumedTail(), "ends before the stub": geminiOriginal()} {
 		for _, by := range []string{"append", "re-read", "rebuild"} {
-			t.Run(name+", stub read by "+by, func(t *testing.T) { transcriptTakesStubRow(t, real, by) })
+			t.Run(name+", stub read by "+by, func(t *testing.T) { transcriptTakesStubRow(t, transcript, by) })
 		}
 	}
 }
 
-func transcriptTakesStubRow(t *testing.T, real, by string) {
+func transcriptTakesStubRow(t *testing.T, realPath, by string) {
+	t.Helper()
 	tmp := hermeticIndexEnv(t)
 	other := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "p", "other.jsonl")
 	write(t, other, claudeLine("s-other", "2026-01-02T03:04:05Z", "the exporter retries without a pause")+
@@ -358,7 +359,7 @@ func transcriptTakesStubRow(t *testing.T, real, by string) {
 	if err := Ensure(dir, "", by == "rebuild", nil); err != nil {
 		t.Fatal(err)
 	}
-	write(t, filepath.Join(geminiChats(), "session-b-008140a7.jsonl"), real)
+	write(t, filepath.Join(geminiChats(), "session-b-008140a7.jsonl"), realPath)
 	if err := Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -394,6 +395,7 @@ func TestAMoveThatAddsAnExitStatusIsStillAMove(t *testing.T) {
 	}{
 		{name: "codex rollout compressed in place", key: "codex:cx-1", staleQuery: "go test",
 			before: func(t *testing.T) (string, string) {
+				t.Helper()
 				if _, err := exec.LookPath("zstd"); err != nil {
 					t.Skip("zstd not installed")
 				}
@@ -403,21 +405,24 @@ func TestAMoveThatAddsAnExitStatusIsStillAMove(t *testing.T) {
 				return p, p + ".zst"
 			},
 			after: func(t *testing.T) (string, string) {
+				t.Helper()
 				dir := filepath.Join(os.Getenv("DEJA_CODEX_ROOT"), "sessions", "2026", "07", "31")
 				p := filepath.Join(dir, "rollout-2026-07-31T00-00-00-cx-1.jsonl")
 				appendFile(t, p, `{"timestamp":"2026-07-31T00:00:03Z","type":"response_item","payload":{"type":"function_call_output","call_id":"c1","output":"Process exited with code 1\nOutput:\nFAIL\n"}}`+"\n")
-				if out, err := exec.Command("zstd", "-q", "--rm", p).CombinedOutput(); err != nil {
+				if out, err := exec.CommandContext(t.Context(), "zstd", "-q", "--rm", p).CombinedOutput(); err != nil {
 					t.Fatalf("zstd: %v %s", err, out)
 				}
 				return p, p + ".zst"
 			}},
 		{name: "gemini json rewritten as jsonl", key: "gemini:sess-mv-1", staleQuery: "git log",
 			before: func(t *testing.T) (string, string) {
+				t.Helper()
 				p := filepath.Join(geminiChats(), "session-2026-10-01T12-51-sess-mv-1.json")
 				write(t, p, geminiJSONBeforeResult)
 				return p, strings.TrimSuffix(p, ".json") + ".jsonl"
 			},
 			after: func(t *testing.T) (string, string) {
+				t.Helper()
 				p := filepath.Join(geminiChats(), "session-2026-10-01T12-51-sess-mv-1.json")
 				if err := os.Remove(p); err != nil {
 					t.Fatal(err)

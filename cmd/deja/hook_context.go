@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -360,15 +361,17 @@ const noteWidth = 100
 // noteWidth, so a long tally drops out of the line instead of wrapping it.
 func fitNote(base string, parts ...string) string {
 	n := termwidth.Columns(base)
+	var baseSb363 strings.Builder
 	for _, p := range parts {
 		if p == "" {
 			continue
 		}
 		if m := termwidth.Columns(p); n+m <= noteWidth {
-			base += p
+			baseSb363.WriteString(p)
 			n += m
 		}
 	}
+	base += baseSb363.String()
 	return base
 }
 
@@ -765,75 +768,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 		digest, sessions, raw, taskMatched, withheld, servedIDs, servedProjects = cachedHookDigestFor(dir, hookProjectPath(input.CWD, input.WorkspaceRoots), self...)
 	}
 	if digest == "" {
-		// No session from this project, which is the usual state in a new
-		// checkout — and exactly where knowing what this machine is missing
-		// helps most. The block is about the machine, not the project, so it
-		// does not depend on the digest having found anything.
-		// The block answers for the switch itself since #2701 — the guard that
-		// stood here is what taught it to.
-		if env, from := environmentBlockFrom(dir, policy.ActivationAuto); env != "" {
-			out := frameRecall(env)
-			// The block is about the machine and names no project, so without
-			// the projects behind its walls a forget of one of them could not
-			// reach the stored text (#2349).
-			if unreadable {
-				usage.RecordDigestPolicySessionsUnread(dir, usage.KindHook, out, input.SessionID, 0, 0, policy.Load().Describe(policy.ActivationAuto), nil, from)
-			} else {
-				usage.RecordDigestPolicyFrom(dir, usage.KindHook, out, input.SessionID, 0, 0, from, policy.Load().Describe(policy.ActivationAuto))
-			}
-			if plain {
-				fmt.Fprintln(os.Stdout, out)
-				return nil
-			}
-			var resp sessionStartHookResponse
-			resp.HookSpecificOutput.HookEventName = eventName
-			resp.HookSpecificOutput.AdditionalContext = out
-			// The environment block is not the project's memory, and while a
-			// build runs it is all there is: without this the whole rebuild
-			// passed in silence on any machine with facts to report (#927).
-			if notesHaveReader() {
-				resp.SystemMessage = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring), joinNotes(withheldEverythingNote(dir, withheld), buildNotice(dir))))
-				// Last, after anything that needs acting on: what the build
-				// found, once (#3073), then once a week what the week looked
-				// like (#3065).
-				resp.SystemMessage = joinNotes(resp.SystemMessage, humanNotes(dir))
-			}
-			emitHookResponse(resp)
-			return nil
-		}
-		// A first build (or one forced by a new index format) is running in
-		// the background. It never blocks the agent, but starting in silence
-		// looks like deja is simply not working — so say what is happening.
-		// Only on the JSON path: systemMessage is the host's UI channel,
-		// whereas the plain path is injected into the model's context, where
-		// a progress line is noise.
-		if !plain && notesHaveReader() {
-			// The session that asks for the build is the one that hears
-			// nothing about it: the child has not written its first progress
-			// line yet. That session is the first one after an upgrade or a
-			// damaged store — the moment deja most looks broken (#878).
-			//
-			// Including the very first build. Requiring a manifest left the
-			// one moment deja most looks broken in silence: a machine with
-			// ten thousand transcripts and no index yet said nothing at all,
-			// twice over, while the build ran (#909).
-			//
-			// A machine with no history also asks for a build; it sees this
-			// line once, truthfully, and never again — the next session has a
-			// manifest and reads the published progress instead.
-			line := buildNotice(dir)
-			if note := unreadableStoreNote(dir); storeNoteIsNews(dir, note) {
-				line = joinNotes(note, line)
-			}
-			line = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring), joinNotes(withheldEverythingNote(dir, withheld), line)))
-			if line != "" {
-				var resp sessionStartHookResponse
-				resp.HookSpecificOutput.HookEventName = eventName
-				resp.SystemMessage = line
-				emitHookResponse(resp)
-			}
-		}
-		return nil
+		return hookContextWithoutDigest(dir, rewired, unreadable, plain, eventName, input.SessionID, withheld)
 	}
 	// One actionable line so injected memory leads somewhere: models that see
 	// bare data tend to ignore it.
@@ -971,6 +906,80 @@ func runHookContextMode(dir string, plain, once bool) error {
 	return nil
 }
 
+// hookContextWithoutDigest answers a session start that found no session from
+// this project: the machine's environment block, or a word about the build.
+func hookContextWithoutDigest(dir string, rewired []string, unreadable, plain bool, eventName, sessionID string, withheld int) error {
+	// No session from this project, which is the usual state in a new
+	// checkout — and exactly where knowing what this machine is missing
+	// helps most. The block is about the machine, not the project, so it
+	// does not depend on the digest having found anything.
+	// The block answers for the switch itself since #2701 — the guard that
+	// stood here is what taught it to.
+	if env, from := environmentBlockFrom(dir, policy.ActivationAuto); env != "" {
+		out := frameRecall(env)
+		// The block is about the machine and names no project, so without
+		// the projects behind its walls a forget of one of them could not
+		// reach the stored text (#2349).
+		if unreadable {
+			usage.RecordDigestPolicySessionsUnread(dir, usage.KindHook, out, sessionID, 0, 0, policy.Load().Describe(policy.ActivationAuto), nil, from)
+		} else {
+			usage.RecordDigestPolicyFrom(dir, usage.KindHook, out, sessionID, 0, 0, from, policy.Load().Describe(policy.ActivationAuto))
+		}
+		if plain {
+			fmt.Fprintln(os.Stdout, out)
+			return nil
+		}
+		var resp sessionStartHookResponse
+		resp.HookSpecificOutput.HookEventName = eventName
+		resp.HookSpecificOutput.AdditionalContext = out
+		// The environment block is not the project's memory, and while a
+		// build runs it is all there is: without this the whole rebuild
+		// passed in silence on any machine with facts to report (#927).
+		if notesHaveReader() {
+			resp.SystemMessage = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring), joinNotes(withheldEverythingNote(dir, withheld), buildNotice(dir))))
+			// Last, after anything that needs acting on: what the build
+			// found, once (#3073), then once a week what the week looked
+			// like (#3065).
+			resp.SystemMessage = joinNotes(resp.SystemMessage, humanNotes(dir))
+		}
+		emitHookResponse(resp)
+		return nil
+	}
+	// A first build (or one forced by a new index format) is running in
+	// the background. It never blocks the agent, but starting in silence
+	// looks like deja is simply not working — so say what is happening.
+	// Only on the JSON path: systemMessage is the host's UI channel,
+	// whereas the plain path is injected into the model's context, where
+	// a progress line is noise.
+	if !plain && notesHaveReader() {
+		// The session that asks for the build is the one that hears
+		// nothing about it: the child has not written its first progress
+		// line yet. That session is the first one after an upgrade or a
+		// damaged store — the moment deja most looks broken (#878).
+		//
+		// Including the very first build. Requiring a manifest left the
+		// one moment deja most looks broken in silence: a machine with
+		// ten thousand transcripts and no index yet said nothing at all,
+		// twice over, while the build ran (#909).
+		//
+		// A machine with no history also asks for a build; it sees this
+		// line once, truthfully, and never again — the next session has a
+		// manifest and reads the published progress instead.
+		line := buildNotice(dir)
+		if note := unreadableStoreNote(dir); storeNoteIsNews(dir, note) {
+			line = joinNotes(note, line)
+		}
+		line = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring), joinNotes(withheldEverythingNote(dir, withheld), line)))
+		if line != "" {
+			var resp sessionStartHookResponse
+			resp.HookSpecificOutput.HookEventName = eventName
+			resp.SystemMessage = line
+			emitHookResponse(resp)
+		}
+	}
+	return nil
+}
+
 // unreadableStoreNote names a store deja could not read in full. A newcomer's
 // first contact is the agent, not the CLI: `deja index` and `deja doctor` both
 // explain a locked directory, and neither is what someone who installed deja
@@ -1040,7 +1049,7 @@ func noteIsNews(p, note string) bool {
 	}
 	h := fnv.New64a()
 	_, _ = h.Write([]byte(note))
-	sum := fmt.Sprintf("%x", h.Sum64())
+	sum := strconv.FormatUint(h.Sum64(), 16)
 	if b, err := os.ReadFile(p); err == nil {
 		parts := strings.Fields(string(b))
 		if len(parts) == 2 && parts[0] == sum {
@@ -1058,7 +1067,7 @@ func noteIsNews(p, note string) bool {
 func receiptIsNews(dir, digest string) bool {
 	h := fnv.New64a()
 	_, _ = h.Write([]byte(digest))
-	sum := fmt.Sprintf("%x", h.Sum64())
+	sum := strconv.FormatUint(h.Sum64(), 16)
 	p := dir + ".receipt"
 	if b, err := os.ReadFile(p); err == nil {
 		parts := strings.Fields(string(b))
@@ -1338,7 +1347,7 @@ func requestHookRefresh(dir, cwd string) {
 	if strings.HasSuffix(strings.TrimSuffix(exe, ".exe"), ".test") {
 		return
 	}
-	cmd := exec.Command(exe, "hook-refresh")
+	cmd := exec.CommandContext(context.Background(), exe, "hook-refresh")
 	cmd.Env = append(os.Environ(), "DEJA_HOOK_REFRESH=1", "CLAUDE_PROJECT_DIR="+cwd)
 	devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
 	if err != nil {
@@ -1471,7 +1480,7 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, c
 			allowedNames = append(allowedNames, n)
 		}
 	}
-	conventions := projectConventions(allowedNames, 6, 800)
+	conventions := projectConventions(allowedNames)
 	var ss []model.Session
 	seen := map[string]bool{}
 	lookupNames := names
@@ -1552,11 +1561,11 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, c
 	// place, and the next variant has to start from the order the store gave.
 	render := func(exclude []string) hookCacheEntry {
 		hookDigestRenders.Add(1)
-		ss := slices.DeleteFunc(slices.Clone(ss), func(s model.Session) bool { return s.ID != "" && slices.Contains(exclude, s.ID) })
+		variant := slices.DeleteFunc(slices.Clone(ss), func(s model.Session) bool { return s.ID != "" && slices.Contains(exclude, s.ID) })
 		if len(cut) > 0 {
-			ss = slices.DeleteFunc(ss, func(s model.Session) bool { return len(cutSessionAt(s, cut).Messages) == 0 })
-			for i := range ss {
-				ss[i] = cutSessionAt(ss[i], cut)
+			variant = slices.DeleteFunc(variant, func(s model.Session) bool { return len(cutSessionAt(s, cut).Messages) == 0 })
+			for i := range variant {
+				variant[i] = cutSessionAt(variant[i], cut)
 			}
 		}
 		// A subagent run is the parent's work seen from inside, and what it says
@@ -1566,10 +1575,10 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, c
 		// them like any other session and let one lead the block ahead of the
 		// session that settled the work (#3368). Kept only when the project has
 		// nothing else: a subagent's transcript still beats an empty digest.
-		if kept := withoutSubagentRuns(ss); len(kept) > 0 {
-			ss = kept
+		if kept := withoutSubagentRuns(variant); len(kept) > 0 {
+			variant = kept
 		}
-		if len(ss) == 0 {
+		if len(variant) == 0 {
 			// A project can have settled decisions and no recent session left to
 			// show them (the transcript was forgotten, or aged past the window).
 			// The standing decisions still apply, so serve them alone rather than
@@ -1581,36 +1590,36 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, c
 			// that separates "the rule hid all of it" from "no history here".
 			return hookCacheEntry{Withheld: withheld}
 		}
-		scores, matched := taskScores(ss, taskFiles)
-		sort.Slice(ss, func(i, j int) bool {
-			if scores[ss[i].Harness+":"+ss[i].ID] != scores[ss[j].Harness+":"+ss[j].ID] {
-				return scores[ss[i].Harness+":"+ss[i].ID] > scores[ss[j].Harness+":"+ss[j].ID]
+		scores, matched := taskScores(variant, taskFiles)
+		sort.Slice(variant, func(i, j int) bool {
+			if scores[variant[i].Harness+":"+variant[i].ID] != scores[variant[j].Harness+":"+variant[j].ID] {
+				return scores[variant[i].Harness+":"+variant[i].ID] > scores[variant[j].Harness+":"+variant[j].ID]
 			}
-			return ss[i].Updated.After(ss[j].Updated)
+			return variant[i].Updated.After(variant[j].Updated)
 		})
-		if len(ss) > 12 {
-			ss = ss[:12]
+		if len(variant) > 12 {
+			variant = variant[:12]
 		}
 		// Digest and scoring only ever use the recent tail; hauling a marathon
 		// session's megabytes through word sets is pure waste.
-		for i := range ss {
-			if len(ss[i].Messages) > 150 {
-				ss[i].Messages = ss[i].Messages[len(ss[i].Messages)-150:]
+		for i := range variant {
+			if len(variant[i].Messages) > 150 {
+				variant[i].Messages = variant[i].Messages[len(variant[i].Messages)-150:]
 			}
 		}
 		mark("task-scores")
 		// A rejected session belongs last, and the mark has to travel with it: the
 		// block listed the correction as a separate item and left the session it
 		// corrects unmarked (#761).
-		ss, rejectedWarning := orderForInjection(ss)
-		ss, unseen := leadWithUnseen(dir, names, ss)
+		variant, rejectedWarning := orderForInjection(variant)
+		variant, unseen := leadWithUnseen(dir, names, variant)
 		// A session found by where its work happened carries the name of the
 		// directory it was started in, which is not one the cwd can guess — the
 		// safe-mode filter is a name list, so the evidence that admitted the
 		// session admits its name with it (#2040). The trust policy has already
 		// had its say on each of these, one session at a time, above.
-		result := search.BuildAutoRecall(ss, search.AutoRecallOptions{
-			Mode: mode, ProjectNames: withProjectsOf(names, ss), TaskScores: scores, Unseen: unseen})
+		result := search.BuildAutoRecall(variant, search.AutoRecallOptions{
+			Mode: mode, ProjectNames: withProjectsOf(names, variant), TaskScores: scores, Unseen: unseen})
 		mark("build-digest")
 		if result.Sessions == 0 {
 			matched = nil
@@ -1641,7 +1650,7 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, c
 		// prints about itself (1 session distilled, 3 sessions' bytes claimed).
 		// The projects behind what actually went out, so the injection log can be
 		// held to a rule or a forget without reading the digest's prose (#2349).
-		return hookCacheEntry{Digest: text, Sessions: result.Sessions, Raw: result.RawBytes, TaskMatched: matched, Withheld: withheld, IDs: result.IDs, Projects: digestProjects(ss, envFrom)}
+		return hookCacheEntry{Digest: text, Sessions: result.Sessions, Raw: result.RawBytes, TaskMatched: matched, Withheld: withheld, IDs: result.IDs, Projects: digestProjects(variant, envFrom)}
 	}
 	entry = render(exclude)
 	if variants && entry.Digest != "" {
@@ -1761,11 +1770,11 @@ func requestWarmup(dir string) {
 			return
 		}
 	}
-	if _, err := fmt.Fprintln(f, now.UnixNano()); err != nil {
+	if _, err = fmt.Fprintln(f, now.UnixNano()); err != nil {
 		_ = f.Close()
 		return
 	}
-	if err := f.Close(); err != nil {
+	if err = f.Close(); err != nil {
 		return
 	}
 	exe, err := os.Executable()
@@ -1778,7 +1787,7 @@ func requestWarmup(dir string) {
 }
 
 func startDetachedWarmup(exe, sentinel string) error {
-	cmd := exec.Command(exe, "index")
+	cmd := exec.CommandContext(context.Background(), exe, "index")
 	cmd.Env = append(os.Environ(), "DEJA_WARMUP_SENTINEL="+sentinel)
 	devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
 	if err != nil {
@@ -1934,7 +1943,7 @@ func serviceReceipt(dir string) string {
 		parts = append(parts, fmt.Sprintf("%d recall%s", served, pluralS(served)))
 	}
 	if n.Injections > 0 {
-		parts = append(parts, fmt.Sprintf("memory arrived %s", timesToday(n.Injections)))
+		parts = append(parts, "memory arrived "+timesToday(n.Injections))
 	}
 	// The bytes stay in the gate above and out of the line: "3.1 KB distilled
 	// from 40 KB" was a number nobody acted on, and it pushed the receipt

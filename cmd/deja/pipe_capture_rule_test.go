@@ -108,7 +108,7 @@ func drainingHelpers(files map[string]parsedFile) map[string]bool {
 	return out
 }
 
-func checkPipeReads(t *testing.T, path string, fset *token.FileSet, file *ast.File, drainers map[string]bool) {
+func checkPipeReads(t *testing.T, _ string, fset *token.FileSet, file *ast.File, drainers map[string]bool) {
 	t.Helper()
 	ast.Inspect(file, func(n ast.Node) bool {
 		fn, ok := n.(*ast.FuncDecl)

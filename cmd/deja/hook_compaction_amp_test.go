@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,7 +25,7 @@ func TestAmpCatchUpIsCapturedOnce(t *testing.T) {
 	if !strings.HasPrefix(filepath.ToSlash(workspace), "/") {
 		uri = "file:///" + filepath.ToSlash(workspace)
 	}
-	body, _ := json.Marshal(map[string]any{
+	body := mustMarshal(t, map[string]any{
 		"id": "T-1", "title": "", "created": 1791000000000,
 		"env": map[string]any{"initial": map[string]any{"trees": []any{map[string]any{"uri": uri}}}},
 		"messages": []any{
@@ -37,10 +36,10 @@ func TestAmpCatchUpIsCapturedOnce(t *testing.T) {
 	if err := os.WriteFile(thread, body, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	payload, _ := json.Marshal(map[string]any{
+	payload := mustMarshal(t, map[string]any{
 		"session_id": "T-1", "transcript_path": thread, "cwd": workspace, "harness": "amp", "deja_catch_up": true,
 	})
-	prompt, _ := json.Marshal(map[string]any{"prompt": "carry on", "session_id": "T-1", "cwd": workspace})
+	prompt := mustMarshal(t, map[string]any{"prompt": "carry on", "session_id": "T-1", "cwd": workspace})
 	ask := func() string {
 		var out bytes.Buffer
 		if err := runHookPromptMode(dir, bytes.NewReader(prompt), &out, true); err != nil {

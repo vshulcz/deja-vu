@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -101,25 +102,26 @@ func doctorCommandFiles() []doctorCommandFile {
 	// row speaks for the first host that has one. The reader lists only hosts
 	// that exist, so the fallback is where plain VS Code would keep it — a row
 	// with no path says less than no row at all.
-	out = append(out, doctorCommandFile{name: "copilot-chat", path: doctorFirstExisting(
-		copilotChatPromptPaths(),
-		filepath.Join(vsCodeDefaultUserDir(), "prompts", "deja.prompt.md"))})
-	// Reasonix reads it from deja's plugin package and lists it as /deja:deja.
-	out = append(out, doctorCommandFile{name: "reasonix", path: reasonixCommandPath()})
-	// Continue's /deja is a `prompts:` item and goose's a `slash_commands:`
-	// entry, each in a config.yaml that holds the reader's own settings, so
-	// the file being there says nothing about the command (#4374).
-	out = append(out, doctorCommandFile{name: "continue", path: continueConfigPath(),
-		entry: func(s string) (bool, bool) {
-			if removeContinueItem(s, "prompts", "deja") == s {
-				return false, false
-			}
-			return true, strings.Contains(s, yamlQuote(continuePromptBody))
-		}})
-	out = append(out, doctorCommandFile{name: "goose", path: filepath.Join(gooseConfigDir(), "config.yaml"),
-		entry: func(s string) (bool, bool) {
-			return gooseSlashCommandOurs(s, gooseRecipePath())
-		}})
+	out = append(out,
+		doctorCommandFile{name: "copilot-chat", path: doctorFirstExisting(
+			copilotChatPromptPaths(),
+			filepath.Join(vsCodeDefaultUserDir(), "prompts", "deja.prompt.md"))},
+		// Reasonix reads it from deja's plugin package and lists it as /deja:deja.
+		doctorCommandFile{name: "reasonix", path: reasonixCommandPath()},
+		// Continue's /deja is a `prompts:` item and goose's a `slash_commands:`
+		// entry, each in a config.yaml that holds the reader's own settings, so
+		// the file being there says nothing about the command (#4374).
+		doctorCommandFile{name: "continue", path: continueConfigPath(),
+			entry: func(s string) (bool, bool) {
+				if removeContinueItem(s, "prompts", "deja") == s {
+					return false, false
+				}
+				return true, strings.Contains(s, yamlQuote(continuePromptBody))
+			}},
+		doctorCommandFile{name: "goose", path: filepath.Join(gooseConfigDir(), "config.yaml"),
+			entry: func(s string) (bool, bool) {
+				return gooseSlashCommandOurs(s, gooseRecipePath())
+			}})
 	for _, name := range skillIsTheCommandHarnesses() {
 		out = append(out, doctorCommandFile{name: name, path: commandSkillPath(name), skill: true})
 	}
@@ -161,10 +163,5 @@ func skillIsTheCommandHarnesses() []string {
 }
 
 func skillIsTheCommand(harness string) bool {
-	for _, name := range skillIsTheCommandHarnesses() {
-		if name == harness {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(skillIsTheCommandHarnesses(), harness)
 }

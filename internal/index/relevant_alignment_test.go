@@ -24,8 +24,8 @@ func TestRelevantCountsStayBesideTheirSessions(t *testing.T) {
 	// Both leaves carry the project slug, so the two sessions land in the same
 	// project and only the path tells them apart.
 	jobs := filepath.Join(root, ".claude", "jobs", "abc", "-w-app")
-	real := filepath.Join(root, "-w-app")
-	for _, d := range []string{jobs, real} {
+	realPath := filepath.Join(root, "-w-app")
+	for _, d := range []string{jobs, realPath} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -46,14 +46,14 @@ func TestRelevantCountsStayBesideTheirSessions(t *testing.T) {
 	// The ignored session holds both rare words, so it ranks first; the two
 	// real ones hold one each.
 	write(jobs, "scratch", "05", "the quokkactl run hit snorblefunc under load")
-	write(real, "keeper", "04", "the quokkactl run needed a second pass")
-	write(real, "other", "03", "snorblefunc came back from the vendor tree")
+	write(realPath, "keeper", "04", "the quokkactl run needed a second pass")
+	write(realPath, "other", "03", "snorblefunc came back from the vendor tree")
 	// Filler, so the two words are rare in this corpus: on a store of three
 	// sessions nothing clears the idf floor and the ranking answers nothing.
 	for i, topic := range []string{"the sidebar layout", "the invoice renderer", "the webpack config",
 		"the login throttle", "the avatar uploader", "the cron scheduler", "the email templates",
 		"the feature flags"} {
-		write(real, fmt.Sprintf("f%02d", i), "02", "worked on "+topic+" today")
+		write(realPath, fmt.Sprintf("f%02d", i), "02", "worked on "+topic+" today")
 	}
 
 	setHome(t, home)

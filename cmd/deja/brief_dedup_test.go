@@ -118,12 +118,13 @@ func TestBriefKeepsWeekLineWhenItAddsRecalls(t *testing.T) {
 // on that same work — the normal case, since what you repeat is what gets
 // recalled.
 func seedAskedAndReused(t *testing.T, reusedTitle string) string {
+	t.Helper()
 	dir := seedAgedSessions(t, map[string]agedSession{
 		"a1": {"why does the docker build fail on arm64", 40 * 24 * time.Hour},
 		"a2": {"why does the docker build fail on arm64", 6 * 24 * time.Hour},
 		"a3": {reusedTitle, 5 * 24 * time.Hour},
 	})
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		usage.RecordServedSessions(dir, usage.KindRecall, 100, 1, false, 1000, []string{"a3"})
 	}
 	return dir
@@ -145,7 +146,7 @@ func TestBriefDoesNotPrintTheSameTitleTwice(t *testing.T) {
 	// Only the two insight labels are judged here: `recent` lists sessions and
 	// will legitimately show a repeated question three times.
 	n := 0
-	for _, ln := range strings.Split(s, "\n") {
+	for ln := range strings.SplitSeq(s, "\n") {
 		if !strings.HasPrefix(ln, "asked ") && !strings.HasPrefix(ln, "reused ") {
 			continue
 		}
@@ -194,7 +195,7 @@ func TestBriefKeepsReusedLineWhenTitlesOnlyShareTheirOpening(t *testing.T) {
 		"a2": {asked, 6 * 24 * time.Hour},
 		"a3": {other, 5 * 24 * time.Hour},
 	})
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		usage.RecordServedSessions(dir, usage.KindRecall, 100, 1, false, 1000, []string{"a3"})
 	}
 	var out bytes.Buffer
@@ -219,7 +220,7 @@ func TestBriefKeepsLastWorkedWhenTheReusedMemoryIsOlderThanTheNewestAsking(t *te
 		"a1": {q, 40 * 24 * time.Hour},
 		"a2": {q, 2 * 24 * time.Hour},
 	})
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		usage.RecordServedSessions(dir, usage.KindRecall, 100, 1, false, 1000, []string{"a1"})
 	}
 	var out bytes.Buffer
@@ -271,7 +272,7 @@ func TestBriefKeepsWeekLineForRecallsServedEarlierInTheWeek(t *testing.T) {
 func writeUsageEvents(t *testing.T, dir string, n int, age time.Duration) {
 	t.Helper()
 	var b strings.Builder
-	for i := 0; i < n; i++ {
+	for range n {
 		e := usage.Event{Time: time.Now().Add(-age).UTC(), Kind: usage.KindRecall, Bytes: 100, Sessions: 1}
 		raw, err := json.Marshal(e)
 		if err != nil {

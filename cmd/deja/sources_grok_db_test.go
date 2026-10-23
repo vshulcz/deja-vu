@@ -34,7 +34,7 @@ INSERT INTO messages VALUES ('s1',0,'user','{"role":"user","content":"zibblex po
 INSERT INTO sessions VALUES ('s2','w1','Retry cap','/work/api','2026-07-28T10:00:00.000Z');
 INSERT INTO messages VALUES ('s2',0,'user','{"role":"user","content":"the retry cap is four"}','2026-07-28T10:00:00.000Z');
 `
-	cmd := exec.Command("sqlite3", filepath.Join(root, "grok.db"))
+	cmd := exec.CommandContext(t.Context(), "sqlite3", filepath.Join(root, "grok.db"))
 	cmd.Stdin = strings.NewReader(schema)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("seed: %v: %s", err, out)
@@ -45,7 +45,7 @@ INSERT INTO messages VALUES ('s2',0,'user','{"role":"user","content":"the retry 
 	// printed zeros.
 	out := captureStdout(t, func() { printSources(filepath.Join(home, "index.db")) })
 	line := ""
-	for _, l := range strings.Split(out, "\n") {
+	for l := range strings.SplitSeq(out, "\n") {
 		if strings.HasPrefix(l, "grok\t") {
 			line = l
 		}

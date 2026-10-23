@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -18,8 +19,8 @@ import (
 // under it, where nothing is missing and nothing can be installed.
 func TestEnvironmentBlockDoesNotBlameAMissingTool(t *testing.T) {
 	tmp := hermeticEnv(t)
-	var roots []string
-	for i := 0; i < environmentMinProjects; i++ {
+	roots := make([]string, 0, environmentMinProjects)
+	for i := range environmentMinProjects {
 		root := filepath.Join(tmp, "claude", fmt.Sprintf("proj-c%d", i))
 		if err := os.MkdirAll(root, 0o755); err != nil {
 			t.Fatal(err)
@@ -30,13 +31,13 @@ func TestEnvironmentBlockDoesNotBlameAMissingTool(t *testing.T) {
 
 	// Two recurring errors that no install fixes: a compile failure and a
 	// network timeout.
-	for i := 0; i < index.FrictionMinSessions; i++ {
+	for i := range index.FrictionMinSessions {
 		sid := fmt.Sprintf("c%02d", i)
 		cwd := fmt.Sprintf("/w/proj%d", i%environmentMinProjects)
 		body := `{"type":"user","sessionId":"` + sid + `","cwd":"` + cwd +
-			`","timestamp":"2026-07-2` + fmt.Sprint(i%10) + `T10:00:00Z","message":{"role":"user","content":"run the checks"}}` + "\n" +
+			`","timestamp":"2026-07-2` + strconv.Itoa(i%10) + `T10:00:00Z","message":{"role":"user","content":"run the checks"}}` + "\n" +
 			`{"type":"user","sessionId":"` + sid + `","cwd":"` + cwd +
-			`","timestamp":"2026-07-2` + fmt.Sprint(i%10) + `T10:05:00Z","message":{"role":"user","content":[{"type":"tool_result",` +
+			`","timestamp":"2026-07-2` + strconv.Itoa(i%10) + `T10:05:00Z","message":{"role":"user","content":[{"type":"tool_result",` +
 			`"content":"undefined: widgetFunc in vendor/acme/api.go\nConnection timed out during banner exchange"}]}}` + "\n"
 		if err := os.WriteFile(filepath.Join(roots[i%len(roots)], sid+".jsonl"), []byte(body), 0o644); err != nil {
 			t.Fatal(err)

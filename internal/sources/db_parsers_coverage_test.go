@@ -14,7 +14,7 @@ func seedDB(t *testing.T, name, schema string) string {
 		t.Skip("sqlite3 not installed")
 	}
 	db := filepath.Join(t.TempDir(), name)
-	if out, err := exec.Command("sqlite3", db, schema).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, schema).CombinedOutput(); err != nil {
 		t.Fatalf("seed: %v: %s", err, out)
 	}
 	return db

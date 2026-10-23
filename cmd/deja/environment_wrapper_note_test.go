@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -44,16 +45,16 @@ func seedWrapperWall(t *testing.T, remedy func(i int) string) string {
 			return string(b)
 		}
 		lines := []string{
-			rec("user", "restart the worker", "2026-04-0"+fmt.Sprint(i+1)+"T10:00:00Z"),
+			rec("user", "restart the worker", "2026-04-0"+strconv.Itoa(i+1)+"T10:00:00Z"),
 			rec("assistant", []any{map[string]any{"type": "tool_use", "name": "Bash",
 				"input": map[string]any{"command": "timeout 12 " + longWorkerCommand}}},
-				"2026-04-0"+fmt.Sprint(i+1)+"T10:00:10Z"),
+				"2026-04-0"+strconv.Itoa(i+1)+"T10:00:10Z"),
 			rec("user", []any{map[string]any{"type": "tool_result", "is_error": true,
-				"content": "zsh:1: command not found: timeout"}}, "2026-04-0"+fmt.Sprint(i+1)+"T10:00:20Z"),
+				"content": "zsh:1: command not found: timeout"}}, "2026-04-0"+strconv.Itoa(i+1)+"T10:00:20Z"),
 			rec("assistant", []any{map[string]any{"type": "tool_use", "name": "Bash",
-				"input": map[string]any{"command": remedy(i)}}}, "2026-04-0"+fmt.Sprint(i+1)+"T10:00:30Z"),
+				"input": map[string]any{"command": remedy(i)}}}, "2026-04-0"+strconv.Itoa(i+1)+"T10:00:30Z"),
 			rec("user", []any{map[string]any{"type": "tool_result", "content": "ok"}},
-				"2026-04-0"+fmt.Sprint(i+1)+"T10:00:40Z"),
+				"2026-04-0"+strconv.Itoa(i+1)+"T10:00:40Z"),
 		}
 		if err := os.WriteFile(filepath.Join(store, id+".jsonl"), []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
 			t.Fatal(err)

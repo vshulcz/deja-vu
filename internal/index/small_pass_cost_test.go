@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -23,19 +25,21 @@ func smallPassStore(t *testing.T, n int) (string, func(i int)) {
 	session := func(i, turns int) {
 		id := fmt.Sprintf("s%02d", i)
 		var body string
-		for turn := 0; turn < turns; turn++ {
+		var bodySb26 strings.Builder
+		for turn := range turns {
 			ts := fmt.Sprintf("%02d:%02d", turn, i)
 			tid := fmt.Sprintf("t%d", turn)
-			body += parityClaudeLine(id, ts+"Z", "user", fmt.Sprintf(`"why does step %d of the migration hang"`, turn)) +
-				parityClaudeLine(id, ts+"Z", "assistant", `[{"type":"tool_use","id":"`+tid+`","name":"Bash","input":{"command":"make migrate STEP=`+fmt.Sprint(turn)+`"}}]`) +
-				parityClaudeLine(id, ts+"Z", "user", `[{"type":"tool_result","tool_use_id":"`+tid+`","content":"dial tcp 127.0.0.1:5432: connect: connection refused\nmake: *** [migrate] Error 1"}]`)
+			bodySb26.WriteString(parityClaudeLine(id, ts+"Z", "user", fmt.Sprintf(`"why does step %d of the migration hang"`, turn)) +
+				parityClaudeLine(id, ts+"Z", "assistant", `[{"type":"tool_use","id":"`+tid+`","name":"Bash","input":{"command":"make migrate STEP=`+strconv.Itoa(turn)+`"}}]`) +
+				parityClaudeLine(id, ts+"Z", "user", `[{"type":"tool_result","tool_use_id":"`+tid+`","content":"dial tcp 127.0.0.1:5432: connect: connection refused\nmake: *** [migrate] Error 1"}]`))
 		}
+		body += bodySb26.String()
 		p := filepath.Join(proj, id+".jsonl")
 		parityWrite(t, p, body, false)
 		later := time.Now().Add(time.Duration(i+10*(4-turns)) * time.Second)
 		_ = os.Chtimes(p, later, later)
 	}
-	for i := 0; i < n; i++ {
+	for i := range n {
 		session(i, 4)
 	}
 	inc := filepath.Join(tmp, "inc")
@@ -137,7 +141,7 @@ func TestTheScrubReadsTheStartOfALiveWordsPostings(t *testing.T) {
 	inc, shorten := smallPassStore(t, n)
 	// Dead records from earlier passes raise the size below which a word's
 	// postings are read at all.
-	for i := 0; i < n/6; i++ {
+	for i := range n / 6 {
 		shorten(i)
 	}
 	parityPass(t, inc, false)
@@ -201,10 +205,14 @@ create table part(id text primary key, message_id text, session_id text, time_cr
 CREATE TABLE sessions (id TEXT PRIMARY KEY, workspace_id TEXT, title TEXT, cwd_last TEXT, created_at TEXT);
 CREATE TABLE messages (session_id TEXT, seq INTEGER, role TEXT, message_json TEXT, created_at TEXT);
 `
-	for i := 0; i < 6; i++ {
-		ocSQL += fmt.Sprintf("insert into session values('oc%d','/w/app','pool %d',%d,%d);\n", i, i, clock, clock) + ocMsg(i, 0) + ocMsg(i, 1)
-		grokSQL += fmt.Sprintf("INSERT INTO sessions VALUES ('g%d','w','queue %d','/work/api','2026-07-27T10:00:00.000Z');\n", i, i) + grokMsg(i, 0) + grokMsg(i, 1)
+	var grokSQLSb204 strings.Builder
+	var ocSQLSb204 strings.Builder
+	for i := range 6 {
+		ocSQLSb204.WriteString(fmt.Sprintf("insert into session values('oc%d','/w/app','pool %d',%d,%d);\n", i, i, clock, clock) + ocMsg(i, 0) + ocMsg(i, 1))
+		grokSQLSb204.WriteString(fmt.Sprintf("INSERT INTO sessions VALUES ('g%d','w','queue %d','/work/api','2026-07-27T10:00:00.000Z');\n", i, i) + grokMsg(i, 0) + grokMsg(i, 1))
 	}
+	grokSQL += grokSQLSb204.String()
+	ocSQL += ocSQLSb204.String()
 	paritySQL(t, oc, ocSQL)
 	paritySQL(t, grok, grokSQL)
 	touch := func(p string, s int) {

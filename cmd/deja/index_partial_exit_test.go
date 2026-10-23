@@ -63,7 +63,7 @@ func TestIndexExitsThreeWhenItLeftInputUnread(t *testing.T) {
 	}
 }
 
-func isExitStatus(err error, code int) bool {
+func isExitStatus(err error, code int) bool { //nolint:unparam // the code is what it checks for
 	var s exitStatus
 	return errors.As(err, &s) && int(s) == code
 }

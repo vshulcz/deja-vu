@@ -20,8 +20,8 @@ func TestOneDecisiveWordOutranksTwoFillerOnes(t *testing.T) {
 	// The filler words have to be common for this to be the real situation:
 	// in a corpus of four everything is rare, idf collapses, and an earlier
 	// tier answers before relevance is ever asked.
-	var texts []string
-	for i := 0; i < 40; i++ {
+	texts := make([]string, 0, 41)
+	for range 40 {
 		texts = append(texts, "there are many ways to own one of these and many people own several")
 	}
 	answer := len(texts)
@@ -42,7 +42,7 @@ func TestOneDecisiveWordOutranksTwoFillerOnes(t *testing.T) {
 	if len(result.Sessions) == 0 {
 		t.Fatal("a question whose rare word is in the corpus returned nothing")
 	}
-	want := string(rune('a' + answer))
+	want := string(rune('a' + answer)) //nolint:gosec // answer is a small index
 	if got := result.Sessions[0].ID; got != want {
 		rank := -1
 		for i, s := range result.Sessions {

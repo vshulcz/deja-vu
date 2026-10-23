@@ -22,7 +22,7 @@ func TestFilesReadsTheRecordLogOnce(t *testing.T) {
 	}
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
 	const sessions = 12
-	for i := 0; i < sessions; i++ {
+	for i := range sessions {
 		id := fmt.Sprintf("s%02d", i)
 		path := filepath.Join(repo, fmt.Sprintf("mod%02d.go", i))
 		if err := os.WriteFile(path, []byte("package repo\n"), 0o644); err != nil {
@@ -67,7 +67,7 @@ func TestBlameReadsTheRecordLogOnce(t *testing.T) {
 	}
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
 	const sessions = 12
-	for i := 0; i < sessions; i++ {
+	for i := range sessions {
 		id := fmt.Sprintf("b%02d", i)
 		lines := []string{
 			fmt.Sprintf(`{"type":"user","sessionId":%q,"cwd":%q,"timestamp":"2026-07-%02dT10:00:00Z","message":{"role":"user","content":"touch the shared file"}}`, id, repo, i+1),

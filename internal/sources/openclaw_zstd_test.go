@@ -1,7 +1,6 @@
 package sources
 
 import (
-	"bytes"
 	"encoding/hex"
 	"os"
 	"os/exec"
@@ -26,10 +25,11 @@ func TestOpenClawReadsCompressedEvents(t *testing.T) {
 		`{"type":"message","id":"a1","parentId":"c1","timestamp":"2026-10-01T09:00:03Z","message":{"role":"assistant","content":[{"type":"text","text":"ZSTD-ANSWER ` + strings.Repeat("raise server_idle_timeout. ", 50) + `"}]}}`,
 	}
 	sql := "create table transcript_events (session_id text not null, seq integer not null, event_json text, created_at integer not null, event_zstd blob, event_utf8_bytes integer, navigation_json text, primary key (session_id, seq));\n"
+	var sqlSb29 strings.Builder
 	for i, e := range events {
 		row := "'" + strings.ReplaceAll(e, "'", "''") + "',null,null"
 		if len(e) >= 1024 {
-			cmd := exec.Command("zstd", "-c", "-q", "-1")
+			cmd := exec.CommandContext(t.Context(), "zstd", "-c", "-q", "-1")
 			cmd.Stdin = strings.NewReader(e)
 			frame, err := cmd.Output()
 			if err != nil {
@@ -37,13 +37,14 @@ func TestOpenClawReadsCompressedEvents(t *testing.T) {
 			}
 			row = "null,X'" + hex.EncodeToString(frame) + "'," + strconv.Itoa(len(e))
 		}
-		sql += "insert into transcript_events (session_id,seq,event_json,event_zstd,event_utf8_bytes,created_at) values ('" + id + "'," + strconv.Itoa(i) + "," + row + ",1790000000000);\n"
+		sqlSb29.WriteString("insert into transcript_events (session_id,seq,event_json,event_zstd,event_utf8_bytes,created_at) values ('" + id + "'," + strconv.Itoa(i) + "," + row + ",1790000000000);\n")
 	}
+	sql += sqlSb29.String()
 	db := filepath.Join(t.TempDir(), "main", "agent", "openclaw-agent.sqlite")
 	if err := os.MkdirAll(filepath.Dir(db), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	build := exec.Command("sqlite3", db)
+	build := exec.CommandContext(t.Context(), "sqlite3", db)
 	build.Stdin = strings.NewReader(sql)
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build store: %v: %s", err, out)
@@ -54,7 +55,7 @@ func TestOpenClawReadsCompressedEvents(t *testing.T) {
 		if err != nil || len(ss) != 1 {
 			t.Fatalf("parse: %v %d", err, len(ss))
 		}
-		var got []string
+		got := make([]string, 0, len(ss[0].Messages))
 		for _, m := range ss[0].Messages {
 			got = append(got, m.Role+":"+strings.Fields(m.Text)[0])
 		}
@@ -65,7 +66,7 @@ func TestOpenClawReadsCompressedEvents(t *testing.T) {
 	check(t)
 
 	// A corrupt frame loses its own event, not the session's other ones.
-	corrupt := exec.Command("sqlite3", db, "update transcript_events set event_zstd = X'28B52FFD00' where seq = 2")
+	corrupt := exec.CommandContext(t.Context(), "sqlite3", db, "update transcript_events set event_zstd = X'28B52FFD00' where seq = 2")
 	if out, err := corrupt.CombinedOutput(); err != nil {
 		t.Fatalf("corrupt: %v: %s", err, out)
 	}
@@ -73,11 +74,11 @@ func TestOpenClawReadsCompressedEvents(t *testing.T) {
 	if err != nil || len(ss) != 1 {
 		t.Fatalf("parse: %v %d", err, len(ss))
 	}
-	var roles []string
+	roles := make([]string, 0, len(ss[0].Messages))
 	for _, m := range ss[0].Messages {
 		roles = append(roles, m.Role)
 	}
-	if strings.Join(roles, ",") != "user,assistant" || !bytes.Contains([]byte(ss[0].Messages[1].Text), []byte("ZSTD-ANSWER")) {
+	if strings.Join(roles, ",") != "user,assistant" || !strings.Contains(ss[0].Messages[1].Text, "ZSTD-ANSWER") {
 		t.Errorf("after a corrupt frame: %v", roles)
 	}
 }

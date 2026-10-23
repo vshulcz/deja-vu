@@ -17,7 +17,7 @@ var harmless = map[string]bool{"COLUMNS": true, "NO_COLOR": true, "TERM": true}
 
 // TestScrubHelperProcess runs only as the child of the test below: it reports
 // every variable that reached it with the value the parent planted.
-func TestScrubHelperProcess(t *testing.T) {
+func TestScrubHelperProcess(_ *testing.T) {
 	if os.Getenv("SCRUB_PROBE") == "" {
 		return
 	}
@@ -37,7 +37,7 @@ func TestTestMainScrubsEveryVariableTheCodeReads(t *testing.T) {
 	if len(read) < 50 {
 		t.Fatalf("found only %d variables, the scan is broken", len(read))
 	}
-	cmd := exec.Command(os.Args[0], "-test.run=^TestScrubHelperProcess$")
+	cmd := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestScrubHelperProcess$")
 	cmd.Env = append(os.Environ(), "SCRUB_PROBE=1")
 	for _, name := range read {
 		// Runtime knobs the runtime parses before main: a path in them is a
@@ -52,7 +52,7 @@ func TestTestMainScrubsEveryVariableTheCodeReads(t *testing.T) {
 		t.Fatalf("helper: %v\n%s", err, out)
 	}
 	var leaked []string
-	for _, line := range strings.Split(string(out), "\n") {
+	for line := range strings.SplitSeq(string(out), "\n") {
 		if name, ok := strings.CutPrefix(line, "LEAK "); ok && !harmless[name] {
 			leaked = append(leaked, name)
 		}
@@ -71,7 +71,7 @@ func envNamesReadByCode(t *testing.T) []string {
 			if err != nil || d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 				return err
 			}
-			src, err := os.ReadFile(path)
+			src, err := os.ReadFile(path) //nolint:gosec // reads the repo's own Go sources
 			if err != nil {
 				return err
 			}

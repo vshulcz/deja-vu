@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -24,18 +25,20 @@ func TestReplacementPassSidecarsReadOnlyTheChangedSessions(t *testing.T) {
 	session := func(i int, ask string) {
 		id := fmt.Sprintf("s%02d", i)
 		var body string
-		for turn := 0; turn < 4; turn++ {
+		var bodySb27 strings.Builder
+		for turn := range 4 {
 			ts := fmt.Sprintf("%02d:%02d", i*4+turn, 0)[:3]
 			tid := fmt.Sprintf("t%d", turn)
-			body += parityClaudeLine(id, ts+"00Z", "user", fmt.Sprintf("%q", ask)) +
+			bodySb27.WriteString(parityClaudeLine(id, ts+"00Z", "user", fmt.Sprintf("%q", ask)) +
 				parityClaudeLine(id, ts+"01Z", "assistant", `[{"type":"tool_use","id":"`+tid+`","name":"Bash","input":{"command":"make migrate"}}]`) +
-				parityClaudeLine(id, ts+"02Z", "user", `[{"type":"tool_result","tool_use_id":"`+tid+`","content":"dial tcp 127.0.0.1:5432: connect: connection refused\nmake: *** [migrate] Error 1"}]`)
+				parityClaudeLine(id, ts+"02Z", "user", `[{"type":"tool_result","tool_use_id":"`+tid+`","content":"dial tcp 127.0.0.1:5432: connect: connection refused\nmake: *** [migrate] Error 1"}]`))
 		}
+		body += bodySb27.String()
 		parityWrite(t, filepath.Join(proj, id+".jsonl"), body, false)
 		later := time.Now().Add(time.Duration(i+len(ask)) * time.Second)
 		_ = os.Chtimes(filepath.Join(proj, id+".jsonl"), later, later)
 	}
-	for i := 0; i < n; i++ {
+	for i := range n {
 		session(i, "why does the migration hang")
 	}
 	inc := filepath.Join(tmp, "inc")

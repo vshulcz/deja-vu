@@ -32,7 +32,7 @@ func TestSubstringTierSurfacesACorruptBucket(t *testing.T) {
 		t.Fatal("no buckets to corrupt")
 	}
 	for _, e := range entries {
-		if err := os.WriteFile(filepath.Join(dir, "buckets", e.Name()), []byte("XXXXXXXX garbage"), 0o600); err != nil {
+		if err = os.WriteFile(filepath.Join(dir, "buckets", e.Name()), []byte("XXXXXXXX garbage"), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -74,7 +74,7 @@ func TestFirstMatchSurfacesCorruption(t *testing.T) {
 	_, k = binary.Uvarint(b[off:])
 	off += k
 	b[off] = 0xFF
-	if err := os.WriteFile(rp, b, 0o600); err != nil {
+	if err = os.WriteFile(rp, b, 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -115,7 +115,7 @@ func TestEachRecordAtSurfacesCorruption(t *testing.T) {
 	_, k = binary.Uvarint(b[off:])
 	off += k
 	b[off] = 0xFF
-	if err := os.WriteFile(rp, b, 0o600); err != nil {
+	if err = os.WriteFile(rp, b, 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -174,7 +174,7 @@ func TestReadSurfacesAMidLogDecodeError(t *testing.T) {
 	_, k = binary.Uvarint(b[off:])
 	off += k // now at the flag byte
 	b[off] = 0xFF
-	if err := os.WriteFile(rp, b, 0o600); err != nil {
+	if err = os.WriteFile(rp, b, 0o600); err != nil {
 		t.Fatal(err)
 	}
 

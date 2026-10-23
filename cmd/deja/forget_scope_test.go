@@ -23,7 +23,7 @@ func TestForgetScopeRefusal(t *testing.T) {
 		}
 	}
 	// Asked for explicitly, it proceeds.
-	if err := forgetScopeRefusal("s1", 12, true); err != nil {
+	if err = forgetScopeRefusal("s1", 12, true); err != nil {
 		t.Errorf("--all-matches still refused: %v", err)
 	}
 	// An elided id has no longer prefix to offer, so the wording differs and

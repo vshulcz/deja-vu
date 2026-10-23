@@ -52,14 +52,14 @@ func TestLauncherCarriesStoreLocationsIntoAStrippedHookEnv(t *testing.T) {
 
 	run := func(env ...string) map[string]string {
 		t.Helper()
-		cmd := exec.Command(launcher, "hook-prompt")
+		cmd := exec.CommandContext(t.Context(), launcher, "hook-prompt")
 		cmd.Env = append([]string{"HOME=" + filepath.Join(tmp, "home"), "PATH=/usr/bin:/bin"}, env...)
 		out, err := cmd.Output()
 		if err != nil {
 			t.Fatalf("launcher: %v", err)
 		}
 		got := map[string]string{}
-		for _, l := range strings.Split(string(out), "\n") {
+		for l := range strings.SplitSeq(string(out), "\n") {
 			if k, v, ok := strings.Cut(l, "="); ok {
 				got[k] = v
 			}

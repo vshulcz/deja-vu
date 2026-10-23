@@ -13,8 +13,11 @@ import (
 
 func post(t *testing.T, h http.Handler, path, auth string, body any) (int, map[string]any) {
 	t.Helper()
-	b, _ := json.Marshal(body)
-	req := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(b))
+	b, err := json.Marshal(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, path, bytes.NewReader(b))
 	if auth != "" {
 		req.Header.Set("Authorization", auth)
 	}
@@ -27,7 +30,7 @@ func post(t *testing.T, h http.Handler, path, auth string, body any) (int, map[s
 
 func add(t *testing.T, h http.Handler, req, user, session string, msgs ...string) {
 	t.Helper()
-	var mm []map[string]any
+	mm := make([]map[string]any, 0, len(msgs))
 	for i, m := range msgs {
 		role := "user"
 		if i%2 == 1 {
@@ -41,13 +44,28 @@ func add(t *testing.T, h http.Handler, req, user, session string, msgs ...string
 	}
 }
 
-func ids(out map[string]any) []string {
-	var r []string
+func ids(t *testing.T, out map[string]any) []string {
+	t.Helper()
 	data, _ := out["data"].([]any)
+	r := make([]string, 0, len(data))
 	for _, d := range data {
-		r = append(r, d.(map[string]any)["id"].(string))
+		r = append(r, field(t, d, "id"))
 	}
 	return r
+}
+
+// field is item[key] for an item of a reply's data array.
+func field(t *testing.T, item any, key string) string {
+	t.Helper()
+	m, ok := item.(map[string]any)
+	if !ok {
+		t.Fatalf("data item is a %T", item)
+	}
+	s, ok := m[key].(string)
+	if !ok {
+		t.Fatalf("data item %s is a %T", key, m[key])
+	}
+	return s
 }
 
 // The contract the leaderboard checks: Add echoes the ids and makes the
@@ -66,7 +84,7 @@ func TestAddThenSearchFollowsTheContract(t *testing.T) {
 	add(t, h, "ro", "u2", "sess:other", "quorum timeout on the raft follower again", "other user's fix")
 
 	code, out := post(t, h, "/search", "Token k", map[string]any{"query": "raft follower quorum timeout", "user_id": "u1", "top_k": 3})
-	got := ids(out)
+	got := ids(t, out)
 	if code != 200 || len(got) == 0 || got[0] != "sess:quorum" {
 		t.Fatalf("search: %d %v", code, out)
 	}
@@ -78,12 +96,13 @@ func TestAddThenSearchFollowsTheContract(t *testing.T) {
 			t.Fatalf("u1's search served u2's memory: %v", got)
 		}
 	}
-	content := out["data"].([]any)[0].(map[string]any)["content"].(string)
+	data, _ := out["data"].([]any)
+	content := field(t, data[0], "content")
 	if !strings.Contains(content, "election_timeout_ms") || strings.Count(content, "raft.toml") != 1 {
 		t.Fatalf("content lost the answer or stored the retried chunk twice:\n%s", content)
 	}
 
-	if _, out := post(t, h, "/search", "Bearer k", map[string]any{"query": "raft quorum", "user_id": "nobody", "top_k": 5}); out["data"] == nil || len(ids(out)) != 0 {
+	if _, out := post(t, h, "/search", "Bearer k", map[string]any{"query": "raft quorum", "user_id": "nobody", "top_k": 5}); out["data"] == nil || len(ids(t, out)) != 0 {
 		t.Fatalf("unknown user_id must return an empty data array: %v", out)
 	}
 	if code, _ := post(t, h, "/search", "Bearer wrong", map[string]any{"query": "raft", "user_id": "u1", "top_k": 5}); code != http.StatusUnauthorized {
@@ -109,7 +128,7 @@ func TestLongSessionIsCutOnARune(t *testing.T) {
 		if len(data) == 0 {
 			t.Fatalf("no result: %v", out)
 		}
-		c := data[0].(map[string]any)["content"].(string)
+		c := field(t, data[0], "content")
 		if !utf8.ValidString(c) || strings.ContainsRune(c, utf8.RuneError) {
 			t.Fatalf("budget %d cut inside a character: %q", budget, c[len(c)-20:])
 		}

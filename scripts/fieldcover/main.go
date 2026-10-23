@@ -68,7 +68,10 @@ func main() {
 		restore()
 	}
 	if *asJSON {
-		_ = json.NewEncoder(os.Stdout).Encode(rows)
+		if err := json.NewEncoder(os.Stdout).Encode(rows); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
 		return
 	}
 	cols := append(append([]string{}, roles...), "project", "time")

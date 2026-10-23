@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -124,10 +125,10 @@ func TestClaudeAutoWiresSessionEndAndUninstallRoundTrips(t *testing.T) {
 	// No timeout: Claude Code then gives the hook its SessionEnd default of
 	// 1.5 s, and a timeout of ours would only cut that budget or, larger,
 	// hold every /exit and /clear the reader makes.
-	for _, e := range settingsHooks(t, b)["SessionEnd"].([]any) {
-		for _, h := range e.(map[string]any)["hooks"].([]any) {
-			h := h.(map[string]any)
-			if _, has := h["timeout"]; has && strings.HasSuffix(h["command"].(string), " hook-session-end") {
+	for _, e := range typedOrFatal[[]any](t, settingsHooks(t, b)["SessionEnd"]) {
+		for _, h := range typedOrFatal[[]any](t, typedOrFatal[map[string]any](t, e)["hooks"]) {
+			h := typedOrFatal[map[string]any](t, h)
+			if _, has := h["timeout"]; has && strings.HasSuffix(typedOrFatal[string](t, h["command"]), " hook-session-end") {
 				t.Errorf("deja's SessionEnd entry carries a timeout: %v", h["timeout"])
 			}
 		}
@@ -136,7 +137,7 @@ func TestClaudeAutoWiresSessionEndAndUninstallRoundTrips(t *testing.T) {
 		t.Errorf("doctor reads %q (missing %v) after a fresh install", st.state, st.missing)
 	}
 
-	if _, err := installClaudeHook("/usr/local/bin/deja", true); err != nil {
+	if _, err = installClaudeHook("/usr/local/bin/deja", true); err != nil {
 		t.Fatal(err)
 	}
 	after, err := os.ReadFile(path)
@@ -229,10 +230,10 @@ func TestQwenAutoWiresSessionEndAndUninstallRoundTrips(t *testing.T) {
 	if !strings.Contains(string(b), "/usr/local/bin/mine --flush") {
 		t.Errorf("install took the reader's own SessionEnd hook:\n%s", b)
 	}
-	if _, err := installTarget("qwen-auto", "/usr/local/bin/deja", false); err != nil {
+	if _, err = installTarget("qwen-auto", "/usr/local/bin/deja", false); err != nil {
 		t.Fatal(err)
 	}
-	if again, _ := os.ReadFile(path); string(again) != string(b) {
+	if again, _ := os.ReadFile(path); !bytes.Equal(again, b) {
 		t.Errorf("a second install changed the file:\n--- first\n%s\n--- second\n%s", b, again)
 	}
 	for _, a := range autoWirings() {
@@ -251,7 +252,7 @@ func TestQwenAutoWiresSessionEndAndUninstallRoundTrips(t *testing.T) {
 		t.Errorf("qwen's SessionEnd payload left the session stamped: %v", readLiveSessions(dir))
 	}
 
-	if _, err := installTarget("qwen-auto", "/usr/local/bin/deja", true); err != nil {
+	if _, err = installTarget("qwen-auto", "/usr/local/bin/deja", true); err != nil {
 		t.Fatal(err)
 	}
 	after, err := os.ReadFile(path)

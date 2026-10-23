@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,7 +35,7 @@ func TestAntigravityCompactionIsCaughtUpAtTheNextInvocation(t *testing.T) {
 		}
 	}
 	invoke := func() string {
-		payload, _ := json.Marshal(map[string]any{
+		payload := mustMarshal(t, map[string]any{
 			"invocationNum": 1, "workspacePaths": []string{workspace},
 			"transcriptPath": transcript, "conversationId": "agy-1",
 		})

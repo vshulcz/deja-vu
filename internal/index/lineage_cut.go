@@ -95,7 +95,7 @@ func TouchedAfter(dir string, meta SessionMeta, path string, at time.Time) bool 
 			if after || r.Role != roleFiles {
 				return
 			}
-			for _, p := range strings.Split(r.Text, "\n") {
+			for p := range strings.SplitSeq(r.Text, "\n") {
 				if p = strings.TrimSpace(p); p != "" && SameFile(p, path) {
 					named = true
 					after = r.Time.After(at)

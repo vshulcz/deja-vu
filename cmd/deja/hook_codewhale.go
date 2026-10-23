@@ -74,7 +74,7 @@ func runHookCodeWhale(dir string, args []string, stdin io.Reader, stdout io.Writ
 func codewhaleMessageSubmit(dir string, stdin io.Reader, stdout io.Writer) error {
 	var in codewhaleSubmit
 	if json.Unmarshal(readHookPayload(stdin, hookStdinWait), &in) != nil || strings.TrimSpace(in.Text) == "" {
-		return nil
+		return nil //nolint:nilerr // a hook never fails the host
 	}
 	if in.Workspace == "" {
 		in.Workspace = os.Getenv("DEEPSEEK_WORKSPACE")
@@ -117,7 +117,7 @@ func codewhaleMessageSubmit(dir string, stdin io.Reader, stdout io.Writer) error
 	}
 	b, err := json.Marshal(map[string]string{"text": in.Text + "\n\n" + extra})
 	if err != nil {
-		return nil
+		return nil //nolint:nilerr // a hook never fails the host
 	}
 	fmt.Fprintln(stdout, string(b))
 	return nil
@@ -209,11 +209,11 @@ func codewhaleToolCallBefore(dir string, stdout io.Writer) error {
 		"cwd":        workspace,
 	})
 	if err != nil {
-		return nil
+		return nil //nolint:nilerr // a hook never fails the host
 	}
 	var out bytes.Buffer
-	if err := runHookToolMode(dir, bytes.NewReader(payload), &out, hookToolPlain); err != nil {
-		return nil
+	if err = runHookToolMode(dir, bytes.NewReader(payload), &out, hookToolPlain); err != nil {
+		return nil //nolint:nilerr // a hook never fails the host
 	}
 	ctx := strings.TrimSpace(out.String())
 	// What waits from an earlier call goes first when both fit under the cap;
@@ -239,7 +239,7 @@ func codewhaleToolCallBefore(dir string, stdout io.Writer) error {
 	}
 	b, err := json.Marshal(map[string]string{"additionalContext": truncateToolLine(ctx, codewhaleContextMax)})
 	if err != nil {
-		return nil
+		return nil //nolint:nilerr // a hook never fails the host
 	}
 	fmt.Fprintln(stdout, string(b))
 	return nil
@@ -308,11 +308,11 @@ func codewhaleToolCallAfter(dir string, stdin io.Reader) error {
 		"cwd":             workspace,
 	})
 	if err != nil {
-		return nil
+		return nil //nolint:nilerr // a hook never fails the host
 	}
 	var out bytes.Buffer
 	if err := runHookToolAfterMode(dir, bytes.NewReader(payload), &out, true); err != nil {
-		return nil
+		return nil //nolint:nilerr // a hook never fails the host
 	}
 	deferText(dir, key, "hook-tool-after", out.String())
 	return nil

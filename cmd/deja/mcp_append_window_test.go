@@ -46,21 +46,21 @@ func TestRecallAnswersDuringAnIncrementalAppend(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.Write([]byte("records of the new session, manifest not committed")); err != nil {
+	if _, err = f.WriteString("records of the new session, manifest not committed"); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.Close(); err != nil {
+	if err = f.Close(); err != nil {
 		t.Fatal(err)
 	}
 	snapshot := func() (int64, []byte) {
 		t.Helper()
-		fi, err := os.Stat(rp)
-		if err != nil {
-			t.Fatal(err)
+		fi, statErr := os.Stat(rp)
+		if statErr != nil {
+			t.Fatal(statErr)
 		}
-		m, err := os.ReadFile(filepath.Join(dir, "manifest.gob"))
-		if err != nil {
-			t.Fatal(err)
+		m, readErr := os.ReadFile(filepath.Join(dir, "manifest.gob"))
+		if readErr != nil {
+			t.Fatal(readErr)
 		}
 		return fi.Size(), m
 	}

@@ -186,8 +186,8 @@ func TestForgetPromotedTitlesLeavesTheFileAloneWhenNothingMatches(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n, err := ForgetPromotedTitles(func(string) bool { return false }); err != nil || n != 0 {
-		t.Fatalf("n=%d err=%v", n, err)
+	if n, forgetErr := ForgetPromotedTitles(func(string) bool { return false }); forgetErr != nil || n != 0 {
+		t.Fatalf("n=%d err=%v", n, forgetErr)
 	}
 	after, err := os.Stat(path)
 	if err != nil {

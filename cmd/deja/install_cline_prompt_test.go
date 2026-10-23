@@ -30,13 +30,13 @@ func TestClinePluginInjectsRecallForThePrompt(t *testing.T) {
 	calls := filepath.Join(home, "calls")
 	script := "#!/bin/sh\nin=$(cat)\nprintf '%s\\n' \"$* $in\" >> " + calls + "\n" +
 		"case \"$1\" in hook-prompt) printf 'RECALLED the token rotates every 47 days' ;; esac\n"
-	if err := os.WriteFile(stub, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(stub, []byte(script), 0o755); werr != nil {
+		t.Fatal(werr)
 	}
 
 	plugin := filepath.Join(home, "index.mjs")
-	if err := os.WriteFile(plugin, []byte(clinePluginJS(stub)), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(plugin, []byte(clinePluginJS(stub)), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 
 	// Two builds of the same prompt, as cline does: the second is the one that
@@ -61,10 +61,10 @@ console.log(text.includes("how often does the token rotate?") ? "KEPT" : "LOST")
 console.log(String(out ? out.filter((m) => m.role === "user").length : 0));
 `
 	run := filepath.Join(home, "drive.mjs")
-	if err := os.WriteFile(run, []byte(driver), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(run, []byte(driver), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
-	out, err := exec.Command(node, run).CombinedOutput()
+	out, err := exec.CommandContext(t.Context(), node, run).CombinedOutput()
 	if err != nil {
 		t.Fatalf("driving the plugin: %v\n%s", err, out)
 	}
@@ -138,12 +138,12 @@ build([
 	if err := os.WriteFile(run, []byte(driver), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := exec.Command(node, run).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), node, run).CombinedOutput(); err != nil {
 		t.Fatalf("driving the plugin: %v\n%s", err, out)
 	}
 	body, _ := os.ReadFile(calls)
 	var prompt string
-	for _, line := range strings.Split(string(body), "\n") {
+	for line := range strings.SplitSeq(string(body), "\n") {
 		if strings.HasPrefix(line, "hook-prompt") {
 			prompt = line
 		}

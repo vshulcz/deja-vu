@@ -2,6 +2,7 @@ package index
 
 import (
 	"math"
+	"slices"
 	"sort"
 	"strings"
 
@@ -339,12 +340,7 @@ func planIndexedSteps(dir string, manifest Manifest, steps [][]string) ([][]plan
 // identifier-shaped (see planIsIdentifierTerm). Used to size the step's need
 // (1 term vs. 2) at both the raw-term-selection layer (cmd/deja) and here.
 func planHasIdentifierTerm(terms []string) bool {
-	for _, t := range terms {
-		if planIsIdentifierTerm(t) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(terms, planIsIdentifierTerm)
 }
 
 // planIsIdentifierTerm mirrors cmd/deja's hasIdentifierTerm at the single-term

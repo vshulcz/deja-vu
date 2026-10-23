@@ -1,3 +1,4 @@
+// Package bench generates the seeded corpora the benchmarks score against.
 package bench
 
 import (
@@ -54,18 +55,18 @@ type BlockCorpus struct {
 //   - The other sessions say the subject's words at length. A block that ranks
 //     on how often the words appear picks one of them.
 func GenerateBlock(seed int64) BlockCorpus {
-	rng := rand.New(rand.NewSource(seed))
+	rng := rand.New(rand.NewSource(seed)) //nolint:gosec // seeded so the fixture is the same on every run
 	base := time.Date(2099, time.March, 2, 9, 0, 0, 0, time.UTC)
 	chains := make([]BlockChain, 0, BlockChainCount)
-	for i := 0; i < BlockChainCount; i++ {
+	for i := range BlockChainCount {
 		id := fmt.Sprintf("block-chain-%02d", i)
 		project := fmt.Sprintf("block-project-%02d", i)
-		subject := fmt.Sprintf("%s-subject", id)
+		subject := id + "-subject"
 		settled := fmt.Sprintf(
 			"The fix was pinning the %s pool at %d connections, decided after the replica lag test.",
 			subject, 20+i%9)
 		chain := BlockChain{ID: id, Terms: []string{subject}, Settled: settled}
-		for j := 0; j < BlockPriorCount; j++ {
+		for j := range BlockPriorCount {
 			t := base.Add(time.Duration(i*24+j) * time.Hour)
 			msgs := []model.Message{
 				{Role: "user", Text: fmt.Sprintf("the %s keeps timing out, take %d", subject, j+1), Time: t},
@@ -79,7 +80,7 @@ func GenerateBlock(seed int64) BlockCorpus {
 			if j == BlockSettledAt {
 				says = 1
 			}
-			for k := 0; k < says; k++ {
+			for k := range says {
 				msgs = append(msgs,
 					model.Message{
 						Role: "assistant",
@@ -106,9 +107,7 @@ func GenerateBlock(seed int64) BlockCorpus {
 				// conclusion cannot be the first sentence.
 				msgs = append(msgs, model.Message{
 					Role: "assistant",
-					Text: fmt.Sprintf(
-						"Read the replica lag over the whole window. Both pools showed the same wait, and the metrics agreed with the trace. %s",
-						settled),
+					Text: "Read the replica lag over the whole window. Both pools showed the same wait, and the metrics agreed with the trace. " + settled,
 					Time: t.Add(30 * time.Minute),
 				})
 				// And something newer that settles nothing but is kept for its
@@ -116,7 +115,7 @@ func GenerateBlock(seed int64) BlockCorpus {
 				// the failure #2913 fixed.
 				// Two of them, because the block asks for two lines: one fence
 				// leaves the second slot free and the conclusion still lands.
-				for k := 0; k < 2; k++ {
+				for k := range 2 {
 					msgs = append(msgs, model.Message{
 						Role: "assistant",
 						Text: fmt.Sprintf("Here is the pool config as it stands, pass %d:\n```ini\n%s_pool_size = 40\nmax_client_conn = 200\n```\n%s",
@@ -124,11 +123,11 @@ func GenerateBlock(seed int64) BlockCorpus {
 						Time: t.Add(time.Duration(31+k) * time.Minute),
 					})
 				}
-				for k := 0; k < 4; k++ {
+				for k := range 4 {
 					msgs = append(msgs,
 						model.Message{
 							Role: "user",
-							Text: fmt.Sprintf("makes sense — anything else worth watching on %s", subject),
+							Text: "makes sense — anything else worth watching on " + subject,
 							Time: t.Add(time.Duration(31+2*k) * time.Minute),
 						},
 						model.Message{

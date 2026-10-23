@@ -173,6 +173,7 @@ const (
 	SortDate      = "date"
 )
 
+// The tiers a hit can come from, strictest first.
 const (
 	TierExact    = "exact"
 	TierClose    = "close"
@@ -190,7 +191,7 @@ const (
 
 // QueryParts separates ordinary terms from quoted phrases without changing
 // the query syntax used by callers.
-func QueryParts(q string) (terms []string, phrases []string) {
+func QueryParts(q string) (terms []string, phrases []string) { //nolint:revive // exported name used from cmd/deja and internal/index
 	start := -1
 	var plain strings.Builder
 	flushPlain := func() {
@@ -288,6 +289,8 @@ func MatchesQuery(text, q string) bool {
 	return MatchesParts(text, terms, phrases, nil)
 }
 
+// MatchesParts reports whether text holds every term (or one of its variants)
+// and every phrase.
 func MatchesParts(text string, terms, phrases []string, variants map[string][]string) bool {
 	return MatchesLowered(Lower(text), terms, phrases, variants)
 }

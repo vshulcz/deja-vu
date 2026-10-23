@@ -40,7 +40,7 @@ func TestPluginHostsNameTheProjectWhenASessionEnds(t *testing.T) {
 	}
 	for name, src := range sources {
 		calls := 0
-		for _, line := range strings.Split(src, "\n") {
+		for line := range strings.SplitSeq(src, "\n") {
 			code := strings.TrimSpace(line)
 			if !strings.Contains(code, "hook-session-end") || !strings.Contains(code, "session_id") || strings.HasPrefix(code, "//") || strings.HasPrefix(code, "#") {
 				continue

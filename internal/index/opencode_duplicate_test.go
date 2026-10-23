@@ -26,7 +26,7 @@ insert into session values ('%[1]s','/tmp/app',0,0);
 insert into message values ('m-%[1]s','%[1]s','{"role":"user"}',0);
 insert into part values ('p-%[1]s','m-%[1]s',json_object('type','text','text','%[2]s'));
 `, id, text)
-	if out, err := exec.Command("sqlite3", db, stmts).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, stmts).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}
 }
@@ -124,11 +124,11 @@ func TestAContinuedOpencodeSessionKeepsItsEarlierTurns(t *testing.T) {
 	stmts := `insert into message values ('m2-s1','s1','{"role":"assistant","time":{"created":1785166787000}}',1785166787000);
 insert into part values ('p2-s1','m2-s1',json_object('type','text','text','the second turn is the answer','time',json_object('start',1785166787000)));
 update session set time_updated=1785166787000 where id='s1';`
-	if out, err := exec.Command("sqlite3", db, stmts).CombinedOutput(); err != nil {
-		t.Fatalf("sqlite3: %v %s", err, out)
+	if out, sqlErr := exec.CommandContext(t.Context(), "sqlite3", db, stmts).CombinedOutput(); sqlErr != nil {
+		t.Fatalf("sqlite3: %v %s", sqlErr, out)
 	}
 	var said strings.Builder
-	if err := Ensure(dir, "", false, &said); err != nil {
+	if err = Ensure(dir, "", false, &said); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(said.String(), replacementPassMarker) {
@@ -139,7 +139,7 @@ update session set time_updated=1785166787000 where id='s1';`
 		t.Fatalf("the session did not come back: %v %v", ok, err)
 	}
 	if len(s.Messages) != 2 {
-		texts := []string{}
+		texts := make([]string, 0, len(s.Messages))
 		for _, msg := range s.Messages {
 			texts = append(texts, msg.Text)
 		}
@@ -175,7 +175,7 @@ func TestANewCursorWorkspaceDoesNotTruncateTheGlobalStore(t *testing.T) {
 	}
 	run := func(db, sql string) {
 		t.Helper()
-		if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
+		if out, err := exec.CommandContext(t.Context(), "sqlite3", db, sql).CombinedOutput(); err != nil {
 			t.Fatalf("sqlite3: %v %s", err, out)
 		}
 	}
@@ -218,7 +218,7 @@ insert or replace into cursorDiskKV values
 		t.Fatalf("the global session did not come back: %v %v", ok, err)
 	}
 	if len(s.Messages) != 2 {
-		texts := []string{}
+		texts := make([]string, 0, len(s.Messages))
 		for _, msg := range s.Messages {
 			texts = append(texts, msg.Text)
 		}
@@ -265,7 +265,7 @@ insert into session values ('%[1]s','%[3]s',0,0);
 insert into message values ('m-%[1]s','%[1]s','{"role":"user"}',0);
 insert into part values ('p-%[1]s','m-%[1]s',json_object('type','text','text','%[2]s'));
 `, id, text, project)
-		if out, err := exec.Command("sqlite3", db, stmts).CombinedOutput(); err != nil {
+		if out, err := exec.CommandContext(t.Context(), "sqlite3", db, stmts).CombinedOutput(); err != nil {
 			t.Fatalf("sqlite3 seed: %v %s", err, out)
 		}
 	}

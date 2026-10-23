@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,7 +19,7 @@ func TestListingAndShareStripControls(t *testing.T) {
 	// Written as JSON escapes because a raw control byte is not valid inside a
 	// JSON string, which is also how a real harness records one.
 	const probe = `probe \u001b[31mRED\u001b[0m \u001b[2K \u001b[1A \u001b]0;pwned\u0007 \u0000 end`
-	line := fmt.Sprintf(`{"type":"user","sessionId":"s-esc","cwd":"/tmp/esc","timestamp":"2026-06-01T10:00:00Z","message":{"role":"user","content":"%s"}}`, probe)
+	line := `{"type":"user","sessionId":"s-esc","cwd":"/tmp/esc","timestamp":"2026-06-01T10:00:00Z","message":{"role":"user","content":"` + probe + `"}}`
 	writeClaudeFixture(t, filepath.Join(root, "projects", "-tmp-esc", "s-esc.jsonl"), "s-esc", []string{line})
 	if err := index.Ensure(os.Getenv("DEJA_INDEX_DIR"), "", false, nil); err != nil {
 		t.Fatal(err)
@@ -44,7 +42,7 @@ func TestListingAndShareStripControls(t *testing.T) {
 			b    byte
 			name string
 		}{{0x1b, "ESC"}, {0x07, "BEL"}, {0x00, "NUL"}} {
-			if bytes.IndexByte([]byte(out), c.b) >= 0 {
+			if strings.IndexByte(out, c.b) >= 0 {
 				t.Errorf("%s passed %s through to the terminal:\n%q", tc.name, c.name, out)
 			}
 		}

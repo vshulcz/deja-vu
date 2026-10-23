@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -79,8 +80,8 @@ func TestOpencodeJSONCAddsToV2NestedServers(t *testing.T) {
 		t.Fatalf("nested config was refused: %v", err)
 	}
 	got := jsoncValue(t, out)
-	mcp := got["mcp"].(map[string]any)
-	servers := mcp["servers"].(map[string]any)
+	mcp := typedOrFatal[map[string]any](t, got["mcp"])
+	servers := typedOrFatal[map[string]any](t, mcp["servers"])
 	if _, ok := servers["deja"]; !ok {
 		t.Fatalf("deja was not added under mcp.servers:\n%s", out)
 	}
@@ -107,9 +108,9 @@ func TestOpencodeJSONCUpdatesInlineV2NestedServers(t *testing.T) {
 		t.Fatalf("inline nested config was refused: %v", err)
 	}
 	got := jsoncValue(t, out)
-	mcp := got["mcp"].(map[string]any)
-	servers := mcp["servers"].(map[string]any)
-	entry := servers["deja"].(map[string]any)
+	mcp := typedOrFatal[map[string]any](t, got["mcp"])
+	servers := typedOrFatal[map[string]any](t, mcp["servers"])
+	entry := typedOrFatal[map[string]any](t, servers["deja"])
 	if got, want := entry["command"], []any{"/bin/deja", "mcp"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("command = %#v, want %#v", got, want)
 	}
@@ -131,9 +132,9 @@ func TestOpencodeJSONUpdatesV2NestedServers(t *testing.T) {
 	if err := json.Unmarshal(out, &root); err != nil {
 		t.Fatalf("output no longer parses: %v\n%s", err, out)
 	}
-	mcp := root["mcp"].(map[string]any)
-	servers := mcp["servers"].(map[string]any)
-	entry := servers["deja"].(map[string]any)
+	mcp := typedOrFatal[map[string]any](t, root["mcp"])
+	servers := typedOrFatal[map[string]any](t, mcp["servers"])
+	entry := typedOrFatal[map[string]any](t, servers["deja"])
 	if got, want := entry["command"], []any{"/bin/deja", "mcp"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("command = %#v, want %#v", got, want)
 	}
@@ -161,8 +162,8 @@ func TestOpencodeJSONCUninstallsFromV2NestedServers(t *testing.T) {
 		t.Fatalf("nested config uninstall failed: %v", err)
 	}
 	got := jsoncValue(t, out)
-	mcp := got["mcp"].(map[string]any)
-	servers := mcp["servers"].(map[string]any)
+	mcp := typedOrFatal[map[string]any](t, got["mcp"])
+	servers := typedOrFatal[map[string]any](t, mcp["servers"])
 	if _, ok := servers["deja"]; ok {
 		t.Fatalf("deja was not removed from mcp.servers:\n%s", out)
 	}
@@ -201,7 +202,7 @@ func TestDoctorAndInstallAgreeOnAMixedConfig(t *testing.T) {
 	if err := json.Unmarshal(out, &root); err != nil {
 		t.Fatalf("output no longer parses: %v\n%s", err, out)
 	}
-	mcp := root["mcp"].(map[string]any)
+	mcp := typedOrFatal[map[string]any](t, root["mcp"])
 	entry, ok := mcp["deja"].(map[string]any)
 	if !ok {
 		t.Fatalf("the direct entry was abandoned:\n%s", out)
@@ -233,12 +234,12 @@ func TestASecondInstallLeavesTheNestedConfigAlone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("second install failed: %v", err)
 	}
-	if string(twice) != string(once) {
+	if !bytes.Equal(twice, once) {
 		t.Errorf("the second install rewrote the file:\n%s\n---\n%s", once, twice)
 	}
 	got := jsoncValue(t, twice)
-	mcp := got["mcp"].(map[string]any)
-	servers := mcp["servers"].(map[string]any)
+	mcp := typedOrFatal[map[string]any](t, got["mcp"])
+	servers := typedOrFatal[map[string]any](t, mcp["servers"])
 	if _, ok := mcp["deja"]; ok {
 		t.Errorf("the second install added a sibling at mcp.deja:\n%s", twice)
 	}

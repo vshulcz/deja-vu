@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -19,6 +18,7 @@ import (
 // ids and timestamps included, under a new session id, and its manifest names
 // the source in metadata.fork.forkedFromSessionId (CLI 3.0.73, observed live).
 func clineForkStore(t *testing.T) (dir, source, fork string) {
+	t.Helper()
 	return clineForkStoreWith(t, false)
 }
 
@@ -44,12 +44,12 @@ func clineForkStoreWith(t *testing.T, sibling bool) (dir, source, fork string) {
 		if from != "" {
 			meta["fork"] = map[string]any{"forkedFromSessionId": from, "forkedAt": t0.Format(time.RFC3339Nano), "source": "cli"}
 		}
-		man, _ := json.Marshal(map[string]any{
+		man := mustMarshal(t, map[string]any{
 			"version": 1, "session_id": id, "source": "cli", "status": "idle",
 			"started_at": at.Format(time.RFC3339Nano), "cwd": "/w/p", "workspace_root": "/w/p",
 			"prompt": user, "metadata": meta,
 		})
-		msgs, _ := json.Marshal(map[string]any{
+		msgs := mustMarshal(t, map[string]any{
 			"version": 1, "agent": "lead", "sessionId": id,
 			"messages": append([]any{
 				map[string]any{"id": "u-" + id[:6], "role": "user", "ts": at.UnixMilli(),
@@ -65,7 +65,7 @@ func clineForkStoreWith(t *testing.T, sibling bool) (dir, source, fork string) {
 			t.Fatal(err)
 		}
 	}
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		write(fmt.Sprintf("17900000%05d_old%02d", i, i), "", fmt.Sprintf("rename table%d in the billing schema", i), "done", t0.Add(-time.Duration(i+2)*time.Hour))
 	}
 	write("1790000099999_prior", "", "the retry loop in fetch.go spins on HTTP 500 again", "Capped the retry loop in fetch.go at MaxAttempts five.", t0.Add(-time.Hour))
@@ -98,7 +98,7 @@ const clineSibling = "1790000150000_sibfk"
 func TestAClineForksDigestLeavesOutItsSource(t *testing.T) {
 	dir, source, fork := clineForkStore(t)
 	digest := func(sid string) string {
-		payload, _ := json.Marshal(map[string]string{"session_id": sid, "cwd": "/w/p"})
+		payload := mustMarshal(t, map[string]string{"session_id": sid, "cwd": "/w/p"})
 		withHookStdin(t, string(payload))
 		return captureStdout(t, func() {
 			if err := runHookContext(dir, true); err != nil {
@@ -119,7 +119,7 @@ func TestAClineForksDigestLeavesOutItsSource(t *testing.T) {
 func TestAClineForksPromptRecallLeavesOutItsSource(t *testing.T) {
 	dir, source, fork := clineForkStore(t)
 	ask := func(sid string) string {
-		payload, _ := json.Marshal(map[string]string{"session_id": sid, "cwd": "/w/p", "prompt": forkQuestion})
+		payload := mustMarshal(t, map[string]string{"session_id": sid, "cwd": "/w/p", "prompt": forkQuestion})
 		var out strings.Builder
 		if err := runHookPrompt(dir, strings.NewReader(string(payload)), &out); err != nil {
 			t.Fatal(err)
@@ -156,7 +156,7 @@ func TestAClineForkIsIndexedAsAForkOfItsSource(t *testing.T) {
 // saw, so the new fork's first prompt still gets it; the source stays out.
 func TestAClineForksFirstPromptKeepsASiblingThatWentOn(t *testing.T) {
 	dir, _, fork := clineForkStoreWith(t, true)
-	payload, _ := json.Marshal(map[string]string{"session_id": fork, "cwd": "/w/p", "prompt": "did we add exponential backoff with jitter to fetch.go"})
+	payload := mustMarshal(t, map[string]string{"session_id": fork, "cwd": "/w/p", "prompt": "did we add exponential backoff with jitter to fetch.go"})
 	var out strings.Builder
 	if err := runHookPrompt(dir, strings.NewReader(string(payload)), &out); err != nil {
 		t.Fatal(err)

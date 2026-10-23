@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -68,8 +69,10 @@ func TestBlameLineCreditsTheSourceNotItsFork(t *testing.T) {
 
 func forkOrder(ss []model.Session) string {
 	out := ""
+	var outSb71 strings.Builder
 	for _, s := range ss {
-		out += s.ID + " "
+		outSb71.WriteString(s.ID + " ")
 	}
+	out += outSb71.String()
 	return out
 }

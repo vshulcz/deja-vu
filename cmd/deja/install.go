@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -77,108 +78,17 @@ func runInstall(dir string, args []string, uninstall bool) error {
 	}()
 	removingWiring = uninstall
 	defer func() { removingWiring = false }()
-	guidance := true
-	noIndex := false
-	var targetArgs []string
-	for _, arg := range args {
-		if arg == "--no-guidance" {
-			guidance = false
-			continue
-		}
-		// For scripted installs that do not want to spend the build here.
-		if arg == "--no-index" {
-			noIndex = true
-			continue
-		}
-		// Take deja's version of a skill back, over one that has been edited.
-		// Without it an edited skill is kept and named rather than replaced.
-		if arg == "--force" {
-			forceGuidance = true
-			continue
-		}
-		targetArgs = append(targetArgs, arg)
-	}
+	guidance, noIndex, targetArgs := parseInstallArgs(args)
 	verb := "install"
 	if uninstall {
 		verb = "uninstall"
 	}
-	// A flag deja does not know is named plainly by every other command; here
-	// it fell into the target list, and the refusal then said the target was
-	// missing while printing the target it had been given (#1078). At one
-	// argument it fell through anyway and `deja install --nosuch` was reported
-	// as an unknown target, with thirty-eight harness names for a remedy
-	// (#1680). No target begins with a dash, so the shape alone settles it.
-	for _, a := range targetArgs {
-		if strings.HasPrefix(a, "-") && a != "--all" && a != "--auto" {
-			return fmt.Errorf("%s: unknown flag %q — it takes a target plus --no-guidance, --no-index or --force", verb, a)
-		}
+	targets, nothing, err := resolveInstallTargets(verb, targetArgs, uninstall)
+	if err != nil {
+		return err
 	}
-	if len(targetArgs) == 0 {
-		// The first command a new machine runs, so a bare word they have to go
-		// look up is the worst possible answer. Every other command in this
-		// position prints the shape it wants (#830), and this one can do
-		// better still: name the agents actually present here.
-		if found := existingTargets(); len(found) > 0 {
-			sort.Strings(found)
-			return fmt.Errorf("%s needs a target — found here: %s (or --all, --auto)", verb, strings.Join(found, ", "))
-		}
-		return fmt.Errorf("%s needs a target — no agent config found here; `deja help install` lists every target deja knows", verb)
-	}
-	// Several names at once, because doctor asks for exactly that: the stale
-	// wiring row prints `deja install ` and the targets it recorded, and on any
-	// machine with two of them that command answered "install needs a target"
-	// — the remedy for a binary that moved was a line that could not run
-	// (#3686).
-	if len(targetArgs) > 1 {
-		for _, a := range targetArgs {
-			if a == "--all" || a == "--auto" {
-				return fmt.Errorf("%s: %s takes no other target beside it", verb, a)
-			}
-		}
-	}
-	targets := append([]string(nil), targetArgs...)
-	if targetArgs[0] == "--auto" {
-		targets = nil
-		for _, t := range existingTargets() {
-			targets = append(targets, autoTargetFor(t))
-		}
-		if len(targets) == 0 {
-			noAgentConfigHere(uninstall)
-			return nil
-		}
-	}
-	if targetArgs[0] == "--all" {
-		targets = existingTargets()
-		if len(targets) == 0 {
-			noAgentConfigHere(uninstall)
-			return nil
-		}
-		if !uninstall {
-			targets = withWiredAutoTargets(targets)
-		}
-	}
-	// Uninstalling has to reach further than installing: --all wires MCP, but
-	// --auto may have written hooks and plugins too, and leaving those behind
-	// means every agent keeps shelling out to a binary the user just removed.
-	if uninstall {
-		targets = withAutoTargets(targets)
-		// The status bar is not a harness, so it is in no detected list and
-		// `uninstall --all` walked past it: the entry stayed, running the
-		// binary the reader was in the middle of removing, on every refresh
-		// (#3684). Only when it is deja's — installStatusline leaves anyone
-		// else's alone, and adding the target where there is nothing of ours
-		// would print a line about it to everybody.
-		if targetArgs[0] == "--all" && statuslineIsDejas() && !slices.Contains(targets, "statusline") {
-			targets = append(targets, "statusline")
-		}
-		// A name it does not know drops out of that expansion and leaves
-		// nothing to do, so `deja uninstall claude-cod` printed not one word
-		// and exited 0 — while `deja install claude-cod` names the near miss
-		// (#2273). Someone removing deja by a half-remembered name was told it
-		// worked, with the wiring still in place.
-		if len(targets) == 0 {
-			return unknownTargetError(targetArgs[0])
-		}
+	if nothing {
+		return nil
 	}
 	// One install at a time. Every writer here reads a config, edits it and
 	// writes it back, which is three steps a second process can land in the
@@ -213,160 +123,22 @@ func runInstall(dir string, args []string, uninstall bool) error {
 		defer func() { removingTargets = nil }()
 	}
 	defer recordWiring(targets, uninstall)
-	saidNotes := map[string]bool{}
-	banner := !uninstall && (targetArgs[0] == "--auto" || targetArgs[0] == "--all") && logoWanted(os.Stdout)
-	type lineItem struct{ target, action, path, note, aside string }
-	// The real paths, not the display ones: an uninstall reports the snapshots
-	// it left beside the configs it handled, and ~ does not stat (#2676).
-	var touchedPaths []string
-	var done []lineItem
-	guidanceCount := 0
-	mcpCount := 0
-	hookCount := 0
-	// One target that refuses to be written used to end the run, so an
-	// uninstall stopped halfway: the hooks were gone, one guidance file was
-	// left behind, and the reader was handed a syscall for a path they did not
-	// choose. Everything else is still done, and what could not be is named at
-	// the end (#902).
-	var refused []string
-	var refusedErrs []error
-	// How many targets were actually written. A target nobody has heard of used
-	// to still leave the CLI skill behind: `deja install frobnicate` refused the
-	// target, exited 1, and wrote `~/.agents/skills/deja-search/SKILL.md` on the
-	// way (#3583).
-	written := 0
-	note := func(t string, err error) {
-		refused = append(refused, fmt.Sprintf("%s: %v", t, err))
-		refusedErrs = append(refusedErrs, err)
+	ir := &installRun{
+		exe:       exe,
+		uninstall: uninstall,
+		guidance:  guidance,
+		banner:    !uninstall && (targetArgs[0] == "--auto" || targetArgs[0] == "--all") && logoWanted(os.Stdout),
+		saidNotes: map[string]bool{},
 	}
+	banner := ir.banner
 	// Install builds the index itself once the targets are written. goose-auto
 	// reads recall on the way to write its block, and that read started a
 	// detached build: install then waited on it, built nothing and printed
 	// "index: built (0 sessions, 0 messages)" over a full store (#4268).
 	installBuildsIndex = !uninstall && !noIndex
 	defer func() { installBuildsIndex = false }()
-	// changed counts targets whose wiring this run actually wrote or removed,
-	// for the line that says what happens next.
-	changed := 0
 	for _, t := range targets {
-		guidanceMoved := false
-		r, err := installTarget(t, exe, uninstall)
-		// A client saved a config under the edit: edited again from its
-		// version rather than renamed over it (#4561).
-		for i := 0; i < configRaceRetries && errors.Is(err, errConfigChanged); i++ {
-			r, err = installTarget(t, exe, uninstall)
-		}
-		if err != nil {
-			note(t, err)
-			continue
-		}
-		// The copy of the reader's rules leaves with the harness, whether or not
-		// --no-guidance was given: the markers are deja's, and an uninstall is
-		// the promise that nothing of deja's is left in the agent's files (#4086).
-		if uninstall {
-			if p, a, err := dropRulesBlock(t); err != nil {
-				note(t, err)
-			} else if p != "" && a != "unchanged" && !banner {
-				fmt.Printf("%s: rules %s %s\n", t, a, shortHome(p))
-			}
-		}
-		if guidance {
-			gr, err := guidanceResult(t, uninstall)
-			if err != nil {
-				note(t, err)
-				continue
-			}
-			// Two targets can share one guidance harness — `gemini` and
-			// `gemini-auto` do — and a note about a file is about the file,
-			// not about the target that noticed it.
-			if gr.Note != "" && saidNotes[gr.Note] {
-				gr.Note = ""
-			} else if gr.Note != "" {
-				saidNotes[gr.Note] = true
-			}
-			// Removing what was never there is not news: the line would say
-			// "unchanged" about a file deja has nothing in.
-			quietMiss := uninstall && gr.Action == "unchanged" && gr.Note == ""
-			if gr.Path != "" && !banner && !quietMiss {
-				fmt.Println(guidanceOutput(t, gr))
-			}
-			if gr.Path != "" && gr.Action != "unchanged" {
-				guidanceMoved = true
-			}
-			if gr.Path != "" && uninstall {
-				pruneGuidanceDirs(gr.Path)
-			}
-			if gr.Path != "" && !uninstall {
-				guidanceCount++
-			}
-			// The command rides with guidance rather than with the wiring: both
-			// are text telling the agent deja exists, and --no-guidance is the
-			// switch for someone who wants the plumbing without either.
-			cr, err := installCommandFile(guidanceHarness(t), exe, uninstall)
-			if err != nil {
-				note(t, err)
-				continue
-			}
-			if cr.Path != "" && !banner {
-				fmt.Printf("%s: command %s %s\n", t, cr.Action, shortHome(cr.Path))
-			}
-			if cr.Path != "" && uninstall {
-				pruneGuidanceDirs(cr.Path)
-			}
-		}
-		// A client that keeps deja off by its own switch gets the same line
-		// doctor prints, unless the writer already said the entry is off
-		// (#4468, #4469). Once a run: gemini and gemini-auto read one file.
-		if !uninstall && !strings.Contains(r.Note, "switched off") {
-			for _, off := range installClientOffNotes(t) {
-				if saidNotes[off] {
-					continue
-				}
-				saidNotes[off] = true
-				if r.Note != "" {
-					r.Note += "; "
-				}
-				r.Note += off
-			}
-		}
-		// On a line of its own: it is about the agent's files, not this write.
-		aside := ""
-		if !uninstall {
-			if n := claudeCleanupNote(t); n != "" && !saidNotes[n] {
-				saidNotes[n] = true
-				aside = n
-			}
-		}
-		written++
-		if r.Action != "unchanged" || guidanceMoved {
-			changed++
-		}
-		touchedPaths = append(touchedPaths, r.touched()...)
-		if banner {
-			done = append(done, lineItem{t, r.Action, shortHome(r.Path), r.Note, aside})
-		} else {
-			if uninstall && r.Action == "unchanged" && r.Note == "" && !guidanceMoved {
-				// Nothing of deja's was in this agent's files.
-				fmt.Printf("%s: not installed\n", t)
-			} else if r.Path == "" {
-				fmt.Printf("%s: %s\n", t, r.Action)
-			} else {
-				fmt.Printf("%s: %s %s\n", t, r.Action, shortHome(r.Path))
-			}
-			// Under the action rather than in place of it, the way guidance
-			// prints its own note: the action is still what happened (#2218).
-			for _, n := range []string{r.Note, aside} {
-				if n != "" {
-					fmt.Printf("%s%s\n", strings.Repeat(" ", len(t)+2), n)
-				}
-			}
-		}
-		if !uninstall && t != "statusline" {
-			mcpCount++
-		}
-		if !uninstall && strings.HasSuffix(t, "-auto") {
-			hookCount++
-		}
+		ir.target(t)
 	}
 	// The CLI skill rides with guidance, like the command file: both are text
 	// telling the agent deja exists, and --no-guidance is the switch for
@@ -374,53 +146,14 @@ func runInstall(dir string, args []string, uninstall bool) error {
 	// skill rather than instead of it — a session holding the tools uses them,
 	// one that does not still knows the shell path (#1320).
 	if guidance {
-		var err error
-		switch {
-		case !uninstall && written > 0:
-			var action string
-			action, err = writeCLISkill()
-			// Every -auto target wrote this file and not one of them said so:
-			// nineteen unreported writes on the screen whose job is saying what
-			// was touched (#3254). Named once, here, rather than in each
-			// target's line.
-			if err == nil && action != "" {
-				done = append(done, lineItem{target: "skill", action: action, path: shortHome(cliSkillPath())})
-				touchedPaths = append(touchedPaths, cliSkillPath())
-				if !banner {
-					fmt.Printf("skill: %s %s\n", action, shortHome(cliSkillPath()))
-				}
-			}
-		case !cliSkillStillWanted(targets):
-			err = removeCLISkill()
-		}
-		if err != nil {
-			note(cliSkillName, err)
-		}
+		ir.cliSkill(targets)
 	}
 	// Held, not returned. "finished what it could" is a summary of the run, and
 	// returning it here made it an early exit from reporting the run: the
 	// banner never rendered, so nobody was told which harnesses had been wired,
 	// and the index build below was skipped, leaving those harnesses wired with
 	// nothing to read (#2721).
-	var refusal error
-	if len(refused) > 0 {
-		verb := "install"
-		if uninstall {
-			verb = "uninstall"
-		}
-		refusal = fmt.Errorf("%s finished what it could; %d target%s refused: %s — %s",
-			verb, len(refused), pluralS(len(refused)), strings.Join(refused, "; "), refusalRemedy(refusedErrs))
-		// Nothing was done and every refusal is a name deja does not know:
-		// "finished what it could" and "fix what it reports" describe a run
-		// that never started. The name and the near miss are the whole answer.
-		if written == 0 && allUnknownTargets(refusedErrs) {
-			msgs := make([]string, len(refusedErrs))
-			for i, e := range refusedErrs {
-				msgs[i] = e.Error()
-			}
-			refusal = fmt.Errorf("%s: %s", verb, strings.Join(msgs, "; "))
-		}
-	}
+	refusal := ir.refusal()
 	// Every install builds, not only --auto and --all. Installing is the one
 	// moment a person has already accepted a wait — they just ran an installer
 	// — and spending the build here is what keeps the first real use, usually
@@ -430,9 +163,9 @@ func runInstall(dir string, args []string, uninstall bool) error {
 	// to build a store for and nothing to celebrate, and printing the whole
 	// success screen ahead of the refusal is worse than the silence #2721 was
 	// about.
-	wired := len(done) > 0 || mcpCount+hookCount+guidanceCount > 0
+	wired := len(ir.done) > 0 || ir.mcpCount+ir.hookCount+ir.guidanceCount > 0
 	if !uninstall && !noIndex && wired {
-		installIndexWarmup(dir, mcpCount, hookCount, guidanceCount,
+		installIndexWarmup(dir, ir.mcpCount, ir.hookCount, ir.guidanceCount,
 			targetArgs[0] == "--auto" || targetArgs[0] == "--all")
 	}
 	// An uninstall keeps the snapshot it took of a config the reader already
@@ -441,14 +174,14 @@ func runInstall(dir string, args []string, uninstall bool) error {
 	// keeps. #2487 added gemini's line for exactly that reason; nine files on
 	// disk are the same shape (#2676).
 	if uninstall {
-		if line := keptSnapshotsLine(touchedPaths); line != "" {
+		if line := keptSnapshotsLine(ir.touchedPaths); line != "" {
 			fmt.Fprint(os.Stderr, line)
 		}
 	}
 	// What happens next, for a run that named its targets: the wiring is read
 	// when an agent session starts, so one already open does not have it yet,
 	// and one already open keeps calling deja after an uninstall.
-	if !banner && changed > 0 && targetArgs[0] != "--auto" && targetArgs[0] != "--all" {
+	if !banner && ir.changed > 0 && targetArgs[0] != "--auto" && targetArgs[0] != "--all" {
 		if uninstall {
 			fmt.Fprintln(os.Stderr, "next: restart sessions already open in that agent so they stop calling deja")
 		} else {
@@ -456,43 +189,7 @@ func runInstall(dir string, args []string, uninstall bool) error {
 		}
 	}
 	if banner && wired {
-		info := append(brandInfo(), "")
-		nameW := 0
-		for _, d := range done {
-			if len(d.target) > nameW {
-				nameW = len(d.target)
-			}
-		}
-		for _, d := range done {
-			info = append(info, fmt.Sprintf("%-*s  %s%-9s%s %s", nameW, d.target, logoBold, d.action, logoReset, logoDim+d.path+logoReset))
-			// Under its own row. The table is the documented path — the README
-			// tells people to run `deja install --auto` — so a note that only
-			// the line-by-line output carried was a note almost nobody read
-			// (#2712).
-			for _, n := range []string{d.note, d.aside} {
-				if n != "" {
-					info = append(info, fmt.Sprintf("%-*s  %s", nameW, "", n))
-				}
-			}
-		}
-		// --all writes the MCP entries and nothing else, which is the flag's
-		// job and not what its name suggests: someone repairing a machine
-		// reaches for "all", gets the servers rewired, and the hooks — the
-		// half that carries recall without being asked — are left exactly as
-		// they were (#3422).
-		if targetArgs[0] == "--all" {
-			info = append(info, "", "hooks are not in this list — `deja install --auto` writes those too")
-		}
-		mood := moodReady
-		if hint := installIndexHint(dir); hint != "" {
-			info = append(info, "", hint)
-			// wired up with nothing to recall yet: the cat has no reason to be
-			// awake until some history exists
-			if strings.HasPrefix(hint, "no agent history found") {
-				mood = moodAsleep
-			}
-		}
-		printLogoMood(os.Stdout, info, mood)
+		printInstallBanner(dir, ir.done, targetArgs[0] == "--all")
 	}
 	return refusal
 }
@@ -740,7 +437,7 @@ func recurringErrorLine(dir string) string {
 	if r.n < index.FrictionMinSessions {
 		return ""
 	}
-	return fmt.Sprintf("this machine has hit `%s` in %d sessions (%s) — your agent will be told before it runs into it again",
+	return fmt.Sprintf("this machine has hit `%s` in %d sessions (%s) — your agent will be told before it runs into it again", //nolint:gocritic // %#q falls back to double quotes for text with a backquote
 		trimFriction(r.line), r.n, strings.Join(r.harnesses, ", "))
 }
 
@@ -860,315 +557,10 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 	if canonical, ok := installTargetAliases[target]; ok {
 		target = canonical
 	}
-	switch target {
-	case "claude-auto":
-		if err := readableStrictJSON(filepath.Join(sources.ClaudeConfigDir(), "settings.json")); err != nil {
-			return installResult{}, err
-		}
-		return installClaudeAuto(exe, uninstall)
-	case "claude-code":
-		return installClaude(exe, uninstall)
-	case "codex":
-		return installCodex(exe, uninstall)
-	case "codex-auto":
-		if err := readableStrictJSON(filepath.Join(sources.CodexHome(), "hooks.json")); err != nil {
-			return installResult{}, err
-		}
-		return installCodexAuto(exe, uninstall)
-	case "cursor":
-		return installCursor(exe, uninstall)
-	case "cursor-auto":
-		if err := cursorAutoPreflight(exe, uninstall); err != nil {
-			return installResult{}, err
-		}
-		return installCursorAuto(exe, uninstall)
-	case "gemini":
-		return installMCPJSON(filepath.Join(sources.GeminiHome(), "settings.json"), exe, uninstall)
-	case "gemini-auto":
-		// The hooks extension, then MCP. `--auto` maps gemini to this target
-		// alone, so installing only the extension left the harness without
-		// the tools: its own `gemini mcp list` said "No MCP servers
-		// configured" on a machine that had just run `deja install --auto`.
-		// grok-auto pairs them the same way. The extension goes first for the
-		// reason qwen-auto has: whichever half may refuse goes first (#2745).
-		ext, err := installGeminiAuto(exe, uninstall)
-		if err != nil {
-			return installResult{}, err
-		}
-		mcp, err := installMCPJSON(filepath.Join(sources.GeminiHome(), "settings.json"), exe, uninstall)
-		if err != nil {
-			return installResult{}, err
-		}
-		// Both writes in one result, like every other -auto target: the
-		// extension's path and its note about hooksConfig reached nobody
-		// while the first result was dropped (#3185).
-		return wroteAll(ext, mcp), nil
-	case "antigravity":
-		return installMCPJSON(filepath.Join(antigravityConfigHome(), "mcp_config.json"), exe, uninstall)
-	case "antigravity-auto":
-		return installAntigravityAuto(exe, uninstall)
-	case "grok":
-		return installGrok(exe, uninstall)
-	case "grok-auto":
-		probe := []string{filepath.Join(sources.GrokHome(), "user-settings.json")}
-		if !uninstall {
-			// Uninstall removes the hook file rather than reading it, so a
-			// file it can still take is not one to refuse over.
-			probe = append(probe, grokHooksPath())
-		}
-		if err := readableStrictJSON(probe...); err != nil {
-			return installResult{}, err
-		}
-		if !uninstall {
-			if err := grokPreflight(exe, true); err != nil {
-				return installResult{}, err
-			}
-		}
-		// Both config.toml halves first, so a config.toml deja cannot write
-		// is refused before the other files are touched.
-		config, err := installGrokConfig(exe, uninstall)
-		if err != nil {
-			return installResult{}, err
-		}
-		status, err := installGrokStatusline(exe, uninstall)
-		if err != nil {
-			return installResult{}, err
-		}
-		user, err := installGrokUserSettings(exe, uninstall)
-		if err != nil {
-			return installResult{}, err
-		}
-		hooks, err := installGrokAuto(exe, uninstall)
-		if err != nil {
-			return installResult{}, err
-		}
-		// Every half in one result: the config and settings writes reached
-		// nobody while the first result was dropped (#3220, the #3185 shape).
-		return wroteAll(config, user, hooks, status), nil
-	case "qwen":
-		return installMCPJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall)
-	case "qwen-auto":
-		// The hook first: it lives in the same file as the MCP entry, and a
-		// refusal after the entry was written left the target reported as
-		// refused with half its wiring in the file and a .bak beside it
-		// (#2745, the shape #2744 was about).
-		hooks, err := installQwenAuto(exe, uninstall)
-		if err != nil {
-			return installResult{}, err
-		}
-		mcp, err := installMCPJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall)
-		if err != nil {
-			return installResult{}, err
-		}
-		status, err := installQwenStatusline(exe, uninstall)
-		if err != nil {
-			return installResult{}, err
-		}
-		// Every half, not just the last one. Returning the MCP result alone
-		// meant a machine that already had the server was told "unchanged"
-		// while the hooks under it were being rewired.
-		return wroteAll(hooks, mcp, status), nil
-	case "trae":
-		return installTrae(exe, uninstall)
-	case "trae-auto":
-		if err := readableStrictJSON(traeHooksPath()); err != nil {
-			return installResult{}, err
-		}
-		return installTraeAuto(exe, uninstall)
-	case "trae-ide":
-		return installTraeIDE(exe, uninstall)
-	case "trae-ide-auto":
-		return installTraeIDEAuto(exe, uninstall)
-	case "codebuddy":
-		return installCodeBuddyMCP(exe, uninstall)
-	case "codebuddy-auto":
-		return installCodeBuddyAuto(exe, uninstall)
-	case "workbuddy":
-		return installMCPJSON(workBuddyMCPPath(), exe, uninstall)
-	case "workbuddy-auto":
-		return installWorkBuddyAuto(exe, uninstall)
-	case "muse":
-		return installMuseMCP(exe, uninstall)
-	case "muse-auto":
-		return installMuseAuto(exe, uninstall)
-	case "mcode":
-		return installMcode(exe, uninstall)
-	case "mcode-auto":
-		return installMcodeAuto(exe, uninstall)
-	case "kimi":
-		return installKimiMCP(exe, uninstall)
-	case "kimi-auto":
-		// Both halves in the result: the report is what says which files were
-		// touched, and this one wrote mcp.json without ever naming it (#3254).
-		// The refusals of the hooks and the status line are asked first, so a
-		// refused target writes nothing.
-		if err := kimiAutoPreflight(exe, uninstall); err != nil {
-			return installResult{}, err
-		}
-		mcp, err := installKimiMCP(exe, uninstall)
-		if err != nil {
-			return installResult{}, err
-		}
-		hooks, err := installKimiAuto(exe, uninstall)
-		if err != nil {
-			return installResult{}, err
-		}
-		status, err := installKimiStatusline(exe, uninstall)
-		if err != nil {
-			return installResult{}, err
-		}
-		return wroteAll(mcp, hooks, status), nil
-	case "zed":
-		return installZedMCP(sources.ZedSettingsPath(), exe, uninstall)
-	case "devin":
-		return installDevinMCP(exe, uninstall)
-	case "devin-auto":
-		return installDevinAuto(exe, uninstall)
-	case "cline":
-		return installMCPJSON(sources.ClineMCPSettingsPath(), exe, uninstall)
-	case "roo":
-		return installRoo(exe, uninstall)
-	case "kilocode":
-		return installKilocode(exe, uninstall)
-	case "kilocode-auto":
-		return installKilocodeAuto(exe, uninstall)
-	case "cherrystudio":
-		return installCherryStudio(exe, uninstall)
-	case "cherrystudio-auto":
-		return installCherryStudioAuto(exe, uninstall)
-	case "kiro":
-		return installKiro(exe, uninstall)
-	case "kiro-auto":
-		return installKiroAuto(exe, uninstall)
-	case "senpi":
-		return installSenpi(exe, uninstall)
-	case "senpi-auto":
-		return installSenpiAuto(exe, uninstall)
-	case "kimchi":
-		return installKimchi(exe, uninstall)
-	case "kimchi-auto":
-		return installKimchiAuto(exe, uninstall)
-	case "codewhale":
-		return installCodeWhale(exe, uninstall)
-	case "codewhale-auto":
-		return installCodeWhaleAuto(exe, uninstall)
-	case "junie":
-		return installJunie(exe, uninstall)
-	case "junie-auto":
-		return installJunieAuto(exe, uninstall)
-	case "jetbrains":
-		return installJetBrains(exe, uninstall)
-	case "windsurf":
-		return installWindsurf(exe, uninstall)
-	case "gjc":
-		return installGjc(exe, uninstall)
-	case "gjc-auto":
-		return installGjcAuto(exe, uninstall)
-	case "zcode":
-		return installZCode(exe, uninstall)
-	case "commandcode":
-		return installCommandCode(exe, uninstall)
-	case "commandcode-auto":
-		return installCommandCodeAuto(exe, uninstall)
-	case "zcode-auto":
-		return installZCodeAuto(exe, uninstall)
-	case "cline-auto":
-		if !uninstall {
-			if err := clineAutoPreflight(exe); err != nil {
-				return installResult{}, err
-			}
-		}
-		mcp, err := installMCPJSON(sources.ClineMCPSettingsPath(), exe, uninstall)
-		if err != nil {
-			return installResult{}, err
-		}
-		plugin, err := installClineAuto(exe, uninstall)
-		if err != nil {
-			return installResult{}, err
-		}
-		return wroteAll(mcp, plugin), nil
-	case "continue":
-		return installContinue(exe, uninstall)
-	case "crush":
-		return installCrushMCP(exe, uninstall)
-	case "crush-auto":
-		// The hook first: it shares crush.json with the MCP entry, and a
-		// refusal after the entry was written left the target reported as
-		// refused with half its wiring in the file (#2745).
-		hooks, err := installCrushAuto(exe, uninstall)
-		if err != nil {
-			return installResult{}, err
-		}
-		mcp, err := installCrushMCP(exe, uninstall)
-		if err != nil {
-			return installResult{}, err
-		}
-		return wroteAll(hooks, mcp), nil
-	case "copilot":
-		return installCopilotMCP(exe, uninstall)
-	case "copilot-auto":
-		return installCopilotAuto(exe, uninstall)
-	case "vscode", "copilot-chat":
-		return installVSCode(exe, uninstall)
-	case "vscode-auto", "copilot-chat-auto":
-		hooks, err := installVSCodeAuto(exe, uninstall)
-		if err != nil {
-			return installResult{}, err
-		}
-		status, err := installVSCodeStatusItem(exe, uninstall)
-		if err != nil {
-			return installResult{}, err
-		}
-		return wroteAll(hooks, status), nil
-	case "hermes":
-		return installHermesMCP(exe, uninstall)
-	case "hermes-auto":
-		return installHermesAuto(exe, uninstall)
-	case "pi":
-		return installPiMCP(exe, uninstall)
-	case "pi-auto":
-		return installPiAuto(exe, uninstall)
-	case "omp":
-		return installMCPJSON(filepath.Join(sources.OmpConfigDir(), "mcp.json"), exe, uninstall)
-	case "omp-auto":
-		return installOmpAuto(exe, uninstall)
-	case "amp":
-		return installAmpMCP(exe, uninstall)
-	case "amp-auto":
-		return installAmpAuto(exe, uninstall)
-	case "prime":
-		return installPrimeMCP(exe, uninstall)
-	case "prime-auto":
-		return installPrimeAuto(exe, uninstall)
-	case "deepseek":
-		return installDeepSeekMCP(exe, uninstall)
-	case "deepseek-auto":
-		return installDeepSeekAuto(exe, uninstall)
-	case "openclaw":
-		return installOpenClawMCP(exe, uninstall)
-	case "openclaw-auto":
-		return installOpenClawAuto(exe, uninstall)
-	case "reasonix":
-		return installReasonix(exe, uninstall, false)
-	case "reasonix-auto":
-		return installReasonix(exe, uninstall, true)
-	case "opencode":
-		return installOpencode(exe, uninstall)
-	case "opencode-auto":
-		return installOpencodeAuto(exe, uninstall)
-	case "aider":
-		return installAider(exe, uninstall)
-	case "goose":
-		return installGoose(exe, uninstall)
-	case "goose-auto":
-		return installGooseAuto(exe, uninstall)
-	case "statusline":
-		return installStatusline(exe, uninstall)
-	case "sync-timer":
-		return installSyncTimer(exe, uninstall)
-	default:
-		return installResult{}, unknownTargetError(target)
+	if f, ok := installTargetCase(target); ok {
+		return f(exe, uninstall)
 	}
+	return installResult{}, unknownTargetError(target)
 }
 
 // wroteAll folds what an -auto target did into the one result its caller
@@ -1182,9 +574,9 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 func wroteAll(rs ...installResult) installResult {
 	out := rs[len(rs)-1]
 	if out.Note == "" {
-		for i := len(rs) - 1; i >= 0; i-- {
-			if rs[i].Path != "" && rs[i].Note != "" {
-				out = rs[i]
+		for _, r := range slices.Backward(rs) {
+			if r.Path != "" && r.Note != "" {
+				out = r
 				break
 			}
 		}
@@ -1531,9 +923,9 @@ func noteCreatedDirs(dir string) {
 		}
 		missing = append(missing, d)
 	}
-	for i := len(missing) - 1; i >= 0; i-- {
-		if !slices.Contains(createdDirsByThisRun, missing[i]) {
-			createdDirsByThisRun = append(createdDirsByThisRun, missing[i])
+	for _, m := range slices.Backward(missing) {
+		if !slices.Contains(createdDirsByThisRun, m) {
+			createdDirsByThisRun = append(createdDirsByThisRun, m)
 		}
 	}
 }
@@ -1542,7 +934,7 @@ func noteCreatedDirs(dir string) {
 // its own back out afterwards without touching one the user made.
 func backupOnce(path string) (bool, error) {
 	if _, err := os.Stat(path); err != nil {
-		return false, nil
+		return false, nil //nolint:nilerr // no file, nothing to back up
 	}
 	bak := path + ".bak"
 	if _, err := os.Stat(bak); err == nil {
@@ -1623,7 +1015,7 @@ func configParseError(path string, err error) error {
 // object over it dropped whatever was there and reported an ordinary write
 // (#2399). A config that will not parse is already refused this way, and the
 // wrong shape is the case where something is actually lost.
-func mcpBlock(root map[string]any, key, path string) (map[string]any, bool, error) {
+func mcpBlock(root map[string]any, key, path string) (map[string]any, bool, error) { //nolint:unparam // the bool says the block exists, which no caller asks yet
 	v, ok := root[key]
 	if !ok || v == nil {
 		return nil, false, nil
@@ -1777,10 +1169,8 @@ func holdsForeignDejaEntry(b []byte) bool {
 				}
 			}
 		case []any:
-			for _, c := range t {
-				if walk(c) {
-					return true
-				}
+			if slices.ContainsFunc(t, walk) {
+				return true
 			}
 		}
 		return false
@@ -1886,7 +1276,7 @@ func mentionsDeja(b []byte) bool {
 // required, so a path that merely contains the word and a subcommand named in
 // prose are each not enough.
 func linesRunDeja(b []byte) bool {
-	for _, line := range strings.Split(lfText(b), "\n") {
+	for line := range strings.SplitSeq(lfText(b), "\n") {
 		fields := strings.Fields(line)
 		for i := 1; i < len(fields); i++ {
 			sub := strings.Trim(fields[i], `"',;)`)
@@ -1940,7 +1330,7 @@ func matchLineEndings(old, next []byte) []byte {
 	// its own output first is not given a second carriage return.
 	var b bytes.Buffer
 	b.Grow(len(next) + bytes.Count(next, []byte("\n")))
-	for i := 0; i < len(next); i++ {
+	for i := range next {
 		if next[i] == '\n' && (i == 0 || next[i-1] != '\r') {
 			b.WriteByte('\r')
 		}
@@ -2124,52 +1514,8 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 	// Removing something must not leave more behind than it found. A file that
 	// is not there has nothing in it to remove.
 	if removingWiring {
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			return "unchanged", nil
-		}
-		// Nothing is left once deja's block comes out, which means deja wrote
-		// the whole file: install created ~/.codex/AGENTS.md, uninstall
-		// truncated it to zero bytes and left it there, plus a .bak of deja's
-		// own guidance (#840). Deleting is what "remove what we added" means
-		// here. Before backupOnce, so the backup of a file that was entirely
-		// ours is not created either — the .bak of a config the user already
-		// had still is.
-		if len(next) == 0 && !keptEmpty {
-			if err := changedSinceRead(path, old); err != nil {
-				return "", err
-			}
-			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-				return "", err
-			}
-			// Only a snapshot deja took itself. mentionsDeja is a content guess
-			// and a loose one — a reader's own config that says the word, or
-			// their own snapshot of an older deja block, matches it — which is
-			// fine for deciding whether a file may be overwritten and not for
-			// deciding whether one may be deleted (review of #3340).
-			if snapshotTaken(path) {
-				dropOwnBackup(path)
-			}
-			// The same prune the structured branch below does: this writer
-			// wrote the file whole, and removing it can leave the tree deja
-			// made for it standing empty (#3698).
-			pruneCreatedDir(filepath.Dir(path))
-			return "removed", nil
-		}
-		// The same rule for the structured writers, which never reach zero
-		// bytes. Only for a file deja created: a config the reader already had
-		// keeps its place, emptied of deja and of nothing else (#2583).
-		if structurallyEmptyConfig(next) && wiringCreated(path) {
-			if err := changedSinceRead(path, old); err != nil {
-				return "", err
-			}
-			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-				return "", err
-			}
-			pruneCreatedDir(filepath.Dir(path))
-			if snapshotTaken(path) {
-				dropOwnBackup(path)
-			}
-			return "removed", nil
+		if action, done, err := writeIfChangedRemoval(path, old, next, keptEmpty); done {
+			return action, err
 		}
 	}
 	if _, err := os.Stat(path); os.IsNotExist(err) && !removingWiring {
@@ -2275,6 +1621,60 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 	return "updated", nil
 }
 
+// writeIfChangedRemoval is the part of writeIfChanged that only an uninstall
+// reaches. The bool is true when the file was settled here and nothing is
+// written.
+func writeIfChangedRemoval(path string, old, next []byte, keptEmpty bool) (string, bool, error) {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return "unchanged", true, nil
+	}
+	// Nothing is left once deja's block comes out, which means deja wrote
+	// the whole file: install created ~/.codex/AGENTS.md, uninstall
+	// truncated it to zero bytes and left it there, plus a .bak of deja's
+	// own guidance (#840). Deleting is what "remove what we added" means
+	// here. Before backupOnce, so the backup of a file that was entirely
+	// ours is not created either — the .bak of a config the user already
+	// had still is.
+	if len(next) == 0 && !keptEmpty {
+		if err := changedSinceRead(path, old); err != nil {
+			return "", true, err
+		}
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return "", true, err
+		}
+		// Only a snapshot deja took itself. mentionsDeja is a content guess
+		// and a loose one — a reader's own config that says the word, or
+		// their own snapshot of an older deja block, matches it — which is
+		// fine for deciding whether a file may be overwritten and not for
+		// deciding whether one may be deleted (review of #3340).
+		if snapshotTaken(path) {
+			dropOwnBackup(path)
+		}
+		// The same prune the structured branch below does: this writer
+		// wrote the file whole, and removing it can leave the tree deja
+		// made for it standing empty (#3698).
+		pruneCreatedDir(filepath.Dir(path))
+		return "removed", true, nil
+	}
+	// The same rule for the structured writers, which never reach zero
+	// bytes. Only for a file deja created: a config the reader already had
+	// keeps its place, emptied of deja and of nothing else (#2583).
+	if structurallyEmptyConfig(next) && wiringCreated(path) {
+		if err := changedSinceRead(path, old); err != nil {
+			return "", true, err
+		}
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return "", true, err
+		}
+		pruneCreatedDir(filepath.Dir(path))
+		if snapshotTaken(path) {
+			dropOwnBackup(path)
+		}
+		return "removed", true, nil
+	}
+	return "", false, nil
+}
+
 func installClaude(exe string, uninstall bool) (installResult, error) {
 	path := sources.ClaudeJSONPath()
 	old, err := readConfig(path)
@@ -2286,13 +1686,13 @@ func installClaude(exe string, uninstall bool) (installResult, error) {
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
 	} else if configIsJSONC(old) {
-		res, err := writeJSONCEntry(path, old, "mcpServers", mcpServerEntry(exe), uninstall)
+		res, werr := writeJSONCEntry(path, old, "mcpServers", mcpServerEntry(exe), uninstall)
 		if !entrySwitchHonored("claude-code") {
 			res.Note = dropNotePart(res.Note, switchedOffNote)
 		}
-		return res, err
-	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, configParseError(path, err)
+		return res, werr
+	} else if uerr := json.Unmarshal(old, &root); uerr != nil {
+		return installResult{}, configParseError(path, uerr)
 	}
 	m, _, err := mcpBlock(root, "mcpServers", path)
 	if err != nil {
@@ -2379,8 +1779,9 @@ var claudeHookWiring = []struct{ Event, Sub, Matcher string }{
 }
 
 func installClaudeHook(exe string, uninstall bool) (installResult, error) {
-	var events []string
-	for _, h := range claudeWiring() {
+	wiring := claudeWiring()
+	events := make([]string, 0, len(wiring))
+	for _, h := range wiring {
 		events = append(events, h.Event)
 	}
 	return installClaudeHooksAt(filepath.Join(sources.ClaudeConfigDir(), "settings.json"), exe, events, uninstall)
@@ -2397,8 +1798,8 @@ func installClaudeHooksAt(path, exe string, events []string, uninstall bool) (in
 	var root map[string]any
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
-	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, configParseError(path, err)
+	} else if uerr := json.Unmarshal(old, &root); uerr != nil {
+		return installResult{}, configParseError(path, uerr)
 	}
 	nextRoot := root
 	// An event the installed Claude Code would reject is taken out, not
@@ -2701,8 +2102,8 @@ func hookLineRest(cmd string) string {
 	if _, rest, ok := quotedHookLine(cmd); ok {
 		return rest
 	}
-	if i := strings.IndexByte(cmd, ' '); i >= 0 {
-		return strings.TrimSpace(cmd[i+1:])
+	if _, after, ok := strings.Cut(cmd, " "); ok {
+		return strings.TrimSpace(after)
 	}
 	return ""
 }
@@ -2978,8 +2379,8 @@ func installStatusline(exe string, uninstall bool) (installResult, error) {
 	var root map[string]any
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
-	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, configParseError(path, err)
+	} else if uerr := json.Unmarshal(old, &root); uerr != nil {
+		return installResult{}, configParseError(path, uerr)
 	}
 	cmd := exe + " statusline"
 	existing, _ := root["statusLine"].(map[string]any)
@@ -3216,12 +2617,12 @@ func installTOML(path, block string, uninstall bool) (installResult, error) {
 	// and say where; this path spliced its block in regardless, so deja's entry
 	// landed in a file the harness cannot load and the harness's own error
 	// named deja's lines (#3576).
-	if err := tomlHeadersClose(text); err != nil {
-		return installResult{}, configParseError(path, err)
+	if terr := tomlHeadersClose(text); terr != nil {
+		return installResult{}, configParseError(path, terr)
 	}
 	if !uninstall {
-		if err := tomlInlineKey(text, "[mcp_servers.deja]"); err != nil {
-			return installResult{}, configParseError(path, err)
+		if terr := tomlInlineKey(text, "[mcp_servers.deja]"); terr != nil {
+			return installResult{}, configParseError(path, terr)
 		}
 	}
 	blocks := tomlMCPBlocks(text)
@@ -3236,15 +2637,15 @@ func installTOML(path, block string, uninstall bool) (installResult, error) {
 		if key := foreignTOMLDejaKey(text); key != "" {
 			noteBlockAdded(path, "mcp_servers."+key)
 			next := []byte(updateTOMLMCPBlock(text, key, block))
-			a, err := writeIfChanged(path, old, next)
+			a, werr := writeIfChanged(path, old, next)
 			res := installResult{Path: path, Action: a}
 			// Said on the run that adopted the entry, not on every run after it
 			// (#5298). key keeps the quotes it was written with, so trim them
 			// before %q or a quoted key is quoted twice.
-			if err == nil && a != "unchanged" {
+			if werr == nil && a != "unchanged" {
 				res.Note = fmt.Sprintf("updated %q, which already ran deja, instead of adding a second entry", strings.Trim(key, `"'`))
 			}
-			return res, err
+			return res, werr
 		}
 	}
 
@@ -3459,7 +2860,7 @@ func tomlCode(line string) string {
 	var out strings.Builder
 	var quote byte
 	escaped := false
-	for i := 0; i < len(line); i++ {
+	for i := range len(line) {
 		c := line[i]
 		if quote != 0 {
 			out.WriteByte(c)
@@ -3509,7 +2910,7 @@ func tomlArrayDelta(s string) int {
 	depth := 0
 	var quote byte
 	escaped := false
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		c := s[i]
 		if quote != 0 {
 			if quote == '"' && escaped {
@@ -3750,7 +3151,7 @@ func replacedEntryNote(prev, entry any) string {
 	if sameDejaCommand(was, entryCommandName(entry)) {
 		return ""
 	}
-	return fmt.Sprintf("replaced the deja entry that was already here, which ran %s", safeForStatusline(was, 200))
+	return "replaced the deja entry that was already here, which ran " + safeForStatusline(was, 200)
 }
 
 // sameDejaCommand reports whether an entry that ran was runs the deja that now
@@ -3808,12 +3209,7 @@ func entryRunsDeja(entry map[string]any) bool {
 			}
 		}
 	}
-	for _, w := range words {
-		if isDejaBinaryToken(w) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(words, isDejaBinaryToken)
 }
 
 // withOtherDejaEntries folds the note about a second deja server into whatever
@@ -3968,12 +3364,8 @@ func mergeDejaEntry(prev any, entry map[string]any) (map[string]any, string) {
 		return entry, note
 	}
 	out := make(map[string]any, len(old)+len(entry))
-	for k, v := range old {
-		out[k] = v
-	}
-	for k, v := range entry {
-		out[k] = v
-	}
+	maps.Copy(out, old)
+	maps.Copy(out, entry)
 	// deja owns how the entry is launched, and it writes that at the top level.
 	// An entry written in the nested shape kept its `transport` beside the
 	// command deja had just written, and a client that prefers the nested one
@@ -4105,9 +3497,9 @@ func entrySwitchedOffFor(client string, entry map[string]any) bool {
 }
 
 // dropNotePart removes one "; "-joined part from an install note.
-func dropNotePart(note, part string) string {
+func dropNotePart(note, part string) string { //nolint:unparam // the part to drop is the caller's to name
 	var keep []string
-	for _, p := range strings.Split(note, "; ") {
+	for p := range strings.SplitSeq(note, "; ") {
 		if p != part {
 			keep = append(keep, p)
 		}
@@ -4221,8 +3613,8 @@ func installCopilotMCP(exe string, uninstall bool) (installResult, error) {
 		command, args := mcpCommandArgs(exe)
 		return writeJSONCEntry(path, old, "mcpServers",
 			map[string]any{"type": "local", "command": command, "args": args, "tools": []string{"*"}}, uninstall)
-	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, configParseError(path, err)
+	} else if uerr := json.Unmarshal(old, &root); uerr != nil {
+		return installResult{}, configParseError(path, uerr)
 	}
 	m, _, err := mcpBlock(root, "mcpServers", path)
 	if err != nil {
@@ -4293,15 +3685,16 @@ func installOpenClawMCPEntry(exe string, uninstall bool) (installResult, error) 
 	}
 	var root map[string]any
 	var note string
-	if len(bytes.TrimSpace(old)) == 0 {
+	switch {
+	case len(bytes.TrimSpace(old)) == 0:
 		root = map[string]any{}
-	} else if configIsJSONC(old) {
+	case configIsJSONC(old):
 		// Two keys deep, which the text writer takes as a dotted block key
 		// (#2783).
 		command, args := mcpLaunchCommandArgs(exe, uninstall)
 		return writeJSONCEntry(path, old, "mcp.servers",
 			map[string]any{"command": command, "args": args}, uninstall)
-	} else if json.Unmarshal(old, &root) != nil {
+	case json.Unmarshal(old, &root) != nil:
 		return installResult{}, openclawParseError(path, old)
 	}
 	mcp, _, err := mcpBlock(root, "mcp", path)
@@ -4468,8 +3861,8 @@ func installMCPJSONEntry(path, blockKey string, entry map[string]any, uninstall 
 		// how somebody who annotated their config could not install deja at
 		// all (#1664).
 		return writeJSONCEntry(path, old, blockKey, entry, uninstall)
-	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, configParseError(path, err)
+	} else if uerr := json.Unmarshal(old, &root); uerr != nil {
+		return installResult{}, configParseError(path, uerr)
 	}
 	m, _, err := mcpBlock(root, blockKey, path)
 	if err != nil {
@@ -4863,7 +4256,7 @@ func jsoncFirstCodeLine(body []string) int {
 // jsoncLineOpensInBlock reports whether line i starts inside a /* */ comment.
 func jsoncLineOpensInBlock(body []string, i int) bool {
 	inBlock := false
-	for j := 0; j < i; j++ {
+	for j := range i {
 		_, inBlock, _ = jsoncCodeOf(body[j], inBlock)
 	}
 	return inBlock
@@ -5057,7 +4450,7 @@ func matchingBrace(line string, open int) int {
 // would read as structure — a path holding one is ordinary (#2475).
 func braceOutsideString(line string, want byte) int {
 	inString, escaped := false, false
-	for i := 0; i < len(line); i++ {
+	for i := range len(line) {
 		switch c := line[i]; {
 		case escaped:
 			escaped = false
@@ -5084,7 +4477,7 @@ func braceOutsideString(line string, want byte) int {
 func jsoncBraceDelta(code string) int {
 	depth := 0
 	inString, escaped := false, false
-	for i := 0; i < len(code); i++ {
+	for i := range len(code) {
 		switch c := code[i]; {
 		case escaped:
 			escaped = false
@@ -5176,7 +4569,7 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 			// back out — and gave a file with no trailing newline one.
 			return old, "", nil
 		}
-		return nil, "", fmt.Errorf("opencode config has an \"mcp\" block deja could not edit without risking it — add the deja server by hand")
+		return nil, "", errors.New("opencode config has an \"mcp\" block deja could not edit without risking it — add the deja server by hand")
 	}
 	start, end := -1, -1
 	sameLine := false
@@ -5215,7 +4608,7 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 		// shape this text path cannot edit safely, and the refusal below says
 		// so rather than guessing where the commas go.
 		if !emptyJSONCBlockRE.MatchString(code) {
-			return nil, "", fmt.Errorf("opencode config has an \"mcp\" block deja could not edit without risking it — add the deja server by hand")
+			return nil, "", errors.New("opencode config has an \"mcp\" block deja could not edit without risking it — add the deja server by hand")
 		}
 		indent := lines[start][:len(lines[start])-len(strings.TrimLeft(lines[start], " \t"))]
 		at := strings.LastIndex(lines[start], "{")
@@ -5255,7 +4648,7 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 		// (#3929). This writer speaks the 1.x shape only; refuse rather than
 		// relocate.
 		if !uninstall && jsoncEntryIsNested(block, key) {
-			return nil, "", fmt.Errorf("opencode config keeps its servers under \"mcp.servers\"; deja edits the top of the \"mcp\" block and would move the entry there — add the deja server by hand")
+			return nil, "", errors.New("opencode config keeps its servers under \"mcp.servers\"; deja edits the top of the \"mcp\" block and would move the entry there — add the deja server by hand")
 		}
 		body, dropped, wasLast, droppedAt := dropJSONCEntry(block, key)
 		if uninstall && len(dropped) == 0 {
@@ -5284,7 +4677,7 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 				body[i] = body[i][:code-1] + body[i][code:]
 			}
 		}
-		note := ""
+		var note string
 		// This path merges the whole entry (mergedJSONCEntryLine above), so
 		// whatever the reader had on it — an env pointing at a store on
 		// another disk, a switch they set — comes across with it, and
@@ -5344,7 +4737,7 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 	// user's other servers. Refuse rather than corrupt a config that cannot be
 	// rebuilt; the caller surfaces this so the user can wire deja by hand.
 	if start >= 0 || opencodeHasMCPKey(lines) {
-		return nil, "", fmt.Errorf("opencode config has an \"mcp\" block deja could not edit without risking it — add the deja server by hand")
+		return nil, "", errors.New("opencode config has an \"mcp\" block deja could not edit without risking it — add the deja server by hand")
 	}
 	insert := len(lines) - 1
 	// opencode puts its $schema line into a config that lacks one, and into
@@ -5362,7 +4755,7 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 	// to have one of its own on that line. On a config written as a single
 	// line the splice put the new block *before* the object (#2777).
 	if insert < 1 || strings.TrimSpace(stripJSONComments(lines[insert])) != "}" {
-		return nil, "", fmt.Errorf("opencode config is not laid out in a way deja can add to — add the deja server by hand")
+		return nil, "", errors.New("opencode config is not laid out in a way deja can add to — add the deja server by hand")
 	}
 	// The comma goes on the last line of code above the brace, and only when
 	// that code has none yet. Walking up past every line that already ended
@@ -5413,18 +4806,18 @@ func replacedJSONCLineNote(dropped []string, line string) string {
 	if sameDejaCommand(was, jsoncEntryCommand(line)) {
 		return ""
 	}
-	return fmt.Sprintf("replaced the deja entry that was already here, which ran %s", safeForStatusline(was, 200))
+	return "replaced the deja entry that was already here, which ran " + safeForStatusline(was, 200)
 }
 
 // jsoncEntryCommand pulls the command out of an entry deja did not write. It
 // reads the text rather than the JSON: the block may carry comments and
 // trailing commas, which is why this writer exists at all.
 func jsoncEntryCommand(text string) string {
-	i := strings.Index(text, `"command"`)
-	if i < 0 {
+	_, after, ok := strings.Cut(text, `"command"`)
+	if !ok {
 		return ""
 	}
-	rest := text[i+len(`"command"`):]
+	rest := after
 	if j := strings.IndexAny(rest, `"`); j >= 0 {
 		rest = rest[j+1:]
 		if k := strings.IndexByte(rest, '"'); k > 0 {
@@ -5546,13 +4939,13 @@ func withAutoTargets(targets []string) []string {
 	return out
 }
 
-// unknownTargetErr marks a refusal for a name that is no target at all, so a
+// targetUnknownError marks a refusal for a name that is no target at all, so a
 // run made only of those can say so without the partial-run summary.
-type unknownTargetErr struct{ error }
+type targetUnknownError struct{ error }
 
 func allUnknownTargets(errs []error) bool {
 	for _, e := range errs {
-		var u unknownTargetErr
+		var u targetUnknownError
 		if !errors.As(e, &u) {
 			return false
 		}
@@ -5565,7 +4958,7 @@ func allUnknownTargets(errs []error) bool {
 // target" leaves someone who typed `claud` guessing — while `deja completion`
 // two commands away lists its three valid values.
 func unknownTargetError(target string) error {
-	return unknownTargetErr{unknownTargetMessage(target)}
+	return targetUnknownError{unknownTargetMessage(target)}
 }
 
 func unknownTargetMessage(target string) error {
@@ -5574,10 +4967,8 @@ func unknownTargetMessage(target string) error {
 	// different agent. A known target with `-auto` on it is someone asking for
 	// recall wiring that target does not have (#4301).
 	if base, ok := strings.CutSuffix(strings.ToLower(strings.TrimSpace(target)), "-auto"); ok && base != "" {
-		for _, n := range names {
-			if n == base {
-				return fmt.Errorf("unknown target %q — %s has no -auto target; `deja install %s` wires it", target, base, base)
-			}
+		if slices.Contains(names, base) {
+			return fmt.Errorf("unknown target %q — %s has no -auto target; `deja install %s` wires it", target, base, base)
 		}
 	}
 	if near := nearestTarget(target, names); near != "" {

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -41,19 +43,16 @@ func TestQwenSubagentRunIsReadByDefault(t *testing.T) {
 		rec("user", "01", `"message":{"role":"user","parts":[{"text":"write fork.txt with the NUMBAT5 line"}]}`) +
 		rec("assistant", "02", `"message":{"role":"model","parts":[{"functionCall":{"id":"c1","name":"write_file","args":{"file_path":"/w/my-app/fork.txt","content":"NUMBAT5 fork child line written by the forked sub-agent"}}}]}`) +
 		rec("tool_result", "03", `"message":{"role":"user","parts":[{"functionResponse":{"id":"c1","name":"write_file","response":{"output":"Successfully created and wrote to new file: /w/my-app/fork.txt."}}}]}`)
-	for i := 0; i < 8; i++ {
-		body += rec("assistant", fmt.Sprintf("%02d", 10+i), `"message":{"role":"model","parts":[{"text":"MIDDLEPROSE step `+fmt.Sprint(i)+`"}]}`)
+	var bodySb44 strings.Builder
+	for i := range 8 {
+		bodySb44.WriteString(rec("assistant", fmt.Sprintf("%02d", 10+i), `"message":{"role":"model","parts":[{"text":"MIDDLEPROSE step `+strconv.Itoa(i)+`"}]}`))
 	}
+	body += bodySb44.String()
 	body += rec("assistant", "30", `"message":{"role":"model","parts":[{"text":"fork.txt written"}]}`)
 	child := put(filepath.Join(project, "subagents", parent, "agent-fork-call_f7a.jsonl"), body)
 
 	has := func(p string) bool {
-		for _, f := range QwenSessionFiles() {
-			if f == p {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(QwenSessionFiles(), p)
 	}
 	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "")
 	if !has(child) {
@@ -67,7 +66,7 @@ func TestQwenSubagentRunIsReadByDefault(t *testing.T) {
 	if s.Kind != "subagent" || s.Parent != parent || s.Agent != "fork" {
 		t.Errorf("child read as kind=%q parent=%q agent=%q, want a fork sub-agent of %s", s.Kind, s.Parent, s.Agent, parent)
 	}
-	var text []string
+	text := make([]string, 0, len(s.Messages))
 	wrote := false
 	for _, m := range s.Messages {
 		text = append(text, m.Text)

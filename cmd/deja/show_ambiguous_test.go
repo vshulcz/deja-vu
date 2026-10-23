@@ -78,8 +78,8 @@ func TestShowNamesHarnessWhenIDsAreShared(t *testing.T) {
 	if strings.Contains(whole, "sessions match") {
 		t.Errorf("a complete id was reported as ambiguous: %q", whole)
 	}
-	if out, err := captureRun(t, "show", "abc"); err != nil || !strings.Contains(out, "the short one") {
-		t.Errorf("show abc read another session: %v\n%s", err, out)
+	if out, showErr := captureRun(t, "show", "abc"); showErr != nil || !strings.Contains(out, "the short one") {
+		t.Errorf("show abc read another session: %v\n%s", showErr, out)
 	}
 
 	// One match, no chatter.

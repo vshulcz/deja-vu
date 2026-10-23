@@ -44,7 +44,7 @@ insert into session_v2 values('new','p1',null,'/w/web','Dark mode toggle',176740
 insert into session_message values('sm3','new','user',1,1767409701000,1767409701000,'{"time":{"created":1767409701000},"text":"add a dark mode toggle"}');
 insert into session_message values('sm4','new','assistant',2,1767409702000,1767409702000,'{"time":{"created":1767409702000},"content":[{"type":"text","text":"added it to the settings page"}]}');
 insert into session_message values('sm5','new','model-switched',3,1767409703000,1767409703000,'{}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
 	return db
@@ -145,7 +145,7 @@ func TestOpencodeNewestSkipsASessionWithNoTurns(t *testing.T) {
 		t.Helper()
 		// Newer than anything the fixtures hold, and with no turns.
 		sql := `insert into ` + table + `(id, directory, title, time_created, time_updated) values('empty','/w','New session',1799999999000,1799999999000);`
-		if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
+		if out, err := exec.CommandContext(t.Context(), "sqlite3", db, sql).CombinedOutput(); err != nil {
 			t.Fatalf("sqlite: %v %s", err, out)
 		}
 	}
@@ -184,7 +184,7 @@ create table part(id text primary key, message_id text, data text);
 insert into session values('s1','/w','the payments suite',1767409200000,1767409300000);
 insert into message values('m1','s1',1767409201000,'{"role":"user","time":{"created":1767409201000}}');
 insert into part values('p1','m1','{"type":"text","text":"why does TestRetry flake","time":{"start":1767409201000}}');`
-	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, script).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
 	return db

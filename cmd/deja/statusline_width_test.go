@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -43,9 +44,9 @@ func seedLongTitleIndex(t *testing.T, sharedFile string) string {
 	for i, title := range titles {
 		sid := fmt.Sprintf("lt%02d", i)
 		body := `{"type":"user","sessionId":"` + sid + `","cwd":"/w/lt","timestamp":"2026-07-1` +
-			fmt.Sprint(i) + `T10:00:00Z","message":{"role":"user","content":"` + title + `"}}` + "\n" +
+			strconv.Itoa(i) + `T10:00:00Z","message":{"role":"user","content":"` + title + `"}}` + "\n" +
 			`{"type":"assistant","sessionId":"` + sid + `","cwd":"/w/lt","timestamp":"2026-07-1` +
-			fmt.Sprint(i) + `T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"` + sharedFile + `"}}]}}` + "\n"
+			strconv.Itoa(i) + `T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"` + sharedFile + `"}}]}}` + "\n"
 		if err := os.WriteFile(filepath.Join(root, sid+".jsonl"), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}
@@ -80,11 +81,11 @@ func TestStatuslineFitsTheBar(t *testing.T) {
 	// The title has to have actually been shortened past the 38-rune cap —
 	// otherwise the line fits for reasons that have nothing to do with the
 	// budget, and a fixed budget would pass this test too.
-	open, close := strings.Index(line, "“"), strings.Index(line, "”")
-	if open < 0 || close < open {
+	open, shut := strings.Index(line, "“"), strings.Index(line, "”")
+	if open < 0 || shut < open {
 		t.Fatalf("no quoted title: %q", line)
 	}
-	if got := visibleLen(line[open:close]) - 1; got >= statuslineMaxTitle {
+	if got := visibleLen(line[open:shut]) - 1; got >= statuslineMaxTitle {
 		t.Errorf("title is %d runes: the 80-column bar did not shrink it below the %d cap: %q",
 			got, statuslineMaxTitle, line)
 	}
@@ -138,11 +139,11 @@ func TestStatuslineNarrowBarKeepsAReadableTitle(t *testing.T) {
 	line := statuslineWith(t, dir, "/anywhere/lt02.jsonl")
 
 	open := strings.Index(line, "“")
-	close := strings.Index(line, "”")
-	if open < 0 || close < open {
+	shut := strings.Index(line, "”")
+	if open < 0 || shut < open {
 		t.Fatalf("no quoted title on the line: %q", line)
 	}
-	if got := visibleLen(line[open:close]); got < statuslineMinTitle {
+	if got := visibleLen(line[open:shut]); got < statuslineMinTitle {
 		t.Errorf("title cut to %d runes, below the floor of %d: %q", got, statuslineMinTitle, line)
 	}
 }

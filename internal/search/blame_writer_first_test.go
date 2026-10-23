@@ -9,7 +9,7 @@ import (
 )
 
 func blameOrder(hits []BlameHit) []string {
-	var out []string
+	out := make([]string, 0, len(hits))
 	for _, h := range hits {
 		out = append(out, h.Session.ID)
 	}

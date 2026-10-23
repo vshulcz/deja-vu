@@ -44,7 +44,7 @@ func TestDoctorShowsEveryHarnessWithoutClaudeCode(t *testing.T) {
 	if !strings.Contains(got, "qwen") {
 		t.Fatalf("doctor said nothing about qwen:\n%s", got)
 	}
-	for _, line := range strings.Split(got, "\n") {
+	for line := range strings.SplitSeq(got, "\n") {
 		if strings.Contains(line, "qwen") && !strings.Contains(line, "wired") {
 			t.Errorf("a wired qwen is reported as %q", strings.TrimSpace(line))
 		}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"testing"
 	"time"
@@ -104,7 +105,7 @@ func TestAStalledReadSaysWhy(t *testing.T) {
 	block := make(chan struct{})
 	defer close(block)
 	_, err := ReadWatched("/nowhere.jsonl", func() ([]model.Session, error) { <-block; return nil, nil })
-	var stalled *StalledRead
+	var stalled *StalledReadError
 	if !errors.As(err, &stalled) {
 		t.Fatalf("got %v, want a stalled read", err)
 	}
@@ -123,7 +124,7 @@ func TestAStalledDirectoryIsNotWaitedOnTwice(t *testing.T) {
 	}
 	start := time.Now()
 	_, err := Watch(filepath.Join(dir, "b.jsonl"), func() (int, error) { <-block; return 0, nil })
-	var stalled *StalledRead
+	var stalled *StalledReadError
 	if !errors.As(err, &stalled) || time.Since(start) > 50*time.Millisecond {
 		t.Fatalf("the second file waited %v (%v)", time.Since(start), err)
 	}
@@ -163,7 +164,7 @@ func TestAReadThatFinishesAtTheBudgetLeavesNoMark(t *testing.T) {
 	t.Setenv("DEJA_STORE_TIMEOUT", "20ms")
 	dir := t.TempDir()
 	for i := range 200 {
-		_, _ = Watch(filepath.Join(dir, fmt.Sprint(i)), func() (int, error) { time.Sleep(20 * time.Millisecond); return 0, nil })
+		_, _ = Watch(filepath.Join(dir, strconv.Itoa(i)), func() (int, error) { time.Sleep(20 * time.Millisecond); return 0, nil })
 	}
 	deadline := time.Now().Add(2 * time.Second)
 	for {

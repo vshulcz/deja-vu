@@ -154,7 +154,7 @@ func TestTUISortToggleReadsTheNewestMatches(t *testing.T) {
 		if len(a.rows) < upTo {
 			t.Fatalf("listed %d cards, want %d", len(a.rows), upTo)
 		}
-		for i := 0; i < upTo; i++ {
+		for i := range upTo {
 			if want := sessionN(n - 1 - i); a.rows[i].s.ID != want {
 				t.Fatalf("card %d is %s, want %s", i+1, a.rows[i].s.ID, want)
 			}
@@ -226,7 +226,7 @@ func TestNewestFirstNoteNamesARankedWindow(t *testing.T) {
 func TestTUIDateHeadsPartialMatchesApart(t *testing.T) {
 	dir, _ := tuiStore(t)
 	a := newTestTUI(t, dir)
-	var hits []search.Hit
+	hits := make([]search.Hit, 0, len(a.rows))
 	for i, r := range a.rows {
 		hits = append(hits, search.Hit{Session: r.s, Strict: i == len(a.rows)-1})
 	}

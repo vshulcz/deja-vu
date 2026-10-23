@@ -13,9 +13,9 @@ import (
 
 // sessionStartBlock runs the session-start hook the way a harness does and
 // returns what it injected.
-func sessionStartBlock(t *testing.T, cwd string) string {
+func sessionStartBlock(t *testing.T) string {
 	t.Helper()
-	t.Setenv("CLAUDE_PROJECT_DIR", cwd)
+	t.Setenv("CLAUDE_PROJECT_DIR", "/work/app")
 	var hookErr error
 	block := captureStdout(t, func() { hookErr = runHookContext(index.DefaultDir(), true) })
 	if hookErr != nil {
@@ -53,7 +53,7 @@ func TestForgettingANoteRetiresTheCachedBlock(t *testing.T) {
 	}
 
 	// Served once, which is what puts it in the cache.
-	if got := sessionStartBlock(t, "/work/app"); !strings.Contains(got, "standing decisions in this project") {
+	if got := sessionStartBlock(t); !strings.Contains(got, "standing decisions in this project") {
 		t.Fatalf("the fixture never served the decision:\n%s", got)
 	}
 
@@ -62,7 +62,7 @@ func TestForgettingANoteRetiresTheCachedBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got := sessionStartBlock(t, "/work/app"); strings.Contains(got, "standing decisions in this project") {
+	if got := sessionStartBlock(t); strings.Contains(got, "standing decisions in this project") {
 		t.Errorf("a decision the reader removed is still being served as standing:\n%s", got)
 	}
 }
@@ -85,13 +85,13 @@ func TestANewNoteReachesTheNextSessionStart(t *testing.T) {
 	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
 		t.Fatal(err)
 	}
-	_ = sessionStartBlock(t, "/work/app")
+	_ = sessionStartBlock(t)
 
 	if err := sources.AppendPromoted("app", "t", "the retry budget stays at 5",
 		"claude:dec", "accepted", time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
-	if got := sessionStartBlock(t, "/work/app"); !strings.Contains(got, "standing decisions in this project") {
+	if got := sessionStartBlock(t); !strings.Contains(got, "standing decisions in this project") {
 		t.Errorf("a decision promoted a moment ago did not reach the next session start:\n%s", got)
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -28,8 +29,10 @@ var (
 	ErrCompactionBusy = errors.New("compaction storage is busy")
 	// ErrCompactionStale says a delayed hook tried to replace a newer capture
 	// for the same native session and workspace.
-	ErrCompactionStale     = errors.New("compaction capture is older than stored state")
-	ErrCompactionIgnored   = errors.New("compaction source is excluded by policy")
+	ErrCompactionStale = errors.New("compaction capture is older than stored state")
+	// ErrCompactionIgnored says the capture's source is excluded by policy.
+	ErrCompactionIgnored = errors.New("compaction source is excluded by policy")
+	// ErrCompactionForgotten says the capture's session was forgotten.
 	ErrCompactionForgotten = errors.New("compaction session was forgotten")
 )
 
@@ -257,9 +260,7 @@ func cloneCompactions(states map[string]CompactionState) map[string]CompactionSt
 		return nil
 	}
 	out := make(map[string]CompactionState, len(states))
-	for key, state := range states {
-		out[key] = state
-	}
+	maps.Copy(out, states)
 	return out
 }
 

@@ -33,7 +33,7 @@ func sampleReport() stats.Report {
 	r.Heatmap.Max = 8
 	r.Heatmap.Weeks = make([][7]int, 53)
 	for w := 40; w < 53; w++ {
-		for d := 0; d < 7; d++ {
+		for d := range 7 {
 			r.Heatmap.Weeks[w][d] = (w + d) % 9
 		}
 	}

@@ -9,7 +9,7 @@ import (
 // go, and is deliberately unused: the skips it held are removed, so windows CI
 // reports what actually fails rather than reporting nothing. See #1119.
 //
-//nolint:unused
+//nolint:unused // kept for the unix-path fixtures #1119 tracks
 func skipWindowsPortability(t *testing.T) {
 	t.Helper()
 	if runtime.GOOS == "windows" {

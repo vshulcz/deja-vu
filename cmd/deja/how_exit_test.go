@@ -19,20 +19,22 @@ func TestHowCountsACommandOnceWhateverItExitedWith(t *testing.T) {
 		t.Fatal(err)
 	}
 	at := time.Date(2026, 8, 1, 10, 0, 0, 0, time.UTC)
-	line := func(text string, min int) string {
+	line := func(text string, mins int) string {
 		return `{"type":"function_call","name":"shell","arguments":"{\"command\":[\"bash\",\"-lc\",\"` + text +
-			`\"]}","timestamp":"` + at.Add(time.Duration(min)*time.Minute).Format(time.RFC3339) + `"}`
+			`\"]}","timestamp":"` + at.Add(time.Duration(mins)*time.Minute).Format(time.RFC3339) + `"}`
 	}
 	_ = line
 	// The reader-visible shape is what matters here, so write the records the
 	// way the opencode reader produces them: the command line carries the code.
 	body := ""
+	var bodySb30 strings.Builder
 	for i, text := range []string{"$ make test", "$ make test  → exit 2", "$ make test  → exit 2"} {
-		body += `{"type":"user","sessionId":"s1","cwd":"/w/app","timestamp":"` +
+		bodySb30.WriteString(`{"type":"user","sessionId":"s1","cwd":"/w/app","timestamp":"` +
 			at.Add(time.Duration(i)*time.Minute).Format(time.RFC3339) +
 			`","message":{"role":"user","content":[{"type":"tool_use","name":"Bash","input":{"command":"` +
-			strings.TrimPrefix(text, "$ ") + `"}}]}}` + "\n"
+			strings.TrimPrefix(text, "$ ") + `"}}]}}` + "\n")
 	}
+	body += bodySb30.String()
 	claude := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-w-app")
 	if err := os.MkdirAll(claude, 0o755); err != nil {
 		t.Fatal(err)

@@ -26,7 +26,7 @@ func runDeferredHook(t *testing.T, dir, name string, rest []string, payload stri
 func TestKimiFixPairRidesTheNextPrompt(t *testing.T) {
 	seedFixPair(t, "panic: sql: database is closed", "make clean && make CGO_ENABLED=0")
 	dir := os.Getenv("DEJA_INDEX_DIR")
-	failure, _ := json.Marshal(map[string]any{
+	failure := mustMarshal(t, map[string]any{
 		"hook_event_name": "PostToolUseFailure", "session_id": "kimi-1", "cwd": "/work/app",
 		"tool_name": "Bash", "tool_input": map[string]any{"command": "make"}, "tool_call_id": "call_1",
 		"error": map[string]any{"code": "TOOL_ERROR", "message": "goroutine 1 [running]:\npanic: sql: database is closed"},
@@ -35,7 +35,7 @@ func TestKimiFixPairRidesTheNextPrompt(t *testing.T) {
 		t.Fatalf("a deferred hook printed what Kimi would drop: %q", out)
 	}
 	prompt := func(id string) string {
-		p, _ := json.Marshal(map[string]any{"hook_event_name": "UserPromptSubmit", "session_id": id, "cwd": "/work/app", "prompt": "ok"})
+		p := mustMarshal(t, map[string]any{"hook_event_name": "UserPromptSubmit", "session_id": id, "cwd": "/work/app", "prompt": "ok"})
 		return runDeferredHook(t, dir, "hook-prompt", []string{"--plain"}, string(p))
 	}
 	if other := prompt("kimi-2"); strings.Contains(other, "CGO_ENABLED=0") {
@@ -55,7 +55,7 @@ func TestKimiFixPairRidesTheNextPrompt(t *testing.T) {
 func TestKiroFixPairRidesTheNextPromptByDirectory(t *testing.T) {
 	seedFixPair(t, "panic: sql: database is closed", "make clean && make CGO_ENABLED=0")
 	dir := os.Getenv("DEJA_INDEX_DIR")
-	failure, _ := json.Marshal(map[string]any{
+	failure := mustMarshal(t, map[string]any{
 		"hook_event_name": "postToolUse", "cwd": "/work/app", "tool_name": "execute_bash",
 		"tool_input":    map[string]any{"command": "make"},
 		"tool_response": map[string]any{"exit_status": "1", "stderr": "goroutine 1 [running]:\npanic: sql: database is closed"},
@@ -63,7 +63,7 @@ func TestKiroFixPairRidesTheNextPromptByDirectory(t *testing.T) {
 	if out := runDeferredHook(t, dir, "hook-tool-after", []string{"--defer"}, string(failure)); strings.TrimSpace(out) != "" {
 		t.Fatalf("a deferred hook printed what Kiro would drop: %q", out)
 	}
-	p, _ := json.Marshal(map[string]any{"hook_event_name": "userPromptSubmit", "cwd": "/work/app", "prompt": "ok"})
+	p := mustMarshal(t, map[string]any{"hook_event_name": "userPromptSubmit", "cwd": "/work/app", "prompt": "ok"})
 	if got := runDeferredHook(t, dir, "hook-prompt", []string{"--plain"}, string(p)); !strings.Contains(got, "CGO_ENABLED=0") {
 		t.Fatalf("the next prompt did not carry the fix pair: %q", got)
 	}
@@ -89,7 +89,7 @@ insert into sessions values ('g1','n','d','/work/app','2026-10-07T10:00:00Z','20
 insert into messages values (1,'g1','user','[{"type":"text","text":"build it"}]',100);
 insert into messages values (2,'g1','assistant','[{"type":"toolRequest","id":"c","toolCall":{"status":"success","value":{"name":"developer__shell","arguments":{"command":"make"}}}}]',101);
 insert into messages values (3,'g1','user','[{"type":"toolResponse","id":"c","toolResult":{"status":"success","value":{"content":[{"type":"text","text":"goroutine 1 [running]:\npanic: sql: database is closed"}],"structuredContent":{"exit_code":2},"isError":true}}}]',102);`
-	if out, err := exec.Command("sqlite3", filepath.Join(root, "sessions", "sessions.db"), sql).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", filepath.Join(root, "sessions", "sessions.db"), sql).CombinedOutput(); err != nil {
 		t.Fatalf("create db: %v: %s", err, out)
 	}
 	stop := `{"event":"Stop","session_id":"g1","working_dir":"/work/app"}`
@@ -124,7 +124,7 @@ func TestGooseCompactionIsCaughtUpAtStop(t *testing.T) {
 	}
 	db := filepath.Join(root, "sessions", "sessions.db")
 	sqlite := func(sql string) {
-		if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
+		if out, err := exec.CommandContext(t.Context(), "sqlite3", db, sql).CombinedOutput(); err != nil {
 			t.Fatalf("store: %v: %s", err, out)
 		}
 	}
@@ -166,8 +166,7 @@ insert into messages values (5,'g2','assistant','[{"type":"text","text":"carryin
 }
 
 func strconvQuoteJSON(s string) string {
-	b, _ := json.Marshal(s)
-	return string(b)
+	return jsonString(s)
 }
 
 func TestWithDeferredKeepsTheAnswersShape(t *testing.T) {

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -44,13 +45,7 @@ func CodexRoots() []string {
 	var roots []string
 	for _, root := range []string{CodexRoot(), XcodeCodexRoot()} {
 		root = filepath.Clean(root)
-		seen := false
-		for _, existing := range roots {
-			if existing == root {
-				seen = true
-				break
-			}
-		}
+		seen := slices.Contains(roots, root)
 		if !seen {
 			roots = append(roots, root)
 		}
@@ -58,6 +53,7 @@ func CodexRoots() []string {
 	return roots
 }
 
+// LoadCodex reads every Codex rollout on this machine.
 func LoadCodex() []model.Session {
 	roots := CodexRoots()
 	var files []string
@@ -146,7 +142,7 @@ func CodexCompressedFiles() []string {
 // on a store with 35 (#3321). Anything else, a rollout in the wrong place
 // included, stays unaccounted for, which is what the row is for.
 func CodexSidecarFiles() []string {
-	var out []string
+	var out []string //nolint:prealloc // each root adds an unknown number of files
 	for _, root := range CodexRoots() {
 		out = append(out, codexSidecarFiles(root)...)
 	}
@@ -272,10 +268,12 @@ func codexRolloutIDs(root string) map[string]bool {
 	return ids
 }
 
+// ParseCodexHistory reads a Codex history.jsonl from the start.
 func ParseCodexHistory(path string) ([]model.Session, error) {
 	return ParseCodexHistoryFromOffset(path, 0)
 }
 
+// ParseCodexHistoryFromOffset reads a Codex history.jsonl from offset on.
 func ParseCodexHistoryFromOffset(path string, offset int64) ([]model.Session, error) {
 	return parseRolloutHistory(path, offset, "codex")
 }
@@ -313,10 +311,12 @@ func parseRolloutHistory(path string, offset int64, harness string) ([]model.Ses
 	return out, err
 }
 
+// ParseCodexRollout reads one Codex rollout.
 func ParseCodexRollout(path string) ([]model.Session, error) {
 	return ParseCodexRolloutFromOffset(path, 0)
 }
 
+// ParseCodexRolloutFromOffset reads a Codex rollout from offset on.
 func ParseCodexRolloutFromOffset(path string, offset int64) ([]model.Session, error) {
 	return parseRolloutFile(path, offset, "codex")
 }
@@ -638,7 +638,7 @@ var codexResumes = resumesUnlessAnswering(`"function_call`, func(m map[string]an
 		return []string{id}, ""
 	case "function_call_output":
 		out, _ := payload["output"].(string)
-		if c := codexExit.FindStringSubmatch(out); c != nil && c[1] != "0" {
+		if c := codexExit.FindStringSubmatch(out); len(c) > 1 && c[1] != "0" {
 			return nil, id
 		}
 	}
@@ -708,7 +708,7 @@ func codexPatchText(s *model.Session, body, cwd string, t time.Time) {
 	removed := map[string][]string{}
 	added := map[string][]string{}
 	current := ""
-	for _, line := range strings.Split(body, "\n") {
+	for line := range strings.SplitSeq(body, "\n") {
 		if m := codexPatchFile.FindStringSubmatch(line); m != nil {
 			current = resolveToolPath(strings.TrimSpace(m[1]), cwd)
 			if !seen[current] {
@@ -801,7 +801,7 @@ func (m *lineMatch) feed(chunk []byte) {
 		return
 	}
 	keep := len(m.pat) - 1
-	join := append(m.tail, chunk[:min(len(chunk), keep)]...)
+	join := append(m.tail, chunk[:min(len(chunk), keep)]...) //nolint:gocritic // reuses the tail's buffer, rewritten below
 	if bytes.Contains(join, m.pat) || bytes.Contains(chunk, m.pat) {
 		m.seen = true
 		return
@@ -827,19 +827,19 @@ func codexRolloutHead(path string) (id, cwd string, payload map[string]any, at t
 	// lost the id, so a resumed tail was filed as a session of its own. A line
 	// past the buffer is streamed, as the parse streams it, so a command's
 	// output of a hundred megabytes near the top is not held whole (#5391).
-	r := jsonlReaders.Get().(*bufio.Reader)
+	r := jsonlReader()
 	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
 	r.Reset(f)
 	// The meta record is the first line in every rollout Codex writes; a few
 	// lines of slack costs nothing and covers a format that adds a preamble.
-	for i := 0; i < 8; i++ {
+	for range 8 {
 		l, err := readJSONLine(r)
 		var rec struct {
 			Timestamp any            `json:"timestamp"`
 			Type      string         `json:"type"`
 			Payload   map[string]any `json:"payload"`
 		}
-		ok := false
+		var ok bool
 		if l.long {
 			rec.Type, _ = l.m["type"].(string)
 			rec.Payload, _ = l.m["payload"].(map[string]any)

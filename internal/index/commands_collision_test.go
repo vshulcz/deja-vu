@@ -28,18 +28,20 @@ func collisionStore(t *testing.T) (inc string, write func(proj, id string, cmds 
 			return fmt.Sprintf(`{"type":%q,"sessionId":%q,"timestamp":"2026-07-17T09:%s","cwd":"/tmp/%s","message":{"role":%q,"content":%s}}`, role, id, ts, proj, role, content) + "\n"
 		}
 		body := line("00:00Z", "user", `"ship the release"`)
+		var bodySb31 strings.Builder
 		for i, c := range cmds {
 			tid := fmt.Sprintf("t%d", i)
-			body += line(fmt.Sprintf("%02d:01Z", i+1), "assistant", `[{"type":"tool_use","id":"`+tid+`","name":"Bash","input":{"command":"`+c+`"}}]`) +
-				line(fmt.Sprintf("%02d:02Z", i+1), "user", `[{"type":"tool_result","tool_use_id":"`+tid+`","content":"make: *** [`+c+`] Error 2"}]`)
+			bodySb31.WriteString(line(fmt.Sprintf("%02d:01Z", i+1), "assistant", `[{"type":"tool_use","id":"`+tid+`","name":"Bash","input":{"command":"`+c+`"}}]`) +
+				line(fmt.Sprintf("%02d:02Z", i+1), "user", `[{"type":"tool_result","tool_use_id":"`+tid+`","content":"make: *** [`+c+`] Error 2"}]`))
 		}
+		body += bodySb31.String()
 		p := filepath.Join(tmp, "claude", "-tmp-"+proj, id+".jsonl")
 		parityWrite(t, p, body, false)
 		bump++
 		later := time.Now().Add(time.Duration(bump) * time.Second)
 		_ = os.Chtimes(p, later, later)
 	}
-	for i := 0; i < 12; i++ {
+	for i := range 12 {
 		write("pad", fmt.Sprintf("pad%02d", i), "go test ./pad")
 	}
 	return filepath.Join(tmp, "inc"), write
@@ -62,7 +64,7 @@ func indexFilesHolding(t *testing.T, dir, word string) []string {
 		if err != nil || d.IsDir() {
 			return err
 		}
-		b, err := os.ReadFile(p)
+		b, err := os.ReadFile(p) //nolint:gosec // walks the test's own temp dir
 		if err != nil {
 			return err
 		}
@@ -227,6 +229,7 @@ func TestAMigratedGooseSessionsCommandsStayInTheTable(t *testing.T) {
 	sql := `create table sessions (id text primary key, name text, description text, working_dir text, created_at text, updated_at text);
 create table messages (id integer primary key autoincrement, session_id text, role text, content_json text, created_timestamp integer);
 `
+	var sqlSb230 strings.Builder
 	for i, id := range []string{"20260101_120000", "20260102_120000"} {
 		base := 1767268800 + i*86400
 		jsonl := fmt.Sprintf(`{"id":%q,"description":"pool","working_dir":"/tmp/app"}
@@ -234,11 +237,12 @@ create table messages (id integer primary key autoincrement, session_id text, ro
 {"role":"assistant","content":%s,"created":%d}
 `, id, base, fmt.Sprintf(tool, i), base+10)
 		parityWrite(t, filepath.Join(sessions, id+".jsonl"), jsonl, false)
-		sql += fmt.Sprintf(`insert into sessions values ('%s','n','pool','/tmp/app','2026-01-01 12:00:00','2026-01-01 12:05:00');
+		fmt.Fprintf(&sqlSb230, `insert into sessions values ('%s','n','pool','/tmp/app','2026-01-01 12:00:00','2026-01-01 12:05:00');
 insert into messages (session_id, role, content_json, created_timestamp) values ('%s','user','[{"type":"text","text":"why does pgbouncer time out"}]',%d);
 insert into messages (session_id, role, content_json, created_timestamp) values ('%s','assistant','%s',%d);
 `, id, id, base, id, fmt.Sprintf(tool, i), base+10)
 	}
+	sql += sqlSb230.String()
 	paritySQL(t, db, sql)
 	proj := filepath.Join(tmp, "claude", "-tmp-proj")
 	parityWrite(t, filepath.Join(proj, "a.jsonl"), parityClaudeLine("a", "00:00Z", "user", `"hi there build"`), false)

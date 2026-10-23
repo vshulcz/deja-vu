@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -46,7 +47,7 @@ func TestRooWritesNoHostWhenOneOfThemWillRefuse(t *testing.T) {
 	if rerr != nil {
 		t.Fatal(rerr)
 	}
-	if string(after) != string(before) {
+	if !bytes.Equal(after, before) {
 		t.Errorf("the first host was written before the refusal:\n%s", after)
 	}
 	if _, err := os.Stat(first + ".bak"); err == nil {
@@ -100,7 +101,7 @@ func TestRooRefusesABlockTheWriterCannotUseBeforeWriting(t *testing.T) {
 	if rerr != nil {
 		t.Fatal(rerr)
 	}
-	if string(after) != string(before) {
+	if !bytes.Equal(after, before) {
 		t.Errorf("the first host was written before the refusal:\n%s", after)
 	}
 }
@@ -163,7 +164,7 @@ func TestRooAsksTheJSONCWriterWhatItWouldRefuse(t *testing.T) {
 			if rerr != nil {
 				t.Fatal(rerr)
 			}
-			if string(after) != string(before) {
+			if !bytes.Equal(after, before) {
 				t.Errorf("the first host was written before the refusal:\n%s", after)
 			}
 			if _, err := os.Stat(first + ".bak"); err == nil {
@@ -202,7 +203,7 @@ func TestRooAsksWhetherItCanWriteTheHostAtAll(t *testing.T) {
 	if rerr != nil {
 		t.Fatal(rerr)
 	}
-	if string(after) != string(before) {
+	if !bytes.Equal(after, before) {
 		t.Errorf("the first host was written before the refusal:\n%s", after)
 	}
 }

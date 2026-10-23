@@ -31,7 +31,7 @@ func TestFilesAnswersAboutTheProjectItWasAskedIn(t *testing.T) {
 		}
 		var b strings.Builder
 		fmt.Fprintf(&b, `{"type":"user","sessionId":%q,"cwd":%q,"timestamp":"2026-07-20T10:00:00Z","message":{"role":"user","content":"the timeout on the worker"}}`+"\n", id, cwd)
-		for i := 0; i < touches; i++ {
+		for i := range touches {
 			fmt.Fprintf(&b, `{"type":"assistant","sessionId":%q,"cwd":%q,"timestamp":"2026-07-20T10:0%d:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Read","input":{"file_path":%q}}]}}`+"\n",
 				id, cwd, i+1, file)
 		}

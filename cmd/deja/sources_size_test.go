@@ -13,7 +13,7 @@ func sourcesLine(t *testing.T, harness string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		if strings.HasPrefix(line, harness+"\t") {
 			return line
 		}

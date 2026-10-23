@@ -13,7 +13,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
-var jsonMarshaler = reflect.TypeOf((*json.Marshaler)(nil)).Elem()
+var jsonMarshaler = reflect.TypeFor[json.Marshaler]()
 
 func writesItsOwnJSON(t reflect.Type) bool {
 	return t.Implements(jsonMarshaler) || reflect.PointerTo(t).Implements(jsonMarshaler)
@@ -36,7 +36,7 @@ func embeddedMarshallers(t reflect.Type, seen map[reflect.Type]bool) []string {
 	}
 	seen[t] = true
 	var found []string
-	for i := 0; i < t.NumField(); i++ {
+	for i := range t.NumField() {
 		f := t.Field(i)
 		if f.Anonymous && writesItsOwnJSON(f.Type) {
 			found = append(found, fmt.Sprintf("%s embeds %s, which writes its own JSON", t, f.Type))
@@ -59,7 +59,7 @@ func TestNoReportedTypeEmbedsAMarshaller(t *testing.T) {
 	// One map across the roots: a type's fields do not depend on which root
 	// reached it, so inspecting it once inspects it for all of them.
 	seen := map[reflect.Type]bool{}
-	var found []string
+	found := make([]string, 0, len(roots))
 	for _, r := range roots {
 		found = append(found, embeddedMarshallers(reflect.TypeOf(r), seen)...)
 	}
@@ -71,7 +71,7 @@ func TestNoReportedTypeEmbedsAMarshaller(t *testing.T) {
 		usage.Summary
 		Extra int `json:"extra"`
 	}
-	if got := embeddedMarshallers(reflect.TypeOf(outer{}), map[reflect.Type]bool{}); len(got) != 1 {
+	if got := embeddedMarshallers(reflect.TypeFor[outer](), map[reflect.Type]bool{}); len(got) != 1 {
 		t.Errorf("the walk misses the case it exists for: %v", got)
 	}
 	// And the shape really does drop the outer field, which is why it matters.

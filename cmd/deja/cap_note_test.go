@@ -20,7 +20,7 @@ func TestHowSaysWhenItCutTheList(t *testing.T) {
 	if err := os.MkdirAll(store, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 13; i++ {
+	for i := range 13 {
 		id := "0000000" + string(rune('a'+i)) + "-1111-4000-8000-d6e7f8a9b0c1"
 		line := `{"type":"assistant","timestamp":"2026-07-0` + string(rune('1'+i%9)) + `T10:00:00Z","sessionId":"` + id + `","cwd":"/api","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"go test ./... -run Case` + string(rune('a'+i)) + `"}}]}}`
 		if err := os.WriteFile(filepath.Join(store, id+".jsonl"), []byte(line+"\n"), 0o644); err != nil {
@@ -70,8 +70,8 @@ func TestFilesSaysWhenItCutTheList(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	var lines []string
-	for i := 0; i < 6; i++ {
+	lines := make([]string, 0, 7)
+	for i := range 6 {
 		name := filepath.Join(repo, "file"+string(rune('a'+i))+".go")
 		if err := os.WriteFile(name, []byte("package p\n"), 0o644); err != nil {
 			t.Fatal(err)

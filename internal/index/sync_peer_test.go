@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	search "github.com/vshulcz/deja-vu/internal/query"
@@ -18,10 +19,12 @@ func syncPeerIndex(t *testing.T, msgs ...string) (string, string) {
 		t.Fatal(err)
 	}
 	body := ""
+	var bodySb21 strings.Builder
 	for i, m := range msgs {
-		body += m
+		bodySb21.WriteString(m)
 		_ = i
 	}
+	body += bodySb21.String()
 	if err := os.WriteFile(filepath.Join(proj, "s1.jsonl"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +52,7 @@ func TestExportWatermarksAreScopedPerPeer(t *testing.T) {
 	if err != nil || n != 1 {
 		t.Fatalf("first peer export = %d, %v", n, err)
 	}
-	if err := commit(); err != nil {
+	if err = commit(); err != nil {
 		t.Fatal(err)
 	}
 	n2, _, err := ExportDeferred(dir, filepath.Join(tmp, "toServer"), "server")
@@ -70,15 +73,15 @@ func TestExportKeepsMessagesSharingTheWatermarkTimestamp(t *testing.T) {
 	if err != nil || n != 1 {
 		t.Fatalf("first export = %d, %v", n, err)
 	}
-	if err := commit(); err != nil {
+	if err = commit(); err != nil {
 		t.Fatal(err)
 	}
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
 	body := msgLine(ts, "first message") + msgLine(ts, "second message same second")
-	if err := os.WriteFile(filepath.Join(claudeRoot, "-tmp-app", "s1.jsonl"), []byte(body), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(claudeRoot, "-tmp-app", "s1.jsonl"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := Ensure(dir, "", true, nil); err != nil {
+	if err = Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	out2 := filepath.Join(tmp, "out2")
@@ -91,10 +94,10 @@ func TestExportKeepsMessagesSharingTheWatermarkTimestamp(t *testing.T) {
 	}
 	// And the receiver must end up with both messages.
 	other := filepath.Join(tmp, "peer.db")
-	if _, err := Import(other, filepath.Join(tmp, "out1")); err != nil {
+	if _, err = Import(other, filepath.Join(tmp, "out1")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Import(other, out2); err != nil {
+	if _, err = Import(other, out2); err != nil {
 		t.Fatal(err)
 	}
 	got, err := Search(other, search.Options{Query: "second message same second", All: true})
@@ -162,7 +165,7 @@ func TestImportHonorsExcludeList(t *testing.T) {
 
 	t.Setenv("DEJA_EXCLUDE_PROJECTS", exportedProject(t, batch))
 	peer := filepath.Join(tmp, "peer.db")
-	if _, err := Import(peer, batch); err != nil {
+	if _, err = Import(peer, batch); err != nil {
 		t.Fatal(err)
 	}
 	got, err := Search(peer, search.Options{Query: "nda project notes", All: true})

@@ -5,6 +5,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -16,6 +17,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -50,19 +52,19 @@ func newHTTPUpdateDownloader(client *http.Client) updateDownloader {
 	previousRedirect := configured.CheckRedirect
 	configured.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 		if req.URL.Scheme != "https" {
-			return fmt.Errorf("refusing non-HTTPS redirect")
+			return errors.New("refusing non-HTTPS redirect")
 		}
 		if previousRedirect != nil {
 			return previousRedirect(req, via)
 		}
 		if len(via) >= 10 {
-			return fmt.Errorf("stopped after 10 redirects")
+			return errors.New("stopped after 10 redirects")
 		}
 		return nil
 	}
 	client = &configured
 	return func(url string, limit int64, label string) ([]byte, error) {
-		req, err := http.NewRequest(http.MethodGet, url, nil)
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
 		if err != nil {
 			return nil, fmt.Errorf("request %s: %w", label, err)
 		}
@@ -134,10 +136,10 @@ func runUpdate(args []string, out io.Writer) error {
 
 func performUpdate(cfg updateConfig, out io.Writer) error {
 	if cfg.download == nil {
-		return fmt.Errorf("update downloader is required")
+		return errors.New("update downloader is required")
 	}
 	if cfg.executable == "" {
-		return fmt.Errorf("update executable path is required")
+		return errors.New("update executable path is required")
 	}
 	if _, _, err := updateAssetNames("version", cfg.goos, cfg.goarch); err != nil {
 		return err
@@ -152,12 +154,12 @@ func performUpdate(cfg updateConfig, out io.Writer) error {
 		return err
 	}
 	var release updateRelease
-	if err := json.Unmarshal(body, &release); err != nil {
+	if err = json.Unmarshal(body, &release); err != nil {
 		return fmt.Errorf("decode latest release: %w", err)
 	}
 	latest := normalizeUpdateVersion(release.TagName)
 	if latest == "" {
-		return fmt.Errorf("latest release did not include a tag")
+		return errors.New("latest release did not include a tag")
 	}
 	current := normalizeUpdateVersion(cfg.currentVersion)
 	// A binary built from source is by definition ahead of the newest tag —
@@ -369,10 +371,8 @@ func parseUpdateVersion(v string) (parsedUpdateVersion, bool) {
 			return parsed, false
 		}
 		parsed.prerelease = strings.Split(parts[1], ".")
-		for _, identifier := range parsed.prerelease {
-			if identifier == "" {
-				return parsedUpdateVersion{}, false
-			}
+		if slices.Contains(parsed.prerelease, "") {
+			return parsedUpdateVersion{}, false
 		}
 	}
 	return parsed, true
@@ -404,7 +404,7 @@ func findUpdateAsset(assets []updateAsset, name string) (updateAsset, bool) {
 }
 
 func checksumForArchive(checksums []byte, archiveName string) (string, error) {
-	for _, line := range strings.Split(string(checksums), "\n") {
+	for line := range strings.SplitSeq(string(checksums), "\n") {
 		fields := strings.Fields(line)
 		if len(fields) != 2 || strings.TrimPrefix(fields[1], "*") != archiveName {
 			continue
@@ -495,7 +495,7 @@ func installUpdateBinary(destination string, binary []byte) (err error) {
 		return err
 	}
 	if !info.Mode().IsRegular() {
-		return fmt.Errorf("destination is not a regular file")
+		return errors.New("destination is not a regular file")
 	}
 	staged, err := os.CreateTemp(filepath.Dir(destination), ".deja-update-*")
 	if err != nil {

@@ -53,7 +53,7 @@ func TestBuildProgressRepaintErasesItsOwnHeight(t *testing.T) {
 	}
 	// The frame is the mark's height until the column outgrows it; past that
 	// it has to keep growing, or the last stores fall off the bottom.
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		p.Harness("store"+itoa(i), 1, 1)
 	}
 	buf.Reset()

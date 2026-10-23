@@ -23,7 +23,7 @@ func TestAStoreRefusalCarriesWhatSqliteSaid(t *testing.T) {
 	// A real database missing the column the first probe reads, which is the
 	// shape a schema change arrives in. The probe asks message too, for the
 	// newest session with turns, so that table is there.
-	mk := exec.Command("sqlite3", db, "create table session(id text, directory text); create table message(id text, session_id text);")
+	mk := exec.CommandContext(t.Context(), "sqlite3", db, "create table session(id text, directory text); create table message(id text, session_id text);")
 	if out, err := mk.CombinedOutput(); err != nil {
 		t.Fatalf("could not build the fixture: %v: %s", err, out)
 	}
@@ -63,7 +63,7 @@ func TestTheQuotedComplaintIsBounded(t *testing.T) {
 func TestASilentFailureKeepsItsOwnError(t *testing.T) {
 	var empty bytes.Buffer
 	want := errors.New("exit status 1")
-	if got := withStderr(want, &empty); got != want {
+	if got := withStderr(want, &empty); got != want { //nolint:errorlint // the very same error value must come back
 		t.Errorf("a silent failure was rewritten: %v", got)
 	}
 	_ = os.Stdout

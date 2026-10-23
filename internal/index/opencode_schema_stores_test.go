@@ -19,7 +19,7 @@ insert into message values ('%[2]s','%[1]s','{"role":"assistant","time":{"create
 insert into part values ('p-%[2]s','%[2]s',json_object('type','text','text','%[3]s','time',json_object('start',%[4]d)));
 update session set time_updated=%[4]d where id='%[1]s';
 `, session, id, text, createdMillis)
-	if out, err := exec.Command("sqlite3", db, stmts).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, stmts).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}
 }

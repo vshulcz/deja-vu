@@ -20,8 +20,8 @@ func TestPoolScopeDoesNotDecideTheWiderAnswer(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "index.db")
 	now := time.Now()
 	n := search.PoolSize(5) + 300
-	var ss []model.Session
-	for i := 0; i < n; i++ {
+	ss := make([]model.Session, 0, n)
+	for i := range n {
 		at := now.Add(-time.Duration(i) * time.Minute)
 		text, project := fmt.Sprintf("alpha went first and beta went after, run %d", i), "other"
 		if i >= n-12 {

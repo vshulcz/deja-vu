@@ -28,7 +28,7 @@ func grokSessionWith(t *testing.T, lines string) []string {
 	if len(ss) != 1 {
 		t.Fatalf("got %d sessions, want 1", len(ss))
 	}
-	var out []string
+	out := make([]string, 0, len(ss[0].Messages))
 	for _, m := range ss[0].Messages {
 		out = append(out, m.Role+": "+m.Text)
 	}

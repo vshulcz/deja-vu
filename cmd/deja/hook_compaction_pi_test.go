@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -16,7 +15,7 @@ import (
 // stay in the file, which is what the capture reads.
 func piSessionFile(t *testing.T, root, workspace, id string, omp bool) string {
 	t.Helper()
-	cwd, _ := json.Marshal(workspace)
+	cwd := mustMarshal(t, workspace)
 	attribution := ""
 	if omp {
 		attribution = `"attribution":"user",`
@@ -70,7 +69,7 @@ func TestPiCompactionRefusesAnotherSessionsFile(t *testing.T) {
 	workspace := compactionGitRepo(t)
 	dir := index.DefaultDir()
 	path := piSessionFile(t, sources.PiRoot(), workspace, "01a115dc-0000-7000-8000-000000000000", false)
-	b, _ := json.Marshal(map[string]any{"session_id": "01a115dc-8221-70f9-956a-50742150659d", "transcript_path": path, "cwd": workspace})
+	b := mustMarshal(t, map[string]any{"session_id": "01a115dc-8221-70f9-956a-50742150659d", "transcript_path": path, "cwd": workspace})
 	withHookStdin(t, string(b))
 	runHookPrecompactFor(dir, "")
 	if _, found, _ := index.Compaction(dir, "01a115dc-8221-70f9-956a-50742150659d", workspace); found {

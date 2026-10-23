@@ -11,6 +11,49 @@ linters:
     # CLI never reaches, three retrieval helpers left by refactors, a regexp the
     # entropy pass stopped using. Cheap to keep out, invisible to find by eye.
     - unused
+    # Bugs: a dropped or misread error, a request without a context, a value
+    # written and never read.
+    - bodyclose
+    - contextcheck
+    - durationcheck
+    - errchkjson
+    - errorlint
+    - exhaustive
+    - forcetypeassert
+    - gosec
+    - ineffassign
+    - makezero
+    - musttag
+    - nilerr
+    - nilnil
+    - noctx
+    - recvcheck
+    - unparam
+    - wastedassign
+    # Code that has a shorter or cheaper standard form.
+    - copyloopvar
+    - gocritic
+    - intrange
+    - mirror
+    - modernize
+    - perfsprint
+    - prealloc
+    - unconvert
+    - usestdlibvars
+    - usetesting
+    # Naming, docs and test hygiene.
+    - dupword
+    - errname
+    - nolintlint
+    - predeclared
+    - revive
+    - thelper
+    - tparallel
+    # Size and nesting ceilings.
+    - funlen
+    - gocognit
+    - gocyclo
+    - nestif
   settings:
     errcheck:
       exclude-functions:
@@ -19,6 +62,77 @@ linters:
         - fmt.Fprint
         - (*os.File).Close
         - os.RemoveAll
+    govet:
+      enable-all: true
+      disable:
+        # Reordering struct fields for padding fights readable field order.
+        - fieldalignment
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - performance
+      disabled-checks:
+        # Large structs are passed and ranged by value on purpose: records are
+        # read-only after ingest and copying them is cheaper than the aliasing bugs.
+        - hugeParam
+        - rangeValCopy
+    gosec:
+      excludes:
+        # A CLI that reads and writes the user's own files under paths the user
+        # or the harness chose: these rules fire on every os.ReadFile and
+        # exec.Command and say nothing about this program.
+        - G204
+        - G301
+        - G302
+        - G304
+        - G306
+        - G703
+        # Taint rules whose results change from run to run on the same tree.
+        - G702
+        - G709
+    dupword:
+      # Repeated words in literals are test data ("two two" is the fixture).
+      comments-only: true
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+    revive:
+      rules:
+        - name: exported
+        - name: package-comments
+        - name: redefines-builtin-id
+        - name: unused-parameter
+        - name: indent-error-flow
+        - name: var-naming
+        - name: empty-block
+        - name: unexported-return
+    prealloc:
+      simple: true
+      range-loops: true
+      for-loops: false
+    funlen:
+      lines: 250
+      statements: 150
+    gocognit:
+      min-complexity: 100
+    gocyclo:
+      min-complexity: 50
+    nestif:
+      min-complexity: 15
+  exclusions:
+    rules:
+      # Tests are tables and scenarios: their length and branching is the
+      # fixture, not logic to split.
+      - path: _test\.go
+        linters:
+          - funlen
+          - gocognit
+          - gocyclo
+          - nestif
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
 
 formatters:
   enable:

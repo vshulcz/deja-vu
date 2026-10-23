@@ -16,7 +16,7 @@ import (
 // used to mine it from raw ss.
 func TestCommandsAreRedactedLikeTheRecordLog(t *testing.T) {
 	dir := t.TempDir()
-	secret := "AKIAIOSFODNN7EXAMPLE"
+	secret := "AKIAIOSFODNN7EXAMPLE" //nolint:gosec // a fake secret the redaction test plants
 	cmd := "AWS_ACCESS_KEY_ID=" + secret + " aws s3 ls"
 	sess := func(id string) model.Session {
 		return model.Session{

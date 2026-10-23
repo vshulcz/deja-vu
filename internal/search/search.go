@@ -1,3 +1,4 @@
+// Package search ranks sessions against a query and prints what it finds.
 package search
 
 import (
@@ -8,6 +9,7 @@ import (
 	"os"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -40,6 +42,7 @@ const (
 // search (index) can use them without importing the ranking engine.
 type Options = query.Options
 
+// The tier names and sort orders, re-exported from internal/query.
 const (
 	TierExact    = query.TierExact
 	TierClose    = query.TierClose
@@ -64,12 +67,16 @@ func ByDate(hits []Hit) {
 	})
 }
 
+// QueryParts is query.QueryParts.
 func QueryParts(q string) (terms []string, phrases []string) { return query.QueryParts(q) }
 
+// IsStopWord is query.IsStopWord.
 func IsStopWord(term string) bool { return query.IsStopWord(term) }
 
+// MatchesQuery is query.MatchesQuery.
 func MatchesQuery(text, q string) bool { return query.MatchesQuery(text, q) }
 
+// MatchesParts is query.MatchesParts.
 func MatchesParts(text string, terms, phrases []string, variants map[string][]string) bool {
 	return query.MatchesParts(text, terms, phrases, variants)
 }
@@ -104,6 +111,7 @@ type searchJSONEnvelope struct {
 	Variants map[string][]string `json:"variants,omitempty"`
 }
 
+// Hit is one session that matched a search.
 type Hit struct {
 	Session    model.Session `json:"session"`
 	Count      int           `json:"count"`
@@ -182,7 +190,7 @@ type bm25Document struct {
 // countIn scores one message against the query the way the exact tier does:
 // a parts match first, then either a whole-query substring count for a single
 // bare token or a per-token count, plus any quoted phrases.
-func countIn(text, low string, qtoks, phrases []string, variants map[string][]string) int {
+func countIn(_, low string, qtoks, phrases []string, variants map[string][]string) int {
 	if !query.MatchesLowered(low, qtoks, phrases, variants) {
 		return 0
 	}
@@ -209,6 +217,32 @@ func countIn(text, low string, qtoks, phrases []string, variants map[string][]st
 	return c
 }
 
+// snipCand is one matching message, a candidate for the hit's excerpts.
+type snipCand struct {
+	text   string
+	weight int
+	// window is how tightly the query's words meet in this message; 0 means
+	// they never do.
+	window int
+	// at is where in the session this was said: the excerpts are chosen by
+	// how well they match, so the strongest passage is often not the last
+	// word the session had on the subject.
+	at   int
+	when time.Time
+	// dump is tool output that is a JSON document or a listing: it holds
+	// the query's words as entries, not as anything said about them.
+	dump bool
+}
+
+// scoredQuery is the query as the exact tier counts it, with the CJK-folded
+// parts used when a raw match scores zero.
+type scoredQuery struct {
+	re                         *regexp.Regexp
+	qtoks, phrases             []string
+	queryCJK                   bool
+	qtoksFolded, phrasesFolded []string
+}
+
 func runScored(ss []model.Session, o Options) ([]Hit, error) {
 	var re *regexp.Regexp
 	qtoks, phrases := QueryParts(o.Query)
@@ -229,6 +263,7 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 			return nil, err
 		}
 	}
+	sq := scoredQuery{re: re, qtoks: qtoks, phrases: phrases, queryCJK: queryCJK, qtoksFolded: qtoksFolded, phrasesFolded: phrasesFolded}
 	cut := time.Time{}
 	if o.Since > 0 {
 		cut = time.Now().Add(-o.Since)
@@ -236,21 +271,6 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 	merged := mergeSessions(ss)
 	documents := make([]bm25Document, 0, len(merged))
 	// Reused across sessions: each one refills it, so a single allocation serves all.
-	type snipCand struct {
-		text   string
-		weight int
-		// window is how tightly the query's words meet in this message; 0 means
-		// they never do.
-		window int
-		// at is where in the session this was said: the excerpts are chosen by
-		// how well they match, so the strongest passage is often not the last
-		// word the session had on the subject.
-		at   int
-		when time.Time
-		// dump is tool output that is a JSON document or a listing: it holds
-		// the query's words as entries, not as anything said about them.
-		dump bool
-	}
 	snipCands := make([]snipCand, 0, 16)
 	df := make([]int, len(qtoks))
 	corpusDocuments := 0
@@ -292,150 +312,8 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 			doc.termCount = []int{0}
 			doc.userCount = []int{0}
 		}
-		snipCands = snipCands[:0]
-		for mi, m := range s.Messages {
-			if o.Role != "" && !roleMatches(m.Role, o.Role) {
-				continue
-			}
-			// A harness's summary of what it compacted away answers a question
-			// only when the question asked for it. Left in the ordinary pool it
-			// is a paraphrase of the conversation competing with the
-			// conversation — and on one store those summaries were a fifth of
-			// everything indexed in the sessions that had them (#3384).
-			if o.Role == "" && m.Role == roleSummary {
-				continue
-			}
-			// The transcript's own record of a call to deja is not something
-			// anyone said, and a question matches the log of that question
-			// being asked (#2067). Removed from matching only; the line stays
-			// in the transcript for `deja how` and `deja fix`.
-			text := withoutOwnCallLog(m.Text)
-			low := lower(text)
-			c := 0
-			// windowText and windowToks are the pair proximity is measured on: the
-			// surface text and the query's own words, except where the match came from
-			// folding — measuring the unfolded pair there finds nothing and reports a
-			// genuine match as words that never meet.
-			windowText, windowToks := low, qtoks
-			// The pair the scorer counts on, folded below when that is where
-			// the match came from.
-			scoreLow, scoreToks := low, qtoks
-			if re != nil {
-				c = countRegex(re, text)
-			} else {
-				c = countIn(text, low, qtoks, phrases, o.FuzzyVariants)
-				// Postings are keyed on Traditional-folded CJK, so a query in
-				// one script legitimately reaches a record in the other. This
-				// counting pass works on surface text and would score that
-				// record zero, dropping it from the results the postings
-				// already found — retry with both sides folded.
-				if c == 0 && queryCJK {
-					foldedLow := cjkfold.String(low)
-					c = countIn(cjkfold.String(text), foldedLow, qtoksFolded,
-						phrasesFolded, o.FuzzyVariants)
-					if c > 0 {
-						windowText, windowToks = foldedLow, qtoksFolded
-						// And the pair the scorer counts on. Leaving it
-						// unfolded gave BM25 a term frequency of zero for a
-						// match the postings had already found, so a
-						// cross-script hit counted twice and scored nothing —
-						// ranked below a record that matched once (#1605).
-						// Only when the two token lists line up: termCount is
-						// indexed by position, and a fold that merged or split
-						// a token would count against the wrong term.
-						if len(qtoksFolded) == len(qtoks) {
-							scoreLow, scoreToks = foldedLow, qtoksFolded
-						}
-					}
-				}
-			}
-			if c > 0 {
-				doc.hit.Count += c
-				if (doc.hit.Tier == TierClose || doc.hit.Tier == TierStemmed) && doc.hit.TierDetail == "" {
-					doc.hit.TierDetail = variantDetail(m.Text, qtoks, o.FuzzyVariants)
-				}
-				// Collect every matching message with its match count; the
-				// strongest few become the excerpts after the scan. Taking the
-				// first three showed wherever a word happened to appear early
-				// rather than the passage that carries the answer.
-				w := tokenWindow(windowText, windowToks)
-				snipCands = append(snipCands, snipCand{text: text, weight: c, window: w, at: mi, when: m.Time,
-					dump: m.Role == roleToolOutput && isDataDump(text)})
-				if w > 0 && (doc.minWindow == 0 || w < doc.minWindow) {
-					doc.minWindow = w
-				}
-			}
-			// Counted over the pair the match was found on: a cross-script hit
-			// is counted above through the fold and, scored against the surface
-			// text where the query's words appear nowhere, would take a term
-			// frequency of zero and rank below a record that matched once.
-			doc.length += countDocumentWords(scoreLow, scoreToks, o.FuzzyVariants, doc.termCount, doc.userCount, m.Role == "user")
-			// The token, not the raw query — the same rule as countIn. This
-			// path is what scores `retry` inside `retry-backoff`, which
-			// countDocumentWords cannot match because it counts whole words
-			// and treats the hyphen as one. Comparing the raw query here left
-			// a punctuated query with a session that matched three times and
-			// scored zero, ranked below one that matched once (#1603).
-			if len(scoreToks) == 1 && doc.termCount[0] == 0 && strings.Contains(scoreLow, scoreToks[0]) {
-				n := strings.Count(scoreLow, scoreToks[0])
-				doc.termCount[0] += n
-				if m.Role == "user" {
-					doc.userCount[0] += n
-				}
-			}
-		}
-		// The passage that answers a question is where its words come together, so
-		// a message that says them together outranks one that repeats a single word:
-		// a search for "what did my dad give me" led with six "gift"s and put the
-		// line naming the dad second (#1325). The relevance tier already picks its
-		// excerpt this way; the exact tier ranked on the raw count alone. Count
-		// still decides between passages that are equally tight, and among equals
-		// the order they were said in stands. Top three shown.
-		//
-		// A JSON or listing dump in tool output is quoted only when nothing
-		// else matched: its words meet tightly because it holds every word,
-		// and it took the excerpts of a session that was 4 MB of them (#4780).
-		sort.SliceStable(snipCands, func(i, j int) bool {
-			a, b := snipCands[i], snipCands[j]
-			if a.dump != b.dump {
-				return !a.dump
-			}
-			if (a.window > 0) != (b.window > 0) {
-				return a.window > 0
-			}
-			if a.window > 0 && a.window != b.window {
-				return a.window < b.window
-			}
-			return a.weight > b.weight
-		})
-		// The last passage that matched, whether or not it matched hardest. A
-		// long session is answered by the fragment that scored, and twice now
-		// the fragment that answered was a different one in the same session:
-		// a status line saying the PR had already been opened and closed, and
-		// the ClawHub submission going through. Both were the session's later
-		// word on the subject, and both cost a duplicate outward action
-		// (#3007, #2976). It takes the third slot, so the two strongest
-		// passages are still first.
-		lastIdx := -1
-		for i, c := range snipCands {
-			if lastIdx < 0 || c.at > snipCands[lastIdx].at {
-				lastIdx = i
-			}
-		}
-		for _, c := range snipCands {
-			doc.hit.matched = append(doc.hit.matched, c.at)
-		}
-		shown := -1
-		for i := 0; i < len(snipCands) && i < 3; i++ {
-			pick := i
-			if i == 2 && lastIdx >= 0 && snipCands[lastIdx].at > snipCands[0].at && snipCands[lastIdx].at > snipCands[1].at {
-				pick = lastIdx
-			}
-			doc.hit.snipTexts = append(doc.hit.snipTexts, snipCands[pick].text)
-			if snipCands[pick].at > shown {
-				shown = snipCands[pick].at
-			}
-		}
+		snipCands = sq.scanMessages(&doc, s, o, snipCands)
+		pickSnippets(&doc, snipCands)
 		// The index hands ranking the records that matched, not the session, so
 		// doc.length measures the size of the match. Normalising by that told
 		// BM25 that a marathon mentioning a word in three short lines is a
@@ -508,6 +386,162 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 	return hits, nil
 }
 
+// scanMessages counts the query in each message of s into doc and collects the
+// messages that matched, refilling snipCands.
+func (sq scoredQuery) scanMessages(doc *bm25Document, s model.Session, o Options, snipCands []snipCand) []snipCand {
+	re, qtoks, phrases := sq.re, sq.qtoks, sq.phrases
+	queryCJK, qtoksFolded, phrasesFolded := sq.queryCJK, sq.qtoksFolded, sq.phrasesFolded
+	snipCands = snipCands[:0]
+	for mi, m := range s.Messages {
+		if o.Role != "" && !roleMatches(m.Role, o.Role) {
+			continue
+		}
+		// A harness's summary of what it compacted away answers a question
+		// only when the question asked for it. Left in the ordinary pool it
+		// is a paraphrase of the conversation competing with the
+		// conversation — and on one store those summaries were a fifth of
+		// everything indexed in the sessions that had them (#3384).
+		if o.Role == "" && m.Role == roleSummary {
+			continue
+		}
+		// The transcript's own record of a call to deja is not something
+		// anyone said, and a question matches the log of that question
+		// being asked (#2067). Removed from matching only; the line stays
+		// in the transcript for `deja how` and `deja fix`.
+		text := withoutOwnCallLog(m.Text)
+		low := lower(text)
+		var c int
+		// windowText and windowToks are the pair proximity is measured on: the
+		// surface text and the query's own words, except where the match came from
+		// folding — measuring the unfolded pair there finds nothing and reports a
+		// genuine match as words that never meet.
+		windowText, windowToks := low, qtoks
+		// The pair the scorer counts on, folded below when that is where
+		// the match came from.
+		scoreLow, scoreToks := low, qtoks
+		if re != nil {
+			c = countRegex(re, text)
+		} else {
+			c = countIn(text, low, qtoks, phrases, o.FuzzyVariants)
+			// Postings are keyed on Traditional-folded CJK, so a query in
+			// one script legitimately reaches a record in the other. This
+			// counting pass works on surface text and would score that
+			// record zero, dropping it from the results the postings
+			// already found — retry with both sides folded.
+			if c == 0 && queryCJK {
+				foldedLow := cjkfold.String(low)
+				c = countIn(cjkfold.String(text), foldedLow, qtoksFolded,
+					phrasesFolded, o.FuzzyVariants)
+				if c > 0 {
+					windowText, windowToks = foldedLow, qtoksFolded
+					// And the pair the scorer counts on. Leaving it
+					// unfolded gave BM25 a term frequency of zero for a
+					// match the postings had already found, so a
+					// cross-script hit counted twice and scored nothing —
+					// ranked below a record that matched once (#1605).
+					// Only when the two token lists line up: termCount is
+					// indexed by position, and a fold that merged or split
+					// a token would count against the wrong term.
+					if len(qtoksFolded) == len(qtoks) {
+						scoreLow, scoreToks = foldedLow, qtoksFolded
+					}
+				}
+			}
+		}
+		if c > 0 {
+			doc.hit.Count += c
+			if (doc.hit.Tier == TierClose || doc.hit.Tier == TierStemmed) && doc.hit.TierDetail == "" {
+				doc.hit.TierDetail = variantDetail(m.Text, qtoks, o.FuzzyVariants)
+			}
+			// Collect every matching message with its match count; the
+			// strongest few become the excerpts after the scan. Taking the
+			// first three showed wherever a word happened to appear early
+			// rather than the passage that carries the answer.
+			w := tokenWindow(windowText, windowToks)
+			snipCands = append(snipCands, snipCand{text: text, weight: c, window: w, at: mi, when: m.Time,
+				dump: m.Role == roleToolOutput && isDataDump(text)})
+			if w > 0 && (doc.minWindow == 0 || w < doc.minWindow) {
+				doc.minWindow = w
+			}
+		}
+		// Counted over the pair the match was found on: a cross-script hit
+		// is counted above through the fold and, scored against the surface
+		// text where the query's words appear nowhere, would take a term
+		// frequency of zero and rank below a record that matched once.
+		doc.length += countDocumentWords(scoreLow, scoreToks, o.FuzzyVariants, doc.termCount, doc.userCount, m.Role == "user")
+		// The token, not the raw query — the same rule as countIn. This
+		// path is what scores `retry` inside `retry-backoff`, which
+		// countDocumentWords cannot match because it counts whole words
+		// and treats the hyphen as one. Comparing the raw query here left
+		// a punctuated query with a session that matched three times and
+		// scored zero, ranked below one that matched once (#1603).
+		if len(scoreToks) == 1 && doc.termCount[0] == 0 && strings.Contains(scoreLow, scoreToks[0]) {
+			n := strings.Count(scoreLow, scoreToks[0])
+			doc.termCount[0] += n
+			if m.Role == "user" {
+				doc.userCount[0] += n
+			}
+		}
+	}
+	return snipCands
+}
+
+// pickSnippets orders the matching messages and keeps the three the hit quotes.
+func pickSnippets(doc *bm25Document, snipCands []snipCand) {
+	// The passage that answers a question is where its words come together, so
+	// a message that says them together outranks one that repeats a single word:
+	// a search for "what did my dad give me" led with six "gift"s and put the
+	// line naming the dad second (#1325). The relevance tier already picks its
+	// excerpt this way; the exact tier ranked on the raw count alone. Count
+	// still decides between passages that are equally tight, and among equals
+	// the order they were said in stands. Top three shown.
+	//
+	// A JSON or listing dump in tool output is quoted only when nothing
+	// else matched: its words meet tightly because it holds every word,
+	// and it took the excerpts of a session that was 4 MB of them (#4780).
+	sort.SliceStable(snipCands, func(i, j int) bool {
+		a, b := snipCands[i], snipCands[j]
+		if a.dump != b.dump {
+			return !a.dump
+		}
+		if (a.window > 0) != (b.window > 0) {
+			return a.window > 0
+		}
+		if a.window > 0 && a.window != b.window {
+			return a.window < b.window
+		}
+		return a.weight > b.weight
+	})
+	// The last passage that matched, whether or not it matched hardest. A
+	// long session is answered by the fragment that scored, and twice now
+	// the fragment that answered was a different one in the same session:
+	// a status line saying the PR had already been opened and closed, and
+	// the ClawHub submission going through. Both were the session's later
+	// word on the subject, and both cost a duplicate outward action
+	// (#3007, #2976). It takes the third slot, so the two strongest
+	// passages are still first.
+	lastIdx := -1
+	for i, c := range snipCands {
+		if lastIdx < 0 || c.at > snipCands[lastIdx].at {
+			lastIdx = i
+		}
+	}
+	for _, c := range snipCands {
+		doc.hit.matched = append(doc.hit.matched, c.at)
+	}
+	shown := -1
+	for i := 0; i < len(snipCands) && i < 3; i++ {
+		pick := i
+		if i == 2 && lastIdx >= 0 && snipCands[lastIdx].at > snipCands[0].at && snipCands[lastIdx].at > snipCands[1].at {
+			pick = lastIdx
+		}
+		doc.hit.snipTexts = append(doc.hit.snipTexts, snipCands[pick].text)
+		if snipCands[pick].at > shown {
+			shown = snipCands[pick].at
+		}
+	}
+}
+
 // renderSnippets quotes the hits that survived the cap, and only those.
 //
 // Choosing the passages is part of scoring — a session is ranked partly on how
@@ -526,7 +560,7 @@ func renderSnippets(hits []Hit, o Options, n int) {
 	if n < 0 || n > len(hits) {
 		n = len(hits)
 	}
-	for i := 0; i < n; i++ {
+	for i := range n {
 		if len(hits[i].snipTexts) == 0 {
 			continue
 		}
@@ -675,15 +709,12 @@ const earlierAttemptWindow = 50
 // above some margin. The old session stays in the results — history is the
 // product — but agents and readers see which one the project moved on to.
 func markEarlierAttempts(hits []Hit) {
-	n := len(hits)
-	if n > earlierAttemptWindow {
-		n = earlierAttemptWindow
-	}
+	n := min(len(hits), earlierAttemptWindow)
 	sets := make([]map[string]bool, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		set := map[string]bool{}
 		for _, sn := range hits[i].Snippets {
-			for _, w := range strings.Fields(lower(sn)) {
+			for w := range strings.FieldsSeq(lower(sn)) {
 				if len(w) > 3 {
 					set[w] = true
 				}
@@ -699,8 +730,8 @@ func markEarlierAttempts(hits []Hit) {
 		}
 		sets[i] = set
 	}
-	for i := 0; i < n; i++ {
-		for j := 0; j < n; j++ {
+	for i := range n {
+		for j := range n {
 			if i == j || hits[i].Superseded != "" {
 				continue
 			}
@@ -1427,11 +1458,8 @@ func countDocumentWords(s string, terms []string, variants map[string][]string, 
 					// A word matching a fuzzy/stem variant of this term counts
 					// toward its term frequency so BM25 ranks the hit instead of
 					// falling back to recency-only order.
-					for _, v := range variants[term] {
-						if word == v {
-							matched = true
-							break
-						}
+					if slices.Contains(variants[term], word) {
+						matched = true
 					}
 				}
 				if matched {
@@ -1527,10 +1555,7 @@ func boundedMessages(ms []model.Message, matched []int) ([]model.Message, bool) 
 		keep = append(keep, i, i+1)
 	}
 	if len(matched) == 0 {
-		from := total - jsonHitMessages
-		if from < 0 {
-			from = 0
-		}
+		from := max(total-jsonHitMessages, 0)
 		for i := from; i < total; i++ {
 			keep = append(keep, i)
 		}
@@ -1605,6 +1630,7 @@ func safeHit(h Hit) Hit {
 	return h
 }
 
+// Print writes search hits as text, or as the JSON envelope with o.JSON.
 func Print(w io.Writer, hits []Hit, o Options) {
 	for i := range hits {
 		if hits[i].Tier == "" {
@@ -1624,7 +1650,7 @@ func Print(w io.Writer, hits []Hit, o Options) {
 		// One shape, always. The exact path used to emit a bare array while
 		// every fallback path emitted an object, so a consumer had to handle
 		// two contracts and could not tell which it had until it looked.
-		_ = json.NewEncoder(w).Encode(searchJSONEnvelope{
+		_ = json.NewEncoder(w).Encode(searchJSONEnvelope{ //nolint:errchkjson // no error return here; write errors are ignored like the text path
 			SchemaVersion:  jsonout.Version,
 			Tier:           setTier(o),
 			Total:          o.Total,
@@ -1769,10 +1795,7 @@ func fitProject(project string, width int, harness, date, id string, count int, 
 	// The column is padded to ten, so a name shorter than that costs ten either
 	// way and the budget has to say so.
 	fixed := termwidth.Columns(fmt.Sprintf("[%s]  · %s · %s — %s%s", harness, date, id, MatchCount(count), tier))
-	room := width - fixed
-	if room < 10 {
-		room = 10
-	}
+	room := max(width-fixed, 10)
 	if termwidth.Columns(project) <= room {
 		return project
 	}
@@ -1879,6 +1902,7 @@ func repeatedStamps(ms []model.Message) map[string]bool {
 	return repeated
 }
 
+// PrintSession writes a whole session as plain text.
 func PrintSession(w io.Writer, s model.Session) {
 	PrintSessionStyled(w, s, false, 0)
 }
@@ -2012,6 +2036,8 @@ func withoutHarnessEnvelopes(s model.Session) model.Session {
 	return s
 }
 
+// PrintContext writes the plain-text briefing for one session: a header line,
+// then the turns around what query matched.
 func PrintContext(w io.Writer, s model.Session, query string) {
 	// Project and id are transcript text a harness wrote, and this is one line:
 	// an escape byte in either recolours the header and a carriage return
@@ -2110,7 +2136,7 @@ func printContextBody(w io.Writer, s model.Session, query string) {
 	if qlow != "" {
 		fmt.Fprintf(w, "\nNo single message contains the full query; showing the session's opening exchange.\n")
 	}
-	printContextChunks(w, s, budget, func(m model.Message) (bool, []int) { return true, nil },
+	printContextChunks(w, s, budget, func(model.Message) (bool, []int) { return true, nil },
 		func(m model.Message) string { return clipCompactionSummary(m.Text, parts) })
 }
 
@@ -2146,7 +2172,7 @@ func clipCompactionSummary(text string, parts []string) string {
 	var b strings.Builder
 	b.WriteString(compactionSummaryLead)
 	lines := 0
-	for _, raw := range strings.Split(text, "\n") {
+	for raw := range strings.SplitSeq(text, "\n") {
 		line := strings.TrimSpace(raw)
 		if line == "" || contextPartHits(line, parts) == nil {
 			continue
@@ -2181,7 +2207,7 @@ func clipCompactionSummary(text string, parts []string) string {
 // about.
 func firstLines(text string, n int) string {
 	var out []string
-	for _, raw := range strings.Split(text, "\n") {
+	for raw := range strings.SplitSeq(text, "\n") {
 		if line := strings.TrimSpace(raw); line != "" {
 			out = append(out, line)
 			if len(out) == n {
@@ -2295,10 +2321,7 @@ var renderContextTurnsWorkers = runtime.NumCPU
 // same bytes in the same order however many cores run it.
 func renderContextTurns(turns []contextTurn) []string {
 	out := make([]string, len(turns))
-	workers := renderContextTurnsWorkers()
-	if workers > len(turns) {
-		workers = len(turns)
-	}
+	workers := min(renderContextTurnsWorkers(), len(turns))
 	if workers < 2 || len(turns) < 32 {
 		for i, t := range turns {
 			out[i] = SafeText(contextText(t.raw, t.carriesQuery()))
@@ -2511,6 +2534,7 @@ func approxSize(n int) string {
 	return fmt.Sprintf("%d KB", (n+512)/1024)
 }
 
+// Recent returns the sessions newest first, at most n of them when n > 0.
 func Recent(ss []model.Session, n int) []model.Session {
 	out := mergeSessions(ss)
 	sort.Slice(out, func(i, j int) bool { return out[i].Updated.After(out[j].Updated) })
@@ -2609,10 +2633,7 @@ func snippetAt(s, q string, re *regexp.Regexp, matched func(string) bool) string
 			idx = utf8.RuneCountInString(low[:b])
 		}
 	}
-	start := idx - 100
-	if start < 0 {
-		start = 0
-	}
+	start := max(idx-100, 0)
 	end := start + 300
 	if end > len(r) {
 		// Spend the whole window: a match near the end of a message left the
@@ -2654,10 +2675,7 @@ func snippetAt(s, q string, re *regexp.Regexp, matched func(string) bool) string
 // end of the message from sliding off its own match.
 func snapToWords(r []rune, start, end, match int) (int, int) {
 	if start > 0 {
-		limit := start + sentenceSnapRunes
-		if limit > match {
-			limit = match
-		}
+		limit := min(start+sentenceSnapRunes, match)
 		moved := start
 		// A sentence start is worth more than a word start, so look for one
 		// first across the whole budget.
@@ -2668,10 +2686,7 @@ func snapToWords(r []rune, start, end, match int) (int, int) {
 			}
 		}
 		if moved == start {
-			wordLimit := start + headWordSnapRunes
-			if wordLimit > limit {
-				wordLimit = limit
-			}
+			wordLimit := min(start+headWordSnapRunes, limit)
 			for i := start; i < wordLimit; i++ {
 				if isSpace(r[i]) {
 					moved = i + 1
@@ -2687,10 +2702,7 @@ func snapToWords(r []rune, start, end, match int) (int, int) {
 		}
 	}
 	if end < len(r) {
-		floor := end - tailWordSnapRunes
-		if floor < match+1 {
-			floor = match + 1
-		}
+		floor := max(end-tailWordSnapRunes, match+1)
 		for i := end; i > floor; i-- {
 			if isSpace(r[i-1]) {
 				end = i - 1
@@ -3041,7 +3053,7 @@ var toolDumpEngineCalls atomic.Int64
 // holding none of them cannot match. Rendering a digest ran this per line over
 // the whole session — 16.5 s of the 17 s a 240 MB render took (#1742).
 func looksToolDump(line string) bool {
-	for i := 0; i < len(line); i++ {
+	for i := range len(line) {
 		if line[i] >= 0x80 {
 			// Case folding is Unicode-wide in the engine (ſ folds to s), and
 			// this prefilter is ASCII. A line with any byte outside ASCII goes
@@ -3158,7 +3170,7 @@ func proseLinesKeeping(s string, matched func(string) bool) ([]string, int) {
 	}
 	var cands []cand
 	proseHit := false
-	for _, line := range strings.Split(s, "\n") {
+	for line := range strings.SplitSeq(s, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
@@ -3296,14 +3308,13 @@ func ErrorHits(ss []model.Session, paste string) []Hit {
 // the first message that has it. Joining a session's text into one string to
 // ask this is quadratic in the number of messages, and these are transcripts.
 func sessionHolds(s model.Session, t string) bool {
-	folded := ""
 	for _, m := range s.Messages {
 		low := lower(m.Text)
 		if strings.Contains(low, t) {
 			return true
 		}
 		if ft := cjkfold.String(t); ft != t || cjkfold.HasCJK(t) {
-			if folded = cjkfold.String(low); strings.Contains(folded, ft) {
+			if folded := cjkfold.String(low); strings.Contains(folded, ft) {
 				return true
 			}
 		}
@@ -3454,10 +3465,7 @@ func RelevanceHitsWeighted(ss []model.Session, terms []string, idf map[string]fl
 // is enough work to pay for them. The bound is the same shape renderContextTurns
 // uses: a handful of items is faster on one core than it is to hand out.
 func parallelForSessions(n int, fn func(i int)) {
-	workers := relevanceWorkers()
-	if workers > n {
-		workers = n
-	}
+	workers := min(relevanceWorkers(), n)
 	if workers < 2 || n < 4 {
 		for i := range n {
 			fn(i)

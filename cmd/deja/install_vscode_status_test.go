@@ -29,8 +29,10 @@ func TestVSCodeAutoAddsTheStatusExtension(t *testing.T) {
 		t.Fatalf("extension.js does not run deja statusline into a status item:\n%s", js)
 	}
 	var pkg struct {
-		Name, Publisher, Main string
-		Activation            []string `json:"activationEvents"`
+		Name       string   `json:"name"`
+		Publisher  string   `json:"publisher"`
+		Main       string   `json:"main"`
+		Activation []string `json:"activationEvents"`
 	}
 	if err := json.Unmarshal([]byte(readRulesTestFile(t, filepath.Join(dir, "package.json"))), &pkg); err != nil {
 		t.Fatal(err)

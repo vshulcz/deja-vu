@@ -22,7 +22,7 @@ func TestDoctorCountsRepeatedHookEntries(t *testing.T) {
 	if err := os.WriteFile(exe, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	var events []string
+	events := make([]string, 0, len(claudeHookWiring))
 	for _, h := range claudeHookWiring {
 		one := `{"hooks":[{"type":"command","command":"` + jsonEscaped(t, exe) + ` ` + h.Sub + `"}]}`
 		copies := []string{one}

@@ -2,6 +2,7 @@ package index
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -77,12 +78,12 @@ func TestNoControlBytesInTrackedText(t *testing.T) {
 // after `git add`, in CI, on someone else's machine — which is how a literal
 // escape byte reached #2091.
 func filesUnderReview(root string) ([]string, error) {
-	out, err := exec.Command("git", "-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard").Output()
+	out, err := exec.CommandContext(context.Background(), "git", "-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard").Output()
 	if err != nil {
 		return nil, err
 	}
 	var names []string
-	for _, name := range bytes.Split(out, []byte{0}) {
+	for name := range bytes.SplitSeq(out, []byte{0}) {
 		if len(name) == 0 {
 			continue
 		}
@@ -123,7 +124,7 @@ func TestTheFileListHoldsANewFileBeforeItIsAdded(t *testing.T) {
 	// whatever that file happens to say.
 	git := func(args ...string) {
 		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+		cmd := exec.CommandContext(t.Context(), "git", append([]string{"-C", root}, args...)...)
 		cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null")
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v %s", args, err, out)

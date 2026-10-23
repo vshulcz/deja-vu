@@ -119,7 +119,7 @@ func TestDirectorySessionsDoNotJumpAnAnswerToTheRestOfTheQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(r.Sessions) == 0 || r.Sessions[0].ID != "review" {
-		var ids []string
+		ids := make([]string, 0, len(r.Sessions))
 		for _, s := range r.Sessions {
 			ids = append(ids, s.ID)
 		}

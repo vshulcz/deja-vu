@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -43,12 +44,12 @@ func TestInstallCodeBuddyMCP(t *testing.T) {
 	// A legacy ~/.codebuddy.json is the file CodeBuddy reads when it is the
 	// only one there, so the entry goes into it rather than a new file it
 	// would shadow.
-	if err := os.Remove(want); err != nil {
-		t.Fatal(err)
+	if rerr := os.Remove(want); rerr != nil {
+		t.Fatal(rerr)
 	}
 	legacy := filepath.Join(home, ".codebuddy.json")
-	if err := os.WriteFile(legacy, []byte(`{"mcpServers":{"other":{"command":"x"}}}`), 0o644); err != nil {
-		t.Fatal(err)
+	if werr := os.WriteFile(legacy, []byte(`{"mcpServers":{"other":{"command":"x"}}}`), 0o644); werr != nil {
+		t.Fatal(werr)
 	}
 	if r, err = installTarget("codebuddy", "/bin/deja", false); err != nil || r.Path != legacy {
 		t.Fatalf("legacy install = %q, %v", r.Path, err)
@@ -89,9 +90,9 @@ func TestInstallCodeBuddyAuto(t *testing.T) {
 		var entry map[string]any
 		var h map[string]any
 		for _, e := range entries {
-			m := e.(map[string]any)
-			hh := m["hooks"].([]any)[0].(map[string]any)
-			if strings.HasSuffix(hh["command"].(string), " "+w.Sub) {
+			m := typedOrFatal[map[string]any](t, e)
+			hh := typedOrFatal[map[string]any](t, typedOrFatal[[]any](t, m["hooks"])[0])
+			if strings.HasSuffix(typedOrFatal[string](t, hh["command"]), " "+w.Sub) {
 				if entry != nil {
 					t.Fatalf("%s: %s wired twice", w.Event, w.Sub)
 				}
@@ -147,12 +148,7 @@ func TestCodeBuddyIsAnInstallTarget(t *testing.T) {
 func TestCodeBuddyDetectedByItsStore(t *testing.T) {
 	home := filepath.Join(hermeticEnv(t), "home")
 	has := func() bool {
-		for _, n := range existingTargets() {
-			if n == "codebuddy" {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(existingTargets(), "codebuddy")
 	}
 	if err := os.MkdirAll(filepath.Join(home, ".codebuddy"), 0o755); err != nil {
 		t.Fatal(err)

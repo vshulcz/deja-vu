@@ -24,11 +24,11 @@ func TestAWriteDoesNotPayForTheWholeLog(t *testing.T) {
 	}
 	best := func(prepare func(dir string)) time.Duration {
 		fastest := time.Duration(1<<62 - 1)
-		for round := 0; round < 3; round++ {
+		for range 3 {
 			dir := t.TempDir()
 			prepare(dir)
 			start := time.Now()
-			for i := 0; i < 200; i++ {
+			for range 200 {
 				RecordResultRaw(dir, KindRecall, 900, 2, false, 9000)
 			}
 			if took := time.Since(start); took < fastest {
@@ -39,7 +39,7 @@ func TestAWriteDoesNotPayForTheWholeLog(t *testing.T) {
 	}
 	base := best(func(string) {})
 	full := best(func(dir string) {
-		for i := 0; i < 12000; i++ {
+		for range 12000 {
 			RecordResultRaw(dir, KindRecall, 900, 2, false, 9000)
 		}
 	})

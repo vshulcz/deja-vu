@@ -17,7 +17,7 @@ func seedSessionsAhead(t *testing.T, n int) {
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < n; i++ {
+	for i := range n {
 		rec := claudeRecord(t, map[string]any{
 			"type": "user", "sessionId": fmt.Sprintf("ahead%d", i), "cwd": "/tmp/app",
 			"timestamp": time.Now().AddDate(1, 0, i).UTC().Format(time.RFC3339),
@@ -52,7 +52,7 @@ func TestTheClockRowReadsAsASentence(t *testing.T) {
 				t.Fatal(err)
 			}
 			var line string
-			for _, l := range strings.Split(out, "\n") {
+			for l := range strings.SplitSeq(out, "\n") {
 				if strings.Contains(l, "later than this machine's clock") {
 					line = strings.TrimSpace(l)
 					break

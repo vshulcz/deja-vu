@@ -26,7 +26,7 @@ func TestMachineRecentSearchAndExactRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	var recent recentJSON
-	if err := json.Unmarshal([]byte(out), &recent); err != nil {
+	if err = json.Unmarshal([]byte(out), &recent); err != nil {
 		t.Fatalf("recent json: %v\n%s", err, out)
 	}
 	if recent.SchemaVersion != jsonout.Version || len(recent.Sessions) != 1 || recent.Sessions[0].Source.Origin != "local" || recent.Sessions[0].Source.Instance != "test-workstation" || recent.Sessions[0].Messages != nil {
@@ -54,7 +54,7 @@ func TestMachineRecentSearchAndExactRead(t *testing.T) {
 			} `json:"session"`
 		} `json:"hits"`
 	}
-	if err := json.Unmarshal([]byte(out), &env); err != nil {
+	if err = json.Unmarshal([]byte(out), &env); err != nil {
 		t.Fatalf("search json: %v\n%s", err, out)
 	}
 	hits := env.Hits

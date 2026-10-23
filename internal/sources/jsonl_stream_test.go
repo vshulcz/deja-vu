@@ -3,7 +3,6 @@ package sources
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -33,7 +32,7 @@ func streamed(line []byte) (map[string]any, bool) {
 // read whole does, valid or not: escapes, surrogates, bad UTF-8, numbers,
 // nesting, and lines that hold something other than one object.
 func TestStreamedLineDecodesAsALineReadWhole(t *testing.T) {
-	cases := []string{
+	cases := []string{ //nolint:prealloc // the fuzz loop below grows the seeds
 		`{}`, `{"a":1}`, `  {"a" : [1, 2.5e3, -0, true, false, null, {"b":"c"}]}  `,
 		`{"s":"tab\tquote\" slash\/ back\\ \b\f\n\r"}`,
 		`{"u":"\u00e9\u20ac\ud83d\ude00"}`, `{"u":"\ud83d"}`, `{"u":"\ud83dx"}`, `{"u":"\ud83d\u0041"}`,
@@ -43,11 +42,11 @@ func TestStreamedLineDecodesAsALineReadWhole(t *testing.T) {
 		`null`, `[1,2]`, `"str"`, `{"a":1}}`, `{"a":1} trailing`, `{"a":1}{"b":2}`, `{"a":1,}`, `{"a"}`,
 		`{"a":1`, `{"dup":1,"dup":2}`, `{"a":[]}`, `{"a":{}}`, `{"a":[{}]}`, `{"t":tru}`, `{,}`, ``, `   `,
 	}
-	rng := rand.New(rand.NewSource(1))
+	rng := rand.New(rand.NewSource(1)) //nolint:gosec // seeded fuzz input
 	words := []string{"a", "é", "\U0001F600", "\\", "\"", "\n", "\x00", "\xff", "{", "}", "[", "]", ":", ",", "1", "-", ".", "e", " ", "\\u00", "\\ud83d", "\\ude00"}
-	for i := 0; i < 3000; i++ {
+	for range 3000 {
 		v := map[string]any{"k": randValue(rng, 3)}
-		b, _ := json.Marshal(v)
+		b := mustJSON(t, v)
 		cases = append(cases, string(b))
 		// The same with a few bytes changed, most of them broken.
 		mut := []byte(string(b))
@@ -109,7 +108,7 @@ func TestStreamedLineCutsLongStrings(t *testing.T) {
 	longStringCap = 64
 	nested := "{\n  \"output\": \"" + strings.Repeat("x", 200) + "\",\n  \"metadata\": {\"exit_code\": 2}\n}"
 	many := "[" + strings.Repeat(`{"id":1,"ok":true},`, 40) + `{"id":2}]`
-	line, _ := json.Marshal(map[string]any{
+	line := mustJSON(t, map[string]any{
 		"text":   strings.Repeat("a", 63) + "€€€ and more",
 		"short":  "ok",
 		"nested": nested,
@@ -241,7 +240,7 @@ func iotest(err error) io.Reader { return errReader{err} }
 // read looks for it, and the line is streamed rather than held.
 func TestCodexRolloutHeadReadsALongSessionMeta(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "rollout-2026-06-01T10-00-00-019a0000-0000-7000-8000-000000000001.jsonl")
-	meta, _ := json.Marshal(map[string]any{"timestamp": "2026-06-01T10:00:00.000Z", "type": "session_meta", "payload": map[string]any{
+	meta := mustJSON(t, map[string]any{"timestamp": "2026-06-01T10:00:00.000Z", "type": "session_meta", "payload": map[string]any{
 		"instructions": strings.Repeat("be brief. ", 300_000), "id": "019a0000-0000-7000-8000-000000000001", "cwd": "/w/app"}})
 	if err := os.WriteFile(p, append(meta, '\n'), 0o644); err != nil {
 		t.Fatal(err)
@@ -250,8 +249,9 @@ func TestCodexRolloutHeadReadsALongSessionMeta(t *testing.T) {
 	if at.IsZero() {
 		t.Error("the long meta line lost its time")
 	}
-	if id != "019a0000-0000-7000-8000-000000000001" || cwd != "/w/app" || len(payload["instructions"].(string)) != longStringCap {
-		t.Errorf("head = %q %q, %d bytes of instructions", id, cwd, len(payload["instructions"].(string)))
+	instructions, _ := payload["instructions"].(string)
+	if id != "019a0000-0000-7000-8000-000000000001" || cwd != "/w/app" || len(instructions) != longStringCap {
+		t.Errorf("head = %q %q, %d bytes of instructions", id, cwd, len(instructions))
 	}
 }
 

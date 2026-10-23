@@ -95,11 +95,11 @@ func callText(t *testing.T, resp map[string]any) string {
 	if !ok || len(content) == 0 {
 		t.Fatalf("no content array: %#v", res)
 	}
-	block := content[0].(map[string]any)
+	block := typedOrFatal[map[string]any](t, content[0])
 	if block["type"] != "text" {
 		t.Fatalf("content[0].type = %v, want text", block["type"])
 	}
-	return block["text"].(string)
+	return typedOrFatal[string](t, block["text"])
 }
 
 // seedClaude writes one claude session (user + assistant line) under the
@@ -113,7 +113,10 @@ func seedClaude(t *testing.T, root, project, id, userText, asstText string) {
 	line := func(role, text string) string {
 		msg := map[string]any{"role": role, "content": text}
 		rec := map[string]any{"type": role, "sessionId": id, "cwd": "/tmp/" + project, "timestamp": "2026-01-02T03:04:05Z", "message": msg}
-		b, _ := json.Marshal(rec)
+		b, err := json.Marshal(rec)
+		if err != nil {
+			t.Fatal(err)
+		}
 		return string(b)
 	}
 	body := line("user", userText) + "\n" + line("assistant", asstText) + "\n"
@@ -137,10 +140,10 @@ func TestMCPToolContract(t *testing.T) {
 
 	t.Run("tools/list schema", func(t *testing.T) {
 		resp := driveMCP(t, `{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}`)
-		tools := resp[0]["result"].(map[string]any)["tools"].([]any)
+		tools := typedOrFatal[[]any](t, typedOrFatal[map[string]any](t, resp[0]["result"])["tools"])
 		got := map[string]bool{}
 		for _, ti := range tools {
-			tool := ti.(map[string]any)
+			tool := typedOrFatal[map[string]any](t, ti)
 			name, _ := tool["name"].(string)
 			got[name] = true
 			schema, ok := tool["inputSchema"].(map[string]any)
@@ -156,16 +159,16 @@ func TestMCPToolContract(t *testing.T) {
 		if !got["deja"] {
 			t.Fatalf("tools/list missing the deja tool; got %v", got)
 		}
-		tool := tools[0].(map[string]any)
-		schema := tool["inputSchema"].(map[string]any)
-		props := schema["properties"].(map[string]any)
+		tool := typedOrFatal[map[string]any](t, tools[0])
+		schema := typedOrFatal[map[string]any](t, tool["inputSchema"])
+		props := typedOrFatal[map[string]any](t, schema["properties"])
 		mode, ok := props["mode"].(map[string]any)
 		if !ok {
 			t.Fatalf("the tool has no mode: %#v", props)
 		}
 		modes := map[string]bool{}
-		for _, m := range mode["enum"].([]any) {
-			modes[m.(string)] = true
+		for _, m := range typedOrFatal[[]any](t, mode["enum"]) {
+			modes[typedOrFatal[string](t, m)] = true
 		}
 		for _, want := range []string{"recall", "context", "blame", "fix", "how", "remember"} {
 			if !modes[want] {
@@ -317,18 +320,18 @@ func TestMCPResourcesAndPagination(t *testing.T) {
 	t.Run("resources list and read", func(t *testing.T) {
 		resp := driveMCP(t,
 			`{"jsonrpc":"2.0","id":1,"method":"resources/list","params":{}}`)
-		resources := resp[0]["result"].(map[string]any)["resources"].([]any)
+		resources := typedOrFatal[[]any](t, typedOrFatal[map[string]any](t, resp[0]["result"])["resources"])
 		if len(resources) != 2 {
 			t.Fatalf("want 2 resources, got %d: %#v", len(resources), resources)
 		}
-		first := resources[0].(map[string]any)
+		first := typedOrFatal[map[string]any](t, resources[0])
 		uri, _ := first["uri"].(string)
 		if !strings.HasPrefix(uri, "deja://session/claude:") {
 			t.Fatalf("uri = %q", uri)
 		}
 		read := driveMCP(t, `{"jsonrpc":"2.0","id":2,"method":"resources/read","params":{"uri":"`+uri+`"}}`)
-		contents := read[0]["result"].(map[string]any)["contents"].([]any)
-		text := contents[0].(map[string]any)["text"].(string)
+		contents := typedOrFatal[[]any](t, typedOrFatal[map[string]any](t, read[0]["result"])["contents"])
+		text := typedOrFatal[string](t, typedOrFatal[map[string]any](t, contents[0])["text"])
 		if !strings.Contains(text, "frobnicator") {
 			t.Fatalf("resource text wrong:\n%s", text)
 		}
@@ -360,8 +363,8 @@ func TestMCPResourcesAndPagination(t *testing.T) {
 
 func mcpToolText(t *testing.T, resp map[string]any) string {
 	t.Helper()
-	content := resp["result"].(map[string]any)["content"].([]any)
-	return content[0].(map[string]any)["text"].(string)
+	content := typedOrFatal[[]any](t, typedOrFatal[map[string]any](t, resp["result"])["content"])
+	return typedOrFatal[string](t, typedOrFatal[map[string]any](t, content[0])["text"])
 }
 
 func pageSessionID(page string) string {
@@ -496,15 +499,15 @@ func TestMCPResourceReadRefusesAnEmptySessionRef(t *testing.T) {
 	// guard cannot be satisfied by refusing everything.
 	t.Run("a full uri is still served", func(t *testing.T) {
 		list := driveMCP(t, `{"jsonrpc":"2.0","id":2,"method":"resources/list","params":{}}`)
-		resources := list[0]["result"].(map[string]any)["resources"].([]any)
-		uri := resources[0].(map[string]any)["uri"].(string)
+		resources := typedOrFatal[[]any](t, typedOrFatal[map[string]any](t, list[0]["result"])["resources"])
+		uri := typedOrFatal[string](t, typedOrFatal[map[string]any](t, resources[0])["uri"])
 
 		read := driveMCP(t, `{"jsonrpc":"2.0","id":3,"method":"resources/read","params":{"uri":"`+uri+`"}}`)
 		if e, ok := read[0]["error"]; ok {
 			t.Fatalf("real uri %q was refused: %#v", uri, e)
 		}
-		contents := read[0]["result"].(map[string]any)["contents"].([]any)
-		if text := contents[0].(map[string]any)["text"].(string); !strings.Contains(text, "frobnicator") {
+		contents := typedOrFatal[[]any](t, typedOrFatal[map[string]any](t, read[0]["result"])["contents"])
+		if text := typedOrFatal[string](t, typedOrFatal[map[string]any](t, contents[0])["text"]); !strings.Contains(text, "frobnicator") {
 			t.Fatalf("resource text wrong:\n%s", text)
 		}
 	})

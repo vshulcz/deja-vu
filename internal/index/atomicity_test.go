@@ -172,7 +172,7 @@ func TestExportDeferredCommitsWatermarkOnlyOnAck(t *testing.T) {
 		t.Fatalf("pre-ack re-export = %d, %v — watermark advanced before ack", n2, err)
 	}
 	_ = commit2
-	if err := commit(); err != nil {
+	if err = commit(); err != nil {
 		t.Fatal(err)
 	}
 	// Committed: the watermark holds, so strictly older work is not resent.
@@ -181,10 +181,10 @@ func TestExportDeferredCommitsWatermarkOnlyOnAck(t *testing.T) {
 	// Same source file: watermarks are per source, so an older record must
 	// land in the file that already has one.
 	older := line + `{"type":"user","sessionId":"s1","timestamp":"2026-01-01T00:00:00Z","message":{"role":"user","content":"older than the watermark"}}` + "\n"
-	if err := os.WriteFile(filepath.Join(proj, "s1.jsonl"), []byte(older), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(proj, "s1.jsonl"), []byte(older), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := Ensure(dir, "", true, nil); err != nil {
+	if err = Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	n3, _, err := ExportDeferred(dir, filepath.Join(tmp, "out3"), "")
@@ -360,12 +360,12 @@ func TestRarityCountsMessagesNotWholeSessions(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		write(fmt.Sprintf("subj%d", i), []string{"we put prepared statements behind pgbouncer today"})
 	}
-	for i := 0; i < 3; i++ {
-		var lines []string
-		for k := 0; k < 40; k++ {
+	for i := range 3 {
+		lines := make([]string, 0, 40)
+		for k := range 40 {
 			lines = append(lines, fmt.Sprintf("pushed the branch again after fix %d", k))
 		}
 		write(fmt.Sprintf("work%d", i), lines)

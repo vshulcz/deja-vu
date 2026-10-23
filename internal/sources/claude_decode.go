@@ -140,18 +140,7 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 		if v.Type == "user" && v.IsMeta {
 			return
 		}
-		if v.IsSidechain && v.AgentID != "" {
-			// The child is its own session, spawned by the parent whose id
-			// every one of these lines carries.
-			s.ID = v.AgentID
-			s.Kind = "sidechain"
-			s.Parent = v.SessionID
-			if v.AttributionAgent != "" {
-				s.Agent = v.AttributionAgent
-			}
-		} else if v.SessionID != "" {
-			s.ID = v.SessionID
-		}
+		claudeStampIdentity(&s, &v)
 		t := claudeTime(v.Timestamp)
 		s.Touch(t)
 		role := v.Type
@@ -193,43 +182,7 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 			s.Messages = append(s.Messages, model.Message{Role: role, Text: txt, Time: t})
 		}
 		if v.Message != nil {
-			if IndexToolPaths() {
-				if p := claudeToolPathsIn(content); p != "" {
-					s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: p, Time: t})
-				}
-			}
-			if IndexEdits() {
-				for _, e := range claudeEditSpansIn(content) {
-					s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: e, Time: t})
-				}
-			}
-			if IndexWrites() {
-				for _, w := range claudeWroteRecordsIn(content) {
-					s.Messages = append(s.Messages, model.Message{Role: RoleWrote, Text: w, Time: t})
-				}
-			}
-			if IndexCommands() {
-				for _, cmd := range claudeCommandsIn(content) {
-					if cmd.ID != "" {
-						// One call can carry a batch of commands, and the
-						// filter drops some of them, so the indexes under one
-						// id are neither one nor contiguous.
-						commandAt[cmd.ID] = append(commandAt[cmd.ID], len(s.Messages))
-					}
-					s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: cmd.Text, Time: t})
-				}
-				// The result arrives in a later record and names the call, in
-				// the marker every other harness writes. A failure is stamped
-				// only with the code its result names; nothing is invented for
-				// one that names none.
-				for _, res := range claudeToolOutcomesIn(content) {
-					if _, ok := commandAt[res.ID]; !ok || !res.Known {
-						continue
-					}
-					commandExits(commandAt).stamp(s.Messages, res.ID, "", res.Code)
-					delete(commandAt, res.ID)
-				}
-			}
+			claudeAppendToolRecords(&s, content, t, commandAt)
 		}
 	})
 	if len(s.Messages) == 0 {
@@ -250,6 +203,66 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 		s.ProjectFromDir = true
 	}
 	return []model.Session{s}, err
+}
+
+// claudeStampIdentity takes the session's id from a line, and for a subagent's
+// line the parent that spawned it.
+func claudeStampIdentity(s *model.Session, v *claudeLine) {
+	if v.IsSidechain && v.AgentID != "" {
+		// The child is its own session, spawned by the parent whose id
+		// every one of these lines carries.
+		s.ID = v.AgentID
+		s.Kind = "sidechain"
+		s.Parent = v.SessionID
+		if v.AttributionAgent != "" {
+			s.Agent = v.AttributionAgent
+		}
+	} else if v.SessionID != "" {
+		s.ID = v.SessionID
+	}
+}
+
+// claudeAppendToolRecords appends the paths, edits, writes and commands a
+// record's content carries, and stamps the outcome of earlier commands whose
+// results it holds.
+func claudeAppendToolRecords(s *model.Session, content *claudeContent, t time.Time, commandAt map[string][]int) {
+	if IndexToolPaths() {
+		if p := claudeToolPathsIn(content); p != "" {
+			s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: p, Time: t})
+		}
+	}
+	if IndexEdits() {
+		for _, e := range claudeEditSpansIn(content) {
+			s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: e, Time: t})
+		}
+	}
+	if IndexWrites() {
+		for _, w := range claudeWroteRecordsIn(content) {
+			s.Messages = append(s.Messages, model.Message{Role: RoleWrote, Text: w, Time: t})
+		}
+	}
+	if IndexCommands() {
+		for _, cmd := range claudeCommandsIn(content) {
+			if cmd.ID != "" {
+				// One call can carry a batch of commands, and the
+				// filter drops some of them, so the indexes under one
+				// id are neither one nor contiguous.
+				commandAt[cmd.ID] = append(commandAt[cmd.ID], len(s.Messages))
+			}
+			s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: cmd.Text, Time: t})
+		}
+		// The result arrives in a later record and names the call, in
+		// the marker every other harness writes. A failure is stamped
+		// only with the code its result names; nothing is invented for
+		// one that names none.
+		for _, res := range claudeToolOutcomesIn(content) {
+			if _, ok := commandAt[res.ID]; !ok || !res.Known {
+				continue
+			}
+			commandExits(commandAt).stamp(s.Messages, res.ID, "", res.Code)
+			delete(commandAt, res.ID)
+		}
+	}
 }
 
 // markClaudeBranch records a /branch's source, which the harness wrote on the
@@ -476,6 +489,13 @@ func trimJSONSpace(b []byte) []byte {
 // churn over 3745 sessions, for one buffer's worth of actual working memory.
 var jsonlReaders = sync.Pool{New: func() any { return bufio.NewReaderSize(nil, 1024*1024) }}
 
+func jsonlReader() *bufio.Reader {
+	if r, ok := jsonlReaders.Get().(*bufio.Reader); ok {
+		return r
+	}
+	return bufio.NewReaderSize(nil, 1024*1024)
+}
+
 // scanJSONLBytes hands each line to the caller without copying it or building a
 // decoder for it. The slice is only valid for the duration of the call.
 //
@@ -494,7 +514,7 @@ func scanJSONLBytes(path string, offset int64, fn func([]byte)) error {
 			return err
 		}
 	}
-	r := jsonlReaders.Get().(*bufio.Reader)
+	r := jsonlReader()
 	// Reset before returning it as well as after taking it: a pooled reader
 	// must not keep the last file open through its reference.
 	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
@@ -774,7 +794,11 @@ func IndexCommands() bool { return os.Getenv("DEJA_INDEX_COMMANDS") != "0" }
 // justfile every deploy and every migration was invisible to it while the same
 // work behind a Makefile was not. They are anchored to the start of a segment
 // because each is an ordinary English word: `git grep task` names no runner.
-var meaningfulCommand = regexp.MustCompile(`\b(go (test|build|vet|run|mod|get|install|generate|work|clean)|brew (install|upgrade|uninstall|reinstall|tap|services)|systemctl|launchctl|service [a-z0-9_.-]+ (start|stop|restart|reload|status)|golangci-lint|gofmt|pytest|python3? -m|uv (run|pip)|pip install|ruff|mypy|npm|npx|pnpm|yarn|bun |cargo |make\b|cmake|ctest|ninja|meson|bazel|buck2|gh (pr|run|release|issue|workflow|api)|git [a-z-]+|docker|kubectl|helm|terraform|psql|mysql|latexmk|mvn|gradle|dotnet|swift (build|test)|bundle exec|rails|rake|rspec|phpunit|composer (install|update|require)|tox|nox|jest|vitest|playwright|cypress|deno|tsc|sbt|stack (build|test|run|exec)|cabal|ghc|dune|zig|nix|rustc|clang\+\+|clang|g\+\+|gcc|pdm run|poetry run|deja )`)
+// The package installs behind a mirror are the remedy to an index that refuses
+// a package: `pip3 install --index-url <mirror>` and `pip config set` were
+// dropped while `pip install` was kept, and conda and apt were not listed at
+// all (#5599).
+var meaningfulCommand = regexp.MustCompile(`\b(go (test|build|vet|run|mod|get|install|generate|work|clean)|brew (install|upgrade|uninstall|reinstall|tap|services)|systemctl|launchctl|service [a-z0-9_.-]+ (start|stop|restart|reload|status)|golangci-lint|gofmt|pytest|python3? -m|uv (run|pip)|pip3? (install|download|config)|conda (install|create|config)|mamba install|apt(-get)? install|ruff|mypy|npm|npx|pnpm|yarn|bun |cargo |make\b|cmake|ctest|ninja|meson|bazel|buck2|gh (pr|run|release|issue|workflow|api)|git [a-z-]+|docker|kubectl|helm|terraform|psql|mysql|latexmk|mvn|gradle|dotnet|swift (build|test)|bundle exec|rails|rake|rspec|phpunit|composer (install|update|require)|tox|nox|jest|vitest|playwright|cypress|deno|tsc|sbt|stack (build|test|run|exec)|cabal|ghc|dune|zig|nix|rustc|clang\+\+|clang|g\+\+|gcc|pdm run|poetry run|deja )`)
 
 var trivialCommand = regexp.MustCompile(`^\s*(ls|cd|pwd|cat|head|tail|echo|grep|rg|find|which|wc|sed|awk|sleep|mkdir|rm|cp|mv|chmod|export|source|touch|open|printf)\b`)
 

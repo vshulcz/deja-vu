@@ -137,7 +137,7 @@ func TestServeAiderLiveAnswersEachRead(t *testing.T) {
 		t.Skip("no FIFO")
 	}
 	n := 0
-	path, stop, err := serveAiderLive(func() string { n++; return "answer " + string(rune('0'+n)) })
+	path, stop, err := serveAiderLive(func() string { n++; return "answer " + string(rune('0'+n)) }) //nolint:gosec // n counts a handful of calls
 	if err != nil {
 		t.Fatal(err)
 	}

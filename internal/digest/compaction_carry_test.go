@@ -16,7 +16,7 @@ func carryEv(pairs ...string) []model.Message {
 	role := map[string]string{"u": "user", "a": "assistant", "t": sources.RoleCommand, "s": "user"}
 	var out []model.Message
 	for i := 0; i < len(pairs); i += 2 {
-		out = append(out, model.Message{Role: role[pairs[i]], Text: pairs[i+1]})
+		out = append(out, model.Message{Role: role[pairs[i]], Text: pairs[i+1]}) //nolint:gosec // callers pass role/text pairs
 	}
 	return out
 }
@@ -24,7 +24,7 @@ func carryEv(pairs ...string) []model.Message {
 type carryWant struct{ kind, text string }
 
 func carryGot(items []model.ContextCarry) []carryWant {
-	var out []carryWant
+	var out []carryWant //nolint:prealloc // the cases compare against nil
 	for _, c := range items {
 		out = append(out, carryWant{c.Kind, c.Text})
 	}
@@ -180,7 +180,7 @@ func TestExtractCarryAgesAndKeys(t *testing.T) {
 }
 
 func TestExtractCarryCaps(t *testing.T) {
-	var text []string
+	text := make([]string, 0, 23)
 	for i := range 5 {
 		text = append(text, fmt.Sprintf("Вариант %d готов, скажи, если брать его.", i))
 	}
@@ -258,7 +258,7 @@ func TestCarryKeepsToItsShareOfThePacket(t *testing.T) {
 		Objective:   model.ContextFact{Text: "Fix retry cancellation."},
 		Conclusions: []model.ContextFact{{Text: "Root cause: the retry loop ignored ctx.Done."}},
 	}
-	for i := 0; i < 12; i++ {
+	for i := range 12 {
 		c.Carry = append(c.Carry, model.ContextCarry{Kind: "open", Key: fmt.Sprintf("#%d", 7300+i),
 			Text: strings.Repeat("длинное описание ", 10) + fmt.Sprintf("PR #%d ждёт мейнтейнера", 7300+i)})
 	}
@@ -294,8 +294,9 @@ func TestBoundCompactionContextDropsCarryLast(t *testing.T) {
 // One unit each, so removing a single rule flips a single row.
 func TestCarryUnitRules(t *testing.T) {
 	kinds := func(text string) string {
-		var out []string
-		for _, c := range ExtractCarry(carryEv("u", "go", "a", text), nil) {
+		carried := ExtractCarry(carryEv("u", "go", "a", text), nil)
+		out := make([]string, 0, len(carried))
+		for _, c := range carried {
 			out = append(out, c.Kind)
 		}
 		return strings.Join(out, ",")

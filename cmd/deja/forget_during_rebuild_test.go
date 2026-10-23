@@ -26,7 +26,7 @@ func TestForgetAgainstARebuildDropsOnlyWhatItNamed(t *testing.T) {
 		if err := os.MkdirAll(store, 0o755); err != nil {
 			t.Fatal(err)
 		}
-		for i := 0; i < 40; i++ {
+		for i := range 40 {
 			at := time.Now().Add(-time.Duration(i) * time.Minute).UTC().Format(time.RFC3339)
 			line := fmt.Sprintf(`{"type":"user","sessionId":"%s%d","timestamp":%q,"cwd":"/work/%s",`+
 				`"message":{"role":"user","content":"the retry budget in %s take %d"}}`,
@@ -43,12 +43,10 @@ func TestForgetAgainstARebuildDropsOnlyWhatItNamed(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		// A rebuild, the heaviest thing that can be holding the index.
 		_ = index.Ensure(dir, "", true, nil)
-	}()
+	})
 	out, errOut := captureBoth(t, "forget", "--project", "work/gone", "--all-matches")
 	wg.Wait()
 	if !strings.Contains(out+errOut, "sessions dropped") {

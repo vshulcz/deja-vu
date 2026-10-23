@@ -191,7 +191,7 @@ func installKiroAuto(exe string, uninstall bool) (installResult, error) {
 	}
 	base = wroteAll(base, global)
 	path := kiroAgentPath()
-	if b, err := os.ReadFile(path); err == nil && !strings.Contains(string(b), kiroAgentDescription) {
+	if b, rerr := os.ReadFile(path); rerr == nil && !strings.Contains(string(b), kiroAgentDescription) {
 		if !uninstall {
 			base.Note = joinNotes(base.Note, reportPath(path)+" is an agent deja did not write, so it was left as it is — rename it and run this again for the recall hooks")
 		}
@@ -233,8 +233,8 @@ func installKiroAgent(path, body string, uninstall bool) (installResult, error) 
 		return installTextFile(path, body, uninstall)
 	}
 	var fresh map[string]any
-	if err := json.Unmarshal([]byte(body), &fresh); err != nil {
-		return installResult{}, err
+	if uerr := json.Unmarshal([]byte(body), &fresh); uerr != nil {
+		return installResult{}, uerr
 	}
 	hooks := kiroAgentHooksWithout(root["hooks"])
 	if uninstall {
@@ -251,7 +251,8 @@ func installKiroAgent(path, body string, uninstall bool) (installResult, error) 
 		if _, ok := root["tools"]; !ok {
 			root["tools"] = fresh["tools"]
 		}
-		root["hooks"] = kiroAgentHooksWith(hooks, fresh["hooks"].(map[string]any))
+		freshHooks, _ := fresh["hooks"].(map[string]any)
+		root["hooks"] = kiroAgentHooksWith(hooks, freshHooks)
 	}
 	next, err := marshalConfigLike(old, root)
 	if err != nil {
@@ -327,8 +328,9 @@ func kiroAgentHooksWith(kept any, dejas map[string]any) any {
 	case []any:
 		for _, k := range kiroAgentHooks {
 			trigger := k.trigger
-			for _, e := range dejas[trigger].([]any) {
-				m := e.(map[string]any)
+			ours, _ := dejas[trigger].([]any)
+			for _, e := range ours {
+				m, _ := e.(map[string]any)
 				h = append(h, map[string]any{
 					"name":    "deja-" + trigger,
 					"trigger": trigger,
@@ -342,7 +344,8 @@ func kiroAgentHooksWith(kept any, dejas map[string]any) any {
 		for _, k := range kiroAgentHooks {
 			trigger := k.trigger
 			list, _ := h[trigger].([]any)
-			h[trigger] = append(list, dejas[trigger].([]any)...)
+			ours, _ := dejas[trigger].([]any)
+			h[trigger] = append(list, ours...)
 		}
 		return h
 	}
@@ -366,8 +369,7 @@ func kiroAgentHoldsTheirs(root map[string]any, hooks any) bool {
 				continue
 			}
 		case "permissions":
-			b, _ := json.Marshal(v)
-			if string(b) == kiroUpgradeDefaultPermissions {
+			if b, merr := json.Marshal(v); merr == nil && string(b) == kiroUpgradeDefaultPermissions {
 				continue
 			}
 		}
@@ -488,8 +490,8 @@ func kiroForgetDefaultAgent() error {
 		return err
 	}
 	root := map[string]any{}
-	if err := json.Unmarshal([]byte(jsoncToJSON(string(old))), &root); err != nil {
-		return nil
+	if uerr := json.Unmarshal([]byte(jsoncToJSON(string(old))), &root); uerr != nil {
+		return nil //nolint:nilerr // an unparsable file is left to the writer to report
 	}
 	delete(root, "chat.defaultAgent")
 	next, err := marshalConfigLike(old, root)

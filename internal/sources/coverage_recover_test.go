@@ -105,21 +105,21 @@ func TestCodexFilesListsRolloutsAndHistory(t *testing.T) {
 
 // --- grok.go: LoadGrok and assorted branches (0%/86%/85%/90%/86%/60%/80%) ---
 
-func grokFixtureTree(t *testing.T) (root, updates string) {
+func grokFixtureTree(t *testing.T) string {
 	t.Helper()
 	tmp := hermeticEnv(t)
-	root = filepath.Join(tmp, "grok")
+	root := filepath.Join(tmp, "grok")
 	t.Setenv("DEJA_GROK_ROOT", root)
 	group := url.PathEscape("/work/needle-project")
 	dir := filepath.Join(root, "sessions", group, "load-grok-session")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	return root, filepath.Join(dir, "updates.jsonl")
+	return filepath.Join(dir, "updates.jsonl")
 }
 
 func TestLoadGrokDiscoversAndParses(t *testing.T) {
-	_, updates := grokFixtureTree(t)
+	updates := grokFixtureTree(t)
 	lines := `{"timestamp":1,"params":{"update":{"sessionUpdate":"user_message_chunk","content":{"type":"text","text":"hi"}}}}` + "\n"
 	if err := os.WriteFile(updates, []byte(lines), 0o644); err != nil {
 		t.Fatal(err)
@@ -131,7 +131,7 @@ func TestLoadGrokDiscoversAndParses(t *testing.T) {
 }
 
 func TestParseGrokFileFallbacksAndDefaultKind(t *testing.T) {
-	_, updates := grokFixtureTree(t)
+	updates := grokFixtureTree(t)
 	// No summary.json at all: id falls back to the session dir name, cwd
 	// falls back to grokCWDFromPath (encoded group segment), title falls
 	// back from empty generated_title to session_summary.
@@ -168,7 +168,7 @@ func TestParseGrokFileFallbacksAndDefaultKind(t *testing.T) {
 }
 
 func TestParseGrokFileTitleFallsBackToSummary(t *testing.T) {
-	_, updates := grokFixtureTree(t)
+	updates := grokFixtureTree(t)
 	summary := `{"info":{"id":"x","cwd":"/work/needle-project"},"session_summary":"fallback summary"}`
 	if err := os.WriteFile(filepath.Join(filepath.Dir(updates), "summary.json"), []byte(summary), 0o644); err != nil {
 		t.Fatal(err)
@@ -217,7 +217,7 @@ func TestGrokCWDForSessionEmptyPath(t *testing.T) {
 }
 
 func TestGrokCWDForSessionPrefersSummary(t *testing.T) {
-	_, updates := grokFixtureTree(t)
+	updates := grokFixtureTree(t)
 	summary := `{"info":{"cwd":"/work/from-summary"}}`
 	if err := os.WriteFile(filepath.Join(filepath.Dir(updates), "summary.json"), []byte(summary), 0o644); err != nil {
 		t.Fatal(err)
@@ -352,16 +352,16 @@ func TestCursorDBsSkipsNonDirWorkspaceEntries(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(ws, "not-a-dir"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	real := filepath.Join(ws, "w1", "state.vscdb")
-	if err := os.MkdirAll(filepath.Dir(real), 0o755); err != nil {
+	resolved := filepath.Join(ws, "w1", "state.vscdb")
+	if err := os.MkdirAll(filepath.Dir(resolved), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(real, []byte("x"), 0o644); err != nil {
+	if err := os.WriteFile(resolved, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	got := CursorDBs()
-	if len(got) != 1 || got[0] != real {
-		t.Fatalf("CursorDBs = %v, want [%s]", got, real)
+	if len(got) != 1 || got[0] != resolved {
+		t.Fatalf("CursorDBs = %v, want [%s]", got, resolved)
 	}
 }
 
@@ -413,7 +413,7 @@ func TestParseCursorDBNoComposers(t *testing.T) {
 	// cursorQuery succeeds with zero rows, exercising the len(composers)==0
 	// early return.
 	schema := `create table cursorDiskKV (key text primary key, value text);`
-	cmd := exec.Command("sqlite3", db, schema)
+	cmd := exec.CommandContext(t.Context(), "sqlite3", db, schema)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}

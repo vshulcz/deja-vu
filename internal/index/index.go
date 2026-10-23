@@ -1,3 +1,5 @@
+// Package index builds and searches deja's on-disk index of past agent
+// sessions.
 package index
 
 import (
@@ -892,6 +894,7 @@ type BuildSummary struct {
 	Took time.Duration
 }
 
+// LastBuild is the summary of this process's most recent build.
 var LastBuild BuildSummary
 
 // SuppressHarnessNarration silences the per-harness progress lines for one
@@ -899,6 +902,7 @@ var LastBuild BuildSummary
 // same numbers in the summary block.
 var SuppressHarnessNarration bool
 
+// FileState is what the index knows about one transcript file.
 type FileState struct {
 	Path          string `json:"path"`
 	Size          int64  `json:"size"`
@@ -955,6 +959,7 @@ type FileState struct {
 	WrittenBack bool `json:"written_back,omitempty"`
 }
 
+// SessionMeta is the manifest's row for one indexed session.
 type SessionMeta struct {
 	ID, Harness, Project, Path, Title string
 	Started, Updated                  time.Time
@@ -1115,6 +1120,8 @@ const askedQuestionCap = 8
 // report, a paste, or an instruction with a question buried in it.
 const askedMaxRunes = 240
 
+// Manifest describes an index: its layout, the files it read and the
+// sessions they hold.
 type Manifest struct {
 	Version int `json:"version"`
 	// Format is the on-disk layout this store was written with. Absent on a
@@ -1187,6 +1194,10 @@ type Manifest struct {
 	// it decodes with it empty, and an empty one means "not recorded", which
 	// says nothing rather than guessing.
 	ExcludeFingerprint string `json:"exclude_fingerprint,omitempty"`
+	// AliasFingerprint is the same for the project alias file
+	// (sources.ProjectAliasFingerprint): aliases name sessions at ingest, so an
+	// edit renames nothing already indexed until a rebuild.
+	AliasFingerprint string `json:"alias_fingerprint,omitempty"`
 	// ToolFingerprint records which external CLIs were available when this
 	// index was built. A store deja could not read for want of sqlite3 or zstd
 	// is not stale by its file state — the transcripts did not change — so
@@ -1300,6 +1311,7 @@ type manifestCore struct {
 	IngestFiles      map[string]FileIngest
 	// ExcludeFingerprint, ToolFingerprint: see Manifest.
 	ExcludeFingerprint string
+	AliasFingerprint   string
 	ToolFingerprint    string
 	Compactions        map[string]CompactionState
 	KeptDated          bool
@@ -1310,12 +1322,15 @@ type manifestCore struct {
 	Empty              map[string]SessionMeta
 }
 
+// RedactionStats counts what redaction masked, in total, per file and per
+// rule.
 type RedactionStats struct {
 	Total int
 	Files map[string]int
 	Rules map[string]map[string]int
 }
 
+// Record is one message as the record log stores it.
 type Record struct {
 	Key        string
 	SourcePath string
@@ -1325,6 +1340,7 @@ type Record struct {
 	LowerText  string `json:"-"`
 }
 
+// OffsetRecord is a Record with its offset in the record log.
 type OffsetRecord struct {
 	Offset int64
 	Record Record
@@ -1341,6 +1357,7 @@ type posting struct {
 	Tool bool
 }
 
+// SearchResult is a search's sessions and how it found them.
 type SearchResult struct {
 	Sessions []model.Session
 	Fuzzy    bool
@@ -1403,6 +1420,8 @@ func (r SearchResult) IsStrict(s model.Session) bool {
 	return r.StrictIDs[s.Harness+":"+s.ID]
 }
 
+// DefaultDir is the index directory: DEJA_INDEX_DIR, or
+// ~/.cache/deja/index.db.
 func DefaultDir() string {
 	if v := os.Getenv("DEJA_INDEX_DIR"); v != "" {
 		return v

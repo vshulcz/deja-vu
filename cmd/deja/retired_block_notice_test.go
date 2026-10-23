@@ -43,7 +43,7 @@ func TestUninstallSaysWhenARetiredBlockHasToStay(t *testing.T) {
 
 	// The same file with its end marker gone.
 	half := "my own gemini notes\n\n" + guidanceStart + "\nold guidance\n"
-	if err := os.WriteFile(retired, []byte(half), 0o644); err != nil {
+	if err = os.WriteFile(retired, []byte(half), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	res, err = installGuidance("gemini", true)

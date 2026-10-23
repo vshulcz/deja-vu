@@ -48,7 +48,7 @@ func TestAHarnessOwnStateIsNotAnUnreadTranscript(t *testing.T) {
 
 	var out bytes.Buffer
 	doctorHarnesses(&out, t.TempDir())
-	for _, line := range strings.Split(out.String(), "\n") {
+	for line := range strings.SplitSeq(out.String(), "\n") {
 		trimmed := strings.TrimSpace(line)
 		if !strings.HasPrefix(trimmed, "qwen ") && !strings.HasPrefix(trimmed, "openclaw ") {
 			continue

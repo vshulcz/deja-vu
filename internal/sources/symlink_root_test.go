@@ -12,12 +12,12 @@ import (
 // (#1744).
 func TestASymlinkedStoreRootIsWalked(t *testing.T) {
 	tmp := t.TempDir()
-	real := filepath.Join(tmp, "real", "proj")
-	if err := os.MkdirAll(real, 0o755); err != nil {
+	resolved := filepath.Join(tmp, "real", "proj")
+	if err := os.MkdirAll(resolved, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	rec := `{"type":"user","sessionId":"s1","cwd":"/w","timestamp":"2026-08-07T01:00:00Z","message":{"role":"user","content":"quibbleknot"}}` + "\n"
-	if err := os.WriteFile(filepath.Join(real, "a.jsonl"), []byte(rec), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(resolved, "a.jsonl"), []byte(rec), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	link := filepath.Join(tmp, "link")
@@ -77,11 +77,11 @@ func TestLinksInsideAStoreAreStillSkipped(t *testing.T) {
 // store back down to nothing.
 func TestWalkReportsPathsUnderTheConfiguredRoot(t *testing.T) {
 	tmp := t.TempDir()
-	real := filepath.Join(tmp, "real", "proj")
-	if err := os.MkdirAll(real, 0o755); err != nil {
+	resolved := filepath.Join(tmp, "real", "proj")
+	if err := os.MkdirAll(resolved, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(real, "a.jsonl"), []byte("{}\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(resolved, "a.jsonl"), []byte("{}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	link := filepath.Join(tmp, "link")

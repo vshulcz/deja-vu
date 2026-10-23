@@ -178,8 +178,9 @@ func cherryStudioMovedDirs() []string {
 // included: `<app data>/Data/cherrystudio.sqlite` (`app.database.file` in
 // 2.0.14's out/main/main.js).
 func CherryStudioDatabases() []string {
-	var out []string
-	for _, base := range cherryStudioAppDirs() {
+	dirs := cherryStudioAppDirs()
+	out := make([]string, 0, len(dirs))
+	for _, base := range dirs {
 		out = append(out, filepath.Join(base, "Data", "cherrystudio.sqlite"))
 	}
 	return out
@@ -351,6 +352,7 @@ func CherryStudioUnderRoot(p string) bool {
 	return false
 }
 
+// LoadCherryStudio reads every Cherry Studio session on this machine.
 func LoadCherryStudio() []model.Session {
 	return parseFiles(CherryStudioSessionFiles(), ParseCherryStudioFile)
 }
@@ -425,16 +427,13 @@ func lastLineBefore(path string, end int64) []byte {
 	var line []byte
 	pos := end - 1 // the newline that ends the line
 	for pos > 0 {
-		n := int64(64 << 10)
-		if n > pos {
-			n = pos
-		}
-		buf := make([]byte, n)
+		n := min(int64(64<<10), pos)
+		buf := make([]byte, n, n+int64(len(line)))
 		if _, err := f.ReadAt(buf, pos-n); err != nil && err != io.EOF {
 			return nil
 		}
-		for i := len(buf) - 1; i >= 0; i-- {
-			if buf[i] == '\n' {
+		for i, b := range slices.Backward(buf) {
+			if b == '\n' {
 				return append(buf[i+1:], line...)
 			}
 		}

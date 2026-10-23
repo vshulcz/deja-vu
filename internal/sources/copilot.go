@@ -116,6 +116,13 @@ func parseCopilotFileFromOffset(path string, offset int64) ([]model.Session, err
 	})
 }
 
+// copilotCmdRef is which message holds each shell command, by the call id the
+// completion event repeats: Copilot files the command and its outcome as two records.
+type copilotCmdRef struct {
+	s  *model.Session
+	at []int
+}
+
 // parseCopilotScan reads the records scan yields as path's, from offset.
 func parseCopilotScan(path string, offset int64, scan func(func(map[string]any)) error) ([]model.Session, error) {
 	s := model.Session{
@@ -123,13 +130,7 @@ func parseCopilotScan(path string, offset int64, scan func(func(map[string]any))
 		ID:      filepath.Base(filepath.Dir(path)),
 		Path:    path,
 	}
-	// Which message holds each shell command, by the call id the completion
-	// event repeats: Copilot files the command and its outcome as two records.
-	type cmdRef struct {
-		s  *model.Session
-		at []int
-	}
-	commandAt := map[string]cmdRef{}
+	commandAt := map[string]copilotCmdRef{}
 	// A `task` sub-agent runs inside the parent's log, every record of it
 	// stamped with agentId. It is a session of its own, as Claude Code's
 	// sidechains are: read into the parent, the prompt the parent agent wrote
@@ -254,100 +255,12 @@ func parseCopilotScan(path string, offset int64, scan func(func(map[string]any))
 			// command ran. Copilot files these outside the message stream, so
 			// the assistant turns that do nothing but call tools were being
 			// stored as empty and the work was reachable from nothing.
-			if data == nil {
-				return
-			}
-			name, _ := data["toolName"].(string)
-			// With a GPT model the only edit tool is apply_patch, a freeform
-			// tool whose arguments are the patch string itself rather than an
-			// object, so every file such a session changed was dropped (#4491).
-			// Its paths may be relative; Copilot resolves them against the
-			// session's directory.
-			if body, ok := data["arguments"].(string); ok && name == "apply_patch" {
-				resolve := func(p string) string { return resolveToolPath(p, cwd) }
-				if records := applyPatchRecords(body, resolve, t); len(records) > 0 {
-					cur.Touch(t)
-					cur.Messages = append(cur.Messages, records...)
-				}
-				return
-			}
-			args, _ := data["arguments"].(map[string]any)
-			if name == "" || args == nil {
-				return
-			}
-			part := []any{map[string]any{"type": "tool_use", "name": name, "input": args}}
-			var records []model.Message
-			if IndexToolPaths() {
-				if p := toolPathsIn(part, copilotDialect); p != "" {
-					records = append(records, model.Message{Role: RoleFiles, Text: p, Time: t})
-				}
-			}
-			if IndexWrites() {
-				for _, w := range wroteRecordsIn(part, copilotDialect) {
-					records = append(records, model.Message{Role: RoleWrote, Text: w, Time: t})
-				}
-			}
-			if IndexEdits() {
-				for _, span := range editSpansIn(part, copilotDialect) {
-					records = append(records, model.Message{Role: RoleEdit, Text: span, Time: t})
-				}
-			}
-			// Every command of the call, not the last one: a dialect that
-			// hands back an array would otherwise mark one of them.
-			var cmdAt []int
-			if IndexCommands() {
-				for _, cmd := range commandsIn(part, copilotDialect) {
-					cmdAt = append(cmdAt, len(records))
-					records = append(records, model.Message{Role: RoleCommand, Text: cmd, Time: t})
-				}
-			}
-			if len(records) == 0 {
-				return
-			}
-			cur.Touch(t)
-			if id, _ := data["toolCallId"].(string); id != "" && len(cmdAt) > 0 {
-				// Assigned, not appended: an id reused for a later call would
-				// otherwise carry the first call's commands too, and the second
-				// outcome would land on a run that had already finished
-				// (review of #3369).
-				at := make([]int, 0, len(cmdAt))
-				for _, i := range cmdAt {
-					at = append(at, len(cur.Messages)+i)
-				}
-				commandAt[id] = cmdRef{s: cur, at: at}
-			}
-			cur.Messages = append(cur.Messages, records...)
+			copilotToolStart(cur, data, t, cwd, commandAt)
 		case "tool.execution_complete":
 			// Kept whether or not the call succeeded: the error a command hit
 			// is exactly what a later search reaches for, and copilot's own
 			// failure text was unreachable before this.
-			if !IndexToolOutput() || data == nil {
-				return
-			}
-			result, _ := data["result"].(map[string]any)
-			out, _ := result["content"].(string)
-			// What the command did, which Copilot does not put in `success`:
-			// that field is true on every completion in a real store, failed
-			// runs included, and the code lives in the telemetry and in a
-			// trailer inside the output (#3369).
-			if code := copilotExitCode(data, out); code > 0 {
-				if id, _ := data["toolCallId"].(string); id != "" {
-					if c := commandAt[id]; c.s != nil {
-						for _, i := range c.at {
-							if i < len(c.s.Messages) {
-								c.s.Messages[i].Text += fmt.Sprintf("  → exit %d", code)
-							}
-						}
-					}
-					// Consumed: one outcome belongs to one call.
-					delete(commandAt, id)
-				}
-			}
-			if out = strings.TrimSpace(out); out == "" {
-				return
-			}
-			cur.Touch(t)
-			cur.Messages = append(cur.Messages, model.Message{Role: RoleToolOutput, Text: out, Time: t})
+			copilotToolComplete(cur, data, t, commandAt)
 		}
 	})
 	var out []model.Session
@@ -368,6 +281,106 @@ func parseCopilotScan(path string, offset int64, scan func(func(map[string]any))
 		out = append(out, *c)
 	}
 	return out, err
+}
+
+// copilotToolStart records the work a tool call carries: the file it patched or
+// edited, what it wrote and the commands it ran.
+func copilotToolStart(cur *model.Session, data map[string]any, t time.Time, cwd string, commandAt map[string]copilotCmdRef) {
+	if data == nil {
+		return
+	}
+	name, _ := data["toolName"].(string)
+	// With a GPT model the only edit tool is apply_patch, a freeform
+	// tool whose arguments are the patch string itself rather than an
+	// object, so every file such a session changed was dropped (#4491).
+	// Its paths may be relative; Copilot resolves them against the
+	// session's directory.
+	if body, ok := data["arguments"].(string); ok && name == "apply_patch" {
+		resolve := func(p string) string { return resolveToolPath(p, cwd) }
+		if records := applyPatchRecords(body, resolve, t); len(records) > 0 {
+			cur.Touch(t)
+			cur.Messages = append(cur.Messages, records...)
+		}
+		return
+	}
+	args, _ := data["arguments"].(map[string]any)
+	if name == "" || args == nil {
+		return
+	}
+	part := []any{map[string]any{"type": "tool_use", "name": name, "input": args}}
+	var records []model.Message
+	if IndexToolPaths() {
+		if p := toolPathsIn(part, copilotDialect); p != "" {
+			records = append(records, model.Message{Role: RoleFiles, Text: p, Time: t})
+		}
+	}
+	if IndexWrites() {
+		for _, w := range wroteRecordsIn(part, copilotDialect) {
+			records = append(records, model.Message{Role: RoleWrote, Text: w, Time: t})
+		}
+	}
+	if IndexEdits() {
+		for _, span := range editSpansIn(part, copilotDialect) {
+			records = append(records, model.Message{Role: RoleEdit, Text: span, Time: t})
+		}
+	}
+	// Every command of the call, not the last one: a dialect that
+	// hands back an array would otherwise mark one of them.
+	var cmdAt []int
+	if IndexCommands() {
+		for _, cmd := range commandsIn(part, copilotDialect) {
+			cmdAt = append(cmdAt, len(records))
+			records = append(records, model.Message{Role: RoleCommand, Text: cmd, Time: t})
+		}
+	}
+	if len(records) == 0 {
+		return
+	}
+	cur.Touch(t)
+	if id, _ := data["toolCallId"].(string); id != "" && len(cmdAt) > 0 {
+		// Assigned, not appended: an id reused for a later call would
+		// otherwise carry the first call's commands too, and the second
+		// outcome would land on a run that had already finished
+		// (review of #3369).
+		at := make([]int, 0, len(cmdAt))
+		for _, i := range cmdAt {
+			at = append(at, len(cur.Messages)+i)
+		}
+		commandAt[id] = copilotCmdRef{s: cur, at: at}
+	}
+	cur.Messages = append(cur.Messages, records...)
+}
+
+// copilotToolComplete stamps a command's exit code onto the call it completes
+// and keeps the tool's output.
+func copilotToolComplete(cur *model.Session, data map[string]any, t time.Time, commandAt map[string]copilotCmdRef) {
+	if !IndexToolOutput() || data == nil {
+		return
+	}
+	result, _ := data["result"].(map[string]any)
+	out, _ := result["content"].(string)
+	// What the command did, which Copilot does not put in `success`:
+	// that field is true on every completion in a real store, failed
+	// runs included, and the code lives in the telemetry and in a
+	// trailer inside the output (#3369).
+	if code := copilotExitCode(data, out); code > 0 {
+		if id, _ := data["toolCallId"].(string); id != "" {
+			if c := commandAt[id]; c.s != nil {
+				for _, i := range c.at {
+					if i < len(c.s.Messages) {
+						c.s.Messages[i].Text += fmt.Sprintf("  → exit %d", code)
+					}
+				}
+			}
+			// Consumed: one outcome belongs to one call.
+			delete(commandAt, id)
+		}
+	}
+	if out = strings.TrimSpace(out); out == "" {
+		return
+	}
+	cur.Touch(t)
+	cur.Messages = append(cur.Messages, model.Message{Role: RoleToolOutput, Text: out, Time: t})
 }
 
 // jsonInt reads a number the scanner decoded with UseNumber, and the two other

@@ -33,9 +33,9 @@ func TestSpecKitExtensionManifest(t *testing.T) {
 		t.Errorf("description is %d characters; the catalog wants under 200", len(d))
 	}
 	// X.Y.Z only: Spec Kit rejects 1.0 and 1.0.0-beta.
-	version := ext.str("version")
-	if !regexp.MustCompile(`^\d+\.\d+\.\d+$`).MatchString(version) {
-		t.Fatalf("extension.version %q is not X.Y.Z", version)
+	extVersion := ext.str("version")
+	if !regexp.MustCompile(`^\d+\.\d+\.\d+$`).MatchString(extVersion) {
+		t.Fatalf("extension.version %q is not X.Y.Z", extVersion)
 	}
 
 	// scripts/pinmanifests moves this with every other release manifest, and
@@ -47,8 +47,8 @@ func TestSpecKitExtensionManifest(t *testing.T) {
 	if err := json.Unmarshal(repoFile(t, "gemini-extension.json"), &gemini); err != nil {
 		t.Fatal(err)
 	}
-	if version != gemini.Version {
-		t.Errorf("extension.version is %s, the other release manifests say %s — run scripts/pinmanifests", version, gemini.Version)
+	if extVersion != gemini.Version {
+		t.Errorf("extension.version is %s, the other release manifests say %s — run scripts/pinmanifests", extVersion, gemini.Version)
 	}
 	release := string(repoFile(t, ".github/workflows/release.yml"))
 	pin, pack := strings.Index(release, "go run ./scripts/pinmanifests -version"), strings.Index(release, `zip -qr "$GITHUB_WORKSPACE/dist/deja-spec-kit.zip"`)
@@ -241,6 +241,7 @@ func (p *yamlParser) pair(text string) (string, any) {
 }
 
 func unquoteYAML(t *testing.T, v string) string {
+	t.Helper()
 	if strings.HasPrefix(v, `"`) {
 		s, err := strconv.Unquote(v)
 		if err != nil {

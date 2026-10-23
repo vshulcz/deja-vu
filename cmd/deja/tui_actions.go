@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -65,7 +66,7 @@ func (a *tuiApp) askForget() {
 }
 
 func (a *tuiApp) handleForget(ev tui.Event) {
-	switch ev.Key {
+	switch ev.Key { //nolint:exhaustive // other keys leave the prompt open
 	case tui.KeyEnter:
 		a.modal = modalNone
 		a.forgetSession(a.m.src)
@@ -136,7 +137,7 @@ func forgetInChild(dir string) func(string) error {
 		if err != nil {
 			return err
 		}
-		cmd := exec.Command(exe, "forget", "--session", id)
+		cmd := exec.CommandContext(context.Background(), exe, "forget", "--session", id)
 		cmd.Env = append(os.Environ(), "DEJA_INDEX_DIR="+dir)
 		out, err := cmd.CombinedOutput()
 		if err == nil {

@@ -145,7 +145,7 @@ func TestSenpiAndKimchiReadThePiEnvelope(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(flat, body, 0o600); err != nil {
+	if err = os.WriteFile(flat, body, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_KIMCHI_ROOT", filepath.Dir(flat))

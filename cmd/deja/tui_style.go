@@ -91,21 +91,21 @@ type painter struct {
 }
 
 // keycap draws " k " on a surface and the label after it.
-func (p painter) keycap(x, y int, k, label string, max int) int {
-	x = p.Put(x, y, " "+k+" ", tui.Style{FG: cText, BG: cSurf2, Bold: true, Reverse: p.mono}, max)
-	x = p.Put(x, y, " "+label, fgs(cSub), max)
+func (p painter) keycap(x, y int, k, label string, limit int) int {
+	x = p.Put(x, y, " "+k+" ", tui.Style{FG: cText, BG: cSurf2, Bold: true, Reverse: p.mono}, limit)
+	x = p.Put(x, y, " "+label, fgs(cSub), limit)
 	return x + 3
 }
 
 // button is a quiet action; primary is the one filled with the accent, of
 // which a panel has exactly one.
-func (p painter) button(x, y int, k, label string, primary bool, max int) int {
+func (p painter) button(x, y int, k, label string, primary bool, limit int) int {
 	if primary {
-		return p.Put(x, y, " "+k+"  "+label+" ", tui.Style{FG: cMantle, BG: cAcc, Bold: true, Reverse: p.mono}, max)
+		return p.Put(x, y, " "+k+"  "+label+" ", tui.Style{FG: cMantle, BG: cAcc, Bold: true, Reverse: p.mono}, limit)
 	}
-	x = p.Put(x, y, " ", on(cText, cOver), max)
-	x = p.Put(x, y, k, boldOn(cAcc, cOver), max)
-	return p.Put(x, y, " "+label+" ", on(cText, cOver), max)
+	x = p.Put(x, y, " ", on(cText, cOver), limit)
+	x = p.Put(x, y, k, boldOn(cAcc, cOver), limit)
+	return p.Put(x, y, " "+label+" ", on(cText, cOver), limit)
 }
 
 // box draws a rounded border around a filled rectangle. The border cells
@@ -126,40 +126,40 @@ func (p painter) box(x, y, w, h int, fill tui.Color) {
 }
 
 // chip is "● Name count" on a surface.
-func (p painter) chip(x, y int, h string, n int, sel bool, max int) int {
+func (p painter) chip(x, y int, h string, n int, sel bool, limit int) int {
 	bg := cSurf2
 	if sel {
 		bg = cOver
 	}
-	x = p.Put(x, y, " ", on(cText, bg), max)
-	x = p.Put(x, y, "●", on(agentColor(h), bg), max)
-	x = p.Put(x, y, " "+agentName(h), on(cText, bg), max)
+	x = p.Put(x, y, " ", on(cText, bg), limit)
+	x = p.Put(x, y, "●", on(agentColor(h), bg), limit)
+	x = p.Put(x, y, " "+agentName(h), on(cText, bg), limit)
 	if n > 0 {
-		x = p.Put(x, y, " "+grouped(n), on(cMuted, bg), max)
+		x = p.Put(x, y, " "+grouped(n), on(cMuted, bg), limit)
 	}
-	return p.Put(x, y, " ", on(cText, bg), max)
+	return p.Put(x, y, " ", on(cText, bg), limit)
 }
 
 // putHL writes text with every occurrence of the query's words picked out.
 // It clips with an ellipsis like PutClip.
 // A first match past the edge brings its part of the line in from the left,
 // after an ellipsis, so a hit is never drawn off screen.
-func (p painter) putHL(x, y int, text string, terms []string, base tui.Style, max int) int {
-	if termwidth.Columns(text) > max-x {
-		if max-x < 1 {
+func (p painter) putHL(x, y int, text string, terms []string, base tui.Style, limit int) int {
+	if termwidth.Columns(text) > limit-x {
+		if limit-x < 1 {
 			return x
 		}
 		if from, to := firstMark(highlightMask([]rune(text), terms)); to > 0 {
 			rs := []rune(text)
-			if termwidth.Columns(string(rs[:to])) > max-x-1 {
+			if termwidth.Columns(string(rs[:to])) > limit-x-1 {
 				// The match ends two thirds of the way in, its line's tail after it.
-				lead := []rune(termwidth.CutRight(string(rs[:to]), (max-x-2)*2/3))
-				x = p.Put(x, y, "…", base, max)
+				lead := []rune(termwidth.CutRight(string(rs[:to]), (limit-x-2)*2/3))
+				x = p.Put(x, y, "…", base, limit)
 				text = string(rs[min(from, to-len(lead)):])
 			}
 		}
-		if termwidth.Columns(text) > max-x {
-			text = strings.TrimRight(termwidth.Cut(text, max-x-1), " ") + "…"
+		if termwidth.Columns(text) > limit-x {
+			text = strings.TrimRight(termwidth.Cut(text, limit-x-1), " ") + "…"
 		}
 	}
 	rs := []rune(text)
@@ -176,7 +176,7 @@ func (p painter) putHL(x, y int, text string, terms []string, base tui.Style, ma
 			if mark[start] {
 				st = hl
 			}
-			x = p.Put(x, y, string(rs[start:i]), st, max)
+			x = p.Put(x, y, string(rs[start:i]), st, limit)
 			start = i
 		}
 	}
@@ -235,7 +235,7 @@ func highlightMask(rs []rune, terms []string) []bool {
 func queryTerms(q string) []string {
 	var out []string
 	seen := map[string]bool{}
-	for _, f := range strings.Fields(strings.ReplaceAll(q, "\"", " ")) {
+	for f := range strings.FieldsSeq(strings.ReplaceAll(q, "\"", " ")) {
 		k := strings.ToLower(f)
 		if len([]rune(f)) < 2 || seen[k] {
 			continue
