@@ -1,8 +1,10 @@
 package sources
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -38,7 +40,7 @@ func TestMcodeFileReadsTheTurnsAndTheWork(t *testing.T) {
 	if s.Started.IsZero() || s.Updated.IsZero() {
 		t.Fatalf("clock is empty: %#v", s)
 	}
-	var roles []string
+	roles := make([]string, 0, len(s.Messages))
 	for _, m := range s.Messages {
 		roles = append(roles, m.Role)
 	}
@@ -118,9 +120,9 @@ func TestMcodeFileResumesFromAnOffset(t *testing.T) {
 	// somewhere else: the line is read again for it. The first line of a
 	// compacted session is the summary, which is not a turn — the cut is
 	// after the first one that is.
-	cut := int64(strings.Index(string(b), "\n") + 1)
-	if i := strings.Index(string(b), `"role":"user"`); i >= 0 {
-		if j := strings.Index(string(b)[i:], "\n"); j >= 0 {
+	cut := int64(bytes.IndexByte(b, '\n') + 1)
+	if i := bytes.Index(b, []byte(`"role":"user"`)); i >= 0 {
+		if j := bytes.IndexByte(b[i:], '\n'); j >= 0 {
 			cut = int64(i + j + 1)
 		}
 	}
@@ -250,12 +252,7 @@ func TestMcodeAnEmptyCompactionSummaryIsNotIndexed(t *testing.T) {
 }
 
 func containsRole(roles []string, want string) bool {
-	for _, r := range roles {
-		if r == want {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(roles, want)
 }
 
 // firstUserMessage is the first turn the person wrote. A session that has

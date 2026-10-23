@@ -39,7 +39,7 @@ func TestMcodeCompactionReadsTheStoreNotTheTemporaryProjection(t *testing.T) {
 	}
 	sql := "create table local_runtime_sessions (session_id text primary key, workspace_dir text, project_workspace_dir text, is_default_workspace integer not null default 0);" +
 		"insert into local_runtime_sessions values ('" + id + "', '" + strings.ReplaceAll(workspace, "'", "''") + "', '/elsewhere/parent-repo', 0);"
-	if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, sql).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, out)
 	}
 	// The projection the runtime would name: not a store deja reads.

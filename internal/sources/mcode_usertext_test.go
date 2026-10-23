@@ -131,6 +131,25 @@ func TestMcodeANonStringGenuineTextIsNoTurn(t *testing.T) {
 	if len(got) != 0 {
 		t.Fatalf("messages = %q, want none", got)
 	}
+	// An empty one is a turn with nothing typed, as the runtime reads it.
+	got = parseMcodeLines(t, mcodeUserLine(
+		`"content":[{"type":"text","text":"words"}],"genuineUserQueryText":""`))
+	if len(got) != 0 {
+		t.Fatalf("empty genuineUserQueryText: messages = %q, want none", got)
+	}
+}
+
+// A content that is a plain string is the text itself (YIe), and the range
+// counts into it.
+func TestMcodeAStringContentIsTheText(t *testing.T) {
+	got := parseMcodeLines(t, mcodeUserLine(`"content":"<system-reminder>r</system-reminder>asked plainly"`))
+	if len(got) != 1 || got[0] != "user: asked plainly" {
+		t.Fatalf("messages = %q", got)
+	}
+	got = parseMcodeLines(t, mcodeUserLine(`"content":"xxtyped","canonicalTextRange":{"startOffset":2,"endOffset":7}`))
+	if len(got) != 1 || got[0] != "user: typed" {
+		t.Fatalf("with a range: messages = %q", got)
+	}
 }
 
 // The marker a migration leaves when it could not recover older history is
@@ -284,7 +303,7 @@ func TestMcodeTheProjectIsTheWorkspaceTheRuntimeRecorded(t *testing.T) {
 		"insert into local_runtime_sessions values ('mvs_ws', '" + strings.ReplaceAll(tree, "'", "''") + "', '" + strings.ReplaceAll(ws, "'", "''") + "', 0);" +
 		"insert into local_runtime_sessions values ('mvs_default', '" + strings.ReplaceAll(filepath.Join(base, ".minimax", "workspace"), "'", "''") + "', null, 1);" +
 		"insert into local_runtime_sessions values ('mvs_rel', 'relative/dir', '', 0);"
-	if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, sql).CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3: %v %s", err, out)
 	}
 	// A worktree session is filed under the repository, and its workspace is

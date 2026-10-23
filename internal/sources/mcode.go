@@ -252,7 +252,7 @@ func mcodeWorkspaces() map[string]mcodeDirs {
 	// The runtime writes through a WAL, so the main file's clock alone can
 	// stay put while sessions are added.
 	key := fmt.Sprintf("%s|%d|%d", db, info.ModTime().UnixNano(), info.Size())
-	if wal, err := os.Stat(db + "-wal"); err == nil {
+	if wal, werr := os.Stat(db + "-wal"); werr == nil {
 		key += fmt.Sprintf("|%d|%d", wal.ModTime().UnixNano(), wal.Size())
 	}
 	c := &mcodeWorkspaceCache

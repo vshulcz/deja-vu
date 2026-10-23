@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // The package MCode loads: a manifest, the hook document, and the icon the
@@ -33,8 +35,8 @@ func TestMcodeAutoWritesThePackageAndTheMCPEntry(t *testing.T) {
 			Args    []string `json:"args"`
 		} `json:"mcpServers"`
 	}
-	if err := json.Unmarshal(b, &cfg); err != nil {
-		t.Fatalf("mcp.json is not JSON: %v", err)
+	if jerr := json.Unmarshal(b, &cfg); jerr != nil {
+		t.Fatalf("mcp.json is not JSON: %v", jerr)
 	}
 	s, ok := cfg.Servers["deja"]
 	if !ok {
@@ -63,8 +65,8 @@ func TestMcodeAutoWritesThePackageAndTheMCPEntry(t *testing.T) {
 		Hooks         []string `json:"hooks"`
 		Skills        []string `json:"skills"`
 	}
-	if err := json.Unmarshal(mb, &m); err != nil {
-		t.Fatal(err)
+	if jerr := json.Unmarshal(mb, &m); jerr != nil {
+		t.Fatal(jerr)
 	}
 	if m.SchemaVersion != 1 || m.Name != "deja" {
 		t.Errorf("manifest = %s", mb)
@@ -210,8 +212,41 @@ func TestMcodeAutoNamesEveryFileItWrote(t *testing.T) {
 // --help); the registry used to call resume impossible (#5593).
 func TestMcodeResumeOpensTheSessionByID(t *testing.T) {
 	hermeticEnv(t)
-	dir, cmd, err := resumeCommand(model.Session{Harness: "mcode", ID: "mvs_0f1e2d3c", Project: "p"})
+	base := t.TempDir()
+	t.Setenv("DEJA_MCODE_ROOT", filepath.Join(base, "v2", "sessions"))
+	s := model.Session{Harness: "mcode", ID: "mvs_0f1e2d3c", Project: "p"}
+	dir, cmd, err := resumeCommand(s)
 	if err != nil || dir != "" || cmd != "mcode --session mvs_0f1e2d3c" {
 		t.Fatalf("resume = %q %q %v", dir, cmd, err)
+	}
+
+	// The runtime's database records the workspace: the command runs there
+	// while it exists, and without the cd once it is gone.
+	if _, lerr := exec.LookPath("sqlite3"); lerr != nil {
+		t.Skip("sqlite3 not installed")
+	}
+	ws := filepath.Join(base, "work", "billing-api")
+	if merr := os.MkdirAll(ws, 0o755); merr != nil {
+		t.Fatal(merr)
+	}
+	db := sources.McodeStateDB()
+	if merr := os.MkdirAll(filepath.Dir(db), 0o755); merr != nil {
+		t.Fatal(merr)
+	}
+	sql := "create table local_runtime_sessions (session_id text primary key, workspace_dir text, project_workspace_dir text, is_default_workspace integer not null default 0);" +
+		"insert into local_runtime_sessions values ('mvs_0f1e2d3c', '" + strings.ReplaceAll(ws, "'", "''") + "', null, 0);"
+	if out, serr := exec.CommandContext(t.Context(), "sqlite3", db, sql).CombinedOutput(); serr != nil {
+		t.Fatalf("sqlite3: %v %s", serr, out)
+	}
+	dir, cmd, err = resumeCommand(s)
+	if err != nil || filepath.Clean(dir) != filepath.Clean(ws) || cmd != "mcode --session mvs_0f1e2d3c" {
+		t.Fatalf("with the workspace: resume = %q %q %v", dir, cmd, err)
+	}
+	if rerr := os.RemoveAll(ws); rerr != nil {
+		t.Fatal(rerr)
+	}
+	dir, cmd, err = resumeCommand(s)
+	if err != nil || dir != "" || cmd != "mcode --session mvs_0f1e2d3c" {
+		t.Fatalf("workspace gone: resume = %q %q %v", dir, cmd, err)
 	}
 }
