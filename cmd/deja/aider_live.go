@@ -36,6 +36,10 @@ type aiderLive struct {
 	// self is the id the index gives the session this aider is writing, once
 	// its header is in the history.
 	self string
+	// gaveUp is set once the header window has closed with self still "":
+	// two aiders started together, and nothing will ever say which header is
+	// this run's, so there is no point walking the history again.
+	gaveUp bool
 }
 
 func newAiderLive(dir, cwd, history, digest string) *aiderLive {
@@ -85,8 +89,11 @@ func (l *aiderLive) body() (out string) {
 // the hook once an index refresh has read it, and comes back to itself as
 // "this was asked here before".
 func (l *aiderLive) asker() string {
-	if l.self == "" {
+	if l.self == "" && !l.gaveUp {
 		l.self = sources.AiderSessionAt(l.history, l.offset, l.launch)
+		if l.self == "" && time.Since(l.launch) > time.Minute {
+			l.gaveUp = true
+		}
 	}
 	if l.self != "" {
 		return l.self
