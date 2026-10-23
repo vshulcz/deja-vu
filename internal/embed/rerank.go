@@ -45,13 +45,29 @@ func Rerank(ctx context.Context, hits []search.Hit, query string, sidecar Sideca
 			cosines[v.Key], seen[v.Key] = c, true
 		}
 	}
+	// A candidate whose session has no vectors yet — indexed since the last
+	// `deja embed`, or synced from another machine — is not known to be
+	// unrelated. Scoring it as cosine 0 sank the newest sessions below older
+	// ones they outranked on keywords; the candidates' mean similarity leaves
+	// its keyword score to decide.
+	neutral := 0.0
+	for _, c := range cosines {
+		neutral += c
+	}
+	if len(cosines) > 0 {
+		neutral /= float64(len(cosines))
+	}
 	for i := range hits[:limit] {
 		key := hits[i].Session.Harness + ":" + hits[i].Session.ID
 		bm := 1.0
 		if hi != lo {
 			bm = (hits[i].Score - lo) / (hi - lo)
 		}
-		hits[i].Score = 0.5*bm + 0.5*cosines[key]
+		cos, ok := cosines[key]
+		if !ok {
+			cos = neutral
+		}
+		hits[i].Score = 0.5*bm + 0.5*cos
 	}
 	sort.SliceStable(hits[:limit], func(i, j int) bool { return hits[i].Score > hits[j].Score })
 	return hits, nil

@@ -239,6 +239,28 @@ func TestRerankUsesBestDuplicateAndRejectsEmptyQueryVector(t *testing.T) {
 	}
 }
 
+func TestRerankDoesNotSinkASessionWithoutVectors(t *testing.T) {
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(`{"data":[{"embedding":[1,0]}]}`)) }))
+	defer s.Close()
+	// "fresh" leads on keywords but was indexed after the last `deja embed`,
+	// so the sidecar holds nothing for it; "close" and "far" are embedded.
+	hits := []search.Hit{{Session: session("fresh"), Score: 10}, {Session: session("close"), Score: 5}, {Session: session("far"), Score: 0}}
+	sidecar := Sidecar{Vectors: []Vector{
+		{Key: "claude:close", Values: []float32{0.9, 0.43588989}},
+		{Key: "claude:far", Values: []float32{0.1, 0.99498744}},
+	}}
+	got, err := Rerank(context.Background(), hits, "q", sidecar, &Client{URL: s.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got[0].Session.ID != "fresh" {
+		t.Fatalf("a session with no vectors fell below one it outscored on keywords: %s first", got[0].Session.ID)
+	}
+	if got[1].Session.ID != "close" || got[2].Session.ID != "far" {
+		t.Fatalf("embedded sessions out of order: %s, %s", got[1].Session.ID, got[2].Session.ID)
+	}
+}
+
 func TestSemanticSearchFiltersRanksAndCaps(t *testing.T) {
 	if errBadQueryVector.Error() != "embedding endpoint returned no query vector" {
 		t.Fatal("unexpected query vector error")
