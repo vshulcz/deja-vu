@@ -188,7 +188,8 @@ func TestTheCommandIsReadableUnderNestedMCPServers(t *testing.T) {
 
 // A TOML table keeps every key at the header's own indent, so the scan that
 // looked for the command *under* the anchor stopped at the first sibling that
-// was not one — `type = "stdio"`, the line codex writes right after the header.
+// was not one — `type = "stdio"`, the line codex installs before #5590 wrote
+// right after the header.
 // A codex config whose command is not the first key read as naming no binary at
 // all, and the row said `wired` about a build in a scratch directory (#3668).
 func TestTheCommandIsReadableAnywhereInATOMLTable(t *testing.T) {

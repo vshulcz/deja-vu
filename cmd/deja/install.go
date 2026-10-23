@@ -2440,7 +2440,9 @@ func installStatusline(exe string, uninstall bool) (installResult, error) {
 func installCodex(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(sources.CodexHome(), "config.toml")
 	cmd, args := mcpLaunchCommandArgs(exe, uninstall)
-	block := fmt.Sprintf("[mcp_servers.deja]\ntype = \"stdio\"\ncommand = %q\nargs = %s\n", cmd, tomlStringArray(args))
+	// No `type` key: codex picks stdio from `command`, and 0.163 warns that
+	// `mcp_servers.deja.type` is a setting it does not know (#5590).
+	block := fmt.Sprintf("[mcp_servers.deja]\ncommand = %q\nargs = %s\n", cmd, tomlStringArray(args))
 	return installTOML(path, block, uninstall)
 }
 
@@ -3043,6 +3045,10 @@ func tomlRecordedNames(key string) []string {
 	return names
 }
 
+// tomlOwnedMCPKey names the keys an install rewrites. `type` stays on the list
+// though deja no longer writes it: an older codex block put `type = "stdio"`
+// there, and a reinstall drops it rather than keeping it as one of the reader's
+// own lines (#5590).
 func tomlOwnedMCPKey(key string) bool {
 	switch key {
 	case "type", "command", "args":

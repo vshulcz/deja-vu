@@ -1564,8 +1564,9 @@ func dejaKeyedCommand(text string) string {
 //
 // For an anchor whose fields sit beside it, only a new table header or a line
 // further out ends the block: the old rule stopped at the first sibling that
-// was not `command`, which for codex's `[mcp_servers.deja]` is `type = "stdio"`
-// on the very next line — so a codex config whose command is not the first key
+// was not `command`, which in a codex `[mcp_servers.deja]` written before
+// #5590 is `type = "stdio"` on the very next line — so a config whose command
+// is not the first key
 // read as though it named no binary at all, and the row said `wired` about a
 // build in a scratch directory (#3668).
 func outOfDejasBlock(line, trimmed string, indent int, beside bool) bool {

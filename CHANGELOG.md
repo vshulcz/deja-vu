@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `deja install codex` no longer writes `type = "stdio"` into
+  `[mcp_servers.deja]`. Codex 0.163 warned the key is not a setting it knows,
+  and picks stdio from `command` anyway. A reinstall drops the line from an
+  older block. Reported by @j2h4u (#5590).
 - `deja fix`, `deja friction` and the hook at a failed command now know the
   errors a package install hits behind a mirror or a proxy: pip's "No matching
   distribution found", an HTTP 403 or 401 from an index, an unresolvable host,
