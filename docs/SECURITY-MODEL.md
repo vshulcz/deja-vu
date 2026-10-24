@@ -126,7 +126,11 @@ store: it rewrites the harness transcripts that still hold a credential, in plac
 replaces only the rule kinds the report names in the file the report named,
 writes the original to `<file>.deja-backup-<stamp>` first and leaves it there,
 refuses a session an agent is inside and a file written in the last two minutes,
-and re-checks size and mtime between the read and the rename. A store with no
+and re-checks size and mtime between the read and the rename. The rules run
+inside each decoded JSON string, or one line at a time in a file that is not
+JSON, never over the raw bytes; a rewrite that would change the line count or
+break a line that parsed is refused, and a compressed or binary store is left
+alone. A store with no
 per-session file is not rewritten at all, and the count of what it could not
 reach is printed rather than dropped. Without `--scrub` the command only reports.
 

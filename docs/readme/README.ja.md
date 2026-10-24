@@ -305,7 +305,7 @@ $ deja "jwt refresh token"
 [自動コンパクション復旧](../../docs/compaction.md)を参照してください。
 
 <!-- matrix:start -->
-aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; Crush &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Cherry Studio &middot; Senpi &middot; gajae-code &middot; Kimchi Coding &middot; Command Code &middot; ZCode &middot; Kiro &middot; Kilo Code &middot; Roo Code &middot; Zed &middot; Devin CLI &middot; CodeWhale &middot; Junie &middot; JetBrains AI Assistant &middot; CodeBuddy Code &middot; Reasonix &middot; TRAE CLI &middot; Muse Code.
+aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; Crush &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Cherry Studio &middot; Senpi &middot; gajae-code &middot; Kimchi Coding &middot; Command Code &middot; ZCode &middot; Kiro &middot; Kilo Code &middot; Roo Code &middot; Zed &middot; Devin CLI &middot; CodeWhale &middot; Junie &middot; JetBrains AI Assistant &middot; Windsurf / Devin Desktop &middot; CodeBuddy Code &middot; Reasonix &middot; TRAE CLI &middot; Muse Code &middot; MiniMax Code.
 
 <details>
 <summary>各ハーネスの対応状況</summary>
@@ -349,10 +349,12 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | CodeWhale | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | なし |
 | Junie | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | なし |
 | JetBrains AI Assistant | ✅ | ⚠ | ⚠ | ⚠ | ✕ | 貼り付け | なし |
+| Windsurf / Devin Desktop | ✅ | ⚠ | ✅ | ✅ | ✕ | 貼り付け | なし |
 | CodeBuddy Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | なし |
 | Reasonix | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 1.x セッション用の zstd |
 | TRAE CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | なし |
 | Muse Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | なし |
+| MiniMax Code | ✅ | ✅ | ✅ | ✕ | ✅ | ✅ | `deja resume` と `deja handoff --to mcode --exec` には MiniMax Code CLI（`mcode`）、セッションのワークスペースには `sqlite3` |
 
 ✅ 動作する &middot; — 可能だが未実装 &middot; ✕ ハーネス側にその仕組みがない &middot; ⚠ ハーネス側の対応待ち &middot; ? 未調査
 
