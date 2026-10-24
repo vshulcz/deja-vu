@@ -23,6 +23,18 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/commands.html"></link>
     <updated>2026-10-24T00:00:00Z</updated>
     <summary>Every deja subcommand: search, ctx, blame, fix, how, secrets, remember, forget, stats, last, sources, install, embed, sync, doctor, bench and update.</summary>
+    <title>deja-vu — the one memory your coding agents share</title>
+    <id>https://vshulcz.github.io/deja-vu/</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
+    <updated>2026-10-24T00:00:00Z</updated>
+    <summary>The most accurate, cheapest and fastest memory for coding agents: Claude Code, Codex and 41 more agents, built from the sessions already on your disk.</summary>
+  </entry>
+  <entry>
+    <title>API keys in your coding agent transcripts — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/credentials-in-transcripts.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/credentials-in-transcripts.html"></link>
+    <updated>2026-10-24T00:00:00Z</updated>
+    <summary>Agents write every command output to plaintext transcripts. One machine held 84 credentials in 42 sessions. How to find yours, and what to do about them.</summary>
   </entry>
   <entry>
     <title>Delete Junie session history — deja-vu</title>
@@ -44,6 +56,18 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
     <updated>2026-10-23T00:00:00Z</updated>
     <summary>The most accurate, cheapest and fastest memory for coding agents: Claude Code, Codex and 41 more agents, built from the sessions already on your disk.</summary>
+    <title>Where Claude Code and Codex store sessions — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html"></link>
+    <updated>2026-10-24T00:00:00Z</updated>
+    <summary>Where each coding agent keeps its conversation history file, in forty-three formats, and how to read them without the tool that wrote them.</summary>
+  </entry>
+  <entry>
+    <title>每个编程智能体把会话历史存在哪里 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html"></link>
+    <updated>2026-10-24T00:00:00Z</updated>
+    <summary>四十三个编程智能体各自把会话记录写在磁盘的哪个位置、用的是什么格式，以及怎么自己读它们。表格来自 deja 解析器所依据的同一份格式登记表。</summary>
   </entry>
   <entry>
     <title>claude-mem alternative for Codex, Cursor, opencode — deja-vu</title>
@@ -58,13 +82,6 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/compare.html"></link>
     <updated>2026-10-23T00:00:00Z</updated>
     <summary>deja-vu next to claude-mem, agentmemory, MemPalace, Mem0, Letta, CASS, ctx and agentsview: what each captures, where it keeps it, how it scores.</summary>
-  </entry>
-  <entry>
-    <title>API keys in your coding agent transcripts — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/credentials-in-transcripts.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/credentials-in-transcripts.html"></link>
-    <updated>2026-10-23T00:00:00Z</updated>
-    <summary>Agents write every command output to plaintext transcripts. One machine held 84 credentials in 42 sessions. How to find yours, and what to do about them.</summary>
   </entry>
   <entry>
     <title>What each memory tool knows the day you install it — deja-vu</title>
