@@ -84,7 +84,7 @@ func TestAHandoverFromPlumbingIsEmpty(t *testing.T) {
 	s := model.Session{
 		Harness: "claude", ID: "s3",
 		Messages: []model.Message{
-			{Role: "user", Text: "<system-reminder>\nCAVEMAN MODE ACTIVE\n</system-reminder>"},
+			{Role: "user", Text: "<system-reminder>\nTERSE MODE ACTIVE\n</system-reminder>"},
 			{Role: "assistant", Text: "File created successfully at: /work/app/notes.txt"},
 		},
 	}

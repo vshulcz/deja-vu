@@ -11,18 +11,18 @@ import (
 // The pointer's whole content is the topic it names, because the agent has to
 // turn that into a recall call. It was built without the query's terms, so
 // dejaVuTopic fell through to the session's title: measured against a real
-// store, "how is the block" was answered with `"делай задачи в next.md"` — a
+// store, "how is the block" was answered with `"делай задачи в todo.md"` — a
 // title from a session that merely mentions the subject somewhere.
 func TestThePointerNamesWhatWasAskedAbout(t *testing.T) {
 	s := model.Session{
 		Harness: "claude", ID: "s1", Project: "org/app",
-		Title:   "делай задачи в next.md",
+		Title:   "делай задачи в todo.md",
 		Updated: time.Now(),
 		// The title and the opening line are one thing; the line that matched
 		// the question is further down. Without the terms the topic comes from
 		// the top of the session, which is the bug.
 		Messages: []model.Message{
-			{Role: "user", Text: "делай задачи в next.md, там список на сегодня"},
+			{Role: "user", Text: "делай задачи в todo.md, там список на сегодня"},
 			{Role: "assistant", Text: "открыл список"},
 			{Role: "user", Text: "the exporter retry budget keeps hammering the server on failure"},
 			{Role: "assistant", Text: "capped it at three attempts"},
@@ -32,7 +32,7 @@ func TestThePointerNamesWhatWasAskedAbout(t *testing.T) {
 	if !strings.Contains(got, "retry budget") {
 		t.Errorf("the pointer does not name what was asked about: %q", got)
 	}
-	if strings.Contains(got, "next.md") {
+	if strings.Contains(got, "todo.md") {
 		t.Errorf("the pointer named the session's title instead: %q", got)
 	}
 }

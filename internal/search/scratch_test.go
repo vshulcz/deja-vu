@@ -30,7 +30,7 @@ func TestAScratchTranscriptDoesNotOutrankTheAnswer(t *testing.T) {
 	// with nothing.
 	echo := model.Session{
 		ID: "echo", Harness: "opencode", Project: "neutral",
-		Path:    "/Users/x/.claude/jobs/9f0aa059/tmp/ab2/neutral",
+		Path:    "/Users/x/.claude/jobs/1a2b3c4d/tmp/ab2/neutral",
 		Started: now, Updated: now,
 		Messages: []model.Message{
 			{Role: "user", Text: "who should send the claudeworkshop email about their outdated article", Time: now},

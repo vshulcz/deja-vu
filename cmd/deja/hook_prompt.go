@@ -1855,7 +1855,7 @@ func weakRecallPointer(ss []model.Session, terms []string) string {
 	// content is the topic it names, because the agent has to turn that into a
 	// recall call. Called without them, dejaVuTopic falls through to the
 	// session's title — and on the one firing measured against a real store
-	// that answered "how is the block" with `"делай задачи в next.md"`, a title
+	// that answered "how is the block" with `"делай задачи в todo.md"`, a title
 	// from a session that merely mentions the subject somewhere. The spoken
 	// déjà vu line has passed its terms since it was written (#2734); this
 	// path did not, so the cheaper payload was also the wronger one.

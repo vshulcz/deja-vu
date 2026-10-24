@@ -17,7 +17,7 @@ import (
 // failed (#2163).
 func TestARemedyUnderATempDirectoryIsNotMined(t *testing.T) {
 	gone := []string{
-		"$ python3 /Users/x/.claude/jobs/9f0aa059/tmp/edit38.py; go test ./internal/index/",
+		"$ python3 /Users/x/.claude/jobs/1a2b3c4d/tmp/edit38.py; go test ./internal/index/",
 		"$ sh /tmp/patch.sh",
 		"$ bash /var/folders/2b/T/scratch/apply.sh && go build ./...",
 		"$ python3 $TMPDIR/fixture.py",

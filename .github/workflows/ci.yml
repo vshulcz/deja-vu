@@ -197,10 +197,6 @@ jobs:
       matrix: ${{ fromJSON(needs.windows-leg.outputs.matrix) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          # The commit-trailer test reads the last sixty messages; a depth of
-          # one shows it only the merge commit.
-          fetch-depth: 60
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.26.x'
@@ -665,8 +661,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # The check reads the commit that last touched each page. The test
-          # matrix clones sixty deep, where a page older than that looks
-          # untouched and the check passes by seeing nothing.
+          # matrix clones one commit deep, where every page looks untouched
+          # and the check passes by seeing nothing.
           fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:

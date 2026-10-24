@@ -272,7 +272,7 @@ var shareStopwords = map[string]bool{
 //
 // A message can be a draft, a spec, a checklist — a text produced during the
 // session rather than a statement about it. Measured on a real store, the
-// session-start block recalled "- Keep responses concise by default; caveman
+// session-start block recalled "- Keep responses concise by default; terse
 // mode active: lite." to a later agent as a past decision; it is one bullet of
 // a 130-line specification the agent had just written. The prose around such a
 // document still describes the work and is left alone, and so is a short list

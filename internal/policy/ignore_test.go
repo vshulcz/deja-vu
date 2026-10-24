@@ -11,7 +11,7 @@ func TestTheDefaultIgnoresAnAgentsScratchTree(t *testing.T) {
 		name, path, project string
 		want                bool
 	}{
-		{"a job's temp tree", "/Users/x/.claude/jobs/9f0aa059/tmp/ab2/neutral", "neutral", true},
+		{"a job's temp tree", "/Users/x/.claude/jobs/1a2b3c4d/tmp/ab2/neutral", "neutral", true},
 		{"opencode, which carries the directory in the project",
 			"/Users/x/.local/share/opencode/db", "/Users/x/.claude/jobs/abc/tmp/run", true},
 		{"a real project", "/Users/x/code/deja-vu/s.jsonl", "deja-vu", false},

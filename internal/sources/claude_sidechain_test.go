@@ -22,7 +22,7 @@ func TestClaudeSidechainIsItsOwnSession(t *testing.T) {
 	}
 	path := filepath.Join(dir, "agent-a768d0f31f74ee0f2.jsonl")
 	line := func(role, text string) string {
-		return `{"type":"` + role + `","isSidechain":true,"agentId":"a768d0f31f74ee0f2","attributionAgent":"caveman:cavecrew-reviewer","sessionId":"` + parentID + `","timestamp":"2026-08-18T15:29:17.173Z","cwd":"/work/app","message":{"role":"` + role + `","content":"` + text + `"}}` + "\n"
+		return `{"type":"` + role + `","isSidechain":true,"agentId":"a768d0f31f74ee0f2","attributionAgent":"tools:reviewer-bot","sessionId":"` + parentID + `","timestamp":"2026-08-18T15:29:17.173Z","cwd":"/work/app","message":{"role":"` + role + `","content":"` + text + `"}}` + "\n"
 	}
 	if err := os.WriteFile(path, []byte(line("user", "review the diff")+line("assistant", "two findings")), 0o644); err != nil {
 		t.Fatal(err)
@@ -42,7 +42,7 @@ func TestClaudeSidechainIsItsOwnSession(t *testing.T) {
 	if s.Parent != parentID {
 		t.Errorf("parent = %q, want the session that launched it", s.Parent)
 	}
-	if s.Kind != "sidechain" || s.Agent != "caveman:cavecrew-reviewer" {
+	if s.Kind != "sidechain" || s.Agent != "tools:reviewer-bot" {
 		t.Errorf("kind = %q agent = %q", s.Kind, s.Agent)
 	}
 	if len(s.Messages) != 2 {

@@ -46,11 +46,11 @@ func TestHookPromptStandsDownOnTheHostsOwnTurn(t *testing.T) {
 	}
 	// A person's words with the host's reminder appended still count as the
 	// person's words — and the reminder's words are not the query.
-	got := ask("exporter_batch dropping rows at utc_midnight again\n<system-reminder>\nCAVEMAN MODE ACTIVE\n</system-reminder>")
+	got := ask("exporter_batch dropping rows at utc_midnight again\n<system-reminder>\nTERSE MODE ACTIVE\n</system-reminder>")
 	if !strings.Contains(got, "utc_midnight") {
 		t.Fatalf("a real question with a reminder appended got nothing:\n%s", got)
 	}
-	if strings.Contains(got, "CAVEMAN") {
+	if strings.Contains(got, "TERSE") {
 		t.Fatalf("the reminder's words reached the block:\n%s", got)
 	}
 }

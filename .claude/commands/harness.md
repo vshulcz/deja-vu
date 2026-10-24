@@ -109,15 +109,10 @@ channel that costs more than this has to earn it with content, not counts.
 ## Workflow
 
 Follow the repository's rules: an issue that states the defect, a branch, a PR
-whose body carries the measurement, green CI, then merge. Commit messages and PR
-bodies in a plain engineer voice — a conventional-commits title and one or two
-lines of substance.
+whose body carries the measurement, green CI, then merge.
 
 Correct yourself in public. If a claim in a merged PR turns out to be wrong,
 say so in a comment on it before moving on.
-
-Nothing leaves the machine without being asked: no publishing to npm, no
-release tags, no posts, no PRs to other people's repositories.
 
 ## What to report
 

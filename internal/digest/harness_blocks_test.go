@@ -9,7 +9,7 @@ func TestStripHarnessBlocksLeavesThePersonsWords(t *testing.T) {
 	cases := map[string]string{ //nolint:gosec // harness tags, not a credential
 		// The host alone: nothing is left.
 		"<task-notification>\n<task-id>br50mykp6</task-id>\n<status>failed</status>\n</task-notification>": "",
-		"<system-reminder>\nCAVEMAN MODE ACTIVE\n</system-reminder>":                                       "",
+		"<system-reminder>\nTERSE MODE ACTIVE\n</system-reminder>":                                         "",
 		// A person, with the host's reminder appended: the reminder goes, the words stay.
 		"why does the pool use the simple protocol?\n<system-reminder>\nthe file changed on disk\n</system-reminder>": "why does the pool use the simple protocol?",
 		// Attributes on the tag, and a block that is never closed.
