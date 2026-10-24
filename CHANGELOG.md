@@ -30,6 +30,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `deja secrets --scrub` redacts inside each decoded JSON string, and one line
+  at a time in a file that is not JSON, instead of over the raw file. On the
+  raw bytes an escaped quote lost its backslash and the private-key rule ran
+  from one record to another: on one machine 47 of 249 rewritten files came
+  back with 182 lines that no longer parsed, and two transcripts went from
+  1040 to 572 lines and from 1033 to 846. A rewrite that would drop a line or
+  break one that parsed is now refused, `--dry-run` included, and compressed
+  or binary stores are left alone. Reported by @AlexanderAbramovPav (#5622).
 - `deja install codex` no longer writes `type = "stdio"` into
   `[mcp_servers.deja]`. Codex 0.163 warned the key is not a setting it knows,
   and picks stdio from `command` anyway. A reinstall drops the line from an

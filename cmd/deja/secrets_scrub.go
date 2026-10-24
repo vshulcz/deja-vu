@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -11,7 +12,6 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/index"
-	"github.com/vshulcz/deja-vu/internal/redact"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
@@ -35,6 +35,10 @@ import (
 //     holds open, and rewriting it mid-session is how a conversation gets
 //     truncated. A session an agent is inside — or a file written seconds ago — is
 //     skipped with a line saying why.
+//   - Rewrite the raw bytes. The rules read decoded text, so the rewrite happens
+//     inside each JSON string, or one line at a time in a file that is not
+//     JSON, and a rewrite that would drop a line or break one that parsed is
+//     refused (#5622).
 //   - Write without a copy beside it. The original goes to
 //     `<file>.deja-backup-<stamp>` first and stays there; the rewrite itself is a
 //     rename over the original, and a file whose size or mtime moved between the
@@ -155,13 +159,21 @@ func scrubOne(t scrubTarget, live map[string]bool, dryRun bool) scrubOutcome {
 	if err != nil {
 		return scrubOutcome{target: t, skipped: "cannot read it: " + err.Error()}
 	}
-	clean, counts := redact.TextKinds(string(b), t.kinds)
-	if clean == string(b) {
+	if scrubBinary(b) {
+		return scrubOutcome{target: t, skipped: "not a text file — a compressed or binary store is not rewritten"}
+	}
+	clean, counts := scrubContent(b, t.kinds)
+	if bytes.Equal(clean, b) {
 		// The report reads the index, which redacts decoded message text; a
-		// value the raw file spells differently — escaped inside JSON, split
-		// across a line — is not reachable from here, and saying so is better
-		// than a rewrite that missed it.
+		// value the file spells differently — split across two strings or two
+		// lines — is not reachable from here, and saying so is better than a
+		// rewrite that missed it.
 		return scrubOutcome{target: t, skipped: "no value in the file itself matched — nothing rewritten"}
+	}
+	// Checked in a dry run too, so the run a person tries first already says
+	// which file would be refused.
+	if err := scrubCheck(b, clean); err != nil {
+		return scrubOutcome{target: t, skipped: "refused: " + err.Error() + " — nothing rewritten (#5622)"}
 	}
 	if dryRun {
 		return scrubOutcome{target: t, written: counts}
@@ -183,7 +195,7 @@ func scrubOne(t scrubTarget, live map[string]bool, dryRun bool) scrubOutcome {
 		}
 		return scrubOutcome{target: t, skipped: "it changed while deja was reading it"}
 	}
-	if err := atomicfile.Write(t.path, []byte(clean), st.Mode().Perm()); err != nil {
+	if err := atomicfile.Write(t.path, clean, st.Mode().Perm()); err != nil {
 		// The copy stays: it is the only thing standing between the reader and
 		// a half-written transcript, and a message that does not name it leaves
 		// them hunting for it.
