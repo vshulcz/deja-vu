@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.23.1] - 2026-10-24
+## [0.23.1] - 2026-10-25
 
 Big stores build and search for less. A cold build peaks at half the memory
 it did (4.7 GB instead of 9.4 GB on 40,000 sessions, 2.4 GB instead of 4.0 GB
