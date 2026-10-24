@@ -242,7 +242,6 @@ TestMCPRecallDemotesBeforePaging 0.62
 TestMCPToolContract 0.19
 TestMeasureRecallUsesFuzzyVariants 0.66
 TestNoBarIsLeftOverWidthWhileThePartsCanStillGiveWay 0.47
-TestNoCommitCarriesAnAITrailer 0.13
 TestNoEmittedTimestampReliesOnOmitemptyAloneToVanish 1.87
 TestNoPromptWithoutSeveralSessionsAndADecision 0.25
 TestNoSurfaceServesMemoryTheTrustPolicyWithholds 1.82
