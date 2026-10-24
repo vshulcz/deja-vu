@@ -169,7 +169,8 @@ upgrade.
     From @have-you-tried-restarting (#5589, #5596).
   - Uninstall removes only what deja wrote: Cline's three plugin files instead
     of the whole directory with the reader's notes and skills, from @6xiaoyan
-    (#5300, #5556); an empty `~/.kiro/settings` deja created, from
+    (#5300, #5556), and the reader's own `SKILL.md` that install had replaced
+    is put back, from @Oscar-Williams (#5588, #5629); an empty `~/.kiro/settings` deja created, from
     @Kasa-Harendra (#5594, #5597); the snapshot of deja's own text file (Kiro's
     steering and agent files, the Copilot Chat prompt) while a reader's is put
     back, the reader's OpenClaw snapshot when `plugins.slots.memory` names
