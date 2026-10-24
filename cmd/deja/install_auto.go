@@ -1396,26 +1396,20 @@ func installKimiMCP(exe string, uninstall bool) (installResult, error) {
 // halves before mcp.json is written: a read-only one was refused after the
 // files before it had been written, and the target was left half wired.
 func kimiAutoPreflight(exe string, uninstall bool) error {
-	// The launcher path the writers will name, without writing it yet; they
-	// fall back to the binary when the launcher cannot be written, so a file
-	// that needs no change under either is not refused.
-	exes := []string{exe}
-	if p := dejaLauncherPath(); p != "" && !uninstall {
-		exes = []string{p, exe}
+	// The path the writers will name, without writing the launcher yet. Both
+	// files are checked against that one path: passing a file on the binary
+	// while the writers name the launcher let config.toml be rewritten before
+	// tui.toml was refused (#5309).
+	if !uninstall {
+		exe = preflightHookExe(exe)
 	}
 	path := filepath.Join(sources.KimiConfigDir(), "config.toml")
-	var refusal error
-	for _, e := range exes {
-		old, next, err := kimiHooksUpdate(path, e, uninstall)
-		if err != nil {
-			return err
-		}
-		if refusal = writableIfChanged(path, old, next); refusal == nil {
-			break
-		}
+	old, next, err := kimiHooksUpdate(path, exe, uninstall)
+	if err != nil {
+		return err
 	}
-	if refusal != nil {
-		return refusal
+	if err := writableIfChanged(path, old, next); err != nil {
+		return err
 	}
 	// Not on the way out: uninstall runs the plain kimi target too, which
 	// removes mcp.json whatever this says.
@@ -1423,20 +1417,12 @@ func kimiAutoPreflight(exe string, uninstall bool) error {
 		return nil
 	}
 	tui := filepath.Join(sources.KimiConfigDir(), "tui.toml")
-	for _, e := range exes {
-		cmd := hookRun(e, "statusline")
-		old, next, _, err := tomlStatuslineUpdate(tui, "status_line", kimiStatuslineBlock(cmd), cmd, false)
-		if err != nil {
-			return err
-		}
-		if next == nil {
-			return nil
-		}
-		if refusal = writableIfChanged(tui, old, next); refusal == nil {
-			return nil
-		}
+	cmd := hookRun(exe, "statusline")
+	old, next, _, err = tomlStatuslineUpdate(tui, "status_line", kimiStatuslineBlock(cmd), cmd, false)
+	if err != nil || next == nil {
+		return err
 	}
-	return refusal
+	return writableIfChanged(tui, old, next)
 }
 
 // writableIfChanged is the read-only refusal writeIfChanged would give, asked

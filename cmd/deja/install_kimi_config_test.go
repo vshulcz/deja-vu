@@ -204,6 +204,46 @@ func TestKimiAutoRefusesAReadOnlyFileBeforeWriting(t *testing.T) {
 	}
 }
 
+// The hooks were written naming the binary while the launcher's directory
+// was read-only. Once it opens, the pre-flight passed tui.toml on the binary
+// while the writers moved config.toml to the launcher, then refused tui.toml.
+func TestKimiAutoPreflightChecksThePathTheWriterNames(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("needs unix permissions as a normal user")
+	}
+	hermeticEnv(t)
+	bin := filepath.Dir(dejaLauncherPath())
+	if err := os.MkdirAll(bin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(bin, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(bin, 0o755) })
+	if _, err := captureRun(t, "install", "kimi-auto", "--no-index"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(bin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dir := sources.KimiConfigDir()
+	if err := os.Chmod(filepath.Join(dir, "tui.toml"), 0o444); err != nil {
+		t.Fatal(err)
+	}
+	cfg := filepath.Join(dir, "config.toml")
+	before, err := os.ReadFile(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = captureRun(t, "install", "kimi-auto", "--no-index")
+	if err == nil || !strings.Contains(err.Error(), "read-only") {
+		t.Fatalf("install err = %v, want the read-only refusal", err)
+	}
+	if after, _ := os.ReadFile(cfg); string(after) != string(before) {
+		t.Errorf("config.toml was rewritten by a refused target:\n%s\nwant:\n%s", after, before)
+	}
+}
+
 // [status_line] can hold Kimi's own `items` beside the command. Rewriting
 // deja's line rebuilt the table without them, and uninstall took the whole
 // table.
