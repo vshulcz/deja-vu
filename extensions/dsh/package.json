@@ -68,7 +68,7 @@
     }
   },
   "dependencies": {
-    "@vshulcz/deja-vu": "^0.23.0"
+    "@vshulcz/deja-vu": "^0.23.1"
   },
   "scripts": {
     "test": "node --test test/*.test.js"

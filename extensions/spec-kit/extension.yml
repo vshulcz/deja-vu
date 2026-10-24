@@ -5,7 +5,7 @@ extension:
   name: "deja-vu session recall"
   # Pinned to the deja release by scripts/pinmanifests; the release packs this
   # file into deja-spec-kit.zip after the pin, so the zip says its own release.
-  version: "0.23.0"
+  version: "0.23.1"
   description: "Searches your past coding-agent sessions for a feature: what was tried, decided or failed."
   author: "Vladislav Shulcz (@vshulcz)"
   repository: "https://github.com/vshulcz/deja-vu"
