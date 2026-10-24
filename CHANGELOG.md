@@ -17,7 +17,8 @@ searches answer in under 200 ms in process instead of up to 800, and a search
 over many copies or look-alike sessions is no longer quadratic, a slowdown
 0.23.0 made worse. MiniMax Code is the forty-third harness, a directory tree
 can be named as one project in `~/.config/deja/projects`, and
-`deja search --sort date` lists the newest match first. `deja secrets --scrub`
+`deja search --sort date` lists the newest match first. A friction wall that
+was fixed leaves the session-start block. `deja secrets --scrub`
 no longer breaks the transcripts it rewrites. The index is rebuilt once on
 upgrade.
 
@@ -42,19 +43,17 @@ upgrade.
   match, not the newest of the best-ranked thousand (#5577, #5587).
 - Guides for deleting Antigravity and Junie history. From @notsubash (#5604)
   and @Kasa-Harendra (#5624).
-
-### Changed
-
-- A cold build reads each transcript line once instead of handing it to six
-  readers that each decoded it again, and checks tool output for known errors
-  in one pass per line. On 40,000 sessions it takes 60 s instead of 87 s and
-  353 CPU-seconds instead of 551 (#5586).
 - A friction wall whose cause was fixed no longer stays in the session-start
   block for good. It drops out after 30 days without a hit while its projects
   keep getting new sessions, and `deja friction --settle <id>` takes it out at
   once, using the id each row of `deja friction` now prints. A session started
   after the settle that hits it again brings it back; `--unsettle` undoes it.
-  Reported by @SmoothSailingMusic (#5628).
+  Reported by @SmoothSailingMusic (#5628, #5631).
+
+### Changed
+
+- A cold build reads each transcript line once instead of handing it to six
+  readers that each decoded it again, and checks tool output for known errors
   in one pass per line: 60 s instead of 87 s and 353 CPU-seconds instead of
   551 on 40,000 sessions (#5586). It also keys messages without allocating a
   string per word, which halves the indexing phase: 9.3 s to 4.2 s on a
