@@ -718,11 +718,16 @@ What this machine keeps tripping over, machine-readable:
       "error": "command not found: shellcheck",
       "sessions": 11,
       "harnesses": ["claude", "codex"],
-      "last": "2026-08-30T09:14:02Z"
+      "last": "2026-08-30T09:14:02Z",
+      "id": "3f9a01c2"
     }
   ]
 }
 ```
+
+`id` is what `deja friction --settle` takes. `settled` carries the time a wall
+was settled, and only while the settle holds: a wall hit again by a session
+started after it has no `settled` field.
 
 `sessions_read` is the denominator the prose header states — sessions that
 recorded tool output, after the trust policy and ignore rules have taken theirs.

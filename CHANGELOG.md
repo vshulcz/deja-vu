@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   readers that each decoded it again, and checks tool output for known errors
   in one pass per line. On 40,000 sessions it takes 60 s instead of 87 s and
   353 CPU-seconds instead of 551 (#5586).
+- A friction wall whose cause was fixed no longer stays in the session-start
+  block for good. It drops out after 30 days without a hit while its projects
+  keep getting new sessions, and `deja friction --settle <id>` takes it out at
+  once, using the id each row of `deja friction` now prints. A session started
+  after the settle that hits it again brings it back; `--unsettle` undoes it.
+  Reported by @SmoothSailingMusic (#5628).
 
 ### Fixed
 

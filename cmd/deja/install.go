@@ -433,10 +433,22 @@ func printMemoryProofOf(dir, heading string, keep func(model.Session) bool, lead
 // would be the tool inventing one.
 func recurringErrorLine(dir string) string {
 	scan, err := scanFriction(dir, policy.Load())
-	if err != nil || len(scan.rows) == 0 {
+	if err != nil {
 		return ""
 	}
-	r := scan.rows[0]
+	// The line promises the agent will be told, and a settled wall is one it
+	// will not be told about (#5628).
+	settled := policy.LoadSettled()
+	var rows []frictionRow
+	for _, r := range scan.rows {
+		if !settled.Hides(r.id, r.started) {
+			rows = append(rows, r)
+		}
+	}
+	if len(rows) == 0 {
+		return ""
+	}
+	r := rows[0]
 	if r.n < index.FrictionMinSessions {
 		return ""
 	}

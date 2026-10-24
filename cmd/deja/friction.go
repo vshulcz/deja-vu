@@ -55,9 +55,27 @@ func hasFrictionLine(text string) bool {
 func runFriction(dir string, args []string, stdout io.Writer) error {
 	limit := 10
 	asJSON := false
+	settle, unsettle := "", ""
 	for i := 0; i < len(args); i++ {
 		if args[i] == "--json" {
 			asJSON = true
+			continue
+		}
+		if args[i] == "--settle" || args[i] == "--unsettle" {
+			if i+1 >= len(args) {
+				return fmt.Errorf("friction: %s needs the id `deja friction` prints for the wall", args[i])
+			}
+			raw := args[i+1] //nolint:gosec // the bound is checked above
+			id := strings.ToLower(strings.TrimSpace(raw))
+			if !validWallID(id) {
+				return fmt.Errorf("friction: %q is not a wall id — `deja friction` prints one under each wall, eight characters like 3f9a01c2", raw)
+			}
+			if args[i] == "--settle" {
+				settle = id
+			} else {
+				unsettle = id
+			}
+			i++
 			continue
 		}
 		// Anything else used to be dropped on the floor, so `deja friction
@@ -65,7 +83,7 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 		// had been understood (#2253). --json is answered now rather than
 		// refused (#1932); anything else still refuses.
 		if args[i] != "--limit" {
-			return fmt.Errorf("friction: unknown flag %q — it takes --limit n and --json", args[i])
+			return fmt.Errorf("friction: unknown flag %q — it takes --limit n, --json, --settle id and --unsettle id", args[i])
 		}
 		if i+1 >= len(args) {
 			return errors.New("friction: --limit needs value")
@@ -77,6 +95,22 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 		}
 		limit = n
 	}
+	if settle != "" && unsettle != "" {
+		return errors.New("friction: --settle and --unsettle are one wall at a time")
+	}
+	if unsettle != "" {
+		// No scan: a wall settled on a store since rebuilt or forgotten is
+		// still in the file, and taking it out must not depend on finding it.
+		had, err := policy.UnsettleWall(unsettle)
+		if err != nil {
+			return fmt.Errorf("friction: %w", err)
+		}
+		if !had {
+			return fmt.Errorf("friction: wall %s is not settled", unsettle)
+		}
+		fmt.Fprintf(stdout, "wall %s is open again — the session-start block names it while it keeps recurring\n", unsettle)
+		return nil
+	}
 	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
 		return ensureError(dir, err)
 	}
@@ -84,6 +118,9 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 	scan, err := scanFriction(dir, pol)
 	if err != nil {
 		return err
+	}
+	if settle != "" {
+		return settleWall(stdout, scan.rows, settle)
 	}
 	rows, sessions := scan.rows, scan.sessions
 	withheldOutput, ignoredOutput := scan.withheldOutput, scan.ignoredOutput
@@ -163,6 +200,7 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 		rows = rows[:limit]
 	}
 	fmt.Fprintf(stdout, "what this machine keeps tripping over — %d session%s read\n", sessions, pluralS(sessions))
+	settled := policy.LoadSettled()
 	lines := frictionRowLines(rows)
 	// On a terminal the error is bold, the harnesses carry their colours and
 	// the line under it is dimmed, so the list scans by error.
@@ -185,6 +223,16 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 		last := ""
 		if !r.when.IsZero() {
 			last = " · last " + search.DisplayDate(r.when)
+		}
+		// The id is what --settle takes, and it is printed on every row: a
+		// wall that is not settled yet is the one a reader wants to name.
+		last += " · id " + r.id
+		if at, ok := settled[r.id]; ok {
+			if settled.Hides(r.id, r.started) {
+				last += " · settled " + search.DisplayDate(at)
+			} else {
+				last += " · hit again after it was settled " + search.DisplayDate(at)
+			}
 		}
 		if color {
 			last = statDim + last + statReset
@@ -223,6 +271,9 @@ func scanFriction(dir string, pol policy.Policy) (*frictionScan, error) {
 		// because the port it printed last is the port the reader will see next
 		// (#2375).
 		text string
+		// started is when the newest session holding it began, which is what
+		// a settle is held against.
+		started time.Time
 	}
 	found := map[uint64]*seen{}
 	sessions := map[string]bool{}
@@ -292,6 +343,9 @@ func scanFriction(dir string, pol policy.Policy) (*frictionScan, error) {
 			}
 			s.sessions[key] = true
 			s.harness[meta.Harness] = true
+			if t := index.NewestStart([]index.SessionMeta{meta}); t.After(s.started) {
+				s.started = t
+			}
 			if r.Time.After(s.last) || s.text == "" {
 				s.last = r.Time
 				s.text = line
@@ -301,7 +355,7 @@ func scanFriction(dir string, pol policy.Policy) (*frictionScan, error) {
 		return nil, fmt.Errorf("friction: %w", err)
 	}
 	var rows []frictionRow
-	for _, s := range found {
+	for sig, s := range found {
 		line := s.text
 		if len(s.sessions) < index.FrictionMinSessions {
 			continue
@@ -311,7 +365,8 @@ func scanFriction(dir string, pol policy.Policy) (*frictionScan, error) {
 			hs = append(hs, h)
 		}
 		sort.Strings(hs)
-		rows = append(rows, frictionRow{line, s.last, len(s.sessions), hs})
+		rows = append(rows, frictionRow{line: line, when: s.last, n: len(s.sessions), harnesses: hs,
+			id: index.WallHandle(sig), started: s.started})
 	}
 	sort.Slice(rows, func(i, j int) bool {
 		if rows[i].n != rows[j].n {
@@ -400,6 +455,38 @@ type frictionRow struct {
 	when      time.Time
 	n         int
 	harnesses []string
+	id        string
+	started   time.Time
+}
+
+// validWallID accepts what index.WallHandle prints.
+func validWallID(id string) bool {
+	if len(id) != 8 {
+		return false
+	}
+	for _, c := range id {
+		if !strings.ContainsRune("0123456789abcdef", c) {
+			return false
+		}
+	}
+	return true
+}
+
+// settleWall records that a wall's cause is fixed. Only a wall the list holds
+// can be settled, so a mistyped id says so rather than settling nothing.
+func settleWall(stdout io.Writer, rows []frictionRow, id string) error {
+	for _, r := range rows {
+		if r.id != id {
+			continue
+		}
+		if err := policy.SettleWall(id, time.Now()); err != nil {
+			return fmt.Errorf("friction: %w", err)
+		}
+		fmt.Fprintf(stdout, "settled `%s` — the session-start block leaves it out until a new session hits it again; --unsettle %s takes this back\n",
+			trimFriction(r.line), id)
+		return nil
+	}
+	return fmt.Errorf("friction: no recurring wall has the id %s — `deja friction` lists them", id)
 }
 
 // frictionJSON is the `deja friction --json` envelope. See docs/json-output.md.
@@ -428,6 +515,11 @@ type frictionRowJSON struct {
 	// Omitted rather than zero-valued, like the fix envelope: a row with no
 	// recorded time is a real state and "0001-01-01" is not a date.
 	Last string `json:"last,omitempty"`
+	// ID is what `deja friction --settle` takes.
+	ID string `json:"id"`
+	// Settled is when the wall was settled, while the settle holds; a wall
+	// hit again in a newer session is open and carries none.
+	Settled string `json:"settled,omitempty"`
 }
 
 func writeFrictionJSON(stdout io.Writer, rows []frictionRow, sessionsRead, limit int) error {
@@ -436,6 +528,7 @@ func writeFrictionJSON(stdout io.Writer, rows []frictionRow, sessionsRead, limit
 		rows = rows[:limit]
 	}
 	out := make([]frictionRowJSON, 0, len(rows))
+	settled := policy.LoadSettled()
 	for _, r := range rows {
 		row := frictionRowJSON{
 			// Sanitised, but not truncated. trimFriction bounds the line to 79
@@ -448,6 +541,10 @@ func writeFrictionJSON(stdout io.Writer, rows []frictionRow, sessionsRead, limit
 		}
 		if !r.when.IsZero() {
 			row.Last = r.when.UTC().Format(time.RFC3339)
+		}
+		row.ID = r.id
+		if settled.Hides(r.id, r.started) {
+			row.Settled = settled[r.id].UTC().Format(time.RFC3339)
 		}
 		out = append(out, row)
 	}

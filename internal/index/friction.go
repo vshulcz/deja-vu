@@ -1,6 +1,7 @@
 package index
 
 import (
+	"fmt"
 	"hash/fnv"
 	"path/filepath"
 	"regexp"
@@ -27,6 +28,32 @@ type Friction struct {
 	Text     string
 	Sessions []SessionMeta
 	Last     time.Time
+	// Hash is the signature the sessions share, which WallHandle turns into
+	// the name a person settles a wall by.
+	Hash uint64
+}
+
+// WallHandle is the short name `deja friction` prints for a wall and
+// `--settle` takes: the top half of its signature, so the same error keeps the
+// same handle across a rebuild and across machines.
+func WallHandle(hash uint64) string {
+	return fmt.Sprintf("%08x", hash>>32)
+}
+
+// NewestStart is when the latest of these sessions began, which is what a
+// settle is compared against.
+func NewestStart(ms []SessionMeta) time.Time {
+	var out time.Time
+	for _, m := range ms {
+		t := m.Started
+		if t.IsZero() {
+			t = m.Updated
+		}
+		if t.After(out) {
+			out = t
+		}
+	}
+	return out
 }
 
 const (
@@ -637,8 +664,11 @@ func FrictionSessions(dir string, sig uint64, allow func(project string) bool) i
 
 // FindFriction picks the wall worth showing on a screen with room for one. See
 // TopFriction for allow.
+//
+// A wall someone settled is skipped: the screens that name one say this
+// machine keeps hitting it, and the reader has said it does not (#5628).
 func FindFriction(dir string, allow func(project string) bool) (Friction, bool) {
-	out := TopFriction(dir, 1, allow)
+	out := OpenFriction(dir, 1, allow)
 	if len(out) == 0 {
 		return Friction{}, false
 	}
@@ -656,6 +686,18 @@ func FindFriction(dir string, allow func(project string) bool) (Friction, bool) 
 // allow counts every session; callers that filter per wall themselves (the
 // environment block) pass nil and keep their own gate.
 func TopFriction(dir string, n int, allow func(project string) bool) []Friction {
+	return topFriction(dir, n, allow, nil)
+}
+
+// OpenFriction is TopFriction without the walls a person settled with `deja
+// friction --settle`, for the surfaces that tell an agent or a reader what is
+// still in the way. They are dropped before the cut, so a settled wall does not
+// cost the next one its slot.
+func OpenFriction(dir string, n int, allow func(project string) bool) []Friction {
+	return topFriction(dir, n, allow, policy.LoadSettled())
+}
+
+func topFriction(dir string, n int, allow func(project string) bool, settled policy.Settled) []Friction {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -689,6 +731,9 @@ func TopFriction(dir string, n int, allow func(project string) bool) []Friction 
 	var cs []cluster
 	for h, metas := range byHash {
 		if len(metas) < FrictionMinSessions {
+			continue
+		}
+		if settled.Hides(WallHandle(h), NewestStart(metas)) {
 			continue
 		}
 		// Ties broken by key: the newest carrier's line is the wall's text,
@@ -746,7 +791,7 @@ func TopFriction(dir string, n int, allow func(project string) bool) []Friction 
 		if want[c.hash] == "" {
 			continue
 		}
-		out = append(out, Friction{Text: want[c.hash], Sessions: c.metas, Last: c.metas[0].Updated})
+		out = append(out, Friction{Text: want[c.hash], Sessions: c.metas, Last: c.metas[0].Updated, Hash: c.hash})
 		if n > 0 && len(out) == n {
 			break
 		}

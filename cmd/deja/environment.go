@@ -39,6 +39,15 @@ const (
 	// fixtures cleared a two-project bar on `run` and `compare/fixes`, both
 	// path fragments of the same tree.
 	environmentMinProjects = 3
+	// environmentStale is how long a wall may go without a hit, while work
+	// goes on in the projects it came from, before the block stops naming it
+	// (#5628). A wall that is really there comes back every few days: the
+	// missing `timeout` above was hit in 34 sessions, and the zsh `==` one
+	// every few days for months. A month of new sessions in the same projects
+	// without it is a cause that was fixed, and a block that still names it
+	// sends the agent to investigate something already closed. A week would
+	// drop a real wall over one holiday from that toolchain.
+	environmentStale = 30 * 24 * time.Hour
 )
 
 // spansProjects reports whether a wall was hit in more than one project.
@@ -67,20 +76,39 @@ func spansProjects(ss []index.SessionMeta, projects int) bool {
 	return len(seen) >= environmentMinProjects
 }
 
-// projectsInStore counts the distinct projects the index holds, which is what
-// decides whether spreading is something this machine could show at all.
-func projectsInStore(dir string) int {
+// projectsInStore maps each project the index holds to its newest session.
+// How many there are decides whether spreading is something this machine could
+// show at all; the dates decide whether work went on after a wall's last hit.
+func projectsInStore(dir string) map[string]time.Time {
 	metas, err := index.AllMeta(dir)
 	if err != nil {
-		return 0
+		return nil
 	}
-	seen := map[string]bool{}
+	out := map[string]time.Time{}
 	for _, m := range metas {
-		if m.Project != "" {
-			seen[m.Project] = true
+		if m.Project == "" {
+			continue
+		}
+		if t, ok := out[m.Project]; !ok || m.Updated.After(t) {
+			out[m.Project] = m.Updated
 		}
 	}
-	return len(seen)
+	return out
+}
+
+// wallWentQuiet reports a wall that stopped recurring: its last hit is older
+// than environmentStale and one of its projects has a session since. Both, so
+// a machine nobody worked on for a month keeps a wall that is still there.
+func wallWentQuiet(w index.Friction, newest map[string]time.Time, now time.Time) bool {
+	if now.Sub(w.Last) < environmentStale {
+		return false
+	}
+	for _, s := range w.Sessions {
+		if newest[s.Project].After(w.Last) {
+			return true
+		}
+	}
+	return false
 }
 
 // environmentBlock names what the machine keeps failing on, or "" when nothing
@@ -135,13 +163,24 @@ func environmentBlockFrom(dir, activation string) (string, []string) {
 	// With room to spare: a wall can fail the policy gate or the project bar
 	// below, and asking for exactly three meant one rejection left the block
 	// short of what it had to say.
-	walls := index.TopFriction(dir, environmentWalls*4, nil)
-	held := projectsInStore(dir)
+	//
+	// Without the walls someone settled: a person who fixed the cause and
+	// said so has nothing to gain from the agent hearing about it (#5628).
+	walls := index.OpenFriction(dir, environmentWalls*4, nil)
+	newest := projectsInStore(dir)
+	held := len(newest)
 	if len(walls) == 0 {
 		return "", nil
 	}
+	now := time.Now()
 	var allowed []index.Friction
 	for _, w := range walls {
+		// Before the policy gate, on every session the wall has: whether it
+		// stopped recurring is a fact about the machine, not about what this
+		// reader may see of it.
+		if wallWentQuiet(w, newest, now) {
+			continue
+		}
 		var keep []index.SessionMeta
 		for _, s := range w.Sessions {
 			if pol.Allows(activation, s.Project) {

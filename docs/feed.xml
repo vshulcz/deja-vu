@@ -11,6 +11,20 @@
     <name>vshulcz</name>
   </author>
   <entry>
+    <title>Persistent memory for coding agents over MCP — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/agents.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/agents.html"></link>
+    <updated>2026-10-24T00:00:00Z</updated>
+    <summary>How deja gives coding agents a searchable memory over MCP: one tool with recall, context, blame, fix, how, orient, remember and handoff modes.</summary>
+  </entry>
+  <entry>
+    <title>deja CLI reference: search, recall, blame, stats — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/commands.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/commands.html"></link>
+    <updated>2026-10-24T00:00:00Z</updated>
+    <summary>Every deja subcommand: search, ctx, blame, fix, how, secrets, remember, forget, stats, last, sources, install, embed, sync, doctor, bench and update.</summary>
+  </entry>
+  <entry>
     <title>Delete Junie session history — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/delete-junie-session-history.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-junie-session-history.html"></link>
@@ -18,18 +32,18 @@
     <summary>Junie keeps each session in a directory under ~/.junie/sessions. Find it, remove one session or all, and understand what remains in index.jsonl.</summary>
   </entry>
   <entry>
+    <title>Stop Claude Code repeating a bug you already fixed — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html"></link>
+    <updated>2026-10-24T00:00:00Z</updated>
+    <summary>Why a coding agent hits the same wall it solved last month, how to see which walls a machine keeps hitting, and how to hand it the fix at the moment it fails.</summary>
+  </entry>
+  <entry>
     <title>deja-vu — the one memory your coding agents share</title>
     <id>https://vshulcz.github.io/deja-vu/</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
     <updated>2026-10-23T00:00:00Z</updated>
     <summary>The most accurate, cheapest and fastest memory for coding agents: Claude Code, Codex and 41 more agents, built from the sessions already on your disk.</summary>
-  </entry>
-  <entry>
-    <title>Persistent memory for coding agents over MCP — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/agents.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/agents.html"></link>
-    <updated>2026-10-23T00:00:00Z</updated>
-    <summary>How deja gives coding agents a searchable memory over MCP: one tool with recall, context, blame, fix, how, orient, remember and handoff modes.</summary>
   </entry>
   <entry>
     <title>claude-mem alternative for Codex, Cursor, opencode — deja-vu</title>
@@ -275,19 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html"></link>
     <updated>2026-10-23T00:00:00Z</updated>
     <summary>How to give Grok Build recall over every coding agent&#39;s sessions on the machine — the hooks it reads, the marketplace plugin, and the name that is not it.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Hermes: every agent&#39;s sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html"></link>
-    <updated>2026-10-23T00:00:00Z</updated>
-    <summary>Hermes searches its own sessions and keeps MEMORY.md. deja adds the other forty-two agents: a plugin on pre_llm_call, the MCP tools, and a skill.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Kilo Code: every agent&#39;s sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-kilocode.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-kilocode.html"></link>
-    <updated>2026-10-23T00:00:00Z</updated>
-    <summary>Kilo Code keeps its tasks in the editor&#39;s global storage and its CLI history in a SQLite store. deja reads both, and adds the sessions from every other agent.</summary>
   </entry>
 </feed>

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/query"
 )
 
@@ -184,6 +185,7 @@ func PlanFrictionMatches(dir string, steps [][]string, keep func(SessionMeta) bo
 				Text:     hit.text,
 				Sessions: hit.cluster.metas,
 				Last:     hit.cluster.metas[0].Updated,
+				Hash:     hit.cluster.hash,
 			},
 			Command:         command,
 			CommandSessions: commandSessions,
@@ -223,6 +225,8 @@ func planWallSharesTerm(wallText string, steps [][]planIndexedTerm) bool {
 }
 
 func planWallClusters(manifest Manifest, keep func(SessionMeta) bool) []planWallCluster {
+	// A settled wall is not something to warn a plan about (#5628).
+	settled := policy.LoadSettled()
 	byHash := map[uint64][]SessionMeta{}
 	for _, meta := range manifest.Sessions {
 		if keep != nil && !keep(meta) {
@@ -235,7 +239,7 @@ func planWallClusters(manifest Manifest, keep func(SessionMeta) bool) []planWall
 
 	var clusters []planWallCluster
 	for hash, metas := range byHash {
-		if len(metas) < FrictionMinSessions {
+		if len(metas) < FrictionMinSessions || settled.Hides(WallHandle(hash), NewestStart(metas)) {
 			continue
 		}
 		sort.Slice(metas, func(i, j int) bool {
