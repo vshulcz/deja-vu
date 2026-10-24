@@ -165,12 +165,20 @@ func hermesPGSessionMeta(dsn string) map[string]hermesMeta {
 		}
 	}
 	fields += fieldsSb159.String()
+	if cols["model_config"] {
+		// The /branch and delegate_task marks the SQLite read takes (#5294).
+		// Taken as text and read here: a row that is not JSON would fail a
+		// cast in the query and lose every session's cwd with it, which
+		// json_valid guards against on SQLite.
+		fields += ", model_config::text as model_config"
+	}
 	out, err = HermesPGRunner(dsn, `select coalesce(json_agg(s),'[]') from (select `+fields+` from sessions) s`)
 	if err != nil {
 		return nil
 	}
 	var rows []struct {
-		ID string `json:"id"`
+		ID          string `json:"id"`
+		ModelConfig string `json:"model_config"`
 		hermesMeta
 	}
 	if json.Unmarshal([]byte(strings.TrimSpace(string(out))), &rows) != nil {
@@ -179,10 +187,26 @@ func hermesPGSessionMeta(dsn string) map[string]hermesMeta {
 	meta := make(map[string]hermesMeta, len(rows))
 	for _, r := range rows {
 		if r.ID != "" {
-			meta[r.ID] = hermesMeta{Cwd: strings.TrimSpace(r.Cwd), Source: strings.TrimSpace(r.Source), Parent: strings.TrimSpace(r.Parent)}
+			branched, delegated := hermesModelConfigMarks(r.ModelConfig)
+			meta[r.ID] = hermesMeta{Cwd: strings.TrimSpace(r.Cwd), Source: strings.TrimSpace(r.Source), Parent: strings.TrimSpace(r.Parent), Branched: branched, Delegated: delegated}
 		}
 	}
 	return meta
+}
+
+// hermesModelConfigMarks reads _branched_from and _delegate_from off a
+// session's model_config, "" for either when it is absent or the config is
+// not a JSON object.
+func hermesModelConfigMarks(config string) (branched, delegated string) {
+	var m map[string]any
+	if json.Unmarshal([]byte(config), &m) != nil {
+		return "", ""
+	}
+	mark := func(key string) string {
+		v, _ := m[key].(string)
+		return strings.TrimSpace(v)
+	}
+	return mark("_branched_from"), mark("_delegate_from")
 }
 
 // hermesPGRead is the index's read of the Postgres store, recorded as unread

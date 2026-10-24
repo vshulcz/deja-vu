@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -1473,6 +1474,10 @@ func (e readOnlyConfigError) Is(target error) bool { return target == fs.ErrPerm
 // Asked by opening the file for writing, without truncating it, so whatever
 // the platform enforces — a mode, an ACL, Windows' read-only attribute — is
 // what decides.
+//
+// A config that is not there yet is writable only if the writer can make it:
+// the pre-flight used to pass it unasked, so a target whose directory could
+// not be created was refused after its other files were already wired (#5291).
 func configWritable(path string) error {
 	f, err := os.OpenFile(path, os.O_WRONLY, 0)
 	if err == nil {
@@ -1481,7 +1486,53 @@ func configWritable(path string) error {
 	if errors.Is(err, fs.ErrPermission) {
 		return readOnlyConfigError{path}
 	}
+	if errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
+		return configCreatable(path)
+	}
 	return nil
+}
+
+// configCreatable asks the nearest directory that exists above a missing
+// config whether a file can be created in it, the way writeIfChanged would:
+// by creating its scratch file there and removing it again. A mode bit is not
+// the answer — it denies nothing on Windows or to root — and neither is
+// creating the missing directories, which would leave them behind for a
+// target that is then refused. The error names what the writer would have
+// failed on, so errors.Is still sees a permission denial underneath.
+func configCreatable(path string) error {
+	missing := ""
+	dir := filepath.Dir(path)
+	for {
+		info, err := os.Stat(dir)
+		if err == nil {
+			if !info.IsDir() {
+				return &fs.PathError{Op: "mkdir", Path: dir, Err: syscall.ENOTDIR}
+			}
+			break
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return nil
+		}
+		missing, dir = dir, parent
+	}
+	tmp, err := os.CreateTemp(dir, ".deja-tmp-")
+	if err != nil {
+		var pe *fs.PathError
+		if errors.As(err, &pe) {
+			if missing != "" {
+				return &fs.PathError{Op: "mkdir", Path: missing, Err: pe.Err}
+			}
+			return &fs.PathError{Op: "open", Path: path, Err: pe.Err}
+		}
+		return err
+	}
+	name := tmp.Name()
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(name)
+		return err
+	}
+	return os.Remove(name)
 }
 
 func writeIfChanged(path string, old, next []byte) (string, error) {

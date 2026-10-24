@@ -69,3 +69,18 @@ test("a branch holds recall when pi still sends the block to the model", () => {
   assert.equal(branchHoldsRecall([{ type: "message", id: "a" }, block, { type: "compaction", firstKeptEntryId: "a" }]), true)
   assert.equal(branchHoldsRecall([block, { type: "compaction", firstKeptEntryId: "b" }]), true)
 })
+
+test("only the marked digest counts once a branch has one", () => {
+  const digest = { type: "custom_message", customType: "deja-recall", id: "a1", details: { digest: true } }
+  const recall = { type: "custom_message", customType: "deja-recall", id: "a3" }
+  // The issue's branch: digest, prompt, prompt recall, prompt, then a
+  // compaction that kept the prompt recall and not the digest (#5314).
+  const compacted = [digest, { type: "message", id: "a2" }, recall, { type: "message", id: "a4" }, { type: "compaction", firstKeptEntryId: "a3" }]
+  assert.equal(branchHoldsRecall(compacted), false)
+  // Kept from the digest on, it still holds one.
+  assert.equal(branchHoldsRecall([digest, recall, { type: "compaction", firstKeptEntryId: "a1" }]), true)
+  // A resume with no compaction holds the digest.
+  assert.equal(branchHoldsRecall([digest, { type: "message", id: "a2" }, recall]), true)
+  // A branch written before the mark: any block of ours counts, as before.
+  assert.equal(branchHoldsRecall([{ type: "message", id: "a2" }, recall, { type: "compaction", firstKeptEntryId: "a3" }]), true)
+})

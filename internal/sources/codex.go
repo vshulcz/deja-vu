@@ -615,6 +615,7 @@ func codexCall(s *model.Session, payload map[string]any, calls map[string]int, c
 		if w := strings.TrimSpace(in.Workdir); w != "" {
 			dir = resolveToolPath(w, cwd)
 		}
+		dir = ShellPatchDir(in.Cmd, dir)
 		for _, body := range patchTexts(in.Cmd, 0) {
 			codexPatchText(s, body, dir, t)
 		}
@@ -626,6 +627,73 @@ func codexCall(s *model.Session, payload map[string]any, calls map[string]int, c
 	if id, _ := payload["call_id"].(string); id != "" {
 		calls[id] = len(s.Messages) - 1
 	}
+}
+
+// ShellPatchDir is the directory a shell apply_patch runs in: dir, moved by
+// the `cd <dir> &&` (or `cd <dir>;`) steps the command opens with. A model
+// that runs `cd sub && apply_patch <<'EOF'` instead of setting the call's
+// workdir has its patch headers read against sub, and filing them under dir
+// credited the edit to a file of the same name there (#5306). A target the
+// shell would expand — ~, $VAR, - — is not followed, and dir stays as it was.
+func ShellPatchDir(cmd, dir string) string {
+	rest := strings.TrimLeft(cmd, " \t")
+	for {
+		target, after, ok := leadingCD(rest)
+		if !ok {
+			return dir
+		}
+		dir = resolveToolPath(target, dir)
+		rest = after
+	}
+}
+
+// ShellPatchPath is the file a shell apply_patch header names, for a caller
+// that keeps the session's cwd for everything else: the header put under the
+// directory a leading cd moved to, or left as written when nothing moved it.
+func ShellPatchPath(cmd, cwd, header string) string {
+	dir := ShellPatchDir(cmd, cwd)
+	if dir == cwd {
+		return header
+	}
+	return resolveToolPath(header, dir)
+}
+
+// leadingCD splits `cd <target> && rest` (or `;`) into target and rest. The
+// target may be quoted with either quote; ok is false for anything else.
+func leadingCD(cmd string) (target, rest string, ok bool) {
+	if !strings.HasPrefix(cmd, "cd ") && !strings.HasPrefix(cmd, "cd\t") {
+		return "", "", false
+	}
+	s := strings.TrimLeft(cmd[2:], " \t")
+	if s == "" {
+		return "", "", false
+	}
+	if q := s[0]; q == '"' || q == '\'' {
+		end := strings.IndexByte(s[1:], q)
+		if end < 0 {
+			return "", "", false
+		}
+		target, s = s[1:1+end], s[2+end:]
+	} else {
+		end := strings.IndexAny(s, " \t;&|\n")
+		if end < 0 {
+			return "", "", false
+		}
+		target, s = s[:end], s[end:]
+	}
+	if target == "" || strings.ContainsAny(target[:1], "~-") || strings.Contains(target, "$") {
+		return "", "", false
+	}
+	s = strings.TrimLeft(s, " \t")
+	switch {
+	case strings.HasPrefix(s, "&&"):
+		s = s[2:]
+	case strings.HasPrefix(s, ";"):
+		s = s[1:]
+	default:
+		return "", "", false
+	}
+	return target, strings.TrimLeft(s, " \t"), true
 }
 
 // codexResumes sends a rollout back for a whole read when its tail holds the

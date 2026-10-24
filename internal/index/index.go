@@ -721,8 +721,17 @@ import (
 // 72: a Gemini sub-agent's first turn no longer opens with the
 // <loaded_context> block Gemini puts ahead of its task; it titled every child
 // session already indexed (#5214).
+// 72: a Codex fork_context sub-agent keeps only its own turns, not the
+// parent's history its rollout opens with, and a shell apply_patch records
+// the edit it made; rows already indexed keep the parent's turns and no
+// writer until a rebuild (#5210, #5211).
 // 73: Qwen Code sub-agent logs are read by default, as Claude's are, so the
 // files they wrote have an author (#5223).
+// 73: an OpenClaw sub-agent hangs under the session that spawned it, a fork
+// child keeps only its own turns, not the copy of its source's, and the
+// internal-context block no longer opens a sub-agent's first turn; rows
+// already indexed hold no parent, the copied turns and that title until a
+// rebuild (#5219, #5220, #5221).
 // 74: a Copilot CLI sub-agent run is its own session under its parent and a
 // /fork names its source (#5216, #5217); rows already indexed hold neither
 // until a rebuild.
@@ -743,7 +752,7 @@ import (
 // (#5241).
 // 80: a dsh sub-agent names its parent, and a session's spawned family is
 // left out of its recall at any depth; sub-agent rows already indexed hold no
-// parent until a rebuild.
+// parent until a rebuild (#5279).
 // 81: an opencode apply_patch with a relative header is filed under the
 // session's directory, as the tool resolved it; rows already indexed carry the
 // bare name until a rebuild (#5212).
