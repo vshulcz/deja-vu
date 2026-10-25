@@ -24,14 +24,17 @@ find_deja() {
 }
 
 # `deja install cursor-auto` writes the same hooks into Cursor's hooks.json,
-# and Cursor runs both, so the plugin stands down there. The installer writes
-# the launcher (`.../deja-hook hook-context`), so match the subcommand rather
-# than a bare `deja hook-`.
-HOOKS="${CURSOR_CONFIG_DIR:-$HOME/.cursor}/hooks.json"
-if [ -f "$HOOKS" ] && grep -qE 'deja[^"]*hook-(context|prompt|precompact|tool)' "$HOOKS" 2>/dev/null; then
-	cat >/dev/null 2>&1 || true
-	exit 0
-fi
+# and Cursor runs both, so the plugin stands down there. Cursor also runs the
+# hooks `deja install claude-auto` writes into ~/.claude/settings.json and only
+# dedupes identical command strings, which this bridge never is. The installer
+# writes the launcher (`.../deja-hook hook-context`), so match the subcommand
+# rather than a bare `deja hook-`.
+for HOOKS in "${CURSOR_CONFIG_DIR:-$HOME/.cursor}/hooks.json" "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"; do
+	if [ -f "$HOOKS" ] && grep -qE 'deja[^"]*hook-(context|prompt|precompact|tool)' "$HOOKS" 2>/dev/null; then
+		cat >/dev/null 2>&1 || true
+		exit 0
+	fi
+done
 
 DEJA=$(find_deja)
 

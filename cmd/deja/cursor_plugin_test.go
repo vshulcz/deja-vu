@@ -164,3 +164,41 @@ func TestCursorPluginBridgeSilentWithoutDeja(t *testing.T) {
 		t.Fatalf("bridge without deja: err %v, output %q", err, out)
 	}
 }
+
+// Cursor runs the hooks claude-auto wrote into ~/.claude/settings.json as well
+// as the plugin's, and dedupes only identical commands, so the bridge has to
+// stand down there too or every session gets the digest twice.
+func TestCursorPluginBridgeStandsDownForClaudeAuto(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the bridge is an sh script")
+	}
+	hermeticEnv(t)
+	home := os.Getenv("HOME")
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "deja"), []byte("#!/bin/sh\necho ran\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	run := func() string {
+		cmd := exec.CommandContext(t.Context(), "sh", filepath.Join("..", "..", "cursor-plugin", "hooks", "deja.sh"), "hook-context")
+		cmd.Env = append(os.Environ(), "PATH="+bin+":/usr/bin:/bin", "CLAUDE_CONFIG_DIR=", "CURSOR_CONFIG_DIR=")
+		cmd.Stdin = strings.NewReader(`{"hook_event_name":"sessionStart"}`)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("bridge: %v %q", err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	if got := run(); got != "ran" {
+		t.Fatalf("without claude-auto the bridge printed %q, want deja to run", got)
+	}
+	settings := filepath.Join(home, ".claude", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(settings), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(settings, []byte(`{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"/x/deja-hook hook-context"}]}]}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := run(); got != "" {
+		t.Fatalf("with claude-auto wired the bridge printed %q, want nothing", got)
+	}
+}
