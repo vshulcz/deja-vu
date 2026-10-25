@@ -131,7 +131,7 @@ func TestRecallOffReachesEverySurfaceThatInjects(t *testing.T) {
 		out := s.run()
 		for _, tell := range []string{
 			"deja-recall",
-			"you have been here",
+			"deja-vu — ",
 			// The block is unframed text, so the two markers above pass
 			// straight over it — which is how this leg was passing with the
 			// gate removed.

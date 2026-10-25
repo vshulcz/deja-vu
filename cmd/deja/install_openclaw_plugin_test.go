@@ -237,7 +237,7 @@ func TestOpenClawPluginShowsTheReceiptInAnOwnerDM(t *testing.T) {
 	}
 	home := t.TempDir()
 	stub := filepath.Join(home, "deja")
-	reply := `{"systemMessage":"deja-vu — you have been here: \"zorbit drain\" (Oct 7 · via: zorbit, drain)","hookSpecificOutput":{"additionalContext":"RECALLED drain with --grace 40"}}`
+	reply := `{"systemMessage":"deja-vu — from Codex CLI, 2 weeks ago: \"zorbit drain\" (via zorbit, drain)","hookSpecificOutput":{"additionalContext":"RECALLED drain with --grace 40"}}`
 	script := "#!/bin/sh\nin=$(cat)\nprintf '%s\\n' \"$*\" >> \"$DEJA_CALLS\"\n" +
 		"case \"$in\" in *zorbit*) ;; *) exit 0 ;; esac\n" +
 		"case \"$*\" in\n" +
@@ -343,7 +343,7 @@ console.log(JSON.stringify(out));
 		t.Fatalf("the reply in the owner's DM went out without the receipt:\n%s", raw)
 	}
 	blocks := dm.Sent.Payload.Presentation.Blocks
-	want := `_↺ you've been here: "zorbit drain" · Oct 7 · deja_`
+	want := `_↺ from Codex CLI, 2 weeks ago: "zorbit drain" · deja_`
 	if dm.Sent.Payload.Text != "Use --grace 40." || len(blocks) != 1 || blocks[0].Type != "context" || blocks[0].Text != want {
 		t.Errorf("want one context block %q under the reply:\n%s", want, raw)
 	}

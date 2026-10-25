@@ -27,7 +27,7 @@
       },
       "receipt": {
         "type": "boolean",
-        "description": "In a 1:1 chat with the owner on a channel, add deja's one-line \"you've been here\" receipt under a reply that was answered from history. Default true."
+        "description": "In a 1:1 chat with the owner on a channel, add deja's one-line receipt under a reply that was answered from history. Default true."
       }
     }
   }

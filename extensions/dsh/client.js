@@ -1,7 +1,7 @@
 // dsh-deja, browser half: the lines deja writes for the person.
 //
 // The host half hands the model its recall and keeps deja's own lines for the
-// person — the "you have been here" receipt, the build and week notes — on a
+// person — the per-prompt receipt, the build and week notes — on a
 // board behind /api/deja-notes. This draws them in a small card just above the
 // input, the way Claude Code prints a hook's systemMessage. Plain JS in dsh's
 // module wrapper, so the package needs no build step: React comes from the
@@ -52,7 +52,9 @@ window.__ModuleLoader__.load({
       return url.href;
     }
 
-    const RECEIPT = /^deja-vu\s+—\s+(you have been here|this was done on another machine):\s+"(.+)"\s+\((.+)\)$/;
+    // "deja-vu — from Codex CLI, 3d ago: "…" (via a, b)"; an older deja led
+    // with "you have been here" and kept the date in the parentheses.
+    const RECEIPT = /^deja-vu\s+—\s+([^"]+?):\s+"(.+)"(?:\s+\((.+)\))?$/;
     // "label: address · label: address", every part a link.
     const LINK_PART = /^([A-Za-z][\w ]{0,20}):\s+(\S+)$/;
     // A sentence that ends on its address: " — github.com/…".
@@ -68,7 +70,7 @@ window.__ModuleLoader__.load({
         const r = RECEIPT.exec(line);
         if (r) {
           // Only the brand goes; the lead says what the quote is.
-          out.receipt = { lead: r[1].charAt(0).toUpperCase() + r[1].slice(1) + ":", topic: r[2], meta: r[3].replace(/\bvia:\s+/, "via ") };
+          out.receipt = { lead: r[1].charAt(0).toUpperCase() + r[1].slice(1) + ":", topic: r[2], meta: (r[3] || "").replace(/\bvia:\s+/, "via ") };
           continue;
         }
         const parts = line.split(/\s+·\s+/);

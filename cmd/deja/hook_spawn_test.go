@@ -16,6 +16,41 @@ type spawnHookResponse struct {
 	} `json:"hookSpecificOutput"`
 }
 
+// The spawn tests send grok's camelCase shape: grok is the one host whose
+// parent gets no recall from its own hooks, and the only one still answered.
+
+// Everywhere else the parent wrote the instructions with its own recall in
+// hand, and on a real machine no subagent ever used the block it was given.
+// The spawn is left exactly as the parent wrote it.
+func TestSpawnHookLeavesAClaudeSubagentAlone(t *testing.T) {
+	tmp := hermeticEnv(t)
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+	writeClaudeFixture(t, filepath.Join(root, "app", "past.jsonl"), "past", []string{
+		`{"type":"user","sessionId":"past","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"the pgbouncer prepared statement error again"}}`,
+		`{"type":"assistant","sessionId":"past","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":"We decided to set default_query_exec_mode=exec for pgbouncer, because prepared statements do not survive transaction pooling."}}`,
+	})
+	if _, err := captureRun(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+	cwd := filepath.Join(t.TempDir(), "src", "app")
+	if err := os.MkdirAll(cwd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(cwd)
+	spawn := `{"prompt":"Investigate the pgbouncer prepared statement failure in the orders service.","subagent_type":"general-purpose"}`
+	// The control: the same spawn in grok's shape is answered, so the silence
+	// below is not an index that knows nothing.
+	if out := toolHookRun(t, `{"hookEventName":"PreToolUse","toolName":"Task","toolInput":`+spawn+`,"sessionId":"grok-parent"}`); !strings.Contains(out, "default_query_exec_mode") {
+		t.Fatalf("the grok control got no recall, so this measures nothing: %q", out)
+	}
+	for _, name := range []string{"Task", "Agent"} {
+		if out := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"`+name+`","tool_input":`+spawn+`,"session_id":"parent"}`); out != "" {
+			t.Errorf("%s: the subagent's instructions were rewritten: %q", name, out)
+		}
+	}
+}
+
 // A spawned agent has no session start and sends no user prompt, so the only
 // thing that reaches it is the instructions the parent wrote. Answering the
 // spawn with additionalContext would hand the memory to the parent, which
@@ -39,7 +74,7 @@ func TestSpawnHookPutsRecallInsideTheSubagentsPrompt(t *testing.T) {
 	}
 	t.Chdir(cwd)
 
-	payload := `{"hook_event_name":"PreToolUse","tool_name":"Task","tool_input":` +
+	payload := `{"hook_event_name":"PreToolUse","tool_name":"Task","toolInput":` +
 		`{"prompt":"Investigate the pgbouncer prepared statement failure in the orders service.",` +
 		`"subagent_type":"general-purpose","description":"pgbouncer dig"},"session_id":"parent"}`
 	out := toolHookRun(t, payload)
@@ -105,13 +140,13 @@ func TestSpawnHookStaysSilentWithNothingToSay(t *testing.T) {
 	if _, err := captureRun(t, "index"); err != nil {
 		t.Fatal(err)
 	}
-	got := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Task","tool_input":`+
+	got := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Task","toolInput":`+
 		`{"prompt":"Port the kubernetes admission webhook to the new cert rotation scheme."},"session_id":"parent"}`)
 	if got != "" {
 		t.Errorf("spoke about work it has no history of: %q", got)
 	}
 	// A spawn with no prompt at all is not something to answer either.
-	got = toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Task","tool_input":{"description":"x"},"session_id":"parent"}`)
+	got = toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Task","toolInput":{"description":"x"},"session_id":"parent"}`)
 	if got != "" {
 		t.Errorf("answered a spawn with no instructions: %q", got)
 	}
@@ -140,7 +175,7 @@ func TestSpawnRecallCannotAttachAFileOrRunACommand(t *testing.T) {
 	t.Chdir(cwd)
 
 	const ask = "Investigate the pgbouncer prepared statement failure, start from @docs/pool.md."
-	out := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Task","tool_input":`+
+	out := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Task","toolInput":`+
 		`{"prompt":"`+ask+`"},"session_id":"parent"}`)
 	if out == "" {
 		t.Fatal("a spawn whose subject the store answers carried nothing")

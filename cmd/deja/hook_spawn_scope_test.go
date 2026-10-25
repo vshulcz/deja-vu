@@ -58,7 +58,7 @@ func TestSpawnRecallStaysInsideTheProject(t *testing.T) {
 	spawn := func(prompt, sid string) string {
 		t.Helper()
 		payload := fmt.Sprintf(`{"hook_event_name":"PreToolUse","tool_name":"Task",`+
-			`"tool_input":{"prompt":%q,"subagent_type":"general"},"cwd":"/work/api","session_id":%q}`, prompt, sid)
+			`"toolInput":{"prompt":%q,"subagent_type":"general"},"cwd":"/work/api","session_id":%q}`, prompt, sid)
 		var out bytes.Buffer
 		if err := runHookTool(dir, strings.NewReader(payload), &out); err != nil {
 			t.Fatal(err)

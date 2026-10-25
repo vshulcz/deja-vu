@@ -12,7 +12,7 @@ import { test } from "node:test";
 import { newestEvents, noteBoard, splitHookReply } from "../lib.js";
 
 const RECALL = "<deja-recall>\nthe staging queue drains with --grace 40\n</deja-recall>";
-const RECEIPT = 'deja-vu — you have been here: "staging queue drain" (3 days ago · via: grace)';
+const RECEIPT = 'deja-vu — from Codex CLI, 3d ago: "staging queue drain" (via grace)';
 const DIGEST = "<deja-recall>\nthis project settled on pnpm\n</deja-recall>";
 const BUILT = "deja indexed 12 sessions (2 agents)";
 

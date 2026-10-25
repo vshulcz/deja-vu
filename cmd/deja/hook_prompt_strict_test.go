@@ -56,7 +56,7 @@ func TestStrictPromptHookDropsTheReceiptAndKeepsTheRecall(t *testing.T) {
 
 	// The control: without the flag the receipt is due and goes out.
 	plain := decode(t, ask(t))
-	if plain.SystemMessage == nil || !strings.Contains(*plain.SystemMessage, "you have been here") {
+	if plain.SystemMessage == nil || !strings.Contains(*plain.SystemMessage, "deja-vu — ") {
 		t.Fatalf("the control carried no receipt, so the strict case proves nothing: %+v", plain)
 	}
 

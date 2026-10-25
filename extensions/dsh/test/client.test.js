@@ -94,15 +94,17 @@ const STAND = [
   "deja recalled 3 prior sessions from this project · today: memory arrived 3 times",
   "deja indexed 13 sessions (1 agent) · docs: vshulcz.github.io/deja-vu",
   "if deja is useful, a GitHub star helps others find it — github.com/vshulcz/deja-vu",
-  'deja-vu — you have been here: "how should the zorbit queue drain on deploy" (3d ago · via grace)',
+  'deja-vu — from Codex CLI, 3d ago: "how should the zorbit queue drain on deploy" (via grace)',
 ];
 
 test("the card leads with the receipt and drops deja's name from each line", async () => {
   const { mod } = await load();
   const p = mod.parseNotes(STAND);
-  // Only the brand is stripped: the lead says what the quote is.
-  assert.deepEqual(p.receipt, { lead: "You have been here:", topic: "how should the zorbit queue drain on deploy", meta: "3d ago · via grace" });
-  // An older deja wrote "via:"; it reads the same.
+  // Only the brand is stripped: the lead says what the quote is and where it came from.
+  assert.deepEqual(p.receipt, { lead: "From Codex CLI, 3d ago:", topic: "how should the zorbit queue drain on deploy", meta: "via grace" });
+  assert.deepEqual(mod.parseNotes(['deja-vu — from Codex CLI, today: "x"']).receipt, { lead: "From Codex CLI, today:", topic: "x", meta: "" });
+  // An older deja led with "you have been here" and wrote "via:"; it reads the same.
+  assert.equal(mod.parseNotes(['deja-vu — you have been here: "x" (3d ago · via grace)']).receipt.lead, "You have been here:");
   assert.equal(mod.parseNotes(['deja-vu — you have been here: "x" (3d ago · via: drain, zorbit)']).receipt.meta, "3d ago · via drain, zorbit");
   assert.equal(
     mod.parseNotes(['deja-vu — this was done on another machine: "rotate the keys" (2w ago · via: rotate)']).receipt.lead,

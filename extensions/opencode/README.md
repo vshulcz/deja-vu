@@ -55,9 +55,11 @@ And recall nobody has to ask for:
 - the project's recent sessions are pushed onto the system prompt once per
   session, with a one-time toast so you know memory arrived (1.x only: a
   2.x server plugin has no channel to the TUI);
-- each prompt gets a relevance pass of its own — silent when nothing matches;
-- a spawned agent gets recall in its own instructions, since it never sees the
-  system prompt or a user prompt;
+- each prompt you type gets a relevance pass of its own, silent when nothing
+  matches; on a strong match a toast says which agent it came from and when
+  (`deja-vu — from Codex CLI, 4 months ago: "…"`, 1.x only, at most once in
+  20 minutes). A task sub-agent's turns are not searched again: the agent
+  that wrote them already had the recall;
 - after a tool call, a failed command gets the command this machine ran next
   after the same error, and a file action gets that file's prior decision,
   folded into the tool's output;

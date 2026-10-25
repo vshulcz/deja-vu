@@ -27,8 +27,9 @@ before it activates the provider.
   give Claude Code and Codex: the recent work in this project and what held.
   After that, only when what was just asked matches something earlier. Most
   turns it adds nothing.
-- You see what it brought: the lines deja shows in Claude Code (the "you have
-  been here" receipt, what a session start recalled, the build and week notes)
+- You see what it brought: the lines deja shows in Claude Code (the receipt
+  naming the agent a memory came from, what a session start recalled, the
+  build and week notes)
   ride Hermes's recall line, `🧠 deja · …`, in the interactive CLI and
   `hermes chat -q`. The model's text is the same as before. Hermes 0.17 has no
   recall line, `hermes -z` and `hermes chat -Q` print none, the TUI only

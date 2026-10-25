@@ -65,7 +65,7 @@ a compaction keeps what the session was in the middle of, and a session that
 ends drops its live stamp.
 
 In `dsh web` you also see the lines deja prints for the person in Claude Code:
-the "you have been here" receipt when a prompt was answered from history, and
+the receipt naming the agent a prompt's answer came from, and
 at session start what was recalled, the first-build note and the weekly note.
 They sit in a small panel above the input until the next prompt, or until you
 close it. The model gets exactly what it got before; these lines never reach

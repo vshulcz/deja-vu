@@ -211,7 +211,7 @@ export default {
     // a compacted session had been shown.
     if (adds.recall) {
       const seen = new Map()
-      // deja's "you have been here" receipt rides under the final reply in a
+      // deja's per-prompt receipt rides under the final reply in a
       // 1:1 chat with the owner on a channel (Telegram, Slack, Discord ...).
       // Not in a group, where other people read the reply, and not on the TUI or
       // the Control UI, which draw the transcript rather than the delivered

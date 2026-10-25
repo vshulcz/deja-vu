@@ -9,7 +9,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
-// deja's lines for the person — the "you have been here" receipt, the build
+// deja's lines for the person — the per-prompt receipt, the build
 // and week notes — reach the model only, unless something draws them. The npm
 // plugin draws them as a card above dsh web's input (#4984); a profile wired by
 // `deja install dsh-auto` gets the same card from the same files (#4983).

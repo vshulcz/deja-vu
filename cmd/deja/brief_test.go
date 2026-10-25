@@ -86,7 +86,7 @@ func TestDejaVuCountersFlow(t *testing.T) {
 func TestDejaVuLineShape(t *testing.T) {
 	s := model.Session{Title: "jwks cache rotation broke login on the gateway and it hurt", Updated: time.Now().AddDate(0, 0, -21)}
 	line := dejaVuLine(s)
-	if !strings.Contains(line, "you have been here") || !strings.Contains(line, "jwks") {
+	if !strings.Contains(line, "deja-vu — ") || !strings.Contains(line, "jwks") {
 		t.Fatalf("dejaVuLine = %q", line)
 	}
 }

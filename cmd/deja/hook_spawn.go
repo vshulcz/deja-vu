@@ -22,6 +22,9 @@ import (
 // prompt can still be reached. Fed through the same recall the per-prompt hook
 // runs — same bar, same dedup, same policy — what comes back is appended to
 // the prompt the subagent is about to receive.
+//
+// It is answered for grok alone now (see runHookSpawn): where the parent has
+// recall of its own, the subagents handed a block never used one.
 
 // spawnPromptFields is where each harness keeps the instruction it hands the
 // spawned agent. Claude Code calls it prompt; the others that grew a subagent
@@ -55,9 +58,20 @@ func runHookSpawn(dir string, input toolHookInput, raw []byte, stdout io.Writer)
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		return nil //nolint:nilerr // an unreadable payload means no reply
 	}
-	if len(payload.ToolInput) == 0 {
-		payload.ToolInput = payload.ToolInputCamel
+	// Only grok, whose parent has no recall of its own. Everywhere else the
+	// parent writes these instructions after its own session-start and
+	// per-prompt recall, and the block repeated what it already knew to a
+	// reader nobody watches. Measured on one machine over 60 days of Claude
+	// Code transcripts: 1339 subagents were handed a block, none cited a
+	// session it named, and of the 539 in the last 14 days, all pointers, 4
+	// called deja and none on a word only the pointer gave. It was 55% of the
+	// per-prompt blocks deja sent. Grok discards what its main thread's hooks
+	// print (hook_grok.go), so a spawned agent's prompt is still the one place
+	// memory reaches there unasked.
+	if len(payload.ToolInput) > 0 {
+		return nil
 	}
+	payload.ToolInput = payload.ToolInputCamel
 	if len(payload.ToolInput) == 0 {
 		return nil
 	}
