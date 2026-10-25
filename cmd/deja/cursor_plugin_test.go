@@ -20,7 +20,7 @@ type cursorPluginHook struct {
 }
 
 type cursorPluginHooks struct {
-	Version int                          `json:"version"`
+	Version int                           `json:"version"`
 	Hooks   map[string][]cursorPluginHook `json:"hooks"`
 }
 
