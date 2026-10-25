@@ -33,7 +33,7 @@ func TestSpawnRecallLeavesOutTheSessionSpawningIt(t *testing.T) {
 		t.Fatal(err)
 	}
 	payload := `{"hook_event_name":"PreToolUse","tool_name":"Agent","cwd":"/tmp/app","session_id":"` + parent + `",` +
-		`"tool_input":{"prompt":"Investigate the pgbouncer prepared statement error in the orders service: what did we do about pgbouncer prepared statements?"}}`
+		`"toolInput":{"prompt":"Investigate the pgbouncer prepared statement error in the orders service: what did we do about pgbouncer prepared statements?"}}`
 	out := toolHookRun(t, payload)
 	var resp spawnHookResponse
 	if err := json.Unmarshal([]byte(out), &resp); err != nil {

@@ -1479,8 +1479,8 @@ func viaTerms(block string, terms []string) []string {
 	return out
 }
 
-// dejaVuLine is the one visible line a déjà vu moment earns: which past
-// session answered, and how old it is.
+// dejaVuLine is the one visible line a déjà vu moment earns: which agent the
+// memory came from, how old it is, and what was said there.
 func dejaVuLine(s model.Session, terms ...string) string {
 	topic := dejaVuTopic(s, terms...)
 	if topic == "" {
@@ -1491,26 +1491,21 @@ func dejaVuLine(s model.Session, terms ...string) string {
 	if len(terms) > 3 {
 		terms = terms[:3]
 	}
-	// "you have been here" for a session that arrived from another machine
-	// claims the reader did work they have never seen — the context block
-	// below labels it `imported:` and this line contradicted it (#1001).
-	who := "you have been here"
-	if strings.HasPrefix(s.Project, "imported:") {
-		who = "this was done on another machine"
-	}
-	when := search.RelativeDate(s.Updated)
+	lead := fmt.Sprintf("deja-vu — %s: ", dejaVuLead(s))
 	// The quote, measured as printed (quotes and escapes included), gets what
-	// the line has left after the fixed words, the date and room for one
-	// term of up to 16 columns: at most 50 columns and never under 26.
-	room := noteWidth - termwidth.Columns(fmt.Sprintf("deja-vu — %s:  (%s)", who, when))
+	// the line has left after the lead and room for one term of up to 16
+	// columns: at most 50 columns, and 26 unless a long agent name on an
+	// imported session leaves less.
+	room := noteWidth - termwidth.Columns(lead)
+	floor := min(26, room)
 	if len(terms) > 0 {
 		longest := 0
 		for _, t := range terms {
 			longest = max(longest, termwidth.Columns(t))
 		}
-		room -= termwidth.Columns(" · via ") + min(longest, 16)
+		room -= termwidth.Columns(" (via )") + min(longest, 16)
 	}
-	quoted := quoteWithin(topic, max(26, min(50, room)))
+	quoted := quoteWithin(topic, max(floor, min(50, room)))
 	// A term the quote already shows tells the reader nothing the quote does
 	// not, so the ones it lacks go first and are the last to be dropped. The
 	// quote as cut is what the reader sees, so that is what is checked.
@@ -1535,21 +1530,21 @@ func dejaVuLine(s model.Session, terms ...string) string {
 	// "UserPromptSubmit says: …", which read "says: deja-vu: you have been
 	// here" — seen on screen, two colons in four words.
 	//
-	// Name the terms that triggered the moment: "you have been here" with no
-	// visible reason reads as noise the first time it misfires. The first
-	// always, cut if it alone would pass noteWidth, the rest while they fit.
-	head := fmt.Sprintf("deja-vu — %s: %s (%s", who, quoted, when)
+	// Name the terms that triggered the moment: a line with no visible reason
+	// reads as noise the first time it misfires. The first always, cut if it
+	// alone would pass noteWidth, the rest while they fit.
+	head := lead + quoted
 	why := ""
 	for i, t := range terms {
 		if i == 0 {
-			left := noteWidth - termwidth.Columns(head+" · via )")
+			left := noteWidth - termwidth.Columns(head+" (via )")
 			if termwidth.Columns(t) > left {
 				if left < 4 {
 					break
 				}
 				t = termwidth.Cut(t, left-1) + "…"
 			}
-			why = " · via " + t
+			why = " (via " + t
 			continue
 		}
 		next := why + ", " + t
@@ -1558,7 +1553,66 @@ func dejaVuLine(s model.Session, terms ...string) string {
 		}
 		why = next
 	}
+	if why == "" {
+		return head
+	}
 	return head + why + ")"
+}
+
+// dejaVuLead says where the memory came from and when: "from Codex CLI, 4
+// months ago". The agent is the point of the line: a question asked in Claude
+// Code that Codex settled in the spring is what no single agent's memory can
+// answer, and "you have been here" left that out.
+func dejaVuLead(s model.Session) string {
+	var from string
+	switch s.Harness {
+	case "":
+	case "deja":
+		from = "from your notes"
+	default:
+		from = "from " + agentName(s.Harness)
+	}
+	// A session that arrived from another machine is not work the reader did
+	// here: the context block below labels it `imported:` and the line has to
+	// agree with it (#1001).
+	if strings.HasPrefix(s.Project, "imported:") {
+		if from == "" {
+			from = "from another machine"
+		} else {
+			from += " on another machine"
+		}
+	}
+	age := dejaVuAge(s.Updated)
+	switch {
+	case from != "" && age != "":
+		return from + ", " + age
+	case from != "":
+		return from
+	case age != "":
+		return age
+	}
+	return "you have been here"
+}
+
+// dejaVuAge is how long ago, in the words a person uses: "today", "3d ago",
+// "2 weeks ago", "4 months ago". A calendar date leaves the reader to do the
+// subtraction, and the distance is what makes the moment worth a line.
+func dejaVuAge(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	rel := search.RelativeDate(t)
+	days := int(time.Since(t).Hours() / 24)
+	switch {
+	case rel == "today" || strings.HasSuffix(rel, " ago") || days < 7:
+		// Ahead of the clock, or on the boundary of a week: the date is what is known.
+		return rel
+	case days < 60:
+		return countNoun(days/7, "week") + " ago"
+	case days < 365:
+		return countNoun(days/30, "month") + " ago"
+	}
+	return countNoun(days/365, "year") + " ago"
 }
 
 // dejaVuTopic picks something a human actually typed. Session titles are the

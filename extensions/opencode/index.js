@@ -156,6 +156,13 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
   const installed = (await ask(["version"], undefined, 5000)) !== ""
   const answer = (text) => (installed ? text || NOTHING : MISSING)
 
+  // The toast is the one channel to the person: what the hooks return is model
+  // context. A 2.x server plugin has none, and there deja is asked --strict so
+  // it keeps its lines for a host that shows them rather than spend them here.
+  const toasts = typeof client?.tui?.showToast === "function"
+  const toast = (message) => (toasts ? client.tui.showToast({ body: { message, variant: "info", duration: 6000 } }) : undefined)
+  const hook = (name) => (toasts ? [name] : [name, "--strict"])
+
   const digests = new Map()
   const told = new Set()
   // How many times this session has been answered with nothing. An empty
@@ -310,16 +317,13 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
         // never reads the digest cached for it (#4273). The parent rides
         // along so the digest leaves it out too.
         const payload = { session_id: input?.sessionID || "", parent_session_id: await parentOf(input?.sessionID), cwd }
-        const { context, receipt } = contextText(await ask(["hook-context"], JSON.stringify(payload), 30000))
+        const { context, receipt } = contextText(await ask(hook("hook-context"), JSON.stringify(payload), 30000))
         digests.set(key, context)
         // The receipt is the only sign the user gets that memory arrived. Once
-        // per session: repeating it every turn is wallpaper. The hook's own
-        // output is model context, so the toast is the only channel for it.
+        // per session: repeating it every turn is wallpaper.
         if (receipt && !told.has(key)) {
           told.add(key)
-          await client.tui.showToast({
-            body: { message: receipt, variant: "info", duration: 6000 },
-          })
+          await toast(receipt)
         }
       }
       const context = digests.get(key)
@@ -346,9 +350,7 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
       if (!status) return
       told.add(key)
       digests.delete(key)
-      await client.tui.showToast({
-        body: { message: status, variant: "info", duration: 6000 },
-      })
+      await toast(status)
     } catch {
       // memory is optional: never break the session over it
     }
@@ -382,8 +384,19 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
         // word-for-word repeat.
         const key = input?.sessionID || last.sessionID || ""
         if (key) live.add(key)
-        const raw = await ask(["hook-prompt"], JSON.stringify({ prompt: last.prompt, session_id: key, parent_session_id: await parentOf(key), cwd }))
-        remember(last.key, last.prompt && raw ? JSON.parse(raw)?.hookSpecificOutput?.additionalContext || "" : "")
+        // A task sub-agent's turns are written by the agent that spawned it,
+        // which had this recall already. Asked with no prompt, deja only stamps
+        // the session live: on a real store sub-agents took more per-prompt
+        // blocks than the sessions people typed in (34 to 19 in 17 days).
+        const parent = await parentOf(key)
+        const prompt = parent ? "" : last.prompt
+        const raw = await ask(hook("hook-prompt"), JSON.stringify({ prompt, session_id: key, parent_session_id: parent, cwd }))
+        const reply = prompt && raw ? JSON.parse(raw) : {}
+        remember(last.key, reply?.hookSpecificOutput?.additionalContext || "")
+        // The "deja-vu — from Codex CLI, …" line is the person's, and what goes
+        // into the message is the model's: without the toast it reached no one,
+        // while deja counted it shown and held the next one back twenty minutes.
+        if (reply?.systemMessage) await toast(reply.systemMessage)
       }
       // Every message gets back what it was given, in every call, the way
       // Claude Code keeps a prompt hook's text in its transcript.
@@ -411,10 +424,10 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
     }
   }
 
-  // A spawned agent gets none of the above: the system prompt was built for the
-  // session that spawned it, and the per-prompt pass fires on what the user
-  // typed, which a subagent never does. Its instructions are the one thing that
-  // reaches it, so recall goes in there.
+  // A spawned agent's instructions are the one thing the parent hands it, and
+  // deja decides whether recall goes in there. It leaves them as written where
+  // the parent had recall of its own, opencode included (hook_spawn.go), and
+  // the call still asks for a rebuild when the index is stale (#2567).
   hooks["tool.execute.before"] = async (input, output) => {
     try {
       if (input?.tool !== "task") return

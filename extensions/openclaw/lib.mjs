@@ -345,11 +345,11 @@ export function escapeMarkdown(text) {
 }
 
 // receiptLine turns deja's per-prompt receipt into the one line a chat shows:
-// no brand in front, no "via" terms, the date kept. The block it rides in has
-// no byline, so a small "deja" at the end says whose line it is. "" when the
-// text holds no receipt.
+// no brand in front, no "via" terms, the agent and the age kept. The block it
+// rides in has no byline, so a small "deja" at the end says whose line it is.
+// "" when the text holds no receipt.
 export function receiptLine(text) {
-  const shape = /^deja-vu\s+—\s+(you have been here|this was done on another machine):\s+("(?:[^"\\]|\\.)*")\s+\((.+)\)$/
+  const shape = /^deja-vu\s+—\s+([^"]+?):\s+("(?:[^"\\]|\\.)*")(?:\s+\((.+)\))?$/
   for (const raw of String(text || "").split("\n")) {
     const m = shape.exec(raw.trim())
     if (!m) continue
@@ -357,9 +357,14 @@ export function receiptLine(text) {
     try {
       topic = JSON.parse(m[2])
     } catch {}
-    const when = m[3].split(/\s+·\s+via:?\s+/)[0].trim()
-    const who = m[1] === "you have been here" ? "you've been here" : "done on another machine"
-    return "↺ " + who + ': "' + escapeMarkdown(topic) + '"' + (when ? " · " + escapeMarkdown(when) : "") + " · deja"
+    // An older deja named no agent and put the date in the parentheses:
+    // "you have been here: "…" (Oct 4 · via zorbit)".
+    const old = { "you have been here": "you've been here", "this was done on another machine": "done on another machine" }[m[1]]
+    if (old) {
+      const when = !m[3] || /^via:?\s/.test(m[3]) ? "" : m[3].split(/\s+·\s+via:?\s+/)[0].trim()
+      return "↺ " + old + ': "' + escapeMarkdown(topic) + '"' + (when ? " · " + escapeMarkdown(when) : "") + " · deja"
+    }
+    return "↺ " + escapeMarkdown(m[1]) + ': "' + escapeMarkdown(topic) + '" · deja'
   }
   return ""
 }

@@ -53,7 +53,7 @@ func TestAFleetOfSpawnedAgentsEachGetMemory(t *testing.T) {
 
 	spawn := func(prompt string) string {
 		t.Helper()
-		payload := `{"hook_event_name":"PreToolUse","tool_name":"Task","tool_input":` +
+		payload := `{"hook_event_name":"PreToolUse","tool_name":"Task","toolInput":` +
 			`{"prompt":` + mustJSON(t, prompt) + `,"subagent_type":"general-purpose","model":"sonnet"},"session_id":"parent"}`
 		out := toolHookRun(t, payload)
 		if strings.TrimSpace(out) == "" {

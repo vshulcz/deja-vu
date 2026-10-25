@@ -19,8 +19,9 @@ import {
   withReceipt,
 } from "../lib.mjs"
 
-const RECEIPT = 'deja-vu — you have been here: "how should the zorbit queue drain on deploy" (Oct 4 · via: zorbit, queue, decide)'
-const LINE = '↺ you\'ve been here: "how should the zorbit queue drain on deploy" · Oct 4 · deja'
+const RECEIPT = 'deja-vu — from Codex CLI, 3 weeks ago: "how should the zorbit queue drain on deploy" (via zorbit, queue, decide)'
+const LINE = '↺ from Codex CLI, 3 weeks ago: "how should the zorbit queue drain on deploy" · deja'
+const OLD_LINE = '↺ you\'ve been here: "how should the zorbit queue drain on deploy" · Oct 4 · deja'
 const CONTEXT = "<deja-recall>\ndrain with --grace 40\n</deja-recall>"
 const OWNER = { channels: { telegram: { allowFrom: ["4242"], streaming: { mode: "off" } } } }
 
@@ -40,9 +41,15 @@ test("a stray stdout line stays with the model's text, where --plain would print
 
 test("the receipt becomes one short line without the brand or the via terms", () => {
   assert.equal(receiptLine(RECEIPT), LINE)
-  // #4994 drops the colon after "via".
-  assert.equal(receiptLine('deja-vu — you have been here: "how should the zorbit queue drain on deploy" (Oct 4 · via zorbit)'), LINE)
-  assert.equal(receiptLine('deja-vu — you have been here: "how should the zorbit queue drain on deploy" (Oct 4)'), LINE)
+  assert.equal(receiptLine('deja-vu — from Codex CLI, 3 weeks ago: "how should the zorbit queue drain on deploy"'), LINE)
+  assert.equal(
+    receiptLine('deja-vu — from Claude Code on another machine, 3d ago: "rotate the \\"api\\" key" (via api)'),
+    '↺ from Claude Code on another machine, 3d ago: "rotate the "api" key" · deja',
+  )
+  // The shape an older deja prints. #4994 dropped the colon after "via".
+  assert.equal(receiptLine('deja-vu — you have been here: "how should the zorbit queue drain on deploy" (Oct 4 · via: zorbit, queue)'), OLD_LINE)
+  assert.equal(receiptLine('deja-vu — you have been here: "how should the zorbit queue drain on deploy" (Oct 4 · via zorbit)'), OLD_LINE)
+  assert.equal(receiptLine('deja-vu — you have been here: "how should the zorbit queue drain on deploy" (Oct 4)'), OLD_LINE)
   assert.equal(
     receiptLine('deja-vu — this was done on another machine: "rotate the \\"api\\" key" (3d ago)'),
     '↺ done on another machine: "rotate the "api" key" · 3d ago · deja',
@@ -54,8 +61,8 @@ test("the receipt becomes one short line without the brand or the via terms", ()
 test("markdown in the topic is escaped so it cannot end the italics", () => {
   assert.equal(escapeMarkdown("fix my_module *now* [x] `y`"), "fix my\\_module \\*now\\* \\[x\\] \\`y\\`")
   assert.equal(
-    receiptLine('deja-vu — you have been here: "rename snake_case_names" (Oct 4 · via: rename)'),
-    '↺ you\'ve been here: "rename snake\\_case\\_names" · Oct 4 · deja',
+    receiptLine('deja-vu — from Codex CLI, today: "rename snake_case_names" (via rename)'),
+    '↺ from Codex CLI, today: "rename snake\\_case\\_names" · deja',
   )
 })
 

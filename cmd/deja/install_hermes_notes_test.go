@@ -39,7 +39,7 @@ args = sys.argv[1:]
 open(` + strconv.Quote(calls) + `, "a").write(" ".join(args) + "\n")
 quiet = os.path.exists(` + strconv.Quote(filepath.Join(dir, "quiet")) + `)
 context = "" if quiet else "<deja-recall>\n- **zorbit** dec-0001 · retry in-process, no queue\n</deja-recall>"
-line = {"hook-prompt": "deja-vu — you have been here: \"ledger webhook retry\" (3d ago · via: ledger, webhook)",
+line = {"hook-prompt": "deja-vu — from Codex CLI, 3d ago: \"ledger webhook retry\" (via ledger, webhook)",
         "hook-context": "deja recalled 1 prior session from this project · 1.2 KB of context\ndeja indexed 15 sessions from 2 agents on this machine"}.get(args[0], "")
 if quiet and args[0] == "hook-context":
     line = "deja is indexing your history — recall comes online when it finishes\n" + line
@@ -112,8 +112,8 @@ assert text == "<deja-recall>\n- **zorbit** dec-0001 · retry in-process, no que
 print(repr(p.recall_status().provider_label))
 `)
 	want := []string{
-		`'deja · recalled 1 prior session from this project · 1.2 KB of context\n   indexed 15 sessions from 2 agents on this machine\n   you have been here: "ledger webhook retry" (3d ago · via ledger, webhook)\n  '`,
-		`'deja · you have been here: "ledger webhook retry" (3d ago · via ledger, webhook)'`,
+		`'deja · recalled 1 prior session from this project · 1.2 KB of context\n   indexed 15 sessions from 2 agents on this machine\n   from Codex CLI, 3d ago: "ledger webhook retry" (via ledger, webhook)\n  '`,
+		`'deja · from Codex CLI, 3d ago: "ledger webhook retry" (via ledger, webhook)'`,
 	}
 	if got := strings.Split(strings.TrimSpace(out), "\n"); len(got) != 2 || got[0] != want[0] || got[1] != want[1] {
 		t.Fatalf("indicator labels:\n%s\nwant:\n%s", out, strings.Join(want, "\n"))
@@ -183,7 +183,7 @@ os.remove(`+strconv.Quote(quiet)+`)
 p.prefetch("the ledger webhook times out again")
 print(repr(p.recall_status().provider_label))
 `)
-	if !strings.Contains(out, "indexed 15 sessions") || strings.Count(out, "you have been here") != 2 {
+	if !strings.Contains(out, "indexed 15 sessions") || strings.Count(out, `"ledger webhook retry"`) != 2 {
 		t.Fatalf("held lines did not reach the next indicator:\n%s", out)
 	}
 	// "indexing your history" was true when it was said; a turn later the
@@ -210,7 +210,7 @@ p._first_turn = False
 p.prefetch("the ledger webhook times out again")
 print(repr(p.recall_status().provider_label))
 `)
-	if strings.Contains(out, "indexed 15 sessions") || strings.Count(out, "you have been here") != 1 {
+	if strings.Contains(out, "indexed 15 sessions") || strings.Count(out, `"ledger webhook retry"`) != 1 {
 		t.Fatalf("the new conversation opened on the last one's lines:\n%s", out)
 	}
 }

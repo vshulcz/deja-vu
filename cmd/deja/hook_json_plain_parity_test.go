@@ -77,7 +77,7 @@ func TestJSONReplyCarriesWhatPlainPrints(t *testing.T) {
 	if strings.TrimSpace(plainPrompt) != strings.TrimSpace(ctx) {
 		t.Errorf("the model would read something else:\n--plain:\n%s\n--json:\n%s", plainPrompt, ctx)
 	}
-	if !strings.Contains(notes, "you have been here") {
+	if !strings.Contains(notes, "deja-vu — ") {
 		t.Errorf("the JSON reply carries no line for the person: %q", notes)
 	}
 

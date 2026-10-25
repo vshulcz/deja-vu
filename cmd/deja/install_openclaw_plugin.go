@@ -548,7 +548,7 @@ function toolLine(event, ctx) {
   return "";
 }
 
-// deja's "you have been here" receipt rides under the final reply in a 1:1
+// deja's per-prompt receipt rides under the final reply in a 1:1
 // chat with the owner on a channel (Telegram, Slack, Discord ...), never in a
 // group, the TUI or the Control UI, and the session-start notes never go to a
 // channel at all. The rules below are extensions/openclaw/lib.mjs's, copied as
@@ -666,7 +666,7 @@ function escapeMarkdown(text) {
   return String(text).replace(/[\\\x60*_~|\[\]]/g, "\\$&")
 }
 function receiptLine(text) {
-  const shape = /^deja-vu\s+—\s+(you have been here|this was done on another machine):\s+("(?:[^"\\]|\\.)*")\s+\((.+)\)$/
+  const shape = /^deja-vu\s+—\s+([^"]+?):\s+("(?:[^"\\]|\\.)*")(?:\s+\((.+)\))?$/
   for (const raw of String(text || "").split("\n")) {
     const m = shape.exec(raw.trim())
     if (!m) continue
@@ -674,9 +674,14 @@ function receiptLine(text) {
     try {
       topic = JSON.parse(m[2])
     } catch {}
-    const when = m[3].split(/\s+·\s+via:?\s+/)[0].trim()
-    const who = m[1] === "you have been here" ? "you've been here" : "done on another machine"
-    return "↺ " + who + ': "' + escapeMarkdown(topic) + '"' + (when ? " · " + escapeMarkdown(when) : "") + " · deja"
+    // An older deja named no agent and put the date in the parentheses:
+    // "you have been here: "…" (Oct 4 · via zorbit)".
+    const old = { "you have been here": "you've been here", "this was done on another machine": "done on another machine" }[m[1]]
+    if (old) {
+      const when = !m[3] || /^via:?\s/.test(m[3]) ? "" : m[3].split(/\s+·\s+via:?\s+/)[0].trim()
+      return "↺ " + old + ': "' + escapeMarkdown(topic) + '"' + (when ? " · " + escapeMarkdown(when) : "") + " · deja"
+    }
+    return "↺ " + escapeMarkdown(m[1]) + ': "' + escapeMarkdown(topic) + '" · deja'
   }
   return ""
 }

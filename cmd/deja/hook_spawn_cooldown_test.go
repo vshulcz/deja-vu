@@ -50,7 +50,7 @@ func TestAFleetIsNotSilencedByTheProjectCooldown(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		out := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Task","tool_input":`+
+		out := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Task","toolInput":`+
 			`{"prompt":`+string(b)+`,"subagent_type":"general-purpose"},"session_id":"parent"}`)
 		if strings.TrimSpace(out) == "" {
 			return ""

@@ -107,7 +107,7 @@ func TestCursorPromptGetsTheRecallWithoutTheReceipt(t *testing.T) {
 	claude := ask(t, func(string) string {
 		return `{"prompt":"` + prompt + `","session_id":"s-new","hook_event_name":"UserPromptSubmit"}`
 	})
-	if !strings.Contains(claude.SystemMessage, "you have been here") {
+	if !strings.Contains(claude.SystemMessage, "deja-vu — ") {
 		t.Fatalf("the control did not get its receipt: %+v", claude)
 	}
 

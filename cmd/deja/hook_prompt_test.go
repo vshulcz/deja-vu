@@ -333,7 +333,7 @@ func TestHookPromptRequiresRealOverlap(t *testing.T) {
 	if err := runHookPrompt(index.DefaultDir(), in, &out); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(out.String(), "you have been here") {
+	if strings.Contains(out.String(), "deja-vu — ") {
 		t.Fatalf("single-term overlap must not claim deja vu:\n%s", out.String())
 	}
 }
@@ -390,10 +390,9 @@ func TestDejaVuTopicSkipsHarnessPlumbing(t *testing.T) {
 	if strings.Contains(line, "AGENTS.md") {
 		t.Fatalf("plumbing leaked into deja vu line: %q", line)
 	}
-	// The year-old date leaves the quote 42 columns, which cuts "midnight"
-	// out of it, so that term is named first; the fourth is never named.
+	// The fourth term is never named.
 	withWhy := dejaVuLine(s, "exporter", "midnight", "rows", "fourth")
-	if !strings.Contains(withWhy, "· via midnight") || strings.Contains(withWhy, "fourth") {
+	if !strings.HasPrefix(withWhy, "deja-vu — from Codex CLI: ") || !strings.Contains(withWhy, "(via exporter") || strings.Contains(withWhy, "fourth") {
 		t.Fatalf("via-terms missing or uncapped: %q", withWhy)
 	}
 	if w := termwidth.Columns(withWhy); w > noteWidth {
@@ -407,17 +406,17 @@ func TestDejaVuTopicSkipsHarnessPlumbing(t *testing.T) {
 	if w := termwidth.Columns(got); w > noteWidth {
 		t.Fatalf("the line is %d columns, over %d: %q", w, noteWidth, got)
 	}
-	if !strings.Contains(got, `\"make test\"`) || !strings.Contains(got, "· via TestReplica") {
+	if !strings.Contains(got, `\"make test\"`) || !strings.Contains(got, "(via TestReplica") {
 		t.Fatalf("the quote or the first term is missing: %q", got)
 	}
 	// The order is checked against the quote as cut: a term that only the cut
 	// tail held is news to the reader and goes first.
 	tail := model.Session{ID: "t", Project: "app", Updated: time.Now(), Messages: []model.Message{{Role: "user", Text: "the exporter drops the last batch of rows every night at midnight, only on the replica"}}}
-	if got := dejaVuLine(tail, "exporter", "replica"); !strings.Contains(got, "· via replica") || strings.Contains(got, "on the replica\"") {
+	if got := dejaVuLine(tail, "exporter", "replica"); !strings.Contains(got, "(via replica") || strings.Contains(got, "on the replica\"") {
 		t.Fatalf("a term cut out of the quote was not put first: %q", got)
 	}
 	short := model.Session{ID: "z", Project: "app", Messages: []model.Message{{Role: "user", Text: "drain the queue"}}}
-	if got := dejaVuLine(short, "queue", "grace", "deploy"); !strings.HasSuffix(got, "· via grace, deploy, queue)") {
+	if got := dejaVuLine(short, "queue", "grace", "deploy"); !strings.HasSuffix(got, "(via grace, deploy, queue)") {
 		t.Fatalf("with room, all three terms, the ones the quote lacks first: %q", got)
 	}
 	junk := model.Session{Harness: "codex", ID: "y", Project: "app",
@@ -454,7 +453,7 @@ func TestHookPromptSkipsMarathonSessions(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := out.String()
-	if !strings.Contains(got, "you have been here") {
+	if !strings.Contains(got, "deja-vu — ") {
 		t.Fatalf("focused session must fire:\n%s", got)
 	}
 	if strings.Contains(got, "msg 5") {
@@ -695,16 +694,21 @@ func TestHookPromptSurvivesBytesAfterThePayload(t *testing.T) {
 // another machine, while the context block below it labelled the same session
 // `imported:` (#1001).
 func TestDejaVuLineDoesNotClaimAPeersWorkAsYours(t *testing.T) {
-	local := model.Session{ID: "loc", Project: "tmp/w16", Updated: time.Now(),
+	local := model.Session{ID: "loc", Harness: "codex", Project: "tmp/w16", Updated: time.Now(),
 		Messages: []model.Message{{Role: "user", Text: "the ticker window stays at 30s"}}}
-	if got := dejaVuLine(local, "ticker"); !strings.Contains(got, "you have been here") {
-		t.Errorf("a local session lost the wording it has always had: %q", got)
+	if got := dejaVuLine(local, "ticker"); !strings.HasPrefix(got, "deja-vu — from Codex CLI, today: ") {
+		t.Errorf("a local session does not name its agent and age: %q", got)
 	}
 	peer := local
 	peer.Project = "imported:tmp/w16"
 	got := dejaVuLine(peer, "ticker")
-	if strings.Contains(got, "you have been here") {
+	if !strings.HasPrefix(got, "deja-vu — from Codex CLI on another machine, today: ") {
 		t.Errorf("a session from another machine is claimed as the reader's own: %q", got)
+	}
+	unknown := peer
+	unknown.Harness = ""
+	if line := dejaVuLine(unknown, "ticker"); !strings.HasPrefix(line, "deja-vu — from another machine, today: ") {
+		t.Errorf("with no agent known the origin is still said: %q", line)
 	}
 	if !strings.Contains(got, "another machine") {
 		t.Errorf("the line does not say where the session came from: %q", got)

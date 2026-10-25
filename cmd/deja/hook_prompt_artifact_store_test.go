@@ -50,7 +50,7 @@ func TestHookPromptStandsDownOnHarnessArtifacts(t *testing.T) {
 		if err := runHookPromptMode(index.DefaultDir(), in, &out, true); err != nil {
 			t.Fatal(err)
 		}
-		if strings.Contains(out.String(), "deja-recall") || strings.Contains(out.String(), "you have been here") {
+		if strings.Contains(out.String(), "deja-recall") || strings.Contains(out.String(), "deja-vu — ") {
 			t.Errorf("the hook recalled on a harness artifact:\nprompt: %s\ngot: %q", artifact, out.String())
 		}
 	}

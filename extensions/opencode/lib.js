@@ -252,14 +252,14 @@ export function resultText(result) {
 }
 
 // v1Client is the slice of the 1.x client the plugin reads, over 2.x's ctx. A
-// 2.x server plugin has no channel to the TUI, so the toasts go nowhere. The
+// 2.x server plugin has no channel to the TUI, so there is no tui here, and the
+// plugin asks deja to keep the person's lines rather than spend them. The
 // session lookup is what names a sub-agent's parent: without it the
 // sub-agent's digest and recall led with the parent that spawned it (#4548).
 // 1.x answers through client.session.get, 2.x through ctx.session.get, whose
 // SessionInfo carries parentID.
 export function v1Client(ctx) {
   return {
-    tui: { showToast: async () => {} },
     session: {
       get: async ({ path } = {}) => {
         if (!path?.id || typeof ctx?.session?.get !== "function") return { data: {} }

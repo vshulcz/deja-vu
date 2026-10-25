@@ -26,7 +26,7 @@ deja 可执行文件随包一起提供；你自己装的 deja（`brew install de
 - **工具**：`deja_recall`（检索历史）、`deja_fix`（这个报错之后上次跑了什么）、`deja_blame`（哪些会话动过某个文件、当时得出了什么结论）。
 - **`/deja <要查什么>`**：同样的检索，结果给你看，而不是给模型。
 
-在频道上（Telegram、Slack、Discord 等）和你的一对一私聊里，如果回复用到了你的历史，下方会多一行斜体：`↺ you've been here: "…" · Oct 4 · deja`。它经由 `reply_payload_sending` 在会话记录写入之后才加上，所以模型看不到，拿到的文本和以前完全一样。只有同时满足以下条件才会出现，任何一项缺失或无法判断都不显示：消息来自一对一私聊（OpenClaw 给出 `isGroup: false`，会话键不含 group、channel、thread 或 topic，给出的聊天类型是 `direct`）；发送者是你（`commands.ownerAllowFrom`，没有配置时指只列了一个 id 的频道 `allowFrom`）；该频道整条发送回复（关闭了流式，也没有开启分块流式，例如 `channels.telegram.streaming.mode: "off"`；Telegram 默认的预览流式分块发送，没有可以附带这一行的最终消息，所以那里根本不会向 deja 请求回执，回执也不会被消耗）；这条回复是同一次运行、同一会话的最终文字回复。媒体或语音回复、没有回复就结束的运行都不带这一行。其他 deja 提示从不发到频道里，仍然随 `/deja` 给你。插件配置里设 `"receipt": false` 可以关掉。
+在频道上（Telegram、Slack、Discord 等）和你的一对一私聊里，如果回复用到了你的历史，下方会多一行斜体：`↺ from Codex CLI, 3 weeks ago: "…" · deja`。它经由 `reply_payload_sending` 在会话记录写入之后才加上，所以模型看不到，拿到的文本和以前完全一样。只有同时满足以下条件才会出现，任何一项缺失或无法判断都不显示：消息来自一对一私聊（OpenClaw 给出 `isGroup: false`，会话键不含 group、channel、thread 或 topic，给出的聊天类型是 `direct`）；发送者是你（`commands.ownerAllowFrom`，没有配置时指只列了一个 id 的频道 `allowFrom`）；该频道整条发送回复（关闭了流式，也没有开启分块流式，例如 `channels.telegram.streaming.mode: "off"`；Telegram 默认的预览流式分块发送，没有可以附带这一行的最终消息，所以那里根本不会向 deja 请求回执，回执也不会被消耗）；这条回复是同一次运行、同一会话的最终文字回复。媒体或语音回复、没有回复就结束的运行都不带这一行。其他 deja 提示从不发到频道里，仍然随 `/deja` 给你。插件配置里设 `"receipt": false` 可以关掉。
 
 ## 配置
 

@@ -52,7 +52,7 @@ In a 1:1 chat with you on a channel (Telegram, Slack, Discord and the rest),
 a reply that was answered from your history gets one italic line under it:
 
 ```
-↺ you've been here: "how should the zorbit queue drain on deploy" · Oct 4 · deja
+↺ from Codex CLI, 3 weeks ago: "how should the zorbit queue drain on deploy" · deja
 ```
 
 It is added through `reply_payload_sending` after the transcript is written,

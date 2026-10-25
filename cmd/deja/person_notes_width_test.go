@@ -105,7 +105,7 @@ func TestSessionStartSaysAtMostTwoShortLines(t *testing.T) {
 	if err := json.Unmarshal(bytes.TrimSpace(out.Bytes()), &resp); err != nil {
 		t.Fatalf("not the hook envelope: %v\n%s", err, out.String())
 	}
-	if !strings.Contains(resp.SystemMessage, "you have been here") {
+	if !strings.Contains(resp.SystemMessage, "deja-vu — ") {
 		t.Fatalf("no déjà vu line to measure: %q", resp.SystemMessage)
 	}
 	checkPersonLines(t, "the déjà vu line", resp.SystemMessage, 1)
