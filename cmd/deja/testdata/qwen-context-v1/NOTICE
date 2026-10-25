@@ -1,0 +1,11 @@
+These three files are copied unchanged from Qwen Code
+(https://github.com/QwenLM/qwen-code), directory
+integrations/external-context/contracts/v1/, at commit
+33e80fc1aa49670666e2797761a4c61206581d9b.
+
+Qwen Code is licensed under the Apache License, Version 2.0:
+https://github.com/QwenLM/qwen-code/blob/main/LICENSE
+http://www.apache.org/licenses/LICENSE-2.0
+
+They are the External Context MCP Profile v1 schemas and test vectors that
+cmd/deja/mcp_context_search_test.go checks `deja mcp --context-search` against.

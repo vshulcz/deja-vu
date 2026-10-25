@@ -67,6 +67,8 @@ type mcpServer struct {
 	enc   *json.Encoder
 	slots chan struct{}
 	open  sync.WaitGroup // requests not answered yet
+	// contextOnly serves the External Context profile instead of deja's tool.
+	contextOnly bool
 
 	mu      sync.Mutex
 	werr    error
@@ -126,7 +128,7 @@ func (s *mcpServer) replyLocked(id any, result any, code int, msg string) {
 // serve answers one request that is owed a reply.
 func (s *mcpServer) serve(req rpcRequest) {
 	if mcpInline[req.Method] {
-		result, code, msg := mcpHandler(s.dir, req)
+		result, code, msg := s.handle(req)
 		s.mu.Lock()
 		s.replyLocked(req.ID, result, code, msg)
 		s.mu.Unlock()
@@ -145,8 +147,8 @@ func (s *mcpServer) serve(req rpcRequest) {
 	}
 	s.open.Add(1)
 	s.pending[mcpIDKey(req.ID)] = p
-	if req.Method == "tools/call" && mcpDeadline > 0 {
-		p.timer = time.AfterFunc(mcpDeadline, func() { s.overdue(p) })
+	if d := s.deadline(); req.Method == "tools/call" && d > 0 {
+		p.timer = time.AfterFunc(d, func() { s.overdue(p) })
 	}
 	if w, ok := s.running[key]; ok {
 		// The same call is already in flight — an agent asking again after a
@@ -175,7 +177,7 @@ func (s *mcpServer) run(req rpcRequest, w *mcpWork) {
 	}
 	s.mu.Unlock()
 
-	result, code, msg := mcpHandler(s.dir, req)
+	result, code, msg := s.handle(req)
 	<-s.slots
 
 	s.mu.Lock()
@@ -222,7 +224,29 @@ func (s *mcpServer) overdue(p *mcpPending) {
 		return
 	}
 	s.answerLocked(p)
+	if s.contextOnly {
+		s.replyLocked(p.id, contextSearchError(contextSearchSlow), 0, "")
+		return
+	}
 	s.replyLocked(p.id, toolText(mcpOverdueNote(mcpDeadline, building)), 0, "")
+}
+
+// handle answers one request on whichever surface this server serves.
+func (s *mcpServer) handle(req rpcRequest) (any, int, string) {
+	if s.contextOnly {
+		return handleContextMCP(s.dir, req)
+	}
+	return mcpHandler(s.dir, req)
+}
+
+// deadline is how long a tools/call may run before it is answered. The
+// profile wants a stable answer well inside the client's call timeout, so
+// its budget caps whatever DEJA_MCP_DEADLINE says.
+func (s *mcpServer) deadline() time.Duration {
+	if s.contextOnly && (mcpDeadline <= 0 || mcpDeadline > contextSearchBudget) {
+		return contextSearchBudget
+	}
+	return mcpDeadline
 }
 
 // cancel handles notifications/cancelled. A request the client gave up on is

@@ -105,10 +105,17 @@ func batchReply(elems []json.RawMessage) (json.RawMessage, bool) {
 const mcpMaxFrame = 10 * 1024 * 1024
 
 func serveMCP(dir string, r io.Reader, w io.Writer) error {
+	return serveMCPAs(dir, r, w, false)
+}
+
+// serveMCPAs serves either deja's own tool or, with contextOnly, the single
+// context_search tool of Qwen Code's External Context MCP Profile v1.
+func serveMCPAs(dir string, r io.Reader, w io.Writer, contextOnly bool) error {
 	mcpConn.Store(newMCPConn())
 	br := bufio.NewReaderSize(r, 64*1024)
 	enc := json.NewEncoder(w)
 	srv := newMCPServer(dir, enc)
+	srv.contextOnly = contextOnly
 	for {
 		if werr := srv.writeErr(); werr != nil {
 			srv.wait()
@@ -1584,11 +1591,62 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 			return text, 1, id.size, []string{id.session}, nil, nil
 		}
 	}
-	live, cut := liveLineageCut(dir)
-	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: live, ExcludeUpTo: cut, Window: offset + limit, Activation: policy.ActivationMCP}
-	cov, err := index.EnsureForSearchCoverage(dir, o, mcpProgress())
+	r, err := rankRecall(dir, q, harness, project, offset+limit)
 	if err != nil {
 		return "", 0, 0, nil, nil, err
+	}
+	result, o, hits, policyHidden, cov := r.result, r.o, r.hits, r.policyHidden, r.cov
+	unread, about := r.unread, r.about
+	if len(hits) == 0 {
+		return recallMissAnswer(dir, q, budget, cov, policyHidden)
+	}
+	// Before the page is cut, not after: demoting inside the page is a no-op
+	// when every hit on it was rejected, and then the approaches the reader did
+	// not reject sit below the cut and never reach the agent at all. On 30
+	// matches with the 25 newest rejected, `limit 15` served 15 rejected
+	// attempts and none of the 5 clean ones.
+	total := len(hits) + unread
+	attachLifecycles(dir, hits)
+	twins := twinSessionsFor(dir)
+	demoted := demoteRejected(hits)
+	if offset > 0 {
+		// Past the read hits too: the total counts sessions ranking never
+		// read, and filters can leave fewer hits than the pool held.
+		if offset >= total || offset >= len(hits) {
+			what := "matches"
+			if result.Tier == search.TierRelevance {
+				what = "sessions ranked by wording"
+			}
+			return fmt.Sprintf("No more %s for %q: %s total, offset %d.", what, clampEcho(q), aboutCount(total, about), offset), 0, 0, nil, nil, nil
+		}
+		hits = hits[offset:]
+	}
+	if len(hits) > limit {
+		hits = hits[:limit]
+	}
+	return recallPage(dir, q, budget, offset, limit, total, demoted, about, result, o, hits, twins, cov)
+}
+
+// rankedRecall is a recall's ranking before it is cut into a page: what the
+// search found, scoped to the project the agent works in first.
+type rankedRecall struct {
+	result       index.SearchResult
+	o            search.Options
+	hits         []search.Hit
+	policyHidden int
+	unread       int
+	about        bool
+	cov          index.Coverage
+}
+
+// rankRecall runs the search recall serves from. context_search reads the
+// same ranking, so the two surfaces cannot disagree about what is relevant.
+func rankRecall(dir, q, harness, project string, window int) (rankedRecall, error) {
+	live, cut := liveLineageCut(dir)
+	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: live, ExcludeUpTo: cut, Window: window, Activation: policy.ActivationMCP}
+	cov, err := index.EnsureForSearchCoverage(dir, o, mcpProgress())
+	if err != nil {
+		return rankedRecall{}, err
 	}
 	if cov.Stale {
 		// A store rewrote itself (cline, cursor); rebuilding inline would
@@ -1626,7 +1684,7 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 	}
 	result, o2, hits, policyHidden, err := recallRank(dir, q, o)
 	if err != nil {
-		return "", 0, 0, nil, nil, err
+		return rankedRecall{}, err
 	}
 	// Matching sessions ranking never read count toward the total all the
 	// same (#5467).
@@ -1682,33 +1740,11 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 	// A fork quoting the turns its source holds said everything twice, the
 	// same as on the search screen (#5320, #5335).
 	hits = dropCopiedHits(dir, hits)
-	if len(hits) == 0 {
-		return recallMissAnswer(dir, q, budget, cov, policyHidden)
-	}
-	// Before the page is cut, not after: demoting inside the page is a no-op
-	// when every hit on it was rejected, and then the approaches the reader did
-	// not reject sit below the cut and never reach the agent at all. On 30
-	// matches with the 25 newest rejected, `limit 15` served 15 rejected
-	// attempts and none of the 5 clean ones.
-	total := len(hits) + unread
-	attachLifecycles(dir, hits)
-	twins := twinSessionsFor(dir)
-	demoted := demoteRejected(hits)
-	if offset > 0 {
-		// Past the read hits too: the total counts sessions ranking never
-		// read, and filters can leave fewer hits than the pool held.
-		if offset >= total || offset >= len(hits) {
-			what := "matches"
-			if result.Tier == search.TierRelevance {
-				what = "sessions ranked by wording"
-			}
-			return fmt.Sprintf("No more %s for %q: %s total, offset %d.", what, clampEcho(q), aboutCount(total, about), offset), 0, 0, nil, nil, nil
-		}
-		hits = hits[offset:]
-	}
-	if len(hits) > limit {
-		hits = hits[:limit]
-	}
+	return rankedRecall{result: result, o: o, hits: hits, policyHidden: policyHidden, unread: unread, about: about, cov: cov}, nil
+}
+
+// recallPage writes one page of ranked hits, already cut to the page.
+func recallPage(dir, q string, budget, offset, limit, total, demoted int, about bool, result index.SearchResult, o search.Options, hits []search.Hit, twins map[string][]string, cov index.Coverage) (string, int, int64, []string, []string, error) {
 	attachAnswers(dir, hits)
 	// Counted on the page rather than taken from the result: the strict head
 	// is small but the trust policy can withhold part of it and paging can

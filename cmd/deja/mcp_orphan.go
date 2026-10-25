@@ -64,7 +64,7 @@ func (r *mcpStampReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
-func serveMCPProcess(dir string, r io.Reader, w io.Writer) error {
+func serveMCPProcess(dir string, r io.Reader, w io.Writer, contextOnly bool) error {
 	var lastRead atomic.Int64
 	lastRead.Store(time.Now().UnixNano())
 
@@ -78,7 +78,7 @@ func serveMCPProcess(dir string, r io.Reader, w io.Writer) error {
 	// design rejected. No recorded parent, no watch — EOF still works.
 	ppid := os.Getppid()
 	if ppid <= 0 {
-		return serveMCP(dir, r, w)
+		return serveMCPAs(dir, r, w, contextOnly)
 	}
 	stop := startOrphanWatch(
 		ppid,
@@ -94,5 +94,5 @@ func serveMCPProcess(dir string, r io.Reader, w io.Writer) error {
 	)
 	defer stop()
 
-	return serveMCP(dir, &mcpStampReader{r: r, lastRead: &lastRead}, w)
+	return serveMCPAs(dir, &mcpStampReader{r: r, lastRead: &lastRead}, w, contextOnly)
 }

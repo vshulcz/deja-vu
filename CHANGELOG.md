@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `deja mcp --context-search` serves Qwen Code's External Context MCP
+  Profile v1: one `context_search({query})` tool that answers from the local
+  index with at most five items in the profile's untrusted envelope, checked
+  against the profile's published schemas and test vectors. `deja mcp` itself
+  is unchanged. Register it with `qwen mcp add deja-context deja mcp
+  --context-search --timeout 8000 --include-tools context_search` (#5662).
+
 ### Fixed
 
 - A resumed Gemini CLI session no longer shows and indexes each tool result

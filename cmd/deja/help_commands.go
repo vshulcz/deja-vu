@@ -272,9 +272,9 @@ var helpEntries = []helpEntry{
 		examples: []string{"deja help blame", "deja blame --help"}},
 
 	{name: "mcp", group: groupAgents,
-		usage:    []string{"deja mcp"},
+		usage:    []string{"deja mcp [--context-search]"},
 		desc:     "the MCP server, on stdio",
-		more:     "deja install wires it into each agent; run it by hand only to debug a client.",
+		more:     "deja install wires it into each agent; run it by hand only to debug a client. --context-search serves only context_search, Qwen Code's External Context MCP Profile v1.",
 		examples: []string{"deja mcp < requests.jsonl"}},
 	{name: "statusline", group: groupAgents,
 		usage:    []string{"deja statusline"},

@@ -21,11 +21,18 @@ import (
 // a client that awaits each call sees them.
 func driveMCP(t *testing.T, requests ...string) []map[string]any {
 	t.Helper()
+	return driveMCPAs(t, false, requests...)
+}
+
+// driveMCPAs is driveMCP for either surface; contextOnly is
+// `deja mcp --context-search`.
+func driveMCPAs(t *testing.T, contextOnly bool, requests ...string) []map[string]any {
+	t.Helper()
 	pr, pw := io.Pipe()
 	outR, outW := io.Pipe()
 	done := make(chan error, 1)
 	go func() {
-		err := serveMCP(index.DefaultDir(), pr, outW)
+		err := serveMCPAs(index.DefaultDir(), pr, outW, contextOnly)
 		_ = outW.Close()
 		done <- err
 	}()

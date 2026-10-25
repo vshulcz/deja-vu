@@ -259,7 +259,9 @@ var commands = map[string]command{
 	"rules":    runRules,
 	"forget":   runForget,
 	"delete":   func(dir string, rest []string) error { return runDelete(dir, rest, os.Stdout) },
-	"mcp":      func(dir string, _ []string) error { return serveMCPProcess(dir, os.Stdin, os.Stdout) },
+	"mcp": func(dir string, rest []string) error {
+		return serveMCPProcess(dir, os.Stdin, os.Stdout, mcpContextFlag(rest))
+	},
 	"hook-prompt": func(dir string, rest []string) error {
 		if sayIfTypedByHand("hook-prompt") {
 			return nil
