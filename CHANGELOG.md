@@ -13,13 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `deja-vu — from Codex CLI, 4 months ago: "<quote>" (via <terms>)`, where it
   used to say only "you have been here" and a date. The gates are unchanged:
   a confident match only, at most once in twenty minutes per session. The dsh
-  card and the OpenClaw chat line read both shapes.
+  card and the OpenClaw chat line read both shapes (#5660).
 - A spawned subagent's instructions are no longer extended with recall, except
   in Grok, whose main-thread hooks print to nobody. Over 60 days on one
   machine, 1339 Claude Code subagents were handed a block and none used it,
   and those blocks were 55% of all per-prompt recall. opencode task sessions
   are not searched on their turns either, since the agent that wrote them had
-  the recall already.
+  the recall already (#5660).
 
 ### Fixed
 
@@ -27,8 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of the reply, so the line reached nobody while deja counted it shown and
   held the next one back twenty minutes. opencode 1.x and Kilo now toast it.
   The 2.x plugin has no channel to the TUI and asks deja `--strict`, so the
-  line and the session-start receipt stay unspent there.
-
+  line and the session-start receipt stay unspent there (#5660).
 - A resumed Gemini CLI session no longer shows and indexes each tool result
   twice. Gemini writes the earlier function responses again under new message
   ids, and those are now dropped by call id. The index is rebuilt once on
