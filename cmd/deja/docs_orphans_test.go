@@ -39,7 +39,10 @@ func TestEverySitemapPageIsReachableFromTheIndex(t *testing.T) {
 		t.Fatalf("sitemap lists %d pages under %s, want at least 100", len(listed), site)
 	}
 
-	href := regexp.MustCompile(`href="([^"]+)"`)
+	// Only <a> links count. Two zh pages were reachable here only through the
+	// hreflang <link> of their English twins, and Google listed them as having
+	// no incoming link at all.
+	href := regexp.MustCompile(`<a\b[^>]*\bhref="([^"]+)"`)
 	links := func(page string) []string {
 		body, err := os.ReadFile(filepath.Join(docs, page))
 		if err != nil {

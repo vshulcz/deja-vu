@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -146,8 +147,12 @@ func (d *Dater) blob(commit, file string) ([]byte, error) {
 }
 
 // Content is the part of a page that dates it: the <article> when there is
-// one, otherwise the page without its <aside>.
+// one, otherwise the page without its <aside>, with counts blanked out.
 func Content(page []byte) []byte {
+	return counts(body(page))
+}
+
+func body(page []byte) []byte {
 	if i := bytes.Index(page, []byte("<article")); i >= 0 {
 		if j := bytes.LastIndex(page, []byte("</article>")); j > i {
 			return page[i:j]
@@ -160,6 +165,23 @@ func Content(page []byte) []byte {
 		}
 	}
 	return page
+}
+
+// The harness count is written into about a hundred page bodies ("forty-three
+// of them", "四十三个", "and 42 others"), so each new harness re-dated all of
+// them on the same day. A change that only moves a number like that is not a
+// new page. Spelled-out numbers count in any position, digits only before a
+// word that says they count agents.
+var (
+	numberWord = regexp.MustCompile(`(?i)\b(?:(?:twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:-(?:one|two|three|four|five|six|seven|eight|nine))?|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|zero|one|two|three|four|five|six|seven|eight|nine)\b`)
+	zhCount    = regexp.MustCompile(`[零一二两三四五六七八九十百]+个`)
+	digitCount = regexp.MustCompile(`\b\d+((?: more| other)? (?:coding agents|agents|harnesses|others|tools)\b)`)
+)
+
+func counts(b []byte) []byte {
+	b = numberWord.ReplaceAll(b, []byte("#"))
+	b = zhCount.ReplaceAll(b, []byte("#个"))
+	return digitCount.ReplaceAll(b, []byte("#$1"))
 }
 
 func day(unix int64) string { return time.Unix(unix, 0).UTC().Format("2006-01-02") }
