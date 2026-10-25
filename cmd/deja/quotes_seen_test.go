@@ -18,7 +18,7 @@ func TestASentenceIsNotNewsUnderAnotherId(t *testing.T) {
 		"  - Assistant: the kestrel retry budget stays at four\n" +
 		"- **beta** `cccc3333` · 2026-09-10\n" +
 		"  - Assistant: the cold path warms the index first\n" +
-		"If it helped, say: …\n"
+		"Answer the user's question in full. Then, only if this history helped, add as the last line of your reply: …\n"
 
 	out, kept, fresh := withoutSeenQuotes(map[string]bool{}, body)
 	if !fresh {
@@ -45,7 +45,7 @@ func TestASentenceIsNotNewsUnderAnotherId(t *testing.T) {
 	again := "deja-vu — you have been here:\n" +
 		"- **beta** `dddd4444` · 2026-09-10\n" +
 		"  - Assistant: the kestrel retry budget stays at four\n" +
-		"If it helped, say: …\n"
+		"Answer the user's question in full. Then, only if this history helped, add as the last line of your reply: …\n"
 	if _, _, fresh := withoutSeenQuotes(seen, again); fresh {
 		t.Error("a sentence the agent has already been shown counted as news")
 	}

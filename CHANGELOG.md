@@ -40,6 +40,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   twice. Gemini writes the earlier function responses again under new message
   ids, and those are now dropped by call id. The index is rebuilt once on
   upgrade. From @adity982 (#5318, #5618).
+- Per-prompt recall no longer replaces the answer on small models. The block
+  ended with `If it helped, say: "déjà vu: ..."`, and qwen3:8b in dsh with
+  reasoning off replied with only that line in 10 of 10 runs. It now asks for
+  the answer first and the line last: 10 of 10 answered, 10 still credited
+  the recall (#5664).
 
 ## [0.23.1] - 2026-10-25
 

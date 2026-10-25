@@ -875,8 +875,22 @@ func symbolShaped(term string) bool {
 // at the top of the block, before the digest, a complete sentence was said in
 // none of 12. So it is complete, and it stays where it was: last, the closest
 // thing to the reply.
+//
+// It asks for the line after the answer, never in its place (#5664). "If it
+// helped, say: ..." on its own read to qwen3:8b with reasoning off as the
+// whole task: in dsh, 10 of 10 replies were the line and nothing else. With
+// this wording 10 of 10 answered and 10 said the line too; "end your reply
+// with one line" answered 9 of 10, and dropping the line answered 6 of 10,
+// because the closing sentence is also what turns a small model back to the
+// question.
 func openerLine(s model.Session, terms []string) string {
-	return "\nIf it helped, say: \"déjà vu: " + matchedTitle(s, terms) + " (" + provenance(s) + ") — reusing it.\""
+	return creditAsk("déjà vu: " + matchedTitle(s, terms) + " (" + provenance(s) + ") — reusing it.")
+}
+
+// creditAsk is the closing sentence of a per-prompt block: answer first, then
+// the credit line.
+func creditAsk(line string) string {
+	return "\nAnswer the user's question in full. Then, only if this history helped, add as the last line of your reply: \"" + line + "\""
 }
 
 // repeatOpener is openerLine for a question this machine already asked: the
@@ -887,7 +901,7 @@ func repeatOpener(s model.Session, again string) string {
 	if len([]rune(again)) > 60 {
 		again = string([]rune(again)[:60]) + "…"
 	}
-	return "\nIf it helped, say: \"déjà vu: " + again + " (" + provenance(s) + ") — reusing it.\""
+	return creditAsk("déjà vu: " + again + " (" + provenance(s) + ") — reusing it.")
 }
 
 // matchedTitle is the line of the session the spoken opener quotes back: what
@@ -941,7 +955,7 @@ func repeatLead(s model.Session, again string) string {
 	// treatment as the digest body.
 	again = strings.Join(strings.Fields(redact.SafeForDisplay(again)), " ")
 	return "déjà vu — this was asked here before" + askedBeforeWhen(s) + ": \"" + again +
-		"\". What that session settled is below; say so if it still holds, and say so if it does not.\n"
+		"\". What that session settled is below; answer from it if it still holds, and say so if it does not.\n"
 }
 
 // provenance is the part of the spoken line that makes it checkable: which
@@ -1832,7 +1846,7 @@ func sessionIDs(ss []model.Session) []string {
 // decision and said history had settled it — naming the mismatch in the same
 // sentence (#2370). The match is on wording, and the lead now says so and asks
 // for the one check that catches it.
-const promptHookLead = "deja found sessions whose wording matches this request — not a judgement that they answer it. Check that the session describes what is happening now before acting on it. If one genuinely helps, use it and tell the user in one short line, as the last line of this block asks; otherwise ignore silently.\n"
+const promptHookLead = "deja found sessions whose wording matches this request — not a judgement that they answer it. Check that the session describes what is happening now before acting on it. If one genuinely helps, answer the user from it, and credit it in the one line the end of this block asks for; otherwise ignore silently.\n"
 
 // The short lead that blocks after the first used to carry — "deja matched on
 // wording, not meaning — check the session fits before acting on it." — is

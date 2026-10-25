@@ -256,13 +256,18 @@ func TestHookPromptCitationAndDedupe(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := out.String()
-	if !strings.Contains(got, `If it helped, say: \"déjà vu: the exporter_batch job drops rows at utc_midnight (claude, `) || !strings.Contains(got, "deja:citefix) — reusing it.") {
+	if !strings.Contains(got, `add as the last line of your reply: \"déjà vu: the exporter_batch job drops rows at utc_midnight (claude, `) || !strings.Contains(got, "deja:citefix) — reusing it.") {
 		t.Fatalf("opener line missing: %q", got)
 	}
 	// Last, after the digest: asked for at the top of the block the complete
 	// sentence was said in none of 12 tool-using replies, after it in 10.
-	if strings.LastIndex(got, "If it helped, say:") < strings.LastIndex(got, "citefix` · ") {
+	if strings.LastIndex(got, "add as the last line of your reply:") < strings.LastIndex(got, "citefix` · ") {
 		t.Fatalf("opener line does not follow the digest: %q", got)
+	}
+	// The answer comes first: a bare "If it helped, say" was the whole reply
+	// of a small local model in 10 of 10 runs (#5664).
+	if !strings.Contains(got, "Answer the user's question in full. Then, only if this history helped,") {
+		t.Fatalf("the credit line is not asked for after the answer: %q", got)
 	}
 	// Same session asks again: the same memory must not be re-injected.
 	var out2 bytes.Buffer

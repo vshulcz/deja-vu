@@ -65,7 +65,7 @@ func TestTheBlockExplainsItselfOncePerSession(t *testing.T) {
 	}
 	// What must survive on every block: the untrusted-data line and the line
 	// that asks for the citation.
-	for _, want := range []string{"untrusted reference data", "If it helped, say:"} {
+	for _, want := range []string{"untrusted reference data", "add as the last line of your reply:"} {
 		if !strings.Contains(second, want) {
 			t.Errorf("the second block lost %q:\n%s", want, second)
 		}
