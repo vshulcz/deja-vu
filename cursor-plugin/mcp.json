@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "deja": {
+      "command": "sh",
+      "args": ["${CURSOR_PLUGIN_ROOT}/mcp/deja-mcp.sh"]
+    }
+  }
+}

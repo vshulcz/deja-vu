@@ -1,7 +1,8 @@
 # deja for Claude Code
 
-The plugin bundle Claude Code, Cursor, Qwen and OpenClaw install from
-this repository's marketplace. Copilot CLI installs it too but takes only the
+The plugin bundle Claude Code, Qwen and OpenClaw install from
+this repository's marketplace. Cursor has its own, in
+[`cursor-plugin/`](../cursor-plugin/). Copilot CLI installs it too but takes only the
 skill (no hooks, no MCP server); `deja install copilot-auto` wires those:
 
 ```sh

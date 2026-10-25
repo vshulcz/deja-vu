@@ -110,9 +110,10 @@ func TestPluginBundleShipsTheMCPServer(t *testing.T) {
 // the one `deja install` writes.
 func TestPluginCommandMatchesInstaller(t *testing.T) {
 	want := claudeCommandMD("deja")
-	got := string(repoFile(t, "claude-plugin/commands/deja.md"))
-	if got != want {
-		t.Fatalf("claude-plugin/commands/deja.md has drifted from claudeCommandMD:\n--- file ---\n%s\n--- installer ---\n%s", got, want)
+	for _, p := range []string{"claude-plugin/commands/deja.md", "cursor-plugin/commands/deja.md"} {
+		if got := string(repoFile(t, p)); got != want {
+			t.Fatalf("%s has drifted from claudeCommandMD:\n--- file ---\n%s\n--- installer ---\n%s", p, got, want)
+		}
 	}
 }
 

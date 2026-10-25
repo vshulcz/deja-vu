@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": "sh \"${CURSOR_PLUGIN_ROOT}/hooks/deja.sh\" hook-context"
+      }
+    ],
+    "beforeSubmitPrompt": [
+      {
+        "command": "sh \"${CURSOR_PLUGIN_ROOT}/hooks/deja.sh\" hook-prompt"
+      }
+    ],
+    "preToolUse": [
+      {
+        "command": "sh \"${CURSOR_PLUGIN_ROOT}/hooks/deja.sh\" hook-tool",
+        "matcher": "^(Shell|Write|Task)$"
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": "sh \"${CURSOR_PLUGIN_ROOT}/hooks/deja.sh\" hook-tool-after",
+        "matcher": "^Shell$"
+      }
+    ],
+    "postToolUseFailure": [
+      {
+        "command": "sh \"${CURSOR_PLUGIN_ROOT}/hooks/deja.sh\" hook-tool-after",
+        "matcher": "^Shell$"
+      }
+    ],
+    "preCompact": [
+      {
+        "command": "sh \"${CURSOR_PLUGIN_ROOT}/hooks/deja.sh\" hook-precompact"
+      }
+    ],
+    "sessionEnd": [
+      {
+        "command": "sh \"${CURSOR_PLUGIN_ROOT}/hooks/deja.sh\" hook-session-end"
+      }
+    ]
+  }
+}

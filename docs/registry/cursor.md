@@ -50,6 +50,8 @@ Each chat also has a `meta.json` beside its `store.db` holding the `cwd` it ran 
 
 `deja install cursor` adds the server to `${CURSOR_CONFIG_DIR:-~/.cursor}/mcp.json`, writes the shared skill `~/.agents/skills/deja-history/SKILL.md` and the `/deja` command in `commands/deja.md` beside it. `deja install cursor-auto` adds the same plus `hooks.json` entries: `sessionStart` (`deja hook-context`), `beforeSubmitPrompt` (`hook-prompt`, interactive TUI only — headless `-p` skips it), `preToolUse` (matcher `^(Shell|Write|Task)$`), `postToolUse` and `postToolUseFailure` (matcher `^Shell$`; the second fires for a tool that errors, with the text in `error_message`), `preCompact` and `sessionEnd` (`hook-session-end`, so the session you closed is back in the next one's MCP recall). Cursor also runs the hooks in `~/.claude/settings.json` and dedupes them against its own by exact command string, so a machine with both wired gets one injection. Cursor tests a matcher as a regex against `tool_name` for the three tool events (2026.09.02), so deja does not start on every read and grep.
 
+The marketplace plugin in `cursor-plugin/` (listed by `.cursor-plugin/marketplace.json`) carries the same hooks, the MCP server, the skill and `/deja`, and needs the binary from `brew install deja-vu` or `npm i -g @vshulcz/deja-vu`. Its hooks run through `hooks/deja.sh`, which exits 0 with no output when deja is missing and stands down when `hooks.json` already has the installer's entries. Loaded with `cursor-agent --plugin-dir` on 2026.09.02: sessionStart, preToolUse, postToolUse and sessionEnd reached deja and the MCP tools answered.
+
 ## Resume
 
 CLI chats only. A transcript is named after the chat id `cursor-agent --resume`

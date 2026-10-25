@@ -56,12 +56,15 @@ const (
 	// (`devin plugins install vshulcz/deja-vu#devin-plugin`), so the version
 	// committed here is the one `devin plugins list` reports.
 	devinPlugin = "devin-plugin/.devin-plugin/plugin.json"
+	// The Cursor marketplace and cursor.directory list the plugin from the
+	// default branch, so the version committed here is the one they show.
+	cursorPlugin = "cursor-plugin/.cursor-plugin/plugin.json"
 	// The Gemini gallery crawls the manifest at the repository root and shows
 	// its version, and `gemini extensions install` reads the same file.
 	geminiExtension = "gemini-extension.json"
-	// The Agent Plugins manifest at the root: cursor.directory reads it
-	// straight from the default branch, so its version is the one a
-	// listing shows.
+	// The Agent Plugins manifest at the root: directories that read that
+	// layout take it straight from the default branch, so its version is the
+	// one a listing shows.
 	agentPlugin = "plugin.json"
 	// The MCP registry entry. `mcp-registry.yml` stamps the release version
 	// into this file inside its own checkout at publish time and never commits
@@ -177,6 +180,7 @@ func targets() map[string]func(pins) ([]byte, error) {
 		claudeAgentPlugin: renderPluginVersion(claudeAgentPlugin),
 		codebuddyPlugin:   renderPluginVersion(codebuddyPlugin),
 		devinPlugin:       renderPluginVersion(devinPlugin),
+		cursorPlugin:      renderPluginVersion(cursorPlugin),
 		geminiExtension:   renderPluginVersion(geminiExtension),
 		kimiPlugin:        renderPluginVersion(kimiPlugin),
 		kimiPacked:        renderPluginVersion(kimiPacked),

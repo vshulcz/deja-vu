@@ -46,6 +46,13 @@
     <summary>Hermes searches its own sessions and keeps MEMORY.md. deja adds the other forty-two agents: a plugin on pre_llm_call, the MCP tools, and a skill.</summary>
   </entry>
   <entry>
+    <title>Where Cursor stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/cursor.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/cursor.html"></link>
+    <updated>2026-10-25T00:00:00Z</updated>
+    <summary>Where Cursor writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
+  <entry>
     <title>Where Qwen Code stores its history — session format</title>
     <id>https://vshulcz.github.io/deja-vu/registry/qwen.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/qwen.html"></link>
@@ -282,12 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-crush.html"></link>
     <updated>2026-10-23T00:00:00Z</updated>
     <summary>Crush keeps one history store per project and reads none of the others. deja adds an MCP server, a skill, a /user:deja command and a PreToolUse hook.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Cursor: every agent&#39;s sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-cursor.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-cursor.html"></link>
-    <updated>2026-10-23T00:00:00Z</updated>
-    <summary>How to give Cursor recall over every coding agent&#39;s sessions on this machine — where its SQLite chat store lives, and what deja install cursor-auto writes.</summary>
   </entry>
 </feed>

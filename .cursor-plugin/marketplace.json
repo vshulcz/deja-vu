@@ -1,0 +1,16 @@
+{
+  "name": "deja-vu",
+  "owner": {
+    "name": "vshulcz"
+  },
+  "metadata": {
+    "description": "Memory for Cursor from the coding sessions already on your disk."
+  },
+  "plugins": [
+    {
+      "name": "deja-vu",
+      "source": "cursor-plugin",
+      "description": "Recall your past sessions from Cursor, Claude Code, Codex and forty more agents, locally."
+    }
+  ]
+}

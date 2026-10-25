@@ -43,6 +43,7 @@ func TestPluginBridgesStandDownBesideTheInstaller(t *testing.T) {
 		{"codebuddy-plugin/hooks/deja.sh", "codebuddy-auto"},
 		{"claude-plugin/hooks/deja.sh", "claude-auto"},
 		{"devin-plugin/hooks/deja.sh", "devin-auto"},
+		{"cursor-plugin/hooks/deja.sh", "cursor-auto"},
 	} {
 		t.Run(c.target, func(t *testing.T) {
 			hermeticEnv(t)

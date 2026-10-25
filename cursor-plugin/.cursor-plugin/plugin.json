@@ -1,0 +1,31 @@
+{
+  "name": "deja-vu",
+  "displayName": "deja-vu",
+  "version": "0.23.1",
+  "description": "Memory for Cursor from the sessions already on your disk: Cursor, Claude Code, Codex, opencode and thirty-nine more agents, searched locally and recalled when a session opens.",
+  "author": {
+    "name": "vshulcz"
+  },
+  "homepage": "https://vshulcz.github.io/deja-vu/guide/memory-for-cursor.html",
+  "repository": "https://github.com/vshulcz/deja-vu",
+  "license": "MIT",
+  "logo": "assets/logo.png",
+  "keywords": [
+    "memory",
+    "recall",
+    "session-history",
+    "search",
+    "mcp",
+    "hooks"
+  ],
+  "category": "developer-tools",
+  "tags": [
+    "memory",
+    "mcp",
+    "hooks"
+  ],
+  "skills": "./skills/",
+  "commands": "./commands/",
+  "hooks": "./hooks/hooks.json",
+  "mcpServers": "./mcp.json"
+}
