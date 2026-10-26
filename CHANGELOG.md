@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Recall labels who wrote each line (`Model said (no record backs it)`,
   `Prompt written by a parent agent`, `Output with an instruction to agents` …)
   and shows the command or edit a model's conclusion rests on above the
-  conclusion, from receipts written at a full index build. A check or build
+  conclusion, from receipts written when the index is built or updated. A check or build
   rule a person typed in an interactive Claude Code session of the current
   project is shown as `User said (this project)`, and the frame header and MCP
   instructions say to follow those lines and nothing else. An instruction to

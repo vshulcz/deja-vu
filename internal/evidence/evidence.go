@@ -17,9 +17,12 @@ import (
 	"hash/fnv"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -90,8 +93,29 @@ func SameLine(a, b string) bool {
 // Key names one message of one session by the opening of its text.
 func Key(harness, id, text string) uint64 {
 	h := fnv.New64a()
-	_, _ = h.Write([]byte(harness + ":" + id + "\x00" + prefix(Norm(text), keyRunes)))
+	_, _ = h.Write([]byte(harness + ":" + id + "\x00" + keyText(text)))
 	return h.Sum64()
+}
+
+// keyHead is how much of a long message keyText normalises first.
+const keyHead = 4096
+
+// keyText is prefix(Norm(text), keyRunes) without normalising all of a long
+// message. Norm maps rune by rune and only trims at the ends, so once the
+// opening alone normalises to more than keyRunes runes, the first keyRunes
+// are the ones the whole text gives; when it does not, the whole text is
+// normalised.
+func keyText(text string) string {
+	if len(text) > keyHead {
+		cut := keyHead
+		for cut > 0 && !utf8.RuneStart(text[cut]) {
+			cut--
+		}
+		if n := Norm(text[:cut]); utf8.RuneCountInString(n) > keyRunes {
+			return prefix(n, keyRunes)
+		}
+	}
+	return prefix(Norm(text), keyRunes)
 }
 
 // Spawned reports a session an agent started, whose "user" turns a model wrote.
@@ -251,7 +275,7 @@ type rec struct {
 	role, text, out string
 	turn, idx       int
 	low             string
-	rule            bool
+	rule, question  bool
 }
 
 func (r rec) body() string {
@@ -294,17 +318,47 @@ func render(r rec, toks []string) string {
 // after editing docs/" lost to the genfeed.sh command it had caused, and the
 // agent never saw it.
 func Receipts(s model.Session, clean func(string) string) map[uint64]string {
+	out, _ := receipts(s, clean)
+	return out
+}
+
+// chunked runs fn over [0, n) in parts on every core, or in one call when n
+// is small. One marathon session held most of a build's receipts phase on a
+// single core while the others had finished.
+func chunked(n, small int, fn func(lo, hi int)) {
+	workers := runtime.GOMAXPROCS(0)
+	if n <= small || workers < 2 {
+		fn(0, n)
+		return
+	}
+	size := (n + workers - 1) / workers
+	var wg sync.WaitGroup
+	for lo := 0; lo < n; lo += size {
+		wg.Go(func() { fn(lo, min(n, lo+size)) })
+	}
+	wg.Wait()
+}
+
+// receipts is Receipts and the key of every assistant message of s, with a
+// receipt or without one: an update drops the keys that have none now.
+func receipts(s model.Session, clean func(string) string) (map[uint64]string, []uint64) {
 	if s.Harness == "deja" || len(s.Messages) == 0 {
-		return nil
+		return nil, nil
 	}
 	spawned := Spawned(s)
+	texts := make([]string, len(s.Messages))
+	chunked(len(s.Messages), 512, func(lo, hi int) {
+		for i := lo; i < hi; i++ {
+			texts[i] = s.Messages[i].Text
+			if clean != nil {
+				texts[i] = clean(texts[i])
+			}
+		}
+	})
 	var recs []rec
 	turn := 0
 	for i, m := range s.Messages {
-		text := m.Text
-		if clean != nil {
-			text = clean(text)
-		}
+		text := texts[i]
 		if strings.TrimSpace(text) == "" {
 			continue
 		}
@@ -334,25 +388,42 @@ func Receipts(s model.Session, clean func(string) string) map[uint64]string {
 			recs = append(recs, rec{role: "tool-output", text: text, turn: turn, idx: i})
 		}
 	}
-	for i := range recs {
-		recs[i].low = strings.ToLower(recs[i].body())
-		recs[i].rule = recs[i].role == "user" && RuleLike(recs[i].text)
-	}
+	chunked(len(recs), 512, func(lo, hi int) {
+		for i := lo; i < hi; i++ {
+			recs[i].low = strings.ToLower(recs[i].body())
+			recs[i].rule = recs[i].role == "user" && RuleLike(recs[i].text)
+			recs[i].question = recs[i].role == "user" && questionLike(recs[i].text)
+		}
+	})
 	// Where each turn opens: its person's message, when it has one.
 	first := map[int]int{}
 	for p, r := range slices.Backward(recs) {
 		first[r.turn] = p
 	}
-	out := map[uint64]string{}
+	var asks []int
 	for p, c := range recs {
-		if c.role != "assistant" {
-			continue
-		}
-		if lines := receiptFor(recs, first, p); len(lines) > 0 {
-			out[Key(s.Harness, s.ID, c.text)] = strings.Join(lines, "\n")
+		if c.role == "assistant" {
+			asks = append(asks, p)
 		}
 	}
-	return out
+	keys := make([]uint64, len(asks))
+	found := make([]string, len(asks))
+	chunked(len(asks), 64, func(lo, hi int) {
+		for i := lo; i < hi; i++ {
+			p := asks[i]
+			keys[i] = Key(s.Harness, s.ID, recs[p].text)
+			if lines := receiptFor(recs, first, p); len(lines) > 0 {
+				found[i] = strings.Join(lines, "\n")
+			}
+		}
+	})
+	out := map[uint64]string{}
+	for i, k := range keys {
+		if found[i] != "" {
+			out[k] = found[i]
+		}
+	}
+	return out, keys
 }
 
 // receiptFor is the receipt of the assistant record at p: the person's rule
@@ -388,7 +459,7 @@ func receiptFor(recs []rec, first map[int]int, p int) []string {
 		if !env && r.role != "user" {
 			continue
 		}
-		if r.role == "user" && questionLike(r.text) {
+		if r.question {
 			continue
 		}
 		var toks []string

@@ -1,6 +1,8 @@
 package evidence
 
 import (
+	"maps"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -99,5 +101,51 @@ func TestCommandsAndRevoked(t *testing.T) {
 	}
 	if got := Revoked("run check.sh, no need to ask me"); len(got) != 0 {
 		t.Errorf("a rule read as revoking: %q", got)
+	}
+}
+
+// keyText reads only the opening of a long message; the key has to be the one
+// the whole text gives, or a receipt is written under a key nothing looks up.
+func TestKeyOfALongMessageIsTheWholeTextsKey(t *testing.T) {
+	long := strings.Repeat("x", keyHead)
+	for _, text := range []string{
+		"  → **Fixed** the `slug` test, " + long,
+		strings.Repeat(" ", keyHead-10) + "short opening then " + long + " …",
+		strings.Repeat("*", keyHead+5) + "after the stars " + long,
+		strings.Repeat("я", keyHead/2-1) + "ё" + long,
+		strings.Repeat("ab ", keyHead/3) + "…",
+	} {
+		if got, want := keyText(text), prefix(Norm(text), keyRunes); got != want {
+			t.Errorf("keyText(%.40q…) = %q, want %q", text, got, want)
+		}
+	}
+}
+
+// A marathon session's receipts are found on every core; the map has to be
+// the one a single core finds.
+func TestReceiptsOfALongSessionDoNotDependOnTheSplit(t *testing.T) {
+	msgs := make([]model.Message, 0, 1600)
+	for i := range 400 {
+		test := "TestSlug" + strings.Repeat(string(rune('A'+i%26)), 1+i/26)
+		msgs = append(msgs,
+			model.Message{Role: "user", Text: "why does " + test + " fail"},
+			model.Message{Role: "command", Text: "go test -run " + test + " ./slug  → exit 1"},
+			model.Message{Role: "tool-output", Text: "--- FAIL: " + test + " slug_test.go:41"},
+			model.Message{Role: "assistant", Text: test + " failed at slug_test.go:41"},
+		)
+	}
+	s := session(msgs...)
+	got, keys := receipts(s, nil)
+	if len(keys) != 400 || len(got) != 400 {
+		t.Fatalf("%d keys, %d receipts, want 400 of each", len(keys), len(got))
+	}
+	for i, k := range keys {
+		if k != Key("claude", "s1", msgs[4*i+3].Text) {
+			t.Fatalf("key %d is not the key of assistant message %d", i, i)
+		}
+	}
+	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(1))
+	if one := Receipts(s, nil); !maps.Equal(one, got) {
+		t.Error("receipts found on one core differ from the ones found in parts")
 	}
 }

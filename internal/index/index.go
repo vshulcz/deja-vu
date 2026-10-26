@@ -828,7 +828,8 @@ import (
 // a runner's verdict, so its failures and fixes are mined (#5678).
 // 109: a Claude Code row keeps the check and build rules its person typed,
 // which recall marks as theirs, and a build writes receipts.bin, the records
-// that back what a model said; rows and indexes built before have neither.
+// that back what a model said, which every later pass keeps up to date; rows
+// and indexes built before have neither.
 const version = 109
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the

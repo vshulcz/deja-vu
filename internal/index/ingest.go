@@ -1273,9 +1273,9 @@ func mineRebuildSidecars(tmp string, ss []model.Session, m Manifest, keptSource 
 			reportAdvance(1)
 		})
 	}
+	// Receipts read the same sessions; no phase of their own.
+	sidecars.Go(func() { evidence.Build(tmp, ss, nil) })
 	sidecars.Wait()
-	// Receipts read the sessions the sidecars above did; no phase of their own.
-	evidence.Build(tmp, ss, nil)
 	// After the facts, whose file it is stamped with.
 	writeCommandsState(tmp, cmdState, m)
 }
@@ -2531,6 +2531,10 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	// the bar sat still through it (#3372).
 	if !m.SearchOnly {
 		reportPhase("mining fixes and commands", 5)
+		// Beside the sidecars, which read the same sessions and write files
+		// of their own, as the other full path runs them.
+		var receipts sync.WaitGroup
+		receipts.Go(func() { evidence.Build(tmp, ss, func(t string) string { r, _, _ := indexedText(t); return r }) })
 		buildCooccur(tmp, ss)
 		reportAdvance(1)
 		cmds := commandSessions(ss, m, nil)
@@ -2543,7 +2547,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 		reportAdvance(1)
 		buildSessionFacts(tmp, cmds)
 		reportAdvance(1)
-		evidence.Build(tmp, ss, func(t string) string { r, _, _ := indexedText(t); return r })
+		receipts.Wait()
 	}
 	reportPhase("writing index", sp.bucketCount())
 	if err := sp.writeBuckets(filepath.Join(tmp, "buckets")); err != nil {
@@ -5850,6 +5854,11 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	}
 	whole, rewhole := wholeSessionsForFixes(dir, m, appended)
 	mergeFixes(dir, dir, nil, whole, rewhole)
+	grew := map[string]bool{}
+	for _, s := range appended {
+		grew[s.Harness+":"+s.ID] = true
+	}
+	updateReceipts(dir, dir, m, grew)
 	// The two command tables are mined from every record the index holds, which
 	// is a scan of records.bin — 2.9s of an 8.6s pass on a 191 MB store. Nothing
 	// this pass added can change them unless it added a command or the output of

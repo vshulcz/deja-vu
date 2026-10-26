@@ -2,6 +2,7 @@ package evidence
 
 import (
 	"encoding/binary"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -24,27 +25,52 @@ const (
 	entrySize = 16
 )
 
-// Build writes the receipts of every session to dir. Only a full build does:
-// an incremental pass leaves the file as it was, and a session that changed
-// after it was written is shown without receipts (Reader.Covers) until the
-// next rebuild. Failures are swallowed: a missing receipt is the old output,
-// never a reason to fail a build.
+// Build writes the receipts of every session to dir. A full build does; the
+// incremental passes Update the file instead. Failures are swallowed: a
+// missing receipt is the old output, never a reason to fail a build.
 func Build(dir string, ss []model.Session, clean func(string) string) {
 	all := map[uint64]string{}
+	collect(ss, clean, func(r map[uint64]string, _ []uint64) { maps.Copy(all, r) })
+	_ = write(dir, all)
+}
+
+// Update writes to dir the receipts in from with those of ss made anew: the
+// sessions an incremental pass added or changed, whole. Every key of their
+// assistant messages is dropped first, so what a key holds is what a full
+// build would write for it. With no receipts in from it writes nothing:
+// written for ss alone, the file would claim to cover every other session
+// too (Reader.Covers). It reports whether dir holds receipts that cover ss.
+func Update(from, dir string, ss []model.Session, clean func(string) string) bool {
+	all, ok := load(from)
+	if !ok {
+		return false
+	}
+	collect(ss, clean, func(r map[uint64]string, keys []uint64) {
+		for _, k := range keys {
+			delete(all, k)
+		}
+		maps.Copy(all, r)
+	})
+	return write(dir, all) == nil
+}
+
+// collect hands put the receipts of each session, one at a time.
+func collect(ss []model.Session, clean func(string) string, put func(map[uint64]string, []uint64)) {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	jobs := make(chan int)
 	for range max(1, runtime.GOMAXPROCS(0)) {
 		wg.Go(func() {
 			for i := range jobs {
-				r := Receipts(ss[i], clean)
-				mu.Lock()
+				r, keys := receipts(ss[i], clean)
 				for k, v := range r {
 					// The texts were redacted on the way in; this is the
 					// one file that does not go through the index's own
 					// writer, so it is not left to that.
-					all[k], _ = redact.Text(v)
+					r[k], _ = redact.Text(v)
 				}
+				mu.Lock()
+				put(r, keys)
 				mu.Unlock()
 			}
 		})
@@ -54,6 +80,33 @@ func Build(dir string, ss []model.Session, clean func(string) string) {
 	}
 	close(jobs)
 	wg.Wait()
+}
+
+// load reads every receipt in dir.
+func load(dir string) (map[uint64]string, bool) {
+	b, err := os.ReadFile(filepath.Join(dir, fileName))
+	if err != nil || len(b) < len(magic)+4 || string(b[:len(magic)]) != magic {
+		return nil, false
+	}
+	n := int(binary.LittleEndian.Uint32(b[len(magic):]))
+	base := len(magic) + 4
+	blob := base + n*entrySize
+	if blob > len(b) {
+		return nil, false
+	}
+	all := make(map[uint64]string, n)
+	for i := range n {
+		e := b[base+i*entrySize:]
+		off, size := int(binary.LittleEndian.Uint32(e[8:])), int(binary.LittleEndian.Uint32(e[12:]))
+		if blob+off+size > len(b) {
+			return nil, false
+		}
+		all[binary.LittleEndian.Uint64(e)] = string(b[blob+off : blob+off+size])
+	}
+	return all, true
+}
+
+func write(dir string, all map[uint64]string) error {
 	keys := make([]uint64, 0, len(all))
 	for k := range all {
 		keys = append(keys, k)
@@ -71,10 +124,17 @@ func Build(dir string, ss []model.Session, clean func(string) string) {
 		blob = append(blob, all[k]...)
 	}
 	tmp := filepath.Join(dir, fileName+".tmp")
-	if os.WriteFile(tmp, slices.Concat(head, blob), 0o600) == nil {
-		_ = os.Rename(tmp, filepath.Join(dir, fileName))
+	if err := os.WriteFile(tmp, slices.Concat(head, blob), 0o600); err != nil {
+		_ = os.Remove(tmp)
+		return err
 	}
+	return os.Rename(tmp, filepath.Join(dir, fileName))
 }
+
+// Drop removes the receipts in dir, for a pass that changed sessions and
+// could not update them: kept, they would cover those sessions with receipts
+// from before the change.
+func Drop(dir string) { _ = os.Remove(filepath.Join(dir, fileName)) }
 
 // Reader looks receipts up without loading the table: a binary search over
 // the sorted keys with ReadAt.

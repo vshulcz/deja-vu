@@ -937,5 +937,10 @@ func (rp *replacePass) commit() error {
 	mergeFixes(rp.dir, rp.tmp, sessionKeys(rp.m), fixSessions, fixKeys)
 	buildCommandTables(rp.dir, rp.tmp, rp.m, len(rp.old.DeadRecords), rp.dropped)
 	buildCommandFailsFromIndex(rp.tmp, carriedCommandFailState(rp.dir, rp.old, rp.tmp, rp.m.Generation, rp.dropped), rp.dropped)
+	// The receipts of the sessions this pass changed, and of those whose row
+	// moved to another copy; the rest are carried as they were.
+	changedKeys := maps.Clone(rp.dropped)
+	maps.Copy(changedKeys, fixKeys)
+	updateReceipts(rp.dir, rp.tmp, rp.m, changedKeys)
 	return rp.swap()
 }
