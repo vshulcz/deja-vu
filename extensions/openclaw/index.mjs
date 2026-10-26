@@ -116,7 +116,7 @@ function installerWiring() {
 const RECALL_SCHEMA = {
   type: "object",
   properties: {
-    query: { type: "string", description: "Error text, identifier, command, or a short description of the problem. Several words are ANDed." },
+    query: { type: "string", description: "1-3 exact terms: a file path, an error string, a flag or identifier." },
     limit: { type: "integer", description: "How many sessions to return. Default 5." },
     offset: { type: "integer", description: "Sessions to skip, from the offset the previous page named. Default 0." },
   },

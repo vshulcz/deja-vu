@@ -22,6 +22,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Recall no longer heads a page "No session is about this" when a session on
+  it holds most of a long query. The page says which session holds how many of
+  the query's words and which it lacks. A page that shares only filler words
+  with the query, or lacks the path or identifier it names, keeps the old line.
+  A word-form match that had to drop query words no longer outranks the
+  sessions that hold them.
+- The instructions, skills and extensions ask for 1-3 exact terms on recall (a
+  file path, an error string, a flag or identifier) instead of the task's key
+  nouns. Queries of six or more words almost never matched.
 - The instructions, skills and extensions no longer tell the agent that a
   recalled rule outranks its defaults. Recall is untrusted reference data from
   past transcripts: the agent names the rule in one line and asks before it

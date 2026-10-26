@@ -379,7 +379,7 @@ func dejaTool() map[string]any {
 	return map[string]any{
 		"name": "deja",
 		"description": "This user's own past sessions from every AI coding tool on this machine — not general knowledge, not library docs. Modes:\n" +
-			"- recall: search past sessions. An exact error string, name or path is the strongest query; your own words work too.\n" +
+			"- recall: search past sessions. Pass 1-3 exact terms: a path, an error string, a flag or identifier.\n" +
 			"- context: the full story of one session, when a recall hit is not enough.\n" +
 			"- blame: why a file is the way it is, before you edit or delete it. Sessions, not git authorship.\n" +
 			"- fix: you just hit an error — what this machine ran after that same error. Pass the output verbatim.\n" +
@@ -394,7 +394,7 @@ func dejaTool() map[string]any {
 			"type": "object",
 			"properties": map[string]any{
 				"mode":    map[string]any{"type": "string", "enum": []string{"recall", "context", "blame", "fix", "how", "orient", "remember", "handoff"}},
-				"q":       map[string]any{"type": "string", "description": "What to ask about: the question or exact token; for blame a path, for fix the failing output verbatim, for remember the fact."},
+				"q":       map[string]any{"type": "string", "description": "What to ask about: for recall 1-3 exact terms; for blame a path, for fix the failing output verbatim, for remember the fact."},
 				"harness": map[string]any{"type": "string", "description": harnessFilterDescription()},
 				"project": map[string]any{"type": "string", "description": "Optional project filter; for remember, where it is filed."},
 				"limit":   map[string]any{"type": "number", "description": "Max sessions per ~4 KB page."},

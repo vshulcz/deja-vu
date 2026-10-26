@@ -116,7 +116,7 @@ function tools(ctx) {
       query: {
         type: "string",
         required: true,
-        description: "Specific tokens to match. Several words are ANDed.",
+        description: "1-3 exact terms: a file path, an error string, a flag or identifier.",
       },
       limit: {
         type: "number",

@@ -227,7 +227,7 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
       description:
         "Search this machine's own past AI coding sessions — every agent used on it, including months before deja was installed. Use before debugging an error or re-implementing anything that may already exist, and before the first edit in a task and before calling a change done or ready to merge. Match on the most specific token available: an exact error string, function name, file path or flag.",
       args: {
-        query: { type: "string", description: "Specific tokens to match. Several words are ANDed." },
+        query: { type: "string", description: "1-3 exact terms: a file path, an error string, a flag or identifier." },
         limit: { type: "number", optional: true, description: "How many sessions to return. Default 5." },
         offset: {
           type: "number",
