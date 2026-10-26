@@ -147,6 +147,10 @@ except ImportError:
 
 DEJA = %s
 
+# deja is a console program: started from a host without a console it would
+# open a window of its own on Windows (#5635).
+_NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+
 _ABOUT = (
     "deja is this machine's memory of past coding sessions across every agent "
     "installed here (Claude Code, Codex, Cursor, Hermes and others), including "
@@ -231,6 +235,7 @@ def _deja(args, payload="", timeout=10):
             capture_output=True,
             text=True,
             timeout=timeout,
+            creationflags=_NO_WINDOW,
         )
         return done.stdout.strip()
     except Exception:

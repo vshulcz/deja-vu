@@ -80,7 +80,7 @@ function reply(line) {
 }
 
 function start() {
-  const child = spawn(resolveDeja(), ["mcp"], { stdio: "inherit" })
+  const child = spawn(resolveDeja(), ["mcp"], { windowsHide: true, stdio: "inherit" })
   child.on("error", (err) => {
     process.stderr.write(
       `deja could not start: ${err.message}. Install it with: ` +

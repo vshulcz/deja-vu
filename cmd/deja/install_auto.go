@@ -325,7 +325,7 @@ const runHook = (args, payload, cwd) =>
     try {
       // stderr is not read, so it is not piped: a full pipe would block the
       // hook, and one a grandchild holds would outlive the deadline.
-      child = spawn(HOOK, [].concat(args), { stdio: ["pipe", "pipe", "ignore"], ...(cwd ? { cwd } : {}) })
+      child = spawn(HOOK, [].concat(args), { windowsHide: true, stdio: ["pipe", "pipe", "ignore"], ...(cwd ? { cwd } : {}) })
     } catch {
       resolve("")
       return

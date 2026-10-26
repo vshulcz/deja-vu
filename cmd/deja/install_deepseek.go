@@ -76,6 +76,7 @@ function apply(ctx) {
       const args = query.startsWith("-") ? ["search", "--", query] : ["search", query];
       try {
         const out = execFileSync(DEJA, args, {
+          windowsHide: true,
           encoding: "utf8",
           timeout: 20000,
           maxBuffer: 4 * 1024 * 1024,
@@ -151,6 +152,7 @@ const notesReady = import("./lib.js")
 function ask(args, payload) {
   try {
     return execFileSync(DEJA, args, {
+      windowsHide: true,
       input: JSON.stringify(payload),
       encoding: "utf8",
       timeout: 10000,
@@ -171,7 +173,7 @@ function askAsync(args, payload) {
       const child = execFile(
         DEJA,
         args,
-        { encoding: "utf8", timeout: 10000, maxBuffer: 4 * 1024 * 1024 },
+        { windowsHide: true, encoding: "utf8", timeout: 10000, maxBuffer: 4 * 1024 * 1024 },
         (err, stdout) => resolve(err ? "" : String(stdout || "").trim()),
       );
       child.on("error", () => resolve(""));

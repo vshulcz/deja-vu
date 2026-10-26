@@ -112,3 +112,10 @@ func TestLauncherCarriesNothingOnADefaultSetup(t *testing.T) {
 		t.Errorf("a default setup carries %v", got)
 	}
 }
+
+func TestLauncherCarriesGlobalRecallOptIn(t *testing.T) {
+	got := launcherEnv([]string{"DEJA_RECALL_GLOBAL=1"})
+	if len(got) != 1 || got[0] != [2]string{"DEJA_RECALL_GLOBAL", "1"} {
+		t.Fatalf("launcher lost global recall setting: %v", got)
+	}
+}

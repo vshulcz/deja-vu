@@ -45,7 +45,7 @@ function run(bin, args, input) {
   return new Promise((resolve) => {
     let child
     try {
-      child = spawn(bin, args, { stdio: ["pipe", "pipe", "ignore"] })
+      child = spawn(bin, args, { windowsHide: true, stdio: ["pipe", "pipe", "ignore"] })
     } catch {
       return resolve("")
     }

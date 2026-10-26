@@ -45,6 +45,7 @@ var launcherEnvSettings = map[string]bool{
 	"DEJA_INDEX_EDITS":           true,
 	"DEJA_INDEX_COMMANDS":        true,
 	"DEJA_RECALL":                true,
+	"DEJA_RECALL_GLOBAL":         true,
 	"DEJA_MACHINE":               true,
 	"DEJA_AUTORECALL_LOCAL_ONLY": true,
 	"DEJA_NO_AUTO_INDEX":         true,

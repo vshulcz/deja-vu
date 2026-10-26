@@ -112,9 +112,19 @@ func hashGitStream(ctx context.Context, h io.Writer, root string, args ...string
 	if err := cmd.Start(); err != nil {
 		return false
 	}
+	defer closeAtDeadline(ctx, stdout)()
 	_, copyErr := io.Copy(h, stdout)
 	waitErr := cmd.Wait()
 	return copyErr == nil && waitErr == nil
+}
+
+// closeAtDeadline closes stdout when ctx ends. The context kills git, but a
+// child git left behind (a shim's real git, #5620) still holds the pipe, and a
+// read on it waits for that child however long its walk takes: 118s over a
+// worktree with 1.8M untracked files. WaitDelay does not help here, exec only
+// closes the pipes it copies itself, not one handed out by StdoutPipe.
+func closeAtDeadline(ctx context.Context, stdout io.Closer) (stop func() bool) {
+	return context.AfterFunc(ctx, func() { _ = stdout.Close() })
 }
 
 // hashUntrackedStream returns true when the resulting fingerprint is partial.
@@ -127,6 +137,7 @@ func hashUntrackedStream(ctx context.Context, h hash.Hash, root string) bool {
 	if err := cmd.Start(); err != nil {
 		return true
 	}
+	defer closeAtDeadline(ctx, stdout)()
 
 	partial := false
 	used := int64(0)

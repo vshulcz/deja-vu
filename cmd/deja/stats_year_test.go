@@ -49,6 +49,55 @@ func TestYearScreenLabelsItsArithmeticAndRedactsWhatItQuotes(t *testing.T) {
 	}
 }
 
+func TestPrintYearPluralizesSingleCounts(t *testing.T) {
+	var out bytes.Buffer
+	printYear(&out, yearReport{
+		from:          time.Date(2025, time.January, 1, 0, 0, 0, 0, time.UTC),
+		to:            time.Date(2025, time.December, 31, 0, 0, 0, 0, time.UTC),
+		sessions:      1,
+		messages:      1,
+		harnesses:     []harnessYear{{Harness: "claude", Sessions: 1}},
+		projects:      []projectYear{{Project: "my/app", Sessions: 1}},
+		work:          index.YearWork{Records: map[string]int{"files": 1, "command": 1}, Files: 1, Commands: 1, Undated: 1},
+		questions:     questionYear{Distinct: 1, Repeated: 1},
+		busiestDay:    "not-a-date",
+		busiestCount:  1,
+		longestTitle:  "Fix frobnicator",
+		longestTurns:  1,
+		friction:      []frictionYear{{Line: "error", Sessions: 1}},
+		outsideWindow: 1,
+	})
+	got := out.String()
+
+	for _, tc := range []struct {
+		name string
+		want string
+	}{
+		{name: "headline session and turns", want: "1 session, 1 turn in them"},
+		{name: "project sessions", want: "my/app, 1 session"},
+		{name: "busiest day turns", want: "not-a-date, 1 turn"},
+		{name: "longest session turns", want: "1 turn — Fix frobnicator"},
+		{name: "file records", want: "1 record naming a file"},
+		{name: "command records", want: "1 command record"},
+		{name: "undated work record", want: "1 work record carries no timestamp, so it is in none"},
+		{name: "repeated question", want: "1 of 1 question was asked in more than one session"},
+		{name: "friction sessions", want: "1 session hit"},
+		{name: "sessions outside the window", want: "1 indexed session is older"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if !strings.Contains(got, tc.want) {
+				t.Errorf("year report is missing %q:\n%s", tc.want, got)
+			}
+		})
+	}
+
+	for _, bad := range []string{"1 sessions", "1 turns", "1 records", "1 command records", "of 1 questions", "1 work records", "1 indexed sessions"} {
+		if strings.Contains(got, bad) {
+			t.Errorf("year report has incorrect singular count %q:\n%s", bad, got)
+		}
+	}
+}
+
 func TestYearJSONCarriesTheSameNumbers(t *testing.T) {
 	dir := yearFixture(t)
 	var out bytes.Buffer

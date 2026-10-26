@@ -20,7 +20,7 @@ if (installerOwns("mcp")) {
   process.exit(0)
 }
 
-const child = spawn(resolveDeja(), ["mcp"], { stdio: "inherit" })
+const child = spawn(resolveDeja(), ["mcp"], { windowsHide: true, stdio: "inherit" })
 child.on("error", (err) => {
   process.stderr.write(
     `deja could not start: ${err.message}. Install it with: ` +
