@@ -79,6 +79,7 @@ function resolveDeja(setting) {
 async function run(bin, args, input, cwd, timeout = 20000) {
   try {
     const child = run_(bin, args, {
+      windowsHide: true,
       encoding: "utf8",
       timeout,
       cwd,

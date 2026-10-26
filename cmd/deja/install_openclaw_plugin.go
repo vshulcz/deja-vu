@@ -493,6 +493,7 @@ const DEJA = %q;
 function ask(args, payload) {
   try {
     return execFileSync(DEJA, args, {
+      windowsHide: true,
       input: JSON.stringify(payload),
       encoding: "utf8",
       timeout: 10000,

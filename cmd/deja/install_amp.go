@@ -199,6 +199,7 @@ function createdOf(path: string): number {
 function run(args: string[], input: string, timeout = 10000): string {
   try {
     return execFileSync(DEJA, args, {
+      windowsHide: true,
       input,
       encoding: "utf8",
       timeout,

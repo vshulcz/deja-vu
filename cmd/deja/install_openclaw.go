@@ -507,6 +507,7 @@ export default async (event) => {
   if (!context || !Array.isArray(context.bootstrapFiles)) return;
   try {
     const digest = execFileSync(DEJA, ["hook-context", "--plain"], {
+      windowsHide: true,
       input: JSON.stringify({
         session_id: context.sessionId || context.sessionKey || event.sessionKey || "",
         cwd: context.workspaceDir || process.cwd(),

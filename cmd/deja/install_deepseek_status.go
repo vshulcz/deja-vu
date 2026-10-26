@@ -77,7 +77,7 @@ let cached = { at: 0, line: "" };
 function statusline() {
   if (Date.now() - cached.at < 2000) return Promise.resolve(cached.line);
   return new Promise((resolve) => {
-    const child = execFile(DEJA, ["statusline"], { encoding: "utf8", timeout: 3000, maxBuffer: 64 * 1024 }, (err, out) => {
+    const child = execFile(DEJA, ["statusline"], { windowsHide: true, encoding: "utf8", timeout: 3000, maxBuffer: 64 * 1024 }, (err, out) => {
       const line = err ? "" : String(out).split("\n")[0].trim();
       cached = { at: Date.now(), line };
       resolve(line);

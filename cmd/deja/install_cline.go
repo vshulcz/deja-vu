@@ -209,6 +209,7 @@ const DEJA = %q;
 function run(args, input = "", timeout = 10000) {
   try {
     return execFileSync(DEJA, args, {
+      windowsHide: true,
       input,
       encoding: "utf8",
       timeout,
