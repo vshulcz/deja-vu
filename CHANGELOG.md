@@ -48,6 +48,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The block is now put in place of any already there, and a block already on
   the message is reused rather than asked for again. Run
   `deja install opencode-auto` again to rewrite the plugin (#5682).
+- `deja show --offset -1` says `--offset` wants a number from 0 up and quotes
+  the value, as `deja recall` does. It shared one message with `--limit`,
+  "needs a positive integer", which is wrong for `--offset`: 0 is the first
+  message (#5650).
 - `deja help delete` names the agents it takes instead of describing them: the
   page closes with the list built from the two maps the command reads, so an
   agent added to either is named there without a second edit. The refusal for an

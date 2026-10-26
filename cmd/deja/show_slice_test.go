@@ -110,3 +110,39 @@ func TestShowHonoursOffsetAndLimitInTextOutput(t *testing.T) {
 		t.Errorf("--offset 7 --limit 2 returned %d messages", got)
 	}
 }
+
+// --offset and --limit were refused with one message, "needs a positive
+// integer", which is wrong for --offset: 0 is the first message. Each now
+// names its own floor and quotes what the reader typed, as recall does
+// (#5650).
+func TestShowRefusesASliceFlagNamingItsFloorAndTheValue(t *testing.T) {
+	hermeticEnv(t)
+	for _, tc := range []struct {
+		flag, value, floor string
+	}{
+		{"--offset", "-1", "a number from 0 up"},
+		{"--offset", "two", "a number from 0 up"},
+		{"--limit", "0", "a positive number"},
+		{"--limit", "-3", "a positive number"},
+	} {
+		t.Run(tc.flag+" "+tc.value, func(t *testing.T) {
+			_, err := captureRun(t, "show", "01a00feb", tc.flag, tc.value)
+			if err == nil {
+				t.Fatalf("show %s %s was accepted", tc.flag, tc.value)
+			}
+			want := "show: " + tc.flag + " wants " + tc.floor + `, got "` + tc.value + `"`
+			if err.Error() != want {
+				t.Errorf("show %s %s:\n got %q\nwant %q", tc.flag, tc.value, err, want)
+			}
+		})
+	}
+
+	// The floors themselves are accepted.
+	o, err := parseShow([]string{"01a00feb", "--offset", "0", "--limit", "1"})
+	if err != nil {
+		t.Fatalf("--offset 0 --limit 1: %v", err)
+	}
+	if o.offset != 0 || o.limit != 1 || !o.sliced {
+		t.Errorf("parsed = %+v", o)
+	}
+}

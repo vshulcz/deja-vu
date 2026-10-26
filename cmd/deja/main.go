@@ -1166,17 +1166,22 @@ func parseShow(args []string) (showOptions, error) {
 				o.harness = args[i] //nolint:gosec // bounds checked before i++
 				continue
 			}
-			n, e := strconv.Atoi(args[i]) //nolint:gosec // bounds checked before i++
-			if e != nil || n < 0 || (a == "--limit" && n == 0) {
-				return o, fmt.Errorf("%s needs a positive integer", a)
-			}
+			v := args[i] //nolint:gosec // bounds checked before i++
+			n, e := strconv.Atoi(v)
+			// 0 is where a session starts, so the two flags have different
+			// floors; the words recall uses for the same flags (#5650).
 			if a == "--offset" {
+				if e != nil || n < 0 {
+					return o, fmt.Errorf("show: --offset wants a number from 0 up, got %q", v)
+				}
 				o.offset = n
-				o.sliced = true
 			} else {
+				if e != nil || n <= 0 {
+					return o, fmt.Errorf("show: --limit wants a positive number, got %q", v)
+				}
 				o.limit = n
-				o.sliced = true
 			}
+			o.sliced = true
 		default:
 			if strings.HasPrefix(a, "-") {
 				return o, unknownFlag("show", a, showFlags)
