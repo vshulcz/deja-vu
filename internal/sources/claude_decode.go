@@ -837,12 +837,20 @@ func worthIndexing(cmd string) bool {
 	// line says a runner ran. Nobody pipes into one, so `&&`, `||` and `;` are
 	// the only places a run can begin.
 	for _, seg := range statementChain.Split(cmd, -1) {
-		if taskRunner.MatchString(seg) && !trivialCommand.MatchString(seg) {
+		if (taskRunner.MatchString(seg) || projectScript.MatchString(seg)) && !trivialCommand.MatchString(seg) {
 			return true
 		}
 	}
 	return false
 }
+
+// projectScript is a repository's own script run by relative path:
+// `./scripts/check.sh`, `bash hack/verify.sh`, `python3 tools/gen.py`. A
+// repository that keeps its checks in scripts had none of them indexed, so a
+// failure there and the command that fixed it never formed a pair. Relative
+// only: an absolute path is a one-off file outside the repository. Anchored to
+// the start of a statement for the same reason as the task runners.
+var projectScript = regexp.MustCompile(`^\s*(?:(?:ba|z)?sh\s+|python3?\s+|node\s+|uv run\s+)?(?:\./|scripts?/|bin/|tools/|hack/|ci/)[\w.-]+(?:/[\w.-]+)*(?:\s|$)`)
 
 // statementChain splits on the operators that start a new command, leaving a
 // pipe inside a quoted argument alone.
