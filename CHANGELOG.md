@@ -45,6 +45,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reasoning off replied with only that line in 10 of 10 runs. It now asks for
   the answer first and the line last: 10 of 10 answered, 10 still credited
   the recall (#5664).
+- `deja fix` finds the failures and fixes that happened in subagents. The
+  subagent cut dropped every command a child ran, so most of them were never
+  mined. It now keeps the commands with their exit status, and of their output
+  only the lines that read as a failure or carry a test runner's verdict. On a
+  rebuild of one machine's Claude history, subagent sessions with commands
+  went from 754 to 2097 of 2273 and served fix pairs from 320 to 588, for 4.6%
+  more index (224 to 234 MB) and about 4% slower search. The index is rebuilt
+  once on upgrade (#5678).
+- `opencode run "<question>"` gets per-prompt recall again. opencode quotes
+  each argument holding a space, and the prompt in quotes read as one clause,
+  so an instruction in front of the question used up the terms and the block
+  was empty. A prompt wrapped whole in one pair of quotes is now read without
+  them (#5679).
 
 ## [0.23.1] - 2026-10-25
 

@@ -218,7 +218,10 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// The envelope comes off before anything is decided: a person's question
 	// with the host's reminder appended is still the question, and the
 	// reminder's own words are not what to search for (#3156).
-	asked := digest.StripHarnessBlocks(string(input.Prompt))
+	//
+	// A host that quoted the whole prompt, as `opencode run "<question>"` does,
+	// sent the question all the same.
+	asked := prompt.Unwrap(digest.StripHarnessBlocks(string(input.Prompt)))
 	nudge := failureNudge(dir, asked)
 	// Nobody asked. A harness delivers its own plumbing as the next user turn —
 	// a finished background task, a system reminder, a slash command's envelope
