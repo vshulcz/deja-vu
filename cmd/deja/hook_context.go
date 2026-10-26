@@ -1614,6 +1614,9 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, c
 		// corrects unmarked (#761).
 		variant, rejectedWarning := orderForInjection(variant)
 		variant, unseen := leadWithUnseen(dir, names, variant)
+		for i := range variant {
+			index.MarkUserRules(dir, &variant[i], names)
+		}
 		// A session found by where its work happened carries the name of the
 		// directory it was started in, which is not one the cwd can guess — the
 		// safe-mode filter is a name list, so the evidence that admitted the

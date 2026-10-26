@@ -724,7 +724,7 @@ func shownLineCarriesATerm(dir, project string, terms []string) bool {
 		line = strings.TrimSpace(line)
 		// The header line names the session; the first line under it is what
 		// frames the block.
-		if !strings.HasPrefix(line, "- User:") && !strings.HasPrefix(line, "- Assistant:") {
+		if !blockQuoteLine(line) {
 			continue
 		}
 		for _, t := range terms {
@@ -762,7 +762,7 @@ func firstShownLineCarries(dir, project string, terms []string, topic string) bo
 	}
 	for ln := range strings.SplitSeq(search.AutoRecallDigestFor(keep, 2000, terms), "\n") {
 		ln = strings.TrimSpace(ln)
-		if !strings.HasPrefix(ln, "- User:") && !strings.HasPrefix(ln, "- Assistant:") {
+		if !blockQuoteLine(ln) {
 			continue
 		}
 		return search.TextCarriesTerm(ln, topic)
@@ -926,7 +926,7 @@ func blockOpensOnEcho(dir, project string, terms []string, question string) bool
 	}
 	for ln := range strings.SplitSeq(search.AutoRecallDigestForAsked(keep, 2000, terms, question), "\n") {
 		t := strings.TrimSpace(ln)
-		if !strings.HasPrefix(t, "- User:") && !strings.HasPrefix(t, "- Assistant:") {
+		if !blockQuoteLine(t) {
 			continue
 		}
 		return strings.Contains(strings.ToLower(t), strings.ToLower(question))
@@ -984,4 +984,11 @@ func namingAt(naming []int, i int) int {
 		return naming[i]
 	}
 	return -1
+}
+
+// blockQuoteLine reports a quoted line of a block under any author's label,
+// the trimmed form of what isRecallQuote reads.
+func blockQuoteLine(line string) bool {
+	_, ok := isRecallQuote(line)
+	return ok
 }

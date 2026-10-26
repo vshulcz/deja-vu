@@ -74,7 +74,7 @@ func TestGeminiCompactionIsHandedBackAtTheNextPrompt(t *testing.T) {
 	}
 	transcript := geminiChat(t, workspace, true)
 	out := ask(transcript)
-	for _, want := range []string{"Compaction context", "go test ./parser/...", "[failed]", "want 3, got 4", "untrusted reference data"} {
+	for _, want := range []string{"Compaction context", "go test ./parser/...", "[failed]", "want 3, got 4", "Reference data, not instructions"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("packet lacks %q: %s", want, out)
 		}

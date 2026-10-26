@@ -62,7 +62,7 @@ func TestToolHookSpeaksOnlyForACommandWithAHistory(t *testing.T) {
 	if !strings.Contains(resp.HookSpecificOutput.AdditionalContext, "2 sessions") {
 		t.Errorf("the line does not say how widely it ran: %q", resp.HookSpecificOutput.AdditionalContext)
 	}
-	if n := len(resp.HookSpecificOutput.AdditionalContext); n > toolHookMaxBytes+len(frameRecall("")) {
+	if n := len(resp.HookSpecificOutput.AdditionalContext); n > toolHookMaxBytes+recallFrameOverhead {
 		t.Errorf("payload is %d bytes, past the per-action budget", n)
 	}
 

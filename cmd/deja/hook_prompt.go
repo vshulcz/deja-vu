@@ -388,6 +388,9 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// been applying this since the arm was written — and saying so in a comment
 	// that claimed the hook did the same — while the hook did not.
 	ss = search.LeadWithConclusion(ss, terms)
+	for i := range ss {
+		index.MarkUserRules(dir, &ss[i], names)
+	}
 	// A rejected session is not an equal answer, and the mark has to travel
 	// with it into the block the agent reads (#761).
 	ss, rejectedWarning := orderForInjection(ss)

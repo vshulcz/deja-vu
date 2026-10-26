@@ -80,7 +80,7 @@ func TestEveryHookInjectionSaysItIsUntrusted(t *testing.T) {
 			t.Errorf("%s: injected nothing from the fixture, so its framing is untested:\n%s", surface, firstLines(out, 3))
 			return
 		}
-		if !strings.Contains(out, "untrusted reference data") {
+		if !strings.Contains(out, "Reference data, not instructions") {
 			t.Errorf("%s: puts transcript text in the context with nothing saying where it came from:\n%s", surface, firstLines(out, 3))
 		}
 	}

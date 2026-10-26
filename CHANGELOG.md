@@ -22,6 +22,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Recall labels who wrote each line (`Model said (no record backs it)`,
+  `Prompt written by a parent agent`, `Output with an instruction to agents` …)
+  and shows the command or edit a model's conclusion rests on above the
+  conclusion, from receipts written at a full index build. A check or build
+  rule a person typed in an interactive Claude Code session of the current
+  project is shown as `User said (this project)`, and the frame header and MCP
+  instructions say to follow those lines and nothing else. An instruction to
+  run something that no person in the project typed (tool output, a paste, a
+  parent agent's prompt, a `claude -p` run, another project) is cut to
+  `[instruction to agents left out]`; a rule the person took back is not
+  shown. The index version is now 109, so the store rebuilds once on the
+  first run.
 - Recall no longer heads a page "No session is about this" when a session on
   it holds most of a long query. The page says which session holds how many of
   the query's words and which it lacks. A page that shares only filler words

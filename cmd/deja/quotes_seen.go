@@ -30,6 +30,13 @@ func isRecallQuote(line string) (string, bool) {
 			return rest, true
 		}
 	}
+	// Every other line under a session is a quote too, under its author's
+	// label ("Ran: ", "User said (this project): "). Counted only by the two
+	// labels above, a session whose lines all carried another one was dropped
+	// as if it had said nothing, while the line crediting it stayed.
+	if rest, ok := strings.CutPrefix(t, "- "); ok && !strings.HasPrefix(rest, "Session: ") && !strings.HasPrefix(rest, "**") {
+		return rest, true
+	}
 	return "", false
 }
 

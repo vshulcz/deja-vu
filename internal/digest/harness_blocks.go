@@ -148,6 +148,34 @@ func StripClosedHarnessBlocks(text string) string {
 	return strings.TrimSpace(text)
 }
 
+// harnessBlockOpenRe is the opening tag of any envelope in harnessBlockTags.
+var harnessBlockOpenRe = func() *regexp.Regexp {
+	alts := make([]string, 0, len(harnessBlockTags))
+	for _, t := range harnessBlockTags {
+		alts = append(alts, regexp.QuoteMeta(t))
+	}
+	return regexp.MustCompile(`(?i)<\s*(?:` + strings.Join(alts, "|") + `)[\s>/]`)
+}()
+
+// BeforeHarnessBlock is the part of a turn ahead of the first envelope a
+// harness put in it, and ahead of a host banner. Unlike StripHarnessBlocks it
+// keeps nothing after one: a notification or a teammate's message delivered
+// in the person's turn can be followed by more of the host, and a rule read
+// out of that is the host's, not the person's.
+func BeforeHarnessBlock(text string) string {
+	if loc := harnessBlockOpenRe.FindStringIndex(text); loc != nil {
+		text = text[:loc[0]]
+	}
+	lines := strings.Split(text, "\n")
+	for i, l := range lines {
+		if hostPreambleBannerRE.MatchString(l) {
+			lines = lines[:i]
+			break
+		}
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n"))
+}
+
 // StripHarnessBlocks returns what is left of a prompt once the harness's own
 // envelopes are removed: the person's words, or "" when the turn was the host
 // alone. A task notification delivered as a user turn once made the prompt

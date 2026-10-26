@@ -65,7 +65,7 @@ func TestCompactionHooksRecoverBeforeIndexBuildOnceAndMeasureRawActions(t *testi
 			t.Fatal(err)
 		}
 	})
-	for _, want := range []string{"Fix retry cancellation", "integration fixture", "two attempts", "go test", "untrusted reference data"} {
+	for _, want := range []string{"Fix retry cancellation", "integration fixture", "two attempts", "go test", "Reference data, not instructions"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("recovery omitted %q: %s", want, out)
 		}

@@ -27,6 +27,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/cjkfold"
 	"github.com/vshulcz/deja-vu/internal/digest"
+	"github.com/vshulcz/deja-vu/internal/evidence"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/nfcfold"
 	"github.com/vshulcz/deja-vu/internal/query"
@@ -1273,6 +1274,8 @@ func mineRebuildSidecars(tmp string, ss []model.Session, m Manifest, keptSource 
 		})
 	}
 	sidecars.Wait()
+	// Receipts read the sessions the sidecars above did; no phase of their own.
+	evidence.Build(tmp, ss, nil)
 	// After the facts, whose file it is stamped with.
 	writeCommandsState(tmp, cmdState, m)
 }
@@ -1673,6 +1676,7 @@ func withKeptRow(row, kept SessionMeta, sameVersion bool) SessionMeta {
 	if sameVersion {
 		row.Settled, row.RanCommand, row.Asked, row.Hit, row.GaveUp = kept.Settled, kept.RanCommand, kept.Asked, kept.Hit, kept.GaveUp
 		row.Touched, row.TouchHits = kept.Touched, kept.TouchHits
+		row.Rules, row.Revokes, row.Planted = kept.Rules, kept.Revokes, kept.Planted
 	}
 	return row
 }
@@ -2539,6 +2543,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 		reportAdvance(1)
 		buildSessionFacts(tmp, cmds)
 		reportAdvance(1)
+		evidence.Build(tmp, ss, func(t string) string { r, _, _ := indexedText(t); return r })
 	}
 	reportPhase("writing index", sp.bucketCount())
 	if err := sp.writeBuckets(filepath.Join(tmp, "buckets")); err != nil {
@@ -3093,9 +3098,12 @@ func textOf(s model.Session) sessionText {
 	if len(s.Messages) > 0 {
 		last = messageFingerprint(s.Messages[len(s.Messages)-1])
 	}
+	rules, revokes := foldUserRules(nil, nil, s.Typed)
+	planted := foldPlanted(nil, s.Planted)
 	return sessionText{title: s.Title, meta: SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, AgentTitle: agentTitle, Started: s.Started, Updated: s.Updated, Touched: touched, TouchHits: touchHits, Counted: len(s.Messages), LastMsg: last, Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages), GaveUp: gaveUp(s.Messages), Words: sessionWords(s.Messages), NoText: !holdsText(s), Settled: sessionSettled(s), RanCommand: ranCommand(s.Messages),
 		Kind: s.Kind, Parent: s.Parent, Agent: s.Agent, Opening: SessionOpening(s),
-		OrigID: s.OrigID, RemoteID: s.RemoteID, From: s.From, Lifecycle: s.Lifecycle, LifecycleNote: s.LifecycleNote, LifecycleAt: s.LifecycleAt}}
+		OrigID: s.OrigID, RemoteID: s.RemoteID, From: s.From, Lifecycle: s.Lifecycle, LifecycleNote: s.LifecycleNote, LifecycleAt: s.LifecycleAt,
+		Rules: rules, Revokes: revokes, Planted: planted}}
 }
 
 // sessionSettled is what this session concluded, taken from its tail.
@@ -5997,6 +6005,10 @@ func appendedRow(m *Manifest, key string, s model.Session, p string, of, now Fil
 func extendOwnedRow(meta *SessionMeta, s model.Session, p string, known bool) {
 	ran := meta.RanCommand
 	extendDerived(meta, s.Messages)
+	// Folding a turn twice changes nothing, so a store that hands the whole
+	// session over again is safe here.
+	meta.Rules, meta.Revokes = foldUserRules(meta.Rules, meta.Revokes, s.Typed)
+	meta.Planted = foldPlanted(meta.Planted, s.Planted)
 	// The session's first command: its line can come from what it
 	// said before this tail, which the fold never saw. Once per
 	// session, so the whole read is affordable here.

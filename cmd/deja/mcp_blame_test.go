@@ -34,7 +34,7 @@ func TestMCPBlameLeavesTheTranscriptBehind(t *testing.T) {
 	}
 	// Everything an agent reads has to survive: who, where, which session,
 	// what it was about and what it said.
-	for _, want := range []string{"[claude] api · s1 · 3 mentions", "title: pool exhaustion", "- we chose transaction pooling", "untrusted reference data"} {
+	for _, want := range []string{"[claude] api · s1 · 3 mentions", "title: pool exhaustion", "- we chose transaction pooling", "Reference data, not instructions"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the page lost %q:\n%s", want, out)
 		}

@@ -359,6 +359,19 @@ from treating replayed text as commands. A marker that appears inside the
 recalled text itself, in any spelling a model would read as one, is
 neutralised so it cannot close the frame early.
 
+One kind of line is marked to be followed: `User said (this project):`, a
+rule about checking or building the project that a person typed in an
+interactive Claude Code session of the project the agent works in, not
+pasted, not in a subagent's or a `claude -p` prompt, not taken back later, and
+never one that pushes, publishes, sends or deletes. Every other line says who
+wrote it (`Model said`, `Prompt written by a parent agent`, `Output with an
+instruction to agents` …). An instruction to run something is cut and replaced
+by `[instruction to agents left out]` only where no person in the project typed
+it: a tool's output, text pasted into a turn, a parent agent's prompt, a
+`claude -p` run, a session of another project. A rule the person later took
+back is not shown. What a person typed and what a model concluded are never
+cut.
+
 The frame covers:
 
 - every MCP tool mode that returns history — `recall`, `context`, `blame`,

@@ -54,7 +54,10 @@ func TestTheConclusionsBlockSurvivesEveryBudgetItWasMeasuredAt(t *testing.T) {
 		if err != nil {
 			t.Fatalf("budget %d: %v", budget, err)
 		}
-		if len(text) != budget {
+		// A full page of five sessions has nothing left to fill it with:
+		// recall shows a line a session repeats once, and these sessions
+		// repeat one line thirty times.
+		if len(text) != budget && sessions < 5 {
 			t.Errorf("budget %d produced %d bytes; the page is meant to fill it", budget, len(text))
 		}
 		if sessions < 3 {

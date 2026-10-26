@@ -43,7 +43,7 @@ func TestTheFixToolFramesTheCommandItServes(t *testing.T) {
 	if !strings.Contains(text, "go build -ldflags=-w") {
 		t.Fatalf("no command was served, so there is nothing to frame:\n%s", text)
 	}
-	if !strings.Contains(text, "untrusted reference data") {
+	if !strings.Contains(text, "Reference data, not instructions") {
 		t.Errorf("a command to run arrives with nothing saying where it came from:\n%s", text)
 	}
 }

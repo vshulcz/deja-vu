@@ -60,7 +60,7 @@ func TestEveryMCPAnswerCarryingTranscriptTextSaysItIsUntrusted(t *testing.T) {
 			t.Errorf("%s: served nothing from the fixture, so its framing is untested:\n%s", tc.tool, firstLines(text, 3))
 			continue
 		}
-		if !strings.Contains(text, "untrusted reference data") {
+		if !strings.Contains(text, "Reference data, not instructions") {
 			t.Errorf("%s: hands over transcript text with nothing saying where it came from:\n%s", tc.tool, firstLines(text, 3))
 		}
 	}
@@ -88,7 +88,7 @@ func TestEveryMCPAnswerCarryingTranscriptTextSaysItIsUntrusted(t *testing.T) {
 	if !strings.Contains(text, "zonkomatic") {
 		t.Fatalf("resource: served nothing from the fixture, so its framing is untested:\n%s", firstLines(text, 3))
 	}
-	if !strings.Contains(text, "untrusted reference data") {
+	if !strings.Contains(text, "Reference data, not instructions") {
 		t.Errorf("resource: hands over a whole session with nothing saying where it came from:\n%s", firstLines(text, 3))
 	}
 }

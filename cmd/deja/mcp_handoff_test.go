@@ -58,7 +58,7 @@ func TestTheHandoffModeHandsOverAnotherSession(t *testing.T) {
 	if !strings.Contains(byID, "reconcile job holds a lock") {
 		t.Errorf("handoff by id did not carry that session's conclusion:\n%s", byID)
 	}
-	if !strings.Contains(byID, "untrusted reference data") {
+	if !strings.Contains(byID, "Reference data, not instructions") {
 		t.Errorf("transcript text went out without the frame:\n%s", byID)
 	}
 

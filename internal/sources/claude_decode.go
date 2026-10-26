@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/evidence"
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
@@ -46,6 +47,10 @@ type claudeLine struct {
 	// placeholder. Indexed as the person's words, a skill body became 52
 	// questions nobody asked on one machine (#3267).
 	IsMeta bool `json:"isMeta"`
+	// Entrypoint is how the session was started: "cli" for a person at the
+	// interactive prompt, "sdk-cli" for `claude -p` and the SDK, where the
+	// "user" turns are whatever a script or a parent agent sent.
+	Entrypoint string `json:"entrypoint"`
 	// IsCompactSummary marks the user-role record Claude Code writes after a
 	// compaction: the model's summary of the turns it dropped. Filed as user
 	// speech it named every topic a marathon touched, and on 453 real recall
@@ -163,6 +168,11 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 			role = RoleSummary
 		}
 		if role == "user" {
+			typed := claudeTyped(&v, content, txt, harness, path)
+			if typed != "" {
+				s.Typed = append(s.Typed, typed)
+			}
+			s.Planted = append(s.Planted, claudePlanted(&v, txt, harness, path)...)
 			txt = UnwrapPastedContent(txt)
 		}
 		if txt != "" {
@@ -203,6 +213,39 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 		s.ProjectFromDir = true
 	}
 	return []model.Session{s}, err
+}
+
+// claudeTyped is what a person typed in this record, when the record can
+// say so: a user turn of an interactive session (entrypoint "cli"), not a
+// sub-agent's prompt, not a turn that also carries a tool result, with what
+// was pasted into it cut out. Anything else is "".
+func claudeTyped(v *claudeLine, c *claudeContent, txt, harness, path string) string {
+	if harness != "claude" || v.Type != "user" || v.Entrypoint != "cli" || v.IsSidechain || v.IsCompactSummary ||
+		IsSubagentPath(path) || c == nil {
+		return ""
+	}
+	// An item that is a tool result, or whose type does not decode, makes
+	// the record something other than speech.
+	for i := range c.items {
+		if !c.notType(i, "tool_result") {
+			return ""
+		}
+	}
+	return StripPastedContent(txt)
+}
+
+// claudePlanted are the orders in a user record that no person typed: the
+// pasted part of an interactive turn, or the whole turn of a headless run
+// (`claude -p`, an SDK). A record without an entrypoint cannot tell, and
+// gives none: its text is shown as the person's.
+func claudePlanted(v *claudeLine, txt, harness, path string) []string {
+	if harness != "claude" || v.Entrypoint == "" || v.IsSidechain || v.IsCompactSummary || IsSubagentPath(path) {
+		return nil
+	}
+	if v.Entrypoint != "cli" {
+		return evidence.OrderSentences(UnwrapPastedContent(txt))
+	}
+	return evidence.OrderSentences(PastedContent(txt))
 }
 
 // claudeStampIdentity takes the session's id from a line, and for a subagent's

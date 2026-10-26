@@ -10,6 +10,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/cjkfold"
 	"github.com/vshulcz/deja-vu/internal/digest"
+	"github.com/vshulcz/deja-vu/internal/evidence"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/prompt"
 )
@@ -555,11 +556,34 @@ func autoRecallSessionForAsked(s model.Session, now time.Time, provenance bool, 
 		}
 		fmt.Fprintf(&b, "- **%s** `%s`%s\n", digestLine(s.Project), digestLine(short(s.ID)), date)
 	}
-	if problem != "" {
-		fmt.Fprintf(&b, "  - User: %s\n", digestLine(problem))
+	// A rule the person gave about checking or building this project goes
+	// first, under the one mark the frame says to follow, whether or not it
+	// matched: on the stand a rule said in a session's second turn never
+	// reached the block, which showed the first turn's output.
+	userRuleLines(&b, s, "  - ")
+	problemLine := func() {
+		if problem == "" || IsUserRule(s, problem) {
+			return
+		}
+		if l, ok := scrubLine(s, personLabel(s, problem)+problem); ok {
+			fmt.Fprintf(&b, "  - %s\n", digestLine(l))
+		}
 	}
+	if s.Path != "" && evidenceReader("").Covers(s.Updated) {
+		problemLine()
+		for _, c := range evidenceRewrite(s, "", conclusions, true, problem) {
+			if IsUserRule(s, strings.TrimPrefix(c, evidence.LabelUserRule)) {
+				continue
+			}
+			fmt.Fprintf(&b, "  - %s\n", digestLine(c))
+		}
+		return b.String()
+	}
+	problemLine()
 	for _, c := range conclusions {
-		fmt.Fprintf(&b, "  - Assistant: %s\n", digestLine(c))
+		if l, ok := scrubLine(s, "Assistant: "+c); ok {
+			fmt.Fprintf(&b, "  - %s\n", digestLine(l))
+		}
 	}
 	return b.String()
 }

@@ -826,7 +826,10 @@ import (
 // 107: Gemini resumed sessions drop repeated function responses (#5318).
 // 108: a sub-agent run keeps its commands, and the outputs that failed or carry
 // a runner's verdict, so its failures and fixes are mined (#5678).
-const version = 108
+// 109: a Claude Code row keeps the check and build rules its person typed,
+// which recall marks as theirs, and a build writes receipts.bin, the records
+// that back what a model said; rows and indexes built before have neither.
+const version = 109
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
@@ -1107,6 +1110,15 @@ type SessionMeta struct {
 	// reading a single session. Same trade as Asked: the text is recovered
 	// from the two or three sessions that matched.
 	Hit []uint64 `json:",omitempty"`
+	// Rules are the check and build rules the person typed in this session
+	// and did not take back in it, and Revokes the commands they took back
+	// here, which may be another session's rule (user_rules.go). Additive: an
+	// older manifest decodes with them empty, and no line is marked.
+	Rules   []string `json:",omitempty"`
+	Revokes []string `json:",omitempty"`
+	// Planted are the orders the session's person turns carried that no
+	// person typed (model.Session.Planted). Additive like Rules.
+	Planted []string `json:",omitempty"`
 }
 
 // touchedFileCap bounds what goes in SessionMeta.Touched.

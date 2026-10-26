@@ -60,3 +60,18 @@ func TestABlockWithNoQuotesIsLeftAlone(t *testing.T) {
 		t.Errorf("a block with no quotes was changed or suppressed: fresh=%v\n%s", fresh, out)
 	}
 }
+
+// A session whose lines all carry an author's label other than User or
+// Assistant ("Ran: ", "User said (this project): ") was dropped as if it said
+// nothing whenever another session in the block quoted a User line, and the
+// credit line still named it.
+func TestALabelledLineIsAQuoteToo(t *testing.T) {
+	body := "- **beta** `aaaa1111` · 2026-10-04\n" +
+		"  - Ran: `go test ./internal/slug`, output: --- FAIL: TestSlugUnicode\n" +
+		"- **beta** `bbbb2222` · 2026-09-18\n" +
+		"  - User: switch slugify to the new table\n"
+	out, _, fresh := withoutSeenQuotes(map[string]bool{}, body)
+	if !fresh || !strings.Contains(out, "aaaa1111") || !strings.Contains(out, "TestSlugUnicode") {
+		t.Errorf("a session of labelled lines was dropped:\n%s", out)
+	}
+}

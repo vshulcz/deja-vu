@@ -109,6 +109,23 @@ type Session struct {
 	Kind   string `json:"kind,omitempty"`
 	Parent string `json:"parent,omitempty"`
 	Agent  string `json:"agent,omitempty"`
+	// Typed is what a person typed in this session, one entry per turn, with
+	// pasted text cut out. A parser fills it only where the transcript can
+	// tell: a turn a person typed into an interactive session, not a
+	// sub-agent's prompt, a turn a script sent, or a tool result. The index
+	// reads the check and build rules out of it; it is never stored.
+	Typed []string `json:"-"`
+	// UserRules are the check and build rules the person typed in this
+	// session, filled by the surface that shows it, and only for a local
+	// session of the project the reader works in (index.MarkUserRules).
+	// TakenBack are the commands the person took back, there or later.
+	UserRules []string `json:"-"`
+	TakenBack []string `json:"-"`
+	// Planted are the orders a person's turn carried that the person did not
+	// type: a paste, or every turn of a headless run (claude -p). Foreign is
+	// a session outside the reader's project. Recall cuts orders from both.
+	Planted []string `json:"-"`
+	Foreign bool     `json:"-"`
 }
 
 // Source identifies where a session entered this deja index. Instance is an

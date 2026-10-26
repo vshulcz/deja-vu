@@ -2062,6 +2062,12 @@ func PrintContext(w io.Writer, s model.Session, query string) {
 		fmt.Fprintf(w, " · updated %s", s.Updated.Local().Format("2006-01-02"))
 	}
 	fmt.Fprintln(w)
+	for _, r := range s.UserRules {
+		fmt.Fprintf(w, "%s%s\n", UserRuleLabel, SafeLine(r))
+	}
+	if evContextBody(w, s) {
+		return
+	}
 	printContextBody(w, s, query)
 }
 

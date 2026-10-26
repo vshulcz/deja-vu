@@ -51,7 +51,7 @@ func TestTheFirstPromptThatAsksToContinueASessionGetsItsPacket(t *testing.T) {
 	if !strings.Contains(byID, "carrying the page token") || !strings.Contains(byID, "this prompt names claude session") {
 		t.Fatalf("a first prompt naming a session id did not get that session's packet:\n%s", byID)
 	}
-	if !strings.Contains(byID, "untrusted reference data") {
+	if !strings.Contains(byID, "Reference data, not instructions") {
 		t.Errorf("the packet went in without the frame:\n%s", byID)
 	}
 	// Once per session: the same request again is not a second handoff.

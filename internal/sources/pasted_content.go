@@ -50,3 +50,52 @@ func UnwrapPastedContent(text string) string {
 	}
 	return strings.TrimSpace(text)
 }
+
+// StripPastedContent is a prompt with what was pasted into it taken out,
+// tags and all: the words the person typed around a paste. A log or an issue
+// pasted to ask about it holds whatever its author wrote, rules for agents
+// included, and none of it is the person's own instruction. An open tag with
+// no close takes the rest of the prompt with it.
+func StripPastedContent(text string) string {
+	if !strings.Contains(text, "<pasted_content id=") {
+		return text
+	}
+	for {
+		loc := pastedOpenRe.FindStringSubmatchIndex(text)
+		if loc == nil {
+			break
+		}
+		closeTag := `</pasted_content id="` + text[loc[2]:loc[3]] + `">`
+		rel := strings.Index(text[loc[1]:], closeTag)
+		if rel < 0 {
+			text = text[:loc[0]]
+			break
+		}
+		text = text[:loc[0]] + "\n" + text[loc[1]+rel+len(closeTag):]
+	}
+	return strings.TrimSpace(text)
+}
+
+// PastedContent is what StripPastedContent cuts: the pasted spans, one per
+// line.
+func PastedContent(text string) string {
+	if !strings.Contains(text, "<pasted_content id=") {
+		return ""
+	}
+	var b strings.Builder
+	for {
+		loc := pastedOpenRe.FindStringSubmatchIndex(text)
+		if loc == nil {
+			break
+		}
+		closeTag := `</pasted_content id="` + text[loc[2]:loc[3]] + `">`
+		rel := strings.Index(text[loc[1]:], closeTag)
+		if rel < 0 {
+			b.WriteString(text[loc[1]:] + "\n")
+			break
+		}
+		b.WriteString(text[loc[1]:loc[1]+rel] + "\n")
+		text = text[loc[1]+rel+len(closeTag):]
+	}
+	return strings.TrimSpace(b.String())
+}
