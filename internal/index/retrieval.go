@@ -376,10 +376,16 @@ func withRelevanceTail(once *relevanceOnce, dir string, m Manifest, o query.Opti
 		merged = append(merged, r)
 		added++
 	}
+	// A head the word-form ladder got by dropping words is a partial match like
+	// the rest, and promoting it put sessions holding only the query's filler
+	// ("flags", "tests") above the one holding its path: on a long query the
+	// ladder drops whichever words leave anything at all, often the ones that
+	// named the subject. The ranking orders it with the rest instead.
+	dropped := droppedAWord(res.Variants)
 	at := make(map[string]int, len(merged))
 	for _, s := range merged {
 		key := s.Harness + ":" + s.ID
-		at[key] = place(s, seen[key])
+		at[key] = place(s, seen[key] && !dropped)
 	}
 	sort.SliceStable(merged, func(i, j int) bool {
 		return at[merged[i].Harness+":"+merged[i].ID] < at[merged[j].Harness+":"+merged[j].ID]
@@ -692,6 +698,9 @@ func gateIDF(totalDocs float64, minDF int, rank float64) float64 {
 // any large corpus and clears nothing. Terms living in one or two sessions
 // are informative regardless — small corpora never reach the ratio bar.
 const dejaVuIDFFloor = 2.0
+
+// InformativeIDF is dejaVuIDFFloor for callers reading SearchResult.TermIDF.
+const InformativeIDF = dejaVuIDFFloor
 
 // dejaVuStrongIDFFloor is the bar for a term rare enough to justify an
 // UNPROMPTED recall on its own. The ordinary floor admits words that merely

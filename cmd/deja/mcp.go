@@ -1778,7 +1778,13 @@ func recallPage(dir, q string, budget, offset, limit, total, demoted int, about 
 	if absent {
 		namesTheAsked = false
 	}
-	namesTheAsked = writeRecallLead(&b, result, hits, q, strictShown, absent, namesTheAsked)
+	// Coverage settles what the two readings above cannot: a session holding
+	// most of a long query is an answer in part even when a word was dropped
+	// or the query's rarest word is one nothing holds.
+	cover := bestCoverage(hits, q, result.TermIDF)
+	covered := result.Tier == search.TierRelevance && strictShown == 0 && result.Directory == "" &&
+		!namesTheAsked && cover.aboutIt()
+	namesTheAsked = writeRecallLead(&b, result, hits, q, strictShown, absent, namesTheAsked, cover, covered)
 	if note := demotedNote(hits, demoted); note != "" {
 		fmt.Fprintln(&b, note+" — read the order as the user's judgement, not as recency.")
 	}
@@ -1924,16 +1930,21 @@ func recallPageFooter(b *strings.Builder, hits []search.Hit, result index.Search
 
 // writeRecallLead writes the line that says how the page was matched, and
 // returns namesTheAsked as that line left it.
-func writeRecallLead(b *strings.Builder, result index.SearchResult, hits []search.Hit, q string, strictShown int, absent, namesTheAsked bool) bool {
+func writeRecallLead(b *strings.Builder, result index.SearchResult, hits []search.Hit, q string, strictShown int, absent, namesTheAsked bool, cover recallCoverage, covered bool) bool {
 	// Whether the line below the tier already said nothing is about this, so
 	// the absent-word case can say it from wherever the chain stopped without
 	// saying it twice.
 	saidNothing := false
+	if covered {
+		// In place of the word forms line too: it called the path the
+		// session below holds "ignored", because no session holds it with
+		// every other word.
+		fmt.Fprintln(b, cover.line())
+		return true
+	}
 	switch {
-	case result.Stemmed:
-		fmt.Fprintf(b, "No exact match; using word forms: %s\n", strings.Join(fuzzySummary(result.Variants), ", "))
-	case result.Fuzzy:
-		fmt.Fprintf(b, "No exact match; using close spellings: %s\n", strings.Join(fuzzySummary(result.Variants), ", "))
+	case result.Stemmed, result.Fuzzy:
+		writeFormsLine(b, result)
 	case result.Tier == search.TierError:
 		fmt.Fprintln(b, "No exact match; these sessions hit the same error (matched by signature).")
 	case result.Directory != "" && strictShown == 0:
@@ -1978,6 +1989,9 @@ func writeRecallLead(b *strings.Builder, result index.SearchResult, hits []searc
 		asked, _ := query.QueryParts(q)
 		if !absent && relevanceHitsAreAboutIt(hits, asked, result.TermIDF) {
 			fmt.Fprintln(b, "No exact match; the sessions below are ranked by relevance — check that one describes what is happening now before acting on it.")
+			// The count line follows the lead; it said "none about it"
+			// under this one.
+			namesTheAsked = true
 		} else {
 			fmt.Fprintln(b, nothingIsAboutThis+" so the sessions below are the nearest by wording — treat them as leads to check, not as a record, and say plainly if none of them answers.")
 			saidNothing = true
@@ -1990,6 +2004,15 @@ func writeRecallLead(b *strings.Builder, result index.SearchResult, hits []searc
 		fmt.Fprintln(b, nothingIsAboutThis+" so the sessions below are the nearest by wording — treat them as leads to check, not as a record, and say plainly if none of them answers.")
 	}
 	return namesTheAsked
+}
+
+// writeFormsLine names the word forms or close spellings the ladder used.
+func writeFormsLine(b *strings.Builder, result index.SearchResult) {
+	how := "word forms"
+	if !result.Stemmed {
+		how = "close spellings"
+	}
+	fmt.Fprintf(b, "No exact match; using %s: %s\n", how, strings.Join(fuzzySummary(result.Variants), ", "))
 }
 
 // writeRecallHitHead writes one hit's header, its marks and its excerpts.
@@ -2383,6 +2406,10 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 		// is the one that identified the question.
 		names := !namedSomethingAbsent(result.Variants) &&
 			sessionNamesTheAsked(whole, q, result.TermIDF)
+		// Holding most of a long query names it too, as on the recall page.
+		if !names && hits[0].Tier == search.TierRelevance && !hits[0].Strict {
+			names = bestCoverage([]search.Hit{{Session: whole}}, q, result.TermIDF).aboutIt()
+		}
 		text = contextTierLead(hits[0].Tier, hits[0].Strict, names) +
 			contextIgnoredWords(result) + text
 	}

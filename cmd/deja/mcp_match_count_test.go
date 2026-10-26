@@ -115,8 +115,9 @@ func TestRelevanceHitsAreNotCalledMatches(t *testing.T) {
 	// The tier has two leads: it disowns the page when nothing served names
 	// what was asked, and says the first one does when it does (#2827). Either
 	// proves the fixture still reaches the tier, and neither is what this test
-	// is about — the count below is.
-	if !strings.Contains(text, "No session is about this") && !strings.Contains(text, "so these were ranked") {
+	// is about — the count below is. So does the third, which says how much of
+	// the query the best session holds.
+	if !strings.Contains(text, "No session is about this") && !strings.Contains(text, "No session matched every word") {
 		t.Fatalf("the fixture no longer reaches the relevance tier, so this test guards nothing:\n%s", firstLines(text, 3))
 	}
 	if strings.Contains(text, "matched)") {

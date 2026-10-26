@@ -101,7 +101,9 @@ func TestALongQueryStillLeavesRoomForTheLineThatSaysHowToPage(t *testing.T) {
 	}
 	// The count line is written whole, with the query in it: the room kept for
 	// it is measured from the line itself rather than guessed at.
-	want := strings.TrimRight(recallCountLine(q, search.TierRelevance, 0, 3, 41, 0, false), "\n")
+	// The lead above it says the page is ranked by relevance, so the count
+	// line says the same rather than "none about it".
+	want := strings.TrimRight(recallCountLine(q, search.TierRelevance, 0, 3, 41, 0, true), "\n")
 	if !strings.Contains(text, want) {
 		t.Errorf("the count line did not survive whole:\nwant %s\ngot\n%s", want, text)
 	}
