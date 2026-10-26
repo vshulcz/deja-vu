@@ -45,7 +45,8 @@ func TestFixNamesARemedyASubagentRan(t *testing.T) {
 			row("user", fmt.Sprintf(`[{"type":"tool_result","tool_use_id":%q,"is_error":%t,"content":%q}]`, id, failed, out)),
 		}
 	}
-	rows := []string{row("user", `"build the vllm image"`)}
+	rows := make([]string, 0, 22)
+	rows = append(rows, row("user", `"build the vllm image"`))
 	for i := range 4 {
 		rows = append(rows, bash(fmt.Sprintf("g%d", i), fmt.Sprintf("git log --oneline -1 part%d", i), "abc123 part", false)...)
 	}
