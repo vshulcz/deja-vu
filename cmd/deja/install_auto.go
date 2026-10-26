@@ -447,11 +447,17 @@ export default {
         for (const m of event.messages || []) {
           if (m?.role !== "user") continue
           const parts = (m.content || []).filter((p) => p?.type === "text" && p.text)
-          const prompt = parts.map((p) => p.text).join("\n").trim()
+          // Without the recall already appended: read as the question, it
+          // changed the key on every call and recall was asked again (#5682).
+          const prompt = parts.map((p, i) => (i === parts.length - 1 ? trailingRecall(p.text).body : p.text)).join("\n").trim()
           users.push({ key: m.id || sid + "#" + users.length + "#" + prompt, parts, prompt })
         }
         const last = users[users.length - 1]
         if (!last) return
+        // A block already on the message is the answer: another copy of this
+        // plugin put it there, or the host kept the message from the last call.
+        const present = trailingRecall(last.parts[last.parts.length - 1]?.text).blocks[0]
+        if (!recalled.has(last.key) && present) remember(last.key, present)
         // Asked once per message. opencode builds every model call afresh
         // from its store, so text added to a message here lasts one call:
         // once the agent ran a tool the recall was gone, and deja, having
@@ -470,11 +476,11 @@ export default {
           remember(last.key, prompt && raw.trim() ? JSON.parse(raw)?.hookSpecificOutput?.additionalContext || "" : "")
         }
         // Every message gets back what it was given, in every call, the way
-        // Claude Code keeps a prompt hook's text in its transcript.
+        // Claude Code keeps a prompt hook's text in its transcript. In place
+        // of any block already there, never after it.
         for (const u of users) {
           const extra = recalled.get(u.key)
-          const tail = u.parts[u.parts.length - 1]
-          if (extra && tail && !tail.text.endsWith(extra)) tail.text += "\n\n" + extra
+          if (extra) settleRecall(u.parts[u.parts.length - 1], extra)
         }
       } catch {
         // memory is optional: never break the session over it
@@ -604,8 +610,47 @@ export default {
     }
   },
 }
-`, exe)
+`, exe) + opencodeRecallSettleJS
 }
+
+// opencodeRecallSettleJS is how both opencode plugins keep one recall block on
+// a user message. They used to append on every model call and check only that
+// the text did not already end with their own block, so a second copy of the
+// plugin, or a host that keeps the message between calls, piled up a block per
+// call (#5682). extensions/opencode/lib.js carries the same two functions.
+// Function declarations, so the plugin above can call them before this point.
+const opencodeRecallSettleJS = `
+// trailingRecall splits the recall blocks appended to the end of a text off
+// it: what the user wrote, and the blocks in the order they were added.
+function trailingRecall(text, extra = "") {
+  const raw = String(text || "")
+  let body = raw
+  const blocks = []
+  for (;;) {
+    const t = body.trimEnd()
+    if (extra && t.endsWith(extra) && t.length > extra.length) {
+      blocks.unshift(extra)
+      body = t.slice(0, t.length - extra.length)
+      continue
+    }
+    const at = t.endsWith("</deja-recall>") ? t.lastIndexOf("<deja-recall>") : -1
+    if (at <= 0) break
+    blocks.unshift(t.slice(at))
+    body = t.slice(0, at)
+  }
+  return blocks.length ? { body: body.trimEnd(), blocks } : { body: raw, blocks }
+}
+
+// settleRecall leaves the last text part carrying one block: the one already
+// there if another copy of the plugin put it in first, or extra.
+function settleRecall(tail, extra) {
+  if (!tail || typeof tail.text !== "string") return
+  const { body, blocks } = trailingRecall(tail.text, extra)
+  const keep = blocks[0] || extra || ""
+  const next = keep ? body + "\n\n" + keep : body
+  if (next !== tail.text) tail.text = next
+}
+`
 
 // opencodeVersionMajorReal is the major version of the opencode on PATH, or 0
 // when there is no opencode to ask.
@@ -832,11 +877,17 @@ func legacyPluginJSFor(target, exe string) string { //nolint:funlen // the body 
         for (const m of msgs) {
           if (m?.info?.role !== "user") continue
           const parts = (m.parts || []).filter((p) => p?.type === "text" && p.text)
-          const prompt = parts.map((p) => p.text).join("\n").trim()
+          // Without the recall already appended: read as the question, it
+          // changed the key on every call and recall was asked again (#5682).
+          const prompt = parts.map((p, i) => (i === parts.length - 1 ? trailingRecall(p.text).body : p.text)).join("\n").trim()
           users.push({ key: m.info?.id || (m.info?.sessionID || "") + "#" + users.length + "#" + prompt, parts, prompt, sessionID: m.info?.sessionID || "" })
         }
         const last = users[users.length - 1]
         if (!last) return
+        // A block already on the message is the answer: another copy of this
+        // plugin put it there, or the host kept the message from the last call.
+        const present = trailingRecall(last.parts[last.parts.length - 1]?.text).blocks[0]
+        if (!recalled.has(last.key) && present) remember(last.key, present)
         // Asked once per message. opencode builds every model call afresh
         // from its store, so text added to a message here lasts one call:
         // once the agent ran a tool the recall was gone, and deja, having
@@ -866,11 +917,11 @@ func legacyPluginJSFor(target, exe string) string { //nolint:funlen // the body 
           if (reply?.systemMessage) await client.tui.showToast({ body: { message: reply.systemMessage, variant: "info", duration: 6000 } })
         }
         // Every message gets back what it was given, in every call, the way
-        // Claude Code keeps a prompt hook's text in its transcript.
+        // Claude Code keeps a prompt hook's text in its transcript. In place
+        // of any block already there, never after it.
         for (const u of users) {
           const extra = recalled.get(u.key)
-          const tail = u.parts[u.parts.length - 1]
-          if (extra && tail && !tail.text.endsWith(extra)) tail.text += "\n\n" + extra
+          if (extra) settleRecall(u.parts[u.parts.length - 1], extra)
         }
       } catch {
         // memory is optional: never break the session over it
@@ -982,7 +1033,7 @@ func legacyPluginJSFor(target, exe string) string { //nolint:funlen // the body 
     },
   }
 }
-`, "`", exe, "`", "`", exe, "hook-context", "`", "`", exe, "warmup-status", "`", "`", exe, "`", "`", "", exe, "`", "`", "", exe, "`", "`", "", exe, "`", "`", "", exe, "`")
+`, "`", exe, "`", "`", exe, "hook-context", "`", "`", exe, "warmup-status", "`", "`", exe, "`", "`", "", exe, "`", "`", "", exe, "`", "`", "", exe, "`", "`", "", exe, "`") + opencodeRecallSettleJS
 }
 
 // Gemini CLI and Qwen Code both run a command before the agent loop, which is

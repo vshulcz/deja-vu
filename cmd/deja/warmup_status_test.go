@@ -198,8 +198,8 @@ func TestOpencodePluginRecallsPerPrompt(t *testing.T) {
 			t.Fatalf("generated plugin missing %q:\n%s", want, src)
 		}
 	}
-	// It appends to the prompt rather than replacing it.
-	if !strings.Contains(src, `tail.text += `) {
+	// It adds to the prompt rather than replacing it.
+	if !strings.Contains(src, `body + "\n\n" + keep`) {
 		t.Fatalf("recall does not append to the user's own text:\n%s", src)
 	}
 }

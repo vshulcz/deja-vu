@@ -26,6 +26,11 @@ export function contextText(raw) {
 // that stays the same from one request to the next: opencode's message id, or
 // where a shape carries none, the message's place among the user messages and
 // its text.
+//
+// The prompt leaves out the recall a plugin already appended. A host that keeps
+// its request messages from one model call to the next hands the block back,
+// and read as part of the question it changed the key on every call: recall was
+// asked again each step and each answer appended, six blocks on one message.
 export function userTurns(messages) {
   const list = Array.isArray(messages) ? messages : []
   const out = []
@@ -33,10 +38,49 @@ export function userTurns(messages) {
     if (m?.info?.role !== "user") continue
     const sessionID = m.info?.sessionID || ""
     const parts = (m.parts || []).filter((p) => p?.type === "text" && p.text)
-    const prompt = parts.map((p) => p.text).join("\n").trim()
+    const texts = parts.map((p, i) => (i === parts.length - 1 ? trailingRecall(p.text).body : p.text))
+    const prompt = texts.join("\n").trim()
     out.push({ key: m.info?.id || sessionID + "#" + out.length + "#" + prompt, parts, prompt, sessionID })
   }
   return out
+}
+
+const RECALL_OPEN = "<deja-recall>"
+const RECALL_CLOSE = "</deja-recall>"
+
+// trailingRecall splits the recall blocks appended to the end of a text off
+// it: what the user wrote, and the blocks in the order they were added. extra
+// is a block as this plugin was given it, so one that came unframed is found
+// too.
+export function trailingRecall(text, extra = "") {
+  const raw = String(text || "")
+  let body = raw
+  const blocks = []
+  for (;;) {
+    const t = body.trimEnd()
+    if (extra && t.endsWith(extra) && t.length > extra.length) {
+      blocks.unshift(extra)
+      body = t.slice(0, t.length - extra.length)
+      continue
+    }
+    const at = t.endsWith(RECALL_CLOSE) ? t.lastIndexOf(RECALL_OPEN) : -1
+    if (at <= 0) break
+    blocks.unshift(t.slice(at))
+    body = t.slice(0, at)
+  }
+  return blocks.length ? { body: body.trimEnd(), blocks } : { body: raw, blocks }
+}
+
+// settleRecall leaves the message's last text part carrying one recall block:
+// the one already there if another copy of the plugin put it in first, or
+// extra. Run on every model call, it replaces rather than appends, so a host
+// that keeps the message between calls does not collect a block per call.
+export function settleRecall(tail, extra) {
+  if (!tail || typeof tail.text !== "string") return
+  const { body, blocks } = trailingRecall(tail.text, extra)
+  const keep = blocks[0] || extra || ""
+  const next = keep ? body + "\n\n" + keep : body
+  if (next !== tail.text) tail.text = next
 }
 
 // cliPluginPath is where `deja install opencode-auto` writes its own plugin.

@@ -36,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- opencode and Kilo keep one per-prompt recall block on a user message. The
+  plugins appended on every model call and only checked for their own block at
+  the end, so two copies of the plugin, or a host that keeps the message
+  between calls, stacked a block per call, alternating between two pointers.
+  The block is now put in place of any already there, and a block already on
+  the message is reused rather than asked for again. Run
+  `deja install opencode-auto` again to rewrite the plugin (#5682).
 - Amp threads the plugin writes are filed under the workspace Amp has open,
   not `amp/plugins`. The plugin took `process.cwd()` for the thread's
   directory, and Amp runs a plugin from `~/.config/amp/plugins`, so every
