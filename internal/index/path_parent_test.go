@@ -161,7 +161,7 @@ func TestDirectoryLeadIsRankedAndStable(t *testing.T) {
 		t.Fatal(err)
 	}
 	var first []string
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		r, err := SearchWithRecoveryDetailed(dir, query.Options{Query: "cmd/quill/main.go final verification quiet banner", All: true}, nil)
 		if err != nil {
 			t.Fatal(err)
