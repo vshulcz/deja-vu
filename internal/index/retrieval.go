@@ -2787,6 +2787,11 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 func scanRecordsTextMisses(dir string, m Manifest, o query.Options, offsets []int64, variants map[string][]string) ([]model.Session, int, error) {
 	misses := 0
 	by := map[string]*model.Session{}
+	// Sessions come back in the order their first match was read. Ranging over
+	// the map handed the exact tier a rotated order on every call, and the
+	// directory lead serves that order as it is: a package rule in the fourth
+	// of seven sessions was on the page in some calls and not in others.
+	var order []string
 	add := func(r Record) {
 		meta, ok := m.Sessions[r.Key]
 		if !ok || o.ExcludeSessions[meta.ID] || o.CutRecord(meta.ID, r.Time) {
@@ -2814,6 +2819,7 @@ func scanRecordsTextMisses(dir string, m Manifest, o query.Options, offsets []in
 			cp.Held = meta.Counted
 			s = &cp
 			by[r.Key] = s
+			order = append(order, r.Key)
 		}
 		s.Messages = append(s.Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
 	}
@@ -2852,7 +2858,8 @@ func scanRecordsTextMisses(dir string, m Manifest, o query.Options, offsets []in
 		}
 	}
 	out := make([]model.Session, 0, len(by))
-	for _, s := range by {
+	for _, k := range order {
+		s := by[k]
 		orderPromotedNote(s)
 		out = append(out, *s)
 	}

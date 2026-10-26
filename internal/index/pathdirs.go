@@ -36,11 +36,27 @@ func withDirectorySessions(dir string, o query.Options, r SearchResult) SearchRe
 		if err != nil || len(r2.Sessions) == 0 || r2.Tier == query.TierRelevance {
 			continue
 		}
+		// The directory's sessions arrive in posting order, which ranks nothing.
+		// The ones the whole question also found go first, in that answer's
+		// order: a package rule that also names the question's words is the
+		// lead, ahead of a session that only touched the same directory.
+		inDir := make(map[string]bool, len(r2.Sessions))
+		for _, s := range r2.Sessions {
+			inDir[s.Harness+"\x00"+s.ID] = true
+		}
 		seen := make(map[string]bool, len(r2.Sessions))
 		merged := make([]model.Session, 0, len(r2.Sessions)+len(r.Sessions))
+		for _, s := range r.Sessions {
+			if k := s.Harness + "\x00" + s.ID; inDir[k] {
+				seen[k] = true
+				merged = append(merged, s)
+			}
+		}
 		for _, s := range r2.Sessions {
-			seen[s.Harness+"\x00"+s.ID] = true
-			merged = append(merged, s)
+			if k := s.Harness + "\x00" + s.ID; !seen[k] {
+				seen[k] = true
+				merged = append(merged, s)
+			}
 		}
 		for _, s := range r.Sessions {
 			if !seen[s.Harness+"\x00"+s.ID] {
