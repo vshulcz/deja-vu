@@ -1481,11 +1481,13 @@ func countDocumentWords(s string, terms []string, variants map[string][]string, 
 
 func mergeSessions(in []model.Session) []model.Session {
 	by := map[string]*model.Session{}
+	var order []string
 	for _, s := range in {
 		k := s.Harness + ":" + s.ID
 		if by[k] == nil {
 			cp := s
 			by[k] = &cp
+			order = append(order, k)
 		} else {
 			by[k].Messages = append(by[k].Messages, s.Messages...)
 			by[k].Touch(s.Updated)
@@ -1494,9 +1496,11 @@ func mergeSessions(in []model.Session) []model.Session {
 			}
 		}
 	}
+	// In first-seen order, so equal scores further on do not tie-break on map
+	// iteration.
 	out := make([]model.Session, 0, len(by))
-	for _, s := range by {
-		out = append(out, *s)
+	for _, k := range order {
+		out = append(out, *by[k])
 	}
 	return out
 }

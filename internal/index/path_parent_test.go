@@ -130,6 +130,60 @@ func TestDirectorySessionsDoNotJumpAnAnswerToTheRestOfTheQuery(t *testing.T) {
 	}
 }
 
+// Several sessions touched the directory, and the one holding the package rule
+// also says the question's words. It has to lead, and the order has to be the
+// same on every call: the directory's sessions came back in map order, so the
+// rule was on a five-session page in some calls and off it in others.
+func TestDirectoryLeadIsRankedAndStable(t *testing.T) {
+	tmp := t.TempDir()
+	claudeRoot := filepath.Join(tmp, "claude")
+	setHome(t, filepath.Join(tmp, "home"))
+	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	dir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", dir)
+	proj := filepath.Join(claudeRoot, "-w-quill")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write := func(sid, text string) {
+		line := `{"type":"user","sessionId":"` + sid + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"` + text + `"}}` + "\n"
+		if err := os.WriteFile(filepath.Join(proj, sid+".jsonl"), []byte(line), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, sid := range []string{"port", "drafts", "outdir", "feed", "layout", "thumbs"} {
+		write(sid, "Updated cmd/quill/"+sid+".go.")
+	}
+	// One of the question's words, not two: two would make it an answer to the
+	// rest of the query and the directory lead would not run at all.
+	write("check", "go test is not enough: before you call a change to cmd/quill done, run scripts/check.sh for verification.")
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	var first []string
+	for i := range 8 {
+		r, err := SearchWithRecoveryDetailed(dir, query.Options{Query: "cmd/quill/main.go final verification quiet banner", All: true}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r.Directory == "" {
+			t.Fatalf("call %d: the directory lead did not run, tier %q", i, r.Tier)
+		}
+		ids := make([]string, 0, len(r.Sessions))
+		for _, s := range r.Sessions {
+			ids = append(ids, s.ID)
+		}
+		if len(ids) == 0 || ids[0] != "check" {
+			t.Fatalf("call %d: got %v (directory %q), want the rule first", i, ids, r.Directory)
+		}
+		if first == nil {
+			first = ids
+		} else if !reflect.DeepEqual(ids, first) {
+			t.Fatalf("call %d: order %v, first call %v", i, ids, first)
+		}
+	}
+}
+
 func TestAnswersTheRestCountsWordsNotSubstrings(t *testing.T) {
 	ss := []model.Session{{Messages: []model.Message{{Text: "Forget the setting, the numerical drift is fine."}}}}
 	if answersTheRest(ss, RelevanceTerms("cmd/x/y.go set numeric")) {
