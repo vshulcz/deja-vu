@@ -6,10 +6,31 @@
   <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
   <link rel="self" type="application/atom+xml" href="https://vshulcz.github.io/deja-vu/feed.xml"></link>
   <link rel="hub" href="https://pubsubhubbub.appspot.com/"></link>
-  <updated>2026-10-25T00:00:00Z</updated>
+  <updated>2026-10-26T00:00:00Z</updated>
   <author>
     <name>vshulcz</name>
   </author>
+  <entry>
+    <title>Delete Goose session history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-goose-session-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-goose-session-history.html"></link>
+    <updated>2026-10-26T00:00:00Z</updated>
+    <summary>Since goose 1.10.0 every session is a row in sessions.db. Remove one with goose session remove, clear the legacy JSONL files yourself, and know what is lost.</summary>
+  </entry>
+  <entry>
+    <title>Add memory to TRAE CLI: every agent&#39;s sessions — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-trae.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-trae.html"></link>
+    <updated>2026-10-26T00:00:00Z</updated>
+    <summary>How to give TRAE CLI recall over every coding agent&#39;s sessions on this machine — the MCP server in traecli.toml and the Codex hooks it trusts at start-up.</summary>
+  </entry>
+  <entry>
+    <title>Where Amp stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/amp.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/amp.html"></link>
+    <updated>2026-10-26T00:00:00Z</updated>
+    <summary>Where Amp writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
   <entry>
     <title>deja-vu: search Claude Code, Codex, Cursor session history</title>
     <id>https://vshulcz.github.io/deja-vu/</id>
@@ -268,26 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/hermes.html"></link>
     <updated>2026-10-19T00:00:00Z</updated>
     <summary>Where Hermes writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
-  </entry>
-  <entry>
-    <title>Where Muse Code stores its history — session format</title>
-    <id>https://vshulcz.github.io/deja-vu/registry/muse.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/muse.html"></link>
-    <updated>2026-10-19T00:00:00Z</updated>
-    <summary>Where Muse Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
-  </entry>
-  <entry>
-    <title>Where OpenClaw stores its history — session format</title>
-    <id>https://vshulcz.github.io/deja-vu/registry/openclaw.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/openclaw.html"></link>
-    <updated>2026-10-19T00:00:00Z</updated>
-    <summary>Where OpenClaw writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
-  </entry>
-  <entry>
-    <title>Where Copilot CLI stores its history — session format</title>
-    <id>https://vshulcz.github.io/deja-vu/registry/copilot.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/copilot.html"></link>
-    <updated>2026-10-18T00:00:00Z</updated>
-    <summary>Where Copilot CLI writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
   </entry>
 </feed>

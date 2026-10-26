@@ -150,6 +150,11 @@ const DEJA = %q
 // Amp keeps threads on its server; the plugin writes each one it sees here, in
 // the thread file shape deja reads.
 const THREADS = %q
+// The directory a thread works in. Amp runs a plugin from the plugin's own
+// directory, so process.cwd() is ~/.config/amp/plugins and every thread was
+// filed under amp/plugins (#5672); the default export replaces it with
+// amp.system.workspaceRoot.
+let workspace = process.cwd()
 
 // A thread as the plugin API reads it, 20 messages a call. full: true reads
 // the turns a compaction took out of the model's view as well.
@@ -183,7 +188,7 @@ function threadFile(id: string, messages: any[], created: number): string {
     id,
     title: "",
     created,
-    env: { initial: { trees: [{ uri: "file://" + process.cwd() }] } },
+    env: { initial: { trees: [{ uri: "file://" + workspace }] } },
     messages: messages.filter((m: any) => m && (m.role === "user" || m.role === "assistant")).map((m: any) => ({ role: m.role, content: blocks(m) })),
   })
 }
@@ -199,6 +204,7 @@ function createdOf(path: string): number {
 function run(args: string[], input: string, timeout = 10000): string {
   try {
     return execFileSync(DEJA, args, {
+      windowsHide: true,
       input,
       encoding: "utf8",
       timeout,
@@ -212,6 +218,10 @@ function run(args: string[], input: string, timeout = 10000): string {
 }
 
 export default function (amp: any) {
+  try {
+    const root = amp.system && amp.system.workspaceRoot
+    if (root) workspace = amp.helpers.filePathFromURI(root) || workspace
+  } catch {}
   // The thread that has had its digest. Amp keeps one process across threads,
   // and a flag set once per process left every thread after the first with no
   // memory (#3263).
@@ -259,7 +269,7 @@ export default function (amp: any) {
     try {
       writeFileSync(tmp, threadFile(id, all.slice(0, cut), createdOf(join(THREADS, id + ".json"))))
       run(["hook-precompact"], JSON.stringify({
-        session_id: id, transcript_path: tmp, cwd: process.cwd(), harness: "amp", deja_catch_up: true,
+        session_id: id, transcript_path: tmp, cwd: workspace, harness: "amp", deja_catch_up: true,
       }), 30000)
     } finally {
       try {
@@ -280,7 +290,7 @@ export default function (amp: any) {
         // across a restart of the process the way it does for Claude Code.
         const raw = run(["hook-context"], JSON.stringify({
           session_id: id,
-          cwd: process.cwd(),
+          cwd: workspace,
           deja_once: true,
         }))
         let digest = raw
@@ -304,7 +314,7 @@ export default function (amp: any) {
       const raw = run(["hook-prompt", "--plain"], JSON.stringify({
         prompt: event.message || "",
         session_id: id,
-        cwd: process.cwd(),
+        cwd: workspace,
       }))
       // Silence is the common case: the hook speaks only when this machine's
       // history answers what was just asked.
@@ -337,7 +347,7 @@ export default function (amp: any) {
             tool_name: fileTool,
             tool_input: { file_path: path },
             session_id: threadID(event),
-            cwd: process.cwd(),
+            cwd: workspace,
           }))
         }
         const line = repaired[id]
@@ -355,7 +365,7 @@ export default function (amp: any) {
           tool_name: "bash",
           tool_response: text,
           session_id: threadID(event),
-          cwd: process.cwd(),
+          cwd: workspace,
         }))
       }
       const line = repaired[id]
@@ -373,7 +383,7 @@ export default function (amp: any) {
   // last one it served. agent.end's answer decides whether the agent goes on,
   // so this one gives Amp's own default back.
   const endThread = (id: string) => {
-    if (id) run(["hook-session-end"], JSON.stringify({ session_id: id, cwd: process.cwd() }), 2000)
+    if (id) run(["hook-session-end"], JSON.stringify({ session_id: id, cwd: workspace }), 2000)
   }
   // The thread goes to the store as it stands, whole, so deja indexes it like
   // any other session; written aside and renamed, a reader never sees half.

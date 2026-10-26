@@ -115,6 +115,16 @@ sixty-odd times and will keep moving; that is why the version lives in the
 manifest. If you find yourself wanting to read it, the surface you want is
 probably missing and worth an issue.
 
+## Global recall
+
+MCP recall, `deja recall`, and `deja mcp --context-search` prefer the current
+project by default. Set `DEJA_RECALL_GLOBAL=1` in their process environment to
+rank across all available projects without that preference. Only the exact
+value `1` enables this option. Explicit recall project and harness filters,
+exclusions, and trust policy still apply. Installed launchers preserve the
+setting as an environment fallback. The TUI and automatic hook recall keep
+their existing scope.
+
 ## Isolating deja in your tests
 
 Your CI must not read the history of whoever runs it, and a test that indexes

@@ -44,6 +44,7 @@ function resolveDeja() {
     if (!candidate) continue;
     try {
       execFileSync(candidate, ["version"], {
+        windowsHide: true,
         encoding: "utf8",
         timeout: 5000,
         stdio: ["ignore", "pipe", "ignore"],
@@ -63,6 +64,7 @@ const DEJA = resolveDeja();
 function run(args, input, cwd) {
   try {
     return execFileSync(DEJA, args, {
+      windowsHide: true,
       cwd,
       encoding: "utf8",
       timeout: 20000,
@@ -421,7 +423,7 @@ function notesRoute(ctx, board) {
 function runAsync(args, input) {
   return new Promise((resolve) => {
     try {
-      const child = execFile(DEJA, args, { encoding: "utf8", timeout: 20000, maxBuffer: 8 * 1024 * 1024 }, (err, stdout) =>
+      const child = execFile(DEJA, args, { windowsHide: true, encoding: "utf8", timeout: 20000, maxBuffer: 8 * 1024 * 1024 }, (err, stdout) =>
         resolve(err ? "" : String(stdout || "").trim()),
       );
       child.on("error", () => resolve(""));

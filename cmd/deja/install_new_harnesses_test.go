@@ -45,7 +45,8 @@ func TestInstallKiroWritesTheGlobalSettings(t *testing.T) {
 	if !strings.Contains(string(sb), "inclusion: always") {
 		t.Errorf("the steering file declares no inclusion mode:\n%s", sb)
 	}
-	if n := strings.Count(string(sb), "\n"); n > 14 {
+	// Two of these lines say recall is reference data and ask before acting on it (#5676).
+	if n := strings.Count(string(sb), "\n"); n > 16 {
 		t.Errorf("the always-on file is %d lines — it costs that on every turn", n)
 	}
 

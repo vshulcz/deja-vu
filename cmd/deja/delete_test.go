@@ -152,7 +152,7 @@ func TestDeleteRefusesWhatIsNotOneSessions(t *testing.T) {
 	s = model.Session{Harness: "qwen", ID: "eeee5555-q", Path: fresh}
 	refuse("a fresh session", s, []model.Session{s, other}, "last 5 minutes")
 	// Agents nobody checked, and deja's own notes.
-	refuse("zed", model.Session{Harness: "zed", ID: "ffff6666-z", Path: db}, []model.Session{other}, "can't delete Zed")
+	refuse("zed", model.Session{Harness: "zed", ID: "ffff6666-z", Path: db}, []model.Session{other}, "Zed sessions can't be deleted yet")
 	refuse("a note", model.Session{Harness: "deja", ID: "deja-note-x1234567", Path: db}, []model.Session{other}, "deja forget")
 }
 
@@ -395,5 +395,45 @@ func TestDeleteSaysASubagentGoesWithItsParent(t *testing.T) {
 	s := model.Session{Harness: "kimi", ID: "explore-" + sid, Parent: sid, Path: p}
 	if _, err := sessionFiles(s, []model.Session{s}); err == nil || !strings.Contains(err.Error(), "subagent run inside session") {
 		t.Errorf("%v", err)
+	}
+}
+
+// Help described which agents delete takes — "agents that keep a session as
+// its own files, and opencode; not goose, Hermes or Zed" — instead of naming
+// them, so the agents that do work were never listed and Continue, CodeBuddy,
+// Kiro and the rest read as an oversight in the command rather than a gap in
+// the check (#5654). The page is built from the two maps now.
+func TestHelpNamesEveryAgentDeleteTakes(t *testing.T) {
+	hermeticEnv(t)
+	out, err := captureRun(t, "help", "delete")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deletable) == 0 || len(cliStores) == 0 {
+		t.Fatal("no agents to name, wrong fixture")
+	}
+	for h := range deletable {
+		if !strings.Contains(out, agentName(h)) {
+			t.Errorf("`deja help delete` does not name %s, whose session files it erases:\n%s", agentName(h), out)
+		}
+	}
+	for h := range cliStores {
+		if !strings.Contains(out, agentName(h)) {
+			t.Errorf("`deja help delete` does not name %s, whose sessions it deletes through the agent's own command:\n%s", agentName(h), out)
+		}
+	}
+}
+
+// The refusal opened with the program's own name, and the CLI prints that name
+// before it: `deja: deja can't delete Continue sessions yet` (#5654). Whoever
+// reads it needs the agent first and the reason after.
+func TestDeleteRefusalOpensWithTheAgent(t *testing.T) {
+	got := deletableRefusal("continue").Error()
+	want := "Continue sessions can't be deleted yet: deja has not checked how Continue lists them"
+	if got != want {
+		t.Errorf("refusal = %q, want %q", got, want)
+	}
+	if strings.HasPrefix(got, "deja") {
+		t.Errorf("refusal repeats the program's name: %q", got)
 	}
 }

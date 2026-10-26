@@ -228,35 +228,46 @@ func printYear(w io.Writer, r yearReport) {
 		fmt.Fprintln(w, "no sessions in the last twelve months — `deja index` reads what is on disk, and `deja sources` says where it looked")
 		return
 	}
-	fmt.Fprintf(w, "  %s session%s, %s turns in them, across %s\n",
-		plainCount(r.sessions), pluralS(r.sessions), plainCount(r.messages), yearAgentList(r.harnesses))
+	fmt.Fprintf(w, "  %s session%s, %s turn%s in them, across %s\n",
+		plainCount(r.sessions), pluralS(r.sessions), plainCount(r.messages), pluralS(r.messages), yearAgentList(r.harnesses))
 	if len(r.projects) > 0 {
-		fmt.Fprintf(w, "  busiest project        %s, %s sessions\n", r.projects[0].Project, plainCount(r.projects[0].Sessions))
+		fmt.Fprintf(w, "  busiest project        %s, %s session%s\n", r.projects[0].Project,
+			plainCount(r.projects[0].Sessions), pluralS(r.projects[0].Sessions))
 	}
 	if r.busiestCount > 0 {
-		fmt.Fprintf(w, "  busiest day            %s, %s turns\n", statDay(r.busiestDay), plainCount(r.busiestCount))
+		fmt.Fprintf(w, "  busiest day            %s, %s turn%s\n", statDay(r.busiestDay),
+			plainCount(r.busiestCount), pluralS(r.busiestCount))
 	}
 	if r.longestTurns > 0 {
-		fmt.Fprintf(w, "  longest session        %s turns — %s\n", plainCount(r.longestTurns), r.longestTitle)
+		fmt.Fprintf(w, "  longest session        %s turn%s — %s\n", plainCount(r.longestTurns),
+			pluralS(r.longestTurns), r.longestTitle)
 	}
 
 	fmt.Fprintf(w, "\nwhat the agents did\n")
-	fmt.Fprintf(w, "  %s file%s opened or written  (%s records naming a file, deduplicated by path)\n",
-		plainCount(r.work.Files), pluralS(r.work.Files), plainCount(r.work.Records["files"]))
-	fmt.Fprintf(w, "  %s distinct command%s run    (%s command records, deduplicated by the command line)\n",
-		plainCount(r.work.Commands), pluralS(r.work.Commands), plainCount(r.work.Records["command"]))
+	fmt.Fprintf(w, "  %s file%s opened or written  (%s record%s naming a file, deduplicated by path)\n",
+		plainCount(r.work.Files), pluralS(r.work.Files), plainCount(r.work.Records["files"]), pluralS(r.work.Records["files"]))
+	fmt.Fprintf(w, "  %s distinct command%s run    (%s command record%s, deduplicated by the command line)\n",
+		plainCount(r.work.Commands), pluralS(r.work.Commands), plainCount(r.work.Records["command"]), pluralS(r.work.Records["command"]))
 	fmt.Fprintf(w, "  %s replaced span%s kept      in %s file%s — the exact bytes an edit overwrote, which `deja restore` hands back\n",
 		plainCount(r.work.Spans), pluralS(r.work.Spans), plainCount(r.work.SpanFiles), pluralS(r.work.SpanFiles))
 	if r.work.Undated > 0 {
-		fmt.Fprintf(w, "  %s work records carry no timestamp, so they are in none of the three figures above\n",
-			plainCount(r.work.Undated))
+		carryVerb, pronounVerb := "carry", "they are"
+		if r.work.Undated == 1 {
+			carryVerb, pronounVerb = "carries", "it is"
+		}
+		fmt.Fprintf(w, "  %s work record%s %s no timestamp, so %s in none of the three figures above\n",
+			plainCount(r.work.Undated), pluralS(r.work.Undated), carryVerb, pronounVerb)
 	}
 
 	fmt.Fprintf(w, "\nwhat came round twice\n")
 	if r.questions.Distinct > 0 {
-		fmt.Fprintf(w, "  %s of %s questions were asked in more than one session (%s)\n",
-			plainCount(r.questions.Repeated), plainCount(r.questions.Distinct),
-			yearPercent(r.questions.Repeated, r.questions.Distinct))
+		wasVerb := "were"
+		if r.questions.Repeated == 1 {
+			wasVerb = "was"
+		}
+		fmt.Fprintf(w, "  %s of %s question%s %s asked in more than one session (%s)\n",
+			plainCount(r.questions.Repeated), plainCount(r.questions.Distinct), pluralS(r.questions.Distinct),
+			wasVerb, yearPercent(r.questions.Repeated, r.questions.Distinct))
 	}
 	for _, f := range r.friction {
 		fmt.Fprintf(w, "  %s session%s hit  %s\n", plainCount(f.Sessions), pluralS(f.Sessions), yearOneLine(f.Line))
@@ -270,7 +281,12 @@ func printYear(w io.Writer, r yearReport) {
 			recapMaskedSummary(r.masked))
 	}
 	if r.outsideWindow > 0 {
-		fmt.Fprintf(w, "%s indexed sessions are older than this window, or carry no date at all\n", plainCount(r.outsideWindow))
+		ageVerb, dateVerb := "are", "carry"
+		if r.outsideWindow == 1 {
+			ageVerb, dateVerb = "is", "carries"
+		}
+		fmt.Fprintf(w, "%s indexed session%s %s older than this window, or %s no date at all\n",
+			plainCount(r.outsideWindow), pluralS(r.outsideWindow), ageVerb, dateVerb)
 	}
 }
 

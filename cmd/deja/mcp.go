@@ -1568,7 +1568,7 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 
 // recallTextResultIn is recall scoped to a project: project, when the caller
 // names one, keeps only that project's sessions; otherwise the project of the
-// directory the server runs in comes first.
+// directory the server runs in comes first, unless DEJA_RECALL_GLOBAL=1.
 func recallTextResultIn(dir, q, harness, project string, limit, offset, budget int) (string, int, int64, []string, []string, error) {
 	if limit <= 0 {
 		limit = 5
@@ -1678,7 +1678,7 @@ func rankRecall(dir, q, harness, project string, window int) (rankedRecall, erro
 	// answered sat at 20-39 for the queries agents sent, or outside the
 	// candidates altogether. The rest of the machine follows.
 	var scope []string
-	if project == "" {
+	if project == "" && os.Getenv("DEJA_RECALL_GLOBAL") != "1" {
 		scope = howScope(howCwd(), "", false)
 		o.PoolScope = scope
 	}

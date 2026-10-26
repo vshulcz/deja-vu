@@ -11,7 +11,11 @@ The plugin that `deja install amp-auto` writes fills that directory itself: on
 `agent.end` it reads the thread through the plugin API
 (`thread.messages({full: true})`, 20 at a time) and writes it to
 `threads/<id>.json` in the shape below. Threads from before the plugin was
-installed are still not read.
+installed are still not read. The thread's directory, in `env.initial.trees`
+and in every hook payload's `cwd`, is `amp.system.workspaceRoot`: Amp runs a
+plugin from the plugin's own directory, so `process.cwd()` is
+`~/.config/amp/plugins` and is used only when Amp gives no workspace root
+(#5672).
 
 The plugin is also how recall reaches Amp. `agent.start` returns the session
 digest and the prompt's recall, which Amp appends to the user message;

@@ -57,7 +57,7 @@ function run(bin, args, input) {
     }
     let child
     try {
-      child = spawn(bin, args, { stdio: ["pipe", "pipe", "ignore"] })
+      child = spawn(bin, args, { windowsHide: true, stdio: ["pipe", "pipe", "ignore"] })
     } catch {
       done("")
       return

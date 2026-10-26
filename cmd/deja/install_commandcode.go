@@ -133,6 +133,7 @@ const DEJA = %q
 function run(args: string[], input: string, timeout = 5000): string {
   try {
     return execFileSync(DEJA, args, {
+      windowsHide: true,
       input,
       encoding: "utf8",
       timeout,

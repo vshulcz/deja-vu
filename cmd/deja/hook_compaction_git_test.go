@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -209,5 +210,70 @@ func compactionWrite(t *testing.T, path, text string) {
 	}
 	if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// A git that leaves a child holding stdout (a shim whose real git outlives
+// it, #5620) kept the hook reading long after the deadline: killing the direct
+// child does not close the pipe, and WaitDelay only closes pipes exec copies
+// itself. Both streams have to give up when the deadline ends. The deadline is
+// cut only once the orphan exists, and the orphan lives 20s, so the 10s ceiling
+// fails on a hang and on nothing else.
+func TestFingerprintStreamsStopAtTheDeadlineWhenAnOrphanHoldsStdout(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake git is a shell script")
+	}
+	bin := t.TempDir()
+	pids := filepath.Join(bin, "pids")
+	script := "#!/bin/sh\nsleep 20 &\necho $! >> '" + pids + "'\nexec sleep 20\n"
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	orphans := func() []string {
+		data, _ := os.ReadFile(pids)
+		return strings.Fields(string(data))
+	}
+	t.Cleanup(func() {
+		for _, field := range orphans() {
+			if pid, err := strconv.Atoi(field); err == nil {
+				if p, err := os.FindProcess(pid); err == nil {
+					_ = p.Kill()
+				}
+			}
+		}
+	})
+
+	root := t.TempDir()
+	for _, stream := range []struct {
+		name    string
+		partial func(context.Context) bool
+	}{
+		{"tracked", func(ctx context.Context) bool { return !hashGitStream(ctx, sha256.New(), root, "diff") }},
+		{"untracked", func(ctx context.Context) bool { return hashUntrackedStream(ctx, sha256.New(), root) }},
+	} {
+		ctx, cancel := context.WithCancel(t.Context())
+		before := len(orphans())
+		go func() {
+			defer cancel()
+			for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+				if len(orphans()) > before {
+					return
+				}
+			}
+		}()
+		start := time.Now()
+		partial := stream.partial(ctx)
+		took := time.Since(start)
+		cancel()
+		if len(orphans()) == before {
+			t.Fatalf("%s: fake git never left an orphan, the case was not exercised", stream.name)
+		}
+		if !partial {
+			t.Errorf("%s: a stream cut off at the deadline was treated as complete", stream.name)
+		}
+		if took > 10*time.Second {
+			t.Errorf("%s: stream returned %v after its deadline, held open by an orphan", stream.name, took.Round(time.Millisecond))
+		}
 	}
 }

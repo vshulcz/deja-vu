@@ -47,7 +47,11 @@
 <p><code>agent.end</code> it reads the thread through the plugin API</p>
 <p>(<code>thread.messages({full: true})</code>, 20 at a time) and writes it to</p>
 <p><code>threads/&lt;id&gt;.json</code> in the shape below. Threads from before the plugin was</p>
-<p>installed are still not read.</p>
+<p>installed are still not read. The thread&#39;s directory, in <code>env.initial.trees</code></p>
+<p>and in every hook payload&#39;s <code>cwd</code>, is <code>amp.system.workspaceRoot</code>: Amp runs a</p>
+<p>plugin from the plugin&#39;s own directory, so <code>process.cwd()</code> is</p>
+<p><code>~/.config/amp/plugins</code> and is used only when Amp gives no workspace root</p>
+<p>(#5672).</p>
 <p>The plugin is also how recall reaches Amp. <code>agent.start</code> returns the session</p>
 <p>digest and the prompt&#39;s recall, which Amp appends to the user message;</p>
 <p><code>tool.result</code> adds the line deja keeps for a file after <code>Read</code>, <code>edit_file</code> or</p>

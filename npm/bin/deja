@@ -17,7 +17,7 @@ try {
   process.exit(1);
 }
 
-const result = spawnSync(bin, process.argv.slice(2), { stdio: 'inherit' });
+const result = spawnSync(bin, process.argv.slice(2), { windowsHide: true, stdio: 'inherit' });
 if (result.error) {
   console.error(result.error.message);
   process.exit(1);

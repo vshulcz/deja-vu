@@ -41,7 +41,7 @@ const tui = async (api) => {
   const refresh = () => {
     const cwd = api.state?.path?.directory || process.cwd()
     try {
-      const child = execFile(DEJA, ["statusline"], { cwd, timeout: 2000 }, (err, out) => {
+      const child = execFile(DEJA, ["statusline"], { windowsHide: true, cwd, timeout: 2000 }, (err, out) => {
         if (!err) setLine(String(out).split("\n")[0].trim())
       })
       child.stdin?.on("error", () => {})
@@ -102,7 +102,7 @@ export default {
     const refresh = () => {
       const cwd = ctx.location?.directory || process.cwd()
       try {
-        const child = execFile(DEJA, ["statusline"], { cwd, timeout: 2000 }, (err, out) => {
+        const child = execFile(DEJA, ["statusline"], { windowsHide: true, cwd, timeout: 2000 }, (err, out) => {
           if (!err) setLine(String(out).split("\n")[0].trim())
         })
         child.stdin?.on("error", () => {})

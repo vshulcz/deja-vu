@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -46,12 +47,33 @@ var (
 	errSubagent      = errors.New("a subagent of another session")
 )
 
-// deletableRefusal says why a session stays, and what to do instead.
+// deletableRefusal says why a session stays, and what to do instead. It opens
+// with the agent: the CLI prints the program's own name before the message, so
+// starting with it read `deja: deja can't delete Continue sessions yet` (#5654).
 func deletableRefusal(harness string) error {
 	if harness == "deja" {
 		return errors.New("this is a deja note, not an agent's session; `deja forget --session <id>` removes it")
 	}
-	return fmt.Errorf("deja can't delete %s sessions yet: it has not checked how %s lists them", agentName(harness), agentName(harness))
+	return fmt.Errorf("%s sessions can't be deleted yet: deja has not checked how %s lists them", agentName(harness), agentName(harness))
+}
+
+// deleteTakes names the agents delete erases a session from — the sessions in
+// files of their own, then the ones whose own command takes the id — for the
+// help page to list. Written from the two maps, so an agent added to either is
+// named in help without a second edit, and the page stops describing which
+// agents qualify instead of saying them (#5654).
+func deleteTakes() []string {
+	names := make([]string, 0, len(deletable)+len(cliStores))
+	for h := range deletable {
+		names = append(names, agentName(h))
+	}
+	for h := range cliStores {
+		names = append(names, agentName(h))
+	}
+	slices.SortFunc(names, func(a, b string) int {
+		return strings.Compare(strings.ToLower(a), strings.ToLower(b))
+	})
+	return names
 }
 
 // recentlyWritten is how fresh a file has to be for deja to take it as a

@@ -174,7 +174,7 @@ var helpEntries = []helpEntry{
 	{name: "delete", group: groupNotes,
 		usage:    []string{"deja delete <id-prefix> [--dry-run] [--yes]"},
 		desc:     "erase a session from its agent and from deja",
-		more:     "Removes the session's files from its agent, then forgets it in deja. Asks first; there is no undo. --dry-run lists the files. Agents that keep a session as its own files, and opencode; not goose, Hermes or Zed. To drop only deja's copy, use forget.",
+		more:     "Removes the session's files from its agent, then forgets it in deja. Asks first; there is no undo. --dry-run lists the files. To drop only deja's copy, use forget.",
 		examples: []string{"deja delete 01a00feb --dry-run", "deja delete 01a00feb"}},
 	{name: "forget", group: groupNotes,
 		usage: []string{
@@ -435,6 +435,9 @@ func helpForCommand(name string) string {
 	b.WriteString("\n" + wrapProse(sentence(e.desc)+" "+e.more, proseWidth()) + "\n")
 	if name == "handoff" {
 		b.WriteString("\n" + wrapProse("--to takes: "+strings.Join(handoffTargets(), ", "), proseWidth()) + "\n")
+	}
+	if name == "delete" {
+		b.WriteString("\nErases a session from:\n" + wrapTargets(deleteTakes(), "  ", proseWidth()) + "\n")
 	}
 	if name == "search" {
 		b.WriteString("\nFlags:\n" + searchFlagsBlock())
