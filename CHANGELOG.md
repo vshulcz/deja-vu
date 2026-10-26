@@ -48,7 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - On Windows, plugins no longer flash a console window each time they run
   deja from a GUI host such as the DSH desktop app. Every spawn in the shipped
   and generated JavaScript plugins and the npm launcher now passes
-  `windowsHide`. Reported by @Deadsoul-114514 (#5635).
+  `windowsHide`, and the Hermes plugins pass `CREATE_NO_WINDOW`. Reported by @Deadsoul-114514 (#5635).
 
 ## [0.23.1] - 2026-10-25
 

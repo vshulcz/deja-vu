@@ -11,10 +11,11 @@ import (
 // deja.exe is a console program. Started from a host that has no console of
 // its own, such as the DSH desktop app, it gets a fresh console window unless
 // the spawn asks for windowsHide, and that window flashes on every hook
-// (#5635). Every JavaScript file we ship or write into a client's config has
-// to ask for it, the plugins under extensions/, the npm launcher, and the
-// plugins install generates from this package.
-func TestShippedJSSpawnsHideTheirWindow(t *testing.T) {
+// (#5635). Every JavaScript or Python file we ship or write into a client's
+// config has to ask for it: the plugins under extensions/, the npm launcher,
+// and the plugins install generates from this package. In Python the ask is
+// creationflags, CREATE_NO_WINDOW on Windows.
+func TestShippedSpawnsHideTheirWindow(t *testing.T) {
 	root := filepath.Join("..", "..")
 	var files []string
 	_ = filepath.WalkDir(filepath.Join(root, "extensions"), func(path string, d os.DirEntry, err error) error {
@@ -25,7 +26,7 @@ func TestShippedJSSpawnsHideTheirWindow(t *testing.T) {
 			return filepath.SkipDir
 		}
 		switch filepath.Ext(path) {
-		case ".js", ".mjs", ".cjs", ".ts":
+		case ".js", ".mjs", ".cjs", ".ts", ".py":
 			files = append(files, path)
 		}
 		return nil
@@ -40,13 +41,23 @@ func TestShippedJSSpawnsHideTheirWindow(t *testing.T) {
 
 	spawners := regexp.MustCompile(`(^|[^.\w])(spawn|spawnSync|execFile|execFileSync|execSync|exec|fork)\(`)
 	promisified := regexp.MustCompile(`(\w+)\s*=\s*promisify\((?:execFile|exec)\)`)
-	checked := 0
+	pyCalls := regexp.MustCompile(`(^|[^.\w])(subprocess\.(?:run|Popen|call|check_call|check_output))\(`)
+	checked, pyChecked := 0, 0
 	for _, path := range files {
 		raw, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)
 		}
 		src := string(raw)
+		if strings.Contains(src, "import subprocess") {
+			for _, loc := range pyCalls.FindAllStringSubmatchIndex(src, -1) {
+				pyChecked++
+				if !strings.Contains(callArgs(src, loc[1]), "creationflags=") {
+					line := strings.Count(src[:loc[4]], "\n") + 1
+					t.Errorf("%s:%d: %s( runs without creationflags", path, line, src[loc[4]:loc[5]])
+				}
+			}
+		}
 		if !strings.Contains(src, "child_process") {
 			continue
 		}
@@ -72,6 +83,9 @@ func TestShippedJSSpawnsHideTheirWindow(t *testing.T) {
 	}
 	if checked < 20 {
 		t.Fatalf("checked %d spawn sites, want at least 20: the scan stopped finding them", checked)
+	}
+	if pyChecked < 3 {
+		t.Fatalf("checked %d Python subprocess calls, want at least 3: the scan stopped finding them", pyChecked)
 	}
 }
 
