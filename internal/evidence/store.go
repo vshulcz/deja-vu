@@ -137,9 +137,11 @@ func write(dir string, all map[uint64]string) error {
 func Drop(dir string) { _ = os.Remove(filepath.Join(dir, fileName)) }
 
 // Reader looks receipts up without loading the table: a binary search over
-// the sorted keys with ReadAt.
+// the sorted keys with ReadAt. It holds the path, not an open file: on Windows
+// a handle kept for the life of the process stops a rebuild from renaming the
+// index directory ("Access is denied").
 type Reader struct {
-	f     *os.File
+	path  string
 	n     int
 	built time.Time
 }
@@ -165,18 +167,14 @@ func Open(dir string) *Reader {
 	if o, ok := readers[dir]; ok && (statErr != nil && o.fi == nil || statErr == nil && o.fi != nil && os.SameFile(o.fi, fi) && o.fi.ModTime().Equal(fi.ModTime())) {
 		return o.r
 	}
-	if o, ok := readers[dir]; ok && o.r != nil {
-		_ = o.r.f.Close()
-	}
 	var r *Reader
 	if statErr == nil {
 		if f, err := os.Open(path); err == nil {
 			h := make([]byte, len(magic)+4)
 			if _, err := f.ReadAt(h, 0); err == nil && string(h[:len(magic)]) == magic {
-				r = &Reader{f: f, n: int(binary.LittleEndian.Uint32(h[len(magic):])), built: fi.ModTime()}
-			} else {
-				_ = f.Close()
+				r = &Reader{path: path, n: int(binary.LittleEndian.Uint32(h[len(magic):])), built: fi.ModTime()}
 			}
+			_ = f.Close()
 		}
 	} else {
 		fi = nil
@@ -197,20 +195,25 @@ func (r *Reader) Lookup(harness, id, text string) []string {
 	if r == nil || r.n == 0 {
 		return nil
 	}
+	f, err := os.Open(r.path)
+	if err != nil {
+		return nil
+	}
+	defer func() { _ = f.Close() }()
 	k := Key(harness, id, text)
 	e := make([]byte, entrySize)
 	base := int64(len(magic) + 4)
 	lo, hi := 0, r.n
 	for lo < hi {
 		mid := (lo + hi) / 2
-		if _, err := r.f.ReadAt(e, base+int64(mid)*entrySize); err != nil {
+		if _, err := f.ReadAt(e, base+int64(mid)*entrySize); err != nil {
 			return nil
 		}
 		v := binary.LittleEndian.Uint64(e)
 		if v == k {
 			off, n := binary.LittleEndian.Uint32(e[8:]), binary.LittleEndian.Uint32(e[12:])
 			b := make([]byte, n)
-			if _, err := r.f.ReadAt(b, base+int64(r.n)*entrySize+int64(off)); err != nil {
+			if _, err := f.ReadAt(b, base+int64(r.n)*entrySize+int64(off)); err != nil {
 				return nil
 			}
 			return strings.Split(string(b), "\n")
