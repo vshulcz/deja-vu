@@ -232,6 +232,13 @@ const SubagentTailKept = 4
 // blame, attribution and restore read, they are small, and nothing else holds
 // them. Cut with the prose, blame never named the subagent that changed a file
 // (#4163).
+//
+// So do its commands, with the exit status stamped on them, and of their output
+// the lines that read as a failure or carry a runner's verdict. `fix`, `how` and
+// the test history read those, and most edit work now happens in child runs:
+// on one machine 1482 subagent sessions held no command record at all, and
+// October's failure-and-fix episodes were nearly all in them. The rest of the
+// output stays out; that is the bulk of the tool stream.
 func KeepSubagentTail(ms []model.Message) []model.Message {
 	if len(ms) <= SubagentTailKept+1 {
 		return ms
@@ -250,11 +257,29 @@ func KeepSubagentTail(ms []model.Message) []model.Message {
 	}
 	kept := make([]model.Message, 0, SubagentTailKept+1)
 	kept = append(kept, ms[0])
+	// Whether a command ran since the last turn of prose or file read, so an
+	// output is weighed as a command's and not as a file the child read. A
+	// call's files record comes before its command, so a turn that ran a
+	// command beside a read still counts as one that ran.
+	ran := false
 	for _, m := range ms[1:tail] {
 		switch m.Role {
+		case "user", "assistant":
+			ran = false
+		case RoleCommand:
+			ran = true
+			kept = append(kept, m)
+		case RoleToolOutput:
+			if !ran {
+				continue
+			}
+			if m.Text = childOutputLines(m.Text); m.Text != "" {
+				kept = append(kept, m)
+			}
 		case RoleEdit, RoleWrote:
 			kept = append(kept, m)
 		case RoleFiles:
+			ran = false
 			var paths []string
 			for p := range strings.SplitSeq(m.Text, "\n") {
 				if changed[p] {

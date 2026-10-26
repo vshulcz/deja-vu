@@ -13,6 +13,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/redact"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // Fix pairs: the error a session hit, and the command that came next and made
@@ -406,6 +407,10 @@ func outputReadsAsFailure(text string) bool {
 	}
 	return false
 }
+
+// A child run's cut keeps the output lines this reads as failures, so the
+// pairs in it can be mined.
+func init() { sources.ChildOutputFailed = outputReadsAsFailure }
 
 // commandFailed reads the exit status the record carries, for the harnesses
 // that store one (codex and opencode append it; Claude does not).

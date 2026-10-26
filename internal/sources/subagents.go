@@ -2,6 +2,7 @@ package sources
 
 import (
 	"os"
+	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -17,6 +18,36 @@ func SubagentsOff() bool { return os.Getenv("DEJA_INCLUDE_SUBAGENTS") == "0" }
 
 // SubagentsWhole reports DEJA_INCLUDE_SUBAGENTS=1.
 func SubagentsWhole() bool { return os.Getenv("DEJA_INCLUDE_SUBAGENTS") == "1" }
+
+// ChildOutputFailed reads a line of command output as a failure. The index sets
+// it to the reading `fix` mines with, which lives there and sources cannot
+// import. Unset, only a runner's own verdict lines are kept from a child.
+var ChildOutputFailed func(line string) bool
+
+// childOutputMax bounds what is kept of one output of a child run.
+const childOutputMax = 2048
+
+// childOutputLines is what a cut child run keeps of a command's output: the
+// lines that read as a failure and the lines a test or build runner prints its
+// verdict on, which is all `fix` and the test history read. "" when there are
+// none. Whole outputs cost search time: kept whole on one machine's history
+// they made search 15% slower, for the same pairs.
+func childOutputLines(text string) string {
+	var b strings.Builder
+	for line := range strings.SplitSeq(text, "\n") {
+		if RunOutputVerdict(line) == "" && (ChildOutputFailed == nil || !ChildOutputFailed(line)) {
+			continue
+		}
+		if b.Len() > 0 {
+			if b.Len()+1+len(line) > childOutputMax {
+				break
+			}
+			b.WriteByte('\n')
+		}
+		b.WriteString(line)
+	}
+	return b.String()
+}
 
 // SpawnedKind reports whether a session's kind is a reader's word for an
 // agent another session spawned.
