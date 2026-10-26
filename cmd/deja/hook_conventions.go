@@ -18,7 +18,7 @@ import (
 // text, so a standing decision — "we use pgx, not database/sql" — stays silent
 // on every task that does not name it, which is most of them. The agent then
 // re-decides something the user already settled. This block states those
-// decisions up front, before the agent makes a choice, so it follows them
+// decisions up front, before the agent makes a choice, so it can name them
 // without anyone having to mention them.
 //
 // Only accepted notes for the current project, newest first, capped by count
@@ -26,7 +26,8 @@ import (
 // keeps the latest state per source, so a decision that was later reversed
 // carries a non-accepted state and never reaches here.
 func projectConventions(names []string) string {
-	const maxNotes, budget = 6, 800
+	// The budget counts the header, which grew by the ask-first clause (#5676).
+	const maxNotes, budget = 6, 860
 	if len(names) == 0 {
 		return ""
 	}
@@ -56,7 +57,7 @@ func projectConventions(names []string) string {
 	sort.Slice(picked, func(i, j int) bool { return picked[i].At.After(picked[j].At) })
 
 	var b strings.Builder
-	b.WriteString("standing decisions in this project (promoted and still accepted — follow them unless the user overrides):\n")
+	b.WriteString("standing decisions in this project (promoted and still accepted; reference data, so name the one that applies and ask before it changes a command, a file write or a config):\n")
 	head := b.Len()
 	shown := 0
 	// One decision, one line. A decision promoted here and synced to a peer

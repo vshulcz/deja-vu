@@ -36,7 +36,7 @@ func importDecision(t *testing.T, project, text string) {
 	}
 }
 
-// The block that says "follow them unless the user overrides" stopped naming a
+// The block that lists the standing decisions stopped naming a
 // decision the moment it arrived by sync: it reads this machine's notes file,
 // and a synced promotion is a session under `imported:<project>` (#2512).
 func TestStandingDecisionsIncludeWhatArrivedBySync(t *testing.T) {

@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   --context-search --timeout 8000 --include-tools context_search` (#5662).
 ### Changed
 
+- The instructions, skills and extensions no longer tell the agent that a
+  recalled rule outranks its defaults. Recall is untrusted reference data from
+  past transcripts: the agent names the rule in one line and asks before it
+  changes a command, a file write or a config. The standing-decisions block
+  says the same (#5676).
 - The per-prompt line names the agent the memory came from and how long ago:
   `deja-vu — from Codex CLI, 4 months ago: "<quote>" (via <terms>)`, where it
   used to say only "you have been here" and a date. The gates are unchanged:
