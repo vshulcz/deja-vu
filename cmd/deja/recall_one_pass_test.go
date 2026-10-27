@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -114,6 +115,11 @@ func TestRecallCutsTheProjectAnswerFromOneSearch(t *testing.T) {
 	}
 	if len(ids) != 5 {
 		t.Fatalf("recall served %d sessions:\n%s", len(ids), text)
+	}
+	// Second is the machine's best answer when it is not the project's own;
+	// the project's order holds around it.
+	if len(ids) > 1 && !slices.ContainsFunc(want, func(h search.Hit) bool { return h.Session.ID == ids[1] }) {
+		ids = slices.Delete(slices.Clone(ids), 1, 2)
 	}
 	for i, id := range ids {
 		if id != want[i].Session.ID {

@@ -1735,7 +1735,13 @@ func rankRecall(dir, q, harness, project string, window int) (rankedRecall, erro
 				about = about || unreadEstimated(pr)
 			}
 			result, o2, policyHidden = pr, po2, phidden
+			// The machine's best answer keeps a place, from the same tier only,
+			// for the same reason.
+			machine := hits
 			hits = slices.Concat(ph, rest)
+			if rest != nil {
+				hits = withMachineBest(hits, machine, ph)
+			}
 		}
 	}
 	o = o2
@@ -1818,7 +1824,7 @@ func recallPage(dir, q string, budget, offset, limit, total, demoted int, about 
 		// recall itself. Later hits stay excerpt-only; they are candidates to
 		// choose between, not answers.
 		if i == 0 {
-			writeRecallConclusions(&hb, dir, q, h, o, budget, headerRoom)
+			writeRecallConclusions(&hb, dir, q, h, o, budget, headerRoom, len(hits) > 1)
 		}
 		served++
 		if headerRoom+hb.Len() >= budget {
@@ -2104,8 +2110,44 @@ func writeRecallHitHead(hb *strings.Builder, h search.Hit, i int, twins map[stri
 }
 
 // writeRecallConclusions writes what the best hit concluded, the files it
-// touched and what it ran, when the budget leaves room for them.
-func writeRecallConclusions(hb *strings.Builder, dir, q string, h search.Hit, o search.Options, budget, headerRoom int) {
+// touched and what it ran, when the budget leaves room for them. With more
+// hits waiting, the block keeps recallConclusionsReserve free for them: on a
+// replay of real recall calls a first hit with thirty thousand matches spent
+// the rest of the page here, and the hit ranked second, the one that
+// answered, arrived as half a header line.
+func writeRecallConclusions(hb *strings.Builder, dir, q string, h search.Hit, o search.Options, budget, headerRoom int, more bool) {
+	block := recallConclusionLines(dir, q, h, o, budget-headerRoom+hb.Len()-recallConclusionsReserve)
+	if more {
+		block = fitLines(block, budget-headerRoom-hb.Len()-recallConclusionsReserve)
+	}
+	for _, l := range block {
+		hb.WriteString(l)
+	}
+}
+
+// fitLines drops lines from the end of a conclusions block until it fits in
+// room: what it ran first, then the files, then the later conclusions. The
+// first conclusion stays, the outcome a small page is still meant to carry.
+func fitLines(lines []string, room int) []string {
+	keep := 0
+	if len(lines) > 1 && strings.HasPrefix(lines[0], "  what this session concluded") {
+		keep = 2
+	}
+	n := 0
+	for _, l := range lines {
+		n += len(l)
+	}
+	for len(lines) > keep && n > room {
+		n -= len(lines[len(lines)-1])
+		lines = lines[:len(lines)-1]
+	}
+	return lines
+}
+
+// recallConclusionLines is the block writeRecallConclusions writes, one line
+// per string, given the room the conclusions may take.
+func recallConclusionLines(dir, q string, h search.Hit, o search.Options, left int) []string {
+	var out []string
 	// The plus is deliberate as it stands, and measured: making it a
 	// minus — which is what the words above suggest — changes nothing
 	// on a full page (identical payloads at 4096, 3000 and 2400 bytes,
@@ -2114,7 +2156,7 @@ func writeRecallConclusions(hb *strings.Builder, dir, q string, h search.Hit, o 
 	// outer trim is what actually bounds the payload. Left as it is
 	// rather than "corrected" blind; whoever changes it should measure
 	// the same three budgets first (#1319).
-	if left := budget - headerRoom + hb.Len() - recallConclusionsReserve; left > recallConclusionsMin {
+	if left > recallConclusionsMin {
 		// The hit carries only the matching messages, so the decision —
 		// usually worded nothing like the query — is not in it. Read the
 		// whole session for the best hit alone, the same upgrade
@@ -2166,10 +2208,10 @@ func writeRecallConclusions(hb *strings.Builder, dir, q string, h search.Hit, o 
 					slices.ContainsFunc(h.Snippets, func(sn string) bool { return strings.TrimSpace(sn) == strings.TrimSpace(c) })
 			})
 			if len(cs) > 0 {
-				fmt.Fprintln(hb, label)
+				out = append(out, label+"\n")
 			}
 			for _, c := range cs {
-				fmt.Fprintf(hb, "  → %s\n", recallListingLine(c))
+				out = append(out, "  → "+recallListingLine(c)+"\n")
 			}
 		}
 		// The files that work touched, for a few dozen bytes. Without
@@ -2177,7 +2219,7 @@ func writeRecallConclusions(hb *strings.Builder, dir, q string, h search.Hit, o 
 		// still has to search the tree for where — and that search
 		// costs far more context than naming the paths here does.
 		if paths := recallTouchedLine(dir, h.Session, query.Tokens(q)); paths != "" {
-			fmt.Fprintf(hb, "  files it touched: %s\n", paths)
+			out = append(out, "  files it touched: "+paths+"\n")
 		}
 		// And what it ran, with the status the harness recorded. The
 		// line above says where the work was; this one is the only
@@ -2187,9 +2229,10 @@ func writeRecallConclusions(hb *strings.Builder, dir, q string, h search.Hit, o 
 		// reads doing that after the answer had already arrived
 		// (#3951). "exit 0 here" is the evidence that search was for.
 		if ran := recallRanLine(dir, h.Session); ran != "" {
-			fmt.Fprintf(hb, "  %s\n", ran)
+			out = append(out, "  "+ran+"\n")
 		}
 	}
+	return out
 }
 
 // recallServedFacts is the size, ids and projects of the hits a page served.
@@ -3033,6 +3076,33 @@ func inProjectHits(hits []search.Hit, names []string) []search.Hit {
 				out = append(out, h)
 				break
 			}
+		}
+	}
+	return out
+}
+
+// withMachineBest puts the machine-wide ranking's first session second on a
+// project-first page, when it is not one of the project's own. Project-first
+// otherwise pushes it below every project session that shares a word with the
+// question: on a replay of real recall calls the answer sat first machine-wide
+// and tenth or lower on the page in 3 of 22 calls, one of them a session
+// holding every word of the query.
+func withMachineBest(merged, machine, project []search.Hit) []search.Hit {
+	if len(machine) == 0 || len(merged) == 0 {
+		return merged
+	}
+	best := machine[0]
+	key := best.Session.Harness + ":" + best.Session.ID
+	for _, h := range project {
+		if h.Session.Harness+":"+h.Session.ID == key {
+			return merged
+		}
+	}
+	out := make([]search.Hit, 0, len(merged)+1)
+	out = append(out, merged[0], best)
+	for _, h := range merged[1:] {
+		if h.Session.Harness+":"+h.Session.ID != key {
+			out = append(out, h)
 		}
 	}
 	return out
