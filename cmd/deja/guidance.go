@@ -699,7 +699,7 @@ func guidanceStatus(harness string) string {
 	harness = guidanceHarness(harness)
 	path := guidancePath(harness)
 	if path == "" {
-		// Four harnesses' manuals are written by their own install target
+		// Some harnesses' manuals are written by their own install target
 		// rather than by the generic guidance step, so this said "unsupported"
 		// about a file deja had written.
 		path = ownGuidanceFile(harness)
@@ -756,6 +756,8 @@ func ownGuidanceFile(harness string) string {
 		// package ships: listed as /deja:deja-history under /skills.
 		return reasonixSkillPath()
 	case "mcode":
+		// Inside the plugin package mcode-auto writes; plain mcode writes
+		// only mcp.json, so its guidance reads as missing (#5651).
 		return mcodeSkillPath()
 	case "windsurf":
 		// Written by installWindsurf, beside the block in global_rules.md.

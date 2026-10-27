@@ -62,6 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `deja doctor` reports MiniMax Code guidance as installed after `deja
+  install mcode-auto` wrote the skill, instead of "unsupported" (#5700).
 - Tab completion offers `deja friction --settle` and `--unsettle` in bash, zsh,
   fish and PowerShell, and completes nothing for the wall id after them.
   friction shared one case with fix and tests, which offered only `--limit`
