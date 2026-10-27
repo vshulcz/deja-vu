@@ -138,12 +138,12 @@ func labelLines(s model.Session, lines []string) []string {
 }
 
 // personLabels open a line a person's turn holds; toolLabels one a tool
-// printed or a parent agent wrote. Nothing else is cut: what a model said, a
+// printed. A parent agent's prompt (evidence.LabelParent) loses every order. Nothing else is cut: what a model said, a
 // subagent's report and an agent's note are the remedies recall exists to
 // carry.
 var (
 	personLabels = []string{evidence.LabelUnmarked, evidence.LabelUser, "User: "}
-	toolLabels   = []string{evidence.LabelOutputOrder, "Output: ", "Ran: ", evidence.LabelParent}
+	toolLabels   = []string{evidence.LabelOutputOrder, "Output: ", "Ran: "}
 )
 
 // cutPersonOrders is a person's turn of s as recall may show it: whole when a
@@ -181,9 +181,14 @@ func scrubLine(s model.Session, line string) (string, bool) {
 			return cut(rest, func(x string) string { return cutPersonOrders(s, x) })
 		}
 	}
+	if rest, ok := strings.CutPrefix(body, evidence.LabelParent); ok {
+		return cut(rest, func(x string) string { return evidence.CutOrders(x, true, nil) })
+	}
+	// What a program printed keeps its own remedy; only what it tells an AI
+	// reader to run goes.
 	for _, l := range toolLabels {
 		if rest, ok := strings.CutPrefix(body, l); ok {
-			return cut(rest, func(x string) string { return evidence.CutOrders(x, true, nil) })
+			return cut(rest, evidence.CutAgentOrders)
 		}
 	}
 	return line, true
@@ -214,7 +219,7 @@ func ScrubMessages(s *model.Session) {
 		case "user":
 			m.Text = cutPersonOrders(*s, m.Text)
 		case "tool-output":
-			m.Text = evidence.CutOrders(m.Text, true, nil)
+			m.Text = evidence.CutAgentOrders(m.Text)
 		}
 		if strings.TrimSpace(strings.ReplaceAll(m.Text, evidence.LeftOut, "")) == "" {
 			continue

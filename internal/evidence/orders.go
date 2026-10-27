@@ -93,13 +93,46 @@ const LeftOut = "[instruction to agents left out]"
 // those planted holds (the orders a parser found outside what the person
 // typed).
 func CutOrders(text string, all bool, planted []string) string {
-	if !all && len(planted) == 0 || len(OrderSentences(text)) == 0 {
+	if !all && len(planted) == 0 {
+		return text
+	}
+	return cutOrders(text, func(sn string) bool { return all || inPlanted(sn, planted) }, nil)
+}
+
+// CutAgentOrders is a tool's output without the orders it gives AI agents.
+// A program telling whoever ran it how to get past its own error ("needs
+// privileges; you must run sudo foo doctor") is the remedy, not something
+// planted for an agent: only text that names its reader as an agent or an
+// assistant is cut. The naming carries to the end of its paragraph, so a
+// "Note for AI agents:" heading covers the list under it.
+func CutAgentOrders(text string) string {
+	addressed := false
+	return cutOrders(text, func(string) bool { return addressed }, func(sn string) {
+		if strings.TrimSpace(sn) == "" {
+			addressed = false
+		} else if agentReaderRE.MatchString(sn) {
+			addressed = true
+		}
+	})
+}
+
+// agentReaderRE names an AI reader. A word joined by a hyphen ("ssh-agent",
+// "user-agent") names a program, not a reader.
+var agentReaderRE = regexp.MustCompile(`(?i)(?:^|[^\p{L}\p{N}_-])(?:agents?|assistants?|AI|LLMs?|Claude|Codex|Copilot|Gemini)(?:$|[^\p{L}\p{N}_-])|агент|ассистент`)
+
+// cutOrders cuts the order sentences pick accepts. seen, when set, is shown
+// every sentence first.
+func cutOrders(text string, pick func(string) bool, seen func(string)) string {
+	if len(OrderSentences(text)) == 0 {
 		return text
 	}
 	var b strings.Builder
 	cut := false
 	for _, sn := range sentences(text) {
-		if order(sn) && (all || inPlanted(sn, planted)) {
+		if seen != nil {
+			seen(sn)
+		}
+		if order(sn) && pick(sn) {
 			// A log pasted with no sentence break carries the order at its
 			// end: what is ahead of the rule's wording stays.
 			if !cut {

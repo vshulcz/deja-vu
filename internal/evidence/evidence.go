@@ -145,11 +145,11 @@ func RuleLike(s string) bool {
 	return ruleRE.MatchString(t)
 }
 
-var addressRE = regexp.MustCompile(`(?i)\b(you|your|agents?|assistants?|AI|LLMs?|Claude|Codex)\b|агент|ассистент`)
-
-// AddressesAgent reports text that instructs whoever reads it: a rule and a
-// reader it is aimed at, in the same line.
-func AddressesAgent(s string) bool { return RuleLike(s) && addressRE.MatchString(s) }
+// AddressesAgent reports text that instructs an AI reader: a rule and an agent
+// or assistant it is aimed at, in the same line. "You" alone is not enough: a
+// program says "you must run sudo foo doctor" to whoever ran it, and that is
+// its remedy, not an instruction planted for an agent.
+func AddressesAgent(s string) bool { return RuleLike(s) && agentReaderRE.MatchString(s) }
 
 func tokens(s string) (strong, words []string) {
 	seen := map[string]bool{}
