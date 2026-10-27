@@ -79,6 +79,44 @@ func TestATwoWordQueryKeepsTheWordTheStoreHolds(t *testing.T) {
 	}
 }
 
+// The sessions such a page lists are leads the header calls nobody's answer:
+// a few of them, one excerpt each, and none of the conclusion block the best
+// hit of a real answer gets.
+func TestATwoWordFallbackPageStaysShort(t *testing.T) {
+	hermeticEnv(t)
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+	for i := range 5 {
+		at := time.Now().Add(-time.Duration(i+100) * time.Hour).UTC().Format(time.RFC3339)
+		id := fmt.Sprintf("z%d", i)
+		writeClaudeFixture(t, filepath.Join(root, "-tmp-app", id+".jsonl"), id, []string{
+			`{"type":"user","sessionId":"` + id + `","timestamp":"` + at + `","cwd":"/tmp/app","message":{"role":"user","content":"the zeppelin hangar door stuck again, attempt ` + strconv.Itoa(i) + `"}}`,
+			`{"type":"assistant","sessionId":"` + id + `","timestamp":"` + at + `","cwd":"/tmp/app","message":{"role":"assistant","content":"decided to oil the zeppelin hangar rails; that fixed it"}}`,
+		})
+	}
+	absentWordCorpus(t)
+
+	got := mcpRecallText(t, "zeppelin quasar")
+	if !strings.Contains(got, "quasar (ignored: no session matches it with the rest)") || !strings.Contains(got, nothingIsAboutThis) {
+		t.Fatalf("not the fallback page this measures:\n%s", head(got))
+	}
+	hits, excerpts := 0, 0
+	for l := range strings.SplitSeq(got, "\n") {
+		switch {
+		case len(l) > 3 && l[0] >= '1' && l[0] <= '9' && strings.HasPrefix(l[1:], ". ["):
+			hits, excerpts = hits+1, 0
+		case hits > 0 && strings.HasPrefix(l, "- "):
+			if excerpts++; excerpts > 1 {
+				t.Errorf("hit %d carries more than one excerpt:\n%s", hits, got)
+			}
+		case hits > 0 && strings.HasPrefix(l, "  "):
+			t.Errorf("a conclusions block reached a page of leads: %q", l)
+		}
+	}
+	if hits == 0 || hits > 3 {
+		t.Errorf("the page lists %d sessions, want 1 to 3:\n%s", hits, got)
+	}
+}
+
 // Same shape as the #3815 corpus: more sessions than the relevance window so
 // the thin match is published under the relevance label with a tail hung
 // underneath it, and one session that holds both real words.

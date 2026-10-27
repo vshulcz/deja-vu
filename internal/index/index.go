@@ -1392,8 +1392,11 @@ type SearchResult struct {
 	// calling it a word form reads as a typo correction the reader did not
 	// make (#1786).
 	Neighbour bool
-	Variants  map[string][]string
-	Tier      string
+	// LoneWord says a two-word question was answered on one of its words
+	// (loneWordSearch): leads, not an answer, so the page keeps them short.
+	LoneWord bool
+	Variants map[string][]string
+	Tier     string
 	// Total is how many sessions the tier matched before its own window
 	// trimmed them, and Capped whether that trimming withheld any. The
 	// relevance tier is the one that needs them: it ranks and truncates

@@ -3883,7 +3883,9 @@ func loneWordSearch(dir string, m Manifest, o query.Options) (SearchResult, erro
 	if terms, _ := query.QueryParts(o.Query); len(terms) != 2 {
 		return SearchResult{}, nil
 	}
-	return stemSearchFor(dir, m, o, len(m.Sessions))
+	res, err := stemSearchFor(dir, m, o, len(m.Sessions))
+	res.LoneWord = res.Stemmed
+	return res, err
 }
 
 // stemSearchFor is the stem rung; sessions > 0 lets a two-word question fall

@@ -137,20 +137,21 @@ func noPostingsLadder(ranking *relevanceOnce, dir string, m Manifest, o query.Op
 		return res, err
 	}
 	ranked, rerr := ranking.get(dir, m, o)
-	if rerr != nil || len(ranked.Sessions) > 0 {
-		return ranked, rerr
+	if res, err := orLoneWord(dir, m, o, ranked, rerr); err != nil || len(res.Sessions) > 0 {
+		return res, err
 	}
 	// Nothing anywhere. The neighbour map holds the one link left to
 	// try — the project's own word for what the reader asked about —
 	// and asking it over the question's identifying words is what
-	// makes it readable by a sentence (#2331).
-	res, err := cooccurNarrowedSearch(dir, m, o)
-	return orLoneWord(dir, m, o, res, err)
+	// makes it readable by a sentence (#2331). After the lone word: the
+	// word the reader typed is a closer answer than the project's word
+	// for it.
+	return cooccurNarrowedSearch(dir, m, o)
 }
 
-// orLoneWord is the last rung: a ladder that found nothing at all, asked in
-// two words one of which no session holds, answers on the other word
-// (loneWordSearch). Last, so it never replaces a page another rung could give.
+// orLoneWord answers, when the rungs above found nothing at all, a question
+// of two words one of which no session holds on the other word
+// (loneWordSearch). It never replaces a page an earlier rung could give.
 func orLoneWord(dir string, m Manifest, o query.Options, res SearchResult, err error) (SearchResult, error) {
 	if err != nil || len(res.Sessions) > 0 {
 		return res, err
