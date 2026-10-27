@@ -51,7 +51,9 @@ func TestASQLiteReadUnderTheBudgetAnswersWithoutProgressLines(t *testing.T) {
 	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, "create table t(a text); insert into t values('one');").CombinedOutput(); err != nil {
 		t.Fatalf("building the fixture: %v: %s", err, out)
 	}
-	t.Setenv("DEJA_STORE_TIMEOUT", "250ms")
+	// 1s, not less: on a loaded macOS runner sqlite3 can take longer than
+	// 250ms to print its first progress line, and the test failed on that.
+	t.Setenv("DEJA_STORE_TIMEOUT", "1s")
 	// No row until the end, and long past the budget: the progress lines
 	// are all that moves.
 	q := "with recursive c(x) as (select 1 union all select x+1 from c where x<6000000) select count(*) from c;"
@@ -63,7 +65,7 @@ func TestASQLiteReadUnderTheBudgetAnswersWithoutProgressLines(t *testing.T) {
 	if got := strings.TrimSpace(string(out)); got != "6000000" {
 		t.Errorf("answer = %q, want 6000000", clip(got))
 	}
-	if time.Since(started) < 250*time.Millisecond {
+	if time.Since(started) < time.Second {
 		t.Log("the query beat the budget here, so only the filter was checked")
 	}
 	cmd, stop := sqliteReadCmd(db, "select a from t")
