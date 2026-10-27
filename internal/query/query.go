@@ -133,6 +133,12 @@ type Options struct {
 	// have read them all; Unread.Scoped lists them and Unread.ScopeWhole says
 	// it happened.
 	PoolScope []string `json:"-"`
+	// LoneWord lets a two-word query whose other word no session holds fall
+	// back to the informative word the store does hold, as a longer query
+	// drops such a word (#5711). Agent recall sets it: an agent asks in one to
+	// three exact terms and stops at an empty page. `deja search` keeps the
+	// silence, since a person sees the empty page and retypes.
+	LoneWord bool `json:"-"`
 }
 
 // Unread is the part of a match retrieval did not read.

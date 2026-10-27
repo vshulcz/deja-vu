@@ -1645,7 +1645,7 @@ type rankedRecall struct {
 // same ranking, so the two surfaces cannot disagree about what is relevant.
 func rankRecall(dir, q, harness, project string, window int) (rankedRecall, error) {
 	live, cut := liveLineageCut(dir)
-	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: live, ExcludeUpTo: cut, Window: window, Activation: policy.ActivationMCP}
+	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: live, ExcludeUpTo: cut, Window: window, Activation: policy.ActivationMCP, LoneWord: true}
 	cov, err := index.EnsureForSearchCoverage(dir, o, mcpProgress())
 	if err != nil {
 		return rankedRecall{}, err
@@ -1697,6 +1697,9 @@ func rankRecall(dir, q, harness, project string, window int) (rankedRecall, erro
 	if len(scope) > 0 {
 		po := o
 		po.Projects, po.PoolScope = scope, nil
+		// The project falls back to one word of two only where the machine
+		// did too: otherwise its guess would replace the machine's answer.
+		po.LoneWord = o.LoneWord && (len(hits) == 0 || dropsAWord(result.Variants))
 		// Cut from the machine's search when that one read everything the
 		// project's would: a second search of a word most sessions hold
 		// cost as much again (#5486). And not run at all where no session
@@ -2799,6 +2802,16 @@ func mcpProgress() io.Writer {
 		return os.Stderr
 	}
 	return io.Discard
+}
+
+// dropsAWord is whether the search answered without one of the query's words.
+func dropsAWord(variants map[string][]string) bool {
+	for _, values := range variants {
+		if slices.Contains(values, "") {
+			return true
+		}
+	}
+	return false
 }
 
 func fuzzySummary(variants map[string][]string) []string {

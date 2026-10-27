@@ -144,7 +144,25 @@ func noPostingsLadder(ranking *relevanceOnce, dir string, m Manifest, o query.Op
 	// try — the project's own word for what the reader asked about —
 	// and asking it over the question's identifying words is what
 	// makes it readable by a sentence (#2331).
-	return cooccurNarrowedSearch(dir, m, o)
+	res, err := cooccurNarrowedSearch(dir, m, o)
+	return orLoneWord(dir, m, o, res, err)
+}
+
+// orLoneWord is the last rung: a ladder that found nothing at all, asked in
+// two words one of which no session holds, answers on the other word
+// (loneWordSearch). Last, so it never replaces a page another rung could give.
+func orLoneWord(dir string, m Manifest, o query.Options, res SearchResult, err error) (SearchResult, error) {
+	if err != nil || len(res.Sessions) > 0 {
+		return res, err
+	}
+	lone, lerr := loneWordSearch(dir, m, o)
+	if lerr != nil {
+		return SearchResult{}, fmt.Errorf("lone word postings: %w", lerr)
+	}
+	if !lone.Stemmed {
+		return res, nil
+	}
+	return lone, nil
 }
 
 // wordLadder tries the stem, fuzzy, co-occurrence and error-signature rungs in

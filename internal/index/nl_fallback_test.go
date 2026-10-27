@@ -123,6 +123,63 @@ func TestCloseTierDisagreeFallsThroughToRelevance(t *testing.T) {
 	}
 }
 
+// A two-word question has no rest to keep once a word drops, and it came back
+// empty while the same word in a three-word question was dropped (#5711).
+func TestTwoWordQueryFallsBackToTheWordTheStoreHolds(t *testing.T) {
+	dir := nlIndex(t,
+		"we kept the ledger outbox in sqlite after the review",
+		"standup notes about lunch",
+		"standup notes about the mobile gap",
+		"standup notes about release dates",
+		"standup notes about a readme typo",
+		"standup notes about the font size",
+		"standup notes about the old logo",
+		"standup notes about parking",
+	)
+	result, err := SearchDetailed(dir, search.Options{Query: "zookeeper outbox", All: true, LoneWord: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := idsOf(result.Sessions); len(got) == 0 || got[0] != "a" {
+		t.Fatalf("the session holding the known word is not on the page: %v", got)
+	}
+	if vs := result.Variants["zookeeper"]; len(vs) != 1 || vs[0] != "" {
+		t.Fatalf("the unknown word is not marked dropped: %v", result.Variants)
+	}
+	// Only where the caller asked: deja search keeps its silence.
+	plain, err := SearchDetailed(dir, search.Options{Query: "zookeeper outbox", All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plain.Sessions) != 0 {
+		t.Fatalf("a search that did not ask for the fallback got it: %v", idsOf(plain.Sessions))
+	}
+}
+
+// The word left standing has to say something on its own: a word most of the
+// store holds would put the store on the page.
+func TestTwoWordQueryDoesNotFallBackToACommonWord(t *testing.T) {
+	dir := nlIndex(t,
+		"we kept the ledger outbox in sqlite after the review",
+		"standup notes about lunch",
+		"standup notes about the mobile gap",
+		"standup notes about release dates",
+		"standup notes about a readme typo",
+		"standup notes about the font size",
+		"standup notes about the old logo",
+		"standup notes about parking",
+	)
+	for _, q := range []string{"zookeeper standup", "zookeeper the"} {
+		result, err := SearchDetailed(dir, search.Options{Query: q, All: true, LoneWord: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(result.Sessions) != 0 {
+			t.Errorf("%q fell back to a word most sessions hold: %v", q, idsOf(result.Sessions))
+		}
+	}
+}
+
 func idsOf(ss []model.Session) []string {
 	out := make([]string, 0, len(ss))
 	for _, s := range ss {

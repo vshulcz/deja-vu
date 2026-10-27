@@ -176,7 +176,8 @@ func searchDetailedRead(dir string, o query.Options) (SearchResult, error) {
 		if res, done, ferr := wordLadder(ranking, dir, m, o); done {
 			return res, ferr
 		}
-		return ranking.get(dir, m, o)
+		res, rerr := ranking.get(dir, m, o)
+		return orLoneWord(dir, m, o, res, rerr)
 	}
 	if err != nil {
 		return SearchResult{}, err
@@ -3865,8 +3866,31 @@ func fuzzySearch(dir string, m Manifest, o query.Options) (SearchResult, error) 
 }
 
 func stemSearch(dir string, m Manifest, o query.Options) (SearchResult, error) {
+	return stemSearchFor(dir, m, o, 0)
+}
+
+// loneWordSearch is the stem rung for a two-word question one of whose words
+// no session holds: "kafka queue" against a store that only ever said queue.
+// A longer question drops such a word and keeps the AND over the rest; two
+// words had no rest to keep, so a typo, a synonym or a translated word emptied
+// the page (#5711). It runs only when every other rung came back empty, and
+// answers only when the word left standing is informative and the caller
+// asked for it (o.LoneWord, agent recall).
+func loneWordSearch(dir string, m Manifest, o query.Options) (SearchResult, error) {
+	if !o.LoneWord || len(m.Sessions) == 0 {
+		return SearchResult{}, nil
+	}
+	if terms, _ := query.QueryParts(o.Query); len(terms) != 2 {
+		return SearchResult{}, nil
+	}
+	return stemSearchFor(dir, m, o, len(m.Sessions))
+}
+
+// stemSearchFor is the stem rung; sessions > 0 lets a two-word question fall
+// back to its one informative word (stemPostingsFor).
+func stemSearchFor(dir string, m Manifest, o query.Options, sessions int) (SearchResult, error) {
 	terms, phrases := query.QueryParts(o.Query)
-	posts, variants, err := stemPostings(dir, terms, phrases)
+	posts, variants, err := stemPostingsFor(dir, terms, phrases, sessions)
 	if err != nil || len(posts) == 0 {
 		return SearchResult{}, err
 	}
@@ -3882,7 +3906,28 @@ func stemSearch(dir string, m Manifest, o query.Options) (SearchResult, error) {
 }
 
 func stemPostings(dir string, terms, phrases []string) ([]posting, map[string][]string, error) {
-	if !hasStemToken(terms) {
+	return stemPostingsFor(dir, terms, phrases, 0)
+}
+
+// loneWordInforms is whether the one word left of a two-word question may
+// answer for it: not filler, and rare by the bar the co-occurrence rung holds
+// its words to, so the page is the sessions about that word, not the store.
+func loneWordInforms(term string, set map[int64]posting, sessions int) bool {
+	if query.IsStopWord(term) {
+		return false
+	}
+	in := map[uint32]bool{}
+	for _, p := range set {
+		in[p.Sid] = true
+	}
+	return len(in) <= 2 || rankIDF(sessions, len(in)) >= dejaVuIDFFloor
+}
+
+// stemPostingsFor is stemPostings that, given the store's session count, also
+// lets a two-word question fall back to its one informative word.
+func stemPostingsFor(dir string, terms, phrases []string, sessions int) ([]posting, map[string][]string, error) {
+	lone := sessions > 0 && len(terms) == 2
+	if !lone && !hasStemToken(terms) {
 		return nil, nil, nil
 	}
 	catalog, err := tokenIndexCached(dir)
@@ -3919,7 +3964,7 @@ func stemPostings(dir string, terms, phrases []string) ([]posting, map[string][]
 	anchors := make([]anchor, 0, len(terms))
 	for i, term := range terms {
 		if len(matchesPer[i]) == 0 {
-			if anchored < 2 {
+			if anchored < 2 && !lone {
 				return nil, nil, nil
 			}
 			variants[term] = []string{""}
@@ -3939,6 +3984,12 @@ func stemPostings(dir string, terms, phrases []string) ([]posting, map[string][]
 		anchors = append(anchors, anchor{term: term, set: set})
 	}
 	_ = phrases
+	if lone && len(anchors) == 1 {
+		if !loneWordInforms(anchors[0].term, anchors[0].set, sessions) {
+			return nil, nil, nil
+		}
+		return intersectPostingMaps([]map[int64]posting{anchors[0].set}), variants, nil
+	}
 	sets := func(skip map[int]bool) []map[int64]posting {
 		out := make([]map[int64]posting, 0, len(anchors))
 		for i, a := range anchors {

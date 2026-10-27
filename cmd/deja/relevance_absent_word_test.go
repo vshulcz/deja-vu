@@ -58,6 +58,27 @@ func TestTheWholeQueryStillHoldsWhenEveryWordIsThere(t *testing.T) {
 	}
 }
 
+// Two words, one of them in no session: the page shows the session that holds
+// the other one, says which word it ignored, and claims nothing about it (#5711).
+func TestATwoWordQueryKeepsTheWordTheStoreHolds(t *testing.T) {
+	hermeticEnv(t)
+	absentWordCorpus(t)
+
+	got := mcpRecallText(t, "pgbouncer quasar")
+	if !strings.Contains(got, "quasar (ignored: no session matches it with the rest)") {
+		t.Fatalf("the unknown word was not reported dropped:\n%s", head(got))
+	}
+	if !strings.Contains(got, "held") {
+		t.Errorf("the session holding the known word is not on the page:\n%s", head(got))
+	}
+	if !strings.Contains(got, nothingIsAboutThis) {
+		t.Errorf("a page missing a query word does not say nothing is about it:\n%s", head(got))
+	}
+	if strings.Contains(got, "[holds every word of the query]") {
+		t.Errorf("a session is tagged as holding a query it does not hold:\n%s", got)
+	}
+}
+
 // Same shape as the #3815 corpus: more sessions than the relevance window so
 // the thin match is published under the relevance label with a tail hung
 // underneath it, and one session that holds both real words.
