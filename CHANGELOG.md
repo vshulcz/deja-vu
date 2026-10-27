@@ -69,6 +69,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the per-prompt block. A program's own remedy in tool output is kept; only
   text addressed to AI agents is cut. The frame names the user-rule
   exception only when the block carries one (#5704).
+- `deja doctor` reports MiniMax Code guidance as installed after `deja
+  install mcode-auto` wrote the skill, instead of "unsupported" (#5700).
 - Tab completion offers `deja friction --settle` and `--unsettle` in bash, zsh,
   fish and PowerShell, and completes nothing for the wall id after them.
   friction shared one case with fix and tests, which offered only `--limit`
