@@ -26,8 +26,10 @@ func TestCommandIsGitWithTheReadOnlyEnvironmentLast(t *testing.T) {
 	if !slices.Equal(cmd.Env[:len(parent)], parent) {
 		t.Error("env does not start with the parent environment")
 	}
-	if got := cmd.Env[len(parent):]; !slices.Equal(got, Env) {
-		t.Errorf("env ends with %q, want %q", got, Env)
+	// The literal values, not Env: a test against Env passes whatever Env holds.
+	want := []string{"GIT_OPTIONAL_LOCKS=0", "GIT_NO_LAZY_FETCH=1"}
+	if got := cmd.Env[len(parent):]; !slices.Equal(got, want) {
+		t.Errorf("env ends with %q, want %q", got, want)
 	}
 	// CommandContext is what sets Cancel; plain Command leaves it nil, and a
 	// hook's git would then outlive the hook's deadline.
