@@ -138,9 +138,9 @@ func labelLines(s model.Session, lines []string) []string {
 }
 
 // personLabels open a line a person's turn holds; toolLabels one a tool
-// printed. A parent agent's prompt (evidence.LabelParent) loses every order. Nothing else is cut: what a model said, a
-// subagent's report and an agent's note are the remedies recall exists to
-// carry.
+// printed. A parent agent's prompt (evidence.LabelParent) loses every order.
+// Nothing else is cut: what a model said, a subagent's report and an agent's
+// note are the remedies recall exists to carry.
 var (
 	personLabels = []string{evidence.LabelUnmarked, evidence.LabelUser, "User: "}
 	toolLabels   = []string{evidence.LabelOutputOrder, "Output: ", "Ran: "}

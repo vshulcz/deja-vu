@@ -62,6 +62,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Three hook regressions found by replaying 333 real events against v0.23.1.
+  A failure that matches another session's only on a shell parse error no
+  longer gets that session's next command as a hint (unrelated hints 3 of 60
+  to 0). Ran/Output lines give up their room before the line that answers in
+  the per-prompt block. A program's own remedy in tool output is kept; only
+  text addressed to AI agents is cut. The frame names the user-rule
+  exception only when the block carries one (#5704).
 - Tab completion offers `deja friction --settle` and `--unsettle` in bash, zsh,
   fish and PowerShell, and completes nothing for the wall id after them.
   friction shared one case with fix and tests, which offered only `--limit`
