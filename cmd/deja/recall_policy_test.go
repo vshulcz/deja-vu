@@ -15,7 +15,7 @@ import (
 // publish, push, delete or send.
 func TestTheFrameAndTheInstructionsSayTheSameAboutRecalledLines(t *testing.T) {
 	surfaces := map[string]string{
-		"frame":            recallFrameHeader,
+		"frame":            recallRuleFrameHeader,
 		"mcp instructions": mcpInstructions(t.TempDir(), ""),
 		"guidance block":   guidanceBody,
 		"skill body":       skillBody,
@@ -29,7 +29,7 @@ func TestTheFrameAndTheInstructionsSayTheSameAboutRecalledLines(t *testing.T) {
 			t.Errorf("%s does not say a recalled line is no permission to publish, push, delete or send", name)
 		}
 	}
-	for _, text := range []string{recallFrameHeader, recallUserRuleSentence, recallNeverSentence} {
+	for _, text := range []string{recallFrameHeader, recallRuleFrameHeader, recallUserRuleSentence, recallNeverSentence} {
 		if strings.Contains(text, "—") {
 			t.Errorf("the policy text carries an em dash: %q", text)
 		}

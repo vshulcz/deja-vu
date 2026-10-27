@@ -180,10 +180,11 @@ func TestHookCodeWhaleMessageSubmitCutsInsideTheFrame(t *testing.T) {
 
 func TestFitFramedDropsABlockWithNoRoomForItsFrame(t *testing.T) {
 	a, b := frameRecall("first"), frameRecall(strings.Repeat("second ", 50))
-	if got := fitFramed([]string{a, b}, "\n\n", len(a)+2+recallFrameOverhead); got != a {
+	over := len(recallFrameHeader) + len(recallFrameFooter)
+	if got := fitFramed([]string{a, b}, "\n\n", len(a)+2+over); got != a {
 		t.Errorf("got %q, want only the first block", got)
 	}
-	if got := fitFramed([]string{a, b}, "\n\n", len(a)+2+recallFrameOverhead+10); !strings.HasSuffix(got, "second sec"+recallFrameFooter) {
+	if got := fitFramed([]string{a, b}, "\n\n", len(a)+2+over+10); !strings.HasSuffix(got, "second sec"+recallFrameFooter) {
 		t.Errorf("the second block was not cut inside its frame: %q", got)
 	}
 	if got := fitFramed([]string{"plain text here"}, "", 5); got != "plain" {

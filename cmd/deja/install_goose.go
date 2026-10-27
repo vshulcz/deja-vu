@@ -981,7 +981,7 @@ func isRetiredGooseRecall(s string) bool {
 	if t == strings.TrimSpace(gooseNoHistory) {
 		return true
 	}
-	return strings.HasPrefix(t, strings.TrimSpace(recallFrameHeader)) &&
+	return (strings.HasPrefix(t, strings.TrimSpace(recallFrameHeader)) || strings.HasPrefix(t, strings.TrimSpace(recallRuleFrameHeader))) &&
 		strings.HasSuffix(t, strings.TrimSpace(recallFrameFooter))
 }
 
