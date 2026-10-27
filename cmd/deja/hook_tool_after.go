@@ -157,7 +157,7 @@ func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain b
 	if cwd == "" && truncated {
 		cwd, _ = jsonStringAfter(after(string(raw), `"cwd"`))
 	}
-	line := fixPairLine(dir, hookCWD(cwd), out)
+	line := fixPairLineFor(dir, hookCWD(cwd), input.ToolInput.Command, out)
 	if line == "" {
 		return nil
 	}
@@ -447,6 +447,12 @@ func clampOutput(s string) string {
 // fixPairLine is the one line the failure gets: the error this machine saw
 // before and the command that followed it without the error coming back.
 func fixPairLine(dir, cwd, output string) string {
+	return fixPairLineFor(dir, cwd, "", output)
+}
+
+// fixPairLineFor is fixPairLine knowing the command that failed, "" when the
+// host does not say (index.FixesForCommand).
+func fixPairLineFor(dir, cwd, command, output string) string {
 	pol := policy.Load()
 	// A pair that names another project is what that project ran next, and
 	// that is almost never about this failure: over 396 hints on one machine,
@@ -462,7 +468,7 @@ func fixPairLine(dir, cwd, output string) string {
 	}
 	// A few, not one: the newest pair for an error can be a remedy that failed,
 	// and silence is the wrong answer when the one behind it worked.
-	pairs := index.FixesFor(dir, output, 4, func(project string) bool {
+	pairs := index.FixesForCommand(dir, command, output, 4, func(project string) bool {
 		return pol.Allows(policy.ActivationAuto, project) && !others(project)
 	})
 	for _, p := range pairs {
@@ -473,7 +479,7 @@ func fixPairLine(dir, cwd, output string) string {
 	// Except a program this machine does not have. `timeout` missing in one
 	// checkout is missing in all of them, and the command that worked without
 	// it was learned wherever the agent happened to be.
-	elsewhere := index.FixesFor(dir, output, 4, func(project string) bool {
+	elsewhere := index.FixesForCommand(dir, command, output, 4, func(project string) bool {
 		return pol.Allows(policy.ActivationAuto, project) && project != "" && !here(project)
 	})
 	for _, p := range elsewhere {

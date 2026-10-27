@@ -988,6 +988,16 @@ func fixSignaturesFor(dir, text string) map[uint64]bool {
 // non-nil, gates each pair by its project — the caller applies its trust
 // policy here, since this package sits below policy.
 func FixesFor(dir, text string, limit int, allow func(project string) bool) []FixPair {
+	return FixesForCommand(dir, "", text, limit, allow)
+}
+
+// FixesForCommand is FixesFor for a failure whose command is known. A pair
+// that matches only on what the shell said about the command line (a parse
+// error, a program it could not find that this command does not run) is kept
+// only when its command is this one, or this one corrected: the shell's
+// complaint is the same for any command that trips it, and the next command
+// of another session that tripped it is that session's work.
+func FixesForCommand(dir, command, text string, limit int, allow func(project string) bool) []FixPair {
 	if limit <= 0 {
 		limit = 3
 	}
@@ -995,6 +1005,7 @@ func FixesFor(dir, text string, limit int, allow func(project string) bool) []Fi
 	if len(sigs) == 0 {
 		return nil
 	}
+	shell := shellOnlySigs(text, command, sigs)
 	var out, held []FixPair
 	// The ignore rule, applied here rather than by the seven callers: a FixPair
 	// carries the project and the rule matches on the session's path, so no
@@ -1016,6 +1027,9 @@ func FixesFor(dir, text string, limit int, allow func(project string) bool) []Fi
 	}
 	for _, p := range ReadFixes(dir) {
 		if !p.answers(sigs) {
+			continue
+		}
+		if len(shell) > 0 && !p.answers(without(sigs, shell)) && !sameFailingCommand(p, command) {
 			continue
 		}
 		if remedyIsTheFailure(p) || remedyIsIrreversible(p.Command) {
