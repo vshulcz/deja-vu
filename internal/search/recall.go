@@ -93,27 +93,81 @@ func AutoRecallDigestShowing(ss []model.Session, budget int, terms []string, ask
 	if budget <= 0 {
 		budget = 2000
 	}
+	// Sections are gathered until the lines that are not receipts fill the
+	// budget, so a receipt never decides which session gets in.
+	type section struct {
+		s     model.Session
+		lines []string
+	}
+	var secs []section
+	core, total := 0, 0
+	for _, s := range ss {
+		if core >= budget {
+			break
+		}
+		text := autoRecallSessionForAsked(s, time.Now(), false, terms, asked)
+		if text == "" {
+			continue
+		}
+		lines := strings.SplitAfter(text, "\n")
+		for _, l := range lines {
+			total += len(l)
+			if !receiptLine(l) {
+				core += len(l)
+			}
+		}
+		secs = append(secs, section{s, lines})
+	}
+	all := make([][]string, len(secs))
+	for i := range secs {
+		all[i] = secs[i].lines
+	}
+	dropReceipts(all, total, budget)
 	var b strings.Builder
 	var shown []model.Session
-	for _, s := range ss {
+	for _, sec := range secs {
 		if b.Len() >= budget {
 			break
 		}
-		section := autoRecallSessionForAsked(s, time.Now(), false, terms, asked)
-		if section == "" {
-			continue
-		}
-		shown = append(shown, s)
-		if b.Len()+len(section) > budget {
+		text := strings.Join(sec.lines, "")
+		shown = append(shown, sec.s)
+		if b.Len()+len(text) > budget {
 			cut := budget - b.Len()
-			for cut > 0 && !utf8.RuneStart(section[cut]) {
+			for cut > 0 && !utf8.RuneStart(text[cut]) {
 				cut--
 			}
-			section = section[:cut]
+			text = text[:cut]
 		}
-		b.WriteString(section)
+		b.WriteString(text)
 	}
 	return strings.TrimSpace(b.String()), shown
+}
+
+// dropReceipts blanks receipt lines of secs, whose lines come to total bytes,
+// until they fit budget. A receipt backs the line that answers; it is not that
+// line. They go last shown first: on a real replay the Ran and Output lines in
+// front of a conclusion took the room of the conclusion.
+func dropReceipts(secs [][]string, total, budget int) {
+	for i := len(secs) - 1; i >= 0 && total > budget; i-- {
+		for j := len(secs[i]) - 1; j >= 0 && total > budget; j-- {
+			if receiptLine(secs[i][j]) {
+				total -= len(secs[i][j])
+				secs[i][j] = ""
+			}
+		}
+	}
+}
+
+// receiptLine reports a block line that is a record backing another line:
+// a command run, an output, an edit (evidence.Receipts).
+func receiptLine(l string) bool {
+	body := strings.TrimPrefix(strings.TrimSpace(l), "- ")
+	for _, p := range []string{"Ran: `", "Output: ", evidence.LabelOutputOrder, "Edit "} {
+		if strings.HasPrefix(body, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // settledProbeBudget is how much of a session the ordering reads to ask whether
