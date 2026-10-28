@@ -20,7 +20,7 @@
 <tr>
 <td align="center" width="33%">召回率<br><b>97.2% R@5</b>（LongMemEval-S）<br><sub>全部 500 题 · MemPalace 96.6%，agentmemory 95.2%<br>同样 19,195 个会话：100 题中 19 题排第一，第二名 14 题</sub></td>
 <td align="center" width="33%">Token 用量<br>token 只有 agentmemory 的<b>一半</b><br><sub>已做过的任务：53,558 对比 104,974<br>工具定义每轮 477 token，七个里最少</sub></td>
-<td align="center" width="33%">索引耗时<br><b>17.6 秒</b>索引 19,195 个会话<br><sub>七个工具里第二名：72 秒<br>首次回答 26 毫秒，搜索中位数 97 毫秒</sub></td>
+<td align="center" width="33%">索引耗时<br><b>13.6 秒</b>索引 19,195 个会话<br><sub>七个工具里第二名：72 秒<br>首次回答 26 毫秒，搜索中位数 97 毫秒</sub></td>
 </tr>
 </table>
 

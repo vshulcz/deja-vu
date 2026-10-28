@@ -21,7 +21,7 @@ deja indexe tout, des mois en arrière compris, et donne la partie utile
 <tr>
 <td align="center" width="33%">Rappel<br><b>97.2% R@5</b> sur LongMemEval-S<br><sub>les 500 questions · MemPalace 96.6%, agentmemory 95.2%<br>mêmes 19,195 sessions : 19/100 au premier rang, le suivant 14</sub></td>
 <td align="center" width="33%">Tokens<br><b>moitié moins de tokens</b> qu'agentmemory<br><sub>53,558 contre 104,974 sur une tâche déjà résolue<br>477 tokens de définitions d'outils, le moins des sept</sub></td>
-<td align="center" width="33%">Indexation<br><b>17.6 s</b> pour indexer 19,195 sessions<br><sub>le suivant des sept : 72 s<br>26 ms jusqu'à la première réponse, recherche médiane en 97 ms</sub></td>
+<td align="center" width="33%">Indexation<br><b>13.6 s</b> pour indexer 19,195 sessions<br><sub>le suivant des sept : 72 s<br>26 ms jusqu'à la première réponse, recherche médiane en 97 ms</sub></td>
 </tr>
 </table>
 

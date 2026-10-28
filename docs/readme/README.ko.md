@@ -20,7 +20,7 @@ deja는 몇 달 전 기록까지 전부 색인하고, 지금 일하는 에이전
 <tr>
 <td align="center" width="33%">재현율<br>LongMemEval-S <b>97.2% R@5</b><br><sub>전체 500문항 · MemPalace 96.6%, agentmemory 95.2%<br>같은 19,195개 세션: 1순위 적중 19/100, 차순위 14</sub></td>
 <td align="center" width="33%">토큰<br>agentmemory의 <b>절반 토큰</b><br><sub>이미 해결한 작업에서 53,558 대 104,974<br>도구 정의는 턴당 477토큰, 7개 중 최소</sub></td>
-<td align="center" width="33%">색인 시간<br>19,195개 세션 인덱싱 <b>17.6초</b><br><sub>7개 도구 중 차순위: 72초<br>첫 응답 26ms, 검색 중앙값 97ms</sub></td>
+<td align="center" width="33%">색인 시간<br>19,195개 세션 인덱싱 <b>13.6초</b><br><sub>7개 도구 중 차순위: 72초<br>첫 응답 26ms, 검색 중앙값 97ms</sub></td>
 </tr>
 </table>
 

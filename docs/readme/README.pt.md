@@ -21,7 +21,7 @@ ao agente que está trabalhando agora.</p>
 <tr>
 <td align="center" width="33%">Recall<br><b>97.2% R@5</b> no LongMemEval-S<br><sub>todas as 500 perguntas · MemPalace 96.6%, agentmemory 95.2%<br>mesmas 19,195 sessões: 19/100 em primeiro lugar, a seguinte 14</sub></td>
 <td align="center" width="33%">Tokens<br><b>metade dos tokens</b> do agentmemory<br><sub>53,558 contra 104,974 numa tarefa já resolvida<br>477 tokens de definições de ferramentas, a menor de sete</sub></td>
-<td align="center" width="33%">Indexação<br><b>17.6 s</b> para indexar 19,195 sessões<br><sub>a seguinte de sete: 72 s<br>26 ms até a primeira resposta, mediana de busca de 97 ms</sub></td>
+<td align="center" width="33%">Indexação<br><b>13.6 s</b> para indexar 19,195 sessões<br><sub>a seguinte de sete: 72 s<br>26 ms até a primeira resposta, mediana de busca de 97 ms</sub></td>
 </tr>
 </table>
 

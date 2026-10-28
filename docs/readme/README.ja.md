@@ -25,7 +25,7 @@ deja はそれを数か月前の分まで丸ごとインデックス化し、
 <tr>
 <td align="center" width="33%">再現率<br>LongMemEval-S で <b>97.2% R@5</b><br><sub>全 500 問 · MemPalace 96.6%、agentmemory 95.2%<br>同じ 19,195 セッションで 1 位正解 19/100、次点は 14</sub></td>
 <td align="center" width="33%">トークン<br>agentmemory の<b>半分のトークン</b><br><sub>解決済みのタスクで 53,558 対 104,974<br>ツール定義は 1 ターン 477 トークン、7 つの中で最少</sub></td>
-<td align="center" width="33%">インデックス時間<br>19,195 セッションを <b>17.6 秒</b>でインデックス<br><sub>7 ツール中の次点は 72 秒<br>最初の回答まで 26 ms、検索の中央値 97 ms</sub></td>
+<td align="center" width="33%">インデックス時間<br>19,195 セッションを <b>13.6 秒</b>でインデックス<br><sub>7 ツール中の次点は 72 秒<br>最初の回答まで 26 ms、検索の中央値 97 ms</sub></td>
 </tr>
 </table>
 

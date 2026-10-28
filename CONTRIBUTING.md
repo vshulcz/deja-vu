@@ -6,8 +6,8 @@ Issues labelled [good first issue](https://github.com/vshulcz/deja-vu/labels/goo
 are bounded, and each one names the case it is wrong on, so you can reproduce
 before you change anything.
 
-Outside pull requests so far: 116 merged of 128 from 47 people, median 5.2 hours
-from opening to merge, the slowest two days, none left open. If yours sits
+Outside pull requests so far: 205 merged of 234 from 86 people, median 6.2 hours
+from opening to merge, the slowest six days, none left open. If yours sits
 longer than that, something went wrong on our side — say so in the thread.
 
 ## Build and test
