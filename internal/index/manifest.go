@@ -1035,6 +1035,21 @@ func AllMeta(dir string) ([]SessionMeta, error) {
 	return out, nil
 }
 
+// AllMetaShared is AllMeta without the copy: the metas of the cached manifest,
+// one slice for every caller until the index is written again. Recall asks
+// for them several times a query, and each copy was 10 MB on a 19,000-session
+// store. The caller must not modify the slice or the metas in it.
+func AllMetaShared(dir string) ([]SessionMeta, error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return nil, err
+	}
+	return viewsFor(m).allMeta(), nil
+}
+
 // SessionCount reports how many sessions the store holds, without reading a
 // record. A caller reporting an empty result needs the size of the corpus, not
 // the size of whatever it just loaded.

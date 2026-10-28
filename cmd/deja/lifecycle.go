@@ -39,7 +39,7 @@ func promotedNoteID(s model.Session) string {
 // its original id; the notes.jsonl holding the states does not travel at all,
 // so on the receiving machine the index is the only place the link survives.
 func importedLifecycles(dir string) map[string]sources.Lifecycle {
-	metas, err := index.AllMeta(dir)
+	metas, err := index.AllMetaShared(dir)
 	if err != nil {
 		return nil
 	}

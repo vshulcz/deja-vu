@@ -40,6 +40,8 @@ var manifestCache struct {
 	sessions os.FileInfo
 	m        Manifest
 	ok       bool
+	// views are derived from m and replaced with it (meta_views.go).
+	views *metaViews
 }
 
 func readManifestCached(dir string) (Manifest, error) {
@@ -74,6 +76,7 @@ func cacheManifest(dir string, fi, si os.FileInfo, m Manifest) {
 	manifestCache.mu.Lock()
 	manifestCache.dir, manifestCache.fi, manifestCache.sessions = dir, fi, si
 	manifestCache.m, manifestCache.ok = m, true
+	manifestCache.views = &metaViews{sessions: m.Sessions}
 	manifestCache.mu.Unlock()
 }
 

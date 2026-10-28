@@ -244,7 +244,7 @@ const recallTouchedFiles = 4
 // three paths. The line exists so an agent that has just learned "this was
 // solved here" knows where to look, and alphabetical order does not know that.
 func recallTouchedLine(dir string, s model.Session, terms []string) string {
-	metas, err := index.AllMeta(dir)
+	metas, err := index.AllMetaShared(dir)
 	if err != nil {
 		return ""
 	}

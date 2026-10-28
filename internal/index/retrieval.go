@@ -2918,7 +2918,7 @@ func cutPostingsBySession(posts []posting, m Manifest, o query.Options) []postin
 	// candidate records to calculate BM25 document frequency and length.
 	out := make([]posting, 0, len(posts))
 	for _, p := range posts {
-		if meta, ok := metaByOrd[p.Sid]; ok && sessionMetaMatches(meta, o) {
+		if meta, ok := metaAt(metaByOrd, p.Sid); ok && sessionMetaMatches(meta, o) {
 			out = append(out, p)
 		}
 	}
@@ -2964,7 +2964,7 @@ func poolPostings(posts []posting, m Manifest, o query.Options, holding int) poo
 	withheld := 0
 	denied, allowed := map[uint32]bool{}, map[uint32]bool{}
 	for sid := range records {
-		meta := metaByOrd[sid]
+		meta, _ := metaAt(metaByOrd, sid)
 		if excluded[strings.ToLower(meta.Harness)] || pol.Ignored(meta.Path, meta.Project) {
 			continue
 		}
@@ -2990,7 +2990,7 @@ func poolPostings(posts []posting, m Manifest, o query.Options, holding int) poo
 	}
 	cands := make([]search.PoolCandidate, len(sids))
 	for i, sid := range sids {
-		meta := metaByOrd[sid]
+		meta, _ := metaAt(metaByOrd, sid)
 		s := sessionFromMeta(meta)
 		s.Held = meta.Counted
 		cands[i] = search.PoolCandidate{Session: s, Records: records[sid]}
@@ -3148,7 +3148,7 @@ func cutRoleOnlyUnread(dir string, m Manifest, o query.Options, variants map[str
 		}
 		out := map[string]bool{}
 		for _, p := range posts {
-			meta := byOrd[p.Sid]
+			meta, _ := metaAt(byOrd, p.Sid)
 			if k := meta.Harness + ":" + meta.ID; !ok[k] {
 				out[k] = true
 			}
@@ -3227,12 +3227,12 @@ func sessionsBorneOut(dir string, m Manifest, o query.Options, variants map[stri
 // Its rule for reading everything: under its pool size, before or after the
 // ignore rule and the trust policy drop what they withhold, it reads every
 // candidate, those included.
-func scopedPool(records map[uint32]int, sids []uint32, kept map[uint32]bool, metaByOrd map[uint32]SessionMeta, o query.Options, n int) (extra map[uint32]bool, whole bool) {
+func scopedPool(records map[uint32]int, sids []uint32, kept map[uint32]bool, metaByOrd map[uint32]*SessionMeta, o query.Options, n int) (extra map[uint32]bool, whole bool) {
 	if len(o.PoolScope) == 0 {
 		return nil, false
 	}
 	in := func(sid uint32) bool {
-		meta := metaByOrd[sid]
+		meta, _ := metaAt(metaByOrd, sid)
 		return query.ProjectAnyMatches(meta.Project, meta.From, o.PoolScope)
 	}
 	var scope []uint32
@@ -3327,12 +3327,9 @@ func capPostingsPerSession(posts []posting, n int) []posting {
 	return out
 }
 
-func sessionMetaByOrd(m Manifest) map[uint32]SessionMeta {
-	out := make(map[uint32]SessionMeta, len(m.Sessions))
-	for _, meta := range m.Sessions {
-		out[meta.Ord] = meta
-	}
-	return out
+// sessionMetaByOrd is m's sessions by ordinal, shared: see metaViews.
+func sessionMetaByOrd(m Manifest) map[uint32]*SessionMeta {
+	return viewsFor(m).metaByOrd()
 }
 
 // fromMatches answers whether a session belongs to the machine asked for.

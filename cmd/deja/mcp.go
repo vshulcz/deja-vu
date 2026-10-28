@@ -1563,7 +1563,7 @@ func recallHeaderReserve(q, tier string, offset, limit, total int) int {
 // per page; empty when the index cannot be read, which costs a marker rather
 // than an answer.
 func twinSessionsFor(dir string) map[string][]string {
-	metas, err := index.AllMeta(dir)
+	metas, err := index.AllMetaShared(dir)
 	if err != nil {
 		return nil
 	}

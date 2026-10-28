@@ -105,15 +105,12 @@ func lineage(dir string, ids map[string]bool, heads, wholes []model.Session) (ma
 		}
 	}
 	held := heldRecords(dir, m)
-	byID := map[string][]SessionMeta{}
-	for _, meta := range m.Sessions {
-		byID[meta.ID] = append(byID[meta.ID], meta)
-	}
+	byID := viewsFor(m).metasByID()
 	// parentMeta is the session a fork names, in the fork's own harness.
 	parentMeta := func(harness, id string) (SessionMeta, bool) {
 		for _, p := range byID[id] {
 			if p.Harness == harness {
-				return p, true
+				return *p, true
 			}
 		}
 		return SessionMeta{}, false
