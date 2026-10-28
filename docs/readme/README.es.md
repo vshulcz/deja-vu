@@ -265,7 +265,7 @@ y el recall por MCP funcionan como siempre.
 ## Evidencia
 
 <p>
-<b>58% menos tokens</b> en una tarea que esta máquina ya había resuelto &middot; <b>88.1% hit@1</b> en LongMemEval-S (conjunto depurado de 470 preguntas) &middot; <b>70.5%</b> en LoCoMo &middot; consultas en <b>milisegundos</b> sobre gigabytes de historial<br>
+<b>58% menos tokens</b> en una tarea que esta máquina ya había resuelto &middot; <b>88.9% hit@1</b> en LongMemEval-S (conjunto depurado de 470 preguntas) &middot; <b>70.5%</b> en LoCoMo &middot; consultas en <b>milisegundos</b> sobre gigabytes de historial<br>
 <sub>Once ejecuciones por brazo: 53,558 tokens frente a 126,222 sin nada conectado, y 52,815 frente a 103,443 en una versión posterior, otra vez once ejecuciones &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">lo que cuesta terminar una tarea</a> &middot;
 los dos harnesses de recuperación están en este repositorio y corren sobre datasets públicos en minutos &middot;
@@ -340,7 +340,7 @@ puede pasar. Ver el [modelo de seguridad](../../docs/SECURITY-MODEL.md#redaction
 
 Un recall es una consulta léxica a un índice local: mediana de 0.7–0.8 ms y
 nada esperando a un modelo. El hook añade el arranque del proceso y la comprobación de frescura de los
-almacenes: decenas de milisegundos en un almacén de varios gigabytes.
+almacenes: en un índice de 19k sesiones, el hook de cada prompt tarda 107 ms de mediana.
 
 </details>
 

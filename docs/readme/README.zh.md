@@ -243,7 +243,7 @@ specify extension add deja-vu --from https://github.com/vshulcz/deja-vu/releases
 ## 证据
 
 <p>
-同一台机器已经做过的任务，<b>少花 58% 的 token</b> &middot; LongMemEval-S（470 题清理集）上 <b>88.1% hit@1</b> &middot; LoCoMo 上 <b>70.5%</b> &middot; 数 GB 历史上的查询在<b>毫秒</b>级<br>
+同一台机器已经做过的任务，<b>少花 58% 的 token</b> &middot; LongMemEval-S（470 题清理集）上 <b>88.9% hit@1</b> &middot; LoCoMo 上 <b>70.5%</b> &middot; 数 GB 历史上的查询在<b>毫秒</b>级<br>
 <sub>每组 11 次运行：53,558 token，对比未接入任何记忆时的 126,222；之后的版本上再各跑 11 次：52,815 对比 103,443 &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">完成一个任务要花多少</a> &middot;
 两套检索评测都在本仓库里，几分钟即可在公开数据集上跑完 &middot;
@@ -312,7 +312,7 @@ MCP 服务端、统计、分享和同步都读这一份索引。细节见
 <summary><b>会拖慢我的智能体吗？</b></summary>
 
 一次召回是对本地索引的词法查询：中位数 0.7–0.8 ms，没有任何东西在等模型。
-钩子会额外加上进程启动和对存储的新鲜度检查——几个 GB 的存储上是几十毫秒。
+钩子会额外加上进程启动和对存储的新鲜度检查——在 19k 个会话的索引上，每次提示的钩子中位数是 107 ms。
 
 </details>
 

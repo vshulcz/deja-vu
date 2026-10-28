@@ -241,7 +241,7 @@ opencode、dsh 和 OpenClaw 只補上缺的那部分；Kimi、Grok、Codex 和 p
 ## 證據
 
 <p>
-同一台機器已經做過的任務，<b>少花 58% 的 token</b> &middot; LongMemEval-S（470 題清理集）上 <b>88.1% hit@1</b> &middot; LoCoMo 上 <b>70.5%</b> &middot; 數 GB 歷史上的查詢在<b>毫秒</b>級<br>
+同一台機器已經做過的任務，<b>少花 58% 的 token</b> &middot; LongMemEval-S（470 題清理集）上 <b>88.9% hit@1</b> &middot; LoCoMo 上 <b>70.5%</b> &middot; 數 GB 歷史上的查詢在<b>毫秒</b>級<br>
 <sub>每組 11 次執行：53,558 token，對比未接上任何記憶時的 126,222；之後的版本上再各跑 11 次：52,815 對比 103,443 &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">完成一個任務要花多少</a> &middot;
 兩套檢索評測都在本儲存庫裡，幾分鐘即可在公開資料集上跑完 &middot;
@@ -310,7 +310,7 @@ MCP 伺服器、統計、分享和同步都讀這一份索引。細節見
 <summary><b>會拖慢我的代理嗎？</b></summary>
 
 一次召回是對本機索引的詞彙查詢：中位數 0.7–0.8 ms，沒有任何東西在等模型。
-掛鉤會額外加上行程啟動和對儲存的新鮮度檢查——數 GB 的儲存上是幾十毫秒。
+掛鉤會額外加上行程啟動和對儲存的新鮮度檢查——在 19k 個會話的索引上，每次提示的掛鉤中位數是 107 ms。
 
 </details>
 

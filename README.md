@@ -229,7 +229,7 @@ as usual. `deja search <query>` skips the suggestion.
 | Command | What it does |
 | --- | --- |
 | `deja ctx <query>` | Markdown digest of the best match, with the code it changed, ready to pipe into a prompt. |
-| `deja recall <words>` | The page the MCP recall tool gives an agent: about 4 KB, this project first. For skills and scripts that run deja through the shell. |
+| `deja recall <words>` | The page the MCP recall tool gives an agent: about 4 KB, this project first (`DEJA_RECALL_GLOBAL=1` ranks every project the same). For skills and scripts that run deja through the shell. |
 | `deja resume <id>` | Reopen a found session in its native harness. `--app` opens a Codex session in the ChatGPT desktop app. |
 | `deja restore <path>` | Hand back a span an agent replaced, from the `old_string` its edit recorded. Never writes over the original. |
 | `deja promote <id>` | Distill a session into a curated note with provenance, tags and a lifecycle state. Notes outrank raw transcripts. |
@@ -275,7 +275,7 @@ whether or not the tool is called.
 
 | Mode | `q` is | Also reads | Returns |
 | --- | --- | --- | --- |
-| `recall` | the question, or an exact error string, name or flag | `harness?`, `limit?`, `offset?` | Dense matching snippets, capped at 4KB. |
+| `recall` | 1-3 exact terms: a file path, an error string, a flag or identifier | `harness?`, `limit?`, `offset?` | Dense matching snippets, capped at 4KB. |
 | `context` | the same as recall | `harness?` | Markdown digest of the best-matching session, with the code it changed. |
 | `blame` | a file path | `harness?`, `project?`, `since?`, `limit?`, `all?` | Sessions that discussed a file. |
 | `fix` | the failing output, verbatim | `limit?` | What this machine ran, or changed, after that same error before. |
@@ -450,7 +450,7 @@ With Ollama or LM Studio, embedding stays local and needs no key.
 
 ## Proof
 
-Millisecond lookups, and on LongMemEval-S 88.1% hit@1 (470-question cleaned set) and 87.4% hit@1 on all 500 questions;
+Millisecond lookups, and on LongMemEval-S 88.9% hit@1 (470-question cleaned set) and 88.2% hit@1 on all 500 questions;
 on LoCoMo retrieval, 70.5% hit@1. On a task this machine had already solved, 58% fewer
 tokens: eleven runs an arm, 53,558 against 126,222 with nothing wired, and 52,815 against
 103,443 on a later build with the arms alternated. Both retrieval harnesses ship in this repo
@@ -514,7 +514,8 @@ transcripts:
 The same store has since grown to 2,754 sessions, 358k messages and 5.7 GB.
 A cold full build over it takes 71 s and writes a 232 MB index — 4% of the
 corpus, because the share falls as transcripts repeat themselves — and the
-end-to-end median is unchanged at 0.25 s.
+end-to-end median is unchanged at 0.25 s. Since 0.23.2 records are compressed
+from 256 bytes, which takes a 19k-session index from 277 to 185 MB.
 
 The index is incremental. When a session file grows, only that file is re-read. When one is
 rewritten, its new records are appended and the old ones zeroed in place. On a
@@ -559,7 +560,8 @@ is not secret detection: a shape it does not know can pass through. See the
 A recall is a lexical lookup against a local index:
 0.7–0.8 ms median, and nothing waits on a model. A hook adds the process start and a
 freshness check over your stores on top of that: about 0.2 s end to end on a 1.9 GB
-store, and 0.59 s for the per-prompt hook on an index of 19k sessions.
+store. On an index of 19k sessions the per-prompt hook takes 107 ms at the median,
+and a recall through `deja mcp` 85 ms.
 
 </details>
 
@@ -696,7 +698,7 @@ Written for the situation rather than the feature:
 - [What each memory tool knows the day you install it](https://vshulcz.github.io/deja-vu/guide/day-zero.html) · [Memory plugins compared](https://vshulcz.github.io/deja-vu/guide/compare.html)
 - [What compaction drops](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [Switching agents](https://vshulcz.github.io/deja-vu/guide/switching-agents.html) · [Auditing an agent](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [Exporting a conversation](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [Across machines](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [What memory costs](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
 
-Per harness: [Claude Code](https://vshulcz.github.io/deja-vu/guide/memory-for-claude-code.html) · [Codex](https://vshulcz.github.io/deja-vu/guide/memory-for-codex.html) · [Cursor](https://vshulcz.github.io/deja-vu/guide/memory-for-cursor.html) · [Windsurf](https://vshulcz.github.io/deja-vu/guide/memory-for-windsurf.html) · [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [DeepSeek Harness](https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html) · [Kimi Code](https://vshulcz.github.io/deja-vu/guide/memory-for-kimi.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [Qwen Code](https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html) · [Copilot CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-copilot.html) · [Copilot Chat](https://vshulcz.github.io/deja-vu/guide/memory-for-copilot-chat.html) · [aider](https://vshulcz.github.io/deja-vu/guide/memory-for-aider.html) · [Amp](https://vshulcz.github.io/deja-vu/guide/memory-for-amp.html) · [Antigravity](https://vshulcz.github.io/deja-vu/guide/memory-for-antigravity.html) · [Continue](https://vshulcz.github.io/deja-vu/guide/memory-for-continue.html) · [Crush](https://vshulcz.github.io/deja-vu/guide/memory-for-crush.html) · [Roo Code](https://vshulcz.github.io/deja-vu/guide/memory-for-roo.html) · [Kilo Code](https://vshulcz.github.io/deja-vu/guide/memory-for-kilocode.html) · [Kiro](https://vshulcz.github.io/deja-vu/guide/memory-for-kiro.html) · [Cherry Studio](https://vshulcz.github.io/deja-vu/guide/memory-for-cherrystudio.html) · [Oh My Pi](https://vshulcz.github.io/deja-vu/guide/memory-for-omp.html) · [prime-agent](https://vshulcz.github.io/deja-vu/guide/memory-for-prime.html) · [Senpi](https://vshulcz.github.io/deja-vu/guide/memory-for-senpi.html) · [Kimchi](https://vshulcz.github.io/deja-vu/guide/memory-for-kimchi.html) · [Command Code](https://vshulcz.github.io/deja-vu/guide/memory-for-commandcode.html) · [ZCode](https://vshulcz.github.io/deja-vu/guide/memory-for-zcode.html) · [gjc](https://vshulcz.github.io/deja-vu/guide/memory-for-gjc.html) · [CodeWhale](https://vshulcz.github.io/deja-vu/guide/memory-for-codewhale.html) · [Reasonix](https://vshulcz.github.io/deja-vu/guide/memory-for-reasonix.html)
+Per harness: [Claude Code](https://vshulcz.github.io/deja-vu/guide/memory-for-claude-code.html) · [Codex](https://vshulcz.github.io/deja-vu/guide/memory-for-codex.html) · [Cursor](https://vshulcz.github.io/deja-vu/guide/memory-for-cursor.html) · [Windsurf](https://vshulcz.github.io/deja-vu/guide/memory-for-windsurf.html) · [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [DeepSeek Harness](https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html) · [Kimi Code](https://vshulcz.github.io/deja-vu/guide/memory-for-kimi.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [Qwen Code](https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html) · [Copilot CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-copilot.html) · [Copilot Chat](https://vshulcz.github.io/deja-vu/guide/memory-for-copilot-chat.html) · [aider](https://vshulcz.github.io/deja-vu/guide/memory-for-aider.html) · [Amp](https://vshulcz.github.io/deja-vu/guide/memory-for-amp.html) · [Antigravity](https://vshulcz.github.io/deja-vu/guide/memory-for-antigravity.html) · [Continue](https://vshulcz.github.io/deja-vu/guide/memory-for-continue.html) · [Crush](https://vshulcz.github.io/deja-vu/guide/memory-for-crush.html) · [Roo Code](https://vshulcz.github.io/deja-vu/guide/memory-for-roo.html) · [Kilo Code](https://vshulcz.github.io/deja-vu/guide/memory-for-kilocode.html) · [Kiro](https://vshulcz.github.io/deja-vu/guide/memory-for-kiro.html) · [Cherry Studio](https://vshulcz.github.io/deja-vu/guide/memory-for-cherrystudio.html) · [Oh My Pi](https://vshulcz.github.io/deja-vu/guide/memory-for-omp.html) · [prime-agent](https://vshulcz.github.io/deja-vu/guide/memory-for-prime.html) · [Senpi](https://vshulcz.github.io/deja-vu/guide/memory-for-senpi.html) · [Kimchi](https://vshulcz.github.io/deja-vu/guide/memory-for-kimchi.html) · [Command Code](https://vshulcz.github.io/deja-vu/guide/memory-for-commandcode.html) · [ZCode](https://vshulcz.github.io/deja-vu/guide/memory-for-zcode.html) · [gjc](https://vshulcz.github.io/deja-vu/guide/memory-for-gjc.html) · [CodeWhale](https://vshulcz.github.io/deja-vu/guide/memory-for-codewhale.html) · [Reasonix](https://vshulcz.github.io/deja-vu/guide/memory-for-reasonix.html) · [TRAE CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-trae.html)
 
 ## Try it on your own history
 
