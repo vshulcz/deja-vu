@@ -31,8 +31,9 @@ A harness is done when all of these are true and you have seen each one
 yourself, on this machine:
 
 - Every channel the harness offers is wired: session start, per prompt, before
-  a tool runs, after one fails, on compaction, and whatever it calls spawning a
-  subagent. `deja doctor` reports no row out of date.
+  a tool runs, after one fails and on compaction. A spawned subagent gets no
+  recall unless the parent's hooks reach nobody, as in Grok (#5660).
+  `deja doctor` reports no row out of date.
 - The recall is **in the request the harness actually sent**, read out of the
   bytes, not inferred from the hook printing something.
 - A question whose answer exists only in history is answered from history. Use

@@ -266,7 +266,10 @@ _deja_completion() {
                 COMPREPLY=( $(compgen -W "--limit --json" -- "$cur") )
             fi
             ;;
-        brief|check|ctx|embed|hook-precompact|hook-prompt|mcp|share|sources|statusline|version|warmup)
+        mcp)
+            COMPREPLY=( $(compgen -W "--context-search" -- "$cur") )
+            ;;
+        brief|check|ctx|embed|hook-precompact|hook-prompt|share|sources|statusline|version|warmup)
             COMPREPLY=()
             ;;
         *)
@@ -454,7 +457,10 @@ _deja() {
     fix|tests)
       _arguments '--limit[max results]:count:' '--json[print JSON]'
       ;;
-    brief|check|ctx|embed|hook-precompact|hook-prompt|mcp|share|sources|statusline|version|warmup)
+    mcp)
+      _arguments '--context-search[serve only context_search]'
+      ;;
+    brief|check|ctx|embed|hook-precompact|hook-prompt|share|sources|statusline|version|warmup)
       ;;
     *)
       _arguments '--json[print JSON]' '--re[interpret query as a regular expression]' '--all[include all results]' '--no-embed[skip semantic reranking]' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '--role=[filter by role]:role:(%ROLES%)' '--session=[only one session]:id:' '--rebuild[force a full rebuild]' '--limit=[max sessions to return (1-100)]:count:' '--sort=[order of the results]:order:(relevance date)'
@@ -504,6 +510,7 @@ complete -c deja -n '__fish_seen_subcommand_from doctor' -l deep
 complete -c deja -n '__fish_seen_subcommand_from doctor' -l all
 complete -c deja -n '__fish_seen_subcommand_from delete' -l dry-run -d 'List the files, remove nothing'
 complete -c deja -n '__fish_seen_subcommand_from delete' -l yes -d 'Do not ask'
+complete -c deja -n '__fish_seen_subcommand_from mcp' -l context-search -d 'Serve only context_search'
 complete -c deja -n '__fish_seen_subcommand_from forget; and not __fish_seen_subcommand_from sync' -l list
 complete -c deja -n '__fish_seen_subcommand_from forget; and not __fish_seen_subcommand_from sync' -l dry-run
 complete -c deja -n '__fish_seen_subcommand_from forget; and not __fish_seen_subcommand_from sync' -l session -r
@@ -719,7 +726,8 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 if ($previous -eq '--limit') { @() }
                 else { @('--limit', '--json') }
             }
-            { $_ -in @('brief', 'check', 'ctx', 'embed', 'hook-precompact', 'hook-prompt', 'mcp', 'share', 'sources', 'statusline', 'version', 'warmup') } { @() }
+            'mcp' { @('--context-search') }
+            { $_ -in @('brief', 'check', 'ctx', 'embed', 'hook-precompact', 'hook-prompt', 'share', 'sources', 'statusline', 'version', 'warmup') } { @() }
             default { if ($previous -eq '--sort') { @('relevance', 'date') } else { $defaultOptions } }
         }
     }

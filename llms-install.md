@@ -33,8 +33,8 @@ Grok Build, OpenClaw, pi, omp, DeepSeek Harness, Zed, Hermes and the rest that
 `deja install --help` lists. For those there is a one-command setup instead:
 
 ```sh
-deja install --auto   # MCP recall everywhere it finds, plus session-start recall
-deja install --all    # the same without the session-start hook
+deja install --auto   # MCP recall everywhere it finds, plus the hooks and plugins each agent takes
+deja install --all    # MCP recall only, no hooks or plugins
 ```
 
 ## Verify

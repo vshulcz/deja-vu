@@ -51,6 +51,7 @@ These are the modes of the one deja tool, passed as ` + "`mode`" + `.
 - how: the real command with the real flags this machine runs for a build, test, deploy or script, ordered by how many sessions ran it. A guessed invocation is plausible and fails on this setup.
 - orient: at the start of work in a project, the commands past sessions ran there and the files they worked in, before you go reading.
 - remember: store one durable decision after it is settled, as a single self-contained fact. Not transcripts, not anything already obvious from the code.
+- handoff: continue another session's work. Pass its id or harness.
 
 ## Reading a result
 

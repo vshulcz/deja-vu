@@ -18,6 +18,7 @@ request, run:
 ```sh
 go test ./... -race -count=1
 go vet ./...
+golangci-lint run
 go build ./cmd/deja
 ```
 
@@ -35,10 +36,10 @@ go test ./internal/sources/ -coverprofile=coverage.out
 go tool cover -func=coverage.out
 ```
 
-Replace `internal/sources` with each package changed. CI prints only the
-aggregate number, so the two commands above are how you check the figure review
-actually looks at — run them before opening the PR and there will be no
-surprises. Do not add low-value tests only to move the number; explain a
+Replace `internal/sources` with each package changed. CI prints each
+package's figure beside its floor only after the whole suite has run, so the
+two commands above are the quicker check — run them before opening the PR and
+there will be no surprises. Do not add low-value tests only to move the number; explain a
 genuinely unreachable branch in the pull request instead.
 
 ## Hermetic tests

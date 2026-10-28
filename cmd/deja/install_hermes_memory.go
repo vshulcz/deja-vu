@@ -185,7 +185,7 @@ RECALL_SCHEMA = {
         "properties": {
             "query": {
                 "type": "string",
-                "description": "Error text, identifier, command or a short description of the problem.",
+                "description": "1-3 exact terms: a file path, an error string, a flag or identifier.",
             },
             "offset": {
                 "type": "integer",

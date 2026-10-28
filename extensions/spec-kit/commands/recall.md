@@ -38,8 +38,8 @@ If the input is not empty, treat it as the search terms and skip step 2.
    Read `FEATURE_SPEC` and, if it exists, `IMPL_PLAN`. If the script is missing
    or fails, use the most recently modified directory under `specs/`.
 
-   From them, write two or three short queries of two to five words each: the
-   feature's subject, the main component, library or API the plan relies on,
+   From them, write two or three queries of one to three exact terms each:
+   the feature's subject, the main component, library or API the plan relies on,
    and any specific error, protocol or data shape it names. Prefer the words a
    developer would have typed while working on it ("stripe webhook signature",
    "sqlite migration rollback") over spec phrasing ("the system shall"). Skip

@@ -70,7 +70,7 @@ var helpEntries = []helpEntry{
 	{name: "recall", group: groupSearch,
 		usage:    []string{"deja recall <words> [--project name] [--harness name] [--limit n] [--offset n]"},
 		desc:     "the page the MCP recall tool gives an agent",
-		more:     "About 4 KB, this project first. For skills and scripts that reach deja through the shell rather than MCP.",
+		more:     "About 4 KB, this project first; DEJA_RECALL_GLOBAL=1 ranks every project the same. For skills and scripts that reach deja through the shell rather than MCP.",
 		examples: []string{`deja recall "pgbouncer prepared statements"`}},
 	{name: "share", group: groupSearch,
 		usage:    []string{"deja share <id-prefix>"},
@@ -229,7 +229,7 @@ var helpEntries = []helpEntry{
 		examples: []string{"DEJA_EMBED_URL=http://localhost:11434/v1/embeddings deja embed"}},
 	{name: "sync", group: groupSetup,
 		usage: []string{
-			"deja sync",
+			"deja sync [--full]",
 			"deja sync export <dir> [--full] [--include-imported] [--peer name]",
 			"deja sync import <dir>",
 			"deja sync ssh <host> [--pull] [--both] [--full]",
@@ -275,7 +275,7 @@ var helpEntries = []helpEntry{
 	{name: "mcp", group: groupAgents,
 		usage:    []string{"deja mcp [--context-search]"},
 		desc:     "the MCP server, on stdio",
-		more:     "deja install wires it into each agent; run it by hand only to debug a client. --context-search serves only context_search, Qwen Code's External Context MCP Profile v1.",
+		more:     "deja install wires it into each agent; run it by hand only to debug a client. --context-search serves only context_search, Qwen Code's External Context MCP Profile v1. A tool call still running after 20 s is answered with a note; DEJA_MCP_DEADLINE sets that in seconds, 0 turns it off.",
 		examples: []string{"deja mcp < requests.jsonl"}},
 	{name: "statusline", group: groupAgents,
 		usage:    []string{"deja statusline"},
@@ -287,7 +287,7 @@ var helpEntries = []helpEntry{
 		desc:     "repeated errors on the things a plan from stdin names",
 		examples: []string{"deja check - < plan.md"}},
 	{name: "hook-prompt", group: groupAgents,
-		usage:    []string{"deja hook-prompt [--plain] [--junie] [--mcode]"},
+		usage:    []string{"deja hook-prompt [--plain] [--copilot] [--strict] [--junie] [--mcode]"},
 		desc:     "per prompt: recall for what was asked",
 		examples: []string{"deja hook-prompt --plain < payload.json"}},
 	{name: "hook-context", group: groupAgents,
@@ -303,7 +303,7 @@ var helpEntries = []helpEntry{
 		desc:     "before a plan runs: what history says about it",
 		examples: []string{"deja hook-plan < payload.json"}},
 	{name: "hook-tool", group: groupAgents,
-		usage:    []string{"deja hook-tool [--plain] [--crush] [--junie] [--mcode]"},
+		usage:    []string{"deja hook-tool [--plain] [--copilot] [--crush] [--junie] [--mcode]"},
 		desc:     "before a command or edit: what it already has",
 		examples: []string{"deja hook-tool --plain < payload.json"}},
 	{name: "hook-tool-after", group: groupAgents,
@@ -368,6 +368,7 @@ var searchFlagRows = [][2]string{
 	{"--re", "treat the query as a regular expression"},
 	{"--json", "machine-readable output"},
 	{"--no-embed", "skip the semantic (embedding) tier"},
+	{"--rebuild", "read every session again before searching"},
 }
 
 // helpRow lays out one name and its description on the shared column.
@@ -391,6 +392,7 @@ func usageText() string {
 	b.WriteString(helpRow("deja <query>", "search your past agent sessions") + "\n")
 	b.WriteString(helpRow("deja <command>", "one of the commands below") + "\n")
 	b.WriteString(helpRow("deja help <command>", "a command's flags and examples") + "\n")
+	b.WriteString(helpRow("deja --framed <cmd>", "its output framed as reference data, for agents") + "\n")
 	for _, g := range helpGroups {
 		b.WriteString("\n" + g + ":\n")
 		for _, e := range helpEntries {
