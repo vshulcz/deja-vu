@@ -27,7 +27,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Delete Qwen Code chat history","description":"Qwen Code keeps one JSONL file per session under ~/.qwen/projects. Find it, delete one session with its sub-agent logs or all of them, and keep your settings.","url":"https://vshulcz.github.io/deja-vu/guide/delete-qwen-code-chat-history.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"datePublished":"2026-10-16","dateModified": "2026-10-16","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Delete Qwen Code chat history","description":"Qwen Code keeps one JSONL file per session under ~/.qwen/projects. Find it, delete one session with its sub-agent logs or all of them, and keep your settings.","url":"https://vshulcz.github.io/deja-vu/guide/delete-qwen-code-chat-history.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"datePublished":"2026-10-16","dateModified": "2026-10-28","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -154,6 +154,12 @@
 rm chats/&lt;sessionId&gt;.jsonl
 rm -r subagents/&lt;sessionId&gt;</pre>
 <p>The second command fails harmlessly when the session never started a sub-agent. To clear a whole project, remove its <code>chats</code> and <code>subagents</code> directories; to clear everything, remove those two in every project directory. Do not remove <code>~/.qwen</code> itself: <code>settings.json</code> and your MCP and hook wiring are there.</p>
+
+<h2>Delete one session with deja</h2>
+<p>If deja is installed, run <code>deja last</code> and copy the session id. Preview the deletion, then run it from a terminal and confirm:</p>
+<pre>deja delete &lt;id&gt; --dry-run
+deja delete &lt;id&gt;</pre>
+<p>The dry run lists the paths without removing them. After confirmation, deja removes those paths and forgets its own copy of the session. This cannot be undone. It also removes the session's <code>subagents/&lt;id&gt;</code> directory, if present. deja refuses deletion if a file or directory to be removed was written in the last 5 minutes; end the session and wait before deleting it.</p>
 
 <h2>What you lose</h2>
 <p>The session file is the only record of what Qwen Code was asked, which commands and edits it ran and why. Deleting it means <code>qwen -r</code> can no longer reopen the session, and nothing in Qwen Code can bring it back without a separate backup.</p>

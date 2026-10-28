@@ -27,7 +27,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Delete Antigravity conversation history","description":"Antigravity keeps a conversation in six places under ~/.gemini/antigravity. Delete it in the app, then VACUUM the summaries database so the text is gone too.","url":"https://vshulcz.github.io/deja-vu/guide/delete-antigravity-history.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"datePublished":"2026-10-23","dateModified": "2026-10-23","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Delete Antigravity conversation history","description":"Antigravity keeps a conversation in six places under ~/.gemini/antigravity. Delete it in the app, then VACUUM the summaries database so the text is gone too.","url":"https://vshulcz.github.io/deja-vu/guide/delete-antigravity-history.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"datePublished":"2026-10-23","dateModified": "2026-10-28","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -163,6 +163,12 @@
 <h2>How to delete one conversation</h2>
 <p>Use Antigravity's own Delete: right-click the conversation in the list, or open its <code>…</code> menu. It asks once (&ldquo;This action cannot be undone&rdquo;), and then removes all six: the <code>brain</code> directory, the <code>.db</code> with its <code>-wal</code> and <code>-shm</code>, the annotation, the lock, the conversation's rows in <code>conversation_summaries.db</code> and its entry in <code>agyhub_summaries_proto.pb</code>. The workspace and the files the agent wrote into it are not touched.</p>
 <p>Deleting by hand is the wrong tool for one conversation: its rows in <code>conversation_summaries.db</code> and its entry in <code>agyhub_summaries_proto.pb</code>, a binary file shared by every conversation, would need editing as well.</p>
+
+<h2>Delete one session with deja</h2>
+<p>If deja is installed, run <code>deja last</code> and copy the session id. Preview the deletion, then run it from a terminal and confirm:</p>
+<pre>deja delete &lt;id&gt; --dry-run
+deja delete &lt;id&gt;</pre>
+<p>The dry run lists the paths without removing them. After confirmation, deja removes those paths and forgets its own copy of the session. This cannot be undone. It removes <code>brain/&lt;id&gt;</code> and matching conversation <code>.db</code> (including <code>-wal</code> and <code>-shm</code>), <code>.pb</code>, annotation and implicit-context files. It leaves the shared <code>conversation_summaries.db</code> and <code>agyhub_summaries_proto.pb</code>, and the presence lock, untouched. To remove the list and search entries too, use Antigravity's own Delete instead of <code>deja delete</code>, then run <code>deja forget --session &lt;id&gt;</code> to remove deja's copy. deja refuses deletion if a file or directory to be removed was written in the last 5 minutes; end the session and wait before deleting it.</p>
 
 <h2>What the Delete leaves</h2>
 <p>The rows go, but SQLite does not erase the bytes they used. After Delete, the conversation's title and prompt were still readable as raw text inside <code>conversation_summaries.db</code> and its <code>-wal</code> file: not listed and not searchable in Antigravity, but there for anyone who opens the file in a hex editor or a recovery tool. To rewrite the database without them, quit Antigravity and run:</p>

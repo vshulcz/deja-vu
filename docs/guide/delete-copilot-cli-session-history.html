@@ -27,7 +27,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Delete Copilot CLI session history","description":"Copilot CLI keeps each session in its own directory under session-state. Find it, delete one session or all of them, and know what goes with them.","url":"https://vshulcz.github.io/deja-vu/guide/delete-copilot-cli-session-history.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"datePublished":"2026-10-15","dateModified": "2026-10-16","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Delete Copilot CLI session history","description":"Copilot CLI keeps each session in its own directory under session-state. Find it, delete one session or all of them, and know what goes with them.","url":"https://vshulcz.github.io/deja-vu/guide/delete-copilot-cli-session-history.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"datePublished":"2026-10-15","dateModified": "2026-10-28","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -161,6 +161,12 @@ grep -m1 session.start "${COPILOT_HOME:-$HOME/.copilot}/session-state/&lt;dir&gt
 <pre>rm -r "${COPILOT_HOME:-$HOME/.copilot}"/session-state/*</pre>
 <p>Leave the rest of <code>~/.copilot</code> alone: <code>mcp-config.json</code>, <code>settings.json</code>, <code>skills</code> and <code>hooks</code> are configuration, not history.</p>
 
+<h2>Delete one session with deja</h2>
+<p>If deja is installed, run <code>deja last</code> and copy the session id. Preview the deletion, then run it from a terminal and confirm:</p>
+<pre>deja delete &lt;id&gt; --dry-run
+deja delete &lt;id&gt;</pre>
+<p>The dry run lists the paths without removing them. After confirmation, deja removes those paths and forgets its own copy of the session. This cannot be undone. The session directory must be named for that session alone. The shared <code>session-store.db</code> is not changed. deja refuses deletion if a file or directory to be removed was written in the last 5 minutes; end the session and wait before deleting it.</p>
+
 <h2>What you lose</h2>
 <p>The conversation, the commands and file edits the tools recorded in the directory. <code>copilot --resume=&lt;sessionId&gt;</code> can no longer reopen the session. The <code>session-store.db</code> row is not removed with it. Copilot has no undo for this unless you have a backup.</p>
 
@@ -168,7 +174,7 @@ grep -m1 session.start "${COPILOT_HOME:-$HOME/.copilot}/session-state/&lt;dir&gt
 <p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads Copilot CLI sessions alongside the other agents' histories into one local index:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "Copilot session about the migration"</pre>
-<p>Indexing and search stay local, credentials are stripped, and <code>deja forget</code> removes a session from the index when you do want it gone. A deleted session stays under the Deleted tab of the screen bare <code>deja</code> opens, and <code>R</code> writes its conversation back so <code>copilot --resume</code> can reopen it.</p>
+<p>Indexing and search stay local, credentials are stripped, and <code>deja forget</code> removes a session from the index when you do want it gone. A session whose directory you deleted by hand stays under the Deleted tab of the screen bare <code>deja</code> opens, and <code>R</code> writes its conversation back so <code>copilot --resume</code> can reopen it.</p>
 <p><a href="where-sessions-are-stored.html">Where every agent keeps its history</a> · <a href="memory-for-copilot.html">Memory for Copilot CLI</a> · <a href="../registry/copilot.html">The Copilot CLI format</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
 </article></div></div>

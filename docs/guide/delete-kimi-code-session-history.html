@@ -27,7 +27,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Delete Kimi Code session history","description":"Kimi Code keeps each session in its own directory. Find it, remove one session or all, and delete the state.json that would still list it.","url":"https://vshulcz.github.io/deja-vu/guide/delete-kimi-code-session-history.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"datePublished":"2026-10-15","dateModified": "2026-10-15","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Delete Kimi Code session history","description":"Kimi Code keeps each session in its own directory. Find it, remove one session or all, and delete the state.json that would still list it.","url":"https://vshulcz.github.io/deja-vu/guide/delete-kimi-code-session-history.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"datePublished":"2026-10-15","dateModified": "2026-10-28","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -155,6 +155,12 @@
 <pre>rm -r "${KIMI_CODE_HOME:-$HOME/.kimi-code}/sessions/&lt;workDirKey&gt;/&lt;sessionId&gt;"</pre>
 <p>Do not delete only <code>wire.jsonl</code>: the <code>state.json</code> left behind still lists the session, now with no conversation behind it.</p>
 <p>To clear everything, remove the <code>sessions</code> directory. That removes every session of every project; the rest of the tree, such as <code>config.toml</code> and <code>mcp.json</code>, is not touched.</p>
+
+<h2>Delete one session with deja</h2>
+<p>If deja is installed, run <code>deja last</code> and copy the session id. Preview the deletion, then run it from a terminal and confirm:</p>
+<pre>deja delete &lt;id&gt; --dry-run
+deja delete &lt;id&gt;</pre>
+<p>The dry run lists the paths without removing them. After confirmation, deja removes those paths and forgets its own copy of the session. This cannot be undone. It removes the whole session directory, including <code>state.json</code> and the sub-agent histories. deja refuses deletion if a file or directory to be removed was written in the last 5 minutes; end the session and wait before deleting it.</p>
 
 <h2>What you lose</h2>
 <p>The conversation, the tool calls and results, and the title and timestamps that identify the session. Sub-agent histories under <code>agents/&lt;agent-id&gt;/</code> go with the directory. Kimi Code cannot bring a deleted session back, and <code>kimi --session &lt;sessionId&gt;</code> no longer finds it unless you have a separate backup.</p>

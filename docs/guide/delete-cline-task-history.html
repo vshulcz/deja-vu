@@ -27,7 +27,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Delete Cline task history","description":"Cline has separate CLI and VS Code extension histories. Find the right store and remove one conversation without deleting unrelated task state.","url":"https://vshulcz.github.io/deja-vu/guide/delete-cline-task-history.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"datePublished":"2026-09-19","dateModified": "2026-10-10","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Delete Cline task history","description":"Cline has separate CLI and VS Code extension histories. Find the right store and remove one conversation without deleting unrelated task state.","url":"https://vshulcz.github.io/deja-vu/guide/delete-cline-task-history.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"datePublished":"2026-09-19","dateModified": "2026-10-28","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -162,6 +162,12 @@
 <pre>rm "&lt;host globalStorage&gt;/saoudrizwan.claude-dev/tasks/&lt;taskId&gt;/api_conversation_history.json"</pre>
 <p>To clear all history for one store, remove its entire <code>sessions</code> directory (CLI) or the extension's <code>tasks</code> directory. This also removes every session or task in that store. The two stores are independent: clearing one does not clear the other.</p>
 
+<h2>Delete one session with deja</h2>
+<p>If deja is installed, run <code>deja last</code> and copy the session id. Preview the deletion, then run it from a terminal and confirm:</p>
+<pre>deja delete &lt;id&gt; --dry-run
+deja delete &lt;id&gt;</pre>
+<p>The dry run lists the paths without removing them. After confirmation, deja removes those paths and forgets its own copy of the session. This cannot be undone. This supports CLI sessions only. deja refuses extension tasks under the editor's <code>globalStorage</code>. deja refuses deletion if a file or directory to be removed was written in the last 5 minutes; end the session and wait before deleting it.</p>
+
 <h2>What you lose</h2>
 <p>The conversation is the record of what Cline tried, the tools it used and the reasoning around the task. Removing the CLI session directory also removes its manifest; removing the extension's history file leaves the task directory's other state behind. Deleted conversations cannot be recovered from Cline unless you have a separate backup.</p>
 
@@ -169,7 +175,7 @@
 <p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads both Cline formats, alongside the other agents' histories, into one local index:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "Cline task about the refactor"</pre>
-<p>Indexing and search stay local, credentials are stripped, and <code>deja forget</code> removes a session from the index when you do want it gone. A deleted CLI session stays under the Deleted tab of the screen bare <code>deja</code> opens, and <code>R</code> writes its conversation back so <code>cline --id</code> can reopen it; extension tasks are not written back.</p>
+<p>Indexing and search stay local, credentials are stripped, and <code>deja forget</code> removes a session from the index when you do want it gone. A CLI session whose directory you deleted by hand stays under the Deleted tab of the screen bare <code>deja</code> opens, and <code>R</code> writes its conversation back so <code>cline --id</code> can reopen it; extension tasks are not written back.</p>
 <p><a href="where-sessions-are-stored.html">Where every agent keeps its history</a> · <a href="memory-for-cline.html">Memory for Cline</a> · <a href="../registry/cline.html">The Cline format</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
 </article></div></div>
