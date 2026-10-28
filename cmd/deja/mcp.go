@@ -1626,7 +1626,7 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 	if len(hits) > limit {
 		hits = hits[:limit]
 	}
-	return recallPage(dir, q, budget, offset, limit, total, demoted, about, result, o, hits, twins, cov)
+	return recallPage(dir, q, budget, offset, limit, total, demoted, about, result, o, hits, twins, cov, r.added)
 }
 
 // rankedRecall is a recall's ranking before it is cut into a page: what the
@@ -1639,6 +1639,9 @@ type rankedRecall struct {
 	unread       int
 	about        bool
 	cov          index.Coverage
+	// added is the machine's best answer withMachineBest put on a
+	// project-first page, by harness:id; empty when it put none there.
+	added string
 }
 
 // rankRecall runs the search recall serves from. context_search reads the
@@ -1680,6 +1683,7 @@ func rankRecall(dir, q, harness, project string, window int) (rankedRecall, erro
 	// answered sat at 20-39 for the queries agents sent, or outside the
 	// candidates altogether. The rest of the machine follows.
 	var scope []string
+	added := ""
 	if project == "" && os.Getenv("DEJA_RECALL_GLOBAL") != "1" {
 		scope = howScope(howCwd(), "", false)
 		o.PoolScope = scope
@@ -1740,7 +1744,12 @@ func rankRecall(dir, q, harness, project string, window int) (rankedRecall, erro
 			machine := hits
 			hits = slices.Concat(ph, rest)
 			if rest != nil {
+				before := hits
 				hits = withMachineBest(hits, machine, ph)
+				// It only ever changes the second place.
+				if len(hits) > 1 && (len(before) < 2 || hitKey(hits[1]) != hitKey(before[1])) {
+					added = hitKey(hits[1])
+				}
 			}
 		}
 	}
@@ -1748,11 +1757,11 @@ func rankRecall(dir, q, harness, project string, window int) (rankedRecall, erro
 	// A fork quoting the turns its source holds said everything twice, the
 	// same as on the search screen (#5320, #5335).
 	hits = dropCopiedHits(dir, hits)
-	return rankedRecall{result: result, o: o, hits: hits, policyHidden: policyHidden, unread: unread, about: about, cov: cov}, nil
+	return rankedRecall{result: result, o: o, hits: hits, policyHidden: policyHidden, unread: unread, about: about, cov: cov, added: added}, nil
 }
 
 // recallPage writes one page of ranked hits, already cut to the page.
-func recallPage(dir, q string, budget, offset, limit, total, demoted int, about bool, result index.SearchResult, o search.Options, hits []search.Hit, twins map[string][]string, cov index.Coverage) (string, int, int64, []string, []string, error) {
+func recallPage(dir, q string, budget, offset, limit, total, demoted int, about bool, result index.SearchResult, o search.Options, hits []search.Hit, twins map[string][]string, cov index.Coverage, added string) (string, int, int64, []string, []string, error) {
 	attachAnswers(dir, hits)
 	// Every line in its author's words, and the person's own check and build
 	// rules for the project the agent works in under the mark the frame says
@@ -1798,10 +1807,14 @@ func recallPage(dir, q string, budget, offset, limit, total, demoted int, about 
 	// Coverage settles what the two readings above cannot: a session holding
 	// most of a long query is an answer in part even when a word was dropped
 	// or the query's rarest word is one nothing holds.
-	cover := bestCoverage(hits, q, result.TermIDF)
+	lead, skipped := leadHits(hits, added)
+	cover := bestCoverage(lead, q, result.TermIDF)
+	if skipped >= 0 && cover.at >= skipped {
+		cover.at++
+	}
 	covered := result.Tier == search.TierRelevance && strictShown == 0 && result.Directory == "" &&
 		!namesTheAsked && cover.aboutIt()
-	namesTheAsked = writeRecallLead(&b, result, hits, q, strictShown, absent, namesTheAsked, cover, covered)
+	namesTheAsked = writeRecallLead(&b, result, lead, q, strictShown, absent, namesTheAsked, cover, covered)
 	if note := demotedNote(hits, demoted); note != "" {
 		fmt.Fprintln(&b, note+" — read the order as the user's judgement, not as recency.")
 	}
@@ -3080,6 +3093,25 @@ func inProjectHits(hits []search.Hit, names []string) []search.Hit {
 	}
 	return out
 }
+
+// leadHits is the page the lead line reads: without the machine's best answer
+// withMachineBest added. It is there for the reader of the page, and the lines
+// above described it instead of the page: on a replay of real recall calls,
+// 11 of 59 questions with nothing to find lost "No session is about this" to a
+// coverage line about the added session. skipped is its position, or -1.
+func leadHits(hits []search.Hit, added string) ([]search.Hit, int) {
+	if added == "" {
+		return hits, -1
+	}
+	for i, h := range hits {
+		if hitKey(h) == added {
+			return slices.Concat(hits[:i], hits[i+1:]), i
+		}
+	}
+	return hits, -1
+}
+
+func hitKey(h search.Hit) string { return h.Session.Harness + ":" + h.Session.ID }
 
 // withMachineBest puts the machine-wide ranking's first session second on a
 // project-first page, when it is not one of the project's own. Project-first

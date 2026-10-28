@@ -68,6 +68,84 @@ func TestRecallKeepsTheMachinesBestAnswerOnThePage(t *testing.T) {
 	}
 }
 
+// The session added second is there for the reader, not for the lines above
+// the page. A question about something no session holds was headed by a
+// coverage line about the added session, which holds most of the words but
+// not the subject, where the page used to say nothing is about it.
+func TestTheAddedAnswerDoesNotSetTheLead(t *testing.T) {
+	hermeticEnv(t)
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+	work := t.TempDir()
+	line := func(sid, cwd, role, text string) string {
+		b, err := json.Marshal(map[string]any{"type": role, "sessionId": sid, "cwd": cwd, "timestamp": "2026-09-10T10:00:00Z",
+			"message": map[string]any{"role": role, "content": text}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	here := filepath.Join(work, "src", "ledgerd")
+	if err := os.MkdirAll(here, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for i := range 40 {
+		sid := fmt.Sprintf("l%02d", i)
+		// Half say one word of the question, half the other: no session here
+		// is about it.
+		word := "retention"
+		if i%2 == 1 {
+			word = "shard"
+		}
+		writeClaudeFixture(t, filepath.Join(root, sources.ClaudeProjectName(here), sid+".jsonl"), sid, []string{
+			line(sid, here, "user", fmt.Sprintf("unlock the ledger %s window %d", word, i)),
+			line(sid, here, "assistant", fmt.Sprintf("%s unlock %d is done, 30 days now", word, i)),
+		})
+	}
+	for _, s := range []struct{ sid, project, user, reply string }{
+		{"box", "gpubox", "the quokka shard retention unlock is parked until the cooling is fixed", "parked: quokka retention unlock waits for the cooling fix."},
+		{"ice", "maps", "draw the glacier outline on the coast layer", "glacier outline drawn."},
+	} {
+		cwd := filepath.Join(work, "src", s.project)
+		writeClaudeFixture(t, filepath.Join(root, sources.ClaudeProjectName(cwd), s.sid+".jsonl"), s.sid, []string{
+			line(s.sid, cwd, "user", s.user), line(s.sid, cwd, "assistant", s.reply),
+		})
+	}
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(here)
+	text, err := callMCPTool(dir, "deja", json.RawMessage(`{"mode":"recall","q":"quokka retention shard glacier"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows := regexp.MustCompile(`\n(\d+)\. \[[^\]]*\] (\S+) · (\S+)`).FindAllStringSubmatch(text, -1)
+	if len(rows) < 2 || rows[1][3] != "box" {
+		t.Fatalf("the machine's best is not second:\n%s", firstLines(text, 20))
+	}
+	if !strings.Contains(firstLines(text, 3), nothingIsAboutThis) {
+		t.Errorf("the added session set the lead:\n%s", firstLines(text, 20))
+	}
+}
+
+func TestLeadHits(t *testing.T) {
+	hit := func(id string) search.Hit { return search.Hit{Session: model.Session{Harness: "claude", ID: id}} }
+	page := []search.Hit{hit("p1"), hit("m1"), hit("p2")}
+	for _, c := range []struct {
+		name, added   string
+		want, skipped int
+	}{
+		{"nothing added", "", 3, -1},
+		{"added", "claude:m1", 2, 1},
+		{"added, not on the page", "claude:m9", 3, -1},
+	} {
+		got, skipped := leadHits(page, c.added)
+		if len(got) != c.want || skipped != c.skipped {
+			t.Errorf("%s: got %d hits, skipped %d; want %d, %d", c.name, len(got), skipped, c.want, c.skipped)
+		}
+	}
+}
+
 func TestWithMachineBest(t *testing.T) {
 	hit := func(id string) search.Hit { return search.Hit{Session: model.Session{Harness: "claude", ID: id}} }
 	ids := func(hs []search.Hit) string {
