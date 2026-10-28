@@ -1703,14 +1703,11 @@ const warmupDeadAfter = 2 * time.Minute
 // not published progress yet. The sentinel carries the time of the request,
 // which is exactly what this needs.
 func warmupJustRequested(dir string) bool {
-	b, err := os.ReadFile(filepath.Join(dir, "warmup.sentinel"))
-	if err != nil {
+	c, ok := readWarmupClaim(dir)
+	if !ok {
 		return false
 	}
-	stamp, err := strconv.ParseInt(strings.TrimSpace(string(b)), 10, 64)
-	if err != nil {
-		return false
-	}
+	stamp := c.stamp
 	// Ahead of the clock is stale too, as it is for the status file (#889):
 	// a sentinel stamped hours ahead kept recall saying a build was on its way
 	// while nothing built.
@@ -1751,19 +1748,23 @@ func requestWarmup(dir string) {
 			return
 		}
 		b, readErr := os.ReadFile(sentinel)
-		stamp, parseErr := strconv.ParseInt(strings.TrimSpace(string(b)), 10, 64)
+		claim, parsed := parseWarmupClaim(b)
 		// The claim is the O_EXCL create; the stamp lands a moment later. A
 		// sentinel read inside that window is empty, and treating empty as
 		// unreadable made the second hook delete another hook's claim and
 		// spawn a build of its own — two rebuilds over one directory whenever
 		// two projects started together (#1065). The file's own mtime says
 		// when the claim was made.
-		if readErr == nil && parseErr != nil {
+		if readErr == nil && !parsed {
 			if fi, statErr := os.Stat(sentinel); statErr == nil {
-				stamp, parseErr = fi.ModTime().UnixNano(), nil
+				claim, parsed = warmupClaim{stamp: fi.ModTime().UnixNano()}, true
 			}
 		}
-		if readErr == nil && parseErr == nil && within(now.Sub(time.Unix(0, stamp)), warmupRetryAfter) && !warmupLooksDead(dir, now, stamp) {
+		// A claim stands while its owner runs, however long since its last
+		// progress report: under I/O contention a live worker went quiet for
+		// two minutes and a second, then a third, was started beside it
+		// (#5719).
+		if readErr == nil && parsed && warmupClaimHeld(dir, now, claim) {
 			return
 		}
 		if os.Remove(sentinel) != nil {
@@ -1793,6 +1794,12 @@ func requestWarmup(dir string) {
 func startDetachedWarmup(exe, sentinel string) error {
 	cmd := exec.CommandContext(context.Background(), exe, "index")
 	cmd.Env = append(os.Environ(), "DEJA_WARMUP_SENTINEL="+sentinel)
+	// The child clears the sentinel only while it still holds this claim.
+	b, err := os.ReadFile(sentinel)
+	claim, claimed := parseWarmupClaim(b)
+	if err == nil && claimed {
+		cmd.Env = append(cmd.Env, warmupClaimEnv+"="+strconv.FormatInt(claim.stamp, 10))
+	}
 	devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
 	if err != nil {
 		return err
@@ -1800,7 +1807,16 @@ func startDetachedWarmup(exe, sentinel string) error {
 	defer func() { _ = devNull.Close() }()
 	cmd.Stdout = devNull
 	cmd.Stderr = cmd.Stdout
-	return startDetached(cmd)
+	pid, err := startDetachedPID(cmd)
+	if err != nil {
+		return err
+	}
+	// Named here as well as by the child itself, so the claim has an owner
+	// from the moment the child exists, even if it stalls before it runs.
+	if claimed {
+		recordWarmupOwner(sentinel, claim.stamp, pid)
+	}
+	return nil
 }
 
 // limitMarkers are the strings harnesses print when a session dies on quota.

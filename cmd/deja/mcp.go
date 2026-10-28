@@ -3064,9 +3064,9 @@ func buildingNowForAgent(dir string) string {
 }
 
 // warmupRunning reports a build in flight or just asked for: its status file,
-// the index lock, or a fresh sentinel.
+// the index lock, a fresh sentinel, or a claim whose owner is still running.
 func warmupRunning(dir string) bool {
-	return readWarmupStatus(dir) != nil || index.RebuildInProgress(dir) || warmupJustRequested(dir)
+	return readWarmupStatus(dir) != nil || index.RebuildInProgress(dir) || warmupJustRequested(dir) || warmupOwnerLive(dir)
 }
 
 // buildingNowForBlockingTool is buildingNowForAgent for the two tools that

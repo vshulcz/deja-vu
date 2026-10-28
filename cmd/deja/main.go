@@ -596,6 +596,9 @@ func cmdIndex(dir string, rest []string) error {
 		clearWarmupSentinel()
 		return nil
 	}
+	// Before the freshness walk and the index lock, either of which can take
+	// minutes on a contended disk: from here on the claim names a live owner.
+	adoptWarmupClaim()
 	defer index.AllowBuild()()
 	// Run by hand, it is also what turns search-only on or off (#5395).
 	if os.Getenv("DEJA_WARMUP_SENTINEL") == "" {
@@ -2907,12 +2910,6 @@ func activeFilters(o search.Options, sinceRaw, harnessRaw string) string {
 		return parts[0]
 	default:
 		return strings.Join(parts[:len(parts)-1], ", ") + " and " + parts[len(parts)-1]
-	}
-}
-
-func clearWarmupSentinel() {
-	if path := os.Getenv("DEJA_WARMUP_SENTINEL"); path != "" {
-		_ = os.Remove(path)
 	}
 }
 
