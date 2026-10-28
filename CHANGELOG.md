@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.2] - 2026-10-28
+
+Recall is twice as fast and the index a third smaller, with the same answers.
+On a 19k-session store against 0.23.1, MCP recall p50 goes from 170 to 85 ms
+and the index from 277 to 185 MB, and LongMemEval-S hit@1 is 88.9 against
+88.1. Agents get less noise: the per-prompt block is injected for 51 unrelated
+prompts in 240 instead of 171, and pages with nothing to find are a third of
+their size. A recall that misses the deadline still reaches the agent, and
+recall answers during an upgrade's rebuild. Cold builds cost 31% more CPU than
+0.23.1 because the index now records the commands and edits behind each
+conclusion. The index rebuilds once on upgrade.
+
 ### Added
 
 - `deja mcp --context-search` serves Qwen Code's External Context MCP
@@ -59,8 +71,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and those blocks were 55% of all per-prompt recall. opencode task sessions
   are not searched on their turns either, since the agent that wrote them had
   the recall already (#5660).
+- The per-prompt block is injected only when the prompt names something the
+  history holds: two of its lead words said in one message, or one word that
+  names a thing (a path, a symbol, a rare Latin-letter word). The block is also
+  dropped when none of its quoted lines holds two of the question's words.
+  Replayed over 240 real prompts: unrelated blocks 171 to 51, relevant 9 to 11,
+  mean block about 1750 to 600 bytes. On a store under 109 sessions the
+  rareness floor follows the store, so a new user's one-word question is still
+  answered (#5717, #5718).
+- A recall page headed "No session is about this" lists each lead on one line
+  (where, when, which query words it holds, id), and only the first keeps an
+  excerpt. Agents followed one of those leads 6 times in 212. Replayed over 88
+  real recall calls: these pages are 0.37x the bytes, with no found answer lost
+  (#5722, #5723).
+- The index is about a third smaller. Records are compressed from 256 bytes
+  instead of 8 KB, at the fastest level: a 19k-session store goes from 277 to
+  185 MB, a 38k one from 548 to 365 MB. Old and new binaries read each other's
+  index, so there is no rebuild (#5727, #5729).
+- Recall is about twice as fast and uses a third of the memory. Session views
+  and bucket directories are kept between queries, ranking runs on slices
+  instead of maps of maps, and `deja mcp` checks the index for freshness on a
+  15 s timer instead of walking every transcript inside each call. On a
+  19k-session store against 0.23.1: MCP recall p50 170 to 85 ms, p95 293 to
+  158 ms, CPU per call 368 to 139 ms, allocation 245 to 91 MB; the per-prompt
+  hook p50 148 to 107 ms; `deja search` p50 203 to 161 ms. Output is
+  unchanged. A session another agent writes becomes searchable within about
+  15 s under `deja mcp`; the CLI and hooks still check on every call (#5728,
+  #5730, #5732, #5733, #5734, #5736).
+- Receipt extraction scans tokens by hand instead of with three regexps. A cold
+  build of 19k sessions takes 59 s of CPU instead of 87 s with byte-identical
+  output. That is still 31% more than 0.23.1, which had no receipts (#5735,
+  #5737).
 
 ### Fixed
+
+- A two-word recall query where one word is in no session falls back to the
+  other word when it is rare enough to mean something. The page says which word
+  was dropped and shows at most three sessions. It used to come back empty
+  while the same word in a three-word query was dropped (#5711, #5712).
+- Recall keeps the machine-wide best answer second on a project-first page, and
+  gives the first conclusion only part of the page. On 48 real recall calls the
+  answer that exists was found 10 times in 22 instead of 7 (#5708, #5709). The
+  added session no longer sets the page's first line, so a question with no
+  answer still opens with "No session is about this" (#5713, #5714).
+- A recall that finishes after its wait note, and found sessions, rides once on
+  the next tool reply on the same connection. Agents repeated the exact call 2
+  times in 47 and the answer was lost (#5715, #5716).
+- While an upgrade rebuilds the index, recall, recall_context and blame answer
+  from the previous index instead of "ask again". On a 40k-session stand 139 of
+  139 recalls during the rebuild returned hits, against 0 of 260. A build older
+  than 10 minutes no longer starts a second one (#5720, #5721).
+- A warmup claim names the process that owns it. A live worker that goes quiet
+  under I/O contention, or waits on the index lock, is no longer replaced by a
+  second and third worker, and a finishing worker removes only its own claim.
+  Reported by @j2h4u (#5719, #5726).
 
 - `deja sources` names a location for `copilot-chat`, `roo`, `kilocode` and
   `cherrystudio` on a machine where they are not installed yet. Those rows
@@ -2586,7 +2650,8 @@ See the release notes: Antigravity harness, share redaction hardening.
 - Stdio MCP memory server with `recall` and `recall_context` tools.
 - Idempotent installers for claude-code, codex, and opencode MCP config.
 
-[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.23.1...HEAD
+[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.23.2...HEAD
+[0.23.2]: https://github.com/vshulcz/deja-vu/compare/v0.23.1...v0.23.2
 [0.23.1]: https://github.com/vshulcz/deja-vu/compare/v0.23.0...v0.23.1
 [0.23.0]: https://github.com/vshulcz/deja-vu/compare/v0.22.2...v0.23.0
 [0.22.2]: https://github.com/vshulcz/deja-vu/compare/v0.22.1...v0.22.2
