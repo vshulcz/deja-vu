@@ -35,6 +35,9 @@ type rpcRequest struct {
 	ID      json.RawMessage `json:"id,omitempty"`
 	Method  string          `json:"method"`
 	Params  json.RawMessage `json:"params,omitempty"`
+	// served, when set, is told how many sessions a recall answered from, so
+	// the server knows whether an answer it kept is worth handing on.
+	served *int
 }
 
 // isNotification reports whether a request omitted id (a JSON-RPC notification,
@@ -248,7 +251,7 @@ func handleMCP(dir string, req rpcRequest) (any, int, string) {
 		if err := json.Unmarshal(req.Params, &p); err != nil {
 			return nil, -32602, "invalid params"
 		}
-		text, err := callMCPTool(dir, p.Name, p.Arguments)
+		text, err := callMCPToolServed(dir, p.Name, p.Arguments, req.served)
 		// A call the agent got wrong is invalid params. A tool that ran and
 		// failed — a notes file it cannot write — is a result marked isError,
 		// which the client hands to the model rather than to its own logs.
@@ -488,7 +491,13 @@ func spreadQ(mode string, raw json.RawMessage) json.RawMessage {
 }
 
 func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
-	out, err := callMCPToolRaw(dir, name, raw)
+	return callMCPToolServed(dir, name, raw, nil)
+}
+
+// callMCPToolServed is callMCPTool that also sets *served, when served is not
+// nil, to the number of sessions a recall answered from.
+func callMCPToolServed(dir, name string, raw json.RawMessage, served *int) (string, error) {
+	out, err := callMCPToolRaw(dir, name, raw, served)
 	// An index the switch will not rebuild is something only the user can
 	// act on, so the agent gets it as an answer to pass on (#5385).
 	if index.IsManualStop(err) {
@@ -497,7 +506,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 	return out, err
 }
 
-func callMCPToolRaw(dir, name string, raw json.RawMessage) (string, error) {
+func callMCPToolRaw(dir, name string, raw json.RawMessage, served *int) (string, error) {
 	if name == "deja" {
 		var a struct {
 			Mode string `json:"mode"`
@@ -514,7 +523,7 @@ func callMCPToolRaw(dir, name string, raw json.RawMessage) (string, error) {
 			// the seventh mode landed and this sentence still listed six.
 			return "", argErrorf("mode %q is not one of %s", a.Mode, strings.Join(declaredModes(), ", "))
 		}
-		return callMCPTool(dir, target, spreadQ(mode, raw))
+		return callMCPToolServed(dir, target, spreadQ(mode, raw), served)
 	}
 	switch name {
 	case "recall":
@@ -558,6 +567,9 @@ func callMCPToolRaw(dir, name string, raw json.RawMessage) (string, error) {
 			}
 			text = dated + frameRecall(text+env)
 			deliverEnv()
+			if served != nil {
+				*served = sessions
+			}
 			usage.RecordServedFromInto(dir, usage.KindRecall, text, mcpConnID(), sessions, raw, ids, projects, policy.Load().Describe(policy.ActivationMCP))
 		}
 		return text, err
@@ -595,6 +607,9 @@ func callMCPToolRaw(dir, name string, raw json.RawMessage) (string, error) {
 			}
 			text = frameRecall(fitContextDigest(text, a.Query, firstID(ids), contextMCPBudget-recallFrameOverhead-len(lead)))
 			text = lead + text
+			if served != nil {
+				*served = sessions
+			}
 			usage.RecordServedFromInto(dir, usage.KindContext, text, mcpConnID(), sessions, raw, ids, projects, policy.Load().Describe(policy.ActivationMCP))
 		}
 		return text, err

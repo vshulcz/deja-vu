@@ -22,7 +22,9 @@ import (
 // cancelled one that has not started is dropped; and a tools/call that is
 // still running at mcpDeadline is answered with a note instead of a timeout.
 // The work keeps going, and the same call asked again joins it or picks up its
-// answer.
+// answer. Agents rarely ask again: in real transcripts they repeated the call
+// 2 times of 47 and moved on, so a recall that found something rides on top of
+// the next reply instead.
 
 // mcpWorkers is how many requests may read the index at once. Search is
 // already parallel inside one query, so more than this buys little.
@@ -94,6 +96,10 @@ type mcpLate struct {
 	code   int
 	msg    string
 	at     time.Time
+	// served is how many sessions the answer came from; label names the
+	// call for an agent that has moved on to another.
+	served int
+	label  string
 }
 
 func newMCPServer(dir string, enc *json.Encoder) *mcpServer {
@@ -141,7 +147,7 @@ func (s *mcpServer) serve(req rpcRequest) {
 	if l, ok := s.late[key]; ok {
 		delete(s.late, key)
 		if time.Since(l.at) < mcpLateTTL {
-			s.replyLocked(req.ID, l.result, l.code, l.msg)
+			s.replyLocked(req.ID, s.withLateLocked(key, l.result), l.code, l.msg)
 			return
 		}
 	}
@@ -177,6 +183,10 @@ func (s *mcpServer) run(req rpcRequest, w *mcpWork) {
 	}
 	s.mu.Unlock()
 
+	var served int
+	if req.Method == "tools/call" && !s.contextOnly {
+		req.served = &served
+	}
 	result, code, msg := s.handle(req)
 	<-s.slots
 
@@ -190,13 +200,17 @@ func (s *mcpServer) run(req rpcRequest, w *mcpWork) {
 			continue
 		}
 		s.answerLocked(p)
-		s.replyLocked(p.id, result, code, msg)
+		out := result
+		if !delivered && code == 0 {
+			out = s.withLateLocked(key, result)
+		}
+		s.replyLocked(p.id, out, code, msg)
 		delivered = true
 	}
 	if !delivered && code == 0 {
 		// Everyone who asked was told to come back. Keep the answer for them.
 		s.pruneLateLocked()
-		s.late[key] = mcpLate{result: result, code: code, msg: msg, at: time.Now()}
+		s.late[key] = mcpLate{result: result, code: code, msg: msg, at: time.Now(), served: served, label: mcpLateLabel(req)}
 	}
 }
 
@@ -228,7 +242,7 @@ func (s *mcpServer) overdue(p *mcpPending) {
 		s.replyLocked(p.id, contextSearchError(contextSearchSlow), 0, "")
 		return
 	}
-	s.replyLocked(p.id, toolText(mcpOverdueNote(mcpDeadline, building)), 0, "")
+	s.replyLocked(p.id, s.withLateLocked(p.key, toolText(mcpOverdueNote(mcpDeadline, building))), 0, "")
 }
 
 // handle answers one request on whichever surface this server serves.
