@@ -577,20 +577,22 @@ func (t *recordTables) lookup(id uint64) string {
 	return ""
 }
 
-// compressFloor is deliberately high. Compressing every message halved the
-// record log but doubled index build time and tripled the latency of a query
-// that materializes many records — the payload is touched once per message on
-// write and once per message shown. The mass is in the tail instead: on a real
-// corpus 1.1% of messages (tool output, file dumps) hold 22.6% of the text, so
-// only those are worth the CPU.
-const compressFloor = 8192
+// compressFloor used to be 8 KB, from a run that compressed every message at
+// the default level: the record log halved, but index builds doubled and a
+// query that materializes many records tripled. That left 99.9% of records
+// stored as plain text and records.bin bigger than the transcripts. At the
+// fastest level and a 256-byte floor the day-zero pile's index went from 277
+// to 194 MB for 3-5% more build CPU and no measurable query cost. Below 256
+// bytes deflate rarely wins anything. Readers go by the per-record flag, so
+// an index mixing both encodings needs no version bump.
+const compressFloor = 256
 
 const (
 	recordRaw      = 0
 	recordDeflated = 1
 )
 
-var deflateWriters = sync.Pool{New: func() any { w, _ := flate.NewWriter(nil, flate.DefaultCompression); return w }}
+var deflateWriters = sync.Pool{New: func() any { w, _ := flate.NewWriter(nil, flate.BestSpeed); return w }}
 var inflateReaders = sync.Pool{New: func() any { return flate.NewReader(nil) }}
 
 // A record is [keyID][pathID][flag][payload]. The ids stay outside the

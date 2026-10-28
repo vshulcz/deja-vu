@@ -1,6 +1,7 @@
 package index
 
 import (
+	"encoding/binary"
 	"os"
 	"path/filepath"
 	"strings"
@@ -54,6 +55,45 @@ func TestCompressedRecordsRoundTrip(t *testing.T) {
 		g := got[i]
 		if g.Text != w.Text || g.Key != w.Key || g.SourcePath != w.SourcePath || g.Role != w.Role || !g.Time.Equal(w.Time) {
 			t.Errorf("record %d round-tripped wrong: key=%q role=%q len(text)=%d want len=%d", i, g.Key, g.Role, len(g.Text), len(w.Text))
+		}
+	}
+}
+
+// An ordinary message of a few hundred bytes is deflated now, and a record a
+// build before the floor dropped stored raw at the same size still reads: the
+// per-record flag decides, not the size, so a log mixing both needs no
+// rebuild.
+func TestMidSizeRecordsDeflateAndOldRawOnesStillRead(t *testing.T) {
+	tbl := newRecordTables()
+	text := strings.Repeat("the gravel pit pump stalls when the float sticks; ", 12)
+	r := Record{Key: "claude:s1", SourcePath: "/tmp/s1.jsonl", Role: "assistant", Text: text, Time: time.Unix(10, 20)}
+	enc := encodeRecord(r, tbl)
+	_, _, _, rest, ok := recordPrefix(enc)
+	if !ok || rest[0] != recordDeflated {
+		t.Fatalf("a %d-byte message was not deflated (ok=%v)", len(text), ok)
+	}
+	if len(enc) >= len(text) {
+		t.Errorf("deflated record is %d bytes for %d of text", len(enc), len(text))
+	}
+	short := encodeRecord(Record{Key: "claude:s1", Role: "user", Text: "tiny", Time: time.Unix(1, 0)}, tbl)
+	if _, _, _, rest, _ := recordPrefix(short); rest[0] != recordRaw {
+		t.Errorf("a record under the floor was deflated")
+	}
+
+	// The same record as the 8 KB floor wrote it.
+	body := binary.LittleEndian.AppendUint64(nil, uint64(r.Time.UnixNano()))
+	body = appendField(body, r.Text)
+	old := binary.AppendUvarint(nil, tbl.intern(r.Key))
+	old = binary.AppendUvarint(old, tbl.intern(r.SourcePath))
+	old = binary.AppendUvarint(old, tbl.intern(r.Role))
+	old = append(append(old, recordRaw), body...)
+	for name, b := range map[string][]byte{"deflated": enc, "raw": old} {
+		got, err := decodeRecord(b, tbl)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if got.Text != text || got.Key != r.Key || got.Role != r.Role || !got.Time.Equal(r.Time) {
+			t.Errorf("%s record read back wrong: %+v", name, got)
 		}
 	}
 }
