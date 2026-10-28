@@ -42,7 +42,7 @@ func TestHookPromptDoesNotReadASessionItAlreadyShowed(t *testing.T) {
 	t.Chdir(cwd)
 
 	var first bytes.Buffer
-	in := strings.NewReader(`{"prompt":"what did we decide about kestrel","session_id":"agent-1"}`)
+	in := strings.NewReader(`{"prompt":"what did we decide about kestrel retries","session_id":"agent-1"}`)
 	if err := runHookPromptMode(index.DefaultDir(), in, &first, true); err != nil {
 		t.Fatal(err)
 	}

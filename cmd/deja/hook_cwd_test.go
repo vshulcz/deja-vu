@@ -29,7 +29,7 @@ func TestHooksRecallFromPayloadCWD(t *testing.T) {
 		"message": map[string]any{"role": "user", "content": "the retry budget keeps blowing up under load"},
 	}) + claudeRecord(t, map[string]any{
 		"type": "assistant", "sessionId": "a1", "cwd": root, "timestamp": at,
-		"message": map[string]any{"role": "assistant", "content": []any{map[string]any{"type": "text", "text": "decision: cap retries at three"}}},
+		"message": map[string]any{"role": "assistant", "content": []any{map[string]any{"type": "text", "text": "decision: the retry budget kept blowing up, so cap retries at three"}}},
 	})
 	if err := os.WriteFile(filepath.Join(root, "a1.jsonl"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)

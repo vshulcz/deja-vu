@@ -52,3 +52,21 @@ func TestAShortQuestionIsJudgedOnShapeAlone(t *testing.T) {
 		t.Error("a short question naming its subject fell silent")
 	}
 }
+
+// The rareness floor is the fixed one wherever the store can reach it, and the
+// store's own ceiling where it cannot.
+func TestIdentifyingTermsFloorFollowsTheStore(t *testing.T) {
+	terms := []string{"zarvoxd", "cache", "absent"}
+	big := map[string]float64{"zarvoxd": 4.3, "cache": 3.9}
+	if got := IdentifyingTerms(terms, big, 7.5); len(got) != 1 || got[0] != "zarvoxd" {
+		t.Errorf("a store that reaches the floor = %v, want [zarvoxd]", got)
+	}
+	// Two sessions: a word one of them says reaches ln(3/2), one both say 0.
+	small := map[string]float64{"zarvoxd": 0.4054651081081644, "cache": 0}
+	if got := IdentifyingTerms(terms, small, 0.4054651081081644); len(got) != 1 || got[0] != "zarvoxd" {
+		t.Errorf("a small store = %v, want [zarvoxd]", got)
+	}
+	if got := IdentifyingTerms(terms, nil, 0); len(got) != len(terms) {
+		t.Errorf("with no idf to judge by the question must stand: %v", got)
+	}
+}

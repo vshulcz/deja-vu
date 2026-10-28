@@ -356,7 +356,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		leadTerms = ordered[:min(len(ordered), leadTermsKept)]
 	}
 	pol := policy.Load()
-	pk := &promptPicker{pol: pol, terms: terms, idfOf: idfOf, self: self, leadTerms: leadTerms, ss: make([]model.Session, 0, 2)}
+	pk := &promptPicker{pol: pol, terms: terms, idfOf: idfOf, topIDF: index.TopIDF(dir), self: self, leadTerms: leadTerms, ss: make([]model.Session, 0, 2)}
 	pk.pick(ranked, matched, strong, naming)
 	// One slot left and duplicates took the window: ask for a wider one. The
 	// second pass costs a ranking read and happens only when the store said
@@ -513,7 +513,8 @@ func emitPromptBlock(stdout io.Writer, dir, sessionID, out string, ss []model.Se
 }
 
 // promptDigestBody builds the full block for a prompt that earned a digest. It
-// reports false when the digest came out empty.
+// reports false when the digest came out empty or quotes nothing that holds
+// the question.
 func promptDigestBody(dir, sessionID string, ss []model.Session, confident bool, terms []string, idfOf map[string]float64, asked, nudge, rejectedWarning string) (string, bool) {
 	// Hand the digest the query's words most-identifying first. It has no
 	// way of its own to tell "mm_status" from "decide", and the session
@@ -521,6 +522,14 @@ func promptDigestBody(dir, sessionID string, ss []model.Session, confident bool,
 	// this hook newly returns open on the ordinary word.
 	digest, shown := search.AutoRecallDigestShowing(ss, digestBudget(confident), byIdentifying(terms, idfOf), asked)
 	if strings.TrimSpace(digest) == "" {
+		return "", false
+	}
+	// The sessions passed on where their words were said, but the block is
+	// what the agent reads. When no line it quotes holds two of the question's
+	// words, each line is about something else that shares one word with it.
+	// Replayed over 160 real prompts, that was 34 of the 68 blocks labelled
+	// unrelated and none of the 5 that answered the prompt.
+	if !search.QuoteCarriesTerms(digest, terms, min(2, len(terms))) {
 		return "", false
 	}
 	// The line the agent is asked to say names a session; it has to be one
@@ -575,9 +584,12 @@ func promptDigestBody(dir, sessionID string, ss []model.Session, confident bool,
 // promptPicker chooses the sessions the prompt hook injects, at most two,
 // and keeps what the choice says about the match.
 type promptPicker struct {
-	pol       policy.Policy
-	terms     []string
-	idfOf     map[string]float64
+	pol   policy.Policy
+	terms []string
+	idfOf map[string]float64
+	// topIDF is the idf a word said in one session reaches on this store
+	// (index.TopIDF), so a small store's rarest words still name something.
+	topIDF    float64
 	self      map[string]bool
 	leadTerms []string
 
@@ -656,7 +668,7 @@ func (p *promptPicker) pick(ranked []model.Session, matched, strong, naming []in
 		if p.self[s.ID] {
 			continue
 		}
-		if !search.SpeechCarriesAnyTerm(s, p.leadTerms) {
+		if !p.leadTermsMeet(s) {
 			// The subject matched, but only where a tool printed it: a
 			// failing job line, a bumped dependency, a pinned action
 			// version. Nobody in that session said anything about it, and a
@@ -693,6 +705,47 @@ func (p *promptPicker) pick(ranked []model.Session, matched, strong, naming []in
 			return
 		}
 	}
+}
+
+// leadTermsMeet asks for the question's lead words where someone spoke them,
+// and for two of them in one message unless a lead word names something.
+//
+// The ranking counts a word anywhere in a session, and a long session holds
+// every word of any question somewhere, each in a different turn about a
+// different thing. Replayed over 80 real prompts, 50 blocks had nothing to
+// do with the question, most of them from sessions of thousands of messages
+// matched that way.
+//
+// A word names something when it is shaped like a symbol, a path or a version,
+// or is a Latin-letter word, and the store holds it rarely
+// (search.IdentifyingTerms): "winget" or "pgbouncer" is answered by the
+// session that said it once. A word of an inflected language is never enough
+// alone, because each form of an everyday word is rare in any store.
+//
+// Asking a long session for three words together instead of two was
+// measured too: it emptied 2 of 5 blocks that answered the prompt.
+func (p *promptPicker) leadTermsMeet(s model.Session) bool {
+	var named []string
+	for _, t := range search.IdentifyingTerms(p.leadTerms, p.idfOf, p.topIDF) {
+		if symbolShaped(t) || latinWord(t) {
+			named = append(named, t)
+		}
+	}
+	if len(named) > 0 && search.SpeechCarriesAnyTerm(s, named) {
+		return true
+	}
+	return search.SpeechCarriesTermsTogether(s, p.leadTerms, 2)
+}
+
+// latinWord reports a term written in Latin letters, the script tool and
+// product names are written in.
+func latinWord(term string) bool {
+	for _, r := range term {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+			return true
+		}
+	}
+	return false
 }
 
 // writePromptResponse prints the per-prompt answer in the shape the host

@@ -48,7 +48,7 @@ func TestHookPromptShrinksToPointerPastTheDigestBudget(t *testing.T) {
 		`{"type":"user","sessionId":"askedterm","timestamp":"` + old +
 			`","message":{"role":"user","content":"why does rsync hang in the nightly deploy script"}}`,
 		`{"type":"assistant","sessionId":"askedterm","timestamp":"` + old +
-			`","message":{"role":"assistant","content":[{"type":"text","text":"rsync waited on a host key prompt, added StrictHostKeyChecking"}]}}`,
+			`","message":{"role":"assistant","content":[{"type":"text","text":"rsync in the nightly deploy waited on a host key prompt, added StrictHostKeyChecking"}]}}`,
 	})
 	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
 		t.Fatal(err)

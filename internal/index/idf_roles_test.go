@@ -49,3 +49,21 @@ func TestTheTwoRarityRolesStaySeparate(t *testing.T) {
 		t.Errorf("rank weight drifted: %.4f", w)
 	}
 }
+
+// The prompt hook's rareness floor is min(4.0, TopIDF). It stays at 4.0 from 109
+// sessions up, which covers the 3,512-session store P2 was replayed on, so
+// lowering it for small stores cannot move that replay.
+func TestTopIDFReachesTheFixedFloorAt109Sessions(t *testing.T) {
+	const fixedFloor = 4.0 // search.identifierIDFFloor
+	if got := topIDF(108); got >= fixedFloor {
+		t.Errorf("108 sessions already reach the floor: %v", got)
+	}
+	for _, n := range []int{109, 3512} {
+		if got := topIDF(n); got < fixedFloor {
+			t.Errorf("%d sessions fall short of the floor: %v", n, got)
+		}
+	}
+	if got := TopIDF(t.TempDir()); !math.IsInf(got, 1) {
+		t.Errorf("a store that cannot be read gave a ceiling of %v; it must leave the floor alone", got)
+	}
+}

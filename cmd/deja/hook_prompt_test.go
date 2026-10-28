@@ -358,6 +358,7 @@ func TestOneRareWordStillGetsTheMemory(t *testing.T) {
 	writeClaudeFixture(t, filepath.Join(claudeRoot, "-tmp-delta", "one.jsonl"), "one", []string{
 		`{"type":"user","sessionId":"one","timestamp":"` + old + `","message":{"role":"user","content":"the quetzalcoatl stampede was fixed by jittering the retry"}}`,
 	})
+	padStoreWithOtherWork(t, claudeRoot)
 	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
 		t.Fatal(err)
 	}

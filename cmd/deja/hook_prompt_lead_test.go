@@ -30,7 +30,7 @@ func TestHookPromptLeadsWithTheSessionThatConcluded(t *testing.T) {
 	talk := make([]string, 0, 6)
 	for range 6 {
 		talk = append(talk, `{"type":"assistant","sessionId":"kestreltalk","timestamp":"`+recent+
-			`","message":{"role":"assistant","content":"looking at kestrel again, still not touching kestrel"}}`)
+			`","message":{"role":"assistant","content":"looking at kestrel retries again, still not touching kestrel"}}`)
 	}
 	writeClaudeFixture(t, filepath.Join(claudeRoot, "beta", "talk.jsonl"), "kestreltalk", talk)
 	writeClaudeFixture(t, filepath.Join(claudeRoot, "beta", "done.jsonl"), "kestreldone", []string{
@@ -47,7 +47,7 @@ func TestHookPromptLeadsWithTheSessionThatConcluded(t *testing.T) {
 	t.Chdir(cwd)
 
 	var out bytes.Buffer
-	in := strings.NewReader(`{"prompt":"what did we decide about kestrel","session_id":"asking"}`)
+	in := strings.NewReader(`{"prompt":"what did we decide about kestrel retries","session_id":"asking"}`)
 	if err := runHookPromptMode(index.DefaultDir(), in, &out, true); err != nil {
 		t.Fatal(err)
 	}

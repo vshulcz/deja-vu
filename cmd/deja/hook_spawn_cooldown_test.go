@@ -25,7 +25,7 @@ func TestAFleetIsNotSilencedByTheProjectCooldown(t *testing.T) {
 	// made once.
 	writeClaudeFixture(t, filepath.Join(root, "app", "kafka.jsonl"), "kafka", []string{
 		`{"type":"user","sessionId":"kafka","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"the kafka consumer rebalance keeps flapping on the orders topic"}}`,
-		`{"type":"assistant","sessionId":"kafka","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":"The fix was to raise session.timeout.ms above the poll interval; nothing else held."}}`,
+		`{"type":"assistant","sessionId":"kafka","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":"The kafka consumer fix was to raise session.timeout.ms above the poll interval; nothing else held."}}`,
 	})
 	for i, top := range []string{"the sidebar layout", "the invoice renderer", "the webpack config",
 		"the login throttle", "the avatar uploader", "the cron scheduler"} {
@@ -93,7 +93,7 @@ func TestAnOrdinaryPromptStillSitsOutTheCooldown(t *testing.T) {
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
 	writeClaudeFixture(t, filepath.Join(root, "app", "kafka.jsonl"), "kafka", []string{
 		`{"type":"user","sessionId":"kafka","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"the kafka consumer rebalance keeps flapping on the orders topic"}}`,
-		`{"type":"assistant","sessionId":"kafka","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":"The fix was to raise session.timeout.ms above the poll interval; nothing else held."}}`,
+		`{"type":"assistant","sessionId":"kafka","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":"The kafka consumer fix was to raise session.timeout.ms above the poll interval; nothing else held."}}`,
 	})
 	if _, err := captureRun(t, "index"); err != nil {
 		t.Fatal(err)

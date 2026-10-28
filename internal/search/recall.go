@@ -868,6 +868,57 @@ func SpeechCarriesAnyTerm(s model.Session, terms []string) bool {
 	return false
 }
 
+// SpeechCarriesTermsTogether reports whether one spoken message of the session
+// holds at least need of these words. need of 1 or less is
+// SpeechCarriesAnyTerm.
+func SpeechCarriesTermsTogether(s model.Session, terms []string, need int) bool {
+	if need <= 1 {
+		return SpeechCarriesAnyTerm(s, terms)
+	}
+	if len(terms) < need {
+		return false
+	}
+	for _, m := range s.Messages {
+		if m.Role == roleToolOutput {
+			continue
+		}
+		n := 0
+		for _, t := range terms {
+			if t != "" && TextCarriesTerm(m.Text, t) {
+				n++
+			}
+		}
+		if n >= need {
+			return true
+		}
+	}
+	return false
+}
+
+// QuoteCarriesTerms reports whether one line a digest quotes holds need
+// distinct terms of the question. Session headers do not count: they name
+// where the lines came from, not what was said.
+func QuoteCarriesTerms(digest string, terms []string, need int) bool {
+	if need <= 0 {
+		return true
+	}
+	for l := range strings.SplitSeq(digest, "\n") {
+		if !strings.HasPrefix(l, "  - ") {
+			continue
+		}
+		n := 0
+		for _, t := range terms {
+			if t != "" && TextCarriesTerm(l, t) {
+				n++
+			}
+		}
+		if n >= need {
+			return true
+		}
+	}
+	return false
+}
+
 // LeadWithConclusion puts a session that settled something about the query
 // first. Ranking counts how often and how rarely the query's words appear and
 // cannot see the difference between settling a question and discussing it: a

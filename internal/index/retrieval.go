@@ -693,6 +693,30 @@ func gateIDF(totalDocs float64, minDF int, rank float64) float64 {
 	return math.Max(math.Log(totalDocs/float64(minDF+1)), rank)
 }
 
+// TopIDF is the idf every word said in only one session reaches on this store,
+// however many of its messages say it: gateIDF never goes below rankIDF, and
+// that is rankIDF's highest value. A store too small to reach a fixed rareness
+// floor still has words that belong to one session. Counted in messages
+// instead, a word the user and the agent both said in a one-session store
+// scores 0 against a ceiling of 0.4 and is never rare. An unreadable store
+// answers +Inf, so a floor taken as min(floor, TopIDF) stays where it was.
+func TopIDF(dir string) float64 {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return math.Inf(1)
+	}
+	return topIDF(len(m.Sessions))
+}
+
+// topIDF is rankIDF for a word in one session, from the same inputs scoreTerm
+// uses, so the two agree to the bit.
+func topIDF(sessions int) float64 {
+	return rankIDF(sessions, 1)
+}
+
 // dejaVuIDFFloor is the informativeness bar for a term to count toward a
 // déjà vu match: ln(N/df) >= 2 keeps terms present in at most ~13% of
 // sessions. Conversational filler ("post", "text", "claude") is frequent in

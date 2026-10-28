@@ -116,7 +116,7 @@ func gooseRecallFixture(t *testing.T) string {
 			`"timestamp":"2026-07-30T03:04:05Z","message":{"role":"` + role + `","content":"` + text + `"}}`
 	}
 	body := line("user", "why does pgbouncer keep timing out") + "\n" +
-		line("assistant", "The fix was raising default_pool_size to 40.") + "\n"
+		line("assistant", "pgbouncer was timing out on a full pool; the fix was raising default_pool_size to 40.") + "\n"
 	if err := os.WriteFile(filepath.Join(proj, "gp1.jsonl"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}

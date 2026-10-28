@@ -81,7 +81,7 @@ func TestTheSecondCallAnswersTheQuestion(t *testing.T) {
 	t.Setenv("DEJA_CLAUDE_ROOT", claude)
 	seedClaude(t, claude, "app", "sess-old",
 		"why does the frobnicator stall on startup",
-		"it stalled because ZORBWAX_LIMIT was unset; exporting ZORBWAX_LIMIT=4 cleared it")
+		"the frobnicator stalled on startup because ZORBWAX_LIMIT was unset; exporting ZORBWAX_LIMIT=4 cleared it")
 	dir := filepath.Join(tmp, "index.db")
 	t.Setenv("DEJA_INDEX_DIR", dir)
 	if err := index.Ensure(dir, "", true, nil); err != nil {

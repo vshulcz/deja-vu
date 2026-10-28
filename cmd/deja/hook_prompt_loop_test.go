@@ -57,7 +57,7 @@ func TestALoopedPromptIsAnsweredOnce(t *testing.T) {
 		`"message":{"role":"user","content":"why does the zebraquux fetcher time out?"}}`+"\n"+
 		`{"type":"assistant","sessionId":"zebmain","timestamp":%q,`+
 		`"message":{"role":"assistant","content":[{"type":"text","text":`+
-		`"we settled it: the zebraquux dial deadline goes to 5s and the retry budget to three"}]}}`, at, at)
+		`"we settled it: the zebraquux fetcher dial deadline goes to 5s and the retry budget to three"}]}}`, at, at)
 	if err := os.WriteFile(filepath.Join(claude, "zebmain.jsonl"), []byte(asked+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

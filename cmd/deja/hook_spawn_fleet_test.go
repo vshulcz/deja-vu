@@ -27,7 +27,7 @@ func TestAFleetOfSpawnedAgentsEachGetMemory(t *testing.T) {
 		id := fmt.Sprintf("kafka%d", k)
 		writeClaudeFixture(t, filepath.Join(root, "app", id+".jsonl"), id, []string{
 			`{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-0` + strconv.Itoa(k+2) + `T03:04:05Z","message":{"role":"user","content":"the kafka consumer rebalance keeps flapping on the orders topic"}}`,
-			`{"type":"assistant","sessionId":"` + id + `","timestamp":"2026-01-0` + strconv.Itoa(k+2) + `T03:04:06Z","message":{"role":"assistant","content":"The fix was to raise session.timeout.ms above the poll interval; nothing else held."}}`,
+			`{"type":"assistant","sessionId":"` + id + `","timestamp":"2026-01-0` + strconv.Itoa(k+2) + `T03:04:06Z","message":{"role":"assistant","content":"The kafka consumer fix was to raise session.timeout.ms above the poll interval; nothing else held."}}`,
 		})
 	}
 	// Unrelated work, so the words of the question carry weight: in a store

@@ -115,13 +115,25 @@ func HasIdentifierTermKnown(terms []string, known map[string]float64) bool {
 // to say what a session is about. The caller that has the ranking's own idf
 // gets that verdict; without it there is nothing to judge by and the whole
 // question stands.
-func IdentifyingTerms(terms []string, known map[string]float64) []string {
+//
+// top is the idf a word said in only one session reaches (index.TopIDF). A
+// store of fewer than 109 sessions cannot give that word identifierIDFFloor,
+// and a new user's one-word question would never be answered; there a word
+// that belongs to one session counts. From 109 sessions up the floor is the
+// fixed one.
+func IdentifyingTerms(terms []string, known map[string]float64, top float64) []string {
 	if known == nil {
 		return terms
 	}
+	floor := identifierIDFFloor
+	if top < floor {
+		// A hair under top, so a word whose idf sits exactly on it is not
+		// lost to rounding.
+		floor = top - 1e-9
+	}
 	kept := make([]string, 0, len(terms))
 	for _, t := range terms {
-		if v, ok := known[t]; ok && v >= identifierIDFFloor {
+		if v, ok := known[t]; ok && v >= floor {
 			kept = append(kept, t)
 		}
 	}

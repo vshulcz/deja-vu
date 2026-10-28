@@ -25,6 +25,7 @@ func TestHookPromptAnswersASingleIdentifier(t *testing.T) {
 	writeClaudeFixture(t, filepath.Join(claudeRoot, "beta", "one.jsonl"), "oneterm", []string{
 		`{"type":"user","sessionId":"oneterm","timestamp":"` + old + `","message":{"role":"user","content":"pgbouncer runs in transaction mode and prepared statements are off"}}`,
 	})
+	padStoreWithOtherWork(t, claudeRoot)
 	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
 		t.Fatal(err)
 	}

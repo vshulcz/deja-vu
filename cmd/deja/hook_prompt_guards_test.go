@@ -41,7 +41,7 @@ func TestHookPromptNarrowsAMarathonItShows(t *testing.T) {
 
 	focusCalls = 0
 	var out bytes.Buffer
-	in := strings.NewReader(`{"prompt":"what did we decide about kestrel","session_id":"asking"}`)
+	in := strings.NewReader(`{"prompt":"what did we decide about kestrel retries","session_id":"asking"}`)
 	if err := runHookPromptMode(index.DefaultDir(), in, &out, true); err != nil {
 		t.Fatal(err)
 	}
