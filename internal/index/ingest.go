@@ -779,6 +779,27 @@ func ensureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 	if autoUpdatesOff() {
 		return false, 0, 0, manualCheck(dir)
 	}
+	if k := keptFresh(dir); k != nil {
+		// Only the manifest, no walk: the keeper does that (keepfresh.go). An
+		// index that cannot answer yet still goes the long way below.
+		if m, ok := servable(dir); ok {
+			switch {
+			case newerIndex(m):
+				return false, 0, 0, nil
+			case m.Version != version || zoneDrifted(m) || miningChanged(m):
+				return true, 0, 0, nil
+			}
+			stale, pending, found := k.verdict()
+			return stale, pending, found, nil
+		}
+	}
+	return walkForSearchStale(dir, o, progress)
+}
+
+// walkForSearchStale is ensureForSearchStale with the walk of every store:
+// what a query runs when nothing keeps the index fresh for it, and what the
+// keeper runs, under the lock, on its timer.
+func walkForSearchStale(dir string, o query.Options, progress io.Writer) (bool, int, int, error) {
 	// The wait before an answer is made of three things — taking the lock,
 	// walking the stores to see what changed, and ingesting whatever did — and
 	// from the outside they are one number. A reader who sees seconds here can
@@ -794,6 +815,11 @@ func ensureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 	}
 	defer unlock()
 	mark("lock")
+	return staleLocked(dir, o, progress, mark)
+}
+
+// staleLocked is the body of walkForSearchStale, with the lock held.
+func staleLocked(dir string, o query.Options, progress io.Writer, mark func(string)) (bool, int, int, error) {
 	// Read first, walk second: this is the path every search takes, and
 	// re-deriving state for unchanged transcripts was costing 700 ms of the
 	// second it takes to answer a query. Through the cache, since nothing here

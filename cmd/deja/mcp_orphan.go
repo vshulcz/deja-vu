@@ -7,6 +7,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/index"
 )
 
 // mcpOrphanGrace is the window a quiet but live client gets after its launcher
@@ -64,7 +66,19 @@ func (r *mcpStampReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
+// mcpFreshEvery is how often a running server checks its index against the
+// stores. A query no longer walks them itself (index.KeepFresh), so a session
+// another agent writes becomes searchable within this plus the time to index it.
+const mcpFreshEvery = 15 * time.Second
+
 func serveMCPProcess(dir string, r io.Reader, w io.Writer, contextOnly bool) error {
+	defer index.KeepFresh(dir, mcpFreshEvery, func() {
+		// Same hand-off a stale query made, with the guard from #5721.
+		if !warmupRunning(dir) {
+			requestWarmup(dir)
+		}
+	}, mcpProgress())()
+
 	var lastRead atomic.Int64
 	lastRead.Store(time.Now().UnixNano())
 
