@@ -262,7 +262,7 @@ recall por MCP funcionam como sempre.
 ## Evidência
 
 <p>
-<b>58% menos tokens</b> numa tarefa que esta máquina já havia resolvido &middot; <b>88.9% hit@1</b> no LongMemEval-S (conjunto limpo de 470 perguntas) &middot; <b>70.5%</b> no LoCoMo &middot; consultas em <b>milissegundos</b> sobre gigabytes de histórico<br>
+<b>58% menos tokens</b> numa tarefa que esta máquina já havia resolvido &middot; <b>88.9% hit@1</b> no LongMemEval-S (conjunto limpo de 470 perguntas) &middot; <b>71.9%</b> no LoCoMo &middot; consultas em <b>milissegundos</b> sobre gigabytes de histórico<br>
 <sub>Onze execuções por braço: 53,558 tokens contra 126,222 sem nada conectado, e 52,815 contra 103,443 numa versão posterior, de novo onze execuções &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">quanto custa terminar uma tarefa</a> &middot;
 os dois harnesses de recuperação estão neste repositório e rodam sobre datasets públicos em minutos &middot;

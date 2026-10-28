@@ -20,7 +20,7 @@ Reasonix and Zed. deja turns those files into one memory layer that all of them
 can read.
 
 One Go binary. No LLM, no embeddings, no API key. The network is used only by commands you run for it, such as `deja update` and `deja sync ssh`, and by a daily release check, which DEJA_OFFLINE=1 turns off.
-**58% fewer tokens** on a task this machine had already solved (53,558 against 126,222 with nothing wired, and 52,815 against 103,443 on a later build with the arms run alternately, eleven runs an arm each time). **88.1% hit@1** on LongMemEval-S (470-question cleaned set), **millisecond** lookups over gigabytes of history.
+**58% fewer tokens** on a task this machine had already solved (53,558 against 126,222 with nothing wired, and 52,815 against 103,443 on a later build with the arms run alternately, eleven runs an arm each time). **88.9% hit@1** on LongMemEval-S (470-question cleaned set), **millisecond** lookups over gigabytes of history.
 
 ```sh
 npx @vshulcz/deja-vu "connection pool exhausted"   # search, no install

@@ -241,7 +241,7 @@ opencode、dsh 和 OpenClaw 只補上缺的那部分；Kimi、Grok、Codex 和 p
 ## 證據
 
 <p>
-同一台機器已經做過的任務，<b>少花 58% 的 token</b> &middot; LongMemEval-S（470 題清理集）上 <b>88.9% hit@1</b> &middot; LoCoMo 上 <b>70.5%</b> &middot; 數 GB 歷史上的查詢在<b>毫秒</b>級<br>
+同一台機器已經做過的任務，<b>少花 58% 的 token</b> &middot; LongMemEval-S（470 題清理集）上 <b>88.9% hit@1</b> &middot; LoCoMo 上 <b>71.9%</b> &middot; 數 GB 歷史上的查詢在<b>毫秒</b>級<br>
 <sub>每組 11 次執行：53,558 token，對比未接上任何記憶時的 126,222；之後的版本上再各跑 11 次：52,815 對比 103,443 &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">完成一個任務要花多少</a> &middot;
 兩套檢索評測都在本儲存庫裡，幾分鐘即可在公開資料集上跑完 &middot;

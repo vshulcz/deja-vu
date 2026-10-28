@@ -262,7 +262,7 @@ sözcüksel arama ve MCP geri çağırma her zamanki gibi çalışır.
 ## Kanıt
 
 <p>
-Bu makinenin daha önce çözdüğü bir işte <b>%58 daha az token</b> &middot; LongMemEval-S üzerinde (470 soruluk temizlenmiş küme) <b>%88.9 hit@1</b> &middot; LoCoMo üzerinde <b>%70.5</b> &middot; gigabaytlarca geçmişte <b>milisaniyelik</b> sorgular<br>
+Bu makinenin daha önce çözdüğü bir işte <b>%58 daha az token</b> &middot; LongMemEval-S üzerinde (470 soruluk temizlenmiş küme) <b>%88.9 hit@1</b> &middot; LoCoMo üzerinde <b>%71.9</b> &middot; gigabaytlarca geçmişte <b>milisaniyelik</b> sorgular<br>
 <sub>Kol başına on bir çalıştırma: hiçbir şey bağlı değilken 126,222'ye karşı 53,558 token; sonraki bir sürümde yine on birer çalıştırma: 103,443'e karşı 52,815 &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">bir işi bitirmenin maliyeti</a> &middot;
 her iki erişim değerlendirme düzeneği de bu depoda ve açık veri kümelerinde dakikalar içinde koşuyor &middot;

@@ -268,7 +268,7 @@ funktionieren lexikalische Suche und MCP-Recall wie gewohnt.
 ## Belege
 
 <p>
-<b>58 % weniger Tokens</b> bei einer Aufgabe, die diese Maschine schon gelöst hatte &middot; <b>88.9 % hit@1</b> auf LongMemEval-S (bereinigter Satz aus 470 Fragen) &middot; <b>70.5 %</b> auf LoCoMo &middot; Abfragen in <b>Millisekunden</b> über Gigabytes an Historie<br>
+<b>58 % weniger Tokens</b> bei einer Aufgabe, die diese Maschine schon gelöst hatte &middot; <b>88.9 % hit@1</b> auf LongMemEval-S (bereinigter Satz aus 470 Fragen) &middot; <b>71.9 %</b> auf LoCoMo &middot; Abfragen in <b>Millisekunden</b> über Gigabytes an Historie<br>
 <sub>Elf Läufe je Arm: 53,558 Tokens gegen 126,222 ohne angebundenes Gedächtnis, und 52,815 gegen 103,443 auf einem späteren Build, wieder elf Läufe &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">was eine Aufgabe kostet</a> &middot;
 beide Retrieval-Harnesses liegen in diesem Repository und laufen in Minuten auf öffentlichen Datensätzen &middot;

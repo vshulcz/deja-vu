@@ -254,7 +254,7 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsur
 ## 근거
 
 <p>
-이 컴퓨터가 이미 해결한 작업에서 <b>토큰 58% 절감</b> &middot; LongMemEval-S(470문항 정제 세트)에서 <b>hit@1 88.9%</b> &middot; LoCoMo에서 <b>70.5%</b> &middot; 수 기가바이트 기록을 <b>밀리초</b> 단위로 조회<br>
+이 컴퓨터가 이미 해결한 작업에서 <b>토큰 58% 절감</b> &middot; LongMemEval-S(470문항 정제 세트)에서 <b>hit@1 88.9%</b> &middot; LoCoMo에서 <b>71.9%</b> &middot; 수 기가바이트 기록을 <b>밀리초</b> 단위로 조회<br>
 <sub>한쪽당 11회 실행: 53,558 토큰 대 아무것도 연결하지 않았을 때의 126,222, 이후 빌드에서 다시 11회 실행: 103,443 대비 52,815 &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">작업 하나를 끝내는 비용</a> &middot;
 검색 평가 하네스 두 개 모두 이 저장소에 있고 공개 데이터셋에서 몇 분이면 돕니다 &middot;

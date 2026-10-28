@@ -448,7 +448,7 @@ deja embed
 ## 検証
 
 <p>
-このマシンが一度解いた作業では <b>token が 58% 少ない</b> &middot; LongMemEval-S（470 問のクリーン版）で <b>88.9% hit@1</b> &middot; LoCoMo で <b>70.5% retrieval hit@1</b> &middot; 数 GB の履歴に対して<b>ミリ秒</b>単位の検索<br>
+このマシンが一度解いた作業では <b>token が 58% 少ない</b> &middot; LongMemEval-S（470 問のクリーン版）で <b>88.9% hit@1</b> &middot; LoCoMo で <b>71.9% retrieval hit@1</b> &middot; 数 GB の履歴に対して<b>ミリ秒</b>単位の検索<br>
 <sub>各アーム 11 回の実行で 53,558 token、記憶をつながない場合の 126,222 に対して。後のビルドで再び各 11 回：103,443 に対して 52,815 &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">1 つの作業を終えるまでの費用</a> &middot;
 検索側のハーネスはどちらもこのリポジトリに含まれており、公開データセット上で数分で実行できます &middot;

@@ -451,7 +451,7 @@ With Ollama or LM Studio, embedding stays local and needs no key.
 ## Proof
 
 Millisecond lookups, and on LongMemEval-S 88.9% hit@1 (470-question cleaned set) and 88.2% hit@1 on all 500 questions;
-on LoCoMo retrieval, 70.5% hit@1. On a task this machine had already solved, 58% fewer
+on LoCoMo retrieval, 71.9% hit@1. On a task this machine had already solved, 58% fewer
 tokens: eleven runs an arm, 53,558 against 126,222 with nothing wired, and 52,815 against
 103,443 on a later build with the arms alternated. Both retrieval harnesses ship in this repo
 and run on the public datasets in minutes: [benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html) ·
