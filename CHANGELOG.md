@@ -167,6 +167,9 @@ conclusion. The index rebuilds once on upgrade.
   `Continue sessions can't be deleted yet: deja has not checked how Continue
   lists them` — where the CLI's own prefix made it read `deja: deja can't delete
   Continue sessions yet`. From @tnalbant (#5654, #5675).
+- Ten agent guides say how to delete a session with `deja delete`, including
+  the Cline and Antigravity cases it refuses or cleans up. From @gezerui888
+  (#5738).
 - `deja stats --year` says "1 session", "1 turn" and "1 record" on every
   line, not only the first, and the verbs agree. From @dannyward630 (#5655,
   #5658).
