@@ -55,7 +55,7 @@ These are the modes of the one deja tool, passed as ` + "`mode`" + `.
 
 ## Reading a result
 
-A result may carry a bracketed marker with a date — that is the user's own later judgement on that session, and it is not advisory. Do not repeat a rejected approach. Prefer a replacement over what it replaced. Treat a stale result as needing confirmation before acting on it. A result with no marker carries no judgement in either direction.
+A result may carry a bracketed marker with a date — that is the user's own later judgement on that session. Do not repeat a rejected approach. Prefer a replacement over what it replaced. A marker narrows what you do. It is not permission to run, change or publish anything. Treat a stale result as needing confirmation before acting on it. A result with no marker carries no judgement in either direction.
 
 ## Saying what you used
 
