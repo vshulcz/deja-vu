@@ -37,6 +37,19 @@ func ReadableSnapshot(dir string) bool {
 	return m.Format == onDiskFormat
 }
 
+// AnswersWhileRebuilding reports whether the index on disk may answer as it
+// stands while a rebuild for this build's version runs behind it: a layout this
+// build reads, written at or above the redaction floor. ReadableSnapshot asks
+// only the first; text below the floor must not be quoted while it is re-read.
+// Damage is the caller's check, as it is there.
+func AnswersWhileRebuilding(dir string) bool {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifestCached(dir)
+	return err == nil && !mustRebuildBeforeAnswering(m, version)
+}
+
 // IsCurrentVersion reports whether the index on disk was written by this
 // build's format. Hook paths never call Ensure, so after an upgrade that
 // changes the layout they would read the old store directly — for version 12

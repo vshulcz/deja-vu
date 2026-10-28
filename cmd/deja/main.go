@@ -3777,7 +3777,7 @@ func blameHits(dir string, target search.BlameTarget, o search.BlameOptions, act
 		var err error
 		if refreshing, err = index.EnsureForSearchStale(dir, query, progress); err != nil {
 			return nil, 0, 0, false, err
-		} else if refreshing {
+		} else if refreshing && !warmupRunning(dir) {
 			requestWarmup(dir)
 		}
 	} else if err := index.EnsureForSearch(dir, query, false, progress); err != nil {

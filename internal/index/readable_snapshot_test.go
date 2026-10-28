@@ -48,3 +48,37 @@ func TestReadableSnapshotSeparatesLayoutFromContent(t *testing.T) {
 		t.Error("a missing store reads as readable")
 	}
 }
+
+// AnswersWhileRebuilding is ReadableSnapshot with the redaction floor: a store
+// below it reads, but must not be quoted while it is re-read.
+func TestAnswersWhileRebuildingHoldsTheRedactionFloor(t *testing.T) {
+	tmp := hermeticIndexEnv(t)
+	dir := filepath.Join(tmp, "floor")
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetManifestVersionForTest(dir, CurrentVersionForTest()-1); err != nil {
+		t.Fatal(err)
+	}
+	if !AnswersWhileRebuilding(dir) {
+		t.Error("a store one content version behind does not answer")
+	}
+	if err := SetManifestVersionForTest(dir, redactionFloor-1); err != nil {
+		t.Fatal(err)
+	}
+	if !ReadableSnapshot(dir) || AnswersWhileRebuilding(dir) {
+		t.Error("a store below the redaction floor answers while rebuilding")
+	}
+	if err := SetManifestVersionForTest(dir, CurrentVersionForTest()-1); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetManifestFormatForTest(dir, 0); err != nil {
+		t.Fatal(err)
+	}
+	if AnswersWhileRebuilding(dir) {
+		t.Error("a layout this build cannot read answers while rebuilding")
+	}
+	if AnswersWhileRebuilding(filepath.Join(tmp, "absent")) {
+		t.Error("a missing store answers")
+	}
+}

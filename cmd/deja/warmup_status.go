@@ -226,7 +226,8 @@ func emptyRecallAnswer(dir, q string) string { return emptyRecallAnswerPolicy(di
 func emptyRecallAnswerPolicy(dir, q string, hidden int) string {
 	q = clampEcho(q)
 	st := readWarmupStatus(dir)
-	if st != nil && index.HasManifest(dir) && index.IsCurrentVersion(dir) && !index.Damaged(dir) {
+	current := st != nil && index.HasManifest(dir) && index.IsCurrentVersion(dir)
+	if st != nil && index.HasManifest(dir) && (current || index.AnswersWhileRebuilding(dir)) && !index.Damaged(dir) {
 		// A refresh over an index that already answers: the search ran over
 		// every session indexed so far, and saying nothing can be recalled
 		// yet denied the history it had just searched.
@@ -235,6 +236,9 @@ func emptyRecallAnswerPolicy(dir, q string, hidden int) string {
 		if c := index.SnapshotCoverage(dir); c.PartialOf > c.Sessions {
 			c.Stale = true
 			return fmt.Sprintf("No prior deja sessions matched %q — %s.", q, coverageLine(c))
+		}
+		if !current {
+			return fmt.Sprintf("No prior deja sessions matched %q. This answer comes from the previous index while deja rebuilds it for this version (%s).", q, st.progress())
 		}
 		return fmt.Sprintf("No prior deja sessions matched %q. The index is refreshing (%s), so the newest sessions may not be in this answer yet.", q, st.progress())
 	}

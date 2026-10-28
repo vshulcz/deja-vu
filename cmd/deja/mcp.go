@@ -1653,10 +1653,12 @@ func rankRecall(dir, q, harness, project string, window int) (rankedRecall, erro
 	if err != nil {
 		return rankedRecall{}, err
 	}
-	if cov.Stale {
+	if cov.Stale && !warmupRunning(dir) {
 		// A store rewrote itself (cline, cursor); rebuilding inline would
 		// blow the client's tool timeout, so refresh detached and serve the
-		// current index with an honest note.
+		// current index with an honest note. Not while a build runs: the
+		// sentinel dedups for ten minutes, a version rebuild can outlast that,
+		// and a second build over one index is the thing to avoid.
 		requestWarmup(dir)
 	}
 	// An agent names the project by the directory it works in, often a git
@@ -2459,7 +2461,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: live, ExcludeUpTo: cut, Window: 1, Activation: policy.ActivationMCP}
 	if stale, err := index.EnsureForSearchStale(dir, o, mcpProgress()); err != nil {
 		return "", 0, 0, nil, nil, "", err
-	} else if stale {
+	} else if stale && !warmupRunning(dir) {
 		requestWarmup(dir)
 	}
 	result, err := index.SearchWithRecoveryDetailed(dir, o, mcpProgress())
@@ -2942,6 +2944,15 @@ func buildingNowForAgent(dir string) string {
 	if index.HasManifest(dir) && !indexNeedsRebuild(dir) {
 		return ""
 	}
+	// The same holds for the rebuild a version bump starts: the old snapshot
+	// stays readable until the swap, and the search layer already serves it
+	// (#3552). Checked after the status file below, this sent 72 of 82
+	// no-answer recalls in real transcripts to "ask again", and agents rarely
+	// do. Only while a build runs: with none running, the branch further down
+	// asks for one first.
+	if warmupRunning(dir) && index.HasManifest(dir) && index.AnswersWhileRebuilding(dir) && !index.Damaged(dir) {
+		return ""
+	}
 	if st := readWarmupStatus(dir); st != nil {
 		return "deja is indexing this machine's history (" + st.progress() + "). Recall comes online when it finishes; ask again then."
 	}
@@ -2983,6 +2994,12 @@ func buildingNowForAgent(dir string) string {
 	// Nothing indexed yet and nothing building: this is a first run, and
 	// building it here is how an install with no hooks ever gets an index.
 	return ""
+}
+
+// warmupRunning reports a build in flight or just asked for: its status file,
+// the index lock, or a fresh sentinel.
+func warmupRunning(dir string) bool {
+	return readWarmupStatus(dir) != nil || index.RebuildInProgress(dir) || warmupJustRequested(dir)
 }
 
 // buildingNowForBlockingTool is buildingNowForAgent for the two tools that
