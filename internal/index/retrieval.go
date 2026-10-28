@@ -67,6 +67,8 @@ func SearchDetailed(dir string, o query.Options) (SearchResult, error) {
 					r2.Strict, r2.StrictIDs = len(r2.Sessions), sessionKeySet(r2.Sessions)
 				}
 				r2.Tier = query.TierRelevance
+				// Found for another query than the caller's.
+				r2.Fell = 0
 				return r2, nil
 			}
 		}
@@ -128,6 +130,9 @@ func searchDetailedRead(dir string, o query.Options) (SearchResult, error) {
 	// answer both ask for it with the same query, and each read and scored
 	// fifty sessions (#5378).
 	ranking := &relevanceOnce{}
+	if o.FellThrough != 0 {
+		return rankedTail(ranking, dir, m, o, o.FellThrough)
+	}
 	hit, served, err := postingsRung(dir, m, o, ranking)
 	if err != nil {
 		return SearchResult{}, err
@@ -176,8 +181,13 @@ func searchDetailedRead(dir string, o query.Options) (SearchResult, error) {
 		if res, done, ferr := wordLadder(ranking, dir, m, o); done {
 			return res, ferr
 		}
-		res, rerr := ranking.get(dir, m, o)
-		return orLoneWord(dir, m, o, res, rerr)
+		// Settled for any narrower search only when every candidate was
+		// filtered out or checked: a pool that left sessions unread is not.
+		fell := 0
+		if len(posts) == 0 || unread == nil {
+			fell = query.FellNoText
+		}
+		return rankedTail(ranking, dir, m, o, fell)
 	}
 	if err != nil {
 		return SearchResult{}, err

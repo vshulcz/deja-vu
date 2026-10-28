@@ -119,7 +119,8 @@ func TestTheAddedAnswerDoesNotSetTheLead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rows := regexp.MustCompile(`\n(\d+)\. \[[^\]]*\] (\S+) · (\S+)`).FindAllStringSubmatch(text, -1)
+	// A page no session is about lists its leads one per line, id last.
+	rows := regexp.MustCompile(`(?m)^(\d+)\. \[[^\]]*\] (\S+) .*· (\S+)$`).FindAllStringSubmatch(text, -1)
 	if len(rows) < 2 || rows[1][3] != "box" {
 		t.Fatalf("the machine's best is not second:\n%s", firstLines(text, 20))
 	}

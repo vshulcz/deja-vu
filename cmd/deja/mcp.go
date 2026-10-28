@@ -1721,6 +1721,9 @@ func rankRecall(dir, q, harness, project string, window int) (rankedRecall, erro
 		// The project falls back to one word of two only where the machine
 		// did too: otherwise its guess would replace the machine's answer.
 		po.LoneWord = o.LoneWord && (len(hits) == 0 || dropsAWord(result.Variants))
+		// Every rung above the ranked tier came back empty for the whole
+		// machine, so it does for the project: start where that ended.
+		po.FellThrough = result.Fell
 		// Cut from the machine's search when that one read everything the
 		// project's would: a second search of a word most sessions hold
 		// cost as much again (#5486). And not run at all where no session
@@ -1782,16 +1785,6 @@ func rankRecall(dir, q, harness, project string, window int) (rankedRecall, erro
 
 // recallPage writes one page of ranked hits, already cut to the page.
 func recallPage(dir, q string, budget, offset, limit, total, demoted int, about bool, result index.SearchResult, o search.Options, hits []search.Hit, twins map[string][]string, cov index.Coverage, added string) (string, int, int64, []string, []string, error) {
-	attachAnswers(dir, hits)
-	// Every line in its author's words, and the person's own check and build
-	// rules for the project the agent works in under the mark the frame says
-	// to follow. The scope is the working directory's even when the caller
-	// filtered on another project: a rule is only ever one of this project's.
-	scope := howScope(howCwd(), "", false)
-	for i := range hits {
-		index.MarkUserRules(dir, &hits[i].Session, scope)
-		hits[i].Snippets = search.EvidenceRewrite(hits[i].Session, dir, hits[i].Snippets)
-	}
 	// Counted on the page rather than taken from the result: the strict head
 	// is small but the trust policy can withhold part of it and paging can
 	// leave the rest behind, and a line counting sessions the reader cannot
@@ -1838,7 +1831,15 @@ func recallPage(dir, q string, budget, offset, limit, total, demoted int, about 
 	}
 	covered := result.Tier == search.TierRelevance && strictShown == 0 && result.Directory == "" &&
 		!namesTheAsked && cover.aboutIt()
-	namesTheAsked = writeRecallLead(&b, result, lead, q, strictShown, absent, namesTheAsked, cover, covered)
+	var lb strings.Builder
+	namesTheAsked, nothing := writeRecallLead(&lb, result, lead, q, strictShown, absent, namesTheAsked, cover, covered)
+	b.WriteString(lb.String())
+	if !nothing {
+		decorateRecallHits(dir, hits)
+	} else if len(hits) > 0 {
+		// The first lead keeps one excerpt, in its author's words.
+		markRecallHits(dir, hits[:1])
+	}
 	if note := demotedNote(hits, demoted); note != "" {
 		fmt.Fprintln(&b, note+" — read the order as the user's judgement, not as recency.")
 	}
@@ -1852,9 +1853,12 @@ func recallPage(dir, q string, budget, offset, limit, total, demoted int, about 
 		headerRoom += len("about ")
 	}
 	for i, h := range hits {
-		if lone {
+		switch {
+		case nothing:
+			writeLeadLine(&hb, h, i, cover.terms)
+		case lone:
 			writeLoneWordHit(&hb, h, i)
-		} else {
+		default:
 			writeRecallHitHead(&hb, h, i, twins)
 		}
 		// Under the best hit only, and only when there is budget left: the
@@ -1864,7 +1868,7 @@ func recallPage(dir, q string, budget, offset, limit, total, demoted int, about 
 		// so the common case — "did we solve this before?" — is answered in the
 		// recall itself. Later hits stay excerpt-only; they are candidates to
 		// choose between, not answers.
-		if i == 0 && !lone {
+		if i == 0 && !lone && !nothing {
 			writeRecallConclusions(&hb, dir, q, h, o, budget, headerRoom, len(hits) > 1)
 		}
 		served++
@@ -1881,9 +1885,53 @@ func recallPage(dir, q string, budget, offset, limit, total, demoted int, about 
 	// From what was served, not from the limit: the loop also stops on the
 	// token budget, and then this said "2 more" while five were left — the
 	// agent asks for offset=served and the arithmetic has to hold.
-	out := recallPageFooter(&b, hits, result, offset, served, total, budget, pageFull, about)
+	out := recallPageFooter(&b, hits, result, offset, served, total, budget, pageFull, about, nothing)
 	raw, ids, projects := recallServedFacts(hits, served)
 	return out, served, raw, ids, projects, nil
+}
+
+// decorateRecallHits puts every line in its author's words, and the person's
+// own check and build rules for the project the agent works in under the mark
+// the frame says to follow. The scope is the working directory's even when the
+// caller filtered on another project: a rule is only ever one of this
+// project's.
+func decorateRecallHits(dir string, hits []search.Hit) {
+	attachAnswers(dir, hits)
+	markRecallHits(dir, hits)
+}
+
+// markRecallHits is decorateRecallHits without the answer lookup.
+func markRecallHits(dir string, hits []search.Hit) {
+	scope := howScope(howCwd(), "", false)
+	for i := range hits {
+		index.MarkUserRules(dir, &hits[i].Session, scope)
+		hits[i].Snippets = search.EvidenceRewrite(hits[i].Session, dir, hits[i].Snippets)
+	}
+}
+
+// writeLeadLine is a hit on a page no session is about: where, when, which of
+// the query's words it holds, and its id. Excerpts went with every one before,
+// and on a replay of real recall calls agents followed one of these leads 6
+// times in 212 while they were most of the bytes of the page. The first keeps
+// one, so a lead that does answer still shows what it says.
+func writeLeadLine(hb *strings.Builder, h search.Hit, i int, terms []string) {
+	fmt.Fprintf(hb, "%d. [%s] %s", i+1, recallListingLine(h.Session.Harness), recallListingLine(h.Session.Project))
+	if !h.Session.Updated.IsZero() {
+		fmt.Fprintf(hb, " · %s", h.Session.Updated.Local().Format("2006-01-02"))
+	}
+	if held := sessionHolds(h.Session, terms); len(held) > 0 {
+		fmt.Fprintf(hb, " · has %s", recallListingLine(strings.Join(held, ", ")))
+	}
+	fmt.Fprintf(hb, " · %s\n", recallListingLine(h.Session.ID))
+	if i > 0 {
+		return
+	}
+	for _, sn := range h.Snippets {
+		if !strings.HasPrefix(sn, search.UserRuleLabel) {
+			fmt.Fprintf(hb, "- %s\n", recallListingLine(sn))
+			return
+		}
+	}
 }
 
 // recallMissAnswer answers a recall whose words matched nothing.
@@ -1914,7 +1962,7 @@ func recallMissAnswer(dir, q string, budget int, cov index.Coverage, policyHidde
 
 // recallPageFooter is the page with its paging and depth lines, trimmed to
 // the budget with room left for them.
-func recallPageFooter(b *strings.Builder, hits []search.Hit, result index.SearchResult, offset, served, total, budget int, pageFull, about bool) string {
+func recallPageFooter(b *strings.Builder, hits []search.Hit, result index.SearchResult, offset, served, total, budget int, pageFull, about, leadsOnly bool) string {
 	more := ""
 	if left := total - offset - served; left > 0 {
 		what := "matches"
@@ -1947,7 +1995,9 @@ func recallPageFooter(b *strings.Builder, hits []search.Hit, result index.Search
 	// shell have recall and no recall_context, and were sent to a tool they
 	// could not call (#5579).
 	deep := ""
-	if deepest := deepestServed(hits, served); deepest != nil {
+	// Not under leads: it sends the reader into a session nothing says is
+	// about the question.
+	if deepest := deepestServed(hits, served); deepest != nil && !leadsOnly {
 		deep = fmt.Sprintf("\nSession %s matched %d times and only three of them fit here — call recall again with that id as the query for a digest of it.\n",
 			deepest.Session.ID, deepest.Count)
 	}
@@ -1987,8 +2037,9 @@ func recallPageFooter(b *strings.Builder, hits []search.Hit, result index.Search
 }
 
 // writeRecallLead writes the line that says how the page was matched, and
-// returns namesTheAsked as that line left it.
-func writeRecallLead(b *strings.Builder, result index.SearchResult, hits []search.Hit, q string, strictShown int, absent, namesTheAsked bool, cover recallCoverage, covered bool) bool {
+// returns namesTheAsked as that line left it and whether it said no session
+// is about the query.
+func writeRecallLead(b *strings.Builder, result index.SearchResult, hits []search.Hit, q string, strictShown int, absent, namesTheAsked bool, cover recallCoverage, covered bool) (bool, bool) {
 	// Whether the line below the tier already said nothing is about this, so
 	// the absent-word case can say it from wherever the chain stopped without
 	// saying it twice.
@@ -1998,7 +2049,7 @@ func writeRecallLead(b *strings.Builder, result index.SearchResult, hits []searc
 		// session below holds "ignored", because no session holds it with
 		// every other word.
 		fmt.Fprintln(b, cover.line())
-		return true
+		return true, false
 	}
 	switch {
 	case result.Stemmed, result.Fuzzy:
@@ -2060,8 +2111,9 @@ func writeRecallLead(b *strings.Builder, result index.SearchResult, hits []searc
 		// says what dropping it means, in the words the relevance tier uses
 		// for the same situation.
 		fmt.Fprintln(b, nothingIsAboutThis+" so the sessions below are the nearest by wording — treat them as leads to check, not as a record, and say plainly if none of them answers.")
+		saidNothing = true
 	}
-	return namesTheAsked
+	return namesTheAsked, saidNothing
 }
 
 // writeFormsLine names the word forms or close spellings the ladder used.

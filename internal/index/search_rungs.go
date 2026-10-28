@@ -136,17 +136,25 @@ func noPostingsLadder(ranking *relevanceOnce, dir string, m Manifest, o query.Op
 	if res, done, err := wordLadder(ranking, dir, m, o); done {
 		return res, err
 	}
+	return rankedTail(ranking, dir, m, o, query.FellNoPostings)
+}
+
+// rankedTail is the ladder from the ranked tier down, for a search whose
+// rungs above it came back empty in the way fell says (0: not settled).
+func rankedTail(ranking *relevanceOnce, dir string, m Manifest, o query.Options, fell int) (SearchResult, error) {
 	ranked, rerr := ranking.get(dir, m, o)
-	if res, err := orLoneWord(dir, m, o, ranked, rerr); err != nil || len(res.Sessions) > 0 {
-		return res, err
+	res, err := orLoneWord(dir, m, o, ranked, rerr)
+	if fell == query.FellNoPostings && err == nil && len(res.Sessions) == 0 {
+		// Nothing anywhere. The neighbour map holds the one link left to
+		// try — the project's own word for what the reader asked about —
+		// and asking it over the question's identifying words is what
+		// makes it readable by a sentence (#2331). After the lone word: the
+		// word the reader typed is a closer answer than the project's word
+		// for it.
+		res, err = cooccurNarrowedSearch(dir, m, o)
 	}
-	// Nothing anywhere. The neighbour map holds the one link left to
-	// try — the project's own word for what the reader asked about —
-	// and asking it over the question's identifying words is what
-	// makes it readable by a sentence (#2331). After the lone word: the
-	// word the reader typed is a closer answer than the project's word
-	// for it.
-	return cooccurNarrowedSearch(dir, m, o)
+	res.Fell = fell
+	return res, err
 }
 
 // orLoneWord answers, when the rungs above found nothing at all, a question

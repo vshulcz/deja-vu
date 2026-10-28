@@ -1440,6 +1440,9 @@ type SearchResult struct {
 	// Unread is set when Options.Window let the exact tier read only the
 	// sessions that can reach the page. The caller hands it to ranking.
 	Unread *query.Unread `json:",omitempty"`
+	// Fell is set (query.FellNoPostings, query.FellNoText) when every rung
+	// above the ranked tier came back empty; see Options.FellThrough.
+	Fell int `json:",omitempty"`
 }
 
 // IsStrict says whether this session holds every word of the query rather

@@ -58,6 +58,13 @@ type Options struct {
 	// the turns a fork already holds as its copy of a source that went on
 	// after it (#5335).
 	ExcludeUpTo map[string]time.Time
+	// FellThrough starts the search at the ranked tier. A caller sets it to
+	// the Fell of a search over a superset of the sessions this one may read,
+	// with the same query: every rung above the ranked tier came back empty
+	// there, so it comes back empty here too. Recall's project-first search
+	// walked the whole ladder again after the machine's had, which was about
+	// a third of a recall that found nothing.
+	FellThrough int
 	// Session narrows a search to one session, by the id prefix a hit prints.
 	// Finding the session by what was said and then searching inside it — for a
 	// command, a file, an error — took reopening the transcript by hand (#1321).
@@ -172,6 +179,14 @@ type Unread struct {
 	// over-counted what was read, and the unread ones were too many to check.
 	Estimated bool
 }
+
+// How a search reached the ranked tier, for Options.FellThrough: no record
+// held the query's words, or records did and none was left once the filters
+// and the text check had been applied.
+const (
+	FellNoPostings = 1
+	FellNoText     = 2
+)
 
 // The orders Options.Sort takes.
 const (
