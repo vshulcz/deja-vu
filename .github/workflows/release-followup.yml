@@ -9,8 +9,14 @@ name: Release follow-up
 # before that with nothing saying so (#3624, #3627).
 #
 # So the reminder arrives with the release rather than with the next pull
-# request. This does not perform the catch-up: the commands are here, and the
-# person who runs them is the person who reads the issue.
+# request, and with RELEASE_PIN_TOKEN set the catch-up arrives with it as a pull
+# request: after v0.23.2 the drift step was forgotten again and the pin PR went
+# red twice, the second time on a package npm served minutes later (#5746).
+#
+# RELEASE_PIN_TOKEN is a fine-grained PAT on this repository with contents and
+# pull requests write. GITHUB_TOKEN can't do it: this repository does not let
+# Actions open pull requests, and a push or PR made with it starts no CI, so the
+# required checks would never report. Without the secret only the issue is filed.
 
 on:
   workflow_run:
@@ -33,9 +39,13 @@ jobs:
     permissions:
       contents: read
       issues: write
+    env:
+      # A step's `if` can't read secrets, so the catch-up step reads this.
+      HAS_PIN_TOKEN: ${{ secrets.RELEASE_PIN_TOKEN != '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          token: ${{ secrets.RELEASE_PIN_TOKEN || github.token }}
           # The manifest check asks GitHub for the newest release and the drift
           # check asks npm; neither needs history, but the tags cost nothing and
           # a future check may want them.
@@ -85,6 +95,7 @@ jobs:
           } >>"$GITHUB_OUTPUT"
 
       - name: File or update the reminder
+        id: issue
         if: steps.behind.outputs.behind == 'yes'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -100,7 +111,40 @@ jobs:
           if [ -n "$existing" ]; then
             gh issue comment "$existing" --repo "$REPO" --body "$body"
             echo "commented on #$existing"
+            echo "number=$existing" >>"$GITHUB_OUTPUT"
           else
-            gh issue create --repo "$REPO" --label release-followup \
-              --title "the repository has not caught up to the release" --body "$body"
+            url=$(gh issue create --repo "$REPO" --label release-followup \
+              --title "the repository has not caught up to the release" --body "$body")
+            echo "$url"
+            echo "number=${url##*/}" >>"$GITHUB_OUTPUT"
           fi
+
+      - name: Catch up in a pull request
+        if: steps.behind.outputs.behind == 'yes' && env.HAS_PIN_TOKEN == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PIN_TOKEN }}
+          REPO: ${{ github.repository }}
+          VERSION: ${{ github.event.workflow_run.head_branch }}
+          ISSUE: ${{ steps.issue.outputs.number }}
+        run: |
+          set -euo pipefail
+          v="${VERSION#v}"
+          gh release download "$VERSION" --repo "$REPO" --pattern checksums.txt --dir "$RUNNER_TEMP/rel"
+          go run ./scripts/pinmanifests -version "$v" -checksums "$RUNNER_TEMP/rel/checksums.txt"
+          # The step above already waited for npm with --after.
+          node scripts/extension-drift.mjs --write
+          go run ./scripts/pinmanifests -check
+          node scripts/extension-drift.mjs
+          if git diff --quiet; then
+            echo "nothing to catch up"
+            exit 0
+          fi
+          branch="chore/pin-$v"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -qam "chore: pin the manifests to $v"
+          git push origin "$branch"
+          gh pr create --repo "$REPO" --base main --head "$branch" \
+            --title "chore: pin the manifests to $v" \
+            --body "Checksums from the ${VERSION} release, extension versions as npm serves them."$'\n\n'"Fixes #${ISSUE}"
