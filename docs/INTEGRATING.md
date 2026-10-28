@@ -65,7 +65,9 @@ collapses to one server rather than listing every tool twice.
 A `tools/call` that is still running after 20 seconds is answered with a note.
 The note says deja has not finished this call, so this is not its answer, and
 that the work is still running; call again with the same arguments within about
-ten minutes and the answer comes back once it is ready. The 20 second mark sits
+ten minutes and the answer comes back once it is ready. Agents rarely do, so a
+recall that finishes after its note and found sessions is also put, once, on
+top of the next tool reply on the same connection. The 20 second mark sits
 under common client limits (opencode gives up at 30 seconds, Codex at 60). Set
 `DEJA_MCP_DEADLINE` to change the wait: a number of seconds (`45`, `2.5`), a
 Go duration (`1m`, `40s`), or `0` to turn the deadline off. A value that does
@@ -120,7 +122,7 @@ in the format registry and on this page.
 
 **Not stable, do not read:** `index.db` and everything in it — `manifest.gob`,
 `sessions.gob`, `records.bin`, the buckets, the sidecars. The format has moved
-sixty-odd times and will keep moving; that is why the version lives in the
+over a hundred times and will keep moving; that is why the version lives in the
 manifest. If you find yourself wanting to read it, the surface you want is
 probably missing and worth an issue.
 

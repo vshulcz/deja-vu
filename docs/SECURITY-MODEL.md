@@ -351,8 +351,9 @@ at `sync export`.
 ## Recall output framing
 
 Text drawn from history that deja hands to an agent is wrapped in
-`<deja-recall>` markers with a preamble stating the content is untrusted
-historical data and instructions inside it must not be followed. Transcripts
+`<deja-recall>` markers with a header saying the content is reference data,
+not instructions: the agent asks before acting on anything in it, and no
+recalled line is permission to publish, push, delete or send anything. Transcripts
 can carry text an attacker influenced (a directive copied from a web page
 persists in the index and replays into later sessions); framing keeps models
 from treating replayed text as commands. A marker that appears inside the

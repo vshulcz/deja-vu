@@ -45,10 +45,10 @@ LongMemEval-S · submitted ranking from yours.json
 questions: 500 · dataset longmemeval_s_cleaned.json · sha256 d6f21ea9…
 
 type                              n    hit@1    hit@5   hit@10   hit@20      MRR
-knowledge-update                 78    97.4%   100.0%   100.0%   100.0%   0.986
+knowledge-update                 78    98.7%   100.0%   100.0%   100.0%   0.994
 …
-TOTAL                           500    87.4%    97.2%    98.6%    99.4%   0.915
-evidence-recall (official)             55.8%    91.0%    94.9%    97.3%
+TOTAL                           500    88.2%    97.2%    98.6%    99.4%   0.921
+evidence-recall (official)             56.4%    91.0%    94.9%    97.2%
 ```
 
 ## The rules, such as they are
@@ -73,8 +73,8 @@ evidence-recall (official)             55.8%    91.0%    94.9%    97.3%
 
 | set | hit@1 | hit@5 | hit@10 | hit@20 | MRR |
 |---|---|---|---|---|---|
-| 470 questions, `-skip-abs` | 88.1% | 97.4% | 98.7% | 99.6% | 0.920 |
-| all 500 | 87.4% | 97.2% | 98.6% | 99.4% | 0.915 |
+| 470 questions, `-skip-abs` | 88.9% | 97.4% | 98.7% | 99.6% | 0.926 |
+| all 500 | 88.2% | 97.2% | 98.6% | 99.4% | 0.921 |
 
 Both runs are committed beside this file — `longmemeval-s-cleaned.json` and
 `longmemeval-s-full.json` — with the dataset's sha256, the flags, the wall time
