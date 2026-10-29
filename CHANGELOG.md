@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.3] - 2026-10-29
+
+Recalled code changes keep library edits ahead of `*_test.py` files and leave
+out scratch `*_test.py` files written outside a test directory.
+
+### Fixed
+
+- `FinalChanges` classifies `*_test.py` files alongside `test_*.py` as tests,
+  so library edits appear before test edits in a recalled session's code changes
+  and scratch `*_test.py` files outside a test directory are left out (#5751).
+
+### Changed
+
+- The README, architecture guide, roadmap and site lead with `codex`,
+  `opencode`, `cursor` and `claude` on equal footing, and internal benchmark
+  stands were removed from `scripts/` (#5751).
+- The release follow-up workflow opens the manifest and extension version
+  catch-up pull request automatically when `RELEASE_PIN_TOKEN` is set (#5749).
+
 ## [0.23.2] - 2026-10-28
 
 Recall is twice as fast and the index a third smaller, with the same answers.
@@ -2653,7 +2672,8 @@ See the release notes: Antigravity harness, share redaction hardening.
 - Stdio MCP memory server with `recall` and `recall_context` tools.
 - Idempotent installers for claude-code, codex, and opencode MCP config.
 
-[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.23.2...HEAD
+[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.23.3...HEAD
+[0.23.3]: https://github.com/vshulcz/deja-vu/compare/v0.23.2...v0.23.3
 [0.23.2]: https://github.com/vshulcz/deja-vu/compare/v0.23.1...v0.23.2
 [0.23.1]: https://github.com/vshulcz/deja-vu/compare/v0.23.0...v0.23.1
 [0.23.0]: https://github.com/vshulcz/deja-vu/compare/v0.22.2...v0.23.0
