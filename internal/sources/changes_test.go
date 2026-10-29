@@ -36,8 +36,14 @@ func TestChangesReadsEditsBackFromTheTranscript(t *testing.T) {
 	if strings.Join(paths, "|") != want {
 		t.Fatalf("got %v\nwant %s", paths, want)
 	}
-	// A file outside the project is not a change to it.
-	if fin := FinalChanges(got); len(fin) != 4 {
+	// A file outside the project, or a scratch *_test.py created outside test
+	// directories, is not a change to the project.
+	got = append(got,
+		Change{Path: "sub/foo_test.py", New: "assert True", Created: true},
+		Change{Path: "tests/foo_test.py", Old: "1", New: "2"},
+	)
+	fin := FinalChanges(got)
+	if len(fin) != 5 || fin[len(fin)-1].Path != "tests/foo_test.py" {
 		t.Fatalf("final %v", fin)
 	}
 	if Changes(model.Session{Harness: "gemini", Path: path}) != nil {

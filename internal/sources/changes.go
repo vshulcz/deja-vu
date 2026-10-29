@@ -231,12 +231,12 @@ func scratchFile(c Change, all []Change) bool {
 	}
 	// A test file the agent made beside the code rather than in the
 	// project's tests is a check it ran, not one it kept.
-	return strings.HasPrefix(base, "test_") && !testDir(p)
+	return (strings.HasPrefix(base, "test_") || strings.HasSuffix(base, "_test.py")) && !testDir(p)
 }
 
 func testPath(p string) bool {
 	base := path.Base(p)
-	return testDir(p) || strings.HasPrefix(base, "test_") || strings.HasSuffix(base, "_test.go") || strings.Contains(base, ".test.") || strings.Contains(base, ".spec.")
+	return testDir(p) || strings.HasPrefix(base, "test_") || strings.HasSuffix(base, "_test.go") || strings.HasSuffix(base, "_test.py") || strings.Contains(base, ".test.") || strings.Contains(base, ".spec.")
 }
 
 func testDir(p string) bool {
