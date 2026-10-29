@@ -1,7 +1,7 @@
 {
   "name": "deja-vu",
   "displayName": "deja-vu",
-  "version": "0.23.2",
+  "version": "0.23.3",
   "description": "Memory for Cursor from the sessions already on your disk: Cursor, Claude Code, Codex, opencode and thirty-nine more agents, searched locally and recalled when a session opens.",
   "author": {
     "name": "vshulcz"
