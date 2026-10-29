@@ -11,8 +11,7 @@ import (
 // not the answer — and it is usually the louder one, because it repeated the
 // terms while flailing. Term frequency alone hands the agent that reverted
 // attempt first, which invites redoing what already failed. GaveUp must demote
-// it below a quieter session that held. decisionbench measures the lift on a
-// corpus (25% -> 100% held-first); this pins the behaviour in CI.
+// it below a quieter session that held.
 func TestGaveUpSessionRanksBelowOneThatHeld(t *testing.T) {
 	day := time.Now().Add(-24 * time.Hour)
 	msg := func(role, text string) model.Message { return model.Message{Role: role, Text: text, Time: day} }

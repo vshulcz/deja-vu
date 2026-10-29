@@ -34,8 +34,7 @@ deja-stats.svg
 .pi/
 .windsurf/
 .zed/
-# Not `.claude/` — `.claude/commands/` is shipped. Only what a local run writes.
-.claude/settings.local.json
+.claude/
 
 # One line per Go command under scripts/: `go build ./scripts/<name>` drops a
 # binary called <name> in the repository root, and a careless `git add -A` then
@@ -46,38 +45,20 @@ deja-stats.svg
 # this was two blocks that had drifted apart: seven names duplicated between
 # them, seven packages with no line at all, and three lines for packages that no
 # longer existed — while the comment above it said one line per package.
-/amlserve
-/blockcarry
-/commandgate
-/corpusprobe
 /day0bench
-/decisionbench
 /demo
-/denialrate
-/fieldcover
-/filehookreach
 /genlogo
 /gennav
 /genfeed
 /genmatrix
 /genregistry
-/harnesssweep
 /ignorecheck
 /indexnow
 /locomo
 /longmemeval
 /mcpb
-/mcpprobe
-/miracl
-/mkcorpus
-/mockmodel
 /pinmanifests
-/planbench
-/rankdiff
 /relnotes
-/reusebench
-/searchbench
-/semanticgap
 /staleoverlap
 /testshard
 

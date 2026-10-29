@@ -1386,7 +1386,7 @@ func looksPasted(s model.Session) bool {
 const promotedNoteBoost = 1.25
 
 // wornBoost rewards sessions agents keep recalling. The shape is set by
-// measurement (scripts/reusebench, internal/search reuse tests): at the old
+// measurement (internal/search reuse tests): at the old
 // 0.05 slope / 1.2 cap the boost rescued a reused answer only when a louder
 // session tied it exactly — a single extra term of noise buried it, so the
 // signal was nearly inert. A 0.10 slope and 1.5 cap let reuse surface an answer

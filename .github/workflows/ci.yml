@@ -267,7 +267,7 @@ jobs:
       # timeout still dies with every goroutine's stack well inside it.
       #
       # Narrowing this to `./cmd/... ./internal/...` was tried and reverted.
-      # The 31 packages under scripts/ are build tooling that never runs on
+      # The packages under scripts/ are build tooling that never runs on
       # windows, and locally they are a quarter of the compile work — a cold
       # `go test -run <nothing>` is 22s over every package against 16s without
       # them. On the runner that quarter does not exist: 5358s for the step with

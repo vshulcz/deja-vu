@@ -16,9 +16,6 @@ ignore_paths = [
   # The extension test suites read their own source and assert on the hook
   # names in it ("tool.execute.before"); nothing in them runs a shell.
   "extensions/*/test/*",
-  # Drives a real agent against a throwaway config and prints the placeholder
-  # key it wired, so the run is reproducible.
-  "scripts/agent-smoke.sh",
   # Asserts the npm release script refuses a bad version; the "dynamic
   # execution" it trips on is node's own test runner spawning the script.
   "scripts/release_npm_test.mjs",
