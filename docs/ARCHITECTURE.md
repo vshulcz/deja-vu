@@ -308,9 +308,9 @@ Stderr goes to `/dev/null` while the screen is up so index output cannot land in
 frame. A resume or handoff picked on the screen is stored as a closure and runs after
 `Close`, with the exact session picked and no index refresh.
 
-## Claude SessionStart hook
+## Session and tool hooks
 
-`deja install --auto` installs the Claude MCP entry and adds a matcher-less command hook to `~/.claude/settings.json`:
+`deja install --auto` wires the MCP server and adds lifecycle and tool hooks across the harnesses that support them (for example in `~/.claude/settings.json`, `~/.codex/hooks.json`, `~/.cursor/hooks.json` and `~/.gemini/settings.json`):
 
 ```json
 {"type":"command","command":"~/.config/deja/bin/deja-hook hook-context"}

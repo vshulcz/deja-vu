@@ -11,11 +11,11 @@
     <name>vshulcz</name>
   </author>
   <entry>
-    <title>deja-vu: search Claude Code, Codex, Cursor session history</title>
+    <title>deja-vu: memory for Claude Code, Codex, Cursor &amp; 40 more</title>
     <id>https://vshulcz.github.io/deja-vu/</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
     <updated>2026-10-28T00:00:00Z</updated>
-    <summary>Search, resume and recover past sessions from Claude Code, Codex and 41 more agents. A local index of the history on your disk that every agent can recall.</summary>
+    <summary>Coding agent memory for Claude Code, Codex and 41 more agents. A local index of the session history already on your disk that every agent can recall.</summary>
   </entry>
   <entry>
     <title>Persistent memory for coding agents over MCP — deja-vu</title>

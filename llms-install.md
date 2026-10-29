@@ -10,8 +10,8 @@ npm install -g @vshulcz/deja-vu     # or: npx -y @vshulcz/deja-vu
 
 ## Wire the MCP server
 
-The stdio server is `deja mcp`. For clients with a JSON MCP config (Cline,
-Claude Code, etc.) add:
+The stdio server is `deja mcp`. For clients with a JSON MCP config (Cursor,
+Cline, Claude Code, etc.) add:
 
 ```json
 {

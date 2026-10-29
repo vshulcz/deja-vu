@@ -6,87 +6,60 @@ the place to discuss design.
 
 ## Now
 
-- **Does the block carry the answer.** The per-prompt hook is judged on one
-  question now: whether what it injects holds what the question was about, not
-  whether it matched a word. That is measured three ways — the prompt benchmark
-  on a corpus large enough for rarity to mean something, LongMemEval end to end,
-  and a replay of real prompts against a frozen index — and every change ships
-  with the before and after. The block a tool call gets has had the same
-  treatment now, read off a real store rather than a fixture: what is left there
-  is the failure path, where a pair exists for 21% of the failures an agent
-  actually hits and the rest are the harness's own refusals, which deja has no
-  lever on yet.
-- **What a pass costs on a big store.** A pass that replaces a few sessions
-  now appends their records and reads only what changed, so 20 rewritten
-  transcripts on a 40,000-session store take 1.7 s. What is left reads or writes
-  more than the change: the manifest is decoded and written whole, so 20 renames
-  still take 1.4 s ([#5471](https://github.com/vshulcz/deja-vu/issues/5471)); a
-  pass that also sees an opencode, Kilo, ZCode, Cursor or goose database change
-  walks the whole log ([#5476](https://github.com/vshulcz/deja-vu/issues/5476));
-  and command text removed from a transcript that shares its session id with
-  another stays in `commands.gob`
-  ([#5477](https://github.com/vshulcz/deja-vu/issues/5477)).
-- **Windows correctness.** The Windows leg runs on `main`, on the weekly canary
-  and on any pull request labelled `windows` rather than on every commit, so the
-  gap between "green on Linux and macOS" and "correct on Windows" has to be
-  closed deliberately. Path-shaped fixtures and the exclude-on-rebuild path are
-  verified there, and CI puts the label on a pull request that touches the paths
-  which have broken the leg before.
-- Maintain the security model, signed checksums, provenance and release SBOMs as
-  release and harness formats change.
+- **Answer-bearing blocks at every seam.** The session-start digest, the
+  per-prompt recall and the point-of-action tool hooks are judged on whether
+  the injected block carries the settled conclusion rather than just a matching
+  word. That is measured on the prompt and block benchmarks, on LongMemEval-S
+  end to end, and against real multi-harness stores; every change ships with
+  the before and after.
+- **Sub-second incremental indexing on 50k+ session stores.** Rewritten
+  transcripts already append in place; the remaining work is keeping renames
+  and multi-session SQLite stores (opencode, Cursor, Kilo, ZCode, goose)
+  proportional to the delta rather than the store size.
+- **Cross-platform parity across macOS, Linux and Windows.** Path handling,
+  store relocation, rebuild exclusions and native launcher wiring are verified
+  hermetically across all three operating systems.
+- **Supply-chain and privacy guarantees.** Maintain the redaction boundary,
+  trust policy (`policy.json`), signed checksums, provenance and release SBOMs
+  as upstream harness formats evolve.
 
 ## Next
 
-- **Compaction recovery on the last hosts.** The packet after a compaction now
-  reaches 34 of the 43 harnesses: from the transcript a hook is handed where the
-  host offers one, and elsewhere from the turns the store keeps before the
-  summary, delivered on the next hook that reaches the model. Devin CLI is next,
-  once its `sessions.db` catch-up has a capture to ride. aider, Continue, Kiro,
-  Roo Code, Zed and JetBrains AI Assistant have no hook that runs at that point,
-  and the registry records why for each. Windsurf / Devin Desktop documents
-  Cascade hooks that deja does not wire yet (#308).
-- **The plan, before it is executed.** `deja check` answers a plan with what this
-  machine already knows about it, and `hook-plan` delivers the same thing at
-  `ExitPlanMode`. No installer wires it yet: the measurement that would justify
-  it — does an agent change a plan it is about to run — has not been made.
-- **Deepen curation past a single boost.** Reuse is a global signal today: a
-  session pulled for one query is lifted for every query. A per-query signal —
-  recording what a recall was for, not only that it happened — would let reuse be
-  both stronger and precise without lifting an off-topic session.
-- **Point-of-action in the harnesses that still refuse it.** The file's prior
-  decision before an edit reaches 31 of the 43 harnesses and the repair beside a
-  failed command 30. Where a host drops what a hook returns — Kimi, Kiro, goose,
-  CodeWhale, Antigravity, Junie — the line is parked and arrives with the next
-  hook that reaches the model, a step late. What is left is the hosts with no
-  tool hook that runs: aider, Continue's CLI, Roo Code, Zed and JetBrains AI
-  Assistant, each recorded in the registry with the measurement behind it.
-- **Close the matrix from upstream.** What is left in the support table is
-  someone else's to ship: aider has no MCP client and no custom commands, Roo
-  Code was archived with no hook events, Zed exposes no lifecycle hook. Each becomes work the day
-  it lands, and the registry records the source so the claim can be rechecked
-  rather than assumed.
+- **Compaction recovery across the remaining hosts.** The recovery packet after
+  context compaction now reaches 34 of the 43 harnesses — either through a
+  native `PreCompact` hook or by catching up from the store's pre-summary turns
+  on the next hook that reaches the model. What remains is wiring the hosts
+  whose compaction seams are still landing upstream (`#308`).
+- **Pre-execution plan checks.** `deja check` answers a proposed plan with what
+  this machine already settled or reverted on the same files, and `hook-plan`
+  delivers it before execution. Wiring it by default waits on measuring how
+  often the warning changes a flawed plan without adding noise on clean ones.
+- **Query-scoped reuse.** Reuse is a global signal today: a session recalled
+  for one topic receives a small lift everywhere. Recording which terms a
+  recall served lets the lift apply only when the same subject returns.
+- **Point-of-action coverage.** Prior file decisions before an edit reach 31 of
+  the 43 harnesses and failure repairs reach 30. As upstream harnesses add
+  pre/post tool hooks or plugin middleware, each is wired and recorded in the
+  format registry with a reproducible stand check.
 
 ## Later
 
-- Mature the optional semantic tier (`deja embed`): still off by default and
-  external to the binary, it should degrade and recover as cleanly as the lexical
-  ladder does. Vectors rerank lexical hits and answer when nothing matches; a
-  vector-first leg would reach the cross-language and paraphrase questions that
-  share no words with the session, and it gets measured before it changes the
-  ranking
-  ([#4976](https://github.com/vshulcz/deja-vu/issues/4976)).
+- **Optional semantic sidecar (`deja embed`).** Off by default and external to
+  the binary, the vector sidecar reranks lexical hits and answers when a query
+  shares no exact tokens with the session (cross-language and paraphrased
+  queries, `#4976`).
 
 ## Not planned
 
 - **Capture daemons.** deja indexes the histories each harness already writes; a
-  recorder would add a persistent process and a second source of truth.
+  background recorder would add a persistent process and a second source of
+  truth.
 - **Cloud sync by default.** Implicit upload conflicts with local-only indexing;
   sync stays an explicit export or an SSH operation you run.
-- **Embeddings in the base binary.** Model files and vector runtimes would break
-  the zero-runtime-dependency distribution and inflate index cost. The semantic
-  tier stays opt-in and external.
+- **Embeddings in the base binary.** Model weights and vector runtimes would
+  break the zero-runtime-dependency distribution and inflate index cost. The
+  semantic tier stays opt-in and external.
 - **Enforcing recalled conclusions.** deja stays at the evidence layer. Curation
-  — promote, lifecycle states, standing project decisions — makes a decision
-  durable and surfaces when it was reverted or superseded, but the agent decides.
-  deja does not gate behaviour on a past conclusion, and does not claim an old
-  conclusion is still true; it shows what was decided and what changed.
+  — `promote`, lifecycle states, standing project decisions — makes a decision
+  durable and surfaces when it was reverted or superseded, but the agent
+  decides.
