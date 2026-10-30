@@ -260,3 +260,43 @@ func TestProgressFilterTakesOutOnlyProgressLines(t *testing.T) {
 		t.Errorf("end of a given-up read = %v", err)
 	}
 }
+
+// The SQL of a read goes to sqlite3 on stdin, not on its command line: a long
+// OpenCode changed-session list overran the Windows command-line limit and the
+// store was skipped (#5758).
+func TestALongSQLiteReadDoesNotRideOnTheCommandLine(t *testing.T) {
+	bin := t.TempDir()
+	argv, in := filepath.Join(bin, "argv"), filepath.Join(bin, "stdin")
+	script := `#!/bin/sh
+case "$*" in
+*"json_object('deja',1)"*) echo '{"deja":1}'; exit 0;;
+esac
+printf '%s\n' "$*" >> "$DEJA_TEST_ARGV"
+cat >> "$DEJA_TEST_STDIN"
+echo 1
+`
+	if err := os.WriteFile(filepath.Join(bin, "sqlite3"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("DEJA_TEST_ARGV", argv)
+	t.Setenv("DEJA_TEST_STDIN", in)
+	ResetSQLite3Probe()
+	t.Cleanup(ResetSQLite3Probe)
+	db := filepath.Join(t.TempDir(), "opencode.db")
+	if err := os.WriteFile(db, []byte("SQLite format 3\x00"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sql := "select 'longmarker' /* " + strings.Repeat("x", 40000) + " */;"
+	if _, err := sqliteOutput(db, sql); err != nil {
+		t.Fatal(err)
+	}
+	a, _ := os.ReadFile(argv)
+	if len(a) > 8000 || strings.Contains(string(a), "longmarker") {
+		t.Errorf("the SQL rode on the command line (%d bytes of argv)", len(a))
+	}
+	s, _ := os.ReadFile(in)
+	if !strings.Contains(string(s), "longmarker") {
+		t.Errorf("the SQL did not reach sqlite3 on stdin (%d bytes)", len(s))
+	}
+}
