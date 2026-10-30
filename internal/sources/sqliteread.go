@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -52,14 +53,28 @@ type sqliteRead struct {
 // names it, rather than the run sitting on it forever.
 func sqliteReadCmd(db string, tail ...string) (*sqliteRead, func()) {
 	budget := storeReadBudget()
-	args := []string{"-readonly", sqliteTarget(db), ".timeout 5000"}
+	setup := []string{".timeout 5000"}
 	if budget > 0 && sqlite3Progress() {
-		args = append(args, sqliteProgressArg)
+		setup = append(setup, sqliteProgressArg)
 	}
-	args = append(args, tail...)
+	args := []string{"-readonly", sqliteTarget(db)}
+	var in io.Reader
+	if n := len(strings.Join(tail, "")); n > sqliteArgvMax {
+		// Windows caps a command line near 32k; setup and SQL both go on stdin,
+		// since a sqlite3 given a positional command ignores stdin.
+		in = strings.NewReader(strings.Join(append(setup, tail...), "\n") + "\n")
+	} else {
+		args = append(append(args, setup...), tail...)
+	}
 	r := &sqliteRead{Cmd: exec.CommandContext(context.Background(), "sqlite3", args...), db: db, budget: budget, quit: make(chan struct{}), killed: make(chan struct{})}
+	if in != nil {
+		r.Stdin = in
+	}
 	return r, r.release
 }
+
+// sqliteArgvMax is the SQL length above which a read goes over stdin.
+const sqliteArgvMax = 4000
 
 // sqliteOutput is the same read for an answer wanted whole.
 func sqliteOutput(db string, tail ...string) ([]byte, error) {
