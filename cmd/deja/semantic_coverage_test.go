@@ -171,3 +171,86 @@ func TestDoctorEmbedAndStatsFilters(t *testing.T) {
 }
 
 func indexDirForTest() string { return os.Getenv("DEJA_INDEX_DIR") }
+
+func TestRegexSearchSkipsSemanticRerankAndFallback(t *testing.T) {
+	tmp := hermeticEnv(t)
+	root := filepath.Join(tmp, "claude", "-tmp-re")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFileMkdir(t, filepath.Join(root, "s1.jsonl"), `{"type":"user","sessionId":"s1","timestamp":"2026-01-01T00:00:00Z","message":{"role":"user","content":"alpha function call"}}`+"\n")
+	writeFileMkdir(t, filepath.Join(root, "s2.jsonl"), `{"type":"user","sessionId":"s2","timestamp":"2026-01-02T00:00:00Z","message":{"role":"user","content":"alpha helper line"}}`+"\n")
+	if err := index.Ensure(index.DefaultDir(), "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	embedEndpoint(t, func(text string) string {
+		if strings.Contains(text, "s1") || strings.Contains(text, "function") {
+			return "1,0"
+		}
+		return "0.9,0.43589"
+	})
+	oMiss := search.Options{Query: `nonexistent\s+regex`, Regex: true}
+	hits, sem := maybeSemantic(index.DefaultDir(), nil, oMiss, os.Stderr)
+	if sem || len(hits) != 0 {
+		t.Fatalf("regex miss fell through to semantic search: sem=%v hits=%#v", sem, hits)
+	}
+	in := []search.Hit{
+		{Session: model.Session{ID: "s2", Harness: "claude"}, Score: 10},
+		{Session: model.Session{ID: "s1", Harness: "claude"}, Score: 1},
+	}
+	got := maybeRerank(index.DefaultDir(), append([]search.Hit(nil), in...), search.Options{Query: `alpha.*`, Regex: true}, os.Stderr)
+	if got[0].Session.ID != "s2" || got[0].Score != 10 {
+		t.Fatalf("regex search reranked lexical hits semantically: %#v", got)
+	}
+}
+
+func TestSearchReranksOver64PoolBeforePageCapAndHonoursDejaNow(t *testing.T) {
+	tmp := hermeticEnv(t)
+	root := filepath.Join(tmp, "claude", "-tmp-pool64")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// 12 sessions all matching "pool": target sits at lexical rank 12 (oldest,
+	// single mention) while 11 newer filler sessions repeat "pool" more often.
+	for i := 1; i <= 11; i++ {
+		id := filepath.Join(root, "f"+string(rune('a'+i))+".jsonl")
+		sid := "filler-" + string(rune('a'+i))
+		writeFileMkdir(t, id, `{"type":"user","sessionId":"`+sid+`","timestamp":"2026-08-10T00:00:00Z","message":{"role":"user","content":"pool pool pool ordinary filler text"}}`+"\n")
+	}
+	writeFileMkdir(t, filepath.Join(root, "target.jsonl"), `{"type":"user","sessionId":"target-12","timestamp":"2026-01-01T00:00:00Z","message":{"role":"user","content":"pool exact semantic needle"}}`+"\n")
+	writeFileMkdir(t, filepath.Join(root, "veconly.jsonl"), `{"type":"user","sessionId":"veconly-13","timestamp":"2026-08-12T00:00:00Z","message":{"role":"user","content":"connection exhaustion fixed by closing idle rows"}}`+"\n")
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	embedEndpoint(t, func(text string) string {
+		switch {
+		case strings.Contains(text, "needle") || text == "pool":
+			return "1,0"
+		case strings.Contains(text, "exhaustion"):
+			return "0.8,0.6"
+		default:
+			return "-0.6,0.8"
+		}
+	})
+	t.Setenv("DEJA_NOW", "2026-10-19T00:00:00Z")
+	o := search.Options{Query: "pool", Limit: 5, Window: rerankCandidateLimit(dir, search.Options{Query: "pool", Limit: 5})}
+	res, err := index.SearchWithRecoveryDetailed(dir, o, os.Stderr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hits, _, _, err := searchTierHits(dir, &o, res, res.Sessions, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 12 {
+		t.Fatalf("searchTierHits pre-rerank count = %d, want all 12 candidates kept for rerank", len(hits))
+	}
+	hits, _ = searchAfterRank(dir, hits, &o)
+	if len(hits) != 5 || !o.Capped || o.Total != 13 {
+		t.Fatalf("post-rerank len=%d capped=%v total=%d, want 5, true, 13", len(hits), o.Capped, o.Total)
+	}
+	if hits[0].Session.ID != "target-12" {
+		t.Fatalf("top hit after 64-pool rerank = %s, want target-12", hits[0].Session.ID)
+	}
+}

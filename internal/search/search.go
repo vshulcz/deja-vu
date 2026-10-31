@@ -264,9 +264,10 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 		}
 	}
 	sq := scoredQuery{re: re, qtoks: qtoks, phrases: phrases, queryCJK: queryCJK, qtoksFolded: qtoksFolded, phrasesFolded: phrasesFolded}
+	now := o.Clock()
 	cut := time.Time{}
 	if o.Since > 0 {
-		cut = time.Now().Add(-o.Since)
+		cut = now.Add(-o.Since)
 	}
 	merged := mergeSessions(ss)
 	documents := make([]bm25Document, 0, len(merged))
@@ -378,11 +379,11 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 	if corpusDocuments > 0 {
 		avgLength = float64(corpusLength) / float64(corpusDocuments)
 	}
-	hits := scoreBM25(documents, df, corpusDocuments, avgLength, len(qtoks), o.RecallWorn)
+	hits := scoreBM25At(documents, df, corpusDocuments, avgLength, len(qtoks), o.RecallWorn, now)
 	// markEarlierAttempts reads the quoted text of the top 50, so those are
 	// rendered here; everything below them waits for the cap.
 	renderSnippets(hits, o, earlierAttemptWindow)
-	markEarlierAttempts(hits)
+	markEarlierAttemptsAt(hits, now)
 	return hits, nil
 }
 
@@ -709,6 +710,10 @@ const earlierAttemptWindow = 50
 // above some margin. The old session stays in the results — history is the
 // product — but agents and readers see which one the project moved on to.
 func markEarlierAttempts(hits []Hit) {
+	markEarlierAttemptsAt(hits, (Options{}).Clock())
+}
+
+func markEarlierAttemptsAt(hits []Hit, now time.Time) {
 	n := min(len(hits), earlierAttemptWindow)
 	sets := make([]map[string]bool, n)
 	for i := range n {
@@ -756,7 +761,7 @@ func markEarlierAttempts(hits []Hit) {
 			// …and it must have happened. A transcript stamped ahead of the
 			// clock is newer than everything, so one bad timestamp labelled
 			// every real session in the project as an earlier attempt (#880).
-			if b.Session.Updated.After(time.Now()) {
+			if b.Session.Updated.After(now) {
 				continue
 			}
 			if snippetOverlap(sets[i], sets[j]) < 0.6 {
@@ -817,8 +822,11 @@ func NoteBucketDay(s model.Session) (string, bool) {
 }
 
 func scoreBM25(documents []bm25Document, df []int, corpusDocuments int, avgLength float64, queryTokenCount int, worn map[string]int) []Hit {
+	return scoreBM25At(documents, df, corpusDocuments, avgLength, queryTokenCount, worn, (Options{}).Clock())
+}
+
+func scoreBM25At(documents []bm25Document, df []int, corpusDocuments int, avgLength float64, queryTokenCount int, worn map[string]int, now time.Time) []Hit {
 	emptyQuery := queryTokenCount == 0
-	now := time.Now()
 	hits := make([]Hit, 0, len(documents))
 	for _, doc := range documents {
 		score := 0.0

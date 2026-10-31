@@ -30,6 +30,10 @@ func SemanticSearch(ctx context.Context, dir string, o search.Options, sidecar S
 	if err != nil {
 		return nil, err
 	}
+	return semanticHitsForQuery(dir, o, sidecar, query)
+}
+
+func semanticHitsForQuery(dir string, o search.Options, sidecar Sidecar, query []float32) ([]search.Hit, error) {
 	if Stale(dir, sidecar) {
 		return nil, nil
 	}

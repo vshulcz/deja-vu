@@ -4,7 +4,6 @@ import (
 	"math"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/query"
@@ -128,7 +127,7 @@ func poolScores(cands []PoolCandidate, o Options, share float64) (score, est []f
 	}
 	avg := total / float64(len(cands))
 	qtoks, _ := QueryParts(o.Query)
-	now := time.Now()
+	now := o.Clock()
 	score = make([]float64, len(cands))
 	for i, c := range cands {
 		tf := float64(c.Records)

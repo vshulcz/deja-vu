@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -449,6 +450,79 @@ func TestSidecarRejectsMalformedHeadersAndRerankShortcuts(t *testing.T) {
 	}
 	if _, err := Rerank(context.Background(), []search.Hit{{Session: session("a")}}, "q", Sidecar{Vectors: []Vector{{Key: "claude:a", Values: []float32{1}}}}, &Client{URL: "http://127.0.0.1:1", HTTP: &http.Client{}}); err == nil {
 		t.Fatal("rerank transport error was ignored")
+	}
+	if got, fused, err := RerankAndFuse(context.Background(), "", nil, search.Options{Query: "q"}, Sidecar{}, &Client{}); err != nil || fused || got != nil {
+		t.Fatalf("empty RerankAndFuse = %v, %v, %v", got, fused, err)
+	}
+	if _, _, err := RerankAndFuse(context.Background(), "", []search.Hit{{Session: session("a")}}, search.Options{Query: "q"}, Sidecar{Vectors: []Vector{{Key: "claude:a", Values: []float32{1}}}}, &Client{URL: "http://127.0.0.1:1", HTTP: &http.Client{}}); err == nil {
+		t.Fatal("RerankAndFuse transport error was ignored")
+	}
+}
+
+func TestRerankAndFuseBringsInVectorOnlySessionByRRF(t *testing.T) {
+	tmp := t.TempDir()
+	root := filepath.Join(tmp, "claude")
+	if err := os.MkdirAll(filepath.Join(root, "project"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	line := func(id, text, ts string) string {
+		return fmt.Sprintf(`{"type":"user","sessionId":%q,"timestamp":%q,"message":{"role":"user","content":%q}}`+"\n", id, ts, text)
+	}
+	for _, s := range []struct{ id, text, ts string }{
+		{"both", "утечка пула соединений", "2026-08-03T10:00:00Z"},
+		{"lexonly", "утечка в логах", "2026-08-02T10:00:00Z"},
+		{"veconly", "connection pool leak fixed by closing rows", "2026-08-04T10:00:00Z"},
+	} {
+		if err := os.WriteFile(filepath.Join(root, "project", s.id+".jsonl"), []byte(line(s.id, s.text, s.ts)), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("DEJA_CLAUDE_ROOT", root)
+	dir := filepath.Join(tmp, "index.db")
+	if err := index.Ensure(dir, "claude", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Input []string `json:"input"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		out := make([][]float32, len(req.Input))
+		for i, in := range req.Input {
+			switch {
+			case strings.Contains(in, "connection pool leak"), strings.Contains(in, "пула"):
+				out[i] = []float32{1, 0}
+			default:
+				out[i] = []float32{0, 1}
+			}
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"embeddings": out})
+	}))
+	defer ts.Close()
+	client := &Client{URL: ts.URL, Model: "m", HTTP: ts.Client()}
+	sidecar, err := EmbedIndex(dir, client, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lexHits := []search.Hit{
+		{Session: model.Session{ID: "lexonly", Harness: "claude", Updated: time.Date(2026, 8, 2, 10, 0, 0, 0, time.UTC)}, Score: 10},
+		{Session: model.Session{ID: "both", Harness: "claude", Updated: time.Date(2026, 8, 3, 10, 0, 0, 0, time.UTC)}, Score: 8},
+	}
+	fused, didFuse, err := RerankAndFuse(context.Background(), dir, lexHits, search.Options{Query: "утечка пула"}, sidecar, client)
+	if err != nil || !didFuse || len(fused) != 3 {
+		t.Fatalf("RerankAndFuse = %#v, didFuse=%v, err=%v", fused, didFuse, err)
+	}
+	if fused[0].Session.ID != "both" {
+		t.Fatalf("want dual-matched session 'both' first, got %s", fused[0].Session.ID)
+	}
+	foundVecOnly := false
+	for _, h := range fused {
+		if h.Session.ID == "veconly" && h.Tier == search.TierSemantic {
+			foundVecOnly = true
+		}
+	}
+	if !foundVecOnly {
+		t.Fatalf("vector-only session 'veconly' missing from fused hits: %#v", fused)
 	}
 }
 

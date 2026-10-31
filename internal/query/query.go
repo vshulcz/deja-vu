@@ -3,6 +3,8 @@
 package query
 
 import (
+	"os"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -146,6 +148,26 @@ type Options struct {
 	// three exact terms and stops at an empty page. `deja search` keeps the
 	// silence, since a person sees the empty page and retypes.
 	LoneWord bool `json:"-"`
+}
+
+// Clock returns Now when set, the timestamp in DEJA_NOW when valid (RFC3339,
+// YYYY-MM-DD, or unix seconds), or time.Now().
+func (o Options) Clock() time.Time {
+	if !o.Now.IsZero() {
+		return o.Now
+	}
+	if raw := strings.TrimSpace(os.Getenv("DEJA_NOW")); raw != "" {
+		if t, err := time.Parse(time.RFC3339, raw); err == nil {
+			return t
+		}
+		if t, err := time.Parse("2006-01-02", raw); err == nil {
+			return t
+		}
+		if sec, err := strconv.ParseInt(raw, 10, 64); err == nil {
+			return time.Unix(sec, 0).UTC()
+		}
+	}
+	return time.Now()
 }
 
 // Unread is the part of a match retrieval did not read.

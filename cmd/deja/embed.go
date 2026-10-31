@@ -115,7 +115,28 @@ func staleSidecarNote() string {
 	return "deja: the vector sidecar was built for an earlier index — semantic search is off until `deja embed` runs again\n"
 }
 
+// rerankPool is the candidate window maybeRerank reorders before the page cap
+// trims the result (#4976).
+const rerankPool = 64
+
+func rerankCandidateLimit(dir string, o search.Options) int {
+	if o.All || o.Regex || o.NoEmbed || os.Getenv("DEJA_EMBED") == "off" || o.Sort == search.SortDate {
+		return 0
+	}
+	if _, err := os.Stat(embed.Path(dir)); err != nil {
+		return 0
+	}
+	want := o.Limit
+	if want <= 0 {
+		want = search.DefaultLimit
+	}
+	return max(want, rerankPool)
+}
+
 func maybeRerank(dir string, hits []search.Hit, o search.Options, notice *os.File) []search.Hit {
+	if o.Regex || o.NoEmbed || os.Getenv("DEJA_EMBED") == "off" {
+		return hits
+	}
 	sidecar, err := embed.Read(dir)
 	if err != nil {
 		fmt.Fprint(notice, unreadableSidecarNote(dir, err))
@@ -140,10 +161,17 @@ func maybeRerank(dir string, hits []search.Hit, o search.Options, notice *os.Fil
 	// keeps the half minute it always had.
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	out, err := embed.Rerank(ctx, hits, o.Query, sidecar, client)
+	out, fused, err := embed.RerankAndFuse(ctx, dir, hits, o, sidecar, client)
 	if err != nil {
 		fmt.Fprintln(notice, "deja: semantic rerank failed; using lexical order")
 		return hits
+	}
+	if fused {
+		act := o.Activation
+		if act == "" {
+			act = policy.ActivationSearch
+		}
+		out, _ = policyFilterHitsCounted(act, out)
 	}
 	// The rerank is a new order over the same hits, and it does not know that
 	// a promoted note and the transcript it was distilled from are not rivals:
@@ -154,7 +182,7 @@ func maybeRerank(dir string, hits []search.Hit, o search.Options, notice *os.Fil
 }
 
 func maybeSemantic(dir string, hits []search.Hit, o search.Options, notice *os.File) ([]search.Hit, bool) {
-	if len(hits) != 0 || o.NoEmbed || os.Getenv("DEJA_EMBED") == "off" {
+	if len(hits) != 0 || o.Regex || o.NoEmbed || os.Getenv("DEJA_EMBED") == "off" {
 		return hits, false
 	}
 	sidecar, err := embed.Read(dir)

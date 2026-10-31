@@ -5,6 +5,7 @@ import (
 	"slices"
 	"sort"
 	"testing"
+	"time"
 )
 
 func sortedCopy(s []string) []string {
@@ -142,4 +143,27 @@ func TestIsStopWord(t *testing.T) {
 
 func contains(s []string, v string) bool {
 	return slices.Contains(s, v)
+}
+
+func TestOptionsClockHonoursNowAndDejaNowEnv(t *testing.T) {
+	explicit := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
+	if got := (Options{Now: explicit}).Clock(); !got.Equal(explicit) {
+		t.Fatalf("explicit Now = %v, want %v", got, explicit)
+	}
+	t.Setenv("DEJA_NOW", "2026-10-19T08:30:00Z")
+	if got := (Options{}).Clock(); !got.Equal(time.Date(2026, 10, 19, 8, 30, 0, 0, time.UTC)) {
+		t.Fatalf("RFC3339 DEJA_NOW = %v", got)
+	}
+	t.Setenv("DEJA_NOW", "2026-10-19")
+	if got := (Options{}).Clock(); !got.Equal(time.Date(2026, 10, 19, 0, 0, 0, 0, time.UTC)) {
+		t.Fatalf("YYYY-MM-DD DEJA_NOW = %v", got)
+	}
+	t.Setenv("DEJA_NOW", "1760832000")
+	if got := (Options{}).Clock(); got.Unix() != 1760832000 {
+		t.Fatalf("unix DEJA_NOW = %v", got)
+	}
+	t.Setenv("DEJA_NOW", "not-a-timestamp")
+	if got := (Options{}).Clock(); got.IsZero() {
+		t.Fatal("invalid DEJA_NOW returned zero time")
+	}
 }

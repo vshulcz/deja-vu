@@ -66,7 +66,7 @@ func addMonths(t time.Time, months int) time.Time {
 // relevance tier consumes these — they are OR-scored hints, never an AND.
 func relativeTimeTerms(q string, now time.Time) []string {
 	if now.IsZero() {
-		now = time.Now()
+		now = (query.Options{}).Clock()
 	}
 	seen := map[string]bool{}
 	var out []string
@@ -160,7 +160,7 @@ func lastWeekday(now time.Time, name string) time.Time {
 // buy ten days ago", not "how much did I spend last month".
 func pointInTime(q string, now time.Time) (time.Time, bool) {
 	if now.IsZero() {
-		now = time.Now()
+		now = (query.Options{}).Clock()
 	}
 	if spanRE.MatchString(q) {
 		return time.Time{}, false

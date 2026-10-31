@@ -57,6 +57,16 @@ history.
 Use table-driven tests from the standard library. The project does not use
 testify or other test frameworks.
 
+## Benchmarking
+
+When measuring ranking or latency changes (`deja bench` or `internal/bench`):
+
+1. Build the control binary from a clean checkout with `go build -trimpath ./cmd/deja` and score both binaries against the same frozen store in one sitting (or set `DEJA_NOW` so recency decay does not drift between runs).
+2. Separate cold-cache and warm-cache timings; discard the warmup pass when reporting steady-state latency.
+3. Do not pipe `go test` or a benchmark command into `tail` or another filter without `set -o pipefail`, so a failing run cannot exit 0.
+4. Verify that a new regression test or benchmark assertion actually fails with the change reverted before trusting a green run.
+5. Check behaviour on real multi-session transcripts as well as synthetic fixtures; uniform synthetic lengths hide pooling and tie-breaking regressions.
+
 ## Adding or updating a harness parser
 
 The [source parser registry](docs/ARCHITECTURE.md#source-parsers) maps harnesses

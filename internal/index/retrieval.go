@@ -2859,7 +2859,7 @@ func scanRecordsTextMisses(dir string, m Manifest, o query.Options, offsets []in
 		if !fromMatches(meta.From, o.From) {
 			return
 		}
-		if o.Since > 0 && meta.Updated.Before(time.Now().Add(-o.Since)) {
+		if o.Since > 0 && meta.Updated.Before(o.Clock().Add(-o.Since)) {
 			return
 		}
 		if !recordServable(r.Role, o) {
@@ -3368,7 +3368,7 @@ func sessionMetaMatches(meta SessionMeta, o query.Options) bool {
 	if !fromMatches(meta.From, o.From) {
 		return false
 	}
-	if o.Since > 0 && meta.Updated.Before(time.Now().Add(-o.Since)) {
+	if o.Since > 0 && meta.Updated.Before(o.Clock().Add(-o.Since)) {
 		return false
 	}
 	return true

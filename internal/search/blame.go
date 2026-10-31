@@ -224,7 +224,7 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 	// evidence and identical timestamps sorted differently on every run — five
 	// runs, five different top hits once blame started seeing the sessions that
 	// only touched the file (#688).
-	now := time.Now()
+	now := (Options{}).Clock()
 	cut := time.Time{}
 	if o.Since > 0 {
 		cut = now.Add(-o.Since)

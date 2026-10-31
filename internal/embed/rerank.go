@@ -17,6 +17,78 @@ func Rerank(ctx context.Context, hits []search.Hit, query string, sidecar Sideca
 	if err != nil {
 		return nil, err
 	}
+	return rerankWithQuery(hits, q, sidecar), nil
+}
+
+// rrfK is the reciprocal-rank smoothing constant used when fusing lexical and
+// vector-first rankings (#4976).
+const rrfK = 60
+
+// RerankAndFuse reorders the lexical candidates with Rerank and, when the
+// sidecar holds sessions above semanticFloor that the lexical pass missed,
+// fuses both legs by reciprocal rank (1/(60+rank)) using a single query
+// embedding.
+func RerankAndFuse(ctx context.Context, dir string, hits []search.Hit, o search.Options, sidecar Sidecar, client *Client) ([]search.Hit, bool, error) {
+	if len(hits) == 0 || len(sidecar.Vectors) == 0 {
+		return hits, false, nil
+	}
+	q, err := client.EmbedQuery(ctx, o.Query)
+	if err != nil {
+		return nil, false, err
+	}
+	hits = rerankWithQuery(hits, q, sidecar)
+	if dir == "" {
+		return hits, false, nil
+	}
+	semHits, _ := semanticHitsForQuery(dir, o, sidecar, q)
+	if len(semHits) == 0 {
+		return hits, false, nil
+	}
+	lexRank := make(map[string]int, len(hits))
+	for i, h := range hits {
+		lexRank[h.Session.Harness+":"+h.Session.ID] = i + 1
+	}
+	vecRank := make(map[string]int, len(semHits))
+	var extra []search.Hit
+	for i, h := range semHits {
+		key := h.Session.Harness + ":" + h.Session.ID
+		vecRank[key] = i + 1
+		if _, ok := lexRank[key]; !ok {
+			extra = append(extra, h)
+		}
+	}
+	if len(extra) == 0 {
+		return hits, false, nil
+	}
+	fused := make([]search.Hit, 0, len(hits)+len(extra))
+	fused = append(fused, hits...)
+	fused = append(fused, extra...)
+	for i := range fused {
+		key := fused[i].Session.Harness + ":" + fused[i].Session.ID
+		score := 0.0
+		if r := lexRank[key]; r > 0 {
+			score += 1.0 / float64(rrfK+r)
+		}
+		if r := vecRank[key]; r > 0 {
+			score += 1.0 / float64(rrfK+r)
+		}
+		fused[i].Score = score
+	}
+	sort.SliceStable(fused, func(i, j int) bool {
+		if fused[i].Score != fused[j].Score {
+			return fused[i].Score > fused[j].Score
+		}
+		li := lexRank[fused[i].Session.Harness+":"+fused[i].Session.ID] > 0
+		lj := lexRank[fused[j].Session.Harness+":"+fused[j].Session.ID] > 0
+		if li != lj {
+			return li
+		}
+		return fused[i].Session.Updated.After(fused[j].Session.Updated)
+	})
+	return fused, true, nil
+}
+
+func rerankWithQuery(hits []search.Hit, q []float32, sidecar Sidecar) []search.Hit {
 	limit := min(len(hits), 64)
 	hi := hits[0].Score
 	lo := hits[0].Score
@@ -70,7 +142,7 @@ func Rerank(ctx context.Context, hits []search.Hit, query string, sidecar Sideca
 		hits[i].Score = 0.5*bm + 0.5*cos
 	}
 	sort.SliceStable(hits[:limit], func(i, j int) bool { return hits[i].Score > hits[j].Score })
-	return hits, nil
+	return hits
 }
 
 var errBadQueryVector = &queryVectorError{}

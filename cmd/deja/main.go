@@ -1799,6 +1799,9 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 		if o.Window <= 0 {
 			o.Window = search.DefaultLimit
 		}
+		if pool := rerankCandidateLimit(dir, o); pool > o.Window {
+			o.Window = pool
+		}
 		o.Activation = policy.ActivationSearch
 	}
 	result, err := index.SearchWithRecoveryDetailed(dir, o, os.Stderr)
@@ -1937,7 +1940,7 @@ func searchAfterPrint(dir string, o search.Options, found int, bare, hinted, mis
 // rejected ones were moved down.
 func searchAfterRank(dir string, hits []search.Hit, o *search.Options) ([]search.Hit, int) {
 	// A rerank reorders by meaning, which date order throws away again.
-	if !o.NoEmbed && os.Getenv("DEJA_EMBED") != "off" && o.Sort != search.SortDate {
+	if !o.Regex && !o.NoEmbed && os.Getenv("DEJA_EMBED") != "off" && o.Sort != search.SortDate {
 		hits = maybeRerank(dir, hits, *o, os.Stderr)
 	}
 	var semantic bool
@@ -1964,6 +1967,11 @@ func searchAfterRank(dir string, hits []search.Hit, o *search.Options) ([]search
 	attachMoved(hits)
 	if !o.Capped {
 		o.Total, o.TotalEstimated = len(hits), false
+	}
+	if !o.All {
+		var pageCapped bool
+		hits, pageCapped = capTierHits(hits, *o)
+		o.Capped = o.Capped || pageCapped
 	}
 	return hits, demoted
 }
@@ -1994,6 +2002,10 @@ func applySearchLadder(o *search.Options, result index.SearchResult) {
 // that answered ranks them. tierWindow says the tier's window cut the match
 // short and windowRead how much of it was read in date order.
 func searchTierHits(dir string, o *search.Options, result index.SearchResult, ss []model.Session, dated bool) (hits []search.Hit, tierWindow bool, windowRead int, err error) {
+	rankOpt := *o
+	if pool := rerankCandidateLimit(dir, *o); pool > rankOpt.Limit {
+		rankOpt.Limit = pool
+	}
 	switch result.Tier {
 	case search.TierError:
 		// A pasted error IS a match; ErrorHits keeps the ranking and the error
@@ -2017,7 +2029,7 @@ func searchTierHits(dir string, o *search.Options, result index.SearchResult, ss
 			windowRead = len(hits)
 		}
 		var capped bool
-		hits, capped = capTierHits(hits, *o)
+		hits, capped = capTierHits(hits, rankOpt)
 		o.Capped = o.Capped || capped
 	case search.TierRelevance:
 		o.Strict = result.Strict
@@ -2051,7 +2063,7 @@ func searchTierHits(dir string, o *search.Options, result index.SearchResult, ss
 			windowRead = len(hits)
 		}
 		var relCapped bool
-		hits, relCapped = capTierHits(hits, *o)
+		hits, relCapped = capTierHits(hits, rankOpt)
 		o.Capped = o.Capped || relCapped
 	default:
 		// RunDetailed rather than Run: the JSON envelope reports how many
@@ -2060,7 +2072,7 @@ func searchTierHits(dir string, o *search.Options, result index.SearchResult, ss
 		// Copies go before the cap: a fork repeating its source took a slot
 		// and counted in the total (#5320, #5335).
 		keep := func(hs []search.Hit) []search.Hit { return dropCopiedHits(dir, hs) }
-		detailed, rerr := search.RunDetailedKeeping(ss, *o, keep)
+		detailed, rerr := search.RunDetailedKeeping(ss, rankOpt, keep)
 		// A date page drawn from the newest matches by their postings comes
 		// back short when few of them say a quoted phrase and the rest were
 		// too many to check. It is read whole then, as the screen does.
