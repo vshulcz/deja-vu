@@ -75,7 +75,7 @@ func TestAPerAgentPageCountsTheOtherAgentsCorrectly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	otherWord := countWordForTest(registryHarnessCount(t, root) - 1)
+	otherWord := countWord(t, registryHarnessCount(t, root)-1)
 	want := "the other " + otherWord
 	// Only a number: "the other agents" and "the other half" are prose.
 	stale := regexp.MustCompile(`the other (twenty[a-z-]*|thirty[a-z-]*|forty[a-z-]*|fifty[a-z-]*|\d+)`)
