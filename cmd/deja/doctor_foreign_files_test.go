@@ -75,6 +75,17 @@ func TestAClientsOwnFilesAreNotUnreadTranscripts(t *testing.T) {
 			want:    "1 subagent transcripts read as task",
 			avoid:   "skipped",
 		},
+		{
+			row: "antigravity", env: "DEJA_ANTIGRAVITY_ROOT",
+			session: "brain/s1/.system_generated/logs/transcript.jsonl",
+			own: []string{
+				"brain/s1/.system_generated/subagents/c1.json",
+				"brain/s1/scratch/poll.json",
+				"brain/c1/.system_generated/logs/transcript.jsonl",
+			},
+			want:  "1 subagent transcripts read as task, answer and what they changed",
+			avoid: "not recognised",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.row, func(t *testing.T) {

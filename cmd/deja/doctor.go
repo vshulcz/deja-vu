@@ -54,7 +54,7 @@ func defaultDoctorVersionLookup() doctorVersionLookup {
 func countSubagentFiles(seen []string) int {
 	n := 0
 	for _, p := range seen {
-		if sources.IsSubagentPath(p) || sources.IsPrimeChildPath(p) || sources.KimiSubagentRun(p) || sources.MuseSubagentFile(p) {
+		if sources.IsSubagentPath(p) || sources.IsPrimeChildPath(p) || sources.KimiSubagentRun(p) || sources.MuseSubagentFile(p) || sources.AntigravitySubagentFile(p) {
 			n++
 		}
 	}
@@ -754,10 +754,10 @@ func doctorHarnessStores(w io.Writer, dir string, all bool) {
 	for _, root := range codexRoots {
 		codexPresent = codexPresent || doctorExists(root)
 	}
-	rows.filesBesideIn("codex", codexLocation, codexRoots, false, codexPresent, sources.CodexFiles(), sources.CodexSidecarFiles()...)
+	rows.filesBesideIn("codex", codexLocation, codexRoots, codexPresent, sources.CodexFiles(), sources.CodexSidecarFiles()...)
 	// TRAE CLI keeps its state database, config and skills beside the codex-rs
 	// store, so only the session directories are walked for unread files.
-	rows.filesBesideIn("trae", sources.TraeRoot(), sources.TraeSessionDirs(), false, doctorExists(sources.TraeRoot()), sources.TraeFiles())
+	rows.filesBesideIn("trae", sources.TraeRoot(), sources.TraeSessionDirs(), doctorExists(sources.TraeRoot()), sources.TraeFiles())
 
 	ocDB := sources.OpencodeDB()
 	rows.row("opencode", ocDB, doctorFilePresent(ocDB), doctorSQLiteDetail(ocDB, sqlite))
@@ -771,7 +771,7 @@ func doctorHarnessStores(w io.Writer, dir string, all bool) {
 	// (#3397). The settings and the extensions beside them are not chats
 	// either.
 	geminiRoot := sources.GeminiRoot()
-	rows.filesBesideIn("gemini", geminiRoot, []string{filepath.Join(geminiRoot, "tmp")}, false,
+	rows.filesBesideIn("gemini", geminiRoot, []string{filepath.Join(geminiRoot, "tmp")},
 		doctorExists(geminiRoot), sources.GeminiChatFiles(), sources.GeminiSidecarFiles()...)
 
 	rows.row("cursor", doctorCursorLocation(), doctorCursorPresent(), doctorCursorDetail(sqlite))
@@ -782,8 +782,8 @@ func doctorHarnessStores(w io.Writer, dir string, all bool) {
 	// removed install — read as `found` with nothing in it, which is the shape
 	// every other row reports as `missing`.
 	agyRoots := sources.AntigravityRoots()
-	rows.filesBesideIn("antigravity", doctorAntigravityLocation(), agyRoots, true, doctorAnyExists(agyRoots),
-		sources.AntigravityTranscripts(), sources.AntigravitySidecarFiles()...)
+	rows.filesSkippingIn("antigravity", doctorAntigravityLocation(), agyRoots, doctorAnyExists(agyRoots),
+		sources.AntigravityTranscripts(), sources.AntigravitySubagentFile, sources.AntigravitySidecarFiles()...)
 
 	// The store root also holds Grok's settings, credentials and caches, which
 	// are not transcripts and never will be; the sessions directory is what the
@@ -833,7 +833,7 @@ func doctorHarnessStores(w io.Writer, dir string, all bool) {
 	// the row does not have: a stray file under a legacy tasks tree was
 	// invisible while the line advertised that root (review of #3360).
 	clineWalks := sources.ClineStoreRoots()
-	rows.filesBesideIn("cline", clineLoc, clineWalks, false, clineFiles > 0 || doctorExists(clineModern),
+	rows.filesBesideIn("cline", clineLoc, clineWalks, clineFiles > 0 || doctorExists(clineModern),
 		sources.ClineSessionFiles(), sources.ClineSidecarFiles()...)
 
 	rooFiles := len(sources.RooTaskFiles())

@@ -173,8 +173,9 @@ func (r *doctorStoreRows) filesSkippingIn(name, loc string, roots []string, pres
 	placed := append(append([]string{}, seen...), beside...)
 	unread := 0
 	byRule := 0
+	dotDirs := name == "antigravity"
 	for _, root := range roots {
-		u, b := unplacedFiles(root, placed, skipped)
+		u, b := unplacedFilesIn(root, placed, skipped, dotDirs)
 		unread += u
 		byRule += b
 	}
@@ -216,23 +217,13 @@ func (r *doctorStoreRows) files(name, path string, present bool, seen []string) 
 // The In form is for a row whose printed location is
 // not one directory: cline names its modern store and its legacy roots on
 // the same line, and that string cannot be walked (#3360).
-func (r *doctorStoreRows) filesBesideIn(name, loc string, walks []string, dotDirsAreTheStore, present bool, seen []string, beside ...string) {
-	detail := doctorCount(len(seen), "file")
-	placed := append(append([]string{}, seen...), beside...)
-	unread := 0
-	for _, walk := range walks {
-		u, _ := unplacedFilesIn(walk, placed, nil, dotDirsAreTheStore)
-		unread += u
-	}
-	if unread > 0 {
-		detail += fmt.Sprintf(", %d not recognised here", unread)
-	}
-	r.row(name, loc, present, detail)
+func (r *doctorStoreRows) filesBesideIn(name, loc string, walks []string, present bool, seen []string, beside ...string) {
+	r.filesSkippingIn(name, loc, walks, present, seen, nil, beside...)
 }
 
 // filesBeside is filesBesideIn for one directory.
 func (r *doctorStoreRows) filesBeside(name, path string, present bool, seen []string, beside ...string) {
-	r.filesBesideIn(name, path, []string{path}, false, present, seen, beside...)
+	r.filesBesideIn(name, path, []string{path}, present, seen, beside...)
 }
 
 // laterStores prints the rows from senpi on, in the table's order.
@@ -347,7 +338,7 @@ func (r *doctorStoreRows) laterStores(sqlite bool) {
 	// queue, the ownership ledger, the checkpoint slot — so those are placed
 	// rather than counted as transcripts deja could not read.
 	cwRoots := sources.CodeWhaleRoots()
-	r.filesBesideIn("codewhale", sources.CodeWhaleRoot(), cwRoots, false, doctorExists(sources.CodeWhaleRoot()),
+	r.filesBesideIn("codewhale", sources.CodeWhaleRoot(), cwRoots, doctorExists(sources.CodeWhaleRoot()),
 		sources.CodeWhaleSessionFiles(), sources.CodeWhaleSidecarFiles()...)
 	// Junie keeps an index and two renderings beside each session's log.
 	r.filesBeside("junie", sources.JunieRoot(), doctorExists(sources.JunieRoot()),
@@ -366,7 +357,7 @@ func (r *doctorStoreRows) laterStores(sqlite bool) {
 	// Reasonix keeps a dozen sidecars beside each transcript — metadata, event
 	// logs, locks, subagent logs — so those are placed, not counted as unread.
 	rxRoot := sources.ReasonixRoot()
-	r.filesBesideIn("reasonix", rxRoot, sources.ReasonixSessionDirsAll(), false, doctorExists(rxRoot),
+	r.filesBesideIn("reasonix", rxRoot, sources.ReasonixSessionDirsAll(), doctorExists(rxRoot),
 		sources.ReasonixSessionFiles(), sources.ReasonixSidecarFiles()...)
 	// Muse keeps cron.db, goals.db and spilled tool output beside each log, and
 	// its subagents' logs one level down, left out with DEJA_INCLUDE_SUBAGENTS=0.

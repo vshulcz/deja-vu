@@ -18,6 +18,8 @@ func TestAntigravitySidecarFilesClaimsOnlyWhatItKnows(t *testing.T) {
 	for _, d := range []string{
 		filepath.Join(brain, "logs", "chunks", "transcript"),
 		filepath.Join(brain, "messages"),
+		filepath.Join(brain, "subagents"),
+		filepath.Join(root, "brain", "f017fad5", "scratch"),
 		filepath.Join(root, "cache"),
 		filepath.Join(root, "restored_backup"),
 		filepath.Join(root, "brain", "sessB", ".system_generated", "logs"),
@@ -36,6 +38,8 @@ func TestAntigravitySidecarFilesClaimsOnlyWhatItKnows(t *testing.T) {
 		filepath.Join(brain, "logs", "transcript_full.jsonl"):                                       true,
 		filepath.Join(brain, "logs", "chunks", "transcript", "0.jsonl"):                             true,
 		filepath.Join(brain, "messages", "8f1c2a3e.json"):                                           true,
+		filepath.Join(brain, "subagents", "child-1.json"):                                           true,
+		filepath.Join(root, "brain", "f017fad5", "scratch", "notes.json"):                           true,
 		filepath.Join(root, "brain", "f017fad5", "task.md.metadata.json"):                           true,
 		filepath.Join(root, "cache", "last_conversations.json"):                                     true,
 		filepath.Join(root, "settings.json"):                                                        true,

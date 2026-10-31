@@ -187,7 +187,12 @@ var (
 	// ordinary a word to put in the key-value list — deja's own commands are
 	// full of `--session <id>`, and redacting those would cost the recall they
 	// exist for. The header is what makes this one unambiguous.
-	cookieRE = regexp.MustCompile(`(?i)\b(?:set-)?cookie:[ \t]*([^\n]{8,400})`)
+	//
+	// Stops at '[' as well as a newline: inside JSON-escaped text a line break
+	// is the two characters `\n`, so a second pass over `Cookie: [redacted:cookie]`
+	// without `[` in the stop set swallowed the marker and the next 383 bytes
+	// after it (#5763).
+	cookieRE = regexp.MustCompile(`(?i)\b(?:set-)?cookie:[ \t]*([^\n[]{8,400})`)
 	// A password named as one, at the length people actually choose. The
 	// key-value patterns above take any value of sixteen characters or more,
 	// which is right for `token = …` where a short value is as likely to be a
@@ -565,9 +570,7 @@ func redactKeyShapes(s, lower string, p kindPass) string {
 		s = replaceWhole(s, pemPrivateOpenRE, "private-key", p)
 	}
 	if strings.Contains(s, "://") {
-		s = replaceSubmatch(s, connURLRE, "url-credentials", p, func(m []string) string {
-			return m[1] + m[2] + ":[redacted:url-credentials]@" + m[4]
-		})
+		s = replaceGroup(s, connURLRE, 3, "url-credentials", p, nil)
 		// Under the URL gate: a webhook travels as https://…, and another
 		// scan of every message cost more than the rule.
 		if strings.Contains(lower, "hooks.slack.com") || strings.Contains(lower, "discord") {
@@ -617,9 +620,7 @@ func redactKeyShapes(s, lower string, p kindPass) string {
 			strings.Contains(lower, "token") || strings.Contains(lower, "api key") ||
 			strings.Contains(lower, "api-key") || strings.Contains(lower, "api_key") ||
 			strings.Contains(lower, "apikey")) {
-		s = replaceSubmatch(s, quotedSecretRE, "quoted-secret", p, func(m []string) string {
-			return m[1] + m[2] + m[3] + "[redacted:quoted-secret]" + m[5]
-		})
+		s = replaceGroup(s, quotedSecretRE, 4, "quoted-secret", p, nil)
 	}
 	// The header, not the word: "the Authorization header" is ordinary prose.
 	// "uthoriz", not "authoriz": the scan stops on every first byte, and an
@@ -863,7 +864,7 @@ func replaceGroup(s string, re *regexp.Regexp, group int, kind string, p kindPas
 				groups[i] = s[m[2*i]:m[2*i+1]]
 			}
 		}
-		if strings.HasPrefix(groups[group], "$") || (skip != nil && skip(groups)) {
+		if strings.HasPrefix(groups[group], "$") || strings.HasPrefix(groups[group], Marker) || (skip != nil && skip(groups)) {
 			continue
 		}
 		b.WriteString(s[at:lo])

@@ -87,23 +87,95 @@ func AntigravitySidecarFiles() []string {
 				// content nowhere else, and the row must say so.
 				return fileExists(filepath.Join(filepath.Dir(p), "transcript.jsonl"))
 			}
+			// A conversation's scratch/ directory and the parent's
+			// .system_generated/subagents/<child>.json descriptors are not
+			// transcripts deja failed to read (#5765).
+			if len(parts) >= 3 && parts[2] == "scratch" {
+				return true
+			}
 			return strings.Contains(dir, "/.system_generated/messages") ||
+				strings.Contains(dir, "/.system_generated/subagents") ||
 				strings.Contains(dir, "/logs/chunks/")
 		})...)
 	}
 	return out
 }
 
-// AntigravityTranscripts lists every Antigravity transcript.jsonl.
+// AntigravitySubagentFile reports whether p is a spawned sub-agent's
+// transcript, recorded under another conversation's .system_generated/subagents
+// directory (#5765).
+func AntigravitySubagentFile(p string) bool {
+	if filepath.Base(p) != "transcript.jsonl" {
+		return false
+	}
+	parent, _, _ := antigravitySubagentInfo(p)
+	return parent != ""
+}
+
+// AntigravityTranscripts lists every Antigravity transcript.jsonl, leaving out
+// sub-agent transcripts when DEJA_INCLUDE_SUBAGENTS=0.
 func AntigravityTranscripts() []string {
+	subagents := !SubagentsOff()
 	var out []string
 	for _, root := range AntigravityRoots() {
 		matches, err := filepath.Glob(filepath.Join(root, "brain", "*", ".system_generated", "logs", "transcript.jsonl"))
-		if err == nil {
-			out = append(out, keepRegular(matches)...)
+		if err != nil {
+			continue
+		}
+		for _, p := range keepRegular(matches) {
+			if subagents || !AntigravitySubagentFile(p) {
+				out = append(out, p)
+			}
 		}
 	}
 	return out
+}
+
+// antigravitySubagentInfo reads the parent conversation ID, descriptor name and
+// workspace fallback from `<root>/brain/<parent>/.system_generated/subagents/<id>.json`.
+func antigravitySubagentInfo(path string) (parent, agent, workspace string) {
+	id := antigravitySessionID(path)
+	if id == "" || id == "." || id == string(filepath.Separator) {
+		return "", "", ""
+	}
+	root := filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(path)))))
+	matches, err := filepath.Glob(filepath.Join(root, "brain", "*", ".system_generated", "subagents", id+".json"))
+	if err != nil {
+		return "", "", ""
+	}
+	for _, m := range matches {
+		p := filepath.Base(filepath.Dir(filepath.Dir(filepath.Dir(m))))
+		if p == "" || p == "." || p == id {
+			continue
+		}
+		parent = p
+		b, readErr := os.ReadFile(m)
+		if readErr != nil {
+			return parent, "", ""
+		}
+		var desc struct {
+			SubagentDescriptor struct {
+				TypeName string `json:"typeName"`
+				Role     string `json:"role"`
+			} `json:"subagentDescriptor"`
+			WorkspaceURIs []string `json:"workspaceUris"`
+		}
+		if json.Unmarshal(b, &desc) != nil {
+			return parent, "", ""
+		}
+		agent = strings.TrimSpace(desc.SubagentDescriptor.Role)
+		if agent == "" {
+			agent = strings.TrimSpace(desc.SubagentDescriptor.TypeName)
+		}
+		for _, uri := range desc.WorkspaceURIs {
+			if w, ok := fileURIPath(uri); ok {
+				workspace = w
+				break
+			}
+		}
+		return parent, agent, workspace
+	}
+	return "", "", ""
 }
 
 // LoadAntigravity reads every Antigravity session on this machine.
@@ -126,6 +198,12 @@ func parseAntigravityWith(path string, scan func(func(map[string]any)) error) ([
 		return nil, nil
 	}
 	s := model.Session{Harness: "antigravity", ID: id, Project: antigravityProject(id), Path: path}
+	parent, agent, subWorkspace := antigravitySubagentInfo(path)
+	if parent != "" {
+		s.Kind = "subagent"
+		s.Parent = parent
+		s.Agent = agent
+	}
 	// Records already taken from a planner's tool_calls, so the step that
 	// runs the call and names it again in its header is not a second run.
 	fromCalls := map[model.Message]int{}
@@ -247,6 +325,8 @@ func parseAntigravityWith(path string, scan func(func(map[string]any)) error) ([
 			s.Project = p
 		} else if cwd != "" {
 			s.Project = projectName(cwd)
+		} else if subWorkspace != "" {
+			s.Project = projectName(subWorkspace)
 		}
 	}
 	return []model.Session{s}, err

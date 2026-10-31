@@ -272,3 +272,43 @@ func TestQuotedSecretRuleLeavesProseAlone(t *testing.T) {
 		}
 	}
 }
+
+// A second pass over redacted text — what `deja index --rebuild` and `forget
+// --unforget` run over imported or kept sessions — must leave the text and
+// counts untouched (#5763).
+func TestTextIsIdempotentAcrossRulesAndJSONEscapedCookies(t *testing.T) {
+	tail := `\nContent-Type: application/json\n\n` + strings.Repeat("ordinary-response-body-", 25)
+	cases := []string{
+		`"headers": "Cookie: session=secret_value_123456` + tail + `"`,
+		`Set-Cookie: sid=secret_value_123456; HttpOnly`,
+		`sshpass -p hunter2secret ssh deploy@host`,
+		`curl -u admin:hunter2secret https://api.example.com`,
+		`mysql -h db -u root -pMySecret99 app`,
+		`redis-cli -a SuperSecretPass99 PING`,
+		`machine api.example.com login deploy password hunter2secret`,
+		`postgres://admin:p@ssw0rd123@db.internal:5432/prod`,
+		`password "S3cr3tP@ssw0rd!"`,
+		`token "` + fake("ghp_", 24) + `"`,
+		`x-api-key: "shortsecret"`,
+		`--password=MyRootPass2026`,
+		`DATABASE_PASSWORD=ShortPass123`,
+		`DB_PASS=ShortPass123`,
+		`the password is correcthorsebatterystaple99`,
+		`пароль: ТестовыйСекрет2026`,
+		`api_key=` + fake("", 20),
+	}
+	for _, in := range cases {
+		pass1, c1 := Text(in)
+		if c1.Total() == 0 {
+			t.Fatalf("pass 1 redacted nothing in %q", in)
+		}
+		if strings.Contains(in, "ordinary-response-body-") && !strings.Contains(pass1, strings.Repeat("ordinary-response-body-", 10)) {
+			t.Fatalf("pass 1 lost the tail after Cookie: %q", pass1)
+		}
+		pass2, c2 := Text(pass1)
+		if pass2 != pass1 || c2.Total() != 0 {
+			t.Errorf("second pass altered already-redacted text:\n  pass1 (%d): %q\n  pass2 (%d): %q\n  counts2: %#v",
+				len(pass1), pass1, len(pass2), pass2, c2)
+		}
+	}
+}

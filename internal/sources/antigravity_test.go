@@ -209,3 +209,42 @@ func TestAntigravityProjectComesFromTheMetadata(t *testing.T) {
 		t.Fatalf("unknown conversation = %q, want the placeholder", got)
 	}
 }
+
+func TestAntigravitySubagentLineageAndWorkspaceFallback(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("DEJA_ANTIGRAVITY_ROOT", root)
+	parentSub := filepath.Join(root, "brain", "parent-conv", ".system_generated", "subagents")
+	childLogs := filepath.Join(root, "brain", "child-conv", ".system_generated", "logs")
+	for _, d := range []string{parentSub, childLogs} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	desc := `{"conversationId":"child-conv","subagentDescriptor":{"typeName":"self","role":"Index Auditor"},"state":"SUBAGENT_STATE_ALIVE","spawnStepIndex":10,"workspaceUris":["file:///Users/me/coding/deja-vu"]}`
+	if err := os.WriteFile(filepath.Join(parentSub, "child-conv.json"), []byte(desc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	childPath := filepath.Join(childLogs, "transcript.jsonl")
+	row := `{"source":"USER_EXPLICIT","type":"USER_INPUT","created_at":"2026-10-31T12:00:00Z","content":"<USER_REQUEST>\naudit the index\n</USER_REQUEST>"}` + "\n" +
+		`{"source":"MODEL","type":"PLANNER_RESPONSE","created_at":"2026-10-31T12:01:00Z","content":"Done."}` + "\n"
+	if err := os.WriteFile(childPath, []byte(row), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !AntigravitySubagentFile(childPath) {
+		t.Fatalf("AntigravitySubagentFile(%s) = false, want true", childPath)
+	}
+	ss, err := ParseAntigravityFile(childPath)
+	if err != nil || len(ss) != 1 {
+		t.Fatalf("ParseAntigravityFile = %v, %#v", err, ss)
+	}
+	if ss[0].Kind != "subagent" || ss[0].Parent != "parent-conv" || ss[0].Agent != "Index Auditor" {
+		t.Fatalf("subagent meta = kind=%q parent=%q agent=%q", ss[0].Kind, ss[0].Parent, ss[0].Agent)
+	}
+	if ss[0].Project != "coding/deja-vu" {
+		t.Fatalf("project = %q, want coding/deja-vu from workspaceUris fallback", ss[0].Project)
+	}
+	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "0")
+	if got := AntigravityTranscripts(); len(got) != 0 {
+		t.Fatalf("DEJA_INCLUDE_SUBAGENTS=0 kept subagent transcript: %v", got)
+	}
+}
