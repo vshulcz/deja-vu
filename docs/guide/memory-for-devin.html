@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add memory to Devin CLI: every agent's sessions — deja-vu</title>
+<meta name="description" content="How to give Devin CLI recall over every coding agent's sessions on the machine — the MCP server, the hooks on each prompt, and CLI install versus plugin.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-devin.html">
+<link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/memory-for-devin.html">
+<link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/memory-for-devin.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Add memory to Devin CLI: every agent's sessions">
+<meta property="og:description" content="How to give Devin CLI recall over every coding agent's sessions on the machine — the MCP server, the hooks on each prompt, and CLI install versus plugin.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-devin.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Add memory to Devin CLI: every agent's sessions">
+<meta name="twitter:description" content="How to give Devin CLI recall over every coding agent's sessions on the machine — the MCP server, the hooks on each prompt, and CLI install versus plugin.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Devin CLI", "description": "How to give Devin CLI recall over every coding agent's sessions on the machine — the MCP server, the hooks on each prompt, and CLI install versus plugin.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-devin.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-devin.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-10-30", "dateModified": "2026-10-31"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Memory for Devin CLI","item":"https://vshulcz.github.io/deja-vu/guide/memory-for-devin.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I give Devin CLI memory of past sessions?","acceptedAnswer":{"@type":"Answer","text":"Run deja install devin-auto. It writes the deja MCP server, the deja-history skill and hooks that recall on every prompt, over a local index of every agent's transcripts."}},{"@type":"Question","name":"Where does Devin CLI keep its session history?","acceptedAnswer":{"@type":"Answer","text":"In ~/.local/share/devin/cli/sessions.db (XDG_DATA_HOME is honoured), with summaries in devin/summaries/<session_id>.md under the same data directory."}},{"@type":"Question","name":"Should I use the plugin or deja install devin-auto?","acceptedAnswer":{"@type":"Answer","text":"Use deja install devin-auto. Devin's cloud sessions are reported to skip SessionStart and SessionEnd for plugin hooks, so the plugin's opening digest may be CLI-only. When both are present the plugin's hooks stand down."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a>
+<div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<details class="grpfold"><summary>Why agents forget <span class="n">11</span></summary>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="one-rules-file.html">One rules file</a>
+<a href="token-cost.html">What memory costs</a>
+</details>
+<details class="grpfold"><summary>Session history <span class="n">11</span></summary>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="codex-history.html">Codex history</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="credentials-in-transcripts.html">Credentials in transcripts</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
+</details>
+<details class="grpfold"><summary>Deleting sessions <span class="n">24</span></summary>
+<a href="session-files-on-disk.html">Claude Code</a>
+<a href="delete-old-claude-sessions.html">Old sessions</a>
+<a href="delete-codex-sessions.html">Codex</a>
+<a href="delete-cursor-chat-history.html">Cursor</a>
+<a href="cursor-state-vscdb-too-large.html">Cursor state.vscdb too large</a>
+<a href="delete-copilot-chat-history.html">Copilot Chat</a>
+<a href="delete-copilot-cli-session-history.html">Copilot CLI</a>
+<a href="delete-gemini-cli-history.html">Gemini CLI</a>
+<a href="delete-opencode-session-history.html">opencode</a>
+<a href="delete-cline-task-history.html">Cline</a>
+<a href="delete-roo-task-history.html">Roo Code</a>
+<a href="delete-zed-thread-history.html">Zed</a>
+<a href="delete-kilo-code-task-history.html">Kilo Code</a>
+<a href="delete-amp-thread-history.html">Amp</a>
+<a href="delete-continue-session-history.html">Continue</a>
+<a href="delete-kiro-session-history.html">Kiro</a>
+<a href="delete-kimi-code-session-history.html">Kimi Code</a>
+<a href="delete-junie-session-history.html">Junie</a>
+<a href="delete-goose-session-history.html">Goose</a>
+<a href="delete-windsurf-cascade-history.html">Windsurf</a>
+<a href="delete-qwen-code-chat-history.html">Qwen Code</a>
+<a href="delete-trae-sessions.html">TRAE CLI</a>
+<a href="delete-codebuddy-sessions.html">CodeBuddy</a>
+<a href="delete-antigravity-history.html">Antigravity</a>
+</details>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">38</span></summary>
+<a href="memory-for-aider.html">aider</a>
+<a href="memory-for-amp.html">Amp</a>
+<a href="memory-for-antigravity.html">Antigravity</a>
+<a href="memory-for-cherrystudio.html">Cherry Studio</a>
+<a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-codewhale.html">CodeWhale</a>
+<a href="memory-for-codex.html">Codex</a>
+<a href="memory-for-commandcode.html">Command Code</a>
+<a href="memory-for-continue.html">Continue</a>
+<a href="memory-for-copilot.html">Copilot CLI</a>
+<a href="memory-for-crush.html">Crush</a>
+<a href="memory-for-cursor.html">Cursor</a>
+<a href="memory-for-devin.html" aria-current="page">Devin CLI</a>
+<a href="memory-for-dsh.html">dsh</a>
+<a href="memory-for-gjc.html">gajae-code</a>
+<a href="memory-for-gemini.html">Gemini CLI</a>
+<a href="memory-for-goose.html">Goose</a>
+<a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-hermes.html">Hermes</a>
+<a href="memory-for-kilocode.html">Kilo Code</a>
+<a href="memory-for-kimchi.html">Kimchi Coding</a>
+<a href="memory-for-kimi.html">Kimi Code</a>
+<a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-omp.html">omp</a>
+<a href="memory-for-openclaw.html">OpenClaw</a>
+<a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-pi.html">pi</a>
+<a href="memory-for-prime.html">prime-agent</a>
+<a href="memory-for-qwen.html">Qwen Code</a>
+<a href="memory-for-reasonix.html">Reasonix</a>
+<a href="memory-for-roo.html">Roo Code</a>
+<a href="memory-for-senpi.html">Senpi</a>
+<a href="memory-for-trae.html">TRAE CLI</a>
+<a href="memory-for-copilot-chat.html">VS Code Copilot Chat</a>
+<a href="memory-for-windsurf.html">Windsurf</a>
+<a href="memory-for-zcode.html">ZCode</a>
+<a href="memory-for-zed.html">Zed</a>
+</details>
+<div class="grp">Evidence</div>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="claude-mem-alternative.html">claude-mem alternative</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Adding memory to Devin CLI</h1>
+<p class="pagelede">one command for the MCP server, the skill and the hooks<span class="mins" data-mins></span></p>
+
+<p>Devin CLI keeps every session in one local database and opens the next one empty. What you worked out last week is still there, and so is the work you did in whichever other agent you had open at the time.</p>
+
+<h2>What Devin already has</h2>
+<p>Sessions live in <code>~/.local/share/devin/cli/sessions.db</code> on macOS and Linux (<code>XDG_DATA_HOME</code> is honoured), with a summary per session at <code>devin/summaries/&lt;session_id&gt;.md</code> under the same data directory. <code>devin --resume &lt;id&gt;</code> reopens one. Complete, and unread by anything — including by Devin's next session.</p>
+
+<h2>Adding recall</h2>
+<pre>deja install devin-auto</pre>
+<p>That needs the binary:</p>
+<pre>brew install deja-vu
+# or
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</pre>
+<p>Without hooks, <code>deja install devin</code> writes only the MCP server and the skill, and the agent searches when it decides to.</p>
+
+<h2>What gets wired</h2>
+<p><code>deja install devin</code> writes the MCP server to <code>~/.config/devin/mcp_config.json</code> and the <code>deja-history</code> skill to <code>~/.agents/skills/deja-history/SKILL.md</code>. <code>deja install devin-auto</code> also writes hooks into the <code>"hooks"</code> key of <code>~/.config/devin/config.json</code>, next to whatever else is in it:</p>
+<ul>
+<li>The project digest on <code>SessionStart</code> and again on <code>PostCompaction</code>, so a compacted thread gets its task back.</li>
+<li>Recall on <code>UserPromptSubmit</code>, silent when the history has no answer.</li>
+<li>A line about the file on <code>PostToolUse</code> after an edit or write, and the repair for a failed command after <code>exec</code>.</li>
+<li><code>SessionEnd</code>, so the session you just quit is one the next session's recall can answer.</li>
+</ul>
+
+<h2>Plugin or CLI install</h2>
+<p>There is also a plugin: <code>devin plugins install vshulcz/deja-vu#devin-plugin</code>. Pick <code>deja install devin-auto</code>. Devin's cloud sessions are reported to skip <code>SessionStart</code> and <code>SessionEnd</code> for plugin hooks, so with the plugin the opening digest may be CLI-only. When both are present the plugin's hooks see the wiring in <code>config.json</code> and stand down, so running both is safe.</p>
+
+<h2>The part that is not about this harness</h2>
+<p>The index covers every agent's transcripts on the machine — forty-three of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in one tool answers a question asked in another, including sessions from before any of this was installed. That is the reason to index rather than to capture.</p>
+<p>Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>). <a href="token-cost.html">What memory costs</a> has the measured comparison.</p>
+
+<p><a href="getting-started.html">Getting started</a> · <a href="../registry/devin.html">How Devin's store is read</a> · <a href="resume-a-session.html">Resuming a session</a></p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

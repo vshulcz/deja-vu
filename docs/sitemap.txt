@@ -22,6 +22,7 @@ https://vshulcz.github.io/deja-vu/guide/no-conversation-found-claude-code.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-kimi.html
+https://vshulcz.github.io/deja-vu/guide/memory-for-devin.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html

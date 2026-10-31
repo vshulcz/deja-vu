@@ -107,6 +107,7 @@ var groups = []group{
 		{"memory-for-copilot.html", "Copilot CLI"},
 		{"memory-for-crush.html", "Crush"},
 		{"memory-for-cursor.html", "Cursor"},
+		{"memory-for-devin.html", "Devin CLI"},
 		{"memory-for-dsh.html", "dsh"},
 		{"memory-for-gjc.html", "gajae-code"},
 		{"memory-for-gemini.html", "Gemini CLI"},
