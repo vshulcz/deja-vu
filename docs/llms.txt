@@ -93,6 +93,7 @@ Run `deja` with no arguments in a terminal and it opens a full-screen search ove
 - [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html)
 - [DeepSeek Harness](https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html)
 - [Kimi Code](https://vshulcz.github.io/deja-vu/guide/memory-for-kimi.html)
+- [Devin CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-devin.html)
 - [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html)
 - [VS Code Copilot Chat](https://vshulcz.github.io/deja-vu/guide/memory-for-copilot-chat.html)
 - [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html)
