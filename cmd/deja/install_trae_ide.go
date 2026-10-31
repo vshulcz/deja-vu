@@ -183,7 +183,7 @@ func installTraeIDEAuto(exe string, uninstall bool) (installResult, error) {
 	}
 	var rs []installResult
 	for _, e := range editions {
-		if !(uninstall && !fileExists(e.hooksPath())) {
+		if !uninstall || fileExists(e.hooksPath()) {
 			r, err := installCodexHooksAt(exe, e.hooksPath(), "", traeIDEHookWiring, uninstall)
 			if err != nil {
 				return installResult{}, err

@@ -50,14 +50,18 @@ func firstHitID(t *testing.T, out string, ids ...string) string {
 // stay out of the way where they do not.
 func TestTimeHintsRankOnlyTheNoExactMatchFallback(t *testing.T) {
 	now := time.Now()
-	lastMonth := now.AddDate(0, -1, 0)
+	// Step back by calendar months from mid-month so the 31st of a 31-day month
+	// does not overflow a 30-day previous month back into the current one
+	// (e.g. Oct 31 AddDate(0,-1,0) is Oct 1).
+	midMonth := time.Date(now.Year(), now.Month(), 15, 10, 0, 0, 0, now.Location())
+	lastMonth := midMonth.AddDate(0, -1, 0)
 	datedStore(t, map[string]string{
 		// Dated in the same calendar deja reads "last month" in — the local
 		// one. Formatted through UTC and taken two hours back, the newest
 		// session landed in the previous month whenever the run happened early
 		// on the first of a month, so "last month" matched it too and the hint
 		// had nothing to tell apart. It failed that way on 2026-09-01.
-		"m_old":  now.AddDate(0, -3, 0).Format("2006-01-02") + "T10:00:00Z",
+		"m_old":  midMonth.AddDate(0, -3, 0).Format("2006-01-02") + "T10:00:00Z",
 		"m_last": lastMonth.Format("2006-01-02") + "T10:00:00Z",
 		"m_now":  now.Format("2006-01-02") + "T10:00:00Z",
 	})

@@ -167,9 +167,9 @@ func TestStoreWalkDoesNotRebuildTheRegistryPerFile(t *testing.T) {
 		t.Fatalf("walk found %d files, want 400", len(old))
 	}
 	perFile := testing.AllocsPerRun(3, func() { currentFilesWith("", old) }) / float64(len(old))
-	// A stat and its FileState are a handful; a registry is hundreds.
-	if perFile > 30 {
-		t.Errorf("the walk allocates %.0f times per file, want at most 30", perFile)
+	// A stat and its FileState are a handful (up to ~40 on Windows); a registry is hundreds.
+	if perFile > 45 {
+		t.Errorf("the walk allocates %.0f times per file, want at most 45", perFile)
 	}
 }
 

@@ -2,7 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -227,5 +229,44 @@ func TestTUIHeaderCountFollowsTheIndex(t *testing.T) {
 	a.loadHome()
 	if len(a.allMeta) != before+1 {
 		t.Fatalf("after the index grew the count is %d, want %d", len(a.allMeta), before+1)
+	}
+}
+
+// Picking an agent in the picker widens loadHome to the full index so an agent
+// whose newest session sits behind the initial 60-row page still lists (#5761).
+func TestTUIAgentPickerReadsBeyondFirstPage(t *testing.T) {
+	dir, root := tuiStore(t)
+	codexRoot := t.TempDir()
+	t.Setenv("DEJA_CODEX_ROOT", codexRoot)
+	codexFile := filepath.Join(codexRoot, "sessions", "2026", "01", "04", "rollout-2026-01-04T10-00-00-codex-old.jsonl")
+	if err := os.MkdirAll(filepath.Dir(codexFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	codex := strings.Join([]string{
+		`{"type":"session_meta","timestamp":"2026-01-04T10:00:00Z","payload":{"session_id":"codex-old","cwd":"/work/payments"}}`,
+		`{"type":"message","timestamp":"2026-01-04T10:01:00Z","payload":{"role":"user","content":"old codex session behind the 60-row page"}}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(codexFile, []byte(codex), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	base := time.Date(2026, 3, 10, 12, 0, 0, 0, time.UTC)
+	for i := range 65 {
+		id := fmt.Sprintf("page-%02d", i)
+		at := base.Add(time.Duration(i) * time.Minute).Format(time.RFC3339)
+		user, err := json.Marshal(map[string]any{"type": "user", "sessionId": id, "cwd": "/work/payments", "timestamp": at,
+			"message": map[string]any{"role": "user", "content": "newer claude session on the first page"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		writeClaudeFixture(t, filepath.Join(root, "payments", id+".jsonl"), id, []string{string(user)})
+	}
+	if err := index.Ensure(dir, "", false, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	a := newTestTUI(t, dir)
+	a.filter = map[string]bool{"codex": true}
+	a.loadHome()
+	if len(a.rows) != 1 || a.rows[0].s.Harness != "codex" {
+		t.Fatalf("picking an agent older than the 60-row home page gave %d rows", len(a.rows))
 	}
 }

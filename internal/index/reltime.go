@@ -51,6 +51,15 @@ func monthOccurrence(m time.Month, now time.Time) time.Time {
 	return time.Date(year, m, 1, 0, 0, 0, 0, now.Location())
 }
 
+// addMonths steps by calendar months without letting the 29th–31st of a long
+// month overflow a shorter target month into the next one (e.g. Oct 31 minus
+// one month is Sep 30, not Oct 1).
+func addMonths(t time.Time, months int) time.Time {
+	first := time.Date(t.Year(), t.Month(), 1, t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location()).AddDate(0, months, 0)
+	lastDay := time.Date(first.Year(), first.Month()+1, 0, 0, 0, 0, 0, t.Location()).Day()
+	return time.Date(first.Year(), first.Month(), min(t.Day(), lastDay), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
+}
+
 // relativeTimeTerms turns relative-time phrases in a query into the month
 // tokens the ingest writes for every message, so "which book did I finish a
 // week ago" can meet sessions from that month structurally. Only the
@@ -83,7 +92,7 @@ func relativeTimeTerms(q string, now time.Time) []string {
 			case "week":
 				add(now.AddDate(0, 0, -7))
 			case "month":
-				add(now.AddDate(0, -1, 0))
+				add(addMonths(now, -1))
 			case "year":
 				add(now.AddDate(-1, 0, 0))
 			default: // weekday: within the previous 7 days
@@ -103,7 +112,7 @@ func relativeTimeTerms(q string, now time.Time) []string {
 			case "week":
 				add(now.AddDate(0, 0, -7*n))
 			case "month":
-				add(now.AddDate(0, -n, 0))
+				add(addMonths(now, -n))
 			case "year":
 				add(now.AddDate(-n, 0, 0))
 			}
@@ -183,7 +192,7 @@ func pointInTime(q string, now time.Time) (time.Time, bool) {
 	case "week":
 		return now.AddDate(0, 0, -7*n), true
 	case "month":
-		return now.AddDate(0, -n, 0), true
+		return addMonths(now, -n), true
 	}
 	return time.Time{}, false
 }

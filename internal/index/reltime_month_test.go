@@ -41,3 +41,22 @@ func TestMonthNamesResolveToTheMostRecentOccurrence(t *testing.T) {
 		t.Log("modal 'may' produced no hint; fine either way")
 	}
 }
+
+// On the 31st of a 31-day month after a 30-day or 28-day month, AddDate(0,-1,0)
+// overflows into the current month (Oct 31 -> Oct 1, Mar 31 -> Mar 3).
+func TestLastMonthOnTheThirtyFirstDoesNotOverflow(t *testing.T) {
+	oct31 := time.Date(2026, time.October, 31, 12, 0, 0, 0, time.UTC)
+	if got := relativeTimeTerms("what did we do last month", oct31); len(got) == 0 || got[0] != "2026-09" {
+		t.Fatalf("last month on Oct 31 = %v, want 2026-09", got)
+	}
+	if day, ok := pointInTime("a month ago", oct31); !ok || day.Month() != time.September || day.Day() != 30 {
+		t.Fatalf("a month ago on Oct 31 = %v (%v), want 2026-09-30", day, ok)
+	}
+	mar31 := time.Date(2026, time.March, 31, 12, 0, 0, 0, time.UTC)
+	if got := relativeTimeTerms("two months ago", mar31); len(got) == 0 || got[0] != "2026-01" {
+		t.Fatalf("two months ago on Mar 31 = %v, want 2026-01", got)
+	}
+	if got := relativeTimeTerms("last month", mar31); len(got) == 0 || got[0] != "2026-02" {
+		t.Fatalf("last month on Mar 31 = %v, want 2026-02", got)
+	}
+}
