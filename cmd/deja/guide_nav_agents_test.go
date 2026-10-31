@@ -75,12 +75,14 @@ func TestAPerAgentPageCountsTheOtherAgentsCorrectly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "the other " + countWordForTest(registryHarnessCount(t, root)-1)
+	otherWord := countWord(t, registryHarnessCount(t, root)-1)
+	want := "the other " + otherWord
 	// Only a number: "the other agents" and "the other half" are prose.
-	stale := regexp.MustCompile(`the other (twenty[a-z-]*|thirty[a-z-]*|\d+)`)
+	stale := regexp.MustCompile(`the other (twenty[a-z-]*|thirty[a-z-]*|forty[a-z-]*|fifty[a-z-]*|\d+)`)
+	otherAgents := regexp.MustCompile(`(?i)\b(twenty[a-z-]*|thirty[a-z-]*|forty[a-z-]*|fifty[a-z-]*|\d+) other (?:coding )?agents\b`)
 	checked := 0
 	for _, e := range entries {
-		if e.IsDir() || !strings.HasPrefix(e.Name(), "memory-for-") {
+		if e.IsDir() || (!strings.HasPrefix(e.Name(), "memory-for-") && !strings.HasPrefix(e.Name(), "delete-")) {
 			continue
 		}
 		b, err := os.ReadFile(filepath.Join(dir, e.Name()))
@@ -93,9 +95,15 @@ func TestAPerAgentPageCountsTheOtherAgentsCorrectly(t *testing.T) {
 				t.Errorf("docs/guide/%s says %q; the registry has %d harnesses", e.Name(), m, registryHarnessCount(t, root))
 			}
 		}
+		for _, m := range otherAgents.FindAllStringSubmatch(string(b), -1) {
+			checked++
+			if !strings.EqualFold(m[1], otherWord) {
+				t.Errorf("docs/guide/%s says %q; the registry has %d harnesses", e.Name(), m[0], registryHarnessCount(t, root))
+			}
+		}
 	}
 	if checked == 0 {
-		t.Skip("no page counts the other agents")
+		t.Fatal("no page counts the other agents; the regex stopped matching")
 	}
 }
 

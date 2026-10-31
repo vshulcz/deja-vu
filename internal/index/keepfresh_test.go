@@ -30,6 +30,11 @@ func keepFreshStore(t *testing.T) (dir, path string) {
 // indexedBytes is how much of the transcripts the manifest says it has read.
 func indexedBytes(t *testing.T, dir string) int64 {
 	t.Helper()
+	unlock, ok, err := tryLockDirFor(dir, keepLockPatience)
+	if err != nil || !ok {
+		t.Fatalf("lock index: ok=%v err=%v", ok, err)
+	}
+	defer unlock()
 	m, err := readManifest(dir)
 	if err != nil {
 		t.Fatal(err)

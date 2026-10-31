@@ -210,8 +210,8 @@ func installKiroAuto(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	if uninstall && agent.Action == "removed" {
-		if err := kiroForgetDefaultAgent(); err != nil {
-			return installResult{}, err
+		if ferr := kiroForgetDefaultAgent(); ferr != nil {
+			return installResult{}, ferr
 		}
 	}
 	if uninstall {

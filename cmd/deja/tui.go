@@ -359,7 +359,7 @@ func (a *tuiApp) loadHome() {
 		// Filtered, the list is read whole: yesterday's sessions sit behind
 		// today's, and a cut taken first would drop them.
 		box, n := a.box(), 60
-		if box.active() {
+		if box.active() || len(a.filter) > 0 {
 			n = 0
 		}
 		ss, total, _ = tuiRecent(a.dir, box.options(a.scopeProjects()), n)
