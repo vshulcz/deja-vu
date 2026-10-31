@@ -92,6 +92,7 @@ var groups = []group{
 		{"delete-trae-sessions.html", "TRAE CLI"},
 		{"delete-codebuddy-sessions.html", "CodeBuddy"},
 		{"delete-antigravity-history.html", "Antigravity"},
+		{"delete-pi-session-history.html", "pi"},
 	}},
 	{title: "Per-agent guides", fold: true, links: []link{
 		{"memory-for-aider.html", "aider"},

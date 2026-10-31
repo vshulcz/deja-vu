@@ -122,6 +122,7 @@ https://vshulcz.github.io/deja-vu/guide/delete-junie-session-history.html
 https://vshulcz.github.io/deja-vu/guide/delete-goose-session-history.html
 https://vshulcz.github.io/deja-vu/guide/delete-amp-thread-history.html
 https://vshulcz.github.io/deja-vu/guide/delete-continue-session-history.html
+https://vshulcz.github.io/deja-vu/guide/delete-pi-session-history.html
 https://vshulcz.github.io/deja-vu/guide/credentials-in-transcripts.html
 https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html
 https://vshulcz.github.io/deja-vu/registry/kilocode.html
