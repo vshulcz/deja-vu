@@ -15,6 +15,7 @@ same local index.
 | [`kimi/`](kimi) | Kimi Code plugin `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
 | [`grok/`](grok) | Grok Build plugin `deja` from this repository's marketplace, then `grok plugin install deja` (official entry in review: xai-org/plugin-marketplace#332) | `grok plugin marketplace add vshulcz/deja-vu` |
 | [`hermes/`](hermes) | Hermes memory provider `deja-memory` | `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
+| [`magpie/`](magpie) | Magpie gateway plugin `github:vshulcz/deja-vu` | `magpie plugin add github:vshulcz/deja-vu` |
 | [`spec-kit/`](spec-kit) | Spec Kit extension `deja-vu`, release asset `deja-spec-kit.zip` | `specify extension add deja-vu --from https://github.com/vshulcz/deja-vu/releases/latest/download/deja-spec-kit.zip` |
 
 Four more integrations live outside this directory because their registries or

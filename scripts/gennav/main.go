@@ -49,6 +49,7 @@ var groups = []group{
 		{"after-compaction.html", "After compaction"},
 		{"repeated-mistakes.html", "Repeated mistakes"},
 		{"switching-agents.html", "Switching agents"},
+		{"switch-agents-without-losing-context.html", "Session handoffs"},
 		{"parallel-sessions.html", "Parallel sessions"},
 		{"rules-files.html", "When CLAUDE.md grows"},
 		{"one-rules-file.html", "One rules file"},

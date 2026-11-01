@@ -8,6 +8,7 @@ https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html
 https://vshulcz.github.io/deja-vu/guide/after-compaction.html
 https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html
 https://vshulcz.github.io/deja-vu/guide/switching-agents.html
+https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html
 https://vshulcz.github.io/deja-vu/guide/export-conversations.html
 https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html
 https://vshulcz.github.io/deja-vu/guide/token-cost.html

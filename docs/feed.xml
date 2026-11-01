@@ -18,6 +18,13 @@
     <summary>Coding agent memory for Claude Code, Codex and 41 more agents. A local index of the session history already on your disk that every agent can recall.</summary>
   </entry>
   <entry>
+    <title>Turn your deja stats card into a PNG — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/card/</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/card/"></link>
+    <updated>2026-11-01T00:00:00Z</updated>
+    <summary>deja stats --card writes an SVG. Drop it here to get a PNG you can post. The conversion happens in your browser; the file is never uploaded.</summary>
+  </entry>
+  <entry>
     <title>claude-mem alternative for Codex, Cursor, opencode — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html"></link>
@@ -109,6 +116,13 @@
     <summary>find ~/.claude/projects -mtime +30 -delete drops them, cleanupPeriodDays does it on a timer — and why age frees far less disk than size.</summary>
   </entry>
   <entry>
+    <title>Install deja and index your agent history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/getting-started.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/getting-started.html"></link>
+    <updated>2026-11-01T00:00:00Z</updated>
+    <summary>Install deja and index your coding-agent history in one command, then search it and wire it into your agents over MCP.</summary>
+  </entry>
+  <entry>
     <title>Add memory to CodeBuddy Code — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/memory-for-codebuddy.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-codebuddy.html"></link>
@@ -144,6 +158,13 @@
     <summary>claude --resume found no session file under ~/.claude/projects. Five causes, reproduced on 2.1.295, how to find the file, and how to get the session back.</summary>
   </entry>
   <entry>
+    <title>Privacy — deja-vu docs</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/privacy.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/privacy.html"></link>
+    <updated>2026-11-01T00:00:00Z</updated>
+    <summary>deja is local by design: no network path in indexing or search unless semantic search is on, credentials redacted at index time, and forget/exclude controls.</summary>
+  </entry>
+  <entry>
     <title>How to recover a deleted Claude Code session — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html"></link>
@@ -156,6 +177,13 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html"></link>
     <updated>2026-11-01T00:00:00Z</updated>
     <summary>One session: rm its .jsonl, or pick it from a list. A whole project: claude project purge. On a timer: cleanupPeriodDays. What /clear does.</summary>
+  </entry>
+  <entry>
+    <title>Switch Coding Agents When Quotas Hit — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html"></link>
+    <updated>2026-11-01T00:00:00Z</updated>
+    <summary>How to switch between Claude Code, Codex, Gemini CLI, OpenCode, Hermes, and DeepSeek Harness when quotas hit, using deja handoff, CC Switch, and Magpie.</summary>
   </entry>
   <entry>
     <title>История сессий Codex CLI: поиск и просмотр — deja-vu</title>
@@ -207,6 +235,13 @@
     <summary>Interactive demo of deja view: browse and filter coding-agent sessions across Claude Code, Codex, Cursor, OpenClaw and Gemini CLI, inspect the recall audit trail, and view promoted notes.</summary>
   </entry>
   <entry>
+    <title>deja 快速开始：让编程智能体能搜自己的会话历史 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html"></link>
+    <updated>2026-11-01T00:00:00Z</updated>
+    <summary>安装 deja、确认它认出了哪些工具、在 Claude Code 与 Codex 的历史里搜索，并把自动召回接到智能体上。索引与搜索不走网络，也不需要账号。</summary>
+  </entry>
+  <entry>
     <title>Delete pi session history — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/delete-pi-session-history.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-pi-session-history.html"></link>
@@ -254,40 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-cline-task-history.html"></link>
     <updated>2026-10-28T00:00:00Z</updated>
     <summary>Cline has separate CLI and VS Code extension histories. Find the right store and remove one conversation without deleting unrelated task state.</summary>
-  </entry>
-  <entry>
-    <title>Delete Copilot CLI session history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-copilot-cli-session-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-copilot-cli-session-history.html"></link>
-    <updated>2026-10-28T00:00:00Z</updated>
-    <summary>Copilot CLI keeps each session in its own directory under session-state. Find it, delete one session or all of them, and know what goes with them.</summary>
-  </entry>
-  <entry>
-    <title>Delete Gemini CLI chat history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-gemini-cli-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-gemini-cli-history.html"></link>
-    <updated>2026-10-28T00:00:00Z</updated>
-    <summary>Where Gemini CLI keeps chats under ~/.gemini/tmp, how to map a project id back to a directory, what to delete and what the prompt log keeps.</summary>
-  </entry>
-  <entry>
-    <title>Delete Kimi Code session history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-kimi-code-session-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-kimi-code-session-history.html"></link>
-    <updated>2026-10-28T00:00:00Z</updated>
-    <summary>Kimi Code keeps each session in its own directory. Find it, remove one session or all, and delete the state.json that would still list it.</summary>
-  </entry>
-  <entry>
-    <title>Delete opencode session history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-opencode-session-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-opencode-session-history.html"></link>
-    <updated>2026-10-28T00:00:00Z</updated>
-    <summary>opencode keeps every session in one SQLite database. What the tables hold, how to remove a session, and why deleting rows does not free the space.</summary>
-  </entry>
-  <entry>
-    <title>Delete Qwen Code chat history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-qwen-code-chat-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-qwen-code-chat-history.html"></link>
-    <updated>2026-10-28T00:00:00Z</updated>
-    <summary>Qwen Code keeps one JSONL file per session under ~/.qwen/projects. Delete one session with its sub-agent logs, or all, and keep your settings.</summary>
   </entry>
 </feed>
