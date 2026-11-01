@@ -130,4 +130,8 @@ func TestHarnessSubscriptionNoticeAndWordBoundaryCut(t *testing.T) {
 	if !strings.HasPrefix(cut, "В лучшем случае…") {
 		t.Fatalf("unexpected cutMarked result: %q", cut)
 	}
+	numbered := "Все открытые PR проверены и влиты в main (0 открытых PR):\n1. Починили баг в ретраях."
+	if got := firstSentences(numbered, 1); strings.HasSuffix(got, ": 1.") {
+		t.Fatalf("firstSentences stopped on a trailing list marker: %q", got)
+	}
 }

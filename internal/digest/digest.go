@@ -1659,6 +1659,9 @@ func sentencesOf(s string) []string {
 			continue
 		}
 		end := i + utf8.RuneLen(r)
+		if r == '.' && trailingListMarker(s[start:end]) {
+			continue
+		}
 		sent := strings.TrimSpace(s[start:end])
 		// A list item's number is not a sentence of its own, and the item
 		// after it reads the same without it.
@@ -1729,7 +1732,7 @@ func firstSentences(s string, n int) string {
 			continue
 		}
 		end := i + utf8.RuneLen(r)
-		if listMarker(s[start:end]) {
+		if listMarker(s[start:end]) || (r == '.' && trailingListMarker(s[start:end])) {
 			continue
 		}
 		start = end

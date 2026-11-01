@@ -144,6 +144,15 @@ func runBrief(dir string, w io.Writer) error {
 	recent, err := index.RecentMatching(dir, briefRecentLines*8, search.Options{})
 	if err == nil {
 		recent, _ = policyFilterSessionsCounted(policy.ActivationSearch, recent)
+		var clean []model.Session
+		for _, s := range recent {
+			if !strings.HasPrefix(strings.TrimSpace(s.Title), "You are picking up work handed off from a ") {
+				clean = append(clean, s)
+			}
+		}
+		if len(clean) >= briefRecentLines {
+			recent = clean
+		}
 		if len(recent) > briefRecentLines {
 			recent = recent[:briefRecentLines]
 		}
@@ -638,6 +647,9 @@ func printNoHistory(w io.Writer, stale bool) {
 // the path: "…/消费者重平衡" says which project this is, where the first
 // characters of a long prefix rarely do (#1592).
 func fitBriefProject(project string, rest int) string {
+	if project == "" || project == "-" {
+		return ""
+	}
 	// Composed before the measurement, for the reason fitBriefWhen is: the cut
 	// composes what it returns, so the two paths otherwise print the same name
 	// two ways (#1844).

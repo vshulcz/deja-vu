@@ -349,3 +349,14 @@ func allRecapLines(r Recap) []string {
 	}
 	return out
 }
+
+func TestCutAtSentenceDoesNotCutInsideURLOrFilename(t *testing.T) {
+	in := strings.Repeat("a", 150) + " see [subagents.jsonl](https://github.com/vshulcz/deja-vu/pull/5762) and more text after the link that pushes it over two hundred and twenty runes"
+	got := cutAtSentence(in, recapLineMax)
+	if strings.HasSuffix(got, "github.") || strings.HasSuffix(got, "subagents.") {
+		t.Fatalf("cutAtSentence treated a dot inside a URL or filename as a sentence end: %q", got)
+	}
+	if !strings.HasSuffix(got, "…") {
+		t.Fatalf("expected word-boundary ellipsis cut, got %q", got)
+	}
+}

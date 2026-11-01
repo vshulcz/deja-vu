@@ -115,6 +115,24 @@ func listMarker(sentence string) bool {
 	return true
 }
 
+// trailingListMarker reports whether a clause without a full stop ran into a
+// numbered list item after a colon or parenthesis (`(0 открытых PR): 1.`,
+// `(Фикс #4) 1.`), where the dot belongs to the list marker rather than ending
+// the sentence.
+func trailingListMarker(sentence string) bool {
+	t := strings.TrimSpace(sentence)
+	sp := strings.LastIndexByte(t, ' ')
+	if sp <= 0 || !listMarker(t[sp+1:]) {
+		return false
+	}
+	prev := strings.TrimSpace(t[:sp])
+	if prev == "" {
+		return false
+	}
+	last := prev[len(prev)-1]
+	return last == ':' || last == ')'
+}
+
 // substantialLead is the lead decisionLead would quote, moved past openers that
 // say nothing. When every sentence of the default head is thin — "Готово.
 // Полный отчёт ниже.", "Проверил." — the quote starts at the first sentence that

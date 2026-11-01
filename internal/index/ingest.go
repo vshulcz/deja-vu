@@ -3413,6 +3413,7 @@ func harnessPreamble(text string) bool {
 		"<bash-", "<system-reminder", "<deja-recall", "Caveat:",
 		"[Request interrupted", "The following tool was executed",
 		"This session is being continued", "Continue from where you left off",
+		"You are picking up work handed off from a ",
 	} {
 		if strings.HasPrefix(t, p) {
 			return true
@@ -3469,6 +3470,12 @@ func looksLikeQuestion(text string) bool {
 	// earlier version was a 900-character critique of some charts.
 	if len([]rune(t)) > askedMaxRunes {
 		return false
+	}
+	low := strings.ToLower(t)
+	for _, p := range []string{"do not ", "don't ", "never ", "always ", "reply with "} {
+		if strings.HasPrefix(low, p) {
+			return false
+		}
 	}
 	if strings.HasSuffix(t, "?") || strings.HasSuffix(t, "？") {
 		return true

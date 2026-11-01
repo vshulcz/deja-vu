@@ -5218,6 +5218,10 @@ func FindAskedTwice(dir string, allow func(project string) bool) (AskedTwice, bo
 			continue
 		}
 		if span > bestSpan || (span == bestSpan && len(metas) > len(best)) {
+			text := askedTextFor(dir, m, metas, h)
+			if text == "" || notAsked(text) || !looksLikeQuestion(text) {
+				continue
+			}
 			best, bestSpan, bestHash = metas, span, h
 		}
 	}

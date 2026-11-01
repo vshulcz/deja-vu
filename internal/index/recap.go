@@ -154,16 +154,19 @@ func recapLines(s model.Session, most int, masked redact.Counts) []string {
 	var out []string
 	var kept []map[string]bool
 	for _, line := range raw {
-		line = trimRecapLine(line)
-		if line == "" {
+		// Mask outbound addresses and paths before trimming so a cut at
+		// recapLineMax cannot split an IPv4 address at a dot (`02.210.171.`)
+		// before redact.Outbound sees it.
+		clean, c := redact.Outbound(line)
+		clean = trimRecapLine(clean)
+		if clean == "" {
 			continue
 		}
-		words := recapWords(line)
+		words := recapWords(clean)
 		if sameThoughtTwice(kept, words) {
 			continue
 		}
 		kept = append(kept, words)
-		clean, c := redact.Outbound(line)
 		for kind, n := range c {
 			masked.Add(kind, n)
 		}
@@ -203,6 +206,9 @@ var processNoise = []string{
 	// agent writes about it, and it is deja telling itself what it said.
 	"déjà vu:",
 	"(deja:ses_",
+	"send_message",
+	"invoke_subagent",
+	"caller agent",
 }
 
 // instructionOpeners are the imperative sentences that come from a prompt, a
@@ -295,13 +301,37 @@ func cutAtSentence(s string, n int) string {
 		return s
 	}
 	head := string(runes[:n])
-	if i := strings.LastIndexAny(head, ".!?"); i > len(head)/2 {
+	for i := len(head) - 1; i > len(head)/2; i-- {
+		c := head[i]
+		if c != '.' && c != '!' && c != '?' {
+			continue
+		}
+		// Must be followed by whitespace (not a dot inside a URL, filename,
+		// version, decimal, or IP address).
+		if i+1 < len(s) && s[i+1] != ' ' && s[i+1] != '\n' && s[i+1] != '\t' {
+			continue
+		}
+		// Not a numbered-list marker (`: 1.` or ` 1.`).
+		if c == '.' && isListNumberDot(head, i) {
+			continue
+		}
 		return head[:i+1]
 	}
 	if i := strings.LastIndexByte(head, ' '); i > 0 {
 		return head[:i] + "…"
 	}
 	return head + "…"
+}
+
+func isListNumberDot(s string, dotIdx int) bool {
+	j := dotIdx - 1
+	for j >= 0 && s[j] >= '0' && s[j] <= '9' {
+		j--
+	}
+	if j == dotIdx-1 {
+		return false
+	}
+	return j < 0 || s[j] == ' ' || s[j] == '\t' || s[j] == '\n' || s[j] == ':'
 }
 
 // recapWords is a line reduced to the set of words that carry it, which is

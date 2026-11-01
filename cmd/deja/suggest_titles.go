@@ -40,8 +40,14 @@ func suggestFromTitles(dir string) string {
 		return ""
 	}
 	titles := make([]string, 0, len(ss))
+	seenTitle := map[string]bool{}
 	for _, s := range ss {
 		if t := suggestTitleOf(s); t != "" {
+			key := strings.ToLower(strings.Join(strings.Fields(t), " "))
+			if seenTitle[key] {
+				continue
+			}
+			seenTitle[key] = true
 			titles = append(titles, t)
 		}
 	}
