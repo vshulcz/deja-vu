@@ -263,6 +263,35 @@ output. Do not use it with histories that contain secrets.
 - Redaction reduces accidental credential disclosure; it does not prove that
   output is free of secrets or other private information.
 
+### Shared multi-user index
+
+When several OS accounts on the same machine share one index directory (for
+example `/opt/deja/index`), every account in the group can read and write the
+indexed transcripts and sidecars. Configure both the parent directory (where
+sibling `.live`, `.hookseen`, `.usage.jsonl`, and `.injections.jsonl` sidecars
+live) and the index directory with the group `setgid` bit (`2770`) and set
+`DEJA_SHARED_GROUP=1`:
+
+```sh
+sudo groupadd -f deja
+sudo mkdir -p /opt/deja/index
+sudo chgrp -R deja /opt/deja
+sudo chmod 2770 /opt/deja /opt/deja/index
+```
+
+In each participating user account's shell profile:
+
+```sh
+export DEJA_INDEX_DIR=/opt/deja/index
+export DEJA_SHARED_GROUP=1
+umask 0007
+```
+
+Run `deja install` inside each user account so that account's agent configs
+receive the hooks and MCP entry, then run `deja doctor` from each account to
+verify index and sidecar group permissions (`permissions ... not group-writable`
+appears when any file in the shared index or its sidecars is missing `g+rw`).
+
 ## Release integrity
 
 Each GitHub release includes `checksums.txt` and `checksums.txt.sigstore.json`.

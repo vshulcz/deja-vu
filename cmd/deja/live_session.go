@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"maps"
 	"os"
@@ -64,7 +65,10 @@ func markSessionLive(dir, id string) {
 	if dir == "" || id == "" || !hookseenField(id) {
 		return
 	}
-	rows := readLiveSessions(dir)
+	rows, err := readLiveSessionsErr(dir)
+	if err != nil {
+		return
+	}
 	rows[id] = time.Now().UTC()
 	writeLiveSessions(dir, rows)
 }
@@ -78,7 +82,10 @@ func endSessionLive(dir, id string) {
 	if dir == "" || id == "" {
 		return
 	}
-	rows := readLiveSessions(dir)
+	rows, err := readLiveSessionsErr(dir)
+	if err != nil {
+		return
+	}
 	if _, ok := rows[id]; !ok {
 		return
 	}
@@ -148,10 +155,18 @@ func runHookMCPCall(dir string, stdin io.Reader, _ io.Writer) {
 
 // readLiveSessions is every stamp in the file, whatever its age.
 func readLiveSessions(dir string) map[string]time.Time {
+	rows, _ := readLiveSessionsErr(dir)
+	return rows
+}
+
+func readLiveSessionsErr(dir string) (map[string]time.Time, error) {
 	out := map[string]time.Time{}
 	b, err := os.ReadFile(liveSessionsPath(dir))
 	if err != nil {
-		return out
+		if errors.Is(err, os.ErrNotExist) {
+			return out, nil
+		}
+		return out, err
 	}
 	for line := range strings.SplitSeq(string(b), "\n") {
 		parts := strings.Fields(line)
@@ -166,7 +181,7 @@ func readLiveSessions(dir string) map[string]time.Time {
 			out[parts[0]] = when
 		}
 	}
-	return out
+	return out, nil
 }
 
 func writeLiveSessions(dir string, rows map[string]time.Time) {

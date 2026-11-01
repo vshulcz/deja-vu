@@ -318,7 +318,7 @@ func snapshotWriteAt(indexDir, kind, digest, into string, sessions int, policyNa
 		return
 	}
 	p := SnapshotPath(indexDir)
-	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
+	if err := atomicfile.MkdirSharedAll(filepath.Dir(p)); err != nil {
 		return
 	}
 	b, err := marshalSnapshot(Snapshot{Time: at, Kind: kind, Sessions: sessions,
@@ -334,7 +334,7 @@ func snapshotWriteAt(indexDir, kind, digest, into string, sessions int, policyNa
 		rotateSnapshots(p, len(b)+1)
 		// O_RDWR rather than O_WRONLY: the append needs to read the last byte, for
 		// the reason the usage log opens the same way (#1901).
-		f, err := os.OpenFile(p, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
+		f, err := atomicfile.OpenSharedFile(p, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
 		if err != nil {
 			return
 		}

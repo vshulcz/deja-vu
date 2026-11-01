@@ -681,3 +681,40 @@ func TestCodexTailAfterAMetaOnlyReadStartsAtTheMeta(t *testing.T) {
 		t.Errorf("tail starts %v, the whole read %v", tail[0].Started, whole[0].Started)
 	}
 }
+
+func TestCodexSubAgentCodeModeAndSendMessage(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "rollout-2026-10-30T10-00-00-019a0000-0000-7000-8000-000000000002.jsonl")
+	lines := []string{
+		`{"timestamp":"2026-10-30T10:00:00Z","type":"session_meta","payload":{"id":"019a0000-0000-7000-8000-000000000002","cwd":"/tmp/demo","source":{"subagent":{"thread_spawn":{"parent_thread_id":"019a0000-0000-7000-8000-000000000001","depth":1,"agent_path":"/root/worker_a","agent_nickname":"WorkerA","agent_role":"explorer"}}}}}`,
+		`{"timestamp":"2026-10-30T10:00:01Z","type":"response_item","payload":{"type":"custom_tool_call","status":"completed","call_id":"call_1","name":"exec","input":"text(await tools.exec_command({cmd: \"grep -rn TODO src | wc -l\"}));"}}`,
+		`{"timestamp":"2026-10-30T10:00:02Z","type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"call_1","output":[{"type":"input_text","text":"42"}]}}`,
+		`{"timestamp":"2026-10-30T10:00:02Z","type":"response_item","payload":{"type":"custom_tool_call","status":"completed","call_id":"call_test","name":"exec","input":"text(await tools.exec_command({cmd: \"go test ./...\"}));"}}`,
+		`{"timestamp":"2026-10-30T10:00:03Z","type":"response_item","payload":{"type":"function_call","name":"send_message","arguments":"{\"target\":\"/root\",\"message\":\"Found 42 TODOs across src/.\"}","call_id":"call_2"}}`,
+		`{"timestamp":"2026-10-30T10:00:04Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call_2","output":"{\"status\":\"sent\"}"}}`,
+	}
+	if err := os.WriteFile(p, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ss, err := ParseCodexRollout(p)
+	if err != nil || len(ss) != 1 {
+		t.Fatalf("ParseCodexRollout: err=%v len=%d", err, len(ss))
+	}
+	s := ss[0]
+	if s.Kind != "subagent" || s.Parent != "019a0000-0000-7000-8000-000000000001" {
+		t.Fatalf("kind=%q parent=%q", s.Kind, s.Parent)
+	}
+	var gotCmd, gotOut, gotMsg bool
+	for _, m := range s.Messages {
+		switch {
+		case m.Role == RoleCommand && m.Text == "$ go test ./...":
+			gotCmd = true
+		case m.Role == RoleToolOutput && m.Text == "42":
+			gotOut = true
+		case m.Role == "assistant" && m.Text == "Found 42 TODOs across src/.":
+			gotMsg = true
+		}
+	}
+	if !gotCmd || !gotOut || !gotMsg {
+		t.Fatalf("gotCmd=%v gotOut=%v gotMsg=%v messages=%#v", gotCmd, gotOut, gotMsg, s.Messages)
+	}
+}

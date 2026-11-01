@@ -26,10 +26,98 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 )
+
+var sharedSidecarSuffixes = []string{
+	".tmp",
+	".part",
+	".lock",
+	".live",
+	".hookseen",
+	".dejavu",
+	".forks",
+	".warming",
+	".usage.jsonl",
+	".injections.jsonl",
+}
+
+// SharedGroup reports whether path belongs to an index configured for shared
+// multi-user group access (#5759, #5772, #5807): either DEJA_SHARED_GROUP=1 is
+// set in the environment, or the index directory (or an ancestor within 4
+// levels) carries the Unix setgid bit (os.ModeSetgid, chmod 2770).
+func SharedGroup(path string) bool {
+	if v := strings.TrimSpace(os.Getenv("DEJA_SHARED_GROUP")); v == "1" || strings.EqualFold(v, "true") {
+		return true
+	}
+	if path == "" {
+		return false
+	}
+	cur := filepath.Clean(path)
+	for range 4 {
+		cands := []string{cur}
+		trimmed := cur
+		for _, suf := range sharedSidecarSuffixes {
+			if next := strings.TrimSuffix(trimmed, suf); next != trimmed && next != "" {
+				trimmed = next
+				cands = append(cands, trimmed)
+			}
+		}
+		for _, cand := range cands {
+			if fi, err := os.Stat(cand); err == nil && fi.IsDir() && fi.Mode()&os.ModeSetgid != 0 {
+				return true
+			}
+		}
+		parent := filepath.Dir(cur)
+		if parent == cur {
+			break
+		}
+		cur = parent
+	}
+	return false
+}
+
+// SharedPerm upgrades owner-only 0o600 permissions to group-read/write 0o660
+// when SharedGroup(path) is true.
+func SharedPerm(path string, perm os.FileMode) os.FileMode {
+	if perm == 0o600 && SharedGroup(path) {
+		return 0o660
+	}
+	return perm
+}
+
+// OpenSharedFile opens path with SharedPerm(path, perm) and ensures group
+// read+write permissions when SharedGroup(path) is true.
+func OpenSharedFile(path string, flag int, perm os.FileMode) (*os.File, error) {
+	shared := SharedGroup(path)
+	if shared && perm == 0o600 {
+		perm = 0o660
+	}
+	f, err := os.OpenFile(path, flag, perm)
+	if err != nil {
+		return nil, err
+	}
+	if shared && perm == 0o660 {
+		_ = f.Chmod(0o660)
+	}
+	return f, nil
+}
+
+// MkdirSharedAll creates path and its parents with 0o770|os.ModeSetgid when
+// SharedGroup(path) is true, or 0o700 otherwise.
+func MkdirSharedAll(path string) error {
+	if !SharedGroup(path) {
+		return os.MkdirAll(path, 0o700)
+	}
+	if err := os.MkdirAll(path, 0o770|os.ModeSetgid); err != nil {
+		return err
+	}
+	_ = os.Chmod(path, 0o770|os.ModeSetgid)
+	return nil
+}
 
 // publish renames the temp file into place, retrying briefly.
 //
@@ -142,7 +230,7 @@ func WriteStream(path string, perm os.FileMode, fn func(io.Writer) error) error 
 		_ = os.Remove(tmp)
 		return err
 	}
-	if err := os.Chmod(tmp, perm); err != nil {
+	if err := os.Chmod(tmp, SharedPerm(path, perm)); err != nil {
 		_ = os.Remove(tmp)
 		return err
 	}
@@ -174,7 +262,7 @@ func Write(path string, b []byte, perm os.FileMode) error {
 		_ = os.Remove(tmp)
 		return err
 	}
-	if err := os.Chmod(tmp, perm); err != nil {
+	if err := os.Chmod(tmp, SharedPerm(path, perm)); err != nil {
 		_ = os.Remove(tmp)
 		return err
 	}

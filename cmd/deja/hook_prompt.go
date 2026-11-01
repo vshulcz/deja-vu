@@ -1349,7 +1349,7 @@ func rememberInjectedIDsFor(dir, sid, project string, ids []string) {
 	// its newline leaves half a line, and writing onto it costs the record
 	// written after — a session deja then does not know it has shown, which is
 	// this file's whole job (#1967).
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
+	f, err := atomicfile.OpenSharedFile(p, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
 	if err != nil {
 		return
 	}
@@ -1449,7 +1449,7 @@ func rememberInjectedIDs(dir, sid string, ids ...string) {
 	if fi, err := os.Stat(p); err == nil && fi.Size() > 1<<20 {
 		rotateHookseen(p, sid)
 	}
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
+	f, err := atomicfile.OpenSharedFile(p, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
 	if err != nil {
 		return
 	}
@@ -1542,7 +1542,7 @@ func recordDejaVuLine(path, sid string, now time.Time) bool {
 			kept = append(kept, line)
 		}
 	}
-	_ = os.WriteFile(path, []byte(strings.Join(kept, "\n")+"\n"), 0o600)
+	_ = atomicfile.Write(path, []byte(strings.Join(kept, "\n")+"\n"), 0o600)
 	return true
 }
 

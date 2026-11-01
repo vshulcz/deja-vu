@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 )
 
 const (
@@ -36,13 +38,13 @@ const (
 // racing write beats a lost injection.
 func withLogLock(path string, fn func()) {
 	lock := path + ".lock"
-	if err := os.MkdirAll(filepath.Dir(lock), 0o700); err != nil {
+	if err := atomicfile.MkdirSharedAll(filepath.Dir(lock)); err != nil {
 		fn()
 		return
 	}
 	deadline := time.Now().Add(logLockWait)
 	for {
-		f, err := os.OpenFile(lock, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+		f, err := atomicfile.OpenSharedFile(lock, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 		if err == nil {
 			_ = f.Close()
 			defer func() { _ = os.Remove(lock) }() //nolint:gocritic // returns right after fn

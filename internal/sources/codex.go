@@ -514,7 +514,7 @@ func parseCodexRolloutWithScanner(s model.Session, idSettled bool, knownCWD stri
 			codexCallOutput(&s, payload, calls, t)
 			return
 		case "custom_tool_call":
-			codexPatch(&s, payload, cwd, t)
+			codexCustomCall(&s, payload, calls, cwd, t)
 			return
 		}
 		role, _ := payload["role"].(string)
@@ -600,23 +600,39 @@ func parseCodexRolloutWithScanner(s model.Session, idSettled bool, knownCWD stri
 // shell_command is the other shell, taking `command` where exec_command takes
 // `cmd`. Codex falls back to it whenever unified exec is off, and on those
 // setups a session read for exec_command alone had no commands (#4490).
+type codexShellIn struct {
+	Cmd     string `json:"cmd"`
+	Command string `json:"command"`
+	Workdir string `json:"workdir"`
+}
+
 func codexCall(s *model.Session, payload map[string]any, calls map[string]int, cwd string, t time.Time) {
 	name, _ := payload["name"].(string)
+	args, _ := payload["arguments"].(string)
+	if name == "send_message" {
+		var in struct {
+			Message string `json:"message"`
+		}
+		if json.Unmarshal([]byte(args), &in) == nil && strings.TrimSpace(in.Message) != "" {
+			s.Messages = append(s.Messages, model.Message{Role: "assistant", Text: in.Message, Time: t})
+		}
+		return
+	}
 	if name != "exec_command" && name != "shell_command" {
 		return
 	}
-	args, _ := payload["arguments"].(string)
-	var in struct {
-		Cmd     string `json:"cmd"`
-		Command string `json:"command"`
-		Workdir string `json:"workdir"`
-	}
+	var in codexShellIn
 	if json.Unmarshal([]byte(args), &in) != nil {
 		return
 	}
 	if name == "shell_command" {
 		in.Cmd = in.Command
 	}
+	id, _ := payload["call_id"].(string)
+	codexRecordCommand(s, in, id, cwd, calls, t)
+}
+
+func codexRecordCommand(s *model.Session, in codexShellIn, callID, cwd string, calls map[string]int, t time.Time) {
 	if in.Cmd == "" {
 		return
 	}
@@ -638,8 +654,8 @@ func codexCall(s *model.Session, payload map[string]any, calls map[string]int, c
 		return
 	}
 	s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: "$ " + in.Cmd, Time: t})
-	if id, _ := payload["call_id"].(string); id != "" {
-		calls[id] = len(s.Messages) - 1
+	if callID != "" && calls != nil {
+		calls[callID] = len(s.Messages) - 1
 	}
 }
 
@@ -712,14 +728,14 @@ func leadingCD(cmd string) (target, rest string, ok bool) {
 
 // codexResumes sends a rollout back for a whole read when its tail holds the
 // failed exit of a command called before it (#4443).
-var codexResumes = resumesUnlessAnswering(`"function_call`, func(m map[string]any) ([]string, string) {
+var codexResumes = resumesUnlessAnswering(`_call`, func(m map[string]any) ([]string, string) {
 	payload, _ := m["payload"].(map[string]any)
 	id, _ := payload["call_id"].(string)
 	switch typ, _ := payload["type"].(string); typ {
-	case "function_call":
+	case "function_call", "custom_tool_call":
 		return []string{id}, ""
-	case "function_call_output":
-		out, _ := payload["output"].(string)
+	case "function_call_output", "custom_tool_call_output":
+		out := textFromContent(payload["output"])
 		if c := codexExit.FindStringSubmatch(out); len(c) > 1 && c[1] != "0" {
 			return nil, id
 		}
@@ -733,7 +749,7 @@ var codexResumes = resumesUnlessAnswering(`"function_call`, func(m map[string]an
 var codexExit = regexp.MustCompile(`(?m)^(?:Process exited with code|Exit code:) (\d+)`)
 
 func codexCallOutput(s *model.Session, payload map[string]any, calls map[string]int, t time.Time) {
-	out, _ := payload["output"].(string)
+	out := textFromContent(payload["output"])
 	if out == "" {
 		return
 	}
@@ -778,6 +794,183 @@ func codexPatch(s *model.Session, payload map[string]any, cwd string, t time.Tim
 	}
 	body, _ := payload["input"].(string)
 	codexPatchText(s, body, cwd, t)
+}
+
+func codexCustomCall(s *model.Session, payload map[string]any, calls map[string]int, cwd string, t time.Time) {
+	name, _ := payload["name"].(string)
+	switch name {
+	case "apply_patch":
+		codexPatch(s, payload, cwd, t)
+	case "exec":
+		body, _ := payload["input"].(string)
+		if body == "" {
+			return
+		}
+		id, _ := payload["call_id"].(string)
+		patched := false
+		for _, in := range codexExecCalls(body) {
+			if strings.Contains(in.Cmd, "apply_patch") && strings.Contains(in.Cmd, "*** Begin Patch") {
+				patched = true
+			}
+			codexRecordCommand(s, in, id, cwd, calls, t)
+		}
+		for _, msg := range codexExecMessages(body) {
+			s.Messages = append(s.Messages, model.Message{Role: "assistant", Text: msg, Time: t})
+		}
+		if !patched && strings.Contains(body, "*** Begin Patch") {
+			codexPatchText(s, body, cwd, t)
+		}
+	}
+}
+
+func codexExecCalls(body string) []codexShellIn {
+	var out []codexShellIn
+	for _, fn := range []string{"exec_command", "shell_command"} {
+		for _, obj := range codexJSCallObjects(body, fn) {
+			cmd := codexJSStringField(obj, "cmd")
+			if cmd == "" {
+				cmd = codexJSStringField(obj, "command")
+			}
+			if cmd == "" {
+				continue
+			}
+			out = append(out, codexShellIn{
+				Cmd:     cmd,
+				Workdir: codexJSStringField(obj, "workdir"),
+			})
+		}
+	}
+	return out
+}
+
+func codexExecMessages(body string) []string {
+	var out []string
+	for _, obj := range codexJSCallObjects(body, "send_message") {
+		if msg := strings.TrimSpace(codexJSStringField(obj, "message")); msg != "" {
+			out = append(out, msg)
+		}
+	}
+	return out
+}
+
+func codexJSCallObjects(body, funcName string) []string {
+	var out []string
+	needle := funcName + "("
+	rest := body
+	for {
+		idx := strings.Index(rest, needle)
+		if idx < 0 {
+			break
+		}
+		rest = strings.TrimLeft(rest[idx+len(needle):], " \t\r\n")
+		if rest == "" || rest[0] != '{' {
+			continue
+		}
+		end := codexJSMatchBrace(rest)
+		if end <= 0 {
+			break
+		}
+		out = append(out, rest[:end])
+		rest = rest[end:]
+	}
+	return out
+}
+
+func codexJSMatchBrace(s string) int {
+	depth := 0
+	var quote byte
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if quote != 0 {
+			if c == '\\' {
+				i++
+				continue
+			}
+			if c == quote {
+				quote = 0
+			}
+			continue
+		}
+		switch c {
+		case '"', '\'', '`':
+			quote = c
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return i + 1
+			}
+		}
+	}
+	return -1
+}
+
+func codexJSStringField(obj, field string) string {
+	for i := 0; i+len(field) < len(obj); i++ {
+		if obj[i:i+len(field)] != field {
+			continue
+		}
+		if i > 0 {
+			prev := obj[i-1]
+			if prev == '"' || prev == '\'' {
+				if i >= 2 && isJSIdentByte(obj[i-2]) {
+					continue
+				}
+			} else if isJSIdentByte(prev) {
+				continue
+			}
+		}
+		rest := obj[i+len(field):]
+		if rest != "" && (rest[0] == '"' || rest[0] == '\'') {
+			rest = rest[1:]
+		} else if rest != "" && isJSIdentByte(rest[0]) {
+			continue
+		}
+		rest = strings.TrimLeft(rest, " \t\r\n")
+		if rest == "" || rest[0] != ':' {
+			continue
+		}
+		rest = strings.TrimLeft(rest[1:], " \t\r\n")
+		if val, ok := codexJSQuotedString(rest); ok {
+			return val
+		}
+	}
+	return ""
+}
+
+func isJSIdentByte(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '$'
+}
+
+func codexJSQuotedString(s string) (string, bool) {
+	if s == "" || (s[0] != '"' && s[0] != '\'' && s[0] != '`') {
+		return "", false
+	}
+	q := s[0]
+	var b strings.Builder
+	for i := 1; i < len(s); i++ {
+		c := s[i]
+		if c == '\\' && i+1 < len(s) {
+			i++
+			switch s[i] {
+			case 'n':
+				b.WriteByte('\n')
+			case 'r':
+				b.WriteByte('\r')
+			case 't':
+				b.WriteByte('\t')
+			default:
+				b.WriteByte(s[i])
+			}
+			continue
+		}
+		if c == q {
+			return b.String(), true
+		}
+		b.WriteByte(c)
+	}
+	return "", false
 }
 
 // codexPatchText records one apply_patch text, from the tool or the shell.

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -190,5 +191,40 @@ func TestForgettingDropsTheMarks(t *testing.T) {
 	dropHookCaches(dir)
 	if ids := liveSessionIDs(dir); len(ids) != 0 {
 		t.Errorf("the marks survived a forget: %v", ids)
+	}
+}
+
+func TestSharedGroupSidecarsAndUnreadableLivePreserved(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix permission bits")
+	}
+	dir := filepath.Join(t.TempDir(), "index.db")
+	t.Setenv("DEJA_SHARED_GROUP", "1")
+	markSessionLive(dir, "live-user-a")
+	rememberInjectedIDs(dir, "live-user-a", "sess-1")
+
+	for _, p := range []string{liveSessionsPath(dir), dir + ".hookseen"} {
+		fi, err := os.Stat(p)
+		if err != nil {
+			t.Fatalf("stat %s: %v", p, err)
+		}
+		if fi.Mode().Perm() != 0o660 {
+			t.Errorf("%s perm = %o, want 0660", p, fi.Mode().Perm())
+		}
+	}
+
+	if os.Geteuid() != 0 {
+		if err := os.Chmod(liveSessionsPath(dir), 0o000); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(liveSessionsPath(dir), 0o660) })
+		markSessionLive(dir, "live-user-b")
+		if err := os.Chmod(liveSessionsPath(dir), 0o660); err != nil {
+			t.Fatal(err)
+		}
+		rows := readLiveSessions(dir)
+		if _, ok := rows["live-user-a"]; !ok {
+			t.Errorf("unreadable .live file was overwritten and lost live-user-a: %v", rows)
+		}
 	}
 }

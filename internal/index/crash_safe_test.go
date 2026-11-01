@@ -267,4 +267,15 @@ func TestIndexPermissionsSupportSharedGroup(t *testing.T) {
 	if got := UnsharedFiles(dir); got == 0 {
 		t.Fatalf("UnsharedFiles(dir) = 0 after tightening manifest.gob to 0600, want >0")
 	}
+	ensureSharedIndexPerms(dir)
+	if err := os.WriteFile(dir+".live", []byte("s1 2026-02-01T10:00:00Z\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := UnsharedFiles(dir); got == 0 {
+		t.Fatalf("UnsharedFiles(dir) = 0 after tightening .live sidecar to 0600, want >0")
+	}
+	ensureSharedIndexPerms(dir)
+	if got := UnsharedFiles(dir); got != 0 {
+		t.Fatalf("UnsharedFiles(dir) = %d after ensureSharedIndexPerms, want 0", got)
+	}
 }

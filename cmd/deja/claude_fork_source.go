@@ -70,7 +70,7 @@ func rememberClaudeForkSource(dir, sid, transcript string) {
 	if fi, err := os.Stat(p); err == nil && fi.Size() > forkMarksPruneAt {
 		pruneForkMarks(p)
 	}
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	f, err := atomicfile.OpenSharedFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return
 	}

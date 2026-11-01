@@ -307,7 +307,7 @@ func recordFullAtUnread(indexDir, kind string, bytes, sessions int, empty bool, 
 // partial-line recovery as recalled-memory rows.
 func recordEvent(indexDir string, event Event) {
 	p := Path(indexDir)
-	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
+	if err := atomicfile.MkdirSharedAll(filepath.Dir(p)); err != nil {
 		return
 	}
 	rotate(p)
@@ -321,7 +321,7 @@ func recordEvent(indexDir string, event Event) {
 	//
 	// O_RDWR rather than O_WRONLY: the append needs to read the last byte to
 	// know whether the previous record finished (#1901).
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
+	f, err := atomicfile.OpenSharedFile(p, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
 	if err != nil {
 		return
 	}

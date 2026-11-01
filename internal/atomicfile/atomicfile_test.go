@@ -414,3 +414,42 @@ func TestARefusalThatNeverClearsGivesUp(t *testing.T) {
 	}
 	leftTemps(t, dir)
 }
+
+func TestSharedGroupOpenAndMkdir(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix permission bits")
+	}
+	dir := filepath.Join(t.TempDir(), "shared", "index.db")
+	if SharedGroup("") {
+		t.Fatal("SharedGroup(\"\") = true, want false")
+	}
+	if err := MkdirSharedAll(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_SHARED_GROUP", "1")
+	if err := MkdirSharedAll(dir); err != nil {
+		t.Fatal(err)
+	}
+	p := dir + ".live"
+	if err := Write(p, []byte("s1 2026-02-01T10:00:00Z\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if fi, err := os.Stat(p); err != nil || fi.Mode().Perm() != 0o660 {
+		t.Fatalf(".live perm = %v, err = %v, want 0660", fi.Mode().Perm(), err)
+	}
+	f, err := OpenSharedFile(dir+".hookseen", os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = f.Close()
+	if fi, err := os.Stat(dir + ".hookseen"); err != nil || fi.Mode().Perm() != 0o660 {
+		t.Fatalf(".hookseen perm = %v, err = %v, want 0660", fi.Mode().Perm(), err)
+	}
+	t.Setenv("DEJA_SHARED_GROUP", "")
+	if err := os.Chmod(dir, 0o770|os.ModeSetgid); err != nil {
+		t.Fatal(err)
+	}
+	if !SharedGroup(dir + ".live") {
+		t.Fatal("SharedGroup(dir+\".live\") = false when dir has setgid bit")
+	}
+}
