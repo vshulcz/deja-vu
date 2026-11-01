@@ -381,7 +381,8 @@ var commands = map[string]command{
 		}
 		return runReasonixExt(dir, os.Stdin, os.Stdout)
 	},
-	"blame": runBlame,
+	"blame":  runBlame,
+	"origin": func(dir string, rest []string) error { return runOrigin(dir, rest, os.Stdout) },
 }
 
 func run(args []string) error {

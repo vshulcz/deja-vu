@@ -51,6 +51,11 @@ func TestBlameDoesNotQuoteTheShapesThatCameAfterTheFirstPass(t *testing.T) {
 			own:  "deja: pool.go:3 written in claude · 2915986c · app (rule: replaced)\nwhy, in full: deja ctx 2915986c",
 			mark: "written in claude",
 		},
+		{
+			name: "the user turn origin quotes",
+			own:  "  user turn (2m before edit): fix internal/pool/pool.go connection leak\n  user turn before edit: fix internal/pool/pool.go connection leak",
+			mark: "before edit",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := model.Session{

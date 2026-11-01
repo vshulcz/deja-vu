@@ -1348,6 +1348,52 @@ quoting it back. One line is one thing to recognise.
 `--git-note` records it on the commit in `refs/notes/deja`, which is opt-in
 because a note is a public claim.
 
+## `deja origin [rev|range] --json`
+
+Commit-level provenance for a single revision or a range (`main~20..main`),
+matched per changed file against recorded edit spans (`replaced`) and written
+lines (`wrote`):
+
+```json
+{
+  "schema_version": 2,
+  "commits": [
+    {
+      "sha": "33ec9160c1",
+      "subject": "fix: one pool per shard",
+      "author": "someone",
+      "when": "2026-09-18T09:12:00Z",
+      "status": "attributed",
+      "attributed": true,
+      "rule": "replaced",
+      "files": ["internal/pool/pool.go"],
+      "matched": "drain(); close()",
+      "said_before": "root cause: internal/pool/pool.go closed before draining. Fixed by draining first.",
+      "prompt": "lint the shell scripts",
+      "turn_gap": "2m",
+      "write_gap": "5m",
+      "session": {
+        "harness": "claude",
+        "id": "fix03",
+        "project": "myapp",
+        "asked": "lint the shell scripts",
+        "ctx": "deja ctx fix03"
+      }
+    }
+  ]
+}
+```
+
+`status` is three-valued: `attributed`, `uncertain`, or `unknown`. When two
+sessions match overlapping files within a quarter of the leader, or when the
+last matching write was more than 7 days before the commit, `status` is
+`uncertain`, `uncertain` is `true`, `attributed` is `false`, `candidates` lists
+the tied sessions when applicable, and `why` explains the refusal. When no
+indexed session matched the commit's changes, `status` is `unknown` and
+`session`, `rule`, `files`, `matched`, `said_before`, `prompt`, `turn_gap`,
+`write_gap`, `uncertain`, and `candidates` are omitted. `turn_gap` and
+`write_gap` are omitted when timestamps are equal or absent.
+
 ## `deja wip --json`
 
 What the last session in this directory was doing, derived from that session's

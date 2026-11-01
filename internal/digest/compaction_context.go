@@ -243,6 +243,12 @@ func contextObjective(s model.Session, window []model.Message) model.ContextFact
 	return model.ContextFact{}
 }
 
+// IsTrivialContinuation reports whether text consists solely of bare
+// continuation nudges ("continue", "продолжай", "ок и давай дальше", "继续").
+func IsTrivialContinuation(text string) bool {
+	return trivialContinuation(text)
+}
+
 // trivialContinuation reports whether a user turn is a way of saying "carry on"
 // rather than the task being resumed.
 //

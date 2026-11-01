@@ -93,6 +93,15 @@ _deja_completion() {
                 COMPREPLY=( $(compgen -f -- "$cur") )
             fi
             ;;
+        origin)
+            if [[ "$prev" == "--harness" ]]; then
+                COMPREPLY=( $(compgen -W "$harnesses" -- "$cur") )
+            elif [[ "$prev" == "--project" || "$prev" == "--limit" ]]; then
+                COMPREPLY=()
+            else
+                COMPREPLY=( $(compgen -W "--json --harness --project --limit" -- "$cur") )
+            fi
+            ;;
         bench)
             if (( COMP_CWORD == 2 )); then
                 COMPREPLY=( $(compgen -W "recall context prompt block ingest read" -- "$cur") )
@@ -293,6 +302,7 @@ _deja() {
   local -a commands harnesses install_targets
   commands=(
     'blame:find sessions that discussed a file'
+    'origin:which session and user turn produced a commit or range'
     'bench:run benchmarks'
     'check:read a plan from stdin and print factual co-occurrences'
     'completion:generate shell completion'
@@ -347,6 +357,9 @@ _deja() {
   case "$words[2]" in
     blame)
       _arguments '--attribution[show line attribution]' '--git-note[write attribution as a git note; implies --attribution]' '--all[include all matching sessions]' '--all-projects[include other projects]' '--json[print JSON]' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '1:path:_files'
+      ;;
+    origin)
+      _arguments '--json[print JSON]' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--limit=[maximum commits]:count:' '1:revision:'
       ;;
     bench)
       if (( CURRENT == 3 )); then
@@ -501,6 +514,10 @@ complete -c deja -n '__fish_seen_subcommand_from blame' -l harness -r -a '%HARNE
 complete -c deja -n '__fish_seen_subcommand_from blame' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from blame' -l since -r
 complete -c deja -n '__fish_seen_subcommand_from blame' -F
+complete -c deja -n '__fish_seen_subcommand_from origin' -l json
+complete -c deja -n '__fish_seen_subcommand_from origin' -l harness -r -a '%HARNESSES%'
+complete -c deja -n '__fish_seen_subcommand_from origin' -l project -r
+complete -c deja -n '__fish_seen_subcommand_from origin' -l limit -r
 complete -c deja -n '__fish_seen_subcommand_from bench; and not __fish_seen_subcommand_from recall context prompt block ingest read' -a 'recall context prompt block ingest read'
 complete -c deja -n '__fish_seen_subcommand_from bench; and __fish_seen_subcommand_from recall context prompt block ingest read' -l json
 complete -c deja -n '__fish_seen_subcommand_from bench; and __fish_seen_subcommand_from recall context prompt block ingest read' -l seed -r
@@ -645,6 +662,11 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 if ($previous -eq '--harness') { $harnesses }
                 else { @('--all', '--all-projects', '--json', '--harness', '--project', '--since', '--attribution', '--git-note') }
             }
+            'origin' {
+                if ($previous -eq '--harness') { $harnesses }
+                elseif ($previous -in @('--project', '--limit')) { @() }
+                else { @('--json', '--harness', '--project', '--limit') }
+            }
             'bench' {
                 if ($argumentPosition -eq 1) { @('recall', 'context', 'prompt', 'block', 'ingest', 'read') }
                 else { @('--json', '--seed') }
@@ -760,7 +782,7 @@ func completionCommands() []string {
 	return []string{
 		"bench", "blame", "brief", "check", "completion", "ctx", "delete", "doctor", "embed",
 		"files", "fix", "forget", "friction", "handoff", "help", "how", "index",
-		"install", "last", "log", "mcp", "promote", "recall", "recap", "remember", "restore",
+		"install", "last", "log", "mcp", "origin", "promote", "recall", "recap", "remember", "restore",
 		"resume", "rules", "search", "secrets", "share", "show", "sources", "stats",
 		"statusline", "sync", "tests", "uninstall", "update", "version", "view",
 		"warmup", "wip",

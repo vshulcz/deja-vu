@@ -117,7 +117,9 @@ func dejaLineAnswerLine(l string) bool {
 	}
 	// The turn the line answer quotes, which is transcript text: the label in
 	// front of it is the only part that is deja's, so it is what this keys on.
-	if strings.HasPrefix(l, "said just before this edit: ") {
+	if strings.HasPrefix(l, "said just before this edit: ") ||
+		strings.HasPrefix(l, "user turn before edit: ") ||
+		(strings.HasPrefix(l, "user turn (") && strings.Contains(l, " before edit): ")) {
 		return true
 	}
 	return dejaLineHeader.MatchString(l) || dejaGitNoteLine.MatchString(l)
@@ -147,7 +149,9 @@ func mayHoldOwnReport(text string) bool {
 		// The quoted turn under a line answer says nothing about deja either:
 		// the label is deja's and the sentence after it is someone's own words
 		// (#3723).
-		strings.Contains(text, "said just before this edit")
+		strings.Contains(text, "said just before this edit") ||
+		strings.Contains(text, " before edit):") ||
+		strings.Contains(text, "user turn before edit:")
 }
 
 // WithoutOwnReport is withoutOwnReport for a caller outside this package:

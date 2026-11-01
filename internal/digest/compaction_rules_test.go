@@ -114,12 +114,12 @@ func TestStandingRulesInOtherShapes(t *testing.T) {
 }
 
 func TestChineseCompactionEpisodeClassification(t *testing.T) {
-	for _, nudge := range []string{"继续", "好的，继续", "可以，接着做！", "繼續"} {
-		if !trivialContinuation(nudge) {
-			t.Errorf("expected Chinese nudge %q to be trivialContinuation", nudge)
+	for _, nudge := range []string{"继续", "好的，继续", "可以，接着做！", "繼續", "ок и давай дальше"} {
+		if !IsTrivialContinuation(nudge) {
+			t.Errorf("expected nudge %q to be IsTrivialContinuation", nudge)
 		}
 	}
-	if trivialContinuation("继续修复数据库连接池的超时问题") {
+	if IsTrivialContinuation("继续修复数据库连接池的超时问题") {
 		t.Error("Chinese task opening with 继续 must not be treated as a bare nudge")
 	}
 	for _, poll := range []string{"怎么样了？", "进展如何", "現在怎麼樣了？"} {
