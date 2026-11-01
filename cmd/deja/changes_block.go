@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
+	"slices"
 	"strings"
 
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/query"
 	"github.com/vshulcz/deja-vu/internal/redact"
@@ -245,6 +248,69 @@ func recallCodeChangedLines(s model.Session, q string) []string {
 			used += len(clean)
 		}
 		if len(out) > 1 {
+			return out
+		}
+	}
+	return nil
+}
+
+// fixEditDiffLines extracts up to 4 compact diff lines (- old / + new) for the
+// file edit that followed an error in p.Key.
+func fixEditDiffLines(dir string, p index.FixPair) []string {
+	if dir == "" || p.Edit == "" || p.Key == "" {
+		return nil
+	}
+	harness, id, ok := strings.Cut(p.Key, ":")
+	if !ok || harness == "" || id == "" {
+		return nil
+	}
+	s, found, err := index.FindByIdentity(dir, harness, id)
+	if err != nil || !found {
+		return nil
+	}
+	cs := sessionChanges(s)
+	wantBase := filepath.Base(p.Edit)
+	for _, c := range slices.Backward(cs) {
+		if c.Path != p.Edit && filepath.Base(c.Path) != wantBase {
+			continue
+		}
+		var rawLines []string
+		switch {
+		case c.Old != "" && c.New != "":
+			for l := range strings.SplitSeq(changeDiff(c.Old, c.New), "\n") {
+				if strings.HasPrefix(l, "- ") || strings.HasPrefix(l, "+ ") {
+					rawLines = append(rawLines, l)
+				}
+			}
+		case c.Old != "":
+			for l := range strings.SplitSeq(strings.TrimSpace(c.Old), "\n") {
+				rawLines = append(rawLines, "- "+l)
+			}
+		case c.New != "":
+			for l := range strings.SplitSeq(strings.TrimSpace(c.New), "\n") {
+				rawLines = append(rawLines, "+ "+l)
+			}
+		}
+		if len(rawLines) == 0 {
+			continue
+		}
+		var out []string
+		used := 0
+		for _, l := range rawLines {
+			if len(out) >= 4 {
+				break
+			}
+			clean := recallListingLine(l)
+			if clean == "" {
+				continue
+			}
+			if used+len(clean) > recallCodeDiffMax && len(out) > 0 {
+				break
+			}
+			out = append(out, clean)
+			used += len(clean)
+		}
+		if len(out) > 0 {
 			return out
 		}
 	}

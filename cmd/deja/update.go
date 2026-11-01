@@ -99,6 +99,7 @@ type updateConfig struct {
 	// force replaces a source build with the latest release; without it a dev
 	// binary is left alone (#751).
 	force          bool
+	refreshPlugins bool
 	currentVersion string
 	goos           string
 	goarch         string
@@ -125,6 +126,7 @@ func runUpdate(args []string, out io.Writer) error {
 	}
 	return performUpdate(updateConfig{
 		force:          force,
+		refreshPlugins: true,
 		currentVersion: version,
 		goos:           runtime.GOOS,
 		goarch:         runtime.GOARCH,
@@ -251,7 +253,36 @@ func performUpdate(cfg updateConfig, out io.Writer) error {
 		from = "v" + from
 	}
 	fmt.Fprintf(out, "updated deja %s -> v%s at %s\n", from, latest, cfg.executable)
+	if cfg.refreshPlugins {
+		refreshInstalledPluginScripts(cfg.executable, out)
+	}
 	return nil
+}
+
+// refreshInstalledPluginScripts rewrites any outdated plugin scripts on disk
+// after a binary update (#5770).
+func refreshInstalledPluginScripts(exe string, out io.Writer) {
+	for _, a := range autoWirings() {
+		if a.marker == "" || autoInClientConfig[a.name] {
+			continue
+		}
+		path := a.path()
+		b, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		text := string(b)
+		stale := pluginScriptOutdated(a.name, text) ||
+			(a.name == "opencode" && opencodePluginShapeStale(text)) ||
+			(a.name == "deepseek" && dshNoticeSourceRetired(text))
+		if !stale {
+			continue
+		}
+		target := a.name + "-auto"
+		if res, err := installTarget(target, exe, false); err == nil && res.Action != "" && res.Action != "unchanged" {
+			fmt.Fprintf(out, "refreshed %s plugin at %s\n", a.name, reportPath(path))
+		}
+	}
 }
 
 // packageManagerOwning reports the package manager whose tree the binary lives

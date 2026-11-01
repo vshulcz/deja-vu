@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -166,4 +167,82 @@ func fileHookRanLine(dir string, metas []index.SessionMeta) string {
 		return fmt.Sprintf("%s`%s` — exit %d in %s", failLabel, cmd, best.exit, toolSessionCount(best.sessions)) //nolint:gocritic // %#q falls back to double quotes for a command with a backquote
 	}
 	return fmt.Sprintf("%s`%s` (%s)", ranLabel, cmd, toolSessionCount(best.sessions)) //nolint:gocritic // %#q falls back to double quotes for a command with a backquote
+}
+
+const (
+	// toolHookMinCoChangeSessions is the minimum focused session count before a
+	// companion file is surfaced at the point of an edit.
+	toolHookMinCoChangeSessions = 3
+	// toolHookMaxFocusedFiles excludes wide repository sweeps so a rename across
+	// twenty files does not pair every file with every other.
+	toolHookMaxFocusedFiles = 8
+)
+
+// fileHookCoChangeLine names the companion or test file that sessions touching
+// path almost always modified alongside it (at least 3 sessions and 2/3 of the
+// focused sessions that touched path).
+func fileHookCoChangeLine(path string, metas []index.SessionMeta) string {
+	targetBase := strings.ToLower(baseName(path))
+	if targetBase == "" {
+		return ""
+	}
+	counted := map[string]bool{}
+	companionCounts := map[string]int{}
+	companionDisplay := map[string]string{}
+	focused := 0
+	for _, m := range metas {
+		key := m.Harness + ":" + m.ID
+		if counted[key] {
+			continue
+		}
+		counted[key] = true
+		if len(m.Touched) == 0 || len(m.Touched) > toolHookMaxFocusedFiles {
+			continue
+		}
+		focused++
+		seenInSession := map[string]bool{}
+		for _, t := range m.Touched {
+			if isScratch(t) {
+				continue
+			}
+			b := baseName(t)
+			low := strings.ToLower(b)
+			if low == "" || low == targetBase || seenInSession[low] {
+				continue
+			}
+			seenInSession[low] = true
+			companionCounts[low]++
+			if companionDisplay[low] == "" {
+				companionDisplay[low] = b
+			}
+		}
+	}
+	if focused < toolHookMinCoChangeSessions {
+		return ""
+	}
+	bestLow := ""
+	bestCount := 0
+	for low, c := range companionCounts {
+		if c < toolHookMinCoChangeSessions || c*3 < focused*2 {
+			continue
+		}
+		if c > bestCount || (c == bestCount && coChangeCompanionBetter(low, bestLow)) {
+			bestLow = low
+			bestCount = c
+		}
+	}
+	if bestLow == "" {
+		return ""
+	}
+	return fmt.Sprintf(" — usually edited alongside %s (%d of %d sessions)",
+		search.SafePath(companionDisplay[bestLow]), bestCount, focused)
+}
+
+func coChangeCompanionBetter(a, b string) bool {
+	aTest := strings.Contains(a, "test") || strings.Contains(a, "spec")
+	bTest := strings.Contains(b, "test") || strings.Contains(b, "spec")
+	if aTest != bTest {
+		return aTest
+	}
+	return a < b
 }

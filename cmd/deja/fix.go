@@ -140,7 +140,7 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 		fmt.Fprintln(stdout, "deja: no session on this machine ran a command after that error")
 		return nil
 	}
-	return printFixPairs(stdout, pairs)
+	return printFixPairsFrom(dir, stdout, pairs)
 }
 
 // fixWithheldLine is the empty answer when a remedy exists and was held back
@@ -150,6 +150,10 @@ const fixWithheldLine = "deja: what ran after that error on this machine was a m
 
 // printFixPairs writes the pairs in the prose form, one remedy per pair.
 func printFixPairs(stdout io.Writer, pairs []index.FixPair) error {
+	return printFixPairsFrom("", stdout, pairs)
+}
+
+func printFixPairsFrom(dir string, stdout io.Writer, pairs []index.FixPair) error {
 	for _, p := range pairs {
 		when := ""
 		if !p.When.IsZero() {
@@ -165,6 +169,9 @@ func printFixPairs(stdout io.Writer, pairs []index.FixPair) error {
 				changed = "changed next, unconfirmed"
 			}
 			fmt.Fprintf(stdout, "  %s: %s\n", changed, search.SafePath(p.Edit))
+			for _, dl := range fixEditDiffLines(dir, p) {
+				fmt.Fprintf(stdout, "    %s\n", dl)
+			}
 			continue
 		}
 		ran := "ran next"

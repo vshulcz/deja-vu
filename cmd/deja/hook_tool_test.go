@@ -513,3 +513,27 @@ func TestToolHookRecordsTheInjection(t *testing.T) {
 		t.Errorf("a deduped repeat still recorded an injection: %d", got)
 	}
 }
+
+func TestToolHookFileLineSurfacesCoChangedCompanion(t *testing.T) {
+	tmp := hermeticEnv(t)
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+	for i := range 6 {
+		id := "co" + string(rune('0'+i))
+		writeClaudeFixture(t, filepath.Join(root, "alpha", id+".jsonl"), id, []string{
+			`{"type":"user","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"update parser"}}`,
+			`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"/work/alpha/parser.go","old_string":"a","new_string":"b"}},{"type":"tool_use","id":"t2","name":"Edit","input":{"file_path":"/work/alpha/parser_test.go","old_string":"x","new_string":"y"}}]}}`,
+		})
+	}
+	if _, err := captureRun(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLAUDE_PROJECT_DIR", "/work/alpha")
+	out := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":"/work/alpha/parser.go"},"session_id":"now","cwd":"/work/alpha"}`)
+	if out == "" {
+		t.Fatal("expected PreToolUse line for co-changed file")
+	}
+	if !strings.Contains(out, "usually edited alongside parser_test.go (6 of 6 sessions)") {
+		t.Errorf("expected co-change companion note in %q", out)
+	}
+}

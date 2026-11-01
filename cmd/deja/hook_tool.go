@@ -1028,6 +1028,9 @@ func fileHookLineOutside(dir, cwd, path string, self func(index.SessionMeta, str
 		}
 		return head + modelLabel(decisionLabel, d) + d
 	}
+	if co := fileHookCoChangeLine(path, inScope); co != "" {
+		return head + co
+	}
 	return ""
 }
 

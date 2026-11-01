@@ -979,6 +979,9 @@ func mcpFix(dir, name string, raw json.RawMessage) (string, int, error) {
 			}
 			fmt.Fprintf(&fb, "%s%s\n  %s: %s\n", recallListingLine(p.Error), when, changed,
 				search.SafePath(p.Edit))
+			for _, dl := range fixEditDiffLines(dir, p) {
+				fmt.Fprintf(&fb, "    %s\n", dl)
+			}
 			continue
 		}
 		ran := "ran next"

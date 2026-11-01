@@ -68,8 +68,18 @@ func TestMCPFixNamesTheFileThatChangedNext(t *testing.T) {
 	if !strings.Contains(got, "changed next: /tmp/app/internal/pool.go") {
 		t.Errorf("the answer does not name the file:\n%s", got)
 	}
+	if !strings.Contains(got, "- close(c)") || !strings.Contains(got, "+ c.drain()") {
+		t.Errorf("the answer does not include the compact edit diff:\n%s", got)
+	}
 	if strings.Contains(got, "ran next") {
 		t.Errorf("an edit was offered as a command to run:\n%s", got)
+	}
+	cliOut, err := captureRun(t, "fix", "--", "--- FAIL: TestPoolDrainsOnClose")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(cliOut, "- close(c)") || !strings.Contains(cliOut, "+ c.drain()") {
+		t.Errorf("CLI fix output missing compact edit diff:\n%s", cliOut)
 	}
 }
 
