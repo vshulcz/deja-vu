@@ -3472,13 +3472,30 @@ func looksLikeQuestion(text string) bool {
 		return false
 	}
 	low := strings.ToLower(t)
-	for _, p := range []string{"do not ", "don't ", "never ", "always ", "reply with "} {
+	if cjkfold.HasCJK(low) {
+		low = cjkfold.String(low)
+		low = strings.NewReplacer("麼", "么", "麽", "么", "裡", "里", "裏", "里").Replace(low)
+	}
+	for _, p := range []string{
+		"do not ", "don't ", "never ", "always ", "reply with ",
+		"не надо ", "никогда ", "всегда ",
+		"不要", "禁止", "切勿", "永远", "只回复",
+	} {
 		if strings.HasPrefix(low, p) {
 			return false
 		}
 	}
-	if strings.HasSuffix(t, "?") || strings.HasSuffix(t, "？") {
+	if strings.HasSuffix(t, "?") || strings.HasSuffix(t, "？") ||
+		strings.HasSuffix(low, "吗") || strings.HasSuffix(low, "呢") {
 		return true
+	}
+	for _, p := range []string{
+		"为什么", "怎么", "如何", "哪里", "哪儿", "哪个", "哪些", "什么", "谁",
+		"何时", "什么时候", "多少", "为何", "可否", "是否", "能不能", "有没有", "是不是",
+	} {
+		if strings.HasPrefix(low, p) {
+			return true
+		}
 	}
 	fields := strings.Fields(t)
 	if len(fields) == 0 {
@@ -3500,7 +3517,12 @@ func looksLikeQuestion(text string) bool {
 // question worth matching on.
 func questionStem(text string) string {
 	var b strings.Builder
-	for _, r := range strings.ToLower(text) {
+	folded := strings.ToLower(text)
+	if cjkfold.HasCJK(folded) {
+		folded = cjkfold.String(folded)
+		folded = strings.NewReplacer("麼", "么", "麽", "么", "裡", "里", "裏", "里").Replace(folded)
+	}
+	for _, r := range folded {
 		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-' {
 			b.WriteRune(r)
 		} else {

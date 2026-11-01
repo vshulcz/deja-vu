@@ -15,11 +15,18 @@ import (
 // app's, whichever agent was run in it afterwards.
 var chatFolderName = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}$`)
 
-// ChatWorkspaceRoot is the workspace root a per-chat folder sits in, so every
-// chat under it is one project rather than one project each (#4735). ok is
-// false for any other directory.
+// ChatWorkspaceRoot is the workspace root a per-chat folder or a Claude Code
+// `.claude/worktrees/<name>` checkout sits in, so every session under it is
+// one project rather than one project each (#4735). ok is false for any other
+// directory.
 func ChatWorkspaceRoot(cwd string) (string, bool) {
 	clean := strings.TrimRight(cwd, `/\`)
+	if w, dp := filepath.Dir(clean), filepath.Dir(filepath.Dir(clean)); filepath.Base(w) == "worktrees" && filepath.Base(dp) == ".claude" {
+		root := filepath.Dir(dp)
+		if root != "." && root != clean && filepath.Dir(root) != root {
+			return root, true
+		}
+	}
 	if !chatFolderName.MatchString(filepath.Base(clean)) {
 		return "", false
 	}
@@ -30,8 +37,11 @@ func ChatWorkspaceRoot(cwd string) (string, bool) {
 	return root, true
 }
 
-// dropChatFolder is segs without a trailing per-chat folder.
+// dropChatFolder is segs without a trailing per-chat folder or `.claude/worktrees/<name>`.
 func dropChatFolder(segs []string) []string {
+	if n := len(segs); n >= 4 && segs[n-3] == ".claude" && segs[n-2] == "worktrees" && !isDriveSegment(segs[n-4]) {
+		return segs[:n-3]
+	}
 	if n := len(segs); n >= 2 && chatFolderName.MatchString(segs[n-1]) && !isDriveSegment(segs[n-2]) {
 		return segs[:n-1]
 	}

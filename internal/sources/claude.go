@@ -499,6 +499,9 @@ func claudeProjectName(dir string) string {
 // names ("deja-vu", not "deja/vu"). Falls back to the dash heuristic when the
 // path no longer exists (deleted projects, dirs imported from other machines).
 func decodeProjectBase(base string) string {
+	if i := strings.Index(base, "--claude-worktrees-"); i > 0 {
+		base = base[:i]
+	}
 	if resolved := resolveEncodedPath(base); resolved != "" {
 		if name := cwdProjectName(resolved); name != "" {
 			return name

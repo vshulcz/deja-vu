@@ -73,6 +73,7 @@ func projectFromPaths(ms []model.Message) string {
 // of /tmp would be simpler and wrong: a repository can live there, and it is
 // still that person's project.
 func agentScratch(p string) bool {
+	p = strings.ReplaceAll(p, "/.claude/worktrees/", "/")
 	for _, seg := range []string{"/.claude/", "/scratchpad/", "/tasks/", "/.cache/", "/claude-501/"} {
 		if strings.Contains(p, seg) {
 			return true

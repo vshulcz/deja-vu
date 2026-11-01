@@ -41,6 +41,7 @@ func TestFilesInFlightKeepsPathsAndDropsProse(t *testing.T) {
 func TestFilesInFlightNamesTheWorkNotTheScratch(t *testing.T) {
 	s := model.Session{Messages: []model.Message{
 		{Role: sources.RoleEdit, Text: "/Users/x/work/internal/index/retrieval.go"},
+		{Role: sources.RoleEdit, Text: "/Users/x/work/.claude/worktrees/agent-a1/internal/index/search_rungs.go"},
 		{Role: sources.RoleFiles, Text: "/private/tmp/deja-probe/run.sh /tmp/scan.py"},
 		{Role: sources.RoleFiles, Text: "/Users/x/.claude/projects/proj/scratchpad/notes.md"},
 		{Role: sources.RoleFiles, Text: "/Users/x/work/node_modules/left-pad/index.js"},
@@ -50,8 +51,8 @@ func TestFilesInFlightNamesTheWorkNotTheScratch(t *testing.T) {
 		{Role: sources.RoleFiles, Text: "tmp/deja-probe/shot.txt"},
 	}}
 	got := ResumeFrom(s, nil).Files
-	if len(got) != 1 || !strings.HasSuffix(got[0], "internal/index/retrieval.go") {
-		t.Fatalf("the handover should name the work and nothing else, got %v", got)
+	if len(got) != 2 || !strings.HasSuffix(got[0], "internal/index/search_rungs.go") || !strings.HasSuffix(got[1], "internal/index/retrieval.go") {
+		t.Fatalf("the handover should name the work (including .claude/worktrees) and nothing else, got %v", got)
 	}
 	// And a session that touched only throwaway files says nothing about files
 	// rather than sending the next turn to a probe script.

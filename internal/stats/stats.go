@@ -439,6 +439,22 @@ func AskedByAPerson(text string) bool {
 	if strings.HasSuffix(t, "?") || strings.HasSuffix(t, "？") {
 		return true
 	}
+	low := strings.ToLower(t)
+	if cjkfold.HasCJK(low) {
+		low = cjkfold.String(low)
+		low = strings.NewReplacer("麼", "么", "麽", "么", "裡", "里", "裏", "里").Replace(low)
+	}
+	if strings.HasSuffix(low, "吗") || strings.HasSuffix(low, "呢") {
+		return true
+	}
+	for _, p := range []string{
+		"为什么", "怎么", "如何", "哪里", "哪儿", "哪个", "哪些", "什么", "谁",
+		"何时", "什么时候", "多少", "为何", "可否", "是否", "能不能", "有没有", "是不是",
+	} {
+		if strings.HasPrefix(low, p) {
+			return true
+		}
+	}
 	fields := strings.Fields(t)
 	if len(fields) == 0 {
 		return false
@@ -564,7 +580,12 @@ func questionStemFor(text string) string {
 		return ""
 	}
 	var b strings.Builder
-	for _, r := range strings.ToLower(text) {
+	folded := strings.ToLower(text)
+	if cjkfold.HasCJK(folded) {
+		folded = cjkfold.String(folded)
+		folded = strings.NewReplacer("麼", "么", "麽", "么", "裡", "里", "裏", "里").Replace(folded)
+	}
+	for _, r := range folded {
 		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-' {
 			b.WriteRune(r)
 		} else {
@@ -581,10 +602,14 @@ func questionStemFor(text string) string {
 // anything. "deja-vu recalled" is the shape agents were asked for before, and
 // the transcripts that say it are still on disk.
 func CreditedAloud(text string) bool {
-	if strings.Contains(text, "deja-vu recalled") {
+	if strings.Contains(text, "deja-vu recalled") || strings.Contains(text, "deja recalled") {
 		return true
 	}
-	return strings.Contains(text, "deja:") && strings.Contains(strings.ToLower(text), "déjà vu")
+	if !strings.Contains(text, "deja:") {
+		return false
+	}
+	low := strings.ToLower(text)
+	return strings.Contains(low, "déjà vu") || strings.Contains(low, "deja vu:")
 }
 
 // dejaSessionRef matches a session id named the way a recall block names one.
@@ -603,7 +628,8 @@ func CreditedRefs(text string) []string {
 	var out []string
 	seen := map[string]bool{}
 	for line := range strings.SplitSeq(text, "\n") {
-		if !strings.Contains(strings.ToLower(line), "déjà vu") {
+		low := strings.ToLower(line)
+		if !strings.Contains(low, "déjà vu") && !strings.Contains(low, "deja vu:") {
 			continue
 		}
 		for _, m := range dejaSessionRef.FindAllString(line, -1) {

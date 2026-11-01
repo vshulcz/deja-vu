@@ -207,6 +207,9 @@ var processNoise = []string{
 	// ingest filter drops the injected block itself; this is the sentence an
 	// agent writes about it, and it is deja telling itself what it said.
 	"déjà vu:",
+	"deja vu:",
+	"deja-vu recalled",
+	"deja recalled",
 	"(deja:ses_",
 	"send_message",
 	"invoke_subagent",

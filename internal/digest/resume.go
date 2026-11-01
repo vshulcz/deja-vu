@@ -281,6 +281,7 @@ func hasPathAlphaNum(s string) bool {
 // clears 189 of the 238 without asking the disk anything,
 // which is the constraint here: this package is a leaf and cannot stat (#3716).
 func throwawayPath(p string) bool {
+	p = strings.ReplaceAll(p, "/.claude/worktrees/", "/")
 	for _, seg := range []string{
 		"/tmp/", "/var/folders/", "/scratchpad/", "/tasks/", "/.claude/",
 		"/.cache/", "/claude-501/", "/node_modules/", "/.git/",
