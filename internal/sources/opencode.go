@@ -426,7 +426,7 @@ func opencodeV1Query(harness, where string, limit int) string {
 		`'id',cast(s.id as text),'directory',cast(s.directory as text),` +
 		`'time_created',s.time_created,'time_updated',s.time_updated,` +
 		`'role',json_extract(m.data,'$.role'),` +
-		`'text',json_extract(p.data,'$.text'),` +
+		`'text',substr(json_extract(p.data,'$.text'),1,262144),` +
 		// The text opencode wrote itself under the user role — "Continue if
 		// you have next steps…", "The following tool was executed by the
 		// user" — carries this flag; 338 of them indexed as the person's words
@@ -463,7 +463,7 @@ func opencodeV1Query(harness, where string, limit int) string {
 		// command output, and #547 measured file bodies as the weakest slice
 		// deja could index. What a command printed is where the errors live.
 		`'out',case when json_extract(p.data,'$.tool') in ('bash','Bash') ` +
-		`then json_extract(p.data,'$.state.output') end,` +
+		`then substr(json_extract(p.data,'$.state.output'),1,262144) end,` +
 		`'exit',json_extract(p.data,'$.state.metadata.exit'),` +
 		`'pt',json_extract(p.data,'$.time.start'),` +
 		`'mt',json_extract(m.data,'$.time.created'),` +
@@ -707,7 +707,7 @@ func readOpencodeRows(harness, db, q string, by map[string]*model.Session) (int,
 func opencodeToolRow(harness string, s *model.Session, r map[string]any) bool {
 	if cmd := str(r["cmd"]); cmd != "" {
 		t := partTime(r)
-		out := str(r["out"])
+		out := capParsedMessage(str(r["out"]))
 		if r["exit"] == nil && harness == "zcode" {
 			// ZCode records no exit field and writes a failed run's code
 			// Claude's way, "Exit code N" as the output's first line, and

@@ -94,3 +94,25 @@ func TestALiteralNameEndingInColonDigitsIsReadAsALineNumber(t *testing.T) {
 		t.Errorf("base %q; the documented trade-off is that this reads as a line number", got.Base)
 	}
 }
+
+func TestResolveBlamePathParsesLineRangesAndAnchors(t *testing.T) {
+	for _, tc := range []struct {
+		in       string
+		wantBase string
+		wantLine int
+		wantEnd  int
+	}{
+		{"internal/search/recall.go:65-95", "recall.go", 65, 95},
+		{"internal/search/recall.go#L65-L95", "recall.go", 65, 95},
+		{"internal/search/recall.go#L42", "recall.go", 42, 42},
+	} {
+		got, err := ResolveBlamePath(tc.in)
+		if err != nil {
+			t.Fatalf("ResolveBlamePath(%q): %v", tc.in, err)
+		}
+		if got.Base != tc.wantBase || got.Line != tc.wantLine || got.EndLine != tc.wantEnd || got.LineNote != "" {
+			t.Errorf("ResolveBlamePath(%q) = {Base:%q Line:%d EndLine:%d Note:%q}, want {Base:%q Line:%d EndLine:%d Note:\"\"}",
+				tc.in, got.Base, got.Line, got.EndLine, got.LineNote, tc.wantBase, tc.wantLine, tc.wantEnd)
+		}
+	}
+}

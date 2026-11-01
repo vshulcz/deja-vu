@@ -1010,7 +1010,7 @@ func fileHookLineOutside(dir, cwd, path string, self func(index.SessionMeta, str
 	// blame` pointer, which the A/B behind this hook already found changed
 	// nothing. What the same A/B found an agent reuses is the decision about the
 	// file, so that is what is left.
-	if d := promotedDecisionFor(inScope); d != "" && mentionsFile(path, d) {
+	if d := promotedDecisionForFile(path, inScope); d != "" && mentionsFile(path, d) {
 		return head + standingLabel + d
 	}
 	// A scanned conclusion does not outrank this: that line is the newest thing
@@ -1022,8 +1022,8 @@ func fileHookLineOutside(dir, cwd, path string, self func(index.SessionMeta, str
 	// A scanned line is a decision about the file only when it reads as one and
 	// names the file. Of 63 lines once offered as "prior decision", none named
 	// the file or its package.
-	if d := fileDecisionLine(dir, inScope); d != "" && digest.CarriesDecision(d) && mentionsFile(path, d) {
-		if promotedDecisionFor(inScope) == d {
+	if d := fileDecisionLine(dir, path, inScope); d != "" && digest.CarriesDecision(d) && mentionsFile(path, d) {
+		if promotedDecisionForFile(path, inScope) == d {
 			return head + decisionLabel + d
 		}
 		return head + modelLabel(decisionLabel, d) + d
@@ -1079,14 +1079,14 @@ const standingLabel = " — standing decision in this project: "
 // sessions (bounded, newest first) and takes the first that yields a conclusion
 // and was not later taken back — the same decision-carrying line the SessionStart
 // digest surfaces, but delivered at the moment the file is about to change.
-func fileDecisionLine(dir string, metas []index.SessionMeta) string {
+func fileDecisionLine(dir, path string, metas []index.SessionMeta) string {
 	sort.Slice(metas, func(i, j int) bool { return metas[i].Updated.After(metas[j].Updated) })
 	// A promoted note first. It is the user's own statement about this work,
 	// which is why the session-start block leads with it and calls it standing;
 	// scanning for a conclusion instead handed back whatever the newest session
 	// happened to end with — "looked at retry.go again (5)" in front of "the
 	// retry budget stays at 5" (#2495).
-	if line := promotedDecisionFor(metas); line != "" {
+	if line := promotedDecisionForFile(path, metas); line != "" {
 		return line
 	}
 	states := sources.PromotedLifecycles()
@@ -1104,8 +1104,17 @@ func fileDecisionLine(dir string, metas []index.SessionMeta) string {
 		if len(s.Messages) > toolHookMsgTail {
 			s.Messages = s.Messages[len(s.Messages)-toolHookMsgTail:]
 		}
-		if cs := digest.Conclusions(s, toolHookDecisionBudget, 1); len(cs) > 0 {
-			return trimTrailingFragment(search.SafeText(strings.TrimSpace(cs[0])))
+		if path == "" {
+			if cs := digest.Conclusions(s, toolHookDecisionBudget, 1); len(cs) > 0 {
+				return trimTrailingFragment(search.SafeText(strings.TrimSpace(cs[0])))
+			}
+			continue
+		}
+		for _, c := range digest.Conclusions(s, toolHookDecisionBudget*4, 6) {
+			line := trimTrailingFragment(search.SafeText(strings.TrimSpace(c)))
+			if line != "" && digest.CarriesDecision(line) && mentionsFile(path, line) {
+				return line
+			}
 		}
 	}
 	return ""
@@ -1116,6 +1125,10 @@ func fileDecisionLine(dir string, metas []index.SessionMeta) string {
 // decision later reversed carries a non-accepted state, and LoadPromotedNotes
 // keeps the latest state per source.
 func promotedDecisionFor(metas []index.SessionMeta) string {
+	return promotedDecisionForFile("", metas)
+}
+
+func promotedDecisionForFile(path string, metas []index.SessionMeta) string {
 	if len(metas) == 0 {
 		return ""
 	}
@@ -1178,7 +1191,21 @@ func promotedDecisionFor(metas []index.SessionMeta) string {
 			keep(noteFromMeta(note))
 		}
 	}
-	return decisionLineOf(found, toolHookDecisionBudget)
+	line := decisionLineOf(found, toolHookDecisionBudget)
+	if path == "" || line == "" || mentionsFile(path, line) {
+		return line
+	}
+	var matching []sources.PromotedNote
+	for _, note := range found {
+		text := strings.TrimSpace(note.Text)
+		if text == "" {
+			text = strings.TrimSpace(note.Title)
+		}
+		if mentionsFile(path, text) {
+			matching = append(matching, note)
+		}
+	}
+	return decisionLineOf(matching, toolHookDecisionBudget)
 }
 
 // decisionLineOf words what this file or command has standing, newest first.

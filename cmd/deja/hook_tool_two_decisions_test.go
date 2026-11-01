@@ -85,3 +85,25 @@ func TestTheEditLineWithOneDecisionIsUnchanged(t *testing.T) {
 		t.Errorf("a single decision now reads as %q", got)
 	}
 }
+
+func TestPromotedDecisionForFileFindsFileNoteBehindUnrelatedLongNote(t *testing.T) {
+	hermeticEnv(t)
+	now := time.Now().UTC()
+	if err := sources.AppendPromoted("app", "retry rule",
+		"every retry path in retry.go goes through the shared budget",
+		"claude:older", "accepted", now.Add(-24*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	longGeneral := "the repository description starts with Search your past AI coding sessions and never uses marketing adjectives or filler words in any README header"
+	if err := sources.AppendPromoted("app", "repo desc", longGeneral, "claude:newer", "accepted", now); err != nil {
+		t.Fatal(err)
+	}
+	metas := []index.SessionMeta{
+		{ID: "newer", Harness: "claude", Project: "app", Updated: now},
+		{ID: "older", Harness: "claude", Project: "app", Updated: now.Add(-24 * time.Hour)},
+	}
+	got := promotedDecisionForFile("pkg/retry.go", metas)
+	if !strings.Contains(got, "retry.go") {
+		t.Fatalf("promotedDecisionForFile lost the file-specific note behind a general one: %q", got)
+	}
+}

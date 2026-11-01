@@ -97,6 +97,31 @@ func gitLineCommit(path string, line int) (lineCommit, string) {
 	return c, ""
 }
 
+func gitTargetCommit(target search.BlameTarget) (lineCommit, string) {
+	if target.EndLine <= target.Line {
+		return gitLineCommit(target.FullPath, target.Line)
+	}
+	var best lineCommit
+	var firstWhy string
+	endLine := min(target.EndLine, target.Line+50)
+	for ln := target.Line; ln <= endLine; ln++ {
+		c, why := gitLineCommit(target.FullPath, ln)
+		if why != "" {
+			if firstWhy == "" {
+				firstWhy = why
+			}
+			continue
+		}
+		if best.SHA == "" || c.When.After(best.When) {
+			best = c
+		}
+	}
+	if best.SHA != "" {
+		return best, ""
+	}
+	return lineCommit{}, firstWhy
+}
+
 // lineBlameRefusal turns git's own refusal into the one sentence a reader
 // needs. The common one is a line past the end of the file, and the count is
 // what makes it actionable.
@@ -264,7 +289,17 @@ func attributeLine(sessions []model.Session, target search.BlameTarget, c lineCo
 // attributeByWritten is the weaker rule: a session that wrote this line, into
 // this file, before the commit that carried it.
 func attributeByWritten(sessions []model.Session, target search.BlameTarget, c lineCommit) (lineAuthor, bool) {
-	line := fileLine(target.FullPath, target.Line)
+	endLine := max(target.Line, target.EndLine)
+	for lineNo := target.Line; lineNo <= endLine; lineNo++ {
+		if a, ok := attributeSingleLineByWritten(sessions, target, lineNo, c); ok {
+			return a, true
+		}
+	}
+	return lineAuthor{}, false
+}
+
+func attributeSingleLineByWritten(sessions []model.Session, target search.BlameTarget, lineNo int, c lineCommit) (lineAuthor, bool) {
+	line := fileLine(target.FullPath, lineNo)
 	want, ok := sources.HashWrittenLine(line)
 	if !ok {
 		// Too short to be evidence: `}` and `return nil` were written by every
@@ -462,7 +497,7 @@ func lineBlame(w io.Writer, dir string, target search.BlameTarget, hits []search
 // — the sentence saying which silence this is. The prose answer and the JSON
 // one are two renderings of this, so neither can drift from the other (#3723).
 func lineAttribution(dir string, target search.BlameTarget, hits []search.BlameHit) (lineCommit, lineAuthor, bool, string) {
-	c, why := gitLineCommit(target.FullPath, target.Line)
+	c, why := gitTargetCommit(target)
 	if why != "" {
 		return lineCommit{}, lineAuthor{}, false, why
 	}

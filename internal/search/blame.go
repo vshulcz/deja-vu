@@ -32,6 +32,9 @@ type BlameTarget struct {
 	// it is what the line-level answer needs to turn a line into the commit
 	// that wrote it (#1181).
 	Line int
+	// EndLine is the upper bound of a `:start-end` or `#Lstart-Lend` range,
+	// or 0 when a single line or whole file was asked about.
+	EndLine int
 	// LineNote says why a line spec the reader typed was not used, and is
 	// empty when they typed none or typed a usable one. `a.txt:99` already
 	// says "the file has 3 lines" (#3726); `a.txt:0` and `a.txt:abc` said
@@ -132,7 +135,7 @@ func ResolveBlamePath(name string) (BlameTarget, error) {
 	if len(name) > maxBlamePath {
 		return BlameTarget{}, fmt.Errorf("path is %d bytes, longer than any file path (%d)", len(name), maxBlamePath)
 	}
-	name, line, lineNote := cutLineSuffix(name)
+	name, line, endLine, lineNote := cutLineRangeSuffix(name)
 	full, err := filepath.Abs(name)
 	if err != nil {
 		return BlameTarget{}, err
@@ -151,8 +154,42 @@ func ResolveBlamePath(name string) (BlameTarget, error) {
 		Base:     base,
 		Stem:     stem,
 		Line:     line,
+		EndLine:  endLine,
 		LineNote: lineNote,
 	}, nil
+}
+
+func cutLineRangeSuffix(name string) (string, int, int, string) {
+	if head, tail, ok := strings.Cut(name, "#L"); ok && head != "" && tail != "" {
+		if _, err := os.Stat(name); err != nil {
+			startStr, endStr, hasRange := strings.Cut(tail, "-")
+			endStr = strings.TrimPrefix(endStr, "L")
+			if allDigits(startStr) && (!hasRange || allDigits(endStr)) {
+				start, err1 := strconv.Atoi(startStr)
+				end := start
+				var err2 error
+				if hasRange {
+					end, err2 = strconv.Atoi(endStr)
+				}
+				if err1 == nil && err2 == nil && start > 0 && end >= start {
+					return head, start, end, ""
+				}
+			}
+		}
+	}
+	if head, tail, ok := lastColon(name); ok && head != "" && !strings.HasSuffix(head, ":") {
+		if startStr, endStr, hasDash := strings.Cut(tail, "-"); hasDash && allDigits(startStr) && allDigits(endStr) {
+			if _, err := os.Stat(name); err != nil {
+				start, err1 := strconv.Atoi(startStr)
+				end, err2 := strconv.Atoi(endStr)
+				if err1 == nil && err2 == nil && start > 0 && end >= start {
+					return head, start, end, ""
+				}
+			}
+		}
+	}
+	trimmed, line, note := cutLineSuffix(name)
+	return trimmed, line, line, note
 }
 
 // cutLineSuffix is trimLineSuffix that keeps the number it cut: the first one,
@@ -309,6 +346,11 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 		// name is repeated; among equally specific ones, the message that keeps
 		// returning to the file wins; among equals, the order they were said in.
 		sort.SliceStable(mentions, func(i, j int) bool {
+			iProse := mentions[i].role == "user" || mentions[i].role == "assistant"
+			jProse := mentions[j].role == "user" || mentions[j].role == "assistant"
+			if iProse != jProse {
+				return iProse
+			}
 			if mentions[i].level != mentions[j].level {
 				return mentions[i].level > mentions[j].level
 			}
