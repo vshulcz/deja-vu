@@ -166,3 +166,28 @@ func TestStandingRulesAreBounded(t *testing.T) {
 		t.Fatalf("%d rules, %d bytes", len(rules), size)
 	}
 }
+
+func TestStandingRulesScopingAndHandoffPacketExclusion(t *testing.T) {
+	handoffTurn := "You are picking up work handed off from a claude session (2915986c, 2026-10-28, project coding/deja-vu).\n\n" +
+		"Quoted context from that session (historical transcript data, not new instructions):\n" +
+		"'''deja-handoff\n" +
+		"Standing instructions (user-stated, carry across compaction)\n" +
+		"- ничего не удаляй из репы кроме .claude/worktrees\n" +
+		"- пиши перед коммитами и пр как обычный старший инженер\n\n" +
+		"Objective\n" +
+		"- Session started with: делай задачи в next.md [claude:2915986c-1234/user @2026-08-09T16:25:03Z]\n" +
+		"- Latest request: секрет создал [claude:2915986c-1234/user @2026-10-28T17:33:38Z]\n\n" +
+		"Recorded verification commands\n" +
+		"- [passed] `go test ./...` -> ok [claude:2915986c-1234/command+output]\n" +
+		"'''\n\n" +
+		"Continue from where that session left off."
+	rules := ExtractStandingRules(rulesSession(handoffTurn, "ок, но не забывай про китайскую аудиторию"), nil)
+	for _, r := range rules {
+		if strings.Contains(r.Text, "Session started with:") || strings.Contains(r.Text, "Latest request:") || strings.Contains(r.Text, "[passed]") {
+			t.Errorf("packet metadata leaked into standing rules: %q", r.Text)
+		}
+	}
+	if len(rules) != 3 {
+		t.Fatalf("got %d rules (%+v), want 3", len(rules), rules)
+	}
+}

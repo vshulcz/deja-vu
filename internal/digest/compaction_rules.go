@@ -37,18 +37,22 @@ var (
 		`никогда|всегда|нельзя|обязательно|запомни|впредь|с этого момента|каждый раз|только не|ни в коем случае|не надо|не нужно|не смей|используй \S+(?: \S+)? (?:вместо|а не)\b|` +
 		// "не трогай", "не запускай", "не пиши": a negated imperative. The
 		// ending is what separates it from "не работает", "не знаю", "не понял".
-		`не \p{L}+(?:й|йте|ь|ьте|и|ите)(?:сь|ся)?(?:$|[^\p{L}])|` +
+		`(?:ничего\s+|никуда\s+|нигде\s+|никому\s+)?не \p{L}+(?:й|йте|ь|ьте|и|ите)(?:сь|ся)?(?:$|[^\p{L}])|` +
 		`永远不要|千万不要|绝对不要|不要|别|禁止|严禁|必须|务必|一定要|总是|始终|记住|以后|从现在起|每次都|优先使用)`)
+	// Optional leading acknowledgement + conjunction ("ок, но ", "да, только ",
+	// "ok, but ", "好，但") before a standing instruction in a short user reply.
+	standingLeadAckRE = regexp.MustCompile(`(?i)^(?:(?:ок|окей|да|ладно|хорошо|ага|угу|понял|ok|okay|yes|yeah|sure|alright|got it|好|好的|可以|行|没问题)[,\s]+)*(?:(?:но|только|и|а|просто|главное|при этом|but|just|and|only|不过|但是|但|只是)[,\s]+)+`)
 	// The ones that open the same way and instruct nothing.
 	standingNotRE = regexp.MustCompile(`(?i)^(?:never mind|nevermind|don't worry|dont worry|do not worry|don't know|dont know|do not know|don't think|dont think|don't see|don't get|always has|always had|always was|always were|always been|не знаю|не помню|не понимаю|не уверен|не важно|не страшно|не надо было|не нужно было|` +
 		// "не удалось", "не нашлось": a past tense whose ending passes for an imperative.
 		`не \p{L}+(?:ось|ась|ись)(?:$|[^\p{L}])|` +
 		`不要紧|没关系|不用谢|不知道|不清楚|不确定|不重要)`)
 	// An instruction keeps its list item; the item is rewritten in full.
-	standingItemRE  = regexp.MustCompile(`^\s*(?:[-*+•]\s+|\d{1,2}[.)]\s+)`)
-	standingFenceRE = regexp.MustCompile("(?s)```.*?```")
-	standingTagRE   = regexp.MustCompile(`(?s)<([A-Za-z][\w-]*)(?:\s[^<>]*)?>.*?</([A-Za-z][\w-]*)>`)
-	standingSentRE  = regexp.MustCompile(`([.!;]\s+|[。！；]\s*)`)
+	standingItemRE       = regexp.MustCompile(`^\s*(?:[-*+•]\s+|\d{1,2}[.)]\s+)`)
+	standingFenceRE      = regexp.MustCompile("(?s)```.*?```")
+	standingTagRE        = regexp.MustCompile(`(?s)<([A-Za-z][\w-]*)(?:\s[^<>]*)?>.*?</([A-Za-z][\w-]*)>`)
+	standingSentRE       = regexp.MustCompile(`([.!;]\s+|[。！；]\s*)`)
+	standingProvenanceRE = regexp.MustCompile(`\s*\[[A-Za-z0-9_-]+:[^\]]+/[A-Za-z_-]+(?:\s+@[^\]]+)?\]\s*$`)
 )
 
 // ExtractStandingRules returns the user's standing instructions from every
@@ -98,14 +102,47 @@ func standingLines(text string) []string {
 	text = stripTagBlocks(text)
 	var items, hits []string
 	listHits := 0
+	inRulesBlock := false
+	flushItems := func() {
+		if len(items) == 0 {
+			inRulesBlock = false
+			return
+		}
+		if inRulesBlock || (listHits >= 2 && listHits*3 >= len(items)*2) {
+			hits = append(hits, items...)
+		} else {
+			for _, it := range items {
+				for _, sentence := range standingSentences(it) {
+					if standingRule(sentence) && fitsStanding(sentence) {
+						hits = append(hits, sentence)
+					}
+				}
+			}
+		}
+		items = nil
+		listHits = 0
+		inRulesBlock = false
+	}
 	for line := range strings.SplitSeq(text, "\n") {
 		raw := strings.TrimSpace(line)
 		if raw == "" || strings.HasPrefix(raw, ">") || strings.HasPrefix(raw, "|") {
+			flushItems()
+			continue
+		}
+		if strings.HasPrefix(raw, "Standing instructions ") {
+			flushItems()
+			inRulesBlock = true
 			continue
 		}
 		item := standingItemRE.MatchString(raw)
+		if !item {
+			flushItems()
+		}
 		line := strings.TrimSpace(standingItemRE.ReplaceAllString(raw, ""))
 		line = strings.ReplaceAll(line, "**", "")
+		if isDejaPacketItem(line) {
+			continue
+		}
 		hit := slices.ContainsFunc(standingSentences(line), standingRule)
 		switch {
 		case item && fitsStanding(line):
@@ -121,23 +158,27 @@ func standingLines(text string) []string {
 			}
 		}
 	}
-	// A list the user wrote as rules is kept whole: "6. When everything is
-	// done, add DONE" is one of them though it opens like a description. Two
-	// thirds of its items being instructions is what makes it a rule list
-	// rather than a plan or a list of findings: at half, a findings list with
-	// two "do not" lines in it carried "Preference questions remain the
-	// weakest category" as a rule.
-	if listHits >= 2 && listHits*3 >= len(items)*2 {
-		return append(items, hits...)
+	flushItems()
+	return hits
+}
+
+func isDejaPacketItem(line string) bool {
+	if standingProvenanceRE.MatchString(line) {
+		return true
 	}
-	for _, it := range items {
-		for _, sentence := range standingSentences(it) {
-			if standingRule(sentence) && fitsStanding(sentence) {
-				hits = append(hits, sentence)
-			}
+	for _, prefix := range []string{
+		"Session started with:",
+		"Latest request:",
+		"Latest request before compaction:",
+		"[passed] ",
+		"[failed] ",
+		"[recorded] ",
+	} {
+		if strings.HasPrefix(line, prefix) {
+			return true
 		}
 	}
-	return hits
+	return false
 }
 
 func standingSentences(line string) []string {
@@ -157,7 +198,25 @@ func standingRule(sentence string) bool {
 		return false
 	}
 	folded := cjkfold.String(s)
+	folded = standingLeadAckRE.ReplaceAllString(folded, "")
 	return standingStartRE.MatchString(folded) && !standingNotRE.MatchString(folded)
+}
+
+func onlyStandingRules(text string) bool {
+	text = strings.TrimSpace(text)
+	if text == "" || len(standingLines(text)) == 0 {
+		return false
+	}
+	sents := standingSentences(text)
+	if len(sents) == 0 {
+		return false
+	}
+	for _, s := range sents {
+		if !standingRule(s) {
+			return false
+		}
+	}
+	return true
 }
 
 func fitsStanding(s string) bool {
@@ -199,16 +258,67 @@ func sessionGoal(s model.Session) model.ContextFact {
 		if m.Role != "user" || IsAgentArtifact(m.Text) {
 			continue
 		}
-		text := strings.TrimSpace(stripTagBlocks(standingFenceRE.ReplaceAllString(m.Text, " ")))
+		raw := unwrapHandoffPrompt(m.Text, true)
+		text := strings.TrimSpace(stripTagBlocks(standingFenceRE.ReplaceAllString(raw, " ")))
 		if i := strings.Index(text, "\n\n"); i > 0 {
 			text = text[:i]
 		}
 		text = contextProse(text, goalBytes)
-		if text != "" && !trivialContinuation(text) && !notARequest(m.Text) {
+		if text != "" && !trivialContinuation(text) && !notARequest(raw) {
 			return model.ContextFact{Text: text, Provenance: contextRef(s, m)}
 		}
 	}
 	return model.ContextFact{}
+}
+
+// unwrapHandoffPrompt extracts the underlying goal or latest request from a
+// `deja handoff` prompt so a session started from a handoff does not report
+// the handoff framing sentence ("You are picking up work handed off from...")
+// as its own objective or goal.
+func unwrapHandoffPrompt(text string, wantGoal bool) string {
+	trimmed := strings.TrimSpace(text)
+	if !strings.HasPrefix(trimmed, "You are picking up work handed off from ") && !strings.Contains(trimmed, handoffQuoteOpen) {
+		return text
+	}
+	if !wantGoal {
+		if _, after, ok := strings.Cut(trimmed, handoffQuoteClose); ok {
+			tail := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(after), cutMark))
+			if tail != "" && !strings.HasPrefix(tail, "paste this into a new chat") {
+				return tail
+			}
+		}
+	}
+	var started, latest string
+	if _, afterObj, ok := strings.Cut(trimmed, "\nObjective\n"); ok {
+		for line := range strings.SplitSeq(afterObj, "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" || !strings.HasPrefix(line, "- ") {
+				break
+			}
+			item := strings.TrimSpace(strings.TrimPrefix(line, "- "))
+			item = strings.TrimSpace(standingProvenanceRE.ReplaceAllString(item, ""))
+			switch {
+			case strings.HasPrefix(item, "Session started with:"):
+				started = strings.TrimSpace(strings.TrimPrefix(item, "Session started with:"))
+			case strings.HasPrefix(item, "Latest request before compaction:"):
+				latest = strings.TrimSpace(strings.TrimPrefix(item, "Latest request before compaction:"))
+			case strings.HasPrefix(item, "Latest request:"):
+				latest = strings.TrimSpace(strings.TrimPrefix(item, "Latest request:"))
+			case latest == "":
+				latest = item
+			}
+		}
+	}
+	if wantGoal {
+		if started != "" {
+			return started
+		}
+		return latest
+	}
+	if latest != "" && !trivialContinuation(latest) && !notARequest(latest) {
+		return latest
+	}
+	return started
 }
 
 // sameRequest reports whether the goal is the objective, or the start of it:

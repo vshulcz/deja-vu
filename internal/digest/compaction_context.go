@@ -181,13 +181,21 @@ func reverseMessages(in []model.Message) []model.Message {
 }
 
 func contextObjective(s model.Session, window []model.Message) model.ContextFact {
+	var fallbackRule model.ContextFact
 	for _, m := range slices.Backward(window) {
 
 		if m.Role != "user" || IsAgentArtifact(m.Text) || IsCompactionSummary(strings.TrimSpace(m.Text)) {
 			continue
 		}
-		text := contextProse(m.Text, contextObjectiveBytes)
-		if text != "" && !trivialContinuation(text) && !notARequest(m.Text) {
+		raw := unwrapHandoffPrompt(m.Text, false)
+		text := contextProse(raw, contextObjectiveBytes)
+		if text != "" && !trivialContinuation(text) && !notARequest(raw) {
+			if onlyStandingRules(raw) {
+				if fallbackRule.Text == "" {
+					fallbackRule = model.ContextFact{Text: text, Provenance: contextRef(s, m)}
+				}
+				continue
+			}
 			return model.ContextFact{Text: text, Provenance: contextRef(s, m)}
 		}
 	}
@@ -205,10 +213,20 @@ func contextObjective(s model.Session, window []model.Message) model.ContextFact
 		if m.Role != "user" || IsAgentArtifact(m.Text) || IsCompactionSummary(strings.TrimSpace(m.Text)) {
 			continue
 		}
-		text := contextProse(m.Text, contextObjectiveBytes)
-		if text != "" && !trivialContinuation(text) && !notARequest(m.Text) {
+		raw := unwrapHandoffPrompt(m.Text, false)
+		text := contextProse(raw, contextObjectiveBytes)
+		if text != "" && !trivialContinuation(text) && !notARequest(raw) {
+			if onlyStandingRules(raw) {
+				if fallbackRule.Text == "" {
+					fallbackRule = model.ContextFact{Text: text, Provenance: contextRef(s, m)}
+				}
+				continue
+			}
 			return model.ContextFact{Text: text, Provenance: contextRef(s, m)}
 		}
+	}
+	if fallbackRule.Text != "" {
+		return fallbackRule
 	}
 	// The first user record after a host compaction is its summary, not a
 	// statement from the user. Its bounded primary intent is still the only
@@ -265,7 +283,10 @@ func trivialContinuation(text string) bool {
 // that the handover picker has no use for: `nudgeWords` is shared with it, and
 // these belong to this rule alone.
 var continuationWords = append(append([]string{}, nudgeWords...),
-	"y", "proceed", "please", "please continue", "continue please", "please do it")
+	"y", "proceed", "please", "please continue", "continue please", "please do it",
+	"and", "then", "also",
+	"и", "а", "ну", "еще", "ещё", "после чего",
+	"那", "那么")
 
 // onlyNudges reports whether the turn is made of nudge words and nothing else.
 // Longest match first, so "давай дальше" is one nudge rather than "давай" plus a

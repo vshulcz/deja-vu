@@ -58,14 +58,17 @@ const resumeFileCap = 5
 func ResumeFrom(s model.Session, readsAsFailure func(output string) bool) Resume {
 	var r Resume
 	var files []string
+	awaitingOutput := false
 	for _, m := range s.Messages {
 		text := strings.TrimSpace(m.Text)
 		switch m.Role {
 		case "user":
-			if !worthAsAsk(text) {
+			awaitingOutput = false
+			u := unwrapHandoffPrompt(text, false)
+			if !worthAsAsk(u) {
 				continue
 			}
-			r.Asked = firstSentences(text, 2)
+			r.Asked = firstSentences(u, 2)
 		case "assistant":
 			if text == "" || IsAgentArtifact(text) {
 				continue
@@ -90,11 +93,13 @@ func ResumeFrom(s model.Session, readsAsFailure func(output string) bool) Resume
 		case sources.RoleCommand:
 			if line := firstTextLine(text); line != "" {
 				r.Command, r.Failed = clipResumeCommand(line, resumeCommandMax), false
+				awaitingOutput = !strings.HasSuffix(line, "→ exit 0")
 			}
 		case sources.RoleToolOutput:
-			if r.Command != "" && readsAsFailure != nil && readsAsFailure(text) {
+			if awaitingOutput && r.Command != "" && readsAsFailure != nil && readsAsFailure(text) {
 				r.Failed = true
 			}
+			awaitingOutput = false
 		}
 	}
 	r.Files = newestFirst(files)
@@ -150,11 +155,17 @@ const (
 // nudgeWords are the ways a reader says "carry on", which is not a task.
 var nudgeWords = []string{
 	"да", "нет", "ок", "окей", "давай", "давай дальше", "давай еще", "давай ещё",
+	"давай еще думать", "давай ещё думать", "давай подумаем",
 	"дальше", "продолжай", "продолжаем", "поехали", "угу", "ага", "спасибо",
-	"мержи", "мержь", "что дальше", "а что дальше",
+	"мержи", "мержь", "что дальше", "а что дальше", "что делаем", "что делаем дальше",
+	"дальше что делаем", "что дальше делаем", "что дальше будем делать",
+	"что дальше делать", "что дальше делать будем", "а что дальше делать будем",
+	"дальше что", "а дальше", "и дальше", "куда дальше",
 	"ok", "okay", "yes", "no", "go", "go on", "continue", "carry on", "thanks",
-	"sure", "do it", "please do",
+	"sure", "do it", "please do", "what next", "what's next", "whats next",
+	"what do we do next", "what now", "now what",
 	"继续", "接着做", "继续做", "好的", "好", "可以", "行", "下一步", "接下来做什么",
+	"下一步做什么", "接下来呢", "下一步呢", "然后呢", "下面做什么", "接着做什么",
 	"没问题", "合并", "合并吧", "搞定", "谢谢", "再来",
 }
 

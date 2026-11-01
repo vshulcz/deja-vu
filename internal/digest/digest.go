@@ -1025,8 +1025,12 @@ func handoffOutputFailed(output string) bool {
 
 func lastCommandFailureLine(s model.Session) string {
 	for i, m := range slices.Backward(s.Messages) {
-		if m.Role != sources.RoleCommand || firstTextLine(m.Text) == "" {
+		first := firstTextLine(m.Text)
+		if m.Role != sources.RoleCommand || first == "" {
 			continue
+		}
+		if strings.HasSuffix(first, "→ exit 0") {
+			return ""
 		}
 		if _, rest, ok := strings.Cut(m.Text, "\n"); ok {
 			if line := firstHandoffFailureLine(rest); line != "" {
@@ -1034,12 +1038,16 @@ func lastCommandFailureLine(s model.Session) string {
 			}
 		}
 		for _, next := range s.Messages[i+1:] {
+			if next.Role == "user" {
+				break
+			}
 			if next.Role != sources.RoleToolOutput && next.Role != "tool_output" {
 				continue
 			}
 			if line := firstHandoffFailureLine(next.Text); line != "" {
 				return line
 			}
+			break
 		}
 		break
 	}

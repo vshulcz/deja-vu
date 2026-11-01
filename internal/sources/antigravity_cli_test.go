@@ -311,3 +311,34 @@ func TestParseAntigravityCLIToolCallsAndHomeProject(t *testing.T) {
 		t.Errorf("subagent project = %q, want parent's resolved project %q", subSessions[0].Project, wantProj)
 	}
 }
+
+func TestAntigravityDropsHookDeniedToolCall(t *testing.T) {
+	dir := t.TempDir()
+	transcript := filepath.Join(dir, "transcript.jsonl")
+	body := `{"source":"USER_EXPLICIT","content":"check status","created_at":"2026-08-14T09:00:00Z","type":"USER_INPUT"}` + "\n" +
+		`{"source":"MODEL","type":"PLANNER_RESPONSE","created_at":"2026-08-14T09:00:01Z","tool_calls":[{"name":"run_command","args":{"CommandLine":"git status -s && git log -1"}},{"name":"run_command","args":{"CommandLine":"git status -s"}}]}` + "\n" +
+		`{"source":"MODEL","type":"GENERIC","status":"ERROR","content":"Encountered error in tool execution: tool call denied by pre-tool hook","created_at":"2026-08-14T09:00:02Z"}` + "\n" +
+		`{"source":"MODEL","type":"GENERIC","status":"DONE","content":"The command exited with code 0.\nOutput:\nM README.md","created_at":"2026-08-14T09:00:03Z"}` + "\n"
+	if err := os.WriteFile(transcript, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sessions, err := ParseAntigravityFile(transcript)
+	if err != nil || len(sessions) != 1 {
+		t.Fatalf("ParseAntigravityFile: len=%d err=%v", len(sessions), err)
+	}
+	var cmds, outputs []string
+	for _, m := range sessions[0].Messages {
+		switch m.Role {
+		case RoleCommand:
+			cmds = append(cmds, m.Text)
+		case RoleToolOutput:
+			outputs = append(outputs, m.Text)
+		}
+	}
+	if len(cmds) != 1 || cmds[0] != "$ git status -s  → exit 0" {
+		t.Errorf("commands = %v, want only [\"$ git status -s  → exit 0\"] (hook-denied command dropped)", cmds)
+	}
+	if len(outputs) != 1 || outputs[0] != "The command exited with code 0.\nOutput:\nM README.md" {
+		t.Errorf("outputs = %v, want 1 output containing M README.md", outputs)
+	}
+}
