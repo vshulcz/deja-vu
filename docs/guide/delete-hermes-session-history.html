@@ -158,12 +158,12 @@
 
 <h1>How to delete Hermes session history, and what you lose</h1>
 <p class="pagelede">every turn, tool call and compacted archive lives in <code>state.db</code><span class="mins" data-mins></span></p>
-<p>Hermes keeps its conversation history in SQLite rather than one file per chat. Even turns that were compacted or rewound during a long run stay in the database as inactive rows (`active = 0`) unless the session itself is removed.</p>
+<p>Hermes keeps its conversation history in SQLite rather than one file per chat. Even turns that were compacted or rewound during a long run stay in the database as inactive rows (<code>active = 0</code>) unless the session itself is removed.</p>
 
 <h2>Where the sessions are</h2>
 <pre>${HERMES_HOME:-~/.hermes}/state.db
 ${HERMES_HOME:-~/.hermes}/profiles/&lt;profile&gt;/state.db</pre>
-<p>Since Hermes 0.17, the default store sits at <code>~/.hermes/state.db</code> (or under <code>$HERMES_HOME</code> when set). Named profiles and older releases keep one <code>state.db</code> per profile under <code>~/.hermes/profiles/&lt;profile&gt;/state.db</code>. Inside each file, the <code>sessions</code> table records the session <code>id</code>, <code>cwd</code>, <code>git_repo_root</code> and <code>title</code>, and the <code>messages</code> table holds every prompt, assistant reply, <code>terminal</code> command, file patch and compaction summary grouped by <code>session_id</code>.</p>
+<p>Since Hermes 0.17, the default store sits at <code>~/.hermes/state.db</code> (or under <code>$HERMES_HOME</code> when set). Named profiles and older releases keep one <code>state.db</code> per profile under <code>~/.hermes/profiles/&lt;profile&gt;/state.db</code>, and a machine upgraded from an older build can hold both. Inside each file, the <code>sessions</code> table records the session <code>id</code>, <code>cwd</code>, <code>git_repo_root</code> and <code>title</code>, and the <code>messages</code> table holds every prompt, assistant reply, <code>terminal</code> command, file patch and compaction summary grouped by <code>session_id</code>.</p>
 <p>If your <code>config.yaml</code> sets <code>sessiondb.provider: postgresql</code>, Hermes writes the same <code>messages</code> columns to Postgres instead of <code>state.db</code>; the steps below cover the default SQLite stores.</p>
 
 <h2>How to delete one session</h2>
@@ -191,7 +191,7 @@ rm -f state.db state.db-wal state.db-shm</pre>
 <p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads <code>state.db</code> across your default home and every profile — along with the other forty-two agents' histories on the machine — into one local index:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "hermes session about the migration"</pre>
-<p><a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> removes a session from the index for good. A session you removed in Hermes stays readable with <code>deja show</code> and under the Deleted tab of bare <code>deja</code>, while deja never writes rows back into <code>state.db</code>. <code>DEJA_HERMES_HOME</code>, <code>DEJA_HERMES_PROFILES_ROOT</code>, <code>DEJA_HERMES_DB</code> and <code>DEJA_HERMES_PG_DSN</code> let you point deja at a backup database or a Postgres store without moving Hermes.</p>
+<p><a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> removes a session from the index for good. A session you removed in Hermes stays readable with <code>deja show</code> and under the Deleted tab of bare <code>deja</code>; <code>deja resume</code> refuses a deleted session with a pointer to <code>deja show</code> rather than handing back a <code>hermes --resume</code> command that Hermes will reject, and deja never writes rows back into <code>state.db</code>. <code>DEJA_HERMES_HOME</code>, <code>DEJA_HERMES_PROFILES_ROOT</code>, <code>DEJA_HERMES_DB</code> and <code>DEJA_HERMES_PG_DSN</code> let you point deja at a backup database or a Postgres store without moving Hermes.</p>
 
 <p><a href="where-sessions-are-stored.html">Where every agent keeps its history</a> · <a href="memory-for-hermes.html">Memory for Hermes</a> · <a href="../registry/hermes.html">The Hermes format</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
