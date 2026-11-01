@@ -1780,6 +1780,7 @@ func rankRecall(dir, q, harness, project string, window int) (rankedRecall, erro
 	// A fork quoting the turns its source holds said everything twice, the
 	// same as on the search screen (#5320, #5335).
 	hits = dropCopiedHits(dir, hits)
+	hits = diversifyUncoveredTerms(hits, q, result.TermIDF, added)
 	return rankedRecall{result: result, o: o, hits: hits, policyHidden: policyHidden, unread: unread, about: about, cov: cov, added: added}, nil
 }
 
@@ -2340,6 +2341,9 @@ func recallConclusionLines(dir, q string, h search.Hit, o search.Options, left i
 		// costs far more context than naming the paths here does.
 		if paths := recallTouchedLine(dir, h.Session, query.Tokens(q)); paths != "" {
 			out = append(out, "  files it touched: "+paths+"\n")
+		}
+		if diffLines := recallCodeChangedLines(whole, q); len(diffLines) > 0 {
+			out = append(out, diffLines...)
 		}
 		// And what it ran, with the status the harness recorded. The
 		// line above says where the work was; this one is the only

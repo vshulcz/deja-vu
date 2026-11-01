@@ -206,3 +206,45 @@ func TestAWordEverySessionSaysNamesNothing(t *testing.T) {
 		t.Errorf("a word every session says was taken as naming one of them:\n%s", got)
 	}
 }
+
+func TestPromptHookUnscopedCwdRequiresNamedSubject(t *testing.T) {
+	hermeticEnv(t)
+	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
+	at := time.Now().Add(-72 * time.Hour).UTC()
+	lines := []string{
+		jsonLine(t, map[string]any{"type": "user", "sessionId": "other1",
+			"timestamp": at.Format(time.RFC3339),
+			"message":   map[string]any{"role": "user", "content": "почему падает загрузка фотографий в zarvoxd после сжатия?"}}),
+		jsonLine(t, map[string]any{"type": "assistant", "sessionId": "other1",
+			"timestamp": at.Add(time.Second).Format(time.RFC3339),
+			"message":   map[string]any{"role": "assistant", "content": "Загрузка фотографий падала: сжатие отдавало пустой файл в zarvoxd."}}),
+	}
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "-tmp-otherproj", "other1.jsonl"), "other1", lines)
+	padStoreWithOtherWork(t, claudeRoot)
+	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	home := os.Getenv("HOME")
+	if err := os.MkdirAll(home, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(home)
+
+	var out bytes.Buffer
+	in := jsonLine(t, map[string]string{"prompt": "снова сломалась загрузка фотографий, глянь сжатие", "cwd": home, "session_id": "ask-1"})
+	if err := runHookPromptMode(index.DefaultDir(), strings.NewReader(in), &out, true); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "пустой файл") {
+		t.Fatalf("unscoped cwd injected unrelated project on generic words:\n%s", out.String())
+	}
+
+	out.Reset()
+	inNamed := jsonLine(t, map[string]string{"prompt": "что там было с zarvoxd и сжатие?", "cwd": home, "session_id": "ask-2"})
+	if err := runHookPromptMode(index.DefaultDir(), strings.NewReader(inNamed), &out, true); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "zarvoxd") {
+		t.Fatalf("unscoped cwd with named subject failed to recall:\n%s", out.String())
+	}
+}

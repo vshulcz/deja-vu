@@ -356,7 +356,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		leadTerms = ordered[:min(len(ordered), leadTermsKept)]
 	}
 	pol := policy.Load()
-	pk := &promptPicker{pol: pol, terms: terms, idfOf: idfOf, topIDF: index.TopIDF(dir), self: self, leadTerms: leadTerms, ss: make([]model.Session, 0, 2)}
+	pk := &promptPicker{pol: pol, terms: terms, idfOf: idfOf, topIDF: index.TopIDF(dir), self: self, leadTerms: leadTerms, unscoped: len(names) == 0, ss: make([]model.Session, 0, 2)}
 	pk.pick(ranked, matched, strong, naming)
 	// One slot left and duplicates took the window: ask for a wider one. The
 	// second pass costs a ranking read and happens only when the store said
@@ -592,6 +592,7 @@ type promptPicker struct {
 	topIDF    float64
 	self      map[string]bool
 	leadTerms []string
+	unscoped  bool
 
 	ss        []model.Session
 	confident bool
@@ -733,6 +734,9 @@ func (p *promptPicker) leadTermsMeet(s model.Session) bool {
 	}
 	if len(named) > 0 && search.SpeechCarriesAnyTerm(s, named) {
 		return true
+	}
+	if p.unscoped {
+		return false
 	}
 	return search.SpeechCarriesTermsTogether(s, p.leadTerms, 2)
 }

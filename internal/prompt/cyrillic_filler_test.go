@@ -46,6 +46,12 @@ func TestCyrillicFillerLeavesOnlyTheSubject(t *testing.T) {
 			want:    []string{"singbox"},
 			notWant: []string{"погоди", "смотри"},
 		},
+		{
+			name:    "meta discussion words",
+			prompt:  "давай по порядку разобрать проблемы и улучшения в pgbouncer, структуру и архитектуру",
+			want:    []string{"pgbouncer"},
+			notWant: []string{"порядку", "разобрать", "проблемы", "улучшения", "структуру", "архитектуру"},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got := Terms(tc.prompt)

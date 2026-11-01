@@ -111,3 +111,40 @@ func TestNotesAreNotEarlierAttempts(t *testing.T) {
 		t.Errorf("transcript marked as superseded by a note: %q", got)
 	}
 }
+
+func TestEarlierAttemptMarkedBySharedTouchedFile(t *testing.T) {
+	now := time.Now()
+	older := model.Session{
+		ID:      "older-edit",
+		Harness: "claude",
+		Project: "api",
+		Updated: now.AddDate(0, 0, -14),
+		Touched: []string{"internal/pool/retry.go"},
+		Messages: []model.Message{
+			{Role: "user", Text: "backoff retry jitter behaves badly under load"},
+			{Role: "assistant", Text: "Adjusted the initial cap in internal/pool/retry.go to two seconds."},
+		},
+	}
+	newer := model.Session{
+		ID:      "newer-edit",
+		Harness: "claude",
+		Project: "api",
+		Updated: now.AddDate(0, 0, -1),
+		Touched: []string{"internal/pool/retry.go"},
+		Messages: []model.Message{
+			{Role: "user", Text: "backoff schedule still spikes during failover"},
+			{Role: "assistant", Text: "Replaced the linear step in internal/pool/retry.go with full jitter."},
+		},
+	}
+	hits := RelevanceHitsWeighted([]model.Session{newer, older}, []string{"backoff", "retry"}, nil)
+	byID := map[string]Hit{}
+	for _, h := range hits {
+		byID[h.Session.ID] = h
+	}
+	if byID["older-edit"].Superseded == "" {
+		t.Fatalf("expected older session touching the same file to be marked superseded, got %+v", byID["older-edit"])
+	}
+	if got := EarlierAttempts([]model.Session{newer, older}); got["older-edit"] == "" {
+		t.Fatalf("expected EarlierAttempts to mark older-edit via shared touched file, got %v", got)
+	}
+}

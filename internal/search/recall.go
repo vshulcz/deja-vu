@@ -1333,7 +1333,8 @@ func EarlierAttempts(ss []model.Session) map[string]string {
 			if !b.Updated.After(a.Updated.Add(24*time.Hour)) || b.Updated.After(now) {
 				continue
 			}
-			if snippetOverlap(words[i], words[j]) < 0.6 {
+			ov := snippetOverlap(words[i], words[j])
+			if ov < 0.6 && !(ov > 0 && sharedTouchedTarget(a, b)) {
 				continue
 			}
 			out[a.ID] = b.Updated.Local().Format("2006-01-02")

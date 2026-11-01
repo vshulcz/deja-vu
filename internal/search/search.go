@@ -764,12 +764,53 @@ func markEarlierAttemptsAt(hits []Hit, now time.Time) {
 			if b.Session.Updated.After(now) {
 				continue
 			}
-			if snippetOverlap(sets[i], sets[j]) < 0.6 {
+			ov := snippetOverlap(sets[i], sets[j])
+			if ov < 0.6 && !(ov > 0 && sharedTouchedTarget(a.Session, b.Session)) {
 				continue
 			}
 			hits[i].Superseded = b.Session.Updated.Local().Format("2006-01-02")
 		}
 	}
+}
+
+func sharedTouchedTarget(a, b model.Session) bool {
+	af := sessionTouchedFiles(a)
+	if len(af) == 0 {
+		return false
+	}
+	bf := sessionTouchedFiles(b)
+	if len(bf) == 0 {
+		return false
+	}
+	seen := make(map[string]bool, len(af))
+	for _, p := range af {
+		seen[p] = true
+	}
+	for _, p := range bf {
+		if seen[p] {
+			return true
+		}
+	}
+	return false
+}
+
+func sessionTouchedFiles(s model.Session) []string {
+	var out []string
+	for _, p := range s.Touched {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	for _, m := range s.Messages {
+		if m.Role != "edit" && m.Role != "wrote" {
+			continue
+		}
+		p, _, _ := strings.Cut(m.Text, "\n")
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func snippetOverlap(a, b map[string]bool) float64 {
@@ -3476,7 +3517,9 @@ func RelevanceHitsWeighted(ss []model.Session, terms []string, idf map[string]fl
 		hit.Score = float64(len(ss) - rank)
 		hits[rank] = hit
 	})
-	return liftedNotes(hits)
+	out := liftedNotes(hits)
+	markEarlierAttempts(out)
+	return out
 }
 
 // parallelForSessions runs fn over 0..n-1, on one goroutine per core once there

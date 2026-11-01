@@ -138,3 +138,73 @@ func dedupTerms(terms []string) []string {
 	}
 	return out
 }
+
+// diversifyUncoveredTerms promotes into the second slot the highest-ranked hit
+// that covers query terms missed by the leading hit(s), when the top hits
+// cluster on the same subset of terms (#5768).
+func diversifyUncoveredTerms(hits []search.Hit, q string, idf map[string]float64, added string) []search.Hit {
+	terms := dedupTerms(index.RelevanceTerms(q))
+	if len(terms) < 2 || len(hits) < 3 {
+		return hits
+	}
+	slot := 1
+	if added != "" && hitKey(hits[1]) == added {
+		slot = 2
+	}
+	if len(hits) <= slot+1 {
+		return hits
+	}
+	held := sessionHolds(hits[0].Session, terms)
+	if len(held) == 0 || len(held) == len(terms) {
+		return hits
+	}
+	for i := 1; i <= slot; i++ {
+		for _, t := range sessionHolds(hits[i].Session, terms) {
+			if !slices.Contains(held, t) {
+				return hits
+			}
+		}
+	}
+	var missing []string
+	for _, t := range terms {
+		if !slices.Contains(held, t) {
+			missing = append(missing, t)
+		}
+	}
+	bestIdx := -1
+	bestWeight := 0.0
+	for k := slot + 1; k < len(hits); k++ {
+		if hits[k].Tier != hits[slot].Tier || hits[k].Lifecycle == "rejected" || hits[k].Session.Lifecycle == "rejected" {
+			continue
+		}
+		if hits[slot].Session.Project != "" && hits[k].Session.Project != hits[slot].Session.Project {
+			continue
+		}
+		covered := sessionHolds(hits[k].Session, missing)
+		if len(covered) == 0 {
+			continue
+		}
+		w := 0.0
+		for _, t := range covered {
+			if idf != nil && idf[t] > 0 {
+				w += idf[t]
+			} else {
+				w += 1.0
+			}
+		}
+		if w > bestWeight {
+			bestWeight = w
+			bestIdx = k
+		}
+	}
+	if bestIdx < 0 {
+		return hits
+	}
+	promoted := hits[bestIdx]
+	out := make([]search.Hit, 0, len(hits))
+	out = append(out, hits[:slot]...)
+	out = append(out, promoted)
+	out = append(out, hits[slot:bestIdx]...)
+	out = append(out, hits[bestIdx+1:]...)
+	return out
+}

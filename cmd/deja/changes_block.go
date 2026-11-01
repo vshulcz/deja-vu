@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/query"
 	"github.com/vshulcz/deja-vu/internal/redact"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -32,7 +33,7 @@ const (
 // Empty for a session that changed nothing, or whose harness it cannot read.
 func changesBlock(s model.Session, room int) string {
 	room = min(max(room, changesBlockMin), changesBlockMax)
-	cs := sources.FinalChanges(sources.Changes(s))
+	cs := sessionChanges(s)
 	if len(cs) == 0 {
 		return ""
 	}
@@ -136,4 +137,116 @@ func changeDiff(old, updated string) string {
 		out = append(out, "  "+l)
 	}
 	return strings.Join(out, "\n")
+}
+
+// sessionChanges returns the final code changes of s, reading from the raw
+// transcript when present and falling back to indexed RoleEdit/RoleWrote
+// records when the session carries only in-index messages.
+func sessionChanges(s model.Session) []sources.Change {
+	if cs := sources.FinalChanges(sources.Changes(s)); len(cs) > 0 {
+		return cs
+	}
+	var raw []sources.Change
+	for i := 0; i < len(s.Messages); i++ {
+		m := s.Messages[i]
+		if m.Role != sources.RoleEdit && m.Role != sources.RoleWrote {
+			continue
+		}
+		p, body, ok := strings.Cut(m.Text, "\n")
+		p = strings.TrimSpace(p)
+		body = strings.TrimSpace(body)
+		if !ok || p == "" || body == "" {
+			continue
+		}
+		if m.Role == sources.RoleEdit {
+			var newText string
+			if i+1 < len(s.Messages) && s.Messages[i+1].Role == sources.RoleWrote {
+				if wp, wbody, wok := strings.Cut(s.Messages[i+1].Text, "\n"); wok && strings.TrimSpace(wp) == p {
+					newText = stripWrotePrefix(wbody)
+					i++
+				}
+			}
+			raw = append(raw, sources.Change{Path: p, Old: body, New: newText})
+			continue
+		}
+		raw = append(raw, sources.Change{Path: p, New: stripWrotePrefix(body)})
+	}
+	return sources.FinalChanges(raw)
+}
+
+func stripWrotePrefix(s string) string {
+	lines := strings.Split(strings.TrimSpace(s), "\n")
+	for i, l := range lines {
+		if after, ok := strings.CutPrefix(l, "+ "); ok {
+			lines[i] = after
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+const recallCodeDiffMax = 240
+
+// recallCodeChangedLines returns a compact diff excerpt from the first file edit
+// whose removed or added code matches one of the query's terms.
+func recallCodeChangedLines(s model.Session, q string) []string {
+	var terms []string
+	for _, t := range query.Tokens(q) {
+		if len(t) >= 3 && !query.IsStopWord(t) {
+			terms = append(terms, strings.ToLower(t))
+		}
+	}
+	if len(terms) == 0 {
+		return nil
+	}
+	cs := sessionChanges(s)
+	for _, c := range cs {
+		lowOld, lowNew := strings.ToLower(c.Old), strings.ToLower(c.New)
+		matched := false
+		for _, t := range terms {
+			if strings.Contains(lowOld, t) || strings.Contains(lowNew, t) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			continue
+		}
+		var rawLines []string
+		switch {
+		case c.Old != "" && c.New != "":
+			for l := range strings.SplitSeq(changeDiff(c.Old, c.New), "\n") {
+				if strings.HasPrefix(l, "- ") || strings.HasPrefix(l, "+ ") {
+					rawLines = append(rawLines, l)
+				}
+			}
+		case c.Old != "":
+			for l := range strings.SplitSeq(strings.TrimSpace(c.Old), "\n") {
+				rawLines = append(rawLines, "- "+l)
+			}
+		case c.New != "":
+			for l := range strings.SplitSeq(strings.TrimSpace(c.New), "\n") {
+				rawLines = append(rawLines, "+ "+l)
+			}
+		}
+		if len(rawLines) == 0 {
+			continue
+		}
+		out := []string{"  code it changed (" + recallListingLine(c.Path) + "):\n"}
+		used := len(out[0])
+		for _, l := range rawLines {
+			if len(out) >= 5 {
+				break
+			}
+			clean := "    " + recallListingLine(l) + "\n"
+			if used+len(clean) > recallCodeDiffMax && len(out) > 1 {
+				break
+			}
+			out = append(out, clean)
+			used += len(clean)
+		}
+		if len(out) > 1 {
+			return out
+		}
+	}
+	return nil
 }

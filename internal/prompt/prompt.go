@@ -461,6 +461,16 @@ var cyrPromptStop = map[string]bool{
 	// showed "продолжай и не отключай больше сборку"; five messages of 142
 	// got a block whose only terms were words of this kind.
 	"продолжай": true, "продолжи": true, "хорошо": true,
+	"хотели": true, "хочется": true, "разобрать": true, "порядку": true,
+	"проблемы": true, "проблема": true, "улучшения": true, "улучшить": true,
+	"интереснее": true, "вариантом": true, "вариант": true, "варианты": true,
+	"лучшим": true, "лучше": true, "заметно": true, "требуется": true,
+	"механизмы": true, "механизм": true, "структуру": true, "структура": true,
+	"архитектуру": true, "архитектура": true, "продукт": true, "продукта": true,
+	"приоритетно": true, "остальном": true, "остальное": true, "заменить": true,
+	"изменить": true, "исправить": true, "починить": true, "умнее": true,
+	"эффективнее": true, "инструментом": true, "инструмент": true, "схему": true,
+	"схема": true, "найти": true, "может": true, "либо": true, "даже": true, "хотя": true,
 	"для": true, "при": true, "над": true, "под": true, "без": true,
 	"она": true, "они": true, "оно": true, "был": true, "была": true,
 	"мне": true, "нам": true, "вам": true,
