@@ -283,4 +283,31 @@ func TestParseAntigravityCLIToolCallsAndHomeProject(t *testing.T) {
 	if gotFiles == 0 || gotEdit == 0 || gotWrote < 2 {
 		t.Errorf("records: files=%d edit=%d wrote=%d, want >=1 files, >=1 edit, >=2 wrote", gotFiles, gotEdit, gotWrote)
 	}
+
+	// Subagent of a home-launched parent inherits the parent's file-resolved project.
+	subID := "sub-conv-0001"
+	subMetaDir := filepath.Join(root, "brain", convID, ".system_generated", "subagents")
+	if err = os.MkdirAll(subMetaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(subMetaDir, subID+".json"), []byte(`{"subagentDescriptor":{"typeName":"research","role":"Codebase Researcher"},"workspaceUris":["file:///Users/me"]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	subLogs := filepath.Join(root, "brain", subID, ".system_generated", "logs")
+	if err = os.MkdirAll(subLogs, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	subTranscript := filepath.Join(subLogs, "transcript.jsonl")
+	subBody := `{"source":"USER_EXPLICIT","content":"research the pool cap","created_at":"2026-08-14T09:01:00Z","type":"USER_INPUT"}` + "\n" +
+		`{"source":"MODEL","type":"PLANNER_RESPONSE","content":"The pool cap is 64.","created_at":"2026-08-14T09:01:05Z"}` + "\n"
+	if err = os.WriteFile(subTranscript, []byte(subBody), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	subSessions, err := ParseAntigravityFile(subTranscript)
+	if err != nil || len(subSessions) != 1 {
+		t.Fatalf("subagent parse: len=%d err=%v", len(subSessions), err)
+	}
+	if subSessions[0].Project != wantProj {
+		t.Errorf("subagent project = %q, want parent's resolved project %q", subSessions[0].Project, wantProj)
+	}
 }

@@ -63,7 +63,7 @@ func StoryOf(s model.Session) Story {
 		case sources.RoleEdit, sources.RoleWrote:
 			// The path is the first line; the rest is the replaced span or
 			// the hashes of what was written.
-			if f := firstTextLine(text); looksLikeAPath(f) && !throwawayPath(f) {
+			if f := sources.CollapseWorktreePath(firstTextLine(text)); looksLikeAPath(f) && !throwawayPath(f) {
 				files = append(files, f)
 			}
 		case sources.RoleCommand:

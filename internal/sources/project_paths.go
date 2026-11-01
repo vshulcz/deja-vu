@@ -34,7 +34,7 @@ func projectFromPaths(ms []model.Message) string {
 			continue
 		}
 		for p := range strings.SplitSeq(m.Text, "\n") {
-			p = strings.TrimSpace(p)
+			p = CollapseWorktreePath(strings.TrimSpace(p))
 			if p == "" {
 				continue
 			}
@@ -95,6 +95,34 @@ func isHomeOrEmptyProject(p string) bool {
 	}
 	parts := strings.Split(p, "/")
 	return len(parts) == 2 && (strings.EqualFold(parts[0], "Users") || strings.EqualFold(parts[0], "home")) && parts[1] != ""
+}
+
+// handoffProject extracts the source project from a `deja handoff` opening
+// prompt when a handed-off session was started from a home directory and has
+// not yet touched enough files to name its repository.
+func handoffProject(ms []model.Message) string {
+	const marker = " session (project "
+	for _, m := range ms {
+		if m.Role != "user" {
+			continue
+		}
+		if !strings.Contains(m.Text, "handed off from a ") {
+			continue
+		}
+		_, rest, ok := strings.Cut(m.Text, marker)
+		if !ok {
+			continue
+		}
+		proj, _, ok := strings.Cut(rest, ",")
+		if !ok {
+			continue
+		}
+		proj = strings.TrimSpace(proj)
+		if !isHomeOrEmptyProject(proj) {
+			return proj
+		}
+	}
+	return ""
 }
 
 var repoRootCache sync.Map

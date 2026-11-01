@@ -73,9 +73,16 @@ func ResumeFrom(s model.Session, readsAsFailure func(output string) bool) Resume
 			if worthAsDecision(text) {
 				r.Decision = firstSentences(text, 1)
 			}
-		case sources.RoleEdit, sources.RoleFiles:
+		case sources.RoleEdit, sources.RoleWrote:
+			for f := range strings.FieldsSeq(firstTextLine(text)) {
+				f = sources.CollapseWorktreePath(strings.TrimRight(strings.Trim(f, " \t\n\r\"'`"), ",;:)"))
+				if looksLikeAPath(f) && !throwawayPath(f) {
+					files = append(files, f)
+				}
+			}
+		case sources.RoleFiles:
 			for f := range strings.FieldsSeq(text) {
-				f = strings.TrimRight(strings.Trim(f, " \t\n\r\"'`"), ",;:)")
+				f = sources.CollapseWorktreePath(strings.TrimRight(strings.Trim(f, " \t\n\r\"'`"), ",;:)"))
 				if looksLikeAPath(f) && !throwawayPath(f) {
 					files = append(files, f)
 				}
@@ -177,9 +184,12 @@ func aboutToExplain(text string) bool {
 	}
 	for _, p := range []string{
 		"отвечаю", "расскажу", "объясню", "сейчас посмотрю", "давай разберём",
+		"жду завершения", "ждём завершения", "ждем завершения", "ожидаю завершения",
 		"let me explain", "i'll explain", "here is how", "here's how",
 		"let me look", "i'll look",
+		"waiting for the command", "waiting for tests", "will wait for it to finish",
 		"我来解释", "让我解释", "我先看看", "让我看看", "下面是",
+		"等待测试", "等待命令", "正在等待",
 	} {
 		if strings.Contains(low, p) {
 			return true

@@ -85,3 +85,23 @@ func TestLooksLikeAPath(t *testing.T) {
 		}
 	}
 }
+
+func TestResumeFromEditSpanWroteAndMidTurnWait(t *testing.T) {
+	s := model.Session{Messages: []model.Message{
+		{Role: "assistant", Text: "Исправил сохранение префиксов в normalizeFriction."},
+		{Role: "assistant", Text: "Исправил сохранение префиксов в normalizeFriction, жду завершения тестов cmd/deja и golangci-lint."},
+		{Role: sources.RoleEdit, Text: "/Users/x/work/.claude/worktrees/fix-wt/cmd/deja/files.go\nimport \"internal/bogus/span.go\""},
+		{Role: sources.RoleWrote, Text: "/Users/x/work/.claude/worktrees/fix-wt/cmd/deja/blame.go\n0123456789abcdef"},
+	}}
+	r := ResumeFrom(s, nil)
+	if strings.Contains(r.Decision, "жду завершения") {
+		t.Errorf("mid-turn waiting update selected as decision: %q", r.Decision)
+	}
+	if !strings.Contains(r.Decision, "normalizeFriction") {
+		t.Errorf("expected real decision, got %q", r.Decision)
+	}
+	wantFiles := []string{"/Users/x/work/cmd/deja/blame.go", "/Users/x/work/cmd/deja/files.go"}
+	if len(r.Files) != len(wantFiles) || r.Files[0] != wantFiles[0] || r.Files[1] != wantFiles[1] {
+		t.Errorf("Files = %v, want %v (collapsed worktree paths, no code span tokens)", r.Files, wantFiles)
+	}
+}

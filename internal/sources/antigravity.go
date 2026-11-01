@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -331,7 +332,7 @@ func parseAntigravityWith(path string, scan func(func(map[string]any)) error) ([
 			}
 		}
 		if isHomeOrEmptyProject(s.Project) && parent != "" {
-			if pp := antigravityProject(parent); !isHomeOrEmptyProject(pp) {
+			if pp := antigravityParentProject(path, parent); !isHomeOrEmptyProject(pp) {
 				s.Project = pp
 			}
 		}
@@ -880,7 +881,7 @@ func antigravityProjectFromFiles(messages []model.Message) string {
 			continue
 		}
 		for line := range strings.SplitSeq(m.Text, "\n") {
-			line = strings.TrimSpace(line)
+			line = CollapseWorktreePath(strings.TrimSpace(line))
 			if !isAbsolutePath(line) || agentScratch(line) {
 				continue
 			}
@@ -899,7 +900,7 @@ func antigravityProjectFromFiles(messages []model.Message) string {
 	// Three segments past the root is "/Users/<name>" — a home directory,
 	// which names no project.
 	if len(common) < 4 {
-		return ""
+		return handoffProject(messages)
 	}
 	dir := strings.Join(common, "/")
 	// A session that touched one file deep in a tree shares only that file's
@@ -907,9 +908,54 @@ func antigravityProjectFromFiles(messages []model.Message) string {
 	// above it is the answer whenever it is still on disk.
 	for probe, depth := dir, len(common); depth >= 4; depth-- {
 		if fi, err := os.Stat(filepath.Join(probe, ".git")); err == nil && (fi.IsDir() || fi.Mode().IsRegular()) {
-			return projectName(probe)
+			return cwdProjectName(probe)
 		}
 		probe = path.Dir(probe)
 	}
-	return projectName(dir)
+	return cwdProjectName(dir)
+}
+
+var antigravityParentProjCache sync.Map // parentTranscript -> antigravityCachedProj
+
+type antigravityCachedProj struct {
+	modNano int64
+	proj    string
+}
+
+func antigravityParentProject(path, parent string) string {
+	if pp := antigravityProject(parent); !isHomeOrEmptyProject(pp) {
+		return pp
+	}
+	root := filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(path)))))
+	parentTranscript := filepath.Join(root, "brain", parent, ".system_generated", "logs", "transcript.jsonl")
+	fi, err := os.Stat(parentTranscript)
+	if err != nil {
+		return ""
+	}
+	if v, ok := antigravityParentProjCache.Load(parentTranscript); ok {
+		if c, ok := v.(antigravityCachedProj); ok && c.modNano == fi.ModTime().UnixNano() {
+			return c.proj
+		}
+	}
+	var msgs []model.Message
+	_ = scanJSONLFromOffset(parentTranscript, 0, func(m map[string]any) {
+		switch str(m["source"]) {
+		case "USER_EXPLICIT":
+			if t := cleanAntigravityUserContent(str(m["content"])); t != "" {
+				msgs = append(msgs, model.Message{Role: "user", Text: t})
+			}
+		case "MODEL":
+			calls, _ := antigravityToolCalls(m["tool_calls"], time.Time{})
+			msgs = append(msgs, calls...)
+			if text := strings.TrimSpace(str(m["content"])); text != "" {
+				msgs = append(msgs, antigravityStep(str(m["type"]), capParsedMessage(text), time.Time{})...)
+			}
+		}
+	})
+	proj := antigravityProjectFromFiles(msgs)
+	antigravityParentProjCache.Store(parentTranscript, antigravityCachedProj{
+		modNano: fi.ModTime().UnixNano(),
+		proj:    proj,
+	})
+	return proj
 }

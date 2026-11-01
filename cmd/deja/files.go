@@ -21,6 +21,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/query"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/termwidth"
 )
 
@@ -415,7 +416,7 @@ func tallyFilesNear(full250 []model.Session, needles []string) filesTally {
 				continue
 			}
 			for p := range strings.SplitSeq(m.Text, "\n") {
-				p = strings.TrimSpace(p)
+				p = sources.CollapseWorktreePath(strings.TrimSpace(p))
 				if p == "" || isScratch(p) {
 					continue
 				}

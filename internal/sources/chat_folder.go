@@ -47,3 +47,32 @@ func dropChatFolder(segs []string) []string {
 	}
 	return segs
 }
+
+// CollapseWorktreePath strips a Claude Code `.claude/worktrees/<name>` segment
+// from a checkout or file path so work done in a worktree maps back to the
+// repository path it belongs to.
+func CollapseWorktreePath(p string) string {
+	for _, marker := range []string{"/.claude/worktrees/", `\.claude\worktrees\`} {
+		i := strings.Index(p, marker)
+		if i <= 0 {
+			continue
+		}
+		prefix := p[:i]
+		if prefix == "/" || prefix == `\` || isDriveSegment(prefix) {
+			continue
+		}
+		rest := p[i+len(marker):]
+		if rest == "" {
+			continue
+		}
+		sep := strings.IndexAny(rest, `/\`)
+		if sep < 0 {
+			return prefix
+		}
+		if sep == 0 {
+			continue
+		}
+		return prefix + rest[sep:]
+	}
+	return p
+}
