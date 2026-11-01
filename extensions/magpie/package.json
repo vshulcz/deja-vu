@@ -1,0 +1,56 @@
+{
+  "name": "@vshulcz/magpie-deja",
+  "version": "0.23.3",
+  "description": "Project-scoped session recall from your local deja-vu index for coding agents behind Magpie. Recalled excerpts are appended to the request sent to your model provider.",
+  "type": "module",
+  "main": "./deja.hooks.mjs",
+  "files": [
+    "deja.hooks.mjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vshulcz/deja-vu.git",
+    "directory": "extensions/magpie"
+  },
+  "homepage": "https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html",
+  "bugs": {
+    "url": "https://github.com/vshulcz/deja-vu/issues"
+  },
+  "keywords": [
+    "magpie",
+    "magpie-plugin",
+    "magpie-gateway",
+    "deja-vu",
+    "memory",
+    "recall",
+    "session-history",
+    "coding-agent",
+    "claude-code",
+    "codex",
+    "cursor",
+    "gemini-cli",
+    "opencode",
+    "hermes"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@vshulcz/deja-vu": "^0.23.3"
+  },
+  "magpie": {
+    "hooks": "./deja.hooks.mjs",
+    "options": {
+      "requestTimeoutMs": 800,
+      "maxBytes": 4000,
+      "recallRemote": false,
+      "allowUnscoped": false
+    }
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  }
+}

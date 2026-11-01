@@ -76,7 +76,7 @@ run("npm", ["publish", "--access", "public"], mainDir);
 // skipping left dsh-deja on npm asking for a deja two releases old, and its
 // version line is ahead of deja's, so "they converge on their own" never came
 // (#2993).
-const extensions = ["opencode", "dsh", "openclaw", "pi"];
+const extensions = ["opencode", "dsh", "openclaw", "pi", "magpie"];
 const published = [];
 for (const name of extensions) {
   const dir = path.join("extensions", name);

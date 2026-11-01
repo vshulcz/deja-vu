@@ -22,7 +22,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 
-export const PACKAGES = ["extensions/opencode", "extensions/dsh", "extensions/openclaw", "extensions/pi"];
+export const PACKAGES = ["extensions/opencode", "extensions/dsh", "extensions/openclaw", "extensions/pi", "extensions/magpie"];
 
 // npmLatest is the version npm serves as `latest`, or "" when the package has
 // never been published or npm cannot be reached. Unreachable is not drift: a

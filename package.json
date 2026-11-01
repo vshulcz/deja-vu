@@ -12,7 +12,6 @@
   },
   "files": [
     "extensions/dsh",
-    "extensions/magpie",
     "README.md",
     "LICENSE"
   ],
@@ -30,8 +29,6 @@
     "dsh",
     "dsh-plugin",
     "deepseek-harness",
-    "magpie",
-    "magpie-plugin",
     "memory",
     "recall",
     "session-history",
@@ -46,13 +43,11 @@
     "gemini-cli",
     "mcp",
     "mcp-server",
-    "session-search"
+    "session-search",
+    "local-first"
   ],
   "engines": {
     "node": ">=18"
-  },
-  "magpie": {
-    "hooks": "./extensions/magpie/deja.hooks.mjs"
   },
   "dsh": {
     "bundle": {

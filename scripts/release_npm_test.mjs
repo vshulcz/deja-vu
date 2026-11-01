@@ -39,7 +39,7 @@ test("the extension packages are published from the release version", () => {
   // plugin that ships the wrong binary as its fallback.
   assert.match(source, /outPkg\.version = publishAs/);
   assert.match(source, /outPkg\.dependencies\["@vshulcz\/deja-vu"\] = `\^\$\{version\}`/);
-  assert.match(source, /const extensions = \["opencode", "dsh", "openclaw", "pi"\]/);
+  assert.match(source, /const extensions = \["opencode", "dsh", "openclaw", "pi", "magpie"\]/);
 });
 
 test("a package whose line runs ahead is published, not skipped", () => {

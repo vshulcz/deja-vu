@@ -127,6 +127,36 @@ jobs:
 
       - run: npm test
 
+  magpie:
+    name: magpie-deja
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: extensions/magpie
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+
+      - name: The plugin has to parse and export onRequest
+        run: |
+          node --check deja.hooks.mjs
+          node -e "const m = await import('./deja.hooks.mjs'); if (typeof m.onRequest !== 'function') throw new Error('no onRequest export')"
+
+      - name: The manifest declares magpie.hooks pointing at an existing file
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            if (!pkg.magpie || typeof pkg.magpie.hooks !== "string" || !fs.existsSync(pkg.magpie.hooks)) {
+              throw new Error("magpie.hooks missing or does not exist");
+            }
+          '
+
+      - run: npm test
+
   dsh:
     name: dsh-deja
     runs-on: ubuntu-latest
@@ -345,7 +375,7 @@ jobs:
           node -e '
             const fs = require("node:fs");
             let bad = 0;
-            for (const dir of ["extensions/opencode", "extensions/dsh", "extensions/openclaw", "extensions/pi"]) {
+            for (const dir of ["extensions/opencode", "extensions/dsh", "extensions/openclaw", "extensions/pi", "extensions/magpie"]) {
               const pkg = JSON.parse(fs.readFileSync(dir + "/package.json", "utf8"));
               const repo = pkg.repository || {};
               if (!String(repo.url || "").includes("vshulcz/deja-vu")) {

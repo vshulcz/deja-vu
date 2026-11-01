@@ -16,6 +16,7 @@ const pkgs = {
   "extensions/dsh": { name: "dsh-deja", version: "0.20.8" },
   "extensions/openclaw": { name: "@vshulcz/openclaw-deja", version: "0.20.1" },
   "extensions/pi": { name: "@vshulcz/pi-deja", version: "0.20.1" },
+  "extensions/magpie": { name: "@vshulcz/magpie-deja", version: "0.20.1" },
 };
 const readPkg = (dir) => pkgs[dir];
 
@@ -53,6 +54,7 @@ test("what cannot be answered is not drift", () => {
 test("every package is reported when all are behind", () => {
   const bad = behindNpm(PACKAGES, readPkg, () => "0.99.0");
   assert.deepEqual(bad.map((p) => p.name).sort(), [
+    "@vshulcz/magpie-deja",
     "@vshulcz/openclaw-deja",
     "@vshulcz/pi-deja",
     "dsh-deja",

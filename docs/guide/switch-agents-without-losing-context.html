@@ -173,8 +173,8 @@
 
 <h3>Magpie Gateway Integration</h3>
 <p>To hook <code>deja</code> directly into Magpie API gateway requests:</p>
-<pre><code>magpie plugin add github:vshulcz/deja-vu</code></pre>
-<p>With Magpie's gateway hook active, every incoming prompt automatically recalls relevant historical sessions and injects them as reference data.</p>
+<pre><code>magpie plugin add @vshulcz/magpie-deja</code></pre>
+<p>With Magpie's gateway hook active, incoming requests with a client working directory (<code>ctx.cwd</code>) recall matching sessions from that project locally, scrub secret patterns, and attach the excerpt to the request sent to your configured model provider.</p>
 
 <h2>Visualizing Cross-Agent Activity with <code>deja view</code></h2>
 <p>Run <code>deja view</code> and open the <b>Map</b> tab (<a href="../view/#map">live demo</a>) to see which harnesses worked in each repository and which promoted decisions apply to it:</p>

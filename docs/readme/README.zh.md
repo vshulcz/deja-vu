@@ -236,7 +236,7 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsur
 | OpenClaw | ClawHub 与 npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi（以及 omp） | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
 | Hermes | 记忆提供者 `deja-memory`，在 Hermes 插件目录里 | `hermes plugins install deja-vu`，或从 GitHub：`hermes plugins install vshulcz/deja-vu/extensions/hermes` |
-| Magpie | 网关请求钩子 `extensions/magpie/deja.hooks.mjs` | `magpie plugin add github:vshulcz/deja-vu` |
+| Magpie | npm `@vshulcz/magpie-deja` | `magpie plugin add @vshulcz/magpie-deja` |
 
 两条路各自都够用，两条都走也不会出问题：每个包都会先读 `deja install` 写下的配置。
 opencode、dsh 和 OpenClaw 只补上缺的那部分；Kimi、Grok、Codex 和 pi 在安装器已经接好时

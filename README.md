@@ -340,7 +340,7 @@ for people who install extensions there rather than from a CLI:
 | OpenClaw | ClawHub and npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi (and omp) | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
 | Hermes | memory provider `deja-memory`, in the Hermes plugin catalog | `hermes plugins install deja-vu`, or from GitHub: `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
-| Magpie | gateway request hook `extensions/magpie/deja.hooks.mjs` | `magpie plugin add github:vshulcz/deja-vu` |
+| Magpie | npm `@vshulcz/magpie-deja` | `magpie plugin add @vshulcz/magpie-deja` |
 | CC Switch | 1-click MCP &amp; Skill Repo import (`ccswitch://`) | [Add MCP to CC Switch](ccswitch://v1/import?resource=mcp&apps=claude,codex,gemini,opencode&config=eyJtY3BTZXJ2ZXJzIjp7ImRlamEiOnsiY29tbWFuZCI6Im5weCIsImFyZ3MiOlsiLXkiLCJAdnNodWxjei9kZWphLXZ1Iiwic2VydmUiXX19fQ==) · [Switching guide](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html) |
 
 Either path works alone, and both together double nothing: each package reads what
