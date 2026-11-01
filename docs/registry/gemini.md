@@ -15,7 +15,7 @@ Whole-session JSON has `sessionId`, `startTime`, `lastUpdated`, and a `messages`
 {"id":"message-1","timestamp":"2026-07-17T09:00:01Z","type":"gemini","content":[{"text":"The configuration is valid."}]}
 ```
 
-`type: "user"` maps to `user`; `gemini` and `model` map to `assistant`. Other types, including informational and error events, are ignored. Content is a string or an array of parts with `text`. All documented timestamps are RFC 3339; a missing message timestamp falls back to session start.
+`type: "user"` maps to `user`; `gemini` and `model` map to `assistant`. Other types, including informational and error events, are ignored. Content is a string or an array of parts with `text`. Tool calls sit on `gemini` messages under `toolCalls` (`name`, `args`, `status`, `result`): `replace` carries `file_path`, `old_string` and `new_string`, and `write_file` carries `file_path` and `content`. `fixtures/registry/gemini/session-changes.jsonl` pins both shapes, read back as `## what it changed` by the generic reader (#4971). All documented timestamps are RFC 3339; a missing message timestamp falls back to session start.
 
 ## Wiring
 
@@ -42,4 +42,4 @@ and `o` continues it in another agent.
 - The chats tree also contains non-session JSON such as checkpoints; files without a valid session ID and messages are ignored.
 - Nested subagent chat files occur below a parent chat directory.
 
-**Last verified:** 2026-07-24
+**Last verified:** 2026-11-01

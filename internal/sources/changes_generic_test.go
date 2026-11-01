@@ -77,3 +77,24 @@ func TestChangesReadsQwenEditCalls(t *testing.T) {
 		t.Fatalf("got  %q\nwant %q", strings.Join(got, " "), want)
 	}
 }
+
+// Gemini CLI's replace and write_file calls on toolCalls, read through the
+// Gemini loader and the generic reader, with a failed replace ignored.
+func TestChangesReadsGeminiReplaceAndWriteFileCalls(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("DEJA_GEMINI_ROOT", root)
+	p := filepath.Join(root, "tmp", "demo-project", "chats", "session-changes.jsonl")
+	copyFixture(t, "fixtures/registry/gemini/session-changes.jsonl", p)
+	ss, err := ParseGeminiFile(p)
+	if err != nil || len(ss) != 1 {
+		t.Fatalf("ParseGeminiFile: %v, %d sessions", err, len(ss))
+	}
+	changes := Changes(ss[0])
+	got := make([]string, 0, len(changes))
+	for _, c := range changes {
+		got = append(got, c.Path+"|"+c.Old+"|"+c.New)
+	}
+	if want := "pool.go|MaxConns: 10|MaxConns: 40 pool_test.go||package demo"; strings.Join(got, " ") != want {
+		t.Fatalf("got  %q\nwant %q", strings.Join(got, " "), want)
+	}
+}

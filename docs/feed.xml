@@ -186,6 +186,34 @@
     <summary>How to switch between Claude Code, Codex, Gemini CLI, OpenCode, Hermes, and DeepSeek Harness when quotas hit, using deja handoff, CC Switch, and Magpie.</summary>
   </entry>
   <entry>
+    <title>Where aider stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/aider.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/aider.html"></link>
+    <updated>2026-11-01T00:00:00Z</updated>
+    <summary>Where aider writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
+  <entry>
+    <title>Where Cline stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/cline.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/cline.html"></link>
+    <updated>2026-11-01T00:00:00Z</updated>
+    <summary>Where Cline writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
+  <entry>
+    <title>Where Gemini CLI stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/gemini.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/gemini.html"></link>
+    <updated>2026-11-01T00:00:00Z</updated>
+    <summary>Where Gemini CLI writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
+  <entry>
+    <title>Where Kimi Code stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/kimi.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/kimi.html"></link>
+    <updated>2026-11-01T00:00:00Z</updated>
+    <summary>Where Kimi Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
+  <entry>
     <title>История сессий Codex CLI: поиск и просмотр — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/ru/guide/codex-history.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/ru/guide/codex-history.html"></link>
@@ -261,33 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/agents.html"></link>
     <updated>2026-10-28T00:00:00Z</updated>
     <summary>How deja gives coding agents a searchable memory over MCP: one tool with recall, context, blame, fix, how, orient, remember and handoff modes.</summary>
-  </entry>
-  <entry>
-    <title>Coding-agent memory benchmarks: quality and cost — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/benchmarks.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html"></link>
-    <updated>2026-10-28T00:00:00Z</updated>
-    <summary>Reproducible, honest measurements of deja&#39;s search quality and the token cost of reaching working context — run them yourself.</summary>
-  </entry>
-  <entry>
-    <title>What each memory tool knows the day you install it — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/day-zero.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/day-zero.html"></link>
-    <updated>2026-10-28T00:00:00Z</updated>
-    <summary>Eight tools on a machine with 19,195 sessions already on disk, asked 100 questions only that history answers: build time, first answer, hit@1.</summary>
-  </entry>
-  <entry>
-    <title>Delete Antigravity conversation history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-antigravity-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-antigravity-history.html"></link>
-    <updated>2026-10-28T00:00:00Z</updated>
-    <summary>Antigravity keeps a conversation in six places under ~/.gemini/antigravity. Delete it in the app, then VACUUM the summaries database so the text is gone too.</summary>
-  </entry>
-  <entry>
-    <title>Delete Cline task history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-cline-task-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-cline-task-history.html"></link>
-    <updated>2026-10-28T00:00:00Z</updated>
-    <summary>Cline has separate CLI and VS Code extension histories. Find the right store and remove one conversation without deleting unrelated task state.</summary>
   </entry>
 </feed>

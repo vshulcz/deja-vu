@@ -771,11 +771,15 @@ func geminiWorkRecords(m geminiMessage, projectDir func() string, t time.Time) [
 	var parts []any
 	if len(m.ToolCalls) > 0 {
 		var calls []struct {
-			Name string         `json:"name"`
-			Args map[string]any `json:"args"`
+			Name   string         `json:"name"`
+			Status string         `json:"status"`
+			Args   map[string]any `json:"args"`
 		}
 		if json.Unmarshal(m.ToolCalls, &calls) == nil {
 			for _, c := range calls {
+				if failedCall(c.Status) && !qwenDialect.isShellTool(c.Name) {
+					continue
+				}
 				if c.Name == "read_many_files" {
 					geminiReadManyPaths(c.Args, projectDir)
 				}

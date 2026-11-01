@@ -81,6 +81,9 @@ func genericChanges(s model.Session) []Change {
 		w.walk(v, "", false, false, 0)
 	}
 	cwd := w.cwd
+	if cwd == "" && s.Harness == "gemini" {
+		cwd = GeminiProjectDir(s.Path)
+	}
 	if cwd == "" {
 		cwd = commonDir(w.out)
 	}
@@ -136,6 +139,10 @@ func (w *editWalker) walk(v any, call string, failed bool, inArgs bool, depth in
 		if !inArgs && w.cwd == "" {
 			if c := firstStringField(t, editCwdKeys); absPath(strings.ReplaceAll(c, `\`, "/")) {
 				w.cwd = c
+			} else if dirs, ok := t["directories"].([]any); ok && len(dirs) > 0 {
+				if d, _ := dirs[0].(string); absPath(strings.ReplaceAll(d, `\`, "/")) {
+					w.cwd = d
+				}
 			}
 		}
 		if inArgs {

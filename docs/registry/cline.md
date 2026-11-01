@@ -57,4 +57,4 @@ Specified by the community in
 [#253](https://github.com/vshulcz/deja-vu/issues/253) with synthetic samples
 and upstream source references.
 
-**Last verified:** 2026-07-28
+**Last verified:** 2026-11-01
