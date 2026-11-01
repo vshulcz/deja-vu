@@ -178,3 +178,34 @@ func TestDescribeSkipsKeysDejaNeverConsults(t *testing.T) {
 		t.Errorf("Describe stopped naming local-only: %q", got)
 	}
 }
+
+func TestRepoOriginPolicyAndDiagnose(t *testing.T) {
+	if got := Origin("repo"); got != "repo" {
+		t.Fatalf("Origin(repo) = %q, want repo", got)
+	}
+	if got := Origin("repo:api"); got != "repo" {
+		t.Fatalf("Origin(repo:api) = %q, want repo", got)
+	}
+	p := Policy{Activations: map[string]map[string]bool{
+		ActivationAuto: {"repo": false, "local": true},
+	}}
+	if p.Allows(ActivationAuto, "repo:api") {
+		t.Fatal("expected repo:api to be denied when repo=false on auto")
+	}
+	if !p.Allows(ActivationAuto, "api") {
+		t.Fatal("expected local api to remain allowed")
+	}
+	if got := p.Describe(ActivationAuto); got != "deny repo" {
+		t.Fatalf("Describe = %q, want deny repo", got)
+	}
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "policy.json")
+	t.Setenv("DEJA_POLICY_FILE", path)
+	if err := os.WriteFile(path, []byte(`{"activations":{"auto":{"repo":false,"local":true}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if exists, unknown, err := Diagnose(); !exists || err != nil || len(unknown) != 0 {
+		t.Fatalf("Diagnose on repo origin: exists=%v unknown=%v err=%v", exists, unknown, err)
+	}
+}

@@ -27,9 +27,12 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 	state := "accepted"
 	noteText := ""
 	exportPath := ""
+	toRepo := false
 	var tags []string
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
+		case "--repo":
+			toRepo = true
 		case "--state":
 			if i+1 >= len(args) {
 				return errors.New("promote: --state needs a value")
@@ -134,7 +137,20 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 	if title == "" {
 		title = firstLine(text)
 	}
-	if err := sources.AppendPromotedSourced(s.Project, title, text, src, state, tags, s.Updated, time.Now()); err != nil {
+	if toRepo {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		repoRoot := sources.NotesRepoRoot(cwd)
+		masked, err := sources.AppendRepoPromotedSourced(repoRoot, s.Project, title, text, src, state, tags, s.Updated, time.Now())
+		if err != nil {
+			return notesWriteError(err)
+		}
+		if masked > 0 {
+			fmt.Fprintf(os.Stderr, "deja: %d secret%s masked in .deja/notes.jsonl. pattern redaction is a floor — review before committing; rotate anything that leaked.\n", masked, pluralS(masked))
+		}
+	} else if err := sources.AppendPromotedSourced(s.Project, title, text, src, state, tags, s.Updated, time.Now()); err != nil {
 		return notesWriteError(err)
 	}
 	// The note has to reach the index before the line below claims it outranks
@@ -449,7 +465,8 @@ func promotedNoteSources() map[string]string {
 		if n.Session == "" {
 			continue
 		}
-		out["deja-note-"+strings.ReplaceAll(n.Session, ":", "-")] = n.Session
+		out[sources.PromotedNoteID(n.Session)] = n.Session
+		out[sources.RepoPromotedNoteID(n.Session)] = n.Session
 	}
 	return out
 }
@@ -461,7 +478,7 @@ func promotedNoteSources() map[string]string {
 func promotedNoteSource(noteID string) (string, string, string, bool) {
 	src, title, body, found := "", "", "", false
 	for _, n := range sources.LoadPromotedNotes() {
-		if n.Session == "" || "deja-note-"+strings.ReplaceAll(n.Session, ":", "-") != noteID {
+		if n.Session == "" || (sources.PromotedNoteID(n.Session) != noteID && sources.RepoPromotedNoteID(n.Session) != noteID) {
 			continue
 		}
 		src, found = n.Session, true

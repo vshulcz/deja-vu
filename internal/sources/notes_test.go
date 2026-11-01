@@ -2,6 +2,7 @@ package sources
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -202,5 +203,132 @@ func TestForgetPromotedTitlesWithNoNotesFile(t *testing.T) {
 	t.Setenv("DEJA_NOTES_FILE", filepath.Join(t.TempDir(), "missing.jsonl"))
 	if n, err := ForgetPromotedTitles(func(string) bool { return true }); err != nil || n != 0 {
 		t.Fatalf("n=%d err=%v — a missing notes file is not an error", n, err)
+	}
+}
+
+func TestRepoScopedNotesSanitizeMergeAndProvenance(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	personalNotes := filepath.Join(home, "personal-notes.jsonl")
+	t.Setenv("DEJA_NOTES_FILE", personalNotes)
+
+	repoDir := filepath.Join(home, "work", "payments-api")
+	if err := os.MkdirAll(filepath.Join(repoDir, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	subDir := filepath.Join(repoDir, "internal", "handler")
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(subDir)
+
+	if got := NotesRepoRoot(""); got != repoDir {
+		t.Fatalf("NotesRepoRoot() = %q, want %q", got, repoDir)
+	}
+	wantRepoNotes := filepath.Join(repoDir, ".deja", "notes.jsonl")
+	if got := RepoNotesFile(""); got != wantRepoNotes {
+		t.Fatalf("RepoNotesFile() = %q, want %q", got, wantRepoNotes)
+	}
+
+	now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
+	if err := AppendNoteTagged("payments-api", "personal note stays in home", []string{"local"}, now); err != nil {
+		t.Fatal(err)
+	}
+
+	secret := "sk-ant-api03-" + strings.Repeat("a", 40)
+	rawNote := "check " + filepath.Join(repoDir, "internal", "handler", "charge.go") + " and " + filepath.Join(home, ".config", "app.env") + " token " + secret
+	masked, err := AppendRepoNoteTagged(repoDir, "", rawNote, []string{"team"}, now)
+	if err != nil {
+		t.Fatalf("AppendRepoNoteTagged: %v", err)
+	}
+	if masked == 0 {
+		t.Fatal("expected secret in repo note to be redacted and counted")
+	}
+	if _, dupErr := AppendRepoNoteTagged(repoDir, "", rawNote, []string{"team"}, now); !errors.Is(dupErr, ErrNoteExists) {
+		t.Fatalf("duplicate repo note err = %v, want ErrNoteExists", dupErr)
+	}
+
+	rawBytes, err := os.ReadFile(wantRepoNotes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	diskText := string(rawBytes)
+	if strings.Contains(diskText, secret) {
+		t.Fatalf("secret leaked into .deja/notes.jsonl: %s", diskText)
+	}
+	if strings.Contains(diskText, repoDir) {
+		t.Fatalf("absolute repo path leaked into .deja/notes.jsonl: %s", diskText)
+	}
+	if !strings.Contains(diskText, filepath.Join("internal", "handler", "charge.go")) {
+		t.Fatalf("expected repo-relative path in .deja/notes.jsonl: %s", diskText)
+	}
+
+	pMasked, err := AppendRepoPromotedSourced(
+		repoDir,
+		"payments-api",
+		"fix retry budget in "+filepath.Join(repoDir, "retry.go"),
+		"keep retry budget at 3 ("+secret+")",
+		"claude:sess123",
+		"accepted",
+		[]string{"retry"},
+		now.Add(-time.Hour),
+		now,
+	)
+	if err != nil {
+		t.Fatalf("AppendRepoPromotedSourced: %v", err)
+	}
+	if pMasked == 0 {
+		t.Fatal("expected secret in promoted repo note to be redacted")
+	}
+	// Idempotent re-promote with identical content does not duplicate.
+	if _, err := AppendRepoPromotedSourced(
+		repoDir,
+		"payments-api",
+		"fix retry budget in "+filepath.Join(repoDir, "retry.go"),
+		"keep retry budget at 3 ("+secret+")",
+		"claude:sess123",
+		"accepted",
+		[]string{"retry"},
+		now.Add(-time.Hour),
+		now,
+	); err != nil {
+		t.Fatalf("idempotent AppendRepoPromotedSourced: %v", err)
+	}
+
+	files := NotesFiles()
+	if len(files) != 2 || files[0] != personalNotes || files[1] != wantRepoNotes {
+		t.Fatalf("NotesFiles() = %v, want [%q, %q]", files, personalNotes, wantRepoNotes)
+	}
+	if !IsNotesFile(personalNotes) || !IsNotesFile(wantRepoNotes) {
+		t.Fatal("IsNotesFile returned false for personal or repo notes file")
+	}
+
+	sessions := LoadNotes()
+	if len(sessions) != 3 {
+		t.Fatalf("LoadNotes() returned %d sessions, want 3 (1 personal day note, 1 repo day note, 1 repo promoted note): %#v", len(sessions), sessions)
+	}
+	var sawPersonal, sawRepoDay, sawRepoPromoted bool
+	for _, s := range sessions {
+		switch {
+		case s.From == "" && strings.HasPrefix(s.ID, "deja-"):
+			sawPersonal = true
+		case s.From == "repo" && strings.HasPrefix(s.ID, "deja-repo-note-"):
+			sawRepoPromoted = true
+		case s.From == "repo" && strings.HasPrefix(s.ID, "deja-repo-"):
+			sawRepoDay = true
+		}
+	}
+	if !sawPersonal || !sawRepoDay || !sawRepoPromoted {
+		t.Fatalf("sessions missing expected provenance: personal=%v repoDay=%v repoPromoted=%v (%#v)", sawPersonal, sawRepoDay, sawRepoPromoted, sessions)
+	}
+
+	promoted := LoadPromotedNotes()
+	if len(promoted) != 1 || promoted[0].Session != "claude:sess123" || promoted[0].State != "accepted" {
+		t.Fatalf("LoadPromotedNotes() = %#v", promoted)
+	}
+	lc := PromotedLifecycles()
+	if lc["claude:sess123"].State != "accepted" {
+		t.Fatalf("PromotedLifecycles() = %#v", lc)
 	}
 }

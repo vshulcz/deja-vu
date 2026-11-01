@@ -3,6 +3,7 @@ package sources
 import (
 	"bufio"
 	"encoding/json"
+	"maps"
 	"os"
 	"sort"
 	"strings"
@@ -37,7 +38,7 @@ func PromotedLifecycles() map[string]Lifecycle {
 	if notesFresh(path, size, mod, statOK) && notesMemo.states != nil {
 		out := notesMemo.states
 		notesMemo.Unlock()
-		return out
+		return mergeRepoLifecycles(path, out)
 	}
 	notesMemo.Unlock()
 
@@ -53,6 +54,26 @@ func PromotedLifecycles() map[string]Lifecycle {
 	}
 	notesMemo.parses++
 	notesMemo.Unlock()
+	return mergeRepoLifecycles(path, out)
+}
+
+func mergeRepoLifecycles(personalPath string, personal map[string]Lifecycle) map[string]Lifecycle {
+	rp := RepoNotesFile("")
+	if rp == "" || rp == personalPath {
+		return personal
+	}
+	repo := promotedLifecyclesFrom(rp)
+	if len(repo) == 0 {
+		return personal
+	}
+	out := make(map[string]Lifecycle, len(personal)+len(repo))
+	maps.Copy(out, repo)
+	for k, v := range personal {
+		if rv, ok := out[k]; ok && rv.At.After(v.At) {
+			continue
+		}
+		out[k] = v
+	}
 	return out
 }
 

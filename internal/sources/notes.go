@@ -19,6 +19,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/cjkfold"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/redact"
 )
 
 type note struct {
@@ -61,6 +62,145 @@ func NotesFile() string {
 		return filepath.Join(Home(), "AppData", "Roaming", "deja", "notes.jsonl")
 	}
 	return filepath.Join(Home(), ".local", "share", "deja", "notes.jsonl")
+}
+
+// NotesRepoRoot walks up from startDir (or the working directory when startDir is
+// empty) to find the nearest ancestor containing a .deja directory or .git
+// marker. DEJA_REPO_DIR overrides the lookup when set to an absolute path.
+func NotesRepoRoot(startDir string) string {
+	if dir := os.Getenv("DEJA_REPO_DIR"); filepath.IsAbs(dir) {
+		return filepath.Clean(dir)
+	}
+	explicit := startDir != ""
+	if !explicit {
+		cwd, err := os.Getwd()
+		if err != nil || !allowImplicitRepoCwd(cwd) {
+			return ""
+		}
+		startDir = cwd
+	}
+	homeInTmp := inTempDir(Home())
+	startInTmp := inTempDir(startDir)
+	for cur := filepath.Clean(startDir); ; {
+		if fi, err := os.Stat(filepath.Join(cur, ".deja")); err == nil && fi.IsDir() {
+			return cur
+		}
+		if _, err := os.Stat(filepath.Join(cur, ".git")); err == nil {
+			return cur
+		}
+		parent := filepath.Dir(cur)
+		if parent == cur {
+			break
+		}
+		if homeInTmp && startInTmp && !inTempDir(parent) {
+			break
+		}
+		cur = parent
+	}
+	if explicit {
+		return filepath.Clean(startDir)
+	}
+	return ""
+}
+
+func allowImplicitRepoCwd(cwd string) bool {
+	if inTempDir(Home()) {
+		return inTempDir(cwd)
+	}
+	return true
+}
+
+func inTempDir(p string) bool {
+	if p == "" {
+		return false
+	}
+	tmp := os.TempDir()
+	if tmp == "" {
+		return false
+	}
+	if hasPathPrefix(p, tmp) {
+		return true
+	}
+	if evalTmp, err := filepath.EvalSymlinks(tmp); err == nil && hasPathPrefix(p, evalTmp) {
+		return true
+	}
+	if evalP, err := filepath.EvalSymlinks(p); err == nil {
+		if hasPathPrefix(evalP, tmp) {
+			return true
+		}
+		if evalTmp, err := filepath.EvalSymlinks(tmp); err == nil && hasPathPrefix(evalP, evalTmp) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasPathPrefix(p, root string) bool {
+	p = filepath.Clean(p)
+	root = filepath.Clean(root)
+	if p == root {
+		return true
+	}
+	return strings.HasPrefix(p, root+string(filepath.Separator))
+}
+
+// RepoNotesFile returns <repo>/.deja/notes.jsonl when inside a repository, or "".
+func RepoNotesFile(startDir string) string {
+	root := NotesRepoRoot(startDir)
+	if root == "" {
+		return ""
+	}
+	return filepath.Join(root, ".deja", "notes.jsonl")
+}
+
+// NotesFiles lists the personal notes file and, when present on disk, the
+// active repository's .deja/notes.jsonl.
+func NotesFiles() []string {
+	out := []string{NotesFile()}
+	if rp := RepoNotesFile(""); rp != "" && rp != out[0] && fileExists(rp) {
+		out = append(out, rp)
+	}
+	return out
+}
+
+// IsNotesFile reports whether path is a personal or repo-scoped notes file.
+func IsNotesFile(path string) bool {
+	if path == NotesFile() {
+		return true
+	}
+	if rp := RepoNotesFile(""); rp != "" && path == rp {
+		return true
+	}
+	return isRepoNotesPath(path)
+}
+
+func isRepoNotesPath(path string) bool {
+	return filepath.Base(path) == "notes.jsonl" && filepath.Base(filepath.Dir(path)) == ".deja"
+}
+
+// SanitizeRepoNote normalizes workstation-absolute paths inside repoRoot and
+// Home() and applies outbound secret redaction before a note is written to a
+// repository-tracked .deja/notes.jsonl file.
+func SanitizeRepoNote(text, repoRoot string) (string, int) {
+	if repoRoot != "" {
+		cleanRoot := filepath.Clean(repoRoot)
+		text = strings.ReplaceAll(text, cleanRoot+string(filepath.Separator), "")
+		if slashRoot := filepath.ToSlash(cleanRoot); slashRoot != cleanRoot {
+			text = strings.ReplaceAll(text, slashRoot+"/", "")
+		}
+		if evalRoot, err := filepath.EvalSymlinks(cleanRoot); err == nil && evalRoot != cleanRoot {
+			text = strings.ReplaceAll(text, evalRoot+string(filepath.Separator), "")
+		}
+	}
+	if home := Home(); home != "" {
+		cleanHome := filepath.Clean(home)
+		text = strings.ReplaceAll(text, cleanHome+string(filepath.Separator), "~/")
+		if slashHome := filepath.ToSlash(cleanHome); slashHome != cleanHome {
+			text = strings.ReplaceAll(text, slashHome+"/", "~/")
+		}
+	}
+	redacted, _ := redact.Text(text)
+	return redacted, strings.Count(redacted, redact.Marker)
 }
 
 // cleanTag removes what a tag cannot carry and cuts it to maxTagLen. A control
@@ -217,6 +357,59 @@ func AppendNoteTagged(project, text string, tags []string, now time.Time) error 
 	return json.NewEncoder(f).Encode(note{TS: now.UTC().Format(time.RFC3339Nano), Project: project, Text: text, Tags: NormalizeTags(tags)})
 }
 
+// AppendRepoNoteTagged appends a sanitized note to <repo>/.deja/notes.jsonl and
+// returns the number of redacted secrets in the written text.
+func AppendRepoNoteTagged(repoRoot, project, text string, tags []string, now time.Time) (int, error) {
+	repoRoot = strings.TrimSpace(repoRoot)
+	if repoRoot == "" {
+		repoRoot = NotesRepoRoot("")
+	}
+	if repoRoot == "" {
+		return 0, errors.New("not inside a git repository or .deja directory")
+	}
+	project = strings.TrimSpace(project)
+	if project == "" {
+		project = ClaudeProjectName(repoRoot)
+	}
+	if project == "" {
+		return 0, errors.New("project required")
+	}
+	if strings.TrimSpace(text) == "" {
+		return 0, errors.New("text required")
+	}
+	cleanText, masked := SanitizeRepoNote(text, repoRoot)
+	path := filepath.Join(repoRoot, ".deja", "notes.jsonl")
+	if err := atomicfile.MkdirSharedAll(filepath.Dir(path)); err != nil {
+		return 0, err
+	}
+	if noteAlreadyStored(path, project, strings.TrimSpace(cleanText)) {
+		return 0, ErrNoteExists
+	}
+	if info, err := os.Lstat(path); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		return 0, errors.New("notes file is a symlink")
+	}
+	f, err := atomicfile.OpenSharedFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0o644)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = f.Close() }()
+	if now.IsZero() {
+		now = time.Now()
+	}
+	if err := padTrailingNewline(f); err != nil {
+		return 0, err
+	}
+	if err := json.NewEncoder(f).Encode(note{
+		TS:      now.UTC().Format(time.RFC3339Nano),
+		Project: project,
+		Text:    cleanText,
+		Tags:    NormalizeTags(tags),
+	}); err != nil {
+		return 0, err
+	}
+	return masked, nil
+}
+
 // padTrailingNewline writes a newline into the append handle f when the file's
 // existing content does not end with one. notes.jsonl is documented as a
 // hand-editable file, so an editor that drops the final newline is a real
@@ -254,6 +447,13 @@ func LoadNotes() []model.Session {
 	// user's notes on a store that has none (#908).
 	if !errors.Is(err, fs.ErrNotExist) {
 		diagFileError(path, err)
+	}
+	if rp := RepoNotesFile(""); rp != "" && rp != path {
+		rss, rerr := ParseNotesFile(rp)
+		if !errors.Is(rerr, fs.ErrNotExist) {
+			diagFileError(rp, rerr)
+		}
+		ss = append(ss, rss...)
 	}
 	return ss
 }
@@ -293,6 +493,17 @@ func ParseNotesFile(path string) ([]model.Session, error) {
 // ParseNotesFileFromOffset reads a notes file from offset on, one session per project and day.
 func ParseNotesFileFromOffset(path string, offset int64) ([]model.Session, error) {
 	byDay := map[string]*model.Session{}
+	fromRepo := isRepoNotesPath(path) && path != NotesFile()
+	from := ""
+	idPrefix := "deja-"
+	defaultProject := "notes"
+	if fromRepo {
+		from = "repo"
+		idPrefix = "deja-repo-"
+		if p := ClaudeProjectName(filepath.Dir(filepath.Dir(path))); p != "" {
+			defaultProject = p
+		}
+	}
 	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
 		ts, _ := m["ts"].(string)
 		project, _ := m["project"].(string)
@@ -312,7 +523,7 @@ func ParseNotesFileFromOffset(path string, offset int64) ([]model.Session, error
 		// at index time with nothing reported (#771).
 		project = strings.TrimSpace(project)
 		if project == "" {
-			project = "notes"
+			project = defaultProject
 		}
 		idProject := noteIDProject(project)
 		if kind, _ := m["kind"].(string); kind == "promoted" {
@@ -337,7 +548,11 @@ func ParseNotesFileFromOffset(path string, offset int64) ([]model.Session, error
 			key := "promoted\x00" + src
 			s := byDay[key]
 			if s == nil {
-				s = &model.Session{ID: PromotedNoteID(src), Harness: "deja", Project: project, Path: path}
+				noteID := PromotedNoteID(src)
+				if fromRepo {
+					noteID = RepoPromotedNoteID(src)
+				}
+				s = &model.Session{ID: noteID, Harness: "deja", Project: project, Path: path, From: from}
 				byDay[key] = s
 			}
 			// The display line is the decision, not the question it answers.
@@ -375,7 +590,7 @@ func ParseNotesFileFromOffset(path string, offset int64) ([]model.Session, error
 		key := project + "\x00" + day
 		s := byDay[key]
 		if s == nil {
-			s = &model.Session{ID: "deja-" + day + "-" + idProject, Harness: "deja", Project: project, Path: path}
+			s = &model.Session{ID: idPrefix + day + "-" + idProject, Harness: "deja", Project: project, Path: path, From: from}
 			byDay[key] = s
 		}
 		s.Touch(t)
@@ -502,6 +717,69 @@ func AppendPromotedSourced(project, title, text, session, state string, tags []s
 		Kind: "promoted", Session: session, State: state, Title: title,
 		Tags: NormalizeTags(tags), SrcTS: stamp,
 	})
+}
+
+// AppendRepoPromotedSourced appends a sanitized promoted note to
+// <repo>/.deja/notes.jsonl and returns the number of redacted secrets.
+func AppendRepoPromotedSourced(repoRoot, project, title, text, session, state string, tags []string, srcTS, now time.Time) (int, error) {
+	if strings.TrimSpace(session) == "" {
+		return 0, errors.New("session required")
+	}
+	if !NoteStates[state] {
+		return 0, errors.New("state must be accepted, rejected, superseded or stale")
+	}
+	repoRoot = strings.TrimSpace(repoRoot)
+	if repoRoot == "" {
+		repoRoot = NotesRepoRoot("")
+	}
+	if repoRoot == "" {
+		return 0, errors.New("not inside a git repository or .deja directory")
+	}
+	project = strings.TrimSpace(project)
+	if project == "" {
+		project = ClaudeProjectName(repoRoot)
+	}
+	if project == "" || strings.TrimSpace(text) == "" {
+		return 0, errors.New("project and text required")
+	}
+	cleanTitle, m1 := SanitizeRepoNote(title, repoRoot)
+	cleanText, m2 := SanitizeRepoNote(text, repoRoot)
+	masked := m1 + m2
+	path := filepath.Join(repoRoot, ".deja", "notes.jsonl")
+	if err := atomicfile.MkdirSharedAll(filepath.Dir(path)); err != nil {
+		return 0, err
+	}
+	if info, err := os.Lstat(path); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		return 0, errors.New("notes file is a symlink")
+	}
+	if last, ok := lastPromotedNote(path, session); ok &&
+		last.State == state && last.Text == cleanText && last.Title == cleanTitle &&
+		equalStrings(last.Tags, NormalizeTags(tags)) {
+		return masked, nil
+	}
+	f, err := atomicfile.OpenSharedFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0o644)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = f.Close() }()
+	if now.IsZero() {
+		now = time.Now()
+	}
+	stamp := ""
+	if !srcTS.IsZero() {
+		stamp = srcTS.UTC().Format(time.RFC3339Nano)
+	}
+	if err := padTrailingNewline(f); err != nil {
+		return 0, err
+	}
+	if err := json.NewEncoder(f).Encode(note{
+		TS: now.UTC().Format(time.RFC3339Nano), Project: project, Text: cleanText,
+		Kind: "promoted", Session: session, State: state, Title: cleanTitle,
+		Tags: NormalizeTags(tags), SrcTS: stamp,
+	}); err != nil {
+		return 0, err
+	}
+	return masked, nil
 }
 
 // lastPromotedNote returns the newest promoted record still on disk for a
@@ -655,7 +933,7 @@ func LoadPromotedNotes() []PromotedNote {
 		// memo's own array would let that reorder what the next caller reads.
 		out := append([]PromotedNote(nil), notesMemo.notes...)
 		notesMemo.Unlock()
-		return out
+		return mergeRepoPromotedNotes(path, out)
 	}
 	notesMemo.Unlock()
 
@@ -673,6 +951,33 @@ func LoadPromotedNotes() []PromotedNote {
 	}
 	notesMemo.parses++
 	notesMemo.Unlock()
+	return mergeRepoPromotedNotes(path, out)
+}
+
+func mergeRepoPromotedNotes(personalPath string, personal []PromotedNote) []PromotedNote {
+	rp := RepoNotesFile("")
+	if rp == "" || rp == personalPath {
+		return personal
+	}
+	repo := loadPromotedNotesFrom(rp)
+	if len(repo) == 0 {
+		return personal
+	}
+	bySession := make(map[string]int, len(personal))
+	out := append([]PromotedNote(nil), personal...)
+	for i, n := range out {
+		bySession[n.Session] = i
+	}
+	for _, rn := range repo {
+		if idx, ok := bySession[rn.Session]; ok {
+			if rn.At.After(out[idx].At) {
+				out[idx] = rn
+			}
+			continue
+		}
+		bySession[rn.Session] = len(out)
+		out = append(out, rn)
+	}
 	return out
 }
 
@@ -792,6 +1097,13 @@ func ForgetPromotedNotes(match func(noteSession string) bool) (int, error) {
 // caller holding an id from the index can match the line that produced it.
 func PromotedNoteID(sourceSession string) string {
 	return "deja-note-" + strings.ReplaceAll(sourceSession, ":", "-")
+}
+
+// RepoPromotedNoteID is the session id a repo-scoped promoted note is indexed
+// under, keeping it distinct from a personal promoted note for the same source
+// session.
+func RepoPromotedNoteID(sourceSession string) string {
+	return "deja-repo-note-" + strings.ReplaceAll(sourceSession, ":", "-")
 }
 
 // ForgetPromotedTitles strips the source session's opening line from every

@@ -186,7 +186,7 @@ func ImportedByMachine(dir string) map[string]int {
 	}
 	out := map[string]int{}
 	for _, meta := range m.Sessions {
-		if meta.From != "" {
+		if meta.From != "" && meta.From != "repo" {
 			out[meta.From]++
 		}
 	}

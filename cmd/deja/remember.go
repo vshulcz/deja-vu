@@ -45,7 +45,12 @@ func noteIndexNarration(dir string) io.Writer {
 func runRemember(dir string, args []string) error {
 	var text, project string
 	var tags []string
+	toRepo := false
 	for i := 0; i < len(args); i++ {
+		if args[i] == "--repo" {
+			toRepo = true
+			continue
+		}
 		if args[i] == "--project" {
 			if i+1 >= len(args) {
 				return errors.New("remember: --project needs value")
@@ -95,7 +100,24 @@ func runRemember(dir string, args []string) error {
 		project = sources.ClaudeProjectName(cwd)
 	}
 	now := time.Now()
-	if err := sources.AppendNoteTagged(project, text, tags, now); err != nil {
+	if toRepo {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		repoRoot := sources.NotesRepoRoot(cwd)
+		masked, err := sources.AppendRepoNoteTagged(repoRoot, project, text, tags, now)
+		if err != nil {
+			if errors.Is(err, sources.ErrNoteExists) {
+				fmt.Fprintf(os.Stderr, "deja: already remembered under %s (.deja/notes.jsonl)\n", projectForEcho(project))
+				return nil
+			}
+			return notesWriteError(err)
+		}
+		if masked > 0 {
+			fmt.Fprintf(os.Stderr, "deja: %d secret%s masked in .deja/notes.jsonl. pattern redaction is a floor — review before committing; rotate anything that leaked.\n", masked, pluralS(masked))
+		}
+	} else if err := sources.AppendNoteTagged(project, text, tags, now); err != nil {
 		if errors.Is(err, sources.ErrNoteExists) {
 			fmt.Fprintf(os.Stderr, "deja: already remembered under %s\n", projectForEcho(project))
 			return nil

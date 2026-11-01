@@ -148,7 +148,7 @@ _deja_completion() {
             fi
             ;;
         remember)
-            COMPREPLY=( $(compgen -W "--project --tag" -- "$cur") )
+            COMPREPLY=( $(compgen -W "--project --tag --repo" -- "$cur") )
             ;;
         rules)
             if (( COMP_CWORD == 2 )); then
@@ -249,7 +249,7 @@ _deja_completion() {
             elif [[ "$prev" == "--note" || "$prev" == "--tag" ]]; then
                 COMPREPLY=()
             else
-                COMPREPLY=( $(compgen -W "--state --note --tag --to" -- "$cur") )
+                COMPREPLY=( $(compgen -W "--state --note --tag --to --repo" -- "$cur") )
             fi
             ;;
         friction)
@@ -389,7 +389,7 @@ _deja() {
       _arguments '--project=[project name]:project:' '--harness=[filter by harness]:harness:($harnesses)' '--limit=[maximum sessions]:count:' '--offset=[sessions to skip]:count:' '*:query:'
       ;;
     remember)
-      _arguments '--project=[note project]:project:' '*--tag=[tag the note, repeatable]:tag:' '1:text:'
+      _arguments '--project=[note project]:project:' '*--tag=[tag the note, repeatable]:tag:' '--repo[write to .deja/notes.jsonl in the repository]' '1:text:'
       ;;
     rules)
       if (( CURRENT == 3 )); then
@@ -448,7 +448,7 @@ _deja() {
       if [[ "$words[CURRENT-1]" == "--state" ]]; then
         _values 'state' %NOTE_STATES%
       else
-        _arguments '--state[mark the note]:state:(%NOTE_STATES%)' '--note[the note text]:text:' '*--tag[tag the note, repeatable]:tag:' '--to[also append the note to a Markdown file]:file:_files' '1:session ID prefix:'
+        _arguments '--state[mark the note]:state:(%NOTE_STATES%)' '--note[the note text]:text:' '*--tag[tag the note, repeatable]:tag:' '--to[also append the note to a Markdown file]:file:_files' '--repo[write to .deja/notes.jsonl in the repository]' '1:session ID prefix:'
       fi
       ;;
     friction)
@@ -545,6 +545,7 @@ complete -c deja -n '__fish_seen_subcommand_from recall; and not __fish_seen_sub
 complete -c deja -n '__fish_seen_subcommand_from recall; and not __fish_seen_subcommand_from bench' -l offset -r
 complete -c deja -n '__fish_seen_subcommand_from remember' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from remember' -l tag -r
+complete -c deja -n '__fish_seen_subcommand_from remember' -l repo -d 'Write to .deja/notes.jsonl in the repository'
 complete -c deja -n '__fish_seen_subcommand_from rules; and not __fish_seen_subcommand_from sync status candidates' -f -a 'sync status candidates'
 complete -c deja -n '__fish_seen_subcommand_from rules; and __fish_seen_subcommand_from candidates' -l json
 complete -c deja -n '__fish_seen_subcommand_from rules; and __fish_seen_subcommand_from candidates' -l limit -r
@@ -594,6 +595,7 @@ complete -c deja -n '__fish_seen_subcommand_from promote' -l state -x -a '%NOTE_
 complete -c deja -n '__fish_seen_subcommand_from promote' -l note -x -d 'The note text'
 complete -c deja -n '__fish_seen_subcommand_from promote' -l tag -x -d 'Tag the note, repeatable'
 complete -c deja -n '__fish_seen_subcommand_from promote' -l to -r -F -d 'Also append the note to a Markdown file'
+complete -c deja -n '__fish_seen_subcommand_from promote' -l repo -d 'Write to .deja/notes.jsonl in the repository'
 complete -c deja -n '__fish_seen_subcommand_from sync; and not __fish_seen_subcommand_from rules; and not __fish_seen_subcommand_from export import ssh forget' -a 'export import ssh forget'
 complete -c deja -n '__fish_seen_subcommand_from sync; and __fish_seen_subcommand_from export' -l include-imported
 complete -c deja -n '__fish_seen_subcommand_from sync; and __fish_seen_subcommand_from export' -l peer -r
@@ -668,7 +670,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 if ($previous -eq '--harness') { $harnesses }
                 else { @('--project', '--harness', '--limit', '--offset') }
             }
-            'remember' { @('--project', '--tag') }
+            'remember' { @('--project', '--tag', '--repo') }
             'rules' {
                 if ($argumentPosition -eq 1) { @('sync', 'status', 'candidates') }
                 elseif ($action -eq 'candidates' -and $previous -notin @('--limit', '--since')) { @('--json', '--limit', '--since') }
@@ -716,7 +718,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
             'promote' {
                 if ($previous -eq '--state') { $noteStates }
                 elseif ($previous -in @('--note', '--tag', '--to')) { @() }
-                else { @('--state', '--note', '--tag', '--to') }
+                else { @('--state', '--note', '--tag', '--to', '--repo') }
             }
             'friction' {
                 if ($previous -in @('--limit', '--settle', '--unsettle')) { @() }

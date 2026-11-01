@@ -865,10 +865,10 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 			}},
 		},
 		{
-			Name: "deja", Load: LoadNotes, Files: func() []string { return []string{NotesFile()} },
+			Name: "deja", Load: LoadNotes, Files: NotesFiles,
 			Kinds: []FileKind{{
 				Name:      "deja",
-				Match:     func(p string) bool { return p == NotesFile() },
+				Match:     IsNotesFile,
 				Parse:     fullParse(ParseNotesFile),
 				ParseFrom: offsetParse(ParseNotesFileFromOffset),
 			}},

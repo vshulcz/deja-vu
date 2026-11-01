@@ -1839,9 +1839,9 @@ var (
 	doctorFlags   = []string{"--json", "--offline", "--deep", "--all"}
 	viewFlags     = []string{"--out", "--no-open"}
 	logFlags      = []string{"--json", "--last"}
-	rememberFlags = []string{"--project", "--tag"}
+	rememberFlags = []string{"--project", "--tag", "--repo"}
 	restoreFlags  = []string{"--force", "--span", "--out", "--all"}
-	promoteFlags  = []string{"--state", "--note", "--to", "--tag"}
+	promoteFlags  = []string{"--state", "--note", "--to", "--tag", "--repo"}
 	handoffFlags  = []string{"--to", "--exec"}
 )
 

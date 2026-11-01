@@ -143,6 +143,10 @@ func (s *Session) SetSource(localInstance string) {
 		s.Source = &Source{Origin: "imported"}
 		return
 	}
+	if s.From == "repo" || s.Project == "repo" || strings.HasPrefix(s.Project, "repo:") {
+		s.Source = &Source{Origin: "repo"}
+		return
+	}
 	s.Source = &Source{Origin: "local", Instance: localInstance}
 }
 

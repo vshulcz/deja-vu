@@ -109,6 +109,9 @@ func Origin(project string) string {
 		}
 		return "imported"
 	}
+	if project == "repo" || strings.HasPrefix(project, "repo:") {
+		return "repo"
+	}
 	return "local"
 }
 
@@ -155,7 +158,7 @@ func (p Policy) AllowsEgress(project string) bool {
 // consultedOrigin reports whether a rule key is one Origin can produce. Rules
 // are keyed by origin; a project name looks like a rule and is not one.
 func consultedOrigin(origin string) bool {
-	return origin == "local" || origin == "imported" || strings.HasPrefix(origin, "imported:")
+	return origin == "local" || origin == "repo" || origin == "imported" || strings.HasPrefix(origin, "imported:")
 }
 
 // Describe names the active rule set for receipts and `deja log`, so the
@@ -269,7 +272,7 @@ func Diagnose() (exists bool, unknown []string, err error) {
 			continue
 		}
 		for origin := range rules {
-			if origin == "local" || origin == "imported" || strings.HasPrefix(origin, "imported:") {
+			if consultedOrigin(origin) {
 				continue
 			}
 			unknown = append(unknown, activation+"."+origin)

@@ -18,6 +18,11 @@ func TestSessionSetSource(t *testing.T) {
 	if imported.Source.Origin != "imported" || imported.Source.Instance != "" {
 		t.Fatalf("imported source = %#v", imported.Source)
 	}
+	repoSession := Session{Project: "agent-fabric", From: "repo"}
+	repoSession.SetSource("must-not-leak")
+	if repoSession.Source.Origin != "repo" || repoSession.Source.Instance != "" {
+		t.Fatalf("repo source = %#v", repoSession.Source)
+	}
 }
 
 func TestUnsetSourceIsOmittedInsteadOfEmittedEmpty(t *testing.T) {
