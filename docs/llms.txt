@@ -55,6 +55,7 @@ Run `deja` with no arguments in a terminal and it opens a full-screen search ove
 - [Codex resume](https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html): codex resume, --all, --last and exec resume, why a session is missing from the picker, "no rollout found for thread id" and archived sessions
 - [No conversation found with session ID](https://vshulcz.github.io/deja-vu/guide/no-conversation-found-claude-code.html): what the claude --resume error means, five causes reproduced on 2.1.295, finding the file and getting the session back
 - [Switching agents](https://vshulcz.github.io/deja-vu/guide/switching-agents.html): move between Claude Code, Codex and Cursor without re-explaining
+- [Switching agents when quotas run out](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html): carry active session state across Claude Code, Codex, Gemini CLI, OpenCode, Hermes, and DSH with deja handoff, CC Switch, and Magpie
 - [One set of rules for every agent](https://vshulcz.github.io/deja-vu/guide/one-rules-file.html): which rules file each agent reads, sharing AGENTS.md in a repository, and keeping your global rules in step with deja rules sync
 - [After compaction](https://vshulcz.github.io/deja-vu/guide/after-compaction.html): recovering the commands a summary dropped, and the packet deja hands back automatically
 - [Auditing an agent](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html): review agent changes when the diff cannot say what was tried

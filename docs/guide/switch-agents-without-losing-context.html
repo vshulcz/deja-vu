@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Switch Coding Agents When Quotas Run Out Without Losing Context — deja-vu</title>
+<meta name="description" content="How to switch between Claude Code, Codex, Gemini CLI, OpenCode, Hermes, and DeepSeek Harness when quotas hit, using deja handoff, CC Switch, and Magpie.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html">
+<link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html">
+<link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Switch Coding Agents When Quotas Run Out Without Losing Context">
+<meta property="og:description" content="How to switch between Claude Code, Codex, Gemini CLI, OpenCode, Hermes, and DeepSeek Harness when quotas hit, using deja handoff, CC Switch, and Magpie.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Switch Coding Agents When Quotas Run Out Without Losing Context", "description": "How to switch between Claude Code, Codex, Gemini CLI, OpenCode, Hermes, and DeepSeek Harness when quotas hit, using deja handoff, CC Switch, and Magpie.", "url": "https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-01", "dateModified": "2026-11-01"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Switch agents without losing context","item":"https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html"}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a>
+<div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="switch-agents-without-losing-context.html" class="active">Switch agents without losing context</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+</aside>
+<main>
+<h1>Switch Coding Agents When Quotas Run Out Without Losing Context</h1>
+<p class="lead">When a 5-hour limit or weekly rate limit hits in Claude Code, Codex, Gemini CLI, OpenCode, Hermes, or DeepSeek Harness, you don't have to re-explain your whole architecture to the next agent. <code>deja handoff</code> and automated gateway integrations carry your session state instantly.</p>
+
+<h2>The 5-Hour Limit Problem</h2>
+<p>Coding agents make rapid progress until they hit their usage ceiling. When you switch to a backup agent, it starts with an empty context window. Your previous debugging steps, failed hypothesis tests, and exact error traces stay locked in the old agent's transcript.</p>
+
+<h2>Carrying Context with <code>deja handoff</code></h2>
+<p>Before closing your exhausted agent session, or right as you pivot to another harness, run:</p>
+<pre><code>deja handoff --to codex</code></pre>
+<p>This packages the active session's conclusions, open questions, and modified files into clean reference text that your new agent reads immediately.</p>
+
+<h2>1-Click Deep Links for CC Switch &amp; Magpie</h2>
+<p>You can instantly provision multi-agent memory bridges across your harness ecosystem using 1-click installer protocols:</p>
+
+<h3>CC Switch MCP Import</h3>
+<p>To configure MCP memory servers across Claude, Codex, Gemini, and OpenCode in one action:</p>
+<p><a class="btn" href="ccswitch://v1/import?resource=mcp&apps=claude,codex,gemini,opencode&config=eyJtY3BTZXJ2ZXJzIjp7ImRlamEiOnsiY29tbWFuZCI6Im5weCIsImFyZ3MiOlsiLXkiLCJAdnNodWxjei9kZWphLXZ1Iiwic2VydmUiXX19fQ==">Import via CC Switch</a></p>
+
+<h3>Magpie Gateway Integration</h3>
+<p>To hook <code>deja</code> directly into Magpie API gateway requests:</p>
+<pre><code>magpie plugin add github:vshulcz/deja-vu</code></pre>
+<p>With Magpie's gateway hook active, every incoming prompt automatically recalls relevant historical sessions and injects them as reference data.</p>
+
+<div class="save-first">
+<strong>Local-First Guarantee:</strong> All session history indexing and context handoffs happen entirely on your machine. No private source code or secrets leave your host.
+</div>
+
+</main>
+</div></div>
+<script src="../assets/guide.js"></script>
+</body>
+</html>
