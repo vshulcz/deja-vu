@@ -106,6 +106,21 @@ footer a:hover{color:var(--ph-hi)}
   padding:14px 18px;margin:0 0 22px;font-size:15px;line-height:1.6}
 .save-first b{color:var(--ink)}
 .save-first code{font-size:.86em}
+.save-first .save-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font:12.5px var(--mono)}
+.save-first .save-cmd{display:flex;align-items:center;gap:8px;flex:1 1 320px;min-width:0;
+  background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 10px}
+.save-first .save-cmd .p{color:var(--faint);user-select:none}
+.save-first .save-cmd code{background:none;border:0;padding:0;color:var(--ph-hi);
+  font-size:12px;overflow-x:auto;white-space:nowrap;flex:1}
+.save-first .save-cmd button{background:var(--panel-hi);border:1px solid var(--line);
+  color:var(--dim);font:11px var(--mono);padding:2px 8px;border-radius:4px;cursor:pointer}
+.save-first .save-cmd button:hover{color:var(--ink);border-color:var(--ph)}
+.save-first .save-btn{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;
+  border-radius:6px;background:var(--amber);color:var(--bg) !important;font-weight:700;white-space:nowrap}
+.save-first .save-btn:hover{background:#ffa033;color:var(--bg) !important}
+.save-first .save-demo{color:var(--ph-hi) !important;white-space:nowrap}
+.save-first .save-demo:hover{color:var(--ink) !important}
 
 /* ── the doc layout ───────────────────────────────────────────────────── */
 .doc{display:grid;grid-template-columns:224px 1fr;gap:56px;padding:40px 0 0}

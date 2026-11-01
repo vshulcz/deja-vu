@@ -149,6 +149,26 @@
         setTimeout(function(){btn.textContent='copy'},1200);
       });
     }
+
+    var saveFirst=art.querySelector('.save-first');
+    if(saveFirst&&!saveFirst.querySelector('.save-actions')){
+      var saveCmd='curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja index';
+      var bar=document.createElement('div');
+      bar.className='save-actions';
+      bar.innerHTML=
+        '<div class="save-cmd"><span class="p">$</span><code>'+saveCmd+'</code><button type="button">copy</button></div>'+
+        '<a class="save-btn" href="https://github.com/vshulcz/deja-vu">'+starTxt+'</a>'+
+        '<a class="save-demo" href="'+rootPrefix+'view/">'+demoTxt+'</a>';
+      saveFirst.appendChild(bar);
+      var sbtn=bar.querySelector('button');
+      if(sbtn){
+        sbtn.addEventListener('click',function(){
+          navigator.clipboard.writeText(saveCmd);
+          sbtn.textContent='copied';
+          setTimeout(function(){sbtn.textContent='copy'},1200);
+        });
+      }
+    }
   })();
 
 

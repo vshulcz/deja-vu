@@ -550,6 +550,14 @@ jobs:
             fi
           done
           exit $fail
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest'
+        continue-on-error: true
+        uses: codecov/codecov-action@0565863a31f2c772f9f0395002a31e3f06189574 # v5.4.0
+        with:
+          files: shipped.out
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   e2e:
     name: e2e smoke
