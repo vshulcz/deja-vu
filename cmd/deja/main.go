@@ -162,7 +162,7 @@ func loadFileSources() []model.Session {
 var worksWithNoHome = map[string]bool{
 	"version": true, "--version": true, "-version": true,
 	"help": true, "--help": true, "-h": true,
-	"completion": true, "update": true,
+	"completion": true, "shell": true, "update": true,
 	"doctor": true, "sources": true,
 	"install": true, "uninstall": true,
 }
@@ -324,6 +324,9 @@ var commands = map[string]command{
 		// --mcode answers in MiniMax Code's shape (hook_mcode.go).
 		mcodeHookOutput = mcodeHookFlag(rest)
 		return endLineOnTerminal(os.Stdout, func(w io.Writer) error { return runHookToolAfterMode(dir, os.Stdin, w, plain) })
+	},
+	"shell": func(dir string, rest []string) error {
+		return runShell(dir, rest, os.Stdout, os.Stderr)
 	},
 	"check": func(dir string, rest []string) error {
 		return runCheck(dir, rest, os.Stdin, os.Stdout)

@@ -112,6 +112,9 @@ _deja_completion() {
         completion)
             COMPREPLY=( $(compgen -W "bash zsh fish powershell pwsh" -- "$cur") )
             ;;
+        shell)
+            COMPREPLY=( $(compgen -W "bash zsh fish -c --verify --json" -- "$cur") )
+            ;;
         doctor)
             COMPREPLY=( $(compgen -W "--json --offline --deep --all" -- "$cur") )
             ;;
@@ -334,6 +337,7 @@ _deja() {
     'resume:reopen a session'
     'search:search your history explicitly'
     'share:print a sanitized session digest'
+    'shell:recall at the shell layer, without a harness'
     'show:print a session'
     'sources:list discovered stores'
     'stats:print usage statistics'
@@ -370,6 +374,9 @@ _deja() {
       ;;
     completion)
       _values 'shell' bash zsh fish powershell pwsh
+      ;;
+    shell)
+      _arguments '-c[run a command with shell-layer recall]:command:' '--verify[verify live MCP call-through]' '--json[print JSON]' '1:shell:(bash zsh fish)'
       ;;
     doctor)
       _arguments '--json[print JSON]' '--offline[skip version check]' '--deep[verify index against sources]' '--all[list every store, missing ones included]'
@@ -505,6 +512,10 @@ complete -c deja -n '__deja_needs_command' -l sort -x -a 'relevance date' -d 'Or
 complete -c deja -n '__fish_seen_subcommand_from search' -l sort -x -a 'relevance date' -d 'Order of the results'
 
 complete -c deja -n '__fish_seen_subcommand_from completion' -a 'bash zsh fish powershell pwsh'
+complete -c deja -n '__fish_seen_subcommand_from shell' -a 'bash zsh fish'
+complete -c deja -n '__fish_seen_subcommand_from shell' -s c -r -d 'Run a command with shell-layer recall'
+complete -c deja -n '__fish_seen_subcommand_from shell' -l verify -d 'Verify live MCP call-through'
+complete -c deja -n '__fish_seen_subcommand_from shell' -l json -d 'Print JSON'
 complete -c deja -n '__fish_seen_subcommand_from blame' -l attribution -d 'Show line attribution'
 complete -c deja -n '__fish_seen_subcommand_from blame' -l git-note -d 'Write attribution as a git note; implies --attribution'
 complete -c deja -n '__fish_seen_subcommand_from blame' -l all
@@ -672,6 +683,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 else { @('--json', '--seed') }
             }
             'completion' { @('bash', 'zsh', 'fish', 'powershell', 'pwsh') }
+            'shell' { @('bash', 'zsh', 'fish', '-c', '--verify', '--json') }
             'doctor' { @('--json', '--offline', '--deep', '--all') }
             'delete' { @('--dry-run', '--yes') }
             'forget' { @('--list', '--dry-run', '--session', '--project', '--before', '--unforget', '--all-matches') }
@@ -783,7 +795,7 @@ func completionCommands() []string {
 		"bench", "blame", "brief", "check", "completion", "ctx", "delete", "doctor", "embed",
 		"files", "fix", "forget", "friction", "handoff", "help", "how", "index",
 		"install", "last", "log", "mcp", "origin", "promote", "recall", "recap", "remember", "restore",
-		"resume", "rules", "search", "secrets", "share", "show", "sources", "stats",
+		"resume", "rules", "search", "secrets", "share", "shell", "show", "sources", "stats",
 		"statusline", "sync", "tests", "uninstall", "update", "version", "view",
 		"warmup", "wip",
 	}
