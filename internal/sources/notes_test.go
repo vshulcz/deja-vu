@@ -260,7 +260,7 @@ func TestRepoScopedNotesSanitizeMergeAndProvenance(t *testing.T) {
 	if strings.Contains(diskText, repoDir) {
 		t.Fatalf("absolute repo path leaked into .deja/notes.jsonl: %s", diskText)
 	}
-	if !strings.Contains(diskText, filepath.Join("internal", "handler", "charge.go")) {
+	if !strings.Contains(diskText, "internal/handler/charge.go") {
 		t.Fatalf("expected repo-relative path in .deja/notes.jsonl: %s", diskText)
 	}
 

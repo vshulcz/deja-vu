@@ -190,6 +190,9 @@ func SanitizeRepoNote(text, repoRoot string) (string, int) {
 		}
 		if evalRoot, err := filepath.EvalSymlinks(cleanRoot); err == nil && evalRoot != cleanRoot {
 			text = strings.ReplaceAll(text, evalRoot+string(filepath.Separator), "")
+			if slashEval := filepath.ToSlash(evalRoot); slashEval != evalRoot {
+				text = strings.ReplaceAll(text, slashEval+"/", "")
+			}
 		}
 	}
 	if home := Home(); home != "" {
@@ -198,6 +201,15 @@ func SanitizeRepoNote(text, repoRoot string) (string, int) {
 		if slashHome := filepath.ToSlash(cleanHome); slashHome != cleanHome {
 			text = strings.ReplaceAll(text, slashHome+"/", "~/")
 		}
+		if evalHome, err := filepath.EvalSymlinks(cleanHome); err == nil && evalHome != cleanHome {
+			text = strings.ReplaceAll(text, evalHome+string(filepath.Separator), "~/")
+			if slashEval := filepath.ToSlash(evalHome); slashEval != evalHome {
+				text = strings.ReplaceAll(text, slashEval+"/", "~/")
+			}
+		}
+	}
+	if filepath.Separator == '\\' {
+		text = strings.ReplaceAll(text, `\`, "/")
 	}
 	redacted, _ := redact.Text(text)
 	return redacted, strings.Count(redacted, redact.Marker)
