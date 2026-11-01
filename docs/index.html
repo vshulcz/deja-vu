@@ -94,6 +94,15 @@ nav .cta .star-ic{color:var(--bg);font-size:12px;line-height:1}
 .cmdline button:hover{color:var(--ink);border-color:var(--coat-dim)}
 .under{margin-top:12px;font:12.5px var(--mono);color:var(--faint)}
 .under b{color:var(--coat-hi);font-weight:400}
+.hero-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:20px;font:12.5px var(--mono)}
+.hero-btn{display:inline-flex;align-items:center;gap:7px;padding:9px 15px;border-radius:8px;
+  border:1px solid var(--line);background:var(--panel);color:var(--ink);font-weight:600;transition:border-color .15s,background .15s}
+.hero-btn:hover{border-color:var(--coat);background:var(--panel-2);color:var(--ink)}
+.hero-btn.primary{background:var(--coat);border-color:var(--coat);color:var(--bg)}
+.hero-btn.primary:hover{background:var(--coat-hi);border-color:var(--coat-hi);color:var(--bg)}
+.hero-badge{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;
+  border:1px solid rgba(255,135,0,.35);background:rgba(255,135,0,.08);color:var(--amber);font-size:12px}
+.hero-badge:hover{background:rgba(255,135,0,.14);color:var(--ink)}
 .defn{margin:-48px 0 56px;max-width:68ch;font-size:15px;color:var(--body)}
 
 .proof{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);
@@ -350,6 +359,11 @@ footer a:hover{color:var(--ink)}
     </div>
     <p class="under">then <b>deja install --auto</b> — ten seconds to install, ten to index,
       and the next session already knows</p>
+    <div class="hero-actions">
+      <a class="hero-btn primary" href="https://github.com/vshulcz/deja-vu"><span aria-hidden="true">★</span> Star on GitHub</a>
+      <a class="hero-btn" href="view/">Live browser demo →</a>
+      <a class="hero-badge" href="https://trendshift.io/repositories/83640">🏆 #1 Go Repo of the Day</a>
+    </div>
   </div>
   <div class="catwrap">
     <img id="hero-cat" src="assets/icon-live.svg" width="240" height="240" alt="">

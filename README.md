@@ -24,7 +24,7 @@ deja indexes all of it locally and hands the relevant history back over MCP and 
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
 </p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">Docs</a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">Live browser demo</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">How it compares</a> &middot; <a href="docs/INTEGRATING.md">Building it into your tool</a></p>
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/"><b>Website &amp; interactive search</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>Live browser demo</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/getting-started.html">Docs</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">How it compares</a> &middot; <a href="docs/INTEGRATING.md">Building it into your tool</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="The same question put to the same agent twice: without memory it has no record of it, with deja it answers with the decision from eight months earlier"></p>
 
@@ -33,7 +33,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 deja install --auto
 ```
 
-<p align="center"><sub>macOS and Linux &middot; <a href="#install">Windows, Homebrew, npm and plugin marketplaces</a></sub></p>
+<p align="center"><sub>macOS and Linux &middot; <a href="#install">Windows, Homebrew, npm and plugin marketplaces</a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">Try in browser without installing →</a></sub></p>
 
 <table align="center">
 <tr>

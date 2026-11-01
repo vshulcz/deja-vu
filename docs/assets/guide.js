@@ -100,6 +100,46 @@
       document.dispatchEvent(new KeyboardEvent('keydown',{key:'/',bubbles:true}));
     });
     nav.parentNode.insertBefore(hint,nav.nextSibling);
+
+    /* upgrade the top nav with a Demo link and a prominent ★ GitHub button */
+    var gh=nav.parentNode.querySelector('a[href*="github.com/vshulcz/deja-vu"]');
+    if(gh){
+      gh.className='nav-cta';
+      gh.innerHTML='<span class="star-ic" aria-hidden="true">★</span>GitHub';
+      var homeLink=nav.parentNode.querySelector('a.brand');
+      var rootPrefix=homeLink?homeLink.getAttribute('href'):'../';
+      if(rootPrefix.slice(-1)!=='/')rootPrefix+='/';
+      if(!nav.parentNode.querySelector('a[href*="view/"]')){
+        var demo=document.createElement('a');
+        demo.className='lnk';
+        demo.href=rootPrefix+'view/';
+        demo.textContent='Demo';
+        nav.parentNode.insertBefore(demo,gh);
+      }
+    }
+  })();
+
+  /* ── enrich the closing star CTA with a 1-click install & live demo ─── */
+  (function(){
+    var cta=art.querySelector('.star-cta');
+    if(!cta)return;
+    var homeLink=document.querySelector('nav a.brand');
+    var rootPrefix=homeLink?homeLink.getAttribute('href'):'../';
+    if(rootPrefix.slice(-1)!=='/')rootPrefix+='/';
+    var cmdText='curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh';
+    cta.innerHTML=
+      '<div class="cta-cmd"><span class="p">$</span><code>'+cmdText+'</code><button type="button">copy</button></div>'+
+      '<div class="cta-row"><span>Ten seconds to install, ten to index.</span>'+
+      '<a class="cta-btn" href="https://github.com/vshulcz/deja-vu">★ Star deja-vu on GitHub</a>'+
+      '<a class="cta-demo" href="'+rootPrefix+'view/">Try live browser demo →</a></div>';
+    var btn=cta.querySelector('button');
+    if(btn){
+      btn.addEventListener('click',function(){
+        navigator.clipboard.writeText(cmdText);
+        btn.textContent='copied';
+        setTimeout(function(){btn.textContent='copy'},1200);
+      });
+    }
   })();
 
 

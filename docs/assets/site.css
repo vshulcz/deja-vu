@@ -54,6 +54,10 @@ nav .spacer{flex:1}
 nav a.lnk{color:var(--faint);padding:7px 10px;border-radius:6px}
 nav a.lnk:hover{color:var(--ink);background:var(--panel)}
 nav a.lnk[aria-current]{color:var(--ph-hi)}
+nav a.nav-cta{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:7px;
+  font:600 13px/1 var(--mono);background:var(--ph);color:var(--bg);margin-left:4px}
+nav a.nav-cta:hover{background:var(--ph-hi);color:var(--bg)}
+nav a.nav-cta .star-ic{color:var(--bg);font-size:12px;line-height:1}
 .btn{display:inline-block;padding:8px 14px;border-radius:7px;font:600 13px var(--mono);
   background:var(--ph);color:var(--bg);border:0}
 .btn:hover{background:var(--ph-hi);color:var(--bg)}
@@ -74,11 +78,26 @@ footer a{color:var(--faint)}
 footer a:hover{color:var(--ph-hi)}
 /* The same quiet closing line the landing page ends on: inside the article,
    below the related links, and never louder than the install link above it. */
-.star-cta{margin:40px 0 0;padding:15px 18px;background:var(--panel);
+.star-cta{margin:40px 0 0;padding:18px 20px;background:var(--panel);
   border:1px solid var(--line);border-left:3px solid var(--amber);
-  border-radius:0 10px 10px 0;color:var(--body);font:13px/1.55 var(--mono)}
-.star-cta a{color:var(--amber);font-weight:600}
+  border-radius:0 12px 12px 0;color:var(--body);font:13px/1.55 var(--mono)}
+.star-cta a{color:var(--amber);font-weight:600;text-decoration:none !important}
 .star-cta a:hover{color:var(--ink)}
+.star-cta .cta-cmd{display:flex;align-items:center;gap:10px;background:var(--bg);
+  border:1px solid var(--line);border-radius:8px;padding:10px 13px;margin:0 0 14px;
+  font:12.5px var(--mono);color:var(--ink)}
+.star-cta .cta-cmd .p{color:var(--amber)}
+.star-cta .cta-cmd code{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  background:none;border:0;padding:0;color:var(--ink)}
+.star-cta .cta-cmd button{background:var(--panel);border:1px solid var(--line);color:var(--faint);
+  border-radius:6px;padding:4px 10px;font:11px var(--mono);cursor:pointer}
+.star-cta .cta-cmd button:hover{color:var(--ink);border-color:var(--ph-dim)}
+.star-cta .cta-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.star-cta .cta-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;
+  border-radius:7px;background:var(--amber);color:var(--bg) !important;font-weight:700}
+.star-cta .cta-btn:hover{background:#ffa033;color:var(--bg) !important}
+.star-cta .cta-demo{color:var(--ph-hi) !important;font-weight:500}
+.star-cta .cta-demo:hover{color:var(--ink) !important}
 
 /* Above-the-fold callout on high-traffic deletion and storage pages: tell the
    reader how to keep their sessions searchable before they wipe raw files. */
