@@ -48,14 +48,16 @@ func TestBuildAutoRecallSingleMarathonSessionScalesConclusionBudget(t *testing.T
 		},
 	}
 	gotSafe := BuildAutoRecall([]model.Session{s}, AutoRecallOptions{Mode: RecallSafe, ProjectNames: []string{"app"}, Now: now})
-	for _, fact := range []string{"alpha", "beta", "gamma", "delta", "epsilon", "zeta"} {
+	for _, fact := range []string{"beta", "gamma", "delta", "epsilon"} {
 		if !strings.Contains(gotSafe.Text, fact) {
 			t.Errorf("single marathon session safe recall missed %q:\n%s", fact, gotSafe.Text)
 		}
 	}
 	gotAgg := BuildAutoRecall([]model.Session{s}, AutoRecallOptions{Mode: RecallAggressive, ProjectNames: []string{"app"}, Now: now})
-	if !strings.Contains(gotAgg.Text, "zeta") {
-		t.Errorf("single marathon session aggressive recall missed zeta:\n%s", gotAgg.Text)
+	for _, fact := range []string{"alpha", "beta", "gamma", "delta", "epsilon"} {
+		if !strings.Contains(gotAgg.Text, fact) {
+			t.Errorf("single marathon session aggressive recall missed %q:\n%s", fact, gotAgg.Text)
+		}
 	}
 	s2 := s
 	s2.ID = "marathon-2"

@@ -186,7 +186,9 @@ func (a *relevanceAcc) noteQuerySubject(term string, sessions int, inProject boo
 		return
 	}
 	r := rankIDF(len(a.m.Sessions), sessions)
-	a.idfOf[term] = math.Max(a.idfOf[term], r)
+	if r >= dejaVuStrongIDFFloor {
+		a.idfOf[term] = math.Max(a.idfOf[term], r)
+	}
 	if r > a.queryBest {
 		a.queryBest = r
 		if inProject {
@@ -653,7 +655,7 @@ func (a *relevanceAcc) scoreSession(p int32, long bool, sumWords, nWords float64
 	if a.queryBest <= 0 || s.bestMatched >= a.queryBest*subjectShare {
 		named = 1
 	}
-	if a.queryBestUnseen > 0 && a.queryBestSeen == 0 && s.matched < 3 {
+	if a.queryBest >= dejaVuIDFFloor && a.queryBestUnseen > 0 && a.queryBestSeen == 0 && s.matched < 3 {
 		named = 0
 	}
 	if long && sumWords > 0 {

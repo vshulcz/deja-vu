@@ -236,14 +236,14 @@ func BuildAutoRecall(ss []model.Session, o AutoRecallOptions) AutoRecallResult {
 	conclusionLimit := 2
 	conclusionBudget := 400
 	if len(candidates) == 1 {
-		conclusionLimit = 6
-		conclusionBudget = 2400
+		conclusionLimit = 4
+		conclusionBudget = 1600
 		if mode != RecallSafe {
-			conclusionLimit = 8
-			conclusionBudget = 3200
+			conclusionLimit = 5
+			conclusionBudget = 2000
 		}
 	} else if len(candidates) == 2 {
-		conclusionLimit = 4
+		conclusionLimit = 3
 		conclusionBudget = 1000
 	}
 	var b strings.Builder
