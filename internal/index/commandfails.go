@@ -299,7 +299,7 @@ func (a *commandFailAcc) table(project func(key string) (string, bool)) []Comman
 // session store (#5465). ss is what the record log holds (see
 // commandSessions): the walk an update starts from reads the log, so the
 // state has to agree with it.
-func buildCommandFails(tmp, generation string, ss []model.Session) {
+func buildCommandFails(tmp, generation string, ss []model.Session) *commandFailAcc {
 	acc := newCommandFailAcc()
 	projects := map[string]string{}
 	for _, s := range ss {
@@ -326,19 +326,24 @@ func buildCommandFails(tmp, generation string, ss []model.Session) {
 		p, ok := projects[key]
 		return p, ok
 	}))
-	if generation == "" {
-		return
-	}
-	fi, err := os.Stat(filepath.Join(tmp, "records.bin"))
-	if err != nil {
-		return
-	}
 	// As the walk leaves it: a session with nothing on file reads the same as
 	// one never seen.
 	for key, s := range acc.Sessions {
 		if len(s.Fails) == 0 && s.Pending == "" {
 			delete(acc.Sessions, key)
 		}
+	}
+	writeCommandFailState(tmp, generation, acc)
+	return acc
+}
+
+func writeCommandFailState(tmp, generation string, acc *commandFailAcc) {
+	if generation == "" || acc == nil {
+		return
+	}
+	fi, err := os.Stat(filepath.Join(tmp, "records.bin"))
+	if err != nil {
+		return
 	}
 	_ = writeGobAtomic(commandFailStatePath(tmp), &commandFailState{Version: commandFailStateVersion, Generation: generation, Size: fi.Size(), Acc: *acc})
 }

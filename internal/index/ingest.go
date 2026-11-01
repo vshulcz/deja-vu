@@ -1096,8 +1096,9 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	// session's messages can be dropped as soon as its records and postings
 	// are handed to the spiller (#5571).
 	// Skipped whole on a search-only index (#5395).
+	var failAcc *commandFailAcc
 	if !m.SearchOnly {
-		mineRebuildSidecars(tmp, ss, m, keptSource)
+		failAcc = mineRebuildSidecars(tmp, ss, m, keptSource)
 	}
 	// Counted in messages and reported when a batch has actually been
 	// indexed, not when it was handed to the spiller: reporting per session
@@ -1158,6 +1159,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	}
 	if !m.SearchOnly {
 		writeCommandsState(tmp, cmdState, m)
+		writeCommandFailState(tmp, m.Generation, failAcc)
 	}
 	summary.Messages = writtenMessages
 	summary.Dropped -= writtenMessages
@@ -1281,19 +1283,20 @@ func rebuildRow(sessions map[string]SessionMeta, s model.Session, text sessionTe
 }
 
 // mineRebuildSidecars writes the five sidecars a full build mines from ss.
-func mineRebuildSidecars(tmp string, ss []model.Session, m Manifest, keptSource func(key string, s model.Session, msg model.Message) string) {
+func mineRebuildSidecars(tmp string, ss []model.Session, m Manifest, keptSource func(key string, s model.Session, msg model.Message) string) *commandFailAcc {
 	reportPhase("mining fixes and commands", 5)
 	// Five passes over the same sessions, each writing its own file and reading
 	// nothing the others write, so they run together rather than one after the
 	// other. Profiled on a real store, they were 9.4 s (fixes) and 6.0 s
 	// (co-occurrence) of a 51 s build, with the whole machine idle beside them.
 	var sidecars sync.WaitGroup
+	var failAcc *commandFailAcc
 	cmds := commandSessions(ss, m, keptSource)
 	for _, build := range []func(){
 		func() { buildCooccur(tmp, ss) },
 		func() { buildFixes(tmp, cmds, func(s model.Session) string { return s.Harness + ":" + s.ID }) },
 		func() { buildCommands(tmp, cmds) },
-		func() { buildCommandFails(tmp, m.Generation, cmds) },
+		func() { failAcc = buildCommandFails(tmp, "", cmds) },
 		func() { buildSessionFacts(tmp, cmds) },
 	} {
 		sidecars.Go(func() {
@@ -1304,6 +1307,7 @@ func mineRebuildSidecars(tmp string, ss []model.Session, m Manifest, keptSource 
 	// Receipts read the same sessions; no phase of their own.
 	sidecars.Go(func() { evidence.Build(tmp, ss, nil) })
 	sidecars.Wait()
+	return failAcc
 }
 
 // importedSessions preserves sync-imported data across full rebuilds: records
