@@ -159,3 +159,35 @@ func TestARedCheckIsSaidAndAGreenOneOutranksIt(t *testing.T) {
 func at(minute int) time.Time {
 	return time.Date(2026, 9, 1, 10, minute, 0, 0, time.UTC)
 }
+
+func TestFileHookLineCombinesRanCommandAndCoChangeCompanion(t *testing.T) {
+	tmp := hermeticEnv(t)
+	root := filepath.Join(tmp, "claude")
+	t.Setenv("DEJA_CLAUDE_ROOT", root)
+	store := filepath.Join(root, "-work-app")
+	if err := os.MkdirAll(store, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	ts := func(m int) string { return now.Add(-time.Duration(m) * time.Minute).Format(time.RFC3339) }
+	for k := range 5 {
+		sid := fmt.Sprintf("co%d", k)
+		lines := []string{
+			`{"type":"user","sessionId":"` + sid + `","timestamp":"` + ts(300-20*k) + `","cwd":"/work/app","message":{"role":"user","content":"update store and schema"}}`,
+			`{"type":"assistant","sessionId":"` + sid + `","timestamp":"` + ts(299-20*k) + `","cwd":"/work/app","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/work/app/internal/store/store.go","old_string":"x","new_string":"y"}},{"type":"tool_use","name":"Edit","input":{"file_path":"/work/app/internal/store/schema.go","old_string":"a","new_string":"b"}}]}}`,
+			`{"type":"assistant","sessionId":"` + sid + `","timestamp":"` + ts(298-20*k) + `","cwd":"/work/app","message":{"role":"assistant","content":[{"type":"tool_use","id":"c1","name":"Bash","input":{"command":"go test ./internal/store"}}]}}`,
+			`{"type":"user","sessionId":"` + sid + `","timestamp":"` + ts(297-20*k) + `","cwd":"/work/app","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"c1","content":"ok"}]}}`,
+		}
+		if err := os.WriteFile(filepath.Join(store, sid+".jsonl"), []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	line := fileHookLine(dir, "/work/app", "/work/app/internal/store/store.go")
+	if !strings.Contains(line, "go test ./internal/store") || !strings.Contains(line, "usually edited alongside schema.go") {
+		t.Fatalf("expected fileHookLine to combine ran command and co-change companion, got:\n  %s", line)
+	}
+}

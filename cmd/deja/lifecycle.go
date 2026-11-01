@@ -281,7 +281,7 @@ func theyOrIt(n int) string {
 // attachBlameLifecycles is attachLifecycles for blame, which carries its own
 // hit type: blame answers "who decided this", and it answered with the
 // accepted line of a decision that had been taken back (#1017).
-func attachBlameLifecycles(hits []search.BlameHit) {
+func attachBlameLifecycles(hits []search.BlameHit, target search.BlameTarget) {
 	if len(hits) == 0 {
 		return
 	}
@@ -289,7 +289,9 @@ func attachBlameLifecycles(hits []search.BlameHit) {
 	for i := range hits {
 		h := &hits[i]
 		key := h.Session.Harness + ":" + h.Session.ID
+		isNote := false
 		if noteID := promotedNoteID(h.Session); noteID != "" {
+			isNote = true
 			if src, ok := strings.CutPrefix(noteID, "deja-note-"); ok {
 				key = strings.Replace(src, "-", ":", 1)
 			}
@@ -297,6 +299,9 @@ func attachBlameLifecycles(hits []search.BlameHit) {
 		lc, ok := states[key]
 		if !ok || lc.State == "" {
 			if h.Session.Lifecycle != "" {
+				if h.Session.Lifecycle == "accepted" && !isNote && h.Session.LifecycleNote != "" && target.FullPath != "" && !mentionsFile(target.FullPath, h.Session.LifecycleNote) {
+					continue
+				}
 				h.Lifecycle, h.LifecycleNote, h.LifecycleAt = h.Session.Lifecycle, h.Session.LifecycleNote, h.Session.LifecycleAt
 			}
 			continue
@@ -306,6 +311,14 @@ func attachBlameLifecycles(hits []search.BlameHit) {
 		// about a decision no longer standing and stayed silent about the one
 		// that does — on a file whose whole history is that decision, the row
 		// carrying the answer read as the oldest and least relevant.
+		//
+		// Scope an accepted note on a raw session to the file being blamed: a
+		// marathon session that touched a hundred files and promoted one note
+		// about the repository description otherwise claims that note as the
+		// standing decision of every file it touched (#3451).
+		if lc.State == "accepted" && !isNote && lc.Note != "" && target.FullPath != "" && !mentionsFile(target.FullPath, lc.Note) {
+			continue
+		}
 		h.Lifecycle, h.LifecycleNote = lc.State, lc.Note
 		if !lc.At.IsZero() {
 			h.LifecycleAt = lc.At.Format("2006-01-02")

@@ -346,17 +346,30 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 		// name is repeated; among equally specific ones, the message that keeps
 		// returning to the file wins; among equals, the order they were said in.
 		sort.SliceStable(mentions, func(i, j int) bool {
-			iProse := mentions[i].role == "user" || mentions[i].role == "assistant"
-			jProse := mentions[j].role == "user" || mentions[j].role == "assistant"
-			if iProse != jProse {
-				return iProse
+			ri, rj := blameMentionRoleRank(mentions[i].role), blameMentionRoleRank(mentions[j].role)
+			if ri != rj {
+				return ri > rj
 			}
 			if mentions[i].level != mentions[j].level {
 				return mentions[i].level > mentions[j].level
 			}
 			return mentions[i].count > mentions[j].count
 		})
-		for i := 0; i < len(mentions) && i < 2; i++ {
+		if len(mentions) > 0 && mentions[0].role != "user" && mentions[0].role != "assistant" {
+			if cs := digest.SubstantialConclusions(session, 240, 1); len(cs) > 0 && digest.CarriesDecision(cs[0]) {
+				hit.Snippets = append(hit.Snippets, SafeText(strings.TrimSpace(cs[0])))
+			}
+		}
+		for i := 0; i < len(mentions) && len(hit.Snippets) < 2; i++ {
+			if i > 0 && mentions[i].role == "files" {
+				if cs := digest.SubstantialConclusions(session, 240, 1); len(cs) > 0 && digest.CarriesDecision(cs[0]) {
+					cand := SafeText(strings.TrimSpace(cs[0]))
+					if cand != "" && (len(hit.Snippets) == 0 || hit.Snippets[0] != cand) {
+						hit.Snippets = append(hit.Snippets, cand)
+						continue
+					}
+				}
+			}
 			hit.Snippets = append(hit.Snippets, blameSnippet(mentions[i].text, mentions[i].role, target))
 		}
 		if hit.Count == 0 {
@@ -493,6 +506,17 @@ func dropRepeatedSnippets(hits []BlameHit) {
 // `git diff --stat` row each took the top of the answer from the session that
 // had debugged it (#2854).
 func namedAPath(h BlameHit) bool { return h.Specificity > 1.0 }
+
+func blameMentionRoleRank(role string) int {
+	switch role {
+	case "user", "assistant":
+		return 3
+	case "edit", "wrote", "command", sources.RoleToolOutput:
+		return 2
+	default:
+		return 1
+	}
+}
 
 // BlameCap is how many hits the default listing shows. The rest are behind
 // --all, so a caller that cuts the list here owes the reader the count it cut

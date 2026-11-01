@@ -280,3 +280,32 @@ func TestDemotedNoteCountsDecisionsNotRows(t *testing.T) {
 		t.Errorf("two decisions were counted as %q", got)
 	}
 }
+
+func TestAttachBlameLifecyclesScopesAcceptedNoteToBlamedFile(t *testing.T) {
+	tmp := t.TempDir()
+	notes := filepath.Join(tmp, "notes.jsonl")
+	t.Setenv("DEJA_NOTES_FILE", notes)
+	body := `{"ts":"2026-08-26T10:00:00Z","project":"p","text":"Repository description starts with Search your past AI coding sessions.","kind":"promoted","session":"claude:m1","state":"accepted","title":"repo description"}` + "\n"
+	if err := os.WriteFile(notes, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	unrelatedHits := []search.BlameHit{{
+		Session: model.Session{ID: "m1", Harness: "claude", Project: "p"},
+	}}
+	attachBlameLifecycles(unrelatedHits, search.BlameTarget{FullPath: "/work/p/internal/index/retrieval.go", Base: "retrieval.go", Stem: "retrieval"})
+	if unrelatedHits[0].Lifecycle != "" {
+		t.Fatalf("unrelated accepted note attached as standing decision on retrieval.go: %+v", unrelatedHits[0])
+	}
+
+	matchingBody := `{"ts":"2026-08-26T10:00:00Z","project":"p","text":"Keep retrieval.go ranking deterministic on ties.","kind":"promoted","session":"claude:m2","state":"accepted","title":"retrieval tie-break"}` + "\n"
+	if err := os.WriteFile(notes, []byte(matchingBody), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	matchingHits := []search.BlameHit{{
+		Session: model.Session{ID: "m2", Harness: "claude", Project: "p"},
+	}}
+	attachBlameLifecycles(matchingHits, search.BlameTarget{FullPath: "/work/p/internal/index/retrieval.go", Base: "retrieval.go", Stem: "retrieval"})
+	if matchingHits[0].Lifecycle != "accepted" {
+		t.Fatalf("accepted note mentioning retrieval.go was not attached: %+v", matchingHits[0])
+	}
+}

@@ -152,3 +152,24 @@ func TestBlameRanksTheSameWayEveryRun(t *testing.T) {
 		}
 	}
 }
+
+func TestBlameConclusionSnippetFallback(t *testing.T) {
+	day := time.Date(2026, 6, 28, 10, 0, 0, 0, time.UTC)
+	ss := []model.Session{{
+		Harness: "claude", ID: "s1", Project: "/repo", Updated: day,
+		Messages: []model.Message{
+			{Role: "user", Text: "fix connection exhaustion in the database layer", Time: day},
+			{Role: "command", Text: "$ git add internal/pool/pool.go && git commit -m 'fix pool'", Time: day},
+			{Role: "files", Text: "/repo/internal/pool/pool.go", Time: day},
+			{Role: "assistant", Text: "We decided to cap max idle connections at 32 to prevent connection exhaustion.", Time: day},
+		},
+	}}
+	target := BlameTarget{FullPath: "/repo/internal/pool/pool.go", Base: "pool.go", Stem: "pool"}
+	hits := Blame(ss, target, BlameOptions{All: true})
+	if len(hits) != 1 || len(hits[0].Snippets) == 0 {
+		t.Fatalf("hits = %+v", hits)
+	}
+	if !strings.Contains(hits[0].Snippets[0], "cap max idle connections at 32") {
+		t.Fatalf("expected session conclusion as first snippet when only command/files mention the path, got %v", hits[0].Snippets)
+	}
+}

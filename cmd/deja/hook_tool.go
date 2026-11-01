@@ -1010,28 +1010,36 @@ func fileHookLineOutside(dir, cwd, path string, self func(index.SessionMeta, str
 	// blame` pointer, which the A/B behind this hook already found changed
 	// nothing. What the same A/B found an agent reuses is the decision about the
 	// file, so that is what is left.
+	var body string
 	if d := promotedDecisionForFile(path, inScope); d != "" && mentionsFile(path, d) {
-		return head + standingLabel + d
-	}
-	// A scanned conclusion does not outrank this: that line is the newest thing
-	// a session said about the file, while this one is a command two sessions
-	// ran here and the transcript saw pass.
-	if ran := fileHookRanLine(dir, inScope); ran != "" {
-		return head + ran
-	}
-	// A scanned line is a decision about the file only when it reads as one and
-	// names the file. Of 63 lines once offered as "prior decision", none named
-	// the file or its package.
-	if d := fileDecisionLine(dir, path, inScope); d != "" && digest.CarriesDecision(d) && mentionsFile(path, d) {
+		body = standingLabel + d
+	} else if ran := fileHookRanLine(dir, inScope); ran != "" {
+		// A scanned conclusion does not outrank this: that line is the newest thing
+		// a session said about the file, while this one is a command two sessions
+		// ran here and the transcript saw pass.
+		body = ran
+	} else if d := fileDecisionLine(dir, path, inScope); d != "" && digest.CarriesDecision(d) && mentionsFile(path, d) {
+		// A scanned line is a decision about the file only when it reads as one and
+		// names the file. Of 63 lines once offered as "prior decision", none named
+		// the file or its package.
 		if promotedDecisionForFile(path, inScope) == d {
-			return head + decisionLabel + d
+			body = decisionLabel + d
+		} else {
+			body = modelLabel(decisionLabel, d) + d
 		}
-		return head + modelLabel(decisionLabel, d) + d
 	}
-	if co := fileHookCoChangeLine(path, inScope); co != "" {
-		return head + co
+	co := fileHookCoChangeLine(path, inScope)
+	if body == "" {
+		if co != "" {
+			return head + co
+		}
+		return ""
 	}
-	return ""
+	out := head + body
+	if co != "" && len(out)+len(co) <= toolHookMaxBytes {
+		out += co
+	}
+	return out
 }
 
 const decisionLabel = " — prior decision: "
