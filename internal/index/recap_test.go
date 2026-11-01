@@ -74,6 +74,11 @@ func TestARecapLineIsTrimmedNotRewritten(t *testing.T) {
 			in:   "Body proportions now match 100% across all frames: | build | slim | slim |",
 			want: "Body proportions now match 100% across all frames:",
 		},
+		{
+			name: "shell pipe inside backticks is kept whole",
+			in:   "Fixed the desktop overflow so `curl -fsSL https://example.com/install.sh | sh` fits on one line.",
+			want: "Fixed the desktop overflow so `curl -fsSL https://example.com/install.sh | sh` fits on one line.",
+		},
 	}
 	for _, c := range cases {
 		if got := trimRecapLine(c.in); got != c.want {
@@ -383,5 +388,33 @@ func TestChineseRecapLineAndDeduplication(t *testing.T) {
 	w2 := recapWords("結論：將數據庫連接池的空閒超時改為三十秒，並增加了測試。")
 	if !sameThoughtTwice([]map[string]bool{w1}, w2) {
 		t.Errorf("restated Chinese conclusion (Traditional vs Simplified) was not deduplicated: w1=%v w2=%v", w1, w2)
+	}
+}
+
+func TestScanRecapSkipsSubagentsAndSidechains(t *testing.T) {
+	dir := t.TempDir() + "/index.db"
+	at := time.Now().Add(-time.Hour)
+	writeStore(t, dir, []model.Session{
+		{
+			ID: "main-sess", Harness: "antigravity", Project: "work/app", Path: "/tmp/main.jsonl", Updated: at,
+			Messages: []model.Message{
+				{Role: "user", Text: "fix the pool leak", Time: at},
+				{Role: "assistant", Text: "decided: cap idle connections at four to stop the pool leak on reconnect", Time: at.Add(time.Minute)},
+			},
+		},
+		{
+			ID: "sub-sess", Harness: "antigravity", Kind: "subagent", Parent: "main-sess", Project: "work/app", Path: "/tmp/sub.jsonl", Updated: at,
+			Messages: []model.Message{
+				{Role: "user", Text: "find the pool leak", Time: at},
+				{Role: "assistant", Text: "root cause: the idle connection cap was zero in the worker config", Time: at.Add(time.Minute)},
+			},
+		},
+	})
+	r, err := ScanRecap(dir, 24*time.Hour, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Considered != 1 || len(r.Sessions) != 1 || r.Sessions[0].ID != "main-sess" {
+		t.Fatalf("expected only main-sess in recap, got considered=%d sessions=%+v", r.Considered, r.Sessions)
 	}
 }

@@ -107,6 +107,9 @@ func ScanRecap(dir string, since time.Duration, perSession int) (Recap, error) {
 		if meta.Updated.Before(cut) {
 			continue
 		}
+		if meta.Kind == "subagent" || meta.Kind == "sidechain" {
+			continue
+		}
 		if pol.Ignored(meta.Path, meta.Project) {
 			out.Withheld++
 			continue
@@ -214,7 +217,13 @@ var processNoise = []string{
 	"send_message",
 	"invoke_subagent",
 	"caller agent",
+	"returned to caller",
 	"invoked the subagent",
+	"invoked the ",
+	"dispatched a subagent",
+	"dispatched the ",
+	"delegated the ",
+	"subagent to ",
 	"launched the",
 	"launched a subagent",
 	"launched a background",
@@ -281,9 +290,7 @@ func trimRecapLine(s string) string {
 	if i := strings.Index(s, "##"); i >= 0 {
 		s = strings.TrimSpace(s[:i])
 	}
-	if i := strings.Index(s, " |"); i >= 0 {
-		s = strings.TrimSpace(s[:i])
-	}
+	s = cutOutsideBackticks(s, " |")
 	// A fence means the sentence swallowed a command and its output: the first
 	// run printed "``` $ registry/cursor.html sitemap=2026-07-17 …" as a
 	// conclusion about the week.
@@ -317,6 +324,21 @@ func trimRecapLine(s string) string {
 		s = cutAtSentence(s, recapLineMax)
 	}
 	return strings.TrimSpace(s)
+}
+
+func cutOutsideBackticks(s, sep string) string {
+	for start := 0; start < len(s); {
+		i := strings.Index(s[start:], sep)
+		if i < 0 {
+			return s
+		}
+		pos := start + i
+		if strings.Count(s[:pos], "`")%2 == 0 {
+			return strings.TrimSpace(s[:pos])
+		}
+		start = pos + len(sep)
+	}
+	return s
 }
 
 // cutAtSentence cuts to at most n runes, at the last sentence end if there is

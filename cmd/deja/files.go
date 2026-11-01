@@ -599,7 +599,7 @@ func lowerAll(in []string) []string {
 func isScratch(p string) bool {
 	p = strings.ReplaceAll(p, "/.claude/worktrees/", "/")
 	for _, seg := range []string{
-		"/scratchpad/", "/tasks/", "/.claude/", "/.cache/", "/claude-501/",
+		"/scratchpad/", "/tasks/", "/.claude/", "/.gemini/", "/.agents/", "/.cache/", "/claude-501/",
 		"/node_modules/", "/.git/", "/testdata/fixtures/",
 	} {
 		if strings.Contains(p, seg) {

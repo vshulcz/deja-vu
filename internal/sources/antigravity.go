@@ -320,13 +320,20 @@ func parseAntigravityWith(path string, scan func(func(map[string]any)) error) ([
 	if len(s.Messages) == 0 {
 		return nil, err
 	}
-	if s.Project == "-" || s.Project == "" {
+	if isHomeOrEmptyProject(s.Project) {
 		if p := antigravityProjectFromFiles(s.Messages); p != "" {
 			s.Project = p
-		} else if cwd != "" {
-			s.Project = projectName(cwd)
-		} else if subWorkspace != "" {
-			s.Project = projectName(subWorkspace)
+		} else if s.Project == "-" || s.Project == "" {
+			if cwd != "" {
+				s.Project = projectName(cwd)
+			} else if subWorkspace != "" {
+				s.Project = projectName(subWorkspace)
+			}
+		}
+		if isHomeOrEmptyProject(s.Project) && parent != "" {
+			if pp := antigravityProject(parent); !isHomeOrEmptyProject(pp) {
+				s.Project = pp
+			}
 		}
 	}
 	return []model.Session{s}, err
@@ -368,6 +375,11 @@ func antigravityStep(kind, text string, t time.Time) []model.Message {
 	case "RUN_COMMAND", "GENERIC":
 		if cmd := antigravityField(text, "Task Description:"); cmd != "" && IndexCommands() && worthIndexing(cmd) {
 			out = append(out, model.Message{Role: RoleCommand, Text: "$ " + cmd, Time: t})
+		}
+		if kind == "GENERIC" {
+			if p := antigravityCLIEditPath(text); p != "" && IndexToolPaths() {
+				out = append(out, model.Message{Role: RoleFiles, Text: p, Time: t})
+			}
 		}
 	case "VIEW_FILE", "CODE_ACTION", "LIST_DIRECTORY":
 		p := antigravityPath(text)
@@ -422,14 +434,43 @@ func antigravityToolCalls(v any, t time.Time) ([]model.Message, string) {
 			if cmd != "" && IndexCommands() && worthIndexing(cmd) {
 				out = append(out, model.Message{Role: RoleCommand, Text: "$ " + cmd, Time: t})
 			}
-		case "view_file", "replace_file_content", "multi_replace_file_content", "write_to_file":
+		case "view_file", "replace_file_content", "multi_replace_file_content", "write_to_file", "read_file", "edit_file", "write_file":
 			p := antigravityArg(args, "AbsolutePath")
 			if p == "" {
 				p = antigravityArg(args, "TargetFile")
 			}
+			if p == "" {
+				p = antigravityArg(args, "Path")
+			}
 			p = decodeURIPath(strings.TrimPrefix(p, "file://"))
 			if p != "" && IndexToolPaths() {
 				out = append(out, model.Message{Role: RoleFiles, Text: p, Time: t})
+			}
+			// Antigravity CLI (agy) edit_file and write_file record their GENERIC
+			// step without a diff block or file path ("Made N replacement(s) in
+			// <path>..." / "Created file."), so Target, Replacement, and Content
+			// in tool_calls are the only record of what changed.
+			switch str(call["name"]) {
+			case "edit_file":
+				if p != "" && IndexEdits() {
+					if span := strings.TrimSpace(antigravityArg(args, "Target")); span != "" {
+						if len(span) > editSpanMax {
+							span = span[:editSpanMax]
+						}
+						out = append(out, model.Message{Role: RoleEdit, Text: p + "\n" + span, Time: t})
+					}
+				}
+				if p != "" && IndexWrites() {
+					if rec := WroteRecord(p, antigravityArg(args, "Replacement")); rec != "" {
+						out = append(out, model.Message{Role: RoleWrote, Text: rec, Time: t})
+					}
+				}
+			case "write_file":
+				if p != "" && IndexWrites() {
+					if rec := WroteRecord(p, antigravityArg(args, "Content")); rec != "" {
+						out = append(out, model.Message{Role: RoleWrote, Text: rec, Time: t})
+					}
+				}
 			}
 		}
 	}
@@ -553,13 +594,16 @@ func AntigravityEditPaths(toolCalls any) []string {
 		call, _ := c.(map[string]any)
 		args, _ := call["args"].(map[string]any)
 		switch str(call["name"]) {
-		case "replace_file_content", "multi_replace_file_content", "write_to_file":
+		case "replace_file_content", "multi_replace_file_content", "write_to_file", "edit_file", "write_file":
 		default:
 			continue
 		}
 		p := antigravityArg(args, "TargetFile")
 		if p == "" {
 			p = antigravityArg(args, "AbsolutePath")
+		}
+		if p == "" {
+			p = antigravityArg(args, "Path")
 		}
 		if p = decodeURIPath(strings.TrimPrefix(p, "file://")); p != "" {
 			out = append(out, p)
@@ -606,6 +650,17 @@ func antigravityField(text, label string) string {
 // (#3279).
 var antigravityEditSentence = regexp.MustCompile(`changes were made by the \S+ tool to: (\S+?)\.?(?:\s|$)`)
 
+// antigravityCLIEditSentence is how Antigravity CLI (agy) edit_file GENERIC
+// steps name the edited file: "Made 1 replacement in /path/to/file starting at line 10".
+var antigravityCLIEditSentence = regexp.MustCompile(`(?m)^Made \d+ replacements? in (.+?) starting at line \d+`)
+
+func antigravityCLIEditPath(text string) string {
+	if m := antigravityCLIEditSentence.FindStringSubmatch(text); m != nil {
+		return decodeURIPath(strings.TrimPrefix(strings.Trim(strings.TrimSpace(m[1]), "`"), "file://"))
+	}
+	return ""
+}
+
 // antigravityAddedLines is the written side of the same block: its "+" lines,
 // minus the "+++ b/x" header, which is not a line of the file.
 func antigravityAddedLines(text string) string {
@@ -651,6 +706,9 @@ func antigravityRemovedLines(text string) string {
 func antigravityPath(text string) string {
 	if m := antigravityEditSentence.FindStringSubmatch(text); m != nil {
 		return decodeURIPath(strings.TrimPrefix(strings.Trim(m[1], "`"), "file://"))
+	}
+	if p := antigravityCLIEditPath(text); p != "" {
+		return p
 	}
 	for _, label := range []string{"File Path:", "Created file", "Edited file", "Modified file"} {
 		v := antigravityField(text, label)
@@ -808,6 +866,9 @@ func slashed(p string) string { return strings.ReplaceAll(p, `\`, "/") }
 // the time they matter. The files a session opened do not expire: the deepest
 // directory shared by all of them is the checkout it ran in.
 func antigravityProjectFromFiles(messages []model.Message) string {
+	if p := projectFromPaths(messages); p != "" {
+		return p
+	}
 	var common []string
 	for _, m := range messages {
 		// Absolute either way round: a store synced from Windows holds
@@ -815,19 +876,25 @@ func antigravityProjectFromFiles(messages []model.Message) string {
 		// those — on Windows itself, no CLI session would ever find its
 		// project. Split on both separators for the same reason CrossBase
 		// exists.
-		if m.Role != RoleFiles || !isAbsolutePath(m.Text) {
+		if m.Role != RoleFiles {
 			continue
 		}
-		parts := strings.Split(path.Dir(slashed(m.Text)), "/")
-		if common == nil {
-			common = parts
-			continue
+		for line := range strings.SplitSeq(m.Text, "\n") {
+			line = strings.TrimSpace(line)
+			if !isAbsolutePath(line) || agentScratch(line) {
+				continue
+			}
+			parts := strings.Split(path.Dir(slashed(line)), "/")
+			if common == nil {
+				common = parts
+				continue
+			}
+			n := 0
+			for n < len(common) && n < len(parts) && common[n] == parts[n] {
+				n++
+			}
+			common = common[:n]
 		}
-		n := 0
-		for n < len(common) && n < len(parts) && common[n] == parts[n] {
-			n++
-		}
-		common = common[:n]
 	}
 	// Three segments past the root is "/Users/<name>" — a home directory,
 	// which names no project.

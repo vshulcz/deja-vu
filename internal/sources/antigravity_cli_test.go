@@ -41,6 +41,9 @@ func TestAntigravityProjectFallsBackToTheCLICache(t *testing.T) {
 	if got := antigravityProject("neither"); got != "-" {
 		t.Errorf("unknown conversation = %q, want the placeholder", got)
 	}
+	if !isHomeOrEmptyProject("Users/me") || !isHomeOrEmptyProject("home/me") || !isHomeOrEmptyProject("-") || isHomeOrEmptyProject("coding/other") {
+		t.Error("isHomeOrEmptyProject should match only empty, placeholder, or home-directory project names")
+	}
 }
 
 // The CLI cache holds only the newest conversation per workspace, so the
@@ -56,6 +59,15 @@ func TestAntigravityProjectFromTheFilesASessionOpened(t *testing.T) {
 			name:  "one checkout",
 			paths: []string{"/Users/me/coding/api-gateway/cmd/main.go", "/Users/me/coding/api-gateway/internal/db/pool.go"},
 			want:  "coding/api-gateway",
+		},
+		{
+			name: "agent skill and brain artifact paths do not collapse checkout to home",
+			paths: []string{
+				"/Users/me/.agents/skills/deja-dev/SKILL.md",
+				"/Users/me/.gemini/antigravity-cli/brain/1234/roadmap.md",
+				"/Users/me/coding/api-gateway/cmd/main.go\n/Users/me/coding/api-gateway/internal/db/pool.go",
+			},
+			want: "coding/api-gateway",
 		},
 		{
 			name:  "a single file still names its directory",
@@ -167,5 +179,108 @@ func TestParseAntigravityCLISessionGetsAProject(t *testing.T) {
 	if got := sessions[0].Project; got != filepath.Base(filepath.Dir(checkout))+"/api-gateway" {
 		t.Fatalf("project = %q; a CLI session with no cache entry is invisible "+
 			"to recall without one", got)
+	}
+}
+
+func TestParseAntigravityCLIToolCallsAndHomeProject(t *testing.T) {
+	checkout := filepath.Join(t.TempDir(), "api-gateway")
+	if err := os.MkdirAll(filepath.Join(checkout, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	root, transcript := antigravityTree(t)
+	convID := antigravitySessionID(transcript)
+	cache := filepath.Join(root, "cache")
+	if err := os.MkdirAll(cache, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Session launched in /Users/me so last_conversations.json maps /Users/me -> convID.
+	last := `{"/Users/me":"` + convID + `"}`
+	if err := os.WriteFile(filepath.Join(cache, "last_conversations.json"), []byte(last), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	poolPath := filepath.Join(checkout, "internal", "db", "pool.go")
+	cfgPath := filepath.Join(checkout, "internal", "db", "config.go")
+	quoteJSON := func(s string) string {
+		b, err := json.Marshal(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	plannerStep, err := json.Marshal(map[string]any{
+		"source":     "MODEL",
+		"type":       "PLANNER_RESPONSE",
+		"content":    "Updating pool cap.",
+		"created_at": "2026-08-14T09:00:01Z",
+		"tool_calls": []map[string]any{
+			{
+				"id":   "1",
+				"name": "read_file",
+				"args": map[string]any{"Path": quoteJSON(poolPath)},
+			},
+			{
+				"id":   "2",
+				"name": "edit_file",
+				"args": map[string]any{
+					"Path":        quoteJSON(poolPath),
+					"Target":      quoteJSON("const maxDatabaseConnectionPoolSize = 4"),
+					"Replacement": quoteJSON("const maxDatabaseConnectionPoolSize = 64"),
+				},
+			},
+			{
+				"id":   "3",
+				"name": "write_file",
+				"args": map[string]any{
+					"Path":    quoteJSON(cfgPath),
+					"Content": quoteJSON("package db\nconst defaultTimeout = 30\n"),
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	genericEditStep, err := json.Marshal(map[string]any{
+		"source":     "MODEL",
+		"type":       "GENERIC",
+		"status":     "DONE",
+		"content":    "Created At: 2026-08-14T09:00:02Z\nCompleted At: 2026-08-14T09:00:02Z\nMade 1 replacement in " + poolPath + " starting at line 10 (+1/-1 lines).",
+		"created_at": "2026-08-14T09:00:02Z",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := `{"source":"USER_EXPLICIT","content":"increase pool cap","created_at":"2026-08-14T09:00:00Z","type":"USER_INPUT"}` + "\n" +
+		string(plannerStep) + "\n" +
+		string(genericEditStep) + "\n"
+	if err = os.WriteFile(transcript, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	sessions, err := ParseAntigravityFile(transcript)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sessions) != 1 {
+		t.Fatalf("parsed %d sessions, want 1", len(sessions))
+	}
+	wantProj := filepath.Base(filepath.Dir(checkout)) + "/api-gateway"
+	if sessions[0].Project != wantProj {
+		t.Errorf("project = %q, want %q (resolved from CLI tool_calls instead of /Users/me)", sessions[0].Project, wantProj)
+	}
+	var gotFiles, gotEdit, gotWrote int
+	for _, m := range sessions[0].Messages {
+		switch m.Role {
+		case RoleFiles:
+			gotFiles++
+		case RoleEdit:
+			gotEdit++
+		case RoleWrote:
+			gotWrote++
+		}
+	}
+	if gotFiles == 0 || gotEdit == 0 || gotWrote < 2 {
+		t.Errorf("records: files=%d edit=%d wrote=%d, want >=1 files, >=1 edit, >=2 wrote", gotFiles, gotEdit, gotWrote)
 	}
 }

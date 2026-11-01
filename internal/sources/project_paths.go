@@ -45,7 +45,11 @@ func projectFromPaths(ms []model.Message) string {
 			if root == "" {
 				continue
 			}
-			counts[root]++
+			proj := cwdProjectName(root)
+			if isHomeOrEmptyProject(proj) {
+				continue
+			}
+			counts[proj]++
 			total++
 		}
 	}
@@ -61,7 +65,7 @@ func projectFromPaths(ms []model.Message) string {
 	if float64(n) < 0.6*float64(total) {
 		return ""
 	}
-	return cwdProjectName(best)
+	return best
 }
 
 // agentScratch drops the agent's own working area. A scratch clone under
@@ -73,13 +77,24 @@ func projectFromPaths(ms []model.Message) string {
 // of /tmp would be simpler and wrong: a repository can live there, and it is
 // still that person's project.
 func agentScratch(p string) bool {
-	p = strings.ReplaceAll(p, "/.claude/worktrees/", "/")
-	for _, seg := range []string{"/.claude/", "/scratchpad/", "/tasks/", "/.cache/", "/claude-501/"} {
+	p = strings.ReplaceAll(slashed(p), "/.claude/worktrees/", "/")
+	for _, seg := range []string{"/.claude/", "/.gemini/", "/.agents/", "/scratchpad/", "/tasks/", "/.cache/", "/claude-501/"} {
 		if strings.Contains(p, seg) {
 			return true
 		}
 	}
 	return false
+}
+
+// isHomeOrEmptyProject reports whether p names no project or only a user's
+// home directory ("Users/<name>" or "home/<name>"), where an agent launched
+// from ~ starts before opening a repository.
+func isHomeOrEmptyProject(p string) bool {
+	if p == "" || p == "-" {
+		return true
+	}
+	parts := strings.Split(p, "/")
+	return len(parts) == 2 && (strings.EqualFold(parts[0], "Users") || strings.EqualFold(parts[0], "home")) && parts[1] != ""
 }
 
 var repoRootCache sync.Map

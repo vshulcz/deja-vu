@@ -380,6 +380,11 @@ func parseOpencodeLayouts(harness, db, where1, where2 string, limit int, only2 s
 	}
 	var out []model.Session
 	for _, s := range by {
+		if isHomeOrEmptyProject(s.Project) {
+			if p := projectFromPaths(s.Messages); p != "" {
+				s.Project = p
+			}
+		}
 		out = append(out, *s)
 	}
 	// A subagent run is its own session with parent_id naming the spawner —
@@ -391,6 +396,11 @@ func parseOpencodeLayouts(harness, db, where1, where2 string, limit int, only2 s
 			if p := parents[out[i].ID]; p != "" {
 				out[i].Kind = "subagent"
 				out[i].Parent = p
+				if isHomeOrEmptyProject(out[i].Project) {
+					if ps := by[p]; ps != nil && !isHomeOrEmptyProject(ps.Project) {
+						out[i].Project = ps.Project
+					}
+				}
 			}
 		}
 	}

@@ -284,7 +284,7 @@ func throwawayPath(p string) bool {
 	p = strings.ReplaceAll(p, "/.claude/worktrees/", "/")
 	for _, seg := range []string{
 		"/tmp/", "/var/folders/", "/scratchpad/", "/tasks/", "/.claude/",
-		"/.cache/", "/claude-501/", "/node_modules/", "/.git/",
+		"/.gemini/", "/.agents/", "/.cache/", "/claude-501/", "/node_modules/", "/.git/",
 	} {
 		if strings.Contains(p, seg) {
 			return true
