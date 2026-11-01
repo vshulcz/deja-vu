@@ -74,9 +74,19 @@ footer a{color:var(--faint)}
 footer a:hover{color:var(--ph-hi)}
 /* The same quiet closing line the landing page ends on: inside the article,
    below the related links, and never louder than the install link above it. */
-.star-cta{margin:40px 0 0;color:var(--body);font:12.5px/1.5 var(--mono)}
+.star-cta{margin:40px 0 0;padding:15px 18px;background:var(--panel);
+  border:1px solid var(--line);border-left:3px solid var(--amber);
+  border-radius:0 10px 10px 0;color:var(--body);font:13px/1.55 var(--mono)}
 .star-cta a{color:var(--amber);font-weight:600}
 .star-cta a:hover{color:var(--ink)}
+
+/* Above-the-fold callout on high-traffic deletion and storage pages: tell the
+   reader how to keep their sessions searchable before they wipe raw files. */
+.save-first{background:var(--panel);border:1px solid var(--line);
+  border-left:3px solid var(--ph);border-radius:0 10px 10px 0;
+  padding:14px 18px;margin:0 0 22px;font-size:15px;line-height:1.6}
+.save-first b{color:var(--ink)}
+.save-first code{font-size:.86em}
 
 /* ── the doc layout ───────────────────────────────────────────────────── */
 .doc{display:grid;grid-template-columns:224px 1fr;gap:56px;padding:40px 0 0}

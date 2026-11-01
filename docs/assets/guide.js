@@ -190,6 +190,21 @@
     function load(){
       if(docs)return Promise.resolve(docs);
       if(loading)return loading;
+      /* Index every sidebar link immediately so all 95 guide pages and 43
+         coding agents are reachable on the first keystroke, not only the 8
+         pages in ORDER. */
+      var seenUrls={};
+      ORDER.forEach(function(pair){seenUrls[pair[0]]=true});
+      var sidePages=[];
+      document.querySelectorAll('.doc aside a[href$=".html"]').forEach(function(a){
+        var url=a.getAttribute('href');
+        if(!url||url.indexOf('..')===0||url.indexOf('http')===0||seenUrls[url])return;
+        seenUrls[url]=true;
+        var grp=a.closest('details.grpfold');
+        var cat=grp?grp.querySelector('summary').firstChild.textContent.trim():'Guide';
+        var label=a.textContent.trim();
+        sidePages.push({page:cat,url:url,title:label,body:cat+' '+label+' '+url.replace(/[-.]/g,' ')});
+      });
       loading=Promise.all(ORDER.map(function(pair){
         return fetch(pair[0]).then(function(r){return r.text()}).then(function(html){
           var d=new DOMParser().parseFromString(html,'text/html');
@@ -203,7 +218,7 @@
                     title:h.textContent.replace(/\s*#$/,'').trim(),body:body.slice(0,600)};
           });
         }).catch(function(){return []});
-      })).then(function(all){docs=[].concat.apply([],all);return docs});
+      })).then(function(all){docs=[].concat.apply([],all).concat(sidePages);return docs});
       return loading;
     }
 

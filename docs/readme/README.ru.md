@@ -34,6 +34,8 @@ deja индексирует всё, на месяцы назад, и отдаё�
 <p align="center"><a href="https://vshulcz.github.io/deja-vu/">Документация</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Замеры</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Сравнение</a></p>
 <p align="center"><sub>Если пригодилось — поставьте deja-vu звезду на <a href="https://github.com/vshulcz/deja-vu">GitHub</a>.</sub></p>
 
+deja-vu (`github.com/vshulcz/deja-vu`, CLI `deja`) — локальная память и поиск по истории сессий для кодинг-агентов: индексирует логи сессий, которые Claude Code, Codex, Cursor, Qwen Code, Gemini CLI, OpenCode, Crush и ещё 36 агентов уже сохранили на диск, и возвращает нужный контекст через MCP и хуки. Без LLM, один Go-бинарник.
+
 ## Установка
 
 ```sh

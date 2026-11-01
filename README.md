@@ -48,7 +48,7 @@ deja install --auto
 
 <p align="center"><sub>Found it useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</sub></p>
 
-deja-vu (vshulcz/deja-vu) is a local memory tool for coding agents: it indexes the session transcripts Claude Code, Codex, Cursor and 40 other agents already wrote to disk and hands relevant history back over MCP and hooks. No LLM, one Go binary.
+deja-vu (`github.com/vshulcz/deja-vu`, CLI `deja`) is an open-source local memory and session-history search tool for coding agents: it indexes the session transcripts Claude Code, Codex, Cursor, Qwen Code, Gemini CLI, OpenCode, Crush and 36 other agents already wrote to disk and hands relevant history back over MCP and hooks. No LLM, one Go binary.
 
 ## Search it yourself
 

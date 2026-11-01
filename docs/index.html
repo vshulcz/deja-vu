@@ -78,6 +78,13 @@ h1 em{font-style:normal;color:var(--amber)}
 .cmdline{display:flex;align-items:center;gap:10px;background:var(--panel);
   border:1px solid var(--line);border-radius:10px;padding:13px 15px;font:13.5px var(--mono);max-width:560px}
 .cmdline .p{color:var(--amber)}
+.install-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;max-width:560px}
+.itab{background:none;border:1px solid var(--line);color:var(--faint);border-radius:6px;
+  padding:4px 10px;font:11.5px var(--mono);cursor:pointer;transition:color .15s,border-color .15s,background .15s}
+.itab:hover{color:var(--ink);border-color:var(--coat-dim)}
+.itab.on{color:var(--ink);background:var(--panel);border-color:var(--coat)}
+nav .cta{display:inline-flex;align-items:center;gap:6px}
+nav .cta .star-ic{color:var(--bg);font-size:12px;line-height:1}
 /* min-width:0 or the flex item refuses to shrink below the width of the
    command, which on a phone pushed the whole hero column to 560px and cut
    the headline, the lede and everything under them off the screen */
@@ -264,7 +271,9 @@ h2 .fig{color:var(--amber);letter-spacing:0;margin-left:10px}
   color:var(--ink);text-transform:none;margin-bottom:14px}
 .closer p{color:var(--faint);font:13px var(--mono);margin-bottom:26px}
 .closer .cmdline{margin:0 auto}
-.closer .star-cta{margin:28px 0 0;color:var(--body);font:12.5px/1.5 var(--mono)}
+.closer .star-cta{display:inline-flex;align-items:center;gap:8px;margin:28px 0 0;
+  padding:10px 18px;background:var(--panel-2);border:1px solid var(--line);
+  border-radius:999px;color:var(--body);font:13px/1.5 var(--mono)}
 .closer .star-cta a{color:var(--amber);font-weight:600}
 .closer .star-cta a:hover{color:var(--ink)}
 
@@ -310,7 +319,9 @@ footer a:hover{color:var(--ink)}
   <a class="lnk" href="guide/getting-started.html">Docs</a>
   <a class="lnk" href="guide/benchmarks.html">Benchmarks</a>
   <a class="lnk" href="guide/compare.html">Compare</a>
-  <a class="cta" href="https://github.com/vshulcz/deja-vu">GitHub</a>
+  <a class="lnk" href="zh/guide/getting-started.html">中文</a>
+  <a class="lnk" href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.ru.md">RU</a>
+  <a class="cta" href="https://github.com/vshulcz/deja-vu"><span class="star-ic" aria-hidden="true">★</span>GitHub</a>
 </nav>
 
 <div class="wrap">
@@ -322,6 +333,13 @@ footer a:hover{color:var(--ink)}
     <p class="lede">Fix it in Codex, and Claude Code remembers. deja indexes the sessions all
       43 of your coding agents already wrote to disk — months of history from before you
       installed it — and hands the right one back in whichever agent asks.</p>
+    <div class="install-tabs" role="tablist" aria-label="install method">
+      <button type="button" class="itab on" role="tab" aria-selected="true" data-cmd="curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh">macOS / Linux</button>
+      <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="brew install vshulcz/tap/deja-vu">Homebrew</button>
+      <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="npm i -g @vshulcz/deja-vu">npm</button>
+      <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="winget install vshulcz.deja-vu">Windows</button>
+      <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="go install github.com/vshulcz/deja-vu/cmd/deja@latest">Go</button>
+    </div>
     <div class="cmdline">
       <span class="p">$</span>
       <code id="i1">curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</code>
@@ -595,6 +613,14 @@ document.querySelectorAll('.copy').forEach(function(b){b.addEventListener('click
   navigator.clipboard.writeText(document.getElementById(b.dataset.copy).textContent.trim());
   var t=b.textContent;b.textContent='copied';cat('wow',1200);
   setTimeout(function(){b.textContent=t},1200);
+})});
+
+/* install tabs */
+document.querySelectorAll('.itab').forEach(function(tab){tab.addEventListener('click',function(){
+  document.querySelectorAll('.itab').forEach(function(t){t.classList.remove('on');t.setAttribute('aria-selected','false')});
+  tab.classList.add('on');tab.setAttribute('aria-selected','true');
+  var code=document.getElementById('i1');
+  if(code)code.textContent=tab.dataset.cmd;
 })});
 
 /* ── the cat reacts ───────────────────────────────────────────────────────
