@@ -472,6 +472,10 @@ jobs:
           floor=87.5
           echo "total coverage ${total}%, floor ${floor}%"
           awk -v t="$total" -v f="$floor" 'BEGIN { if (t+0 < f+0) { printf "coverage %.1f%% is below the %.1f%% floor\n", t, f; exit 1 } }'
+          badge=$(grep -oE 'coverage-[0-9]+(\.[0-9]+)?%25' README.md | head -1 | sed -E 's/coverage-([0-9.]+)%25/\1/')
+          if [ -n "$badge" ]; then
+            awk -v t="$total" -v b="$badge" 'BEGIN { if (int(t+0) < b+0) { printf "README coverage badge %s%% exceeds measured %.1f%%\n", b, t; exit 1 } }'
+          fi
       # A floor per package, set at where each stands today. Raise them as
       # coverage improves; lowering one to make a build pass is the move this
       # gate exists to prevent.

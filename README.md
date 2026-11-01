@@ -7,7 +7,7 @@
 
 <p align="center"><b>Your coding agents stop re-debugging what you already fixed.</b></p>
 
-<p align="center">Claude Code, Codex, Cursor and 40 more agents already save every session to disk.
+<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes and 36 more agents already save every session to disk.
 deja indexes all of it, months back, and hands the part that matters
 to whichever agent is working now.</p>
 
@@ -39,16 +39,19 @@ deja install --auto
 
 <p align="center">
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI"></a>
+  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/coverage-88%25-brightgreen" alt="Coverage"></a>
+  <a href="https://goreportcard.com/report/github.com/vshulcz/deja-vu"><img src="https://goreportcard.com/badge/github.com/vshulcz/deja-vu" alt="Go Report Card"></a>
   <a href="https://github.com/vshulcz/deja-vu/releases"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
+  <a href="https://trendshift.io/repositories/83640"><img src="https://img.shields.io/badge/Trendshift-%231%20Go%20Repo-ff8700" alt="Trendshift"></a>
   <a href="https://mcptoplist.com/server/io.github.vshulcz%2Fdeja-vu"><img src="https://mcptoplist.com/badge/io.github.vshulcz%2Fdeja-vu.svg" alt="MCP Toplist"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
 </p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">Docs</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">How it compares</a> &middot; <a href="docs/INTEGRATING.md">Building it into your tool</a></p>
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/">Docs</a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">Live browser demo</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">How it compares</a> &middot; <a href="docs/INTEGRATING.md">Building it into your tool</a></p>
 
 <p align="center"><sub>Found it useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</sub></p>
 
-deja-vu (`github.com/vshulcz/deja-vu`, CLI `deja`) is an open-source local memory and session-history search tool for coding agents: it indexes the session transcripts Claude Code, Codex, Cursor, Qwen Code, Gemini CLI, OpenCode, Crush and 36 other agents already wrote to disk and hands relevant history back over MCP and hooks. No LLM, one Go binary.
+deja-vu (`github.com/vshulcz/deja-vu`, CLI `deja`) is an open-source local memory and session-history search tool for coding agents: it indexes the session transcripts Claude Code, Codex, Cursor, OpenClaw, Hermes, Gemini CLI, OpenCode, Qwen Code, Kimi Code, Copilot and 33 other agents already wrote to disk and hands relevant history back over MCP and hooks. No LLM, one Go binary.
 
 ## Search it yourself
 
@@ -67,7 +70,9 @@ the list narrows as you type.
 - `?` lists every key, `^k` has the rest (copy the session id or project path, forget a session), `q` quits from the list; `esc` steps back and quits from an empty search box.
 
 With `DEJA_TUI=0` it prints the text summary instead, which is also `deja brief`. Piped, it
-prints what is indexed and which command to run next.
+prints what is indexed and which command to run next. `deja view` writes the whole store —
+sessions, the recall audit trail, and promoted notes — into one self-contained local HTML
+file ([interactive demo in your browser](https://vshulcz.github.io/deja-vu/view/)).
 
 ## Highlights
 
@@ -243,7 +248,7 @@ as usual. `deja search <query>` skips the suggestion.
 | Command | What it does |
 | --- | --- |
 | `deja sync export/import/ssh` | Move memory between machines. Watermarked, append-only, idempotent. |
-| `deja view` | Your whole memory as one local HTML file. No server, and the file never leaves the machine. |
+| `deja view` | Your whole memory as one local HTML file ([live demo](https://vshulcz.github.io/deja-vu/view/)). No server, and the file never leaves the machine. |
 | `deja stats` | Your agent work, wrapped. `--card` draws it in the terminal, `--card <file>.svg` writes one for a profile, `--html` a browsable timeline. |
 | `deja secrets [--scrub]` | Which sessions' source transcripts carry credentials, and what kind. Never prints a value. `--scrub` rewrites the ones it can, original kept beside the file. |
 | `deja rules [sync]` | Keep your standing rules in `~/.config/deja/rules.md`; `sync` copies them as a marked block into every installed agent's global rules file. |

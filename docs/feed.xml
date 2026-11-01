@@ -137,6 +137,13 @@
     <summary>Где Claude Code хранит сессии в ~/.claude/projects, как удалить одну сессию или проект через claude project purge, настройка cleanupPeriodDays и бэкап в deja.</summary>
   </entry>
   <entry>
+    <title>deja view — interactive session browser demo — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/view/</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/view/"></link>
+    <updated>2026-11-01T00:00:00Z</updated>
+    <summary>Interactive demo of deja view: browse and filter coding-agent sessions across Claude Code, Codex, Cursor, OpenClaw and Gemini CLI, inspect the recall audit trail, and view promoted notes.</summary>
+  </entry>
+  <entry>
     <title>Delete pi session history — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/delete-pi-session-history.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-pi-session-history.html"></link>
@@ -282,12 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-claude-code.html"></link>
     <updated>2026-10-28T00:00:00Z</updated>
     <summary>如何让 Claude Code 查到这台机器上每个编程智能体的会话：MCP 服务器、SessionStart 钩子和插件市场。</summary>
-  </entry>
-  <entry>
-    <title>Delete Goose session history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-goose-session-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-goose-session-history.html"></link>
-    <updated>2026-10-26T00:00:00Z</updated>
-    <summary>Since goose 1.10.0 every session is a row in sessions.db. Remove one with goose session remove, clear the legacy JSONL files yourself, and know what is lost.</summary>
   </entry>
 </feed>
