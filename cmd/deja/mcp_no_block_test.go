@@ -26,12 +26,12 @@ import (
 func TestNothingTheMCPServerServesUsesTheBlockingLookup(t *testing.T) {
 	// Guard the guard: a rename must retire or retarget this, not leave it
 	// green against a name nobody uses.
-	src, err := os.ReadFile("main.go")
+	src, err := os.ReadFile("last.go")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(string(src), "func findByPrefix(") {
-		t.Fatal("findByPrefix is gone from main.go — retire or retarget this test")
+		t.Fatal("findByPrefix is gone from last.go — retire or retarget this test")
 	}
 
 	files, err := filepath.Glob("mcp*.go")
