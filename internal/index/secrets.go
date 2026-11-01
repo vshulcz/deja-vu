@@ -1,6 +1,7 @@
 package index
 
 import (
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -30,7 +31,9 @@ type SecretFinding struct {
 }
 
 // databaseStorePath reports whether a session's path is a database holding
-// every other session too, rather than that session's own file.
+// every other session too, or a working directory stored in place of a file by
+// a database-backed harness (opencode, kilocode, zcode), rather than that
+// session's own transcript file.
 //
 // The test used to be "the extension is .jsonl", which withheld the file from
 // three harnesses that do write one file per session: Cline and half of VS Code
@@ -39,7 +42,10 @@ type SecretFinding struct {
 // where the answer was a single file they could open.
 func databaseStorePath(p string) bool {
 	switch strings.ToLower(filepath.Ext(p)) {
-	case ".db", ".sqlite", ".sqlite3", ".vscdb":
+	case "", ".db", ".sqlite", ".sqlite3", ".vscdb":
+		return true
+	}
+	if info, err := os.Stat(p); err == nil && info.IsDir() {
 		return true
 	}
 	return false

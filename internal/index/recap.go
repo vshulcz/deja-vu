@@ -209,6 +209,20 @@ var processNoise = []string{
 	"send_message",
 	"invoke_subagent",
 	"caller agent",
+	"invoked the subagent",
+	"launched the",
+	"launched a subagent",
+	"launched a background",
+	"back to the main agent",
+	"to the parent agent",
+	"to the coordinator",
+	"waiting for active",
+	"waiting for completion",
+	"waiting for background",
+	"awaiting findings",
+	"still running at",
+	"timer active",
+	"<truncated ",
 }
 
 // instructionOpeners are the imperative sentences that come from a prompt, a
@@ -255,6 +269,9 @@ func isProcessNoise(s string) bool {
 func trimRecapLine(s string) string {
 	s = strings.TrimSpace(s)
 	if i := strings.Index(s, "##"); i >= 0 {
+		s = strings.TrimSpace(s[:i])
+	}
+	if i := strings.Index(s, " |"); i >= 0 {
 		s = strings.TrimSpace(s[:i])
 	}
 	// A fence means the sentence swallowed a command and its output: the first

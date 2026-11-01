@@ -403,7 +403,7 @@ func planCommandForStep(session model.Session, terms []planIndexedTerm, need int
 			continue
 		}
 		command := strings.Join(strings.Fields(message.Text), " ")
-		if command == "" {
+		if command == "" || len(command) > 160 || namesAnEphemeralPath(command) {
 			continue
 		}
 		matched := 0
@@ -460,7 +460,8 @@ func planWallCommand(
 	bestCount := 0
 	for command, sessions := range groups {
 		if len(sessions) > bestCount ||
-			(len(sessions) == bestCount && (best == "" || command < best)) {
+			(len(sessions) == bestCount && (best == "" || len(command) < len(best))) ||
+			(len(sessions) == bestCount && len(command) == len(best) && command < best) {
 			best = command
 			bestCount = len(sessions)
 		}

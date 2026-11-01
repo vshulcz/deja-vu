@@ -23,17 +23,21 @@ func TestNormalizeFrictionStripsMechanicalPrefixes(t *testing.T) {
 	}
 	// The controls: nothing that carries meaning may be trimmed.
 	for in, keep := range map[string]string{
-		"Error: cannot find module 'express'": "Error: cannot find module 'express'",
-		"E2BIG: argument list too long":       "E2BIG: argument list too long",
-		"Exception: no route to host":         "Exception: no route to host",
-		"zsh:1: command not found: timeout":   "command not found: timeout",
-		"npm ERR! code ELIFECYCLE":            "npm ERR! code ELIFECYCLE",
-		"EACCES: permission denied, open 'x'": "EACCES: permission denied, open 'x'",
-		"E: Unable to locate package golang":  "E: Unable to locate package golang",
-		"2026 is not a year we support":       "2026 is not a year we support",
+		"Error: cannot find module 'express'":                                       "Error: cannot find module 'express'",
+		"E2BIG: argument list too long":                                             "E2BIG: argument list too long",
+		"Exception: no route to host":                                               "Exception: no route to host",
+		"zsh:1: command not found: timeout":                                         "command not found: timeout",
+		"npm ERR! code ELIFECYCLE":                                                  "npm ERR! code ELIFECYCLE",
+		"EACCES: permission denied, open 'x'":                                       "EACCES: permission denied, open 'x'",
+		"E: Unable to locate package golang":                                        "E: Unable to locate package golang",
+		"2026 is not a year we support":                                             "2026 is not a year we support",
+		"// `(eval):2: command not found: timeout` are one piece of friction; left": "// `(eval):2: command not found: timeout` are one piece of friction; left",
 	} {
 		if got := normalizeFriction(in); got != keep {
 			t.Errorf("normalizeFriction(%q) = %q, want %q", in, got, keep)
 		}
+	}
+	if _, ok := FrictionLine("// `(eval):2: command not found: timeout` are one piece of friction; left"); ok {
+		t.Error("a comment quoting a shell error was accepted as friction")
 	}
 }

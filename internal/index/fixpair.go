@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/redact"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -607,7 +608,9 @@ func looksLikeEditedPath(p string) bool {
 	// written in. "Makefile" is a path and "\tif err != nil {" is not;
 	// requiring a dot or a slash would have refused the first, which is a real
 	// file at the top of a repository.
-	if p == "" || len(p) > 200 {
+	if p == "" || len(p) > 200 ||
+		strings.Contains(p, "/.claude/projects/") || strings.Contains(p, "/.claude/jobs/") ||
+		strings.Contains(p, "/.cache/") {
 		return false
 	}
 	return !strings.ContainsAny(p, " \t\"'`$(){}[]=;:,*")
@@ -955,19 +958,18 @@ func ReadFixes(dir string) []FixPair {
 // held, the very line it had just been given.
 func fixSignaturesFor(dir, text string) map[uint64]bool {
 	sigs := map[uint64]bool{}
+	want := map[string]bool{}
 	for raw := range strings.SplitSeq(text, "\n") {
 		if line, ok := FrictionLine(raw); ok {
 			sigs[frictionHash(line)] = true
+			// `go test` separates `FAIL` and the package path with a tab,
+			// which SafeLine flattens to a space when `deja friction` or
+			// `deja fix`'s own hint prints the line.
+			if rest, ok := strings.CutPrefix(line, "FAIL "); ok {
+				sigs[frictionHash("FAIL\t"+strings.TrimSpace(rest))] = true
+			}
 		}
-	}
-	if len(sigs) > 0 {
-		return sigs
-	}
-	// Exact lines only, and only after nothing hashed: this is deja recognising
-	// its own wording, not a search for something like it.
-	want := map[string]bool{}
-	for raw := range strings.SplitSeq(text, "\n") {
-		if l := strings.ToLower(strings.TrimSpace(raw)); l != "" {
+		if l := strings.Join(strings.Fields(strings.ToLower(raw)), " "); l != "" {
 			want[l] = true
 		}
 	}
@@ -975,11 +977,42 @@ func fixSignaturesFor(dir, text string) map[uint64]bool {
 		return sigs
 	}
 	for _, p := range ReadFixes(dir) {
-		if want[strings.ToLower(strings.TrimSpace(p.Error))] {
+		if want[strings.Join(strings.Fields(strings.ToLower(p.Error)), " ")] {
 			sigs[p.Sig] = true
 		}
 	}
 	return sigs
+}
+
+func fixIgnoreGate(dir string) func(FixPair) bool {
+	var (
+		loaded  bool
+		m       Manifest
+		pol     policy.Policy
+		touched map[string]bool
+	)
+	return func(p FixPair) bool {
+		if !loaded {
+			if dir == "" {
+				dir = DefaultDir()
+			}
+			m, _ = readManifestCached(dir)
+			pol = policy.Load()
+			loaded = true
+		}
+		if p.Edit != "" && pol.Ignored(p.Edit, p.Project) {
+			return true
+		}
+		if p.Key != "" {
+			if meta, ok := m.Sessions[p.Key]; ok {
+				return pol.Ignored(meta.Path, meta.Project)
+			}
+		}
+		if touched == nil {
+			touched = ProjectsTouchedByIgnore(dir)
+		}
+		return touched[p.Project]
+	}
 }
 
 // FixesFor returns the commands that followed this error before, newest first.
@@ -1006,25 +1039,8 @@ func FixesForCommand(dir, command, text string, limit int, allow func(project st
 		return nil
 	}
 	shell := shellOnlySigs(text, command, sigs)
-	var out, held []FixPair
-	// The ignore rule, applied here rather than by the seven callers: a FixPair
-	// carries the project and the rule matches on the session's path, so no
-	// caller can apply it — the same shape #2652 measured for the commands
-	// table. Three of those callers speak unasked (the session-start block,
-	// hook-plan, hook-tool-after), and `deja fix` offered a remedy out of the
-	// tree the reader excluded while `deja how` refused to name the very same
-	// command (#2660).
-	//
-	// Loaded only once something matched, so an error nobody has hit pays
-	// nothing for the manifest read.
-	var ignored map[string]bool
-	loaded := false
-	isIgnored := func(project string) bool {
-		if !loaded {
-			ignored, loaded = ProjectsTouchedByIgnore(dir), true
-		}
-		return ignored[project]
-	}
+	var out, alsoOut, held, alsoHeld []FixPair
+	isIgnored := fixIgnoreGate(dir)
 	for _, p := range ReadFixes(dir) {
 		if !p.answers(sigs) {
 			continue
@@ -1032,7 +1048,10 @@ func FixesForCommand(dir, command, text string, limit int, allow func(project st
 		if len(shell) > 0 && !p.answers(without(sigs, shell)) && !sameFailingCommand(p, command) {
 			continue
 		}
-		if remedyIsTheFailure(p) || remedyIsIrreversible(p.Command) {
+		if remedyIsTheFailure(p) || remedyIsIrreversible(p.Command) || (p.Edit != "" && !looksLikeEditedPath(p.Edit)) {
+			continue
+		}
+		if !sigs[p.Sig] && (p.Repaired || p.Substitute) {
 			continue
 		}
 		// One session doing something after an error is not evidence that it
@@ -1042,25 +1061,39 @@ func FixesForCommand(dir, command, text string, limit int, allow func(project st
 		// failures on one machine, 112 had a confirmed pair and 373 more had
 		// only this.
 		if p.Candidate {
-			held = append(held, p)
+			if sigs[p.Sig] {
+				held = append(held, p)
+			} else {
+				alsoHeld = append(alsoHeld, p)
+			}
 			continue
 		}
 		if allow != nil && !allow(p.Project) {
 			continue
 		}
-		if isIgnored(p.Project) {
+		if isIgnored(p) {
 			continue
 		}
-		out = append(out, p)
+		if sigs[p.Sig] {
+			out = append(out, p)
+			if len(out) >= limit {
+				break
+			}
+		} else {
+			alsoOut = append(alsoOut, p)
+		}
+	}
+	for _, p := range alsoOut {
 		if len(out) >= limit {
 			break
 		}
+		out = append(out, p)
 	}
 	// Confirmed first, always. What is held goes behind them and only when
 	// nothing was confirmed, so a pair two sessions agree on is never displaced
 	// by a single sighting.
 	if len(out) == 0 {
-		for _, p := range held {
+		for _, p := range append(held, alsoHeld...) {
 			if allow != nil && !allow(p.Project) {
 				continue
 			}
@@ -1068,7 +1101,7 @@ func FixesForCommand(dir, command, text string, limit int, allow func(project st
 			// search and `deja how` refuse the session, and `deja fix` handed
 			// back what it ran there (#3403). #2660 fixed the confirmed half;
 			// the candidates arrived after it.
-			if isIgnored(p.Project) {
+			if isIgnored(p) {
 				continue
 			}
 			out = append(out, p)
@@ -1181,13 +1214,17 @@ func FixCandidateSeen(dir, text string, allow func(project string) bool) bool {
 	if len(sigs) == 0 {
 		return false
 	}
+	isIgnored := fixIgnoreGate(dir)
 	for _, p := range ReadFixes(dir) {
 		if !p.answers(sigs) || !p.Candidate {
 			continue
 		}
 		// A sighting FixesFor would drop is not one a second session can
 		// promote into an answer, so it is not "waiting for a second sighting".
-		if remedyIsTheFailure(p) || remedyIsIrreversible(p.Command) {
+		if remedyIsTheFailure(p) || remedyIsIrreversible(p.Command) || (p.Edit != "" && !looksLikeEditedPath(p.Edit)) {
+			continue
+		}
+		if !sigs[p.Sig] && (p.Repaired || p.Substitute) {
 			continue
 		}
 		if allow != nil && !allow(p.Project) {
@@ -1195,7 +1232,7 @@ func FixCandidateSeen(dir, text string, allow func(project string) bool) bool {
 		}
 		// The same rule as FixesFor: saying deja holds a sighting it will not
 		// show is worse than saying nothing (#2660).
-		if ProjectsTouchedByIgnore(dir)[p.Project] {
+		if isIgnored(p) {
 			continue
 		}
 		return true
@@ -1213,7 +1250,7 @@ func FixWithheldAsIrreversible(dir, text string, allow func(project string) bool
 	if len(sigs) == 0 {
 		return false
 	}
-	var ignored map[string]bool
+	isIgnored := fixIgnoreGate(dir)
 	for _, p := range ReadFixes(dir) {
 		if !p.answers(sigs) || !remedyIsIrreversible(p.Command) {
 			continue
@@ -1221,10 +1258,7 @@ func FixWithheldAsIrreversible(dir, text string, allow func(project string) bool
 		if allow != nil && !allow(p.Project) {
 			continue
 		}
-		if ignored == nil {
-			ignored = ProjectsTouchedByIgnore(dir)
-		}
-		if ignored[p.Project] {
+		if isIgnored(p) {
 			continue
 		}
 		return true

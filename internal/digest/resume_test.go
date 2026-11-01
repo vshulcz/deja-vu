@@ -92,3 +92,27 @@ func TestAHandoverFromPlumbingIsEmpty(t *testing.T) {
 		t.Errorf("plumbing produced a handover: %+v", r)
 	}
 }
+
+func TestHandoverSkipsContinuationNudgesAndClipsChainedCommands(t *testing.T) {
+	longCmd := "git push -u origin fix/branch && gh pr create --title 'fix: trim handover commands' --body '" +
+		strings.Repeat("long body word ", 30) + "'"
+	s := model.Session{
+		Harness: "claude", ID: "s4",
+		Messages: []model.Message{
+			{Role: "user", Text: "audit the live store surfaces and fix the six regressions"},
+			{Role: "user", Text: "мержи и давай думать"},
+			{Role: "user", Text: "давай еще думать дальше"},
+			{Role: sources.RoleCommand, Text: longCmd + "\n| row | val |"},
+		},
+	}
+	r := ResumeFrom(s, nil)
+	if !strings.Contains(r.Asked, "audit the live store surfaces") {
+		t.Errorf("continuation nudge overwrote the task: %q", r.Asked)
+	}
+	if len([]rune(r.Command)) > resumeCommandMax+1 || !strings.HasSuffix(r.Command, "…") {
+		t.Errorf("chained command was not clipped to %d runes: %d (%q)", resumeCommandMax, len([]rune(r.Command)), r.Command)
+	}
+	if got := MessageText("Result summary:\n| col1 | col2 |\n|---|---|\nAll checks passed."); strings.Contains(got, "|") {
+		t.Errorf("MessageText kept markdown table rows: %q", got)
+	}
+}

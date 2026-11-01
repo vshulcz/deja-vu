@@ -81,7 +81,7 @@ func ResumeFrom(s model.Session, readsAsFailure func(output string) bool) Resume
 			}
 		case sources.RoleCommand:
 			if line := firstTextLine(text); line != "" {
-				r.Command, r.Failed = line, false
+				r.Command, r.Failed = clipResumeCommand(line, resumeCommandMax), false
 			}
 		case sources.RoleToolOutput:
 			if r.Command != "" && readsAsFailure != nil && readsAsFailure(text) {
@@ -129,14 +129,30 @@ const (
 	askMinRunes = 20
 	// askMaxRunes keeps a pasted document out.
 	askMaxRunes = 600
+	// resumeCommandMax keeps a chained one-liner from turning the handover
+	// line into a paragraph.
+	resumeCommandMax = 240
 )
 
 // nudgeWords are the ways a reader says "carry on", which is not a task.
 var nudgeWords = []string{
-	"да", "нет", "ок", "окей", "давай", "давай дальше", "дальше", "продолжай",
-	"продолжаем", "поехали", "угу", "ага", "спасибо",
+	"да", "нет", "ок", "окей", "давай", "давай дальше", "давай еще", "давай ещё",
+	"дальше", "продолжай", "продолжаем", "поехали", "угу", "ага", "спасибо",
+	"мержи", "мержь", "что дальше", "а что дальше",
 	"ok", "okay", "yes", "no", "go", "go on", "continue", "carry on", "thanks",
 	"sure", "do it", "please do",
+}
+
+func clipResumeCommand(s string, limit int) string {
+	runes := []rune(s)
+	if len(runes) <= limit {
+		return s
+	}
+	cut := string(runes[:limit])
+	if i := strings.LastIndexByte(cut, ' '); i > limit/2 {
+		cut = strings.TrimSpace(cut[:i])
+	}
+	return cut + "…"
 }
 
 // aboutToExplain reports whether the line is an agent announcing an answer

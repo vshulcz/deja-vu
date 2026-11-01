@@ -199,9 +199,9 @@ func looksLikeProse(line string) bool {
 }
 
 func noiseLine(line string) bool {
-	return numberedDumpLine(line) || shareGrepRE.MatchString(line) ||
-		shareShellRE.MatchString(line) || shareDigitsRE.MatchString(line) ||
-		looksLikeListingDump(line)
+	return strings.HasPrefix(line, "|") || numberedDumpLine(line) ||
+		shareGrepRE.MatchString(line) || shareShellRE.MatchString(line) ||
+		shareDigitsRE.MatchString(line) || looksLikeListingDump(line)
 }
 
 // numberedDumpLine reports whether a line that opens with a number is a line

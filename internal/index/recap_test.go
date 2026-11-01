@@ -64,6 +64,16 @@ func TestARecapLineIsTrimmedNotRewritten(t *testing.T) {
 			in:   "déjà vu: tokscale was already configured for local usage — reusing it (deja:ses_f45a9)",
 			want: "",
 		},
+		{
+			name: "subagent launch narration",
+			in:   "I have launched a background research agent to check the deployment state on the server.",
+			want: "",
+		},
+		{
+			name: "sentence running into a markdown table row",
+			in:   "Body proportions now match 100% across all frames: | build | slim | slim |",
+			want: "Body proportions now match 100% across all frames:",
+		},
 	}
 	for _, c := range cases {
 		if got := trimRecapLine(c.in); got != c.want {

@@ -151,11 +151,13 @@ func normalizeFriction(l string) string {
 	l = strings.TrimSpace(l)
 	l = strings.TrimSpace(trimLogPrefix(l))
 	l = trimTestDuration(l)
-	// The prefix is `<where>:<line>: `, where <where> is a shell name or an
-	// `(eval)`/`(anon)` marker. Only strip it when the middle field is a
-	// number — `Error: cannot find x: y` must keep its shape.
+	// The prefix is `<where>:<line>: `, where <where> is a shell name, an
+	// `(eval)`/`(anon)` marker, or a short filename (`worker.py:41: `). Only
+	// strip it when <where> is a single token with no quotes or backticks and
+	// the middle field is a line number — `Error: cannot find x: y` and a
+	// comment like `// `(eval):2: ...` must keep their shape.
 	first := strings.Index(l, ":")
-	if first <= 0 || first > 16 {
+	if first <= 0 || first > 16 || strings.ContainsAny(l[:first], " \t`\"'") {
 		return l
 	}
 	rest := l[first+1:]
@@ -373,7 +375,7 @@ func looksLikeSource(l string) bool {
 	if strings.Contains(l, `("`) || strings.Contains(l, `, "`) ||
 		strings.Contains(l, `:= "`) || strings.Contains(l, `= "`) ||
 		strings.Contains(l, `: "`) && strings.HasSuffix(l, `"},`) ||
-		strings.HasPrefix(l, "`") {
+		strings.HasPrefix(l, "`") || strings.Contains(l, "` ") {
 		return true
 	}
 	// A comment about an error is source too, and the wider marker list in

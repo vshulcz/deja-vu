@@ -342,17 +342,19 @@ func planSearchSteps(plan string) [][]string {
 // about to act is worse than silence.
 func planRemedy(dir, wall string) string {
 	pol := policy.Load()
-	fixes := index.FixesFor(dir, wall, 1, func(project string) bool {
+	fixes := index.FixesFor(dir, wall, 5, func(project string) bool {
 		return pol.Allows(policy.ActivationAuto, project)
 	})
-	if len(fixes) == 0 || fixes[0].Candidate {
-		return ""
+	for _, f := range fixes {
+		if f.Candidate || f.Repaired {
+			continue
+		}
+		cmd := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(f.Command), "$ "))
+		if cmd != "" && len(cmd) <= planCommandMax {
+			return cmd
+		}
 	}
-	cmd := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(fixes[0].Command), "$ "))
-	if cmd == "" || len(cmd) > planCommandMax {
-		return ""
-	}
-	return cmd
+	return ""
 }
 
 // planCommandMax bounds the remedy clause: the finding rides in a block that

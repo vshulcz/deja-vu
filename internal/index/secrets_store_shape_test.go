@@ -23,6 +23,7 @@ func TestAPerSessionFileIsNamedWhateverItsExtension(t *testing.T) {
 		{ID: "b", Harness: "deepseek", Path: "/tmp/.dsh/b.jsonl.zstd", Updated: when, Messages: []model.Message{msg}},
 		{ID: "c", Harness: "zed", Path: "/tmp/zed/threads.db", Updated: when, Messages: []model.Message{msg}},
 		{ID: "d", Harness: "goose", Path: "/tmp/goose/sessions.sqlite", Updated: when, Messages: []model.Message{msg}},
+		{ID: "e", Harness: "opencode", Path: t.TempDir(), Updated: when, Messages: []model.Message{msg}},
 	})
 
 	scan, err := ScanSecrets(dir)
@@ -33,7 +34,7 @@ func TestAPerSessionFileIsNamedWhateverItsExtension(t *testing.T) {
 	for _, f := range scan.Findings {
 		got[f.ID] = f.Path
 	}
-	if len(got) != 4 {
+	if len(got) != 5 {
 		t.Fatalf("want a finding per session, got %d: %+v", len(got), scan.Findings)
 	}
 	for _, id := range []string{"a", "b"} {
@@ -43,7 +44,7 @@ func TestAPerSessionFileIsNamedWhateverItsExtension(t *testing.T) {
 	}
 	// A database holds every other session too, so naming it sends someone to
 	// a file they must not edit.
-	for _, id := range []string{"c", "d"} {
+	for _, id := range []string{"c", "d", "e"} {
 		if got[id] != "" {
 			t.Errorf("session %s is a database store and the report named %q", id, got[id])
 		}
