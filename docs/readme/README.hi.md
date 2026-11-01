@@ -80,7 +80,7 @@ dsh plugin --profile web add dsh-deja
 # Grok Build: grok plugin marketplace add vshulcz/deja-vu && grok plugin install deja
 openclaw plugins install clawhub:@vshulcz/openclaw-deja && openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 pi install npm:@vshulcz/pi-deja
-hermes plugins install deja-vu
+hermes plugins install deja-memory
 ```
 
 `deja install --auto` ऊपर वाला सब कुछ पहले ही जोड़ देता है, इसलिए दोनों में से कोई एक रास्ता काफ़ी है। दोनों साथ
@@ -249,7 +249,7 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsur
 | Grok Build | प्लगइन `deja` | `grok plugin marketplace add vshulcz/deja-vu`, फिर `grok plugin install deja` |
 | OpenClaw | ClawHub और npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi (और omp) | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
-| Hermes | Hermes प्लगइन कैटलॉग में मेमोरी प्रोवाइडर `deja-memory` | `hermes plugins install deja-vu`, या GitHub से: `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
+| Hermes | Hermes प्लगइन कैटलॉग में मेमोरी प्रोवाइडर `deja-memory` | `hermes plugins install deja-memory`, या GitHub से: `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 
 दोनों में से कोई एक रास्ता काफ़ी है और दोनों साथ में भी कुछ नहीं तोड़ते: हर पैकेज पहले वही पढ़ता है जो
 `deja install` ने लिखा। opencode, dsh और OpenClaw सिर्फ़ छूटा हुआ भरते हैं; Kimi, Grok, Codex और pi हट जाते हैं

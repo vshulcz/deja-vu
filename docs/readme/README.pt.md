@@ -80,7 +80,7 @@ dsh plugin --profile web add dsh-deja
 # Grok Build: grok plugin marketplace add vshulcz/deja-vu && grok plugin install deja
 openclaw plugins install clawhub:@vshulcz/openclaw-deja && openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 pi install npm:@vshulcz/pi-deja
-hermes plugins install deja-vu
+hermes plugins install deja-memory
 ```
 
 O `deja install --auto` já conecta tudo isso, então qualquer um dos dois caminhos basta. Os dois juntos também
@@ -251,7 +251,7 @@ cada um tem um pacote no próprio ecossistema, para quem instala extensões por 
 | Grok Build | plugin `deja` | `grok plugin marketplace add vshulcz/deja-vu`, depois `grok plugin install deja` |
 | OpenClaw | ClawHub e npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi (e omp) | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
-| Hermes | provedor de memória `deja-memory`, no catálogo de plugins do Hermes | `hermes plugins install deja-vu`, ou do GitHub: `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
+| Hermes | provedor de memória `deja-memory`, no catálogo de plugins do Hermes | `hermes plugins install deja-memory`, ou do GitHub: `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 
 Qualquer um dos dois caminhos basta e os dois juntos não quebram nada: cada pacote lê primeiro o que o
 `deja install` deixou escrito. opencode, dsh e OpenClaw só completam o que falta; Kimi, Grok, Codex e pi saem

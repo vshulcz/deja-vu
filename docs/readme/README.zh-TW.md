@@ -77,7 +77,7 @@ dsh plugin --profile web add dsh-deja
 # Grok Build：grok plugin marketplace add vshulcz/deja-vu && grok plugin install deja
 openclaw plugins install clawhub:@vshulcz/openclaw-deja && openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 pi install npm:@vshulcz/pi-deja
-hermes plugins install deja-vu
+hermes plugins install deja-memory
 ```
 
 `deja install --auto` 已經把上面這些都接好了，兩條路走哪條都夠。兩邊都裝也沒問題：套件會看
@@ -232,7 +232,7 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsur
 | Grok Build | 外掛 `deja` | `grok plugin marketplace add vshulcz/deja-vu`，然後 `grok plugin install deja` |
 | OpenClaw | ClawHub 與 npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi（以及 omp） | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
-| Hermes | 記憶提供者 `deja-memory`，在 Hermes 外掛目錄裡 | `hermes plugins install deja-vu`，或從 GitHub：`hermes plugins install vshulcz/deja-vu/extensions/hermes` |
+| Hermes | 記憶提供者 `deja-memory`，在 Hermes 外掛目錄裡 | `hermes plugins install deja-memory`，或從 GitHub：`hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 
 兩條路各自都夠用，兩條都走也不會出問題：每個套件都會先讀 `deja install` 寫下的設定。
 opencode、dsh 和 OpenClaw 只補上缺的那部分；Kimi、Grok、Codex 和 pi 在安裝器已經接好時

@@ -7,7 +7,7 @@
 
 <p align="center"><b>别再让编程智能体重新调试你已经修好的问题。</b></p>
 
-<p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes 以及另外 36 个智能体本来就把每次会话写在磁盘上。<br>
+<p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes 以及另外 37 个智能体本来就把每次会话写在磁盘上。<br>
 deja 在本地索引全部历史，并通过 MCP 和钩子把相关上下文交还给正在干活的智能体——无需 LLM，单个 Go 二进制。</p>
 
 <p align="center"><a href="../../README.md">English</a> | 简体中文 | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
@@ -72,19 +72,21 @@ deja install --auto
 
 也不必特意去问——开启自动召回后，会话一打开，智能体就已经知道你在这个项目里解决过什么。想自己翻一翻，运行 `deja`。
 
-opencode、DeepSeek Harness、Zed、Kimi Code、Codex CLI、Grok Build、OpenClaw、pi 和 Hermes 也有各自生态里的包，习惯在那边装扩展的人
+opencode、DeepSeek Harness、Zed、Kimi Code、Qwen Code、Codex CLI、Grok Build、OpenClaw、pi、Hermes 和 Magpie 也有各自生态里的包，习惯在那边装扩展的人
 可以直接用：
 
 ```sh
 opencode plugin opencode-deja
 dsh plugin --profile web add dsh-deja
+magpie plugin add @vshulcz/magpie-deja
+qwen extensions install https://github.com/vshulcz/deja-vu
 # Zed：扩展面板里搜 deja
 # Kimi Code：/plugins install https://github.com/vshulcz/deja-vu
 # Codex CLI：codex plugin marketplace add https://github.com/vshulcz/deja-vu && codex plugin add deja-vu@deja-vu
 # Grok Build：grok plugin marketplace add vshulcz/deja-vu && grok plugin install deja
 openclaw plugins install clawhub:@vshulcz/openclaw-deja && openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 pi install npm:@vshulcz/pi-deja
-hermes plugins install deja-vu
+hermes plugins install deja-memory
 ```
 
 `deja install --auto` 已经把上面这些都接好了，两条路走哪条都够。两边都装也没问题：包会看
@@ -235,8 +237,9 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsur
 | Grok Build | 插件 `deja` | `grok plugin marketplace add vshulcz/deja-vu`，然后 `grok plugin install deja` |
 | OpenClaw | ClawHub 与 npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi（以及 omp） | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
-| Hermes | 记忆提供者 `deja-memory`，在 Hermes 插件目录里 | `hermes plugins install deja-vu`，或从 GitHub：`hermes plugins install vshulcz/deja-vu/extensions/hermes` |
+| Hermes | 记忆提供者 `deja-memory`，在 Hermes 插件目录里 | `hermes plugins install deja-memory`，或从 GitHub：`hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 | Magpie | npm `@vshulcz/magpie-deja` | `magpie plugin add @vshulcz/magpie-deja` |
+| CC Switch | 一键导入 MCP 与 Skill 仓库（`ccswitch://`） | [导入 MCP 到 CC Switch](ccswitch://v1/import?resource=mcp&apps=claude,codex,gemini,opencode&config=eyJtY3BTZXJ2ZXJzIjp7ImRlamEiOnsiY29tbWFuZCI6Im5weCIsImFyZ3MiOlsiLXkiLCJAdnNodWxjei9kZWphLXZ1Iiwic2VydmUiXX19fQ==) · [跨智能体切换指南](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html) |
 
 两条路各自都够用，两条都走也不会出问题：每个包都会先读 `deja install` 写下的配置。
 opencode、dsh 和 OpenClaw 只补上缺的那部分；Kimi、Grok、Codex 和 pi 在安装器已经接好时

@@ -14,7 +14,7 @@
 
 ```bash
 brew install deja-vu        # 或者：go install github.com/vshulcz/deja-vu/cmd/deja@latest
-hermes plugins install vshulcz/deja-vu/extensions/hermes
+hermes plugins install deja-memory   # 或直接从 GitHub：hermes plugins install vshulcz/deja-vu/extensions/hermes
 hermes config set memory.provider deja-memory
 ```
 
