@@ -78,7 +78,7 @@ dsh plugin --profile web add dsh-deja
 # Grok Build: grok plugin marketplace add vshulcz/deja-vu && grok plugin install deja
 openclaw plugins install clawhub:@vshulcz/openclaw-deja && openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 pi install npm:@vshulcz/pi-deja
-hermes plugins install deja-vu
+hermes plugins install deja-memory
 ```
 
 `deja install --auto`가 위의 것들을 알아서 연결하므로 두 경로 중 하나면 충분합니다. 둘 다 써도
@@ -245,7 +245,7 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsur
 | Grok Build | 플러그인 `deja` | `grok plugin marketplace add vshulcz/deja-vu` 다음 `grok plugin install deja` |
 | OpenClaw | ClawHub와 npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi (그리고 omp) | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
-| Hermes | Hermes 플러그인 카탈로그의 메모리 공급자 `deja-memory` | `hermes plugins install deja-vu`, 또는 GitHub에서: `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
+| Hermes | Hermes 플러그인 카탈로그의 메모리 공급자 `deja-memory` | `hermes plugins install deja-memory`, 또는 GitHub에서: `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 
 어느 쪽이든 하나면 충분하고 둘 다 해도 탈이 없습니다. 각 패키지는 먼저 `deja install`이 써 둔 설정을
 읽습니다. opencode, dsh, OpenClaw는 빠진 부분만 채우고, Kimi, Grok, Codex, pi는 설치기가 이미 연결했다면

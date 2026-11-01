@@ -381,7 +381,7 @@ TRAE IDE は接続はしますが、読み取りはしません。チャット�
 | Grok Build | プラグイン `deja` | `grok plugin marketplace add vshulcz/deja-vu` の後に `grok plugin install deja` |
 | OpenClaw | ClawHub と npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi（と omp） | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
-| Hermes | メモリプロバイダー `deja-memory`（Hermes のプラグインカタログ内） | `hermes plugins install deja-vu`、または GitHub から：`hermes plugins install vshulcz/deja-vu/extensions/hermes` |
+| Hermes | メモリプロバイダー `deja-memory`（Hermes のプラグインカタログ内） | `hermes plugins install deja-memory`、または GitHub から：`hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 
 どちらの方法も単独で十分で、両方を使っても問題ありません。どのパッケージもまず `deja install` が
 書き込んだ内容を読み取ります。opencode、dsh、OpenClaw は足りないものだけを追加し、Kimi、Grok、Codex、pi は

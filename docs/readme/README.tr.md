@@ -80,7 +80,7 @@ dsh plugin --profile web add dsh-deja
 # Grok Build: grok plugin marketplace add vshulcz/deja-vu && grok plugin install deja
 openclaw plugins install clawhub:@vshulcz/openclaw-deja && openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 pi install npm:@vshulcz/pi-deja
-hermes plugins install deja-vu
+hermes plugins install deja-memory
 ```
 
 `deja install --auto` yukarıdakilerin hepsini zaten bağlıyor, yani iki yoldan biri yeter. İkisi birden de
@@ -252,7 +252,7 @@ kendi ekosisteminde bir paketi var; eklentilerini oradan kuranlar için:
 | Grok Build | eklenti `deja` | `grok plugin marketplace add vshulcz/deja-vu`, sonra `grok plugin install deja` |
 | OpenClaw | ClawHub ve npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi (ve omp) | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
-| Hermes | Hermes eklenti kataloğunda `deja-memory` bellek sağlayıcısı | `hermes plugins install deja-vu` ya da GitHub'dan: `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
+| Hermes | Hermes eklenti kataloğunda `deja-memory` bellek sağlayıcısı | `hermes plugins install deja-memory` ya da GitHub'dan: `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 
 İki yoldan biri yeter, ikisi birden de bir şey bozmaz: her paket önce `deja install`'ın yazdığını okur.
 opencode, dsh ve OpenClaw yalnızca eksiği tamamlar; Kimi, Grok, Codex ve pi kurucu zaten bağladıysa geri

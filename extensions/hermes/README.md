@@ -18,7 +18,7 @@ deja has to be on PATH first:
 
 ```bash
 brew install deja-vu        # or: go install github.com/vshulcz/deja-vu/cmd/deja@latest
-hermes plugins install vshulcz/deja-vu/extensions/hermes
+hermes plugins install deja-memory   # or from GitHub: hermes plugins install vshulcz/deja-vu/extensions/hermes
 hermes config set memory.provider deja-memory
 ```
 
