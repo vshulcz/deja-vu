@@ -428,13 +428,13 @@ func noisyMessage(s string) bool {
 }
 
 // harnessNotice is a line the harness wrote in the assistant's place: a usage
-// limit or an API error. It ends a turn, so it was picked as what the turn
-// concluded.
+// limit, a billing notice, or an API error. It ends a turn, so it was picked as
+// what the turn concluded.
 func harnessNotice(t string) bool {
-	if len(t) > 200 {
+	if len(t) > 300 {
 		return false
 	}
-	if strings.HasPrefix(t, "API Error: ") {
+	if strings.HasPrefix(t, "API Error: ") || strings.HasPrefix(t, "Claude Code can't use your ") {
 		return true
 	}
 	return (strings.HasPrefix(t, "You've hit your ") || strings.HasPrefix(t, "You've reached your ")) &&
@@ -481,7 +481,14 @@ func cutMarked(s string, n int) string {
 	if n <= len(cutMarker) {
 		return ""
 	}
-	t := strings.TrimRight(UTF8SafeCut(s, n-len(cutMarker)), " \t\n")
+	limit := n - len(cutMarker)
+	raw := UTF8SafeCut(s, limit)
+	t := strings.TrimRight(raw, " \t\n")
+	if limit < len(s) && len(t) == len(raw) {
+		if i := strings.LastIndexAny(t, " \t\n"); i > 0 && len(t)-i <= 24 {
+			t = strings.TrimRight(t[:i], " \t\n.,;:-")
+		}
+	}
 	if t == "" {
 		return ""
 	}
@@ -710,7 +717,7 @@ func IsAgentArtifact(text string) bool {
 		return true
 	}
 	trimmed := strings.TrimSpace(text)
-	if IsCompactionSummary(trimmed) || IsHookStatusLine(trimmed) || isReviewVerdict(trimmed) {
+	if IsCompactionSummary(trimmed) || IsHookStatusLine(trimmed) || isReviewVerdict(trimmed) || harnessNotice(trimmed) {
 		return true
 	}
 	// Harness preambles injected as user turns: <environment_context>,

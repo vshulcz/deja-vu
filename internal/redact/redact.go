@@ -249,7 +249,10 @@ var (
 	//
 	// Words between the key and the colon, the way genericKVIntlFillerRE
 	// allows: "пароль от стейджа: …" is how the line is actually written.
-	intlValueRE = regexp.MustCompile(`(?i)(?:^|[^\p{L}\p{N}_])(парол[ьяею]|токен[ауы]?|секрет[ауы]?|ключ[аеиуом]?|contraseña|senha|passwort|密码|密碼|パスワード|비밀번호|api[_-]?key|secret|token|passwd|password)([^\p{L}\n:=]?[^\n:=]{0,32}[:=]\s*)(\\*['"]?)([^\s'"]*[^\x00-\x7f][^\s'"]*)(\\*['"]?)`)
+	// Stops at '[' as well as a newline so a provenance tag (`[claude:id/user]`)
+	// whose truncated id carries `…` is not taken as the value of a key word
+	// earlier on the line.
+	intlValueRE = regexp.MustCompile(`(?i)(?:^|[^\p{L}\p{N}_])(парол[ьяею]|токен[ауы]?|секрет[ауы]?|ключ[аеиуом]?|contraseña|senha|passwort|密码|密碼|パスワード|비밀번호|api[_-]?key|secret|token|passwd|password)([^\p{L}\n:=\[]?[^\n:=\[]{0,32}[:=]\s*)(\\*['"]?)([^\s'"]*[^\x00-\x7f][^\s'"]*)(\\*['"]?)`)
 	// A credential stated in prose rather than assigned. Every pattern above
 	// wants a delimiter — a colon, an equals sign, a flag — and a person
 	// telling an agent a password does not use one: "also the admin password is

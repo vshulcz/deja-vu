@@ -117,3 +117,17 @@ func TestHandoffContinuationLines(t *testing.T) {
 		t.Fatalf("clean command failure = %q", got)
 	}
 }
+
+func TestHarnessSubscriptionNoticeAndWordBoundaryCut(t *testing.T) {
+	billing := "Claude Code can't use your Claude subscription, usually because a payment is past due · Pay or renew at https://claude.ai/settings/billing, or run claude /login to use an API key instead"
+	if !IsAgentArtifact(billing) || !IsPlumbing(billing) {
+		t.Fatalf("billing notice should be treated as harness plumbing")
+	}
+	cut := cutMarked("В лучшем случае выйти из сессии", len("В лучшем случае вый")+len(cutMarker))
+	if strings.Contains(cut, "вый") {
+		t.Fatalf("cutMarked split a word instead of backing up to whitespace: %q", cut)
+	}
+	if !strings.HasPrefix(cut, "В лучшем случае…") {
+		t.Fatalf("unexpected cutMarked result: %q", cut)
+	}
+}

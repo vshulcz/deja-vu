@@ -74,7 +74,8 @@ func ResumeFrom(s model.Session, readsAsFailure func(output string) bool) Resume
 			}
 		case sources.RoleEdit, sources.RoleFiles:
 			for f := range strings.FieldsSeq(text) {
-				if f = strings.TrimSpace(f); looksLikeAPath(f) && !throwawayPath(f) {
+				f = strings.TrimRight(strings.Trim(f, " \t\n\r\"'`"), ",;:)")
+				if looksLikeAPath(f) && !throwawayPath(f) {
 					files = append(files, f)
 				}
 			}
@@ -198,28 +199,44 @@ const decisionMinRunes = 20
 // looks like in these records, where deja writes absolute ones. A bare
 // `Makefile` is left out, which is the price of not printing prose.
 func looksLikeAPath(s string) bool {
-	if s == "" {
+	if s == "" || strings.Contains(s, "://") || strings.ContainsAny(s, "<>[]=*(){};,") {
+		return false
+	}
+	if i := strings.IndexByte(s, '@'); i > 0 && s[i-1] != '/' && s[i-1] != '\\' {
+		return false
+	}
+	if !hasPathAlphaNum(s) {
 		return false
 	}
 	if strings.ContainsAny(s, `/\`) {
+		return !strings.HasPrefix(s, "~") || strings.HasPrefix(s, "~/") || strings.HasPrefix(s, `~\`)
+	}
+	if strings.HasPrefix(s, ".") && len(s) > 1 && ((s[1] >= 'a' && s[1] <= 'z') || (s[1] >= 'A' && s[1] <= 'Z')) {
 		return true
 	}
-	if strings.HasPrefix(s, "~") || strings.HasPrefix(s, ".") {
-		return true
-	}
-	// An extension: a dot inside the name with a short alphanumeric tail, and
-	// nothing after it. `was.` has the dot at the end and is not one.
-	if i := strings.LastIndexByte(s, '.'); i > 0 && i < len(s)-1 {
+	// An extension: a dot inside the name with a short lowercase alphanumeric
+	// tail, and nothing after it. `was.` has the dot at the end and is not one;
+	// `os.File` and `o.r` are field accesses in prose, not bare filenames.
+	if i := strings.LastIndexByte(s, '.'); i >= 2 && i < len(s)-1 {
 		ext := s[i+1:]
 		if len(ext) > 5 {
 			return false
 		}
 		for _, r := range ext {
-			if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') {
+			if (r < 'a' || r > 'z') && (r < '0' || r > '9') {
 				return false
 			}
 		}
 		return true
+	}
+	return false
+}
+
+func hasPathAlphaNum(s string) bool {
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r >= utf8.RuneSelf {
+			return true
+		}
 	}
 	return false
 }

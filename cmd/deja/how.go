@@ -356,10 +356,16 @@ func howEntries(dir string, terms []string, projects []string, activation string
 	for _, e := range byCmd {
 		out = append(out, *e)
 	}
-	// Sessions before runs: a command run forty times in one session is one
-	// person iterating, and a command run once in six sessions is how the
-	// thing is done here.
+	// Commands whose every recorded run failed or that only mention the tool
+	// inside a multi-step script yield to direct invocations that worked; within
+	// each tier, sessions come before runs.
 	sort.Slice(out, func(i, j int) bool {
+		if fi, fj := out[i].failedEveryTime(), out[j].failedEveryTime(); fi != fj {
+			return !fi
+		}
+		if di, dj := howDirectMatch(out[i].Command, terms), howDirectMatch(out[j].Command, terms); di != dj {
+			return di
+		}
 		if len(out[i].Sessions) != len(out[j].Sessions) {
 			return len(out[i].Sessions) > len(out[j].Sessions)
 		}
@@ -369,6 +375,43 @@ func howEntries(dir string, terms []string, projects []string, activation string
 		return out[i].Command < out[j].Command
 	})
 	return out, len(hidden), len(ignored), nil
+}
+
+// howDirectMatch reports whether the leading command segment (after any `cd`
+// prefix) mentions every query term rather than burying the tool inside a
+// multi-step `&&` / `;` pipeline.
+func howDirectMatch(cmd string, terms []string) bool {
+	head := strings.TrimSpace(cmd)
+	for {
+		low := strings.ToLower(head)
+		if !strings.HasPrefix(low, "cd ") {
+			break
+		}
+		andIdx := strings.Index(head, "&&")
+		semiIdx := strings.IndexByte(head, ';')
+		switch {
+		case andIdx >= 0 && (semiIdx < 0 || andIdx < semiIdx):
+			head = strings.TrimSpace(head[andIdx+2:])
+		case semiIdx >= 0:
+			head = strings.TrimSpace(head[semiIdx+1:])
+		}
+		if andIdx < 0 && semiIdx < 0 {
+			break
+		}
+	}
+	if idx := strings.Index(head, "&&"); idx >= 0 {
+		head = head[:idx]
+	}
+	if idx := strings.IndexAny(head, ";\n"); idx >= 0 {
+		head = head[:idx]
+	}
+	low := strings.ToLower(head)
+	for _, t := range terms {
+		if !commandMentions(low, strings.ToLower(t)) {
+			return false
+		}
+	}
+	return true
 }
 
 // howScope is the project the answer is about: what was asked for, the project

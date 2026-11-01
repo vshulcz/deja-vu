@@ -56,3 +56,32 @@ func TestHowSaysNothingRatherThanGuessing(t *testing.T) {
 		t.Errorf("a store with no such command must say so, got:\n%s", out)
 	}
 }
+
+func TestHowPrefersDirectWorkingInvocationsOverCompoundOrFailedOnes(t *testing.T) {
+	tmp := hermeticEnv(t)
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+	for i, tc := range []struct {
+		id  string
+		cmd string
+	}{
+		{"s1", "git checkout -b lint/branch && golangci-lint run"},
+		{"s2", "git checkout -b lint/branch && golangci-lint run"},
+		{"s3", "golangci-lint run --broken-flag  \\u2192 exit 1"},
+		{"s4", "golangci-lint run --broken-flag  \\u2192 exit 1"},
+		{"s5", "golangci-lint run ./..."},
+	} {
+		writeClaudeFixture(t, filepath.Join(root, "p", tc.id+".jsonl"), tc.id, []string{
+			`{"type":"user","sessionId":"` + tc.id + `","timestamp":"2026-01-0` + string(rune('2'+i)) + `T03:04:05Z","message":{"role":"user","content":"lint"}}`,
+			`{"type":"assistant","sessionId":"` + tc.id + `","timestamp":"2026-01-0` + string(rune('2'+i)) + `T03:04:06Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"` + tc.cmd + `"}}]}}`,
+		})
+	}
+	out, err := captureRun(t, "how", "golangci-lint")
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, _, _ := strings.Cut(strings.TrimSpace(out), "\n")
+	if !strings.Contains(first, "golangci-lint run ./...") {
+		t.Fatalf("direct working invocation should rank first, got:\n%s", out)
+	}
+}

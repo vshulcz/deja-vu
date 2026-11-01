@@ -312,3 +312,11 @@ func TestTextIsIdempotentAcrossRulesAndJSONEscapedCookies(t *testing.T) {
 		}
 	}
 }
+
+func TestProvenanceTagAfterSecretKeywordIsNotRedacted(t *testing.T) {
+	line := "- Latest request: секрет создал [claude:2915986c-…b929ca62b8/user @2026-10-28T17:33:38Z]"
+	got, c := Text(line)
+	if got != line || c.Total() != 0 {
+		t.Fatalf("provenance tag was masked:\n  got: %q\n  counts: %#v", got, c)
+	}
+}

@@ -622,7 +622,7 @@ var (
 			if wordBefore(s, k) {
 				return 0, 0, false
 			}
-			d, c := firstOf(s, k, 200, ":=\n")
+			d, c := firstOf(s, k, 200, ":=\n[")
 			if c != ':' && c != '=' {
 				return 0, 0, false
 			}

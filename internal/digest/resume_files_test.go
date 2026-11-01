@@ -75,7 +75,9 @@ func TestLooksLikeAPath(t *testing.T) {
 	}
 	for _, s := range []string{
 		"", "the", "state", "was.", "exactly", "it", "sentence,", "deja-vu",
-		"word.longerthanextension",
+		"word.longerthanextension", `\,`, "actions/checkout@3d3c42e5d204f500a0fd1c2fe4ac7ede2d22138c",
+		"https://github.com/vshulcz/deja-vu/issues/new", "file.</p>", "~600",
+		"[internal/embed]=93", "o.r", "*os.File", "strings.HasPrefix(m.Text",
 	} {
 		if looksLikeAPath(s) {
 			t.Errorf("%q is prose and was taken as a path", s)
