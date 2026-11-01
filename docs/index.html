@@ -127,6 +127,14 @@ h2{font:700 12px/1 var(--mono);letter-spacing:.18em;color:var(--faint);
 .step h3{margin:12px 0 8px;font:600 17px var(--sans);color:var(--ink)}
 .step p{font-size:14.5px;color:var(--faint);line-height:1.55}
 
+.home-cmp{margin-top:28px;border:1px solid var(--line);border-radius:12px;overflow-x:auto;background:var(--panel)}
+.home-cmp table{width:100%;border-collapse:collapse;font:13px/1.55 var(--mono);min-width:680px}
+.home-cmp th,.home-cmp td{padding:12px 15px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.home-cmp tr:last-child td{border-bottom:0}
+.home-cmp th{background:var(--panel-2);color:var(--faint);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.1em}
+.home-cmp tr.us td{background:rgba(135,135,175,.12);color:var(--ink)}
+.home-cmp tr.us td:first-child{color:var(--amber);font-weight:700}
+
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px}
 .in-ln{display:flex;align-items:center;gap:8px;font:14px var(--mono);color:var(--ink)}
 .in-ln .p{color:var(--amber)}
@@ -347,9 +355,11 @@ footer a:hover{color:var(--ink)}
       installed it — and hands the right one back over MCP and hooks. No LLM, one Go binary.</p>
     <div class="install-tabs" role="tablist" aria-label="install method">
       <button type="button" class="itab on" role="tab" aria-selected="true" data-cmd="curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh">macOS / Linux</button>
-      <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="brew install vshulcz/tap/deja-vu">Homebrew</button>
+      <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="brew install deja-vu">Homebrew</button>
       <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="npm i -g @vshulcz/deja-vu">npm</button>
       <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="winget install vshulcz.deja-vu">Windows</button>
+      <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="claude plugin marketplace add vshulcz/deja-vu && claude plugin install deja-vu@deja-vu">Claude Code</button>
+      <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="codex plugin marketplace add https://github.com/vshulcz/deja-vu && codex plugin add deja-vu@deja-vu">Codex</button>
       <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="go install github.com/vshulcz/deja-vu/cmd/deja@latest">Go</button>
     </div>
     <div class="cmdline">
@@ -407,6 +417,21 @@ footer a:hover{color:var(--ink)}
         this to disk all along.</p>
     </div>
   </div>
+  <div class="home-cmp">
+    <table>
+      <thead>
+        <tr><th>Approach</th><th>History before install</th><th>Agents shared</th><th>Runtime &amp; LLM</th><th>LongMemEval-S R@5</th><th>19,195 sessions</th></tr>
+      </thead>
+      <tbody>
+        <tr class="us"><td>deja-vu</td><td>Yes — indexes existing transcripts</td><td>43 agents</td><td>1 Go binary, 0 LLMs</td><td>97.2%</td><td>13.6 s</td></tr>
+        <tr><td>CLAUDE.md / rules</td><td>Only what you hand-write</td><td>Per-file / manual</td><td>Loaded every turn</td><td>—</td><td>—</td></tr>
+        <tr><td>MemPalace</td><td>Claude Code, Codex, Cursor</td><td>3 agents</td><td>Python + 300 MB model</td><td>96.6%</td><td>72 s</td></tr>
+        <tr><td>agentmemory</td><td>Claude Code import (<code>import-jsonl</code>)</td><td>12 agents</td><td>Node daemon (2 ports)</td><td>95.2%</td><td>95 s</td></tr>
+        <tr><td>claude-mem</td><td>No — records from install on</td><td>9 agents</td><td>Bun worker + SQLite + LLM</td><td>—</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note" style="margin-top:12px;font:12.5px var(--mono);color:var(--faint)">Full 14-tool breakdown and benchmark methodology: <a href="guide/compare.html">compare memory plugins →</a></p>
 </section>
 
 <section class="reveal" id="screen">
@@ -440,8 +465,7 @@ footer a:hover{color:var(--ink)}
       <button class="chip" data-q="cors">cors</button>
       <button class="chip" data-q="migration rollback">migration rollback</button>
     </div>
-    <p class="demo-note">demo corpus: 16 synthetic sessions — press <b>/</b> anywhere to search.
-      The real thing searches your own history, retroactively.</p>
+    <p class="demo-note">demo corpus: 16 synthetic sessions — press <b>/</b> anywhere to search, or <a href="view/">browse the full 67-session demo in deja view →</a></p>
   </div>
 </section>
 
