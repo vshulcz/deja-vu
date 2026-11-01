@@ -235,4 +235,5 @@ var soleWorkingWord = map[string]bool{
 	// started firing the moment they could reach the store.
 	"line": true, "file": true, "code": true, "read": true, "open": true,
 	"task": true, "step": true, "note": true, "logs": true, "docs": true,
+	"failures": true, "failure": true, "prepared": true, "statement": true, "statements": true,
 }

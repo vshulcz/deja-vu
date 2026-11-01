@@ -233,6 +233,19 @@ func BuildAutoRecall(ss []model.Session, o AutoRecallOptions) AutoRecallResult {
 		budget = 2048
 		maxSessions = 3
 	}
+	conclusionLimit := 2
+	conclusionBudget := 400
+	if len(candidates) == 1 {
+		conclusionLimit = 6
+		conclusionBudget = 2400
+		if mode != RecallSafe {
+			conclusionLimit = 8
+			conclusionBudget = 3200
+		}
+	} else if len(candidates) == 2 {
+		conclusionLimit = 4
+		conclusionBudget = 1000
+	}
 	var b strings.Builder
 	var fingerprints []map[string]bool
 	var ids []string
@@ -241,7 +254,7 @@ func BuildAutoRecall(ss []model.Session, o AutoRecallOptions) AutoRecallResult {
 		if mode == RecallSafe && !projectMatches(s.Project, o.ProjectNames) {
 			continue
 		}
-		section := autoRecallSession(s, o.Now, true)
+		section := autoRecallSessionWithLimit(s, o.Now, true, conclusionBudget, conclusionLimit)
 		if section == "" || (mode == RecallSafe && relevanceWords(s) < 3) {
 			continue
 		}
@@ -349,6 +362,10 @@ func nearDuplicate(candidate map[string]bool, prior []map[string]bool) bool {
 
 func autoRecallSession(s model.Session, now time.Time, provenance bool) string {
 	return autoRecallSessionFor(s, now, provenance, nil)
+}
+
+func autoRecallSessionWithLimit(s model.Session, now time.Time, provenance bool, conclusionBudget, conclusionLimit int) string {
+	return autoRecallSessionForAskedWithLimit(s, now, provenance, nil, "", conclusionBudget, conclusionLimit)
 }
 
 // termHits counts how many distinct query terms a text carries. It decides
@@ -504,10 +521,20 @@ func autoRecallSessionFor(s model.Session, now time.Time, provenance bool, terms
 }
 
 func autoRecallSessionForAsked(s model.Session, now time.Time, provenance bool, terms []string, asked string) string {
+	return autoRecallSessionForAskedWithLimit(s, now, provenance, terms, asked, 400, 2)
+}
+
+func autoRecallSessionForAskedWithLimit(s model.Session, now time.Time, provenance bool, terms []string, asked string, conclusionBudget, conclusionLimit int) string {
 	// A harness check has nothing to recall: it exists to prove the wiring
 	// works, and quoting it hands the reader a test fixture.
 	if isHarnessCheck(s) {
 		return ""
+	}
+	if conclusionBudget <= 0 {
+		conclusionBudget = 400
+	}
+	if conclusionLimit <= 0 {
+		conclusionLimit = 2
 	}
 	var problem string
 	var conclusions []string
@@ -523,11 +550,11 @@ func autoRecallSessionForAsked(s model.Session, now time.Time, provenance bool, 
 		//
 		// digest.SubstantialConclusions picks the decision-carrying lines, newest
 		// first, and is what `deja share` prints under the same heading.
-		conclusions = digest.SubstantialConclusions(s, 400, 2)
+		conclusions = digest.SubstantialConclusions(s, conclusionBudget, conclusionLimit)
 		matched = len(conclusions) > 0
 	}
 	for _, m := range s.Messages {
-		if problem != "" && (len(conclusions) >= 2 || matched) {
+		if problem != "" && (len(conclusions) >= conclusionLimit || matched) {
 			break
 		}
 		// One line that answers beats that line plus a filler. When the
@@ -568,7 +595,7 @@ func autoRecallSessionForAsked(s model.Session, now time.Time, provenance bool, 
 			// The fallback is held to the same bar as the conclusions it
 			// stands in for, or a session that settled nothing still opened
 			// on "Hi. What do you want to work on?" or "Waiting for CI.".
-			if len(conclusions) < 2 && digest.SaysSomething(text) {
+			if len(conclusions) < conclusionLimit && digest.SaysSomething(text) {
 				conclusions = append(conclusions, firstLine(text, 220))
 			}
 		}

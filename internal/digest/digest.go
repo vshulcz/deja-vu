@@ -1198,7 +1198,7 @@ var decisionMarkers = []string{
 	// fired once or twice each: the store is Russian-dominant, so the gap read
 	// as rare rather than as a hole (#2340). It is a hole for a reader working
 	// in English, and these are the same shapes as the entries above them.
-	"settled on", "went with", "ended up", "in the end", "opted for",
+	"settled on", "settled at", "settled that", "agreed to", "went with", "ended up", "in the end", "opted for",
 }
 
 // CarriesDecision reports whether a line reads as something concluded rather

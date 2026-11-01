@@ -190,3 +190,19 @@ func TestAQuotedCommandInAQuestionIsNotCut(t *testing.T) {
 		t.Errorf("Terms = %q, want %q", got, want)
 	}
 }
+
+func TestContextPasteDoesNotPolluteSingleSubjectAsk(t *testing.T) {
+	for _, p := range []string{
+		"@cmd/deja/main.go @internal/index/index.go @internal/search/recall.go\nwhat did we decide about telemetry?",
+		"panic: boom\ngoroutine 1 [running]:\nwhat did we decide about telemetry?",
+		"Without calling any MCP tool: what did we decide about telemetry?",
+		"Do not open the editor, answer from memory only. what did we decide about telemetry?",
+		"Before touching staging — what did we decide about telemetry?",
+		"Не вызывай инструменты, отвечай только по памяти: напомни, что мы решали про mcode?",
+	} {
+		got := Terms(p)
+		if len(got) != 2 || (!has(got, "telemetry") && !has(got, "mcode")) {
+			t.Errorf("Terms(%q) = %q, want question terms without preamble noise", p, got)
+		}
+	}
+}

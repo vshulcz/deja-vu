@@ -67,3 +67,30 @@ func TestTopIDFReachesTheFixedFloorAt109Sessions(t *testing.T) {
 		t.Errorf("a store that cannot be read gave a ceiling of %v; it must leave the floor alone", got)
 	}
 }
+
+func TestNoteQuerySubjectSeenAndUnseen(t *testing.T) {
+	sessions := make(map[string]SessionMeta, 120)
+	for i := range 120 {
+		sessions[string(rune(i+1))] = SessionMeta{}
+	}
+	acc := &relevanceAcc{
+		m:     Manifest{Sessions: sessions},
+		idfOf: map[string]float64{},
+	}
+	acc.noteQuerySubject("common", 10, true)
+	if acc.queryBestSeen != 1 || acc.queryBestUnseen != 0 {
+		t.Fatalf("after seen subject: seen=%d unseen=%d", acc.queryBestSeen, acc.queryBestUnseen)
+	}
+	acc.noteQuerySubject("common2", 10, false)
+	if acc.queryBestSeen != 1 || acc.queryBestUnseen != 1 {
+		t.Fatalf("after tied unseen subject: seen=%d unseen=%d", acc.queryBestSeen, acc.queryBestUnseen)
+	}
+	acc.noteQuerySubject("common3", 10, true)
+	if acc.queryBestSeen != 2 || acc.queryBestUnseen != 1 {
+		t.Fatalf("after tied seen subject: seen=%d unseen=%d", acc.queryBestSeen, acc.queryBestUnseen)
+	}
+	acc.noteQuerySubject("pgbouncer", 1, false)
+	if acc.queryBestSeen != 0 || acc.queryBestUnseen != 1 {
+		t.Fatalf("after rarer unseen subject: seen=%d unseen=%d", acc.queryBestSeen, acc.queryBestUnseen)
+	}
+}

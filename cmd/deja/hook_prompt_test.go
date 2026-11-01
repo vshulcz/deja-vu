@@ -758,3 +758,13 @@ func TestStartingHarnessFromTranscriptPath(t *testing.T) {
 		t.Fatalf("startingHarness with nothing to go on = %q", got)
 	}
 }
+
+func TestNamedLeadTermsAndSingleSubjectDigest(t *testing.T) {
+	idf := map[string]float64{"telemetry": 5.2, "decide": 2.1, "kestrel": 5.0, "escrow": 5.0}
+	if got := namedLeadTerms([]string{"telemetry", "decide"}, idf, 5.2); len(got) != 1 || got[0] != "telemetry" {
+		t.Fatalf("namedLeadTerms single = %v, want [telemetry]", got)
+	}
+	if got := namedLeadTerms([]string{"kestrel", "escrow", "decide"}, idf, 1e9); len(got) != 2 {
+		t.Fatalf("namedLeadTerms multi = %v, want [kestrel escrow]", got)
+	}
+}

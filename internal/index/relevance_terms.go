@@ -36,7 +36,9 @@ type relevanceAcc struct {
 	// query has been read rather than term by term.
 	identifyingTerms int
 	// The rarest term the question holds; see sessionCredit.bestMatched.
-	queryBest float64
+	queryBest       float64
+	queryBestUnseen int
+	queryBestSeen   int
 	// msgs is every record of the sessions being ranked that a term matched or
 	// that is a tool record, and msgAt finds one by its offset.
 	msgs  []messageCredit
@@ -175,7 +177,7 @@ type termHits struct {
 // counted over the whole store, before the project scope drops the term, so
 // a subject that lives somewhere else still counts as the subject — which
 // is the case this exists for.
-func (a *relevanceAcc) noteQuerySubject(term string, sessions int) {
+func (a *relevanceAcc) noteQuerySubject(term string, sessions int, inProject bool) {
 	// A word this store has never seen says nothing about what the
 	// question is about here: counting it set a mark no session could
 	// reach, and the recall went silent whenever a question carried one
@@ -183,8 +185,21 @@ func (a *relevanceAcc) noteQuerySubject(term string, sessions int) {
 	if sessions <= 0 || !search.HasIdentifierTerm([]string{term}) {
 		return
 	}
-	if r := rankIDF(len(a.m.Sessions), sessions); r > a.queryBest {
+	r := rankIDF(len(a.m.Sessions), sessions)
+	a.idfOf[term] = math.Max(a.idfOf[term], r)
+	if r > a.queryBest {
 		a.queryBest = r
+		if inProject {
+			a.queryBestSeen, a.queryBestUnseen = 1, 0
+		} else {
+			a.queryBestSeen, a.queryBestUnseen = 0, 1
+		}
+	} else if r == a.queryBest {
+		if inProject {
+			a.queryBestSeen++
+		} else {
+			a.queryBestUnseen++
+		}
 	}
 }
 
@@ -342,7 +357,7 @@ func (a *relevanceAcc) unionForms(term string, orKeys []string) (termHits, bool)
 		a.termsKnown++
 	}
 	if len(th.hits) == 0 {
-		a.noteQuerySubject(term, sessions)
+		a.noteQuerySubject(term, sessions, false)
 		return th, false
 	}
 	th.minDF, th.minSess = df, sessions
@@ -446,7 +461,7 @@ func (a *relevanceAcc) everyKey(term string, keys []string) (termHits, bool) {
 			a.keyOffs = keyOffs[:0]
 		}
 		if len(th.hits) == 0 {
-			a.noteQuerySubject(term, sessions)
+			a.noteQuerySubject(term, sessions, false)
 			missed = true
 			break
 		}
@@ -509,7 +524,7 @@ func (a *relevanceAcc) scoreTerm(term string, th termHits) {
 	strong := idf >= dejaVuStrongIDFFloor || minSess <= 1
 	// The question's own high-water mark: its rarest word is what it is
 	// about, whether or not any session here holds it (#3351).
-	a.noteQuerySubject(term, minSess)
+	a.noteQuerySubject(term, minSess, true)
 	for _, p := range th.hits {
 		a.inHit[p] = true
 	}
@@ -637,6 +652,9 @@ func (a *relevanceAcc) scoreSession(p int32, long bool, sumWords, nWords float64
 	named := 0
 	if a.queryBest <= 0 || s.bestMatched >= a.queryBest*subjectShare {
 		named = 1
+	}
+	if a.queryBestUnseen > 0 && a.queryBestSeen == 0 && s.matched < 3 {
+		named = 0
 	}
 	if long && sumWords > 0 {
 		// A session indexed before lengths were counted is taken as

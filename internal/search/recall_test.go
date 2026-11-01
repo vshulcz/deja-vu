@@ -1,6 +1,12 @@
 package search
 
-import "testing"
+import (
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/vshulcz/deja-vu/internal/model"
+)
 
 func TestIsSmokeTestKeepsRealSessions(t *testing.T) {
 	if !isSmokeTest("Reply with the single word OK.", []string{"OK"}) {
@@ -21,5 +27,44 @@ func TestIsSmokeTestKeepsRealSessions(t *testing.T) {
 	if isSmokeTest("reply with your assessment of the retry budget", []string{
 		"the budget is wrong: it retries four times inside a one second deadline"}) {
 		t.Error("a substantial answer means this was not a smoke test")
+	}
+}
+
+func TestBuildAutoRecallSingleMarathonSessionScalesConclusionBudget(t *testing.T) {
+	now := time.Now().UTC()
+	s := model.Session{
+		ID:      "marathon-1",
+		Harness: "claude",
+		Project: "app",
+		Updated: now,
+		Messages: []model.Message{
+			{Role: "user", Text: "wire up the marathon subsystem", Time: now},
+			{Role: "assistant", Text: "we decided alpha retry cap is 4", Time: now},
+			{Role: "assistant", Text: "settled at beta batch size 64", Time: now},
+			{Role: "assistant", Text: "settled that gamma pool mode is transaction", Time: now},
+			{Role: "assistant", Text: "agreed to delta timeout of 30s", Time: now},
+			{Role: "assistant", Text: "we chose epsilon compression zstd", Time: now},
+			{Role: "assistant", Text: "we picked zeta flush interval 500ms", Time: now},
+		},
+	}
+	gotSafe := BuildAutoRecall([]model.Session{s}, AutoRecallOptions{Mode: RecallSafe, ProjectNames: []string{"app"}, Now: now})
+	for _, fact := range []string{"alpha", "beta", "gamma", "delta", "epsilon", "zeta"} {
+		if !strings.Contains(gotSafe.Text, fact) {
+			t.Errorf("single marathon session safe recall missed %q:\n%s", fact, gotSafe.Text)
+		}
+	}
+	gotAgg := BuildAutoRecall([]model.Session{s}, AutoRecallOptions{Mode: RecallAggressive, ProjectNames: []string{"app"}, Now: now})
+	if !strings.Contains(gotAgg.Text, "zeta") {
+		t.Errorf("single marathon session aggressive recall missed zeta:\n%s", gotAgg.Text)
+	}
+	s2 := s
+	s2.ID = "marathon-2"
+	s2.Messages = []model.Message{
+		{Role: "user", Text: "second session", Time: now},
+		{Role: "assistant", Text: "we decided theta cache ttl is 10m", Time: now},
+	}
+	gotPair := BuildAutoRecall([]model.Session{s, s2}, AutoRecallOptions{Mode: RecallSafe, ProjectNames: []string{"app"}, Now: now})
+	if !strings.Contains(gotPair.Text, "theta") {
+		t.Errorf("two-session recall missed second session:\n%s", gotPair.Text)
 	}
 }

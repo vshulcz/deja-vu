@@ -41,20 +41,33 @@ func termsAsked(ask, rest string) []string {
 		out = append(out, f)
 		return len(out) == 6
 	}
-	// Six terms is the whole budget and a paste spends it before the question is
-	// reached: a repo listing, a set of @file mentions or a stack trace above
-	// "why does the fetcher time out?" left the question out of the query and
-	// auto-recall answered nothing (#3183). An instruction in front of the
-	// question on the same line does the same (#4751). The ask is read first,
-	// the rest of the prompt fills what is left — the term rules themselves are
-	// untouched.
 	if ask != "" {
 		if termsFrom(ask, seen, add) {
 			return out
 		}
 	}
+	if len(out) > 0 && isContextPaste(rest) {
+		return out
+	}
 	termsFrom(rest, seen, add)
 	return out
+}
+
+func isContextPaste(rest string) bool {
+	low := strings.ToLower(rest)
+	if strings.Contains(low, "goroutine ") || strings.Contains(low, "without calling") ||
+		strings.Contains(low, "answer from memory") || strings.Contains(low, "before touching") ||
+		strings.Contains(low, "отвечай только по памяти") {
+		return true
+	}
+	paths := 0
+	for w := range strings.FieldsSeq(rest) {
+		w = strings.Trim(w, ",;:()")
+		if strings.HasPrefix(w, "@") || strings.HasSuffix(w, ".go") || strings.HasSuffix(w, ".mod") || w == "Makefile" {
+			paths++
+		}
+	}
+	return paths >= 3
 }
 
 // termsFrom runs the three passes — identifiers, CJK bigrams, Cyrillic words —
@@ -350,6 +363,7 @@ var promptFiller = map[string]bool{
 	"then": true, "than": true, "here": true, "your": true, "ours": true,
 	"going": true, "doing": true, "being": true, "used": true, "using": true,
 	"give": true, "take": true, "come": true, "seen": true, "said": true,
+	"deal": true, "touch": true,
 }
 
 // techTerm keeps tokens that can actually identify past work: identifiers,
