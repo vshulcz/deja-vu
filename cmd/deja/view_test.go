@@ -82,8 +82,8 @@ func TestViewGeneratesSelfContainedHTML(t *testing.T) {
 			t.Fatalf("view missing %q", want)
 		}
 	}
-	// Self-contained: no external fetches of any kind.
-	if regexp.MustCompile(`(src|href)="https?://`).MatchString(s) {
+	// Self-contained: no external stylesheet, script, font or image fetches.
+	if regexp.MustCompile(`(?i)<(link|script|img|iframe)\b[^>]*\b(src|href)="https?://`).MatchString(s) {
 		t.Fatal("view references external assets")
 	}
 	// Script-closer inside indexed text must not break out of the data block.

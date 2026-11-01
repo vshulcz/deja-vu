@@ -36,6 +36,9 @@ func TestTheCardSaysHowToPostIt(t *testing.T) {
 	if !strings.Contains(out, "vshulcz.github.io/deja-vu/card/") {
 		t.Errorf("the card says nothing about how to post it, and an SVG cannot be posted:\n%s", out)
 	}
+	if !strings.Contains(out, "[![deja](deja-stats.svg)](https://github.com/vshulcz/deja-vu)") {
+		t.Errorf("the card README snippet does not link back to github.com/vshulcz/deja-vu:\n%s", out)
+	}
 
 	// The page the line sends people to.
 	page := filepath.Join("..", "..", "docs", "card", "index.html")

@@ -23,9 +23,11 @@ const viewSource = `<!doctype html>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--body);font:14px/1.6 "SF Mono","JetBrains Mono",Menlo,Consolas,monospace;padding:0 0 60px}
 a{color:var(--ph);text-decoration:none}
-header{position:sticky;top:0;background:rgba(5,8,7,.95);border-bottom:1px solid var(--line);padding:12px 22px;display:flex;gap:18px;align-items:baseline;flex-wrap:wrap;z-index:5}
+header{position:sticky;top:0;background:rgba(5,8,7,.95);border-bottom:1px solid var(--line);padding:12px 22px;display:flex;gap:18px;align-items:center;flex-wrap:wrap;z-index:5}
 header b{color:var(--ph)}
 header .meta{color:var(--faint);font-size:.8rem}
+header .star{margin-left:auto;border:1px solid var(--ph);color:var(--hi);background:rgba(135,135,175,.14);padding:4px 11px;border-radius:6px;font-size:.78rem;font-weight:600}
+header .star:hover{background:var(--ph);color:var(--bg)}
 .wrap{max-width:1100px;margin:0 auto;padding:0 22px}
 .stats{display:flex;gap:26px;flex-wrap:wrap;margin:20px 0}
 .stat b{display:block;color:var(--hi);font-size:1.25rem}
@@ -48,7 +50,7 @@ input[type=search]:focus{outline:none;border-color:var(--ph)}
 .note{color:var(--faint);font-size:.78rem;margin:10px 0 30px}
 .empty{color:var(--faint);padding:24px 0}
 </style></head><body>
-<header><b><svg class="mark" viewBox="0 0 24 22" width="22" height="20" aria-hidden="true">{{MARK_STILL}}</svg>deja view</b><span class="meta">generated {{.GeneratedAt}} · local file, nothing leaves this machine</span></header>
+<header><b><svg class="mark" viewBox="0 0 24 22" width="22" height="20" aria-hidden="true">{{MARK_STILL}}</svg>deja view</b><span class="meta">generated {{.GeneratedAt}} · local file, nothing leaves this machine</span><a class="star" href="https://github.com/vshulcz/deja-vu">★ Star on GitHub</a></header>
 <div class="wrap">
 <div class="stats">
 <div class="stat"><b>{{.TotalSessions}}</b><span>sessions</span></div>

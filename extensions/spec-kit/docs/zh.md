@@ -2,6 +2,10 @@
 
 [English](../README.md) | 中文
 
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
+
+属于 **[deja-vu](https://github.com/vshulcz/deja-vu)** 项目（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · Token 用量仅为 agentmemory 的**一半**）· [官网与在线搜索](https://vshulcz.github.io/deja-vu/) · [浏览器在线演示](https://vshulcz.github.io/deja-vu/view/) · **[★ 在 GitHub 上给 deja-vu 点 Star](https://github.com/vshulcz/deja-vu)**
+
 这是一个 [Spec Kit](https://github.com/github/spec-kit) 扩展。在动手实现某个功能之前，`/speckit.deja-vu.recall` 会在你过去的编程智能体会话里搜索这个功能，告诉你以前试过什么、定下了什么、哪些路走不通，每一条都附上出处的会话 id。
 
 会话来自 [deja](https://github.com/vshulcz/deja-vu)：它索引 Claude Code、Codex、Cursor、Copilot、Gemini 等智能体本来就写在磁盘上的会话记录。所有数据都留在你自己的机器上。

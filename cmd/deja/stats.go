@@ -311,7 +311,7 @@ func writeStatsReport(dir string, report stats.Report, ss []model.Session, a sta
 		// renders it; X, Threads, Reddit and every chat app refuse it, which
 		// the reader found out after writing the post. The page converts it
 		// locally, in their own browser.
-		fmt.Fprintf(os.Stdout, "deja: card written to %s\n\nin a README:\n  ![deja](%s)\n\nin a post, as a PNG:\n  https://vshulcz.github.io/deja-vu/card/\n", search.SafePath(path), search.SafePath(base))
+		fmt.Fprintf(os.Stdout, "deja: card written to %s\n\nin a README:\n  [![deja](%s)](https://github.com/vshulcz/deja-vu)\n\nin a post, as a PNG:\n  https://vshulcz.github.io/deja-vu/card/\n", search.SafePath(path), search.SafePath(base))
 		return nil
 	}
 	if htmlPath != "" {

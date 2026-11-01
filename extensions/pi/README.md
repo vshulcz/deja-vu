@@ -2,6 +2,10 @@
 
 English | [中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/pi/docs/zh.md)
 
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
+
+Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on LongMemEval-S · **13.6 s** to index 19,195 sessions · **half the tokens** of agentmemory) · [Website & live search](https://vshulcz.github.io/deja-vu/) · [Browser demo](https://vshulcz.github.io/deja-vu/view/) · **[★ Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)**
+
 pi remembers its own sessions. This extension answers the other question: what
 was done in the forty-two other coding agents on this machine — Claude Code,
 Codex, Cursor, Gemini, OpenClaw and Hermes among them — including the months

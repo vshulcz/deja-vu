@@ -2,6 +2,10 @@
 
 [English](../README.md) | 中文
 
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
+
+属于 **[deja-vu](https://github.com/vshulcz/deja-vu)** 项目（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · Token 用量仅为 agentmemory 的**一半**）· [官网与在线搜索](https://vshulcz.github.io/deja-vu/) · [浏览器在线演示](https://vshulcz.github.io/deja-vu/view/) · **[★ 在 GitHub 上给 deja-vu 点 Star](https://github.com/vshulcz/deja-vu)**
+
 一个 Hermes 记忆提供者（memory provider），答案来自这台机器上已经存在的编程会话：Claude Code、Codex、Cursor、Hermes 自己，以及 deja 能读的其他智能体，包括装任何东西之前的那几个月。不用大模型，不用 API key，不用服务器。历史记录由 [deja](https://github.com/vshulcz/deja-vu) 在本地建索引，它是一个单独的 Go 可执行文件。
 
 ## 安装

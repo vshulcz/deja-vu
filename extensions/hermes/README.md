@@ -2,6 +2,10 @@
 
 English | [中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/hermes/docs/zh.md)
 
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
+
+Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on LongMemEval-S · **13.6 s** to index 19,195 sessions · **half the tokens** of agentmemory) · [Website & live search](https://vshulcz.github.io/deja-vu/) · [Browser demo](https://vshulcz.github.io/deja-vu/view/) · **[★ Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)**
+
 A Hermes memory provider that answers from the coding sessions already on this
 machine: Claude Code, Codex, Cursor, Hermes itself and the other agents deja
 reads, including the months before anything was installed. No model, no API
