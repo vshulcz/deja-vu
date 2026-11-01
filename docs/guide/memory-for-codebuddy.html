@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add memory to CodeBuddy Code — deja-vu</title>
+<meta name="description" content="How to give CodeBuddy Code and WorkBuddy recall over every coding agent's sessions on this machine — MCP server, Claude-shape hooks, and status line.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-codebuddy.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Add memory to CodeBuddy Code">
+<meta property="og:description" content="How to give CodeBuddy Code and WorkBuddy recall over every coding agent's sessions on this machine — MCP server, Claude-shape hooks, and status line.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-codebuddy.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Add memory to CodeBuddy Code">
+<meta name="twitter:description" content="How to give CodeBuddy Code and WorkBuddy recall over every coding agent's sessions on this machine — MCP server, Claude-shape hooks, and status line.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to CodeBuddy Code", "description": "How to give CodeBuddy Code and WorkBuddy recall over every coding agent's sessions on this machine — MCP server, Claude-shape hooks, and status line.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-codebuddy.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-codebuddy.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-01", "dateModified": "2026-11-01"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Memory for CodeBuddy Code","item":"https://vshulcz.github.io/deja-vu/guide/memory-for-codebuddy.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I add memory to CodeBuddy Code?","acceptedAnswer":{"@type":"Answer","text":"Run deja install codebuddy-auto to wire the MCP server in ~/.codebuddy/.mcp.json and the hooks and status line in ~/.codebuddy/settings.json. For WorkBuddy, run deja install workbuddy-auto."}},{"@type":"Question","name":"Where does CodeBuddy Code keep its sessions?","acceptedAnswer":{"@type":"Answer","text":"Under ${CODEBUDDY_CONFIG_DIR:-~/.codebuddy}/projects/<mangled-cwd>/<session-id>.jsonl, with sub-agent transcripts under <session-id>/subagents/."}},{"@type":"Question","name":"How does deja resume reopen a CodeBuddy session?","acceptedAnswer":{"@type":"Answer","text":"deja resume runs codebuddy -c -r <id> from the session's project directory so CodeBuddy passes the SessionStart context to the resumed session."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a>
+<div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<details class="grpfold"><summary>Why agents forget <span class="n">11</span></summary>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="one-rules-file.html">One rules file</a>
+<a href="token-cost.html">What memory costs</a>
+</details>
+<details class="grpfold"><summary>Session history <span class="n">11</span></summary>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="codex-history.html">Codex history</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="credentials-in-transcripts.html">Credentials in transcripts</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
+</details>
+<details class="grpfold"><summary>Deleting sessions <span class="n">27</span></summary>
+<a href="session-files-on-disk.html">Claude Code</a>
+<a href="delete-old-claude-sessions.html">Old sessions</a>
+<a href="delete-codex-sessions.html">Codex</a>
+<a href="delete-cursor-chat-history.html">Cursor</a>
+<a href="cursor-state-vscdb-too-large.html">Cursor state.vscdb too large</a>
+<a href="delete-copilot-chat-history.html">Copilot Chat</a>
+<a href="delete-copilot-cli-session-history.html">Copilot CLI</a>
+<a href="delete-gemini-cli-history.html">Gemini CLI</a>
+<a href="delete-opencode-session-history.html">opencode</a>
+<a href="delete-cline-task-history.html">Cline</a>
+<a href="delete-roo-task-history.html">Roo Code</a>
+<a href="delete-zed-thread-history.html">Zed</a>
+<a href="delete-kilo-code-task-history.html">Kilo Code</a>
+<a href="delete-amp-thread-history.html">Amp</a>
+<a href="delete-continue-session-history.html">Continue</a>
+<a href="delete-kiro-session-history.html">Kiro</a>
+<a href="delete-kimi-code-session-history.html">Kimi Code</a>
+<a href="delete-junie-session-history.html">Junie</a>
+<a href="delete-goose-session-history.html">Goose</a>
+<a href="delete-windsurf-cascade-history.html">Windsurf</a>
+<a href="delete-qwen-code-chat-history.html">Qwen Code</a>
+<a href="delete-trae-sessions.html">TRAE CLI</a>
+<a href="delete-codebuddy-sessions.html">CodeBuddy</a>
+<a href="delete-antigravity-history.html">Antigravity</a>
+<a href="delete-pi-session-history.html">pi</a>
+<a href="delete-crush-session-history.html">Crush</a>
+<a href="delete-hermes-session-history.html">Hermes</a>
+</details>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">40</span></summary>
+<a href="memory-for-aider.html">aider</a>
+<a href="memory-for-amp.html">Amp</a>
+<a href="memory-for-antigravity.html">Antigravity</a>
+<a href="memory-for-cherrystudio.html">Cherry Studio</a>
+<a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-codebuddy.html" aria-current="page">CodeBuddy Code</a>
+<a href="memory-for-codewhale.html">CodeWhale</a>
+<a href="memory-for-codex.html">Codex</a>
+<a href="memory-for-commandcode.html">Command Code</a>
+<a href="memory-for-continue.html">Continue</a>
+<a href="memory-for-copilot.html">Copilot CLI</a>
+<a href="memory-for-crush.html">Crush</a>
+<a href="memory-for-cursor.html">Cursor</a>
+<a href="memory-for-devin.html">Devin CLI</a>
+<a href="memory-for-dsh.html">dsh</a>
+<a href="memory-for-gjc.html">gajae-code</a>
+<a href="memory-for-gemini.html">Gemini CLI</a>
+<a href="memory-for-goose.html">Goose</a>
+<a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-hermes.html">Hermes</a>
+<a href="memory-for-junie.html">Junie</a>
+<a href="memory-for-kilocode.html">Kilo Code</a>
+<a href="memory-for-kimchi.html">Kimchi Coding</a>
+<a href="memory-for-kimi.html">Kimi Code</a>
+<a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-omp.html">omp</a>
+<a href="memory-for-openclaw.html">OpenClaw</a>
+<a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-pi.html">pi</a>
+<a href="memory-for-prime.html">prime-agent</a>
+<a href="memory-for-qwen.html">Qwen Code</a>
+<a href="memory-for-reasonix.html">Reasonix</a>
+<a href="memory-for-roo.html">Roo Code</a>
+<a href="memory-for-senpi.html">Senpi</a>
+<a href="memory-for-trae.html">TRAE CLI</a>
+<a href="memory-for-copilot-chat.html">VS Code Copilot Chat</a>
+<a href="memory-for-windsurf.html">Windsurf</a>
+<a href="memory-for-zcode.html">ZCode</a>
+<a href="memory-for-zed.html">Zed</a>
+</details>
+<div class="grp">Evidence</div>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="claude-mem-alternative.html">claude-mem alternative</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Adding memory to CodeBuddy Code</h1>
+<p class="pagelede">the CLI and WorkBuddy desktop share the same session layout and Claude-shape hooks<span class="mins" data-mins></span></p>
+
+<p>CodeBuddy Code (<code>@tencent-ai/codebuddy-code</code>) writes every conversation to disk and starts the next session blank. Its desktop counterpart, WorkBuddy, runs the same agent under its own configuration directory. Both stores sit on disk alongside whatever the other forty-two coding agents on the machine wrote.</p>
+
+<h2>What CodeBuddy already has</h2>
+<p>Sessions live under <code>${CODEBUDDY_CONFIG_DIR:-~/.codebuddy}/projects/&lt;mangled-cwd&gt;/&lt;session-id&gt;.jsonl</code>, one JSONL file per conversation, with sub-agent runs under <code>&lt;session-id&gt;/subagents/agent-&lt;id&gt;.jsonl</code>. WorkBuddy writes the same layout under <code>~/.workbuddy/projects</code> (workbuddy.cn), <code>~/.workbuddy-ai/projects</code> (workbuddy.ai), or <code>$WORKBUDDY_CONFIG_DIR/projects</code>.</p>
+
+<h2>Adding recall</h2>
+<pre>deja install codebuddy-auto</pre>
+<p>That wires the MCP server, the recall hooks and the status line for CodeBuddy Code. If you only want the MCP tool without automatic hook injection, run <code>deja install codebuddy</code>.</p>
+<p>Because WorkBuddy launches the agent with <code>CODEBUDDY_CONFIG_DIR</code> pointed at its own home, wiring in <code>~/.codebuddy</code> never reaches the desktop app. Wire WorkBuddy in its own directory with:</p>
+<pre>deja install workbuddy-auto</pre>
+<p>WorkBuddy writes its MCP configuration to <code>mcp.json</code> in the WorkBuddy home. In WorkBuddy AI, new MCP servers start disabled until you click Trust in <code>Settings &gt; MCP</code> and restart the app; <code>deja doctor</code> reports the server as <code>untrusted</code> until you do.</p>
+
+<h2>What gets wired</h2>
+<p><code>deja install codebuddy</code> writes the MCP server to the first of <code>~/.codebuddy/.mcp.json</code>, <code>~/.codebuddy/mcp.json</code> or <code>~/.codebuddy.json</code> that already exists, or creates <code>~/.codebuddy/.mcp.json</code>. <code>deja install codebuddy-auto</code> also writes six hooks in Claude Code's schema (with <code>timeout</code> in seconds) into <code>~/.codebuddy/settings.json</code> and sets <code>statusLine.command</code> there if none is set:</p>
+<ul>
+<li><code>SessionStart</code> delivers the project digest before the first turn.</li>
+<li><code>UserPromptSubmit</code> injects matching history for the prompt and stays silent when nothing matches.</li>
+<li><code>PostToolUse</code> and <code>PostToolUseFailure</code> on <code>Bash|PowerShell</code> attach the prior fix when a shell command fails with an error solved on this machine before.</li>
+<li><code>PostToolUse</code> on <code>Read|Edit|Write|MultiEdit</code> adds the decisions past sessions recorded for that file.</li>
+<li><code>PreCompact</code> and <code>SessionEnd</code> preserve the pre-compaction state and close out the active session stamp.</li>
+</ul>
+
+<h2>Resuming a session</h2>
+<p><code>codebuddy -r &lt;id&gt;</code> looks for the session only under the folder of the current working directory, and <code>-r</code> by itself drops the <code>SessionStart</code> hook context. Passing <code>-c</code> alongside <code>-r</code> keeps the <code>SessionStart</code> context while still selecting the session id, so <code>deja resume &lt;id&gt;</code> runs <code>codebuddy -c -r &lt;id&gt;</code> in the project directory.</p>
+
+<h2>The part that is not about this harness</h2>
+<p>The index covers every agent's transcripts on the machine — forty-three of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Claude Code or Qwen Code answers a question asked in CodeBuddy. Indexing and search stay local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+
+<p><a href="getting-started.html">Getting started</a> · <a href="delete-codebuddy-sessions.html">Deleting CodeBuddy sessions</a> · <a href="../registry/codebuddy.html">How CodeBuddy's store is read</a></p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

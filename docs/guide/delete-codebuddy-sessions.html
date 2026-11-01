@@ -31,7 +31,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "How to delete CodeBuddy and WorkBuddy session history, and what you lose", "description": "How to delete CodeBuddy Code and WorkBuddy sessions — the .jsonl conversation, its .meta.json, rollback sidecar and file-history snapshots.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-10-16", "dateModified": "2026-10-21"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "How to delete CodeBuddy and WorkBuddy session history, and what you lose", "description": "How to delete CodeBuddy Code and WorkBuddy sessions — the .jsonl conversation, its .meta.json, rollback sidecar and file-history snapshots.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-10-16", "dateModified": "2026-11-01"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete CodeBuddy sessions", "item": "https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html"}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How do I delete a CodeBuddy session?", "acceptedAnswer": {"@type": "Answer", "text": "Remove <session-id>.jsonl under ${CODEBUDDY_CONFIG_DIR:-~/.codebuddy}/projects/<folder>/, its <session-id>.meta.json, the <session-id>/ directory beside it (the sub-agent transcripts), its <session-id>.file-rollback.ndjson sidecar, and ~/.codebuddy/file-history/<session-id>/, the snapshots that /rewind uses. One project's sessions are one directory, so rm -rf projects/<folder> covers them all."}}, {"@type": "Question", "name": "Where does CodeBuddy Code store its sessions?", "acceptedAnswer": {"@type": "Answer", "text": "In a directory per working directory under ~/.codebuddy/projects, named by the cwd with /, \\ and : turned into - and the leading dash dropped, one JSONL per session. WorkBuddy keeps the same tree in ~/.workbuddy (workbuddy.cn) and ~/.workbuddy-ai (workbuddy.ai)."}}, {"@type": "Question", "name": "Do the sub-agent transcripts stay when I delete the session file?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. <session-id>/subagents/agent-*.jsonl sit in a directory of the same name beside the file, so remove both unless you want the sub-agent turns kept."}}, {"@type": "Question", "name": "Does deleting a CodeBuddy session affect WorkBuddy?", "acceptedAnswer": {"@type": "Answer", "text": "No. WorkBuddy writes its own sessions in its own homes; remove ~/.workbuddy/projects or ~/.workbuddy-ai/projects separately."}}]}</script>
 </head>
@@ -73,7 +73,7 @@
 <a href="recover-a-deleted-session.html">Recover a deleted session</a>
 <a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
-<details class="grpfold" open><summary>Deleting sessions <span class="n">25</span></summary>
+<details class="grpfold" open><summary>Deleting sessions <span class="n">27</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
 <a href="delete-old-claude-sessions.html">Old sessions</a>
 <a href="delete-codex-sessions.html">Codex</a>
@@ -99,14 +99,17 @@
 <a href="delete-codebuddy-sessions.html" aria-current="page">CodeBuddy</a>
 <a href="delete-antigravity-history.html">Antigravity</a>
 <a href="delete-pi-session-history.html">pi</a>
+<a href="delete-crush-session-history.html">Crush</a>
+<a href="delete-hermes-session-history.html">Hermes</a>
 </details>
-<details class="grpfold"><summary>Per-agent guides <span class="n">38</span></summary>
+<details class="grpfold"><summary>Per-agent guides <span class="n">40</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
 <a href="memory-for-cherrystudio.html">Cherry Studio</a>
 <a href="memory-for-claude-code.html">Claude Code</a>
 <a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-codebuddy.html">CodeBuddy Code</a>
 <a href="memory-for-codewhale.html">CodeWhale</a>
 <a href="memory-for-codex.html">Codex</a>
 <a href="memory-for-commandcode.html">Command Code</a>
@@ -121,6 +124,7 @@
 <a href="memory-for-goose.html">Goose</a>
 <a href="memory-for-grok.html">Grok Build</a>
 <a href="memory-for-hermes.html">Hermes</a>
+<a href="memory-for-junie.html">Junie</a>
 <a href="memory-for-kilocode.html">Kilo Code</a>
 <a href="memory-for-kimchi.html">Kimchi Coding</a>
 <a href="memory-for-kimi.html">Kimi Code</a>
@@ -191,7 +195,7 @@ rm -rf ~/.workbuddy/projects ~/.workbuddy-ai/projects</pre>
 <p>The session leaves the agent's own history list, and what goes with it is the record: the commands, their output, and the edits, none of which are recoverable from a summary. deja reads these files — and WorkBuddy's — along with every other agent's on the machine, so a decision made here answers a question asked in Claude Code or Cursor. A session it has already indexed stays searchable after the file goes; only <code>deja forget</code> drops one on purpose.</p>
 <p>In the screen bare <code>deja</code> opens, a deleted session sits under the Deleted tab, and <code>R</code> writes one back so <code>codebuddy -r &lt;id&gt;</code> finds it again, with the conversation but not the tool calls. WorkBuddy comes back refused: deja knows no command that reopens one. That is a reason to index before deleting, not a reason to keep gigabytes.</p>
 
-<p><a href="session-files-on-disk.html">The same question for Claude Code</a> · <a href="where-sessions-are-stored.html">Where every agent stores history</a> · <a href="../registry/codebuddy.html">The CodeBuddy format registry</a></p>
+<p><a href="session-files-on-disk.html">The same question for Claude Code</a> · <a href="memory-for-codebuddy.html">Memory for CodeBuddy</a> · <a href="where-sessions-are-stored.html">Where every agent stores history</a> · <a href="../registry/codebuddy.html">The CodeBuddy format registry</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
 </article>
 </div>

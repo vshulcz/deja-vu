@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Delete Crush session history — deja-vu</title>
+<meta name="description" content="Crush keeps a crush.db SQLite store inside each project's .crush directory. Find every store via projects.json and remove one session or a project's history.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/delete-crush-session-history.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Delete Crush session history">
+<meta property="og:description" content="Crush keeps a crush.db SQLite store inside each project's .crush directory. Find every store via projects.json and remove one session or a project's history.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/delete-crush-session-history.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Delete Crush session history">
+<meta name="twitter:description" content="Crush keeps a crush.db SQLite store inside each project's .crush directory. Find every store via projects.json and remove one session or a project's history.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete Crush session history", "description": "Crush keeps a crush.db SQLite store inside each project's .crush directory. Find every store via projects.json and remove one session or a project's history.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-crush-session-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-crush-session-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-01", "dateModified": "2026-11-01"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete Crush session history", "item": "https://vshulcz.github.io/deja-vu/guide/delete-crush-session-history.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Where does Crush store its session history?", "acceptedAnswer": {"@type": "Answer", "text": "Beside the project rather than in one central database: <project>/.crush/crush.db by default. Every project store Crush has opened is listed in ${XDG_DATA_HOME:-~/.local/share}/crush/projects.json (or via crush projects)."}}, {"@type": "Question", "name": "How do I delete a project's Crush history?", "acceptedAnswer": {"@type": "Answer", "text": "Close Crush in that project and remove <project>/.crush/crush.db along with any crush.db-wal and crush.db-shm files beside it. Your global configuration in ~/.config/crush/crush.json is untouched."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a>
+<div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<details class="grpfold"><summary>Why agents forget <span class="n">11</span></summary>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="one-rules-file.html">One rules file</a>
+<a href="token-cost.html">What memory costs</a>
+</details>
+<details class="grpfold"><summary>Session history <span class="n">11</span></summary>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="codex-history.html">Codex history</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="credentials-in-transcripts.html">Credentials in transcripts</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
+</details>
+<details class="grpfold" open><summary>Deleting sessions <span class="n">27</span></summary>
+<a href="session-files-on-disk.html">Claude Code</a>
+<a href="delete-old-claude-sessions.html">Old sessions</a>
+<a href="delete-codex-sessions.html">Codex</a>
+<a href="delete-cursor-chat-history.html">Cursor</a>
+<a href="cursor-state-vscdb-too-large.html">Cursor state.vscdb too large</a>
+<a href="delete-copilot-chat-history.html">Copilot Chat</a>
+<a href="delete-copilot-cli-session-history.html">Copilot CLI</a>
+<a href="delete-gemini-cli-history.html">Gemini CLI</a>
+<a href="delete-opencode-session-history.html">opencode</a>
+<a href="delete-cline-task-history.html">Cline</a>
+<a href="delete-roo-task-history.html">Roo Code</a>
+<a href="delete-zed-thread-history.html">Zed</a>
+<a href="delete-kilo-code-task-history.html">Kilo Code</a>
+<a href="delete-amp-thread-history.html">Amp</a>
+<a href="delete-continue-session-history.html">Continue</a>
+<a href="delete-kiro-session-history.html">Kiro</a>
+<a href="delete-kimi-code-session-history.html">Kimi Code</a>
+<a href="delete-junie-session-history.html">Junie</a>
+<a href="delete-goose-session-history.html">Goose</a>
+<a href="delete-windsurf-cascade-history.html">Windsurf</a>
+<a href="delete-qwen-code-chat-history.html">Qwen Code</a>
+<a href="delete-trae-sessions.html">TRAE CLI</a>
+<a href="delete-codebuddy-sessions.html">CodeBuddy</a>
+<a href="delete-antigravity-history.html">Antigravity</a>
+<a href="delete-pi-session-history.html">pi</a>
+<a href="delete-crush-session-history.html" aria-current="page">Crush</a>
+<a href="delete-hermes-session-history.html">Hermes</a>
+</details>
+<details class="grpfold"><summary>Per-agent guides <span class="n">40</span></summary>
+<a href="memory-for-aider.html">aider</a>
+<a href="memory-for-amp.html">Amp</a>
+<a href="memory-for-antigravity.html">Antigravity</a>
+<a href="memory-for-cherrystudio.html">Cherry Studio</a>
+<a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-codebuddy.html">CodeBuddy Code</a>
+<a href="memory-for-codewhale.html">CodeWhale</a>
+<a href="memory-for-codex.html">Codex</a>
+<a href="memory-for-commandcode.html">Command Code</a>
+<a href="memory-for-continue.html">Continue</a>
+<a href="memory-for-copilot.html">Copilot CLI</a>
+<a href="memory-for-crush.html">Crush</a>
+<a href="memory-for-cursor.html">Cursor</a>
+<a href="memory-for-devin.html">Devin CLI</a>
+<a href="memory-for-dsh.html">dsh</a>
+<a href="memory-for-gjc.html">gajae-code</a>
+<a href="memory-for-gemini.html">Gemini CLI</a>
+<a href="memory-for-goose.html">Goose</a>
+<a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-hermes.html">Hermes</a>
+<a href="memory-for-junie.html">Junie</a>
+<a href="memory-for-kilocode.html">Kilo Code</a>
+<a href="memory-for-kimchi.html">Kimchi Coding</a>
+<a href="memory-for-kimi.html">Kimi Code</a>
+<a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-omp.html">omp</a>
+<a href="memory-for-openclaw.html">OpenClaw</a>
+<a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-pi.html">pi</a>
+<a href="memory-for-prime.html">prime-agent</a>
+<a href="memory-for-qwen.html">Qwen Code</a>
+<a href="memory-for-reasonix.html">Reasonix</a>
+<a href="memory-for-roo.html">Roo Code</a>
+<a href="memory-for-senpi.html">Senpi</a>
+<a href="memory-for-trae.html">TRAE CLI</a>
+<a href="memory-for-copilot-chat.html">VS Code Copilot Chat</a>
+<a href="memory-for-windsurf.html">Windsurf</a>
+<a href="memory-for-zcode.html">ZCode</a>
+<a href="memory-for-zed.html">Zed</a>
+</details>
+<div class="grp">Evidence</div>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="claude-mem-alternative.html">claude-mem alternative</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>How to delete Crush session history, and what you lose</h1>
+<p class="pagelede">one <code>crush.db</code> SQLite file per project, tracked in <code>projects.json</code><span class="mins" data-mins></span></p>
+<p>Unlike agents that keep every conversation under one directory in your home folder, Charm's Crush writes a separate SQLite database inside each project you run it in. Deleting your global data directory removes only the list of projects, while the conversations stay inside each repository's <code>.crush</code> folder.</p>
+
+<h2>Where the sessions are</h2>
+<pre>&lt;project&gt;/.crush/crush.db
+${XDG_DATA_HOME:-~/.local/share}/crush/projects.json</pre>
+<p>Nothing under <code>~/.local/share/crush</code> holds a transcript. Instead, <code>projects.json</code> records each project's path and its <code>data_dir</code> (which defaults to <code>&lt;project&gt;/.crush</code>). Running <code>crush projects</code> prints the same list:</p>
+<pre>crush projects</pre>
+<p>Inside each <code>crush.db</code>, two tables carry the history: <code>sessions</code> (one row per session, with <code>parent_session_id</code> linking subagent runs to the session that spawned them) and <code>messages</code> (joined on <code>session_id</code>, where the <code>parts</code> JSON array holds the prompt text, tool calls, file edits and command output).</p>
+
+<h2>How to delete one session</h2>
+<p>Close Crush in that project first — <code>crush.db</code> is live state the TUI owns while running. With Crush closed, remove the session's messages, any subagent child sessions, and the session row itself:</p>
+<pre>sqlite3 .crush/crush.db "
+  DELETE FROM messages WHERE session_id = '&lt;session-id&gt;'
+    OR session_id IN (SELECT id FROM sessions WHERE parent_session_id = '&lt;session-id&gt;');
+  DELETE FROM sessions WHERE id = '&lt;session-id&gt;' OR parent_session_id = '&lt;session-id&gt;';
+  VACUUM;
+"</pre>
+<p>Deleting rows in SQLite marks their pages for reuse without shrinking the file on disk; <code>VACUUM</code> rewrites the database without the freed pages.</p>
+
+<h2>How to delete a project's history</h2>
+<p>With Crush closed, removing <code>crush.db</code> (and any WAL sidecars beside it) clears every session recorded in that project:</p>
+<pre>rm -f .crush/crush.db .crush/crush.db-wal .crush/crush.db-shm</pre>
+<p>Your global configuration, provider keys and MCP servers live in <code>~/.config/crush/crush.json</code>, and custom commands live in <code>~/.config/crush/commands/</code>, so removing a project's <code>.crush/crush.db</code> leaves them untouched. To clear every project's history across the machine, check the paths in <code>${XDG_DATA_HOME:-~/.local/share}/crush/projects.json</code> and remove each <code>&lt;data_dir&gt;/crush.db</code>.</p>
+<p><code>deja delete</code> does not reach into a project's <code>crush.db</code>. When deja is installed, <code>deja forget &lt;id&gt;</code> drops a session from deja's own index and leaves a tombstone so the next scan does not re-import it.</p>
+
+<h2>What you lose</h2>
+<p>The prompts, the shell commands and their exit codes, and the exact old and new lines of every <code>edit</code>, <code>multiedit</code>, <code>write</code> and <code>lsp_replace_symbol</code> call. Once removed, <code>crush --session &lt;uuid&gt;</code> in that project can no longer resume the conversation.</p>
+
+<h2>Keeping it searchable instead</h2>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> follows <code>projects.json</code> and reads each project's <code>crush.db</code> — along with the other forty-two agents' histories on the machine — into one local index, searchable from the shell and readable by Crush itself over MCP:</p>
+<pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja "crush session about the symbol rename"</pre>
+<p>Nothing to configure first: the per-project databases are already on disk. <a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> removes a session from the index when you want it gone. A session whose <code>crush.db</code> was later deleted stays readable with <code>deja show</code> and under the Deleted tab of bare <code>deja</code>, while deja never writes rows back into <code>crush.db</code>. Set <code>DEJA_CRUSH_ROOT</code> to point deja at a backup of the data directory holding <code>projects.json</code>.</p>
+
+<p><a href="where-sessions-are-stored.html">Where every agent keeps its history</a> · <a href="memory-for-crush.html">Memory for Crush</a> · <a href="../registry/crush.html">The Crush format</a></p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

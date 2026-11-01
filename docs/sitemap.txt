@@ -57,6 +57,8 @@ https://vshulcz.github.io/deja-vu/guide/memory-for-senpi.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-zcode.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-windsurf.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-trae.html
+https://vshulcz.github.io/deja-vu/guide/memory-for-codebuddy.html
+https://vshulcz.github.io/deja-vu/guide/memory-for-junie.html
 https://vshulcz.github.io/deja-vu/guide/lost-context.html
 https://vshulcz.github.io/deja-vu/guide/context-window-full.html
 https://vshulcz.github.io/deja-vu/guide/resume-a-session.html
@@ -125,6 +127,8 @@ https://vshulcz.github.io/deja-vu/guide/delete-goose-session-history.html
 https://vshulcz.github.io/deja-vu/guide/delete-amp-thread-history.html
 https://vshulcz.github.io/deja-vu/guide/delete-continue-session-history.html
 https://vshulcz.github.io/deja-vu/guide/delete-pi-session-history.html
+https://vshulcz.github.io/deja-vu/guide/delete-crush-session-history.html
+https://vshulcz.github.io/deja-vu/guide/delete-hermes-session-history.html
 https://vshulcz.github.io/deja-vu/guide/credentials-in-transcripts.html
 https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html
 https://vshulcz.github.io/deja-vu/registry/kilocode.html

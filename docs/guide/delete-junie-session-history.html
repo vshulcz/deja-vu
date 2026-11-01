@@ -27,7 +27,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Delete Junie session history","description":"Junie keeps each session in a directory under ~/.junie/sessions. Find it, remove one session or all, and understand what remains in index.jsonl.","url":"https://vshulcz.github.io/deja-vu/guide/delete-junie-session-history.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"datePublished": "2026-10-24","dateModified": "2026-10-24","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Delete Junie session history","description":"Junie keeps each session in a directory under ~/.junie/sessions. Find it, remove one session or all, and understand what remains in index.jsonl.","url":"https://vshulcz.github.io/deja-vu/guide/delete-junie-session-history.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"datePublished": "2026-10-24","dateModified": "2026-11-01","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -66,7 +66,7 @@
 <a href="recover-a-deleted-session.html">Recover a deleted session</a>
 <a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
-<details class="grpfold" open><summary>Deleting sessions <span class="n">25</span></summary>
+<details class="grpfold" open><summary>Deleting sessions <span class="n">27</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
 <a href="delete-old-claude-sessions.html">Old sessions</a>
 <a href="delete-codex-sessions.html">Codex</a>
@@ -92,14 +92,17 @@
 <a href="delete-codebuddy-sessions.html">CodeBuddy</a>
 <a href="delete-antigravity-history.html">Antigravity</a>
 <a href="delete-pi-session-history.html">pi</a>
+<a href="delete-crush-session-history.html">Crush</a>
+<a href="delete-hermes-session-history.html">Hermes</a>
 </details>
-<details class="grpfold"><summary>Per-agent guides <span class="n">38</span></summary>
+<details class="grpfold"><summary>Per-agent guides <span class="n">40</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
 <a href="memory-for-cherrystudio.html">Cherry Studio</a>
 <a href="memory-for-claude-code.html">Claude Code</a>
 <a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-codebuddy.html">CodeBuddy Code</a>
 <a href="memory-for-codewhale.html">CodeWhale</a>
 <a href="memory-for-codex.html">Codex</a>
 <a href="memory-for-commandcode.html">Command Code</a>
@@ -114,6 +117,7 @@
 <a href="memory-for-goose.html">Goose</a>
 <a href="memory-for-grok.html">Grok Build</a>
 <a href="memory-for-hermes.html">Hermes</a>
+<a href="memory-for-junie.html">Junie</a>
 <a href="memory-for-kilocode.html">Kilo Code</a>
 <a href="memory-for-kimchi.html">Kimchi Coding</a>
 <a href="memory-for-kimi.html">Kimi Code</a>
@@ -170,7 +174,7 @@
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "Junie session about the refactor"</pre>
 <p>Indexing and search stay local, credentials are stripped, and <code>deja forget</code> removes a session from the index when you do want it gone. deja reads <code>JUNIE_HOME</code> too; <code>DEJA_JUNIE_ROOT</code> overrides it for deja's reads only, so set it to point deja at a copy or a backup of the sessions directory.</p>
-<p><a href="where-sessions-are-stored.html">Where every agent keeps its history</a> · <a href="delete-kimi-code-session-history.html">Deleting Kimi Code history</a> · <a href="../registry/junie.html">The Junie format registry</a></p>
+<p><a href="where-sessions-are-stored.html">Where every agent keeps its history</a> · <a href="memory-for-junie.html">Memory for Junie</a> · <a href="delete-kimi-code-session-history.html">Deleting Kimi Code history</a> · <a href="../registry/junie.html">The Junie format registry</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
 </article></div></div>
 </body></html>

@@ -28,6 +28,8 @@ Run `deja` with no arguments in a terminal and it opens a full-screen search ove
 - [Delete Amp thread history](https://vshulcz.github.io/deja-vu/guide/delete-amp-thread-history.html): one JSON file per thread under ~/.local/share/amp/threads, so deleting one conversation is deleting one file; the thread in your Amp account is separate
 - [Delete Continue session history](https://vshulcz.github.io/deja-vu/guide/delete-continue-session-history.html): one JSON file per session plus a sessions.json list the history view reads; remove the entry with the file, or the session stays listed and cannot be deleted from Continue
 - [Delete pi session history](https://vshulcz.github.io/deja-vu/guide/delete-pi-session-history.html): each session is a single JSONL file under ~/.pi/agent/sessions; delete one file or a whole project directory, or use deja delete with dry-run preview
+- [Delete Crush session history](https://vshulcz.github.io/deja-vu/guide/delete-crush-session-history.html): one crush.db SQLite file per project under .crush/crush.db, listed in ~/.local/share/crush/projects.json; remove one session or a project's history and leave global config alone
+- [Delete Hermes session history](https://vshulcz.github.io/deja-vu/guide/delete-hermes-session-history.html): every conversation and compacted archive lives in ~/.hermes/state.db or profiles/<profile>/state.db; remove one session with hermes sessions delete or clear the database cleanly
 - [Delete old Claude Code sessions](https://vshulcz.github.io/deja-vu/guide/delete-old-claude-sessions.html): `find ~/.claude/projects -mtime +30 -delete` or `cleanupPeriodDays`, and why age frees far less disk than size
 - [Delete Codex CLI sessions](https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html): one rollout, one day, or all of ~/.codex/sessions, and why ~/.codex/history.jsonl keeps your prompts regardless
 - [Delete CodeBuddy and WorkBuddy session history](https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html): one JSONL per session under ~/.codebuddy/projects and the sub-agent directory beside it; WorkBuddy keeps its own copies in its own homes
@@ -125,6 +127,8 @@ Run `deja` with no arguments in a terminal and it opens a full-screen search ove
 - [CodeWhale](https://vshulcz.github.io/deja-vu/guide/memory-for-codewhale.html)
 - [Windsurf / Devin Desktop](https://vshulcz.github.io/deja-vu/guide/memory-for-windsurf.html): no hook output reaches Cascade, so recall is pulled through MCP, a global rule, a skill and a /deja workflow
 - [TRAE CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-trae.html): the MCP server in traecli.toml and Codex's hooks in cli/hooks.json, which run once trusted at start-up
+- [CodeBuddy Code & WorkBuddy](https://vshulcz.github.io/deja-vu/guide/memory-for-codebuddy.html): MCP, four hooks in ~/.codebuddy/settings.json, a skill, and /deja
+- [Junie](https://vshulcz.github.io/deja-vu/guide/memory-for-junie.html): MCP in ~/.junie/mcp/mcp.json and the shared skill in ~/.agents/skills/deja-history/SKILL.md
 
 ## Evidence
 

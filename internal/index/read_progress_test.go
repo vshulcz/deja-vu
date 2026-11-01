@@ -15,6 +15,7 @@ import (
 type perFileProgress struct {
 	mu     sync.Mutex
 	phase  string
+	order  []string
 	steps  map[string][]int // phase -> the advances it received
 	totals map[string]int
 }
@@ -27,6 +28,7 @@ func (r *perFileProgress) Phase(name string, total int) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.phase = name
+	r.order = append(r.order, name)
 	r.totals[name] = total
 }
 
@@ -172,5 +174,19 @@ func TestTheSidecarsAreAPhaseOfTheirOwn(t *testing.T) {
 	}
 	if sum != 5 {
 		t.Errorf("%q advanced %d of 5 — a builder reports nothing", phase, sum)
+	}
+	// Mining runs before indexing so each session's messages can be dropped as
+	// soon as its records and postings are handed to the spiller (#5571).
+	minedAt, indexedAt := -1, -1
+	for i, name := range rec.order {
+		switch name {
+		case phase:
+			minedAt = i
+		case "indexing messages":
+			indexedAt = i
+		}
+	}
+	if minedAt < 0 || indexedAt < 0 || minedAt >= indexedAt {
+		t.Errorf("want %q before \"indexing messages\"; phase order was %v", phase, rec.order)
 	}
 }

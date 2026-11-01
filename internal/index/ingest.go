@@ -1064,22 +1064,6 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 		}
 		return keptTurns[seenKey(key, msg.Role, msg.Time, msg.Text)]
 	}
-	// Counted in messages and reported when a batch has actually been
-	// indexed, not when it was handed to the spiller: reporting per session
-	// pushed sent the bar from 1% to 99% in one step and then held it at 99%
-	// while the workers drained — a third of the phase (#3372).
-	reportPhase("indexing messages", countMessages(ss))
-	wrote := map[string]bool{}
-	var wroteMu sync.Mutex
-	sp, err := newSpiller(tmp)
-	if err != nil {
-		_ = rw.Close()
-		return err
-	}
-	defer sp.cleanup()
-	// The command table's state, from the records as they are written: the
-	// first pass after the build reads only what it changed.
-	cmdState := newCommandsState()
 	// What each session's row reads off its text, all at once: in the loop it
 	// was one core's work for most of the phase.
 	texts := sessionTexts(ss)
@@ -1089,8 +1073,49 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	// The rows above take the files in the order the sources hand them; the
 	// records, and what is mined from them, keep the order the log had.
 	keepCopyOrder(ss, orphans)
+	wrote := map[string]bool{}
+	for _, s := range ss {
+		if holdsText(s) {
+			wrote[s.Harness+":"+s.ID] = true
+		}
+	}
+	dropEmptySessions(&m, wrote)
+	for key, ps := range orphans.bare {
+		if row, ok := m.Sessions[key]; ok {
+			row.Copies = withCopies(row.Path, row.Copies, ps...)
+			m.Sessions[key] = row
+			for _, p := range ps {
+				st := orphans.bareFiles[p]
+				st.Kept = true
+				m.Files[p] = st
+			}
+		}
+	}
+	summary := buildSummary(initialBuild, len(m.Sessions), 0, ss)
+	// The five sidecars walk every session before indexing starts so each
+	// session's messages can be dropped as soon as its records and postings
+	// are handed to the spiller (#5571).
+	// Skipped whole on a search-only index (#5395).
+	if !m.SearchOnly {
+		mineRebuildSidecars(tmp, ss, m, keptSource)
+	}
+	// Counted in messages and reported when a batch has actually been
+	// indexed, not when it was handed to the spiller: reporting per session
+	// pushed sent the bar from 1% to 99% in one step and then held it at 99%
+	// while the workers drained — a third of the phase (#3372).
+	reportPhase("indexing messages", countMessages(ss))
+	sp, err := newSpiller(tmp)
+	if err != nil {
+		_ = rw.Close()
+		return err
+	}
+	defer sp.cleanup()
+	// The command table's state, from the records as they are written: the
+	// first pass after the build reads only what it changed.
+	cmdState := newCommandsState()
 	err = sp.run(func(push func(tokenJob)) error {
-		for _, s := range ss {
+		for i := range ss {
+			s := ss[i]
 			key := s.Harness + ":" + s.ID
 			for _, msg := range s.Messages {
 				if seenMsgs.dup(key, msg.Role, msg.Time, msg.Text) {
@@ -1115,14 +1140,12 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 				if msg.Role == roleCommand {
 					cmdState.add(key, tbl.intern(src), text, msg.Time, off)
 				}
-				wroteMu.Lock()
-				wrote[key] = true
-				wroteMu.Unlock()
 				if sources.IsMessageRole(msg.Role) {
 					writtenMessages++
 				}
 				push(tokenJob{text: tokenizedPart(msg.Role, text), offset: off, sid: m.Sessions[key].Ord, when: msg.Time, tool: isToolRole(msg.Role)})
 			}
+			ss[i].Messages = nil
 		}
 		return nil
 	})
@@ -1133,32 +1156,12 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	if err := rw.Close(); err != nil {
 		return err
 	}
-	dropEmptySessions(&m, wrote)
-	for key, ps := range orphans.bare {
-		if row, ok := m.Sessions[key]; ok {
-			row.Copies = withCopies(row.Path, row.Copies, ps...)
-			m.Sessions[key] = row
-			for _, p := range ps {
-				st := orphans.bareFiles[p]
-				st.Kept = true
-				m.Files[p] = st
-			}
-		}
-	}
-	// The five sidecars walk every session again — what co-occurs, which
-	// command followed which error, what was run and what failed. On a real
-	// store that is eight seconds of a twenty-second build, and it used to run
-	// under the previous phase's last percentage, so the bar sat still through
-	// it (#3372).
-	// Skipped whole on a search-only index (#5395).
 	if !m.SearchOnly {
-		mineRebuildSidecars(tmp, ss, m, keptSource, cmdState)
+		writeCommandsState(tmp, cmdState, m)
 	}
-	// Nothing below reads a session's text: counted here, the sessions can go
-	// before the bucket files are assembled, rather than sitting beside the
-	// postings as the larger half of the build's peak.
-	summary := buildSummary(initialBuild, len(m.Sessions), writtenMessages, ss)
-	ss, imported.sessions, orphans.sessions = nil, nil, nil
+	summary.Messages = writtenMessages
+	summary.Dropped -= writtenMessages
+	ss = nil
 	cmdState, seenMsgs, keptTurns = nil, nil, nil
 	reportPhase("writing index", sp.bucketCount())
 	if err := sp.writeBuckets(filepath.Join(tmp, "buckets")); err != nil {
@@ -1277,9 +1280,8 @@ func rebuildRow(sessions map[string]SessionMeta, s model.Session, text sessionTe
 	recordCopy(sessions, key, prev, s)
 }
 
-// mineRebuildSidecars writes the five sidecars a full build mines from ss, and
-// the command state after them.
-func mineRebuildSidecars(tmp string, ss []model.Session, m Manifest, keptSource func(key string, s model.Session, msg model.Message) string, cmdState *commandsState) {
+// mineRebuildSidecars writes the five sidecars a full build mines from ss.
+func mineRebuildSidecars(tmp string, ss []model.Session, m Manifest, keptSource func(key string, s model.Session, msg model.Message) string) {
 	reportPhase("mining fixes and commands", 5)
 	// Five passes over the same sessions, each writing its own file and reading
 	// nothing the others write, so they run together rather than one after the
@@ -1302,8 +1304,6 @@ func mineRebuildSidecars(tmp string, ss []model.Session, m Manifest, keptSource 
 	// Receipts read the same sessions; no phase of their own.
 	sidecars.Go(func() { evidence.Build(tmp, ss, nil) })
 	sidecars.Wait()
-	// After the facts, whose file it is stamped with.
-	writeCommandsState(tmp, cmdState, m)
 }
 
 // importedSessions preserves sync-imported data across full rebuilds: records
