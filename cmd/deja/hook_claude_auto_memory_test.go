@@ -19,7 +19,8 @@ func TestHookContextHandsClaudeAutoMemoryToNonClaudeAndNotClaude(t *testing.T) {
 	t.Cleanup(func() { spawnWarmup = oldSpawn })
 
 	work := "/tmp/tuip/payments"
-	memDir := filepath.Join(claudeRoot, encodedProjectDir(work), "memory")
+	encoded := strings.ReplaceAll(work, "/", "-")
+	memDir := filepath.Join(claudeRoot, encoded, "memory")
 	if err := os.MkdirAll(memDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +67,7 @@ func TestHookContextHandsClaudeAutoMemoryToNonClaudeAndNotClaude(t *testing.T) {
 	}
 
 	// 2. Claude Code session in the same directory must not get its own auto-memory twice.
-	claudeTranscript := filepath.Join(claudeRoot, encodedProjectDir(work), "claude-s1.jsonl")
+	claudeTranscript := filepath.Join(claudeRoot, encoded, "claude-s1.jsonl")
 	claudePayload, err := json.Marshal(map[string]string{
 		"session_id":      "claude-s1",
 		"cwd":             work,
