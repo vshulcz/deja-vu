@@ -24,9 +24,16 @@ deja 在本地索引全部历史，并通过 MCP 和钩子把相关上下文交�
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">文档</a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">浏览器在线演示</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">评测</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">与同类对比</a></p>
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/"><b>官网与交互搜索</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>浏览器在线演示</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html">中文快速开始</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">评测</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">与同类对比</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="同一个问题问同一个智能体两次：没有记忆时它毫无印象，有 deja 时它用八个月前的结论作答"></p>
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto
+```
+
+<p align="center"><sub>macOS 与 Linux &middot; <a href="#安装">Windows、Homebrew、npm 与插件市场</a> &middot; 免安装只读检查本机已有哪些会话：<code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">浏览器在线演示 →</a></sub></p>
 
 <table align="center">
 <tr>

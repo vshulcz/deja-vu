@@ -24,9 +24,16 @@ deja индексирует всю историю локально и возвр
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">Документация</a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">Демо в браузере</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Замеры</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Сравнение</a></p>
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/"><b>Сайт и интерактивный поиск</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>Живое демо в браузере</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/ru/guide/getting-started.html">Быстрый старт (RU)</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Замеры</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Сравнение</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="один и тот же вопрос одному и тому же агенту дважды: без памяти он не помнит ничего, с deja отвечает выводом восьмимесячной давности"></p>
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto
+```
+
+<p align="center"><sub>macOS и Linux &middot; <a href="#установка">Windows, Homebrew, npm и плагины</a> &middot; Проверить сколько сессий уже на диске без установки: <code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">Демо в браузере →</a></sub></p>
 
 <table align="center">
 <tr>

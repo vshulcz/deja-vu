@@ -90,12 +90,14 @@
   })();
 
   /* ── say that the guide can be searched ────────────────────────────── */
+  var docLang=(document.documentElement.lang||'en').toLowerCase();
+  var isRu=docLang.indexOf('ru')===0,isZh=docLang.indexOf('zh')===0;
   (function(){
     var nav=document.querySelector('nav .spacer');
     if(!nav)return;
     var hint=document.createElement('button');
     hint.className='searchhint';hint.type='button';
-    hint.innerHTML='<span>search the guide</span><kbd>/</kbd>';
+    hint.innerHTML='<span>'+(isRu?'поиск по документации':isZh?'搜索指南':'search the guide')+'</span><kbd>/</kbd>';
     hint.addEventListener('click',function(){
       document.dispatchEvent(new KeyboardEvent('keydown',{key:'/',bubbles:true}));
     });
@@ -113,7 +115,7 @@
         var demo=document.createElement('a');
         demo.className='lnk';
         demo.href=rootPrefix+'view/';
-        demo.textContent='Demo';
+        demo.textContent=isRu?'Демо':isZh?'演示':'Demo';
         nav.parentNode.insertBefore(demo,gh);
       }
     }
@@ -122,16 +124,23 @@
   /* ── enrich the closing star CTA with a 1-click install & live demo ─── */
   (function(){
     var cta=art.querySelector('.star-cta');
-    if(!cta)return;
+    if(!cta){
+      cta=document.createElement('p');
+      cta.className='star-cta';
+      art.appendChild(cta);
+    }
     var homeLink=document.querySelector('nav a.brand');
     var rootPrefix=homeLink?homeLink.getAttribute('href'):'../';
     if(rootPrefix.slice(-1)!=='/')rootPrefix+='/';
     var cmdText='curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh';
+    var leadTxt=isRu?'Установка за 10 секунд, индекс за 10.':isZh?'十秒安装，十秒建索引。':'Ten seconds to install, ten to index.';
+    var starTxt=isRu?'★ Поставить звезду на GitHub':isZh?'★ 在 GitHub 上点 Star':'★ Star deja-vu on GitHub';
+    var demoTxt=isRu?'Живое демо в браузере →':isZh?'浏览器在线演示 →':'Try live browser demo →';
     cta.innerHTML=
       '<div class="cta-cmd"><span class="p">$</span><code>'+cmdText+'</code><button type="button">copy</button></div>'+
-      '<div class="cta-row"><span>Ten seconds to install, ten to index.</span>'+
-      '<a class="cta-btn" href="https://github.com/vshulcz/deja-vu">★ Star deja-vu on GitHub</a>'+
-      '<a class="cta-demo" href="'+rootPrefix+'view/">Try live browser demo →</a></div>';
+      '<div class="cta-row"><span>'+leadTxt+'</span>'+
+      '<a class="cta-btn" href="https://github.com/vshulcz/deja-vu">'+starTxt+'</a>'+
+      '<a class="cta-demo" href="'+rootPrefix+'view/">'+demoTxt+'</a></div>';
     var btn=cta.querySelector('button');
     if(btn){
       btn.addEventListener('click',function(){

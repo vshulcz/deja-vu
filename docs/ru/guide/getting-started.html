@@ -71,7 +71,7 @@
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja install --auto</pre>
 <p>Вторая команда подключает MCP-сервер <code>deja</code> ко всем найденным на машине агентам, включает автоматическую подгрузку контекста через хуки (на старте сессии, перед правкой файла, после ошибки команды и после компакции) и строит первый индекс. Также можно поставить через Homebrew (<code>brew install vshulcz/tap/deja-vu</code>), npm (<code>npm i -g @vshulcz/deja-vu</code>), Windows WinGet (<code>winget install vshulcz.deja-vu</code>) или Scoop (<code>scoop install deja-vu</code>).</p>
-<p>Индекс строится по сессиям, которые <b>уже лежат на диске</b>, поэтому сразу после установки вся ваша работа за прошлые месяцы доступна для поиска.</p>
+<p>Индекс строится по сессиям, которые <b>уже лежат на диске</b>, поэтому сразу после установки вся ваша работа за прошлые месяцы доступна для поиска. Хотите сначала посмотреть без установки? Откройте <a href="../../view/">живое демо в браузере</a> или выполните read-only проверку: <code>npx @vshulcz/deja-vu sources</code> покажет, сколько сессий уже сохранено у вас на диске.</p>
 
 <h2>Проверка найденных агентов</h2>
 <pre>deja sources

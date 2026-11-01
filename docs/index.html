@@ -358,8 +358,9 @@ footer a:hover{color:var(--ink)}
       <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="brew install deja-vu">Homebrew</button>
       <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="npm i -g @vshulcz/deja-vu">npm</button>
       <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="winget install vshulcz.deja-vu">Windows</button>
-      <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="claude plugin marketplace add vshulcz/deja-vu && claude plugin install deja-vu@deja-vu">Claude Code</button>
-      <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="codex plugin marketplace add https://github.com/vshulcz/deja-vu && codex plugin add deja-vu@deja-vu">Codex</button>
+      <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="npx @vshulcz/deja-vu sources" data-under="<b>read-only check</b> — lists every agent and session count already on your disk without installing anything">Try (no install)</button>
+      <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="claude plugin marketplace add vshulcz/deja-vu && claude plugin install deja-vu@deja-vu" data-under="wires MCP recall and hooks into Claude Code — then run <b>deja index</b>">Claude Code</button>
+      <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="codex plugin marketplace add https://github.com/vshulcz/deja-vu && codex plugin add deja-vu@deja-vu" data-under="wires MCP recall and skill into Codex CLI — then run <b>deja index</b>">Codex</button>
       <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="go install github.com/vshulcz/deja-vu/cmd/deja@latest">Go</button>
     </div>
     <div class="cmdline">
@@ -367,7 +368,7 @@ footer a:hover{color:var(--ink)}
       <code id="i1">curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</code>
       <button class="copy" data-copy="i1">copy</button>
     </div>
-    <p class="under">then <b>deja install --auto</b> — ten seconds to install, ten to index,
+    <p class="under" id="under">then <b>deja install --auto</b> — ten seconds to install, ten to index,
       and the next session already knows</p>
     <div class="hero-actions">
       <a class="hero-btn primary" href="https://github.com/vshulcz/deja-vu"><span aria-hidden="true">★</span> Star on GitHub</a>
@@ -655,12 +656,20 @@ document.querySelectorAll('.copy').forEach(function(b){b.addEventListener('click
 })});
 
 /* install tabs */
+var defaultUnder='then <b>deja install --auto</b> — ten seconds to install, ten to index, and the next session already knows';
 document.querySelectorAll('.itab').forEach(function(tab){tab.addEventListener('click',function(){
   document.querySelectorAll('.itab').forEach(function(t){t.classList.remove('on');t.setAttribute('aria-selected','false')});
   tab.classList.add('on');tab.setAttribute('aria-selected','true');
-  var code=document.getElementById('i1');
+  var code=document.getElementById('i1'),under=document.getElementById('under');
   if(code)code.textContent=tab.dataset.cmd;
+  if(under)under.innerHTML=tab.dataset.under||defaultUnder;
 })});
+if(/Win/i.test(navigator.platform||navigator.userAgent||'')){
+  var winTab=document.querySelector('.itab[data-cmd^="winget"]');
+  if(winTab)winTab.click();
+  var i2=document.getElementById('i2');
+  if(i2)i2.textContent='winget install vshulcz.deja-vu';
+}
 
 /* ── the cat reacts ───────────────────────────────────────────────────────
    The moods are generated files, so the page swaps a src rather than reaching
@@ -695,6 +704,18 @@ document.addEventListener('visibilitychange',function(){
   line.textContent='welcome back — you were here '+when+
     (prior.page?' · last time you were reading '+prior.page:'');
   line.hidden=false;
+})();
+(function(){
+  var line=document.getElementById('recall-line');
+  if(!line||!line.hidden)return;
+  var lang=(navigator.language||'').toLowerCase();
+  if(/^ru\b/.test(lang)){
+    line.innerHTML='На русском: <a href="ru/guide/getting-started.html">быстрый старт и документация →</a>';
+    line.hidden=false;
+  }else if(/^zh\b/.test(lang)){
+    line.innerHTML='中文指南：<a href="zh/guide/getting-started.html">快速开始与文档 →</a>';
+    line.hidden=false;
+  }
 })();
 
 /* scroll reveal */

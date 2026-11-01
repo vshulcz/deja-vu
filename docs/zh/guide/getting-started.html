@@ -85,7 +85,7 @@
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja install --auto</pre>
 <p>第二条命令做三件事：把 MCP 召回接到它在这台机器上找到的每一个智能体，在支持的地方打开会话启动时的自动召回，并建好第一份索引。也可以用 Homebrew（<code>brew install deja-vu</code>）或从 <a href="https://github.com/vshulcz/deja-vu/releases">releases</a> 直接下二进制。</p>
-<p>建索引读的是你磁盘上<b>已经有</b>的会话记录，所以第一次跑完，你几个月前的工作就已经能搜到了——不需要提前记录任何东西。</p>
+<p>建索引读的是你磁盘上<b>已经有</b>的会话记录，所以第一次跑完，你几个月前的工作就已经能搜到了——不需要提前记录任何东西。想先在不安装的情况下试试？可以打开<a href="../../view/">浏览器交互演示</a>，或运行只读检查 <code>npx @vshulcz/deja-vu sources</code> 看看本机磁盘上已经有几个智能体、多少条会话。</p>
 
 <h2>先确认它看到了什么</h2>
 <pre>deja sources
@@ -123,7 +123,7 @@ rm -rf ~/.cache/deja</pre>
 <p>会话记录本来就是各个工具自己写的，deja 不动它们。</p>
 
 <p><a href="does-my-agent-remember.html">智能体记得之前的对话吗</a> · <a href="forgetting.html">为什么会忘事</a> · <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.zh.md">中文 README</a></p>
-
+<p class="star-cta">觉得有用？欢迎在 <a href="https://github.com/vshulcz/deja-vu">GitHub 上给 deja-vu 点颗 Star</a>。</p>
 </article>
 </div>
 <footer>deja-vu 采用 MIT 许可，在你的机器上运行。<a href="https://github.com/vshulcz/deja-vu">GitHub 源码</a> · <a href="../../">首页</a></footer>

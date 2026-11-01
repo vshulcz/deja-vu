@@ -36,7 +36,14 @@
 #err{color:#e06c75;font-family:var(--mono);font-size:14px;margin-top:14px;display:none}
 .note{opacity:.6;font-size:14px;margin-top:26px}
 .cardpage pre{background:var(--panel);border:1px solid var(--line);border-radius:10px;
-  padding:14px 18px;margin:0 0 18px;font:13.5px/1.6 var(--mono);color:var(--ph-hi);overflow-x:auto}
+  padding:14px 18px;margin:0 0 18px;font:13.5px/1.6 var(--mono);color:var(--ph-hi);overflow-x:auto;
+  display:flex;align-items:center;justify-content:space-between;gap:12px}
+.cardpage pre button{font-family:var(--mono);font-size:11.5px;padding:4px 10px;border-radius:6px;
+  border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer}
+.cardpage pre button:hover{color:var(--ink);border-color:#8787af}
+.sample-row{margin-top:12px;text-align:center;font:13px var(--mono);color:var(--muted)}
+.sample-row button{background:none;border:0;color:#8787af;font:inherit;text-decoration:underline;cursor:pointer;padding:0}
+.sample-row button:hover{color:var(--ink)}
 footer{max-width:860px;margin:64px auto 0;padding:28px 24px 56px}
 </style>
 </head>
@@ -48,12 +55,13 @@ footer{max-width:860px;margin:64px auto 0;padding:28px 24px 56px}
 <h1>Your stats card, as a PNG</h1>
 <p class="lede">The card <code>deja</code> draws is an SVG, which a README renders and every social site refuses. This turns it into a PNG. The conversion runs in this page — the file never leaves your machine.</p>
 
-<pre>deja stats --card deja-stats.svg</pre>
+<pre><code>deja stats --card deja-stats.svg</code><button type="button" id="cpcmd">copy</button></pre>
 
 <div id="drop" tabindex="0" role="button" aria-label="Choose or drop your card SVG">
   drop <b>deja-stats.svg</b> here, or click to choose
   <input id="file" type="file" accept=".svg,image/svg+xml">
 </div>
+<p class="sample-row">No card on disk yet? <button type="button" id="sample">Load sample card</button> to test the 2× PNG export right here.</p>
 <div id="err"></div>
 
 <div id="out">
@@ -94,45 +102,65 @@ footer{max-width:860px;margin:64px auto 0;padding:28px 24px 56px}
     return null;
   }
 
+  function renderText(svgText, outName) {
+    err.style.display = 'none';
+    name = outName || 'deja-stats.png';
+    var url = URL.createObjectURL(new Blob([svgText], { type: 'image/svg+xml' }));
+    var size = cardSize(svgText);
+    if (!size) { URL.revokeObjectURL(url); return fail('that SVG says no size — the card deja writes carries width and height'); }
+    var img = new Image();
+    img.onload = function () {
+      // The SVG's own size, not the decoded image's: a browser that cannot
+      // work one out hands back 0, or its own default, and the card comes
+      // out stretched.
+      var scale = 2, w = size.w, h = size.h;
+      var canvas = document.createElement('canvas');
+      canvas.width = w * scale; canvas.height = h * scale;
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#0b0f10';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(function (b) {
+        // An SVG that pulls in anything from outside itself taints the
+        // canvas, and then this returns null rather than raising. The card
+        // deja writes references nothing, so say what a null means here.
+        if (!b) { return fail('the browser would not encode this one — an SVG that loads an external image or font cannot be exported'); }
+        blob = b;
+        preview.src = URL.createObjectURL(b);
+        dims.textContent = canvas.width + '×' + canvas.height;
+        out.style.display = 'block';
+      }, 'image/png');
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); fail('that SVG did not render — is it the card deja wrote?'); };
+    img.src = url;
+  }
+
   function render(f) {
     err.style.display = 'none';
     if (!f) return;
     if (!/svg/.test(f.type) && !/\.svg$/i.test(f.name)) { return fail('that is not an SVG — deja stats --card writes one'); }
-    name = f.name.replace(/\.svg$/i, '') + '.png';
+    var outName = f.name.replace(/\.svg$/i, '') + '.png';
     var reader = new FileReader();
     reader.onerror = function () { fail('could not read the file'); };
-    reader.onload = function () {
-      var url = URL.createObjectURL(new Blob([reader.result], { type: 'image/svg+xml' }));
-      var size = cardSize(reader.result);
-      if (!size) { URL.revokeObjectURL(url); return fail('that SVG says no size — the card deja writes carries width and height'); }
-      var img = new Image();
-      img.onload = function () {
-        // The SVG's own size, not the decoded image's: a browser that cannot
-        // work one out hands back 0, or its own default, and the card comes
-        // out stretched.
-        var scale = 2, w = size.w, h = size.h;
-        var canvas = document.createElement('canvas');
-        canvas.width = w * scale; canvas.height = h * scale;
-        var ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#0b0f10';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        URL.revokeObjectURL(url);
-        canvas.toBlob(function (b) {
-          // An SVG that pulls in anything from outside itself taints the
-          // canvas, and then this returns null rather than raising. The card
-          // deja writes references nothing, so say what a null means here.
-          if (!b) { return fail('the browser would not encode this one — an SVG that loads an external image or font cannot be exported'); }
-          blob = b;
-          preview.src = URL.createObjectURL(b);
-          dims.textContent = canvas.width + '×' + canvas.height;
-          out.style.display = 'block';
-        }, 'image/png');
-      };
-      img.onerror = function () { URL.revokeObjectURL(url); fail('that SVG did not render — is it the card deja wrote?'); };
-      img.src = url;
-    };
+    reader.onload = function () { renderText(reader.result, outName); };
     reader.readAsText(f);
+  }
+
+  var cpcmd = document.getElementById('cpcmd'), sample = document.getElementById('sample');
+  if (cpcmd) {
+    cpcmd.addEventListener('click', function () {
+      navigator.clipboard.writeText('deja stats --card deja-stats.svg');
+      cpcmd.textContent = 'copied';
+      setTimeout(function () { cpcmd.textContent = 'copy'; }, 1200);
+    });
+  }
+  if (sample) {
+    sample.addEventListener('click', function () {
+      fetch('../assets/stats-card-demo.svg').then(function (r) { return r.text(); }).then(function (txt) {
+        renderText(txt, 'deja-stats-sample.png');
+      }).catch(function () { fail('could not load sample SVG'); });
+    });
   }
 
   drop.addEventListener('click', function () { file.click(); });

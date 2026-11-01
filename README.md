@@ -33,7 +33,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 deja install --auto
 ```
 
-<p align="center"><sub>macOS and Linux &middot; <a href="#install">Windows, Homebrew, npm and plugin marketplaces</a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">Try in browser without installing →</a></sub></p>
+<p align="center"><sub>macOS and Linux &middot; <a href="#install">Windows, Homebrew, npm and plugin marketplaces</a> &middot; Or check what is already on your disk without installing: <code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">Try in browser →</a></sub></p>
 
 <table align="center">
 <tr>
