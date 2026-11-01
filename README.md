@@ -38,11 +38,13 @@ deja install --auto
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">every run</a></sub></p>
 
 <p align="center">
+  <a href="https://trendshift.io/repositories/83640"><img src="https://trendshift.io/api/badge/repositories/83640" alt="vshulcz/deja-vu | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"></a>
+</p>
+
+<p align="center">
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/coverage-88%25-brightgreen" alt="Coverage"></a>
-  <a href="https://goreportcard.com/report/github.com/vshulcz/deja-vu"><img src="https://goreportcard.com/badge/github.com/vshulcz/deja-vu" alt="Go Report Card"></a>
   <a href="https://github.com/vshulcz/deja-vu/releases"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
-  <a href="https://trendshift.io/repositories/83640"><img src="https://img.shields.io/badge/Trendshift-%231%20Go%20Repo-ff8700" alt="Trendshift"></a>
   <a href="https://mcptoplist.com/server/io.github.vshulcz%2Fdeja-vu"><img src="https://mcptoplist.com/badge/io.github.vshulcz%2Fdeja-vu.svg" alt="MCP Toplist"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
 </p>
