@@ -258,6 +258,9 @@ func namesTheFullSet(text string, start, end, n int) bool {
 	// reads the full set's denominator as the cleaned figure's too.
 	lo := max(start-40, 0)
 	hi := min(end+40, len(text))
+	if strings.Contains(text[end:hi], "470") {
+		return false
+	}
 	return strings.Contains(text[lo:hi], strconv.Itoa(n))
 }
 
