@@ -7,15 +7,26 @@
 
 <p align="center"><b>Ваши кодинг-агенты больше не отлаживают заново то, что вы уже починили.</b></p>
 
-<p align="center">Claude Code, Codex, Cursor и остальные агенты на этой машине и так сохраняют каждую сессию на диск.
-deja индексирует всё, на месяцы назад, и отдаёт нужное
-тому агенту, который работает сейчас.</p>
+<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes и ещё 36 агентов уже сохраняют каждую сессию на диск.<br>
+deja индексирует всю историю локально и возвращает нужный контекст через MCP и хуки — без LLM, один Go-бинарник.</p>
+
+<p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | Русский | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
+
+<p align="center">
+  <a href="https://trendshift.io/repositories/83640" target="_blank"><img src="https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go" alt="vshulcz/deja-vu — Trendshift" width="250" height="55" /></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/badges/.badges/main/coverage.svg" alt="coverage">
+  <a href="https://github.com/vshulcz/deja-vu/releases/latest"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
+  <a href="https://www.npmjs.com/package/@vshulcz/deja-vu"><img src="https://img.shields.io/npm/v/%40vshulcz%2Fdeja-vu" alt="npm"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+</p>
+
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/">Документация</a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">Демо в браузере</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Замеры</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Сравнение</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="один и тот же вопрос одному и тому же агенту дважды: без памяти он не помнит ничего, с deja отвечает выводом восьмимесячной давности"></p>
-
-<p align="center"><sub><em>Никто ничего не искал — агент вызвал deja сам. Два настоящих прогона, настоящая модель, настоящие вызовы инструментов, на синтетическом корпусе: ничья история не публикуется.</em></sub></p>
-
-<p align="center"><b>deja полна с первой минуты: история, которую 43 агент уже записал, индекс за несколько секунд, без модели и без отдельного шага сбора.</b></p>
 
 <table align="center">
 <tr>
@@ -25,16 +36,9 @@ deja индексирует всё, на месяцы назад, и отдаё�
 </tr>
 </table>
 
-<p align="center"><sub>deja-vu поддерживаю я, поэтому все драйверы, корпус и правило подсчёта лежат в этом репозитории &middot;
+<p align="center"><sub>Драйверы, синтетический корпус и правила подсчёта лежат в репозитории &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">сравнение лоб в лоб и как перепроверить любую строку</a> &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">прогоны LongMemEval и LoCoMo</a></sub></p>
-
-<p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | Русский | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
-
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">Документация</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Замеры</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Сравнение</a></p>
-<p align="center"><sub>Если пригодилось — поставьте deja-vu звезду на <a href="https://github.com/vshulcz/deja-vu">GitHub</a>.</sub></p>
-
-deja-vu (`github.com/vshulcz/deja-vu`, CLI `deja`) — локальная память и поиск по истории сессий для кодинг-агентов: индексирует логи сессий, которые Claude Code, Codex, Cursor, Qwen Code, Gemini CLI, OpenCode, Crush и ещё 36 агентов уже сохранили на диск, и возвращает нужный контекст через MCP и хуки. Без LLM, один Go-бинарник.
 
 ## Установка
 
@@ -315,41 +319,6 @@ deja bench read       # сколько стоит прочитать храни�
 ## Частые вопросы
 
 <details>
-<summary><b>Что-нибудь уходит с моей машины?</b></summary>
-
-Нет, пока вы сами не попросите. См.
-[потоки данных](../../docs/SECURITY-MODEL.md#data-flows).
-
-</details>
-
-<details>
-<summary><b>А секреты, которые уже лежат в логах?</b></summary>
-
-Они остаются в файлах самих инструментов, это данные вашего
-агента; `deja secrets` называет сессии, где они есть, чтобы их можно было отозвать и удалить, а `--scrub`
-переписывает те записи, до которых дотягивается. Известные формы вычищаются при индексации и не попадают
-в выжимки, share и экспорт sync. Совпадение по шаблону не детектор секретов: незнакомая форма может пройти.
-См. [модель безопасности](../../docs/SECURITY-MODEL.md#redaction-boundary).
-
-</details>
-
-<details>
-<summary><b>Это замедлит агента?</b></summary>
-
-Один recall — лексический запрос к локальному индексу: медиана 0.7–0.8 мс, ничто
-не ждёт модель. Хук добавляет старт процесса и проверку свежести хранилищ — на индексе из 19k сессий хук на каждый промпт занимает 107 мс по медиане.
-
-</details>
-
-<details>
-<summary><b>Придётся менять то, как я работаю?</b></summary>
-
-Нет. Recall вызывает сам агент; с включённым авто-recall он уже на
-старте сессии знает, что в этом проекте решали раньше.
-
-</details>
-
-<details>
 <summary><b>Чем это отличается от других инструментов памяти?</b></summary>
 
 | | deja | Платформы памяти<br>(Mem0, Letta, memU) | Поиск по сессиям<br>(cass) |
@@ -360,6 +329,14 @@ deja bench read       # сколько стоит прочитать храни�
 | Отдаёт контекст, когда его не спрашивали | на старте сессии и перед выполнением инструмента | нет | нет |
 
 [Полное сравнение](https://vshulcz.github.io/deja-vu/guide/compare.html) охватывает пятнадцать из них.
+
+</details>
+
+<details>
+<summary><b>Это замедлит агента?</b></summary>
+
+Один recall — лексический запрос к локальному индексу: медиана 0.7–0.8 мс, ничто
+не ждёт модель. Хук добавляет старт процесса и проверку свежести хранилищ — на индексе из 19k сессий хук на каждый промпт занимает 107 мс по медиане.
 
 </details>
 
@@ -401,29 +378,12 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 
 ## Руководства
 
-Написаны по ситуациям, а не по функциям:
-
-- [Помнит ли кодинг-агент прошлые разговоры?](https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html) — что каждый агент оставляет между сессиями, а что теряет
-- [Файлы сессий на диске](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html) — насколько вырастает `~/.claude/projects` и чего стоит удаление
-- [Агент потерял контекст](https://vshulcz.github.io/deja-vu/guide/lost-context.html) — после падения, после очистки или когда сессия вернулась пустой
-- [Контекстное окно заполнено](https://vshulcz.github.io/deja-vu/guide/context-window-full.html) — что на самом деле сохраняет компактация, с замерами, и чем это можно заменить
-- [Продолжить вчерашнюю сессию](https://vshulcz.github.io/deja-vu/guide/resume-a-session.html) — найти её по всем агентам и открыть в том, которому она принадлежит
-- [Агент снова сделал ошибку, которую вы уже чинили](https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html)
-- [Найти сессию, где это решили](https://vshulcz.github.io/deja-vu/guide/find-a-session.html)
-- [Почему агенты забывают между сессиями](https://vshulcz.github.io/deja-vu/guide/forgetting.html) · [где каждый агент хранит историю](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)
-- [Что теряет компактация](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [сменить агента](https://vshulcz.github.io/deja-vu/guide/switching-agents.html) · [аудит того, что делали агенты](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [экспорт разговора](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [между машинами](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [во сколько токенов обходится память](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
+- **Контекст и восстановление:** [Помнит ли кодинг-агент прошлые разговоры?](https://vshulcz.github.io/deja-vu/ru/guide/does-my-agent-remember.html) · [Агент потерял контекст](https://vshulcz.github.io/deja-vu/guide/lost-context.html) · [Контекстное окно заполнено](https://vshulcz.github.io/deja-vu/guide/context-window-full.html) · [Что теряет компактация](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [Почему агенты забывают между сессиями](https://vshulcz.github.io/deja-vu/guide/forgetting.html)
+- **Поиск и продолжение работы:** [Продолжить вчерашнюю сессию](https://vshulcz.github.io/deja-vu/guide/resume-a-session.html) · [Найти сессию, где это решили](https://vshulcz.github.io/deja-vu/guide/find-a-session.html) · [Агент снова сделал ошибку, которую вы уже чинили](https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html) · [Сменить агента](https://vshulcz.github.io/deja-vu/guide/switching-agents.html)
+- **Файлы сессий и очистка:** [Файлы сессий на диске](https://vshulcz.github.io/deja-vu/ru/guide/session-files-on-disk.html) · [Где каждый агент хранит историю](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html) · [state.vscdb в Cursor слишком большой](https://vshulcz.github.io/deja-vu/ru/guide/cursor-state-vscdb-too-large.html) · [История сессий Codex CLI](https://vshulcz.github.io/deja-vu/ru/guide/codex-history.html)
+- **Эксплуатация и стоимость:** [Аудит того, что делали агенты](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [Экспорт разговора](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [Между машинами](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [Во сколько токенов обходится память](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
 
 По инструментам: [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi и omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
-
-## Попробуйте на своей истории
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
-deja install --auto
-```
-
-Десять секунд на установку, десяток на индекс. В следующей сессии агент уже будет знать, что вы решали в
-этом проекте — включая то, что было до установки deja.
 
 ## Разработка
 

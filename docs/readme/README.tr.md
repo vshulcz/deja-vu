@@ -11,11 +11,23 @@
 deja aylar öncesi dahil hepsini indeksler ve önemli kısmı
 şu an çalışan ajana verir.</p>
 
+<p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | Türkçe | <a href="README.hi.md">हिन्दी</a></p>
+
+<p align="center">
+  <a href="https://trendshift.io/repositories/83640" target="_blank"><img src="https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go" alt="vshulcz/deja-vu — Trendshift" width="250" height="55" /></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/badges/.badges/main/coverage.svg" alt="coverage">
+  <a href="https://github.com/vshulcz/deja-vu/releases/latest"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
+  <a href="https://www.npmjs.com/package/@vshulcz/deja-vu"><img src="https://img.shields.io/npm/v/%40vshulcz%2Fdeja-vu" alt="npm"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+</p>
+
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/">Belgeler</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Ölçümler</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Karşılaştırma</a></p>
+
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="aynı soru aynı ajana iki kez: bellek yokken hiçbir şey hatırlamıyor, deja varken sekiz ay önceki sonuçla yanıtlıyor"></p>
-
-<p align="center"><sub><em>Kimse arama yapmadı; ajan deja'yı kendisi çağırdı. Gerçek model ve gerçek araç çağrılarıyla iki gerçek çalıştırma, sentetik bir külliyat üzerinde: kimsenin geçmişi yayımlanmıyor.</em></sub></p>
-
-<p align="center"><b>deja ilk dakikadan itibaren dolu: 43 ajanın çoktan yazdığı geçmiş, saniyeler içinde indekslenir, model de ayrı bir toplama adımı da gerekmez.</b></p>
 
 <table align="center">
 <tr>
@@ -28,11 +40,6 @@ deja aylar öncesi dahil hepsini indeksler ve önemli kısmı
 <p align="center"><sub>deja-vu'yu ben geliştiriyorum; bu yüzden tüm sürücüler, derlem ve puanlama kuralı bu depoda &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">birebir karşılaştırma ve şüphelendiğiniz bir satırı yeniden ölçme</a> &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">LongMemEval ve LoCoMo çalıştırmaları</a></sub></p>
-
-<p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | Türkçe | <a href="README.hi.md">हिन्दी</a></p>
-
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">Belgeler</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Ölçümler</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Karşılaştırma</a></p>
-<p align="center"><sub>İşinize yaradıysa <a href="https://github.com/vshulcz/deja-vu">GitHub</a>'da deja-vu'ya bir yıldız bırakın.</sub></p>
 
 ## Kurulum
 
@@ -314,42 +321,6 @@ okur. Ayrıntılar [docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md) dosyasınd
 ## Sık sorulanlar
 
 <details>
-<summary><b>Makinemden bir şey çıkıyor mu?</b></summary>
-
-Siz istemedikçe hayır.
-[Veri akışları](../../docs/SECURITY-MODEL.md#data-flows) bölümüne bakın.
-
-</details>
-
-<details>
-<summary><b>Günlüklerde zaten duran sırlar ne olacak?</b></summary>
-
-Onlar özgün aracın dosyalarında kalır, sizin ajanınızın
-verisidir; `deja secrets` onları taşıyan oturumları adlarıyla verir ki anahtarları yenileyip silebilesiniz,
-`--scrub` da erişebildiği kayıtları yeniden yazar. Bilinen biçimler indeksleme sırasında çıkarılır ve
-özetlere, share'e ya da sync dışa aktarımına ulaşmaz. Örüntü eşleştirme sır tespiti değildir: bilinmeyen bir
-biçim geçebilir. [Güvenlik modeline](../../docs/SECURITY-MODEL.md#redaction-boundary) bakın.
-
-</details>
-
-<details>
-<summary><b>Ajanımı yavaşlatır mı?</b></summary>
-
-Bir geri çağırma, yerel indekse yapılan sözcüksel bir sorgudur: ortanca 0.7–0.8 ms
-ve hiçbir şey model beklemez. Kanca, süreç başlatmayı ve depoların tazelik denetimini ekler; 19k oturumluk bir indekste
-her istemdeki kanca ortanca 107 ms sürer.
-
-</details>
-
-<details>
-<summary><b>Çalışma şeklimi değiştirmem gerekir mi?</b></summary>
-
-Hayır. Geri çağırmayı ajanın kendisi çağırır; otomatik geri çağırma
-açıkken oturum açılır açılmaz bu projede daha önce nelerin kararlaştırıldığını zaten bilir.
-
-</details>
-
-<details>
 <summary><b>Diğer bellek araçlarından farkı ne?</b></summary>
 
 | | deja | Bellek platformları<br>(Mem0, Letta, memU) | Oturum araması<br>(cass) |
@@ -360,6 +331,15 @@ açıkken oturum açılır açılmaz bu projede daha önce nelerin kararlaştır
 | Sorulmadan geri çağırır | oturum başlangıcında ve araç çalıştırılmadan önce | hayır | hayır |
 
 [Tam karşılaştırma](https://vshulcz.github.io/deja-vu/guide/compare.html) bunlardan on beş tanesini kapsıyor.
+
+</details>
+
+<details>
+<summary><b>Ajanımı yavaşlatır mı?</b></summary>
+
+Bir geri çağırma, yerel indekse yapılan sözcüksel bir sorgudur: ortanca 0.7–0.8 ms
+ve hiçbir şey model beklemez. Kanca, süreç başlatmayı ve depoların tazelik denetimini ekler; 19k oturumluk bir indekste
+her istemdeki kanca ortanca 107 ms sürer.
 
 </details>
 
@@ -415,16 +395,6 @@ Windows'ta notlar `%AppData%\deja` içindedir).
 - [Sıkıştırmanın kaybettikleri](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [ajan değiştirmek](https://vshulcz.github.io/deja-vu/guide/switching-agents.html) · [ajanların ne yaptığını denetlemek](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [bir konuşmayı dışa aktarmak](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [makineler arasında](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [belleğin token maliyeti](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
 
 Araca göre: [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi ve omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
-
-## Kendi geçmişinizde deneyin
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
-deja install --auto
-```
-
-Kurulum on saniye, indeksleme on saniye kadar. Bir ajan bir sonraki oturumu açtığında, bu projede neleri
-çözdüğünüzü zaten biliyor olacak — deja'yı kurmanızdan öncekiler dahil.
 
 ## Geliştirme
 

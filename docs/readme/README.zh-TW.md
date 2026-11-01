@@ -10,11 +10,23 @@
 <p align="center">Claude Code、Codex、Cursor 以及這台機器上的其他代理，本來就把每次會話寫在磁碟上。deja 把這些歷史全部索引，幾個月前的也在，
 再把有用的那部分交給正在工作的代理。</p>
 
+<p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | 繁體中文 | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
+
+<p align="center">
+  <a href="https://trendshift.io/repositories/83640" target="_blank"><img src="https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go" alt="vshulcz/deja-vu — Trendshift" width="250" height="55" /></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/badges/.badges/main/coverage.svg" alt="coverage">
+  <a href="https://github.com/vshulcz/deja-vu/releases/latest"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
+  <a href="https://www.npmjs.com/package/@vshulcz/deja-vu"><img src="https://img.shields.io/npm/v/%40vshulcz%2Fdeja-vu" alt="npm"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+</p>
+
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/">文件</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">評測</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">與同類比較</a></p>
+
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="同一個問題問同一個代理兩次：沒有記憶時它毫無印象，有 deja 時它用八個月前的結論作答"></p>
-
-<p align="center"><sub><em>沒有人去搜尋——是代理自己呼叫了 deja。兩次真實執行，真實模型、真實工具呼叫，跑在合成語料上：不會公開任何人的歷史。</em></sub></p>
-
-<p align="center"><b>deja 一開始就是滿的：四十三個代理早已寫下的歷史，幾秒建好索引，不需要模型，也不需要額外的蒐集步驟。</b></p>
 
 <table align="center">
 <tr>
@@ -27,11 +39,6 @@
 <p align="center"><sub>deja-vu 由我維護，所以每個驅動腳本、語料和評分規則都在本儲存庫裡 &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">正面對比，以及如何重跑你懷疑的那一列</a> &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">LongMemEval 與 LoCoMo 的執行紀錄</a></sub></p>
-
-<p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | 繁體中文 | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
-
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">文件</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">評測</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">與同類比較</a></p>
-<p align="center"><sub>覺得有用的話，歡迎在 <a href="https://github.com/vshulcz/deja-vu">GitHub</a> 上給 deja-vu 點個 Star。</sub></p>
 
 ## 安裝
 
@@ -291,38 +298,6 @@ MCP 伺服器、統計、分享和同步都讀這一份索引。細節見
 ## 常見問題
 
 <details>
-<summary><b>有東西離開我的機器嗎？</b></summary>
-
-沒有，除非你主動要求。見[資料流向](../../docs/SECURITY-MODEL.md#data-flows)。
-
-</details>
-
-<details>
-<summary><b>日誌裡已經有的金鑰怎麼辦？</b></summary>
-
-它們留在原本的工具檔案裡，那是你的代理的資料；`deja secrets` 會指出帶有金鑰的會話，方便你輪替和刪除，
-`--scrub` 會重寫它能觸及的記錄。已知形態在建索引時剝掉，不會進入摘要、分享或同步匯出。樣式比對不是金鑰偵測，
-未知形態可能漏過。見[安全模型](../../docs/SECURITY-MODEL.md#redaction-boundary)。
-
-</details>
-
-<details>
-<summary><b>會拖慢我的代理嗎？</b></summary>
-
-一次召回是對本機索引的詞彙查詢：中位數 0.7–0.8 ms，沒有任何東西在等模型。
-掛鉤會額外加上行程啟動和對儲存的新鮮度檢查——在 19k 個會話的索引上，每次提示的掛鉤中位數是 107 ms。
-
-</details>
-
-<details>
-<summary><b>我需要改變工作方式嗎？</b></summary>
-
-不需要。是代理自己呼叫召回；開啟自動召回後，
-會話一打開它就已經知道這個專案此前的決定。
-
-</details>
-
-<details>
 <summary><b>和其他記憶工具有什麼不同？</b></summary>
 
 | | deja | 記憶平台<br>(Mem0、Letta、memU) | 會話檢索<br>(cass) |
@@ -333,6 +308,14 @@ MCP 伺服器、統計、分享和同步都讀這一份索引。細節見
 | 不用問也會召回 | 會話開始時、以及工具執行前 | 否 | 否 |
 
 [完整比較](https://vshulcz.github.io/deja-vu/guide/compare.html)涵蓋了其中十五個。
+
+</details>
+
+<details>
+<summary><b>會拖慢我的代理嗎？</b></summary>
+
+一次召回是對本機索引的詞彙查詢：中位數 0.7–0.8 ms，沒有任何東西在等模型。
+掛鉤會額外加上行程啟動和對儲存的新鮮度檢查——在 19k 個會話的索引上，每次提示的掛鉤中位數是 107 ms。
 
 </details>
 
@@ -379,16 +362,6 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 - [壓縮會丟掉什麼](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [換一個代理](https://vshulcz.github.io/deja-vu/guide/switching-agents.html) · [稽核代理做過什麼](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [匯出一次對話](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [跨機器](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [記憶要花多少 token](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
 
 按工具：[opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi 和 omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
-
-## 在你自己的歷史上試一次
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
-deja install --auto
-```
-
-裝好十秒，建索引十來秒。下一次代理打開會話，它就已經知道你在這個專案裡解決過什麼——
-包括你裝 deja 之前的那些。
 
 ## 參與開發
 

@@ -23,12 +23,8 @@ The binary is not in the bundle — plugins carry files, not native binaries:
 
 ```sh
 brew install deja-vu
-```
-
-or
-
-```sh
-npm i -g @vshulcz/deja-vu
+# or: npm i -g @vshulcz/deja-vu
+# or: curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 ```
 
 Having both this bundle and `deja install` is fine: the hooks here stand down

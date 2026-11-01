@@ -13,16 +13,12 @@ redacted as the index is built.
 
 ## Install deja first
 
-The plugin does not carry the binary. Install it with Homebrew:
+The plugin does not carry the binary:
 
 ```sh
 brew install deja-vu
-```
-
-or npm:
-
-```sh
-npm i -g @vshulcz/deja-vu
+# or: npm i -g @vshulcz/deja-vu
+# or: curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 ```
 
 Until `deja` is on PATH (or in `~/.local/bin`, `/opt/homebrew/bin`,

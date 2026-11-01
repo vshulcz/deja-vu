@@ -58,27 +58,11 @@ location. The directory contains:
   the few files each session touched most, and hashes — not text — of the
   questions it asked.
 
-Text taken out of a transcript leaves `records.bin` and `buckets/` on the next
-`deja index` pass that reads it, and a command taken out leaves the command
-tables (`commands.gob`, `commandfails.gob`, `sessionfacts.gob`) on the same
-pass. A word no remaining record holds also leaves the co-occurrence map
-(`cooccur.gob`) on that pass, and so does one the removed text held only in a
-file body or the middle of a long output, which the postings never index, even
-when another session still has it there. The pass zeroes the replaced records in
-`records.bin` where they stand, and in `buckets/` blanks every word that no
-remaining record holds: a word filed under two leading letters keeps those,
-which the bucket file is named after, and one filed under a hash, as every
-CJK word is, is overwritten whole with filler. A one-letter word of a
-non-Latin alphabet can stay as it is. A word another session still contains
-stays, as that session's. If the pass is killed between committing the new index and
-the zeroing, the next `deja index`, or any deja process that takes the index
-lock, finishes it. On
-Windows, a search holding the index open as a pass ends can keep the previous
-index directory (`index.db.old`, or `index.db.old.N` when that one is held
-too) until a later pass removes it; what stays there is usually only the
-record log it shares with the live index, already zeroed. deja overwrites in
-place and does not attempt secure deletion: an SSD or a copy-on-write
-filesystem may keep the old blocks until it reuses them.
+When text or a command is removed from a transcript, the next `deja index` pass removes it across all index structures:
+
+- **Record log & postings:** replaced records in `records.bin` are zeroed in place, and `buckets/` blanks every word that no remaining record holds (a word filed under two leading letters keeps those two letters, which name the bucket file; a hashed CJK word is overwritten whole). Words still present in another session remain under that session.
+- **Command & co-occurrence tables:** removed commands leave `commands.gob`, `commandfails.gob` and `sessionfacts.gob`, and words no remaining record holds leave `cooccur.gob` on the same pass.
+- **Crash recovery & storage limits:** if a pass is killed between committing the new index and zeroing old records, the next `deja` process that takes the index lock finishes the zeroing. On Windows, a concurrent search holding the index open can keep `index.db.old` until a later pass removes it. Overwrites happen in place without hardware secure-erase (`SSD`/copy-on-write filesystems may retain old blocks until reused).
 
 At a supported pre-compaction hook, `manifest.gob` also retains redacted,
 transcript-derived continuation packets for at most 32 session/workspace pairs,
@@ -90,16 +74,11 @@ deferred checks) carried from one compaction to the next. They remain local, are
 and forgotten-session controls. `deja forget` removes matching packets even
 before their source sessions have been indexed. See [compaction recovery](compaction.md).
 
-Privacy control files are primary data, not cache data: the XDG-aware
-`~/.config/deja/tombstones` list prevents forgotten source sessions from being
-re-ingested, and `~/.config/deja/exclude` contains project patterns skipped at
-ingest. `DEJA_EXCLUDE_PROJECTS` adds comma-separated patterns. A line in the same file prefixed `harness:` names a store instead of a project — `harness:opencode` — and deja then neither walks it nor asks for the tool that would read it; `deja doctor` and `deja sources` both report it as `excluded` rather than naming a package to install. `DEJA_EXCLUDE_HARNESSES` is the comma-separated form. A store excluded after it was indexed is not walked again on any pass; the sessions already read from it stay in the index, unserved, until `deja index --rebuild` drops them. Store names are exact, not globs: they are the forty-four `deja sources` prints. Patterns and
-excluded stores also apply at `sync export`, so a project or store excluded after
-the index was built does not leave the machine, and at `sync import`, so a peer's
-batch does not put it back; what is already indexed stays searchable locally until
-`deja index --rebuild`, and `deja index` says so when the list has changed. A full `forget`
-rebuild replaces the index atomically before the tombstone list is used by the
-next index pass.
+Privacy control files in `~/.config/deja` are primary data, not cache data:
+
+- **Tombstones (`~/.config/deja/tombstones`):** prevents `deja forget` sessions from being re-ingested. A full `forget` rebuild replaces the index atomically before the tombstone list is used by the next index pass.
+- **Project exclusions (`~/.config/deja/exclude` / `DEJA_EXCLUDE_PROJECTS`):** skips matching projects at ingest, `sync export` and `sync import`. Sessions indexed before a pattern was added stay searchable locally until `deja index --rebuild`.
+- **Store exclusions (`harness:<name>` / `DEJA_EXCLUDE_HARNESSES`):** an exact store name from the forty-four `deja sources` prints (e.g. `harness:opencode`) skips that store at ingest, `sync export` and `sync import`; `deja doctor` and `deja sources` report it as `excluded`.
 
 Usage events are appended to the sibling file `<index-dir>.usage.jsonl`. This
 sidecar records the kind and time of local search, recall, context, and hook

@@ -43,10 +43,10 @@ code{font-family:var(--mono);font-size:.88em}
   -webkit-mask-image:radial-gradient(ellipse 90% 50% at 50% 0%,#000 10%,transparent 65%);
   mask-image:radial-gradient(ellipse 90% 50% at 50% 0%,#000 10%,transparent 65%)}
 
-.wrap{max-width:1060px;margin:0 auto;padding:0 32px;position:relative;z-index:1}
+.wrap{max-width:1280px;margin:0 auto;padding:0 32px;position:relative;z-index:1}
 
 nav{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:6px;
-  padding:16px 32px;max-width:1060px;margin:0 auto;font:13px/1 var(--mono);
+  padding:16px 32px;max-width:1280px;margin:0 auto;font:13px/1 var(--mono);
   backdrop-filter:blur(8px);background:rgba(11,15,16,.72)}
 nav .brand{display:flex;align-items:center;gap:10px;font-weight:600;color:var(--ink)}
 nav .brand img{width:26px;height:26px}
@@ -64,7 +64,7 @@ h3{font:600 16.5px var(--sans);color:var(--ink);margin:0 0 6px}
 p{margin:0 0 16px}
 .grad{color:var(--amber)}
 
-.js .reveal{opacity:0;transform:translateY(10px);transition:opacity .5s ease,transform .5s ease}
+.js .reveal{opacity:1;transform:none;transition:opacity .5s ease,transform .5s ease}
 .js .reveal.in{opacity:1;transform:none}
 @media(prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}}
 
@@ -99,7 +99,7 @@ footer a:hover{color:var(--ph-hi)}
 .doc aside a[aria-current]{color:var(--ph-hi);border-left-color:var(--ph);background:var(--panel)}
 /* long words break rather than push the column: on a 360px phone an italic
    phrase was hanging nine pixels off the edge */
-.doc article{min-width:0;max-width:74ch;overflow-wrap:break-word}
+.doc article{min-width:0;max-width:86ch;overflow-wrap:break-word}
 
 /* The prompt before the title stays: it is a terminal tool, and the mark of one
    costs a heading nothing. The ## before every h2 did not — at one per section
@@ -199,7 +199,9 @@ h2:hover .hlink{opacity:1}
 .toc a:hover{color:var(--ink)}
 .toc a.on{color:var(--ph-hi)}
 @media(min-width:1240px){
-  .doc{grid-template-columns:224px minmax(0,1fr) 200px;gap:48px}
+  .doc{grid-template-columns:220px minmax(0,1fr);gap:44px}
+  .doc:has(.toc){grid-template-columns:220px minmax(0,1fr) 185px;gap:40px}
+  .doc:not(:has(.toc)) article{max-width:none}
 }
 @media(max-width:1239px){.toc{display:none}}
 

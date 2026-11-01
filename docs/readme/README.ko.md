@@ -10,11 +10,23 @@
 <p align="center">Claude Code, Codex, Cursor를 비롯한 이 컴퓨터의 에이전트들은 이미 모든 세션을 디스크에 저장합니다.
 deja는 몇 달 전 기록까지 전부 색인하고, 지금 일하는 에이전트에게 필요한 부분을 건넵니다.</p>
 
+<p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | 한국어 | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
+
+<p align="center">
+  <a href="https://trendshift.io/repositories/83640" target="_blank"><img src="https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go" alt="vshulcz/deja-vu — Trendshift" width="250" height="55" /></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/badges/.badges/main/coverage.svg" alt="coverage">
+  <a href="https://github.com/vshulcz/deja-vu/releases/latest"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
+  <a href="https://www.npmjs.com/package/@vshulcz/deja-vu"><img src="https://img.shields.io/npm/v/%40vshulcz%2Fdeja-vu" alt="npm"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+</p>
+
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/">문서</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">벤치마크</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">비교</a></p>
+
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="같은 에이전트에게 같은 질문을 두 번: 기억이 없을 때는 아무것도 모르고, deja가 있으면 8개월 전 결론으로 답한다"></p>
-
-<p align="center"><sub><em>아무도 검색하지 않았습니다. 에이전트가 스스로 deja를 호출했습니다. 실제 모델과 실제 도구 호출로 진행한 두 번의 실제 실행이며, 합성 코퍼스 위에서 돌렸기 때문에 누구의 기록도 공개되지 않습니다.</em></sub></p>
-
-<p align="center"><b>deja는 처음부터 가득 차 있습니다. 43개 에이전트가 이미 남긴 기록, 몇 초 만에 끝나는 색인, 모델도 별도의 수집 단계도 없습니다.</b></p>
 
 <table align="center">
 <tr>
@@ -27,11 +39,6 @@ deja는 몇 달 전 기록까지 전부 색인하고, 지금 일하는 에이전
 <p align="center"><sub>deja-vu는 제가 관리하므로 모든 드라이버, 코퍼스, 채점 규칙이 이 저장소에 있습니다 &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">직접 비교와 의심스러운 행을 다시 돌리는 방법</a> &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">LongMemEval 및 LoCoMo 실행 결과</a></sub></p>
-
-<p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | 한국어 | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
-
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">문서</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">벤치마크</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">비교</a></p>
-<p align="center"><sub>쓸 만하다면 <a href="https://github.com/vshulcz/deja-vu">GitHub</a>에서 deja-vu에 별을 눌러 주세요.</sub></p>
 
 ## 설치
 
@@ -305,42 +312,6 @@ deja bench read       # 데이터베이스 기반 저장소를 읽는 비용과,
 ## 자주 묻는 질문
 
 <details>
-<summary><b>뭔가 내 컴퓨터를 떠나나요?</b></summary>
-
-직접 요청하지 않는 한 아닙니다.
-[데이터 흐름](../../docs/SECURITY-MODEL.md#data-flows)을 보세요.
-
-</details>
-
-<details>
-<summary><b>이미 로그에 있는 비밀정보는요?</b></summary>
-
-그건 원래 도구의 파일에 남습니다. 여러분 에이전트의 데이터니까요.
-`deja secrets`는 그런 비밀정보가 든 세션을 알려 주므로 교체하고 지울 수 있고, `--scrub`은 손이 닿는 기록을
-다시 씁니다. 알려진 형태는 색인 시점에 제거되어 요약, share, sync 내보내기에 들어가지 않습니다. 패턴 매칭은
-비밀정보 탐지기가 아니라서 모르는 형태는 지나갈 수 있습니다.
-[보안 모델](../../docs/SECURITY-MODEL.md#redaction-boundary)을 참고하세요.
-
-</details>
-
-<details>
-<summary><b>에이전트가 느려지나요?</b></summary>
-
-회상 한 번은 로컬 색인에 대한 어휘 질의입니다. 중앙값 0.7–0.8 ms이고
-모델을 기다리는 것은 없습니다. 훅은 프로세스 시작과 저장소 신선도 확인을 더하는데, 세션 19k개 색인에서
-프롬프트마다 도는 훅은 중앙값 107 ms입니다.
-
-</details>
-
-<details>
-<summary><b>일하는 방식을 바꿔야 하나요?</b></summary>
-
-아니요. 회상은 에이전트가 스스로 호출합니다. 자동 회상을 켜면 세션이
-열리는 순간 이 프로젝트에서 전에 무엇을 결정했는지 이미 알고 있습니다.
-
-</details>
-
-<details>
 <summary><b>다른 기억 도구와 무엇이 다른가요?</b></summary>
 
 | | deja | 기억 플랫폼<br>(Mem0, Letta, memU) | 세션 검색<br>(cass) |
@@ -351,6 +322,15 @@ deja bench read       # 데이터베이스 기반 저장소를 읽는 비용과,
 | 묻지 않아도 회상한다 | 세션 시작 시, 그리고 도구 실행 직전 | 아니요 | 아니요 |
 
 [전체 비교](https://vshulcz.github.io/deja-vu/guide/compare.html)에서 열다섯 개를 다룹니다.
+
+</details>
+
+<details>
+<summary><b>에이전트가 느려지나요?</b></summary>
+
+회상 한 번은 로컬 색인에 대한 어휘 질의입니다. 중앙값 0.7–0.8 ms이고
+모델을 기다리는 것은 없습니다. 훅은 프로세스 시작과 저장소 신선도 확인을 더하는데, 세션 19k개 색인에서
+프롬프트마다 도는 훅은 중앙값 107 ms입니다.
 
 </details>
 
@@ -404,16 +384,6 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 - [압축이 잃는 것](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [에이전트 바꾸기](https://vshulcz.github.io/deja-vu/guide/switching-agents.html) · [에이전트가 한 일 감사하기](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [대화 내보내기](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [기계 사이에서](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [기억에 드는 토큰 비용](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
 
 도구별: [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi와 omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
-
-## 자기 기록에서 한번 해 보기
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
-deja install --auto
-```
-
-설치 10초, 색인 10초 남짓. 다음에 에이전트가 세션을 열면, 이 프로젝트에서 여러분이 무엇을 해결했는지
-이미 알고 있습니다. deja를 설치하기 전의 것까지 포함해서.
 
 ## 개발
 

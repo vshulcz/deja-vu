@@ -7,14 +7,26 @@
 
 <p align="center"><b>别再让编程智能体重新调试你已经修好的问题。</b></p>
 
-<p align="center">Claude Code、Codex、Cursor 以及这台机器上的其他智能体，本来就把每次会话写在磁盘上。deja 把这些历史全部索引，几个月前的也在，
-再把有用的那部分交给正在干活的智能体。</p>
+<p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes 以及另外 36 个智能体本来就把每次会话写在磁盘上。<br>
+deja 在本地索引全部历史，并通过 MCP 和钩子把相关上下文交还给正在干活的智能体——无需 LLM，单个 Go 二进制。</p>
+
+<p align="center"><a href="../../README.md">English</a> | 简体中文 | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
+
+<p align="center">
+  <a href="https://trendshift.io/repositories/83640" target="_blank"><img src="https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go" alt="vshulcz/deja-vu — Trendshift" width="250" height="55" /></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/badges/.badges/main/coverage.svg" alt="coverage">
+  <a href="https://github.com/vshulcz/deja-vu/releases/latest"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
+  <a href="https://www.npmjs.com/package/@vshulcz/deja-vu"><img src="https://img.shields.io/npm/v/%40vshulcz%2Fdeja-vu" alt="npm"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+</p>
+
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/">文档</a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">浏览器在线演示</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">评测</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">与同类对比</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="同一个问题问同一个智能体两次：没有记忆时它毫无印象，有 deja 时它用八个月前的结论作答"></p>
-
-<p align="center"><sub><em>没有人去搜索——是智能体自己调用了 deja。两次真实运行，真实模型、真实工具调用，跑在合成语料上：不会公开任何人的历史。</em></sub></p>
-
-<p align="center"><b>deja 一开始就是满的：四十三个智能体早已写下的历史，几秒建好索引，不需要模型，也不需要额外的采集步骤。</b></p>
 
 <table align="center">
 <tr>
@@ -24,14 +36,9 @@
 </tr>
 </table>
 
-<p align="center"><sub>deja-vu 是我维护的，所以每个驱动脚本、语料和评分规则都在本仓库里 &middot;
+<p align="center"><sub>每个驱动脚本、合成语料和评分规则都在本仓库里 &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">正面对比，以及如何重跑你怀疑的那一行</a> &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">LongMemEval 和 LoCoMo 的运行记录</a></sub></p>
-
-<p align="center"><a href="../../README.md">English</a> | 简体中文 | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
-
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">文档</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">评测</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">与同类对比</a></p>
-<p align="center"><sub>觉得有用的话，欢迎在 <a href="https://github.com/vshulcz/deja-vu">GitHub</a> 上给 deja-vu 点个 Star。</sub></p>
 
 ## 安装
 
@@ -293,38 +300,6 @@ MCP 服务端、统计、分享和同步都读这一份索引。细节见
 ## 常见问题
 
 <details>
-<summary><b>有东西离开我的机器吗？</b></summary>
-
-没有，除非你主动要求。见[数据流向](../../docs/SECURITY-MODEL.md#data-flows)。
-
-</details>
-
-<details>
-<summary><b>日志里已经有的密钥怎么办？</b></summary>
-
-它们留在原本的工具文件里，那是你的智能体的数据；`deja secrets` 会指出带有密钥的会话，方便你轮换和删除，
-`--scrub` 会重写它能触及的记录。已知形态在建索引时剥掉，不会进入摘要、分享或同步导出。模式匹配不是密钥检测，
-未知形态可能漏过。见[安全模型](../../docs/SECURITY-MODEL.md#redaction-boundary)。
-
-</details>
-
-<details>
-<summary><b>会拖慢我的智能体吗？</b></summary>
-
-一次召回是对本地索引的词法查询：中位数 0.7–0.8 ms，没有任何东西在等模型。
-钩子会额外加上进程启动和对存储的新鲜度检查——在 19k 个会话的索引上，每次提示的钩子中位数是 107 ms。
-
-</details>
-
-<details>
-<summary><b>我需要改变工作方式吗？</b></summary>
-
-不需要。是智能体自己调用召回；开启自动召回后，
-会话一打开它就已经知道这个项目此前的决定。
-
-</details>
-
-<details>
 <summary><b>和其他记忆工具有什么不同？</b></summary>
 
 | | deja | 记忆平台<br>(Mem0、Letta、memU) | 会话检索<br>(cass) |
@@ -335,6 +310,14 @@ MCP 服务端、统计、分享和同步都读这一份索引。细节见
 | 不用问也会召回 | 会话开始时、以及工具执行前 | 否 | 否 |
 
 [完整对比](https://vshulcz.github.io/deja-vu/guide/compare.html)覆盖了其中十五个。
+
+</details>
+
+<details>
+<summary><b>会拖慢我的智能体吗？</b></summary>
+
+一次召回是对本地索引的词法查询：中位数 0.7–0.8 ms，没有任何东西在等模型。
+钩子会额外加上进程启动和对存储的新鲜度检查——在 19k 个会话的索引上，每次提示的钩子中位数是 107 ms。
 
 </details>
 
@@ -368,32 +351,11 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 
 ## 指南
 
-按场景写的，不是按功能：
-
-- [快速开始（中文）](https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html)——安装、接上智能体、第一次查询
-- [编程智能体记得之前的对话吗（中文）](https://vshulcz.github.io/deja-vu/zh/guide/does-my-agent-remember.html)——各个工具跨会话留下了什么
-- [为什么智能体会忘事（中文）](https://vshulcz.github.io/deja-vu/zh/guide/forgetting.html)——会话结束时消失的是什么
-- [编码智能体记得之前的对话吗？](https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html)——每个智能体在会话之间留下了什么，又丢掉了什么
-- [磁盘上的会话文件](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html)——`~/.claude/projects` 会长到多大，删掉要付出什么代价
-- [智能体把你刚才的上下文弄丢了](https://vshulcz.github.io/deja-vu/guide/lost-context.html)——崩溃之后、清空之后，或者会话回来时空空如也
-- [上下文窗口满了（中文）](https://vshulcz.github.io/deja-vu/zh/guide/context-window-full.html)——压缩到底保住了什么，实测数据，以及可以换成什么做法
-- [接着昨天的会话做](https://vshulcz.github.io/deja-vu/guide/resume-a-session.html)——跨所有智能体找到它，再回到它原来所属的那一个里打开
-- [智能体又犯了你已经修过的错](https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html)
-- [找到当初解决它的那次会话](https://vshulcz.github.io/deja-vu/guide/find-a-session.html)
-- [为什么智能体在会话之间会忘事](https://vshulcz.github.io/deja-vu/guide/forgetting.html) · [每个智能体把历史存在哪里](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)
-- [压缩会丢掉什么](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [换一个智能体](https://vshulcz.github.io/deja-vu/guide/switching-agents.html) · [审计智能体做过什么](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [导出一次对话](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [跨机器](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [记忆要花多少 token](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
+- **快速上手与上下文：** [快速开始（中文）](https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html) · [编程智能体记得之前的对话吗（中文）](https://vshulcz.github.io/deja-vu/zh/guide/does-my-agent-remember.html) · [为什么智能体会忘事（中文）](https://vshulcz.github.io/deja-vu/zh/guide/forgetting.html) · [上下文窗口满了（中文）](https://vshulcz.github.io/deja-vu/zh/guide/context-window-full.html) · [智能体把你刚才的上下文弄丢了](https://vshulcz.github.io/deja-vu/guide/lost-context.html) · [压缩会丢掉什么](https://vshulcz.github.io/deja-vu/guide/after-compaction.html)
+- **查找与继续工作：** [接着昨天的会话做](https://vshulcz.github.io/deja-vu/guide/resume-a-session.html) · [找到当初解决它的那次会话](https://vshulcz.github.io/deja-vu/guide/find-a-session.html) · [智能体又犯了你已经修过的错](https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html) · [换一个智能体](https://vshulcz.github.io/deja-vu/guide/switching-agents.html)
+- **会话文件与日常维护：** [磁盘上的会话文件](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html) · [每个智能体把历史存在哪里](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html) · [审计智能体做过什么](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [导出一次对话](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [跨机器](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [记忆要花多少 token](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
 
 按工具：[opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [DeepSeek Harness（中文）](https://vshulcz.github.io/deja-vu/zh/guide/memory-for-dsh.html) · [Kimi Code（中文）](https://vshulcz.github.io/deja-vu/zh/guide/memory-for-kimi.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [Qwen Code（中文）](https://vshulcz.github.io/deja-vu/zh/guide/memory-for-qwen.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi 和 omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
-
-## 在你自己的历史上试一次
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
-deja install --auto
-```
-
-装好十秒，建索引十来秒。下一次智能体打开会话，它就已经知道你在这个项目里解决过什么——
-包括你装 deja 之前的那些。
 
 ## 参与开发
 

@@ -11,11 +11,23 @@
 deja महीनों पुराने समेत सब कुछ इंडेक्स करता है और काम का हिस्सा
 उस एजेंट को देता है जो अभी काम कर रहा है।</p>
 
+<p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | हिन्दी</p>
+
+<p align="center">
+  <a href="https://trendshift.io/repositories/83640" target="_blank"><img src="https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go" alt="vshulcz/deja-vu — Trendshift" width="250" height="55" /></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/badges/.badges/main/coverage.svg" alt="coverage">
+  <a href="https://github.com/vshulcz/deja-vu/releases/latest"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
+  <a href="https://www.npmjs.com/package/@vshulcz/deja-vu"><img src="https://img.shields.io/npm/v/%40vshulcz%2Fdeja-vu" alt="npm"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+</p>
+
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/">दस्तावेज़</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">बेंचमार्क</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">तुलना</a></p>
+
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="एक ही सवाल एक ही एजेंट से दो बार: मेमोरी के बिना उसे कुछ याद नहीं, deja के साथ वह आठ महीने पुराने नतीजे से जवाब देता है"></p>
-
-<p align="center"><sub><em>किसी ने खोजा नहीं — एजेंट ने deja को खुद बुलाया। असली मॉडल और असली टूल कॉल्स के साथ दो असली रन, एक सिंथेटिक कॉर्पस पर: किसी का इतिहास सार्वजनिक नहीं किया जाता।</em></sub></p>
-
-<p align="center"><b>deja पहले ही मिनट से भरी हुई है: वह इतिहास जो 43 एजेंट पहले ही लिख चुके हैं, कुछ सेकंड में इंडेक्स, न कोई मॉडल, न कोई अलग कैप्चर स्टेप।</b></p>
 
 <table align="center">
 <tr>
@@ -28,11 +40,6 @@ deja महीनों पुराने समेत सब कुछ इं�
 <p align="center"><sub>deja-vu का मेंटेनर मैं हूँ, इसलिए हर ड्राइवर, कॉर्पस और स्कोरिंग नियम इसी रिपॉज़िटरी में हैं &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">सीधी तुलना, और जिस पंक्ति पर शक हो उसे दोबारा कैसे मापें</a> &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">LongMemEval और LoCoMo रन</a></sub></p>
-
-<p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | हिन्दी</p>
-
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">दस्तावेज़</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">बेंचमार्क</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">तुलना</a></p>
-<p align="center"><sub>काम आए तो <a href="https://github.com/vshulcz/deja-vu">GitHub</a> पर deja-vu को स्टार दीजिए।</sub></p>
 
 ## इंस्टॉल
 
@@ -311,41 +318,6 @@ deja bench read       # डेटाबेस वाले स्टोर क�
 ## अक्सर पूछे जाने वाले सवाल
 
 <details>
-<summary><b>क्या कुछ भी मेरी मशीन से बाहर जाता है?</b></summary>
-
-नहीं, जब तक आप खुद न कहें।
-[डेटा प्रवाह](../../docs/SECURITY-MODEL.md#data-flows) देखिए।
-
-</details>
-
-<details>
-<summary><b>लॉग में जो सीक्रेट पहले से हैं उनका क्या?</b></summary>
-
-वे मूल टूल की फ़ाइलों में ही रहते हैं, वह आपके एजेंट का डेटा है; `deja secrets` उन सेशन्स के नाम बताता है जिनमें वे
-हैं, ताकि आप उन्हें बदल और मिटा सकें, और `--scrub` जिन रिकॉर्ड तक पहुँच पाता है उन्हें दोबारा लिखता है। जानी-पहचानी
-शक्लें इंडेक्सिंग के समय हटा दी जाती हैं और सारांश, share या sync निर्यात तक नहीं पहुँचतीं। पैटर्न मिलाना सीक्रेट
-पहचानना नहीं है: कोई अनजानी शक्ल निकल सकती है। [सुरक्षा मॉडल](../../docs/SECURITY-MODEL.md#redaction-boundary) देखिए।
-
-</details>
-
-<details>
-<summary><b>क्या इससे मेरा एजेंट धीमा होगा?</b></summary>
-
-एक रिकॉल लोकल इंडेक्स पर शाब्दिक क्वेरी है: माध्यिका 0.7–0.8 ms, और कुछ भी
-मॉडल का इंतज़ार नहीं करता। हुक प्रोसेस शुरू होने और स्टोर की ताज़गी जाँच जोड़ता है — 19k सेशन के इंडेक्स पर
-हर प्रॉम्प्ट वाला हुक माध्यिका में 107 ms लेता है।
-
-</details>
-
-<details>
-<summary><b>क्या मुझे काम करने का तरीक़ा बदलना होगा?</b></summary>
-
-नहीं। रिकॉल एजेंट खुद बुलाता है; ऑटोमैटिक रिकॉल चालू हो तो सेशन खुलते
-ही उसे पता होता है कि इस प्रोजेक्ट में पहले क्या तय हुआ था।
-
-</details>
-
-<details>
 <summary><b>दूसरे मेमोरी टूल्स से यह कैसे अलग है?</b></summary>
 
 | | deja | मेमोरी प्लेटफ़ॉर्म<br>(Mem0, Letta, memU) | सेशन खोज<br>(cass) |
@@ -356,6 +328,15 @@ deja bench read       # डेटाबेस वाले स्टोर क�
 | बिना पूछे याद दिलाता है | सेशन शुरू होने पर, और टूल चलने से पहले | नहीं | नहीं |
 
 [पूरी तुलना](https://vshulcz.github.io/deja-vu/guide/compare.html) इनमें से पंद्रह को कवर करती है।
+
+</details>
+
+<details>
+<summary><b>क्या इससे मेरा एजेंट धीमा होगा?</b></summary>
+
+एक रिकॉल लोकल इंडेक्स पर शाब्दिक क्वेरी है: माध्यिका 0.7–0.8 ms, और कुछ भी
+मॉडल का इंतज़ार नहीं करता। हुक प्रोसेस शुरू होने और स्टोर की ताज़गी जाँच जोड़ता है — 19k सेशन के इंडेक्स पर
+हर प्रॉम्प्ट वाला हुक माध्यिका में 107 ms लेता है।
 
 </details>
 
@@ -410,16 +391,6 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 - [कॉम्पैक्शन क्या खोता है](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [एजेंट बदलना](https://vshulcz.github.io/deja-vu/guide/switching-agents.html) · [एजेंट्स ने क्या किया इसका ऑडिट](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [बातचीत निर्यात करना](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [मशीनों के बीच](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [मेमोरी की टोकन लागत](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
 
 टूल के हिसाब से: [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi और omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
-
-## अपने इतिहास पर आज़माइए
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
-deja install --auto
-```
-
-इंस्टॉल में दस सेकंड, इंडेक्स में करीब दस। अगली बार जब कोई एजेंट सेशन खोलेगा, उसे पहले से पता होगा कि आपने इस
-प्रोजेक्ट में क्या हल किया है — deja इंस्टॉल करने से पहले का भी।
 
 ## विकास
 

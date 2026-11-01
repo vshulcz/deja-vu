@@ -26,12 +26,8 @@ The plugin calls the `deja` binary, which is not in the bundle:
 
 ```sh
 brew install deja-vu
-```
-
-or
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+# or: npm i -g @vshulcz/deja-vu
+# or: curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 ```
 
 Then install the plugin from this subdirectory of the repo:

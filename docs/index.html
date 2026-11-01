@@ -36,7 +36,7 @@
   --sans:"Inter","SF Pro Display",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,sans-serif;
 }
 *{margin:0;padding:0;box-sizing:border-box}
-html{scroll-behavior:smooth}
+html{scroll-behavior:smooth;overflow-x:hidden}
 body{background:var(--bg);color:var(--body);font:16px/1.65 var(--sans);
   -webkit-font-smoothing:antialiased;overflow-x:hidden}
 a{color:var(--coat-hi);text-decoration:none}
@@ -52,10 +52,10 @@ a:hover{color:var(--ink)}
   -webkit-mask-image:radial-gradient(ellipse 90% 55% at 50% 0%,#000 15%,transparent 70%);
   mask-image:radial-gradient(ellipse 90% 55% at 50% 0%,#000 15%,transparent 70%)}
 
-.wrap{position:relative;z-index:1;max-width:1060px;margin:0 auto;padding:0 32px}
+.wrap{position:relative;z-index:1;max-width:1140px;margin:0 auto;padding:0 32px}
 
 nav{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:6px;
-  padding:16px 32px;font:13px/1 var(--mono);max-width:1060px;margin:0 auto;
+  padding:16px 32px;font:13px/1 var(--mono);max-width:1140px;margin:0 auto;
   backdrop-filter:blur(8px);background:rgba(11,15,16,.72)}
 nav .brand{display:flex;align-items:center;gap:10px;color:var(--ink);font-weight:600}
 nav .brand img{width:26px;height:26px}
@@ -65,20 +65,20 @@ nav .lnk:hover{color:var(--ink);background:var(--panel)}
 nav .cta{color:var(--bg);background:var(--coat);padding:8px 14px;border-radius:7px;font-weight:600}
 nav .cta:hover{background:var(--coat-hi);color:var(--bg)}
 
-header{padding:72px 0 96px;display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:56px;align-items:center}
-h1{font:700 clamp(36px,5.1vw,58px)/1.06 var(--sans);letter-spacing:-.028em;color:var(--ink);margin-bottom:22px}
+header{padding:64px 0 84px;display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:36px;align-items:center}
+h1{font:700 clamp(36px,4.8vw,56px)/1.07 var(--sans);letter-spacing:-.028em;color:var(--ink);margin-bottom:22px}
 h1 em{font-style:normal;color:var(--amber)}
-.lede{font-size:19px;line-height:1.55;max-width:40ch;margin-bottom:32px}
+.lede{font-size:19px;line-height:1.55;max-width:46ch;margin-bottom:32px}
 .catwrap{justify-self:center;position:relative}
-.catwrap img{width:240px;height:240px;display:block}
+.catwrap img{width:220px;height:220px;display:block}
 .catwrap .say{position:absolute;left:50%;transform:translateX(-50%);bottom:-14px;
   font:11px var(--mono);color:var(--faint);white-space:nowrap;opacity:0;transition:opacity .3s}
 .catwrap:hover .say{opacity:1}
 
 .cmdline{display:flex;align-items:center;gap:10px;background:var(--panel);
-  border:1px solid var(--line);border-radius:10px;padding:13px 15px;font:13.5px var(--mono);max-width:560px}
+  border:1px solid var(--line);border-radius:10px;padding:13px 15px;font:12.5px var(--mono);max-width:760px}
 .cmdline .p{color:var(--amber)}
-.install-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;max-width:560px}
+.install-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;max-width:760px}
 .itab{background:none;border:1px solid var(--line);color:var(--faint);border-radius:6px;
   padding:4px 10px;font:11.5px var(--mono);cursor:pointer;transition:color .15s,border-color .15s,background .15s}
 .itab:hover{color:var(--ink);border-color:var(--coat-dim)}
@@ -139,7 +139,7 @@ footer{border-top:1px solid var(--line);padding:34px 0 60px;font:12.5px var(--mo
   color:var(--faint);display:flex;gap:18px;flex-wrap:wrap;align-items:center}
 footer .sp{flex:1}
 
-.js .reveal{opacity:0;transform:translateY(12px);transition:opacity .6s ease,transform .6s ease}
+.js .reveal{opacity:1;transform:none;transition:opacity .6s ease,transform .6s ease}
 .js .reveal.in{opacity:1;transform:none}
 
 /* the ghost of the page, for the déjà vu */
@@ -189,12 +189,11 @@ footer .sp{flex:1}
 
 
 /* the headline arrives a word at a time */
-.js h1 .w{display:inline-block;opacity:0;transform:translateY(.35em);
-  animation:wordin .5s cubic-bezier(.2,.7,.3,1) forwards}
+.js h1 .w{display:inline-block;opacity:1;transform:none}
 @keyframes wordin{to{opacity:1;transform:none}}
 
 /* the exchange plays rather than sits */
-.js .xbody p{opacity:0}
+.js .xbody p{opacity:1}
 .js .xbody p.on{opacity:1;transition:opacity .35s}
 .xbody .caret{display:inline-block;width:.55em;height:1em;vertical-align:-.15em;
   background:var(--amber);animation:blink 1.05s steps(1) infinite}
@@ -212,7 +211,7 @@ footer .sp{flex:1}
 .catwrap .bubble.on{opacity:1;transform:translate(-50%,0)}
 
 /* the agent list lands one at a time */
-.js .agents span{opacity:0;transform:translateY(6px)}
+.js .agents span{opacity:1;transform:none}
 .js .agents.in span{animation:chipin .4s ease forwards}
 @keyframes chipin{to{opacity:1;transform:none}}
 
@@ -279,7 +278,7 @@ h2 .fig{color:var(--amber);letter-spacing:0;margin-left:10px}
 
 /* ── the footer ──────────────────────────────────────────────────────── */
 footer{border-top:1px solid var(--line);margin-top:0;padding:44px 0 64px;
-  display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:32px;
+  display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 1fr;gap:28px;
   font:12.5px/1.9 var(--mono);color:var(--faint)}
 footer .who{display:flex;flex-direction:column;gap:10px}
 footer .who img{width:34px;height:34px;border-radius:9px}
@@ -296,10 +295,13 @@ footer a:hover{color:var(--ink)}
   /* The header did not fit: the GitHub button ran off the right edge and the
      brand broke across two lines. Wrapping keeps every link reachable, which
      matters more on a phone than keeping the row to one line. */
+  .wrap{padding:0 20px}
   nav{flex-wrap:wrap;row-gap:6px;padding:12px 20px}
   nav .sp,nav .spacer{display:none}
   nav .brand{white-space:nowrap;width:100%}
   nav .lnk{padding:6px 8px}
+  .cmdline{padding:11px 12px;font-size:11.5px}
+  .cmdline code{overflow-x:auto;text-overflow:clip}
 }
 @media(max-width:860px){
   header{grid-template-columns:minmax(0,1fr);gap:32px}
@@ -333,7 +335,7 @@ footer a:hover{color:var(--ink)}
     <h1>Your agent is about to re-debug something you fixed in <em>March</em>.</h1>
     <p class="lede">Fix it in Codex, and Claude Code remembers. deja indexes the sessions all
       43 of your coding agents already wrote to disk — months of history from before you
-      installed it — and hands the right one back in whichever agent asks.</p>
+      installed it — and hands the right one back over MCP and hooks. No LLM, one Go binary.</p>
     <div class="install-tabs" role="tablist" aria-label="install method">
       <button type="button" class="itab on" role="tab" aria-selected="true" data-cmd="curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh">macOS / Linux</button>
       <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="brew install vshulcz/tap/deja-vu">Homebrew</button>
@@ -355,9 +357,6 @@ footer a:hover{color:var(--ink)}
   </div>
 </header>
 
-<p class="defn">deja-vu (vshulcz/deja-vu) is a local memory tool for coding agents: it indexes the session transcripts Claude Code, Codex, Cursor and 40 other agents already wrote to disk and hands relevant history back over MCP and hooks. No LLM, one Go binary.</p>
-
-
 <div class="exchange reveal">
   <div class="xhead"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
     <span class="xtitle">cursor — payments</span></div>
@@ -374,13 +373,12 @@ footer a:hover{color:var(--ink)}
 </div>
 
 <div class="proof reveal" id="proof">
-  <div><b data-count="97.2" data-dp="1">0<i>%</i></b><span class="lab">R@5 · LongMemEval-S, all 500 questions · MemPalace publishes 96.6, agentmemory 95.2</span></div>
-  <div><b data-count="49" data-dp="0">0<i>%</i></b><span class="lab">fewer tokens than agentmemory on a task already solved · 53,558 vs 104,974</span></div>
-  <div><b data-count="13.6" data-dp="1">0<i>s</i></b><span class="lab">to index 19,195 sessions · the next of seven tools, 72 s</span></div>
+  <div><b data-count="97.2" data-dp="1">97.2<i>%</i></b><span class="lab">R@5 · LongMemEval-S, all 500 questions · MemPalace publishes 96.6, agentmemory 95.2</span></div>
+  <div><b data-count="49" data-dp="0">49<i>%</i></b><span class="lab">fewer tokens than agentmemory on a task already solved · 53,558 vs 104,974</span></div>
+  <div><b data-count="13.6" data-dp="1">13.6<i>s</i></b><span class="lab">to index 19,195 sessions · the next of seven tools, 72 s</span></div>
 </div>
-<p class="proofcap reveal">The most accurate, the cheapest and the fastest coding-agent memory we could measure.
-  I maintain deja-vu, so <a href="guide/day-zero.html">every driver and the corpus</a> are in the repository
-  — re-run a row you doubt. <a href="guide/benchmarks.html">All the runs</a>.</p>
+<p class="proofcap reveal">Every driver, the synthetic corpus and the scoring rules are in the repository —
+  <a href="guide/day-zero.html">re-run any row</a> or inspect <a href="guide/benchmarks.html">all LongMemEval and LoCoMo runs</a>.</p>
 
 <section class="reveal">
   <h2>The difference</h2>
@@ -402,15 +400,12 @@ footer a:hover{color:var(--ink)}
   <p class="big" style="margin-bottom:26px"><code>deja</code> with no arguments opens a search over every
     agent's history, <em>in the terminal you already have open.</em></p>
   <div class="cardshot tui"><img src="assets/tui.gif" width="720" height="442" alt="The deja screen: typing a search, reading the session it found, and continuing it in another agent" loading="lazy"></div>
-  <p class="note">It opens on the sessions behind your uncommitted change, then the recent
-    ones in this project, and the list answers as you type. <b>↵</b> reads a session at the
-    match, <b>r</b> resumes it in its own agent, <b>o</b> continues it in any other agent with
-    what it asked, decided and left open. Type <b>codex:</b>, <b>yesterday</b> or
-    <b>in:api</b> to filter, and <b>/</b> inside a session to find a word in it. <b>tab</b>
-    switches between this project, all projects and Deleted, the sessions an agent deleted
-    that deja still holds; <b>?</b> lists every key. <b>DEJA_TUI=0</b> keeps a bare <b>deja</b> to the text brief.
-    Prefer a browser? <b>deja view</b> writes the whole store — sessions, recall audit trail and promoted
-    notes — into one local HTML file (<a href="view/">open a live demo</a>).</p>
+  <p class="note">
+    <b>Navigate:</b> opens on the sessions behind your uncommitted change, then recent ones in this project; <b>↵</b> reads a session at the match, <b>/</b> finds a word inside it, <b>?</b> lists every key.<br>
+    <b>Filter:</b> type <b>codex:</b>, <b>yesterday</b> or <b>in:api</b>, or press <b>tab</b> to switch between this project, all projects and <i>Deleted</i> (sessions an agent purged from disk that deja still holds).<br>
+    <b>Resume or hand off:</b> <b>r</b> reopens a session in its own agent; <b>o</b> continues it in any other agent with its goal, decisions and open work.<br>
+    <b>Browser view:</b> <b>deja view</b> writes the whole store — sessions, recall audit trail and promoted notes — into one local HTML file (<a href="view/">open the live demo</a>).
+  </p>
 </section>
 
 <section class="reveal band" id="demo">
@@ -524,31 +519,34 @@ footer a:hover{color:var(--ink)}
         <a href="guide/compare.html">How it compares</a> ·
         <a href="guide/day-zero.html">Day zero: eight tools, one machine with 19,195 sessions already on disk</a></p></div>
   </div>
-  <p class="agents" style="margin-top:18px">
-    <span><a href="guide/memory-for-claude-code.html">Claude Code</a></span>
-    <span><a href="guide/memory-for-codex.html">Codex</a></span>
-    <span><a href="guide/memory-for-cursor.html">Cursor</a></span>
-    <span><a href="guide/memory-for-copilot.html">Copilot CLI</a></span>
-    <span><a href="guide/memory-for-opencode.html">opencode</a></span>
-    <span><a href="guide/memory-for-gemini.html">Gemini CLI</a></span>
-    <span><a href="guide/memory-for-qwen.html">Qwen Code</a></span>
-    <span><a href="guide/memory-for-roo.html">Roo Code</a></span>
-    <span><a href="guide/memory-for-prime.html">prime-agent</a></span>
-    <span><a href="guide/memory-for-continue.html">Continue</a></span>
-    <span><a href="guide/memory-for-crush.html">Crush</a></span>
-    <span><a href="guide/memory-for-amp.html">Amp</a></span>
-    <span><a href="guide/memory-for-copilot-chat.html">VS Code Copilot Chat</a></span>
-    <span><a href="guide/memory-for-kimi.html">Kimi Code</a></span>
-    <span><a href="guide/memory-for-dsh.html">DeepSeek Harness</a></span>
-    <span><a href="guide/memory-for-grok.html">Grok Build</a></span>
-    <span><a href="guide/memory-for-zed.html">Zed</a></span>
-    <span><a href="guide/memory-for-openclaw.html">OpenClaw</a></span>
-    <span><a href="guide/memory-for-goose.html">Goose</a></span>
-    <span><a href="guide/memory-for-cline.html">Cline</a></span>
-    <span><a href="guide/memory-for-pi.html">pi and omp</a></span>
-    <span><a href="guide/memory-for-hermes.html">Hermes</a></span>
-    <span class="more">memory for each, set up in a minute</span>
-  </p>
+  <details style="margin-top:18px">
+    <summary class="note" style="cursor:pointer"><b>Per-agent setup guides</b> (Claude Code, Codex, Cursor, OpenClaw, Hermes…)</summary>
+    <p class="agents" style="margin-top:12px">
+      <span><a href="guide/memory-for-claude-code.html">Claude Code</a></span>
+      <span><a href="guide/memory-for-codex.html">Codex</a></span>
+      <span><a href="guide/memory-for-cursor.html">Cursor</a></span>
+      <span><a href="guide/memory-for-copilot.html">Copilot CLI</a></span>
+      <span><a href="guide/memory-for-opencode.html">opencode</a></span>
+      <span><a href="guide/memory-for-gemini.html">Gemini CLI</a></span>
+      <span><a href="guide/memory-for-qwen.html">Qwen Code</a></span>
+      <span><a href="guide/memory-for-roo.html">Roo Code</a></span>
+      <span><a href="guide/memory-for-prime.html">prime-agent</a></span>
+      <span><a href="guide/memory-for-continue.html">Continue</a></span>
+      <span><a href="guide/memory-for-crush.html">Crush</a></span>
+      <span><a href="guide/memory-for-amp.html">Amp</a></span>
+      <span><a href="guide/memory-for-copilot-chat.html">VS Code Copilot Chat</a></span>
+      <span><a href="guide/memory-for-kimi.html">Kimi Code</a></span>
+      <span><a href="guide/memory-for-dsh.html">DeepSeek Harness</a></span>
+      <span><a href="guide/memory-for-grok.html">Grok Build</a></span>
+      <span><a href="guide/memory-for-zed.html">Zed</a></span>
+      <span><a href="guide/memory-for-openclaw.html">OpenClaw</a></span>
+      <span><a href="guide/memory-for-goose.html">Goose</a></span>
+      <span><a href="guide/memory-for-cline.html">Cline</a></span>
+      <span><a href="guide/memory-for-pi.html">pi and omp</a></span>
+      <span><a href="guide/memory-for-hermes.html">Hermes</a></span>
+      <span class="more">memory for each, set up in a minute</span>
+    </p>
+  </details>
 </section>
 
 <section class="closer reveal" id="install">
@@ -776,21 +774,7 @@ document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
    Printed, they are a claim. Counted, they are a measurement being taken. */
 (function(){
   var els=[].slice.call(document.querySelectorAll('[data-count]'));
-  if(!els.length)return;
-  if(reduced){els.forEach(function(el){el.firstChild.nodeValue=el.dataset.count});return}
-  var io=new IntersectionObserver(function(es){es.forEach(function(e){
-    if(!e.isIntersecting)return;
-    io.unobserve(e.target);
-    var el=e.target,target=parseFloat(el.dataset.count),dp=+(el.dataset.dp||0),t0=null;
-    requestAnimationFrame(function step(t){
-      t0=t0||t;
-      var k=Math.min(1,(t-t0)/900);
-      /* ease out: a counter that lands hard reads as a jump, not an arrival */
-      el.firstChild.nodeValue=(target*(1-Math.pow(1-k,3))).toFixed(dp);
-      if(k<1)requestAnimationFrame(step);
-    });
-  })},{threshold:.6});
-  els.forEach(function(el){io.observe(el)});
+  els.forEach(function(el){el.firstChild.nodeValue=el.dataset.count});
 })();
 
 /* ── the demo answers its own first question ──────────────────────────────
@@ -815,51 +799,13 @@ document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
   })},{threshold:.8}).observe(proof);
 })();
 
-/* ── the headline arrives ─────────────────────────────────────────────────
-   Split on the way in rather than in the markup, so the sentence a reader
-   without scripting gets is still one sentence. */
-(function(){
-  var h=document.querySelector('h1');
-  if(!h||reduced)return;
-  var i=0;
-  h.innerHTML=h.innerHTML.replace(/(<em>.*?<\/em>|[^\s<]+)/g,function(m){
-    return '<span class="w" style="animation-delay:'+(i++*52)+'ms">'+m+'</span>';
-  });
-})();
-
 /* ── the exchange plays ───────────────────────────────────────────────────
    A still of a conversation says the same as a paragraph. Typed out, with the
    pause where recall actually runs, it is the product happening. */
 (function(){
   var box=document.querySelector('.xbody');
   if(!box)return;
-  var rows=[].slice.call(box.querySelectorAll('p'));
-  if(reduced){rows.forEach(function(r){r.classList.add('on')});return}
-
-  var typed=rows[0],full=typed.innerHTML,label=full.slice(0,full.indexOf('</span>')+7);
-  var body=full.slice(label.length);
-  function play(){
-    typed.innerHTML=label+'<span class="caret"></span>';
-    typed.classList.add('on');
-    var n=0;
-    (function tick(){
-      n++;
-      typed.innerHTML=label+body.slice(0,n)+'<span class="caret"></span>';
-      if(n<body.length)return setTimeout(tick,26);
-      typed.innerHTML=full;
-      /* the beat where the tool is working is the point of the beat */
-      setTimeout(function(){rows[1].classList.add('on')},380);
-      setTimeout(function(){rows[2].classList.add('on');rows[3].classList.add('on');
-        cat('wow',900)},1150);
-      setTimeout(function(){rows[4].classList.add('on')},1750);
-    })();
-  }
-  /* A low threshold on purpose. At .4 the panel had to be 40% on screen, which
-     on a laptop is the boundary it lands on exactly — the replay would sit
-     there unplayed until someone scrolled past it. */
-  new IntersectionObserver(function(es,o){es.forEach(function(e){
-    if(e.isIntersecting){o.unobserve(e.target);play()}
-  })},{threshold:.15}).observe(box);
+  [].slice.call(box.querySelectorAll('p')).forEach(function(r){r.classList.add('on')});
 })();
 
 /* ── the cat has opinions ─────────────────────────────────────────────────

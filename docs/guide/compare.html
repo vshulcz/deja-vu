@@ -44,13 +44,13 @@
    Removing the article's max-width alone was not enough — the grid still held
    the middle column, so four of the seven columns stayed off-screen. */
 @media(min-width:861px){
-.doc{grid-template-columns:224px minmax(0,1fr)}
+.doc,.doc:has(.toc){grid-template-columns:220px minmax(0,1fr);gap:44px}
 .doc .toc{display:none}
 .doc article{max-width:none}
 }
 .cmpwrap{overflow-x:auto;margin:0 0 20px;border:1px solid var(--line);border-radius:10px}
-.cmpwrap table{table-layout:fixed;border-collapse:collapse;margin:0;
-  font:12.5px var(--mono);min-width:1040px;width:100%}
+.doc article .cmpwrap table{display:table;table-layout:fixed;border-collapse:collapse;margin:0;
+  font:12.5px var(--mono);min-width:880px;width:100%}
 .cmpwrap th,.cmpwrap td{padding:11px 13px;vertical-align:top;overflow-wrap:break-word;
   border:1px solid var(--line);line-height:1.5}
 .cmpwrap td:first-child,.cmpwrap th:first-child{position:sticky;left:0;z-index:1;
@@ -189,7 +189,6 @@
 
 <h1>Memory plugins for coding agents, compared</h1>
 <p class="pagelede">where deja sits among the memory tools<span class="mins" data-mins></span></p>
-<p>deja-vu (vshulcz/deja-vu) is a local memory tool for coding agents: it indexes the session transcripts Claude Code, Codex, Cursor and 40 other agents already wrote to disk and hands relevant history back over MCP and hooks. No LLM, one Go binary.</p>
 
 <h2 id="at-a-glance">At a glance, checked 28 October 2026</h2>
 <p>One row per tool. Every competitor cell comes from that project's own README or docs as read on 28 October 2026; the sources are under the table. Where this table and the older ones further down disagree, this one is newer.</p>

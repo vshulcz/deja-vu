@@ -7,19 +7,26 @@
 
 <p align="center"><b>解決済みの問題を、コーディングエージェントにもう一度デバッグさせない。</b></p>
 
-<p align="center">Claude Code、Codex、Cursor をはじめ、このマシン上のエージェントはすべてのセッションをすでにディスクに保存しています。
-deja はそれを数か月前の分まで丸ごとインデックス化し、
-いま作業中のエージェントに必要な部分を渡します。</p>
+<p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes をはじめとする 43 のエージェントは、すべてのセッションをすでにディスクに保存しています。<br>
+deja はそれをローカルでインデックス化し、MCP とフック経由で必要な履歴を渡します——LLM 不要、単一の Go バイナリ。</p>
+
+<p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | 日本語 | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
+
+<p align="center">
+  <a href="https://trendshift.io/repositories/83640" target="_blank"><img src="https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go" alt="vshulcz/deja-vu — Trendshift" width="250" height="55" /></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI"></a>
+  <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/badges/.badges/main/coverage.svg" alt="coverage">
+  <a href="https://github.com/vshulcz/deja-vu/releases"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
+  <a href="https://www.npmjs.com/package/@vshulcz/deja-vu"><img src="https://img.shields.io/npm/v/%40vshulcz%2Fdeja-vu" alt="npm"></a>
+  <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
+</p>
+
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/">ドキュメント</a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">ブラウザデモ</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">ベンチマーク</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">他ツールとの比較</a> &middot; <a href="../../docs/INTEGRATING.md">自分のツールへの組み込み</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="同じエージェントに同じ質問を2回する：記憶がないと何の記録もないが、deja があると8か月前の決定をもとに答える"></p>
-
-<p align="center"><sub><em>誰も検索していません——エージェントが自分で deja を呼び出しました。実際のモデルと実際のツール呼び出しによる2回の本物の実行で、対象は合成コーパスです。誰の履歴も公開していません。</em></sub></p>
-
-<p align="center"><b>deja は最初から満杯の状態で始まります。43 のエージェントがすでに書き残した履歴を、インデックス作成中から検索でき、モデルもキャプチャ手順も不要です。</b></p>
-
-<p align="center">しかも、誰かが頼む必要もありません。リコールはセッション開始時、履歴にあるものを名指すプロンプトのとき、
-ファイルが編集される前やコマンドが実行される前、そしてコマンドが失敗した後に届きます。キーやトークンはインデックス作成時に取り除かれます。
-何が取り除かれ、何は取り除けないのかは<a href="../../docs/SECURITY-MODEL.md">セキュリティモデル</a>に書いてあります。</p>
 
 <table align="center">
 <tr>
@@ -29,21 +36,9 @@ deja はそれを数か月前の分まで丸ごとインデックス化し、
 </tr>
 </table>
 
-<p align="center"><sub>deja-vu は私がメンテナンスしているため、ドライバ、コーパス、採点ルールはすべてこのリポジトリにあります &middot;
+<p align="center"><sub>ドライバ、合成コーパス、採点ルールはすべてこのリポジトリにあります &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">直接比較と、疑わしい行の再実行方法</a> &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">LongMemEval と LoCoMo の実行結果</a></sub></p>
-
-<p align="center">
-  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI"></a>
-  <a href="https://github.com/vshulcz/deja-vu/releases"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
-  <a href="https://mcptoplist.com/server/io.github.vshulcz%2Fdeja-vu"><img src="https://mcptoplist.com/badge/io.github.vshulcz%2Fdeja-vu.svg" alt="MCP Toplist"></a>
-  <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
-</p>
-
-<p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | 日本語 | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
-
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">ドキュメント</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">ベンチマーク</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">他ツールとの比較</a> &middot; <a href="../../docs/INTEGRATING.md">自分のツールへの組み込み</a></p>
-<p align="center"><sub>役に立ったら、<a href="https://github.com/vshulcz/deja-vu">GitHub で deja-vu にスター</a>をお願いします。</sub></p>
 
 ## インストール
 
@@ -518,43 +513,6 @@ deja bench read       # what it costs to read a database-backed store, and what 
 ## FAQ
 
 <details>
-<summary><b>何かがマシンの外に送られますか？</b></summary>
-
-いいえ、あなたが指示しない限り送られません。
-[データフロー](../../docs/SECURITY-MODEL.md#data-flows)を参照してください。
-
-</details>
-
-<details>
-<summary><b>すでにログに含まれているシークレットはどうなりますか？</b></summary>
-
-それらは元のハーネスのファイル——つまり
-エージェントのデータ——に残ります。`deja secrets` がそれを含むセッションを示すので、ローテーションや削除が
-できます。`--scrub` は届く範囲のトランスクリプトを書き換えます。既知の形式——AWS キー、`api_key=`/`token=` の代入、Bearer トークンや裸の JWT、PEM ブロック、
-各プロバイダーのトークン、高エントロピー値——はインデックス作成時に取り除かれるので、ダイジェスト、共有、
-同期エクスポートには含まれません。パターンマッチングはシークレット検出ではありません：未知の形式は
-すり抜ける可能性があります。[セキュリティモデル](../../docs/SECURITY-MODEL.md#redaction-boundary)を参照してください。
-
-</details>
-
-<details>
-<summary><b>エージェントが遅くなりませんか？</b></summary>
-
-リコールはローカルインデックスに対する字句検索です：
-中央値 0.7–0.8 ms で、モデルの応答を待つことはありません。フックではこれに加えてプロセス起動と
-ストアの鮮度チェックがかかります——19k セッションのインデックスで、プロンプトごとのフックは中央値 107 ms です。
-
-</details>
-
-<details>
-<summary><b>作業のやり方を変える必要はありますか？</b></summary>
-
-いいえ。エージェントが自分でリコールを呼び出し、
-自動リコールを有効にしていれば、セッションを開いた時点でプロジェクトの過去の決定をすでに知っています。
-
-</details>
-
-<details>
 <summary><b>他のメモリツールとどう違うのですか？</b></summary>
 
 | | deja | メモリプラットフォーム<br>（Mem0、Letta、memU） | セッション検索<br>（cass） |
@@ -568,6 +526,15 @@ deja bench read       # what it costs to read a database-backed store, and what 
 そのモデルが合うなら試す価値があります。ただし、やはり空の状態から始まり、エージェントが保存することを
 選んだものしか知りません。[完全な比較](https://vshulcz.github.io/deja-vu/guide/compare.html)では
 15 のツールを取り上げています。
+
+</details>
+
+<details>
+<summary><b>エージェントが遅くなりませんか？</b></summary>
+
+リコールはローカルインデックスに対する字句検索です：
+中央値 0.7–0.8 ms で、モデルの応答を待つことはありません。フックではこれに加えてプロセス起動と
+ストアの鮮度チェックがかかります——19k セッションのインデックスで、プロンプトごとのフックは中央値 107 ms です。
 
 </details>
 
@@ -592,14 +559,6 @@ Claude Code は 30 日より古い
 </details>
 
 <details>
-<summary><b>Windows はどうですか？</b></summary>
-
-ビルドは存在し、CI でもテストスイートを実行しています。十分に実績があるのは
-macOS と Linux です。実環境でのレポートは [#9](https://github.com/vshulcz/deja-vu/issues/9) で歓迎しています。
-
-</details>
-
-<details>
 <summary><b>すべてを消去するには？</b></summary>
 
 ```sh
@@ -615,29 +574,11 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 
 ## ガイド
 
-機能ごとではなく、状況ごとに書かれています：
-
-- [エージェントは以前の会話を覚えているか？](https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html) — 各エージェントがセッション間で何を保持し、何を捨てるか
-- [ディスク上のセッションファイル](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html) — `~/.claude/projects` はどのくらい大きくなるか、削除すると何を失うか
-- [エージェントがコンテキストを失った](https://vshulcz.github.io/deja-vu/guide/lost-context.html) — クラッシュ、クリア、空で戻ってきたセッションの後に
-- [コンテキストウィンドウがいっぱい](https://vshulcz.github.io/deja-vu/guide/context-window-full.html) — コンパクションが何を残すかの計測と、代わりにすべきこと
-- [昨日のセッションを再開する](https://vshulcz.github.io/deja-vu/guide/resume-a-session.html) — 全エージェントから探し出し、それを持つエージェントで再開する
-- [エージェントが修正済みのミスを繰り返す](https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html)
-- [問題を解決したセッションを見つける](https://vshulcz.github.io/deja-vu/guide/find-a-session.html)
-- [エージェントがセッション間で忘れる理由](https://vshulcz.github.io/deja-vu/guide/forgetting.html) · [各エージェントの履歴の保存場所](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)
-- [コンパクションで失われるもの](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [エージェントの切り替え](https://vshulcz.github.io/deja-vu/guide/switching-agents.html) · [エージェントの監査](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [会話のエクスポート](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [マシン間での利用](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [記憶のコスト](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
+- **コンテキストと復元：** [エージェントは以前の会話を覚えているか？](https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html) · [エージェントがコンテキストを失った](https://vshulcz.github.io/deja-vu/guide/lost-context.html) · [コンテキストウィンドウがいっぱい](https://vshulcz.github.io/deja-vu/guide/context-window-full.html) · [コンパクションで失われるもの](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [エージェントがセッション間で忘れる理由](https://vshulcz.github.io/deja-vu/guide/forgetting.html)
+- **検索と再開：** [昨日のセッションを再開する](https://vshulcz.github.io/deja-vu/guide/resume-a-session.html) · [問題を解決したセッションを見つける](https://vshulcz.github.io/deja-vu/guide/find-a-session.html) · [エージェントが修正済みのミスを繰り返す](https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html) · [エージェントの切り替え](https://vshulcz.github.io/deja-vu/guide/switching-agents.html)
+- **セッションファイルと運用：** [ディスク上のセッションファイル](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html) · [各エージェントの履歴の保存場所](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html) · [エージェントの監査](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [会話のエクスポート](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [マシン間での利用](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [記憶のコスト](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
 
 ハーネス別：[opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [DeepSeek Harness](https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html) · [Kimi Code](https://vshulcz.github.io/deja-vu/guide/memory-for-kimi.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [Qwen Code](https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi と omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
-
-## 自分の履歴で試す
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
-deja install --auto
-```
-
-インストールに 10 秒、インデックス作成に約 10 秒。次にエージェントがセッションを開くとき、
-そのプロジェクトで解決したことをすでに知っています——deja をインストールする前のことも含めて。
 
 ## コントリビュート
 

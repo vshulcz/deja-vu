@@ -7,19 +7,9 @@
 
 <p align="center"><strong>Your coding agents stop re-debugging what you already fixed.</strong></p>
 
-**deja starts full**: the history 43 agents already wrote, with no model and no capture step. It
-indexes the sessions your coding agents already wrote to disk — months of
-history from before you installed it — and serves them back over MCP, in
-whichever agent asks.
+Forty-three coding agents — including Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, opencode, Cline, Copilot CLI, Roo Code, Kilo Code, aider, Goose, Qwen Code, Kimi Code, Antigravity, Grok Build, pi, omp, DeepSeek Harness, Hermes, Kiro, Reasonix and Zed — already write every session to local files. **deja starts full**: it indexes months of history from before you installed it and serves relevant context back over MCP and hooks, with no model and no capture step.
 
-Forty-three coding agents write every conversation to local files, among them
-Claude Code, Codex, Cursor, opencode, Gemini CLI, Cline, Copilot CLI, VS Code
-Copilot Chat, Roo Code, Kilo Code, aider, Goose, Qwen Code, Kimi Code,
-Antigravity, Grok Build, OpenClaw, pi, omp, DeepSeek Harness, Hermes, Kiro,
-Reasonix and Zed. deja turns those files into one memory layer that all of them
-can read.
-
-One Go binary. No LLM, no embeddings, no API key. The network is used only by commands you run for it, such as `deja update` and `deja sync ssh`, and by a daily release check, which DEJA_OFFLINE=1 turns off.
+One Go binary. No LLM, no embeddings, no API key. The network is used only by commands you run for it, such as `deja update` and `deja sync ssh`, and by a daily release check, which `DEJA_OFFLINE=1` turns off.
 **58% fewer tokens** on a task this machine had already solved (53,558 against 126,222 with nothing wired, and 52,815 against 103,443 on a later build with the arms run alternately, eleven runs an arm each time). **88.9% hit@1** on LongMemEval-S (470-question cleaned set), **millisecond** lookups over gigabytes of history.
 
 ```sh

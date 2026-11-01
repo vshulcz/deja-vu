@@ -11,11 +11,23 @@
 deja indiziert alles, auch Monate zurück, und gibt dem Agenten,
 der gerade arbeitet, den Teil, der zählt.</p>
 
+<p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | Deutsch | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
+
+<p align="center">
+  <a href="https://trendshift.io/repositories/83640" target="_blank"><img src="https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go" alt="vshulcz/deja-vu — Trendshift" width="250" height="55" /></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/badges/.badges/main/coverage.svg" alt="coverage">
+  <a href="https://github.com/vshulcz/deja-vu/releases/latest"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
+  <a href="https://www.npmjs.com/package/@vshulcz/deja-vu"><img src="https://img.shields.io/npm/v/%40vshulcz%2Fdeja-vu" alt="npm"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+</p>
+
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/">Dokumentation</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Vergleich</a></p>
+
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="dieselbe Frage zweimal an denselben Agenten: ohne Gedächtnis weiß er nichts, mit deja antwortet er mit einem acht Monate alten Ergebnis"></p>
-
-<p align="center"><sub><em>Niemand hat gesucht — der Agent hat deja von sich aus aufgerufen. Zwei echte Läufe, echtes Modell, echte Tool-Aufrufe, auf einem synthetischen Korpus: es wird niemandes Historie veröffentlicht.</em></sub></p>
-
-<p align="center"><b>deja ist von der ersten Minute an voll: die Historie, die 43 Agents längst geschrieben haben, in Sekunden indiziert, ohne Modell und ohne eigenen Erfassungsschritt.</b></p>
 
 <table align="center">
 <tr>
@@ -28,11 +40,6 @@ der gerade arbeitet, den Teil, der zählt.</p>
 <p align="center"><sub>Ich pflege deja-vu, deshalb liegen alle Treiber, das Korpus und die Bewertungsregel in diesem Repository &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">der direkte Vergleich und wie man eine angezweifelte Zeile neu misst</a> &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">LongMemEval- und LoCoMo-Läufe</a></sub></p>
-
-<p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | Deutsch | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
-
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">Dokumentation</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Vergleich</a></p>
-<p align="center"><sub>Wenn es dir hilft, gib deja-vu einen Stern auf <a href="https://github.com/vshulcz/deja-vu">GitHub</a>.</sub></p>
 
 ## Installation
 
@@ -320,43 +327,6 @@ stehen in [docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md).
 ## Häufige Fragen
 
 <details>
-<summary><b>Verlässt irgendetwas meine Maschine?</b></summary>
-
-Nein, außer du verlangst es. Siehe
-[Datenflüsse](../../docs/SECURITY-MODEL.md#data-flows).
-
-</details>
-
-<details>
-<summary><b>Und die Secrets, die schon in den Logs stehen?</b></summary>
-
-Die bleiben in den Dateien des jeweiligen Werkzeugs, das
-sind die Daten deines Agenten; `deja secrets` nennt die Sessions, in denen sie stehen, damit du sie rotieren
-und löschen kannst, und `--scrub` schreibt die Aufzeichnungen um, an die es herankommt. Bekannte Formen werden
-beim Indizieren entfernt und landen nicht in Zusammenfassungen, Share oder Sync-Export. Mustererkennung ist
-keine Secret-Erkennung: eine unbekannte Form kann durchrutschen. Siehe
-[Sicherheitsmodell](../../docs/SECURITY-MODEL.md#redaction-boundary).
-
-</details>
-
-<details>
-<summary><b>Bremst das meinen Agenten?</b></summary>
-
-Ein Recall ist eine lexikalische Abfrage auf einen lokalen Index: Median
-0.7–0.8 ms, und nichts wartet auf ein Modell. Der Hook fügt Prozessstart und Aktualitätsprüfung der Speicher
-hinzu — auf einem Index von 19k Sessions braucht der Hook pro Prompt im Median 107 ms.
-
-</details>
-
-<details>
-<summary><b>Muss ich meine Arbeitsweise ändern?</b></summary>
-
-Nein. Den Recall ruft der Agent selbst auf; mit automatischem Recall
-weiß er schon beim Öffnen der Session, was in diesem Projekt zuvor entschieden wurde.
-
-</details>
-
-<details>
 <summary><b>Wie unterscheidet sich das von anderen Gedächtnis-Werkzeugen?</b></summary>
 
 | | deja | Gedächtnis-Plattformen<br>(Mem0, Letta, memU) | Session-Suche<br>(cass) |
@@ -367,6 +337,15 @@ weiß er schon beim Öffnen der Session, was in diesem Projekt zuvor entschieden
 | Ruft ab, ohne gefragt zu werden | beim Session-Start und vor der Tool-Ausführung | nein | nein |
 
 Der [vollständige Vergleich](https://vshulcz.github.io/deja-vu/guide/compare.html) deckt fünfzehn davon ab.
+
+</details>
+
+<details>
+<summary><b>Bremst das meinen Agenten?</b></summary>
+
+Ein Recall ist eine lexikalische Abfrage auf einen lokalen Index: Median
+0.7–0.8 ms, und nichts wartet auf ein Modell. Der Hook fügt Prozessstart und Aktualitätsprüfung der Speicher
+hinzu — auf einem Index von 19k Sessions braucht der Hook pro Prompt im Median 107 ms.
 
 </details>
 
@@ -423,16 +402,6 @@ Nach Situationen geschrieben, nicht nach Funktionen:
 - [Was die Kompaktierung verliert](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [den Agenten wechseln](https://vshulcz.github.io/deja-vu/guide/switching-agents.html) · [prüfen, was Agents getan haben](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [ein Gespräch exportieren](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [zwischen Maschinen](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [was Gedächtnis an Tokens kostet](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
 
 Nach Werkzeug: [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi und omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
-
-## Probier es an deiner eigenen Historie
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
-deja install --auto
-```
-
-Zehn Sekunden installieren, etwa zehn indizieren. Wenn ein Agent das nächste Mal eine Session öffnet, weiß er
-bereits, was du in diesem Projekt gelöst hast — auch das von vor der Installation von deja.
 
 ## Entwicklung
 

@@ -36,7 +36,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Getting started", "description": "Install deja and index your coding-agent history in one command, then search it and wire it into your agents over MCP.", "url": "https://vshulcz.github.io/deja-vu/guide/getting-started.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/getting-started.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-07-19", "dateModified": "2026-10-28"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Getting started", "description": "Install deja and index your coding-agent history in one command, then search it and wire it into your agents over MCP.", "url": "https://vshulcz.github.io/deja-vu/guide/getting-started.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/getting-started.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-07-19", "dateModified": "2026-11-01"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Getting started","item":"https://vshulcz.github.io/deja-vu/guide/getting-started.html"}]}</script>
 </head>
 <body>
@@ -161,7 +161,7 @@
 
 <h1>Getting started</h1>
 <p class="pagelede">install it, wire it in, ask your first question<span class="mins" data-mins></span></p>
-<p>deja is a single zero-dependency binary. It reads the session logs your coding agents already write, builds a local search index, and serves that memory back to the agents over MCP. Indexing and search have no network path unless you set up semantic search: after <code>deja embed</code>, each search also sends the query to the embedding endpoint. Otherwise what reaches the network is a command you run — <code>deja update</code>, <code>deja sync ssh</code>, the <code>doctor</code> version check and <code>deja embed</code> — plus a once-a-day look at the latest release number from a command typed at a terminal, which <code>DEJA_NO_UPDATE_NOTICE=1</code> turns off. <a href="privacy.html">Privacy</a> covers each one.</p>
+<p>deja is a single zero-dependency binary. It reads the session logs your coding agents already write, builds a local search index, and serves that memory back to the agents over MCP and hooks. Indexing and search have no network path unless you set up semantic search; <a href="privacy.html">Privacy</a> covers local storage, redaction and network paths.</p>
 <div class="term-shot"><img src="../assets/demo.gif" alt="deja demo: one question put to the same agent twice — without memory it has no record, with deja it answers with the decision from eight months earlier" loading="lazy"><p class="cap">the same question, the same agent, once without memory and once with deja — two genuine runs against a synthetic corpus, so nobody's history is in the frame</p></div>
 <h2>Install</h2>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
@@ -187,6 +187,9 @@ deja "have we dealt with jwt refresh rotation before"</pre>
 <h2>Wire it into your agents</h2>
 <pre>deja install --all      # MCP recall for every agent found on this machine
 deja install --auto     # same, plus session-start auto-recall where supported</pre>
+<p>After that, an agent can call <code>recall</code> the moment you reference past work — see <a href="agents.html">Agents &amp; MCP</a>. Confirm the wiring any time with <code>deja doctor</code>.</p>
+<details>
+<summary><b>Or install from an agent's own plugin marketplace</b></summary>
 <p>These harnesses can pull deja straight from their own plugin registry instead — same wiring, no local step:</p>
 <pre>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu
 codex  plugin marketplace add https://github.com/vshulcz/deja-vu &amp;&amp; codex plugin add deja-vu@deja-vu
@@ -208,7 +211,7 @@ grok plugin install deja
 <div class="note">Either path is enough — <code>deja install --auto</code> wires these as well. The opencode and dsh packages read what the installer wrote and contribute only what is missing, and in Zed both halves register under one server id, so having both never means two servers or a tool listed twice.</div>
 <p>In a <a href="https://github.com/github/spec-kit">Spec Kit</a> project, an extension adds <code>/speckit.deja-vu.recall</code>, which searches past sessions for the feature before you implement it:</p>
 <pre>specify extension add deja-vu --from https://github.com/vshulcz/deja-vu/releases/latest/download/deja-spec-kit.zip</pre>
-<p>After that, an agent can call <code>recall</code> the moment you reference past work — see <a href="agents.html">Agents &amp; MCP</a>. Confirm the wiring any time with <code>deja doctor</code>.</p>
+</details>
 <h2>Optional: semantic recall</h2>
 <p>If you run a local embedding endpoint (Ollama, LM Studio), <code>deja embed</code> adds a vector sidecar so rephrased queries still match. Without one, deja works exactly as before. See <a href="search.html">Search</a>.</p>
 
