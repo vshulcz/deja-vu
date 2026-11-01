@@ -94,9 +94,13 @@ printf '{"session_id":"h1","role":"user","content":"partneedle","timestamp":1790
 	}
 
 	// Built, then asked what to carry for the root store as if unread.
+	if err := os.Remove(filepath.Join(hermes, "profiles", "b", "state.db")); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_STORE_TIMEOUT", "5s")
 	root := filepath.Join(hermes, "state.db")
 	dir := filepath.Join(home, "index.db")
-	if err := Ensure(dir, "", true, nil); err != nil {
+	if err := Ensure(dir, "hermes", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	unread := map[string]bool{root: true}
