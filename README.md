@@ -38,7 +38,7 @@ deja install --auto
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">every run</a></sub></p>
 
 <p align="center">
-  <a href="https://trendshift.io/repositories/83640"><img src="https://trendshift.io/api/badge/repositories/83640" alt="vshulcz/deja-vu | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"></a>
+  <a href="https://trendshift.io/repositories/83640"><img src="https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go" alt="#1 Go Repository Of The Day" style="width: 250px; height: 55px;" width="250" height="55"></a>
 </p>
 
 <p align="center">
