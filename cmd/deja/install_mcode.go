@@ -210,8 +210,10 @@ func installMcodePlugin(exe string, uninstall bool) (installResult, error) {
 		if err := os.RemoveAll(root); err != nil {
 			return installResult{}, err
 		}
+		pruneCreatedDir(filepath.Dir(root))
 		return installResult{Path: root, Action: "removed"}, nil
 	}
+	noteCreatedDirs(root)
 	// The launcher, not this binary: a package is as much a config as a
 	// hook file, and one that names the build it was installed from stops
 	// working the day that build moves.

@@ -47,6 +47,9 @@ func TestProjectNameCandidatesIncludesWorktreeSiblings(t *testing.T) {
 	if !hasMainBase {
 		t.Fatalf("worktree lookup must include the main checkout's name, got %v", names)
 	}
+	if dirs := ProjectDirs(wt); len(dirs) < 2 {
+		t.Fatalf("ProjectDirs(%q) = %v, want both worktree and main checkout", wt, dirs)
+	}
 }
 
 func TestProjectNameCandidatesPlainDirUnchanged(t *testing.T) {
@@ -132,6 +135,9 @@ func TestProjectNameCandidatesSkipsHomeAndRoot(t *testing.T) {
 	for _, dir := range []string{"", ".", "/", home} {
 		if got := ProjectNameCandidates(dir); len(got) != 0 {
 			t.Errorf("ProjectNameCandidates(%q) = %v, want nil", dir, got)
+		}
+		if got := ProjectDirs(dir); len(got) != 0 {
+			t.Errorf("ProjectDirs(%q) = %v, want nil", dir, got)
 		}
 	}
 	sub := filepath.Join(home, "coding", "app")

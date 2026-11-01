@@ -274,3 +274,44 @@ func TestMcodeResumeOpensTheSessionByID(t *testing.T) {
 		t.Fatalf("workspace gone: resume = %q %q %v", dir, cmd, err)
 	}
 }
+
+func TestMcodeAutoUninstallPrunesCreatedDirs(t *testing.T) {
+	t.Run("removes empty created dirs across processes", func(t *testing.T) {
+		root := hermeticEnv(t)
+		home := filepath.Join(root, "home")
+		if _, err := captureRun(t, "install", "mcode-auto", "--no-index"); err != nil {
+			t.Fatal(err)
+		}
+		resetClineTestRunRecord()
+		if _, err := captureRun(t, "uninstall", "mcode-auto"); err != nil {
+			t.Fatal(err)
+		}
+		for _, p := range []string{
+			filepath.Join(home, ".minimax", "plugins"),
+			filepath.Join(home, ".minimax"),
+		} {
+			if _, err := os.Stat(p); !os.IsNotExist(err) {
+				t.Errorf("%s survived uninstall (err = %v)", p, err)
+			}
+		}
+	})
+
+	t.Run("keeps plugins dir when user file is present", func(t *testing.T) {
+		root := hermeticEnv(t)
+		home := filepath.Join(root, "home")
+		if _, err := captureRun(t, "install", "mcode-auto", "--no-index"); err != nil {
+			t.Fatal(err)
+		}
+		userFile := filepath.Join(home, ".minimax", "plugins", "other.txt")
+		if err := os.WriteFile(userFile, []byte("keep"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		resetClineTestRunRecord()
+		if _, err := captureRun(t, "uninstall", "mcode-auto"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(userFile); err != nil {
+			t.Errorf("user file in ~/.minimax/plugins removed: %v", err)
+		}
+	})
+}

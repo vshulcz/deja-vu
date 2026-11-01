@@ -663,6 +663,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 		// hook_event_name and rejects a reply that names a different event
 		// back; Claude names it too, in the same canonical spelling.
 		HookEventName string `json:"hook_event_name"`
+		Harness       string `json:"harness"`
 	}
 	// Best effort, as every hook is — but not silent about it. A payload deja
 	// cannot decode carries the session this injection went to, and losing it
@@ -768,6 +769,12 @@ func runHookContextMode(dir string, plain, once bool) error {
 	} else {
 		digest, sessions, raw, taskMatched, withheld, servedIDs, servedProjects = cachedHookDigestFor(dir, hookProjectPath(input.CWD, input.WorkspaceRoots), self...)
 	}
+	var claudeMemCount int
+	digest, claudeMemCount, servedProjects = attachClaudeAutoMemory(
+		dir, input.SessionID, input.TranscriptPath, input.Harness,
+		hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots)),
+		digest, servedProjects,
+	)
 	if digest == "" {
 		return hookContextWithoutDigest(dir, rewired, unreadable, plain, eventName, input.SessionID, withheld)
 	}
@@ -818,60 +825,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 	var resp sessionStartHookResponse
 	resp.HookSpecificOutput.HookEventName = eventName
 	resp.HookSpecificOutput.AdditionalContext = digest
-	// Announce only when the recalled set changed since the last announcement:
-	// injection is recency-ranked, so repeating the same receipt every session
-	// start is wallpaper, and wallpaper builds no habit.
-	if sessions > 0 && notesHaveReader() && receiptIsNews(dir, digest) {
-		plural := ""
-		if sessions > 1 {
-			plural = "s"
-		}
-		// The receipt says why these sessions and not just "recent": when the
-		// working tree pointed at them, name the files that did it.
-		why := "from this project"
-		if len(taskMatched) > 0 {
-			why = "touching " + fitList(taskMatched, 48)
-		}
-		// A non-default policy is part of the receipt: the user should see
-		// that a rule, not chance, decided what memory crossed over.
-		polNote := ""
-		if polName != "local+imported" {
-			polNote = " · policy: " + polName
-			// The line was identical whether the rule hid a session here or
-			// merely existed, so the reader could not tell that memory had
-			// been withheld from this very session — search has said it since
-			// the counter existed (#L-new19).
-			if withheld > 0 {
-				polNote += fmt.Sprintf(" (%s withheld here)", doctorCount(withheld, "session"))
-			}
-		}
-		// A count says deja did something; a name says what. The receipt is
-		// the one place a person reliably sees, so when a piece of work has
-		// earned its keep more than once, it is named here rather than only
-		// on a screen someone has to decide to open (#579).
-		var reused reusedMemory
-		hookPol := policy.Load()
-		if r, ok := findReusedMemory(dir, func(project string) bool {
-			return hookPol.Allows(policy.ActivationAuto, project)
-		}); ok {
-			reused = r
-		}
-		// The receipt is read at a glance, and several hosts show it in a
-		// toast about fifty columns wide, so it is one line: the claim and
-		// the policy always, then today's tally and the re-used session while
-		// they still fit. The byte count and the clause explaining what a
-		// recall is made it two terminal lines in Codex, and nobody acted on
-		// either.
-		//
-		// No colon after the name: hosts introduce the line themselves, and
-		// Claude Code's is "SessionStart:startup says:", which turned the
-		// receipt into "says: deja: recalled …" on screen. Without it the
-		// sentence reads whole after any host's prefix and still carries the
-		// name for hosts that add none.
-		resp.SystemMessage = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring),
-			receiptLine(fmt.Sprintf("deja recalled %d prior session%s %s%s", sessions, plural, why, polNote),
-				reused, serviceReceipt(dir))))
-	}
+	resp.SystemMessage = hookSessionStartReceipt(dir, digest, rewired, sessions, claudeMemCount, withheld, polName, taskMatched)
 	// Nothing below is spent on a host that shows it to nobody.
 	//
 	// A build under way is said whether or not there is a receipt. Gating it on
@@ -1919,6 +1873,77 @@ func limitHandoffTip(dir, cwd string, self []string, starting func() string) str
 		}
 	}
 	return ""
+}
+
+func attachClaudeAutoMemory(dir, id, transcript, harness, cwd, digest string, projects []string) (string, int, []string) {
+	if isClaudeSessionStart(dir, id, transcript, harness) {
+		return digest, 0, projects
+	}
+	cm, n, proj := claudeAutoMemoryBlock(cwd)
+	if cm == "" {
+		return digest, 0, projects
+	}
+	if digest == "" {
+		digest = strings.TrimRight(cm, "\n")
+	} else {
+		digest = cm + "\n" + digest
+	}
+	if proj != "" && !slices.Contains(projects, proj) {
+		projects = append(projects, proj)
+	}
+	return digest, n, projects
+}
+
+func hookSessionStartReceipt(dir, digest string, rewired []string, sessions, claudeMemCount, withheld int, polName string, taskMatched []string) string {
+	if (sessions == 0 && claudeMemCount == 0) || !notesHaveReader() || !receiptIsNews(dir, digest) {
+		return ""
+	}
+	polNote := ""
+	if polName != "local+imported" {
+		polNote = " · policy: " + polName
+		if sessions > 0 && withheld > 0 {
+			polNote += fmt.Sprintf(" (%s withheld here)", doctorCount(withheld, "session"))
+		}
+	}
+	if sessions == 0 {
+		return joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring),
+			receiptLine(fmt.Sprintf("deja carried over %d Claude auto-memory note%s from this project%s", claudeMemCount, pluralS(claudeMemCount), polNote),
+				reusedMemory{}, serviceReceipt(dir))))
+	}
+	why := "from this project"
+	if len(taskMatched) > 0 {
+		why = "touching " + fitList(taskMatched, 48)
+	}
+	var reused reusedMemory
+	hookPol := policy.Load()
+	if r, ok := findReusedMemory(dir, func(project string) bool {
+		return hookPol.Allows(policy.ActivationAuto, project)
+	}); ok {
+		reused = r
+	}
+	return joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring),
+		receiptLine(fmt.Sprintf("deja recalled %d prior session%s %s%s", sessions, pluralS(sessions), why, polNote),
+			reused, serviceReceipt(dir))))
+}
+
+// isClaudeSessionStart reports whether a SessionStart hook payload comes from
+// Claude Code itself, which already loads ~/.claude/projects/<encoded>/memory
+// natively and should not receive those entries twice (#5095).
+func isClaudeSessionStart(dir, id, transcript, harness string) bool {
+	if h := strings.ToLower(strings.TrimSpace(harness)); h != "" {
+		return h == "claude"
+	}
+	if startingHarness(dir, id, transcript) == "claude" {
+		return true
+	}
+	if transcript == "" {
+		return false
+	}
+	if sources.UnderClaudeRoot(transcript) {
+		return true
+	}
+	slash := filepath.ToSlash(filepath.Clean(transcript))
+	return strings.Contains(slash, "/.claude/projects/") || strings.Contains(slash, "/.claude/transcripts/")
 }
 
 // startingHarness is the harness of the session a hook fires for, or "" when

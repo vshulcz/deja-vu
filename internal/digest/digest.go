@@ -602,6 +602,33 @@ func ProjectLabel(cwd string) string {
 	return sources.CWDProjectName(projectRoot(cwd))
 }
 
+// ProjectDirs returns the directory paths that identify the project at cwd:
+// the workspace root, cwd itself, and any git worktree roots, excluding home
+// and filesystem root.
+func ProjectDirs(cwd string) []string {
+	root := projectRoot(cwd)
+	if isHomeOrRoot(root) {
+		return nil
+	}
+	var dirs []string
+	add := func(d string) {
+		d = strings.TrimSpace(d)
+		if d == "" || isHomeOrRoot(d) {
+			return
+		}
+		d = filepath.Clean(d)
+		if !slices.Contains(dirs, d) {
+			dirs = append(dirs, d)
+		}
+	}
+	add(cwd)
+	add(root)
+	for _, wt := range gitWorktreeRoots(root) {
+		add(wt)
+	}
+	return dirs
+}
+
 // projectRoot is where the names are taken from: a WorkBuddy chat folder is
 // named for the workspace root it sits in, as the session recorded there is
 // (#4735).

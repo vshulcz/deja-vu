@@ -107,7 +107,14 @@ BLAME_SCHEMA = {
 }
 
 
-def _deja(args, payload="", timeout=10):
+def _cwd(**kwargs):
+    for d in (kwargs.get("cwd"), kwargs.get("workspace"), kwargs.get("workspace_dir"), os.getenv("TERMINAL_CWD")):
+        if isinstance(d, str) and d.strip() and os.path.isdir(d):
+            return d
+    return os.getcwd()
+
+
+def _deja(args, payload="", timeout=10, cwd=None):
     """Never let memory break a turn: a failure here returns nothing."""
     try:
         done = subprocess.run(
@@ -116,6 +123,7 @@ def _deja(args, payload="", timeout=10):
             capture_output=True,
             text=True,
             timeout=timeout,
+            cwd=cwd or _cwd(),
             creationflags=_NO_WINDOW,
         )
         return done.stdout.strip()
@@ -268,6 +276,7 @@ class DejaMemoryProvider(MemoryProvider):
         self._session_id = session_id or ""
         self._platform = kwargs.get("platform") or ""
         self._status_callback = kwargs.get("status_callback")
+        self._cwd = _cwd(**kwargs)
 
     def system_prompt_block(self) -> str:
         return _ABOUT
@@ -288,20 +297,21 @@ class DejaMemoryProvider(MemoryProvider):
         # one; the timeouts are the ceiling for a machine that is swapping.
         parts, notes = [], []
         session_id = session_id or getattr(self, "_session_id", "")
+        cwd = getattr(self, "_cwd", None) or _cwd()
         if self._first_turn:
             self._first_turn = False
             # The session goes with it: hook-context stamps the session live,
             # which keeps it out of its own MCP recall on this first turn, and
             # keys the digest's once-per-session ledger (#4246 for the hook).
-            start = json.dumps({"session_id": session_id or "", "cwd": os.getcwd()})
-            digest, note = self._hook("hook-context", start, timeout=8)
+            start = json.dumps({"session_id": session_id or "", "cwd": cwd})
+            digest, note = self._hook("hook-context", start, timeout=8, cwd=cwd)
             if digest:
                 parts.append(digest)
             if note:
                 notes.append(note)
         if query:
-            payload = json.dumps({"prompt": query, "session_id": session_id or ""})
-            hit, note = self._hook("hook-prompt", payload, timeout=5)
+            payload = json.dumps({"prompt": query, "session_id": session_id or "", "cwd": cwd})
+            hit, note = self._hook("hook-prompt", payload, timeout=5, cwd=cwd)
             if hit:
                 parts.append(hit)
             if note:
@@ -322,13 +332,13 @@ class DejaMemoryProvider(MemoryProvider):
             self._last_notes, self._held_notes = [], (self._held_notes + fresh)[-8:]
         return text
 
-    def _hook(self, command, payload, timeout):
+    def _hook(self, command, payload, timeout, cwd=None):
         """One deja run: the model's text, and deja's line for the person
         when this Hermes will print a recall indicator to show it on."""
         if (RecallStatus is None or getattr(self, "_platform", "") not in _SHOWS_LINE
                 or not _status_prints(getattr(self, "_status_callback", None))):
-            return _deja([command, "--plain"], payload, timeout=timeout), ""
-        return _split_reply(_deja([command], payload, timeout=timeout))
+            return _deja([command, "--plain"], payload, timeout=timeout, cwd=cwd), ""
+        return _split_reply(_deja([command], payload, timeout=timeout, cwd=cwd))
 
     def recall_status(self):
         if RecallStatus is None or not self._last_text:
@@ -347,8 +357,9 @@ class DejaMemoryProvider(MemoryProvider):
         # 0.17.0). The session's live stamp goes, so the next session's MCP
         # recall can answer with it now rather than twenty minutes from now.
         sid = getattr(self, "_session_id", "")
+        cwd = getattr(self, "_cwd", None) or _cwd()
         if sid:
-            _deja(["hook-session-end"], json.dumps({"session_id": sid, "cwd": os.getcwd()}), timeout=3)
+            _deja(["hook-session-end"], json.dumps({"session_id": sid, "cwd": cwd}), timeout=3, cwd=cwd)
 
     def on_pre_compress(self, messages) -> str:
         # Held until the compression commits: Hermes can still abandon it, and
@@ -361,6 +372,10 @@ class DejaMemoryProvider(MemoryProvider):
         # the digest; hand it over again on the next turn.
         if new_session_id:
             self._session_id = new_session_id
+        for k in ("cwd", "workspace", "workspace_dir"):
+            if kwargs.get(k):
+                self._cwd = _cwd(**kwargs)
+                break
         if reset or rewound:
             self._first_turn = True
         # Lines held for the conversation that just ended are not about the
@@ -373,20 +388,22 @@ class DejaMemoryProvider(MemoryProvider):
         # with, and hands it back on that turn.
         compressed, self._compressing = getattr(self, "_compressing", None), None
         if kwargs.get("reason") == "compression" and compressed and new_session_id:
+            cwd = getattr(self, "_cwd", None) or _cwd()
             payload = json.dumps({
                 "session_id": new_session_id,
-                "cwd": os.getcwd(),
+                "cwd": cwd,
                 "harness": "hermes",
                 "messages": _bounded_messages(compressed),
             }, default=str)
-            _deja(["hook-precompact"], payload, timeout=10)
+            _deja(["hook-precompact"], payload, timeout=10, cwd=cwd)
 
     def on_memory_write(self, action: str, target: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> None:
         # A MEMORY.md / USER.md entry is a decision worth outranking the noisy
         # sessions around it; deja keeps it as a note in the same index.
         # "--" because an entry may start with a dash ("- user prefers X").
         if action == "add" and content and content.strip():
-            _deja(["remember", "--tag", "hermes-%s" % (target or "memory"), "--", content.strip()])
+            cwd = getattr(self, "_cwd", None) or _cwd()
+            _deja(["remember", "--tag", "hermes-%s" % (target or "memory"), "--", content.strip()], cwd=cwd)
 
     def get_tool_schemas(self) -> List[Dict[str, Any]]:
         return [RECALL_SCHEMA, FIX_SCHEMA, BLAME_SCHEMA]
@@ -396,17 +413,18 @@ class DejaMemoryProvider(MemoryProvider):
         # the index, which took 18s on a large machine. The per-turn hooks
         # above never build. fix and blame print for a person, so --framed puts
         # it inside deja's untrusted-data frame; recall frames its own page.
+        cwd = _cwd(**kwargs) if any(kwargs.get(k) for k in ("cwd", "workspace", "workspace_dir")) else (getattr(self, "_cwd", None) or _cwd())
         if tool_name == "deja_recall":
             call = _recall_args(args)
-            text = _deja(call, timeout=120)
+            text = _deja(call, timeout=120, cwd=cwd)
             if not text and "--offset" in call:
                 # recall always prints a line; silence past the first page is
                 # a deja older than --offset refusing the flag.
                 text = "This deja cannot page recall. Run deja update, then ask again with the same offset."
         elif tool_name == "deja_fix":
-            text = _deja(["--framed"] + _query_args("fix", args.get("error", "")), timeout=120)
+            text = _deja(["--framed"] + _query_args("fix", args.get("error", "")), timeout=120, cwd=cwd)
         elif tool_name == "deja_blame":
-            text = _deja(["--framed"] + _query_args("blame", args.get("path", "")), timeout=120)
+            text = _deja(["--framed"] + _query_args("blame", args.get("path", "")), timeout=120, cwd=cwd)
         else:
             return json.dumps({"error": "unknown tool %s" % tool_name})
         return json.dumps({"result": text or "nothing in this machine's history matches"})

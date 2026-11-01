@@ -102,6 +102,13 @@ DEJA = %s
 _NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
 
+def _cwd(**kwargs):
+    for d in (kwargs.get("cwd"), kwargs.get("workspace"), kwargs.get("workspace_dir"), os.getenv("TERMINAL_CWD")):
+        if isinstance(d, str) and d.strip() and os.path.isdir(d):
+            return d
+    return os.getcwd()
+
+
 def _deja(args, payload="", timeout=10):
     """Never let memory break a turn: a failure here returns nothing."""
     try:
@@ -111,6 +118,7 @@ def _deja(args, payload="", timeout=10):
             capture_output=True,
             text=True,
             timeout=timeout,
+            cwd=_cwd(),
             creationflags=_NO_WINDOW,
         )
         return done.stdout.strip()
@@ -245,17 +253,18 @@ def recall(session_id=None, user_message=None, is_first_turn=False, **kwargs):
     # person asked for. The deja tool still answers when the job calls it.
     if kwargs.get("platform") == "cron":
         return None
+    cwd = _cwd(**kwargs)
     if is_first_turn:
         # The session id, so hook-context stamps this session live: a first
         # turn returns before hook-prompt runs, and the deja tool answered it
         # with the session asking (#4246).
-        start = json.dumps({"session_id": session_id or ""})
+        start = json.dumps({"session_id": session_id or "", "cwd": cwd})
         digest = _deja(["hook-context", "--plain"], start)
         if digest:
             return {"context": digest}
     if not user_message:
         return None
-    payload = json.dumps({"prompt": user_message, "session_id": session_id or ""})
+    payload = json.dumps({"prompt": user_message, "session_id": session_id or "", "cwd": cwd})
     hit = _deja(["hook-prompt", "--plain"], payload)
     return {"context": hit} if hit else None
 

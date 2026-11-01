@@ -197,3 +197,59 @@ func TestHermesToolsAskForFramedOutput(t *testing.T) {
 		t.Fatalf("argv =\n%s\nwant\n%s", got, want)
 	}
 }
+
+func TestHermesToolsRunInSessionWorkspace(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("stub deja is a shebang script")
+	}
+	py, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("python3 not on PATH")
+	}
+	dir := t.TempDir()
+	cwdFile := filepath.Join(dir, "cwd.txt")
+	stub := filepath.Join(dir, "deja")
+	stubSrc := "#!" + py + "\nimport os\nopen(" + strconv.Quote(cwdFile) + ", 'a').write(os.path.realpath(os.getcwd()) + '\\n')\n"
+	if werr := os.WriteFile(stub, []byte(stubSrc), 0o755); werr != nil {
+		t.Fatal(werr)
+	}
+	ws := filepath.Join(dir, "workspace")
+	if merr := os.MkdirAll(ws, 0o755); merr != nil {
+		t.Fatal(merr)
+	}
+	realWS, err := filepath.EvalSymlinks(ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if merr := os.MkdirAll(filepath.Join(dir, "agent"), 0o755); merr != nil {
+		t.Fatal(merr)
+	}
+	if werr := os.WriteFile(filepath.Join(dir, "agent", "__init__.py"), nil, 0o644); werr != nil {
+		t.Fatal(werr)
+	}
+	if werr := os.WriteFile(filepath.Join(dir, "agent", "memory_provider.py"), []byte("class MemoryProvider:\n    pass\n"), 0o644); werr != nil {
+		t.Fatal(werr)
+	}
+	if werr := os.WriteFile(filepath.Join(dir, "provider.py"), []byte(hermesMemoryPy(stub)), 0o644); werr != nil {
+		t.Fatal(werr)
+	}
+	run := "import provider\np = provider.DejaMemoryProvider()\n" +
+		"p.initialize('s1', workspace_dir=" + strconv.Quote(ws) + ")\n" +
+		"p.handle_tool_call('deja_recall', {'query': 'q'})\n" +
+		"p.handle_tool_call('deja_fix', {'error': 'e'})\n" +
+		"p.handle_tool_call('deja_blame', {'path': 'a.go'})\n"
+	cmd := exec.CommandContext(t.Context(), py, "-c", run)
+	cmd.Dir = dir
+	if out, cerr := cmd.CombinedOutput(); cerr != nil {
+		t.Fatalf("provider: %v\n%s", cerr, out)
+	}
+	got, err := os.ReadFile(cwdFile)
+	if err != nil {
+		t.Fatalf("stub deja was not called: %v", err)
+	}
+	for line := range strings.SplitSeq(strings.TrimSpace(string(got)), "\n") {
+		if line != realWS {
+			t.Errorf("tool ran in %q, want session workspace %q", line, realWS)
+		}
+	}
+}

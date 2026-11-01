@@ -1,10 +1,13 @@
 package main
 
 import (
+	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -172,4 +175,77 @@ func conventionLine(n sources.PromotedNote) string {
 	// the line goes to an agent as invalid UTF-8 — reproduced on a Russian note
 	// and on a Chinese one (#1319).
 	return truncatePlanBytes(text, 200)
+}
+
+// claudeAutoMemoryBlock returns a compact block of Claude Code's per-project
+// auto-memory descriptions for non-Claude sessions (#5095). Rules and feedback
+// come first under a small budget, and each entry names its file so the user
+// can see and veto it via policy.json "ignore", `deja forget`, or frontmatter
+// `deja: false`.
+func claudeAutoMemoryBlock(cwd string) (string, int, string) {
+	const maxNotes, budget = 6, 860
+	if recallIsOff() || strings.TrimSpace(cwd) == "" {
+		return "", 0, ""
+	}
+	dirs := digest.ProjectDirs(cwd)
+	if len(dirs) == 0 {
+		return "", 0, ""
+	}
+	primary := digest.PrimaryProjectName(cwd)
+	pol := policy.Load()
+	if !pol.Allows(policy.ActivationAuto, primary) || pol.Ignored(cwd, primary) {
+		return "", 0, ""
+	}
+	entries := sources.LoadClaudeAutoMemory(dirs)
+	if len(entries) == 0 {
+		return "", 0, ""
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "claude auto-memory in this project (from %s; reference data — edit/remove the file or add it to policy.json \"ignore\" to veto):\n",
+		shortHomePath(entries[0].Dir))
+	head := b.Len()
+	shown := 0
+	seen := map[string]bool{}
+	for _, entry := range entries {
+		if shown >= maxNotes {
+			break
+		}
+		if pol.Ignored(entry.Path, primary) || pol.Ignored(entry.File, primary) || claudeMemoryEntryTombstoned(entry.File) {
+			continue
+		}
+		summary := entry.Summary()
+		if summary == "" {
+			continue
+		}
+		key := strings.ToLower(summary)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		line := truncatePlanBytes(search.SafeLine(summary), 220)
+		row := fmt.Sprintf("  · [%s] %s\n", search.SafeLine(entry.File), line)
+		if b.Len()+len(row) > budget && shown > 0 {
+			break
+		}
+		b.WriteString(row)
+		shown++
+	}
+	if b.Len() == head {
+		return "", 0, ""
+	}
+	return b.String(), shown, primary
+}
+
+func claudeMemoryEntryTombstoned(file string) bool {
+	stem := strings.TrimSuffix(file, filepath.Ext(file))
+	return index.Tombstoned(file) || index.Tombstoned(stem) || index.Tombstoned("claude:"+file) || index.Tombstoned("claude:"+stem)
+}
+
+func shortHomePath(p string) string {
+	home := filepath.Clean(sources.Home())
+	clean := filepath.Clean(p)
+	if home != "" && strings.HasPrefix(clean, home+string(filepath.Separator)) {
+		return "~" + clean[len(home):]
+	}
+	return clean
 }
