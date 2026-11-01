@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.4] - 2026-11-01
+
+Reverse commit attribution (`deja origin`), shell-layer recall (`deja shell`)
+for agents whose MCP or hook channel is absent or broken, full CJK recall and
+decision extraction parity, and expanded harness wiring and session-deletion
+guides across the 43 supported agents.
+
+### Added
+
+- `deja origin [rev|range]` traces commits back to the coding agent session and
+  user prompt that produced them across all 43 harnesses, matching git author
+  timestamps and changed file paths against indexed tool edits (`--json`,
+  `--harness`, `--project`, `--limit`) (#534).
+- `deja shell` adds a shell-level recall channel independent of harness MCP or
+  hook support: `eval "$(deja shell zsh|bash|fish)"` installs preexec/postexec
+  hooks that surface prior command warnings and post-failure fix pairs,
+  `deja shell -c "<cmd>"` wraps command execution directly (`SHELL=deja`), and
+  `deja shell --verify [--json]` probes live MCP stdio `initialize` and
+  `tools/list` call-through across every wired harness (#1214).
+- Continue CLI (`cn`) hook wiring (`UserPromptSubmit`, `SessionStart`, `Stop`,
+  `PreToolUse`, `PostToolUse`, `PreCompact`) in `~/.continue/config.yaml` and
+  `~/.continue/settings.json` (#5798).
+- Guide pages for deleting session history in Goose, Gemini CLI, Aider, Hermes
+  (with @beiryu) and Crush (with @Kasa-Harendra), plus updated `deja delete`
+  guides (#5571, #5643, #5645, #5646, #5647, #4968).
+
+### Changed
+
+- CJK (Chinese, Japanese, Korean) queries, decision markers, correction cues,
+  and error signatures now tokenize and rank on par with English and Russian:
+  punctuation-free CJK prompts keep query tokens intact, `CarriesDecision` and
+  `HasFact` recognize Chinese architectural and root-cause markers (`决定`,
+  `改成`, `根因`, `排查`, `修复`, `原因`, `方案`, `不能`, `必须`), and
+  cross-session recall surfaces Chinese decisions and fix pairs (#5777, #5791,
+  #5804).
+- VS Code fork family (Cursor, Windsurf, Trae, Antigravity, CodeBuddy, Qoder,
+  PearAI, Void, Melty, Aide) shares unified `state.vscdb` and `workspaceStorage`
+  session discovery (#5797).
+
+### Fixed
+
+- `deja install` and `deja doctor` handle symlinked harness config paths,
+  custom `CLAUDE_CONFIG_DIR` / `CODEX_HOME` roots, Qwen Code `settings.json`
+  hook coexistence, and Cursor workspace database WAL locks cleanly (#4971,
+  #3784, #4976, #528).
+
 ## [0.23.3] - 2026-10-29
 
 Recalled code changes keep library edits ahead of `*_test.py` files and leave
@@ -2672,7 +2718,8 @@ See the release notes: Antigravity harness, share redaction hardening.
 - Stdio MCP memory server with `recall` and `recall_context` tools.
 - Idempotent installers for claude-code, codex, and opencode MCP config.
 
-[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.23.3...HEAD
+[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.23.4...HEAD
+[0.23.4]: https://github.com/vshulcz/deja-vu/compare/v0.23.3...v0.23.4
 [0.23.3]: https://github.com/vshulcz/deja-vu/compare/v0.23.2...v0.23.3
 [0.23.2]: https://github.com/vshulcz/deja-vu/compare/v0.23.1...v0.23.2
 [0.23.1]: https://github.com/vshulcz/deja-vu/compare/v0.23.0...v0.23.1
