@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ru" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Как удалить сессии Claude Code на диске — deja-vu</title>
+<meta name="description" content="Где Claude Code хранит сессии в ~/.claude/projects, как удалить одну сессию или проект через claude project purge, настройка cleanupPeriodDays и бэкап в deja.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/ru/guide/session-files-on-disk.html">
+<link rel="alternate" hreflang="ru" href="https://vshulcz.github.io/deja-vu/ru/guide/session-files-on-disk.html">
+<link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html">
+<link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:title" content="Как удалить сессии Claude Code на диске">
+<meta property="og:description" content="Где Claude Code хранит сессии в ~/.claude/projects, как удалить одну сессию или проект через claude project purge, настройка cleanupPeriodDays и бэкап в deja.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/ru/guide/session-files-on-disk.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — локальная память и поиск по истории для кодинг-агентов">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<meta name="twitter:title" content="Как удалить сессии Claude Code на диске">
+<meta name="twitter:description" content="Где Claude Code хранит сессии в ~/.claude/projects, как удалить одну сессию или проект через claude project purge, настройка cleanupPeriodDays и бэкап в deja.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../../assets/icon.svg">
+<link rel="stylesheet" href="../../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<link rel="apple-touch-icon" href="../../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Как удалить сессии Claude Code на диске и что при этом теряется", "description": "Где Claude Code хранит сессии в ~/.claude/projects, как удалить одну сессию или проект через claude project purge, настройка cleanupPeriodDays и бэкап в deja.", "url": "https://vshulcz.github.io/deja-vu/ru/guide/session-files-on-disk.html", "inLanguage": "ru", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/ru/guide/session-files-on-disk.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-01", "dateModified": "2026-11-01"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Как удалить сессии Claude Code", "item": "https://vshulcz.github.io/deja-vu/ru/guide/session-files-on-disk.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Как удалить одну или все сессии Claude Code?", "acceptedAnswer": {"@type": "Answer", "text": "Весь проект удаляется командой claude project purge (с флагом --dry-run для предпросмотра). Одна сессия — это файл ~/.claude/projects/<папка-проекта>/<session-id>.jsonl, который удаляется через rm или клавишей D в терминальном интерфейсе deja."}}, {"@type": "Question", "name": "Удаляет ли Claude Code старые сессии автоматически?", "acceptedAnswer": {"@type": "Answer", "text": "Да. По умолчанию параметр cleanupPeriodDays в ~/.claude/settings.json равен 30 дням: файлы старше 30 дней удаляются без предупреждения. Увеличьте cleanupPeriodDays или проиндексируйте сессии через deja-vu, чтобы не потерять их."}}, {"@type": "Question", "name": "Удаляет ли команда /clear файлы сессий?", "acceptedAnswer": {"@type": "Answer", "text": "Нет. /clear только начинает новый диалог с пустым окном контекста, а предыдущая сессия остаётся на диске в виде отдельного файла .jsonl."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../../"><img src="../../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../../">Главная</a><a class="lnk" href="getting-started.html">Документация</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../../">← deja-vu</a><div class="grp">Руководство (RU)</div>
+<a href="getting-started.html">Быстрый старт</a>
+<a href="does-my-agent-remember.html">Помнит ли агент прошлые сессии?</a>
+<a href="session-files-on-disk.html" aria-current="page">Как удалить сессии Claude Code</a>
+<a href="cursor-state-vscdb-too-large.html">state.vscdb в Cursor слишком большой</a>
+<a href="delete-cursor-chat-history.html">Как удалить историю чатов Cursor</a>
+<a href="codex-history.html">История сессий Codex CLI</a>
+<div class="grp">English</div>
+<a href="../../guide/getting-started.html">Getting started</a>
+<a href="../../guide/does-my-agent-remember.html">Does my agent remember?</a>
+<a href="../../guide/session-files-on-disk.html">Session files on disk</a>
+<a href="../../guide/harnesses.html">Harnesses</a>
+<a href="../../guide/benchmarks.html">Benchmarks</a>
+<a href="../../guide/compare.html">Compare</a>
+<div class="grp">Справка</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.ru.md">README на русском</a>
+<a href="../../registry/README.html">Реестр форматов</a><a class="sidecat" href="../../"><img src="../../assets/icon-live.svg" width="46" height="46" alt=""><span>помнит за вас</span></a></aside>
+<article>
+
+<h1>Как удалить сессии Claude Code и что при этом теряется</h1>
+<p class="pagelede">сессии лежат в <code>~/.claude/projects</code> в виде файлов <code>.jsonl</code>: удалить можно через <code>rm</code>, <code>claude project purge</code> или таймер <code>cleanupPeriodDays</code><span class="mins" data-mins></span></p>
+
+<p>Каждая сессия Claude Code записывается на диск в реальном времени в каталог <code>~/.claude/projects</code> — по одной папке на проект и по одному файлу <code>.jsonl</code> на сессию. О существовании этих файлов обычно узнают, когда они разрастаются до гигабайтов (на рабочей машине с 13 проектами за два месяца набралось 875 файлов на 1,6 ГБ, причём один файл весил 586 МБ).</p>
+
+<div class="save-first"><b>Перед запуском <code>rm</code> или <code>claude project purge</code>:</b> удалённый <code>.jsonl</code> навсегда пропадает из <code>claude --resume</code> и любого будущего поиска. Проиндексируйте историю с помощью <a href="https://github.com/vshulcz/deja-vu">deja-vu</a> за ~10 секунд (индекс занимает ~10% от исходного размера, секреты вырезаются) — тогда удалённые сессии останутся доступны для поиска, а <code>deja resume &lt;id&gt; --write-back</code> позволит вернуть нужную сессию обратно в <code>claude --resume</code>.</div>
+
+<h2>Команды для удаления сессий Claude Code</h2>
+<p>Начиная с Claude Code 2.1.126, удалить все сессии проекта целиком можно одной командой <code>claude project purge</code> (сначала запустите с <code>--dry-run</code>). Для удаления одной конкретной сессии отдельной команды в Claude Code нет — достаточно удалить её файл <code>.jsonl</code> или выбрать сессию в терминальном списке <a href="https://github.com/vshulcz/deja-vu">deja</a> (клавиша <code>D</code> или <code>deja delete &lt;id&gt;</code>).</p>
+<p>Команда <code>/clear</code> внутри чата ничего с диска не удаляет: она лишь открывает новую сессию с чистым контекстом, оставляя старый <code>.jsonl</code> на месте.</p>
+<pre># все сессии текущего проекта (сначала проверьте список через --dry-run)
+claude project purge --dry-run
+claude project purge
+
+# все проекты сразу
+claude project purge --all
+
+# одна сессия: посмотреть самые свежие или самые крупные и удалить файл
+ls -lhS ~/.claude/projects/-Users-you-project/*.jsonl | head
+rm ~/.claude/projects/-Users-you-project/&lt;session-id&gt;.jsonl
+
+# или через deja (для любого из 43 агентов):
+deja delete &lt;session-id&gt; --dry-run
+deja delete &lt;session-id&gt;
+
+# автоочистка сессий старше N дней в ~/.claude/settings.json
+{ "cleanupPeriodDays": 7 }</pre>
+
+<h2>Автоматическое удаление через 30 дней (cleanupPeriodDays)</h2>
+<p>По умолчанию Claude Code хранит транскрипты только <b>30 дней</b>, после чего фоновая очистка удаляет их без уведомлений. Если вы хотите хранить файлы дольше, увеличьте <code>cleanupPeriodDays</code> в <code>~/.claude/settings.json</code>:</p>
+<pre>{ "cleanupPeriodDays": 3650 }</pre>
+<p>Если вы используете <a href="https://github.com/vshulcz/deja-vu">deja-vu</a>, все проиндексированные сессии остаются в локальном индексе даже после того, как Claude Code удалит исходные <code>.jsonl</code>. Во вкладке <b>Deleted</b> интерактивного экрана <code>deja</code> можно просмотреть такие сессии и нажать <code>R</code> (или выполнить <code>deja resume &lt;id&gt; --write-back</code>), чтобы записать диалог обратно в <code>~/.claude/projects</code> для <code>claude --resume</code>.</p>
+
+<h2>Как освободить место без потери истории</h2>
+<p>Основной объём в <code>~/.claude/projects</code> занимают не сотни старых диалогов, а 5–10 гигантских сессий с длинным выводом сборщиков и тестов. Чтобы быстро освободить гигабайты:</p>
+<pre># найти файлы крупнее 50 МБ
+find ~/.claude/projects -name '*.jsonl' -size +50M -ls
+
+# сначала проиндексировать всё в deja, чтобы сохранить поиск
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto</pre>
+
+<p><a href="getting-started.html">Быстрый старт deja</a> · <a href="cursor-state-vscdb-too-large.html">state.vscdb в Cursor слишком большой</a> · <a href="codex-history.html">История сессий Codex CLI</a></p>
+<p class="star-cta">Пригодилось? <a href="https://github.com/vshulcz/deja-vu">Поставьте deja-vu звезду на GitHub</a>.</p>
+</article>
+</div>
+<footer>deja-vu распространяется под лицензией MIT и работает локально на вашей машине. <a href="https://github.com/vshulcz/deja-vu">Исходный код на GitHub</a> · <a href="../../">Главная</a></footer>
+</div>
+<script src="../../assets/guide.js" defer></script>
+</body>
+</html>

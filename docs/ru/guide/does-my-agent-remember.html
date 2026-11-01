@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ru" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Помнит ли Claude Code прошлые сессии и чаты? — deja-vu</title>
+<meta name="description" content="Claude Code, Codex, Cursor и Gemini CLI забывают контекст между сессиями. Что остаётся на диске, что теряется при компакции и как дать агентам общую память.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/ru/guide/does-my-agent-remember.html">
+<link rel="alternate" hreflang="ru" href="https://vshulcz.github.io/deja-vu/ru/guide/does-my-agent-remember.html">
+<link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/does-my-agent-remember.html">
+<link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:title" content="Помнит ли Claude Code прошлые сессии и чаты?">
+<meta property="og:description" content="Claude Code, Codex, Cursor и Gemini CLI забывают контекст между сессиями. Что остаётся на диске, что теряется при компакции и как дать агентам общую память.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/ru/guide/does-my-agent-remember.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — локальная память и поиск по истории для кодинг-агентов">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<meta name="twitter:title" content="Помнит ли Claude Code прошлые сессии и чаты?">
+<meta name="twitter:description" content="Claude Code, Codex, Cursor и Gemini CLI забывают контекст между сессиями. Что остаётся на диске, что теряется при компакции и как дать агентам общую память.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../../assets/icon.svg">
+<link rel="stylesheet" href="../../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<link rel="apple-touch-icon" href="../../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Помнит ли ваш кодинг-агент предыдущие сессии?", "description": "Claude Code, Codex, Cursor и Gemini CLI забывают контекст между сессиями. Что остаётся на диске, что теряется при компакции и как дать агентам общую память.", "url": "https://vshulcz.github.io/deja-vu/ru/guide/does-my-agent-remember.html", "inLanguage": "ru", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/ru/guide/does-my-agent-remember.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-01", "dateModified": "2026-11-01"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Помнит ли агент прошлые сессии?", "item": "https://vshulcz.github.io/deja-vu/ru/guide/does-my-agent-remember.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Помнит ли Claude Code предыдущие сессии?", "acceptedAnswer": {"@type": "Answer", "text": "Нет. При запуске новой сессии окно контекста пустое, кроме файлов CLAUDE.md и MEMORY.md. При этом полные логи всех прошлых сессий уже лежат на диске в ~/.claude/projects, но сам агент по ним не ищет."}}, {"@type": "Question", "name": "Как дать Claude Code, Codex и Cursor общую память между сессиями?", "acceptedAnswer": {"@type": "Answer", "text": "Установите deja-vu (curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto). deja строит локальный индекс по уже существующим на диске сессиям всех 43 агентов и автоматически подгружает релевантный опыт через MCP и хуки."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../../"><img src="../../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../../">Главная</a><a class="lnk" href="getting-started.html">Документация</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../../">← deja-vu</a><div class="grp">Руководство (RU)</div>
+<a href="getting-started.html">Быстрый старт</a>
+<a href="does-my-agent-remember.html" aria-current="page">Помнит ли агент прошлые сессии?</a>
+<a href="session-files-on-disk.html">Как удалить сессии Claude Code</a>
+<a href="cursor-state-vscdb-too-large.html">state.vscdb в Cursor слишком большой</a>
+<a href="delete-cursor-chat-history.html">Как удалить историю чатов Cursor</a>
+<a href="codex-history.html">История сессий Codex CLI</a>
+<div class="grp">English</div>
+<a href="../../guide/getting-started.html">Getting started</a>
+<a href="../../guide/does-my-agent-remember.html">Does my agent remember?</a>
+<a href="../../guide/session-files-on-disk.html">Session files on disk</a>
+<a href="../../guide/harnesses.html">Harnesses</a>
+<a href="../../guide/benchmarks.html">Benchmarks</a>
+<a href="../../guide/compare.html">Compare</a>
+<div class="grp">Справка</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.ru.md">README на русском</a>
+<a href="../../registry/README.html">Реестр форматов</a><a class="sidecat" href="../../"><img src="../../assets/icon-live.svg" width="46" height="46" alt=""><span>помнит за вас</span></a></aside>
+<article>
+
+<h1>Помнит ли ваш кодинг-агент предыдущие сессии?</h1>
+<p class="pagelede">на диске сохранено каждое слово, но новая сессия открывается с чистого листа<span class="mins" data-mins></span></p>
+
+<p>Короткий ответ — нет. Когда вы закрываете терминал или начинаете новый чат в Claude Code, Codex, Cursor, Gemini CLI или Qwen Code, окно контекста сбрасывается. При этом сам диалог, все запущенные команды и их вывод <b>уже записаны на диск</b> — просто ни один агент не индексирует и не ищет по этой истории сам.</p>
+
+<h2>Что каждый агент хранит на диске</h2>
+<table>
+<tr><th>Агент</th><th>Где лежит история</th><th>Что помнит новая сессия сама</th></tr>
+<tr><td>Claude Code</td><td><code>~/.claude/projects/**/*.jsonl</code></td><td><code>CLAUDE.md</code> и <code>MEMORY.md</code> (до 200 строк); прошлые <code>.jsonl</code> не читаются</td></tr>
+<tr><td>Codex CLI</td><td><code>~/.codex/sessions/**/*.jsonl(.zst)</code></td><td><code>AGENTS.md</code>; прошлые сессии доступны только через ручной <code>codex resume</code></td></tr>
+<tr><td>Cursor</td><td><code>state.vscdb</code> (SQLite) и <code>~/.cursor/projects</code></td><td>правила <code>.cursor/rules</code>; поиск по старым чатам из нового чата не выполняется</td></tr>
+<tr><td>Gemini CLI / Qwen Code</td><td><code>~/.gemini/tmp</code>, <code>~/.qwen/projects</code></td><td><code>GEMINI.md</code> / <code>QWEN.md</code>; прошлые сессии изолированы</td></tr>
+</table>
+
+<h2>Что теряется при компакции (<code>/compact</code>)</h2>
+<p>Даже внутри одной длинной сессии, когда окно контекста заполняется и запускается компакция, суммаризация сохраняет около <b>77% архитектурных решений, но лишь 0,2% точных команд и флагов</b> (замер на 43 реальных компакциях). Точная строка ошибки или флаг сборки почти всегда выбрасываются из сводки.</p>
+
+<h2>Как дать всем агентам память по уже существующей истории</h2>
+<p>Инструменты вроде <code>claude-mem</code> или <code>Mem0</code> начинают записывать сессии только с момента своей установки и требуют LLM для суммаризации. <a href="https://github.com/vshulcz/deja-vu">deja-vu</a> идёт другим путём: один Go-бинарник без LLM индексирует сессии, которые ваши 43 агента <b>уже записали на диск за прошлые месяцы</b>, и автоматически подаёт нужные решения через MCP и хуки.</p>
+<pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto</pre>
+<p>После этого решение, найденное в марте в Codex, автоматически всплывает в Claude Code или Cursor, когда вы снова сталкиваетесь с той же ошибкой или тем же файлом.</p>
+
+<p><a href="getting-started.html">Быстрый старт deja</a> · <a href="session-files-on-disk.html">Как удалить сессии Claude Code</a> · <a href="codex-history.html">История сессий Codex CLI</a></p>
+<p class="star-cta">Пригодилось? <a href="https://github.com/vshulcz/deja-vu">Поставьте deja-vu звезду на GitHub</a>.</p>
+</article>
+</div>
+<footer>deja-vu распространяется под лицензией MIT и работает локально на вашей машине. <a href="https://github.com/vshulcz/deja-vu">Исходный код на GitHub</a> · <a href="../../">Главная</a></footer>
+</div>
+<script src="../../assets/guide.js" defer></script>
+</body>
+</html>

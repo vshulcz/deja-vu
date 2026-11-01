@@ -24,57 +24,65 @@ func TestChinesePagesArePairedWithTheirEnglishOnes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var pages []string
-	err = filepath.Walk(filepath.Join(root, "docs", "zh"), func(p string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() || !strings.HasSuffix(p, ".html") {
-			return err
-		}
-		pages = append(pages, p)
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(pages) == 0 {
-		t.Fatal("no Chinese pages under docs/zh — this test has lost its subject")
-	}
-
-	for _, zh := range pages {
-		rel := filepath.ToSlash(strings.TrimPrefix(zh, filepath.Join(root, "docs")+string(filepath.Separator)))
-		en := filepath.Join(root, "docs", filepath.FromSlash(strings.TrimPrefix(rel, "zh/")))
-
-		zhURL := site + rel
-		enURL := site + strings.TrimPrefix(rel, "zh/")
-
-		zhBody, err := os.ReadFile(zh)
+	for _, tc := range []struct {
+		dir      string
+		hreflang string
+	}{
+		{"zh", "zh-Hans"},
+		{"ru", "ru"},
+	} {
+		var pages []string
+		err = filepath.Walk(filepath.Join(root, "docs", tc.dir), func(p string, info os.FileInfo, err error) error {
+			if err != nil || info.IsDir() || !strings.HasSuffix(p, ".html") {
+				return err
+			}
+			pages = append(pages, p)
+			return nil
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		enBody, err := os.ReadFile(en)
-		if err != nil {
-			t.Errorf("%s has no English counterpart at %s: %v", rel, en, err)
-			continue
+		if len(pages) == 0 {
+			t.Fatalf("no %s pages under docs/%s — this test has lost its subject", tc.dir, tc.dir)
 		}
 
-		for _, want := range []struct{ file, link string }{
-			{zh, `hreflang="zh-Hans" href="` + zhURL + `"`},
-			{zh, `hreflang="en" href="` + enURL + `"`},
-			{en, `hreflang="zh-Hans" href="` + zhURL + `"`},
-			{en, `hreflang="en" href="` + enURL + `"`},
-		} {
-			body := zhBody
-			if want.file == en {
-				body = enBody
-			}
-			if !strings.Contains(string(body), want.link) {
-				t.Errorf("%s does not declare %s — hreflang has to be on both pages or it is ignored",
-					strings.TrimPrefix(want.file, root+string(filepath.Separator)), want.link)
-			}
-		}
+		for _, loc := range pages {
+			rel := filepath.ToSlash(strings.TrimPrefix(loc, filepath.Join(root, "docs")+string(filepath.Separator)))
+			en := filepath.Join(root, "docs", filepath.FromSlash(strings.TrimPrefix(rel, tc.dir+"/")))
 
-		for _, u := range []string{zhURL, enURL} {
-			if !strings.Contains(string(sitemap), "<loc>"+u+"</loc>") {
-				t.Errorf("docs/sitemap.xml does not list %s", u)
+			locURL := site + rel
+			enURL := site + strings.TrimPrefix(rel, tc.dir+"/")
+
+			locBody, err := os.ReadFile(loc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			enBody, err := os.ReadFile(en)
+			if err != nil {
+				t.Errorf("%s has no English counterpart at %s: %v", rel, en, err)
+				continue
+			}
+
+			for _, want := range []struct{ file, link string }{
+				{loc, `hreflang="` + tc.hreflang + `" href="` + locURL + `"`},
+				{loc, `hreflang="en" href="` + enURL + `"`},
+				{en, `hreflang="` + tc.hreflang + `" href="` + locURL + `"`},
+				{en, `hreflang="en" href="` + enURL + `"`},
+			} {
+				body := locBody
+				if want.file == en {
+					body = enBody
+				}
+				if !strings.Contains(string(body), want.link) {
+					t.Errorf("%s does not declare %s — hreflang has to be on both pages or it is ignored",
+						strings.TrimPrefix(want.file, root+string(filepath.Separator)), want.link)
+				}
+			}
+
+			for _, u := range []string{locURL, enURL} {
+				if !strings.Contains(string(sitemap), "<loc>"+u+"</loc>") {
+					t.Errorf("docs/sitemap.xml does not list %s", u)
+				}
 			}
 		}
 	}

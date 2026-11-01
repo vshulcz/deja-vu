@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ru" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Как удалить историю чатов Cursor — deja-vu</title>
+<meta name="description" content="Где Cursor хранит чаты в state.vscdb и логи CLI, почему удаление файла сбрасывает настройки IDE и как сохранить поиск по удалённым чатам через deja-vu.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/ru/guide/delete-cursor-chat-history.html">
+<link rel="alternate" hreflang="ru" href="https://vshulcz.github.io/deja-vu/ru/guide/delete-cursor-chat-history.html">
+<link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/delete-cursor-chat-history.html">
+<link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:title" content="Как удалить историю чатов Cursor">
+<meta property="og:description" content="Где Cursor хранит чаты в state.vscdb и логи CLI, почему удаление файла сбрасывает настройки IDE и как сохранить поиск по удалённым чатам через deja-vu.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/ru/guide/delete-cursor-chat-history.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — локальная память и поиск по истории для кодинг-агентов">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<meta name="twitter:title" content="Как удалить историю чатов Cursor">
+<meta name="twitter:description" content="Где Cursor хранит чаты в state.vscdb и логи CLI, почему удаление файла сбрасывает настройки IDE и как сохранить поиск по удалённым чатам через deja-vu.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../../assets/icon.svg">
+<link rel="stylesheet" href="../../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<link rel="apple-touch-icon" href="../../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Как удалить историю чатов Cursor и что при этом теряется", "description": "Где Cursor хранит чаты в state.vscdb и логи CLI, почему удаление файла сбрасывает настройки IDE и как сохранить поиск по удалённым чатам через deja-vu.", "url": "https://vshulcz.github.io/deja-vu/ru/guide/delete-cursor-chat-history.html", "inLanguage": "ru", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/ru/guide/delete-cursor-chat-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-01", "dateModified": "2026-11-01"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Удаление истории чатов Cursor", "item": "https://vshulcz.github.io/deja-vu/ru/guide/delete-cursor-chat-history.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Где Cursor хранит историю чатов?", "acceptedAnswer": {"@type": "Answer", "text": "В SQLite-базе state.vscdb внутри ~/Library/Application Support/Cursor/User (macOS) или ~/.config/Cursor/User (Linux) — в папках globalStorage/ и workspaceStorage/<id>/. Транскрипты Cursor CLI лежат отдельно в ~/.cursor/projects/<encoded-path>/agent-transcripts/."}}, {"@type": "Question", "name": "Как безопасно удалить историю чатов Cursor?", "acceptedAnswer": {"@type": "Answer", "text": "В IDE удаляйте чаты через интерфейс самого Cursor, так как state.vscdb хранит и другие настройки редактора. Логи Cursor CLI можно удалять напрямую файлами или через deja delete <id>."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../../"><img src="../../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../../">Главная</a><a class="lnk" href="getting-started.html">Документация</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../../">← deja-vu</a><div class="grp">Руководство (RU)</div>
+<a href="getting-started.html">Быстрый старт</a>
+<a href="does-my-agent-remember.html">Помнит ли агент прошлые сессии?</a>
+<a href="session-files-on-disk.html">Как удалить сессии Claude Code</a>
+<a href="cursor-state-vscdb-too-large.html">state.vscdb в Cursor слишком большой</a>
+<a href="delete-cursor-chat-history.html" aria-current="page">Как удалить историю чатов Cursor</a>
+<a href="codex-history.html">История сессий Codex CLI</a>
+<div class="grp">English</div>
+<a href="../../guide/getting-started.html">Getting started</a>
+<a href="../../guide/does-my-agent-remember.html">Does my agent remember?</a>
+<a href="../../guide/session-files-on-disk.html">Session files on disk</a>
+<a href="../../guide/harnesses.html">Harnesses</a>
+<a href="../../guide/benchmarks.html">Benchmarks</a>
+<a href="../../guide/compare.html">Compare</a>
+<div class="grp">Справка</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.ru.md">README на русском</a>
+<a href="../../registry/README.html">Реестр форматов</a><a class="sidecat" href="../../"><img src="../../assets/icon-live.svg" width="46" height="46" alt=""><span>помнит за вас</span></a></aside>
+<article>
+
+<h1>Как удалить историю чатов Cursor и что при этом теряется</h1>
+<p class="pagelede">в IDE чаты лежат внутри общей SQLite-базы <code>state.vscdb</code>, а в Cursor CLI — обычными файлами<span class="mins" data-mins></span></p>
+
+<p>В отличие от Claude Code, десктопный Cursor не создаёт отдельный файл на каждый диалог: все чаты хранятся строками в SQLite-базе <code>state.vscdb</code> вместе с состоянием окон и расширений. При этом консольный Cursor CLI пишет обычные файлы <code>.jsonl</code> в совсем другое место.</p>
+
+<div class="save-first"><b>Перед очисткой чатов:</b> у Cursor нет корзины или архива для удалённых диалогов. Запустите <a href="https://github.com/vshulcz/deja-vu">deja-vu</a> (<code>deja index</code>) перед удалением — deja проиндексирует и базу <code>state.vscdb</code>, и файлы CLI, чтобы вы могли искать старые решения из Cursor, Claude Code или Codex.</div>
+
+<h2>Где хранятся чаты Cursor</h2>
+<pre># база IDE (macOS)
+ls -lh ~/Library/Application\ Support/Cursor/User/globalStorage/state.vscdb
+
+# количество чатов в базе
+sqlite3 ~/Library/Application\ Support/Cursor/User/globalStorage/state.vscdb \
+  "select count(*) from cursorDiskKV where key like 'composerData:%'"
+
+# транскрипты Cursor CLI
+ls -t ~/.cursor/projects/*/agent-transcripts/**/*.jsonl | head</pre>
+
+<h2>Как удалить</h2>
+<p>Отдельные чаты в десктопном Cursor безопаснее всего удалять через интерфейс самого редактора (или палитру команд <code>Delete old chats…</code>). Если нужно полностью очистить файлы на диске, сначала закройте Cursor:</p>
+<pre># один воркспейс (чаты и состояние этого воркспейса)
+rm -rf ~/Library/Application\ Support/Cursor/User/workspaceStorage/&lt;id&gt;
+
+# только транскрипты Cursor CLI
+rm -rf ~/.cursor/projects/&lt;encoded-path&gt;/agent-transcripts
+
+# точечное удаление сессии CLI через deja с проверкой
+deja delete &lt;id&gt; --dry-run
+deja delete &lt;id&gt;</pre>
+<p>Если причина удаления — раздувшийся на десятки гигабайт <code>state.vscdb</code>, посмотрите инструкцию <a href="cursor-state-vscdb-too-large.html">как найти тяжёлые чаты и сжать базу</a>.</p>
+
+<p><a href="cursor-state-vscdb-too-large.html">state.vscdb слишком большой</a> · <a href="session-files-on-disk.html">Как удалить сессии Claude Code</a> · <a href="getting-started.html">Быстрый старт deja</a></p>
+<p class="star-cta">Пригодилось? <a href="https://github.com/vshulcz/deja-vu">Поставьте deja-vu звезду на GitHub</a>.</p>
+</article>
+</div>
+<footer>deja-vu распространяется под лицензией MIT и работает локально на вашей машине. <a href="https://github.com/vshulcz/deja-vu">Исходный код на GitHub</a> · <a href="../../">Главная</a></footer>
+</div>
+<script src="../../assets/guide.js" defer></script>
+</body>
+</html>

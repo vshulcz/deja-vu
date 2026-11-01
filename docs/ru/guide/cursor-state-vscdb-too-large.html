@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ru" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>state.vscdb в Cursor слишком большой: как сжать — deja-vu</title>
+<meta name="description" content="База Cursor state.vscdb на 30–125 ГБ: два read-only запроса sqlite3, чтобы найти тяжёлые чаты, безопасно освободить место на диске и сохранить историю в deja.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/ru/guide/cursor-state-vscdb-too-large.html">
+<link rel="alternate" hreflang="ru" href="https://vshulcz.github.io/deja-vu/ru/guide/cursor-state-vscdb-too-large.html">
+<link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html">
+<link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:title" content="state.vscdb в Cursor слишком большой: как сжать">
+<meta property="og:description" content="База Cursor state.vscdb на 30–125 ГБ: два read-only запроса sqlite3, чтобы найти тяжёлые чаты, безопасно освободить место на диске и сохранить историю в deja.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/ru/guide/cursor-state-vscdb-too-large.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — локальная память и поиск по истории для кодинг-агентов">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<meta name="twitter:title" content="state.vscdb в Cursor слишком большой: как сжать">
+<meta name="twitter:description" content="База Cursor state.vscdb на 30–125 ГБ: два read-only запроса sqlite3, чтобы найти тяжёлые чаты, безопасно освободить место на диске и сохранить историю в deja.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../../assets/icon.svg">
+<link rel="stylesheet" href="../../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<link rel="apple-touch-icon" href="../../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Файл state.vscdb в Cursor слишком большой: чем он забит и как безопасно уменьшить", "description": "База Cursor state.vscdb на 30–125 ГБ: два read-only запроса sqlite3, чтобы найти тяжёлые чаты, безопасно освободить место на диске и сохранить историю в deja.", "url": "https://vshulcz.github.io/deja-vu/ru/guide/cursor-state-vscdb-too-large.html", "inLanguage": "ru", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/ru/guide/cursor-state-vscdb-too-large.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-01", "dateModified": "2026-11-01"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "state.vscdb в Cursor слишком большой", "item": "https://vshulcz.github.io/deja-vu/ru/guide/cursor-state-vscdb-too-large.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Почему state.vscdb в Cursor разрастается до десятков гигабайт?", "acceptedAnswer": {"@type": "Answer", "text": "В таблице cursorDiskKV хранятся все чаты: строки composerData:<id> для каждого чата, bubbleId:<chat>:<bubble> для сообщений, а также чекпоинты и блобы агента. Несколько длинных агентских сессий обычно занимают большую часть файла."}}, {"@type": "Question", "name": "Как уменьшить state.vscdb без потери истории чатов?", "acceptedAnswer": {"@type": "Answer", "text": "Сначала проиндексируйте чаты через deja-vu (deja index), чтобы они остались доступны для локального поиска. Затем удалите устаревшие резервные копии state.vscdb.backup, удалите самые тяжёлые чаты через интерфейс Cursor и выполните GC Agent KV Blobs."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../../"><img src="../../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../../">Главная</a><a class="lnk" href="getting-started.html">Документация</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../../">← deja-vu</a><div class="grp">Руководство (RU)</div>
+<a href="getting-started.html">Быстрый старт</a>
+<a href="does-my-agent-remember.html">Помнит ли агент прошлые сессии?</a>
+<a href="session-files-on-disk.html">Как удалить сессии Claude Code</a>
+<a href="cursor-state-vscdb-too-large.html" aria-current="page">state.vscdb в Cursor слишком большой</a>
+<a href="delete-cursor-chat-history.html">Как удалить историю чатов Cursor</a>
+<a href="codex-history.html">История сессий Codex CLI</a>
+<div class="grp">English</div>
+<a href="../../guide/getting-started.html">Getting started</a>
+<a href="../../guide/does-my-agent-remember.html">Does my agent remember?</a>
+<a href="../../guide/session-files-on-disk.html">Session files on disk</a>
+<a href="../../guide/harnesses.html">Harnesses</a>
+<a href="../../guide/benchmarks.html">Benchmarks</a>
+<a href="../../guide/compare.html">Compare</a>
+<div class="grp">Справка</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.ru.md">README на русском</a>
+<a href="../../registry/README.html">Реестр форматов</a><a class="sidecat" href="../../"><img src="../../assets/icon-live.svg" width="46" height="46" alt=""><span>помнит за вас</span></a></aside>
+<article>
+
+<h1>state.vscdb в Cursor слишком большой: чем он забит и как его уменьшить</h1>
+<p class="pagelede">десятки гигабайт в одном SQLite-файле и способ освободить место, сохранив поиск по чатам<span class="mins" data-mins></span></p>
+
+<p>Типичный симптом: после перезапуска Cursor зависает на «Loading chats», новый чат долго думает на первом сообщении, а папка <code>globalStorage</code> занимает 30, 50 или 125 ГБ. Почти весь этот объём — один SQLite-файл <code>state.vscdb</code>.</p>
+
+<div class="save-first"><b>Перед удалением чатов или переносом <code>state.vscdb</code>:</b> в Cursor нет архива, поэтому любой удалённый чат пропадает навсегда. Запустите <a href="https://github.com/vshulcz/deja-vu">deja-vu</a> (<code>deja index</code>) до очистки — deja прочитает <code>state.vscdb</code> в режиме только для чтения через <code>sqlite3</code> и сохранит компактный локальный индекс всех диалогов.</div>
+
+<h2>Где лежит файл</h2>
+<pre># macOS
+~/Library/Application Support/Cursor/User/globalStorage/state.vscdb
+# Linux
+~/.config/Cursor/User/globalStorage/state.vscdb
+# Windows
+%APPDATA%\Cursor\User\globalStorage\state.vscdb</pre>
+
+<h2>Узнать, какие чаты занимают место (без риска для Cursor)</h2>
+<p>Закройте Cursor или выполняйте запросы с флагом <code>-readonly</code>:</p>
+<pre>sqlite3 -readonly state.vscdb "
+SELECT substr(key, 1, instr(key, ':') - 1) AS kind, count(*),
+       round(sum(length(CAST(value AS BLOB))) / 1e9, 2) AS gb
+FROM cursorDiskKV GROUP BY kind ORDER BY gb DESC;"</pre>
+<p>Топ-15 самых тяжёлых чатов:</p>
+<pre>sqlite3 -readonly state.vscdb "
+SELECT substr(key, 10, 36) AS chat, count(*) AS messages,
+       round(sum(length(CAST(value AS BLOB))) / 1e6) AS mb
+FROM cursorDiskKV WHERE key LIKE 'bubbleId:%'
+GROUP BY chat ORDER BY mb DESC LIMIT 15;"</pre>
+
+<h2>Как безопасно уменьшить размер</h2>
+<ul>
+<li><b>Удалите <code>state.vscdb.backup</code>, если он есть.</b> Это устаревшая копия, которая часто занимает 10+ ГБ; при закрытом Cursor её можно безопасно удалить.</li>
+<li><b>Удалите самые большие чаты через интерфейс Cursor</b> или команду палитры <code>Delete old chats…</code>, затем запустите <code>GC Agent KV Blobs</code>.</li>
+<li><b>Сохраните историю в deja перед очисткой:</b></li>
+</ul>
+<pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja index
+deja "pgbouncer"   # находит решение даже после удаления чата из Cursor</pre>
+
+<p><a href="delete-cursor-chat-history.html">Как удалить историю чатов Cursor</a> · <a href="session-files-on-disk.html">Как удалить сессии Claude Code</a> · <a href="getting-started.html">Быстрый старт deja</a></p>
+<p class="star-cta">Пригодилось? <a href="https://github.com/vshulcz/deja-vu">Поставьте deja-vu звезду на GitHub</a>.</p>
+</article>
+</div>
+<footer>deja-vu распространяется под лицензией MIT и работает локально на вашей машине. <a href="https://github.com/vshulcz/deja-vu">Исходный код на GitHub</a> · <a href="../../">Главная</a></footer>
+</div>
+<script src="../../assets/guide.js" defer></script>
+</body>
+</html>

@@ -143,3 +143,12 @@ Run `deja` with no arguments in a terminal and it opens a full-screen search ove
 - [Installing deja for an agent](https://github.com/vshulcz/deja-vu/blob/main/llms-install.md): the install page written for an agent doing it on a user's behalf
 - [JSON output](https://github.com/vshulcz/deja-vu/blob/main/docs/json-output.md): the shape of every `--json` result
 - [Compaction recovery](https://github.com/vshulcz/deja-vu/blob/main/docs/compaction.md): what is captured before a compaction, what is handed back, and the limits
+
+## Русский
+
+- [Быстрый старт](https://vshulcz.github.io/deja-vu/ru/guide/getting-started.html): установка за один шаг и как работает автовыборка контекста
+- [Удаление сессий Claude Code](https://vshulcz.github.io/deja-vu/ru/guide/session-files-on-disk.html): где лежат файлы сессий в `~/.claude/projects` и как индексировать их до удаления
+- [Cursor state.vscdb слишком большой](https://vshulcz.github.io/deja-vu/ru/guide/cursor-state-vscdb-too-large.html): как сжать базу Cursor через `VACUUM` без потери истории чатов
+- [Удаление истории чатов Cursor](https://vshulcz.github.io/deja-vu/ru/guide/delete-cursor-chat-history.html): где хранятся чаты Cursor на диске и как очистить их по одному проекту
+- [Где хранятся сессии Codex CLI](https://vshulcz.github.io/deja-vu/ru/guide/codex-history.html): файлы `rollout-*.jsonl` в `~/.codex/sessions` и как искать по ним
+- [Помнит ли агент прошлые сессии?](https://vshulcz.github.io/deja-vu/ru/guide/does-my-agent-remember.html): что помнят Claude Code, Codex и Cursor сами по себе и что добавляет deja-vu

@@ -421,7 +421,7 @@ func refreshDateModified() error {
 		return err
 	}
 	defer func() { _ = d.Close() }()
-	for _, glob := range []string{"docs/guide/*.html", "docs/zh/guide/*.html"} {
+	for _, glob := range []string{"docs/guide/*.html", "docs/zh/guide/*.html", "docs/ru/guide/*.html"} {
 		pages, err := filepath.Glob(filepath.FromSlash(glob))
 		if err != nil {
 			return err

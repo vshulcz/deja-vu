@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ru" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>История сессий Codex CLI: поиск и просмотр — deja-vu</title>
+<meta name="description" content="Где Codex CLI хранит сессии в ~/.codex/sessions, почему grep пропускает сжатые .jsonl.zst старше недели, рецепты jq/sqlite3 и мгновенный поиск через deja.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/ru/guide/codex-history.html">
+<link rel="alternate" hreflang="ru" href="https://vshulcz.github.io/deja-vu/ru/guide/codex-history.html">
+<link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/codex-history.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/codex-history.html">
+<link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/codex-history.html">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:title" content="История сессий Codex CLI: поиск и просмотр">
+<meta property="og:description" content="Где Codex CLI хранит сессии в ~/.codex/sessions, почему grep пропускает сжатые .jsonl.zst старше недели, рецепты jq/sqlite3 и мгновенный поиск через deja.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/ru/guide/codex-history.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — локальная память и поиск по истории для кодинг-агентов">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<meta name="twitter:title" content="История сессий Codex CLI: поиск и просмотр">
+<meta name="twitter:description" content="Где Codex CLI хранит сессии в ~/.codex/sessions, почему grep пропускает сжатые .jsonl.zst старше недели, рецепты jq/sqlite3 и мгновенный поиск через deja.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../../assets/icon.svg">
+<link rel="stylesheet" href="../../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<link rel="apple-touch-icon" href="../../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "История сессий Codex CLI: где лежит, как читать и как искать", "description": "Где Codex CLI хранит сессии в ~/.codex/sessions, почему grep пропускает сжатые .jsonl.zst старше недели, рецепты jq/sqlite3 и мгновенный поиск через deja.", "url": "https://vshulcz.github.io/deja-vu/ru/guide/codex-history.html", "inLanguage": "ru", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/ru/guide/codex-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-01", "dateModified": "2026-11-01"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "История сессий Codex CLI", "item": "https://vshulcz.github.io/deja-vu/ru/guide/codex-history.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Где Codex CLI хранит историю сессий?", "acceptedAnswer": {"@type": "Answer", "text": "В каталоге ${CODEX_HOME:-~/.codex}: полные логи сессий лежат в sessions/YYYY/MM/DD/rollout-*.jsonl (через 7 дней сжимаются в .jsonl.zst), архивные — в archived_sessions/, только ваши промпты — в history.jsonl, а список для пикера resume — в state_5.sqlite."}}, {"@type": "Question", "name": "Как искать внутри прошлых сессий Codex CLI?", "acceptedAnswer": {"@type": "Answer", "text": "codex resume показывает только заголовки, а обычный grep по *.jsonl не видит сжатые .jsonl.zst старше недели. deja-vu индексирует и обычные, и сжатые, и архивные сессии: запустите deja --harness codex \"ваш запрос\" или откройте интерактивный экран командой deja."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../../"><img src="../../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../../">Главная</a><a class="lnk" href="getting-started.html">Документация</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../../">← deja-vu</a><div class="grp">Руководство (RU)</div>
+<a href="getting-started.html">Быстрый старт</a>
+<a href="does-my-agent-remember.html">Помнит ли агент прошлые сессии?</a>
+<a href="session-files-on-disk.html">Как удалить сессии Claude Code</a>
+<a href="cursor-state-vscdb-too-large.html">state.vscdb в Cursor слишком большой</a>
+<a href="delete-cursor-chat-history.html">Как удалить историю чатов Cursor</a>
+<a href="codex-history.html" aria-current="page">История сессий Codex CLI</a>
+<div class="grp">English</div>
+<a href="../../guide/getting-started.html">Getting started</a>
+<a href="../../guide/does-my-agent-remember.html">Does my agent remember?</a>
+<a href="../../guide/session-files-on-disk.html">Session files on disk</a>
+<a href="../../guide/harnesses.html">Harnesses</a>
+<a href="../../guide/benchmarks.html">Benchmarks</a>
+<a href="../../guide/compare.html">Compare</a>
+<div class="grp">Справка</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.ru.md">README на русском</a>
+<a href="../../registry/README.html">Реестр форматов</a><a class="sidecat" href="../../"><img src="../../assets/icon-live.svg" width="46" height="46" alt=""><span>помнит за вас</span></a></aside>
+<article>
+
+<h1>История сессий Codex CLI: где лежит, как читать и как искать</h1>
+<p class="pagelede">каждая сессия сохранена на диске, но <code>codex resume</code> умеет только листать список, а не искать по содержимому<span class="mins" data-mins></span></p>
+
+<p>Codex CLI сохраняет каждую сессию на диск. Через неделю после создания файлы сессий сжимаются в <code>.jsonl.zst</code>, поэтому обычный <code>grep</code> по <code>*.jsonl</code> перестаёт находить всё, что старше семи дней.</p>
+
+<div class="save-first"><b>Нужен мгновенный поиск по всем сессиям Codex (включая сжатые <code>.jsonl.zst</code> и архивные)?</b> <a href="https://github.com/vshulcz/deja-vu">deja-vu</a> индексирует <code>~/.codex/sessions</code> и <code>archived_sessions</code> за секунды: запустите <code>deja --harness codex "ваш запрос"</code> или откройте интерактивный поиск командой <code>deja</code>.</div>
+
+<h2>Где Codex хранит файлы</h2>
+<p>Всё находится внутри <code>${CODEX_HOME:-~/.codex}</code>:</p>
+<ul>
+<li><code>sessions/YYYY/MM/DD/rollout-&lt;time&gt;-&lt;id&gt;.jsonl</code> — полный лог сессии. Через 7 дней Codex в фоне сжимает его в <code>rollout-….jsonl.zst</code>.</li>
+<li><code>archived_sessions/</code> — скрытые через <code>codex archive</code> сессии в том же формате.</li>
+<li><code>history.jsonl</code> — только ваши промпты (без ответов агента и без вывода команд).</li>
+<li><code>state_5.sqlite</code> — SQLite-таблица заголовков и путей, которую читает пикер <code>codex resume</code>.</li>
+</ul>
+
+<h2>Чтение и поиск вручную</h2>
+<pre># последние 20 сессий из базы пикера
+sqlite3 -readonly ~/.codex/state_5.sqlite "
+SELECT datetime(updated_at, 'unixepoch', 'localtime'), substr(title, 1, 50), cwd
+FROM threads WHERE archived = 0 ORDER BY updated_at DESC LIMIT 20;"
+
+# поиск слова по свежим и сжатым сессиям
+grep -l "pgbouncer" ~/.codex/sessions/*/*/*/rollout-*.jsonl
+zstdgrep -l "pgbouncer" ~/.codex/sessions/*/*/*/rollout-*.jsonl.zst</pre>
+
+<h2>Ранжированный поиск через deja-vu</h2>
+<pre>deja index
+deja --harness codex "pgbouncer prepared statement"   # ранжированный поиск с ID сессии
+deja last 20 --harness codex                           # недавние сессии из любых папок
+deja show &lt;id&gt;                                         # прочитать диалог
+deja resume &lt;id&gt;                                       # команда для открытия в Codex</pre>
+<p>Если убрать флаг <code>--harness codex</code>, тот же запрос одновременно ищет по истории Claude Code, Cursor, opencode, Qwen Code и остальных агентов на машине.</p>
+
+<p><a href="getting-started.html">Быстрый старт deja</a> · <a href="session-files-on-disk.html">Как удалить сессии Claude Code</a> · <a href="does-my-agent-remember.html">Помнит ли агент прошлые сессии?</a></p>
+<p class="star-cta">Пригодилось? <a href="https://github.com/vshulcz/deja-vu">Поставьте deja-vu звезду на GitHub</a>.</p>
+</article>
+</div>
+<footer>deja-vu распространяется под лицензией MIT и работает локально на вашей машине. <a href="https://github.com/vshulcz/deja-vu">Исходный код на GitHub</a> · <a href="../../">Главная</a></footer>
+</div>
+<script src="../../assets/guide.js" defer></script>
+</body>
+</html>

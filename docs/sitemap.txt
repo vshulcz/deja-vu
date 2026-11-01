@@ -162,3 +162,9 @@ https://vshulcz.github.io/deja-vu/registry/junie.html
 https://vshulcz.github.io/deja-vu/registry/devin.html
 https://vshulcz.github.io/deja-vu/registry/windsurf.html
 https://vshulcz.github.io/deja-vu/registry/mcode.html
+https://vshulcz.github.io/deja-vu/ru/guide/getting-started.html
+https://vshulcz.github.io/deja-vu/ru/guide/session-files-on-disk.html
+https://vshulcz.github.io/deja-vu/ru/guide/cursor-state-vscdb-too-large.html
+https://vshulcz.github.io/deja-vu/ru/guide/delete-cursor-chat-history.html
+https://vshulcz.github.io/deja-vu/ru/guide/codex-history.html
+https://vshulcz.github.io/deja-vu/ru/guide/does-my-agent-remember.html
