@@ -532,22 +532,12 @@ func promptDigestBody(dir, sessionID string, ss []model.Session, confident bool,
 	// also cover them rather than answering a two-subject question with a
 	// session that only ever heard of one.
 	named := namedLeadTerms(terms, idfOf, index.TopIDF(dir))
-	fixedNamed := namedLeadTerms(terms, idfOf, 1e9)
-	switch {
-	case len(fixedNamed) >= 2:
-		for _, t := range fixedNamed {
-			if !search.QuoteCarriesTerms(digest, []string{t}, 1) {
-				return "", false
-			}
-		}
-	case len(named) >= 1:
+	if len(named) == 1 {
 		if !search.QuoteCarriesTerms(digest, named, 1) && !search.QuoteCarriesTerms(digest, terms, min(2, len(terms))) {
 			return "", false
 		}
-	default:
-		if !search.QuoteCarriesTerms(digest, terms, min(2, len(terms))) {
-			return "", false
-		}
+	} else if !search.QuoteCarriesTerms(digest, terms, min(2, len(terms))) {
+		return "", false
 	}
 	// The line the agent is asked to say names a session; it has to be one
 	// the digest shows. The top of the ranking is skipped when it has
@@ -744,7 +734,15 @@ func (p *promptPicker) pick(ranked []model.Session, matched, strong, naming []in
 // measured too: it emptied 2 of 5 blocks that answered the prompt.
 func (p *promptPicker) leadTermsMeet(s model.Session) bool {
 	if fixedNamed := namedLeadTerms(p.leadTerms, p.idfOf, 1e9); len(fixedNamed) >= 2 {
-		return search.SpeechCarriesTermsTogether(s, fixedNamed, 2)
+		for _, t := range fixedNamed {
+			if !search.SpeechCarriesAnyTerm(s, []string{t}) {
+				return false
+			}
+		}
+		if len(s.Messages) >= dejaVuMaxMessages {
+			return search.SpeechCarriesTermsTogether(s, fixedNamed, 2)
+		}
+		return true
 	}
 	if named := namedLeadTerms(p.leadTerms, p.idfOf, p.topIDF); len(named) > 0 && search.SpeechCarriesAnyTerm(s, named) {
 		return true
