@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/cjkfold"
+	"github.com/vshulcz/deja-vu/internal/model"
 
 	search "github.com/vshulcz/deja-vu/internal/query"
 )
@@ -235,5 +236,39 @@ func TestCJKFunctionBigramsAreNotQueryTerms(t *testing.T) {
 	// Latin is untouched — the filter requires CJK runes.
 	if got := RelevanceTerms("what is the database migration"); !slices.Contains(got, "database") {
 		t.Errorf("ASCII query lost content terms: %v", got)
+	}
+}
+
+func TestCJKMessageTermsAndCrossScriptBridge(t *testing.T) {
+	terms := RelevanceTerms("数据库连接池死锁")
+	mt := newMessageTerms(terms, nil, false)
+	if !mt.unspaced {
+		t.Fatalf("expected mt.unspaced for CJK terms %v", terms)
+	}
+	// Exact contiguous match scores above scattered terms via mt.window proximity.
+	tight := mt.best(model.Session{Messages: []model.Message{{Role: "assistant", Text: "今天定位并修复了数据库连接池死锁的故障"}}})
+	scattered := mt.best(model.Session{Messages: []model.Message{{Role: "assistant", Text: "今天看了数据库配置，后来调整了连接池参数，顺便排查了死锁"}}})
+	if tight <= float64(len(terms)) || tight <= scattered {
+		t.Fatalf("expected CJK proximity lift: tight=%v scattered=%v len(terms)=%d", tight, scattered, len(terms))
+	}
+	// Traditional Chinese message matches Simplified query terms.
+	tradScore := mt.best(model.Session{Messages: []model.Message{{Role: "assistant", Text: "今天定位並修復了數據庫連接池死鎖的故障"}}})
+	if tradScore != tight {
+		t.Fatalf("expected Traditional Chinese message to score identically: trad=%v tight=%v", tradScore, tight)
+	}
+
+	// Cross-script bridge connects Chinese/Russian query terms to English sessions.
+	dir := cjkIndex(t, map[string]string{
+		"s_en":    "Fixed the database deadlock in the connection pool by bounding transaction retries.",
+		"s_other": "Updated CSS colors for the marketing landing page.",
+	})
+	for _, q := range []string{"为什么数据库死锁", "почему дедлок базы"} {
+		got, err := SearchDetailed(dir, search.Options{Query: q, All: true})
+		if err != nil {
+			t.Fatalf("%q: %v", q, err)
+		}
+		if len(got.Sessions) == 0 || got.Sessions[0].ID != "s_en" {
+			t.Fatalf("cross-script query %q failed to bridge to English session s_en: got %+v", q, got.Sessions)
+		}
 	}
 }

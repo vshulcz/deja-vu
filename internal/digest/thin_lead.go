@@ -4,6 +4,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/vshulcz/deja-vu/internal/cjkfold"
 )
 
 // thinSentence reports whether a sentence carries nothing a later session could
@@ -31,13 +33,14 @@ func thinSentence(s string) bool {
 	// already refuses to read as outcomes. Except "сейчас", which opens a state
 	// as often as a plan — "Сейчас Hermes — это «читалка»: 15 кронов…" was
 	// dropped on a real recall page.
-	if low := strings.ToLower(plain); announcesItself(low) && !strings.HasPrefix(low, "сейчас ") {
+	low := cjkfold.String(strings.ToLower(plain))
+	if announcesItself(low) && !strings.HasPrefix(low, "сейчас ") {
 		return true
 	}
-	if namesSomething(s) || namesWhatWasDecided(strings.ToLower(plain)) {
+	if namesSomething(s) || namesWhatWasDecided(low) {
 		return false
 	}
-	return utf8.RuneCountInString(plain) < decisionMinRunes
+	return utf8.RuneCountInString(plain) < decisionMinRunes && cjkfold.CountCJK(plain) < 8
 }
 
 // namesWhatWasDecided reports whether a short line says what its decision was

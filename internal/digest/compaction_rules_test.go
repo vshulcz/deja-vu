@@ -98,11 +98,47 @@ func TestStandingRulesInOtherShapes(t *testing.T) {
 		"давай дальше. не трогай legacy и не запускай go test сам":               "не трогай legacy и не запускай go test сам",
 		"Use slices instead of sort in new code.":                                "Use slices instead of sort in new code.",
 		"всегда гоняй тесты через ./check.sh":                                    "всегда гоняй тесты через ./check.sh",
+		"先修导出模块。不要修改安装代码，别人在维护。":                                                 "不要修改安装代码，别人在维护。",
+		"永遠不要直接調用外部接口。":                                                          "永遠不要直接調用外部接口。",
 	} {
 		rules := ExtractStandingRules(rulesSession(turn), nil)
 		if len(rules) != 1 || rules[0].Text != want {
 			t.Errorf("%q gave %+v, want %q", turn, rules, want)
 		}
+	}
+	for _, nonRule := range []string{"不要紧，我们继续修。", "不知道为什么挂了？", "不要修改这里吗？"} {
+		if rules := ExtractStandingRules(rulesSession(nonRule), nil); len(rules) != 0 {
+			t.Errorf("non-rule %q extracted as rule: %+v", nonRule, rules)
+		}
+	}
+}
+
+func TestChineseCompactionEpisodeClassification(t *testing.T) {
+	for _, nudge := range []string{"继续", "好的，继续", "可以，接着做！", "繼續"} {
+		if !trivialContinuation(nudge) {
+			t.Errorf("expected Chinese nudge %q to be trivialContinuation", nudge)
+		}
+	}
+	if trivialContinuation("继续修复数据库连接池的超时问题") {
+		t.Error("Chinese task opening with 继续 must not be treated as a bare nudge")
+	}
+	for _, poll := range []string{"怎么样了？", "进展如何", "現在怎麼樣了？"} {
+		if !notARequest(poll) {
+			t.Errorf("expected Chinese status poll %q to be notARequest", poll)
+		}
+	}
+	decisions := SubstantialConclusions(model.Session{
+		Messages: []model.Message{
+			{Role: "assistant", Text: "我先看看日志。"},
+			{Role: "assistant", Text: "决定：改用指数退避策略处理重试。"},
+		},
+	}, 240, 5)
+	if len(decisions) != 1 || decisions[0] != "决定：改用指数退避策略处理重试。" {
+		t.Fatalf("unexpected Chinese Conclusions: %v", decisions)
+	}
+	open := explicitOpenItems("待办：补齐集成测试\n冲突：旧配置与新参数不一致", model.ContextRef{})
+	if len(open) != 2 || open[0].Kind != "gap" || open[1].Kind != "conflict" {
+		t.Fatalf("unexpected Chinese explicitOpenItems: %+v", open)
 	}
 }
 

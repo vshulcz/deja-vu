@@ -3,6 +3,8 @@ package digest
 import (
 	"regexp"
 	"strings"
+
+	"github.com/vshulcz/deja-vu/internal/cjkfold"
 )
 
 // notARequest reports a user turn that cannot be the task being resumed, so the
@@ -37,13 +39,14 @@ var pollWords = []string{
 	"ну что", "ну что там", "что там", "как там", "ну как", "как дела", "и что",
 	"ну", "что", "status", "any update", "any updates", "update", "how's it going",
 	"how is it going", "where are we", "what's the status",
+	"怎么样了", "进展如何", "有进展吗", "现在怎么样了", "现在怎么样", "状态如何", "弄好了吗", "跑完了吗", "好了吗",
 }
 
 func onlyPolls(text string) bool {
-	low := strings.ToLower(strings.TrimSpace(text))
+	low := cjkfold.String(strings.ToLower(strings.TrimSpace(text)))
 	low = strings.Join(strings.Fields(strings.Map(func(r rune) rune {
 		switch r {
-		case ',', ';', '.', '!', '?', ':', '…':
+		case ',', ';', '.', '!', '?', ':', '…', '。', '，', '！', '？', '：', '；', '、':
 			return ' '
 		}
 		return r
@@ -54,7 +57,8 @@ func onlyPolls(text string) bool {
 	for low != "" {
 		best := ""
 		for _, w := range pollWords {
-			if len(w) > len(best) && (low == w || strings.HasPrefix(low, w+" ")) {
+			if len(w) > len(best) && (low == w || strings.HasPrefix(low, w+" ") ||
+				(cjkfold.HasCJK(w) && strings.HasPrefix(low, w))) {
 				best = w
 			}
 		}

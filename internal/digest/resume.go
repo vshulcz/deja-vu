@@ -4,6 +4,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/vshulcz/deja-vu/internal/cjkfold"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -107,16 +108,21 @@ func worthAsAsk(text string) bool {
 		// A slash command is the host's, whatever it says.
 		return false
 	}
-	if utf8.RuneCountInString(text) < askMinRunes || utf8.RuneCountInString(text) > askMaxRunes {
+	n := utf8.RuneCountInString(text)
+	if (n < askMinRunes && cjkfold.CountCJK(text) < 6) || n > askMaxRunes {
 		return false
 	}
 	if strings.Contains(text, `":`) && strings.Contains(text, "{") {
 		// A pasted document, not a sentence.
 		return false
 	}
-	low := strings.ToLower(strings.TrimRight(text, " .!…"))
+	low := strings.ToLower(strings.TrimRight(text, " .!…。！，？"))
+	if cjkfold.HasCJK(low) {
+		low = cjkfold.String(low)
+	}
 	for _, nudge := range nudgeWords {
-		if low == nudge || strings.HasPrefix(low, nudge+" ") && utf8.RuneCountInString(low) < askMinRunes+10 {
+		if low == nudge || strings.HasPrefix(low, nudge+" ") && utf8.RuneCountInString(low) < askMinRunes+10 ||
+			(cjkfold.HasCJK(nudge) && strings.HasPrefix(low, nudge) && utf8.RuneCountInString(low) < 10) {
 			return false
 		}
 	}
@@ -141,6 +147,8 @@ var nudgeWords = []string{
 	"мержи", "мержь", "что дальше", "а что дальше",
 	"ok", "okay", "yes", "no", "go", "go on", "continue", "carry on", "thanks",
 	"sure", "do it", "please do",
+	"继续", "接着做", "继续做", "好的", "好", "可以", "行", "下一步", "接下来做什么",
+	"没问题", "合并", "合并吧", "搞定", "谢谢", "再来",
 }
 
 func clipResumeCommand(s string, limit int) string {
@@ -161,6 +169,9 @@ func clipResumeCommand(s string, limit int) string {
 // is a preamble to one.
 func aboutToExplain(text string) bool {
 	low := strings.ToLower(text)
+	if cjkfold.HasCJK(low) {
+		low = cjkfold.String(low)
+	}
 	if utf8.RuneCountInString(low) > 200 {
 		low = string([]rune(low)[:200])
 	}
@@ -168,6 +179,7 @@ func aboutToExplain(text string) bool {
 		"отвечаю", "расскажу", "объясню", "сейчас посмотрю", "давай разберём",
 		"let me explain", "i'll explain", "here is how", "here's how",
 		"let me look", "i'll look",
+		"我来解释", "让我解释", "我先看看", "让我看看", "下面是",
 	} {
 		if strings.Contains(low, p) {
 			return true
@@ -196,7 +208,8 @@ func worthAsDecision(text string) bool {
 		return false
 	}
 	// Long enough to mean something on its own, read cold, weeks later.
-	return utf8.RuneCountInString(firstSentences(text, 1)) >= decisionMinRunes
+	sent := firstSentences(text, 1)
+	return utf8.RuneCountInString(sent) >= decisionMinRunes || cjkfold.CountCJK(sent) >= 8
 }
 
 // decisionMinRunes is the bar for a decision worth repeating back. "Затащил."

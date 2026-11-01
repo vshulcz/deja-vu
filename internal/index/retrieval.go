@@ -535,7 +535,19 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 		return SearchResult{}, rerr
 	}
 	if len(metas) == 0 {
-		return SearchResult{}, nil
+		if bridged := crossScriptBridgeTerms(terms); len(bridged) > 0 {
+			rank, rerr = relevantMetasCounts(dir, m, nil, append(append([]string{}, terms...), bridged...), relevanceWindow, func(meta SessionMeta) bool {
+				return sessionMetaMatches(meta, o)
+			})
+			if rerr != nil {
+				return SearchResult{}, rerr
+			}
+			metas, anyMatched, strong = rank.metas, rank.any, rank.strong
+			termsKnown, matched = rank.termsKnown, rank.total
+		}
+		if len(metas) == 0 {
+			return SearchResult{}, nil
+		}
 	}
 	keep := make([]SessionMeta, 0, len(metas))
 	var weak []SessionMeta
@@ -944,9 +956,6 @@ func bridgedRetry(dir string, m Manifest, projects, terms []string, n int, skip 
 		}
 	}
 	neighbours := readCooccur(dir)
-	if neighbours == nil {
-		return nil, nil, nil, nil, false
-	}
 	inProject := map[uint32]bool{}
 	scope := newProjectScope(projects...)
 	for _, meta := range m.Sessions {
@@ -960,6 +969,9 @@ func bridgedRetry(dir string, m Manifest, projects, terms []string, n int, skip 
 	}
 	added := make([]string, 0, bridgeTerms)
 	for _, t := range terms {
+		if neighbours == nil {
+			break
+		}
 		// Bridge from a word that means something. "open the file and read it"
 		// is three ordinary words, and the corpus's neighbours for ordinary
 		// words are its subjects — that sentence was the one negative control
@@ -1008,6 +1020,34 @@ func bridgedRetry(dir string, m Manifest, projects, terms []string, n int, skip 
 			break
 		}
 	}
+	crossScript := false
+	if was == 0 && len(added) < bridgeTerms {
+		for _, cand := range crossScriptBridgeTerms(terms) {
+			if have[cand] {
+				continue
+			}
+			cPosts, cerr := postingsFor(dir, "t"+cjkfold.String(cand))
+			if cerr != nil || len(cPosts) == 0 {
+				continue
+			}
+			inProj := false
+			for _, pp := range cPosts {
+				if inProject[pp.Sid] {
+					inProj = true
+					break
+				}
+			}
+			if !inProj {
+				continue
+			}
+			have[cand] = true
+			added = append(added, cand)
+			crossScript = true
+			if len(added) == bridgeTerms {
+				break
+			}
+		}
+	}
 	if len(added) == 0 {
 		return nil, nil, nil, nil, false
 	}
@@ -1019,12 +1059,86 @@ func bridgedRetry(dir string, m Manifest, projects, terms []string, n int, skip 
 	// Taken only when the bridge found something more identifying than the
 	// question's own words did. Otherwise the project has no better answer and
 	// the first ranking stands.
-	for _, v := range bstrong {
-		if v > was {
+	for i, v := range bstrong {
+		if v > was || (crossScript && i < len(matched) && matched[i] >= 2) {
 			return metas, matched, bstrong, idf, true
 		}
 	}
 	return nil, nil, nil, nil, false
+}
+
+type trilingualConcept struct {
+	en []string
+	ru []string
+	zh []string
+}
+
+var trilingualLexicon = []trilingualConcept{
+	{en: []string{"timeout"}, ru: []string{"таймаут"}, zh: []string{"超时"}},
+	{en: []string{"deadlock", "lock"}, ru: []string{"дедлок", "блокировк"}, zh: []string{"死锁", "加锁"}},
+	{en: []string{"memory", "leak"}, ru: []string{"утечк", "памят"}, zh: []string{"内存", "泄漏"}},
+	{en: []string{"database", "sqlite"}, ru: []string{"база", "базы", "базе"}, zh: []string{"数据", "据库"}},
+	{en: []string{"pool", "connection"}, ru: []string{"пул", "пула", "пуле", "соединен"}, zh: []string{"连接", "接池"}},
+	{en: []string{"build", "compile"}, ru: []string{"сборк", "компиляц"}, zh: []string{"构建", "编译"}},
+	{en: []string{"cache"}, ru: []string{"кэш", "кеш"}, zh: []string{"缓存"}},
+	{en: []string{"config"}, ru: []string{"конфиг", "настройк"}, zh: []string{"配置"}},
+	{en: []string{"deploy"}, ru: []string{"депло", "выкат"}, zh: []string{"部署"}},
+	{en: []string{"container", "docker"}, ru: []string{"контейнер", "докер"}, zh: []string{"容器", "镜像"}},
+	{en: []string{"branch"}, ru: []string{"ветк"}, zh: []string{"分支"}},
+	{en: []string{"merge"}, ru: []string{"мерж", "смерж", "влит"}, zh: []string{"合并"}},
+	{en: []string{"hook"}, ru: []string{"хук"}, zh: []string{"钩子"}},
+	{en: []string{"index"}, ru: []string{"индекс"}, zh: []string{"索引"}},
+	{en: []string{"auth", "token"}, ru: []string{"авторизац", "токен"}, zh: []string{"认证", "鉴权"}},
+	{en: []string{"permission"}, ru: []string{"права", "доступ"}, zh: []string{"权限"}},
+	{en: []string{"port"}, ru: []string{"порт"}, zh: []string{"端口"}},
+	{en: []string{"proxy"}, ru: []string{"прокси"}, zh: []string{"代理"}},
+	{en: []string{"retry"}, ru: []string{"ретра", "повтор"}, zh: []string{"重试"}},
+	{en: []string{"panic", "crash", "fail"}, ru: []string{"паник", "краш", "падает", "упал"}, zh: []string{"崩溃", "失败"}},
+	{en: []string{"latency"}, ru: []string{"задержк", "латентн"}, zh: []string{"延迟"}},
+	{en: []string{"queue"}, ru: []string{"очеред"}, zh: []string{"队列"}},
+	{en: []string{"worker", "goroutine"}, ru: []string{"воркер", "горутин"}, zh: []string{"协程"}},
+	{en: []string{"migration"}, ru: []string{"миграц"}, zh: []string{"迁移"}},
+}
+
+// crossScriptBridgeTerms maps technical terms in one script (Latin, Cyrillic,
+// CJK) to their equivalents in the OTHER scripts only, so a Russian or Chinese
+// question about an English codebase (or an English recall against a Chinese or
+// Russian session) bridges across scripts without perturbing same-script queries.
+func crossScriptBridgeTerms(terms []string) []string {
+	var out []string
+	seen := map[string]bool{}
+	add := func(list []string) {
+		for _, w := range list {
+			if !seen[w] {
+				seen[w] = true
+				out = append(out, w)
+			}
+		}
+	}
+	for _, raw := range terms {
+		t := cjkfold.String(query.Lower(raw))
+		for _, c := range trilingualLexicon {
+			for _, zh := range c.zh {
+				if t == zh {
+					add(c.en)
+					add(c.ru)
+				}
+			}
+			for _, ru := range c.ru {
+				if t == ru || (len(ru) >= 4 && strings.HasPrefix(t, ru)) {
+					add(c.en)
+					add(c.zh)
+				}
+			}
+			for _, en := range c.en {
+				if t == en {
+					add(c.ru)
+					add(c.zh)
+				}
+			}
+		}
+	}
+	return out
 }
 
 func relevantMetasMatched(dir string, m Manifest, projects, terms []string, n int, skip map[string]bool) ([]SessionMeta, []int, []int, map[string]float64, error) {
@@ -5508,11 +5622,12 @@ func defaultRerankWorkers() int { return runtime.NumCPU() }
 // messageTerms is each term with the forms a message may hold it in, every
 // one of those forms, and the term each form stands for.
 type messageTerms struct {
-	terms  []string
-	forms  [][]string
-	wanted map[string]bool
-	of     map[string]int
-	idf    map[string]float64
+	terms    []string
+	forms    [][]string
+	wanted   map[string]bool
+	of       map[string]int
+	idf      map[string]float64
+	unspaced bool
 }
 
 // newMessageTerms takes each term in its word forms, or with exact as asked.
@@ -5520,7 +5635,16 @@ func newMessageTerms(terms []string, idf map[string]float64, exact bool) message
 	mt := messageTerms{terms: terms, forms: make([][]string, len(terms)), wanted: map[string]bool{}, of: map[string]int{}, idf: idf}
 	for i, t := range terms {
 		t = query.Lower(t)
+		for _, r := range t {
+			if cjkfold.Unspaced(r) {
+				mt.unspaced = true
+				break
+			}
+		}
 		mt.forms[i] = []string{t}
+		if ft := cjkfold.String(t); ft != t {
+			mt.forms[i] = append(mt.forms[i], ft)
+		}
 		if !exact {
 			mt.forms[i] = append(mt.forms[i], stemMatchForms(t)...)
 		}
@@ -5532,6 +5656,69 @@ func newMessageTerms(terms []string, idf map[string]float64, exact bool) message
 		}
 	}
 	return mt
+}
+
+// unspacedTokenHits adds any wanted CJK/Thai bigrams (raw or Traditional-folded)
+// present in s to hit.
+func unspacedTokenHits(s string, want map[string]bool, hit map[string]bool) map[string]bool {
+	if len(want) == 0 {
+		return hit
+	}
+	ascii := true
+	for i := range len(s) {
+		if s[i] >= utf8.RuneSelf {
+			ascii = false
+			break
+		}
+	}
+	if ascii {
+		return hit
+	}
+	var pair [2 * utf8.UTFMax]byte
+	check := func(r1, r2 rune) {
+		n := 0
+		if r1 != 0 {
+			n += utf8.EncodeRune(pair[n:], r1)
+		}
+		n += utf8.EncodeRune(pair[n:], r2)
+		if want[string(pair[:n])] {
+			if hit == nil {
+				hit = make(map[string]bool, len(want))
+			}
+			hit[string(pair[:n])] = true
+		}
+	}
+	var prevRaw, prevFold rune
+	runLen := 0
+	flush := func() {
+		if runLen == 1 {
+			check(0, prevRaw)
+			if prevFold != prevRaw {
+				check(0, prevFold)
+			}
+		}
+		runLen = 0
+	}
+	for _, r := range s {
+		if !cjkfold.Unspaced(r) {
+			flush()
+			continue
+		}
+		f := cjkfold.Rune(r)
+		if runLen == 0 {
+			prevRaw, prevFold = r, f
+			runLen = 1
+			continue
+		}
+		check(prevRaw, r)
+		if prevFold != prevRaw || f != r {
+			check(prevFold, f)
+		}
+		prevRaw, prevFold = r, f
+		runLen = 2
+	}
+	flush()
+	return hit
 }
 
 // proximityWeight is what a message gains for holding every term close
@@ -5552,6 +5739,9 @@ func (mt messageTerms) best(s model.Session) float64 {
 	best := 0.0
 	for _, msg := range msgs {
 		toks := tokenHits(msg.Text, mt.wanted)
+		if mt.unspaced {
+			toks = unspacedTokenHits(msg.Text, mt.wanted, toks)
+		}
 		score := 0.0
 		held := 0
 		for ti, t := range mt.terms {
@@ -5594,6 +5784,7 @@ func (mt messageTerms) best(s model.Session) float64 {
 func (mt messageTerms) window(text string) int {
 	var at []int // the term each word is a form of, -1 for any other word
 	var buf [tokenHitCap]byte
+	var pair [2 * utf8.UTFMax]byte
 	n := 0
 	flush := func() {
 		if n >= 2 {
@@ -5605,7 +5796,53 @@ func (mt messageTerms) window(text string) int {
 		}
 		n = 0
 	}
+	lookupPair := func(r1, r2 rune) int {
+		m := 0
+		if r1 != 0 {
+			m += utf8.EncodeRune(pair[m:], r1)
+		}
+		m += utf8.EncodeRune(pair[m:], r2)
+		if i, ok := mt.of[string(pair[:m])]; ok {
+			return i
+		}
+		f1, f2 := r1, cjkfold.Rune(r2)
+		if r1 != 0 {
+			f1 = cjkfold.Rune(r1)
+		}
+		if f1 != r1 || f2 != r2 {
+			m = 0
+			if f1 != 0 {
+				m += utf8.EncodeRune(pair[m:], f1)
+			}
+			m += utf8.EncodeRune(pair[m:], f2)
+			if i, ok := mt.of[string(pair[:m])]; ok {
+				return i
+			}
+		}
+		return -1
+	}
+	var prevUnspaced rune
+	unspacedRun := 0
+	flushUnspaced := func() {
+		if unspacedRun == 1 {
+			at = append(at, lookupPair(0, prevUnspaced))
+		}
+		unspacedRun = 0
+	}
 	for _, r := range query.Lower(nfcfold.Compose(text)) {
+		if mt.unspaced && cjkfold.Unspaced(r) {
+			flush()
+			if unspacedRun == 0 {
+				prevUnspaced = r
+				unspacedRun = 1
+			} else {
+				at = append(at, lookupPair(prevUnspaced, r))
+				prevUnspaced = r
+				unspacedRun = 2
+			}
+			continue
+		}
+		flushUnspaced()
 		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-' || (n > 0 && isMark(r)) {
 			n += utf8.EncodeRune(buf[n:], r)
 			if n > 64 {
@@ -5615,6 +5852,7 @@ func (mt messageTerms) window(text string) int {
 			flush()
 		}
 	}
+	flushUnspaced()
 	flush()
 	count := make([]int, len(mt.forms))
 	have, best, lo := 0, 0, 0

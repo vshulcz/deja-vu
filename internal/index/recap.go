@@ -10,9 +10,11 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/vshulcz/deja-vu/internal/cjkfold"
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/query"
 	"github.com/vshulcz/deja-vu/internal/redact"
 )
 
@@ -223,6 +225,10 @@ var processNoise = []string{
 	"still running at",
 	"timer active",
 	"<truncated ",
+	"正在等待",
+	"已启动子代理",
+	"等待后台任务",
+	"子代理已",
 }
 
 // instructionOpeners are the imperative sentences that come from a prompt, a
@@ -239,17 +245,18 @@ var instructionOpeners = []string{
 	// "Now let me compile my findings by examining each specific concern".
 	"now let me", "let me ", "i'll now", "i will now", "first, let me",
 	"next, let me", "i'm going to",
+	"我先看看", "让我看看", "现在我来", "接下来我",
 }
 
 // recapLayoutRunes are the characters a line can only start with because of
 // where it was cut out of: list markers, heading marks, and the punctuation
 // that joined it to the clause above.
-const recapLayoutRunes = "-*•#:,;) \t"
+const recapLayoutRunes = "-*•#:,;)：，；） \t"
 
 // isProcessNoise reports whether a line is the agent narrating its own turn or
 // repeating an instruction it was given.
 func isProcessNoise(s string) bool {
-	low := strings.ToLower(s)
+	low := cjkfold.String(strings.ToLower(s))
 	for _, p := range processNoise {
 		if strings.Contains(low, p) {
 			return true
@@ -301,7 +308,7 @@ func trimRecapLine(s string) string {
 	if isProcessNoise(s) {
 		return ""
 	}
-	if n := utf8.RuneCountInString(s); n < recapLineMin {
+	if n := utf8.RuneCountInString(s); n < recapLineMin && cjkfold.CountCJK(s) < 12 {
 		return ""
 	} else if n > recapLineMax {
 		s = cutAtSentence(s, recapLineMax)
@@ -317,30 +324,34 @@ func cutAtSentence(s string, n int) string {
 	if len(runes) <= n {
 		return s
 	}
-	head := string(runes[:n])
+	head := runes[:n]
 	for i := len(head) - 1; i > len(head)/2; i-- {
 		c := head[i]
+		if c == '。' || c == '！' || c == '？' {
+			return string(head[:i+1])
+		}
 		if c != '.' && c != '!' && c != '?' {
 			continue
 		}
 		// Must be followed by whitespace (not a dot inside a URL, filename,
 		// version, decimal, or IP address).
-		if i+1 < len(s) && s[i+1] != ' ' && s[i+1] != '\n' && s[i+1] != '\t' {
+		if i+1 < len(runes) && runes[i+1] != ' ' && runes[i+1] != '\n' && runes[i+1] != '\t' {
 			continue
 		}
 		// Not a numbered-list marker (`: 1.` or ` 1.`).
 		if c == '.' && isListNumberDot(head, i) {
 			continue
 		}
-		return head[:i+1]
+		return string(head[:i+1])
 	}
-	if i := strings.LastIndexByte(head, ' '); i > 0 {
-		return head[:i] + "…"
+	headStr := string(head)
+	if i := strings.LastIndexByte(headStr, ' '); i > 0 {
+		return headStr[:i] + "…"
 	}
-	return head + "…"
+	return headStr + "…"
 }
 
-func isListNumberDot(s string, dotIdx int) bool {
+func isListNumberDot(s []rune, dotIdx int) bool {
 	j := dotIdx - 1
 	for j >= 0 && s[j] >= '0' && s[j] <= '9' {
 		j--
@@ -355,7 +366,8 @@ func isListNumberDot(s string, dotIdx int) bool {
 // what two spellings of one conclusion have in common.
 func recapWords(s string) map[string]bool {
 	out := map[string]bool{}
-	for _, w := range strings.FieldsFunc(strings.ToLower(s), func(r rune) bool {
+	low := cjkfold.String(strings.ToLower(s))
+	for _, w := range strings.FieldsFunc(low, func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
 	}) {
 		// Short words are grammar in every language this sees and they make
@@ -364,6 +376,13 @@ func recapWords(s string) map[string]bool {
 			continue
 		}
 		out[w] = true
+	}
+	if cjkfold.HasCJK(low) {
+		for _, bg := range cjkfold.Bigrams(low) {
+			if !query.CJKFunctionBigram(bg) {
+				out[bg] = true
+			}
+		}
 	}
 	return out
 }

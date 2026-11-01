@@ -1206,6 +1206,11 @@ var decisionMarkers = []string{
 	// as rare rather than as a hole (#2340). It is a hole for a reader working
 	// in English, and these are the same shapes as the entries above them.
 	"settled on", "settled at", "settled that", "agreed to", "went with", "ended up", "in the end", "opted for",
+	// Chinese decision, root-cause and outcome markers, in Simplified form
+	// (Traditional is folded before matching).
+	"决定：", "决定:", "结论：", "结论:", "原因：", "原因:", "根因：", "根因:",
+	"原因是", "根因是", "最终决定", "决定采用", "改为", "改用", "修复了", "已修复",
+	"修好了", "解决了", "已解决", "已合并", "已发布", "默认使用",
 }
 
 // CarriesDecision reports whether a line reads as something concluded rather
@@ -1227,6 +1232,7 @@ var planAfterMarker = []string{
 	"теперь давай", "теперь главное", "теперь нужно", "теперь надо",
 	"теперь буду", "теперь сделаю", "теперь я", "now let's", "now i'll",
 	"now we need", "now i will",
+	"现在让我们", "现在我来", "接下来我", "现在需要",
 }
 
 // blankOpeningNow removes "теперь" where it opens a clause, which is how a
@@ -1280,6 +1286,9 @@ func endsWord(text string) bool {
 // шардирование" promoted a session about something else entirely.
 func CarriesDecisionExcept(text string, asked []string) bool {
 	low := strings.ToLower(text)
+	if cjkfold.HasCJK(low) {
+		low = cjkfold.String(low)
+	}
 	// deja asks an agent to credit a recall it used — "déjà vu: … — reusing
 	// it" — and that sentence reports what a past session decided, so every
 	// decision marker in the quoted line fires on it. Found at the file line:
@@ -1303,7 +1312,7 @@ func CarriesDecisionExcept(text string, asked []string) bool {
 		}
 		skip := false
 		for _, a := range asked {
-			if a != "" && strings.Contains(d, strings.ToLower(a)) {
+			if a != "" && strings.Contains(d, cjkfold.String(strings.ToLower(a))) {
 				skip = true
 				break
 			}
@@ -1331,6 +1340,7 @@ var planOpeners = []string{
 	"going to ", "about to ",
 	"ищу", "проверяю", "смотрю", "читаю", "реализую", "добавляю", "пишу ",
 	"делаю", "начинаю", "перемеряю", "спавню", "запускаю", "собираю", "сейчас ",
+	"我先", "让我先", "让我看看", "我来看看", "我先看看", "正在检查", "我现在",
 }
 
 // announcesItself reports whether the line opens by saying what the speaker is
@@ -1385,6 +1395,8 @@ var acknowledgements = map[string]bool{
 	"none": true, "sure": true, "got it": true, "ping": true, "pong": true,
 	"no response requested": true, "review complete": true,
 	"ок": true, "да": true, "нет": true, "готово": true, "понял": true, "принято": true,
+	"好": true, "好的": true, "行": true, "可以": true, "收到": true, "明白": true,
+	"搞定": true, "完成": true, "没问题": true, "是的": true, "对": true, "嗯": true,
 }
 
 func acknowledgement(text string) bool {
@@ -1393,8 +1405,11 @@ func acknowledgement(text string) bool {
 		return false
 	}
 	t = strings.TrimSpace(strings.TrimFunc(t, func(r rune) bool {
-		return strings.ContainsRune(".!,:;*`'\"", r)
+		return strings.ContainsRune(".!,:;*`'\"。！，：；", r)
 	}))
+	if cjkfold.HasCJK(t) {
+		t = cjkfold.String(t)
+	}
 	return acknowledgements[t]
 }
 
@@ -1418,7 +1433,7 @@ func marksLine(low, marker string) bool {
 	// The first rune, not the first byte: every Cyrillic marker starts with a
 	// multi-byte one, and reading a single byte of it decoded as an error and
 	// took the boundary rule out of play for half the list.
-	if first, _ := utf8.DecodeRuneInString(marker); !unicode.IsLetter(first) && !unicode.IsDigit(first) {
+	if first, _ := utf8.DecodeRuneInString(marker); (!unicode.IsLetter(first) && !unicode.IsDigit(first)) || cjkfold.Unspaced(first) {
 		return strings.Contains(low, marker)
 	}
 	for i := 0; ; {
@@ -1445,6 +1460,9 @@ func selectConclusions(ms []model.Message) []model.Message {
 	var keep []model.Message
 	for i, m := range ms {
 		low := strings.ToLower(m.Text)
+		if cjkfold.HasCJK(low) {
+			low = cjkfold.String(low)
+		}
 		marked := false
 		for _, d := range decisionMarkers {
 			if marksLine(low, d) {

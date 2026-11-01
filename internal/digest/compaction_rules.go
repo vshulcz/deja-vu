@@ -6,6 +6,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/vshulcz/deja-vu/internal/cjkfold"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/redact"
 )
@@ -36,16 +37,18 @@ var (
 		`никогда|всегда|нельзя|обязательно|запомни|впредь|с этого момента|каждый раз|только не|ни в коем случае|не надо|не нужно|не смей|используй \S+(?: \S+)? (?:вместо|а не)\b|` +
 		// "не трогай", "не запускай", "не пиши": a negated imperative. The
 		// ending is what separates it from "не работает", "не знаю", "не понял".
-		`не \p{L}+(?:й|йте|ь|ьте|и|ите)(?:сь|ся)?(?:$|[^\p{L}]))`)
+		`не \p{L}+(?:й|йте|ь|ьте|и|ите)(?:сь|ся)?(?:$|[^\p{L}])|` +
+		`永远不要|千万不要|绝对不要|不要|别|禁止|严禁|必须|务必|一定要|总是|始终|记住|以后|从现在起|每次都|优先使用)`)
 	// The ones that open the same way and instruct nothing.
 	standingNotRE = regexp.MustCompile(`(?i)^(?:never mind|nevermind|don't worry|dont worry|do not worry|don't know|dont know|do not know|don't think|dont think|don't see|don't get|always has|always had|always was|always were|always been|не знаю|не помню|не понимаю|не уверен|не важно|не страшно|не надо было|не нужно было|` +
 		// "не удалось", "не нашлось": a past tense whose ending passes for an imperative.
-		`не \p{L}+(?:ось|ась|ись)(?:$|[^\p{L}]))`)
+		`не \p{L}+(?:ось|ась|ись)(?:$|[^\p{L}])|` +
+		`不要紧|没关系|不用谢|不知道|不清楚|不确定|不重要)`)
 	// An instruction keeps its list item; the item is rewritten in full.
 	standingItemRE  = regexp.MustCompile(`^\s*(?:[-*+•]\s+|\d{1,2}[.)]\s+)`)
 	standingFenceRE = regexp.MustCompile("(?s)```.*?```")
 	standingTagRE   = regexp.MustCompile(`(?s)<([A-Za-z][\w-]*)(?:\s[^<>]*)?>.*?</([A-Za-z][\w-]*)>`)
-	standingSentRE  = regexp.MustCompile(`([.!;])\s+`)
+	standingSentRE  = regexp.MustCompile(`([.!;]\s+|[。！；]\s*)`)
 )
 
 // ExtractStandingRules returns the user's standing instructions from every
@@ -148,16 +151,20 @@ func standingSentences(line string) []string {
 }
 
 func standingRule(sentence string) bool {
-	s := strings.TrimLeft(sentence, "\"'«“`(")
-	if strings.HasSuffix(strings.TrimRight(s, " \"'»”)"), "?") {
+	s := strings.TrimLeft(sentence, "\"'«“`(「『")
+	trimmed := strings.TrimRight(s, " \"'»”)」』")
+	if strings.HasSuffix(trimmed, "?") || strings.HasSuffix(trimmed, "？") {
 		return false
 	}
-	return standingStartRE.MatchString(s) && !standingNotRE.MatchString(s)
+	folded := cjkfold.String(s)
+	return standingStartRE.MatchString(folded) && !standingNotRE.MatchString(folded)
 }
 
 func fitsStanding(s string) bool {
-	n := utf8.RuneCountInString(s)
-	return n >= 12 && len(s) <= standingRuleBytes
+	if len(s) > standingRuleBytes {
+		return false
+	}
+	return utf8.RuneCountInString(s) >= 12 || cjkfold.CountCJK(s) >= 6
 }
 
 // stripTagBlocks drops XML-wrapped plumbing a harness puts inside a user turn

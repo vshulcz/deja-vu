@@ -18,12 +18,12 @@ func TestRecallWorthShowing(t *testing.T) {
 }
 
 func TestHasIdentifierTerm(t *testing.T) {
-	for _, term := range []string{"pgbouncer", "omoda", "сеть", "v11.2", "pkg/index", "bot_id"} {
+	for _, term := range []string{"pgbouncer", "omoda", "сеть", "v11.2", "pkg/index", "bot_id", "死锁", "缓存", "数据库", "數據庫"} {
 		if !HasIdentifierTerm([]string{term}) {
 			t.Errorf("%q names something", term)
 		}
 	}
-	for _, term := range []string{"build", "tests", "line", "of", ""} {
+	for _, term := range []string{"build", "tests", "line", "of", "", "文件", "代码", "测试", "问题", "代碼"} {
 		if HasIdentifierTerm([]string{term}) {
 			t.Errorf("%q is ordinary vocabulary", term)
 		}

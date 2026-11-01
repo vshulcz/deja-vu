@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/cjkfold"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/redact"
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -242,10 +243,10 @@ func trivialContinuation(text string) bool {
 	}
 	// Punctuation between the words too: "thanks, continue" and "ага, давай" are
 	// the same turn as without the comma.
-	low := strings.ToLower(strings.Trim(text, " .,!?:;"))
+	low := cjkfold.String(strings.ToLower(strings.Trim(text, " .,!?:;。，！？：；、…")))
 	low = strings.Join(strings.Fields(strings.Map(func(r rune) rune {
 		switch r {
-		case ',', ';', '.', '!', '?', ':':
+		case ',', ';', '.', '!', '?', ':', '。', '，', '！', '？', '：', '；', '、', '…':
 			return ' '
 		}
 		return r
@@ -276,7 +277,8 @@ func onlyNudges(low string) bool {
 			if len(nudge) <= len(best) {
 				continue
 			}
-			if low == nudge || strings.HasPrefix(low, nudge+" ") {
+			if low == nudge || strings.HasPrefix(low, nudge+" ") ||
+				(cjkfold.HasCJK(nudge) && strings.HasPrefix(low, nudge)) {
 				best = nudge
 			}
 		}
@@ -347,7 +349,7 @@ func explicitOpenItems(text string, ref model.ContextRef) []classifiedOpenItem {
 		if line == "" {
 			continue
 		}
-		low := strings.ToLower(line)
+		low := cjkfold.String(strings.ToLower(line))
 		kind := ""
 		switch {
 		case hasAnyLabel(low, gapLabels):
@@ -379,9 +381,13 @@ var gapLabels = []string{
 	"осталось", "что осталось", "остаётся", "остается", "остался",
 	"открытый вопрос", "открытые вопросы", "не сделал", "чего не сделал",
 	"не доделал", "не проверено",
+	"待办", "还剩", "剩下", "未完成", "未验证", "遗留问题", "开放问题", "待解决",
 }
 
-var conflictLabels = []string{"conflict", "disagreement", "contradiction", "конфликт", "противоречие"}
+var conflictLabels = []string{
+	"conflict", "disagreement", "contradiction", "конфликт", "противоречие",
+	"冲突", "矛盾", "分歧",
+}
 
 func hasAnyLabel(line string, labels []string) bool {
 	for _, label := range labels {
@@ -403,7 +409,7 @@ func hasLabel(line, label string) bool {
 	}
 	rest := strings.TrimPrefix(strings.TrimPrefix(line, label), "**")
 	rest = strings.TrimLeft(rest, " ")
-	for _, sep := range []string{":", "—", "-", "–"} {
+	for _, sep := range []string{":", "：", "—", "-", "–"} {
 		if strings.HasPrefix(rest, sep) {
 			return true
 		}

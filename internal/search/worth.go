@@ -3,6 +3,8 @@ package search
 import (
 	"strings"
 	"unicode/utf8"
+
+	"github.com/vshulcz/deja-vu/internal/cjkfold"
 )
 
 // RecallWorthShowing is the one bar both the hook and the benchmark apply. It
@@ -159,9 +161,11 @@ func HasIdentifierTerm(terms []string) bool {
 		//
 		// Russian carries its meaning in shorter words — "сеть", "порт" name
 		// something the way a five-letter Latin word does — so the bar is one
-		// letter lower there.
+		// letter lower there. CJK terms arrive as two-rune bigrams from
+		// ExpandCJKTokens, so a two-rune unspaced bigram is a full word.
 		n := utf8.RuneCountInString(t)
-		if n >= 3 && !soleWorkingWord[t] {
+		first, _ := utf8.DecodeRuneInString(t)
+		if (n >= 3 || (n >= 2 && cjkfold.Unspaced(first))) && !soleWorkingWord[t] && !soleWorkingWord[cjkfold.String(t)] {
 			return true
 		}
 		for _, r := range t {
@@ -236,4 +240,15 @@ var soleWorkingWord = map[string]bool{
 	"line": true, "file": true, "code": true, "read": true, "open": true,
 	"task": true, "step": true, "note": true, "logs": true, "docs": true,
 	"failures": true, "failure": true, "prepared": true, "statement": true, "statements": true,
+	// Chinese ordinary working/question bigrams: CJK terms are two runes each,
+	// so the same ordinary vocabulary ("文件"=file, "代码"=code, "测试"=test,
+	// "问题"=problem) is listed in Simplified form (Traditional folds to it).
+	"文件": true, "代码": true, "测试": true, "构建": true, "错误": true,
+	"报错": true, "修改": true, "检查": true, "任务": true, "步骤": true,
+	"日志": true, "提交": true, "分支": true, "函数": true, "方法": true,
+	"运行": true, "执行": true, "问题": true, "为什": true, "怎么": true,
+	"哪里": true, "哪个": true, "多少": true, "可以": true, "需要": true,
+	"应该": true, "现在": true, "刚才": true, "之前": true, "以前": true,
+	"已经": true, "一下": true, "一个": true, "这个": true, "那个": true,
+	"看下": true, "看看": true, "继续": true, "好的": true,
 }

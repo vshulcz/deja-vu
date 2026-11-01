@@ -370,3 +370,18 @@ func TestCutAtSentenceDoesNotCutInsideURLOrFilename(t *testing.T) {
 		t.Fatalf("expected word-boundary ellipsis cut, got %q", got)
 	}
 }
+
+func TestChineseRecapLineAndDeduplication(t *testing.T) {
+	line1 := trimRecapLine("决定：将数据库连接池的空闲超时改为三十秒以避免连接泄漏。")
+	if line1 == "" {
+		t.Fatal("Chinese conclusion of 27 runes was dropped by trimRecapLine")
+	}
+	if noise := trimRecapLine("已启动子代理正在等待后台任务完成。"); noise != "" {
+		t.Fatalf("Chinese subagent process noise survived trimRecapLine: %q", noise)
+	}
+	w1 := recapWords("决定：将数据库连接池的空闲超时改为三十秒。")
+	w2 := recapWords("結論：將數據庫連接池的空閒超時改為三十秒，並增加了測試。")
+	if !sameThoughtTwice([]map[string]bool{w1}, w2) {
+		t.Errorf("restated Chinese conclusion (Traditional vs Simplified) was not deduplicated: w1=%v w2=%v", w1, w2)
+	}
+}
