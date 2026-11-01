@@ -1040,7 +1040,7 @@ func writeBucket(p string, data map[string][]posting) error {
 		pos += uint64(len(b))
 	}
 	tmp := p + ".tmp"
-	f, err := os.OpenFile(tmp, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
+	f, err := openIndexFileWrite(tmp, os.O_RDWR|os.O_CREATE|os.O_TRUNC)
 	if err != nil {
 		return err
 	}
@@ -1367,7 +1367,7 @@ func uvarintLen(v uint64) int {
 }
 
 func writeGob(p string, v any) error {
-	f, err := os.OpenFile(p, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
+	f, err := openIndexFileWrite(p, os.O_RDWR|os.O_CREATE|os.O_TRUNC)
 	if err != nil {
 		return err
 	}
@@ -1386,7 +1386,7 @@ func writeGobAtomic(p string, v any) error {
 // stat saw it before the rename, which moves the name and not the file.
 func writeGobAtomicStat(p string, v any) (os.FileInfo, error) {
 	tmp := p + ".tmp"
-	f, err := os.OpenFile(tmp, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
+	f, err := openIndexFileWrite(tmp, os.O_RDWR|os.O_CREATE|os.O_TRUNC)
 	if err != nil {
 		return nil, err
 	}

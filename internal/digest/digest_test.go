@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 func TestShareFilteringHelpers(t *testing.T) {
@@ -76,5 +77,43 @@ func TestHandoffCleanDropsPreamblesAndRepeats(t *testing.T) {
 	got := cleanSession(s)
 	if len(got.Messages) != 2 || got.Messages[0].Text != "hi" || got.Messages[1].Text != "real question about retries" {
 		t.Fatalf("cleaned = %#v", got.Messages)
+	}
+}
+
+func TestHandoffContinuationLines(t *testing.T) {
+	longErr := "error: " + strings.Repeat("x", 140)
+	s := model.Session{
+		ID:      "sess-cont",
+		Project: "deja-vu",
+		Harness: "claude",
+		Messages: []model.Message{
+			{Role: "user", Text: "wire retry backoff in internal/search/engine.go"},
+			{Role: sources.RoleFiles, Text: "internal/search/engine.go internal/search/engine_test.go"},
+			{Role: sources.RoleCommand, Text: "git checkout -b fix/retry"},
+			{Role: "assistant", Text: "checking"},
+			{Role: sources.RoleToolOutput, Text: "ok\n" + longErr},
+		},
+	}
+	out := Handoff(s, 4000)
+	if !strings.Contains(out, "Files in flight") || !strings.Contains(out, "Last command") || !strings.Contains(out, "failed: error:") {
+		t.Fatalf("missing continuation fields in:\n%s", out)
+	}
+
+	inline := model.Session{
+		Messages: []model.Message{
+			{Role: sources.RoleCommand, Text: "make lint\nfatal: bad config"},
+		},
+	}
+	if got := lastCommandFailureLine(inline); got != "fatal: bad config" {
+		t.Fatalf("inline failure = %q", got)
+	}
+	clean := model.Session{
+		Messages: []model.Message{
+			{Role: sources.RoleCommand, Text: "git status"},
+			{Role: sources.RoleToolOutput, Text: "nothing to commit"},
+		},
+	}
+	if got := lastCommandFailureLine(clean); got != "" {
+		t.Fatalf("clean command failure = %q", got)
 	}
 }

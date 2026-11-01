@@ -272,3 +272,28 @@ func TestHumanAgeBuckets(t *testing.T) {
 		}
 	}
 }
+
+func TestHandoffIncludesContinuationFilesAndFailedCommand(t *testing.T) {
+	s := model.Session{
+		ID: "cont123456", Harness: "claude", Project: "gateway",
+		Updated: time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC),
+		Messages: []model.Message{
+			{Role: "user", Text: "fix the connection pool leak in internal/pool/conn.go"},
+			{Role: "assistant", Text: "We decided to cap MaxIdleConns at 16 per shard so idle connections drain deterministically."},
+			{Role: "edit", Text: "internal/pool/conn.go internal/pool/conn_test.go"},
+			{Role: "command", Text: "./scripts/migrate-staging.sh"},
+			{Role: "tool_output", Text: "Error: pq: relation \"pool_leases\" does not exist\nexit status 1"},
+		},
+	}
+	d := digest.Handoff(s, handoffBudget)
+	for _, want := range []string{
+		"Files in flight",
+		"internal/pool/conn_test.go, internal/pool/conn.go",
+		"Last command",
+		"./scripts/migrate-staging.sh — failed: Error: pq: relation \"pool_leases\" does not exist",
+	} {
+		if !strings.Contains(d, want) {
+			t.Fatalf("handoff digest missing %q:\n%s", want, d)
+		}
+	}
+}

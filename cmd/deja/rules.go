@@ -641,3 +641,90 @@ func rulesDoctorNote() string {
 	}
 	return fmt.Sprintf("%s behind %s — `deja rules sync`", strings.Join(behind, ", "), shortHome(rulesSourcePath()))
 }
+
+// repoRulesDriftNote reports when two or more repository instruction files
+// (CLAUDE.md, AGENTS.md, .cursorrules, .windsurfrules,
+// .github/copilot-instructions.md) exist in cwd and their non-managed bullet
+// rule sets differ (#5775).
+func repoRulesDriftNote(cwd string) string {
+	if cwd == "" {
+		var err error
+		if cwd, err = os.Getwd(); err != nil || cwd == "" {
+			return ""
+		}
+	}
+	if h := homeDir(); h != "" && filepath.Clean(cwd) == filepath.Clean(h) {
+		return ""
+	}
+	var names []string
+	var fingerprints []string
+	for _, rel := range []string{
+		"CLAUDE.md",
+		"AGENTS.md",
+		".cursorrules",
+		".windsurfrules",
+		filepath.Join(".github", "copilot-instructions.md"),
+	} {
+		b, err := os.ReadFile(filepath.Join(cwd, rel))
+		if err != nil {
+			continue
+		}
+		fp := repoRuleFingerprint(string(b))
+		if fp == "" {
+			continue
+		}
+		names = append(names, filepath.ToSlash(rel))
+		fingerprints = append(fingerprints, fp)
+	}
+	if len(names) < 2 {
+		return ""
+	}
+	differ := false
+	for i := 1; i < len(fingerprints); i++ {
+		if fingerprints[i] != fingerprints[0] {
+			differ = true
+			break
+		}
+	}
+	if !differ {
+		return ""
+	}
+	return fmt.Sprintf("repo rules %s differ — `deja rules` keeps agent rules in one place", strings.Join(names, ", "))
+}
+
+func repoRuleFingerprint(text string) string {
+	inManaged := false
+	seen := map[string]bool{}
+	var rules []string
+	for line := range strings.SplitSeq(strings.ReplaceAll(text, "\r\n", "\n"), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == rulesStart || trimmed == guidanceStart {
+			inManaged = true
+			continue
+		}
+		if trimmed == rulesEnd || trimmed == guidanceEnd {
+			inManaged = false
+			continue
+		}
+		if inManaged {
+			continue
+		}
+		var body string
+		switch {
+		case strings.HasPrefix(trimmed, "- "):
+			body = strings.TrimSpace(trimmed[2:])
+		case strings.HasPrefix(trimmed, "* "):
+			body = strings.TrimSpace(trimmed[2:])
+		default:
+			continue
+		}
+		norm := strings.ToLower(strings.Join(strings.Fields(body), " "))
+		if norm == "" || seen[norm] {
+			continue
+		}
+		seen[norm] = true
+		rules = append(rules, norm)
+	}
+	sort.Strings(rules)
+	return strings.Join(rules, "\n")
+}

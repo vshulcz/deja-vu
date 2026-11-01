@@ -343,7 +343,7 @@ func (rp *replacePass) sayPass(copiesRead int) {
 func (rp *replacePass) write() error {
 	rp.tmp = rp.dir + ".tmp"
 	_ = os.RemoveAll(rp.tmp)
-	if mkErr := os.MkdirAll(filepath.Join(rp.tmp, "buckets"), 0o700); mkErr != nil {
+	if mkErr := mkdirIndexAll(filepath.Join(rp.tmp, "buckets")); mkErr != nil {
 		return mkErr
 	}
 	// Appended to the log the old index holds, or the log written anew: see
@@ -433,7 +433,7 @@ func (rp *replacePass) openLog() error {
 	var rf *os.File
 	rp.tbl = newRecordTables()
 	if rp.appending {
-		rf, err = os.OpenFile(filepath.Join(rp.tmp, "records.bin"), os.O_RDWR, 0o600)
+		rf, err = openIndexFileWrite(filepath.Join(rp.tmp, "records.bin"), os.O_RDWR)
 		// Ids continue where the log's records left off; clipped, so the
 		// table this pass grows is not the old manifest's backing array.
 		rp.tbl = tablesFromStrings(slices.Clip(rp.old.RecordStrings))

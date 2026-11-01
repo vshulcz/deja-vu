@@ -3,7 +3,10 @@ package main
 import (
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -12,10 +15,52 @@ import (
 
 // installLead is what the install says under "deja already knows this
 // machine:" before the listing — the questions this machine has asked more
-// than once, then the error it keeps hitting. Both come from the store the
-// install just built; neither is new data (#3064, #2967).
+// than once, then the error it keeps hitting, plus a settled constraint from
+// the current project when running inside one (#3064, #2967, #5774).
 func installLead(dir string) string {
-	return joinNotesWith("\n  ", repeatQuestionsLine(dir), recurringErrorLine(dir))
+	return joinNotesWith("\n  ", repeatQuestionsLine(dir), recurringErrorLine(dir), currentProjectRecallLine(dir))
+}
+
+func currentProjectRecallLine(dir string) string {
+	if !index.HasManifest(dir) {
+		return ""
+	}
+	cwd, err := os.Getwd()
+	if err != nil || cwd == "" {
+		return ""
+	}
+	if h := homeDir(); h != "" && filepath.Clean(cwd) == filepath.Clean(h) {
+		return ""
+	}
+	for _, cand := range digest.ProjectNameCandidates(cwd) {
+		ss, err := index.SearchWithRecovery(dir, search.Options{Project: cand, All: true}, io.Discard)
+		if err != nil || len(ss) == 0 {
+			continue
+		}
+		kept, _ := policyFilterSessionsCounted(policy.ActivationSearch, ss)
+		if len(kept) == 0 {
+			continue
+		}
+		var dec string
+		for _, s := range kept {
+			if d := digest.ResumeFrom(s, nil).Decision; d != "" {
+				dec = search.SafeLine(d)
+				break
+			}
+			if rules := digest.ExtractStandingRules(s, nil); len(rules) > 0 && rules[0].Text != "" {
+				dec = search.SafeLine(rules[0].Text)
+				break
+			}
+		}
+		if dec == "" {
+			continue
+		}
+		if len(dec) > 76 {
+			dec = digest.UTF8SafeCut(dec, 76) + "…"
+		}
+		return fmt.Sprintf("in %s (%d session%s): settled — %s", cand, len(kept), pluralS(len(kept)), dec)
+	}
+	return ""
 }
 
 // repeatQuestionsLine reads the whole store once. That is an install-time

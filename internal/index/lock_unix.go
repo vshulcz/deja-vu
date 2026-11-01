@@ -17,11 +17,11 @@ func lockDir(dir string) (func(), error) {
 		return nil, err
 	}
 	// Tighten pre-existing indexes created before the 0700 default.
-	_ = os.Chmod(dir, 0o700)
-	if err := os.MkdirAll(filepath.Dir(lockPath), 0o700); err != nil {
+	chmodIndexDir(dir)
+	if err := mkdirIndexAll(filepath.Dir(lockPath)); err != nil {
 		return nil, err
 	}
-	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600)
+	f, err := openIndexFileWrite(lockPath, os.O_CREATE|os.O_RDWR)
 	if err != nil {
 		return nil, err
 	}
@@ -58,14 +58,14 @@ func tryLockDir(dir string) (func(), bool, error) {
 	if err := checkIndexPath(dir); err != nil {
 		return nil, false, err
 	}
-	_ = os.Chmod(dir, 0o700)
-	if err := os.MkdirAll(filepath.Dir(lockPath), 0o700); err != nil {
+	chmodIndexDir(dir)
+	if err := mkdirIndexAll(filepath.Dir(lockPath)); err != nil {
 		if Unwritable(err) {
 			return nil, false, nil
 		}
 		return nil, false, err
 	}
-	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600)
+	f, err := openIndexFileWrite(lockPath, os.O_CREATE|os.O_RDWR)
 	if err != nil {
 		// A read-only index is not an error for a reader: a container mount
 		// or a locked-down machine can still answer every question asked of

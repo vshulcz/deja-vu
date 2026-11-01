@@ -63,3 +63,28 @@ func TestInstallProofStaysQuietWithoutARecurringError(t *testing.T) {
 		t.Errorf("the listing itself went missing:\n%s", out)
 	}
 }
+
+func TestInstallProofShowsCurrentProjectRecallPreview(t *testing.T) {
+	hermeticEnv(t)
+	projDir := filepath.Join(t.TempDir(), "work", "orbit")
+	if err := os.MkdirAll(projDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(projDir)
+	root := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-work-orbit")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	slashDir := filepath.ToSlash(projDir)
+	writeClaudeFixture(t, filepath.Join(root, "s1.jsonl"), "s1", []string{
+		`{"type":"user","sessionId":"s1","cwd":"` + slashDir + `","timestamp":"2026-07-28T10:00:00Z","message":{"role":"user","content":"wire the queue consumer"}}`,
+		`{"type":"assistant","sessionId":"s1","cwd":"` + slashDir + `","timestamp":"2026-07-28T10:01:00Z","message":{"role":"assistant","content":"We decided to avoid global mutexes in the queue consumer and pass a channel per worker instead."}}`,
+	})
+	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	out := captureStderr(t, func() { printInstallProof(index.DefaultDir()) })
+	if !strings.Contains(out, "settled —") || !strings.Contains(out, "avoid global mutexes") {
+		t.Fatalf("expected live project recall preview in install proof, got:\n%s", out)
+	}
+}

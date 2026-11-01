@@ -685,7 +685,7 @@ func EnsureForSearchNoWait(dir string, o query.Options, progress io.Writer) (bus
 // lockUnwritable reports an index whose lock file cannot be created or opened
 // for writing, which is how a read-only store presents itself.
 func lockUnwritable(dir string) bool {
-	f, err := os.OpenFile(dir+".lock", os.O_CREATE|os.O_RDWR, 0o600)
+	f, err := openIndexFileWrite(dir+".lock", os.O_CREATE|os.O_RDWR)
 	if err != nil {
 		return Unwritable(err)
 	}
@@ -984,7 +984,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	imported := importedSessions(dir)
 	tmp := dir + ".tmp"
 	_ = os.RemoveAll(tmp)
-	if err := os.MkdirAll(filepath.Join(tmp, "buckets"), 0o700); err != nil {
+	if err := mkdirIndexAll(filepath.Join(tmp, "buckets")); err != nil {
 		return err
 	}
 	total := 0
@@ -2337,7 +2337,7 @@ func publishNewestFirst(dir string, ss []model.Session, progress io.Writer) {
 	newest = newest[:newestSlice(newest)]
 	tmp := dir + ".part"
 	_ = os.RemoveAll(tmp)
-	if err := os.MkdirAll(filepath.Join(tmp, "buckets"), 0o700); err != nil {
+	if err := mkdirIndexAll(filepath.Join(tmp, "buckets")); err != nil {
 		return
 	}
 	defer func() { _ = os.RemoveAll(tmp) }()
@@ -5484,7 +5484,7 @@ func carrySidecars(dir, tmp string) {
 		if err != nil {
 			continue
 		}
-		_ = os.WriteFile(filepath.Join(tmp, name), b, 0o600)
+		_ = writeIndexFile(filepath.Join(tmp, name), b)
 	}
 }
 
@@ -5712,7 +5712,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	// the file, so what it finds adds to the file's count instead of replacing
 	// it. Marking the file re-read dropped every bad line in the part already
 	// indexed — which is every live session.
-	rf, err := os.OpenFile(filepath.Join(dir, "records.bin"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	rf, err := openIndexFileWrite(filepath.Join(dir, "records.bin"), os.O_CREATE|os.O_WRONLY|os.O_APPEND)
 	if err != nil {
 		return 0, 0, 0, err
 	}

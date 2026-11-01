@@ -31,11 +31,11 @@ func lockDir(dir string) (func(), error) {
 		return nil, err
 	}
 	// Tighten pre-existing indexes created before the 0700 default.
-	_ = os.Chmod(dir, 0o700)
-	if err := os.MkdirAll(filepath.Dir(lockPath), 0o700); err != nil {
+	chmodIndexDir(dir)
+	if err := mkdirIndexAll(filepath.Dir(lockPath)); err != nil {
 		return nil, err
 	}
-	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600)
+	f, err := openIndexFileWrite(lockPath, os.O_CREATE|os.O_RDWR)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func lockDir(dir string) (func(), error) {
 	// ambiguous, and the blocking call that follows never returned. Only to
 	// learn whether there is a wait worth reporting — see lock_unix.go (#994).
 	ended := func() {}
-	if probe, perr := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600); perr == nil {
+	if probe, perr := openIndexFileWrite(lockPath, os.O_CREATE|os.O_RDWR); perr == nil {
 		var pol syscall.Overlapped
 		if lockFileEx(syscall.Handle(probe.Fd()), lockfileExclusiveLock|lockfileFailImmediately, 0, 1, 0, &pol) != nil {
 			ended = noteLockWait()
@@ -101,14 +101,14 @@ func tryLockDir(dir string) (func(), bool, error) {
 	if err := checkIndexPath(dir); err != nil {
 		return nil, false, err
 	}
-	_ = os.Chmod(dir, 0o700)
-	if err := os.MkdirAll(filepath.Dir(lockPath), 0o700); err != nil {
+	chmodIndexDir(dir)
+	if err := mkdirIndexAll(filepath.Dir(lockPath)); err != nil {
 		if errors.Is(err, fs.ErrPermission) {
 			return nil, false, nil
 		}
 		return nil, false, err
 	}
-	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600)
+	f, err := openIndexFileWrite(lockPath, os.O_CREATE|os.O_RDWR)
 	if err != nil {
 		// A read-only index is not an error for a reader: a container mount
 		// or a locked-down machine can still answer every question asked of

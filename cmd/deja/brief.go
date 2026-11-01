@@ -178,6 +178,9 @@ func runBrief(dir string, w io.Writer) error {
 	if note := deadHookNotice(dir); note != "" {
 		fmt.Fprintf(w, "%shooks      %s%s\n", bold, note, reset)
 	}
+	if drift := repoRulesDriftNote(""); drift != "" {
+		fmt.Fprintf(w, "rules      %s\n", drift)
+	}
 	fmt.Fprintf(w, "%smore       deja log · deja stats · deja help%s\n", dim, reset)
 	return nil
 }

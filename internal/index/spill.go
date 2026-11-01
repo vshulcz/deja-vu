@@ -48,7 +48,7 @@ type spiller struct {
 
 func newSpiller(tmp string) (*spiller, error) {
 	d := filepath.Join(tmp, "spill")
-	if err := os.MkdirAll(d, 0o700); err != nil {
+	if err := mkdirIndexAll(d); err != nil {
 		return nil, err
 	}
 	return &spiller{dir: d, buckets: map[string]bool{}}, nil
@@ -70,7 +70,7 @@ func (s *spiller) append(i int, b []byte) error {
 	s.mu[i].Lock()
 	defer s.mu[i].Unlock()
 	if s.w[i] == nil {
-		f, err := os.OpenFile(filepath.Join(s.dir, shardName(i)), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
+		f, err := openIndexFileWrite(filepath.Join(s.dir, shardName(i)), os.O_RDWR|os.O_CREATE|os.O_TRUNC)
 		if err != nil {
 			return err
 		}

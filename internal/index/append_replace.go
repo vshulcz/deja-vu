@@ -58,7 +58,7 @@ func appendsInPlace(dir, tmp string, old Manifest) bool {
 	}
 	undo := func() bool {
 		_ = os.RemoveAll(tmp)
-		_ = os.MkdirAll(filepath.Join(tmp, "buckets"), 0o700)
+		_ = mkdirIndexAll(filepath.Join(tmp, "buckets"))
 		return false
 	}
 	if os.Link(filepath.Join(dir, "records.bin"), filepath.Join(tmp, "records.bin")) != nil {
@@ -79,7 +79,7 @@ func createLog(p string) (*os.File, error) {
 	if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
-	return os.OpenFile(p, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600)
+	return openIndexFileWrite(p, os.O_RDWR|os.O_CREATE|os.O_EXCL)
 }
 
 // undoAppend cuts the log in dir back to what its manifest committed, after a
@@ -296,7 +296,7 @@ func markScrubPending(dir string) error {
 		return err
 	}
 	b := binary.LittleEndian.AppendUint64(nil, uint64(size)) //nolint:gosec // file sizes are non-negative
-	return os.WriteFile(filepath.Join(dir, scrubPendingFile), append(b, fp[:]...), 0o600)
+	return writeIndexFile(filepath.Join(dir, scrubPendingFile), append(b, fp[:]...))
 }
 
 // scrubMarked is the log size and fingerprint the mark in dir carries, or

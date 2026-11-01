@@ -36,6 +36,36 @@ func GeminiRoot() string {
 	return EnvPath("DEJA_GEMINI_ROOT", GeminiHome())
 }
 
+// GeminiRoots returns GeminiRoot() followed by any readable .gemini stores
+// under DEJA_HOME_ROOTS when DEJA_GEMINI_ROOT is not pinned.
+func GeminiRoots() []string {
+	roots := []string{GeminiRoot()}
+	if os.Getenv("DEJA_GEMINI_ROOT") == "" {
+		for _, h := range extraHomeRoots() {
+			r := filepath.Join(h, ".gemini")
+			if _, err := os.ReadDir(filepath.Join(r, "tmp")); err == nil && !slices.Contains(roots, r) {
+				roots = append(roots, r)
+			}
+		}
+	}
+	return roots
+}
+
+// UnderGeminiRoot reports whether p sits inside any Gemini tmp directory.
+func UnderGeminiRoot(p string) bool {
+	if strings.HasPrefix(p, filepath.Join(GeminiRoot(), "tmp")) {
+		return true
+	}
+	if os.Getenv("DEJA_GEMINI_ROOT") == "" {
+		for _, h := range rawExtraHomeRoots() {
+			if strings.HasPrefix(p, filepath.Join(h, ".gemini", "tmp")) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // GeminiSidecarFiles lists what a Gemini store keeps under `tmp` beside the
 // chats: the per-project log the CLI writes for itself. Everything outside
 // `tmp` is out of the walk entirely, because Antigravity's store lives in a
@@ -45,18 +75,22 @@ func GeminiRoot() string {
 // (checkpoint-<tag>.json), restore points (checkpoints/*.json) and task lists
 // (<session>/tasks/*.json). None is a chat log the reader takes (#4474).
 func GeminiSidecarFiles() []string {
-	return walkFiles(filepath.Join(GeminiRoot(), "tmp"), func(p string) bool {
-		base, dir := filepath.Base(p), filepath.Base(filepath.Dir(p))
-		switch {
-		case base == "logs.json":
-			return true
-		case strings.HasPrefix(base, "checkpoint-") && strings.HasSuffix(base, ".json"):
-			return true
-		case dir == "checkpoints" || dir == "tasks":
-			return true
-		}
-		return false
-	})
+	var out []string //nolint:prealloc // each root adds an unknown number of files
+	for _, gRoot := range GeminiRoots() {
+		out = append(out, walkFiles(filepath.Join(gRoot, "tmp"), func(p string) bool {
+			base, dir := filepath.Base(p), filepath.Base(filepath.Dir(p))
+			switch {
+			case base == "logs.json":
+				return true
+			case strings.HasPrefix(base, "checkpoint-") && strings.HasSuffix(base, ".json"):
+				return true
+			case dir == "checkpoints" || dir == "tasks":
+				return true
+			}
+			return false
+		})...)
+	}
+	return out
 }
 
 // IsGeminiChatPath reports a path inside a Gemini CLI project's chats, the way
@@ -82,26 +116,28 @@ func IsGeminiChatPath(p string) bool {
 
 // GeminiChatFiles lists every Gemini CLI chat file.
 func GeminiChatFiles() []string {
-	root := filepath.Join(GeminiRoot(), "tmp")
 	var out []string
-	entries, err := os.ReadDir(root)
-	if err != nil {
-		return nil
-	}
-	for _, e := range entries {
-		if !e.IsDir() {
+	for _, gRoot := range GeminiRoots() {
+		root := filepath.Join(gRoot, "tmp")
+		entries, err := os.ReadDir(root)
+		if err != nil {
 			continue
 		}
-		chats := filepath.Join(root, e.Name(), "chats")
-		walked, under := walkRoot(chats)
-		_ = filepath.WalkDir(walked, func(p string, d os.DirEntry, err error) error {
-			// Regular files only: a FIFO matching the glob would block the
-			// parser's Open forever (same hang walkFiles guards against).
-			if err == nil && d.Type().IsRegular() && (strings.HasSuffix(p, ".json") || strings.HasSuffix(p, ".jsonl")) {
-				out = append(out, under(p))
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
 			}
-			return nil
-		})
+			chats := filepath.Join(root, e.Name(), "chats")
+			walked, under := walkRoot(chats)
+			_ = filepath.WalkDir(walked, func(p string, d os.DirEntry, err error) error {
+				// Regular files only: a FIFO matching the glob would block the
+				// parser's Open forever (same hang walkFiles guards against).
+				if err == nil && d.Type().IsRegular() && (strings.HasSuffix(p, ".json") || strings.HasSuffix(p, ".jsonl")) {
+					out = append(out, under(p))
+				}
+				return nil
+			})
+		}
 	}
 	return out
 }

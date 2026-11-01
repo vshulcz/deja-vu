@@ -223,3 +223,48 @@ func TestIndexPermissionsAreOwnerOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestIndexPermissionsSupportSharedGroup(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix permission bits")
+	}
+	root, dir := allHarnessEnv(t)
+	t.Setenv("DEJA_SHARED_GROUP", "1")
+	write(t, filepath.Join(root, "claude", "-p-app", "s1.jsonl"),
+		`{"type":"user","sessionId":"s1","timestamp":"2026-02-01T10:00:00Z","message":{"role":"user","content":"shared group perm probe"}}`+"\n")
+	if err := EnsureForSearch(dir, search.Options{Query: "x", All: true}, true, nil); err != nil {
+		t.Fatal(err)
+	}
+	if fi, err := os.Stat(dir); err != nil || fi.Mode().Perm() != 0o770 {
+		t.Fatalf("shared index dir perm=%v err=%v, want 0770", fi.Mode().Perm(), err)
+	}
+	err := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		fi, err := os.Stat(p)
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if fi.Mode().Perm() != 0o770 {
+				t.Errorf("%s perm=%v want 0770", p, fi.Mode().Perm())
+			}
+		} else if fi.Mode().Perm() != 0o660 {
+			t.Errorf("%s perm=%v want 0660", p, fi.Mode().Perm())
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := UnsharedFiles(dir); got != 0 {
+		t.Fatalf("UnsharedFiles(dir) = %d, want 0", got)
+	}
+	if err := os.Chmod(filepath.Join(dir, "manifest.gob"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := UnsharedFiles(dir); got == 0 {
+		t.Fatalf("UnsharedFiles(dir) = 0 after tightening manifest.gob to 0600, want >0")
+	}
+}

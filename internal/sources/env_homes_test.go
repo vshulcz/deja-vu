@@ -87,3 +87,42 @@ func TestUpstreamHomeVariables(t *testing.T) {
 		}
 	})
 }
+
+func TestDejaHomeRootsDiscoversReadablePeerHomes(t *testing.T) {
+	home := t.TempDir()
+	peer := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("DEJA_CLAUDE_ROOT", "")
+	t.Setenv("DEJA_CODEX_ROOT", "")
+	t.Setenv("DEJA_GEMINI_ROOT", "")
+	t.Setenv("DEJA_HOME_ROOTS", peer+string(os.PathListSeparator)+"relative/skip")
+
+	peerClaude := filepath.Join(peer, ".claude", "projects")
+	peerCodex := filepath.Join(peer, ".codex")
+	peerGemini := filepath.Join(peer, ".gemini", "tmp")
+	for _, d := range []string{peerClaude, peerCodex, peerGemini} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if got := HomeRoots(); len(got) != 2 || got[1] != filepath.Clean(peer) {
+		t.Fatalf("HomeRoots() = %v, want [%s %s]", got, home, peer)
+	}
+	if !UnderClaudeRoot(filepath.Join(peerClaude, "proj", "s1.jsonl")) {
+		t.Fatalf("UnderClaudeRoot should match peer home transcript")
+	}
+	if !UnderGeminiRoot(filepath.Join(peerGemini, "proj", "chats", "c1.json")) {
+		t.Fatalf("UnderGeminiRoot should match peer home chat")
+	}
+	foundCodex := false
+	for _, r := range CodexRoots() {
+		if r == filepath.Clean(peerCodex) {
+			foundCodex = true
+		}
+	}
+	if !foundCodex {
+		t.Fatalf("CodexRoots() = %v, missing %s", CodexRoots(), peerCodex)
+	}
+}

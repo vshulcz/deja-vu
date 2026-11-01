@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -47,6 +48,57 @@ type Source struct{ Name, Root string }
 
 // Home is the user's home dir, empty when it cannot be found.
 func Home() string { h, _ := os.UserHomeDir(); return h }
+
+// HomeRoots returns Home() followed by any additional readable home
+// directories listed in DEJA_HOME_ROOTS (separated by filepath.ListSeparator,
+// e.g. "/home/alice:/home/bob" on shared multi-user servers). Relative paths
+// and unreadable directories are skipped so a restrictive peer home never
+// fails the caller's pass (#5759, #5773).
+func HomeRoots() []string {
+	var out []string
+	if h := Home(); h != "" {
+		out = append(out, filepath.Clean(h))
+	}
+	for _, h := range extraHomeRoots() {
+		if !slices.Contains(out, h) {
+			out = append(out, h)
+		}
+	}
+	return out
+}
+
+func rawExtraHomeRoots() []string {
+	raw := os.Getenv("DEJA_HOME_ROOTS")
+	if raw == "" {
+		return nil
+	}
+	home := filepath.Clean(Home())
+	var out []string
+	for _, p := range filepath.SplitList(raw) {
+		p = strings.TrimSpace(p)
+		if p == "" || !filepath.IsAbs(p) {
+			continue
+		}
+		p = filepath.Clean(p)
+		if p == home || slices.Contains(out, p) {
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
+func extraHomeRoots() []string {
+	var out []string
+	for _, p := range rawExtraHomeRoots() {
+		if fi, err := os.Stat(p); err == nil && fi.IsDir() {
+			if _, rerr := os.ReadDir(p); rerr == nil {
+				out = append(out, p)
+			}
+		}
+	}
+	return out
+}
 
 // ConfigHome is the XDG config base for deja's own files: the tombstones, the
 // exclude list, the aider context, peers, policy, the wiring record and the

@@ -2328,6 +2328,9 @@ func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 	// A precise non-claim: users deciding what to trust deserve to read the
 	// boundary in the tool itself, not only in the security docs.
 	fmt.Fprintln(w, "  security plaintext on disk — protected by file permissions only, no encryption or access control")
+	if n := index.UnsharedFiles(loc); n > 0 {
+		fmt.Fprintf(w, "  permissions %d file%s in shared index not group-writable — `chmod -R g+rwX %s`\n", n, pluralS(n), reportPath(loc))
+	}
 	if idx.State == "missing" || idx.State == "path-is-a-file" {
 		// A build already running is not a missing index, and "run `deja
 		// warmup`" tells the reader to start what is under way — doctor is

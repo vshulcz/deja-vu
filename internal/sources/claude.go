@@ -69,6 +69,14 @@ func ClaudeRoots() []string {
 	}
 	cfg := ClaudeConfigDir()
 	roots := append([]string{filepath.Join(cfg, claudeProjectsDirName()), filepath.Join(cfg, "transcripts"), XcodeClaudeRoot()}, ccMirrorRoots()...)
+	for _, h := range extraHomeRoots() {
+		extraCfg := filepath.Join(h, ".claude")
+		for _, r := range []string{filepath.Join(extraCfg, claudeProjectsDirName()), filepath.Join(extraCfg, "transcripts")} {
+			if _, err := os.ReadDir(r); err == nil {
+				roots = append(roots, r)
+			}
+		}
+	}
 	var out []string
 	for _, r := range roots {
 		r = filepath.Clean(r)
@@ -187,6 +195,14 @@ func UnderClaudeRoot(p string) bool {
 	for _, r := range []string{filepath.Join(cfg, claudeProjectsDirName()), filepath.Join(cfg, "transcripts"), XcodeClaudeRoot()} {
 		if strings.HasPrefix(p, filepath.Clean(r)) {
 			return true
+		}
+	}
+	for _, h := range rawExtraHomeRoots() {
+		extraCfg := filepath.Join(h, ".claude")
+		for _, r := range []string{filepath.Join(extraCfg, claudeProjectsDirName()), filepath.Join(extraCfg, "transcripts")} {
+			if strings.HasPrefix(p, filepath.Clean(r)) {
+				return true
+			}
 		}
 	}
 	// ~/.cc-mirror/<variant>/.claude/<projects>

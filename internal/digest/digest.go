@@ -929,8 +929,15 @@ func Handoff(s model.Session, budget int) string {
 	// month-long session described a blocker from four weeks earlier. The
 	// packet reads backwards from where the session stopped and carries the
 	// first and latest request, standing instructions and the checks that ran.
-	if packet := strings.TrimSpace(RenderHandoffContext(ExtractCompactionContext(whole, ExtractOptions{}), budget*3/4-len(body))); packet != "" {
+	ctx := ExtractCompactionContext(whole, ExtractOptions{})
+	if len(ctx.Carry) == 0 {
+		ctx.Carry = ExtractCarry(whole.Messages, nil)
+	}
+	if packet := strings.TrimSpace(RenderHandoffContext(ctx, budget*3/4-len(body))); packet != "" {
 		body += packet
+		if wip := handoffContinuationLines(whole, ctx); wip != "" && len(body)+len(wip)+2 <= budget*3/4 {
+			body += "\n\n" + wip
+		}
 	} else {
 		share := Share(s, budget*3/4-len(body))
 		// Drop the share header line; the framing above replaces it.
@@ -987,6 +994,65 @@ func Handoff(s model.Session, budget int) string {
 	short := idSelector(Short(s.ID))
 	fmt.Fprintf(&b, "\n\nThis is a compact slice of session %s. If anything you need is missing — an exact error, a file, a decision — search the full history with `deja \"<term>\"` or `deja show %s`, or call the deja MCP tools recall / recall_context if available.\n", short, short)
 	return strings.TrimSpace(b.String()) + "\n"
+}
+
+func handoffContinuationLines(s model.Session, ctx model.CompactionContext) string {
+	res := ResumeFrom(s, handoffOutputFailed)
+	var parts []string
+	if len(res.Files) > 0 {
+		parts = append(parts, "Files in flight\n- "+strings.Join(res.Files, ", "))
+	}
+	if res.Command != "" && !hasTest(ctx.Tests, res.Command) {
+		line := res.Command
+		if errLine := lastCommandFailureLine(s); errLine != "" {
+			line += " — failed: " + errLine
+		}
+		parts = append(parts, "Last command\n- "+line)
+	}
+	return strings.Join(parts, "\n\n")
+}
+
+func handoffOutputFailed(output string) bool {
+	return firstHandoffFailureLine(output) != ""
+}
+
+func lastCommandFailureLine(s model.Session) string {
+	for i, m := range slices.Backward(s.Messages) {
+		if m.Role != sources.RoleCommand || firstTextLine(m.Text) == "" {
+			continue
+		}
+		if _, rest, ok := strings.Cut(m.Text, "\n"); ok {
+			if line := firstHandoffFailureLine(rest); line != "" {
+				return line
+			}
+		}
+		for _, next := range s.Messages[i+1:] {
+			if next.Role != sources.RoleToolOutput && next.Role != "tool_output" {
+				continue
+			}
+			if line := firstHandoffFailureLine(next.Text); line != "" {
+				return line
+			}
+		}
+		break
+	}
+	return ""
+}
+
+func firstHandoffFailureLine(output string) string {
+	for line := range strings.SplitSeq(output, "\n") {
+		line = strings.TrimSpace(line)
+		low := strings.ToLower(line)
+		for _, tok := range []string{
+			"exit status ", "exit code ", "error:", "fatal:", "panic:",
+			"permission denied", "command not found", "--- fail:",
+		} {
+			if strings.Contains(low, tok) {
+				return UTF8SafeCut(line, 120)
+			}
+		}
+	}
+	return ""
 }
 
 // neutralizeHandoffMarkers keeps a marker written inside a transcript from

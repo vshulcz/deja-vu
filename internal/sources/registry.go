@@ -321,7 +321,7 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 			Kinds: []FileKind{{
 				Name: "gemini",
 				Match: func(p string) bool {
-					return strings.HasPrefix(p, filepath.Join(GeminiRoot(), "tmp")) && (strings.HasSuffix(p, ".json") || strings.HasSuffix(p, ".jsonl"))
+					return UnderGeminiRoot(p) && (strings.HasSuffix(p, ".json") || strings.HasSuffix(p, ".jsonl"))
 				},
 				Parse: fullParse(ParseGeminiFile),
 			}},

@@ -732,10 +732,10 @@ func skippedError(skipped []string) error {
 }
 
 func initEmptyIndex(dir string) error {
-	if err := os.MkdirAll(filepath.Join(dir, "buckets"), 0o700); err != nil {
+	if err := mkdirIndexAll(filepath.Join(dir, "buckets")); err != nil {
 		return err
 	}
-	f, err := os.Create(filepath.Join(dir, "records.bin"))
+	f, err := openIndexFileWrite(filepath.Join(dir, "records.bin"), os.O_RDWR|os.O_CREATE|os.O_TRUNC)
 	if err != nil {
 		return err
 	}
@@ -871,7 +871,7 @@ func mergeCappedU64(a, b []uint64, limit int) []uint64 {
 }
 
 func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Record, metas map[string]SessionMeta) error {
-	rf, err := os.OpenFile(filepath.Join(dir, "records.bin"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	rf, err := openIndexFileWrite(filepath.Join(dir, "records.bin"), os.O_CREATE|os.O_WRONLY|os.O_APPEND)
 	if err != nil {
 		return err
 	}

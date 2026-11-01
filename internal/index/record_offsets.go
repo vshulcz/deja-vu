@@ -497,7 +497,7 @@ func readRecordAtInRoles(f *os.File, off int64, t *recordTables, want, roles map
 // table is a cache checked against the log, and a torn one is refused.
 func writeFileAtomic(p string, b []byte) error {
 	tmp := p + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o600); err != nil {
+	if err := writeIndexFile(tmp, b); err != nil {
 		_ = os.Remove(tmp)
 		return err
 	}

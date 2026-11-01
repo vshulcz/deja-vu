@@ -42,6 +42,9 @@ func doctorCommands(w io.Writer) {
 	if note := rulesDoctorNote(); note != "" {
 		fmt.Fprintf(w, "  %-12s %s\n", "rules", note)
 	}
+	if drift := repoRulesDriftNote(""); drift != "" {
+		fmt.Fprintf(w, "  %-12s %s\n", "repo-rules", drift)
+	}
 }
 
 type doctorCommandFile struct {

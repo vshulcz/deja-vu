@@ -122,7 +122,7 @@ func PutCompaction(dir string, next CompactionState) (CompactionState, error) {
 		// safer than saying the new packet was stored.
 		return CompactionState{}, ErrCompactionStale
 	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	if err := mkdirIndexAll(dir); err != nil {
 		return CompactionState{}, err
 	}
 	if err := writeGobAtomic(filepath.Join(dir, "manifest.gob"), core); err != nil {

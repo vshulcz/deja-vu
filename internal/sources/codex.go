@@ -42,8 +42,17 @@ func XcodeCodexRoot() string {
 // harness. The primary root remains first so existing ordering and history
 // semantics remain stable. Equal configured roots are read once.
 func CodexRoots() []string {
+	candidates := []string{CodexRoot(), XcodeCodexRoot()}
+	if os.Getenv("DEJA_CODEX_ROOT") == "" {
+		for _, h := range extraHomeRoots() {
+			r := filepath.Join(h, ".codex")
+			if _, err := os.ReadDir(r); err == nil {
+				candidates = append(candidates, r)
+			}
+		}
+	}
 	var roots []string
-	for _, root := range []string{CodexRoot(), XcodeCodexRoot()} {
+	for _, root := range candidates {
 		root = filepath.Clean(root)
 		seen := slices.Contains(roots, root)
 		if !seen {

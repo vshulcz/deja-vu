@@ -546,7 +546,7 @@ func carryFrictionTexts(dir, tmp string, old Manifest, changed map[string]bool) 
 	}
 	size, fp, err := logFingerprint(filepath.Join(tmp, "records.bin"))
 	if err != nil {
-		_ = os.WriteFile(dst, b, 0o600)
+		_ = writeIndexFile(dst, b)
 		return
 	}
 	for k := range changed {

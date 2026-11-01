@@ -574,6 +574,7 @@ func commitManifest(dir string, m Manifest, wroteRecords, share bool) error {
 		return err
 	}
 	mfi, err := writeGobAtomicStat(filepath.Join(dir, "manifest.gob"), core)
+	ensureSharedIndexPerms(dir)
 	// The cache this process holds is keyed on manifest.gob's mtime and size,
 	// and the comment there claimed the atomic swap always changes that pair.
 	// It does not: a rewrite that keeps the size and lands inside one tick of

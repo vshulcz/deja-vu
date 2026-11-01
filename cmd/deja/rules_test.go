@@ -405,3 +405,18 @@ func TestRulesSyncWritesAiderOnceInstalled(t *testing.T) {
 		t.Fatalf("aider context after sync: %q, %v", b, err)
 	}
 }
+
+func TestRepoRulesDriftNoteReportsDriftedInstructionFiles(t *testing.T) {
+	hermeticEnv(t)
+	repo := t.TempDir()
+	writeRulesTestFile(t, filepath.Join(repo, "CLAUDE.md"), "# Rules\n- Always run go test before committing\n")
+	writeRulesTestFile(t, filepath.Join(repo, "AGENTS.md"), "# Rules\n- Always run go test before committing\n")
+	if got := repoRulesDriftNote(repo); got != "" {
+		t.Fatalf("identical rule sets reported drift: %q", got)
+	}
+	writeRulesTestFile(t, filepath.Join(repo, "AGENTS.md"), "# Rules\n- Use pnpm instead of npm\n")
+	got := repoRulesDriftNote(repo)
+	if !strings.Contains(got, "CLAUDE.md, AGENTS.md differ") || !strings.Contains(got, "deja rules") {
+		t.Fatalf("expected drift note naming CLAUDE.md, AGENTS.md, got %q", got)
+	}
+}
