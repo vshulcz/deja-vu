@@ -295,21 +295,7 @@ func parseAntigravityWith(path string, scan func(func(map[string]any)) error) ([
 		// MODEL rows on this machine, 90%, ranked as things the agent said.
 		if role == "assistant" {
 			if str(m["status"]) == "ERROR" && strings.Contains(text, "Encountered error in tool execution: tool call denied") {
-				if len(running) > 0 {
-					dropIdx := running[0]
-					running = running[1:]
-					if asked > 0 {
-						asked--
-					}
-					if dropIdx >= 0 && dropIdx < len(s.Messages) {
-						s.Messages = append(s.Messages[:dropIdx], s.Messages[dropIdx+1:]...)
-						for i := range running {
-							if running[i] > dropIdx {
-								running[i]--
-							}
-						}
-					}
-				}
+				s.Messages, running, asked = antigravityDropDeniedCall(s.Messages, running, asked)
 				return
 			}
 			step := antigravityStep(str(m["type"]), text, t)
@@ -339,23 +325,48 @@ func parseAntigravityWith(path string, scan func(func(map[string]any)) error) ([
 	if len(s.Messages) == 0 {
 		return nil, err
 	}
-	if isHomeOrEmptyProject(s.Project) {
-		if p := antigravityProjectFromFiles(s.Messages); p != "" {
-			s.Project = p
-		} else if s.Project == "-" || s.Project == "" {
-			if cwd != "" {
-				s.Project = projectName(cwd)
-			} else if subWorkspace != "" {
-				s.Project = projectName(subWorkspace)
-			}
-		}
-		if isHomeOrEmptyProject(s.Project) && parent != "" {
-			if pp := antigravityParentProject(path, parent); !isHomeOrEmptyProject(pp) {
-				s.Project = pp
+	antigravityResolveProject(&s, path, cwd, subWorkspace, parent)
+	return []model.Session{s}, err
+}
+
+func antigravityDropDeniedCall(msgs []model.Message, running []int, asked int) ([]model.Message, []int, int) {
+	if len(running) == 0 {
+		return msgs, running, asked
+	}
+	dropIdx := running[0]
+	running = running[1:]
+	if asked > 0 {
+		asked--
+	}
+	if dropIdx >= 0 && dropIdx < len(msgs) {
+		msgs = append(msgs[:dropIdx], msgs[dropIdx+1:]...)
+		for i := range running {
+			if running[i] > dropIdx {
+				running[i]--
 			}
 		}
 	}
-	return []model.Session{s}, err
+	return msgs, running, asked
+}
+
+func antigravityResolveProject(s *model.Session, path, cwd, subWorkspace, parent string) {
+	if !isHomeOrEmptyProject(s.Project) {
+		return
+	}
+	if p := antigravityProjectFromFiles(s.Messages); p != "" {
+		s.Project = p
+	} else if s.Project == "-" || s.Project == "" {
+		if cwd != "" {
+			s.Project = projectName(cwd)
+		} else if subWorkspace != "" {
+			s.Project = projectName(subWorkspace)
+		}
+	}
+	if isHomeOrEmptyProject(s.Project) && parent != "" {
+		if pp := antigravityParentProject(path, parent); !isHomeOrEmptyProject(pp) {
+			s.Project = pp
+		}
+	}
 }
 
 func antigravitySessionID(path string) string {
