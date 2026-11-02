@@ -2163,10 +2163,7 @@ func scanRecords(dir string, m Manifest, o query.Options, offsets []int64) ([]mo
 // command, edit) are the only way to reach work records and appear in no help
 // text; they keep working under their own names.
 func roleMatches(stored, want string) bool {
-	if stored == want {
-		return true
-	}
-	return want == "tool" && stored == roleToolOutput
+	return search.RoleMatches(stored, want)
 }
 
 // harnessMatches accepts the name deja prints as well as the one it stores.
@@ -2212,8 +2209,7 @@ const roleSummary = "summary"
 // paths, session after session — so a query that matches one matches hundreds,
 // and the per-session bound has to spend its budget on speech first.
 func isToolRole(role string) bool {
-	return role == roleFiles || role == roleCommand || role == roleToolOutput ||
-		role == roleEdit || role == roleSummary || role == roleWrote
+	return search.IsWorkRecord(role)
 }
 
 // wholeLogScanned, when set, is told of each record a scan with no offsets

@@ -131,9 +131,9 @@ func earliestAnyText(ms []model.Message) string {
 	var bestAt time.Time
 	for _, msg := range ms {
 		// Work records are not something anyone said — a file list, an
-		// invocation, a replaced span — and a session named after one reads as
-		// a sentence it never contained.
-		if msg.Role == roleFiles || msg.Role == roleCommand || msg.Role == roleEdit {
+		// invocation, a replaced span, a line hash — and a session named after
+		// one reads as a sentence it never contained.
+		if msg.Role == roleFiles || msg.Role == roleCommand || msg.Role == roleEdit || msg.Role == roleWrote {
 			continue
 		}
 		t := strings.TrimSpace(msg.Text)
