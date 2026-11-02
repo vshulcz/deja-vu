@@ -14,6 +14,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/evidence"
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -860,7 +861,16 @@ func commandDecisionLine(dir, cwd, cmd, self string, lookupOnly bool) string {
 	// fact this table held; the ranking existed to guess it.
 	pol := policy.Load()
 	allow := func(project string) bool { return pol.Allows(policy.ActivationAuto, project) }
-	if d := index.CommandSettledOutside(dir, cmd, digest.ProjectNameCandidates(cwd), allow, self); d != "" {
+	r := newLifecycleResolver(dir)
+	usableMeta := func(meta index.SessionMeta) bool {
+		return decisionUsable(model.Session{
+			Harness:   meta.Harness,
+			ID:        meta.ID,
+			OrigID:    meta.OrigID,
+			Lifecycle: meta.Lifecycle,
+		}, r)
+	}
+	if d := index.CommandSettledUsableOutside(dir, cmd, digest.ProjectNameCandidates(cwd), allow, usableMeta, self); d != "" {
 		return trimTrailingFragment(search.SafeText(strings.TrimSpace(d)))
 	}
 	// And the search, for a table written before it carried the session key:
@@ -878,7 +888,6 @@ func commandDecisionLine(dir, cwd, cmd, self string, lookupOnly bool) string {
 	if err != nil {
 		return ""
 	}
-	r := newLifecycleResolver(dir)
 	for _, s := range ranked {
 		// The old rule wanted every one of the command's words to be rare.
 		// Measured on 1,696 sessions, none of the fifteen most-run commands

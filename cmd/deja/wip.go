@@ -155,7 +155,7 @@ func wipSession(dir string) (model.Session, digest.Resume, bool, error) {
 	var fallback model.Session
 	var fallbackResume digest.Resume
 	for _, s := range ss {
-		if len(s.Messages) == 0 || !pol.Allows(policy.ActivationSearch, s.Project) {
+		if !isHandoverSession(s) || len(s.Messages) == 0 || !pol.Allows(policy.ActivationSearch, s.Project) {
 			continue
 		}
 		r := digest.ResumeFrom(s, index.LooksLikeError)
@@ -175,6 +175,13 @@ func wipSession(dir string) (model.Session, digest.Resume, bool, error) {
 		return fallback, fallbackResume, true, nil
 	}
 	return model.Session{}, digest.Resume{}, false, nil
+}
+
+// isHandoverSession reports whether s is a root human/agent session eligible to
+// be picked up as live work in `deja wip` or `deja handoff` (excluding synthetic
+// `deja` notes and spawned subagent runs).
+func isHandoverSession(s model.Session) bool {
+	return s.Harness != model.NotesHarness && !s.IsSpawned()
 }
 
 // resumeFacts counts how much of the handover a session actually yielded.

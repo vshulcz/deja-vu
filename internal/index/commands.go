@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // What a machine runs is the most reusable thing it knows, and the record log
@@ -329,6 +331,12 @@ func CommandSettled(dir, cmd string, projects []string, allow func(string) bool)
 // the command and been indexed that is self, whose own words are no history to
 // it. Its project then has nothing to say (#4380).
 func CommandSettledOutside(dir, cmd string, projects []string, allow func(string) bool, self string) string {
+	return CommandSettledUsableOutside(dir, cmd, projects, allow, nil, self)
+}
+
+// CommandSettledUsableOutside is CommandSettledOutside with an optional
+// session-usability predicate (e.g. local lifecycle rejection in notes.md).
+func CommandSettledUsableOutside(dir, cmd string, projects []string, allow func(string) bool, usable func(SessionMeta) bool, self string) string {
 	use, ok := CommandHistory(dir, cmd)
 	if !ok || len(use.ByProject) == 0 {
 		return ""
@@ -337,16 +345,41 @@ func CommandSettledOutside(dir, cmd string, projects []string, allow func(string
 	if err != nil {
 		return ""
 	}
+	pol := policy.Load()
+	excluded := sources.ExcludedHarnesses()
 	for _, proj := range projects {
-		pu, ok := use.ByProject[proj]
-		if !ok || pu.LastSession == "" {
-			continue
+		var bestKey string
+		var bestLast time.Time
+		var bestExact bool
+		for recordedProj, pu := range use.ByProject {
+			if pu.LastSession == "" {
+				continue
+			}
+			exact := recordedProj == proj
+			if !exact && !ProjectInScope(recordedProj, proj) {
+				continue
+			}
+			if allow != nil && !allow(recordedProj) {
+				continue
+			}
+			meta, ok := m.Sessions[pu.LastSession]
+			if !ok || meta.Settled == "" || meta.Lifecycle == model.LifecycleRejected || (self != "" && meta.ID == self) {
+				continue
+			}
+			if metaIgnoredOrExcluded(pol, excluded, meta) {
+				continue
+			}
+			if usable != nil && !usable(meta) {
+				continue
+			}
+			if bestKey == "" || (exact && !bestExact) || (exact == bestExact && pu.Last.After(bestLast)) {
+				bestKey = pu.LastSession
+				bestLast = pu.Last
+				bestExact = exact
+			}
 		}
-		if allow != nil && !allow(proj) {
-			continue
-		}
-		if meta, ok := m.Sessions[pu.LastSession]; ok && meta.Settled != "" && (self == "" || meta.ID != self) {
-			return meta.Settled
+		if bestKey != "" {
+			return m.Sessions[bestKey].Settled
 		}
 	}
 	return ""

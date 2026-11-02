@@ -509,9 +509,76 @@ func TestDDDNoteFromMetaAndSyncedCommandDecision(t *testing.T) {
 	if s, ok, err := index.FindByIdentity(dir, "claude", "src1"); err != nil || !ok || s.OrigID != "src1" {
 		t.Fatalf("FindByIdentity by OrigID = (%+v, %v, %v)", s, ok, err)
 	}
+	// FindManyByIdentity, FindByID, FindByPrefix("claude:src1"), and PrefixMatches("claude:src1")
+	// all resolve synced sessions by OrigID.
+	if found, err := index.FindManyByIdentity(dir, []index.Identity{{Harness: "claude", ID: "src1"}}); err != nil || len(found) != 1 || found[0].OrigID != "src1" {
+		t.Fatalf("FindManyByIdentity by OrigID = (%+v, %v)", found, err)
+	}
+	if s, ok, err := index.FindByID(dir, "src1"); err != nil || !ok || s.OrigID != "src1" {
+		t.Fatalf("FindByID by OrigID = (%+v, %v, %v)", s, ok, err)
+	}
+	if s, ok, err := index.FindByPrefix(dir, "claude:src1"); err != nil || !ok || s.OrigID != "src1" {
+		t.Fatalf("FindByPrefix(claude:src1) = (%+v, %v, %v)", s, ok, err)
+	}
+	if matches := index.PrefixMatches(dir, "claude:src1"); matches != 1 {
+		t.Fatalf("PrefixMatches(claude:src1) = %d; want 1", matches)
+	}
 	// promotedCommandDecision resolves a synced accepted note back to its
 	// synced source transcript and checks SessionRanCommand.
 	if got := promotedCommandDecision(dir, "/work/org/app", "go test ./... -p 1"); !strings.Contains(got, "Always run go test with -p 1") {
 		t.Fatalf("promotedCommandDecision = %q; want synced convention", got)
+	}
+}
+
+func TestDDDWave15And16HandoverRecapAndSidecarInvariants(t *testing.T) {
+	if isHandoverSession(model.Session{Harness: model.NotesHarness, ID: "deja-note-1"}) {
+		t.Fatalf("isHandoverSession allowed synthetic deja note")
+	}
+	if isHandoverSession(model.Session{Harness: "claude", ID: "sub1", Kind: model.KindSubagent, Parent: "root1"}) {
+		t.Fatalf("isHandoverSession allowed spawned subagent")
+	}
+	if isHandoverSession(model.Session{Harness: "opencode", ID: "fork1", Kind: model.KindSubagentFork}) {
+		t.Fatalf("isHandoverSession allowed subagent_fork session")
+	}
+	if !isHandoverSession(model.Session{Harness: "claude", ID: "root1"}) {
+		t.Fatalf("isHandoverSession rejected normal root session")
+	}
+
+	tmp := hermeticEnv(t)
+	batch := filepath.Join(tmp, "batch")
+	if err := os.MkdirAll(batch, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	recs := strings.Join([]string{
+		`{"harness":"claude","session_id":"s-claude","project":"org/app","role":"user","text":"investigate build failure","time":"` + now + `"}`,
+		`{"harness":"claude","session_id":"s-claude","project":"org/app","role":"assistant","text":"We decided to use -tags=integration for the build.","time":"` + now + `"}`,
+		`{"harness":"codex","session_id":"s-codex","project":"org/app","role":"user","text":"codex session","time":"` + now + `"}`,
+		`{"harness":"codex","session_id":"s-codex","project":"org/app","role":"assistant","text":"codex reply","time":"` + now + `"}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(filepath.Join(batch, "deja-sync-bbbb-1.jsonl"), []byte(recs), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRunStderr(t, "sync", "import", batch); err != nil {
+		t.Fatal(err)
+	}
+	dir := index.DefaultDir()
+	t.Setenv("DEJA_EXCLUDE_HARNESSES", "codex")
+
+	recap, err := index.ScanRecap(dir, 24*time.Hour, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if recap.Considered != 1 {
+		t.Fatalf("ScanRecap.Considered with DEJA_EXCLUDE_HARNESSES=codex = %d; want 1", recap.Considered)
+	}
+	metas, err := index.RecentProjectMetasUnder(dir, []string{"org/app"}, "", time.Time{}, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range metas {
+		if m.Harness == "codex" {
+			t.Fatalf("RecentProjectMetasUnder leaked excluded harness codex: %+v", m)
+		}
 	}
 }

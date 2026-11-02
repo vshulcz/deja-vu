@@ -503,7 +503,7 @@ func frictionCount(dir string, p index.FixPair, pol policy.Policy) int {
 		if !pol.Allows(policy.ActivationAuto, proj) {
 			return false
 		}
-		return project == "" || proj == project
+		return project == "" || proj == project || index.ProjectInScope(proj, project) || index.ProjectInScope(project, proj)
 	})
 }
 
