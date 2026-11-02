@@ -5,10 +5,10 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -34,13 +34,9 @@ func projectConventions(names []string) string {
 	if len(names) == 0 {
 		return ""
 	}
-	want := map[string]bool{}
-	for _, n := range names {
-		want[n] = true
-	}
 	var picked []sources.PromotedNote
 	for _, n := range sources.LoadPromotedNotes() {
-		if n.State != "accepted" || !want[n.Project] {
+		if n.State != model.LifecycleAccepted || !inAnyProject(n.Project, names) {
 			continue
 		}
 		picked = append(picked, n)
@@ -104,25 +100,13 @@ func importedConventions(names []string) []sources.PromotedNote {
 	})
 	var out []sources.PromotedNote
 	for _, meta := range metas {
-		if meta.Lifecycle != "accepted" {
+		if meta.Lifecycle != model.LifecycleAccepted {
 			continue
 		}
 		if !inAnyProject(meta.Project, names) {
 			continue
 		}
-		when := meta.Updated
-		if t, err := time.Parse(time.RFC3339, meta.LifecycleAt); err == nil {
-			when = t
-		} else if t, err := time.Parse("2006-01-02", meta.LifecycleAt); err == nil {
-			when = t
-		}
-		text := meta.LifecycleNote
-		if strings.TrimSpace(text) == "" {
-			text = meta.Title
-		}
-		out = append(out, sources.PromotedNote{
-			Project: meta.Project, State: meta.Lifecycle, Title: meta.Title, Text: text, At: when,
-		})
+		out = append(out, noteFromMeta(meta))
 	}
 	return out
 }

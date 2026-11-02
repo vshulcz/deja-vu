@@ -338,15 +338,19 @@ func decisionLineOf(notes []sources.PromotedNote, budget int) string {
 // two sources — this machine's notes file and what arrived by sync — can be
 // weighed against each other by one rule.
 func noteFromMeta(meta index.SessionMeta) sources.PromotedNote {
-	when := meta.Updated
-	if t, err := time.Parse(time.RFC3339, meta.LifecycleAt); err == nil {
-		when = t
-	}
 	text := meta.LifecycleNote
 	if strings.TrimSpace(text) == "" {
 		text = meta.Title
 	}
-	return sources.PromotedNote{Project: meta.Project, State: meta.Lifecycle, Title: meta.Title, Text: text, At: when}
+	src, _ := meta.PromotedNoteSourceKey()
+	return sources.PromotedNote{
+		Project: meta.Project,
+		Session: src,
+		State:   meta.Lifecycle,
+		Title:   meta.Title,
+		Text:    text,
+		At:      meta.LifecycleTime(),
+	}
 }
 
 // clipDecision keeps a promoted note inside the same budget a scanned
