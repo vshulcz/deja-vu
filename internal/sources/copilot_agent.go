@@ -217,29 +217,27 @@ func parseCopilotAgentTranscript(path string, data []byte) ([]model.Session, err
 	// directory — two levels further up than for a `chatSessions` file — and
 	// from the paths the tool calls touched when that file says nothing (the
 	// answer claude's reader takes for the same question).
-	s.Project = copilotAgentProject(path, s.Messages)
+	s.Project = copilotAgentProject(path)
+	resolveHomeOrEmptyProject(&s)
+	if s.Project == "" {
+		s.Project = "-"
+	}
 	return []model.Session{s}, nil
 }
 
-// copilotAgentProject names the project a transcript belongs to.
+// copilotAgentProject names the project a transcript belongs to from the
+// workspace.json beside the storage directory.
 //
 // The storage directory is `workspaceStorage/<md5 of the workspace URI>`, so
 // the hash itself says nothing; `workspace.json` beside it carries the URI, and
 // that is two levels above a transcript rather than the one above a
-// `chatSessions` file. Failing that, the absolute paths the session's tool
-// calls touched name it — the reporter's machine has twelve workspaces and the
-// hash for each of them (#3637).
-func copilotAgentProject(path string, ms []model.Message) string {
+// `chatSessions` file. Failing that, resolveHomeOrEmptyProject uses the paths
+// and handoff notes the session's messages carry (#3637).
+func copilotAgentProject(path string) string {
 	ws := filepath.Dir(filepath.Dir(filepath.Dir(path)))
 	// copilotChatProjectFromWorkspace reads `workspace.json` two levels above
 	// the path it is given, which is what a `chatSessions/<id>.json` needs.
-	if p := copilotChatProjectFromWorkspace(filepath.Join(ws, "x", "y")); p != "" {
-		return p
-	}
-	if p := projectFromPaths(ms); p != "" {
-		return p
-	}
-	return "-"
+	return copilotChatProjectFromWorkspace(filepath.Join(ws, "x", "y"))
 }
 
 // copilotAgentToolArgs takes what a tool call says about the work: the file it

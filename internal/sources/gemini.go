@@ -264,11 +264,7 @@ func parseGeminiJSON(path string) ([]model.Session, error) {
 	if len(s.Messages) == 0 {
 		return nil, nil
 	}
-	if isHomeOrEmptyProject(s.Project) {
-		if p := projectFromPaths(s.Messages); p != "" {
-			s.Project = p
-		}
-	}
+	resolveHomeOrEmptyProject(&s)
 	return []model.Session{s}, nil
 }
 
@@ -381,11 +377,7 @@ func parseGeminiJSONLWith(path string, scan func(func(map[string]any)) error) ([
 	if len(s.Messages) == 0 {
 		return nil, err
 	}
-	if isHomeOrEmptyProject(s.Project) {
-		if p := projectFromPaths(s.Messages); p != "" {
-			s.Project = p
-		}
-	}
+	resolveHomeOrEmptyProject(&s)
 	return []model.Session{s}, err
 }
 

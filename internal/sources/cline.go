@@ -299,6 +299,7 @@ func parseClineModernSession(path string) ([]model.Session, error) {
 	if len(s.Messages) == 0 {
 		return nil, nil
 	}
+	resolveHomeOrEmptyProject(&s)
 	return []model.Session{s}, nil
 }
 
@@ -479,6 +480,7 @@ func parseClineLegacyTask(path string) ([]model.Session, error) {
 	if len(s.Messages) == 0 {
 		return nil, nil
 	}
+	resolveHomeOrEmptyProject(&s)
 	return []model.Session{s}, nil
 }
 

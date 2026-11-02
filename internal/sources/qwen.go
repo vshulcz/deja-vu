@@ -251,6 +251,7 @@ func parseQwenScan(path string, scan func(func(map[string]any)) error) ([]model.
 	if child && !SubagentsWhole() {
 		s.Messages = KeepSubagentTail(s.Messages)
 	}
+	resolveHomeOrEmptyProject(&s)
 	return []model.Session{s}, err
 }
 
@@ -417,39 +418,11 @@ func qwenWorkRecords(v any, t time.Time) []model.Message {
 				}
 			}
 			if out != "" {
-				results = append(results, capParsedMessage(out))
+				results = append(results, out)
 			}
 		}
 	}
-	var recs []model.Message
-	if len(calls) > 0 {
-		if IndexToolPaths() {
-			if p := toolPathsIn(calls, qwenDialect); p != "" {
-				recs = append(recs, model.Message{Role: RoleFiles, Text: p, Time: t})
-			}
-		}
-		if IndexWrites() {
-			for _, w := range wroteRecordsIn(calls, qwenDialect) {
-				recs = append(recs, model.Message{Role: RoleWrote, Text: w, Time: t})
-			}
-		}
-		if IndexEdits() {
-			for _, span := range editSpansIn(calls, qwenDialect) {
-				recs = append(recs, model.Message{Role: RoleEdit, Text: span, Time: t})
-			}
-		}
-		if IndexCommands() {
-			for _, cmd := range commandsIn(calls, qwenDialect) {
-				recs = append(recs, model.Message{Role: RoleCommand, Text: cmd, Time: t})
-			}
-		}
-	}
-	if IndexToolOutput() {
-		for _, out := range results {
-			recs = append(recs, model.Message{Role: RoleToolOutput, Text: out, Time: t})
-		}
-	}
-	return recs
+	return dialectWorkRecords(calls, results, qwenDialect, t)
 }
 
 func qwenText(v any) string {

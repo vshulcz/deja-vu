@@ -212,6 +212,17 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	if m.SearchOnly {
 		return filesTouched, messages, unreadable, nil
 	}
+	refreshAppendedSidecars(dir, m, appended, rowMoved)
+	return filesTouched, messages, unreadable, nil
+}
+
+// refreshAppendedSidecars updates the derived sidecar tables in dir after an
+// in-place append pass (local transcript append or sync import) has committed
+// new records to records.bin and manifest.gob.
+func refreshAppendedSidecars(dir string, m Manifest, appended []model.Session, rowMoved map[string]bool) {
+	if m.SearchOnly {
+		return
+	}
 	whole, rewhole := wholeSessionsForFixes(dir, m, appended)
 	mergeFixes(dir, dir, nil, whole, rewhole)
 	grew := map[string]bool{}
@@ -232,7 +243,6 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 		buildCommandFailsFromIndex(dir, readCommandFailState(dir), maps.Clone(rowMoved))
 		buildCommandTables(dir, dir, m, len(m.DeadRecords), maps.Clone(rowMoved))
 	}
-	return filesTouched, messages, unreadable, nil
 }
 
 // readAppended reads what p holds past the last pass, or whole when the index

@@ -599,6 +599,7 @@ func eachCommandAndOutputFrom(path string, m Manifest, from, end int64, redo map
 
 func writeCommandFails(tmp string, out []CommandFailure) {
 	if len(out) == 0 {
+		_ = os.Remove(commandFailsPath(tmp))
 		return
 	}
 	_ = writeGobAtomic(commandFailsPath(tmp), out)

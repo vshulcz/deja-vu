@@ -156,8 +156,6 @@ func guidancePath(harness string) string {
 	case "trae-ide":
 		// The IDE's global skill root; it does not read ~/.agents/skills.
 		return traeIDESkillPath()
-	case "pi":
-		return filepath.Join(sources.PiConfigDir(), "skills", "deja-history", "SKILL.md")
 	case "hermes":
 		// Top-level, not inside the plugin deja generates: a plugin-bundled
 		// skill in Hermes is opt-in, absent from skills_list and never in the
@@ -680,7 +678,7 @@ func guidanceOwnsWholeFile(harness string) bool {
 		return true
 	}
 	switch harness {
-	case "claude-code", "claude", "antigravity", "copilot", "pi", "opencode", "hermes", "vscode", "continue", "codebuddy", "workbuddy", "trae-ide":
+	case "claude-code", "claude", "antigravity", "copilot", "opencode", "hermes", "vscode", "continue", "codebuddy", "workbuddy", "trae-ide":
 		return true
 	}
 	return false

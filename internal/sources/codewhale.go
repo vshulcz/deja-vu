@@ -328,33 +328,7 @@ func codeWhaleWorkRecords(raw json.RawMessage, ts time.Time) []model.Message {
 	}
 	codeWhaleFoldEdits(blocks)
 	codeWhaleFoldEditKeys(blocks)
-	var out []model.Message
-	if IndexToolPaths() {
-		if p := toolPathsIn(blocks, codeWhaleDialect); p != "" {
-			out = append(out, model.Message{Role: RoleFiles, Text: p, Time: ts})
-		}
-	}
-	if IndexWrites() {
-		for _, w := range wroteRecordsIn(blocks, codeWhaleDialect) {
-			out = append(out, model.Message{Role: RoleWrote, Text: w, Time: ts})
-		}
-	}
-	if IndexEdits() {
-		for _, span := range editSpansIn(blocks, codeWhaleDialect) {
-			out = append(out, model.Message{Role: RoleEdit, Text: span, Time: ts})
-		}
-	}
-	if IndexCommands() {
-		for _, cmd := range commandsIn(blocks, codeWhaleDialect) {
-			out = append(out, model.Message{Role: RoleCommand, Text: cmd, Time: ts})
-		}
-	}
-	if IndexToolOutput() {
-		for _, body := range clineToolResults(blocks) {
-			out = append(out, model.Message{Role: RoleToolOutput, Text: capParsedMessage(body), Time: ts})
-		}
-	}
-	return out
+	return dialectWorkRecords(blocks, clineToolResults(blocks), codeWhaleDialect, ts)
 }
 
 // codeWhalePatchRecords reads the apply_patch calls in one message. The tool

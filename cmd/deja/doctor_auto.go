@@ -533,7 +533,7 @@ func doctorHermesWired(path string) bool {
 // key, so the child-key check above has nothing to look for: the row asks
 // whether an item under mcpServers names deja.
 func doctorContinueWired(path string) bool {
-	b, err := os.ReadFile(path)
+	b, err := readConfig(path)
 	if err != nil {
 		return false
 	}

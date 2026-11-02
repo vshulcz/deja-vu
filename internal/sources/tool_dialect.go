@@ -1,6 +1,11 @@
 package sources
 
-import "strings"
+import (
+	"strings"
+	"time"
+
+	"github.com/vshulcz/deja-vu/internal/model"
+)
 
 // toolDialect names one harness's tool-call vocabulary. The wire shape is the
 // same everywhere — a `tool_use` part with a name and an input object — but the
@@ -421,4 +426,38 @@ func CommandArgs(v any) string {
 		}
 	}
 	return ""
+}
+
+// dialectWorkRecords turns one turn's tool_use-shaped calls and tool outputs
+// into the index's work records (files, wrote, edit, command, tool) for d.
+func dialectWorkRecords(calls []any, results []string, d toolDialect, t time.Time) []model.Message {
+	var out []model.Message
+	if len(calls) > 0 {
+		if IndexToolPaths() {
+			if p := toolPathsIn(calls, d); p != "" {
+				out = append(out, model.Message{Role: RoleFiles, Text: p, Time: t})
+			}
+		}
+		if IndexWrites() {
+			for _, w := range wroteRecordsIn(calls, d) {
+				out = append(out, model.Message{Role: RoleWrote, Text: w, Time: t})
+			}
+		}
+		if IndexEdits() {
+			for _, span := range editSpansIn(calls, d) {
+				out = append(out, model.Message{Role: RoleEdit, Text: span, Time: t})
+			}
+		}
+		if IndexCommands() {
+			for _, cmd := range commandsIn(calls, d) {
+				out = append(out, model.Message{Role: RoleCommand, Text: cmd, Time: t})
+			}
+		}
+	}
+	if IndexToolOutput() {
+		for _, r := range results {
+			out = append(out, model.Message{Role: RoleToolOutput, Text: capParsedMessage(r), Time: t})
+		}
+	}
+	return out
 }

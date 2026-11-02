@@ -88,6 +88,7 @@ func parsePiShapedScan(path, harness, project string, useHeaderCwd bool, scan fu
 	if len(s.Messages) == 0 {
 		return nil, err
 	}
+	resolveHomeOrEmptyProject(&s)
 	return []model.Session{s}, err
 }
 

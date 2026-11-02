@@ -265,6 +265,7 @@ func parseCopilotScan(path string, offset int64, scan func(func(map[string]any))
 	})
 	var out []model.Session
 	if len(s.Messages) > 0 {
+		resolveHomeOrEmptyProject(&s)
 		out = append(out, s)
 	}
 	// The same rule as Claude Code's sub-agent files: by default the task,

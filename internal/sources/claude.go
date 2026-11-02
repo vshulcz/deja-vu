@@ -446,11 +446,7 @@ func parseClaudeGenericFromOffset(path string, offset int64) ([]model.Session, e
 	if IsSubagentPath(path) && !SubagentsWhole() {
 		s.Messages = KeepSubagentTail(s.Messages)
 	}
-	if p := projectFromPaths(s.Messages); p != "" {
-		s.Project = p
-	} else {
-		s.ProjectFromDir = true
-	}
+	resolveDirProject(&s)
 	return []model.Session{s}, err
 }
 
