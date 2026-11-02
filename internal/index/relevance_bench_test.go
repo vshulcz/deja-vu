@@ -59,3 +59,44 @@ func BenchmarkRussianRelevance(b *testing.B) {
 		}
 	}
 }
+
+// BenchmarkRelevanceWithWorkRecords measures ProjectRelevant on a corpus whose
+// sessions hold the work and compaction records (files, command, edit, wrote,
+// summary) that real coding sessions carry alongside speech.
+func BenchmarkRelevanceWithWorkRecords(b *testing.B) {
+	tmp := b.TempDir()
+	claudeRoot := filepath.Join(tmp, "claude")
+	b.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	dir := filepath.Join(tmp, "index.db")
+	b.Setenv("DEJA_INDEX_DIR", dir)
+	proj := filepath.Join(claudeRoot, "-tmp-app")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		b.Fatal(err)
+	}
+	topics := []string{"pgbouncer", "keepalive", "backpressure", "walreceiver", "checkpoint", "autovacuum", "logicalslot", "deadlock"}
+	filler := strings.Repeat("func handleConn(ctx context.Context, pool *ConnPool) error { return pool.Acquire(ctx) }\n", 24)
+	rng := rand.New(rand.NewSource(11)) //nolint:gosec // seeded benchmark fixture
+	for i := range 400 {
+		t1 := topics[rng.Intn(len(topics))]
+		t2 := topics[rng.Intn(len(topics))]
+		var sb strings.Builder
+		fmt.Fprintf(&sb, `{"type":"user","sessionId":"w%d","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"investigate %s and %s latency spike under load"}}`+"\n", i, t1, t2)
+		fmt.Fprintf(&sb, `{"type":"assistant","sessionId":"w%d","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"text","text":"Checking %s pool saturation and %s timeout settings."},{"type":"tool_use","id":"tu1","name":"Bash","input":{"command":"go test -v ./internal/%s/... -run Test%s"}},{"type":"tool_use","id":"tu2","name":"Edit","input":{"file_path":"/tmp/app/%s.go","old_string":%q,"new_string":%q}},{"type":"tool_use","id":"tu3","name":"Write","input":{"file_path":"/tmp/app/%s_test.go","content":%q}}]}}`+"\n",
+			i, t1, t2, t1, t2, t1, filler+"// "+t1, filler+"// "+t2, t1, filler)
+		fmt.Fprintf(&sb, `{"type":"summary","sessionId":"w%d","timestamp":"2026-01-02T03:04:07Z","summary":"Session tuned %s and %s configuration parameters: %s"}`+"\n", i, t1, t2, filler)
+		if err := os.WriteFile(filepath.Join(proj, fmt.Sprintf("w%d.jsonl", i)), []byte(sb.String()), 0o644); err != nil {
+			b.Fatal(err)
+		}
+	}
+	if err := Ensure(dir, "", true, nil); err != nil {
+		b.Fatal(err)
+	}
+	terms := []string{"pgbouncer", "keepalive", "backpressure", "latency"}
+	b.ResetTimer()
+	b.ReportAllocs()
+	for range b.N {
+		if _, _, _, _, err := ProjectRelevant(dir, []string{"tmp/app"}, terms, 10); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

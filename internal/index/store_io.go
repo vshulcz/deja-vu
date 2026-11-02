@@ -298,6 +298,16 @@ func recordRoleIn(b []byte, t *recordTables) (key, role string, ok bool) {
 	return t.lookup(kid), t.lookup(rid), true
 }
 
+func roleWanted(roles map[string]bool, role string) bool {
+	if roles == nil || role == "" {
+		return true
+	}
+	if v, ok := roles[role]; ok {
+		return v
+	}
+	return roles["*"]
+}
+
 // eachRecordInRoles streams the records whose role is wanted, reading the
 // prefix of every record and the body of only those. Same order and same
 // records as filtering after a full decode, at a fraction of the work.
@@ -400,7 +410,7 @@ func walkRecordsForKeys(r *bufio.Reader, from int64, t *recordTables, want, role
 			// Key, source and role lead the payload; the body after them is
 			// only read for a role the caller wants.
 			if head, _ := r.Peek(min(int(n), 3*binary.MaxVarintLen64)); len(head) > 0 {
-				if _, role, ok := recordRoleIn(head, t); ok && !roles[role] {
+				if _, role, ok := recordRoleIn(head, t); ok && !roleWanted(roles, role) {
 					skip = true
 				}
 			}
@@ -1450,14 +1460,23 @@ type bucketReader struct {
 	dir string
 	// dirs is each file's directory as first looked up, nil for a file that
 	// was not there.
-	dirs map[string]*cachedBucketDir
+	dirs  map[string]*cachedBucketDir
+	files map[string]*os.File
 	// layers is each bucket's overlays as first looked up.
 	layers map[string][]string
+	posts  map[string][]posting
 	dead   []int64
 }
 
 func newBucketReader(dir string) *bucketReader {
-	return &bucketReader{dir: dir, dirs: map[string]*cachedBucketDir{}, layers: map[string][]string{}, dead: deadRecordsOf(dir)}
+	return &bucketReader{
+		dir:    dir,
+		dirs:   map[string]*cachedBucketDir{},
+		files:  map[string]*os.File{},
+		layers: map[string][]string{},
+		posts:  map[string][]posting{},
+		dead:   deadRecordsOf(dir),
+	}
 }
 
 // bucketBaseRead, when set, runs between a bucket's own postings and its
@@ -1465,6 +1484,11 @@ func newBucketReader(dir string) *bucketReader {
 var bucketBaseRead func(tok string)
 
 func (b *bucketReader) postings(tok string) ([]posting, error) {
+	if bucketBaseRead == nil {
+		if cached, ok := b.posts[tok]; ok {
+			return cached, nil
+		}
+	}
 	p, ok := bucketPath(b.dir, tok)
 	if !ok {
 		return nil, nil
@@ -1483,6 +1507,9 @@ func (b *bucketReader) postings(tok string) ([]posting, error) {
 			// was listed is in the file it was merged into.
 			if os.IsNotExist(err) {
 				if i == 0 {
+					if bucketBaseRead == nil {
+						b.posts[tok] = nil
+					}
 					return nil, nil
 				}
 				continue
@@ -1494,13 +1521,18 @@ func (b *bucketReader) postings(tok string) ([]posting, error) {
 			bucketBaseRead(tok)
 		}
 	}
-	return liveOnly(out, b.dead), nil
+	res := liveOnly(out, b.dead)
+	if bucketBaseRead == nil {
+		b.posts[tok] = res
+	}
+	return res, nil
 }
 
 func (b *bucketReader) filePostings(p, tok string) ([]posting, error) {
 	d, seen := b.dirs[p]
 	var f *os.File
-	if !seen {
+	switch {
+	case !seen:
 		var err error
 		if f, err = openIndexFile(p); err != nil {
 			if os.IsNotExist(err) {
@@ -1508,13 +1540,19 @@ func (b *bucketReader) filePostings(p, tok string) ([]posting, error) {
 			}
 			return nil, err
 		}
-		defer func() { _ = f.Close() }()
+		if bucketBaseRead != nil {
+			defer func() { _ = f.Close() }()
+		} else {
+			b.files[p] = f
+		}
 		if d, err = bucketDirOf(p, f); err != nil {
 			return nil, err
 		}
 		b.dirs[p] = d
-	} else if d == nil {
+	case d == nil:
 		return nil, os.ErrNotExist
+	case bucketBaseRead == nil:
+		f = b.files[p]
 	}
 	if _, ok := d.find(tok); !ok {
 		return nil, nil
@@ -1543,7 +1581,14 @@ func (b *bucketReader) filePostings(p, tok string) ([]posting, error) {
 	return decodePostingBlock(buf)
 }
 
-func (b *bucketReader) close() { b.dirs = nil }
+func (b *bucketReader) close() {
+	for _, f := range b.files {
+		_ = f.Close()
+	}
+	b.files = nil
+	b.dirs = nil
+	b.posts = nil
+}
 
 // Coalescing bounds for eachRecordAt. A search over a common term resolves a
 // few thousand records that sit close together in write order — the median hole
@@ -1559,6 +1604,10 @@ const (
 // the span read for them fall back to a single read, so a long record costs
 // what it always did rather than forcing the span to grow.
 func eachRecordAt(f *os.File, offsets []int64, t *recordTables, fn func(Record)) error {
+	return eachRecordAtInRoles(f, offsets, t, nil, fn)
+}
+
+func eachRecordAtInRoles(f *os.File, offsets []int64, t *recordTables, roles map[string]bool, fn func(Record)) error {
 	buf := make([]byte, 0, 64*1024)
 	for i := 0; i < len(offsets); {
 		j := i + 1
@@ -1586,6 +1635,15 @@ func eachRecordAt(f *os.File, offsets []int64, t *recordTables, fn func(Record))
 				continue
 			}
 			rel := int(off - start)
+			if roles != nil && rel >= 0 && rel+4 < len(b) {
+				size := binary.LittleEndian.Uint32(b[rel : rel+4])
+				if size <= maxRecordSize {
+					end := min(len(b), rel+4+int(size))
+					if _, role, ok := recordRoleIn(b[rel+4:end], t); ok && !roleWanted(roles, role) {
+						continue
+					}
+				}
+			}
 			if r, ok := decodeRecordIn(b, rel, t); ok {
 				fn(r)
 				continue
@@ -1603,6 +1661,9 @@ func eachRecordAt(f *os.File, offsets []int64, t *recordTables, fn func(Record))
 					continue
 				}
 				return err
+			}
+			if !roleWanted(roles, r.Role) {
+				continue
 			}
 			fn(r)
 		}

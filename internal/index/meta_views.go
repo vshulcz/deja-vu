@@ -21,12 +21,15 @@ import (
 type metaViews struct {
 	sessions map[string]SessionMeta
 
-	allOnce sync.Once
-	all     []SessionMeta
-	ordOnce sync.Once
-	byOrd   map[uint32]*SessionMeta
-	idOnce  sync.Once
-	byID    map[string][]*SessionMeta
+	allOnce     sync.Once
+	all         []SessionMeta
+	maxOrd      int
+	ordOnce     sync.Once
+	byOrd       map[uint32]*SessionMeta
+	idOnce      sync.Once
+	byID        map[string][]*SessionMeta
+	countedOnce sync.Once
+	counted     int
 }
 
 // viewsFor is the views of m's session table: the cached ones when m is the
@@ -51,11 +54,31 @@ func sameTable(a, b map[string]SessionMeta) bool {
 func (v *metaViews) allMeta() []SessionMeta {
 	v.allOnce.Do(func() {
 		v.all = make([]SessionMeta, 0, len(v.sessions))
+		v.maxOrd = -1
 		for _, meta := range v.sessions {
 			v.all = append(v.all, meta)
+			if int(meta.Ord) > v.maxOrd {
+				v.maxOrd = int(meta.Ord)
+			}
 		}
 	})
 	return v.all
+}
+
+func (v *metaViews) countedDocs() int {
+	v.countedOnce.Do(func() {
+		all := v.allMeta()
+		n := 0
+		for i := range all {
+			c := all[i].Counted
+			if c <= 0 {
+				c = 1
+			}
+			n += min(c, dfMessageCap)
+		}
+		v.counted = n
+	})
+	return v.counted
 }
 
 func (v *metaViews) metaByOrd() map[uint32]*SessionMeta {

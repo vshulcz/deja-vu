@@ -16,14 +16,14 @@ func TestAFocusedWinTakesABetterPlaceButPaysForIt(t *testing.T) {
 	// Ranked last on the whole query, first on the rare part of it.
 	ranked := make([]relevanceScored, 12)
 	for i := range ranked {
-		ranked[i] = relevanceScored{meta: SessionMeta{ID: string(rune('a' + i))}, score: float64(12 - i)}
+		ranked[i] = relevanceScored{place: int32(i), score: float64(12 - i)}
 	}
 	ranked[11].focus = 100
 
 	out := fuseRanked(ranked)
 	at := -1
 	for i, r := range out {
-		if r.meta.ID == ranked[11].meta.ID {
+		if r.place == ranked[11].place {
 			at = i
 			break
 		}
@@ -51,13 +51,13 @@ func TestAFocusedWinTakesABetterPlaceButPaysForIt(t *testing.T) {
 func TestTheFocusedViewCannotTakeTheFront(t *testing.T) {
 	ranked := make([]relevanceScored, 6)
 	for i := range ranked {
-		ranked[i] = relevanceScored{meta: SessionMeta{ID: string(rune('a' + i))}, score: float64(6 - i)}
+		ranked[i] = relevanceScored{place: int32(i), score: float64(6 - i)}
 	}
 	ranked[5].focus = 100
 
 	out := fuseRanked(ranked)
-	if out[0].meta.ID != "a" {
-		t.Errorf("the front of the ranking changed hands to %q", out[0].meta.ID)
+	if out[0].place != 0 {
+		t.Errorf("the front of the ranking changed hands to %d", out[0].place)
 	}
 }
 
@@ -67,14 +67,14 @@ func TestAgreementLeavesTheOrderAlone(t *testing.T) {
 	ranked := make([]relevanceScored, 8)
 	for i := range ranked {
 		ranked[i] = relevanceScored{
-			meta:  SessionMeta{ID: string(rune('a' + i))},
+			place: int32(i),
 			score: float64(8 - i),
 			focus: float64(8 - i),
 		}
 	}
 	for i, r := range fuseRanked(ranked) {
-		if r.meta.ID != ranked[i].meta.ID {
-			t.Fatalf("agreeing views still reordered the ranking at %d: %q, want %q", i, r.meta.ID, ranked[i].meta.ID)
+		if r.place != ranked[i].place {
+			t.Fatalf("agreeing views still reordered the ranking at %d: %d, want %d", i, r.place, ranked[i].place)
 		}
 	}
 }
@@ -86,21 +86,21 @@ func TestAgreementLeavesTheOrderAlone(t *testing.T) {
 // the constant to zero puts the ranking back where it stood before the fusion.
 func TestFusionDampsASingleTopPlace(t *testing.T) {
 	ranked := make([]relevanceScored, 10)
-	// "a" leads the whole query and is last on the rare part of it, and "i"
-	// leads the rare part while sitting ninth on the whole query. "b" is second
+	// "a" (0) leads the whole query and is last on the rare part of it, and "i"
+	// (8) leads the rare part while sitting ninth on the whole query. "b" (1) is second
 	// on both. Second twice is the better bet, and only a damped sum says so:
 	// undamped, one first place carries either of the other two past it.
 	focus := []float64{1, 90, 80, 70, 60, 50, 40, 30, 100, 10}
 	for i := range ranked {
 		ranked[i] = relevanceScored{
-			meta:  SessionMeta{ID: string(rune('a' + i))},
+			place: int32(i),
 			score: float64(10 - i),
 			focus: focus[i],
 		}
 	}
-	if out := fuseRanked(ranked); out[0].meta.ID != "b" {
-		t.Errorf("front went to %q, want b: second on both views beats first on one",
-			out[0].meta.ID)
+	if out := fuseRanked(ranked); out[0].place != 1 {
+		t.Errorf("front went to %d, want 1: second on both views beats first on one",
+			out[0].place)
 	}
 }
 
@@ -110,5 +110,10 @@ func fuseRanked(ranked []relevanceScored) []relevanceScored {
 	for i := range order {
 		order[i] = int32(i)
 	}
-	return fuseFocus(ranked, order)
+	final := fuseFocus(ranked, order)
+	out := make([]relevanceScored, len(final))
+	for i, idx := range final {
+		out[i] = ranked[idx]
+	}
+	return out
 }

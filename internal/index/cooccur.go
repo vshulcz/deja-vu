@@ -1,6 +1,7 @@
 package index
 
 import (
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -283,11 +284,41 @@ func cooccurUnindexed(dir string, words bucketPostings) map[string]bool {
 	return out
 }
 
+var cooccurCache struct {
+	mu   sync.Mutex
+	dir  string
+	stat os.FileInfo
+	m    map[string][]string
+}
+
+func dropCooccurCache(dir string) {
+	cooccurCache.mu.Lock()
+	if cooccurCache.dir == dir {
+		cooccurCache.dir, cooccurCache.stat, cooccurCache.m = "", nil, nil
+	}
+	cooccurCache.mu.Unlock()
+}
+
 func readCooccur(dir string) map[string][]string {
-	var m map[string][]string
-	if err := readGob(cooccurPath(dir), &m); err != nil {
+	p := cooccurPath(dir)
+	fi, err := os.Stat(p)
+	if err != nil {
 		return nil
 	}
+	cooccurCache.mu.Lock()
+	if cooccurCache.dir == dir && cooccurCache.stat != nil && sameFileVersion(cooccurCache.stat, fi) {
+		m := cooccurCache.m
+		cooccurCache.mu.Unlock()
+		return m
+	}
+	cooccurCache.mu.Unlock()
+	var m map[string][]string
+	if err := readGob(p, &m); err != nil {
+		return nil
+	}
+	cooccurCache.mu.Lock()
+	cooccurCache.dir, cooccurCache.stat, cooccurCache.m = dir, fi, m
+	cooccurCache.mu.Unlock()
 	return m
 }
 
