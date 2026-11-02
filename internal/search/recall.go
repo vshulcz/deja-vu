@@ -479,8 +479,7 @@ func wordRuneAt(text string, i int) bool {
 }
 
 func isWordRune(r rune) bool {
-	return r == '_' || (r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') ||
-		(r >= 'A' && r <= 'Z') || r >= 0x400
+	return r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r)
 }
 
 // termStemMin is how long a term must be before its ending may be trimmed.
@@ -1396,7 +1395,7 @@ func contentWords(s string) map[string]bool {
 	out := map[string]bool{}
 	wordy := func(r rune) bool {
 		return r == '_' || r == '-' || r == '.' || r == '/' ||
-			(r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r >= 0x400
+			unicode.IsLetter(r) || unicode.IsDigit(r)
 	}
 	for _, w := range strings.FieldsFunc(lower(s), func(r rune) bool { return !wordy(r) }) {
 		if len([]rune(w)) >= 3 {
