@@ -169,7 +169,7 @@ func orientSessionCount(dir string, projects []string) int {
 	pol := policy.Load()
 	n := 0
 	for _, m := range metas {
-		if howProjectMatches(m.Project, projects) && pol.Allows(policy.ActivationMCP, m.Project) && !pol.Ignored(m.Path, m.Project) {
+		if howProjectMatches(m.Project, projects) && metaVisible(pol, policy.ActivationMCP, m) {
 			n++
 		}
 	}
@@ -197,7 +197,7 @@ func orientFiles(dir string, projects []string, cwd string) []orientFile {
 		if !howProjectMatches(m.Project, projects) {
 			continue
 		}
-		if !pol.Allows(policy.ActivationMCP, m.Project) || pol.Ignored(m.Path, m.Project) {
+		if !metaVisible(pol, policy.ActivationMCP, m) {
 			continue
 		}
 		for _, p := range m.Touched {

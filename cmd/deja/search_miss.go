@@ -495,7 +495,7 @@ func sessionsTouchingWords(dir string, terms []string) (int, string) {
 	pol := policy.Load()
 	n, name := 0, ""
 	for _, meta := range metas {
-		if !pol.Allows(policy.ActivationSearch, meta.Project) || pol.Ignored(meta.Path, meta.Project) {
+		if !metaVisible(pol, policy.ActivationSearch, meta) {
 			continue
 		}
 		for _, p := range meta.Touched {

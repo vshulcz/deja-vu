@@ -82,9 +82,9 @@ func mcpResourceRead(dir, uri string) (any, int, string) {
 	// The first colon separates the harness from the id, the way the listing
 	// writes it. No harness name carries one, so the first is always the right
 	// one; an id that does keeps everything after it.
-	id := ref
-	if _, after, ok := strings.Cut(ref, ":"); ok {
-		id = after
+	harness, id := "", ref
+	if before, after, ok := strings.Cut(ref, ":"); ok {
+		harness, id = before, after
 	}
 	// Every id has the empty string as a prefix, so a URI carrying no id at all
 	// matched the first session and handed back a transcript nobody asked for —
@@ -94,7 +94,7 @@ func mcpResourceRead(dir, uri string) (any, int, string) {
 	if strings.TrimSpace(id) == "" {
 		return nil, -32602, "resource uri carries no session id"
 	}
-	s, found, err := index.FindByPrefix(dir, id)
+	s, found, err := index.FindByPrefixIn(dir, id, harness)
 	if err != nil {
 		return nil, -32603, err.Error()
 	}
@@ -114,7 +114,7 @@ func mcpResourceRead(dir, uri string) (any, int, string) {
 	// frame, so it reads as deja's own words and not as recalled text.
 	note := ""
 	pol := policy.Load()
-	if n := index.PrefixMatchesAllowed(dir, id, func(project string) bool {
+	if n := index.PrefixMatchesIn(dir, id, harness, func(project string) bool {
 		return pol.Allows(policy.ActivationMCP, project)
 	}); n > 1 {
 		note = fmt.Sprintf("deja: %d sessions match %q — this is the most recent; ask for a longer prefix to read another.\n\n",

@@ -372,7 +372,7 @@ func ProjectsTouchedByIgnore(dir string) map[string]bool {
 	pol := policy.Load()
 	out := map[string]bool{}
 	for _, meta := range metas {
-		if pol.Ignored(meta.Path, meta.Project) {
+		if !sources.HarnessExcluded(meta.Harness) && pol.Ignored(meta.Path, meta.Project) {
 			out[meta.Project] = true
 		}
 	}
@@ -395,7 +395,7 @@ func IgnoredMatching(dir string, o query.Options) int {
 	pol := policy.Load()
 	n := 0
 	for _, meta := range m.Sessions {
-		if !sessionMetaMatches(meta, o) {
+		if sources.HarnessExcluded(meta.Harness) || !sessionMetaMatches(meta, o) {
 			continue
 		}
 		if pol.Ignored(meta.Path, meta.Project) {

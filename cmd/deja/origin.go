@@ -347,7 +347,7 @@ func loadOriginCandidateSessions(dir, repoRoot string, commits []originCommit, o
 		if len(scope) > 0 && !howProjectMatches(meta.Project, scope) {
 			continue
 		}
-		if !pol.Allows(policy.ActivationSearch, meta.Project) || pol.Ignored(meta.Path, meta.Project) {
+		if !metaVisible(pol, policy.ActivationSearch, meta) {
 			continue
 		}
 		for _, p := range meta.Touched {

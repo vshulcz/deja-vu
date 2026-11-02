@@ -1097,7 +1097,7 @@ func limitHandoffTip(dir, cwd string, self []string, starting func() string) str
 	pol := policy.Load()
 	var fresh []index.SessionMeta
 	for _, m := range metas {
-		if skip[m.ID] || sources.HarnessExcluded(m.Harness) || !pol.Allows(policy.ActivationAuto, m.Project) {
+		if skip[m.ID] || !isHandoverMeta(m) || !metaVisible(pol, policy.ActivationAuto, m) {
 			continue
 		}
 		fresh = append(fresh, m)
@@ -1226,7 +1226,7 @@ func startingHarness(dir, id, transcript string) string {
 			return "claude"
 		}
 	}
-	if s, ok, err := index.FindByPrefix(dir, id); err == nil && ok && s.ID == id {
+	if s, ok, err := index.FindByID(dir, id); err == nil && ok {
 		return s.Harness
 	}
 	return ""

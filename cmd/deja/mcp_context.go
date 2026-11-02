@@ -68,15 +68,19 @@ const mcpIDPrefixMin = 6
 // agent calls with whatever deja printed at it (#1622). Empty when the string
 // is not an id, when it names nothing, or when this machine's policy withholds
 // what it names.
-func contextByID(dir, q string) (string, idContext, bool) {
+func contextByID(dir, q string, harness ...string) (string, idContext, bool) {
 	if strings.ContainsAny(q, " \t\n") {
 		return "", idContext{}, false
 	}
-	// index.FindByPrefix directly, never the CLI's findByPrefix: that one calls
+	h := ""
+	if len(harness) > 0 {
+		h = harness[0]
+	}
+	// index.FindByPrefixIn directly, never the CLI's findByPrefix: that one calls
 	// index.Ensure first and blocks on the index lock, and this path serves a
 	// client that cannot wait (mcp_no_block_test.go guards it). The resource
 	// reader resolves an id the same way.
-	s, ok, err := index.FindByPrefix(dir, q)
+	s, ok, err := index.FindByPrefixIn(dir, q, h)
 	if err != nil || !ok {
 		return "", idContext{}, false
 	}
@@ -122,7 +126,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 	// 96 answers were a different session, stated as confidently (#3717). The
 	// CLI has had this order since #1614; this is the surface an agent uses.
 	if looksLikeSessionID(q) {
-		if text, id, ok := contextByID(dir, q); ok {
+		if text, id, ok := contextByID(dir, q, harness); ok {
 			return text, 1, id.size, []string{id.session}, nil, id.note, nil
 		}
 	}
@@ -175,7 +179,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 		// "no prior deja sessions matched" about a session deja holds (#1622).
 		// After the search, like the CLI does since #1614: there is no answer
 		// left for the id to shadow.
-		if text, id, ok := contextByID(dir, q); ok {
+		if text, id, ok := contextByID(dir, q, harness); ok {
 			return text, 1, id.size, []string{id.session}, nil, id.note, nil
 		}
 		return emptyRecallAnswerPolicy(dir, q, policyHidden), 0, 0, nil, nil, "", nil

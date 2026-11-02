@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -56,8 +57,12 @@ func findReusedMemory(dir string, allow func(string) bool) (reusedMemory, bool) 
 	// two. Those ids are dropped rather than guessed. Latent on this store
 	// (1153 sessions, 1153 distinct ids), but a duplicate makes the answer
 	// flip between runs on identical data, because the metas come out of a map.
+	pol := policy.Load()
 	byID := make(map[string][]index.SessionMeta, len(metas))
 	for _, m := range metas {
+		if !metaVisibleAllow(pol, nil, m) {
+			continue
+		}
 		byID[m.ID] = append(byID[m.ID], m)
 	}
 	cutoff := time.Now().Add(-reusedSettleAge)
@@ -75,7 +80,7 @@ func findReusedMemory(dir string, allow func(string) bool) (reusedMemory, bool) 
 		if strings.TrimSpace(m.Title) == "" {
 			continue
 		}
-		if allow != nil && !allow(m.Project) {
+		if !metaVisibleAllow(pol, allow, m) {
 			continue
 		}
 		// A session with no parseable timestamp is not old, it is undated —

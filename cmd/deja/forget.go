@@ -415,7 +415,7 @@ func restorePromotedTitles(dir, selector string) {
 		if !index.SelectorMatches(m, selector) {
 			continue
 		}
-		s, ok, err := index.FindByPrefix(dir, m.ID)
+		s, ok, err := index.FindByIdentity(dir, m.Harness, m.ID)
 		if err != nil || !ok {
 			continue
 		}

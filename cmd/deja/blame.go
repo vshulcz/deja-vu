@@ -13,6 +13,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // blameMode is what the caller asked for beyond the hits: the line answer on
@@ -313,7 +314,7 @@ func ignoredTouching(dir string, target search.BlameTarget) int {
 	base := strings.ToLower(filepath.Base(target.FullPath))
 	n := 0
 	for _, meta := range metas {
-		if !pol.Ignored(meta.Path, meta.Project) {
+		if sources.HarnessExcluded(meta.Harness) || !pol.Ignored(meta.Path, meta.Project) {
 			continue
 		}
 		for _, p := range meta.Touched {
@@ -339,6 +340,7 @@ func withFileTouchers(dir string, ss []model.Session, target search.BlameTarget)
 	if err != nil {
 		return ss
 	}
+	pol := policy.Load()
 	// Where each session sits, not merely whether it is here: search returns
 	// sessions with only their matching messages attached, so one that matched
 	// on speech arrives with its `files` record stripped. Skipping it as
@@ -364,6 +366,9 @@ func withFileTouchers(dir string, ss []model.Session, target search.BlameTarget)
 		// rank them.
 		if len(want) >= blameToucherCap {
 			break
+		}
+		if !metaVisible(pol, "", meta) {
+			continue
 		}
 		for _, p := range meta.Touched {
 			if strings.ToLower(filepath.Base(filepath.FromSlash(p))) != base {

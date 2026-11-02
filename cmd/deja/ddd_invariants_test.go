@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -768,5 +769,195 @@ func TestDDDStageBToDArchitectureInvariants(t *testing.T) {
 		if !refreshCallers[want] {
 			t.Errorf("Stage C violation: %s does not route in-place sidecar updates through refreshAppendedSidecars", want)
 		}
+	}
+}
+
+// TestDDDStageEToGManifestVisibilityAndHandoverInvariants pins the domain
+// invariants and bug fixes for Stages E-G (Bugs #44-#52):
+//   - Stage E: Manifest visibility policy (metaVisible / metaVisibleAllow)
+//     across all index.AllMeta callers in cmd/deja.
+//   - Stage F: Handover session eligibility (isHandoverSession / isHandoverMeta)
+//     across CLI, MCP, and hook handover pickers.
+//   - Stage G: Composite identity (m.Key() == s.Key()) in recallTouchedLine.
+func TestDDDStageEToGManifestVisibilityAndHandoverInvariants(t *testing.T) {
+	// 1. AST Invariant: Every manifest-scanning surface and handover picker in
+	// cmd/deja must route through metaVisible/metaVisibleAllow and
+	// isHandoverSession/isHandoverMeta.
+	fset := token.NewFileSet()
+	mustCallMetaVisible := []string{
+		"reused.go",
+		"statusline_memory.go",
+		"blame_earlier_name.go",
+		"blame.go",
+		"cli_help_empty.go",
+		"mcp_orient.go",
+		"search_miss.go",
+		"origin.go",
+		"hook_week_used.go",
+		"hook_context.go",
+	}
+	for _, name := range mustCallMetaVisible {
+		f, parseErr := parser.ParseFile(fset, name, nil, 0)
+		if parseErr != nil {
+			t.Fatalf("ParseFile(%s): %v", name, parseErr)
+		}
+		found := false
+		ast.Inspect(f, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			if ident, ok := call.Fun.(*ast.Ident); ok && (ident.Name == "metaVisible" || ident.Name == "metaVisibleAllow") {
+				found = true
+			}
+			return true
+		})
+		if !found {
+			t.Errorf("Stage E violation: %s scans manifest metadata without calling metaVisible or metaVisibleAllow", name)
+		}
+	}
+
+	mustCallHandover := []string{
+		"wip.go",
+		"handoff.go",
+		"mcp_handoff.go",
+		"hook_prompt_handoff.go",
+		"hook_context.go",
+	}
+	for _, name := range mustCallHandover {
+		f, parseErr := parser.ParseFile(fset, name, nil, 0)
+		if parseErr != nil {
+			t.Fatalf("ParseFile(%s): %v", name, parseErr)
+		}
+		found := false
+		ast.Inspect(f, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			if ident, ok := call.Fun.(*ast.Ident); ok && (ident.Name == "isHandoverSession" || ident.Name == "isHandoverMeta") {
+				found = true
+			}
+			return true
+		})
+		if !found {
+			t.Errorf("Stage F violation: %s selects a handover session without calling isHandoverSession or isHandoverMeta", name)
+		}
+	}
+
+	noBareFindByPrefix := []string{
+		"forget.go",
+		"view.go",
+		"mcp_resources.go",
+		"mcp_handoff.go",
+		"mcp_context.go",
+		"hook_prompt_handoff.go",
+		"hook_context.go",
+		"blame_earlier_name.go",
+	}
+	for _, name := range noBareFindByPrefix {
+		f, parseErr := parser.ParseFile(fset, name, nil, 0)
+		if parseErr != nil {
+			t.Fatalf("ParseFile(%s): %v", name, parseErr)
+		}
+		ast.Inspect(f, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			sel, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok {
+				return true
+			}
+			if pkg, ok := sel.X.(*ast.Ident); ok && pkg.Name == "index" && sel.Sel.Name == "FindByPrefix" {
+				pos := fset.Position(call.Pos())
+				t.Errorf("Stage H violation at %s:%d: bare index.FindByPrefix call drops composite (Harness, ID) or exact ID semantics; use FindByIdentity, FindByID, or FindByPrefixIn", name, pos.Line)
+			}
+			return true
+		})
+	}
+
+	// 2. Behavioral Invariant (Stage E–H): Excluded harnesses and .dejaignore
+	// sessions must be hidden across orient, newestSessionNote, findReusedMemory,
+	// and recallTouchedLine / mcpResourceRead / handoffTargetForAgent must key by (Harness, ID).
+	tmp := hermeticEnv(t)
+	claude := filepath.Join(tmp, "claude", "payments")
+	codex := filepath.Join(tmp, "codex", "sessions", "2026", "07", "20")
+	for _, d := range []string{claude, codex} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
+	old := time.Now().Add(-72 * time.Hour).UTC().Format("2006-01-02T15:04:05Z")
+	if err := os.WriteFile(filepath.Join(claude, "shared-id-1.jsonl"), []byte(
+		`{"type":"user","sessionId":"shared-id-1","cwd":"/work/payments","timestamp":"`+old+`","message":{"role":"user","content":"fix /work/payments/auth.go token refresh"}}`+"\n"+
+			`{"type":"assistant","sessionId":"shared-id-1","cwd":"/work/payments","timestamp":"`+old+`","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"/work/payments/auth.go"}}]}}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(codex, "rollout-2026-07-20T10-00-00-shared-id-1.jsonl"), []byte(
+		`{"timestamp":"`+old+`","type":"session_meta","payload":{"session_id":"shared-id-1","id":"shared-id-1","cwd":"/work/payments"}}`+"\n"+
+			`{"timestamp":"`+old+`","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"text","text":"update /work/payments/billing.go"}]}}`+"\n"+
+			`{"timestamp":"`+old+`","type":"response_item","payload":{"type":"custom_tool_call","name":"apply_patch","input":"*** Begin Patch\n*** Update File: /work/payments/billing.go\n*** End Patch"}}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatalf("index.Ensure: %v", err)
+	}
+
+	sClaude := model.Session{ID: "shared-id-1", Harness: "claude", Project: "payments"}
+	sCodex := model.Session{ID: "shared-id-1", Harness: "codex", Project: "payments"}
+
+	// Bug #52: recallTouchedLine must match composite key (Harness, ID), not bare ID.
+	claudeLine := recallTouchedLine(dir, sClaude, []string{"auth"})
+	if !strings.Contains(claudeLine, "auth.go") || strings.Contains(claudeLine, "billing.go") {
+		t.Fatalf("Bug #52 regression: recallTouchedLine(sClaude) = %q, want auth.go and not billing.go", claudeLine)
+	}
+	codexLine := recallTouchedLine(dir, sCodex, []string{"billing"})
+	if !strings.Contains(codexLine, "billing.go") || strings.Contains(codexLine, "auth.go") {
+		t.Fatalf("Bug #52 regression: recallTouchedLine(sCodex) = %q, want billing.go and not auth.go", codexLine)
+	}
+
+	// Bug #55 & #56: mcpResourceRead and handoffTargetForAgent must respect the
+	// requested harness when two harnesses share the same session ID.
+	resVal, resCode, resMsg := mcpResourceRead(dir, "deja://session/claude:shared-id-1")
+	if resCode != 0 || resMsg != "" {
+		t.Fatalf("Bug #55 regression: mcpResourceRead(claude:shared-id-1) failed: code=%d msg=%q", resCode, resMsg)
+	}
+	resStr := fmt.Sprint(resVal)
+	if !strings.Contains(resStr, "auth.go") || strings.Contains(resStr, "billing.go") {
+		t.Fatalf("Bug #55 regression: mcpResourceRead(claude:shared-id-1) returned wrong harness session: %s", resStr)
+	}
+	if gotTarget, why := handoffTargetForAgent(dir, "shared-id-1", "claude"); why != "" || gotTarget.Harness != "claude" {
+		t.Fatalf("Bug #56 regression: handoffTargetForAgent(shared-id-1, claude) = (%+v, %q); want claude", gotTarget, why)
+	}
+	if gotTarget, why := handoffTargetForAgent(dir, "shared-id-1", "codex"); why != "" || gotTarget.Harness != "codex" {
+		t.Fatalf("Bug #56 regression: handoffTargetForAgent(shared-id-1, codex) = (%+v, %q); want codex", gotTarget, why)
+	}
+
+	// Bug #49: Excluding codex via DEJA_EXCLUDE_HARNESSES must hide it from orientSessionCount and orientFiles.
+	t.Setenv("DEJA_EXCLUDE_HARNESSES", "codex")
+	if got := orientSessionCount(dir, []string{"payments"}); got != 1 {
+		t.Fatalf("Bug #49 regression: orientSessionCount with codex excluded = %d, want 1", got)
+	}
+	files := orientFiles(dir, []string{"payments"}, "")
+	for _, f := range files {
+		if strings.Contains(f.Path, "billing.go") {
+			t.Fatalf("Bug #49 regression: orientFiles leaked excluded codex touched file %q", f.Path)
+		}
+	}
+
+	// 3. Behavioral Invariant (Stage F, Bugs #50-#51): isHandoverMeta and
+	// askedHandoffSource must reject synthetic deja notes and spawned subagents.
+	if isHandoverMeta(index.SessionMeta{Harness: model.NotesHarness, ID: "deja-2026-01-01"}) {
+		t.Fatal("Bug #51 regression: isHandoverMeta accepted synthetic deja note")
+	}
+	if isHandoverMeta(index.SessionMeta{Harness: "claude", ID: "sub-1", Kind: model.KindSubagent}) {
+		t.Fatal("Bug #51 regression: isHandoverMeta accepted spawned subagent kind")
+	}
+	if isHandoverMeta(index.SessionMeta{Harness: "claude", ID: "sub-2", Path: "/Users/x/.claude/projects/p/subagents/agent-1.jsonl"}) {
+		t.Fatal("Bug #51 regression: isHandoverMeta accepted subagent transcript path")
 	}
 }
