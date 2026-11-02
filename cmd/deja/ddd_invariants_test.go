@@ -265,7 +265,6 @@ func TestDDDHookseenLedgerEncapsulated(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-
 func TestDDDPromotedNoteDomainUnification(t *testing.T) {
 	if got := model.PromotedNoteID("claude:s1"); got != "deja-note-claude-s1" {
 		t.Fatalf("PromotedNoteID = %q", got)
@@ -430,5 +429,41 @@ func TestDDDLineageAndSpawnedKindInvariants(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func TestDDDLifecycleResolutionEncapsulated(t *testing.T) {
+	fset := token.NewFileSet()
+	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		if path == "lifecycle.go" || path == "promote.go" {
+			return nil
+		}
+		f, err := parser.ParseFile(fset, path, nil, 0)
+		if err != nil {
+			return err
+		}
+		ast.Inspect(f, func(n ast.Node) bool {
+			sel, ok := n.(*ast.SelectorExpr)
+			if !ok {
+				return true
+			}
+			ident, ok := sel.X.(*ast.Ident)
+			if ok && ident.Name == "sources" && sel.Sel.Name == "PromotedLifecycles" {
+				pos := fset.Position(sel.Pos())
+				t.Errorf("cmd/deja/%s:%d calls sources.PromotedLifecycles() directly; use newLifecycleResolver / attachLifecycles / attachBlameLifecycles in lifecycle.go so synced and OrigID lifecycles stay unified",
+					path, pos.Line)
+			}
+			return true
+		})
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }

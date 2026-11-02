@@ -171,13 +171,13 @@ func fileDecisionLine(dir, path string, metas []index.SessionMeta) string {
 	if line := promotedDecisionForFile(path, metas); line != "" {
 		return line
 	}
-	states := sources.PromotedLifecycles()
+	r := newLifecycleResolver(dir)
 	for i, meta := range metas {
 		if i >= toolHookDecisionScan {
 			break
 		}
 		s, ok, err := index.FindByIdentity(dir, meta.Harness, meta.ID)
-		if err != nil || !ok || !decisionUsable(s, states) {
+		if err != nil || !ok || !decisionUsable(s, r) {
 			continue
 		}
 		// Bound the work inside a hook the agent is blocked on: a marathon
@@ -368,16 +368,16 @@ func clipDecision(s string, budget int) string {
 // says in its own words it backed the approach out (GaveUp), and one a later
 // state marked rejected, superseded or stale. Surfacing either at the point of an
 // edit would push the agent to redo exactly what was undone.
-func decisionUsable(s model.Session, states map[string]sources.Lifecycle) bool {
+func decisionUsable(s model.Session, r *lifecycleResolver) bool {
 	if s.GaveUp {
 		return false
 	}
-	state := s.Lifecycle // a note that arrived by sync carries its own state
-	if lc, ok := states[s.Key()]; ok && lc.State != "" {
-		state = lc.State
+	state, _, _, _, ok := r.resolve(s)
+	if !ok {
+		return true
 	}
 	switch state {
-	case "rejected", "superseded", "stale":
+	case model.LifecycleRejected, model.LifecycleSuperseded, model.LifecycleStale:
 		return false
 	}
 	return true

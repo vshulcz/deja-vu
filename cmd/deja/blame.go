@@ -290,7 +290,7 @@ func blameHits(dir string, target search.BlameTarget, o search.BlameOptions, act
 	// session ate one of the ten slots, so a reader could get eight hits with
 	// forty sessions still waiting behind --all.
 	hits := search.CapBlame(visible, o)
-	attachBlameLifecycles(hits, target)
+	attachBlameLifecycles(dir, hits, target)
 	return hits, len(all) - len(visible), len(visible), refreshing, nil
 }
 

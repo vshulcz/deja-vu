@@ -878,7 +878,7 @@ func commandDecisionLine(dir, cwd, cmd, self string, lookupOnly bool) string {
 	if err != nil {
 		return ""
 	}
-	states := sources.PromotedLifecycles()
+	r := newLifecycleResolver(dir)
 	for _, s := range ranked {
 		// The old rule wanted every one of the command's words to be rare.
 		// Measured on 1,696 sessions, none of the fifteen most-run commands
@@ -890,7 +890,7 @@ func commandDecisionLine(dir, cwd, cmd, self string, lookupOnly bool) string {
 		// fact rather than a ranking: did the session run it. The words still
 		// choose the candidates; running the command earns the line. A session
 		// that merely says "apply" is not the history of `terraform apply`.
-		if (self != "" && s.ID == self) || !pol.Allows(policy.ActivationAuto, s.Project) || !decisionUsable(s, states) {
+		if (self != "" && s.ID == self) || !pol.Allows(policy.ActivationAuto, s.Project) || !decisionUsable(s, r) {
 			continue
 		}
 		// The ranked sessions are served without their command records, so the
