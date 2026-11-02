@@ -452,6 +452,7 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 	if len(s.Messages) == 0 {
 		return nil, err
 	}
+	resolveHomeOrEmptyProject(&s)
 	return []model.Session{s}, err
 }
 

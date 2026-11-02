@@ -494,7 +494,7 @@ func appendPass(dir, harness, scope string, old Manifest, files, changed map[str
 // update are missing until a full build, which is the ordinary staleness of a
 // derived file and not the same thing as having none.
 func carrySidecars(dir, tmp string) {
-	for _, name := range []string{fixesFile, fixRawFile, commandsFile, cooccurFile} {
+	for _, name := range []string{fixesFile, fixRawFile, commandsFile, sessionFactsFile, commandFailsFile, cooccurFile} {
 		b, err := os.ReadFile(filepath.Join(dir, name))
 		if err != nil {
 			continue

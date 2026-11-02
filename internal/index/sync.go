@@ -676,13 +676,7 @@ func refreshImportSidecars(dir string, m Manifest, recsByKey map[string][]Record
 		}
 		batch = append(batch, s)
 	}
-	whole, rewhole := wholeSessionsForFixes(dir, m, batch)
-	mergeFixes(dir, dir, nil, whole, rewhole)
-	if carriesWork(batch) {
-		buildCommandsFromIndex(dir)
-		buildCommandFailsFromIndex(dir, readCommandFailState(dir), nil)
-		buildSessionFactsFromIndex(dir)
-	}
+	refreshAppendedSidecars(dir, m, batch, nil)
 }
 
 // importSnapshot is what one file had contributed before it was read, so a

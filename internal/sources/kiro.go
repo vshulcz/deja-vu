@@ -527,35 +527,7 @@ func kiroExitStatus(v any) (int, bool) {
 // kiroWorkRecords turns one record's tool calls and results into work records,
 // the way the other readers do for their own dialects.
 func kiroWorkRecords(calls []any, results []string, t time.Time) []model.Message {
-	var out []model.Message
-	if len(calls) > 0 {
-		if IndexToolPaths() {
-			if p := toolPathsIn(calls, kiroDialect); p != "" {
-				out = append(out, model.Message{Role: RoleFiles, Text: p, Time: t})
-			}
-		}
-		if IndexWrites() {
-			for _, w := range wroteRecordsIn(calls, kiroDialect) {
-				out = append(out, model.Message{Role: RoleWrote, Text: w, Time: t})
-			}
-		}
-		if IndexEdits() {
-			for _, span := range editSpansIn(calls, kiroDialect) {
-				out = append(out, model.Message{Role: RoleEdit, Text: span, Time: t})
-			}
-		}
-		if IndexCommands() {
-			for _, cmd := range commandsIn(calls, kiroDialect) {
-				out = append(out, model.Message{Role: RoleCommand, Text: cmd, Time: t})
-			}
-		}
-	}
-	if IndexToolOutput() {
-		for _, r := range results {
-			out = append(out, model.Message{Role: RoleToolOutput, Text: capParsedMessage(r), Time: t})
-		}
-	}
-	return out
+	return dialectWorkRecords(calls, results, kiroDialect, t)
 }
 
 func kiroMetaTimestamp(data map[string]any) any {

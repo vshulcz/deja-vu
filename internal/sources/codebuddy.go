@@ -532,6 +532,7 @@ func parseCodeBuddy(path string, scan func(func(map[string]any)) error) ([]model
 	} else {
 		s.Project = claudeProjectName(projDir)
 	}
+	resolveHomeOrEmptyProject(&s)
 	for _, title := range []string{custom, generated, topic} {
 		if strings.TrimSpace(title) != "" {
 			s.Title = firstLineTrim(title)
@@ -552,26 +553,5 @@ func codeBuddyPlaceholderTitle(t string) bool {
 // codeBuddyWorkRecords is what one call leaves in the index: the files it
 // named, the span an edit replaced, what it wrote and the command it ran.
 func codeBuddyWorkRecords(blocks []any, ts time.Time) []model.Message {
-	var out []model.Message
-	if IndexToolPaths() {
-		if p := toolPathsIn(blocks, claudeDialect); p != "" {
-			out = append(out, model.Message{Role: RoleFiles, Text: p, Time: ts})
-		}
-	}
-	if IndexWrites() {
-		for _, w := range wroteRecordsIn(blocks, claudeDialect) {
-			out = append(out, model.Message{Role: RoleWrote, Text: w, Time: ts})
-		}
-	}
-	if IndexEdits() {
-		for _, span := range editSpansIn(blocks, claudeDialect) {
-			out = append(out, model.Message{Role: RoleEdit, Text: span, Time: ts})
-		}
-	}
-	if IndexCommands() {
-		for _, cmd := range commandsIn(blocks, claudeDialect) {
-			out = append(out, model.Message{Role: RoleCommand, Text: cmd, Time: ts})
-		}
-	}
-	return out
+	return dialectWorkRecords(blocks, nil, claudeDialect, ts)
 }

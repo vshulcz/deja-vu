@@ -97,6 +97,40 @@ func isHomeOrEmptyProject(p string) bool {
 	return len(parts) == 2 && (strings.EqualFold(parts[0], "Users") || strings.EqualFold(parts[0], "home")) && parts[1] != ""
 }
 
+// resolveHomeOrEmptyProject refines s.Project when the session started with no
+// project or in a user's home directory ("Users/<name>" or "home/<name>"):
+// first from the repository most of its file activity touched, then from a
+// `deja handoff` opening prompt.
+func resolveHomeOrEmptyProject(s *model.Session) {
+	if !isHomeOrEmptyProject(s.Project) {
+		return
+	}
+	if p := projectFromPaths(s.Messages); p != "" {
+		s.Project = p
+		return
+	}
+	if p := handoffProject(s.Messages); p != "" {
+		s.Project = p
+	}
+}
+
+// resolveDirProject refines a directory-derived s.Project using the files the
+// session actually touched, or a handoff prompt when the directory was a home
+// folder. Sets ProjectFromDir when the directory name remains in force.
+func resolveDirProject(s *model.Session) {
+	if p := projectFromPaths(s.Messages); p != "" {
+		s.Project = p
+		return
+	}
+	if isHomeOrEmptyProject(s.Project) {
+		if p := handoffProject(s.Messages); p != "" {
+			s.Project = p
+			return
+		}
+	}
+	s.ProjectFromDir = true
+}
+
 // handoffProject extracts the source project from a `deja handoff` opening
 // prompt when a handed-off session was started from a home directory and has
 // not yet touched enough files to name its repository.

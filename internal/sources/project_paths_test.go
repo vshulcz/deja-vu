@@ -109,3 +109,54 @@ func TestRepoRootTerminatesAtTheVolumeRoot(t *testing.T) {
 		t.Fatal("repoRoot did not terminate at the volume root")
 	}
 }
+
+func TestResolveHomeOrEmptyAndDirProjectACL(t *testing.T) {
+	// A session started from a home directory (~ -> "Users/alice") that opens
+	// with a deja handoff prompt resolves its project from the handoff prompt
+	// even before touching 3 files.
+	handoffMsg := model.Message{
+		Role: "user",
+		Text: "Continuing a task handed off from a claude session (project goprojects/deja-vu, 2026-10-01).",
+	}
+	s := model.Session{
+		Harness:  "codex",
+		ID:       "s1",
+		Project:  "Users/alice",
+		Messages: []model.Message{handoffMsg},
+	}
+	resolveHomeOrEmptyProject(&s)
+	if s.Project != "goprojects/deja-vu" {
+		t.Fatalf("resolveHomeOrEmptyProject(handoff) = %q; want goprojects/deja-vu", s.Project)
+	}
+
+	// Same for directory-derived sessions (claude, mcode) started from ~.
+	s2 := model.Session{
+		Harness:  "claude",
+		ID:       "s2",
+		Project:  "home/alice",
+		Messages: []model.Message{handoffMsg},
+	}
+	resolveDirProject(&s2)
+	if s2.Project != "goprojects/deja-vu" || s2.ProjectFromDir {
+		t.Fatalf("resolveDirProject(handoff from home) = (%q, %v); want (goprojects/deja-vu, false)", s2.Project, s2.ProjectFromDir)
+	}
+
+	// parseCompactionSession preserves non-Claude parser project attribution
+	// when workspace is empty (e.g. transcriptHead on Copilot/Qwen).
+	copilotDir := filepath.Join(t.TempDir(), "1111-2222")
+	if err := os.MkdirAll(copilotDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	copilotPath := filepath.Join(copilotDir, "events.jsonl")
+	copilotData := strings.Join([]string{
+		`{"type":"session.start","timestamp":"2026-10-01T10:00:00Z","data":{"sessionId":"1111-2222","startTime":"2026-10-01T10:00:00Z","context":{"cwd":"/work/org/app"}}}`,
+		`{"type":"user.message","timestamp":"2026-10-01T10:00:01Z","data":{"content":"hello"}}`,
+	}, "\n") + "\n"
+	compSess, err := parseCompactionSession(copilotPath, "copilot", "", []byte(copilotData))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if compSess.Project != "org/app" {
+		t.Fatalf("parseCompactionSession(copilot, workspace=\"\").Project = %q; want org/app", compSess.Project)
+	}
+}

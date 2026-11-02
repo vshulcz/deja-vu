@@ -337,11 +337,12 @@ func reprojectSidecars(dir string, sessions map[string]SessionMeta, keys map[str
 		}
 	}
 	// Nothing was read, so what the records say is what the states say; the
-	// tables take the new project from the rows.
+	// tables take the new project from the rows. The command state goes last,
+	// so it stays behind until both tables are written.
+	buildCommandFailsFromIndex(dir, readCommandFailState(dir), nil)
 	if m, err := readManifest(dir); err == nil {
 		buildCommandTables(dir, dir, m, len(m.DeadRecords), nil)
 	}
-	buildCommandFailsFromIndex(dir, readCommandFailState(dir), nil)
 }
 
 // orphanState is what a full rebuild has to carry: sessions whose transcript

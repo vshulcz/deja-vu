@@ -194,6 +194,7 @@ func applyHermesMeta(out []model.Session, meta map[string]hermesMeta) {
 			out[i].Project = projectName(cwd)
 			hermesAnchorPaths(out[i].Messages, cwd)
 		}
+		resolveHomeOrEmptyProject(&out[i])
 		// delegate_task marks its child with _delegate_from, which outlives
 		// a delete of the parent. The child's source is "subagent" only
 		// under the classic CLI: under --source, the TUI or a gateway it

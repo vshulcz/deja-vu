@@ -207,11 +207,7 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 	}
 	// The directory a session was started from is a weak guess at what it was
 	// about; the files it touched are a strong one.
-	if p := projectFromPaths(s.Messages); p != "" {
-		s.Project = p
-	} else {
-		s.ProjectFromDir = true
-	}
+	resolveDirProject(&s)
 	return []model.Session{s}, err
 }
 

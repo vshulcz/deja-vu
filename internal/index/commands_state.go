@@ -308,7 +308,7 @@ func buildCommandTables(dir, tmp string, m Manifest, priorDead int, redo map[str
 	if len(facts) == 0 {
 		_ = os.Remove(sessionFactsPath(tmp))
 	} else {
-		_ = writeGob(sessionFactsPath(tmp), facts)
+		_ = writeGobAtomic(sessionFactsPath(tmp), facts)
 	}
 	st.Generation, st.Size, st.Dead = m.Generation, size, len(m.DeadRecords)
 	st.Facts = factsStamp(tmp)

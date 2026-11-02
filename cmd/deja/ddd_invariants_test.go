@@ -582,3 +582,191 @@ func TestDDDWave15And16HandoverRecapAndSidecarInvariants(t *testing.T) {
 		}
 	}
 }
+
+func TestDDDStageAWiringDomainSymmetryAndBugs32To36(t *testing.T) {
+	// Every installTargetNames() entry must be covered by doctorMCPConfigs(),
+	// autoWirings(), or one of the explicit non-table targets.
+	mcpCovered := map[string]bool{
+		"trae-ide": true, // added per installed IDE build in doctorMCPConfigs()
+	}
+	mcpDupes := map[string]func(string) []string{}
+	for _, cfg := range doctorMCPConfigs() {
+		mcpCovered[cfg.name] = true
+		mcpDupes[cfg.name] = cfg.dupes
+	}
+	autoCovered := map[string]bool{
+		"claude": true, "codex": true,
+	}
+	for _, a := range autoWirings() {
+		autoCovered[a.name] = true
+	}
+	for _, target := range installTargetNames() {
+		if target == "statusline" || target == "sync-timer" {
+			continue
+		}
+		if name, ok := strings.CutSuffix(target, "-auto"); ok {
+			if !autoCovered[name] {
+				t.Fatalf("install auto target %q missing from doctor autoWirings()", target)
+			}
+			continue
+		}
+		if !mcpCovered[target] && !autoCovered[target] {
+			t.Fatalf("install target %q missing from both doctorMCPConfigs() and autoWirings()", target)
+		}
+	}
+
+	// Bug #32: mcpServerMaps must include Muse's legacy `mcp_servers` block when
+	// `mcpServers` is absent so dejaCommandIn and dejaEntrySwitchedOff work.
+	museRoot := map[string]any{
+		"mcp_servers": map[string]any{
+			"deja": map[string]any{
+				"command":  "/usr/local/bin/deja",
+				"args":     []any{"mcp"},
+				"disabled": true,
+			},
+		},
+	}
+	if maps := mcpServerMaps(museRoot); len(maps) != 1 {
+		t.Fatalf("mcpServerMaps(muse legacy mcp_servers) = %d maps; want 1", len(maps))
+	}
+	tmp := t.TempDir()
+	museFile := filepath.Join(tmp, "muse.json")
+	if err := os.WriteFile(museFile, []byte(`{"mcp_servers":{"deja":{"command":"/usr/local/bin/deja","args":["mcp"],"disabled":true}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !dejaEntrySwitchedOff("muse", museFile) {
+		t.Fatalf("dejaEntrySwitchedOff missed disabled entry in Muse legacy mcp_servers")
+	}
+	if got := dejaCommandIn(museFile); got != "/usr/local/bin/deja" {
+		t.Fatalf("dejaCommandIn(muse legacy mcp_servers) = %q; want /usr/local/bin/deja", got)
+	}
+
+	// Bug #33 & #34: openclaw and zcode recognize hand-named entries (e.g. "deja-vu")
+	// and expose duplicate-key detection under `mcp.servers`.
+	nestedFile := filepath.Join(tmp, "nested.json")
+	if err := os.WriteFile(nestedFile, []byte(`{"mcp":{"servers":{"deja":{"command":"deja","args":["mcp"]},"deja-vu":{"command":"/opt/bin/deja","args":["mcp"]}}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !doctorOpenClawWired(nestedFile) || !doctorZCodeWired(nestedFile) {
+		t.Fatalf("openclaw/zcode wired check failed on nested mcp.servers")
+	}
+	for _, name := range []string{"openclaw", "zcode"} {
+		dupesFn := mcpDupes[name]
+		if dupesFn == nil {
+			t.Fatalf("doctorMCPConfigs()[%q].dupes is nil; want duplicate key detector", name)
+		}
+		if keys := dupesFn(nestedFile); len(keys) != 2 || keys[0] != "deja" || keys[1] != "deja-vu" {
+			t.Fatalf("%s dupes = %v; want [deja deja-vu]", name, keys)
+		}
+	}
+
+	// Bug #35: kilocode recognizes 2.x CLI `mcp.servers` in kilo.jsonc and
+	// exposes duplicate-key detection across both shapes.
+	if !doctorKilocodeWired(nestedFile) {
+		t.Fatalf("doctorKilocodeWired failed on 2.x CLI mcp.servers shape")
+	}
+	if mcpDupes["kilocode"] == nil {
+		t.Fatalf("doctorMCPConfigs()[kilocode].dupes is nil")
+	}
+	if keys := mcpDupes["kilocode"](nestedFile); len(keys) != 2 {
+		t.Fatalf("kilocode dupes on 2.x CLI shape = %v; want [deja deja-vu]", keys)
+	}
+
+	// Bug #36: pi uses the shared skill path and retires its old local skill copy.
+	if got, want := guidancePath("pi"), sharedSkillPath(); got != want {
+		t.Fatalf("guidancePath(pi) = %q; want sharedSkillPath %q", got, want)
+	}
+}
+
+// TestDDDStageBToDArchitectureInvariants enforces the Anti-Corruption Layer in
+// internal/sources/ (Stage B) and the unified Sidecar State Machine in
+// internal/index/ (Stage C & D) at the AST level so regressions fail `go test`.
+func TestDDDStageBToDArchitectureInvariants(t *testing.T) {
+	repoRoot := ".."
+	if _, err := os.Stat(filepath.Join(repoRoot, "internal", "sources")); err != nil {
+		repoRoot = filepath.Join("..", "..")
+	}
+	// 1. Stage B ACL Invariant: No parser in internal/sources/ may call
+	// projectFromPaths or handoffProject ad-hoc outside project_paths.go and antigravity.go.
+	sourcesDir := filepath.Join(repoRoot, "internal", "sources")
+	srcEntries, err := os.ReadDir(sourcesDir)
+	if err != nil {
+		t.Fatalf("ReadDir(%s): %v", sourcesDir, err)
+	}
+	fset := token.NewFileSet()
+	allowedDirectCallers := map[string]bool{
+		"project_paths.go": true,
+		"antigravity.go":   true,
+	}
+	aclCallers := 0
+	for _, e := range srcEntries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		path := filepath.Join(sourcesDir, name)
+		f, parseErr := parser.ParseFile(fset, path, nil, 0)
+		if parseErr != nil {
+			t.Fatalf("ParseFile(%s): %v", path, parseErr)
+		}
+		ast.Inspect(f, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			ident, ok := call.Fun.(*ast.Ident)
+			if !ok {
+				return true
+			}
+			if (ident.Name == "projectFromPaths" || ident.Name == "handoffProject") && !allowedDirectCallers[name] {
+				t.Errorf("Stage B ACL violation: %s calls %s directly instead of resolveHomeOrEmptyProject or resolveDirProject", name, ident.Name)
+			}
+			if (ident.Name == "resolveHomeOrEmptyProject" || ident.Name == "resolveDirProject") && name != "project_paths.go" {
+				aclCallers++
+			}
+			return true
+		})
+	}
+	if aclCallers < 12 {
+		t.Fatalf("expected at least 12 harness parser calls to resolveHomeOrEmptyProject/resolveDirProject, got %d", aclCallers)
+	}
+
+	// 2. Stage C Sidecar State Machine Invariant:
+	// - Both in-place append paths (ingest_append.go and sync.go) must call refreshAppendedSidecars.
+	// - Legacy full-log re-scanners buildCommandsFromIndex and buildSessionFactsFromIndex must not exist.
+	indexDir := filepath.Join(repoRoot, "internal", "index")
+	idxEntries, err := os.ReadDir(indexDir)
+	if err != nil {
+		t.Fatalf("ReadDir(%s): %v", indexDir, err)
+	}
+	refreshCallers := map[string]bool{}
+	for _, e := range idxEntries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		path := filepath.Join(indexDir, name)
+		f, parseErr := parser.ParseFile(fset, path, nil, 0)
+		if parseErr != nil {
+			t.Fatalf("ParseFile(%s): %v", path, parseErr)
+		}
+		ast.Inspect(f, func(n ast.Node) bool {
+			switch x := n.(type) {
+			case *ast.FuncDecl:
+				if x.Name.Name == "buildCommandsFromIndex" || x.Name.Name == "buildSessionFactsFromIndex" {
+					t.Errorf("Stage C violation: legacy full-log sidecar scanner %s still defined in %s", x.Name.Name, name)
+				}
+			case *ast.CallExpr:
+				if ident, ok := x.Fun.(*ast.Ident); ok && ident.Name == "refreshAppendedSidecars" {
+					refreshCallers[name] = true
+				}
+			}
+			return true
+		})
+	}
+	for _, want := range []string{"ingest_append.go", "sync.go"} {
+		if !refreshCallers[want] {
+			t.Errorf("Stage C violation: %s does not route in-place sidecar updates through refreshAppendedSidecars", want)
+		}
+	}
+}

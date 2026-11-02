@@ -308,6 +308,13 @@ func mcpServerMaps(root map[string]any) []map[string]any {
 			out = append(out, nested)
 		}
 	}
+	// Muse's legacy `mcp_servers` block is active when `mcpServers` is not also
+	// present (#4709).
+	if legacy, _ := root["mcp_servers"].(map[string]any); legacy != nil {
+		if _, hasCurrent := root["mcpServers"].(map[string]any); !hasCurrent {
+			out = append(out, legacy)
+		}
+	}
 	return out
 }
 
@@ -615,7 +622,7 @@ func doctorMCPConfigs() []doctorMCPConfig {
 		{"omp", filepath.Join(sources.OmpConfigDir(), "mcp.json"), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"amp", sources.AmpSettingsFile(), doctorJSONWired(ampServersKey), doctorJSONDejaKeys(ampServersKey)},
 		{"prime", primeSettingsPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
-		{"openclaw", filepath.Join(sources.OpenClawStateDir(), "openclaw.json"), doctorOpenClawWired, nil},
+		{"openclaw", filepath.Join(sources.OpenClawStateDir(), "openclaw.json"), doctorOpenClawWired, doctorJSONDejaKeysIn(doctorMCPServersBlock)},
 		{"copilot", copilotMCPConfigPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"vscode", doctorVSCodeMCPPath(), doctorJSONWired("servers"), doctorJSONDejaKeys("servers")},
 		{"hermes", filepath.Join(sources.HermesHome(), "config.yaml"), doctorHermesWired, nil},
@@ -631,7 +638,7 @@ func doctorMCPConfigs() []doctorMCPConfig {
 		// pointed at a throwaway build with every other row repaired.
 		{"deepseek", dshPatchPath(), doctorDSHWired, nil},
 		{"roo", doctorFirstExisting(rooMCPSettingsPaths(), vsCodeExtensionMCPPath(sources.RooExtensionID)), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
-		{"kilocode", kilocodeDoctorPath(), doctorKilocodeWired, nil},
+		{"kilocode", kilocodeDoctorPath(), doctorKilocodeWired, doctorJSONDejaKeysIn(doctorKilocodeServers)},
 		{"kiro", kiroMCPSettingsPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"senpi", senpiMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"kimchi", kimchiMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
@@ -641,7 +648,7 @@ func doctorMCPConfigs() []doctorMCPConfig {
 		{"windsurf", windsurfMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"mcode", mcodeConfigPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"gjc", gjcMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
-		{"zcode", zcodeConfigPath(), doctorZCodeWired, nil},
+		{"zcode", zcodeConfigPath(), doctorZCodeWired, doctorJSONDejaKeysIn(doctorMCPServersBlock)},
 		{"commandcode", commandCodeMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"cherrystudio", cherryStudioImportPath(), doctorFileWired, nil},
 		// The server rides in deja's plugin package; the manifest Reasonix
@@ -836,25 +843,7 @@ func yamlScalar(v string) string {
 // doctorZCodeWired reads `mcp.servers`, one level deeper than the `mcpServers`
 // the rest of this table uses.
 func doctorZCodeWired(path string) bool {
-	b, err := readConfig(path)
-	if err != nil {
-		return false
-	}
-	var root struct {
-		MCP struct {
-			Servers map[string]any `json:"servers"`
-		} `json:"mcp"`
-	}
-	if json.Unmarshal([]byte(jsoncToJSON(string(b))), &root) != nil {
-		return false
-	}
-	for _, v := range root.MCP.Servers {
-		if mcpEntryDejaCommand(v) != "" {
-			return true
-		}
-	}
-	_, ok := root.MCP.Servers["deja"]
-	return ok
+	return doctorJSONWiredIn(doctorMCPServersBlock)(path)
 }
 
 // doctorFirstExisting names the host a report should talk about when a harness
@@ -894,10 +883,20 @@ func kilocodeDoctorPath() string {
 	return vsCodeExtensionMCPPath(sources.KiloExtensionID)
 }
 
+// doctorKilocodeServers picks the server map out of whichever of Kilo's shapes
+// the file is in: `mcpServers` in the extension's settings, or OpenCode-shaped
+// `mcp` / `mcp.servers` in the CLI's kilo.jsonc.
+func doctorKilocodeServers(root map[string]any) map[string]any {
+	if m, _ := root["mcpServers"].(map[string]any); m != nil {
+		return m
+	}
+	return doctorOpencodeServers(root)
+}
+
 // doctorKilocodeWired reads whichever of the two shapes the named file is in:
-// `mcpServers` in the extension's settings, `mcp` in the CLI's config.
+// `mcpServers` in the extension's settings, `mcp` / `mcp.servers` in the CLI's config.
 func doctorKilocodeWired(path string) bool {
-	return doctorJSONWired("mcpServers")(path) || doctorJSONWired("mcp")(path)
+	return doctorJSONWiredIn(doctorKilocodeServers)(path)
 }
 
 // vsCodeExtensionMCPPath is where an extension would keep its MCP settings in
@@ -955,18 +954,7 @@ func doctorOpencodeConfigPath() string {
 // any $include read in: an entry added by hand to the included file is the
 // wiring `deja install openclaw` asks for there (#5331).
 func doctorOpenClawWired(path string) bool {
-	b, err := doctorReadConfig(path)
-	if err != nil {
-		return false
-	}
-	var root map[string]any
-	if json.Unmarshal([]byte(jsoncToJSON(string(b))), &root) != nil {
-		return strings.Contains(string(b), `"deja"`)
-	}
-	mcp, _ := root["mcp"].(map[string]any)
-	servers, _ := mcp["servers"].(map[string]any)
-	_, ok := servers["deja"]
-	return ok
+	return doctorJSONWiredIn(doctorMCPServersBlock)(path)
 }
 
 // doctorJSONBlock picks the server map out of a config that keeps it under one
@@ -976,6 +964,17 @@ func doctorJSONBlock(key string) func(map[string]any) map[string]any {
 		m, _ := root[key].(map[string]any)
 		return m
 	}
+}
+
+// doctorMCPServersBlock picks the nested `mcp.servers` map used by OpenClaw
+// and ZCode.
+func doctorMCPServersBlock(root map[string]any) map[string]any {
+	m, _ := root["mcp"].(map[string]any)
+	if m == nil {
+		return nil
+	}
+	sub, _ := m["servers"].(map[string]any)
+	return sub
 }
 
 // doctorOpencodeServers is the same for opencode, which has two shapes: 1.x
@@ -1014,7 +1013,7 @@ func doctorJSONWired(key string) func(string) bool {
 
 func doctorJSONWiredIn(pick func(map[string]any) map[string]any) func(string) bool {
 	return func(path string) bool {
-		b, err := readConfig(path)
+		b, err := doctorReadConfig(path)
 		if err != nil {
 			return false
 		}
@@ -1051,7 +1050,7 @@ func doctorJSONDejaKeys(key string) func(string) []string {
 
 func doctorJSONDejaKeysIn(pick func(map[string]any) map[string]any) func(string) []string {
 	return func(path string) []string {
-		b, err := readConfig(path)
+		b, err := doctorReadConfig(path)
 		if err != nil {
 			return nil
 		}

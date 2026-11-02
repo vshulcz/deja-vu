@@ -196,10 +196,9 @@ func parseMcodeFile(path string, offset int64) ([]model.Session, error) {
 	}
 	if ws := mcodeSessionProject(s.ID); ws != "" {
 		s.Project = projectName(ws)
-	} else if p := projectFromPaths(s.Messages); p != "" {
-		s.Project = p
+		resolveHomeOrEmptyProject(&s)
 	} else {
-		s.ProjectFromDir = true
+		resolveDirProject(&s)
 	}
 	return []model.Session{s}, err
 }

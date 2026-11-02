@@ -1,7 +1,6 @@
 package index
 
 import (
-	"os"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -73,38 +72,6 @@ func buildSessionFacts(tmp string, ss []model.Session) {
 		}
 	}
 	if len(out) == 0 {
-		return
-	}
-	_ = writeGob(sessionFactsPath(tmp), out)
-}
-
-// buildSessionFactsFromIndex is the same from the records an index already
-// holds. Unlike the aggregate tables this one could be merged per session, but
-// reading it back out of the records is exact and shorter: by this point the
-// records in tmp are the whole corpus.
-func buildSessionFactsFromIndex(tmp string) {
-	byKey := map[string][]model.Message{}
-	if err := EachRecordOfRole(tmp, roleCommand, func(meta SessionMeta, r Record) {
-		if foreignPath(r.SourcePath, meta) {
-			return
-		}
-		byKey[r.Key] = append(byKey[r.Key], model.Message{Role: roleCommand, Text: r.Text, Time: r.Time})
-	}); err != nil {
-		return
-	}
-	out := make(map[string]SessionFact, len(byKey))
-	for key, msgs := range byKey {
-		// The walk arrives in record order rather than in time order, and the
-		// commands are kept most recent first.
-		sort.SliceStable(msgs, func(i, j int) bool { return msgs[i].Time.Before(msgs[j].Time) })
-		if f, ok := sessionFactOf(msgs); ok {
-			out[key] = f
-		}
-	}
-	if len(out) == 0 {
-		// The last session with a command lost it; a table left from before
-		// would still answer for it (#4441).
-		_ = os.Remove(sessionFactsPath(tmp))
 		return
 	}
 	_ = writeGob(sessionFactsPath(tmp), out)

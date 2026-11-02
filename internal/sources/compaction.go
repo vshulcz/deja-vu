@@ -340,7 +340,7 @@ func parseCompactionSession(originalPath, harness, workspace string, data []byte
 		s.Project = projectName(workspace)
 	case harness == "claude":
 		s.Project = claudeProjectNameFor(originalPath)
-	default:
+	case s.Project == "" || s.Project == "-":
 		s.Project = filepath.Base(filepath.Dir(originalPath))
 	}
 	return s, nil

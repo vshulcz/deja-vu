@@ -583,11 +583,7 @@ func parseCodexRolloutWithScanner(s model.Session, idSettled bool, knownCWD stri
 		}
 		return nil, err
 	}
-	if isHomeOrEmptyProject(s.Project) {
-		if p := projectFromPaths(s.Messages); p != "" {
-			s.Project = p
-		}
-	}
+	resolveHomeOrEmptyProject(&s)
 	return []model.Session{s}, err
 }
 

@@ -935,12 +935,13 @@ func (rp *replacePass) commit() error {
 	// as a full build would not write it (#4441).
 	fixSessions, fixKeys := fixSessionsForPass(rp.tmp, rp.old, rp.m, rp.replacements, rp.replaceKeys)
 	mergeFixes(rp.dir, rp.tmp, sessionKeys(rp.m), fixSessions, fixKeys)
-	buildCommandTables(rp.dir, rp.tmp, rp.m, len(rp.old.DeadRecords), rp.dropped)
-	buildCommandFailsFromIndex(rp.tmp, carriedCommandFailState(rp.dir, rp.old, rp.tmp, rp.m.Generation, rp.dropped), rp.dropped)
-	// The receipts of the sessions this pass changed, and of those whose row
-	// moved to another copy; the rest are carried as they were.
+	// The sessions this pass changed, and those whose row moved to another
+	// copy; the rest are carried as they were.
 	changedKeys := maps.Clone(rp.dropped)
 	maps.Copy(changedKeys, fixKeys)
+	buildCommandTables(rp.dir, rp.tmp, rp.m, len(rp.old.DeadRecords), maps.Clone(changedKeys))
+	failRedo := maps.Clone(changedKeys)
+	buildCommandFailsFromIndex(rp.tmp, carriedCommandFailState(rp.dir, rp.old, rp.tmp, rp.m.Generation, failRedo), failRedo)
 	updateReceipts(rp.dir, rp.tmp, rp.m, changedKeys)
 	return rp.swap()
 }
