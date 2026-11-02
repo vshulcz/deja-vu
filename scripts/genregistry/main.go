@@ -217,7 +217,7 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!DOCTYPE html>
 </head>
 <body>
 <div class="glow"></div>
-<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="nav-cta" href="https://github.com/vshulcz/deja-vu"><span class="star-ic" aria-hidden="true">★</span>GitHub</a></nav>
 <div class="wrap"><div class="doc">
 {{.Sidebar}}
 <article>

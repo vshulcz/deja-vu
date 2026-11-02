@@ -52,5 +52,9 @@
   },
   "scripts": {
     "test": "node --test test/*.test.mjs"
+  },
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/vshulcz/deja-vu"
   }
 }

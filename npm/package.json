@@ -50,5 +50,9 @@
     "@vshulcz/deja-vu-windows-arm64": "0.0.0",
     "@vshulcz/deja-vu-windows-amd64": "0.0.0"
   },
-  "mcpName": "io.github.vshulcz/deja-vu"
+  "mcpName": "io.github.vshulcz/deja-vu",
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/vshulcz/deja-vu"
+  }
 }

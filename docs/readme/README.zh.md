@@ -17,6 +17,7 @@ deja 在本地索引全部历史，并通过 MCP 和钩子把相关上下文交�
 </p>
 
 <p align="center">
+  <a href="https://github.com/vshulcz/deja-vu/stargazers"><img src="https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&color=f59e0b" alt="GitHub Stars"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/badges/.badges/main/coverage.svg" alt="coverage">
   <a href="https://github.com/vshulcz/deja-vu/releases/latest"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
@@ -377,3 +378,5 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ## 许可
 
 MIT © [Vladislav Shulcz](https://github.com/vshulcz)
+
+⭐ [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)

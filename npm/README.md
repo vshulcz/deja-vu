@@ -7,6 +7,8 @@
 
 <p align="center"><strong>Your coding agents stop re-debugging what you already fixed.</strong></p>
 
+<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="deja-vu cross-agent coding session memory"></p>
+
 Forty-three coding agents — including Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, opencode, Cline, Copilot CLI, Roo Code, Kilo Code, aider, Goose, Qwen Code, Kimi Code, Antigravity, Grok Build, pi, omp, DeepSeek Harness, Hermes, Kiro, Reasonix and Zed — already write every session to local files. **deja starts full**: it indexes months of history from before you installed it and serves relevant context back over MCP and hooks, with no model and no capture step.
 
 One Go binary. No LLM, no embeddings, no API key. The network is used only by commands you run for it, such as `deja update` and `deja sync ssh`, and by a daily release check, which `DEJA_OFFLINE=1` turns off.
@@ -23,6 +25,19 @@ seconds to install, about ten to index, and the next session already knows.
 Use `--all` for the MCP tools without the session-start hook. `deja` on its own
 opens a search screen over every agent's history, where you can read a session,
 resume it, or continue it in another agent.
+
+Or wire the stdio MCP server directly in any MCP client (`mcp.json` / `claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "deja": {
+      "command": "npx",
+      "args": ["-y", "@vshulcz/deja-vu", "mcp"]
+    }
+  }
+}
+```
 
 Full documentation, the harness matrix and the benchmarks:
 [github.com/vshulcz/deja-vu](https://github.com/vshulcz/deja-vu) ·

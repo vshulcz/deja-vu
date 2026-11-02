@@ -18,6 +18,7 @@ al agente que está trabajando ahora.</p>
 </p>
 
 <p align="center">
+  <a href="https://github.com/vshulcz/deja-vu/stargazers"><img src="https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&color=f59e0b" alt="GitHub Stars"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/badges/.badges/main/coverage.svg" alt="coverage">
   <a href="https://github.com/vshulcz/deja-vu/releases/latest"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
@@ -28,6 +29,11 @@ al agente que está trabajando ahora.</p>
 <p align="center"><a href="https://vshulcz.github.io/deja-vu/">Documentación</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Comparación</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="la misma pregunta al mismo agente dos veces: sin memoria no recuerda nada, con deja responde con una conclusión de hace ocho meses"></p>
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto
+```
 
 <table align="center">
 <tr>
@@ -408,3 +414,5 @@ Las prioridades y lo que no vamos a hacer están en [ROADMAP.md](../../ROADMAP.m
 ## Licencia
 
 MIT © [Vladislav Shulcz](https://github.com/vshulcz)
+
+⭐ [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)

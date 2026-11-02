@@ -1,9 +1,13 @@
 {
   "name": "kimi-deja",
   "private": true,
-  "description": "Kimi Code plugin for deja \u2014 installed through Kimi's plugin manager, not npm. This file only carries the test script; the plugin itself is .mjs so it never depends on it.",
+  "description": "Kimi Code plugin for deja — installed through Kimi's plugin manager, not npm. This file only carries the test script; the plugin itself is .mjs so it never depends on it.",
   "license": "MIT",
   "scripts": {
     "test": "node --test test/*.test.mjs"
+  },
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/vshulcz/deja-vu"
   }
 }

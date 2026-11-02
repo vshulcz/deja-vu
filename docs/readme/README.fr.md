@@ -18,6 +18,7 @@ deja indexe tout, des mois en arrière compris, et donne la partie utile
 </p>
 
 <p align="center">
+  <a href="https://github.com/vshulcz/deja-vu/stargazers"><img src="https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&color=f59e0b" alt="GitHub Stars"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/badges/.badges/main/coverage.svg" alt="coverage">
   <a href="https://github.com/vshulcz/deja-vu/releases/latest"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
@@ -28,6 +29,11 @@ deja indexe tout, des mois en arrière compris, et donne la partie utile
 <p align="center"><a href="https://vshulcz.github.io/deja-vu/">Documentation</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Comparaison</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="la même question au même agent deux fois : sans mémoire il ne se souvient de rien, avec deja il répond avec une conclusion vieille de huit mois"></p>
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto
+```
 
 <table align="center">
 <tr>
@@ -410,3 +416,5 @@ Les priorités et ce que nous ne ferons pas sont dans [ROADMAP.md](../../ROADMAP
 ## Licence
 
 MIT © [Vladislav Shulcz](https://github.com/vshulcz)
+
+⭐ [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)

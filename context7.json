@@ -1,0 +1,13 @@
+{
+  "projectTitle": "deja-vu",
+  "description": "Cross-agent coding session memory & compaction recovery across 44 coding agents",
+  "folders": [
+    "docs"
+  ],
+  "excludeFolders": [
+    "internal",
+    "cmd",
+    "testdata",
+    "bench"
+  ]
+}
