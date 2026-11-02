@@ -1204,6 +1204,9 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		}
 		// Total order even on full ties: the order sessions were collected
 		// in must never decide what the user sees first.
+		if xm.Harness != ym.Harness {
+			return strings.Compare(xm.Harness, ym.Harness)
+		}
 		return strings.Compare(xm.ID, ym.ID)
 	})
 	ranked := fuseFocus(scored, order)

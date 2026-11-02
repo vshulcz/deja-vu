@@ -420,6 +420,14 @@ func metaIgnoredOrExcluded(pol policy.Policy, excluded map[string]bool, meta Ses
 	return excluded[strings.ToLower(meta.Harness)] || pol.Ignored(meta.Path, meta.Project)
 }
 
+func excludedHarnesses() map[string]bool {
+	return sources.ExcludedHarnesses()
+}
+
+func metaIgnoredOrExcludedLoad() (policy.Policy, map[string]bool) {
+	return policy.Load(), sources.ExcludedHarnesses()
+}
+
 func metasNotIgnoredBy(pol policy.Policy, metas []SessionMeta) []SessionMeta {
 	excluded := sources.ExcludedHarnesses()
 	out := metas[:0:0]

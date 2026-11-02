@@ -150,9 +150,11 @@ func MarkUserRules(dir string, s *model.Session, scope []string) {
 		!localPersonSession(row.Project, row.From, row.OrigID, row.Kind) {
 		return
 	}
+	pol, excluded := metaIgnoredOrExcludedLoad()
 	later := slices.Clone(row.Revokes)
 	for k, other := range m.Sessions {
 		if len(other.Revokes) == 0 || k == key || !other.Updated.After(row.Started) ||
+			metaIgnoredOrExcluded(pol, excluded, other) ||
 			!localPersonSession(other.Project, other.From, other.OrigID, other.Kind) || !inAnyScope(other.Project, scope) {
 			continue
 		}

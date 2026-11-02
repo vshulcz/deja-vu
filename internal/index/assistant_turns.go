@@ -21,6 +21,7 @@ func EachAssistantTurnSince(dir string, since time.Time, allow func(project stri
 		return err
 	}
 	pol := policy.Load()
+	excluded := excludedHarnesses()
 	keys := map[string]bool{}
 	metas := map[string]SessionMeta{}
 	for key, meta := range m.Sessions {
@@ -30,7 +31,7 @@ func EachAssistantTurnSince(dir string, since time.Time, allow func(project stri
 		if allow != nil && !allow(meta.Project) {
 			continue
 		}
-		if pol.Ignored(meta.Path, meta.Project) {
+		if metaIgnoredOrExcluded(pol, excluded, meta) {
 			continue
 		}
 		keys[key] = true

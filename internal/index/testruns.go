@@ -150,8 +150,12 @@ func ScanTestHistory(dir string) (TestHistory, error) {
 			b.NoVerdict++
 		}
 	}
+	excluded := excludedHarnesses()
 	err := eachRecordOfRoles(dir, map[string]bool{roleCommand: true, roleToolOutput: true},
 		func(meta SessionMeta, r Record) {
+			if excluded[strings.ToLower(meta.Harness)] {
+				return
+			}
 			if pol.Ignored(meta.Path, meta.Project) {
 				withheld[r.Key] = true
 				return

@@ -139,9 +139,28 @@ func servableSids(dir string) map[uint32]bool {
 		return nil
 	}
 	pol := policy.Load()
+	excluded := excludedHarnesses()
 	out := make(map[uint32]bool, len(m.Sessions))
 	for _, meta := range m.Sessions {
-		if !pol.Ignored(meta.Path, meta.Project) {
+		if !metaIgnoredOrExcluded(pol, excluded, meta) {
+			out[meta.Ord] = true
+		}
+	}
+	return out
+}
+
+// ignoredSids is the set of session ordinals withheld by the ignore rule (and
+// not from an excluded harness).
+func ignoredSids(dir string) map[uint32]bool {
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return nil
+	}
+	pol := policy.Load()
+	excluded := excludedHarnesses()
+	out := make(map[uint32]bool)
+	for _, meta := range m.Sessions {
+		if !excluded[strings.ToLower(meta.Harness)] && pol.Ignored(meta.Path, meta.Project) {
 			out[meta.Ord] = true
 		}
 	}
@@ -159,8 +178,8 @@ func IgnoredWithAllTerms(dir string, terms []string) int {
 	if len(terms) == 0 {
 		return 0
 	}
-	servable := servableSids(dir)
-	if servable == nil {
+	ignored := ignoredSids(dir)
+	if len(ignored) == 0 {
 		return 0
 	}
 	// Each term matches any of its forms, the way the tiers match. Counting the
@@ -177,7 +196,7 @@ func IgnoredWithAllTerms(dir string, terms []string) int {
 				continue
 			}
 			for _, p := range posts {
-				if !servable[p.Sid] {
+				if ignored[p.Sid] {
 					hit[p.Sid] = true
 				}
 			}

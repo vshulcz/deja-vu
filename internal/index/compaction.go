@@ -284,6 +284,9 @@ func compactionsForRebuild(dir string, dead map[string]bool) map[string]Compacti
 }
 
 func compactionExcluded(state CompactionState) bool {
+	if sources.HarnessExcluded(state.Harness) {
+		return true
+	}
 	if policy.Load().Ignored(state.TranscriptPath, state.Workspace) {
 		return true
 	}

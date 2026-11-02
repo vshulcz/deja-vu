@@ -794,6 +794,7 @@ func TestDDDStageEToGManifestVisibilityAndHandoverInvariants(t *testing.T) {
 		"search_miss.go",
 		"origin.go",
 		"hook_week_used.go",
+		"hook_week_deleted.go",
 		"hook_context.go",
 	}
 	for _, name := range mustCallMetaVisible {
@@ -959,5 +960,14 @@ func TestDDDStageEToGManifestVisibilityAndHandoverInvariants(t *testing.T) {
 	}
 	if isHandoverMeta(index.SessionMeta{Harness: "claude", ID: "sub-2", Path: "/Users/x/.claude/projects/p/subagents/agent-1.jsonl"}) {
 		t.Fatal("Bug #51 regression: isHandoverMeta accepted subagent transcript path")
+	}
+
+	// 4. Behavioral Invariant (Stage K, Bug #73): leadWithUnseen keys by composite
+	// s.Key() so two harnesses sharing a raw session ID do not cross-contaminate
+	// the fresh map when one is seen and the other is unseen.
+	rememberInjectedIDsFor(dir, "agent-one", sessionStartKeyPrefix+"payments", []string{"claude:shared-id-1"})
+	lead, fresh := leadWithUnseen(dir, []string{"payments"}, []model.Session{sClaude, sCodex})
+	if len(lead) != 2 || lead[0].Harness != "codex" || !fresh["codex:shared-id-1"] || fresh["claude:shared-id-1"] {
+		t.Fatalf("Bug #73 regression: leadWithUnseen failed to isolate unseen codex:shared-id-1 from seen claude:shared-id-1: lead=%+v fresh=%+v", lead, fresh)
 	}
 }

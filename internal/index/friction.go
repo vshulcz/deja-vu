@@ -622,12 +622,17 @@ func PromotedNoteMetas(dir string, allow func(project string) bool) []SessionMet
 	if err != nil {
 		return nil
 	}
+	pol := policy.Load()
+	excluded := sources.ExcludedHarnesses()
 	var out []SessionMeta
 	for _, meta := range m.Sessions {
 		if meta.Lifecycle == "" {
 			continue
 		}
 		if allow != nil && !allow(meta.Project) {
+			continue
+		}
+		if metaIgnoredOrExcluded(pol, excluded, meta) {
 			continue
 		}
 		out = append(out, meta)

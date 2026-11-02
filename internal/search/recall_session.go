@@ -488,7 +488,7 @@ func EarlierAttempts(ss []model.Session) map[string]string {
 	now := time.Now()
 	for i, a := range ss {
 		for j, b := range ss {
-			if i == j || out[a.ID] != "" {
+			if i == j || out[a.Key()] != "" {
 				continue
 			}
 			if a.Harness == notesHarness || b.Harness == notesHarness {
@@ -504,7 +504,11 @@ func EarlierAttempts(ss []model.Session) map[string]string {
 			if ov < 0.6 && !(ov > 0 && sharedTouchedTarget(a, b)) {
 				continue
 			}
-			out[a.ID] = b.Updated.Local().Format("2006-01-02")
+			when := b.Updated.Local().Format("2006-01-02")
+			out[a.Key()] = when
+			if out[a.ID] == "" {
+				out[a.ID] = when
+			}
 		}
 	}
 	return out
