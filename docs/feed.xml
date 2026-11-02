@@ -32,18 +32,18 @@
     <summary>No model, worker or sign-in: deja-vu indexes the sessions Codex, Cursor, opencode and 40 other agents already keep, including those from before install.</summary>
   </entry>
   <entry>
-    <title>Codex CLI history: view, search and sync it — deja-vu</title>
+    <title>Codex CLI history in ~/.codex/sessions: search it — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/codex-history.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/codex-history.html"></link>
     <updated>2026-11-01T00:00:00Z</updated>
-    <summary>Where Codex CLI keeps session history, why grep misses sessions older than a week, jq and sqlite3 recipes, and search across every Codex session.</summary>
+    <summary>Where Codex CLI keeps session history (~/.codex/sessions), why grep misses rollouts older than a week, jq and sqlite3 recipes, and search across all of it.</summary>
   </entry>
   <entry>
     <title>Codex resume session: list, find and fix errors — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html"></link>
     <updated>2026-11-01T00:00:00Z</updated>
-    <summary>codex resume, --all, --last and exec resume: why a session is missing from the picker, and the no rollout found and is archived errors.</summary>
+    <summary>codex resume, --all, --last and exec resume: why a session in ~/.codex/sessions is missing from the picker, the no rollout found error, and the fix.</summary>
   </entry>
   <entry>
     <title>deja CLI reference: search, recall, blame, stats — deja-vu</title>
@@ -74,7 +74,7 @@
     <summary>How to delete CodeBuddy Code and WorkBuddy sessions — the .jsonl conversation, its .meta.json, rollback sidecar and file-history snapshots.</summary>
   </entry>
   <entry>
-    <title>How to delete Codex CLI sessions — deja-vu</title>
+    <title>Delete Codex CLI sessions in ~/.codex/sessions — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html"></link>
     <updated>2026-11-01T00:00:00Z</updated>
@@ -88,7 +88,7 @@
     <summary>Crush keeps a crush.db SQLite store inside each project&#39;s .crush directory. Find every store via projects.json and remove one session or a project&#39;s history.</summary>
   </entry>
   <entry>
-    <title>How to delete Cursor chat history — deja-vu</title>
+    <title>Delete Cursor chat history from state.vscdb — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html"></link>
     <updated>2026-11-01T00:00:00Z</updated>
@@ -109,11 +109,11 @@
     <summary>Junie keeps each session in a directory under ~/.junie/sessions. Find it, remove one session or all, and understand what remains in index.jsonl.</summary>
   </entry>
   <entry>
-    <title>How to delete old Claude Code sessions — deja-vu</title>
+    <title>Delete old Claude Code CLI sessions by age — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/delete-old-claude-sessions.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-old-claude-sessions.html"></link>
     <updated>2026-11-01T00:00:00Z</updated>
-    <summary>find ~/.claude/projects -mtime +30 -delete drops them, cleanupPeriodDays does it on a timer — and why age frees far less disk than size.</summary>
+    <summary>Claude Code CLI transcripts, not claude.ai chats: find ~/.claude/projects -mtime +30 -delete, cleanupPeriodDays on a timer, and why age frees little disk.</summary>
   </entry>
   <entry>
     <title>Install deja and index your agent history — deja-vu</title>
@@ -155,7 +155,7 @@
     <id>https://vshulcz.github.io/deja-vu/guide/no-conversation-found-claude-code.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/no-conversation-found-claude-code.html"></link>
     <updated>2026-11-01T00:00:00Z</updated>
-    <summary>claude --resume found no session file under ~/.claude/projects. Five causes, reproduced on 2.1.295, how to find the file, and how to get the session back.</summary>
+    <summary>Claude Code CLI: claude --resume found no file under ~/.claude/projects. Five causes reproduced on 2.1.295, how to find the file, and how to write it back.</summary>
   </entry>
   <entry>
     <title>Privacy — deja-vu docs</title>
@@ -165,18 +165,18 @@
     <summary>deja is local by design: no network path in indexing or search unless semantic search is on, credentials redacted at index time, and forget/exclude controls.</summary>
   </entry>
   <entry>
-    <title>How to recover a deleted Claude Code session — deja-vu</title>
+    <title>Recover a deleted Claude Code CLI session — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html"></link>
     <updated>2026-11-01T00:00:00Z</updated>
-    <summary>A Claude Code session missing from --resume: where the file went, the four reasons it moved rather than vanished, and what is actually recoverable.</summary>
+    <summary>A Claude Code CLI session (not a claude.ai chat) missing from --resume: where its ~/.claude/projects file went, and how to write it back from an index.</summary>
   </entry>
   <entry>
-    <title>How to delete Claude Code sessions — deja-vu</title>
+    <title>Delete Claude Code sessions in ~/.claude/projects — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html"></link>
     <updated>2026-11-01T00:00:00Z</updated>
-    <summary>One session: rm its .jsonl, or pick it from a list. A whole project: claude project purge. On a timer: cleanupPeriodDays. What /clear does.</summary>
+    <summary>Claude Code CLI transcripts, not claude.ai chats: rm one .jsonl under ~/.claude/projects, claude project purge, cleanupPeriodDays. What /clear does.</summary>
   </entry>
   <entry>
     <title>Switch Coding Agents When Quotas Hit — deja-vu</title>

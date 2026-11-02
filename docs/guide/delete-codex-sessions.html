@@ -4,14 +4,14 @@
 <script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>How to delete Codex CLI sessions — deja-vu</title>
+<title>Delete Codex CLI sessions in ~/.codex/sessions — deja-vu</title>
 <meta name="description" content="How to delete Codex CLI sessions — one rollout, one day, or all of ~/.codex/sessions — and why ~/.codex/history.jsonl keeps your prompts regardless.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html">
 <link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html">
 <link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/delete-codex-sessions.html">
 <link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html">
 <meta property="og:type" content="article">
-<meta property="og:title" content="How to delete Codex CLI sessions">
+<meta property="og:title" content="Delete Codex CLI sessions in ~/.codex/sessions">
 <meta property="og:description" content="How to delete Codex CLI sessions — one rollout, one day, or all of ~/.codex/sessions — and why ~/.codex/history.jsonl keeps your prompts regardless.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
@@ -27,7 +27,7 @@
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
-<meta name="twitter:title" content="How to delete Codex CLI sessions">
+<meta name="twitter:title" content="Delete Codex CLI sessions in ~/.codex/sessions">
 <meta name="twitter:description" content="How to delete Codex CLI sessions — one rollout, one day, or all of ~/.codex/sessions — and why ~/.codex/history.jsonl keeps your prompts regardless.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
@@ -164,7 +164,7 @@
 
 <p>Codex writes each session to disk as it runs. The store is <code>${CODEX_HOME:-~/.codex}</code>, and there are two separate things in it: the rollouts, which are the conversations, and <code>history.jsonl</code>, which is your prompts. Deleting one does not touch the other — that is the part people get wrong.</p>
 
-<div class="save-first"><b>Before you delete <code>~/.codex/sessions</code>:</b> once a rollout file is removed, its replies and tool calls are gone from <code>codex resume</code>. Run <a href="https://github.com/vshulcz/deja-vu">deja-vu</a> (<code>deja index</code>) first to keep a compact local index of every session — or press <code>R</code> in <code>deja</code>'s Deleted tab later to write a removed session back for <code>codex resume</code>.</div>
+<div class="save-first"><b>Before you delete <code>~/.codex/sessions</code>:</b> once a rollout file is removed, its replies and tool calls are gone from <code>codex resume</code>. Index them first with <a href="https://github.com/vshulcz/deja-vu">deja-vu</a> to keep a compact local copy of every session; <code>deja resume &lt;id&gt; --write-back</code>, or <code>R</code> in <code>deja</code>'s Deleted tab, writes a removed session back for <code>codex resume</code>.<div class="save-actions"><div class="save-cmd"><span class="p">$</span><code>brew install deja-vu &amp;&amp; deja index</code><button type="button">copy</button></div><div class="save-cmd"><span class="p">$</span><code>npx @vshulcz/deja-vu index</code><button type="button">copy</button></div><a class="save-btn" href="https://github.com/vshulcz/deja-vu">deja-vu on GitHub</a><a class="save-demo" href="getting-started.html">Other ways to install &rarr;</a></div></div>
 
 <h2>How to delete Codex sessions</h2>
 <p>Current Codex has a command for one session, <code>codex delete &lt;id&gt;</code>, and <code>codex archive &lt;id&gt;</code> to hide one without deleting it. Beyond that the sessions are files. The path is dated, so a day of work is a directory, and a rollout older than a week has been compressed to <code>.jsonl.zst</code>, which a pattern ending in <code>.jsonl</code> does not match.</p>
