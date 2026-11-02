@@ -252,7 +252,7 @@ func handoffSource(dir, prefix string) (model.Session, error) {
 		// handed off as the session, with the note as its objective.
 		var own []model.Session
 		for _, s := range ss {
-			if s.Harness == "deja" {
+			if !isHandoverSession(s) {
 				continue
 			}
 			if index.ProjectInScopeStrict(s.Project, name) {
@@ -261,13 +261,13 @@ func handoffSource(dir, prefix string) (model.Session, error) {
 		}
 		ss = own
 		kept, _ := policyFilterSessionsCounted(policy.ActivationSearch, ss)
-		keptIDs := map[string]bool{}
+		keptKeys := map[string]bool{}
 		for _, k := range kept {
-			keptIDs[k.ID] = true
+			keptKeys[k.Key()] = true
 		}
 		for _, s := range ss {
-			if !keptIDs[s.ID] {
-				hidden[s.ID] = true
+			if !keptKeys[s.Key()] {
+				hidden[s.Key()] = true
 				if s.Updated.After(hiddenNewest) {
 					hiddenNewest = s.Updated
 				}
@@ -276,7 +276,7 @@ func handoffSource(dir, prefix string) (model.Session, error) {
 		if len(kept) == 0 {
 			continue
 		}
-		distinct[kept[0].ID] = true
+		distinct[kept[0].Key()] = true
 		if kept[0].Updated.After(newest.Updated) {
 			newest = kept[0]
 		}

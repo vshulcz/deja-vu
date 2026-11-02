@@ -9,6 +9,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/query"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // PlanCooccurrence is one factual join between a recurring wall and a plan
@@ -155,12 +156,12 @@ func PlanFrictionMatches(dir string, steps [][]string, keep func(SessionMeta) bo
 	// strengthening pass: a step with no matching command simply leaves
 	// Command empty, it does not drop the finding (see PlanCooccurrence).
 	commands := map[string]map[int]string{}
-	for i, session := range sessions {
-		if i >= len(metas) {
-			break
+	for _, session := range sessions {
+		key := session.Key()
+		meta, ok := candidateMetas[key]
+		if !ok {
+			continue
 		}
-		meta := metas[i]
-		key := meta.Key()
 		for step, terms := range indexedSteps {
 			if !candidates[step][meta.Ord] {
 				continue
@@ -227,9 +228,14 @@ func planWallSharesTerm(wallText string, steps [][]planIndexedTerm) bool {
 func planWallClusters(manifest Manifest, keep func(SessionMeta) bool) []planWallCluster {
 	// A settled wall is not something to warn a plan about (#5628).
 	settled := policy.LoadSettled()
+	pol := policy.Load()
+	excluded := sources.ExcludedHarnesses()
 	byHash := map[uint64][]SessionMeta{}
 	for _, meta := range manifest.Sessions {
 		if keep != nil && !keep(meta) {
+			continue
+		}
+		if metaIgnoredOrExcluded(pol, excluded, meta) {
 			continue
 		}
 		for _, hash := range meta.Hit {

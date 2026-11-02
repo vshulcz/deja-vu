@@ -74,7 +74,7 @@ func ExcludedHarnesses() map[string]bool {
 	out := map[string]bool{}
 	for _, pattern := range ExclusionPatterns() {
 		if name, ok := strings.CutPrefix(pattern, harnessExcludePrefix); ok {
-			if name = strings.TrimSpace(name); name != "" {
+			if name = strings.ToLower(strings.TrimSpace(name)); name != "" {
 				out[name] = true
 			}
 		}

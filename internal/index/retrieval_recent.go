@@ -414,10 +414,17 @@ func metasNotIgnored(metas []SessionMeta) []SessionMeta {
 	return metasNotIgnoredBy(policy.Load(), metas)
 }
 
+// metaIgnoredOrExcluded reports whether a manifest entry is withheld by the
+// ignore policy or by the excluded-harness list (#2541, #3965).
+func metaIgnoredOrExcluded(pol policy.Policy, excluded map[string]bool, meta SessionMeta) bool {
+	return excluded[strings.ToLower(meta.Harness)] || pol.Ignored(meta.Path, meta.Project)
+}
+
 func metasNotIgnoredBy(pol policy.Policy, metas []SessionMeta) []SessionMeta {
+	excluded := sources.ExcludedHarnesses()
 	out := metas[:0:0]
 	for _, meta := range metas {
-		if pol.Ignored(meta.Path, meta.Project) {
+		if metaIgnoredOrExcluded(pol, excluded, meta) {
 			continue
 		}
 		out = append(out, meta)

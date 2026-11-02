@@ -14,6 +14,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // Friction is what this machine keeps tripping over: one specific error, in
@@ -649,9 +650,14 @@ func FrictionSessions(dir string, sig uint64, allow func(project string) bool) i
 	if err != nil {
 		return 0
 	}
+	pol := policy.Load()
+	excluded := sources.ExcludedHarnesses()
 	n := 0
 	for _, meta := range m.Sessions {
 		if allow != nil && !allow(meta.Project) {
+			continue
+		}
+		if metaIgnoredOrExcluded(pol, excluded, meta) {
 			continue
 		}
 		if slices.Contains(meta.Hit, sig) {
@@ -712,11 +718,12 @@ func topFriction(dir string, n int, allow func(project string) bool, settled pol
 	// brief claimed five sessions for a wall where `deja friction` said three,
 	// and the session-start block counted the same two (#2658).
 	pol := policy.Load()
+	excluded := sources.ExcludedHarnesses()
 	for _, meta := range m.Sessions {
 		if allow != nil && !allow(meta.Project) {
 			continue
 		}
-		if pol.Ignored(meta.Path, meta.Project) {
+		if metaIgnoredOrExcluded(pol, excluded, meta) {
 			continue
 		}
 		for _, h := range meta.Hit {

@@ -16,6 +16,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/query"
 	"github.com/vshulcz/deja-vu/internal/redact"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // What a week of work actually was, read back out of the sessions (#544).
@@ -100,6 +101,7 @@ func ScanRecap(dir string, since time.Duration, perSession int) (Recap, error) {
 		return Recap{}, err
 	}
 	pol := policy.Load()
+	excluded := sources.ExcludedHarnesses()
 	cut := time.Now().Add(-since)
 	out := Recap{Masked: redact.Counts{}}
 	var metas []SessionMeta
@@ -107,7 +109,10 @@ func ScanRecap(dir string, since time.Duration, perSession int) (Recap, error) {
 		if meta.Updated.Before(cut) {
 			continue
 		}
-		if meta.IsSpawned() {
+		if excluded[strings.ToLower(meta.Harness)] {
+			continue
+		}
+		if meta.IsSpawned() || sources.IsSubagentPath(meta.Path) {
 			continue
 		}
 		if pol.Ignored(meta.Path, meta.Project) {
@@ -116,7 +121,7 @@ func ScanRecap(dir string, since time.Duration, perSession int) (Recap, error) {
 		}
 		metas = append(metas, meta)
 	}
-	sort.Slice(metas, func(i, j int) bool { return metas[i].Updated.After(metas[j].Updated) })
+	sort.Slice(metas, func(i, j int) bool { return newestFirstMeta(metas[i], metas[j]) })
 	out.Considered = len(metas)
 	if len(metas) > recapSessionCap {
 		metas = metas[:recapSessionCap]
@@ -146,7 +151,13 @@ func ScanRecap(dir string, since time.Duration, perSession int) (Recap, error) {
 		}
 	}
 	sort.SliceStable(out.Sessions, func(i, j int) bool {
-		return out.Sessions[i].When.After(out.Sessions[j].When)
+		if !out.Sessions[i].When.Equal(out.Sessions[j].When) {
+			return out.Sessions[i].When.After(out.Sessions[j].When)
+		}
+		if out.Sessions[i].Harness != out.Sessions[j].Harness {
+			return out.Sessions[i].Harness < out.Sessions[j].Harness
+		}
+		return out.Sessions[i].ID < out.Sessions[j].ID
 	})
 	return out, nil
 }

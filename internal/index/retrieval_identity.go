@@ -124,7 +124,7 @@ func resolveSelectorMatches(sessions map[string]SessionMeta, p string, allow fun
 			if !allowed(meta) {
 				continue
 			}
-			if idLooselyMatches(meta.ID, p) {
+			if idLooselyMatches(meta.ID, p) || (meta.OrigID != "" && idLooselyMatches(meta.OrigID, p)) {
 				matches = append(matches, meta)
 			}
 		}
@@ -137,7 +137,9 @@ func resolveSelectorMatches(sessions map[string]SessionMeta, p string, allow fun
 				if !allowed(meta) {
 					continue
 				}
-				if strings.EqualFold(meta.Harness, harness) && (strings.HasPrefix(meta.ID, id) || idLooselyMatches(meta.ID, id)) {
+				if strings.EqualFold(meta.Harness, harness) &&
+					(strings.HasPrefix(meta.ID, id) || idLooselyMatches(meta.ID, id) ||
+						(meta.OrigID != "" && (strings.HasPrefix(meta.OrigID, id) || idLooselyMatches(meta.OrigID, id)))) {
 					matches = append(matches, meta)
 				}
 			}
@@ -297,19 +299,23 @@ func FindByIdentity(dir, harness, id string) (model.Session, bool, error) {
 	if mustRebuildBeforeAnswering(m, version) {
 		return model.Session{}, false, ErrStoreWithheld
 	}
-	meta, ok := m.Sessions[model.SessionKey(harness, id)]
-	if !ok {
-		for _, cand := range m.Sessions {
-			if cand.Harness == harness && cand.OrigID == id {
-				meta, ok = cand, true
-				break
-			}
-		}
-	}
+	meta, ok := metaForIdentity(m, harness, id)
 	if !ok {
 		return model.Session{}, false, nil
 	}
 	return loadSessionMeta(dir, m, meta)
+}
+
+func metaForIdentity(m Manifest, harness, id string) (SessionMeta, bool) {
+	if meta, ok := m.Sessions[model.SessionKey(harness, id)]; ok {
+		return meta, true
+	}
+	for _, cand := range m.Sessions {
+		if cand.Harness == harness && cand.OrigID == id {
+			return cand, true
+		}
+	}
+	return SessionMeta{}, false
 }
 
 // Identity names one session the way machine output does.
@@ -349,7 +355,7 @@ func FindManyByIdentity(dir string, ids []Identity) ([]model.Session, error) {
 	}
 	metas := make([]SessionMeta, 0, len(ids))
 	for _, want := range ids {
-		if meta, found := m.Sessions[want.Key()]; found {
+		if meta, found := metaForIdentity(m, want.Harness, want.ID); found {
 			metas = append(metas, meta)
 		}
 	}
@@ -376,11 +382,11 @@ func ChildrenOf(dir, id string) ([]model.Session, error) {
 	var out []model.Session
 	for _, meta := range m.Sessions {
 		// A fork names its source as its parent too, and nothing spawned it.
-		if meta.Parent == id && meta.Kind != "fork" {
+		if meta.Parent == id && meta.Kind != model.KindFork {
 			out = append(out, sessionFromMeta(meta))
 		}
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Updated.After(out[j].Updated) })
+	sort.Slice(out, func(i, j int) bool { return newestFirstSession(out[i], out[j]) })
 	return out, nil
 }
 
@@ -417,11 +423,26 @@ func FindByIDPreferProject(dir, id, project string) (model.Session, bool, error)
 	if err != nil {
 		return model.Session{}, false, err
 	}
+	best, found := pickSessionMetaByID(m.Sessions, project, func(meta SessionMeta) bool {
+		return meta.ID == id
+	})
+	if !found {
+		best, found = pickSessionMetaByID(m.Sessions, project, func(meta SessionMeta) bool {
+			return meta.OrigID == id
+		})
+	}
+	if !found {
+		return model.Session{}, false, nil
+	}
+	return loadSessionMeta(dir, m, best)
+}
+
+func pickSessionMetaByID(sessions map[string]SessionMeta, project string, match func(SessionMeta) bool) (SessionMeta, bool) {
 	var best SessionMeta
 	var found bool
 	bestNear := -1
-	for _, meta := range m.Sessions {
-		if meta.ID != id {
+	for _, meta := range sessions {
+		if !match(meta) {
 			continue
 		}
 		near := -1
@@ -435,10 +456,7 @@ func FindByIDPreferProject(dir, id, project string) (model.Session, bool, error)
 			best = meta
 		}
 	}
-	if !found {
-		return model.Session{}, false, nil
-	}
-	return loadSessionMeta(dir, m, best)
+	return best, found
 }
 
 // projectDistance measures a session's project against the directory the caller
