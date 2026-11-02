@@ -536,7 +536,7 @@ func clearedNoteIDs(keys []string) string {
 	known := promotedNoteSources()
 	ids := make([]string, 0, len(keys))
 	for _, k := range keys {
-		id := "deja-note-" + strings.ReplaceAll(k, ":", "-")
+		id := model.PromotedNoteID(k)
 		if _, ok := known[id]; !ok {
 			continue
 		}

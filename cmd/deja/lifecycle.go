@@ -13,25 +13,16 @@ import (
 )
 
 const (
-	lifecycleRejected   = "rejected"
-	lifecycleSuperseded = "superseded"
-	lifecycleStale      = "stale"
+	lifecycleRejected   = model.LifecycleRejected
+	lifecycleSuperseded = model.LifecycleSuperseded
+	lifecycleStale      = model.LifecycleStale
 )
 
 // promotedNoteID returns the id a promoted note has on the machine that made
 // it: after a sync the local id is imported-<hash>, and every rule written for
 // notes keys on the deja-note- shape (#975).
 func promotedNoteID(s model.Session) string {
-	if s.Harness != "deja" {
-		return ""
-	}
-	if strings.HasPrefix(s.ID, "deja-note-") {
-		return s.ID
-	}
-	if strings.HasPrefix(s.OrigID, "deja-note-") {
-		return s.OrigID
-	}
-	return ""
+	return s.PromotedNoteID()
 }
 
 // importedLifecycles maps a source session key ("claude:src1") to the state of
@@ -45,15 +36,15 @@ func importedLifecycles(dir string) map[string]sources.Lifecycle {
 	}
 	out := map[string]sources.Lifecycle{}
 	for _, m := range metas {
-		if m.Harness != "deja" || m.Lifecycle == "" {
+		if m.Lifecycle == "" {
 			continue
 		}
-		src, ok := strings.CutPrefix(m.OrigID, "deja-note-")
+		srcKey, ok := m.PromotedNoteSourceKey()
 		if !ok {
 			continue
 		}
 		at, _ := time.Parse("2006-01-02", m.LifecycleAt)
-		out[strings.Replace(src, "-", ":", 1)] = sources.Lifecycle{
+		out[srcKey] = sources.Lifecycle{
 			State: m.Lifecycle, Note: m.LifecycleNote, At: at,
 		}
 	}
@@ -87,10 +78,8 @@ func attachLifecycles(dir string, hits []search.Hit) {
 		// Recall shows the lines that matched, and a rejection whose words are
 		// not in the query simply did not appear: the agent was handed the
 		// accepted line of a decision that had been taken back (#974).
-		if noteID := promotedNoteID(h.Session); noteID != "" {
-			if src, ok := strings.CutPrefix(noteID, "deja-note-"); ok {
-				key = strings.Replace(src, "-", ":", 1)
-			}
+		if src, ok := h.Session.PromotedNoteSourceKey(); ok {
+			key = src
 		}
 		lc, ok := states[key]
 		if !ok || lc.State == "" {
@@ -290,11 +279,9 @@ func attachBlameLifecycles(hits []search.BlameHit, target search.BlameTarget) {
 		h := &hits[i]
 		key := h.Session.Key()
 		isNote := false
-		if noteID := promotedNoteID(h.Session); noteID != "" {
+		if src, ok := h.Session.PromotedNoteSourceKey(); ok {
 			isNote = true
-			if src, ok := strings.CutPrefix(noteID, "deja-note-"); ok {
-				key = strings.Replace(src, "-", ":", 1)
-			}
+			key = src
 		}
 		lc, ok := states[key]
 		if !ok || lc.State == "" {

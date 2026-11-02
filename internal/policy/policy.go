@@ -110,8 +110,8 @@ func Origin(project string) string {
 		}
 		return "imported"
 	}
-	if project == "repo" || strings.HasPrefix(project, "repo:") {
-		return "repo"
+	if model.IsRepoProject(project) {
+		return model.OriginRepo
 	}
 	return "local"
 }

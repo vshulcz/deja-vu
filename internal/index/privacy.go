@@ -657,9 +657,9 @@ func matchForget(rows, sessions map[string]SessionMeta, o ForgetOptions, exact s
 				continue
 			}
 		}
-		if meta.Harness == "deja" {
+		if meta.Harness == model.NotesHarness {
 			result.Notes++
-			if strings.HasPrefix(meta.ID, "deja-note-") {
+			if meta.IsPromotedNote() {
 				result.Promoted++
 			}
 		}

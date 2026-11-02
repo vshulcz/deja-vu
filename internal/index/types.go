@@ -257,6 +257,29 @@ func (m SessionMeta) IsImported() bool { return model.IsImportedProject(m.Projec
 // BareProject returns the session's project name without an "imported:" prefix.
 func (m SessionMeta) BareProject() string { return model.BareProject(m.Project) }
 
+// PromotedNoteID returns the session's canonical promoted-note id, or "".
+func (m SessionMeta) PromotedNoteID() string {
+	return model.CanonicalPromotedNoteID(m.Harness, m.ID, m.OrigID)
+}
+
+// IsPromotedNote reports whether the session is a personal or repo-scoped
+// promoted note.
+func (m SessionMeta) IsPromotedNote() bool {
+	return m.PromotedNoteID() != ""
+}
+
+// PromotedNoteSourceKey returns the "harness:id" key of the session this note
+// was promoted from, when m is a promoted note.
+func (m SessionMeta) PromotedNoteSourceKey() (string, bool) {
+	return model.PromotedNoteSourceKey(m.PromotedNoteID())
+}
+
+// CandidatePromotedNoteIDs returns the personal and repo-scoped promoted note
+// ids that could refer to this session (including its pre-sync OrigID).
+func (m SessionMeta) CandidatePromotedNoteIDs() []string {
+	return model.CandidatePromotedNoteIDs(m.Harness, m.ID, m.OrigID)
+}
+
 // Key returns the finding's canonical "harness:id" session identifier.
 func (f SecretFinding) Key() string { return model.SessionKey(f.Harness, f.ID) }
 

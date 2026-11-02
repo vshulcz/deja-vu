@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/redact"
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -345,7 +346,7 @@ func (imp *importer) sessionMeta(sr SyncRecord, key, importID, origID, text stri
 	// the evidence time, taken as its UTC day so every peer and every
 	// rebuild store the same string (#5053). Read from the redacted
 	// text: the note lands in the manifest.
-	if strings.HasPrefix(origID, "deja-note-") {
+	if model.IsPromotedNoteID(origID) {
 		if st, note, at, ok := carriedNoteState(sr); ok {
 			meta.Lifecycle, meta.LifecycleNote, meta.LifecycleAt = st, note, at
 		} else if st, note, ok := noteStateFromText(text); ok {

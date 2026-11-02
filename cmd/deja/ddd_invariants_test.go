@@ -176,7 +176,6 @@ func TestDDDNoRawImportedPrefixOutsideDomainModel(t *testing.T) {
 		}
 	}
 }
-
 func TestDDDNoRawSessionKeyConcatenationInCLI(t *testing.T) {
 	fset := token.NewFileSet()
 	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, walkErr error) error {
@@ -249,5 +248,90 @@ func TestDDDHookseenLedgerEncapsulated(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestDDDPromotedNoteDomainUnification(t *testing.T) {
+	if got := model.PromotedNoteID("claude:s1"); got != "deja-note-claude-s1" {
+		t.Fatalf("PromotedNoteID = %q", got)
+	}
+	if got := model.RepoPromotedNoteID("claude:s1"); got != "deja-repo-note-claude-s1" {
+		t.Fatalf("RepoPromotedNoteID = %q", got)
+	}
+	// Hyphenated harness round-trip (#copilot-chat):
+	copilotNote := model.Session{Harness: model.NotesHarness, ID: model.PromotedNoteID("copilot-chat:s-42")}
+	if src, ok := copilotNote.PromotedNoteSourceKey(); !ok || src != "copilot-chat:s-42" {
+		t.Fatalf("PromotedNoteSourceKey(%q) = (%q, %v), want (\"copilot-chat:s-42\", true)", copilotNote.ID, src, ok)
+	}
+	// Synced repo-scoped promoted note:
+	syncedRepoNote := model.Session{
+		Harness: model.NotesHarness,
+		ID:      "imported-abc123",
+		OrigID:  "deja-repo-note-claude-s1",
+	}
+	if !syncedRepoNote.IsPromotedNote() || syncedRepoNote.PromotedNoteID() != "deja-repo-note-claude-s1" {
+		t.Fatalf("synced repo note not recognized: IsPromotedNote=%v PromotedNoteID=%q",
+			syncedRepoNote.IsPromotedNote(), syncedRepoNote.PromotedNoteID())
+	}
+	if src, ok := syncedRepoNote.PromotedNoteSourceKey(); !ok || src != "claude:s1" {
+		t.Fatalf("syncedRepoNote.PromotedNoteSourceKey() = (%q, %v), want (\"claude:s1\", true)", src, ok)
+	}
+	if !index.IsPromotedNote("deja", "imported-abc123", "deja-repo-note-claude-s1") {
+		t.Fatal("index.IsPromotedNote failed on synced repo promoted note")
+	}
+	// LiftNotesAboveTheirSource must lift repo-scoped promoted notes above their source session:
+	hits := []search.Hit{
+		{Session: model.Session{Harness: "claude", ID: "s1"}, Score: 10},
+		{Session: syncedRepoNote, Score: 2},
+	}
+	search.LiftNotesAboveTheirSource(hits)
+	if hits[0].Session.ID != "imported-abc123" || hits[1].Session.ID != "s1" {
+		t.Fatalf("LiftNotesAboveTheirSource did not lift repo-scoped promoted note: got [%s, %s]",
+			hits[0].Session.ID, hits[1].Session.ID)
+	}
+}
+
+func TestDDDNoRawPromotedNotePrefixOutsideDomainModel(t *testing.T) {
+	fset := token.NewFileSet()
+	repoRoot := filepath.Join("..", "..")
+	for _, sub := range []string{"cmd/deja", "internal"} {
+		root := filepath.Join(repoRoot, sub)
+		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			rel, err := filepath.Rel(repoRoot, path)
+			if err != nil {
+				return err
+			}
+			rel = filepath.ToSlash(rel)
+			if rel == "internal/model/model.go" {
+				return nil
+			}
+			f, err := parser.ParseFile(fset, path, nil, 0)
+			if err != nil {
+				return err
+			}
+			ast.Inspect(f, func(n ast.Node) bool {
+				lit, ok := n.(*ast.BasicLit)
+				if !ok || lit.Kind != token.STRING {
+					return true
+				}
+				val, err := strconv.Unquote(lit.Value)
+				if err == nil && (val == model.PromotedNotePrefix || val == model.RepoPromotedNotePrefix) {
+					pos := fset.Position(lit.Pos())
+					t.Errorf("%s:%d hardcodes %q string literal; use s.PromotedNoteID(), s.IsPromotedNote(), s.PromotedNoteSourceKey(), s.CandidatePromotedNoteIDs(), or model.PromotedNoteID instead",
+						rel, pos.Line, val)
+				}
+				return true
+			})
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 }

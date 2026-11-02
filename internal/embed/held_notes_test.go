@@ -66,3 +66,23 @@ func TestHeldNotesTravelOnlyWithTheirSource(t *testing.T) {
 		t.Errorf("a note whose source is not in the answer was served anyway: %v", heldIDs(got))
 	}
 }
+
+func TestHeldRepoAndSyncedNotesAreServedWithTheirSource(t *testing.T) {
+	out := []search.Hit{
+		{Session: model.Session{ID: "imported-src", OrigID: "sess1", Harness: "claude"}, Score: 0.65},
+	}
+	held := map[string]match{
+		"deja:deja-repo-note-claude-sess1": {
+			session: model.Session{ID: "imported-note", OrigID: "deja-repo-note-claude-sess1", Harness: "deja"},
+			record:  index.Record{Text: "repo decision"},
+			score:   0.35,
+		},
+	}
+	got := withHeldNotes(out, held)
+	search.LiftNotesAboveTheirSource(got)
+	ids := heldIDs(got)
+	want := []string{"imported-note", "imported-src"}
+	if len(ids) != len(want) || ids[0] != want[0] || ids[1] != want[1] {
+		t.Fatalf("got %v, want %v", ids, want)
+	}
+}

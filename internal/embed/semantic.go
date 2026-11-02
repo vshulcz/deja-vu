@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -47,7 +46,7 @@ func semanticHitsForQuery(dir string, o search.Options, sidecar Sidecar, query [
 	}
 	byKey := make(map[string]model.Session, len(metaSessions))
 	for _, s := range metaSessions {
-		byKey[s.Harness+":"+s.ID] = s
+		byKey[s.Key()] = s
 	}
 	gen, err := index.Generation(dir)
 	if err != nil {
@@ -63,7 +62,7 @@ func semanticHitsForQuery(dir string, o search.Options, sidecar Sidecar, query [
 		}
 		found, ok := lookup.find(vector)
 		record := found.Record
-		if !ok || (o.Role != "" && record.Role != o.Role) {
+		if !ok || (o.Role != "" && !model.RoleMatches(record.Role, o.Role)) {
 			continue
 		}
 		score := Cosine(query, vector.Values)
@@ -74,9 +73,10 @@ func semanticHitsForQuery(dir string, o search.Options, sidecar Sidecar, query [
 			// and then the floor cut the note while serving the source, which
 			// is the answer `promote` says it just put in front (#2803). It is
 			// only ever served beside that source, below.
-			if session.Harness == notesHarness && strings.HasPrefix(session.ID, notePrefix) {
-				if old, ok := heldNotes[vector.Key]; !ok || score > old.score {
-					heldNotes[vector.Key] = match{session: session, record: record, score: score}
+			if noteID := session.PromotedNoteID(); noteID != "" {
+				key := model.SessionKey(notesHarness, noteID)
+				if old, ok := heldNotes[key]; !ok || score > old.score {
+					heldNotes[key] = match{session: session, record: record, score: score}
 				}
 			}
 			continue
@@ -113,12 +113,8 @@ func semanticHitsForQuery(dir string, o search.Options, sidecar Sidecar, query [
 	return out, nil
 }
 
-// notePrefix is how a promoted note's id begins; sources.PromotedNoteID builds
-// the rest of it from the source session's key.
-const notePrefix = "deja-note-"
-
 // notesHarness is the pseudo-harness deja files its own notes under.
-const notesHarness = "deja"
+const notesHarness = model.NotesHarness
 
 // withHeldNotes puts back the notes the floor cut, but only those whose own
 // source is being served — a note nobody asked about stays out, and one that
@@ -135,17 +131,19 @@ func withHeldNotes(out []search.Hit, held map[string]match) []search.Hit {
 		if hit.Session.Harness == notesHarness {
 			continue
 		}
-		found, ok := held[notesHarness+":"+notePrefix+hit.Session.Harness+"-"+hit.Session.ID]
-		if !ok {
-			continue
+		for _, noteID := range hit.Session.CandidatePromotedNoteIDs() {
+			found, ok := held[model.SessionKey(notesHarness, noteID)]
+			if !ok {
+				continue
+			}
+			out = append(out, search.Hit{
+				Session:    found.session,
+				Snippets:   []string{search.Snippet(found.record.Text, "")},
+				Score:      found.score,
+				Tier:       search.TierSemantic,
+				TierDetail: fmt.Sprintf("%.2f", found.score),
+			})
 		}
-		out = append(out, search.Hit{
-			Session:    found.session,
-			Snippets:   []string{search.Snippet(found.record.Text, "")},
-			Score:      found.score,
-			Tier:       search.TierSemantic,
-			TierDetail: fmt.Sprintf("%.2f", found.score),
-		})
 	}
 	return out
 }

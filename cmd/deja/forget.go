@@ -474,11 +474,8 @@ func forgottenSourceNote(s model.Session, selector string, resolved bool) string
 	// Through promotedNoteID, so a note that arrived by sync is one: its local
 	// id is `imported-…` and the id it names lives in OrigID (#2839).
 	noteID := promotedNoteID(s)
-	if noteID == "" {
-		return ""
-	}
-	src, ok := strings.CutPrefix(noteID, "deja-note-")
-	if !ok || src == "" {
+	key, ok := s.PromotedNoteSourceKey()
+	if noteID == "" || !ok {
 		return ""
 	}
 	// The selector named the source, not the note: a reader who typed the note
@@ -486,7 +483,6 @@ func forgottenSourceNote(s model.Session, selector string, resolved bool) string
 	if strings.HasPrefix(s.ID, selector) || strings.HasPrefix(noteID, selector) {
 		return ""
 	}
-	key := strings.Replace(src, "-", ":", 1)
 	// Only when the reader named that session: an ordinary topical query that
 	// happens to land on the note is not asking about the forgotten source, and
 	// the line would be noise on every such search.

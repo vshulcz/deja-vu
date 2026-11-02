@@ -218,10 +218,11 @@ func promotedDecisionForFile(path string, metas []index.SessionMeta) string {
 	noteKeys := make(map[string]bool, len(metas))
 	for _, meta := range metas {
 		want[meta.Key()] = true
-		noteKeys["deja-note-"+meta.Harness+"-"+meta.ID] = true
 		if meta.OrigID != "" {
 			want[model.SessionKey(meta.Harness, meta.OrigID)] = true
-			noteKeys["deja-note-"+meta.Harness+"-"+meta.OrigID] = true
+		}
+		for _, id := range meta.CandidatePromotedNoteIDs() {
+			noteKeys[id] = true
 		}
 	}
 	// The note's own project as well as the session it came from. The metas
