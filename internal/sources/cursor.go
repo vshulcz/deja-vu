@@ -1,12 +1,15 @@
 package sources
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -405,6 +408,11 @@ var cursorDialect = toolDialect{
 // ParseCursorTranscript reads a CLI agent transcript: Anthropic wire-shaped
 // JSONL; control lines (turn_ended etc.) carry no role and are skipped.
 func ParseCursorTranscript(path string) ([]model.Session, error) {
+	return ParseCursorTranscriptFromOffset(path, 0)
+}
+
+// ParseCursorTranscriptFromOffset reads a Cursor CLI agent transcript from offset on.
+func ParseCursorTranscriptFromOffset(path string, offset int64) ([]model.Session, error) {
 	id := strings.TrimSuffix(filepath.Base(path), ".jsonl")
 	s := model.Session{Harness: "cursor", ID: id, Project: cursorTranscriptProject(path), Path: path}
 	// cursor-agent writes a subagent's run to
@@ -428,10 +436,16 @@ func ParseCursorTranscript(path string) ([]model.Session, error) {
 	// holding turns a month apart read as one day.
 	at := fileTime
 	stamped := false
+	if offset > 0 {
+		if prev, ok := lastCursorTurnTimeBefore(path, offset); ok {
+			at = prev
+			stamped = true
+		}
+	}
 	// The chat store's results, read on the first turn that calls a tool.
 	var results *cursorToolResults
 	read := !IndexCommands() && !IndexToolOutput()
-	err = scanJSONLFromOffset(path, 0, func(m map[string]any) {
+	err = scanJSONLFromOffset(path, offset, func(m map[string]any) {
 		role, _ := m["role"].(string)
 		if role != "user" && role != "assistant" {
 			return
@@ -482,6 +496,53 @@ func ParseCursorTranscript(path string) ([]model.Session, error) {
 		s.Messages = KeepSubagentTail(s.Messages)
 	}
 	return []model.Session{s}, err
+}
+
+func cursorTranscriptResumes(path string, offset int64) bool {
+	if offset <= 0 {
+		return true
+	}
+	if !SubagentsWhole() && CursorSubagentParent(path) != "" {
+		return false
+	}
+	if (IndexCommands() || IndexToolOutput()) && cursorStoreFor(path) != "" {
+		calls := false
+		_ = scanJSONLHinted(path, offset, []byte(`"tool_use"`), func(m map[string]any) {
+			if calls {
+				return
+			}
+			if msg, _ := m["message"].(map[string]any); msg != nil && cursorCallsTools(msg["content"]) {
+				calls = true
+			}
+		})
+		if calls {
+			return false
+		}
+	}
+	return true
+}
+
+func lastCursorTurnTimeBefore(path string, offset int64) (time.Time, bool) {
+	f, err := os.Open(path)
+	if err != nil {
+		return time.Time{}, false
+	}
+	defer func() { _ = f.Close() }()
+	start := max(0, offset-callWindow)
+	buf := make([]byte, offset-start)
+	if _, err := f.ReadAt(buf, start); err != nil && err != io.EOF {
+		return time.Time{}, false
+	}
+	lines := bytes.Split(buf, []byte("\n"))
+	for _, line := range slices.Backward(lines) {
+		if !bytes.Contains(line, []byte("<timestamp>")) {
+			continue
+		}
+		if t, ok := cursorTurnTime(string(line)); ok {
+			return t, true
+		}
+	}
+	return time.Time{}, false
 }
 
 // CursorSubagentParent returns the parent conversation id of a subagent

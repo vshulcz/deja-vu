@@ -240,27 +240,28 @@ func unspacedTokenHits(s string, want map[string]bool, hit map[string]bool) map[
 	if ascii {
 		return hit
 	}
-	var pair [2 * utf8.UTFMax]byte
-	check := func(r1, r2 rune) {
+	var spanBuf [4 * utf8.UTFMax]byte
+	checkSpan := func(rs ...rune) {
 		n := 0
-		if r1 != 0 {
-			n += utf8.EncodeRune(pair[n:], r1)
+		for _, r := range rs {
+			if r != 0 {
+				n += utf8.EncodeRune(spanBuf[n:], r)
+			}
 		}
-		n += utf8.EncodeRune(pair[n:], r2)
-		if want[string(pair[:n])] {
+		if n > 0 && want[string(spanBuf[:n])] {
 			if hit == nil {
 				hit = make(map[string]bool, len(want))
 			}
-			hit[string(pair[:n])] = true
+			hit[string(spanBuf[:n])] = true
 		}
 	}
-	var prevRaw, prevFold rune
+	var rawRing, foldRing [4]rune
 	runLen := 0
 	flush := func() {
 		if runLen == 1 {
-			check(0, prevRaw)
-			if prevFold != prevRaw {
-				check(0, prevFold)
+			checkSpan(rawRing[3])
+			if foldRing[3] != rawRing[3] {
+				checkSpan(foldRing[3])
 			}
 		}
 		runLen = 0
@@ -271,17 +272,29 @@ func unspacedTokenHits(s string, want map[string]bool, hit map[string]bool) map[
 			continue
 		}
 		f := cjkfold.Rune(r)
+		rawRing[0], rawRing[1], rawRing[2], rawRing[3] = rawRing[1], rawRing[2], rawRing[3], r
+		foldRing[0], foldRing[1], foldRing[2], foldRing[3] = foldRing[1], foldRing[2], foldRing[3], f
 		if runLen == 0 {
-			prevRaw, prevFold = r, f
 			runLen = 1
 			continue
 		}
-		check(prevRaw, r)
-		if prevFold != prevRaw || f != r {
-			check(prevFold, f)
+		runLen++
+		checkSpan(rawRing[2], rawRing[3])
+		if foldRing[2] != rawRing[2] || foldRing[3] != rawRing[3] {
+			checkSpan(foldRing[2], foldRing[3])
 		}
-		prevRaw, prevFold = r, f
-		runLen = 2
+		if runLen >= 3 {
+			checkSpan(rawRing[1], rawRing[2], rawRing[3])
+			if foldRing[1] != rawRing[1] || foldRing[2] != rawRing[2] || foldRing[3] != rawRing[3] {
+				checkSpan(foldRing[1], foldRing[2], foldRing[3])
+			}
+		}
+		if runLen >= 4 {
+			checkSpan(rawRing[0], rawRing[1], rawRing[2], rawRing[3])
+			if foldRing[0] != rawRing[0] || foldRing[1] != rawRing[1] || foldRing[2] != rawRing[2] || foldRing[3] != rawRing[3] {
+				checkSpan(foldRing[0], foldRing[1], foldRing[2], foldRing[3])
+			}
+		}
 	}
 	flush()
 	return hit
@@ -334,6 +347,11 @@ func (mt messageTerms) best(s model.Session) float64 {
 			if w := mt.window(msg.Text); w > 0 {
 				score *= 1 + proximityWeight*float64(held)/float64(w)
 			}
+		} else if held >= 3 {
+			if w := mt.windowFor(msg.Text, held); w > 0 {
+				cov := float64(held) / float64(len(mt.terms))
+				score *= 1 + proximityWeight*cov*float64(held)/float64(w)
+			}
 		}
 		if isToolRole(msg.Role) {
 			score *= toolMatchWeight
@@ -348,9 +366,18 @@ func (mt messageTerms) best(s model.Session) float64 {
 // window is the fewest words of text that hold a form of every term, or 0
 // when one is missing. Words are cut as tokenHits cuts them.
 func (mt messageTerms) window(text string) int {
+	return mt.windowFor(text, len(mt.forms))
+}
+
+// windowFor is the fewest words of text that hold at least want distinct
+// query terms, or 0 when fewer than want appear.
+func (mt messageTerms) windowFor(text string, want int) int {
+	if want <= 0 || want > len(mt.forms) {
+		return 0
+	}
 	var at []int // the term each word is a form of, -1 for any other word
 	var buf [tokenHitCap]byte
-	var pair [2 * utf8.UTFMax]byte
+	var spanBuf [4 * utf8.UTFMax]byte
 	n := 0
 	flush := func() {
 		if n >= 2 {
@@ -362,49 +389,64 @@ func (mt messageTerms) window(text string) int {
 		}
 		n = 0
 	}
-	lookupPair := func(r1, r2 rune) int {
+	lookupSpan := func(rs ...rune) int {
 		m := 0
-		if r1 != 0 {
-			m += utf8.EncodeRune(pair[m:], r1)
-		}
-		m += utf8.EncodeRune(pair[m:], r2)
-		if i, ok := mt.of[string(pair[:m])]; ok {
-			return i
-		}
-		f1, f2 := r1, cjkfold.Rune(r2)
-		if r1 != 0 {
-			f1 = cjkfold.Rune(r1)
-		}
-		if f1 != r1 || f2 != r2 {
-			m = 0
-			if f1 != 0 {
-				m += utf8.EncodeRune(pair[m:], f1)
+		for _, r := range rs {
+			if r != 0 {
+				m += utf8.EncodeRune(spanBuf[m:], r)
 			}
-			m += utf8.EncodeRune(pair[m:], f2)
-			if i, ok := mt.of[string(pair[:m])]; ok {
+		}
+		if m > 0 {
+			if i, ok := mt.of[string(spanBuf[:m])]; ok {
+				return i
+			}
+		}
+		m = 0
+		changed := false
+		for _, r := range rs {
+			if r != 0 {
+				f := cjkfold.Rune(r)
+				if f != r {
+					changed = true
+				}
+				m += utf8.EncodeRune(spanBuf[m:], f)
+			}
+		}
+		if changed && m > 0 {
+			if i, ok := mt.of[string(spanBuf[:m])]; ok {
 				return i
 			}
 		}
 		return -1
 	}
-	var prevUnspaced rune
+	var unspacedRing [4]rune
 	unspacedRun := 0
 	flushUnspaced := func() {
 		if unspacedRun == 1 {
-			at = append(at, lookupPair(0, prevUnspaced))
+			at = append(at, lookupSpan(unspacedRing[3]))
 		}
 		unspacedRun = 0
 	}
 	for _, r := range query.Lower(nfcfold.Compose(text)) {
 		if mt.unspaced && cjkfold.Unspaced(r) {
 			flush()
+			unspacedRing[0], unspacedRing[1], unspacedRing[2], unspacedRing[3] = unspacedRing[1], unspacedRing[2], unspacedRing[3], r
 			if unspacedRun == 0 {
-				prevUnspaced = r
 				unspacedRun = 1
 			} else {
-				at = append(at, lookupPair(prevUnspaced, r))
-				prevUnspaced = r
-				unspacedRun = 2
+				unspacedRun++
+				idx := lookupSpan(unspacedRing[2], unspacedRing[3])
+				if unspacedRun >= 4 {
+					if c4 := lookupSpan(unspacedRing[0], unspacedRing[1], unspacedRing[2], unspacedRing[3]); c4 >= 0 {
+						at = append(at, c4)
+					}
+				}
+				if unspacedRun >= 3 {
+					if c3 := lookupSpan(unspacedRing[1], unspacedRing[2], unspacedRing[3]); c3 >= 0 {
+						at = append(at, c3)
+					}
+				}
+				at = append(at, idx)
 			}
 			continue
 		}
@@ -430,7 +472,7 @@ func (mt messageTerms) window(text string) int {
 			have++
 		}
 		count[t]++
-		for have == len(mt.forms) {
+		for have >= want {
 			if w := hi - lo + 1; best == 0 || w < best {
 				best = w
 			}

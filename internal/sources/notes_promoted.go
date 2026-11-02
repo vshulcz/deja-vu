@@ -400,6 +400,10 @@ func ConflictingNotes(candidate PromotedNote, all []PromotedNote) []PromotedNote
 	for _, t := range candidate.Tags {
 		ctags[t] = true
 	}
+	cfiles := map[string]bool{}
+	for _, f := range NoteFileRefs(candidate) {
+		cfiles[strings.ToLower(filepath.Base(f))] = true
+	}
 	cwords := noteWordSet(candidate.Title + " " + candidate.Text)
 	var out []PromotedNote
 	for _, n := range all {
@@ -413,13 +417,20 @@ func ConflictingNotes(candidate PromotedNote, all []PromotedNote) []PromotedNote
 				break
 			}
 		}
+		shareFile := false
+		for _, f := range NoteFileRefs(n) {
+			if cfiles[strings.ToLower(filepath.Base(f))] {
+				shareFile = true
+				break
+			}
+		}
 		shared := 0
 		for w := range noteWordSet(n.Title + " " + n.Text) {
 			if cwords[w] {
 				shared++
 			}
 		}
-		if shareTag || shared >= 3 {
+		if shareTag || shareFile || shared >= 3 {
 			out = append(out, n)
 		}
 	}
@@ -439,6 +450,90 @@ func noteWordSet(s string) map[string]bool {
 	// such notes could ever share the three the bar asks for (#1348).
 	for _, b := range cjkfold.Bigrams(s) {
 		out[b] = true
+	}
+	return out
+}
+
+// StaleCandidate pairs an accepted promoted note with a file it cites that was
+// modified in a newer session after the note was recorded.
+type StaleCandidate struct {
+	Note      PromotedNote
+	File      string
+	TouchedAt time.Time
+}
+
+// NoteFileRefs extracts distinct file paths or filenames cited in a note's
+// title and text.
+func NoteFileRefs(n PromotedNote) []string {
+	var out []string
+	seen := map[string]bool{}
+	for raw := range strings.FieldsSeq(n.Title + " " + n.Text) {
+		tok := strings.Trim(raw, ".,!?:;()[]{}<>\"'`")
+		if idx := strings.IndexByte(tok, ':'); idx > 0 {
+			tok = tok[:idx]
+		}
+		tok = filepath.ToSlash(tok)
+		if !looksLikeNoteFilePath(tok) || seen[tok] {
+			continue
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	return out
+}
+
+var noteFileExts = map[string]bool{
+	".go": true, ".py": true, ".ts": true, ".tsx": true, ".js": true, ".jsx": true,
+	".rs": true, ".c": true, ".cc": true, ".cpp": true, ".h": true, ".java": true,
+	".rb": true, ".sh": true, ".sql": true, ".yaml": true, ".yml": true, ".toml": true,
+	".json": true, ".md": true,
+}
+
+func looksLikeNoteFilePath(tok string) bool {
+	if len(tok) < 4 || len(tok) > 160 || strings.Contains(tok, "://") || strings.HasPrefix(tok, ".") {
+		return false
+	}
+	ext := strings.ToLower(filepath.Ext(tok))
+	if !noteFileExts[ext] {
+		return false
+	}
+	base := filepath.Base(tok)
+	return len(base) > len(ext)
+}
+
+// StaleCandidateNotes returns accepted notes whose cited files were touched in
+// sessions strictly newer than the note's timestamp.
+func StaleCandidateNotes(notes []PromotedNote, fileLastTouched map[string]time.Time) []StaleCandidate {
+	if len(notes) == 0 || len(fileLastTouched) == 0 {
+		return nil
+	}
+	normTouched := make(map[string]time.Time, len(fileLastTouched)*2)
+	for path, t := range fileLastTouched {
+		norm := strings.ToLower(filepath.ToSlash(path))
+		if t.After(normTouched[norm]) {
+			normTouched[norm] = t
+		}
+		base := filepath.Base(norm)
+		if t.After(normTouched[base]) {
+			normTouched[base] = t
+		}
+	}
+	var out []StaleCandidate
+	for _, n := range notes {
+		if n.State != "accepted" || n.At.IsZero() {
+			continue
+		}
+		for _, ref := range NoteFileRefs(n) {
+			key := strings.ToLower(filepath.ToSlash(ref))
+			touchedAt := normTouched[key]
+			if touchedAt.IsZero() {
+				touchedAt = normTouched[filepath.Base(key)]
+			}
+			if touchedAt.After(n.At) {
+				out = append(out, StaleCandidate{Note: n, File: ref, TouchedAt: touchedAt})
+				break
+			}
+		}
 	}
 	return out
 }

@@ -13,7 +13,7 @@ func TestWeakMatchGetsHalfTheBlock(t *testing.T) {
 	if weak >= full {
 		t.Errorf("a weak match got %d of %d — no room was saved", weak, full)
 	}
-	if weak*2 != full {
+	if weak != full/2 {
 		t.Errorf("a weak match got %d, which is not half of %d", weak, full)
 	}
 	// Still enough to quote something: a block that cannot hold one line is a

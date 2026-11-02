@@ -1,6 +1,8 @@
 package query
 
 import (
+	"unicode/utf8"
+
 	"github.com/vshulcz/deja-vu/internal/cjkfold"
 )
 
@@ -122,4 +124,86 @@ func CJKFunctionBigram(tok string) bool {
 		}
 	}
 	return true
+}
+
+// cjkTechnicalCompounds holds 3- and 4-rune Chinese software engineering
+// compounds in Simplified form. Matching folds Traditional runes first so both
+// scripts hit the same table while returning the caller's original script.
+var cjkTechnicalCompounds = map[string]bool{
+	"内存泄漏":  true,
+	"协程泄漏":  true,
+	"竞态条件":  true,
+	"连接池":   true,
+	"连接超时":  true,
+	"接口超时":  true,
+	"超时重试":  true,
+	"幂等性":   true,
+	"向后兼容":  true,
+	"空指针":   true,
+	"环境变量":  true,
+	"单元测试":  true,
+	"数据库锁":  true,
+	"死锁检测":  true,
+	"正则表达式": true,
+	"上下文窗口": true,
+	"消息队列":  true,
+	"缓存穿透":  true,
+	"缓存击穿":  true,
+	"缓存雪崩":  true,
+	"负载均衡":  true,
+	"反序列化":  true,
+	"依赖注入":  true,
+	"垃圾回收":  true,
+	"事务隔离":  true,
+	"权限校验":  true,
+	"索引重建":  true,
+	"增量索引":  true,
+}
+
+// CJKTechnicalCompounds returns any 3–5 rune Chinese technical compounds
+// found in s, preserving the script (Simplified or Traditional) written in s.
+func CJKTechnicalCompounds(s string) []string {
+	ascii := true
+	for i := range len(s) {
+		if s[i] >= utf8.RuneSelf {
+			ascii = false
+			break
+		}
+	}
+	if ascii {
+		return nil
+	}
+	var out []string
+	seen := map[string]bool{}
+	var rawRun, foldRun []rune
+	flush := func() {
+		if len(rawRun) >= 3 {
+			for i := range rawRun {
+				for width := 5; width >= 3; width-- {
+					if i+width > len(rawRun) {
+						continue
+					}
+					if cjkTechnicalCompounds[string(foldRun[i:i+width])] {
+						orig := string(rawRun[i : i+width])
+						if !seen[orig] {
+							seen[orig] = true
+							out = append(out, orig)
+						}
+					}
+				}
+			}
+		}
+		rawRun = rawRun[:0]
+		foldRun = foldRun[:0]
+	}
+	for _, r := range s {
+		if cjkfold.Unspaced(r) {
+			rawRun = append(rawRun, r)
+			foldRun = append(foldRun, cjkfold.Rune(r))
+			continue
+		}
+		flush()
+	}
+	flush()
+	return out
 }

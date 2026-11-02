@@ -745,16 +745,17 @@ func TestRequestedPureCheapIndexCoverageBranches(t *testing.T) {
 		name string
 		path string
 		old  FileState
+		want int
 	}{
 		{name: "cursor-db full", path: cursorDB, old: FileState{Size: 10, SafeSize: 20}},
 		{name: "cursor-db since", path: cursorDB, old: FileState{LastUpdated: time.Now().UnixNano()}},
 		{name: "gemini default", path: gemini},
-		{name: "antigravity default", path: ag},
+		{name: "antigravity default", path: ag, want: 1},
 		{name: "unknown default", path: unknown},
 	} {
 		t.Run("appended "+tc.name, func(t *testing.T) {
 			got, err := parseAppendedFile("", tc.path, tc.old, false)
-			if err != nil || got != nil {
+			if err != nil || len(got) != tc.want {
 				t.Fatalf("parseAppendedFile got=%#v err=%v", got, err)
 			}
 		})
