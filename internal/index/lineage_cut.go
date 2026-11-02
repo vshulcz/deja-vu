@@ -34,7 +34,7 @@ func sharedRecords(dir string, m Manifest) func(asker, other SessionMeta) time.T
 		return r.Role + "\x00" + strconv.FormatInt(r.Time.UnixNano(), 10) + "\x00" + r.Text
 	}
 	return func(asker, other SessionMeta) time.Time {
-		k := asker.Harness + ":" + asker.ID
+		k := asker.Key()
 		set, ok := sets[k]
 		if !ok {
 			if recs, err := recordsForKey(path, tables, k); err == nil {
@@ -49,7 +49,7 @@ func sharedRecords(dir string, m Manifest) func(asker, other SessionMeta) time.T
 		if len(set) == 0 || asker.Harness != other.Harness {
 			return at
 		}
-		recs, err := recordsForKey(path, tables, other.Harness+":"+other.ID)
+		recs, err := recordsForKey(path, tables, other.Key())
 		if err != nil {
 			return at
 		}
@@ -66,7 +66,7 @@ func sharedRecords(dir string, m Manifest) func(asker, other SessionMeta) time.T
 // millisecond the way wholeHolds matches.
 func wholeShared(dir string, m Manifest, turns map[string]bool, other SessionMeta) time.Time {
 	var at time.Time
-	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), other.Harness+":"+other.ID)
+	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), other.Key())
 	if err != nil {
 		return at
 	}
@@ -91,7 +91,7 @@ func TouchedAfter(dir string, meta SessionMeta, path string, at time.Time) bool 
 	}
 	var named, after bool
 	err = eachRecordForKeysInRoles(filepath.Join(dir, "records.bin"), tablesFromManifest(m),
-		map[string]bool{meta.Harness + ":" + meta.ID: true}, map[string]bool{roleFiles: true}, func(r Record) {
+		map[string]bool{meta.Key(): true}, map[string]bool{roleFiles: true}, func(r Record) {
 			if after || r.Role != roleFiles {
 				return
 			}

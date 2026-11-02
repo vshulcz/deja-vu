@@ -71,7 +71,7 @@ func frictionCarriers(m Manifest, walls map[uint64]bool) map[string]SessionMeta 
 	for _, meta := range m.Sessions {
 		for _, h := range meta.Hit {
 			if walls[h] {
-				out[meta.Harness+":"+meta.ID] = meta
+				out[meta.Key()] = meta
 				break
 			}
 		}
@@ -346,7 +346,7 @@ func readFrictionEntries(dir string, m Manifest, f *os.File, t *recordTables, ke
 		}
 		for _, msg := range s.Messages {
 			if msg.Role == roleToolOutput {
-				send(meta.Harness+":"+meta.ID, msg.Text)
+				send(meta.Key(), msg.Text)
 			}
 		}
 	}

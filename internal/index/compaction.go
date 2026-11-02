@@ -59,6 +59,9 @@ type CompactionState struct {
 	Data                      model.CompactionContext `json:"data"`
 }
 
+// Key returns the compaction state's canonical "harness:session_id" composite key.
+func (s CompactionState) Key() string { return model.SessionKey(s.Harness, s.SessionID) }
+
 // PutCompaction stores a redacted continuation packet. It uses the index lock
 // without waiting so a host can compact normally while an index rebuild is in
 // progress. The newest source snapshot wins; a duplicate source digest keeps
@@ -73,7 +76,7 @@ func PutCompaction(dir string, next CompactionState) (CompactionState, error) {
 	if compactionExcluded(next) {
 		return CompactionState{}, ErrCompactionIgnored
 	}
-	if readTombstones()[next.Harness+":"+next.SessionID] {
+	if readTombstones()[next.Key()] {
 		return CompactionState{}, ErrCompactionForgotten
 	}
 
@@ -155,7 +158,7 @@ func Compaction(dir, sessionID, workspace string) (CompactionState, bool, error)
 	}
 	state, ok := core.Compactions[compactionKey(sessionID, workspace)]
 	if !ok || compactionExcluded(state) ||
-		readTombstones()[state.Harness+":"+state.SessionID] {
+		readTombstones()[state.Key()] {
 		return CompactionState{}, false, nil
 	}
 	return state, true, nil
@@ -273,7 +276,7 @@ func compactionsForRebuild(dir string, dead map[string]bool) map[string]Compacti
 	}
 	states := cloneCompactions(core.Compactions)
 	for key, state := range states {
-		if dead[state.Harness+":"+state.SessionID] || compactionExcluded(state) {
+		if dead[state.Key()] || compactionExcluded(state) {
 			delete(states, key)
 		}
 	}
@@ -304,7 +307,7 @@ func removeMatchingCompactions(m *Manifest, o ForgetOptions, exact string) []str
 			continue
 		}
 		delete(m.Compactions, key)
-		keys = append(keys, state.Harness+":"+state.SessionID)
+		keys = append(keys, state.Key())
 	}
 	sort.Strings(keys)
 	return keys

@@ -139,7 +139,7 @@ func MarkUserRules(dir string, s *model.Session, scope []string) {
 	if err != nil {
 		return
 	}
-	key := s.Harness + ":" + s.ID
+	key := s.Key()
 	row, ok := m.Sessions[key]
 	if !ok {
 		return

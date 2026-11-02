@@ -303,7 +303,7 @@ func buildCommandFails(tmp, generation string, ss []model.Session) *commandFailA
 	acc := newCommandFailAcc()
 	projects := map[string]string{}
 	for _, s := range ss {
-		key := s.Harness + ":" + s.ID
+		key := s.Key()
 		if _, ok := projects[key]; !ok {
 			projects[key] = s.Project
 		}

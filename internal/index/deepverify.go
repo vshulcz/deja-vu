@@ -128,7 +128,7 @@ func DeepVerify(dir string) (DeepReport, error) {
 		report.SampledFiles++
 		seen := msgSeen{}
 		for _, s := range ss {
-			key := s.Harness + ":" + s.ID
+			key := s.Key()
 			if _, known := m.Sessions[key]; !known {
 				report.Findings = append(report.Findings, DeepFinding{Kind: "parse-drift", Detail: key + " parses from " + p + " but is absent from the index"})
 				continue

@@ -90,7 +90,7 @@ func keysByFile(sessions map[string]SessionMeta) map[string][]string {
 func settleCopies(m *Manifest, old map[string]SessionMeta, reread map[string]FileState, replacements []model.Session) {
 	readFrom := map[string][]string{}
 	for _, s := range replacements {
-		key := s.Harness + ":" + s.ID
+		key := s.Key()
 		readFrom[key] = append(readFrom[key], s.Path)
 	}
 	for key, row := range m.Sessions {
@@ -200,7 +200,7 @@ func copiesHoldingTail(dir, harness string, old Manifest, p string, of FileState
 	preRedactSessions(nil, ss)
 	tail, keys := map[repeatKey]bool{}, map[string]bool{}
 	for _, s := range ss {
-		keys[s.Harness+":"+s.ID] = true
+		keys[s.Key()] = true
 		for _, m := range s.Messages {
 			// A command is the same turn before and after its result lands.
 			tail[repeatKeyOf(m.Role, m.Time, exitSuffix.ReplaceAllString(m.Text, ""))] = true

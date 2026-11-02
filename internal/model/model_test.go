@@ -137,3 +137,28 @@ func TestSessionProjectAndPromotedNoteMethods(t *testing.T) {
 		t.Fatal("IsPromotedNote mismatch")
 	}
 }
+
+func TestSessionLineageAndCompositeKeys(t *testing.T) {
+	var empty Session
+	if empty.IsSpawned() || empty.InParentFile() || empty.ParentKey() != "" || empty.OrigKey() != "" || empty.FormerKey() != "" {
+		t.Fatal("empty session lineage methods returned non-empty")
+	}
+	child := Session{
+		Harness:  "copilot",
+		ID:       "task1",
+		Kind:     KindSidechain,
+		Parent:   "root1",
+		OrigID:   "orig-task1",
+		FormerID: "legacy-task1",
+	}
+	if !child.IsSpawned() || !child.InParentFile() {
+		t.Fatalf("copilot sidechain: IsSpawned=%v InParentFile=%v", child.IsSpawned(), child.InParentFile())
+	}
+	if child.ParentKey() != "copilot:root1" || child.OrigKey() != "copilot:orig-task1" || child.FormerKey() != "copilot:legacy-task1" {
+		t.Fatalf("keys: parent=%q orig=%q former=%q", child.ParentKey(), child.OrigKey(), child.FormerKey())
+	}
+	codexFork := Session{Harness: "codex", ID: "f1", Kind: KindSubagentFork, Parent: "p1"}
+	if !codexFork.IsSpawned() || codexFork.InParentFile() {
+		t.Fatalf("codex subagent_fork: IsSpawned=%v InParentFile=%v", codexFork.IsSpawned(), codexFork.InParentFile())
+	}
+}

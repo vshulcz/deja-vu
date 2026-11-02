@@ -201,11 +201,11 @@ func BuildAutoRecall(ss []model.Session, o AutoRecallOptions) AutoRecallResult {
 	settled := make(map[string]bool, len(candidates))
 	for _, c := range candidates {
 		lines := digest.SubstantialConclusions(c, settledProbeBudget, 1)
-		settled[c.Harness+":"+c.ID] = len(lines) > 0 && digest.CarriesDecision(lines[0])
+		settled[c.Key()] = len(lines) > 0 && digest.CarriesDecision(lines[0])
 	}
 	sort.SliceStable(candidates, func(i, j int) bool {
-		ti := o.TaskScores[candidates[i].Harness+":"+candidates[i].ID]
-		tj := o.TaskScores[candidates[j].Harness+":"+candidates[j].ID]
+		ti := o.TaskScores[candidates[i].Key()]
+		tj := o.TaskScores[candidates[j].Key()]
 		if ti != tj {
 			return ti > tj
 		}
@@ -215,8 +215,8 @@ func BuildAutoRecall(ss []model.Session, o AutoRecallOptions) AutoRecallResult {
 				return iNew
 			}
 		}
-		iSet := settled[candidates[i].Harness+":"+candidates[i].ID]
-		jSet := settled[candidates[j].Harness+":"+candidates[j].ID]
+		iSet := settled[candidates[i].Key()]
+		jSet := settled[candidates[j].Key()]
 		if iSet != jSet {
 			return iSet
 		}

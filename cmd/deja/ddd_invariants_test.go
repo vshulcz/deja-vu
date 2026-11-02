@@ -178,43 +178,58 @@ func TestDDDNoRawImportedPrefixOutsideDomainModel(t *testing.T) {
 }
 func TestDDDNoRawSessionKeyConcatenationInCLI(t *testing.T) {
 	fset := token.NewFileSet()
-	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+	repoRoot := filepath.Join("..", "..")
+	for _, sub := range []string{"cmd/deja", "internal"} {
+		root := filepath.Join(repoRoot, sub)
+		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			rel, err := filepath.Rel(repoRoot, path)
+			if err != nil {
+				return err
+			}
+			rel = filepath.ToSlash(rel)
+			if rel == "internal/model/model.go" {
+				return nil
+			}
+			f, err := parser.ParseFile(fset, path, nil, 0)
+			if err != nil {
+				return err
+			}
+			ast.Inspect(f, func(n ast.Node) bool {
+				bin, ok := n.(*ast.BinaryExpr)
+				if !ok || bin.Op != token.ADD {
+					return true
+				}
+				leftBin, ok := bin.X.(*ast.BinaryExpr)
+				if !ok || leftBin.Op != token.ADD {
+					return true
+				}
+				selLeft, ok1 := leftBin.X.(*ast.SelectorExpr)
+				litMid, ok2 := leftBin.Y.(*ast.BasicLit)
+				selRight, ok3 := bin.Y.(*ast.SelectorExpr)
+				if !ok1 || !ok2 || !ok3 || selLeft.Sel.Name != "Harness" || litMid.Value != `":"` {
+					return true
+				}
+				switch selRight.Sel.Name {
+				case "ID", "Parent", "OrigID", "FormerID", "SessionID":
+					pos := fset.Position(bin.Pos())
+					t.Errorf("%s:%d concatenates .Harness + \":\" + .%s directly; call .Key(), .ParentKey(), .OrigKey(), .FormerKey(), or model.SessionKey(harness, id) instead",
+						rel, pos.Line, selRight.Sel.Name)
+				}
+				return true
+			})
 			return nil
-		}
-		f, err := parser.ParseFile(fset, path, nil, 0)
-		if err != nil {
-			return err
-		}
-		ast.Inspect(f, func(n ast.Node) bool {
-			bin, ok := n.(*ast.BinaryExpr)
-			if !ok || bin.Op != token.ADD {
-				return true
-			}
-			leftBin, ok := bin.X.(*ast.BinaryExpr)
-			if !ok || leftBin.Op != token.ADD {
-				return true
-			}
-			selLeft, ok1 := leftBin.X.(*ast.SelectorExpr)
-			litMid, ok2 := leftBin.Y.(*ast.BasicLit)
-			selRight, ok3 := bin.Y.(*ast.SelectorExpr)
-			if ok1 && ok2 && ok3 && selLeft.Sel.Name == "Harness" && litMid.Value == `":"` && selRight.Sel.Name == "ID" {
-				pos := fset.Position(bin.Pos())
-				t.Errorf("cmd/deja/%s:%d concatenates .Harness + \":\" + .ID directly; call .Key() or model.SessionKey(harness, id) instead",
-					path, pos.Line)
-			}
-			return true
 		})
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 }
-
 func TestDDDHookseenLedgerEncapsulated(t *testing.T) {
 	fset := token.NewFileSet()
 	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, walkErr error) error {
@@ -250,7 +265,6 @@ func TestDDDHookseenLedgerEncapsulated(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-
 func TestDDDPromotedNoteDomainUnification(t *testing.T) {
 	if got := model.PromotedNoteID("claude:s1"); got != "deja-note-claude-s1" {
 		t.Fatalf("PromotedNoteID = %q", got)
@@ -333,5 +347,123 @@ func TestDDDNoRawPromotedNotePrefixOutsideDomainModel(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+func TestDDDLineageAndSpawnedKindInvariants(t *testing.T) {
+	for _, kind := range []string{model.KindSubagent, model.KindSidechain, model.KindSubagentFork} {
+		meta := index.SessionMeta{Harness: "copilot", ID: "s1", Kind: kind, Parent: "p1", OrigID: "orig1"}
+		if !meta.IsSpawned() {
+			t.Fatalf("SessionMeta(Kind=%q).IsSpawned() = false; want true", kind)
+		}
+		if got := meta.ParentKey(); got != "copilot:p1" {
+			t.Fatalf("ParentKey() = %q", got)
+		}
+		if got := meta.OrigKey(); got != "copilot:orig1" {
+			t.Fatalf("OrigKey() = %q", got)
+		}
+	}
+	forkMeta := index.SessionMeta{Harness: "claude", ID: "f1", Kind: model.KindFork, Parent: "p1"}
+	if forkMeta.IsSpawned() {
+		t.Fatal("KindFork should not be IsSpawned()")
+	}
+	inParent := index.SessionMeta{Harness: "copilot", ID: "t1", Kind: model.KindSidechain, Parent: "p1"}
+	if !inParent.InParentFile() {
+		t.Fatal("copilot sidechain with parent should report InParentFile() = true")
+	}
+	emptyMeta := index.SessionMeta{Harness: "claude", ID: "s1"}
+	if emptyMeta.ParentKey() != "" || emptyMeta.OrigKey() != "" || emptyMeta.InParentFile() {
+		t.Fatal("unset lineage fields should return empty keys and false InParentFile()")
+	}
+	if got := (index.Identity{Harness: "claude", ID: "s1"}).Key(); got != "claude:s1" {
+		t.Fatalf("Identity.Key() = %q", got)
+	}
+	if got := (index.CompactionState{Harness: "claude", SessionID: "s1"}).Key(); got != "claude:s1" {
+		t.Fatalf("CompactionState.Key() = %q", got)
+	}
+
+	// Ensure no non-test file checks Kind == "subagent" || Kind == "sidechain"
+	// directly instead of calling .IsSpawned() or model.SpawnedKind.
+	repoRoot := filepath.Join("..", "..")
+	fset := token.NewFileSet()
+	for _, sub := range []string{"cmd/deja", "internal"} {
+		root := filepath.Join(repoRoot, sub)
+		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			rel, err := filepath.Rel(repoRoot, path)
+			if err != nil {
+				return err
+			}
+			rel = filepath.ToSlash(rel)
+			if rel == "internal/model/model.go" {
+				return nil
+			}
+			f, err := parser.ParseFile(fset, path, nil, 0)
+			if err != nil {
+				return err
+			}
+			ast.Inspect(f, func(n ast.Node) bool {
+				bin, ok := n.(*ast.BinaryExpr)
+				if !ok || (bin.Op != token.EQL && bin.Op != token.NEQ) {
+					return true
+				}
+				sel, ok := bin.X.(*ast.SelectorExpr)
+				lit, litOK := bin.Y.(*ast.BasicLit)
+				if !ok || !litOK || sel.Sel.Name != "Kind" || lit.Kind != token.STRING {
+					return true
+				}
+				val, err := strconv.Unquote(lit.Value)
+				if err == nil && (val == model.KindSidechain || val == model.KindSubagentFork) {
+					pos := fset.Position(bin.Pos())
+					t.Errorf("%s:%d compares .Kind against %q directly; use .IsSpawned() or model.SpawnedKind(kind) so all spawned kinds remain consistent",
+						rel, pos.Line, val)
+				}
+				return true
+			})
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestDDDLifecycleResolutionEncapsulated(t *testing.T) {
+	fset := token.NewFileSet()
+	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		if path == "lifecycle.go" || path == "promote.go" {
+			return nil
+		}
+		f, err := parser.ParseFile(fset, path, nil, 0)
+		if err != nil {
+			return err
+		}
+		ast.Inspect(f, func(n ast.Node) bool {
+			sel, ok := n.(*ast.SelectorExpr)
+			if !ok {
+				return true
+			}
+			ident, ok := sel.X.(*ast.Ident)
+			if ok && ident.Name == "sources" && sel.Sel.Name == "PromotedLifecycles" {
+				pos := fset.Position(sel.Pos())
+				t.Errorf("cmd/deja/%s:%d calls sources.PromotedLifecycles() directly; use newLifecycleResolver / attachLifecycles / attachBlameLifecycles in lifecycle.go so synced and OrigID lifecycles stay unified",
+					path, pos.Line)
+			}
+			return true
+		})
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }

@@ -64,7 +64,7 @@ func ApplySubagentSwitch(ss []model.Session) []model.Session {
 	off := SubagentsOff()
 	out := ss[:0:0]
 	for _, s := range ss {
-		if SpawnedKind(s.Kind) {
+		if s.IsSpawned() {
 			if off {
 				continue
 			}

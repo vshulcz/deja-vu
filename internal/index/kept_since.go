@@ -35,7 +35,7 @@ func KeptSince(dir string, from, to time.Time) ([]KeptSession, error) {
 		}
 		// A subagent's run is a transcript of its own and goes with the
 		// session that launched it; counted, one session read as four.
-		if spawnedKind(meta.Kind) || sources.IsSubagentPath(meta.Path) {
+		if meta.IsSpawned() || sources.IsSubagentPath(meta.Path) {
 			continue
 		}
 		out = append(out, KeptSession{SessionMeta: meta, At: time.Unix(f.KeptAt, 0)})
@@ -47,7 +47,7 @@ func KeptSince(dir string, from, to time.Time) ([]KeptSession, error) {
 		if !out[i].Updated.Equal(out[j].Updated) {
 			return out[i].Updated.After(out[j].Updated)
 		}
-		return out[i].Harness+":"+out[i].ID < out[j].Harness+":"+out[j].ID
+		return out[i].Key() < out[j].Key()
 	})
 	return out, nil
 }

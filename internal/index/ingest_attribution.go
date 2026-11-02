@@ -178,7 +178,7 @@ func coversKept(r model.Session, meta SessionMeta) bool {
 // the file moved, and taking it for one dropped the turns only the deleted
 // file held. Asked only once coversKept has matched, which is rare.
 func holdsKeptRecords(dir string, m Manifest, r model.Session, path string) bool {
-	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), r.Harness+":"+r.ID)
+	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), r.Key())
 	if err != nil {
 		return false
 	}
@@ -269,7 +269,7 @@ func promptLogTakeover(changed, oldFiles map[string]FileState, sessions map[stri
 func promptLogTakeovers(ss []model.Session, held map[string]SessionMeta) map[string]bool {
 	out := map[string]bool{}
 	for _, s := range ss {
-		key := s.Harness + ":" + s.ID
+		key := s.Key()
 		if meta, ok := held[key]; ok && isCodexHistory(meta.Path) && !isCodexHistory(s.Path) {
 			out[key] = true
 		}
@@ -289,7 +289,7 @@ const freshPromptWait = 5 * time.Minute
 // time the transcript is on disk and the parser skips the line.
 func waitsForTranscript(ss []model.Session, held map[string]SessionMeta, now time.Time) bool {
 	for _, s := range ss {
-		if _, ok := held[s.Harness+":"+s.ID]; ok {
+		if _, ok := held[s.Key()]; ok {
 			continue
 		}
 		if !s.Updated.IsZero() && now.Sub(s.Updated) < freshPromptWait {
@@ -314,7 +314,7 @@ func dropShadowedPrompts(ss []model.Session, held map[string]SessionMeta) []mode
 		if isCodexHistory(s.Path) {
 			logs = true
 		} else {
-			transcript[s.Harness+":"+s.ID] = true
+			transcript[s.Key()] = true
 		}
 	}
 	if !logs {
@@ -323,7 +323,7 @@ func dropShadowedPrompts(ss []model.Session, held map[string]SessionMeta) []mode
 	out := make([]model.Session, 0, len(ss))
 	for _, s := range ss {
 		if isCodexHistory(s.Path) {
-			key := s.Harness + ":" + s.ID
+			key := s.Key()
 			if transcript[key] {
 				continue
 			}

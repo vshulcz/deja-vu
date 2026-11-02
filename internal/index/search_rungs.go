@@ -95,9 +95,9 @@ func relevanceOverClose(dir string, m Manifest, o query.Options, rel SearchResul
 	}
 	agree := false
 	if serr == nil {
-		top := rel.Sessions[0].Harness + ":" + rel.Sessions[0].ID
+		top := rel.Sessions[0].Key()
 		for _, c := range closeSS {
-			if c.Harness+":"+c.ID == top {
+			if c.Key() == top {
 				agree = true
 				break
 			}
@@ -113,11 +113,11 @@ func relevanceOverClose(dir string, m Manifest, o query.Options, rel SearchResul
 	}
 	seen := map[string]bool{}
 	for _, r := range rel.Sessions {
-		seen[r.Harness+":"+r.ID] = true
+		seen[r.Key()] = true
 	}
 	merged := rel.Sessions
 	for _, c := range closeSS {
-		if !seen[c.Harness+":"+c.ID] {
+		if !seen[c.Key()] {
 			merged = append(merged, c)
 		}
 	}
@@ -221,7 +221,7 @@ func withPoolScope(dir string, m Manifest, o query.Options, res SearchResult, un
 		if unread.Scoped == nil {
 			unread.Scoped = map[string]bool{}
 		}
-		unread.Scoped[s.Harness+":"+s.ID] = true
+		unread.Scoped[s.Key()] = true
 	}
 	res.Sessions = append(res.Sessions, extra...)
 	unread.ScopeWhole = true

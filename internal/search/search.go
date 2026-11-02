@@ -321,7 +321,7 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 		var sampled bool
 		if o.Unread != nil {
 			var est float64
-			est, sampled = o.Unread.Sample[doc.hit.Session.Harness+":"+doc.hit.Session.ID]
+			est, sampled = o.Unread.Sample[doc.hit.Session.Key()]
 			if sampled {
 				sampleDocuments++
 				sampleLength += doc.length
@@ -618,7 +618,7 @@ func RunDetailedKeeping(ss []model.Session, o Options, keep func([]Hit) []Hit) (
 		if u := o.Unread; u != nil && (u.Sessions > 0 || u.Estimated) && len(u.Sample) > 0 {
 			kept := hits[:0:0]
 			for _, h := range hits {
-				if _, sampled := u.Sample[h.Session.Harness+":"+h.Session.ID]; !sampled {
+				if _, sampled := u.Sample[h.Session.Key()]; !sampled {
 					kept = append(kept, h)
 				}
 			}

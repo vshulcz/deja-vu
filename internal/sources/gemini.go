@@ -161,7 +161,7 @@ func LoadGemini() []model.Session {
 func dedupeGeminiSessions(ss []model.Session) []model.Session {
 	byKey := map[string][]int{}
 	for i, s := range ss {
-		key := s.Harness + ":" + s.ID
+		key := s.Key()
 		byKey[key] = append(byKey[key], i)
 	}
 	drop := map[int]bool{}

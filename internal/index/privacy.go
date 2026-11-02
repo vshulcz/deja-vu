@@ -312,12 +312,6 @@ func writeTombstoneMirrorAt(dir string, keys []string) error {
 	return os.Rename(tmp, path)
 }
 
-// inParentFile reports whether a session is a sub-agent run its harness keeps
-// inside the parent's own log: Copilot CLI's task runs (#5216).
-func inParentFile(harness, kind, parent string) bool {
-	return harness == "copilot" && kind == "sidechain" && parent != ""
-}
-
 func filterTombstoned(ss []model.Session) []model.Session {
 	return filterTombstonedSet(ss, readTombstones())
 }
@@ -328,11 +322,11 @@ func filterTombstonedSet(ss []model.Session, dead map[string]bool) []model.Sessi
 	}
 	out := make([]model.Session, 0, len(ss))
 	for _, s := range ss {
-		if dead[s.Harness+":"+s.ID] || s.FormerID != "" && dead[s.Harness+":"+s.FormerID] {
+		if dead[s.Key()] || s.FormerID != "" && dead[s.FormerKey()] {
 			continue
 		}
 		// A run kept in a forgotten session's own file goes with it (#5216).
-		if inParentFile(s.Harness, s.Kind, s.Parent) && dead[s.Harness+":"+s.Parent] {
+		if s.InParentFile() && dead[s.ParentKey()] {
 			continue
 		}
 		out = append(out, s)
@@ -480,7 +474,7 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 	// the runs the log gains later, and unforgetting the parent brings the run
 	// back with it.
 	for key, meta := range m.Sessions {
-		if matched[key] || !inParentFile(meta.Harness, meta.Kind, meta.Parent) || !matched[meta.Harness+":"+meta.Parent] {
+		if matched[key] || !meta.InParentFile() || !matched[meta.ParentKey()] {
 			continue
 		}
 		matched[key] = true
@@ -651,8 +645,8 @@ func matchForget(rows, sessions map[string]SessionMeta, o ForgetOptions, exact s
 		// A run kept in its parent's own log, matched along with the parent,
 		// is covered by the parent's tombstone (#5216): one of its own would
 		// outlive an unforget of the parent.
-		if inParentFile(meta.Harness, meta.Kind, meta.Parent) {
-			if pm, ok := sessions[meta.Harness+":"+meta.Parent]; ok && (exact == "" || pm.ID == exact) && sessionMatches(pm, o) {
+		if meta.InParentFile() {
+			if pm, ok := sessions[meta.ParentKey()]; ok && (exact == "" || pm.ID == exact) && sessionMatches(pm, o) {
 				result.Attached++
 				continue
 			}
@@ -707,7 +701,7 @@ func storeManifest() (Manifest, map[string]int) {
 	m := Manifest{Sessions: map[string]SessionMeta{}}
 	counts := map[string]int{}
 	for _, s := range sources.FilterSessions(loadProgress("", nil)) {
-		key := s.Harness + ":" + s.ID
+		key := s.Key()
 		m.Sessions[key] = SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Started: s.Started, Updated: s.Updated}
 		counts[key] += len(s.Messages)
 	}

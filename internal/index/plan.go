@@ -129,7 +129,7 @@ func PlanFrictionMatches(dir string, steps [][]string, keep func(SessionMeta) bo
 		}
 		hits = append(hits, wallHit{cluster: cluster, text: text})
 		for _, meta := range carriers[cluster.hash] {
-			candidateMetas[meta.Harness+":"+meta.ID] = meta
+			candidateMetas[meta.Key()] = meta
 		}
 	}
 	if len(hits) == 0 {
@@ -160,7 +160,7 @@ func PlanFrictionMatches(dir string, steps [][]string, keep func(SessionMeta) bo
 			break
 		}
 		meta := metas[i]
-		key := meta.Harness + ":" + meta.ID
+		key := meta.Key()
 		for step, terms := range indexedSteps {
 			if !candidates[step][meta.Ord] {
 				continue
@@ -444,7 +444,7 @@ func planWallCommand(
 			continue
 		}
 		for _, meta := range cluster.metas {
-			key := meta.Harness + ":" + meta.ID
+			key := meta.Key()
 			command := commands[key][step]
 			if command == "" {
 				continue
@@ -473,7 +473,7 @@ func planWallCommand(
 	selected := groups[best]
 	out := make([]SessionMeta, 0, len(selected))
 	for _, meta := range cluster.metas {
-		if _, ok := selected[meta.Harness+":"+meta.ID]; ok {
+		if _, ok := selected[meta.Key()]; ok {
 			out = append(out, meta)
 		}
 	}

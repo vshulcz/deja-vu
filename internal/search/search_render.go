@@ -25,7 +25,7 @@ func mergeSessions(in []model.Session) []model.Session {
 	by := map[string]*model.Session{}
 	var order []string
 	for _, s := range in {
-		k := s.Harness + ":" + s.ID
+		k := s.Key()
 		if by[k] == nil {
 			cp := s
 			by[k] = &cp

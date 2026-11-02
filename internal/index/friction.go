@@ -742,7 +742,7 @@ func topFriction(dir string, n int, allow func(project string) bool, settled pol
 			if !metas[i].Updated.Equal(metas[j].Updated) {
 				return metas[i].Updated.After(metas[j].Updated)
 			}
-			return metas[i].Harness+":"+metas[i].ID < metas[j].Harness+":"+metas[j].ID
+			return metas[i].Key() < metas[j].Key()
 		})
 		cs = append(cs, cluster{h, metas})
 	}
@@ -814,7 +814,7 @@ func newestOf(ms []SessionMeta) time.Time {
 // the difference between one lookup and N.
 func frictionTexts(rd *frictionReader, metas []SessionMeta, want map[uint64]string, target uint64) {
 	for _, meta := range metas {
-		if e, ok := rd.texts[meta.Harness+":"+meta.ID]; ok {
+		if e, ok := rd.texts[meta.Key()]; ok {
 			// The first line behind each wall, which is all the loop below
 			// would take from this session.
 			for h, line := range e.lines {
@@ -875,7 +875,7 @@ func newFrictionReader(dir string, m Manifest) *frictionReader {
 }
 
 func (rd *frictionReader) toolOutput(meta SessionMeta) ([]string, bool) {
-	key := meta.Harness + ":" + meta.ID
+	key := meta.Key()
 	if out, ok := rd.read[key]; ok {
 		return out, true
 	}
@@ -888,7 +888,7 @@ func (rd *frictionReader) toolOutput(meta SessionMeta) ([]string, bool) {
 		if len(keys) >= frictionReadBatch {
 			break
 		}
-		k := next.Harness + ":" + next.ID
+		k := next.Key()
 		if _, done := rd.read[k]; done || next.Harness == "deja" {
 			continue
 		}

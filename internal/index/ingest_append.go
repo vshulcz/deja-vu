@@ -129,14 +129,14 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 			if known {
 				from = &of
 			}
-			dropStoredRepeats(rw, dir, &ss[i], m.Sessions[ss[i].Harness+":"+ss[i].ID], seenMsgs, m.Files, harness, from)
+			dropStoredRepeats(rw, dir, &ss[i], m.Sessions[ss[i].Key()], seenMsgs, m.Files, harness, from)
 		}
 		// Kept for the sidecars below, after redaction so a pair cannot carry a
 		// credential the records do not.
 		appended = append(appended, ss...)
 		filesTouched++
 		for _, s := range ss {
-			key := s.Harness + ":" + s.ID
+			key := s.Key()
 			meta, moved := appendedRow(&m, key, s, p, of, changed[p], known, emptyBefore)
 			// Which copy's commands the tables count follows the row's file
 			// (foreignPath): one that moved has its runs mined again.
@@ -216,7 +216,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	mergeFixes(dir, dir, nil, whole, rewhole)
 	grew := map[string]bool{}
 	for _, s := range appended {
-		grew[s.Harness+":"+s.ID] = true
+		grew[s.Key()] = true
 	}
 	updateReceipts(dir, dir, m, grew)
 	// The two command tables are mined from every record the index holds, which

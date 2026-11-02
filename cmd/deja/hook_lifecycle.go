@@ -5,9 +5,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
-	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // injectionLifecycle words a recorded state for the block the agent reads. It
@@ -39,21 +39,21 @@ func injectionLifecycle(state string) string {
 // promoting a correction changed `deja search` and changed nothing in the
 // block, so the replaced line kept leading the injection unmarked.
 func orderForInjection(ss []model.Session) ([]model.Session, string) {
-	states := sources.PromotedLifecycles()
-	if len(states) == 0 {
-		return ss, earlierAttemptWarning(ss)
+	if len(ss) == 0 {
+		return ss, ""
 	}
-	marked := func(s model.Session) (sources.Lifecycle, string, bool) {
-		lc, ok := states[s.Key()]
+	r := newLifecycleResolver(index.DefaultDir())
+	marked := func(s model.Session) (string, string, bool) {
+		state, note, _, _, ok := r.resolve(s)
 		if !ok {
-			return lc, "", false
+			return "", "", false
 		}
-		phrase := injectionLifecycle(lc.State)
-		return lc, phrase, phrase != ""
+		phrase := injectionLifecycle(state)
+		return note, phrase, phrase != ""
 	}
 	rejected := func(s model.Session) bool {
-		lc, ok := states[s.Key()]
-		return ok && lc.State == lifecycleRejected
+		state, _, _, _, ok := r.resolve(s)
+		return ok && state == lifecycleRejected
 	}
 	out := append([]model.Session(nil), ss...)
 	sort.SliceStable(out, func(i, j int) bool {
@@ -61,7 +61,7 @@ func orderForInjection(ss []model.Session) ([]model.Session, string) {
 	})
 	var warn []string
 	for _, s := range out {
-		lc, phrase, ok := marked(s)
+		note, phrase, ok := marked(s)
 		if !ok {
 			continue
 		}
@@ -69,8 +69,8 @@ func orderForInjection(ss []model.Session) ([]model.Session, string) {
 		// This warning is one line of an injected digest, so a note spanning
 		// several lines writes rows the store never held.
 		line := fmt.Sprintf("session %s %s", recallListingLine(s.ID), phrase)
-		if lc.Note != "" {
-			line += ": " + recallListingLine(lc.Note)
+		if note != "" {
+			line += ": " + recallListingLine(note)
 		}
 		warn = append(warn, line)
 	}

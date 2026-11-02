@@ -61,7 +61,7 @@ func keptTurnsOf(ss []model.Session, orphans orphanState) map[seenK]string {
 	for _, s := range ss {
 		if _, ok := orphans.files[s.Path]; ok {
 			for _, msg := range s.Messages {
-				if k := seenKey(s.Harness+":"+s.ID, msg.Role, msg.Time, msg.Text); keptTurns[k] == "" {
+				if k := seenKey(s.Key(), msg.Role, msg.Time, msg.Text); keptTurns[k] == "" {
 					keptTurns[k] = s.Path
 				}
 			}
@@ -72,7 +72,7 @@ func keptTurnsOf(ss []model.Session, orphans orphanState) map[seenK]string {
 
 // rebuildRow folds s into the row the rebuild holds for its key.
 func rebuildRow(sessions map[string]SessionMeta, s model.Session, text sessionText, orphans orphanState) {
-	key := s.Harness + ":" + s.ID
+	key := s.Key()
 	ord := uint32(0)
 	own := s
 	if old, ok := sessions[key]; ok {
@@ -128,7 +128,7 @@ func mineRebuildSidecars(tmp string, ss []model.Session, m Manifest, keptSource 
 	cmds := commandSessions(ss, m, keptSource)
 	for _, build := range []func(){
 		func() { buildCooccur(tmp, ss) },
-		func() { buildFixes(tmp, cmds, func(s model.Session) string { return s.Harness + ":" + s.ID }) },
+		func() { buildFixes(tmp, cmds, func(s model.Session) string { return s.Key() }) },
 		func() { buildCommands(tmp, cmds) },
 		func() { failAcc = buildCommandFails(tmp, "", cmds) },
 		func() { buildSessionFacts(tmp, cmds) },
@@ -280,7 +280,7 @@ func applyRenamedFiles(m *Manifest, renamed map[string]string) map[string]bool {
 			if meta.Path == op {
 				meta.Path = np
 				for _, s := range moved {
-					if s.Harness+":"+s.ID == key && s.Project != "" && s.Project != meta.Project {
+					if s.Key() == key && s.Project != "" && s.Project != meta.Project {
 						meta.Project = s.Project
 						reprojected[key] = true
 					}
@@ -294,7 +294,7 @@ func applyRenamedFiles(m *Manifest, renamed map[string]string) map[string]bool {
 			if meta.Path == op {
 				meta.Path = np
 				for _, s := range moved {
-					if s.Harness+":"+s.ID == key && s.Project != "" {
+					if s.Key() == key && s.Project != "" {
 						meta.Project = s.Project
 					}
 				}
@@ -541,12 +541,12 @@ func keepCopyOrder(ss []model.Session, orphans orphanState) {
 	kept := map[string]bool{}
 	for _, s := range ss {
 		if _, ok := orphans.files[s.Path]; ok {
-			kept[s.Harness+":"+s.ID] = true
+			kept[s.Key()] = true
 		}
 	}
 	slots := map[string][]int{}
 	for i, s := range ss {
-		if key := s.Harness + ":" + s.ID; kept[key] {
+		if key := s.Key(); kept[key] {
 			slots[key] = append(slots[key], i)
 		}
 	}
@@ -662,7 +662,7 @@ func carryFromStores(dir string, m Manifest, stores map[string]bool, fresh []mod
 	}
 	have := make(map[string]bool, len(fresh))
 	for _, s := range fresh {
-		have[s.Harness+":"+s.ID] = true
+		have[s.Key()] = true
 	}
 	// An OpenCode-schema session records its project directory as its path,
 	// not the database (#2033), so the path alone carried none of them and a

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/search"
 )
 
 // A decision rejected on one machine and synced to another: the note arrives
@@ -60,5 +61,16 @@ func TestASyncedRejectionMarksTheTranscriptItRejects(t *testing.T) {
 	// Without the loader's "(from …, day)" tail, as on the sender (#5053).
 	if got := hits[transcript].LifecycleNote; got != "reverted: pgbouncer instead" {
 		t.Errorf("correction lost on the way: %q", got)
+	}
+
+	// Blame must resolve the same synced rejection and local promotion of an
+	// imported session via OrigID.
+	blameHits := []search.BlameHit{{Session: hits[transcript].Session}}
+	attachBlameLifecycles(dir, blameHits, search.BlameTarget{FullPath: "/work/p/pool.go", Base: "pool.go", Stem: "pool"})
+	if got := blameHits[0].Lifecycle; got != "rejected" {
+		t.Errorf("blame on imported transcript carries lifecycle %q, want rejected", got)
+	}
+	if got := blameHits[0].LifecycleNote; got != "reverted: pgbouncer instead" {
+		t.Errorf("blame correction lost on the way: %q", got)
 	}
 }

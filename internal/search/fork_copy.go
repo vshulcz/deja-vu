@@ -60,7 +60,7 @@ func SourceOf(sessions []model.Session, src, c model.Session, at time.Time) bool
 // line, and the newest copy took the credit for an edit it only copied.
 func forkSource(sessions []model.Session, src, fork model.Session) bool {
 	for range sessions {
-		if fork.Kind != "fork" || fork.Parent == "" || fork.Harness != src.Harness {
+		if fork.Kind != model.KindFork || fork.Parent == "" || fork.Harness != src.Harness {
 			return false
 		}
 		if fork.Parent == src.ID {
@@ -93,7 +93,7 @@ func forkSource(sessions []model.Session, src, fork model.Session) bool {
 // one line in the same whole second (goose, Hermes) is not a copy, and taking
 // the older session handed the child's line to the parent.
 func copiedFrom(at time.Time, s, best model.Session) bool {
-	if model.SpawnedKind(s.Kind) || model.SpawnedKind(best.Kind) {
+	if s.IsSpawned() || best.IsSpawned() {
 		return false
 	}
 	if at.IsZero() || s.Harness != best.Harness {

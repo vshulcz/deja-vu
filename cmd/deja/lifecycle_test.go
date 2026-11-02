@@ -292,7 +292,7 @@ func TestAttachBlameLifecyclesScopesAcceptedNoteToBlamedFile(t *testing.T) {
 	unrelatedHits := []search.BlameHit{{
 		Session: model.Session{ID: "m1", Harness: "claude", Project: "p"},
 	}}
-	attachBlameLifecycles(unrelatedHits, search.BlameTarget{FullPath: "/work/p/internal/index/retrieval.go", Base: "retrieval.go", Stem: "retrieval"})
+	attachBlameLifecycles("", unrelatedHits, search.BlameTarget{FullPath: "/work/p/internal/index/retrieval.go", Base: "retrieval.go", Stem: "retrieval"})
 	if unrelatedHits[0].Lifecycle != "" {
 		t.Fatalf("unrelated accepted note attached as standing decision on retrieval.go: %+v", unrelatedHits[0])
 	}
@@ -304,7 +304,7 @@ func TestAttachBlameLifecyclesScopesAcceptedNoteToBlamedFile(t *testing.T) {
 	matchingHits := []search.BlameHit{{
 		Session: model.Session{ID: "m2", Harness: "claude", Project: "p"},
 	}}
-	attachBlameLifecycles(matchingHits, search.BlameTarget{FullPath: "/work/p/internal/index/retrieval.go", Base: "retrieval.go", Stem: "retrieval"})
+	attachBlameLifecycles("", matchingHits, search.BlameTarget{FullPath: "/work/p/internal/index/retrieval.go", Base: "retrieval.go", Stem: "retrieval"})
 	if matchingHits[0].Lifecycle != "accepted" {
 		t.Fatalf("accepted note mentioning retrieval.go was not attached: %+v", matchingHits[0])
 	}

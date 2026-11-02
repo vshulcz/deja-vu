@@ -66,7 +66,7 @@ func buildSessionFacts(tmp string, ss []model.Session) {
 	out := make(map[string]SessionFact, len(ss))
 	for _, s := range ss {
 		if f, ok := sessionFactOf(commandsInTimeOrder(s.Messages)); ok {
-			out[s.Harness+":"+s.ID] = f
+			out[s.Key()] = f
 		}
 		if len(out) >= sessionFactsMax {
 			break

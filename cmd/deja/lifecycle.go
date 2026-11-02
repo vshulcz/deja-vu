@@ -51,6 +51,54 @@ func importedLifecycles(dir string) map[string]sources.Lifecycle {
 	return out
 }
 
+// lifecycleResolver resolves the effective decision lifecycle for sessions by
+// combining local/repo promoted notes, the session's own indexed lifecycle
+// (#975), and synced promoted notes in the index (#1051).
+type lifecycleResolver struct {
+	dir           string
+	states        map[string]sources.Lifecycle
+	imported      map[string]sources.Lifecycle
+	importedReady bool
+}
+
+func newLifecycleResolver(dir string) *lifecycleResolver {
+	return &lifecycleResolver{
+		dir:    dir,
+		states: sources.PromotedLifecycles(),
+	}
+}
+
+func (r *lifecycleResolver) resolve(s model.Session) (state, note, at string, isNote, ok bool) {
+	key := s.Key()
+	if src, okSrc := s.PromotedNoteSourceKey(); okSrc {
+		isNote = true
+		key = src
+	}
+	lc, found := r.states[key]
+	if !found && s.OrigID != "" {
+		lc, found = r.states[s.OrigKey()]
+	}
+	if !found || lc.State == "" {
+		if s.Lifecycle != "" {
+			return s.Lifecycle, s.LifecycleNote, s.LifecycleAt, isNote, true
+		}
+		if !r.importedReady && r.dir != "" {
+			r.imported, r.importedReady = importedLifecycles(r.dir), true
+		}
+		lc, found = r.imported[key]
+		if !found && s.OrigID != "" {
+			lc, found = r.imported[s.OrigKey()]
+		}
+		if !found || lc.State == "" {
+			return "", "", "", isNote, false
+		}
+	}
+	if !lc.At.IsZero() {
+		at = lc.At.Format("2006-01-02")
+	}
+	return lc.State, lc.Note, at, isNote, true
+}
+
 // attachLifecycles marks hits whose decision was later rejected, superseded or
 // left to go stale.
 //
@@ -67,52 +115,14 @@ func attachLifecycles(dir string, hits []search.Hit) {
 	// An empty local table is not "nothing to attach": a note that arrived by
 	// sync carries its state in the index, because the states themselves live
 	// in the other machine's notes.jsonl and never travel (#975).
-	states := sources.PromotedLifecycles()
-	var imported map[string]sources.Lifecycle
-	importedReady := false
+	r := newLifecycleResolver(dir)
 	for i := range hits {
 		h := &hits[i]
-		key := h.Session.Key()
-		// A promoted note is filed under its own id, so the state — which is a
-		// property of the decision, not of the transcript — never reached it.
-		// Recall shows the lines that matched, and a rejection whose words are
-		// not in the query simply did not appear: the agent was handed the
-		// accepted line of a decision that had been taken back (#974).
-		if src, ok := h.Session.PromotedNoteSourceKey(); ok {
-			key = src
-		}
-		lc, ok := states[key]
-		if !ok || lc.State == "" {
-			// An imported note brought its state with it: the machine that
-			// made the decision keeps the states, and notes.jsonl does not
-			// travel (#975).
-			if h.Session.Lifecycle != "" && h.Session.Lifecycle != "accepted" {
-				h.Lifecycle, h.LifecycleNote, h.LifecycleAt = h.Session.Lifecycle, h.Session.LifecycleNote, h.Session.LifecycleAt
-				continue
-			}
-			// The rejection and the transcript it rejects can both arrive by
-			// sync. Each keeps its original id, so the note still names the
-			// session it is about — but only the index remembers, and the
-			// transcript came back with no mark on it: the query a person
-			// actually types returned a reverted decision as current (#1051).
-			if !importedReady {
-				imported, importedReady = importedLifecycles(dir), true
-			}
-			lc, ok = imported[key]
-			if !ok && h.Session.OrigID != "" {
-				lc, ok = imported[h.Session.Harness+":"+h.Session.OrigID]
-			}
-			if !ok || lc.State == "" || lc.State == "accepted" {
-				continue
-			}
-		} else if lc.State == "accepted" {
+		state, note, at, _, ok := r.resolve(h.Session)
+		if !ok || state == model.LifecycleAccepted {
 			continue
 		}
-		h.Lifecycle = lc.State
-		h.LifecycleNote = lc.Note
-		if !lc.At.IsZero() {
-			h.LifecycleAt = lc.At.Format("2006-01-02")
-		}
+		h.Lifecycle, h.LifecycleNote, h.LifecycleAt = state, note, at
 	}
 }
 
@@ -270,27 +280,15 @@ func theyOrIt(n int) string {
 // attachBlameLifecycles is attachLifecycles for blame, which carries its own
 // hit type: blame answers "who decided this", and it answered with the
 // accepted line of a decision that had been taken back (#1017).
-func attachBlameLifecycles(hits []search.BlameHit, target search.BlameTarget) {
+func attachBlameLifecycles(dir string, hits []search.BlameHit, target search.BlameTarget) {
 	if len(hits) == 0 {
 		return
 	}
-	states := sources.PromotedLifecycles()
+	r := newLifecycleResolver(dir)
 	for i := range hits {
 		h := &hits[i]
-		key := h.Session.Key()
-		isNote := false
-		if src, ok := h.Session.PromotedNoteSourceKey(); ok {
-			isNote = true
-			key = src
-		}
-		lc, ok := states[key]
-		if !ok || lc.State == "" {
-			if h.Session.Lifecycle != "" {
-				if h.Session.Lifecycle == "accepted" && !isNote && h.Session.LifecycleNote != "" && target.FullPath != "" && !mentionsFile(target.FullPath, h.Session.LifecycleNote) {
-					continue
-				}
-				h.Lifecycle, h.LifecycleNote, h.LifecycleAt = h.Session.Lifecycle, h.Session.LifecycleNote, h.Session.LifecycleAt
-			}
+		state, note, at, isNote, ok := r.resolve(h.Session)
+		if !ok {
 			continue
 		}
 		// Accepted too, since #2514. This started as a warning about a decision
@@ -303,12 +301,9 @@ func attachBlameLifecycles(hits []search.BlameHit, target search.BlameTarget) {
 		// marathon session that touched a hundred files and promoted one note
 		// about the repository description otherwise claims that note as the
 		// standing decision of every file it touched (#3451).
-		if lc.State == "accepted" && !isNote && lc.Note != "" && target.FullPath != "" && !mentionsFile(target.FullPath, lc.Note) {
+		if state == model.LifecycleAccepted && !isNote && note != "" && target.FullPath != "" && !mentionsFile(target.FullPath, note) {
 			continue
 		}
-		h.Lifecycle, h.LifecycleNote = lc.State, lc.Note
-		if !lc.At.IsZero() {
-			h.LifecycleAt = lc.At.Format("2006-01-02")
-		}
+		h.Lifecycle, h.LifecycleNote, h.LifecycleAt = state, note, at
 	}
 }
