@@ -381,7 +381,7 @@ func dropStoredRepeats(rw *recordWriter, dir string, s *model.Session, row Sessi
 	if !older || rw.w.Flush() != nil {
 		return
 	}
-	key := s.Harness + ":" + s.ID
+	key := s.Key()
 	stored := map[repeatKey]bool{}
 	elsewhere := map[repeatKey]bool{}
 	if err := eachRecordForKeys(filepath.Join(dir, "records.bin"), rw.tables, map[string]bool{key: true}, func(r Record) {

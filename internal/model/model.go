@@ -45,6 +45,14 @@ const (
 	LifecycleStale      = "stale"
 )
 
+// Canonical session lineage kinds recorded by harnesses.
+const (
+	KindSubagent     = "subagent"
+	KindSidechain    = "sidechain"
+	KindSubagentFork = "subagent_fork"
+	KindFork         = "fork"
+)
+
 // IsWorkRole reports whether a message role records what an agent did rather
 // than what was said. Tool and file-activity records are bulk-repetitive by
 // nature and are excluded from conversational context windows and prose
@@ -344,6 +352,45 @@ func (s *Session) CandidatePromotedNoteIDs() []string {
 	return CandidatePromotedNoteIDs(s.Harness, s.ID, s.OrigID)
 }
 
+// IsSpawned reports whether the session was spawned by another agent rather
+// than started directly by a person.
+func (s *Session) IsSpawned() bool {
+	return SpawnedKind(s.Kind)
+}
+
+// InParentFile reports whether the session is a sub-agent run kept inside its
+// parent session's own transcript file (#5216).
+func (s *Session) InParentFile() bool {
+	return InParentFile(s.Harness, s.Kind, s.Parent)
+}
+
+// ParentKey returns the "harness:parent" composite key of the session that
+// spawned or forked this session, or "" when Parent is unset.
+func (s *Session) ParentKey() string {
+	if s.Parent == "" {
+		return ""
+	}
+	return SessionKey(s.Harness, s.Parent)
+}
+
+// OrigKey returns the "harness:orig_id" composite key from the peer machine
+// before sync renamed the session, or "" when OrigID is unset.
+func (s *Session) OrigKey() string {
+	if s.OrigID == "" {
+		return ""
+	}
+	return SessionKey(s.Harness, s.OrigID)
+}
+
+// FormerKey returns the "harness:former_id" composite key from an older parser
+// naming scheme, or "" when FormerID is unset.
+func (s *Session) FormerKey() string {
+	if s.FormerID == "" {
+		return ""
+	}
+	return SessionKey(s.Harness, s.FormerID)
+}
+
 // SetSource fills the machine-facing provenance fields without changing the
 // project string retained for human compatibility.
 func (s *Session) SetSource(localInstance string) {
@@ -404,8 +451,14 @@ func LoggedID(id string) string {
 // agent another session spawned.
 func SpawnedKind(kind string) bool {
 	switch kind {
-	case "sidechain", "subagent", "subagent_fork":
+	case KindSidechain, KindSubagent, KindSubagentFork:
 		return true
 	}
 	return false
+}
+
+// InParentFile reports whether a session is a sub-agent run its harness keeps
+// inside the parent's own log: Copilot CLI's task runs (#5216).
+func InParentFile(harness, kind, parent string) bool {
+	return harness == "copilot" && kind == KindSidechain && parent != ""
 }

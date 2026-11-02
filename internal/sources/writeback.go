@@ -208,7 +208,7 @@ func claudeWriteBackRoots() []string {
 }
 
 func renderClaude(s model.Session, turns []model.Message) (string, []byte, error) {
-	if s.Kind == "sidechain" {
+	if s.IsSpawned() {
 		return "", nil, &WriteBackRefusal{Harness: s.Harness, Reason: "session is a sub-agent run; Claude Code keeps those inside the parent's transcript and does not reopen one on its own"}
 	}
 	if IsPromptLog(s.Path) {

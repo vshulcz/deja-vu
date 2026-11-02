@@ -188,7 +188,7 @@ func (imp *importer) add(sr SyncRecord, file *importFile) error {
 	if !ok {
 		return nil
 	}
-	key := sr.Harness + ":" + importID
+	key := model.SessionKey(sr.Harness, importID)
 	// Count what redaction removed, the way local ingest does — the
 	// import path redacted the text but threw the count away, so
 	// `stats --redaction` under-reported protection on an imported
@@ -224,11 +224,11 @@ func (imp *importer) admit(sr SyncRecord, origID, importID string) (text string,
 	// case — the same batch handed over twice. Both drop the record;
 	// only this one knows why, and behind the ledger the import went
 	// silent exactly when the peer re-sent what you forgot (#980).
-	if dead[sr.Harness+":"+importID] || dead[sr.Harness+":"+origID] {
+	if dead[model.SessionKey(sr.Harness, importID)] || dead[model.SessionKey(sr.Harness, origID)] {
 		imp.forgottenSkipped++
 		return "", nil, "", false
 	}
-	if parent := string(sr.Parent); parent != "" && (dead[sr.Harness+":"+ImportedSessionID(sr.Harness, parent)] || dead[sr.Harness+":"+parent]) {
+	if parent := string(sr.Parent); parent != "" && (dead[model.SessionKey(sr.Harness, ImportedSessionID(sr.Harness, parent))] || dead[model.SessionKey(sr.Harness, parent)]) {
 		imp.forgottenSkipped++
 		return "", nil, "", false
 	}
@@ -236,7 +236,7 @@ func (imp *importer) admit(sr SyncRecord, origID, importID string) (text string,
 	// a timestamp (aider stamps a whole session with its start time).
 	// The legacy time-only key is still honored so batches imported by
 	// older versions stay idempotent.
-	legacy := sr.Harness + ":" + origID + ":" + sr.Time.UTC().Format(time.RFC3339Nano)
+	legacy := model.SessionKey(sr.Harness, origID) + ":" + sr.Time.UTC().Format(time.RFC3339Nano)
 	// Keyed on the text as this machine stores it, redacted here. A
 	// peer whose rules widened re-sends the same record with a marker
 	// where the value was, and keyed on what it sent the record landed
@@ -257,7 +257,7 @@ func (imp *importer) admit(sr SyncRecord, origID, importID string) (text string,
 	// not the identity of what it holds: after that machine changes
 	// zone the same note arrives under a new bucket and every peer
 	// grew a second copy (#977). Key those on what does not move.
-	if imp.localSessions[sr.Harness+":"+sr.SessionID] {
+	if imp.localSessions[model.SessionKey(sr.Harness, sr.SessionID)] {
 		imp.loadLocalContent()
 		if imp.localContent[recordContentKey(sr.Harness, sr.SessionID, sr.Role, sr.Time, th.Sum64())] ||
 			imp.localContent[recordContentKey(sr.Harness, sr.SessionID, sr.Role, sr.Time, rawHash)] {
@@ -289,7 +289,7 @@ func (imp *importer) admit(sr SyncRecord, origID, importID string) (text string,
 	// unrecoverable. Skip only while the session it belongs to still
 	// lives; a ledger row whose session is gone is stale, not a dupe.
 	if m.ImportedRecords[dedupe] || m.ImportedRecords[sent] || m.ImportedRecords[legacy] {
-		if _, live := m.Sessions[sr.Harness+":"+importID]; live {
+		if _, live := m.Sessions[model.SessionKey(sr.Harness, importID)]; live {
 			return "", nil, "", false
 		}
 	}

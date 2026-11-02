@@ -37,13 +37,13 @@ func writeFixTables(dir string, raw []FixPair) {
 func wholeSessionsForFixes(dir string, m Manifest, tails []model.Session) ([]model.Session, map[string]bool) {
 	keys := map[string]bool{}
 	for _, s := range tails {
-		if m.Sessions[s.Harness+":"+s.ID].Shared {
-			keys[s.Harness+":"+s.ID] = true
+		if m.Sessions[s.Key()].Shared {
+			keys[s.Key()] = true
 			continue
 		}
 		for _, msg := range s.Messages {
 			if msg.Role != "user" && msg.Role != "assistant" {
-				keys[s.Harness+":"+s.ID] = true
+				keys[s.Key()] = true
 				break
 			}
 		}
@@ -107,7 +107,7 @@ func fixSessionsForPass(tmp string, old, m Manifest, replacements []model.Sessio
 	}
 	var read []model.Session
 	for _, s := range replacements {
-		if !fromLog[s.Harness+":"+s.ID] {
+		if !fromLog[s.Key()] {
 			read = append(read, s)
 		}
 	}
@@ -183,7 +183,7 @@ func remineFixes(dir string) {
 	}
 	_ = os.Remove(fixesPath(dir))
 	_ = os.Remove(fixRawPath(dir))
-	buildFixes(dir, ss, func(s model.Session) string { return s.Harness + ":" + s.ID })
+	buildFixes(dir, ss, func(s model.Session) string { return s.Key() })
 }
 
 // ReadFixes loads the mined pairs. An index built before they existed simply

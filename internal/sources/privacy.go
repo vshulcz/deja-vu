@@ -167,7 +167,7 @@ func ExclusionFingerprint() string {
 func CountSessions(ss []model.Session) int {
 	seen := make(map[string]struct{}, len(ss))
 	for _, s := range ss {
-		seen[s.Harness+":"+s.ID] = struct{}{}
+		seen[s.Key()] = struct{}{}
 	}
 	return len(seen)
 }
@@ -203,7 +203,7 @@ func CountMessages(ss []model.Session) int {
 	n := 0
 	seen := map[msgKey]struct{}{}
 	for _, s := range ss {
-		session := s.Harness + ":" + s.ID
+		session := s.Key()
 		for _, m := range s.Messages {
 			if !IsMessageRole(m.Role) {
 				continue

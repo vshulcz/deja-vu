@@ -366,7 +366,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	wrote := map[string]bool{}
 	for _, s := range ss {
 		if holdsText(s) {
-			wrote[s.Harness+":"+s.ID] = true
+			wrote[s.Key()] = true
 		}
 	}
 	dropEmptySessions(&m, wrote)
@@ -407,7 +407,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	err = sp.run(func(push func(tokenJob)) error {
 		for i := range ss {
 			s := ss[i]
-			key := s.Harness + ":" + s.ID
+			key := s.Key()
 			for _, msg := range s.Messages {
 				if seenMsgs.dup(key, msg.Role, msg.Time, msg.Text) {
 					continue
@@ -924,7 +924,7 @@ func publishNewestFirst(dir string, ss []model.Session, progress io.Writer) {
 func distinctSessions(ss []model.Session) int {
 	seen := make(map[string]struct{}, len(ss))
 	for _, s := range ss {
-		seen[s.Harness+":"+s.ID] = struct{}{}
+		seen[s.Key()] = struct{}{}
 	}
 	return len(seen)
 }
@@ -1023,7 +1023,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	texts := sessionTexts(ss)
 	err = sp.run(func(push func(tokenJob)) error {
 		for i, s := range ss {
-			key := s.Harness + ":" + s.ID
+			key := s.Key()
 			ord := uint32(0)
 			own := s
 			if old, ok := m.Sessions[key]; ok {
@@ -1119,7 +1119,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 		buildCooccur(tmp, ss)
 		reportAdvance(1)
 		cmds := commandSessions(ss, m, nil)
-		buildFixes(tmp, cmds, func(s model.Session) string { return s.Harness + ":" + s.ID })
+		buildFixes(tmp, cmds, func(s model.Session) string { return s.Key() })
 		reportAdvance(1)
 		buildCommands(tmp, cmds)
 		reportAdvance(1)

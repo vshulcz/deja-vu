@@ -438,7 +438,7 @@ func verifyUnread(dir string, m Manifest, o query.Options, variants map[string][
 	}
 	passed, sampled := 0, len(u.Sample)
 	for _, s := range ss {
-		if _, ok := u.Sample[s.Harness+":"+s.ID]; ok {
+		if _, ok := u.Sample[s.Key()]; ok {
 			passed++
 		}
 	}
@@ -488,12 +488,12 @@ func cutRoleOnlyUnread(dir string, m Manifest, o query.Options, variants map[str
 		}
 		ok := map[string]bool{}
 		for _, s := range held {
-			ok[s.Harness+":"+s.ID] = true
+			ok[s.Key()] = true
 		}
 		out := map[string]bool{}
 		for _, p := range posts {
 			meta, _ := metaAt(byOrd, p.Sid)
-			if k := meta.Harness + ":" + meta.ID; !ok[k] {
+			if k := meta.Key(); !ok[k] {
 				out[k] = true
 			}
 		}

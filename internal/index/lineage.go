@@ -78,7 +78,7 @@ func lineage(dir string, ids map[string]bool, heads, wholes []model.Session) (ma
 	// against nothing, being a fork's first prompts, before its source can
 	// have gone on.
 	parentOf := func(kind, parent string) {
-		if parent != "" && (spawnedKind(kind) || kind == "fork") {
+		if parent != "" && (spawnedKind(kind) || kind == model.KindFork) {
 			out[parent] = true
 		}
 	}
@@ -263,7 +263,7 @@ func heldRecords(dir string, m Manifest) func(asker, other SessionMeta) bool {
 		return r.Role + "\x00" + strconv.FormatInt(r.Time.UnixNano(), 10) + "\x00" + r.Text
 	}
 	return func(asker, other SessionMeta) bool {
-		k := asker.Harness + ":" + asker.ID
+		k := asker.Key()
 		set, ok := sets[k]
 		if !ok {
 			if recs, err := recordsForKey(path, tables, k); err == nil {
@@ -277,7 +277,7 @@ func heldRecords(dir string, m Manifest) func(asker, other SessionMeta) bool {
 		if len(set) == 0 {
 			return false
 		}
-		recs, err := recordsForKey(path, tables, other.Harness+":"+other.ID)
+		recs, err := recordsForKey(path, tables, other.Key())
 		if err != nil {
 			return false
 		}
@@ -302,7 +302,7 @@ func endedBy(dir string, m Manifest, src SessionMeta, at time.Time) bool {
 	if at.IsZero() {
 		return true
 	}
-	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), src.Harness+":"+src.ID)
+	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), src.Key())
 	if err != nil {
 		return false
 	}
@@ -322,7 +322,7 @@ func startedAt(dir string, m Manifest, meta SessionMeta) time.Time {
 	if !meta.Started.IsZero() {
 		return meta.Started
 	}
-	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), meta.Harness+":"+meta.ID)
+	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), meta.Key())
 	if err != nil {
 		return time.Time{}
 	}
@@ -363,7 +363,7 @@ func turnKey(role string, ms int64) string { return role + "\x00" + strconv.Form
 // and the store a whole asker is read off carries no diff. A read that fails
 // answers no.
 func wholeHolds(dir string, m Manifest, wholes []map[string]bool, other SessionMeta) bool {
-	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), other.Harness+":"+other.ID)
+	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), other.Key())
 	if err != nil {
 		return false
 	}
@@ -436,10 +436,10 @@ func spawnedFamily(m Manifest, ids, out map[string]bool, forkHolds func(SessionM
 		if meta.Parent == "" || meta.Parent == meta.ID {
 			continue
 		}
-		if spawnedKind(meta.Kind) {
+		if meta.IsSpawned() {
 			children[meta.Parent] = append(children[meta.Parent], meta.ID)
 			parent[meta.ID] = meta.Parent
-		} else if meta.Kind == "fork" && forkHolds != nil {
+		} else if meta.Kind == model.KindFork && forkHolds != nil {
 			forks[meta.ID] = meta
 		}
 	}

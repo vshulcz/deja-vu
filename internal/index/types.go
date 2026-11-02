@@ -280,6 +280,36 @@ func (m SessionMeta) CandidatePromotedNoteIDs() []string {
 	return model.CandidatePromotedNoteIDs(m.Harness, m.ID, m.OrigID)
 }
 
+// IsSpawned reports whether the session was spawned by another agent rather
+// than started directly by a person.
+func (m SessionMeta) IsSpawned() bool {
+	return model.SpawnedKind(m.Kind)
+}
+
+// InParentFile reports whether the session is a sub-agent run kept inside its
+// parent session's own transcript file (#5216).
+func (m SessionMeta) InParentFile() bool {
+	return model.InParentFile(m.Harness, m.Kind, m.Parent)
+}
+
+// ParentKey returns the "harness:parent" composite key of the session that
+// spawned or forked this session, or "" when Parent is unset.
+func (m SessionMeta) ParentKey() string {
+	if m.Parent == "" {
+		return ""
+	}
+	return model.SessionKey(m.Harness, m.Parent)
+}
+
+// OrigKey returns the "harness:orig_id" composite key from the peer machine
+// before sync renamed the session, or "" when OrigID is unset.
+func (m SessionMeta) OrigKey() string {
+	if m.OrigID == "" {
+		return ""
+	}
+	return model.SessionKey(m.Harness, m.OrigID)
+}
+
 // Key returns the finding's canonical "harness:id" session identifier.
 func (f SecretFinding) Key() string { return model.SessionKey(f.Harness, f.ID) }
 
@@ -609,7 +639,7 @@ type SearchResult struct {
 // IsStrict says whether this session holds every word of the query rather
 // than having been ranked into the answer underneath the ones that do.
 func (r SearchResult) IsStrict(s model.Session) bool {
-	return r.StrictIDs[s.Harness+":"+s.ID]
+	return r.StrictIDs[s.Key()]
 }
 
 // DefaultDir is the index directory: DEJA_INDEX_DIR, or

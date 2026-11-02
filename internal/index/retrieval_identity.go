@@ -310,6 +310,9 @@ type Identity struct {
 	ID      string
 }
 
+// Key returns the identity's canonical "harness:id" composite identifier.
+func (id Identity) Key() string { return model.SessionKey(id.Harness, id.ID) }
+
 // FindManyByIdentity is FindByIdentity for a list. Records live in one
 // append-only log with no per-session offsets, so resolving a single identity
 // streams the whole of records.bin; calling it in a loop streams it once per
@@ -338,7 +341,7 @@ func FindManyByIdentity(dir string, ids []Identity) ([]model.Session, error) {
 	}
 	metas := make([]SessionMeta, 0, len(ids))
 	for _, want := range ids {
-		if meta, found := m.Sessions[want.Harness+":"+want.ID]; found {
+		if meta, found := m.Sessions[want.Key()]; found {
 			metas = append(metas, meta)
 		}
 	}
@@ -490,7 +493,7 @@ func betterIDMatch(candidate, held SessionMeta) bool {
 }
 
 func loadSessionMeta(dir string, m Manifest, meta SessionMeta) (model.Session, bool, error) {
-	key := meta.Harness + ":" + meta.ID
+	key := meta.Key()
 	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), key)
 	// A pass that swapped in during the read zeroes the records it replaced
 	// in the log this one shares, and the session read empty (#5449). Once

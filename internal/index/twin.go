@@ -16,7 +16,7 @@ func TwinSessions(metas []SessionMeta) map[string][]string {
 	local := make(map[string]string, len(metas))
 	for _, m := range metas {
 		if m.OrigID == "" {
-			local[m.Harness+":"+m.ID] = m.Harness + ":" + m.ID
+			local[m.Key()] = m.Key()
 		}
 	}
 	out := map[string][]string{}
@@ -24,13 +24,13 @@ func TwinSessions(metas []SessionMeta) map[string][]string {
 		if m.OrigID == "" {
 			continue
 		}
-		origin := m.Harness + ":" + m.OrigID
+		origin := m.OrigKey()
 		if _, ok := local[origin]; !ok {
 			continue
 		}
 		// Several machines can hold one session, so the local copy names all
 		// of them; each import names the one it came from.
-		imported := m.Harness + ":" + m.ID
+		imported := m.Key()
 		out[imported] = []string{origin}
 		out[origin] = append(out[origin], imported)
 	}

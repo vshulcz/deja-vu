@@ -196,7 +196,7 @@ func searchDetailedRead(dir string, o query.Options) (SearchResult, error) {
 func sessionKeySet(ss []model.Session) map[string]bool {
 	out := make(map[string]bool, len(ss))
 	for _, s := range ss {
-		out[s.Harness+":"+s.ID] = true
+		out[s.Key()] = true
 	}
 	return out
 }
@@ -281,7 +281,7 @@ func withRelevanceTail(once *relevanceOnce, dir string, m Manifest, o query.Opti
 	}
 	seen := make(map[string]bool, len(ss))
 	for _, s := range ss {
-		seen[s.Harness+":"+s.ID] = true
+		seen[s.Key()] = true
 	}
 	// The head arrives in posting order, not in any ranking: the tier that
 	// produced it expected the caller to rank it, and the caller cannot once
@@ -290,7 +290,7 @@ func withRelevanceTail(once *relevanceOnce, dir string, m Manifest, o query.Opti
 	// leave anything the pool never scored at the back of the head.
 	relRank := make(map[string]int, len(rel.Sessions))
 	for i, r := range rel.Sessions {
-		relRank[r.Harness+":"+r.ID] = i
+		relRank[r.Key()] = i
 	}
 	// Both lists, ordered by one rule. The strict head used to sit in front of
 	// everything whatever the ranking thought of it, which made a thin AND —
@@ -314,7 +314,7 @@ func withRelevanceTail(once *relevanceOnce, dir string, m Manifest, o query.Opti
 	var outside []model.Session
 	if !isLongQuery(RelevanceTermsWithTime(o.Query, o.Now)) && !droppedAWord(res.Variants) {
 		for _, s := range ss {
-			if _, ok := relRank[s.Harness+":"+s.ID]; !ok {
+			if _, ok := relRank[s.Key()]; !ok {
 				outside = append(outside, s)
 			}
 		}
@@ -333,13 +333,13 @@ func withRelevanceTail(once *relevanceOnce, dir string, m Manifest, o query.Opti
 					r++
 				}
 			}
-			byMsg[s.Harness+":"+s.ID] = r
+			byMsg[s.Key()] = r
 		}
 	}
 	// Doubled, so a session placed by its message sits just behind the pool
 	// session it ties with rather than ahead of it.
 	place := func(s model.Session, strict bool) int {
-		key := s.Harness + ":" + s.ID
+		key := s.Key()
 		r, ok := relRank[key]
 		if !ok {
 			if m, ok := byMsg[key]; ok {
@@ -367,7 +367,7 @@ func withRelevanceTail(once *relevanceOnce, dir string, m Manifest, o query.Opti
 		tailCap = min(thinAND, len(m.Sessions)/5)
 	}
 	for _, r := range rel.Sessions {
-		if seen[r.Harness+":"+r.ID] {
+		if seen[r.Key()] {
 			continue
 		}
 		if tailCap > 0 && added >= tailCap {
@@ -384,11 +384,11 @@ func withRelevanceTail(once *relevanceOnce, dir string, m Manifest, o query.Opti
 	dropped := droppedAWord(res.Variants)
 	at := make(map[string]int, len(merged))
 	for _, s := range merged {
-		key := s.Harness + ":" + s.ID
+		key := s.Key()
 		at[key] = place(s, seen[key] && !dropped)
 	}
 	sort.SliceStable(merged, func(i, j int) bool {
-		return at[merged[i].Harness+":"+merged[i].ID] < at[merged[j].Harness+":"+merged[j].ID]
+		return at[merged[i].Key()] < at[merged[j].Key()]
 	})
 	if added == 0 {
 		return res
@@ -895,12 +895,12 @@ func countsFor(out []model.Session, metas []SessionMeta, matched, strong []int) 
 	}
 	at := make(map[string]int, len(metas))
 	for i, meta := range metas {
-		at[meta.Harness+":"+meta.ID] = i
+		at[meta.Key()] = i
 	}
 	m := make([]int, len(out))
 	st := make([]int, len(out))
 	for j, s := range out {
-		i, ok := at[s.Harness+":"+s.ID]
+		i, ok := at[s.Key()]
 		if !ok {
 			continue
 		}
@@ -1268,7 +1268,7 @@ func sessionsAtOffsets(dir string, m Manifest, o query.Options, metas []SessionM
 	var flat []int64
 	rank := make(map[string]int, len(metas))
 	for i, meta := range metas {
-		rank[meta.Harness+":"+meta.ID] = i
+		rank[meta.Key()] = i
 		flat = append(flat, offsets[meta.Ord]...)
 	}
 	if len(flat) == 0 {
@@ -1309,7 +1309,7 @@ func sessionsAtOffsets(dir string, m Manifest, o query.Options, metas []SessionM
 	// Back into the ranked order: the records came off disk in log order, and
 	// the order the ranking chose is what the caller serves.
 	sort.SliceStable(out, func(i, j int) bool {
-		return rank[out[i].Harness+":"+out[i].ID] < rank[out[j].Harness+":"+out[j].ID]
+		return rank[out[i].Key()] < rank[out[j].Key()]
 	})
 	return ignoredByPolicy(out), nil
 }

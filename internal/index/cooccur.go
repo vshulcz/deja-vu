@@ -379,7 +379,7 @@ func cooccurNarrowedSearch(dir string, m Manifest, o query.Options) (SearchResul
 			return SearchResult{}, err
 		}
 		for _, s := range res.Sessions {
-			key := s.Harness + ":" + s.ID
+			key := s.Key()
 			if seen[key] {
 				continue
 			}
@@ -627,7 +627,7 @@ func cooccurSearchOver(dir string, m Manifest, o query.Options, terms []string, 
 				return SearchResult{Sessions: ss, Stemmed: true, Neighbour: true, Variants: variants, Tier: query.TierClose}, nil
 			}
 			for _, s := range ss {
-				key := s.Harness + ":" + s.ID
+				key := s.Key()
 				if seen[key] {
 					continue
 				}

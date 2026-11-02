@@ -100,7 +100,7 @@ func attachLifecycles(dir string, hits []search.Hit) {
 			}
 			lc, ok = imported[key]
 			if !ok && h.Session.OrigID != "" {
-				lc, ok = imported[h.Session.Harness+":"+h.Session.OrigID]
+				lc, ok = imported[h.Session.OrigKey()]
 			}
 			if !ok || lc.State == "" || lc.State == "accepted" {
 				continue

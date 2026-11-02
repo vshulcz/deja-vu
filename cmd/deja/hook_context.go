@@ -223,7 +223,7 @@ func withoutSubagentRuns(ss []model.Session) []model.Session {
 		// "sidechain" is Claude's word for the edge; Gemini, Codex, Cursor and
 		// the rest say "subagent", Grok "subagent_fork" too (#5215). The same
 		// words recall leaves out of a session's own lineage.
-		if index.SpawnedKind(s.Kind) || s.Kind == "cron" {
+		if s.IsSpawned() || s.Kind == "cron" {
 			continue
 		}
 		out = append(out, s)

@@ -27,7 +27,7 @@ func commandSessions(ss []model.Session, m Manifest, filedUnder func(key string,
 	at := make(map[string]int, len(ss))
 	seen := msgSeen{}
 	for _, s := range ss {
-		key := s.Harness + ":" + s.ID
+		key := s.Key()
 		meta, ok := m.Sessions[key]
 		if !ok {
 			continue

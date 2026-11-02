@@ -115,7 +115,7 @@ func keyText(text string) string {
 
 // Spawned reports a session an agent started, whose "user" turns a model wrote.
 func Spawned(s model.Session) bool {
-	return model.SpawnedKind(s.Kind) || strings.Contains(s.Path, string(filepath.Separator)+"subagents"+string(filepath.Separator))
+	return s.IsSpawned() || strings.Contains(s.Path, string(filepath.Separator)+"subagents"+string(filepath.Separator))
 }
 
 // AgentReport reports model prose that arrives as a tool result or a user

@@ -741,7 +741,7 @@ func mergeFixes(dir, tmp string, live map[string]bool, replacements []model.Sess
 		kept = append(kept, p)
 	}
 	for _, s := range replacements {
-		fresh := fixPairsIn(s.Messages, s.Harness+":"+s.ID, s.Project)
+		fresh := fixPairsIn(s.Messages, s.Key(), s.Project)
 		changed = changed || len(fresh) > 0
 		kept = append(kept, fresh...)
 	}

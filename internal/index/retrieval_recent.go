@@ -447,7 +447,7 @@ func sessionsForMetasInRoles(dir string, metas []SessionMeta, roles map[string]b
 		}
 		m = cur
 		metas = slices.DeleteFunc(slices.Clone(metas), func(meta SessionMeta) bool {
-			_, ok := m.Sessions[meta.Harness+":"+meta.ID]
+			_, ok := m.Sessions[meta.Key()]
 			return !ok
 		})
 		if sessionReread != nil {
@@ -490,7 +490,7 @@ func sessionsForMetasIn(dir string, m Manifest, metas []SessionMeta, roles map[s
 	want := make(map[string]int, len(metas))
 	out := make([]model.Session, len(metas))
 	for i, meta := range metas {
-		want[meta.Harness+":"+meta.ID] = i
+		want[meta.Key()] = i
 		out[i] = sessionFromMeta(meta)
 	}
 	keys := make(map[string]bool, len(want))
@@ -601,7 +601,7 @@ func recentProjectMetas(m Manifest, projects []string, root string, perName int)
 			mine = mine[:perName]
 		}
 		for _, meta := range mine {
-			k := meta.Harness + ":" + meta.ID
+			k := meta.Key()
 			if !seen[k] {
 				seen[k] = true
 				metas = append(metas, meta)
@@ -651,7 +651,7 @@ func metasWorkingUnder(m Manifest, root string, seen map[string]bool) []SessionM
 	prefix += "/"
 	var out []SessionMeta
 	for _, meta := range m.Sessions {
-		k := meta.Harness + ":" + meta.ID
+		k := meta.Key()
 		if seen[k] {
 			continue
 		}

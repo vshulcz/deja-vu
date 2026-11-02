@@ -75,7 +75,7 @@ func widenLogTail(ids map[string]bool, p string, ss []model.Session, held map[st
 	got := make(map[string]bool, len(ss))
 	for _, s := range ss {
 		got[s.ID] = true
-		if held[s.Harness+":"+s.ID].Path != p {
+		if held[s.Key()].Path != p {
 			ids[s.ID] = true
 		}
 	}

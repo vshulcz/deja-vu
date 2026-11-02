@@ -315,7 +315,7 @@ func parseCompactionSession(originalPath, harness, workspace string, data []byte
 		// own (#5216); the session here is the one the log belongs to.
 		own := sessions[:0]
 		for _, s := range sessions {
-			if s.Kind != "sidechain" {
+			if !s.IsSpawned() {
 				own = append(own, s)
 			}
 		}

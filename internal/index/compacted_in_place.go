@@ -40,7 +40,7 @@ func compactedInPlace(ss []model.Session, raw bool) map[string]map[string]bool {
 		if out == nil {
 			out = map[string]map[string]bool{}
 		}
-		out[s.Harness+":"+s.ID] = held
+		out[s.Key()] = held
 	}
 	return out
 }
@@ -66,8 +66,8 @@ func carryCompactedAway(dir string, ss []model.Session) []model.Session {
 	}
 	at := map[string]int{}
 	for i, s := range ss {
-		if _, ok := compacted[s.Harness+":"+s.ID]; ok {
-			at[s.Harness+":"+s.ID] = i
+		if _, ok := compacted[s.Key()]; ok {
+			at[s.Key()] = i
 		}
 	}
 	carried := map[string][]model.Message{}

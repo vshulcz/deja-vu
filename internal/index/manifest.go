@@ -289,7 +289,7 @@ func IndexedSessionKeys(dir string) map[string]bool {
 	}
 	out := make(map[string]bool, len(m.Sessions))
 	for _, meta := range m.Sessions {
-		out[meta.Harness+":"+meta.ID] = true
+		out[meta.Key()] = true
 	}
 	return out
 }

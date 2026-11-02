@@ -296,10 +296,10 @@ func exportRecordsWith(dir, outDir, peer string, full, relay bool) (int, func() 
 		}
 		text, _ := redact.Text(r.Text)
 		rec := SyncRecord{Harness: meta.Harness, SessionID: sessionID, Project: project, Role: r.Role, Text: text, Time: r.Time, Origin: origin}
-		if !relayed && inParentFile(meta.Harness, meta.Kind, meta.Parent) {
+		if !relayed && meta.InParentFile() {
 			rec.Parent = syncName(meta.Parent)
 		}
-		if spawnedKind(meta.Kind) {
+		if meta.IsSpawned() {
 			rec.Kind = syncName(meta.Kind)
 		}
 		if meta.Harness == model.NotesHarness && model.IsPromotedNoteID(sessionID) {
@@ -630,7 +630,7 @@ func Import(dir, inDir string) (int, error) {
 	imp.m = &m
 	for _, meta := range m.Sessions {
 		if meta.OrigID == "" {
-			imp.localSessions[meta.Harness+":"+meta.ID] = true
+			imp.localSessions[meta.Key()] = true
 		}
 	}
 	var skipped []string

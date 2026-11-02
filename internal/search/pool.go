@@ -88,7 +88,7 @@ func Pool(cands []PoolCandidate, o Options, n int, share float64) (keep []bool, 
 			next += step
 			keep[i] = true
 			c := cands[i].Session
-			unread.Sample[c.Harness+":"+c.ID] = est[i]
+			unread.Sample[c.Key()] = est[i]
 			continue
 		}
 		unread.Sessions++

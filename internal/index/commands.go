@@ -98,7 +98,7 @@ func buildCommands(tmp string, ss []model.Session) {
 	}
 	by := map[string]*acc{}
 	for _, s := range ss {
-		key := s.Harness + ":" + s.ID
+		key := s.Key()
 		for _, m := range s.Messages {
 			if m.Role != roleCommand {
 				continue

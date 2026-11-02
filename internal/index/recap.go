@@ -107,7 +107,7 @@ func ScanRecap(dir string, since time.Duration, perSession int) (Recap, error) {
 		if meta.Updated.Before(cut) {
 			continue
 		}
-		if meta.Kind == "subagent" || meta.Kind == "sidechain" {
+		if meta.IsSpawned() {
 			continue
 		}
 		if pol.Ignored(meta.Path, meta.Project) {

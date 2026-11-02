@@ -125,7 +125,7 @@ func (rp *replacePass) run(takenFrom map[string]bool) error {
 	rp.replacements = dropShadowedPrompts(rp.replacements, rp.old.Sessions)
 	rp.replaceKeys = map[string]bool{}
 	for _, s := range rp.replacements {
-		rp.replaceKeys[s.Harness+":"+s.ID] = true
+		rp.replaceKeys[s.Key()] = true
 	}
 	// A transcript arriving for a session held from a prompt log alone: the
 	// log's records for it go, and the row starts over from the transcript.
@@ -155,7 +155,7 @@ func (rp *replacePass) skip(p string, err error) {
 func (rp *replacePass) take(p string, ss []model.Session) {
 	ss = dropShadowedPrompts(sources.FilterSessions(filterTombstoned(ss)), rp.old.Sessions)
 	for _, s := range ss {
-		rp.keysFrom[p] = append(rp.keysFrom[p], s.Harness+":"+s.ID)
+		rp.keysFrom[p] = append(rp.keysFrom[p], s.Key())
 	}
 	rp.replacements = append(rp.replacements, ss...)
 }
@@ -288,7 +288,7 @@ func (rp *replacePass) dropMovedKept() {
 			continue
 		}
 		if holdsText(r) {
-			key := r.Harness + ":" + r.ID
+			key := r.Key()
 			arrivals[key] = append(arrivals[key], i)
 		}
 	}
@@ -594,7 +594,7 @@ func (rp *replacePass) prepareCarry() {
 	}
 	rp.readAgain = msgSeen{}
 	for _, s := range rp.replacements {
-		if key := s.Harness + ":" + s.ID; rp.keptCopy[key] != "" {
+		if key := s.Key(); rp.keptCopy[key] != "" {
 			for _, msg := range s.Messages {
 				rp.readAgain.dup(key, msg.Role, msg.Time, msg.Text)
 				// A command whose result landed since is the same turn.
@@ -737,7 +737,7 @@ func (rp *replacePass) writeReplacements() (map[string]bool, error) {
 	// is done goes to Empty, as a rebuild sets it aside (#5563).
 	readKeys := map[string]bool{}
 	for i, s := range rp.replacements {
-		key := s.Harness + ":" + s.ID
+		key := s.Key()
 		readKeys[key] = true
 		ord := uint32(0)
 		if om, ok := rp.old.Sessions[key]; ok {
