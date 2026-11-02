@@ -84,6 +84,9 @@ func contextByID(dir, q string, harness ...string) (string, idContext, bool) {
 	if err != nil || !ok {
 		return "", idContext{}, false
 	}
+	if policy.Load().Ignored(s.Path, s.Project) {
+		return "", idContext{}, false
+	}
 	kept, _ := policyFilterSessionsCounted(policy.ActivationMCP, []model.Session{s})
 	if len(kept) == 0 {
 		return "", idContext{}, false

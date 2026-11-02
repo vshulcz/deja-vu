@@ -244,7 +244,7 @@ func ClaudeFileWanted(p string) bool {
 // it. A sidechain transcript outside such a directory is listed whatever the
 // switch says, and the registry's switch cuts or drops it by its kind (#5301).
 func IsSubagentPath(p string) bool {
-	return strings.Contains(p, string(filepath.Separator)+"subagents"+string(filepath.Separator))
+	return strings.Contains(p, "/subagents/") || strings.Contains(p, `\subagents\`)
 }
 
 // SubagentTailKept is how many of a child's own turns are indexed: the task it

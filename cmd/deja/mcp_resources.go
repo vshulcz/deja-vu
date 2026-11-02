@@ -104,7 +104,8 @@ func mcpResourceRead(dir, uri string) (any, int, string) {
 		// entries above (#1729).
 		return nil, -32602, fmt.Sprintf("no session matches %q", neutralizeFrameMarkers(safeForStatusline(id, mcpResourceNameMax)))
 	}
-	if !policy.Load().Allows(policy.ActivationMCP, s.Project) {
+	pol := policy.Load()
+	if !pol.Allows(policy.ActivationMCP, s.Project) || pol.Ignored(s.Path, s.Project) {
 		return nil, -32602, "blocked by trust policy"
 	}
 	// Every door a person types says when a prefix reached more than one
@@ -113,7 +114,6 @@ func mcpResourceRead(dir, uri string) (any, int, string) {
 	// the transcript rather than inside it; here it goes above the recall
 	// frame, so it reads as deja's own words and not as recalled text.
 	note := ""
-	pol := policy.Load()
 	if n := index.PrefixMatchesIn(dir, id, harness, func(project string) bool {
 		return pol.Allows(policy.ActivationMCP, project)
 	}); n > 1 {

@@ -796,6 +796,12 @@ func TestDDDStageEToGManifestVisibilityAndHandoverInvariants(t *testing.T) {
 		"hook_week_used.go",
 		"hook_week_deleted.go",
 		"hook_context.go",
+		"restore.go",
+		"embed.go",
+		"environment.go",
+		"lifecycle.go",
+		"mcp_recall.go",
+		"doctor.go",
 	}
 	for _, name := range mustCallMetaVisible {
 		f, parseErr := parser.ParseFile(fset, name, nil, 0)
@@ -961,6 +967,9 @@ func TestDDDStageEToGManifestVisibilityAndHandoverInvariants(t *testing.T) {
 	if isHandoverMeta(index.SessionMeta{Harness: "claude", ID: "sub-2", Path: "/Users/x/.claude/projects/p/subagents/agent-1.jsonl"}) {
 		t.Fatal("Bug #51 regression: isHandoverMeta accepted subagent transcript path")
 	}
+	if isHandoverMeta(index.SessionMeta{Harness: "claude", ID: "sub-3", Path: `C:\Users\x\.claude\projects\p\subagents\agent-1.jsonl`}) {
+		t.Fatal("Bug #87 regression: isHandoverMeta accepted Windows subagent transcript path on non-Windows host")
+	}
 
 	// 4. Behavioral Invariant (Stage K, Bug #73): leadWithUnseen keys by composite
 	// s.Key() so two harnesses sharing a raw session ID do not cross-contaminate
@@ -969,5 +978,32 @@ func TestDDDStageEToGManifestVisibilityAndHandoverInvariants(t *testing.T) {
 	lead, fresh := leadWithUnseen(dir, []string{"payments"}, []model.Session{sClaude, sCodex})
 	if len(lead) != 2 || lead[0].Harness != "codex" || !fresh["codex:shared-id-1"] || fresh["claude:shared-id-1"] {
 		t.Fatalf("Bug #73 regression: leadWithUnseen failed to isolate unseen codex:shared-id-1 from seen claude:shared-id-1: lead=%+v fresh=%+v", lead, fresh)
+	}
+
+	// 5. Behavioral Invariants (Stages L-N, Bugs #75-#86): With codex excluded via
+	// DEJA_EXCLUDE_HARNESSES, reachableSessionCount, policyWithheldCounts,
+	// projectsInStore, embedPolicyKeep, and search.WithoutIgnored must all exclude
+	// the codex session.
+	if reach, trusted, total, ok := reachableSessionCount(dir); !ok || reach != 1 || trusted != 1 || total != 1 {
+		t.Fatalf("Bug #83 regression: reachableSessionCount with codex excluded = (%d, %d, %d, %v), want (1, 1, 1, true)", reach, trusted, total, ok)
+	}
+	if _, total := policyWithheldCounts(dir); total != 1 {
+		t.Fatalf("Bug #84 regression: policyWithheldCounts total with codex excluded = %d, want 1", total)
+	}
+	keepFn, heldFn, err := embedPolicyKeep(dir)
+	if err != nil {
+		t.Fatalf("embedPolicyKeep: %v", err)
+	}
+	if keepFn(index.Record{Key: "codex:shared-id-1"}) || heldFn() != 1 {
+		t.Fatalf("Bug #78 regression: embedPolicyKeep allowed excluded codex session off machine (held=%d)", heldFn())
+	}
+	if !keepFn(index.Record{Key: "claude:shared-id-1"}) {
+		t.Fatal("Bug #78 regression: embedPolicyKeep rejected allowed claude session")
+	}
+	if filtered := search.WithoutIgnored([]model.Session{sClaude, sCodex}); len(filtered) != 1 || filtered[0].Harness != "claude" {
+		t.Fatalf("Bug #79 regression: search.WithoutIgnored leaked excluded codex session: %+v", filtered)
+	}
+	if _, _, ok := contextByID(dir, "shared-id-1", "codex"); ok {
+		t.Fatal("Bug #86 regression: contextByID resolved excluded codex session")
 	}
 }

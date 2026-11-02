@@ -200,4 +200,17 @@ func TestDDDStageIReadSideExclusionAndIgnoreInvariants(t *testing.T) {
 			t.Fatalf("Bug #70 regression: KeptSince leaked excluded codex session: %+v", k)
 		}
 	}
+
+	// Stage N (Bug #86): Unscoped FindByPrefix, FindByID, and PrefixHarnesses must
+	// skip excluded harnesses rather than letting an excluded harness shadow an
+	// active one.
+	if hs := PrefixHarnesses(dir, "shared-1"); len(hs) != 1 || hs[0] != "claude" {
+		t.Fatalf("Bug #86 regression: PrefixHarnesses with codex excluded = %v, want [claude]", hs)
+	}
+	if s, ok, err := FindByPrefix(dir, "shared-1"); err != nil || !ok || s.Harness != "claude" {
+		t.Fatalf("Bug #86 regression: FindByPrefix with codex excluded = (%s, %v, %v), want claude", s.Harness, ok, err)
+	}
+	if s, ok, err := FindByID(dir, "shared-1"); err != nil || !ok || s.Harness != "claude" {
+		t.Fatalf("Bug #86 regression: FindByID with codex excluded = (%s, %v, %v), want claude", s.Harness, ok, err)
+	}
 }

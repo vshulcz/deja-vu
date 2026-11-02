@@ -18,6 +18,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/jsonout"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // `deja how` answers "how do I run this here" from what was actually run here.
@@ -293,7 +294,7 @@ func howEntries(dir string, terms []string, projects []string, activation string
 	ignored := map[string]bool{}
 	byCmd := map[string]*howEntry{}
 	err := index.EachRecordOfRole(dir, "command", func(meta index.SessionMeta, r index.Record) {
-		if !howProjectMatches(meta.Project, projects) {
+		if sources.HarnessExcluded(meta.Harness) || !howProjectMatches(meta.Project, projects) {
 			return
 		}
 		// Without the outcome codex and opencode append: "$ make test  → exit

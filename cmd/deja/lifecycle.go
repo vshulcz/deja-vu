@@ -8,6 +8,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -34,9 +35,10 @@ func importedLifecycles(dir string) map[string]sources.Lifecycle {
 	if err != nil {
 		return nil
 	}
+	pol := policy.Load()
 	out := map[string]sources.Lifecycle{}
 	for _, m := range metas {
-		if m.Lifecycle == "" {
+		if m.Lifecycle == "" || !metaVisible(pol, "", m) {
 			continue
 		}
 		srcKey, ok := m.PromotedNoteSourceKey()
@@ -44,6 +46,9 @@ func importedLifecycles(dir string) map[string]sources.Lifecycle {
 			continue
 		}
 		at, _ := time.Parse("2006-01-02", m.LifecycleAt)
+		if prev, exists := out[srcKey]; exists && prev.At.After(at) {
+			continue
+		}
 		out[srcKey] = sources.Lifecycle{
 			State: m.Lifecycle, Note: m.LifecycleNote, At: at,
 		}

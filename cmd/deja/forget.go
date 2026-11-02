@@ -571,6 +571,10 @@ func reachableSessionCount(dir string) (reach, trusted, total int, ok bool) {
 	}
 	pol := policy.Load()
 	for _, m := range metas {
+		if sources.HarnessExcluded(m.Harness) {
+			continue
+		}
+		total++
 		if !pol.Allows(policy.ActivationSearch, m.Project) {
 			continue
 		}
@@ -579,7 +583,7 @@ func reachableSessionCount(dir string) (reach, trusted, total int, ok bool) {
 			reach++
 		}
 	}
-	return reach, trusted, len(metas), true
+	return reach, trusted, total, true
 }
 
 // joinCapped lists at most n items and says how many it left out, so a refusal

@@ -55,17 +55,17 @@ func embedPolicyKeep(dir string) (func(index.Record) bool, func() int, error) {
 		// egress gate fails closed: no origins known, nothing leaves.
 		return nil, nil, fmt.Errorf("embed: cannot read which sessions are local before sending text off the machine: %w", err)
 	}
-	project := make(map[string]string, len(metas))
+	byKey := make(map[string]index.SessionMeta, len(metas))
 	for _, m := range metas {
-		project[m.Key()] = m.Project
+		byKey[m.Key()] = m
 	}
 	pol := policy.Load()
 	return func(r index.Record) bool {
-			p, ok := project[r.Key]
+			m, ok := byKey[r.Key]
 			if !ok {
 				return true
 			}
-			if pol.AllowsEgress(p) {
+			if metaVisible(pol, "", m) && pol.AllowsEgress(m.Project) {
 				return true
 			}
 			held++

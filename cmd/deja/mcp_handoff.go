@@ -63,6 +63,9 @@ func handoffTargetForAgent(dir, sel, harness string) (model.Session, string) {
 		if err != nil || !ok {
 			return model.Session{}, fmt.Sprintf("no session matches %q", sel)
 		}
+		if policy.Load().Ignored(s.Path, s.Project) {
+			return model.Session{}, fmt.Sprintf("%q is withheld by this machine's trust policy", sel)
+		}
 		kept, _ := policyFilterSessionsCounted(policy.ActivationMCP, []model.Session{s})
 		if len(kept) == 0 {
 			return model.Session{}, fmt.Sprintf("%q is withheld by this machine's trust policy", sel)
