@@ -310,6 +310,21 @@ func (m SessionMeta) OrigKey() string {
 	return model.SessionKey(m.Harness, m.OrigID)
 }
 
+// LifecycleTime returns the parsed timestamp of LifecycleAt (either RFC3339 or
+// "2006-01-02" day format), falling back to Updated when LifecycleAt is empty
+// or unparseable.
+func (m SessionMeta) LifecycleTime() time.Time {
+	if m.LifecycleAt != "" {
+		if t, err := time.Parse(time.RFC3339, m.LifecycleAt); err == nil {
+			return t
+		}
+		if t, err := time.Parse("2006-01-02", m.LifecycleAt); err == nil {
+			return t
+		}
+	}
+	return m.Updated
+}
+
 // Key returns the finding's canonical "harness:id" session identifier.
 func (f SecretFinding) Key() string { return model.SessionKey(f.Harness, f.ID) }
 

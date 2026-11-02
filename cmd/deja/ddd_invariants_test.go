@@ -5,6 +5,7 @@ import (
 	"go/parser"
 	"go/token"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -465,5 +466,52 @@ func TestDDDLifecycleResolutionEncapsulated(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestDDDNoteFromMetaAndSyncedCommandDecision(t *testing.T) {
+	meta := index.SessionMeta{
+		ID:            "imported-n1",
+		OrigID:        "deja-note-claude-src1",
+		Harness:       model.NotesHarness,
+		Project:       "imported:org/app",
+		Title:         "use -p 1",
+		Lifecycle:     model.LifecycleAccepted,
+		LifecycleNote: "Always pass -p 1 to go test.",
+		LifecycleAt:   "2026-08-29",
+	}
+	note := noteFromMeta(meta)
+	if note.Session != "claude:src1" {
+		t.Fatalf("noteFromMeta.Session = %q; want claude:src1", note.Session)
+	}
+	if got := note.At.Format("2006-01-02"); got != "2026-08-29" {
+		t.Fatalf("noteFromMeta.At = %q; want 2026-08-29", got)
+	}
+
+	tmp := hermeticEnv(t)
+	batch := filepath.Join(tmp, "batch")
+	if err := os.MkdirAll(batch, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	recs := strings.Join([]string{
+		`{"harness":"claude","session_id":"src1","project":"org/app","role":"command","text":"go test ./... -p 1","time":"2026-08-04T17:44:54Z"}`,
+		`{"harness":"claude","session_id":"src1","project":"org/app","role":"user","text":"run tests sequentially","time":"2026-08-04T17:44:55Z"}`,
+		`{"harness":"deja","session_id":"deja-note-claude-src1","project":"org/app","role":"user","text":"[accepted] Always run go test with -p 1 (from claude:src1, 2026-08-06)","time":"2026-08-06T17:44:54Z"}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(filepath.Join(batch, "deja-sync-aaaa-1.jsonl"), []byte(recs), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRunStderr(t, "sync", "import", batch); err != nil {
+		t.Fatal(err)
+	}
+	dir := index.DefaultDir()
+	// FindByIdentity resolves imported sessions by OrigID as well as local ID.
+	if s, ok, err := index.FindByIdentity(dir, "claude", "src1"); err != nil || !ok || s.OrigID != "src1" {
+		t.Fatalf("FindByIdentity by OrigID = (%+v, %v, %v)", s, ok, err)
+	}
+	// promotedCommandDecision resolves a synced accepted note back to its
+	// synced source transcript and checks SessionRanCommand.
+	if got := promotedCommandDecision(dir, "/work/org/app", "go test ./... -p 1"); !strings.Contains(got, "Always run go test with -p 1") {
+		t.Fatalf("promotedCommandDecision = %q; want synced convention", got)
 	}
 }

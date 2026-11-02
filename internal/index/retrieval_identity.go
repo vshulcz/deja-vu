@@ -297,7 +297,15 @@ func FindByIdentity(dir, harness, id string) (model.Session, bool, error) {
 	if mustRebuildBeforeAnswering(m, version) {
 		return model.Session{}, false, ErrStoreWithheld
 	}
-	meta, ok := m.Sessions[harness+":"+id]
+	meta, ok := m.Sessions[model.SessionKey(harness, id)]
+	if !ok {
+		for _, cand := range m.Sessions {
+			if cand.Harness == harness && cand.OrigID == id {
+				meta, ok = cand, true
+				break
+			}
+		}
+	}
 	if !ok {
 		return model.Session{}, false, nil
 	}
