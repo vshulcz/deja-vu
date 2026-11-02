@@ -14,9 +14,14 @@ import (
 // following deja's own instruction spent a call on
 // `mode "recall_context" is not one of recall, context, blame, ...`.
 func TestEveryToolNameDejaTellsAgentsToCallIsAMode(t *testing.T) {
-	for _, name := range []string{"recall", "recall_context", "blame", "fix", "how", "orient", "remember"} {
+	for _, name := range []string{"recall", "recall_context", "blame", "fix", "how", "orient", "remember", "handoff"} {
 		if _, ok := dispatcherModes[name]; !ok {
 			t.Errorf("deja names %q in its own guidance and the dispatcher does not accept it", name)
+		}
+	}
+	for _, mode := range declaredModes() {
+		if _, ok := dispatcherModes[mode]; !ok {
+			t.Errorf("declaredModes() advertises %q, which dispatcherModes does not accept", mode)
 		}
 	}
 	// Named, not declared: the enum is what a model picks from, and listing
@@ -32,15 +37,24 @@ func TestEveryToolNameDejaTellsAgentsToCallIsAMode(t *testing.T) {
 // answered "query required", because the field to copy q into was keyed by
 // mode and only the canonical modes had a row.
 func TestEveryAcceptedModeKnowsWhereQGoes(t *testing.T) {
-	for mode := range dispatcherModes {
-		if _, ok := qField[dispatcherModes[mode]]; !ok {
-			t.Errorf("mode %q dispatches to %q, which has no field for q", mode, dispatcherModes[mode])
+	targets := map[string]bool{}
+	for mode, target := range dispatcherModes {
+		targets[target] = true
+		field, ok := qField[target]
+		if !ok {
+			t.Errorf("mode %q dispatches to %q, which has no field for q", mode, target)
+			continue
+		}
+		if field != "" {
+			got := string(spreadQ(mode, json.RawMessage(`{"mode":"`+mode+`","q":"carried"}`)))
+			if !strings.Contains(got, `"`+field+`":"carried"`) {
+				t.Errorf("spreadQ(%q) did not carry q into %q: %s", mode, field, got)
+			}
 		}
 	}
-	for _, mode := range []string{"search", "digest", "recall_context", "context", "recall"} {
-		got := string(spreadQ(mode, json.RawMessage(`{"mode":"`+mode+`","q":"carried"}`)))
-		if !strings.Contains(got, `"query":"carried"`) {
-			t.Errorf("spreadQ(%q) did not carry q into query: %s", mode, got)
+	for target := range qField {
+		if !targets[target] {
+			t.Errorf("qField has an entry for %q, which no mode in dispatcherModes dispatches to", target)
 		}
 	}
 }

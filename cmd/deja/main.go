@@ -103,49 +103,20 @@ func rebuildWindowError(err error) error {
 
 func loadAll(h string) []model.Session {
 	var ss []model.Session
-	if h == "" || h == "claude" {
-		ss = append(ss, sources.LoadClaude()...)
-	}
-	if h == "" || h == "codex" {
-		ss = append(ss, sources.LoadCodex()...)
-	}
-	if h == "" || h == "opencode" {
-		ss = append(ss, sources.LoadOpencode()...)
-	}
-	if h == "" || h == "aider" {
-		ss = append(ss, sources.LoadAider()...)
-	}
-	if h == "" || h == "gemini" {
-		ss = append(ss, sources.LoadGemini()...)
-	}
-	if h == "" || h == "cursor" {
-		ss = append(ss, sources.LoadCursor()...)
-	}
-	if h == "" || h == "antigravity" {
-		ss = append(ss, sources.LoadAntigravity()...)
-	}
-	if h == "" || h == "grok" {
-		ss = append(ss, sources.LoadGrok()...)
-	}
-	if h == "" || h == "qwen" {
-		ss = append(ss, sources.LoadQwen()...)
-	}
-	if h == "" || h == "kimi" {
-		ss = append(ss, sources.LoadKimi()...)
-	}
-	if h == "" || h == "goose" {
-		ss = append(ss, sources.LoadGoose()...)
-	}
-	if h == "" || h == "hermes" {
-		ss = append(ss, sources.LoadHermes()...)
+	for _, store := range sources.StoresToRead() {
+		if (h == "" || store.Name == h) && store.Load != nil {
+			ss = append(ss, store.Load()...)
+		}
 	}
 	return ss
 }
 
 func loadFileSources() []model.Session {
-	var ss []model.Session //nolint:prealloc // the count is whatever each store holds
-	for _, harness := range []string{"claude", "codex", "aider", "gemini", "cursor", "antigravity", "grok", "qwen", "kimi", "goose", "hermes"} {
-		ss = append(ss, loadAll(harness)...)
+	var ss []model.Session
+	for _, store := range sources.StoresToRead() {
+		if store.Name != "opencode" && store.Load != nil {
+			ss = append(ss, store.Load()...)
+		}
 	}
 	return ss
 }

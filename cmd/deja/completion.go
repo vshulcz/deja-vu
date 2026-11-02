@@ -132,7 +132,7 @@ _deja_completion() {
             fi
             ;;
         hook-context)
-            COMPREPLY=( $(compgen -W "--plain --once --copilot --notes" -- "$cur") )
+            COMPREPLY=( $(compgen -W "--plain --once --strict --copilot --notes --junie --mcode" -- "$cur") )
             ;;
         index)
             COMPREPLY=( $(compgen -W "--rebuild -rebuild --quiet -quiet" -- "$cur") )
@@ -201,7 +201,7 @@ _deja_completion() {
             ;;
         sync)
             if (( COMP_CWORD == 2 )); then
-                COMPREPLY=( $(compgen -W "export import ssh forget" -- "$cur") )
+                COMPREPLY=( $(compgen -W "export import ssh forget --full" -- "$cur") )
             elif [[ "$action" == "export" ]]; then
                 if [[ "$prev" == "--peer" ]]; then
                     COMPREPLY=()
@@ -391,7 +391,7 @@ _deja() {
       _arguments '--to=[target agent]:agent:(%HANDOFF_TARGETS%)' '--exec[launch the target agent]' '1:session ID prefix:'
       ;;
     hook-context)
-      _arguments '--plain[omit formatting]' '--once[one digest per session]' '--copilot[answer in the Copilot CLI hook shape]' '--notes[only the notes meant for the person]'
+      _arguments '--plain[omit formatting]' '--once[one digest per session]' '--strict[skip low-confidence sessions]' '--copilot[answer in the Copilot CLI hook shape]' '--notes[only the notes meant for the person]' '--junie[answer in the Junie hook shape]' '--mcode[answer in the MCode hook shape]'
       ;;
     index)
       _arguments '--rebuild[force a full rebuild]' '-rebuild[force a full rebuild]' '--quiet[say nothing when it worked]' '-quiet[say nothing when it worked]'
@@ -432,7 +432,7 @@ _deja() {
       ;;
     sync)
       if (( CURRENT == 3 )); then
-        _values 'sync action' export import ssh forget
+        _values 'sync action' export import ssh forget --full
       elif [[ "$words[3]" == "export" ]]; then
         _arguments '--full[export all records]' '--include-imported[include records received from other machines]' '--peer=[destination peer name]:peer:' '1:directory:_files -/'
       elif [[ "$words[3]" == "import" ]]; then
@@ -550,7 +550,11 @@ complete -c deja -n '__fish_seen_subcommand_from handoff' -l to -r -a '%HANDOFF_
 complete -c deja -n '__fish_seen_subcommand_from handoff' -l exec
 complete -c deja -n '__fish_seen_subcommand_from hook-context' -l plain
 complete -c deja -n '__fish_seen_subcommand_from hook-context' -l once
+complete -c deja -n '__fish_seen_subcommand_from hook-context' -l strict
+complete -c deja -n '__fish_seen_subcommand_from hook-context' -l copilot
 complete -c deja -n '__fish_seen_subcommand_from hook-context' -l notes
+complete -c deja -n '__fish_seen_subcommand_from hook-context' -l junie
+complete -c deja -n '__fish_seen_subcommand_from hook-context' -l mcode
 complete -c deja -n '__fish_seen_subcommand_from index' -l rebuild
 complete -c deja -n '__fish_seen_subcommand_from index' -l quiet -d 'Say nothing when it worked'
 complete -c deja -n '__fish_seen_subcommand_from install uninstall' -a '%INSTALL_TARGETS% --all --auto'
@@ -625,13 +629,14 @@ complete -c deja -n '__fish_seen_subcommand_from promote' -l tag -x -d 'Tag the 
 complete -c deja -n '__fish_seen_subcommand_from promote' -l to -r -F -d 'Also append the note to a Markdown file'
 complete -c deja -n '__fish_seen_subcommand_from promote' -l repo -d 'Write to .deja/notes.jsonl in the repository'
 complete -c deja -n '__fish_seen_subcommand_from sync; and not __fish_seen_subcommand_from rules; and not __fish_seen_subcommand_from export import ssh forget' -a 'export import ssh forget'
+complete -c deja -n '__fish_seen_subcommand_from sync; and not __fish_seen_subcommand_from rules; and not __fish_seen_subcommand_from export import ssh forget' -l full
 complete -c deja -n '__fish_seen_subcommand_from sync; and __fish_seen_subcommand_from export' -l include-imported
 complete -c deja -n '__fish_seen_subcommand_from sync; and __fish_seen_subcommand_from export' -l peer -r
-complete -c deja -n '__fish_seen_subcommand_from export' -l full
-complete -c deja -n '__fish_seen_subcommand_from export' -F
-complete -c deja -n '__fish_seen_subcommand_from import' -F
-complete -c deja -n '__fish_seen_subcommand_from ssh' -l pull
-complete -c deja -n '__fish_seen_subcommand_from ssh' -l full
+complete -c deja -n '__fish_seen_subcommand_from sync; and __fish_seen_subcommand_from export' -l full
+complete -c deja -n '__fish_seen_subcommand_from sync; and __fish_seen_subcommand_from export' -F
+complete -c deja -n '__fish_seen_subcommand_from sync; and __fish_seen_subcommand_from import' -F
+complete -c deja -n '__fish_seen_subcommand_from sync; and __fish_seen_subcommand_from ssh' -l pull
+complete -c deja -n '__fish_seen_subcommand_from sync; and __fish_seen_subcommand_from ssh' -l full
 complete -c deja -n '__fish_seen_subcommand_from sync; and __fish_seen_subcommand_from ssh' -l both
 `
 
@@ -691,7 +696,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 if ($previous -eq '--to') { $handoffTargets }
                 else { @('--to', '--exec') }
             }
-            'hook-context' { @('--plain', '--once', '--copilot', '--notes') }
+            'hook-context' { @('--plain', '--once', '--strict', '--copilot', '--notes', '--junie', '--mcode') }
             'index' { @('--rebuild', '-rebuild', '--quiet', '-quiet') }
             'install' { $installTargets + @('--no-guidance', '--no-index', '--force') }
             'uninstall' { $installTargets + @('--no-guidance') }
@@ -725,7 +730,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 else { @('--json', '--impact', '--year', '--html', '--redaction', '--card', '--harness', '--project', '--since', '--role') }
             }
             'sync' {
-                if ($argumentPosition -eq 1) { @('export', 'import', 'ssh', 'forget') }
+                if ($argumentPosition -eq 1) { @('export', 'import', 'ssh', 'forget', '--full') }
                 elseif ($action -eq 'export' -and $previous -ne '--peer') { @('--full', '--include-imported', '--peer') }
                 elseif ($action -eq 'ssh') { @('--pull', '--full', '--both') }
                 else { @() }

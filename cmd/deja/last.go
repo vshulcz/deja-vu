@@ -227,7 +227,7 @@ func recentMatching(dir string, n int, o search.Options) ([]model.Session, error
 	return search.Recent(ss, n), nil
 }
 
-var lastFlags = []string{"--json", "--project", "--harness", "--from", "--since", "--role", "--limit"}
+var lastFlags = []string{"--json", "--project", "--harness", "--from", "--since", "--role"}
 
 func parseLast(args []string) (int, search.Options, string, error) {
 	sinceRaw := ""
