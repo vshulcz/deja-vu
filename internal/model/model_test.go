@@ -68,3 +68,72 @@ func TestTouchIgnoresZero(t *testing.T) {
 		t.Fatalf("zero touch changed state: started=%v updated=%v", s.Started, s.Updated)
 	}
 }
+
+func TestRolesAndMessagePredicates(t *testing.T) {
+	for _, r := range []string{RoleToolOutput, RoleFiles, RoleCommand, RoleEdit, RoleSummary, RoleWrote} {
+		if !IsWorkRole(r) || IsSpokenRole(r) {
+			t.Fatalf("role %q: IsWorkRole=%v IsSpokenRole=%v", r, IsWorkRole(r), IsSpokenRole(r))
+		}
+		m := Message{Role: r}
+		if !m.IsWorkRecord() || m.IsSpoken() {
+			t.Fatalf("message(%q) predicates mismatch", r)
+		}
+	}
+	for _, r := range []string{RoleUser, RoleAssistant} {
+		if IsWorkRole(r) || !IsSpokenRole(r) {
+			t.Fatalf("role %q: IsWorkRole=%v IsSpokenRole=%v", r, IsWorkRole(r), IsSpokenRole(r))
+		}
+		m := Message{Role: r}
+		if m.IsWorkRecord() || !m.IsSpoken() {
+			t.Fatalf("message(%q) predicates mismatch", r)
+		}
+	}
+	if !RoleMatches(RoleToolOutput, RoleTool) || !RoleMatches(RoleUser, RoleUser) || RoleMatches(RoleUser, RoleTool) {
+		t.Fatal("RoleMatches failed")
+	}
+}
+
+func TestSessionProjectAndPromotedNoteMethods(t *testing.T) {
+	s := Session{Harness: "claude", ID: "s1", Project: "imported:acme/api"}
+	if s.Key() != "claude:s1" || !s.IsImported() || s.BareProject() != "acme/api" {
+		t.Fatalf("session key/imported/bare mismatch: %q %v %q", s.Key(), s.IsImported(), s.BareProject())
+	}
+	if !IsRepoProject("repo") || !IsRepoProject("repo:acme") || IsRepoProject("acme") {
+		t.Fatal("IsRepoProject mismatch")
+	}
+	if s.IsPromotedNote() || s.PromotedNoteID() != "" {
+		t.Fatal("non-note session reported as promoted note")
+	}
+	if _, ok := s.PromotedNoteSourceKey(); ok {
+		t.Fatal("non-note session returned source key")
+	}
+	if got := s.CandidatePromotedNoteIDs(); len(got) != 2 || got[0] != "deja-note-claude-s1" || got[1] != "deja-repo-note-claude-s1" {
+		t.Fatalf("CandidatePromotedNoteIDs(no OrigID) = %v", got)
+	}
+	s.OrigID = "orig1"
+	if got := s.CandidatePromotedNoteIDs(); len(got) != 4 || got[1] != "deja-note-claude-orig1" || got[3] != "deja-repo-note-claude-orig1" {
+		t.Fatalf("CandidatePromotedNoteIDs(with OrigID) = %v", got)
+	}
+
+	note := Session{Harness: NotesHarness, ID: PromotedNoteID("claude:s1")}
+	if !note.IsPromotedNote() || note.PromotedNoteID() != "deja-note-claude-s1" {
+		t.Fatalf("local note mismatch: %v %q", note.IsPromotedNote(), note.PromotedNoteID())
+	}
+	if src, ok := note.PromotedNoteSourceKey(); !ok || src != "claude:s1" {
+		t.Fatalf("local note source key = (%q, %v)", src, ok)
+	}
+
+	syncedRepo := Session{Harness: NotesHarness, ID: "imported-123", OrigID: RepoPromotedNoteID("copilot-chat:c-1")}
+	if !syncedRepo.IsPromotedNote() || syncedRepo.PromotedNoteID() != "deja-repo-note-copilot-chat-c-1" {
+		t.Fatalf("synced repo note mismatch: %v %q", syncedRepo.IsPromotedNote(), syncedRepo.PromotedNoteID())
+	}
+	if src, ok := syncedRepo.PromotedNoteSourceKey(); !ok || src != "copilot-chat:c-1" {
+		t.Fatalf("synced repo note source key = (%q, %v)", src, ok)
+	}
+	if _, ok := PromotedNoteSourceKey("deja-note-"); ok {
+		t.Fatal("empty promoted note suffix should fail")
+	}
+	if IsPromotedNote(NotesHarness, "deja-2026-08-09-manual", "") || !IsPromotedNote(NotesHarness, "deja-note-claude-s1", "") {
+		t.Fatal("IsPromotedNote mismatch")
+	}
+}
