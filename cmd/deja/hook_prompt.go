@@ -78,8 +78,7 @@ type promptHookInput struct {
 // adopt fills in what grok spells differently, so this prompt's recall is filed
 // under the session that asked for it.
 func (i *promptHookInput) adopt() {
-	i.SessionID = adoptGrok(adoptGrok(i.SessionID, i.grokEnvelope.SessionID), i.ConversationID)
-	i.WorkspaceRoots = adoptGrokRoots(i.WorkspaceRoots, i.WorkspaceRoot)
+	i.SessionID, i.TranscriptPath, i.WorkspaceRoots = i.adoptCommon(i.SessionID, i.ConversationID, i.TranscriptPath, i.WorkspaceRoots)
 }
 
 // hookPromptText reads a prompt that arrives either as a string (Claude Code,

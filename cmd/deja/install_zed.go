@@ -98,11 +98,7 @@ func zedEntryOnFile(text string) any {
 // zedEntryJSON is the server object, indented to sit at the depth Zed's own
 // settings use.
 func zedEntryJSON(entry map[string]any) (string, error) {
-	b, err := json.MarshalIndent(entry, "    ", "  ")
-	if err != nil {
-		return "", err
-	}
-	return string(b), nil
+	return jsoncEntryText(entry)
 }
 
 // zedSettingsWith returns the settings text with deja's entry added, replaced

@@ -475,23 +475,9 @@ func normalizedContextText(text string) string {
 	return strings.ToLower(strings.Join(strings.Fields(text), " "))
 }
 
-func reverseFacts(items []model.ContextFact) {
-	for i, j := 0, len(items)-1; i < j; i, j = i+1, j-1 {
-		items[i], items[j] = items[j], items[i]
-	}
-}
-
-func reverseTests(items []model.ContextTest) {
-	for i, j := 0, len(items)-1; i < j; i, j = i+1, j-1 {
-		items[i], items[j] = items[j], items[i]
-	}
-}
-
-func reverseOpenItems(items []model.ContextOpenItem) {
-	for i, j := 0, len(items)-1; i < j; i, j = i+1, j-1 {
-		items[i], items[j] = items[j], items[i]
-	}
-}
+func reverseFacts(items []model.ContextFact)         { slices.Reverse(items) }
+func reverseTests(items []model.ContextTest)         { slices.Reverse(items) }
+func reverseOpenItems(items []model.ContextOpenItem) { slices.Reverse(items) }
 
 func isVerificationCommand(command string) bool {
 	low := strings.ToLower(command)

@@ -74,18 +74,14 @@ type precompactHookInput struct {
 	// CatchUp is a compaction found after the fact, which may be handed over
 	// again: it is captured once (catchUpCompactionWith).
 	CatchUp bool `json:"deja_catch_up"`
-	// Grok spells all of this in camelCase. See hook_grok.go.
+	// Grok and Antigravity spell all of this in camelCase. See hook_grok.go.
 	grokEnvelope
-	// Antigravity names the conversation in camelCase too.
-	AntigravityConversation string `json:"conversationId"`
 }
 
 // adopt fills in what grok spells differently, so the session this compaction
 // belongs to is the one deja forgets.
 func (i *precompactHookInput) adopt() {
-	i.SessionID = adoptGrok(adoptGrok(adoptGrok(i.SessionID, i.grokEnvelope.SessionID), i.ConversationID), i.AntigravityConversation)
-	i.TranscriptPath = adoptGrok(i.TranscriptPath, i.grokEnvelope.TranscriptPath)
-	i.WorkspaceRoots = adoptGrokRoots(i.WorkspaceRoots, i.WorkspaceRoot)
+	i.SessionID, i.TranscriptPath, i.WorkspaceRoots = i.adoptCommon(i.SessionID, i.ConversationID, i.TranscriptPath, i.WorkspaceRoots)
 }
 
 // hookStdinWait bounds how long any hook waits for its payload.
