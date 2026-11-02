@@ -156,24 +156,7 @@ func indexNotes[T any](hits []T, of func(T) model.Session) map[string][]int {
 // a session that is not one. Mirrors cmd/deja's promotedNoteID: after a sync
 // the local id is `imported-…` and the real one rides in OrigID (#975, #2833).
 func noteID(s model.Session) string {
-	if s.Harness != notesHarness {
-		return ""
-	}
-	if strings.HasPrefix(s.ID, "deja-note-") {
-		return s.ID
-	}
-	if strings.HasPrefix(s.OrigID, "deja-note-") {
-		return s.OrigID
-	}
-	return ""
-}
-
-// sessionOrigID is the id a session had where it was recorded.
-func sessionOrigID(s model.Session) string {
-	if s.OrigID != "" {
-		return s.OrigID
-	}
-	return s.ID
+	return s.PromotedNoteID()
 }
 
 // liftNotesBy is the rule itself, over anything that names a session: blame
@@ -200,10 +183,7 @@ func liftNotesBy[T any](hits []T, of func(T) model.Session) {
 			// Every copy that has not been placed yet, in rank order, so two
 			// machines' notes about one session both land above it and this
 			// machine's own comes first.
-			for _, id := range []string{
-				"deja-note-" + src.Harness + "-" + src.ID,
-				"deja-note-" + src.Harness + "-" + sessionOrigID(src),
-			} {
+			for _, id := range src.CandidatePromotedNoteIDs() {
 				for _, j := range notes[id] {
 					if j > i && !done[j] {
 						done[j] = true
@@ -251,7 +231,7 @@ func sortHits(hits []Hit) {
 // isLocalProject reports whether a session came from this machine. Imported
 // sessions carry the peer prefix the sync path gives them.
 func isLocalProject(project string) bool {
-	return !strings.HasPrefix(project, "imported:")
+	return !model.IsImportedProject(project)
 }
 
 // freshnessFloor bounds how much a session's age can cost it. The decay used

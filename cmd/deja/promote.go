@@ -104,7 +104,7 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 	if s.Harness != "deja" && sources.ExcludedProject(s.Project) {
 		return fmt.Errorf("%s is in a project your exclude list covers — a note promoted from it is filtered out of recall too; `deja index --rebuild` drops the session, or remove the pattern to promote it", prefix)
 	}
-	src := s.Harness + ":" + s.ID
+	src := s.Key()
 	if s.Harness == "deja" {
 		// A correction on a promoted note is what `promote` tells you to write,
 		// and the id in that hint stops resolving to the transcript once the
@@ -167,7 +167,11 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 	// suppressed and `promote` reported success over a note that never showed.
 	// Say so and name the one command that restores it, rather than silently
 	// clearing a tombstone the reader set on purpose.
-	if noteID := "deja-note-" + strings.ReplaceAll(src, ":", "-"); index.Tombstoned("deja:" + noteID) {
+	noteID := model.PromotedNoteID(src)
+	if toRepo {
+		noteID = model.RepoPromotedNoteID(src)
+	}
+	if index.Tombstoned(model.SessionKey(model.NotesHarness, noteID)) {
 		fmt.Fprint(os.Stderr, tombstoneHint("the note is written", noteID))
 	}
 	if exportPath != "" {
@@ -178,7 +182,7 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 			// — and named a path with nothing to do about it (#871).
 			fmt.Fprintf(stdout, "promoted %s as %s: %s\n", safeForStatusline(src, 200), state, search.SafeNote(title))
 			return fmt.Errorf("the note is kept, but %s could not be written (%s) — export it somewhere you can, or read the note back with `deja show %s`",
-				exportPath, exportFailureReason(err), pasteSafe("deja-note-"+strings.ReplaceAll(src, ":", "-")))
+				exportPath, exportFailureReason(err), pasteSafe(noteID))
 		}
 		// The one outbound path that said nothing: `--to` exists to hand a
 		// decision to someone, and `share` and `sync export` both end with this
@@ -272,7 +276,7 @@ func markTakenBack(src, state string, prior sources.Lifecycle) string {
 	// The echo is read and the id is pasted, so they are treated differently —
 	// the same split the line above this one makes (#2768).
 	return fmt.Sprintf("this takes back the %s mark%s: hits for %s are no longer labelled. Both marks stay in the note — `deja show %s`",
-		prior.State, when, safeForStatusline(src, 200), pasteSafe("deja-note-"+strings.ReplaceAll(src, ":", "-")))
+		prior.State, when, safeForStatusline(src, 200), pasteSafe(model.PromotedNoteID(src)))
 }
 
 // distillSession quotes the session instead of summarizing it: the first user

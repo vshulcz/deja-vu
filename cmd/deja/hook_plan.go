@@ -228,7 +228,7 @@ func filterPlanMetas(metas []index.SessionMeta, keep func(index.SessionMeta) boo
 }
 
 func planMetaKey(meta index.SessionMeta) string {
-	return meta.Harness + ":" + meta.ID
+	return meta.Key()
 }
 
 func rememberPlanFindings(dir, sessionID string, findings []planFinding) {

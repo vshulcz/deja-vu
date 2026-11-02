@@ -74,7 +74,7 @@ type syncName string
 
 // importedProjectPrefix marks a project that arrived by sync. Relaying strips
 // it so the next machine files the work under its real name.
-const importedProjectPrefix = "imported:"
+const importedProjectPrefix = model.ImportedPrefix
 
 func (n *syncName) UnmarshalJSON(b []byte) error {
 	var s string
@@ -302,7 +302,7 @@ func exportRecordsWith(dir, outDir, peer string, full, relay bool) (int, func() 
 		if spawnedKind(meta.Kind) {
 			rec.Kind = syncName(meta.Kind)
 		}
-		if meta.Harness == "deja" && strings.HasPrefix(sessionID, "deja-note-") {
+		if meta.Harness == model.NotesHarness && model.IsPromotedNoteID(sessionID) {
 			exportNoteLifecycle(&rec, meta, sessionID, relayed, &noteStates)
 		}
 		bySource[source] = append(bySource[source], rec)
@@ -501,6 +501,7 @@ func promotedStatesByNoteID() map[string]sources.Lifecycle {
 	out := map[string]sources.Lifecycle{}
 	for src, lc := range sources.PromotedLifecycles() {
 		out[sources.PromotedNoteID(src)] = lc
+		out[sources.RepoPromotedNoteID(src)] = lc
 	}
 	return out
 }

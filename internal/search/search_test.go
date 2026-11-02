@@ -768,11 +768,13 @@ func TestProjectMatchesHandlesImportedPrefix(t *testing.T) {
 		want    bool
 	}{
 		{"myproj", true},
-		{"imported:myproj", true},     // peer's copy of the same project
-		{"/home/me/myproj", true},     // path suffix
-		{"imported:otherproj", false}, // different imported project — no over-match
-		{"myproject2", false},         // substring must not match
-		{"imported:notmyproj", false}, // base name differs
+		{"imported:myproj", true},      // peer's copy of the same project
+		{"/home/me/myproj", true},      // path suffix
+		{"imported:acme/myproj", true}, // peer's parent path differs from local, bare candidate allowed
+		{"acme/myproj", false},         // local sibling ending in /myproj must not match bare "myproj" (#2333)
+		{"imported:otherproj", false},  // different imported project — no over-match
+		{"myproject2", false},          // substring must not match
+		{"imported:notmyproj", false},  // base name differs
 	}
 	for _, c := range cases {
 		if got := projectMatches(c.project, names); got != c.want {

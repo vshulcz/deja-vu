@@ -697,10 +697,7 @@ func homeDir() string {
 // or on the one it came from. Import renames sessions to imported-<hash>, so
 // the id alone stops answering the question after a sync (#975).
 func IsPromotedNote(harness, id, origID string) bool {
-	if harness != "deja" {
-		return false
-	}
-	return strings.HasPrefix(id, "deja-note-") || strings.HasPrefix(origID, "deja-note-")
+	return model.IsPromotedNote(harness, id, origID)
 }
 
 // orderPromotedNote keeps a promoted note's corrections newest-first. The

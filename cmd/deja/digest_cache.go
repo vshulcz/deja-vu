@@ -434,7 +434,7 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, c
 				withheld++
 				continue
 			}
-			k := s.Harness + ":" + s.ID
+			k := s.Key()
 			if seen[k] {
 				continue
 			}
@@ -514,8 +514,8 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, c
 		}
 		scores, matched := taskScores(variant, taskFiles)
 		sort.Slice(variant, func(i, j int) bool {
-			if scores[variant[i].Harness+":"+variant[i].ID] != scores[variant[j].Harness+":"+variant[j].ID] {
-				return scores[variant[i].Harness+":"+variant[i].ID] > scores[variant[j].Harness+":"+variant[j].ID]
+			if scores[variant[i].Key()] != scores[variant[j].Key()] {
+				return scores[variant[i].Key()] > scores[variant[j].Key()]
 			}
 			return variant[i].Updated.After(variant[j].Updated)
 		})

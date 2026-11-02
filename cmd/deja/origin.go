@@ -388,7 +388,7 @@ func attributeOriginCommit(repoRoot string, c originCommit, sessions []model.Ses
 
 	votes := map[string]*originVote{}
 	voteFor := func(s model.Session) *originVote {
-		k := s.Harness + ":" + s.ID
+		k := s.Key()
 		v, ok := votes[k]
 		if !ok {
 			v = &originVote{session: s, files: map[string]bool{}}

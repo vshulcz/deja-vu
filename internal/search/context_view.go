@@ -120,27 +120,20 @@ func wroteForDisplay(m model.Message) string {
 // is what `deja help` promises and "tool-output" is what is stored, so the
 // documented spelling matched nothing — silently, with a healthy exit.
 func roleMatches(stored, want string) bool {
-	if stored == want {
-		return true
-	}
-	return want == "tool" && stored == roleToolOutput
+	return model.RoleMatches(stored, want)
 }
 
 // RoleMatches is roleMatches for the callers that filter records themselves.
 // `deja stats` is one: it retrieves everything and narrows locally, and its own
 // comparison was a bare string equality, so `--role tool` reported an empty
 // store while `--role tool-output` counted six records in it.
-func RoleMatches(stored, want string) bool { return roleMatches(stored, want) }
+func RoleMatches(stored, want string) bool { return model.RoleMatches(stored, want) }
 
 // IsWorkRecord reports whether a message records what an agent did rather than
 // what was said. Tool records are bulk-repetitive by nature and are excluded
 // from conversational context windows unless explicitly requested.
 func IsWorkRecord(role string) bool {
-	switch role {
-	case roleToolOutput, "files", "command", "edit", "summary", "wrote":
-		return true
-	}
-	return false
+	return model.IsWorkRole(role)
 }
 
 func isWorkRecord(role string) bool { return IsWorkRecord(role) }

@@ -13,25 +13,16 @@ import (
 )
 
 const (
-	lifecycleRejected   = "rejected"
-	lifecycleSuperseded = "superseded"
-	lifecycleStale      = "stale"
+	lifecycleRejected   = model.LifecycleRejected
+	lifecycleSuperseded = model.LifecycleSuperseded
+	lifecycleStale      = model.LifecycleStale
 )
 
 // promotedNoteID returns the id a promoted note has on the machine that made
 // it: after a sync the local id is imported-<hash>, and every rule written for
 // notes keys on the deja-note- shape (#975).
 func promotedNoteID(s model.Session) string {
-	if s.Harness != "deja" {
-		return ""
-	}
-	if strings.HasPrefix(s.ID, "deja-note-") {
-		return s.ID
-	}
-	if strings.HasPrefix(s.OrigID, "deja-note-") {
-		return s.OrigID
-	}
-	return ""
+	return s.PromotedNoteID()
 }
 
 // importedLifecycles maps a source session key ("claude:src1") to the state of
@@ -45,15 +36,15 @@ func importedLifecycles(dir string) map[string]sources.Lifecycle {
 	}
 	out := map[string]sources.Lifecycle{}
 	for _, m := range metas {
-		if m.Harness != "deja" || m.Lifecycle == "" {
+		if m.Lifecycle == "" {
 			continue
 		}
-		src, ok := strings.CutPrefix(m.OrigID, "deja-note-")
+		srcKey, ok := m.PromotedNoteSourceKey()
 		if !ok {
 			continue
 		}
 		at, _ := time.Parse("2006-01-02", m.LifecycleAt)
-		out[strings.Replace(src, "-", ":", 1)] = sources.Lifecycle{
+		out[srcKey] = sources.Lifecycle{
 			State: m.Lifecycle, Note: m.LifecycleNote, At: at,
 		}
 	}
@@ -81,16 +72,14 @@ func attachLifecycles(dir string, hits []search.Hit) {
 	importedReady := false
 	for i := range hits {
 		h := &hits[i]
-		key := h.Session.Harness + ":" + h.Session.ID
+		key := h.Session.Key()
 		// A promoted note is filed under its own id, so the state — which is a
 		// property of the decision, not of the transcript — never reached it.
 		// Recall shows the lines that matched, and a rejection whose words are
 		// not in the query simply did not appear: the agent was handed the
 		// accepted line of a decision that had been taken back (#974).
-		if noteID := promotedNoteID(h.Session); noteID != "" {
-			if src, ok := strings.CutPrefix(noteID, "deja-note-"); ok {
-				key = strings.Replace(src, "-", ":", 1)
-			}
+		if src, ok := h.Session.PromotedNoteSourceKey(); ok {
+			key = src
 		}
 		lc, ok := states[key]
 		if !ok || lc.State == "" {
@@ -200,14 +189,14 @@ func demoteRejected(hits []search.Hit) int {
 	}
 	before := make([]string, len(hits))
 	for i, h := range hits {
-		before[i] = h.Session.Harness + ":" + h.Session.ID
+		before[i] = h.Session.Key()
 	}
 	sort.SliceStable(hits, func(i, j int) bool {
 		return hits[i].Lifecycle != lifecycleRejected && hits[j].Lifecycle == lifecycleRejected
 	})
 	moved := 0
 	for i, h := range hits {
-		if before[i] != h.Session.Harness+":"+h.Session.ID {
+		if before[i] != h.Session.Key() {
 			moved++
 		}
 	}
@@ -235,7 +224,7 @@ func demotedNote(hits []search.Hit, moved int) string {
 		if h.Lifecycle != lifecycleRejected {
 			continue
 		}
-		key := h.Session.Harness + ":" + h.Session.ID
+		key := h.Session.Key()
 		if src, ok := notes[h.Session.ID]; ok {
 			key = src
 		}
@@ -247,7 +236,7 @@ func demotedNote(hits []search.Hit, moved int) string {
 		// "you marked" is wrong for a decision another machine took back: the
 		// state travelled with the note, the judgement was not this reader's
 		// (#975).
-		if strings.HasPrefix(h.Session.Project, "imported:") {
+		if h.Session.IsImported() {
 			elsewhere++
 		}
 	}
@@ -288,13 +277,11 @@ func attachBlameLifecycles(hits []search.BlameHit, target search.BlameTarget) {
 	states := sources.PromotedLifecycles()
 	for i := range hits {
 		h := &hits[i]
-		key := h.Session.Harness + ":" + h.Session.ID
+		key := h.Session.Key()
 		isNote := false
-		if noteID := promotedNoteID(h.Session); noteID != "" {
+		if src, ok := h.Session.PromotedNoteSourceKey(); ok {
 			isNote = true
-			if src, ok := strings.CutPrefix(noteID, "deja-note-"); ok {
-				key = strings.Replace(src, "-", ":", 1)
-			}
+			key = src
 		}
 		lc, ok := states[key]
 		if !ok || lc.State == "" {

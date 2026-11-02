@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
@@ -992,7 +993,7 @@ func matchedTitle(s model.Session, terms []string) string {
 				continue
 			}
 			r, _ := utf8.DecodeRuneInString(tt)
-			alpha := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r >= 0x400
+			alpha := unicode.IsLetter(r) || unicode.IsDigit(r)
 			if !alpha {
 				continue
 			}

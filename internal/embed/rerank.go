@@ -46,12 +46,12 @@ func RerankAndFuse(ctx context.Context, dir string, hits []search.Hit, o search.
 	}
 	lexRank := make(map[string]int, len(hits))
 	for i, h := range hits {
-		lexRank[h.Session.Harness+":"+h.Session.ID] = i + 1
+		lexRank[h.Session.Key()] = i + 1
 	}
 	vecRank := make(map[string]int, len(semHits))
 	var extra []search.Hit
 	for i, h := range semHits {
-		key := h.Session.Harness + ":" + h.Session.ID
+		key := h.Session.Key()
 		vecRank[key] = i + 1
 		if _, ok := lexRank[key]; !ok {
 			extra = append(extra, h)
@@ -64,7 +64,7 @@ func RerankAndFuse(ctx context.Context, dir string, hits []search.Hit, o search.
 	fused = append(fused, hits...)
 	fused = append(fused, extra...)
 	for i := range fused {
-		key := fused[i].Session.Harness + ":" + fused[i].Session.ID
+		key := fused[i].Session.Key()
 		score := 0.0
 		if r := lexRank[key]; r > 0 {
 			score += 1.0 / float64(rrfK+r)
@@ -78,8 +78,8 @@ func RerankAndFuse(ctx context.Context, dir string, hits []search.Hit, o search.
 		if fused[i].Score != fused[j].Score {
 			return fused[i].Score > fused[j].Score
 		}
-		li := lexRank[fused[i].Session.Harness+":"+fused[i].Session.ID] > 0
-		lj := lexRank[fused[j].Session.Harness+":"+fused[j].Session.ID] > 0
+		li := lexRank[fused[i].Session.Key()] > 0
+		lj := lexRank[fused[j].Session.Key()] > 0
 		if li != lj {
 			return li
 		}
@@ -104,7 +104,7 @@ func rerankWithQuery(hits []search.Hit, q []float32, sidecar Sidecar) []search.H
 	// pass proportional to the result page, not the corpus.
 	wanted := make(map[string]bool, limit)
 	for _, h := range hits[:limit] {
-		wanted[h.Session.Harness+":"+h.Session.ID] = true
+		wanted[h.Session.Key()] = true
 	}
 	cosines := make(map[string]float64)
 	seen := make(map[string]bool)
@@ -130,7 +130,7 @@ func rerankWithQuery(hits []search.Hit, q []float32, sidecar Sidecar) []search.H
 		neutral /= float64(len(cosines))
 	}
 	for i := range hits[:limit] {
-		key := hits[i].Session.Harness + ":" + hits[i].Session.ID
+		key := hits[i].Session.Key()
 		bm := 1.0
 		if hi != lo {
 			bm = (hits[i].Score - lo) / (hi - lo)

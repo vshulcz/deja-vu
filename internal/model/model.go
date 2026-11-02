@@ -7,12 +7,187 @@ import (
 	"unicode/utf8"
 )
 
+// Canonical message roles stored in transcripts and the index.
+const (
+	RoleUser       = "user"
+	RoleAssistant  = "assistant"
+	RoleTool       = "tool"
+	RoleToolOutput = "tool-output"
+	RoleFiles      = "files"
+	RoleCommand    = "command"
+	RoleEdit       = "edit"
+	RoleSummary    = "summary"
+	RoleWrote      = "wrote"
+)
+
+// ImportedPrefix marks a session project name that arrived via peer sync.
+const ImportedPrefix = "imported:"
+
+// RepoOriginPrefix marks a repo-scoped origin or project prefix.
+const (
+	OriginRepo       = "repo"
+	RepoOriginPrefix = "repo:"
+)
+
+// NotesHarness and promoted-note prefixes define the canonical identity shape
+// of personal and repo-scoped promoted notes across the index, search, and sync.
+const (
+	NotesHarness           = "deja"
+	PromotedNotePrefix     = "deja-note-"
+	RepoPromotedNotePrefix = "deja-repo-note-"
+)
+
+// Canonical lifecycle states of a promoted decision.
+const (
+	LifecycleAccepted   = "accepted"
+	LifecycleRejected   = "rejected"
+	LifecycleSuperseded = "superseded"
+	LifecycleStale      = "stale"
+)
+
+// IsWorkRole reports whether a message role records what an agent did rather
+// than what was said. Tool and file-activity records are bulk-repetitive by
+// nature and are excluded from conversational context windows and prose
+// extractors unless explicitly requested.
+func IsWorkRole(role string) bool {
+	switch role {
+	case RoleToolOutput, RoleFiles, RoleCommand, RoleEdit, RoleSummary, RoleWrote:
+		return true
+	}
+	return false
+}
+
+// IsSpokenRole reports whether a message role represents conversational speech
+// rather than a tool or file-activity work record.
+func IsSpokenRole(role string) bool {
+	return !IsWorkRole(role)
+}
+
+// RoleMatches reports whether a stored message role satisfies a --role filter.
+// `--role tool` is what `deja help` documents while "tool-output" is what is
+// stored, so both spellings match.
+func RoleMatches(stored, want string) bool {
+	if stored == want {
+		return true
+	}
+	return want == RoleTool && stored == RoleToolOutput
+}
+
+// SessionKey returns the canonical "harness:id" composite identifier used
+// across the manifest, seen ledgers, and dedupe maps.
+func SessionKey(harness, id string) string {
+	return harness + ":" + id
+}
+
+// IsImportedProject reports whether a project name carries the synced
+// "imported:" prefix.
+func IsImportedProject(project string) bool {
+	return strings.HasPrefix(project, ImportedPrefix)
+}
+
+// BareProject strips the "imported:" prefix from a project name if present.
+func BareProject(project string) string {
+	return strings.TrimPrefix(project, ImportedPrefix)
+}
+
+// IsRepoProject reports whether project names a repo-scoped origin ("repo" or "repo:...").
+func IsRepoProject(project string) bool {
+	return project == OriginRepo || strings.HasPrefix(project, RepoOriginPrefix)
+}
+
+// PromotedNoteID returns the session id a personal promoted note is indexed
+// under for sourceSession ("harness:id").
+func PromotedNoteID(sourceSession string) string {
+	return PromotedNotePrefix + strings.ReplaceAll(sourceSession, ":", "-")
+}
+
+// RepoPromotedNoteID returns the session id a repo-scoped promoted note is
+// indexed under for sourceSession ("harness:id").
+func RepoPromotedNoteID(sourceSession string) string {
+	return RepoPromotedNotePrefix + strings.ReplaceAll(sourceSession, ":", "-")
+}
+
+// IsPromotedNoteID reports whether id has a personal ("deja-note-") or
+// repo-scoped ("deja-repo-note-") promoted note prefix.
+func IsPromotedNoteID(id string) bool {
+	return strings.HasPrefix(id, PromotedNotePrefix) || strings.HasPrefix(id, RepoPromotedNotePrefix)
+}
+
+// CanonicalPromotedNoteID returns the promoted note id of a session on the
+// machine that created it, or "" when the session is not a promoted note.
+// After sync the local id is "imported-<hash>" while OrigID preserves the
+// original "deja-note-..." or "deja-repo-note-..." id (#975, #2833).
+func CanonicalPromotedNoteID(harness, id, origID string) string {
+	if harness != NotesHarness {
+		return ""
+	}
+	if IsPromotedNoteID(id) {
+		return id
+	}
+	if IsPromotedNoteID(origID) {
+		return origID
+	}
+	return ""
+}
+
+// IsPromotedNote reports whether (harness, id, origID) identifies a personal
+// or repo-scoped promoted note, locally or after sync.
+func IsPromotedNote(harness, id, origID string) bool {
+	return CanonicalPromotedNoteID(harness, id, origID) != ""
+}
+
+// PromotedNoteSourceKey extracts the "harness:id" source key from a promoted
+// note id ("deja-note-<harness>-<id>" or "deja-repo-note-<harness>-<id>").
+// Hyphenated harness names ("copilot-chat", "claude-history") are matched before
+// falling back to splitting on the first hyphen.
+func PromotedNoteSourceKey(noteID string) (string, bool) {
+	rest, ok := strings.CutPrefix(noteID, RepoPromotedNotePrefix)
+	if !ok {
+		rest, ok = strings.CutPrefix(noteID, PromotedNotePrefix)
+	}
+	if !ok || rest == "" {
+		return "", false
+	}
+	for _, h := range []string{"copilot-chat", "claude-history"} {
+		if id, ok := strings.CutPrefix(rest, h+"-"); ok && id != "" {
+			return SessionKey(h, id), true
+		}
+	}
+	return strings.Replace(rest, "-", ":", 1), true
+}
+
+// CandidatePromotedNoteIDs returns the personal and repo-scoped promoted note
+// session ids that could have been promoted from (harness, id, origID).
+func CandidatePromotedNoteIDs(harness, id, origID string) []string {
+	localKey := SessionKey(harness, id)
+	if origID == "" || origID == id {
+		return []string{
+			PromotedNoteID(localKey),
+			RepoPromotedNoteID(localKey),
+		}
+	}
+	origKey := SessionKey(harness, origID)
+	return []string{
+		PromotedNoteID(localKey),
+		PromotedNoteID(origKey),
+		RepoPromotedNoteID(localKey),
+		RepoPromotedNoteID(origKey),
+	}
+}
+
 // Message is one turn of a session.
 type Message struct {
 	Role string    `json:"role"`
 	Text string    `json:"text"`
 	Time time.Time `json:"time"`
 }
+
+// IsWorkRecord reports whether m records tool or file activity rather than
+// conversational speech.
+func (m Message) IsWorkRecord() bool { return IsWorkRole(m.Role) }
+
+// IsSpoken reports whether m is conversational speech rather than a work record.
+func (m Message) IsSpoken() bool { return !IsWorkRole(m.Role) }
 
 // MarshalJSON leaves the time out of a message the transcript never stamped.
 //
@@ -136,15 +311,48 @@ type Source struct {
 	Instance string `json:"instance,omitempty"`
 }
 
+// Key returns the session's canonical "harness:id" composite identifier.
+func (s *Session) Key() string { return SessionKey(s.Harness, s.ID) }
+
+// IsImported reports whether the session arrived from another machine via sync.
+func (s *Session) IsImported() bool { return IsImportedProject(s.Project) }
+
+// BareProject returns the session's project name without an "imported:" prefix.
+func (s *Session) BareProject() string { return BareProject(s.Project) }
+
+// PromotedNoteID returns the session's canonical promoted-note id (handling
+// both personal/repo notes and synced OrigID), or "" if not a promoted note.
+func (s *Session) PromotedNoteID() string {
+	return CanonicalPromotedNoteID(s.Harness, s.ID, s.OrigID)
+}
+
+// IsPromotedNote reports whether the session is a personal or repo-scoped
+// promoted note.
+func (s *Session) IsPromotedNote() bool {
+	return s.PromotedNoteID() != ""
+}
+
+// PromotedNoteSourceKey returns the "harness:id" key of the session this note
+// was promoted from, when s is a promoted note.
+func (s *Session) PromotedNoteSourceKey() (string, bool) {
+	return PromotedNoteSourceKey(s.PromotedNoteID())
+}
+
+// CandidatePromotedNoteIDs returns the personal and repo-scoped promoted note
+// ids that could refer to this session (including its pre-sync OrigID).
+func (s *Session) CandidatePromotedNoteIDs() []string {
+	return CandidatePromotedNoteIDs(s.Harness, s.ID, s.OrigID)
+}
+
 // SetSource fills the machine-facing provenance fields without changing the
 // project string retained for human compatibility.
 func (s *Session) SetSource(localInstance string) {
-	if strings.HasPrefix(s.Project, "imported:") {
+	if s.IsImported() {
 		s.Source = &Source{Origin: "imported"}
 		return
 	}
-	if s.From == "repo" || s.Project == "repo" || strings.HasPrefix(s.Project, "repo:") {
-		s.Source = &Source{Origin: "repo"}
+	if s.From == OriginRepo || IsRepoProject(s.Project) {
+		s.Source = &Source{Origin: OriginRepo}
 		return
 	}
 	s.Source = &Source{Origin: "local", Instance: localInstance}

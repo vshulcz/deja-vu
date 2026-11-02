@@ -13,6 +13,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/evidence"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/prompt"
+	"github.com/vshulcz/deja-vu/internal/query"
 )
 
 // The auto-recall modes.
@@ -286,20 +287,13 @@ func BuildAutoRecall(ss []model.Session, o AutoRecallOptions) AutoRecallResult {
 }
 
 func projectMatches(project string, names []string) bool {
-	project = lower(filepathClean(project))
-	// A session imported from a peer carries its project under an "imported:"
-	// prefix but is still this project's history. Match the base name too, or the
-	// session-start digest silently drops imported sessions the trust policy
-	// (default local+imported) already allowed — while hook-prompt keeps them, so
-	// the two auto-injections disagreed on the same store (#E-new33).
-	bare := strings.TrimPrefix(project, "imported:")
+	project = filepathClean(project)
+	// Delegate to the canonical domain scope rule (query.ProjectInScope) so
+	// session-start auto-recall honors both the imported: peer prefix (#E-new33)
+	// and the #2333 bare-basename rule (preventing a local "acme/api" session
+	// from matching a bare "api" candidate when standing in /work/api).
 	for _, name := range names {
-		name = lower(filepathClean(name))
-		if name == "" {
-			continue
-		}
-		if project == name || strings.HasSuffix(project, "/"+name) ||
-			bare == name || strings.HasSuffix(bare, "/"+name) {
+		if query.ProjectInScope(project, filepathClean(name)) {
 			return true
 		}
 	}

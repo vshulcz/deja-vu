@@ -314,7 +314,7 @@ func writeRecallHitMarks(hb *strings.Builder, h search.Hit, twins map[string][]s
 	// Sync keeps both copies when a session id is on two machines, and
 	// nothing connected them: one session's two histories read as two
 	// unrelated sessions, sometimes disagreeing with each other (#1775).
-	if twin := twins[h.Session.Harness+":"+h.Session.ID]; len(twin) > 0 {
+	if twin := twins[h.Session.Key()]; len(twin) > 0 {
 		// OrigID is the fact; an "imported-" id is only the convention
 		// sync mints, and a harness could name a local session that way.
 		if h.Session.OrigID != "" {
@@ -609,7 +609,7 @@ func withoutScoped(r index.SearchResult) []model.Session {
 	}
 	out := make([]model.Session, 0, len(r.Sessions))
 	for _, s := range r.Sessions {
-		if !r.Unread.Scoped[s.Harness+":"+s.ID] {
+		if !r.Unread.Scoped[s.Key()] {
 			out = append(out, s)
 		}
 	}
@@ -678,7 +678,7 @@ func leadHits(hits []search.Hit, added string) ([]search.Hit, int) {
 	return hits, -1
 }
 
-func hitKey(h search.Hit) string { return h.Session.Harness + ":" + h.Session.ID }
+func hitKey(h search.Hit) string { return h.Session.Key() }
 
 // withMachineBest puts the machine-wide ranking's first session second on a
 // project-first page, when it is not one of the project's own. Project-first
@@ -691,16 +691,16 @@ func withMachineBest(merged, machine, project []search.Hit) []search.Hit {
 		return merged
 	}
 	best := machine[0]
-	key := best.Session.Harness + ":" + best.Session.ID
+	key := best.Session.Key()
 	for _, h := range project {
-		if h.Session.Harness+":"+h.Session.ID == key {
+		if h.Session.Key() == key {
 			return merged
 		}
 	}
 	out := make([]search.Hit, 0, len(merged)+1)
 	out = append(out, merged[0], best)
 	for _, h := range merged[1:] {
-		if h.Session.Harness+":"+h.Session.ID != key {
+		if h.Session.Key() != key {
 			out = append(out, h)
 		}
 	}
@@ -711,11 +711,11 @@ func withMachineBest(merged, machine, project []search.Hit) []search.Hit {
 func hitsNotIn(hits, lead []search.Hit) []search.Hit {
 	seen := make(map[string]bool, len(lead))
 	for _, h := range lead {
-		seen[h.Session.Harness+":"+h.Session.ID] = true
+		seen[h.Session.Key()] = true
 	}
 	out := make([]search.Hit, 0, len(hits))
 	for _, h := range hits {
-		if !seen[h.Session.Harness+":"+h.Session.ID] {
+		if !seen[h.Session.Key()] {
 			out = append(out, h)
 		}
 	}

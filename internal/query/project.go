@@ -1,6 +1,10 @@
 package query
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/vshulcz/deja-vu/internal/model"
+)
 
 // ProjectMatches reports whether a --project filter selects this session.
 //
@@ -61,9 +65,78 @@ func DisplayProject(project, from string) string {
 	if from == "" {
 		return project
 	}
-	rest, ok := strings.CutPrefix(project, "imported:")
+	rest, ok := strings.CutPrefix(project, model.ImportedPrefix)
 	if !ok {
 		return project
 	}
 	return from + ":" + rest
+}
+
+// ProjectInScope reports whether a session's project is the one a caller is
+// standing in. Exported so the automatic surfaces share one rule: the same
+// question answered different ways is how a client's project reached a
+// session start (#2333), a handoff (#2336) and a tool-time line (#2339).
+func ProjectInScope(project, want string) bool {
+	if want == "" {
+		return false
+	}
+	return LowerProjectInScope(strings.ToLower(project), strings.ToLower(want))
+}
+
+// LowerProjectInScope is the rule of ProjectInScope on names already lowered.
+func LowerProjectInScope(p, w string) bool {
+	if w == "" {
+		return false
+	}
+	imported := false
+	if rest, ok := strings.CutPrefix(p, model.ImportedPrefix); ok {
+		// A synced session carries the peer's prefix and is otherwise the same
+		// project under the same name.
+		p, imported = rest, true
+	}
+	w = strings.TrimPrefix(w, model.ImportedPrefix)
+	if p == w {
+		return true
+	}
+	// A candidate with no separator is a bare directory name, and as a suffix
+	// against a LOCAL project it cannot tell two directories apart: working in
+	// /work/api, the candidate "api" matched a client's acme/api and the
+	// session-start hook injected it "from this project" (#2333).
+	//
+	// A peer's project keeps the peer's path, which is not this machine's, so
+	// the loose rule stays for imported work: matching it by the name this
+	// machine knows it by is the point of scoping a synced index.
+	if !imported && !strings.ContainsAny(w, `/\`) {
+		return false
+	}
+	return endsWithSegment(p, w)
+}
+
+// ProjectInScopeStrict is ProjectInScope without the allowance synced work
+// gets. The loose rule is right for recall and wrong for a command that
+// packages one session's content for another agent (#2347).
+func ProjectInScopeStrict(project, want string) bool {
+	if want == "" {
+		return false
+	}
+	p := strings.TrimPrefix(strings.ToLower(project), model.ImportedPrefix)
+	w := strings.TrimPrefix(strings.ToLower(want), model.ImportedPrefix)
+	if p == w {
+		return true
+	}
+	if !strings.ContainsAny(w, `/\`) {
+		return false
+	}
+	return endsWithSegment(p, w)
+}
+
+// EndsWithSegment is strings.HasSuffix(p, "/"+w) || strings.HasSuffix(p, `\`+w)
+// without building either string.
+func EndsWithSegment(p, w string) bool {
+	return endsWithSegment(p, w)
+}
+
+func endsWithSegment(p, w string) bool {
+	n := len(p) - len(w) - 1
+	return n >= 0 && (p[n] == '/' || p[n] == '\\') && p[n+1:] == w
 }

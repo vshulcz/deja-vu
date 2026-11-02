@@ -44,7 +44,7 @@ func orderForInjection(ss []model.Session) ([]model.Session, string) {
 		return ss, earlierAttemptWarning(ss)
 	}
 	marked := func(s model.Session) (sources.Lifecycle, string, bool) {
-		lc, ok := states[s.Harness+":"+s.ID]
+		lc, ok := states[s.Key()]
 		if !ok {
 			return lc, "", false
 		}
@@ -52,7 +52,7 @@ func orderForInjection(ss []model.Session) ([]model.Session, string) {
 		return lc, phrase, phrase != ""
 	}
 	rejected := func(s model.Session) bool {
-		lc, ok := states[s.Harness+":"+s.ID]
+		lc, ok := states[s.Key()]
 		return ok && lc.State == lifecycleRejected
 	}
 	out := append([]model.Session(nil), ss...)

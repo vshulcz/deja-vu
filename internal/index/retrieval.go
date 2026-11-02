@@ -1075,42 +1075,11 @@ func (s *projectScope) has(project string) bool {
 
 // lowerInScope is the rule of projectInScope on names already lowered.
 func lowerInScope(p, w string) bool {
-	imported := false
-	if rest, ok := strings.CutPrefix(p, "imported:"); ok {
-		// A synced session carries the peer's prefix and is otherwise the same
-		// project under the same name.
-		p, imported = rest, true
-	}
-	if p == w {
-		return true
-	}
-	// A candidate with no separator is a bare directory name, and as a suffix
-	// against a LOCAL project it cannot tell two directories apart: working in
-	// /work/api, the candidate "api" matched a client's acme/api and the
-	// session-start hook injected it "from this project" (#2333). Nothing is
-	// lost by insisting on more here — a claude project is recorded as
-	// parent/base and the candidates carry that form, and the stores that
-	// record a bare project name match it exactly on the line above.
-	//
-	// A peer's project keeps the peer's path, which is not this machine's, so
-	// the loose rule stays for imported work: matching it by the name this
-	// machine knows it by is the point of scoping a synced index.
-	if !imported && !strings.ContainsAny(w, `/\`) {
-		return false
-	}
-	// Both separators, because a project name is built from a path and windows
-	// builds it with backslashes. Matching only "/" made every scoped ranking on
-	// windows return nothing — the substring rule this replaced happened not to
-	// care which separator it was, and taking the loose rule out took the
-	// platform's separator with it.
-	return endsWithSegment(p, w)
+	return query.LowerProjectInScope(p, w)
 }
 
-// endsWithSegment is strings.HasSuffix(p, "/"+w) || strings.HasSuffix(p, `\`+w)
-// without building either string.
 func endsWithSegment(p, w string) bool {
-	n := len(p) - len(w) - 1
-	return n >= 0 && (p[n] == '/' || p[n] == '\\') && p[n+1:] == w
+	return query.EndsWithSegment(p, w)
 }
 
 // ProjectInScopeStrict is ProjectInScope without the allowance synced work
@@ -1120,25 +1089,14 @@ func endsWithSegment(p, w string) bool {
 // `deja handoff`, run from a directory named api, picked a teammate's
 // `clients/acme/api` because it was the newest thing ending in /api (#2347).
 func ProjectInScopeStrict(project, want string) bool {
-	if want == "" {
-		return false
-	}
-	p := strings.TrimPrefix(strings.ToLower(project), "imported:")
-	w := strings.ToLower(want)
-	if p == w {
-		return true
-	}
-	if !strings.ContainsAny(w, `/\`) {
-		return false
-	}
-	return strings.HasSuffix(p, "/"+w) || strings.HasSuffix(p, `\`+w)
+	return query.ProjectInScopeStrict(project, want)
 }
 
 // ProjectInScope reports whether a session's project is the one a caller is
 // standing in. Exported so the automatic surfaces share one rule: the same
 // question answered three different ways is how a client's project reached a
 // session start (#2333), a handoff (#2336) and a tool-time line (#2339).
-func ProjectInScope(project, want string) bool { return projectInScope(project, want) }
+func ProjectInScope(project, want string) bool { return query.ProjectInScope(project, want) }
 
 // relevantMetasCounts additionally reports how many terms of ANY frequency
 // each session matched — the noise gate for full-index relevance search,

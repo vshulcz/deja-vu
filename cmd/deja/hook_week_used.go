@@ -83,7 +83,7 @@ func weekUsed(dir string, now time.Time) ([]weekUsedSession, bool) {
 			if m == nil || (m.Harness == speaker.Harness && m.ID == speaker.ID) {
 				continue
 			}
-			k := m.Harness + ":" + m.ID
+			k := m.Key()
 			u := byKey[k]
 			if u == nil {
 				u = &weekUsedSession{meta: *m}
@@ -119,7 +119,7 @@ func weekUsed(dir string, now time.Time) ([]weekUsedSession, bool) {
 		if !shown(m) || m.Updated.IsZero() || !m.Updated.Before(settle) {
 			continue
 		}
-		byKey[m.Harness+":"+m.ID] = &weekUsedSession{meta: m, times: times, last: m.Updated}
+		byKey[m.Key()] = &weekUsedSession{meta: m, times: times, last: m.Updated}
 	}
 	return sortWeekUsed(byKey), false
 }
@@ -136,7 +136,7 @@ func sortWeekUsed(byKey map[string]*weekUsedSession) []weekUsedSession {
 		if !out[i].last.Equal(out[j].last) {
 			return out[i].last.After(out[j].last)
 		}
-		return out[i].meta.Harness+":"+out[i].meta.ID < out[j].meta.Harness+":"+out[j].meta.ID
+		return out[i].meta.Key() < out[j].meta.Key()
 	})
 	return out
 }

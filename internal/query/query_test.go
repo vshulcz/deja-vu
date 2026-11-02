@@ -167,3 +167,33 @@ func TestOptionsClockHonoursNowAndDejaNowEnv(t *testing.T) {
 		t.Fatal("invalid DEJA_NOW returned zero time")
 	}
 }
+
+func TestProjectInScopeAndStrict(t *testing.T) {
+	if ProjectInScope("acme/api", "") || LowerProjectInScope("acme/api", "") || ProjectInScopeStrict("acme/api", "") {
+		t.Fatal("empty want matched")
+	}
+	if !ProjectInScope("Acme/API", "acme/api") {
+		t.Fatal("exact match failed")
+	}
+	if ProjectInScope("acme/api", "api") {
+		t.Fatal("bare basename matched local project")
+	}
+	if !ProjectInScope("imported:acme/api", "api") {
+		t.Fatal("bare basename did not match imported project")
+	}
+	if !ProjectInScope("work/acme/api", "acme/api") {
+		t.Fatal("multi-segment suffix did not match local project")
+	}
+	if !ProjectInScopeStrict("imported:acme/api", "acme/api") {
+		t.Fatal("strict exact match failed")
+	}
+	if ProjectInScopeStrict("imported:acme/api", "api") {
+		t.Fatal("strict mode allowed bare basename on imported project")
+	}
+	if !ProjectInScopeStrict("imported:work/acme/api", "acme/api") {
+		t.Fatal("strict mode rejected multi-segment suffix")
+	}
+	if !EndsWithSegment(`work\acme\api`, "api") || EndsWithSegment("work/acme/api", "other") {
+		t.Fatal("EndsWithSegment mismatch")
+	}
+}

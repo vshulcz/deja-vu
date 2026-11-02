@@ -229,7 +229,7 @@ func dejaVuLead(s model.Session) string {
 	// A session that arrived from another machine is not work the reader did
 	// here: the context block below labels it `imported:` and the line has to
 	// agree with it (#1001).
-	if strings.HasPrefix(s.Project, "imported:") {
+	if s.IsImported() {
 		if from == "" {
 			from = "from another machine"
 		} else {

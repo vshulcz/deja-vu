@@ -189,7 +189,7 @@ func foldPlanted(old, add []string) []string {
 }
 
 func localPersonSession(project, from, origID, kind string) bool {
-	return from == "" && origID == "" && !strings.HasPrefix(project, "imported:") && !model.SpawnedKind(kind)
+	return from == "" && origID == "" && !model.IsImportedProject(project) && !model.SpawnedKind(kind)
 }
 
 func inAnyScope(project string, scope []string) bool {

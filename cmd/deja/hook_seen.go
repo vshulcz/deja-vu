@@ -57,8 +57,12 @@ func alreadyInjected(dir, sid string) map[string]bool {
 // questions gave before.
 type seenLines []string
 
+func hookseenPath(dir string) string {
+	return dir + ".hookseen"
+}
+
 func loadSeen(dir string) seenLines {
-	b, err := os.ReadFile(dir + ".hookseen")
+	b, err := os.ReadFile(hookseenPath(dir))
 	if err != nil {
 		return nil
 	}
@@ -217,7 +221,7 @@ func forgetInjected(dir, sid string) {
 	if sid == "" {
 		return
 	}
-	p := dir + ".hookseen"
+	p := hookseenPath(dir)
 	b, err := os.ReadFile(p)
 	if err != nil {
 		return
@@ -284,7 +288,7 @@ func rememberInjectedIDsFor(dir, sid, project string, ids []string) {
 	if sid == "" {
 		return
 	}
-	p := dir + ".hookseen"
+	p := hookseenPath(dir)
 	// Past 1MB the dedup file used to stop writing entirely, which permanently
 	// broke dedup — the per-prompt hook then re-injected the same sessions turn
 	// after turn. Rotate instead: keep this session's own lines (so its dedup
@@ -387,7 +391,7 @@ func rememberInjectedIDs(dir, sid string, ids ...string) {
 	if sid == "" {
 		return
 	}
-	p := dir + ".hookseen"
+	p := hookseenPath(dir)
 	// Rotate rather than stop, for the reason rememberInjected does: a full
 	// file used to end the dedup for good, and the hooks that write tokens are
 	// the ones whose whole job is not repeating themselves to the same agent.

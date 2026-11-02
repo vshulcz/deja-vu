@@ -14,10 +14,16 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/cjkfold"
+	"github.com/vshulcz/deja-vu/internal/model"
 )
 
 // NoteStates are the lifecycle states a promoted note may carry.
-var NoteStates = map[string]bool{"accepted": true, "rejected": true, "superseded": true, "stale": true}
+var NoteStates = map[string]bool{
+	model.LifecycleAccepted:   true,
+	model.LifecycleRejected:   true,
+	model.LifecycleSuperseded: true,
+	model.LifecycleStale:      true,
+}
 
 // AppendPromoted appends a curated note distilled from a session. Appending
 // the same session again records a correction; history is never rewritten.
@@ -459,14 +465,14 @@ func ForgetPromotedNotes(match func(noteSession string) bool) (int, error) {
 // PromotedNoteID is the session id a promoted note is indexed under, so a
 // caller holding an id from the index can match the line that produced it.
 func PromotedNoteID(sourceSession string) string {
-	return "deja-note-" + strings.ReplaceAll(sourceSession, ":", "-")
+	return model.PromotedNoteID(sourceSession)
 }
 
 // RepoPromotedNoteID is the session id a repo-scoped promoted note is indexed
 // under, keeping it distinct from a personal promoted note for the same source
 // session.
 func RepoPromotedNoteID(sourceSession string) string {
-	return "deja-repo-note-" + strings.ReplaceAll(sourceSession, ":", "-")
+	return model.RepoPromotedNoteID(sourceSession)
 }
 
 // ForgetPromotedTitles strips the source session's opening line from every
