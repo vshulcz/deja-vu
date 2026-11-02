@@ -287,7 +287,7 @@ func TestRulesCandidatesMustComeFirst(t *testing.T) {
 // Both skills carry the procedure, and it stops before writing.
 func TestSkillsCarryTheRulesProcedure(t *testing.T) {
 	for name, body := range map[string]string{"skill": skillBody, "cli skill": cliSkillBody} {
-		for _, want := range []string{"deja rules candidates", "Write nothing until the user picks", "deja rules sync"} {
+		for _, want := range []string{"deja rules candidates", "Write nothing until the user picks", "wait for a yes to those exact lines", "deja rules sync"} {
 			if !strings.Contains(body, want) {
 				t.Errorf("%s is missing %q", name, want)
 			}

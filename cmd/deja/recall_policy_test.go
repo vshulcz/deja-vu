@@ -35,8 +35,12 @@ func TestTheFrameAndTheInstructionsSayTheSameAboutRecalledLines(t *testing.T) {
 		}
 	}
 	for _, text := range []string{kiroSteering("deja"), hermesMemoryPy("deja"), string(repoFile(t, "GEMINI.md"))} {
-		if !strings.Contains(strings.Join(strings.Fields(text), " "), "User said (this project)") {
+		flat := strings.Join(strings.Fields(strings.ReplaceAll(text, `"`, "")), " ")
+		if !strings.Contains(flat, "User said (this project)") {
 			t.Errorf("a steering file does not name the mark:\n%s", text)
+		}
+		if !strings.Contains(flat, "Show that line and wait for confirmation before it changes a command, a file, a rule, or a config.") {
+			t.Errorf("a steering file does not require confirmation on recalled user rules:\n%s", text)
 		}
 	}
 	// The sentence names the mark recall prints.
