@@ -25,6 +25,7 @@ func RelevanceTerms(q string) []string {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
 	})
 	fields = ExpandCJKTokens(fields)
+	fields = append(fields, CJKTechnicalCompounds(q)...)
 	seen := map[string]bool{}
 	var out []string
 	for _, f := range fields {

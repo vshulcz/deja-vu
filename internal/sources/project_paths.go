@@ -86,9 +86,13 @@ func agentScratch(p string) bool {
 	return false
 }
 
-// isHomeOrEmptyProject reports whether p names no project or only a user's
+// IsHomeOrEmptyProject reports whether p names no project or only a user's
 // home directory ("Users/<name>" or "home/<name>"), where an agent launched
 // from ~ starts before opening a repository.
+func IsHomeOrEmptyProject(p string) bool {
+	return isHomeOrEmptyProject(p)
+}
+
 func isHomeOrEmptyProject(p string) bool {
 	if p == "" || p == "-" {
 		return true
@@ -111,7 +115,9 @@ func resolveHomeOrEmptyProject(s *model.Session) {
 	}
 	if p := handoffProject(s.Messages); p != "" {
 		s.Project = p
+		return
 	}
+	s.ProjectFromDir = true
 }
 
 // resolveDirProject refines a directory-derived s.Project using the files the

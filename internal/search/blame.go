@@ -41,6 +41,9 @@ type BlameTarget struct {
 	// nothing at all and answered about the file as though no line had been
 	// asked for (#3738).
 	LineNote string
+	// Symbol is the function, method, or type name resolved from `path:Symbol`,
+	// or empty when the target was not a symbol query.
+	Symbol string
 }
 
 // BlameOptions narrows which sessions a blame search reads.
@@ -68,6 +71,8 @@ type BlameHit struct {
 	// wrote is whether the session holds a write or edit of the file that it
 	// did not copy from another candidate.
 	wrote bool
+	// symbolHit is whether the session mentions the requested BlameTarget.Symbol.
+	symbolHit bool
 	// Specificity is how fully the session named the file — a path against a
 	// bare name — and is what orders the answer before the score does (#2840).
 	Specificity float64 `json:"specificity"`
@@ -135,7 +140,7 @@ func ResolveBlamePath(name string) (BlameTarget, error) {
 	if len(name) > maxBlamePath {
 		return BlameTarget{}, fmt.Errorf("path is %d bytes, longer than any file path (%d)", len(name), maxBlamePath)
 	}
-	name, line, endLine, lineNote := cutLineRangeSuffix(name)
+	name, line, endLine, lineNote, symbol := cutLineRangeSuffix(name)
 	full, err := filepath.Abs(name)
 	if err != nil {
 		return BlameTarget{}, err
@@ -156,10 +161,11 @@ func ResolveBlamePath(name string) (BlameTarget, error) {
 		Line:     line,
 		EndLine:  endLine,
 		LineNote: lineNote,
+		Symbol:   symbol,
 	}, nil
 }
 
-func cutLineRangeSuffix(name string) (string, int, int, string) {
+func cutLineRangeSuffix(name string) (string, int, int, string, string) {
 	if head, tail, ok := strings.Cut(name, "#L"); ok && head != "" && tail != "" {
 		if _, err := os.Stat(name); err != nil {
 			startStr, endStr, hasRange := strings.Cut(tail, "-")
@@ -172,7 +178,7 @@ func cutLineRangeSuffix(name string) (string, int, int, string) {
 					end, err2 = strconv.Atoi(endStr)
 				}
 				if err1 == nil && err2 == nil && start > 0 && end >= start {
-					return head, start, end, ""
+					return head, start, end, "", ""
 				}
 			}
 		}
@@ -183,13 +189,20 @@ func cutLineRangeSuffix(name string) (string, int, int, string) {
 				start, err1 := strconv.Atoi(startStr)
 				end, err2 := strconv.Atoi(endStr)
 				if err1 == nil && err2 == nil && start > 0 && end >= start {
-					return head, start, end, ""
+					return head, start, end, "", ""
+				}
+			}
+		}
+		if isSymbolName(tail) {
+			if _, err := os.Stat(name); err != nil {
+				if start, end, ok := resolveSymbolLineRange(head, tail); ok {
+					return head, start, end, "", tail
 				}
 			}
 		}
 	}
 	trimmed, line, note := cutLineSuffix(name)
-	return trimmed, line, line, note
+	return trimmed, line, line, note, ""
 }
 
 // cutLineSuffix is trimLineSuffix that keeps the number it cut: the first one,
@@ -379,6 +392,10 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 		if projectContainsFile(session.Project, target.FullPath) {
 			score *= 1.35
 		}
+		if target.Symbol != "" && sessionMentionsSymbol(session, target.Symbol) {
+			hit.symbolHit = true
+			score *= 1.5
+		}
 		hit.Score = score * freshnessDecay(session.Updated, now)
 		hit.Specificity = specificity
 		hits = append(hits, hit)
@@ -396,6 +413,9 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 		// answers.
 		if namedAPath(hits[i]) != namedAPath(hits[j]) {
 			return namedAPath(hits[i])
+		}
+		if hits[i].symbolHit != hits[j].symbolHit {
+			return hits[i].symbolHit
 		}
 		// Among sessions that wrote the path out, newest first, the way a log
 		// reads: by score, one that named it a few more times sat above a newer

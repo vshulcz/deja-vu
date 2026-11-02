@@ -523,3 +523,85 @@ func TestOpenClawFailedApplyPatchAcrossAResumeKeepsNoEdit(t *testing.T) {
 		t.Fatalf("after an append the index holds %d edit/wrote records for a patch that failed (a whole read holds 0): %q", len(got), got)
 	}
 }
+
+func TestAntigravityIncrementalResumeParity(t *testing.T) {
+	home := readerEnv(t)
+	path := filepath.Join(home, ".gemini", "antigravity-cli", "brain", "0930ac06-37af-4c13-8cd9-6ff0db93da97", ".system_generated", "logs", "transcript.jsonl")
+	lines := []string{
+		`{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-10-01T10:00:00Z","content":"<USER_REQUEST>\ninspect and update retry.go\n</USER_REQUEST>"}`,
+		`{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-10-01T10:00:05Z","thinking":"let us check retry.go","content":"Reading and updating retry.go.","tool_calls":[{"id":"c1","name":"view_file","args":{"AbsolutePath":"/workspace/app/retry.go"}},{"id":"c2","name":"write_to_file","args":{"TargetFile":"/workspace/app/new.go","CodeContent":"package app\nfunc New() {}\n"}},{"id":"c3","name":"run_command","args":{"CommandLine":"go test ./...","Cwd":"/workspace/app"}}]}`,
+		`{"step_index":2,"source":"MODEL","type":"VIEW_FILE","status":"DONE","created_at":"2026-10-01T10:00:06Z","content":"File Path: ` + "`file:///workspace/app/retry.go`" + `\nShowing lines 1 to 10"}`,
+		`{"step_index":3,"source":"MODEL","type":"CODE_ACTION","status":"DONE","created_at":"2026-10-01T10:00:07Z","content":"Created file ` + "`file:///workspace/app/new.go`" + `"}`,
+		`{"step_index":4,"source":"MODEL","type":"RUN_COMMAND","status":"DONE","created_at":"2026-10-01T10:00:08Z","content":"Task Description: go test ./...\nOutput:\nok"}`,
+		`{"step_index":5,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-10-01T10:01:00Z","content":"<USER_REQUEST>\nnow run linter\n</USER_REQUEST>"}`,
+		`{"step_index":6,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-10-01T10:01:05Z","content":"Running linter.","tool_calls":[{"id":"c4","name":"run_command","args":{"CommandLine":"golangci-lint run"}}]}`,
+		`{"step_index":7,"source":"MODEL","type":"GENERIC","status":"DONE","created_at":"2026-10-01T10:01:06Z","content":"Task Description: golangci-lint run\nOutput:\nok"}`,
+	}
+	readerWriteLines(t, path, lines)
+	kind := readerKind(t, "antigravity")
+	if kind.ParseFrom == nil || kind.Resumes == nil {
+		t.Fatal("antigravity FileKind must wire ParseFrom and Resumes")
+	}
+	full, err := kind.Parse(path, 0)
+	if err != nil || len(full) != 1 {
+		t.Fatalf("full parse: %v (len=%d)", err, len(full))
+	}
+	want := readerMessages(full)
+
+	// Split both mid-turn (right after PLANNER_RESPONSE at n=2) and between turns (n=5).
+	for _, splitAt := range []int{2, 5} {
+		stored, resumed := readerSplit(t, kind, path, lines, splitAt)
+		if !resumed {
+			t.Fatalf("splitAt=%d: expected antigravityResumes=true", splitAt)
+		}
+		got := readerMessages([]model.Session{{Messages: stored}})
+		if strings.Join(got, "\n") != strings.Join(want, "\n") {
+			t.Fatalf("splitAt=%d parity mismatch:\ngot:  %q\nwant: %q", splitAt, got, want)
+		}
+	}
+
+	// If a MODEL step before the tail's first PLANNER_RESPONSE stamps a non-zero exit
+	// code on a command from before offset, antigravityResumes must return false.
+	failLines := append([]string{}, lines[:2]...)
+	failLines = append(failLines, `{"step_index":2,"source":"MODEL","type":"RUN_COMMAND","status":"ERROR","created_at":"2026-10-01T10:00:08Z","content":"Task Description: go test ./...\nThe command exited with code 1.\nOutput:\nFAIL"}`)
+	readerWriteLines(t, path, failLines)
+	if _, resumed := readerSplit(t, kind, path, failLines, 2); resumed {
+		t.Fatal("expected antigravityResumes=false when tail modifies exit code of pre-offset command")
+	}
+}
+
+func TestCursorTranscriptIncrementalResumeParity(t *testing.T) {
+	home := readerEnv(t)
+	path := filepath.Join(home, ".cursor", "projects", "Users-shulcz-workspace-app", "agent-transcripts", "cur-123.jsonl")
+	lines := []string{
+		`{"role":"user","message":{"content":[{"type":"text","text":"<timestamp>2026-10-01T12:00:00Z</timestamp>\nfix bug in main.go"}]}}`,
+		`{"role":"assistant","message":{"content":[{"type":"text","text":"Checking main.go now."},{"type":"tool_use","name":"Read","input":{"path":"/Users/shulcz/workspace/app/main.go"}}]}}`,
+		`{"role":"user","message":{"content":[{"type":"text","text":"thanks, now add a unit test"}]}}`,
+		`{"role":"assistant","message":{"content":[{"type":"text","text":"Added unit test in main_test.go."}]}}`,
+	}
+	readerWriteLines(t, path, lines)
+	kind := readerKind(t, "cursor")
+	if kind.ParseFrom == nil || kind.Resumes == nil {
+		t.Fatal("cursor FileKind must wire ParseFrom and Resumes")
+	}
+	full, err := kind.Parse(path, 0)
+	if err != nil || len(full) != 1 {
+		t.Fatalf("full parse: %v (len=%d)", err, len(full))
+	}
+	want := readerMessages(full)
+
+	stored, resumed := readerSplit(t, kind, path, lines, 2)
+	if !resumed {
+		t.Fatal("expected cursorTranscriptResumes=true")
+	}
+	got := readerMessages([]model.Session{{Messages: stored}})
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("cursor parity mismatch:\ngot:  %q\nwant: %q", got, want)
+	}
+	for i, m := range stored {
+		if m.Time.IsZero() {
+			t.Fatalf("message %d has zero timestamp after incremental resume", i)
+		}
+	}
+}
+

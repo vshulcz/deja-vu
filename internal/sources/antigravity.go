@@ -1,8 +1,10 @@
 package sources
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path"
@@ -186,14 +188,23 @@ func LoadAntigravity() []model.Session {
 
 // ParseAntigravityFile reads one Antigravity transcript.
 func ParseAntigravityFile(path string) ([]model.Session, error) {
-	return parseAntigravityWith(path, func(fn func(map[string]any)) error {
-		return scanJSONLFromOffset(path, 0, fn)
+	return ParseAntigravityFileFromOffset(path, 0)
+}
+
+// ParseAntigravityFileFromOffset reads an Antigravity transcript from offset on.
+func ParseAntigravityFileFromOffset(path string, offset int64) ([]model.Session, error) {
+	return parseAntigravityWithOffset(path, offset, func(fn func(map[string]any)) error {
+		return scanJSONLFromOffset(path, offset, fn)
 	})
 }
 
 // parseAntigravityWith reads the records scan hands it as the transcript at
 // path: the whole file, or the part a compaction left behind it.
 func parseAntigravityWith(path string, scan func(func(map[string]any)) error) ([]model.Session, error) {
+	return parseAntigravityWithOffset(path, 0, scan)
+}
+
+func parseAntigravityWithOffset(path string, offset int64, scan func(func(map[string]any)) error) ([]model.Session, error) {
 	id := antigravitySessionID(path)
 	if id == "" || id == "." || id == string(filepath.Separator) {
 		return nil, nil
@@ -212,6 +223,9 @@ func parseAntigravityWith(path string, scan func(func(map[string]any)) error) ([
 	// that ran it says it did (#4528).
 	pendingWrites := map[string]string{}
 	cwd := ""
+	if offset > 0 {
+		cwd = seedAntigravityBefore(path, offset, fromCalls, pendingWrites, &s.Started)
+	}
 	// The commands the latest planner row asked for, where they sit, waiting
 	// for the step that says how each ended. A step carries no call id, so
 	// it answers the call it follows (#4530).
@@ -325,8 +339,131 @@ func parseAntigravityWith(path string, scan func(func(map[string]any)) error) ([
 	if len(s.Messages) == 0 {
 		return nil, err
 	}
-	antigravityResolveProject(&s, path, cwd, subWorkspace, parent)
+	antigravityResolveProject(&s, path, cwd, subWorkspace, parent, offset > 0)
 	return []model.Session{s}, err
+}
+
+// antigravityResumes reports whether the tail from offset can be appended
+// without re-reading the file whole: sub-agent runs cut their middle when
+// DEJA_INCLUDE_SUBAGENTS!=1, and a tool step before the tail's first
+// PLANNER_RESPONSE that drops a denied call or stamps an exit code on a command
+// emitted before offset requires the preceding planner row.
+func antigravityResumes(path string, offset int64) bool {
+	if offset <= 0 {
+		return true
+	}
+	if !SubagentsWhole() {
+		if parent, _, _ := antigravitySubagentInfo(path); parent != "" {
+			return false
+		}
+	}
+	ok := true
+	seenPlanner := false
+	_ = scanJSONLFromOffset(path, offset, func(m map[string]any) {
+		if !ok || seenPlanner {
+			return
+		}
+		if str(m["source"]) != "MODEL" {
+			return
+		}
+		kind := str(m["type"])
+		if kind == "PLANNER_RESPONSE" {
+			seenPlanner = true
+			return
+		}
+		text := capParsedMessage(str(m["content"]))
+		if str(m["status"]) == "ERROR" && strings.Contains(text, "Encountered error in tool execution: tool call denied") {
+			ok = false
+			return
+		}
+		if IndexCommands() {
+			if _, hasExit := antigravityExitCode(kind, text); hasExit {
+				ok = false
+			}
+		}
+	})
+	return ok
+}
+
+// seedAntigravityBefore populates fromCalls, pendingWrites, cwd, and started
+// from the latest PLANNER_RESPONSE before offset so tool execution steps at the
+// start of an appended tail deduplicate against their planner row's calls.
+func seedAntigravityBefore(path string, offset int64, fromCalls map[model.Message]int, pendingWrites map[string]string, started *time.Time) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer func() { _ = f.Close() }()
+	// Read the first line for the session start timestamp fallback when offset
+	// is beyond the window.
+	var head [2048]byte
+	if n, rerr := f.ReadAt(head[:], 0); n > 0 && (rerr == nil || rerr == io.EOF) {
+		if nl := bytes.IndexByte(head[:n], '\n'); nl > 0 {
+			var first map[string]any
+			if json.Unmarshal(bytes.TrimPrefix(head[:nl], []byte("\ufeff")), &first) == nil {
+				if t, terr := time.Parse(time.RFC3339Nano, str(first["created_at"])); terr == nil {
+					*started = t
+				}
+			}
+		}
+	}
+	start := max(0, offset-callWindow)
+	buf := make([]byte, offset-start)
+	if _, err := f.ReadAt(buf, start); err != nil && err != io.EOF {
+		return ""
+	}
+	if start > 0 {
+		if nl := bytes.IndexByte(buf, '\n'); nl >= 0 {
+			buf = buf[nl+1:]
+		} else {
+			return ""
+		}
+	}
+	cwd := ""
+	lines := bytes.Split(buf, []byte("\n"))
+	lastPlanner := -1
+	for i := len(lines) - 1; i >= 0; i-- {
+		if bytes.Contains(lines[i], []byte(`"PLANNER_RESPONSE"`)) {
+			lastPlanner = i
+			break
+		}
+	}
+	if lastPlanner < 0 {
+		return ""
+	}
+	for _, raw := range lines[lastPlanner:] {
+		raw = bytes.TrimSpace(bytes.TrimPrefix(raw, []byte("\ufeff")))
+		if len(raw) == 0 {
+			continue
+		}
+		m := decodeJSONLine(raw)
+		if m == nil || str(m["source"]) != "MODEL" {
+			continue
+		}
+		calls, c := antigravityToolCalls(m["tool_calls"], time.Time{})
+		if cwd == "" {
+			cwd = c
+		}
+		if rawCalls, _ := m["tool_calls"].([]any); len(rawCalls) > 0 {
+			clear(pendingWrites)
+			antigravityNoteWrites(m["tool_calls"], pendingWrites)
+		}
+		text := capParsedMessage(str(m["content"]))
+		if strings.TrimSpace(text) != "" {
+			step := antigravityStep(str(m["type"]), text, time.Time{})
+			for _, rec := range step {
+				key := model.Message{Role: rec.Role, Text: rec.Text}
+				if (rec.Role == RoleCommand || rec.Role == RoleFiles) && fromCalls[key] > 0 {
+					fromCalls[key]--
+				}
+			}
+			if str(m["type"]) == "CODE_ACTION" && str(m["status"]) == "DONE" {
+				_ = antigravityTakeWrite(text, step, pendingWrites, time.Time{})
+			}
+		}
+		antigravityTakeCalls(calls, fromCalls)
+	}
+	return cwd
 }
 
 func antigravityDropDeniedCall(msgs []model.Message, running []int, asked int) ([]model.Message, []int, int) {
@@ -349,13 +486,18 @@ func antigravityDropDeniedCall(msgs []model.Message, running []int, asked int) (
 	return msgs, running, asked
 }
 
-func antigravityResolveProject(s *model.Session, path, cwd, subWorkspace, parent string) {
+func antigravityResolveProject(s *model.Session, path, cwd, subWorkspace, parent string, fromOffset bool) {
 	if !isHomeOrEmptyProject(s.Project) {
 		return
 	}
 	if p := antigravityProjectFromFiles(s.Messages); p != "" {
 		s.Project = p
-	} else if s.Project == "-" || s.Project == "" {
+		if fromOffset && projectFromPaths(s.Messages) == "" {
+			s.ProjectFromDir = true
+		}
+		return
+	}
+	if s.Project == "-" || s.Project == "" {
 		if cwd != "" {
 			s.Project = projectName(cwd)
 		} else if subWorkspace != "" {
@@ -365,8 +507,10 @@ func antigravityResolveProject(s *model.Session, path, cwd, subWorkspace, parent
 	if isHomeOrEmptyProject(s.Project) && parent != "" {
 		if pp := antigravityParentProject(path, parent); !isHomeOrEmptyProject(pp) {
 			s.Project = pp
+			return
 		}
 	}
+	s.ProjectFromDir = true
 }
 
 func antigravitySessionID(path string) string {

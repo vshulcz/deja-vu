@@ -341,7 +341,9 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 					Match: func(p string) bool {
 						return strings.HasSuffix(p, ".jsonl") && strings.HasPrefix(p, filepath.Join(CursorCLIRoot(), "projects"))
 					},
-					Parse: fullParse(ParseCursorTranscript),
+					Parse:     fullParse(ParseCursorTranscript),
+					ParseFrom: offsetParse(ParseCursorTranscriptFromOffset),
+					Resumes:   cursorTranscriptResumes,
 				},
 			},
 		},
@@ -360,7 +362,9 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 					}
 					return false
 				},
-				Parse: fullParse(ParseAntigravityFile),
+				Parse:     fullParse(ParseAntigravityFile),
+				ParseFrom: offsetParse(ParseAntigravityFileFromOffset),
+				Resumes:   antigravityResumes,
 			}},
 		},
 		{
