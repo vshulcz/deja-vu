@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -422,8 +423,8 @@ func seedAntigravityBefore(path string, offset int64, fromCalls map[model.Messag
 	cwd := ""
 	lines := bytes.Split(buf, []byte("\n"))
 	lastPlanner := -1
-	for i := len(lines) - 1; i >= 0; i-- {
-		if bytes.Contains(lines[i], []byte(`"PLANNER_RESPONSE"`)) {
+	for i, line := range slices.Backward(lines) {
+		if bytes.Contains(line, []byte(`"PLANNER_RESPONSE"`)) {
 			lastPlanner = i
 			break
 		}

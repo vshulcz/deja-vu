@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -533,11 +534,11 @@ func lastCursorTurnTimeBefore(path string, offset int64) (time.Time, bool) {
 		return time.Time{}, false
 	}
 	lines := bytes.Split(buf, []byte("\n"))
-	for i := len(lines) - 1; i >= 0; i-- {
-		if !bytes.Contains(lines[i], []byte("<timestamp>")) {
+	for _, line := range slices.Backward(lines) {
+		if !bytes.Contains(line, []byte("<timestamp>")) {
 			continue
 		}
-		if t, ok := cursorTurnTime(string(lines[i])); ok {
+		if t, ok := cursorTurnTime(string(line)); ok {
 			return t, true
 		}
 	}

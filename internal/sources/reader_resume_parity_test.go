@@ -604,4 +604,3 @@ func TestCursorTranscriptIncrementalResumeParity(t *testing.T) {
 		}
 	}
 }
-
