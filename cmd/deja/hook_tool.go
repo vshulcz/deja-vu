@@ -106,9 +106,7 @@ type toolHookInput struct {
 // command this hook cannot tell a spawn from an edit, and has nothing to look
 // the action up by.
 func (i *toolHookInput) adopt() {
-	i.SessionID = adoptGrok(adoptGrok(i.SessionID, i.grokEnvelope.SessionID), i.ConversationID)
-	i.TranscriptPath = adoptGrok(i.TranscriptPath, i.grokEnvelope.TranscriptPath)
-	i.WorkspaceRoots = adoptGrokRoots(i.WorkspaceRoots, i.WorkspaceRoot)
+	i.SessionID, i.TranscriptPath, i.WorkspaceRoots = i.adoptCommon(i.SessionID, i.ConversationID, i.TranscriptPath, i.WorkspaceRoots)
 	i.ToolName = adoptGrok(adoptGrok(i.ToolName, i.grokEnvelope.ToolName), i.LLMToolName)
 	i.ToolInput.Command = adoptGrok(i.ToolInput.Command, i.grokEnvelope.ToolInput.Command)
 	i.ToolInput.FilePath = adoptGrok(i.ToolInput.FilePath, i.grokEnvelope.ToolInput.FilePath)

@@ -185,13 +185,7 @@ func statuslineMemory(dir string, in transcriptSource) (fileMemory, bool) {
 // named a different session each time (#668, measured 40/20 over 60 runs).
 // Identity breaks the tie because it is the one thing that does not change.
 func newestFirst(a, b index.SessionMeta) bool {
-	if !a.Updated.Equal(b.Updated) {
-		return a.Updated.After(b.Updated)
-	}
-	if a.Harness != b.Harness {
-		return a.Harness < b.Harness
-	}
-	return a.ID < b.ID
+	return index.NewestFirstMeta(a, b)
 }
 
 // sessionsTouching returns the sessions other than self that worked on path.

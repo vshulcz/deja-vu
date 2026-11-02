@@ -14,6 +14,9 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
+// NewestFirstMeta orders sessions for every "most recent" answer deja gives.
+func NewestFirstMeta(a, b SessionMeta) bool { return newestFirstMeta(a, b) }
+
 // newestFirstMeta orders sessions for every "most recent" answer deja gives.
 //
 // A timestamp alone is not an order. Sessions come out of a map, so a store

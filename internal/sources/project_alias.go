@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -82,15 +83,7 @@ func loadProjectAliases() []projectAlias {
 }
 
 func sameAliases(a, b []projectAlias) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
+	return slices.Equal(a, b)
 }
 
 // forgetProjectNames drops the folder names worked out under the old file, so

@@ -17,14 +17,22 @@ import "os"
 // The structs below embed this one, so a payload decodes into both spellings at
 // once, and each adopts grok's where the common spelling arrived empty.
 type grokEnvelope struct {
-	SessionID      string `json:"sessionId"`
-	WorkspaceRoot  string `json:"workspaceRoot"`
-	TranscriptPath string `json:"transcriptPath"`
-	ToolName       string `json:"toolName"`
-	ToolInput      struct {
+	SessionID           string `json:"sessionId"`
+	ConversationIDCamel string `json:"conversationId"`
+	WorkspaceRoot       string `json:"workspaceRoot"`
+	TranscriptPath      string `json:"transcriptPath"`
+	ToolName            string `json:"toolName"`
+	ToolInput           struct {
 		Command  string `json:"command"`
 		FilePath string `json:"file_path"`
 	} `json:"toolInput"`
+}
+
+func (e grokEnvelope) adoptCommon(sessionID, conversationID, transcriptPath string, roots []string) (string, string, []string) {
+	sid := adoptGrok(adoptGrok(adoptGrok(sessionID, e.SessionID), conversationID), e.ConversationIDCamel)
+	tp := adoptGrok(transcriptPath, e.TranscriptPath)
+	ws := adoptGrokRoots(roots, e.WorkspaceRoot)
+	return sid, tp, ws
 }
 
 // adoptGrok returns the value every other harness sends, or grok's when that

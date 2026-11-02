@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -629,7 +630,10 @@ func sessionsHolding(hits []search.Hit, form string) int {
 	n := 0
 	for _, h := range hits {
 		for _, m := range h.Session.Messages {
-			if containsWord(strings.ToLower(m.Text), form) {
+			if search.IsWorkRecord(m.Role) {
+				continue
+			}
+			if containsWord(query.Lower(m.Text), form) {
 				n++
 				break
 			}
@@ -649,17 +653,21 @@ func containsWord(low, word string) bool {
 		}
 		start := i + j
 		end := start + len(word)
-		beforeOK := start == 0 || !isWordByte(low[start-1])
-		afterOK := end == len(low) || !isWordByte(low[end])
+		beforeOK := start == 0
+		if !beforeOK {
+			r, _ := utf8.DecodeLastRuneInString(low[:start])
+			beforeOK = !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_'
+		}
+		afterOK := end == len(low)
+		if !afterOK {
+			r, _ := utf8.DecodeRuneInString(low[end:])
+			afterOK = !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_'
+		}
 		if beforeOK && afterOK {
 			return true
 		}
 		i = start + 1
 	}
-}
-
-func isWordByte(b byte) bool {
-	return b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z' || b >= '0' && b <= '9' || b >= 0x80
 }
 
 // termCountLine names the terms that do match on their own, so "try fewer
