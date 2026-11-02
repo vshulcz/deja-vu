@@ -147,3 +147,90 @@ func TestSessionMetadataIsTheSameWhicheverWayTheIndexGotThere(t *testing.T) {
 		t.Errorf("%s differs by build path — %s", k, strings.Join(diffs, "; "))
 	}
 }
+
+// Every field added to SessionMeta has to say which of the three row-transfer
+// paths (deleted-copy keep across versions, deleted-copy keep within the same
+// version, incremental sync batch carry/reset) owns it. Leaving a new derived
+// field out of withKeptRow or carryAccumulatedFrom silently drifts incremental
+// passes and sync imports away from a rebuild.
+func TestEverySessionMetaFieldIsClassifiedForCarryAndKeep(t *testing.T) {
+	watermarkFields := map[string]bool{
+		"Counted": true, "Words": true, "LastMsg": true, "Opening": true,
+	}
+	keptSameVersionOnly := map[string]bool{
+		"Settled": true, "RanCommand": true, "Asked": true, "Hit": true, "GaveUp": true,
+		"Touched": true, "TouchHits": true, "Rules": true, "Revokes": true, "Planted": true,
+	}
+	syncCarryExtra := map[string]bool{
+		"Asked": true, "Hit": true, "GaveUp": true, "NoText": true,
+		"Touched": true, "TouchHits": true, "Settled": true, "RanCommand": true,
+	}
+	identityOrSpan := map[string]bool{
+		"ID": true, "Harness": true, "Project": true, "Path": true,
+		"Title": true, "AgentTitle": true, "Started": true, "Updated": true,
+		"Shared": true, "SharedStarted": true, "SharedUpdated": true, "Copies": true,
+		"OrigID": true, "RemoteID": true, "Kind": true, "Parent": true, "Agent": true,
+		"From": true, "Lifecycle": true, "LifecycleNote": true, "LifecycleAt": true,
+		"Ord": true, "NoText": true, "Rules": true, "Revokes": true, "Planted": true,
+	}
+
+	rt := reflect.TypeFor[SessionMeta]()
+	for i := range rt.NumField() {
+		name := rt.Field(i).Name
+		if !watermarkFields[name] && !keptSameVersionOnly[name] && !syncCarryExtra[name] && !identityOrSpan[name] {
+			t.Errorf("SessionMeta.%s is unclassified: update withKeptRow / carryAccumulatedFrom / resetAccumulated in ingest_derived.go and classify it here", name)
+		}
+	}
+
+	full := SessionMeta{
+		Counted: 7, Words: 42, LastMsg: 99, Opening: 123,
+		Settled: "fixed", RanCommand: true, Asked: []uint64{1}, Hit: []uint64{2}, GaveUp: true,
+		Touched: []string{"a.go"}, TouchHits: []int{3}, NoText: true,
+		Rules: []string{"make test"}, Revokes: []string{"go test"}, Planted: []string{"plan"},
+	}
+
+	keptSame := withKeptRow(SessionMeta{}, full, true)
+	vFull := reflect.ValueOf(full)
+	vKeptSame := reflect.ValueOf(keptSame)
+	vKeptDiff := reflect.ValueOf(withKeptRow(SessionMeta{}, full, false))
+	for i := range rt.NumField() {
+		name := rt.Field(i).Name
+		if watermarkFields[name] || keptSameVersionOnly[name] {
+			if !reflect.DeepEqual(vKeptSame.Field(i).Interface(), vFull.Field(i).Interface()) {
+				t.Errorf("withKeptRow(sameVersion=true) did not copy SessionMeta.%s", name)
+			}
+		}
+		if watermarkFields[name] {
+			if !reflect.DeepEqual(vKeptDiff.Field(i).Interface(), vFull.Field(i).Interface()) {
+				t.Errorf("withKeptRow(sameVersion=false) did not copy watermark field SessionMeta.%s", name)
+			}
+		} else if keptSameVersionOnly[name] {
+			if !vKeptDiff.Field(i).IsZero() {
+				t.Errorf("withKeptRow(sameVersion=false) leaked version-bound field SessionMeta.%s", name)
+			}
+		}
+	}
+
+	var carried SessionMeta
+	carryAccumulatedFrom(&carried, full)
+	vCarried := reflect.ValueOf(carried)
+	for i := range rt.NumField() {
+		name := rt.Field(i).Name
+		if watermarkFields[name] || syncCarryExtra[name] {
+			if !reflect.DeepEqual(vCarried.Field(i).Interface(), vFull.Field(i).Interface()) {
+				t.Errorf("carryAccumulatedFrom did not copy SessionMeta.%s", name)
+			}
+		}
+	}
+
+	resetAccumulated(&carried, false)
+	vReset := reflect.ValueOf(carried)
+	for i := range rt.NumField() {
+		name := rt.Field(i).Name
+		if watermarkFields[name] || syncCarryExtra[name] {
+			if !vReset.Field(i).IsZero() {
+				t.Errorf("resetAccumulated did not zero SessionMeta.%s", name)
+			}
+		}
+	}
+}

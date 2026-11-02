@@ -19,10 +19,10 @@ var hookExePath = regexp.MustCompile("(/[^\\s\"'`\\\\]*/deja(?:-hook|\\.[eE][xX]
 var hookExeRuns = regexp.MustCompile(`^["'\\\s]*(hook-[a-z-]+|warmup-status|recall|statusline|mcp)\b`)
 
 // hookExeAssigned matches what precedes the path when a generated plugin binds
-// it to a name of its own — `const DEJA = "…"`, `DEJA = "…"`. The `=` is what
-// keeps a config *key* that ends in deja out: `"DEJA_INDEX_DIR": "…/deja"` is
-// a directory this check has no business reporting on.
-var hookExeAssigned = regexp.MustCompile(`(?i)deja[a-z_]*["']?\s*=\s*["'\\]*$`)
+// it to a name of its own — `const DEJA = "…"`, `DEJA = "…"`, `const HOOK = "…"`.
+// The `=` is what keeps a config *key* that ends in deja out: `"DEJA_INDEX_DIR": "…/deja"`
+// is a directory this check has no business reporting on.
+var hookExeAssigned = regexp.MustCompile(`(?i)(?:deja[a-z_]*|hook)["']?\s*=\s*["'\\]*$`)
 
 // dejaHookCommandMissing returns the deja binary a hook file runs when that
 // binary is not there, and "" otherwise.

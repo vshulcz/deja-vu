@@ -1571,7 +1571,7 @@ func dejaKeyedCommand(text string) string {
 // build in a scratch directory (#3668).
 func outOfDejasBlock(line, trimmed string, indent int, beside bool) bool {
 	if beside {
-		if strings.HasPrefix(trimmed, "[") {
+		if strings.HasPrefix(trimmed, "[") || strings.HasPrefix(trimmed, "- ") {
 			return true
 		}
 		return yamlIndentWidth(line) < indent
@@ -1588,14 +1588,15 @@ func outOfDejasBlock(line, trimmed string, indent int, beside bool) bool {
 // dejaBlockOpens reports whether a line starts the block that belongs to deja,
 // and whether that block's keys sit beside the anchor rather than under it. A
 // mapping key indents its fields below; a TOML table header does not, and dsh
-// has no server key at all — the name is a field inside a patch-list row,
-// beside the command rather than above it.
+// and Continue keep the server name in a field of the list row (`serverName:`
+// or `- name:`), beside or above the command in the same item.
 func dejaBlockOpens(trimmed string) (opens, beside bool) {
 	switch trimmed {
 	case "deja:":
 		return true, false
 	case "[mcp_servers.deja]", "[mcp.servers.deja]",
-		"serverName: deja", `serverName: "deja"`, "serverName: 'deja'":
+		"serverName: deja", `serverName: "deja"`, "serverName: 'deja'",
+		"- name: deja", `- name: "deja"`, "- name: 'deja'":
 		return true, true
 	}
 	// A quoted JSON key, for the files that do not parse even as JSONC, which

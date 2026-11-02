@@ -30,6 +30,7 @@ func hermeticEnv(t *testing.T) string {
 	freshRunRecord := func() {
 		createdDirsByThisRun, createdByThisRun, snapshotsByThisRun = nil, nil, nil
 		blocksAddedThisRun, blocksForgottenThisRun = nil, map[string]bool{}
+		forgetWrittenExes()
 	}
 	freshRunRecord()
 	t.Cleanup(freshRunRecord)

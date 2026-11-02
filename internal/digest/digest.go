@@ -5,11 +5,13 @@ package digest
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -658,6 +660,32 @@ var worktreeListBudget = func() time.Duration {
 // when cwd is inside a git repository. Best effort with a hard timeout: no
 // git, no repo, or a slow disk simply yields nothing.
 func gitWorktreeRoots(cwd string) []string {
+	top, gitInfo, ok := findGitTop(cwd)
+	if !ok {
+		return nil
+	}
+	// Fast path for the common case: a standard checkout whose .git directory
+	// has no linked worktrees. Resolving the root in-process avoids spawning git
+	// on every hook/query invocation and prevents cold-process timeouts (#3624).
+	if gitInfo.IsDir() {
+		if _, err := os.Stat(filepath.Join(top, ".git", "worktrees")); err != nil {
+			if resolved, err := filepath.EvalSymlinks(top); err == nil {
+				top = resolved
+			}
+			if strings.Contains(filepath.ToSlash(top), "/.git/") {
+				return nil
+			}
+			return []string{top}
+		}
+	}
+	cacheKey := worktreeCacheKey(top, gitInfo)
+	if cacheKey != "" {
+		if v, ok := worktreeRootsCache.Load(cacheKey); ok {
+			if cached, ok := v.([]string); ok {
+				return slices.Clone(cached)
+			}
+		}
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), worktreeListBudget)
 	defer cancel()
 	out, err := gitread.Command(ctx, "-C", cwd, "worktree", "list", "--porcelain").Output()
@@ -686,7 +714,61 @@ func gitWorktreeRoots(cwd string) []string {
 		}
 		roots = append(roots, p)
 	}
+	if cacheKey != "" {
+		worktreeRootsCache.Store(cacheKey, slices.Clone(roots))
+	}
 	return roots
+}
+
+var worktreeRootsCache sync.Map
+
+func findGitTop(cwd string) (string, os.FileInfo, bool) {
+	cwd = strings.TrimSpace(cwd)
+	if cwd == "" {
+		return "", nil, false
+	}
+	dir, err := filepath.Abs(cwd)
+	if err != nil {
+		dir = filepath.Clean(cwd)
+	}
+	for {
+		if info, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
+			return dir, info, true
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", nil, false
+		}
+		dir = parent
+	}
+}
+
+func worktreeCacheKey(top string, gitInfo os.FileInfo) string {
+	dotGit := filepath.Join(top, ".git")
+	if gitInfo.IsDir() {
+		wtDir := filepath.Join(dotGit, "worktrees")
+		info, err := os.Stat(wtDir)
+		if err != nil {
+			return ""
+		}
+		return fmt.Sprintf("%s|%d", top, info.ModTime().UnixNano())
+	}
+	b, err := os.ReadFile(dotGit)
+	if err != nil {
+		return fmt.Sprintf("%s|%d", top, gitInfo.ModTime().UnixNano())
+	}
+	line := strings.TrimSpace(string(b))
+	if gitdir, ok := strings.CutPrefix(line, "gitdir:"); ok {
+		gitdir = strings.TrimSpace(gitdir)
+		if !filepath.IsAbs(gitdir) {
+			gitdir = filepath.Join(top, gitdir)
+		}
+		wtParent := filepath.Dir(filepath.Clean(gitdir))
+		if info, err := os.Stat(wtParent); err == nil {
+			return fmt.Sprintf("%s|%d|%d", top, gitInfo.ModTime().UnixNano(), info.ModTime().UnixNano())
+		}
+	}
+	return fmt.Sprintf("%s|%d", top, gitInfo.ModTime().UnixNano())
 }
 
 // agentArtifactMarkers flag transcript entries that are tool output or

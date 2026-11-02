@@ -54,23 +54,49 @@ func claudeFolderIs(cwd, base string) bool {
 // cwd, and a project name is not worth reading a long session for.
 const claudeCWDScanLines = 64
 
+// claudeFileStamp is the mtime and byte length of a transcript when
+// claudeFolderCWD inspected it.
+type claudeFileStamp struct {
+	modNano int64
+	size    int64
+}
+
+type claudeMiss struct {
+	at      time.Time
+	scanned map[string]claudeFileStamp
+}
+
 // claudeTranscriptCWD is the working directory a transcript records, when it
 // is the one the project folder base was named for; "" otherwise.
 func claudeTranscriptCWD(path, base string) string {
+	cwd, _ := claudeTranscriptCWDStamp(path, base)
+	return cwd
+}
+
+func claudeTranscriptCWDStamp(path, base string) (string, claudeFileStamp) {
 	if base == "" {
-		return ""
+		return "", claudeFileStamp{}
 	}
-	return transcriptCWD(path, func(cwd string) bool { return claudeFolderIs(cwd, base) })
+	return transcriptCWDStamp(path, func(cwd string) bool { return claudeFolderIs(cwd, base) })
 }
 
 // transcriptCWD is the first cwd among the head records of a JSONL transcript
 // that fits, the check being whether its folder was named for it.
 func transcriptCWD(path string, fits func(cwd string) bool) string {
+	cwd, _ := transcriptCWDStamp(path, fits)
+	return cwd
+}
+
+func transcriptCWDStamp(path string, fits func(cwd string) bool) (string, claudeFileStamp) {
 	f, err := os.Open(path)
 	if err != nil {
-		return ""
+		return "", claudeFileStamp{}
 	}
 	defer f.Close()
+	var stamp claudeFileStamp
+	if fi, serr := f.Stat(); serr == nil {
+		stamp = claudeFileStamp{modNano: fi.ModTime().UnixNano(), size: fi.Size()}
+	}
 	// A head record past the buffer is streamed, as the parse streams it: a
 	// tool output of a hundred megabytes near the top is not held (#5414).
 	r := jsonlReader()
@@ -83,14 +109,14 @@ func transcriptCWD(path string, fits func(cwd string) bool) string {
 				CWD string `json:"cwd"`
 			}
 			if json.Unmarshal(line, &v) == nil && v.CWD != "" && fits(v.CWD) {
-				return v.CWD
+				return v.CWD, stamp
 			}
 		}
 		if err != nil {
-			return ""
+			return "", stamp
 		}
 	}
-	return ""
+	return "", stamp
 }
 
 // claudeProjectNameFor is the project of the transcript at path, which is the
@@ -114,12 +140,13 @@ func claudeProjectNameFor(path string) string {
 		return name
 	}
 	start := time.Now()
-	name := cwdProjectName(claudeFolderCWD(dir))
+	cwd, scanned := claudeFolderCWDScanned(dir)
+	name := cwdProjectName(cwd)
 	if name == "" {
 		// Not cached as a name: a new transcript's first line can be a
 		// snapshot with no cwd, and the decoded name kept for it would
 		// outlive the cwd landing in a long-lived process such as deja mcp.
-		claudeCWDMiss.Store(dir, start)
+		claudeCWDMiss.Store(dir, claudeMiss{at: start, scanned: scanned})
 		return claudeProjectName(dir)
 	}
 	claudeCWDNameCache.Store(dir, name)
@@ -142,11 +169,24 @@ func claudeCachedProjectName(dir, path string) (string, bool) {
 	// is where a cwd can have landed (#4225), so it reads the folder again.
 	// File times run on a coarser clock than time.Now and some filesystems
 	// keep whole seconds, so a write just after the miss can be stamped
-	// before it; only a transcript older than the slack counts as older.
+	// before it; only a transcript older than the slack — or one already
+	// present at the same size and mtime when the miss scanned the folder —
+	// counts as unchanged since the miss.
 	if v, ok := claudeCWDMiss.Load(dir); ok {
-		at, _ := v.(time.Time)
-		if fi, err := os.Stat(path); err == nil && fi.ModTime().Before(at.Add(-claudeCWDMissSlack)) {
-			return claudeProjectName(dir), true
+		miss, _ := v.(claudeMiss)
+		if fi, err := os.Stat(path); err == nil {
+			if fi.ModTime().Before(miss.at.Add(-claudeCWDMissSlack)) {
+				return claudeProjectName(dir), true
+			}
+			if !fi.ModTime().After(miss.at) {
+				if stamp, seen := miss.scanned[path]; seen {
+					if fi.ModTime().UnixNano() == stamp.modNano && fi.Size() == stamp.size {
+						return claudeProjectName(dir), true
+					}
+				} else if len(miss.scanned) >= claudeFolderScanFiles {
+					return claudeProjectName(dir), true
+				}
+			}
 		}
 	}
 	return "", false
@@ -223,10 +263,15 @@ const claudeFolderScanFiles = 32
 // under two projects, and which one won would depend on which file a run read
 // first.
 func claudeFolderCWD(dir string) string {
+	cwd, _ := claudeFolderCWDScanned(dir)
+	return cwd
+}
+
+func claudeFolderCWDScanned(dir string) (string, map[string]claudeFileStamp) {
 	base := filepath.Base(dir)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return ""
+		return "", nil
 	}
 	var files []string
 	for _, e := range entries {
@@ -244,15 +289,18 @@ func claudeFolderCWD(dir string) string {
 			break
 		}
 	}
+	scanned := make(map[string]claudeFileStamp, min(len(files), claudeFolderScanFiles))
 	for i, f := range files {
 		if i >= claudeFolderScanFiles {
 			break
 		}
-		if cwd := claudeTranscriptCWD(f, base); cwd != "" {
-			return cwd
+		cwd, stamp := claudeTranscriptCWDStamp(f, base)
+		if cwd != "" {
+			return cwd, nil
 		}
+		scanned[f] = stamp
 	}
-	return ""
+	return "", scanned
 }
 
 // ClaudeSessionDir is the directory a Claude Code session ran in, for the cd

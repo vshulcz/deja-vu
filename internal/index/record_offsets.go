@@ -84,6 +84,7 @@ func keyHash(key string) uint64 {
 // recordOffsets is a decoded table: every key's record offsets, ascending.
 type recordOffsets struct {
 	covered int64
+	logSize int64
 	records int64
 	byKey   map[string][]int64
 }
@@ -268,13 +269,14 @@ func readRecordOffsetsFor(dir string, f *os.File, keys map[string]bool) (recordO
 	if nkeys < 0 || dataStart > len(b) {
 		return recordOffsets{}, errNoRecordOffsets
 	}
-	if fi, err := f.Stat(); err != nil || fi.Size() < covered {
+	fi, err := f.Stat()
+	if err != nil || fi.Size() < covered {
 		return recordOffsets{}, errNoRecordOffsets
 	}
 	if got, err := recordLogFingerprint(f, covered); err != nil || got != fp {
 		return recordOffsets{}, errNoRecordOffsets
 	}
-	out := recordOffsets{covered: covered, records: records, byKey: map[string][]int64{}}
+	out := recordOffsets{covered: covered, logSize: fi.Size(), records: records, byKey: map[string][]int64{}}
 	entryAt := func(i int) (uint64, int) {
 		p := dirStart + 16*i
 		return binary.LittleEndian.Uint64(b[p:]), int(binary.LittleEndian.Uint64(b[p+8:])) //nolint:gosec // written from a non-negative offset
@@ -414,6 +416,9 @@ func eachRecordForKeysByOffsets(f *os.File, dir string, t *recordTables, want, r
 	for _, rec := range recs {
 		fn(rec)
 	}
+	if ro.covered >= ro.logSize {
+		return true, nil
+	}
 	if _, err := f.Seek(ro.covered, io.SeekStart); err != nil {
 		return true, err
 	}
@@ -438,7 +443,7 @@ func recordInSpan(b []byte, rel int, t *recordTables, want, roles map[string]boo
 	if !ok || !want[key] {
 		return Record{}, false, true, errOffsetsMismatch
 	}
-	if roles != nil && !roles[role] {
+	if !roleWanted(roles, role) {
 		return Record{}, false, true, nil
 	}
 	rec, derr := decodeRecord(payload, t)
@@ -470,7 +475,7 @@ func readRecordAtInRoles(f *os.File, off int64, t *recordTables, want, roles map
 	if !ok || !want[key] {
 		return Record{}, false, errOffsetsMismatch
 	}
-	if roles != nil && !roles[role] {
+	if !roleWanted(roles, role) {
 		return Record{}, false, nil
 	}
 	var payload []byte

@@ -103,4 +103,5 @@ func dropBucketDirs(dir string) {
 		bucketDirCache.dir, bucketDirCache.byPath = "", nil
 	}
 	bucketDirCache.mu.Unlock()
+	dropCooccurCache(dir)
 }

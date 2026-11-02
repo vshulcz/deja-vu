@@ -38,13 +38,24 @@ func bridgedRetry(dir string, m Manifest, projects, terms []string, n int, skip 
 			was = v
 		}
 	}
-	neighbours := readCooccur(dir)
-	inProject := map[uint32]bool{}
-	scope := newProjectScope(projects...)
-	for _, meta := range m.Sessions {
-		if scope.has(meta.Project) {
-			inProject[meta.Ord] = true
+	hasStrongTerm := hasTermAboveFloor(terms, idfOf, dejaVuStrongIDFFloor)
+	var crossCands []string
+	if was == 0 {
+		crossCands = crossScriptBridgeTerms(terms)
+	}
+	if !hasStrongTerm && len(crossCands) == 0 {
+		return nil, nil, nil, nil, false
+	}
+	var neighbours map[string][]string
+	if hasStrongTerm {
+		neighbours = readCooccur(dir)
+	}
+	var inProject map[uint32]bool
+	projectOrds := func() map[uint32]bool {
+		if inProject == nil {
+			inProject = projectOrdSet(m, projects)
 		}
+		return inProject
 	}
 	have := make(map[string]bool, len(terms))
 	for _, t := range terms {
@@ -59,16 +70,17 @@ func bridgedRetry(dir string, m Manifest, projects, terms []string, n int, skip 
 		// is three ordinary words, and the corpus's neighbours for ordinary
 		// words are its subjects — that sentence was the one negative control
 		// this fired on.
-		if idfOf[t] < dejaVuStrongIDFFloor {
+		if idfOf[t] < dejaVuStrongIDFFloor || len(neighbours[t]) == 0 {
 			continue
 		}
 		tPosts, terr := postingsFor(dir, "t"+t)
 		if terr != nil || len(tPosts) == 0 {
 			continue
 		}
+		inProj := projectOrds()
 		at := make(map[int64]bool, len(tPosts))
 		for _, pp := range tPosts {
-			if inProject[pp.Sid] {
+			if inProj[pp.Sid] {
 				at[pp.Off] = true
 			}
 		}
@@ -85,7 +97,7 @@ func bridgedRetry(dir string, m Manifest, projects, terms []string, n int, skip 
 			}
 			tied := false
 			for _, pp := range cPosts {
-				if inProject[pp.Sid] && at[pp.Off] {
+				if inProj[pp.Sid] && at[pp.Off] {
 					tied = true
 					break
 				}
@@ -105,7 +117,7 @@ func bridgedRetry(dir string, m Manifest, projects, terms []string, n int, skip 
 	}
 	crossScript := false
 	if was == 0 && len(added) < bridgeTerms {
-		for _, cand := range crossScriptBridgeTerms(terms) {
+		for _, cand := range crossCands {
 			if have[cand] {
 				continue
 			}
@@ -113,9 +125,10 @@ func bridgedRetry(dir string, m Manifest, projects, terms []string, n int, skip 
 			if cerr != nil || len(cPosts) == 0 {
 				continue
 			}
+			inProjMap := projectOrds()
 			inProj := false
 			for _, pp := range cPosts {
-				if inProject[pp.Sid] {
+				if inProjMap[pp.Sid] {
 					inProj = true
 					break
 				}
@@ -148,6 +161,27 @@ func bridgedRetry(dir string, m Manifest, projects, terms []string, n int, skip 
 		}
 	}
 	return nil, nil, nil, nil, false
+}
+
+func hasTermAboveFloor(terms []string, idfOf map[string]float64, floor float64) bool {
+	for _, t := range terms {
+		if idfOf[t] >= floor {
+			return true
+		}
+	}
+	return false
+}
+
+func projectOrdSet(m Manifest, projects []string) map[uint32]bool {
+	inProject := map[uint32]bool{}
+	scope := newProjectScope(projects...)
+	all := viewsFor(m).allMeta()
+	for i := range all {
+		if scope.has(all[i].Project) {
+			inProject[all[i].Ord] = true
+		}
+	}
+	return inProject
 }
 
 type trilingualConcept struct {

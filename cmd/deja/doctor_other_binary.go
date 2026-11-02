@@ -61,6 +61,12 @@ func dejaHookCommandIn(path string) string {
 		return ""
 	}
 	text := string(b)
+	for _, m := range quotedDejaCommandQuoted.FindAllStringSubmatch(text, -1) {
+		cand := quotedPathUnescape.Replace(m[1])
+		if filepath.IsAbs(cand) {
+			return filepath.FromSlash(cand)
+		}
+	}
 	for _, loc := range hookExePath.FindAllStringIndex(text, -1) {
 		if !hookExeBoundary(text, loc[0]-1) || !hookExeBoundary(text, loc[1]) {
 			continue

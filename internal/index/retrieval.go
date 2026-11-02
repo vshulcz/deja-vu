@@ -968,15 +968,15 @@ type relevanceRanking struct {
 // relevanceScored is one session's standing after the ranking pass: its score
 // over the whole query, and its score over only the words that distinguish.
 type relevanceScored struct {
-	meta    SessionMeta
-	score   float64
-	matched int
-	any     int
-	strong  int
+	place   int32
+	matched int32
+	any     int32
+	strong  int32
 	// naming is how many of the question's naming words this session matched,
 	// judged by shape. The gate needs it to tell a match on the subject from a
 	// match on the verb beside it (#3351).
-	naming int
+	naming int32
+	score  float64
 	focus  float64
 }
 
@@ -996,21 +996,13 @@ const rrfK = 60
 // So both are kept and each session takes its better place, the focused one at
 // a price. Ordering by the fused place rather than by a blended score keeps the
 // two views from having to be on the same scale, which they are not.
-func fuseFocus(scored []relevanceScored, order []int32) []relevanceScored {
+func fuseFocus(scored []relevanceScored, order []int32) []int32 {
 	if len(order) < 2 {
-		out := make([]relevanceScored, len(order))
-		for i, idx := range order {
-			out[i] = scored[idx]
-		}
-		return out
+		return order
 	}
 	// The rows stay where they are; places are kept by index.
 	byFocusOrder := slices.Clone(order)
 	slices.SortStableFunc(byFocusOrder, func(a, b int32) int { return cmp.Compare(scored[b].focus, scored[a].focus) })
-	byFocus := make([]int, len(scored))
-	for place, idx := range byFocusOrder {
-		byFocus[idx] = place
-	}
 	// Reciprocal rank fusion instead of "the better of the two places, with the
 	// focused view paying three of them". RRF sums 1/(k+rank) over the
 	// rankings and needs no common scale between them (Cormack, Clarke &
@@ -1020,15 +1012,13 @@ func fuseFocus(scored []relevanceScored, order []int32) []relevanceScored {
 	// replaces was two numbers picked by hand.
 	fused := make([]float64, len(scored))
 	for i, idx := range order {
-		fused[idx] = 1/float64(rrfK+i+1) + 1/float64(rrfK+byFocus[idx]+1)
+		fused[idx] = 1 / float64(rrfK+i+1)
 	}
-	final := slices.Clone(order)
-	slices.SortStableFunc(final, func(a, b int32) int { return cmp.Compare(fused[b], fused[a]) })
-	out := make([]relevanceScored, len(final))
-	for i, idx := range final {
-		out[i] = scored[idx]
+	for place, idx := range byFocusOrder {
+		fused[idx] += 1 / float64(rrfK+place+1)
 	}
-	return out
+	slices.SortStableFunc(order, func(a, b int32) int { return cmp.Compare(fused[b], fused[a]) })
+	return order
 }
 
 // projectInScope says whether a session belongs to the project a caller is
@@ -1176,32 +1166,51 @@ func ProjectInScope(project, want string) bool { return projectInScope(project, 
 // any-frequency term counts, how many query terms the corpus knows at all,
 // and that pre-truncation total.
 func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int, keep func(SessionMeta) bool) (relevanceRanking, error) {
-	metas := make([]SessionMeta, 0, len(m.Sessions))
-	scope := newProjectScope(projects...)
-	maxOrd := -1
-	for _, meta := range m.Sessions {
-		if keep != nil && !keep(meta) {
-			continue
-		}
-		// An empty scope is the whole index.
-		if len(projects) == 0 || scope.has(meta.Project) {
-			metas = append(metas, meta)
-			maxOrd = max(maxOrd, int(meta.Ord))
-		}
-	}
-	if len(metas) == 0 {
+	views := viewsFor(m)
+	all := views.allMeta()
+	if len(all) == 0 {
 		return relevanceRanking{}, nil
 	}
-	place := make([]int32, maxOrd+1)
-	for i := range place {
-		place[i] = -1
-	}
-	for i, meta := range metas {
-		place[meta.Ord] = int32(i)
+	var metaIdx []int32
+	var place []int32
+	nMetas := len(all)
+	if len(projects) == 0 && keep == nil {
+		place = make([]int32, views.maxOrd+1)
+		for i := range place {
+			place[i] = -1
+		}
+		for i := range all {
+			place[all[i].Ord] = int32(i)
+		}
+	} else {
+		scope := newProjectScope(projects...)
+		metaIdx = make([]int32, 0, len(all))
+		maxOrd := -1
+		for i := range all {
+			if keep != nil && !keep(all[i]) {
+				continue
+			}
+			// An empty scope is the whole index.
+			if len(projects) == 0 || scope.has(all[i].Project) {
+				metaIdx = append(metaIdx, int32(i))
+				maxOrd = max(maxOrd, int(all[i].Ord))
+			}
+		}
+		if len(metaIdx) == 0 {
+			return relevanceRanking{}, nil
+		}
+		nMetas = len(metaIdx)
+		place = make([]int32, maxOrd+1)
+		for i := range place {
+			place[i] = -1
+		}
+		for p, idx := range metaIdx {
+			place[all[idx].Ord] = int32(p)
+		}
 	}
 	br := newBucketReader(dir)
 	defer br.close()
-	a := newRelevanceAcc(m, metas, place, br)
+	a := newRelevanceAcc(m, all, metaIdx, place, br)
 	for _, term := range terms {
 		a.addTerm(term)
 	}
@@ -1213,9 +1222,9 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 	long := isLongQuery(terms)
 	var sumWords, nWords float64
 	if long {
-		for _, meta := range metas {
-			if meta.Words > 0 {
-				sumWords += float64(meta.Words)
+		for p := range nMetas {
+			if w := a.meta(int32(p)).Words; w > 0 {
+				sumWords += float64(w)
 				nWords++
 			}
 		}
@@ -1241,12 +1250,13 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		if x.score != y.score {
 			return cmp.Compare(y.score, x.score)
 		}
-		if !x.meta.Updated.Equal(y.meta.Updated) {
-			return y.meta.Updated.Compare(x.meta.Updated)
+		xm, ym := a.meta(x.place), a.meta(y.place)
+		if !xm.Updated.Equal(ym.Updated) {
+			return ym.Updated.Compare(xm.Updated)
 		}
 		// Total order even on full ties: the order sessions were collected
 		// in must never decide what the user sees first.
-		return strings.Compare(x.meta.ID, y.meta.ID)
+		return strings.Compare(xm.ID, ym.ID)
 	})
 	ranked := fuseFocus(scored, order)
 	// Counted here, one line above the truncation, because this is the last
@@ -1261,15 +1271,16 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 	strong := make([]int, 0, len(ranked))
 	naming := make([]int, 0, len(ranked))
 	scores := make([]float64, 0, len(ranked))
-	kept := make([]bool, len(metas))
-	for _, r := range ranked {
-		out = append(out, r.meta)
+	kept := make([]bool, nMetas)
+	for _, idx := range ranked {
+		r := &scored[idx]
+		out = append(out, *a.meta(r.place))
 		scores = append(scores, r.score)
-		matched = append(matched, r.matched)
-		anyMatched = append(anyMatched, r.any)
-		strong = append(strong, r.strong)
-		naming = append(naming, r.naming)
-		kept[place[r.meta.Ord]] = true
+		matched = append(matched, int(r.matched))
+		anyMatched = append(anyMatched, int(r.any))
+		strong = append(strong, int(r.strong))
+		naming = append(naming, int(r.naming))
+		kept[r.place] = true
 	}
 	// The records that matched, for the sessions that survived the window.
 	// The per-message signals need them by offset; handing them on is what
@@ -1278,7 +1289,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 	offsets := make(map[uint32][]int64, len(ranked))
 	for _, msg := range a.msgs {
 		if msg.matched && kept[msg.place] {
-			ord := metas[msg.place].Ord
+			ord := a.meta(msg.place).Ord
 			offsets[ord] = append(offsets[ord], msg.off)
 		}
 	}
@@ -1321,7 +1332,7 @@ func sessionsAtOffsets(dir string, m Manifest, o query.Options, metas []SessionM
 	}
 	defer func() { _ = f.Close() }()
 	by := map[string]*model.Session{}
-	if err := eachRecordAt(f, sortedUniqueOffsets(flat), tablesFromManifest(m), func(r Record) {
+	if err := eachRecordAtInRoles(f, sortedUniqueOffsets(flat), tablesFromManifest(m), servableRoles(o), func(r Record) {
 		meta, ok := m.Sessions[r.Key]
 		if !ok {
 			return
@@ -1660,6 +1671,35 @@ func recordServable(role string, o query.Options) bool {
 	return true
 }
 
+// defaultServableRoles is the role filter for a query without --role: every
+// role is wanted ("*": true) except the work and summary roles that are only
+// served when asked for by name.
+var defaultServableRoles = map[string]bool{
+	"*":         true,
+	roleFiles:   false,
+	roleCommand: false,
+	roleEdit:    false,
+	roleSummary: false,
+	roleWrote:   false,
+}
+
+// servableRoles returns the role filter map for roleWanted that matches
+// recordServable(role, o), so non-servable records are skipped at their header
+// prefix before flate decompression.
+func servableRoles(o query.Options) map[string]bool {
+	if o.Role == "" {
+		return defaultServableRoles
+	}
+	if o.Role == roleWrote {
+		return map[string]bool{}
+	}
+	m := map[string]bool{o.Role: true}
+	if o.Role == "tool" {
+		m[roleToolOutput] = true
+	}
+	return m
+}
+
 // sessionsServable loads the sessions and keeps only the records this query is
 // allowed to be served, dropping any session left holding nothing.
 //
@@ -1682,7 +1722,7 @@ func recordServable(role string, o query.Options) bool {
 // after ranking, and it reads the text to do it. Bounding that — a window
 // around the match rather than the session — is the open question (#2592).
 func sessionsServable(dir string, metas []SessionMeta, o query.Options) ([]model.Session, error) {
-	all, err := sessionsForMetas(dir, metas)
+	all, err := sessionsForMetasInRoles(dir, metas, servableRoles(o))
 	if err != nil {
 		return nil, err
 	}
@@ -1817,11 +1857,15 @@ func metasNotIgnoredBy(pol policy.Policy, metas []SessionMeta) []SessionMeta {
 // records.bin. The per-session variant re-scanned the whole log for every
 // session, which turned a session-start hook into hundreds of milliseconds.
 func sessionsForMetas(dir string, metas []SessionMeta) ([]model.Session, error) {
+	return sessionsForMetasInRoles(dir, metas, nil)
+}
+
+func sessionsForMetasInRoles(dir string, metas []SessionMeta, roles map[string]bool) ([]model.Session, error) {
 	m, err := readManifestCached(dir)
 	if err != nil {
 		return nil, err
 	}
-	out, err := sessionsForMetasIn(dir, m, metas)
+	out, err := sessionsForMetasIn(dir, m, metas, roles)
 	// Read again when a pass swapped in during the read, as loadSessionMeta
 	// does, without the sessions it took away (#5449).
 	for range sessionRereads {
@@ -1837,7 +1881,7 @@ func sessionsForMetas(dir string, metas []SessionMeta) ([]model.Session, error) 
 		if sessionReread != nil {
 			sessionReread()
 		}
-		out, err = sessionsForMetasIn(dir, m, metas)
+		out, err = sessionsForMetasIn(dir, m, metas, roles)
 	}
 	if err != nil {
 		return nil, err
@@ -1869,7 +1913,7 @@ func liveManifest(dir string, m Manifest) (Manifest, bool) {
 }
 
 // sessionsForMetasIn is the read sessionsForMetas makes with m's tables.
-func sessionsForMetasIn(dir string, m Manifest, metas []SessionMeta) ([]model.Session, error) {
+func sessionsForMetasIn(dir string, m Manifest, metas []SessionMeta, roles map[string]bool) ([]model.Session, error) {
 	tbl := tablesFromManifest(m)
 	want := make(map[string]int, len(metas))
 	out := make([]model.Session, len(metas))
@@ -1881,7 +1925,7 @@ func sessionsForMetasIn(dir string, m Manifest, metas []SessionMeta) ([]model.Se
 	for k := range want {
 		keys[k] = true
 	}
-	err := eachRecordForKeys(filepath.Join(dir, "records.bin"), tbl, keys, func(r Record) {
+	err := eachRecordForKeysInRoles(filepath.Join(dir, "records.bin"), tbl, keys, roles, func(r Record) {
 		if i, ok := want[r.Key]; ok {
 			out[i].Messages = append(out[i].Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
 		}
@@ -5000,15 +5044,7 @@ const dfMessageCap = 25
 // the ranking did before — the numbers stay consistent, they just stay coarse
 // until the index is next built.
 func countedDocs(m Manifest) int {
-	n := 0
-	for _, meta := range m.Sessions {
-		c := meta.Counted
-		if c <= 0 {
-			c = 1
-		}
-		n += min(c, dfMessageCap)
-	}
-	return n
+	return viewsFor(m).countedDocs()
 }
 
 // stemMatchForms generates the same candidate surface forms stemMatches

@@ -148,3 +148,62 @@ func TestProjectNameCandidatesSkipsHomeAndRoot(t *testing.T) {
 		t.Errorf("ProjectNameCandidates(%q) = %v, want coding/app without the home name", sub, got)
 	}
 }
+
+func BenchmarkProjectNameCandidates(b *testing.B) {
+	if _, err := exec.LookPath("git"); err != nil {
+		b.Skip("git not installed")
+	}
+	tmp := b.TempDir()
+	plain := filepath.Join(tmp, "plain", "app")
+	if err := os.MkdirAll(plain, 0o755); err != nil {
+		b.Fatal(err)
+	}
+	repo := filepath.Join(tmp, "work", "deja-vu")
+	sub := filepath.Join(repo, "cmd", "deja")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		b.Fatal(err)
+	}
+	run := func(dir string, args ...string) {
+		cmd := exec.CommandContext(b.Context(), "git", append([]string{"-C", dir}, args...)...)
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			b.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	run(repo, "init", "-q")
+	if err := os.WriteFile(filepath.Join(repo, "a.txt"), []byte("x"), 0o644); err != nil {
+		b.Fatal(err)
+	}
+	run(repo, "add", ".")
+	run(repo, "commit", "-q", "-m", "seed")
+
+	wtMain := filepath.Join(tmp, "wt-main", "deja-vu")
+	wtLinked := filepath.Join(tmp, "wt-linked", "deja-vu-fix")
+	if err := os.MkdirAll(wtMain, 0o755); err != nil {
+		b.Fatal(err)
+	}
+	run(wtMain, "init", "-q")
+	if err := os.WriteFile(filepath.Join(wtMain, "a.txt"), []byte("x"), 0o644); err != nil {
+		b.Fatal(err)
+	}
+	run(wtMain, "add", ".")
+	run(wtMain, "commit", "-q", "-m", "seed")
+	run(wtMain, "worktree", "add", "-q", wtLinked, "-b", "fix")
+
+	b.Run("plain-dir", func(b *testing.B) {
+		for b.Loop() {
+			_ = ProjectNameCandidates(plain)
+		}
+	})
+	b.Run("git-subdir", func(b *testing.B) {
+		for b.Loop() {
+			_ = ProjectNameCandidates(sub)
+		}
+	})
+	b.Run("git-worktree", func(b *testing.B) {
+		for b.Loop() {
+			_ = ProjectNameCandidates(wtLinked)
+		}
+	})
+}

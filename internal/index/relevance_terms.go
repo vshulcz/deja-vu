@@ -16,10 +16,12 @@ import (
 type relevanceAcc struct {
 	m  Manifest
 	br *bucketReader
-	// metas are the sessions being ranked, and place is each ordinal's index
-	// there, -1 for a session that is not.
-	metas []SessionMeta
-	place []int32
+	// all is the manifest's session slice, metaIdx is each ranked session's
+	// index in all (nil when every session is ranked), and place is each
+	// ordinal's index in the ranked pool, -1 for a session that is not.
+	all     []SessionMeta
+	metaIdx []int32
+	place   []int32
 	// A real bucket read error (a corrupt or unreadable postings file) must not
 	// pass as "the term is absent": that silently drops the term from the
 	// ranking. Remember the first one and hand it back so the caller triggers
@@ -61,6 +63,8 @@ type relevanceAcc struct {
 	keyHits   []int32
 	termOffs  []placeOff
 	keyOffs   []placeOff
+	unionA    []posting
+	unionB    []posting
 }
 
 // sessionCredit is what one session collected over the query's terms.
@@ -115,12 +119,16 @@ type placeOff struct {
 	off   int64
 }
 
-func newRelevanceAcc(m Manifest, metas []SessionMeta, place []int32, br *bucketReader) *relevanceAcc {
-	n := len(metas)
+func newRelevanceAcc(m Manifest, all []SessionMeta, metaIdx, place []int32, br *bucketReader) *relevanceAcc {
+	n := len(all)
+	if metaIdx != nil {
+		n = len(metaIdx)
+	}
 	return &relevanceAcc{
 		m:         m,
 		br:        br,
-		metas:     metas,
+		all:       all,
+		metaIdx:   metaIdx,
 		place:     place,
 		totalDocs: float64(countedDocs(m)) + 1,
 		idfOf:     map[string]float64{},
@@ -132,6 +140,13 @@ func newRelevanceAcc(m Manifest, metas []SessionMeta, place []int32, br *bucketR
 		inHit:     make([]bool, n),
 		spoken:    make([]bool, n),
 	}
+}
+
+func (a *relevanceAcc) meta(p int32) *SessionMeta {
+	if a.metaIdx != nil {
+		return &a.all[a.metaIdx[p]]
+	}
+	return &a.all[p]
 }
 
 // placeOf is where the session with ordinal sid is among those being ranked,
@@ -346,7 +361,7 @@ func (a *relevanceAcc) unionForms(term string, orKeys []string) (termHits, bool)
 		}
 	}
 	// Two forms can share a record; it counts once.
-	union := unionPostings(lists)
+	union := a.unionPostings(lists)
 	df, sessions := a.countDF(union)
 	offs := a.termOffs[:0]
 	for _, pp := range union {
@@ -368,36 +383,48 @@ func (a *relevanceAcc) unionForms(term string, orKeys []string) (termHits, bool)
 
 // unionPostings is the postings of every list, each sorted by offset, in one
 // list sorted by offset with each record once.
-func unionPostings(lists [][]posting) []posting {
+func (a *relevanceAcc) unionPostings(lists [][]posting) []posting {
 	switch len(lists) {
 	case 0:
 		return nil
 	case 1:
 		return lists[0]
 	}
-	out := lists[0]
+	total := 0
+	for _, l := range lists {
+		total += len(l)
+	}
+	if cap(a.unionA) < total {
+		a.unionA = make([]posting, 0, total)
+	}
+	if cap(a.unionB) < total {
+		a.unionB = make([]posting, 0, total)
+	}
+	src := lists[0]
+	dst, next := a.unionA, a.unionB
 	for _, l := range lists[1:] {
-		merged := make([]posting, 0, len(out)+len(l))
+		merged := dst[:0]
 		i, j := 0, 0
-		for i < len(out) && j < len(l) {
+		for i < len(src) && j < len(l) {
 			switch {
-			case out[i].Off < l[j].Off:
-				merged = append(merged, out[i])
+			case src[i].Off < l[j].Off:
+				merged = append(merged, src[i])
 				i++
-			case out[i].Off > l[j].Off:
+			case src[i].Off > l[j].Off:
 				merged = append(merged, l[j])
 				j++
 			default:
-				merged = append(merged, out[i])
+				merged = append(merged, src[i])
 				i++
 				j++
 			}
 		}
-		merged = append(merged, out[i:]...)
+		merged = append(merged, src[i:]...)
 		merged = append(merged, l[j:]...)
-		out = merged
+		src = merged
+		dst, next = next, dst
 	}
-	return out
+	return src
 }
 
 // everyKey matches a term only where every one of its sub-tokens is present.
@@ -609,7 +636,7 @@ func (a *relevanceAcc) bestMessages() {
 // scoreSession turns one session's collected credit into its final score.
 func (a *relevanceAcc) scoreSession(p int32, long bool, sumWords, nWords float64) relevanceScored {
 	s := &a.sess[p]
-	meta := a.metas[p]
+	meta := a.meta(p)
 	sc := s.score
 	// Same-message co-occurrence bonus: the best single message covering
 	// k distinct query terms scales the session's score. A session where
@@ -651,7 +678,7 @@ func (a *relevanceAcc) scoreSession(p int32, long bool, sumWords, nWords float64
 	// around it. Half the mark, not all of it: a rephrasing reaches the
 	// subject through a neighbouring word, and demanding the exact one cost
 	// the reworded arm nine of twenty (#3351).
-	named := 0
+	named := int32(0)
 	if a.queryBest <= 0 || s.bestMatched >= a.queryBest*subjectShare {
 		named = 1
 	}
@@ -669,5 +696,5 @@ func (a *relevanceAcc) scoreSession(p int32, long bool, sumWords, nWords float64
 		sc /= norm
 		s.focus /= norm
 	}
-	return relevanceScored{meta, sc, int(covered), int(s.any), int(s.strong), named, s.focus}
+	return relevanceScored{p, covered, s.any, s.strong, named, sc, s.focus}
 }

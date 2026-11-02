@@ -196,3 +196,32 @@ func TestAClaudeFolderMissIsKeptForOlderTranscripts(t *testing.T) {
 		t.Errorf("a transcript written after the miss is %q, want w/проект", got)
 	}
 }
+
+// A batch of transcripts written right before a build falls inside the 2s
+// clock-slack window. Once the first miss has scanned the folder, the sibling
+// files that were already present at that exact size and mtime must reuse the
+// miss instead of re-scanning the folder per file.
+func TestAClaudeFolderMissIsReusedAcrossAJustWrittenBatch(t *testing.T) {
+	home := t.TempDir()
+	dir := filepath.Join(home, "projects", "-tmp-batch")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	claudeCWDNameCache, claudeCWDMiss = sync.Map{}, sync.Map{}
+	snap := `{"type":"file-history-snapshot","messageId":"m0","snapshot":{"trackedFileBackups":{}}}` + "\n"
+	paths := make([]string, 40)
+	for i := range paths {
+		p := filepath.Join(dir, "s"+string(rune('a'+i/26))+string(rune('a'+i%26))+".jsonl")
+		if err := os.WriteFile(p, []byte(snap), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		paths[i] = p
+	}
+	first := claudeProjectNameFor(paths[0])
+	for _, p := range paths[1:] {
+		got, ok := claudeCachedProjectName(dir, p)
+		if !ok || got != first {
+			t.Fatalf("claudeCachedProjectName(%s) = (%q, %v), want (%q, true)", filepath.Base(p), got, ok, first)
+		}
+	}
+}
