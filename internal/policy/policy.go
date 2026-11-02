@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -103,9 +104,9 @@ func Load() Policy {
 // "imported:<group>" when its source project had a path, so a group of another
 // machine's projects can be addressed on its own (#955).
 func Origin(project string) string {
-	if peer, ok := strings.CutPrefix(project, "imported:"); ok {
+	if peer, ok := strings.CutPrefix(project, model.ImportedPrefix); ok {
 		if i := strings.IndexByte(peer, '/'); i > 0 {
-			return "imported:" + peer[:i]
+			return model.ImportedPrefix + peer[:i]
 		}
 		return "imported"
 	}
@@ -127,7 +128,7 @@ func (p Policy) Allows(activation, project string) bool {
 	if v, ok := rules[origin]; ok {
 		return v
 	}
-	if strings.HasPrefix(origin, "imported:") {
+	if model.IsImportedProject(origin) {
 		if v, ok := rules["imported"]; ok {
 			return v
 		}
@@ -158,7 +159,7 @@ func (p Policy) AllowsEgress(project string) bool {
 // consultedOrigin reports whether a rule key is one Origin can produce. Rules
 // are keyed by origin; a project name looks like a rule and is not one.
 func consultedOrigin(origin string) bool {
-	return origin == "local" || origin == "repo" || origin == "imported" || strings.HasPrefix(origin, "imported:")
+	return origin == "local" || origin == "repo" || origin == "imported" || model.IsImportedProject(origin)
 }
 
 // Describe names the active rule set for receipts and `deja log`, so the

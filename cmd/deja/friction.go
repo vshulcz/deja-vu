@@ -315,7 +315,7 @@ func scanFriction(dir string, pol policy.Policy) (*frictionScan, error) {
 			// away. A session whose output is all green belongs to the second
 			// and not the first.
 			hit := hasFrictionLine(r.Text)
-			key := meta.Harness + ":" + meta.ID
+			key := meta.Key()
 			if denied {
 				withheldOutput[key] = true
 				if hit {
@@ -329,7 +329,7 @@ func scanFriction(dir string, pol policy.Policy) (*frictionScan, error) {
 			}
 			return
 		}
-		key := meta.Harness + ":" + meta.ID
+		key := meta.Key()
 		sessions[key] = true
 		for raw := range strings.SplitSeq(r.Text, "\n") {
 			line, sig, ok := index.FrictionSignature(raw)

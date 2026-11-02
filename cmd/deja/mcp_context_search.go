@@ -257,7 +257,7 @@ func contextItemFor(h search.Hit) (contextItem, bool) {
 	if s.ID == "" || strings.TrimSpace(content) == "" {
 		return contextItem{}, false
 	}
-	ref := s.Harness + ":" + s.ID
+	ref := s.Key()
 	title := recallListingLine(s.Harness)
 	if p := recallListingLine(s.Project); p != "" {
 		title += " session in " + p

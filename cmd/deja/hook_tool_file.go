@@ -217,10 +217,10 @@ func promotedDecisionForFile(path string, metas []index.SessionMeta) string {
 	want := make(map[string]bool, len(metas))
 	noteKeys := make(map[string]bool, len(metas))
 	for _, meta := range metas {
-		want[meta.Harness+":"+meta.ID] = true
+		want[meta.Key()] = true
 		noteKeys["deja-note-"+meta.Harness+"-"+meta.ID] = true
 		if meta.OrigID != "" {
-			want[meta.Harness+":"+meta.OrigID] = true
+			want[model.SessionKey(meta.Harness, meta.OrigID)] = true
 			noteKeys["deja-note-"+meta.Harness+"-"+meta.OrigID] = true
 		}
 	}
@@ -372,7 +372,7 @@ func decisionUsable(s model.Session, states map[string]sources.Lifecycle) bool {
 		return false
 	}
 	state := s.Lifecycle // a note that arrived by sync carries its own state
-	if lc, ok := states[s.Harness+":"+s.ID]; ok && lc.State != "" {
+	if lc, ok := states[s.Key()]; ok && lc.State != "" {
 		state = lc.State
 	}
 	switch state {
@@ -406,7 +406,7 @@ func fileMetaInScope(meta index.SessionMeta, path string, projects []string) boo
 	if slices.Contains(meta.Touched, path) {
 		return true
 	}
-	proj := strings.TrimPrefix(meta.Project, "imported:")
+	proj := meta.BareProject()
 	for _, cand := range projects {
 		if cand == "" {
 			continue

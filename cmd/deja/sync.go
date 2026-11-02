@@ -296,7 +296,7 @@ func runSyncImport(dir string, args []string) error {
 	// The end of a move to a new machine is the same moment as an install,
 	// and install proves it with real lines rather than a count (#929).
 	printMemoryProofOf(dir, "deja now knows, from the machine you came from:", func(s model.Session) bool {
-		return strings.HasPrefix(s.Project, "imported:")
+		return s.IsImported()
 	}, "")
 	return nil
 }

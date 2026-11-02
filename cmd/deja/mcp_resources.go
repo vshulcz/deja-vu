@@ -61,7 +61,7 @@ func mcpResourcesList(dir string) (any, int, string) {
 			desc += " · " + s.Updated.Local().Format("2006-01-02")
 		}
 		resources = append(resources, map[string]any{
-			"uri":         "deja://session/" + s.Harness + ":" + s.ID,
+			"uri":         "deja://session/" + s.Key(),
 			"name":        name,
 			"description": desc,
 			"mimeType":    "text/markdown",

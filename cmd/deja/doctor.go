@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -716,7 +717,7 @@ func unmatchedImportGroups(dir string) []string {
 		return nil
 	}
 	for _, m := range metas {
-		if o := policy.Origin(m.Project); strings.HasPrefix(o, "imported:") {
+		if o := policy.Origin(m.Project); model.IsImportedProject(o) {
 			present[o] = true
 		}
 	}
@@ -724,7 +725,7 @@ func unmatchedImportGroups(dir string) []string {
 	var out []string
 	for _, rules := range pol.Activations {
 		for origin, allowed := range rules {
-			if allowed || !strings.HasPrefix(origin, "imported:") || present[origin] || seen[origin] {
+			if allowed || !model.IsImportedProject(origin) || present[origin] || seen[origin] {
 				continue
 			}
 			seen[origin] = true
@@ -1043,7 +1044,7 @@ func reportFutureDated(w io.Writer, dir string) {
 		}
 		count++
 		if meta.Updated.After(newest) {
-			newest, newestID = meta.Updated, meta.Harness+":"+meta.ID
+			newest, newestID = meta.Updated, meta.Key()
 		}
 	}
 	if count == 0 {

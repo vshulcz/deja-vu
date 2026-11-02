@@ -126,7 +126,7 @@ func groupSecrets(findings []index.SecretFinding) []secretsGroup {
 	var out []secretsGroup
 	at := map[string]int{}
 	for _, f := range findings {
-		key := f.Harness + ":" + f.ID
+		key := f.Key()
 		i, ok := at[key]
 		if !ok {
 			at[key] = len(out)

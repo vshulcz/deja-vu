@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/termwidth"
@@ -29,7 +30,7 @@ func weekDeletedSince(dir string, since, now time.Time) []index.KeptSession {
 	pol := policy.Load()
 	out := kept[:0]
 	for _, k := range kept {
-		if strings.HasPrefix(k.Project, "imported:") || !pol.Allows(policy.ActivationSearch, k.Project) ||
+		if model.IsImportedProject(k.Project) || !pol.Allows(policy.ActivationSearch, k.Project) ||
 			pol.Ignored(k.Path, k.Project) || strings.ContainsFunc(k.ID, isSpaceOrControl) {
 			continue
 		}

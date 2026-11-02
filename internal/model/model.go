@@ -7,12 +7,80 @@ import (
 	"unicode/utf8"
 )
 
+// Canonical message roles stored in transcripts and the index.
+const (
+	RoleUser       = "user"
+	RoleAssistant  = "assistant"
+	RoleTool       = "tool"
+	RoleToolOutput = "tool-output"
+	RoleFiles      = "files"
+	RoleCommand    = "command"
+	RoleEdit       = "edit"
+	RoleSummary    = "summary"
+	RoleWrote      = "wrote"
+)
+
+// ImportedPrefix marks a session project name that arrived via peer sync.
+const ImportedPrefix = "imported:"
+
+// IsWorkRole reports whether a message role records what an agent did rather
+// than what was said. Tool and file-activity records are bulk-repetitive by
+// nature and are excluded from conversational context windows and prose
+// extractors unless explicitly requested.
+func IsWorkRole(role string) bool {
+	switch role {
+	case RoleToolOutput, RoleFiles, RoleCommand, RoleEdit, RoleSummary, RoleWrote:
+		return true
+	}
+	return false
+}
+
+// IsSpokenRole reports whether a message role represents conversational speech
+// rather than a tool or file-activity work record.
+func IsSpokenRole(role string) bool {
+	return !IsWorkRole(role)
+}
+
+// RoleMatches reports whether a stored message role satisfies a --role filter.
+// `--role tool` is what `deja help` documents while "tool-output" is what is
+// stored, so both spellings match.
+func RoleMatches(stored, want string) bool {
+	if stored == want {
+		return true
+	}
+	return want == RoleTool && stored == RoleToolOutput
+}
+
+// SessionKey returns the canonical "harness:id" composite identifier used
+// across the manifest, seen ledgers, and dedupe maps.
+func SessionKey(harness, id string) string {
+	return harness + ":" + id
+}
+
+// IsImportedProject reports whether a project name carries the synced
+// "imported:" prefix.
+func IsImportedProject(project string) bool {
+	return strings.HasPrefix(project, ImportedPrefix)
+}
+
+// BareProject strips the "imported:" prefix from a project name if present.
+func BareProject(project string) string {
+	return strings.TrimPrefix(project, ImportedPrefix)
+}
+
 // Message is one turn of a session.
 type Message struct {
 	Role string    `json:"role"`
 	Text string    `json:"text"`
 	Time time.Time `json:"time"`
 }
+
+// IsWorkRecord reports whether m records tool or file activity rather than
+// conversational speech.
+func (m Message) IsWorkRecord() bool { return IsWorkRole(m.Role) }
+
+// IsSpoken reports whether m is conversational speech rather than a work record.
+func (m Message) IsSpoken() bool { return !IsWorkRole(m.Role) }
 
 // MarshalJSON leaves the time out of a message the transcript never stamped.
 //
@@ -136,10 +204,19 @@ type Source struct {
 	Instance string `json:"instance,omitempty"`
 }
 
+// Key returns the session's canonical "harness:id" composite identifier.
+func (s *Session) Key() string { return SessionKey(s.Harness, s.ID) }
+
+// IsImported reports whether the session arrived from another machine via sync.
+func (s *Session) IsImported() bool { return IsImportedProject(s.Project) }
+
+// BareProject returns the session's project name without an "imported:" prefix.
+func (s *Session) BareProject() string { return BareProject(s.Project) }
+
 // SetSource fills the machine-facing provenance fields without changing the
 // project string retained for human compatibility.
 func (s *Session) SetSource(localInstance string) {
-	if strings.HasPrefix(s.Project, "imported:") {
+	if s.IsImported() {
 		s.Source = &Source{Origin: "imported"}
 		return
 	}

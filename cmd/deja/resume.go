@@ -84,14 +84,14 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 	// Some harnesses' resume reads the directory from the transcript itself
 	// (CodeBuddy, the pi family), which is what is gone: the command is worked
 	// out again once the file is back.
-	if writeBack && (err == nil || (transcriptGone(s) && !strings.HasPrefix(s.Project, "imported:"))) {
+	if writeBack && (err == nil || (transcriptGone(s) && !s.IsImported())) {
 		if werr := writeBackSession(indexDir, s, os.Stderr); werr != nil {
 			return werr
 		}
 		dir, cmdline, err = resumeCommand(s)
 	}
 	if err != nil {
-		if gone := resumeGoneError(s); gone != nil && !writeBack && !strings.HasPrefix(s.Project, "imported:") {
+		if gone := resumeGoneError(s); gone != nil && !writeBack && !s.IsImported() {
 			return gone
 		}
 		return err
@@ -156,7 +156,7 @@ func codexAppCommand(s model.Session, goos string) ([]string, error) {
 	if s.Harness != "codex" || s.Project == "history" {
 		return nil, fmt.Errorf("--app opens Codex CLI sessions in the ChatGPT app; %s is a %s session", digest.Short(s.ID), agentName(s.Harness))
 	}
-	if strings.HasPrefix(s.Project, "imported:") {
+	if s.IsImported() {
 		return nil, fmt.Errorf("session %s was synced from another machine — open it there", digest.Short(s.ID))
 	}
 	if !resumeIDPattern.MatchString(s.ID) {
@@ -333,7 +333,7 @@ var subagentNotReopened = map[string]bool{
 // resumeCommand maps a session to (workdir, command). workdir is empty when
 // the harness resumes globally or the original directory is unknown.
 func resumeCommand(s model.Session) (string, string, error) {
-	if strings.HasPrefix(s.Project, "imported:") {
+	if s.IsImported() {
 		return "", "", fmt.Errorf("session %s was synced from another machine — resume it there", digest.Short(s.ID))
 	}
 	if !resumeIDPattern.MatchString(s.ID) {

@@ -104,7 +104,7 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 	if s.Harness != "deja" && sources.ExcludedProject(s.Project) {
 		return fmt.Errorf("%s is in a project your exclude list covers — a note promoted from it is filtered out of recall too; `deja index --rebuild` drops the session, or remove the pattern to promote it", prefix)
 	}
-	src := s.Harness + ":" + s.ID
+	src := s.Key()
 	if s.Harness == "deja" {
 		// A correction on a promoted note is what `promote` tells you to write,
 		// and the id in that hint stops resolving to the transcript once the

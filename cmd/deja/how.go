@@ -321,11 +321,11 @@ func howEntries(dir string, terms []string, projects []string, activation string
 		// `go test` (#2766). `files` is the shape this follows: it counts
 		// from what was already searched.
 		if !pol.Allows(activation, meta.Project) {
-			hidden[meta.Harness+":"+meta.ID] = true
+			hidden[meta.Key()] = true
 			return
 		}
 		if pol.Ignored(meta.Path, meta.Project) {
-			ignored[meta.Harness+":"+meta.ID] = true
+			ignored[meta.Key()] = true
 			return
 		}
 		e := byCmd[low]

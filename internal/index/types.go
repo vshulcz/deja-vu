@@ -248,6 +248,18 @@ type SessionMeta struct {
 	Planted []string `json:",omitempty"`
 }
 
+// Key returns the session's canonical "harness:id" composite identifier.
+func (m SessionMeta) Key() string { return model.SessionKey(m.Harness, m.ID) }
+
+// IsImported reports whether the session arrived from another machine via sync.
+func (m SessionMeta) IsImported() bool { return model.IsImportedProject(m.Project) }
+
+// BareProject returns the session's project name without an "imported:" prefix.
+func (m SessionMeta) BareProject() string { return model.BareProject(m.Project) }
+
+// Key returns the finding's canonical "harness:id" session identifier.
+func (f SecretFinding) Key() string { return model.SessionKey(f.Harness, f.ID) }
+
 // touchedFileCap bounds what goes in SessionMeta.Touched.
 //
 // Six was enough to say something about a session and wrong for the thing that

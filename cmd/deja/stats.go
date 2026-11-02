@@ -276,9 +276,9 @@ func runStats(dir string, args []string) error {
 	if filtered {
 		kept := map[string]bool{}
 		for _, s := range stats.Filter(ss, options) {
-			kept[s.Harness+":"+s.ID] = true
+			kept[s.Key()] = true
 		}
-		keep = func(m index.SessionMeta) bool { return kept[m.Harness+":"+m.ID] }
+		keep = func(m index.SessionMeta) bool { return kept[m.Key()] }
 	}
 	if spans, files, err := index.SpanInventoryWhere(dir, keep); err == nil {
 		report.Spans, report.SpanFiles = spans, files

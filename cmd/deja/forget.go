@@ -41,7 +41,7 @@ func orphanedTombstones(dir string, keys []string) map[string]bool {
 			}
 			found = map[string]bool{}
 			for _, s := range h.Load() {
-				found[s.Harness+":"+s.ID] = true
+				found[s.Key()] = true
 			}
 		}
 		onDisk[harness] = found
@@ -368,7 +368,7 @@ func restoredSessions(dir, selector string, lifted int, lifting []string) (back,
 	// lifting its tombstone restores nothing (#967).
 	here := map[string]bool{}
 	for _, m := range metas {
-		here[m.Harness+":"+m.ID] = true
+		here[m.Key()] = true
 	}
 	for _, key := range lifting {
 		if here[key] {
@@ -384,7 +384,7 @@ func restoredSessions(dir, selector string, lifted int, lifting []string) (back,
 		for _, m := range metas {
 			if index.SelectorMatches(m, selector) {
 				back++
-				names = append(names, m.Harness+":"+m.ID)
+				names = append(names, m.Key())
 			}
 		}
 		if back > lifted {
@@ -420,7 +420,7 @@ func restorePromotedTitles(dir, selector string) {
 			continue
 		}
 		if t := firstUserTitle(s); t != "" {
-			titles[m.Harness+":"+m.ID] = t
+			titles[m.Key()] = t
 		}
 	}
 	if len(titles) == 0 {
@@ -445,7 +445,7 @@ func sharedRowsAmong(dir string, keys []string) int {
 	}
 	n := 0
 	for _, m := range metas {
-		if m.Shared && want[m.Harness+":"+m.ID] {
+		if m.Shared && want[m.Key()] {
 			n++
 		}
 	}
@@ -554,7 +554,7 @@ func forgetKeyOf(dir string, o index.ForgetOptions) string {
 	}
 	for _, m := range metas {
 		if index.SelectorMatches(m, o.Session) {
-			return m.Harness + ":" + m.ID
+			return m.Key()
 		}
 	}
 	return ""

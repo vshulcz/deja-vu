@@ -251,7 +251,7 @@ func sortHits(hits []Hit) {
 // isLocalProject reports whether a session came from this machine. Imported
 // sessions carry the peer prefix the sync path gives them.
 func isLocalProject(project string) bool {
-	return !strings.HasPrefix(project, "imported:")
+	return !model.IsImportedProject(project)
 }
 
 // freshnessFloor bounds how much a session's age can cost it. The decay used

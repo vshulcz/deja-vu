@@ -57,7 +57,7 @@ func embedPolicyKeep(dir string) (func(index.Record) bool, func() int, error) {
 	}
 	project := make(map[string]string, len(metas))
 	for _, m := range metas {
-		project[m.Harness+":"+m.ID] = m.Project
+		project[m.Key()] = m.Project
 	}
 	pol := policy.Load()
 	return func(r index.Record) bool {

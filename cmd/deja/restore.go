@@ -208,14 +208,14 @@ func findRestoreSpans(dir string, path string) ([]restoreSpan, error) {
 		if pol.Ignored(meta.Path, meta.Project) {
 			return
 		}
-		if len(seen) >= restoreMaxSessions && !seen[meta.Harness+":"+meta.ID] {
+		if len(seen) >= restoreMaxSessions && !seen[meta.Key()] {
 			return
 		}
 		recorded, body, found := strings.Cut(r.Text, "\n")
 		if !found || !pathMatches(recorded, path) {
 			return
 		}
-		seen[meta.Harness+":"+meta.ID] = true
+		seen[meta.Key()] = true
 		spans = append(spans, restoreSpan{when: r.Time, session: meta.ID, harness: meta.Harness, body: body, file: recorded})
 	})
 	if err != nil {

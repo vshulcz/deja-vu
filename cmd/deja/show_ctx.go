@@ -213,7 +213,7 @@ func printSpawnEdges(w io.Writer, dir string, s model.Session) {
 			by = " as " + s.Agent
 		}
 		fmt.Fprintf(w, "deja: spawned from %s%s — `deja show %s`\n", digest.Short(s.Parent), by, pasteSafe(digest.Short(s.Parent)))
-	case s.Kind != "" && strings.HasPrefix(s.Project, "imported:"):
+	case s.Kind != "" && s.IsImported():
 		// The parent is on the machine that sent it.
 		fmt.Fprintf(w, "deja: %s session from another machine\n", s.Kind)
 	case s.Kind != "":

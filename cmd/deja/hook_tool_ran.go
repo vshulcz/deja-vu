@@ -95,7 +95,7 @@ func fileHookRanLine(dir string, metas []index.SessionMeta) string {
 	// name arrives twice, and the number in the line is sessions.
 	counted := map[string]bool{}
 	for _, m := range metas {
-		key := m.Harness + ":" + m.ID
+		key := m.Key()
 		if counted[key] {
 			continue
 		}
@@ -191,7 +191,7 @@ func fileHookCoChangeLine(path string, metas []index.SessionMeta) string {
 	companionDisplay := map[string]string{}
 	focused := 0
 	for _, m := range metas {
-		key := m.Harness + ":" + m.ID
+		key := m.Key()
 		if counted[key] {
 			continue
 		}

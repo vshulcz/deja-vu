@@ -346,7 +346,7 @@ func withFileTouchers(dir string, ss []model.Session, target search.BlameTarget)
 	// its own file's blame (#723) — it has to be replaced by the full record.
 	at := make(map[string]int, len(ss))
 	for i, s := range ss {
-		at[s.Harness+":"+s.ID] = i
+		at[s.Key()] = i
 	}
 	base := strings.ToLower(filepath.Base(target.FullPath))
 	// Newest first, so the cap below keeps the sessions a "who last worked on
@@ -380,7 +380,7 @@ func withFileTouchers(dir string, ss []model.Session, target search.BlameTarget)
 	for _, s := range full {
 		// The manifest is keyed by identity, so each session reaches this once
 		// — there is no second visit to record a position for.
-		if i, present := at[s.Harness+":"+s.ID]; present {
+		if i, present := at[s.Key()]; present {
 			ss[i] = s
 		} else {
 			ss = append(ss, s)

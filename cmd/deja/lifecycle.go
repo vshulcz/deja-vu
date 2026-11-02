@@ -81,7 +81,7 @@ func attachLifecycles(dir string, hits []search.Hit) {
 	importedReady := false
 	for i := range hits {
 		h := &hits[i]
-		key := h.Session.Harness + ":" + h.Session.ID
+		key := h.Session.Key()
 		// A promoted note is filed under its own id, so the state — which is a
 		// property of the decision, not of the transcript — never reached it.
 		// Recall shows the lines that matched, and a rejection whose words are
@@ -200,14 +200,14 @@ func demoteRejected(hits []search.Hit) int {
 	}
 	before := make([]string, len(hits))
 	for i, h := range hits {
-		before[i] = h.Session.Harness + ":" + h.Session.ID
+		before[i] = h.Session.Key()
 	}
 	sort.SliceStable(hits, func(i, j int) bool {
 		return hits[i].Lifecycle != lifecycleRejected && hits[j].Lifecycle == lifecycleRejected
 	})
 	moved := 0
 	for i, h := range hits {
-		if before[i] != h.Session.Harness+":"+h.Session.ID {
+		if before[i] != h.Session.Key() {
 			moved++
 		}
 	}
@@ -235,7 +235,7 @@ func demotedNote(hits []search.Hit, moved int) string {
 		if h.Lifecycle != lifecycleRejected {
 			continue
 		}
-		key := h.Session.Harness + ":" + h.Session.ID
+		key := h.Session.Key()
 		if src, ok := notes[h.Session.ID]; ok {
 			key = src
 		}
@@ -247,7 +247,7 @@ func demotedNote(hits []search.Hit, moved int) string {
 		// "you marked" is wrong for a decision another machine took back: the
 		// state travelled with the note, the judgement was not this reader's
 		// (#975).
-		if strings.HasPrefix(h.Session.Project, "imported:") {
+		if h.Session.IsImported() {
 			elsewhere++
 		}
 	}
@@ -288,7 +288,7 @@ func attachBlameLifecycles(hits []search.BlameHit, target search.BlameTarget) {
 	states := sources.PromotedLifecycles()
 	for i := range hits {
 		h := &hits[i]
-		key := h.Session.Harness + ":" + h.Session.ID
+		key := h.Session.Key()
 		isNote := false
 		if noteID := promotedNoteID(h.Session); noteID != "" {
 			isNote = true

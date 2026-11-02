@@ -74,7 +74,7 @@ type syncName string
 
 // importedProjectPrefix marks a project that arrived by sync. Relaying strips
 // it so the next machine files the work under its real name.
-const importedProjectPrefix = "imported:"
+const importedProjectPrefix = model.ImportedPrefix
 
 func (n *syncName) UnmarshalJSON(b []byte) error {
 	var s string

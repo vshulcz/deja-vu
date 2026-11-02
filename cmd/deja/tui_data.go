@@ -157,7 +157,7 @@ func tuiKept(dir string) ([]model.Session, error) {
 	ss, _ = policyFilterSessionsCounted(policy.ActivationSearch, ss)
 	var out []model.Session
 	for _, s := range ss {
-		if !strings.HasPrefix(s.Project, "imported:") && transcriptGone(s) {
+		if !s.IsImported() && transcriptGone(s) {
 			out = append(out, s)
 		}
 	}
@@ -173,7 +173,7 @@ func tuiLoadDetail(dir string, s model.Session) *tuiDetail {
 	}
 	d.conclusions = tuiConclusions(d.full, 3)
 	d.story = tuiStoryOf(d.full)
-	d.gone = !strings.HasPrefix(s.Project, "imported:") && transcriptGone(d.full)
+	d.gone = !s.IsImported() && transcriptGone(d.full)
 	return d
 }
 

@@ -106,7 +106,7 @@ func taskScores(ss []model.Session, files []string) (map[string]int, []string) {
 			}
 		}
 		if n > 0 {
-			scores[s.Harness+":"+s.ID] = n
+			scores[s.Key()] = n
 		}
 	}
 	if len(scores) == 0 {
