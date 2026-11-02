@@ -37,9 +37,11 @@ func TestUninstallTakesBackEveryFileItWrote(t *testing.T) {
 		}
 	}
 	// While every target is installed, the other sweeps over the same home:
-	// every skill declares the name of its directory (#3700). Installing all
-	// of them is the most expensive thing in this suite, so it is done once.
+	// every skill declares the name of its directory (#3700), and every
+	// doctor table agrees that what was just installed is wired. Installing
+	// all of them is the most expensive thing in this suite, so it is done once.
 	skillNamesMatchTheirDirectories(t, home)
+	doctorAgreesWithInstall(t)
 	// What deja says it created, before the uninstall wipes the record.
 	made := append([]string(nil), readWiringState().Dirs...)
 	if len(made) == 0 {
@@ -50,6 +52,7 @@ func TestUninstallTakesBackEveryFileItWrote(t *testing.T) {
 			t.Fatalf("uninstall %s: %v", target, err)
 		}
 	}
+	doctorAgreesWithUninstall(t)
 	// A directory deja made goes when the last thing in it does. Thirty-three
 	// were left on a bare home, from the harness roots down to a plugin
 	// directory four levels deep (#3698).
@@ -375,5 +378,85 @@ func TestHermeticEnvStartsAFreshRunRecord(t *testing.T) {
 	hermeticEnv(t)
 	if slices.Contains(createdDirsByThisRun, earlier) {
 		t.Fatalf("a directory from an earlier run is still on this run's record: %v", createdDirsByThisRun)
+	}
+}
+
+func doctorAgreesWithInstall(t *testing.T) {
+	t.Helper()
+	for _, c := range doctorMCPConfigs() {
+		// Roo writes only into an editor host that already has the extension.
+		if c.name == "roo" {
+			continue
+		}
+		if !c.wired(c.path) {
+			t.Errorf("doctor MCP row %s (%s) is not wired after installing every target", c.name, c.path)
+			continue
+		}
+		if c.dupes != nil {
+			if keys := c.dupes(c.path); len(keys) != 1 {
+				t.Errorf("doctor MCP row %s (%s) reports deja keys %v, want 1", c.name, c.path, keys)
+			}
+		}
+		if cmd := dejaCommandIn(c.path); cmd == "" {
+			t.Errorf("doctor MCP row %s (%s) is wired but dejaCommandIn read no binary from it", c.name, c.path)
+		}
+	}
+	for _, c := range doctorCommandFiles() {
+		if st := c.state(); st != "written" && st != "skill" {
+			t.Errorf("doctor command row %s (%s) is %q after installing every target, want written or skill", c.name, c.path, st)
+		}
+	}
+	for _, a := range autoWirings() {
+		if a.name == "roo" {
+			continue
+		}
+		st, _ := autoWiringState(a)
+		want := "wired"
+		if a.name == "kiro" {
+			want = "installed"
+		}
+		if st != want {
+			t.Errorf("doctor auto row %s is %q after installing every target, want %s", a.name, st, want)
+		}
+		if a.marker != "" {
+			cmd := dejaHookCommandIn(a.path())
+			if cmd == "" && a.name == "reasonix" {
+				cmd = dejaCommandIn(a.path())
+			}
+			if cmd == "" {
+				t.Errorf("doctor auto row %s (%s) is %s but read no binary from it", a.name, a.path(), st)
+			}
+		}
+	}
+	if st := claudeHookWiringState(); st.state != "wired" {
+		t.Errorf("claudeHookWiringState = %q after installing every target, want wired", st.state)
+	}
+	if st := codexHookWiringState(); st.state != "wired" && st.state != "untrusted" {
+		t.Errorf("codexHookWiringState = %q after installing every target, want wired or untrusted", st.state)
+	}
+}
+
+func doctorAgreesWithUninstall(t *testing.T) {
+	t.Helper()
+	for _, c := range doctorMCPConfigs() {
+		if c.wired(c.path) {
+			t.Errorf("doctor MCP row %s (%s) is still wired after uninstalling every target", c.name, c.path)
+		}
+	}
+	for _, c := range doctorCommandFiles() {
+		if st := c.state(); st != "missing" {
+			t.Errorf("doctor command row %s (%s) is %q after uninstalling every target, want missing", c.name, c.path, st)
+		}
+	}
+	for _, a := range autoWirings() {
+		if st, _ := autoWiringState(a); st != "missing" {
+			t.Errorf("doctor auto row %s is %q after uninstalling every target, want missing", a.name, st)
+		}
+	}
+	if st := claudeHookWiringState(); st.state != "missing" {
+		t.Errorf("claudeHookWiringState = %q after uninstalling every target, want missing", st.state)
+	}
+	if st := codexHookWiringState(); st.state != "missing" {
+		t.Errorf("codexHookWiringState = %q after uninstalling every target, want missing", st.state)
 	}
 }

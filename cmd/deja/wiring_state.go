@@ -306,6 +306,7 @@ func recordWiring(targets []string, uninstall bool) {
 		return
 	}
 	_ = os.WriteFile(path, append(b, '\n'), 0o644)
+	forgetWrittenExes()
 }
 
 // exeIsTemporary reports whether the running binary is one the wiring must not
