@@ -1540,18 +1540,22 @@ func (b *bucketReader) filePostings(p, tok string) ([]posting, error) {
 			}
 			return nil, err
 		}
-		if bucketBaseRead != nil {
+		if bucketBaseRead != nil || runtime.GOOS == "windows" {
 			defer func() { _ = f.Close() }()
-		} else {
-			b.files[p] = f
 		}
 		if d, err = bucketDirOf(p, f); err != nil {
+			if bucketBaseRead == nil && runtime.GOOS != "windows" {
+				_ = f.Close()
+			}
 			return nil, err
+		}
+		if bucketBaseRead == nil && runtime.GOOS != "windows" {
+			b.files[p] = f
 		}
 		b.dirs[p] = d
 	case d == nil:
 		return nil, os.ErrNotExist
-	case bucketBaseRead == nil:
+	case bucketBaseRead == nil && runtime.GOOS != "windows":
 		f = b.files[p]
 	}
 	if _, ok := d.find(tok); !ok {

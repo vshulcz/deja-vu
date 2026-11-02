@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -86,8 +87,12 @@ func TestShellCommandWrapper(t *testing.T) {
 	t.Setenv("CLAUDE_PROJECT_DIR", "/work/app")
 	t.Setenv("DEJA_SHELL_SESSION", "sh-wrap-1")
 
+	failCmd := "echo 'panic: sql: database is closed' >&2; exit 2"
+	if runtime.GOOS == "windows" {
+		failCmd = "echo panic: sql: database is closed 1>&2 & exit /b 2"
+	}
 	var stdout, stderr bytes.Buffer
-	err := runShell(dir, []string{"-c", "echo 'panic: sql: database is closed' >&2; exit 2"}, &stdout, &stderr)
+	err := runShell(dir, []string{"-c", failCmd}, &stdout, &stderr)
 	if err == nil {
 		t.Fatal("expected non-zero exit from failing -c command")
 	}

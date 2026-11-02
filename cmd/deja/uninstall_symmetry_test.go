@@ -418,7 +418,10 @@ func doctorAgreesWithInstall(t *testing.T) {
 		if st != want {
 			t.Errorf("doctor auto row %s is %q after installing every target, want %s", a.name, st, want)
 		}
-		if a.marker != "" {
+		if a.marker != "" && !underTestBinary() {
+			// Under go test, os.Executable() is `deja.test` (not `deja`), so on
+			// Windows (where no `deja-hook` launcher is used) the installed path
+			// ends in `deja.test.exe` rather than `deja.exe`.
 			cmd := dejaHookCommandIn(a.path())
 			if cmd == "" && a.name == "reasonix" {
 				cmd = dejaCommandIn(a.path())
