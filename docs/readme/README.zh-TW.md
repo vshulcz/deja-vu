@@ -17,6 +17,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/vshulcz/deja-vu/stargazers"><img src="https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&color=f59e0b" alt="GitHub Stars"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/badges/.badges/main/coverage.svg" alt="coverage">
   <a href="https://github.com/vshulcz/deja-vu/releases/latest"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
@@ -27,6 +28,11 @@
 <p align="center"><a href="https://vshulcz.github.io/deja-vu/">文件</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">評測</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">與同類比較</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="同一個問題問同一個代理兩次：沒有記憶時它毫無印象，有 deja 時它用八個月前的結論作答"></p>
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto
+```
 
 <table align="center">
 <tr>
@@ -372,3 +378,5 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ## 授權
 
 MIT © [Vladislav Shulcz](https://github.com/vshulcz)
+
+⭐ [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)

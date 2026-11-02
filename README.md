@@ -17,6 +17,7 @@ deja indexes all of it locally and hands the relevant history back over MCP and 
 </p>
 
 <p align="center">
+  <a href="https://github.com/vshulcz/deja-vu/stargazers"><img src="https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&color=f59e0b" alt="GitHub Stars"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/coverage-88%25-brightgreen" alt="Coverage"></a>
   <a href="https://github.com/vshulcz/deja-vu/releases"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
@@ -85,7 +86,7 @@ Open a new session in any wired agent and it already knows what you solved in th
 <details>
 <summary><b>Homebrew, Windows (Scoop / winget), npm, plugin marketplaces, and binary-only setup</b></summary>
 
-`brew install deja-vu`, `go install github.com/vshulcz/deja-vu/cmd/deja@latest`,
+`brew install deja-vu`, `nix run github:numtide/llm-agents.nix#deja-vu`, `go install github.com/vshulcz/deja-vu/cmd/deja@latest`,
 or `npx @vshulcz/deja-vu "query"` to try it without installing anything. Desktop apps that
 take MCP servers as bundles can open the `.mcpb` from the
 [latest release](https://github.com/vshulcz/deja-vu/releases/latest); it carries the binary.
@@ -616,7 +617,7 @@ Bugs and questions go to [issues](https://github.com/vshulcz/deja-vu/issues).
 Anything you think is exploitable goes through the private advisory link in
 [SECURITY.md](SECURITY.md) instead. What deja reads, what it never sends
 anywhere, and how to exclude a project or forget a session is under
-[Privacy](#privacy).
+[Privacy](#privacy). Found it useful? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).
 
 ## License
 

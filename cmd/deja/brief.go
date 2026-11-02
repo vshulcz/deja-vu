@@ -190,6 +190,11 @@ func runBrief(dir string, w io.Writer) error {
 	if drift := repoRulesDriftNote(""); drift != "" {
 		fmt.Fprintf(w, "rules      %s\n", drift)
 	}
+	if n := usage.StatusCounters(dir); n.Recalls+n.Injected > 0 {
+		if tip := maybeStarTip(dir, n.Recalls+n.Injected); tip != "" {
+			fmt.Fprintf(w, "star       %s\n", strings.TrimSpace(strings.TrimPrefix(tip, "  If it helps")))
+		}
+	}
 	fmt.Fprintf(w, "%smore       deja log · deja stats · deja help%s\n", dim, reset)
 	return nil
 }

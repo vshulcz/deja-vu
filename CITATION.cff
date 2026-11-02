@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+title: "deja-vu: Cross-Agent Coding Session Memory and Compaction Recovery"
+message: "If you use deja-vu in your research or tooling, please cite it using the metadata from this file."
+type: software
+authors:
+  - given-names: Vladislav
+    family-names: Shulcz
+    alias: vshulcz
+repository-code: "https://github.com/vshulcz/deja-vu"
+url: "https://vshulcz.github.io/deja-vu/"
+license: MIT
+keywords:
+  - ai-coding-agents
+  - agent-memory
+  - claude-code
+  - codex
+  - cursor
+  - model-context-protocol
+  - bm25
