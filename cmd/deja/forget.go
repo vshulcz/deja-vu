@@ -415,7 +415,7 @@ func restorePromotedTitles(dir, selector string) {
 		if !index.SelectorMatches(m, selector) {
 			continue
 		}
-		s, ok, err := index.FindByPrefix(dir, m.ID)
+		s, ok, err := index.FindByIdentity(dir, m.Harness, m.ID)
 		if err != nil || !ok {
 			continue
 		}
@@ -549,6 +549,12 @@ func forgetKeyOf(dir string, o index.ForgetOptions) string {
 		return ""
 	}
 	for _, m := range metas {
+		if o.Project != "" && !strings.Contains(strings.ToLower(m.Project), strings.ToLower(o.Project)) {
+			continue
+		}
+		if !o.Before.IsZero() && !m.Updated.Before(o.Before) {
+			continue
+		}
 		if index.SelectorMatches(m, o.Session) {
 			return m.Key()
 		}
@@ -571,6 +577,10 @@ func reachableSessionCount(dir string) (reach, trusted, total int, ok bool) {
 	}
 	pol := policy.Load()
 	for _, m := range metas {
+		if sources.HarnessExcluded(m.Harness) {
+			continue
+		}
+		total++
 		if !pol.Allows(policy.ActivationSearch, m.Project) {
 			continue
 		}
@@ -579,7 +589,7 @@ func reachableSessionCount(dir string) (reach, trusted, total int, ok bool) {
 			reach++
 		}
 	}
-	return reach, trusted, len(metas), true
+	return reach, trusted, total, true
 }
 
 // joinCapped lists at most n items and says how many it left out, so a refusal

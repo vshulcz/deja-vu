@@ -30,8 +30,8 @@ func weekDeletedSince(dir string, since, now time.Time) []index.KeptSession {
 	pol := policy.Load()
 	out := kept[:0]
 	for _, k := range kept {
-		if model.IsImportedProject(k.Project) || !pol.Allows(policy.ActivationSearch, k.Project) ||
-			pol.Ignored(k.Path, k.Project) || strings.ContainsFunc(k.ID, isSpaceOrControl) {
+		if model.IsImportedProject(k.Project) || !metaVisible(pol, policy.ActivationSearch, k.SessionMeta) ||
+			strings.ContainsFunc(k.ID, isSpaceOrControl) {
 			continue
 		}
 		out = append(out, k)

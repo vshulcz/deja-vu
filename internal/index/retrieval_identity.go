@@ -204,14 +204,19 @@ func PrefixMatchesIn(dir, p, harness string, allow func(project string) bool) in
 	return len(resolveSelectorMatches(inHarness(m.Sessions, harness), p, allow))
 }
 
-// inHarness keeps one harness's sessions; an empty harness keeps all of them.
+// inHarness keeps one harness's sessions; an empty harness keeps all of them
+// except harnesses excluded by DEJA_EXCLUDE_HARNESSES.
 func inHarness(ss map[string]SessionMeta, harness string) map[string]SessionMeta {
-	if harness == "" {
+	excluded := excludedHarnesses()
+	if harness == "" && len(excluded) == 0 {
 		return ss
 	}
 	out := map[string]SessionMeta{}
 	for k, meta := range ss {
-		if strings.EqualFold(meta.Harness, harness) {
+		if excluded[strings.ToLower(meta.Harness)] {
+			continue
+		}
+		if harness == "" || strings.EqualFold(meta.Harness, harness) {
 			out[k] = meta
 		}
 	}
@@ -259,8 +264,12 @@ func PrefixHarnesses(dir, id string) []string {
 	if err != nil {
 		return nil
 	}
+	excluded := excludedHarnesses()
 	var out []string
 	for _, meta := range m.Sessions {
+		if excluded[strings.ToLower(meta.Harness)] {
+			continue
+		}
 		if meta.OrigID == id {
 			out = append(out, meta.Harness)
 			continue
@@ -379,8 +388,12 @@ func ChildrenOf(dir, id string) ([]model.Session, error) {
 	if err != nil {
 		return nil, err
 	}
+	excluded := excludedHarnesses()
 	var out []model.Session
 	for _, meta := range m.Sessions {
+		if excluded[strings.ToLower(meta.Harness)] {
+			continue
+		}
 		// A fork names its source as its parent too, and nothing spawned it.
 		if meta.Parent == id && meta.Kind != model.KindFork {
 			out = append(out, sessionFromMeta(meta))
@@ -438,11 +451,12 @@ func FindByIDPreferProject(dir, id, project string) (model.Session, bool, error)
 }
 
 func pickSessionMetaByID(sessions map[string]SessionMeta, project string, match func(SessionMeta) bool) (SessionMeta, bool) {
+	excluded := excludedHarnesses()
 	var best SessionMeta
 	var found bool
 	bestNear := -1
 	for _, meta := range sessions {
-		if !match(meta) {
+		if excluded[strings.ToLower(meta.Harness)] || !match(meta) {
 			continue
 		}
 		near := -1

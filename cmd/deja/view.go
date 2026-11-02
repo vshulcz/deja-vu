@@ -218,7 +218,7 @@ func writeViewHTML(dir, out string) (string, int, error) {
 			Updated: s.Updated.Local().Format("2006-01-02 15:04"),
 		}
 		if i < viewTranscripts {
-			if full, ok, findErr := index.FindByPrefix(dir, s.ID); findErr == nil && ok {
+			if full, ok, findErr := index.FindByIdentity(dir, s.Harness, s.ID); findErr == nil && ok {
 				v.Preview = sessionPreview(full.Messages)
 				page.PreviewCount++
 			}

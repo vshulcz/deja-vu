@@ -14,6 +14,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/termwidth"
 )
 
@@ -182,6 +183,13 @@ func wipSession(dir string) (model.Session, digest.Resume, bool, error) {
 // `deja` notes and spawned subagent runs).
 func isHandoverSession(s model.Session) bool {
 	return s.Harness != model.NotesHarness && !s.IsSpawned()
+}
+
+// isHandoverMeta is the manifest-level counterpart to isHandoverSession,
+// ruling out synthetic `deja` notes and spawned subagent runs before reading
+// the full session record.
+func isHandoverMeta(m index.SessionMeta) bool {
+	return m.Harness != model.NotesHarness && !m.IsSpawned() && !sources.IsSubagentPath(m.Path)
 }
 
 // resumeFacts counts how much of the handover a session actually yielded.

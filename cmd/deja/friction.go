@@ -17,6 +17,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/jsonout"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/termwidth"
 )
 
@@ -299,6 +300,9 @@ func scanFriction(dir string, pol policy.Policy) (*frictionScan, error) {
 	// identity walks the whole log each time, which put this command at 2m46s
 	// on a 1150-session store.
 	if err := index.EachToolOutput(dir, func(meta index.SessionMeta, r index.Record) {
+		if sources.HarnessExcluded(meta.Harness) {
+			return
+		}
 		// Whether the record is withheld is decided here; whether friction
 		// would have said anything about it is decided below, and that is where
 		// the counts are taken. Counted here, they were about tool output

@@ -44,7 +44,7 @@ func weekUsed(dir string, now time.Time) ([]weekUsedSession, bool) {
 		return nil, false
 	}
 	shown := func(m index.SessionMeta) bool {
-		return allow(m.Project) && !pol.Ignored(m.Path, m.Project) && !strings.ContainsFunc(m.ID, isSpaceOrControl)
+		return metaVisibleAllow(pol, allow, m) && !strings.ContainsFunc(m.ID, isSpaceOrControl)
 	}
 	cut := usage.WeekCut(now)
 
@@ -62,7 +62,10 @@ func weekUsed(dir string, now time.Time) ([]weekUsedSession, bool) {
 		var hit *index.SessionMeta
 		n := 0
 		for i := range metas {
-			if strings.HasPrefix(metas[i].ID, ref) {
+			if !metaVisibleAllow(pol, nil, metas[i]) {
+				continue
+			}
+			if strings.HasPrefix(metas[i].ID, ref) || (metas[i].OrigID != "" && strings.HasPrefix(metas[i].OrigID, ref)) {
 				n++
 				hit = &metas[i]
 			}
@@ -108,6 +111,9 @@ func weekUsed(dir string, now time.Time) ([]weekUsedSession, bool) {
 	}
 	byID := map[string][]int{}
 	for i := range metas {
+		if !metaVisibleAllow(pol, nil, metas[i]) {
+			continue
+		}
 		byID[metas[i].ID] = append(byID[metas[i].ID], i)
 	}
 	settle := now.Add(-reusedSettleAge)

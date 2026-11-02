@@ -5,10 +5,35 @@ import (
 	"io"
 	"strings"
 
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
+
+// metaVisible reports whether a manifest entry passes all three visibility
+// gates for activation: harness exclusion (DEJA_EXCLUDE_HARNESSES), .dejaignore
+// path/project rules, and the trust policy for activation.
+//
+// Manifest-scanning surfaces (index.AllMeta) bypass index.Recent / index.Load,
+// so any caller that hand-rolls only one or two of these gates leaks excluded
+// or ignored sessions onto status bars, blame hints, orient counts, or recap notes.
+func metaVisible(pol policy.Policy, activation string, m index.SessionMeta) bool {
+	if sources.HarnessExcluded(m.Harness) || pol.Ignored(m.Path, m.Project) {
+		return false
+	}
+	return activation == "" || pol.Allows(activation, m.Project)
+}
+
+// metaVisibleAllow is metaVisible when the caller supplies a custom project
+// trust predicate (such as findReusedMemory's allow callback).
+func metaVisibleAllow(pol policy.Policy, allow func(string) bool, m index.SessionMeta) bool {
+	if sources.HarnessExcluded(m.Harness) || pol.Ignored(m.Path, m.Project) {
+		return false
+	}
+	return allow == nil || allow(m.Project)
+}
 
 // policyFilterHits drops search hits the trust policy blocks on this
 // activation path. The default policy blocks nothing.

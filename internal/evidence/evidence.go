@@ -15,7 +15,6 @@ package evidence
 
 import (
 	"hash/fnv"
-	"path/filepath"
 	"regexp"
 	"runtime"
 	"slices"
@@ -115,7 +114,7 @@ func keyText(text string) string {
 
 // Spawned reports a session an agent started, whose "user" turns a model wrote.
 func Spawned(s model.Session) bool {
-	return s.IsSpawned() || strings.Contains(s.Path, string(filepath.Separator)+"subagents"+string(filepath.Separator))
+	return s.IsSpawned() || strings.Contains(s.Path, "/subagents/") || strings.Contains(s.Path, `\subagents\`)
 }
 
 // AgentReport reports model prose that arrives as a tool result or a user

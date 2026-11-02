@@ -24,8 +24,10 @@ import (
 // another machine.
 func importedSessionTotal(dir string) int {
 	total := 0
-	for _, n := range index.ImportedSessionCounts(dir) {
-		total += n
+	for h, n := range index.ImportedSessionCounts(dir) {
+		if !sources.HarnessExcluded(h) {
+			total += n
+		}
 	}
 	return total
 }

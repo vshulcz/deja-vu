@@ -395,7 +395,7 @@ func movedBucketHint(dir, id string) string {
 			// Naming it is recalling it: a rule that hides the session hides
 			// the fact that it moved too, or the hint becomes the way around
 			// the rule (#1043).
-			if !pol.Allows(policy.ActivationSearch, m.Project) {
+			if !metaVisible(pol, policy.ActivationSearch, m) {
 				return ""
 			}
 			return fmt.Sprintf(" — the days regrouped when this machine's zone changed; it is %#q now", want)
@@ -512,7 +512,7 @@ func newestSessionNote(dir, command string, window time.Duration) string {
 	pol := policy.Load()
 	var newest time.Time
 	for _, m := range metas {
-		if m.Updated.After(newest) && pol.Allows(policy.ActivationSearch, m.Project) {
+		if m.Updated.After(newest) && metaVisible(pol, policy.ActivationSearch, m) {
 			newest = m.Updated
 		}
 	}

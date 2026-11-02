@@ -210,7 +210,8 @@ func BuildAutoRecall(ss []model.Session, o AutoRecallOptions) AutoRecallResult {
 			return ti > tj
 		}
 		if len(o.Unseen) > 0 {
-			iNew, jNew := o.Unseen[candidates[i].ID], o.Unseen[candidates[j].ID]
+			iNew := o.Unseen[candidates[i].Key()] || o.Unseen[candidates[i].ID]
+			jNew := o.Unseen[candidates[j].Key()] || o.Unseen[candidates[j].ID]
 			if iNew != jNew {
 				return iNew
 			}

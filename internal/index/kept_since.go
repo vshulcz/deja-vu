@@ -27,10 +27,14 @@ func KeptSince(dir string, from, to time.Time) ([]KeptSession, error) {
 	if err != nil {
 		return nil, err
 	}
+	pol, excluded := metaIgnoredOrExcludedLoad()
 	var out []KeptSession
 	for _, meta := range m.Sessions {
 		f, ok := m.Files[meta.Path]
 		if !ok || !f.Kept || f.KeptAt == 0 || f.KeptAt < from.Unix() || f.KeptAt >= to.Unix() {
+			continue
+		}
+		if metaIgnoredOrExcluded(pol, excluded, meta) {
 			continue
 		}
 		// A subagent's run is a transcript of its own and goes with the

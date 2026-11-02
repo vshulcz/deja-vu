@@ -697,14 +697,19 @@ func policyWithheldCounts(dir string) (map[string]int, int) {
 	}
 	pol := policy.Load()
 	out := map[string]int{}
-	for _, activation := range []string{policy.ActivationSearch, policy.ActivationMCP, policy.ActivationAuto} {
-		for _, m := range metas {
+	total := 0
+	for _, m := range metas {
+		if sources.HarnessExcluded(m.Harness) {
+			continue
+		}
+		total++
+		for _, activation := range []string{policy.ActivationSearch, policy.ActivationMCP, policy.ActivationAuto} {
 			if !pol.Allows(activation, m.Project) {
 				out[activation]++
 			}
 		}
 	}
-	return out, len(metas)
+	return out, total
 }
 
 // unmatchedImportGroups lists imported:<group> rules that no session in the
@@ -717,6 +722,9 @@ func unmatchedImportGroups(dir string) []string {
 		return nil
 	}
 	for _, m := range metas {
+		if sources.HarnessExcluded(m.Harness) {
+			continue
+		}
 		if o := policy.Origin(m.Project); model.IsImportedProject(o) {
 			present[o] = true
 		}
@@ -1033,13 +1041,14 @@ func reportFutureDated(w io.Writer, dir string) {
 	if err != nil {
 		return
 	}
+	pol := policy.Load()
 	// A minute of slack: clocks between machines disagree by seconds, and a
 	// session synced from a peer a moment ago is not a finding.
 	cutoff := time.Now().Add(time.Minute)
 	newest, count := time.Time{}, 0
 	var newestID string
 	for _, meta := range metas {
-		if !meta.Updated.After(cutoff) {
+		if !metaVisible(pol, policy.ActivationSearch, meta) || !meta.Updated.After(cutoff) {
 			continue
 		}
 		count++
@@ -1210,13 +1219,22 @@ func printIgnored(w io.Writer, pol policy.Policy, dir string) {
 		return
 	}
 	metas, err := index.AllMeta(dir)
-	if err != nil || len(metas) == 0 {
+	if err != nil {
+		return
+	}
+	var active []index.SessionMeta
+	for _, m := range metas {
+		if !sources.HarnessExcluded(m.Harness) {
+			active = append(active, m)
+		}
+	}
+	if len(active) == 0 {
 		return
 	}
 	for _, pat := range pol.Ignore {
 		one := policy.Policy{Ignore: []string{pat}}
 		n := 0
-		for _, m := range metas {
+		for _, m := range active {
 			if one.Ignored(m.Path, m.Project) {
 				n++
 			}
@@ -1225,7 +1243,7 @@ func printIgnored(w io.Writer, pol policy.Policy, dir string) {
 			fmt.Fprintf(w, "  %-12s %q matches no indexed session — a rule is matched against the project name and the transcript's path, not the directory you ran in\n", "", pat)
 			continue
 		}
-		fmt.Fprintf(w, "  %-12s %q hides %d of %d indexed session%s\n", "", pat, n, len(metas), pluralS(len(metas)))
+		fmt.Fprintf(w, "  %-12s %q hides %d of %d indexed session%s\n", "", pat, n, len(active), pluralS(len(active)))
 	}
 }
 

@@ -72,7 +72,7 @@ func leadWithUnseen(dir string, projects []string, ss []model.Session) ([]model.
 	unseen := make([]model.Session, 0, len(ss))
 	repeats := make([]model.Session, 0, len(ss))
 	for _, s := range ss {
-		if seen[s.ID] {
+		if seen[s.Key()] || seen[s.ID] {
 			repeats = append(repeats, s)
 			continue
 		}
@@ -83,7 +83,7 @@ func leadWithUnseen(dir string, projects []string, ss []model.Session) ([]model.
 	}
 	fresh := make(map[string]bool, len(unseen))
 	for _, s := range unseen {
-		fresh[s.ID] = true
+		fresh[s.Key()] = true
 	}
 	// Stable by demand so the repeat that does get through is the one agents
 	// keep coming back to, rather than whichever happened to be newest.

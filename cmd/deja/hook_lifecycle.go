@@ -92,7 +92,11 @@ func earlierAttemptWarning(ss []model.Session) string {
 	}
 	var lines []string
 	for _, s := range ss {
-		if when := older[s.ID]; when != "" {
+		when := older[s.Key()]
+		if when == "" {
+			when = older[s.ID]
+		}
+		if when != "" {
 			// The id is free text from the transcript; sanitise it the way the
 			// rejected-warning above does, or a crafted sessionId carries an
 			// escape or an invisible run into the agent block this line joins.

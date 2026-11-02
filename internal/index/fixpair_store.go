@@ -235,10 +235,11 @@ func fixSignaturesFor(dir, text string) map[uint64]bool {
 
 func fixIgnoreGate(dir string) func(FixPair) bool {
 	var (
-		loaded  bool
-		m       Manifest
-		pol     policy.Policy
-		touched map[string]bool
+		loaded   bool
+		m        Manifest
+		pol      policy.Policy
+		excluded map[string]bool
+		touched  map[string]bool
 	)
 	return func(p FixPair) bool {
 		if !loaded {
@@ -247,6 +248,7 @@ func fixIgnoreGate(dir string) func(FixPair) bool {
 			}
 			m, _ = readManifestCached(dir)
 			pol = policy.Load()
+			excluded = excludedHarnesses()
 			loaded = true
 		}
 		if p.Edit != "" && pol.Ignored(p.Edit, p.Project) {
@@ -254,7 +256,7 @@ func fixIgnoreGate(dir string) func(FixPair) bool {
 		}
 		if p.Key != "" {
 			if meta, ok := m.Sessions[p.Key]; ok {
-				return pol.Ignored(meta.Path, meta.Project)
+				return metaIgnoredOrExcluded(pol, excluded, meta)
 			}
 		}
 		if touched == nil {

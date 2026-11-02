@@ -11,6 +11,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/nfcfold"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -68,16 +69,23 @@ const mcpIDPrefixMin = 6
 // agent calls with whatever deja printed at it (#1622). Empty when the string
 // is not an id, when it names nothing, or when this machine's policy withholds
 // what it names.
-func contextByID(dir, q string) (string, idContext, bool) {
+func contextByID(dir, q string, harness ...string) (string, idContext, bool) {
 	if strings.ContainsAny(q, " \t\n") {
 		return "", idContext{}, false
 	}
-	// index.FindByPrefix directly, never the CLI's findByPrefix: that one calls
+	h := ""
+	if len(harness) > 0 {
+		h = harness[0]
+	}
+	// index.FindByPrefixIn directly, never the CLI's findByPrefix: that one calls
 	// index.Ensure first and blocks on the index lock, and this path serves a
 	// client that cannot wait (mcp_no_block_test.go guards it). The resource
 	// reader resolves an id the same way.
-	s, ok, err := index.FindByPrefix(dir, q)
+	s, ok, err := index.FindByPrefixIn(dir, q, h)
 	if err != nil || !ok {
+		return "", idContext{}, false
+	}
+	if policy.Load().Ignored(s.Path, s.Project) {
 		return "", idContext{}, false
 	}
 	kept, _ := policyFilterSessionsCounted(policy.ActivationMCP, []model.Session{s})
@@ -122,7 +130,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 	// 96 answers were a different session, stated as confidently (#3717). The
 	// CLI has had this order since #1614; this is the surface an agent uses.
 	if looksLikeSessionID(q) {
-		if text, id, ok := contextByID(dir, q); ok {
+		if text, id, ok := contextByID(dir, q, harness); ok {
 			return text, 1, id.size, []string{id.session}, nil, id.note, nil
 		}
 	}
@@ -175,7 +183,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 		// "no prior deja sessions matched" about a session deja holds (#1622).
 		// After the search, like the CLI does since #1614: there is no answer
 		// left for the id to shadow.
-		if text, id, ok := contextByID(dir, q); ok {
+		if text, id, ok := contextByID(dir, q, harness); ok {
 			return text, 1, id.size, []string{id.session}, nil, id.note, nil
 		}
 		return emptyRecallAnswerPolicy(dir, q, policyHidden), 0, 0, nil, nil, "", nil
@@ -240,6 +248,21 @@ func contextIgnoredWords(result index.SearchResult) string {
 	return fmt.Sprintf("No exact match; using %s: %s\n", what, strings.Join(summary, ", "))
 }
 
+// hasActiveMeta reports whether the manifest in dir holds at least one session
+// from a non-excluded harness.
+func hasActiveMeta(dir string) (bool, error) {
+	metas, err := index.AllMeta(dir)
+	if err != nil {
+		return false, err
+	}
+	for _, m := range metas {
+		if !sources.HarnessExcluded(m.Harness) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // emptyStoreNote is what a tool says when the store holds nothing at all,
 // rather than reporting a real absence. An agent told a thing was never done
 // concludes exactly that and starts over (#680); on a first run every tool is
@@ -247,7 +270,7 @@ func contextIgnoredWords(result index.SearchResult) string {
 //
 // Empty when the store has something in it, so a caller can append it blind.
 func emptyStoreNote(dir string) string {
-	if metas, err := index.AllMeta(dir); err == nil && len(metas) == 0 {
+	if has, err := hasActiveMeta(dir); err == nil && !has {
 		return " " + emptyStoreSentence("so nothing can be found")
 	}
 	return ""

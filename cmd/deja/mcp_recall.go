@@ -427,7 +427,14 @@ func twinSessionsFor(dir string) map[string][]string {
 	if err != nil {
 		return nil
 	}
-	return index.TwinSessions(metas)
+	pol := policy.Load()
+	visible := make([]index.SessionMeta, 0, len(metas))
+	for _, m := range metas {
+		if metaVisible(pol, policy.ActivationMCP, m) {
+			visible = append(visible, m)
+		}
+	}
+	return index.TwinSessions(visible)
 }
 
 // recallTextResult keeps the four-value shape its callers and tests read.
@@ -456,7 +463,7 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 	// answered about *other* sessions 77 times, named the right one 37 and
 	// said nothing 6 (#3717).
 	if looksLikeSessionID(q) {
-		if text, id, ok := contextByID(dir, q); ok {
+		if text, id, ok := contextByID(dir, q, harness); ok {
 			note := ""
 			if id.note != "" {
 				note = id.note + "\n"

@@ -60,11 +60,11 @@ func firstPromptOf(dir, sid string) bool {
 	if strings.TrimSpace(sid) == "" {
 		return false
 	}
-	s, ok, err := index.FindByPrefix(dir, sid)
+	s, ok, err := index.FindByID(dir, sid)
 	if err != nil {
 		return false
 	}
-	if !ok || s.ID != sid {
+	if !ok {
 		return true
 	}
 	turns := 0
@@ -80,7 +80,7 @@ func firstPromptOf(dir, sid string) bool {
 // newest session of the named harness in this project.
 func askedHandoffSource(dir string, ask digest.HandoffAsk, cwd string, self map[string]bool) (model.Session, bool) {
 	for _, id := range ask.IDs {
-		s, ok, err := index.FindByPrefix(dir, id)
+		s, ok, err := index.FindByPrefixIn(dir, id, ask.Harness)
 		if err != nil || !ok || self[s.ID] {
 			continue
 		}
@@ -102,7 +102,7 @@ func askedHandoffSource(dir string, ask digest.HandoffAsk, cwd string, self map[
 		}
 		var own []model.Session
 		for _, s := range ss {
-			if s.Harness == ask.Harness && !self[s.ID] && index.ProjectInScopeStrict(s.Project, name) {
+			if isHandoverSession(s) && s.Harness == ask.Harness && !self[s.ID] && index.ProjectInScopeStrict(s.Project, name) {
 				own = append(own, s)
 			}
 		}

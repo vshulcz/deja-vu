@@ -84,9 +84,10 @@ func projectsInStore(dir string) map[string]time.Time {
 	if err != nil {
 		return nil
 	}
+	pol := policy.Load()
 	out := map[string]time.Time{}
 	for _, m := range metas {
-		if m.Project == "" {
+		if m.Project == "" || !metaVisible(pol, "", m) {
 			continue
 		}
 		if t, ok := out[m.Project]; !ok || m.Updated.After(t) {

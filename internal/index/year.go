@@ -46,6 +46,7 @@ func ScanYearWork(dir string, from time.Time) (YearWork, error) {
 		return out, err
 	}
 	pol := policy.Load()
+	excluded := excludedHarnesses()
 	files := map[string]bool{}
 	commands := map[string]bool{}
 	spanFiles := map[string]bool{}
@@ -56,7 +57,7 @@ func ScanYearWork(dir string, from time.Time) (YearWork, error) {
 			return
 		}
 		meta, ok := m.Sessions[r.Key]
-		if !ok || pol.Ignored(meta.Path, meta.Project) {
+		if !ok || metaIgnoredOrExcluded(pol, excluded, meta) {
 			return
 		}
 		if r.Time.IsZero() {

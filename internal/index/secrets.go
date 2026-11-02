@@ -129,6 +129,7 @@ func ScanSecrets(dir string) (SecretScan, error) {
 		return SecretScan{}, err
 	}
 	pol := policy.Load()
+	excluded := excludedHarnesses()
 	out := SecretScan{Counted: map[string]int{}}
 	// Keyed by session and kind: a session that pasted the same key into six
 	// turns is one finding with a count, not six lines.
@@ -140,7 +141,7 @@ func ScanSecrets(dir string) (SecretScan, error) {
 			return
 		}
 		meta, ok := m.Sessions[r.Key]
-		if !ok {
+		if !ok || excluded[strings.ToLower(meta.Harness)] {
 			return
 		}
 		// The same rule every other answer follows: a project the user

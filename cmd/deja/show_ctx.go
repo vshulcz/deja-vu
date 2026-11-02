@@ -511,7 +511,7 @@ func cmdCtx(dir string, rest []string) error {
 	// decision — was missing, and the command whose whole job is packaging
 	// context handed an agent a decision that had been withdrawn (#1011).
 	whole := hits[0].Session
-	if full, ok, ferr := findByPrefix(dir, whole.ID); ferr == nil && ok {
+	if full, ok, ferr := index.FindByIdentity(dir, whole.Harness, whole.ID); ferr == nil && ok {
 		whole = full
 	}
 	cw := &countingWriter{w: os.Stdout}

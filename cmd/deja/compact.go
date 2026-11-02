@@ -7,6 +7,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
@@ -48,6 +49,10 @@ func compactEvidence(dir, sessionID, cwd string) string {
 	// about the session that is compacting (#1999).
 	s, ok, err := index.FindByIDPreferProject(dir, sessionID, cwd)
 	if err != nil || !ok {
+		return ""
+	}
+	pol := policy.Load()
+	if !pol.Allows(policy.ActivationAuto, s.Project) || pol.Ignored(s.Path, s.Project) {
 		return ""
 	}
 	// Both lists come from the session's own records, and a record can be a path

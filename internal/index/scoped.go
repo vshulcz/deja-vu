@@ -48,8 +48,9 @@ func AnyInScope(dir string, scope []string) bool {
 	if err != nil {
 		return true
 	}
+	pol, excluded := metaIgnoredOrExcludedLoad()
 	for _, meta := range m.Sessions {
-		if query.ProjectAnyMatches(meta.Project, meta.From, scope) {
+		if !metaIgnoredOrExcluded(pol, excluded, meta) && query.ProjectAnyMatches(meta.Project, meta.From, scope) {
 			return true
 		}
 	}

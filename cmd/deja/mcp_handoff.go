@@ -59,9 +59,12 @@ func mcpHandoff(dir, name string, raw json.RawMessage) (string, int, error) {
 // MCP trust policy rather than the CLI's search one.
 func handoffTargetForAgent(dir, sel, harness string) (model.Session, string) {
 	if sel != "" {
-		s, ok, err := index.FindByPrefix(dir, sel)
+		s, ok, err := index.FindByPrefixIn(dir, sel, harness)
 		if err != nil || !ok {
 			return model.Session{}, fmt.Sprintf("no session matches %q", sel)
+		}
+		if policy.Load().Ignored(s.Path, s.Project) {
+			return model.Session{}, fmt.Sprintf("%q is withheld by this machine's trust policy", sel)
 		}
 		kept, _ := policyFilterSessionsCounted(policy.ActivationMCP, []model.Session{s})
 		if len(kept) == 0 {
@@ -89,7 +92,7 @@ func handoffTargetForAgent(dir, sel, harness string) (model.Session, string) {
 		}
 		var own []model.Session
 		for _, s := range ss {
-			if !index.ProjectInScopeStrict(s.Project, name) || live[s.ID] {
+			if !isHandoverSession(s) || !index.ProjectInScopeStrict(s.Project, name) || live[s.ID] {
 				continue
 			}
 			if harness != "" && s.Harness != harness {

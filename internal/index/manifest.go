@@ -184,8 +184,12 @@ func ImportedByMachine(dir string) map[string]int {
 	if err != nil {
 		return nil
 	}
+	excluded := excludedHarnesses()
 	out := map[string]int{}
 	for _, meta := range m.Sessions {
+		if excluded[strings.ToLower(meta.Harness)] {
+			continue
+		}
 		if meta.From != "" && meta.From != "repo" {
 			out[meta.From]++
 		}

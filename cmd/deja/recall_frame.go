@@ -249,7 +249,7 @@ func recallTouchedLine(dir string, s model.Session, terms []string) string {
 		return ""
 	}
 	for _, m := range metas {
-		if m.ID != s.ID || len(m.Touched) == 0 {
+		if m.Key() != s.Key() || len(m.Touched) == 0 {
 			continue
 		}
 		paths := pathsAboutIt(m.Touched, terms)

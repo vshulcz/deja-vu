@@ -987,6 +987,7 @@ func SpanInventoryWhere(dir string, keep func(SessionMeta) bool) (spans, files i
 	}
 	seen := map[string]bool{}
 	pol := policy.Load()
+	excluded := excludedHarnesses()
 	err = eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
 		if r.Role != roleEdit {
 			return
@@ -996,7 +997,7 @@ func SpanInventoryWhere(dir string, keep func(SessionMeta) bool) (spans, files i
 		// so counting it here promised something the command would decline
 		// (#2650).
 		meta, ok := m.Sessions[r.Key]
-		if !ok || pol.Ignored(meta.Path, meta.Project) || (keep != nil && !keep(meta)) {
+		if !ok || metaIgnoredOrExcluded(pol, excluded, meta) || (keep != nil && !keep(meta)) {
 			return
 		}
 		spans++

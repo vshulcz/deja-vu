@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -46,10 +47,12 @@ func earlierNameNote(dir, typed string, target search.BlameTarget) string {
 	if err != nil {
 		return ""
 	}
+	pol := policy.Load()
 	lastTouch := map[string]time.Time{}
 	type joint struct {
 		when    time.Time
 		project string
+		harness string
 		session string
 	}
 	together := map[string]joint{}
@@ -60,6 +63,9 @@ func earlierNameNote(dir, typed string, target search.BlameTarget) string {
 	// maps onto the absolute path a session wrote.
 	targetDirs := map[string]bool{}
 	for _, m := range metas {
+		if !metaVisible(pol, policy.ActivationSearch, m) {
+			continue
+		}
 		when := m.Updated
 		if when.IsZero() {
 			when = m.Started
@@ -90,7 +96,7 @@ func earlierNameNote(dir, typed string, target search.BlameTarget) string {
 			// be about these two files.
 			if touchedTarget && len(m.Touched) <= earlierNameJointCap {
 				if prev, ok := together[p]; !ok || when.After(prev.when) {
-					together[p] = joint{when: when, project: m.Project, session: m.ID}
+					together[p] = joint{when: when, project: m.Project, harness: m.Harness, session: m.ID}
 				}
 			}
 		}
@@ -147,7 +153,7 @@ func earlierNameNote(dir, typed string, target search.BlameTarget) string {
 			break
 		}
 		reads++
-		if !sessionSaysItMoved(dir, j.session, path.Base(p), target.Base) {
+		if !sessionSaysItMoved(dir, j.harness, j.session, path.Base(p), target.Base) {
 			continue
 		}
 		best = p
@@ -193,8 +199,8 @@ func blameSamePath(touched, typed string, target search.BlameTarget) bool {
 // whether it names them together in a sentence about moving a name — `git mv`,
 // "rename x to y". One session, read only when the touch data has already
 // narrowed the field to a single candidate.
-func sessionSaysItMoved(dir, id, from, to string) bool {
-	s, ok, err := index.FindByPrefix(dir, id)
+func sessionSaysItMoved(dir, harness, id, from, to string) bool {
+	s, ok, err := index.FindByIdentity(dir, harness, id)
 	if err != nil || !ok {
 		return false
 	}

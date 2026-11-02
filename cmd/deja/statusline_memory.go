@@ -151,7 +151,7 @@ func statuslineMemory(dir string, in transcriptSource) (fileMemory, bool) {
 		others := sessionsTouching(metas, here, self)
 		kept := others[:0]
 		for _, m := range others {
-			if pol.Allows(policy.ActivationSearch, m.Project) {
+			if metaVisible(pol, policy.ActivationSearch, m) {
 				kept = append(kept, m)
 			}
 		}
