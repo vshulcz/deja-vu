@@ -151,6 +151,17 @@
     }
 
     var saveFirst=art.querySelector('.save-first');
+    /* a page that names its own commands writes them into the callout; the
+       copy buttons there only need wiring */
+    if(saveFirst)saveFirst.querySelectorAll('.save-actions .save-cmd').forEach(function(row){
+      var b=row.querySelector('button'),c=row.querySelector('code');
+      if(!b||!c)return;
+      b.addEventListener('click',function(){
+        navigator.clipboard.writeText(c.textContent);
+        b.textContent='copied';
+        setTimeout(function(){b.textContent='copy'},1200);
+      });
+    });
     if(saveFirst&&!saveFirst.querySelector('.save-actions')){
       var saveCmd='curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja index';
       var bar=document.createElement('div');

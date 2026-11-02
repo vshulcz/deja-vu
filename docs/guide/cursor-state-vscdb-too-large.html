@@ -164,7 +164,7 @@
 
 <p>The usual report: after a restart Cursor sits on "Loading chats", a new chat spins on the first message, and <code>globalStorage</code> turns out to be 30, 50 or 125 GB. Almost all of that is one file, <code>state.vscdb</code>, and almost all of the file is chat state.</p>
 
-<div class="save-first"><b>Before you delete chats or move <code>state.vscdb</code> aside:</b> Cursor has no archive, so any chat removed to reclaim disk space is gone for good. Run <a href="https://github.com/vshulcz/deja-vu">deja-vu</a> (<code>deja index</code>) first — it reads <code>state.vscdb</code> read-only via <code>sqlite3</code> and keeps a compact local search index of every conversation after you shrink or reset the database.</div>
+<div class="save-first"><b>Before you delete chats or move <code>state.vscdb</code> aside:</b> Cursor has no archive, so any chat removed to reclaim disk space is gone for good. Index it first with <a href="https://github.com/vshulcz/deja-vu">deja-vu</a>: it reads <code>state.vscdb</code> read-only via <code>sqlite3</code> and keeps a compact local search index of every conversation after you shrink or reset the database.<div class="save-actions"><div class="save-cmd"><span class="p">$</span><code>brew install deja-vu &amp;&amp; deja index</code><button type="button">copy</button></div><div class="save-cmd"><span class="p">$</span><code>npx @vshulcz/deja-vu index</code><button type="button">copy</button></div><a class="save-btn" href="https://github.com/vshulcz/deja-vu">deja-vu on GitHub</a><a class="save-demo" href="getting-started.html">Other ways to install &rarr;</a></div></div>
 
 <h2>Where it is</h2>
 <pre># macOS
