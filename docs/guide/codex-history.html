@@ -4,16 +4,16 @@
 <script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Codex CLI history: view, search and sync it — deja-vu</title>
-<meta name="description" content="Where Codex CLI keeps session history, why grep misses sessions older than a week, jq and sqlite3 recipes, and search across every Codex session.">
+<title>Codex CLI history in ~/.codex/sessions: search it — deja-vu</title>
+<meta name="description" content="Where Codex CLI keeps session history (~/.codex/sessions), why grep misses rollouts older than a week, jq and sqlite3 recipes, and search across all of it.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/codex-history.html">
 <link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/codex-history.html">
 <link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/codex-history.html">
 <link rel="alternate" hreflang="ru" href="https://vshulcz.github.io/deja-vu/ru/guide/codex-history.html">
 <link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/codex-history.html">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Codex CLI history: view, search and sync it">
-<meta property="og:description" content="Where Codex CLI keeps session history, why grep misses sessions older than a week, jq and sqlite3 recipes, and search across every Codex session.">
+<meta property="og:title" content="Codex CLI history in ~/.codex/sessions: search it">
+<meta property="og:description" content="Where Codex CLI keeps session history (~/.codex/sessions), why grep misses rollouts older than a week, jq and sqlite3 recipes, and search across all of it.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/codex-history.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -28,14 +28,14 @@
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
-<meta name="twitter:title" content="Codex CLI history: view, search and sync it">
-<meta name="twitter:description" content="Where Codex CLI keeps session history, why grep misses sessions older than a week, jq and sqlite3 recipes, and search across every Codex session.">
+<meta name="twitter:title" content="Codex CLI history in ~/.codex/sessions: search it">
+<meta name="twitter:description" content="Where Codex CLI keeps session history (~/.codex/sessions), why grep misses rollouts older than a week, jq and sqlite3 recipes, and search across all of it.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Codex CLI history: view, search and sync it", "description": "Where Codex CLI keeps session history, why grep misses sessions older than a week, jq and sqlite3 recipes, and search across every Codex session.", "url": "https://vshulcz.github.io/deja-vu/guide/codex-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/codex-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-30", "dateModified": "2026-11-01"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Codex CLI history in ~/.codex/sessions: search it", "description": "Where Codex CLI keeps session history (~/.codex/sessions), why grep misses rollouts older than a week, jq and sqlite3 recipes, and search across all of it.", "url": "https://vshulcz.github.io/deja-vu/guide/codex-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/codex-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-30", "dateModified": "2026-11-01"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Codex CLI history", "item": "https://vshulcz.github.io/deja-vu/guide/codex-history.html"}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Where is Codex CLI history stored?", "acceptedAnswer": {"@type": "Answer", "text": "Under ${CODEX_HOME:-~/.codex}: one rollout file per session at sessions/YYYY/MM/DD/rollout-*.jsonl, compressed to .jsonl.zst after seven days, archived sessions in archived_sessions/, your prompts alone in history.jsonl, and the resume picker's session list in state_5.sqlite."}}, {"@type": "Question", "name": "How do I search my Codex history?", "acceptedAnswer": {"@type": "Answer", "text": "codex resume lists sessions by title but does not search inside them. grep works on .jsonl rollouts but misses the .jsonl.zst ones older than a week; zstdgrep reads those. deja-vu indexes both, plus archived sessions, and ranks results: deja --harness codex \"your query\"."}}, {"@type": "Question", "name": "Can I sync Codex history between machines?", "acceptedAnswer": {"@type": "Answer", "text": "Codex keeps history local. deja sync ssh <host> carries deja's index of it to another machine, where it is searchable with deja; it does not add sessions to that machine's codex resume picker."}}]}</script>
 </head>
@@ -165,7 +165,7 @@
 
 <p>Codex keeps every session you run. What it does not have is a way to ask which session had the fix, or to look at them outside the resume picker. The files are plain enough that <code>jq</code> and <code>sqlite3</code> go a long way, and a week in, one detail breaks the obvious <code>grep</code>.</p>
 
-<div class="save-first"><b>Want instant search across every Codex session (including <code>.jsonl.zst</code> rollouts older than a week)?</b> <a href="https://github.com/vshulcz/deja-vu">deja-vu</a> indexes <code>~/.codex/sessions</code> and <code>archived_sessions</code> in seconds: run <code>deja --harness codex "your query"</code> or open the interactive terminal UI with <code>deja</code>.</div>
+<div class="save-first"><b>Before you clean up <code>~/.codex/sessions</code>:</b> a removed rollout is gone from <code>codex resume</code> and from <code>grep</code>. Index it first with <a href="https://github.com/vshulcz/deja-vu">deja-vu</a>: every session, <code>.jsonl.zst</code> rollouts older than a week and <code>archived_sessions</code> included, stays searchable with <code>deja --harness codex "your query"</code>, and <code>deja resume &lt;id&gt; --write-back</code> can write one back.<div class="save-actions"><div class="save-cmd"><span class="p">$</span><code>brew install deja-vu &amp;&amp; deja index</code><button type="button">copy</button></div><div class="save-cmd"><span class="p">$</span><code>npx @vshulcz/deja-vu index</code><button type="button">copy</button></div><a class="save-btn" href="https://github.com/vshulcz/deja-vu">deja-vu on GitHub</a><a class="save-demo" href="getting-started.html">Other ways to install &rarr;</a></div></div>
 
 <h2>Where Codex keeps it</h2>
 <p>Everything is under <code>${CODEX_HOME:-~/.codex}</code>:</p>

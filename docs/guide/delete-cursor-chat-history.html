@@ -4,7 +4,7 @@
 <script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>How to delete Cursor chat history — deja-vu</title>
+<title>Delete Cursor chat history from state.vscdb — deja-vu</title>
 <meta name="description" content="How to delete Cursor chat history — where the chats live in state.vscdb, why deleting the file resets more than chats, and what the CLI writes separately.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html">
 <link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html">
@@ -12,7 +12,7 @@
 <link rel="alternate" hreflang="ru" href="https://vshulcz.github.io/deja-vu/ru/guide/delete-cursor-chat-history.html">
 <link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html">
 <meta property="og:type" content="article">
-<meta property="og:title" content="How to delete Cursor chat history">
+<meta property="og:title" content="Delete Cursor chat history from state.vscdb">
 <meta property="og:description" content="How to delete Cursor chat history — where the chats live in state.vscdb, why deleting the file resets more than chats, and what the CLI writes separately.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
@@ -28,7 +28,7 @@
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
-<meta name="twitter:title" content="How to delete Cursor chat history">
+<meta name="twitter:title" content="Delete Cursor chat history from state.vscdb">
 <meta name="twitter:description" content="How to delete Cursor chat history — where the chats live in state.vscdb, why deleting the file resets more than chats, and what the CLI writes separately.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
@@ -165,7 +165,7 @@
 
 <p>Cursor does not keep one file per conversation. The IDE stores chats as rows in <code>state.vscdb</code>, a SQLite database that also holds the rest of its state, and the CLI writes transcripts as ordinary files somewhere else entirely. Which one you are trying to delete decides what you can safely do.</p>
 
-<div class="save-first"><b>Before you wipe chats to free space:</b> Cursor keeps no archive once a chat row is deleted from <code>state.vscdb</code>. If you want past fixes searchable without the multi-gigabyte database, run <a href="https://github.com/vshulcz/deja-vu">deja-vu</a> (<code>deja index</code>) first — it indexes both <code>state.vscdb</code> and CLI transcripts locally so you can still recall them in Cursor, Claude Code or Codex.</div>
+<div class="save-first"><b>Before you wipe chats to free space:</b> Cursor keeps no archive once a chat row is deleted from <code>state.vscdb</code>. Index them first with <a href="https://github.com/vshulcz/deja-vu">deja-vu</a>: it reads both <code>state.vscdb</code> and the CLI transcripts locally, so past fixes stay searchable from Cursor, Claude Code or Codex after the database is gone.<div class="save-actions"><div class="save-cmd"><span class="p">$</span><code>brew install deja-vu &amp;&amp; deja index</code><button type="button">copy</button></div><div class="save-cmd"><span class="p">$</span><code>npx @vshulcz/deja-vu index</code><button type="button">copy</button></div><a class="save-btn" href="https://github.com/vshulcz/deja-vu">deja-vu on GitHub</a><a class="save-demo" href="getting-started.html">Other ways to install &rarr;</a></div></div>
 
 <h2>Where the chats are</h2>
 <p>The user directory is <code>~/Library/Application Support/Cursor/User</code> on macOS and <code>~/.config/Cursor/User</code> elsewhere, with <code>state.vscdb</code> under <code>globalStorage/</code> and under each <code>workspaceStorage/&lt;id&gt;/</code>. Inside it, the <code>cursorDiskKV</code> table holds one value per chat at <code>composerData:&lt;id&gt;</code> and one per message at <code>bubbleId:&lt;chat-id&gt;:&lt;bubble-id&gt;</code>. Cursor CLI is the simple case: <code>~/.cursor/projects/&lt;encoded-path&gt;/agent-transcripts/**/*.jsonl</code>, one file per transcript.</p>
