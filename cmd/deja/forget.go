@@ -549,6 +549,12 @@ func forgetKeyOf(dir string, o index.ForgetOptions) string {
 		return ""
 	}
 	for _, m := range metas {
+		if o.Project != "" && !strings.Contains(strings.ToLower(m.Project), strings.ToLower(o.Project)) {
+			continue
+		}
+		if !o.Before.IsZero() && !m.Updated.Before(o.Before) {
+			continue
+		}
 		if index.SelectorMatches(m, o.Session) {
 			return m.Key()
 		}

@@ -802,6 +802,7 @@ func TestDDDStageEToGManifestVisibilityAndHandoverInvariants(t *testing.T) {
 		"lifecycle.go",
 		"mcp_recall.go",
 		"doctor.go",
+		"mcp.go",
 	}
 	for _, name := range mustCallMetaVisible {
 		f, parseErr := parser.ParseFile(fset, name, nil, 0)
@@ -1005,5 +1006,22 @@ func TestDDDStageEToGManifestVisibilityAndHandoverInvariants(t *testing.T) {
 	}
 	if _, _, ok := contextByID(dir, "shared-id-1", "codex"); ok {
 		t.Fatal("Bug #86 regression: contextByID resolved excluded codex session")
+	}
+
+	// 6. Behavioral Invariants (Stage O, Bugs #88-#94):
+	// - sessionIDStartsWith accepts composite "harness:id" selectors (Bug #89)
+	// - search.FindByPrefix sorts newest-first and accepts "harness:id" (Bug #91)
+	// - forgetKeyOf honours composite "harness:id" and o.Project (Bug #92)
+	if !sessionIDStartsWith(sClaude, "claude:shared-id") || sessionIDStartsWith(sClaude, "codex:shared-id") {
+		t.Fatal("Bug #89 regression: sessionIDStartsWith failed on composite harness:id selector")
+	}
+	if got, ok := search.FindByPrefix([]model.Session{sClaude, sCodex}, "claude:shared-id"); !ok || got.Harness != "claude" {
+		t.Fatalf("Bug #91 regression: search.FindByPrefix(claude:shared-id) = (%+v, %v), want claude", got, ok)
+	}
+	if gotKey := forgetKeyOf(dir, index.ForgetOptions{Session: "codex:shared-id-1", Project: "payments"}); gotKey != "codex:shared-id-1" {
+		t.Fatalf("Bug #92 regression: forgetKeyOf(codex:shared-id-1, payments) = %q, want codex:shared-id-1", gotKey)
+	}
+	if gotKey := forgetKeyOf(dir, index.ForgetOptions{Session: "codex:shared-id-1", Project: "other"}); gotKey != "" {
+		t.Fatalf("Bug #92 regression: forgetKeyOf(codex:shared-id-1, other) = %q, want empty", gotKey)
 	}
 }

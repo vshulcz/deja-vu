@@ -764,10 +764,21 @@ func blameTextResult(dir string, o search.BlameOptions, path string, limit int) 
 		// touched it has to say so in a sentence rather than read as a tool
 		// that failed (#3570).
 		metas, err := index.AllMeta(dir)
-		if err == nil && len(metas) == 0 {
+		pol := policy.Load()
+		active, visible := 0, 0
+		for _, m := range metas {
+			if sources.HarnessExcluded(m.Harness) {
+				continue
+			}
+			active++
+			if metaVisible(pol, policy.ActivationMCP, m) {
+				visible++
+			}
+		}
+		if err == nil && active == 0 {
 			return emptyStoreSentence("so nothing can be found"), 0, nil
 		}
-		out := noBlameHistorySentence(target.Base, len(metas))
+		out := noBlameHistorySentence(target.Base, visible)
 		if refreshing {
 			c := index.SnapshotCoverage(dir)
 			c.Stale = true

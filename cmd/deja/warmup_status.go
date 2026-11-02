@@ -265,7 +265,7 @@ func emptyRecallAnswerPolicy(dir, q string, hidden int) string {
 	// mistake #680 named, one step earlier. Said only when the store is
 	// genuinely empty; a store with sessions that simply did not match keeps
 	// the ordinary answer.
-	if metas, err := index.AllMeta(dir); err == nil && len(metas) == 0 {
+	if has, err := hasActiveMeta(dir); err == nil && !has {
 		return emptyStoreSentence("so nothing can match")
 	}
 	return fmt.Sprintf("No prior deja sessions matched %q.", q)

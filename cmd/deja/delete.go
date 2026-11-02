@@ -406,7 +406,7 @@ func runDeleteIn(dir string, args []string, in io.Reader, w io.Writer) error {
 	}
 	// The resolver also matches the middle of an id; an erase takes the start
 	// of one, or the head…tail form deja prints.
-	if !idStartsWith(s.ID, prefix) {
+	if !sessionIDStartsWith(s, prefix) {
 		return fmt.Errorf("%q is not the start of a session id; delete takes the id as `deja last` prints it", prefix)
 	}
 	var files []string
@@ -441,11 +441,21 @@ func runDeleteIn(dir string, args []string, in io.Reader, w io.Writer) error {
 	if _, err := eraseSession(dir, s, all); err != nil {
 		return err
 	}
-	if err := forgetErased(dir, s.ID); err != nil {
+	if err := forgetErased(dir, s.Key()); err != nil {
 		return fmt.Errorf("removed from %s, but deja still holds a copy: %w — `deja forget --session %s` drops it", agentName(s.Harness), err, digest.Short(s.ID))
 	}
 	fmt.Fprintf(w, "erased %s from %s and from deja\n", digest.Short(s.ID), agentName(s.Harness))
 	return nil
+}
+
+func sessionIDStartsWith(s model.Session, p string) bool {
+	if idStartsWith(s.ID, p) {
+		return true
+	}
+	if h, id, ok := strings.Cut(p, ":"); ok && strings.EqualFold(s.Harness, h) {
+		return idStartsWith(s.ID, id)
+	}
+	return false
 }
 
 func idStartsWith(id, p string) bool {

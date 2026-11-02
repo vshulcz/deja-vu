@@ -415,12 +415,20 @@ func variantDetail(text string, terms []string, variants map[string][]string) st
 // no match. Otherwise the guard depends on whether a rebuild happens to be
 // running, which is the worst kind of intermittent.
 func FindByPrefix(ss []model.Session, p string) (model.Session, bool) {
-	if p == "" {
+	if strings.TrimSpace(p) == "" {
 		return model.Session{}, false
 	}
-	for _, s := range mergeSessions(ss) {
+	ordered := Recent(ss, 0)
+	for _, s := range ordered {
 		if strings.HasPrefix(s.ID, p) {
 			return s, true
+		}
+	}
+	if h, id, ok := strings.Cut(p, ":"); ok && h != "" && id != "" {
+		for _, s := range ordered {
+			if strings.EqualFold(s.Harness, h) && strings.HasPrefix(s.ID, id) {
+				return s, true
+			}
 		}
 	}
 	return model.Session{}, false

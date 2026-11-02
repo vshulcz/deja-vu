@@ -11,6 +11,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/nfcfold"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -247,6 +248,21 @@ func contextIgnoredWords(result index.SearchResult) string {
 	return fmt.Sprintf("No exact match; using %s: %s\n", what, strings.Join(summary, ", "))
 }
 
+// hasActiveMeta reports whether the manifest in dir holds at least one session
+// from a non-excluded harness.
+func hasActiveMeta(dir string) (bool, error) {
+	metas, err := index.AllMeta(dir)
+	if err != nil {
+		return false, err
+	}
+	for _, m := range metas {
+		if !sources.HarnessExcluded(m.Harness) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // emptyStoreNote is what a tool says when the store holds nothing at all,
 // rather than reporting a real absence. An agent told a thing was never done
 // concludes exactly that and starts over (#680); on a first run every tool is
@@ -254,7 +270,7 @@ func contextIgnoredWords(result index.SearchResult) string {
 //
 // Empty when the store has something in it, so a caller can append it blind.
 func emptyStoreNote(dir string) string {
-	if metas, err := index.AllMeta(dir); err == nil && len(metas) == 0 {
+	if has, err := hasActiveMeta(dir); err == nil && !has {
 		return " " + emptyStoreSentence("so nothing can be found")
 	}
 	return ""
