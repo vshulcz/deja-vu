@@ -729,6 +729,25 @@ func TestLoadAllHermeticEmptySources(t *testing.T) {
 	}
 }
 
+func TestLoadFileSourcesReadsEveryRegisteredStoreExceptOpencode(t *testing.T) {
+	tmp := hermeticEnv(t)
+	notes := filepath.Join(tmp, "notes.jsonl")
+	t.Setenv("DEJA_NOTES_FILE", notes)
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	line := `{"ts":"` + now + `","project":"acme","text":"fallback store check"}` + "\n"
+	if err := os.WriteFile(notes, []byte(line), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got := loadFileSources()
+	if len(got) != 1 || got[0].Project != "acme" || len(got[0].Messages) != 1 || got[0].Messages[0].Text != "fallback store check" {
+		t.Fatalf("loadFileSources() = %#v, want 1 acme note session", got)
+	}
+	t.Setenv("DEJA_STORES", "claude")
+	if got := loadFileSources(); len(got) != 0 {
+		t.Fatalf("loadFileSources() with DEJA_STORES=claude = %#v, want empty", got)
+	}
+}
+
 func TestMCPHandshakeListRecallRoundTrip(t *testing.T) {
 	root, err := filepath.Abs(filepath.Join("..", "..", "fixtures", "synthetic", "claude"))
 	if err != nil {

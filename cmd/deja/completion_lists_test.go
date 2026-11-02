@@ -305,3 +305,135 @@ func fishLinesFor(script, name string) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
+func shellCommandBlock(shell, script, cmd string) string {
+	switch shell {
+	case "fish":
+		return strings.ReplaceAll(fishLinesFor(script, cmd), "-l ", "--")
+	case "bash":
+		_, body, ok := strings.Cut(script, `    case "$command" in`+"\n")
+		if !ok {
+			return ""
+		}
+		body, _, _ = strings.Cut(body, "\n    esac\n")
+		return caseBranchFor(body, "        ", "            ;;", cmd, false)
+	case "zsh":
+		_, body, ok := strings.Cut(script, `  case "$words[2]" in`+"\n")
+		if !ok {
+			return ""
+		}
+		body, _, _ = strings.Cut(body, "\n  esac\n")
+		return caseBranchFor(body, "    ", "      ;;", cmd, false)
+	case "powershell":
+		_, body, ok := strings.Cut(script, "        $candidates = switch ($command) {\n")
+		if !ok {
+			return ""
+		}
+		body, _, _ = strings.Cut(body, "\n        }\n")
+		return powershellBranchFor(body, cmd)
+	}
+	return ""
+}
+
+func caseBranchFor(body, indent, endMarker, cmd string, _ bool) string {
+	lines := strings.Split(body, "\n")
+	var defaultBlock string
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
+		if !strings.HasPrefix(line, indent) || strings.HasPrefix(line, indent+" ") {
+			continue
+		}
+		head, ok := strings.CutSuffix(strings.TrimPrefix(line, indent), ")")
+		if !ok {
+			continue
+		}
+		var blockLines []string
+		for j := i + 1; j < len(lines); j++ {
+			if lines[j] == endMarker {
+				i = j
+				break
+			}
+			blockLines = append(blockLines, lines[j])
+		}
+		block := strings.Join(blockLines, "\n")
+		if head == "*" {
+			defaultBlock = block
+			continue
+		}
+		for c := range strings.SplitSeq(head, "|") {
+			if c == cmd {
+				return block
+			}
+		}
+	}
+	return defaultBlock
+}
+
+func powershellBranchFor(body, cmd string) string {
+	var defaultBlock string
+	for line := range strings.SplitSeq(body, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "default {") {
+			defaultBlock = line
+			continue
+		}
+		if strings.HasPrefix(trimmed, "'"+cmd+"' {") ||
+			(strings.HasPrefix(trimmed, "{ $_ -in @(") && strings.Contains(trimmed, "'"+cmd+"'")) {
+			var blockLines []string
+			_, rest, _ := strings.Cut(body, line)
+			blockLines = append(blockLines, line)
+			if !strings.HasSuffix(trimmed, "}") {
+				for l := range strings.SplitSeq(rest, "\n") {
+					if l == "" {
+						continue
+					}
+					blockLines = append(blockLines, l)
+					if l == "            }" {
+						break
+					}
+				}
+			}
+			return strings.Join(blockLines, "\n")
+		}
+	}
+	return defaultBlock
+}
+
+func TestEveryHelpEntryFlagIsOfferedByCompletion(t *testing.T) {
+	scripts := map[string]string{}
+	for _, shell := range completionTestShells {
+		scripts[shell] = emittedCompletion(t, shell)
+	}
+	for _, entry := range helpEntries {
+		if entry.toolHelp || entry.name == "search" ||
+			(strings.HasPrefix(entry.name, "hook-") && entry.name != "hook-context") {
+			continue
+		}
+		usageText := strings.Join(entry.usage, " ")
+		var flags []string
+		for tok := range strings.FieldsSeq(usageText) {
+			tok = strings.Trim(tok, "[]|")
+			for part := range strings.SplitSeq(tok, "|") {
+				if strings.HasPrefix(part, "--") && len(part) > 2 {
+					flags = append(flags, part)
+				}
+			}
+		}
+		if len(flags) == 0 {
+			continue
+		}
+		for _, shell := range completionTestShells {
+			block := shellCommandBlock(shell, scripts[shell], entry.name)
+			// install_targets / $installTargets holds --all and --auto for install and uninstall.
+			if entry.name == "install" || entry.name == "uninstall" {
+				block += " --all --auto"
+			}
+			for _, flag := range flags {
+				if !strings.Contains(block, flag) {
+					t.Errorf("%s completion for %q does not offer %s (documented in %q):\n%s",
+						shell, entry.name, flag, usageText, block)
+				}
+			}
+		}
+	}
+}

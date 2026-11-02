@@ -59,13 +59,50 @@ func TestEachFlagListNamesEveryFlagItsParserTakes(t *testing.T) {
 				t.Errorf("%s passes %s to unknownFlag, which is not a slice literal of flags", fn.Name.Name, listName)
 				continue
 			}
+			cmdName := unknownFlagCmdArg(fn)
 			seen++
-			for _, lit := range stringLiterals(fn.Body) {
+			parsed := stringLiterals(fn.Body)
+			for _, lit := range parsed {
 				if !flagToken.MatchString(lit) || contains(known, lit) {
+					continue
+				}
+				if cmdName == "last" && lit == "--limit" {
+					// parseLast names --limit only to reject it with a custom hint (#3405).
 					continue
 				}
 				t.Errorf("%s takes %s but %s does not list it — a near miss would be told to use something else",
 					fn.Name.Name, lit, listName)
+			}
+			for _, flag := range known {
+				if !flagToken.MatchString(flag) {
+					continue
+				}
+				if cmdName == "search" && flag == "--rebuild" {
+					// searchWithOptions strips --rebuild before calling parseSearch.
+					continue
+				}
+				if !contains(parsed, flag) {
+					t.Errorf("%s lists %s, which %s does not accept — a near miss could suggest a rejected flag",
+						listName, flag, fn.Name.Name)
+				}
+			}
+			if cmdName == "search" {
+				for _, row := range searchFlagRows {
+					for _, m := range flagToken.FindAllString(row[0], -1) {
+						if !contains(known, m) {
+							t.Errorf("searchFlagRows documents %s (%q) but %s does not list it",
+								m, row[0], listName)
+						}
+					}
+				}
+			} else if entry, ok := helpEntryFor(cmdName); ok {
+				usageText := strings.Join(entry.usage, " ")
+				for _, m := range flagToken.FindAllString(usageText, -1) {
+					if !contains(known, m) {
+						t.Errorf("help for %q documents %s in usage (%q) but %s does not list it",
+							cmdName, m, usageText, listName)
+					}
+				}
 			}
 		}
 	}
@@ -123,6 +160,27 @@ func unknownFlagListArg(fn *ast.FuncDecl) string {
 		return true
 	})
 	return name
+}
+
+func unknownFlagCmdArg(fn *ast.FuncDecl) string {
+	cmd := ""
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		id, ok := call.Fun.(*ast.Ident)
+		if !ok || id.Name != "unknownFlag" || len(call.Args) != 3 {
+			return true
+		}
+		if lit, ok := call.Args[0].(*ast.BasicLit); ok && lit.Kind == token.STRING {
+			if v, err := strconv.Unquote(lit.Value); err == nil {
+				cmd = v
+			}
+		}
+		return true
+	})
+	return cmd
 }
 
 func stringSliceLiteral(e ast.Expr) ([]string, bool) {
