@@ -98,3 +98,18 @@ func TestSessionsHoldingHandlesUTF8PunctuationYoFoldAndWorkRecords(t *testing.T)
 		t.Errorf("sessionsHolding(счетчика) = %d, want 1 (s1 with ё->е fold inside «guillemets»)", got)
 	}
 }
+
+func TestTextCarriesTermHandlesUnicodePunctuationAndExtendedLatin(t *testing.T) {
+	if !search.TextCarriesTerm("We switched —retry— and “токен”…", "retry") {
+		t.Error("TextCarriesTerm failed to match 'retry' bounded by em-dashes (U+2014)")
+	}
+	if !search.TextCarriesTerm("Проверь «токен»—он истёк…", "токен") {
+		t.Error("TextCarriesTerm failed to match 'токен' bounded by guillemets and em-dash")
+	}
+	if search.TextCarriesTerm("retrying uberalles", "über") {
+		t.Error("TextCarriesTerm matched 'über' when not present")
+	}
+	if !search.TextCarriesTerm("configured überproxy for local dev", "überproxy") {
+		t.Error("TextCarriesTerm failed to match extended-Latin term 'überproxy'")
+	}
+}
