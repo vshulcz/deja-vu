@@ -99,6 +99,7 @@ var groups = []group{
 		{"delete-cherrystudio-session-history.html", "Cherry Studio"},
 		{"delete-codewhale-session-history.html", "CodeWhale"},
 		{"delete-aider-chat-history.html", "aider"},
+		{"delete-openclaw-session-history.html", "OpenClaw"},
 	}},
 	{title: "Per-agent guides", fold: true, links: []link{
 		{"memory-for-aider.html", "aider"},
