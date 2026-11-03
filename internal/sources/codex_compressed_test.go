@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -129,6 +130,52 @@ func TestCodexStreamsACompressedRollout(t *testing.T) {
 	// The streamed read allocated 16 MB locally; leave room for runtime noise.
 	if alloc > 24<<20 {
 		t.Errorf("reading a %d MB rollout allocated %d MB, want at most 24 MB", size>>20, alloc>>20)
+	}
+}
+
+// The scan runs while zstd is still writing. A parse that stops early, with an
+// error or a panic safeParse recovers further up, must not leave zstd blocked on
+// a pipe nobody reads.
+func TestZstdScanStopsOnErrorOrPanic(t *testing.T) {
+	if !ZstdAvailable() {
+		t.Skip("zstd CLI not installed")
+	}
+	root := t.TempDir()
+	t.Setenv("HOME", root)
+	t.Setenv("USERPROFILE", root)
+	path := filepath.Join(root, "rollout.jsonl.zst")
+	// More than a pipe holds: waiting without killing would block on stdout.
+	if err := os.WriteFile(path, zstdFrame(t, strings.Repeat("x", 2<<20)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	want := errors.New("scan stopped")
+	for _, panics := range []bool{false, true} {
+		name := "error"
+		if panics {
+			name = "panic"
+		}
+		t.Run(name, func(t *testing.T) {
+			defer func() {
+				if got := recover(); got != nil || panics {
+					if err, ok := got.(error); !panics || !ok || !errors.Is(err, want) {
+						t.Errorf("panic = %v, want %v", got, want)
+					}
+				}
+			}()
+			err := zstdScan(path, "codex", func(r io.Reader) error {
+				var first [1]byte
+				if _, err := io.ReadFull(r, first[:]); err != nil {
+					t.Fatal(err)
+				}
+				if panics {
+					panic(want)
+				}
+				return want
+			})
+			if !errors.Is(err, want) {
+				t.Errorf("scan error = %v, want %v", err, want)
+			}
+		})
 	}
 }
 
