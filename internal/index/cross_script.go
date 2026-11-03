@@ -31,7 +31,7 @@ const bridgeTerms = 4
 // which is the sentence that explains the term — the thing a rephrasing has
 // and an absent subject does not.
 func bridgedRetry(dir string, m Manifest, projects, terms []string, n int, skip map[string]bool,
-	strong []int, idfOf map[string]float64) ([]SessionMeta, []int, []int, map[string]float64, bool) {
+	strong []int, idfOf map[string]float64) ([]SessionMeta, []int, []int, map[string]float64, map[uint32][]int64, bool) {
 	was := 0
 	for _, v := range strong {
 		if v > was {
@@ -44,7 +44,7 @@ func bridgedRetry(dir string, m Manifest, projects, terms []string, n int, skip 
 		crossCands = crossScriptBridgeTerms(terms)
 	}
 	if !hasStrongTerm && len(crossCands) == 0 {
-		return nil, nil, nil, nil, false
+		return nil, nil, nil, nil, nil, false
 	}
 	var neighbours map[string][]string
 	if hasStrongTerm {
@@ -145,22 +145,22 @@ func bridgedRetry(dir string, m Manifest, projects, terms []string, n int, skip 
 		}
 	}
 	if len(added) == 0 {
-		return nil, nil, nil, nil, false
+		return nil, nil, nil, nil, nil, false
 	}
-	metas, matched, bstrong, idf, err := relevantMetasMatched(dir, m, projects,
+	metas, matched, bstrong, idf, offsets, err := relevantMetasMatched(dir, m, projects,
 		append(append([]string{}, terms...), added...), n, skip)
 	if err != nil || len(metas) == 0 {
-		return nil, nil, nil, nil, false
+		return nil, nil, nil, nil, nil, false
 	}
 	// Taken only when the bridge found something more identifying than the
 	// question's own words did. Otherwise the project has no better answer and
 	// the first ranking stands.
 	for i, v := range bstrong {
 		if v > was || (crossScript && i < len(matched) && matched[i] >= 2) {
-			return metas, matched, bstrong, idf, true
+			return metas, matched, bstrong, idf, offsets, true
 		}
 	}
-	return nil, nil, nil, nil, false
+	return nil, nil, nil, nil, nil, false
 }
 
 func hasTermAboveFloor(terms []string, idfOf map[string]float64, floor float64) bool {

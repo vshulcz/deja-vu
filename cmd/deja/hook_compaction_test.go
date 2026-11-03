@@ -9,8 +9,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -230,5 +232,79 @@ func TestCompactionRecoveryWaitsOutAnEmptyPrompt(t *testing.T) {
 	}
 	if _, packet := compactionRecovery(dir, "compaction-fixture", workspace); !strings.Contains(packet, "Fix retry cancellation") {
 		t.Fatalf("the recovery packet was spent on an empty prompt: %q", packet)
+	}
+}
+
+func TestCompactionCapturePreservesActionableFailureReasons(t *testing.T) {
+	hermeticEnv(t)
+	dir := index.DefaultDir()
+	workspace := t.TempDir()
+
+	// 1. Missing transcript file -> transcript_missing with stage=stat_before and os=ENOENT.
+	missingPath := filepath.Join(t.TempDir(), "does-not-exist.jsonl")
+	captureCompaction(dir, precompactHookInput{
+		SessionID:      "compaction-fixture",
+		CWD:            workspace,
+		TranscriptPath: missingPath,
+	})
+	events := usage.Events(dir, 1)
+	if len(events) != 1 {
+		t.Fatalf("events = %d, want 1", len(events))
+	}
+	gotMissing := events[0]
+	if gotMissing.CompactionError != "transcript_missing" || gotMissing.CompactionStage != "stat_before" || gotMissing.CompactionOSError != "ENOENT" || gotMissing.CompactionSource == "" {
+		t.Fatalf("missing transcript event = %+v", gotMissing)
+	}
+	if strings.Contains(gotMissing.CompactionSource, missingPath) {
+		t.Fatalf("compaction_source leaked raw path: %q", gotMissing.CompactionSource)
+	}
+	if note := compactionFailureNote(gotMissing); !strings.Contains(note, "could not read") || !strings.Contains(note, "stage=stat_before") || !strings.Contains(note, "os=ENOENT") {
+		t.Fatalf("unexpected log note for missing transcript: %q", note)
+	}
+
+	// 2. Identity mismatch -> transcript_identity_mismatch.
+	mismatchPath := filepath.Join(t.TempDir(), "mismatch.jsonl")
+	compactionWrite(t, mismatchPath, compactionFixture(t, "claude-before.jsonl", workspace))
+	captureCompaction(dir, precompactHookInput{
+		SessionID:      "wrong-session-id",
+		CWD:            workspace,
+		TranscriptPath: mismatchPath,
+	})
+	events = usage.Events(dir, 1)
+	if events[0].CompactionError != "transcript_identity_mismatch" || events[0].CompactionStage == "" {
+		t.Fatalf("identity mismatch event = %+v", events[0])
+	}
+
+	// 3. Consistency check failure -> transcript_changing with size/mtime/read diagnostics.
+	t0 := time.Unix(1700000000, 0).UTC()
+	reason, detail := classifyCompactionError(
+		&sources.CompactionStageError{
+			Stage: "consistency_check",
+			Err: &sources.TranscriptChangingError{
+				SameFile:    true,
+				BeforeSize:  4096,
+				AfterSize:   4608,
+				BeforeMTime: t0,
+				AfterMTime:  t0.Add(15 * time.Millisecond),
+				ReadMS:      4,
+			},
+		},
+		"read_file",
+		"codex:12345678",
+	)
+	if reason != "transcript_changing" || detail.Stage != "consistency_check" || detail.BeforeSize != 4096 || detail.AfterSize != 4608 || detail.MTimeDeltaMS != 15 || detail.ReadMS != 4 {
+		t.Fatalf("changing classification = %q %+v", reason, detail)
+	}
+	usage.RecordCompactionCapture(dir, usage.CompactionCapture{
+		Key:     usage.CompactionKey{Session: "s1", Workspace: "w1"},
+		Error:   reason,
+		Failure: detail,
+	})
+	changingEvent := usage.Events(dir, 1)[0]
+	if changingEvent.CompactionBeforeSize != 4096 || changingEvent.CompactionAfterSize != 4608 || changingEvent.CompactionMTimeDeltaMS != 15 || changingEvent.CompactionReadMS != 4 {
+		t.Fatalf("changing event = %+v", changingEvent)
+	}
+	if note := compactionFailureNote(changingEvent); !strings.Contains(note, "size=4096->4608") || !strings.Contains(note, "mtime_delta=15ms") || !strings.Contains(note, "read=4ms") {
+		t.Fatalf("changing log note missing diagnostics: %q", note)
 	}
 }

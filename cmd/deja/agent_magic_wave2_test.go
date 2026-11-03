@@ -216,4 +216,3 @@ func TestFixesForCommandIgnoresUnrelatedPairOnGenericNotGitRepoError(t *testing.
 		t.Fatalf("expected unrelated command after generic 'not a git repository' error to be filtered out, got: %#v", got)
 	}
 }
-

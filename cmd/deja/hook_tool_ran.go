@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -52,6 +53,9 @@ type ranCandidate struct {
 	// three sessions still wins over one that failed in two.
 	failed bool
 	exit   int
+	// targeted says the command names this file's stem or package rather than
+	// sweeping the whole repository (`go test ./...`, `make test`).
+	targeted bool
 }
 
 // ranBetter orders two candidates: the one more sessions ran, then the one
@@ -65,6 +69,10 @@ func ranBetter(a, b ranCandidate) bool {
 		// What works outranks what does not, at any count: the reader is
 		// about to change this file, and one of the two is a thing to run.
 		return b.failed
+	case !a.failed && a.targeted != b.targeted:
+		// A passing check that targets this file or its package outranks a
+		// repo-wide sweep once both meet the session floor.
+		return a.targeted
 	case a.sessions != b.sessions:
 		return a.sessions > b.sessions
 	case a.rank != b.rank:
@@ -82,6 +90,10 @@ func ranBetter(a, b ranCandidate) bool {
 // the per-action path, where the file line's own history cost 133 ms before
 // #3605 moved it into the manifest.
 func fileHookRanLine(dir string, metas []index.SessionMeta) string {
+	return fileHookRanLineFor(dir, "", metas)
+}
+
+func fileHookRanLineFor(dir, path string, metas []index.SessionMeta) string {
 	if len(metas) < toolHookMinRanSessions {
 		return ""
 	}
@@ -132,7 +144,13 @@ func fileHookRanLine(dir string, metas []index.SessionMeta) string {
 			}
 			a := by[ck]
 			if a == nil {
-				a = &ranCandidate{text: cmd, rank: pos, failed: !c.Passed(), exit: c.Exit}
+				a = &ranCandidate{
+					text:     cmd,
+					rank:     pos,
+					failed:   !c.Passed(),
+					exit:     c.Exit,
+					targeted: commandTargetsFile(cmd, path),
+				}
 				by[ck] = a
 			}
 			a.sessions++
@@ -167,6 +185,33 @@ func fileHookRanLine(dir string, metas []index.SessionMeta) string {
 		return fmt.Sprintf("%s`%s` — exit %d in %s", failLabel, cmd, best.exit, toolSessionCount(best.sessions)) //nolint:gocritic // %#q falls back to double quotes for a command with a backquote
 	}
 	return fmt.Sprintf("%s`%s` (%s)", ranLabel, cmd, toolSessionCount(best.sessions)) //nolint:gocritic // %#q falls back to double quotes for a command with a backquote
+}
+
+// commandTargetsFile reports whether cmd specifically names the file's stem,
+// package directory, or a test filter (`-run`, `-k`, `--grep`) rather than a
+// repo-wide sweep (`go test ./...`, `make test`).
+func commandTargetsFile(cmd, path string) bool {
+	if path == "" || cmd == "" {
+		return false
+	}
+	lowCmd := strings.ToLower(cmd)
+	base := strings.ToLower(filepath.Base(path))
+	stem := base
+	if i := strings.LastIndex(stem, "."); i > 0 {
+		stem = stem[:i]
+	}
+	stem = strings.TrimSuffix(stem, "_test")
+	dirBase := strings.ToLower(filepath.Base(filepath.Dir(path)))
+	if len(stem) >= 3 && strings.Contains(lowCmd, stem) {
+		return true
+	}
+	if len(dirBase) >= 3 && dirBase != "." && dirBase != "/" &&
+		dirBase != "src" && dirBase != "pkg" && dirBase != "cmd" && dirBase != "internal" {
+		if strings.Contains(lowCmd, "/"+dirBase) || strings.HasSuffix(lowCmd, " "+dirBase) || strings.Contains(lowCmd, " "+dirBase+" ") {
+			return true
+		}
+	}
+	return strings.Contains(lowCmd, " -run ") || strings.Contains(lowCmd, " -k ") || strings.Contains(lowCmd, " --grep ")
 }
 
 const (

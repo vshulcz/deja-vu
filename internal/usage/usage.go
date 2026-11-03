@@ -159,8 +159,16 @@ type Event struct {
 	// Measured says the event's count came from a complete, supported
 	// transcript. False together with CompactionError is an explicit
 	// unmeasured interval, never a zero-valued success.
-	Measured        bool   `json:"measured,omitempty"`
-	CompactionError string `json:"compaction_error,omitempty"`
+	Measured               bool   `json:"measured,omitempty"`
+	CompactionError        string `json:"compaction_error,omitempty"`
+	CompactionStage        string `json:"compaction_stage,omitempty"`
+	CompactionOSError      string `json:"compaction_os_error,omitempty"`
+	CompactionSource       string `json:"compaction_source,omitempty"`
+	CompactionBeforeSize   int64  `json:"compaction_before_size,omitempty"`
+	CompactionAfterSize    int64  `json:"compaction_after_size,omitempty"`
+	CompactionMTimeDeltaMS int64  `json:"compaction_mtime_delta_ms,omitempty"`
+	CompactionReadMS       int64  `json:"compaction_read_ms,omitempty"`
+	CompactionSameFile     *bool  `json:"compaction_same_file,omitempty"`
 }
 
 // Summary is the usage log totalled.

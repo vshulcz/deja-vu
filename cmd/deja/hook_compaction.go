@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
@@ -43,7 +45,7 @@ func compactionUsageKey(s index.CompactionState) usage.CompactionKey {
 // guesses another session or waits for a history rebuild on the hook path. It
 // returns the state this compaction stored, and false when it stored none.
 func captureCompaction(dir string, input precompactHookInput) (index.CompactionState, bool) {
-	return captureCompactionFrom(dir, input, func(workspace string) (sources.CompactionTranscript, string) {
+	return captureCompactionFrom(dir, input, func(workspace string) (sources.CompactionTranscript, string, usage.CompactionFailure) {
 		return compactionSource(input, workspace)
 	})
 }
@@ -51,11 +53,13 @@ func captureCompaction(dir string, input precompactHookInput) (index.CompactionS
 // compactionSource reads what the host named: a transcript file, the turns it
 // handed over in the payload, or a session in a store deja reads by its id.
 // The second string is the failure reason, empty on success.
-func compactionSource(input precompactHookInput, workspace string) (sources.CompactionTranscript, string) {
+func compactionSource(input precompactHookInput, workspace string) (sources.CompactionTranscript, string, usage.CompactionFailure) {
 	var (
-		transcript sources.CompactionTranscript
-		err        error
+		transcript   sources.CompactionTranscript
+		err          error
+		defaultStage string
 	)
+	sourceTag := compactionSourceToken(input)
 	// MiniMax Code gives hooks a temporary Claude-compatible projection of
 	// the session as transcript_path and deletes it after the call. Its own
 	// store, read by the session id, is the record.
@@ -64,25 +68,137 @@ func compactionSource(input precompactHookInput, workspace string) (sources.Comp
 	}
 	switch {
 	case input.TranscriptPath != "":
+		defaultStage = "read_file"
 		transcript, err = readCompactionFile(input, workspace)
 	case len(input.Messages) > 0:
+		defaultStage = "read_messages"
 		transcript, err = sources.ReadCompactionMessages(input.Harness, input.SessionID, workspace, input.Messages)
 	case input.Harness != "":
+		defaultStage = "read_store"
 		transcript, err = sources.ReadCompactionStore(input.Harness, input.SessionID)
 		if errors.Is(err, sources.ErrUnsupportedCompactionTranscript) {
+			defaultStage = "read_session"
 			transcript, err = sources.ReadCompactionSession(input.Harness, input.SessionID, "", workspace)
 		}
 	case sources.MuseSessionPath(input.SessionID) != "":
 		// Muse names neither a transcript nor itself; its log is found by
 		// the session id, and the reader holds it to the log's own stream.
+		defaultStage = "read_store"
 		transcript, err = sources.ReadCompactionStore("muse", input.SessionID)
 	default:
-		return transcript, "missing_transcript"
+		return transcript, "missing_transcript", usage.CompactionFailure{Stage: "select_source", Source: sourceTag}
 	}
 	if err != nil {
-		return transcript, "transcript_unavailable"
+		reason, detail := classifyCompactionError(err, defaultStage, sourceTag)
+		return transcript, reason, detail
 	}
-	return transcript, ""
+	return transcript, "", usage.CompactionFailure{}
+}
+
+func compactionSourceToken(input precompactHookInput) string {
+	switch {
+	case strings.TrimSpace(input.TranscriptPath) != "":
+		owner := sources.CompactionTranscriptHarness(input.TranscriptPath)
+		if owner == "" {
+			owner = strings.TrimSpace(input.Harness)
+		}
+		if owner == "" {
+			owner = "file"
+		}
+		return owner + ":" + shortHash(filepath.Clean(input.TranscriptPath))
+	case len(input.Messages) > 0:
+		h := strings.TrimSpace(input.Harness)
+		if h == "" {
+			h = "payload"
+		}
+		return h + ":messages"
+	case strings.TrimSpace(input.Harness) != "":
+		return strings.TrimSpace(input.Harness) + ":" + shortHash(input.SessionID)
+	case strings.TrimSpace(input.SessionID) != "":
+		return "session:" + shortHash(input.SessionID)
+	default:
+		return ""
+	}
+}
+
+func classifyCompactionError(err error, defaultStage, sourceTag string) (string, usage.CompactionFailure) {
+	stage := defaultStage
+	var stageErr *sources.CompactionStageError
+	if errors.As(err, &stageErr) && stageErr.Stage != "" {
+		stage = stageErr.Stage
+	}
+	detail := usage.CompactionFailure{
+		Stage:   stage,
+		OSError: compactionOSErrorCode(err),
+		Source:  sourceTag,
+	}
+	var changing *sources.TranscriptChangingError
+	if errors.As(err, &changing) {
+		same := changing.SameFile
+		detail.SameFile = &same
+		detail.BeforeSize = changing.BeforeSize
+		detail.AfterSize = changing.AfterSize
+		detail.MTimeDeltaMS = changing.AfterMTime.Sub(changing.BeforeMTime).Milliseconds()
+		detail.ReadMS = changing.ReadMS
+	}
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		return "transcript_missing", detail
+	case errors.Is(err, os.ErrPermission):
+		return "transcript_permission_denied", detail
+	case errors.Is(err, sources.ErrTranscriptChanging):
+		return "transcript_changing", detail
+	case errors.Is(err, sources.ErrTranscriptIdentity):
+		return "transcript_identity_mismatch", detail
+	case errors.Is(err, sources.ErrUnsupportedCompactionTranscript):
+		return "transcript_unsupported", detail
+	case errors.Is(err, sources.ErrTranscriptLineTooLarge):
+		return "transcript_line_too_large", detail
+	case stage == "parse_session" || stage == "scan_tool_calls" || stage == "read_messages":
+		return "transcript_parse_error", detail
+	default:
+		return "transcript_unavailable", detail
+	}
+}
+
+func compactionOSErrorCode(err error) string {
+	var errno syscall.Errno
+	if errors.As(err, &errno) {
+		switch errno { //nolint:exhaustive // default formats any unlisted errno value
+		case syscall.ENOENT:
+			return "ENOENT"
+		case syscall.EACCES:
+			return "EACCES"
+		case syscall.EPERM:
+			return "EPERM"
+		case syscall.EISDIR:
+			return "EISDIR"
+		case syscall.ENOTDIR:
+			return "ENOTDIR"
+		case syscall.EINVAL:
+			return "EINVAL"
+		case syscall.EIO:
+			return "EIO"
+		case syscall.EBUSY:
+			return "EBUSY"
+		case syscall.EMFILE:
+			return "EMFILE"
+		case syscall.ENFILE:
+			return "ENFILE"
+		default:
+			return "errno_" + strconv.Itoa(int(errno))
+		}
+	}
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		return "ENOENT"
+	case errors.Is(err, os.ErrPermission):
+		return "EACCES"
+	case errors.Is(err, os.ErrClosed):
+		return "ECLOSED"
+	default:
+		return ""
+	}
 }
 
 // compactionTailHarnesses are the formats ReadCompactionTranscript reads from a
@@ -157,10 +273,12 @@ func catchUpCompactionWith(dir string, input precompactHookInput, read func() (s
 	// gone from its window, so recall may show it again.
 	forgetInjected(dir, input.SessionID)
 	forgetInjected(dir, compactionFailureKey(input.SessionID))
-	captureCompactionFrom(dir, input, func(string) (sources.CompactionTranscript, string) { return transcript, "" })
+	captureCompactionFrom(dir, input, func(string) (sources.CompactionTranscript, string, usage.CompactionFailure) {
+		return transcript, "", usage.CompactionFailure{}
+	})
 }
 
-func captureCompactionFrom(dir string, input precompactHookInput, read func(workspace string) (sources.CompactionTranscript, string)) (index.CompactionState, bool) {
+func captureCompactionFrom(dir string, input precompactHookInput, read func(workspace string) (sources.CompactionTranscript, string, usage.CompactionFailure)) (index.CompactionState, bool) {
 	if input.SessionID == "" {
 		return index.CompactionState{}, false
 	}
@@ -173,23 +291,25 @@ func captureCompactionFrom(dir string, input precompactHookInput, read func(work
 		blockOldPacket()
 		return index.CompactionState{}, false
 	}
-	failure := func(reason string) {
+	failure := func(reason string, detail usage.CompactionFailure) {
 		// Precompact cleared delivery marks before this attempt. Preserve a
 		// failure mark in that same ledger so an older successful packet cannot
 		// masquerade as the state of this compaction, even if the index is busy.
 		blockOldPacket()
 		usage.RecordCompactionCapture(dir, usage.CompactionCapture{
-			Key: usage.CompactionKey{Session: shortHash(input.SessionID), Workspace: shortHash(workspace)}, Error: reason,
+			Key:     usage.CompactionKey{Session: shortHash(input.SessionID), Workspace: shortHash(workspace)},
+			Error:   reason,
+			Failure: detail,
 		})
 	}
 	now := time.Now().UTC()
-	transcript, reason := read(workspace)
+	transcript, reason, detail := read(workspace)
 	if reason != "" {
-		failure(reason)
+		failure(reason, detail)
 		return index.CompactionState{}, false
 	}
 	if transcript.Workspace == "" || compactionWorkspace(transcript.Workspace) != workspace {
-		failure("workspace_mismatch")
+		failure("workspace_mismatch", usage.CompactionFailure{Stage: "verify_workspace", Source: compactionSourceToken(input)})
 		return index.CompactionState{}, false
 	}
 	// Each capture reads its store beside the registry; what a parse switch
@@ -232,7 +352,11 @@ func captureCompactionFrom(dir string, input precompactHookInput, read func(work
 		LastToolCallID: transcript.LastToolID, CapturedAt: now, Data: data,
 	})
 	if err != nil {
-		failure("storage_unavailable")
+		failure("storage_unavailable", usage.CompactionFailure{
+			Stage:   "put_compaction",
+			OSError: compactionOSErrorCode(err),
+			Source:  compactionSourceToken(input),
+		})
 		return index.CompactionState{}, false
 	}
 	if saved.CapturedAt.Equal(now) {
@@ -444,7 +568,11 @@ func measureCompactionRecovery(dir string, input toolHookInput) {
 	}
 	current, err := sources.ReadCompactionTranscript(path, input.SessionID)
 	if err != nil {
-		result.Error = "transcript_unavailable"
+		sourceTag := ""
+		if strings.TrimSpace(path) != "" {
+			sourceTag = state.Harness + ":" + shortHash(filepath.Clean(path))
+		}
+		result.Error, result.Failure = classifyCompactionError(err, "read_file", sourceTag)
 	} else if current.Workspace == "" || compactionWorkspace(current.Workspace) != state.Workspace ||
 		current.HeaderFingerprint != state.SourceHeaderFingerprint ||
 		!sources.MatchesCompactionBoundary(current, state.SourceSize, state.SourceBoundaryFingerprint) {

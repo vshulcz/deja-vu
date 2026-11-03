@@ -1224,7 +1224,10 @@ writes rather than serves; `search` and `handoff` are the reader's own commands.
 delivered bytes. They add `compaction_session` and `compaction_workspace`
 (hashed identifiers), `compaction_revision`, `tool_calls` (capture baseline),
 `actions_before_edit` (recovery count), `measured`, and `compaction_error`
-(a short failure code). A true `measured` with an omitted zero-valued
+(a short failure code), plus optional failure diagnostics (`compaction_stage`,
+`compaction_os_error`, `compaction_source`, `compaction_before_size`,
+`compaction_after_size`, `compaction_mtime_delta_ms`, `compaction_read_ms`,
+`compaction_same_file`). A true `measured` with an omitted zero-valued
 `actions_before_edit` means no tool calls preceded the edit; false means the
 interval must not be used as a sample. These events do not increment recall or
 injection counters, and their timestamps do not start the recall window.

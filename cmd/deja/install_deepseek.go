@@ -285,18 +285,57 @@ function sessionCwd(agent) {
 
 // The project digest, once at the start of the session. deja_once keys the
 // one-shot on the session id in deja's ledger, which survives a resume in a new
-// process; the Set is the in-process guard that keeps the long-lived web and
-// tui profiles from spawning deja on every assembly of a session already shown.
-function projectDigest(agent, seen) {
+// process; the Map caches the opening digest across systemPrompt.refreshContext
+// re-resolutions during the first step (#5904) and clears it once the session
+// moves past its opening step.
+function pastOpeningStep(agent) {
+  let log = null;
+  try {
+    log = eventAtFrom(agent && agent.session);
+  } catch {}
+  if (!log) return false;
+  let humanTurns = 0;
+  for (let i = log.top - 1; i >= 0; i--) {
+    let event;
+    try {
+      event = log.at(i);
+    } catch {
+      return false;
+    }
+    if (!event || typeof event.type !== "string") continue;
+    if (event.type === "turn/start" && event.data && event.data.turn > 1) return true;
+    if (event.type === "runtime-context" || event.type === "turn/end" || event.type === "step/end" || event.type.startsWith("assistant/")) {
+      return true;
+    }
+    if (event.type === "user/message" && isHuman(event.data)) {
+      if (++humanTurns > 1) return true;
+    }
+    if (event.type === "agent/inbox/spliced") {
+      const inserted = event.data && event.data.inserted;
+      if (Array.isArray(inserted) && inserted.some(isHuman) && ++humanTurns > 1) return true;
+    }
+  }
+  return false;
+}
+
+function projectDigest(agent, digests) {
   const sid = sessionId(agent);
-  if (sid && seen.has(sid)) return "";
-  if (sid) seen.add(sid);
-  return askHook("hook-context", {
+  if (pastOpeningStep(agent)) {
+    if (sid) digests.set(sid, "");
+    return "";
+  }
+  if (sid && digests.has(sid)) return digests.get(sid);
+  const text = askHook("hook-context", {
     session_id: sid,
     cwd: sessionCwd(agent),
     source: "startup",
     deja_once: true,
   });
+  if (sid) {
+    digests.set(sid, text);
+    while (digests.size > 64) digests.delete(digests.keys().next().value);
+  }
+  return text;
 }
 
 function userText(message) {
@@ -356,7 +395,7 @@ function apply(ctx) {
   let askedIn = "";
   let askedBy = "";
   let recalled = "";
-  const digestSeen = new Set();
+  const digests = new Map();
   const capturing = new Map();
   const compacted = new Set();
 
@@ -380,7 +419,7 @@ function apply(ctx) {
       text: (assembly) => {
         const agent = assembly && assembly.agent;
         if (!agent) return "";
-        return projectDigest(agent, digestSeen);
+        return projectDigest(agent, digests);
       },
     });
     ctx.systemPrompt.context({

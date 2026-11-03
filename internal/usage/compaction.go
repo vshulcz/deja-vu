@@ -45,6 +45,34 @@ func keyFromEvent(e Event) CompactionKey {
 	}
 }
 
+// CompactionFailure holds sanitized diagnostic metadata for a failed
+// compaction capture or recovery without recording transcript contents or
+// raw filesystem paths.
+type CompactionFailure struct {
+	Stage        string
+	OSError      string
+	Source       string
+	BeforeSize   int64
+	AfterSize    int64
+	MTimeDeltaMS int64
+	ReadMS       int64
+	SameFile     *bool
+}
+
+func (f CompactionFailure) apply(e *Event) {
+	if e.CompactionError == "" {
+		return
+	}
+	e.CompactionStage = strings.TrimSpace(f.Stage)
+	e.CompactionOSError = strings.TrimSpace(f.OSError)
+	e.CompactionSource = strings.TrimSpace(f.Source)
+	e.CompactionBeforeSize = f.BeforeSize
+	e.CompactionAfterSize = f.AfterSize
+	e.CompactionMTimeDeltaMS = f.MTimeDeltaMS
+	e.CompactionReadMS = f.ReadMS
+	e.CompactionSameFile = f.SameFile
+}
+
 // CompactionCapture is the baseline read from the raw transcript before a
 // host compacts it. Error is a short machine-readable reason such as
 // "unsupported" or "truncated"; it must not contain transcript content.
@@ -52,6 +80,7 @@ type CompactionCapture struct {
 	Key       CompactionKey
 	ToolCalls int
 	Error     string
+	Failure   CompactionFailure
 }
 
 // CompactionRecovery is the outcome at the first edit after a capture.
@@ -61,6 +90,7 @@ type CompactionRecovery struct {
 	Key               CompactionKey
 	ActionsBeforeEdit int
 	Error             string
+	Failure           CompactionFailure
 }
 
 // RecordCompactionCapture records a compaction baseline in the existing usage
@@ -82,6 +112,7 @@ func RecordCompactionCapture(indexDir string, capture CompactionCapture) {
 		Measured:        errText == "",
 		CompactionError: errText,
 	}
+	capture.Failure.apply(&e)
 	capture.Key.eventFields(&e)
 	recordEvent(indexDir, e)
 }
@@ -104,6 +135,7 @@ func RecordCompactionRecovery(indexDir string, recovery CompactionRecovery) {
 		Measured:          errText == "",
 		CompactionError:   errText,
 	}
+	recovery.Failure.apply(&e)
 	recovery.Key.eventFields(&e)
 	recordEvent(indexDir, e)
 }

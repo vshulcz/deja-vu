@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync/atomic"
 	"testing"
 )
@@ -106,4 +107,50 @@ func shiftFirstOffset(b []byte) []byte {
 		out[p]++
 	}
 	return out
+}
+
+// ProjectRelevantNamingCut on a corpus where the ranked candidates hold more
+// than a quarter of all records still uses bounded offset reads from
+// recordoffsets.bin rather than walking the full log or materializing every
+// non-matching record of a marathon session (#5901).
+func TestProjectRelevantBoundsCandidateSessionReadsThroughOffsetTable(t *testing.T) {
+	h := newTwoWayEnv(t)
+	// Four marathon sessions (220 messages each) holding >95% of all records.
+	for i := range 4 {
+		id := "m" + string(rune('1'+i))
+		day := 2 + i
+		var b strings.Builder
+		b.WriteString(hPrompt("app", id, day, 0, "how do we configure kestrel retries"))
+		for m := 1; m <= 109; m++ {
+			b.WriteString(hSay("app", id, day, m%59, "routine background turn "+string(rune('A'+m%26))+string(rune('0'+m/26))+" without target keyword"))
+			b.WriteString(hPrompt("app", id, day, m%59, "next routine question "+string(rune('A'+m%26))+string(rune('0'+m/26))))
+		}
+		b.WriteString(hSay("app", id, day, 59, "we decided kestrel retries cap at four"))
+		h.put("app", id, b.String())
+	}
+	h.put("svc", "other", richSession("svc", "other", 10, "outbox"))
+	dir := filepath.Join(h.tmp, "a.db")
+	if err := Ensure(dir, "claude", false, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	before := atomic.LoadInt64(&recordOffsetReads)
+	ss, _, _, _, _, err := ProjectRelevantNamingCut(dir, []string{"me/app"}, []string{"kestrel"}, 4, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if atomic.LoadInt64(&recordOffsetReads) == before {
+		t.Fatal("ProjectRelevantNamingCut walked the log instead of reading recordoffsets.bin")
+	}
+	if len(ss) != 4 {
+		t.Fatalf("got %d sessions, want 4", len(ss))
+	}
+	for _, s := range ss {
+		if len(s.Messages) > maxWindowedSessionRecords {
+			t.Errorf("session %s loaded %d messages, want <= %d", s.ID, len(s.Messages), maxWindowedSessionRecords)
+		}
+		if s.Held < 200 {
+			t.Errorf("marathon session %s Held = %d, want >= 200 so prompt narrowing still fires", s.ID, s.Held)
+		}
+	}
 }

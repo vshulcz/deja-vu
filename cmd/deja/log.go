@@ -162,13 +162,14 @@ func compactionFailureNote(e usage.Event) string {
 	if e.CompactionError == "" {
 		return ""
 	}
+	detail := compactionDiagnosticTail(e)
 	// These two stored the packet; only the edit count after it is not
 	// measured. On TRAE CLI every /compact read "stored nothing" while the
 	// packet reached the next turn.
 	if e.Kind == usage.KindCompactionCapture && (e.CompactionError == "incomplete_transcript" || e.CompactionError == "no_offsets") {
-		return "  (stored; edits after it not counted: " + compactionErrorWords(e.CompactionError) + ")"
+		return "  (stored; edits after it not counted: " + compactionErrorWords(e.CompactionError) + detail + ")"
 	}
-	return "  (stored nothing: " + compactionErrorWords(e.CompactionError) + ")"
+	return "  (stored nothing: " + compactionErrorWords(e.CompactionError) + detail + ")"
 }
 
 // compactionErrorWords turns the recorded token into the sentence a reader can
@@ -178,6 +179,26 @@ func compactionErrorWords(token string) string {
 	switch token {
 	case "transcript_unavailable":
 		return "the host named a transcript deja could not read"
+	case "transcript_missing":
+		return "the host named a transcript deja could not read (file does not exist)"
+	case "transcript_permission_denied":
+		return "the host named a transcript deja could not read (permission denied)"
+	case "transcript_changing":
+		return "the host named a transcript deja could not read because it changed while being read"
+	case "transcript_identity_mismatch":
+		return "the host named a transcript deja could not read because its session id did not match"
+	case "transcript_unsupported":
+		return "the host named a transcript deja could not read (unsupported format)"
+	case "transcript_line_too_large":
+		return "the host named a transcript deja could not read (line exceeds capture bound)"
+	case "transcript_parse_error":
+		return "the host named a transcript deja could not read (parse failed)"
+	case "missing_transcript":
+		return "the host sent no transcript or session to read"
+	case "workspace_mismatch":
+		return "the transcript's workspace did not match the active checkout"
+	case "storage_unavailable":
+		return "deja could not write the compaction packet to the store"
 	case "incomplete_transcript":
 		return "the transcript ended mid-turn"
 	case "no_offsets":
@@ -192,6 +213,35 @@ func compactionErrorWords(token string) string {
 		return "the host's action count was not usable"
 	}
 	return token
+}
+
+func compactionDiagnosticTail(e usage.Event) string {
+	var parts []string
+	if e.CompactionStage != "" {
+		parts = append(parts, "stage="+e.CompactionStage)
+	}
+	if e.CompactionOSError != "" {
+		parts = append(parts, "os="+e.CompactionOSError)
+	}
+	if e.CompactionSameFile != nil && !*e.CompactionSameFile {
+		parts = append(parts, "same_file=false")
+	}
+	if e.CompactionBeforeSize != 0 || e.CompactionAfterSize != 0 {
+		parts = append(parts, fmt.Sprintf("size=%d->%d", e.CompactionBeforeSize, e.CompactionAfterSize))
+	}
+	if e.CompactionMTimeDeltaMS != 0 {
+		parts = append(parts, fmt.Sprintf("mtime_delta=%dms", e.CompactionMTimeDeltaMS))
+	}
+	if e.CompactionReadMS > 0 || (e.CompactionError == "transcript_changing" && e.CompactionStage == "consistency_check") {
+		parts = append(parts, fmt.Sprintf("read=%dms", e.CompactionReadMS))
+	}
+	if e.CompactionSource != "" {
+		parts = append(parts, "src="+e.CompactionSource)
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return " [" + strings.Join(parts, " ") + "]"
 }
 
 // pluralThoseOnes is the pronoun for the tail of that sentence, so it never

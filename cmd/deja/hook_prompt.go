@@ -309,6 +309,8 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	for id := range self {
 		skip[id] = true
 	}
+	promptStart := time.Now()
+	const promptSoftBudget = 1500 * time.Millisecond
 	ranked, matched, strong, naming, idfOf, err := index.ProjectRelevantNamingCut(dir, names, terms, prompt.Candidates, skip, cut)
 	// The rule every other surface applies: a promoted note goes in front of
 	// the transcript it was distilled from. This hook ranks sessions and never
@@ -344,15 +346,34 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		leadTerms = ordered[:min(len(ordered), leadTermsKept)]
 	}
 	pol := policy.Load()
-	pk := &promptPicker{pol: pol, terms: terms, idfOf: idfOf, topIDF: index.TopIDF(dir), self: self, leadTerms: leadTerms, unscoped: len(names) == 0, ss: make([]model.Session, 0, 2)}
+	pk := &promptPicker{
+		pol:       pol,
+		terms:     terms,
+		idfOf:     idfOf,
+		topIDF:    index.TopIDF(dir),
+		self:      self,
+		leadTerms: leadTerms,
+		unscoped:  len(names) == 0,
+		deadline:  promptStart.Add(promptSoftBudget),
+		ss:        make([]model.Session, 0, 2),
+	}
 	pk.pick(ranked, matched, strong, naming)
 	// One slot left and duplicates took the window: ask for a wider one. The
 	// second pass costs a ranking read and happens only when the store said
 	// the same thing several times, which is exactly when the answer is
-	// further down than the window reached.
-	if len(pk.ss) < 2 && pk.crowdedOut > 0 {
+	// further down than the window reached. Skip the wider retry when the soft
+	// latency budget is already exhausted, and exclude the candidates already
+	// examined in the first pass (#5901).
+	if len(pk.ss) < 2 && pk.crowdedOut > 0 && time.Since(promptStart) < promptSoftBudget {
+		widerSkip := make(map[string]bool, len(skip)+len(ranked))
+		for id := range skip {
+			widerSkip[id] = true
+		}
+		for _, s := range ranked {
+			widerSkip[s.ID] = true
+		}
 		wider, wmatched, wstrong, wnaming, _, werr := index.ProjectRelevantNamingCut(
-			dir, names, terms, prompt.Candidates*widerWindow, skip, cut)
+			dir, names, terms, prompt.Candidates*widerWindow, widerSkip, cut)
 		if werr == nil {
 			pk.pick(wider, wmatched, wstrong, wnaming)
 		}
@@ -602,11 +623,15 @@ type promptPicker struct {
 	// shards — and those copies take the ranking's window with them, so the
 	// answer to the question can sit outside it (#1556).
 	crowdedOut int
+	deadline   time.Time
 }
 
 // pick walks one ranking and takes the sessions worth injecting.
 func (p *promptPicker) pick(ranked []model.Session, matched, strong, naming []int) {
 	for i, s := range ranked {
+		if len(p.ss) > 0 && !p.deadline.IsZero() && time.Now().After(p.deadline) {
+			return
+		}
 		// Every other injection path asks the policy first; this one is a
 		// per-prompt injection like any other, and imported projects reach
 		// it (a local project name is a substring of "imported:<name>").
@@ -680,7 +705,7 @@ func (p *promptPicker) pick(ranked []model.Session, matched, strong, naming []in
 		// the line and they are the current work. The haystack argument is
 		// about the session as a whole and not about the part that matched,
 		// so narrow it to that part instead of dropping the answer.
-		if len(s.Messages) > dejaVuMaxMessages {
+		if len(s.Messages) > dejaVuMaxMessages || s.Held > dejaVuMaxMessages {
 			s = focusSession(s, p.terms)
 			if len(s.Messages) == 0 {
 				continue
@@ -728,7 +753,7 @@ func (p *promptPicker) leadTermsMeet(s model.Session) bool {
 				return false
 			}
 		}
-		if len(s.Messages) >= dejaVuMaxMessages {
+		if len(s.Messages) >= dejaVuMaxMessages || s.Held >= dejaVuMaxMessages {
 			return search.SpeechCarriesTermsTogether(s, fixedNamed, 2)
 		}
 		return true
