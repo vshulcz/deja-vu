@@ -1,5 +1,7 @@
 # deja-vu for Raycast
 
+English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/raycast/docs/zh.md)
+
 Search and resume coding agent sessions across Claude Code, Codex, Cursor, OpenCode, Gemini CLI and 38 more harnesses from Raycast.
 
 ## Prerequisites

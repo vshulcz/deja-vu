@@ -1,5 +1,7 @@
 # deja-vu for VS Code, Cursor, Windsurf & Antigravity
 
+English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/vscode/docs/zh.md)
+
 **Your coding agents stop re-debugging what you already fixed.**
 
 [deja-vu](https://github.com/vshulcz/deja-vu) indexes the session transcripts Claude Code, Cursor, Codex, Windsurf, Copilot Chat, OpenCode, Cline, Roo Code and 35 other coding agents already write to disk — locally, in one Go binary, with no LLM and no background daemon.

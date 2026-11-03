@@ -157,7 +157,7 @@ test("the card keeps to the receipt and one note, the rest behind more, links in
   assert.match(shown, /a GitHub star/);
   assert.doesNotMatch(shown, /github\.com/);
   const links = find(tree, (n) => n.type === "a");
-  assert.deepEqual(links.map((a) => text(a)), ["Docs", "if deja is useful, a GitHub star helps others find it"]);
+  assert.deepEqual(links.map((a) => text(a)), ["deja-vu", "Docs", "if deja is useful, a GitHub star helps others find it"]);
   for (const a of links) {
     assert.equal(a.props.target, "_blank");
     assert.match(a.props.rel, /noopener/);

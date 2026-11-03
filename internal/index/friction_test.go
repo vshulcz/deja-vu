@@ -239,4 +239,3 @@ func TestFindFrictionSkipsLowSignalShellGlobWhenAnotherWallExists(t *testing.T) 
 		t.Fatalf("FindFriction picked %q, want real error over zsh glob noise", f.Text)
 	}
 }
-

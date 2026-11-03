@@ -99,6 +99,6 @@ export function quoteConversationMarkdown(session: ShowSessionEnvelope): string 
 }
 
 export async function runDeja(bin: string, args: string[]): Promise<string> {
-  const { stdout } = await execFileAsync(bin, args, { maxBuffer: 16 * 1024 * 1024, timeout: 15000 });
+  const { stdout } = await execFileAsync(bin, args, { maxBuffer: 16 * 1024 * 1024, timeout: 15000, windowsHide: true });
   return String(stdout || "");
 }
