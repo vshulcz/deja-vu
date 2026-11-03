@@ -21,7 +21,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
-func fileHookLine(dir, cwd, path string) string { //nolint:unparam // the cwd is part of the payload it builds
+func fileHookLine(dir, cwd, path string) string {
 	return fileHookLineOutside(dir, cwd, path, nil)
 }
 

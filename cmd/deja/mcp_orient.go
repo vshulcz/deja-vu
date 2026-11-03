@@ -274,7 +274,7 @@ func orientFiles(dir string, projects []string, cwd string) []orientFile {
 //
 // Empty when the project has nothing recurring, because a map of one session's
 // keystrokes is noise sitting in every prompt of every session after it.
-func orientDigestBlock(dir, cwd string, projects []string, activation string) string {
+func orientDigestBlock(dir, cwd string, projects []string, activation string) string { //nolint:unparam // forwarded to orientRecurringCommands
 	if cwd == "" {
 		// The hook is handed the project by the harness and not always the
 		// directory; without one every path stays absolute and the list fills
