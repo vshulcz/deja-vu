@@ -16,6 +16,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/termwidth"
+	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
 // The status line is the only surface deja has that is present *during* the
@@ -133,8 +134,9 @@ func statuslineMemory(dir string, in transcriptSource) (fileMemory, bool) {
 			}
 		}
 	}
+	pol := policy.Load()
 	if !found || len(self.Touched) == 0 {
-		return fileMemory{}, false
+		return liveSessionMemoryFromSnapshots(dir, ids, metas, pol)
 	}
 	// Every file this session worked on, busiest first — not just the busiest
 	// one. The file a session spends most of itself in is often the one being
@@ -146,7 +148,6 @@ func statuslineMemory(dir string, in transcriptSource) (fileMemory, bool) {
 	// one place an imported session's title showed through while search, blame
 	// and restore all refused (#1026). The bar is a browsing surface the reader
 	// watches, so it gates on the search activation like those do.
-	pol := policy.Load()
 	for _, here := range self.Touched {
 		others := sessionsTouching(metas, here, self)
 		kept := others[:0]
@@ -175,6 +176,68 @@ func statuslineMemory(dir string, in transcriptSource) (fileMemory, bool) {
 	// Silence, not a zero: a file nobody else has worked on has no memory to
 	// report, and printing "0 sessions" makes the line noise forever.
 	return fileMemory{}, false
+}
+
+// liveSessionMemoryFromSnapshots resolves file memory for a live session that
+// has not yet been written to manifest.gob by checking recent tool-hook
+// injections delivered into one of ids.
+func liveSessionMemoryFromSnapshots(dir string, ids []string, metas []index.SessionMeta, pol policy.Policy) (fileMemory, bool) {
+	if len(ids) == 0 || len(metas) == 0 {
+		return fileMemory{}, false
+	}
+	for _, snap := range usage.Snapshots(dir, 8) {
+		if snap.Into == "" || !slices.Contains(ids, snap.Into) || snap.Kind != usage.KindTool {
+			continue
+		}
+		path := snapshotToolFilePath(snap.Digest)
+		if path == "" {
+			continue
+		}
+		var others []index.SessionMeta
+		for _, m := range metas {
+			if slices.Contains(ids, m.ID) || !metaVisible(pol, policy.ActivationSearch, m) {
+				continue
+			}
+			if slices.Contains(m.Touched, path) || hasTouchBase(m.Touched, path) {
+				others = append(others, m)
+			}
+		}
+		if len(others) == 0 {
+			continue
+		}
+		sort.Slice(others, func(i, j int) bool { return newestFirst(others[i], others[j]) })
+		return fileMemory{
+			Path:     path,
+			Sessions: len(others),
+			Title:    others[0].Title,
+			Last:     others[0].Updated,
+		}, true
+	}
+	return fileMemory{}, false
+}
+
+func snapshotToolFilePath(digestText string) string {
+	const marker = " has been worked on in "
+	for line := range strings.SplitSeq(digestText, "\n") {
+		line = strings.TrimSpace(line)
+		if i := strings.Index(line, marker); i > 0 {
+			cand := strings.TrimSpace(line[:i])
+			if cand != "" && !strings.ContainsAny(cand, " \t<>") {
+				return cand
+			}
+		}
+	}
+	return ""
+}
+
+func hasTouchBase(touched []string, name string) bool {
+	base := index.CrossBase(name)
+	for _, t := range touched {
+		if index.CrossBase(t) == base {
+			return true
+		}
+	}
+	return false
 }
 
 // newestFirst orders the earlier sessions the bar can name.

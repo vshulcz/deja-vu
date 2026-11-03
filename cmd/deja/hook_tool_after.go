@@ -89,6 +89,7 @@ func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain b
 	input.ToolName = adoptGrok(adoptGrok(input.ToolName, input.grokEnvelope.ToolName), input.LLMToolName)
 	input.SessionID = adoptGrok(input.SessionID, input.grokEnvelope.SessionID)
 	adoptCopilotHost(raw)
+	adoptCursorHost(raw)
 	// The kill switch, before anything is read. It reached the session-start
 	// hook and nothing else, so a machine with recall off still had text drawn
 	// from its own indexed sessions injected here (#2701).
@@ -195,6 +196,9 @@ func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain b
 	// qwen takes either. Everything else gets the name it always had.
 	resp.HookSpecificOutput.HookEventName = replyEventName(input.HookEventName, "PostToolUse", "PostToolUse", "PostToolUseFailure")
 	resp.HookSpecificOutput.AdditionalContext = payload
+	if notesHaveReader() {
+		resp.SystemMessage = safeNote("deja: " + line)
+	}
 	b, err := json.Marshal(resp)
 	if err != nil {
 		return nil //nolint:nilerr // a reply that cannot marshal means no reply

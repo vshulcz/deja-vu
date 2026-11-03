@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"hash/fnv"
+	"os"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
@@ -30,6 +32,10 @@ func fileHookLine(dir, cwd, path string) string {
 // file, and as the newest it was counted and its own last reply quoted back as
 // the file's history (#4380).
 func fileHookLineOutside(dir, cwd, path string, self func(index.SessionMeta, string) bool) string {
+	return fileHookLineOutsideWithEdit(dir, cwd, path, "", self)
+}
+
+func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(index.SessionMeta, string) bool) string {
 	// FileSessions matches on the file's basename, so without scoping "main.go"
 	// or "README.md" collects every project's file of that name — the line then
 	// claims a history this file does not have and points `deja blame` at a
@@ -108,20 +114,21 @@ func fileHookLineOutside(dir, cwd, path string, self func(index.SessionMeta, str
 	// blame` pointer, which the A/B behind this hook already found changed
 	// nothing. What the same A/B found an agent reuses is the decision about the
 	// file, so that is what is left.
+	editSymbols, fileSymbols := fileHookSymbols(cwd, path, editText)
+	allSymbols := append(slices.Clone(editSymbols), fileSymbols...)
 	var dec string
-	if d := promotedDecisionForFile(path, inScope); d != "" && mentionsFile(path, d) {
+	if d := promotedDecisionForFile(path, inScope); d != "" && (mentionsFile(path, d) || mentionsAnySymbol(allSymbols, d)) {
 		dec = standingLabel + d
-	} else if d := fileDecisionLine(dir, path, inScope); d != "" && digest.CarriesDecision(d) && mentionsFile(path, d) {
+	} else if d := fileDecisionLineWithSymbols(dir, path, editSymbols, fileSymbols, inScope); d != "" && digest.CarriesDecision(d) && (mentionsFile(path, d) || mentionsAnySymbol(allSymbols, d)) {
 		// A scanned line is a decision about the file only when it reads as one and
-		// names the file. Of 63 lines once offered as "prior decision", none named
-		// the file or its package.
+		// names the file or a symbol declared in it.
 		if promotedDecisionForFile(path, inScope) == d {
 			dec = decisionLabel + d
 		} else {
 			dec = modelLabel(decisionLabel, d) + d
 		}
 	}
-	ran := fileHookRanLine(dir, inScope)
+	ran := fileHookRanLineFor(dir, path, inScope)
 	var body string
 	switch {
 	case dec != "" && strings.HasPrefix(dec, standingLabel):
@@ -199,6 +206,11 @@ const standingLabel = " — standing decision in this project: "
 // and was not later taken back — the same decision-carrying line the SessionStart
 // digest surfaces, but delivered at the moment the file is about to change.
 func fileDecisionLine(dir, path string, metas []index.SessionMeta) string {
+	_, fileSymbols := fileHookSymbols("", path, "")
+	return fileDecisionLineWithSymbols(dir, path, nil, fileSymbols, metas)
+}
+
+func fileDecisionLineWithSymbols(dir, path string, editSymbols, fileSymbols []string, metas []index.SessionMeta) string {
 	sort.Slice(metas, func(i, j int) bool { return metas[i].Updated.After(metas[j].Updated) })
 	// A promoted note first. It is the user's own statement about this work,
 	// which is why the session-start block leads with it and calls it standing;
@@ -209,6 +221,7 @@ func fileDecisionLine(dir, path string, metas []index.SessionMeta) string {
 		return line
 	}
 	r := newLifecycleResolver(dir)
+	var fallback string
 	for i, meta := range metas {
 		if i >= toolHookDecisionScan {
 			break
@@ -231,12 +244,217 @@ func fileDecisionLine(dir, path string, metas []index.SessionMeta) string {
 		}
 		for _, c := range digest.Conclusions(s, toolHookDecisionBudget*4, 6) {
 			line := trimTrailingFragment(search.SafeText(strings.TrimSpace(c)))
-			if line != "" && digest.CarriesDecision(line) && mentionsFile(path, line) {
+			if line == "" || !digest.CarriesDecision(line) {
+				continue
+			}
+			if len(editSymbols) > 0 && mentionsAnySymbol(editSymbols, line) {
 				return line
+			}
+			if fallback == "" && (mentionsFile(path, line) || mentionsAnySymbol(fileSymbols, line)) {
+				fallback = line
+				if len(editSymbols) == 0 {
+					return line
+				}
 			}
 		}
 	}
+	return fallback
+}
+
+// fileHookSymbols extracts candidate symbol names from the edit text and from
+// top-level declarations in the target file on disk (when readable).
+func fileHookSymbols(cwd, path, editText string) ([]string, []string) {
+	var editSyms []string
+	seenEdit := map[string]bool{}
+	addEdit := func(sym string) {
+		low := strings.ToLower(sym)
+		if len(low) < 4 || seenEdit[low] || isCommonKeyword(low) {
+			return
+		}
+		seenEdit[low] = true
+		editSyms = append(editSyms, sym)
+	}
+	for _, sym := range declaredSymbolsInText(editText) {
+		addEdit(sym)
+	}
+	for _, tok := range identifierTokens(editText) {
+		if hasMixedCaseOrUnderscore(tok) {
+			addEdit(tok)
+		}
+	}
+
+	diskPath := path
+	if diskPath != "" && !filepath.IsAbs(diskPath) && cwd != "" {
+		diskPath = filepath.Join(cwd, diskPath)
+	}
+	var fileSyms []string
+	seenFile := map[string]bool{}
+	if diskPath != "" {
+		if info, err := os.Stat(diskPath); err == nil && !info.IsDir() && info.Size() <= 2<<20 {
+			if raw, err := os.ReadFile(diskPath); err == nil {
+				content := string(raw)
+				for _, sym := range declaredSymbolsInText(content) {
+					low := strings.ToLower(sym)
+					if len(low) >= 4 && !seenFile[low] && !isCommonKeyword(low) {
+						seenFile[low] = true
+						fileSyms = append(fileSyms, sym)
+					}
+				}
+				if editText != "" {
+					if enc := enclosingSymbolForSnippet(content, editText); enc != "" {
+						addEdit(enc)
+					}
+				}
+			}
+		}
+	}
+	return editSyms, fileSyms
+}
+
+func declaredSymbolsInText(text string) []string {
+	if text == "" {
+		return nil
+	}
+	var out []string
+	for line := range strings.SplitSeq(text, "\n") {
+		s := strings.TrimSpace(strings.TrimLeft(line, "+- "))
+		if s == "" || strings.HasPrefix(s, "//") || strings.HasPrefix(s, "#") || strings.HasPrefix(s, "/*") || strings.HasPrefix(s, "*") {
+			continue
+		}
+		for _, kw := range []string{
+			"func ", "type ", "async def ", "def ", "class ",
+			"export default function ", "export async function ", "export function ",
+			"export class ", "export interface ", "export type ",
+			"async function ", "function ", "interface ",
+			"pub async fn ", "pub fn ", "async fn ", "fn ",
+			"pub struct ", "struct ", "pub enum ", "enum ", "pub trait ", "trait ",
+		} {
+			if strings.HasPrefix(s, kw) {
+				rest := strings.TrimSpace(s[len(kw):])
+				if kw == "func " && strings.HasPrefix(rest, "(") {
+					if closeIdx := strings.IndexByte(rest, ')'); closeIdx >= 0 {
+						rest = strings.TrimSpace(rest[closeIdx+1:])
+					} else {
+						break
+					}
+				}
+				if id := leadingIdent(rest); len(id) >= 4 {
+					out = append(out, id)
+				}
+				break
+			}
+		}
+	}
+	return out
+}
+
+func enclosingSymbolForSnippet(fileContent, editText string) string {
+	for line := range strings.SplitSeq(editText, "\n") {
+		probe := strings.TrimSpace(strings.TrimLeft(line, "+- "))
+		if len(probe) < 12 || strings.HasPrefix(probe, "//") || strings.HasPrefix(probe, "#") || strings.HasPrefix(probe, "***") || strings.HasPrefix(probe, "@@") {
+			continue
+		}
+		idx := strings.Index(fileContent, probe)
+		if idx < 0 {
+			continue
+		}
+		before := fileContent[:idx]
+		decls := declaredSymbolsInText(before)
+		if len(decls) > 0 {
+			return decls[len(decls)-1]
+		}
+	}
 	return ""
+}
+
+func leadingIdent(s string) string {
+	var b strings.Builder
+	for i, r := range s {
+		if i == 0 && !unicode.IsLetter(r) && r != '_' {
+			return ""
+		}
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_' {
+			break
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+func identifierTokens(s string) []string {
+	return strings.FieldsFunc(s, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_'
+	})
+}
+
+func hasMixedCaseOrUnderscore(s string) bool {
+	if len(s) < 5 {
+		return false
+	}
+	if strings.ContainsRune(s, '_') {
+		return true
+	}
+	hasUpper, hasLower := false, false
+	for _, r := range s {
+		if unicode.IsUpper(r) {
+			hasUpper = true
+		} else if unicode.IsLower(r) {
+			hasLower = true
+		}
+		if hasUpper && hasLower {
+			return true
+		}
+	}
+	return false
+}
+
+func isCommonKeyword(low string) bool {
+	switch low {
+	case "func", "type", "struct", "interface", "return", "string", "error", "bool",
+		"true", "false", "context", "class", "async", "function", "export", "const",
+		"import", "package", "default", "switch", "case", "break", "continue":
+		return true
+	}
+	return false
+}
+
+func mentionsAnySymbol(symbols []string, text string) bool {
+	if len(symbols) == 0 || text == "" {
+		return false
+	}
+	low := strings.ToLower(text)
+	for _, sym := range symbols {
+		w := strings.ToLower(strings.TrimSpace(sym))
+		if len(w) < 4 {
+			continue
+		}
+		if containsIdentifierWord(low, w) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsIdentifierWord(lowText, lowSym string) bool {
+	start := 0
+	for {
+		idx := strings.Index(lowText[start:], lowSym)
+		if idx < 0 {
+			return false
+		}
+		pos := start + idx
+		end := pos + len(lowSym)
+		leftOK := pos == 0 || !isIdentByte(lowText[pos-1])
+		rightOK := end == len(lowText) || !isIdentByte(lowText[end])
+		if leftOK && rightOK {
+			return true
+		}
+		start = pos + 1
+	}
+}
+
+func isIdentByte(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9') || b == '_'
 }
 
 // promotedDecisionFor returns the newest accepted promoted note belonging to one

@@ -85,6 +85,10 @@ type toolHookInput struct {
 		// patchText or patch when not under command.
 		PatchText string `json:"patchText"`
 		Patch     string `json:"patch"`
+		OldString string `json:"old_string"`
+		NewString string `json:"new_string"`
+		OldStr    string `json:"oldStr"`
+		NewStr    string `json:"newStr"`
 	} `json:"tool_input"`
 	// Copilot CLI sends the tool's arguments as toolArgs: {command} for bash,
 	// {path} for edit and create (1.0.92).
@@ -210,10 +214,12 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 	var input toolHookInput
 	_ = json.NewDecoder(bytes.NewReader(raw)).Decode(&input)
 	input.adopt()
+	adoptCursorHost(raw)
 	// The Copilot hook file is VS Code's too, and VS Code reads only the
 	// nested shape here. See adoptCopilotHost.
 	if shape == hookToolCopilot && input.HookEventName != "" {
 		shape = hookToolClaude
+		strictHookOutput = true
 	}
 	// The kill switch, before anything is read. It reached the session-start
 	// hook and nothing else, so a machine with recall off still had text drawn
@@ -336,6 +342,9 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 	// AfterTool takes the same answer its failure hook already gives.
 	resp.HookSpecificOutput.HookEventName = event
 	resp.HookSpecificOutput.AdditionalContext = out
+	if notesHaveReader() {
+		resp.SystemMessage = safeNote("deja: " + line)
+	}
 	b, err := json.Marshal(resp)
 	if err != nil {
 		return nil //nolint:nilerr // a reply that cannot marshal means no reply
@@ -444,7 +453,7 @@ func applyPatchLine(dir, cwd, patch string, self func(index.SessionMeta, string)
 	for _, path := range applyPatchFiles(patch) {
 		// A shell `cd sub && apply_patch` edits sub/<header> (#5306).
 		path = sources.ShellPatchPath(patch, cwd, path)
-		if line := fileHookLineOutside(dir, cwd, path, self); line != "" {
+		if line := fileHookLineOutsideWithEdit(dir, cwd, path, patch, self); line != "" {
 			return line
 		}
 	}
@@ -476,7 +485,15 @@ func fileLineFor(dir, cwd string, input toolHookInput) string {
 	if path == "" {
 		return ""
 	}
-	return fileHookLineOutside(dir, cwd, path, askerSkip(dir, input))
+	editText := strings.Join([]string{
+		input.ToolInput.OldString,
+		input.ToolInput.NewString,
+		input.ToolInput.OldStr,
+		input.ToolInput.NewStr,
+		input.ToolInput.PatchText,
+		input.ToolInput.Patch,
+	}, "\n")
+	return fileHookLineOutsideWithEdit(dir, cwd, path, editText, askerSkip(dir, input))
 }
 
 // askerSkip says which sessions are the one asking: itself, and what counts as
@@ -565,9 +582,10 @@ func applyPatchFiles(patch string) []string {
 // reader ignores.
 func commandFailureLine(dir, cwd, cmd string) string {
 	pol := policy.Load()
-	fail, ok := index.CommandFailedBefore(dir, cmd, func(project string) bool {
+	allow := func(project string) bool {
 		return pol.Allows(policy.ActivationAuto, project)
-	})
+	}
+	fail, ok := index.CommandFailedBefore(dir, cmd, allow)
 	if !ok {
 		return ""
 	}
@@ -582,8 +600,28 @@ func commandFailureLine(dir, cwd, cmd string) string {
 	if project := strings.TrimSpace(search.SafeLine(fail.Project)); project != "" && !hookProjectIs(cwd, fail.Project) {
 		where = " in " + project
 	}
-	return fmt.Sprintf("Last time this machine ran %s%s it ended with: %s (in %s)",
+	line := fmt.Sprintf("Last time this machine ran %s%s it ended with: %s (in %s)",
 		search.SafeCommand(fail.Head), where, search.SafeLine(fail.Line), toolSessionCount(fail.Sessions))
+	if where == "" {
+		for _, p := range index.FixesForCommand(dir, cmd, fail.Line, 4, allow) {
+			if p.Candidate {
+				continue
+			}
+			if p.Project != "" && !hookProjectIs(cwd, p.Project) {
+				continue
+			}
+			cleanCmd, ok := withoutFailedExit(strings.TrimPrefix(strings.TrimSpace(search.SafeCommand(p.Command)), "$ "))
+			if !ok || cleanCmd == "" {
+				continue
+			}
+			remedy := " — next command that worked: " + cleanCmd
+			if len(line)+len(remedy) <= toolHookMaxBytes {
+				line += remedy
+			}
+			break
+		}
+	}
+	return line
 }
 
 // hookProjectIs reports whether a recorded project is the one the agent is

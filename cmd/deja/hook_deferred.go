@@ -364,10 +364,13 @@ func runHookDeferred(dir, name string, rest []string, cmd command) error {
 	plain := hasFlag(rest, "--plain")
 	if deferIt {
 		deferText(dir, key, name, hookOutputContext(out))
-		// What the host shows the person still goes out; the context does not,
-		// so it is not counted twice when it is handed over.
-		if notes := hookOutputNotes(out); notes != nil && !quiet {
-			_, _ = os.Stdout.Write(notes)
+		// What the host shows the person still goes out on session-start and
+		// prompt hooks; the context does not, so it is not counted twice when it
+		// is handed over. Kimi and Kiro drop post-tool output entirely.
+		if name != "hook-tool" && name != "hook-tool-after" {
+			if notes := hookOutputNotes(out); notes != nil && !quiet {
+				_, _ = os.Stdout.Write(notes)
+			}
 		}
 		return err
 	}
