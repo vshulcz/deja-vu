@@ -37,3 +37,5 @@ magpie plugin add @vshulcz/magpie-deja
 | `cwd` | `""` | 当 `ctx.cwd` 缺失时使用的显式项目目录。 |
 | `skipAgents` | `[]` | 需要跳过的客户端标识列表（例如已启用原生钩子的 `["claude-code"]`）。 |
 | `bin` | `""` | 显式指定 `deja` 二进制文件路径。 |
+
+属于 [deja-vu](https://github.com/vshulcz/deja-vu) 项目。MIT 许可。觉得有用的话，欢迎在 [GitHub](https://github.com/vshulcz/deja-vu) 上给 deja-vu 点个 Star。

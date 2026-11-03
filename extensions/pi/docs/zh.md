@@ -2,7 +2,7 @@
 
 [English](../README.md) | 中文
 
-[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
 
 属于 **[deja-vu](https://github.com/vshulcz/deja-vu)** 项目（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · Token 用量仅为 agentmemory 的**一半**）· [官网与在线搜索](https://vshulcz.github.io/deja-vu/) · [浏览器在线演示](https://vshulcz.github.io/deja-vu/view/) · **[★ 在 GitHub 上给 deja-vu 点 Star](https://github.com/vshulcz/deja-vu)**
 

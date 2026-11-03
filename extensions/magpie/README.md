@@ -37,3 +37,5 @@ Configure in Magpie's plugin options for `@vshulcz/magpie-deja`:
 | `cwd` | `""` | Explicit fallback project directory when `ctx.cwd` is absent. |
 | `skipAgents` | `[]` | Agent names (`ctx.agent`) to skip (for example `["claude-code"]` if native hooks are already active). |
 | `bin` | `""` | Explicit path to the `deja` binary. |
+
+Part of [deja-vu](https://github.com/vshulcz/deja-vu). MIT. Found it useful? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).

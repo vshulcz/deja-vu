@@ -2,7 +2,7 @@
 
 [English](../README.md) | 中文
 
-[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
 
 属于 **[deja-vu](https://github.com/vshulcz/deja-vu)** 项目（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · Token 用量仅为 agentmemory 的**一半**）· [官网与在线搜索](https://vshulcz.github.io/deja-vu/) · [浏览器在线演示](https://vshulcz.github.io/deja-vu/view/) · **[★ 在 GitHub 上给 deja-vu 点 Star](https://github.com/vshulcz/deja-vu)**
 
@@ -36,3 +36,5 @@ hermes config set memory.provider deja-memory
 ## 和 `deja install` 是同一份代码
 
 `deja install hermes-auto` 会把这个提供者写到 `~/.hermes/plugins/deja-memory`，同时写入 MCP 服务器和一个 pre_llm_call 钩子插件。这里的文件由同一份源码生成（`cmd/deja/install_hermes_memory.go`），唯一的区别是：这一份从 PATH 里找 deja，而不是把路径写死。两份一旦不一致，`TestHermesExtensionIsTheProviderInstallWrites` 就会失败。
+
+属于 [deja-vu](https://github.com/vshulcz/deja-vu) 项目。MIT 许可。觉得有用的话，欢迎在 [GitHub](https://github.com/vshulcz/deja-vu) 上给 deja-vu 点个 Star。

@@ -2,7 +2,7 @@
 
 [English](../README.md) | 中文
 
-[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
 
 属于 **[deja-vu](https://github.com/vshulcz/deja-vu)** 项目（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · Token 用量仅为 agentmemory 的**一半**）· [官网与在线搜索](https://vshulcz.github.io/deja-vu/) · [浏览器在线演示](https://vshulcz.github.io/deja-vu/view/) · **[★ 在 GitHub 上给 deja-vu 点 Star](https://github.com/vshulcz/deja-vu)**
 
@@ -65,3 +65,5 @@ dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
 不用大模型，不用向量嵌入。索引是本地 BM25，建立在本来就存在的文件之上，一次查询约一毫秒，除非你主动要求，否则不走网络。密钥在建立索引时被脱敏。
 
 属于 [deja-vu](https://github.com/vshulcz/deja-vu) 项目。MIT 许可。
+
+属于 [deja-vu](https://github.com/vshulcz/deja-vu) 项目。MIT 许可。觉得有用的话，欢迎在 [GitHub](https://github.com/vshulcz/deja-vu) 上给 deja-vu 点个 Star。
