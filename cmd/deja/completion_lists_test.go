@@ -91,6 +91,39 @@ func TestCompletionOffersEveryRole(t *testing.T) {
 	}
 }
 
+func TestCompletionOffersHookFlags(t *testing.T) {
+	want := map[string][]string{
+		"bash": {
+			`hook-prompt)` + "\n            COMPREPLY=( $(compgen -W \"--plain --copilot --strict --mcode\"",
+			`hook-tool-after)` + "\n            COMPREPLY=( $(compgen -W \"--plain --copilot --mcode\"",
+			`hook-session-end)` + "\n            COMPREPLY=( $(compgen -W \"--json\"",
+		},
+		"zsh": {
+			`hook-prompt)` + "\n      _arguments '--plain[omit formatting]' '--copilot[answer in the Copilot CLI hook shape]' '--strict[skip low-confidence sessions]' '--mcode[answer in the MCode hook shape]'",
+			`hook-tool-after)` + "\n      _arguments '--plain[omit formatting]' '--copilot[answer in the Copilot CLI hook shape]' '--mcode[answer in the MCode hook shape]'",
+			`hook-session-end)` + "\n      _arguments '--json[print JSON]'",
+		},
+		"fish": {
+			`__fish_seen_subcommand_from hook-prompt' -l plain`, `__fish_seen_subcommand_from hook-prompt' -l copilot`, `__fish_seen_subcommand_from hook-prompt' -l strict`, `__fish_seen_subcommand_from hook-prompt' -l mcode`,
+			`__fish_seen_subcommand_from hook-tool-after' -l plain`, `__fish_seen_subcommand_from hook-tool-after' -l copilot`, `__fish_seen_subcommand_from hook-tool-after' -l mcode`,
+			`__fish_seen_subcommand_from hook-session-end' -l json`,
+		},
+		"powershell": {
+			`'hook-prompt' { @('--plain', '--copilot', '--strict', '--mcode') }`,
+			`'hook-tool-after' { @('--plain', '--copilot', '--mcode') }`,
+			`'hook-session-end' { @('--json') }`,
+		},
+	}
+	for _, shell := range completionTestShells {
+		script := emittedCompletion(t, shell)
+		for _, commandEntry := range want[shell] {
+			if !strings.Contains(script, commandEntry) {
+				t.Errorf("%s completion does not dispatch hook flags through %s", shell, commandEntry)
+			}
+		}
+	}
+}
+
 // The command list was the copy that outlived every other: `deja recap` and
 // `deja tests` shipped in 0.21.0 and neither bash nor fish had ever heard of
 // them, while the bash and fish scripts each carried the same list twice over
