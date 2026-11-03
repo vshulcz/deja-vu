@@ -88,6 +88,56 @@ func TestHookRefreshRetriesPastTheWindow(t *testing.T) {
 	}
 }
 
+// A refresher waiting for the index lock can outlive the window (#5719).
+func TestHookRefreshClaimOwner(t *testing.T) {
+	requireNoSpawnHere(t)
+	start, alive, known := processStart(os.Getpid())
+	if !known || !alive {
+		t.Fatal("cannot identify the test process")
+	}
+	for _, tt := range []struct {
+		name  string
+		age   time.Duration
+		start string
+		held  bool
+	}{
+		{"live past the window", 3 * time.Minute, start, true},
+		{"gone past the window", 3 * time.Minute, "0", false},
+		{"gone inside the window", 10 * time.Second, "0", true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			tmp := hermeticEnv(t)
+			t.Setenv("DEJA_HOOK_REFRESH", "")
+			dir := filepath.Join(tmp, "index.db")
+			cwd := filepath.Join(tmp, "work")
+			sentinel := hookCachePath(dir, cwd) + ".refreshing"
+			owner := warmupOwner{pid: os.Getpid(), start: tt.start, host: warmupHost()}
+			writeClaim(t, sentinel, tt.age, owner.line()+"\n")
+			before, err := os.ReadFile(sentinel)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			requestHookRefresh(dir, cwd)
+
+			got, err := os.ReadFile(sentinel)
+			if err != nil {
+				t.Fatalf("the sentinel vanished: %v", err)
+			}
+			if tt.held {
+				if string(got) != string(before) {
+					t.Errorf("a held claim was replaced: %q", got)
+				}
+			} else {
+				claim, ok := parseWarmupClaim(got)
+				if !ok || claim.stamp <= 1 || string(got) == string(before) {
+					t.Errorf("an expired claim was not replaced with a request stamp: %q", got)
+				}
+			}
+		})
+	}
+}
+
 // A refresher must not ask for a refresh. The variable it runs under is the
 // only thing stopping that, and it is checked before the sentinel is touched,
 // so a refresh in progress leaves no trace of a request it did not make.

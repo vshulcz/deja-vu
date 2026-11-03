@@ -254,10 +254,17 @@ func requestHookRefresh(dir, cwd string) {
 		return
 	}
 	sentinel := hookCachePath(dir, cwd) + ".refreshing"
+	// Waiting for the index lock can outlast the window, as in warmup (#5719).
+	if b, err := os.ReadFile(sentinel); err == nil {
+		if claim, ok := parseWarmupClaim(b); ok && claim.state() == ownerLive {
+			return
+		}
+	}
 	if fi, err := os.Stat(sentinel); err == nil && time.Since(fi.ModTime()) < 2*time.Minute {
 		return
 	}
-	if err := os.WriteFile(sentinel, []byte("1"), 0o600); err != nil {
+	stamp := time.Now().UnixNano()
+	if err := os.WriteFile(sentinel, []byte(strconv.FormatInt(stamp, 10)), 0o600); err != nil {
 		return
 	}
 	exe, err := os.Executable()
@@ -278,7 +285,9 @@ func requestHookRefresh(dir, cwd string) {
 	defer func() { _ = devNull.Close() }()
 	cmd.Stdout = devNull
 	cmd.Stderr = cmd.Stdout
-	_ = startDetached(cmd)
+	if pid, err := startDetachedPID(cmd); err == nil {
+		recordWarmupOwner(sentinel, stamp, pid)
+	}
 }
 
 // runHookRefresh recomputes the session-start digest for the cwd in the
