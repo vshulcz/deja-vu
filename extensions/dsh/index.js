@@ -281,10 +281,11 @@ function userText(message) {
 // dsh's own agent/session-start is emit-only, its return reaches nothing, so
 // the digest rides the same assembly seam the recall does. deja_once keys the
 // one-shot on the session id in deja's ledger, which survives a resume in a new
-// process; the Set is the in-process guard that keeps the long-lived web and
-// tui profiles from spawning deja on every assembly of a session already shown.
+// process; the Map caches the opening digest across systemPrompt.refreshContext
+// re-resolutions during the first step (#5904) and clears it once the session
+// moves past its opening step.
 function autoDigest(ctx, board) {
-  const seen = new Set();
+  const digests = new Map();
 
   guarded(() =>
     ctx.systemPrompt.context({
@@ -295,18 +296,45 @@ function autoDigest(ctx, board) {
         const agent = assembly && assembly.agent;
         if (!agent) return "";
         const sid = sessionId(agent);
-        if (sid && seen.has(sid)) return "";
-        if (sid) seen.add(sid);
-        return inert(askHook(
+        if (pastOpeningStep(agent.session)) {
+          if (sid) digests.set(sid, "");
+          return "";
+        }
+        if (sid && digests.has(sid)) return digests.get(sid);
+        const text = inert(askHook(
           ["hook-context", "--plain"],
           ["hook-context"],
           JSON.stringify({ session_id: sid, cwd: sessionCwd(agent), source: "startup", deja_once: true }),
           sid,
           board,
         ));
+        if (sid) {
+          digests.set(sid, text);
+          while (digests.size > 64) digests.delete(digests.keys().next().value);
+        }
+        return text;
       },
     }),
   );
+}
+
+function pastOpeningStep(session) {
+  let humanTurns = 0;
+  for (const event of newestEvents(session)) {
+    if (!event || typeof event.type !== "string") continue;
+    if (event.type === "turn/start" && event.data && event.data.turn > 1) return true;
+    if (event.type === "runtime-context" || event.type === "turn/end" || event.type === "step/end" || event.type.startsWith("assistant/")) {
+      return true;
+    }
+    if (event.type === "user/message" && isHuman(event.data)) {
+      if (++humanTurns > 1) return true;
+    }
+    if (event.type === "agent/inbox/spliced") {
+      const inserted = event.data && event.data.inserted;
+      if (Array.isArray(inserted) && inserted.some(isHuman) && ++humanTurns > 1) return true;
+    }
+  }
+  return false;
 }
 
 // dsh names a session "session-<uuid>" and its log's folder the same; deja

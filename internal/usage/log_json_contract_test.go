@@ -54,6 +54,10 @@ func TestLogJSONShapesAreStable(t *testing.T) {
 		"compaction_revision": true, "tool_calls": true,
 		"actions_before_edit": true, "measured": true,
 		"compaction_error": true,
+		"compaction_stage": true, "compaction_os_error": true,
+		"compaction_source": true, "compaction_before_size": true,
+		"compaction_after_size": true, "compaction_mtime_delta_ms": true,
+		"compaction_read_ms": true, "compaction_same_file": true,
 	})
 	// "into" is additive and optional: it names the agent session an injection
 	// went to, which the log never recorded. Without it the only measure of

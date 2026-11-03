@@ -154,6 +154,9 @@ test("the recall reaches the model unchanged and the receipt reaches the page", 
 
   const before = calls().length;
   assert.equal(web.contexts.get("deja:project")(assembly("session-1234")), DIGEST, "the digest the model reads changed");
+  // DSH calls systemPrompt.refreshContext at request admission before the first
+  // step runs; the cached digest must survive that second resolution (#5904).
+  assert.equal(web.contexts.get("deja:project")(assembly("session-1234")), DIGEST, "refreshContext lost the session-start digest");
   assert.equal(web.contexts.get("deja:recall")(assembly("session-1234")), RECALL, "the recall the model reads changed");
   assert.deepEqual(calls().slice(before), ["hook-context", "hook-prompt"], "one call each, in the JSON form");
 

@@ -71,6 +71,10 @@ if (!digest) { console.log("NODIGEST"); process.exit(0) }
 const a = { sessionId: "sess-A", session: { events: [] } };
 const b = { sessionId: "sess-B", session: { events: [] } };
 console.log(JSON.stringify(digest.text({ agent: a })));
+// DSH calls systemPrompt.refreshContext at request admission on the first turn
+// (#5904); the cached digest survives that re-resolution and clears on turn 2.
+console.log(JSON.stringify(digest.text({ agent: a })));
+a.session.events.push({ type: "turn/start", data: { turn: 2 } });
 console.log(JSON.stringify(digest.text({ agent: a })));
 console.log(JSON.stringify(digest.text({ agent: b })));
 `
@@ -86,17 +90,20 @@ console.log(JSON.stringify(digest.text({ agent: b })));
 	if lines[0] == "NODIGEST" {
 		t.Fatal("the plugin registers no deja:project context, so a session opens with no memory of the project")
 	}
-	if len(lines) < 3 {
+	if len(lines) < 4 {
 		t.Fatalf("driver said %q", out)
 	}
 	if !strings.Contains(lines[0], "DIGEST") {
 		t.Errorf("the session's first turn carried no digest: %q", lines[0])
 	}
-	if strings.Contains(lines[1], "DIGEST") {
-		t.Errorf("the digest came back on the same session's second turn: %q", lines[1])
+	if !strings.Contains(lines[1], "DIGEST") {
+		t.Errorf("refreshContext on the first turn lost the digest (#5904): %q", lines[1])
 	}
-	if !strings.Contains(lines[2], "DIGEST") {
-		t.Errorf("a second session was refused the digest the first one had: %q", lines[2])
+	if strings.Contains(lines[2], "DIGEST") {
+		t.Errorf("the digest came back on the same session's second turn: %q", lines[2])
+	}
+	if !strings.Contains(lines[3], "DIGEST") {
+		t.Errorf("a second session was refused the digest the first one had: %q", lines[3])
 	}
 	// One session, one call: the in-process guard must keep the long-lived web
 	// and tui profiles from spawning deja on every assembly.
