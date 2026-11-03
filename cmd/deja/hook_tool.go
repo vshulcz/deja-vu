@@ -367,6 +367,9 @@ func toolHookLineSkipping(dir, cwd string, input toolHookInput, used func(string
 			return applyPatchLine(dir, cwd, cmd, askerSkip(dir, input))
 		}
 		if !commandHintsOn() {
+			if cmd := strings.TrimSpace(input.ToolInput.Command); cmd != "" {
+				return promotedCommandHookLine(dir, cwd, cmd, input.SessionID, used)
+			}
 			return ""
 		}
 		if cmd := strings.TrimSpace(input.ToolInput.Command); cmd != "" {
@@ -755,6 +758,63 @@ func commandDecisionLabel(cmd, text string) string {
 		return " — last time: "
 	}
 	return standingLabel
+}
+
+// promotedCommandHookLine surfaces an explicit user-promoted standing decision
+// that names the command even when general command history hints are off.
+func promotedCommandHookLine(dir, cwd, cmd, self string, used func(string) bool) string {
+	if index.InspectionCommand(cmd) {
+		return ""
+	}
+	d := promotedCommandDecision(dir, cwd, cmd)
+	if d == "" || !mentionsCommand(cmd, d) {
+		return ""
+	}
+	use, ok := index.CommandHistoryOutside(dir, cmd, self)
+	if !ok || len(use.ByProject) == 0 {
+		return ""
+	}
+	pol := policy.Load()
+	sessions := 0
+	var last time.Time
+	for proj, pu := range use.ByProject {
+		if !pol.Allows(policy.ActivationAuto, proj) {
+			continue
+		}
+		sessions += pu.Sessions
+		if pu.Last.After(last) {
+			last = pu.Last
+		}
+	}
+	if sessions < 1 {
+		return ""
+	}
+	if ignored := index.ProjectsTouchedByIgnore(dir); len(ignored) > 0 {
+		sessions, last = 0, time.Time{}
+		for proj, pu := range use.ByProject {
+			if !pol.Allows(policy.ActivationAuto, proj) || ignored[proj] {
+				continue
+			}
+			sessions += pu.Sessions
+			if pu.Last.After(last) {
+				last = pu.Last
+			}
+		}
+		if sessions < 1 {
+			return ""
+		}
+	}
+	when := ""
+	if !last.IsZero() {
+		when = ", last " + last.Local().Format("2006-01-02")
+	}
+	head := fmt.Sprintf("This machine has run that command in %s%s",
+		toolSessionCount(sessions), when)
+	line := head + commandDecisionLabel(cmd, d) + d
+	if used(line) {
+		return ""
+	}
+	return line
 }
 
 // mentionsCommand reports whether the text names what the command invokes. The

@@ -84,23 +84,36 @@ func fileHookLineOutside(dir, cwd, path string, self func(index.SessionMeta, str
 	// blame` pointer, which the A/B behind this hook already found changed
 	// nothing. What the same A/B found an agent reuses is the decision about the
 	// file, so that is what is left.
-	var body string
+	var dec string
 	if d := promotedDecisionForFile(path, inScope); d != "" && mentionsFile(path, d) {
-		body = standingLabel + d
-	} else if ran := fileHookRanLine(dir, inScope); ran != "" {
-		// A scanned conclusion does not outrank this: that line is the newest thing
-		// a session said about the file, while this one is a command two sessions
-		// ran here and the transcript saw pass.
-		body = ran
+		dec = standingLabel + d
 	} else if d := fileDecisionLine(dir, path, inScope); d != "" && digest.CarriesDecision(d) && mentionsFile(path, d) {
 		// A scanned line is a decision about the file only when it reads as one and
 		// names the file. Of 63 lines once offered as "prior decision", none named
 		// the file or its package.
 		if promotedDecisionForFile(path, inScope) == d {
-			body = decisionLabel + d
+			dec = decisionLabel + d
 		} else {
-			body = modelLabel(decisionLabel, d) + d
+			dec = modelLabel(decisionLabel, d) + d
 		}
+	}
+	ran := fileHookRanLine(dir, inScope)
+	var body string
+	switch {
+	case dec != "" && strings.HasPrefix(dec, standingLabel):
+		body = dec
+		if ran != "" && len(head)+len(body)+len(ran) <= toolHookMaxBytes {
+			body += ran
+		}
+	case ran != "":
+		// A scanned conclusion does not outrank a verification command that two
+		// sessions ran here and passed; when both fit, carry both.
+		body = ran
+		if dec != "" && len(head)+len(body)+len(dec) <= toolHookMaxBytes {
+			body = dec + ran
+		}
+	default:
+		body = dec
 	}
 	co := fileHookCoChangeLine(path, inScope)
 	if body == "" {
