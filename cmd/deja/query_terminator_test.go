@@ -171,3 +171,22 @@ func TestRememberTakesANoteBehindTheTerminator(t *testing.T) {
 		t.Fatalf("flag before the terminator: %v", err)
 	}
 }
+
+func TestDoubleDashKeepsRemainingArgumentsPositional(t *testing.T) {
+	cases := []struct {
+		command string
+		want    string
+	}{
+		{"remember", "remember: expected one text argument"},
+		{"blame", "blame accepts one path"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.command, func(t *testing.T) {
+			_, err := captureRun(t, tc.command, "--", "-first", "-second")
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("unexpected error: %v; want %q", err, tc.want)
+			}
+		})
+	}
+}
