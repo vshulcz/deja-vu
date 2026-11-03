@@ -88,6 +88,7 @@ const (
 	// runs, and its catalog entry names the version inside the zip, so the
 	// two have to be the release's.
 	specKitExtension = "extensions/spec-kit/extension.yml"
+	vscodeExtension  = "extensions/vscode/package.json"
 	releaseAPI       = "https://api.github.com/repos/vshulcz/deja-vu/releases/latest"
 	assetBase        = "https://github.com/vshulcz/deja-vu/releases/download"
 )
@@ -188,6 +189,7 @@ func targets() map[string]func(pins) ([]byte, error) {
 		agentPlugin:       renderPluginVersion(agentPlugin),
 		serverJSON:        renderPluginVersion(serverJSON),
 		specKitExtension:  renderYAMLExtensionVersion(specKitExtension),
+		vscodeExtension:   renderPluginVersion(vscodeExtension),
 	}
 	// The harness packages depend on the deja binary package. The pin is a
 	// caret on a 0.x version, which npm reads as "this minor and no further",
