@@ -1,9 +1,11 @@
 package sources
 
 import (
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -76,6 +78,57 @@ func TestCodexReadsACompressedRollout(t *testing.T) {
 	// by comparing this against the store.
 	if !strings.HasSuffix(ss[0].Path, ".jsonl.zst") {
 		t.Errorf("path = %q, want the compressed file", ss[0].Path)
+	}
+}
+
+// A compressed rollout was read whole and decompressed into a buffer before the
+// first line was scanned, so one 4 GB rollout took more memory than the rest of
+// the store. Almost all of it is records the parser drops; the same bytes read
+// as plain .jsonl stayed at one line's worth.
+func TestCodexStreamsACompressedRollout(t *testing.T) {
+	if !ZstdAvailable() {
+		t.Skip("zstd CLI not installed")
+	}
+	if testing.Short() {
+		t.Skip("compresses a 64 MB rollout")
+	}
+	root := t.TempDir()
+	t.Setenv("HOME", root)
+	t.Setenv("USERPROFILE", root)
+	t.Setenv("CODEX_HOME", root)
+	t.Setenv("DEJA_CODEX_ROOT", root)
+	t.Setenv("DEJA_XCODE_CODEX_ROOT", filepath.Join(root, "absent"))
+	const size = 64 << 20
+	ignored := `{"type":"turn_context","payload":{"context":"` + strings.Repeat("x", size/2) + `"}}` + "\n"
+	cmd := exec.CommandContext(t.Context(), "zstd", "-q", "-c")
+	cmd.Stdin = io.MultiReader(strings.NewReader(codexRolloutFixture), strings.NewReader(ignored), strings.NewReader(ignored))
+	compressed, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(root, "rollout-thread-7.jsonl.zst")
+	if err := os.WriteFile(path, compressed, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var before, after runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&before)
+	ss, err := ParseCodexRollout(path)
+	runtime.ReadMemStats(&after)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ss) != 1 || ss[0].ID != "thread-7" || len(ss[0].Messages) != 2 ||
+		!hasMessage(ss[0], "user", "why does the migration hang") ||
+		!hasMessage(ss[0], "assistant", "the advisory lock was never released") {
+		t.Fatalf("compressed messages: %+v", ss)
+	}
+	alloc := after.TotalAlloc - before.TotalAlloc
+	t.Logf("reading a %d MB rollout allocated %d bytes", size>>20, alloc)
+	// The streamed read allocated 16 MB locally; leave room for runtime noise.
+	if alloc > 24<<20 {
+		t.Errorf("reading a %d MB rollout allocated %d MB, want at most 24 MB", size>>20, alloc>>20)
 	}
 }
 
