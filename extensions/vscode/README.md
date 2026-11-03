@@ -1,5 +1,7 @@
 # deja-vu for VS Code, Cursor, Windsurf & Antigravity
 
+
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
 English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/vscode/docs/zh.md)
 
 **Your coding agents stop re-debugging what you already fixed.**
@@ -40,3 +42,5 @@ code --install-extension vshulcz.deja-status
 ## License
 
 MIT — [github.com/vshulcz/deja-vu](https://github.com/vshulcz/deja-vu)
+
+Part of [deja-vu](https://github.com/vshulcz/deja-vu). MIT. Found it useful? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).

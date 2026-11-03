@@ -1,5 +1,7 @@
 # deja-vu VS Code、Cursor、Windsurf 与 Antigravity 状态栏扩展
 
+
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
 [English](../README.md) | 简体中文
 
 **别再让编程智能体重新调试你已经修好的问题。**
@@ -27,3 +29,5 @@ code --install-extension vshulcz.deja-status
 ## 开源许可
 
 MIT — [github.com/vshulcz/deja-vu](https://github.com/vshulcz/deja-vu)
+
+属于 [deja-vu](https://github.com/vshulcz/deja-vu) 项目。MIT 许可。觉得有用的话，欢迎在 [GitHub](https://github.com/vshulcz/deja-vu) 上给 deja-vu 点个 Star。

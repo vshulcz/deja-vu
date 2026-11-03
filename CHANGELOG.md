@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.5] - 2026-11-03
+
+### Added
+
+- **VS Code, Cursor, Windsurf, and Antigravity extension (`vshulcz.deja-status`, `extensions/vscode`).** Shows a live session memory counter in the status bar and runs `deja stats` or `deja install --auto` on click (#5859).
+- **Raycast extension (`extensions/raycast`).** Adds `Search Sessions` and `Recent Sessions` commands on macOS for searching across all indexed coding agent sessions and copying `deja resume <id>` (#5829).
+- **`deja-reflect` skill (`skills/deja-reflect/SKILL.md`).** Standalone end-of-session reflection skill that inspects `deja notes` and `deja friction`, distills durable project invariants, and stores confirmed notes via `deja remember` (#5841).
+- **Incremental offset parsing for Antigravity and Cursor transcripts** and symbol-level blame in `deja blame` (#5863).
+
+### Fixed
+
+- **Status line multi-harness audit** across OpenCode, Antigravity, Claude Code, and Cursor (`statusline`), plus `recall_context` tool name alignment in `hook-context` and `deja doctor` self-version check (#5850, #5851, #5864).
+- **Claude Code and Codex plugin hooks (`claude-plugin/hooks/deja.sh`, `codex-plugin/hooks/deja.sh`).** Require explicit confirmation before acting on recalled `User said (this project)` lines or running `deja rules sync`, and point missing-binary hints solely at `brew install deja-vu` (#5838, #5860, #5865).
+
 ## [0.23.4] - 2026-11-01
 
 Reverse commit attribution (`deja origin`), shell-layer recall (`deja shell`)
