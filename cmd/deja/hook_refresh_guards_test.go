@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -136,6 +138,39 @@ func TestHookRefreshClaimOwner(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// The claim has to name the process that was started. Without that a waiting
+// refresher reads as having no owner, and the next request replaces it once the
+// window passes.
+func TestHookRefreshNamesWhatItStarted(t *testing.T) {
+	if _, alive, known := processStart(os.Getpid()); !known || !alive {
+		t.Skip("this platform cannot name a process: a claim falls back to its age")
+	}
+	tmp := hermeticEnv(t)
+	t.Setenv("DEJA_HOOK_REFRESH", "")
+	dir := filepath.Join(tmp, "index.db")
+	cwd := filepath.Join(tmp, "work")
+	var env []string
+	saved := startRefresher
+	startRefresher = func(cmd *exec.Cmd) (int, error) {
+		env = cmd.Env
+		return os.Getpid(), nil
+	}
+	t.Cleanup(func() { startRefresher = saved })
+
+	requestHookRefresh(dir, cwd)
+
+	b, err := os.ReadFile(hookCachePath(dir, cwd) + ".refreshing")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if claim, ok := parseWarmupClaim(b); !ok || claim.state() != ownerLive {
+		t.Errorf("the sentinel does not name the started process: %q", b)
+	}
+	if !slices.Contains(env, "DEJA_HOOK_REFRESH=1") || !slices.Contains(env, "CLAUDE_PROJECT_DIR="+cwd) {
+		t.Errorf("the refresher was not told what it is or where: %q", env)
 	}
 }
 

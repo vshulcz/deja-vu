@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"os"
@@ -271,11 +272,6 @@ func requestHookRefresh(dir, cwd string) {
 	if err != nil {
 		return
 	}
-	// Under `go test` the executable is the test binary; spawning it as a
-	// refresher would rerun the suite (and hung the Windows runner).
-	if strings.HasSuffix(strings.TrimSuffix(exe, ".exe"), ".test") {
-		return
-	}
 	cmd := exec.CommandContext(context.Background(), exe, "hook-refresh")
 	cmd.Env = append(os.Environ(), "DEJA_HOOK_REFRESH=1", "CLAUDE_PROJECT_DIR="+cwd)
 	devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
@@ -285,9 +281,19 @@ func requestHookRefresh(dir, cwd string) {
 	defer func() { _ = devNull.Close() }()
 	cmd.Stdout = devNull
 	cmd.Stderr = cmd.Stdout
-	if pid, err := startDetachedPID(cmd); err == nil {
+	if pid, err := startRefresher(cmd); err == nil {
 		recordWarmupOwner(sentinel, stamp, pid)
 	}
+}
+
+// startRefresher starts the detached process and names it. Under `go test` the
+// executable is the test binary; spawning it as a refresher would rerun the
+// suite (and hung the Windows runner).
+var startRefresher = func(cmd *exec.Cmd) (int, error) {
+	if strings.HasSuffix(strings.TrimSuffix(cmd.Path, ".exe"), ".test") {
+		return 0, errors.New("not spawning the test binary")
+	}
+	return startDetachedPID(cmd)
 }
 
 // runHookRefresh recomputes the session-start digest for the cwd in the
