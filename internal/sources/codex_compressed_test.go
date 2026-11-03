@@ -108,7 +108,7 @@ func TestCodexStreamsACompressedRollout(t *testing.T) {
 		t.Fatal(err)
 	}
 	path := filepath.Join(root, "rollout-thread-7.jsonl.zst")
-	if err := os.WriteFile(path, compressed, 0o600); err != nil {
+	if err = os.WriteFile(path, compressed, 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -130,6 +130,30 @@ func TestCodexStreamsACompressedRollout(t *testing.T) {
 	// The streamed read allocated 16 MB locally; leave room for runtime noise.
 	if alloc > 24<<20 {
 		t.Errorf("reading a %d MB rollout allocated %d MB, want at most 24 MB", size>>20, alloc>>20)
+	}
+}
+
+// A file that is not there, or that holds no frame to salvage, is an error rather
+// than an empty rollout: the empty answer would be remembered as a read.
+func TestZstdScanReportsAFileItCannotRead(t *testing.T) {
+	if !ZstdAvailable() {
+		t.Skip("zstd CLI not installed")
+	}
+	dir := t.TempDir()
+	drain := func(r io.Reader) error {
+		_, err := io.Copy(io.Discard, r)
+		return err
+	}
+	missing := filepath.Join(dir, "missing.jsonl.zst")
+	if err := zstdScan(missing, "codex", drain); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("a missing file: %v", err)
+	}
+	garbage := filepath.Join(dir, "garbage.jsonl.zst")
+	if err := os.WriteFile(garbage, []byte("not a zstd frame"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := zstdScan(garbage, "codex", drain); err == nil {
+		t.Error("a file with no frame in it read as an empty rollout")
 	}
 }
 

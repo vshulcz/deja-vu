@@ -88,7 +88,7 @@ func zstdScan(path, harness string, scan func(io.Reader) error) error {
 	if err != nil {
 		return err
 	}
-	if err := cmd.Start(); err != nil {
+	if err = cmd.Start(); err != nil {
 		return err
 	}
 	restoreDiag := diagMalformedMark(path)
@@ -100,7 +100,7 @@ func zstdScan(path, harness string, scan func(io.Reader) error) error {
 			_ = cmd.Wait()
 		}
 	}()
-	if err := scan(out); err != nil {
+	if err = scan(out); err != nil {
 		return err
 	}
 	err = cmd.Wait()
