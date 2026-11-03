@@ -37,6 +37,46 @@ var (
 	ErrTranscriptLineTooLarge          = errors.New("compaction transcript line exceeds capture bound")
 )
 
+const (
+	compactionChangingAttempts = 3
+	compactionChangingBackoff  = 5 * time.Millisecond
+)
+
+// CompactionStageError tags a compaction reader error with the stage that
+// failed while keeping errors.Is and errors.As working on the underlying error.
+type CompactionStageError struct {
+	Stage string
+	Err   error
+}
+
+func (e *CompactionStageError) Error() string { return e.Err.Error() }
+func (e *CompactionStageError) Unwrap() error { return e.Err }
+
+func compactionStage(stage string, err error) error {
+	if err == nil {
+		return nil
+	}
+	var existing *CompactionStageError
+	if errors.As(err, &existing) {
+		return err
+	}
+	return &CompactionStageError{Stage: stage, Err: err}
+}
+
+// TranscriptChangingError records how a transcript changed between the
+// pre-read and post-read stats during compaction capture.
+type TranscriptChangingError struct {
+	SameFile    bool
+	BeforeSize  int64
+	AfterSize   int64
+	BeforeMTime time.Time
+	AfterMTime  time.Time
+	ReadMS      int64
+}
+
+func (e *TranscriptChangingError) Error() string { return ErrTranscriptChanging.Error() }
+func (e *TranscriptChangingError) Unwrap() error { return ErrTranscriptChanging }
+
 // TranscriptToolCall is one native assistant tool invocation. It is not a
 // normalized deja Message: several messages can be derived from one invocation
 // and using those messages for the compaction-to-edit metric would overcount.
@@ -90,42 +130,65 @@ func (t CompactionTranscript) HasOffsets() bool { return t.tail != nil }
 // agent's prompt, which is worse than returning no recovery packet.
 func ReadCompactionTranscript(path, nativeSessionID string) (CompactionTranscript, error) {
 	if strings.TrimSpace(nativeSessionID) == "" {
-		return CompactionTranscript{}, fmt.Errorf("%w: missing session id", ErrTranscriptIdentity)
+		return CompactionTranscript{}, compactionStage("verify_identity", fmt.Errorf("%w: missing session id", ErrTranscriptIdentity))
 	}
-	info, err := regularCompactionFile(path)
-	if err != nil {
-		return CompactionTranscript{}, err
-	}
-	beforeSize, beforeMTime := info.Size(), info.ModTime()
-	header, tail, tailOffset, truncated, err := readCompactionParts(path, beforeSize)
-	if err != nil {
-		return CompactionTranscript{}, err
-	}
-	// A second stat catches an append or rewrite while a hook was reading. Do
-	// not use a partially-observed transcript to make persisted claims.
-	after, err := regularCompactionFile(path)
-	if err != nil {
-		return CompactionTranscript{}, err
-	}
-	if !os.SameFile(info, after) || after.Size() != beforeSize || !after.ModTime().Equal(beforeMTime) {
-		return CompactionTranscript{}, ErrTranscriptChanging
+	var (
+		beforeSize  int64
+		beforeMTime time.Time
+		header      []byte
+		tail        []byte
+		tailOffset  int64
+		truncated   bool
+	)
+	for attempt := 1; ; attempt++ {
+		readStart := time.Now()
+		info, err := regularCompactionFile(path)
+		if err != nil {
+			return CompactionTranscript{}, compactionStage("stat_before", err)
+		}
+		beforeSize, beforeMTime = info.Size(), info.ModTime()
+		header, tail, tailOffset, truncated, err = readCompactionParts(path, beforeSize)
+		if err != nil {
+			return CompactionTranscript{}, compactionStage("read_parts", err)
+		}
+		// A second stat catches an append or rewrite while a hook was reading. Do
+		// not use a partially-observed transcript to make persisted claims.
+		after, err := regularCompactionFile(path)
+		if err != nil {
+			return CompactionTranscript{}, compactionStage("stat_after", err)
+		}
+		sameFile := os.SameFile(info, after)
+		if sameFile && after.Size() == beforeSize && after.ModTime().Equal(beforeMTime) {
+			break
+		}
+		if attempt >= compactionChangingAttempts {
+			return CompactionTranscript{}, compactionStage("consistency_check", &TranscriptChangingError{
+				SameFile:    sameFile,
+				BeforeSize:  beforeSize,
+				AfterSize:   after.Size(),
+				BeforeMTime: beforeMTime,
+				AfterMTime:  after.ModTime(),
+				ReadMS:      max(time.Since(readStart).Milliseconds(), 0),
+			})
+		}
+		time.Sleep(compactionChangingBackoff)
 	}
 
 	harness, err := compactionHarness(header, tail)
 	if err != nil {
-		return CompactionTranscript{}, err
+		return CompactionTranscript{}, compactionStage("detect_harness", err)
 	}
 	calls, workspace, metricComplete, err := compactionToolCalls(harness, header, tail, tailOffset, nativeSessionID)
 	if err != nil {
-		return CompactionTranscript{}, err
+		return CompactionTranscript{}, compactionStage("scan_tool_calls", err)
 	}
 	combined := append(append([]byte(nil), header...), tail...)
 	session, err := parseCompactionSession(path, harness, workspace, combined)
 	if err != nil {
-		return CompactionTranscript{}, err
+		return CompactionTranscript{}, compactionStage("parse_session", err)
 	}
 	if session.ID != nativeSessionID {
-		return CompactionTranscript{}, fmt.Errorf("%w: got %q, want %q", ErrTranscriptIdentity, session.ID, nativeSessionID)
+		return CompactionTranscript{}, compactionStage("verify_identity", fmt.Errorf("%w: got %q, want %q", ErrTranscriptIdentity, session.ID, nativeSessionID))
 	}
 	result := CompactionTranscript{
 		Session:             session,

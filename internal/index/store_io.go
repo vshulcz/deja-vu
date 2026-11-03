@@ -354,13 +354,17 @@ func eachRecordForKeys(path string, t *recordTables, want map[string]bool, fn fu
 // record's prefix, the bodies of wanted sessions whose role is not in roles.
 // A nil roles keeps every role.
 func eachRecordForKeysInRoles(path string, t *recordTables, want, roles map[string]bool, fn func(Record)) error {
+	return eachRecordForKeysInRolesWindowed(path, t, want, roles, nil, fn)
+}
+
+func eachRecordForKeysInRolesWindowed(path string, t *recordTables, want, roles map[string]bool, matchedByKey map[string][]int64, fn func(Record)) error {
 	atomic.AddInt64(&recordLogScans, 1)
 	f, err := openIndexFile(path)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = f.Close() }()
-	if ok, err := eachRecordForKeysByOffsets(f, filepath.Dir(path), t, want, roles, fn); ok || err != nil {
+	if ok, err := eachRecordForKeysByOffsetsWindowed(f, filepath.Dir(path), t, want, roles, matchedByKey, fn); ok || err != nil {
 		return err
 	}
 	return walkRecordsForKeys(bufio.NewReaderSize(f, 1024*1024), 0, t, want, roles, fn)

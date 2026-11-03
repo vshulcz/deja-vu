@@ -24,7 +24,7 @@ import (
 )
 
 func fileHookLine(dir, cwd, path string) string {
-	return fileHookLineOutside(dir, cwd, path, nil)
+	return fileHookLineOutsideWithEdit(dir, cwd, path, "", nil)
 }
 
 // fileHookLineOutside leaves out the sessions self reports: the one the hook
@@ -200,16 +200,11 @@ func mentionsFile(path, text string) bool {
 // not do is claim to be about the file the agent is holding.
 const standingLabel = " — standing decision in this project: "
 
-// fileDecisionLine returns the single most relevant prior decision recorded
+// fileDecisionLineWithSymbols returns the single most relevant prior decision recorded
 // about this file, or "" if none can be extracted. It reads the newest in-scope
 // sessions (bounded, newest first) and takes the first that yields a conclusion
 // and was not later taken back — the same decision-carrying line the SessionStart
 // digest surfaces, but delivered at the moment the file is about to change.
-func fileDecisionLine(dir, path string, metas []index.SessionMeta) string {
-	_, fileSymbols := fileHookSymbols("", path, "")
-	return fileDecisionLineWithSymbols(dir, path, nil, fileSymbols, metas)
-}
-
 func fileDecisionLineWithSymbols(dir, path string, editSymbols, fileSymbols []string, metas []index.SessionMeta) string {
 	sort.Slice(metas, func(i, j int) bool { return metas[i].Updated.After(metas[j].Updated) })
 	// A promoted note first. It is the user's own statement about this work,
@@ -354,11 +349,10 @@ func enclosingSymbolForSnippet(fileContent, editText string) string {
 		if len(probe) < 12 || strings.HasPrefix(probe, "//") || strings.HasPrefix(probe, "#") || strings.HasPrefix(probe, "***") || strings.HasPrefix(probe, "@@") {
 			continue
 		}
-		idx := strings.Index(fileContent, probe)
-		if idx < 0 {
+		before, _, ok := strings.Cut(fileContent, probe)
+		if !ok {
 			continue
 		}
-		before := fileContent[:idx]
 		decls := declaredSymbolsInText(before)
 		if len(decls) > 0 {
 			return decls[len(decls)-1]

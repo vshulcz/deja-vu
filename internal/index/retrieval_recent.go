@@ -293,8 +293,8 @@ func servableRoles(o query.Options) map[string]bool {
 // The whole session is loaded because the caller picks which message to show
 // after ranking, and it reads the text to do it. Bounding that — a window
 // around the match rather than the session — is the open question (#2592).
-func sessionsServable(dir string, metas []SessionMeta, o query.Options) ([]model.Session, error) {
-	all, err := sessionsForMetasInRoles(dir, metas, servableRoles(o))
+func sessionsServableWindowed(dir string, metas []SessionMeta, matchedOffsets map[uint32][]int64, o query.Options) ([]model.Session, error) {
+	all, err := sessionsForMetasInRolesWindowed(dir, metas, servableRoles(o), matchedOffsets)
 	if err != nil {
 		return nil, err
 	}
@@ -448,11 +448,15 @@ func sessionsForMetas(dir string, metas []SessionMeta) ([]model.Session, error) 
 }
 
 func sessionsForMetasInRoles(dir string, metas []SessionMeta, roles map[string]bool) ([]model.Session, error) {
+	return sessionsForMetasInRolesWindowed(dir, metas, roles, nil)
+}
+
+func sessionsForMetasInRolesWindowed(dir string, metas []SessionMeta, roles map[string]bool, matchedOffsets map[uint32][]int64) ([]model.Session, error) {
 	m, err := readManifestCached(dir)
 	if err != nil {
 		return nil, err
 	}
-	out, err := sessionsForMetasIn(dir, m, metas, roles)
+	out, err := sessionsForMetasInWindowed(dir, m, metas, roles, matchedOffsets)
 	// Read again when a pass swapped in during the read, as loadSessionMeta
 	// does, without the sessions it took away (#5449).
 	for range sessionRereads {
@@ -468,7 +472,7 @@ func sessionsForMetasInRoles(dir string, metas []SessionMeta, roles map[string]b
 		if sessionReread != nil {
 			sessionReread()
 		}
-		out, err = sessionsForMetasIn(dir, m, metas, roles)
+		out, err = sessionsForMetasInWindowed(dir, m, metas, roles, matchedOffsets)
 	}
 	if err != nil {
 		return nil, err
@@ -499,20 +503,29 @@ func liveManifest(dir string, m Manifest) (Manifest, bool) {
 	return cur, true
 }
 
-// sessionsForMetasIn is the read sessionsForMetas makes with m's tables.
-func sessionsForMetasIn(dir string, m Manifest, metas []SessionMeta, roles map[string]bool) ([]model.Session, error) {
+// sessionsForMetasInWindowed is the read sessionsForMetas makes with m's tables.
+func sessionsForMetasInWindowed(dir string, m Manifest, metas []SessionMeta, roles map[string]bool, matchedOffsets map[uint32][]int64) ([]model.Session, error) {
 	tbl := tablesFromManifest(m)
 	want := make(map[string]int, len(metas))
 	out := make([]model.Session, len(metas))
+	var matchedByKey map[string][]int64
+	if matchedOffsets != nil {
+		matchedByKey = make(map[string][]int64, len(metas))
+	}
 	for i, meta := range metas {
-		want[meta.Key()] = i
+		k := meta.Key()
+		want[k] = i
 		out[i] = sessionFromMeta(meta)
+		if matchedByKey != nil {
+			out[i].Held = meta.Counted
+			matchedByKey[k] = matchedOffsets[meta.Ord]
+		}
 	}
 	keys := make(map[string]bool, len(want))
 	for k := range want {
 		keys[k] = true
 	}
-	err := eachRecordForKeysInRoles(filepath.Join(dir, "records.bin"), tbl, keys, roles, func(r Record) {
+	err := eachRecordForKeysInRolesWindowed(filepath.Join(dir, "records.bin"), tbl, keys, roles, matchedByKey, func(r Record) {
 		if i, ok := want[r.Key]; ok {
 			out[i].Messages = append(out[i].Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
 		}

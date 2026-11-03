@@ -836,7 +836,7 @@ func promptBenchProbeBlock(dir, project, chainID string, terms []string) (fired,
 		if !search.RecallWorthShowingNaming(terms, matched[i], strong[i], namingAt(naming, i), idfOf) {
 			continue
 		}
-		if len(s.Messages) > dejaVuMaxMessages {
+		if len(s.Messages) > dejaVuMaxMessages || s.Held > dejaVuMaxMessages {
 			if s = focusSession(s, terms); len(s.Messages) == 0 {
 				continue
 			}
@@ -878,7 +878,7 @@ func promptBenchProbe(dir, project, chainID string, terms []string) (fired, corr
 		if !search.RecallWorthShowingNaming(terms, matched[i], strong[i], namingAt(naming, i), idfOf) {
 			continue
 		}
-		if len(s.Messages) > dejaVuMaxMessages {
+		if len(s.Messages) > dejaVuMaxMessages || s.Held > dejaVuMaxMessages {
 			if s = focusSession(s, terms); len(s.Messages) == 0 {
 				continue
 			}

@@ -352,24 +352,43 @@ var recordOffsetReads int64
 // key: the table is wrong, and the caller walks the log instead.
 var errOffsetsMismatch = errors.New("record offsets do not match the log")
 
-// eachRecordForKeysByOffsets is eachRecordForKeysInRoles answered from the
+const (
+	// maxWindowedSessionRecords caps how many records ProjectRelevant loads
+	// for one candidate session when recordoffsets.bin is available. Short
+	// and medium sessions load whole; marathon sessions load the windows
+	// around their matched offsets plus head and tail context while Session.Held
+	// preserves the full message count for marathon narrowing (#5901).
+	maxWindowedSessionRecords = 160
+	recordMatchWindow         = 6
+	maxAddressedOffsets       = 8192
+	maxWindowedTailWalkBytes  = 16 << 20
+)
+
+// eachRecordForKeysByOffsetsWindowed is eachRecordForKeysInRoles answered from the
 // table: the wanted keys' records inside the covered span by offset, then a
 // walk of the tail past it. ok is false when the table cannot answer, before
 // fn has been called.
-func eachRecordForKeysByOffsets(f *os.File, dir string, t *recordTables, want, roles map[string]bool, fn func(Record)) (bool, error) {
+func eachRecordForKeysByOffsetsWindowed(f *os.File, dir string, t *recordTables, want, roles map[string]bool, matchedByKey map[string][]int64, fn func(Record)) (bool, error) {
 	ro, err := readRecordOffsetsFor(dir, f, want)
 	if err != nil {
 		return false, nil //nolint:nilerr // no table: the caller walks the log
 	}
 	var offs []int64
 	for k := range want {
-		offs = append(offs, ro.byKey[k]...)
+		keyOffs := ro.byKey[k]
+		if matchedByKey != nil {
+			keyOffs = windowedKeyOffsets(keyOffs, matchedByKey[k])
+		}
+		offs = append(offs, keyOffs...)
 	}
 	// Many sessions at once are walked: their records are held until the
 	// table is known to be right, and a walk streams them instead. One session
 	// is read by offset however long it is, since its caller holds all of it
 	// anyway, and a marathon of a third of the log walked all 200 MB of it.
-	if len(want) > 1 && ro.records > 0 && int64(len(offs)) > ro.records/offsetsWalkShare {
+	// When the caller has already windowed each session (or total offsets fit
+	// comfortably in maxAddressedOffsets), always use addressed reads rather
+	// than walking an 855 MiB log (#5901).
+	if matchedByKey == nil && len(want) > 1 && len(offs) > maxAddressedOffsets && ro.records > 0 && int64(len(offs)) > ro.records/offsetsWalkShare {
 		return false, nil
 	}
 	atomic.AddInt64(&recordOffsetReads, 1)
@@ -419,10 +438,53 @@ func eachRecordForKeysByOffsets(f *os.File, dir string, t *recordTables, want, r
 	if ro.covered >= ro.logSize {
 		return true, nil
 	}
+	if matchedByKey != nil && ro.logSize-ro.covered > maxWindowedTailWalkBytes {
+		return true, nil
+	}
 	if _, err := f.Seek(ro.covered, io.SeekStart); err != nil {
 		return true, err
 	}
 	return true, walkRecordsForKeys(bufio.NewReaderSize(f, 256*1024), ro.covered, t, want, roles, fn)
+}
+
+func windowedKeyOffsets(all, matched []int64) []int64 {
+	if len(all) <= maxWindowedSessionRecords {
+		return all
+	}
+	keep := make([]bool, len(all))
+	selected := 0
+	mark := func(idx int) {
+		if idx >= 0 && idx < len(all) && !keep[idx] && selected < maxWindowedSessionRecords {
+			keep[idx] = true
+			selected++
+		}
+	}
+	for i := range min(4, len(all)) {
+		mark(i)
+	}
+	for i := max(0, len(all)-8); i < len(all); i++ {
+		mark(i)
+	}
+	// Prioritize the most recent matching records first if a session matched
+	// hundreds of times, then expand +/- recordMatchWindow around each match.
+	for i := len(matched) - 1; i >= 0 && selected < maxWindowedSessionRecords; i-- {
+		idx, ok := slices.BinarySearch(all, matched[i])
+		if !ok {
+			continue
+		}
+		mark(idx)
+		for d := 1; d <= recordMatchWindow && selected < maxWindowedSessionRecords; d++ {
+			mark(idx - d)
+			mark(idx + d)
+		}
+	}
+	out := make([]int64, 0, selected)
+	for i, off := range all {
+		if keep[i] {
+			out = append(out, off)
+		}
+	}
+	return out
 }
 
 // recordInSpan is readRecordAtInRoles over a span already read: whole is false

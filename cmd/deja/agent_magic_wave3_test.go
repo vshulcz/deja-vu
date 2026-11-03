@@ -94,8 +94,11 @@ func ClosePool() error {
 		t.Fatalf("expected symbol-targeted decision for ClosePool, got: %q", stdout.String())
 	}
 
-	// 2. Reading the file without an edit snippet still matches the newest symbol decision declared in the file.
-	line := fileHookLineOutside(indexDir, repoDir, targetFile, nil)
+	// 2. Reading the file without an edit snippet still matches the newest symbol decision declared in the file,
+	// while skipping the live session itself.
+	line := fileHookLineOutside(indexDir, repoDir, targetFile, func(m index.SessionMeta, _ string) bool {
+		return m.ID == "live-sym"
+	})
 	if !strings.Contains(line, "AcquireSlot rejects non-positive slot counts") {
 		t.Fatalf("expected file-declared symbol decision for AcquireSlot, got: %q", line)
 	}
