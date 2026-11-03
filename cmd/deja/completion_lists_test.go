@@ -330,7 +330,14 @@ func shellCommandBlock(shell, script, cmd string) string {
 			return ""
 		}
 		body, _, _ = strings.Cut(body, "\n        }\n")
-		return powershellBranchFor(body, cmd)
+		b := powershellBranchFor(body, cmd)
+		if strings.Contains(b, "$defaultOptions") {
+			if _, def, ok := strings.Cut(script, "$defaultOptions = @("); ok {
+				def, _, _ = strings.Cut(def, ")")
+				b += " " + def
+			}
+		}
+		return b
 	}
 	return ""
 }
@@ -405,7 +412,7 @@ func TestEveryHelpEntryFlagIsOfferedByCompletion(t *testing.T) {
 		scripts[shell] = emittedCompletion(t, shell)
 	}
 	for _, entry := range helpEntries {
-		if entry.toolHelp || entry.name == "search" ||
+		if entry.toolHelp ||
 			(strings.HasPrefix(entry.name, "hook-") && entry.name != "hook-context") {
 			continue
 		}

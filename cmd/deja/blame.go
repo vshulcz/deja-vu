@@ -32,21 +32,23 @@ func parseBlame(args []string) (string, search.BlameOptions, blameMode, error) {
 	o := search.BlameOptions{}
 	mode := blameMode{}
 	var path string
+	afterDashDash := false
 	for i := 0; i < len(args); i++ {
 		a := args[i]
+		if afterDashDash {
+			if path != "" {
+				return "", o, mode, errors.New("blame accepts one path")
+			}
+			path = a
+			continue
+		}
 		switch a {
 		case "--":
 			// The rest is the path, dash or not — the spelling search, fix and
 			// how already take. A file really named `-report.md` was otherwise
 			// unreachable, and the refusal reads to a caller like a file
 			// nobody has ever touched.
-			if i+1 < len(args) {
-				if path != "" {
-					return "", o, mode, errors.New("blame accepts one path")
-				}
-				path = args[i+1]
-			}
-			i++
+			afterDashDash = true
 		case "--json":
 			mode.JSON = true
 		case "--attribution":

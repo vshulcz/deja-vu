@@ -134,6 +134,15 @@ _deja_completion() {
         hook-context)
             COMPREPLY=( $(compgen -W "--plain --once --strict --copilot --notes --junie --mcode" -- "$cur") )
             ;;
+        hook-prompt)
+            COMPREPLY=( $(compgen -W "--plain --copilot --strict --mcode" -- "$cur") )
+            ;;
+        hook-tool-after)
+            COMPREPLY=( $(compgen -W "--plain --copilot --mcode" -- "$cur") )
+            ;;
+        hook-session-end)
+            COMPREPLY=( $(compgen -W "--json" -- "$cur") )
+            ;;
         index)
             COMPREPLY=( $(compgen -W "--rebuild -rebuild --quiet -quiet" -- "$cur") )
             ;;
@@ -195,6 +204,8 @@ _deja_completion() {
         stats)
             if [[ "$prev" == "--harness" ]]; then
                 COMPREPLY=( $(compgen -W "$harnesses" -- "$cur") )
+            elif [[ "$prev" == "--role" ]]; then
+                COMPREPLY=( $(compgen -W "%ROLES%" -- "$cur") )
             else
                 COMPREPLY=( $(compgen -W "--json --impact --year --html --redaction --card --harness --project --since --role" -- "$cur") )
             fi
@@ -281,12 +292,14 @@ _deja_completion() {
         mcp)
             COMPREPLY=( $(compgen -W "--context-search" -- "$cur") )
             ;;
-        brief|check|ctx|embed|hook-precompact|hook-prompt|share|sources|statusline|version|warmup)
+        brief|check|ctx|embed|hook-precompact|share|sources|statusline|version|warmup)
             COMPREPLY=()
             ;;
         *)
             if [[ "$prev" == "--harness" ]]; then
                 COMPREPLY=( $(compgen -W "$harnesses" -- "$cur") )
+            elif [[ "$prev" == "--role" ]]; then
+                COMPREPLY=( $(compgen -W "%ROLES%" -- "$cur") )
             elif [[ "$prev" == "--sort" ]]; then
                 COMPREPLY=( $(compgen -W "relevance date" -- "$cur") )
             else
@@ -393,6 +406,15 @@ _deja() {
     hook-context)
       _arguments '--plain[omit formatting]' '--once[one digest per session]' '--strict[skip low-confidence sessions]' '--copilot[answer in the Copilot CLI hook shape]' '--notes[only the notes meant for the person]' '--junie[answer in the Junie hook shape]' '--mcode[answer in the MCode hook shape]'
       ;;
+    hook-prompt)
+      _arguments '--plain[omit formatting]' '--copilot[answer in the Copilot CLI hook shape]' '--strict[skip low-confidence sessions]' '--mcode[answer in the MCode hook shape]'
+      ;;
+    hook-tool-after)
+      _arguments '--plain[omit formatting]' '--copilot[answer in the Copilot CLI hook shape]' '--mcode[answer in the MCode hook shape]'
+      ;;
+    hook-session-end)
+      _arguments '--json[print JSON]'
+      ;;
     index)
       _arguments '--rebuild[force a full rebuild]' '-rebuild[force a full rebuild]' '--quiet[say nothing when it worked]' '-quiet[say nothing when it worked]'
       ;;
@@ -480,7 +502,7 @@ _deja() {
     mcp)
       _arguments '--context-search[serve only context_search]'
       ;;
-    brief|check|ctx|embed|hook-precompact|hook-prompt|share|sources|statusline|version|warmup)
+    brief|check|ctx|embed|hook-precompact|share|sources|statusline|version|warmup)
       ;;
     *)
       _arguments '--json[print JSON]' '--re[interpret query as a regular expression]' '--all[include all results]' '--no-embed[skip semantic reranking]' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '--role=[filter by role]:role:(%ROLES%)' '--session=[only one session]:id:' '--rebuild[force a full rebuild]' '--limit=[max sessions to return (1-100)]:count:' '--sort=[order of the results]:order:(relevance date)'
@@ -497,15 +519,25 @@ end
 
 complete -c deja -n '__deja_needs_command' -a '%COMMANDS%'
 complete -c deja -n '__deja_needs_command' -l json -d 'Print JSON'
+complete -c deja -n '__fish_seen_subcommand_from search' -l json -d 'Print JSON'
 complete -c deja -n '__deja_needs_command' -l re -d 'Interpret query as a regular expression'
+complete -c deja -n '__fish_seen_subcommand_from search' -l re -d 'Interpret query as a regular expression'
 complete -c deja -n '__deja_needs_command' -l all -d 'Include all results'
+complete -c deja -n '__fish_seen_subcommand_from search' -l all -d 'Include all results'
 complete -c deja -n '__deja_needs_command' -l no-embed -d 'Skip semantic reranking'
+complete -c deja -n '__fish_seen_subcommand_from search' -l no-embed -d 'Skip semantic reranking'
 complete -c deja -n '__deja_needs_command' -l harness -r -a '%HARNESSES%'
+complete -c deja -n '__fish_seen_subcommand_from search' -l harness -r -a '%HARNESSES%'
 complete -c deja -n '__deja_needs_command' -l project -r
+complete -c deja -n '__fish_seen_subcommand_from search' -l project -r
 complete -c deja -n '__deja_needs_command' -l since -r
+complete -c deja -n '__fish_seen_subcommand_from search' -l since -r
 complete -c deja -n '__deja_needs_command' -l role -r -a '%ROLES%'
+complete -c deja -n '__fish_seen_subcommand_from search' -l role -r -a '%ROLES%'
 complete -c deja -n '__deja_needs_command' -l session -r
+complete -c deja -n '__fish_seen_subcommand_from search' -l session -r
 complete -c deja -n '__deja_needs_command' -l rebuild
+complete -c deja -n '__fish_seen_subcommand_from search' -l rebuild
 complete -c deja -n '__deja_needs_command' -l limit -r -d 'Max sessions to return (1-100)'
 complete -c deja -n '__fish_seen_subcommand_from search' -l limit -r -d 'Max sessions to return (1-100)'
 complete -c deja -n '__deja_needs_command' -l sort -x -a 'relevance date' -d 'Order of the results'
@@ -555,6 +587,14 @@ complete -c deja -n '__fish_seen_subcommand_from hook-context' -l copilot
 complete -c deja -n '__fish_seen_subcommand_from hook-context' -l notes
 complete -c deja -n '__fish_seen_subcommand_from hook-context' -l junie
 complete -c deja -n '__fish_seen_subcommand_from hook-context' -l mcode
+complete -c deja -n '__fish_seen_subcommand_from hook-prompt' -l plain
+complete -c deja -n '__fish_seen_subcommand_from hook-prompt' -l copilot
+complete -c deja -n '__fish_seen_subcommand_from hook-prompt' -l strict
+complete -c deja -n '__fish_seen_subcommand_from hook-prompt' -l mcode
+complete -c deja -n '__fish_seen_subcommand_from hook-tool-after' -l plain
+complete -c deja -n '__fish_seen_subcommand_from hook-tool-after' -l copilot
+complete -c deja -n '__fish_seen_subcommand_from hook-tool-after' -l mcode
+complete -c deja -n '__fish_seen_subcommand_from hook-session-end' -l json
 complete -c deja -n '__fish_seen_subcommand_from index' -l rebuild
 complete -c deja -n '__fish_seen_subcommand_from index' -l quiet -d 'Say nothing when it worked'
 complete -c deja -n '__fish_seen_subcommand_from install uninstall' -a '%INSTALL_TARGETS% --all --auto'
@@ -697,6 +737,9 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 else { @('--to', '--exec') }
             }
             'hook-context' { @('--plain', '--once', '--strict', '--copilot', '--notes', '--junie', '--mcode') }
+            'hook-prompt' { @('--plain', '--copilot', '--strict', '--mcode') }
+            'hook-tool-after' { @('--plain', '--copilot', '--mcode') }
+            'hook-session-end' { @('--json') }
             'index' { @('--rebuild', '-rebuild', '--quiet', '-quiet') }
             'install' { $installTargets + @('--no-guidance', '--no-index', '--force') }
             'uninstall' { $installTargets + @('--no-guidance') }
@@ -768,8 +811,8 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 else { @('--limit', '--json') }
             }
             'mcp' { @('--context-search') }
-            { $_ -in @('brief', 'check', 'ctx', 'embed', 'hook-precompact', 'hook-prompt', 'share', 'sources', 'statusline', 'version', 'warmup') } { @() }
-            default { if ($previous -eq '--sort') { @('relevance', 'date') } else { $defaultOptions } }
+            { $_ -in @('brief', 'check', 'ctx', 'embed', 'hook-precompact', 'share', 'sources', 'statusline', 'version', 'warmup') } { @() }
+            default { if ($previous -eq '--harness') { $harnesses } elseif ($previous -eq '--role') { $roles } elseif ($previous -eq '--sort') { @('relevance', 'date') } else { $defaultOptions } }
         }
     }
 

@@ -40,19 +40,19 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 			i++
 			state = strings.ToLower(args[i]) //nolint:gosec // G602: i+1 < len(args) checked above
 		case "--note":
-			if i+1 >= len(args) {
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" { //nolint:gosec // G602: i+1 < len(args) checked by left operand
 				return errors.New("promote: --note needs text")
 			}
 			i++
 			noteText = args[i] //nolint:gosec // G602: i+1 < len(args) checked above
 		case "--to":
-			if i+1 >= len(args) {
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" { //nolint:gosec // G602: i+1 < len(args) checked by left operand
 				return errors.New("promote: --to needs a path")
 			}
 			i++
 			exportPath = args[i] //nolint:gosec // G602: i+1 < len(args) checked above
 		case "--tag":
-			if i+1 >= len(args) {
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" { //nolint:gosec // G602: i+1 < len(args) checked by left operand
 				return errors.New("promote: --tag needs a value")
 			}
 			i++

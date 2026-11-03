@@ -70,7 +70,7 @@ func runRestore(dir string, args []string, stdout io.Writer) error {
 			}
 			want = n
 		case "-o", "--out":
-			if i+1 >= len(args) {
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" { //nolint:gosec // G602: i+1 < len(args) checked by left operand
 				return errors.New("restore: -o needs value")
 			}
 			i++

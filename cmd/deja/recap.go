@@ -81,7 +81,7 @@ func runRecap(dir string, args []string, stdout io.Writer) error {
 			i++
 			n, err := strconv.Atoi(args[i]) //nolint:gosec // G602: i+1 < len(args) checked above
 			if err != nil || n < 0 {
-				return fmt.Errorf("recap: --limit wants a number, got %q", args[i]) //nolint:gosec // G602: i+1 < len(args) checked above
+				return fmt.Errorf("recap: --limit wants a number from 0 up, got %q", args[i]) //nolint:gosec // G602: i+1 < len(args) checked above
 			}
 			limit = n
 		default:
@@ -98,10 +98,14 @@ func runRecap(dir string, args []string, stdout io.Writer) error {
 	if asJSON {
 		enc := json.NewEncoder(stdout)
 		enc.SetIndent("", "  ")
+		sessions := safeRecapSessions(r.Sessions)
+		if limit > 0 && len(sessions) > limit {
+			sessions = sessions[:limit]
+		}
 		out := recapJSON{
 			Kind: recapJSONKind, Schema: jsonout.Version, Since: sinceText,
 			Considered: r.Considered, Spoke: r.Spoke, Read: r.Read, Projects: r.Projects,
-			Sessions: safeRecapSessions(r.Sessions), Masked: r.Masked, Withheld: r.Withheld,
+			Sessions: sessions, Masked: r.Masked, Withheld: r.Withheld,
 		}
 		if out.Projects == nil {
 			out.Projects = []string{}
