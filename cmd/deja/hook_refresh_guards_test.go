@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -125,12 +126,12 @@ func TestHookRefreshClaimOwner(t *testing.T) {
 				t.Fatalf("the sentinel vanished: %v", err)
 			}
 			if tt.held {
-				if string(got) != string(before) {
+				if !bytes.Equal(got, before) {
 					t.Errorf("a held claim was replaced: %q", got)
 				}
 			} else {
 				claim, ok := parseWarmupClaim(got)
-				if !ok || claim.stamp <= 1 || string(got) == string(before) {
+				if !ok || claim.stamp <= 1 || bytes.Equal(got, before) {
 					t.Errorf("an expired claim was not replaced with a request stamp: %q", got)
 				}
 			}
