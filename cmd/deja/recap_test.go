@@ -93,6 +93,48 @@ func TestRecapJSONAndItsFlags(t *testing.T) {
 	}
 }
 
+// --json must honor --limit the way the text path already does (#5888).
+func TestRecapJSONRespectsSessionLimit(t *testing.T) {
+	withStatsStores(t)
+	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
+	base := time.Now().UTC()
+	for i, id := range []string{"lim-a", "lim-b", "lim-c"} {
+		ts := base.Add(-time.Duration(i+1) * time.Hour).Format(time.RFC3339)
+		writeClaudeFixture(t, filepath.Join(claudeRoot, "-work-net", id+".jsonl"), id, []string{
+			`{"type":"user","sessionId":"` + id + `","cwd":"/work/net","timestamp":"` + ts +
+				`","message":{"role":"user","content":"question ` + id + `"}}`,
+			`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/net","timestamp":"` + ts +
+				`","message":{"role":"assistant","content":"conclusion: fixed ` + id + ` by tightening the route table"}}`,
+		})
+	}
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	var all bytes.Buffer
+	if err := runRecap(dir, []string{"--json"}, &all); err != nil {
+		t.Fatal(err)
+	}
+	var full recapJSON
+	if err := json.Unmarshal(all.Bytes(), &full); err != nil {
+		t.Fatalf("not JSON: %v\n%s", err, all.String())
+	}
+	if len(full.Sessions) < 2 {
+		t.Fatalf("need at least 2 sessions to exercise --limit, got %d", len(full.Sessions))
+	}
+	var limited bytes.Buffer
+	if err := runRecap(dir, []string{"--json", "--limit", "1"}, &limited); err != nil {
+		t.Fatal(err)
+	}
+	var got recapJSON
+	if err := json.Unmarshal(limited.Bytes(), &got); err != nil {
+		t.Fatalf("not JSON: %v\n%s", err, limited.String())
+	}
+	if len(got.Sessions) != 1 {
+		t.Fatalf("--json --limit 1 returned %d sessions: %+v", len(got.Sessions), got.Sessions)
+	}
+}
+
 // An empty window says so rather than printing a heading with nothing under it.
 func TestRecapSaysWhenTheWindowIsEmpty(t *testing.T) {
 	withStatsStores(t)
