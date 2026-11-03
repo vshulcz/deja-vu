@@ -93,7 +93,7 @@ func TestHookRefreshClaimOwner(t *testing.T) {
 	requireNoSpawnHere(t)
 	start, alive, known := processStart(os.Getpid())
 	if !known || !alive {
-		t.Fatal("cannot identify the test process")
+		t.Skip("this platform cannot name a process: a claim falls back to its age")
 	}
 	for _, tt := range []struct {
 		name  string
