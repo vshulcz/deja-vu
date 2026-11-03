@@ -1153,10 +1153,10 @@ func renderMCPBlame(asked, base string, hits []search.BlameHit, omitted int, sta
 func otherTouched(paths []string, base string) []string {
 	// Either separator, whatever this machine uses: a synced session from
 	// Windows names its files with backslashes.
-	baseName := func(p string) string { return p[strings.LastIndexAny(p, `/\`)+1:] }
+	leafName := func(p string) string { return p[strings.LastIndexAny(p, `/\`)+1:] }
 	var out []string
 	for _, p := range paths {
-		name := baseName(p)
+		name := leafName(p)
 		if name == "" || name == base {
 			continue
 		}

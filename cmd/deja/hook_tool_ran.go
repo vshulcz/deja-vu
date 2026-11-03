@@ -178,13 +178,13 @@ const (
 	toolHookMaxFocusedFiles = 8
 )
 
-// fileHookCoChangeLine names the companion or test file that sessions touching
+// coChangeCompanion finds the companion or test file that sessions touching
 // path almost always modified alongside it (at least 3 sessions and 2/3 of the
 // focused sessions that touched path).
-func fileHookCoChangeLine(path string, metas []index.SessionMeta) string {
+func coChangeCompanion(path string, metas []index.SessionMeta) (string, int, int) {
 	targetBase := strings.ToLower(baseName(path))
 	if targetBase == "" {
-		return ""
+		return "", 0, 0
 	}
 	counted := map[string]bool{}
 	companionCounts := map[string]int{}
@@ -218,7 +218,7 @@ func fileHookCoChangeLine(path string, metas []index.SessionMeta) string {
 		}
 	}
 	if focused < toolHookMinCoChangeSessions {
-		return ""
+		return "", 0, 0
 	}
 	bestLow := ""
 	bestCount := 0
@@ -232,10 +232,21 @@ func fileHookCoChangeLine(path string, metas []index.SessionMeta) string {
 		}
 	}
 	if bestLow == "" {
+		return "", 0, 0
+	}
+	return search.SafePath(companionDisplay[bestLow]), bestCount, focused
+}
+
+// fileHookCoChangeLine names the companion or test file that sessions touching
+// path almost always modified alongside it (at least 3 sessions and 2/3 of the
+// focused sessions that touched path).
+func fileHookCoChangeLine(path string, metas []index.SessionMeta) string {
+	companion, bestCount, focused := coChangeCompanion(path, metas)
+	if companion == "" {
 		return ""
 	}
 	return fmt.Sprintf(" — usually edited alongside %s (%d of %d sessions)",
-		search.SafePath(companionDisplay[bestLow]), bestCount, focused)
+		companion, bestCount, focused)
 }
 
 func coChangeCompanionBetter(a, b string) bool {

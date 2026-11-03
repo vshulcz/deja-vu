@@ -38,6 +38,8 @@ const (
 	// it arrives in every session whether or not it is wanted.
 	orientDigestCommands = 3
 	orientDigestFiles    = 4
+	orientDigestCoupled  = 2
+	orientDigestFixes    = 2
 )
 
 func mcpOrient(dir, name string, raw json.RawMessage) (string, int, error) {
@@ -64,6 +66,9 @@ func mcpOrient(dir, name string, raw json.RawMessage) (string, int, error) {
 		return "", 0, err
 	}
 	cwd := howCwd()
+	if strings.TrimSpace(a.Project) != "" && !howProjectMatches(a.Project, howScope(cwd, "", false)) {
+		cwd = ""
+	}
 	files := orientFiles(dir, scope, cwd)
 	where := howScopeName(scope)
 	if where == "" {
@@ -111,8 +116,25 @@ func mcpOrient(dir, name string, raw json.RawMessage) (string, int, error) {
 			fmt.Fprintf(&b, "- %s · %s\n", f.Path, pluralSessions(f.Sessions))
 		}
 	}
+	coupled := orientCoChangePairs(dir, scope, files, policy.ActivationMCP)
+	if len(coupled) > 0 {
+		fmt.Fprintln(&b, "coupled files (usually edited together):")
+		for _, pair := range coupled {
+			fmt.Fprintf(&b, "- %s\n", pair)
+		}
+	}
+	fixes := orientProjectFixes(dir, scope, cwd, policy.ActivationMCP)
+	if len(fixes) > 0 {
+		fmt.Fprintln(&b, "known traps and verified fixes here:")
+		for i, fx := range fixes {
+			if i >= orientCommandsShown {
+				break
+			}
+			fmt.Fprintf(&b, "- %s\n", fx)
+		}
+	}
 	fmt.Fprint(&b, "This is what was done here before, not a rule — check a command still fits before running it.")
-	return frameRecall(b.String()), len(cmds) + len(files), nil
+	return frameRecall(b.String()), len(cmds) + len(files) + len(coupled) + len(fixes), nil
 }
 
 // orientCommand is the command without the way one machine reached it. Half
@@ -252,7 +274,7 @@ func orientFiles(dir string, projects []string, cwd string) []orientFile {
 //
 // Empty when the project has nothing recurring, because a map of one session's
 // keystrokes is noise sitting in every prompt of every session after it.
-func orientDigestBlock(dir, cwd string, projects []string, activation string) string {
+func orientDigestBlock(dir, cwd string, projects []string, activation string) string { //nolint:unparam // forwarded to orientRecurringCommands
 	if cwd == "" {
 		// The hook is handed the project by the harness and not always the
 		// directory; without one every path stays absolute and the list fills
@@ -264,6 +286,8 @@ func orientDigestBlock(dir, cwd string, projects []string, activation string) st
 	if len(recurring) == 0 && len(files) == 0 {
 		return ""
 	}
+	coupled := orientCoChangePairs(dir, projects, files, activation)
+	fixes := orientProjectFixes(dir, projects, cwd, activation)
 	var b strings.Builder
 	b.WriteString("What work looks like in this project, from its past sessions:\n")
 	for i, c := range recurring {
@@ -282,6 +306,22 @@ func orientDigestBlock(dir, cwd string, projects []string, activation string) st
 		}
 		fmt.Fprintf(&b, "- the files its sessions keep opening: %s\n", strings.Join(shown, ", "))
 	}
+	if len(coupled) > 0 {
+		var shown []string
+		for i, pair := range coupled {
+			if i >= orientDigestCoupled {
+				break
+			}
+			shown = append(shown, pair)
+		}
+		fmt.Fprintf(&b, "- coupled files (usually edited together): %s\n", strings.Join(shown, "; "))
+	}
+	for i, fx := range fixes {
+		if i >= orientDigestFixes {
+			break
+		}
+		fmt.Fprintf(&b, "- known trap here: %s\n", fx)
+	}
 	b.WriteString("Check a command still fits before running it.\n")
 	return b.String()
 }
@@ -292,6 +332,7 @@ type orientCommandUse struct {
 	Text     string
 	Sessions int
 	Last     time.Time
+	Verify   bool
 }
 
 // orientRecurringCommands reads the table the build already writes, not the
@@ -320,9 +361,18 @@ func orientRecurringCommands(dir string, projects []string, activation string) [
 		if n < 2 {
 			continue
 		}
-		out = append(out, orientCommandUse{Text: cu.Command, Sessions: n, Last: last})
+		clean := orientCommand(cu.Command)
+		out = append(out, orientCommandUse{
+			Text:     cu.Command,
+			Sessions: n,
+			Last:     last,
+			Verify:   index.VerifyCommand(clean),
+		})
 	}
 	sort.Slice(out, func(i, j int) bool {
+		if out[i].Verify != out[j].Verify {
+			return out[i].Verify
+		}
 		if out[i].Sessions != out[j].Sessions {
 			return out[i].Sessions > out[j].Sessions
 		}
@@ -332,4 +382,190 @@ func orientRecurringCommands(dir string, projects []string, activation string) [
 		return out[i].Text < out[j].Text
 	})
 	return out
+}
+
+// orientCoChangePairs finds high-confidence file pairs in this project that
+// sessions almost always edited together (>= 3 focused sessions and >= 2/3
+// co-change ratio), seeding from top hot files in the manifest cache.
+func orientCoChangePairs(dir string, projects []string, files []orientFile, activation string) []string {
+	metas, err := index.AllMeta(dir)
+	if err != nil {
+		return nil
+	}
+	pol := policy.Load()
+	var inScope []index.SessionMeta
+	for _, m := range metas {
+		if howProjectMatches(m.Project, projects) && metaVisible(pol, activation, m) {
+			inScope = append(inScope, m)
+		}
+	}
+	if len(inScope) < toolHookMinCoChangeSessions {
+		return nil
+	}
+	var candidates []string
+	seenTarget := map[string]bool{}
+	addCandidate := func(p string) {
+		b := strings.ToLower(baseName(p))
+		if b == "" || seenTarget[b] {
+			return
+		}
+		seenTarget[b] = true
+		candidates = append(candidates, p)
+	}
+	for i, f := range files {
+		if i >= orientFilesShown {
+			break
+		}
+		addCandidate(f.Path)
+	}
+	if len(candidates) == 0 {
+		for _, m := range inScope {
+			for _, t := range m.Touched {
+				if !isScratch(t) {
+					addCandidate(t)
+				}
+			}
+		}
+	}
+	seenPair := map[string]bool{}
+	var out []string
+	for _, target := range candidates {
+		targetBase := strings.ToLower(baseName(target))
+		var touching []index.SessionMeta
+		for _, m := range inScope {
+			for _, t := range m.Touched {
+				if strings.EqualFold(baseName(t), targetBase) {
+					touching = append(touching, m)
+					break
+				}
+			}
+		}
+		companion, both, focused := coChangeCompanion(target, touching)
+		if companion == "" {
+			continue
+		}
+		a, b := targetBase, strings.ToLower(companion)
+		if a > b {
+			a, b = b, a
+		}
+		pairKey := a + "\x00" + b
+		if seenPair[pairKey] {
+			continue
+		}
+		seenPair[pairKey] = true
+		out = append(out, fmt.Sprintf("%s ↔ %s (%d of %d sessions)",
+			search.SafePath(baseName(target)), companion, both, focused))
+		if len(out) >= orientCommandsShown {
+			break
+		}
+	}
+	return out
+}
+
+// orientProjectFixes returns confirmed (non-candidate) error->fix pairs mined
+// from past sessions in this project, newest first.
+func orientProjectFixes(dir string, projects []string, cwd, activation string) []string {
+	pol := policy.Load()
+	var pairs []index.FixPair
+	for _, p := range index.ReadFixes(dir) {
+		if p.Candidate {
+			continue
+		}
+		proj := strings.TrimSpace(p.Project)
+		if proj == "" || !howProjectMatches(proj, projects) || !pol.Allows(activation, proj) {
+			continue
+		}
+		pairs = append(pairs, p)
+	}
+	if len(pairs) == 0 {
+		return nil
+	}
+	sort.Slice(pairs, func(i, j int) bool {
+		if !pairs[i].When.Equal(pairs[j].When) {
+			return pairs[i].When.After(pairs[j].When)
+		}
+		return pairs[i].Error < pairs[j].Error
+	})
+	seen := map[string]bool{}
+	var out []string
+	for _, p := range pairs {
+		errText := truncateToolLine(strings.TrimSpace(search.SafeLine(p.Error)), 60)
+		if errText == "" {
+			continue
+		}
+		cmd, ok := withoutFailedExit(strings.TrimPrefix(strings.TrimSpace(search.SafeText(p.Command)), "$ "))
+		edit := strings.TrimSpace(search.SafeLine(p.Edit))
+		var remedy string
+		switch {
+		case ok && cmd != "":
+			remedy = "`" + orientCommand(cmd) + "`"
+		case edit != "":
+			remedy = "edit " + search.SafePath(orientPath(edit, cwd))
+		default:
+			continue
+		}
+		key := errText + "\x00" + remedy
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, "`"+errText+"` → "+remedy)
+	}
+	return out
+}
+
+// projectXRayLine summarizes what deja already knows about the current
+// working repository during `deja install`, or "" when the directory has no
+// indexed project practice yet.
+func projectXRayLine(dir, cwd string) string {
+	if !index.HasManifest(dir) {
+		return ""
+	}
+	if cwd == "" {
+		cwd = howCwd()
+	}
+	scope := howScope(cwd, "", false)
+	if len(scope) == 0 {
+		return ""
+	}
+	sessions := orientSessionCount(dir, scope)
+	if sessions < 2 {
+		return ""
+	}
+	where := howScopeName(scope)
+	if where == "" {
+		return ""
+	}
+	recurring := orientRecurringCommands(dir, scope, policy.ActivationSearch)
+	files := orientFiles(dir, scope, cwd)
+	coupled := orientCoChangePairs(dir, scope, files, policy.ActivationSearch)
+	fixes := orientProjectFixes(dir, scope, cwd, policy.ActivationSearch)
+	if len(recurring) == 0 && len(files) == 0 && len(coupled) == 0 && len(fixes) == 0 {
+		return ""
+	}
+	parts := []string{pluralSessions(sessions)}
+	if len(recurring) > 0 {
+		parts = append(parts, "check: `"+orientCommand(recurring[0].Text)+"`")
+	}
+	if len(files) > 0 {
+		var hot []string
+		for i, f := range files {
+			if i >= 2 {
+				break
+			}
+			hot = append(hot, f.Path)
+		}
+		parts = append(parts, "hot: "+strings.Join(hot, ", "))
+	}
+	if len(coupled) > 0 {
+		parts = append(parts, "coupled: "+coupled[0])
+	}
+	if len(fixes) > 0 {
+		noun := "error→fix pairs"
+		if len(fixes) == 1 {
+			noun = "error→fix pair"
+		}
+		parts = append(parts, fmt.Sprintf("%d %s ready", len(fixes), noun))
+	}
+	return fmt.Sprintf("this repo (%s): %s", search.SafeLine(where), strings.Join(parts, " · "))
 }
