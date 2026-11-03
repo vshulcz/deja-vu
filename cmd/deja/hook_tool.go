@@ -81,6 +81,10 @@ type toolHookInput struct {
 		Args any `json:"args"`
 		// VS Code Copilot Chat's replace_string_in_file and create_file.
 		FilePathCamel string `json:"filePath"`
+		// OpenCode and OpenAI-style apply_patch pass the patch text under
+		// patchText or patch when not under command.
+		PatchText string `json:"patchText"`
+		Patch     string `json:"patch"`
 	} `json:"tool_input"`
 	// Copilot CLI sends the tool's arguments as toolArgs: {command} for bash,
 	// {path} for edit and create (1.0.92).
@@ -415,12 +419,22 @@ func toolHookLineSkipping(dir, cwd string, input toolHookInput, used func(string
 			return fileLineFor(dir, cwd, input)
 		}
 	case "apply_patch":
-		// Codex and other OpenAI-style agents make every file edit through a
-		// single apply_patch tool: the patch text is in `command` and the path
-		// is in its header, not in file_path. Pull the targets out so the
-		// file-history line fires here too — without this the hook is blind to
-		// every edit those agents make.
-		return applyPatchLine(dir, cwd, input.ToolInput.Command, askerSkip(dir, input))
+		// Codex, OpenCode and other OpenAI-style agents make file edits through
+		// an apply_patch tool: the patch text is in `command`, `patchText` or
+		// `patch` and the target path is in its header, not in file_path. Pull
+		// the targets out so the file-history line fires here too — without
+		// this the hook is blind to every edit those agents make.
+		patch := strings.TrimSpace(input.ToolInput.Command)
+		if patch == "" {
+			patch = strings.TrimSpace(input.ToolInput.PatchText)
+		}
+		if patch == "" {
+			patch = strings.TrimSpace(input.ToolInput.Patch)
+		}
+		if patch != "" {
+			return applyPatchLine(dir, cwd, patch, askerSkip(dir, input))
+		}
+		return fileLineFor(dir, cwd, input)
 	}
 	return ""
 }

@@ -63,6 +63,7 @@ func ExtractCompactionContext(s model.Session, opts ExtractOptions) model.Compac
 		c.Goal = goal
 	}
 	c.Rules = ExtractStandingRules(s, nil)
+	c.Modified = extractModifiedFiles(s, opts.MaxItems)
 	verdicts := runOutputVerdicts(s.Messages)
 
 	for _, m := range slices.Backward(window) {
@@ -479,6 +480,38 @@ func reverseFacts(items []model.ContextFact)         { slices.Reverse(items) }
 func reverseTests(items []model.ContextTest)         { slices.Reverse(items) }
 func reverseOpenItems(items []model.ContextOpenItem) { slices.Reverse(items) }
 
+// extractModifiedFiles collects the files modified by edit/write records in
+// the session (in transcript order, newest set capped at maxItems) so a
+// resumed agent after compaction sees which files were already updated without
+// re-reading each one to check.
+func extractModifiedFiles(s model.Session, maxItems int) []model.ContextFact {
+	if maxItems <= 0 {
+		maxItems = defaultContextItems
+	}
+	var rev []model.ContextFact
+	scanned := 0
+	for _, m := range slices.Backward(s.Messages) {
+		scanned += len(m.Text)
+		if scanned > maxContextScanBytes {
+			break
+		}
+		if m.Role != sources.RoleEdit && m.Role != sources.RoleWrote {
+			continue
+		}
+		path, _, _ := strings.Cut(m.Text, "\n")
+		path = strings.TrimSpace(path)
+		if path == "" || len(path) > 200 || strings.ContainsAny(path, " \t\"'`$(){}[]=;:,*") || hasFact(rev, path) {
+			continue
+		}
+		rev = append(rev, model.ContextFact{Text: path, Provenance: contextRef(s, m)})
+		if len(rev) >= maxItems {
+			break
+		}
+	}
+	reverseFacts(rev)
+	return rev
+}
+
 func isVerificationCommand(command string) bool {
 	low := strings.ToLower(command)
 	for _, marker := range []string{
@@ -557,6 +590,11 @@ func RedactCompactionContext(c model.CompactionContext) model.CompactionContext 
 		c.Rules[i].Text = limitContextText(redactContextText(c.Rules[i].Text), standingRuleBytes)
 		c.Rules[i].Provenance = redactContextRef(c.Rules[i].Provenance)
 	}
+	c.Modified = append([]model.ContextFact(nil), c.Modified...)
+	for i := range c.Modified {
+		c.Modified[i].Text = limitContextText(redactContextText(c.Modified[i].Text), contextFactBytes)
+		c.Modified[i].Provenance = redactContextRef(c.Modified[i].Provenance)
+	}
 	c.Goal.Text = limitContextText(redactContextText(c.Goal.Text), goalBytes)
 	c.Goal.Provenance = redactContextRef(c.Goal.Provenance)
 	for i := range c.Carry {
@@ -620,6 +658,9 @@ func rebuildSources(c *model.CompactionContext) {
 	}
 	add(c.Goal.Provenance)
 	add(c.Objective.Provenance)
+	for _, fact := range c.Modified {
+		add(fact.Provenance)
+	}
 	for _, fact := range c.Conclusions {
 		add(fact.Provenance)
 	}
@@ -650,6 +691,8 @@ func boundCompactionContext(c model.CompactionContext) model.CompactionContext {
 		// and the conclusions were the first thing dropped.
 		case len(c.Tests) > 0:
 			c.Tests = c.Tests[1:]
+		case len(c.Modified) > 0:
+			c.Modified = c.Modified[1:]
 		case len(c.Conclusions) > 0:
 			c.Conclusions = c.Conclusions[1:]
 		case len(c.Gaps) > 1:
@@ -743,6 +786,7 @@ func renderContext(c model.CompactionContext, byteBudget int, header string, com
 	// drops the list first: the render budget cuts from the bottom, so whatever
 	// is printed last is what a tight packet loses.
 	addFactSection(&b, &omittedAny, limit, "Assistant-reported conclusions", c.Conclusions)
+	addFactSection(&b, &omittedAny, limit, "Modified in this session", c.Modified)
 	addTestSection(&b, &omittedAny, limit, c.Tests)
 	if omittedAny && b.Len()+len(omitted) <= byteBudget {
 		b.WriteString(omitted)

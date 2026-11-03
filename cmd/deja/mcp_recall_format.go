@@ -234,11 +234,15 @@ func writeRecallLead(b *strings.Builder, result index.SearchResult, hits []searc
 		}
 	}
 	if absent && !saidNothing {
-		// The tier below relevance already says which word it dropped; this
-		// says what dropping it means, in the words the relevance tier uses
-		// for the same situation.
-		fmt.Fprintln(b, nothingIsAboutThis+" so the sessions below are the nearest by wording — treat them as leads to check, not as a record, and say plainly if none of them answers.")
-		saidNothing = true
+		if cover.aboutIt() {
+			namesTheAsked = true
+		} else {
+			// The tier below relevance already says which word it dropped; this
+			// says what dropping it means, in the words the relevance tier uses
+			// for the same situation.
+			fmt.Fprintln(b, nothingIsAboutThis+" so the sessions below are the nearest by wording — treat them as leads to check, not as a record, and say plainly if none of them answers.")
+			saidNothing = true
+		}
 	}
 	return namesTheAsked, saidNothing
 }

@@ -775,14 +775,8 @@ func questionStem(text string) string {
 
 // topTouchedFiles returns the files a session worked on most, busiest first.
 func topTouchedFiles(ms []model.Message) []string {
-	count := map[string]int{}
-	for _, m := range ms {
-		if m.Role != roleFiles {
-			continue
-		}
-		countTouchedPaths(count, m.Text)
-	}
-	return rankTouched(count)
+	paths, _ := topTouchedCounted(ms)
+	return paths
 }
 
 // countTouchedPaths tallies the file paths in one `files` record's text, one
@@ -807,14 +801,27 @@ func rankTouchedCounted(count map[string]int) ([]string, []int) {
 	return paths, hits
 }
 
-// topTouchedCounted is topTouchedFiles with those counts.
+// topTouchedCounted is topTouchedFiles with those counts. Files modified via
+// edit/write/apply_patch records that did not also emit a `files` record (e.g.
+// opencode apply_patch on a file not read first) are included so co-change and
+// file-history lookups see every file the session modified.
 func topTouchedCounted(ms []model.Message) ([]string, []int) {
 	count := map[string]int{}
+	edited := map[string]int{}
 	for _, m := range ms {
-		if m.Role != roleFiles {
-			continue
+		switch m.Role {
+		case roleFiles:
+			countTouchedPaths(count, m.Text)
+		case sources.RoleEdit, sources.RoleWrote:
+			if p := strings.TrimSpace(firstLineOf(m.Text)); p != "" && looksLikeEditedPath(p) && !agentOwnedFile(p) {
+				edited[p]++
+			}
 		}
-		countTouchedPaths(count, m.Text)
+	}
+	for p, n := range edited {
+		if count[p] == 0 {
+			count[p] = n
+		}
 	}
 	return rankTouchedCounted(count)
 }

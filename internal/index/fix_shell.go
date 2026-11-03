@@ -43,7 +43,13 @@ func shellOnlySigs(text, command string, sigs map[uint64]bool) map[uint64]bool {
 // rather than an error a program printed. A missing program the command runs
 // is that program's failure, and the same for every command that runs it.
 func shellComplaint(raw, line, command string) bool {
-	if !shellSpoke(trimEnvelopeLabel(strings.TrimSpace(raw))) {
+	trimmed := trimEnvelopeLabel(strings.TrimSpace(raw))
+	low := strings.ToLower(trimmed)
+	if strings.Contains(low, "not a git repository") ||
+		strings.Contains(low, "not a repository (or any of the parent directories)") {
+		return true
+	}
+	if !shellSpoke(trimmed) {
 		return false
 	}
 	if prog := missingProgram(line); prog != "" && runsProgram(command, prog) {

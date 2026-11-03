@@ -260,6 +260,7 @@ export default {
     // window is collapsed.
     await ctx.session.hook("compaction", async (event) => {
       try {
+        recalled.clear()
         // With the session id deja reads the turns from the store and keeps a
         // recovery packet for the next turn; without one it only forgets.
         await runHook("hook-precompact", JSON.stringify({ session_id: event?.sessionID || "", cwd, harness: "opencode" }), cwd)
@@ -308,13 +309,14 @@ export default {
         // model. Matched on the argument, because the tool that carries a file
         // path is a file action whatever this version calls it.
         const fpath = event.input?.filePath || event.input?.path || ""
-        if (fpath && event.tool !== "shell" && event.status === "completed") {
+        const patchText = event.input?.patchText || event.input?.patch || ""
+        if ((fpath || patchText) && event.tool !== "shell" && event.status === "completed") {
           const fres = event.result || {}
           const fcontent = Array.isArray(fres.content) ? fres.content : []
           const fpayload = {
             hook_event_name: "PostToolUse",
             tool_name: event.tool || "read",
-            tool_input: { file_path: fpath },
+            tool_input: { file_path: fpath, patchText },
             session_id: event.sessionID || "",
             cwd,
           }
@@ -625,6 +627,7 @@ func legacyPluginJSFor(target, exe string) string { //nolint:funlen // the body 
       try {
         const sessionID = input?.sessionID || ""
         if (sessionID) compacting.add(sessionID)
+        recalled.clear()
         await $%secho ${JSON.stringify({ session_id: sessionID, cwd, harness: HARNESS })} | %q hook-precompact%s.quiet()
       } catch {
         // memory is optional: never break a compaction over it
@@ -738,13 +741,14 @@ func legacyPluginJSFor(target, exe string) string { //nolint:funlen // the body 
         // on the argument rather than the tool name — a tool carrying a file
         // path is a file action whatever this version calls it.
         const fpath = input?.args?.filePath || input?.args?.path || ""
-        if (fpath && input?.tool !== "bash") {
+        const patchText = input?.args?.patchText || input?.args?.patch || ""
+        if ((fpath || patchText) && input?.tool !== "bash") {
           const ftext = output?.output
           if (!ftext) return
           const fpayload = {
             hook_event_name: "PostToolUse",
             tool_name: input?.tool || "read",
-            tool_input: { file_path: fpath },
+            tool_input: { file_path: fpath, patchText },
             session_id: input.sessionID || "",
             cwd,
           }

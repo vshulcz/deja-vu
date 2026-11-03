@@ -533,7 +533,7 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, c
 		// A rejected session belongs last, and the mark has to travel with it: the
 		// block listed the correction as a separate item and left the session it
 		// corrects unmarked (#761).
-		variant, rejectedWarning := orderForInjection(variant)
+		variant, _ = orderForInjection(variant)
 		variant, unseen := leadWithUnseen(dir, names, variant)
 		for i := range variant {
 			index.MarkUserRules(dir, &variant[i], names)
@@ -550,8 +550,10 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, c
 			matched = nil
 		}
 		text := result.Text
-		if rejectedWarning != "" && result.Sessions > 0 {
-			text = rejectedWarning + text
+		if result.Sessions > 0 {
+			if rejectedWarning := shownInjectionWarning(variant, sessionsMatchingIDs(variant, result.IDs)); rejectedWarning != "" {
+				text = rejectedWarning + text
+			}
 		}
 		env, envFrom := environment()
 		text += env
