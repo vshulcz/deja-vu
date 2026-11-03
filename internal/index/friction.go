@@ -678,11 +678,28 @@ func FrictionSessions(dir string, sig uint64, allow func(project string) bool) i
 // A wall someone settled is skipped: the screens that name one say this
 // machine keeps hitting it, and the reader has said it does not (#5628).
 func FindFriction(dir string, allow func(project string) bool) (Friction, bool) {
-	out := OpenFriction(dir, 1, allow)
+	out := OpenFriction(dir, 5, allow)
 	if len(out) == 0 {
 		return Friction{}, false
 	}
+	for _, f := range out {
+		if !isLowSignalShellFriction(f.Text) {
+			return f, true
+		}
+	}
 	return out[0], true
+}
+
+func isLowSignalShellFriction(text string) bool {
+	s := strings.TrimSpace(text)
+	if strings.HasPrefix(s, "no matches found:") {
+		return true
+	}
+	switch s {
+	case "== not found", "= not found", "=== not found":
+		return true
+	}
+	return false
 }
 
 // TopFriction returns the walls this machine keeps running into, most-hit

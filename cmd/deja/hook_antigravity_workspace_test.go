@@ -94,7 +94,14 @@ func TestTheHookRecallsTheProjectWhenThePayloadOmitsIt(t *testing.T) {
 	}
 	// seedClaude files its sessions under /tmp/<project>, which is the path
 	// the conversation cache has to name for the two to meet.
-	project := filepath.Join(os.TempDir(), "wsapp")
+	project := "/tmp/wsapp"
+	memDir := filepath.Join(claude, "-tmp-wsapp", "memory")
+	if err := os.MkdirAll(memDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(memDir, "feedback_rule.md"), []byte("---\ndescription: Always pass --race to wsapp tests (auto-mem-needle)\ntype: feedback\n---\nBody\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	b, err := json.Marshal(map[string]string{project: "conv-ws"})
 	if err != nil {
 		t.Fatal(err)
@@ -118,5 +125,8 @@ func TestTheHookRecallsTheProjectWhenThePayloadOmitsIt(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "zorbwaxneedle") {
 		t.Errorf("the conversation's own project was not recalled:\n%s", out.String())
+	}
+	if !strings.Contains(out.String(), "auto-mem-needle") {
+		t.Errorf("Claude auto-memory was not attached to hook-antigravity:\n%s", out.String())
 	}
 }

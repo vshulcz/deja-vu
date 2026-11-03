@@ -48,7 +48,7 @@ func TestStatsJSONKeysMatchTheDocumentedContract(t *testing.T) {
 		"week_recalls": true, "week_bytes": true, "week_injected": true,
 		"handoffs_received": true, "agent_credits": true, "week_agent_credits": true,
 		"used_not_credited": true, "week_used_not_credited": true,
-		"sidecar_size": true, "spans": true, "span_files": true,
+		"sidecar_size": true, "spans": true, "span_files": true, "preserved_sessions": true,
 		// HarnessStats / ProjectStats / MonthStats
 		"harness": true, "sessions": true, "messages": true, "project": true, "month": true,
 		// DateRangeStats / SessionStat / DayStat
@@ -56,7 +56,8 @@ func TestStatsJSONKeysMatchTheDocumentedContract(t *testing.T) {
 		// recall (usage.Summary)
 		"recalls_served": true, "injections": true, "recall_sessions": true,
 		"injected_sessions": true, "bytes": true, "injected_bytes": true,
-		"raw_bytes": true, "dejavu_moments": true, "empty_result_rate": true, "since": true,
+		"raw_bytes": true, "dejavu_moments": true, "tool_lines": true, "fixes_served": true,
+		"empty_result_rate": true, "since": true,
 		// recall.compaction, documented in docs/json-output.md
 		"compaction": true, "captures": true, "measured": true,
 		"pending": true, "unmeasured": true, "median_actions": true, "p75_actions": true,

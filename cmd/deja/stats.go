@@ -245,7 +245,13 @@ func runStats(dir string, args []string) error {
 	if note := policyHiddenNote(policy.ActivationSearch, policyHidden); note != "" {
 		fmt.Fprintln(os.Stderr, note)
 	}
-	report := stats.Build(stats.Filter(ss, options), time.Now())
+	filteredSessions := stats.Filter(ss, options)
+	report := stats.Build(filteredSessions, time.Now())
+	for _, s := range filteredSessions {
+		if !s.IsImported() && transcriptGone(s) {
+			report.PreservedSessions++
+		}
+	}
 	// The rule that emptied the report is named a line above, so "nothing
 	// indexed yet — run `deja index`" is advice for a state deja is not in:
 	// the same backside `last` grew when it learned to filter (#949, #983).
@@ -435,6 +441,10 @@ func printStats(w io.Writer, r stats.Report) {
 			bold, grouped(r.Spans), reset, pluralS(r.Spans), grouped(r.SpanFiles), pluralS(r.SpanFiles))
 		fmt.Fprintf(w, "          %sif something got clobbered:%s deja restore <file>\n\n", faint, reset)
 	}
+	if r.PreservedSessions > 0 {
+		fmt.Fprintf(w, "Preserved %s%s%s deleted session%s still searchable in the index\n\n",
+			bold, grouped(r.PreservedSessions), reset, pluralS(r.PreservedSessions))
+	}
 	if r.SidecarSize > 0 {
 		fmt.Fprintf(w, "Semantic  sidecar %s\n\n", humanBytes(r.SidecarSize))
 	}
@@ -533,6 +543,12 @@ func printStats(w io.Writer, r stats.Report) {
 	}
 	if r.Recall.DejaVuMoments > 0 {
 		fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  Déjà vu          %d prompt%s your own history already answered", r.Recall.DejaVuMoments, pluralS(r.Recall.DejaVuMoments))))
+	}
+	if r.Recall.ToolLines > 0 {
+		fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  Tool-time hints  %d file rule%s, companion%s or fix pair%s surfaced before or after an action", r.Recall.ToolLines, pluralS(r.Recall.ToolLines), pluralS(r.Recall.ToolLines), pluralS(r.Recall.ToolLines))))
+	}
+	if r.Recall.FixesServed > 0 {
+		fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  Error fixes      %d fix command%s served for a recurring error", r.Recall.FixesServed, pluralS(r.Recall.FixesServed))))
 	}
 	if c := r.Recall.Compaction; c != nil {
 		if c.Measured > 0 {

@@ -47,6 +47,9 @@ func TestStatusCountersAgreeWithTheReadersTheyReplace(t *testing.T) {
 	if raw := TodayRaw(dir); got.RawToday != raw {
 		t.Errorf("raw: one pass says %d, TodayRaw says %d", got.RawToday, raw)
 	}
+	if got.ServedRawToday != 13000 {
+		t.Errorf("ServedRawToday = %d, want 13000 (served events only, excluding hook raw bytes)", got.ServedRawToday)
+	}
 	// The premise: these numbers are not all zero, or agreeing means nothing.
 	if got.Recalls == 0 || got.Bytes == 0 || got.Injected == 0 || got.WeekRecalls == 0 || got.RawToday == 0 {
 		t.Fatalf("the fixture produced %+v, so agreement measures nothing", got)

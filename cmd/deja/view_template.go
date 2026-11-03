@@ -65,6 +65,8 @@ input[type=search]:focus{outline:none;border-color:var(--ph)}
 <div class="stat"><b>{{.TotalSessions}}</b><span>sessions</span></div>
 <div class="stat"><b>{{.Harnesses}}</b><span>agents</span></div>
 <div class="stat"><b>{{if .DateStart}}{{.DateStart}} → {{.DateEnd}}{{else}}—{{end}}</b><span>covered</span></div>
+{{if .PreservedSessions}}<div class="stat"><b>{{.PreservedSessions}}</b><span>deleted kept</span></div>{{end}}
+{{if .TotalRecalls}}<div class="stat"><b>{{.TotalRecalls}}</b><span>recalls served</span></div>{{end}}
 </div>
 <div class="tabs">
 <button class="on" data-tab="sessions">Sessions</button>
@@ -83,6 +85,7 @@ input[type=search]:focus{outline:none;border-color:var(--ph)}
 <p class="note">the injections agents received, verbatim — the audit trail behind <b>deja log</b>.{{if lt .RecallCount .TotalRecalls}} The {{.RecallCount}} most recent of {{.TotalRecalls}} are on this page; older ones stay in the log until it rotates.{{end}}{{if .RecallsWithheld}} Held back by the trust policy ({{.PolicyRule}}): {{.RecallsWithheld}}.{{end}}</p></div>
 <div id="tab-notes" style="display:none"><div id="nlist"></div>
 <p class="note">decisions promoted with <b>deja promote</b>; lifecycle states shown as badges. A plain <b>deja remember</b> note is indexed as a session and reads on the Sessions tab.{{if lt .NoteCount .TotalNotes}} The {{.NoteCount}} most recent notes of {{.TotalNotes}} are on this page — the rest answer through <b>deja "query"</b> and the agents' recall tool.{{end}}{{if .NotesWithheld}} Held back by the trust policy ({{.PolicyRule}}): {{.NotesWithheld}}.{{end}}</p></div>
+<footer class="note">deja-vu · <a href="https://github.com/vshulcz/deja-vu">github.com/vshulcz/deja-vu</a></footer>
 </div>
 <script>
 const S={{.SessionsJSON}},R={{.RecallsJSON}},N={{.NotesJSON}};

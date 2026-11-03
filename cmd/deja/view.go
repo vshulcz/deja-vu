@@ -95,8 +95,9 @@ type viewPage struct {
 	RecallsWithheld int
 	// RecallCount is how many injections the page carries and TotalRecalls how
 	// many the log holds, for the same reason the two note counts exist.
-	RecallCount  int
-	TotalRecalls int
+	RecallCount       int
+	TotalRecalls      int
+	PreservedSessions int
 	// NoteCount is how many notes the page carries and TotalNotes how many
 	// there are, so the page can say when those differ (#2111).
 	NoteCount  int
@@ -212,6 +213,9 @@ func writeViewHTML(dir, out string) (string, int, error) {
 	}
 	sessions := make([]viewSession, 0, len(metas))
 	for i, s := range metas {
+		if !s.IsImported() && transcriptGone(s) {
+			page.PreservedSessions++
+		}
 		v := viewSession{
 			ID: s.ID, Harness: s.Harness, Project: s.Project,
 			Title:   strings.TrimSpace(s.Title),

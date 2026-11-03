@@ -225,7 +225,7 @@ func printBriefActivity(w io.Writer, dir string, ov index.OverviewStats, bold, r
 		line += fmt.Sprintf(" · %d recall%s served", recalls, pluralS(recalls))
 		served := " (" + humanBytes(int64(bytes)) + ")"
 		full := served
-		if raw := counters.RawToday; bytes > 0 && raw/int64(bytes) >= 2 {
+		if raw := counters.ServedRawToday; bytes > 0 && raw/int64(bytes) >= 2 {
 			full = " (" + humanBytes(int64(bytes)) + " from " + humanBytes(raw) + ")"
 		}
 		// printableWidth, not briefWidth: a pipe reads as "do not cut", and a

@@ -342,6 +342,8 @@ for people who install extensions there rather than from a CLI:
 | pi (and omp) | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
 | Hermes | memory provider `deja-memory`, in the Hermes plugin catalog | `hermes plugins install deja-memory`, or from GitHub: `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 | Magpie | npm `@vshulcz/magpie-deja` | `magpie plugin add @vshulcz/magpie-deja` |
+| VS Code / Cursor / Windsurf | status bar extension `vshulcz.deja-status` | `code --install-extension vshulcz.deja-status` |
+| Raycast | Raycast extension `deja-vu` | `cd extensions/raycast && npm install && npx ray develop` |
 | CC Switch | 1-click MCP &amp; Skill Repo import (`ccswitch://`) | [Add MCP to CC Switch](ccswitch://v1/import?resource=mcp&apps=claude,codex,gemini,opencode&config=eyJtY3BTZXJ2ZXJzIjp7ImRlamEiOnsiY29tbWFuZCI6Im5weCIsImFyZ3MiOlsiLXkiLCJAdnNodWxjei9kZWphLXZ1Iiwic2VydmUiXX19fQ==) · [Switching guide](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html) |
 
 Either path works alone, and both together double nothing: each package reads what

@@ -144,10 +144,32 @@ func readDejaBinaryVersion(p string) string {
 	if _, ok := parseUpdateVersion(bi.Main.Version); ok {
 		return normalizeUpdateVersion(bi.Main.Version)
 	}
+	for _, s := range bi.Settings {
+		if s.Key != "-ldflags" {
+			continue
+		}
+		for f := range strings.FieldsSeq(s.Value) {
+			if v, ok := strings.CutPrefix(f, "main.version="); ok {
+				v = strings.Trim(v, `"'`)
+				if _, valid := parseUpdateVersion(v); valid {
+					return normalizeUpdateVersion(v)
+				}
+			}
+		}
+	}
 	if resolved, linkErr := filepath.EvalSymlinks(p); linkErr == nil {
 		if m := cellarVersion.FindStringSubmatch(filepath.ToSlash(resolved)); m != nil {
 			if _, ok := parseUpdateVersion(m[1]); ok {
 				return m[1]
+			}
+		}
+	}
+	if self, selfErr := os.Executable(); selfErr == nil {
+		if fi1, e1 := os.Stat(p); e1 == nil {
+			if fi2, e2 := os.Stat(self); e2 == nil && os.SameFile(fi1, fi2) {
+				if _, ok := parseUpdateVersion(version); ok {
+					return normalizeUpdateVersion(version)
+				}
 			}
 		}
 	}

@@ -17,7 +17,7 @@ func starTipLine(dir string, served int) string {
 	if err := os.WriteFile(stamp, []byte("1\n"), 0o600); err != nil {
 		return ""
 	}
-	return "  If it helps      gh repo star vshulcz/deja-vu"
+	return "  If it helps      gh repo star vshulcz/deja-vu · https://github.com/vshulcz/deja-vu"
 }
 
 func maybeStarTip(dir string, served int) string {

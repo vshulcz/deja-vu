@@ -27,7 +27,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Delete Continue session history","description":"Continue keeps one JSON file per session plus a sessions.json list the history view reads. How to remove one session or all, and why the list has to go too.","url":"https://vshulcz.github.io/deja-vu/guide/delete-continue-session-history.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"datePublished":"2026-09-26","dateModified": "2026-10-10","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Delete Continue session history","description":"Continue keeps one JSON file per session plus a sessions.json list the history view reads. How to remove one session or all, and why the list has to go too.","url":"https://vshulcz.github.io/deja-vu/guide/delete-continue-session-history.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"datePublished":"2026-09-26","dateModified": "2026-11-03","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -179,6 +179,7 @@ jq 'map(select(.sessionId != "&lt;sessionId&gt;"))' sessions.json &gt; sessions.
 deja "Continue session about the flaky test"</pre>
 <p>Indexing and search stay local, credentials are stripped, and <code>deja forget</code> removes a session from the index when you do want it gone. A session whose file you deleted stays under the Deleted tab of the screen bare <code>deja</code> opens, and <code>R</code> writes its conversation back so <code>cn --fork</code> can pick it up again.</p>
 <p><a href="where-sessions-are-stored.html">Where every agent keeps its history</a> · <a href="memory-for-continue.html">Memory for Continue</a> · <a href="../registry/continue.html">The Continue format</a></p>
+<nav class="related-guides" aria-label="Related guides"><p><b>Related guides:</b> <a href="memory-for-continue.html">Memory for Continue</a> · <a href="../registry/continue.html">Continue format</a> · <a href="getting-started.html">Getting started</a> · <a href="day-zero.html">Day zero</a> · <a href="switching-agents.html">Switching agents</a> · <a href="sync-across-machines.html">Sync across machines</a> · <a href="compare.html">Compare memory tools</a> · <a href="claude-mem-alternative.html">claude-mem alternative</a> · <a href="memory-for-claude-code.html">Claude Code</a> · <a href="memory-for-codex.html">Codex</a> · <a href="memory-for-cursor.html">Cursor</a> · <a href="memory-for-opencode.html">opencode</a> · <a href="memory-for-gemini.html">Gemini CLI</a> · <a href="agents.html">Agents &amp; MCP</a></p></nav>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
 </article></div></div>
 </body></html>

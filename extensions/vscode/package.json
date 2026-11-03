@@ -1,0 +1,50 @@
+{
+  "name": "deja-status",
+  "displayName": "deja-vu — Claude Code, Cursor, Codex & OpenCode Memory",
+  "description": "Local cross-agent memory status bar for VS Code, Cursor, Windsurf, Antigravity, Trae and Kiro. Indexes sessions from 43 coding agents with one Go binary and no LLM.",
+  "publisher": "vshulcz",
+  "version": "0.23.0",
+  "license": "MIT",
+  "icon": "assets/logo.png",
+  "categories": [
+    "AI",
+    "Other",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "claude-code",
+    "cursor",
+    "windsurf",
+    "codex",
+    "opencode",
+    "agent-memory",
+    "mcp",
+    "session-history",
+    "compaction",
+    "deja-vu"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vshulcz/deja-vu.git",
+    "directory": "extensions/vscode"
+  },
+  "homepage": "https://github.com/vshulcz/deja-vu",
+  "bugs": {
+    "url": "https://github.com/vshulcz/deja-vu/issues"
+  },
+  "engines": {
+    "vscode": "^1.57.0"
+  },
+  "main": "./extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "deja.installOrStats",
+        "title": "deja: Install or Show Session Memory Stats"
+      }
+    ]
+  }
+}

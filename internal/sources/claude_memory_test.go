@@ -97,7 +97,7 @@ func TestLoadClaudeAutoMemoryEdgeCases(t *testing.T) {
 		t.Fatal(err)
 	}
 	// MEMORY.md with frontmatter description.
-	memIndex := "---\ndescription: Index frontmatter rule\ntype: rule\n---\nBody line\n"
+	memIndex := "---\ndescription: Index frontmatter rule\nmetadata:\n  type: rule\n---\nBody line\n"
 	if err := os.WriteFile(filepath.Join(memDir, "MEMORY.md"), []byte(memIndex), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -105,6 +105,9 @@ func TestLoadClaudeAutoMemoryEdgeCases(t *testing.T) {
 	entries := LoadClaudeAutoMemory([]string{longWork})
 	if len(entries) != 2 {
 		t.Fatalf("got %d entries, want 2: %#v", len(entries), entries)
+	}
+	if entries[0].Type != "rule" {
+		t.Fatalf("nested metadata.type was not parsed as rule: %#v", entries[0])
 	}
 	if !strings.Contains(entries[0].Summary(), "Plain bullet rule") && !strings.Contains(entries[1].Summary(), "Plain bullet rule") {
 		t.Fatalf("missing plain bullet rule in %#v", entries)
