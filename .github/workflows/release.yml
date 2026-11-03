@@ -127,6 +127,7 @@ jobs:
           npx --yes @vscode/vsce package --no-dependencies -o "$GITHUB_WORKSPACE/dist/deja-status.vsix"
           gh release upload "${GITHUB_REF_NAME}" "$GITHUB_WORKSPACE/dist/deja-status.vsix" --clobber
           if [ -n "${OVSX_PAT:-}" ]; then
+            npx --yes ovsx create-namespace vshulcz -p "$OVSX_PAT" || true
             npx --yes ovsx publish "$GITHUB_WORKSPACE/dist/deja-status.vsix" -p "$OVSX_PAT"
           fi
           if [ -n "${VSCE_PAT:-}" ]; then
@@ -359,3 +360,25 @@ jobs:
             --source-path skills/deja-search \
             --changelog "deja-vu $TAG" \
             --no-input
+
+      - name: Publish the VS Code extension to OpenVSX and Marketplace
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" -p deja-status.vsix -D "$RUNNER_TEMP" --clobber
+          if [ -n "${OVSX_PAT:-}" ]; then
+            live="$(curl -fsS https://open-vsx.org/api/vshulcz/deja-status | jq -r '.version // empty' || true)"
+            if [ "$live" = "$version" ]; then
+              echo "vshulcz.deja-status $version is already on OpenVSX"
+            else
+              npx --yes ovsx create-namespace vshulcz -p "$OVSX_PAT" || true
+              npx --yes ovsx publish "$RUNNER_TEMP/deja-status.vsix" -p "$OVSX_PAT"
+            fi
+          fi
+          if [ -n "${VSCE_PAT:-}" ]; then
+            npx --yes @vscode/vsce publish --packagePath "$RUNNER_TEMP/deja-status.vsix" -p "$VSCE_PAT" || true
+          fi
