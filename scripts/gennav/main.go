@@ -96,6 +96,9 @@ var groups = []group{
 		{"delete-pi-session-history.html", "pi"},
 		{"delete-crush-session-history.html", "Crush"},
 		{"delete-hermes-session-history.html", "Hermes"},
+		{"delete-cherrystudio-session-history.html", "Cherry Studio"},
+		{"delete-codewhale-session-history.html", "CodeWhale"},
+		{"delete-aider-chat-history.html", "aider"},
 	}},
 	{title: "Per-agent guides", fold: true, links: []link{
 		{"memory-for-aider.html", "aider"},
@@ -119,6 +122,7 @@ var groups = []group{
 		{"memory-for-goose.html", "Goose"},
 		{"memory-for-grok.html", "Grok Build"},
 		{"memory-for-hermes.html", "Hermes"},
+		{"memory-for-jetbrains.html", "JetBrains AI Assistant"},
 		{"memory-for-junie.html", "Junie"},
 		{"memory-for-kilocode.html", "Kilo Code"},
 		{"memory-for-kimchi.html", "Kimchi Coding"},
