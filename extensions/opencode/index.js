@@ -427,6 +427,7 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
     try {
       const sessionID = input?.sessionID || ""
       if (sessionID) compacting.add(sessionID)
+      recalled.clear()
       await ask(["hook-precompact"], JSON.stringify({ session_id: sessionID, cwd, harness: "opencode" }), 60000)
     } catch {
       // memory is optional: never break a compaction over it
@@ -475,13 +476,14 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
       // file path is a file action whatever this version calls it, and a name
       // deja does not recognise is answered with silence.
       const fpath = input?.args?.filePath || input?.args?.path || ""
-      if (fpath && input?.tool !== "bash") {
+      const patchText = input?.args?.patchText || input?.args?.patch || ""
+      if ((fpath || patchText) && input?.tool !== "bash") {
         const ftext = output?.output
         if (!ftext) return
         const fpayload = {
           hook_event_name: "PostToolUse",
           tool_name: input?.tool || "read",
-          tool_input: { file_path: fpath },
+          tool_input: { file_path: fpath, patchText },
           session_id: input.sessionID || "",
           cwd,
         }

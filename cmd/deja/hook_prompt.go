@@ -418,7 +418,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		}
 		body = full
 	} else {
-		body = weakRecallPointer(ss, terms) + rejectedWarning
+		body = weakRecallPointer(ss, terms) + shownInjectionWarning(ss, ss[:1])
 		if nudge != "" {
 			body += "\n" + nudge
 		}
@@ -534,6 +534,7 @@ func promptDigestBody(dir, sessionID string, ss []model.Session, confident bool,
 	cite := ss[0]
 	if len(shown) > 0 {
 		cite = shown[0]
+		rejectedWarning = shownInjectionWarning(ss, shown)
 	}
 	tail := openerLine(cite, terms)
 	if nudge != "" {

@@ -55,6 +55,7 @@ type CompactionContext struct {
 	Objective   ContextFact         `json:"objective"`
 	Goal        ContextFact         `json:"goal,omitzero"`
 	Rules       []ContextFact       `json:"rules,omitempty"`
+	Modified    []ContextFact       `json:"modified,omitempty"`
 	Conclusions []ContextFact       `json:"conclusions,omitempty"`
 	Tests       []ContextTest       `json:"tests,omitempty"`
 	Gaps        []ContextOpenItem   `json:"gaps,omitempty"`

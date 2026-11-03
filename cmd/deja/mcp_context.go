@@ -212,7 +212,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 		names := !namedSomethingAbsent(result.Variants) &&
 			sessionNamesTheAsked(whole, q, result.TermIDF)
 		// Holding most of a long query names it too, as on the recall page.
-		if !names && hits[0].Tier == search.TierRelevance && !hits[0].Strict {
+		if !names && !hits[0].Strict {
 			names = bestCoverage([]search.Hit{{Session: whole}}, q, result.TermIDF).aboutIt()
 		}
 		text = contextTierLead(hits[0].Tier, hits[0].Strict, names) +

@@ -108,3 +108,85 @@ func earlierAttemptWarning(ss []model.Session) string {
 	}
 	return strings.Join(lines, "; ") + ".\n"
 }
+
+// shownInjectionWarning computes the rejected/superseded and earlier-attempt
+// warnings across all candidate sessions, but only emits lines for sessions
+// actually present in shown. Without this filter, a 12-candidate pool whose
+// digest only rendered 1–2 sessions warned about earlier-attempt session IDs
+// that never appeared in the injected block.
+func shownInjectionWarning(candidates, shown []model.Session) string {
+	if len(candidates) == 0 || len(shown) == 0 {
+		return ""
+	}
+	keep := make(map[string]bool, len(shown)*2)
+	for _, s := range shown {
+		if s.ID != "" {
+			keep[s.ID] = true
+		}
+		if k := s.Key(); k != "" && k != ":" {
+			keep[k] = true
+		}
+	}
+	inShown := func(s model.Session) bool {
+		return keep[s.ID] || keep[s.Key()]
+	}
+	r := newLifecycleResolver(index.DefaultDir())
+	var warn []string
+	for _, s := range candidates {
+		if !inShown(s) {
+			continue
+		}
+		state, note, _, _, ok := r.resolve(s)
+		if !ok {
+			continue
+		}
+		phrase := injectionLifecycle(state)
+		if phrase == "" {
+			continue
+		}
+		line := fmt.Sprintf("session %s %s", recallListingLine(s.ID), phrase)
+		if note != "" {
+			line += ": " + recallListingLine(note)
+		}
+		warn = append(warn, line)
+	}
+	older := search.EarlierAttempts(candidates)
+	var earlier []string
+	for _, s := range candidates {
+		if !inShown(s) {
+			continue
+		}
+		when := older[s.Key()]
+		if when == "" {
+			when = older[s.ID]
+		}
+		if when != "" {
+			earlier = append(earlier, fmt.Sprintf("session %s is an earlier attempt — this project has a newer session on the same ground (%s)", recallListingLine(s.ID), when))
+		}
+	}
+	var earlierText string
+	if len(earlier) > 0 {
+		earlierText = strings.Join(earlier, "; ") + ".\n"
+	}
+	if len(warn) == 0 {
+		return earlierText
+	}
+	return "Some of this no longer holds — " + strings.Join(warn, "; ") + ".\n" + earlierText
+}
+
+func sessionsMatchingIDs(ss []model.Session, ids []string) []model.Session {
+	if len(ids) == 0 {
+		return nil
+	}
+	want := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		want[id] = true
+	}
+	var out []model.Session
+	for _, s := range ss {
+		if want[s.ID] || want[s.Key()] {
+			out = append(out, s)
+		}
+	}
+	return out
+}

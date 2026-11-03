@@ -37,7 +37,31 @@ func fileHookLineOutside(dir, cwd, path string, self func(index.SessionMeta, str
 	// unless the stored path is the exact one (which cannot collide). Asked
 	// for only when a session needs them: the names list the repository's
 	// worktrees, which is a subprocess on every edit.
-	projects := sync.OnceValue(func() []string { return digest.ProjectNameCandidates(cwd) })
+	projects := sync.OnceValue(func() []string {
+		names := digest.ProjectNameCandidates(cwd)
+		if filepath.IsAbs(path) && cwd != "" {
+			cleanCwd := filepath.Clean(cwd)
+			cleanPath := filepath.Clean(path)
+			if strings.HasPrefix(cleanPath, cleanCwd+string(filepath.Separator)) {
+				dirPath := filepath.Dir(cleanPath)
+				for _, cand := range digest.ProjectNameCandidates(dirPath) {
+					if !slices.Contains(names, cand) {
+						names = append(names, cand)
+					}
+				}
+				for cur := dirPath; strings.HasPrefix(cur, cleanCwd+string(filepath.Separator)); cur = filepath.Dir(cur) {
+					base := filepath.Base(cur)
+					parent := filepath.Base(filepath.Dir(cur))
+					for _, cand := range []string{parent + "/" + base, base} {
+						if cand != "" && !slices.Contains(names, cand) {
+							names = append(names, cand)
+						}
+					}
+				}
+			}
+		}
+		return names
+	})
 	// A hook that fires unasked is the auto activation, so a session the trust
 	// policy withholds must not even be counted here.
 	pol := policy.Load()
