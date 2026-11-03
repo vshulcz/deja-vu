@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Delete aider chat history — deja-vu</title>
+<meta name="description" content="aider appends every session in a project to one .aider.chat.history.md. Cut out one session or remove the file, and keep both searchable with deja.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/delete-aider-chat-history.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Delete aider chat history">
+<meta property="og:description" content="aider appends every session in a project to one .aider.chat.history.md. Cut out one session or remove the file, and keep both searchable with deja.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/delete-aider-chat-history.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Delete aider chat history">
+<meta name="twitter:description" content="aider appends every session in a project to one .aider.chat.history.md. Cut out one session or remove the file, and keep both searchable with deja.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete aider chat history", "description": "aider appends every session in a project to one .aider.chat.history.md. Cut out one session or remove the file, and keep both searchable with deja.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-aider-chat-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-aider-chat-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-03", "dateModified": "2026-11-03"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete aider chat history", "item": "https://vshulcz.github.io/deja-vu/guide/delete-aider-chat-history.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Where does aider store its chat history?", "acceptedAnswer": {"@type": "Answer", "text": "In .aider.chat.history.md at the root of the git repository aider runs in (the launch directory outside a repository), with the typed prompts in .aider.input.history beside it. --chat-history-file or AIDER_CHAT_HISTORY_FILE moves the chat log."}}, {"@type": "Question", "name": "How do I delete one aider session?", "acceptedAnswer": {"@type": "Answer", "text": "Quit aider, then remove the session's block from .aider.chat.history.md: everything from its \"# aider chat started at\" line down to the next one. The other sessions in the file stay. Removing the file deletes every session in that project."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="nav-cta" href="https://github.com/vshulcz/deja-vu"><span class="star-ic" aria-hidden="true">★</span>GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a>
+<div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<details class="grpfold"><summary>Why agents forget <span class="n">12</span></summary>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="switch-agents-without-losing-context.html">Session handoffs</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="one-rules-file.html">One rules file</a>
+<a href="token-cost.html">What memory costs</a>
+</details>
+<details class="grpfold"><summary>Session history <span class="n">11</span></summary>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="codex-history.html">Codex history</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="credentials-in-transcripts.html">Credentials in transcripts</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
+</details>
+<details class="grpfold" open><summary>Deleting sessions <span class="n">30</span></summary>
+<a href="session-files-on-disk.html">Claude Code</a>
+<a href="delete-old-claude-sessions.html">Old sessions</a>
+<a href="delete-codex-sessions.html">Codex</a>
+<a href="delete-cursor-chat-history.html">Cursor</a>
+<a href="cursor-state-vscdb-too-large.html">Cursor state.vscdb too large</a>
+<a href="delete-copilot-chat-history.html">Copilot Chat</a>
+<a href="delete-copilot-cli-session-history.html">Copilot CLI</a>
+<a href="delete-gemini-cli-history.html">Gemini CLI</a>
+<a href="delete-opencode-session-history.html">opencode</a>
+<a href="delete-cline-task-history.html">Cline</a>
+<a href="delete-roo-task-history.html">Roo Code</a>
+<a href="delete-zed-thread-history.html">Zed</a>
+<a href="delete-kilo-code-task-history.html">Kilo Code</a>
+<a href="delete-amp-thread-history.html">Amp</a>
+<a href="delete-continue-session-history.html">Continue</a>
+<a href="delete-kiro-session-history.html">Kiro</a>
+<a href="delete-kimi-code-session-history.html">Kimi Code</a>
+<a href="delete-junie-session-history.html">Junie</a>
+<a href="delete-goose-session-history.html">Goose</a>
+<a href="delete-windsurf-cascade-history.html">Windsurf</a>
+<a href="delete-qwen-code-chat-history.html">Qwen Code</a>
+<a href="delete-trae-sessions.html">TRAE CLI</a>
+<a href="delete-codebuddy-sessions.html">CodeBuddy</a>
+<a href="delete-antigravity-history.html">Antigravity</a>
+<a href="delete-pi-session-history.html">pi</a>
+<a href="delete-crush-session-history.html">Crush</a>
+<a href="delete-hermes-session-history.html">Hermes</a>
+<a href="delete-cherrystudio-session-history.html">Cherry Studio</a>
+<a href="delete-codewhale-session-history.html">CodeWhale</a>
+<a href="delete-aider-chat-history.html" aria-current="page">aider</a>
+</details>
+<details class="grpfold"><summary>Per-agent guides <span class="n">41</span></summary>
+<a href="memory-for-aider.html">aider</a>
+<a href="memory-for-amp.html">Amp</a>
+<a href="memory-for-antigravity.html">Antigravity</a>
+<a href="memory-for-cherrystudio.html">Cherry Studio</a>
+<a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-codebuddy.html">CodeBuddy Code</a>
+<a href="memory-for-codewhale.html">CodeWhale</a>
+<a href="memory-for-codex.html">Codex</a>
+<a href="memory-for-commandcode.html">Command Code</a>
+<a href="memory-for-continue.html">Continue</a>
+<a href="memory-for-copilot.html">Copilot CLI</a>
+<a href="memory-for-crush.html">Crush</a>
+<a href="memory-for-cursor.html">Cursor</a>
+<a href="memory-for-devin.html">Devin CLI</a>
+<a href="memory-for-dsh.html">dsh</a>
+<a href="memory-for-gjc.html">gajae-code</a>
+<a href="memory-for-gemini.html">Gemini CLI</a>
+<a href="memory-for-goose.html">Goose</a>
+<a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-hermes.html">Hermes</a>
+<a href="memory-for-jetbrains.html">JetBrains AI Assistant</a>
+<a href="memory-for-junie.html">Junie</a>
+<a href="memory-for-kilocode.html">Kilo Code</a>
+<a href="memory-for-kimchi.html">Kimchi Coding</a>
+<a href="memory-for-kimi.html">Kimi Code</a>
+<a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-omp.html">omp</a>
+<a href="memory-for-openclaw.html">OpenClaw</a>
+<a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-pi.html">pi</a>
+<a href="memory-for-prime.html">prime-agent</a>
+<a href="memory-for-qwen.html">Qwen Code</a>
+<a href="memory-for-reasonix.html">Reasonix</a>
+<a href="memory-for-roo.html">Roo Code</a>
+<a href="memory-for-senpi.html">Senpi</a>
+<a href="memory-for-trae.html">TRAE CLI</a>
+<a href="memory-for-copilot-chat.html">VS Code Copilot Chat</a>
+<a href="memory-for-windsurf.html">Windsurf</a>
+<a href="memory-for-zcode.html">ZCode</a>
+<a href="memory-for-zed.html">Zed</a>
+</details>
+<div class="grp">Evidence</div>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="claude-mem-alternative.html">claude-mem alternative</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>How to delete aider chat history, and what you lose</h1>
+<p class="pagelede">one Markdown file per project holds every session<span class="mins" data-mins></span></p>
+<p>aider does not keep a file per conversation. Every time it starts in a repository it appends to the same <code>.aider.chat.history.md</code>, so one file holds every session you have had in that project, each one opening with a heading like <code># aider chat started at 2026-07-17 09:00:00</code>. Deleting one session means cutting its block out of that file; deleting the file deletes all of them.</p>
+
+<h2>Where the history is</h2>
+<pre>&lt;git root&gt;/.aider.chat.history.md   every session, as Markdown
+&lt;git root&gt;/.aider.input.history     the prompts you typed</pre>
+<p>aider writes both at the root of the git repository it runs in, and in the launch directory when it runs outside one, so <code>~/.aider.chat.history.md</code> exists only if you started aider from your home directory. <code>--chat-history-file</code> (or <code>AIDER_CHAT_HISTORY_FILE</code>) and <code>--input-history-file</code> (<code>AIDER_INPUT_HISTORY_FILE</code>) move them. A third log, of the raw messages sent to the model, is written only when you set <code>--llm-history-file</code> (<code>AIDER_LLM_HISTORY_FILE</code>).</p>
+<p>When aider starts in a repository it offers to add <code>.aider*</code> to <code>.gitignore</code>, so the files are usually untracked. If one was committed before that, deleting it does not remove it from the repository's git history.</p>
+
+<h2>How to delete one session</h2>
+<p>Quit aider first: a running aider appends to the file. Then delete the session's block, from its <code># aider chat started at</code> line down to the line before the next one, in an editor or with <code>awk</code>, using the heading of the session you want gone:</p>
+<pre>awk -v start='# aider chat started at 2026-07-17 09:00:00' '
+  $0 == start { skip = 1; next }
+  skip &amp;&amp; /^# aider chat started at / { skip = 0 }
+  !skip
+' .aider.chat.history.md &gt; .aider.chat.history.md.tmp &amp;&amp;
+  mv .aider.chat.history.md.tmp .aider.chat.history.md</pre>
+<p>The sessions before and after it stay as they are. The prompts you typed in that session are still in <code>.aider.input.history</code>, each under a <code># &lt;date&gt; &lt;time&gt;</code> line with its text on <code>+</code> lines; delete those entries too, or the file as a whole, if the prompts have to go.</p>
+<p><code>deja delete</code> refuses aider sessions: one file holds every session in the project, and deja does not edit it. After trimming the file, <code>deja forget --session &lt;id&gt;</code> drops deja's copy as well; <code>deja last</code> lists the ids.</p>
+
+<h2>How to delete all of it</h2>
+<p>In the project's root, with aider closed:</p>
+<pre>rm .aider.chat.history.md .aider.input.history</pre>
+<p>Add your <code>.aider.llm.history</code>, or whatever <code>--llm-history-file</code> names, if you set one. Do not run <code>rm .aider*</code>: <code>.aider.conf.yml</code>, <code>.aider.model.settings.yml</code> and <code>.aider.model.metadata.json</code> are your configuration, and <code>.aider.tags.cache.v*</code> is only the repository map's cache. Repeat in each project you have used aider in.</p>
+
+<h2>What you lose</h2>
+<p>The conversation as aider logged it: your prompts (the <code>####</code> lines), the replies with the edit blocks the model wrote, and the <code>&gt;</code> lines that record which files were added or edited and which commands ran. <code>aider --restore-chat-history</code> loads the file back into a new chat, so a trimmed session is gone from it, and a deleted file leaves nothing to restore. The commits aider made stay in <code>git log</code>; deleting the history does not touch them.</p>
+
+<h2>Keeping it searchable instead</h2>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> indexes aider's history with every other agent's on the machine. Run <code>deja index</code> before you trim or delete: a session that leaves the file stays in deja's local index, so <code>deja &lt;query&gt;</code> still finds it and <code>deja show &lt;id&gt;</code> prints it.</p>
+<pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja index
+deja "aider session about the tenant query"</pre>
+<p>deja reads <code>~/.aider.chat.history.md</code>, <code>AIDER_CHAT_HISTORY_FILE</code>, every project <code>deja aider</code> has started aider in (listed in <code>~/.config/deja/aider-projects</code>), and each directory in <code>DEJA_AIDER_ROOTS</code> to two levels down; <code>deja sources</code> shows which histories it found. <code>deja resume</code> cannot reopen one aider session, since <code>--restore-chat-history</code> loads the whole file, and says so. <a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget --session &lt;id&gt;</code> removes a session from the index for good.</p>
+
+<p><a href="where-sessions-are-stored.html">Where every agent keeps its history</a> · <a href="memory-for-aider.html">Memory for aider</a> · <a href="../registry/aider.html">The aider format</a></p>
+<nav class="related-guides" aria-label="Related guides"><p><b>Related guides:</b> <a href="memory-for-aider.html">Memory for aider</a> · <a href="../registry/aider.html">aider format</a> · <a href="getting-started.html">Getting started</a> · <a href="day-zero.html">Day zero</a> · <a href="switching-agents.html">Switching agents</a> · <a href="sync-across-machines.html">Sync across machines</a> · <a href="compare.html">Compare memory tools</a> · <a href="claude-mem-alternative.html">claude-mem alternative</a> · <a href="memory-for-claude-code.html">Claude Code</a> · <a href="memory-for-codex.html">Codex</a> · <a href="memory-for-cursor.html">Cursor</a> · <a href="memory-for-opencode.html">opencode</a> · <a href="memory-for-gemini.html">Gemini CLI</a> · <a href="agents.html">Agents &amp; MCP</a></p></nav>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

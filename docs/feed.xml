@@ -32,6 +32,13 @@
     <summary>Cursor&#39;s state.vscdb at 30–125 GB: two read-only queries that show which chats fill it, how to shrink it safest first, and how to keep the chats you delete.</summary>
   </entry>
   <entry>
+    <title>Delete aider chat history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-aider-chat-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-aider-chat-history.html"></link>
+    <updated>2026-11-03T00:00:00Z</updated>
+    <summary>aider appends every session in a project to one .aider.chat.history.md. Cut out one session or remove the file, and keep both searchable with deja.</summary>
+  </entry>
+  <entry>
     <title>Delete Amp thread history — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/delete-amp-thread-history.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-amp-thread-history.html"></link>
@@ -46,6 +53,13 @@
     <summary>Antigravity keeps a conversation in six places under ~/.gemini/antigravity. Delete it in the app, then VACUUM the summaries database so the text is gone too.</summary>
   </entry>
   <entry>
+    <title>Delete Cherry Studio session history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-cherrystudio-session-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-cherrystudio-session-history.html"></link>
+    <updated>2026-11-03T00:00:00Z</updated>
+    <summary>Cherry Studio keeps Claude, pi and dsh transcripts under Data/Agents. Delete the session files by hand, and run deja index first so they stay searchable.</summary>
+  </entry>
+  <entry>
     <title>Delete Cline task history — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/delete-cline-task-history.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-cline-task-history.html"></link>
@@ -58,6 +72,13 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html"></link>
     <updated>2026-11-03T00:00:00Z</updated>
     <summary>How to delete CodeBuddy Code and WorkBuddy sessions — the .jsonl conversation, its .meta.json, rollback sidecar and file-history snapshots.</summary>
+  </entry>
+  <entry>
+    <title>Delete CodeWhale session history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-codewhale-session-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-codewhale-session-history.html"></link>
+    <updated>2026-11-03T00:00:00Z</updated>
+    <summary>CodeWhale stores each session in a JSON file under ~/.codewhale/sessions. Remove one session or all, and keep history searchable with deja before deleting.</summary>
   </entry>
   <entry>
     <title>Delete Codex CLI sessions in ~/.codex/sessions — deja-vu</title>
@@ -214,6 +235,13 @@
     <summary>Install deja and index your coding-agent history in one command, then search it and wire it into your agents over MCP.</summary>
   </entry>
   <entry>
+    <title>Add memory to JetBrains AI Assistant — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-jetbrains.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-jetbrains.html"></link>
+    <updated>2026-11-03T00:00:00Z</updated>
+    <summary>Give JetBrains AI Assistant recall over every coding agent&#39;s sessions — MCP in ~/.ai/mcp/mcp.json, and why no hook can deliver it.</summary>
+  </entry>
+  <entry>
     <title>Claude Code: No conversation found with session ID — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/no-conversation-found-claude-code.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/no-conversation-found-claude-code.html"></link>
@@ -261,33 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/card/"></link>
     <updated>2026-11-01T00:00:00Z</updated>
     <summary>deja stats --card writes an SVG. Drop it here to get a PNG you can post. The conversion happens in your browser; the file is never uploaded.</summary>
-  </entry>
-  <entry>
-    <title>deja CLI reference: search, recall, blame, stats — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/commands.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/commands.html"></link>
-    <updated>2026-11-01T00:00:00Z</updated>
-    <summary>Every deja subcommand: search, ctx, blame, fix, how, secrets, remember, forget, stats, last, sources, install, embed, sync, doctor, bench and update.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to CodeBuddy Code — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-codebuddy.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-codebuddy.html"></link>
-    <updated>2026-11-01T00:00:00Z</updated>
-    <summary>How to give CodeBuddy Code and WorkBuddy recall over every coding agent&#39;s sessions on this machine — MCP server, Claude-shape hooks, and status line.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Crush: every agent&#39;s sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-crush.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-crush.html"></link>
-    <updated>2026-11-01T00:00:00Z</updated>
-    <summary>Crush keeps one history store per project and reads none of the others. deja adds an MCP server, a skill, a /user:deja command and a PreToolUse hook.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Hermes: every agent&#39;s sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html"></link>
-    <updated>2026-11-01T00:00:00Z</updated>
-    <summary>Hermes searches its own sessions and keeps MEMORY.md. deja adds the other forty-two agents: a plugin on pre_llm_call, the MCP tools, and a skill.</summary>
   </entry>
 </feed>
