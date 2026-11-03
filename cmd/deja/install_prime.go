@@ -258,7 +258,7 @@ export default function (pi: any) {
           // The receipt is what tells the user memory arrived; without it the
           // recall is invisible and reads as the model guessing.
           if (receipt) ctx.ui.notify(receipt, "info");
-          const stats = run(["statusline"], "");
+          const stats = run(["statusline"], JSON.stringify({ session_id: sessionID(), transcript_path: sessionFile, cwd: process.cwd() })).split(" · ").slice(0, 3).map((p: string, i: number) => i === 2 ? p.replace(/^(\d+\s+earlier)\b.*/, "$1") : p).join(" · ");
           if (stats) ctx.ui.setStatus("deja", stats);
           return { message: { customType: "deja-recall", content: digest, display: false } };
         }

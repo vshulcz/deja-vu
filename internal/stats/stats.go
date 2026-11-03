@@ -72,8 +72,9 @@ type Report struct {
 	// caller, not by Build — replaced spans are deliberately kept out of
 	// ordinary retrieval (a span is the file's old contents, not a statement),
 	// so they never reach the sessions Build is given.
-	Spans     int `json:"spans,omitempty"`
-	SpanFiles int `json:"span_files,omitempty"`
+	Spans             int `json:"spans,omitempty"`
+	SpanFiles         int `json:"span_files,omitempty"`
+	PreservedSessions int `json:"preserved_sessions,omitempty"`
 }
 
 // HarnessStats is one harness row of a report.

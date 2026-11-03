@@ -111,6 +111,28 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "${GITHUB_REF_NAME}" dist/deja-spec-kit.zip --clobber
 
+      - name: Pack and publish VS Code extension
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          cd extensions/vscode
+          node -e '
+            const fs = require("node:fs");
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            pkg.version = process.env.GITHUB_REF_NAME.replace(/^v/, "");
+            fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
+          '
+          npx --yes @vscode/vsce package --no-dependencies -o "$GITHUB_WORKSPACE/dist/deja-status.vsix"
+          gh release upload "${GITHUB_REF_NAME}" "$GITHUB_WORKSPACE/dist/deja-status.vsix" --clobber
+          if [ -n "${OVSX_PAT:-}" ]; then
+            npx --yes ovsx publish "$GITHUB_WORKSPACE/dist/deja-status.vsix" -p "$OVSX_PAT"
+          fi
+          if [ -n "${VSCE_PAT:-}" ]; then
+            npx --yes @vscode/vsce publish --packagePath "$GITHUB_WORKSPACE/dist/deja-status.vsix" -p "$VSCE_PAT"
+          fi
+
       - name: Attach the manifests to the release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -190,10 +212,16 @@ jobs:
           fi
           # komac branches from upstream master inside the fork; a fork far
           # enough behind lacks that commit and komac fails with "Ref cannot
-          # be created" (#4137).
-          if ! owner="$(gh api user --jq .login)" \
-            || ! gh api -X POST "repos/${owner}/winget-pkgs/merge-upstream" -f branch=master >/dev/null; then
-            echo "::warning::could not sync the winget-pkgs fork with upstream"
+          # be created" (#4137). Create the fork first if the token owner does
+          # not have one yet (#5832).
+          if owner="$(gh api user --jq .login)"; then
+            if ! gh api "repos/${owner}/winget-pkgs" >/dev/null 2>&1; then
+              gh repo fork microsoft/winget-pkgs --clone=false || echo "::warning::could not fork microsoft/winget-pkgs"
+              sleep 5
+            fi
+            if ! gh api -X POST "repos/${owner}/winget-pkgs/merge-upstream" -f branch=master >/dev/null; then
+              echo "::warning::could not sync the winget-pkgs fork with upstream"
+            fi
           fi
           v="${GITHUB_REF_NAME#v}"
           base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"

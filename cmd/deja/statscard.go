@@ -97,6 +97,10 @@ func renderStatsCard(r stats.Report) string {
 		cardText(&b, w-pad, rowY, 12, "400",
 			formatStatNumber(r.Spans)+" replaced span"+pluralS(r.Spans)+" in "+formatStatNumber(r.SpanFiles)+" file"+pluralS(r.SpanFiles)+" deja can restore", "#8b989a",
 			"text-anchor=\"end\"")
+	case r.PreservedSessions > 0:
+		cardText(&b, w-pad, rowY, 12, "400",
+			formatStatNumber(r.PreservedSessions)+" deleted session"+pluralS(r.PreservedSessions)+" kept searchable", "#8b989a",
+			"text-anchor=\"end\"")
 	case r.RepeatQuestions > 0 && formatStatNumber(r.RepeatQuestions) != hero:
 		cardText(&b, w-pad, rowY, 12, "400",
 			formatStatNumber(r.RepeatQuestions)+" question"+pluralS(r.RepeatQuestions)+" asked more than once", "#8b989a",

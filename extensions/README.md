@@ -16,6 +16,8 @@ same local index.
 | [`grok/`](grok) | Grok Build plugin `deja` from this repository's marketplace, then `grok plugin install deja` (official entry in review: xai-org/plugin-marketplace#332) | `grok plugin marketplace add vshulcz/deja-vu` |
 | [`hermes/`](hermes) | Hermes memory provider `deja-memory` | `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 | [`magpie/`](magpie) | npm `@vshulcz/magpie-deja` | `magpie plugin add @vshulcz/magpie-deja` |
+| [`vscode/`](vscode) | VS Code Marketplace & OpenVSX `vshulcz.deja-status` | `code --install-extension vshulcz.deja-status` |
+| [`raycast/`](raycast) | Raycast extension `deja-vu` | `cd extensions/raycast && npm install && npx ray develop` |
 | [`spec-kit/`](spec-kit) | Spec Kit extension `deja-vu`, release asset `deja-spec-kit.zip` | `specify extension add deja-vu --from https://github.com/vshulcz/deja-vu/releases/latest/download/deja-spec-kit.zip` |
 
 Four more integrations live outside this directory because their registries or

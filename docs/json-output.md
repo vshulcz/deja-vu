@@ -338,6 +338,9 @@ and is omitted when none were.
 
 `spans` and `span_files` count the replaced spans `deja restore` can hand back
 and the files they belong to. Both are omitted when the index holds none.
+`preserved_sessions` counts indexed sessions whose source transcript on disk has
+been deleted or pruned by its harness and that remain searchable in the index; it
+is omitted when zero.
 
 `agent_credits` counts assistant turns that said the credit line. Beside it,
 `used_not_credited` counts turns that name a recalled session — `deja:<id>` —
@@ -347,7 +350,9 @@ session *about* deja quotes ids in prose; read the two together as the size of
 the question rather than as an answer.
 
 Inside `recall`, `raw_bytes` is the size of the source transcripts the served
-digests distilled and `since` is the oldest non-compaction-measurement event still in the usage log; both
+digests distilled, `tool_lines` counts non-empty PreToolUse/PostToolUse hints
+served at point of action, `fixes_served` counts non-empty `deja_fix` error-fix
+answers served, and `since` is the oldest non-compaction-measurement event still in the usage log; all four
 are omitted when zero. Any event counts toward `since`, a search the reader ran
 included, so it can be present while `recalls_served` and `injections` are 0.
 

@@ -177,6 +177,8 @@ type Summary struct {
 	InjectedBytes    int     `json:"injected_bytes"`
 	RawBytes         int64   `json:"raw_bytes,omitempty"`
 	DejaVuMoments    int     `json:"dejavu_moments,omitempty"`
+	ToolLines        int     `json:"tool_lines,omitempty"`
+	FixesServed      int     `json:"fixes_served,omitempty"`
 	EmptyResultRate  float64 `json:"empty_result_rate"`
 	// Since is the oldest event still in the log. The log is rewritten past
 	// 1MB keeping the last 14 days, so a count with no period attached reads
@@ -402,6 +404,8 @@ type StatusNumbers struct {
 	// Today's source transcripts behind what was served, for the "less than
 	// replaying" clause.
 	RawToday int64
+	// Today's source transcripts behind explicit recalls only, matching Bytes.
+	ServedRawToday int64
 }
 
 // StatusCounters is every figure the day-and-week surfaces print, from one
@@ -445,6 +449,7 @@ func StatusCounters(indexDir string) StatusNumbers {
 			case servedKind(e.Kind):
 				out.Recalls++
 				out.Bytes += e.Bytes
+				out.ServedRawToday += e.RawBytes
 			case injectedKind(e.Kind):
 				out.Injected += e.Bytes
 				out.Injections++
@@ -529,6 +534,13 @@ func Totals(indexDir string) Summary {
 			out.RawBytes += e.RawBytes
 			if e.Kind == KindDejaVu {
 				out.DejaVuMoments++
+			}
+			if e.Kind == KindTool && !e.Empty {
+				out.ToolLines++
+			}
+		case e.Kind == KindFix:
+			if !e.Empty {
+				out.FixesServed++
 			}
 		}
 	}

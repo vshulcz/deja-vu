@@ -126,6 +126,7 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 		steps = append(steps, antigravityInjectStep{EphemeralMessage: recovery})
 	}
 	digest, sessions, raw, _, _, ids, projects := cachedHookDigestFor(dir, workspace, "")
+	digest, _, projects = attachClaudeAutoMemory(dir, input.ConversationID, input.TranscriptPath, "antigravity", hookCWD(workspace), digest, projects)
 	if digest != "" {
 		digest = frameRecall(startLead(antigravityLead) + digest)
 		rememberDigestInjected(dir, input.ConversationID)
@@ -163,4 +164,4 @@ func antigravityCompactionPacket(dir string, input antigravityHookInput, workspa
 	return strings.TrimSpace(out.String())
 }
 
-const antigravityLead = "The sessions below are from this project's recent history. If any is relevant to what the user asks next, call recall_context with the session id printed beside it — an id is exact, a phrase is a guess — to pull the full details before acting. \nIf one of these helps, open your reply with that one line and nothing more about it: déjà vu: <what it said> — reusing it (deja:<session id>). If none helps, say nothing about them.\n"
+const antigravityLead = "The sessions below are from this project's recent history. If any is relevant to what the user asks next, call the deja tool in \"context\" mode (or recall_context) with the session id printed beside it — an id is exact, a phrase is a guess — to pull the full details before acting. \nIf one of these helps, open your reply with that one line and nothing more about it: déjà vu: <what it said> — reusing it (deja:<session id>). If none helps, say nothing about them.\n"

@@ -229,7 +229,7 @@ window.__ModuleLoader__.load({
         h(
           "div",
           { className: "deja-head" },
-          h("span", { className: "deja-name" }, "deja-vu"),
+          h("a", { className: "deja-name", href: "https://github.com/vshulcz/deja-vu", target: "_blank", rel: "noopener noreferrer" }, "deja-vu"),
           h("button", { type: "button", className: "deja-close", title: "Dismiss", "aria-label": "Dismiss deja-vu notes", onClick: onClose }, "×"),
         ),
         hidden > 0 ? body.slice(0, VISIBLE) : body,

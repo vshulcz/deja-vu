@@ -1,0 +1,46 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "deja-vu",
+  "title": "deja-vu",
+  "description": "Search and resume sessions across Claude Code, Codex, Cursor, OpenCode, Gemini CLI and 38 more coding agents.",
+  "icon": "command-icon.png",
+  "author": "vshulcz",
+  "license": "MIT",
+  "categories": [
+    "Developer Tools",
+    "Productivity"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vshulcz/deja-vu.git",
+    "directory": "extensions/raycast"
+  },
+  "commands": [
+    {
+      "name": "search-sessions",
+      "title": "Search Sessions",
+      "subtitle": "deja-vu",
+      "description": "Full-text search across every coding agent session on this Mac.",
+      "mode": "view"
+    },
+    {
+      "name": "recent-sessions",
+      "title": "Recent Sessions",
+      "subtitle": "deja-vu",
+      "description": "Browse the 100 most recent coding agent sessions across all harnesses.",
+      "mode": "view"
+    }
+  ],
+  "preferences": [
+    {
+      "name": "dejaPath",
+      "type": "file",
+      "required": false,
+      "title": "deja binary path",
+      "description": "Optional path to the deja binary if not in /opt/homebrew/bin, /usr/local/bin, ~/.local/bin or ~/go/bin."
+    }
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.mts"
+  }
+}

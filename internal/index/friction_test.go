@@ -188,3 +188,54 @@ func TestNewestOfBreaksTheTie(t *testing.T) {
 		t.Fatalf("no sessions, no date, got %v", got)
 	}
 }
+
+func TestFindFrictionSkipsLowSignalShellGlobWhenAnotherWallExists(t *testing.T) {
+	tmp := t.TempDir()
+	claude := filepath.Join(tmp, "claude")
+	proj := filepath.Join(claude, "-Users-you-code-app")
+	if err := os.MkdirAll(proj, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for i := range 4 {
+		sid := fmt.Sprintf("glob%02d", i)
+		lines := []string{
+			`{"type":"user","sessionId":"` + sid + `","cwd":"/w","timestamp":"2026-01-0` +
+				strconv.Itoa(i+1) + `T03:04:05Z","message":{"role":"user","content":"check glob"}}`,
+			`{"type":"user","sessionId":"` + sid + `","cwd":"/w","timestamp":"2026-01-0` +
+				strconv.Itoa(i+1) + `T03:05:05Z","message":{"role":"user","content":[{"type":"tool_result",` +
+				`"content":"(eval):1: no matches found: *.nonexistent"}]}}`,
+		}
+		if err := os.WriteFile(filepath.Join(proj, sid+".jsonl"), []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := range 3 {
+		sid := fmt.Sprintf("real%02d", i)
+		lines := []string{
+			`{"type":"user","sessionId":"` + sid + `","cwd":"/w","timestamp":"2026-01-0` +
+				strconv.Itoa(i+1) + `T02:04:05Z","message":{"role":"user","content":"run shellcheck"}}`,
+			`{"type":"user","sessionId":"` + sid + `","cwd":"/w","timestamp":"2026-01-0` +
+				strconv.Itoa(i+1) + `T02:05:05Z","message":{"role":"user","content":[{"type":"tool_result",` +
+				`"content":"(eval):1: command not found: shellcheck"}]}}`,
+		}
+		if err := os.WriteFile(filepath.Join(proj, sid+".jsonl"), []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	setHome(t, t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
+	t.Setenv("DEJA_CLAUDE_ROOT", claude)
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))
+	dir := filepath.Join(tmp, "index.db")
+	if err := Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	f, ok := FindFriction(dir, nil)
+	if !ok {
+		t.Fatal("expected FindFriction to return a wall")
+	}
+	if f.Text != "command not found: shellcheck" {
+		t.Fatalf("FindFriction picked %q, want real error over zsh glob noise", f.Text)
+	}
+}

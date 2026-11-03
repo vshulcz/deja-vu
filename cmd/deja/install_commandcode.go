@@ -163,7 +163,8 @@ export default function (cmd: any) {
   const recalls = new Map<string, string>()
   const status = () => {
     try {
-      cmd.ui.setStatus(run(["statusline"], "", 2000).split(" · ").slice(0, 3).join(" · ") || null)
+      const payload = session ? JSON.stringify({ session_id: session, cwd: cmd.cwd }) : ""
+      cmd.ui.setStatus(run(["statusline"], payload, 2000).split(" · ").slice(0, 3).map((p, i) => i === 2 ? p.replace(/^(\d+\s+earlier)\b.*/, "$1") : p).join(" · ") || null)
     } catch {}
   }
   cmd.on("run_start", (event: any) => {

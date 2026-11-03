@@ -25,7 +25,7 @@ func TestStarTipLine(t *testing.T) {
 	}
 
 	// At >= 25 recalls returns star tip on first call and writes stamp.
-	const want = "  If it helps      gh repo star vshulcz/deja-vu"
+	const want = "  If it helps      gh repo star vshulcz/deja-vu · https://github.com/vshulcz/deja-vu"
 	if got := starTipLine(dir, 25); got != want {
 		t.Fatalf("starTipLine(25) = %q, want %q", got, want)
 	}

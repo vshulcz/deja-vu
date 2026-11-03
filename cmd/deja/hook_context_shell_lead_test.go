@@ -27,7 +27,7 @@ func TestHookContextLeadNamesTheShellWhereThereIsNoTool(t *testing.T) {
 	// The control: a harness with the tool still hears about it.
 	withHookStdin(t, `{"source":"startup","session_id":"a1"}`)
 	out := captureStdout(t, func() { _ = runHookContext(index.DefaultDir(), true) })
-	if !strings.Contains(out, "call recall_context") {
+	if !strings.Contains(out, "call the deja tool") || !strings.Contains(out, "recall_context") {
 		t.Fatalf("the ordinary lead does not name the tool, so this measures nothing: %q", out)
 	}
 

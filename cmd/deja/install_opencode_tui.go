@@ -45,7 +45,8 @@ const tui = async (api) => {
         if (!err) setLine(String(out).split("\n")[0].trim())
       })
       child.stdin?.on("error", () => {})
-      child.stdin?.end(JSON.stringify({ session_id: sid }) + "\n")
+      const width = Math.max(24, Math.min(72, (process.stdout?.columns || 80) - 24))
+      child.stdin?.end(JSON.stringify({ session_id: sid, width }) + "\n")
     } catch {}
   }
   const follow = (id) => {
@@ -64,7 +65,7 @@ const tui = async (api) => {
   const view = (ctx) => <text fg={ctx.theme.current.textMuted}>{line()}</text>
   const short = (ctx) => {
     const max = (process.stdout?.columns || 80) < 100 ? 2 : 3
-    return <text fg={ctx.theme.current.textMuted}>{line().split(" · ").slice(0, max).join(" · ")}</text>
+    return <text fg={ctx.theme.current.textMuted}>{line().split(" · ").slice(0, max).map((p, i) => i === 2 ? p.replace(/^(\d+\s+earlier)\b.*/, "$1") : p).join(" · ")}</text>
   }
   api.slots.register({
     order: 150,

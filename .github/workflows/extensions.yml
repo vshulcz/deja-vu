@@ -337,6 +337,56 @@ jobs:
             process.exit(bad ? 1 : 0);
           '
 
+  vscode:
+    name: vscode-deja
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: extensions/vscode
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 22
+
+      - name: The extension and manifest have to parse
+        run: |
+          node --check extension.js
+          node -e '
+            const fs = require("node:fs");
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            if (!fs.existsSync(pkg.main)) throw new Error("main missing: " + pkg.main);
+            if (!fs.existsSync(pkg.icon)) throw new Error("icon missing: " + pkg.icon);
+          '
+
+  raycast:
+    name: raycast-deja
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: extensions/raycast
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 22
+
+      - name: Run unit tests
+        run: node --test test/*.test.mts
+
+      - name: Validate manifest entrypoints and assets
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            if (!fs.existsSync("assets/" + pkg.icon)) throw new Error("missing icon: " + pkg.icon);
+            for (const c of pkg.commands || []) {
+              if (!fs.existsSync("src/" + c.name + ".tsx")) throw new Error("missing command entrypoint: " + c.name);
+            }
+          '
+
   metadata:
     name: packages point at this repository
     runs-on: ubuntu-latest
@@ -375,7 +425,7 @@ jobs:
           node -e '
             const fs = require("node:fs");
             let bad = 0;
-            for (const dir of ["extensions/opencode", "extensions/dsh", "extensions/openclaw", "extensions/pi", "extensions/magpie"]) {
+            for (const dir of ["extensions/opencode", "extensions/dsh", "extensions/openclaw", "extensions/pi", "extensions/magpie", "extensions/vscode", "extensions/raycast"]) {
               const pkg = JSON.parse(fs.readFileSync(dir + "/package.json", "utf8"));
               const repo = pkg.repository || {};
               if (!String(repo.url || "").includes("vshulcz/deja-vu")) {

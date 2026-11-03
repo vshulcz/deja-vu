@@ -102,7 +102,7 @@ function activate(context) {
           return;
         }
         item.tooltip = line;
-        item.text = line.split(" · ").slice(0, 3).join(" · ");
+        item.text = line.split(" · ").slice(0, 3).map((p, i) => i === 2 ? p.replace(/^(\d+\s+earlier)\b.*/, "$1") : p).join(" · ");
         item.show();
       });
     } catch {

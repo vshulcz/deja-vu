@@ -290,7 +290,9 @@ func splitClaudeFrontmatter(text string) (map[string]string, string) {
 	} else {
 		after = ""
 	}
+	inMetadata := false
 	for line := range strings.SplitSeq(header, "\n") {
+		indented := len(line) > 0 && (line[0] == ' ' || line[0] == '\t')
 		k, v, hasColon := strings.Cut(line, ":")
 		if !hasColon {
 			continue
@@ -298,8 +300,13 @@ func splitClaudeFrontmatter(text string) (map[string]string, string) {
 		k = strings.ToLower(strings.TrimSpace(k))
 		v = strings.TrimSpace(v)
 		v = strings.Trim(v, `"'`)
+		if !indented {
+			inMetadata = k == "metadata" && v == ""
+		}
 		if k != "" && v != "" {
-			fm[k] = v
+			if !indented || (inMetadata && fm[k] == "") {
+				fm[k] = v
+			}
 		}
 	}
 	return fm, after

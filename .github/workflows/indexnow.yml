@@ -123,6 +123,10 @@ jobs:
                   ;;
               esac
               echo "pages built $commit, which is $rel of $SHA — waiting"
+            elif [ "$state" = "errored" ] && [ "${retried:-0}" -lt 2 ]; then
+              retried=$(( ${retried:-0} + 1 ))
+              echo "pages build errored ($built); requesting retry $retried/2"
+              gh api -X POST "repos/$REPO/pages/builds" >/dev/null 2>&1 || true
             else
               echo "pages: $built — waiting"
             fi

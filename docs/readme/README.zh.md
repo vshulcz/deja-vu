@@ -240,6 +240,8 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsur
 | pi（以及 omp） | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
 | Hermes | 记忆提供者 `deja-memory`，在 Hermes 插件目录里 | `hermes plugins install deja-memory`，或从 GitHub：`hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 | Magpie | npm `@vshulcz/magpie-deja` | `magpie plugin add @vshulcz/magpie-deja` |
+| VS Code / Cursor / Windsurf | 状态栏扩展 `vshulcz.deja-status` | `code --install-extension vshulcz.deja-status` |
+| Raycast | Raycast 扩展 `deja-vu` | `cd extensions/raycast && npm install && npx ray develop` |
 | CC Switch | 一键导入 MCP 与 Skill 仓库（`ccswitch://`） | [导入 MCP 到 CC Switch](ccswitch://v1/import?resource=mcp&apps=claude,codex,gemini,opencode&config=eyJtY3BTZXJ2ZXJzIjp7ImRlamEiOnsiY29tbWFuZCI6Im5weCIsImFyZ3MiOlsiLXkiLCJAdnNodWxjei9kZWphLXZ1Iiwic2VydmUiXX19fQ==) · [跨智能体切换指南](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html) |
 
 两条路各自都够用，两条都走也不会出问题：每个包都会先读 `deja install` 写下的配置。

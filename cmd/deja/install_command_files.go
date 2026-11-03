@@ -37,11 +37,12 @@ func commandBody(exe, argsToken string) string {
 	return `Search the user's own past sessions across every AI coding tool on this
 machine, then answer from what you find.
 
-Use the deja recall tool with the user's words as the query — the most specific
-tokens win: an exact error string, a function name, a file path, a flag. If a
-result looks right but is too short to act on, follow up with recall_context.
+Call the deja tool in ` + "`recall`" + ` mode with the user's words as the query — the
+most specific tokens win (an exact error string, a function name, a file path,
+a flag). If a result looks right but is too short to act on, follow up with
+` + "`context`" + ` mode using a term from it.
 
-If the deja MCP tools are unavailable, run the CLI instead:
+If the deja MCP tool is unavailable, run the CLI instead:
 
 ` + "```bash\n" + shellQuoteIfNeeded(exe) + ` --framed search -- "` + argsToken + `"
 ` + "```" + `
@@ -240,7 +241,7 @@ func installCommandFile(harness, exe string, uninstall bool) (installResult, err
 // silently turned the uninstall restore into a no-op and would have done the
 // same to the retired-name drop (#3655).
 func isOurCommandFile(b []byte) bool {
-	for _, marker := range []string{"(deja-vu)", "the deja recall tool", "deja MCP tools"} {
+	for _, marker := range []string{"(deja-vu)", "the deja recall tool", "Call the deja tool in `recall` mode", "deja MCP tools", "deja MCP tool"} {
 		if bytes.Contains(b, []byte(marker)) {
 			return true
 		}
