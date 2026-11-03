@@ -70,7 +70,7 @@ func runTests(dir string, args []string, stdout io.Writer) error {
 			i++
 			n, err := strconv.Atoi(args[i]) //nolint:gosec // i+1 < len(args) is checked above
 			if err != nil || n < 0 {
-				return fmt.Errorf("tests: --limit wants a number, got %q", args[i]) //nolint:gosec // i+1 < len(args) is checked above
+				return fmt.Errorf("tests: --limit wants a number from 0 up, got %q", args[i]) //nolint:gosec // i+1 < len(args) is checked above
 			}
 			limit = n
 		default:

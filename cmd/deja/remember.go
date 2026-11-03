@@ -46,43 +46,42 @@ func runRemember(dir string, args []string) error {
 	var text, project string
 	var tags []string
 	toRepo := false
+	afterDashDash := false
 	for i := 0; i < len(args); i++ {
-		if args[i] == "--repo" {
-			toRepo = true
-			continue
-		}
-		if args[i] == "--project" {
-			if i+1 >= len(args) {
-				return errors.New("remember: --project needs value")
+		if !afterDashDash {
+			if args[i] == "--repo" {
+				toRepo = true
+				continue
 			}
-			project = args[i+1] //nolint:gosec // G602: i+1 < len(args) checked above
-			i++
-			continue
-		}
-		if args[i] == "--tag" {
-			if i+1 >= len(args) {
-				return errors.New("remember: --tag needs value")
+			if args[i] == "--project" {
+				if i+1 >= len(args) {
+					return errors.New("remember: --project needs value")
+				}
+				project = args[i+1] //nolint:gosec // G602: i+1 < len(args) checked above
+				i++
+				continue
 			}
-			tags = append(tags, args[i+1]) //nolint:gosec // G602: i+1 < len(args) checked above
-			i++
-			continue
-		}
-		// `--` says the next word is the note however it starts, the spelling
-		// search, fix and how already take. A decision whose own words begin
-		// with a dash was otherwise refused as a flag.
-		if args[i] == "--" {
-			if i+1 >= len(args) {
-				return errors.New("remember: text required — deja remember \"the note\"")
+			if args[i] == "--tag" {
+				if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" { //nolint:gosec // G602: i+1 < len(args) checked by left operand
+					return errors.New("remember: --tag needs value")
+				}
+				tags = append(tags, args[i+1]) //nolint:gosec // G602: i+1 < len(args) checked above
+				i++
+				continue
 			}
-			if text != "" {
-				return errors.New("remember: expected one text argument — quote the note: deja remember \"the whole note\"")
+			// `--` says the rest are positional words however they start, the
+			// spelling search, fix and how already take. A decision whose own
+			// words begin with a dash was otherwise refused as a flag.
+			if args[i] == "--" {
+				if i+1 >= len(args) {
+					return errors.New("remember: text required — deja remember \"the note\"")
+				}
+				afterDashDash = true
+				continue
 			}
-			text = args[i+1] //nolint:gosec // G602: i+1 < len(args) checked above
-			i++
-			continue
-		}
-		if strings.HasPrefix(args[i], "-") {
-			return unknownFlag("remember", args[i], rememberFlags)
+			if strings.HasPrefix(args[i], "-") {
+				return unknownFlag("remember", args[i], rememberFlags)
+			}
 		}
 		if text != "" {
 			return errors.New("remember: expected one text argument — quote the note: deja remember \"the whole note\"")

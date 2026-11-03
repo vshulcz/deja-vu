@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -86,8 +87,8 @@ func TestFileHookLineOutsideResolvesProjectFromChildFilePath(t *testing.T) {
 		// live agent session was started from homeDir and accesses targetFile by
 		// its absolute path inside homeDir.
 		lines := []string{
-			`{"type":"user","sessionId":"` + id + `","cwd":"` + repoDir + `","timestamp":"` + ts + `","message":{"role":"user","content":"check pkg/engine.go"}}`,
-			`{"type":"assistant","sessionId":"` + id + `","cwd":"` + repoDir + `","timestamp":"` + ts + `","message":{"role":"assistant","content":[{"type":"tool_use","id":"u1","name":"Read","input":{"file_path":"pkg/engine.go"}},{"type":"text","text":"Decision: keep pkg/engine.go stateless across retries."}]}}`,
+			fmt.Sprintf(`{"type":"user","sessionId":%q,"cwd":%q,"timestamp":%q,"message":{"role":"user","content":"check pkg/engine.go"}}`, id, repoDir, ts),
+			fmt.Sprintf(`{"type":"assistant","sessionId":%q,"cwd":%q,"timestamp":%q,"message":{"role":"assistant","content":[{"type":"tool_use","id":"u1","name":"Read","input":{"file_path":"pkg/engine.go"}},{"type":"text","text":"Decision: keep pkg/engine.go stateless across retries."}]}}`, id, repoDir, ts),
 		}
 		if err := os.WriteFile(filepath.Join(proj, id+".jsonl"), []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
 			t.Fatal(err)

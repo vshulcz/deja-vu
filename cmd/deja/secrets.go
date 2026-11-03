@@ -67,7 +67,7 @@ func runSecrets(dir string, args []string, stdout io.Writer) error {
 			i++
 			n, err := strconv.Atoi(args[i]) //nolint:gosec // G602: i+1 < len(args) checked above
 			if err != nil || n < 0 {
-				return fmt.Errorf("secrets: --limit wants a number, got %q", args[i]) //nolint:gosec // G602: i+1 < len(args) checked above
+				return fmt.Errorf("secrets: --limit wants a number from 0 up, got %q", args[i]) //nolint:gosec // G602: i+1 < len(args) checked above
 			}
 			limit = n
 		default:

@@ -110,7 +110,7 @@ func runView(dir string, args []string) error {
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--out":
-			if i+1 >= len(args) {
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" { //nolint:gosec // i+1 < len(args) checked by left operand
 				return errors.New("view: --out needs a path")
 			}
 			i++
