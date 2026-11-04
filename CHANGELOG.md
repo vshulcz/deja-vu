@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `deja promote` rejects whitespace-only session id prefixes with the missing-prefix message.
+
 ## [0.23.5] - 2026-11-03
 
 ### Added

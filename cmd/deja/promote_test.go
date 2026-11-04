@@ -50,6 +50,35 @@ func TestPromoteWritesNoteWithProvenanceAndState(t *testing.T) {
 	}
 }
 
+func TestPromoteRefusesWhitespaceOnlyIDPrefix(t *testing.T) {
+	dir := promoteFixture(t)
+	n, err := index.SessionCount(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Fatalf("SessionCount = %d, want 1", n)
+	}
+	for _, tc := range []struct {
+		name   string
+		prefix string
+	}{
+		{"empty", ""},
+		{"spaces", "   "},
+		{"tabs_newline", "\t\r\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := runPromote(dir, []string{tc.prefix}, &bytes.Buffer{})
+			if err == nil {
+				t.Fatal("blank prefix must fail")
+			}
+			if want := "promote needs a session id prefix (see `deja last`)"; err.Error() != want {
+				t.Fatalf("error = %q, want %q", err, want)
+			}
+		})
+	}
+}
+
 func TestPromoteRefusesASecondIDPrefix(t *testing.T) {
 	dir := promoteFixture(t)
 	for _, args := range [][]string{{"nosuch", "sess1234"}, {"sess1234", "extra"}, {"sess1234", "--note", "x", "nosuch"}} {
