@@ -2,6 +2,7 @@ package search
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -546,6 +547,9 @@ func autoRecallSessionForAskedWithLimit(s model.Session, now time.Time, provenan
 		// first, and is what `deja share` prints under the same heading.
 		conclusions = digest.SubstantialConclusions(s, conclusionBudget, conclusionLimit)
 		matched = len(conclusions) > 0
+		if matched {
+			problem = sessionStartProblemForConclusions(s, conclusions)
+		}
 	}
 	for _, m := range s.Messages {
 		if problem != "" && (len(conclusions) >= conclusionLimit || matched) {
@@ -663,6 +667,85 @@ func autoRecallSessionForAskedWithLimit(s model.Session, now time.Time, provenan
 	return b.String()
 }
 
+// sessionStartProblemForConclusions picks the user question that initiated the
+// episode `conclusions` came from. On a multi-topic marathon session, message 0
+// can be thousands of messages and several topics earlier than the concluding
+// turn at the tail ("wg будто бы упал" at the start vs a Moscow-Vienna VLESS
+// routing diagnosis at message 13,104), splicing two unrelated systems into one
+// digest block.
+func sessionStartProblemForConclusions(s model.Session, conclusions []string) string {
+	if len(conclusions) == 0 {
+		return ""
+	}
+	firstIdx := -1
+	firstProblem := ""
+	for i, m := range s.Messages {
+		if m.Role != "user" || noiseMessage(m.Text) || digest.IsCompactionSummary(strings.TrimSpace(m.Text)) {
+			continue
+		}
+		text := contextText(m.Text, false)
+		if strings.TrimSpace(text) == "" || saysItHasNoMemory(text) {
+			continue
+		}
+		if len(prompt.Terms(text)) > 0 {
+			firstIdx = i
+			firstProblem = firstLine(text, 160)
+			break
+		}
+	}
+	if firstIdx < 0 {
+		return ""
+	}
+	probe := strings.TrimSpace(strings.TrimSuffix(conclusions[0], "…"))
+	if len(probe) > 48 {
+		probe = strings.TrimSpace(digest.UTF8SafeCut(probe, 48))
+	}
+	concIdx := -1
+	for i, m := range slices.Backward(s.Messages) {
+		if m.Role != "assistant" {
+			continue
+		}
+		if probe != "" && (strings.Contains(m.Text, probe) || strings.Contains(digest.MessageText(m.Text), probe)) {
+			concIdx = i
+			break
+		}
+	}
+	if concIdx <= firstIdx+12 {
+		return firstProblem
+	}
+	concText := conclusions[0]
+	if TextCarriesAnyTerm(concText, prompt.Terms(firstProblem)) {
+		return firstProblem
+	}
+	nearest := ""
+	floor := max(firstIdx+1, concIdx-80)
+	for i := concIdx - 1; i >= floor; i-- {
+		m := s.Messages[i]
+		if m.Role != "user" || noiseMessage(m.Text) || digest.IsCompactionSummary(strings.TrimSpace(m.Text)) || digest.IsTrivialContinuation(m.Text) {
+			continue
+		}
+		text := contextText(m.Text, false)
+		if strings.TrimSpace(text) == "" || saysItHasNoMemory(text) {
+			continue
+		}
+		uTerms := prompt.Terms(text)
+		if len(uTerms) == 0 {
+			continue
+		}
+		line := firstLine(text, 160)
+		if TextCarriesAnyTerm(concText, uTerms) {
+			return line
+		}
+		if nearest == "" && len(uTerms) >= 2 {
+			nearest = line
+		}
+	}
+	if nearest != "" {
+		return nearest
+	}
+	return firstProblem
+}
+
 // matchedLines picks the lines of a session that carry what was asked about:
 // the best-matching user message, and the two best-matching assistant
 // messages in the order they were said. What matches nothing is left to the
@@ -714,7 +797,7 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 		if digest.IsDocumentItem(m.Text, line) {
 			continue
 		}
-		if digest.CarriesDecision(line) {
+		if digest.CarriesDecision(line) && (hits >= 2 || TextCarriesTerm(line, terms[0])) {
 			hits++
 		}
 		// Terms arrive most-identifying first when the caller knows the order,
@@ -734,6 +817,9 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 		}
 		switch m.Role {
 		case "user":
+			if digest.CarriesUserCorrection(line) {
+				hits += len(terms)
+			}
 			if !noiseMessage(m.Text) && !nearCopy(line, asked) && hits > bestUser.hits {
 				bestUser = scored{i, hits, lineAround(text, 160, terms)}
 			}
@@ -816,8 +902,17 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 	// about mm_status" opened on "1. **Decide**: User settings or project
 	// settings?" while the answer sat two lines below. If a line the agent
 	// wrote is worth more, lead with that instead of framing it with this.
-	if len(assistants) > 0 && assistants[0].hits > bestUser.hits {
+	if len(assistants) > 0 && assistants[0].hits > bestUser.hits && !digest.CarriesUserCorrection(bestUser.text) {
 		bestUser = scored{}
+	}
+	if bestUser.text != "" && len(assistants) > 0 && !digest.CarriesUserCorrection(bestUser.text) {
+		dist := bestUser.idx - assistants[0].idx
+		if dist < 0 {
+			dist = -dist
+		}
+		if dist > 30 && len(terms) > 0 && (!TextCarriesTerm(bestUser.text, terms[0]) || !TextCarriesTerm(assistants[0].text, terms[0])) {
+			bestUser = scored{}
+		}
 	}
 	// Three quotes, not two. The pair rule above already trims to two whenever
 	// a session has a conclusion to pair with its subject, so this only widens

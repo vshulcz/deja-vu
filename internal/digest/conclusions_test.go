@@ -69,3 +69,24 @@ func TestFirstSentencesKeepsTheOpeningClaim(t *testing.T) {
 		t.Errorf("split on a version number: %q", got)
 	}
 }
+
+func TestAnnouncesPlanAndCarriesUserCorrection(t *testing.T) {
+	if !AnnouncesPlan("Понял, пересобираю картину.") {
+		t.Error("expected AnnouncesPlan to match Russian rebuild opener")
+	}
+	if !AnnouncesPlan("Сейчас проверю конфиг.") {
+		t.Error("expected AnnouncesPlan to match Russian check opener")
+	}
+	if AnnouncesPlan("Архитектура: sing-box 95410 -> vless -> 178.236.240.175") {
+		t.Error("expected AnnouncesPlan to reject architectural conclusion")
+	}
+	if !CarriesDecision("Архитектура: sing-box 95410 -> vless -> 178.236.240.175") {
+		t.Error("expected CarriesDecision to recognize Russian architecture summary")
+	}
+	if !CarriesUserCorrection("причем тут кластер, у меня два разных впн — один до вены, второй для доступа к кластеру") {
+		t.Error("expected CarriesUserCorrection to recognize user disambiguation")
+	}
+	if CarriesUserCorrection("почему тормозит интернет") {
+		t.Error("expected CarriesUserCorrection to be false for ordinary question")
+	}
+}

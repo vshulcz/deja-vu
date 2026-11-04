@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/cjkfold"
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/query"
 )
@@ -390,7 +391,7 @@ func (sq scoredQuery) scanMessages(doc *bm25Document, s model.Session, o Options
 		// is a paraphrase of the conversation competing with the
 		// conversation — and on one store those summaries were a fifth of
 		// everything indexed in the sessions that had them (#3384).
-		if o.Role == "" && m.Role == roleSummary {
+		if o.Role == "" && (m.Role == roleSummary || (m.Role == "user" && digest.IsCompactionSummary(strings.TrimSpace(m.Text)))) {
 			continue
 		}
 		// The transcript's own record of a call to deja is not something

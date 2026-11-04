@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -63,6 +65,59 @@ func zstdRun(in []byte) (out []byte, stderr string, err error) {
 	cmd.Stderr = &e
 	err = cmd.Run()
 	return o.Bytes(), strings.TrimSpace(e.String()), err
+}
+
+// zstdScan hands scan the decompressed bytes of the file at path as zstd writes
+// them, so a large rollout costs a line's worth of memory rather than its whole
+// size, twice over. The plaintext stays in a pipe, not in a temporary file. scan
+// runs a second time, from memory, when zstd reports damage: it starts over.
+func zstdScan(path, harness string, scan func(io.Reader) error) error {
+	// Check before opening so a missing tool leaves the file retryable (#5061).
+	if !ZstdAvailable() {
+		diagNoZstd(path)
+		return fmt.Errorf("%s: %s: %w", harness, filepath.Base(path), errNoZstd)
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	cmd := exec.CommandContext(context.Background(), "zstd", "-d", "-c", "-q")
+	cmd.Stdin = f
+	out, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	err = cmd.Start()
+	if err != nil {
+		return err
+	}
+	restoreDiag := diagMalformedMark(path)
+	waited := false
+	defer func() {
+		// A scan error or panic must not leave zstd blocked on its stdout.
+		if !waited {
+			_ = cmd.Process.Kill()
+			_ = cmd.Wait()
+		}
+	}()
+	err = scan(out)
+	if err != nil {
+		return err
+	}
+	err = cmd.Wait()
+	waited = true
+	if err == nil {
+		return nil
+	}
+	// Discard the partial parse and salvage frames as before. Only damaged
+	// files pay for holding the compressed and decompressed bytes in memory.
+	restoreDiag()
+	plain, err := zstdDecoded(path, harness)
+	if err != nil {
+		return err
+	}
+	return scan(bytes.NewReader(plain))
 }
 
 // zstdSplitFrames cuts a stream at its frame boundaries by reading the frame
