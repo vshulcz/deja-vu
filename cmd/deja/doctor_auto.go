@@ -660,11 +660,16 @@ func opencodePluginShapeStale(js string) bool {
 	}
 	switch major := opencodeVersionMajor(); {
 	case major == 1:
-		return v2
+		return v2 || opencodeTUIFileGenerated(filepath.Join(opencodeConfigHome(), "opencode", "plugins", "deja-status", "tui.tsx"))
 	case major >= 2:
-		return !v2
+		return !v2 || opencodeTUIFileGenerated(filepath.Join(opencodeConfigHome(), "opencode", "plugins", "deja-status.tsx"))
 	}
 	return false
+}
+
+func opencodeTUIFileGenerated(path string) bool {
+	b, err := os.ReadFile(path)
+	return err == nil && strings.Contains(headLines(string(b), 3), opencodeTUIMarker)
 }
 
 // pluginScriptOutdated reports whether an installed plugin script on disk was

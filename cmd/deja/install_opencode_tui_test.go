@@ -91,7 +91,7 @@ func TestV2TUIPluginNeedsNoList(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"setup(ctx)", `append: "prompt.footer.status"`, `["statusline"]`, "input.sessionID", "ctx.theme.text.muted"} {
+	for _, want := range []string{"setup(ctx)", `append: "prompt.footer.status"`, `append: "home.footer.status"`, `append: "sidebar.content"`, `["statusline"]`, "input.sessionID", "ctx.theme.text.muted", "ctx.theme.text.base"} {
 		if !strings.Contains(string(b), want) {
 			t.Errorf("plugin lacks %q", want)
 		}
@@ -108,5 +108,40 @@ func TestV2TUIPluginNeedsNoList(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "plugins", "deja-status")); err == nil {
 		t.Error("uninstall left the plugin directory")
+	}
+}
+
+func TestUpgradingOpencodeFromV1ToV2ReplacesTUIAndServerPlugins(t *testing.T) {
+	hermeticEnv(t)
+	t.Cleanup(func() { opencodeVersionMajor = opencodeVersionMajorReal })
+	dir := filepath.Join(opencodeConfigHome(), "opencode")
+
+	opencodeVersionMajor = func() int { return 1 }
+	if _, err := installTarget("opencode-auto", "/opt/deja/bin/deja", false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "plugins", "deja-status.tsx")); err != nil {
+		t.Fatalf("1.x install did not write deja-status.tsx: %v", err)
+	}
+
+	opencodeVersionMajor = func() int { return 2 }
+	row := autoWirings()[0]
+	if got, _ := autoWiringState(row); got != "stale" {
+		t.Fatalf("1.x wiring after upgrading to 2.x reads %q, want stale", got)
+	}
+	if _, err := installTarget("opencode-auto", "/opt/deja/bin/deja", false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "plugins", "deja-status.tsx")); err == nil {
+		t.Error("2.x install left 1.x plugins/deja-status.tsx behind")
+	}
+	if got := tuiPluginList(t, filepath.Join(dir, "tui.json")); len(got) != 0 {
+		t.Errorf("2.x install left ./plugins/deja-status.tsx in tui.json: %v", got)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "plugins", "deja-status", "tui.tsx")); err != nil {
+		t.Errorf("2.x install did not write plugins/deja-status/tui.tsx: %v", err)
+	}
+	if got, _ := autoWiringState(row); got != "wired" {
+		t.Errorf("2.x wiring after install reads %q, want wired", got)
 	}
 }

@@ -72,6 +72,7 @@ func (r *mcpStampReader) Read(p []byte) (int, error) {
 const mcpFreshEvery = 15 * time.Second
 
 func serveMCPProcess(dir string, r io.Reader, w io.Writer, contextOnly bool) error {
+	_ = refreshWiringAfterUpgrade()
 	defer index.KeepFresh(dir, mcpFreshEvery, func() {
 		// Same hand-off a stale query made, with the guard from #5721.
 		if !warmupRunning(dir) {

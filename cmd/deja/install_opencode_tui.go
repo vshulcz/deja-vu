@@ -155,6 +155,28 @@ export default {
         },
       }),
       ctx.ui.slot({ append: "home.footer.status", render: view }),
+      ctx.ui.slot({
+        append: "sidebar.content",
+        render: (input) => {
+          createEffect(() => {
+            const next = input?.sessionID || ""
+            if (next && next !== sid) {
+              sid = next
+              refresh()
+            }
+          })
+          const parts = line().replace(/^deja\s*·\s*/, "").split(" · ").filter(Boolean)
+          if (!parts.length) return view()
+          return (
+            <box>
+              <text fg={ctx.theme.text.base}><b>deja</b></text>
+              {parts.map((p) => (
+                <text fg={ctx.theme.text.muted} wrapMode="none">{p.length > 36 ? p.slice(0, 35) + "…" : p}</text>
+              ))}
+            </box>
+          )
+        },
+      }),
     ]
     return () => {
       clearInterval(tick)
@@ -200,7 +222,7 @@ func headLines(s string, n int) string {
 
 // installTUIPluginList adds entry to the plugin list of dir's tui.json, or
 // takes it out. A tui.jsonc deja does not edit: the note says what to add.
-func installTUIPluginList(dir, schema, entry string, uninstall bool) (installResult, error) {
+func installTUIPluginList(dir, schema, entry string, uninstall bool) (installResult, error) { //nolint:unparam // entry stays explicit at the call sites
 	path := filepath.Join(dir, "tui.json")
 	if _, err := os.Stat(path); err != nil {
 		if _, jerr := os.Stat(filepath.Join(dir, "tui.jsonc")); jerr == nil {
@@ -364,9 +386,25 @@ func installOpencodeTUI(exe string, uninstall bool) (installResult, error) {
 		if err != nil {
 			return installResult{}, err
 		}
-		return wroteAll(file, list), nil
+		staleV2, err := writeGeneratedFile(v2, "", true)
+		if err != nil {
+			return installResult{}, err
+		}
+		return wroteAll(file, list, staleV2), nil
 	}
-	return writeGeneratedFile(v2, opencodeTUIPluginV2(exe), false)
+	staleV1, err := writeGeneratedFile(v1, "", true)
+	if err != nil {
+		return installResult{}, err
+	}
+	staleList, err := installTUIPluginList(dir, "https://opencode.ai/tui.json", "./plugins/deja-status.tsx", true)
+	if err != nil {
+		return installResult{}, err
+	}
+	file, err := writeGeneratedFile(v2, opencodeTUIPluginV2(exe), false)
+	if err != nil {
+		return installResult{}, err
+	}
+	return wroteAll(file, staleV1, staleList), nil
 }
 
 // installKiloTUI is the 1.x plugin in Kilo CLI's config, which reads tui.json
