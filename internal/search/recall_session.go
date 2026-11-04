@@ -25,7 +25,13 @@ func SpeechCarriesAnyTerm(s model.Session, terms []string) bool {
 		return true
 	}
 	for _, m := range s.Messages {
-		if m.Role == roleToolOutput {
+		if m.Role == roleToolOutput || m.Role == roleSummary {
+			continue
+		}
+		if m.Role == "user" && digest.IsCompactionSummary(strings.TrimSpace(m.Text)) {
+			if QuoteCarriesTerms(m.Text, terms, 1) {
+				return true
+			}
 			continue
 		}
 		if TextCarriesAnyTerm(m.Text, terms) {
@@ -46,7 +52,16 @@ func SpeechCarriesTermsTogether(s model.Session, terms []string, need int) bool 
 		return false
 	}
 	for _, m := range s.Messages {
-		if m.Role == roleToolOutput {
+		if m.Role == roleToolOutput || m.Role == roleSummary {
+			continue
+		}
+		// Compaction summaries concatenate bulleted prompts from across the
+		// session ("6. All user messages:"), so two unrelated topics from
+		// different days sit in one message. Require the terms to share a line.
+		if m.Role == "user" && digest.IsCompactionSummary(strings.TrimSpace(m.Text)) {
+			if QuoteCarriesTerms(m.Text, terms, need) {
+				return true
+			}
 			continue
 		}
 		n := 0
@@ -92,7 +107,18 @@ func QuoteCarriesTerms(digest string, terms []string, need int) bool {
 // session that mentioned the subject sixty times outranks the one that answered
 // it in a sentence.
 func LeadWithConclusion(ss []model.Session, terms []string) []model.Session {
-	if len(ss) < 2 || ConcludedAbout(ss[0], terms) {
+	if len(ss) < 2 {
+		return ss
+	}
+	if !hasUserCorrectionFor(ss[0], terms) {
+		for i := 1; i < len(ss); i++ {
+			if hasUserCorrectionFor(ss[i], terms) {
+				ss[0], ss[i] = ss[i], ss[0]
+				return ss
+			}
+		}
+	}
+	if ConcludedAbout(ss[0], terms) {
 		return ss
 	}
 	for i := 1; i < len(ss); i++ {
@@ -102,6 +128,22 @@ func LeadWithConclusion(ss []model.Session, terms []string) []model.Session {
 		}
 	}
 	return ss
+}
+
+func hasUserCorrectionFor(s model.Session, terms []string) bool {
+	if len(terms) < 2 {
+		return false
+	}
+	for _, m := range s.Messages {
+		if m.Role != "user" || noiseMessage(m.Text) || digest.IsCompactionSummary(strings.TrimSpace(m.Text)) {
+			continue
+		}
+		line, hits := densestLine(m.Text, terms)
+		if hits >= 2 && digest.CarriesUserCorrection(line) {
+			return true
+		}
+	}
+	return false
 }
 
 // ConcludedAbout reports whether the lines this session is about to show carry
@@ -300,14 +342,21 @@ func MatchedUserLine(s model.Session, terms []string) string {
 	if len(terms) == 0 {
 		return ""
 	}
-	best, bestHits := "", 0
+	best, bestScore := "", 0
 	for _, m := range s.Messages {
 		if m.Role != "user" || noiseMessage(m.Text) {
 			continue
 		}
 		line, hits := densestLine(digest.StripHarnessBlocks(m.Text), terms)
-		if hits > bestHits {
-			best, bestHits = strings.TrimSpace(line), hits
+		if hits == 0 {
+			continue
+		}
+		if digest.CarriesUserCorrection(line) {
+			hits++
+		}
+		score := hits*len(terms) + rankOfBestTerm(line, terms)
+		if score > bestScore {
+			best, bestScore = strings.TrimSpace(line), score
 		}
 	}
 	return best

@@ -19,6 +19,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/prompt"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -342,20 +343,24 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// while a neighbour about the reporting service was served in its place.
 	// The ranking had already put the right one first with two strong terms.
 	leadTerms := terms
-	if ordered := byIdentifying(terms, idfOf); len(ordered) > 0 {
+	ordered := byIdentifying(terms, idfOf)
+	if len(ordered) > 0 {
 		leadTerms = ordered[:min(len(ordered), leadTermsKept)]
 	}
 	pol := policy.Load()
 	pk := &promptPicker{
-		pol:       pol,
-		terms:     terms,
-		idfOf:     idfOf,
-		topIDF:    index.TopIDF(dir),
-		self:      self,
-		leadTerms: leadTerms,
-		unscoped:  len(names) == 0,
-		deadline:  promptStart.Add(promptSoftBudget),
-		ss:        make([]model.Session, 0, 2),
+		pol:          pol,
+		terms:        terms,
+		orderedTerms: ordered,
+		asked:        asked,
+		idfOf:        idfOf,
+		topIDF:       index.TopIDF(dir),
+		self:         self,
+		leadTerms:    leadTerms,
+		unscoped:     len(names) == 0,
+		cwdPlain:     sources.PlainProjectName(cwd),
+		deadline:     promptStart.Add(promptSoftBudget),
+		ss:           make([]model.Session, 0, 2),
 	}
 	pk.pick(ranked, matched, strong, naming)
 	// One slot left and duplicates took the window: ask for a wider one. The
@@ -378,6 +383,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 			pk.pick(wider, wmatched, wstrong, wnaming)
 		}
 	}
+	pickUnscopedNamedProjects(dir, pk, names, terms, skip, cut, promptStart, promptSoftBudget)
 	ss, confident, worthDigest := pk.ss, pk.confident, pk.worthDigest
 	if len(ss) == 0 {
 		return nil
@@ -390,13 +396,10 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// Of the two candidates, lead with the one that settled something about the
 	// question rather than the one that merely mentioned it. The benchmark has
 	// been applying this since the arm was written — and saying so in a comment
-	// that claimed the hook did the same — while the hook did not, so the
-	// concluded_session arm scored a behaviour the product never had.
-	// Of the two candidates, lead with the one that settled something about the
-	// question rather than the one that merely mentioned it. The benchmark has
-	// been applying this since the arm was written — and saying so in a comment
 	// that claimed the hook did the same — while the hook did not.
-	ss = search.LeadWithConclusion(ss, terms)
+	if len(names) > 0 || !projectMatchesAnyTerm(ss[0].Project, terms) {
+		ss = search.LeadWithConclusion(ss, terms)
+	}
 	for i := range ss {
 		index.MarkUserRules(dir, &ss[i], names)
 	}
@@ -541,11 +544,17 @@ func promptDigestBody(dir, sessionID string, ss []model.Session, confident bool,
 	// also cover them rather than answering a two-subject question with a
 	// session that only ever heard of one.
 	named := namedLeadTerms(terms, idfOf, index.TopIDF(dir))
-	if len(named) == 1 {
+	shownMatchesNamedProject := len(shown) > 0 && projectMatchesAnyTerm(shown[0].Project, terms)
+	switch {
+	case shownMatchesNamedProject:
+		if !search.QuoteCarriesTerms(digest, terms, 1) {
+			return "", false
+		}
+	case len(named) == 1:
 		if !search.QuoteCarriesTerms(digest, named, 1) && !search.QuoteCarriesTerms(digest, terms, min(2, len(terms))) {
 			return "", false
 		}
-	} else if !search.QuoteCarriesTerms(digest, terms, min(2, len(terms))) {
+	case !search.QuoteCarriesTerms(digest, terms, min(2, len(terms))):
 		return "", false
 	}
 	// The line the agent is asked to say names a session; it has to be one
@@ -557,7 +566,7 @@ func promptDigestBody(dir, sessionID string, ss []model.Session, confident bool,
 		cite = shown[0]
 		rejectedWarning = shownInjectionWarning(ss, shown)
 	}
-	tail := openerLine(cite, terms)
+	tail := openerLine(cite, byIdentifying(terms, idfOf))
 	if nudge != "" {
 		tail += "\n" + nudge
 	}
@@ -601,15 +610,18 @@ func promptDigestBody(dir, sessionID string, ss []model.Session, confident bool,
 // promptPicker chooses the sessions the prompt hook injects, at most two,
 // and keeps what the choice says about the match.
 type promptPicker struct {
-	pol   policy.Policy
-	terms []string
-	idfOf map[string]float64
+	pol          policy.Policy
+	terms        []string
+	orderedTerms []string
+	asked        string
+	idfOf        map[string]float64
 	// topIDF is the idf a word said in one session reaches on this store
 	// (index.TopIDF), so a small store's rarest words still name something.
 	topIDF    float64
 	self      map[string]bool
 	leadTerms []string
 	unscoped  bool
+	cwdPlain  string
 
 	ss        []model.Session
 	confident bool
@@ -696,6 +708,7 @@ func (p *promptPicker) pick(ranked []model.Session, matched, strong, naming []in
 			// version. Nobody in that session said anything about it, and a
 			// block built from those lines answers a different question
 			// than the one asked.
+			p.crowdedOut++
 			continue
 		}
 
@@ -719,6 +732,10 @@ func (p *promptPicker) pick(ranked []model.Session, matched, strong, naming []in
 		// session that settled it, both slots went to two copies of one
 		// neighbour on every framing but the near-verbatim one.
 		if sameAnswerAs(p.ss, s, p.terms) {
+			p.crowdedOut++
+			continue
+		}
+		if _, shown := search.AutoRecallDigestShowing([]model.Session{s}, digestBudget(p.confident), p.orderedTerms, p.asked); len(shown) == 0 {
 			p.crowdedOut++
 			continue
 		}
@@ -749,7 +766,7 @@ func (p *promptPicker) pick(ranked []model.Session, matched, strong, naming []in
 func (p *promptPicker) leadTermsMeet(s model.Session) bool {
 	if fixedNamed := namedLeadTerms(p.leadTerms, p.idfOf, 1e9); len(fixedNamed) >= 2 {
 		for _, t := range fixedNamed {
-			if !search.SpeechCarriesAnyTerm(s, []string{t}) {
+			if !search.SpeechCarriesAnyTerm(s, []string{t}) && !projectMatchesAnyTerm(s.Project, []string{t}) {
 				return false
 			}
 		}
@@ -758,13 +775,117 @@ func (p *promptPicker) leadTermsMeet(s model.Session) bool {
 		}
 		return true
 	}
-	if named := namedLeadTerms(p.leadTerms, p.idfOf, p.topIDF); len(named) > 0 && search.SpeechCarriesAnyTerm(s, named) {
-		return true
+	named := namedLeadTerms(p.orderedTerms, p.idfOf, p.topIDF)
+	if len(named) > 0 {
+		need := named
+		if len(need) > 2 {
+			need = need[:2]
+		}
+		allCarry := true
+		for _, t := range need {
+			if !search.SpeechCarriesAnyTerm(s, []string{t}) && !projectMatchesAnyTerm(s.Project, []string{t}) {
+				allCarry = false
+				break
+			}
+		}
+		if allCarry {
+			if len(need) >= 2 && (len(s.Messages) >= dejaVuMaxMessages || s.Held >= dejaVuMaxMessages) {
+				return search.SpeechCarriesTermsTogether(s, need, 2)
+			}
+			return true
+		}
 	}
 	if p.unscoped {
+		// A session recorded directly in the unscoped cwd (e.g. ~) shares the
+		// caller's working directory rather than belonging to an unrelated repo.
+		if p.cwdPlain != "" && strings.EqualFold(s.Project, p.cwdPlain) && len(named) == 0 {
+			return search.SpeechCarriesTermsTogether(s, p.terms, 2)
+		}
+		// On a large multi-project store, two rare non-Latin domain terms spoken
+		// together in one message ("фронт" + "вена" + "впн") identify the subject
+		// when no Latin/symbol identifier was named.
+		if len(named) == 0 && p.topIDF >= 5.0 {
+			if rare := rareTerms(p.terms, p.idfOf, 3.8); len(rare) >= 2 {
+				return search.SpeechCarriesTermsTogether(s, rare, 2)
+			}
+		}
 		return false
 	}
-	return search.SpeechCarriesTermsTogether(s, p.leadTerms, 2)
+	return search.SpeechCarriesTermsTogether(s, p.leadTerms, 2) ||
+		(projectMatchesAnyTerm(s.Project, p.leadTerms) && search.SpeechCarriesAnyTerm(s, p.leadTerms))
+}
+
+func projectMatchesAnyTerm(project string, terms []string) bool {
+	if project == "" {
+		return false
+	}
+	for _, t := range terms {
+		if len(t) >= 4 && (index.ProjectInScope(project, t) || index.ProjectEndsWithSegment(project, t)) {
+			return true
+		}
+	}
+	return false
+}
+
+func pickUnscopedNamedProjects(dir string, pk *promptPicker, names, terms []string, skip map[string]bool, cut map[string]time.Time, start time.Time, budget time.Duration) {
+	if len(names) > 0 || len(pk.ss) >= 2 || len(terms) < 2 || time.Since(start) >= budget {
+		return
+	}
+	var projTerms []string
+	for _, t := range terms {
+		if len(t) >= 4 && latinWord(t) {
+			projTerms = append(projTerms, t)
+		}
+	}
+	matchedProjects := index.ProjectsMatchingTerms(dir, projTerms)
+	if len(matchedProjects) == 0 {
+		return
+	}
+	pranked, pmatched, pstrong, pnaming, pidf, perr := index.ProjectRelevantNamingCut(
+		dir, matchedProjects, terms, prompt.Candidates, skip, cut)
+	if perr != nil || len(pranked) == 0 {
+		return
+	}
+	pkProj := *pk
+	pkProj.unscoped = false
+	pkProj.idfOf = pidf
+	pkProj.orderedTerms = byIdentifying(terms, pidf)
+	pkProj.ss = make([]model.Session, 0, 2)
+	for i := range pranked {
+		if !projectMatchesAnyTerm(pranked[i].Project, projTerms) || !search.SpeechCarriesAnyTerm(pranked[i], terms) {
+			continue
+		}
+		pmatched[i] = max(pmatched[i], 2)
+		pstrong[i] = max(pstrong[i], 1)
+		if i < len(pnaming) {
+			pnaming[i] = max(pnaming[i], 1)
+		}
+	}
+	pkProj.pick(pranked, pmatched, pstrong, pnaming)
+	if len(pkProj.ss) == 0 {
+		return
+	}
+	pkProj.ss = search.LeadWithConclusion(pkProj.ss, terms)
+	for _, s := range pkProj.ss {
+		if len(pk.ss) >= 2 {
+			break
+		}
+		if !sameAnswerAs(pk.ss, s, terms) && (len(pk.ss) == 0 || s.ID != pk.ss[0].ID) {
+			pk.ss = append(pk.ss, s)
+		}
+	}
+	pk.confident = pk.confident || pkProj.confident
+	pk.worthDigest = pk.worthDigest || pkProj.worthDigest
+}
+
+func rareTerms(terms []string, idfOf map[string]float64, floor float64) []string {
+	var out []string
+	for _, t := range terms {
+		if idfOf[t] >= floor {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 func namedLeadTerms(terms []string, idfOf map[string]float64, topIDF float64) []string {

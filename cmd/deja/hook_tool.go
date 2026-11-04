@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -643,6 +644,69 @@ func namesInclude(names []string, project string) bool {
 	return false
 }
 
+var systemPathSegments = map[string]bool{
+	"var": true, "run": true, "tmp": true, "etc": true, "usr": true,
+	"local": true, "bin": true, "opt": true, "users": true, "home": true,
+	".config": true, ".cache": true, ".local": true, "share": true,
+	"state": true, "log": true, "lib": true, "private": true, "dev": true,
+	"proc": true, "sys": true,
+}
+
+// commandProjectCandidates returns the project names for cwd, or infers
+// candidate project names from file paths in cmd when cwd is unscoped (e.g. ~).
+func commandProjectCandidates(cwd, cmd string) []string {
+	if names := digest.ProjectNameCandidates(cwd); len(names) > 0 {
+		return names
+	}
+	var out []string
+	add := func(name string) {
+		if name != "" && !namesInclude(out, name) {
+			out = append(out, name)
+		}
+	}
+	for tok := range strings.FieldsSeq(cmd) {
+		tok = strings.Trim(tok, "\"'`();,|&<>")
+		if !strings.Contains(tok, "/") {
+			continue
+		}
+		parts := strings.Split(filepath.Clean(tok), "/")
+		if len(parts) < 2 {
+			continue
+		}
+		// Inspect directory segments (all except the final filename segment).
+		for i := range len(parts) - 1 {
+			seg := parts[i]
+			if seg == "" || seg == "." || seg == "~" || systemPathSegments[strings.ToLower(seg)] {
+				continue
+			}
+			if i > 0 && parts[i-1] != "" && !systemPathSegments[strings.ToLower(parts[i-1])] {
+				add(parts[i-1] + "/" + seg)
+			}
+			add(seg)
+		}
+	}
+	return out
+}
+
+// commandProjectCandidatesIn expands commandProjectCandidates against the
+// recorded projects in dir when cwd is unscoped (e.g. "splitbox" -> "goprojects/splitbox").
+func commandProjectCandidatesIn(dir, cwd, cmd string) []string {
+	if names := digest.ProjectNameCandidates(cwd); len(names) > 0 {
+		return names
+	}
+	raw := commandProjectCandidates("", cmd)
+	if len(raw) == 0 {
+		return nil
+	}
+	out := append([]string{}, raw...)
+	for _, m := range index.ProjectsMatchingTerms(dir, raw) {
+		if !namesInclude(out, m) {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
 // commandHookLine is the line for a command when nothing has been said yet.
 func commandHookLine(dir, cwd, cmd string) string {
 	return commandHookLineSkipping(dir, cwd, cmd, "", func(string) bool { return false })
@@ -914,7 +978,7 @@ func mentionsCommand(cmd, text string) bool {
 // that. Not done: 5 ms is not worth the coupling, and this is where a reader
 // would look for the number.
 func promotedCommandDecision(dir, cwd, cmd string) string {
-	names := digest.ProjectNameCandidates(cwd)
+	names := commandProjectCandidatesIn(dir, cwd, cmd)
 	if len(names) == 0 {
 		return ""
 	}
@@ -982,7 +1046,8 @@ func commandDecisionLine(dir, cwd, cmd, self string, lookupOnly bool) string {
 			Lifecycle: meta.Lifecycle,
 		}, r)
 	}
-	if d := index.CommandSettledUsableOutside(dir, cmd, digest.ProjectNameCandidates(cwd), allow, usableMeta, self); d != "" {
+	projNames := commandProjectCandidatesIn(dir, cwd, cmd)
+	if d := index.CommandSettledUsableOutside(dir, cmd, projNames, allow, usableMeta, self); d != "" {
 		return trimTrailingFragment(search.SafeText(strings.TrimSpace(d)))
 	}
 	// And the search, for a table written before it carried the session key:
@@ -996,7 +1061,7 @@ func commandDecisionLine(dir, cwd, cmd, self string, lookupOnly bool) string {
 	if len(terms) == 0 {
 		return ""
 	}
-	ranked, _, _, _, err := index.ProjectRelevant(dir, digest.ProjectNameCandidates(cwd), terms, toolHookDecisionScan)
+	ranked, _, _, _, err := index.ProjectRelevant(dir, projNames, terms, toolHookDecisionScan)
 	if err != nil {
 		return ""
 	}
