@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"os"
@@ -254,19 +255,21 @@ func requestHookRefresh(dir, cwd string) {
 		return
 	}
 	sentinel := hookCachePath(dir, cwd) + ".refreshing"
+	// Waiting for the index lock can outlast the window, as in warmup (#5719).
+	if b, err := os.ReadFile(sentinel); err == nil {
+		if claim, ok := parseWarmupClaim(b); ok && claim.state() == ownerLive {
+			return
+		}
+	}
 	if fi, err := os.Stat(sentinel); err == nil && time.Since(fi.ModTime()) < 2*time.Minute {
 		return
 	}
-	if err := os.WriteFile(sentinel, []byte("1"), 0o600); err != nil {
+	stamp := time.Now().UnixNano()
+	if err := os.WriteFile(sentinel, []byte(strconv.FormatInt(stamp, 10)), 0o600); err != nil {
 		return
 	}
 	exe, err := os.Executable()
 	if err != nil {
-		return
-	}
-	// Under `go test` the executable is the test binary; spawning it as a
-	// refresher would rerun the suite (and hung the Windows runner).
-	if strings.HasSuffix(strings.TrimSuffix(exe, ".exe"), ".test") {
 		return
 	}
 	cmd := exec.CommandContext(context.Background(), exe, "hook-refresh")
@@ -278,7 +281,19 @@ func requestHookRefresh(dir, cwd string) {
 	defer func() { _ = devNull.Close() }()
 	cmd.Stdout = devNull
 	cmd.Stderr = cmd.Stdout
-	_ = startDetached(cmd)
+	if pid, err := startRefresher(cmd); err == nil {
+		recordWarmupOwner(sentinel, stamp, pid)
+	}
+}
+
+// startRefresher starts the detached process and names it. Under `go test` the
+// executable is the test binary; spawning it as a refresher would rerun the
+// suite (and hung the Windows runner).
+var startRefresher = func(cmd *exec.Cmd) (int, error) {
+	if strings.HasSuffix(strings.TrimSuffix(cmd.Path, ".exe"), ".test") {
+		return 0, errors.New("not spawning the test binary")
+	}
+	return startDetachedPID(cmd)
 }
 
 // runHookRefresh recomputes the session-start digest for the cwd in the

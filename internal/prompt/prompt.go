@@ -426,7 +426,7 @@ func shortSubject(f string) bool {
 // Closed class, the same shape as shortWord below it: named rather than
 // measured, because two letters cannot be told apart by length.
 var shortSubjectWord = map[string]bool{
-	"pr": true, "mr": true, "ci": true, "db": true, "ui": true, "qa": true,
+	"pr": true, "mr": true, "ci": true, "db": true, "ui": true, "qa": true, "wg": true,
 }
 
 // The closed class plus the handful of verbs that open half of all questions.

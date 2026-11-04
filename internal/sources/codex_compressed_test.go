@@ -1,9 +1,12 @@
 package sources
 
 import (
+	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -76,6 +79,127 @@ func TestCodexReadsACompressedRollout(t *testing.T) {
 	// by comparing this against the store.
 	if !strings.HasSuffix(ss[0].Path, ".jsonl.zst") {
 		t.Errorf("path = %q, want the compressed file", ss[0].Path)
+	}
+}
+
+// A compressed rollout was read whole and decompressed into a buffer before the
+// first line was scanned, so one 4 GB rollout took more memory than the rest of
+// the store. Almost all of it is records the parser drops; the same bytes read
+// as plain .jsonl stayed at one line's worth.
+func TestCodexStreamsACompressedRollout(t *testing.T) {
+	if !ZstdAvailable() {
+		t.Skip("zstd CLI not installed")
+	}
+	if testing.Short() {
+		t.Skip("compresses a 64 MB rollout")
+	}
+	root := t.TempDir()
+	t.Setenv("HOME", root)
+	t.Setenv("USERPROFILE", root)
+	t.Setenv("CODEX_HOME", root)
+	t.Setenv("DEJA_CODEX_ROOT", root)
+	t.Setenv("DEJA_XCODE_CODEX_ROOT", filepath.Join(root, "absent"))
+	const size = 64 << 20
+	ignored := `{"type":"turn_context","payload":{"context":"` + strings.Repeat("x", size/2) + `"}}` + "\n"
+	cmd := exec.CommandContext(t.Context(), "zstd", "-q", "-c")
+	cmd.Stdin = io.MultiReader(strings.NewReader(codexRolloutFixture), strings.NewReader(ignored), strings.NewReader(ignored))
+	compressed, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(root, "rollout-thread-7.jsonl.zst")
+	if err = os.WriteFile(path, compressed, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var before, after runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&before)
+	ss, err := ParseCodexRollout(path)
+	runtime.ReadMemStats(&after)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ss) != 1 || ss[0].ID != "thread-7" || len(ss[0].Messages) != 2 ||
+		!hasMessage(ss[0], "user", "why does the migration hang") ||
+		!hasMessage(ss[0], "assistant", "the advisory lock was never released") {
+		t.Fatalf("compressed messages: %+v", ss)
+	}
+	alloc := after.TotalAlloc - before.TotalAlloc
+	t.Logf("reading a %d MB rollout allocated %d bytes", size>>20, alloc)
+	// The streamed read allocated 16 MB locally; leave room for runtime noise.
+	if alloc > 24<<20 {
+		t.Errorf("reading a %d MB rollout allocated %d MB, want at most 24 MB", size>>20, alloc>>20)
+	}
+}
+
+// A file that is not there, or that holds no frame to salvage, is an error rather
+// than an empty rollout: the empty answer would be remembered as a read.
+func TestZstdScanReportsAFileItCannotRead(t *testing.T) {
+	if !ZstdAvailable() {
+		t.Skip("zstd CLI not installed")
+	}
+	dir := t.TempDir()
+	drain := func(r io.Reader) error {
+		_, err := io.Copy(io.Discard, r)
+		return err
+	}
+	missing := filepath.Join(dir, "missing.jsonl.zst")
+	if err := zstdScan(missing, "codex", drain); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("a missing file: %v", err)
+	}
+	garbage := filepath.Join(dir, "garbage.jsonl.zst")
+	if err := os.WriteFile(garbage, []byte("not a zstd frame"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := zstdScan(garbage, "codex", drain); err == nil {
+		t.Error("a file with no frame in it read as an empty rollout")
+	}
+}
+
+// The scan runs while zstd is still writing. A parse that stops early, with an
+// error or a panic safeParse recovers further up, must not leave zstd blocked on
+// a pipe nobody reads.
+func TestZstdScanStopsOnErrorOrPanic(t *testing.T) {
+	if !ZstdAvailable() {
+		t.Skip("zstd CLI not installed")
+	}
+	root := t.TempDir()
+	t.Setenv("HOME", root)
+	t.Setenv("USERPROFILE", root)
+	path := filepath.Join(root, "rollout.jsonl.zst")
+	// More than a pipe holds: waiting without killing would block on stdout.
+	if err := os.WriteFile(path, zstdFrame(t, strings.Repeat("x", 2<<20)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	want := errors.New("scan stopped")
+	for _, panics := range []bool{false, true} {
+		name := "error"
+		if panics {
+			name = "panic"
+		}
+		t.Run(name, func(t *testing.T) {
+			defer func() {
+				if got := recover(); got != nil || panics {
+					if err, ok := got.(error); !panics || !ok || !errors.Is(err, want) {
+						t.Errorf("panic = %v, want %v", got, want)
+					}
+				}
+			}()
+			err := zstdScan(path, "codex", func(r io.Reader) error {
+				var first [1]byte
+				if _, err := io.ReadFull(r, first[:]); err != nil {
+					t.Fatal(err)
+				}
+				if panics {
+					panic(want)
+				}
+				return want
+			})
+			if !errors.Is(err, want) {
+				t.Errorf("scan error = %v, want %v", err, want)
+			}
+		})
 	}
 }
 

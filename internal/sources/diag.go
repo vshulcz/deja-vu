@@ -42,6 +42,23 @@ func diagMalformedLine(path string) {
 	diagMu.Unlock()
 }
 
+// diagMalformedMark remembers the count for path and returns what puts it back,
+// for a read that starts over and will count the same lines again.
+func diagMalformedMark(path string) (restore func()) {
+	diagMu.Lock()
+	defer diagMu.Unlock()
+	was, had := diagMalformed[path]
+	return func() {
+		diagMu.Lock()
+		defer diagMu.Unlock()
+		if had {
+			diagMalformed[path] = was
+		} else {
+			delete(diagMalformed, path)
+		}
+	}
+}
+
 // diagUnusableRecord counts one record a store holds and deja could not use,
 // with why. A JSONL line explains itself by its position; a row in a database
 // does not, and "unknown data_type brotli" is the difference between a bad row

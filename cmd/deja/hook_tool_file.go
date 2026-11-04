@@ -66,6 +66,18 @@ func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(inde
 				}
 			}
 		}
+		if len(names) == 0 {
+			if plain := sources.PlainProjectName(cwd); plain != "" {
+				names = append(names, plain)
+			}
+			if path != "" {
+				for _, cand := range commandProjectCandidatesIn(dir, "", path) {
+					if !slices.Contains(names, cand) {
+						names = append(names, cand)
+					}
+				}
+			}
+		}
 		return names
 	})
 	// A hook that fires unasked is the auto activation, so a session the trust
