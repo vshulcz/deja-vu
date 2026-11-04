@@ -413,7 +413,19 @@ func recallConclusionLines(dir, q string, h search.Hit, o search.Options, left i
 		// whole session for the best hit alone, the same upgrade
 		// recall_context makes for the same reason (#1011).
 		whole := h.Session
-		if full, ok, ferr := wholeSessionForMCP(dir, whole); ferr == nil && ok {
+		roles := map[string]bool{
+			"user":               true,
+			"assistant":          true,
+			"edit":               true,
+			"wrote":              true,
+			index.RoleStubOthers: true,
+		}
+		for _, m := range h.Session.Messages {
+			if m.Role != "" {
+				roles[m.Role] = true
+			}
+		}
+		if full, ok, ferr := wholeSessionForMCPInRoles(dir, whole, roles); ferr == nil && ok {
 			whole = cutSession(full, o)
 		}
 		// Not the line already shown as this hit's answer. The answer

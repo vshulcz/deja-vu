@@ -394,7 +394,7 @@ func eachRecordForKeysByOffsetsWindowedTail(f *os.File, dir string, t *recordTab
 	// When the caller has already windowed each session (or total offsets fit
 	// comfortably in maxAddressedOffsets), always use addressed reads rather
 	// than walking an 855 MiB log (#5901).
-	if matchedByKey == nil && tail <= 0 && len(want) > 1 && len(offs) > maxAddressedOffsets && ro.records > 0 && int64(len(offs)) > ro.records/offsetsWalkShare {
+	if matchedByKey == nil && tail <= 0 && roles == nil && len(want) > 1 && len(offs) > maxAddressedOffsets && ro.records > 0 && int64(len(offs)) > ro.records/offsetsWalkShare {
 		return false, nil
 	}
 	atomic.AddInt64(&recordOffsetReads, 1)
@@ -503,6 +503,20 @@ func recordInSpan(b []byte, rel int, t *recordTables, want, roles map[string]boo
 	if size > maxRecordSize {
 		return Record{}, false, true, errOffsetsMismatch
 	}
+	if roles != nil && rel+4 < len(b) {
+		end := min(len(b), rel+4+size)
+		if key, role, ok := recordRoleIn(b[rel+4:end], t); ok {
+			if !want[key] {
+				return Record{}, false, true, errOffsetsMismatch
+			}
+			if !roleWanted(roles, role) {
+				if roles[RoleStubOthers] {
+					return Record{Key: key, Role: role}, true, true, nil
+				}
+				return Record{}, false, true, nil
+			}
+		}
+	}
 	if rel+4+size > len(b) {
 		return Record{}, false, false, nil
 	}
@@ -512,6 +526,9 @@ func recordInSpan(b []byte, rel int, t *recordTables, want, roles map[string]boo
 		return Record{}, false, true, errOffsetsMismatch
 	}
 	if !roleWanted(roles, role) {
+		if roles[RoleStubOthers] {
+			return Record{Key: key, Role: role}, true, true, nil
+		}
 		return Record{}, false, true, nil
 	}
 	rec, derr := decodeRecord(payload, t)
@@ -544,6 +561,9 @@ func readRecordAtInRoles(f *os.File, off int64, t *recordTables, want, roles map
 		return Record{}, false, errOffsetsMismatch
 	}
 	if !roleWanted(roles, role) {
+		if roles[RoleStubOthers] {
+			return Record{Key: key, Role: role}, true, nil
+		}
 		return Record{}, false, nil
 	}
 	var payload []byte

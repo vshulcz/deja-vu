@@ -286,6 +286,11 @@ func PrefixHarnesses(dir, id string) []string {
 // search and recent output. Unlike the human prefix command, it never guesses
 // between harnesses or accepts a shortened native ID.
 func FindByIdentity(dir, harness, id string) (model.Session, bool, error) {
+	return FindByIdentityInRoles(dir, harness, id, nil)
+}
+
+// FindByIdentityInRoles is FindByIdentity decoding only records matching roles.
+func FindByIdentityInRoles(dir, harness, id string, roles map[string]bool) (model.Session, bool, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -312,7 +317,7 @@ func FindByIdentity(dir, harness, id string) (model.Session, bool, error) {
 	if !ok {
 		return model.Session{}, false, nil
 	}
-	return loadSessionMeta(dir, m, meta)
+	return loadSessionMetaInRolesTail(dir, m, meta, roles, 0)
 }
 
 // FindTailByIdentity is FindByIdentity bounded to the last tail records of the
@@ -378,6 +383,12 @@ func (id Identity) Key() string { return model.SessionKey(id.Harness, id.ID) }
 // Sessions come back in the order asked for, with identities the manifest does
 // not know dropped.
 func FindManyByIdentity(dir string, ids []Identity) ([]model.Session, error) {
+	return FindManyByIdentityInRoles(dir, ids, nil)
+}
+
+// FindManyByIdentityInRoles is FindManyByIdentity decoding only records whose
+// role is selected by roles.
+func FindManyByIdentityInRoles(dir string, ids []Identity, roles map[string]bool) ([]model.Session, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -404,7 +415,7 @@ func FindManyByIdentity(dir string, ids []Identity) ([]model.Session, error) {
 	if len(metas) == 0 {
 		return nil, nil
 	}
-	return sessionsForMetas(dir, metas)
+	return sessionsForMetasInRoles(dir, metas, roles)
 }
 
 // ChildrenOf lists the sessions an agent spawned from this one, newest first.
@@ -603,15 +614,19 @@ func betterIDMatch(candidate, held SessionMeta) bool {
 }
 
 func loadSessionMeta(dir string, m Manifest, meta SessionMeta) (model.Session, bool, error) {
-	return loadSessionMetaTail(dir, m, meta, 0)
+	return loadSessionMetaInRolesTail(dir, m, meta, nil, 0)
 }
 
 func loadSessionMetaTail(dir string, m Manifest, meta SessionMeta, tail int) (model.Session, bool, error) {
+	return loadSessionMetaInRolesTail(dir, m, meta, nil, tail)
+}
+
+func loadSessionMetaInRolesTail(dir string, m Manifest, meta SessionMeta, roles map[string]bool, tail int) (model.Session, bool, error) {
 	if tail > 0 && IsPromotedNote(meta.Harness, meta.ID, meta.OrigID) {
 		tail = 0
 	}
 	key := meta.Key()
-	recs, err := recordsForKeyTail(filepath.Join(dir, "records.bin"), tablesFromManifest(m), key, tail)
+	recs, err := recordsForKeyInRolesTail(filepath.Join(dir, "records.bin"), tablesFromManifest(m), key, roles, tail)
 	// A pass that swapped in during the read zeroes the records it replaced
 	// in the log this one shares, and the session read empty (#5449). Once
 	// more from the live manifest; a failed read too, since the new log's tail
@@ -628,7 +643,7 @@ func loadSessionMetaTail(dir string, m Manifest, meta SessionMeta, tail int) (mo
 		if sessionReread != nil {
 			sessionReread()
 		}
-		recs, err = recordsForKeyTail(filepath.Join(dir, "records.bin"), tablesFromManifest(m), key, tail)
+		recs, err = recordsForKeyInRolesTail(filepath.Join(dir, "records.bin"), tablesFromManifest(m), key, roles, tail)
 	}
 	if err != nil {
 		return model.Session{}, false, err

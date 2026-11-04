@@ -62,6 +62,11 @@ func claudeChanges(file, id string) []Change {
 	cwd := ""
 	failed := map[string]bool{}
 	_ = scanJSONLBytes(file, 0, func(line []byte) {
+		hasFilePath := bytes.Contains(line, []byte(`"file_path"`))
+		hasError := len(out) > 0 && bytes.Contains(line, []byte(`"is_error"`))
+		if !hasFilePath && !hasError && (cwd != "" || !bytes.Contains(line, []byte(`"cwd"`))) {
+			return
+		}
 		var v struct {
 			Type      string `json:"type"`
 			SessionID string `json:"sessionId"`
@@ -78,7 +83,7 @@ func claudeChanges(file, id string) []Change {
 		}
 		if v.Type == "user" {
 			// The result of each call comes back on a user line.
-			if !bytes.Contains(line, []byte(`"is_error"`)) {
+			if !hasError {
 				return
 			}
 			var results []struct {
@@ -97,6 +102,9 @@ func claudeChanges(file, id string) []Change {
 		}
 		if v.Cwd != "" {
 			cwd = v.Cwd
+		}
+		if !hasFilePath {
+			return
 		}
 		var parts []struct {
 			Type  string `json:"type"`

@@ -578,31 +578,33 @@ func staleLocked(dir string, o query.Options, progress io.Writer, mark func(stri
 	// every recall, 12 MB on a 25k-session store (#5386).
 	m, err := readManifestCached(dir)
 	mark("manifest")
+	if err == nil && m.Scope == "" && recordsIntact(dir, m) && !mustRebuildBeforeAnswering(m, version) {
+		if newerIndex(m) {
+			// Left alone, and current as far as this build can tell: calling it
+			// stale handed it to a warmup that would not touch it either.
+			return false, 0, 0, nil
+		}
+		if m.Version != version {
+			// A content-version bump that this build can still read: the store
+			// answers under the old rules while the re-read runs behind it, the
+			// way staleness is already handled. Blocking on it is what made the
+			// first question after an upgrade wait for the whole pass — 13m54s on
+			// a 520 MB store, and an agent that waited a minute gave up on the
+			// tool (#3552).
+			return true, 0, 0, nil
+		}
+		if zoneDrifted(m) || miningChanged(m) {
+			// Regrouping the day buckets or rereading aider headers in this zone
+			// is a full rebuild; hand it to the detached warmup and say the current answer is stale.
+			return true, 0, 0, nil
+		}
+	}
 	want := currentFilesReusing("", priorFiles(m, err))
 	mark("walk stores")
 	if err != nil || m.Scope != "" || !recordsIntact(dir, m) || mustRebuildBeforeAnswering(m, version) {
 		// No usable index yet (or a rebuild-grade problem): the caller cannot
 		// serve anything sensible stale, so build synchronously.
 		return false, 0, 0, updateIndex(dir, o.Harness, "", want, false, progress)
-	}
-	if newerIndex(m) {
-		// Left alone, and current as far as this build can tell: calling it
-		// stale handed it to a warmup that would not touch it either.
-		return false, 0, 0, nil
-	}
-	if m.Version != version {
-		// A content-version bump that this build can still read: the store
-		// answers under the old rules while the re-read runs behind it, the
-		// way staleness is already handled. Blocking on it is what made the
-		// first question after an upgrade wait for the whole pass — 13m54s on
-		// a 520 MB store, and an agent that waited a minute gave up on the
-		// tool (#3552).
-		return true, 0, 0, nil
-	}
-	if zoneDrifted(m) || miningChanged(m) {
-		// Regrouping the day buckets or rereading aider headers in this zone
-		// is a full rebuild; hand it to the detached warmup and say the current answer is stale.
-		return true, 0, 0, nil
 	}
 	if manifestFresh(m, want, "") {
 		return false, 0, 0, nil

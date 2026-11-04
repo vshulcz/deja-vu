@@ -380,7 +380,10 @@ func withFileTouchers(dir string, ss []model.Session, target search.BlameTarget)
 			break
 		}
 	}
-	full, err := index.FindManyByIdentity(dir, want)
+	full, err := index.FindManyByIdentityInRoles(dir, want, map[string]bool{
+		"*":                    true,
+		sources.RoleToolOutput: false,
+	})
 	if err != nil {
 		return ss
 	}
@@ -388,6 +391,11 @@ func withFileTouchers(dir string, ss []model.Session, target search.BlameTarget)
 		// The manifest is keyed by identity, so each session reaches this once
 		// — there is no second visit to record a position for.
 		if i, present := at[s.Key()]; present {
+			for _, m := range ss[i].Messages {
+				if m.Role == sources.RoleToolOutput {
+					s.Messages = append(s.Messages, m)
+				}
+			}
 			ss[i] = s
 		} else {
 			ss = append(ss, s)

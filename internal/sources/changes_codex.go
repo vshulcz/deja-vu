@@ -16,6 +16,11 @@ func codexChanges(file string) []Change {
 	cwd, metaSeen := "", false
 	failed := map[string]bool{}
 	_ = scanJSONLBytes(file, 0, func(line []byte) {
+		if !bytes.Contains(line, []byte("Begin Patch")) &&
+			(len(out) == 0 || !bytes.Contains(line, []byte(`_call_output"`))) &&
+			!bytes.Contains(line, []byte(`"cwd"`)) {
+			return
+		}
 		var v struct {
 			Type    string          `json:"type"`
 			Payload json.RawMessage `json:"payload"`

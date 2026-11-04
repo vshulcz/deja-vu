@@ -27,6 +27,13 @@ import (
 // the session is not in memory at that point. Here the index is at hand, so the
 // session is read back and the reply carried along.
 func attachAnswers(dir string, hits []search.Hit) {
+	type pending struct {
+		hitIdx      int
+		matchedUser string
+	}
+	var want []index.Identity
+	var pend []pending
+	seen := map[string]bool{}
 	for i := range hits {
 		h := &hits[i]
 		if len(h.Snippets) == 0 || len(h.Snippets) >= 3 {
@@ -42,12 +49,36 @@ func attachAnswers(dir string, hits []search.Hit) {
 		if matchedUser == "" {
 			continue
 		}
-		full, ok, err := index.FindByIdentity(dir, h.Session.Harness, h.Session.ID)
-		if err != nil || !ok {
+		id := index.Identity{Harness: h.Session.Harness, ID: h.Session.ID}
+		if !seen[id.Key()] {
+			seen[id.Key()] = true
+			want = append(want, id)
+		}
+		pend = append(pend, pending{hitIdx: i, matchedUser: matchedUser})
+	}
+	if len(want) == 0 {
+		return
+	}
+	sessions, err := index.FindManyByIdentityInRoles(dir, want, map[string]bool{
+		"user":               true,
+		"assistant":          true,
+		index.RoleStubOthers: true,
+	})
+	if err != nil {
+		return
+	}
+	byKey := make(map[string]model.Session, len(sessions))
+	for _, s := range sessions {
+		byKey[s.Key()] = s
+	}
+	for _, p := range pend {
+		h := &hits[p.hitIdx]
+		full, ok := byKey[h.Session.Key()]
+		if !ok {
 			continue
 		}
 		for mi, m := range full.Messages {
-			if m.Role != "user" || m.Text != matchedUser {
+			if m.Role != "user" || m.Text != p.matchedUser {
 				continue
 			}
 			if a := search.AnswerAfter(full.Messages, mi); a != "" {
@@ -388,6 +419,10 @@ func recallCountLineAbout(q, tier string, offset, served, total, strict int, nam
 // a theoretical one (#719). The hit knows its own harness; use it.
 func wholeSessionForMCP(dir string, s model.Session) (model.Session, bool, error) {
 	return index.FindByIdentity(dir, s.Harness, s.ID)
+}
+
+func wholeSessionForMCPInRoles(dir string, s model.Session, roles map[string]bool) (model.Session, bool, error) {
+	return index.FindByIdentityInRoles(dir, s.Harness, s.ID, roles)
 }
 
 // recallCountLineReserve is what the "N more, call again with offset=N" line

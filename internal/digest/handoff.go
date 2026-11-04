@@ -135,6 +135,9 @@ func cleanSession(s model.Session) model.Session {
 	out.Messages = nil
 	seen := map[string]bool{}
 	for _, m := range s.Messages {
+		if m.Role != "user" && m.Role != "assistant" {
+			continue
+		}
 		if IsAgentArtifact(m.Text) {
 			continue
 		}

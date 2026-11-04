@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"os"
@@ -30,7 +31,8 @@ var (
 	// toolArgKeys hold a tool call's arguments beside its name. An edit is
 	// only taken from inside one: the same shape in a system prompt, a tool
 	// schema or a read result is not a change the session made.
-	toolArgKeys = map[string]bool{"input": true, "arguments": true, "args": true, "parameters": true, "params": true, "rawInput": true, "raw_input": true}
+	toolArgKeys     = map[string]bool{"input": true, "arguments": true, "args": true, "parameters": true, "params": true, "rawInput": true, "raw_input": true}
+	toolArgKeySlice = []string{"input", "arguments", "args", "parameters", "params", "rawInput", "raw_input"}
 	// callStatusKeys name the field a harness marks a failed call with.
 	callStatusKeys = []string{"status", "callStatus", "toolStatus", "resultStatus"}
 )
@@ -47,7 +49,8 @@ var writeToolName = regexp.MustCompile(`(?i)write|create|save|new_?file`).MatchS
 // sessions in one file, one session would show another's code — so the file
 // is parsed by its own harness first and must come back as one session.
 func genericChanges(s model.Session) []Change {
-	if ext := strings.ToLower(path.Ext(s.Path)); ext != ".json" && ext != ".jsonl" {
+	ext := strings.ToLower(path.Ext(s.Path))
+	if ext != ".json" && ext != ".jsonl" {
 		return nil
 	}
 	fi, err := os.Stat(s.Path)
@@ -58,27 +61,36 @@ func genericChanges(s model.Session) []Change {
 	if !ok || k.Parse == nil {
 		return nil
 	}
-	if ss, parseErr := k.Parse(s.Path, 0); parseErr != nil || len(ss) != 1 {
-		return nil
-	}
-	f, err := os.Open(s.Path)
-	if err != nil {
-		return nil
-	}
-	defer f.Close()
 	w := &editWalker{seen: map[Change]bool{}}
-	dec := json.NewDecoder(f)
-	for {
-		var v any
-		if err := dec.Decode(&v); err != nil {
-			if err == io.EOF {
+	walkedJSONL := false
+	if ext == ".jsonl" {
+		walkedJSONL = walkGenericJSONL(s.Path, w)
+	}
+	if !walkedJSONL {
+		f, openErr := os.Open(s.Path)
+		if openErr != nil {
+			return nil
+		}
+		defer f.Close()
+		dec := json.NewDecoder(f)
+		for {
+			var v any
+			if decErr := dec.Decode(&v); decErr != nil {
+				if decErr == io.EOF {
+					break
+				}
+				// A line that is not JSON ends the walk where it stands; what
+				// was read before it still counts.
 				break
 			}
-			// A line that is not JSON ends the walk where it stands; what
-			// was read before it still counts.
-			break
+			w.walk(v, "", false, false, 0)
 		}
-		w.walk(v, "", false, false, 0)
+	}
+	if len(w.out) == 0 {
+		return nil
+	}
+	if ss, parseErr := k.Parse(s.Path, 0); parseErr != nil || len(ss) != 1 {
+		return nil
 	}
 	cwd := w.cwd
 	if cwd == "" && s.Harness == "gemini" {
@@ -91,6 +103,64 @@ func genericChanges(s model.Session) []Change {
 		w.out[i].Path = relTo(cwd, w.out[i].Path)
 	}
 	return w.out
+}
+
+func walkGenericJSONL(file string, w *editWalker) bool {
+	stopped := false
+	firstLine := true
+	fallback := false
+	_ = scanJSONLBytes(file, 0, func(line []byte) {
+		if stopped || fallback {
+			return
+		}
+		if firstLine {
+			firstLine = false
+			var probe any
+			if json.Unmarshal(line, &probe) != nil {
+				fallback = true
+				return
+			}
+			if lineMayCarryEditOrCwd(line, w.cwd != "") {
+				w.walk(probe, "", false, false, 0)
+			}
+			return
+		}
+		if !lineMayCarryEditOrCwd(line, w.cwd != "") {
+			return
+		}
+		var v any
+		if json.Unmarshal(line, &v) != nil {
+			stopped = true
+			return
+		}
+		w.walk(v, "", false, false, 0)
+	})
+	return !fallback
+}
+
+func lineMayCarryEditOrCwd(line []byte, hasCwd bool) bool {
+	if !hasCwd && (lineContainsAny(line, editCwdKeys) || bytes.Contains(line, []byte(`"directories"`))) {
+		return true
+	}
+	if !lineContainsAny(line, toolArgKeySlice) {
+		return false
+	}
+	if bytes.Contains(line, []byte("Begin Patch")) {
+		return true
+	}
+	if !lineContainsAny(line, editPathKeys) {
+		return false
+	}
+	return lineContainsAny(line, editOldKeys) || lineContainsAny(line, editContentKeys)
+}
+
+func lineContainsAny(line []byte, keys []string) bool {
+	for _, k := range keys {
+		if bytes.Contains(line, []byte(k)) {
+			return true
+		}
+	}
+	return false
 }
 
 type editWalker struct {

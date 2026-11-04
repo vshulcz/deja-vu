@@ -82,6 +82,10 @@ func newLogWalk(r io.Reader, t *recordTables, from int64) *logWalk {
 // next is the next live record. A clean or torn end of the log is io.EOF or
 // io.ErrUnexpectedEOF.
 func (w *logWalk) next() (int64, []byte, error) {
+	return w.nextInRoles(nil, nil, nil)
+}
+
+func (w *logWalk) nextInRoles(t *recordTables, want map[string]bool, keepKey func(string) bool) (int64, []byte, error) {
 	var hdr [4]byte
 	for {
 		if _, err := io.ReadFull(w.r, hdr[:]); err != nil {
@@ -98,6 +102,23 @@ func (w *logWalk) next() (int64, []byte, error) {
 				return 0, nil, err
 			}
 			continue
+		}
+		if want != nil {
+			peek := min(int(n), 3*binary.MaxVarintLen64)
+			head, perr := w.r.Peek(peek)
+			if len(head) < peek && perr != nil {
+				return 0, nil, perr
+			}
+			key, role, ok := recordRoleIn(head, t)
+			if !ok {
+				return 0, nil, errShortRecord
+			}
+			if !want[role] || (keepKey != nil && !keepKey(key)) {
+				if _, err := w.r.Discard(int(n)); err != nil {
+					return 0, nil, err
+				}
+				continue
+			}
 		}
 		if cap(w.buf) < int(n) {
 			w.buf = make([]byte, n)
@@ -293,6 +314,11 @@ func recordRoleIn(b []byte, t *recordTables) (key, role string, ok bool) {
 	return t.lookup(kid), t.lookup(rid), true
 }
 
+// RoleStubOthers instructs role-filtered session loaders to emit a zero-text
+// stub Record{Key, Role} for records whose role is not wanted, preserving
+// exact message slice indices without inflating unwanted record payloads.
+const RoleStubOthers = "\x00stub"
+
 func roleWanted(roles map[string]bool, role string) bool {
 	if roles == nil || role == "" {
 		return true
@@ -307,6 +333,10 @@ func roleWanted(roles map[string]bool, role string) bool {
 // prefix of every record and the body of only those. Same order and same
 // records as filtering after a full decode, at a fraction of the work.
 func eachRecordInRoles(path string, t *recordTables, want map[string]bool, fn func(Record)) error {
+	return eachRecordInRolesWhere(path, t, want, nil, fn)
+}
+
+func eachRecordInRolesWhere(path string, t *recordTables, want map[string]bool, keepKey func(string) bool, fn func(Record)) error {
 	f, err := openIndexFile(path)
 	if err != nil {
 		return err
@@ -314,19 +344,12 @@ func eachRecordInRoles(path string, t *recordTables, want map[string]bool, fn fu
 	defer func() { _ = f.Close() }()
 	w := newLogWalk(f, t, 0)
 	for {
-		_, payload, err := w.next()
+		_, payload, err := w.nextInRoles(t, want, keepKey)
 		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 			return nil
 		}
 		if err != nil {
 			return err
-		}
-		_, role, ok := recordRoleIn(payload, t)
-		if !ok {
-			return errShortRecord
-		}
-		if !want[role] {
-			continue
 		}
 		rec, err := decodeRecord(payload, t)
 		if err != nil {
@@ -409,12 +432,16 @@ func walkRecordsForKeys(r *bufio.Reader, from int64, t *recordTables, want, role
 		at := off
 		off += 4 + int64(n)
 		skip := !want[t.lookup(kid)] || dead.at(at)
+		var stubRole string
 		if !skip && roles != nil {
 			// Key, source and role lead the payload; the body after them is
 			// only read for a role the caller wants.
 			if head, _ := r.Peek(min(int(n), 3*binary.MaxVarintLen64)); len(head) > 0 {
 				if _, role, ok := recordRoleIn(head, t); ok && !roleWanted(roles, role) {
 					skip = true
+					if roles[RoleStubOthers] {
+						stubRole = role
+					}
 				}
 			}
 		}
@@ -424,6 +451,9 @@ func walkRecordsForKeys(r *bufio.Reader, from int64, t *recordTables, want, role
 					return nil
 				}
 				return derr
+			}
+			if stubRole != "" {
+				fn(Record{Key: t.lookup(kid), Role: stubRole})
 			}
 			continue
 		}
@@ -942,12 +972,41 @@ func eachRecordOfRoles(dir string, roles map[string]bool, fn func(SessionMeta, R
 // key and needs every match rather than the best ones — restore is that case
 // (#647), and so is any inventory of what the store holds.
 func EachRecordOfRole(dir, role string, fn func(SessionMeta, Record)) error {
+	return EachRecordOfRoleWhere(dir, role, nil, fn)
+}
+
+// EachRecordOfRoleWhere is EachRecordOfRole filtered to sessions matching
+// keepSession before record bodies are read or inflated.
+func EachRecordOfRoleWhere(dir, role string, keepSession func(SessionMeta) bool, fn func(SessionMeta, Record)) error {
 	if dir == "" {
 		dir = DefaultDir()
 	}
 	return walkRecordsStable(dir, func(m Manifest) error {
-		return eachRecordInRoles(filepath.Join(dir, "records.bin"), tablesFromManifest(m),
-			map[string]bool{role: true}, func(r Record) {
+		var keep map[string]SessionMeta
+		var keepKey func(string) bool
+		if keepSession != nil {
+			keep = make(map[string]SessionMeta)
+			for k, meta := range m.Sessions {
+				if keepSession(meta) {
+					keep[k] = meta
+				}
+			}
+			if len(keep) == 0 {
+				return nil
+			}
+			keepKey = func(k string) bool {
+				_, ok := keep[k]
+				return ok
+			}
+		}
+		return eachRecordInRolesWhere(filepath.Join(dir, "records.bin"), tablesFromManifest(m),
+			map[string]bool{role: true}, keepKey, func(r Record) {
+				if keep != nil {
+					if meta, ok := keep[r.Key]; ok {
+						fn(meta, r)
+					}
+					return
+				}
 				if meta, ok := m.Sessions[r.Key]; ok {
 					fn(meta, r)
 				}

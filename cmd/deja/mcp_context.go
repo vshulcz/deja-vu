@@ -210,10 +210,11 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 		// without it does not name what was asked either — the dropped word
 		// is the one that identified the question.
 		names := !namedSomethingAbsent(result.Variants) &&
-			sessionNamesTheAsked(whole, q, result.TermIDF)
+			(sessionNamesTheAsked(hits[0].Session, q, result.TermIDF) || sessionNamesTheAsked(whole, q, result.TermIDF))
 		// Holding most of a long query names it too, as on the recall page.
 		if !names && !hits[0].Strict {
-			names = bestCoverage([]search.Hit{{Session: whole}}, q, result.TermIDF).aboutIt()
+			names = bestCoverage([]search.Hit{hits[0]}, q, result.TermIDF).aboutIt() ||
+				bestCoverage([]search.Hit{{Session: whole}}, q, result.TermIDF).aboutIt()
 		}
 		text = contextTierLead(hits[0].Tier, hits[0].Strict, names) +
 			contextIgnoredWords(result) + text

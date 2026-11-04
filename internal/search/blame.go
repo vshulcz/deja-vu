@@ -288,6 +288,13 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 	if ordinaryWordName(target.Base) {
 		inDir = strings.ToLower(filepath.ToSlash(filepath.Join(filepath.Base(filepath.Dir(target.FullPath)), target.Base)))
 	}
+	type blameMention struct {
+		text  string
+		count int
+		level float64
+		role  string
+	}
+	mentionsBySession := make(map[string][]blameMention)
 	hits := make([]BlameHit, 0)
 	for _, session := range mergeSessions(ss) {
 		if o.Harness != "" && session.Harness != o.Harness {
@@ -305,14 +312,11 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 		// to name it. A session that mentions a file in passing and discusses it
 		// properly further down was quoted on the passing line, which is the
 		// evidence a reader judges the hit by (#1329).
-		type mention struct {
-			text  string
-			count int
-			level float64
-			role  string
-		}
-		var mentions []mention
+		var mentions []blameMention
 		for mi, message := range session.Messages {
+			if !containsFold(message.Text, base) {
+				continue
+			}
 			// The transcript's record of a past `deja blame` names the file in
 			// every line of its own output, so blame ranked its own answer as
 			// the history of the file and quoted it back. Recall was fixed for
@@ -352,8 +356,11 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 			if level > specificity {
 				specificity = level
 			}
-			mentions = append(mentions, mention{text, count, level, message.Role})
+			mentions = append(mentions, blameMention{text, count, level, message.Role})
 			hit.matched = append(hit.matched, mi)
+		}
+		if hit.Count == 0 {
+			continue
 		}
 		// A path-shaped mention outranks a bare filename however often the bare
 		// name is repeated; among equally specific ones, the message that keeps
@@ -368,26 +375,10 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 			}
 			return mentions[i].count > mentions[j].count
 		})
-		if len(mentions) > 0 && mentions[0].role != "user" && mentions[0].role != "assistant" {
-			if cs := digest.SubstantialConclusions(session, 240, 1); len(cs) > 0 && digest.CarriesDecision(cs[0]) {
-				hit.Snippets = append(hit.Snippets, SafeText(strings.TrimSpace(cs[0])))
-			}
+		if len(mentions) > 2 {
+			mentions = mentions[:2]
 		}
-		for i := 0; i < len(mentions) && len(hit.Snippets) < 2; i++ {
-			if i > 0 && mentions[i].role == "files" {
-				if cs := digest.SubstantialConclusions(session, 240, 1); len(cs) > 0 && digest.CarriesDecision(cs[0]) {
-					cand := SafeText(strings.TrimSpace(cs[0]))
-					if cand != "" && (len(hit.Snippets) == 0 || hit.Snippets[0] != cand) {
-						hit.Snippets = append(hit.Snippets, cand)
-						continue
-					}
-				}
-			}
-			hit.Snippets = append(hit.Snippets, blameSnippet(mentions[i].text, mentions[i].role, target))
-		}
-		if hit.Count == 0 {
-			continue
-		}
+		mentionsBySession[session.Key()] = mentions
 		score := float64(hit.Count) * (1 + specificity)
 		if projectContainsFile(session.Project, target.FullPath) {
 			score *= 1.35
@@ -440,6 +431,39 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 	// many times, so scoring alone put the transcript above its own note on
 	// every blame (#2829).
 	liftNotesBy(hits, func(h BlameHit) model.Session { return h.Session })
+	snippetLimit := len(hits)
+	if !o.All && snippetLimit > BlameCap*4 {
+		snippetLimit = BlameCap * 4
+	}
+	for hi := range snippetLimit {
+		hit := &hits[hi]
+		mentions := mentionsBySession[hit.Session.Key()]
+		var cachedDecision string
+		decisionComputed := false
+		decisionLine := func() string {
+			if !decisionComputed {
+				decisionComputed = true
+				if cs := digest.SubstantialConclusions(hit.Session, 240, 1); len(cs) > 0 && digest.CarriesDecision(cs[0]) {
+					cachedDecision = SafeText(strings.TrimSpace(cs[0]))
+				}
+			}
+			return cachedDecision
+		}
+		if len(mentions) > 0 && mentions[0].role != "user" && mentions[0].role != "assistant" {
+			if cand := decisionLine(); cand != "" {
+				hit.Snippets = append(hit.Snippets, cand)
+			}
+		}
+		for i := 0; i < len(mentions) && len(hit.Snippets) < 2; i++ {
+			if i > 0 && mentions[i].role == "files" {
+				if cand := decisionLine(); cand != "" && (len(hit.Snippets) == 0 || hit.Snippets[0] != cand) {
+					hit.Snippets = append(hit.Snippets, cand)
+					continue
+				}
+			}
+			hit.Snippets = append(hit.Snippets, blameSnippet(mentions[i].text, mentions[i].role, target))
+		}
+	}
 	dropRepeatedSnippets(hits)
 	return hits
 }
@@ -568,7 +592,24 @@ func blameForms(full string) []string {
 
 func mentionScore(text, base string, forms []string) (int, float64) {
 	low := strings.ToLower(filepath.ToSlash(text))
+	if !strings.Contains(low, base) {
+		return 0, 1.0
+	}
 	count := 0
+	for pos := 0; ; {
+		i := strings.Index(low[pos:], base)
+		if i < 0 {
+			break
+		}
+		i += pos
+		if pathComponentOrWord(low, i, i+len(base)) {
+			count++
+		}
+		pos = i + len(base)
+	}
+	if count == 0 {
+		return 0, 1.0
+	}
 	level := 1.0
 	// A path with nothing said around it is not a session working on the file:
 	// a `git diff --stat` row and a pasted absolute path each name it once and
@@ -592,24 +633,6 @@ func mentionScore(text, base string, forms []string) (int, float64) {
 				level = candidate
 			}
 		}
-	}
-	// Only the target's own directories count, which is what the forms above
-	// are. Crediting any directory a session wrote instead — measured on a
-	// real store — handed `blame Makefile` to three other projects' Makefiles
-	// and dropped this repo's own from rank 2 to rank 24, because "wrote a
-	// deep path" is a proxy for working in a deep tree rather than for meaning
-	// this file. A target with no directory of its own leaves every mention at
-	// 1.0, and the rule sits out (#2840).
-	for pos := 0; ; {
-		i := strings.Index(low[pos:], base)
-		if i < 0 {
-			break
-		}
-		i += pos
-		if pathComponentOrWord(low, i, i+len(base)) {
-			count++
-		}
-		pos = i + len(base)
 	}
 	return count, level
 }

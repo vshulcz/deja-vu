@@ -47,8 +47,10 @@ func mcpHandoff(dir, name string, raw json.RawMessage) (string, int, error) {
 	if s.ID == "" {
 		return "deja: " + why, 0, nil
 	}
-	if full, ok, err := wholeSessionForMCP(dir, s); err == nil && ok {
-		s = full
+	if len(s.Messages) == 0 {
+		if full, ok, err := wholeSessionForMCP(dir, s); err == nil && ok {
+			s = full
+		}
 	}
 	text := frameRecall(handoffPrompt(digest.Handoff(s, handoffBudget)))
 	return text, 1, nil
@@ -84,25 +86,31 @@ func handoffTargetForAgent(dir, sel, harness string) (model.Session, string) {
 	if harness == "" {
 		live = liveSessionIDs(dir)
 	}
-	var newest model.Session
+	pol := policy.Load()
+	metas, _ := index.AllMetaShared(dir)
+	var newestMeta index.SessionMeta
 	for _, name := range digest.ProjectNameCandidates(cwd) {
-		ss, err := index.RecentInProject(dir, name, 12)
-		if err != nil {
-			continue
-		}
-		var own []model.Session
-		for _, s := range ss {
-			if !isHandoverSession(s) || !index.ProjectInScopeStrict(s.Project, name) || live[s.ID] {
+		for _, m := range metas {
+			if !isHandoverMeta(m) || !index.ProjectInScopeStrict(m.Project, name) || live[m.ID] {
 				continue
 			}
-			if harness != "" && s.Harness != harness {
+			if harness != "" && m.Harness != harness {
 				continue
 			}
-			own = append(own, s)
+			if !metaVisible(pol, policy.ActivationMCP, m) {
+				continue
+			}
+			if newestMeta.ID == "" || m.Updated.After(newestMeta.Updated) || (m.Updated.Equal(newestMeta.Updated) && m.ID > newestMeta.ID) {
+				newestMeta = m
+			}
 		}
-		kept, _ := policyFilterSessionsCounted(policy.ActivationMCP, own)
-		if len(kept) > 0 && kept[0].Updated.After(newest.Updated) {
-			newest = kept[0]
+	}
+	var newest model.Session
+	if newestMeta.ID != "" {
+		if s, ok, err := index.FindByIdentity(dir, newestMeta.Harness, newestMeta.ID); err == nil && ok && isHandoverSession(s) {
+			if kept, _ := policyFilterSessionsCounted(policy.ActivationMCP, []model.Session{s}); len(kept) > 0 {
+				newest = kept[0]
+			}
 		}
 	}
 	if newest.ID == "" {

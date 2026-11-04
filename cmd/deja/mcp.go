@@ -1033,15 +1033,9 @@ func mcpHow(dir, name string, raw json.RawMessage) (string, int, error) {
 	// agent asking is standing in the repository it means, and a machine-wide
 	// answer put another project's wrapper at the top (#3705).
 	scope := howScope(howCwd(), a.Project, false)
-	entries, hidden, ignored, err := howEntries(dir, strings.Fields(a.What), scope, policy.ActivationMCP)
+	entries, hidden, ignored, _, err := howEntriesWithFallback(dir, strings.Fields(a.What), scope, len(scope) > 0 && strings.TrimSpace(a.Project) == "", policy.ActivationMCP)
 	if err != nil {
 		return "", 0, err
-	}
-	if len(entries) == 0 && hidden == 0 && ignored == 0 && len(scope) > 0 && strings.TrimSpace(a.Project) == "" {
-		wider, h2, i2, werr := howEntries(dir, strings.Fields(a.What), nil, policy.ActivationMCP)
-		if werr == nil && (len(wider) > 0 || h2 > 0 || i2 > 0) {
-			entries, hidden, ignored = wider, h2, i2
-		}
 	}
 	if len(entries) == 0 {
 		// The same reasoning one line down, for the other rule: an agent

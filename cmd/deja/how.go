@@ -156,24 +156,18 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 		return ensureError(dir, err)
 	}
 	scope := howScope(howCwd(), project, allProjects)
-	entries, hidden, ignored, err := howEntries(dir, terms, scope, policy.ActivationSearch)
-	if err != nil {
-		return err
-	}
 	// Nothing here does not mean nothing anywhere: the scope is a default, and
 	// an agent told "no command on this machine mentions it" when one does
 	// goes and invents one (#3705, the reasoning #2630 wrote for the ignore
-	// rule).
-	widened := false
-	// The counters too, not only the rows: the note that says a rule hid the
-	// answer is what keeps an agent from inventing a command, and a scope with
-	// nothing in it zeroes that note as surely as it zeroes the rows.
-	if len(entries) == 0 && hidden == 0 && ignored == 0 && len(scope) > 0 && project == "" {
-		wider, h2, i2, werr := howEntries(dir, terms, nil, policy.ActivationSearch)
-		if werr == nil && (len(wider) > 0 || h2 > 0 || i2 > 0) {
-			entries, hidden, ignored, widened = wider, h2, i2, true
-			scope = nil
-		}
+	// rule). The counters too, not only the rows: the note that says a rule hid
+	// the answer is what keeps an agent from inventing a command, and a scope
+	// with nothing in it zeroes that note as surely as it zeroes the rows.
+	entries, hidden, ignored, widened, err := howEntriesWithFallback(dir, terms, scope, len(scope) > 0 && project == "", policy.ActivationSearch)
+	if err != nil {
+		return err
+	}
+	if widened {
+		scope = nil
 	}
 	if note := ignoredHiddenNoteFor("answer", ignored); note != "" {
 		fmt.Fprint(os.Stderr, note)
@@ -287,39 +281,59 @@ func howCapNote(found, limit int, raise string) string {
 // asked in one repository it used to answer with another's wrapper, forty runs
 // of `rtk go test ./...` above this repository's own command (#3705).
 func howEntries(dir string, terms []string, projects []string, activation string) ([]howEntry, int, int, error) {
+	entries, hidden, ignored, _, err := howEntriesWithFallback(dir, terms, projects, false, activation)
+	return entries, hidden, ignored, err
+}
+
+func howEntriesWithFallback(dir string, terms []string, projects []string, widen bool, activation string) ([]howEntry, int, int, bool, error) {
 	pol := policy.Load()
+	excluded := sources.ExcludedHarnesses()
+	lowTerms := make([]string, len(terms))
+	for i, t := range terms {
+		lowTerms[i] = strings.ToLower(t)
+	}
+	type bucket struct {
+		hidden  map[string]bool
+		ignored map[string]bool
+		byCmd   map[string]*howEntry
+	}
 	// Sessions, not records: the sentence this feeds says "matching sessions",
 	// and one withheld session that ran a command five times was reported as
 	// five (#1641, the shape #1639 fixed for friction).
-	hidden := map[string]bool{}
 	// The other rule that takes sessions out of an answer. It is applied inside
 	// retrieval, and this screen reads the record log instead of ranking, so it
 	// was not applied here at all: a tree the reader asked deja to stay out of
 	// answered "how do I run this here" — and the default rule is the temp tree
 	// a background agent makes for itself (#2630).
-	ignored := map[string]bool{}
-	byCmd := map[string]*howEntry{}
-	err := index.EachRecordOfRole(dir, "command", func(meta index.SessionMeta, r index.Record) {
-		if sources.HarnessExcluded(meta.Harness) || !howProjectMatches(meta.Project, projects) {
-			return
+	scoped := bucket{hidden: map[string]bool{}, ignored: map[string]bool{}, byCmd: map[string]*howEntry{}}
+	var wider bucket
+	if widen {
+		wider = bucket{hidden: map[string]bool{}, ignored: map[string]bool{}, byCmd: map[string]*howEntry{}}
+	}
+	const (
+		metaUnseen  uint8 = 0
+		metaAllowed uint8 = 1
+		metaHidden  uint8 = 2
+		metaIgnored uint8 = 3
+	)
+	metaStatus := map[string]uint8{}
+	sessionStatus := func(meta index.SessionMeta) (string, uint8) {
+		k := meta.Key()
+		if st := metaStatus[k]; st != metaUnseen {
+			return k, st
 		}
-		// Without the outcome codex and opencode append: "$ make test  → exit
-		// 2" is the same command as "$ make test", and counting them apart put
-		// one command on two rows of this screen (#2590).
-		line := strings.TrimSpace(firstCommandLine(r.Text))
-		cmd := index.CommandWithoutExitStatus(line)
-		// Measured on the form the screen prints, as it always was: the whole
-		// command is what the row groups and the JSON hands over, and a long
-		// one-liner is still a row.
-		if cmd == "" || len(howScreenCommand(cmd)) > howCommandMax {
-			return
+		if !pol.Allows(activation, meta.Project) {
+			metaStatus[k] = metaAllowed + 1
+			return k, metaHidden
 		}
-		low := strings.ToLower(cmd)
-		for _, t := range terms {
-			if !commandMentions(low, strings.ToLower(t)) {
-				return
-			}
+		if pol.Ignored(meta.Path, meta.Project) {
+			metaStatus[k] = metaIgnored
+			return k, metaIgnored
 		}
+		metaStatus[k] = metaAllowed
+		return k, metaAllowed
+	}
+	recordInto := func(b *bucket, meta index.SessionMeta, r index.Record, cmd, low string, code int, hasExit bool) {
 		// The rules after the question, not before it: the sentence says the
 		// policy "hides N matching sessions", and counting every withheld
 		// session that ran any command at all made that number about the
@@ -327,21 +341,21 @@ func howEntries(dir string, terms []string, projects []string, activation string
 		// three were hidden on a machine whose hidden sessions only ever ran
 		// `go test` (#2766). `files` is the shape this follows: it counts
 		// from what was already searched.
-		if !pol.Allows(activation, meta.Project) {
-			hidden[meta.Key()] = true
+		switch k, st := sessionStatus(meta); st {
+		case metaHidden:
+			b.hidden[k] = true
+			return
+		case metaIgnored:
+			b.ignored[k] = true
 			return
 		}
-		if pol.Ignored(meta.Path, meta.Project) {
-			ignored[meta.Key()] = true
-			return
-		}
-		e := byCmd[low]
+		e := b.byCmd[low]
 		if e == nil {
 			e = &howEntry{Command: cmd, Sessions: map[string]bool{}}
-			byCmd[low] = e
+			b.byCmd[low] = e
 		}
 		e.Runs++
-		if code, ok := index.CommandExitStatus(line); ok {
+		if hasExit {
 			e.Outcomes++
 			if code != 0 {
 				if e.Failures > 0 && code != e.ExitCode {
@@ -355,23 +369,82 @@ func howEntries(dir string, terms []string, projects []string, activation string
 		if r.Time.After(e.Last) {
 			e.Last = r.Time
 		}
+	}
+	scopedMeta := map[string]bool{}
+	keepSession := func(meta index.SessionMeta) bool {
+		if len(excluded) > 0 && excluded[strings.ToLower(strings.TrimSpace(meta.Harness))] {
+			return false
+		}
+		inScope := howProjectMatches(meta.Project, projects)
+		if inScope {
+			scopedMeta[meta.Key()] = true
+		}
+		if !widen && !inScope {
+			return false
+		}
+		return true
+	}
+	err := index.EachRecordOfRoleWhere(dir, "command", keepSession, func(meta index.SessionMeta, r index.Record) {
+		inScope := !widen || scopedMeta[r.Key]
+		if !inScope && !widen {
+			return
+		}
+		// Without the outcome codex and opencode append: "$ make test  → exit
+		// 2" is the same command as "$ make test", and counting them apart put
+		// one command on two rows of this screen (#2590).
+		line := strings.TrimSpace(firstCommandLine(r.Text))
+		cmd, code, hasExit := index.CommandExitOutcome(line)
+		// Measured on the form the screen prints, as it always was: the whole
+		// command is what the row groups and the JSON hands over, and a long
+		// one-liner is still a row.
+		if cmd == "" || (len(cmd) > howCommandMax && len(howScreenCommand(cmd)) > howCommandMax) {
+			return
+		}
+		low := strings.ToLower(cmd)
+		for _, t := range lowTerms {
+			if !commandMentions(low, t) {
+				return
+			}
+		}
+		if inScope {
+			recordInto(&scoped, meta, r, cmd, low, code, hasExit)
+		}
+		if widen && len(scoped.byCmd) == 0 && len(scoped.hidden) == 0 && len(scoped.ignored) == 0 {
+			recordInto(&wider, meta, r, cmd, low, code, hasExit)
+		}
 	})
 	if err != nil {
-		return nil, len(hidden), len(ignored), fmt.Errorf("read: %w", err)
+		return nil, len(scoped.hidden), len(scoped.ignored), false, fmt.Errorf("read: %w", err)
 	}
-	out := make([]howEntry, 0, len(byCmd))
-	for _, e := range byCmd {
+	chosen := &scoped
+	widened := false
+	if widen && len(scoped.byCmd) == 0 && len(scoped.hidden) == 0 && len(scoped.ignored) == 0 &&
+		(len(wider.byCmd) > 0 || len(wider.hidden) > 0 || len(wider.ignored) > 0) {
+		chosen = &wider
+		widened = true
+	}
+	out := make([]howEntry, 0, len(chosen.byCmd))
+	for _, e := range chosen.byCmd {
 		out = append(out, *e)
 	}
 	// Commands whose every recorded run failed or that only mention the tool
 	// inside a multi-step script yield to direct invocations that worked; within
 	// each tier, sessions come before runs.
+	var direct map[string]bool
+	if len(terms) > 0 {
+		direct = make(map[string]bool, len(out))
+		for i := range out {
+			direct[out[i].Command] = howDirectMatch(out[i].Command, terms)
+		}
+	}
 	sort.Slice(out, func(i, j int) bool {
 		if fi, fj := out[i].failedEveryTime(), out[j].failedEveryTime(); fi != fj {
 			return !fi
 		}
-		if di, dj := howDirectMatch(out[i].Command, terms), howDirectMatch(out[j].Command, terms); di != dj {
-			return di
+		if direct != nil {
+			if di, dj := direct[out[i].Command], direct[out[j].Command]; di != dj {
+				return di
+			}
 		}
 		if len(out[i].Sessions) != len(out[j].Sessions) {
 			return len(out[i].Sessions) > len(out[j].Sessions)
@@ -381,13 +454,16 @@ func howEntries(dir string, terms []string, projects []string, activation string
 		}
 		return out[i].Command < out[j].Command
 	})
-	return out, len(hidden), len(ignored), nil
+	return out, len(chosen.hidden), len(chosen.ignored), widened, nil
 }
 
 // howDirectMatch reports whether the leading command segment (after any `cd`
 // prefix) mentions every query term rather than burying the tool inside a
 // multi-step `&&` / `;` pipeline.
 func howDirectMatch(cmd string, terms []string) bool {
+	if len(terms) == 0 {
+		return true
+	}
 	head := strings.TrimSpace(cmd)
 	for {
 		low := strings.ToLower(head)

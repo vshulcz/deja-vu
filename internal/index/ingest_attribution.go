@@ -395,8 +395,12 @@ func recordsForKey(path string, t *recordTables, key string) ([]Record, error) {
 }
 
 func recordsForKeyTail(path string, t *recordTables, key string, tail int) ([]Record, error) {
+	return recordsForKeyInRolesTail(path, t, key, nil, tail)
+}
+
+func recordsForKeyInRolesTail(path string, t *recordTables, key string, roles map[string]bool, tail int) ([]Record, error) {
 	var out []Record
-	err := eachRecordForKeysInRolesWindowedTail(path, t, map[string]bool{key: true}, nil, nil, tail, func(r Record) {
+	err := eachRecordForKeysInRolesWindowedTail(path, t, map[string]bool{key: true}, roles, nil, tail, func(r Record) {
 		out = append(out, r)
 	})
 	if tail > 0 && len(out) > tail {

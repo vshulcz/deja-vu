@@ -213,15 +213,22 @@ func ScrubLines(s model.Session, lines []string) []string {
 // from tool output and from the person turns no person in this project
 // typed. The messages are copied; s may share them with a cache.
 func ScrubMessages(s *model.Session) {
+	scrubTool := len(s.Messages) <= contextBodyMaxMessages
 	ms := make([]model.Message, 0, len(s.Messages))
 	for _, m := range s.Messages {
 		switch m.Role {
 		case "user":
 			m.Text = cutPersonOrders(*s, m.Text)
 		case "tool-output":
-			m.Text = evidence.CutAgentOrders(m.Text)
+			if scrubTool {
+				m.Text = evidence.CutAgentOrders(m.Text)
+			}
 		}
-		if strings.TrimSpace(strings.ReplaceAll(m.Text, evidence.LeftOut, "")) == "" {
+		check := m.Text
+		if strings.Contains(check, evidence.LeftOut) {
+			check = strings.ReplaceAll(check, evidence.LeftOut, "")
+		}
+		if strings.TrimSpace(check) == "" {
 			continue
 		}
 		ms = append(ms, m)

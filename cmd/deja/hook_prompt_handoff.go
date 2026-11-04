@@ -94,20 +94,28 @@ func askedHandoffSource(dir string, ask digest.HandoffAsk, cwd string, self map[
 	if cwd == "" {
 		cwd, _ = os.Getwd()
 	}
-	var newest model.Session
+	pol := policy.Load()
+	metas, _ := index.AllMetaShared(dir)
+	var newestMeta index.SessionMeta
 	for _, name := range digest.ProjectNameCandidates(cwd) {
-		ss, err := index.RecentInProject(dir, name, 12)
-		if err != nil {
-			continue
-		}
-		var own []model.Session
-		for _, s := range ss {
-			if isHandoverSession(s) && s.Harness == ask.Harness && !self[s.ID] && index.ProjectInScopeStrict(s.Project, name) {
-				own = append(own, s)
+		for _, m := range metas {
+			if !isHandoverMeta(m) || m.Harness != ask.Harness || self[m.ID] || !index.ProjectInScopeStrict(m.Project, name) {
+				continue
+			}
+			if !metaVisible(pol, policy.ActivationAuto, m) {
+				continue
+			}
+			if newestMeta.ID == "" || m.Updated.After(newestMeta.Updated) || (m.Updated.Equal(newestMeta.Updated) && m.ID > newestMeta.ID) {
+				newestMeta = m
 			}
 		}
-		if kept, _ := policyFilterSessionsCounted(policy.ActivationAuto, own); len(kept) > 0 && kept[0].Updated.After(newest.Updated) {
-			newest = kept[0]
+	}
+	var newest model.Session
+	if newestMeta.ID != "" {
+		if s, ok, err := index.FindByIdentity(dir, newestMeta.Harness, newestMeta.ID); err == nil && ok && isHandoverSession(s) {
+			if kept, _ := policyFilterSessionsCounted(policy.ActivationAuto, []model.Session{s}); len(kept) > 0 {
+				newest = kept[0]
+			}
 		}
 	}
 	return newest, newest.ID != ""
