@@ -56,6 +56,10 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 			if strings.HasPrefix(args[i], "-") {
 				return unknownFlag("handoff", args[i], handoffFlags)
 			}
+			if strings.TrimSpace(args[i]) == "" {
+				return idPrefixNeeded(dir, "handoff: empty session id prefix",
+					"handoff: empty session id prefix (see `deja last`, or omit the argument to hand off the latest session)")
+			}
 			// The last one used to win, so a stray word replaced the id and
 			// the refusal named it as the session that was missing (#2251).
 			if prefix != "" {

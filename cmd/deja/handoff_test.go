@@ -297,3 +297,23 @@ func TestHandoffIncludesContinuationFilesAndFailedCommand(t *testing.T) {
 		}
 	}
 }
+
+func TestHandoffRefusesAnExplicitBlankID(t *testing.T) {
+	withStatsStores(t)
+	cwd := filepath.Join(t.TempDir(), "tmp", "alpha")
+	if err := os.MkdirAll(cwd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(cwd)
+
+	for _, id := range []string{"", " \t"} {
+		out, err := captureRun(t, "handoff", id)
+		if err == nil || !strings.Contains(err.Error(), "handoff: empty session id prefix") || out != "" {
+			t.Errorf("handoff %q: output %q, error %v; want an empty-id refusal and no digest", id, out, err)
+		}
+	}
+	out, err := captureRun(t, "handoff")
+	if err != nil || !strings.Contains(out, "picking up work handed off") {
+		t.Fatalf("handoff with no argument: output %q, error %v; want the newest session digest", out, err)
+	}
+}
