@@ -334,19 +334,22 @@ func ParseCodexRolloutFromOffset(path string, offset int64) ([]model.Session, er
 // sessions of the harness that wrote it.
 func parseRolloutFile(path string, offset int64, harness string) ([]model.Session, error) {
 	// A compressed rollout is read through the same scanner as a plain one,
-	// from the decompressed bytes in memory. The frame is immutable: Codex
-	// materializes a rollout back to `.jsonl` before appending, so the offset
-	// the incremental pass carries for a compressed file is a whole-file read
-	// (#3640).
+	// from zstd's stdout. The frame is immutable: Codex materializes a rollout
+	// back to `.jsonl` before appending, so the offset the incremental pass
+	// carries for a compressed file is a whole-file read (#3640).
 	if codexCompressed(path) {
-		plain, err := zstdDecoded(path, harness)
+		s := model.Session{Harness: harness, ID: codexSessionID(path), Project: filepath.Base(filepath.Dir(path)), Path: path}
+		var ss []model.Session
+		err := zstdScan(path, harness, func(r io.Reader) error {
+			var err error
+			ss, err = parseCodexRolloutWithScanner(s, false, "", func(fn func(map[string]any)) error {
+				return scanJSONLReader(path, r, fn)
+			}, nil)
+			return err
+		})
 		if err != nil {
 			return nil, err
 		}
-		s := model.Session{Harness: harness, ID: codexSessionID(path), Project: filepath.Base(filepath.Dir(path)), Path: path}
-		ss, err := parseCodexRolloutWithScanner(s, false, "", func(fn func(map[string]any)) error {
-			return scanJSONLReader(path, bytes.NewReader(plain), fn)
-		}, nil)
 		// As parseCodexRolloutPath: a rollout with no message is no session.
 		if len(ss) == 1 && len(ss[0].Messages) == 0 {
 			return nil, err

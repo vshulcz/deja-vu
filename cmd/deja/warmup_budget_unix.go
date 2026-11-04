@@ -15,7 +15,7 @@ import (
 // and the compiler someone is waiting on.
 const warmupNice = 10
 
-// takeWarmupBudget lowers what a detached warmup is allowed to take.
+// takeWarmupBudget limits detached warmups and hook refreshes that build the index.
 //
 // The warmup is `deja index` with nothing holding it back: a compaction asks for
 // one at exactly the moment a session is busy, and a full rebuild then tokenizes
@@ -30,7 +30,7 @@ const warmupNice = 10
 // it has already exec'd, and a wrapper like `nice` is a binary this machine may
 // not have — `timeout` is missing here, which is how that lesson was learned.
 func takeWarmupBudget() {
-	if os.Getenv("DEJA_WARMUP_SENTINEL") == "" {
+	if os.Getenv("DEJA_WARMUP_SENTINEL") == "" && os.Getenv("DEJA_HOOK_REFRESH") == "" {
 		return
 	}
 	// Half the cores, at least one, and never more than the eight a bucket

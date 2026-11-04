@@ -1,10 +1,10 @@
 package search
 
 import (
-	"github.com/vshulcz/deja-vu/internal/digest"
 	"strings"
 	"unicode/utf8"
 
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
@@ -28,7 +28,8 @@ func AnswerAfter(messages []model.Message, i int) string {
 	// "Причина найдена: бэкофф считался от нуля". The same mistake #3470 fixed
 	// where a plan led a block, on the line an agent reads as the answer.
 	first := ""
-	for j := i + 1; j < len(messages) && j <= i+3; j++ {
+	assistantsSeen := 0
+	for j := i + 1; j < len(messages) && j <= i+16 && assistantsSeen < 4; j++ {
 		m := messages[j]
 		if m.Role == "user" {
 			// The user spoke again; there is no further reply to attach, and
@@ -38,14 +39,17 @@ func AnswerAfter(messages []model.Message, i int) string {
 		if m.Role != "assistant" {
 			continue
 		}
+		assistantsSeen++
 		// deja's own credit line is not the answer, and a reply that was
 		// nothing else has none (#4247).
 		reply := withoutOwnCredit(m.Text)
 		if text, ok := decisionSentence(reply); ok {
 			return text
 		}
-		if first == "" {
-			first = DecisionText(reply)
+		if cand := DecisionText(reply); cand != "" {
+			if first == "" || (digest.AnnouncesPlan(first) && !digest.AnnouncesPlan(cand)) {
+				first = cand
+			}
 		}
 	}
 	return first
@@ -125,10 +129,10 @@ func decisionSentence(text string) (string, bool) {
 		if carriesDecisionSentence(s) {
 			{
 				out := sentences[i]
-				// A decision often needs the sentence after it to make sense
-				// ("We pinned pgx to 5.4.3. Revisit when 1.24 ships.").
-				if i+1 < len(sentences) && len(out)+len(sentences[i+1]) < answerCap {
-					out += " " + sentences[i+1]
+				// A decision or heading often needs the sentences/bullets after
+				// it to make sense ("We pinned pgx to 5.4.3. Revisit when 1.24 ships.").
+				for j := i + 1; j < len(sentences) && j <= i+3 && len(out)+1+len(sentences[j]) <= answerCap; j++ {
+					out += " " + sentences[j]
 				}
 				return clip(out), true
 			}

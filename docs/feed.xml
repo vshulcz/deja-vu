@@ -179,6 +179,13 @@
     <summary>Claude Code CLI transcripts, not claude.ai chats: find ~/.claude/projects -mtime +30 -delete, cleanupPeriodDays on a timer, and why age frees little disk.</summary>
   </entry>
   <entry>
+    <title>Delete OpenClaw session history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-openclaw-session-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-openclaw-session-history.html"></link>
+    <updated>2026-11-03T00:00:00Z</updated>
+    <summary>Since 2026.8 OpenClaw keeps sessions in one SQLite file per agent. Delete one with openclaw sessions delete, then clear the archive it keeps.</summary>
+  </entry>
+  <entry>
     <title>Delete opencode session history — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/delete-opencode-session-history.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-opencode-session-history.html"></link>
@@ -282,12 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html"></link>
     <updated>2026-11-02T00:00:00Z</updated>
     <summary>codex resume, --all, --last and exec resume: why a session in ~/.codex/sessions is missing from the picker, the no rollout found error, and the fix.</summary>
-  </entry>
-  <entry>
-    <title>Turn your deja stats card into a PNG — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/card/</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/card/"></link>
-    <updated>2026-11-01T00:00:00Z</updated>
-    <summary>deja stats --card writes an SVG. Drop it here to get a PNG you can post. The conversion happens in your browser; the file is never uploaded.</summary>
   </entry>
 </feed>

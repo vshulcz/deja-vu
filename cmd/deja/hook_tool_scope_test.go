@@ -35,3 +35,22 @@ func TestFileScopeDoesNotCrossProjectsOnABareName(t *testing.T) {
 		t.Errorf("a session that touched this very path is out of scope")
 	}
 }
+
+func TestCommandProjectCandidatesInfersFromPathWhenUnscoped(t *testing.T) {
+	got := commandProjectCandidates("", "cat /var/run/splitbox/sing-box-cluster.json")
+	if !namesInclude(got, "splitbox") {
+		t.Fatalf("expected commandProjectCandidates to infer 'splitbox', got %v", got)
+	}
+	if namesInclude(got, "var") || namesInclude(got, "run") {
+		t.Fatalf("expected system path segments to be excluded, got %v", got)
+	}
+}
+
+func TestProjectMatchesAnyTermMatchesRepoBasename(t *testing.T) {
+	if !projectMatchesAnyTerm("goprojects/splitbox", []string{"splitbox"}) {
+		t.Error("expected projectMatchesAnyTerm to match repo basename in parent/repo project")
+	}
+	if projectMatchesAnyTerm("goprojects/splitbox", []string{"box"}) {
+		t.Error("expected projectMatchesAnyTerm not to match partial segment")
+	}
+}
