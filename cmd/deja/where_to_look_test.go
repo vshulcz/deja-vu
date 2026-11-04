@@ -18,9 +18,10 @@ func TestTheInstallProofSaysWhereToLook(t *testing.T) {
 	if !strings.Contains(out, "deja already knows this machine:") {
 		t.Fatalf("the proof did not print, so nothing was measured:\n%s", out)
 	}
-	if !strings.Contains(out, "docs: vshulcz.github.io/deja-vu") ||
+	if !strings.Contains(out, "card: `deja stats --card`") ||
+		!strings.Contains(out, "docs: vshulcz.github.io/deja-vu") ||
 		!strings.Contains(out, "issues: github.com/vshulcz/deja-vu/issues") {
-		t.Fatalf("the proof does not say where the docs and the tracker are:\n%s", out)
+		t.Fatalf("the proof does not say where the card, docs and tracker are:\n%s", out)
 	}
 
 	// Once per machine: a pointer that repeats is a pointer nobody reads.

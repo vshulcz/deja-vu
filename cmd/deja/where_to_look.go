@@ -13,7 +13,7 @@ import (
 // Once per machine: it is a pointer, not news, and a line that repeats is a
 // line that gets skipped. The marker sits beside the index for the same reason
 // the built note's does — one machine, one index directory.
-const whereToLookLine = docsLink + " · issues: github.com/vshulcz/deja-vu/issues"
+const whereToLookLine = "card: `deja stats --card` · " + docsLink + " · issues: github.com/vshulcz/deja-vu/issues"
 
 // docsLink is the docs half alone, for the built note, which has room for one
 // address on its line.
