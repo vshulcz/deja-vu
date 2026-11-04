@@ -666,10 +666,10 @@ func commandProjectCandidates(cwd, cmd string) []string {
 	}
 	for tok := range strings.FieldsSeq(cmd) {
 		tok = strings.Trim(tok, "\"'`();,|&<>")
-		if !strings.Contains(tok, "/") {
+		if !strings.ContainsAny(tok, `/\`) {
 			continue
 		}
-		parts := strings.Split(filepath.Clean(tok), "/")
+		parts := strings.Split(filepath.ToSlash(filepath.Clean(tok)), "/")
 		if len(parts) < 2 {
 			continue
 		}
