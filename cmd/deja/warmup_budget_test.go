@@ -25,6 +25,7 @@ func TestAWarmupTakesLessThanAForegroundRun(t *testing.T) {
 	// Without the sentinel this is an ordinary command and nothing changes.
 	runtime.GOMAXPROCS(all)
 	t.Setenv("DEJA_WARMUP_SENTINEL", "")
+	t.Setenv("DEJA_HOOK_REFRESH", "")
 	t.Setenv("GOMAXPROCS", "")
 	takeWarmupBudget()
 	if now := runtime.GOMAXPROCS(0); now != all {
@@ -53,5 +54,25 @@ func TestAWarmupTakesLessThanAForegroundRun(t *testing.T) {
 	takeWarmupBudget()
 	if now := runtime.GOMAXPROCS(0); now != all {
 		t.Errorf("GOMAXPROCS=3 from the environment was overridden to %d", now)
+	}
+}
+
+// A hook refresh can build the same index as a warmup, so it takes the same cap.
+func TestAHookRefreshTakesLessThanAForegroundRun(t *testing.T) {
+	if runtime.NumCPU() < 2 {
+		t.Skip("one core: there is nothing to cap")
+	}
+	was := runtime.GOMAXPROCS(0)
+	t.Cleanup(func() { runtime.GOMAXPROCS(was) })
+	all := runtime.NumCPU()
+	runtime.GOMAXPROCS(all)
+	t.Setenv("DEJA_WARMUP_SENTINEL", "")
+	t.Setenv("DEJA_HOOK_REFRESH", "1")
+	t.Setenv("GOMAXPROCS", "")
+
+	takeWarmupBudget()
+
+	if now, want := runtime.GOMAXPROCS(0), min(max(all/2, 1), 8); now != want {
+		t.Errorf("the refresher kept %d of %d cores, want %d", now, all, want)
 	}
 }

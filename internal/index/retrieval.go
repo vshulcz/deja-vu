@@ -1082,6 +1082,56 @@ func endsWithSegment(p, w string) bool {
 	return query.EndsWithSegment(p, w)
 }
 
+// ProjectEndsWithSegment reports whether project's path ends with the given
+// segment (case-insensitive), e.g. "goprojects/splitbox" ends with "splitbox".
+func ProjectEndsWithSegment(project, segment string) bool {
+	if project == "" || segment == "" {
+		return false
+	}
+	return endsWithSegment(strings.ToLower(project), strings.ToLower(segment))
+}
+
+// ProjectsMatchingTerms returns the distinct recorded project names in dir
+// whose path ends with any term in terms (length >= 4). Used when an unscoped
+// prompt names a repository by its basename ("splitbox", "routepilot").
+func ProjectsMatchingTerms(dir string, terms []string) []string {
+	if len(terms) == 0 {
+		return nil
+	}
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return nil
+	}
+	var lwants []string
+	for _, t := range terms {
+		if len(t) >= 4 {
+			lwants = append(lwants, strings.ToLower(t))
+		}
+	}
+	if len(lwants) == 0 {
+		return nil
+	}
+	seen := make(map[string]bool)
+	var out []string
+	for _, meta := range viewsFor(m).allMeta() {
+		if meta.Project == "" || seen[meta.Project] {
+			continue
+		}
+		lp := strings.ToLower(meta.Project)
+		for _, w := range lwants {
+			if endsWithSegment(lp, w) {
+				seen[meta.Project] = true
+				out = append(out, meta.Project)
+				break
+			}
+		}
+	}
+	return out
+}
+
 // ProjectInScopeStrict is ProjectInScope without the allowance synced work
 // gets. The loose rule is right for recall — a peer's parent path is not this
 // machine's, so `imported:goprojects/svc` has to answer to a local `svc` — and

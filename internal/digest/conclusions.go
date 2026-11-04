@@ -48,6 +48,7 @@ var decisionMarkers = []string{
 	// live questions turns into a pointer.
 	"теперь ", "стало ", "становится", "лежит в", "работает через",
 	"по умолчанию", "переехал", "now lives", "now goes", "by default",
+	"архитектура:", "картина:", "проксирует", "маршрутизируется", "для доступа к",
 	// The English half was missing the shapes English actually uses to close
 	// something. Counted over 41,084 real messages, the Russian markers fired
 	// 149 times on "решили" and 47 on "в итоге" while their English mirrors —
@@ -190,7 +191,37 @@ var planOpeners = []string{
 	"going to ", "about to ",
 	"ищу", "проверяю", "смотрю", "читаю", "реализую", "добавляю", "пишу ",
 	"делаю", "начинаю", "перемеряю", "спавню", "запускаю", "собираю", "сейчас ",
+	"пересобираю", "пересоберу", "понял, пересобираю", "понял, сейчас", "замерю", "замеряю",
 	"我先", "让我先", "让我看看", "我来看看", "我先看看", "正在检查", "我现在",
+}
+
+// AnnouncesPlan reports whether text opens by announcing what the speaker is
+// about to do rather than stating an outcome.
+func AnnouncesPlan(text string) bool {
+	return announcesItself(strings.ToLower(strings.TrimSpace(text)))
+}
+
+// userCorrectionMarkers mark user turns that explicitly correct an agent's
+// confusion or disambiguate distinct systems/configs.
+var userCorrectionMarkers = []string{
+	"причем тут", "причему тут", "при чём тут", "при чем тут",
+	"не путай", "путаешь", "перепутал",
+	"у меня впн для", "для доступа к", "это для ",
+	"проксирует", "два туннеля", "два разных", "разные впн", "разных впн",
+	"один до ", "второй до ",
+	"don't confuse", "do not confuse", "nothing to do with",
+}
+
+// CarriesUserCorrection reports whether a user message states a correction or
+// architectural disambiguation between entities.
+func CarriesUserCorrection(text string) bool {
+	low := strings.ToLower(text)
+	for _, m := range userCorrectionMarkers {
+		if marksLine(low, m) {
+			return true
+		}
+	}
+	return false
 }
 
 // announcesItself reports whether the line opens by saying what the speaker is

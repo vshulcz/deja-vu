@@ -26,6 +26,18 @@ import (
 
 var fixFlags = []string{"--limit", "--json"}
 
+// appendNonBlank keeps arguments that contain something other than whitespace.
+// A blank word is not part of the error. `deja fix ""` and `deja fix -- "   "`
+// must not carry one (#5911).
+func appendNonBlank(parts []string, args ...string) []string {
+	for _, arg := range args {
+		if strings.TrimSpace(arg) != "" {
+			parts = append(parts, arg)
+		}
+	}
+	return parts
+}
+
 func runFix(dir string, args []string, stdout io.Writer) error {
 	limit := 3
 	asJSON := false
@@ -51,7 +63,7 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 			// An error line can start with a dash, and Go's own test output is
 			// the commonest one a reader pastes: `deja fix -- '--- FAIL: …'`
 			// (#2799).
-			parts = append(parts, args[i+1:]...)
+			parts = appendNonBlank(parts, args[i+1:]...)
 			i = len(args)
 		default:
 			// A flag deja does not know must not be swallowed into the error
@@ -65,7 +77,7 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 			if strings.HasPrefix(args[i], "-") && args[i] != "-" && !looksLikeAPastedLine(args[i]) {
 				return unknownFlag("fix", args[i], fixFlags)
 			}
-			parts = append(parts, args[i])
+			parts = appendNonBlank(parts, args[i])
 		}
 	}
 	text := strings.TrimSpace(strings.Join(parts, " "))

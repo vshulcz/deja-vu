@@ -108,6 +108,46 @@ func TestCodexKeepsTheFramesBeforeATornOne(t *testing.T) {
 	}
 }
 
+// A damaged rollout is scanned as it streams and then again from the salvage,
+// and only the second reading counts: one malformed line and the torn frame.
+func TestCodexCountsADamagedRolloutOnce(t *testing.T) {
+	if !ZstdAvailable() {
+		t.Skip("zstd CLI not installed")
+	}
+	path := filepath.Join(t.TempDir(), "rollout-thread-7.jsonl.zst")
+	tail := `{"timestamp":"2026-07-17T09:00:03.000Z","type":"response_item","payload":{"role":"user"}}` + "\n"
+	if err := os.WriteFile(path, tornLog(t, codexRolloutFixture+"not json\n", tail), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ParseCodexRollout(path); err != nil {
+		t.Fatal(err)
+	}
+	if got := DiagMalformedCounts()[path]; got != 2 {
+		t.Errorf("counted %d unusable items, want the malformed line and the torn frame", got)
+	}
+}
+
+// Abandoning the first pass of a read puts back only what that pass counted, not
+// what an earlier read of the same file left there.
+func TestCodexKeepsTheCountOfAnEarlierRead(t *testing.T) {
+	if !ZstdAvailable() {
+		t.Skip("zstd CLI not installed")
+	}
+	path := filepath.Join(t.TempDir(), "rollout-thread-7.jsonl.zst")
+	tail := `{"timestamp":"2026-07-17T09:00:03.000Z","type":"response_item","payload":{"role":"user"}}` + "\n"
+	if err := os.WriteFile(path, tornLog(t, codexRolloutFixture, tail), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if _, err := ParseCodexRollout(path); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := DiagMalformedCounts()[path]; got != 2 {
+		t.Errorf("counted %d torn frames over two reads, want 2", got)
+	}
+}
+
 // A corrupt frame in the middle is not a torn tail: zstd stops at it, and the
 // complete frames after it are as good as the ones before. Each frame is
 // decoded on its own then, and only the bad one is lost.
