@@ -229,11 +229,11 @@ func TestZshOffersEveryCommand(t *testing.T) {
 // recall fell through to the search flags in bash, zsh and PowerShell, most of
 // which it refuses, and fish offered nothing for it.
 func TestCompletionHasARecallBlock(t *testing.T) {
-	for _, tc := range []struct{ shell, start, end string }{
-		{"bash", "\n        recall)\n", "\n            ;;\n"},
-		{"zsh", "\n    recall)\n", "\n      ;;\n"},
-		{"fish", "__fish_seen_subcommand_from recall;", "\ncomplete -c deja -n '__fish_seen_subcommand_from remember'"},
-		{"powershell", "\n            'recall' {\n", "\n            }\n"},
+	for _, tc := range []struct{ shell, start, end, valueGuard string }{
+		{"bash", "\n        recall)\n", "\n            ;;\n", "elif [[ \"$prev\" == \"--project\" || \"$prev\" == \"--limit\" || \"$prev\" == \"--offset\" ]]; then\n                COMPREPLY=()"},
+		{"zsh", "\n    recall)\n", "\n      ;;\n", ""},
+		{"fish", "__fish_seen_subcommand_from recall;", "\ncomplete -c deja -n '__fish_seen_subcommand_from remember'", ""},
+		{"powershell", "\n            'recall' {\n", "\n            }\n", "elseif ($previous -in @('--project', '--limit', '--offset')) { @() }"},
 	} {
 		script := emittedCompletion(t, tc.shell)
 		_, block, ok := strings.Cut(script, tc.start)
@@ -242,6 +242,12 @@ func TestCompletionHasARecallBlock(t *testing.T) {
 			continue
 		}
 		block, _, _ = strings.Cut(block, tc.end)
+		if tc.valueGuard != "" {
+			if !strings.Contains(block, tc.valueGuard) {
+				t.Errorf("%s recall block offers flags while completing a project, limit, or offset:\n%s", tc.shell, block)
+			}
+			block = strings.Replace(block, tc.valueGuard, "", 1)
+		}
 		block = strings.ReplaceAll(block, "-l ", "--")
 		for _, flag := range recallFlags {
 			if !strings.Contains(block, flag) {
