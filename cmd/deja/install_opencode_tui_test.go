@@ -54,10 +54,13 @@ func TestV1TUIPluginIsListedAndTakenBack(t *testing.T) {
 			t.Fatalf("%s: no plugin file: %v", c.target, err)
 		}
 		src := string(b)
-		for _, want := range []string{"@jsxImportSource @opentui/solid", `["statusline"]`, "sidebar_content", "session_prompt_right", "export default { id: \"deja.status\", tui }"} {
+		for _, want := range []string{"@jsxImportSource @opentui/solid", `["statusline"]`, "order: 50", "home_bottom", "order: 150", "sidebar_content", "session_prompt_right", "export default { id: \"deja.status\", tui }"} {
 			if !strings.Contains(src, want) {
 				t.Errorf("%s: plugin lacks %q", c.target, want)
 			}
+		}
+		if strings.Index(src, "home_bottom") > strings.Index(src, "sidebar_content") {
+			t.Errorf("%s: home_bottom must register at order 50 before internal:home-tips (order 100)", c.target)
 		}
 		if !strings.HasPrefix(src, "/** @jsxImportSource") {
 			t.Errorf("%s: the JSX pragma is not the first line", c.target)

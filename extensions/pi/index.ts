@@ -167,7 +167,7 @@ export default function (pi: any) {
       try {
         if (!injected.has(session) && branchHoldsRecall(ctx.sessionManager.getBranch())) {
           injected.add(session);
-          const stats = run(["statusline"], "");
+          const stats = run(["statusline"], JSON.stringify({ session_id: session, cwd: process.cwd() })).split(" · ").slice(0, 3).map((p: string, i: number) => i === 2 ? p.replace(/^(\d+\s+earlier)\b.*/, "$1") : p).join(" · ");
           if (stats) ctx.ui.setStatus("deja", stats);
         }
       } catch {}
@@ -186,7 +186,7 @@ export default function (pi: any) {
           if (receipt) ctx.ui.notify(receipt, "info");
           // pi keeps the footer until it is cleared, so the session carries a
           // quiet reminder that memory is on rather than a one-off toast.
-          const stats = run(["statusline"], "");
+          const stats = run(["statusline"], JSON.stringify({ session_id: session, cwd: process.cwd() })).split(" · ").slice(0, 3).map((p: string, i: number) => i === 2 ? p.replace(/^(\d+\s+earlier)\b.*/, "$1") : p).join(" · ");
           if (stats) ctx.ui.setStatus("deja", stats);
           // Marked, so a resume can tell the digest from a prompt's recall
           // (#5314).

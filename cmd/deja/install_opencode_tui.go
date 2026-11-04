@@ -62,11 +62,20 @@ const tui = async (api) => {
     clearInterval(tick)
     offs.forEach((off) => off())
   })
-  const view = (ctx) => <text fg={ctx.theme.current.textMuted}>{line()}</text>
+  const view = (ctx) => <text fg={ctx.theme.current.textMuted} wrapMode="none">{line()}</text>
   const short = (ctx) => {
     const max = (process.stdout?.columns || 80) < 100 ? 2 : 3
-    return <text fg={ctx.theme.current.textMuted}>{line().split(" · ").slice(0, max).map((p, i) => i === 2 ? p.replace(/^(\d+\s+earlier)\b.*/, "$1") : p).join(" · ")}</text>
+    return <text fg={ctx.theme.current.textMuted} wrapMode="none">{line().split(" · ").slice(0, max).map((p, i) => i === 2 ? p.replace(/^(\d+\s+earlier)\b.*/, "$1") : p).join(" · ")}</text>
   }
+  api.slots.register({
+    order: 50,
+    slots: {
+      home_bottom(ctx) {
+        if ((process.stdout?.rows || 24) < 22) return <box />
+        return <box paddingTop={1} flexShrink={0}>{view(ctx)}</box>
+      },
+    },
+  })
   api.slots.register({
     order: 150,
     slots: {
@@ -86,9 +95,6 @@ const tui = async (api) => {
       session_prompt_right(ctx, props) {
         follow(props?.session_id)
         return short(ctx)
-      },
-      home_bottom(ctx) {
-        return view(ctx)
       },
     },
   })
@@ -124,7 +130,11 @@ export default {
         child.stdin?.end(JSON.stringify({ session_id: sid, width }) + "\n")
       } catch {}
     }
-    const view = () => <text fg={ctx.theme.text.muted}>{line()}</text>
+    const view = () => <text fg={ctx.theme.text.muted} wrapMode="none">{line()}</text>
+    const short = () => {
+      const max = (process.stdout?.columns || 80) < 100 ? 2 : 3
+      return <text fg={ctx.theme.text.muted} wrapMode="none">{line().split(" · ").slice(0, max).map((p, i) => i === 2 ? p.replace(/^(\d+\s+earlier)\b.*/, "$1") : p).join(" · ")}</text>
+    }
     refresh()
     const tick = setInterval(refresh, 10000)
     const offs = [
@@ -141,7 +151,7 @@ export default {
           // The home screen's prompt box is too narrow for the line and has
           // home.footer.status below it; the prompt footer carries it only in
           // a session.
-          return <text fg={ctx.theme.text.muted}>{input.sessionID ? line() : ""}</text>
+          return input.sessionID ? short() : <text fg={ctx.theme.text.muted}>{""}</text>
         },
       }),
       ctx.ui.slot({ append: "home.footer.status", render: view }),
