@@ -50,7 +50,7 @@ func (ir *installRun) note(t string, err error) {
 }
 
 // parseInstallArgs splits the install flags from the targets.
-func parseInstallArgs(args []string) (guidance, noIndex bool, targetArgs []string) {
+func parseInstallArgs(args []string) (guidance, noIndex, noMCP bool, targetArgs []string) {
 	guidance = true
 	for _, arg := range args {
 		if arg == "--no-guidance" {
@@ -62,6 +62,11 @@ func parseInstallArgs(args []string) (guidance, noIndex bool, targetArgs []strin
 			noIndex = true
 			continue
 		}
+		// Wire hooks and guidance without adding an MCP server entry (#5929).
+		if arg == "--no-mcp" {
+			noMCP = true
+			continue
+		}
 		// Take deja's version of a skill back, over one that has been edited.
 		// Without it an edited skill is kept and named rather than replaced.
 		if arg == "--force" {
@@ -70,7 +75,7 @@ func parseInstallArgs(args []string) (guidance, noIndex bool, targetArgs []strin
 		}
 		targetArgs = append(targetArgs, arg)
 	}
-	return guidance, noIndex, targetArgs
+	return guidance, noIndex, noMCP, targetArgs
 }
 
 // resolveInstallTargets turns the named targets, --all or --auto into the
@@ -85,7 +90,7 @@ func resolveInstallTargets(verb string, targetArgs []string, uninstall bool) (ta
 	// (#1680). No target begins with a dash, so the shape alone settles it.
 	for _, a := range targetArgs {
 		if strings.HasPrefix(a, "-") && a != "--all" && a != "--auto" {
-			return nil, false, fmt.Errorf("%s: unknown flag %q — it takes a target plus --no-guidance, --no-index or --force", verb, a)
+			return nil, false, fmt.Errorf("%s: unknown flag %q — it takes a target plus --no-guidance, --no-index, --no-mcp or --force", verb, a)
 		}
 	}
 	if len(targetArgs) == 0 {
@@ -223,7 +228,7 @@ func (ir *installRun) target(t string) {
 	} else {
 		printInstallTargetLine(t, r, aside, uninstall, guidanceMoved)
 	}
-	if !uninstall && t != "statusline" {
+	if !uninstall && t != "statusline" && (!skippingMCP || t != "codex-auto") {
 		ir.mcpCount++
 	}
 	if !uninstall && strings.HasSuffix(t, "-auto") {

@@ -147,7 +147,7 @@ _deja_completion() {
             COMPREPLY=( $(compgen -W "--rebuild -rebuild --quiet -quiet" -- "$cur") )
             ;;
         install)
-            COMPREPLY=( $(compgen -W "$install_targets --no-guidance --no-index --force" -- "$cur") )
+            COMPREPLY=( $(compgen -W "$install_targets --no-guidance --no-index --no-mcp --force" -- "$cur") )
             ;;
         uninstall)
             COMPREPLY=( $(compgen -W "$install_targets --no-guidance" -- "$cur") )
@@ -421,7 +421,7 @@ _deja() {
       _arguments '--rebuild[force a full rebuild]' '-rebuild[force a full rebuild]' '--quiet[say nothing when it worked]' '-quiet[say nothing when it worked]'
       ;;
     install)
-      _arguments '--no-guidance[skip guidance files]' '--no-index[skip indexing]' '--force[replace edited guidance files]' "1:target:($install_targets)"
+      _arguments '--no-guidance[skip guidance files]' '--no-index[skip indexing]' '--no-mcp[skip MCP server entry]' '--force[replace edited guidance files]' "1:target:($install_targets)"
       ;;
     uninstall)
       _arguments '--no-guidance[skip guidance files]' "1:target:($install_targets)"
@@ -743,7 +743,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
             'hook-tool-after' { @('--plain', '--copilot', '--mcode') }
             'hook-session-end' { @('--json') }
             'index' { @('--rebuild', '-rebuild', '--quiet', '-quiet') }
-            'install' { $installTargets + @('--no-guidance', '--no-index', '--force') }
+            'install' { $installTargets + @('--no-guidance', '--no-index', '--no-mcp', '--force') }
             'uninstall' { $installTargets + @('--no-guidance') }
             'last' {
                 if ($previous -eq '--harness') { $harnesses }

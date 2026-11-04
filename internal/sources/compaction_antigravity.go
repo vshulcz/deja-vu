@@ -18,6 +18,13 @@ import (
 // newest CHECKPOINT. found is false when the transcript has none. workspace is
 // the one the hook payload names: the transcript does not record it.
 func ReadAntigravityCompaction(path, conversationID, workspace string) (CompactionTranscript, bool, error) {
+	return ReadAntigravityCompactionIfNew(path, conversationID, workspace, nil)
+}
+
+// ReadAntigravityCompactionIfNew is ReadAntigravityCompaction, but returns
+// early before parsing the transcript when seen reports the newest CHECKPOINT
+// fingerprint has already been processed.
+func ReadAntigravityCompactionIfNew(path, conversationID, workspace string, seen func(fingerprint string) bool) (CompactionTranscript, bool, error) {
 	if strings.TrimSpace(conversationID) == "" || antigravitySessionID(path) != conversationID {
 		return CompactionTranscript{}, false, fmt.Errorf("%w: not the antigravity conversation %q", ErrTranscriptIdentity, conversationID)
 	}
@@ -53,6 +60,11 @@ func ReadAntigravityCompaction(path, conversationID, workspace string) (Compacti
 	if cut <= 0 {
 		return CompactionTranscript{}, false, nil
 	}
+	boundary := records[cut]
+	fp := hashCompactionBytes(append(fmt.Appendf(nil, "%d\x00", boundary.off), boundary.line...))
+	if seen != nil && seen(fp) {
+		return CompactionTranscript{}, false, nil
+	}
 	var prefix []byte
 	for _, r := range records[:cut] {
 		prefix = append(append(prefix, r.line...), '\n')
@@ -64,13 +76,12 @@ func ReadAntigravityCompaction(path, conversationID, workspace string) (Compacti
 	if len(ss) != 1 || ss[0].ID != conversationID {
 		return CompactionTranscript{}, false, fmt.Errorf("%w: no parseable antigravity conversation", ErrUnsupportedCompactionTranscript)
 	}
-	boundary := records[cut]
 	return CompactionTranscript{
 		Session: ss[0], Harness: "antigravity", NativeSessionID: conversationID,
 		Workspace: workspace, Path: path,
 		// The checkpoint, not the file: later steps append to the file, and
 		// the same compaction found again must keep its revision.
-		Fingerprint:       hashCompactionBytes(append(fmt.Appendf(nil, "%d\x00", boundary.off), boundary.line...)),
+		Fingerprint:       fp,
 		HeaderFingerprint: hashCompactionBytes(records[0].line),
 		SourceSize:        boundary.off, SourceMTime: mtime,
 		TailOffset: tailOffset, Truncated: truncated,

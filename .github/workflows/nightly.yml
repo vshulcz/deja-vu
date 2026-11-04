@@ -95,8 +95,19 @@ jobs:
           NOTES
           )
           gh release delete nightly --yes --cleanup-tag 2>/dev/null || true
-          gh release create nightly dist/deja-vu_* dist/checksums.txt \
-            --prerelease \
-            --target "$GITHUB_SHA" \
-            --title "Nightly $(date -u +%Y-%m-%d)" \
-            --notes "$notes"
+          git push origin :refs/tags/nightly 2>/dev/null || true
+          for attempt in 1 2 3; do
+            if gh release create nightly dist/deja-vu_* dist/checksums.txt \
+              --prerelease \
+              --target "$GITHUB_SHA" \
+              --title "Nightly $(date -u +%Y-%m-%d)" \
+              --notes "$notes"; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              exit 1
+            fi
+            sleep 3
+            gh release delete nightly --yes --cleanup-tag 2>/dev/null || true
+            git push origin :refs/tags/nightly 2>/dev/null || true
+          done

@@ -97,6 +97,8 @@ func (e howEntry) failureNote() string {
 	return fmt.Sprintf(" · %s (exit %d)", what, e.ExitCode)
 }
 
+var howFlags = []string{"--project", "--all-projects", "--limit", "--json"}
+
 func runHow(dir string, args []string, stdout io.Writer) error {
 	limit := 8
 	project := ""
@@ -132,11 +134,15 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 			allProjects = true
 		case "--":
 			// A command can start with a dash — `deja how -- -run`.
-			terms = append(terms, args[i+1:]...)
+			for _, w := range args[i+1:] {
+				if strings.TrimSpace(w) != "" {
+					terms = append(terms, w)
+				}
+			}
 			i = len(args)
 		default:
 			if strings.HasPrefix(args[i], "-") {
-				return fmt.Errorf("how: unknown flag %q; a query that starts with a dash goes after `--`", args[i])
+				return unknownFlag("how", args[i], howFlags)
 			}
 			if strings.TrimSpace(args[i]) != "" {
 				terms = append(terms, args[i])

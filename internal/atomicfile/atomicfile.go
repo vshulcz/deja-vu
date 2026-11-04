@@ -38,6 +38,7 @@ var sharedSidecarSuffixes = []string{
 	".lock",
 	".live",
 	".hookseen",
+	".hookseen.lock",
 	".dejavu",
 	".forks",
 	".warming",

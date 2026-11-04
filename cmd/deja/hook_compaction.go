@@ -229,8 +229,12 @@ func readCompactionFile(input precompactHookInput, workspace string) (sources.Co
 // so the next prompt finds it there. A compaction already stored is left alone,
 // which keeps its packet delivered once.
 func catchUpCompaction(dir string, input precompactHookInput) {
+	seenKey := onceDigestKey("compaction-seen:" + input.SessionID)
+	seenMap := loadSeen(dir).injected(seenKey)
 	catchUpCompactionWith(dir, input, func() (sources.CompactionTranscript, bool, error) {
-		return sources.ReadGeminiCompaction(input.TranscriptPath, input.SessionID)
+		return sources.ReadGeminiCompactionIfNew(input.TranscriptPath, input.SessionID, func(fp string) bool {
+			return seenMap["compaction-seen:"+shortHash(fp)]
+		})
 	})
 }
 
@@ -242,8 +246,12 @@ func catchUpZCodeCompaction(dir string, input precompactHookInput) {
 		return
 	}
 	input.TranscriptPath = sources.ZCodeDB()
+	seenKey := onceDigestKey("compaction-seen:" + input.SessionID)
+	seenMap := loadSeen(dir).injected(seenKey)
 	catchUpCompactionWith(dir, input, func() (sources.CompactionTranscript, bool, error) {
-		return sources.ReadZCodeCompaction(input.SessionID)
+		return sources.ReadZCodeCompactionIfNew(input.SessionID, func(fp string) bool {
+			return seenMap["compaction-seen:"+shortHash(fp)]
+		})
 	})
 }
 

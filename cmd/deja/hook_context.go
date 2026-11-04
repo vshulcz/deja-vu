@@ -259,7 +259,11 @@ func threadHasDigest(dir, source, sessionID, transcript string) bool {
 	}
 	head, err := sources.TranscriptHead(transcript, sessionID)
 	if err != nil {
-		return false
+		var ok bool
+		head, ok = codexRolloutMetaHead(transcript, sessionID)
+		if !ok {
+			return false
+		}
 	}
 	if head.Harness == "claude" {
 		return source == "resume" && claudeTranscriptHoldsDigest(transcript)
@@ -268,10 +272,54 @@ func threadHasDigest(dir, source, sessionID, transcript string) bool {
 		return false
 	}
 	told := func(id string) bool { return len(alreadyInjected(dir, sessionStartKeyPrefix+id)) > 0 }
-	if source == "resume" && told(sessionID) {
+	if told(sessionID) {
 		return true
 	}
 	return head.Kind == "fork" && head.Parent != "" && told(head.Parent)
+}
+
+// codexRolloutMetaHead identifies a Codex rollout before its first user turn is
+// written — when SessionStart fires on a fresh thread or fork, TranscriptHead
+// returns ErrUnsupportedCompactionTranscript because there are no messages yet
+// (#5930).
+func codexRolloutMetaHead(path, sessionID string) (model.Session, bool) {
+	base := filepath.Base(path)
+	if !strings.HasPrefix(base, "rollout-") || !strings.HasSuffix(base, ".jsonl") {
+		return model.Session{}, false
+	}
+	s := model.Session{Harness: "codex", ID: sessionID}
+	f, err := os.Open(path)
+	if err != nil {
+		return s, true
+	}
+	defer func() { _ = f.Close() }()
+	sc := bufio.NewScanner(io.LimitReader(f, 64<<10))
+	for sc.Scan() {
+		var rec struct {
+			Type    string `json:"type"`
+			Payload struct {
+				ID           string `json:"id"`
+				SessionID    string `json:"session_id"`
+				ForkedFromID string `json:"forked_from_id"`
+			} `json:"payload"`
+		}
+		if json.Unmarshal(bytes.TrimSpace(sc.Bytes()), &rec) != nil || rec.Type != "session_meta" {
+			continue
+		}
+		id := rec.Payload.ID
+		if id == "" {
+			id = rec.Payload.SessionID
+		}
+		if id != "" && id != sessionID {
+			continue
+		}
+		if rec.Payload.ForkedFromID != "" && rec.Payload.ForkedFromID != sessionID {
+			s.Kind = "fork"
+			s.Parent = rec.Payload.ForkedFromID
+		}
+		break
+	}
+	return s, true
 }
 
 // claudeTranscriptHoldsDigest reports whether a Claude Code transcript holds a
@@ -689,6 +737,12 @@ func runHookContextMode(dir string, plain, once bool) error {
 	// The first moment this session exists, so the first recall of it — the one
 	// an agent plans against — already knows whose transcript to leave out.
 	markSessionLive(dir, input.SessionID)
+	releaseSeenLock, contendedSeenLock := holdHookseenLock(dir)
+	defer releaseSeenLock()
+	if contendedSeenLock && input.SessionID != "" && input.Source != "compact" && input.Source != "clear" &&
+		len(alreadyInjected(dir, sessionStartKeyPrefix+input.SessionID)) > 0 {
+		return nil
+	}
 	// Grok shows the receipt and drops the context (#4588); the digest waits
 	// for the session's first tool hook, which does reach the model
 	// (hook_deferred.go).
@@ -810,6 +864,9 @@ func runHookContextMode(dir string, plain, once bool) error {
 	// and unprefixed rows made a session-start block count as that — the first
 	// prompt about what the start just mentioned got nothing back.
 	rememberInjectedIDsFor(dir, sessionStartKeyPrefix+input.SessionID, hookProjectKey(hookProjectPath(input.CWD, input.WorkspaceRoots)), servedIDs)
+	if len(servedIDs) == 0 && input.SessionID != "" {
+		rememberInjectedIDs(dir, sessionStartKeyPrefix+input.SessionID, onceDigestMarker)
+	}
 	if plain {
 		fmt.Fprintln(os.Stdout, digest)
 		return nil
@@ -871,6 +928,9 @@ func hookContextWithoutDigest(dir string, rewired []string, unreadable, plain bo
 			usage.RecordDigestPolicySessionsUnread(dir, usage.KindHook, out, sessionID, 0, 0, policy.Load().Describe(policy.ActivationAuto), nil, from)
 		} else {
 			usage.RecordDigestPolicyFrom(dir, usage.KindHook, out, sessionID, 0, 0, from, policy.Load().Describe(policy.ActivationAuto))
+		}
+		if sessionID != "" {
+			rememberInjectedIDs(dir, sessionStartKeyPrefix+sessionID, onceDigestMarker)
 		}
 		if plain {
 			fmt.Fprintln(os.Stdout, out)

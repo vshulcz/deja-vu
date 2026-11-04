@@ -119,19 +119,18 @@ func TestCompareQuotesTheDayZeroTable(t *testing.T) {
 	}
 	day, cmp := read("day-zero.html"), read("compare.html")
 
-	// columns: deja, funes, ctx
+	// columns: deja, ctx
 	cells := func(label string) []string {
-		m := regexp.MustCompile(`<tr><td>` + regexp.QuoteMeta(label) + `</td><td class="us y">(\d+)</td><td>(\d+)[^<]*?(?:\((\d+)[^)]*\))?</td><td>(\d+)</td>`).FindStringSubmatch(day)
+		m := regexp.MustCompile(`<tr><td>` + regexp.QuoteMeta(label) + `</td><td class="us y">(\d+)</td><td>(\d+)</td>`).FindStringSubmatch(day)
 		if m == nil {
 			t.Fatalf("day-zero.html has no %q row in the expected shape", label)
 		}
 		return m[1:]
 	}
-	hit1, hit5, found := cells("hit@1 / 100"), cells("hit@5 / 100"), cells("found@50 / 100")
+	hit1, found := cells("hit@1 / 100"), cells("found@50 / 100")
 
 	for _, want := range []string{
-		"hit@1 " + hit1[3] + ", found@50 " + found[3],
-		hit5[2] + " against " + hit5[0] + " at rank five",
+		"hit@1 " + hit1[1] + ", found@50 " + found[1],
 	} {
 		if !strings.Contains(cmp, want) {
 			t.Errorf("compare.html should say %q, from the day-zero table", want)

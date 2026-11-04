@@ -53,6 +53,8 @@ func hasFrictionLine(text string) bool {
 	return false
 }
 
+var frictionFlags = []string{"--limit", "--json", "--settle", "--unsettle"}
+
 func runFriction(dir string, args []string, stdout io.Writer) error {
 	limit := 10
 	asJSON := false
@@ -84,7 +86,7 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 		// had been understood (#2253). --json is answered now rather than
 		// refused (#1932); anything else still refuses.
 		if args[i] != "--limit" {
-			return fmt.Errorf("friction: unknown flag %q — it takes --limit n, --json, --settle id and --unsettle id", args[i])
+			return unknownFlag("friction", args[i], frictionFlags)
 		}
 		if i+1 >= len(args) {
 			return errors.New("friction: --limit needs value")

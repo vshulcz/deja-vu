@@ -26,6 +26,14 @@ import (
 // stood before the newest compaction written after since. found is false when
 // there is none.
 func ReadCodeWhaleCompaction(workspace string, since time.Time) (CompactionTranscript, bool, error) {
+	return ReadCodeWhaleCompactionIfNew(workspace, since, nil)
+}
+
+// ReadCodeWhaleCompactionIfNew captures the CodeWhale session in workspace as
+// it stood before the newest compaction written after since, skipping full
+// history JSON decoding when seen reports the compaction fingerprint has
+// already been processed.
+func ReadCodeWhaleCompactionIfNew(workspace string, since time.Time, seen func(string) bool) (CompactionTranscript, bool, error) {
 	want := sameDirKey(workspace)
 	if want == "" {
 		return CompactionTranscript{}, false, nil
@@ -52,22 +60,9 @@ func ReadCodeWhaleCompaction(workspace string, since time.Time) (CompactionTrans
 	if best == "" {
 		return CompactionTranscript{}, false, nil
 	}
-	history := strings.TrimSuffix(best, ".md") + ".json"
-	info, err := regularCompactionFile(history)
-	if err != nil {
-		return CompactionTranscript{}, false, err
-	}
-	b, err := os.ReadFile(history)
-	if err != nil {
-		return CompactionTranscript{}, false, err
-	}
-	var doc codeWhaleSession
-	if err := json.Unmarshal(b, &doc.Messages); err != nil {
-		return CompactionTranscript{}, false, fmt.Errorf("%w: %w", ErrUnsupportedCompactionTranscript, err)
-	}
-	// The session file has what the history does not: the id, title,
-	// workspace and start.
+	checkpoint := strings.TrimSuffix(strings.TrimPrefix(filepath.Base(best), "context-transfer-"), ".md")
 	session := filepath.Join(bestRoot, bestID+".json")
+	var doc codeWhaleSession
 	if meta, err := os.ReadFile(session); err == nil {
 		var head codeWhaleSession
 		if json.Unmarshal(meta, &head) == nil {
@@ -77,11 +72,26 @@ func ReadCodeWhaleCompaction(workspace string, since time.Time) (CompactionTrans
 	if doc.Metadata.ID == "" {
 		doc.Metadata.ID = bestID
 	}
+	fp := hashCompactionBytes([]byte("codewhale\x00" + doc.Metadata.ID + "\x00" + checkpoint))
+	if seen != nil && seen(fp) {
+		return CompactionTranscript{}, false, nil
+	}
+	history := strings.TrimSuffix(best, ".md") + ".json"
+	info, err := regularCompactionFile(history)
+	if err != nil {
+		return CompactionTranscript{}, false, err
+	}
+	b, err := os.ReadFile(history)
+	if err != nil {
+		return CompactionTranscript{}, false, err
+	}
+	if err := json.Unmarshal(b, &doc.Messages); err != nil {
+		return CompactionTranscript{}, false, fmt.Errorf("%w: %w", ErrUnsupportedCompactionTranscript, err)
+	}
 	ss := parseCodeWhaleDoc(session, doc)
 	if len(ss) != 1 {
 		return CompactionTranscript{}, false, nil
 	}
-	checkpoint := strings.TrimSuffix(strings.TrimPrefix(filepath.Base(best), "context-transfer-"), ".md")
 	return CompactionTranscript{
 		Session: ss[0], Harness: "codewhale", NativeSessionID: ss[0].ID,
 		Workspace: doc.Metadata.Workspace, Path: history,

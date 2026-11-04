@@ -63,10 +63,14 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	if workspace == "" {
 		workspace = workspaceFromConversation(input.TranscriptPath, input.ConversationID)
 	}
+	// Decode the transcript tail once per invocation rather than re-reading and
+	// re-unmarshaling up to 128 KB of JSONL four times across checkpoint,
+	// failure, prompt, and edit checks.
+	tailSteps := transcriptTailSteps(input.TranscriptPath)
 	// A compaction throws away the blocks this conversation was shown while the
 	// record of having sent them outlives them, so the memory it just lost is
 	// the memory recall refuses to send again.
-	forgetOnCheckpoint(dir, input.ConversationID, newestCheckpoint(input.TranscriptPath))
+	forgetOnCheckpoint(dir, input.ConversationID, newestCheckpointFromSteps(tailSteps))
 	// The compaction itself, caught up from the transcript the way Gemini's is:
 	// the steps before the CHECKPOINT are still in the file, so the session is
 	// captured as it stood then and the packet rides this invocation.
@@ -87,10 +91,10 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 		// A command that just failed is the more urgent memory, and it is only
 		// reachable from here: PostToolUse is handed the error and its contract
 		// allows no answer at all.
-		block := antigravityFixPair(dir, latestToolFailure(input.TranscriptPath),
+		block := antigravityFixPair(dir, latestToolFailureFromSteps(tailSteps),
 			input.ConversationID, workspace)
 		if block == "" {
-			block = antigravityPromptBlock(dir, latestUserRequest(input.TranscriptPath),
+			block = antigravityPromptBlock(dir, latestUserRequestFromSteps(tailSteps),
 				input.ConversationID, workspace)
 		}
 		// The line the pre-tool hook gives before an edit, for the file the
@@ -100,7 +104,7 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 		if recovery != "" {
 			steps = append(steps, antigravityInjectStep{EphemeralMessage: recovery})
 		}
-		if line := editFileLines(dir, latestEditPaths(input.TranscriptPath), input.ConversationID, workspace); line != "" {
+		if line := editFileLines(dir, latestEditPathsFromSteps(tailSteps), input.ConversationID, workspace); line != "" {
 			steps = append(steps, antigravityInjectStep{EphemeralMessage: line})
 		}
 		if block != "" {
@@ -127,12 +131,22 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	}
 	digest, sessions, raw, _, _, ids, projects := cachedHookDigestFor(dir, workspace, "")
 	digest, _, projects = attachClaudeAutoMemory(dir, input.ConversationID, input.TranscriptPath, "antigravity", hookCWD(workspace), digest, projects)
+	rememberDigestInjected(dir, input.ConversationID)
 	if digest != "" {
 		digest = frameRecall(startLead(antigravityLead) + digest)
-		rememberDigestInjected(dir, input.ConversationID)
 		usage.RecordDigestPolicySessionsFrom(dir, usage.KindHook, digest, "", sessions, raw,
 			policy.Load().Describe(policy.ActivationAuto), ids, projects)
 		steps = append(steps, antigravityInjectStep{EphemeralMessage: digest})
+	} else {
+		block := antigravityFixPair(dir, latestToolFailureFromSteps(tailSteps),
+			input.ConversationID, workspace)
+		if block == "" {
+			block = antigravityPromptBlock(dir, latestUserRequestFromSteps(tailSteps),
+				input.ConversationID, workspace)
+		}
+		if block != "" {
+			steps = append(steps, antigravityInjectStep{EphemeralMessage: block})
+		}
 	}
 	if len(steps) == 0 {
 		fmt.Fprintln(stdout, "{}")
@@ -154,8 +168,12 @@ func antigravityCompactionPacket(dir string, input antigravityHookInput, workspa
 		return ""
 	}
 	pre := precompactHookInput{SessionID: input.ConversationID, TranscriptPath: input.TranscriptPath, CWD: workspace}
+	seenKey := onceDigestKey("compaction-seen:" + input.ConversationID)
+	seenMap := loadSeen(dir).injected(seenKey)
 	catchUpCompactionWith(dir, pre, func() (sources.CompactionTranscript, bool, error) {
-		return sources.ReadAntigravityCompaction(input.TranscriptPath, input.ConversationID, workspace)
+		return sources.ReadAntigravityCompactionIfNew(input.TranscriptPath, input.ConversationID, workspace, func(fp string) bool {
+			return seenMap["compaction-seen:"+shortHash(fp)]
+		})
 	})
 	var out bytes.Buffer
 	if delivered, _ := emitCompactionRecovery(dir, input.ConversationID, workspace, "PreInvocation", hookToolPlain, &out); !delivered {

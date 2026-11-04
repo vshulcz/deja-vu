@@ -26,7 +26,9 @@ qs = json.load(open(os.path.join(S, 'questions.json')))
 hit1 = hit5 = found = 0; first = None; lat = []
 head = re.compile(r'^\s*→ get (\S+) --from', re.M)
 for q in qs:
-    args = [FUNES, 'recall', q['question'], '-k', '50', '--candidates', '50']
+    # Results are passages; ask for 200 passages reranked from 500 candidates
+    # and rank the first 50 distinct sessions they belong to.
+    args = [FUNES, 'recall', q['question'], '-k', '200', '--candidates', '500']
     if half is not None:
         args += ['--half-life', half]
     t1 = time.time()
@@ -38,7 +40,7 @@ for q in qs:
     for m in head.finditer(r.stdout):
         sid = m.group(1)
         if sid not in order: order.append(sid)
-    rank = next((k for k, sid in enumerate(order) if sid in want), None)
+    rank = next((k for k, sid in enumerate(order[:50]) if sid in want), None)
     if rank is not None:
         found += 1
         if rank == 0: hit1 += 1

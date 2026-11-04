@@ -96,7 +96,11 @@ func parseFilesArgs(args []string) (filesOptions, error) {
 			// The escape `parseSearch` already offers: everything after it is
 			// the topic, dashes and all. Without it, refusing unknown flags
 			// left `--feature-flag` with no way to be asked about.
-			terms = append(terms, args[i+1:]...)
+			for _, w := range args[i+1:] {
+				if strings.TrimSpace(w) != "" {
+					terms = append(terms, w)
+				}
+			}
 			i = len(args)
 		default:
 			if strings.HasPrefix(args[i], "-") {

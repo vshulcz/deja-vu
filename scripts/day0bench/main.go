@@ -93,6 +93,7 @@ func writeClaude(root, id string, ts time.Time, turns []turn) error {
 			content = []any{map[string]any{"type": "text", "text": t.Content}}
 		}
 		if err := enc.Encode(map[string]any{
+			"uuid":      fmt.Sprintf("%s-%d", id, i),
 			"type":      t.Role,
 			"sessionId": id,
 			"timestamp": ts.Add(time.Duration(i) * time.Minute).UTC().Format(time.RFC3339),

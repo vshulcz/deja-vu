@@ -37,7 +37,7 @@ func runRecall(dir string, args []string, stdout io.Writer) error {
 	var norm []string
 	for i, a := range args {
 		if a == "--" {
-			terms = append(terms, args[i+1:]...)
+			norm = append(norm, args[i:]...)
 			break
 		}
 		if k, v, ok := strings.Cut(a, "="); ok && strings.HasPrefix(k, "--") {
@@ -83,11 +83,20 @@ func runRecall(dir string, args []string, stdout io.Writer) error {
 				return err
 			}
 			harness, i = v, i+1
+		case "--":
+			for _, w := range args[i+1:] {
+				if strings.TrimSpace(w) != "" {
+					terms = append(terms, w)
+				}
+			}
+			i = len(args)
 		default:
-			if strings.HasPrefix(a, "--") {
+			if strings.HasPrefix(a, "-") && a != "-" {
 				return unknownFlag("recall", a, recallFlags)
 			}
-			terms = append(terms, a)
+			if strings.TrimSpace(a) != "" {
+				terms = append(terms, a)
+			}
 		}
 	}
 	q := strings.TrimSpace(strings.Join(terms, " "))

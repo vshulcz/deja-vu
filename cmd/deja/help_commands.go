@@ -201,9 +201,9 @@ var helpEntries = []helpEntry{
 		examples: []string{"deja rules", "deja rules sync", "deja rules candidates --since 180d"}},
 
 	{name: "install", group: groupSetup,
-		usage:    []string{"deja install <target>... | --all | --auto [--no-guidance] [--no-index] [--force]"},
+		usage:    []string{"deja install <target>... | --all | --auto [--no-guidance] [--no-index] [--no-mcp] [--force]"},
 		desc:     "wire recall, hooks and guidance into your agents",
-		more:     "--all wires MCP recall into every agent found on this machine; --auto adds the hooks and plugins each one takes.",
+		more:     "--all wires MCP recall into every agent found on this machine; --auto adds the hooks and plugins each one takes; --no-mcp skips the MCP server entry.",
 		examples: []string{"deja install --auto", "deja install claude-code codex"}},
 	{name: "uninstall", group: groupSetup,
 		usage:    []string{"deja uninstall <target>... | --all | --auto"},

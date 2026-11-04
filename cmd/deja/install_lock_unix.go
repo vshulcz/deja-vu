@@ -4,8 +4,9 @@ package main
 
 import (
 	"os"
-	"path/filepath"
 	"syscall"
+
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 )
 
 // takeInstallLock holds an advisory lock on path. ok=false means there is no
@@ -18,10 +19,7 @@ import (
 // busy tells the two failures apart: somebody else holds the lock, rather than
 // this machine not letting deja have one at all.
 func takeInstallLock(path string, wait bool) (release func(), ok, busy bool) {
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return func() {}, false, false
-	}
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	f, err := atomicfile.OpenSharedFile(path, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return func() {}, false, false
 	}

@@ -249,7 +249,7 @@ func performUpdate(cfg updateConfig, out io.Writer) error {
 	if from == "" {
 		from = "unknown"
 	}
-	if from != "dev" && from != "unknown" {
+	if from != "dev" && !strings.HasPrefix(from, "dev-") && from != "unknown" {
 		from = "v" + from
 	}
 	fmt.Fprintf(out, "updated deja %s -> v%s at %s\n", from, latest, cfg.executable)

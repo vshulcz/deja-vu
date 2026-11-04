@@ -106,6 +106,29 @@ func TestPerformUpdateAlreadyCurrent(t *testing.T) {
 	}
 }
 
+func TestPerformUpdateFromCommitDevVersion(t *testing.T) {
+	target := filepath.Join(t.TempDir(), "deja")
+	if err := os.WriteFile(target, []byte("dev binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	download, _ := newUpdateDownloader(t, "linux", []byte("release binary"), false)
+	var out bytes.Buffer
+	err := performUpdate(updateConfig{
+		currentVersion: "dev-795f6e6",
+		goos:           "linux",
+		goarch:         "amd64",
+		executable:     target,
+		latestURL:      testLatestReleaseURL,
+		download:       download,
+	}, &out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "updated deja dev-795f6e6 -> v1.2.0") || strings.Contains(out.String(), "vdev-") {
+		t.Fatalf("output = %q, want 'updated deja dev-795f6e6 -> v1.2.0'", out.String())
+	}
+}
+
 func TestPerformUpdateDoesNotDowngrade(t *testing.T) {
 	target := filepath.Join(t.TempDir(), "deja")
 	if err := os.WriteFile(target, []byte("newer binary"), 0o755); err != nil {

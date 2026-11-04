@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/redact"
 )
@@ -124,11 +125,26 @@ func write(dir string, all map[uint64]string) error {
 		blob = append(blob, all[k]...)
 	}
 	tmp := filepath.Join(dir, fileName+".tmp")
-	if err := os.WriteFile(tmp, slices.Concat(head, blob), 0o600); err != nil {
+	shared := atomicfile.SharedGroup(dir)
+	perm := os.FileMode(0o600)
+	if shared {
+		perm = 0o660
+	}
+	if err := os.WriteFile(tmp, slices.Concat(head, blob), perm); err != nil {
 		_ = os.Remove(tmp)
 		return err
 	}
-	return os.Rename(tmp, filepath.Join(dir, fileName))
+	if shared {
+		_ = os.Chmod(tmp, 0o660)
+	}
+	dst := filepath.Join(dir, fileName)
+	if err := os.Rename(tmp, dst); err != nil {
+		return err
+	}
+	if shared {
+		_ = os.Chmod(dst, 0o660)
+	}
+	return nil
 }
 
 // Drop removes the receipts in dir, for a pass that changed sessions and

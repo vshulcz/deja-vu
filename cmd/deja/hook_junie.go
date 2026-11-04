@@ -38,8 +38,9 @@ func runJunieHook(dir, name string, rest []string, cmd command) error {
 	}
 	extra := ""
 	if name != "hook-context" && sid != "" && !recallIsOff() {
-		junieCatchUpCompaction(dir, sid, project)
-		extra = junieFailurePair(dir, sid, project)
+		st := sources.JunieTurn(sid)
+		junieCatchUpCompaction(dir, sid, project, st)
+		extra = junieFailurePair(dir, sid, project, st)
 	}
 	var out []byte
 	err := withStdin(raw, func() error {
@@ -51,21 +52,27 @@ func runJunieHook(dir, name string, rest []string, cmd command) error {
 	return err
 }
 
-func junieCatchUpCompaction(dir, sid, project string) {
+func junieCatchUpCompaction(dir, sid, project string, st sources.JunieTurnState) {
+	if st.CompactionID == "" || st.CompactionAt.IsZero() {
+		return
+	}
 	path := sources.JunieSessionEvents(sid)
 	if path == "" {
 		return
 	}
 	pre := precompactHookInput{SessionID: sid, TranscriptPath: path, CWD: project}
+	seenKey := onceDigestKey("compaction-seen:" + sid)
+	seenMap := loadSeen(dir).injected(seenKey)
 	catchUpCompactionWith(dir, pre, func() (sources.CompactionTranscript, bool, error) {
-		return sources.ReadJunieCompaction(sid)
+		return sources.ReadJunieCompactionFromTurnIfNew(sid, st, func(fp string) bool {
+			return seenMap["compaction-seen:"+shortHash(fp)]
+		})
 	})
 }
 
 // junieFailurePair is hook-tool-after's answer for the newest command in the
 // session's log when it failed, once per command.
-func junieFailurePair(dir, sid, project string) string {
-	st := sources.JunieTurn(sid)
+func junieFailurePair(dir, sid, project string, st sources.JunieTurnState) string {
 	if st.FailureID == "" || st.Failure == "" {
 		return ""
 	}

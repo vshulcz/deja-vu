@@ -24,6 +24,7 @@ func sharedSiblingSidecars(dir string) []string {
 		dir + ".lock",
 		dir + ".live",
 		dir + ".hookseen",
+		dir + ".hookseen.lock",
 		dir + ".dejavu",
 		dir + ".forks",
 		dir + ".warming",

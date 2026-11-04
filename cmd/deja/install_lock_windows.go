@@ -5,9 +5,10 @@ package main
 import (
 	"errors"
 	"os"
-	"path/filepath"
 	"syscall"
 	"unsafe"
+
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 )
 
 const (
@@ -25,10 +26,7 @@ var (
 // for what it is for. LockFileEx blocks without the FAIL_IMMEDIATELY flag,
 // which is the `wait` case here.
 func takeInstallLock(path string, wait bool) (release func(), ok, busy bool) {
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return func() {}, false, false
-	}
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	f, err := atomicfile.OpenSharedFile(path, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return func() {}, false, false
 	}

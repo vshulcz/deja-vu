@@ -68,12 +68,20 @@ func JunieTurn(sessionID string) JunieTurnState {
 // ReadJunieCompaction captures a Junie session as it stood before its newest
 // compaction. found is false when it has none.
 func ReadJunieCompaction(sessionID string) (CompactionTranscript, bool, error) {
+	return ReadJunieCompactionFromTurnIfNew(sessionID, JunieTurn(sessionID), nil)
+}
+
+// ReadJunieCompactionFromTurnIfNew captures a Junie session from an already-read
+// JunieTurnState, skipping the second events.jsonl parse when seen reports the
+// compaction fingerprint has already been processed.
+func ReadJunieCompactionFromTurnIfNew(sessionID string, st JunieTurnState, seen func(string) bool) (CompactionTranscript, bool, error) {
 	path := JunieSessionEvents(sessionID)
-	if path == "" {
+	if path == "" || st.CompactionID == "" || st.CompactionAt.IsZero() {
 		return CompactionTranscript{}, false, nil
 	}
-	st := JunieTurn(sessionID)
-	if st.CompactionID == "" || st.CompactionAt.IsZero() {
+	id := filepath.Base(filepath.Dir(path))
+	fp := hashCompactionBytes([]byte("junie\x00" + id + "\x00" + st.CompactionID))
+	if seen != nil && seen(fp) {
 		return CompactionTranscript{}, false, nil
 	}
 	info, err := regularCompactionFile(path)
@@ -87,7 +95,7 @@ func ReadJunieCompaction(sessionID string) (CompactionTranscript, bool, error) {
 	return CompactionTranscript{
 		Session: s, Harness: "junie", NativeSessionID: s.ID,
 		Workspace: junieIndexFor(filepath.Dir(path)).ProjectDir, Path: path,
-		Fingerprint: hashCompactionBytes([]byte("junie\x00" + s.ID + "\x00" + st.CompactionID)),
+		Fingerprint: fp,
 		SourceSize:  info.Size(), SourceMTime: info.ModTime(),
 	}, true, nil
 }

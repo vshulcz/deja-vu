@@ -95,8 +95,12 @@ func crushCompactionPacket(dir, sid, cwd string) string {
 	}
 	workspace := sources.CrushProjectDir(db)
 	pre := precompactHookInput{SessionID: sid, TranscriptPath: db, CWD: workspace}
+	seenKey := onceDigestKey("compaction-seen:" + sid)
+	seenMap := loadSeen(dir).injected(seenKey)
 	catchUpCompactionWith(dir, pre, func() (sources.CompactionTranscript, bool, error) {
-		return sources.ReadCrushCompaction(cwd, sid)
+		return sources.ReadCrushCompactionIfNew(cwd, sid, func(fp string) bool {
+			return seenMap["compaction-seen:"+shortHash(fp)]
+		})
 	})
 	var out bytes.Buffer
 	if delivered, _ := emitCompactionRecovery(dir, sid, workspace, "PreToolUse", hookToolPlain, &out); !delivered {
@@ -130,8 +134,12 @@ func runCommandCodeTool(dir string, rest []string, cmd command) error {
 	_ = json.Unmarshal(raw, &p)
 	if p.SessionID != "" && sources.CommandCodeUnderRoot(p.TranscriptPath) {
 		pre := precompactHookInput{SessionID: p.SessionID, TranscriptPath: p.TranscriptPath, CWD: p.CWD}
+		seenKey := onceDigestKey("compaction-seen:" + p.SessionID)
+		seenMap := loadSeen(dir).injected(seenKey)
 		catchUpCompactionWith(dir, pre, func() (sources.CompactionTranscript, bool, error) {
-			return sources.ReadCommandCodeCompaction(p.TranscriptPath, p.SessionID)
+			return sources.ReadCommandCodeCompactionIfNew(p.TranscriptPath, p.SessionID, func(fp string) bool {
+				return seenMap["compaction-seen:"+shortHash(fp)]
+			})
 		})
 	}
 	return withStdin(raw, func() error { return cmd(dir, rest) })

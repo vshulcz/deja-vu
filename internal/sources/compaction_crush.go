@@ -15,6 +15,13 @@ import (
 // ReadCrushCompaction captures the session as it stood before its newest
 // summary. found is false when the session has never been summarised.
 func ReadCrushCompaction(cwd, sessionID string) (CompactionTranscript, bool, error) {
+	return ReadCrushCompactionIfNew(cwd, sessionID, nil)
+}
+
+// ReadCrushCompactionIfNew captures the session as it stood before its newest
+// summary, skipping the full SQLite session parse when seen reports the
+// compaction fingerprint has already been processed.
+func ReadCrushCompactionIfNew(cwd, sessionID string, seen func(string) bool) (CompactionTranscript, bool, error) {
 	if strings.TrimSpace(sessionID) == "" {
 		return CompactionTranscript{}, false, fmt.Errorf("%w: missing session id", ErrTranscriptIdentity)
 	}
@@ -32,6 +39,10 @@ func ReadCrushCompaction(cwd, sessionID string) (CompactionTranscript, bool, err
 		return CompactionTranscript{}, false, err
 	}
 	summary := rows[0].ID
+	fp := hashCompactionBytes([]byte("crush\x00" + sessionID + "\x00" + summary))
+	if seen != nil && seen(fp) {
+		return CompactionTranscript{}, false, nil
+	}
 	where := " where s.id='" + id + "' and m.created_at < " +
 		"(select created_at from messages where id='" + sqlEscape(summary) + "')"
 	ss, err := parseCrushWhere(db, where)
@@ -48,7 +59,7 @@ func ReadCrushCompaction(cwd, sessionID string) (CompactionTranscript, bool, err
 		Workspace: CrushProjectDir(db), Path: db,
 		// The summary, not the store: later turns change the store, and the
 		// same compaction found again must keep its revision.
-		Fingerprint: hashCompactionBytes([]byte("crush\x00" + sessionID + "\x00" + summary)),
+		Fingerprint: fp,
 		SourceSize:  info.Size(), SourceMTime: info.ModTime(),
 	}, true, nil
 }

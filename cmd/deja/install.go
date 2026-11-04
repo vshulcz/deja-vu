@@ -71,9 +71,11 @@ func runInstall(dir string, args []string, uninstall bool) error {
 	}()
 	removingWiring = uninstall
 	defer func() { removingWiring = false }()
-	guidance, noIndex, targetArgs := parseInstallArgs(args)
+	guidance, noIndex, noMCP, targetArgs := parseInstallArgs(args)
 	skippingGuidance = !guidance
 	defer func() { skippingGuidance = false }()
+	skippingMCP = noMCP && !uninstall
+	defer func() { skippingMCP = false }()
 	verb := "install"
 	if uninstall {
 		verb = "uninstall"
@@ -823,13 +825,21 @@ func installCursorAuto(exe string, uninstall bool) (installResult, error) {
 	return wroteAll(mcp, hooks, status), nil
 }
 
+// skippingMCP is set when `deja install` runs with `--no-mcp`, so `-auto`
+// targets wire hooks and skills without writing an MCP server entry (#5929).
+var skippingMCP bool
+
 func installCodexAuto(exe string, uninstall bool) (installResult, error) {
-	mcp, err := installCodex(exe, uninstall)
-	if err != nil {
-		return installResult{}, err
+	var mcp installResult
+	var err error
+	if !skippingMCP || uninstall {
+		mcp, err = installCodex(exe, uninstall)
+		if err != nil {
+			return installResult{}, err
+		}
 	}
 	res, err := installCodexHooks(exe, uninstall)
-	if err == nil {
+	if err == nil && mcp.Path != "" {
 		res = wroteAll(mcp, res)
 	}
 	// Writing the file is not the same as codex agreeing to run it. Said here

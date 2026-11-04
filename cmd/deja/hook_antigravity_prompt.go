@@ -44,7 +44,11 @@ type transcriptStep struct {
 // its result, the way it does on opencode and Grok: PreToolUse's reason never
 // reaches the model here (hook_antigravity.go).
 func latestEditPaths(path string) []string {
-	for _, step := range transcriptTailSteps(path) {
+	return latestEditPathsFromSteps(transcriptTailSteps(path))
+}
+
+func latestEditPathsFromSteps(steps []transcriptStep) []string {
+	for _, step := range steps {
 		if step.Type == "USER_INPUT" {
 			return nil
 		}
@@ -128,7 +132,11 @@ func transcriptTailSteps(path string) []transcriptStep {
 // latestUserRequest returns the newest user turn in an antigravity transcript,
 // or "" when the file holds none it can read.
 func latestUserRequest(path string) string {
-	for _, step := range transcriptTailSteps(path) {
+	return latestUserRequestFromSteps(transcriptTailSteps(path))
+}
+
+func latestUserRequestFromSteps(steps []transcriptStep) string {
+	for _, step := range steps {
 		if step.Type != "USER_INPUT" {
 			continue
 		}
@@ -158,8 +166,17 @@ func userRequestText(content string) string {
 // ordinary prompt hook rather than reimplementing the ranking: the budget, the
 // dedupe and the kill switch are the ones every other harness gets.
 func antigravityPromptBlock(dir, question, conversationID, workspace string) string {
-	if strings.TrimSpace(question) == "" {
+	question = strings.TrimSpace(question)
+	if question == "" {
 		return ""
+	}
+	if strings.TrimSpace(conversationID) != "" {
+		qKey := "q:" + shortHash(question)
+		dKey := antigravityDigestKey(conversationID)
+		if alreadyInjected(dir, dKey)[qKey] {
+			return ""
+		}
+		rememberInjectedIDs(dir, dKey, qKey)
 	}
 	payload, err := json.Marshal(map[string]string{
 		"prompt":     question,
@@ -257,7 +274,11 @@ func workspaceFromConversation(transcriptPath, conversationID string) string {
 // answered or worked around, and injecting it again would be talking about
 // something the agent has moved on from.
 func latestToolFailure(path string) string {
-	for _, step := range transcriptTailSteps(path) {
+	return latestToolFailureFromSteps(transcriptTailSteps(path))
+}
+
+func latestToolFailureFromSteps(steps []transcriptStep) string {
+	for _, step := range steps {
 		if step.Type != "GENERIC" {
 			continue
 		}
@@ -319,7 +340,11 @@ func antigravityFixPair(dir, output, conversationID, workspace string) string {
 // truncates the conversation and writes a CHECKPOINT step saying so, and the
 // hook is handed the transcript on every call.
 func newestCheckpoint(path string) string {
-	for _, step := range transcriptTailSteps(path) {
+	return newestCheckpointFromSteps(transcriptTailSteps(path))
+}
+
+func newestCheckpointFromSteps(steps []transcriptStep) string {
+	for _, step := range steps {
 		if step.Type == checkpointStepType {
 			return step.CreatedAt
 		}

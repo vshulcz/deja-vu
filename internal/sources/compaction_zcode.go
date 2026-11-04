@@ -24,6 +24,13 @@ func ZCodeHookTranscript(path string) bool {
 // ReadZCodeCompaction captures a ZCode session as it stood before its newest
 // compaction summary. found is false when it has none.
 func ReadZCodeCompaction(sessionID string) (CompactionTranscript, bool, error) {
+	return ReadZCodeCompactionIfNew(sessionID, nil)
+}
+
+// ReadZCodeCompactionIfNew captures a ZCode session as it stood before its
+// newest compaction summary, skipping the full SQLite session parse when seen
+// reports the compaction fingerprint has already been processed.
+func ReadZCodeCompactionIfNew(sessionID string, seen func(string) bool) (CompactionTranscript, bool, error) {
 	if strings.TrimSpace(sessionID) == "" {
 		return CompactionTranscript{}, false, fmt.Errorf("%w: missing session id", ErrTranscriptIdentity)
 	}
@@ -48,6 +55,10 @@ func ReadZCodeCompaction(sessionID string) (CompactionTranscript, bool, error) {
 		return CompactionTranscript{}, false, err
 	}
 	summary := rows[0]
+	fp := hashCompactionBytes([]byte("zcode\x00" + sessionID + "\x00" + summary.ID))
+	if seen != nil && seen(fp) {
+		return CompactionTranscript{}, false, nil
+	}
 	ss, err := parseOpencodeSchemaDB("zcode", db, fmt.Sprintf(" and s.id='%s' and m.time_created < %d", id, summary.At), 0)
 	if err != nil {
 		return CompactionTranscript{}, false, err
@@ -62,7 +73,7 @@ func ReadZCodeCompaction(sessionID string) (CompactionTranscript, bool, error) {
 		Workspace: s.Path, Path: db,
 		// The summary, not the store: later turns change the store, and the
 		// same compaction found again must keep its revision.
-		Fingerprint: hashCompactionBytes([]byte("zcode\x00" + sessionID + "\x00" + summary.ID)),
+		Fingerprint: fp,
 		SourceSize:  info.Size(), SourceMTime: info.ModTime(),
 	}, true, nil
 }

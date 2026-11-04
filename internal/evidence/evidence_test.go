@@ -2,6 +2,8 @@ package evidence
 
 import (
 	"maps"
+	"os"
+	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
@@ -147,5 +149,31 @@ func TestReceiptsOfALongSessionDoNotDependOnTheSplit(t *testing.T) {
 	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(1))
 	if one := Receipts(s, nil); !maps.Equal(one, got) {
 		t.Error("receipts found on one core differ from the ones found in parts")
+	}
+}
+
+func TestBuildSharedGroupReceiptPermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX group permissions only")
+	}
+	t.Setenv("DEJA_SHARED_GROUP", "1")
+	dir := filepath.Join(t.TempDir(), "index.db")
+	if err := os.MkdirAll(dir, 0o770|os.ModeSetgid); err != nil {
+		t.Fatal(err)
+	}
+	answer := "Fixed: retry_limit in payments_client was 0, set it to 5"
+	s := session(
+		model.Message{Role: "user", Text: "payments_client gives up on the first timeout, fix it"},
+		model.Message{Role: "command", Text: "grep -n retry_limit payments_client.go"},
+		model.Message{Role: "tool-output", Text: "12: retry_limit = 0 // payments_client"},
+		model.Message{Role: "assistant", Text: answer},
+	)
+	Build(dir, []model.Session{s}, nil)
+	info, err := os.Stat(filepath.Join(dir, "receipts.bin"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o660 {
+		t.Fatalf("receipts.bin mode = %04o, want 0660", perm)
 	}
 }

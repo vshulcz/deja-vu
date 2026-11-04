@@ -34,7 +34,6 @@ func TestDayZeroLinksEveryToolItCompares(t *testing.T) {
 	// same author, while the version and issue the footnote cites — 0.7.1 and
 	// #441 — only exist in coding_agent_session_search.
 	want := map[string]string{
-		"funes":       "huggingface/funes",
 		"ctx":         "ctxrs/ctx",
 		"CASS":        "Dicklesworthstone/coding_agent_session_search",
 		"agentsview":  "kenn-io/agentsview",

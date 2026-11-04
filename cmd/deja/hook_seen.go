@@ -61,6 +61,26 @@ func hookseenPath(dir string) string {
 	return dir + ".hookseen"
 }
 
+func hookseenLockPath(dir string) string {
+	return dir + ".hookseen.lock"
+}
+
+// holdHookseenLock serializes concurrent hook invocations against the same
+// index so two hooks spawned in the same millisecond do not both read an
+// un-injected state and emit duplicate blocks (#5930). contended reports
+// whether another hook process held the lock when this caller arrived.
+func holdHookseenLock(dir string) (func(), bool) {
+	if strings.TrimSpace(dir) == "" {
+		return func() {}, false
+	}
+	path := hookseenLockPath(dir)
+	if release, ok, busy := takeInstallLock(path, false); ok || !busy {
+		return release, false
+	}
+	release, _, _ := takeInstallLock(path, true)
+	return release, true
+}
+
 func loadSeen(dir string) seenLines {
 	b, err := os.ReadFile(hookseenPath(dir))
 	if err != nil {

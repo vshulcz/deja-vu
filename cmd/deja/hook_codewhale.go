@@ -150,8 +150,12 @@ func codewhaleCatchUp(dir, sessionID, workspace string) {
 	}
 	since := codewhaleFirstSeen(dir, sessionID)
 	pre := precompactHookInput{SessionID: sessionID, TranscriptPath: sources.CodeWhaleRoot(), CWD: workspace}
+	seenKey := onceDigestKey("compaction-seen:" + sessionID)
+	seenMap := loadSeen(dir).injected(seenKey)
 	catchUpCompactionWith(dir, pre, func() (sources.CompactionTranscript, bool, error) {
-		return sources.ReadCodeWhaleCompaction(workspace, since)
+		return sources.ReadCodeWhaleCompactionIfNew(workspace, since, func(fp string) bool {
+			return seenMap["compaction-seen:"+shortHash(fp)]
+		})
 	})
 }
 

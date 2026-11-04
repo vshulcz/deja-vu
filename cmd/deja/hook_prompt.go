@@ -194,6 +194,8 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	if strings.TrimSpace(string(input.Prompt)) == "" {
 		return nil
 	}
+	releaseSeenLock, _ := holdHookseenLock(dir)
+	defer releaseSeenLock()
 	if input.HookEventName == "BeforeAgent" {
 		catchUpCompaction(dir, precompactHookInput{SessionID: input.SessionID, TranscriptPath: input.TranscriptPath, CWD: input.CWD, WorkspaceRoots: input.WorkspaceRoots})
 	}

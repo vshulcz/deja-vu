@@ -71,6 +71,9 @@ type wiringState struct {
 	// (#4189). Remove the link and the configs are dead while Exe is still
 	// there, so the repair checks this too.
 	Written string `json:"written,omitempty"`
+	// NoMCP is set when `deja install` ran with `--no-mcp`, so an upgrade
+	// repair does not add an MCP server entry the install omitted (#5929).
+	NoMCP bool `json:"no_mcp,omitempty"`
 }
 
 // writtenStillResolves reports whether the path the configs name still leads
@@ -292,8 +295,14 @@ func recordWiring(targets []string, uninstall bool) {
 	}
 	sort.Strings(blocks)
 	exes := append([]string(nil), st.Exes...)
+	noMCP := st.NoMCP
+	if !uninstall {
+		noMCP = skippingMCP
+	} else if len(kept) == 0 {
+		noMCP = false
+	}
 	next := wiringState{Version: version, Targets: kept, Created: created, Dirs: dirs, Snapshots: snapshots,
-		Blocks: blocks, Exe: exe, Exes: exes, Home: homeDir(), Written: written}
+		Blocks: blocks, Exe: exe, Exes: exes, Home: homeDir(), Written: written, NoMCP: noMCP}
 	rememberWrittenExe(&next, exe)
 	rememberWrittenExe(&next, written)
 	st = next
@@ -457,6 +466,9 @@ func refreshWiringAfterUpgrade() []string {
 	write := stableExe(invoked, exe)
 	wiringWrittenExe = write
 	defer func() { wiringWrittenExe = "" }()
+	prevSkippingMCP := skippingMCP
+	skippingMCP = st.NoMCP
+	defer func() { skippingMCP = prevSkippingMCP }()
 	for _, target := range st.Targets {
 		res, err := installTarget(target, write, false)
 		if err != nil {

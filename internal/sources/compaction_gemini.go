@@ -30,6 +30,13 @@ type geminiRecord struct {
 // and captures the session as it stood just before it. found is false when
 // the transcript holds none.
 func ReadGeminiCompaction(path, nativeSessionID string) (CompactionTranscript, bool, error) {
+	return ReadGeminiCompactionIfNew(path, nativeSessionID, nil)
+}
+
+// ReadGeminiCompactionIfNew is ReadGeminiCompaction, but returns early before
+// parsing the transcript when seen reports the newest compaction fingerprint
+// has already been processed.
+func ReadGeminiCompactionIfNew(path, nativeSessionID string, seen func(fingerprint string) bool) (CompactionTranscript, bool, error) {
 	if strings.TrimSpace(nativeSessionID) == "" {
 		return CompactionTranscript{}, false, fmt.Errorf("%w: missing session id", ErrTranscriptIdentity)
 	}
@@ -59,6 +66,11 @@ func ReadGeminiCompaction(path, nativeSessionID string) (CompactionTranscript, b
 	if cut < 0 {
 		return CompactionTranscript{}, false, nil
 	}
+	boundary := records[at]
+	fp := hashCompactionBytes(append(fmt.Appendf(nil, "%d\x00", boundary.off), boundary.line...))
+	if seen != nil && seen(fp) {
+		return CompactionTranscript{}, false, nil
+	}
 	var prefix []byte
 	for _, r := range records[:cut] {
 		prefix = append(append(prefix, r.line...), '\n')
@@ -70,13 +82,12 @@ func ReadGeminiCompaction(path, nativeSessionID string) (CompactionTranscript, b
 	if len(ss) != 1 || ss[0].ID != nativeSessionID {
 		return CompactionTranscript{}, false, fmt.Errorf("%w: no parseable gemini session", ErrUnsupportedCompactionTranscript)
 	}
-	boundary := records[at]
 	return CompactionTranscript{
 		Session: ss[0], Harness: "gemini", NativeSessionID: nativeSessionID,
 		Workspace: GeminiProjectDir(path), Path: path,
 		// The compaction, not the file: later turns append to the file, and
 		// the same compaction found again must keep its revision.
-		Fingerprint:       hashCompactionBytes(append(fmt.Appendf(nil, "%d\x00", boundary.off), boundary.line...)),
+		Fingerprint:       fp,
 		HeaderFingerprint: hashCompactionBytes(records[0].line),
 		SourceSize:        records[cut].off, SourceMTime: mtime,
 		TailOffset: tailOffset, Truncated: truncated,
