@@ -591,14 +591,23 @@ func walkFiles(root string, pred func(string) bool) []string {
 		// Only regular files. A FIFO or socket that matched the session glob
 		// hung the whole index: the parser's Open blocks on a named pipe with
 		// no writer and never returns, so one such file in a scanned store
-		// froze indexing for good. IsRegular already excludes symlinks and
-		// directories, so it subsumes the checks it replaces.
-		if q := under(p); d.Type().IsRegular() && pred(q) {
+		// froze indexing for good.
+		if q := under(p); isRegularWalkEntry(d) && pred(q) {
 			out = append(out, q)
 		}
 		return nil
 	})
 	return out
+}
+
+func isRegularWalkEntry(d os.DirEntry) bool {
+	if d.Type()&os.ModeSymlink != 0 {
+		// PRoot can report DT_LNK for regular files (#5921). Info
+		// checks the entry itself, so a real symlink stays excluded.
+		info, err := d.Info()
+		return err == nil && info.Mode().IsRegular()
+	}
+	return d.Type().IsRegular()
 }
 
 // safeParse shields the index from a panicking parser: one malformed session

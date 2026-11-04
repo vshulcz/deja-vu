@@ -10,6 +10,11 @@ which is what `deja sources` prints. `docs/registry/` describes each store's
 layout in detail, and `internal/sources/registry_test.go` checks that index
 against the loader list.
 
+The shared `walkFiles` helper accepts regular files. For an entry reported as
+a symlink, it checks the entry's own metadata before excluding it. This allows
+discovery on PRoot filesystems that report regular files as symlinks while
+keeping real links inside a store out of the walk.
+
 | Source | Code | Input |
 | --- | --- | --- |
 | Claude Code | `claude.go`, `claude_history.go` | JSONL files under `~/.claude/projects`, plus the prompts in `~/.claude/history.jsonl` of sessions whose transcript is gone |
