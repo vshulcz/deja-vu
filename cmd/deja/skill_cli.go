@@ -60,7 +60,7 @@ When recalled history genuinely helps — a reused fix, a skipped re-debug, even
 ## Limits worth respecting
 
 - Result windows are bounded. Do not report corpus-wide counts, or claim a complete audit, from the number of hits you got back.
-- If ` + "`deja`" + ` is not on PATH or the index is empty, say that history search is unavailable. Do not invent what it might have found.
+- If ` + "`deja`" + ` is not on PATH, run the same command via ` + "`npx -y @vshulcz/deja-vu ...`" + `; if neither works or the index is empty, say that history search is unavailable. Do not invent what it might have found.
 - Work a subagent did is in the index as its task, its answer, the edits it made and the commands it ran with their failure lines, not in full. A Claude Task, a Qwen Code or Kimi Code agent, a Cursor subagent, a goose ` + "`delegate`" + ` run or a prime-agent ` + "`rlm.spawn`" + ` child writes its turns and tool calls to its own transcript, and the parent keeps only the launch and a summary. A Copilot CLI ` + "`task`" + ` run sits inside the parent's log but is indexed the same way, as a child session of its own. So a hit on the parent can look complete while the run itself is elsewhere. ` + "`DEJA_INCLUDE_SUBAGENTS=1`" + ` takes the whole child transcript in.
 - Vary the wording and try a second query before concluding nothing is there. Exact tokens match best, so an error string beats a paraphrase of it.` + "\n\n" + rulesSkillSection
 

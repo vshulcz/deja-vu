@@ -34,7 +34,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 deja install --auto
 ```
 
-<p align="center"><sub>macOS and Linux &middot; <a href="#install">Windows, Homebrew, npm and plugin marketplaces</a> &middot; Or check what is already on your disk without installing: <code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">Try in browser →</a></sub></p>
+<p align="center"><sub>Or with Homebrew: <code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Claude Code plugin: <code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills: <code>npx skills add vshulcz/deja-vu</code><br><a href="#install">Windows (Scoop / winget), Codex, OpenCode, OpenClaw and more</a> &middot; Try without installing: <code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">Live demo →</a></sub></p>
 
 <table align="center">
 <tr>

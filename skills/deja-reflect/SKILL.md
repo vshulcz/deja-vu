@@ -21,7 +21,7 @@ Run an end-of-session reflection over the current task and record only durable, 
 ## Workflow
 
 1. **Inspect what was already recorded or hit in this project:**
-   - Run `deja notes` to check existing promoted decisions so you do not duplicate or contradict an active rule.
+   - Run `deja notes` to check existing promoted decisions so you do not duplicate or contradict an active rule. (If `deja` is not on PATH, run `npx -y @vshulcz/deja-vu ...`.)
    - Run `deja friction` to see recurring command failures across sessions.
 2. **Distill durable findings from this session:**
    - Keep: architectural invariants, required flags/commands that were non-obvious, rejected approaches and why they failed, user-stated project rules.
