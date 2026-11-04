@@ -452,11 +452,15 @@ func sessionsForMetasInRoles(dir string, metas []SessionMeta, roles map[string]b
 }
 
 func sessionsForMetasInRolesWindowed(dir string, metas []SessionMeta, roles map[string]bool, matchedOffsets map[uint32][]int64) ([]model.Session, error) {
+	return sessionsForMetasInRolesWindowedTail(dir, metas, roles, matchedOffsets, 0)
+}
+
+func sessionsForMetasInRolesWindowedTail(dir string, metas []SessionMeta, roles map[string]bool, matchedOffsets map[uint32][]int64, tail int) ([]model.Session, error) {
 	m, err := readManifestCached(dir)
 	if err != nil {
 		return nil, err
 	}
-	out, err := sessionsForMetasInWindowed(dir, m, metas, roles, matchedOffsets)
+	out, err := sessionsForMetasInWindowedTail(dir, m, metas, roles, matchedOffsets, tail)
 	// Read again when a pass swapped in during the read, as loadSessionMeta
 	// does, without the sessions it took away (#5449).
 	for range sessionRereads {
@@ -472,12 +476,15 @@ func sessionsForMetasInRolesWindowed(dir string, metas []SessionMeta, roles map[
 		if sessionReread != nil {
 			sessionReread()
 		}
-		out, err = sessionsForMetasInWindowed(dir, m, metas, roles, matchedOffsets)
+		out, err = sessionsForMetasInWindowedTail(dir, m, metas, roles, matchedOffsets, tail)
 	}
 	if err != nil {
 		return nil, err
 	}
 	for i := range out {
+		if tail > 0 && len(out[i].Messages) > tail && !IsPromotedNote(out[i].Harness, out[i].ID, out[i].OrigID) {
+			out[i].Messages = out[i].Messages[len(out[i].Messages)-tail:]
+		}
 		orderPromotedNote(&out[i])
 	}
 	return ignoredByPolicy(out), nil
@@ -503,8 +510,8 @@ func liveManifest(dir string, m Manifest) (Manifest, bool) {
 	return cur, true
 }
 
-// sessionsForMetasInWindowed is the read sessionsForMetas makes with m's tables.
-func sessionsForMetasInWindowed(dir string, m Manifest, metas []SessionMeta, roles map[string]bool, matchedOffsets map[uint32][]int64) ([]model.Session, error) {
+// sessionsForMetasInWindowedTail is the read sessionsForMetas makes with m's tables.
+func sessionsForMetasInWindowedTail(dir string, m Manifest, metas []SessionMeta, roles map[string]bool, matchedOffsets map[uint32][]int64, tail int) ([]model.Session, error) {
 	tbl := tablesFromManifest(m)
 	want := make(map[string]int, len(metas))
 	out := make([]model.Session, len(metas))
@@ -525,7 +532,7 @@ func sessionsForMetasInWindowed(dir string, m Manifest, metas []SessionMeta, rol
 	for k := range want {
 		keys[k] = true
 	}
-	err := eachRecordForKeysInRolesWindowed(filepath.Join(dir, "records.bin"), tbl, keys, roles, matchedByKey, func(r Record) {
+	err := eachRecordForKeysInRolesWindowedTail(filepath.Join(dir, "records.bin"), tbl, keys, roles, matchedByKey, tail, func(r Record) {
 		if i, ok := want[r.Key]; ok {
 			out[i].Messages = append(out[i].Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
 		}
@@ -550,6 +557,12 @@ func RecentProjects(dir string, projects []string, perName int) ([]model.Session
 // the manifest and say where the work was, so the root asks that instead of
 // guessing.
 func RecentProjectsUnder(dir string, projects []string, root string, perName int) ([]model.Session, error) {
+	return RecentProjectsUnderTail(dir, projects, root, perName, 0)
+}
+
+// RecentProjectsUnderTail is RecentProjectsUnder with each session bounded to
+// its last tail messages when tail > 0.
+func RecentProjectsUnderTail(dir string, projects []string, root string, perName, tail int) ([]model.Session, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -564,7 +577,7 @@ func RecentProjectsUnder(dir string, projects []string, root string, perName int
 	if err != nil {
 		return nil, err
 	}
-	return sessionsForMetas(dir, recentProjectMetas(m, projects, root, perName))
+	return sessionsForMetasInRolesWindowedTail(dir, recentProjectMetas(m, projects, root, perName), nil, nil, tail)
 }
 
 // RecentProjectMetasUnder is RecentProjectsUnder without the records, and

@@ -391,10 +391,17 @@ func pluralThem(n int) string {
 // hundred cost 300 ms per session on an 80 MB log, paid twice on every bare
 // `deja` by the two lines that recover text from a hash (#625).
 func recordsForKey(path string, t *recordTables, key string) ([]Record, error) {
+	return recordsForKeyTail(path, t, key, 0)
+}
+
+func recordsForKeyTail(path string, t *recordTables, key string, tail int) ([]Record, error) {
 	var out []Record
-	err := eachRecordForKeys(path, t, map[string]bool{key: true}, func(r Record) {
+	err := eachRecordForKeysInRolesWindowedTail(path, t, map[string]bool{key: true}, nil, nil, tail, func(r Record) {
 		out = append(out, r)
 	})
+	if tail > 0 && len(out) > tail {
+		out = out[len(out)-tail:]
+	}
 	return out, err
 }
 

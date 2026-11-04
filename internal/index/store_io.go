@@ -358,13 +358,17 @@ func eachRecordForKeysInRoles(path string, t *recordTables, want, roles map[stri
 }
 
 func eachRecordForKeysInRolesWindowed(path string, t *recordTables, want, roles map[string]bool, matchedByKey map[string][]int64, fn func(Record)) error {
+	return eachRecordForKeysInRolesWindowedTail(path, t, want, roles, matchedByKey, 0, fn)
+}
+
+func eachRecordForKeysInRolesWindowedTail(path string, t *recordTables, want, roles map[string]bool, matchedByKey map[string][]int64, tail int, fn func(Record)) error {
 	atomic.AddInt64(&recordLogScans, 1)
 	f, err := openIndexFile(path)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = f.Close() }()
-	if ok, err := eachRecordForKeysByOffsetsWindowed(f, filepath.Dir(path), t, want, roles, matchedByKey, fn); ok || err != nil {
+	if ok, err := eachRecordForKeysByOffsetsWindowedTail(f, filepath.Dir(path), t, want, roles, matchedByKey, tail, fn); ok || err != nil {
 		return err
 	}
 	return walkRecordsForKeys(bufio.NewReaderSize(f, 1024*1024), 0, t, want, roles, fn)

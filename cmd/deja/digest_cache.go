@@ -283,6 +283,8 @@ func requestHookRefresh(dir, cwd string) {
 	cmd.Stderr = cmd.Stdout
 	if pid, err := startRefresher(cmd); err == nil {
 		recordWarmupOwner(sentinel, stamp, pid)
+	} else {
+		_ = os.Remove(sentinel)
 	}
 }
 
@@ -443,7 +445,11 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, c
 	// The cwd as well as the names it can guess: a session started in a
 	// subdirectory keeps that directory's name, and no list of names reaches
 	// down to it (#2040).
-	if got, err := index.RecentProjectsUnder(dir, lookupNames, cwd, perName); err == nil {
+	tailLimit := 150
+	if len(cut) > 0 {
+		tailLimit = 0
+	}
+	if got, err := index.RecentProjectsUnderTail(dir, lookupNames, cwd, perName, tailLimit); err == nil {
 		for _, s := range got {
 			if !pol.Allows(policy.ActivationAuto, s.Project) {
 				withheld++
@@ -527,6 +533,13 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, c
 			// that separates "the rule hid all of it" from "no history here".
 			return hookCacheEntry{Withheld: withheld}
 		}
+		// Digest and scoring only ever use the recent tail; hauling a marathon
+		// session's megabytes through word sets is pure waste.
+		for i := range variant {
+			if len(variant[i].Messages) > 150 {
+				variant[i].Messages = variant[i].Messages[len(variant[i].Messages)-150:]
+			}
+		}
 		scores, matched := taskScores(variant, taskFiles)
 		sort.Slice(variant, func(i, j int) bool {
 			if scores[variant[i].Key()] != scores[variant[j].Key()] {
@@ -536,13 +549,6 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, c
 		})
 		if len(variant) > 12 {
 			variant = variant[:12]
-		}
-		// Digest and scoring only ever use the recent tail; hauling a marathon
-		// session's megabytes through word sets is pure waste.
-		for i := range variant {
-			if len(variant[i].Messages) > 150 {
-				variant[i].Messages = variant[i].Messages[len(variant[i].Messages)-150:]
-			}
 		}
 		mark("task-scores")
 		// A rejected session belongs last, and the mark has to travel with it: the

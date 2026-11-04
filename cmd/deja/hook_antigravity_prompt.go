@@ -61,7 +61,12 @@ func latestEditPathsFromSteps(steps []transcriptStep) []string {
 // (Antigravity, goose) and the line rides a later hook.
 func editFileLines(dir string, paths []string, conversationID, workspace string) string {
 	var lines []string
+	seen := make(map[string]bool, len(paths))
 	for _, p := range paths {
+		if p == "" || seen[p] {
+			continue
+		}
+		seen[p] = true
 		payload, err := json.Marshal(map[string]any{
 			"hook_event_name": "PreToolUse",
 			"tool_name":       "Edit",

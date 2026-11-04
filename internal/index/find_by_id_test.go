@@ -72,4 +72,12 @@ func TestFindByIDAnswersTheSameWayTwice(t *testing.T) {
 	if first.Harness != "claude" {
 		t.Errorf("with two copies of an id, the newer one is the better guess; got %s", first.Harness)
 	}
+	beforeScans := RecordLogScans()
+	meta, metaOK, metaErr := FindMetaByID(dir, "shared")
+	if metaErr != nil || !metaOK || meta.Harness != first.Harness {
+		t.Fatalf("FindMetaByID = (%s, %v, %v), want %s", meta.Harness, metaOK, metaErr, first.Harness)
+	}
+	if RecordLogScans() != beforeScans {
+		t.Fatalf("FindMetaByID scanned records.bin (%d -> %d)", beforeScans, RecordLogScans())
+	}
 }

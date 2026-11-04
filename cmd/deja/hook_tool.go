@@ -15,7 +15,6 @@ import (
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/evidence"
 	"github.com/vshulcz/deja-vu/internal/index"
-	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -1037,12 +1036,7 @@ func commandDecisionLine(dir, cwd, cmd, self string, lookupOnly bool) string {
 	allow := func(project string) bool { return pol.Allows(policy.ActivationAuto, project) }
 	r := newLifecycleResolver(dir)
 	usableMeta := func(meta index.SessionMeta) bool {
-		return decisionUsable(model.Session{
-			Harness:   meta.Harness,
-			ID:        meta.ID,
-			OrigID:    meta.OrigID,
-			Lifecycle: meta.Lifecycle,
-		}, r)
+		return decisionUsable(metaSession(meta), r)
 	}
 	projNames := commandProjectCandidatesIn(dir, cwd, cmd)
 	if d := index.CommandSettledUsableOutside(dir, cmd, projNames, allow, usableMeta, self); d != "" {

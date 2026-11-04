@@ -87,13 +87,13 @@ func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(inde
 	var last time.Time
 	var inScope []index.SessionMeta
 	for _, meta := range index.FileSessions(dir, path) {
-		if self != nil && self(meta, path) {
-			continue
-		}
 		if !pol.Allows(policy.ActivationAuto, meta.Project) {
 			continue
 		}
 		if !fileMetaInScope(meta, path, nil) && !fileMetaInScope(meta, path, projects()) {
+			continue
+		}
+		if self != nil && self(meta, path) {
 			continue
 		}
 		sessions++
@@ -129,12 +129,13 @@ func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(inde
 	editSymbols, fileSymbols := fileHookSymbols(cwd, path, editText)
 	allSymbols := append(slices.Clone(editSymbols), fileSymbols...)
 	var dec string
-	if d := promotedDecisionForFile(path, inScope); d != "" && (mentionsFile(path, d) || mentionsAnySymbol(allSymbols, d)) {
-		dec = standingLabel + d
+	promoted := promotedDecisionForFileIn(dir, path, inScope)
+	if promoted != "" && (mentionsFile(path, promoted) || mentionsAnySymbol(allSymbols, promoted)) {
+		dec = standingLabel + promoted
 	} else if d := fileDecisionLineWithSymbols(dir, path, editSymbols, fileSymbols, inScope); d != "" && digest.CarriesDecision(d) && (mentionsFile(path, d) || mentionsAnySymbol(allSymbols, d)) {
 		// A scanned line is a decision about the file only when it reads as one and
 		// names the file or a symbol declared in it.
-		if promotedDecisionForFile(path, inScope) == d {
+		if promoted == d {
 			dec = decisionLabel + d
 		} else {
 			dec = modelLabel(decisionLabel, d) + d
@@ -224,7 +225,7 @@ func fileDecisionLineWithSymbols(dir, path string, editSymbols, fileSymbols []st
 	// scanning for a conclusion instead handed back whatever the newest session
 	// happened to end with — "looked at retry.go again (5)" in front of "the
 	// retry budget stays at 5" (#2495).
-	if line := promotedDecisionForFile(path, metas); line != "" {
+	if line := promotedDecisionForFileIn(dir, path, metas); line != "" {
 		return line
 	}
 	r := newLifecycleResolver(dir)
@@ -233,15 +234,15 @@ func fileDecisionLineWithSymbols(dir, path string, editSymbols, fileSymbols []st
 		if i >= toolHookDecisionScan {
 			break
 		}
-		s, ok, err := index.FindByIdentity(dir, meta.Harness, meta.ID)
-		if err != nil || !ok || !decisionUsable(s, r) {
+		if !decisionUsable(metaSession(meta), r) {
 			continue
 		}
 		// Bound the work inside a hook the agent is blocked on: a marathon
 		// session's whole history is not worth scanning for one line, and a
 		// decision states itself near the end anyway.
-		if len(s.Messages) > toolHookMsgTail {
-			s.Messages = s.Messages[len(s.Messages)-toolHookMsgTail:]
+		s, ok, err := index.FindTailByIdentity(dir, meta.Harness, meta.ID, toolHookMsgTail)
+		if err != nil || !ok || !decisionUsable(s, r) {
+			continue
 		}
 		if path == "" {
 			if cs := digest.Conclusions(s, toolHookDecisionBudget, 1); len(cs) > 0 {
@@ -472,8 +473,15 @@ func promotedDecisionFor(metas []index.SessionMeta) string {
 }
 
 func promotedDecisionForFile(path string, metas []index.SessionMeta) string {
+	return promotedDecisionForFileIn(index.DefaultDir(), path, metas)
+}
+
+func promotedDecisionForFileIn(dir, path string, metas []index.SessionMeta) string {
 	if len(metas) == 0 {
 		return ""
+	}
+	if dir == "" {
+		dir = index.DefaultDir()
 	}
 	want := make(map[string]bool, len(metas))
 	noteKeys := make(map[string]bool, len(metas))
@@ -522,7 +530,7 @@ func promotedDecisionForFile(path string, metas []index.SessionMeta) string {
 		}
 	}
 	if len(noteKeys) > 0 {
-		for _, note := range index.PromotedNoteMetas(index.DefaultDir(), func(project string) bool {
+		for _, note := range index.PromotedNoteMetas(dir, func(project string) bool {
 			return pol.Allows(policy.ActivationAuto, project)
 		}) {
 			id := note.OrigID
@@ -627,6 +635,18 @@ func clipDecision(s string, budget int) string {
 		end--
 	}
 	return s[:end]
+}
+
+func metaSession(meta index.SessionMeta) model.Session {
+	return model.Session{
+		Harness:       meta.Harness,
+		ID:            meta.ID,
+		OrigID:        meta.OrigID,
+		GaveUp:        meta.GaveUp,
+		Lifecycle:     meta.Lifecycle,
+		LifecycleNote: meta.LifecycleNote,
+		LifecycleAt:   meta.LifecycleAt,
+	}
 }
 
 // decisionUsable rejects a session whose decision should not be reused: one that

@@ -154,3 +154,55 @@ func TestProjectRelevantBoundsCandidateSessionReadsThroughOffsetTable(t *testing
 		}
 	}
 }
+
+func TestFindTailByIdentityAndRecentProjectsUnderTailMatchFullTail(t *testing.T) {
+	h := newTwoWayEnv(t)
+	var b strings.Builder
+	b.WriteString(hPrompt("app", "long", 2, 0, "opening turn"))
+	for m := 1; m <= 25; m++ {
+		b.WriteString(hSay("app", "long", 2, m, "reply "+string(rune('A'+m%26))))
+		b.WriteString(hPrompt("app", "long", 2, m, "prompt "+string(rune('A'+m%26))))
+	}
+	b.WriteString(hSay("app", "long", 2, 30, "final decision on retry.go"))
+	h.put("app", "long", b.String())
+	dir := filepath.Join(h.tmp, "a.db")
+	if err := Ensure(dir, "claude", false, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	full, ok, err := FindByIdentity(dir, "claude", "long")
+	if err != nil || !ok || len(full.Messages) <= 10 {
+		t.Fatalf("full load = (%d msgs, %v, %v)", len(full.Messages), ok, err)
+	}
+	wantTail := full.Messages[len(full.Messages)-6:]
+
+	before := atomic.LoadInt64(&recordOffsetReads)
+	tailed, ok, err := FindTailByIdentity(dir, "claude", "long", 6)
+	if err != nil || !ok {
+		t.Fatalf("FindTailByIdentity: %v %v", ok, err)
+	}
+	if atomic.LoadInt64(&recordOffsetReads) == before {
+		t.Fatal("FindTailByIdentity did not use recordoffsets.bin")
+	}
+	if len(tailed.Messages) != 6 {
+		t.Fatalf("FindTailByIdentity returned %d messages, want 6", len(tailed.Messages))
+	}
+	for i := range wantTail {
+		if tailed.Messages[i].Text != wantTail[i].Text || tailed.Messages[i].Role != wantTail[i].Role {
+			t.Fatalf("tail[%d] = %#v, want %#v", i, tailed.Messages[i], wantTail[i])
+		}
+	}
+
+	recent, err := RecentProjectsUnderTail(dir, []string{"me/app"}, "", 12, 6)
+	if err != nil || len(recent) != 1 {
+		t.Fatalf("RecentProjectsUnderTail = (%d, %v)", len(recent), err)
+	}
+	if len(recent[0].Messages) != 6 {
+		t.Fatalf("RecentProjectsUnderTail returned %d messages, want 6", len(recent[0].Messages))
+	}
+	for i := range wantTail {
+		if recent[0].Messages[i].Text != wantTail[i].Text {
+			t.Fatalf("recent tail[%d] = %q, want %q", i, recent[0].Messages[i].Text, wantTail[i].Text)
+		}
+	}
+}

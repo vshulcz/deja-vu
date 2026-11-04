@@ -815,9 +815,22 @@ func runHookContextMode(dir string, plain, once bool) error {
 	} else {
 		digest, sessions, raw, taskMatched, withheld, servedIDs, servedProjects = cachedHookDigestFor(dir, hookProjectPath(input.CWD, input.WorkspaceRoots), self...)
 	}
+	var (
+		startingOnce    sync.Once
+		resolvedHarness string
+	)
+	getStartingHarness := func() string {
+		if h := strings.ToLower(strings.TrimSpace(input.Harness)); h != "" {
+			return h
+		}
+		startingOnce.Do(func() {
+			resolvedHarness = startingHarness(dir, input.SessionID, input.TranscriptPath)
+		})
+		return resolvedHarness
+	}
 	var claudeMemCount int
 	digest, claudeMemCount, servedProjects = attachClaudeAutoMemory(
-		dir, input.SessionID, input.TranscriptPath, input.Harness,
+		dir, input.SessionID, input.TranscriptPath, getStartingHarness(),
 		hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots)),
 		digest, servedProjects,
 	)
@@ -841,9 +854,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 		lead = shellRecallLead(lead)
 	}
 	digest = lead + digest
-	if tip := limitHandoffTip(dir, hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots)), append(self, input.SessionID), func() string {
-		return startingHarness(dir, input.SessionID, input.TranscriptPath)
-	}); tip != "" {
+	if tip := limitHandoffTip(dir, hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots)), append(self, input.SessionID), getStartingHarness); tip != "" {
 		digest += "\n" + tip
 	}
 	digest = frameRecall(digest)
@@ -1181,7 +1192,7 @@ func limitHandoffTip(dir, cwd string, self []string, starting func() string) str
 	if pick == nil {
 		return ""
 	}
-	s, ok, err := index.FindByIdentity(dir, pick.Harness, pick.ID)
+	s, ok, err := index.FindTailByIdentity(dir, pick.Harness, pick.ID, 4)
 	if err != nil || !ok {
 		return ""
 	}
@@ -1286,8 +1297,8 @@ func startingHarness(dir, id, transcript string) string {
 			return "claude"
 		}
 	}
-	if s, ok, err := index.FindByID(dir, id); err == nil && ok {
-		return s.Harness
+	if meta, ok, err := index.FindMetaByID(dir, id); err == nil && ok {
+		return meta.Harness
 	}
 	return ""
 }

@@ -315,6 +315,39 @@ func FindByIdentity(dir, harness, id string) (model.Session, bool, error) {
 	return loadSessionMeta(dir, m, meta)
 }
 
+// FindTailByIdentity is FindByIdentity bounded to the last tail records of the
+// session when tail > 0 and recoffsets.bin is available. Callers that only
+// inspect the recent tail of a session (such as hook decision extractors and
+// limit-notice checks) avoid decoding tens of thousands of earlier records on
+// marathon sessions.
+func FindTailByIdentity(dir, harness, id string, tail int) (model.Session, bool, error) {
+	if tail <= 0 {
+		return FindByIdentity(dir, harness, id)
+	}
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	unlock, ok, err := tryLockDir(dir)
+	if err != nil {
+		return model.Session{}, false, err
+	}
+	if ok {
+		defer unlock()
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return model.Session{}, false, err
+	}
+	if mustRebuildBeforeAnswering(m, version) {
+		return model.Session{}, false, ErrStoreWithheld
+	}
+	meta, ok := metaForIdentity(m, harness, id)
+	if !ok {
+		return model.Session{}, false, nil
+	}
+	return loadSessionMetaTail(dir, m, meta, tail)
+}
+
 func metaForIdentity(m Manifest, harness, id string) (SessionMeta, bool) {
 	if meta, ok := m.Sessions[model.SessionKey(harness, id)]; ok {
 		return meta, true
@@ -408,6 +441,43 @@ func ChildrenOf(dir, id string) ([]model.Session, error) {
 // harnesses that generate them use uuids or their own prefixed ids.
 func FindByID(dir, id string) (model.Session, bool, error) {
 	return FindByIDPreferProject(dir, id, "")
+}
+
+// FindMetaByID resolves a session's manifest metadata by id without reading
+// records.bin.
+func FindMetaByID(dir, id string) (SessionMeta, bool, error) {
+	return FindMetaByIDPreferProject(dir, id, "")
+}
+
+// FindMetaByIDPreferProject is FindByIDPreferProject without loading the
+// session's records from records.bin.
+func FindMetaByIDPreferProject(dir, id, project string) (SessionMeta, bool, error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	if id == "" {
+		return SessionMeta{}, false, nil
+	}
+	unlock, ok, err := tryLockDir(dir)
+	if err != nil {
+		return SessionMeta{}, false, err
+	}
+	if ok {
+		defer unlock()
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return SessionMeta{}, false, err
+	}
+	best, found := pickSessionMetaByID(m.Sessions, project, func(meta SessionMeta) bool {
+		return meta.ID == id
+	})
+	if !found {
+		best, found = pickSessionMetaByID(m.Sessions, project, func(meta SessionMeta) bool {
+			return meta.OrigID == id
+		})
+	}
+	return best, found, nil
 }
 
 // FindByIDPreferProject is FindByID for a caller that knows where it is
@@ -533,8 +603,15 @@ func betterIDMatch(candidate, held SessionMeta) bool {
 }
 
 func loadSessionMeta(dir string, m Manifest, meta SessionMeta) (model.Session, bool, error) {
+	return loadSessionMetaTail(dir, m, meta, 0)
+}
+
+func loadSessionMetaTail(dir string, m Manifest, meta SessionMeta, tail int) (model.Session, bool, error) {
+	if tail > 0 && IsPromotedNote(meta.Harness, meta.ID, meta.OrigID) {
+		tail = 0
+	}
 	key := meta.Key()
-	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), key)
+	recs, err := recordsForKeyTail(filepath.Join(dir, "records.bin"), tablesFromManifest(m), key, tail)
 	// A pass that swapped in during the read zeroes the records it replaced
 	// in the log this one shares, and the session read empty (#5449). Once
 	// more from the live manifest; a failed read too, since the new log's tail
@@ -551,12 +628,15 @@ func loadSessionMeta(dir string, m Manifest, meta SessionMeta) (model.Session, b
 		if sessionReread != nil {
 			sessionReread()
 		}
-		recs, err = recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), key)
+		recs, err = recordsForKeyTail(filepath.Join(dir, "records.bin"), tablesFromManifest(m), key, tail)
 	}
 	if err != nil {
 		return model.Session{}, false, err
 	}
 	s := sessionFromMeta(meta)
+	if tail > 0 && len(recs) > tail {
+		recs = recs[len(recs)-tail:]
+	}
 	for _, r := range recs {
 		s.Messages = append(s.Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
 	}
