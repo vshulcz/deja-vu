@@ -1,0 +1,18 @@
+{
+  "deja-recall": {
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "./scripts/deja.sh hook-antigravity",
+        "timeout": 10
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "./scripts/deja.sh hook-session-end --json",
+        "timeout": 10
+      }
+    ]
+  }
+}

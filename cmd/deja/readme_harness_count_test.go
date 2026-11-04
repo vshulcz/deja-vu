@@ -81,6 +81,7 @@ func TestReadmeSpellsTheHarnessCountTheRegistryHas(t *testing.T) {
 		"docs/guide/harnesses.html",
 		"claude-plugin/README.md",
 		"codex-plugin/README.md",
+		"antigravity-plugin/README.md",
 	} {
 		b, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name)))
 		if err != nil {

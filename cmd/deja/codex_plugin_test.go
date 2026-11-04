@@ -100,6 +100,7 @@ func TestBundledSkillsMatchInstaller(t *testing.T) {
 		"codebuddy-plugin/skills/deja-history/SKILL.md",
 		"devin-plugin/skills/deja-history/SKILL.md",
 		"cursor-plugin/skills/deja-history/SKILL.md",
+		"antigravity-plugin/skills/deja-history/SKILL.md",
 		"extensions/kimi/skills/deja-history/SKILL.md",
 		"extensions/grok/skills/deja-history/SKILL.md",
 	} {

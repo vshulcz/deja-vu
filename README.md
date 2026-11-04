@@ -94,7 +94,7 @@ take MCP servers as bundles can open the `.mcpb` from the
 Codex CLI, opencode, Claude Code, Qwen and OpenClaw can also install the plugin
 bundle directly from their own marketplaces or registries (see
 [Harnesses with a package of their own](#harnesses-with-a-package-of-their-own),
-plus [`cursor-plugin/`](cursor-plugin/) for Cursor). Copilot CLI installs the
+plus [`cursor-plugin/`](cursor-plugin/) for Cursor and [`antigravity-plugin/`](antigravity-plugin/) for Antigravity). Copilot CLI installs the
 marketplace bundle too, though it takes only the skill there — use
 `deja install copilot-auto` for hooks and MCP:
 
@@ -336,6 +336,8 @@ for people who install extensions there rather than from a CLI:
 | DeepSeek Harness | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | plugin `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
+| Gemini CLI | extension `@vshulcz/deja`, in the [Gemini CLI Extensions Gallery](https://geminicli.com/extensions/) | `gemini extensions install https://github.com/vshulcz/deja-vu` |
+| Antigravity | plugin `deja-vu` ([`antigravity-plugin/`](antigravity-plugin/)) | `agy plugin install deja-vu` |
 | Codex CLI | plugin `deja-vu` | `codex plugin marketplace add https://github.com/vshulcz/deja-vu` then `codex plugin add deja-vu@deja-vu` |
 | Grok Build | plugin `deja` | `grok plugin marketplace add vshulcz/deja-vu` then `grok plugin install deja` |
 | OpenClaw | ClawHub and npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |

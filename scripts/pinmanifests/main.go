@@ -59,6 +59,11 @@ const (
 	// The Cursor marketplace and cursor.directory list the plugin from the
 	// default branch, so the version committed here is the one they show.
 	cursorPlugin = "cursor-plugin/.cursor-plugin/plugin.json"
+	// The Antigravity marketplace and `agy plugin install` read either the
+	// dedicated bundle or the root .antigravity-plugin manifest from the
+	// default branch, so their versions are what the listing shows.
+	antigravityPlugin     = "antigravity-plugin/plugin.json"
+	antigravityRootPlugin = ".antigravity-plugin/plugin.json"
 	// The Gemini gallery crawls the manifest at the repository root and shows
 	// its version, and `gemini extensions install` reads the same file.
 	geminiExtension = "gemini-extension.json"
@@ -181,8 +186,10 @@ func targets() map[string]func(pins) ([]byte, error) {
 		claudeAgentPlugin: renderPluginVersion(claudeAgentPlugin),
 		codebuddyPlugin:   renderPluginVersion(codebuddyPlugin),
 		devinPlugin:       renderPluginVersion(devinPlugin),
-		cursorPlugin:      renderPluginVersion(cursorPlugin),
-		geminiExtension:   renderPluginVersion(geminiExtension),
+		cursorPlugin:          renderPluginVersion(cursorPlugin),
+		antigravityPlugin:     renderPluginVersion(antigravityPlugin),
+		antigravityRootPlugin: renderPluginVersion(antigravityRootPlugin),
+		geminiExtension:       renderPluginVersion(geminiExtension),
 		kimiPlugin:        renderPluginVersion(kimiPlugin),
 		kimiPacked:        renderPluginVersion(kimiPacked),
 		kimiConst:         renderGoVersionConst(kimiConst, "kimiPluginVersion"),

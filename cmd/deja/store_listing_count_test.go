@@ -31,6 +31,8 @@ func TestEveryStoreListingCountsTheRestOfTheHarnesses(t *testing.T) {
 		digit bool
 	}{
 		{file: "plugin.json", named: 4, shape: "Claude Code, Codex, Cursor, opencode and %s more"},
+		{file: ".antigravity-plugin/plugin.json", named: 4, shape: "Claude Code, Codex, Cursor, opencode and %s more"},
+		{file: "antigravity-plugin/plugin.json", named: 4, shape: "Claude Code, Codex, Cursor, opencode and %s more"},
 		{file: "kimi.plugin.json", named: 4, shape: "Claude Code, Codex, Cursor, opencode and %s more"},
 		{file: "gemini-extension.json", named: 4, shape: "Gemini CLI, Claude Code, Codex, Cursor and %s more"},
 		{file: ".claude-plugin/marketplace.json", named: 4, shape: "Claude Code, Codex, Cursor, opencode and %s more agents"},
@@ -69,7 +71,8 @@ func TestEveryStoreListingCountsTheRestOfTheHarnesses(t *testing.T) {
 func TestNoStoreListingUndercountsWithADozen(t *testing.T) {
 	root := filepath.Join("..", "..")
 	for _, f := range []string{
-		"plugin.json", "kimi.plugin.json", "gemini-extension.json",
+		"plugin.json", ".antigravity-plugin/plugin.json", "antigravity-plugin/plugin.json",
+		"kimi.plugin.json", "gemini-extension.json",
 		".claude-plugin/marketplace.json", "codex-plugin/.codex-plugin/plugin.json",
 		"docs/guide/forgetting.html",
 	} {

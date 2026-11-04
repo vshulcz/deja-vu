@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "deja": {
+      "command": "deja",
+      "args": [
+        "mcp"
+      ]
+    }
+  }
+}

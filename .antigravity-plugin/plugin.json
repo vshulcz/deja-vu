@@ -1,0 +1,28 @@
+{
+  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
+  "name": "deja-vu",
+  "displayName": "deja-vu",
+  "version": "0.23.5",
+  "description": "deja-vu: memory for coding agents from the sessions already on your disk — Claude Code, Codex, Cursor, opencode and thirty-nine more — recalled locally.",
+  "logo": "assets/icon.svg",
+  "suggestedPrompts": [
+    "Recall what we already settled in this repository before editing",
+    "Find which past session changed this file and why",
+    "Summarize recurring corrections from my past agent sessions"
+  ],
+  "author": {
+    "name": "vshulcz",
+    "url": "https://github.com/vshulcz"
+  },
+  "homepage": "https://vshulcz.github.io/deja-vu/",
+  "repository": "https://github.com/vshulcz/deja-vu",
+  "license": "MIT",
+  "keywords": [
+    "memory",
+    "recall",
+    "sessions",
+    "search",
+    "history",
+    "mcp"
+  ]
+}
