@@ -60,15 +60,16 @@ func TestPromoteRefusesWhitespaceOnlyIDPrefix(t *testing.T) {
 		t.Fatalf("SessionCount = %d, want 1", n)
 	}
 	for _, tc := range []struct {
-		name   string
-		prefix string
+		name string
+		args []string
 	}{
-		{"empty", ""},
-		{"spaces", "   "},
-		{"tabs_newline", "\t\r\n"},
+		{"empty", []string{""}},
+		{"spaces", []string{"   "}},
+		{"tabs_newline", []string{"\t\r\n"}},
+		{"empty_before_id", []string{"", "sess1234"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			err := runPromote(dir, []string{tc.prefix}, &bytes.Buffer{})
+			err := runPromote(dir, tc.args, &bytes.Buffer{})
 			if err == nil {
 				t.Fatal("blank prefix must fail")
 			}

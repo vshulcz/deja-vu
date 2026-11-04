@@ -92,7 +92,7 @@ func CopilotChatSessionFiles() []string {
 			}
 			for _, e := range entries {
 				p := filepath.Join(dir, e.Name())
-				if e.Type().IsRegular() && copilotChatFile(p) {
+				if isRegularWalkEntry(e) && copilotChatFile(p) {
 					files = append(files, p)
 				}
 			}

@@ -92,7 +92,7 @@ func CursorTranscripts() []string {
 	_ = filepath.WalkDir(walked, func(p string, d os.DirEntry, err error) error {
 		// Regular files only: a FIFO matching the glob would block the
 		// parser's Open forever (same hang walkFiles guards against).
-		if err != nil || !d.Type().IsRegular() {
+		if err != nil || !isRegularWalkEntry(d) {
 			return nil //nolint:nilerr // the walk goes past entries it cannot read
 		}
 		if !strings.EqualFold(filepath.Ext(p), ".jsonl") {

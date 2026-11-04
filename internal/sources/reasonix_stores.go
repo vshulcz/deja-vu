@@ -236,7 +236,7 @@ func ReasonixSidecarFiles() []string {
 				}
 				return nil
 			}
-			if d.Type().IsRegular() && !read[filepath.Clean(p)] {
+			if isRegularWalkEntry(d) && !read[filepath.Clean(p)] {
 				out = append(out, p)
 			}
 			return nil
