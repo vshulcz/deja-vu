@@ -322,14 +322,12 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 		// No decision field: Crush reads "allow" as affirmative pre-approval
 		// and would skip the permission prompt for every call this fires on.
 		// All deja wants is the context appended.
-		b, err := json.Marshal(struct {
+		if b, err := json.Marshal(struct {
 			Version int    `json:"version"`
 			Context string `json:"context"`
-		}{Version: 1, Context: out})
-		if err != nil {
-			return nil //nolint:nilerr // a reply that cannot marshal means no reply
+		}{Version: 1, Context: out}); err == nil {
+			fmt.Fprintln(stdout, string(b))
 		}
-		fmt.Fprintln(stdout, string(b))
 		return nil
 	case hookToolCopilot:
 		emitCopilotContext(stdout, out)
@@ -348,11 +346,9 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 	if notesHaveReader() {
 		resp.SystemMessage = safeNote("deja: " + line)
 	}
-	b, err := json.Marshal(resp)
-	if err != nil {
-		return nil //nolint:nilerr // a reply that cannot marshal means no reply
+	if b, err := json.Marshal(resp); err == nil {
+		fmt.Fprintln(stdout, string(b))
 	}
-	fmt.Fprintln(stdout, string(b))
 	return nil
 }
 

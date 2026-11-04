@@ -39,14 +39,10 @@ type transcriptStep struct {
 	ToolCalls any    `json:"tool_calls"`
 }
 
-// latestEditPaths are the files the newest planner row of this turn edits. By
-// the PreInvocation that follows it the edit has run, so the line arrives with
-// its result, the way it does on opencode and Grok: PreToolUse's reason never
-// reaches the model here (hook_antigravity.go).
-func latestEditPaths(path string) []string {
-	return latestEditPathsFromSteps(transcriptTailSteps(path))
-}
-
+// latestEditPathsFromSteps are the files the newest planner row of this turn
+// edits. By the PreInvocation that follows it the edit has run, so the line
+// arrives with its result, the way it does on opencode and Grok: PreToolUse's
+// reason never reaches the model here (hook_antigravity.go).
 func latestEditPathsFromSteps(steps []transcriptStep) []string {
 	for _, step := range steps {
 		if step.Type == "USER_INPUT" {
@@ -334,15 +330,11 @@ func antigravityFixPair(dir, output, conversationID, workspace string) string {
 	return resp.HookSpecificOutput.AdditionalContext
 }
 
-// newestCheckpoint is when this conversation was last compacted, or "" if it
-// has not been. Antigravity has no compaction event — the five it offers are
-// PreToolUse, PostToolUse, PreInvocation, PostInvocation and Stop — but it
+// newestCheckpointFromSteps is when this conversation was last compacted, or ""
+// if it has not been. Antigravity has no compaction event — the five it offers
+// are PreToolUse, PostToolUse, PreInvocation, PostInvocation and Stop — but it
 // truncates the conversation and writes a CHECKPOINT step saying so, and the
 // hook is handed the transcript on every call.
-func newestCheckpoint(path string) string {
-	return newestCheckpointFromSteps(transcriptTailSteps(path))
-}
-
 func newestCheckpointFromSteps(steps []transcriptStep) string {
 	for _, step := range steps {
 		if step.Type == checkpointStepType {
