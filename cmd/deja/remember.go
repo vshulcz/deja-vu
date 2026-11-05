@@ -54,7 +54,7 @@ func runRemember(dir string, args []string) error {
 				continue
 			}
 			if args[i] == "--project" {
-				if i+1 >= len(args) {
+				if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" { //nolint:gosec // G602: i+1 < len(args) checked by left operand
 					return errors.New("remember: --project needs value")
 				}
 				project = args[i+1] //nolint:gosec // G602: i+1 < len(args) checked above
