@@ -108,6 +108,19 @@ calendar day in the local zone of whichever run indexed them, then redacted and
 indexed like every other source. `deja index` regroups buckets minted in
 another zone. The file is primary data; the index remains a rebuildable cache.
 
+The same store has a second file kind, `deja-repo`: `<repository>/.deja/memory.jsonl`
+(`repo_memory.go`), entries picked with `deja repo add` and committed. One JSON
+object per line, `{"id","kind","text","date","from"}`, sorted and deduped by `id`
+(a hash of kind and folded text) so parallel additions merge, with
+`merge=union` in `.deja/.gitattributes` for the case where they land on the same
+gap. The index reads every such file listed in `repos.txt` beside the notes file
+(added when deja runs in or writes to a checkout that has one) and the current
+checkout's, whole on every change. Each entry is one session, harness `deja`,
+project `repo:<name>` with the name taken from the reader's own checkout path;
+`internal/policy` reads that prefix as the `repo` origin. Session start reads the
+file directly, so a fresh clone needs no index pass to see it. Sync does not
+export these sessions.
+
 ## Secret redaction
 
 `internal/redact` runs before every `writeRecord` path: cold rebuild, `writeSessions`, non-append incremental replacement, and append-only incremental ingest. The pass is disabled only when `DEJA_NO_REDACT=1` is set; that escape hatch is unsafe because plaintext credentials will be written to the local index.

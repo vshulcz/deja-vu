@@ -63,6 +63,7 @@ var groups = []group{
 		{"codex-resume-session.html", "Codex resume"},
 		{"export-conversations.html", "Exporting sessions"},
 		{"sync-across-machines.html", "Across machines"},
+		{"repo-memory.html", "Repo memory"},
 		{"auditing-agents.html", "Auditing an agent"},
 		{"credentials-in-transcripts.html", "Credentials in transcripts"},
 		{"recover-a-deleted-session.html", "Recover a deleted session"},

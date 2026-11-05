@@ -276,6 +276,11 @@ func exportRecordsWith(dir, outDir, peer string, full, relay bool) (int, func() 
 		if !ok {
 			return
 		}
+		// Repo memory travels with the repository; a copy over sync would
+		// outlive the line someone deleted from it.
+		if strings.HasPrefix(meta.Project, model.RepoOriginPrefix) || meta.From == model.OriginRepo {
+			return
+		}
 		// A relayed session is filed here under "imported:<project>" and a
 		// local id. It goes back out under the names it had where the work
 		// happened, so the next machine dedupes it against a batch pulled

@@ -637,7 +637,7 @@ func noteBucketsRegrouped(dir string) int {
 	type span struct{ started, updated time.Time }
 	indexed := map[string]span{}
 	for _, m := range metas {
-		if m.Harness == "deja" {
+		if m.Harness == "deja" && !strings.HasPrefix(m.Project, model.RepoOriginPrefix) && !strings.HasPrefix(m.ID, "deja-repo-") && !strings.HasPrefix(m.ID, "deja-note-") {
 			indexed[m.ID] = span{m.Started, m.Updated}
 		}
 	}

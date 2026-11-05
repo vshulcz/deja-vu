@@ -86,23 +86,32 @@ func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(inde
 	var sessions int
 	var last time.Time
 	var inScope []index.SessionMeta
-	for _, meta := range index.FileSessions(dir, path) {
-		if !pol.Allows(policy.ActivationAuto, meta.Project) {
-			continue
-		}
-		if !fileMetaInScope(meta, path, nil) && !fileMetaInScope(meta, path, projects()) {
-			continue
-		}
-		if self != nil && self(meta, path) {
-			continue
-		}
-		sessions++
-		inScope = append(inScope, meta)
-		if meta.Updated.After(last) {
-			last = meta.Updated
+	if planIndexReady(dir) {
+		for _, meta := range index.FileSessions(dir, path) {
+			if !pol.Allows(policy.ActivationAuto, meta.Project) {
+				continue
+			}
+			if !fileMetaInScope(meta, path, nil) && !fileMetaInScope(meta, path, projects()) {
+				continue
+			}
+			if self != nil && self(meta, path) {
+				continue
+			}
+			sessions++
+			inScope = append(inScope, meta)
+			if meta.Updated.After(last) {
+				last = meta.Updated
+			}
 		}
 	}
+	name := search.SafePath(baseName(path))
+	editSymbols, fileSymbols := fileHookSymbols(cwd, path, editText)
+	allSymbols := append(slices.Clone(editSymbols), fileSymbols...)
+	repoDec := repoMemoryDecisionForFile(cwd, path, allSymbols, pol)
 	if sessions < toolHookMinFileSessionsWithDecision {
+		if repoDec != "" {
+			return name + repoDecisionLabel + repoDec
+		}
 		return ""
 	}
 	when := ""
@@ -112,7 +121,6 @@ func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(inde
 	// The line-safe form: the name lands inside the hook's own sentence, and a
 	// newline in it would end that sentence and start one that reads as deja
 	// speaking to the agent (#1863).
-	name := search.SafePath(baseName(path))
 	head := fmt.Sprintf("%s has been worked on in %s%s", name, toolSessionCount(sessions), when)
 	// The line speaks only when what it carries is about this file: a decision
 	// that names it, or a command two sessions here ran on it. Read from a month
@@ -126,12 +134,12 @@ func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(inde
 	// blame` pointer, which the A/B behind this hook already found changed
 	// nothing. What the same A/B found an agent reuses is the decision about the
 	// file, so that is what is left.
-	editSymbols, fileSymbols := fileHookSymbols(cwd, path, editText)
-	allSymbols := append(slices.Clone(editSymbols), fileSymbols...)
 	var dec string
 	promoted := promotedDecisionForFileIn(dir, path, inScope)
 	if promoted != "" && (mentionsFile(path, promoted) || mentionsAnySymbol(allSymbols, promoted)) {
 		dec = standingLabel + promoted
+	} else if repoDec != "" {
+		dec = repoDecisionLabel + repoDec
 	} else if d := fileDecisionLineWithSymbols(dir, path, editSymbols, fileSymbols, inScope); d != "" && digest.CarriesDecision(d) && (mentionsFile(path, d) || mentionsAnySymbol(allSymbols, d)) {
 		// A scanned line is a decision about the file only when it reads as one and
 		// names the file or a symbol declared in it.
@@ -144,7 +152,7 @@ func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(inde
 	ran := fileHookRanLineFor(dir, path, inScope)
 	var body string
 	switch {
-	case dec != "" && strings.HasPrefix(dec, standingLabel):
+	case dec != "" && (strings.HasPrefix(dec, standingLabel) || strings.HasPrefix(dec, repoDecisionLabel)):
 		body = dec
 		if ran != "" && len(head)+len(body)+len(ran) <= toolHookMaxBytes {
 			body += ran
@@ -212,6 +220,75 @@ func mentionsFile(path, text string) bool {
 // worth carrying and the ordering behind it was measured (#2495); what it must
 // not do is claim to be about the file the agent is holding.
 const standingLabel = " — standing decision in this project: "
+const repoDecisionLabel = " — in " + repoFileShown + ": "
+
+// repoMemoryDecisionForFile returns the highest-priority entry from the
+// checkout's .deja/memory.jsonl that names this file or one of its symbols.
+// Because repo memory is not linked to file-touch records in the index, matching
+// requires the file's basename, its multi-segment directory path, or a declared
+// symbol rather than a single parent folder name like "cmd" or "deja".
+func repoMemoryDecisionForFile(cwd, path string, allSymbols []string, pol policy.Policy) string {
+	probe := cwd
+	if probe == "" && path != "" {
+		if filepath.IsAbs(path) {
+			probe = filepath.Dir(path)
+		}
+	}
+	root := sources.RepoRoot(probe)
+	if root == "" && filepath.IsAbs(path) {
+		root = sources.RepoRoot(filepath.Dir(path))
+	}
+	if root == "" || !pol.Allows(policy.ActivationAuto, sources.RepoMemoryProject(root)) {
+		return ""
+	}
+	entries, _, err := sources.ReadRepoMemory(sources.RepoMemoryPath(root))
+	if err != nil || len(entries) == 0 {
+		return ""
+	}
+	rank := map[string]int{"rejected": 0, "gotcha": 1, "decision": 2}
+	sort.SliceStable(entries, func(i, j int) bool {
+		if rank[entries[i].Kind] != rank[entries[j].Kind] {
+			return rank[entries[i].Kind] < rank[entries[j].Kind]
+		}
+		return entries[i].Date > entries[j].Date
+	})
+	for _, e := range entries {
+		if repoEntryMentionsFile(root, path, e.Text) || mentionsAnySymbol(allSymbols, e.Text) {
+			body := "[" + e.Kind + "] " + e.Text
+			return trimTrailingFragment(search.SafeText(clipDecision(body, toolHookDecisionBudget)))
+		}
+	}
+	return ""
+}
+
+func repoEntryMentionsFile(root, path, text string) bool {
+	if path == "" || text == "" {
+		return false
+	}
+	low := strings.ToLower(text)
+	slashPath := filepath.ToSlash(path)
+	if root != "" && filepath.IsAbs(path) {
+		if rel, err := filepath.Rel(root, path); err == nil && !strings.HasPrefix(rel, "..") {
+			slashPath = filepath.ToSlash(rel)
+		}
+	}
+	base := strings.ToLower(filepath.Base(slashPath))
+	if len(base) >= 5 && strings.Contains(low, base) {
+		return true
+	}
+	dir := strings.ToLower(filepath.ToSlash(filepath.Dir(slashPath)))
+	if dir != "." && dir != "/" && len(dir) >= 5 && strings.Contains(dir, "/") && strings.Contains(low, dir) {
+		return true
+	}
+	stem := base
+	if i := strings.LastIndex(stem, "."); i > 0 {
+		stem = stem[:i]
+	}
+	if len(stem) >= 6 && (strings.ContainsRune(stem, '_') || strings.ContainsRune(stem, '-')) && containsIdentifierWord(low, stem) {
+		return true
+	}
+	return false
+}
 
 // fileDecisionLineWithSymbols returns the single most relevant prior decision recorded
 // about this file, or "" if none can be extracted. It reads the newest in-scope

@@ -702,6 +702,18 @@ func callMCPToolRaw(dir, name string, raw json.RawMessage, served *int) (string,
 		if strings.TrimSpace(a.Text) == "" {
 			return "", argErrorf("text required")
 		}
+		// "repo:" asks for the repository's committed memory instead of this
+		// machine's notes. Written only when named, and never committed.
+		if kind, repo, err := repoRememberKind(a.Project); repo {
+			if err != nil {
+				return "", err
+			}
+			out, err := mcpRememberRepo(kind, a.Text)
+			if err == nil {
+				usage.RecordResult(dir, usage.KindRemember, len(a.Text), 1, false)
+			}
+			return out, err
+		}
 		if strings.TrimSpace(a.Project) == "" {
 			// Filed where `deja remember` files it, under the project the
 			// server runs in, so the hooks there serve it back.

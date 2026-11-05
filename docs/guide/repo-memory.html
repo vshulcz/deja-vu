@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project memory committed in the repository — deja-vu</title>
+<meta name="description" content="Commit picked decisions and dropped approaches into .deja/memory.jsonl, so whoever clones the repository gets them in their own agent's recall.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/repo-memory.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Project memory committed in the repository">
+<meta property="og:description" content="Commit picked decisions and dropped approaches into .deja/memory.jsonl, so whoever clones the repository gets them in their own agent's recall.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/repo-memory.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Project memory committed in the repository">
+<meta name="twitter:description" content="Commit picked decisions and dropped approaches into .deja/memory.jsonl, so whoever clones the repository gets them in their own agent's recall.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Project memory committed in the repository", "description": "Commit picked decisions and dropped approaches into .deja/memory.jsonl, so whoever clones the repository gets them in their own agent's recall.", "url": "https://vshulcz.github.io/deja-vu/guide/repo-memory.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/repo-memory.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-10-25", "dateModified": "2026-10-25"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Repo memory","item":"https://vshulcz.github.io/deja-vu/guide/repo-memory.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I share what my coding agent learned about a repository with my team?","acceptedAnswer":{"@type":"Answer","text":"deja repo candidates lists decisions, dropped approaches and gotchas for the project from your agent history. deja repo add writes the ones you pick into .deja/memory.jsonl, redacted. Commit the file and everyone who clones the repository and runs deja gets those entries in recall and at session start, in whichever agent they use."}},{"@type":"Question","name":"Does deja write to my repository on its own?","acceptedAnswer":{"@type":"Answer","text":"No. The file changes only when you run deja repo add, or when you ask your agent to store an entry in the repository. deja never stages or commits it."}},{"@type":"Question","name":"Can I stop entries from a cloned repository reaching my agent?","acceptedAnswer":{"@type":"Answer","text":"Yes. The trust policy has a repo origin: {\"activations\":{\"auto\":{\"repo\":false}}} keeps repository entries out of session start and prompt hooks, and repo:<project> names one repository."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a>
+<div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<details class="grpfold"><summary>Why agents forget <span class="n">12</span></summary>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="switch-agents-without-losing-context.html">Session handoffs</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="one-rules-file.html">One rules file</a>
+<a href="token-cost.html">What memory costs</a>
+</details>
+<details class="grpfold" open><summary>Session history <span class="n">12</span></summary>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="codex-history.html">Codex history</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="repo-memory.html" aria-current="page">Repo memory</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="credentials-in-transcripts.html">Credentials in transcripts</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
+</details>
+<details class="grpfold"><summary>Deleting sessions <span class="n">31</span></summary>
+<a href="session-files-on-disk.html">Claude Code</a>
+<a href="delete-old-claude-sessions.html">Old sessions</a>
+<a href="delete-codex-sessions.html">Codex</a>
+<a href="delete-cursor-chat-history.html">Cursor</a>
+<a href="cursor-state-vscdb-too-large.html">Cursor state.vscdb too large</a>
+<a href="delete-copilot-chat-history.html">Copilot Chat</a>
+<a href="delete-copilot-cli-session-history.html">Copilot CLI</a>
+<a href="delete-gemini-cli-history.html">Gemini CLI</a>
+<a href="delete-opencode-session-history.html">opencode</a>
+<a href="delete-cline-task-history.html">Cline</a>
+<a href="delete-roo-task-history.html">Roo Code</a>
+<a href="delete-zed-thread-history.html">Zed</a>
+<a href="delete-kilo-code-task-history.html">Kilo Code</a>
+<a href="delete-amp-thread-history.html">Amp</a>
+<a href="delete-continue-session-history.html">Continue</a>
+<a href="delete-kiro-session-history.html">Kiro</a>
+<a href="delete-kimi-code-session-history.html">Kimi Code</a>
+<a href="delete-junie-session-history.html">Junie</a>
+<a href="delete-goose-session-history.html">Goose</a>
+<a href="delete-windsurf-cascade-history.html">Windsurf</a>
+<a href="delete-qwen-code-chat-history.html">Qwen Code</a>
+<a href="delete-trae-sessions.html">TRAE CLI</a>
+<a href="delete-codebuddy-sessions.html">CodeBuddy</a>
+<a href="delete-antigravity-history.html">Antigravity</a>
+<a href="delete-pi-session-history.html">pi</a>
+<a href="delete-crush-session-history.html">Crush</a>
+<a href="delete-hermes-session-history.html">Hermes</a>
+<a href="delete-cherrystudio-session-history.html">Cherry Studio</a>
+<a href="delete-codewhale-session-history.html">CodeWhale</a>
+<a href="delete-aider-chat-history.html">aider</a>
+<a href="delete-openclaw-session-history.html">OpenClaw</a>
+</details>
+<details class="grpfold"><summary>Per-agent guides <span class="n">41</span></summary>
+<a href="memory-for-aider.html">aider</a>
+<a href="memory-for-amp.html">Amp</a>
+<a href="memory-for-antigravity.html">Antigravity</a>
+<a href="memory-for-cherrystudio.html">Cherry Studio</a>
+<a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-codebuddy.html">CodeBuddy Code</a>
+<a href="memory-for-codewhale.html">CodeWhale</a>
+<a href="memory-for-codex.html">Codex</a>
+<a href="memory-for-commandcode.html">Command Code</a>
+<a href="memory-for-continue.html">Continue</a>
+<a href="memory-for-copilot.html">Copilot CLI</a>
+<a href="memory-for-crush.html">Crush</a>
+<a href="memory-for-cursor.html">Cursor</a>
+<a href="memory-for-devin.html">Devin CLI</a>
+<a href="memory-for-dsh.html">dsh</a>
+<a href="memory-for-gjc.html">gajae-code</a>
+<a href="memory-for-gemini.html">Gemini CLI</a>
+<a href="memory-for-goose.html">Goose</a>
+<a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-hermes.html">Hermes</a>
+<a href="memory-for-jetbrains.html">JetBrains AI Assistant</a>
+<a href="memory-for-junie.html">Junie</a>
+<a href="memory-for-kilocode.html">Kilo Code</a>
+<a href="memory-for-kimchi.html">Kimchi Coding</a>
+<a href="memory-for-kimi.html">Kimi Code</a>
+<a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-omp.html">omp</a>
+<a href="memory-for-openclaw.html">OpenClaw</a>
+<a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-pi.html">pi</a>
+<a href="memory-for-prime.html">prime-agent</a>
+<a href="memory-for-qwen.html">Qwen Code</a>
+<a href="memory-for-reasonix.html">Reasonix</a>
+<a href="memory-for-roo.html">Roo Code</a>
+<a href="memory-for-senpi.html">Senpi</a>
+<a href="memory-for-trae.html">TRAE CLI</a>
+<a href="memory-for-copilot-chat.html">VS Code Copilot Chat</a>
+<a href="memory-for-windsurf.html">Windsurf</a>
+<a href="memory-for-zcode.html">ZCode</a>
+<a href="memory-for-zed.html">Zed</a>
+</details>
+<div class="grp">Evidence</div>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="claude-mem-alternative.html">claude-mem alternative</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Project memory committed in the repository</h1>
+<p class="pagelede">the decisions behind the code, in the repository with it<span class="mins" data-mins></span></p>
+
+<p>Your agent tried retry with jitter on the webhook sender in August, watched it break idempotency, and reverted it. That is in your session history and nowhere else. A teammate's agent, in a fresh clone, will suggest it again on the first slow receiver. <code>deja sync</code> moves history between your own machines. This moves the few lines that matter to the people you work with, through the repository.</p>
+
+<h2>Picking entries</h2>
+<pre>$ deja repo candidates
+2 candidates for webhooks, newest first. nothing is written until you pick
+4cd7e7bb9c rejected Reverted the retry with jitter: it broke idempotency because the sender re-signs each attempt with a new delivery id.  (session s1, claude 2026-08-03)
+c5ea828bb3 decision Reverted the retry with jitter: it broke idempotency because the sender re-signs each attempt with a new delivery id. We decided to keep one delivery id per event and let the outbox table own retries.  (session s1, claude 2026-08-03)
+add the ones that hold for everyone: deja repo add &lt;id&gt; [&lt;id&gt;...]
+
+$ deja repo add 4cd7e7bb9c
+added 1 entry to .deja/memory.jsonl
+wrote .deja/.gitattributes so parallel additions merge line by line, and a short .deja/README.md for whoever opens the folder
+nothing is committed: review with `git diff .deja/` and commit it like code</pre>
+<p>Candidates come from this project's history in every agent deja reads: notes you promoted (accepted becomes a decision, rejected stays rejected), notes you stored with <code>deja remember</code>, reversals you or an agent reported in a session, and what a session settled. The last two are found by pattern, with no model, so most of the list is yours to throw away. <code>--since 90d</code> and <code>--limit</code> narrow it. To write one in your own words:</p>
+<pre>deja repo add --kind gotcha "the staging receiver drops payloads over 1 MB"</pre>
+<p>An agent can write one too, through the MCP <code>remember</code> mode with the project set to <code>repo:</code>, <code>repo:rejected</code> or <code>repo:gotcha</code>. Its skill tells it to do that only when you ask. Either way the file changes in your working tree and nothing else happens: you read the diff and commit it with the code it explains.</p>
+
+<h2>What is in the file</h2>
+<pre>{"id":"4cd7e7bb9c","kind":"rejected","text":"Reverted the retry with jitter: it broke idempotency because the sender re-signs each attempt with a new delivery id.","date":"2026-10-25","from":"claude 2026-08-03"}</pre>
+<p>One JSON line per entry. <code>kind</code> is <code>decision</code>, <code>rejected</code> or <code>gotcha</code>. <code>from</code> is the agent and the day of the session it came from. No path, no session id, no machine or user name goes in. Before an entry is written it goes through the secret rules deja applies everywhere and then the pass <code>deja share</code> uses for home paths, email addresses, internal host names and private IP addresses. If the result still matches a secret rule, or redaction is turned off with <code>DEJA_NO_REDACT=1</code>, the entry is refused. Pattern redaction is a floor, so read the diff.</p>
+<p>Entries are capped at 600 characters, and deja reads at most 500 of them or 1 MB from a file.</p>
+<p>When deja creates <code>.deja/</code> it also writes a four-line <code>README.md</code> there, saying what the folder is and how a teammate uses it, for someone who finds it while browsing the repository. It is written that one time only: edit it or delete it and deja leaves it that way. The same goes for <code>.gitattributes</code>.</p>
+
+<h2>Merging and removing</h2>
+<p>The id is a hash of the kind and the text, so the same entry added by two people is one line. Lines are kept sorted by id, which spreads new entries through the file, and two branches that each add one usually merge without touching the same lines. When they do land in the same place, <code>.deja/.gitattributes</code> asks git for a union merge (<code>memory.jsonl merge=union</code>), which keeps both lines instead of leaving conflict markers. Duplicates from a merge are read once and tidied on the next write. A union merge can bring back a line one side deleted if the other side changed the line next to it, so check the diff after a merge that touched the file.</p>
+<p>To remove an entry, delete its line. If the file holds a line deja cannot read, such as a conflict marker, <code>deja repo</code> counts it, recall skips it, and <code>deja repo add</code> refuses until it is fixed, so deja never rewrites away something a person put there.</p>
+
+<h2>What a teammate gets</h2>
+<p>After a clone, the entries show up like other memory, in any agent deja is installed for. At session start they come right after your own standing decisions, read straight from the file, rejected and gotcha entries first:</p>
+<pre>from this repository's .deja/memory.jsonl (committed by the people working on it):
+  · [rejected] Reverted the retry with jitter: it broke idempotency because the sender re-signs each attempt with a new delivery id. (in .deja/memory.jsonl, from claude 2026-08-03)</pre>
+<p>Recall, search and the MCP tool find them by topic, ranked like notes, under the project <code>repo:&lt;name&gt;</code>, where the name is what your own checkout is called on your machine. <code>deja repo</code> lists what the file holds. The index reads the file of every checkout deja has been run in, and drops it when the checkout is gone. <code>deja sync</code> does not send these entries, since the repository already carries them.</p>
+<p>Repository text is treated like everything else recall hands an agent: as untrusted reference data, inside the same frame, never as instructions. A repository you cloned from a stranger can still put words in front of your agent, the way its README or <code>CLAUDE.md</code> can. The trust policy has a <code>repo</code> origin for that:</p>
+<pre>{"activations": {"auto": {"repo": false}}}</pre>
+<p>That keeps repository entries out of session start and the prompt hooks while leaving them in search. <code>repo:&lt;project&gt;</code> names one repository, and the most specific rule wins. <code>DEJA_RECALL=off</code> turns the session-start block off with the rest.</p>
+
+<p><a href="sync-across-machines.html">Across machines</a> · <a href="one-rules-file.html">One rules file</a> · <a href="privacy.html">Privacy and trust scopes</a> · <a href="commands.html">CLI reference</a></p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

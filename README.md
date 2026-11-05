@@ -67,6 +67,7 @@ Prefer a browser? `deja view` exports the store — sessions, the recall audit t
 - **Survives compaction.** Over 43 measured compactions, summaries kept 77% of decisions and 0.2% of commands; deja hands back the rest ([how](docs/compaction.md)).
 - **Indexes code changes, not just chat.** Tracks opened files, commands with exit codes, and exact `Edit` spans (`deja blame <file>:<line>`, `deja restore <path>`).
 - **Tracks decision lifecycle & staleness.** `deja promote <id> --state rejected` marks a reverted approach so later hits warn why it was dropped (`--state accepted` takes the mark back), and hits report when files touched by a session have changed since.
+- **Travels with the repository.** `deja repo add` commits the decisions and dead ends you pick into `.deja/memory.jsonl`; a teammate's agent recalls them after a clone ([repo memory](#memory-in-the-repository)).
 - **Local and private by default.** Zero LLM calls, no cloud account, and automatic credential redaction at index time ([privacy](#privacy)).
 
 ### Your own work, wrapped
@@ -138,6 +139,29 @@ harness supports, aider's read-only context file, and the Windows `cmd /c deja m
 Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, opencode, Gemini CLI, Antigravity, Qwen, Kimi Code, pi, Senpi, Copilot, VS Code Copilot Chat, Goose, OpenClaw, Hermes, Roo Code, omp, Amp, prime-agent, DeepSeek Harness, Continue, Crush, CodeBuddy Code, WorkBuddy, Zed, TRAE CLI, TRAE IDE, Muse Code, CodeWhale, ZCode and Junie each get it in their own guidance file (or under the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Grok Build and Devin CLI get the shared skill in `~/.agents/skills`, which is what they read; the `~/.grok/GROK.md` written beside it is for the unrelated community CLI that shares that directory. Cursor has no user-level instructions file, so it gets the shared skill in `~/.agents/skills` — one of the four places Cursor reads skills from — read only when something looks relevant rather than every session. Kilo Code, gajae-code, Kimchi, Command Code, Cherry Studio and Reasonix get the skill, MiniMax Code gets it inside the plugin package, and Kiro the skill and a steering file, from their own install target.
 
 </details>
+
+## Memory in the repository
+
+Sync moves history between your own machines. To hand the people you work with the
+few things your agents learned the hard way, put them in the repository:
+
+```text
+$ deja repo candidates
+4cd7e7bb9c rejected Reverted the retry with jitter: it broke idempotency because the sender re-signs each attempt with a new delivery id.  (session s1, claude 2026-08-03)
+$ deja repo add 4cd7e7bb9c
+added 1 entry to .deja/memory.jsonl
+nothing is committed: review with `git diff .deja/` and commit it like code
+```
+
+Candidates come from this project's history in every agent: promoted and remembered
+notes, reversals reported in a session, and what sessions settled. Nothing is written
+until you pick, every entry is redacted on the way in, and one that still matches a secret
+rule is refused. The file is JSON lines sorted by a content hash, with a
+`merge=union` attribute beside it, so parallel additions merge; deleting a line removes
+an entry. After a clone, the entries come back at session start and in recall, in any agent
+deja is wired into, marked as from the repository and framed as untrusted like the rest.
+`{"activations":{"auto":{"repo":false}}}` in the trust policy keeps them out of the hooks.
+[More](https://vshulcz.github.io/deja-vu/guide/repo-memory.html).
 
 ## Privacy
 
@@ -211,6 +235,7 @@ as usual. `deja search <query>` skips the suggestion.
 | Command | What it does |
 | --- | --- |
 | `deja sync export/import/ssh` | Move memory between machines. Watermarked, append-only, idempotent. |
+| `deja repo candidates`, `deja repo add <id>` | Move memory between people: write the decisions and dropped approaches you pick into the repository's `.deja/memory.jsonl`, redacted, for review and commit. Whoever clones it gets them in recall. |
 | `deja view` | Your whole memory as one local HTML file ([live demo](https://vshulcz.github.io/deja-vu/view/)). No server, and the file never leaves the machine. |
 | `deja stats` | Your agent work, wrapped. `--card` draws it in the terminal, `--card <file>.svg` writes one for a profile, `--html` a browsable timeline. |
 | `deja secrets [--scrub]` | Which sessions' source transcripts carry credentials, and what kind. Never prints a value. `--scrub` rewrites the ones it can, original kept beside the file. |
@@ -252,7 +277,7 @@ whether or not the tool is called.
 | `fix` | the failing output, verbatim | `limit?` | What this machine ran, or changed, after that same error before. |
 | `how` | the tool or target, e.g. `go test` | `project?`, `limit?` | The real invocation, from what agents ran here. |
 | `orient` | nothing — it asks about the project | `project?`, `limit?` | The commands past sessions ran here and the files they worked in. |
-| `remember` | one durable fact or decision | `project?`, `tags?` | Stores a durable decision for later recall. |
+| `remember` | one durable fact or decision | `project?`, `tags?` | Stores a durable decision for later recall. `project` `repo:` (or `repo:rejected`, `repo:gotcha`) writes it into this repository's `.deja/memory.jsonl` instead, uncommitted. |
 | `handoff` | a session id or harness name; empty for the newest session here | `harness?` | Another session's goal, standing instructions, latest conclusions, passed checks and where it stopped, to continue it. |
 
 </details>

@@ -214,6 +214,7 @@ var commands = map[string]command{
 	"remember": runRemember,
 	"promote":  func(dir string, rest []string) error { return runPromote(dir, rest, os.Stdout) },
 	"rules":    runRules,
+	"repo":     runRepo,
 	"forget":   runForget,
 	"delete":   func(dir string, rest []string) error { return runDelete(dir, rest, os.Stdout) },
 	"mcp": func(dir string, rest []string) error {

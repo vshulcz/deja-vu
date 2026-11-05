@@ -289,7 +289,9 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 		// (#2567). requestWarmup writes a sentinel and detaches a child; the
 		// action pays neither the read nor the wait.
 		requestWarmup(dir)
-		return nil
+		if repoMemoryStamp(hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots))) == "" {
+			return nil
+		}
 	}
 	// A PreToolUse hook fires on every action, so the same fact must not be
 	// re-injected turn after turn. Dedupe per agent session on the fact, the
@@ -768,20 +770,37 @@ func commandHookLineSkipping(dir, cwd, cmd, self string, used func(string) bool)
 	// #3001 filed, so the retry asks the table and stops rather than searching
 	// — a first pass, which is almost every call, still searches (#3603).
 	skipped := false
-	if line := missingProgramLine(dir, cmd); line != "" {
-		if !used(line) {
-			return line
+	if planIndexReady(dir) {
+		if line := missingProgramLine(dir, cmd); line != "" {
+			if !used(line) {
+				return line
+			}
+			skipped = true
 		}
-		skipped = true
+		if line := commandFailureLine(dir, cwd, cmd); line != "" {
+			if !used(line) {
+				return line
+			}
+			skipped = true
+		}
 	}
-	if line := commandFailureLine(dir, cwd, cmd); line != "" {
-		if !used(line) {
-			return line
+	pol := policy.Load()
+	repoDec := repoMemoryDecisionForCommand(cwd, cmd, pol)
+	if !planIndexReady(dir) {
+		if repoDec != "" {
+			if line := "Before running that command" + repoDecisionLabel + repoDec; !used(line) {
+				return line
+			}
 		}
-		skipped = true
+		return ""
 	}
 	use, ok := index.CommandHistoryOutside(dir, cmd, self)
-	if !ok {
+	if !ok || len(use.ByProject) == 0 {
+		if repoDec != "" {
+			if line := "Before running that command" + repoDecisionLabel + repoDec; !used(line) {
+				return line
+			}
+		}
 		return ""
 	}
 	// A hook that fires unasked is the auto activation. Count only the sessions
@@ -790,10 +809,6 @@ func commandHookLineSkipping(dir, cwd, cmd, self string, used func(string) bool)
 	// not print a withheld project's more-recent run. An index built before
 	// ByProject existed has none; the version gate keeps the hook silent there
 	// rather than falling back to a machine-wide count that ignores the policy.
-	if len(use.ByProject) == 0 {
-		return ""
-	}
-	pol := policy.Load()
 	sessions := 0
 	var last time.Time
 	for proj, pu := range use.ByProject {
@@ -806,6 +821,11 @@ func commandHookLineSkipping(dir, cwd, cmd, self string, used func(string) bool)
 		}
 	}
 	if sessions < 1 {
+		if repoDec != "" {
+			if line := "Before running that command" + repoDecisionLabel + repoDec; !used(line) {
+				return line
+			}
+		}
 		return ""
 	}
 	// And the rule that keeps a tree out of recall. `how` refuses to answer
@@ -856,6 +876,11 @@ func commandHookLineSkipping(dir, cwd, cmd, self string, used func(string) bool)
 			return line
 		}
 	}
+	if repoDec != "" {
+		if line := head + repoDecisionLabel + repoDec; !used(line) {
+			return line
+		}
+	}
 	if d := commandDecisionLine(dir, cwd, cmd, self, skipped); d != "" {
 		if line := head + modelLabel(" — last time: ", d) + d; !used(line) {
 			return line
@@ -893,15 +918,35 @@ func promotedCommandHookLine(dir, cwd, cmd, self string, used func(string) bool)
 	if index.InspectionCommand(cmd) {
 		return ""
 	}
-	d := promotedCommandDecision(dir, cwd, cmd)
-	if d == "" || !mentionsCommand(cmd, d) {
+	pol := policy.Load()
+	repoDec := repoMemoryDecisionForCommand(cwd, cmd, pol)
+	var d string
+	if planIndexReady(dir) {
+		d = promotedCommandDecision(dir, cwd, cmd)
+		if d != "" && !mentionsCommand(cmd, d) {
+			d = ""
+		}
+	}
+	if d == "" && repoDec == "" {
 		return ""
+	}
+	if !planIndexReady(dir) {
+		line := "Before running that command" + repoDecisionLabel + repoDec
+		if used(line) {
+			return ""
+		}
+		return line
 	}
 	use, ok := index.CommandHistoryOutside(dir, cmd, self)
 	if !ok || len(use.ByProject) == 0 {
+		if repoDec != "" {
+			line := "Before running that command" + repoDecisionLabel + repoDec
+			if !used(line) {
+				return line
+			}
+		}
 		return ""
 	}
-	pol := policy.Load()
 	sessions := 0
 	var last time.Time
 	for proj, pu := range use.ByProject {
@@ -914,6 +959,12 @@ func promotedCommandHookLine(dir, cwd, cmd, self string, used func(string) bool)
 		}
 	}
 	if sessions < 1 {
+		if repoDec != "" {
+			line := "Before running that command" + repoDecisionLabel + repoDec
+			if !used(line) {
+				return line
+			}
+		}
 		return ""
 	}
 	if ignored := index.ProjectsTouchedByIgnore(dir); len(ignored) > 0 {
@@ -937,11 +988,86 @@ func promotedCommandHookLine(dir, cwd, cmd, self string, used func(string) bool)
 	}
 	head := fmt.Sprintf("This machine has run that command in %s%s",
 		toolSessionCount(sessions), when)
-	line := head + commandDecisionLabel(cmd, d) + d
+	var line string
+	if d != "" {
+		line = head + commandDecisionLabel(cmd, d) + d
+	} else {
+		line = head + repoDecisionLabel + repoDec
+	}
 	if used(line) {
 		return ""
 	}
 	return line
+}
+
+var genericCommandMultiplexers = map[string]bool{
+	"git": true, "go": true, "npm": true, "npx": true, "yarn": true, "pnpm": true,
+	"cargo": true, "make": true, "python": true, "python3": true, "node": true,
+	"bash": true, "sh": true, "zsh": true, "env": true, "sudo": true, "deja": true,
+}
+
+func repoMemoryDecisionForCommand(cwd, cmd string, pol policy.Policy) string {
+	root := sources.RepoRoot(cwd)
+	if root == "" || !pol.Allows(policy.ActivationAuto, sources.RepoMemoryProject(root)) {
+		return ""
+	}
+	entries, _, err := sources.ReadRepoMemory(sources.RepoMemoryPath(root))
+	if err != nil || len(entries) == 0 {
+		return ""
+	}
+	rank := map[string]int{"rejected": 0, "gotcha": 1, "decision": 2}
+	sort.SliceStable(entries, func(i, j int) bool {
+		if rank[entries[i].Kind] != rank[entries[j].Kind] {
+			return rank[entries[i].Kind] < rank[entries[j].Kind]
+		}
+		return entries[i].Date > entries[j].Date
+	})
+	for _, e := range entries {
+		if repoEntryMentionsCommand(cmd, e.Text) {
+			body := "[" + e.Kind + "] " + e.Text
+			return trimTrailingFragment(search.SafeText(clipDecision(body, toolHookDecisionBudget)))
+		}
+	}
+	return ""
+}
+
+func repoEntryMentionsCommand(cmd, text string) bool {
+	low := strings.ToLower(text)
+	for _, seg := range splitCommandSegments(cmd) {
+		fields := strings.Fields(seg)
+		for len(fields) > 0 && strings.Contains(fields[0], "=") {
+			fields = fields[1:]
+		}
+		if len(fields) == 0 {
+			continue
+		}
+		prog := strings.ToLower(filepath.Base(strings.Trim(fields[0], "\"'`")))
+		if len(prog) >= 4 && !genericCommandMultiplexers[prog] && containsIdentifierWord(low, prog) {
+			return true
+		}
+		if len(fields) >= 2 {
+			subBase := strings.ToLower(filepath.Base(strings.Trim(fields[1], "\"'`")))
+			if len(subBase) >= 5 && strings.Contains(subBase, ".") && containsIdentifierWord(low, subBase) {
+				return true
+			}
+			sub := strings.ToLower(strings.Trim(fields[1], "-"))
+			if len(prog) >= 2 && len(sub) >= 3 && !strings.ContainsAny(sub, "/$\"'`(){}<>=") {
+				if strings.Contains(low, prog+" "+sub) {
+					return true
+				}
+			}
+		}
+	}
+	for _, prog := range commandPrograms(cmd) {
+		prog = strings.ToLower(prog)
+		if len(prog) < 4 || genericCommandMultiplexers[prog] {
+			continue
+		}
+		if containsIdentifierWord(low, prog) {
+			return true
+		}
+	}
+	return false
 }
 
 // mentionsCommand reports whether the text names what the command invokes. The

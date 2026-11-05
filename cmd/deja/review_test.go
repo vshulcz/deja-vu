@@ -20,7 +20,7 @@ func initReviewRepo(t *testing.T) string {
 	}
 	runGit := func(args ...string) {
 		t.Helper()
-		cmd := exec.Command("git", args...)
+		cmd := exec.CommandContext(t.Context(), "git", args...)
 		cmd.Dir = repo
 		cmd.Env = append(os.Environ(),
 			"GIT_AUTHOR_NAME=Test",
@@ -45,15 +45,7 @@ func TestReviewSurfacesRepoNotesAndPriorSessions(t *testing.T) {
 	hermeticEnv(t)
 	repo := initReviewRepo(t)
 	t.Setenv("DEJA_REPO_DIR", repo)
-
-	orig, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(repo); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(orig) })
+	t.Chdir(repo)
 
 	// Seed a repo note in .deja/notes.jsonl and a Claude session touching pool.go.
 	now := time.Date(2026, 3, 15, 10, 0, 0, 0, time.UTC)
@@ -81,7 +73,7 @@ func TestReviewSurfacesRepoNotesAndPriorSessions(t *testing.T) {
 		t.Fatalf("review --json: %v\n%s", err, out)
 	}
 	var env reviewEnvelopeJSON
-	if err := json.Unmarshal([]byte(out), &env); err != nil {
+	if err = json.Unmarshal([]byte(out), &env); err != nil {
 		t.Fatalf("unmarshal: %v\n%s", err, out)
 	}
 	if env.Target != "working-tree" {

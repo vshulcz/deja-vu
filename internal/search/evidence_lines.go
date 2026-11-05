@@ -90,6 +90,8 @@ func takenBack(s model.Session, line string) bool {
 // evPersonLabel names who wrote a session's user-role line, by the source.
 func evPersonLabel(s model.Session, text string) string {
 	switch {
+	case strings.HasPrefix(s.Project, model.RepoOriginPrefix) || s.From == model.OriginRepo:
+		return evidence.LabelRepo
 	case s.Harness == "deja":
 		return evidence.LabelNote
 	case evidence.Spawned(s):

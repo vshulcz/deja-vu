@@ -196,7 +196,7 @@ func cachedHookDigestFor(dir, fromPayload string, exclude ...string) (string, in
 	if !index.HasManifest(dir) || !index.IsCurrentVersion(dir) || index.Damaged(dir) {
 		requestWarmup(dir)
 	}
-	gate := hookGate()
+	gate := hookGate() + repoMemoryStamp(cwd)
 	p := hookCachePath(dir, cwd)
 	if b, err := os.ReadFile(p); err == nil {
 		var e hookCacheEntry
@@ -239,7 +239,7 @@ func writeHookCacheEntry(dir, cwd string, e hookCacheEntry) {
 	if e.Digest == "" {
 		return
 	}
-	e.At, e.CWD, e.Gate = time.Now(), cwd, hookGate()
+	e.At, e.CWD, e.Gate = time.Now(), cwd, hookGate()+repoMemoryStamp(cwd)
 	// Renamed into place: a hook reading while the refresh writes would
 	// otherwise see a torn entry and rebuild.
 	if b, err := json.Marshal(e); err == nil {
@@ -381,6 +381,12 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, c
 	if mode == search.RecallOff {
 		return hookCacheEntry{}
 	}
+	cwd := resolveHookCWD(fromPayload)
+	if cwd == "" {
+		return hookCacheEntry{}
+	}
+	pol := policy.Load()
+	mark("policy")
 	// A store from an older index version must be rebuilt before it is read:
 	// this path never calls Ensure, so otherwise the first prompts after an
 	// upgrade recall nothing and say nothing about why.
@@ -388,18 +394,10 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, c
 	// manifest still describes, and this path answers from them (#800).
 	if !index.HasManifest(dir) || !index.IsCurrentVersion(dir) || index.Damaged(dir) {
 		requestWarmup(dir)
-		return hookCacheEntry{}
-	}
-	cwd := fromPayload
-	if cwd == "" {
-		cwd = os.Getenv("CLAUDE_PROJECT_DIR")
-	}
-	if cwd == "" {
-		var err error
-		cwd, err = os.Getwd()
-		if err != nil {
-			return hookCacheEntry{}
+		if repo, repoProj := repoMemoryDigestAndProject(cwd, pol, changedTaskFiles(cwd)...); repo != "" {
+			return hookCacheEntry{Digest: strings.TrimRight(repo, "\n"), Projects: []string{repoProj}}
 		}
+		return hookCacheEntry{}
 	}
 	// The two git probes (worktree list for identity, status/log for the
 	// task signal) are independent forks — overlap them.
@@ -407,8 +405,6 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, c
 	go func() { taskCh <- changedTaskFiles(cwd) }()
 	names := digest.ProjectNameCandidates(cwd)
 	mark("names+worktrees")
-	pol := policy.Load()
-	mark("policy")
 	// The standing decisions are scoped by the same trust policy as the session
 	// digest: a project the policy withholds from auto-activation must not leak
 	// its decisions here either.
@@ -433,6 +429,14 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, c
 	}
 	taskFiles := <-taskCh
 	mark("git-taskfiles")
+	// The repository's committed entries sit with the standing decisions,
+	// ranked with task-relevant entries first, and stay out of the session
+	// list below so one entry is not said twice.
+	repo, repoProj := repoMemoryDigestAndProject(cwd, pol, taskFiles...)
+	if repo != "" {
+		conventions = joinBlocks(conventions, repo)
+		allowedNames = appendProjectIfMissing(allowedNames, repoProj)
+	}
 	// Four times what a safe-mode digest serves, so the novelty ordering below
 	// has something to choose from. Without changed files this used to be three
 	// — exactly what the digest serves — so every candidate had just been shown,
@@ -450,6 +454,9 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, c
 	}
 	if got, err := index.RecentProjectsUnderTail(dir, lookupNames, cwd, perName, tailLimit); err == nil {
 		for _, s := range got {
+			if strings.HasPrefix(s.Project, model.RepoOriginPrefix) {
+				continue
+			}
 			if !pol.Allows(policy.ActivationAuto, s.Project) {
 				withheld++
 				continue
@@ -597,7 +604,8 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, c
 		// prints about itself (1 session distilled, 3 sessions' bytes claimed).
 		// The projects behind what actually went out, so the injection log can be
 		// held to a rule or a forget without reading the digest's prose (#2349).
-		return hookCacheEntry{Digest: text, Sessions: result.Sessions, Raw: result.RawBytes, TaskMatched: matched, Withheld: withheld, IDs: result.IDs, Projects: digestProjects(variant, envFrom)}
+		projs := appendProjectIfMissing(digestProjects(variant, envFrom), repoProj)
+		return hookCacheEntry{Digest: text, Sessions: result.Sessions, Raw: result.RawBytes, TaskMatched: matched, Withheld: withheld, IDs: result.IDs, Projects: projs}
 	}
 	entry = render(exclude)
 	if variants && entry.Digest != "" {
@@ -611,6 +619,35 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, c
 		mark("variants")
 	}
 	return entry
+}
+
+func resolveHookCWD(fromPayload string) string {
+	if fromPayload != "" {
+		return fromPayload
+	}
+	if cwd := os.Getenv("CLAUDE_PROJECT_DIR"); cwd != "" {
+		return cwd
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	return cwd
+}
+
+func repoMemoryDigestAndProject(cwd string, pol policy.Policy, taskFiles ...string) (string, string) {
+	repo := repoMemoryBlock(cwd, pol, taskFiles...)
+	if repo == "" {
+		return "", ""
+	}
+	return repo, sources.RepoMemoryProject(sources.RepoRoot(cwd))
+}
+
+func appendProjectIfMissing(projs []string, proj string) []string {
+	if proj != "" && !slices.Contains(projs, proj) {
+		return append(projs, proj)
+	}
+	return projs
 }
 
 // digestProjects names the projects a session-start digest was built from: the

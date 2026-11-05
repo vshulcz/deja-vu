@@ -93,8 +93,12 @@ func LowerProjectInScope(p, w string) bool {
 		// A synced session carries the peer's prefix and is otherwise the same
 		// project under the same name.
 		p, imported = rest, true
+	} else {
+		// Repo memory is named from this machine's checkout, so it takes the
+		// local rule once the mark is off.
+		p = strings.TrimPrefix(p, model.RepoOriginPrefix)
 	}
-	w = strings.TrimPrefix(w, model.ImportedPrefix)
+	w = model.BareProject(w)
 	if p == w {
 		return true
 	}
@@ -119,8 +123,8 @@ func ProjectInScopeStrict(project, want string) bool {
 	if want == "" {
 		return false
 	}
-	p := strings.TrimPrefix(strings.ToLower(project), model.ImportedPrefix)
-	w := strings.TrimPrefix(strings.ToLower(want), model.ImportedPrefix)
+	p := model.BareProject(strings.ToLower(project))
+	w := model.BareProject(strings.ToLower(want))
 	if p == w {
 		return true
 	}

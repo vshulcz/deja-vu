@@ -1227,8 +1227,25 @@ func attachClaudeAutoMemory(dir, id, transcript, harness, cwd, digest string, pr
 	return digest, n, projects
 }
 
+func repoMemoryCountInDigest(digest string) int {
+	const header = "from this repository's " + repoFileShown + " (committed by the people working on it):\n"
+	_, rest, ok := strings.Cut(digest, header)
+	if !ok {
+		return 0
+	}
+	n := 0
+	for line := range strings.SplitSeq(rest, "\n") {
+		if !strings.HasPrefix(line, "  · ") {
+			break
+		}
+		n++
+	}
+	return n
+}
+
 func hookSessionStartReceipt(dir, digest string, rewired []string, sessions, claudeMemCount, withheld int, polName string, taskMatched []string) string {
-	if (sessions == 0 && claudeMemCount == 0) || !notesHaveReader() || !receiptIsNews(dir, digest) {
+	repoCount := repoMemoryCountInDigest(digest)
+	if (sessions == 0 && claudeMemCount == 0 && repoCount == 0) || !notesHaveReader() || !receiptIsNews(dir, digest) {
 		return ""
 	}
 	polNote := ""
@@ -1238,9 +1255,14 @@ func hookSessionStartReceipt(dir, digest string, rewired []string, sessions, cla
 			polNote += fmt.Sprintf(" (%s withheld here)", doctorCount(withheld, "session"))
 		}
 	}
-	if sessions == 0 {
+	if sessions == 0 && claudeMemCount > 0 {
 		return joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring),
 			receiptLine(fmt.Sprintf("deja carried over %d Claude auto-memory note%s from this project%s", claudeMemCount, pluralS(claudeMemCount), polNote),
+				reusedMemory{}, serviceReceipt(dir))))
+	}
+	if sessions == 0 {
+		return joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring),
+			receiptLine(fmt.Sprintf("deja loaded %d repo memory entr%s from %s%s", repoCount, pluralY(repoCount), repoFileShown, polNote),
 				reusedMemory{}, serviceReceipt(dir))))
 	}
 	why := "from this project"

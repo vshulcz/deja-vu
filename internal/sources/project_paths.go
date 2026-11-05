@@ -171,7 +171,12 @@ var repoRootCache sync.Map
 // for the index, which needs to know whether a caller's directory is a
 // repository before treating everything under it as one project's work
 // (#2040).
-func RepoRoot(dir string) string { return repoRoot(dir) }
+func RepoRoot(dir string) string {
+	if !allowImplicitRepoCwd(dir) {
+		return ""
+	}
+	return repoRoot(dir)
+}
 
 // repoRoot walks up until it finds a .git, which is what makes a directory a
 // project rather than a folder. Cached because one session touches the same few

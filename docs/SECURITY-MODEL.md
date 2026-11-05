@@ -339,7 +339,11 @@ stabilizes timestamps but does not remove those differences.
 which history may be handed to an agent on each read path. `activations` maps
 `search`, `mcp` and `auto` (the hooks) to rules keyed by origin: `local`,
 `imported` for anything that arrived by sync, `imported:<group>` for one group
-of synced projects, and `*`. The most specific rule wins, and an activation with
+of synced projects, `repo` for entries read from a repository's committed
+`.deja/memory.jsonl`, `repo:<project>` for one repository, and `*`. Repository
+entries are text from whoever can push to that repository, so they get the same
+untrusted framing as transcripts, and writing one runs the export redaction and
+refuses what still matches a secret rule. The most specific rule wins, and an activation with
 no rules allows every origin. `DEJA_AUTORECALL_LOCAL_ONLY=1` denies imported
 memory on the `auto` path. Content leaves the machine for an embedding endpoint
 only when all three activations allow it.

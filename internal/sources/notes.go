@@ -101,7 +101,7 @@ func NotesRepoRoot(startDir string) string {
 }
 
 func allowImplicitRepoCwd(cwd string) bool {
-	if inTempDir(Home()) {
+	if inTempDir(Home()) || inTempDir(NotesFile()) || inTempDir(os.Getenv("DEJA_INDEX_DIR")) {
 		return inTempDir(cwd)
 	}
 	return true
@@ -531,7 +531,7 @@ func ParseNotesFileFromOffset(path string, offset int64) ([]model.Session, error
 		// content deja cannot re-derive from anything else. It used to vanish
 		// at index time with nothing reported (#771).
 		project = strings.TrimSpace(project)
-		if project == "" {
+		if project == "" || (fromRepo && defaultProject != "notes" && strings.ContainsAny(project, `/\`)) {
 			project = defaultProject
 		}
 		idProject := noteIDProject(project)

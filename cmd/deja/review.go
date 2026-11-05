@@ -13,6 +13,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/jsonout"
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -260,9 +261,9 @@ func gitReviewFiles(repoRoot, rev string) (string, []string, error) {
 		return "", nil, fmt.Errorf("review: unknown revision %q", rev)
 	}
 	sha := strings.TrimSpace(shaOut)
-	out, err := gitRun(repoRoot, "show", "--pretty=format:", "--name-only", sha)
-	if err != nil {
-		return shortSHA(sha), nil, nil
+	out, showErr := gitRun(repoRoot, "show", "--pretty=format:", "--name-only", sha)
+	if showErr != nil {
+		return shortSHA(sha), nil, nil //nolint:nilerr // fall back to empty file list if git show fails
 	}
 	return shortSHA(sha), splitNonEmptyLines(out), nil
 }
@@ -322,21 +323,14 @@ func collectReviewNotes(repoRoot string, scope, changed []string) []reviewNoteJS
 
 	var notes []reviewNoteJSON
 	seen := map[string]bool{}
-	addFrom := func(path, defaultOrigin string) {
-		if path == "" {
-			return
-		}
-		ss, err := sources.ParseNotesFile(path)
-		if err != nil {
-			return
-		}
+	addSessions := func(ss []model.Session, defaultOrigin string) {
 		for _, s := range ss {
 			inScope := len(scope) == 0 || howProjectMatches(s.Project, scope) || defaultOrigin == "repo"
 			if !inScope {
 				continue
 			}
 			origin := defaultOrigin
-			if s.From == "repo" {
+			if s.From == "repo" || strings.HasPrefix(s.Project, model.RepoOriginPrefix) {
 				origin = "repo"
 			}
 			for _, m := range s.Messages {
@@ -371,7 +365,22 @@ func collectReviewNotes(repoRoot string, scope, changed []string) []reviewNoteJS
 			}
 		}
 	}
+	addFrom := func(path, defaultOrigin string) {
+		if path == "" {
+			return
+		}
+		ss, err := sources.ParseNotesFile(path)
+		if err != nil {
+			return
+		}
+		addSessions(ss, defaultOrigin)
+	}
 
+	if repoRoot != "" {
+		if ss, err := sources.ParseRepoMemoryFile(sources.RepoMemoryPath(repoRoot)); err == nil {
+			addSessions(ss, "repo")
+		}
+	}
 	if rp := sources.RepoNotesFile(repoRoot); rp != "" {
 		addFrom(rp, "repo")
 	}

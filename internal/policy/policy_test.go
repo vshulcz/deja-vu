@@ -183,8 +183,8 @@ func TestRepoOriginPolicyAndDiagnose(t *testing.T) {
 	if got := Origin("repo"); got != "repo" {
 		t.Fatalf("Origin(repo) = %q, want repo", got)
 	}
-	if got := Origin("repo:api"); got != "repo" {
-		t.Fatalf("Origin(repo:api) = %q, want repo", got)
+	if got := Origin("repo:api"); got != "repo:api" {
+		t.Fatalf("Origin(repo:api) = %q, want repo:api", got)
 	}
 	p := Policy{Activations: map[string]map[string]bool{
 		ActivationAuto: {"repo": false, "local": true},

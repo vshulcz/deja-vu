@@ -104,6 +104,12 @@ func Load() Policy {
 // "imported:<group>" when its source project had a path, so a group of another
 // machine's projects can be addressed on its own (#955).
 func Origin(project string) string {
+	// An entry from a repository's committed .deja/memory.jsonl is "repo:"
+	// and the project, so one repository can be denied on its own and "repo"
+	// denies them all.
+	if strings.HasPrefix(project, model.RepoOriginPrefix) {
+		return project
+	}
 	if peer, ok := strings.CutPrefix(project, model.ImportedPrefix); ok {
 		if i := strings.IndexByte(peer, '/'); i > 0 {
 			return model.ImportedPrefix + peer[:i]
@@ -133,6 +139,11 @@ func (p Policy) Allows(activation, project string) bool {
 			return v
 		}
 	}
+	if strings.HasPrefix(origin, model.RepoOriginPrefix) {
+		if v, ok := rules[model.OriginRepo]; ok {
+			return v
+		}
+	}
 	if v, ok := rules["*"]; ok {
 		return v
 	}
@@ -159,7 +170,7 @@ func (p Policy) AllowsEgress(project string) bool {
 // consultedOrigin reports whether a rule key is one Origin can produce. Rules
 // are keyed by origin; a project name looks like a rule and is not one.
 func consultedOrigin(origin string) bool {
-	return origin == "local" || origin == "repo" || origin == "imported" || model.IsImportedProject(origin)
+	return origin == "local" || origin == "repo" || strings.HasPrefix(origin, model.RepoOriginPrefix) || origin == "imported" || model.IsImportedProject(origin)
 }
 
 // Describe names the active rule set for receipts and `deja log`, so the

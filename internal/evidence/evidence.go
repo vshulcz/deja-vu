@@ -45,6 +45,7 @@ const (
 	LabelModelSaid   = "Model said: "
 	LabelParent      = "Prompt written by a parent agent: "
 	LabelNote        = "Note an agent saved: "
+	LabelRepo        = "Repository memory: "
 	LabelAgent       = "Report a subagent wrote (its words, not a record): "
 )
 

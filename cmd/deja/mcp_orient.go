@@ -11,6 +11,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // orient answers the question an agent otherwise answers by reading: how is
@@ -70,11 +71,12 @@ func mcpOrient(dir, name string, raw json.RawMessage) (string, int, error) {
 		cwd = ""
 	}
 	files := orientFiles(dir, scope, cwd)
+	repoEntries := orientRepoMemory(cwd, policy.ActivationMCP)
 	where := howScopeName(scope)
 	if where == "" {
 		where = "this machine"
 	}
-	if len(cmds) == 0 && len(files) == 0 {
+	if len(cmds) == 0 && len(files) == 0 && len(repoEntries) == 0 {
 		if note := ignoredHiddenNoteFor("answer", ignored); note != "" {
 			return strings.TrimSpace(note), 0, nil
 		}
@@ -91,6 +93,15 @@ func mcpOrient(dir, name string, raw json.RawMessage) (string, int, error) {
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "how work has been done in %s, from past sessions here\n", where)
+	if len(repoEntries) > 0 {
+		fmt.Fprintf(&b, "committed in %s:\n", repoFileShown)
+		for i, e := range repoEntries {
+			if i >= orientFilesShown {
+				break
+			}
+			fmt.Fprintf(&b, "- [%s] %s\n", e.Kind, search.SafeLine(e.Text))
+		}
+	}
 	if len(cmds) > 0 {
 		fmt.Fprintln(&b, "commands, by how many sessions ran them:")
 		for i, e := range cmds {
@@ -134,7 +145,30 @@ func mcpOrient(dir, name string, raw json.RawMessage) (string, int, error) {
 		}
 	}
 	fmt.Fprint(&b, "This is what was done here before, not a rule — check a command still fits before running it.")
-	return frameRecall(b.String()), len(cmds) + len(files) + len(coupled) + len(fixes), nil
+	return frameRecall(b.String()), len(repoEntries) + len(cmds) + len(files) + len(coupled) + len(fixes), nil
+}
+
+func orientRepoMemory(cwd, act string) []sources.RepoEntry {
+	if cwd == "" {
+		return nil
+	}
+	root := sources.RepoRoot(cwd)
+	if root == "" || !policy.Load().Allows(act, sources.RepoMemoryProject(root)) {
+		return nil
+	}
+	entries, _, err := sources.ReadRepoMemory(sources.RepoMemoryPath(root))
+	if err != nil || len(entries) == 0 {
+		return nil
+	}
+	sources.RememberRepoCheckout(root)
+	rank := map[string]int{"rejected": 0, "gotcha": 1, "decision": 2}
+	sort.SliceStable(entries, func(i, j int) bool {
+		if rank[entries[i].Kind] != rank[entries[j].Kind] {
+			return rank[entries[i].Kind] < rank[entries[j].Kind]
+		}
+		return entries[i].Date > entries[j].Date
+	})
+	return entries
 }
 
 // orientCommand is the command without the way one machine reached it. Half

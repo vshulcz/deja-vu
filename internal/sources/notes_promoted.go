@@ -351,6 +351,11 @@ func mergeRepoPromotedNotes(personalPath string, personal []PromotedNote) []Prom
 }
 
 func loadPromotedNotesFrom(path string) []PromotedNote {
+	fromRepo := isRepoNotesPath(path) && path != NotesFile()
+	defaultProject := ""
+	if fromRepo {
+		defaultProject = ClaudeProjectName(filepath.Dir(filepath.Dir(path)))
+	}
 	latest := map[string]*PromotedNote{}
 	var order []string
 	_ = scanJSONLFromOffset(path, 0, func(m map[string]any) {
@@ -368,6 +373,10 @@ func loadPromotedNotesFrom(path string) []PromotedNote {
 		title, _ := m["title"].(string)
 		text, _ := m["text"].(string)
 		project, _ := m["project"].(string)
+		project = strings.TrimSpace(project)
+		if fromRepo && defaultProject != "" && (project == "" || strings.ContainsAny(project, `/\`)) {
+			project = defaultProject
+		}
 		var tags []string
 		if raw, ok := m["tags"].([]any); ok {
 			for _, x := range raw {

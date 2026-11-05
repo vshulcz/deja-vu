@@ -25,8 +25,9 @@ const ImportedPrefix = "imported:"
 
 // RepoOriginPrefix marks a repo-scoped origin or project prefix.
 const (
-	OriginRepo       = "repo"
-	RepoOriginPrefix = "repo:"
+	OriginRepo        = "repo"
+	RepoOriginPrefix  = "repo:"
+	RepoProjectPrefix = RepoOriginPrefix
 )
 
 // NotesHarness and promoted-note prefixes define the canonical identity shape
@@ -93,9 +94,12 @@ func IsImportedProject(project string) bool {
 	return strings.HasPrefix(project, ImportedPrefix)
 }
 
-// BareProject strips the "imported:" prefix from a project name if present.
+// BareProject strips the "imported:" or "repo:" prefix from a project name if present.
 func BareProject(project string) string {
-	return strings.TrimPrefix(project, ImportedPrefix)
+	if rest, ok := strings.CutPrefix(project, ImportedPrefix); ok {
+		return rest
+	}
+	return strings.TrimPrefix(project, RepoOriginPrefix)
 }
 
 // IsRepoProject reports whether project names a repo-scoped origin ("repo" or "repo:...").

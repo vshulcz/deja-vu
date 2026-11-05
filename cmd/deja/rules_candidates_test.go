@@ -330,13 +330,8 @@ func TestRulesCandidatesProjectAndRepoScope(t *testing.T) {
 		t.Fatal("want error for missing --project value")
 	}
 	t.Setenv("DEJA_REPO_DIR", "")
-	outside := t.TempDir()
-	orig, _ := os.Getwd()
-	if err := os.Chdir(outside); err == nil {
-		t.Cleanup(func() { _ = os.Chdir(orig) })
-		if _, err := captureRun(t, "rules", "candidates", "--repo"); err == nil {
-			t.Fatal("want error for --repo outside a git repo")
-		}
+	t.Chdir(t.TempDir())
+	if _, err := captureRun(t, "rules", "candidates", "--repo"); err == nil {
+		t.Fatal("want error for --repo outside a git repo")
 	}
 }
-

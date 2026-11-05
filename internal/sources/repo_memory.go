@@ -1,0 +1,453 @@
+package sources
+
+import (
+	"bufio"
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"hash/fnv"
+	"io"
+	"os"
+	"path/filepath"
+	"slices"
+	"sort"
+	"strings"
+	"time"
+	"unicode"
+
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
+	"github.com/vshulcz/deja-vu/internal/model"
+)
+
+// Repo memory is a small file of picked entries committed in a repository:
+// <root>/.deja/memory.jsonl. Notes and sync stay one person's; this file is
+// how a decision, an approach that was dropped or a trap reaches the people
+// who clone the repository. deja never writes it on its own — `deja repo add`
+// and the MCP remember tool with a repo target do, and the person reviews the
+// diff and commits it.
+//
+// One JSON object per line, sorted by id. Ids are a hash of the entry, so the
+// same entry written by two people is one line, and two people adding entries
+// at once usually touch different places in the file. The .gitattributes
+// beside it asks git for a union merge when they do not.
+const (
+	RepoMemoryDir  = ".deja"
+	RepoMemoryName = "memory.jsonl"
+	// RepoGitattributes is written beside the file when deja makes .deja/.
+	RepoGitattributes = "memory.jsonl merge=union\n"
+)
+
+const (
+	// RepoTextMax bounds one entry. An entry is a sentence or two someone
+	// picked, not a transcript; a longer one is refused when it is written and
+	// cut when it is read.
+	RepoTextMax = 600
+	// repoFileMax and repoEntriesMax bound what a cloned repository can hand
+	// every recall and every session start.
+	repoFileMax    = 1 << 20
+	repoEntriesMax = 500
+)
+
+// RepoKinds are the kinds an entry may carry. "rejected" is the note state of
+// the same name; "decision" is what an accepted note becomes in the repo.
+// superseded and stale have no kind here: in a committed file the line is
+// deleted instead.
+var RepoKinds = map[string]bool{"decision": true, "rejected": true, "gotcha": true}
+
+// RepoEntry is one line of the file, in the key order it is written.
+type RepoEntry struct {
+	ID   string `json:"id"`
+	Kind string `json:"kind"`
+	Text string `json:"text"`
+	Date string `json:"date"`
+	// From is the harness and day of the session the entry came from, never a
+	// path or a session id: the file is read by people who do not have it.
+	From string `json:"from,omitempty"`
+}
+
+// ErrRepoMemoryMalformed says the file holds a line deja cannot read: a
+// conflict marker left by a merge, or a hand edit gone wrong. Writes refuse
+// until it is fixed, so a rewrite never drops what someone put there.
+var ErrRepoMemoryMalformed = errors.New("repo memory has a line deja cannot read")
+
+// RepoEntryID is the id an entry gets: the kind and the text with case and
+// spacing folded, hashed. FNV, not a cryptographic hash: the id only has to
+// tell a few hundred entries apart and stay the same on every machine.
+func RepoEntryID(kind, text string) string {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(kind + "\x00" + strings.ToLower(strings.Join(strings.Fields(text), " "))))
+	return fmt.Sprintf("%010x", h.Sum64()>>24)
+}
+
+// CleanRepoText folds an entry to the one line it is stored as: control and
+// format characters out, whitespace runs to one space.
+func CleanRepoText(s string) string {
+	s = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
+			return ' '
+		}
+		return r
+	}, s)
+	return strings.Join(strings.Fields(s), " ")
+}
+
+// RepoMemoryPath is the file in a repository root.
+func RepoMemoryPath(root string) string {
+	return filepath.Join(root, RepoMemoryDir, RepoMemoryName)
+}
+
+// IsRepoMemoryFile reports whether p is a repo memory file.
+func IsRepoMemoryFile(p string) bool {
+	return filepath.Base(p) == RepoMemoryName && filepath.Base(filepath.Dir(p)) == RepoMemoryDir
+}
+
+// RepoMemoryProject is the project the entries of a checkout are filed under:
+// "repo:" and the name this machine gives the checkout, so they scope with the
+// reader's own sessions there and the trust policy can tell them apart.
+func RepoMemoryProject(root string) string {
+	return model.RepoProjectPrefix + ClaudeProjectName(root)
+}
+
+// ReadRepoMemory reads the entries of a file, deduped by id and sorted. bad is
+// the count of lines it could not read; they are skipped.
+func ReadRepoMemory(path string) (entries []RepoEntry, bad int, err error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer func() { _ = f.Close() }()
+	return readRepoMemory(io.LimitReader(f, repoFileMax))
+}
+
+func readRepoMemory(r io.Reader) ([]RepoEntry, int, error) {
+	seen := map[string]bool{}
+	var out []RepoEntry
+	bad := 0
+	sc := bufio.NewScanner(r)
+	sc.Buffer(make([]byte, 64*1024), repoFileMax)
+	for sc.Scan() {
+		line := bytes.TrimSpace(sc.Bytes())
+		if len(line) == 0 {
+			continue
+		}
+		e, ok := parseRepoLine(line)
+		if !ok {
+			bad++
+			continue
+		}
+		if seen[e.ID] || len(out) >= repoEntriesMax {
+			continue
+		}
+		seen[e.ID] = true
+		out = append(out, e)
+	}
+	if err := sc.Err(); err != nil {
+		return out, bad + 1, nil //nolint:nilerr // a line past the cap is one bad line, not an unreadable file
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, bad, nil
+}
+
+func parseRepoLine(line []byte) (RepoEntry, bool) {
+	var e RepoEntry
+	if json.Unmarshal(line, &e) != nil {
+		return RepoEntry{}, false
+	}
+	e.Kind = strings.ToLower(strings.TrimSpace(e.Kind))
+	e.Text = CleanRepoText(e.Text)
+	if !RepoKinds[e.Kind] || e.Text == "" {
+		return RepoEntry{}, false
+	}
+	if r := []rune(e.Text); len(r) > RepoTextMax {
+		e.Text = string(r[:RepoTextMax]) + "…"
+	}
+	e.ID = strings.TrimSpace(e.ID)
+	if e.ID == "" {
+		e.ID = RepoEntryID(e.Kind, e.Text)
+	}
+	e.ID = CleanRepoText(e.ID)
+	e.Date = CleanRepoText(e.Date)
+	e.From = CleanRepoText(e.From)
+	return e, true
+}
+
+// RepoEntryBody is the text an entry is indexed and shown as. The bracket
+// is the kind, the way a promoted note shows its state; the tail says where it
+// lives so no reader takes it for their own session.
+func RepoEntryBody(e RepoEntry) string {
+	tail := "in " + RepoMemoryDir + "/" + RepoMemoryName
+	if e.From != "" {
+		tail += ", from " + e.From
+	}
+	return "[" + e.Kind + "] " + e.Text + " (" + tail + ")"
+}
+
+// ParseRepoMemoryFile reads a repo memory file as sessions, one per entry.
+func ParseRepoMemoryFile(path string) ([]model.Session, error) {
+	entries, bad, err := ReadRepoMemory(path)
+	if err != nil {
+		return nil, err
+	}
+	for range bad {
+		diagMalformedLine(path)
+	}
+	root := filepath.Dir(filepath.Dir(path))
+	project := RepoMemoryProject(root)
+	idProject := noteIDProject(strings.TrimPrefix(project, model.RepoProjectPrefix))
+	var mod time.Time
+	if fi, statErr := os.Stat(path); statErr == nil {
+		mod = fi.ModTime()
+	}
+	out := make([]model.Session, 0, len(entries))
+	for _, e := range entries {
+		t, perr := time.Parse("2006-01-02", e.Date)
+		if perr != nil {
+			t = mod
+		}
+		s := model.Session{
+			ID:      "deja-repo-" + idProject + "-" + e.ID,
+			Harness: "deja", Project: project, Path: path,
+			Title: "[" + e.Kind + "] " + truncateRunes(e.Text, 80),
+		}
+		s.Touch(t)
+		s.Messages = []model.Message{{Role: "user", Text: RepoEntryBody(e), Time: t}}
+		out = append(out, s)
+	}
+	return out, nil
+}
+
+// AddRepoEntries writes entries into root's file and returns the ones that
+// were not already there. The file is rewritten sorted and deduped through a
+// temp file; the .gitattributes beside it is written when it is missing.
+// Entries are taken as given: the caller has already redacted them.
+func AddRepoEntries(root string, entries []RepoEntry) ([]RepoEntry, error) {
+	dir := filepath.Join(root, RepoMemoryDir)
+	path := RepoMemoryPath(root)
+	for _, p := range []string{dir, path} {
+		if fi, err := os.Lstat(p); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+			return nil, fmt.Errorf("%s is a symlink", p)
+		}
+	}
+	var existing []RepoEntry
+	if b, err := os.ReadFile(path); err == nil {
+		if len(b) > repoFileMax {
+			return nil, fmt.Errorf("%s is over %d bytes", path, repoFileMax)
+		}
+		var bad int
+		existing, bad, _ = readRepoMemory(bytes.NewReader(b))
+		if bad > 0 {
+			return nil, ErrRepoMemoryMalformed
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	have := map[string]bool{}
+	for _, e := range existing {
+		have[e.ID] = true
+	}
+	var added []RepoEntry
+	all := existing
+	for _, e := range entries {
+		if !RepoKinds[e.Kind] || strings.TrimSpace(e.Text) == "" {
+			return nil, errors.New("an entry needs a kind (decision, rejected or gotcha) and text")
+		}
+		if e.ID == "" {
+			e.ID = RepoEntryID(e.Kind, e.Text)
+		}
+		if have[e.ID] {
+			continue
+		}
+		have[e.ID] = true
+		added = append(added, e)
+		all = append(all, e)
+	}
+	if len(added) == 0 {
+		return nil, nil
+	}
+	if len(all) > repoEntriesMax {
+		return nil, fmt.Errorf("%s would hold more than %d entries", path, repoEntriesMax)
+	}
+	sort.Slice(all, func(i, j int) bool { return all[i].ID < all[j].ID })
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	for _, e := range all {
+		if err := enc.Encode(e); err != nil {
+			return nil, err
+		}
+	}
+	_, statErr := os.Lstat(dir)
+	created := errors.Is(statErr, os.ErrNotExist)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	if err := atomicfile.Write(path, buf.Bytes(), 0o644); err != nil {
+		return nil, err
+	}
+	// The two files beside it are written once, when deja makes the
+	// directory. Someone who deletes or edits either afterwards meant to.
+	if created {
+		for name, body := range map[string]string{".gitattributes": RepoGitattributes, "README.md": RepoReadme} {
+			if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+				return added, err
+			}
+		}
+	}
+	RememberRepoCheckout(root)
+	return added, nil
+}
+
+// RemoveRepoEntries deletes entries matching ids from root's .deja/memory.jsonl
+// and returns the entries that were removed.
+func RemoveRepoEntries(root string, ids []string) ([]RepoEntry, error) {
+	path := RepoMemoryPath(root)
+	if fi, err := os.Lstat(path); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		return nil, fmt.Errorf("%s is a symlink", path)
+	}
+	b, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if len(b) > repoFileMax {
+		return nil, fmt.Errorf("%s is over %d bytes", path, repoFileMax)
+	}
+	existing, bad, _ := readRepoMemory(bytes.NewReader(b))
+	if bad > 0 {
+		return nil, ErrRepoMemoryMalformed
+	}
+	drop := map[string]bool{}
+	for _, id := range ids {
+		id = strings.TrimPrefix(strings.ToLower(strings.TrimSpace(id)), "#")
+		if id != "" {
+			drop[id] = true
+		}
+	}
+	var kept, removed []RepoEntry
+	for _, e := range existing {
+		if drop[strings.ToLower(e.ID)] {
+			removed = append(removed, e)
+		} else {
+			kept = append(kept, e)
+		}
+	}
+	if len(removed) == 0 {
+		return nil, nil
+	}
+	sort.Slice(kept, func(i, j int) bool { return kept[i].ID < kept[j].ID })
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	for _, e := range kept {
+		if err := enc.Encode(e); err != nil {
+			return nil, err
+		}
+	}
+	if err := atomicfile.Write(path, buf.Bytes(), 0o644); err != nil {
+		return nil, err
+	}
+	return removed, nil
+}
+
+// RepoReadme is what a person who opens .deja/ in the repository reads.
+const RepoReadme = `# .deja
+
+This folder is project memory for deja. Each line of memory.jsonl is a decision, a dropped approach or a gotcha that someone picked from past coding agent sessions and reviewed before committing.
+
+With deja installed, your coding agent gets these entries at session start and in recall after you clone. Without it, memory.jsonl is plain JSON lines you can read and edit; deleting a line removes an entry.
+
+https://github.com/vshulcz/deja-vu
+`
+
+// repoListPath is where deja keeps the repo memory files it has seen, beside
+// the notes file. The index reads every one of them, whatever directory a
+// pass runs from; a file set that changed with the cwd would drop the entries
+// from the index each time deja ran somewhere else.
+func repoListPath() string {
+	return filepath.Join(filepath.Dir(NotesFile()), "repos.txt")
+}
+
+func readRepoList() []string {
+	b, err := os.ReadFile(repoListPath())
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for line := range strings.SplitSeq(string(b), "\n") {
+		if line = strings.TrimSpace(line); line != "" && filepath.IsAbs(line) && IsRepoMemoryFile(line) {
+			out = append(out, line)
+		}
+	}
+	return out
+}
+
+// RememberRepoCheckout records the repo memory file of the checkout dir sits
+// in, when it has one. Best effort: a list that cannot be written only means
+// the entries are read when deja runs from that checkout.
+func RememberRepoCheckout(dir string) {
+	if dir == "" {
+		return
+	}
+	root := RepoRoot(dir)
+	if root == "" {
+		return
+	}
+	p := RepoMemoryPath(root)
+	if !regularFile(p) {
+		return
+	}
+	if abs, err := filepath.Abs(p); err == nil {
+		p = abs
+	}
+	known := readRepoList()
+	if slices.Contains(known, p) {
+		return
+	}
+	var keep []string
+	for _, k := range known {
+		if regularFile(k) {
+			keep = append(keep, k)
+		}
+	}
+	keep = append(keep, p)
+	sort.Strings(keep)
+	list := repoListPath()
+	if err := os.MkdirAll(filepath.Dir(list), 0o700); err != nil {
+		return
+	}
+	_ = atomicfile.Write(list, []byte(strings.Join(keep, "\n")+"\n"), 0o600)
+}
+
+func regularFile(p string) bool {
+	fi, err := os.Lstat(p)
+	return err == nil && fi.Mode().IsRegular()
+}
+
+// RepoMemoryFiles is every repo memory file the index reads: the ones deja has
+// seen, and the one of the checkout this process runs in.
+func RepoMemoryFiles() []string {
+	if cwd, err := os.Getwd(); err == nil && allowImplicitRepoCwd(cwd) {
+		RememberRepoCheckout(cwd)
+	}
+	var out []string
+	for _, p := range readRepoList() {
+		if regularFile(p) {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// LoadRepoMemory reads every known repo memory file.
+func LoadRepoMemory() []model.Session {
+	var out []model.Session
+	for _, p := range RepoMemoryFiles() {
+		ss, err := ParseRepoMemoryFile(p)
+		diagFileError(p, err)
+		out = append(out, ss...)
+	}
+	return out
+}
