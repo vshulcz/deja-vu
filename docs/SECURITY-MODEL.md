@@ -347,9 +347,13 @@ only when all three activations allow it.
 `ignore` lists shell globs matched against a session's path and project; a
 match stays out of recall. With no `ignore` key the default is
 `*/.claude/jobs/*`, a background agent's own scratch tree; writing the key
-replaces that default. A file that is missing or does not parse means the
-default policy, so recall never breaks on a bad file; `deja doctor` reports what
-is in force.
+replaces that default. Two operational booleans also live in `policy.json` so
+hooks started without the user's shell environment see them: `"auto_index":
+false` (same as `DEJA_NO_AUTO_INDEX=1`) stops automatic index updates, and
+`"search_only": true` (same as `DEJA_SEARCH_ONLY=1`) skips mining fixes,
+commands and co-occurrence tables. A file that is missing or does not parse
+means the default policy, so recall never breaks on a bad file; `deja doctor`
+reports what is in force.
 
 The policy filters what recall serves. It does not keep this machine's own
 sessions out of the index; the exclude list and `deja forget` above do that. A
