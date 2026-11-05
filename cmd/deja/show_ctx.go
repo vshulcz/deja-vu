@@ -319,6 +319,12 @@ func parseShow(args []string) (showOptions, error) {
 			if strings.HasPrefix(a, "-") {
 				return o, unknownFlag("show", a, showFlags)
 			}
+			// A whitespace-only token is no id at all: without this,
+			// `deja show "   "` sailed past the missing-id refusal and a
+			// leading empty argument was silently ignored (#5936).
+			if strings.TrimSpace(a) == "" {
+				return o, errors.New(showNeedsID)
+			}
 			if o.id != "" {
 				return o, errors.New("show accepts one session id")
 			}
