@@ -61,8 +61,8 @@ func TestEnsureDefaultDirAndInternalRecordsIntactForce(t *testing.T) {
 // EnsureForSearch's incremental-update branch (manifest fresh in version and
 // scope, but files changed) must wrap a genuine updateIndex failure.
 func TestEnsureForSearchWrapsUpdateIndexError(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("chmod-based permission simulation is unix-only")
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("chmod-based permission simulation is non-root unix-only")
 	}
 	tmp := hermeticIndexEnv(t)
 	aiderRoot := filepath.Join(tmp, "aider")
@@ -100,8 +100,8 @@ func TestEnsureForSearchWrapsUpdateIndexError(t *testing.T) {
 // filtered out by cutPostingsBySession must return an empty result, not an
 // error.
 func TestSearchSubstringPostingsDirErrorAndEmptyAfterCut(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("chmod-based permission simulation is unix-only")
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("chmod-based permission simulation is non-root unix-only")
 	}
 	tmp := hermeticIndexEnv(t)
 	dir := filepath.Join(tmp, "idx")
@@ -126,8 +126,8 @@ func TestSearchSubstringPostingsDirErrorAndEmptyAfterCut(t *testing.T) {
 // normal canAppendIncremental invariant, reachable only via this direct
 // same-package call) must be dropped from Files rather than panicking.
 func TestAppendIncrementalDirectDefensiveBranches(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("chmod-based permission simulation is unix-only")
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("chmod-based permission simulation is non-root unix-only")
 	}
 	tmp := hermeticIndexEnv(t)
 	if err := os.MkdirAll(filepath.Join(tmp, "idx", "buckets"), 0o755); err != nil {
@@ -164,8 +164,8 @@ func TestAppendIncrementalDirectDefensiveBranches(t *testing.T) {
 // A claude file that grows but becomes unreadable mid-pass must keep its old
 // FileState so the next run retries it, rather than losing track of it.
 func TestAppendIncrementalUnreadableGrownFileKeepsOldState(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("chmod-based permission simulation is unix-only")
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("chmod-based permission simulation is non-root unix-only")
 	}
 	tmp := hermeticIndexEnv(t)
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
@@ -242,8 +242,8 @@ func TestAppendIncrementalNewSessionMidFile(t *testing.T) {
 // brand-new bucket file can't be created, and a writeManifest failure when
 // the index dir itself can't accept a new temp file, distinctly.
 func TestAppendIncrementalBucketAndManifestWriteErrors(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("chmod-based permission simulation is unix-only")
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("chmod-based permission simulation is non-root unix-only")
 	}
 	tmp := hermeticIndexEnv(t)
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
@@ -384,8 +384,8 @@ func TestImportOlderBatchKeepsNewerUpdated(t *testing.T) {
 // Import's appendImportedRecords must surface a bucket-write failure when
 // buckets/ can't accept a brand-new file.
 func TestImportBlockedBucketsDirWriteError(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("chmod-based permission simulation is unix-only")
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("chmod-based permission simulation is non-root unix-only")
 	}
 	tmp := hermeticIndexEnv(t)
 	dir := filepath.Join(tmp, "idx")
@@ -407,8 +407,8 @@ func TestImportBlockedBucketsDirWriteError(t *testing.T) {
 // manifest read, a write failure into a blocked outDir, and a final
 // writeManifest failure when the index dir itself is blocked.
 func TestExportRecordsErrorBranches(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("chmod-based permission simulation is unix-only")
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("chmod-based permission simulation is non-root unix-only")
 	}
 	tmp := hermeticIndexEnv(t)
 

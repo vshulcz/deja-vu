@@ -74,8 +74,8 @@ func TestDoctorFullReport(t *testing.T) {
 }
 
 func TestDoctorStoreStates(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("chmod permissions are not meaningful on windows")
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("chmod permissions are not meaningful on windows or as root")
 	}
 	tmp := t.TempDir()
 	unreadable := filepath.Join(tmp, "unreadable")

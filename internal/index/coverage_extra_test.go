@@ -913,7 +913,7 @@ func TestRequestedCodecLineAndSubstringBranches(t *testing.T) {
 func TestIndexErrorBranches(t *testing.T) {
 	tmp := hermeticIndexEnv(t)
 	blockedParent := filepath.Join(tmp, "blocked")
-	if runtime.GOOS != "windows" {
+	if runtime.GOOS != "windows" && os.Geteuid() != 0 {
 		if err := os.MkdirAll(blockedParent, 0o755); err != nil {
 			t.Fatal(err)
 		}

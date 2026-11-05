@@ -283,8 +283,8 @@ func TestKilledAppendIsCutBackUnderTheLock(t *testing.T) {
 // the live log. The next pass that writes the log anew must make its own file
 // rather than truncate that one, which is the live log under another name.
 func TestALeftoverStagingLinkNeverTruncatesTheLiveLog(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("directory permissions do not stop a delete on windows")
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("directory permissions do not stop a delete on windows or as root")
 	}
 	proj, inc := replaceStore(t, 12)
 	log := filepath.Join(inc, "records.bin")

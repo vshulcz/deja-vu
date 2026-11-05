@@ -3,6 +3,7 @@ package index
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -46,6 +47,16 @@ func TestManifestFreshWithAKeptTranscript(t *testing.T) {
 // date" and the store stayed out of recall, after doctor had told the user to
 // install the tool and run exactly that (#1760).
 func TestInstallingTheMissingToolMakesTheIndexStale(t *testing.T) {
+	if !sources.SQLite3Available() && !sources.ZstdAvailable() {
+		if runtime.GOOS == "windows" {
+			t.Skip("neither sqlite3 nor zstd on PATH")
+		}
+		bin := t.TempDir()
+		if err := os.WriteFile(filepath.Join(bin, "zstd"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	}
 	without := toolFingerprint(false, false)
 	sqliteOnly := toolFingerprint(true, false)
 	both := toolFingerprint(true, true)

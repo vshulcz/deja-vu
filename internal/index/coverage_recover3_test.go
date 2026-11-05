@@ -190,8 +190,8 @@ func TestCutPostingsBySessionTieBreak(t *testing.T) {
 // keeping its FileState for an existing entry and dropping it entirely for
 // a brand-new one, and must surface a blocked staging directory.
 func TestUpdateIndexReplacePathParseFailureSkipBranches(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("chmod-based permission simulation is unix-only")
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("chmod-based permission simulation is non-root unix-only")
 	}
 	tmp := hermeticIndexEnv(t)
 	aiderRoot := filepath.Join(tmp, "aider")

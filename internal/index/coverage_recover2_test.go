@@ -195,7 +195,7 @@ func TestIntersectSubstringPostingsSkipBranches(t *testing.T) {
 		}
 	}()
 
-	if runtime.GOOS != "windows" {
+	if runtime.GOOS != "windows" && os.Geteuid() != 0 {
 		unreadableParent := filepath.Join(t.TempDir(), "unreadable-parent")
 		unreadableBuckets := filepath.Join(unreadableParent, "buckets")
 		if err := os.MkdirAll(unreadableBuckets, 0o755); err != nil {
@@ -214,8 +214,8 @@ func TestIntersectSubstringPostingsSkipBranches(t *testing.T) {
 // lockDir must surface an OpenFile failure when the lock file's parent
 // directory exists but cannot accept a new file.
 func TestLockDirOpenFileFailure(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("chmod-based permission simulation is unix-only")
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("chmod-based permission simulation is non-root unix-only")
 	}
 	tmp := t.TempDir()
 	parent := filepath.Join(tmp, "parent")

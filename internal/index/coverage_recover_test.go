@@ -38,8 +38,8 @@ func TestEnsureForSearchDefaultDirAndFastPath(t *testing.T) {
 // forced rebuild it triggers on a corrupt index itself fails, it must surface
 // that failure rather than mask it.
 func TestSearchWithRecoveryPassthroughAndForcedRebuildFailure(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("chmod-based permission simulation is unix-only")
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("chmod-based permission simulation is non-root unix-only")
 	}
 	tmp := hermeticIndexEnv(t)
 	parent := filepath.Join(tmp, "parent")
@@ -130,8 +130,8 @@ func TestRecentFamilyDefaultDirAndMissingManifest(t *testing.T) {
 // MkdirAll in the full rebuild; a records.bin path blocked by a
 // pre-existing directory must fail the subsequent os.Create.
 func TestRebuildStagingDirBlocked(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("chmod-based permission simulation is unix-only")
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("chmod-based permission simulation is non-root unix-only")
 	}
 	tmp := hermeticIndexEnv(t)
 
@@ -311,8 +311,8 @@ func TestUpdateIndexSyncImportSkipAndCorruptAppendRebuild(t *testing.T) {
 // appendIncremental must surface (not swallow) a genuine, non-corrupt bucket
 // read failure so updateIndex's "append: %w" wrap path executes.
 func TestUpdateIndexAppendNonCorruptErrorWrapped(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("chmod-based unreadable file simulation is unix-only")
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("chmod-based unreadable file simulation is non-root unix-only")
 	}
 	tmp := hermeticIndexEnv(t)
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")

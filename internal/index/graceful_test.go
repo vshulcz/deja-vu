@@ -13,8 +13,8 @@ import (
 // is skipped for the pass, its old records survive, and it is retried once
 // readable again.
 func TestUnreadableSourceSkippedNotFatal(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("chmod 0 does not make files unreadable on windows")
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("chmod 0 does not make files unreadable on windows or as root")
 	}
 	tmp := t.TempDir()
 	claudeRoot := filepath.Join(tmp, "claude")
