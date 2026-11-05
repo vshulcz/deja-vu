@@ -67,6 +67,25 @@ func TestRememberDefaultProjectAndAppendError(t *testing.T) {
 	}
 }
 
+func TestRememberRefusesBlankExplicitProject(t *testing.T) {
+	for _, project := range []string{"", " \t "} {
+		t.Run("project="+project, func(t *testing.T) {
+			hermeticEnv(t)
+			notes := filepath.Join(t.TempDir(), "notes.jsonl")
+			t.Setenv("DEJA_NOTES_FILE", notes)
+			t.Chdir(t.TempDir())
+
+			err := runRemember(index.DefaultDir(), []string{"--project", project, "misfiled note"})
+			if err == nil || err.Error() != "remember: --project needs value" {
+				t.Fatalf("runRemember with --project %q: got %v, want missing project error", project, err)
+			}
+			if _, err := os.Stat(notes); !os.IsNotExist(err) {
+				t.Fatalf("refused remember should leave no notes file, stat error: %v", err)
+			}
+		})
+	}
+}
+
 func TestRememberMCPValidation(t *testing.T) {
 	if _, err := callMCPTool(index.DefaultDir(), "remember", []byte("{")); err == nil {
 		t.Fatal("malformed remember arguments accepted")
