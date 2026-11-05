@@ -277,6 +277,34 @@ func codexRolloutIDs(root string) map[string]bool {
 	return ids
 }
 
+// CodexSessionIDs returns the session IDs recorded across Codex's stores, both
+// the full rollout basename IDs and their trailing UUIDs.
+func CodexSessionIDs() map[string]bool {
+	const uuidLen = 36
+	ids := map[string]bool{}
+	roots := append(CodexRoots(), CodexHome())
+	for _, root := range roots {
+		for _, dir := range codexSessionDirs(root) {
+			for _, f := range walkFiles(dir, codexRolloutWanted) {
+				if name := codexSessionID(f); name != "" {
+					ids[name] = true
+					if len(name) >= uuidLen {
+						ids[name[len(name)-uuidLen:]] = true
+					}
+				}
+			}
+		}
+		if ss, err := ParseCodexHistory(filepath.Join(root, "history.jsonl")); err == nil {
+			for _, s := range ss {
+				if s.ID != "" {
+					ids[s.ID] = true
+				}
+			}
+		}
+	}
+	return ids
+}
+
 // ParseCodexHistory reads a Codex history.jsonl from the start.
 func ParseCodexHistory(path string) ([]model.Session, error) {
 	return ParseCodexHistoryFromOffset(path, 0)

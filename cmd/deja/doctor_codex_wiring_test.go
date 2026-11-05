@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -173,6 +174,73 @@ func TestDoctorCodexHookWithThePluginBesideTheUsersHooks(t *testing.T) {
 	if st := codexHookWiringState(); st.state != "plugin" {
 		t.Errorf("state = %q, want plugin", st.state)
 	}
+}
+
+func TestDoctorCodexHookApprovedViaLaterEventOrExecutionEvidence(t *testing.T) {
+	t.Run("later event pinned when SessionStart unpinned", func(t *testing.T) {
+		hermeticEnv(t)
+		home := sources.CodexHome()
+		if err := os.MkdirAll(home, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := installCodexHooks("/usr/local/bin/deja", false); err != nil {
+			t.Fatal(err)
+		}
+		hooks := filepath.Join(home, "hooks.json")
+		cfg := "[hooks.state." + strconv.Quote(hooks+":user_prompt_submit:0:0") + "]\ntrusted_hash = \"sha256:abc\"\n"
+		if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte(cfg), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		st := codexHookWiringState()
+		if st.state != "wired" || st.approved != 1 || st.pinned != len(codexHookWiring) {
+			t.Fatalf("state = %+v, want wired with 1/%d approved", st, len(codexHookWiring))
+		}
+	})
+
+	t.Run("hook execution evidence when only user hooks pinned", func(t *testing.T) {
+		hermeticEnv(t)
+		home := sources.CodexHome()
+		sessDir := filepath.Join(home, "sessions", "2026", "04", "07")
+		if err := os.MkdirAll(sessDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		sid := "019dd5a0-1234-7000-8000-000000000001"
+		rollout := filepath.Join(sessDir, "rollout-2026-04-07T00-00-00-"+sid+".jsonl")
+		if err := os.WriteFile(rollout, []byte("{}\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		hooks := filepath.Join(home, "hooks.json")
+		own := `{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"/usr/local/bin/other-hook"}]}]}}`
+		if err := os.WriteFile(hooks, []byte(own), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := installCodexHooks("/usr/local/bin/deja", false); err != nil {
+			t.Fatal(err)
+		}
+		cfg := "[hooks.state." + strconv.Quote(hooks+":session_start:0:0") + "]\ntrusted_hash = \"sha256:abc\"\n"
+		if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte(cfg), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if st := codexHookWiringState(); st.state != "untrusted" {
+			t.Fatalf("before execution evidence: state = %q, want untrusted", st.state)
+		}
+		if err := os.MkdirAll(filepath.Dir(index.DefaultDir()), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		markSessionLive(index.DefaultDir(), sid)
+		st := codexHookWiringState()
+		if st.state != "wired" {
+			t.Fatalf("after execution evidence: state = %q, want wired", st.state)
+		}
+		if !codexHasSeenItsHook() {
+			t.Errorf("codexHasSeenItsHook() = false after hook ran")
+		}
+		var buf bytes.Buffer
+		doctorCodexHook(&buf)
+		if out := buf.String(); strings.Contains(out, "untrusted") || strings.Contains(out, "hooks approved") {
+			t.Errorf("unexpected warning after hook ran:\n%s", out)
+		}
+	})
 }
 
 // Codex pins trust per entry, by where it sits in hooks.json. With the user's

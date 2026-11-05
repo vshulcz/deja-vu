@@ -5,7 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -138,17 +140,19 @@ func codexHookWiringState() hookWiringState {
 			st.state = "disabled"
 		case strings.Contains(section, "trusted_hash = \"sha256:"):
 			st.state = "wired"
+			// Trust is per hook, not per file. A machine that approved deja's hook
+			// when there was one and has five now sits with four unapproved, and codex
+			// runs none of those — its own screen says so ("5 hooks are new or
+			// changed… Continue without trusting (hooks won't run)") while this row
+			// said `wired` because the session_start pin was there (#3654).
+			st.approved, st.pinned = codexApprovedHooks(pins, codexHookWiring)
 		}
+	} else if codexHookExecuted(st.path) {
+		st.state = "wired"
 	}
 	if st.state != "wired" {
 		return st
 	}
-	// Trust is per hook, not per file. A machine that approved deja's hook
-	// when there was one and has five now sits with four unapproved, and codex
-	// runs none of those — its own screen says so ("5 hooks are new or
-	// changed… Continue without trusting (hooks won't run)") while this row
-	// said `wired` because the session_start pin was there (#3654).
-	st.approved, st.pinned = codexApprovedHooks(pins, codexHookWiring)
 	for _, h := range codexHookWiring {
 		if !hookEventWired(st.hooks, h.Event, h.Sub) {
 			st.missing = append(st.missing, h.Event)
@@ -252,12 +256,57 @@ func codexDejaPins(cfg, path string, hooks map[string]any) map[string]string {
 // codexPrimaryPin is the table for the first event deja has an entry for —
 // SessionStart on any install — which decides the row's trust state.
 func codexPrimaryPin(pins map[string]string) string {
+	first := ""
 	for _, h := range codexHookWiring {
-		if section, ok := pins[h.Event]; ok {
+		section := pins[h.Event]
+		if section == "" {
+			continue
+		}
+		if first == "" {
+			first = section
+		}
+		off, on := strings.Index(section, "enabled = false"), strings.Index(section, "enabled = true")
+		disabled := off >= 0 && (on == -1 || on > off)
+		if !disabled && strings.Contains(section, "trusted_hash = \"sha256:") {
 			return section
 		}
 	}
-	return ""
+	return first
+}
+
+// codexHookExecuted reports whether a Codex session has run a deja hook since
+// hooksPath was written, for Codex releases that run an approved hook without
+// writing a [hooks.state] pin for deja's entry in config.toml (#5948).
+func codexHookExecuted(hooksPath string) bool {
+	info, err := os.Stat(hooksPath)
+	if err != nil {
+		return false
+	}
+	since := info.ModTime().Truncate(time.Second)
+	ids := sources.CodexSessionIDs()
+	if len(ids) == 0 {
+		return false
+	}
+	dir := index.DefaultDir()
+	for sid, when := range readLiveSessions(dir) {
+		if ids[sid] && !when.Before(since) {
+			return true
+		}
+	}
+	for _, line := range loadSeen(dir) {
+		parts := strings.Fields(line)
+		if len(parts) < 3 {
+			continue
+		}
+		sid := strings.TrimPrefix(strings.TrimPrefix(parts[0], sessionStartKeyPrefix), "once:")
+		if !ids[parts[0]] && !ids[sid] {
+			continue
+		}
+		if when, err := time.Parse(time.RFC3339, parts[2]); err == nil && !when.Before(since) {
+			return true
+		}
+	}
+	return false
 }
 
 // codexEventKey is the event name as codex writes it into a trust key:

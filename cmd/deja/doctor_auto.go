@@ -639,7 +639,7 @@ func codexHasSeenItsHook() bool {
 		return true
 	}
 	hooks, _ := root["hooks"].(map[string]any)
-	return codexPrimaryPin(codexDejaPins(string(cfg), path, hooks)) != ""
+	return codexPrimaryPin(codexDejaPins(string(cfg), path, hooks)) != "" || codexHookExecuted(path)
 }
 
 // dshNoticeSourceRetired reports whether the installed plugin still tags its
