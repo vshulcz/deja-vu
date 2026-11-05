@@ -34,7 +34,7 @@
 <meta property="og:site_name" content="deja-vu">
 <link rel="apple-touch-icon" href="../../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "上下文窗口满了", "description": "压缩保留了 77% 的决定和 0.2% 的命令——实测。与其为不断增长、直到崩掉的窗口持续付账，不如换个做法。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/context-window-full.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/context-window-full.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-08-25", "dateModified": "2026-10-17"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "上下文窗口满了", "description": "压缩保留了 77% 的决定和 0.2% 的命令——实测。与其为不断增长、直到崩掉的窗口持续付账，不如换个做法。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/context-window-full.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/context-window-full.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-08-25", "dateModified": "2026-11-05"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "上下文窗口满了", "item": "https://vshulcz.github.io/deja-vu/zh/guide/context-window-full.html"}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "上下文窗口满了会怎样？", "acceptedAnswer": {"@type": "Answer", "text": "智能体会提议压缩。对 43 次压缩实测下来，摘要保留了 77% 的决定和 0.2% 跑过的命令。"}}, {"@type": "Question", "name": "怎么避开压缩？", "acceptedAnswer": {"@type": "Answer", "text": "把上下文取过来，而不是一直带着：召回注入上限是每次提问 1,536 字节、每次召回调用约 4 KB，这是一个固定开销，而窗口本来会不断增长。"}}, {"@type": "Question", "name": "压缩丢掉的东西能拿回来吗？", "acceptedAnswer": {"@type": "Answer", "text": "能。压缩重写的是智能体的上下文，不是它的转录，所以那些命令和报错还在磁盘上、还搜得到。"}}]}</script>
 </head>
@@ -59,6 +59,9 @@
 <a href="delete-old-claude-sessions.html">怎么删掉旧会话</a>
 <a href="delete-codex-sessions.html">删除 Codex 的会话</a>
 <a href="delete-cursor-chat-history.html">删除 Cursor 的聊天记录</a>
+<a href="cursor-state-vscdb-too-large.html">Cursor state.vscdb 太大</a>
+<a href="repo-memory.html">仓库共享记忆</a>
+<a href="claude-mem-alternative.html">claude-mem 替代方案</a>
 <a href="privacy.html">隐私</a>
 <a href="memory-for-claude-code.html">给 Claude Code 加记忆</a>
 <a href="memory-for-codex.html">给 Codex CLI 加记忆</a>
@@ -100,6 +103,7 @@
 <p>索引覆盖这台机器上每个智能体的转录——<a href="where-sessions-are-stored.html">各有各的格式</a>——包括 deja 装上之前的会话。建索引和检索都在本地：不需要模型（embedding 是可选的，用 <code>deja embed</code> 打开），什么都不离开这台机器（<a href="privacy.html">隐私</a>）。</p>
 
 <p><a href="getting-started.html">快速开始</a> · <a href="../../guide/token-cost.html">记忆要花多少 token</a> · <a href="../../guide/after-compaction.html">压缩丢掉了什么</a></p>
+<p class="star-cta">觉得有用？欢迎在 <a href="https://github.com/vshulcz/deja-vu">GitHub 上给 deja-vu 点颗 Star</a>。</p>
 </article>
 </div>
 <footer>deja-vu 采用 MIT 许可，在你的机器上运行。<a href="https://github.com/vshulcz/deja-vu">GitHub 源码</a> · <a href="../../">首页</a></footer>

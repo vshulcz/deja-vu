@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Basic Memory alternative for coding agents — deja-vu</title>
+<meta name="description" content="Automatic session-history recall across Claude Code, Codex, Cursor and 40 other agents from existing transcripts, with no Markdown notes to maintain by hand.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Basic Memory alternative for coding agents">
+<meta property="og:description" content="Automatic session-history recall across Claude Code, Codex, Cursor and 40 other agents from existing transcripts, with no Markdown notes to maintain by hand.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Basic Memory alternative for coding agents">
+<meta name="twitter:description" content="Automatic session-history recall across Claude Code, Codex, Cursor and 40 other agents from existing transcripts, with no Markdown notes to maintain by hand.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Basic Memory alternative for coding agents", "description": "Automatic session-history recall across Claude Code, Codex, Cursor and 40 other agents from existing transcripts, with no Markdown notes to maintain by hand.", "url": "https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-05", "dateModified": "2026-11-05"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Basic Memory alternative", "item": "https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How does deja-vu differ from Basic Memory?", "acceptedAnswer": {"@type": "Answer", "text": "Basic Memory stores a knowledge graph of Markdown notes that you or the model write explicitly through MCP tool calls. deja-vu indexes the raw session transcripts that 43 coding agents already write to disk — including months of history from before install — and recalls exact error strings, commands, and file edits automatically."}}, {"@type": "Question", "name": "Does deja-vu require Python or uv?", "acceptedAnswer": {"@type": "Answer", "text": "No. deja-vu is a single 20 MB Go binary with no runtime dependencies."}}, {"@type": "Question", "name": "Can I also store explicit notes in deja-vu?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Alongside automatic transcript indexing, deja remember stores durable project notes, and deja repo add commits curated decisions and rejected approaches into .deja/memory.jsonl for your team."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="nav-cta" href="https://github.com/vshulcz/deja-vu"><span class="star-ic" aria-hidden="true">★</span>GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a>
+<div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<details class="grpfold"><summary>Why agents forget <span class="n">12</span></summary>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="switch-agents-without-losing-context.html">Session handoffs</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="one-rules-file.html">One rules file</a>
+<a href="token-cost.html">What memory costs</a>
+</details>
+<details class="grpfold"><summary>Session history <span class="n">12</span></summary>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="codex-history.html">Codex history</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="repo-memory.html">Repo memory</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="credentials-in-transcripts.html">Credentials in transcripts</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
+</details>
+<details class="grpfold"><summary>Deleting sessions <span class="n">31</span></summary>
+<a href="session-files-on-disk.html">Claude Code</a>
+<a href="delete-old-claude-sessions.html">Old sessions</a>
+<a href="delete-codex-sessions.html">Codex</a>
+<a href="delete-cursor-chat-history.html">Cursor</a>
+<a href="cursor-state-vscdb-too-large.html">Cursor state.vscdb too large</a>
+<a href="delete-copilot-chat-history.html">Copilot Chat</a>
+<a href="delete-copilot-cli-session-history.html">Copilot CLI</a>
+<a href="delete-gemini-cli-history.html">Gemini CLI</a>
+<a href="delete-opencode-session-history.html">opencode</a>
+<a href="delete-cline-task-history.html">Cline</a>
+<a href="delete-roo-task-history.html">Roo Code</a>
+<a href="delete-zed-thread-history.html">Zed</a>
+<a href="delete-kilo-code-task-history.html">Kilo Code</a>
+<a href="delete-amp-thread-history.html">Amp</a>
+<a href="delete-continue-session-history.html">Continue</a>
+<a href="delete-kiro-session-history.html">Kiro</a>
+<a href="delete-kimi-code-session-history.html">Kimi Code</a>
+<a href="delete-junie-session-history.html">Junie</a>
+<a href="delete-goose-session-history.html">Goose</a>
+<a href="delete-windsurf-cascade-history.html">Windsurf</a>
+<a href="delete-qwen-code-chat-history.html">Qwen Code</a>
+<a href="delete-trae-sessions.html">TRAE CLI</a>
+<a href="delete-codebuddy-sessions.html">CodeBuddy</a>
+<a href="delete-antigravity-history.html">Antigravity</a>
+<a href="delete-pi-session-history.html">pi</a>
+<a href="delete-crush-session-history.html">Crush</a>
+<a href="delete-hermes-session-history.html">Hermes</a>
+<a href="delete-cherrystudio-session-history.html">Cherry Studio</a>
+<a href="delete-codewhale-session-history.html">CodeWhale</a>
+<a href="delete-aider-chat-history.html">aider</a>
+<a href="delete-openclaw-session-history.html">OpenClaw</a>
+</details>
+<details class="grpfold"><summary>Per-agent guides <span class="n">41</span></summary>
+<a href="memory-for-aider.html">aider</a>
+<a href="memory-for-amp.html">Amp</a>
+<a href="memory-for-antigravity.html">Antigravity</a>
+<a href="memory-for-cherrystudio.html">Cherry Studio</a>
+<a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-codebuddy.html">CodeBuddy Code</a>
+<a href="memory-for-codewhale.html">CodeWhale</a>
+<a href="memory-for-codex.html">Codex</a>
+<a href="memory-for-commandcode.html">Command Code</a>
+<a href="memory-for-continue.html">Continue</a>
+<a href="memory-for-copilot.html">Copilot CLI</a>
+<a href="memory-for-crush.html">Crush</a>
+<a href="memory-for-cursor.html">Cursor</a>
+<a href="memory-for-devin.html">Devin CLI</a>
+<a href="memory-for-dsh.html">dsh</a>
+<a href="memory-for-gjc.html">gajae-code</a>
+<a href="memory-for-gemini.html">Gemini CLI</a>
+<a href="memory-for-goose.html">Goose</a>
+<a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-hermes.html">Hermes</a>
+<a href="memory-for-jetbrains.html">JetBrains AI Assistant</a>
+<a href="memory-for-junie.html">Junie</a>
+<a href="memory-for-kilocode.html">Kilo Code</a>
+<a href="memory-for-kimchi.html">Kimchi Coding</a>
+<a href="memory-for-kimi.html">Kimi Code</a>
+<a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-omp.html">omp</a>
+<a href="memory-for-openclaw.html">OpenClaw</a>
+<a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-pi.html">pi</a>
+<a href="memory-for-prime.html">prime-agent</a>
+<a href="memory-for-qwen.html">Qwen Code</a>
+<a href="memory-for-reasonix.html">Reasonix</a>
+<a href="memory-for-roo.html">Roo Code</a>
+<a href="memory-for-senpi.html">Senpi</a>
+<a href="memory-for-trae.html">TRAE CLI</a>
+<a href="memory-for-copilot-chat.html">VS Code Copilot Chat</a>
+<a href="memory-for-windsurf.html">Windsurf</a>
+<a href="memory-for-zcode.html">ZCode</a>
+<a href="memory-for-zed.html">Zed</a>
+</details>
+<div class="grp">Evidence</div>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="claude-mem-alternative.html">claude-mem alternative</a>
+<a href="specstory-alternative.html">SpecStory alternative</a>
+<a href="basic-memory-alternative.html" aria-current="page">Basic Memory alternative</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>A Basic Memory alternative for coding agents</h1>
+<p class="pagelede">recall from the sessions your agents already ran, without maintaining a Markdown vault<span class="mins" data-mins></span></p>
+
+<p>Basic Memory is an MCP server that builds a local knowledge graph from Markdown files on disk, compatible with Obsidian. When an assistant calls its MCP tools to write or update a note, that note becomes searchable in future conversations.</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja-vu</a> is built for software engineering sessions where nobody stopped to write a note. Every coding agent — Claude Code, Codex, Cursor, OpenCode, Gemini CLI, Windsurf and thirty-seven others — already logs every prompt, file edit, shell command and exit code to disk. deja indexes those files as they are and hands the relevant history back over MCP and hooks.</p>
+
+<div class="save-first"><b>Try it on your existing transcripts:</b> <code>brew install deja-vu &amp;&amp; deja install --auto</code> indexes your Claude Code, Codex and Cursor history in ~15 seconds with no Python runtime or manual note-taking — <a href="https://github.com/vshulcz/deja-vu">vshulcz/deja-vu on GitHub</a>.<div class="save-actions"><div class="save-cmd"><span class="p">$</span><code>brew install deja-vu &amp;&amp; deja install --auto</code><button type="button">copy</button></div><div class="save-cmd"><span class="p">$</span><code>npx @vshulcz/deja-vu sources</code><button type="button">copy</button></div><a class="save-btn" href="https://github.com/vshulcz/deja-vu">deja-vu on GitHub</a><a class="save-demo" href="getting-started.html">Quick start &rarr;</a></div></div>
+
+<h2>What differs</h2>
+<table>
+<tr><th></th><th>deja-vu</th><th>Basic Memory</th></tr>
+<tr><td>Where memory comes from</td><td>the session transcripts 43 coding agents already write to disk, plus optional <code>deja remember</code> notes and <a href="repo-memory.html"><code>.deja/memory.jsonl</code></a></td><td>Markdown files written explicitly by you or by the model calling <code>write_note</code></td></tr>
+<tr><td>First-day recall</td><td>months of prior sessions are searchable immediately after <code>deja index</code></td><td>starts empty unless you point it at an existing Markdown vault</td></tr>
+<tr><td>What survives in the index</td><td>exact error messages, shell commands that fixed a failure, file diffs, and session decisions</td><td>structured summaries and observations the model chose to record</td></tr>
+<tr><td>Proactive hooks</td><td>session-start brief, prompt recall, pre-edit file history, failed-command fix lookup, and <a href="after-compaction.html">compaction recovery</a></td><td>on-demand MCP tool calls</td></tr>
+<tr><td>MCP token footprint</td><td>1 tool (<code>deja</code> with modes), ~477 tokens</td><td>multiple note read/write/search/canvas tools</td></tr>
+<tr><td>Runtime</td><td>single 20 MB Go binary</td><td>Python (<code>uvx basic-memory</code>)</td></tr>
+<tr><td>License</td><td>MIT</td><td>AGPL-3.0</td></tr>
+</table>
+
+<h2>Why coding sessions need transcript indexing, not just note-taking</h2>
+<p>When a build fails with a cryptic linker error or a migration breaks staging, the thing you need three weeks later is rarely a high-level note you remembered to ask the agent to save. It is the exact flag passed to the compiler, the environment variable that fixed the test, or the reason a seemingly obvious retry loop was reverted (<a href="repeated-mistakes.html">repeated mistakes</a>). Because deja indexes the transcript itself, <code>deja fix "&lt;error&gt;"</code> and <code>deja blame path:line</code> find those answers even when nobody wrote a summary.</p>
+<p>When you <em>do</em> want explicit notes, deja has them without leaving the tool: <code>deja remember "always run go generate before testing internal/schema"</code> pins a project note, and <a href="repo-memory.html"><code>deja repo add</code></a> commits shared decisions into <code>.deja/memory.jsonl</code> so teammates get them on clone.</p>
+
+<h2>When Basic Memory fits better</h2>
+<ul>
+<li>You maintain a personal Obsidian vault for general research or writing outside of coding agents and want Claude Desktop to read and edit those Markdown files directly.</li>
+</ul>
+
+<h2>Questions people ask</h2>
+<h3 id="run-both">Can I use deja-vu alongside Basic Memory?</h3>
+<p>Yes. Basic Memory manages your Obsidian Markdown vault while <code>deja-vu</code> indexes your coding-agent transcripts across Claude Code, Codex, Cursor, and 40 other harnesses.</p>
+<h3 id="curated-rules">Does deja-vu support distilling standing rules from past sessions?</h3>
+<p>Yes. Run <code>deja rules candidates</code> to extract repeated corrections you gave your agents across sessions, or <code>deja repo candidates</code> to pick decisions and rejected approaches for the repository (<a href="one-rules-file.html">one rules file</a>).</p>
+
+<p><a href="compare.html">Every memory tool, compared</a> · <a href="claude-mem-alternative.html">claude-mem alternative</a> · <a href="specstory-alternative.html">SpecStory alternative</a> · <a href="day-zero.html">Day zero benchmark</a></p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

@@ -34,7 +34,7 @@
 <meta property="og:site_name" content="deja-vu">
 <link rel="apple-touch-icon" href="../../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "给 Cursor 加记忆", "description": "如何让 Cursor 查到这台机器上每个编程智能体的会话：它的 SQLite 聊天记录存在哪，以及 deja install cursor-auto 写入了什么。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/memory-for-cursor.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/memory-for-cursor.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-10-15", "dateModified": "2026-10-16"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "给 Cursor 加记忆", "description": "如何让 Cursor 查到这台机器上每个编程智能体的会话：它的 SQLite 聊天记录存在哪，以及 deja install cursor-auto 写入了什么。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/memory-for-cursor.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/memory-for-cursor.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-10-15", "dateModified": "2026-11-05"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "给 Cursor 加记忆", "item": "https://vshulcz.github.io/deja-vu/zh/guide/memory-for-cursor.html"}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "怎么给 Cursor 加记忆？", "acceptedAnswer": {"@type": "Answer", "text": "执行 deja install cursor-auto，它会把 deja MCP 服务器写进 ~/.cursor/mcp.json，同时写入把召回送进会话的钩子。"}}, {"@type": "Question", "name": "Cursor 的聊天记录存在哪里？", "acceptedAnswer": {"@type": "Answer", "text": "不是 JSONL 而是 SQLite：macOS 上是 ~/Library/Application Support/Cursor/User 下的 state.vscdb，Linux 上是 ~/.config/Cursor/User 下的同名文件。"}}, {"@type": "Question", "name": "在终端智能体里做过的事，Cursor 也能召回吗？", "acceptedAnswer": {"@type": "Answer", "text": "能。deja 给这台机器上每个智能体的会话记录建索引，所以不论当时是哪个工具，你在 Cursor 里提的问题都会由当时真正解决它的那次会话来回答。"}}]}</script>
 </head>
@@ -59,6 +59,9 @@
 <a href="delete-old-claude-sessions.html">怎么删掉旧会话</a>
 <a href="delete-codex-sessions.html">删除 Codex 的会话</a>
 <a href="delete-cursor-chat-history.html">删除 Cursor 的聊天记录</a>
+<a href="cursor-state-vscdb-too-large.html">Cursor state.vscdb 太大</a>
+<a href="repo-memory.html">仓库共享记忆</a>
+<a href="claude-mem-alternative.html">claude-mem 替代方案</a>
 <a href="privacy.html">隐私</a>
 <a href="memory-for-claude-code.html">给 Claude Code 加记忆</a>
 <a href="memory-for-codex.html">给 Codex CLI 加记忆</a>
@@ -105,6 +108,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 <p>这里没有任何东西在写记忆，所以也就没有什么能凭空编进你的历史里；建索引和检索都在本地，凭据在建索引时就被脱敏（<a href="../../guide/privacy.html">隐私说明</a>）。每次提问注入上限 1536 字节，每次工具调用约 4 KB——<a href="../../guide/token-cost.html">记忆要花多少 token</a> 里有实测对比。</p>
 
 <p><a href="getting-started.html">快速开始</a> · <a href="../../registry/cursor.html">Cursor 的聊天记录是怎么读的</a> · <a href="../../guide/parallel-sessions.html">并行会话</a></p>
+<p class="star-cta">觉得有用？欢迎在 <a href="https://github.com/vshulcz/deja-vu">GitHub 上给 deja-vu 点颗 Star</a>。</p>
 </article>
 </div>
 <footer>deja-vu 采用 MIT 许可，在你的机器上运行。<a href="https://github.com/vshulcz/deja-vu">GitHub 源码</a> · <a href="../../">首页</a></footer>

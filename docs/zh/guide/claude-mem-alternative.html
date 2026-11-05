@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-Hans" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>支持 Codex、Cursor、opencode 的 claude-mem 替代方案 — deja-vu</title>
+<meta name="description" content="无需模型、后台进程或登录账号：deja-vu 直接索引 Codex、Cursor、opencode 等 43 款工具磁盘上已有的会话，包括安装前的历史。">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/zh/guide/claude-mem-alternative.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/claude-mem-alternative.html">
+<link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html">
+<link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:title" content="支持 Codex、Cursor、opencode 的 claude-mem 替代方案">
+<meta property="og:description" content="无需模型、后台进程或登录账号：deja-vu 直接索引 Codex、Cursor、opencode 等 43 款工具磁盘上已有的会话，包括安装前的历史。">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/zh/guide/claude-mem-alternative.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — 给编程智能体的可搜索本地记忆">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<meta name="twitter:title" content="支持 Codex、Cursor、opencode 的 claude-mem 替代方案">
+<meta name="twitter:description" content="无需模型、后台进程或登录账号：deja-vu 直接索引 Codex、Cursor、opencode 等 43 款工具磁盘上已有的会话，包括安装前的历史。">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../../assets/icon.svg">
+<link rel="stylesheet" href="../../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<link rel="apple-touch-icon" href="../../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "面向 Codex、Cursor 与 opencode 的 claude-mem 替代方案", "description": "无需模型、后台进程或登录账号：deja-vu 直接索引 Codex、Cursor、opencode 等 43 款工具磁盘上已有的会话，包括安装前的历史。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/claude-mem-alternative.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/claude-mem-alternative.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-05", "dateModified": "2026-11-05"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "claude-mem 替代方案", "item": "https://vshulcz.github.io/deja-vu/zh/guide/claude-mem-alternative.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "有没有不需要 API Key、Bun 或后台常驻进程的 claude-mem 替代方案？", "acceptedAnswer": {"@type": "Answer", "text": "deja-vu 是一个 20 MB 的单文件 Go 二进制，不需要 Bun、Node.js、Python 或后台 worker。它直接索引 Claude Code、Codex、Cursor 等 43 款编程智能体在本地磁盘上已有的会话记录（自动脱敏密钥），并通过 stdio MCP 与轻量级 hooks 把相关历史交还给智能体。"}}, {"@type": "Question", "name": "deja-vu 能搜到安装之前的历史会话吗？", "acceptedAnswer": {"@type": "Answer", "text": "能。因为各个编程工具本来就把会话写在磁盘上，deja 第一次建索引时就会把过去几个月的历史全部读进来，装好第一天就能搜。"}}, {"@type": "Question", "name": "deja-vu 可以和 claude-mem 同时使用吗？", "acceptedAnswer": {"@type": "Answer", "text": "可以。deja-vu 会只读读取 ~/.claude-mem/claude-mem.db，绝不修改它。如果不想在会话启动时注入两份上下文，可以用 deja install --all 只挂载按需调用的 MCP 工具。"}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../../"><img src="../../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../../">首页</a><a class="lnk" href="getting-started.html">文档</a><a class="nav-cta" href="https://github.com/vshulcz/deja-vu"><span class="star-ic" aria-hidden="true">★</span>GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../../">← deja-vu</a><div class="grp">中文指南</div>
+<a href="getting-started.html">快速开始</a>
+<a href="does-my-agent-remember.html">智能体记得之前的对话吗</a>
+<a href="forgetting.html">为什么会忘事</a>
+<a href="context-window-full.html">上下文窗口满了</a>
+<a href="lost-context.html">上下文丢了</a>
+<a href="where-sessions-are-stored.html">历史文件在哪里</a>
+<a href="find-a-session.html">找回解决问题的那次会话</a>
+<a href="resume-a-session.html">接着昨天的会话继续</a>
+<a href="codex-history.html">Codex 的会话历史</a>
+<a href="codex-resume-session.html">Codex 会话恢复</a>
+<a href="no-conversation-found-claude-code.html">找不到会话</a>
+<a href="recover-a-deleted-session.html">找回被删掉的会话</a>
+<a href="session-files-on-disk.html">会话文件怎么删</a>
+<a href="delete-old-claude-sessions.html">怎么删掉旧会话</a>
+<a href="delete-codex-sessions.html">删除 Codex 的会话</a>
+<a href="delete-cursor-chat-history.html">删除 Cursor 的聊天记录</a>
+<a href="cursor-state-vscdb-too-large.html">Cursor state.vscdb 太大</a>
+<a href="repo-memory.html">仓库共享记忆</a>
+<a href="claude-mem-alternative.html" aria-current="page">claude-mem 替代方案</a>
+<a href="privacy.html">隐私</a>
+<a href="memory-for-claude-code.html">给 Claude Code 加记忆</a>
+<a href="memory-for-codex.html">给 Codex CLI 加记忆</a>
+<a href="memory-for-cursor.html">给 Cursor 加记忆</a>
+<a href="memory-for-dsh.html">给 DeepSeek Harness 加记忆</a>
+<a href="memory-for-kimi.html">给 Kimi Code 加记忆</a>
+<a href="memory-for-qwen.html">给 Qwen Code 加记忆</a>
+<div class="grp">English</div>
+<a href="../../guide/claude-mem-alternative.html">claude-mem alternative</a>
+<a href="../../guide/compare.html">Compare</a>
+<a href="../../guide/day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.zh.md">中文 README</a>
+<a href="../../registry/README.html">Format registry</a><a class="sidecat" href="../../"><img src="../../assets/icon-live.svg" width="46" height="46" alt=""><span>它记得，你就不必记</span></a></aside>
+<article>
+
+<h1>面向 Codex、Cursor 与 opencode 的 claude-mem 替代方案</h1>
+<p class="pagelede">直接从磁盘上已有的会话记录建立记忆，不需要模型去写摘要<span class="mins" data-mins></span></p>
+
+<p>claude-mem 是很多人接触到的第一个记忆插件，通过 hooks 监听会话，再让模型把发生过的事写成摘要留给下一次会话。</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja-vu</a> 走的是另一条路：每一个编程智能体本来就已经把会话完整地写在磁盘上了；deja 直接按原样索引这些文件（自动脱敏密钥），再把相关的上下文交还给当前正在运行的智能体。没有模型去改写记忆，因此不需要消耗额外 Token 或 API Key，而且你安装之前几个月的历史在第一天就能直接搜到。</p>
+
+<div class="save-first"><b>直接在现有历史记录上试用：</b><code>brew install deja-vu &amp;&amp; deja install --auto</code> 约 15 秒即可索引本机已有的 Claude Code、Codex 与 Cursor 历史，可替代 <code>claude-mem</code> 或与它共存 —— <a href="https://github.com/vshulcz/deja-vu">GitHub 上的 vshulcz/deja-vu</a>。</div>
+
+<h2>核心差异</h2>
+<table>
+<tr><th></th><th>deja-vu</th><th>claude-mem</th></tr>
+<tr><td>记忆来源</td><td>各个智能体已经写在磁盘上的会话文件，包含安装之前的所有历史</td><td>从安装那一刻起通过 hooks 记录</td></tr>
+<tr><td>谁来生成记忆</td><td>无需生成：原样索引转录并自动脱敏密钥</td><td>由模型总结每次会话（云端 observer、OpenRouter/Gemini Key 或 Anthropic 额度）</td></tr>
+<tr><td>后台常驻进程</td><td>无</td><td>基于 Bun 的后台 HTTP worker 与 Chroma 向量服务</td></tr>
+<tr><td>安装体积与依赖</td><td>单个 20 MB Go 二进制文件</td><td><code>npx claude-mem install</code>（需拉取 Bun 与 uv）</td></tr>
+<tr><td>原生支持的智能体</td><td>43 款编程智能体</td><td>Claude Code、Codex、Cursor、opencode、Windsurf、Antigravity、Grok Bot、OpenClaw</td></tr>
+<tr><td>每次请求携带的工具定义</td><td>1 个工具，约 477 tokens</td><td>15 个工具，约 2,307 tokens</td></tr>
+<tr><td>检索方式</td><td>SQLite FTS5 全文检索 + 可选向量嵌入</td><td>SQLite FTS5 + Chroma 向量</td></tr>
+<tr><td>许可证</td><td>MIT</td><td>Apache-2.0</td></tr>
+</table>
+
+<h2>安装第一天的区别（Day Zero）</h2>
+<p>从安装后才开始往前记录的记忆工具，在装好的第一天是空的。在包含 19,195 个真实会话、100 个历史问题的 <a href="../../guide/day-zero.html">Day-Zero 基准测试</a>中，deja 在 13.6 秒内建完索引即可直接回答历史问题。更重要的是，模型摘要往往会丢掉当时以为不重要、事后却最关键的细节：报错原文、编译参数、在跑通之前失败过的那条命令。deja 保留原始回合，因此 <code>deja fix "&lt;报错&gt;"</code> 能直接返回上次修好这个报错的命令，<code>deja blame path:line</code> 能定位写出这一行代码的那次会话。</p>
+
+<h2>切换或共存</h2>
+<pre>brew install deja-vu
+# 或：curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto</pre>
+<p>切换时，deja 还会直接只读解析 <code>~/.claude-mem/claude-mem.db</code>，因此就算超过 Claude Code 30 天清理期的旧观察记录也不会丢。两者也可以同时运行；如果不想在会话启动时收到两份注入块，运行 <code>deja install --all</code> 即可只挂载按需调用的 MCP 工具。</p>
+
+<p><a href="getting-started.html">快速开始</a> · <a href="memory-for-claude-code.html">给 Claude Code 加记忆</a> · <a href="memory-for-codex.html">给 Codex CLI 加记忆</a> · <a href="memory-for-cursor.html">给 Cursor 加记忆</a></p>
+<p class="star-cta">觉得有用？欢迎在 <a href="https://github.com/vshulcz/deja-vu">GitHub 上给 deja-vu 点颗 Star</a>。</p>
+
+</article>
+</div>
+<footer>deja-vu 采用 MIT 许可，在你的机器上运行。<a href="https://github.com/vshulcz/deja-vu">GitHub 源码</a> · <a href="../../">首页</a></footer>
+</div>
+<script src="../../assets/guide.js" defer></script>
+</body>
+</html>

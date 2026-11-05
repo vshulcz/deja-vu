@@ -179,3 +179,9 @@ https://vshulcz.github.io/deja-vu/ru/guide/cursor-state-vscdb-too-large.html
 https://vshulcz.github.io/deja-vu/ru/guide/delete-cursor-chat-history.html
 https://vshulcz.github.io/deja-vu/ru/guide/codex-history.html
 https://vshulcz.github.io/deja-vu/ru/guide/does-my-agent-remember.html
+https://vshulcz.github.io/deja-vu/guide/repo-memory.html
+https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html
+https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html
+https://vshulcz.github.io/deja-vu/zh/guide/cursor-state-vscdb-too-large.html
+https://vshulcz.github.io/deja-vu/zh/guide/claude-mem-alternative.html
+https://vshulcz.github.io/deja-vu/zh/guide/repo-memory.html

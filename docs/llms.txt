@@ -25,6 +25,7 @@ Run `deja` with no arguments in a terminal and it opens a full-screen search ove
 - [Delete Goose session history](https://vshulcz.github.io/deja-vu/guide/delete-goose-session-history.html): since 1.10.0 every session is a row in sessions.db; remove one with goose session remove, and delete the legacy JSONL files goose no longer manages yourself
 - [Delete Windsurf Cascade history](https://vshulcz.github.io/deja-vu/guide/delete-windsurf-cascade-history.html): one encrypted .pb file per conversation under ~/.codeium/windsurf/cascade; find the file, delete one or all, and leave the rules, MCP config and settings beside it alone
 - [Delete Qwen Code chat history](https://vshulcz.github.io/deja-vu/guide/delete-qwen-code-chat-history.html): one JSONL file per session under ~/.qwen/projects/<project>/chats, plus its sub-agent logs; delete one or all and leave settings alone
+- [Delete TRAE CLI session history](https://vshulcz.github.io/deja-vu/guide/delete-trae-sessions.html): session rollouts under ~/.trae/sessions; remove one session or clear the directory while leaving traecli.toml alone
 - [Delete Amp thread history](https://vshulcz.github.io/deja-vu/guide/delete-amp-thread-history.html): one JSON file per thread under ~/.local/share/amp/threads, so deleting one conversation is deleting one file; the thread in your Amp account is separate
 - [Delete Continue session history](https://vshulcz.github.io/deja-vu/guide/delete-continue-session-history.html): one JSON file per session plus a sessions.json list the history view reads; remove the entry with the file, or the session stays listed and cannot be deleted from Continue
 - [Delete pi session history](https://vshulcz.github.io/deja-vu/guide/delete-pi-session-history.html): each session is a single JSONL file under ~/.pi/agent/sessions; delete one file or a whole project directory, or use deja delete with dry-run preview
@@ -46,6 +47,7 @@ Run `deja` with no arguments in a terminal and it opens a full-screen search ove
 - [Delete Copilot CLI session history](https://vshulcz.github.io/deja-vu/guide/delete-copilot-cli-session-history.html): one directory per session under session-state, found by the id in events.jsonl rather than the directory name
 - [Delete Kilo Code task history](https://vshulcz.github.io/deja-vu/guide/delete-kilo-code-task-history.html): task JSON under the extension's storage, and the CLI's separate SQLite store
 - [CLI reference](https://vshulcz.github.io/deja-vu/guide/commands.html): every command and flag
+- [Search and ranking](https://vshulcz.github.io/deja-vu/guide/search.html): how BM25, filters, field boosts and optional embeddings work
 - [Agents & MCP](https://vshulcz.github.io/deja-vu/guide/agents.html): the deja MCP tool and its modes, and what each harness supports
 
 ## Problems it answers
@@ -60,9 +62,12 @@ Run `deja` with no arguments in a terminal and it opens a full-screen search ove
 - [No conversation found with session ID](https://vshulcz.github.io/deja-vu/guide/no-conversation-found-claude-code.html): what the claude --resume error means, five causes reproduced on 2.1.295, finding the file and getting the session back
 - [Switching agents](https://vshulcz.github.io/deja-vu/guide/switching-agents.html): move between Claude Code, Codex and Cursor without re-explaining
 - [Switching agents when quotas run out](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html): carry active session state across Claude Code, Codex, Gemini CLI, OpenCode, Hermes, and DSH with deja handoff, CC Switch, and Magpie
+- [Parallel sessions](https://vshulcz.github.io/deja-vu/guide/parallel-sessions.html): running multiple coding agents across worktrees and keeping their session history shared
+- [When CLAUDE.md grows too large](https://vshulcz.github.io/deja-vu/guide/rules-files.html): what belongs in standing rules vs on-demand session recall
 - [One set of rules for every agent](https://vshulcz.github.io/deja-vu/guide/one-rules-file.html): which rules file each agent reads, sharing AGENTS.md in a repository, and keeping your global rules in step with deja rules sync
+- [Project memory in the repository](https://vshulcz.github.io/deja-vu/guide/repo-memory.html): commit picked decisions, rejected approaches and gotchas into .deja/memory.jsonl so teammates' agents inherit them on clone
 - [After compaction](https://vshulcz.github.io/deja-vu/guide/after-compaction.html): recovering the commands a summary dropped, and the packet deja hands back automatically
-- [Auditing an agent](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html): review agent changes when the diff cannot say what was tried
+- [Auditing an agent](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html): review agent changes with deja review and deja blame when the diff cannot say what was tried
 - [Exporting a conversation](https://vshulcz.github.io/deja-vu/guide/export-conversations.html): markdown, JSON, or a shareable page
 - [Across machines](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html): sync between machines with no server
 - [What memory costs](https://vshulcz.github.io/deja-vu/guide/token-cost.html): the measured token cost of recall
@@ -90,6 +95,9 @@ Run `deja` with no arguments in a terminal and it opens a full-screen search ove
 - [给 Cursor 加记忆](https://vshulcz.github.io/deja-vu/zh/guide/memory-for-cursor.html)：它的聊天记录在 SQLite 里，而旁边的那个终端智能体是同一段历史
 - [接着昨天的会话继续](https://vshulcz.github.io/deja-vu/zh/guide/resume-a-session.html)：先在所有智能体里找到会话，再在它所属的那个里重新打开，或者只取摘要
 - [隐私](https://vshulcz.github.io/deja-vu/zh/guide/privacy.html)：索引什么、脱敏什么、什么永远不出这台机器，以及怎么控制留下什么
+- [Cursor 的 state.vscdb 太大](https://vshulcz.github.io/deja-vu/zh/guide/cursor-state-vscdb-too-large.html)：两条只读查询找出占满 30–125 GB 的对话，按最安全顺序瘦身并保住聊天记录
+- [claude-mem 替代方案](https://vshulcz.github.io/deja-vu/zh/guide/claude-mem-alternative.html)：直接从磁盘已有转录建立记忆，无需模型摘要或后台常驻进程
+- [把项目记忆提交进代码仓库](https://vshulcz.github.io/deja-vu/zh/guide/repo-memory.html)：通过 .deja/memory.jsonl 与团队共享经过验证的决定与被回滚的方案
 
 ## Per-harness setup
 
@@ -142,6 +150,8 @@ Run `deja` with no arguments in a terminal and it opens a full-screen search ove
 - [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html): 88.9% hit@1 on LongMemEval-S (470-question cleaned set; 97.2% R@5 across all 500 questions), 71.9% on LoCoMo, both harnesses in the repository
 - [How it compares](https://vshulcz.github.io/deja-vu/guide/compare.html): next to Mem0, Letta, memU, Memori, claude-mem, agentmemory, MemPalace, cognee, Graphiti / Zep, Hindsight, cass, Agent Sessions, agent-historian, casr and agentsview
 - [claude-mem alternative](https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html): deja-vu next to claude-mem — memory from existing transcripts with no model or worker, the day-zero difference, and running both
+- [SpecStory alternative](https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html): deja-vu next to SpecStory — index existing transcripts across 43 agents without CLI wrappers or per-repo .specstory folders
+- [Basic Memory alternative](https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html): deja-vu next to Basic Memory — automatic transcript indexing and hooks without maintaining a Markdown vault by hand
 - [Day zero](https://vshulcz.github.io/deja-vu/guide/day-zero.html): eight tools installed on one machine that already held 19,195 sessions, then asked 100 questions only that history answers — build time, first answer, search latency, hit@1; the driver for every row is in the repository
 - [Session format registry](https://vshulcz.github.io/deja-vu/registry/README.html): where each of the forty-three agents stores its sessions, with fixtures
 - [Privacy](https://vshulcz.github.io/deja-vu/guide/privacy.html): what is read, what is redacted, what never leaves

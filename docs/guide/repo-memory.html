@@ -7,6 +7,9 @@
 <title>Project memory committed in the repository — deja-vu</title>
 <meta name="description" content="Commit picked decisions and dropped approaches into .deja/memory.jsonl, so whoever clones the repository gets them in their own agent's recall.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/repo-memory.html">
+<link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/repo-memory.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/repo-memory.html">
+<link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/repo-memory.html">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Project memory committed in the repository">
 <meta property="og:description" content="Commit picked decisions and dropped approaches into .deja/memory.jsonl, so whoever clones the repository gets them in their own agent's recall.">
@@ -32,13 +35,13 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Project memory committed in the repository", "description": "Commit picked decisions and dropped approaches into .deja/memory.jsonl, so whoever clones the repository gets them in their own agent's recall.", "url": "https://vshulcz.github.io/deja-vu/guide/repo-memory.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/repo-memory.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-10-25", "dateModified": "2026-10-25"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Project memory committed in the repository", "description": "Commit picked decisions and dropped approaches into .deja/memory.jsonl, so whoever clones the repository gets them in their own agent's recall.", "url": "https://vshulcz.github.io/deja-vu/guide/repo-memory.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/repo-memory.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-10-25", "dateModified": "2026-11-05"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Repo memory","item":"https://vshulcz.github.io/deja-vu/guide/repo-memory.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I share what my coding agent learned about a repository with my team?","acceptedAnswer":{"@type":"Answer","text":"deja repo candidates lists decisions, dropped approaches and gotchas for the project from your agent history. deja repo add writes the ones you pick into .deja/memory.jsonl, redacted. Commit the file and everyone who clones the repository and runs deja gets those entries in recall and at session start, in whichever agent they use."}},{"@type":"Question","name":"Does deja write to my repository on its own?","acceptedAnswer":{"@type":"Answer","text":"No. The file changes only when you run deja repo add, or when you ask your agent to store an entry in the repository. deja never stages or commits it."}},{"@type":"Question","name":"Can I stop entries from a cloned repository reaching my agent?","acceptedAnswer":{"@type":"Answer","text":"Yes. The trust policy has a repo origin: {\"activations\":{\"auto\":{\"repo\":false}}} keeps repository entries out of session start and prompt hooks, and repo:<project> names one repository."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
-<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="nav-cta" href="https://github.com/vshulcz/deja-vu"><span class="star-ic" aria-hidden="true">★</span>GitHub</a></nav>
 <div class="wrap"><div class="doc">
 <aside><a href="../">← deja-vu</a>
 <div class="grp">Guide</div>
@@ -156,6 +159,8 @@
 <a href="benchmarks.html">Benchmarks</a>
 <a href="compare.html">Compare</a>
 <a href="claude-mem-alternative.html">claude-mem alternative</a>
+<a href="specstory-alternative.html">SpecStory alternative</a>
+<a href="basic-memory-alternative.html">Basic Memory alternative</a>
 <a href="day-zero.html">Day zero</a>
 <div class="grp">Reference</div>
 <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
@@ -167,6 +172,8 @@
 <p class="pagelede">the decisions behind the code, in the repository with it<span class="mins" data-mins></span></p>
 
 <p>Your agent tried retry with jitter on the webhook sender in August, watched it break idempotency, and reverted it. That is in your session history and nowhere else. A teammate's agent, in a fresh clone, will suggest it again on the first slow receiver. <code>deja sync</code> moves history between your own machines. This moves the few lines that matter to the people you work with, through the repository.</p>
+
+<div class="save-first"><b>Share project decisions through git:</b> <a href="https://github.com/vshulcz/deja-vu">deja-vu</a> extracts decisions, rejected approaches and gotchas from your local session history into a merge-friendly <code>.deja/memory.jsonl</code>.<div class="save-actions"><div class="save-cmd"><span class="p">$</span><code>brew install deja-vu &amp;&amp; deja repo candidates</code><button type="button">copy</button></div><div class="save-cmd"><span class="p">$</span><code>npx @vshulcz/deja-vu repo candidates</code><button type="button">copy</button></div><a class="save-btn" href="https://github.com/vshulcz/deja-vu">deja-vu on GitHub</a><a class="save-demo" href="getting-started.html">Quick start &rarr;</a></div></div>
 
 <h2>Picking entries</h2>
 <pre>$ deja repo candidates

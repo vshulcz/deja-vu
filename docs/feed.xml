@@ -11,11 +11,221 @@
     <name>vshulcz</name>
   </author>
   <entry>
+    <title>Auditing what a coding agent actually did — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/auditing-agents.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/auditing-agents.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>How to review agent changes after the fact: the diff says what changed, the transcript says what was tried and why.</summary>
+  </entry>
+  <entry>
+    <title>Basic Memory alternative for coding agents — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>Automatic session-history recall across Claude Code, Codex, Cursor and 40 other agents from existing transcripts, with no Markdown notes to maintain by hand.</summary>
+  </entry>
+  <entry>
     <title>deja CLI reference: search, recall, blame, stats — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/commands.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/commands.html"></link>
     <updated>2026-11-05T00:00:00Z</updated>
     <summary>Every deja subcommand: search, ctx, blame, fix, how, secrets, remember, forget, stats, last, sources, install, embed, sync, doctor, bench and update.</summary>
+  </entry>
+  <entry>
+    <title>Search Claude Code, Codex &amp; Cursor sessions — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/find-a-session.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/find-a-session.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>Search past chat history across Claude Code, Codex, Cursor and 40 other agents by the error string, function name, file path or flag you remember.</summary>
+  </entry>
+  <entry>
+    <title>Project memory committed in the repository — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/repo-memory.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/repo-memory.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>Commit picked decisions and dropped approaches into .deja/memory.jsonl, so whoever clones the repository gets them in their own agent&#39;s recall.</summary>
+  </entry>
+  <entry>
+    <title>SpecStory alternative for CLI &amp; 43 agents — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>Index the transcripts Claude Code, Codex, Cursor and 40 other agents already keep on disk into one local SQLite search index, with no account or extension.</summary>
+  </entry>
+  <entry>
+    <title>支持 Codex、Cursor、opencode 的 claude-mem 替代方案 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/claude-mem-alternative.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/claude-mem-alternative.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>无需模型、后台进程或登录账号：deja-vu 直接索引 Codex、Cursor、opencode 等 43 款工具磁盘上已有的会话，包括安装前的历史。</summary>
+  </entry>
+  <entry>
+    <title>Codex CLI 的会话历史：查看、搜索和同步 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/codex-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/codex-history.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>Codex CLI 把会话历史放在哪里、为什么 grep 会漏掉一周之前的会话、jq 和 sqlite3 怎么读，以及如何搜索全部 Codex 会话。</summary>
+  </entry>
+  <entry>
+    <title>Codex resume 会话：列出、查找和修复报错 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/codex-resume-session.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/codex-resume-session.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>codex resume、--all、--last 和 exec resume：为什么某个会话不在选择器里，以及 no rollout found 和 is archived 这两个报错。</summary>
+  </entry>
+  <entry>
+    <title>Claude Code 上下文窗口满了：它会丢掉什么 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/context-window-full.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/context-window-full.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>压缩保留了 77% 的决定和 0.2% 的命令——实测。与其为不断增长、直到崩掉的窗口持续付账，不如换个做法。</summary>
+  </entry>
+  <entry>
+    <title>Cursor 的 state.vscdb 太大：安全瘦身并保留聊天记录 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/cursor-state-vscdb-too-large.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/cursor-state-vscdb-too-large.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>Cursor 的 state.vscdb 膨胀到 30–125 GB：两条只读 SQLite 查询找出哪些对话占满了空间，按最安全顺序瘦身，并保留删掉的聊天记录。</summary>
+  </entry>
+  <entry>
+    <title>怎么删除 Codex CLI 的会话 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/delete-codex-sessions.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/delete-codex-sessions.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>怎么删除 Codex CLI 的会话——删一次 rollout、删一天，或者删掉整个 ~/.codex/sessions——以及为什么 ~/.codex/history.jsonl 无论如何都留着你的提示词。</summary>
+  </entry>
+  <entry>
+    <title>怎么删除 Cursor 的聊天记录 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/delete-cursor-chat-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/delete-cursor-chat-history.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>怎么删除 Cursor 的聊天记录——聊天存在 state.vscdb 里的什么位置、为什么删掉整个文件会重置的不只是聊天，以及命令行版另外写了什么。</summary>
+  </entry>
+  <entry>
+    <title>怎么删掉 Claude Code 的旧会话 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/delete-old-claude-sessions.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/delete-old-claude-sessions.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>find ~/.claude/projects -mtime +30 -delete 一条命令就能清掉，cleanupPeriodDays 则按时间自动清——以及为什么按时间删腾出的磁盘远比按大小删少。</summary>
+  </entry>
+  <entry>
+    <title>Claude Code 记得之前的对话吗？ — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/does-my-agent-remember.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/does-my-agent-remember.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>Claude Code、Codex、Cursor、Gemini CLI 都不会跨会话记忆。这篇讲清楚每个工具在磁盘上留下了什么、压缩到底保住了多少，以及把历史找回来的三种办法。</summary>
+  </entry>
+  <entry>
+    <title>找回解决问题的那次会话 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/find-a-session.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/find-a-session.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>怎么在整台机器的所有智能体里同时搜聊天记录：按你记得的那个词搜，而不是按你记不清的话题搜，然后用会话 id 继续那次对话。</summary>
+  </entry>
+  <entry>
+    <title>为什么智能体在会话之间会忘事 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/forgetting.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/forgetting.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>会话结束时上下文窗口被丢弃，但会话记录还在磁盘上。这篇讲压缩到底保住了什么、丢掉了什么，以及为什么直接 grep 日志代价高得多。</summary>
+  </entry>
+  <entry>
+    <title>Claude Code 丢了上下文：怎么找回来 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/lost-context.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/lost-context.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>崩溃、清空窗口或重启会带走智能体的上下文，但带不走会话记录。怎么把工作找回来，以及怎样让下一次不必再付这个代价。</summary>
+  </entry>
+  <entry>
+    <title>给 Claude Code 加记忆：召回这台机器上所有智能体的历史会话 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-claude-code.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-claude-code.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>如何让 Claude Code 查到这台机器上每个编程智能体的会话：MCP 服务器、SessionStart 钩子和插件市场。</summary>
+  </entry>
+  <entry>
+    <title>给 Codex CLI 加记忆：召回这台机器上所有智能体的历史会话 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-codex.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-codex.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>如何让 Codex CLI 查到这台机器上每个编程智能体的会话：MCP 服务器、需要你批准的钩子，以及插件市场。</summary>
+  </entry>
+  <entry>
+    <title>给 Cursor 加记忆：召回这台机器上所有智能体的历史会话 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-cursor.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-cursor.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>如何让 Cursor 查到这台机器上每个编程智能体的会话：它的 SQLite 聊天记录存在哪，以及 deja install cursor-auto 写入了什么。</summary>
+  </entry>
+  <entry>
+    <title>给 DeepSeek Harness 加记忆：召回这台机器上所有智能体的历史会话 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-dsh.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-dsh.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>如何让 dsh 能查到这台机器上每个编程智能体已经写下的会话记录：插件怎么装、装完多了哪些工具，以及它和 CLI 安装并存时的行为。</summary>
+  </entry>
+  <entry>
+    <title>给 Kimi Code 加记忆：召回这台机器上所有智能体的历史会话 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-kimi.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-kimi.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>如何让 Kimi Code 查到这台机器上每个编程智能体的会话：插件怎么装、每次提问都会触发的那个钩子，以及走 CLI 的那条路。</summary>
+  </entry>
+  <entry>
+    <title>给 Qwen Code 加记忆：召回这台机器上所有智能体的历史会话 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-qwen.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-qwen.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>如何让 Qwen Code 查到这台机器上每个编程智能体的会话：走 Gemini 扩展格式，也走 Claude 格式的插件市场。</summary>
+  </entry>
+  <entry>
+    <title>Claude Code：No conversation found with session ID — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/no-conversation-found-claude-code.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/no-conversation-found-claude-code.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>claude --resume 在 ~/.claude/projects 下没找到会话文件。五种原因，在 2.1.295 上复现，怎么找到那个文件，以及怎么把会话找回来。</summary>
+  </entry>
+  <entry>
+    <title>隐私：索引什么、脱敏什么、什么都不外传 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/privacy.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/privacy.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>deja 索引的是可能含有凭据的会话历史：索引和检索都在本地，凭据在写入前就被脱敏，排除、遗忘与信任范围决定留下什么。</summary>
+  </entry>
+  <entry>
+    <title>怎么找回被删掉的 Claude Code 会话 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/recover-a-deleted-session.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/recover-a-deleted-session.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>claude --resume 里找不到那次会话：文件去了哪里，四种原因里有三种并不是删除，以及真正还能找回的是什么。</summary>
+  </entry>
+  <entry>
+    <title>把项目记忆提交进代码仓库（.deja/memory.jsonl） — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/repo-memory.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/repo-memory.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>把经过验证的架构决定、踩坑教训和被否掉的方案写进 .deja/memory.jsonl，让克隆仓库的每位协作者在自己的编程智能体里直接召回。</summary>
+  </entry>
+  <entry>
+    <title>接着昨天的 Claude Code 或 Codex 会话继续 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/resume-a-session.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/resume-a-session.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>先在整台机器的所有智能体里找到那次会话，再在它所属的工具里重新打开——或者只取摘要，不要整段对话。</summary>
+  </entry>
+  <entry>
+    <title>怎么删 Claude Code 的会话文件 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>Claude Code 的会话记录在 ~/.claude/projects 下：怎么删一个、删一个项目、全删，cleanupPeriodDays 会自动删掉什么，以及删掉之后失去什么。</summary>
+  </entry>
+  <entry>
+    <title>每个编程智能体把会话历史存在哪里 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html"></link>
+    <updated>2026-11-05T00:00:00Z</updated>
+    <summary>四十三个编程智能体各自把会话记录写在磁盘的哪个位置、用的是什么格式，以及怎么自己读它们。表格来自 deja 解析器所依据的同一份格式登记表。</summary>
   </entry>
   <entry>
     <title>Memory plugins for Claude Code, Codex and Cursor, compared</title>
@@ -79,215 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-cherrystudio-session-history.html"></link>
     <updated>2026-11-03T00:00:00Z</updated>
     <summary>Cherry Studio keeps Claude, pi and dsh transcripts under Data/Agents. Delete the session files by hand, and run deja index first so they stay searchable.</summary>
-  </entry>
-  <entry>
-    <title>Delete Cline task history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-cline-task-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-cline-task-history.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>Cline has separate CLI and VS Code extension histories. Find the right store and remove one conversation without deleting unrelated task state.</summary>
-  </entry>
-  <entry>
-    <title>How to delete CodeBuddy session history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>How to delete CodeBuddy Code and WorkBuddy sessions — the .jsonl conversation, its .meta.json, rollback sidecar and file-history snapshots.</summary>
-  </entry>
-  <entry>
-    <title>Delete CodeWhale session history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-codewhale-session-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-codewhale-session-history.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>CodeWhale stores each session in a JSON file under ~/.codewhale/sessions. Remove one session or all, and keep history searchable with deja before deleting.</summary>
-  </entry>
-  <entry>
-    <title>Delete Codex CLI sessions in ~/.codex/sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>How to delete Codex CLI sessions — one rollout, one day, or all of ~/.codex/sessions — and why ~/.codex/history.jsonl keeps your prompts regardless.</summary>
-  </entry>
-  <entry>
-    <title>Delete Continue session history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-continue-session-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-continue-session-history.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>Continue keeps one JSON file per session plus a sessions.json list the history view reads. How to remove one session or all, and why the list has to go too.</summary>
-  </entry>
-  <entry>
-    <title>Delete VS Code Copilot Chat history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>Where VS Code Copilot Chat keeps conversations, how to remove one or all of them, and what goes with them.</summary>
-  </entry>
-  <entry>
-    <title>Delete Copilot CLI session history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-copilot-cli-session-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-copilot-cli-session-history.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>Copilot CLI keeps each session in its own directory under session-state. Find it, delete one session or all of them, and know what goes with them.</summary>
-  </entry>
-  <entry>
-    <title>Delete Crush session history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-crush-session-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-crush-session-history.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>Crush keeps a crush.db SQLite store inside each project&#39;s .crush directory. Find every store via projects.json and remove one session or a project&#39;s history.</summary>
-  </entry>
-  <entry>
-    <title>Delete Cursor chat history from state.vscdb — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>How to delete Cursor chat history — where the chats live in state.vscdb, why deleting the file resets more than chats, and what the CLI writes separately.</summary>
-  </entry>
-  <entry>
-    <title>Delete Gemini CLI chat history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-gemini-cli-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-gemini-cli-history.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>Where Gemini CLI keeps chats under ~/.gemini/tmp, how to map a project id back to a directory, what to delete and what the prompt log keeps.</summary>
-  </entry>
-  <entry>
-    <title>Delete Goose session history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-goose-session-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-goose-session-history.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>Since goose 1.10.0 every session is a row in sessions.db. Remove one with goose session remove, clear the legacy JSONL files yourself, and know what is lost.</summary>
-  </entry>
-  <entry>
-    <title>Delete Hermes session history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-hermes-session-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-hermes-session-history.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>Hermes stores its conversations in ~/.hermes/state.db and profile state.db files. Remove one session with hermes sessions delete or clear the database cleanly.</summary>
-  </entry>
-  <entry>
-    <title>Delete Junie session history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-junie-session-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-junie-session-history.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>Junie keeps each session in a directory under ~/.junie/sessions. Find it, remove one session or all, and understand what remains in index.jsonl.</summary>
-  </entry>
-  <entry>
-    <title>Delete Kilo Code task history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-kilo-code-task-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-kilo-code-task-history.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>Kilo Code keeps each task as JSON under the VS Code extension&#39;s storage, and its CLI keeps a separate SQLite store.</summary>
-  </entry>
-  <entry>
-    <title>Delete Kimi Code session history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-kimi-code-session-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-kimi-code-session-history.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>Kimi Code keeps each session in its own directory. Find it, remove one session or all, and delete the state.json that would still list it.</summary>
-  </entry>
-  <entry>
-    <title>Delete Kiro session history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-kiro-session-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-kiro-session-history.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>Kiro keeps CLI and IDE sessions in two different trees under ~/.kiro/sessions. Where each one is, how to remove one session or all, and what else Kiro keeps.</summary>
-  </entry>
-  <entry>
-    <title>Delete old Claude Code CLI sessions by age — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-old-claude-sessions.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-old-claude-sessions.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>Claude Code CLI transcripts, not claude.ai chats: find ~/.claude/projects -mtime +30 -delete, cleanupPeriodDays on a timer, and why age frees little disk.</summary>
-  </entry>
-  <entry>
-    <title>Delete OpenClaw session history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-openclaw-session-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-openclaw-session-history.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>Since 2026.8 OpenClaw keeps sessions in one SQLite file per agent. Delete one with openclaw sessions delete, then clear the archive it keeps.</summary>
-  </entry>
-  <entry>
-    <title>Delete opencode session history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-opencode-session-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-opencode-session-history.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>opencode keeps every session in one SQLite database. What the tables hold, how to remove a session, and why deleting rows does not free the space.</summary>
-  </entry>
-  <entry>
-    <title>Delete pi session history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-pi-session-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-pi-session-history.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>pi stores each session in a JSONL file under ~/.pi/agent/sessions. Find it, delete one session or all, or use deja delete with dry-run preview.</summary>
-  </entry>
-  <entry>
-    <title>Delete Qwen Code chat history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-qwen-code-chat-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-qwen-code-chat-history.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>Qwen Code keeps one JSONL file per session under ~/.qwen/projects. Delete one session with its sub-agent logs, or all, and keep your settings.</summary>
-  </entry>
-  <entry>
-    <title>Delete Roo Code task history</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-roo-task-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-roo-task-history.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>Find Roo Code history across editor hosts and custom storage. Delete one task or all tasks, understand what is lost, or keep the history searchable.</summary>
-  </entry>
-  <entry>
-    <title>How to delete TRAE CLI sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-trae-sessions.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-trae-sessions.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>How to delete TRAE CLI sessions — one rollout, one day, or all of ~/.trae/cli/sessions — and why an archived session and history.jsonl survive it.</summary>
-  </entry>
-  <entry>
-    <title>Delete Windsurf Cascade history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-windsurf-cascade-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-windsurf-cascade-history.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>Windsurf and Devin Desktop keep one encrypted file per Cascade conversation. Where it is, how to delete one or all, and what to leave alone beside it.</summary>
-  </entry>
-  <entry>
-    <title>Delete Zed agent thread history</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-zed-thread-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-zed-thread-history.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>Find Zed agent threads in threads.db, delete one through the history view, or remove the built-in agent database with Zed closed. Know what is lost.</summary>
-  </entry>
-  <entry>
-    <title>Install deja and index your agent history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/getting-started.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/getting-started.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>Install deja and index your coding-agent history in one command, then search it and wire it into your agents over MCP.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to JetBrains AI Assistant — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-jetbrains.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-jetbrains.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>Give JetBrains AI Assistant recall over every coding agent&#39;s sessions — MCP in ~/.ai/mcp/mcp.json, and why no hook can deliver it.</summary>
-  </entry>
-  <entry>
-    <title>Claude Code: No conversation found with session ID — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/no-conversation-found-claude-code.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/no-conversation-found-claude-code.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>Claude Code CLI: claude --resume found no file under ~/.claude/projects. Five causes reproduced on 2.1.295, how to find the file, and how to write it back.</summary>
-  </entry>
-  <entry>
-    <title>Recover a deleted Claude Code CLI session — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>A Claude Code CLI session (not a claude.ai chat) missing from --resume: where its ~/.claude/projects file went, and how to write it back from an index.</summary>
-  </entry>
-  <entry>
-    <title>Delete Claude Code sessions in ~/.claude/projects — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>Claude Code CLI transcripts, not claude.ai chats: rm one .jsonl under ~/.claude/projects, claude project purge, cleanupPeriodDays. What /clear does.</summary>
   </entry>
 </feed>

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-Hans" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cursor 的 state.vscdb 太大：安全瘦身并保留聊天记录 — deja-vu</title>
+<meta name="description" content="Cursor 的 state.vscdb 膨胀到 30–125 GB：两条只读 SQLite 查询找出哪些对话占满了空间，按最安全顺序瘦身，并保留删掉的聊天记录。">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/zh/guide/cursor-state-vscdb-too-large.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/cursor-state-vscdb-too-large.html">
+<link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html">
+<link rel="alternate" hreflang="ru" href="https://vshulcz.github.io/deja-vu/ru/guide/cursor-state-vscdb-too-large.html">
+<link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:title" content="Cursor 的 state.vscdb 太大：安全瘦身并保留聊天记录">
+<meta property="og:description" content="Cursor 的 state.vscdb 膨胀到 30–125 GB：两条只读 SQLite 查询找出哪些对话占满了空间，按最安全顺序瘦身，并保留删掉的聊天记录。">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/zh/guide/cursor-state-vscdb-too-large.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — 给编程智能体的可搜索本地记忆">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<meta name="twitter:title" content="Cursor 的 state.vscdb 太大：安全瘦身并保留聊天记录">
+<meta name="twitter:description" content="Cursor 的 state.vscdb 膨胀到 30–125 GB：两条只读 SQLite 查询找出哪些对话占满了空间，按最安全顺序瘦身，并保留删掉的聊天记录。">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../../assets/icon.svg">
+<link rel="stylesheet" href="../../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<link rel="apple-touch-icon" href="../../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Cursor 的 state.vscdb 太大：是什么塞满了它，以及怎么安全瘦身", "description": "Cursor 的 state.vscdb 膨胀到 30–125 GB：两条只读 SQLite 查询找出哪些对话占满了空间，按最安全顺序瘦身，并保留删掉的聊天记录。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/cursor-state-vscdb-too-large.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/cursor-state-vscdb-too-large.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-05", "dateModified": "2026-11-05"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "state.vscdb 太大", "item": "https://vshulcz.github.io/deja-vu/zh/guide/cursor-state-vscdb-too-large.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "为什么 Cursor 的 state.vscdb 会膨胀到几十 GB？", "acceptedAnswer": {"@type": "Answer", "text": "state.vscdb 是一个 SQLite 数据库，其中的 cursorDiskKV 表存着所有聊天记录（composerData、bubbleId）以及 Agent 的检查点与大对象（checkpointId、agentKv）。几个超长的 Agent 会话往往就占了绝大部分体积。"}}, {"@type": "Question", "name": "state.vscdb.backup 可以直接删掉吗？", "acceptedAnswer": {"@type": "Answer", "text": "可以。Cursor 已经不再更新这个旧备份文件，退出 Cursor 后直接删除即可释放空间，不会影响当前聊天记录。"}}, {"@type": "Question", "name": "清理或重置 state.vscdb 之前怎么保留里面的历史对话？", "acceptedAnswer": {"@type": "Answer", "text": "Cursor 本身没有归档功能。清理前先运行一次 deja index，它会通过 sqlite3 只读读取 state.vscdb 并建立紧凑的本地全文索引；之后即使你在 Cursor 里删掉对话或移走整个数据库，这些对话依然可以用 deja 搜索和查看。"}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../../"><img src="../../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../../">首页</a><a class="lnk" href="getting-started.html">文档</a><a class="nav-cta" href="https://github.com/vshulcz/deja-vu"><span class="star-ic" aria-hidden="true">★</span>GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../../">← deja-vu</a><div class="grp">中文指南</div>
+<a href="getting-started.html">快速开始</a>
+<a href="does-my-agent-remember.html">智能体记得之前的对话吗</a>
+<a href="forgetting.html">为什么会忘事</a>
+<a href="context-window-full.html">上下文窗口满了</a>
+<a href="lost-context.html">上下文丢了</a>
+<a href="where-sessions-are-stored.html">历史文件在哪里</a>
+<a href="find-a-session.html">找回解决问题的那次会话</a>
+<a href="resume-a-session.html">接着昨天的会话继续</a>
+<a href="codex-history.html">Codex 的会话历史</a>
+<a href="codex-resume-session.html">Codex 会话恢复</a>
+<a href="no-conversation-found-claude-code.html">找不到会话</a>
+<a href="recover-a-deleted-session.html">找回被删掉的会话</a>
+<a href="session-files-on-disk.html">会话文件怎么删</a>
+<a href="delete-old-claude-sessions.html">怎么删掉旧会话</a>
+<a href="delete-codex-sessions.html">删除 Codex 的会话</a>
+<a href="delete-cursor-chat-history.html">删除 Cursor 的聊天记录</a>
+<a href="cursor-state-vscdb-too-large.html" aria-current="page">Cursor state.vscdb 太大</a>
+<a href="repo-memory.html">仓库共享记忆</a>
+<a href="claude-mem-alternative.html">claude-mem 替代方案</a>
+<a href="privacy.html">隐私</a>
+<a href="memory-for-claude-code.html">给 Claude Code 加记忆</a>
+<a href="memory-for-codex.html">给 Codex CLI 加记忆</a>
+<a href="memory-for-cursor.html">给 Cursor 加记忆</a>
+<a href="memory-for-dsh.html">给 DeepSeek Harness 加记忆</a>
+<a href="memory-for-kimi.html">给 Kimi Code 加记忆</a>
+<a href="memory-for-qwen.html">给 Qwen Code 加记忆</a>
+<div class="grp">English</div>
+<a href="../../guide/cursor-state-vscdb-too-large.html">Cursor state.vscdb too large</a>
+<a href="../../guide/delete-cursor-chat-history.html">Delete Cursor chat history</a>
+<a href="../../guide/commands.html">CLI reference</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.zh.md">中文 README</a>
+<a href="../../registry/README.html">Format registry</a><a class="sidecat" href="../../"><img src="../../assets/icon-live.svg" width="46" height="46" alt=""><span>它记得，你就不必记</span></a></aside>
+<article>
+
+<h1>Cursor 的 state.vscdb 太大：是什么塞满了它，以及怎么安全瘦身</h1>
+<p class="pagelede">几十 GB 的聊天状态，以及在释放磁盘的同时保住对话记录的办法<span class="mins" data-mins></span></p>
+
+<p>常见现象：重启后 Cursor 一直卡在“Loading chats”，新开对话发第一条消息就转圈，一查 <code>globalStorage</code> 发现占了 30、50 甚至 125 GB。这里面几乎全是同一个文件：<code>state.vscdb</code>，而这个文件里几乎全是聊天状态。</p>
+
+<div class="save-first"><b>在删除对话或移走 <code>state.vscdb</code> 之前：</b>Cursor 没有归档机制，为了腾空间删掉的任何对话都会永久消失。先用 <a href="https://github.com/vshulcz/deja-vu">deja-vu</a> 建一份索引：它通过 <code>sqlite3</code> 只读读取 <code>state.vscdb</code>，在你瘦身或重置数据库之后，仍然在本地保留所有历史对话的可搜索索引。<div class="save-actions"><div class="save-cmd"><span class="p">$</span><code>brew install deja-vu &amp;&amp; deja index</code><button type="button">copy</button></div><div class="save-cmd"><span class="p">$</span><code>npx @vshulcz/deja-vu index</code><button type="button">copy</button></div><a class="save-btn" href="https://github.com/vshulcz/deja-vu">GitHub 上的 deja-vu</a><a class="save-demo" href="getting-started.html">快速开始 &rarr;</a></div></div>
+
+<h2>文件在哪里</h2>
+<pre># macOS
+~/Library/Application Support/Cursor/User/globalStorage/state.vscdb
+# Linux
+~/.config/Cursor/User/globalStorage/state.vscdb
+# Windows
+%APPDATA%\Cursor\User\globalStorage\state.vscdb</pre>
+<p>它是一个 SQLite 数据库。对话存在 <code>cursorDiskKV</code> 表里：每个会话一条 <code>composerData:&lt;id&gt;</code>，每条消息一条 <code>bubbleId:&lt;chat&gt;:&lt;bubble&gt;</code>，再加上 Agent 检查点和大对象的 <code>checkpointId:</code> 与 <code>agentKv:</code>。<a href="delete-cursor-chat-history.html">删除 Cursor 聊天记录</a>那一页有完整的表结构说明。</p>
+
+<h2>先不改文件，只读查出是谁占了空间</h2>
+<p>退出 Cursor，或者直接带 <code>-readonly</code> 查询。两条查询都会扫全表，50 GB 的文件大约需要几分钟。</p>
+<p>看哪一类键占了空间：</p>
+<pre>sqlite3 -readonly state.vscdb "
+SELECT substr(key, 1, instr(key, ':') - 1) AS kind, count(*),
+       round(sum(length(CAST(value AS BLOB))) / 1e9, 2) AS gb
+FROM cursorDiskKV GROUP BY kind ORDER BY gb DESC;"</pre>
+<p>看具体是哪几个会话占得最多：</p>
+<pre>sqlite3 -readonly state.vscdb "
+SELECT substr(key, 10, 36) AS chat, count(*) AS messages,
+       round(sum(length(CAST(value AS BLOB))) / 1e6) AS mb
+FROM cursorDiskKV WHERE key LIKE 'bubbleId:%'
+GROUP BY chat ORDER BY mb DESC LIMIT 15;"</pre>
+<p>再查出某个会话的标题，方便在 Cursor 列表里找到它：</p>
+<pre>sqlite3 -readonly state.vscdb "
+SELECT json_extract(value, '$.name') FROM cursorDiskKV
+WHERE key = 'composerData:&lt;chat id&gt;';"</pre>
+<p>通常结果都是少数几个极长的 Agent 会话占掉了大半个文件，而不是几千个小对话。</p>
+
+<h2>按最安全的顺序瘦身</h2>
+<ul>
+<li><b>如果有 <code>state.vscdb.backup</code>，先删它。</b>Cursor 早就不再更新这个文件了，它只是残留的旧副本，有时超过 10 GB；退出 Cursor 后直接删掉，不会碰任何聊天记录。</li>
+<li><b>在 Cursor 界面里删掉最大的几个会话。</b>通过界面删除能让 Cursor 自己清理关联行；在 Cursor 运行时直接用 SQL 改表，往往会把窗口状态一起搞坏。</li>
+<li><b>触发回收。</b>命令面板里的 <code>Delete old chats…</code> 可以批量删旧对话，开发者命令 <code>GC Agent KV Blobs</code> 会清理不再被任何会话引用的大对象。注意：在旧版创建的数据库上，删除行释放的空间仍留在文件内部，压实（VACUUM/compaction）需要接近数据库本身甚至两倍大小的可用磁盘空间。</li>
+<li><b>彻底重建。</b>退出 Cursor，把 <code>state.vscdb</code>、<code>state.vscdb-wal</code> 和 <code>state.vscdb-shm</code> 移到别的目录（先别进废纸篓），再启动 Cursor：它会建一个全新的空库。确认旧库里没有什么遗漏之前，先留着备份文件。</li>
+</ul>
+
+<h2>保住你删掉的那些对话</h2>
+<p>无论用哪种方式瘦身，里面那些对话都是你排查问题、跑通命令的记录，而 Cursor 自己没有归档。</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja-vu</a> 通过 <code>sqlite3</code> 只读索引 Cursor 的对话，并和本机上 Claude Code、Codex 等其他智能体的历史放进同一个本地索引。已经被索引过的对话，就算从 <code>state.vscdb</code> 里删掉甚至整个数据库被移走，依然能搜到。所以在动手清理前先跑一次：</p>
+<pre>deja index
+deja "pgbouncer"          # 从 Cursor 删掉之后依然能搜出那次对话</pre>
+<p>在直接运行 <code>deja</code> 打开的全屏界面里，你随时能翻阅这段对话，或者按 <code>o</code> 把它的上下文带进另一个智能体继续做。</p>
+
+<p><a href="delete-cursor-chat-history.html">删除 Cursor 的聊天记录</a> · <a href="where-sessions-are-stored.html">各个工具把历史存在哪里</a> · <a href="memory-for-cursor.html">给 Cursor 加上跨工具记忆</a></p>
+<p class="star-cta">觉得有用？欢迎在 <a href="https://github.com/vshulcz/deja-vu">GitHub 上给 deja-vu 点颗 Star</a>。</p>
+</article>
+</div>
+<footer>deja-vu 采用 MIT 许可，在你的机器上运行。<a href="https://github.com/vshulcz/deja-vu">GitHub 源码</a> · <a href="../../">首页</a></footer>
+</div>
+<script src="../../assets/guide.js" defer></script>
+</body>
+</html>

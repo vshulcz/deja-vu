@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-Hans" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>把项目记忆提交进代码仓库（.deja/memory.jsonl） — deja-vu</title>
+<meta name="description" content="把经过验证的架构决定、踩坑教训和被否掉的方案写进 .deja/memory.jsonl，让克隆仓库的每位协作者在自己的编程智能体里直接召回。">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/zh/guide/repo-memory.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/repo-memory.html">
+<link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/repo-memory.html">
+<link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/repo-memory.html">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:title" content="把项目记忆提交进代码仓库（.deja/memory.jsonl）">
+<meta property="og:description" content="把经过验证的架构决定、踩坑教训和被否掉的方案写进 .deja/memory.jsonl，让克隆仓库的每位协作者在自己的编程智能体里直接召回。">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/zh/guide/repo-memory.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — 给编程智能体的可搜索本地记忆">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<meta name="twitter:title" content="把项目记忆提交进代码仓库（.deja/memory.jsonl）">
+<meta name="twitter:description" content="把经过验证的架构决定、踩坑教训和被否掉的方案写进 .deja/memory.jsonl，让克隆仓库的每位协作者在自己的编程智能体里直接召回。">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../../assets/icon.svg">
+<link rel="stylesheet" href="../../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<link rel="apple-touch-icon" href="../../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "把项目记忆提交进代码仓库（.deja/memory.jsonl）", "description": "把经过验证的架构决定、踩坑教训和被否掉的方案写进 .deja/memory.jsonl，让克隆仓库的每位协作者在自己的编程智能体里直接召回。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/repo-memory.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/repo-memory.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-05", "dateModified": "2026-11-05"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "仓库共享记忆", "item": "https://vshulcz.github.io/deja-vu/zh/guide/repo-memory.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "怎么把我的编程智能体在项目里踩过的坑分享给团队成员？", "acceptedAnswer": {"@type": "Answer", "text": "运行 deja repo candidates 从本地历史里列出该项目曾做出的决定、被回滚的方案与注意事项；用 deja repo add 把选中的条目脱敏写入 .deja/memory.jsonl 并提交到 Git。任何克隆该仓库并安装了 deja 的队友，无论使用 Claude Code、Codex 还是 Cursor，都能在召回和会话启动时看到这些记录。"}}, {"@type": "Question", "name": "deja 会自动修改或提交我的代码仓库吗？", "acceptedAnswer": {"@type": "Answer", "text": "不会。只有当你手动运行 deja repo add 或明确要求智能体写入仓库记忆时，.deja/memory.jsonl 才会更新；deja 绝不会自动 git add 或 git commit。"}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../../"><img src="../../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../../">首页</a><a class="lnk" href="getting-started.html">文档</a><a class="nav-cta" href="https://github.com/vshulcz/deja-vu"><span class="star-ic" aria-hidden="true">★</span>GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../../">← deja-vu</a><div class="grp">中文指南</div>
+<a href="getting-started.html">快速开始</a>
+<a href="does-my-agent-remember.html">智能体记得之前的对话吗</a>
+<a href="forgetting.html">为什么会忘事</a>
+<a href="context-window-full.html">上下文窗口满了</a>
+<a href="lost-context.html">上下文丢了</a>
+<a href="where-sessions-are-stored.html">历史文件在哪里</a>
+<a href="find-a-session.html">找回解决问题的那次会话</a>
+<a href="resume-a-session.html">接着昨天的会话继续</a>
+<a href="codex-history.html">Codex 的会话历史</a>
+<a href="codex-resume-session.html">Codex 会话恢复</a>
+<a href="no-conversation-found-claude-code.html">找不到会话</a>
+<a href="recover-a-deleted-session.html">找回被删掉的会话</a>
+<a href="session-files-on-disk.html">会话文件怎么删</a>
+<a href="delete-old-claude-sessions.html">怎么删掉旧会话</a>
+<a href="delete-codex-sessions.html">删除 Codex 的会话</a>
+<a href="delete-cursor-chat-history.html">删除 Cursor 的聊天记录</a>
+<a href="cursor-state-vscdb-too-large.html">Cursor state.vscdb 太大</a>
+<a href="repo-memory.html" aria-current="page">仓库共享记忆</a>
+<a href="claude-mem-alternative.html">claude-mem 替代方案</a>
+<a href="privacy.html">隐私</a>
+<a href="memory-for-claude-code.html">给 Claude Code 加记忆</a>
+<a href="memory-for-codex.html">给 Codex CLI 加记忆</a>
+<a href="memory-for-cursor.html">给 Cursor 加记忆</a>
+<a href="memory-for-dsh.html">给 DeepSeek Harness 加记忆</a>
+<a href="memory-for-kimi.html">给 Kimi Code 加记忆</a>
+<a href="memory-for-qwen.html">给 Qwen Code 加记忆</a>
+<div class="grp">English</div>
+<a href="../../guide/repo-memory.html">Repo memory</a>
+<a href="../../guide/sync-across-machines.html">Across machines</a>
+<a href="../../guide/commands.html">CLI reference</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.zh.md">中文 README</a>
+<a href="../../registry/README.html">Format registry</a><a class="sidecat" href="../../"><img src="../../assets/icon-live.svg" width="46" height="46" alt=""><span>它记得，你就不必记</span></a></aside>
+<article>
+
+<h1>把项目记忆提交进代码仓库</h1>
+<p class="pagelede">代码背后的取舍与被否掉的死胡同，随代码一起留在仓库里<span class="mins" data-mins></span></p>
+
+<p>八月份你的智能体在 webhook 发送端试过带抖动的重试（retry with jitter），结果破坏了幂等性又回滚了。这件事只留在你本机的会话历史里。队友在新克隆的仓库里遇到慢接收端时，他的智能体还会再提议一次同样的错法。<code>deja sync</code> 负责在你自己的多台机器之间同步历史；而 <code>deja repo</code> 则把真正值得全员知道的那几条结论随仓库一起移交给协作者。</p>
+
+<h2>挑选并写入条目</h2>
+<pre>$ deja repo candidates
+2 candidates for webhooks, newest first. nothing is written until you pick
+4cd7e7bb9c rejected Reverted the retry with jitter: it broke idempotency because the sender re-signs each attempt with a new delivery id.  (session s1, claude 2026-08-03)
+c5ea828bb3 decision Reverted the retry with jitter: it broke idempotency because the sender re-signs each attempt with a new delivery id. We decided to keep one delivery id per event and let the outbox table own retries.  (session s1, claude 2026-08-03)
+add the ones that hold for everyone: deja repo add &lt;id&gt; [&lt;id&gt;...]
+
+$ deja repo add 4cd7e7bb9c
+added 1 entry to .deja/memory.jsonl
+wrote .deja/.gitattributes so parallel additions merge line by line, and a short .deja/README.md for whoever opens the folder
+nothing is committed: review with `git diff .deja/` and commit it like code</pre>
+<p>候选条目来自该项目在所有智能体里的历史：你提升过的笔记、<code>deja remember</code> 记录的事项、会话中回滚过的方案（<code>rejected</code>）以及最终敲定的做法（<code>decision</code>）。你也可以直接手写一条：</p>
+<pre>deja repo add --kind gotcha "预发环境的接收端会丢弃超过 1 MB 的 payload"</pre>
+
+<h2>文件里存了什么</h2>
+<pre>{"id":"4cd7e7bb9c","kind":"rejected","text":"Reverted the retry with jitter: it broke idempotency because the sender re-signs each attempt with a new delivery id.","date":"2026-10-25","from":"claude 2026-08-03"}</pre>
+<p>每条记录占一行 JSON，<code>kind</code> 为 <code>decision</code>、<code>rejected</code> 或 <code>gotcha</code>。不会写入本机路径、会话 ID、机器名或用户名，并且在写入前会自动经过密钥脱敏以及主目录路径、邮箱、内网主机名和私有 IP 清洗。条目按 ID 排序并配有 <code>.deja/.gitattributes</code>（<code>memory.jsonl merge=union</code>），多分支并行添加时能按行无冲突合并。</p>
+
+<h2>队友克隆仓库后会得到什么</h2>
+<p>克隆仓库后，只要安装了 deja，无论队友用的是 Claude Code、Codex 还是 Cursor，这些条目都会在会话启动与按需召回时自动出现（以不可信参考数据的安全边界包裹，绝不当作指令执行）。对于陌生仓库，也可以在信任策略里设置 <code>{"activations": {"auto": {"repo": false}}}</code> 关闭自动注入，仅保留手动搜索。</p>
+
+<p><a href="getting-started.html">快速开始</a> · <a href="privacy.html">隐私与信任边界</a> · <a href="memory-for-claude-code.html">给 Claude Code 加记忆</a></p>
+<p class="star-cta">觉得有用？欢迎在 <a href="https://github.com/vshulcz/deja-vu">GitHub 上给 deja-vu 点颗 Star</a>。</p>
+</article>
+</div>
+<footer>deja-vu 采用 MIT 许可，在你的机器上运行。<a href="https://github.com/vshulcz/deja-vu">GitHub 源码</a> · <a href="../../">首页</a></footer>
+</div>
+<script src="../../assets/guide.js" defer></script>
+</body>
+</html>

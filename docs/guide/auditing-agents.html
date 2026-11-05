@@ -32,7 +32,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Auditing what an agent actually did", "description": "How to review agent changes after the fact: the diff says what changed, the transcript says what was tried and why.", "url": "https://vshulcz.github.io/deja-vu/guide/auditing-agents.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/auditing-agents.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-08-24", "dateModified": "2026-10-09"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Auditing what an agent actually did", "description": "How to review agent changes after the fact: the diff says what changed, the transcript says what was tried and why.", "url": "https://vshulcz.github.io/deja-vu/guide/auditing-agents.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/auditing-agents.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-08-24", "dateModified": "2026-11-05"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Auditing an agent","item":"https://vshulcz.github.io/deja-vu/guide/auditing-agents.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How can I see what a coding agent actually did in a session?","acceptedAnswer":{"@type":"Answer","text":"The transcript records more than the conversation: the files each turn opened, the commands it ran with their exit status, and the exact spans an edit replaced. Indexing those makes them searchable after the fact."}},{"@type":"Question","name":"Which sessions touched this file?","acceptedAnswer":{"@type":"Answer","text":"deja blame <path> lists the sessions that discussed or changed a file, with what was decided and when — session history rather than git authorship."}},{"@type":"Question","name":"Can I see what memory was given to the agent?","acceptedAnswer":{"@type":"Answer","text":"Yes. deja log lists every recall and injection with its size and the sessions it served, and deja log --last prints the exact text most recently handed over."}}]}</script>
 </head>
@@ -156,6 +156,8 @@
 <a href="benchmarks.html">Benchmarks</a>
 <a href="compare.html">Compare</a>
 <a href="claude-mem-alternative.html">claude-mem alternative</a>
+<a href="specstory-alternative.html">SpecStory alternative</a>
+<a href="basic-memory-alternative.html">Basic Memory alternative</a>
 <a href="day-zero.html">Day zero</a>
 <div class="grp">Reference</div>
 <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
@@ -167,6 +169,20 @@
 <p class="pagelede">the diff says what changed; the transcript says what was tried<span class="mins" data-mins></span></p>
 
 <p>You want to review agent changes from a week ago: what was touched, and why. Or a build broke and the last person to touch it was a session, not a person. Or a review asks a question the diff cannot answer: what else did it try first.</p>
+
+<div class="save-first"><b>Audit diffs and file lines against your session history:</b> <a href="https://github.com/vshulcz/deja-vu">deja-vu</a> cross-references git diffs and lines against the transcripts of 43 coding agents.<div class="save-actions"><div class="save-cmd"><span class="p">$</span><code>brew install deja-vu &amp;&amp; deja review</code><button type="button">copy</button></div><div class="save-cmd"><span class="p">$</span><code>npx @vshulcz/deja-vu blame path/to/file.go</code><button type="button">copy</button></div><a class="save-btn" href="https://github.com/vshulcz/deja-vu">deja-vu on GitHub</a><a class="save-demo" href="getting-started.html">Quick start &rarr;</a></div></div>
+
+<h2>Reviewing a branch or diff before a pull request</h2>
+<pre>$ deja review main..HEAD
+deja review: 2 changed file(s) with prior history (main..HEAD)
+
+cmd/deja/review.go
+  sessions (2):
+    · [claude] 8f31c0a9 · Nov 5 — wired review into usageText and completion
+  failed commands &amp; fixes (1):
+    ✗ go test ./cmd/deja -run TestTheCommandsPageNamesEveryCommand
+    ✓ go test ./cmd/deja -run TestTheCommandsPageNamesEveryCommand -count=1  (session 8f31c0a9)</pre>
+<p><code>deja review</code> inspects the files touched by your working tree, staged changes (<code>--staged</code>), or any git revision range (<code>main..HEAD</code>) and cross-references each changed file against past sessions, promoted project notes, and recorded command failures that were later fixed in the same session. Use <code>--since 30d</code> to narrow the window or <code>--json</code> to feed the report into a pre-PR script.</p>
 
 <h2>The transcript records more than the conversation</h2>
 <p>What the harness writes is not only the words. Each turn carries the files it opened, the commands it ran and what they exited with, and the exact text an edit replaced. That is the part every summary throws away and the part an audit needs — a summary can tell you it "fixed the pool exhaustion"; only the record tells you which file, which command, and what the code said before.</p>
