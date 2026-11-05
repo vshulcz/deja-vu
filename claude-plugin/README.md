@@ -10,9 +10,11 @@ claude plugin marketplace add vshulcz/deja-vu && claude plugin install deja-vu@d
 ```
 
 It carries deja's MCP server, the `deja-history` skill, the `/deja` command and
-the session-start, per-prompt, pre-compact, pre-tool, post-failure and session-end hooks — the same
+the session-start, per-prompt (`UserPromptSubmit`), pre-compact (`PreCompact`), pre-tool (`PreToolUse`), post-failure (`PostToolUseFailure`) and session-end (`SessionEnd`) hooks — the same
 wiring `deja install --auto` writes, packaged the way those harnesses install
 things.
+
+`deja` indexes the session transcripts of every coding agent on the machine (`forty-three coding agents` total), across projects, and the hooks inject matching snippets from those local transcripts into the model's context (`UserPromptSubmit` recalls past sessions matching the prompt; `PreToolUse` surfaces decisions, verification commands, and co-changed files for edited paths, or pre-flight failure warnings before shell commands). Recalled transcripts are an untrusted text channel (they can contain earlier tool outputs or external content), so hook output is wrapped with a `<deja-recall>` untrusted-data framing banner and credentials are redacted at index time.
 
 [deja](https://github.com/vshulcz/deja-vu) indexes the session transcripts
 forty-three coding agents already write to disk, including sessions from before it
