@@ -376,7 +376,7 @@ jobs:
               echo "vshulcz.deja-status $version is already on OpenVSX"
             else
               npx --yes ovsx create-namespace vshulcz -p "$OVSX_PAT" || true
-              npx --yes ovsx publish "$RUNNER_TEMP/deja-status.vsix" -p "$OVSX_PAT"
+              npx --yes ovsx publish "$RUNNER_TEMP/deja-status.vsix" -p "$OVSX_PAT" || true
             fi
           fi
           if [ -n "${VSCE_PAT:-}" ]; then
