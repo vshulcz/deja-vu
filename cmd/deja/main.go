@@ -351,6 +351,7 @@ var commands = map[string]command{
 	},
 	"blame":  runBlame,
 	"origin": func(dir string, rest []string) error { return runOrigin(dir, rest, os.Stdout) },
+	"review": func(dir string, rest []string) error { return runReview(dir, rest, os.Stdout) },
 }
 
 func run(args []string) error {

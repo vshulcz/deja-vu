@@ -181,6 +181,8 @@ $ deja "jwt refresh token"
 | `deja` | In a terminal, the full-screen search above. `deja brief` prints the text summary instead: today's sessions, what deja served, recent work and a search to try. |
 | `deja wip` | What the last session in this directory was doing: the task, what it settled, the files in flight, the last command and whether it failed — derived from the transcript, not from a note someone remembered to write. |
 | `deja blame <path>[:line]` | Which sessions discussed a file, what was decided, and why. With a line: the commit that last changed it, and the session that wrote that line or the text the commit replaced. `--attribution` prints the line answer alone, as JSON with `--json`, and `--git-note` records it in `refs/notes/deja`. |
+| `deja origin [rev\|range]` | Which session and user turn produced a commit or commit range, matched against recorded edit spans (`attributed`, `uncertain`, or `unknown`). |
+| `deja review [rev\|range]` | Prior sessions and settled notes (`.deja/notes.jsonl` and personal notes) for the files changed in a working-tree diff, commit, or range. |
 | `deja files <topic>` | The other direction: which files the work on a subject actually touched. |
 | `deja how <tool>` | How this machine actually runs a thing, with the real flags, from what agents ran before. |
 | `deja fix <error>` | What this machine ran after that same error before, when the error did not come back. Never a merge, a force push or a deletion. |
@@ -201,7 +203,7 @@ as usual. `deja search <query>` skips the suggestion.
 | `deja recall <words>` | The page the MCP recall tool gives an agent: about 4 KB, this project first (`DEJA_RECALL_GLOBAL=1` ranks every project the same). For skills and scripts that run deja through the shell. |
 | `deja resume <id>` | Reopen a found session in its native harness. `--app` opens a Codex session in the ChatGPT desktop app. |
 | `deja restore <path>` | Hand back a span an agent replaced, from the `old_string` its edit recorded. Never writes over the original. |
-| `deja promote <id>` | Distill a session into a curated note with provenance, tags and a lifecycle state. Notes outrank raw transcripts. |
+| `deja promote <id>` | Distill a session into a curated note with provenance, tags and a lifecycle state (`--repo` writes to `<repo>/.deja/notes.jsonl` for the team). Notes outrank raw transcripts. |
 | `deja share <id>` | A sanitized session digest for a colleague, with secrets already scrubbed. |
 
 **Move it and check it**
@@ -213,7 +215,7 @@ as usual. `deja search <query>` skips the suggestion.
 | `deja stats` | Your agent work, wrapped. `--card` draws it in the terminal, `--card <file>.svg` writes one for a profile, `--html` a browsable timeline. |
 | `deja secrets [--scrub]` | Which sessions' source transcripts carry credentials, and what kind. Never prints a value. `--scrub` rewrites the ones it can, original kept beside the file. |
 | `deja rules [sync]` | Keep your standing rules in `~/.config/deja/rules.md`; `sync` copies them as a marked block into every installed agent's global rules file. |
-| `deja rules candidates [--json] [--limit n] [--since 90d]` | The turns where you corrected an agent, across every tool, numbered with their session. Ask your agent to suggest rules and it groups them; nothing is written until you pick. |
+| `deja rules candidates [--json] [--limit n] [--since 90d] [--project name] [--repo]` | The turns where you corrected an agent, across every tool (or scoped to `--repo` / `--project`), numbered with their session. Ask your agent to suggest rules and it groups them; nothing is written until you pick. |
 | `deja doctor [--deep]` | Self-diagnosis, and with `--deep`, proof of the index against the sources. |
 | `deja mcp` | The stdio MCP server, which is what `deja install` wires in. |
 

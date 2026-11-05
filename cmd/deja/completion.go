@@ -93,7 +93,7 @@ _deja_completion() {
                 COMPREPLY=( $(compgen -f -- "$cur") )
             fi
             ;;
-        origin)
+        origin|review)
             if [[ "$prev" == "--harness" ]]; then
                 COMPREPLY=( $(compgen -W "$harnesses" -- "$cur") )
             elif [[ "$prev" == "--project" || "$prev" == "--limit" ]]; then
@@ -176,8 +176,8 @@ _deja_completion() {
         rules)
             if (( COMP_CWORD == 2 )); then
                 COMPREPLY=( $(compgen -W "sync status candidates" -- "$cur") )
-            elif [[ "$action" == "candidates" && "$prev" != "--limit" && "$prev" != "--since" ]]; then
-                COMPREPLY=( $(compgen -W "--json --limit --since" -- "$cur") )
+            elif [[ "$action" == "candidates" && "$prev" != "--limit" && "$prev" != "--since" && "$prev" != "--project" ]]; then
+                COMPREPLY=( $(compgen -W "--json --limit --since --project --repo" -- "$cur") )
             else
                 COMPREPLY=()
             fi
@@ -321,6 +321,7 @@ _deja() {
   commands=(
     'blame:find sessions that discussed a file'
     'origin:which session and user turn produced a commit or range'
+    'review:prior sessions and settled notes for a diff or commit'
     'bench:run benchmarks'
     'check:read a plan from stdin and print factual co-occurrences'
     'completion:generate shell completion'
@@ -377,8 +378,8 @@ _deja() {
     blame)
       _arguments '--attribution[show line attribution]' '--git-note[write attribution as a git note; implies --attribution]' '--all[include all matching sessions]' '--all-projects[include other projects]' '--json[print JSON]' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '1:path:_files'
       ;;
-    origin)
-      _arguments '--json[print JSON]' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--limit=[maximum commits]:count:' '1:revision:'
+    origin|review)
+      _arguments '--json[print JSON]' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--limit=[maximum items]:count:' '1:revision:'
       ;;
     bench)
       if (( CURRENT == 3 )); then
@@ -439,7 +440,7 @@ _deja() {
       if (( CURRENT == 3 )); then
         _values 'rules action' sync status candidates
       elif [[ "$words[3]" == "candidates" ]]; then
-        _arguments '--json[print JSON]' '--limit=[maximum candidates]:count:' '--since=[filter by age]:duration:'
+        _arguments '--json[print JSON]' '--limit=[maximum candidates]:count:' '--since=[filter by age]:duration:' '--project=[filter by project]:project:' '--repo[scope to the current repository]'
       fi
       ;;
     resume)
@@ -559,10 +560,10 @@ complete -c deja -n '__fish_seen_subcommand_from blame' -l harness -r -a '%HARNE
 complete -c deja -n '__fish_seen_subcommand_from blame' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from blame' -l since -r
 complete -c deja -n '__fish_seen_subcommand_from blame' -F
-complete -c deja -n '__fish_seen_subcommand_from origin' -l json
-complete -c deja -n '__fish_seen_subcommand_from origin' -l harness -r -a '%HARNESSES%'
-complete -c deja -n '__fish_seen_subcommand_from origin' -l project -r
-complete -c deja -n '__fish_seen_subcommand_from origin' -l limit -r
+complete -c deja -n '__fish_seen_subcommand_from origin review' -l json
+complete -c deja -n '__fish_seen_subcommand_from origin review' -l harness -r -a '%HARNESSES%'
+complete -c deja -n '__fish_seen_subcommand_from origin review' -l project -r
+complete -c deja -n '__fish_seen_subcommand_from origin review' -l limit -r
 complete -c deja -n '__fish_seen_subcommand_from bench; and not __fish_seen_subcommand_from recall context prompt block ingest read' -a 'recall context prompt block ingest read'
 complete -c deja -n '__fish_seen_subcommand_from bench; and __fish_seen_subcommand_from recall context prompt block ingest read' -l json
 complete -c deja -n '__fish_seen_subcommand_from bench; and __fish_seen_subcommand_from recall context prompt block ingest read' -l seed -r
@@ -625,6 +626,8 @@ complete -c deja -n '__fish_seen_subcommand_from rules; and not __fish_seen_subc
 complete -c deja -n '__fish_seen_subcommand_from rules; and __fish_seen_subcommand_from candidates' -l json
 complete -c deja -n '__fish_seen_subcommand_from rules; and __fish_seen_subcommand_from candidates' -l limit -r
 complete -c deja -n '__fish_seen_subcommand_from rules; and __fish_seen_subcommand_from candidates' -l since -r
+complete -c deja -n '__fish_seen_subcommand_from rules; and __fish_seen_subcommand_from candidates' -l project -r
+complete -c deja -n '__fish_seen_subcommand_from rules; and __fish_seen_subcommand_from candidates' -l repo -d 'Scope to the current repository'
 complete -c deja -n '__fish_seen_subcommand_from resume' -l exec
 complete -c deja -n '__fish_seen_subcommand_from resume' -l write-back -d 'Write a deleted transcript back from the index'
 complete -c deja -n '__fish_seen_subcommand_from resume' -l app -d 'Open a Codex session in the ChatGPT app'
@@ -721,7 +724,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 if ($previous -eq '--harness') { $harnesses }
                 else { @('--all', '--all-projects', '--json', '--harness', '--project', '--since', '--attribution', '--git-note') }
             }
-            'origin' {
+            { $_ -in @('origin', 'review') } {
                 if ($previous -eq '--harness') { $harnesses }
                 elseif ($previous -in @('--project', '--limit')) { @() }
                 else { @('--json', '--harness', '--project', '--limit') }
@@ -759,7 +762,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
             'remember' { @('--project', '--tag', '--repo') }
             'rules' {
                 if ($argumentPosition -eq 1) { @('sync', 'status', 'candidates') }
-                elseif ($action -eq 'candidates' -and $previous -notin @('--limit', '--since')) { @('--json', '--limit', '--since') }
+                elseif ($action -eq 'candidates' -and $previous -notin @('--limit', '--since', '--project')) { @('--json', '--limit', '--since', '--project', '--repo') }
                 else { @() }
             }
             'resume' { @('--exec', '--write-back', '--app') }
@@ -847,7 +850,7 @@ func completionCommands() []string {
 		"bench", "blame", "brief", "check", "completion", "ctx", "delete", "doctor", "embed",
 		"files", "fix", "forget", "friction", "handoff", "help", "how", "index",
 		"install", "last", "log", "mcp", "origin", "promote", "recall", "recap", "remember", "restore",
-		"resume", "rules", "search", "secrets", "share", "shell", "show", "sources", "stats",
+		"resume", "review", "rules", "search", "secrets", "share", "shell", "show", "sources", "stats",
 		"statusline", "sync", "tests", "uninstall", "update", "version", "view",
 		"warmup", "wip",
 	}

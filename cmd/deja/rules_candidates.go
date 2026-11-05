@@ -84,10 +84,20 @@ func runRulesCandidates(dir string, w io.Writer, args []string) error {
 	asJSON := false
 	limit := 0
 	var since time.Duration
+	var project string
+	toRepo := false
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--json":
 			asJSON = true
+		case "--repo":
+			toRepo = true
+		case "--project":
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
+				return errors.New("rules candidates: --project needs value")
+			}
+			i++
+			project = strings.TrimSpace(args[i])
 		case "--limit":
 			if i+1 >= len(args) {
 				return errors.New("rules candidates: --limit needs value")
@@ -109,13 +119,23 @@ func runRulesCandidates(dir string, w io.Writer, args []string) error {
 			}
 			since = d
 		default:
-			return unknownFlag("rules candidates", args[i], []string{"--json", "--limit", "--since"})
+			return unknownFlag("rules candidates", args[i], []string{"--json", "--limit", "--since", "--project", "--repo"})
 		}
+	}
+	var scope []string
+	if toRepo {
+		repoRoot := sources.NotesRepoRoot("")
+		if repoRoot == "" {
+			return errors.New("rules candidates: --repo needs a git repository or .deja directory")
+		}
+		scope = howScope(repoRoot, project, false)
+	} else if project != "" {
+		scope = []string{project}
 	}
 	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
 		return ensureError(dir, err)
 	}
-	cands, stands, err := collectRuleCandidates(dir, since, limit)
+	cands, stands, err := collectRuleCandidates(dir, since, limit, scope)
 	if err != nil {
 		return err
 	}
@@ -155,7 +175,7 @@ func runRulesCandidates(dir string, w io.Writer, args []string) error {
 // records in the order they alternated and keeps a user turn that corrects what
 // the agent just did. since and limit of zero mean everything; limit keeps the
 // newest.
-func collectRuleCandidates(dir string, since time.Duration, limit int) ([]ruleCandidate, int, error) {
+func collectRuleCandidates(dir string, since time.Duration, limit int, scope []string) ([]ruleCandidate, int, error) {
 	type state struct {
 		skip                bool
 		seenUser, afterTurn bool
@@ -172,9 +192,13 @@ func collectRuleCandidates(dir string, since time.Duration, limit int) ([]ruleCa
 	err := index.EachRecordInRoles(dir, []string{"user", "assistant", "command", index.RoleEdit}, func(meta index.SessionMeta, r index.Record) {
 		st := states[r.Key]
 		if st == nil {
-			st = &state{skip: !candidateSession(meta, pol)}
+			keep := candidateSession(meta, pol)
+			if keep && len(scope) > 0 && !howProjectMatches(meta.Project, scope) {
+				keep = false
+			}
+			st = &state{skip: !keep}
 			states[r.Key] = st
-			if st.skip && (throwawayPath(meta.Path) || throwawayPath(meta.Project)) {
+			if !candidateSession(meta, pol) && (throwawayPath(meta.Path) || throwawayPath(meta.Project)) {
 				stands++
 			}
 		}

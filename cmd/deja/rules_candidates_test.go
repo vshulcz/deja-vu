@@ -297,3 +297,46 @@ func TestSkillsCarryTheRulesProcedure(t *testing.T) {
 		t.Error("the VS Code instructions file is in every chat; the rules procedure belongs only in the skills")
 	}
 }
+
+func TestRulesCandidatesProjectAndRepoScope(t *testing.T) {
+	candidateEnv(t)
+	seedCandidateSession(t, "-home-u-proj", "p1", t0,
+		candidateTurn{"user", "fix the handler"},
+		candidateTurn{"assistant", "rewrote the handler and added global state"},
+		candidateTurn{"user", "no, don't use global state here"},
+	)
+	seedCandidateSession(t, "-home-u-other", "p2", t0.Add(time.Hour),
+		candidateTurn{"user", "update README"},
+		candidateTurn{"assistant", "added badges"},
+		candidateTurn{"user", "no, never add badges to the README"},
+	)
+
+	got := runCandidatesJSON(t, "--project", "other")
+	if len(got) != 1 || got[0].SessionID != "p2" {
+		t.Fatalf("--project other = %+v, want p2 only", got)
+	}
+
+	repo := filepath.Join(t.TempDir(), "proj")
+	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_REPO_DIR", repo)
+	got = runCandidatesJSON(t, "--repo")
+	if len(got) != 1 || got[0].SessionID != "p1" {
+		t.Fatalf("--repo = %+v, want p1 only", got)
+	}
+
+	if _, err := captureRun(t, "rules", "candidates", "--project"); err == nil {
+		t.Fatal("want error for missing --project value")
+	}
+	t.Setenv("DEJA_REPO_DIR", "")
+	outside := t.TempDir()
+	orig, _ := os.Getwd()
+	if err := os.Chdir(outside); err == nil {
+		t.Cleanup(func() { _ = os.Chdir(orig) })
+		if _, err := captureRun(t, "rules", "candidates", "--repo"); err == nil {
+			t.Fatal("want error for --repo outside a git repo")
+		}
+	}
+}
+
