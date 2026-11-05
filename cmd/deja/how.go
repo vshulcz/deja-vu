@@ -142,7 +142,7 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 			i = len(args)
 		default:
 			if strings.HasPrefix(args[i], "-") {
-				return unknownFlag("how", args[i], howFlags)
+				return fmt.Errorf("%w; a query that starts with a dash goes after `--`", unknownFlag("how", args[i], howFlags))
 			}
 			if strings.TrimSpace(args[i]) != "" {
 				terms = append(terms, args[i])

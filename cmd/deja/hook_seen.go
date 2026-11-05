@@ -8,6 +8,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -65,6 +66,8 @@ func hookseenLockPath(dir string) string {
 	return dir + ".hookseen.lock"
 }
 
+var hookseenMu sync.Mutex
+
 // holdHookseenLock serializes concurrent hook invocations against the same
 // index so two hooks spawned in the same millisecond do not both read an
 // un-injected state and emit duplicate blocks (#5930). contended reports
@@ -73,12 +76,22 @@ func holdHookseenLock(dir string) (func(), bool) {
 	if strings.TrimSpace(dir) == "" {
 		return func() {}, false
 	}
+	inProcContended := !hookseenMu.TryLock()
+	if inProcContended {
+		hookseenMu.Lock()
+	}
 	path := hookseenLockPath(dir)
 	if release, ok, busy := takeInstallLock(path, false); ok || !busy {
-		return release, false
+		return func() {
+			release()
+			hookseenMu.Unlock()
+		}, inProcContended
 	}
 	release, _, _ := takeInstallLock(path, true)
-	return release, true
+	return func() {
+		release()
+		hookseenMu.Unlock()
+	}, true
 }
 
 func loadSeen(dir string) seenLines {

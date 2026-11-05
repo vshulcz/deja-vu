@@ -155,6 +155,8 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// second line, a trailing NUL) keeps its recall instead of losing the
 	// whole payload to a syntax error.
 	payload := readHookPayload(stdin, hookStdinWait)
+	releaseSeenLock, _ := holdHookseenLock(dir)
+	defer releaseSeenLock()
 	// The error is kept, not swallowed: a decode that fails on a later field —
 	// `{"prompt":"…","session_id":123}` — reads the prompt, injects on it, and
 	// leaves a row saying the host named no session, when it named one deja
@@ -194,8 +196,6 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	if strings.TrimSpace(string(input.Prompt)) == "" {
 		return nil
 	}
-	releaseSeenLock, _ := holdHookseenLock(dir)
-	defer releaseSeenLock()
 	if input.HookEventName == "BeforeAgent" {
 		catchUpCompaction(dir, precompactHookInput{SessionID: input.SessionID, TranscriptPath: input.TranscriptPath, CWD: input.CWD, WorkspaceRoots: input.WorkspaceRoots})
 	}

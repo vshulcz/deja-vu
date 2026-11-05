@@ -602,6 +602,7 @@ complete -c deja -n '__fish_seen_subcommand_from index' -l quiet -d 'Say nothing
 complete -c deja -n '__fish_seen_subcommand_from install uninstall' -a '%INSTALL_TARGETS% --all --auto'
 complete -c deja -n '__fish_seen_subcommand_from install uninstall' -l no-guidance
 complete -c deja -n '__fish_seen_subcommand_from install' -l no-index -d 'Skip indexing'
+complete -c deja -n '__fish_seen_subcommand_from install' -l no-mcp
 complete -c deja -n '__fish_seen_subcommand_from install' -l force -d 'Replace edited guidance files'
 complete -c deja -n '__fish_seen_subcommand_from show' -l json
 complete -c deja -n '__fish_seen_subcommand_from show' -l harness -r -a '%HARNESSES%'

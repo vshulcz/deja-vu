@@ -340,9 +340,9 @@ func main() {
 	darkLogo := logo("#e8e6f0", !*static)
 	appIcon := icon()
 	assets := map[string]string{
-		"assets/logo.svg":               logo("#1d1b2e", !*static),
-		"assets/logo-dark.svg":          darkLogo,
-		"assets/icon.svg":               appIcon,
+		"assets/logo.svg":                    logo("#1d1b2e", !*static),
+		"assets/logo-dark.svg":               darkLogo,
+		"assets/icon.svg":                    appIcon,
 		"antigravity-plugin/assets/icon.svg": appIcon,
 		// The site serves docs/ as its root, so it cannot reach the files
 		// above. Written from the same sprite in the same run rather than
