@@ -166,6 +166,8 @@ func changelogSections(changelog string) []changelogSection {
 // to its first sentence, and caps that at 140 characters, so three of them
 // still read as a short list in a terminal.
 func firstSentence(item string) string {
+	item = strings.ReplaceAll(item, ".** ", ". ")
+	item = strings.ReplaceAll(item, "**", "")
 	if i := strings.Index(item, ". "); i >= 0 {
 		item = item[:i+1]
 	}

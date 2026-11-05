@@ -58,7 +58,8 @@ func (a *tuiApp) drawNews() {
 	lines := make([][]string, 0, len(a.news))
 	h := 7
 	for _, it := range a.news {
-		l := wrapLines(strings.ReplaceAll(it, "`", ""), max(10, tw-2), 3)
+		clean := strings.NewReplacer("`", "", "**", "").Replace(it)
+		l := wrapLines(clean, max(10, tw-2), 3)
 		lines = append(lines, l)
 		h += len(l) + 1
 	}

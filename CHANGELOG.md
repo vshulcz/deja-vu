@@ -15,37 +15,37 @@ Sub-50 ms hook and MCP hot path, project X-Ray and symbol decision recall,
 
 ### Added
 
-- **Project X-Ray (`deja orient`), co-change pairs, symbol decision recall, and pre-flight remedies.** `deja orient` and `PreToolUse` hooks surface historical co-change file pairs, verified failure traps, symbol-level decisions, targeted test priority, and command remedies before an agent edits or runs a command (#5882, #5896).
-- **Compaction edit ledger and `apply_patch` file history.** `PreCompact` captures modified files and symbol decisions so post-compaction recall restores the active working set, and `apply_patch` edits are indexed into file blame and history (#5896).
-- **Antigravity marketplace plugin bundle (`antigravity-plugin/`, `.antigravity-plugin/plugin.json`).** Native plugin manifest and hooks for Google Antigravity, plus `deja stats --card` on the first-install proof line.
-- **Asymmetric embedding model support (`deja embed`).** Sends `input_type` (`"passage"` when indexing, `"query"` when searching) for NVIDIA NIM (`integrate.api.nvidia.com`) and `nvidia/*`, `nemotron`, and `nv-embed` models, and retries automatically with `input_type` when any endpoint returns HTTP 400 requesting it (#5950).
-- **Configuration reference and session-deletion guides.** Documents `~/.config/deja` files, `policy.json` keys, and `DEJA_RECALL` modes, and adds guides for JetBrains AI Assistant and deleting OpenClaw, Aider, CodeWhale, and Cherry Studio session history (#5869, #5943).
+- `deja orient` and `PreToolUse` surface co-change file pairs, symbol decisions, and verified traps. Pre-flight hooks also surface targeted test priority and command remedies before an agent edits or runs a command (#5882, #5896).
+- `PreCompact` captures modified files and symbol decisions so compaction keeps the active working set. `apply_patch` edits are also indexed into file blame and history (#5896).
+- `deja embed` supports asymmetric NVIDIA NIM and Nemotron models with automatic `input_type` retry. Passes `"passage"` when indexing and `"query"` when searching (#5950).
+- Native Antigravity plugin bundle (`antigravity-plugin/`) and `deja stats --card` on first install.
+- Configuration reference for `~/.config/deja` and `policy.json`, plus JetBrains AI and session-deletion guides (#5869, #5943).
 
 ### Changed
 
-- **Hook and MCP latency.** Bounds session record reads in hooks to tail windows and metadata, skips tool-output inflation during MCP search when tool outputs are not requested, prefilters transcript change scans by mtime, and streams compressed `.jsonl.zst` Codex rollouts without holding them in memory (#5901, #5907, #5908, #5927, #5928).
+- Hook and MCP recall bound session record reads to tail windows and skip unused tool-output inflation. Transcript change scans prefilter by mtime, and compressed `.jsonl.zst` Codex rollouts stream without holding them in memory (#5901, #5907, #5908, #5927, #5928).
 
 ### Fixed
 
-- **1-tool `deja` MCP mode guidance and argument aliases.** Hook leads (`promptHookLead`, `weakRecallPointer`, `renderMCPBlame`, `contextOthersNote`, `/deja` prompt, and handoff frames) name the 1-tool `deja` modes (`"context"` and `"recall"`) alongside `recall_context` / `recall`, `spreadQ` accepts subject aliases (`session_id`, `session`, `id`, `file_path`, `filepath`, `file`, `output`, `stderr`, `command`, `cmd`, `fact`, `note`, `content`), and `dejaCallNames` recognizes MCP-prefixed `deja` tool calls.
-- **OpenCode 2.x plugin upgrade and TUI status row.** Replaces the OpenCode 1.x TUI status plugin with the 2.x server plugin on upgrade instead of leaving a broken entry in `tui.json`, and registers `home_bottom` before `home-tips` to prevent row overlap.
-- **Codex hook trust detection in `deja doctor`.** Checks all wired hook events in `codexPrimaryPin` when `SessionStart` is unpinned and treats post-install Codex hook execution recorded in `.live` or `.hookseen` as `wired` when `config.toml` omits per-hook pins (#5948).
-- **Hook concurrency, detached refreshers, and CLI validation.** Releases the tool-hook lock before spawn recall, serializes in-process `.hookseen` state, preserves compaction failure reasons and `dsh` opening digests across `refreshContext`, normalizes Windows path separators in `commandProjectCandidates`, honors `--limit` in `deja recap --json`, and rejects blank arguments in `promote`, `remember --project`, `handoff`, `fix`, `view --out`, and `restore -o` (#5899, #5904, #5909, #5910, #5911, #5915, #5929, #5930, #5931, #5932, #5933, #5945, #5949).
-- **Hermetic test suite in root and minimal containers.** Arranges a stub tool when neither `sqlite3` nor `zstd` is on `PATH` and skips `chmod`-based permission-refusal tests when running as `uid 0` (#5947).
+- Hook leads and `/deja` prompts name 1-tool `deja` modes (`"context"` and `"recall"`), and `spreadQ` accepts subject aliases (`session_id`, `file_path`, `output`, `fact`). `dejaCallNames` also recognizes MCP-prefixed `deja` tool calls.
+- `deja install opencode-auto` replaces the legacy OpenCode 1.x TUI status plugin with the 2.x server plugin on upgrade, and registers `home_bottom` before `home-tips`.
+- `deja doctor` detects approved Codex hooks from non-primary event pins and live hook execution in `.live` / `.hookseen` (#5948).
+- Hook concurrency, detached refreshers, and CLI flag validation handle spawn recall locks, `.hookseen` serialization, Windows path separators, `recap --json --limit`, and blank arguments in `promote`, `remember --project`, `handoff`, `fix`, `view --out`, and `restore -o` (#5899, #5904, #5909, #5910, #5911, #5915, #5929, #5930, #5931, #5932, #5933, #5945, #5949).
+- `go test ./...` runs hermetically in root and minimal containers without `sqlite3` or `zstd` installed (#5947).
 
 ## [0.23.5] - 2026-11-03
 
 ### Added
 
-- **VS Code, Cursor, Windsurf, and Antigravity extension (`vshulcz.deja-status`, `extensions/vscode`).** Shows a live session memory counter in the status bar and runs `deja stats` or `deja install --auto` on click (#5859).
-- **Raycast extension (`extensions/raycast`).** Adds `Search Sessions` and `Recent Sessions` commands on macOS for searching across all indexed coding agent sessions and copying `deja resume <id>` (#5829).
-- **`deja-reflect` skill (`skills/deja-reflect/SKILL.md`).** Standalone end-of-session reflection skill that inspects `deja notes` and `deja friction`, distills durable project invariants, and stores confirmed notes via `deja remember` (#5841).
-- **Incremental offset parsing for Antigravity and Cursor transcripts** and symbol-level blame in `deja blame` (#5863).
+- VS Code, Cursor, Windsurf, and Antigravity status bar extension (`vshulcz.deja-status`, `extensions/vscode`). Shows a live session memory counter in the status bar and runs `deja stats` or `deja install --auto` on click (#5859).
+- Raycast extension (`extensions/raycast`) for searching sessions and copying `deja resume <id>` on macOS (#5829).
+- `deja-reflect` skill (`skills/deja-reflect/SKILL.md`) for distilling durable project notes via `deja remember` (#5841).
+- Incremental offset parsing for Antigravity and Cursor transcripts and symbol-level blame in `deja blame` (#5863).
 
 ### Fixed
 
-- **Status line multi-harness audit** across OpenCode, Antigravity, Claude Code, and Cursor (`statusline`), plus `recall_context` tool name alignment in `hook-context` and `deja doctor` self-version check (#5850, #5851, #5864).
-- **Claude Code and Codex plugin hooks (`claude-plugin/hooks/deja.sh`, `codex-plugin/hooks/deja.sh`).** Require explicit confirmation before acting on recalled `User said (this project)` lines or running `deja rules sync`, and point missing-binary hints solely at `brew install deja-vu` (#5838, #5860, #5865).
+- Status line multi-harness audit across OpenCode, Antigravity, Claude Code, and Cursor, plus `recall_context` tool alignment and `deja doctor` self-version check (#5850, #5851, #5864).
+- Claude Code and Codex plugin hooks require confirmation before acting on recalled `User said` lines or running `deja rules sync` (#5838, #5860, #5865).
 
 ## [0.23.4] - 2026-11-01
 
