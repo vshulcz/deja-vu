@@ -486,7 +486,7 @@ func sessionIDs(ss []model.Session) []string {
 // decision and said history had settled it — naming the mismatch in the same
 // sentence (#2370). The match is on wording, and the lead now says so and asks
 // for the one check that catches it.
-const promptHookLead = "deja found sessions whose wording matches this request — not a judgement that they answer it. Check that the session describes what is happening now before acting on it. If one genuinely helps, answer the user from it, and credit it in the one line the end of this block asks for; otherwise ignore silently.\n"
+const promptHookLead = "deja found sessions whose wording matches this request — not a judgement that they answer it. Check that the session describes what is happening now before acting on it, and call the deja tool in \"context\" mode (or recall_context) with its session id if you need the full details. If one genuinely helps, answer the user from it, and credit it in the one line the end of this block asks for; otherwise ignore silently.\n"
 
 // The short lead that blocks after the first used to carry — "deja matched on
 // wording, not meaning — check the session fits before acting on it." — is

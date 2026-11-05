@@ -392,7 +392,7 @@ func dejaTool() map[string]any {
 			"type": "object",
 			"properties": map[string]any{
 				"mode":    map[string]any{"type": "string", "enum": []string{"recall", "context", "blame", "fix", "how", "orient", "remember", "handoff"}},
-				"q":       map[string]any{"type": "string", "description": "What to ask about: for recall 1-3 exact terms; for blame a path, for fix the failing output verbatim, for remember the fact."},
+				"q":       map[string]any{"type": "string", "description": "What to ask about: 1-3 terms (recall), session id or query (context), path (blame), failing output (fix), fact (remember)."},
 				"harness": map[string]any{"type": "string", "description": harnessFilterDescription()},
 				"project": map[string]any{"type": "string", "description": "Optional project filter; for remember, where it is filed."},
 				"limit":   map[string]any{"type": "number", "description": "Max sessions per ~4 KB page."},
@@ -459,8 +459,26 @@ var qField = map[string]string{
 	"handoff":        "session",
 }
 
-// spreadQ copies q into the field the mode reads, unless the caller already
-// named that field itself.
+// qAliases lists the argument names models write when they do not write "q" or
+// the mode's older field name. Leads that say "with its session id" or "for
+// blame a path" draw "session_id", "id", or "file", and a strict error there
+// wastes a call when the intent is unambiguous.
+var qAliases = map[string][]string{
+	"query":   {"q", "session_id", "session", "id"},
+	"path":    {"q", "file_path", "filepath", "file", "query"},
+	"error":   {"q", "output", "stderr", "query"},
+	"what":    {"q", "command", "cmd", "query"},
+	"text":    {"q", "fact", "note", "content", "query"},
+	"session": {"q", "session_id", "id", "query"},
+}
+
+func nonEmptyJSONValue(raw json.RawMessage) bool {
+	trimmed := bytes.TrimSpace(raw)
+	return len(trimmed) > 0 && string(trimmed) != `""` && string(trimmed) != "null"
+}
+
+// spreadQ copies q (or a common alias for the mode's subject) into the field
+// the mode reads, unless the caller already named that field itself.
 func spreadQ(mode string, raw json.RawMessage) json.RawMessage {
 	field, ok := qField[dispatcherModes[mode]]
 	if !ok || field == "" {
@@ -470,14 +488,20 @@ func spreadQ(mode string, raw json.RawMessage) json.RawMessage {
 	if err := json.Unmarshal(raw, &args); err != nil {
 		return raw
 	}
-	q, ok := args["q"]
-	if !ok {
+	if cur, taken := args[field]; taken && nonEmptyJSONValue(cur) {
 		return raw
 	}
-	if cur, taken := args[field]; taken && len(bytes.TrimSpace(cur)) > 0 && string(cur) != `""` {
+	var val json.RawMessage
+	for _, key := range qAliases[field] {
+		if v, exists := args[key]; exists && nonEmptyJSONValue(v) {
+			val = v
+			break
+		}
+	}
+	if len(val) == 0 {
 		return raw
 	}
-	args[field] = q
+	args[field] = val
 	out, err := json.Marshal(args)
 	if err != nil {
 		return raw
@@ -520,6 +544,7 @@ func callMCPToolRaw(dir, name string, raw json.RawMessage, served *int) (string,
 		}
 		return callMCPToolServed(dir, target, spreadQ(mode, raw), served)
 	}
+	raw = spreadQ(name, raw)
 	switch name {
 	case "recall":
 		var a struct {
@@ -1135,7 +1160,7 @@ func renderMCPBlame(asked, base string, hits []search.BlameHit, omitted int, sta
 		}
 	}
 	if omitted > 0 {
-		fmt.Fprintf(&b, "\n%d more session%s touch this path and were left out to stay within one answer — narrow with project, harness or since, or call recall_context on one of the above.\n",
+		fmt.Fprintf(&b, "\n%d more session%s touch this path and were left out to stay within one answer — narrow with project, harness or since, or call the deja tool in \"context\" mode (or recall_context) on one of the above.\n",
 			omitted, pluralS(omitted))
 	}
 	return frameRecall(strings.TrimRight(b.String(), "\n"))

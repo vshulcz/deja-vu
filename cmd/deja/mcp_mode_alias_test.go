@@ -64,11 +64,27 @@ func TestEveryAcceptedModeKnowsWhereQGoes(t *testing.T) {
 func TestTheLeadsNameTheDeepRead(t *testing.T) {
 	for name, text := range map[string]string{
 		"sessionStartLead": sessionStartLead,
+		"promptHookLead":   promptHookLead,
 		"wideRecallLead":   wideRecallLead,
 		"antigravityLead":  antigravityLead,
 	} {
 		if !strings.Contains(text, "recall_context") {
 			t.Errorf("%s no longer names the deep read; the alias it justifies may be dead: %q", name, text)
 		}
+	}
+	for name, text := range map[string]string{
+		"sessionStartLead":  sessionStartLead,
+		"promptHookLead":    promptHookLead,
+		"copilotChatPrompt": copilotChatPrompt("/bin/deja"),
+	} {
+		if !strings.Contains(text, "context") {
+			t.Errorf("%s does not name the 1-tool context mode: %q", name, text)
+		}
+	}
+	if ptr := weakRecallPointer(nil, nil); ptr != "" {
+		t.Errorf("empty pointer: %q", ptr)
+	}
+	if note := contextOthersNote(3, false); !strings.Contains(note, `"recall" mode`) {
+		t.Errorf("contextOthersNote does not name the 1-tool recall mode: %q", note)
 	}
 }

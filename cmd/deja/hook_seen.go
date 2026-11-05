@@ -536,7 +536,7 @@ func weakRecallPointer(ss []model.Session, terms []string) string {
 	if len(ss) > 1 {
 		more = fmt.Sprintf(" (+%d more)", len(ss)-1)
 	}
-	return fmt.Sprintf("deja: this project has history on %q from %s%s — call recall with a specific token if it matters here.\n",
+	return fmt.Sprintf("deja: this project has history on %q from %s%s — call deja in \"recall\" mode (or recall) with a specific token if it matters here.\n",
 		search.SafeLine(topic), when, more)
 }
 

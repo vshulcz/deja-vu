@@ -50,5 +50,5 @@ func TestAHandoffDoesNotContinuePastACutMarker(t *testing.T) {
 // closingLine is the sentence Handoff ends with, for the test above.
 func closingLine(s model.Session) string {
 	short := idSelector(Short(s.ID))
-	return fmt.Sprintf("This is a compact slice of session %s. If anything you need is missing — an exact error, a file, a decision — search the full history with `deja \"<term>\"` or `deja show %s`, or call the deja MCP tools recall / recall_context if available.", short, short)
+	return fmt.Sprintf("This is a compact slice of session %s. If anything you need is missing — an exact error, a file, a decision — search the full history with `deja \"<term>\"` or `deja show %s`, or call the deja MCP tool in \"recall\" or \"context\" mode (or recall / recall_context) if available.", short, short)
 }

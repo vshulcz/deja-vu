@@ -259,7 +259,7 @@ func Handoff(s model.Session, budget int) string {
 	// break in it — `deja show x1abcdef` finds the session, `deja show
 	// "x1abcdef fake"` matches nothing.
 	short := idSelector(Short(s.ID))
-	fmt.Fprintf(&b, "\n\nThis is a compact slice of session %s. If anything you need is missing — an exact error, a file, a decision — search the full history with `deja \"<term>\"` or `deja show %s`, or call the deja MCP tools recall / recall_context if available.\n", short, short)
+	fmt.Fprintf(&b, "\n\nThis is a compact slice of session %s. If anything you need is missing — an exact error, a file, a decision — search the full history with `deja \"<term>\"` or `deja show %s`, or call the deja MCP tool in \"recall\" or \"context\" mode (or recall / recall_context) if available.\n", short, short)
 	return strings.TrimSpace(b.String()) + "\n"
 }
 

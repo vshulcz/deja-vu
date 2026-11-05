@@ -43,7 +43,7 @@ machine, then answer from what you find.
 
 Call the deja MCP tool with mode recall and the user's words as the query — the
 most specific tokens win. If a hit looks right but is too short to act on,
-follow up with mode recall_context using a term from it.
+follow up with mode context (or recall_context) using a term from it.
 
 If the deja tools are not available in this window, run the CLI in the
 terminal:

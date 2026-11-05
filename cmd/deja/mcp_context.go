@@ -321,7 +321,7 @@ func contextOthersNote(hits int, about bool) string {
 	if hits < 2 {
 		return ""
 	}
-	return fmt.Sprintf("\n%s other session%s matched this question — call recall for the list if this one does not answer it.\n",
+	return fmt.Sprintf("\n%s other session%s matched this question — call the deja tool in \"recall\" mode (or recall) for the list if this one does not answer it.\n",
 		aboutCount(hits-1, about), pluralS(hits-1))
 }
 

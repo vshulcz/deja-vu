@@ -11,7 +11,8 @@ import (
 var dejaCallNames = []string{
 	"deja_recall_context", "deja_recall", "deja_remember",
 	"deja_blame", "deja_fix", "deja_how",
-	"recall_context",
+	"deja_session", "recall_context", "context_search",
+	"mcp__plugin_deja-vu_deja__deja", "mcp__deja__deja", "mcp_deja_deja",
 }
 
 // withoutOwnCallLog removes the lines where a transcript recorded a call to

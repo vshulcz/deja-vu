@@ -62,3 +62,32 @@ func TestSpreadQLeavesWhatItDoesNotUnderstandAlone(t *testing.T) {
 		t.Errorf("an unknown mode was rewritten: %s", got)
 	}
 }
+
+// Leads that say "with its session id" or "for blame a path" draw "session_id",
+// "id", or "file" from models that do not notice "q".
+func TestSpreadQAcceptsCommonSubjectAliases(t *testing.T) {
+	for _, tc := range []struct {
+		mode  string
+		alias string
+		field string
+	}{
+		{"context", "session_id", "query"},
+		{"context", "id", "query"},
+		{"context", "session", "query"},
+		{"blame", "file_path", "path"},
+		{"blame", "file", "path"},
+		{"fix", "output", "error"},
+		{"how", "command", "what"},
+		{"remember", "fact", "text"},
+		{"handoff", "session_id", "session"},
+	} {
+		got := spreadQ(tc.mode, json.RawMessage(`{"mode":"`+tc.mode+`","`+tc.alias+`":"carried"}`))
+		var args map[string]any
+		if err := json.Unmarshal(got, &args); err != nil {
+			t.Fatalf("%s (%s): %v", tc.mode, tc.alias, err)
+		}
+		if args[tc.field] != "carried" {
+			t.Errorf("mode %s with %s did not reach %q: %s", tc.mode, tc.alias, tc.field, got)
+		}
+	}
+}

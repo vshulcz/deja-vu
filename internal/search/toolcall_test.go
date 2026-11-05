@@ -87,10 +87,14 @@ func TestProseAboutTheToolsIsKept(t *testing.T) {
 func TestOnlyTheCallLinesAreRemoved(t *testing.T) {
 	text := "looked at the release\n" +
 		`⚙ deja_recall {"query":"release discussion permission"}` + "\n" +
+		`⚙ mcp__deja__deja {"mode":"recall","q":"release discussion permission"}` + "\n" +
+		`⚙ deja_session {"id":"ses_123"}` + "\n" +
 		"the missing permission was discussions: write"
 	got := withoutOwnCallLog(text)
-	if strings.Contains(got, "deja_recall {") {
-		t.Errorf("the call line survived: %q", got)
+	for _, call := range []string{"deja_recall {", "mcp__deja__deja {", "deja_session {"} {
+		if strings.Contains(got, call) {
+			t.Errorf("the call line survived (%s): %q", call, got)
+		}
 	}
 	for _, want := range []string{"looked at the release", "discussions: write"} {
 		if !strings.Contains(got, want) {
