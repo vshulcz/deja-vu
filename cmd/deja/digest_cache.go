@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"hash/fnv"
 	"os"
@@ -293,7 +292,7 @@ func requestHookRefresh(dir, cwd string) {
 // suite (and hung the Windows runner).
 var startRefresher = func(cmd *exec.Cmd) (int, error) {
 	if strings.HasSuffix(strings.TrimSuffix(cmd.Path, ".exe"), ".test") {
-		return 0, errors.New("not spawning the test binary")
+		return 0, nil
 	}
 	return startDetachedPID(cmd)
 }

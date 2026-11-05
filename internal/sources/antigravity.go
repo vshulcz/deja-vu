@@ -679,7 +679,7 @@ func antigravityExitCode(kind, text string) (int, bool) {
 				if num == "-1" {
 					return 1, true
 				}
-				if code, ok := statusCode(num, "", ""); ok {
+				if code, ok := statusCode(num, "", ""); ok && code != 0 {
 					return code, true
 				}
 			}

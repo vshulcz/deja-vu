@@ -107,14 +107,14 @@ func genericChanges(s model.Session) []Change {
 
 func walkGenericJSONL(file string, w *editWalker) bool {
 	stopped := false
-	firstLine := true
+	lineNo := 0
 	fallback := false
 	_ = scanJSONLBytes(file, 0, func(line []byte) {
 		if stopped || fallback {
 			return
 		}
-		if firstLine {
-			firstLine = false
+		lineNo++
+		if lineNo == 1 {
 			var probe any
 			if json.Unmarshal(line, &probe) != nil {
 				fallback = true
@@ -125,7 +125,7 @@ func walkGenericJSONL(file string, w *editWalker) bool {
 			}
 			return
 		}
-		if !lineMayCarryEditOrCwd(line, w.cwd != "") {
+		if !lineMayCarryEditOrCwd(line, w.cwd != "" || lineNo > 8) {
 			return
 		}
 		var v any

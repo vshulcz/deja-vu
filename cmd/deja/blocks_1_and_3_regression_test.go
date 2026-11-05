@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -11,7 +10,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"syscall"
 	"testing"
 	"time"
 
@@ -79,7 +77,7 @@ func TestStartDetachedPIDReapsExitedChild(t *testing.T) {
 	}
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		if killErr := syscall.Kill(pid, 0); errors.Is(killErr, syscall.ESRCH) {
+		if !processAlive(pid) {
 			return
 		}
 		time.Sleep(10 * time.Millisecond)

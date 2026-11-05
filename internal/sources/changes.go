@@ -53,8 +53,71 @@ func Changes(s model.Session) []Change {
 		return claudeChanges(s.Path, s.ID)
 	case "codex":
 		return codexChanges(s.Path)
+	case "antigravity":
+		return antigravityChanges(s.Path)
 	}
 	return genericChanges(s)
+}
+
+func antigravityChanges(file string) []Change {
+	var out []Change
+	seen := map[Change]bool{}
+	cwd := ""
+	_ = scanJSONLBytes(file, 0, func(line []byte) {
+		hasEdit := bytes.Contains(line, []byte(`"edit_file"`)) ||
+			bytes.Contains(line, []byte(`"write_file"`)) ||
+			bytes.Contains(line, []byte(`"write_to_file"`))
+		hasCwd := cwd == "" && (bytes.Contains(line, []byte(`"Cwd"`)) || bytes.Contains(line, []byte(`"cwd"`)))
+		if !hasEdit && !hasCwd {
+			return
+		}
+		var v struct {
+			Source    string `json:"source"`
+			Type      string `json:"type"`
+			ToolCalls []any  `json:"tool_calls"`
+		}
+		if json.Unmarshal(line, &v) != nil || v.Source != "MODEL" || v.Type != "PLANNER_RESPONSE" {
+			return
+		}
+		for _, raw := range v.ToolCalls {
+			call, _ := raw.(map[string]any)
+			args, _ := call["args"].(map[string]any)
+			if cwd == "" {
+				if c := firstNonEmpty(antigravityArg(args, "Cwd"), antigravityArg(args, "cwd")); c != "" {
+					cwd = c
+				}
+			}
+			p := decodeURIPath(strings.TrimPrefix(firstNonEmpty(antigravityArg(args, "TargetFile"), antigravityArg(args, "Path")), "file://"))
+			if p == "" || strings.ContainsAny(p, "\n\r") {
+				continue
+			}
+			var ch Change
+			switch str(call["name"]) {
+			case "edit_file":
+				ch = Change{Path: p, Old: antigravityArg(args, "Target"), New: antigravityArg(args, "Replacement")}
+			case "write_file":
+				ch = Change{Path: p, New: antigravityArg(args, "Content"), Created: true}
+			case "write_to_file":
+				ch = Change{Path: p, New: antigravityArg(args, "CodeContent"), Created: true}
+			default:
+				continue
+			}
+			if !seen[ch] {
+				seen[ch] = true
+				out = append(out, ch)
+			}
+		}
+	})
+	if len(out) == 0 {
+		return nil
+	}
+	if cwd == "" {
+		cwd = commonDir(out)
+	}
+	for i := range out {
+		out[i].Path = relTo(cwd, out[i].Path)
+	}
+	return out
 }
 
 func claudeChanges(file, id string) []Change {
