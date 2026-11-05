@@ -231,7 +231,8 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 	// session id, so what this hook writes down is how recall knows not to
 	// answer with the transcript being written (#3945, #3965).
 	markSessionLive(dir, input.SessionID)
-	releaseSeenLock, _ := holdHookseenLock(dir)
+	unlockSeen, _ := holdHookseenLock(dir)
+	releaseSeenLock := sync.OnceFunc(unlockSeen)
 	defer releaseSeenLock()
 	measureCompactionRecovery(dir, input)
 	// A ZCode compaction in the middle of a turn shows up at the next tool.
@@ -261,6 +262,8 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 			requestWarmup(dir)
 			return nil
 		}
+		// Spawn recall runs the prompt hook, which takes this same lock.
+		releaseSeenLock()
 		return runHookSpawn(dir, input, raw, stdout)
 	}
 	// Never build or repair from here. This runs inside an action the user is
