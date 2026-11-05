@@ -29,6 +29,7 @@ type Client struct {
 	// so an endpoint that wants none sees the text as before.
 	QueryPrefix   string
 	PassagePrefix string
+	sendInputType bool
 }
 
 // Made reports whether the vectors of s came from this client's model and
@@ -105,20 +106,53 @@ var errNoEmbedEndpoint = errors.New("embedding endpoint unavailable (set DEJA_EM
 
 // Embed returns one vector per text.
 func (c *Client) Embed(ctx context.Context, texts []string) ([][]float32, error) {
+	return c.embed(ctx, texts, "passage")
+}
+
+// wantsInputType reports whether the endpoint or model expects an "input_type"
+// parameter ("passage" when indexing, "query" when searching), as NVIDIA NIM
+// and asymmetric Nemotron / NV-Embed models do (#5950).
+func wantsInputType(endpoint, model string) bool {
+	u, m := strings.ToLower(endpoint), strings.ToLower(model)
+	return strings.Contains(u, "integrate.api.nvidia.com") ||
+		strings.HasPrefix(m, "nvidia/") ||
+		strings.Contains(m, "nemotron") ||
+		strings.Contains(m, "nv-embed")
+}
+
+func (c *Client) embed(ctx context.Context, texts []string, inputType string) ([][]float32, error) {
 	if len(texts) == 0 {
 		return nil, nil
+	}
+	if inputType == "" {
+		inputType = "passage"
 	}
 	httpClient := c.HTTP
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: 120 * time.Second}
 	}
-	body, err := json.Marshal(map[string]any{"model": c.Model, "input": texts})
+	withInputType := c.sendInputType || wantsInputType(c.URL, c.Model)
+	result, status, detail, err := c.doEmbed(ctx, httpClient, texts, inputType, withInputType)
+	if err != nil && status == http.StatusBadRequest && !withInputType && strings.Contains(strings.ToLower(detail), "input_type") {
+		c.sendInputType = true
+		res, _, _, retryErr := c.doEmbed(ctx, httpClient, texts, inputType, true)
+		return res, retryErr
+	}
+	return result, err
+}
+
+func (c *Client) doEmbed(ctx context.Context, httpClient *http.Client, texts []string, inputType string, withInputType bool) ([][]float32, int, string, error) {
+	payload := map[string]any{"model": c.Model, "input": texts}
+	if withInputType {
+		payload["input_type"] = inputType
+	}
+	body, err := json.Marshal(payload)
 	if err != nil {
-		return nil, fmt.Errorf("encode embedding request: %w", err)
+		return nil, 0, "", fmt.Errorf("encode embedding request: %w", err)
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.URL, bytes.NewReader(body))
 	if err != nil {
-		return nil, fmt.Errorf("create embedding request: %w", err)
+		return nil, 0, "", fmt.Errorf("create embedding request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	if c.apiKey != "" {
@@ -126,7 +160,7 @@ func (c *Client) Embed(ctx context.Context, texts []string) ([][]float32, error)
 	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("embedding request: %w", err)
+		return nil, 0, "", fmt.Errorf("embedding request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -140,9 +174,9 @@ func (c *Client) Embed(ctx context.Context, texts []string) ([][]float32, error)
 			d = strings.ReplaceAll(d, c.apiKey, "<redacted>")
 		}
 		if d != "" {
-			return nil, fmt.Errorf("embedding endpoint returned %s: %s", resp.Status, d)
+			return nil, resp.StatusCode, d, fmt.Errorf("embedding endpoint returned %s: %s", resp.Status, d)
 		}
-		return nil, fmt.Errorf("embedding endpoint returned %s", resp.Status)
+		return nil, resp.StatusCode, "", fmt.Errorf("embedding endpoint returned %s", resp.Status)
 	}
 	var out struct {
 		Embeddings [][]float32 `json:"embeddings"`
@@ -151,7 +185,7 @@ func (c *Client) Embed(ctx context.Context, texts []string) ([][]float32, error)
 		} `json:"data"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return nil, fmt.Errorf("decode embedding response: %w", err)
+		return nil, resp.StatusCode, "", fmt.Errorf("decode embedding response: %w", err)
 	}
 	result := out.Embeddings
 	if len(result) == 0 {
@@ -161,9 +195,9 @@ func (c *Client) Embed(ctx context.Context, texts []string) ([][]float32, error)
 		}
 	}
 	if len(result) != len(texts) {
-		return nil, fmt.Errorf("embedding endpoint returned %d vectors for %d texts", len(result), len(texts))
+		return nil, resp.StatusCode, "", fmt.Errorf("embedding endpoint returned %d vectors for %d texts", len(result), len(texts))
 	}
-	return result, nil
+	return result, resp.StatusCode, "", nil
 }
 
 func embedAPIKey(endpoint string) string {

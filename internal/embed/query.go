@@ -36,7 +36,7 @@ func (c *Client) EmbedQuery(ctx context.Context, query string) ([]float32, error
 	if ok {
 		return v, nil
 	}
-	out, err := c.Embed(ctx, []string{text})
+	out, err := c.embed(ctx, []string{text}, "query")
 	if err != nil {
 		return nil, err
 	}

@@ -73,6 +73,51 @@ func TestClientShapesAndErrors(t *testing.T) {
 	}
 }
 
+func TestAsymmetricInputTypeForNemotronAndRetryOn400(t *testing.T) {
+	var seen []string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatal(err)
+		}
+		it, _ := req["input_type"].(string)
+		seen = append(seen, it)
+		if it == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"object":"error","message":"'input_type' parameter is required for asymmetric models","type":"invalid_request_error"}`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"embedding":[1,2]}]}`))
+	}))
+	defer ts.Close()
+
+	// Named Nemotron model sends input_type on the first request without a 400 round-trip.
+	nemotron := &Client{URL: ts.URL, Model: "nvidia/nemotron-3.5-embed-8b"}
+	if _, err := nemotron.Embed(context.Background(), []string{"doc"}); err != nil {
+		t.Fatalf("nemotron Embed: %v", err)
+	}
+	if _, err := nemotron.EmbedQuery(context.Background(), "question"); err != nil {
+		t.Fatalf("nemotron EmbedQuery: %v", err)
+	}
+	if len(seen) != 2 || seen[0] != "passage" || seen[1] != "query" {
+		t.Fatalf("nemotron input_types = %v, want [passage query]", seen)
+	}
+
+	// Any model whose endpoint demands input_type with HTTP 400 retries with it and remembers.
+	seen = nil
+	other := &Client{URL: ts.URL, Model: "custom-asymmetric"}
+	if _, err := other.Embed(context.Background(), []string{"doc"}); err != nil {
+		t.Fatalf("retry Embed: %v", err)
+	}
+	if _, err := other.EmbedQuery(context.Background(), "other question"); err != nil {
+		t.Fatalf("subsequent EmbedQuery: %v", err)
+	}
+	if len(seen) != 3 || seen[0] != "" || seen[1] != "passage" || seen[2] != "query" {
+		t.Fatalf("retry input_types = %v, want [\"\" passage query]", seen)
+	}
+}
+
 func TestNewExplicitAndProbeOrder(t *testing.T) {
 	t.Setenv("DEJA_EMBED_MODEL", "probe-model")
 	t.Setenv("DEJA_EMBED_URL", "http://explicit.invalid/api/embed")
