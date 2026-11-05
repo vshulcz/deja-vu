@@ -259,6 +259,9 @@ func handleMCP(dir string, req rpcRequest) (any, int, string) {
 			out["isError"] = true
 			return out, 0, ""
 		}
+		if stageMCPToolResult(dir, mcpClientName(), p.Name, p.Arguments, text) {
+			return map[string]any{"content": []map[string]string{}}, 0, ""
+		}
 		return toolText(text), 0, ""
 	default:
 		return nil, -32601, "method not found"

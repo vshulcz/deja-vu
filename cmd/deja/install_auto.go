@@ -285,9 +285,11 @@ var qwenHookWiring = []struct{ Event, Sub, Matcher string }{
 	// The fix pair, at the failure. Matched on the tool that runs a command so
 	// it never spawns on a read.
 	{"PostToolUseFailure", "hook-tool-after", "run_shell_command"},
-	// The file line, after a read or an edit: PreToolUse is not read, and
-	// what PostToolUse returns goes in beside the tool's result.
-	{"PostToolUse", "hook-tool", "read_file|edit|write_file"},
+	// The file line, after a read or an edit, and the staged MCP answer
+	// after a deja tool call: PreToolUse is not read, and what PostToolUse
+	// returns goes into the model's functionResponse without printing in
+	// the TUI's tool result box.
+	{"PostToolUse", "hook-tool", "read_file|edit|write_file|mcp__deja__.*"},
 	// Compaction throws away the blocks this session was shown while the list
 	// that stops them repeating outlives them, so without this the memory qwen
 	// just lost is the memory recall refuses to send again.
@@ -422,6 +424,9 @@ func installSettingsHookRetiring(path, event, matcher string, timeout int, cmd s
 			// without this left everyone who installed before the fix with a
 			// hook that could never answer.
 			adoptHookTimeout(entry, cmd, timeout)
+			if hs, _ := entry["hooks"].([]any); len(hs) == 1 {
+				adoptMatcher(entry, hs, matcher)
+			}
 		}
 		kept = append(kept, entryAny)
 	}

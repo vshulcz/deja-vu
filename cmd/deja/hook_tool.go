@@ -243,6 +243,17 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 	if postToolEvent(input.HookEventName) {
 		event = "PostToolUse"
 	}
+	if isDejaMCPToolCall(input.ToolName) {
+		if staged := popStagedMCPToolResult(dir, raw); staged != "" {
+			var resp sessionStartHookResponse
+			resp.HookSpecificOutput.HookEventName = event
+			resp.HookSpecificOutput.AdditionalContext = staged
+			if b, err := json.Marshal(resp); err == nil {
+				fmt.Fprintln(stdout, string(b))
+			}
+		}
+		return nil
+	}
 	if delivered, err := emitCompactionRecovery(dir, input.SessionID, hookProjectPath(input.CWD, input.WorkspaceRoots), event, shape, stdout); delivered {
 		return err
 	}

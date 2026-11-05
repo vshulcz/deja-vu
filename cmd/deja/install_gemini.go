@@ -127,7 +127,7 @@ func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 					"timeout": 10000,
 				}},
 			}, map[string]any{
-				"matcher": "read_file|replace|write_file",
+				"matcher": "read_file|replace|write_file|mcp_deja_.*|deja__.*",
 				"hooks": []any{map[string]any{
 					"type": "command", "name": geminiExtensionName, "command": hookRun(exe, "hook-tool"),
 					"timeout": 10000,

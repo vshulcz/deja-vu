@@ -44,8 +44,8 @@ func TestInstallGeminiWiresTheFixPair(t *testing.T) {
 		if len(entries) != 2 {
 			t.Fatalf("%s entries = %d, want 2: %s", event, len(entries), b)
 		}
-		if m := entries[1].Matcher; m != "read_file|replace|write_file" || !strings.HasSuffix(entries[1].Hooks[0].Command, "hook-tool") {
-			t.Errorf("%s second entry = %q %q, want the file line on read_file|replace|write_file", event, m, entries[1].Hooks[0].Command)
+		if m := entries[1].Matcher; m != "read_file|replace|write_file|mcp_deja_.*|deja__.*" || !strings.HasSuffix(entries[1].Hooks[0].Command, "hook-tool") {
+			t.Errorf("%s second entry = %q %q, want hook-tool on read_file|replace|write_file|mcp_deja_.*|deja__.*", event, m, entries[1].Hooks[0].Command)
 		}
 		if got := entries[0].Hooks[0].Command; !strings.HasSuffix(got, sub) {
 			t.Errorf("%s runs %q, want %s", event, got, sub)

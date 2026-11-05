@@ -197,8 +197,8 @@ func TestQwenRetiresOnlyTheOldFixPair(t *testing.T) {
 		t.Fatal(err)
 	}
 	post := root.Hooks["PostToolUse"]
-	if len(post) != 1 || post[0].Matcher != "read_file|edit|write_file" || !strings.HasSuffix(post[0].Hooks[0].Command, " hook-tool") {
-		t.Errorf("PostToolUse = %+v, want only the file line", post)
+	if len(post) != 1 || post[0].Matcher != "read_file|edit|write_file|mcp__deja__.*" || !strings.HasSuffix(post[0].Hooks[0].Command, " hook-tool") {
+		t.Errorf("PostToolUse = %+v, want only hook-tool", post)
 	}
 }
 
