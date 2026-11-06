@@ -109,8 +109,9 @@ func autoWirings() []autoWiring {
 		{"vscode", copilotHooksPath, "hook-prompt --copilot", ""},
 		// ZCode keeps its hooks in the same file as its server map, and the
 		// line deja writes ends in `--strict` — its schema discards a whole
-		// response over one key it does not know.
-		{"zcode", zcodeConfigPath, "hook-context", ""},
+		// response over one key it does not know. A 3.17+ desktop build has
+		// config.json instead of setting.json, so ask for whichever is there.
+		{"zcode", zcodeDoctorPath, "hook-context", ""},
 		// Command Code keeps its hooks in the same settings.json as its
 		// permissions, and its timeout unit is seconds.
 		{"commandcode", commandCodeSettings, "hook-context", ""},
