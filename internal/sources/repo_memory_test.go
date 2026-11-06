@@ -294,3 +294,59 @@ func TestRemoveRepoEntries(t *testing.T) {
 		t.Fatalf("ReadRepoMemory after remove: %v, bad=%d, err=%v", left, bad, err)
 	}
 }
+
+func TestEvolveRepoEntriesAndAutoToggle(t *testing.T) {
+	root := repoMemFixture(t)
+	keepFile := filepath.Join(root, "internal", "outbox.go")
+	goneFile := filepath.Join(root, "internal", "legacy.go")
+	if err := os.MkdirAll(filepath.Dir(keepFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{keepFile, goneFile} {
+		if err := os.WriteFile(p, []byte("package internal\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	added, updated, pruned, err := EvolveRepoEntries(root, []RepoEntry{
+		{Kind: "decision", Text: "outbox owns retry scheduling", Files: []string{"internal/outbox.go"}, Sessions: 1, Date: "2026-10-01"},
+		{Kind: "rejected", Text: "legacy polling loop caused lock contention", Files: []string{"internal/legacy.go"}, Sessions: 1, Date: "2026-10-01"},
+	}, 50)
+	if err != nil || added != 2 || updated != 0 || pruned != 0 {
+		t.Fatalf("initial evolve: +%d ~%d -%d err=%v", added, updated, pruned, err)
+	}
+
+	// Delete legacy.go and reinforce the outbox entry (even under a different kind).
+	if rmErr := os.Remove(goneFile); rmErr != nil {
+		t.Fatal(rmErr)
+	}
+	added, updated, pruned, err = EvolveRepoEntries(root, []RepoEntry{
+		{Kind: "gotcha", Text: "outbox owns retry scheduling", Files: []string{"internal/outbox.go"}, Commit: "1489a47b1", Sessions: 4, Date: "2026-10-02"},
+	}, 50)
+	if err != nil || added != 0 || updated != 1 || pruned != 1 {
+		t.Fatalf("second evolve: +%d ~%d -%d err=%v", added, updated, pruned, err)
+	}
+
+	entries, bad, err := ReadRepoMemory(RepoMemoryPath(root))
+	if err != nil || bad != 0 || len(entries) != 1 {
+		t.Fatalf("entries after prune+reinforce: %+v bad=%d err=%v", entries, bad, err)
+	}
+	if entries[0].Commit != "1489a47b1" || entries[0].Sessions != 4 || len(entries[0].Files) != 1 || entries[0].Files[0] != "internal/outbox.go" {
+		t.Errorf("reinforced entry = %+v", entries[0])
+	}
+
+	ss, err := ParseRepoMemoryFile(RepoMemoryPath(root))
+	if err != nil || len(ss) != 1 || len(ss[0].Messages) != 2 || ss[0].Messages[1].Role != "edit" {
+		t.Fatalf("ParseRepoMemoryFile messages = %+v, err=%v", ss, err)
+	}
+
+	if RepoAutoDisabled(root) {
+		t.Error("auto sync disabled by default")
+	}
+	if err := SetRepoAutoDisabled(root, true); err != nil || !RepoAutoDisabled(root) {
+		t.Fatalf("SetRepoAutoDisabled(true): disabled=%v err=%v", RepoAutoDisabled(root), err)
+	}
+	if err := SetRepoAutoDisabled(root, false); err != nil || RepoAutoDisabled(root) {
+		t.Fatalf("SetRepoAutoDisabled(false): disabled=%v err=%v", RepoAutoDisabled(root), err)
+	}
+}

@@ -42,13 +42,33 @@ func runRepo(dir string, args []string) error {
 			return runRepoAdd(dir, os.Stdout, args[1:])
 		case "gotcha", "rejected", "decision":
 			return runRepoAdd(dir, os.Stdout, append([]string{"--kind", args[0]}, args[1:]...))
-		case "init":
-			return runRepoInit(dir, os.Stdout, args[1:])
+		case "init", "sync":
+			return runRepoSync(dir, os.Stdout, args[0], args[1:])
+		case "off", "disable":
+			return runRepoToggle(os.Stdout, true)
+		case "on", "enable":
+			return runRepoToggle(os.Stdout, false)
 		case "rm", "remove", "delete":
 			return runRepoRemove(os.Stdout, args[1:])
 		}
 	}
-	return runRepoList(os.Stdout, args)
+	return runRepoList(dir, os.Stdout, args)
+}
+
+func runRepoToggle(w io.Writer, off bool) error {
+	root, err := repoCheckout()
+	if err != nil {
+		return err
+	}
+	if err := sources.SetRepoAutoDisabled(root, off); err != nil {
+		return err
+	}
+	if off {
+		fmt.Fprintf(w, "automatic %s updates are off for %s — `deja repo on` turns them back on\n", repoFileShown, search.SafeLine(sources.ClaudeProjectName(root)))
+	} else {
+		fmt.Fprintf(w, "automatic %s updates are on for %s\n", repoFileShown, search.SafeLine(sources.ClaudeProjectName(root)))
+	}
+	return nil
 }
 
 // repoCheckout is the repository the command is about: the one the process
@@ -65,7 +85,7 @@ func repoCheckout() (string, error) {
 	return root, nil
 }
 
-func runRepoList(w io.Writer, args []string) error {
+func runRepoList(dir string, w io.Writer, args []string) error {
 	asJSON := false
 	for _, a := range args {
 		if a != "--json" {
@@ -77,6 +97,7 @@ func runRepoList(w io.Writer, args []string) error {
 	if err != nil {
 		return err
 	}
+	autoEvolveRepoMemory(dir, root)
 	entries, bad, err := readRepoMemoryAndNotes(root)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
@@ -91,10 +112,27 @@ func runRepoList(w io.Writer, args []string) error {
 		return enc.Encode(entries)
 	}
 	if len(entries) == 0 && bad == 0 {
-		fmt.Fprintf(w, "no %s in this repository yet — `deja repo candidates` proposes entries from your history\n", repoFileShown)
+		if sources.RepoAutoDisabled(root) {
+			fmt.Fprintf(w, "no %s in this repository (automatic updates are off — `deja repo on` or `deja repo sync`)\n", repoFileShown)
+			return nil
+		}
+		fmt.Fprintf(w, "no %s in this repository yet — `deja repo sync` builds it automatically, or `deja repo candidates` lists entries\n", repoFileShown)
 		return nil
 	}
-	fmt.Fprintf(w, "%d entr%s in %s\n", len(entries), pluralY(len(entries)), repoFileShown)
+	guarded := map[string]bool{}
+	for _, e := range entries {
+		for _, f := range e.Files {
+			guarded[f] = true
+		}
+	}
+	extra := ""
+	if len(guarded) > 0 {
+		extra = fmt.Sprintf(" · %d file%s guarded", len(guarded), pluralS(len(guarded)))
+	}
+	if sources.RepoAutoDisabled(root) {
+		extra += " · auto-sync off"
+	}
+	fmt.Fprintf(w, "%d entr%s in %s%s\n", len(entries), pluralY(len(entries)), repoFileShown, extra)
 	for i, e := range entries {
 		fmt.Fprintf(w, "%2d. %s\n", i+1, repoEntryRow(e))
 	}
@@ -108,11 +146,32 @@ func runRepoList(w io.Writer, args []string) error {
 }
 
 func repoEntryRow(e sources.RepoEntry) string {
-	from := ""
-	if e.From != "" {
-		from = "  (" + search.SafeLine(e.From) + ")"
+	var meta []string
+	if len(e.Files) > 0 {
+		shown := e.Files
+		if len(shown) > 2 {
+			shown = shown[:2]
+		}
+		fileStr := strings.Join(shown, ", ")
+		if len(e.Files) > 2 {
+			fileStr += fmt.Sprintf(" +%d", len(e.Files)-2)
+		}
+		meta = append(meta, fileStr)
 	}
-	return fmt.Sprintf("%s %-8s %s%s", search.SafeLine(e.ID), e.Kind, search.SafeLine(e.Text), from)
+	if e.Commit != "" {
+		meta = append(meta, "@"+search.SafeLine(e.Commit))
+	}
+	if e.Sessions > 1 {
+		meta = append(meta, fmt.Sprintf("%dx", e.Sessions))
+	}
+	if e.From != "" {
+		meta = append(meta, search.SafeLine(e.From))
+	}
+	tail := ""
+	if len(meta) > 0 {
+		tail = "  (" + strings.Join(meta, " · ") + ")"
+	}
+	return fmt.Sprintf("%s %-8s %s%s", search.SafeLine(e.ID), e.Kind, search.SafeLine(e.Text), tail)
 }
 
 // repoPolicyLine says when the trust policy keeps these entries off a path, so
@@ -180,22 +239,25 @@ func runRepoAdd(dir string, w io.Writer, args []string) error {
 	return writeRepoEntries(w, root, entries)
 }
 
-func runRepoInit(dir string, w io.Writer, args []string) error {
-	limit := 5
+func runRepoSync(dir string, w io.Writer, sub string, args []string) error {
+	limit := 15
+	if sub == "init" {
+		limit = 5
+	}
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--limit":
 			if i+1 >= len(args) {
-				return errors.New("repo init: --limit needs value")
+				return fmt.Errorf("repo %s: --limit needs value", sub)
 			}
 			i++
 			n, err := strconv.Atoi(args[i])
 			if err != nil || n <= 0 {
-				return fmt.Errorf("repo init: --limit wants a positive number, got %q", args[i])
+				return fmt.Errorf("repo %s: --limit wants a positive number, got %q", sub, args[i])
 			}
 			limit = n
 		default:
-			return unknownFlag("repo init", args[i], repoInitFlags)
+			return unknownFlag("repo "+sub, args[i], repoInitFlags)
 		}
 	}
 	root, err := repoCheckout()
@@ -209,21 +271,108 @@ func runRepoInit(dir string, w io.Writer, args []string) error {
 	if err != nil {
 		return err
 	}
-	var entries []sources.RepoEntry
+	var incoming []sources.RepoEntry
 	for _, c := range cands {
-		if c.InFile || c.Refused != "" {
+		if c.Refused != "" || (sub == "sync" && !autoSyncEligible(c)) {
 			continue
 		}
-		entries = append(entries, sources.RepoEntry{ID: c.ID, Kind: c.Kind, Text: c.Text, From: c.From})
-		if len(entries) >= limit {
+		incoming = append(incoming, repoEntryFromCandidate(c))
+		if len(incoming) >= limit {
 			break
 		}
 	}
-	if len(entries) == 0 {
-		fmt.Fprintf(w, "no new candidates for %s to initialize %s\n", search.SafeLine(sources.ClaudeProjectName(root)), repoFileShown)
+	if sub == "init" {
+		var fresh []sources.RepoEntry
+		for _, c := range cands {
+			if c.InFile || c.Refused != "" {
+				continue
+			}
+			fresh = append(fresh, repoEntryFromCandidate(c))
+			if len(fresh) >= limit {
+				break
+			}
+		}
+		if len(fresh) == 0 {
+			fmt.Fprintf(w, "no new candidates for %s to initialize %s\n", search.SafeLine(sources.ClaudeProjectName(root)), repoFileShown)
+			return nil
+		}
+		return writeRepoEntries(w, root, fresh)
+	}
+	added, updated, pruned, err := sources.EvolveRepoEntries(root, incoming, 50)
+	if err != nil {
+		return fmt.Errorf("repo sync: %w", err)
+	}
+	if added == 0 && updated == 0 && pruned == 0 {
+		fmt.Fprintf(w, "%s is up to date\n", repoFileShown)
 		return nil
 	}
-	return writeRepoEntries(w, root, entries)
+	fmt.Fprintf(w, "synced %s: +%d added, %d reinforced, %d stale pruned\n", repoFileShown, added, updated, pruned)
+	return nil
+}
+
+func repoEntryFromCandidate(c repoCandidate) sources.RepoEntry {
+	day := c.at.UTC().Format("2006-01-02")
+	if c.at.IsZero() {
+		day = time.Now().UTC().Format("2006-01-02")
+	}
+	return sources.RepoEntry{
+		ID:       c.ID,
+		Kind:     c.Kind,
+		Text:     c.Text,
+		Files:    c.Files,
+		Commit:   c.Commit,
+		Sessions: c.Sessions,
+		Date:     day,
+		From:     c.From,
+	}
+}
+
+// autoEvolveRepoMemory quietly evolves .deja/memory.jsonl from the local index
+// unless disabled via `deja repo off`, DEJA_REPO=off, or policy. Under `go test`
+// binaries it only evolves when .deja/memory.jsonl already exists (or when
+// DEJA_REPO=on is explicitly set).
+func autoEvolveRepoMemory(dir, cwd string) {
+	if redact.Disabled() {
+		return
+	}
+	root := sources.RepoRoot(cwd)
+	if root == "" || sources.RepoAutoDisabled(root) {
+		return
+	}
+	if !policy.Load().Allows(policy.ActivationAuto, sources.RepoMemoryProject(root)) {
+		return
+	}
+	inTestBinary := strings.HasSuffix(strings.TrimSuffix(os.Args[0], ".exe"), ".test")
+	if inTestBinary && strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_REPO"))) != "on" {
+		if !fileThere(sources.RepoMemoryPath(root)) {
+			return
+		}
+	}
+	if !index.HasManifest(dir) || !index.IsCurrentVersion(dir) || index.Damaged(dir) {
+		return
+	}
+	cands, err := collectRepoCandidates(dir, root, 0, 20)
+	if err != nil {
+		return
+	}
+	var incoming []sources.RepoEntry
+	for _, c := range cands {
+		if c.Refused != "" || !autoSyncEligible(c) {
+			continue
+		}
+		incoming = append(incoming, repoEntryFromCandidate(c))
+		if len(incoming) >= 12 {
+			break
+		}
+	}
+	_, _, _, _ = sources.EvolveRepoEntries(root, incoming, 50)
+}
+
+func autoSyncEligible(c repoCandidate) bool {
+	if c.tier == 0 {
+		return true
+	}
+	return len(c.Files) > 0
 }
 
 func runRepoRemove(w io.Writer, args []string) error {
@@ -297,7 +446,7 @@ func pickRepoCandidates(dir, root string, ids []string) ([]sources.RepoEntry, er
 		if c.Refused != "" {
 			return nil, fmt.Errorf("repo add: %s is refused: %s", c.ID, c.Refused)
 		}
-		out = append(out, sources.RepoEntry{ID: c.ID, Kind: c.Kind, Text: c.Text, From: c.From})
+		out = append(out, repoEntryFromCandidate(c))
 	}
 	return out, nil
 }
@@ -414,6 +563,9 @@ func writeRepoEntries(w io.Writer, root string, entries []sources.RepoEntry) err
 		masked += n
 		entries[i].Text = text
 		entries[i].ID = sources.RepoEntryID(entries[i].Kind, text)
+		if len(entries[i].Files) == 0 {
+			entries[i].Files = sources.CleanRepoFiles(extractMentionedRepoFiles(root, text, nil))
+		}
 		if entries[i].Date == "" {
 			entries[i].Date = time.Now().UTC().Format("2006-01-02")
 		}
@@ -542,14 +694,17 @@ func repoMemoryBlock(cwd string, pol policy.Policy, taskFiles ...string) string 
 	rank := map[string]int{"rejected": 0, "gotcha": 1, "decision": 2}
 	sort.SliceStable(entries, func(i, j int) bool {
 		if len(taskFiles) > 0 {
-			mi := repoEntryMatchesAnyFile(root, entries[i].Text, taskFiles)
-			mj := repoEntryMatchesAnyFile(root, entries[j].Text, taskFiles)
+			mi := repoEntryMatchesAnyEntryFile(root, entries[i], taskFiles)
+			mj := repoEntryMatchesAnyEntryFile(root, entries[j], taskFiles)
 			if mi != mj {
 				return mi
 			}
 		}
 		if rank[entries[i].Kind] != rank[entries[j].Kind] {
 			return rank[entries[i].Kind] < rank[entries[j].Kind]
+		}
+		if entries[i].Sessions != entries[j].Sessions {
+			return entries[i].Sessions > entries[j].Sessions
 		}
 		return entries[i].Date > entries[j].Date
 	})
@@ -598,9 +753,9 @@ func repoMemoryStamp(cwd string) string {
 	return "|repo:" + strconv.FormatInt(fi.Size(), 10) + "@" + strconv.FormatInt(fi.ModTime().UnixNano(), 10)
 }
 
-func repoEntryMatchesAnyFile(root, text string, taskFiles []string) bool {
+func repoEntryMatchesAnyEntryFile(root string, e sources.RepoEntry, taskFiles []string) bool {
 	for _, f := range taskFiles {
-		if f != "" && repoEntryMentionsFile(root, f, text) {
+		if f != "" && (repoEntryHasFile(root, f, e.Files) || repoEntryMentionsFile(root, f, e.Text)) {
 			return true
 		}
 	}

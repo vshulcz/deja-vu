@@ -175,7 +175,7 @@ _deja_completion() {
             ;;
         repo)
             if (( COMP_CWORD == 2 )); then
-                COMPREPLY=( $(compgen -W "candidates add --json" -- "$cur") )
+                COMPREPLY=( $(compgen -W "candidates add sync on off --json" -- "$cur") )
             elif [[ "$action" == "candidates" && "$prev" != "--limit" && "$prev" != "--since" ]]; then
                 COMPREPLY=( $(compgen -W "--json --limit --since" -- "$cur") )
             elif [[ "$action" == "add" && "$prev" == "--kind" ]]; then
@@ -452,7 +452,7 @@ _deja() {
       ;;
     repo)
       if (( CURRENT == 3 )); then
-        _values 'repo action' candidates add
+        _values 'repo action' candidates add sync on off
       elif [[ "$words[3]" == "candidates" ]]; then
         _arguments '--json[print JSON]' '--limit=[maximum candidates]:count:' '--since=[filter by age]:duration:'
       elif [[ "$words[3]" == "add" ]]; then
@@ -645,8 +645,8 @@ complete -c deja -n '__fish_seen_subcommand_from recall; and not __fish_seen_sub
 complete -c deja -n '__fish_seen_subcommand_from remember' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from remember' -l tag -r
 complete -c deja -n '__fish_seen_subcommand_from remember' -l repo -d 'Write to .deja/notes.jsonl in the repository'
-complete -c deja -n '__fish_seen_subcommand_from repo; and not __fish_seen_subcommand_from candidates add' -f -a 'candidates add'
-complete -c deja -n '__fish_seen_subcommand_from repo; and not __fish_seen_subcommand_from candidates add' -l json
+complete -c deja -n '__fish_seen_subcommand_from repo; and not __fish_seen_subcommand_from candidates add sync on off' -f -a 'candidates add sync on off'
+complete -c deja -n '__fish_seen_subcommand_from repo; and not __fish_seen_subcommand_from candidates add sync on off' -l json
 complete -c deja -n '__fish_seen_subcommand_from repo; and __fish_seen_subcommand_from candidates' -l json
 complete -c deja -n '__fish_seen_subcommand_from repo; and __fish_seen_subcommand_from candidates' -l limit -r
 complete -c deja -n '__fish_seen_subcommand_from repo; and __fish_seen_subcommand_from candidates' -l since -r
@@ -790,7 +790,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
             }
             'remember' { @('--project', '--tag', '--repo') }
             'repo' {
-                if ($argumentPosition -eq 1) { @('candidates', 'add', '--json') }
+                if ($argumentPosition -eq 1) { @('candidates', 'add', 'sync', 'on', 'off', '--json') }
                 elseif ($action -eq 'candidates' -and $previous -notin @('--limit', '--since')) { @('--json', '--limit', '--since') }
                 elseif ($action -eq 'add' -and $previous -eq '--kind') { @('decision', 'rejected', 'gotcha') }
                 elseif ($action -eq 'add') { @('--kind') }
@@ -885,7 +885,7 @@ func completionCommands() []string {
 	return []string{
 		"bench", "blame", "brief", "check", "completion", "ctx", "delete", "doctor", "embed",
 		"files", "fix", "forget", "friction", "handoff", "help", "how", "index",
-		"install", "last", "log", "mcp", "origin", "promote", "recall", "recap", "remember", "restore",
+		"install", "last", "log", "mcp", "origin", "promote", "recall", "recap", "remember", "repo", "restore",
 		"resume", "review", "rules", "search", "secrets", "share", "shell", "show", "sources", "stats",
 		"statusline", "sync", "tests", "uninstall", "update", "version", "view",
 		"warmup", "wip",
