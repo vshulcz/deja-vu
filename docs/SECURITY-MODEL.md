@@ -120,7 +120,9 @@ and only inside that agent's store directory.
 
 The index and sidecar never leave the machine through indexing, search, MCP,
 stats, or hook operation. The MCP server uses JSON-RPC over standard input and
-output and does not listen on a network socket. The git commands deja runs to
+output by default and does not listen on a network socket unless started with
+`deja mcp --http <addr>` (which checks `Origin` and `Host` headers on loopback
+and requires `DEJA_MCP_TOKEN` on non-loopback addresses). The git commands deja runs to
 read a repository (changed files, blame, worktree names) set
 `GIT_NO_LAZY_FETCH=1`, so in a partial clone they answer from what is on disk
 instead of fetching missing objects from the remote.
