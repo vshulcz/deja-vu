@@ -3,15 +3,30 @@ package embed
 import (
 	"context"
 	"fmt"
+	"os"
 	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
-// semanticFloor avoids turning unrelated vectors into search results.
-const semanticFloor = 0.55
+// defaultSemanticFloor avoids turning unrelated vectors into search results.
+const defaultSemanticFloor = 0.55
+
+// semanticFloor is the cosine a vector has to reach to be served. Models do not
+// share a cosine scale, so DEJA_EMBED_FLOOR overrides the default for one whose
+// related pairs sit below it. A value that is not a number from -1 to 1 is
+// ignored, so a typo cannot open the gate.
+func semanticFloor() float64 {
+	v, err := strconv.ParseFloat(strings.TrimSpace(os.Getenv("DEJA_EMBED_FLOOR")), 64)
+	if err != nil || !(v >= -1 && v <= 1) { // negated so NaN is refused too
+		return defaultSemanticFloor
+	}
+	return v
+}
 
 // match is one vector's session, the record it came from and how close it
 // scored — the unit both the served set and the held notes are kept in.
@@ -53,6 +68,7 @@ func semanticHitsForQuery(dir string, o search.Options, sidecar Sidecar, query [
 		return nil, err
 	}
 	lookup := newRecordLookup(records, sameLayout(sidecar.Generation, gen), identOf(sidecar.Version))
+	floor := semanticFloor()
 	best := make(map[string]match)
 	heldNotes := make(map[string]match)
 	for _, vector := range sidecar.Vectors {
@@ -66,7 +82,7 @@ func semanticHitsForQuery(dir string, o search.Options, sidecar Sidecar, query [
 			continue
 		}
 		score := Cosine(query, vector.Values)
-		if score < semanticFloor {
+		if score < floor {
 			// A promoted note is held rather than dropped. It is one distilled
 			// line where its transcript is a whole session, so it is often
 			// worded further from the query than the source it was made from —

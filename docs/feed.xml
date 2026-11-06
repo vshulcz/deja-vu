@@ -6,10 +6,17 @@
   <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
   <link rel="self" type="application/atom+xml" href="https://vshulcz.github.io/deja-vu/feed.xml"></link>
   <link rel="hub" href="https://pubsubhubbub.appspot.com/"></link>
-  <updated>2026-11-05T00:00:00Z</updated>
+  <updated>2026-11-06T00:00:00Z</updated>
   <author>
     <name>vshulcz</name>
   </author>
+  <entry>
+    <title>Search your Claude Code and Codex history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/search.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/search.html"></link>
+    <updated>2026-11-06T00:00:00Z</updated>
+    <summary>deja search syntax: exact and phrase queries, natural language with stop words, fuzzy typo tolerance, confidence tiers, and optional local semantic recall.</summary>
+  </entry>
   <entry>
     <title>Auditing what a coding agent actually did — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/auditing-agents.html</id>
@@ -282,12 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-antigravity-history.html"></link>
     <updated>2026-11-03T00:00:00Z</updated>
     <summary>Antigravity keeps a conversation in six places under ~/.gemini/antigravity. Delete it in the app, then VACUUM the summaries database so the text is gone too.</summary>
-  </entry>
-  <entry>
-    <title>Delete Cherry Studio session history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-cherrystudio-session-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-cherrystudio-session-history.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>Cherry Studio keeps Claude, pi and dsh transcripts under Data/Agents. Delete the session files by hand, and run deja index first so they stay searchable.</summary>
   </entry>
 </feed>

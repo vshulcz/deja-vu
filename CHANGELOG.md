@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `DEJA_EMBED_FLOOR` overrides the semantic cosine floor of 0.55 for embedding models with a lower cosine scale. It is read at search time, so changing it needs no new `deja embed`.
+
 ## [0.24.0] - 2026-11-05
 
 Sub-50 ms hook and MCP hot path, project X-Ray and symbol decision recall,

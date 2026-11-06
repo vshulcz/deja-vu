@@ -443,6 +443,15 @@ deja embed
 The passage prefix is part of the sidecar's model name, so changing it embeds everything
 again, and search ignores vectors made with another model or prefix (it says so once).
 
+Models do not share a cosine scale. A vector reaches the results only at a cosine of 0.55 or
+more, and on a model whose related pairs score lower that drops most of what it found.
+`DEJA_EMBED_FLOOR` sets that floor, from -1 to 1, and is read at search time, so changing it
+needs no new `deja embed`. Lowering it serves weaker matches:
+
+```sh
+export DEJA_EMBED_FLOOR='0.40'
+```
+
 The sidecar sits beside the index as `.vectors.bin`, not inside `index.db`. Float32 vectors
 cost roughly 4 MB per 1k messages for a 1,024 dimension model. A remote endpoint receives
 the redacted indexed text, truncated to about 2k characters, but never raw source files.

@@ -32,7 +32,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Search", "description": "deja search syntax: exact and phrase queries, natural language with stop-word handling, fuzzy typo tolerance, confidence tiers, and optional local semantic recall.", "url": "https://vshulcz.github.io/deja-vu/guide/search.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/search.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-07-19", "dateModified": "2026-10-22"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Search", "description": "deja search syntax: exact and phrase queries, natural language with stop-word handling, fuzzy typo tolerance, confidence tiers, and optional local semantic recall.", "url": "https://vshulcz.github.io/deja-vu/guide/search.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/search.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-07-19", "dateModified": "2026-11-06"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Search","item":"https://vshulcz.github.io/deja-vu/guide/search.html"}]}</script>
 </head>
 <body>
@@ -193,7 +193,7 @@
 <h2>Semantic recall</h2>
 <pre>deja embed          # build a vector sidecar from an embedding endpoint
 deja "ran out of db connections"   # matches "connection pool exhausted"</pre>
-<p>Resolution: <code>DEJA_EMBED_URL</code>, else a probed Ollama or LM Studio. Authenticated endpoints use <code>DEJA_EMBED_KEY</code>; an HTTPS <code>api.openai.com</code> URL also accepts <code>OPENAI_API_KEY</code>. No endpoint, no semantic layer — search is unchanged.</p>
+<p>Resolution: <code>DEJA_EMBED_URL</code>, else a probed Ollama or LM Studio. Authenticated endpoints use <code>DEJA_EMBED_KEY</code>; an HTTPS <code>api.openai.com</code> URL also accepts <code>OPENAI_API_KEY</code>. No endpoint, no semantic layer — search is unchanged. A vector is served at a cosine of 0.55 or more; <code>DEJA_EMBED_FLOOR</code> sets that floor for a model with a lower cosine scale, and takes effect without a new <code>deja embed</code>.</p>
 
 <h2>Natural-language queries</h2>
 <p>Stop words are dropped, word forms bridge morphology in both directions (<code>failing</code> finds <code>fails</code>), and when no session holds every remaining token deja drops up to two — telling you exactly which (<code>ignoring "why" — no session matches it together with the rest</code>). Zero results now mean the content genuinely is not there.</p>
