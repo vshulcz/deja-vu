@@ -79,6 +79,22 @@ func TestRepeatedInjectionsIsSilentOnAHealthyLog(t *testing.T) {
 	}
 }
 
+// A compaction recovery packet and a session-start digest landing in the same
+// second are two distinct outputs (different bytes, raw sizes, and session IDs),
+// not a doubled hook wiring (#5967).
+func TestRepeatedInjectionsIgnoresDistinctHookOutputsInOneSecond(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "index.db")
+	at := time.Date(2026, 11, 6, 13, 11, 37, 89_000_000, time.UTC)
+	writeEvents(t, dir,
+		Event{Time: at, Kind: KindHook, Bytes: 3449, RawBytes: 13333272, SessionIDs: []string{"s-cur"}, Into: "s-cur"},
+		Event{Time: at.Add(118 * time.Millisecond), Kind: KindHook, Bytes: 4272, RawBytes: 517352, SessionIDs: []string{"s-1", "s-2", "s-3"}, Into: "s-cur"},
+		Event{Time: at.Add(479 * time.Millisecond), Kind: KindDejaVu, Bytes: 1593, RawBytes: 336041, SessionIDs: []string{"s-4", "s-5"}, Into: "s-cur"},
+	)
+	if got := RepeatedInjections(dir, time.Time{}); got != nil {
+		t.Errorf("repeats = %+v, want none for distinct lifecycle hook outputs", got)
+	}
+}
+
 // Worst first when two sessions doubled in the same second, newest first
 // otherwise — the reader reads the top line.
 func TestRepeatedInjectionsOrdersWhatMatters(t *testing.T) {

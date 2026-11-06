@@ -74,7 +74,7 @@ func TestOpencodeSinceReadsANewSessionBehindALeftoverSessionTable(t *testing.T) 
 	if err != nil {
 		t.Fatalf("parse since: %v", err)
 	}
-	var ids []string
+	ids := make([]string, 0, len(ss))
 	for _, s := range ss {
 		ids = append(ids, s.ID)
 	}

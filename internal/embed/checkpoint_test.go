@@ -56,3 +56,36 @@ func TestAnInterruptedEmbedKeepsWhatItEmbedded(t *testing.T) {
 		t.Fatalf("the second run embedded %d texts into %d vectors; want 1 into 5", embedded.Load(), len(done.Vectors))
 	}
 }
+
+func TestEmbedBatchEnvOverride(t *testing.T) {
+	dir, _ := embedStore(t)
+	t.Setenv("DEJA_EMBED_BATCH", "2")
+
+	var requests atomic.Int64
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		var body struct {
+			Input []string `json:"input"`
+		}
+		raw, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(raw, &body)
+		if len(body.Input) > 2 {
+			t.Errorf("request batch size = %d, want <= 2", len(body.Input))
+		}
+		out := make([][]float32, len(body.Input))
+		for i := range out {
+			out[i] = []float32{1, 0}
+		}
+		payload, _ := json.Marshal(map[string]any{"embeddings": out})
+		_, _ = w.Write(payload)
+	}))
+	defer srv.Close()
+
+	done, err := EmbedIndex(dir, &Client{URL: srv.URL, Model: "test"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(done.Vectors) != 5 || requests.Load() != 3 {
+		t.Fatalf("embedded %d vectors in %d requests; want 5 vectors in 3 requests (2+2+1)", len(done.Vectors), requests.Load())
+	}
+}

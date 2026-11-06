@@ -2,6 +2,7 @@ package usage
 
 import (
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -32,6 +33,9 @@ func RepeatedInjections(indexDir string, since time.Time) []Repeat {
 	type key struct {
 		into, kind string
 		sec        int64
+		bytes      int
+		raw        int64
+		ids        string
 	}
 	seen := map[key]*Repeat{}
 	for _, e := range read(Path(indexDir)) {
@@ -43,7 +47,7 @@ func RepeatedInjections(indexDir string, since time.Time) []Repeat {
 		if !since.IsZero() && e.Time.Before(since) {
 			continue
 		}
-		k := key{e.Into, e.Kind, e.Time.Unix()}
+		k := key{e.Into, e.Kind, e.Time.Unix(), e.Bytes, e.RawBytes, strings.Join(e.SessionIDs, ",")}
 		if r := seen[k]; r != nil {
 			r.Count++
 			if e.Time.After(r.At) {
