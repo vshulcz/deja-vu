@@ -181,8 +181,17 @@ func TestTheResumeClaimMatchesTheRegistry(t *testing.T) {
 			t.Fatalf("%s: %v", page, err)
 		}
 		text := string(raw)
+		exceptions := text
+		if i := strings.Index(exceptions, "The remaining "); i >= 0 {
+			exceptions = exceptions[i:]
+		} else if i := strings.Index(exceptions, "The other "); i >= 0 {
+			exceptions = exceptions[i:]
+		}
+		if end := strings.Index(exceptions, "</p>"); end >= 0 {
+			exceptions = exceptions[:end]
+		}
 		for _, missing := range reg.without {
-			if !strings.Contains(text, missing) {
+			if !strings.Contains(exceptions, missing) {
 				t.Errorf("%s does not name %s, which cannot be resumed", page, missing)
 			}
 		}
@@ -196,7 +205,7 @@ func TestTheResumeClaimMatchesTheRegistry(t *testing.T) {
 			if display == "Roo Code" || display == "Kilo Code" {
 				continue
 			}
-			if strings.Contains(text, "— "+display) || strings.Contains(text, ", "+display+" and ") {
+			if strings.Contains(exceptions, "— "+display) || strings.Contains(exceptions, ", "+display+" and ") {
 				t.Errorf("%s lists %s among the harnesses without a resume path; the registry says it has one", page, display)
 			}
 		}

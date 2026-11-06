@@ -35,6 +35,7 @@ deja-stats.svg
 .windsurf/
 .zed/
 .claude/
+.deja/
 
 # One line per Go command under scripts/: `go build ./scripts/<name>` drops a
 # binary called <name> in the repository root, and a careless `git add -A` then

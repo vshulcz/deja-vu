@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -16,6 +15,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
+	"github.com/vshulcz/deja-vu/internal/gitread"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
@@ -639,7 +639,7 @@ type repoGitCommit struct {
 func recentRepoGitCommits(root string) []repoGitCommit {
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", "-C", root, "log", "-n", "500", "--format=COMMIT:%h|%ct", "--name-only")
+	cmd := gitread.Command(ctx, "-C", root, "log", "-n", "500", "--format=COMMIT:%h|%ct", "--name-only")
 	out, err := cmd.Output()
 	if err != nil {
 		return nil
