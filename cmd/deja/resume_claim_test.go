@@ -175,29 +175,35 @@ func TestTheResumeClaimMatchesTheRegistry(t *testing.T) {
 	// And the exceptions, which is the half that was wrong rather than merely
 	// old: a harness listed as unable to resume when it can sends the reader
 	// to another tool for nothing.
-	for _, page := range []string{"docs/guide/find-a-session.html", "docs/guide/resume-a-session.html"} {
-		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(page)))
+	for _, guide := range []struct{ page, start string }{
+		{"docs/guide/find-a-session.html", `The remaining [a-z-]+ — `},
+		{"docs/guide/resume-a-session.html", `The other [a-z-]+ are refusals with a reason rather than silence: `},
+	} {
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(guide.page)))
 		if err != nil {
-			t.Fatalf("%s: %v", page, err)
+			t.Fatalf("%s: %v", guide.page, err)
 		}
+		// Only the exception sentence describes refusals. A list of supported
+		// harnesses elsewhere on the page may use the same punctuation.
 		text := string(raw)
-		for _, missing := range reg.without {
-			if !strings.Contains(text, missing) {
-				t.Errorf("%s does not name %s, which cannot be resumed", page, missing)
-			}
+		start := regexp.MustCompile(guide.start).FindStringIndex(text)
+		if start == nil {
+			t.Errorf("%s has no resume exceptions sentence", guide.page)
+			continue
+		}
+		exceptions, _, ended := strings.Cut(text[start[1]:], ".")
+		if !ended {
+			t.Errorf("%s has no resume exceptions sentence", guide.page)
+			continue
 		}
 		for display, resumes := range reg.names {
-			if !resumes {
-				continue
+			name := regexp.MustCompile(`(^|[^[:alnum:]])` + regexp.QuoteMeta(display) + `($|[^[:alnum:]])`)
+			listed := name.MatchString(exceptions)
+			if !resumes && !listed {
+				t.Errorf("%s does not name %s in the resume exceptions", guide.page, display)
 			}
-			// Roo Code and Kilo Code are named in those paragraphs on purpose:
-			// half of each store resumes and the other half reopens in the
-			// editor, and the pages say so.
-			if display == "Roo Code" || display == "Kilo Code" {
-				continue
-			}
-			if strings.Contains(text, "— "+display) || strings.Contains(text, ", "+display+" and ") {
-				t.Errorf("%s lists %s among the harnesses without a resume path; the registry says it has one", page, display)
+			if resumes && listed {
+				t.Errorf("%s lists %s among the harnesses without a resume path; the registry says it has one", guide.page, display)
 			}
 		}
 	}

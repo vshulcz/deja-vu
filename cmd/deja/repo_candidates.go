@@ -169,7 +169,7 @@ func collectRepoCandidates(dir, root string, since time.Duration, limit int) ([]
 		add(repoCandidate{Kind: kind, Text: text, From: repoFrom(harness, n.At), Source: "promoted note", tier: 0, at: n.At})
 	}
 	for _, s := range sources.LoadNotes() {
-		if strings.HasPrefix(s.ID, "deja-note-") || !inScope(s.Project) || !allowed(s.Path, s.Project) {
+		if strings.HasPrefix(s.ID, model.PromotedNotePrefix) || !inScope(s.Project) || !allowed(s.Path, s.Project) {
 			continue
 		}
 		for _, m := range s.Messages {
@@ -251,7 +251,7 @@ func sessionRepoCandidates(dir string, inScope func(string) bool, allowed func(s
 		if m.Harness == "deja" || m.Kind != "" || sources.IsSubagentPath(m.Path) || !inScope(m.Project) || !allowed(m.Path, m.Project) {
 			continue
 		}
-		key := m.Harness + ":" + m.ID
+		key := m.Key()
 		pick[key] = m
 		for _, rule := range m.Rules {
 			r := cleanRepoCandidateLine(rule)
@@ -271,7 +271,7 @@ func sessionRepoCandidates(dir string, inScope func(string) bool, allowed func(s
 	// this project's sessions, so the walk holds little whatever the store is.
 	said := map[string]*model.Session{}
 	err = index.EachRecordInRoles(dir, []string{"user", "assistant"}, func(meta index.SessionMeta, r index.Record) {
-		key := meta.Harness + ":" + meta.ID
+		key := meta.Key()
 		if _, ok := pick[key]; !ok {
 			return
 		}

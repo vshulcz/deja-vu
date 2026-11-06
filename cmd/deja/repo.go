@@ -26,9 +26,10 @@ import (
 // entries only when asked; the person reviews the diff and commits it.
 
 var (
-	repoFlags     = []string{"--json"}
-	repoAddFlags  = []string{"--kind"}
-	repoInitFlags = []string{"--limit"}
+	repoFlags       = []string{"--json"}
+	repoAddFlags    = []string{"--kind"}
+	repoInitFlags   = []string{"--limit"}
+	repoRemoveFlags = []string{}
 )
 
 const repoFileShown = sources.RepoMemoryDir + "/" + sources.RepoMemoryName
@@ -230,7 +231,7 @@ func runRepoRemove(w io.Writer, args []string) error {
 	var ids []string
 	for _, a := range args {
 		if strings.HasPrefix(a, "-") {
-			return unknownFlag("repo rm", a, nil)
+			return unknownFlag("repo rm", a, repoRemoveFlags)
 		}
 		ids = append(ids, a)
 	}

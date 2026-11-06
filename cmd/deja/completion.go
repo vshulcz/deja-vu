@@ -335,6 +335,7 @@ _deja() {
     'blame:find sessions that discussed a file'
     'origin:which session and user turn produced a commit or range'
     'review:prior sessions and settled notes for a diff or commit'
+    'repo:show and edit memory committed in this repository'
     'bench:run benchmarks'
     'check:read a plan from stdin and print factual co-occurrences'
     'completion:generate shell completion'
@@ -885,7 +886,7 @@ func completionCommands() []string {
 	return []string{
 		"bench", "blame", "brief", "check", "completion", "ctx", "delete", "doctor", "embed",
 		"files", "fix", "forget", "friction", "handoff", "help", "how", "index",
-		"install", "last", "log", "mcp", "origin", "promote", "recall", "recap", "remember", "restore",
+		"install", "last", "log", "mcp", "origin", "promote", "recall", "recap", "remember", "repo", "restore",
 		"resume", "review", "rules", "search", "secrets", "share", "shell", "show", "sources", "stats",
 		"statusline", "sync", "tests", "uninstall", "update", "version", "view",
 		"warmup", "wip",
