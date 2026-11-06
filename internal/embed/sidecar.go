@@ -299,7 +299,7 @@ func EmbedIndex(dir string, client *Client, keep func(index.Record) bool) (Sidec
 	pending := toEmbed(recs, covered)
 	batches := 0
 	for len(pending) > 0 {
-		n := min(len(pending), embedBatch)
+		n := min(len(pending), batchSize())
 		texts := make([]string, n)
 		for i := range pending[:n] {
 			texts[i] = client.PassagePrefix + truncate(pending[i].Record.Text)
@@ -365,8 +365,18 @@ func toEmbed(recs []index.OffsetRecord, covered map[uint64]bool) []index.OffsetR
 
 // embedBatch is how many texts go in one request; checkpointEvery is how many
 // requests pass between writes of the sidecar, so a run killed partway keeps
-// what it embedded.
+// what it embedded. DEJA_EMBED_BATCH overrides embedBatch for endpoints with
+// stricter per-request concurrency limits (#5957).
 var embedBatch, checkpointEvery = 32, 50
+
+func batchSize() int {
+	if s := strings.TrimSpace(os.Getenv("DEJA_EMBED_BATCH")); s != "" {
+		if n, err := strconv.Atoi(s); err == nil && n > 0 {
+			return n
+		}
+	}
+	return embedBatch
+}
 
 func truncate(s string) string {
 	const limit = 2000
