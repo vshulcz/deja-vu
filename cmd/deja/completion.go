@@ -245,6 +245,8 @@ _deja_completion() {
         show)
             if [[ "$prev" == "--harness" ]]; then
                 COMPREPLY=( $(compgen -W "$harnesses" -- "$cur") )
+            elif [[ "$prev" == "--offset" || "$prev" == "--limit" ]]; then
+                COMPREPLY=()
             else
                 COMPREPLY=( $(compgen -W "--json --harness --offset --limit" -- "$cur") )
             fi
@@ -823,6 +825,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
             }
             'show' {
                 if ($previous -eq '--harness') { $harnesses }
+                elseif ($previous -in @('--offset', '--limit')) { @() }
                 else { @('--json', '--harness', '--offset', '--limit') }
             }
             'update' { @('--force') }
