@@ -100,7 +100,14 @@ func readOpencodeSchema(db string) opencodeSchema {
 	}
 	out.rowsStamped = have["message.time_updated"] && have["part.time_updated"] && have["part.session_id"]
 	out.turnsStamped = have["session_message.time_updated"]
-	if have["session_v2"] && !have["session"] {
+	// A store can keep the old `session` table beside `session_v2` after the
+	// 2.0 migration has moved its turns and dropped message and part. The
+	// leftover is frozen at migration time: every session written since is a
+	// `session_v2` row alone, and with the turn tables gone nothing reads the
+	// old copy anyway. So sessions are read from `session_v2` unless the
+	// whole 1.x layout — session, message and part — is still there to read
+	// beside.
+	if have["session_v2"] && (!have["session"] || !have["message"] || !have["part"]) {
 		out.sessionTable = "session_v2"
 	}
 	if !have["session_message"] {
