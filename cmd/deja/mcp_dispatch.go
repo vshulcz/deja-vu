@@ -85,6 +85,7 @@ type mcpPending struct {
 	answered  bool
 	cancelled bool
 	timer     *time.Timer
+	reply     func(id any, result any, code int, msg string)
 }
 
 type mcpWork struct {
@@ -131,24 +132,40 @@ func (s *mcpServer) replyLocked(id any, result any, code int, msg string) {
 	}
 }
 
+func (s *mcpServer) replyPendingLocked(p *mcpPending, result any, code int, msg string) {
+	if p.reply != nil {
+		p.reply(p.id, result, code, msg)
+		return
+	}
+	s.replyLocked(p.id, result, code, msg)
+}
+
 // serve answers one request that is owed a reply.
 func (s *mcpServer) serve(req rpcRequest) {
+	s.serveRequest(req, nil)
+}
+
+func (s *mcpServer) serveRequest(req rpcRequest, reply func(id any, result any, code int, msg string)) *mcpPending {
 	if mcpInline[req.Method] {
 		result, code, msg := s.handle(req)
+		if reply != nil {
+			reply(req.ID, result, code, msg)
+			return nil
+		}
 		s.mu.Lock()
 		s.replyLocked(req.ID, result, code, msg)
 		s.mu.Unlock()
-		return
+		return nil
 	}
 	key := mcpCallKey(req)
-	p := &mcpPending{id: req.ID, key: key}
+	p := &mcpPending{id: req.ID, key: key, reply: reply}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if l, ok := s.late[key]; ok {
 		delete(s.late, key)
 		if time.Since(l.at) < mcpLateTTL {
-			s.replyLocked(req.ID, s.withLateLocked(key, l.result), l.code, l.msg)
-			return
+			s.replyPendingLocked(p, s.withLateLocked(key, l.result), l.code, l.msg)
+			return nil
 		}
 	}
 	s.open.Add(1)
@@ -161,11 +178,25 @@ func (s *mcpServer) serve(req rpcRequest) {
 		// deadline note, or the same question sent twice. It gets that answer
 		// rather than a second search.
 		w.waiters = append(w.waiters, p)
-		return
+		return p
 	}
 	w := &mcpWork{waiters: []*mcpPending{p}}
 	s.running[key] = w
 	go s.run(req, w)
+	return p
+}
+
+func (s *mcpServer) cancelPending(p *mcpPending) {
+	if p == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if p.answered {
+		return
+	}
+	p.cancelled = true
+	s.answerLocked(p)
 }
 
 func (s *mcpServer) run(req rpcRequest, w *mcpWork) {
@@ -204,7 +235,7 @@ func (s *mcpServer) run(req rpcRequest, w *mcpWork) {
 		if !delivered && code == 0 {
 			out = s.withLateLocked(key, result)
 		}
-		s.replyLocked(p.id, out, code, msg)
+		s.replyPendingLocked(p, out, code, msg)
 		delivered = true
 	}
 	if !delivered && code == 0 {
@@ -239,10 +270,10 @@ func (s *mcpServer) overdue(p *mcpPending) {
 	}
 	s.answerLocked(p)
 	if s.contextOnly {
-		s.replyLocked(p.id, contextSearchError(contextSearchSlow), 0, "")
+		s.replyPendingLocked(p, contextSearchError(contextSearchSlow), 0, "")
 		return
 	}
-	s.replyLocked(p.id, s.withLateLocked(p.key, toolText(mcpOverdueNote(mcpDeadline, building))), 0, "")
+	s.replyPendingLocked(p, s.withLateLocked(p.key, toolText(mcpOverdueNote(mcpDeadline, building))), 0, "")
 }
 
 // handle answers one request on whichever surface this server serves.

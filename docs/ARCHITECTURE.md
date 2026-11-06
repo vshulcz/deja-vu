@@ -255,7 +255,7 @@ Cold rebuild does all parsing first, then writes `records.bin`, buckets, and man
 
 ## MCP server design
 
-`cmd/deja/mcp.go` implements a small JSON-RPC stdio server.
+`cmd/deja/mcp.go` implements a small JSON-RPC stdio server (`cmd/deja/mcp_http.go` adds opt-in Streamable HTTP via `deja mcp --http <addr>`).
 
 Supported methods:
 

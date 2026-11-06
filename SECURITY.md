@@ -35,7 +35,8 @@ Nightly builds are prereleases and are not signed. `deja update` follows
 ## Scope notes
 
 deja-vu reads coding-agent session logs from the local disk and builds a local
-index. It has no network listener; network access happens only in
+index. It has no network listener by default (`deja mcp --http <addr>` is an
+explicit opt-in listener; non-loopback addresses require `DEJA_MCP_TOKEN`); network access happens only in
 `deja update` and `deja doctor` (release metadata from GitHub, no session
 data), the once-a-day release check an interactive command starts (the same
 metadata; off with `DEJA_OFFLINE=1` or `DEJA_NO_UPDATE_NOTICE=1`), `deja sync

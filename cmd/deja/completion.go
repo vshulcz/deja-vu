@@ -307,7 +307,11 @@ _deja_completion() {
             fi
             ;;
         mcp)
-            COMPREPLY=( $(compgen -W "--context-search" -- "$cur") )
+            if [[ "$prev" == "--http" ]]; then
+                COMPREPLY=()
+            else
+                COMPREPLY=( $(compgen -W "--context-search --http" -- "$cur") )
+            fi
             ;;
         brief|check|ctx|embed|hook-precompact|share|sources|statusline|version|warmup)
             COMPREPLY=()
@@ -528,7 +532,7 @@ _deja() {
       _arguments '--limit[max results]:count:' '--json[print JSON]'
       ;;
     mcp)
-      _arguments '--context-search[serve only context_search]'
+      _arguments '--context-search[serve only context_search]' '--http=[listen on Streamable HTTP address]:address:'
       ;;
     brief|check|ctx|embed|hook-precompact|share|sources|statusline|version|warmup)
       ;;
@@ -599,6 +603,7 @@ complete -c deja -n '__fish_seen_subcommand_from doctor' -l all
 complete -c deja -n '__fish_seen_subcommand_from delete' -l dry-run -d 'List the files, remove nothing'
 complete -c deja -n '__fish_seen_subcommand_from delete' -l yes -d 'Do not ask'
 complete -c deja -n '__fish_seen_subcommand_from mcp' -l context-search -d 'Serve only context_search'
+complete -c deja -n '__fish_seen_subcommand_from mcp' -l http -r -d 'Listen on Streamable HTTP address'
 complete -c deja -n '__fish_seen_subcommand_from forget; and not __fish_seen_subcommand_from sync' -l list
 complete -c deja -n '__fish_seen_subcommand_from forget; and not __fish_seen_subcommand_from sync' -l dry-run
 complete -c deja -n '__fish_seen_subcommand_from forget; and not __fish_seen_subcommand_from sync' -l session -r
@@ -856,7 +861,10 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 if ($previous -eq '--limit') { @() }
                 else { @('--limit', '--json') }
             }
-            'mcp' { @('--context-search') }
+            'mcp' {
+                if ($previous -eq '--http') { @() }
+                else { @('--context-search', '--http') }
+            }
             { $_ -in @('brief', 'check', 'ctx', 'embed', 'hook-precompact', 'share', 'sources', 'statusline', 'version', 'warmup') } { @() }
             default { if ($previous -eq '--harness') { $harnesses } elseif ($previous -eq '--role') { $roles } elseif ($previous -eq '--sort') { @('relevance', 'date') } else { $defaultOptions } }
         }
