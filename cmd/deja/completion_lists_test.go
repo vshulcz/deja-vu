@@ -265,6 +265,31 @@ func TestCompletionHasARecallBlock(t *testing.T) {
 	}
 }
 
+// show in bash and PowerShell only guarded --harness, so the count after
+// --offset or --limit was completed with show's own flags (#5940).
+func TestCompletionShowBlockLeavesCountsAlone(t *testing.T) {
+	for _, tc := range []struct{ shell, start, end, valueGuard string }{
+		{"bash", "\n        show)\n", "\n            ;;\n", "elif [[ \"$prev\" == \"--offset\" || \"$prev\" == \"--limit\" ]]; then\n                COMPREPLY=()"},
+		{"powershell", "\n            'show' {\n", "\n            }\n", "elseif ($previous -in @('--offset', '--limit')) { @() }"},
+	} {
+		_, block, ok := strings.Cut(emittedCompletion(t, tc.shell), tc.start)
+		if !ok {
+			t.Errorf("%s completion has no show block", tc.shell)
+			continue
+		}
+		block, _, _ = strings.Cut(block, tc.end)
+		if !strings.Contains(block, tc.valueGuard) {
+			t.Errorf("%s show block offers flags while completing an offset or limit:\n%s", tc.shell, block)
+		}
+		block = strings.Replace(block, tc.valueGuard, "", 1)
+		for _, flag := range showFlags {
+			if !strings.Contains(block, flag) {
+				t.Errorf("%s show block does not offer %s:\n%s", tc.shell, flag, block)
+			}
+		}
+	}
+}
+
 // friction shared one case with fix and tests in every shell, so Tab never
 // offered --settle or --unsettle, which `deja help friction` documents. Its
 // case is its own now; fix keeps the two flags it takes, and the wall id after
