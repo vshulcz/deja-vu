@@ -29,6 +29,7 @@ var (
 	repoFlags     = []string{"--json"}
 	repoAddFlags  = []string{"--kind"}
 	repoInitFlags = []string{"--limit"}
+	repoRmFlags   = []string{}
 )
 
 const repoFileShown = sources.RepoMemoryDir + "/" + sources.RepoMemoryName
@@ -379,7 +380,7 @@ func runRepoRemove(w io.Writer, args []string) error {
 	var ids []string
 	for _, a := range args {
 		if strings.HasPrefix(a, "-") {
-			return unknownFlag("repo rm", a, nil)
+			return unknownFlag("repo rm", a, repoRmFlags)
 		}
 		ids = append(ids, a)
 	}
