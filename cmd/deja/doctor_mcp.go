@@ -648,7 +648,7 @@ func doctorMCPConfigs() []doctorMCPConfig {
 		{"windsurf", windsurfMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"mcode", mcodeConfigPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"gjc", gjcMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
-		{"zcode", zcodeConfigPath(), doctorZCodeWired, doctorJSONDejaKeysIn(doctorMCPServersBlock)},
+		{"zcode", zcodeDoctorPath(), doctorZCodeWired, doctorJSONDejaKeysIn(doctorMCPServersBlock)},
 		{"commandcode", commandCodeMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"cherrystudio", cherryStudioImportPath(), doctorFileWired, nil},
 		// The server rides in deja's plugin package; the manifest Reasonix
