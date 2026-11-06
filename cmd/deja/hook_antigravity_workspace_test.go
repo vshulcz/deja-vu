@@ -147,18 +147,26 @@ func TestAntigravityProjectWorkspaceNarrowsHomeToActiveCheckout(t *testing.T) {
 		t.Fatal(err)
 	}
 	steps := []transcriptStep{
+		{Type: "USER_INPUT"},
 		{
 			Type: "PLANNER_RESPONSE",
 			ToolCalls: []any{
+				map[string]any{"name": "noop"},
 				map[string]any{
-					"name": "edit_file",
-					"args": map[string]any{"Path": targetFile},
+					"name": "mcp_qwen_read",
+					"args": map[string]any{
+						"Path":  `"relative/path.go"`,
+						"paths": []any{filepath.Join(home, ".gemini", "brain", "scratch.md"), "/outside/workspace/file.go", targetFile},
+					},
 				},
 			},
 		},
 	}
 	if got := antigravityProjectWorkspace(home, steps); got != repo {
 		t.Fatalf("antigravityProjectWorkspace(%q) = %q, want %q", home, got, repo)
+	}
+	if got := antigravityProjectWorkspace(home, nil); got != home {
+		t.Fatalf("antigravityProjectWorkspace(%q, nil) = %q, want %q", home, got, home)
 	}
 	// A non-home workspace is kept as-is.
 	other := filepath.Join(home, "coding", "other-app")

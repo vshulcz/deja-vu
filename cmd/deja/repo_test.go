@@ -522,4 +522,20 @@ func TestRepoCandidateTrimAndMentionedFileAttribution(t *testing.T) {
 	if len(files) != 1 || files[0] != "internal/redact/redact.go" {
 		t.Fatalf("mentioned file attribution = %v, want [internal/redact/redact.go]", files)
 	}
+	// Unique basename mention resolves to its repo path.
+	baseFiles := episodeFilesForText(
+		"В redact.go исправлена ошибка маскирования.",
+		edits, 0, len(edits), time.Time{}, nil,
+	)
+	if len(baseFiles) != 1 || baseFiles[0] != "internal/redact/redact.go" {
+		t.Fatalf("basename file attribution = %v, want [internal/redact/redact.go]", baseFiles)
+	}
+	// Current-turn edit slice [start:end] scopes attribution when no file is named in text.
+	turnFiles := episodeFilesForText(
+		"исправлена ошибка маскирования",
+		edits, 1, 2, time.Time{}, []string{"cmd/deja/hook_antigravity.go"},
+	)
+	if len(turnFiles) != 1 || turnFiles[0] != "internal/redact/redact.go" {
+		t.Fatalf("turn-scoped file attribution = %v, want [internal/redact/redact.go]", turnFiles)
+	}
 }

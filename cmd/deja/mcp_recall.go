@@ -588,9 +588,7 @@ func recallErrorFixesBlock(dir, q string) (string, int) {
 		if p.Edit != "" {
 			fmt.Fprintf(&b, "  changed next: %s\n", search.SafePath(p.Edit))
 			shown++
-			continue
-		}
-		if p.Command != "" {
+		} else if p.Command != "" {
 			fmt.Fprintf(&b, "  ran next: %s\n", commandListingLine(p.Command))
 			shown++
 		}

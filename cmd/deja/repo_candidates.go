@@ -533,10 +533,7 @@ func mentionedRepoFiles(text string, edits []repoEditEvent, fallback []string) [
 		}
 	}
 	if len(exact) > 0 {
-		if len(exact) > 4 {
-			exact = exact[:4]
-		}
-		return sources.CleanRepoFiles(exact)
+		return sources.CleanRepoFiles(exact[:min(len(exact), 4)])
 	}
 	byBase := map[string][]string{}
 	for _, f := range pool {
@@ -553,10 +550,7 @@ func mentionedRepoFiles(text string, edits []repoEditEvent, fallback []string) [
 	}
 	if len(baseHits) > 0 {
 		slices.Sort(baseHits)
-		if len(baseHits) > 4 {
-			baseHits = baseHits[:4]
-		}
-		return sources.CleanRepoFiles(baseHits)
+		return sources.CleanRepoFiles(baseHits[:min(len(baseHits), 4)])
 	}
 	return nil
 }
