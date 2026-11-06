@@ -48,9 +48,12 @@ $D ctx frobnicator | grep -q "deja context" || fail "ctx"
 # json output is one envelope on every path, and says which tier answered
 $D --json frobnicator | head -1 | grep -q '^{"schema_version"' || fail "json envelope"
 $D --json frobnicator | head -1 | grep -q '"tier":"exact"' || fail "json match"
-# mcp handshake + recall
-printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"e2e","version":"0"}}}\n{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"recall","arguments":{"query":"frobnicator"}}}\n' \
-  | $D mcp | tail -1 | grep -q "frobnicator" || fail "mcp recall"
+# mcp handshake + tools/list + recall
+printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"e2e","version":"0"}}}\n{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}\n{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"recall","arguments":{"query":"frobnicator"}}}\n' \
+  | $D mcp > /tmp/deja-e2e-mcp.out
+grep -q '"name":"deja"' /tmp/deja-e2e-mcp.out || fail "mcp tools/list"
+tail -1 /tmp/deja-e2e-mcp.out | grep -q "frobnicator" || fail "mcp recall"
+rm -f /tmp/deja-e2e-mcp.out
 # install into a temp HOME is idempotent and non-destructive
 H=$(mktemp -d)
 mkdir -p "$H/.codex"
@@ -68,6 +71,8 @@ WORK="$(mktemp -d)/project"
 mkdir -p "$WORK"
 ( cd "$WORK" && printf '%s\n' '{"prompt":"the frobnicator parser bug again","session_id":"e2e-1"}' | $D hook-prompt ) \
   | grep -q 'frobnicator' || fail "hook-prompt returned no recall for a prompt about indexed work"
+( cd "$WORK" && printf '%s\n' '{"prompt":"the frobnicator parser bug again","conversation_id":"e2e-agy-1","workspace":"'"$WORK"'"}' | $D hook-antigravity ) \
+  | grep -q 'frobnicator' || fail "hook-antigravity returned no recall for a prompt about indexed work"
 
 # --auto wires whatever it finds, and doctor agrees with it afterwards. The two
 # disagreeing is the failure a user cannot see: doctor is the command they run

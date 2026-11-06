@@ -4,7 +4,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
-	"time"
 )
 
 // deja narrates its own builds line by line and said nothing while waiting for
@@ -20,7 +19,13 @@ func TestWaitingForAnotherBuildIsReportedOnce(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "index.db")
 	notices, ends := 0, 0
 	old, oldDone := LockWaitNotice, LockWaitDone
-	LockWaitNotice = func() { notices++ }
+	var onNotice func()
+	LockWaitNotice = func() {
+		notices++
+		if onNotice != nil {
+			onNotice()
+		}
+	}
 	LockWaitDone = func() { ends++ }
 	t.Cleanup(func() { LockWaitNotice, LockWaitDone = old, oldDone; lockWaitNoted = false })
 
@@ -33,18 +38,14 @@ func TestWaitingForAnotherBuildIsReportedOnce(t *testing.T) {
 		t.Fatalf("an uncontended lock reported a wait: %d", notices)
 	}
 
-	// Held by someone else: the notice fires before the wait.
-	done := make(chan struct{})
-	go func() {
-		time.Sleep(150 * time.Millisecond)
-		unlock()
-		close(done)
-	}()
+	// Held by someone else: the notice fires before the wait, and releasing
+	// inside it proves the blocking LOCK_EX acquires immediately after.
+	onNotice = unlock
 	second, err := lockDir(dir)
+	onNotice = nil
 	if err != nil {
 		t.Fatal(err)
 	}
-	<-done
 	second()
 	if notices != 1 {
 		t.Errorf("the wait was not reported exactly once: %d", notices)
