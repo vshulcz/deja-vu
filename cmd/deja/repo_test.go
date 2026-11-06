@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -207,6 +208,27 @@ func TestRepoCandidatesFromASession(t *testing.T) {
 	}
 }
 
+func TestRepoCandidatesProposeAPromotedNoteOnce(t *testing.T) {
+	base := repoStandBase(t)
+	repoPerson(t, base, "erin")
+	root := filepath.Join(base, "erin", "webhooks")
+	repoGit(t, base, "init", "-q", root)
+	t.Chdir(root)
+
+	text := "Keep one delivery ID per event across all attempts."
+	stamp := time.Date(2026, time.August, 3, 10, 0, 0, 0, time.UTC)
+	if err := sources.AppendPromoted("webhooks", "Delivery IDs", text, "claude:s1", "accepted", stamp); err != nil {
+		t.Fatal(err)
+	}
+	out, err := captureRun(t, "repo", "candidates")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(out, text) != 1 || !strings.Contains(out, "promoted note") {
+		t.Fatalf("want one promoted candidate, got:\n%s", out)
+	}
+}
+
 func TestRepoAddRefusesWithoutRedaction(t *testing.T) {
 	t.Setenv("DEJA_NO_REDACT", "1")
 	if _, _, err := repoSafeText("anything"); err == nil || !strings.Contains(err.Error(), "DEJA_NO_REDACT") {
@@ -289,6 +311,9 @@ func TestRepoCommandErrors(t *testing.T) {
 	}
 	if _, err := captureRun(t, "repo", "--bogus"); err == nil {
 		t.Error("unknown flag accepted")
+	}
+	if _, err := captureRun(t, "repo", "rm", "--bogus"); err == nil || !strings.Contains(err.Error(), `repo rm: unknown flag "--bogus"`) {
+		t.Errorf("repo rm: expected an unknown flag error, got %v", err)
 	}
 	if _, err := captureRun(t, "repo", "candidates", "--limit", "0"); err == nil {
 		t.Error("--limit 0 accepted")
