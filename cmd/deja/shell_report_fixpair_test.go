@@ -49,7 +49,7 @@ func assertShellReportPair(t *testing.T, errLine string, response map[string]any
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	if err := runHookToolAfterMode(dir, bytes.NewReader(raw), &out, true); err != nil {
+	if err = runHookToolAfterMode(dir, bytes.NewReader(raw), &out, true); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), shellReportFix) {

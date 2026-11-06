@@ -556,11 +556,11 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 		pageBudget = budget
 		fixHead = ""
 	}
-	out, served, raw, ids, projects, err := recallPage(dir, q, pageBudget, offset, limit, total, demoted, about, result, o, hits, twins, cov, r.added)
-	if err == nil && fixHead != "" {
+	out, served, raw, ids, projects := recallPage(dir, q, pageBudget, offset, limit, total, demoted, about, result, o, hits, twins, cov, r.added)
+	if fixHead != "" {
 		out = fixHead + out
 	}
-	return out, served, raw, ids, projects, err
+	return out, served, raw, ids, projects, nil
 }
 
 // recallErrorFixesBlock returns a compact remedy header when a default recall
@@ -743,7 +743,7 @@ func rankRecall(dir, q, harness, project string, window int) (rankedRecall, erro
 }
 
 // recallPage writes one page of ranked hits, already cut to the page.
-func recallPage(dir, q string, budget, offset, limit, total, demoted int, about bool, result index.SearchResult, o search.Options, hits []search.Hit, twins map[string][]string, cov index.Coverage, added string) (string, int, int64, []string, []string, error) {
+func recallPage(dir, q string, budget, offset, limit, total, demoted int, about bool, result index.SearchResult, o search.Options, hits []search.Hit, twins map[string][]string, cov index.Coverage, added string) (string, int, int64, []string, []string) {
 	// Counted on the page rather than taken from the result: the strict head
 	// is small but the trust policy can withhold part of it and paging can
 	// leave the rest behind, and a line counting sessions the reader cannot
@@ -846,5 +846,5 @@ func recallPage(dir, q string, budget, offset, limit, total, demoted int, about 
 	// agent asks for offset=served and the arithmetic has to hold.
 	out := recallPageFooter(&b, hits, result, offset, served, total, budget, pageFull, about, nothing)
 	raw, ids, projects := recallServedFacts(hits, served)
-	return out, served, raw, ids, projects, nil
+	return out, served, raw, ids, projects
 }
