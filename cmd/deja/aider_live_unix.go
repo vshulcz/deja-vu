@@ -16,7 +16,7 @@ var errNoAiderLive = errors.New("no named pipes here")
 // aiderLiveSettle is how long the server waits after answering one read
 // before it opens the pipe again. Opened while the last reader is still
 // draining, the next answer would land in that read as a second copy.
-const aiderLiveSettle = 25 * time.Millisecond
+var aiderLiveSettle = 75 * time.Millisecond
 
 // serveAiderLive makes a named pipe and answers every open of it with body().
 func serveAiderLive(body func() string) (string, func(), error) {

@@ -29,9 +29,8 @@ func TestReadersWaitOutTheSwapWindow(t *testing.T) {
 	if err := os.Rename(index, parked); err != nil {
 		t.Fatal(err)
 	}
-	var wg sync.WaitGroup
-	wg.Go(func() {
-		time.Sleep(40 * time.Millisecond)
+	old := waitOutSwapWindow
+	waitOutSwapWindow = func() {
 		fresh := filepath.Join(dir, "tmp.db")
 		if err := os.MkdirAll(fresh, 0o755); err != nil {
 			return
@@ -39,14 +38,14 @@ func TestReadersWaitOutTheSwapWindow(t *testing.T) {
 		_ = os.WriteFile(filepath.Join(fresh, "manifest.gob"), []byte("rebuilt"), 0o644)
 		_ = os.Rename(fresh, index)
 		_ = os.RemoveAll(parked)
-	})
+	}
+	defer func() { waitOutSwapWindow = old }()
 
 	f, err := openIndexFile(path)
 	if err != nil {
 		t.Fatalf("a reader in the swap window was handed %v", err)
 	}
-	defer func() { _ = f.Close() }()
-	wg.Wait()
+	_ = f.Close()
 }
 
 // And an index that is simply not there keeps failing at once: that path has a
@@ -133,17 +132,16 @@ func TestBucketReadsWaitOutTheSwapWindowToo(t *testing.T) {
 	if err := os.Rename(idx, parked); err != nil {
 		t.Fatal(err)
 	}
-	var wg sync.WaitGroup
-	wg.Go(func() {
-		time.Sleep(40 * time.Millisecond)
+	old := waitOutSwapWindow
+	waitOutSwapWindow = func() {
 		_ = os.Rename(parked, idx)
-	})
+	}
+	defer func() { waitOutSwapWindow = old }()
 	f, err := openIndexFile(path)
 	if err != nil {
 		t.Fatalf("a bucket read in the swap window was handed %v", err)
 	}
 	_ = f.Close()
-	wg.Wait()
 }
 
 // A crashed swap leaves the parking spot behind until the next build clears it.

@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 )
@@ -28,15 +27,14 @@ func TestHasManifestWaitsOutTheSwap(t *testing.T) {
 	if err := os.Rename(dir, parked); err != nil {
 		t.Fatal(err)
 	}
-	var wg sync.WaitGroup
-	wg.Go(func() {
-		time.Sleep(40 * time.Millisecond)
+	old := waitOutSwapWindow
+	waitOutSwapWindow = func() {
 		_ = os.Rename(parked, dir)
-	})
+	}
+	defer func() { waitOutSwapWindow = old }()
 	if !HasManifest(dir) {
 		t.Error("a hook landing in the swap window was told there is no index")
 	}
-	wg.Wait()
 }
 
 // An index that is simply not there still answers at once: waiting for a
