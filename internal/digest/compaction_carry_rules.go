@@ -98,27 +98,46 @@ func carryBNorm(s string) string {
 var carryYo = strings.NewReplacer("ё", "е", "Ё", "Е")
 
 var (
-	carryIssueNumRE = regexp.MustCompile(`(?i)` + carryLB + `(?:issue|ишью|иш[ую]|задач\p{L}*)\s*#(\d{2,6})`)
-	carryPRNumRE    = regexp.MustCompile(`(?i)` + carryLB + `(?:PR|pull request|пулл?-?реквест\p{L}*|пр)\s*#(\d{2,6})`)
+	carryIssueNumRE    = regexp.MustCompile(`(?i)` + carryLB + `(?:issue|ишью|иш[ую]|задач\p{L}*)\s*#(\d{2,6})`)
+	carryPRNumRE       = regexp.MustCompile(`(?i)` + carryLB + `(?:PR|pull request|пулл?-?реквест\p{L}*|пр)\s*#(\d{2,6})`)
+	carryPRParenRE     = regexp.MustCompile(`(?i)` + carryLB + `(?:PR|pull request|пулл?-?реквест\p{L}*|пр)\s*#(\d{2,6})\s*\(([^()]{1,120})\)`)
+	carryBareHashNumRE = regexp.MustCompile(`#(\d{2,6})(?:[^\p{N}]|$)`)
 )
 
 // carryIssuePRPairs links each issue a unit names to the one PR it names with
-// it: "Открыл issue #4638 и PR #4639". The PR's body says "Closes #4638", so
+// it: "Открыл issue #4638 и PR #4639", or a parenthetical right after a PR
+// such as "PR #5968 (#5967 + #5957)". The PR's body says "Closes #4638", so
 // merging it closes the issue on GitHub, and nobody writes that down — the
 // session says "PR #4639 смёржен", and the issue stayed on the list for days.
-// A unit naming two PRs pairs nothing: which one closes the issue is not said.
+// Outside a PR's own parentheses, a unit naming two PRs pairs nothing: which
+// one closes the issue is not said.
 func carryIssuePRPairs(s string) map[int]int {
 	prs := carryPRNumRE.FindAllStringSubmatch(s, -1)
 	if len(prs) == 0 {
 		return nil
 	}
+	out := map[int]int{}
+	for _, pm := range carryPRParenRE.FindAllStringSubmatch(s, -1) {
+		pr := atoiCarry(pm[1])
+		inner := pm[2]
+		if carryPRNumRE.MatchString(inner) {
+			continue
+		}
+		for _, hm := range carryBareHashNumRE.FindAllStringSubmatch(inner, -1) {
+			if n := atoiCarry(hm[1]); n != pr {
+				out[n] = pr
+			}
+		}
+	}
 	pr := atoiCarry(prs[0][1])
 	for _, m := range prs[1:] {
 		if atoiCarry(m[1]) != pr {
-			return nil
+			if len(out) == 0 {
+				return nil
+			}
+			return out
 		}
 	}
-	out := map[int]int{}
 	for _, m := range carryIssueNumRE.FindAllStringSubmatch(s, -1) {
 		if n := atoiCarry(m[1]); n != pr {
 			out[n] = pr

@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -492,5 +493,49 @@ func TestRepoAutoSyncAndToggle(t *testing.T) {
 	}
 	if out, err := captureRun(t, "repo", "on"); err != nil || !strings.Contains(out, "are on") || sources.RepoAutoDisabled(root) {
 		t.Fatalf("repo on: %q, %v", out, err)
+	}
+}
+
+func TestRepoCandidateTrimAndMentionedFileAttribution(t *testing.T) {
+	// Sentence-boundary trim avoids cutting mid-word when a sentence ends in the second half.
+	long := strings.Repeat("a", 180) + ". " + strings.Repeat("b", 140) + " opencode.db.bak"
+	got := trimRepoCandidateText(long)
+	if got != strings.Repeat("a", 180)+"." {
+		t.Fatalf("expected sentence-boundary cut, got %q", got)
+	}
+	// When no sentence boundary exists, word-boundary trim avoids cutting mid-token.
+	noPeriod := strings.Repeat("word ", 58) + "opencode.db.bak_very_long_filename"
+	gotWord := trimRepoCandidateText(noPeriod)
+	if strings.Contains(gotWord, "opencode.db.") {
+		t.Fatalf("expected word-boundary cut before mid-token, got %q", gotWord)
+	}
+
+	// Mentioned files take priority over unrelated recent edits from another episode.
+	edits := []repoEditEvent{
+		{file: "cmd/deja/hook_antigravity.go"},
+		{file: "internal/redact/redact.go"},
+	}
+	files := episodeFilesForText(
+		"В internal/redact/redact.go исправлена ошибка маскирования прованс-тегов.",
+		edits, 0, len(edits), time.Time{}, []string{"cmd/deja/hook_antigravity.go", "internal/redact/redact.go"},
+	)
+	if len(files) != 1 || files[0] != "internal/redact/redact.go" {
+		t.Fatalf("mentioned file attribution = %v, want [internal/redact/redact.go]", files)
+	}
+	// Unique basename mention resolves to its repo path.
+	baseFiles := episodeFilesForText(
+		"В redact.go исправлена ошибка маскирования.",
+		edits, 0, len(edits), time.Time{}, nil,
+	)
+	if len(baseFiles) != 1 || baseFiles[0] != "internal/redact/redact.go" {
+		t.Fatalf("basename file attribution = %v, want [internal/redact/redact.go]", baseFiles)
+	}
+	// Current-turn edit slice [start:end] scopes attribution when no file is named in text.
+	turnFiles := episodeFilesForText(
+		"исправлена ошибка маскирования",
+		edits, 1, 2, time.Time{}, []string{"cmd/deja/hook_antigravity.go"},
+	)
+	if len(turnFiles) != 1 || turnFiles[0] != "internal/redact/redact.go" {
+		t.Fatalf("turn-scoped file attribution = %v, want [internal/redact/redact.go]", turnFiles)
 	}
 }

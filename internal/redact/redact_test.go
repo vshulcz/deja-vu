@@ -320,3 +320,22 @@ func TestProvenanceTagAfterSecretKeywordIsNotRedacted(t *testing.T) {
 		t.Fatalf("provenance tag was masked:\n  got: %q\n  counts: %#v", got, c)
 	}
 }
+
+func TestGoTestRunnerLinesAreNotRedactedAsEntropy(t *testing.T) {
+	for _, line := range []string{
+		"--- FAIL: TestCompactionRecoveryPacket/subtest_with_many_characters_and_mixed_case (0.02s)",
+		"    --- FAIL: TestCarryIssueClosesWithItsPR/parenthetical_pair_closes_both_issues (0.00s)",
+		"--- PASS: TestDoctorReportsDuplicateCodexHooks/mixed_case_subtest_identifier (0.01s)",
+		"--- SKIP: TestIntegrationBrowserStreamableHTTP/skip_when_offline (0.00s)",
+	} {
+		got, c := Text(line)
+		if got != line || c.Total() != 0 {
+			t.Fatalf("go test runner line was redacted:\n  in:  %q\n  got: %q\n  counts: %#v", line, got, c)
+		}
+	}
+	// Ordinary "pass: <secret>" with high entropy must still be redacted.
+	secretLine := "pass: K9mP2xQ7vL4nR8wT1yZ5bC3d" //nolint:gosec // fake secret for redactor test
+	if got, c := Text(secretLine); got == secretLine || c.Total() == 0 {
+		t.Fatalf("expected pass: secret to be redacted, got %q", got)
+	}
+}

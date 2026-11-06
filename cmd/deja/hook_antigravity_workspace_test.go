@@ -130,3 +130,47 @@ func TestTheHookRecallsTheProjectWhenThePayloadOmitsIt(t *testing.T) {
 		t.Errorf("Claude auto-memory was not attached to hook-antigravity:\n%s", out.String())
 	}
 }
+
+func TestAntigravityProjectWorkspaceNarrowsHomeToActiveCheckout(t *testing.T) {
+	hermeticEnv(t)
+	home := os.Getenv("HOME")
+	repo := filepath.Join(home, "coding", "goprojects", "deja-vu")
+	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	srcDir := filepath.Join(repo, "cmd", "deja")
+	if err := os.MkdirAll(srcDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	targetFile := filepath.Join(srcDir, "mcp.go")
+	if err := os.WriteFile(targetFile, []byte("package main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	steps := []transcriptStep{
+		{Type: "USER_INPUT"},
+		{
+			Type: "PLANNER_RESPONSE",
+			ToolCalls: []any{
+				map[string]any{"name": "noop"},
+				map[string]any{
+					"name": "mcp_qwen_read",
+					"args": map[string]any{
+						"Path":  `"relative/path.go"`,
+						"paths": []any{filepath.Join(home, ".gemini", "brain", "scratch.md"), "/outside/workspace/file.go", targetFile},
+					},
+				},
+			},
+		},
+	}
+	if got := antigravityProjectWorkspace(home, steps); got != repo {
+		t.Fatalf("antigravityProjectWorkspace(%q) = %q, want %q", home, got, repo)
+	}
+	if got := antigravityProjectWorkspace(home, nil); got != home {
+		t.Fatalf("antigravityProjectWorkspace(%q, nil) = %q, want %q", home, got, home)
+	}
+	// A non-home workspace is kept as-is.
+	other := filepath.Join(home, "coding", "other-app")
+	if got := antigravityProjectWorkspace(other, steps); got != other {
+		t.Fatalf("antigravityProjectWorkspace(%q) = %q, want %q", other, got, other)
+	}
+}

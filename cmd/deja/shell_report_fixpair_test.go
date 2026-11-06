@@ -49,11 +49,15 @@ func assertShellReportPair(t *testing.T, errLine string, response map[string]any
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	if err := runHookToolAfterMode(dir, bytes.NewReader(raw), &out, true); err != nil {
+	if err = runHookToolAfterMode(dir, bytes.NewReader(raw), &out, true); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), shellReportFix) {
 		t.Fatalf("the failure hook said nothing for a pair in the index:\n%q", out.String())
+	}
+	recalled, _, _, _, _, err := recallTextResultIn(dir, errLine, "", "", 5, 0, recallMCPBudget)
+	if err != nil || !strings.Contains(recalled, "Remedy from prior sessions on this machine:") || !strings.Contains(recalled, shellReportFix) {
+		t.Fatalf("recall on an error line with a confirmed remedy did not include it:\n%q (err=%v)", recalled, err)
 	}
 }
 

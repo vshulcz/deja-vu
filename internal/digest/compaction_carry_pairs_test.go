@@ -38,6 +38,13 @@ func TestCarryIssueClosesWithItsPR(t *testing.T) {
 			carryEv("u", "go", "a", "Issue #300 is still open, PR #301 and PR #302 are waiting.", "a", "PR #301 merged."),
 			nil,
 			[]carryWant{{"open", "Issue #300 is still open, PR #301 and PR #302 are waiting."}}},
+		{"parenthetical PR issue list closes when PR merges via gh",
+			carryEv("u", "go",
+				"a", "Issue #5967 is open: doctor reports duplicate Codex wiring.",
+				"a", "Открыты PR #5968 (#5967 + #5957) и PR #5969 (для #5966).",
+				"t", "$ gh pr merge 5968 --squash",
+				"u", "next"),
+			nil, nil},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -51,13 +58,14 @@ func TestCarryIssueClosesWithItsPR(t *testing.T) {
 
 func TestCarryIssuePRPairs(t *testing.T) {
 	for s, want := range map[string]map[int]int{
-		"Открыл issue #4638 и PR #4639":           {4638: 4639},
-		"PR #12 (issue #10, issue #11)":           {10: 12, 11: 12},
-		"задача #77, пулл-реквест #78":            {77: 78},
-		"PR #1 and PR #2 for issue #3":            nil,
-		"issue #5 only":                           nil,
-		"See PR #9.":                              {},
-		"APR #12 is a date, not a pull request #": nil,
+		"Открыл issue #4638 и PR #4639":                   {4638: 4639},
+		"PR #12 (issue #10, issue #11)":                   {10: 12, 11: 12},
+		"PR #5968 (#5967 + #5957) и PR #5969 (для #5966)": {5967: 5968, 5957: 5968, 5966: 5969},
+		"задача #77, пулл-реквест #78":                    {77: 78},
+		"PR #1 and PR #2 for issue #3":                    nil,
+		"issue #5 only":                                   nil,
+		"See PR #9.":                                      {},
+		"APR #12 is a date, not a pull request #":         nil,
 	} {
 		got := carryIssuePRPairs(carryBNorm(s))
 		if len(got) == 0 && len(want) == 0 {

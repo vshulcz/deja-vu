@@ -239,3 +239,33 @@ func TestFindFrictionSkipsLowSignalShellGlobWhenAnotherWallExists(t *testing.T) 
 		t.Fatalf("FindFriction picked %q, want real error over zsh glob noise", f.Text)
 	}
 }
+
+func TestFrictionSignatureFoldsZshEqualsAndIncludeGlobs(t *testing.T) {
+	_, eqBase, ok := FrictionSignature("(eval):1: == not found")
+	if !ok {
+		t.Fatal("expected == not found to be recognised as friction")
+	}
+	for _, variant := range []string{
+		"(eval):1: = not found",
+		"(eval):1: === not found",
+		"(eval):1: ==== not found",
+		"(eval):1: ===== not found",
+	} {
+		line, sig, ok := FrictionSignature(variant)
+		if !ok {
+			t.Fatalf("expected %q to be recognised as friction", variant)
+		}
+		if sig != eqBase {
+			t.Fatalf("signature for %q = %x, want %x (same as == not found)", variant, sig, eqBase)
+		}
+		if !isLowSignalShellFriction(line) {
+			t.Fatalf("expected %q (%q) to be marked low-signal shell friction", variant, line)
+		}
+	}
+
+	_, inc1, ok1 := FrictionSignature("(eval):1: no matches found: --include=*.go")
+	_, inc2, ok2 := FrictionSignature("(eval):1: no matches found: --include=*.ts")
+	if !ok1 || !ok2 || inc1 != inc2 {
+		t.Fatalf("expected --include=<glob> zsh errors to share one signature: ok1=%v ok2=%v %x vs %x", ok1, ok2, inc1, inc2)
+	}
+}

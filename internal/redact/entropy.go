@@ -96,10 +96,26 @@ func entropyCandidate(tok string) bool {
 	// output of a `pwd` — the whole message became `[redacted:entropy]`, which
 	// destroys the content rather than masking it, and says a key was removed
 	// when none was there.
-	if looksLikePath(tok) {
+	if looksLikePath(tok) || looksLikeGoTest(tok) {
 		return false
 	}
 	return shannonBits(tok) >= entropyMinBits
+}
+
+// looksLikeGoTest reports whether tok is a Go test/subtest identifier
+// (`TestFoo/sub_case`, `BenchmarkBar_16`). Go test output writes `--- FAIL:
+// TestName/subtest`, and a long CamelCase + snake_case subtest path crosses
+// 4.5 bits of Shannon entropy without carrying any secret.
+func looksLikeGoTest(tok string) bool {
+	if strings.ContainsAny(tok, "+=") || !strings.ContainsAny(tok, "/_") {
+		return false
+	}
+	for _, p := range []string{"Test", "Benchmark", "Fuzz", "Example"} {
+		if rest, ok := strings.CutPrefix(tok, p); ok && len(rest) > 0 && (rest[0] >= 'A' && rest[0] <= 'Z' || rest[0] >= '0' && rest[0] <= '9' || rest[0] == '_') {
+			return true
+		}
+	}
+	return false
 }
 
 // assignmentValue reports whether s[start] begins the value side of an
@@ -162,8 +178,14 @@ func assignmentValue(s string, start int) bool {
 // key block is caught by its own rule whatever the line around it says.
 func labelSaysPublic(s string, keyStart int, key string) bool {
 	switch strings.ToLower(key) {
-	case "pubkey", "publickey", "public_key", "public-key":
+	case "pubkey", "publickey", "public_key", "public-key", "fail", "skip":
 		return true
+	case "pass":
+		i := keyStart - 1
+		for i >= 0 && (s[i] == ' ' || s[i] == '\t') {
+			i--
+		}
+		return i >= 2 && s[i-2:i+1] == "---"
 	case "key", "keys":
 		// The word before it, if any: "public key: …" but not "api key: …".
 		i := keyStart - 1
