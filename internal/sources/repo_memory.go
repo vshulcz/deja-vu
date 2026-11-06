@@ -35,7 +35,9 @@ const (
 	RepoMemoryDir  = ".deja"
 	RepoMemoryName = "memory.jsonl"
 	// RepoGitattributes is written beside the file when deja makes .deja/.
-	RepoGitattributes = "memory.jsonl merge=union\n"
+	// linguist-generated collapses .deja/ diffs by default in GitHub PRs while
+	// merge=union resolves parallel branch additions without conflicts.
+	RepoGitattributes = "memory.jsonl merge=union linguist-generated=true\n"
 )
 
 const (
@@ -47,6 +49,7 @@ const (
 	// every recall and every session start.
 	repoFileMax    = 1 << 20
 	repoEntriesMax = 500
+	repoFilesMax   = 8
 )
 
 // RepoKinds are the kinds an entry may carry. "rejected" is the note state of
@@ -57,10 +60,13 @@ var RepoKinds = map[string]bool{"decision": true, "rejected": true, "gotcha": tr
 
 // RepoEntry is one line of the file, in the key order it is written.
 type RepoEntry struct {
-	ID   string `json:"id"`
-	Kind string `json:"kind"`
-	Text string `json:"text"`
-	Date string `json:"date"`
+	ID       string   `json:"id"`
+	Kind     string   `json:"kind"`
+	Text     string   `json:"text"`
+	Files    []string `json:"files,omitempty"`
+	Commit   string   `json:"commit,omitempty"`
+	Sessions int      `json:"sessions,omitempty"`
+	Date     string   `json:"date"`
 	// From is the harness and day of the session the entry came from, never a
 	// path or a session id: the file is read by people who do not have it.
 	From string `json:"from,omitempty"`
@@ -167,9 +173,58 @@ func parseRepoLine(line []byte) (RepoEntry, bool) {
 		e.ID = RepoEntryID(e.Kind, e.Text)
 	}
 	e.ID = CleanRepoText(e.ID)
+	e.Files = CleanRepoFiles(e.Files)
+	e.Commit = CleanRepoCommit(e.Commit)
+	if e.Sessions < 0 {
+		e.Sessions = 0
+	}
 	e.Date = CleanRepoText(e.Date)
 	e.From = CleanRepoText(e.From)
 	return e, true
+}
+
+// CleanRepoFiles normalizes, deduplicates and bounds repo-relative file paths.
+func CleanRepoFiles(files []string) []string {
+	if len(files) == 0 {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, raw := range files {
+		p := filepath.ToSlash(strings.TrimSpace(CleanRepoText(raw)))
+		p = strings.TrimPrefix(p, "./")
+		if p == "" || p == "." || strings.HasPrefix(p, "/") || strings.HasPrefix(p, "../") || strings.Contains(p, "/../") || strings.ContainsRune(p, '\\') || len(p) > 200 {
+			continue
+		}
+		if seen[p] {
+			continue
+		}
+		seen[p] = true
+		out = append(out, p)
+		if len(out) >= repoFilesMax {
+			break
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// CleanRepoCommit keeps only a short lowercase hexadecimal commit SHA.
+func CleanRepoCommit(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	if len(s) < 7 || len(s) > 40 {
+		return ""
+	}
+	for i := range len(s) {
+		c := s[i]
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return ""
+		}
+	}
+	if len(s) > 12 {
+		s = s[:12]
+	}
+	return s
 }
 
 // RepoEntryBody is the text an entry is indexed and shown as. The bracket
@@ -211,7 +266,12 @@ func ParseRepoMemoryFile(path string) ([]model.Session, error) {
 			Title: "[" + e.Kind + "] " + truncateRunes(e.Text, 80),
 		}
 		s.Touch(t)
-		s.Messages = []model.Message{{Role: "user", Text: RepoEntryBody(e), Time: t}}
+		msgs := make([]model.Message, 0, 1+len(e.Files))
+		msgs = append(msgs, model.Message{Role: "user", Text: RepoEntryBody(e), Time: t})
+		for _, f := range e.Files {
+			msgs = append(msgs, model.Message{Role: "edit", Text: filepath.Join(root, filepath.FromSlash(f)), Time: t})
+		}
+		s.Messages = msgs
 		out = append(out, s)
 	}
 	return out, nil
@@ -242,12 +302,13 @@ func AddRepoEntries(root string, entries []RepoEntry) ([]RepoEntry, error) {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
-	have := map[string]bool{}
-	for _, e := range existing {
-		have[e.ID] = true
+	have := map[string]int{}
+	for i, e := range existing {
+		have[e.ID] = i + 1
 	}
 	var added []RepoEntry
 	all := existing
+	updatedExisting := false
 	for _, e := range entries {
 		if !RepoKinds[e.Kind] || strings.TrimSpace(e.Text) == "" {
 			return nil, errors.New("an entry needs a kind (decision, rejected or gotcha) and text")
@@ -255,47 +316,286 @@ func AddRepoEntries(root string, entries []RepoEntry) ([]RepoEntry, error) {
 		if e.ID == "" {
 			e.ID = RepoEntryID(e.Kind, e.Text)
 		}
-		if have[e.ID] {
+		e.Files = CleanRepoFiles(e.Files)
+		e.Commit = CleanRepoCommit(e.Commit)
+		if e.Sessions < 0 {
+			e.Sessions = 0
+		}
+		if idx := have[e.ID]; idx > 0 {
+			merged, changed := mergeRepoEntry(all[idx-1], e)
+			if changed {
+				all[idx-1] = merged
+				updatedExisting = true
+			}
 			continue
 		}
-		have[e.ID] = true
+		have[e.ID] = len(all) + 1
 		added = append(added, e)
 		all = append(all, e)
 	}
-	if len(added) == 0 {
+	if len(added) == 0 && !updatedExisting {
 		return nil, nil
 	}
 	if len(all) > repoEntriesMax {
 		return nil, fmt.Errorf("%s would hold more than %d entries", path, repoEntriesMax)
 	}
+	if err := writeRepoMemorySlice(root, dir, path, all); err != nil {
+		return nil, err
+	}
+	return added, nil
+}
+
+func mergeRepoEntry(cur, inc RepoEntry) (RepoEntry, bool) {
+	changed := false
+	files := CleanRepoFiles(append(slices.Clone(cur.Files), inc.Files...))
+	if !slices.Equal(files, cur.Files) {
+		cur.Files = files
+		changed = true
+	}
+	if cur.Commit == "" && inc.Commit != "" {
+		cur.Commit = inc.Commit
+		changed = true
+	}
+	if inc.Sessions > cur.Sessions {
+		cur.Sessions = inc.Sessions
+		changed = true
+	}
+	if cur.From == "" && inc.From != "" {
+		cur.From = inc.From
+		changed = true
+	}
+	return cur, changed
+}
+
+func writeRepoMemorySlice(root, dir, path string, all []RepoEntry) error {
 	sort.Slice(all, func(i, j int) bool { return all[i].ID < all[j].ID })
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
 	for _, e := range all {
 		if err := enc.Encode(e); err != nil {
-			return nil, err
+			return err
 		}
+	}
+	if prev, err := os.ReadFile(path); err == nil && bytes.Equal(prev, buf.Bytes()) {
+		RememberRepoCheckout(root)
+		return nil
 	}
 	_, statErr := os.Lstat(dir)
 	created := errors.Is(statErr, os.ErrNotExist)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, err
+		return err
 	}
 	if err := atomicfile.Write(path, buf.Bytes(), 0o644); err != nil {
-		return nil, err
+		return err
 	}
 	// The two files beside it are written once, when deja makes the
 	// directory. Someone who deletes or edits either afterwards meant to.
 	if created {
 		for name, body := range map[string]string{".gitattributes": RepoGitattributes, "README.md": RepoReadme} {
 			if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
-				return added, err
+				return err
 			}
 		}
 	}
 	RememberRepoCheckout(root)
-	return added, nil
+	return nil
+}
+
+// EvolveRepoEntries updates root's .deja/memory.jsonl by pruning entries whose
+// tracked files were all deleted from the repository, merging file/commit/session
+// reinforcement into existing entries, adding new high-signal entries, and
+// capping total entries to maxEntries (when > 0) by signal rank.
+func EvolveRepoEntries(root string, incoming []RepoEntry, maxEntries int) (added, updated, pruned int, err error) {
+	dir := filepath.Join(root, RepoMemoryDir)
+	path := RepoMemoryPath(root)
+	for _, p := range []string{dir, path} {
+		if fi, statErr := os.Lstat(p); statErr == nil && fi.Mode()&os.ModeSymlink != 0 {
+			return 0, 0, 0, fmt.Errorf("%s is a symlink", p)
+		}
+	}
+	var existing []RepoEntry
+	if b, readErr := os.ReadFile(path); readErr == nil {
+		if len(b) > repoFileMax {
+			return 0, 0, 0, fmt.Errorf("%s is over %d bytes", path, repoFileMax)
+		}
+		var bad int
+		existing, bad, _ = readRepoMemory(bytes.NewReader(b))
+		if bad > 0 {
+			return 0, 0, 0, ErrRepoMemoryMalformed
+		}
+	} else if !errors.Is(readErr, os.ErrNotExist) {
+		return 0, 0, 0, readErr
+	}
+	// 1. Self-heal: prune entries whose bound files were all removed from root.
+	var surviving []RepoEntry
+	for _, e := range existing {
+		if len(e.Files) > 0 {
+			live := filterExistingRepoFiles(root, e.Files)
+			if len(live) == 0 {
+				pruned++
+				continue
+			}
+			if !slices.Equal(live, e.Files) {
+				e.Files = live
+				updated++
+			}
+		}
+		surviving = append(surviving, e)
+	}
+	byID := map[string]int{}
+	byText := map[string]int{}
+	for i, e := range surviving {
+		byID[e.ID] = i + 1
+		if tk := repoNormTextKey(e.Text); tk != "" {
+			byText[tk] = i + 1
+		}
+	}
+	for _, e := range incoming {
+		if !RepoKinds[e.Kind] || strings.TrimSpace(e.Text) == "" {
+			continue
+		}
+		if e.ID == "" {
+			e.ID = RepoEntryID(e.Kind, e.Text)
+		}
+		e.Files = filterExistingRepoFiles(root, CleanRepoFiles(e.Files))
+		e.Commit = CleanRepoCommit(e.Commit)
+		if e.Sessions < 0 {
+			e.Sessions = 0
+		}
+		idx := byID[e.ID]
+		tk := repoNormTextKey(e.Text)
+		if idx == 0 && tk != "" {
+			idx = byText[tk]
+		}
+		if idx > 0 {
+			merged, changed := mergeRepoEntry(surviving[idx-1], e)
+			if changed {
+				surviving[idx-1] = merged
+				updated++
+			}
+			continue
+		}
+		byID[e.ID] = len(surviving) + 1
+		if tk != "" {
+			byText[tk] = len(surviving) + 1
+		}
+		surviving = append(surviving, e)
+		added++
+	}
+	if maxEntries > 0 && len(surviving) > maxEntries {
+		rank := map[string]int{"rejected": 0, "gotcha": 1, "decision": 2}
+		sort.SliceStable(surviving, func(i, j int) bool {
+			a, b := surviving[i], surviving[j]
+			if (len(a.Files) > 0) != (len(b.Files) > 0) {
+				return len(a.Files) > 0
+			}
+			if rank[a.Kind] != rank[b.Kind] {
+				return rank[a.Kind] < rank[b.Kind]
+			}
+			if a.Sessions != b.Sessions {
+				return a.Sessions > b.Sessions
+			}
+			if (a.Commit != "") != (b.Commit != "") {
+				return a.Commit != ""
+			}
+			return a.Date > b.Date
+		})
+		surviving = surviving[:maxEntries]
+	}
+	if added == 0 && updated == 0 && pruned == 0 {
+		return 0, 0, 0, nil
+	}
+	if len(surviving) == 0 && !regularFile(path) {
+		return 0, 0, 0, nil
+	}
+	if err := writeRepoMemorySlice(root, dir, path, surviving); err != nil {
+		return 0, 0, 0, err
+	}
+	return added, updated, pruned, nil
+}
+
+func filterExistingRepoFiles(root string, files []string) []string {
+	if root == "" || len(files) == 0 {
+		return nil
+	}
+	var out []string
+	for _, f := range files {
+		if regularFile(filepath.Join(root, filepath.FromSlash(f))) {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+func repoNormTextKey(text string) string {
+	norm := strings.ToLower(strings.Join(strings.Fields(CleanRepoText(text)), " "))
+	r := []rune(norm)
+	if len(r) > 65 {
+		r = r[:65]
+	}
+	return string(r)
+}
+
+func repoOffListPath() string {
+	return filepath.Join(filepath.Dir(NotesFile()), "repo-off.txt")
+}
+
+// RepoAutoDisabled reports whether automatic .deja/memory.jsonl evolution is
+// turned off for root (via DEJA_REPO=off or `deja repo off`).
+func RepoAutoDisabled(root string) bool {
+	if v := strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_REPO"))); v == "off" || v == "0" || v == "false" {
+		return true
+	}
+	if root == "" {
+		return false
+	}
+	if abs, err := filepath.Abs(root); err == nil {
+		root = abs
+	}
+	b, err := os.ReadFile(repoOffListPath())
+	if err != nil {
+		return false
+	}
+	for line := range strings.SplitSeq(string(b), "\n") {
+		if strings.TrimSpace(line) == root {
+			return true
+		}
+	}
+	return false
+}
+
+// SetRepoAutoDisabled turns automatic .deja/memory.jsonl evolution off or on
+// for root.
+func SetRepoAutoDisabled(root string, off bool) error {
+	if root == "" {
+		return errors.New("empty repository root")
+	}
+	if abs, err := filepath.Abs(root); err == nil {
+		root = abs
+	}
+	p := repoOffListPath()
+	var current []string
+	if b, err := os.ReadFile(p); err == nil {
+		for line := range strings.SplitSeq(string(b), "\n") {
+			line = strings.TrimSpace(line)
+			if line != "" && line != root {
+				current = append(current, line)
+			}
+		}
+	}
+	if off {
+		current = append(current, root)
+	}
+	sort.Strings(current)
+	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
+		return err
+	}
+	body := ""
+	if len(current) > 0 {
+		body = strings.Join(current, "\n") + "\n"
+	}
+	return atomicfile.Write(p, []byte(body), 0o600)
 }
 
 // RemoveRepoEntries deletes entries matching ids from root's .deja/memory.jsonl

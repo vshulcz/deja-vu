@@ -440,3 +440,57 @@ func TestRepoZeroFrictionCLIAndTaskRanking(t *testing.T) {
 		t.Error("ephemeral status report was accepted as a repo candidate")
 	}
 }
+
+func TestRepoAutoSyncAndToggle(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the fixture names a Claude project folder the unix way")
+	}
+	base := repoStandBase(t)
+	home := repoPerson(t, base, "grace")
+	root := filepath.Join(base, "grace", "orders")
+	repoGit(t, base, "init", "-q", root)
+	workerFile := filepath.Join(root, "internal", "worker.go")
+	if err := os.MkdirAll(filepath.Dir(workerFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(workerFile, []byte("package internal\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	repoGit(t, root, "add", "internal/worker.go")
+	repoGit(t, root, "commit", "-qm", "add worker")
+
+	folder := filepath.Join(home, "claude", strings.ReplaceAll(root, "/", "-"))
+	lines := []string{
+		`{"type":"user","sessionId":"s1","cwd":"` + root + `","timestamp":"2026-08-03T10:00:00Z","message":{"role":"user","content":"parallelize order dispatch"}}`,
+		`{"type":"assistant","sessionId":"s1","cwd":"` + root + `","timestamp":"2026-08-03T10:05:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"` + workerFile + `","old_string":"package internal","new_string":"package internal // v2"}}]}}`,
+		`{"type":"user","sessionId":"s1","cwd":"` + root + `","timestamp":"2026-08-03T10:06:00Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"ok"}]}}`,
+		`{"type":"assistant","sessionId":"s1","cwd":"` + root + `","timestamp":"2026-08-03T10:10:00Z","message":{"role":"assistant","content":[{"type":"text","text":"Reverted the goroutine fan-out because concurrent dispatch broke FIFO per-account ordering."}]}}`,
+	}
+	writeClaudeFixture(t, filepath.Join(folder, "s1.jsonl"), "s1", lines)
+	t.Chdir(root)
+	dir := os.Getenv("DEJA_INDEX_DIR")
+
+	syncOut, err := captureRun(t, "repo", "sync")
+	if err != nil || !strings.Contains(syncOut, "synced .deja/memory.jsonl") {
+		t.Fatalf("repo sync: %q, %v", syncOut, err)
+	}
+	entries, _, err := sources.ReadRepoMemory(sources.RepoMemoryPath(root))
+	if err != nil || len(entries) != 1 || len(entries[0].Files) != 1 || entries[0].Files[0] != "internal/worker.go" {
+		t.Fatalf("synced entries = %+v, err=%v", entries, err)
+	}
+
+	// PreToolUse matches internal/worker.go via e.Files even though the text never names worker.go.
+	fileIn := toolHookInput{ToolName: "Edit", CWD: root}
+	fileIn.ToolInput.FilePath = workerFile
+	if line := toolHookLine(dir, root, fileIn); !strings.Contains(line, "FIFO per-account ordering") {
+		t.Errorf("PreToolUse on bound file = %q, want FIFO per-account ordering", line)
+	}
+
+	// Toggle off and back on.
+	if out, err := captureRun(t, "repo", "off"); err != nil || !strings.Contains(out, "are off") || !sources.RepoAutoDisabled(root) {
+		t.Fatalf("repo off: %q, %v", out, err)
+	}
+	if out, err := captureRun(t, "repo", "on"); err != nil || !strings.Contains(out, "are on") || sources.RepoAutoDisabled(root) {
+		t.Fatalf("repo on: %q, %v", out, err)
+	}
+}

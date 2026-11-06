@@ -313,6 +313,7 @@ func runHookRefresh(dir string) {
 	if err := index.Ensure(dir, "", false, nil); err != nil {
 		return
 	}
+	autoEvolveRepoMemory(dir, cwd)
 	writeHookCacheEntry(dir, cwd, hookDigestEntryFor(dir, ""))
 	_ = os.Remove(hookCachePath(dir, cwd) + ".refreshing")
 }

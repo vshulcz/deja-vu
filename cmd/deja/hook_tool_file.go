@@ -241,24 +241,52 @@ func repoMemoryDecisionForFile(cwd, path string, allSymbols []string, pol policy
 	if root == "" || !pol.Allows(policy.ActivationAuto, sources.RepoMemoryProject(root)) {
 		return ""
 	}
-	entries, _, err := sources.ReadRepoMemory(sources.RepoMemoryPath(root))
+	entries, _, err := readRepoMemoryAndNotes(root)
 	if err != nil || len(entries) == 0 {
 		return ""
 	}
 	rank := map[string]int{"rejected": 0, "gotcha": 1, "decision": 2}
 	sort.SliceStable(entries, func(i, j int) bool {
+		fi := repoEntryHasFile(root, path, entries[i].Files)
+		fj := repoEntryHasFile(root, path, entries[j].Files)
+		if fi != fj {
+			return fi
+		}
 		if rank[entries[i].Kind] != rank[entries[j].Kind] {
 			return rank[entries[i].Kind] < rank[entries[j].Kind]
+		}
+		if entries[i].Sessions != entries[j].Sessions {
+			return entries[i].Sessions > entries[j].Sessions
 		}
 		return entries[i].Date > entries[j].Date
 	})
 	for _, e := range entries {
-		if repoEntryMentionsFile(root, path, e.Text) || mentionsAnySymbol(allSymbols, e.Text) {
+		if repoEntryHasFile(root, path, e.Files) || repoEntryMentionsFile(root, path, e.Text) || mentionsAnySymbol(allSymbols, e.Text) {
 			body := "[" + e.Kind + "] " + e.Text
 			return trimTrailingFragment(search.SafeText(clipDecision(body, toolHookDecisionBudget)))
 		}
 	}
 	return ""
+}
+
+func repoEntryHasFile(root, path string, files []string) bool {
+	if path == "" || len(files) == 0 {
+		return false
+	}
+	slashPath := strings.TrimPrefix(filepath.ToSlash(path), "./")
+	if root != "" && filepath.IsAbs(path) {
+		if rel, err := filepath.Rel(root, path); err == nil && !strings.HasPrefix(rel, "..") {
+			slashPath = filepath.ToSlash(rel)
+		}
+	}
+	base := filepath.Base(slashPath)
+	for _, f := range files {
+		f = strings.TrimPrefix(filepath.ToSlash(f), "./")
+		if strings.EqualFold(f, slashPath) || (len(base) >= 6 && !strings.Contains(slashPath, "/") && strings.EqualFold(filepath.Base(f), base)) {
+			return true
+		}
+	}
+	return false
 }
 
 func repoEntryMentionsFile(root, path, text string) bool {
@@ -276,8 +304,7 @@ func repoEntryMentionsFile(root, path, text string) bool {
 	if len(base) >= 5 && strings.Contains(low, base) {
 		return true
 	}
-	dir := strings.ToLower(filepath.ToSlash(filepath.Dir(slashPath)))
-	if dir != "." && dir != "/" && len(dir) >= 5 && strings.Contains(dir, "/") && strings.Contains(low, dir) {
+	if len(slashPath) >= 5 && strings.Contains(low, strings.ToLower(slashPath)) {
 		return true
 	}
 	stem := base
