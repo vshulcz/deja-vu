@@ -13,28 +13,10 @@ import (
 
 var errNoAiderLive = errors.New("no named pipes here")
 
-// aiderLiveSettle is how long the server waits between checks for the reader
-// closing its end of the pipe before opening the pipe again. Opened while the
-// last reader is still draining, the next answer would land in that read as a
-// second copy.
-const aiderLiveSettle = 25 * time.Millisecond
-
-// waitForAiderReaderClose blocks until no reader holds path open (so
-// O_WRONLY|O_NONBLOCK returns ENXIO), bounded so a stuck reader cannot wedge
-// the server loop forever.
-func waitForAiderReaderClose(path string, stopped *atomic.Bool) {
-	for range 40 {
-		if stopped.Load() {
-			return
-		}
-		probe, err := os.OpenFile(path, os.O_WRONLY|syscall.O_NONBLOCK, 0)
-		if err != nil {
-			return
-		}
-		_ = probe.Close()
-		time.Sleep(aiderLiveSettle)
-	}
-}
+// aiderLiveSettle is how long the server waits after answering one read
+// before it opens the pipe again. Opened while the last reader is still
+// draining, the next answer would land in that read as a second copy.
+var aiderLiveSettle = 75 * time.Millisecond
 
 // serveAiderLive makes a named pipe and answers every open of it with body().
 func serveAiderLive(body func() string) (string, func(), error) {
@@ -63,7 +45,7 @@ func serveAiderLive(body func() string) (string, func(), error) {
 				_, _ = f.WriteString(body())
 			}
 			_ = f.Close()
-			waitForAiderReaderClose(path, &stopped)
+			time.Sleep(aiderLiveSettle)
 		}
 	}()
 	stop := func() {
