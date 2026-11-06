@@ -514,9 +514,17 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 	if err != nil {
 		return "", 0, 0, nil, nil, err
 	}
+	var fixHead string
+	var fixCount int
+	if offset == 0 {
+		fixHead, fixCount = recallErrorFixesBlock(dir, q)
+	}
 	result, o, hits, policyHidden, cov := r.result, r.o, r.hits, r.policyHidden, r.cov
 	unread, about := r.unread, r.about
 	if len(hits) == 0 {
+		if fixHead != "" {
+			return strings.TrimSpace(fixHead), fixCount, 0, nil, nil, nil
+		}
 		return recallMissAnswer(dir, q, budget, cov, policyHidden)
 	}
 	// Before the page is cut, not after: demoting inside the page is a no-op
@@ -543,7 +551,55 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 	if len(hits) > limit {
 		hits = hits[:limit]
 	}
-	return recallPage(dir, q, budget, offset, limit, total, demoted, about, result, o, hits, twins, cov, r.added)
+	pageBudget := budget - len(fixHead)
+	if pageBudget < 200 {
+		pageBudget = budget
+		fixHead = ""
+	}
+	out, served, raw, ids, projects, err := recallPage(dir, q, pageBudget, offset, limit, total, demoted, about, result, o, hits, twins, cov, r.added)
+	if err == nil && fixHead != "" {
+		out = fixHead + out
+	}
+	return out, served, raw, ids, projects, err
+}
+
+// recallErrorFixesBlock returns a compact remedy header when a default recall
+// query is itself a recognised error line (`index.FrictionLine`) with a
+// confirmed remedy on this machine, so agents that call `recall` instead of
+// `fix` on an error still receive the command or edit that resolved it.
+func recallErrorFixesBlock(dir, q string) (string, int) {
+	if _, ok := index.FrictionLine(q); !ok {
+		return "", 0
+	}
+	pol := policy.Load()
+	pairs := index.FixesFor(dir, q, 2, func(project string) bool {
+		return pol.Allows(policy.ActivationMCP, project)
+	})
+	if len(pairs) == 0 {
+		return "", 0
+	}
+	var b strings.Builder
+	b.WriteString("Remedy from prior sessions on this machine:\n")
+	shown := 0
+	for _, p := range pairs {
+		if p.Candidate {
+			continue
+		}
+		if p.Edit != "" {
+			fmt.Fprintf(&b, "  changed next: %s\n", search.SafePath(p.Edit))
+			shown++
+			continue
+		}
+		if p.Command != "" {
+			fmt.Fprintf(&b, "  ran next: %s\n", commandListingLine(p.Command))
+			shown++
+		}
+	}
+	if shown == 0 {
+		return "", 0
+	}
+	b.WriteByte('\n')
+	return b.String(), shown
 }
 
 // rankedRecall is a recall's ranking before it is cut into a page: what the

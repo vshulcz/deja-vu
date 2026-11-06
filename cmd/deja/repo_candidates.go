@@ -443,15 +443,15 @@ func emitSessionConclusions(m index.SessionMeta, st *repoEpState, fallbackFiles 
 			if r == "" || revoked[strings.ToLower(r)] || !usableRepoCandidateLine(r) {
 				continue
 			}
-			at, end := msgTimeAndEditsForText(msgs, editEnds, r, m.Updated, len(edits))
-			files := episodeFilesNear(edits[:end], at, fallbackFiles)
-			add(repoCandidate{Kind: inferRepoKind(r), Text: squeezeTrim(r, 300), Files: files, From: repoFrom(m.Harness, at), Source: "user rule", Session: m.ID, tier: 0, at: at})
+			at, start, end := msgTimeAndEditsForText(msgs, editEnds, r, m.Updated, len(edits))
+			files := episodeFilesForText(r, edits, start, end, at, fallbackFiles)
+			add(repoCandidate{Kind: inferRepoKind(r), Text: trimRepoCandidateText(r), Files: files, From: repoFrom(m.Harness, at), Source: "user rule", Session: m.ID, tier: 0, at: at})
 		}
 	}
-	if d := cleanRepoCandidateLine(m.Settled); d != "" && digest.CarriesDecision(d) && usableRepoCandidateLine(d) {
-		at, end := msgTimeAndEditsForText(msgs, editEnds, d, m.Updated, len(edits))
-		files := episodeFilesNear(edits[:end], at, fallbackFiles)
-		add(repoCandidate{Kind: "decision", Text: squeezeTrim(d, 300), Files: files, From: repoFrom(m.Harness, at), Source: "session " + shortID(m.ID), Session: m.ID, tier: 1, at: at})
+	if d := cleanRepoCandidateLine(m.Settled); d != "" && (!strings.HasSuffix(d, "…") || len(msgs) == 0) && digest.CarriesDecision(d) && usableRepoCandidateLine(d) {
+		at, start, end := msgTimeAndEditsForText(msgs, editEnds, d, m.Updated, len(edits))
+		files := episodeFilesForText(d, edits, start, end, at, fallbackFiles)
+		add(repoCandidate{Kind: "decision", Text: trimRepoCandidateText(d), Files: files, From: repoFrom(m.Harness, at), Source: "session " + shortID(m.ID), Session: m.ID, tier: 1, at: at})
 		return
 	}
 	if len(msgs) == 0 {
@@ -460,21 +460,21 @@ func emitSessionConclusions(m index.SessionMeta, st *repoEpState, fallbackFiles 
 	s := model.Session{ID: m.ID, Harness: m.Harness, Project: m.Project, Messages: msgs}
 	for _, d := range digest.SubstantialConclusions(s, promoteDecisionBudget, 2) {
 		if d = cleanRepoCandidateLine(d); d != "" && digest.CarriesDecision(d) && usableRepoCandidateLine(d) {
-			at, end := msgTimeAndEditsForText(msgs, editEnds, d, m.Updated, len(edits))
-			files := episodeFilesNear(edits[:end], at, fallbackFiles)
-			add(repoCandidate{Kind: "decision", Text: squeezeTrim(d, 300), Files: files, From: repoFrom(m.Harness, at), Source: "session " + shortID(m.ID), Session: m.ID, tier: 1, at: at})
+			at, start, end := msgTimeAndEditsForText(msgs, editEnds, d, m.Updated, len(edits))
+			files := episodeFilesForText(d, edits, start, end, at, fallbackFiles)
+			add(repoCandidate{Kind: "decision", Text: trimRepoCandidateText(d), Files: files, From: repoFrom(m.Harness, at), Source: "session " + shortID(m.ID), Session: m.ID, tier: 1, at: at})
 		}
 	}
 }
 
-func msgTimeAndEditsForText(msgs []model.Message, editEnds []int, text string, fallbackTime time.Time, fallbackEnd int) (time.Time, int) {
+func msgTimeAndEditsForText(msgs []model.Message, editEnds []int, text string, fallbackTime time.Time, fallbackEnd int) (time.Time, int, int) {
 	r := []rune(strings.TrimSpace(text))
 	if len(r) > 40 {
 		r = r[:40]
 	}
 	probe := strings.ToLower(string(r))
 	if probe == "" {
-		return fallbackTime, fallbackEnd
+		return fallbackTime, 0, fallbackEnd
 	}
 	for i, msg := range slices.Backward(msgs) {
 		if strings.Contains(strings.ToLower(cleanRepoCandidateLine(msg.Text)), probe) {
@@ -486,10 +486,102 @@ func msgTimeAndEditsForText(msgs []model.Message, editEnds []int, text string, f
 			if i < len(editEnds) {
 				end = editEnds[i]
 			}
-			return at, end
+			start := 0
+			for u := i - 1; u >= 0; u-- {
+				if msgs[u].Role == "user" {
+					if u < len(editEnds) {
+						start = editEnds[u]
+					}
+					break
+				}
+			}
+			return at, start, end
 		}
 	}
-	return fallbackTime, fallbackEnd
+	return fallbackTime, 0, fallbackEnd
+}
+
+func episodeFilesForText(text string, edits []repoEditEvent, start, end int, at time.Time, fallback []string) []string {
+	if mentioned := mentionedRepoFiles(text, edits[:end], fallback); len(mentioned) > 0 {
+		return mentioned
+	}
+	if start > 0 && start < end {
+		if turnFiles := episodeFilesNear(edits[start:end], at, nil); len(turnFiles) > 0 {
+			return turnFiles
+		}
+	}
+	return episodeFilesNear(edits[:end], at, fallback)
+}
+
+func mentionedRepoFiles(text string, edits []repoEditEvent, fallback []string) []string {
+	low := strings.ToLower(text)
+	var pool []string
+	for _, e := range edits {
+		if e.file != "" && !slices.Contains(pool, e.file) {
+			pool = append(pool, e.file)
+		}
+	}
+	for _, f := range fallback {
+		if f != "" && !slices.Contains(pool, f) {
+			pool = append(pool, f)
+		}
+	}
+	var exact []string
+	for _, f := range pool {
+		if strings.Contains(low, strings.ToLower(f)) {
+			exact = append(exact, f)
+		}
+	}
+	if len(exact) > 0 {
+		if len(exact) > 4 {
+			exact = exact[:4]
+		}
+		return sources.CleanRepoFiles(exact)
+	}
+	byBase := map[string][]string{}
+	for _, f := range pool {
+		base := strings.ToLower(filepath.Base(f))
+		if strings.Contains(base, ".") {
+			byBase[base] = append(byBase[base], f)
+		}
+	}
+	var baseHits []string
+	for base, files := range byBase {
+		if len(files) == 1 && strings.Contains(low, base) {
+			baseHits = append(baseHits, files[0])
+		}
+	}
+	if len(baseHits) > 0 {
+		slices.Sort(baseHits)
+		if len(baseHits) > 4 {
+			baseHits = baseHits[:4]
+		}
+		return sources.CleanRepoFiles(baseHits)
+	}
+	return nil
+}
+
+func trimRepoCandidateText(s string) string {
+	const maxRunes = 300
+	s = strings.Join(strings.Fields(s), " ")
+	r := []rune(s)
+	if len(r) <= maxRunes {
+		return s
+	}
+	for i := maxRunes; i >= maxRunes/2; i-- {
+		if i < len(r) && (r[i-1] == '.' || r[i-1] == '!' || r[i-1] == '?') && (i == len(r) || r[i] == ' ') {
+			return strings.TrimSpace(string(r[:i]))
+		}
+	}
+	cut := maxRunes - 1
+	for i := cut; i >= max(0, cut-60); i-- {
+		if r[i] == ' ' {
+			cut = i
+			break
+		}
+	}
+	trimmed := strings.TrimRight(string(r[:cut]), " \t.,;:(—-")
+	return trimmed + "…"
 }
 
 func episodeFilesNear(edits []repoEditEvent, at time.Time, fallback []string) []string {
@@ -802,6 +894,13 @@ func usableRepoCandidateLine(s string) bool {
 		"сначала коммичу",
 		"один ревьюер",
 		"осталось на ",
+		"опубликован ответ",
+		"вмержены в main",
+		"смержены в main",
+		"fixed on fix/",
+		"fixed on feat/",
+		"missing coverage for",
+		"the report is correct",
 		" 2. ",
 	} {
 		if strings.Contains(low, noise) {

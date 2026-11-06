@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -53,6 +54,85 @@ func latestEditPathsFromSteps(steps []transcriptStep) []string {
 		}
 	}
 	return nil
+}
+
+// antigravityProjectWorkspace narrows a home-directory or empty workspace to
+// the git repository the recent transcript steps actually work in, so sessions
+// launched from ~ still scope per-prompt recall and .deja/memory.jsonl to the
+// active checkout.
+func antigravityProjectWorkspace(workspace string, steps []transcriptStep) string {
+	if workspace != "" && len(digest.ProjectNameCandidates(workspace)) > 0 {
+		return workspace
+	}
+	for _, step := range steps {
+		calls, ok := step.ToolCalls.([]any)
+		if !ok {
+			continue
+		}
+		for _, rawCall := range calls {
+			call, _ := rawCall.(map[string]any)
+			args, _ := call["args"].(map[string]any)
+			if args == nil {
+				continue
+			}
+			for _, p := range antigravityCallPaths(args) {
+				if repo := antigravityRepoRootFromPath(workspace, p); repo != "" {
+					return repo
+				}
+			}
+		}
+	}
+	return workspace
+}
+
+func antigravityCallPaths(args map[string]any) []string {
+	var out []string
+	for _, k := range []string{"TargetFile", "AbsolutePath", "Path", "cwd", "Cwd", "where"} {
+		if s, ok := args[k].(string); ok && s != "" {
+			var decoded string
+			if strings.HasPrefix(s, `"`) && json.Unmarshal([]byte(s), &decoded) == nil {
+				s = decoded
+			}
+			out = append(out, s)
+		}
+	}
+	if list, ok := args["paths"].([]any); ok {
+		for _, item := range list {
+			if s, ok := item.(string); ok && s != "" {
+				out = append(out, s)
+			}
+		}
+	}
+	return out
+}
+
+func antigravityRepoRootFromPath(workspace, raw string) string {
+	p := strings.TrimSpace(strings.TrimPrefix(raw, "file://"))
+	if p == "" || !filepath.IsAbs(p) {
+		return ""
+	}
+	slashed := filepath.ToSlash(p)
+	for _, skip := range []string{"/.gemini/", "/.claude/", "/.agents/", "/.codex/"} {
+		if strings.Contains(slashed, skip) {
+			return ""
+		}
+	}
+	if workspace != "" {
+		cleanW := filepath.Clean(workspace)
+		cleanP := filepath.Clean(p)
+		if cleanP != cleanW && !strings.HasPrefix(cleanP, cleanW+string(filepath.Separator)) {
+			return ""
+		}
+	}
+	probe := p
+	if fi, err := os.Stat(p); err != nil || !fi.IsDir() {
+		probe = filepath.Dir(p)
+	}
+	repo := sources.RepoRoot(probe)
+	if repo != "" && len(digest.ProjectNameCandidates(repo)) > 0 {
+		return repo
+	}
+	return ""
 }
 
 // editFileLines is what the pre-tool hook would say before an edit of each

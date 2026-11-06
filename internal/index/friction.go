@@ -260,6 +260,13 @@ func maskFilePosition(l string) string {
 // is, and `make: *** [build] Error 1` must not become `Error 2`. Ports, pids,
 // epochs and ids are longer than that; 404 and 500 are not.
 func maskVolatileNumbers(l string) string {
+	s := strings.TrimSpace(l)
+	if rest, ok := strings.CutSuffix(s, " not found"); ok && rest != "" && strings.Trim(rest, "=") == "" {
+		return "== not found"
+	}
+	if strings.HasPrefix(s, "no matches found: --include=") || strings.HasPrefix(s, "no matches found: --exclude=") {
+		return "no matches found: --include=<glob>"
+	}
 	l = maskIPv4(l)
 	l = maskFilePosition(l)
 	var b strings.Builder
@@ -695,8 +702,7 @@ func isLowSignalShellFriction(text string) bool {
 	if strings.HasPrefix(s, "no matches found:") {
 		return true
 	}
-	switch s {
-	case "== not found", "= not found", "=== not found":
+	if rest, ok := strings.CutSuffix(s, " not found"); ok && rest != "" && strings.Trim(rest, "=") == "" {
 		return true
 	}
 	return false

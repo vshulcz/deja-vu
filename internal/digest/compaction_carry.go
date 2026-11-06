@@ -55,7 +55,7 @@ var (
 	carryUserCloseRE = regexp.MustCompile(`(?i)` + carryLB + `(смержил\p{L}*|вмержил\p{L}*|смерджил\p{L}*|влил\p{L}*|закрыл\p{L}*|merged|closed)` + carryRB)
 	carryWaitMeRE    = regexp.MustCompile(`(?i)(мерж|мердж|merge|апрув|approv|добро|отмашк|твоего|твоё|твое|на тебя|за тобой)`)
 	carryCIWaitRE    = regexp.MustCompile(`(?i)(` + carryLB + `(ci|чек\p{L}*|зелён\p{L}*|зелен\p{L}*|сборк\p{L}*|джоб\p{L}*)` + carryRB + `|\b(checks?|build|jobs?)\b)`)
-	carryLinksRE     = regexp.MustCompile(`(?:closes|fixes|resolves|закрывает|чинит)\s+#(\d{2,6})`)
+	carryLinksRE     = regexp.MustCompile(`(?:closes|closed|fixes|fixed|resolves|resolved|закрывает|закрыл\p{L}*|чинит|починил\p{L}*|исправляет|исправил\p{L}*)\s+(?:(?:issue|ишью|задач\p{L}*)\s+)?#(\d{2,6})`)
 	carryLongWordRE  = regexp.MustCompile(`[\p{L}\p{N}_]{6,}`)
 	carrySpaces      = strings.NewReplacer(" ", " ", " ", " ")
 )
@@ -141,7 +141,9 @@ func carryBuild(ev []carryEvent, prev []model.ContextCarry) []model.ContextCarry
 			}
 		}
 		for _, s := range carryUnits(e.text, true) { // status tables often sit in code blocks
-			for _, st := range carryBState(carryBNorm(s)) {
+			norm := carryBNorm(s)
+			maps.Copy(closedBy, carryIssuePRPairs(norm))
+			for _, st := range carryBState(norm) {
 				if st.closed {
 					closed[st.n] = append(closed[st.n], j)
 				}
@@ -246,7 +248,7 @@ func carryFreshItems(ev []carryEvent, items []carryItem, lastU int, closedAfter 
 }
 
 func carryHasLinkWord(low string) bool {
-	for _, w := range []string{"closes", "fixes", "resolves", "закрывает", "чинит"} {
+	for _, w := range []string{"closes", "closed", "fixes", "fixed", "resolves", "resolved", "закрывает", "закрыл", "чинит", "починил", "исправляет", "исправил"} {
 		if strings.Contains(low, w) {
 			return true
 		}

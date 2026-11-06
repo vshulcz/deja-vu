@@ -80,7 +80,7 @@ func PutCompaction(dir string, next CompactionState) (CompactionState, error) {
 		return CompactionState{}, ErrCompactionForgotten
 	}
 
-	unlock, locked, err := tryLockDir(dir)
+	unlock, locked, err := tryLockDirFor(dir, 200*time.Millisecond)
 	if err != nil {
 		return CompactionState{}, err
 	}

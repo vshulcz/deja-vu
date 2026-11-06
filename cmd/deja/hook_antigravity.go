@@ -67,6 +67,7 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	// re-unmarshaling up to 128 KB of JSONL four times across checkpoint,
 	// failure, prompt, and edit checks.
 	tailSteps := transcriptTailSteps(input.TranscriptPath)
+	projectWorkspace := antigravityProjectWorkspace(workspace, tailSteps)
 	// A compaction throws away the blocks this conversation was shown while the
 	// record of having sent them outlives them, so the memory it just lost is
 	// the memory recall refuses to send again.
@@ -92,10 +93,10 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 		// reachable from here: PostToolUse is handed the error and its contract
 		// allows no answer at all.
 		block := antigravityFixPair(dir, latestToolFailureFromSteps(tailSteps),
-			input.ConversationID, workspace)
+			input.ConversationID, projectWorkspace)
 		if block == "" {
 			block = antigravityPromptBlock(dir, latestUserRequestFromSteps(tailSteps),
-				input.ConversationID, workspace)
+				input.ConversationID, projectWorkspace)
 		}
 		// The line the pre-tool hook gives before an edit, for the file the
 		// last call edited: PreToolUse cannot say it here, so it rides the
@@ -104,7 +105,7 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 		if recovery != "" {
 			steps = append(steps, antigravityInjectStep{EphemeralMessage: recovery})
 		}
-		if line := editFileLines(dir, latestEditPathsFromSteps(tailSteps), input.ConversationID, workspace); line != "" {
+		if line := editFileLines(dir, latestEditPathsFromSteps(tailSteps), input.ConversationID, projectWorkspace); line != "" {
 			steps = append(steps, antigravityInjectStep{EphemeralMessage: line})
 		}
 		if block != "" {
@@ -129,8 +130,8 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	if recovery != "" {
 		steps = append(steps, antigravityInjectStep{EphemeralMessage: recovery})
 	}
-	digest, sessions, raw, _, _, ids, projects := cachedHookDigestFor(dir, workspace, "")
-	digest, _, projects = attachClaudeAutoMemory(dir, input.ConversationID, input.TranscriptPath, "antigravity", hookCWD(workspace), digest, projects)
+	digest, sessions, raw, _, _, ids, projects := cachedHookDigestFor(dir, projectWorkspace, "")
+	digest, _, projects = attachClaudeAutoMemory(dir, input.ConversationID, input.TranscriptPath, "antigravity", hookCWD(projectWorkspace), digest, projects)
 	rememberDigestInjected(dir, input.ConversationID)
 	if digest != "" {
 		digest = frameRecall(startLead(antigravityLead) + digest)
@@ -139,10 +140,10 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 		steps = append(steps, antigravityInjectStep{EphemeralMessage: digest})
 	} else {
 		block := antigravityFixPair(dir, latestToolFailureFromSteps(tailSteps),
-			input.ConversationID, workspace)
+			input.ConversationID, projectWorkspace)
 		if block == "" {
 			block = antigravityPromptBlock(dir, latestUserRequestFromSteps(tailSteps),
-				input.ConversationID, workspace)
+				input.ConversationID, projectWorkspace)
 		}
 		if block != "" {
 			steps = append(steps, antigravityInjectStep{EphemeralMessage: block})

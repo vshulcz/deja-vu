@@ -55,6 +55,10 @@ func assertShellReportPair(t *testing.T, errLine string, response map[string]any
 	if !strings.Contains(out.String(), shellReportFix) {
 		t.Fatalf("the failure hook said nothing for a pair in the index:\n%q", out.String())
 	}
+	recalled, _, _, _, _, err := recallTextResultIn(dir, errLine, "", "", 5, 0, recallMCPBudget)
+	if err != nil || !strings.Contains(recalled, "Remedy from prior sessions on this machine:") || !strings.Contains(recalled, shellReportFix) {
+		t.Fatalf("recall on an error line with a confirmed remedy did not include it:\n%q (err=%v)", recalled, err)
+	}
 }
 
 // qwenShellSessions writes two Qwen Code sessions that each hit shellReportErr
