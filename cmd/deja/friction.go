@@ -362,7 +362,7 @@ func scanFriction(dir string, pol policy.Policy) (*frictionScan, error) {
 	}
 	var rows []frictionRow
 	for sig, s := range found {
-		line := s.text
+		line := normalizeEnvironmentWallText(s.text)
 		if len(s.sessions) < index.FrictionMinSessions {
 			continue
 		}
@@ -375,6 +375,10 @@ func scanFriction(dir string, pol policy.Policy) (*frictionScan, error) {
 			id: index.WallHandle(sig), started: s.started})
 	}
 	sort.Slice(rows, func(i, j int) bool {
+		li, lj := isLowSignalEnvironmentWall(rows[i].line), isLowSignalEnvironmentWall(rows[j].line)
+		if li != lj {
+			return !li
+		}
 		if rows[i].n != rows[j].n {
 			return rows[i].n > rows[j].n
 		}

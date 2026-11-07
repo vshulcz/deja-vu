@@ -1,12 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // The command as it was run carries the way one machine reached the directory,
@@ -107,5 +110,130 @@ func TestTheDigestMapSaysNothingWhenThereIsNoPractice(t *testing.T) {
 	hermeticEnv(t)
 	if got := orientDigestBlock(t.TempDir(), t.TempDir(), []string{"nowhere"}, policy.ActivationAuto); got != "" {
 		t.Errorf("an empty store produced a map block:\n%s", got)
+	}
+}
+
+func TestOrientHelpersFilterEphemeralAndRankSuiteVerify(t *testing.T) {
+	if !orientSuiteVerifyCommand("go test ./...") {
+		t.Error("expected go test ./... to be a suite verify command")
+	}
+	if orientSuiteVerifyCommand("go test ./cmd/deja -run TestOrient") {
+		t.Error("targeted -run test command must not be ranked as full suite verify")
+	}
+	if !orientEphemeralCommand("go test /tmp/probe_test.go") {
+		t.Error("expected /tmp/ command to be filtered as ephemeral")
+	}
+	if !isOrientEphemeralFile("/w/svc/cmd/deja/zz_probe_test.go") {
+		t.Error("expected zz_probe_test.go to be filtered as ephemeral")
+	}
+	if got := orientPath("/w/svc/.claude/worktrees/agent-123/cmd/deja/main.go", "/w/svc"); got != filepath.Join("cmd", "deja", "main.go") {
+		t.Errorf("orientPath with worktree segment = %q, want cmd/deja/main.go", got)
+	}
+	if !orientSkipFixError("--- SKIP: TestLiveMCPPerfBreakdown (0.00s)") {
+		t.Error("expected --- SKIP: to be skipped in orient fixes")
+	}
+	if !orientSkipFixError("internal/search/search.go:393:69: undefined: digest") {
+		t.Error("expected one-off compiler undefined error to be skipped in orient fixes")
+	}
+	if !orientDestructiveRemedy("go test ./... && git reset --hard HEAD") {
+		t.Error("expected git reset --hard remedy to be flagged as destructive")
+	}
+	if orientTestRemedyMatchesFail("--- FAIL: TestFoo", "go test ./cmd/deja -run TestBar") {
+		t.Error("expected go test remedy to be rejected for --- FAIL: error line")
+	}
+	if !orientTautologicalEdit("internal/search/search.go:10: err", "internal/search/search.go") {
+		t.Error("expected tautological edit of the same file in compiler error to be skipped")
+	}
+}
+
+func TestOrientRepoTreeKeepsSubdirBasenamesAndDropsDeletedFiles(t *testing.T) {
+	repo := t.TempDir()
+	cmdDir := filepath.Join(repo, "cmd", "deja")
+	if err := os.MkdirAll(cmdDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cmdDir, "main.go"), []byte("package main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tree := orientRepoTree(repo)
+	if !tree.exists("cmd/deja/main.go") {
+		t.Error("expected relative path cmd/deja/main.go to exist in repoFileTree")
+	}
+	if !tree.exists("main.go") {
+		t.Error("expected bare basename main.go in subdirectory to exist in repoFileTree")
+	}
+	if tree.exists("deleted_probe.py") {
+		t.Error("unexpected match for deleted_probe.py")
+	}
+}
+
+func TestHookToolMentionsFileAndRepoMemoryScoping(t *testing.T) {
+	if mentionsFile("/Users/x/goprojects/deja-vu/cmd/deja/help_commands.go", "deja") {
+		t.Error("mentionsFile must not match parent dir 'deja' when filename has specific stem 'help_commands'")
+	}
+	if !mentionsFile("/Users/x/goprojects/deja-vu/cmd/deja/help_commands.go", "help_commands returned an error") {
+		t.Error("mentionsFile should match specific stem 'help_commands'")
+	}
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sources.AddRepoEntries(root, []sources.RepoEntry{
+		{
+			ID:    "e1",
+			Date:  "2026-11-01",
+			Kind:  "gotcha",
+			Text:  "cursor-state-vscdb-too-large.html needs synced table headers",
+			Files: []string{"docs/guide/cursor-state-vscdb-too-large.html"},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	targetGo := filepath.Join(root, "cmd", "deja", "rules_candidates.go")
+	if err := os.MkdirAll(filepath.Dir(targetGo), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(targetGo, []byte("package main\ntype state struct{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := repoMemoryDecisionForFile(root, targetGo, []string{"state"}, policy.Load()); got != "" {
+		t.Errorf("repoMemoryDecisionForFile cross-matched file-scoped entry onto unrelated Go file: %q", got)
+	}
+}
+
+func TestRulesCandidatesRejectsNumberedListsAndMidSentenceNet(t *testing.T) {
+	if isCorrection("1. да\n2. нет\n3. оставим на потом") {
+		t.Error("numbered list answer must not be classified as a user correction")
+	}
+	if isCorrection("у нас нет аккаунта на этой платформе") {
+		t.Error("mid-sentence 'нет' statement must not be classified as a user correction")
+	}
+	if !isCorrection("нет, стало хуже значительно с багами и аномалиями") {
+		t.Error("leading 'нет, стало хуже...' correction should be detected")
+	}
+}
+
+func TestFixResolvesNearestRecordedErrorForPartialQuery(t *testing.T) {
+	dir := seedDay1MagicStore(t)
+	var out bytes.Buffer
+	if err := runFix(dir, []string{"database is closed"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	got := out.String()
+	if !strings.Contains(got, "make clean && make CGO_ENABLED=0") {
+		t.Errorf("runFix for partial error query did not resolve and print the fix:\n%s", got)
+	}
+}
+
+func TestNearErrorProbesAndStandingCorrectionFilter(t *testing.T) {
+	probes := nearErrorProbesFromOutput("ok  pkg 0.1s\n--- FAIL: TestGuideSnippetsFitWhatSearchShows (0.04s)\nFAIL\n")
+	if len(probes) != 1 || probes[0] != "--- FAIL: TestGuideSnippetsFitWhatSearchShows" {
+		t.Errorf("nearErrorProbesFromOutput = %v, want [--- FAIL: TestGuideSnippetsFitWhatSearchShows]", probes)
+	}
+	if !isStandingCorrection("не, сам то .deja/ пусть будет локально, потестим насколько с ним лучше, а вот пушить не надо чтоб не палить его") {
+		t.Error("expected .deja/ git push rule to be recognized as a standing correction")
+	}
+	if isStandingCorrection("ок, без просьбы процитировать (это пока не надо нам)") {
+		t.Error("situational 'пока не надо' remark must not be promoted to standing repo memory")
 	}
 }

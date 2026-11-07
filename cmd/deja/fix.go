@@ -147,6 +147,11 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 			// out of a transcript can carry (#2768).
 			fmt.Fprintf(stdout, "deja: nothing recorded for that line — deja matches a whole error line, and the closest it holds is:\n  %s\ntry: %s\n",
 				search.SafeLine(near), fixHintCommand(near))
+			if nearPairs := index.FixesFor(dir, near, limit, func(project string) bool {
+				return pol.Allows(policy.ActivationSearch, project)
+			}); len(nearPairs) > 0 {
+				return printFixPairsFrom(dir, stdout, nearPairs)
+			}
 			return nil
 		}
 		fmt.Fprintln(stdout, "deja: no session on this machine ran a command after that error")
@@ -166,6 +171,7 @@ func printFixPairs(stdout io.Writer, pairs []index.FixPair) error {
 }
 
 func printFixPairsFrom(dir string, stdout io.Writer, pairs []index.FixPair) error {
+	cwd := howCwd()
 	for _, p := range pairs {
 		when := ""
 		if !p.When.IsZero() {
@@ -180,7 +186,11 @@ func printFixPairsFrom(dir string, stdout io.Writer, pairs []index.FixPair) erro
 			if p.Candidate {
 				changed = "changed next, unconfirmed"
 			}
-			fmt.Fprintf(stdout, "  %s: %s\n", changed, search.SafePath(p.Edit))
+			edit := p.Edit
+			if cwd != "" {
+				edit = orientPath(edit, cwd)
+			}
+			fmt.Fprintf(stdout, "  %s: %s\n", changed, search.SafePath(edit))
 			for _, dl := range fixEditDiffLines(dir, p) {
 				fmt.Fprintf(stdout, "    %s\n", dl)
 			}

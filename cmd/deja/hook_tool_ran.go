@@ -227,6 +227,10 @@ const (
 // path almost always modified alongside it (at least 3 sessions and 2/3 of the
 // focused sessions that touched path).
 func coChangeCompanion(path string, metas []index.SessionMeta) (string, int, int) {
+	return coChangeCompanionIn("", path, metas)
+}
+
+func coChangeCompanionIn(cwd, path string, metas []index.SessionMeta) (string, int, int) {
 	targetBase := strings.ToLower(baseName(path))
 	if targetBase == "" {
 		return "", 0, 0
@@ -235,31 +239,58 @@ func coChangeCompanion(path string, metas []index.SessionMeta) (string, int, int
 	companionCounts := map[string]int{}
 	companionDisplay := map[string]string{}
 	focused := 0
+	tree := orientRepoTree(cwd)
+	checkDisk := tree.exists(orientPath(path, cwd)) || tree.exists(targetBase)
 	for _, m := range metas {
 		key := m.Key()
 		if counted[key] {
 			continue
 		}
 		counted[key] = true
-		if len(m.Touched) == 0 || len(m.Touched) > toolHookMaxFocusedFiles {
+		if len(m.Touched) == 0 {
 			continue
 		}
-		focused++
 		seenInSession := map[string]bool{}
+		var companions []string
+		hasTarget := false
 		for _, t := range m.Touched {
 			if isScratch(t) {
 				continue
 			}
-			b := baseName(t)
+			norm := orientPath(t, cwd)
+			if norm == "" {
+				norm = baseName(t)
+			}
+			if isOrientEphemeralFile(norm) {
+				continue
+			}
+			if checkDisk && !tree.exists(norm) {
+				continue
+			}
+			b := baseName(norm)
 			low := strings.ToLower(b)
-			if low == "" || low == targetBase || seenInSession[low] {
+			if low == "" {
+				continue
+			}
+			if low == targetBase {
+				hasTarget = true
+				continue
+			}
+			if seenInSession[low] {
 				continue
 			}
 			seenInSession[low] = true
-			companionCounts[low]++
+			companions = append(companions, low)
 			if companionDisplay[low] == "" {
 				companionDisplay[low] = b
 			}
+		}
+		if !hasTarget || len(companions) == 0 || len(companions)+1 > toolHookMaxFocusedFiles {
+			continue
+		}
+		focused++
+		for _, low := range companions {
+			companionCounts[low]++
 		}
 	}
 	if focused < toolHookMinCoChangeSessions {
@@ -282,11 +313,11 @@ func coChangeCompanion(path string, metas []index.SessionMeta) (string, int, int
 	return search.SafePath(companionDisplay[bestLow]), bestCount, focused
 }
 
-// fileHookCoChangeLine names the companion or test file that sessions touching
+// fileHookCoChangeLineIn names the companion or test file that sessions touching
 // path almost always modified alongside it (at least 3 sessions and 2/3 of the
 // focused sessions that touched path).
-func fileHookCoChangeLine(path string, metas []index.SessionMeta) string {
-	companion, bestCount, focused := coChangeCompanion(path, metas)
+func fileHookCoChangeLineIn(cwd, path string, metas []index.SessionMeta) string {
+	companion, bestCount, focused := coChangeCompanionIn(cwd, path, metas)
 	if companion == "" {
 		return ""
 	}

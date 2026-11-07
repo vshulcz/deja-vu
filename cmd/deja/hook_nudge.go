@@ -4,11 +4,16 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // Negative knowledge — "we tried X, it did not work" — is the most expensive
@@ -39,6 +44,191 @@ func failureNudge(dir, prompt string) string {
 		return ""
 	}
 	return "The user just said an approach did not hold. Dead ends are the one thing this store never records — if that is what happened, save it now with `deja remember \"<what was tried, why it failed>\"`, in one line, before moving on."
+}
+
+func joinPromptAdvisories(parts ...string) string {
+	var out []string
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return strings.Join(out, "\n")
+}
+
+// promptDirectContext performs live correction capture into .deja/memory.jsonl
+// and returns any high-precision repo-memory guardrail or verified error fix
+// matching the user's prompt.
+func promptDirectContext(dir, cwd, sessionID, asked string) string {
+	if strings.TrimSpace(asked) == "" || digest.IsAgentArtifact(asked) {
+		return ""
+	}
+	autoRecordPromptCorrection(cwd, sessionID, asked)
+	seen := alreadyInjected(dir, sessionID)
+	var lines []string
+	var tokens []string
+	if rmLine, rmTok := promptRepoMemoryLine(cwd, asked, seen); rmLine != "" {
+		lines = append(lines, rmLine)
+		tokens = append(tokens, rmTok)
+	}
+	if fxLine, fxTok := promptErrorFixLine(dir, cwd, asked, seen); fxLine != "" {
+		lines = append(lines, fxLine)
+		tokens = append(tokens, fxTok)
+	}
+	if sessionID != "" && len(tokens) > 0 {
+		rememberInjectedIDs(dir, sessionID, tokens...)
+	}
+	return strings.Join(lines, "\n")
+}
+
+// autoRecordPromptCorrection captures a user's standing prohibition or correction
+// from a live prompt directly into .deja/memory.jsonl when it names a repo file
+// or path, so subsequent tool hooks in the same session enforce it immediately.
+func autoRecordPromptCorrection(cwd, sessionID, asked string) {
+	if cwd == "" {
+		return
+	}
+	root := sources.RepoRoot(cwd)
+	if root == "" || sources.RepoAutoDisabled(root) {
+		return
+	}
+	memPath := sources.RepoMemoryPath(root)
+	if !fileThere(memPath) {
+		return
+	}
+	raw := strings.TrimSpace(asked)
+	if raw == "" || strings.HasPrefix(raw, "!") || pseudoUserRe.MatchString(raw) || !isStandingCorrection(raw) {
+		return
+	}
+	text := cleanRepoCandidateLine(raw)
+	if text == "" || len([]rune(text)) > 260 || !usableRepoCandidateLine(text) {
+		return
+	}
+	files := extractMentionedRepoFiles(root, text, nil)
+	if len(files) == 0 {
+		return
+	}
+	kind := inferRepoKind(text)
+	if kind == "decision" {
+		kind = "gotcha"
+	}
+	text = trimRepoCandidateText(text)
+	entry := sources.RepoEntry{
+		ID:       sources.RepoEntryID(kind, text),
+		Kind:     kind,
+		Text:     text,
+		Files:    files,
+		Sessions: 1,
+		From:     repoFrom(sessionID, time.Now()),
+		Date:     time.Now().UTC().Format("2006-01-02"),
+	}
+	_, _, _, _ = sources.EvolveRepoEntries(root, []sources.RepoEntry{entry}, 50)
+}
+
+func promptRepoMemoryLine(cwd, asked string, seen map[string]bool) (string, string) {
+	if cwd == "" {
+		return "", ""
+	}
+	root := sources.RepoRoot(cwd)
+	if root == "" {
+		return "", ""
+	}
+	pol := policy.Load()
+	if !pol.Allows(policy.ActivationAuto, sources.RepoMemoryProject(root)) {
+		return "", ""
+	}
+	entries, _, err := sources.ReadRepoMemory(sources.RepoMemoryPath(root))
+	if err != nil || len(entries) == 0 {
+		return "", ""
+	}
+	rank := map[string]int{"rejected": 0, "gotcha": 1, "decision": 2}
+	sort.SliceStable(entries, func(i, j int) bool {
+		if rank[entries[i].Kind] != rank[entries[j].Kind] {
+			return rank[entries[i].Kind] < rank[entries[j].Kind]
+		}
+		return entries[i].Date > entries[j].Date
+	})
+	for _, e := range entries {
+		matched := commandTouchesRepoEntryFiles(asked, e.Files)
+		if !matched {
+			for _, f := range e.Files {
+				if repoEntryMentionsFile(root, f, asked) {
+					matched = true
+					break
+				}
+			}
+		}
+		if !matched {
+			matched = repoEntryMentionsCommand(asked, e.Text)
+		}
+		if !matched {
+			continue
+		}
+		scope := ""
+		if len(e.Files) > 0 {
+			scope = " (" + strings.Join(e.Files, ", ") + ")"
+		}
+		line := fmt.Sprintf("in %s%s: [%s] %s", repoFileShown, scope, e.Kind, search.SafeText(clipDecision(e.Text, 240)))
+		tok := "prompt:rm:" + shortHash(line)
+		if seen[tok] {
+			continue
+		}
+		return line, tok
+	}
+	return "", ""
+}
+
+func promptErrorFixLine(dir, cwd, asked string, seen map[string]bool) (string, string) {
+	if !planIndexReady(dir) || !promptCarriesErrorOrTest(asked) {
+		return "", ""
+	}
+	var probes []string
+	probes = append(probes, asked)
+	for tok := range strings.FieldsSeq(asked) {
+		tok = strings.Trim(tok, "\"'`(),:;!?[]{}<>")
+		if strings.HasPrefix(tok, "Test") && len(tok) > 8 && hasMixedCaseOrUnderscore(tok) {
+			probes = append(probes, "--- FAIL: "+tok, tok)
+		}
+	}
+	for _, probe := range probes {
+		line := fixPairLine(dir, cwd, probe)
+		if line == "" || strings.Contains(line, "one session ") {
+			continue
+		}
+		if idx := strings.Index(line, "changed next: "); idx >= 0 {
+			editPart := strings.TrimSpace(line[idx+len("changed next: "):])
+			if norm := orientPath(editPart, cwd); norm != "" {
+				line = line[:idx+len("changed next: ")] + norm
+			}
+		}
+		tok := "prompt:fx:" + shortHash(line)
+		if seen[tok] {
+			return "", ""
+		}
+		return line, tok
+	}
+	return "", ""
+}
+
+func promptCarriesErrorOrTest(asked string) bool {
+	low := strings.ToLower(asked)
+	for _, marker := range []string{
+		"--- fail:", "fail\t", "panic:", "fatal:", "level=error", "error:",
+		"command not found:", "does not contain main module", "undefined:",
+		"exit status ", "segmentation fault",
+	} {
+		if strings.Contains(low, marker) {
+			return true
+		}
+	}
+	for tok := range strings.FieldsSeq(asked) {
+		tok = strings.Trim(tok, "\"'`(),:;!?[]{}<>")
+		if strings.HasPrefix(tok, "Test") && len(tok) > 8 && hasMixedCaseOrUnderscore(tok) {
+			return true
+		}
+	}
+	return false
 }
 
 // reportsFailure reads the user's own words, line by line, using the same rule

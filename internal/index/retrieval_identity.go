@@ -389,6 +389,12 @@ func FindManyByIdentity(dir string, ids []Identity) ([]model.Session, error) {
 // FindManyByIdentityInRoles is FindManyByIdentity decoding only records whose
 // role is selected by roles.
 func FindManyByIdentityInRoles(dir string, ids []Identity, roles map[string]bool) ([]model.Session, error) {
+	return FindManyByIdentityInRolesTail(dir, ids, roles, 0)
+}
+
+// FindManyByIdentityInRolesTail is FindManyByIdentityInRoles bounded to the
+// last tail records of each session when tail > 0.
+func FindManyByIdentityInRolesTail(dir string, ids []Identity, roles map[string]bool, tail int) ([]model.Session, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -415,7 +421,7 @@ func FindManyByIdentityInRoles(dir string, ids []Identity, roles map[string]bool
 	if len(metas) == 0 {
 		return nil, nil
 	}
-	return sessionsForMetasInRoles(dir, metas, roles)
+	return sessionsForMetasInRolesWindowedTail(dir, metas, roles, nil, tail)
 }
 
 // ChildrenOf lists the sessions an agent spawned from this one, newest first.

@@ -358,6 +358,10 @@ func mergeRepoEntry(cur, inc RepoEntry) (RepoEntry, bool) {
 	}
 	if inc.Sessions > cur.Sessions {
 		cur.Sessions = inc.Sessions
+		if strings.HasSuffix(cur.Text, "sessions)") && strings.HasSuffix(inc.Text, "sessions)") && cur.Text != inc.Text {
+			cur.Text = inc.Text
+			cur.ID = RepoEntryID(cur.Kind, cur.Text)
+		}
 		changed = true
 	}
 	if cur.From == "" && inc.From != "" {
@@ -530,6 +534,9 @@ func filterExistingRepoFiles(root string, files []string) []string {
 
 func repoNormTextKey(text string) string {
 	norm := strings.ToLower(strings.Join(strings.Fields(CleanRepoText(text)), " "))
+	if idx := strings.LastIndex(norm, " ("); idx > 20 && strings.HasSuffix(norm, "sessions)") {
+		norm = strings.TrimSpace(norm[:idx])
+	}
 	r := []rune(norm)
 	if len(r) > 65 {
 		r = r[:65]
