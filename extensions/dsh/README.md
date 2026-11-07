@@ -86,7 +86,7 @@ panel from these files; with both installed you get one panel.
 
 ## Search controls
 
-Open **Settings → Deja** for two independent switches, both enabled by default:
+Open **Settings → Deja** for three independent switches, all enabled by default:
 
 - **Ctrl+F in conversations** fills the message input with the literal text
   `deja search --session <bare session UUID> `, followed by your existing draft
@@ -94,6 +94,13 @@ Open **Settings → Deja** for two independent switches, both enabled by default
   **Ctrl+F** on Windows/Linux desktop or **Cmd+F** on macOS desktop. In a
   browser, use **Ctrl+Alt+F** on Windows or **Option+Command+F** on macOS;
   DSH reserves the browser's ordinary Find shortcut.
+- **Ctrl+K opens Deja full-text search** takes over the sidebar search that
+  gesture opens: the search starts in Deja full-text mode instead of the title
+  search. The magnifying glass returns the native search for that opening.
+  This also binds **Ctrl+Alt+K** (Ctrl+Option+Shift+K in a browser) as a
+  direct Deja search shortcut, because DSH's shortcut registry rejects a
+  second binding for the native Ctrl+K. Turn the switch off to restore the
+  official behaviour completely.
 - **Deja search in the sidebar** adds a full-text mode to sidebar search.
   Open sidebar search, then click its magnifying glass again to switch to
   Deja. Enter a query to search the local index of **DSH conversations only**,

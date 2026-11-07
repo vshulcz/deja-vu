@@ -6,7 +6,17 @@ import { runInNewContext } from "node:vm";
 const source = readFileSync(new URL("../client.js", import.meta.url), "utf8");
 function load(extras = {}, modules = {}) {
   let registration;
-  const context = { window: { __ModuleLoader__: { load: (r) => { registration = r; } } }, URL, ...extras };
+  const context = {
+    window: { __ModuleLoader__: { load: (r) => { registration = r; } } },
+    URL,
+    // The sidebar adapter owns its DOM seams: a detached result container and
+    // an attribute observer that never fires in this fixture.
+    document: { createElement: () => ({ className: "", dataset: {}, hidden: false, remove() {} }) },
+    MutationObserver: class { observe() {} disconnect() {} },
+    setTimeout,
+    clearTimeout,
+    ...extras,
+  };
   runInNewContext(source, context);
   return registration.factory((name) => {
     if (name in modules) return modules[name];
@@ -17,6 +27,36 @@ function load(extras = {}, modules = {}) {
 function storage(initial) {
   let saved = initial;
   return { getItem: () => saved, setItem: (_key, next) => { saved = next; }, value: () => JSON.parse(saved) };
+}
+function sidebarAnchor(expanded = false) {
+  const listeners = { input: new Map(), button: new Map() };
+  const emit = (target, event) => {
+    const handler = listeners[target].get(event.type);
+    if (handler) handler(event);
+    return true;
+  };
+  const input = { type: "text", value: "", parentElement: null, focus() {}, dispatchEvent: (event) => emit("input", event) };
+  const button = { aria: expanded ? "true" : "false", pressed: null, title: null, parentElement: null, dispatchEvent: (event) => emit("button", event) };
+  for (const [name, target] of [["input", input], ["button", button]]) {
+    target.addEventListener = (type, handler) => listeners[name].set(type, handler);
+    target.removeEventListener = (type) => listeners[name].delete(type);
+  }
+  const list = { hidden: false, className: "fixture_listArea", parentElement: { appendChild() {}, removeChild() {} } };
+  button.getAttribute = (name) => name === "aria-expanded" ? button.aria : button[name === "aria-pressed" ? "pressed" : name === "title" ? "title" : "pressed"];
+  button.setAttribute = (name, value) => { if (name === "aria-expanded") button.aria = value; else if (name === "aria-pressed") button.pressed = value; else button.title = value; };
+  button.removeAttribute = (name) => { if (name === "aria-expanded") button.aria = null; else if (name === "aria-pressed") button.pressed = null; else button.title = null; };
+  // The adapter walks input → its parent container → the expanded button.
+  input.parentElement = { querySelector: () => button };
+  const anchor = {
+    input, button, list,
+    querySelector(selector) {
+      if (selector === 'input[type="text"]') return input;
+      if (selector === 'button[aria-expanded]') return button;
+      if (selector === '[class*="_listArea"]') return list;
+      return null;
+    },
+  };
+  return anchor;
 }
 function shortcuts(mod, prefs) {
   const state = { id: "session-first", drafts: new Map(), focused: [], persisted: [] };
@@ -90,7 +130,7 @@ test("preferences persist independent switches and notify subscribers", () => {
   let updates = 0;
   const dispose = prefs.subscribe(() => updates++);
   prefs.set("sidebar", false);
-  assert.deepEqual(disk.value(), { conversation: false, sidebar: false });
+  assert.deepEqual(disk.value(), { conversation: false, sidebar: false, opensDeja: true });
   assert.equal(updates, 1);
   dispose();
   prefs.set("conversation", true);
@@ -98,6 +138,12 @@ test("preferences persist independent switches and notify subscribers", () => {
   assert.equal(mod.preferences(disk).getSnapshot().conversation, true);
   prefs.set("unknown", true);
   assert.equal("unknown" in prefs.getSnapshot(), false);
+  // A saved v1 document without the new switch falls back to its default.
+  const upgradedDisk = storage('{"conversation":true,"sidebar":true}');
+  const upgraded = mod.preferences(upgradedDisk);
+  assert.equal(upgraded.getSnapshot().opensDeja, true);
+  upgraded.set("opensDeja", false);
+  assert.deepEqual(JSON.parse(upgradedDisk.getItem("dsh.deja.search.v1")), { conversation: true, sidebar: true, opensDeja: false });
 });
 
 test("malformed or unavailable storage leaves both controls usable", () => {
@@ -110,6 +156,92 @@ test("malformed or unavailable storage leaves both controls usable", () => {
     assert.equal(prefs.getSnapshot().conversation, false);
     assert.equal(prefs.getSnapshot().sidebar, true);
   }
+});
+
+test("Ctrl+K opens the sidebar in Deja full-text mode and the magnifier restores the native view", () => {
+  const mod = load();
+  const prefs = mod.preferences();
+  const anchor = sidebarAnchor(true);
+  anchor.list.hidden = false;
+  const views = [];
+  const attachment = mod.attachSidebar(anchor, prefs, (view) => views.push(view));
+  assert.ok(attachment, "the adapter attaches to the semantic search controls");
+  assert.deepEqual(views.map((view) => view.active), [false]);
+  assert.equal(attachment.claimOpen(), true, "an opened search is claimed for Deja");
+  assert.deepEqual(views.map((view) => view.active), [false, true]);
+  assert.equal(anchor.list.hidden, true);
+  assert.equal(anchor.button.getAttribute("aria-pressed"), "true");
+  assert.equal(prefs.getSnapshot().opensDeja, true);
+  // The magnifier is the escape hatch back to the native search.
+  anchor.button.dispatchEvent({ type: "click", bubbles: true, cancelable: true, preventDefault() {}, stopPropagation() {} });
+  assert.equal(views.at(-1).active, false, "the click restores the native search");
+  assert.equal(anchor.list.hidden, false);
+  assert.equal(anchor.button.getAttribute("aria-pressed"), "false");
+  // After the handoff the claim is spent: the next opening stays native
+  // unless Deja claims it again.
+  anchor.button.setAttribute("aria-expanded", "true");
+  assert.equal(views.at(-1).active, false);
+  attachment.dispose();
+});
+
+test("a claim only fires while the search is expanding, and is released otherwise", async () => {
+  const mod = load();
+  const prefs = mod.preferences();
+  const anchor = sidebarAnchor(false);
+  const views = [];
+  const attachment = mod.attachSidebar(anchor, prefs, (view) => views.push(view));
+  // A collapsed search has nothing to claim, so the pending flag is released
+  // after the bounded wait rather than by the first synchronous check.
+  assert.equal(attachment.claimOpen(), null, "the claim follows the expansion asynchronously");
+  await new Promise((resolve) => setTimeout(resolve, 550));
+  assert.deepEqual(views.map((view) => view.active), [false], "a search that never opens leaves the native view alone");
+  anchor.button.setAttribute("aria-expanded", "true");
+  assert.equal(views.at(-1).active, false, "an unclaimed opening stays native");
+  anchor.button.setAttribute("aria-expanded", "false");
+  // The switches gate the takeover independently.
+  prefs.set("sidebar", false);
+  assert.equal(attachment.claimOpen(), false, "a disabled sidebar cannot claim");
+  prefs.set("opensDeja", false);
+  prefs.set("sidebar", true);
+  assert.equal(attachment.claimOpen(), false, "the takeover switch can be turned off");
+  // A claim settles as soon as the expansion the shortcut triggered lands.
+  prefs.set("opensDeja", true);
+  assert.equal(attachment.claimOpen(), null, "the claim waits for the expansion");
+  anchor.button.setAttribute("aria-expanded", "true");
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.equal(views.at(-1).active, true, "the expansion the shortcut opened becomes Deja's");
+  attachment.dispose();
+});
+
+test("the direct Deja search shortcut keeps its own binding distinct from native Ctrl+K", () => {
+  const mod = load({}, { "react-dom": { createPortal() {} } });
+  const commands = new Map();
+  const services = { shortcuts: { register: (command) => { commands.set(command.id, command); return () => {}; } }, uiSession: {}, sessions: {}, conversation: {}, uiWorkspace: {} };
+  const ctx = {
+    ...services,
+    effect: (fn) => fn(),
+    slots: { inject: (_slot, fn) => fn(), register: () => () => {} },
+    inject(names, fn) {
+      if (!names.every((name) => name in services)) return;
+      fn(ctx);
+    },
+  };
+  mod.installSearch(ctx);
+  const direct = commands.get("deja.search-sessions");
+  assert.ok(direct, "a discoverable direct binding is registered");
+  assert.equal(direct.defaults["desktop:windows"].modifiers.join("+"), "primary+alt");
+  assert.equal(direct.defaults["web:macos"].modifiers.join("+"), "primary+alt+shift");
+  // The official session.search keeps primary+K; Deja must not collide with it.
+  const keys = new Set([...commands.values()].map((command) => command.defaults["desktop:windows"]?.code + ":" + (command.defaults["desktop:windows"]?.modifiers || []).join("+")));
+  assert.equal(keys.has("KeyK:primary+alt"), true);
+  assert.equal(keys.has("KeyK:primary"), false, "the native session.search binding stays untouched");
+  // The command closes over installSearch's own preferences object; reaching
+  // it through a second preferences() instance would read a different copy.
+  // The switch is exercised end to end through the sidebar takeover tests
+  // above; here the binding's own resolution contract is what matters.
+  assert.equal(direct.resolve({ modal: "settings" }).status, "pass", "modals keep the key for DSH");
+  assert.equal(direct.resolve({ modal: null }).status, "handled", "the direct binding runs when enabled");
+  assert.doesNotThrow(() => direct.resolve({ modal: null }).run());
 });
 
 test("search composes through the settings list and root overlay, preserving the native sidebar slot", () => {
@@ -132,7 +264,7 @@ test("search composes through the settings list and root overlay, preserving the
     inject: (names, fn) => { if (names.every((name) => name in services)) fn(ctx); },
   };
   mod.installSearch(ctx);
-  assert.deepEqual(registered, ["settings.section:deja", "deja.search-session", "shell.overlay:deja-search"]);
+  assert.deepEqual(registered, ["settings.section:deja", "deja.search-session", "shell.overlay:deja-search", "deja.search-sessions"]);
 });
 
 test("the package and CLI browser panel share a single search owner", () => {

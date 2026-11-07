@@ -58,7 +58,7 @@ dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
 
 ## 搜索控制
 
-打开 **设置 → Deja**，可分别控制两个默认开启的开关：
+打开 **设置 → Deja**，可分别控制三个默认开启的开关：
 
 - **Ctrl+F in conversations（会话内快捷搜索）**：把字面文本
   `deja search --session <不带 session- 前缀的会话 UUID> ` 填入消息输入框，
@@ -66,6 +66,12 @@ dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
   Windows/Linux 桌面端使用 **Ctrl+F**，macOS 桌面端使用 **Cmd+F**；
   浏览器中 Windows 使用 **Ctrl+Alt+F**，macOS 使用 **Option+Command+F**，
   因为 DSH 为浏览器原生查找保留了普通的 Find 快捷键。
+- **Ctrl+K opens Deja full-text search（Ctrl+K 唤起 Deja 全文搜索）**：接管
+  Ctrl+K 打开的侧栏搜索——打开后直接进入 Deja 全文模式，而不是原来的标题
+  搜索；点放大镜可对当次打开恢复原生搜索。由于 DSH 快捷键注册表不允许第二个
+  Ctrl+K 默认绑定，此开关同时绑定 **Ctrl+Alt+K**（浏览器中为
+  Ctrl+Option+Shift+K）作为直达 Deja 搜索的快捷键。关闭此开关即完全恢复
+  官方行为。
 - **Deja search in the sidebar（侧栏 Deja 搜索）**：先打开侧栏搜索，
   再点一次放大镜，切换到 Deja 全文搜索。输入关键词后，只检索本地索引中的
   **DSH 会话**，最多显示 20 条结果及匹配片段；点击结果可打开对应会话。

@@ -298,12 +298,16 @@ window.__ModuleLoader__.load({
     // Preferences belong to this browser/profile, like DSH's keybindings.
     const SEARCH_PREFS = "dsh.deja.search.v1";
     function preferences(storage) {
-      let value = { conversation: true, sidebar: true };
+      let value = { conversation: true, sidebar: true, opensDeja: true };
       try {
         const saved = JSON.parse(storage.getItem(SEARCH_PREFS));
         for (const key of Object.keys(value)) if (typeof saved?.[key] === "boolean") value[key] = saved[key];
       } catch {}
       const listeners = new Set();
+      // Ctrl+K opens DSH's sidebar search. With the switch on, the Deja
+      // adapter switches that search straight to full-text results, so the
+      // official title search becomes the second magnifier click.
+      let pendingOpen = false;
       return {
         getSnapshot: () => value,
         subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
@@ -312,6 +316,19 @@ window.__ModuleLoader__.load({
           value = { ...value, [key]: Boolean(enabled) };
           try { storage.setItem(SEARCH_PREFS, JSON.stringify(value)); } catch {}
           for (const fn of listeners) fn();
+        },
+        // When Deja owns the open gesture, the first opened search becomes
+        // Deja's. The magnifier click and re-open interactions reset the
+        // flag, so the native view stays reachable.
+        claimOpen() {
+          if (!value.opensDeja || !value.sidebar) return false;
+          pendingOpen = true;
+          return true;
+        },
+        releaseOpen() {
+          const wasPending = pendingOpen;
+          pendingOpen = false;
+          return wasPending;
         },
       };
     }
@@ -370,6 +387,7 @@ window.__ModuleLoader__.load({
         ...[
           ["conversation", "Ctrl+F in conversations", "Fill the message input with a search command for the current session. In a browser, use Ctrl+Alt+F (Option+Command+F on macOS). Existing draft text becomes the query; nothing is sent automatically."],
           ["sidebar", "Deja search in the sidebar", "Open sidebar search, then click its magnifying glass again to search DSH conversation text with Deja. Click again to return to the regular results."],
+          ["opensDeja", "Ctrl+K opens Deja full-text search", "Take over the Ctrl+K sidebar search: the opened search starts in Deja full-text mode instead of the title search. The magnifying glass returns the native search. Also binds Ctrl+Alt+K (Ctrl+Option+Shift+K in a browser) as a direct Deja search shortcut."],
         ].map(([key, title, hint]) => h("label", { key, className: "deja-setting" },
           h("input", { type: "checkbox", role: "switch", checked: value[key], onChange: (event) => prefs.set(key, event.target.checked) }),
           h("span", null, h("strong", null, title), h("span", { className: "deja-setting-hint" }, hint)),
@@ -381,7 +399,7 @@ window.__ModuleLoader__.load({
     // extension. Keep this adapter inside that anchor, use semantic controls,
     // and stand down if its shape is unavailable. Never replace slot owners or
     // reach into React internals. Removing the adapter restores native content.
-    function attachSidebar(anchor, changed) {
+    function attachSidebar(anchor, prefs, changed) {
       const input = anchor.querySelector('input[type="text"]');
       const button = input?.parentElement?.querySelector('button[aria-expanded]');
       const list = anchor.querySelector('[class*="_listArea"]');
@@ -402,22 +420,52 @@ window.__ModuleLoader__.load({
         button.setAttribute("title", active ? "Deja search — click for regular search" : "Search conversation text with Deja");
         publish();
       };
+      // The native search is reachable whenever its list is the one showing.
+      publish();
       const click = (event) => {
         if (button.getAttribute("aria-expanded") !== "true") return;
         event.preventDefault();
         event.stopPropagation();
+        // The magnifier is the escape hatch back to DSH's title search.
+        prefs.releaseOpen();
         setActive(!active);
         input.focus();
       };
-      const update = () => { if (active) publish(); };
+      const update = (event) => {
+        if (event && event.preventDefault) { event.preventDefault(); event.stopPropagation(); }
+        if (active) publish();
+      };
       const sync = () => { if (active && button.getAttribute("aria-expanded") !== "true") setActive(false); };
+      // A search opened from the keyboard (Ctrl+K) becomes Deja's when the
+      // switch is on: the opening expansion lands in full-text mode. The
+      // sidebar's own re-render races the shortcut, so poll briefly and give
+      // up cleanly — an unclaimed opening keeps the native search.
+      const claimOpen = () => {
+        if (!prefs.claimOpen()) return false;
+        let attempts = 0;
+        const settle = () => {
+          if (stopped) { prefs.releaseOpen(); return false; }
+          if (button.getAttribute("aria-expanded") === "true") {
+            prefs.releaseOpen();
+            setActive(true);
+            input.focus();
+            return true;
+          }
+          if (++attempts >= 40) { prefs.releaseOpen(); return false; }
+          setTimeout(settle, 10);
+          return null;
+        };
+        return settle();
+      };
+      const observer = new MutationObserver(sync);
+      let stopped = false;
       button.addEventListener("click", click, true);
       input.addEventListener("input", update);
-      const observer = new MutationObserver(sync);
       observer.observe(button, { attributes: true, attributeFilter: ["aria-expanded"] });
       return {
-        input, button, list, target,
+        input, button, list, target, claimOpen,
         dispose() {
+          stopped = true;
           observer.disconnect();
           button.removeEventListener("click", click, true);
           input.removeEventListener("input", update);
@@ -430,7 +478,7 @@ window.__ModuleLoader__.load({
       };
     }
 
-    function observeSidebar(changed, root = document) {
+    function observeSidebar(prefs, changed, root = document) {
       let attachment = null;
       let stopped = false;
       const scan = () => {
@@ -441,7 +489,7 @@ window.__ModuleLoader__.load({
           attachment = null;
           changed(null);
         }
-        if (!attachment && anchor) attachment = attachSidebar(anchor, changed);
+        if (!attachment && anchor) attachment = attachSidebar(anchor, prefs, changed);
       };
       const observer = new MutationObserver(scan);
       observer.observe(root.body || root, { childList: true, subtree: true });
@@ -507,7 +555,7 @@ window.__ModuleLoader__.load({
     function Sidebar({ prefs, open, portal }) {
       const settings = usePreferences(prefs);
       const [view, setView] = React.useState(null);
-      React.useEffect(() => settings.sidebar ? observeSidebar(setView) : undefined, [settings.sidebar]);
+      React.useEffect(() => settings.sidebar ? observeSidebar(prefs, setView) : undefined, [settings.sidebar]);
       return settings.sidebar && view?.active ? portal(h(Results, { query: view.query, open }), view.target) : null;
     }
 
@@ -533,6 +581,12 @@ window.__ModuleLoader__.load({
         }, () => h(Settings, { prefs })));
       } catch {}
       if (typeof ctx.inject !== "function") return;
+      // Ctrl+K officially opens DSH's sidebar search. The shortcut registry
+      // rejects a second default binding for the same key, so instead the
+      // adapter takes over the search that gesture opens: the first expansion
+      // lands in Deja full-text mode when the switch is on. The magnifier
+      // click remains the way back to the title search.
+      let claimOpen = null;
       ctx.inject(["shortcuts", "uiSession", "sessions", "conversation"], (c) => {
         try { c.effect(() => installFind(c, prefs), "dsh-deja: find in conversation"); } catch {}
       });
@@ -540,9 +594,40 @@ window.__ModuleLoader__.load({
         let portal;
         try { portal = require("react-dom").createPortal; } catch { return; }
         if (typeof portal !== "function") return;
+        // The sidebar's adapter claims an opened search; the shortcut runs the
+        // same probe so Ctrl+K and the direct binding share one entry point.
+        claimOpen = (probe) => { try { return probe(); } catch { return false; } };
         c.slots.inject("shell.overlay", () => c.slots.register({
           name: "shell.overlay", id: "deja-search", order: 950,
         }, () => h(Sidebar, { prefs, portal, open: (id) => c.uiWorkspace.openSession(id) })));
+      });
+      // The direct binding mirrors the takeover gesture: it only fires when
+      // both switches are on, and always claims the next sidebar opening.
+      const takeoverEnabled = () => prefs.getSnapshot().sidebar && prefs.getSnapshot().opensDeja;
+      ctx.inject(["shortcuts"], (c) => {
+        try {
+          c.effect(() => c.shortcuts.register({
+            id: "deja.search-sessions",
+            label: () => "Deja: search DSH conversations",
+            aliases: ["deja search", "search conversations"],
+            // The native session.search owns primary+K; registering the same
+            // default would throw. Deja keeps its own discoverable binding.
+            defaults: Object.fromEntries([
+              ...["windows", "macos", "linux"].map((os) => ["desktop:" + os, { code: "KeyK", modifiers: ["primary", "alt"] }]),
+              ...["windows", "macos"].map((os) => ["web:" + os, { code: "KeyK", modifiers: ["primary", "alt", "shift"] }]),
+            ]),
+            regions: ["page"],
+            modals: [],
+            resolve(context) {
+              if (context.modal != null || !takeoverEnabled()) return { status: "pass" };
+              return { status: "handled", run() {
+                // The probe defers to the live sidebar; the shared prefs flag
+                // above keeps an opening claimed even before it mounts.
+                if (!claimOpen?.(() => false)) prefs.claimOpen();
+              } };
+            },
+          }), "dsh-deja: open sidebar search");
+        } catch {}
       });
     }
 
