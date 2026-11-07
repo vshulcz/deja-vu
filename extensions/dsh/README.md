@@ -115,14 +115,21 @@ or devices. Manual search remains available with `autoRecall: false`.
 
 ### Customizing the shortcuts
 
-Both shortcuts are ordinary DSH commands, so they are editable in the built-in
-shortcut editor: open **Settings → General → Shortcuts** (or press **Ctrl+/**
-on the desktop), find the two **Deja** rows under *Application actions*, and
-click a row to record a new combination or clear it. Edits persist per
-platform in DSH's own keybindings file and survive plugin updates; the
-switches above control whether the commands do anything, not their keys. The
-official `session.search` (Ctrl+K) binding is untouched — rebind it there if
-you want a different key to open the title search.
+Open **Settings → Deja → 自定义快捷键** to change the actual key combinations.
+Three rows show the current binding for conversation search, Deja cross-session
+search, and DSH's sidebar opener (`session.search`). Click **修改快捷键**, press
+and release the desired combination, and it saves immediately. **恢复默认**
+restores that command's default; **移除** unbinds it. Escape or moving focus
+away cancels recording. Conflicts and save failures are displayed without
+replacing the accepted binding. If a combination is occupied, first change or
+remove the other command's binding.
+
+The controls use DSH's native keybinding service, with the same platform-specific
+persistence, conflict validation and live catalog as **Settings → General →
+Shortcuts**. Edits survive plugin updates. Browser/system reserved combinations
+remain subject to DSH's validation. Older DSH versions without the editing
+service show an upgrade notice. The switches above enable the features; the
+keybinding rows determine which keys invoke them.
 
 Sidebar full-text search requires the **dsh-deja package host plugin**. The CLI's
 `deja install dsh-auto` copies the browser panel but currently does not install

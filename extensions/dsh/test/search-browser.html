@@ -89,6 +89,16 @@
     input.dispatchEvent(new Event("input", { bubbles: true }));
     await wait(() => document.querySelector(".deja-results")?.textContent.includes("Enter a keyword"));
     check(true, "clearing query returns to the idle prompt");
+    button.click(); // Native mode while the search is already open.
+    prefs.requestOpen();
+    await wait(() => nativeList.hidden);
+    check(button.getAttribute("aria-pressed") === "true", "direct command enters Deja from an already-open native search");
+    button.setAttribute("aria-expanded", "false");
+    await wait(() => !nativeList.hidden);
+    prefs.requestOpen();
+    await wait(() => nativeList.hidden);
+    check(button.getAttribute("aria-expanded") === "true", "direct command expands a closed search and focuses it");
+    check(document.activeElement === input, "direct command focuses the search input");
     sidebarRoot.unmount();
     check(!nativeList.hidden && !document.querySelector("[data-deja-results]"), "unmount restores the native sidebar");
     report.textContent = checks.join("\n") + "\nAll browser checks passed.";

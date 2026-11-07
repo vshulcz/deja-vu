@@ -256,13 +256,9 @@ test("all Deja commands are editable in the built-in shortcuts editor", () => {
   };
   mod.installFind(ctx, mod.preferences());
   mod.installSearch(ctx);
-  // DSH's shortcut reference renders only the four known groups; anything
-  // else vanishes from the editor and becomes impossible to customize.
-  const rendered = ["application", "input", "menus", "approval"];
-  const shortcuts = mod.preferences();
+  // Normal register() commands are editable; registerFixed() is read-only.
   const registered = [...commands.values()];
   for (const command of registered) {
-    assert.ok(rendered.includes(command.group), `${command.id} must declare a group the shortcuts editor renders`);
     assert.equal(typeof command.label, "function", `${command.id} needs a label for the editor row`);
     assert.ok(Array.isArray(command.aliases) && command.aliases.length > 0, `${command.id} needs aliases so search finds it`);
     assert.ok(command.defaults["desktop:windows"], `${command.id} needs a default users can reset to`);

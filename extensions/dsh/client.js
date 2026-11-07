@@ -127,6 +127,10 @@ window.__ModuleLoader__.load({
 .deja-setting { display: flex; align-items: flex-start; gap: 12px; padding: 16px 0; cursor: pointer; }
 .deja-setting input { margin-top: 4px; accent-color: var(--dsw-alias-state-business-primary, Highlight); }
 .deja-setting-hint { display: block; font-size: 13px; margin-top: 4px; }
+.deja-keybinding { flex-wrap: wrap; cursor: default; border-top: 1px solid var(--dsw-alias-border-l2, GrayText); }
+.deja-keybinding > div { flex: 1 1 200px; }
+.deja-keybinding > [role="status"] { flex-basis: 100%; }
+.deja-keybinding button { font: inherit; padding: 6px 10px; cursor: pointer; }
 .deja-sidebar-results { flex: 1; min-height: 0; overflow: auto; color: var(--dsw-alias-label-primary, CanvasText); }
 .deja-sidebar-results[hidden], [data-slot="sidebar.workspaces"] [class*="_listArea"][hidden] { display: none !important; }
 .deja-results { padding: 8px; font-size: 13px; }
@@ -308,7 +312,18 @@ window.__ModuleLoader__.load({
       // adapter switches that search straight to full-text results, so the
       // official title search becomes the second magnifier click.
       let pendingOpen = false;
+      const openListeners = new Set();
       return {
+        requestOpen() {
+          if (!value.sidebar || !value.opensDeja) return;
+          pendingOpen = true;
+          for (const fn of openListeners) fn();
+        },
+        onOpen(fn) {
+          openListeners.add(fn);
+          if (pendingOpen) fn();
+          return () => openListeners.delete(fn);
+        },
         getSnapshot: () => value,
         subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
         set(key, enabled) {
@@ -352,9 +367,6 @@ window.__ModuleLoader__.load({
         id: "deja.search-session",
         label: () => "Deja: search this conversation",
         aliases: ["deja", "find in conversation"],
-        // group places the command in the built-in shortcut editor's
-        // "application" section, where users can rebind or clear it.
-        group: "application",
         defaults: Object.fromEntries([
           ...["windows", "macos", "linux"].map((os) => ["desktop:" + os, { code: "KeyF", modifiers: ["primary"] }]),
           ...["windows", "macos"].map((os) => ["web:" + os, { code: "KeyF", modifiers: ["primary", "alt"] }]),
@@ -382,19 +394,173 @@ window.__ModuleLoader__.load({
       });
     }
 
-    function Settings({ prefs }) {
+    // All edits go through DSH so native menu bindings, conflict checks and
+    // per-platform persistence stay in sync with the built-in shortcut editor.
+    function bindingEditor(shortcuts, id, changed) {
+      let alive = true, recording = false, busy = false, starting = false, candidate = null, revision;
+      let generation = 0;
+      let protection = Promise.resolve();
+      const emit = (message = "") => { if (alive) changed({ recording, busy, starting, message }); };
+      const stop = () => {
+        generation++;
+        recording = false;
+        candidate = null;
+        // Serialize stop after start, including disposal during bridge startup.
+        protection = protection.catch(() => {}).then(() => shortcuts.recording(false));
+        protection.catch(() => {});
+      };
+      const save = async (operation) => {
+        if (!alive || busy) return;
+        busy = true;
+        stop();
+        emit();
+        try {
+          await protection;
+          if (!alive) return;
+          const result = await shortcuts.edit(operation, revision);
+          emit(result.status === "saved" ? "已保存" : "保存失败：" + result.status + "。请重新录制后重试。");
+        } catch (error) { emit("保存失败：" + error.message); }
+        finally { busy = false; if (alive) changed({ recording, busy, message: null }); }
+      };
+      return {
+        async start() {
+          if (!alive || busy || recording) return;
+          if (shortcuts.config.getSnapshot().status !== "ready") { emit("快捷键配置尚未就绪。"); return; }
+          revision = shortcuts.config.getSnapshot().revision;
+          busy = true; starting = true;
+          const attempt = ++generation;
+          emit();
+          protection = protection.catch(() => {}).then(() => shortcuts.recording(true));
+          try { await protection; if (alive && attempt === generation) { recording = true; emit("请按组合键，松开后保存；Esc 取消。"); } }
+          catch { stop(); emit("无法启用录键保护，请重试。"); }
+          finally { busy = false; starting = false; if (alive) changed({ recording, busy, starting, message: null }); }
+        },
+        keydown(event) {
+          if (!recording) return;
+          event.preventDefault(); event.stopPropagation();
+          if (event.code === "Escape") { stop(); emit("已取消"); return; }
+          if (event.isComposing || event.key === "Dead" || event.getModifierState?.("AltGraph")) {
+            stop(); emit("输入法或 AltGraph 状态下无法录制，请重试。"); return;
+          }
+          if (event.repeat || /^(Control|Alt|Shift|Meta)(Left|Right)$/.test(event.code)) return;
+          if (event.code === "Tab" && !event.ctrlKey && !event.altKey && !event.metaKey) { stop(); emit("已取消"); return; }
+          if (candidate) { candidate = null; stop(); emit("请一次录制一组组合键。"); return; }
+          try {
+            const binding = { code: event.code, modifiers: [
+              event.ctrlKey && "control", event.altKey && "alt", event.shiftKey && "shift", event.metaKey && "meta",
+            ].filter(Boolean) };
+            const description = shortcuts.describeBinding(binding);
+            const conflicts = description.conflicts.filter((other) => other !== id);
+            if (description.issue || conflicts.length) {
+              const catalog = shortcuts.catalog.getSnapshot();
+              const labels = conflicts.map((other) => catalog.find((row) => row.id === other)?.label || other);
+              stop(); emit(conflicts.length ? "快捷键冲突：" + labels.join("、") : "此组合不可用：" + description.issue);
+              return;
+            }
+            candidate = description.binding;
+            emit(description.keys.join(" ") + " — 松开后保存");
+          } catch { stop(); emit("不支持此组合键。"); }
+        },
+        keyup(event) {
+          if (!recording) return;
+          event.preventDefault(); event.stopPropagation();
+          const modifier = /^(Control|Alt|Shift|Meta)(Left|Right)$/.exec(event.code)?.[1]?.toLowerCase();
+          if (candidate && (event.code === candidate.code || candidate.modifiers.includes(modifier))) {
+            return save({ type: "set", id, binding: candidate });
+          }
+        },
+        cancel() { if (recording || starting) { stop(); emit("已取消"); } },
+        reset() {
+          revision = shortcuts.config.getSnapshot().revision;
+          return save({ type: "reset", id });
+        },
+        clear() {
+          revision = shortcuts.config.getSnapshot().revision;
+          return save({ type: "set", id, binding: null });
+        },
+        activate() { alive = true; },
+        dispose() { alive = false; if (recording || busy) stop(); },
+      };
+    }
+
+    function useShortcutStore(store) {
+      const [value, setValue] = React.useState(() => store.getSnapshot());
+      React.useEffect(() => {
+        const update = () => setValue(store.getSnapshot());
+        const dispose = store.subscribe(update);
+        update();
+        return dispose;
+      }, [store]);
+      return value;
+    }
+
+    function ShortcutBinding({ shortcuts, id, title }) {
+      const catalog = useShortcutStore(shortcuts.catalog);
+      const config = useShortcutStore(shortcuts.config);
+      const [state, setState] = React.useState({ recording: false, busy: false, message: "" });
+      const editor = React.useMemo(() => bindingEditor(shortcuts, id, (next) => setState((old) => ({
+        ...next, message: next.message === null ? old.message : next.message,
+      }))), [shortcuts, id]);
+      React.useEffect(() => {
+        editor.activate();
+        const cancel = () => editor.cancel();
+        window.addEventListener("blur", cancel);
+        document.addEventListener("compositionstart", cancel, true);
+        return () => {
+          window.removeEventListener("blur", cancel);
+          document.removeEventListener("compositionstart", cancel, true);
+          editor.dispose();
+        };
+      }, [editor]);
+      const recorder = React.useRef(null);
+      React.useEffect(() => {
+        if (!state.recording) return;
+        recorder.current?.focus();
+        const down = (event) => { if (document.activeElement === recorder.current) editor.keydown(event); };
+        const up = (event) => { if (document.activeElement === recorder.current) editor.keyup(event); };
+        document.addEventListener("keydown", down, true);
+        document.addEventListener("keyup", up, true);
+        return () => {
+          document.removeEventListener("keydown", down, true);
+          document.removeEventListener("keyup", up, true);
+        };
+      }, [editor, state.recording]);
+      const row = catalog.find((item) => item.id === id);
+      const disabled = !row || config.status !== "ready" || state.busy;
+      return h("div", { className: "deja-setting deja-keybinding" },
+        h("div", null, h("strong", null, title),
+          h("div", { className: "deja-setting-hint" }, row?.keys?.join(" ") || "未绑定")),
+        h("button", { type: "button", ref: recorder, disabled: !row || config.status !== "ready" || (state.busy && !state.starting), "aria-label": "修改" + title + "快捷键",
+          onClick: () => editor.start(), onBlur: () => editor.cancel(),
+        }, state.recording ? "请按组合键…" : "修改快捷键"),
+        h("button", { type: "button", disabled: disabled || state.recording, onClick: () => editor.reset() }, "恢复默认"),
+        h("button", { type: "button", disabled: disabled || state.recording, onClick: () => editor.clear() }, "移除"),
+        h("span", { role: "status", className: "deja-setting-hint" }, state.message),
+      );
+    }
+
+    function Settings({ prefs, shortcuts }) {
       const value = usePreferences(prefs);
       return h("section", { className: "deja-settings", "aria-label": "Deja" },
         h("h2", null, "Deja"),
         h("p", null, "Search your conversation history with the local Deja index."),
         ...[
-          ["conversation", "Ctrl+F in conversations", "Fill the message input with a search command for the current session. In a browser, use Ctrl+Alt+F (Option+Command+F on macOS). Existing draft text becomes the query; nothing is sent automatically."],
+          ["conversation", "Search this conversation", "Fill the message input with a search command for the current session. Existing draft text becomes the query; nothing is sent automatically. Customize the key below."],
           ["sidebar", "Deja search in the sidebar", "Open sidebar search, then click its magnifying glass again to search DSH conversation text with Deja. Click again to return to the regular results."],
-          ["opensDeja", "Ctrl+K opens Deja full-text search", "Take over the Ctrl+K sidebar search: the opened search starts in Deja full-text mode instead of the title search. The magnifying glass returns the native search. Also binds Ctrl+Alt+K (Ctrl+Option+Shift+K in a browser) as a direct Deja search shortcut."],
+          ["opensDeja", "Deja cross-session shortcut", "Enable the shortcut that opens Deja full-text search for DSH conversations. Customize its key below. The magnifying glass returns the native search."],
         ].map(([key, title, hint]) => h("label", { key, className: "deja-setting" },
           h("input", { type: "checkbox", role: "switch", checked: value[key], onChange: (event) => prefs.set(key, event.target.checked) }),
           h("span", null, h("strong", null, title), h("span", { className: "deja-setting-hint" }, hint)),
         )),
+        h("h3", null, "自定义快捷键"),
+        h("p", { className: "deja-setting-hint" }, "点击修改后按下所需组合键，松开即可保存。设置与 DSH 内置快捷键编辑器同步。"),
+        shortcuts?.edit && shortcuts?.recording && shortcuts?.catalog && shortcuts?.config
+          ? h(React.Fragment, null,
+            h(ShortcutBinding, { shortcuts, id: "deja.search-session", title: "搜索当前会话" }),
+            h(ShortcutBinding, { shortcuts, id: "deja.search-sessions", title: "Deja 跨会话搜索（仅 DSH）" }),
+            h(ShortcutBinding, { shortcuts, id: "session.search", title: "打开侧栏搜索（DSH）" }),
+          )
+          : h("p", null, "此版本未提供快捷键编辑服务，请升级 DSH。"),
       );
     }
 
@@ -434,10 +600,7 @@ window.__ModuleLoader__.load({
         setActive(!active);
         input.focus();
       };
-      const update = (event) => {
-        if (event && event.preventDefault) { event.preventDefault(); event.stopPropagation(); }
-        if (active) publish();
-      };
+      const update = () => { if (active) publish(); };
       const sync = () => { if (active && button.getAttribute("aria-expanded") !== "true") setActive(false); };
       // A search opened from the keyboard (Ctrl+K) becomes Deja's when the
       // switch is on: the opening expansion lands in full-text mode. The
@@ -455,13 +618,18 @@ window.__ModuleLoader__.load({
             return true;
           }
           if (++attempts >= 40) { prefs.releaseOpen(); return false; }
-          setTimeout(settle, 10);
+          settleTimer = setTimeout(settle, 10);
           return null;
         };
         return settle();
       };
       const observer = new MutationObserver(sync);
       let stopped = false;
+      let settleTimer;
+      const removeOpen = prefs.onOpen(() => {
+        if (button.getAttribute("aria-expanded") !== "true") button.click();
+        claimOpen();
+      });
       button.addEventListener("click", click, true);
       input.addEventListener("input", update);
       observer.observe(button, { attributes: true, attributeFilter: ["aria-expanded"] });
@@ -469,6 +637,8 @@ window.__ModuleLoader__.load({
         input, button, list, target, claimOpen,
         dispose() {
           stopped = true;
+          clearTimeout(settleTimer);
+          removeOpen();
           observer.disconnect();
           button.removeEventListener("click", click, true);
           input.removeEventListener("input", update);
@@ -578,10 +748,12 @@ window.__ModuleLoader__.load({
       let storage;
       try { storage = window.localStorage; } catch {}
       const prefs = preferences(storage);
+      let shortcutService;
+      if (typeof ctx.inject === "function") ctx.inject(["shortcuts"], (c) => { shortcutService = c.shortcuts; });
       try {
         ctx.slots.inject("settings.section", () => ctx.slots.register({
           name: "settings.section", id: "deja", order: 650, label: () => "Deja",
-        }, () => h(Settings, { prefs })));
+        }, () => h(Settings, { prefs, shortcuts: shortcutService })));
       } catch {}
       if (typeof ctx.inject !== "function") return;
       // Ctrl+K officially opens DSH's sidebar search. The shortcut registry
@@ -589,7 +761,6 @@ window.__ModuleLoader__.load({
       // adapter takes over the search that gesture opens: the first expansion
       // lands in Deja full-text mode when the switch is on. The magnifier
       // click remains the way back to the title search.
-      let claimOpen = null;
       ctx.inject(["shortcuts", "uiSession", "sessions", "conversation"], (c) => {
         try { c.effect(() => installFind(c, prefs), "dsh-deja: find in conversation"); } catch {}
       });
@@ -597,9 +768,6 @@ window.__ModuleLoader__.load({
         let portal;
         try { portal = require("react-dom").createPortal; } catch { return; }
         if (typeof portal !== "function") return;
-        // The sidebar's adapter claims an opened search; the shortcut runs the
-        // same probe so Ctrl+K and the direct binding share one entry point.
-        claimOpen = (probe) => { try { return probe(); } catch { return false; } };
         c.slots.inject("shell.overlay", () => c.slots.register({
           name: "shell.overlay", id: "deja-search", order: 950,
         }, () => h(Sidebar, { prefs, portal, open: (id) => c.uiWorkspace.openSession(id) })));
@@ -613,8 +781,6 @@ window.__ModuleLoader__.load({
             id: "deja.search-sessions",
             label: () => "Deja: search DSH conversations",
             aliases: ["deja search", "search conversations"],
-            // Editable in the built-in shortcut editor's application section.
-            group: "application",
             // The native session.search owns primary+K; registering the same
             // default would throw. Deja keeps its own discoverable binding.
             defaults: Object.fromEntries([
@@ -626,9 +792,7 @@ window.__ModuleLoader__.load({
             resolve(context) {
               if (context.modal != null || !takeoverEnabled()) return { status: "pass" };
               return { status: "handled", run() {
-                // The probe defers to the live sidebar; the shared prefs flag
-                // above keeps an opening claimed even before it mounts.
-                if (!claimOpen?.(() => false)) prefs.claimOpen();
+                prefs.requestOpen();
               } };
             },
           }), "dsh-deja: open sidebar search");
@@ -666,6 +830,8 @@ window.__ModuleLoader__.load({
     module.exports.attachSidebar = attachSidebar;
     module.exports.observeSidebar = observeSidebar;
     module.exports.searchHistory = searchHistory;
+    module.exports.bindingEditor = bindingEditor;
+    module.exports.ShortcutBinding = ShortcutBinding;
     module.exports.Settings = Settings;
     module.exports.Sidebar = Sidebar;
     module.exports.Results = Results;
