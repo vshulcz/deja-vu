@@ -299,10 +299,12 @@ func runRepoSync(dir string, w io.Writer, sub string, args []string) error {
 		}
 		return writeRepoEntries(w, root, fresh)
 	}
+	prunedNoise := pruneFilteredRepoEntries(root)
 	added, updated, pruned, err := sources.EvolveRepoEntries(root, incoming, 50)
 	if err != nil {
 		return fmt.Errorf("repo sync: %w", err)
 	}
+	pruned += prunedNoise
 	if added == 0 && updated == 0 && pruned == 0 {
 		fmt.Fprintf(w, "%s is up to date\n", repoFileShown)
 		return nil
@@ -366,7 +368,26 @@ func autoEvolveRepoMemory(dir, cwd string) {
 			break
 		}
 	}
+	_ = pruneFilteredRepoEntries(root)
 	_, _, _, _ = sources.EvolveRepoEntries(root, incoming, 50)
+}
+
+func pruneFilteredRepoEntries(root string) int {
+	entries, bad, err := sources.ReadRepoMemory(sources.RepoMemoryPath(root))
+	if err != nil || bad > 0 {
+		return 0
+	}
+	var drop []string
+	for _, e := range entries {
+		if e.From != "" && !strings.HasPrefix(e.From, "deja") && !usableRepoCandidateLine(e.Text) {
+			drop = append(drop, e.ID)
+		}
+	}
+	if len(drop) == 0 {
+		return 0
+	}
+	removed, _ := sources.RemoveRepoEntries(root, drop)
+	return len(removed)
 }
 
 func autoSyncEligible(c repoCandidate) bool {

@@ -538,4 +538,30 @@ func TestRepoCandidateTrimAndMentionedFileAttribution(t *testing.T) {
 	if len(turnFiles) != 1 || turnFiles[0] != "internal/redact/redact.go" {
 		t.Fatalf("turn-scoped file attribution = %v, want [internal/redact/redact.go]", turnFiles)
 	}
+
+	for _, noisy := range []string{
+		"PR #5960 (`@KiMelody`) — описана причина падения всех 12 тестовых шардов и способ поддержки config.json.",
+		"Карта проекта и онбординг — было C, стало A В mcp_orient.go: - Команды ранжируются выше.",
+		"You asked whether the Zed context-server duplicate wiring was already fixed; it was, in #1571.",
+	} {
+		if usableRepoCandidateLine(noisy) {
+			t.Errorf("usableRepoCandidateLine(%q) = true, want false", noisy)
+		}
+	}
+
+	root := t.TempDir()
+	_, err := sources.AddRepoEntries(root, []sources.RepoEntry{
+		{ID: "1111111111", Kind: "decision", Text: "PR #5960 (`@KiMelody`) — описана причина падения всех 12 тестовых шардов и способ поддержки config.json.", From: "antigravity 2026-11-07"},
+		{ID: "2222222222", Kind: "gotcha", Text: "Never include the count of supported coding agents inside docs/assets/og.png so social preview images do not become stale.", From: "deja 2026-11-01"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := pruneFilteredRepoEntries(root); n != 1 {
+		t.Fatalf("pruneFilteredRepoEntries = %d, want 1", n)
+	}
+	left, _, err := sources.ReadRepoMemory(sources.RepoMemoryPath(root))
+	if err != nil || len(left) != 1 || left[0].ID != "2222222222" {
+		t.Fatalf("remaining entries = %+v, err = %v", left, err)
+	}
 }

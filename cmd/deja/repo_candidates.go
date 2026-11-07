@@ -895,6 +895,15 @@ func usableRepoCandidateLine(s string) bool {
 		"fixed on feat/",
 		"missing coverage for",
 		"the report is correct",
+		"remains unverified because",
+		"описана причина",
+		"оставлено ревью",
+		"автоматически смержен",
+		"прошёл все ",
+		"прошел все ",
+		"тестовых шардов",
+		" — было ",
+		": - ",
 		" 2. ",
 	} {
 		if strings.Contains(low, noise) {
@@ -902,6 +911,16 @@ func usableRepoCandidateLine(s string) bool {
 		}
 	}
 	for _, prefix := range []string{
+		"pr #",
+		"issue #",
+		"draft pr #",
+		"pull request #",
+		"closed pr #",
+		"closes #",
+		"you asked whether ",
+		"no benchmarks were ",
+		"before the fix, ",
+		"i would first ",
 		"починил (",
 		"починил сразу",
 		"поправку оставил в ",
