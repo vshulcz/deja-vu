@@ -131,10 +131,13 @@ remain subject to DSH's validation. Older DSH versions without the editing
 service show an upgrade notice. The switches above enable the features; the
 keybinding rows determine which keys invoke them.
 
-Sidebar full-text search requires the **dsh-deja package host plugin**. The CLI's
-`deja install dsh-auto` copies the browser panel but currently does not install
-its search endpoint; install the package as above to enable that endpoint.
-The existing CLI tools and command can coexist with the package.
+Sidebar full-text search needs the **dsh-deja package host plugin**, which
+registers its endpoint. The CLI's `deja install dsh-auto` copies the browser
+panel but not that endpoint, so the panel probes it once at startup: without
+it, the sidebar mode, its switch and the cross-session shortcut stand down
+and leave DSH's sidebar exactly as the host drew it. Install the package as
+above to enable the sidebar search. The existing CLI tools and command can
+coexist with the package.
 
 ## How it is wired
 

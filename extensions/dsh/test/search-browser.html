@@ -52,6 +52,9 @@
     };
     const settingsRoot = ReactDOM.createRoot(document.getElementById("settings"));
     const sidebarRoot = ReactDOM.createRoot(document.getElementById("bridge"));
+    // The package host ships the route: declare it, as installSearch's probe
+    // would after a 2xx answer, so the sidebar feature is live for these runs.
+    mod.searchRoute().set("present");
     settingsRoot.render(React.createElement(mod.Settings, { prefs }));
     sidebarRoot.render(React.createElement(mod.Sidebar, { prefs, portal: ReactDOM.createPortal, open: (id) => opened.push(id) }));
     const button = document.querySelector("button[aria-expanded]");
@@ -101,6 +104,19 @@
     check(document.activeElement === input, "direct command focuses the search input");
     sidebarRoot.unmount();
     check(!nativeList.hidden && !document.querySelector("[data-deja-results]"), "unmount restores the native sidebar");
+    // A CLI-only install has no /api/deja-search: the 404 probe must keep the
+    // sidebar exactly as DSH drew it — no results target, no magnifier state.
+    delete window[Symbol.for("dsh-deja.search-route")];
+    window.fetch = async () => ({ status: 404, json: async () => ({}) });
+    mod.searchRoute().probe();
+    await wait(() => mod.searchRoute().getSnapshot() === "absent");
+    const cliRoot = ReactDOM.createRoot(document.getElementById("bridge"));
+    cliRoot.render(React.createElement(mod.Sidebar, { prefs, portal: ReactDOM.createPortal, open: () => {} }));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    button.click();
+    check(!document.querySelector("[data-deja-results]") && button.getAttribute("aria-pressed") === null && !nativeList.hidden,
+      "an absent search route leaves the native sidebar untouched");
+    cliRoot.unmount();
     report.textContent = checks.join("\n") + "\nAll browser checks passed.";
     document.body.dataset.result = "passed";
   } catch (error) {

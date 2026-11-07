@@ -354,6 +354,51 @@ window.__ModuleLoader__.load({
       return value;
     }
 
+    // The sidebar mode and its shortcut query the host route the package's
+    // index.js installs. `deja install dsh-auto` loads this same file as the
+    // deja-notes card without that route; a 404 there means the search would
+    // only ever fail, so the whole feature stands down instead of showing a
+    // dead entry. The empty query is the route's own launch-nothing path, so
+    // the probe never starts a deja search.
+    const routeKey = Symbol.for("dsh-deja.search-route");
+    function searchRoute() {
+      if (window[routeKey]) return window[routeKey];
+      let status = "unknown", started = false, decided = false;
+      const listeners = new Set();
+      const publish = (next) => {
+        if (status === next) return;
+        status = next;
+        for (const fn of [...listeners]) fn();
+      };
+      const store = window[routeKey] = {
+        getSnapshot: () => status,
+        subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+        // A host that knows its own state (a test, or a mount that shipped
+        // with the route) can declare it; declaring stops the probe from
+        // second-guessing it later.
+        set(next) { decided = true; publish(next); return store; },
+        probe(send = typeof fetch === "function" ? fetch : null) {
+          if (started || decided) return store;
+          started = true;
+          if (!send) { publish("absent"); return store; }
+          Promise.resolve()
+            .then(() => send("api/deja-search?q=", {
+              credentials: "same-origin", cache: "no-store", headers: { accept: "application/json" },
+            }))
+            .then((response) => { if (!decided) publish(response && response.status === 404 ? "absent" : "present"); },
+              () => { if (!decided) publish("absent"); });
+          return store;
+        },
+      };
+      return store;
+    }
+
+    function useSearchRoute(route) {
+      const [status, setStatus] = React.useState(route.getSnapshot);
+      React.useEffect(() => route.subscribe(() => setStatus(route.getSnapshot())), [route]);
+      return status;
+    }
+
     function sessionCommand(id, draft = "") {
       const bare = String(id || "").replace(/^session-/, "");
       if (!/^[a-zA-Z0-9_-]+$/.test(bare)) return null;
@@ -539,19 +584,26 @@ window.__ModuleLoader__.load({
       );
     }
 
-    function Settings({ prefs, shortcuts }) {
+    function Settings({ prefs, shortcuts, route }) {
       const value = usePreferences(prefs);
+      // Without the host route (a CLI-only install), the sidebar mode and its
+      // shortcut can only fail, so they are not offered at all; the composer
+      // draft does not need the route and stays configurable.
+      const sidebarUsable = useSearchRoute(route || searchRoute()) !== "absent";
       return h("section", { className: "deja-settings", "aria-label": "Deja" },
         h("h2", null, "Deja"),
         h("p", null, "Search your conversation history with the local Deja index."),
         ...[
           ["conversation", "Search this conversation", "Fill the message input with a search command for the current session. Existing draft text becomes the query; nothing is sent automatically. Customize the key below."],
-          ["sidebar", "Deja search in the sidebar", "Open sidebar search, then click its magnifying glass again to search DSH conversation text with Deja. Click again to return to the regular results."],
-          ["opensDeja", "Deja cross-session shortcut", "Enable the shortcut that opens Deja full-text search for DSH conversations. Customize its key below. The magnifying glass returns the native search."],
+          ...(sidebarUsable ? [
+            ["sidebar", "Deja search in the sidebar", "Open sidebar search, then click its magnifying glass again to search DSH conversation text with Deja. Click again to return to the regular results."],
+            ["opensDeja", "Deja cross-session shortcut", "Enable the shortcut that opens Deja full-text search for DSH conversations. Customize its key below. The magnifying glass returns the native search."],
+          ] : []),
         ].map(([key, title, hint]) => h("label", { key, className: "deja-setting" },
           h("input", { type: "checkbox", role: "switch", checked: value[key], onChange: (event) => prefs.set(key, event.target.checked) }),
           h("span", null, h("strong", null, title), h("span", { className: "deja-setting-hint" }, hint)),
         )),
+        sidebarUsable ? null : h("p", { className: "deja-setting-hint" }, "Sidebar full-text search needs the dsh-deja package host plugin; install it to enable the sidebar switch and the cross-session shortcut."),
         h("h3", null, "自定义快捷键"),
         h("p", { className: "deja-setting-hint" }, "点击修改后按下所需组合键，松开即可保存。设置与 DSH 内置快捷键编辑器同步。"),
         shortcuts?.edit && shortcuts?.recording && shortcuts?.catalog && shortcuts?.config
@@ -725,11 +777,13 @@ window.__ModuleLoader__.load({
       );
     }
 
-    function Sidebar({ prefs, open, portal }) {
+    function Sidebar({ prefs, open, portal, route = searchRoute() }) {
       const settings = usePreferences(prefs);
+      const status = useSearchRoute(route);
       const [view, setView] = React.useState(null);
-      React.useEffect(() => settings.sidebar ? observeSidebar(prefs, setView) : undefined, [settings.sidebar]);
-      return settings.sidebar && view?.active ? portal(h(Results, { query: view.query, open }), view.target) : null;
+      const usable = status === "present";
+      React.useEffect(() => settings.sidebar && usable ? observeSidebar(prefs, setView) : undefined, [settings.sidebar, usable]);
+      return settings.sidebar && usable && view?.active ? portal(h(Results, { query: view.query, open }), view.target) : null;
     }
 
     function installSearch(ctx) {
@@ -748,12 +802,14 @@ window.__ModuleLoader__.load({
       let storage;
       try { storage = window.localStorage; } catch {}
       const prefs = preferences(storage);
+      const route = searchRoute();
+      route.probe();
       let shortcutService;
       if (typeof ctx.inject === "function") ctx.inject(["shortcuts"], (c) => { shortcutService = c.shortcuts; });
       try {
         ctx.slots.inject("settings.section", () => ctx.slots.register({
           name: "settings.section", id: "deja", order: 650, label: () => "Deja",
-        }, () => h(Settings, { prefs, shortcuts: shortcutService })));
+        }, () => h(Settings, { prefs, shortcuts: shortcutService, route })));
       } catch {}
       if (typeof ctx.inject !== "function") return;
       // Ctrl+K officially opens DSH's sidebar search. The shortcut registry
@@ -770,11 +826,14 @@ window.__ModuleLoader__.load({
         if (typeof portal !== "function") return;
         c.slots.inject("shell.overlay", () => c.slots.register({
           name: "shell.overlay", id: "deja-search", order: 950,
-        }, () => h(Sidebar, { prefs, portal, open: (id) => c.uiWorkspace.openSession(id) })));
+        }, () => h(Sidebar, { prefs, portal, route, open: (id) => c.uiWorkspace.openSession(id) })));
       });
       // The direct binding mirrors the takeover gesture: it only fires when
-      // both switches are on, and always claims the next sidebar opening.
-      const takeoverEnabled = () => prefs.getSnapshot().sidebar && prefs.getSnapshot().opensDeja;
+      // both switches are on, and always claims the next sidebar opening. An
+      // unknown route is a pass: the key stays DSH's until the probe says the
+      // search this shortcut opens can actually answer.
+      const takeoverEnabled = () => route.getSnapshot() === "present"
+        && prefs.getSnapshot().sidebar && prefs.getSnapshot().opensDeja;
       ctx.inject(["shortcuts"], (c) => {
         try {
           c.effect(() => c.shortcuts.register({
@@ -830,6 +889,7 @@ window.__ModuleLoader__.load({
     module.exports.attachSidebar = attachSidebar;
     module.exports.observeSidebar = observeSidebar;
     module.exports.searchHistory = searchHistory;
+    module.exports.searchRoute = searchRoute;
     module.exports.bindingEditor = bindingEditor;
     module.exports.ShortcutBinding = ShortcutBinding;
     module.exports.Settings = Settings;

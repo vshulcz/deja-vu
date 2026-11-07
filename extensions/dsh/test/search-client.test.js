@@ -226,6 +226,7 @@ test("the direct Deja search shortcut keeps its own binding distinct from native
       fn(ctx);
     },
   };
+  mod.searchRoute().set("present");
   mod.installSearch(ctx);
   const direct = commands.get("deja.search-sessions");
   assert.ok(direct, "a discoverable direct binding is registered");
@@ -304,6 +305,37 @@ test("the package and CLI browser panel share a single search owner", () => {
   for (const dispose of cleanups) dispose();
   mod.installSearch(ctx);
   assert.equal(settings, 2, "a fresh mount can claim ownership after disposal");
+});
+
+test("a CLI-only install without the search route keeps its keys and hides the sidebar mode", () => {
+  // `deja install dsh-auto` loads this same browser file without the route
+  // the package's index.js registers. A 404 must stand the whole sidebar
+  // feature down: the key stays DSH's and the switches are not offered.
+  const mod = load({ fetch: async () => ({ status: 404 }) }, { "react-dom": { createPortal() {} } });
+  const commands = new Map();
+  const services = { shortcuts: { register: (command) => { commands.set(command.id, command); return () => {}; } }, uiSession: {}, sessions: {}, conversation: {}, uiWorkspace: {} };
+  const ctx = {
+    ...services,
+    effect: (fn) => fn(),
+    slots: { inject: (_slot, fn) => fn(), register: () => () => {} },
+    inject(names, fn) { if (names.every((name) => name in services)) fn(ctx); },
+  };
+  const route = mod.searchRoute();
+  mod.installSearch(ctx);
+  assert.equal(route.getSnapshot(), "unknown", "the probe runs asynchronously, and until then the key stays DSH's");
+  const direct = commands.get("deja.search-sessions");
+  assert.equal(direct.resolve({ modal: null }).status, "pass", "no sidebar search to open yet");
+  const settled = new Promise((resolve) => setTimeout(resolve, 0));
+  return settled.then(() => {
+    assert.equal(route.getSnapshot(), "absent", "a 404 means no search endpoint");
+    assert.equal(direct.resolve({ modal: null }).status, "pass", "the absent route keeps releasing the key");
+    // A server that answers anything else (200, 400, 500) is a live route:
+    // the search itself reports failures, not the capability probe.
+    const other = load({ fetch: async () => ({ status: 500 }) });
+    const live = other.searchRoute();
+    other.installSearch({ inject() {}, slots: { inject: () => {}, register: () => () => {} } });
+    return new Promise((resolve) => setTimeout(resolve, 0)).then(() => assert.equal(live.getSnapshot(), "present"));
+  });
 });
 
 test("search query remains one encoded parameter and host errors stay visible", async () => {
