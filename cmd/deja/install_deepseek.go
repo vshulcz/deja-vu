@@ -69,13 +69,21 @@ function apply(ctx) {
     async handler(invocation) {
       const raw = String((invocation && invocation.rawInput) || "").trim();
       const match = SESSION.exec(raw);
-      const bare = match ? match[1].replace(/^session-/, "") : "";
-      const query = match ? String(match[2] || "").trim() : raw;
-      if (!query) {
-        return { kind: "error", text: "Say what to look for: /deja <error, file, or decision>" };
+      const scoped = match !== null;
+      // A scoped form that does not parse is refused, not searched as words:
+      // the person asked for one conversation, and a silent full search would
+      // look like the scope worked.
+      const malformed = !scoped && /^--session(?:\s|$)/.test(raw);
+      const bare = scoped ? match[1].replace(/^session-/, "") : "";
+      const query = scoped ? String(match[2] || "").trim() : raw;
+      if (malformed) {
+        return { kind: "error", text: "A scoped search looks like /deja --session <id> -- <query>." };
       }
       if (bare && !/^[a-zA-Z0-9_-]+$/.test(bare)) {
         return { kind: "error", text: "That session id is not one dsh writes — /deja --session <id> -- <query> searches one conversation." };
+      }
+      if (!query) {
+        return { kind: "error", text: scoped ? "A scoped search needs a query — /deja --session <id> -- <query>." : "Say what to look for: /deja <error, file, or decision>" };
       }
       // "search" is named rather than handed over as deja's first word: the
       // bare-query path dispatches a word that happens to be a command, so

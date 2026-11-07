@@ -228,16 +228,17 @@ function tools(ctx) {
 }
 
 // `/deja --session <id> -- <query>` scopes the search to one conversation; the
-// composer shortcut writes exactly that. Anything else stays one plain query,
-// so a typed `/deja --session foo` still searches for those words rather than
-// quietly filtering by a session that does not exist.
+// composer shortcut writes exactly that. Anything else stays one plain query.
+// A line that starts with --session but does not parse is refused rather than
+// searched as those words: the person asked for one conversation, and a silent
+// full search would look like the scope worked.
 const SESSION_FLAG = /^--session\s+(\S+)(?:\s+--\s*([\s\S]*))?$/;
 
 function commandQuery(rawInput) {
   const text = String(rawInput || "").trim();
   const match = SESSION_FLAG.exec(text);
-  if (!match) return { session: "", query: text };
-  return { session: bareSessionId(match[1]), query: (match[2] || "").trim() };
+  if (match) return { session: bareSessionId(match[1]), query: (match[2] || "").trim(), scoped: true, malformed: false };
+  return { session: "", query: text, scoped: false, malformed: /^--session(?:\s|$)/.test(text) };
 }
 
 function command(ctx, board) {
@@ -246,12 +247,17 @@ function command(ctx, board) {
     description: "Search this machine's past AI coding sessions",
     input: { hint: "what to look for" },
     async handler(invocation) {
-      const { session, query } = commandQuery(invocation && invocation.rawInput);
-      if (!query) {
-        return { kind: "error", text: "Say what to look for: /deja <error, file, or decision>" };
+      const { session, query, scoped, malformed } = commandQuery(invocation && invocation.rawInput);
+      if (malformed) {
+        return { kind: "error", text: "A scoped search looks like `/deja --session <id> -- <query>`." };
       }
       if (session && !/^[a-zA-Z0-9_-]+$/.test(session)) {
         return { kind: "error", text: "That session id is not one dsh writes — `/deja --session <id> -- <query>` searches one conversation." };
+      }
+      if (!query) {
+        return { kind: "error", text: scoped
+          ? "A scoped search needs a query — `/deja --session <id> -- <query>`."
+          : "Say what to look for: /deja <error, file, or decision>" };
       }
       // Named, not handed over as deja's first word: the bare-query path
       // dispatches a word that happens to be a command, so `/deja version`

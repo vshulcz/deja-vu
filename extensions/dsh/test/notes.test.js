@@ -164,6 +164,17 @@ function assembly(sid) {
   return { agent: { sessionId: sid, session: { header: { cwd: STAND }, get seq() { return log.length; }, eventAt: (i) => log[i] } } };
 }
 
+// Refusals run before deja is spawned, so they are the same on every platform.
+test("/deja refuses a scoped form it cannot read", async () => {
+  const { default: apply } = await import("../index.js?refuse");
+  const host1 = host(["connection"]);
+  apply(host1.ctx, {});
+  const say = async (rawInput) => (await host1.command.handler({ rawInput })).kind;
+  assert.equal(await say("--session 'a b' -- q"), "error", "an unreadable id was searched as words");
+  assert.equal(await say("--session abc123"), "error", "a scope with no query said nothing");
+  assert.equal(await say(""), "error", "an empty command said nothing");
+});
+
 test("the recall reaches the model unchanged and the receipt reaches the page", { skip }, async () => {
   const { default: apply } = await import("../index.js?web");
   const web = host(["connection", "webServer"]);
