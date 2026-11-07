@@ -634,7 +634,7 @@ window.__ModuleLoader__.load({
     // mode cannot work without the package's route, so the settings page names
     // the endpoint and its version, and hands over the command when it is
     // missing instead of leaving a dead switch.
-    const INSTALL_COMMAND = "dsh plugin add dsh-deja";
+    const INSTALL_COMMAND = "dsh plugin --profile web add dsh-deja";
 
     async function copyText(text) {
       try {
@@ -682,7 +682,7 @@ window.__ModuleLoader__.load({
             h("code", { className: "deja-install-command" }, INSTALL_COMMAND),
             h("button", { type: "button", onClick: async () => setCopied(await copyText(INSTALL_COMMAND)) },
               copied ? "已复制" : "复制安装命令"),
-            h("span", { className: "deja-setting-hint" }, "安装后重新加载此页面即可。"),
+            h("span", { className: "deja-setting-hint" }, "把 web 换成你的配置名（例如 desktop）；安装后重新加载此页面即可。"),
           )
           : null,
       );

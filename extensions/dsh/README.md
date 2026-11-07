@@ -143,8 +143,8 @@ panel but not that endpoint, so the panel probes it once at startup:
   package and its version, or that `/api/deja-search` is missing. Missing
   means the sidebar mode, its switch and the cross-session shortcut stand
   down, DSH's sidebar stays exactly as the host drew it, and the page offers
-  the install command (`dsh plugin add dsh-deja`) to copy instead of leaving a
-  dead switch.
+  the install command (`dsh plugin --profile web add dsh-deja`, with the
+  profile swapped for yours) to copy instead of leaving a dead switch.
 - The probe is the route's own `?probe=1` ping: it names the plugin and its
   version, starts no `deja search`, and a declared state (used by tests) wins
   over a late answer.

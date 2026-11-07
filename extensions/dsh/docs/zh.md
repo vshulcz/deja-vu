@@ -99,7 +99,8 @@ dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
 
 - **设置 → Deja → 搜索接口** 始终说明探测结果：已安装的包及版本，或缺少
   `/api/deja-search`。缺少时侧栏模式、对应开关和跨会话快捷键整体不启用，
-  DSH 侧栏保持原样，页面提供可复制的安装命令（`dsh plugin add dsh-deja`），
+  DSH 侧栏保持原样，页面提供可复制的安装命令
+  （`dsh plugin --profile web add dsh-deja`，把 web 换成你的配置名），
   而不是留一个点了没用的开关。
 - 探测走接口自己的 `?probe=1`，返回插件名与版本，不会启动 `deja search`；
   显式声明的状态（测试用）优先于迟到的探测结果。
