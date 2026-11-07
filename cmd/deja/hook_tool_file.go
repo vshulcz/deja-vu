@@ -188,14 +188,30 @@ const decisionLabel = " — prior decision: "
 // `notes.jsonl` says "notes".
 func mentionsFile(path, text string) bool {
 	low := strings.ToLower(text)
-	base := strings.ToLower(filepath.Base(path))
+	fullBase := strings.ToLower(filepath.Base(path))
+	if len(fullBase) >= 5 && strings.ContainsRune(fullBase, '.') && strings.Contains(low, fullBase) {
+		return true
+	}
+	base := fullBase
 	if i := strings.LastIndex(base, "."); i > 0 {
 		base = base[:i]
 	}
 	parts := strings.FieldsFunc(base, func(r rune) bool { return r == '_' || r == '-' || r == '.' })
-	parts = append(parts, strings.ToLower(filepath.Base(filepath.Dir(path))))
+	hasSpecificStem := false
 	for _, w := range parts {
-		if len(w) < 4 {
+		if len(w) >= 4 && !isGenericFileStemPart(w) {
+			hasSpecificStem = true
+			break
+		}
+	}
+	if !hasSpecificStem {
+		dirBase := strings.ToLower(filepath.Base(filepath.Dir(path)))
+		if !isGenericDirPart(dirBase) {
+			parts = append(parts, dirBase)
+		}
+	}
+	for _, w := range parts {
+		if len(w) < 4 || (hasSpecificStem && isGenericFileStemPart(w)) {
 			continue
 		}
 		if strings.Contains(low, w) {
@@ -203,9 +219,28 @@ func mentionsFile(path, text string) bool {
 		}
 		// The plural or the agent noun: notes -> note, render -> renderer is
 		// already covered by the containment above.
-		if strings.HasSuffix(w, "s") && strings.Contains(low, strings.TrimSuffix(w, "s")) {
+		if strings.HasSuffix(w, "s") && len(w) >= 5 && strings.Contains(low, strings.TrimSuffix(w, "s")) {
 			return true
 		}
+	}
+	return false
+}
+
+func isGenericFileStemPart(w string) bool {
+	switch w {
+	case "file", "files", "tool", "tools", "test", "tests", "main", "util", "utils",
+		"helper", "helpers", "common", "types", "model", "models", "index", "data",
+		"base", "core", "init", "spec", "specs":
+		return true
+	}
+	return false
+}
+
+func isGenericDirPart(w string) bool {
+	switch w {
+	case "deja", "cmd", "internal", "pkg", "src", "lib", "app", "docs", "guide",
+		"test", "tests", "scripts", "assets", "web", "api", "cli", "server", "client":
+		return true
 	}
 	return false
 }
@@ -261,7 +296,11 @@ func repoMemoryDecisionForFile(cwd, path string, allSymbols []string, pol policy
 		return entries[i].Date > entries[j].Date
 	})
 	for _, e := range entries {
-		if repoEntryHasFile(root, path, e.Files) || repoEntryMentionsFile(root, path, e.Text) || mentionsAnySymbol(allSymbols, e.Text) {
+		matched := repoEntryHasFile(root, path, e.Files) || repoEntryMentionsFile(root, path, e.Text)
+		if !matched && len(e.Files) == 0 {
+			matched = mentionsAnySymbol(allSymbols, e.Text)
+		}
+		if matched {
 			body := "[" + e.Kind + "] " + e.Text
 			return trimTrailingFragment(search.SafeText(clipDecision(body, toolHookDecisionBudget)))
 		}
@@ -357,6 +396,9 @@ func fileDecisionLineWithSymbols(dir, path string, editSymbols, fileSymbols []st
 		for _, c := range digest.Conclusions(s, toolHookDecisionBudget*4, 6) {
 			line := trimTrailingFragment(search.SafeText(strings.TrimSpace(c)))
 			if line == "" || !digest.CarriesDecision(line) {
+				continue
+			}
+			if len([]rune(line)) >= 45 && !usableRepoCandidateLine(line) {
 				continue
 			}
 			if len(editSymbols) > 0 && mentionsAnySymbol(editSymbols, line) {
@@ -523,7 +565,12 @@ func isCommonKeyword(low string) bool {
 	switch low {
 	case "func", "type", "struct", "interface", "return", "string", "error", "bool",
 		"true", "false", "context", "class", "async", "function", "export", "const",
-		"import", "package", "default", "switch", "case", "break", "continue":
+		"import", "package", "default", "switch", "case", "break", "continue",
+		"main", "test", "file", "path", "name", "text", "line", "data", "list",
+		"item", "info", "user", "time", "read", "write", "open", "close", "count",
+		"index", "model", "agent", "check", "build", "entry", "state", "value",
+		"store", "lines", "files", "names", "paths", "items", "users", "tests",
+		"event", "input", "query", "scope", "token", "usage", "match", "parse", "print":
 		return true
 	}
 	return false
@@ -565,7 +612,7 @@ func containsIdentifierWord(lowText, lowSym string) bool {
 }
 
 func isIdentByte(b byte) bool {
-	return (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9') || b == '_'
+	return (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9') || b == '_' || b == '-' || b == '/'
 }
 
 // promotedDecisionFor returns the newest accepted promoted note belonging to one

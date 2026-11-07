@@ -447,6 +447,33 @@ func emitSessionConclusions(m index.SessionMeta, st *repoEpState, fallbackFiles 
 			files := episodeFilesForText(r, edits, start, end, at, fallbackFiles)
 			add(repoCandidate{Kind: inferRepoKind(r), Text: trimRepoCandidateText(r), Files: files, From: repoFrom(m.Harness, at), Source: "user rule", Session: m.ID, tier: 0, at: at})
 		}
+		for i := 1; i < len(msgs); i++ {
+			if msgs[i].Role != "user" || msgs[i-1].Role != "assistant" {
+				continue
+			}
+			raw := strings.TrimSpace(msgs[i].Text)
+			if raw == "" || strings.HasPrefix(raw, "!") || pseudoUserRe.MatchString(raw) || !isStandingCorrection(raw) {
+				continue
+			}
+			c := cleanRepoCandidateLine(raw)
+			if c == "" || len([]rune(c)) > 260 || revoked[strings.ToLower(c)] || !usableRepoCandidateLine(c) {
+				continue
+			}
+			at := msgs[i].Time
+			if at.IsZero() {
+				at = m.Updated
+			}
+			end := len(edits)
+			if i < len(editEnds) {
+				end = editEnds[i]
+			}
+			start := 0
+			if i-1 < len(editEnds) {
+				start = editEnds[i-1]
+			}
+			files := episodeFilesForText(c, edits, start, end, at, fallbackFiles)
+			add(repoCandidate{Kind: "gotcha", Text: trimRepoCandidateText(c), Files: files, From: repoFrom(m.Harness, at), Source: "user correction", Session: m.ID, tier: 0, at: at})
+		}
 	}
 	if d := cleanRepoCandidateLine(m.Settled); d != "" && (!strings.HasSuffix(d, "…") || len(msgs) == 0) && digest.CarriesDecision(d) && usableRepoCandidateLine(d) {
 		at, start, end := msgTimeAndEditsForText(msgs, editEnds, d, m.Updated, len(edits))
@@ -792,14 +819,59 @@ func matchRepoCommit(files []string, at time.Time, commits []repoGitCommit) stri
 	return bestSHA
 }
 
+func isStandingCorrection(s string) bool {
+	if !isCorrection(s) {
+		return false
+	}
+	if strings.Contains(s, "\n") || len([]rune(s)) > 220 {
+		return false
+	}
+	low := strings.ToLower(strings.TrimSpace(s))
+	for _, chatty := range []string{
+		"давай ", "надо еще копать", "надо ещё копать", "а почему у нас",
+		"я только захожу в диалог", "1. ", "2. ", "пока не надо", "не надо такое пока",
+		"не надо тогда пока", "пока что", "ок, без ", "круто получилось",
+		"ты слишком длинно пишешь", "в 4689 и в остальных", "блять",
+	} {
+		if strings.Contains(low, chatty) {
+			return false
+		}
+	}
+	hasSignal := false
+	for _, signal := range []string{
+		"не надо", "не делай", "не пушь", "не трогай", "не создавай", "не удаляй",
+		"никогда", "всегда ", "пусть будет", "стоп,", "стоп ", "нельзя ",
+		"never ", "do not ", "don't ", "must not ", "always ", "stop ", "instead of ",
+	} {
+		if strings.Contains(low, signal) {
+			hasSignal = true
+			break
+		}
+	}
+	if !hasSignal {
+		return false
+	}
+	for _, anchor := range []string{
+		".deja", ".git", ".go", ".md", ".html", ".json", ".yaml", ".yml", ".sh", ".py", ".ts", ".js",
+		"git ", "пушить", "пуш", "коммит", "commit", "push", "merge", "pr ", "ветк", "branch",
+		"тест", "test", "билд", "build", "файл", "file", "папк", "dir", "repo", "репо",
+		"readme", "changelog", "config", "конфиг", "флаг", "flag", "хук", "hook", "mcp",
+	} {
+		if strings.Contains(low, anchor) {
+			return true
+		}
+	}
+	return false
+}
+
 func cleanRepoCandidateLine(s string) string {
 	s = stripMarkdownLinks(s)
 	s = strings.ReplaceAll(s, "**", "")
-	s = strings.Trim(s, "*->• \t")
+	s = strings.TrimLeft(s, "#*->• \t")
 	for len(s) > 2 && s[0] >= '0' && s[0] <= '9' && (s[1] == '.' || s[1] == ')') {
 		s = strings.TrimSpace(s[2:])
 	}
-	return strings.Trim(s, "*->• \t")
+	return strings.Trim(s, "#*->• \t")
 }
 
 func stripMarkdownLinks(s string) string {
@@ -826,7 +898,7 @@ func usableRepoCandidateLine(s string) bool {
 	if len([]rune(s)) < 45 {
 		return false
 	}
-	if strings.HasSuffix(s, "?") || strings.HasSuffix(s, ":") || strings.Contains(s, " | ") || strings.HasPrefix(s, "|") || strings.Contains(s, "```") || strings.Contains(s, " ### ") || strings.Contains(s, " ## ") {
+	if strings.HasSuffix(s, "?") || strings.HasSuffix(s, ":") || strings.Contains(s, " | ") || strings.HasPrefix(s, "|") || strings.HasPrefix(s, "#") || strings.Contains(s, "```") || strings.Contains(s, " ### ") || strings.Contains(s, " ## ") || strings.Count(s, " - ") >= 2 {
 		return false
 	}
 	low := strings.ToLower(s)
@@ -905,6 +977,22 @@ func usableRepoCandidateLine(s string) bool {
 		" — было ",
 		": - ",
 		" 2. ",
+		"поставил его на",
+		"will be automatically merged",
+		"результаты глубокого инженерного",
+		"в /tmp/",
+		"в `/tmp/",
+		"причина спада в том",
+		"ветка уже запушена",
+		"чего не могу проверить локально",
+		"было c,",
+		"было c−",
+		"стало a",
+		"до → после",
+		"ниже — что",
+		"хочешь, чтобы я",
+		"что уже работает",
+		"где магии сейчас нет",
 	} {
 		if strings.Contains(low, noise) {
 			return false
@@ -932,6 +1020,12 @@ func usableRepoCandidateLine(s string) bool {
 		"откатил.",
 		"merged pr ",
 		"opened pr ",
+		"opened issue ",
+		"открыл issue ",
+		"открыл pr ",
+		"сразу закрываем",
+		"сначала:",
+		"а теперь —",
 		"добавлю ",
 		"добавляю ",
 		"теперь добавлю ",

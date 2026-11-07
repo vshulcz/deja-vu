@@ -47,9 +47,10 @@ This takes a strong model: on one machine's 236 candidates a frontier model foun
 // match only makes a turn a candidate: of 60 hand-labelled ones, 23% were a
 // standing rule, which is why nothing here is ever applied without the user.
 var (
-	correctionRU = `(^|\s)(нет[,.!\s]|нет$|не так|я же (говорил|просил|сказал|писал)|не надо|зачем ты|^стоп|стоп[,.!]|ты (опять|снова)|неправильно|я не просил|не нужно|никогда не|больше не (делай|пиши|надо)|перестань|хватит|сколько раз|не то[,.!\s]|почему ты|не делай)`
-	correctionEN = `(^no[,.!\s]|\bwrong\b|\bdon'?t\b|\bi said\b|\bi told you\b|\binstead\b|not what i|\bwhy did you\b|^stop\b|\bnever\b|you should(n'?t| not)|\bi asked\b)`
-	correctionRe = regexp.MustCompile(`(?i)` + correctionRU + `|` + correctionEN)
+	correctionRU        = `(^нет[,.!\s]|(^|\s)(не так|я же (говорил|просил|сказал|писал)|не надо|зачем ты|^стоп|стоп[,.!]|ты (опять|снова)|неправильно|я не просил|не нужно|никогда не|больше не (делай|пиши|надо)|перестань|хватит|сколько раз|^не то[,.!\s]|это не то\b|почему ты|не делай))`
+	correctionEN        = `(^no[,.!\s]|\bwrong\b|\bdon'?t\b|\bi said\b|\bi told you\b|\binstead\b|not what i|\bwhy did you\b|^stop\b|\bnever\b|you should(n'?t| not)|\bi asked\b)`
+	correctionRe        = regexp.MustCompile(`(?i)` + correctionRU + `|` + correctionEN)
+	numberedListReplyRe = regexp.MustCompile(`(?i)^\s*1[.)]\s*(да|нет|yes|no)\b`)
 	// pseudoUserRe is text a harness files under the user's role without the
 	// user having typed it: system reminders and other tagged blocks, skill
 	// bodies, compaction summaries, interrupt notices, hook output.
@@ -267,10 +268,15 @@ func skippedStandsNote(stands int) string {
 }
 
 func isCorrection(x string) bool {
-	if len([]rune(x)) >= candidateMaxRunes {
+	r := []rune(strings.TrimSpace(x))
+	if len(r) < 12 || len(r) >= candidateMaxRunes {
 		return false
 	}
-	return correctionRe.MatchString(firstRunes(x, candidateScanRunes))
+	head := firstRunes(x, candidateScanRunes)
+	if numberedListReplyRe.MatchString(head) {
+		return false
+	}
+	return correctionRe.MatchString(head)
 }
 
 // candidateSession drops sessions whose corrections are not the user's: a

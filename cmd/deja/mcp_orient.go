@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/fs"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -66,11 +68,53 @@ func mcpOrient(dir, name string, raw json.RawMessage) (string, int, error) {
 	if err != nil {
 		return "", 0, err
 	}
+	filteredCmds := cmds[:0]
+	for _, e := range cmds {
+		if !orientEphemeralCommand(orientCommand(e.Command)) {
+			filteredCmds = append(filteredCmds, e)
+		}
+	}
+	cmds = filteredCmds
+	sort.SliceStable(cmds, func(i, j int) bool {
+		ci, cj := orientCommand(cmds[i].Command), orientCommand(cmds[j].Command)
+		si, sj := orientSuiteVerifyCommand(ci), orientSuiteVerifyCommand(cj)
+		if si != sj {
+			return si
+		}
+		vi, vj := index.VerifyCommand(ci), index.VerifyCommand(cj)
+		if vi != vj {
+			return vi
+		}
+		ii, ij := index.InspectionCommand(ci), index.InspectionCommand(cj)
+		if ii != ij {
+			return !ii
+		}
+		if len(cmds[i].Sessions) != len(cmds[j].Sessions) {
+			return len(cmds[i].Sessions) > len(cmds[j].Sessions)
+		}
+		return cmds[i].Last.After(cmds[j].Last)
+	})
+	seenCmd := map[string]bool{}
+	dedupCmds := cmds[:0]
+	for _, e := range cmds {
+		clean := orientCommand(e.Command)
+		if seenCmd[clean] {
+			continue
+		}
+		seenCmd[clean] = true
+		dedupCmds = append(dedupCmds, e)
+	}
+	cmds = dedupCmds
 	cwd := howCwd()
 	if strings.TrimSpace(a.Project) != "" && !howProjectMatches(a.Project, howScope(cwd, "", false)) {
 		cwd = ""
 	}
 	files := orientFiles(dir, scope, cwd)
+	if cwd != "" {
+		if root := sources.RepoRoot(cwd); root != "" && !fileThere(sources.RepoMemoryPath(root)) {
+			autoEvolveRepoMemory(dir, cwd)
+		}
+	}
 	repoEntries := orientRepoMemory(cwd, policy.ActivationMCP)
 	where := howScopeName(scope)
 	if where == "" {
@@ -127,7 +171,7 @@ func mcpOrient(dir, name string, raw json.RawMessage) (string, int, error) {
 			fmt.Fprintf(&b, "- %s · %s\n", f.Path, pluralSessions(f.Sessions))
 		}
 	}
-	coupled := orientCoChangePairs(dir, scope, files, policy.ActivationMCP)
+	coupled := orientCoChangePairs(dir, scope, cwd, files, policy.ActivationMCP)
 	if len(coupled) > 0 {
 		fmt.Fprintln(&b, "coupled files (usually edited together):")
 		for _, pair := range coupled {
@@ -144,8 +188,18 @@ func mcpOrient(dir, name string, raw json.RawMessage) (string, int, error) {
 			fmt.Fprintf(&b, "- %s\n", fx)
 		}
 	}
+	corrections := orientProjectCorrections(dir, scope, policy.ActivationMCP)
+	if len(corrections) > 0 {
+		fmt.Fprintln(&b, "recent user corrections here (do not repeat):")
+		for i, c := range corrections {
+			if i >= 3 {
+				break
+			}
+			fmt.Fprintf(&b, "- %s\n", c)
+		}
+	}
 	fmt.Fprint(&b, "This is what was done here before, not a rule — check a command still fits before running it.")
-	return frameRecall(b.String()), len(repoEntries) + len(cmds) + len(files) + len(coupled) + len(fixes), nil
+	return frameRecall(b.String()), len(repoEntries) + len(cmds) + len(files) + len(coupled) + len(fixes) + len(corrections), nil
 }
 
 func orientRepoMemory(cwd, act string) []sources.RepoEntry {
@@ -200,13 +254,79 @@ func orientCommand(cmd string) string {
 // this was written on were the user's own memory files, edited from every
 // project — so the caller drops what comes back unchanged.
 func orientPath(p, cwd string) string {
+	p = stripWorktreeSegment(p)
 	if cwd == "" {
 		return p
 	}
 	if rel, err := filepath.Rel(cwd, p); err == nil && !strings.HasPrefix(rel, "..") {
 		return rel
 	}
+	if mainRoot := orientMainRepoRoot(cwd); mainRoot != "" {
+		if rel, err := filepath.Rel(mainRoot, p); err == nil && !strings.HasPrefix(rel, "..") {
+			return rel
+		}
+	}
+	if rel := resolveForeignWorktreeSuffix(p, cwd); rel != "" {
+		return rel
+	}
 	return p
+}
+
+func resolveForeignWorktreeSuffix(p, cwd string) string {
+	if cwd == "" || !filepath.IsAbs(p) {
+		return ""
+	}
+	slash := filepath.ToSlash(p)
+	low := strings.ToLower(slash)
+	if !strings.HasPrefix(low, "/tmp/") && !strings.HasPrefix(low, "/private/tmp/") && !strings.Contains(low, "/worktrees/") {
+		return ""
+	}
+	parts := strings.Split(strings.TrimPrefix(slash, "/"), "/")
+	for i := 1; i < len(parts)-1; i++ {
+		rel := strings.Join(parts[i:], "/")
+		if !strings.Contains(rel, "/") {
+			continue
+		}
+		target := filepath.Join(cwd, filepath.FromSlash(rel))
+		if fi, err := os.Stat(target); err == nil && fi.Mode().IsRegular() {
+			return filepath.FromSlash(rel)
+		}
+	}
+	return ""
+}
+
+func stripWorktreeSegment(p string) string {
+	slash := filepath.ToSlash(p)
+	for _, marker := range []string{"/.claude/worktrees/", "/.git/worktrees/"} {
+		if before, rest, ok := strings.Cut(slash, marker); ok {
+			if _, after, ok := strings.Cut(rest, "/"); ok {
+				return filepath.FromSlash(before + "/" + after)
+			}
+		}
+	}
+	return p
+}
+
+func orientMainRepoRoot(cwd string) string {
+	gitPath := filepath.Join(cwd, ".git")
+	fi, err := os.Stat(gitPath)
+	if err != nil || fi.IsDir() {
+		return ""
+	}
+	raw, err := os.ReadFile(gitPath)
+	if err != nil {
+		return ""
+	}
+	line := strings.TrimSpace(string(raw))
+	after, ok := strings.CutPrefix(line, "gitdir:")
+	if !ok {
+		return ""
+	}
+	gitDir := filepath.ToSlash(strings.TrimSpace(after))
+	if idx := strings.Index(gitDir, "/.git/worktrees/"); idx > 0 {
+		return filepath.FromSlash(gitDir[:idx])
+	}
+	return ""
 }
 
 // orientFile is one path and how many sessions in the scope touched it.
@@ -256,15 +376,28 @@ func orientFiles(dir string, projects []string, cwd string) []orientFile {
 		if !metaVisible(pol, policy.ActivationMCP, m) {
 			continue
 		}
+		seenInSession := map[string]bool{}
 		for _, p := range m.Touched {
 			p = strings.TrimSpace(p)
-			if p == "" || len(p) > orientPathMax {
+			if p == "" || isOrientEphemeralFile(p) {
 				continue
 			}
-			a := byPath[p]
+			named := orientPath(p, cwd)
+			if len(named) > orientPathMax {
+				continue
+			}
+			// A path the cwd could not shorten is outside this project.
+			if cwd != "" && named == p && filepath.IsAbs(p) {
+				continue
+			}
+			if seenInSession[named] {
+				continue
+			}
+			seenInSession[named] = true
+			a := byPath[named]
 			if a == nil {
 				a = &acc{}
-				byPath[p] = a
+				byPath[named] = a
 			}
 			a.sessions++
 			if m.Updated.After(a.last) {
@@ -272,16 +405,16 @@ func orientFiles(dir string, projects []string, cwd string) []orientFile {
 			}
 		}
 	}
+	tree := orientRepoTree(cwd)
+	checkDisk := orientMatchesAny(tree, byPath)
 	out := make([]orientFile, 0, len(byPath))
-	for p, a := range byPath {
+	for named, a := range byPath {
 		// One session opening a file says nothing about the project; the point
 		// of the list is where work keeps landing.
 		if a.sessions < 2 {
 			continue
 		}
-		named := orientPath(p, cwd)
-		// A path the cwd could not shorten is outside this project.
-		if cwd != "" && named == p && filepath.IsAbs(p) {
+		if checkDisk && !tree.exists(named) {
 			continue
 		}
 		out = append(out, orientFile{Path: named, Sessions: a.sessions, Last: a.last})
@@ -309,7 +442,7 @@ func orientFiles(dir string, projects []string, cwd string) []orientFile {
 // Empty when the project has nothing recurring, because a map of one session's
 // keystrokes is noise sitting in every prompt of every session after it.
 func orientDigestBlock(dir, cwd string, projects []string, activation string) string { //nolint:unparam // forwarded to orientRecurringCommands
-	if cwd == "" {
+	if cwd == "" || (!filepath.IsAbs(cwd) && howProjectMatches(cwd, howScope(howCwd(), "", false))) {
 		// The hook is handed the project by the harness and not always the
 		// directory; without one every path stays absolute and the list fills
 		// with files from outside the project.
@@ -320,8 +453,9 @@ func orientDigestBlock(dir, cwd string, projects []string, activation string) st
 	if len(recurring) == 0 && len(files) == 0 {
 		return ""
 	}
-	coupled := orientCoChangePairs(dir, projects, files, activation)
+	coupled := orientCoChangePairs(dir, projects, cwd, files, activation)
 	fixes := orientProjectFixes(dir, projects, cwd, activation)
+	corrections := orientProjectCorrections(dir, projects, activation)
 	var b strings.Builder
 	b.WriteString("What work looks like in this project, from its past sessions:\n")
 	for i, c := range recurring {
@@ -356,6 +490,12 @@ func orientDigestBlock(dir, cwd string, projects []string, activation string) st
 		}
 		fmt.Fprintf(&b, "- known trap here: %s\n", fx)
 	}
+	for i, corr := range corrections {
+		if i >= 2 {
+			break
+		}
+		fmt.Fprintf(&b, "- user correction here: %s\n", corr)
+	}
 	b.WriteString("Check a command still fits before running it.\n")
 	return b.String()
 }
@@ -363,10 +503,12 @@ func orientDigestBlock(dir, cwd string, projects []string, activation string) st
 // orientCommandUse is one recurring command and how many of this project's
 // sessions ran it.
 type orientCommandUse struct {
-	Text     string
-	Sessions int
-	Last     time.Time
-	Verify   bool
+	Text        string
+	Sessions    int
+	Last        time.Time
+	SuiteVerify bool
+	Verify      bool
+	Inspect     bool
 }
 
 // orientRecurringCommands reads the table the build already writes, not the
@@ -396,16 +538,27 @@ func orientRecurringCommands(dir string, projects []string, activation string) [
 			continue
 		}
 		clean := orientCommand(cu.Command)
+		if orientEphemeralCommand(clean) {
+			continue
+		}
 		out = append(out, orientCommandUse{
-			Text:     cu.Command,
-			Sessions: n,
-			Last:     last,
-			Verify:   index.VerifyCommand(clean),
+			Text:        cu.Command,
+			Sessions:    n,
+			Last:        last,
+			SuiteVerify: orientSuiteVerifyCommand(clean),
+			Verify:      index.VerifyCommand(clean),
+			Inspect:     index.InspectionCommand(clean),
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {
+		if out[i].SuiteVerify != out[j].SuiteVerify {
+			return out[i].SuiteVerify
+		}
 		if out[i].Verify != out[j].Verify {
 			return out[i].Verify
+		}
+		if out[i].Inspect != out[j].Inspect {
+			return !out[i].Inspect
 		}
 		if out[i].Sessions != out[j].Sessions {
 			return out[i].Sessions > out[j].Sessions
@@ -415,30 +568,74 @@ func orientRecurringCommands(dir string, projects []string, activation string) [
 		}
 		return out[i].Text < out[j].Text
 	})
-	return out
+	seenClean := map[string]bool{}
+	dedup := out[:0]
+	for _, c := range out {
+		clean := orientCommand(c.Text)
+		if seenClean[clean] {
+			continue
+		}
+		seenClean[clean] = true
+		dedup = append(dedup, c)
+	}
+	return dedup
 }
 
 // orientCoChangePairs finds high-confidence file pairs in this project that
 // sessions almost always edited together (>= 3 focused sessions and >= 2/3
 // co-change ratio), seeding from top hot files in the manifest cache.
-func orientCoChangePairs(dir string, projects []string, files []orientFile, activation string) []string {
+func orientCoChangePairs(dir string, projects []string, cwd string, files []orientFile, activation string) []string {
 	metas, err := index.AllMeta(dir)
 	if err != nil {
 		return nil
 	}
 	pol := policy.Load()
+	if cwd == "" {
+		cwd = howCwd()
+	}
+	if len(projects) > 0 && !howProjectMatches(projects[0], howScope(cwd, "", false)) && orientMainRepoRoot(cwd) == "" {
+		cwd = ""
+	}
+	tree := orientRepoTree(cwd)
 	var inScope []index.SessionMeta
+	hasOnDisk := false
 	for _, m := range metas {
 		if howProjectMatches(m.Project, projects) && metaVisible(pol, activation, m) {
 			inScope = append(inScope, m)
+			if !hasOnDisk && len(tree.base) > 0 {
+				for _, t := range m.Touched {
+					if tree.exists(orientPath(t, cwd)) {
+						hasOnDisk = true
+						break
+					}
+				}
+			}
 		}
 	}
 	if len(inScope) < toolHookMinCoChangeSessions {
 		return nil
 	}
+	if hasOnDisk {
+		filteredScope := make([]index.SessionMeta, 0, len(inScope))
+		for _, m := range inScope {
+			var kept []string
+			for _, t := range m.Touched {
+				named := orientPath(t, cwd)
+				if !isOrientEphemeralFile(t) && tree.exists(named) {
+					kept = append(kept, t)
+				}
+			}
+			m.Touched = kept
+			filteredScope = append(filteredScope, m)
+		}
+		inScope = filteredScope
+	}
 	var candidates []string
 	seenTarget := map[string]bool{}
 	addCandidate := func(p string) {
+		if isOrientEphemeralFile(p) {
+			return
+		}
 		b := strings.ToLower(baseName(p))
 		if b == "" || seenTarget[b] {
 			return
@@ -447,7 +644,7 @@ func orientCoChangePairs(dir string, projects []string, files []orientFile, acti
 		candidates = append(candidates, p)
 	}
 	for i, f := range files {
-		if i >= orientFilesShown {
+		if i >= 32 {
 			break
 		}
 		addCandidate(f.Path)
@@ -455,7 +652,7 @@ func orientCoChangePairs(dir string, projects []string, files []orientFile, acti
 	if len(candidates) == 0 {
 		for _, m := range inScope {
 			for _, t := range m.Touched {
-				if !isScratch(t) {
+				if !isScratch(t) && !isOrientEphemeralFile(t) {
 					addCandidate(t)
 				}
 			}
@@ -523,7 +720,11 @@ func orientProjectFixes(dir string, projects []string, cwd, activation string) [
 	seen := map[string]bool{}
 	var out []string
 	for _, p := range pairs {
-		errText := truncateToolLine(strings.TrimSpace(search.SafeLine(p.Error)), 60)
+		rawErr := strings.TrimSpace(search.SafeLine(p.Error))
+		if orientSkipFixError(rawErr) {
+			continue
+		}
+		errText := truncateToolLine(rawErr, 60)
 		if errText == "" {
 			continue
 		}
@@ -532,20 +733,282 @@ func orientProjectFixes(dir string, projects []string, cwd, activation string) [
 		var remedy string
 		switch {
 		case ok && cmd != "":
-			remedy = "`" + orientCommand(cmd) + "`"
+			cleanCmd := orientCommand(cmd)
+			if orientEphemeralCommand(cleanCmd) || orientDestructiveRemedy(cleanCmd) || !orientTestRemedyMatchesFail(rawErr, cleanCmd) {
+				continue
+			}
+			remedy = "`" + cleanCmd + "`"
 		case edit != "":
-			remedy = "edit " + search.SafePath(orientPath(edit, cwd))
+			if isScratch(edit) || isOrientEphemeralFile(edit) {
+				continue
+			}
+			relEdit := search.SafePath(orientPath(edit, cwd))
+			if cwd != "" && filepath.IsAbs(relEdit) {
+				continue
+			}
+			if orientTautologicalEdit(rawErr, relEdit) {
+				continue
+			}
+			remedy = "edit " + relEdit
 		default:
 			continue
 		}
-		key := errText + "\x00" + remedy
-		if seen[key] {
+		if seen[errText] {
 			continue
 		}
-		seen[key] = true
+		seen[errText] = true
 		out = append(out, "`"+errText+"` → "+remedy)
 	}
 	return out
+}
+
+func orientProjectCorrections(dir string, projects []string, activation string) []string {
+	if len(projects) == 0 {
+		return nil
+	}
+	metas, err := index.AllMeta(dir)
+	if err != nil || len(metas) == 0 {
+		return nil
+	}
+	pol := policy.Load()
+	var cands []index.SessionMeta
+	for _, m := range metas {
+		if !howProjectMatches(m.Project, projects) || !metaVisible(pol, activation, m) {
+			continue
+		}
+		if m.Harness == "deja" || m.IsSpawned() || sources.IsSubagentPath(m.Path) {
+			continue
+		}
+		if throwawayPath(m.Path) || throwawayPath(m.Project) {
+			continue
+		}
+		cands = append(cands, m)
+	}
+	sort.Slice(cands, func(i, j int) bool { return index.NewestFirstMeta(cands[i], cands[j]) })
+	if len(cands) > 8 {
+		cands = cands[:8]
+	}
+	ids := make([]index.Identity, len(cands))
+	for i, m := range cands {
+		ids[i] = index.Identity{Harness: m.Harness, ID: m.ID}
+	}
+	roles := map[string]bool{"user": true, index.RoleStubOthers: true}
+	ss, err := index.FindManyByIdentityInRolesTail(dir, ids, roles, 1500)
+	if err != nil || len(ss) == 0 {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, s := range ss {
+		for i := len(s.Messages) - 1; i >= 1; i-- {
+			if s.Messages[i].Role != "user" {
+				continue
+			}
+			prevAgent := false
+			for j := i - 1; j >= 0; j-- {
+				if s.Messages[j].Role == "user" {
+					break
+				}
+				if s.Messages[j].Role != "user" {
+					prevAgent = true
+					break
+				}
+			}
+			if !prevAgent {
+				continue
+			}
+			raw := strings.TrimSpace(s.Messages[i].Text)
+			if !isOrientActionableCorrection(raw) {
+				continue
+			}
+			line := search.SafeLine(squeezeTrim(raw, 140))
+			key := strings.ToLower(line)
+			if line == "" || seen[key] {
+				continue
+			}
+			seen[key] = true
+			out = append(out, line)
+			if len(out) >= 3 {
+				return out
+			}
+		}
+	}
+	return out
+}
+
+func isOrientActionableCorrection(s string) bool {
+	if s == "" || strings.HasPrefix(s, "!") || pseudoUserRe.MatchString(s) || !isStandingCorrection(s) {
+		return false
+	}
+	return true
+}
+
+func orientSuiteVerifyCommand(cmd string) bool {
+	if !index.VerifyCommand(cmd) {
+		return false
+	}
+	low := " " + strings.ToLower(cmd) + " "
+	return !strings.Contains(low, " -run ") && !strings.Contains(low, " -run=") && !strings.Contains(low, " -k ")
+}
+
+func orientEphemeralCommand(cmd string) bool {
+	low := strings.ToLower(strings.TrimSpace(cmd))
+	if low == "" {
+		return true
+	}
+	for _, marker := range []string{
+		"/private/tmp/", "/tmp/", "/var/folders/",
+		".claude/worktrees/", ".git/worktrees/",
+		"zz_probe", "zz_hunt", "origin/hunt/",
+	} {
+		if strings.Contains(low, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func isOrientEphemeralFile(p string) bool {
+	slash := filepath.ToSlash(strings.TrimSpace(p))
+	low := strings.ToLower(slash)
+	base := strings.ToLower(baseName(slash))
+	if strings.HasPrefix(base, "zz_") || strings.HasSuffix(base, "_tmp_test.go") || strings.HasSuffix(base, "_tmp.go") {
+		return true
+	}
+	for _, marker := range []string{
+		"/private/tmp/", "/tmp/", "/var/folders/",
+		"/.git/", "/.deja/", "/deja-vu-loop/", "/.gemini/", "/.claude/projects/",
+	} {
+		if strings.Contains(low, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+type repoFileTree struct {
+	rel  map[string]bool
+	base map[string]bool
+}
+
+func orientRepoTree(cwd string) repoFileTree {
+	t := repoFileTree{
+		rel:  map[string]bool{},
+		base: map[string]bool{},
+	}
+	if cwd == "" {
+		return t
+	}
+	fi, err := os.Stat(cwd)
+	if err != nil || !fi.IsDir() {
+		return t
+	}
+	count := 0
+	_ = filepath.WalkDir(cwd, func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return nil //nolint:nilerr // unreadable subdirectories are skipped during best-effort walk
+		}
+		if d.IsDir() {
+			name := d.Name()
+			if path != cwd && (strings.HasPrefix(name, ".") || name == "node_modules" || name == "vendor" || name == "dist" || name == "build" || name == "target") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		count++
+		if count > 8000 {
+			return fs.SkipAll
+		}
+		if rel, err := filepath.Rel(cwd, path); err == nil {
+			t.rel[filepath.ToSlash(rel)] = true
+		}
+		t.base[strings.ToLower(d.Name())] = true
+		return nil
+	})
+	return t
+}
+
+func (t repoFileTree) exists(named string) bool {
+	if named == "" {
+		return false
+	}
+	slash := filepath.ToSlash(named)
+	if t.rel[slash] {
+		return true
+	}
+	if !strings.Contains(slash, "/") {
+		return t.base[strings.ToLower(slash)]
+	}
+	return false
+}
+
+func orientMatchesAny[V any](t repoFileTree, byPath map[string]V) bool {
+	if len(t.base) == 0 {
+		return false
+	}
+	for p := range byPath {
+		if t.exists(p) {
+			return true
+		}
+	}
+	return false
+}
+
+func orientSkipFixError(errLine string) bool {
+	low := strings.ToLower(strings.TrimSpace(errLine))
+	if low == "" || strings.HasPrefix(low, "--- skip:") || strings.Contains(low, "[command timed out") ||
+		strings.HasPrefix(low, "encountered error in step execution:") || strings.HasPrefix(low, "fatal: bad revision ") {
+		return true
+	}
+	if strings.HasPrefix(low, "fail\t") && strings.HasSuffix(low, "[build failed]") {
+		return true
+	}
+	if strings.HasPrefix(low, "fail ") && strings.HasSuffix(low, "[build failed]") {
+		return true
+	}
+	for _, compileNoise := range []string{
+		": undefined: ", "imported and not used", "declared and not used",
+		"syntax error:", "too many errors",
+	} {
+		if strings.Contains(low, compileNoise) {
+			return true
+		}
+	}
+	return false
+}
+
+func orientDestructiveRemedy(cmd string) bool {
+	low := " " + strings.ToLower(cmd) + " "
+	for _, bad := range []string{
+		" git reset ", " git checkout ", " git clean ", " git stash ",
+		" rm -rf ", " rm -f ",
+	} {
+		if strings.Contains(low, bad) {
+			return true
+		}
+	}
+	return false
+}
+
+func orientTestRemedyMatchesFail(errLine, cmd string) bool {
+	if !strings.HasPrefix(strings.TrimSpace(errLine), "--- FAIL:") {
+		return true
+	}
+	lowCmd := strings.ToLower(strings.TrimSpace(cmd))
+	if strings.HasPrefix(lowCmd, "go test ") || lowCmd == "go test" {
+		return false
+	}
+	return true
+}
+
+func orientTautologicalEdit(errLine, relEdit string) bool {
+	if relEdit == "" {
+		return false
+	}
+	lowErr := strings.ToLower(filepath.ToSlash(errLine))
+	lowEdit := strings.ToLower(filepath.ToSlash(relEdit))
+	base := filepath.Base(lowEdit)
+	return strings.HasPrefix(lowErr, lowEdit+":") || (len(base) >= 5 && strings.Contains(lowErr, base+":"))
 }
 
 // projectXRayLine summarizes what deja already knows about the current
@@ -572,7 +1035,7 @@ func projectXRayLine(dir, cwd string) string {
 	}
 	recurring := orientRecurringCommands(dir, scope, policy.ActivationSearch)
 	files := orientFiles(dir, scope, cwd)
-	coupled := orientCoChangePairs(dir, scope, files, policy.ActivationSearch)
+	coupled := orientCoChangePairs(dir, scope, cwd, files, policy.ActivationSearch)
 	fixes := orientProjectFixes(dir, scope, cwd, policy.ActivationSearch)
 	if len(recurring) == 0 && len(files) == 0 && len(coupled) == 0 && len(fixes) == 0 {
 		return ""

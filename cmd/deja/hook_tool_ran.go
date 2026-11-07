@@ -247,7 +247,7 @@ func coChangeCompanion(path string, metas []index.SessionMeta) (string, int, int
 		focused++
 		seenInSession := map[string]bool{}
 		for _, t := range m.Touched {
-			if isScratch(t) {
+			if isScratch(t) || isOrientEphemeralFile(t) {
 				continue
 			}
 			b := baseName(t)

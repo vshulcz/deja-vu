@@ -167,14 +167,14 @@ func environmentBlockFrom(dir, activation string) (string, []string) {
 	//
 	// Without the walls someone settled: a person who fixed the cause and
 	// said so has nothing to gain from the agent hearing about it (#5628).
-	walls := index.OpenFriction(dir, environmentWalls*4, nil)
+	walls := index.OpenFriction(dir, environmentWalls*32, nil)
 	newest := projectsInStore(dir)
 	held := len(newest)
 	if len(walls) == 0 {
 		return "", nil
 	}
 	now := time.Now()
-	var allowed []index.Friction
+	var allowed, lowSignal []index.Friction
 	for _, w := range walls {
 		// Before the policy gate, on every session the wall has: whether it
 		// stopped recurring is a fact about the machine, not about what this
@@ -192,8 +192,16 @@ func environmentBlockFrom(dir, activation string) (string, []string) {
 		// mostly hidden must not keep claiming the full number.
 		if len(keep) >= index.FrictionMinSessions && spansProjects(keep, held) {
 			w.Sessions = keep
-			allowed = append(allowed, w)
+			w.Text = normalizeEnvironmentWallText(w.Text)
+			if isLowSignalEnvironmentWall(w.Text) {
+				lowSignal = append(lowSignal, w)
+			} else {
+				allowed = append(allowed, w)
+			}
 		}
+	}
+	if len(allowed) == 0 {
+		allowed = lowSignal
 	}
 	if len(allowed) == 0 {
 		return "", nil
@@ -374,6 +382,31 @@ func missingProgramFromWall(wall string) (string, bool) {
 		return "", false
 	}
 	return prog, true
+}
+
+func normalizeEnvironmentWallText(s string) string {
+	trimmed := strings.TrimSpace(s)
+	if rest, ok := strings.CutSuffix(trimmed, " not found"); ok && rest != "" && strings.Trim(rest, "=") == "" {
+		return "== not found"
+	}
+	return s
+}
+
+func isLowSignalEnvironmentWall(s string) bool {
+	low := strings.ToLower(strings.TrimSpace(s))
+	if low == "== not found" || strings.HasPrefix(low, "no matches found: --include=") || strings.HasPrefix(low, "no matches found: --exclude=") {
+		return true
+	}
+	if strings.HasPrefix(low, "fatal: not a git repository") || strings.HasPrefix(low, "json.decoder.jsondecodeerror: expecting value:") {
+		return true
+	}
+	if (strings.HasPrefix(low, "fail\t") || strings.HasPrefix(low, "fail ")) && strings.HasSuffix(low, "[build failed]") {
+		return true
+	}
+	if strings.Contains(low, "[redacted:") {
+		return true
+	}
+	return false
 }
 
 // environmentSpent is per process, which is what makes "once" countable on

@@ -472,12 +472,30 @@ func fixPairLineFor(dir, cwd, command, output string) string {
 	}
 	// A few, not one: the newest pair for an error can be a remedy that failed,
 	// and silence is the wrong answer when the one behind it worked.
-	pairs := index.FixesForCommand(dir, command, output, 4, func(project string) bool {
+	allowHere := func(project string) bool {
 		return pol.Allows(policy.ActivationAuto, project) && !others(project)
-	})
+	}
+	pairs := index.FixesForCommand(dir, command, output, 4, allowHere)
 	for _, p := range pairs {
+		if orientSkipFixPairForHook(p) {
+			continue
+		}
 		if line := fixLine(p, frictionCount(dir, p, pol)); line != "" {
 			return line
+		}
+	}
+	for _, probe := range nearErrorProbesFromOutput(output) {
+		near := nearestRecordedError(dir, probe, allowHere)
+		if near == "" {
+			continue
+		}
+		for _, p := range index.FixesFor(dir, near, 4, allowHere) {
+			if orientSkipFixPairForHook(p) {
+				continue
+			}
+			if line := fixLine(p, frictionCount(dir, p, pol)); line != "" {
+				return line
+			}
 		}
 	}
 	// Except a program this machine does not have. `timeout` missing in one
@@ -487,7 +505,7 @@ func fixPairLineFor(dir, cwd, command, output string) string {
 		return pol.Allows(policy.ActivationAuto, project) && project != "" && !here(project)
 	})
 	for _, p := range elsewhere {
-		if !p.MachineFact() {
+		if !p.MachineFact() || orientSkipFixPairForHook(p) {
 			continue
 		}
 		if line := fixLine(p, frictionCount(dir, p, pol)); line != "" {
@@ -495,6 +513,54 @@ func fixPairLineFor(dir, cwd, command, output string) string {
 		}
 	}
 	return ""
+}
+
+func orientSkipFixPairForHook(p index.FixPair) bool {
+	cmd, ok := withoutFailedExit(strings.TrimPrefix(strings.TrimSpace(search.SafeText(p.Command)), "$ "))
+	if ok && cmd != "" {
+		if orientDestructiveRemedy(cmd) || !orientTestRemedyMatchesFail(p.Error, cmd) {
+			return true
+		}
+	}
+	return false
+}
+
+func nearErrorProbesFromOutput(output string) []string {
+	var probes []string
+	seen := map[string]bool{}
+	add := func(p string) {
+		p = strings.TrimSpace(p)
+		if len(p) >= 12 && !seen[p] {
+			seen[p] = true
+			probes = append(probes, p)
+		}
+	}
+	for raw := range strings.SplitSeq(output, "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "--- FAIL:") {
+			probe := line
+			if idx := strings.LastIndex(probe, " ("); idx > len("--- FAIL:") {
+				probe = strings.TrimSpace(probe[:idx])
+			}
+			add(probe)
+			continue
+		}
+		low := strings.ToLower(line)
+		if idx := strings.Index(low, "does not contain main module"); idx >= 0 {
+			add("does not contain main module")
+			continue
+		}
+		for _, prefix := range []string{"level=error", "error:", "fatal:", "panic:"} {
+			if strings.HasPrefix(low, prefix) {
+				add(line)
+				break
+			}
+		}
+	}
+	return probes
 }
 
 // frictionCount is how many sessions hit this error, scoped the way the line
@@ -553,6 +619,9 @@ func fixLine(p index.FixPair, sessions int) string {
 	// one session did, and an agent handed it at the moment it is stuck has to
 	// be told which of the two it is holding.
 	if edit != "" && (!ok || cmd == "") {
+		if cwd := howCwd(); cwd != "" {
+			edit = search.SafePath(orientPath(edit, cwd))
+		}
 		// Not something to run, so not offered as one: the file, in the words
 		// `deja fix` uses for the same pair.
 		if p.Candidate {
@@ -563,7 +632,7 @@ func fixLine(p index.FixPair, sessions int) string {
 	}
 	if p.Candidate {
 		return "this error came up" + how + " " + where + " before" + when +
-			" — this was run after it, and nothing confirms it worked: " + cmd
+			" — this was run after it, and nothing confirms it worked: " + orientCommand(cmd)
 	}
 	// A repaired remedy is not "what followed it", it is the command the reader
 	// has just run, corrected — and this is the one surface where they already
@@ -571,9 +640,9 @@ func fixLine(p index.FixPair, sessions int) string {
 	// twice. Of the 360 pairs served on a real store, 107 name nothing their
 	// error names for exactly this reason.
 	if p.Failed != "" {
-		return "this error came up" + how + " " + where + " before" + when + " — the same command worked as: " + cmd
+		return "this error came up" + how + " " + where + " before" + when + " — the same command worked as: " + orientCommand(cmd)
 	}
-	return "this error came up" + how + " " + where + " before" + when + " — what followed it: " + cmd
+	return "this error came up" + how + " " + where + " before" + when + " — what followed it: " + orientCommand(cmd)
 }
 
 // withoutFailedExit drops the recorded exit status from a command, and reports

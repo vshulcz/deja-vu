@@ -962,6 +962,15 @@ func mcpFix(dir, name string, raw json.RawMessage) (string, int, error) {
 		return pol.Allows(policy.ActivationMCP, project)
 	})
 	if len(pairs) == 0 {
+		if near := nearestRecordedError(dir, a.Error, func(project string) bool {
+			return pol.Allows(policy.ActivationMCP, project)
+		}); near != "" {
+			pairs = index.FixesFor(dir, near, int(a.Limit), func(project string) bool {
+				return pol.Allows(policy.ActivationMCP, project)
+			})
+		}
+	}
+	if len(pairs) == 0 {
 		// Nothing to look in is not nothing found (#5395). What sessions
 		// said about the error still helps.
 		if note := fixDataNote(dir); note != "" {
