@@ -17,6 +17,7 @@ const semanticFloor = 0.55
 // scored — the unit both the served set and the held notes are kept in.
 type match struct {
 	session model.Session
+	vector  Vector
 	record  index.Record
 	score   float64
 }
@@ -36,10 +37,6 @@ func semanticHitsForQuery(dir string, o search.Options, sidecar Sidecar, query [
 	if Stale(dir, sidecar) {
 		return nil, nil
 	}
-	records, err := index.ReadRecords(dir)
-	if err != nil {
-		return nil, err
-	}
 	metaSessions, err := index.RecentMatching(dir, 0, o)
 	if err != nil {
 		return nil, err
@@ -52,7 +49,56 @@ func semanticHitsForQuery(dir string, o search.Options, sidecar Sidecar, query [
 	if err != nil {
 		return nil, err
 	}
+	if sameLayout(sidecar.Generation, gen) && o.Role == "" {
+		if hits, ok, oerr := semanticHitsByOffset(dir, o, sidecar, query, byKey); ok || oerr != nil {
+			return hits, oerr
+		}
+	}
+	records, err := index.ReadRecords(dir)
+	if err != nil {
+		return nil, err
+	}
 	lookup := newRecordLookup(records, sameLayout(sidecar.Generation, gen), identOf(sidecar.Version))
+	out, _, _ := rankVectors(o, sidecar, query, byKey, func(v Vector) (index.Record, bool) {
+		found, ok := lookup.find(v)
+		return found.Record, ok
+	})
+	return out, nil
+}
+
+func semanticHitsByOffset(dir string, o search.Options, sidecar Sidecar, query []float32, byKey map[string]model.Session) ([]search.Hit, bool, error) {
+	out, best, heldNotes := rankVectors(o, sidecar, query, byKey, nil)
+	offsets := make([]int64, 0, len(out))
+	for _, hit := range out {
+		offsets = append(offsets, hitMatch(hit, best, heldNotes).vector.Offset)
+	}
+	records, err := index.ReadRecordsAt(dir, offsets)
+	if err != nil {
+		return nil, false, err
+	}
+	lookup := newRecordLookup(records, true, identOf(sidecar.Version))
+	for i, hit := range out {
+		found, ok := lookup.find(hitMatch(hit, best, heldNotes).vector)
+		if !ok {
+			return nil, false, nil
+		}
+		q := o.Query
+		if hit.Score < semanticFloor {
+			q = ""
+		}
+		out[i].Snippets = []string{search.Snippet(found.Record.Text, q)}
+	}
+	return out, true, nil
+}
+
+func hitMatch(hit search.Hit, best, heldNotes map[string]match) match {
+	if hit.Score < semanticFloor {
+		return heldNotes[model.SessionKey(notesHarness, hit.Session.PromotedNoteID())]
+	}
+	return best[hit.Session.Key()]
+}
+
+func rankVectors(o search.Options, sidecar Sidecar, query []float32, byKey map[string]model.Session, find func(Vector) (index.Record, bool)) ([]search.Hit, map[string]match, map[string]match) {
 	best := make(map[string]match)
 	heldNotes := make(map[string]match)
 	for _, vector := range sidecar.Vectors {
@@ -60,10 +106,12 @@ func semanticHitsForQuery(dir string, o search.Options, sidecar Sidecar, query [
 		if !ok {
 			continue
 		}
-		found, ok := lookup.find(vector)
-		record := found.Record
-		if !ok || (o.Role != "" && !model.RoleMatches(record.Role, o.Role)) {
-			continue
+		var record index.Record
+		if find != nil {
+			record, ok = find(vector)
+			if !ok || (o.Role != "" && !model.RoleMatches(record.Role, o.Role)) {
+				continue
+			}
 		}
 		score := Cosine(query, vector.Values)
 		if score < semanticFloor {
@@ -76,13 +124,13 @@ func semanticHitsForQuery(dir string, o search.Options, sidecar Sidecar, query [
 			if noteID := session.PromotedNoteID(); noteID != "" {
 				key := model.SessionKey(notesHarness, noteID)
 				if old, ok := heldNotes[key]; !ok || score > old.score {
-					heldNotes[key] = match{session: session, record: record, score: score}
+					heldNotes[key] = match{session: session, vector: vector, record: record, score: score}
 				}
 			}
 			continue
 		}
 		if old, ok := best[vector.Key]; !ok || score > old.score {
-			best[vector.Key] = match{session: session, record: record, score: score}
+			best[vector.Key] = match{session: session, vector: vector, record: record, score: score}
 		}
 	}
 	out := make([]search.Hit, 0, len(best))
@@ -110,7 +158,7 @@ func semanticHitsForQuery(dir string, o search.Options, sidecar Sidecar, query [
 	if len(out) > 10 {
 		out = out[:10]
 	}
-	return out, nil
+	return out, best, heldNotes
 }
 
 // notesHarness is the pseudo-harness deja files its own notes under.

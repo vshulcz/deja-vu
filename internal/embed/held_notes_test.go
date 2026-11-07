@@ -1,6 +1,10 @@
 package embed
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -84,5 +88,88 @@ func TestHeldRepoAndSyncedNotesAreServedWithTheirSource(t *testing.T) {
 	want := []string{"imported-note", "imported-src"}
 	if len(ids) != len(want) || ids[0] != want[0] || ids[1] != want[1] {
 		t.Fatalf("got %v, want %v", ids, want)
+	}
+}
+
+func TestSemanticSearchReadsWinningOffsetsWithoutFullLogScan(t *testing.T) {
+	tmp := t.TempDir()
+	claudeRoot := filepath.Join(tmp, "claude")
+	notesFile := filepath.Join(tmp, "notes.jsonl")
+	for key, value := range map[string]string{
+		"HOME": tmp, "USERPROFILE": tmp, "DEJA_CLAUDE_ROOT": claudeRoot,
+		"DEJA_NOTES_FILE": notesFile, "DEJA_CODEX_ROOT": filepath.Join(tmp, "codex"),
+		"DEJA_OPENCODE_DB": filepath.Join(tmp, "open.db"), "DEJA_AIDER_ROOTS": filepath.Join(tmp, "aider"),
+		"DEJA_GEMINI_ROOT": filepath.Join(tmp, "gemini"), "DEJA_CURSOR_ROOT": filepath.Join(tmp, "cursor"),
+		"DEJA_CURSOR_CLI_ROOT": filepath.Join(tmp, "cursor-cli"), "DEJA_ANTIGRAVITY_ROOT": filepath.Join(tmp, "antigravity"),
+		"DEJA_GROK_ROOT": filepath.Join(tmp, "grok"), "DEJA_QWEN_ROOT": filepath.Join(tmp, "qwen"),
+	} {
+		t.Setenv(key, value)
+	}
+	proj := filepath.Join(claudeRoot, "project")
+	if err := os.MkdirAll(proj, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for i := range 12 {
+		id := fmt.Sprintf("s%02d", i)
+		line := fmt.Sprintf("{\"type\":\"user\",\"sessionId\":%q,\"cwd\":\"/work/app\",\"timestamp\":\"2026-03-01T10:%02d:00Z\",\"message\":{\"role\":\"user\",\"content\":\"session %s pool tuning detail\"}}\n", id, i, id)
+		if err := os.WriteFile(filepath.Join(proj, id+".jsonl"), []byte(line), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	noteID := model.PromotedNoteID("claude:s11")
+	noteLine := `{"ts":"2026-03-01T10:30:00Z","kind":"promoted","session":"claude:s11","state":"accepted","text":"pool cap settled at 40"}` + "\n"
+	if err := os.WriteFile(notesFile, []byte(noteLine), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(tmp, "index")
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	records, err := index.ReadRecords(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gen, err := index.Generation(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vectors := make([]Vector, 0, len(records))
+	for _, r := range records {
+		v := []float32{0.8, 0.6}
+		switch r.Record.Key {
+		case "claude:s11":
+			v = []float32{1, 0}
+		case model.SessionKey(notesHarness, noteID):
+			v = []float32{0.3, 0.9539392}
+		}
+		vectors = append(vectors, Vector{
+			Offset: r.Offset,
+			Key:    r.Record.Key,
+			Values: v,
+		})
+	}
+	sidecar := Sidecar{Generation: gen, Dim: 2, Covered: len(vectors), Vectors: vectors}
+	before := index.RecordLogScans()
+	hits, err := semanticHitsForQuery(dir, search.Options{Query: "pool", All: true}, sidecar, []float32{1, 0})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if index.RecordLogScans() != before {
+		t.Fatalf("semanticHitsForQuery walked the full record log (%d -> %d)", before, index.RecordLogScans())
+	}
+	if len(hits) != 10 {
+		t.Fatalf("len(hits) = %d, want 10", len(hits))
+	}
+	if hits[0].Session.ID != noteID || !strings.Contains(hits[0].Snippets[0], "pool cap settled at 40") {
+		t.Fatalf("hits[0] = %+v, want lifted promoted note %s", hits[0], noteID)
+	}
+	if hits[1].Session.ID != "s11" || !strings.Contains(hits[1].Snippets[0], "session s11 pool tuning detail") {
+		t.Fatalf("hits[1] = %+v, want source session s11", hits[1])
+	}
+	if err := os.Remove(filepath.Join(dir, "records.bin")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := semanticHitsForQuery(dir, search.Options{Query: "pool", All: true}, sidecar, []float32{1, 0}); err == nil {
+		t.Fatal("missing records.bin was accepted")
 	}
 }

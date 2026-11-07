@@ -164,3 +164,25 @@ func TestDamerauRunesStopsOnlyPastTheLimit(t *testing.T) {
 		}
 	}
 }
+
+func TestReadRecordsAtReadsRequestedOffsets(t *testing.T) {
+	dir := recallReadsStore(t)
+	all, err := ReadRecords(dir)
+	if err != nil || len(all) < 3 {
+		t.Fatalf("ReadRecords = %d, err = %v", len(all), err)
+	}
+	before := RecordLogScans()
+	got, err := ReadRecordsAt(dir, []int64{all[2].Offset, all[0].Offset, all[2].Offset})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if RecordLogScans() != before {
+		t.Fatalf("ReadRecordsAt scanned the full log (%d -> %d)", before, RecordLogScans())
+	}
+	if len(got) != 2 || got[0].Offset != all[0].Offset || got[0].Record.Text != all[0].Record.Text || got[1].Offset != all[2].Offset || got[1].Record.Text != all[2].Record.Text {
+		t.Fatalf("ReadRecordsAt = %+v, want [%+v, %+v]", got, all[0], all[2])
+	}
+	if _, err := ReadRecordsAt(filepath.Join(t.TempDir(), "missing"), []int64{0}); err == nil {
+		t.Fatal("missing index directory was accepted")
+	}
+}
