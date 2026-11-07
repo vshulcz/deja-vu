@@ -4,14 +4,21 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
-// semanticFloor avoids turning unrelated vectors into search results.
+// semanticFloor avoids turning unrelated vectors into search results on
+// high-baseline models (e.g. nomic-embed-text).
 const semanticFloor = 0.55
+
+// lowCosineFloor is the floor for embedding models whose cosine distribution
+// separates relevant and unrelated passages around 0.40 rather than 0.55
+// (e.g. voyage-4-large, text-embedding-3-* — #5970).
+const lowCosineFloor = 0.40
 
 // match is one vector's session, the record it came from and how close it
 // scored — the unit both the served set and the held notes are kept in.
@@ -59,7 +66,7 @@ func semanticHitsForQuery(dir string, o search.Options, sidecar Sidecar, query [
 		return nil, err
 	}
 	lookup := newRecordLookup(records, sameLayout(sidecar.Generation, gen), identOf(sidecar.Version))
-	out, _, _ := rankVectors(o, sidecar, query, byKey, func(v Vector) (index.Record, bool) {
+	out, _, _, _ := rankVectors(o, sidecar, query, byKey, func(v Vector) (index.Record, bool) {
 		found, ok := lookup.find(v)
 		return found.Record, ok
 	})
@@ -67,10 +74,10 @@ func semanticHitsForQuery(dir string, o search.Options, sidecar Sidecar, query [
 }
 
 func semanticHitsByOffset(dir string, o search.Options, sidecar Sidecar, query []float32, byKey map[string]model.Session) ([]search.Hit, bool, error) {
-	out, best, heldNotes := rankVectors(o, sidecar, query, byKey, nil)
+	out, best, heldNotes, floor := rankVectors(o, sidecar, query, byKey, nil)
 	offsets := make([]int64, 0, len(out))
 	for _, hit := range out {
-		offsets = append(offsets, hitMatch(hit, best, heldNotes).vector.Offset)
+		offsets = append(offsets, hitMatch(hit, best, heldNotes, floor).vector.Offset)
 	}
 	records, err := index.ReadRecordsAt(dir, offsets)
 	if err != nil {
@@ -78,12 +85,12 @@ func semanticHitsByOffset(dir string, o search.Options, sidecar Sidecar, query [
 	}
 	lookup := newRecordLookup(records, true, identOf(sidecar.Version))
 	for i, hit := range out {
-		found, ok := lookup.find(hitMatch(hit, best, heldNotes).vector)
+		found, ok := lookup.find(hitMatch(hit, best, heldNotes, floor).vector)
 		if !ok {
 			return nil, false, nil
 		}
 		q := o.Query
-		if hit.Score < semanticFloor {
+		if hit.Score < floor {
 			q = ""
 		}
 		out[i].Snippets = []string{search.Snippet(found.Record.Text, q)}
@@ -91,16 +98,35 @@ func semanticHitsByOffset(dir string, o search.Options, sidecar Sidecar, query [
 	return out, true, nil
 }
 
-func hitMatch(hit search.Hit, best, heldNotes map[string]match) match {
-	if hit.Score < semanticFloor {
+func hitMatch(hit search.Hit, best, heldNotes map[string]match, floor float64) match {
+	if hit.Score < floor {
 		return heldNotes[model.SessionKey(notesHarness, hit.Session.PromotedNoteID())]
 	}
 	return best[hit.Session.Key()]
 }
 
-func rankVectors(o search.Options, sidecar Sidecar, query []float32, byKey map[string]model.Session, find func(Vector) (index.Record, bool)) ([]search.Hit, map[string]match, map[string]match) {
-	best := make(map[string]match)
-	heldNotes := make(map[string]match)
+func effectiveSemanticFloor(modelName string, candidates map[string]match) float64 {
+	low := strings.ToLower(modelName)
+	for _, family := range []string{"voyage", "text-embedding-3", "embed-english", "embed-multilingual", "embed-v", "jina-embeddings"} {
+		if strings.Contains(low, family) {
+			return lowCosineFloor
+		}
+	}
+	if len(candidates) >= 8 {
+		scores := make([]float64, 0, len(candidates))
+		for _, c := range candidates {
+			scores = append(scores, c.score)
+		}
+		sort.Float64s(scores)
+		if p50 := scores[len(scores)/2]; p50 < 0.35 {
+			return max(lowCosineFloor, p50+0.20)
+		}
+	}
+	return semanticFloor
+}
+
+func rankVectors(o search.Options, sidecar Sidecar, query []float32, byKey map[string]model.Session, find func(Vector) (index.Record, bool)) ([]search.Hit, map[string]match, map[string]match, float64) {
+	candidates := make(map[string]match)
 	for _, vector := range sidecar.Vectors {
 		session, ok := byKey[vector.Key]
 		if !ok {
@@ -114,24 +140,30 @@ func rankVectors(o search.Options, sidecar Sidecar, query []float32, byKey map[s
 			}
 		}
 		score := Cosine(query, vector.Values)
-		if score < semanticFloor {
+		if old, ok := candidates[vector.Key]; !ok || score > old.score {
+			candidates[vector.Key] = match{session: session, vector: vector, record: record, score: score}
+		}
+	}
+	floor := effectiveSemanticFloor(sidecar.Model, candidates)
+	best := make(map[string]match)
+	heldNotes := make(map[string]match)
+	for key, m := range candidates {
+		if m.score < floor {
 			// A promoted note is held rather than dropped. It is one distilled
 			// line where its transcript is a whole session, so it is often
 			// worded further from the query than the source it was made from —
 			// and then the floor cut the note while serving the source, which
 			// is the answer `promote` says it just put in front (#2803). It is
 			// only ever served beside that source, below.
-			if noteID := session.PromotedNoteID(); noteID != "" {
-				key := model.SessionKey(notesHarness, noteID)
-				if old, ok := heldNotes[key]; !ok || score > old.score {
-					heldNotes[key] = match{session: session, vector: vector, record: record, score: score}
+			if noteID := m.session.PromotedNoteID(); noteID != "" {
+				nkey := model.SessionKey(notesHarness, noteID)
+				if old, ok := heldNotes[nkey]; !ok || m.score > old.score {
+					heldNotes[nkey] = m
 				}
 			}
 			continue
 		}
-		if old, ok := best[vector.Key]; !ok || score > old.score {
-			best[vector.Key] = match{session: session, vector: vector, record: record, score: score}
-		}
+		best[key] = m
 	}
 	out := make([]search.Hit, 0, len(best))
 	for _, found := range best {
@@ -158,7 +190,7 @@ func rankVectors(o search.Options, sidecar Sidecar, query []float32, byKey map[s
 	if len(out) > 10 {
 		out = out[:10]
 	}
-	return out, best, heldNotes
+	return out, best, heldNotes, floor
 }
 
 // notesHarness is the pseudo-harness deja files its own notes under.

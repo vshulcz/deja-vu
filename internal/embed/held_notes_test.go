@@ -173,3 +173,71 @@ func TestSemanticSearchReadsWinningOffsetsWithoutFullLogScan(t *testing.T) {
 		t.Fatal("missing records.bin was accepted")
 	}
 }
+
+func TestEffectiveSemanticFloorCalibratesLowCosineModelsAndDistributions(t *testing.T) {
+	tmp := t.TempDir()
+	claudeRoot := filepath.Join(tmp, "claude")
+	for key, value := range map[string]string{
+		"HOME": tmp, "USERPROFILE": tmp, "DEJA_CLAUDE_ROOT": claudeRoot,
+		"DEJA_NOTES_FILE": filepath.Join(tmp, "notes.jsonl"), "DEJA_CODEX_ROOT": filepath.Join(tmp, "codex"),
+		"DEJA_OPENCODE_DB": filepath.Join(tmp, "open.db"), "DEJA_AIDER_ROOTS": filepath.Join(tmp, "aider"),
+		"DEJA_GEMINI_ROOT": filepath.Join(tmp, "gemini"), "DEJA_CURSOR_ROOT": filepath.Join(tmp, "cursor"),
+		"DEJA_CURSOR_CLI_ROOT": filepath.Join(tmp, "cursor-cli"), "DEJA_ANTIGRAVITY_ROOT": filepath.Join(tmp, "antigravity"),
+		"DEJA_GROK_ROOT": filepath.Join(tmp, "grok"), "DEJA_QWEN_ROOT": filepath.Join(tmp, "qwen"),
+	} {
+		t.Setenv(key, value)
+	}
+	proj := filepath.Join(claudeRoot, "project")
+	if err := os.MkdirAll(proj, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for i := range 10 {
+		id := fmt.Sprintf("v%02d", i)
+		line := fmt.Sprintf("{\"type\":\"user\",\"sessionId\":%q,\"cwd\":\"/work/app\",\"timestamp\":\"2026-03-01T10:%02d:00Z\",\"message\":{\"role\":\"user\",\"content\":\"session %s voyage calibration\"}}\n", id, i, id)
+		if err := os.WriteFile(filepath.Join(proj, id+".jsonl"), []byte(line), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dir := filepath.Join(tmp, "index")
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	records, err := index.ReadRecords(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gen, err := index.Generation(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vectors := make([]Vector, 0, len(records))
+	for _, r := range records {
+		v := []float32{0.20, 0.9797959}
+		if r.Record.Key == "claude:v09" {
+			v = []float32{0.45, 0.8930285}
+		}
+		vectors = append(vectors, Vector{Offset: r.Offset, Key: r.Record.Key, Values: v})
+	}
+	// 1. Model-family calibration (voyage-4-large) serves a 0.45 hit on a small vector set.
+	voyageSidecar := Sidecar{Model: "voyage-4-large", Generation: gen, Dim: 2, Vectors: []Vector{
+		{Offset: records[len(records)-1].Offset, Key: "claude:v09", Values: []float32{0.45, 0.8930285}},
+	}}
+	hits, err := semanticHitsForQuery(dir, search.Options{Query: "voyage", All: true}, voyageSidecar, []float32{1, 0})
+	if err != nil || len(hits) != 1 || hits[0].Session.ID != "v09" {
+		t.Fatalf("voyage-4-large hits = %+v, err = %v", hits, err)
+	}
+	// 2. Distribution-aware calibration (p50 = 0.20 < 0.35 across >= 8 sessions) serves a 0.45 hit on an unknown model.
+	distSidecar := Sidecar{Model: "custom-embed", Generation: gen, Dim: 2, Vectors: vectors}
+	hits, err = semanticHitsForQuery(dir, search.Options{Query: "voyage", All: true}, distSidecar, []float32{1, 0})
+	if err != nil || len(hits) != 1 || hits[0].Session.ID != "v09" {
+		t.Fatalf("distribution-calibrated hits = %+v, err = %v", hits, err)
+	}
+	// 3. Default 0.55 floor rejects a 0.45 hit when background is not low-cosine.
+	nomicSidecar := Sidecar{Model: "nomic-embed-text", Generation: gen, Dim: 2, Vectors: []Vector{
+		{Offset: records[len(records)-1].Offset, Key: "claude:v09", Values: []float32{0.45, 0.8930285}},
+	}}
+	hits, err = semanticHitsForQuery(dir, search.Options{Query: "voyage", All: true}, nomicSidecar, []float32{1, 0})
+	if err != nil || len(hits) != 0 {
+		t.Fatalf("nomic-embed-text hits = %+v, err = %v, want empty", hits, err)
+	}
+}
