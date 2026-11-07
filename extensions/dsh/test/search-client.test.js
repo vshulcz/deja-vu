@@ -244,6 +244,32 @@ test("the direct Deja search shortcut keeps its own binding distinct from native
   assert.doesNotThrow(() => direct.resolve({ modal: null }).run());
 });
 
+test("all Deja commands are editable in the built-in shortcuts editor", () => {
+  const mod = load({}, { "react-dom": { createPortal() {} } });
+  const commands = new Map();
+  const services = { shortcuts: { register: (command) => { commands.set(command.id, command); return () => {}; } }, uiSession: {}, sessions: {}, conversation: {}, uiWorkspace: {} };
+  const ctx = {
+    ...services,
+    effect: (fn) => fn(),
+    slots: { inject: (_slot, fn) => fn(), register: () => () => {} },
+    inject(names, fn) { if (names.every((name) => name in services)) fn(ctx); },
+  };
+  mod.installFind(ctx, mod.preferences());
+  mod.installSearch(ctx);
+  // DSH's shortcut reference renders only the four known groups; anything
+  // else vanishes from the editor and becomes impossible to customize.
+  const rendered = ["application", "input", "menus", "approval"];
+  const shortcuts = mod.preferences();
+  const registered = [...commands.values()];
+  for (const command of registered) {
+    assert.ok(rendered.includes(command.group), `${command.id} must declare a group the shortcuts editor renders`);
+    assert.equal(typeof command.label, "function", `${command.id} needs a label for the editor row`);
+    assert.ok(Array.isArray(command.aliases) && command.aliases.length > 0, `${command.id} needs aliases so search finds it`);
+    assert.ok(command.defaults["desktop:windows"], `${command.id} needs a default users can reset to`);
+  }
+  assert.deepEqual(registered.map((command) => command.id).sort(), ["deja.search-session", "deja.search-sessions"]);
+});
+
 test("search composes through the settings list and root overlay, preserving the native sidebar slot", () => {
   const mod = load({}, { "react-dom": { createPortal() {} } });
   const registered = [];

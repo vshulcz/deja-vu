@@ -352,6 +352,9 @@ window.__ModuleLoader__.load({
         id: "deja.search-session",
         label: () => "Deja: search this conversation",
         aliases: ["deja", "find in conversation"],
+        // group places the command in the built-in shortcut editor's
+        // "application" section, where users can rebind or clear it.
+        group: "application",
         defaults: Object.fromEntries([
           ...["windows", "macos", "linux"].map((os) => ["desktop:" + os, { code: "KeyF", modifiers: ["primary"] }]),
           ...["windows", "macos"].map((os) => ["web:" + os, { code: "KeyF", modifiers: ["primary", "alt"] }]),
@@ -610,6 +613,8 @@ window.__ModuleLoader__.load({
             id: "deja.search-sessions",
             label: () => "Deja: search DSH conversations",
             aliases: ["deja search", "search conversations"],
+            // Editable in the built-in shortcut editor's application section.
+            group: "application",
             // The native session.search owns primary+K; registering the same
             // default would throw. Deja keeps its own discoverable binding.
             defaults: Object.fromEntries([

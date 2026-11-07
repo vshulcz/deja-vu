@@ -113,6 +113,17 @@ These preferences are saved separately in this browser/profile's local storage;
 changing one does not change the other, and they do not sync between browsers
 or devices. Manual search remains available with `autoRecall: false`.
 
+### Customizing the shortcuts
+
+Both shortcuts are ordinary DSH commands, so they are editable in the built-in
+shortcut editor: open **Settings → General → Shortcuts** (or press **Ctrl+/**
+on the desktop), find the two **Deja** rows under *Application actions*, and
+click a row to record a new combination or clear it. Edits persist per
+platform in DSH's own keybindings file and survive plugin updates; the
+switches above control whether the commands do anything, not their keys. The
+official `session.search` (Ctrl+K) binding is untouched — rebind it there if
+you want a different key to open the title search.
+
 Sidebar full-text search requires the **dsh-deja package host plugin**. The CLI's
 `deja install dsh-auto` copies the browser panel but currently does not install
 its search endpoint; install the package as above to enable that endpoint.
