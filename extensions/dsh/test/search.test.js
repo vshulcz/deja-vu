@@ -124,6 +124,23 @@ test("GET handler passes only trimmed q to the executor and returns no-store JSO
   assert.equal((await response.json()).hits[0].sessionId, "session-abc");
 });
 
+// The settings page asks which plugin answers this route. The probe must
+// answer even when deja itself is missing, and must never start a search.
+test("the probe names the plugin and its version without launching deja", async () => {
+  let calls = 0;
+  const handler = createSearchHandler(null, { run: () => { calls++; throw new Error("must not run"); } });
+  const response = await handler(new Request("http://localhost/api/deja-search?probe=1"));
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  const body = await response.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.plugin, "dsh-deja");
+  assert.match(body.version, /^\d+\.\d+\.\d+/);
+  assert.equal(calls, 0, "the probe started a search");
+  // A binary-less host still answers the probe: it is about the route.
+  assert.equal((await handler(new Request("http://localhost/api/deja-search?probe=1&q=x"))).status, 200);
+});
+
 test("empty queries and rejected requests launch nothing", async () => {
   let calls = 0;
   const handler = createSearchHandler("fake", { run: () => { calls++; throw new Error("must not run"); } });

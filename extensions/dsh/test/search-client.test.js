@@ -364,13 +364,29 @@ test("a CLI-only install without the search route keeps its keys and hides the s
   const settled = new Promise((resolve) => setTimeout(resolve, 0));
   return settled.then(() => {
     assert.equal(route.getSnapshot(), "absent", "a 404 means no search endpoint");
+    assert.equal(route.getVersion(), "", "an absent route has no version to report");
     assert.equal(direct.resolve({ modal: null }).status, "pass", "the absent route keeps releasing the key");
-    // A server that answers anything else (200, 400, 500) is a live route:
-    // the search itself reports failures, not the capability probe.
-    const other = load({ fetch: async () => ({ status: 500 }) });
-    const live = other.searchRoute();
-    other.installSearch({ inject() {}, slots: { inject: () => {}, register: () => () => {} } });
-    return new Promise((resolve) => setTimeout(resolve, 0)).then(() => assert.equal(live.getSnapshot(), "present"));
+    // A live route names the plugin behind it, which is what Settings shows.
+    const probes = [];
+    const live = load({ fetch: async (url) => {
+      probes.push(url);
+      return { status: 200, json: async () => ({ ok: true, plugin: "dsh-deja", version: "0.24.0" }) };
+    } });
+    const store = live.searchRoute();
+    live.installSearch({ inject() {}, slots: { inject: () => {}, register: () => () => {} } });
+    return new Promise((resolve) => setTimeout(resolve, 0)).then(() => {
+      assert.equal(store.getSnapshot(), "present");
+      assert.equal(store.getVersion(), "0.24.0", "the installed version is not reported");
+      assert.match(probes[0], /\?probe=1/, "the probe is not the route's own ping");
+      // A host that answers without the probe payload is still a live route.
+      const silent = load({ fetch: async () => ({ status: 500 }) });
+      const quiet = silent.searchRoute();
+      silent.installSearch({ inject() {}, slots: { inject: () => {}, register: () => () => {} } });
+      return new Promise((resolve) => setTimeout(resolve, 0)).then(() => {
+        assert.equal(quiet.getSnapshot(), "present");
+        assert.equal(quiet.getVersion(), "");
+      });
+    });
   });
 });
 

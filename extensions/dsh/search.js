@@ -1,4 +1,12 @@
 import { execFile } from "node:child_process";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+// The browser asks which plugin answers this route; reporting its own version
+// is what lets Settings say "installed, 0.24.0" instead of guessing.
+const VERSION = (() => {
+  try { return String(require("./package.json").version || ""); } catch { return ""; }
+})();
 
 export const SEARCH_PATH = "/api/deja-search";
 export const SEARCH_LIMIT = 20;
@@ -86,10 +94,17 @@ export function createSearchHandler(binary, { run = createSearchExecutor() } = {
   return async (request) => {
     if (request.method !== "GET") return failure(405, "method_not_allowed", "Use GET for search.");
     let query;
+    let url;
     try {
-      query = (new URL(request.url).searchParams.get("q") || "").trim();
+      url = new URL(request.url);
+      query = (url.searchParams.get("q") || "").trim();
     } catch {
       return failure(400, "invalid_request", "Invalid search URL.");
+    }
+    // The probe answers before any deja work: the browser only needs to know
+    // whether this route exists and which plugin serves it.
+    if (url.searchParams.has("probe")) {
+      return json({ ok: true, plugin: "dsh-deja", version: VERSION });
     }
     if (!query) return json({ hits: [], hasMore: false, total: 0, tier: "" });
     if (query.length > 500) return failure(400, "query_too_long", "Search queries must be at most 500 characters.");

@@ -96,7 +96,14 @@ dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
 
 侧栏全文搜索需要安装 **dsh-deja 包的宿主插件**，由它注册搜索接口。CLI 的
 `deja install dsh-auto` 会复制浏览器面板但不带该接口，因此面板启动时探测一次：
-接口不存在时，侧栏模式、对应开关和跨会话快捷键整体不启用，DSH 侧栏保持原样。
+
+- **设置 → Deja → 搜索接口** 始终说明探测结果：已安装的包及版本，或缺少
+  `/api/deja-search`。缺少时侧栏模式、对应开关和跨会话快捷键整体不启用，
+  DSH 侧栏保持原样，页面提供可复制的安装命令（`dsh plugin add dsh-deja`），
+  而不是留一个点了没用的开关。
+- 探测走接口自己的 `?probe=1`，返回插件名与版本，不会启动 `deja search`；
+  显式声明的状态（测试用）优先于迟到的探测结果。
+
 请按上面的步骤安装包以启用侧栏搜索。原有的 CLI 工具、命令可以与包同时使用。
 
 ## 接入方式

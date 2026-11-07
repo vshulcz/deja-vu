@@ -117,6 +117,23 @@
     check(!document.querySelector("[data-deja-results]") && button.getAttribute("aria-pressed") === null && !nativeList.hidden,
       "an absent search route leaves the native sidebar untouched");
     cliRoot.unmount();
+    // The settings page still opens, names the endpoint, and offers the
+    // install command when the route is missing.
+    const absentStore = { getSnapshot: () => "absent", getVersion: () => "", subscribe: () => () => {} };
+    // Re-render the existing root: a second createRoot on the same container
+    // leaves the first tree in place and updates nothing.
+    Object.defineProperty(navigator, "clipboard", { value: { writeText: async (text) => { window.__copied = text; } }, configurable: true });
+    settingsRoot.render(React.createElement(mod.Settings, { prefs, route: absentStore }));
+    await wait(() => [...document.querySelectorAll("button")].some((node) => node.textContent === "复制安装命令"));
+    check(document.querySelectorAll('input[role="switch"]').length === 1, "an absent route hides the sidebar switches");
+    check(document.querySelector(".deja-endpoint").textContent.includes("/api/deja-search"), "settings names the missing endpoint");
+    [...document.querySelectorAll("button")].find((node) => node.textContent === "复制安装命令").click();
+    await wait(() => window.__copied === "dsh plugin add dsh-deja");
+    check(true, "the install command is copied");
+    const presentStore = { getSnapshot: () => "present", getVersion: () => "0.24.0", subscribe: () => () => {} };
+    settingsRoot.render(React.createElement(mod.Settings, { prefs, route: presentStore }));
+    await wait(() => document.querySelector(".deja-endpoint").textContent.includes("0.24.0"));
+    check(document.querySelectorAll('input[role="switch"]').length === 3, "a live route restores the sidebar switches");
     report.textContent = checks.join("\n") + "\nAll browser checks passed.";
     document.body.dataset.result = "passed";
   } catch (error) {

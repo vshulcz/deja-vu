@@ -137,11 +137,20 @@ keybinding rows determine which keys invoke them.
 
 Sidebar full-text search needs the **dsh-deja package host plugin**, which
 registers its endpoint. The CLI's `deja install dsh-auto` copies the browser
-panel but not that endpoint, so the panel probes it once at startup: without
-it, the sidebar mode, its switch and the cross-session shortcut stand down
-and leave DSH's sidebar exactly as the host drew it. Install the package as
-above to enable the sidebar search. The existing CLI tools and command can
-coexist with the package.
+panel but not that endpoint, so the panel probes it once at startup:
+
+- **Settings → Deja → 搜索接口** always says what it found — the installed
+  package and its version, or that `/api/deja-search` is missing. Missing
+  means the sidebar mode, its switch and the cross-session shortcut stand
+  down, DSH's sidebar stays exactly as the host drew it, and the page offers
+  the install command (`dsh plugin add dsh-deja`) to copy instead of leaving a
+  dead switch.
+- The probe is the route's own `?probe=1` ping: it names the plugin and its
+  version, starts no `deja search`, and a declared state (used by tests) wins
+  over a late answer.
+
+Install the package as above to enable the sidebar search; the existing CLI
+tools and command can coexist with the package.
 
 ## How it is wired
 

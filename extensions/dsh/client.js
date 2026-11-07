@@ -131,6 +131,8 @@ window.__ModuleLoader__.load({
 .deja-keybinding > div { flex: 1 1 200px; }
 .deja-keybinding > [role="status"] { flex-basis: 100%; }
 .deja-keybinding button { font: inherit; padding: 6px 10px; cursor: pointer; }
+.deja-endpoint { margin: 6px 0 12px; }
+.deja-install-command { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--dsw-alias-bg-module-platform, rgba(127,127,127,.12)); padding: 4px 8px; border-radius: 6px; }
 .deja-sidebar-results { flex: 1; min-height: 0; overflow: auto; color: var(--dsw-alias-label-primary, CanvasText); }
 .deja-sidebar-results[hidden], [data-slot="sidebar.workspaces"] [class*="_listArea"][hidden] { display: none !important; }
 .deja-results { padding: 8px; font-size: 13px; }
@@ -363,30 +365,39 @@ window.__ModuleLoader__.load({
     const routeKey = Symbol.for("dsh-deja.search-route");
     function searchRoute() {
       if (window[routeKey]) return window[routeKey];
-      let status = "unknown", started = false, decided = false;
+      let status = "unknown", started = false, decided = false, version = "";
       const listeners = new Set();
-      const publish = (next) => {
+      const publish = (next, nextVersion) => {
+        if (typeof nextVersion === "string") version = nextVersion;
         if (status === next) return;
         status = next;
         for (const fn of [...listeners]) fn();
       };
       const store = window[routeKey] = {
         getSnapshot: () => status,
+        getVersion: () => version,
         subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
         // A host that knows its own state (a test, or a mount that shipped
         // with the route) can declare it; declaring stops the probe from
         // second-guessing it later.
-        set(next) { decided = true; publish(next); return store; },
+        set(next, nextVersion) { decided = true; publish(next, nextVersion); return store; },
         probe(send = typeof fetch === "function" ? fetch : null) {
           if (started || decided) return store;
           started = true;
           if (!send) { publish("absent"); return store; }
           Promise.resolve()
-            .then(() => send("api/deja-search?q=", {
+            .then(() => send("api/deja-search?probe=1", {
               credentials: "same-origin", cache: "no-store", headers: { accept: "application/json" },
             }))
-            .then((response) => { if (!decided) publish(response && response.status === 404 ? "absent" : "present"); },
-              () => { if (!decided) publish("absent"); });
+            .then((response) => {
+              if (decided) return;
+              if (response && response.status === 404) { publish("absent"); return; }
+              // The route answers with the plugin that serves it, so Settings
+              // can name an installed version instead of guessing.
+              Promise.resolve(response && response.json ? response.json() : null)
+                .then((body) => { if (!decided) publish("present", String(body?.version || "")); },
+                  () => { if (!decided) publish("present"); });
+            }, () => { if (!decided) publish("absent"); });
           return store;
         },
       };
@@ -395,7 +406,13 @@ window.__ModuleLoader__.load({
 
     function useSearchRoute(route) {
       const [status, setStatus] = React.useState(route.getSnapshot);
-      React.useEffect(() => route.subscribe(() => setStatus(route.getSnapshot())), [route]);
+      React.useEffect(() => {
+        const update = () => setStatus(route.getSnapshot());
+        const off = route.subscribe(update);
+        // Read once on subscribe: a store handed in later may already answer.
+        update();
+        return off;
+      }, [route]);
       return status;
     }
 
@@ -613,6 +630,64 @@ window.__ModuleLoader__.load({
       );
     }
 
+    // What an install needs to say, and how the page offers it: the sidebar
+    // mode cannot work without the package's route, so the settings page names
+    // the endpoint and its version, and hands over the command when it is
+    // missing instead of leaving a dead switch.
+    const INSTALL_COMMAND = "dsh plugin add dsh-deja";
+
+    async function copyText(text) {
+      try {
+        if (navigator?.clipboard?.writeText) { await navigator.clipboard.writeText(text); return true; }
+      } catch {}
+      try {
+        const area = document.createElement("textarea");
+        area.value = text;
+        area.setAttribute("readonly", "");
+        area.style.position = "fixed";
+        area.style.opacity = "0";
+        document.body.appendChild(area);
+        area.select();
+        const copied = document.execCommand("copy");
+        area.remove();
+        return copied;
+      } catch { return false; }
+    }
+
+    function useRouteVersion(route) {
+      const [version, setVersion] = React.useState(() => route.getVersion ? route.getVersion() : "");
+      React.useEffect(() => {
+        const update = () => setVersion(route.getVersion ? route.getVersion() : "");
+        const off = route.subscribe(update);
+        update();
+        return off;
+      }, [route]);
+      return version;
+    }
+
+    function EndpointStatus({ route }) {
+      const status = useSearchRoute(route);
+      const version = useRouteVersion(route);
+      const [copied, setCopied] = React.useState(false);
+      return h("div", null,
+        h("h3", null, "搜索接口"),
+        h("p", { className: "deja-endpoint", role: "status" },
+          status === "unknown"
+            ? "正在检测 /api/deja-search …"
+            : status === "present"
+              ? "已检测到 dsh-deja" + (version ? " " + version : "（版本未知）") + " 提供的全文搜索接口。"
+              : "未检测到 /api/deja-search。侧栏全文搜索与跨会话快捷键需要 dsh-deja 包。"),
+        status === "absent"
+          ? h("div", { className: "deja-setting deja-keybinding" },
+            h("code", { className: "deja-install-command" }, INSTALL_COMMAND),
+            h("button", { type: "button", onClick: async () => setCopied(await copyText(INSTALL_COMMAND)) },
+              copied ? "已复制" : "复制安装命令"),
+            h("span", { className: "deja-setting-hint" }, "安装后重新加载此页面即可。"),
+          )
+          : null,
+      );
+    }
+
     function Settings({ prefs, shortcuts, route }) {
       const value = usePreferences(prefs);
       // Without the host route (a CLI-only install), the sidebar mode and its
@@ -632,7 +707,7 @@ window.__ModuleLoader__.load({
           h("input", { type: "checkbox", role: "switch", checked: value[key], onChange: (event) => prefs.set(key, event.target.checked) }),
           h("span", null, h("strong", null, title), h("span", { className: "deja-setting-hint" }, hint)),
         )),
-        sidebarUsable ? null : h("p", { className: "deja-setting-hint" }, "Sidebar full-text search needs the dsh-deja package host plugin; install it to enable the sidebar switch and the cross-session shortcut."),
+        h(EndpointStatus, { route: route || searchRoute() }),
         h("h3", null, "自定义快捷键"),
         h("p", { className: "deja-setting-hint" }, "点击修改后按下所需组合键，松开即可保存。设置与 DSH 内置快捷键编辑器同步。"),
         shortcuts?.edit && shortcuts?.recording && shortcuts?.catalog && shortcuts?.config
