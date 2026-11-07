@@ -82,6 +82,28 @@ func TestDSHCommandSearchesRatherThanDispatching(t *testing.T) {
 	}
 }
 
+// The composer shortcut writes `/deja --session <id> -- <query>`, so the
+// installed command has to scope one conversation and keep the ordinary query
+// working. The option terminator matters in the scoped form too.
+func TestDSHCommandSearchesOneConversationWhenScoped(t *testing.T) {
+	js := dshCommandJS("/bin/deja")
+	for _, want := range []string{`--session`, `SESSION.exec(`, `replace(/^session-/, "")`} {
+		if !strings.Contains(js, want) {
+			t.Errorf("the scoped form lost %q", want)
+		}
+	}
+	compact := strings.Join(strings.Fields(js), "")
+	for _, want := range []string{`["search","--session",bare,"--",query]`, `["search","--session",bare,query]`} {
+		if !strings.Contains(compact, want) {
+			t.Errorf("the scoped form is missing %s", want)
+		}
+	}
+	// A session id dsh would not write is refused, not silently dropped.
+	if !strings.Contains(js, `/^[a-zA-Z0-9_-]+$/`) {
+		t.Error("the scoped form accepts any session id")
+	}
+}
+
 // dsh refuses a name one of its registries already holds, and the failure is
 // not local: "prompt context deja:recall is already registered" fails the whole
 // plugin tree, so the profile boots with no agent at all. Two copies of these
