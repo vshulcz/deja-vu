@@ -120,10 +120,16 @@ func PlanFrictionMatches(dir string, steps [][]string, keep func(SessionMeta) bo
 	}
 	var hits []wallHit
 	candidateMetas := map[string]SessionMeta{}
-	rd := newFrictionReader(dir, manifest)
+	wanted := map[uint64]string{}
 	for _, cluster := range eligible {
-		wanted := map[uint64]string{cluster.hash: ""}
-		frictionTexts(rd, cluster.metas, wanted, cluster.hash)
+		wanted[cluster.hash] = ""
+	}
+	rd := newFrictionReader(dir, manifest)
+	rd.texts = loadFrictionTexts(dir, manifest, wanted)
+	for _, cluster := range eligible {
+		if wanted[cluster.hash] == "" {
+			frictionTexts(rd, cluster.metas, wanted, cluster.hash)
+		}
 		text := wanted[cluster.hash]
 		if text == "" || !planWallSharesTerm(text, indexedSteps) {
 			continue
@@ -131,6 +137,9 @@ func PlanFrictionMatches(dir string, steps [][]string, keep func(SessionMeta) bo
 		hits = append(hits, wallHit{cluster: cluster, text: text})
 		for _, meta := range carriers[cluster.hash] {
 			candidateMetas[meta.Key()] = meta
+		}
+		if limit > 0 && len(hits) >= limit {
+			break
 		}
 	}
 	if len(hits) == 0 {

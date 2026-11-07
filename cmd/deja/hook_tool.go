@@ -624,7 +624,7 @@ func commandFailureLine(dir, cwd, cmd string) string {
 			if p.Project != "" && !hookProjectIs(cwd, p.Project) {
 				continue
 			}
-			cleanCmd, ok := withoutFailedExit(strings.TrimPrefix(strings.TrimSpace(search.SafeCommand(p.Command)), "$ "))
+			cleanCmd, ok := withoutFailedExit(orientCommand(strings.TrimPrefix(strings.TrimSpace(search.SafeCommand(p.Command)), "$ ")))
 			if !ok || cleanCmd == "" {
 				continue
 			}
@@ -636,6 +636,139 @@ func commandFailureLine(dir, cwd, cmd string) string {
 		}
 	}
 	return line
+}
+
+func missingProgramLineWithRemedy(dir, cmd string) string {
+	line := missingProgramLine(dir, cmd)
+	if line == "" || strings.Contains(line, " — ") {
+		return line
+	}
+	pol := policy.Load()
+	allow := func(project string) bool {
+		return pol.Allows(policy.ActivationAuto, project)
+	}
+	for _, prog := range commandPrograms(cmd) {
+		for _, p := range index.FixesForCommand(dir, cmd, "command not found: "+prog, 4, allow) {
+			if p.Candidate || p.Command == "" {
+				continue
+			}
+			cleanCmd, ok := withoutFailedExit(orientCommand(strings.TrimPrefix(strings.TrimSpace(search.SafeCommand(p.Command)), "$ ")))
+			if !ok || cleanCmd == "" {
+				continue
+			}
+			remedy := " — next command that worked: " + cleanCmd
+			if len(line)+len(remedy) <= toolHookMaxBytes {
+				return line + remedy
+			}
+		}
+	}
+	return line
+}
+
+func isUnitTestFailureLine(line string) bool {
+	l := strings.TrimSpace(line)
+	return strings.Contains(l, "--- FAIL:") || strings.HasPrefix(l, "FAIL\t") || strings.HasPrefix(l, "FAIL ")
+}
+
+func isTestRunnerCommand(norm string) bool {
+	for _, prefix := range []string{"go test", "pytest", "npm test", "pnpm test", "yarn test", "cargo test", "jest", "vitest"} {
+		if norm == prefix || strings.HasPrefix(norm, prefix+" ") {
+			return true
+		}
+	}
+	return false
+}
+
+// confirmedCommandTrapLine warns before a command when that command shape has
+// failed in THIS project and has a confirmed replacement command that differs
+// from the failing invocation (for example, bare `golangci-lint run` at a repo
+// root where package arguments are required). Ordinary test runs whose remedy
+// is editing a source file and re-running a test command stay silent.
+func confirmedCommandTrapLine(dir, cwd, cmd string) string {
+	if cwd == "" {
+		return ""
+	}
+	inNorm := normalizedCommandText(orientCommand(cmd))
+	if inNorm == "" || isTestRunnerCommand(inNorm) {
+		return ""
+	}
+	pol := policy.Load()
+	allow := func(project string) bool {
+		return pol.Allows(policy.ActivationAuto, project) && hookProjectIs(cwd, project)
+	}
+	if fail, ok := index.CommandFailedBefore(dir, cmd, allow); ok && fail.Project != "" && hookProjectIs(cwd, fail.Project) && !isUnitTestFailureLine(fail.Line) {
+		for _, p := range index.FixesForCommand(dir, cmd, fail.Line, 4, allow) {
+			if p.Candidate || p.Command == "" {
+				continue
+			}
+			if p.Project != "" && !hookProjectIs(cwd, p.Project) {
+				continue
+			}
+			cleanCmd, ok := withoutFailedExit(orientCommand(strings.TrimPrefix(strings.TrimSpace(search.SafeCommand(p.Command)), "$ ")))
+			if !ok || cleanCmd == "" {
+				continue
+			}
+			if normalizedCommandText(cleanCmd) == inNorm {
+				continue
+			}
+			line := fmt.Sprintf("Last time this project ran %s it ended with: %s (in %s)",
+				search.SafeCommand(fail.Head), search.SafeLine(fail.Line), toolSessionCount(fail.Sessions))
+			remedy := " — next command that worked: " + cleanCmd
+			if len(line)+len(remedy) <= toolHookMaxBytes {
+				return line + remedy
+			}
+			return line
+		}
+	}
+	inFields := strings.Fields(inNorm)
+	inProg := ""
+	if len(inFields) > 0 {
+		inProg = inFields[0]
+	}
+	for _, p := range index.ReadFixes(dir) {
+		if p.Command == "" || p.Error == "" {
+			continue
+		}
+		if p.Project == "" || !allow(p.Project) || isUnitTestFailureLine(p.Error) || orientSkipFixError(p.Error) {
+			continue
+		}
+		rawCmd, ok := withoutFailedExit(strings.TrimPrefix(strings.TrimSpace(search.SafeText(p.Command)), "$ "))
+		if !ok || rawCmd == "" {
+			continue
+		}
+		cleanCmd := orientCommand(rawCmd)
+		if orientEphemeralCommand(cleanCmd) || orientDestructiveRemedy(cleanCmd) {
+			continue
+		}
+		cleanNorm := normalizedCommandText(cleanCmd)
+		if cleanNorm == "" || cleanNorm == inNorm {
+			continue
+		}
+		failedRaw, _ := withoutFailedExit(strings.TrimPrefix(strings.TrimSpace(search.SafeText(p.Failed)), "$ "))
+		failedClean := strings.TrimSpace(orientCommand(failedRaw))
+		matched := failedClean != "" && normalizedCommandText(failedClean) == inNorm
+		if !matched && len(inFields) >= 1 && len(inFields) <= 2 && inProg != "" && !genericCommandMultiplexers[inProg] {
+			if strings.HasPrefix(cleanNorm, inNorm+" ") {
+				matched = true
+				failedClean = orientCommand(cmd)
+			}
+		}
+		if !matched {
+			continue
+		}
+		if p.Candidate && frictionCount(dir, p, pol) < 2 {
+			continue
+		}
+		errLine := truncateToolLine(search.SafeLine(p.Error), 160)
+		line := fmt.Sprintf("Last time this project ran %s it ended with: %s",
+			search.SafeCommand(failedClean), errLine)
+		remedy := " — next command that worked: " + cleanCmd
+		if len(line)+len(remedy) <= toolHookMaxBytes {
+			return line + remedy
+		}
+		return line
+	}
+	return ""
 }
 
 // hookProjectIs reports whether a recorded project is the one the agent is
@@ -918,6 +1051,18 @@ func promotedCommandHookLine(dir, cwd, cmd, self string, used func(string) bool)
 	if index.InspectionCommand(cmd) {
 		return ""
 	}
+	if planIndexReady(dir) {
+		if line := missingProgramLineWithRemedy(dir, cmd); line != "" {
+			if !used(line) {
+				return line
+			}
+		}
+		if line := confirmedCommandTrapLine(dir, cwd, cmd); line != "" {
+			if !used(line) {
+				return line
+			}
+		}
+	}
 	pol := policy.Load()
 	repoDec := repoMemoryDecisionForCommand(cwd, cmd, pol)
 	var d string
@@ -1017,13 +1162,18 @@ func repoMemoryDecisionForCommand(cwd, cmd string, pol policy.Policy) string {
 	}
 	rank := map[string]int{"rejected": 0, "gotcha": 1, "decision": 2}
 	sort.SliceStable(entries, func(i, j int) bool {
+		fi := commandTouchesRepoEntryFiles(cmd, entries[i].Files)
+		fj := commandTouchesRepoEntryFiles(cmd, entries[j].Files)
+		if fi != fj {
+			return fi
+		}
 		if rank[entries[i].Kind] != rank[entries[j].Kind] {
 			return rank[entries[i].Kind] < rank[entries[j].Kind]
 		}
 		return entries[i].Date > entries[j].Date
 	})
 	for _, e := range entries {
-		if repoEntryMentionsCommand(cmd, e.Text) {
+		if commandTouchesRepoEntryFiles(cmd, e.Files) || repoEntryMentionsCommand(cmd, e.Text) {
 			body := "[" + e.Kind + "] " + e.Text
 			return trimTrailingFragment(search.SafeText(clipDecision(body, toolHookDecisionBudget)))
 		}
@@ -1031,8 +1181,49 @@ func repoMemoryDecisionForCommand(cwd, cmd string, pol policy.Policy) string {
 	return ""
 }
 
+func commandTouchesRepoEntryFiles(cmd string, files []string) bool {
+	if len(files) == 0 || cmd == "" {
+		return false
+	}
+	var tokens []string
+	for tok := range strings.FieldsSeq(cmd) {
+		tok = strings.Trim(tok, "\"'`();,|&<>=")
+		if idx := strings.LastIndex(tok, "="); idx >= 0 && idx+1 < len(tok) {
+			tok = tok[idx+1:]
+		}
+		tok = filepath.ToSlash(strings.TrimPrefix(strings.TrimSpace(tok), "./"))
+		tok = strings.TrimSuffix(tok, "/")
+		if tok != "" {
+			tokens = append(tokens, strings.ToLower(tok))
+		}
+	}
+	for _, f := range files {
+		clean := strings.ToLower(filepath.ToSlash(strings.TrimPrefix(strings.TrimSpace(f), "./")))
+		clean = strings.TrimSuffix(clean, "/")
+		if clean == "" {
+			continue
+		}
+		base := filepath.Base(clean)
+		for _, tok := range tokens {
+			if tok == clean || strings.HasSuffix(tok, "/"+clean) || strings.HasPrefix(tok, clean+"/") {
+				return true
+			}
+			if len(base) >= 5 && (strings.ContainsRune(base, '.') || strings.HasPrefix(base, ".")) {
+				if tok == base || strings.HasSuffix(tok, "/"+base) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 func repoEntryMentionsCommand(cmd, text string) bool {
 	low := strings.ToLower(text)
+	cmdLow := strings.ToLower(cmd)
+	if strings.Contains(cmdLow, ".deja") && strings.Contains(low, ".deja") {
+		return true
+	}
 	for _, seg := range splitCommandSegments(cmd) {
 		fields := strings.Fields(seg)
 		for len(fields) > 0 && strings.Contains(fields[0], "=") {

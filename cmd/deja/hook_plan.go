@@ -12,12 +12,13 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/vshulcz/deja-vu/internal/search"
-
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/prompt"
+	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // planHookBudget is the complete framed payload budget. Findings receive the
@@ -84,7 +85,8 @@ func runHookPlan(dir string, stdin io.Reader, stdout io.Writer) error {
 		return nil
 	}
 
-	lines := planFindings(dir, input.ToolInput.Plan, input.SessionID)
+	cwd := hookCWD(input.CWD)
+	lines := planFindingsIn(dir, cwd, input.ToolInput.Plan, input.SessionID)
 	if len(lines) == 0 {
 		return nil
 	}
@@ -103,6 +105,10 @@ func runHookPlan(dir string, stdin io.Reader, stdout io.Writer) error {
 // planFindings is shared verbatim by hook-plan and check. A non-empty session
 // id enables the same cross-hook advisory dedupe used by hook-prompt.
 func planFindings(dir, plan, sessionID string) []string {
+	return planFindingsIn(dir, "", plan, sessionID)
+}
+
+func planFindingsIn(dir, cwd, plan, sessionID string) []string {
 	steps := planSearchSteps(plan)
 	if len(steps) == 0 {
 		return nil
@@ -110,6 +116,13 @@ func planFindings(dir, plan, sessionID string) []string {
 
 	pol := policy.Load()
 	seen := alreadyInjected(dir, sessionID)
+	var extraFindings []planFinding
+	var extraTokens []string
+	if cwd != "" {
+		rmFindings, rmTokens := planRepoMemoryFindings(cwd, plan, pol, seen)
+		extraFindings = append(extraFindings, rmFindings...)
+		extraTokens = append(extraTokens, rmTokens...)
+	}
 	keep := func(meta index.SessionMeta) bool {
 		if !pol.Allows(policy.ActivationAuto, meta.Project) {
 			return false
@@ -132,15 +145,32 @@ func planFindings(dir, plan, sessionID string) []string {
 		// (#2567). requestWarmup writes a sentinel and detaches a child; the
 		// action pays neither the read nor the wait.
 		requestWarmup(dir)
-		return nil
+		if len(extraFindings) == 0 {
+			return nil
+		}
+		findings := budgetPlanFindings(extraFindings, planHookBudget-recallFrameOverhead)
+		if sessionID != "" && len(extraTokens) > 0 {
+			rememberInjectedIDs(dir, sessionID, extraTokens...)
+		}
+		lines := make([]string, 0, len(findings))
+		for _, f := range findings {
+			lines = append(lines, f.line)
+		}
+		return lines
+	}
+
+	if cwd != "" {
+		cpFindings, cpTokens := planCoupledFileFindings(dir, cwd, plan, extraFindings, seen)
+		extraFindings = append(extraFindings, cpFindings...)
+		extraTokens = append(extraTokens, cpTokens...)
 	}
 
 	matches := planFrictionLookup(dir, steps, keep, planFindingLimit)
-	if len(matches) == 0 {
+	if len(matches) == 0 && len(extraFindings) == 0 {
 		return nil
 	}
 
-	var findings []planFinding
+	findings := append([]planFinding{}, extraFindings...)
 	emittedWalls := map[string]bool{}
 	for _, match := range matches {
 		wallSessions := filterPlanMetas(match.Wall.Sessions, keep, nil)
@@ -201,6 +231,9 @@ func planFindings(dir, plan, sessionID string) []string {
 	}
 	if sessionID != "" {
 		rememberPlanFindings(dir, sessionID, findings)
+		if len(extraTokens) > 0 {
+			rememberInjectedIDs(dir, sessionID, extraTokens...)
+		}
 	}
 
 	lines := make([]string, 0, len(findings))
@@ -208,6 +241,108 @@ func planFindings(dir, plan, sessionID string) []string {
 		lines = append(lines, finding.line)
 	}
 	return lines
+}
+
+func planRepoMemoryFindings(cwd, plan string, pol policy.Policy, seen map[string]bool) ([]planFinding, []string) {
+	root := sources.RepoRoot(cwd)
+	if root == "" || !pol.Allows(policy.ActivationAuto, sources.RepoMemoryProject(root)) {
+		return nil, nil
+	}
+	entries, _, err := readRepoMemoryAndNotes(root)
+	if err != nil || len(entries) == 0 {
+		return nil, nil
+	}
+	var out []planFinding
+	var tokens []string
+	for _, e := range entries {
+		matched := commandTouchesRepoEntryFiles(plan, e.Files)
+		if !matched {
+			for _, f := range e.Files {
+				if repoEntryMentionsFile(root, f, plan) {
+					matched = true
+					break
+				}
+			}
+		}
+		if !matched {
+			matched = repoEntryMentionsCommand(plan, e.Text)
+		}
+		if !matched {
+			continue
+		}
+		scope := ""
+		if len(e.Files) > 0 {
+			scope = " (" + strings.Join(e.Files, ", ") + ")"
+		}
+		line := fmt.Sprintf("in %s%s: [%s] %s", repoFileShown, scope, e.Kind, neutralPlanEvidence(clipDecision(e.Text, 240)))
+		tok := "plan:rm:" + shortHash(line)
+		if seen[tok] {
+			continue
+		}
+		out = append(out, planFinding{line: line})
+		tokens = append(tokens, tok)
+		if len(out) >= 2 {
+			break
+		}
+	}
+	return out, tokens
+}
+
+func planCoupledFileFindings(dir, cwd, plan string, existing []planFinding, seen map[string]bool) ([]planFinding, []string) {
+	names := digest.ProjectNameCandidates(cwd)
+	if len(names) == 0 {
+		return nil, nil
+	}
+	pairs := orientCoChangePairs(dir, names, cwd, orientFiles(dir, names, cwd), policy.ActivationAuto)
+	if len(pairs) == 0 {
+		return nil, nil
+	}
+	var out []planFinding
+	var tokens []string
+	for _, pair := range pairs {
+		parts := strings.SplitN(pair, " (", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		files := strings.SplitN(parts[0], " ↔ ", 2)
+		if len(files) != 2 {
+			continue
+		}
+		fileA := strings.TrimSpace(files[0])
+		fileB := strings.TrimSpace(files[1])
+		inA := commandTouchesRepoEntryFiles(plan, []string{fileA})
+		inB := commandTouchesRepoEntryFiles(plan, []string{fileB})
+		if inA == inB {
+			continue
+		}
+		named, missing := fileA, fileB
+		if inB {
+			named, missing = fileB, fileA
+		}
+		alreadyCovered := false
+		for _, ex := range existing {
+			low := strings.ToLower(ex.line)
+			if strings.Contains(low, strings.ToLower(named)) && strings.Contains(low, strings.ToLower(missing)) {
+				alreadyCovered = true
+				break
+			}
+		}
+		if alreadyCovered {
+			continue
+		}
+		stats := strings.TrimSuffix(parts[1], ")")
+		line := fmt.Sprintf("coupled files: %s is usually edited alongside %s (%s), which is not named in this plan", named, missing, stats)
+		tok := "plan:co:" + shortHash(line)
+		if seen[tok] {
+			continue
+		}
+		out = append(out, planFinding{line: line})
+		tokens = append(tokens, tok)
+		if len(out) >= 2 {
+			break
+		}
+	}
+	return out, tokens
 }
 
 func filterPlanMetas(metas []index.SessionMeta, keep func(index.SessionMeta) bool, members map[string]bool) []index.SessionMeta {

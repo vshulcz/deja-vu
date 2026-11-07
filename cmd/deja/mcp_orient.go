@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -243,7 +244,7 @@ func orientCommand(cmd string) string {
 		cmd = strings.TrimSpace(strings.TrimLeft(cmd[i+1:], "&; "))
 	}
 	if len(cmd) > orientCommandMax {
-		cmd = strings.TrimSpace(cmd[:orientCommandMax]) + "…"
+		cmd = strings.TrimSpace(truncateToolLine(cmd, orientCommandMax)) + "…"
 	}
 	return cmd
 }
@@ -281,14 +282,14 @@ func resolveForeignWorktreeSuffix(p, cwd string) string {
 	if !strings.HasPrefix(low, "/tmp/") && !strings.HasPrefix(low, "/private/tmp/") && !strings.Contains(low, "/worktrees/") {
 		return ""
 	}
+	tree := orientRepoTree(cwd)
 	parts := strings.Split(strings.TrimPrefix(slash, "/"), "/")
 	for i := 1; i < len(parts)-1; i++ {
 		rel := strings.Join(parts[i:], "/")
 		if !strings.Contains(rel, "/") {
 			continue
 		}
-		target := filepath.Join(cwd, filepath.FromSlash(rel))
-		if fi, err := os.Stat(target); err == nil && fi.Mode().IsRegular() {
+		if tree.rel[rel] {
 			return filepath.FromSlash(rel)
 		}
 	}
@@ -887,17 +888,28 @@ func isOrientEphemeralFile(p string) bool {
 }
 
 type repoFileTree struct {
-	rel  map[string]bool
-	base map[string]bool
+	rel    map[string]bool
+	base   map[string]bool
+	byBase map[string]string
+	at     time.Time
 }
 
+var orientTreeCache sync.Map
+
 func orientRepoTree(cwd string) repoFileTree {
-	t := repoFileTree{
-		rel:  map[string]bool{},
-		base: map[string]bool{},
-	}
 	if cwd == "" {
-		return t
+		return repoFileTree{}
+	}
+	if v, ok := orientTreeCache.Load(cwd); ok {
+		if cached, ok := v.(repoFileTree); ok && time.Since(cached.at) < 250*time.Millisecond {
+			return cached
+		}
+	}
+	t := repoFileTree{
+		rel:    map[string]bool{},
+		base:   map[string]bool{},
+		byBase: map[string]string{},
+		at:     time.Now(),
 	}
 	fi, err := os.Stat(cwd)
 	if err != nil || !fi.IsDir() {
@@ -919,12 +931,18 @@ func orientRepoTree(cwd string) repoFileTree {
 		if count > 8000 {
 			return fs.SkipAll
 		}
+		b := strings.ToLower(d.Name())
+		t.base[b] = true
 		if rel, err := filepath.Rel(cwd, path); err == nil {
-			t.rel[filepath.ToSlash(rel)] = true
+			slash := filepath.ToSlash(rel)
+			t.rel[slash] = true
+			if prev, exists := t.byBase[b]; !exists || len(slash) < len(prev) {
+				t.byBase[b] = slash
+			}
 		}
-		t.base[strings.ToLower(d.Name())] = true
 		return nil
 	})
+	orientTreeCache.Store(cwd, t)
 	return t
 }
 
@@ -940,6 +958,20 @@ func (t repoFileTree) exists(named string) bool {
 		return t.base[strings.ToLower(slash)]
 	}
 	return false
+}
+
+func (t repoFileTree) resolveRel(named string) string {
+	if named == "" {
+		return ""
+	}
+	slash := strings.TrimPrefix(filepath.ToSlash(named), "./")
+	if t.rel[slash] {
+		return slash
+	}
+	if !strings.Contains(slash, "/") {
+		return t.byBase[strings.ToLower(slash)]
+	}
+	return ""
 }
 
 func orientMatchesAny[V any](t repoFileTree, byPath map[string]V) bool {

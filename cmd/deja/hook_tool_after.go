@@ -549,7 +549,7 @@ func nearErrorProbesFromOutput(output string) []string {
 			continue
 		}
 		low := strings.ToLower(line)
-		if idx := strings.Index(low, "does not contain main module"); idx >= 0 {
+		if strings.Contains(low, "does not contain main module") {
 			add("does not contain main module")
 			continue
 		}

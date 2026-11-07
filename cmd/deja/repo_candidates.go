@@ -205,6 +205,33 @@ func collectRepoCandidates(dir, root string, since time.Duration, limit int) ([]
 	if err := sessionRepoCandidates(dir, root, inScope, allowed, add); err != nil {
 		return nil, err
 	}
+	for _, pair := range orientCoChangePairs(dir, names, root, orientFiles(dir, names, root), policy.ActivationAuto) {
+		parts := strings.SplitN(pair, " (", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		files := strings.SplitN(parts[0], " ↔ ", 2)
+		if len(files) != 2 {
+			continue
+		}
+		fileA := strings.TrimSpace(files[0])
+		fileB := strings.TrimSpace(files[1])
+		stats := strings.TrimSuffix(parts[1], ")")
+		count := 3
+		if n, err := fmt.Sscanf(stats, "%d of ", &count); n != 1 || err != nil {
+			count = 3
+		}
+		add(repoCandidate{
+			Kind:     "gotcha",
+			Text:     fmt.Sprintf("Editing %s requires updating %s alongside it (%s)", fileA, fileB, stats),
+			Files:    []string{fileA, fileB},
+			Sessions: count,
+			From:     repoFrom("deja", time.Now()),
+			Source:   "coupled files",
+			tier:     0,
+			at:       time.Now(),
+		})
+	}
 	enrichRepoCandidateFilesAndCommits(dir, root, out)
 	return sortAndDedupeRepoCandidates(root, out, since, limit), nil
 }
@@ -661,6 +688,9 @@ func cleanRepoRelFile(root, raw string) string {
 	if slash == "" || slash == "." || strings.HasPrefix(slash, "/") || strings.HasPrefix(slash, "..") || strings.HasPrefix(slash, ".git/") || strings.HasPrefix(slash, ".deja/") || strings.HasPrefix(slash, ".claude/") || strings.HasPrefix(slash, "deja-vu-loop/") {
 		return ""
 	}
+	if resolved := orientRepoTree(root).resolveRel(slash); resolved != "" {
+		return resolved
+	}
 	fi, err := os.Stat(filepath.Join(root, filepath.FromSlash(slash)))
 	if err != nil || !fi.Mode().IsRegular() {
 		return ""
@@ -682,7 +712,7 @@ func enrichRepoCandidateFilesAndCommits(dir, root string, cands []repoCandidate)
 			}
 			perSession := map[string]bool{}
 			for _, raw := range m.Touched {
-				rel := cleanRepoRelFile(root, raw)
+				rel := cleanRepoRelFile(root, orientPath(raw, root))
 				if rel == "" {
 					continue
 				}
@@ -699,7 +729,15 @@ func enrichRepoCandidateFilesAndCommits(dir, root string, cands []repoCandidate)
 	}
 	commits := recentRepoGitCommits(root)
 	for i := range cands {
-		cands[i].Files = sources.CleanRepoFiles(append(cands[i].Files, extractMentionedRepoFiles(root, cands[i].Text, knownFiles)...))
+		var resolved []string
+		for _, f := range cands[i].Files {
+			if rel := cleanRepoRelFile(root, f); rel != "" {
+				resolved = append(resolved, rel)
+			} else {
+				resolved = append(resolved, f)
+			}
+		}
+		cands[i].Files = sources.CleanRepoFiles(append(resolved, extractMentionedRepoFiles(root, cands[i].Text, knownFiles)...))
 		maxSess := cands[i].Sessions
 		for _, f := range cands[i].Files {
 			if n := fileSessions[f]; n > maxSess {
@@ -721,6 +759,9 @@ func extractMentionedRepoFiles(root, text string, knownFiles []string) []string 
 	}
 	low := strings.ToLower(text)
 	var out []string
+	if strings.Contains(low, ".deja/") || strings.Contains(low, " .deja ") || strings.HasSuffix(low, " .deja") {
+		out = append(out, ".deja")
+	}
 	for _, f := range knownFiles {
 		if strings.Contains(low, strings.ToLower(f)) {
 			out = append(out, f)
@@ -1041,6 +1082,9 @@ func usableRepoCandidateLine(s string) bool {
 
 func repoCandidatePrefixKey(kind, text string) string {
 	norm := strings.ToLower(strings.Join(strings.Fields(cleanRepoCandidateLine(text)), " "))
+	if idx := strings.LastIndex(norm, " ("); idx > 20 && strings.HasSuffix(norm, "sessions)") {
+		norm = strings.TrimSpace(norm[:idx])
+	}
 	r := []rune(norm)
 	if len(r) < 35 {
 		return ""

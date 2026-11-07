@@ -213,7 +213,14 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// A host that quoted the whole prompt, as `opencode run "<question>"` does,
 	// sent the question all the same.
 	asked := prompt.Unwrap(digest.StripHarnessBlocks(string(input.Prompt)))
-	nudge := failureNudge(dir, asked)
+	// The payload first, then the export, then where the process stands: the
+	// export is set once per process and will not change, so reading it alone
+	// answered a second payload with the first one's project (#2182).
+	cwd := hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots))
+	nudge := joinPromptAdvisories(
+		promptDirectContext(dir, cwd, input.SessionID, asked),
+		failureNudge(dir, asked),
+	)
 	// Nobody asked. A harness delivers its own plumbing as the next user turn —
 	// a finished background task, a system reminder, a slash command's envelope
 	// — and the hook fires on it like a question. The terms are then the
@@ -237,7 +244,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	}
 	// A new session whose first words ask to carry on another one gets that
 	// session's packet instead of a recall on the words of the request.
-	if emitAskedHandoff(dir, input, asked, hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots)), plain, stdout) {
+	if emitAskedHandoff(dir, input, asked, cwd, plain, stdout) {
 		return nil
 	}
 	// The same question, from the same reader, was answered a moment ago. The
@@ -256,10 +263,6 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		seenFile.asked(input.SessionID, askKey(terms), repeatAskWindow) {
 		return emitNudgeOnly(stdout, plain, nudge)
 	}
-	// The payload first, then the export, then where the process stands: the
-	// export is set once per process and will not change, so reading it alone
-	// answered a second payload with the first one's project (#2182).
-	cwd := hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots))
 	// Rank THIS project's sessions by how well they match the prompt terms
 	// (IDF-weighted), rather than reconstructing an AND query — natural
 	// prompts are full of filler that poisons an AND.

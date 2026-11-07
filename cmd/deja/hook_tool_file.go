@@ -150,10 +150,36 @@ func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(inde
 		}
 	}
 	ran := fileHookRanLineFor(dir, path, inScope)
+	co := fileHookCoChangeLineIn(cwd, path, inScope)
+	return assembleFileHookLine(head, dec, co, ran)
+}
+
+func assembleFileHookLine(head, dec, co, ran string) string {
+	if dec != "" && (strings.Contains(dec, "requires updating ") || strings.Contains(dec, "edited alongside ")) {
+		co = ""
+	}
+	if dec != "" && co != "" && ran != "" && len(head)+len(dec)+len(co)+len(ran) > toolHookMaxBytes {
+		for _, label := range []string{standingLabel, repoDecisionLabel, decisionLabel} {
+			if strings.HasPrefix(dec, label) {
+				avail := toolHookMaxBytes - len(head) - len(co) - len(ran) - len(label)
+				if avail >= 90 {
+					clipped := trimTrailingFragment(search.SafeText(clipDecision(strings.TrimPrefix(dec, label), avail)))
+					if clipped != "" {
+						dec = label + clipped
+					}
+				}
+				break
+			}
+		}
+	}
 	var body string
 	switch {
 	case dec != "" && (strings.HasPrefix(dec, standingLabel) || strings.HasPrefix(dec, repoDecisionLabel)):
 		body = dec
+		if co != "" && len(head)+len(body)+len(co) <= toolHookMaxBytes {
+			body += co
+			co = ""
+		}
 		if ran != "" && len(head)+len(body)+len(ran) <= toolHookMaxBytes {
 			body += ran
 		}
@@ -167,7 +193,6 @@ func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(inde
 	default:
 		body = dec
 	}
-	co := fileHookCoChangeLine(path, inScope)
 	if body == "" {
 		if co != "" {
 			return head + co
