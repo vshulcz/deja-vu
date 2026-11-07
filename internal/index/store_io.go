@@ -33,16 +33,13 @@ func RecordLogScans() int64 { return atomic.LoadInt64(&recordLogScans) }
 
 // ReadRecords reads every record in the log with its offset.
 func ReadRecords(dir string) ([]OffsetRecord, error) {
-	t, err := loadRecordTables(dir)
-	if err != nil {
-		return nil, err
-	}
-	var out []OffsetRecord
-	f, err := openIndexFile(filepath.Join(dir, "records.bin"))
+	f, t, err := openRecordLog(dir)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = f.Close() }()
+	atomic.AddInt64(&recordLogScans, 1)
+	var out []OffsetRecord
 	w := newLogWalk(f, t, 0)
 	for {
 		off, payload, err := w.next()
@@ -63,6 +60,37 @@ func ReadRecords(dir string) ([]OffsetRecord, error) {
 		}
 		out = append(out, OffsetRecord{Offset: off, Record: r})
 	}
+}
+
+// ReadRecordsAt reads the records at the given byte offsets in the log.
+func ReadRecordsAt(dir string, offsets []int64) ([]OffsetRecord, error) {
+	f, t, err := openRecordLog(dir)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+	sorted := slices.Clone(offsets)
+	slices.Sort(sorted)
+	sorted = slices.Compact(sorted)
+	out := make([]OffsetRecord, 0, len(sorted))
+	err = eachOffsetRecordAtInRoles(f, sorted, t, nil, func(off int64, r Record) {
+		if r.Key != "" {
+			out = append(out, OffsetRecord{Offset: off, Record: r})
+		}
+	})
+	return out, err
+}
+
+func openRecordLog(dir string) (*os.File, *recordTables, error) {
+	t, err := loadRecordTables(dir)
+	if err != nil {
+		return nil, nil, err
+	}
+	f, err := openIndexFile(filepath.Join(dir, "records.bin"))
+	if err != nil {
+		return nil, nil, err
+	}
+	return f, t, nil
 }
 
 // logWalk reads the record log in order, handing back each live record's
@@ -764,6 +792,12 @@ func eachRecordAt(f *os.File, offsets []int64, t *recordTables, fn func(Record))
 }
 
 func eachRecordAtInRoles(f *os.File, offsets []int64, t *recordTables, roles map[string]bool, fn func(Record)) error {
+	return eachOffsetRecordAtInRoles(f, offsets, t, roles, func(_ int64, r Record) {
+		fn(r)
+	})
+}
+
+func eachOffsetRecordAtInRoles(f *os.File, offsets []int64, t *recordTables, roles map[string]bool, fn func(int64, Record)) error {
 	buf := make([]byte, 0, 64*1024)
 	for i := 0; i < len(offsets); {
 		j := i + 1
@@ -801,7 +835,7 @@ func eachRecordAtInRoles(f *os.File, offsets []int64, t *recordTables, roles map
 				}
 			}
 			if r, ok := decodeRecordIn(b, rel, t); ok {
-				fn(r)
+				fn(off, r)
 				continue
 			}
 			// decodeRecordIn only failed because the span did not hold the whole
@@ -821,7 +855,7 @@ func eachRecordAtInRoles(f *os.File, offsets []int64, t *recordTables, roles map
 			if !roleWanted(roles, r.Role) {
 				continue
 			}
-			fn(r)
+			fn(off, r)
 		}
 		i = j
 	}
