@@ -92,12 +92,12 @@ Open **Settings → Deja** for three independent switches, all enabled by defaul
   input — `/deja --session <bare session UUID> -- <your draft>` — and focuses
   it. Sending it runs deja against that one conversation, so the search
   actually happens instead of arriving as an ordinary message; reference
-  chips in the draft are kept and move with the prefix. Nothing is sent until
-  you send it. A draft that already starts with another command is left
-  untouched. Use **Ctrl+F** on Windows/Linux desktop or **Cmd+F** on macOS
-  desktop. In a browser, use **Ctrl+Alt+F** on Windows or
-  **Option+Command+F** on macOS; DSH reserves the browser's ordinary Find
-  shortcut.
+  chips in the draft are kept and move with the prefix. The shortcut does not
+  send the draft; you send it when you choose. A draft that already starts
+  with another command is left untouched. Use **Ctrl+F** on Windows/Linux
+  desktop or **Cmd+F** on macOS desktop. In a browser, use **Ctrl+Alt+F** on
+  Windows or **Option+Command+F** on macOS; DSH reserves the browser's
+  ordinary Find shortcut.
 - **Ctrl+K opens Deja full-text search** takes over the sidebar search that
   gesture opens: the search starts in Deja full-text mode instead of the title
   search. The magnifying glass returns the native search for that opening.
