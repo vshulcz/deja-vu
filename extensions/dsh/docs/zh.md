@@ -60,10 +60,11 @@ dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
 
 打开 **设置 → Deja**，可分别控制三个默认开启的开关：
 
-- **Ctrl+F in conversations（会话内快捷搜索）**：把字面文本
-  `deja search --session <不带 session- 前缀的会话 UUID> ` 填入消息输入框，
-  后接当前草稿作为查询内容，并聚焦输入框。它不会自动发送消息。
-  Windows/Linux 桌面端使用 **Ctrl+F**，macOS 桌面端使用 **Cmd+F**；
+- **Ctrl+F in conversations（会话内快捷搜索）**：把真正的 `/deja` 命令写进
+  消息输入框——`/deja --session <不带 session- 前缀的会话 UUID> -- <当前草稿>`，
+  并聚焦输入框。发送后由 deja 只搜这一段会话，而不是变成一条普通消息；草稿里的
+  引用块会保留并随前缀整体后移。不会自动发送。若草稿本身已以别的命令开头，
+  则原样不动。Windows/Linux 桌面端使用 **Ctrl+F**，macOS 桌面端使用 **Cmd+F**；
   浏览器中 Windows 使用 **Ctrl+Alt+F**，macOS 使用 **Option+Command+F**，
   因为 DSH 为浏览器原生查找保留了普通的 Find 快捷键。
 - **Ctrl+K opens Deja full-text search（Ctrl+K 唤起 Deja 全文搜索）**：接管

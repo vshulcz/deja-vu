@@ -399,12 +399,41 @@ window.__ModuleLoader__.load({
       return status;
     }
 
-    function sessionCommand(id, draft = "") {
+    // Ctrl+F writes a real `/deja` command, so the search runs when the
+    // person sends it — a plain "deja search" sentence would only be a message
+    // to the model. The draft keeps its reference chips by shifting every
+    // occurrence past the prefix; the shape is DSH's own draft snapshot.
+    const SESSION_COMMAND = "/deja";
+    function bareSession(id) {
       const bare = String(id || "").replace(/^session-/, "");
-      if (!/^[a-zA-Z0-9_-]+$/.test(bare)) return null;
-      const prefix = "deja search --session " + bare + " ";
-      // Repeated Ctrl+F focuses the same draft, without nesting commands.
-      return draft.startsWith(prefix) ? draft : prefix + draft;
+      return /^[a-zA-Z0-9_-]+$/.test(bare) ? bare : "";
+    }
+    function sessionDraft(id, projection) {
+      const bare = bareSession(id);
+      if (!bare) return null;
+      const prefix = SESSION_COMMAND + " --session " + bare + " -- ";
+      const text = typeof projection?.clipboardText === "string" ? projection.clipboardText : "";
+      const command = { token: SESSION_COMMAND };
+      const occurrences = Array.isArray(projection?.occurrences) ? projection.occurrences : [];
+      // A different command chip leads this draft; rewriting it would replace
+      // the command the person typed, so leave their draft as it is.
+      if (projection?.command && !text.startsWith(prefix)) return null;
+      // Repeated Ctrl+F focuses the same draft instead of nesting prefixes.
+      const shift = text.startsWith(prefix) ? 0 : prefix.length;
+      return {
+        text: shift ? prefix + text : text,
+        command,
+        references: occurrences.map((row) => ({
+          source: String(row.source || ""),
+          ref: String(row.ref || ""),
+          label: String(row.label || ""),
+          offset: Number(row.offset) + shift,
+          length: Number(row.length),
+          clipboardText: String(row.clipboardText || ""),
+          ...(row.appearance ? { appearance: row.appearance } : {}),
+          ...(row.invalid ? { invalid: true } : {}),
+        })),
+      };
     }
 
     function installFind(ctx, prefs) {
@@ -422,14 +451,14 @@ window.__ModuleLoader__.load({
           if (!prefs.getSnapshot().conversation || context.modal != null || context.region === "terminal") return { status: "pass" };
           const id = ctx.uiSession.current.getSnapshot().key;
           const binding = id && ctx.sessions.binding(id);
-          if (!binding || !sessionCommand(id)) return { status: "pass" };
+          if (!binding || !bareSession(id)) return { status: "pass" };
           return { status: "handled", run() {
             // Resolve again: navigation can change between key resolution and execution.
             const current = ctx.uiSession.current.getSnapshot().key;
             const active = current && ctx.sessions.binding(current);
             if (!active) return;
             const input = ctx.conversation.input.for(active.ctx);
-            const draft = sessionCommand(current, input.projection.clipboardText || "");
+            const draft = sessionDraft(current, input.projection);
             if (!draft) return;
             input.actions.setDraft(draft);
             input.actions.persistDraft();
@@ -883,7 +912,8 @@ window.__ModuleLoader__.load({
     module.exports.stripName = stripName;
     module.exports.safeHref = safeHref;
     module.exports.preferences = preferences;
-    module.exports.sessionCommand = sessionCommand;
+    module.exports.sessionDraft = sessionDraft;
+    module.exports.bareSession = bareSession;
     module.exports.installFind = installFind;
     module.exports.installSearch = installSearch;
     module.exports.attachSidebar = attachSidebar;

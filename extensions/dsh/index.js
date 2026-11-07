@@ -227,21 +227,37 @@ function tools(ctx) {
   })));
 }
 
+// `/deja --session <id> -- <query>` scopes the search to one conversation; the
+// composer shortcut writes exactly that. Anything else stays one plain query,
+// so a typed `/deja --session foo` still searches for those words rather than
+// quietly filtering by a session that does not exist.
+const SESSION_FLAG = /^--session\s+(\S+)(?:\s+--\s*([\s\S]*))?$/;
+
+function commandQuery(rawInput) {
+  const text = String(rawInput || "").trim();
+  const match = SESSION_FLAG.exec(text);
+  if (!match) return { session: "", query: text };
+  return { session: bareSessionId(match[1]), query: (match[2] || "").trim() };
+}
+
 function command(ctx, board) {
   guarded(() => ctx.commands.register({
     name: "deja",
     description: "Search this machine's past AI coding sessions",
     input: { hint: "what to look for" },
     async handler(invocation) {
-      const query = String((invocation && invocation.rawInput) || "").trim();
+      const { session, query } = commandQuery(invocation && invocation.rawInput);
       if (!query) {
         return { kind: "error", text: "Say what to look for: /deja <error, file, or decision>" };
+      }
+      if (session && !/^[a-zA-Z0-9_-]+$/.test(session)) {
+        return { kind: "error", text: "That session id is not one dsh writes — `/deja --session <id> -- <query>` searches one conversation." };
       }
       // Named, not handed over as deja's first word: the bare-query path
       // dispatches a word that happens to be a command, so `/deja version`
       // printed a version number and `/deja index` rebuilt the index, and one
       // of the words people most want history about is `install`.
-      const out = run(argv("search", [], query));
+      const out = run(argv("search", session ? ["--session", session] : [], query));
       if (!INSTALLED) return { kind: "error", text: MISSING };
       // Outside dsh web a person sees nothing the hooks print — the digest
       // goes to the model — so the reply to /deja is where deja's own notes

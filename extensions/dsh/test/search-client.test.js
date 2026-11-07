@@ -59,15 +59,15 @@ function sidebarAnchor(expanded = false) {
   return anchor;
 }
 function shortcuts(mod, prefs) {
-  const state = { id: "session-first", drafts: new Map(), focused: [], persisted: [] };
+  const state = { id: "session-first", drafts: new Map(), projections: new Map(), focused: [], persisted: [] };
   let command;
   const ctx = {
     shortcuts: { register(value) { command = value; return () => {}; } },
     uiSession: { current: { getSnapshot: () => ({ key: state.id }) } },
     sessions: { binding: (id) => ({ ctx: { id } }) },
     conversation: { input: { for: ({ id }) => ({
-      projection: { clipboardText: state.drafts.get(id) || "" },
-      actions: { setDraft: (text) => state.drafts.set(id, text), persistDraft: () => state.persisted.push(id) },
+      projection: state.projections.get(id) || { clipboardText: state.drafts.get(id)?.text || "", occurrences: [] },
+      actions: { setDraft: (draft) => state.drafts.set(id, draft), persistDraft: () => state.persisted.push(id) },
       focus: () => state.focused.push(id),
     }) } },
   };
@@ -75,20 +75,56 @@ function shortcuts(mod, prefs) {
   return { command, ctx, state };
 }
 
-test("Ctrl+F fills and persists the active session's draft without submitting", () => {
+test("Ctrl+F writes a real /deja command and keeps the draft and its references", () => {
   const mod = load();
   const { command, state } = shortcuts(mod, mod.preferences());
-  state.drafts.set("session-first", "中文 query");
+  state.projections.set("session-first", { clipboardText: "中文 query", occurrences: [] });
   const action = command.resolve({ modal: null, region: "editable" });
   assert.equal(action.status, "handled");
   action.run();
-  assert.equal(state.drafts.get("session-first"), "deja search --session first 中文 query");
+  assert.deepEqual(JSON.parse(JSON.stringify(state.drafts.get("session-first"))), {
+    text: "/deja --session first -- 中文 query",
+    command: { token: "/deja" },
+    references: [],
+  });
   assert.deepEqual(state.persisted, ["session-first"]);
   assert.deepEqual(state.focused, ["session-first"]);
+  // A second press focuses the same command instead of nesting a prefix.
   command.resolve({ modal: null }).run();
-  assert.equal(state.drafts.get("session-first"), "deja search --session first 中文 query");
+  assert.equal(state.drafts.get("session-first").text, "/deja --session first -- 中文 query");
   assert.equal(command.defaults["desktop:windows"].code, "KeyF");
   assert.equal(command.defaults["web:windows"].modifiers.join("+"), "primary+alt");
+});
+
+test("a reference chip keeps its identity and moves past the command prefix", () => {
+  const mod = load();
+  const { command, state } = shortcuts(mod, mod.preferences());
+  const chip = { source: "file", ref: "src/app.js", label: "app.js", offset: 0, length: 10, clipboardText: "@src/app.j", appearance: "file" };
+  state.projections.set("session-first", { clipboardText: chip.clipboardText + " tail", occurrences: [chip] });
+  command.resolve({ modal: null }).run();
+  const draft = state.drafts.get("session-first");
+  assert.equal(draft.text, "/deja --session first -- @src/app.j tail");
+  assert.equal(draft.references.length, 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(draft.references[0])), {
+    source: "file", ref: "src/app.js", label: "app.js",
+    offset: "/deja --session first -- ".length, length: 10, clipboardText: "@src/app.j", appearance: "file",
+  });
+});
+
+test("a draft led by someone else's command is left alone", () => {
+  const mod = load();
+  const { command, state } = shortcuts(mod, mod.preferences());
+  state.projections.set("session-first", { clipboardText: "/review this diff", occurrences: [], command: { token: "/review" } });
+  command.resolve({ modal: null }).run();
+  assert.equal(state.drafts.has("session-first"), false, "another command's chip was overwritten");
+  assert.deepEqual(state.focused, [], "a draft left alone is not re-focused");
+});
+
+test("session ids dsh would not write leave the key to DSH", () => {
+  const mod = load();
+  const { command, state } = shortcuts(mod, mod.preferences());
+  state.id = "session-bad id";
+  assert.equal(command.resolve({ modal: null }).status, "pass");
 });
 
 test("navigation between resolution and execution never writes the previous session", () => {
@@ -98,7 +134,7 @@ test("navigation between resolution and execution never writes the previous sess
   state.id = "session-second";
   action.run();
   assert.equal(state.drafts.has("session-first"), false);
-  assert.equal(state.drafts.get("session-second"), "deja search --session second ");
+  assert.equal(state.drafts.get("session-second").text, "/deja --session second -- ");
   state.id = undefined;
   action.run();
   assert.equal(state.drafts.size, 1);

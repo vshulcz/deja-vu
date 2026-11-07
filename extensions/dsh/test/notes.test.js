@@ -68,6 +68,27 @@ test("the board hands a session's lines over once and stays bounded", () => {
   assert.equal(board.hasReader(), true);
 });
 
+// The composer shortcut writes `/deja --session <id> -- <query>`, so /deja has
+// to search that one conversation. A plain query keeps searching everything.
+test("/deja searches one conversation when the composer scopes it", { skip: process.platform === "win32" }, async () => {
+  const { default: apply } = await import("../index.js?scoped");
+  const web = host(["connection", "webServer"]);
+  apply(web.ctx, {});
+  const before = calls().length;
+  const scoped = await web.command.handler({ rawInput: "--session abc123 -- staging queue", agent: { sessionId: "session-5678" } });
+  assert.equal(scoped.kind, "success");
+  assert.ok(calls().slice(before).some((line) => line.startsWith("search --session abc123 ") && line.endsWith("staging queue")),
+    calls().slice(before).join(" | "));
+  const plain = await web.command.handler({ rawInput: "staging queue", agent: { sessionId: "session-5678" } });
+  assert.equal(plain.kind, "success");
+  assert.ok(calls().slice(before).some((line) => line === "search staging queue"), calls().slice(before).join(" | "));
+  // A session id dsh would not write is refused instead of silently ignored.
+  const bad = await web.command.handler({ rawInput: "--session 'a b' -- q", agent: { sessionId: "session-5678" } });
+  assert.equal(bad.kind, "error");
+});
+
+const skip = process.platform === "win32";
+
 // dsh 0.2.0 dropped session.events for eventAt(seq); reading only the array
 // found no prompt there, and the per-prompt recall never ran.
 test("the session log is read newest first in either shape", () => {
@@ -142,8 +163,6 @@ function assembly(sid) {
   ];
   return { agent: { sessionId: sid, session: { header: { cwd: STAND }, get seq() { return log.length; }, eventAt: (i) => log[i] } } };
 }
-
-const skip = process.platform === "win32";
 
 test("the recall reaches the model unchanged and the receipt reaches the page", { skip }, async () => {
   const { default: apply } = await import("../index.js?web");
