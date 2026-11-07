@@ -53,12 +53,47 @@ dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
     - id: deja
       name: dsh-deja
       config:
-        autoRecall: false   # 只保留工具和 /deja
+        autoRecall: false   # 保留工具、/deja 和手动搜索
 ```
+
+## 搜索控制
+
+打开 **设置 → Deja**，可分别控制两个默认开启的开关：
+
+- **Ctrl+F in conversations（会话内快捷搜索）**：把字面文本
+  `deja search --session <不带 session- 前缀的会话 UUID> ` 填入消息输入框，
+  后接当前草稿作为查询内容，并聚焦输入框。它不会自动发送消息。
+  Windows/Linux 桌面端使用 **Ctrl+F**，macOS 桌面端使用 **Cmd+F**；
+  浏览器中 Windows 使用 **Ctrl+Alt+F**，macOS 使用 **Option+Command+F**，
+  因为 DSH 为浏览器原生查找保留了普通的 Find 快捷键。
+- **Deja search in the sidebar（侧栏 Deja 搜索）**：先打开侧栏搜索，
+  再点一次放大镜，切换到 Deja 全文搜索。输入关键词后，只检索本地索引中的
+  **DSH 会话**，最多显示 20 条结果及匹配片段；点击结果可打开对应会话。
+  再点放大镜可恢复普通侧栏结果。若还有更多匹配，请缩小查询范围。
+  Deja 不可用、搜索失败或无法打开会话时，界面会显示错误信息。
+
+两个偏好分别保存在当前浏览器／配置的本地存储中，互不影响，也不会同步到其他
+浏览器或设备。即使设置了 `autoRecall: false`，手动搜索仍然可用。
+
+侧栏全文搜索需要安装 **dsh-deja 包的宿主插件**。CLI 的
+`deja install dsh-auto` 会复制浏览器面板，但目前不会安装搜索接口；
+请按上面的步骤安装包以启用接口。原有的 CLI 工具、命令可以与包同时使用。
 
 ## 接入方式
 
 召回通过 `ctx.systemPrompt.context` 注入，该回调在每次 assembly 时求值。另一种看起来可行的做法——在 `agent/pre-step` 中间件里往这一步的消息列表里插入一条消息——插件能加载、回合也能正常结束，但内容到不了模型：该 waterfall 中后续的监听器会基于 payload 重建返回值，插入的消息被丢弃且没有任何报错。这一点是通过读取 dsh 0.1.1-rc.2 实际发出的请求确认的。
+
+手动侧栏搜索使用 DSH 同一套登录保护下的 `GET /api/deja-search` 接口，
+通过异步、无 shell 的调用执行
+`deja search --harness deepseek --json --limit 20 -- <query>`，
+超时为 20 秒，输出上限为 2 MiB。空查询不会启动进程；超过 500 个字符的查询会被拒绝。
+接口只返回精简的会话元数据和匹配片段，不返回完整对话。
+
+DSH 目前没有侧栏搜索 provider API。浏览器适配器限定在
+`data-slot="sidebar.workspaces"` 锚点内，通过带 `aria-expanded` 的语义化
+搜索按钮和 `_listArea` CSS 类后缀定位原界面。已检查的界面版本为
+**DSH 0.2.1-rc.5**。如果旧版或变更后的布局缺少这些元素，适配器会保持普通
+侧栏不变。这些内部标记依赖可能需要随 DSH 后续版本调整。
 
 ## 不做什么
 

@@ -1,0 +1,101 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>dsh-deja search browser fixture</title>
+<!-- Optional browser integration check. Serve the repository with any static
+     HTTP server and open extensions/dsh/test/search-browser.html. React is a
+     test-only CDN dependency; the shipped plugin uses DSH's module table. -->
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+<style>
+  body { font: 14px system-ui; margin: 24px; background: #f7f8fb; color: #202534; }
+  #fixture { display: flex; gap: 28px; }
+  [data-slot="sidebar.workspaces"] > div { display: flex; flex-direction: column; width: 300px; height: 400px; border: 1px solid #bbc3d4; border-radius: 8px; padding: 8px; }
+  .fixture_listArea { flex: 1; display: flex; }
+  #report { white-space: pre-wrap; }
+</style>
+<h1>Deja search browser integration fixture</h1>
+<p>Synthetic history only. The sidebar markup follows the inspected DSH 0.2.1-rc.5 slot and controls.</p>
+<div id="fixture">
+  <div data-slot="sidebar.workspaces"><div>
+    <header><div><button type="button" aria-label="Search sessions" aria-expanded="false">🔍</button><input type="text" placeholder="Search session names"></div></header>
+    <div class="fixture_listArea">Regular sidebar results</div>
+  </div></div>
+  <div id="settings"></div>
+</div>
+<div id="bridge"></div>
+<pre id="report" role="status">Running…</pre>
+<script>window.__ModuleLoader__ = { load: (registration) => { window.pluginRegistration = registration; } };</script>
+<script src="../client.js"></script>
+<script>
+(async () => {
+  const report = document.getElementById("report");
+  const checks = [];
+  const check = (condition, message) => { if (!condition) throw Error(message); checks.push("PASS " + message); };
+  const wait = async (predicate) => {
+    const deadline = Date.now() + 3000;
+    while (!predicate()) {
+      if (Date.now() > deadline) throw Error("Timed out waiting for browser update");
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  };
+  try {
+    const mod = pluginRegistration.factory((name) => ({ react: React, "react-dom": ReactDOM })[name]);
+    // Mount styles through the actual plugin apply path; all registrations stay
+    // inside this synthetic page, with no connection to a DSH session or index.
+    mod.apply({ slots: { inject() {} }, effect: (fn) => fn() });
+    const prefs = mod.preferences();
+    const opened = [];
+    const requests = [];
+    window.fetch = async (url, options) => {
+      requests.push({ url, signal: options.signal });
+      return { ok: true, json: async () => ({ hits: [{ sessionId: "session-synthetic", title: "Synthetic 中文 history", snippets: ["Matched conversation text"] }], hasMore: false }) };
+    };
+    const settingsRoot = ReactDOM.createRoot(document.getElementById("settings"));
+    const sidebarRoot = ReactDOM.createRoot(document.getElementById("bridge"));
+    settingsRoot.render(React.createElement(mod.Settings, { prefs }));
+    sidebarRoot.render(React.createElement(mod.Sidebar, { prefs, portal: ReactDOM.createPortal, open: (id) => opened.push(id) }));
+    const button = document.querySelector("button[aria-expanded]");
+    const input = document.querySelector('input[type="text"]');
+    const nativeList = document.querySelector(".fixture_listArea");
+    button.addEventListener("click", () => button.setAttribute("aria-expanded", "true"));
+    await wait(() => document.querySelector("[data-deja-results]"));
+    button.click();
+    check(!nativeList.hidden, "first magnifier click retains regular search");
+    input.value = "中文 & --all";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    button.click();
+    await wait(() => document.querySelector(".deja-hit"));
+    check(nativeList.hidden && button.getAttribute("aria-pressed") === "true", "second click replaces regular results");
+    check(new URL(requests[0].url, location.href).searchParams.get("q") === input.value, "query arrives intact as one URL parameter");
+    document.querySelector(".deja-hit").click();
+    check(opened[0] === "session-synthetic", "result opens the DSH session id");
+    button.click();
+    check(!nativeList.hidden, "third click restores native results");
+    await wait(() => !document.querySelector(".deja-results"));
+    window.fetch = async () => ({ ok: false, json: async () => ({ error: { message: "Synthetic timeout" } }) });
+    button.click();
+    await wait(() => document.querySelector('[role="alert"]'));
+    check(document.querySelector('[role="alert"]').textContent === "Synthetic timeout", "host failures are visible");
+    prefs.set("sidebar", false);
+    await wait(() => !document.querySelector("[data-deja-results]"));
+    check(!nativeList.hidden, "disabling sidebar search removes listeners and restores results");
+    prefs.set("sidebar", true);
+    await wait(() => document.querySelector("[data-deja-results]"));
+    window.fetch = async () => ({ ok: true, json: async () => ({ hits: [], hasMore: false }) });
+    button.click();
+    await wait(() => document.querySelector(".deja-results")?.textContent.includes("No matching conversations"));
+    check(true, "empty results are distinguished from failures");
+    input.value = "";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await wait(() => document.querySelector(".deja-results")?.textContent.includes("Enter a keyword"));
+    check(true, "clearing query returns to the idle prompt");
+    sidebarRoot.unmount();
+    check(!nativeList.hidden && !document.querySelector("[data-deja-results]"), "unmount restores the native sidebar");
+    report.textContent = checks.join("\n") + "\nAll browser checks passed.";
+    document.body.dataset.result = "passed";
+  } catch (error) {
+    report.textContent = checks.join("\n") + "\nFAIL " + error.stack;
+    document.body.dataset.result = "failed";
+  }
+})();
+</script>

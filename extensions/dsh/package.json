@@ -12,6 +12,7 @@
   "files": [
     "index.js",
     "lib.js",
+    "search.js",
     "client.js",
     "cordis.patch.yml",
     "README.md",

@@ -122,6 +122,22 @@ window.__ModuleLoader__.load({
     // so the card follows light and dark. Fallbacks only matter on a host that
     // defines none of them.
     const STYLES = `
+.deja-settings { padding: 12px 24px; max-width: 640px; color: var(--dsw-alias-label-primary, CanvasText); }
+.deja-settings p, .deja-setting-hint { color: var(--dsw-alias-label-secondary, GrayText); line-height: 1.5; }
+.deja-setting { display: flex; align-items: flex-start; gap: 12px; padding: 16px 0; cursor: pointer; }
+.deja-setting input { margin-top: 4px; accent-color: var(--dsw-alias-state-business-primary, Highlight); }
+.deja-setting-hint { display: block; font-size: 13px; margin-top: 4px; }
+.deja-sidebar-results { flex: 1; min-height: 0; overflow: auto; color: var(--dsw-alias-label-primary, CanvasText); }
+.deja-sidebar-results[hidden], [data-slot="sidebar.workspaces"] [class*="_listArea"][hidden] { display: none !important; }
+.deja-results { padding: 8px; font-size: 13px; }
+.deja-results ul { list-style: none; padding: 0; margin: 0; }
+.deja-search-label { font-size: 11px; color: var(--dsw-alias-label-secondary, GrayText); padding: 4px 6px 8px; }
+.deja-results p { padding: 6px; line-height: 1.5; }
+.deja-hit { display: block; width: 100%; text-align: start; background: transparent; color: inherit; border: 0; border-radius: 6px; padding: 10px 6px; cursor: pointer; font: inherit; }
+.deja-hit:hover { background: var(--dsw-alias-interactive-bg-hover, ButtonFace); }
+.deja-hit:focus-visible { outline: 2px solid var(--dsw-focus-ring-color, Highlight); outline-offset: -2px; }
+.deja-hit strong, .deja-hit span { display: block; overflow-wrap: anywhere; white-space: pre-wrap; }
+.deja-hit span { color: var(--dsw-alias-label-secondary, GrayText); margin-top: 4px; font-size: 12px; line-height: 1.5; }
 .deja-card {
   box-sizing: border-box;
   width: calc(100% - 2 * var(--dsh-composer-side-clearance, 16px) - 4 * var(--dsh-composer-dock-inset, 8px));
@@ -279,7 +295,259 @@ window.__ModuleLoader__.load({
       return h(Card, { lines, onClose: () => setLines([]) });
     }
 
+    // Preferences belong to this browser/profile, like DSH's keybindings.
+    const SEARCH_PREFS = "dsh.deja.search.v1";
+    function preferences(storage) {
+      let value = { conversation: true, sidebar: true };
+      try {
+        const saved = JSON.parse(storage.getItem(SEARCH_PREFS));
+        for (const key of Object.keys(value)) if (typeof saved?.[key] === "boolean") value[key] = saved[key];
+      } catch {}
+      const listeners = new Set();
+      return {
+        getSnapshot: () => value,
+        subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+        set(key, enabled) {
+          if (!(key in value)) return;
+          value = { ...value, [key]: Boolean(enabled) };
+          try { storage.setItem(SEARCH_PREFS, JSON.stringify(value)); } catch {}
+          for (const fn of listeners) fn();
+        },
+      };
+    }
+
+    function usePreferences(prefs) {
+      const [value, setValue] = React.useState(prefs.getSnapshot);
+      React.useEffect(() => prefs.subscribe(() => setValue(prefs.getSnapshot())), [prefs]);
+      return value;
+    }
+
+    function sessionCommand(id, draft = "") {
+      const bare = String(id || "").replace(/^session-/, "");
+      if (!/^[a-zA-Z0-9_-]+$/.test(bare)) return null;
+      const prefix = "deja search --session " + bare + " ";
+      // Repeated Ctrl+F focuses the same draft, without nesting commands.
+      return draft.startsWith(prefix) ? draft : prefix + draft;
+    }
+
+    function installFind(ctx, prefs) {
+      return ctx.shortcuts.register({
+        id: "deja.search-session",
+        label: () => "Deja: search this conversation",
+        aliases: ["deja", "find in conversation"],
+        defaults: Object.fromEntries([
+          ...["windows", "macos", "linux"].map((os) => ["desktop:" + os, { code: "KeyF", modifiers: ["primary"] }]),
+          ...["windows", "macos"].map((os) => ["web:" + os, { code: "KeyF", modifiers: ["primary", "alt"] }]),
+        ]),
+        regions: ["page", "editable"],
+        modals: [],
+        resolve(context) {
+          if (!prefs.getSnapshot().conversation || context.modal != null || context.region === "terminal") return { status: "pass" };
+          const id = ctx.uiSession.current.getSnapshot().key;
+          const binding = id && ctx.sessions.binding(id);
+          if (!binding || !sessionCommand(id)) return { status: "pass" };
+          return { status: "handled", run() {
+            // Resolve again: navigation can change between key resolution and execution.
+            const current = ctx.uiSession.current.getSnapshot().key;
+            const active = current && ctx.sessions.binding(current);
+            if (!active) return;
+            const input = ctx.conversation.input.for(active.ctx);
+            const draft = sessionCommand(current, input.projection.clipboardText || "");
+            if (!draft) return;
+            input.actions.setDraft(draft);
+            input.actions.persistDraft();
+            input.focus();
+          } };
+        },
+      });
+    }
+
+    function Settings({ prefs }) {
+      const value = usePreferences(prefs);
+      return h("section", { className: "deja-settings", "aria-label": "Deja" },
+        h("h2", null, "Deja"),
+        h("p", null, "Search your conversation history with the local Deja index."),
+        ...[
+          ["conversation", "Ctrl+F in conversations", "Fill the message input with a search command for the current session. In a browser, use Ctrl+Alt+F (Option+Command+F on macOS). Existing draft text becomes the query; nothing is sent automatically."],
+          ["sidebar", "Deja search in the sidebar", "Open sidebar search, then click its magnifying glass again to search DSH conversation text with Deja. Click again to return to the regular results."],
+        ].map(([key, title, hint]) => h("label", { key, className: "deja-setting" },
+          h("input", { type: "checkbox", role: "switch", checked: value[key], onChange: (event) => prefs.set(key, event.target.checked) }),
+          h("span", null, h("strong", null, title), h("span", { className: "deja-setting-hint" }, hint)),
+        )),
+      );
+    }
+
+    // DSH exposes an addressable slot anchor but no sidebar-search provider
+    // extension. Keep this adapter inside that anchor, use semantic controls,
+    // and stand down if its shape is unavailable. Never replace slot owners or
+    // reach into React internals. Removing the adapter restores native content.
+    function attachSidebar(anchor, changed) {
+      const input = anchor.querySelector('input[type="text"]');
+      const button = input?.parentElement?.querySelector('button[aria-expanded]');
+      const list = anchor.querySelector('[class*="_listArea"]');
+      if (!input || !button || !list) return null;
+      const target = document.createElement("div");
+      target.className = "deja-sidebar-results";
+      target.dataset.dejaResults = "";
+      target.hidden = true;
+      list.parentElement.appendChild(target);
+      const old = { hidden: list.hidden, title: button.getAttribute("title"), pressed: button.getAttribute("aria-pressed") };
+      let active = false;
+      const publish = () => changed({ active, query: input.value, target });
+      const setActive = (next) => {
+        active = next;
+        list.hidden = active || old.hidden;
+        target.hidden = !active;
+        button.setAttribute("aria-pressed", String(active));
+        button.setAttribute("title", active ? "Deja search — click for regular search" : "Search conversation text with Deja");
+        publish();
+      };
+      const click = (event) => {
+        if (button.getAttribute("aria-expanded") !== "true") return;
+        event.preventDefault();
+        event.stopPropagation();
+        setActive(!active);
+        input.focus();
+      };
+      const update = () => { if (active) publish(); };
+      const sync = () => { if (active && button.getAttribute("aria-expanded") !== "true") setActive(false); };
+      button.addEventListener("click", click, true);
+      input.addEventListener("input", update);
+      const observer = new MutationObserver(sync);
+      observer.observe(button, { attributes: true, attributeFilter: ["aria-expanded"] });
+      return {
+        input, button, list, target,
+        dispose() {
+          observer.disconnect();
+          button.removeEventListener("click", click, true);
+          input.removeEventListener("input", update);
+          list.hidden = old.hidden;
+          for (const [key, value] of [["title", old.title], ["aria-pressed", old.pressed]]) {
+            if (value === null) button.removeAttribute(key); else button.setAttribute(key, value);
+          }
+          target.remove();
+        },
+      };
+    }
+
+    function observeSidebar(changed, root = document) {
+      let attachment = null;
+      let stopped = false;
+      const scan = () => {
+        if (stopped) return;
+        const anchor = root.querySelector('[data-slot="sidebar.workspaces"]');
+        if (attachment && (!anchor?.contains(attachment.input) || !anchor.contains(attachment.button) || !anchor.contains(attachment.list))) {
+          attachment.dispose();
+          attachment = null;
+          changed(null);
+        }
+        if (!attachment && anchor) attachment = attachSidebar(anchor, changed);
+      };
+      const observer = new MutationObserver(scan);
+      observer.observe(root.body || root, { childList: true, subtree: true });
+      scan();
+      return () => {
+        stopped = true;
+        observer.disconnect();
+        attachment?.dispose();
+        changed(null);
+      };
+    }
+
+    async function searchHistory(query, signal) {
+      const response = await fetch("api/deja-search?q=" + encodeURIComponent(query), {
+        credentials: "same-origin", cache: "no-store", headers: { accept: "application/json" }, signal,
+      });
+      let body;
+      try { body = await response.json(); } catch { throw new Error("Deja search is unavailable. Update the dsh-deja host plugin."); }
+      if (!response.ok || body.error) throw new Error(body.error?.message || "Deja search is unavailable.");
+      if (!Array.isArray(body.hits)) throw new Error("Deja returned invalid search data.");
+      return body;
+    }
+
+    function Results({ query, open }) {
+      const [result, setResult] = React.useState({ query: "", status: "idle", hits: [] });
+      const [openError, setOpenError] = React.useState("");
+      React.useEffect(() => {
+        setOpenError("");
+        if (!query.trim()) { setResult({ query, status: "idle", hits: [] }); return undefined; }
+        const controller = new AbortController();
+        let alive = true;
+        setResult({ query, status: "loading", hits: [] });
+        const timer = setTimeout(() => {
+          searchHistory(query, controller.signal).then(
+            (body) => { if (alive) setResult({ ...body, query, status: "ready" }); },
+            (error) => { if (alive) setResult({ query, status: "error", hits: [], message: error.message }); },
+          );
+        }, 250);
+        return () => { alive = false; clearTimeout(timer); controller.abort(); };
+      }, [query]);
+      // Do not show the old query's hits while the next effect is being committed.
+      const current = result.query === query ? result : { status: "loading", hits: [] };
+      return h("section", { "aria-label": "Deja search results", className: "deja-results" },
+        h("div", { className: "deja-search-label" }, "Deja · DSH conversations"),
+        current.status === "idle" ? h("p", { role: "status" }, "Enter a keyword to search conversation text.") : null,
+        current.status === "loading" ? h("p", { role: "status" }, "Searching Deja…") : null,
+        current.status === "error" ? h("p", { role: "alert" }, current.message) : null,
+        current.status === "ready" && current.hits.length === 0 ? h("p", { role: "status" }, "No matching conversations.") : null,
+        openError ? h("p", { role: "alert" }, openError) : null,
+        h("ul", null, ...current.hits.map((hit) => h("li", { key: hit.sessionId },
+          h("button", { type: "button", className: "deja-hit", onClick: async () => {
+            try { setOpenError(""); await open(hit.sessionId); }
+            catch { setOpenError("This conversation could not be opened. It may have been archived or removed from DSH."); }
+          } },
+            h("strong", null, hit.title || hit.sessionId),
+            ...(hit.snippets || []).map((snippet, i) => h("span", { key: i }, snippet)),
+          ),
+        ))),
+        current.hasMore ? h("p", { role: "status" }, "Showing the first 20 matches. Narrow your query for more precise results.") : null,
+      );
+    }
+
+    function Sidebar({ prefs, open, portal }) {
+      const settings = usePreferences(prefs);
+      const [view, setView] = React.useState(null);
+      React.useEffect(() => settings.sidebar ? observeSidebar(setView) : undefined, [settings.sidebar]);
+      return settings.sidebar && view?.active ? portal(h(Results, { query: view.query, open }), view.target) : null;
+    }
+
+    function installSearch(ctx) {
+      // `deja install dsh-auto` can load this same browser file as deja-notes
+      // alongside the npm package. One owner prevents two click listeners from
+      // toggling on and straight back off, and duplicate shortcut registrations.
+      const ownerKey = Symbol.for("dsh-deja.search-owner");
+      if (typeof ctx.inject === "function") {
+        if (window[ownerKey]) return;
+        const owner = {};
+        window[ownerKey] = owner;
+        if (typeof ctx.effect === "function") ctx.effect(() => () => {
+          if (window[ownerKey] === owner) delete window[ownerKey];
+        }, "dsh-deja: search owner");
+      }
+      let storage;
+      try { storage = window.localStorage; } catch {}
+      const prefs = preferences(storage);
+      try {
+        ctx.slots.inject("settings.section", () => ctx.slots.register({
+          name: "settings.section", id: "deja", order: 650, label: () => "Deja",
+        }, () => h(Settings, { prefs })));
+      } catch {}
+      if (typeof ctx.inject !== "function") return;
+      ctx.inject(["shortcuts", "uiSession", "sessions", "conversation"], (c) => {
+        try { c.effect(() => installFind(c, prefs), "dsh-deja: find in conversation"); } catch {}
+      });
+      ctx.inject(["uiWorkspace"], (c) => {
+        let portal;
+        try { portal = require("react-dom").createPortal; } catch { return; }
+        if (typeof portal !== "function") return;
+        c.slots.inject("shell.overlay", () => c.slots.register({
+          name: "shell.overlay", id: "deja-search", order: 950,
+        }, () => h(Sidebar, { prefs, portal, open: (id) => c.uiWorkspace.openSession(id) })));
+      });
+    }
+
     function apply(ctx) {
+      installSearch(ctx);
       try {
         if (typeof ctx.effect === "function") ctx.effect(installStyles, "dsh-deja: styles");
         else installStyles();
@@ -301,6 +569,16 @@ window.__ModuleLoader__.load({
     module.exports.parseNotes = parseNotes;
     module.exports.stripName = stripName;
     module.exports.safeHref = safeHref;
+    module.exports.preferences = preferences;
+    module.exports.sessionCommand = sessionCommand;
+    module.exports.installFind = installFind;
+    module.exports.installSearch = installSearch;
+    module.exports.attachSidebar = attachSidebar;
+    module.exports.observeSidebar = observeSidebar;
+    module.exports.searchHistory = searchHistory;
+    module.exports.Settings = Settings;
+    module.exports.Sidebar = Sidebar;
+    module.exports.Results = Results;
     return module.exports;
   },
 });

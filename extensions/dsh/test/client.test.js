@@ -83,7 +83,7 @@ async function load(notesFor = {}) {
     throw new Error(`unexpected require ${name}`);
   });
   let Component = null;
-  mod.apply({ slots: { inject: (_name, cb) => cb(), register: (_opts, c) => { Component = c; return () => {}; } } });
+  mod.apply({ slots: { inject: (_name, cb) => cb(), register: (opts, c) => { if (opts.name === "conversation.input.dock") Component = c; return () => {}; } } });
   return { rt, Component, mod };
 }
 

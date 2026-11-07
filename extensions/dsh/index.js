@@ -5,6 +5,7 @@
 // in Claude Code, Codex, Cursor, opencode and thirty-nine more agents, on this
 // machine, before dsh existed. The index is deja's; this file is the seam.
 
+import { installSearchRoute } from "./search.js";
 import { createRequire } from "node:module";
 import { execFile, execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -667,6 +668,8 @@ function apply(ctx, config) {
     config,
   );
   const board = noteBoard();
+  // User-initiated search remains available when automatic recall is disabled.
+  installSearchRoute(ctx, DEJA);
   if (adds.tools) tools(ctx);
   if (adds.command) command(ctx, board);
   if (adds.recall) {
