@@ -227,14 +227,3 @@ func piProjectName(path string) string {
 	dir := projectDir(PiRoot(), path)
 	return claudeProjectName(dir)
 }
-
-// PiProjectDirBase returns the encoded project dir name for a transcript
-// path, e.g. "--Users-x-projects-app--" for .../sessions/--Users-x-projects-app--/s.jsonl.
-func PiProjectDirBase(path string) string {
-	dir := projectDir(PiRoot(), path)
-	base := filepath.Base(dir)
-	if base == "" || base == "." || base == string(filepath.Separator) {
-		return ""
-	}
-	return base
-}

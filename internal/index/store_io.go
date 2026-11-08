@@ -1043,23 +1043,9 @@ func EachRecordInRoles(dir string, roles []string, fn func(SessionMeta, Record))
 // RoleEdit is the record kind holding the exact bytes an agent replaced.
 const RoleEdit = roleEdit
 
-// SpanInventory counts the replaced spans the store holds and the files they
-// belong to.
-//
-// It needs its own pass: a span is served only when asked for by role, because
-// it is the file's old contents rather than a statement about anything, so it
-// never reaches a caller loading sessions the ordinary way.
-//
-// This is what `deja restore` has to hand back, stated as a number before
-// anyone needs it — the command matters entirely at one panicked moment, and
-// nobody reads a command list then (#577). Measured at ~180 ms on a
-// 160k-record store, so it belongs on a page someone opens deliberately.
-func SpanInventory(dir string) (spans, files int, err error) {
-	return SpanInventoryWhere(dir, nil)
-}
-
-// SpanInventoryWhere is SpanInventory over the sessions keep accepts, for a
-// report narrowed to a project, a harness or a window. A nil keep takes all.
+// SpanInventoryWhere counts the replaced spans the store holds and the files
+// they belong to over the sessions keep accepts, for a report narrowed to a
+// project, a harness or a window. A nil keep takes all.
 func SpanInventoryWhere(dir string, keep func(SessionMeta) bool) (spans, files int, err error) {
 	if dir == "" {
 		dir = DefaultDir()

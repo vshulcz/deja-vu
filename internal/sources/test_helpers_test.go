@@ -2,8 +2,11 @@ package sources
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"path/filepath"
+	"slices"
+	"sort"
 	"strings"
 	"time"
 )
@@ -213,6 +216,120 @@ func toolOutcomesFromContent(v any) []claudeToolOutcome {
 		}
 		bad, _ := m["is_error"].(bool)
 		out = append(out, claudeOutcome(id, bad, m["content"]))
+	}
+	return out
+}
+
+func ReadGeminiCompaction(path, nativeSessionID string) (CompactionTranscript, bool, error) {
+	return ReadGeminiCompactionIfNew(path, nativeSessionID, nil)
+}
+
+func ReadZCodeCompaction(sessionID string) (CompactionTranscript, bool, error) {
+	return ReadZCodeCompactionIfNew(sessionID, nil)
+}
+
+func ReadCodeWhaleCompaction(workspace string, since time.Time) (CompactionTranscript, bool, error) {
+	return ReadCodeWhaleCompactionIfNew(workspace, since, nil)
+}
+
+func GooseTurnFailure(sessionID string) string {
+	return GooseTurn(sessionID).Failure
+}
+
+func ReadJunieCompaction(sessionID string) (CompactionTranscript, bool, error) {
+	return ReadJunieCompactionFromTurnIfNew(sessionID, JunieTurn(sessionID), nil)
+}
+
+func LifecycleKeys(m map[string]Lifecycle) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// StaleCandidateNotes returns accepted notes whose cited files were touched in
+// sessions strictly newer than the note's timestamp.
+func StaleCandidateNotes(notes []PromotedNote, fileLastTouched map[string]time.Time) []StaleCandidate {
+	if len(notes) == 0 || len(fileLastTouched) == 0 {
+		return nil
+	}
+	normTouched := make(map[string]time.Time, len(fileLastTouched)*2)
+	for path, t := range fileLastTouched {
+		norm := strings.ToLower(filepath.ToSlash(path))
+		if t.After(normTouched[norm]) {
+			normTouched[norm] = t
+		}
+		base := filepath.Base(norm)
+		if t.After(normTouched[base]) {
+			normTouched[base] = t
+		}
+	}
+	var out []StaleCandidate
+	for _, n := range notes {
+		if n.State != "accepted" || n.At.IsZero() {
+			continue
+		}
+		for _, ref := range NoteFileRefs(n) {
+			key := strings.ToLower(filepath.ToSlash(ref))
+			touchedAt := normTouched[key]
+			if touchedAt.IsZero() {
+				touchedAt = normTouched[filepath.Base(key)]
+			}
+			if touchedAt.After(n.At) {
+				out = append(out, StaleCandidate{Note: n, File: ref, TouchedAt: touchedAt})
+				break
+			}
+		}
+	}
+	return out
+}
+
+// LoadOpencodeMatching reads the OpenCode sessions whose text contains q.
+func LoadOpencodeMatching(q string) []model.Session {
+	where := fmt.Sprintf(" and lower(p.data) like '%%%s%%' escape '\\'", sqlEscape(sqlLikeEscape(strings.ToLower(q))))
+	ss, _ := ParseOpencodeDBWhere(OpencodeDB(), where, 5000)
+	return ss
+}
+
+// LoadOpencodeSince reads the OpenCode sessions that changed after t.
+func LoadOpencodeSince(t time.Time) []model.Session {
+	ss, _ := ParseOpencodeDBSince(OpencodeDB(), t)
+	return ss
+}
+
+// PiProjectDirBase returns the encoded project dir name for a transcript
+// path, e.g. "--Users-x-projects-app--" for .../sessions/--Users-x-projects-app--/s.jsonl.
+func PiProjectDirBase(path string) string {
+	dir := projectDir(PiRoot(), path)
+	base := filepath.Base(dir)
+	if base == "" || base == "." || base == string(filepath.Separator) {
+		return ""
+	}
+	return base
+}
+
+// AllHarnesses is every harness deja knows how to read, whatever DEJA_STORES
+// says. The set `--harness` accepts, and the number the documentation counts:
+// silencing a store for one run does not make deja a tool that reads fewer
+// harnesses.
+func AllHarnesses() []Harness { return allHarnesses() }
+
+// HomeRoots returns Home() followed by any additional readable home
+// directories listed in DEJA_HOME_ROOTS (separated by filepath.ListSeparator,
+// e.g. "/home/alice:/home/bob" on shared multi-user servers). Relative paths
+// and unreadable directories are skipped so a restrictive peer home never
+// fails the caller's pass (#5759, #5773).
+func HomeRoots() []string {
+	var out []string
+	if h := Home(); h != "" {
+		out = append(out, filepath.Clean(h))
+	}
+	for _, h := range extraHomeRoots() {
+		if !slices.Contains(out, h) {
+			out = append(out, h)
+		}
 	}
 	return out
 }

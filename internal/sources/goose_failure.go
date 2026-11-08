@@ -10,17 +10,6 @@ type GooseTurnState struct {
 	Edits   []string
 }
 
-// GooseTurnFailure is the output of the newest shell command that failed in
-// this goose session's current turn, read from sessions.db: goose hands its
-// hooks no tool output (PostToolUseFailure carries the tool's name and input
-// only), and the store has the response by the time the turn ends. A turn
-// starts at the person's last message, so a failure the agent already moved
-// past in an earlier turn is not brought back. "" when there is none or the
-// store cannot be read.
-func GooseTurnFailure(sessionID string) string {
-	return GooseTurn(sessionID).Failure
-}
-
 // GooseTurn reads the session's current turn from sessions.db, one query.
 func GooseTurn(sessionID string) GooseTurnState {
 	if sessionID == "" {

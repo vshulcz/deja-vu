@@ -502,43 +502,6 @@ func looksLikeNoteFilePath(tok string) bool {
 	return len(base) > len(ext)
 }
 
-// StaleCandidateNotes returns accepted notes whose cited files were touched in
-// sessions strictly newer than the note's timestamp.
-func StaleCandidateNotes(notes []PromotedNote, fileLastTouched map[string]time.Time) []StaleCandidate {
-	if len(notes) == 0 || len(fileLastTouched) == 0 {
-		return nil
-	}
-	normTouched := make(map[string]time.Time, len(fileLastTouched)*2)
-	for path, t := range fileLastTouched {
-		norm := strings.ToLower(filepath.ToSlash(path))
-		if t.After(normTouched[norm]) {
-			normTouched[norm] = t
-		}
-		base := filepath.Base(norm)
-		if t.After(normTouched[base]) {
-			normTouched[base] = t
-		}
-	}
-	var out []StaleCandidate
-	for _, n := range notes {
-		if n.State != "accepted" || n.At.IsZero() {
-			continue
-		}
-		for _, ref := range NoteFileRefs(n) {
-			key := strings.ToLower(filepath.ToSlash(ref))
-			touchedAt := normTouched[key]
-			if touchedAt.IsZero() {
-				touchedAt = normTouched[filepath.Base(key)]
-			}
-			if touchedAt.After(n.At) {
-				out = append(out, StaleCandidate{Note: n, File: ref, TouchedAt: touchedAt})
-				break
-			}
-		}
-	}
-	return out
-}
-
 // ForgetPromotedNotes deletes whole promoted lines whose note session the
 // caller matched — what `deja forget` on a note itself has to mean. Dropping
 // the session from the index only writes a tombstone: search goes quiet while

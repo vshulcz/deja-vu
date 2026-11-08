@@ -125,19 +125,6 @@ func Snapshot() ([]Peer, string) {
 	return out, ""
 }
 
-// Problem reports why the file could not be read, and "" when there is nothing
-// wrong — including when there is no file at all, which is a machine that has
-// never synced rather than a fault.
-//
-// Load deliberately treats every failure as "no peers", so that a malformed
-// config cannot stop a sync; its comment says doctor is where that surfaces.
-// This is the half that lets doctor say it (#1840). A caller that wants both
-// takes Snapshot, which reads the file once.
-func Problem() string {
-	_, why := Snapshot()
-	return why
-}
-
 // identity is what makes two names one machine. ssh lowercases a host before
 // it matches it and a DNS name is case-insensitive (RFC 4343), so `Laptop` and
 // `laptop` are one machine — comparing byte for byte gave it two rows, two

@@ -105,17 +105,6 @@ func RecordDigest(indexDir, kind, digest string, sessions int, raw int64) {
 	RecordDigestPolicy(indexDir, kind, digest, sessions, raw, "")
 }
 
-// RecordDigestTerms is RecordDigest plus the query terms, for déjà vu audits,
-// and the ids of the sessions the moment surfaced.
-//
-// The ids were missing, which meant a déjà vu moment — the user returning to
-// ground they had covered before — left no trace on the session it was about.
-// It is the only signal deja has that the *user* came back, as opposed to an
-// agent pulling something, and it could not reach ranking at all.
-func RecordDigestTerms(indexDir, kind, digest string, sessions int, raw int64, terms []string, ids ...string) {
-	RecordDigestInto(indexDir, kind, digest, "", sessions, raw, terms, ids...)
-}
-
 // RecordDigestFrom is RecordDigestInto plus the projects the digest was built
 // from, for the reason RecordServedFrom exists.
 func RecordDigestFrom(indexDir, kind, digest, into string, sessions int, raw int64, terms, projects, ids []string) {
@@ -234,12 +223,6 @@ func RecordDigestPolicySessionsUnread(indexDir, kind, digest, into string, sessi
 	at := time.Now().UTC()
 	recordFullAtUnread(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, into, at, true)
 	snapshotWriteAt(indexDir, kind, digest, into, sessions, policyName, nil, projects, at, true)
-}
-
-// SnapshotOnly stores the digest text without writing a counting event, for
-// callers that already recorded one with extra fields.
-func SnapshotOnly(indexDir, kind, digest string, sessions int) {
-	snapshotWrite(indexDir, kind, digest, sessions, "")
 }
 
 // SnapshotPolicy is SnapshotOnly plus the policy name for the audit trail.

@@ -280,14 +280,6 @@ func RecordResultRaw(indexDir, kind string, bytes, sessions int, empty bool, raw
 	recordFull(indexDir, kind, bytes, sessions, empty, raw, nil)
 }
 
-// RecordServedInto records one injection and the agent session that received
-// it. The kinds that carry a digest have had this since #1494; the
-// point-of-action hooks recorded the event without a receiver, so nothing could
-// be paired with what the agent did next.
-func RecordServedInto(indexDir, kind string, bytes, sessions int, into string) {
-	recordFullAt(indexDir, kind, bytes, sessions, sessions == 0, 0, nil, into, time.Now().UTC())
-}
-
 // RecordServedSessions is RecordResultRaw plus the ids of the sessions the
 // digest contained.
 func RecordServedSessions(indexDir, kind string, bytes, sessions int, empty bool, raw int64, ids []string) {
@@ -349,34 +341,6 @@ func recordEvent(indexDir string, event Event) {
 		b = append([]byte{'\n'}, b...)
 	}
 	_, _ = f.Write(append(b, '\n'))
-}
-
-// InjectedToday returns session-start context bytes injected since local midnight.
-func InjectedToday(indexDir string) int {
-	_, _, injected := TodayWithInjections(indexDir)
-	return injected
-}
-
-// TodayWithInjections returns today's agent-memory events, served bytes, and
-// the subset of those bytes injected by session-start hooks.
-func TodayWithInjections(indexDir string) (recalls, bytes, injected int) {
-	now := time.Now()
-	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	for _, e := range read(Path(indexDir)) {
-		if e.Time.Before(midnight) || ahead(e.Time, now) {
-			continue
-		}
-		switch {
-		case servedKind(e.Kind):
-			recalls++
-			bytes += e.Bytes
-		case injectedKind(e.Kind):
-			recalls++
-			bytes += e.Bytes
-			injected += e.Bytes
-		}
-	}
-	return recalls, bytes, injected
 }
 
 // StatusNumbers is everything the status line can print, from one read.
@@ -508,11 +472,6 @@ func DejaVuWeek(indexDir string) int {
 	return StatusCounters(indexDir).DejaVuWeek
 }
 
-// TodayRaw sums the source-transcript volume behind today's served digests.
-func TodayRaw(indexDir string) int64 {
-	return StatusCounters(indexDir).RawToday
-}
-
 // Totals summarizes the retained usage log.
 func Totals(indexDir string) Summary {
 	var out Summary
@@ -566,12 +525,6 @@ func Totals(indexDir string) Summary {
 func Week(indexDir string) (recalls, bytes, injected, injectedBytes int) {
 	n := StatusCounters(indexDir)
 	return n.WeekRecalls, n.WeekBytes, n.WeekInjections, n.WeekInjectedBytes
-}
-
-// Today sums today's agent-memory events and their served bytes.
-func Today(indexDir string) (recalls int, bytes int) {
-	recalls, bytes, _ = TodayWithInjections(indexDir)
-	return recalls, bytes
 }
 
 // usable reports whether a line is an event at all: a stamp, so it can be

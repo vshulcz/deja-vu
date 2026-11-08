@@ -63,15 +63,6 @@ func CanWriteBack(harness string) bool {
 	return ok
 }
 
-// WriteBackHarnesses lists the harnesses a session can be written back for.
-func WriteBackHarnesses() []string {
-	out := make([]string, 0, len(writeBackFormats))
-	for h := range writeBackFormats {
-		out = append(out, h)
-	}
-	return out
-}
-
 // writeBackLacks is what the index does not hold for a harness whose store
 // would need it, or why deja does not write there, said to the person instead
 // of writing a file the agent cannot open.
@@ -80,11 +71,6 @@ var writeBackLacks = map[string]string{}
 // refuseWriteBack records why a harness's sessions are not written back.
 func refuseWriteBack(harness, reason string) {
 	writeBackLacks[harness] = reason
-}
-
-// WriteBackLacks is the reason a harness is not written back, or "".
-func WriteBackLacks(harness string) string {
-	return writeBackLacks[harness]
 }
 
 // RenderWriteBack builds the transcript for s in its harness's format. It does

@@ -109,22 +109,9 @@ func withOpencodeDiffs(ss []model.Session) []model.Session {
 	return ss
 }
 
-// LoadOpencodeMatching reads the OpenCode sessions whose text contains q.
-func LoadOpencodeMatching(q string) []model.Session {
-	where := fmt.Sprintf(" and lower(p.data) like '%%%s%%' escape '\\'", sqlEscape(sqlLikeEscape(strings.ToLower(q))))
-	ss, _ := ParseOpencodeDBWhere(OpencodeDB(), where, 5000)
-	return ss
-}
-
 // LoadOpencodeRecent reads the newest OpenCode history, capped at n*20 rows.
 func LoadOpencodeRecent(n int) []model.Session {
 	ss, _ := ParseOpencodeDBWhere(OpencodeDB(), "", n*20)
-	return ss
-}
-
-// LoadOpencodeSince reads the OpenCode sessions that changed after t.
-func LoadOpencodeSince(t time.Time) []model.Session {
-	ss, _ := ParseOpencodeDBSince(OpencodeDB(), t)
 	return ss
 }
 

@@ -32,7 +32,7 @@ func TestSearchNamesTheWordFormsItLeftOut(t *testing.T) {
 	if err := index.Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
-	result, err := index.Search(dir, query.Options{Query: "retry", All: true})
+	result, err := indexSearch(dir, query.Options{Query: "retry", All: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +52,7 @@ func TestSearchNamesTheWordFormsItLeftOut(t *testing.T) {
 	// A form already on the page is not left out, and a query with no other
 	// form in the corpus gets no line at all.
 	uploader := query.Options{Query: "uploader", All: true, Tier: search.TierExact}
-	ss, err := index.Search(dir, uploader)
+	ss, err := indexSearch(dir, uploader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestTheWordFormsNoteIgnoresWhatOnlyAToolPrinted(t *testing.T) {
 		t.Fatal(err)
 	}
 	o := query.Options{Query: "retry", All: true, Tier: search.TierExact}
-	result, err := index.Search(dir, o)
+	result, err := indexSearch(dir, o)
 	if err != nil {
 		t.Fatal(err)
 	}

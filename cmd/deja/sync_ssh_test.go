@@ -161,7 +161,7 @@ func TestSyncSSHPull(t *testing.T) {
 	if err := runSyncSSH(index.DefaultDir(), []string{"minihost", "--pull"}); err != nil {
 		t.Fatal(err)
 	}
-	ss, err := index.Search(os.Getenv("DEJA_INDEX_DIR"), search.Options{Query: "pullneedle", All: true})
+	ss, err := indexSearch(os.Getenv("DEJA_INDEX_DIR"), search.Options{Query: "pullneedle", All: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +200,7 @@ func TestRunSyncExportImport(t *testing.T) {
 	if err = runSync(index.DefaultDir(), []string{"import", out}); err != nil {
 		t.Fatal(err)
 	}
-	ss, err := index.Search(importDir, search.Options{Query: "sshneedle", All: true})
+	ss, err := indexSearch(importDir, search.Options{Query: "sshneedle", All: true})
 	if err != nil {
 		t.Fatal(err)
 	}

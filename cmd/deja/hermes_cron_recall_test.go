@@ -61,7 +61,7 @@ INSERT INTO messages (session_id,role,content,timestamp) VALUES
 		if err := runHookPromptMode(dir, strings.NewReader(string(payload)), &out, true); err != nil {
 			t.Fatal(err)
 		}
-		hits, err := index.Search(dir, query.Options{Query: "zephyr reconciler QX-77"})
+		hits, err := indexSearch(dir, query.Options{Query: "zephyr reconciler QX-77"})
 		if err != nil {
 			t.Fatal(err)
 		}

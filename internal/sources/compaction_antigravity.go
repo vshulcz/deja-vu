@@ -14,13 +14,6 @@ import (
 // PreInvocation finds it there and the session reads as it stood before it,
 // the way Gemini's next BeforeAgent does.
 
-// ReadAntigravityCompaction captures the conversation as it stood before the
-// newest CHECKPOINT. found is false when the transcript has none. workspace is
-// the one the hook payload names: the transcript does not record it.
-func ReadAntigravityCompaction(path, conversationID, workspace string) (CompactionTranscript, bool, error) {
-	return ReadAntigravityCompactionIfNew(path, conversationID, workspace, nil)
-}
-
 // ReadAntigravityCompactionIfNew is ReadAntigravityCompaction, but returns
 // early before parsing the transcript when seen reports the newest CHECKPOINT
 // fingerprint has already been processed.

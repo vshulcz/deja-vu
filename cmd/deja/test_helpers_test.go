@@ -14,6 +14,11 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
+func indexSearch(dir string, o search.Options) ([]model.Session, error) {
+	r, err := index.SearchDetailed(dir, o)
+	return r.Sessions, err
+}
+
 // trimBriefTitle bounds a title for the brief and strips what a terminal would
 // act on rather than print. Titles are user-typed text arriving verbatim: a
 // carriage return rewinds the line, an escape recolours the rest of the

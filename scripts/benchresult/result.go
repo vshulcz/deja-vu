@@ -87,12 +87,3 @@ func Write(path string, r Result) error {
 	}
 	return os.WriteFile(path, append(b, '\n'), 0o644)
 }
-
-// Pct is the percentage the harnesses print, kept here so the file and the
-// table cannot round differently.
-func Pct(hit, n int) float64 {
-	if n == 0 {
-		return 0
-	}
-	return float64(hit) / float64(n) * 100
-}

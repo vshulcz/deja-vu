@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"maps"
 	"os"
-	"sort"
 	"strings"
 	"time"
 )
@@ -129,15 +128,4 @@ func promotedLifecyclesFrom(path string) map[string]Lifecycle {
 		out[k] = e.Lifecycle
 	}
 	return out
-}
-
-// LifecycleKeys returns the keys in a stable order, for tests and for anything
-// that reports what is recorded.
-func LifecycleKeys(m map[string]Lifecycle) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
 }

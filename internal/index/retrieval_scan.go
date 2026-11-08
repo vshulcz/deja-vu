@@ -19,58 +19,6 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
-// FirstMatch tries candidate queries in order under ONE lock and manifest
-// read, probes each via exact posting intersection (bucket reads only), and
-// materializes sessions for the first query that matches. Built for the
-// per-prompt hook, which fires on every user message and must stay fast: the
-// full Search pipeline per candidate would re-read the manifest each time.
-func FirstMatch(dir string, queries []string, limit int) ([]model.Session, string, error) {
-	if dir == "" {
-		dir = DefaultDir()
-	}
-	unlock, ok, err := tryLockDir(dir)
-	if err != nil {
-		return nil, "", err
-	}
-	if ok {
-		defer unlock()
-	}
-	m, err := readManifestCached(dir)
-	if err != nil {
-		return nil, "", fmt.Errorf("manifest: %w", err)
-	}
-	if !recordsReadable(dir, m) {
-		return nil, "", fmt.Errorf("%w: records.bin size does not match the manifest (crash-truncated or uncommitted tail)", errCorruptIndex)
-	}
-	for _, q := range queries {
-		keys := queryKeys(q)
-		if len(keys) == 0 {
-			continue
-		}
-		posts, err := intersectPostings(dir, retrievalKeys(keys))
-		if err != nil {
-			return nil, "", fmt.Errorf("postings: %w", err)
-		}
-		o := query.Options{Query: q}
-		posts = cutPostingsBySession(posts, m, o)
-		if len(posts) == 0 {
-			continue
-		}
-		ss, err := scanRecords(dir, m, o, postingOffsets(posts))
-		if err != nil {
-			return nil, "", fmt.Errorf("records: %w", err)
-		}
-		if len(ss) == 0 {
-			continue
-		}
-		if len(ss) > limit {
-			ss = ss[:limit]
-		}
-		return ss, q, nil
-	}
-	return nil, "", nil
-}
-
 // SearchWithRecovery is Search plus self-healing: a corrupt bucket (crash
 // mid-append) triggers one full rebuild instead of erroring until the user
 // runs --rebuild by hand.

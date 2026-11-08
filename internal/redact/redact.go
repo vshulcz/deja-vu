@@ -7,7 +7,6 @@ import (
 
 	"os"
 	"regexp"
-	"sort"
 	"strings"
 )
 
@@ -975,13 +974,3 @@ var kinds = map[string]bool{
 // IsKind reports whether a name is a rule this package can write, so a caller
 // reading markers back out of text can tell one from a mention of the format.
 func IsKind(name string) bool { return kinds[name] }
-
-// Kinds lists those rule names.
-func Kinds() []string {
-	out := make([]string, 0, len(kinds))
-	for k := range kinds {
-		out = append(out, k)
-	}
-	sort.Strings(out)
-	return out
-}

@@ -6,7 +6,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/vshulcz/deja-vu/internal/policy"
 )
@@ -75,22 +74,6 @@ func manualCheck(dir string) error {
 		return &ManualStopError{"the index was written by an older deja and must be rebuilt, and automatic indexing is off — run: deja index"}
 	}
 	return nil
-}
-
-// LastUpdated is when the index on disk last read this machine's stores, or
-// zero when there is none.
-func LastUpdated(dir string) time.Time {
-	if dir == "" {
-		dir = DefaultDir()
-	}
-	m, err := readManifestCached(dir)
-	if err != nil {
-		return time.Time{}
-	}
-	if !m.SourcesReadAt.IsZero() {
-		return m.SourcesReadAt
-	}
-	return m.BuiltAt
 }
 
 // ManualStatus is what an Ensure would answer with automatic updates off:

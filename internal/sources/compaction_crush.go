@@ -12,12 +12,6 @@ import (
 // PreToolUse finds the summary there and reads the session as it stood before
 // it, the way Gemini's next BeforeAgent does.
 
-// ReadCrushCompaction captures the session as it stood before its newest
-// summary. found is false when the session has never been summarised.
-func ReadCrushCompaction(cwd, sessionID string) (CompactionTranscript, bool, error) {
-	return ReadCrushCompactionIfNew(cwd, sessionID, nil)
-}
-
 // ReadCrushCompactionIfNew captures the session as it stood before its newest
 // summary, skipping the full SQLite session parse when seen reports the
 // compaction fingerprint has already been processed.

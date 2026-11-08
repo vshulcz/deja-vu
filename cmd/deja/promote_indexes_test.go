@@ -39,7 +39,7 @@ func TestPromoteLeavesTheNoteInTheIndex(t *testing.T) {
 		t.Errorf("the note is not in the index: %d note sessions", n)
 	}
 	// And it can be recalled without anything else running first.
-	ss, err := index.Search(dir, query.Options{Query: "a decision I just made"})
+	ss, err := indexSearch(dir, query.Options{Query: "a decision I just made"})
 	if err != nil {
 		t.Fatal(err)
 	}

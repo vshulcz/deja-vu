@@ -3,10 +3,14 @@ package index
 import (
 	"encoding/binary"
 	"errors"
-	"github.com/vshulcz/deja-vu/internal/model"
-	"github.com/vshulcz/deja-vu/internal/query"
+	"fmt"
 	"io"
 	"os"
+	"sort"
+	"strings"
+
+	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/query"
 )
 
 // cjkIndexKeys is what keyer.cjkKeys emits, as strings.
@@ -103,4 +107,116 @@ func writeRecord(f *os.File, r Record, t *recordTables) (int64, error) {
 	}
 	_, err = f.Write(b)
 	return off, err
+}
+
+// Search returns the sessions in the index at dir that answer o.
+func Search(dir string, o query.Options) ([]model.Session, error) {
+	r, err := SearchDetailed(dir, o)
+	return r.Sessions, err
+}
+
+func CommandSettled(dir, cmd string, projects []string, allow func(string) bool) string {
+	return CommandSettledOutside(dir, cmd, projects, allow, "")
+}
+
+func CommandSettledOutside(dir, cmd string, projects []string, allow func(string) bool, self string) string {
+	return CommandSettledUsableOutside(dir, cmd, projects, allow, nil, self)
+}
+
+func Lineage(dir string, ids map[string]bool, heads ...model.Session) map[string]bool {
+	out, _ := lineage(dir, ids, heads, nil)
+	return out
+}
+
+func LineageWhole(dir string, ids map[string]bool, wholes ...model.Session) map[string]bool {
+	out, _ := lineage(dir, ids, nil, wholes)
+	return out
+}
+
+func OlderFormat(dir string) bool { return FormatDirection(dir) != 0 }
+
+func RecentProject(dir, project string, n int) ([]model.Session, error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	unlock, ok, err := tryLockDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	if ok {
+		defer unlock()
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return nil, err
+	}
+	project = strings.ToLower(project)
+	var metas []SessionMeta
+	for _, meta := range m.Sessions {
+		p := strings.ToLower(meta.Project)
+		if p == project || (project != "" && strings.Contains(p, project)) {
+			metas = append(metas, meta)
+		}
+	}
+	metas = metasNotIgnored(metas)
+	sort.Slice(metas, func(i, j int) bool { return newestFirstMeta(metas[i], metas[j]) })
+	if n > 0 && len(metas) > n {
+		metas = metas[:n]
+	}
+	return sessionsForMetas(dir, metas)
+}
+
+func RecentProjects(dir string, projects []string, perName int) ([]model.Session, error) {
+	return RecentProjectsUnder(dir, projects, "", perName)
+}
+
+func FirstMatch(dir string, queries []string, limit int) ([]model.Session, string, error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	unlock, ok, err := tryLockDir(dir)
+	if err != nil {
+		return nil, "", err
+	}
+	if ok {
+		defer unlock()
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return nil, "", fmt.Errorf("manifest: %w", err)
+	}
+	if !recordsReadable(dir, m) {
+		return nil, "", fmt.Errorf("%w: records.bin size does not match the manifest (crash-truncated or uncommitted tail)", errCorruptIndex)
+	}
+	for _, q := range queries {
+		keys := queryKeys(q)
+		if len(keys) == 0 {
+			continue
+		}
+		posts, err := intersectPostings(dir, retrievalKeys(keys))
+		if err != nil {
+			return nil, "", fmt.Errorf("postings: %w", err)
+		}
+		o := query.Options{Query: q}
+		posts = cutPostingsBySession(posts, m, o)
+		if len(posts) == 0 {
+			continue
+		}
+		ss, err := scanRecords(dir, m, o, postingOffsets(posts))
+		if err != nil {
+			return nil, "", fmt.Errorf("records: %w", err)
+		}
+		if len(ss) == 0 {
+			continue
+		}
+		if len(ss) > limit {
+			ss = ss[:limit]
+		}
+		return ss, q, nil
+	}
+	return nil, "", nil
+}
+
+func SpanInventory(dir string) (spans, files int, err error) {
+	return SpanInventoryWhere(dir, nil)
 }

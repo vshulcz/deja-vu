@@ -49,24 +49,6 @@ type Source struct{ Name, Root string }
 // Home is the user's home dir, empty when it cannot be found.
 func Home() string { h, _ := os.UserHomeDir(); return h }
 
-// HomeRoots returns Home() followed by any additional readable home
-// directories listed in DEJA_HOME_ROOTS (separated by filepath.ListSeparator,
-// e.g. "/home/alice:/home/bob" on shared multi-user servers). Relative paths
-// and unreadable directories are skipped so a restrictive peer home never
-// fails the caller's pass (#5759, #5773).
-func HomeRoots() []string {
-	var out []string
-	if h := Home(); h != "" {
-		out = append(out, filepath.Clean(h))
-	}
-	for _, h := range extraHomeRoots() {
-		if !slices.Contains(out, h) {
-			out = append(out, h)
-		}
-	}
-	return out
-}
-
 func rawExtraHomeRoots() []string {
 	raw := os.Getenv("DEJA_HOME_ROOTS")
 	if raw == "" {

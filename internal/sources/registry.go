@@ -184,12 +184,6 @@ func OutsideStoresRead(p string) bool {
 	return false
 }
 
-// AllHarnesses is every harness deja knows how to read, whatever DEJA_STORES
-// says. The set `--harness` accepts, and the number the documentation counts:
-// silencing a store for one run does not make deja a tool that reads fewer
-// harnesses.
-func AllHarnesses() []Harness { return allHarnesses() }
-
 func allHarnesses() []Harness { return withSubagentSwitch(harnessTable()) }
 
 func harnessTable() []Harness { //nolint:funlen // one entry per supported harness

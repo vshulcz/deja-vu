@@ -17,12 +17,6 @@ import (
 	"github.com/vshulcz/deja-vu/internal/query"
 )
 
-// Search returns the sessions in the index at dir that answer o.
-func Search(dir string, o query.Options) ([]model.Session, error) {
-	r, err := SearchDetailed(dir, o)
-	return r.Sessions, err
-}
-
 // SearchDetailed is Search with how the answer was found.
 func SearchDetailed(dir string, o query.Options) (SearchResult, error) {
 	r, err := searchDetailedOnce(dir, o)
