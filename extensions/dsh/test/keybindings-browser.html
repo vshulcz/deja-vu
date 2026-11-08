@@ -37,7 +37,10 @@ const shortcuts = {
   },
 };
 const prefs = mod.preferences();
-ReactDOM.createRoot(document.getElementById('settings')).render(React.createElement(mod.Settings, { prefs, shortcuts }));
+// Declare a working route so all three shortcut rows render; this fixture
+// only inspects the recorder, it never writes a real binding.
+mod.searchRoute().set("present");
+ReactDOM.createRoot(document.getElementById('settings')).render(React.createElement(mod.Settings, { prefs, shortcuts, route: mod.searchRoute() }));
 window.fixture = { catalog, config, edits, protections };
 document.getElementById('report').textContent = 'Ready';
 </script>

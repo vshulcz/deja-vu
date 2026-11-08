@@ -92,8 +92,20 @@ test("Ctrl+F writes a real /deja command and keeps the draft and its references"
   // A second press focuses the same command instead of nesting a prefix.
   command.resolve({ modal: null }).run();
   assert.equal(state.drafts.get("session-first").text, "/deja --session first -- 中文 query");
-  assert.equal(command.defaults["desktop:windows"].code, "KeyF");
-  assert.equal(command.defaults["web:windows"].modifiers.join("+"), "primary+alt");
+  // The README promises these exact defaults for every platform.
+  const promised = {
+    "desktop:windows": "KeyF:primary",
+    "desktop:linux": "KeyF:primary",
+    "desktop:macos": "KeyF:primary",
+    "web:windows": "KeyF:primary+alt",
+    "web:linux": "KeyF:primary+alt",
+    "web:macos": "KeyF:primary+alt",
+  };
+  for (const [profile, expected] of Object.entries(promised)) {
+    const row = command.defaults[profile];
+    assert.equal(row && row.code + ":" + row.modifiers.join("+"), expected,
+      profile + " must match the documented default");
+  }
 });
 
 test("a reference chip keeps its identity and moves past the command prefix", () => {
@@ -194,7 +206,7 @@ test("malformed or unavailable storage leaves both controls usable", () => {
   }
 });
 
-test("Ctrl+K opens the sidebar in Deja full-text mode and the magnifier restores the native view", () => {
+test("Ctrl+Alt+K opens the sidebar in Deja full-text mode and the magnifier restores the native view", () => {
   const mod = load();
   const prefs = mod.preferences();
   const anchor = sidebarAnchor(true);
@@ -203,8 +215,11 @@ test("Ctrl+K opens the sidebar in Deja full-text mode and the magnifier restores
   const attachment = mod.attachSidebar(anchor, prefs, (view) => views.push(view));
   assert.ok(attachment, "the adapter attaches to the semantic search controls");
   assert.deepEqual(views.map((view) => view.active), [false]);
-  assert.equal(attachment.claimOpen(), true, "an opened search is claimed for Deja");
-  assert.deepEqual(views.map((view) => view.active), [false, true]);
+  // Exercise the real event path: the deja.search-sessions command calls
+  // prefs.requestOpen(), which notifies onOpen listeners and claims the
+  // expansion. Calling attachment.claimOpen() directly would bypass it.
+  prefs.requestOpen();
+  assert.deepEqual(views.map((view) => view.active), [false, true], "the Ctrl+Alt+K gesture lands in Deja mode");
   assert.equal(anchor.list.hidden, true);
   assert.equal(anchor.button.getAttribute("aria-pressed"), "true");
   assert.equal(prefs.getSnapshot().opensDeja, true);
@@ -220,7 +235,7 @@ test("Ctrl+K opens the sidebar in Deja full-text mode and the magnifier restores
   attachment.dispose();
 });
 
-test("a claim only fires while the search is expanding, and is released otherwise", async () => {
+test("the claim helper only settles while the sidebar is expanding, and is released otherwise", async () => {
   const mod = load();
   const prefs = mod.preferences();
   const anchor = sidebarAnchor(false);
@@ -266,8 +281,22 @@ test("the direct Deja search shortcut keeps its own binding distinct from native
   mod.installSearch(ctx);
   const direct = commands.get("deja.search-sessions");
   assert.ok(direct, "a discoverable direct binding is registered");
-  assert.equal(direct.defaults["desktop:windows"].modifiers.join("+"), "primary+alt");
-  assert.equal(direct.defaults["web:macos"].modifiers.join("+"), "primary+alt+shift");
+  // These are the exact bindings the README promises. Keep them in sync:
+  // primary is Ctrl on Windows/Linux and Cmd on macOS; the browser needs the
+  // extra Alt/Shift because the page's own shortcuts claim the plain forms.
+  const promised = {
+    "desktop:windows": "KeyK:primary+alt",
+    "desktop:linux": "KeyK:primary+alt",
+    "desktop:macos": "KeyK:primary+alt",
+    "web:windows": "KeyK:primary+alt+shift",
+    "web:linux": "KeyK:primary+alt+shift",
+    "web:macos": "KeyK:primary+alt+shift",
+  };
+  for (const [profile, expected] of Object.entries(promised)) {
+    const row = direct.defaults[profile];
+    assert.equal(row && row.code + ":" + row.modifiers.join("+"), expected,
+      profile + " must match the documented default");
+  }
   // The official session.search keeps primary+K; Deja must not collide with it.
   const keys = new Set([...commands.values()].map((command) => command.defaults["desktop:windows"]?.code + ":" + (command.defaults["desktop:windows"]?.modifiers || []).join("+")));
   assert.equal(keys.has("KeyK:primary+alt"), true);
@@ -374,18 +403,29 @@ test("a CLI-only install without the search route keeps its keys and hides the s
     } });
     const store = live.searchRoute();
     live.installSearch({ inject() {}, slots: { inject: () => {}, register: () => () => {} } });
-    return new Promise((resolve) => setTimeout(resolve, 0)).then(() => {
+    return new Promise((resolve) => setTimeout(resolve, 0)).then(async () => {
       assert.equal(store.getSnapshot(), "present");
       assert.equal(store.getVersion(), "0.24.0", "the installed version is not reported");
       assert.match(probes[0], /\?probe=1/, "the probe is not the route's own ping");
-      // A host that answers without the probe payload is still a live route.
-      const silent = load({ fetch: async () => ({ status: 500 }) });
-      const quiet = silent.searchRoute();
-      silent.installSearch({ inject() {}, slots: { inject: () => {}, register: () => () => {} } });
-      return new Promise((resolve) => setTimeout(resolve, 0)).then(() => {
-        assert.equal(quiet.getSnapshot(), "present");
-        assert.equal(quiet.getVersion(), "");
-      });
+      // Only the route's own probe payload is evidence of a working endpoint.
+      // Every other answer (500, HTML fallback, wrong body) must stand the
+      // sidebar down: a toggle with no route behind it is worse than no toggle.
+      const badResponses = {
+        server_error: { status: 500, ok: false, json: async () => ({ ok: true, plugin: "dsh-deja" }) },
+        bad_gateway: { status: 502, ok: false, json: async () => { throw Error("HTML"); } },
+        html_fallback: { status: 200, ok: true, json: async () => { throw Error("Unexpected token '<'"); } },
+        foreign_route: { status: 200, ok: true, json: async () => ({ ok: true, plugin: "something-else" }) },
+        missing_ok: { status: 200, ok: true, json: async () => ({ version: "0.24.0" }) },
+        empty_body: { status: 204, ok: true, json: async () => null },
+      };
+      for (const [name, response] of Object.entries(badResponses)) {
+        const host = load({ fetch: async () => response });
+        const store = host.searchRoute();
+        host.installSearch({ inject() {}, slots: { inject: () => {}, register: () => () => {} } });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        assert.equal(store.getSnapshot(), "absent", name + " must not enable the sidebar");
+        assert.equal(store.getVersion(), "", name + " must not report a version");
+      }
     });
   });
 });

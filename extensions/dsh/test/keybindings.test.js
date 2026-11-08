@@ -35,7 +35,7 @@ test("recording awaits native protection and saves once on release using the rev
   const saved = JSON.parse(JSON.stringify(f.operations[0]));
   assert.deepEqual(saved, { operation: { type: "set", id: "deja.search-session", binding: { code: "KeyJ", modifiers: ["control"] } }, revision: "reviewed" });
   assert.deepEqual(f.protections, [true, false]);
-  assert.ok(f.states.some((state) => state.message === "已保存"));
+  assert.ok(f.states.some((state) => state.message === "Saved"));
 });
 
 test("conflicts and reserved combinations never write preferences", async () => {
@@ -46,7 +46,7 @@ test("conflicts and reserved combinations never write preferences", async () => 
     f.editor.keydown(key());
     await f.editor.keyup(key());
     assert.equal(f.operations.length, 0);
-    assert.ok(f.states.some((state) => /冲突|不可用/.test(state.message)));
+    assert.ok(f.states.some((state) => /Shortcut conflict|Combination unavailable/.test(state.message)));
     f.editor.dispose();
   }
 });
@@ -59,7 +59,7 @@ test("stale edits retain the reviewed revision and report failure without claimi
   f.editor.keydown(key());
   await f.editor.keyup(key());
   assert.ok(f.states.some((state) => /stale/.test(state.message)));
-  assert.equal(f.states.some((state) => state.message === "已保存"), false);
+  assert.equal(f.states.some((state) => state.message === "Saved"), false);
 });
 
 test("reset and clear use native per-command operations without touching other bindings", async () => {
@@ -130,5 +130,5 @@ test("failed startup and disposal during startup release native protection", asy
   failed.editor.keydown(key());
   await failed.editor.keyup(key());
   assert.equal(failed.operations.length, 0);
-  assert.ok(failed.states.some((state) => /无法启用/.test(state.message)));
+  assert.ok(failed.states.some((state) => /Could not enable recording protection/.test(state.message)));
 });

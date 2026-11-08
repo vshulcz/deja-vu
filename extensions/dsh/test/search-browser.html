@@ -52,6 +52,16 @@
     };
     const settingsRoot = ReactDOM.createRoot(document.getElementById("settings"));
     const sidebarRoot = ReactDOM.createRoot(document.getElementById("bridge"));
+    // A minimal editing service so the shortcut rows render; they are only
+    // inspected, never used to write a binding.
+    const stubStore = (initial) => ({ getSnapshot: () => initial, subscribe: () => () => {} });
+    const shortcuts = {
+      catalog: stubStore(["deja.search-session", "deja.search-sessions", "session.search"].map((id) => ({ id, label: id, keys: ["Ctrl"] }))),
+      config: stubStore({ status: "ready", revision: "0" }),
+      edit: async () => ({ status: "saved" }),
+      recording: async () => {},
+      describeBinding: (binding) => ({ binding, keys: [], conflicts: [], issue: null }),
+    };
     // The package host ships the route: declare it, as installSearch's probe
     // would after a 2xx answer, so the sidebar feature is live for these runs.
     mod.searchRoute().set("present");
@@ -123,17 +133,25 @@
     // Re-render the existing root: a second createRoot on the same container
     // leaves the first tree in place and updates nothing.
     Object.defineProperty(navigator, "clipboard", { value: { writeText: async (text) => { window.__copied = text; } }, configurable: true });
-    settingsRoot.render(React.createElement(mod.Settings, { prefs, route: absentStore }));
-    await wait(() => [...document.querySelectorAll("button")].some((node) => node.textContent === "复制安装命令"));
+    settingsRoot.render(React.createElement(mod.Settings, { prefs, route: absentStore, shortcuts }));
+    await wait(() => [...document.querySelectorAll("button")].some((node) => node.textContent === "Copy install command"));
     check(document.querySelectorAll('input[role="switch"]').length === 1, "an absent route hides the sidebar switches");
     check(document.querySelector(".deja-endpoint").textContent.includes("/api/deja-search"), "settings names the missing endpoint");
-    [...document.querySelectorAll("button")].find((node) => node.textContent === "复制安装命令").click();
+    check(![...document.querySelectorAll("strong")].some((node) => node.textContent === "Deja cross-session search"),
+      "an absent route hides the sidebar shortcut rows");
+    [...document.querySelectorAll("button")].find((node) => node.textContent === "Copy install command").click();
     await wait(() => window.__copied === "dsh plugin --profile web add dsh-deja");
     check(true, "the install command is copied");
     const presentStore = { getSnapshot: () => "present", getVersion: () => "0.24.0", subscribe: () => () => {} };
-    settingsRoot.render(React.createElement(mod.Settings, { prefs, route: presentStore }));
+    settingsRoot.render(React.createElement(mod.Settings, { prefs, route: presentStore, shortcuts }));
     await wait(() => document.querySelector(".deja-endpoint").textContent.includes("0.24.0"));
     check(document.querySelectorAll('input[role="switch"]').length === 3, "a live route restores the sidebar switches");
+    check([...document.querySelectorAll("strong")].some((node) => node.textContent === "Deja cross-session search"),
+      "a live route restores the sidebar shortcut rows");
+    const unknownStore = { getSnapshot: () => "unknown", getVersion: () => "", subscribe: () => () => {} };
+    settingsRoot.render(React.createElement(mod.Settings, { prefs, route: unknownStore, shortcuts }));
+    await wait(() => document.querySelector(".deja-endpoint").textContent.includes("Checking"));
+    check(document.querySelectorAll('input[role="switch"]').length === 1, "an unproven route shows no sidebar switches");
     report.textContent = checks.join("\n") + "\nAll browser checks passed.";
     document.body.dataset.result = "passed";
   } catch (error) {

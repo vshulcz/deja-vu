@@ -98,13 +98,14 @@ Open **Settings → Deja** for three independent switches, all enabled by defaul
   desktop or **Cmd+F** on macOS desktop. In a browser, use **Ctrl+Alt+F** on
   Windows or **Option+Command+F** on macOS; DSH reserves the browser's
   ordinary Find shortcut.
-- **Ctrl+K opens Deja full-text search** takes over the sidebar search that
-  gesture opens: the search starts in Deja full-text mode instead of the title
-  search. The magnifying glass returns the native search for that opening.
-  This also binds **Ctrl+Alt+K** (Ctrl+Option+Shift+K in a browser) as a
-  direct Deja search shortcut, because DSH's shortcut registry rejects a
-  second binding for the native Ctrl+K. Turn the switch off to restore the
-  official behaviour completely.
+- **Ctrl+Alt+K opens Deja full-text search** is the direct cross-session
+  shortcut. It opens DSH's sidebar search and starts it in Deja full-text mode
+  instead of the title search. The magnifying glass returns the native search
+  for that opening. DSH's own **Ctrl+K** is left untouched: the shortcut
+  registry rejects a second binding for the same key, so Deja uses
+  **Ctrl+Alt+K** on Windows/Linux desktop, **Cmd+Option+K** on macOS desktop,
+  and **Ctrl+Alt+Shift+K** in a browser (**Cmd+Option+Shift+K** on macOS).
+  Turn the switch off to restore the official behaviour completely.
 - **Deja search in the sidebar** adds a full-text mode to sidebar search.
   Open sidebar search, then click its magnifying glass again to switch to
   Deja. Enter a query to search the local index of **DSH conversations only**,
@@ -119,14 +120,14 @@ or devices. Manual search remains available with `autoRecall: false`.
 
 ### Customizing the shortcuts
 
-Open **Settings → Deja → 自定义快捷键** to change the actual key combinations.
-Three rows show the current binding for conversation search, Deja cross-session
-search, and DSH's sidebar opener (`session.search`). Click **修改快捷键**, press
-and release the desired combination, and it saves immediately. **恢复默认**
-restores that command's default; **移除** unbinds it. Escape or moving focus
-away cancels recording. Conflicts and save failures are displayed without
-replacing the accepted binding. If a combination is occupied, first change or
-remove the other command's binding.
+Open **Settings → Deja → Customize shortcuts** to change the actual key
+combinations. Three rows show the current binding for conversation search,
+Deja cross-session search, and DSH's sidebar opener (`session.search`). Click
+**Change shortcut**, press and release the desired combination, and it saves
+immediately. **Restore default** restores that command's default; **Remove**
+unbinds it. Escape or moving focus away cancels recording. Conflicts and save
+failures are displayed without replacing the accepted binding. If a combination
+is occupied, first change or remove the other command's binding.
 
 The controls use DSH's native keybinding service, with the same platform-specific
 persistence, conflict validation and live catalog as **Settings → General →
@@ -139,13 +140,16 @@ Sidebar full-text search needs the **dsh-deja package host plugin**, which
 registers its endpoint. The CLI's `deja install dsh-auto` copies the browser
 panel but not that endpoint, so the panel probes it once at startup:
 
-- **Settings → Deja → 搜索接口** always says what it found — the installed
-  package and its version, or that `/api/deja-search` is missing. Missing
-  means the sidebar mode, its switch and the cross-session shortcut stand
-  down, DSH's sidebar stays exactly as the host drew it, and the page offers
-  the install command (`dsh plugin --profile web add dsh-deja`, with the
-  profile swapped for yours) to copy instead of leaving a dead switch.
-- The probe is the route's own `?probe=1` ping: it names the plugin and its
+- **Settings → Deja → Search endpoint** always says what it found — the
+  installed package and its version, or that `/api/deja-search` is missing.
+  Missing means the sidebar mode, its switch, the cross-session shortcut and
+  its keybinding rows stand down, DSH's sidebar stays exactly as the host drew
+  it, and the page offers the install command (`dsh plugin --profile web add
+  dsh-deja`, with the profile swapped for yours) to copy instead of leaving a
+  dead switch.
+- The probe is the route's own `?probe=1` ping: only a JSON payload with
+  `ok: true` and `plugin: "dsh-deja"` counts as a working endpoint. A 500, a
+  proxy error or an HTML fallback is treated as missing. It names the plugin's
   version, starts no `deja search`, and a declared state (used by tests) wins
   over a late answer.
 

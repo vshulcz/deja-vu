@@ -67,12 +67,12 @@ dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
   则原样不动。Windows/Linux 桌面端使用 **Ctrl+F**，macOS 桌面端使用 **Cmd+F**；
   浏览器中 Windows 使用 **Ctrl+Alt+F**，macOS 使用 **Option+Command+F**，
   因为 DSH 为浏览器原生查找保留了普通的 Find 快捷键。
-- **Ctrl+K opens Deja full-text search（Ctrl+K 唤起 Deja 全文搜索）**：接管
-  Ctrl+K 打开的侧栏搜索——打开后直接进入 Deja 全文模式，而不是原来的标题
-  搜索；点放大镜可对当次打开恢复原生搜索。由于 DSH 快捷键注册表不允许第二个
-  Ctrl+K 默认绑定，此开关同时绑定 **Ctrl+Alt+K**（浏览器中为
-  Ctrl+Option+Shift+K）作为直达 Deja 搜索的快捷键。关闭此开关即完全恢复
-  官方行为。
+- **Ctrl+Alt+K 唤起 Deja 全文搜索**：这是直达跨会话搜索的快捷键。按下后打开
+  DSH 侧栏搜索，并直接进入 Deja 全文模式，而不是原来的标题搜索；点放大镜可对
+  当次打开恢复原生搜索。DSH 自带的 **Ctrl+K 保持不变**——快捷键注册表不允许
+  第二个相同默认绑定，所以 Windows/Linux 桌面端用 **Ctrl+Alt+K**，macOS 桌面端
+  用 **Cmd+Option+K**，浏览器用 **Ctrl+Alt+Shift+K**（macOS 为
+  Cmd+Option+Shift+K）。关闭此开关即完全恢复官方行为。
 - **Deja search in the sidebar（侧栏 Deja 搜索）**：先打开侧栏搜索，
   再点一次放大镜，切换到 Deja 全文搜索。输入关键词后，只检索本地索引中的
   **DSH 会话**，最多显示 20 条结果及匹配片段；点击结果可打开对应会话。
@@ -84,10 +84,10 @@ dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
 
 ### 自定义快捷键
 
-打开 **设置 → Deja → 自定义快捷键**，可直接修改实际按键组合。三行分别显示
-「搜索当前会话」「Deja 跨会话搜索（仅 DSH）」和「打开侧栏搜索（DSH）」的当前
-键位。点击 **修改快捷键** 后按下所需组合键，松开即保存；**恢复默认** 恢复该
-命令的默认键位，**移除** 清除绑定。Esc 或移开焦点取消录制。冲突和保存失败
+打开 **设置 → Deja → Customize shortcuts**，可直接修改实际按键组合。三行分别显示
+「Search this conversation」「Deja cross-session search」和「Open sidebar search」的当前
+键位。点击 **Change shortcut** 后按下所需组合键，松开即保存；**Restore default** 恢复该
+命令的默认键位，**Remove** 清除绑定。Esc 或移开焦点取消录制。冲突和保存失败
 会显示提示，并保留原键位。要使用已占用的组合，请先修改或移除占用者的绑定。
 
 这里使用 DSH 原生快捷键服务，与 **设置 → 通用 → 快捷键** 同步。修改按平台
@@ -97,13 +97,15 @@ dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
 侧栏全文搜索需要安装 **dsh-deja 包的宿主插件**，由它注册搜索接口。CLI 的
 `deja install dsh-auto` 会复制浏览器面板但不带该接口，因此面板启动时探测一次：
 
-- **设置 → Deja → 搜索接口** 始终说明探测结果：已安装的包及版本，或缺少
-  `/api/deja-search`。缺少时侧栏模式、对应开关和跨会话快捷键整体不启用，
-  DSH 侧栏保持原样，页面提供可复制的安装命令
+- **设置 → Deja → Search endpoint** 始终说明探测结果：已安装的包及版本，或缺少
+  `/api/deja-search`。缺少时侧栏模式、对应开关、跨会话快捷键及其键位编辑行整体
+  不启用，DSH 侧栏保持原样，页面提供可复制的安装命令
   （`dsh plugin --profile web add dsh-deja`，把 web 换成你的配置名），
   而不是留一个点了没用的开关。
-- 探测走接口自己的 `?probe=1`，返回插件名与版本，不会启动 `deja search`；
-  显式声明的状态（测试用）优先于迟到的探测结果。
+- 探测走接口自己的 `?probe=1`：只有返回 `ok: true` 且
+  `plugin: "dsh-deja"` 的 JSON 才算接口可用，500、代理错误或返回 HTML 一律视为
+  缺失。探测同时返回版本号，不会启动 `deja search`；显式声明的状态（测试用）
+  优先于迟到的探测结果。
 
 请按上面的步骤安装包以启用侧栏搜索。原有的 CLI 工具、命令可以与包同时使用。
 
