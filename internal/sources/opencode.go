@@ -899,12 +899,6 @@ func sqlLikeEscape(s string) string {
 }
 
 func str(v any) string { s, _ := v.(string); return s }
-func parseNestedTime(m map[string]any, k, sub string) time.Time {
-	if x, ok := m[k].(map[string]any); ok {
-		return parseTimeAny(x[sub])
-	}
-	return time.Time{}
-}
 
 // ParseOpencodeNewest reads only the most recent session. deja doctor asks
 // one question of a store — does it parse into sessions — and answering it by

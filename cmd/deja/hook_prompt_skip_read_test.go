@@ -50,7 +50,7 @@ func TestHookPromptDoesNotReadASessionItAlreadyShowed(t *testing.T) {
 		t.Fatalf("the session was not recalled the first time, so the second ask proves nothing:\n%q", first.String())
 	}
 
-	rankedAlreadyShown = 0
+	rankedAlreadyShown.Store(0)
 	var second bytes.Buffer
 	in = strings.NewReader(`{"prompt":"and what about kestrel retries","session_id":"agent-1"}`)
 	if err := runHookPromptMode(index.DefaultDir(), in, &second, true); err != nil {
@@ -59,7 +59,7 @@ func TestHookPromptDoesNotReadASessionItAlreadyShowed(t *testing.T) {
 	if strings.Contains(second.String(), "capped at four") {
 		t.Fatalf("the same session was injected twice:\n%q", second.String())
 	}
-	if rankedAlreadyShown != 0 {
-		t.Errorf("the ranking returned %d session(s) already shown — they are read from disk in full and then dropped", rankedAlreadyShown)
+	if rankedAlreadyShown.Load() != 0 {
+		t.Errorf("the ranking returned %d session(s) already shown — they are read from disk in full and then dropped", rankedAlreadyShown.Load())
 	}
 }

@@ -199,10 +199,6 @@ func lookupUnlessNew(dir string, find func() (model.Session, bool, error)) (mode
 	return find()
 }
 
-func recent(dir string, n int) ([]model.Session, error) {
-	return recentMatching(dir, n, search.Options{})
-}
-
 func recentMatching(dir string, n int, o search.Options) ([]model.Session, error) {
 	if err := ensureForCLIRead(dir); err == nil {
 		if o.Role != "" {

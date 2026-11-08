@@ -367,16 +367,6 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 	return nil
 }
 
-// toolHookLine is what the agent is told, or "" for the silence that is the
-// default answer. It gates on the tool: a command line is worth saying only for
-// the tool that runs a command, and a file's history only before the file is
-// changed — Read, Glob and NotebookRead carry a file_path too, and a hook wired
-// with a wide matcher would otherwise fire on every one of them.
-// toolHookLine is the line for an action when nothing has been said yet.
-func toolHookLine(dir, cwd string, input toolHookInput) string {
-	return toolHookLineSkipping(dir, cwd, input, func(string) bool { return false })
-}
-
 // toolHookLineSkipping is the same choice, told which lines this agent session
 // has already been given, so a repeated fact yields to the next one rather than
 // ending the call (#3603).
@@ -851,11 +841,6 @@ func commandProjectCandidatesIn(dir, cwd, cmd string) []string {
 		}
 	}
 	return out
-}
-
-// commandHookLine is the line for a command when nothing has been said yet.
-func commandHookLine(dir, cwd, cmd string) string {
-	return commandHookLineSkipping(dir, cwd, cmd, "", func(string) bool { return false })
 }
 
 // commandHookLineSkipping is the same walk, told which lines the agent has

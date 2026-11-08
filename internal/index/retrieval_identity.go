@@ -596,8 +596,6 @@ func projectDistance(recorded, cwd string) int {
 	}
 }
 
-func sameProject(recorded, cwd string) bool { return projectDistance(recorded, cwd) >= 0 }
-
 // nearerProject reports whether a match this far from the caller beats the one
 // already held. A match at any distance beats none; among matches the nearer
 // wins, and equals fall through to betterIDMatch.

@@ -444,12 +444,6 @@ func restoreAiderRead(lines []string, was string) ([]string, bool) {
 	return lines, false
 }
 
-// refreshAiderContext regenerates the read-only file from the same digest the
-// hooks inject elsewhere, so aider users get what every other harness gets.
-func refreshAiderContext(dir string) error {
-	return writeAiderContext(aiderContextBody(dir))
-}
-
 // aiderPlaceholder is the file when it holds no digest. An empty file still has
 // to exist: aider refuses to start when a configured read file is missing.
 //

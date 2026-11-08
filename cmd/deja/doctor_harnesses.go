@@ -12,11 +12,6 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
-// doctorHarnesses lists every store, the form `deja doctor --all` prints.
-func doctorHarnesses(w io.Writer, dir string) {
-	doctorHarnessStores(w, dir, true)
-}
-
 // doctorHarnessStores prints the store rows. Without all, a store that is
 // simply absent folds into one closing line: doctor lists every agent deja
 // can read, so on a machine with two of them the rows that matter hid among

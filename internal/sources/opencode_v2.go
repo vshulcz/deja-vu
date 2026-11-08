@@ -148,9 +148,6 @@ func opencodeSessionTables(db string) []string {
 	return []string{sc.sessionTable}
 }
 
-// opencodeV2 reports whether the conversation in a store is kept the 2.x way.
-func opencodeV2(db string) bool { return opencodeSchemaOf(db).v2 }
-
 // opencodeV2Parts is the shape the rest of the parser already reads: one row
 // per part, with the message's own columns beside it.
 //

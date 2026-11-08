@@ -37,7 +37,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	emptied.Store(0)
 	collisions.Store(nil)
 	merged.Store(0)
-	lastIngestFiles = len(changed)
+	lastIngestFiles.Store(int64(len(changed)))
 	readThisPass(changed)
 	// Deliberately not parsedThisPass: this path reads the appended tail, not
 	// the file, so what it finds adds to the file's count instead of replacing

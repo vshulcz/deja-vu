@@ -267,20 +267,6 @@ func sessionsTouching(metas []index.SessionMeta, path string, self index.Session
 	return out
 }
 
-// statuslineMemoryLine renders it. A count is a statistic; what the earlier
-// session was about is a memory, so the title wins when there is one.
-func statuslineMemoryLine(m fileMemory) string {
-	return statuslineMemoryLineTo(m, statuslineMaxTitle)
-}
-
-// statuslineMemoryLineTo bounds the title to maxTitle columns — the unit
-// safeForStatusline works in, since the bound exists to keep the bar inside the
-// terminal. maxTitle <= 0 drops the title and falls through to the count form,
-// which is what a bar too narrow to hold any of it gets.
-func statuslineMemoryLineTo(m fileMemory, maxTitle int) string {
-	return statuslineMemoryLineWithin(m, maxTitle, statuslineMaxName)
-}
-
 // statuslineMemoryLineWithin is that with the filename bounded too. The
 // filename is the second elastic part: at 28 columns it alone could put the
 // segment past a narrow bar however far the title was cut (#1880).
@@ -306,11 +292,6 @@ func statuslineMemoryLineWithin(m fileMemory, maxTitle, maxName int) string {
 	}
 	return fmt.Sprintf("%s · %d earlier %s%s", name, m.Sessions, noun, when)
 }
-
-// trimStatuslineTitle makes a session title safe for a status bar. The title
-// is whatever the user typed first, so it can carry a carriage return that
-// rewrites the line, an ANSI escape that recolours the whole bar, or a bell.
-func trimStatuslineTitle(t string) string { return safeForStatusline(t, statuslineMaxTitle) }
 
 // safeForStatusline strips what a terminal would act on rather than print, and
 // bounds the length in columns.

@@ -71,7 +71,7 @@ func (rp *replacePass) run(takenFrom map[string]bool) error {
 	emptied.Store(0)
 	collisions.Store(nil)
 	merged.Store(0)
-	lastIngestFiles = len(rp.changed)
+	lastIngestFiles.Store(int64(len(rp.changed)))
 	// The sessions a shared store handed back. Only those may drop a store's
 	// records by key: a per-file transcript under the same id — goose's JSONL
 	// beside its database — says nothing about what the store still holds.

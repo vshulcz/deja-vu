@@ -135,15 +135,6 @@ func withoutInjectedContext(s string) string {
 	return strings.TrimSpace(s)
 }
 
-// runHookPrompt is the UserPromptSubmit hook: search the user's own prompt
-// against the index (relevance, not recency) and inject a compact hint only
-// when something genuinely matches. Empty output means stay silent — a hook
-// that talks every turn is wallpaper. It never builds or refreshes the index:
-// this path runs on every prompt and must stay ~milliseconds.
-func runHookPrompt(dir string, stdin io.Reader, stdout io.Writer) error {
-	return runHookPromptMode(dir, stdin, stdout, false)
-}
-
 // plain=true prints the bare digest for hosts that inject a hook's stdout
 // verbatim — Kimi does that and reads no JSON field for context.
 func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool) error {
@@ -324,10 +315,10 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// two slots below could go to the transcript while its own note waited
 	// behind it (#2803).
 	search.LiftNoteSessionsAboveTheirSource(ranked)
-	rankedAlreadyShown = 0
+	rankedAlreadyShown.Store(0)
 	for _, s := range ranked {
 		if skip[s.ID] {
-			rankedAlreadyShown++
+			rankedAlreadyShown.Add(1)
 		}
 	}
 	if err != nil || len(ranked) == 0 {

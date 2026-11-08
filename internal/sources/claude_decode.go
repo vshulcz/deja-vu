@@ -342,27 +342,12 @@ func claudeTime(raw json.RawMessage) time.Time {
 	return parseTimeAny(n)
 }
 
-// claudeText joins the text a message carries. Items that are not objects, or
-// objects with neither key, are skipped rather than failing the line — a
-// transcript mixing shapes must not cost the whole message.
-func claudeText(raw json.RawMessage) string {
-	txt, _ := claudeTextKind(raw)
-	return txt
-}
-
 // RoleToolOutput marks text a tool produced. Claude Code files tool results
 // inside `user` messages, so without this the index labels 89% of its user-role
 // content as if a person had typed it — 33,027 of 37,077 messages, 77.8 MB
 // (#559). The text is worth keeping and searching; only the attribution was
 // wrong.
 const RoleToolOutput = "tool-output"
-
-// claudeTextKind joins a message's text and reports whether what it joined came
-// from tool results rather than from speech. A message mixing both counts as
-// speech: the person said something, and the tool output rode along with it.
-func claudeTextKind(raw json.RawMessage) (string, bool) {
-	return claudeTextKindIn(splitClaudeContent(raw))
-}
 
 func claudeTextKindIn(c *claudeContent) (string, bool) {
 	var sawToolResult, sawSpeech bool
@@ -618,10 +603,6 @@ func claudeCallPath(filePath, notebookPath string) string {
 	return notebookPath
 }
 
-// claudeToolPaths returns the distinct file paths a message's tool calls name,
-// one per line, or "" when it names none.
-func claudeToolPaths(raw json.RawMessage) string { return claudeToolPathsIn(splitClaudeContent(raw)) }
-
 func claudeToolPathsIn(c *claudeContent) string {
 	if !c.array {
 		return ""
@@ -674,10 +655,6 @@ func IndexEdits() bool { return os.Getenv("DEJA_INDEX_EDITS") != "0" }
 // megabyte of someone else's file into the index.
 const editSpanMax = 32 * 1024
 
-// claudeEditSpans returns "path\nreplaced bytes" for every edit in a turn,
-// including the sub-edits of a MultiEdit call.
-func claudeEditSpans(raw json.RawMessage) []string { return claudeEditSpansIn(splitClaudeContent(raw)) }
-
 func claudeEditSpansIn(c *claudeContent) []string {
 	if !c.array {
 		return nil
@@ -726,13 +703,6 @@ func claudeEditSpansIn(c *claudeContent) []string {
 		}
 	}
 	return out
-}
-
-// claudeWroteRecords returns "path\n<line hashes>" for every write in a turn:
-// the new side of an Edit, of each sub-edit of a MultiEdit, and the whole
-// content of a Write. The mirror of claudeEditSpans, which takes the old side.
-func claudeWroteRecords(raw json.RawMessage) []string {
-	return claudeWroteRecordsIn(splitClaudeContent(raw))
 }
 
 func claudeWroteRecordsIn(c *claudeContent) []string {

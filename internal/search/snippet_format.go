@@ -460,8 +460,7 @@ func collapseTool(s string) string {
 }
 
 var (
-	lineNumberRE = regexp.MustCompile(`^\s*\d{1,5}[:|]\s+`)
-	toolDumpRE   = regexp.MustCompile(`(?i)(tool_use|tool_result|<local-command|netcat|npm ERR!|panic:|goroutine \d+)`)
+	toolDumpRE = regexp.MustCompile(`(?i)(tool_use|tool_result|<local-command|netcat|npm ERR!|panic:|goroutine \d+)`)
 	// The literal each alternative of toolDumpRE begins with, in the same
 	// order. A line holding none of them cannot match, and looksToolDump uses
 	// that to skip the engine entirely.

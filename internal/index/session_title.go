@@ -10,11 +10,6 @@ import (
 	"github.com/vshulcz/deja-vu/internal/redact"
 )
 
-func sessionTitle(s model.Session) string {
-	t, _ := sessionTitleFrom(s)
-	return t
-}
-
 // sessionTitleFrom derives a session's title and reports whether it is the
 // agent's own words rather than the reader's.
 //

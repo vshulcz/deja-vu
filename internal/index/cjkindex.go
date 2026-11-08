@@ -91,9 +91,3 @@ func bucketInvalidUTF8(tok string) string {
 	_, _ = h.Write([]byte(string(runes)))
 	return hexBuckets[h.Sum32()%256]
 }
-
-// cjkIndexKeys is what keyer.cjkKeys emits, as strings.
-func cjkIndexKeys(s string, emit func(tok string)) {
-	var k keyer
-	k.cjkKeys(s, func(b []byte) { emit(string(b)) })
-}

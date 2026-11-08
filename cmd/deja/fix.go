@@ -165,11 +165,6 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 // command after that error" was false there.
 const fixWithheldLine = "deja: what ran after that error on this machine was a merge, a force push or a deletion — deja does not hand those over as a fix"
 
-// printFixPairs writes the pairs in the prose form, one remedy per pair.
-func printFixPairs(stdout io.Writer, pairs []index.FixPair) error {
-	return printFixPairsFrom("", stdout, pairs)
-}
-
 func printFixPairsFrom(dir string, stdout io.Writer, pairs []index.FixPair) error {
 	cwd := howCwd()
 	for _, p := range pairs {

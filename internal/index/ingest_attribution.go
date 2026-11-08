@@ -9,11 +9,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/model"
-	"github.com/vshulcz/deja-vu/internal/nfcfold"
-	"github.com/vshulcz/deja-vu/internal/redact"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -407,67 +404,6 @@ func recordsForKeyInRolesTail(path string, t *recordTables, key string, roles ma
 		out = out[len(out)-tail:]
 	}
 	return out, err
-}
-
-func redactForIngest(m *Manifest, sourcePath, text string) string { //nolint:unparam // the result is the stored text; tests read only the counts
-	// Drop deja's own injected recall before anything else looks at the text,
-	// so it is never counted, tokenized or stored.
-	text = stripSelfRecall(text)
-	// Canonicalise accented text to NFC so an "é" stored decomposed (base + a
-	// combining mark, as some editors and macOS filesystems emit) matches a
-	// query typed precomposed and the reverse. NFC is lossless — it names the
-	// same characters — so unlike a fold it is safe to store, and it makes every
-	// downstream surface (postings, snippet, digest) compare like against like
-	// (#1098).
-	text = nfcfold.Compose(text)
-	// Redact the full text before capping: a secret straddling the cap
-	// boundary would otherwise lose its closing marker and store raw.
-	redacted, counts := redact.Text(text)
-	if len(redacted) > maxIndexedText {
-		// Cut on a rune boundary so a multibyte rune straddling the cap is not
-		// split, leaving an invalid tail byte in the stored text.
-		cut := maxIndexedText
-		for cut > 0 && !utf8.RuneStart(redacted[cut]) {
-			cut--
-		}
-		redacted = redacted[:cut]
-		countClipped(m, sourcePath, "", 1)
-	}
-	n := counts.Total()
-	if n == 0 || m == nil {
-		return redacted
-	}
-	m.Redacted += n
-	if m.RedactionRules == nil {
-		m.RedactionRules = map[string]int{}
-	}
-	// The store, not the file kind: `deja stats` prints these as headings, and
-	// "cline-sdk" is a word no other screen uses (#2238, the shape #2234 fixed
-	// for the ingest counters).
-	h := sources.HarnessForKind(harnessForPath(sourcePath))
-	if h == "" {
-		if _, ok := m.Files[sources.OpencodeDB()]; ok {
-			h = "opencode"
-		}
-	}
-	for rule, count := range counts {
-		m.RedactionRules[h+":"+rule] += count
-	}
-	if sourcePath != "" && m.Files != nil {
-		if fs, ok := m.Files[sourcePath]; ok {
-			fs.Redactions += n
-			m.Files[sourcePath] = fs
-		} else if db := sources.OpencodeDB(); sourcePath != db {
-			// opencode sessions carry their project dir as Path; the store
-			// on record is the database file. Attribute stats there so
-			// `deja sources` reports them.
-			if fs, ok := m.Files[db]; ok {
-				fs.Redactions += n
-				m.Files[db] = fs
-			}
-		}
-	}
-	return redacted
 }
 
 func carryRedactions(m *Manifest, old Manifest, skip map[string]bool) {

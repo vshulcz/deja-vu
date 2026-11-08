@@ -152,11 +152,6 @@ func toolPart(it any, _ toolDialect) (name string, in map[string]any, ok bool) {
 	return name, in, in != nil
 }
 
-// toolPathsFromContent is claudeToolPaths for the reference parser, which walks
-// decoded maps rather than raw JSON. The two must agree or the differential
-// test in #502 stops meaning anything.
-func toolPathsFromContent(v any) string { return toolPathsIn(v, claudeDialect) }
-
 func toolPathsIn(v any, d toolDialect) string {
 	items, ok := v.([]any)
 	if !ok {
@@ -212,9 +207,6 @@ func toolPathStrings(in map[string]any, d toolDialect) []string {
 	return out
 }
 
-// editSpansFromContent is claudeEditSpans for the reference parser.
-func editSpansFromContent(v any) []string { return editSpansIn(v, claudeDialect) }
-
 func editSpansIn(v any, d toolDialect) []string {
 	items, ok := v.([]any)
 	if !ok {
@@ -266,10 +258,6 @@ func editSpansIn(v any, d toolDialect) []string {
 	return out
 }
 
-// wroteRecordsFromContent is claudeWroteRecords for the reference parser: the
-// written side of the same calls editSpansIn reads the replaced side of.
-func wroteRecordsFromContent(v any) []string { return wroteRecordsIn(v, claudeDialect) }
-
 func wroteRecordsIn(v any, d toolDialect) []string {
 	items, ok := v.([]any)
 	if !ok {
@@ -311,40 +299,6 @@ func wroteRecordsIn(v any, d toolDialect) []string {
 				out = append(out, rec)
 			}
 		}
-	}
-	return out
-}
-
-// commandsFromContent is claudeCommands for the reference parser.
-func commandsFromContent(v any) []string { return commandsIn(v, claudeDialect) }
-
-// commandCallsFromContent is commandsFromContent with the call id each command
-// will be answered under, so the reference parser can stamp an outcome the same
-// way the typed one does. The two must agree or the differential test in #502
-// stops meaning anything.
-func commandCallsFromContent(v any) []claudeCommand { return commandCallsIn(v, claudeDialect) }
-
-// toolOutcomesFromContent is claudeToolOutcomes for the reference parser.
-func toolOutcomesFromContent(v any) []claudeToolOutcome {
-	items, ok := v.([]any)
-	if !ok {
-		return nil
-	}
-	var out []claudeToolOutcome
-	for _, it := range items {
-		m, ok := it.(map[string]any)
-		if !ok {
-			continue
-		}
-		if t, _ := m["type"].(string); t != "tool_result" {
-			continue
-		}
-		id, _ := m["tool_use_id"].(string)
-		if id == "" {
-			continue
-		}
-		bad, _ := m["is_error"].(bool)
-		out = append(out, claudeOutcome(id, bad, m["content"]))
 	}
 	return out
 }

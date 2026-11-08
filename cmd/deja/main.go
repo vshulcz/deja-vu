@@ -95,16 +95,6 @@ func rebuildWindowError(err error) error {
 	return errors.New("the index is being rebuilt right now — run this again in a moment")
 }
 
-func loadAll(h string) []model.Session {
-	var ss []model.Session
-	for _, store := range sources.StoresToRead() {
-		if (h == "" || store.Name == h) && store.Load != nil {
-			ss = append(ss, store.Load()...)
-		}
-	}
-	return ss
-}
-
 func loadFileSources() []model.Session {
 	var ss []model.Session
 	for _, store := range sources.StoresToRead() {

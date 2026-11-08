@@ -165,11 +165,6 @@ func installClaudeHooksAt(path, exe string, events []string, uninstall bool) (in
 	return installResult{Path: path, Action: a}, err
 }
 
-func updateClaudeSessionStartHook(root map[string]any, exe string, uninstall bool) map[string]any {
-	root = updateClaudeHook(root, "SessionStart", hookRun(exe, "hook-context"), "", uninstall)
-	return root
-}
-
 // hookStatusMessage labels the hook while it runs. Codex carries it through
 // to its hook run summary; Claude Code 2.1.220 parses the field but shows
 // nothing for it — there the receipt in systemMessage is what the user sees,

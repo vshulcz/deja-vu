@@ -213,13 +213,6 @@ func cmdWarmupStatus(dir string, _ []string) error {
 	return nil
 }
 
-// emptyRecallAnswer distinguishes "there is nothing" from "there is nothing
-// YET". A harness with no auto-recall wiring reaches deja over MCP and nothing
-// else, so a tool result is the one place it can learn that the first index is
-// still being built. Without this the agent reads a confident negative and
-// tells the user they have no history.
-func emptyRecallAnswer(dir, q string) string { return emptyRecallAnswerPolicy(dir, q, 0) }
-
 // emptyRecallAnswerPolicy adds the reason when a rule, not the query, is why
 // the answer is empty. An agent told "no prior sessions matched" concludes the
 // work was never done and starts over (#680).

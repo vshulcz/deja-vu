@@ -248,14 +248,6 @@ var notesMemo struct {
 // whole seconds and a write that lands just after the memo was taken.
 const notesFreshWindow = 2 * time.Second
 
-// notesParses counts the parses that actually read the file, for the test that
-// pins the memo.
-func notesParses() int {
-	notesMemo.Lock()
-	defer notesMemo.Unlock()
-	return notesMemo.parses
-}
-
 // notesStamp identifies the file a memo was built from. A file that cannot be
 // stat'd is never memoized: the read below answers with nothing and remembering
 // that would hide the file arriving a moment later.

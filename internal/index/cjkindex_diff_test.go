@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/cjkfold"
+	"github.com/vshulcz/deja-vu/internal/query"
 )
 
 func legacyBucket(tok string) string {
@@ -302,14 +303,14 @@ func TestCJKIndexKeysFoldCollision492(t *testing.T) {
 // through expandCJKTokens keeps its script, before and after the ingestion
 // emitter split (#492).
 func TestExpandCJKTokensKeepsScript492(t *testing.T) {
-	got := expandCJKTokens([]string{"韓國簽證"})
+	got := query.ExpandCJKTokens([]string{"韓國簽證"})
 	want := []string{"韓國", "國簽", "簽證"}
 	if len(got) != len(want) {
-		t.Fatalf("expandCJKTokens(韓國簽證) = %q, want %q", got, want)
+		t.Fatalf("query.ExpandCJKTokens(韓國簽證) = %q, want %q", got, want)
 	}
 	for i, w := range want {
 		if got[i] != w {
-			t.Fatalf("expandCJKTokens(韓國簽證)[%d] = %q, want %q (folded or reordered)", i, got[i], w)
+			t.Fatalf("query.ExpandCJKTokens(韓國簽證)[%d] = %q, want %q (folded or reordered)", i, got[i], w)
 		}
 	}
 	if f := cjkfold.String("韓國"); f == "韓國" {

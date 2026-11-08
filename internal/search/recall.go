@@ -356,10 +356,6 @@ func nearDuplicate(candidate map[string]bool, prior []map[string]bool) bool {
 	return false
 }
 
-func autoRecallSession(s model.Session, now time.Time, provenance bool) string {
-	return autoRecallSessionFor(s, now, provenance, nil)
-}
-
 func autoRecallSessionWithLimit(s model.Session, now time.Time, provenance bool, conclusionBudget, conclusionLimit int) string {
 	return autoRecallSessionForAskedWithLimit(s, now, provenance, nil, "", conclusionBudget, conclusionLimit)
 }
@@ -509,10 +505,6 @@ func termStem(t string) string {
 		return ""
 	}
 	return string(r[:len(r)-2])
-}
-
-func autoRecallSessionFor(s model.Session, now time.Time, provenance bool, terms []string) string {
-	return autoRecallSessionForAsked(s, now, provenance, terms, "")
 }
 
 func autoRecallSessionForAsked(s model.Session, now time.Time, provenance bool, terms []string, asked string) string {

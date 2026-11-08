@@ -220,24 +220,6 @@ func (rw *recordWriter) Close() error {
 	return cerr
 }
 
-func writeRecord(f *os.File, r Record, t *recordTables) (int64, error) {
-	off, err := f.Seek(0, io.SeekCurrent)
-	if err != nil {
-		return 0, err
-	}
-	b := encodeRecord(r, t)
-	if len(b) > 1<<31 {
-		return 0, errors.New("record too large")
-	}
-	var hdr [4]byte
-	binary.LittleEndian.PutUint32(hdr[:], uint32(len(b))) //nolint:gosec // a record is far below 4 GiB
-	if _, err = f.Write(hdr[:]); err != nil {
-		return 0, err
-	}
-	_, err = f.Write(b)
-	return off, err
-}
-
 // readRecordAt reads one record without moving the file position.
 //
 // It used to Seek and then read the header and the payload, three syscalls per

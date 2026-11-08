@@ -15,11 +15,6 @@ import (
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
-func recallContext(dir, q string) (string, error) {
-	text, _, _, _, err := recallContextResult(dir, q, "")
-	return text, err
-}
-
 // idContext is what contextByID reports alongside the text: the session it
 // opened and what that session weighs, both of which the caller records.
 type idContext struct {
@@ -110,12 +105,6 @@ func contextByID(dir, q string, harness ...string) (string, idContext, bool) {
 		// FindByPrefix resolved this session from the selector, so a prefix
 		// here is honest by construction.
 		note: forgottenSourceNote(whole, q, true)}, true
-}
-
-// recallContextResult keeps the four-value shape its callers and tests read.
-func recallContextResult(dir, q, harness string) (string, int, int64, []string, error) { //nolint:unparam // same shape as recallTextResult; changes_block_test.go calls it
-	text, sessions, raw, ids, _, _, err := recallContextResultFrom(dir, q, harness)
-	return text, sessions, raw, ids, err
 }
 
 // recallContextResultFrom is recallContextResult plus the project behind the

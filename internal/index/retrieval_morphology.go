@@ -136,10 +136,6 @@ func stemSearchFor(dir string, m Manifest, o query.Options, sessions int) (Searc
 	return SearchResult{Sessions: ss, Stemmed: true, Variants: variants, Tier: query.TierClose}, nil
 }
 
-func stemPostings(dir string, terms, phrases []string) ([]posting, map[string][]string, error) {
-	return stemPostingsFor(dir, terms, phrases, 0)
-}
-
 // loneWordInforms is whether the one word left of a two-word question may
 // answer for it: not filler, and rare by the bar the co-occurrence rung holds
 // its words to, so the page is the sessions about that word, not the store.

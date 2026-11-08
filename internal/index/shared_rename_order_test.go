@@ -22,8 +22,8 @@ func TestARenameThatKeepsTheOrderIsNotReadAgain(t *testing.T) {
 		t.Fatal(err)
 	}
 	indexPass(t, dir)
-	if lastIngestFiles != 0 {
-		t.Errorf("a copy renamed in place behind its owner read %d files again, want none", lastIngestFiles)
+	if lastIngestFiles.Load() != 0 {
+		t.Errorf("a copy renamed in place behind its owner read %d files again, want none", lastIngestFiles.Load())
 	}
 	keptMatchesRebuild(t, dir, "s-x")
 
@@ -33,7 +33,7 @@ func TestARenameThatKeepsTheOrderIsNotReadAgain(t *testing.T) {
 		t.Fatal(err)
 	}
 	indexPass(t, dir)
-	if lastIngestFiles == 0 {
+	if lastIngestFiles.Load() == 0 {
 		t.Errorf("a copy renamed ahead of its owner was followed by name alone")
 	}
 	keptMatchesRebuild(t, dir, "s-x")

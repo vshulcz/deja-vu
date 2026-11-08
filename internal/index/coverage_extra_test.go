@@ -954,8 +954,8 @@ func TestIndexErrorBranches(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := updateIndex(dir, "", m.Scope, m.Files, false, nil); err != nil || lastIngestFiles != 0 {
-		t.Fatalf("fresh update err=%v last=%d", err, lastIngestFiles)
+	if err := updateIndex(dir, "", m.Scope, m.Files, false, nil); err != nil || lastIngestFiles.Load() != 0 {
+		t.Fatalf("fresh update err=%v last=%d", err, lastIngestFiles.Load())
 	}
 	if !manifestFresh(m, m.Files, m.Scope) || manifestFresh(m, m.Files, "other") {
 		t.Fatal("manifestFresh scope branch failed")
