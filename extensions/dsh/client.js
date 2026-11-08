@@ -310,8 +310,8 @@ window.__ModuleLoader__.load({
         for (const key of Object.keys(value)) if (typeof saved?.[key] === "boolean") value[key] = saved[key];
       } catch {}
       const listeners = new Set();
-      // Ctrl+Alt+K opens DSH's sidebar search and switches it to Deja's
-      // full-text mode via requestOpen(); native Ctrl+K is untouched.
+      // Mod+Shift+K opens DSH's sidebar search and switches it to Deja's
+      // full-text mode via requestOpen(); native Mod+K is untouched.
       let pendingOpen = false;
       const openListeners = new Set();
       return {
@@ -333,7 +333,7 @@ window.__ModuleLoader__.load({
           try { storage.setItem(SEARCH_PREFS, JSON.stringify(value)); } catch {}
           for (const fn of listeners) fn();
         },
-        // When Deja owns the Ctrl+Alt+K gesture, the search it opens becomes
+        // When Deja owns the Mod+Shift+K gesture, the search it opens becomes
         // Deja's. The magnifier click and re-open interactions reset the
         // flag, so the native view stays reachable.
         claimOpen() {
@@ -428,7 +428,7 @@ window.__ModuleLoader__.load({
       return status;
     }
 
-    // Ctrl+F writes a real `/deja` command, so the search runs when the
+    // Mod+F writes a real `/deja` command, so the search runs when the
     // person sends it — a plain "deja search" sentence would only be a message
     // to the model. The draft keeps its reference chips by shifting every
     // occurrence past the prefix; the shape is DSH's own draft snapshot.
@@ -447,7 +447,7 @@ window.__ModuleLoader__.load({
       // A different command chip leads this draft; rewriting it would replace
       // the command the person typed, so leave their draft as it is.
       if (projection?.command && !text.startsWith(prefix)) return null;
-      // Repeated Ctrl+F focuses the same draft instead of nesting prefixes.
+      // Repeated Mod+F focuses the same draft instead of nesting prefixes.
       const shift = text.startsWith(prefix) ? 0 : prefix.length;
       return {
         text: shift ? prefix + text : text,
@@ -472,7 +472,13 @@ window.__ModuleLoader__.load({
         aliases: ["deja", "find in conversation"],
         defaults: Object.fromEntries([
           ...["windows", "macos", "linux"].map((os) => ["desktop:" + os, { code: "KeyF", modifiers: ["primary"] }]),
-          ...["windows", "macos", "linux"].map((os) => ["web:" + os, { code: "KeyF", modifiers: ["primary", "alt"] }]),
+          // The browser service admits only a short allowlist on web:linux
+          // (primary+Slash, primary+shift+Comma, primary+shift+Period) or
+          // three or more modifiers. Any other combination makes register()
+          // throw, which would leave the command unregistered everywhere.
+          // web:linux therefore declares no default; an omitted profile is
+          // unbound, and the person there records their own combination.
+          ...["windows", "macos"].map((os) => ["web:" + os, { code: "KeyF", modifiers: ["primary", "alt"] }]),
         ]),
         regions: ["page", "editable"],
         modals: [],
@@ -774,8 +780,8 @@ window.__ModuleLoader__.load({
       };
       const update = () => { if (active) publish(); };
       const sync = () => { if (active && button.getAttribute("aria-expanded") !== "true") setActive(false); };
-      // A search opened by the Ctrl+Alt+K gesture becomes Deja's when the
-      // switch is on: that expansion lands in full-text mode. Native Ctrl+K
+      // A search opened by the Mod+Shift+K gesture becomes Deja's when the
+      // switch is on: that expansion lands in full-text mode. Native Mod+K
       // still opens DSH's regular title search. The sidebar's own re-render
       // races the shortcut, so poll briefly and give up cleanly — an
       // unclaimed opening keeps the native search.
@@ -933,8 +939,8 @@ window.__ModuleLoader__.load({
         }, () => h(Settings, { prefs, shortcuts: shortcutService, route })));
       } catch {}
       if (typeof ctx.inject !== "function") return;
-      // Ctrl+Alt+K is Deja's own gesture: it opens the sidebar search and
-      // switches that expansion to Deja full-text mode. DSH's native Ctrl+K
+      // Mod+Shift+K is Deja's own gesture: it opens the sidebar search and
+      // switches that expansion to Deja full-text mode. DSH's native Mod+K
       // (session.search) keeps its title search. The magnifier click is the
       // way back to the title search for a Deja-owned opening.
       ctx.inject(["shortcuts", "uiSession", "sessions", "conversation"], (c) => {
@@ -948,10 +954,12 @@ window.__ModuleLoader__.load({
           name: "shell.overlay", id: "deja-search", order: 950,
         }, () => h(Sidebar, { prefs, portal, route, open: (id) => c.uiWorkspace.openSession(id) })));
       });
-      // The direct binding is Ctrl+Alt+K (with Shift in a browser). It only
-      // fires when both switches are on, and claims the sidebar search it
-      // opens. An unproven route is a pass: the key stays DSH's until the
-      // probe confirms the search this shortcut opens can actually answer.
+      // The direct binding is Mod+Shift+K — `primary` in the defaults below,
+      // the registry's logical modifier (Cmd on macOS, Ctrl elsewhere), the
+      // same convention dsh-shortcuts uses. It only fires when both switches
+      // are on, and claims the sidebar search it opens. An unproven route is
+      // a pass: the key stays DSH's until the probe confirms the search this
+      // shortcut opens can actually answer.
       const takeoverEnabled = () => route.getSnapshot() === "present"
         && prefs.getSnapshot().sidebar && prefs.getSnapshot().opensDeja;
       ctx.inject(["shortcuts"], (c) => {
@@ -960,12 +968,14 @@ window.__ModuleLoader__.load({
             id: "deja.search-sessions",
             label: () => "Deja: search DSH conversations",
             aliases: ["deja search", "search conversations"],
-            // DSH's native session.search owns primary+K, so Deja uses its
-            // own primary+alt+K binding (plus Shift in a browser). The native
-            // Ctrl+K title search is left alone.
+            // DSH's native session.search owns primary+K, so Deja uses the
+            // primary+shift+K chord. The native Mod+K title search is left
+            // alone.
             defaults: Object.fromEntries([
-              ...["windows", "macos", "linux"].map((os) => ["desktop:" + os, { code: "KeyK", modifiers: ["primary", "alt"] }]),
-              ...["windows", "macos", "linux"].map((os) => ["web:" + os, { code: "KeyK", modifiers: ["primary", "alt", "shift"] }]),
+              ...["windows", "macos", "linux"].map((os) => ["desktop:" + os, { code: "KeyK", modifiers: ["primary", "shift"] }]),
+              // See installFind: web:linux admits only a short allowlist, so
+              // it declares no default rather than making register() throw.
+              ...["windows", "macos"].map((os) => ["web:" + os, { code: "KeyK", modifiers: ["primary", "shift"] }]),
             ]),
             regions: ["page"],
             modals: [],
