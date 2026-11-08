@@ -85,51 +85,24 @@ type claudeOrigin struct {
 	Body         string `json:"body"`
 }
 
-func isClaudeSubagentReport(v *claudeLine, msgText string) bool {
-	if v.Origin == nil || v.Origin.Kind != "peer" {
-		return false
-	}
-	body := strings.TrimSpace(v.Origin.Body)
-	if strings.HasPrefix(body, "[Subagent hand-back]") || strings.Contains(body, "hand-back") {
-		return true
-	}
-	msg := strings.TrimSpace(msgText)
-	return strings.HasPrefix(msg, "[Subagent hand-back]") || strings.Contains(msg, "hand-back")
+func isClaudeSubagentReport(body, msgText string) bool {
+	return strings.Contains(body, "hand-back") || strings.Contains(msgText, "hand-back")
 }
 
 // stripSubagentFrame removes the subagent hand-back envelope prefix line,
 // preserving the report content indented or unindented (#5985).
 func stripSubagentFrame(s string) string {
 	s = strings.TrimSpace(s)
-	if !strings.HasPrefix(s, "[Subagent hand-back]") {
-		return s
+	if strings.HasPrefix(s, "[Subagent hand-back]") {
+		_, s, _ = strings.Cut(s, "\n")
 	}
-	if idx := strings.Index(s, "The report follows:"); idx >= 0 {
-		s = s[idx+len("The report follows:"):]
-	} else if nl := strings.Index(s, "\n"); nl >= 0 {
-		s = s[nl+1:]
-	}
-	s = strings.TrimPrefix(s, "\r")
-	s = strings.TrimPrefix(s, "\n")
 	lines := strings.Split(s, "\n")
-	allIndented := true
-	for _, l := range lines {
-		if l != "" && !strings.HasPrefix(l, "  ") && !strings.HasPrefix(l, "\t") {
-			allIndented = false
-			break
+	for i, l := range lines {
+		if after, ok := strings.CutPrefix(l, "  "); ok {
+			lines[i] = after
 		}
 	}
-	if allIndented && len(lines) > 0 {
-		for i, l := range lines {
-			if strings.HasPrefix(l, "  ") {
-				lines[i] = strings.TrimPrefix(l, "  ")
-			} else if strings.HasPrefix(l, "\t") {
-				lines[i] = strings.TrimPrefix(l, "\t")
-			}
-		}
-		s = strings.Join(lines, "\n")
-	}
-	return strings.TrimSpace(s)
+	return strings.TrimSpace(strings.Join(lines, "\n"))
 }
 
 type claudeMessage struct {
@@ -224,13 +197,13 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 			}
 		}
 		if isPeer {
-			if !isClaudeSubagentReport(&v, txt) {
+			if txt == "" {
+				txt = v.Origin.Body
+			}
+			if !isClaudeSubagentReport(v.Origin.Body, txt) {
 				return
 			}
 			role = "assistant"
-			if txt == "" && v.Origin.Body != "" {
-				txt = v.Origin.Body
-			}
 			txt = stripSubagentFrame(txt)
 		}
 		if v.Type == "user" && v.IsCompactSummary && role == "user" {

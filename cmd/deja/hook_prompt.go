@@ -315,10 +315,10 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// two slots below could go to the transcript while its own note waited
 	// behind it (#2803).
 	search.LiftNoteSessionsAboveTheirSource(ranked)
-	rankedAlreadyShown.Store(0)
+	rankedAlreadyShown = 0
 	for _, s := range ranked {
 		if skip[s.ID] {
-			rankedAlreadyShown.Add(1)
+			rankedAlreadyShown++
 		}
 	}
 	if err != nil || len(ranked) == 0 {
@@ -798,7 +798,7 @@ func (p *promptPicker) leadTermsMeet(s model.Session) bool {
 			return search.SpeechCarriesTermsTogether(s, p.terms, 2)
 		}
 		// On a large multi-project store, two rare non-Latin domain terms spoken
-		// together in one message ("фронт" + "вена" + "впн") identify the subject
+		// together in one message ("шлюз" + "витрина" + "роутер") identify the subject
 		// when no Latin/symbol identifier was named.
 		if len(named) == 0 && p.topIDF >= 5.0 {
 			if rare := rareTerms(p.terms, p.idfOf, 3.8); len(rare) >= 2 {

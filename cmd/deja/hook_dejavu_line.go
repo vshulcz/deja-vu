@@ -312,7 +312,7 @@ func presentableTopic(t string) bool {
 // injected already. A seam, like focusCalls below: such a session is read from
 // disk in full and then dropped on its id, and nothing in the output changes
 // either way, so only a count can hold the skip in place.
-var rankedAlreadyShown atomic.Int64
+var rankedAlreadyShown int //nolint:unused,nolintlint
 
 // focusCalls counts how many sessions were narrowed. A seam, like
 // rebuildInProgress above: narrowing walks every message of a session that can

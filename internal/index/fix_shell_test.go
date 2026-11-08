@@ -36,4 +36,24 @@ func TestShellOnlySigsAndTheSameFailingCommand(t *testing.T) {
 	if got := without(map[uint64]bool{1: true, 2: true}, map[uint64]bool{2: true}); len(got) != 1 || !got[1] {
 		t.Errorf("without = %v", got)
 	}
+	globOut := "(eval):1: no matches found: --include=*.py\nError: widget cache is locked by pid 4242"
+	globSigs := fixSignaturesFor(t.TempDir(), globOut)
+	globLine, _ := FrictionLine("(eval):1: no matches found: --include=*.py")
+	if s := shellOnlySigs(globOut, "grep -r --include=*.py foo", globSigs); s[frictionHash(globLine)] {
+		t.Error("an unmatched glob the command carries read as an unanchored shell complaint")
+	}
+	for _, diag := range []string{
+		"(eval):1: no matches found: --include=*.py",
+		"zsh:1: bad pattern: [a-",
+		"zsh: = not found",
+		"== not found",
+		"bash: syntax error near unexpected token `)'",
+	} {
+		if !IsShellDiagnostic(diag) {
+			t.Errorf("IsShellDiagnostic(%q) = false, want true", diag)
+		}
+	}
+	if IsShellDiagnostic("") || IsShellDiagnostic("psql: error: connection refused") {
+		t.Error("IsShellDiagnostic matched non-shell output")
+	}
 }

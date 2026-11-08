@@ -262,7 +262,8 @@ func TestShellLevelDiagnosticFixPairAnsweredFromAnyProject(t *testing.T) {
 		t.Fatal(err)
 	}
 	// In a different project, the shell error should be answered with the fix
-	if line := fixPairLineFor(dir, "/work/otherproject", "git grep --include=*.py pattern", wall); !strings.Contains(line, "git grep --include='*.py' pattern") {
+	// even when the surrounding grep arguments differ between checkouts.
+	if line := fixPairLineFor(dir, "/work/otherproject", "git grep -n --include=*.py other_symbol internal/sub", wall); !strings.Contains(line, "git grep --include='*.py' pattern") {
 		t.Errorf("shell-level error was not answered from another project: %q", line)
 	}
 	// A project-specific error from another project should still be filtered out
@@ -270,4 +271,3 @@ func TestShellLevelDiagnosticFixPairAnsweredFromAnyProject(t *testing.T) {
 		t.Errorf("project-specific error from another project leaked: %q", line)
 	}
 }
-

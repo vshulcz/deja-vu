@@ -68,16 +68,13 @@ func parseClaudeGenericFromOffset(path string, offset int64) ([]model.Session, e
 		}
 		if isPeer {
 			body, _ := origin["body"].(string)
-			body = strings.TrimSpace(body)
-			msgText := strings.TrimSpace(txt)
-			if !strings.HasPrefix(body, "[Subagent hand-back]") && !strings.Contains(body, "hand-back") &&
-				!strings.HasPrefix(msgText, "[Subagent hand-back]") && !strings.Contains(msgText, "hand-back") {
+			if txt == "" {
+				txt = body
+			}
+			if !isClaudeSubagentReport(body, txt) {
 				return
 			}
 			role = "assistant"
-			if txt == "" && body != "" {
-				txt = body
-			}
 			txt = stripSubagentFrame(txt)
 		}
 		if summary, _ := m["isCompactSummary"].(bool); summary && typ == "user" && role == "user" {
