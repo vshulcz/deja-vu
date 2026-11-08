@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/index"
 )
 
 // A session that hit an error and then ran the command that made it go away,
@@ -187,3 +189,85 @@ func TestFixPairRefusesACommandThatFailed(t *testing.T) {
 		}
 	}
 }
+
+// An error from the shell itself (e.g. zsh no matches found, syntax error,
+// or command not found) is a machine fact rather than a project fact: its
+// remedy is valid across checkouts, so hook-tool-after delivers it even
+// when recorded in another project (#5986).
+func TestShellLevelDiagnosticFixPairAnsweredFromAnyProject(t *testing.T) {
+	tmp := hermeticEnv(t)
+	root := filepath.Join(tmp, "claude")
+	t.Setenv("DEJA_CLAUDE_ROOT", root)
+	store := filepath.Join(root, "-work-searchapp")
+	if err := os.MkdirAll(store, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	wall := "(eval):1: no matches found: --include=*.py"
+	other := "psql: error: connection to server failed: Connection refused"
+	now := time.Now().UTC()
+	for k := range 2 {
+		at := now.Add(-time.Duration(600-20*k) * time.Minute).Format(time.RFC3339)
+		var lines []string
+		add := func(role string, content any) {
+			b, err := json.Marshal(map[string]any{"type": role, "sessionId": fmt.Sprintf("s%d", k),
+				"timestamp": at, "cwd": "/work/searchapp", "message": map[string]any{"role": role, "content": content}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			lines = append(lines, string(b))
+		}
+		bash := func(cmd string) {
+			add("assistant", []any{map[string]any{"type": "tool_use", "name": "Bash", "input": map[string]any{"command": cmd}}})
+		}
+		result := func(text string, failed bool) {
+			add("user", []any{map[string]any{"type": "tool_result", "is_error": failed, "content": text}})
+		}
+		add("user", fmt.Sprintf("find python files (%d)", k))
+		bash("git grep --include=*.py pattern")
+		result(wall, true)
+		bash("git grep --include='*.py' pattern")
+		result("match.py:10: pattern", false)
+		if err := os.WriteFile(filepath.Join(store, fmt.Sprintf("s%d.jsonl", k)),
+			[]byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		var mlines []string
+		madd := func(role string, content any) {
+			b, err := json.Marshal(map[string]any{"type": role, "sessionId": fmt.Sprintf("m%d", k),
+				"timestamp": at, "cwd": "/work/searchapp", "message": map[string]any{"role": role, "content": content}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			mlines = append(mlines, string(b))
+		}
+		mbash := func(cmd string) {
+			madd("assistant", []any{map[string]any{"type": "tool_use", "name": "Bash", "input": map[string]any{"command": cmd}}})
+		}
+		mresult := func(text string, failed bool) {
+			madd("user", []any{map[string]any{"type": "tool_result", "is_error": failed, "content": text}})
+		}
+		madd("user", fmt.Sprintf("run db migrations (%d)", k))
+		mbash("make migrate")
+		mresult(other, true)
+		mbash("docker compose up -d")
+		mresult("done", false)
+		if err := os.WriteFile(filepath.Join(store, fmt.Sprintf("m%d.jsonl", k)),
+			[]byte(strings.Join(mlines, "\n")+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	// In a different project, the shell error should be answered with the fix
+	if line := fixPairLineFor(dir, "/work/otherproject", "git grep --include=*.py pattern", wall); !strings.Contains(line, "git grep --include='*.py' pattern") {
+		t.Errorf("shell-level error was not answered from another project: %q", line)
+	}
+	// A project-specific error from another project should still be filtered out
+	if line := fixPairLineFor(dir, "/work/otherproject", "make migrate", other); line != "" {
+		t.Errorf("project-specific error from another project leaked: %q", line)
+	}
+}
+

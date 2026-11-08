@@ -448,6 +448,68 @@ func clampOutput(s string) string {
 	return s[:half] + "\n" + s[len(s)-half:]
 }
 
+var shellDiagnosticPhrases = []string{
+	"no matches found",
+	"bad pattern",
+	"bad substitution",
+	"syntax error near unexpected token",
+	"parse error near",
+	"unbound variable",
+	"command not found",
+}
+
+var shellPrefixes = []string{
+	"zsh", "bash", "sh", "dash", "ksh", "fish", "(eval)", "(anon)", "-bash", "-zsh",
+}
+
+// isShellLevelDiagnostic reports whether output indicates an error emitted by
+// the shell itself (e.g. globbing failure, syntax error, bad substitution, or
+// command-not-found) before or during command invocation. Such failures and
+// their remedies are machine-wide facts rather than project-specific (#5986).
+func isShellLevelDiagnostic(output string) bool {
+	if output == "" {
+		return false
+	}
+	for line := range strings.SplitSeq(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		low := strings.ToLower(line)
+		for _, phrase := range shellDiagnosticPhrases {
+			if strings.Contains(low, phrase) {
+				return true
+			}
+		}
+		if hasShellPrefix(low) {
+			if strings.Contains(low, "not found") ||
+				strings.Contains(low, "syntax error") ||
+				strings.Contains(low, "parse error") ||
+				strings.Contains(low, "cannot execute") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func hasShellPrefix(line string) bool {
+	idx := strings.Index(line, ":")
+	if idx <= 0 {
+		return false
+	}
+	name := line[:idx]
+	if slash := strings.LastIndex(name, "/"); slash >= 0 {
+		name = name[slash+1:]
+	}
+	for _, sh := range shellPrefixes {
+		if name == sh {
+			return true
+		}
+	}
+	return false
+}
+
 // fixPairLine is the one line the failure gets: the error this machine saw
 // before and the command that followed it without the error coming back.
 func fixPairLine(dir, cwd, output string) string {
@@ -470,10 +532,19 @@ func fixPairLineFor(dir, cwd, command, output string) string {
 	others := func(project string) bool {
 		return cwd != "" && project != "" && !here(project)
 	}
+	isShellErr := isShellLevelDiagnostic(output)
 	// A few, not one: the newest pair for an error can be a remedy that failed,
 	// and silence is the wrong answer when the one behind it worked.
+	// An error from the shell itself (glob failure, syntax error, missing command)
+	// is a machine-wide fact rather than a project fact (#5986).
 	allowHere := func(project string) bool {
-		return pol.Allows(policy.ActivationAuto, project) && !others(project)
+		if !pol.Allows(policy.ActivationAuto, project) {
+			return false
+		}
+		if isShellErr {
+			return true
+		}
+		return !others(project)
 	}
 	pairs := index.FixesForCommand(dir, command, output, 4, allowHere)
 	for _, p := range pairs {
@@ -505,7 +576,7 @@ func fixPairLineFor(dir, cwd, command, output string) string {
 		return pol.Allows(policy.ActivationAuto, project) && project != "" && !here(project)
 	})
 	for _, p := range elsewhere {
-		if !p.MachineFact() || orientSkipFixPairForHook(p) {
+		if (!p.MachineFact() && !isShellLevelDiagnostic(p.Error)) || orientSkipFixPairForHook(p) {
 			continue
 		}
 		if line := fixLine(p, frictionCount(dir, p, pol)); line != "" {
