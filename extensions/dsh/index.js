@@ -5,6 +5,7 @@
 // in Claude Code, Codex, Cursor, opencode and thirty-nine more agents, on this
 // machine, before dsh existed. The index is deja's; this file is the seam.
 
+import { installSearchRoute } from "./search.js";
 import { createRequire } from "node:module";
 import { execFile, execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -226,21 +227,43 @@ function tools(ctx) {
   })));
 }
 
+// `/deja --session <id> -- <query>` scopes the search to one conversation; the
+// composer shortcut writes exactly that. Anything else stays one plain query.
+// A line that starts with --session but does not parse is refused rather than
+// searched as those words: the person asked for one conversation, and a silent
+// full search would look like the scope worked.
+const SESSION_FLAG = /^--session\s+(\S+)(?:\s+--\s*([\s\S]*))?$/;
+
+function commandQuery(rawInput) {
+  const text = String(rawInput || "").trim();
+  const match = SESSION_FLAG.exec(text);
+  if (match) return { session: bareSessionId(match[1]), query: (match[2] || "").trim(), scoped: true, malformed: false };
+  return { session: "", query: text, scoped: false, malformed: /^--session(?:\s|$)/.test(text) };
+}
+
 function command(ctx, board) {
   guarded(() => ctx.commands.register({
     name: "deja",
     description: "Search this machine's past AI coding sessions",
     input: { hint: "what to look for" },
     async handler(invocation) {
-      const query = String((invocation && invocation.rawInput) || "").trim();
+      const { session, query, scoped, malformed } = commandQuery(invocation && invocation.rawInput);
+      if (malformed) {
+        return { kind: "error", text: "A scoped search looks like `/deja --session <id> -- <query>`." };
+      }
+      if (session && !/^[a-zA-Z0-9_-]+$/.test(session)) {
+        return { kind: "error", text: "That session id is not one dsh writes — `/deja --session <id> -- <query>` searches one conversation." };
+      }
       if (!query) {
-        return { kind: "error", text: "Say what to look for: /deja <error, file, or decision>" };
+        return { kind: "error", text: scoped
+          ? "A scoped search needs a query — `/deja --session <id> -- <query>`."
+          : "Say what to look for: /deja <error, file, or decision>" };
       }
       // Named, not handed over as deja's first word: the bare-query path
       // dispatches a word that happens to be a command, so `/deja version`
       // printed a version number and `/deja index` rebuilt the index, and one
       // of the words people most want history about is `install`.
-      const out = run(argv("search", [], query));
+      const out = run(argv("search", session ? ["--session", session] : [], query));
       if (!INSTALLED) return { kind: "error", text: MISSING };
       // Outside dsh web a person sees nothing the hooks print — the digest
       // goes to the model — so the reply to /deja is where deja's own notes
@@ -667,6 +690,8 @@ function apply(ctx, config) {
     config,
   );
   const board = noteBoard();
+  // User-initiated search remains available when automatic recall is disabled.
+  installSearchRoute(ctx, DEJA);
   if (adds.tools) tools(ctx);
   if (adds.command) command(ctx, board);
   if (adds.recall) {

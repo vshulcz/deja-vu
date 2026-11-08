@@ -53,12 +53,77 @@ dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
     - id: deja
       name: dsh-deja
       config:
-        autoRecall: false   # 只保留工具和 /deja
+        autoRecall: false   # 保留工具、/deja 和手动搜索
 ```
+
+## 搜索控制
+
+打开 **设置 → Deja**，可分别控制三个默认开启的开关：
+
+- **Ctrl+F in conversations（会话内快捷搜索）**：把真正的 `/deja` 命令写进
+  消息输入框——`/deja --session <不带 session- 前缀的会话 UUID> -- <当前草稿>`，
+  并聚焦输入框。发送后由 deja 只搜这一段会话，而不是变成一条普通消息；草稿里的
+  引用块会保留并随前缀整体后移。不会自动发送。若草稿本身已以别的命令开头，
+  则原样不动。Windows/Linux 桌面端使用 **Ctrl+F**，macOS 桌面端使用 **Cmd+F**；
+  浏览器中 Windows 使用 **Ctrl+Alt+F**，macOS 使用 **Option+Command+F**，
+  因为 DSH 为浏览器原生查找保留了普通的 Find 快捷键。
+- **Ctrl+Alt+K 唤起 Deja 全文搜索**：这是直达跨会话搜索的快捷键。按下后打开
+  DSH 侧栏搜索，并直接进入 Deja 全文模式，而不是原来的标题搜索；点放大镜可对
+  当次打开恢复原生搜索。DSH 自带的 **Ctrl+K 保持不变**——快捷键注册表不允许
+  第二个相同默认绑定，所以 Windows/Linux 桌面端用 **Ctrl+Alt+K**，macOS 桌面端
+  用 **Cmd+Option+K**，浏览器用 **Ctrl+Alt+Shift+K**（macOS 为
+  Cmd+Option+Shift+K）。关闭此开关即完全恢复官方行为。
+- **Deja search in the sidebar（侧栏 Deja 搜索）**：先打开侧栏搜索，
+  再点一次放大镜，切换到 Deja 全文搜索。输入关键词后，只检索本地索引中的
+  **DSH 会话**，最多显示 20 条结果及匹配片段；点击结果可打开对应会话。
+  再点放大镜可恢复普通侧栏结果。若还有更多匹配，请缩小查询范围。
+  Deja 不可用、搜索失败或无法打开会话时，界面会显示错误信息。
+
+两个偏好分别保存在当前浏览器／配置的本地存储中，互不影响，也不会同步到其他
+浏览器或设备。即使设置了 `autoRecall: false`，手动搜索仍然可用。
+
+### 自定义快捷键
+
+打开 **设置 → Deja → Customize shortcuts**，可直接修改实际按键组合。三行分别显示
+「Search this conversation」「Deja cross-session search」和「Open sidebar search」的当前
+键位。点击 **Change shortcut** 后按下所需组合键，松开即保存；**Restore default** 恢复该
+命令的默认键位，**Remove** 清除绑定。Esc 或移开焦点取消录制。冲突和保存失败
+会显示提示，并保留原键位。要使用已占用的组合，请先修改或移除占用者的绑定。
+
+这里使用 DSH 原生快捷键服务，与 **设置 → 通用 → 快捷键** 同步。修改按平台
+持久保存，插件升级不会覆盖。浏览器或系统保留组合由 DSH 校验；不支持编辑服务
+的旧版 DSH 会提示升级。功能开关控制是否生效，键位设置控制具体按哪组键。
+
+侧栏全文搜索需要安装 **dsh-deja 包的宿主插件**，由它注册搜索接口。CLI 的
+`deja install dsh-auto` 会复制浏览器面板但不带该接口，因此面板启动时探测一次：
+
+- **设置 → Deja → Search endpoint** 始终说明探测结果：已安装的包及版本，或缺少
+  `/api/deja-search`。缺少时侧栏模式、对应开关、跨会话快捷键及其键位编辑行整体
+  不启用，DSH 侧栏保持原样，页面提供可复制的安装命令
+  （`dsh plugin --profile web add dsh-deja`，把 web 换成你的配置名），
+  而不是留一个点了没用的开关。
+- 探测走接口自己的 `?probe=1`：只有返回 `ok: true` 且
+  `plugin: "dsh-deja"` 的 JSON 才算接口可用，500、代理错误或返回 HTML 一律视为
+  缺失。探测同时返回版本号，不会启动 `deja search`；显式声明的状态（测试用）
+  优先于迟到的探测结果。
+
+请按上面的步骤安装包以启用侧栏搜索。原有的 CLI 工具、命令可以与包同时使用。
 
 ## 接入方式
 
 召回通过 `ctx.systemPrompt.context` 注入，该回调在每次 assembly 时求值。另一种看起来可行的做法——在 `agent/pre-step` 中间件里往这一步的消息列表里插入一条消息——插件能加载、回合也能正常结束，但内容到不了模型：该 waterfall 中后续的监听器会基于 payload 重建返回值，插入的消息被丢弃且没有任何报错。这一点是通过读取 dsh 0.1.1-rc.2 实际发出的请求确认的。
+
+手动侧栏搜索使用 DSH 同一套登录保护下的 `GET /api/deja-search` 接口，
+通过异步、无 shell 的调用执行
+`deja search --harness deepseek --json --limit 20 -- <query>`，
+超时为 20 秒，输出上限为 2 MiB。空查询不会启动进程；超过 500 个字符的查询会被拒绝。
+接口只返回精简的会话元数据和匹配片段，不返回完整对话。
+
+DSH 目前没有侧栏搜索 provider API。浏览器适配器限定在
+`data-slot="sidebar.workspaces"` 锚点内，通过带 `aria-expanded` 的语义化
+搜索按钮和 `_listArea` CSS 类后缀定位原界面。已检查的界面版本为
+**DSH 0.2.1-rc.5**。如果旧版或变更后的布局缺少这些元素，适配器会保持普通
+侧栏不变。这些内部标记依赖可能需要随 DSH 后续版本调整。
 
 ## 不做什么
 

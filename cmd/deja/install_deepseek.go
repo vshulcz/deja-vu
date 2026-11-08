@@ -53,6 +53,10 @@ import { execFileSync } from "node:child_process";
 
 const DEJA = %q;
 
+// "/deja --session <id> -- <query>" searches one conversation; dsh's composer
+// shortcut writes exactly that line. Anything else stays one plain query.
+const SESSION = /^--session\s+(\S+)(?:\s+--\s*([\s\S]*))?$/;
+
 function apply(ctx) {
   // Loaded twice in one profile the host throws "command deja is already
   // registered" and the whole profile fails to load, which costs the user
@@ -63,17 +67,33 @@ function apply(ctx) {
     description: "Search this machine's past AI coding sessions",
     input: { hint: "what to look for" },
     async handler(invocation) {
-      const query = String((invocation && invocation.rawInput) || "").trim();
+      const raw = String((invocation && invocation.rawInput) || "").trim();
+      const match = SESSION.exec(raw);
+      const scoped = match !== null;
+      // A scoped form that does not parse is refused, not searched as words:
+      // the person asked for one conversation, and a silent full search would
+      // look like the scope worked.
+      const malformed = !scoped && /^--session(?:\s|$)/.test(raw);
+      const bare = scoped ? match[1].replace(/^session-/, "") : "";
+      const query = scoped ? String(match[2] || "").trim() : raw;
+      if (malformed) {
+        return { kind: "error", text: "A scoped search looks like /deja --session <id> -- <query>." };
+      }
+      if (bare && !/^[a-zA-Z0-9_-]+$/.test(bare)) {
+        return { kind: "error", text: "That session id is not one dsh writes — /deja --session <id> -- <query> searches one conversation." };
+      }
       if (!query) {
-        return { kind: "error", text: "Say what to look for: /deja <error, file, or decision>" };
+        return { kind: "error", text: scoped ? "A scoped search needs a query — /deja --session <id> -- <query>." : "Say what to look for: /deja <error, file, or decision>" };
       }
       // "search" is named rather than handed over as deja's first word: the
       // bare-query path dispatches a word that happens to be a command, so
       // /deja version printed a version number and /deja index rebuilt the
       // index. "--" then keeps a query that starts with a dash from being read
       // as a flag, which came back as an error the caller cannot tell from an
-      // empty history.
-      const args = query.startsWith("-") ? ["search", "--", query] : ["search", query];
+      // empty history. A scoped query keeps both properties.
+      const args = bare
+        ? (query.startsWith("-") ? ["search", "--session", bare, "--", query] : ["search", "--session", bare, query])
+        : (query.startsWith("-") ? ["search", "--", query] : ["search", query]);
       try {
         const out = execFileSync(DEJA, args, {
           windowsHide: true,

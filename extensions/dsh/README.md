@@ -81,8 +81,80 @@ panel from these files; with both installed you get one panel.
     - id: deja
       name: dsh-deja
       config:
-        autoRecall: false   # tools and /deja only
+        autoRecall: false   # keep tools, /deja and manual search
 ```
+
+## Search controls
+
+Open **Settings → Deja** for three independent switches, all enabled by default:
+
+- **Ctrl+F in conversations** writes a real `/deja` command into the message
+  input — `/deja --session <bare session UUID> -- <your draft>` — and focuses
+  it. Sending it runs deja against that one conversation, so the search
+  actually happens instead of arriving as an ordinary message; reference
+  chips in the draft are kept and move with the prefix. The shortcut does not
+  send the draft; you send it when you choose. A draft that already starts
+  with another command is left untouched. Use **Ctrl+F** on Windows/Linux
+  desktop or **Cmd+F** on macOS desktop. In a browser, use **Ctrl+Alt+F** on
+  Windows or **Option+Command+F** on macOS; DSH reserves the browser's
+  ordinary Find shortcut.
+- **Ctrl+Alt+K opens Deja full-text search** is the direct cross-session
+  shortcut. It opens DSH's sidebar search and starts it in Deja full-text mode
+  instead of the title search. The magnifying glass returns the native search
+  for that opening. DSH's own **Ctrl+K** is left untouched: the shortcut
+  registry rejects a second binding for the same key, so Deja uses
+  **Ctrl+Alt+K** on Windows/Linux desktop, **Cmd+Option+K** on macOS desktop,
+  and **Ctrl+Alt+Shift+K** in a browser (**Cmd+Option+Shift+K** on macOS).
+  Turn the switch off to restore the official behaviour completely.
+- **Deja search in the sidebar** adds a full-text mode to sidebar search.
+  Open sidebar search, then click its magnifying glass again to switch to
+  Deja. Enter a query to search the local index of **DSH conversations only**,
+  see up to 20 hits with matching snippets, and click a hit to open its session.
+  Click the magnifying glass again to return to regular sidebar results.
+  If more matches exist, narrow the query. Missing Deja, failed searches and
+  sessions that cannot be opened are shown as errors.
+
+These preferences are saved separately in this browser/profile's local storage;
+changing one does not change the other, and they do not sync between browsers
+or devices. Manual search remains available with `autoRecall: false`.
+
+### Customizing the shortcuts
+
+Open **Settings → Deja → Customize shortcuts** to change the actual key
+combinations. Three rows show the current binding for conversation search,
+Deja cross-session search, and DSH's sidebar opener (`session.search`). Click
+**Change shortcut**, press and release the desired combination, and it saves
+immediately. **Restore default** restores that command's default; **Remove**
+unbinds it. Escape or moving focus away cancels recording. Conflicts and save
+failures are displayed without replacing the accepted binding. If a combination
+is occupied, first change or remove the other command's binding.
+
+The controls use DSH's native keybinding service, with the same platform-specific
+persistence, conflict validation and live catalog as **Settings → General →
+Shortcuts**. Edits survive plugin updates. Browser/system reserved combinations
+remain subject to DSH's validation. Older DSH versions without the editing
+service show an upgrade notice. The switches above enable the features; the
+keybinding rows determine which keys invoke them.
+
+Sidebar full-text search needs the **dsh-deja package host plugin**, which
+registers its endpoint. The CLI's `deja install dsh-auto` copies the browser
+panel but not that endpoint, so the panel probes it once at startup:
+
+- **Settings → Deja → Search endpoint** always says what it found — the
+  installed package and its version, or that `/api/deja-search` is missing.
+  Missing means the sidebar mode, its switch, the cross-session shortcut and
+  its keybinding rows stand down, DSH's sidebar stays exactly as the host drew
+  it, and the page offers the install command (`dsh plugin --profile web add
+  dsh-deja`, with the profile swapped for yours) to copy instead of leaving a
+  dead switch.
+- The probe is the route's own `?probe=1` ping: only a JSON payload with
+  `ok: true` and `plugin: "dsh-deja"` counts as a working endpoint. A 500, a
+  proxy error or an HTML fallback is treated as missing. It names the plugin's
+  version, starts no `deja search`, and a declared state (used by tests) wins
+  over a late answer.
+
+Install the package as above to enable the sidebar search; the existing CLI
+tools and command can coexist with the package.
 
 ## How it is wired
 
@@ -99,6 +171,30 @@ serves the page, the plugin asks for the hook's JSON reply, hands `additionalCon
 behind dsh's own login. Anywhere else it keeps asking for `--plain`, because
 deja marks a note shown when it prints it. The browser half is `client.js`,
 plain JS in dsh's module wrapper, so the package has no build step.
+
+Manual sidebar search uses `GET /api/deja-search` on the same authenticated DSH
+API mount. It runs an asynchronous, shell-free
+`deja search --harness deepseek --json --limit 20 -- <query>` call, bounded to
+20 seconds and 2 MiB of output. Empty queries launch no process; queries longer
+than 500 characters are rejected. The route returns compact session metadata
+and snippets rather than complete transcripts.
+
+DSH currently exposes no sidebar-search provider API. The browser adapter stays
+inside the `data-slot="sidebar.workspaces"` anchor and finds the semantic
+`aria-expanded` search button and the `_listArea` CSS class suffix. This markup
+was inspected in DSH **0.2.1-rc.5**. If those elements are absent in an older or
+changed layout, the adapter leaves the regular sidebar alone. These internal
+markup dependencies may need updating for future DSH versions.
+
+## Testing the search controls
+
+Run `node --test extensions/dsh/test/*.test.js` from the repository root for the
+synthetic host, preferences, shortcut and composition tests. For the DOM/React
+adapter check, serve the repository with a static HTTP server and open
+`extensions/dsh/test/search-browser.html`. That optional fixture loads React
+18 from a CDN and uses synthetic history; it does not connect to DSH or read a
+local index. A passing report covers mode switching, session opening, host
+errors, empty queries, disabling the feature and cleanup.
 
 ## What it does not do
 
