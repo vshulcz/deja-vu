@@ -648,7 +648,7 @@ func doctorMCPConfigs() []doctorMCPConfig {
 		{"windsurf", windsurfMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"mcode", mcodeConfigPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"gjc", gjcMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
-		{"zcode", zcodeDoctorPath(), doctorZCodeWired, doctorJSONDejaKeysIn(doctorMCPServersBlock)},
+		{"zcode", zcodeDoctorMCPPath(), doctorZCodeWired, doctorJSONDejaKeysIn(doctorMCPServersBlock)},
 		{"commandcode", commandCodeMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"cherrystudio", cherryStudioImportPath(), doctorFileWired, nil},
 		// The server rides in deja's plugin package; the manifest Reasonix
@@ -844,6 +844,34 @@ func yamlScalar(v string) string {
 // the rest of this table uses.
 func doctorZCodeWired(path string) bool {
 	return doctorJSONWiredIn(doctorMCPServersBlock)(path)
+}
+
+// zcodeDoctorMCPPath is where the MCP server actually runs on a 3.17+ desktop:
+// the runtime reads config.json, and #4429 keeps install from writing a server
+// there, so a package manager (or the reader) wires it instead. When that live
+// config already runs deja, report against it — zcodeDoctorPath() alone would
+// name setting.json, which the desktop never loads, and a working server would
+// read as missing. Otherwise stay with the file install writes, so a 3.17+
+// machine with no server at all is still reported as missing (#4429, #5960).
+func zcodeDoctorMCPPath() string {
+	legacy := zcodeLegacyConfigPath()
+	if !zcodeConfigIsLiveRuntimeConfig() || !doctorExists(legacy) {
+		return zcodeDoctorPath()
+	}
+	b, err := doctorReadConfig(legacy)
+	if err != nil {
+		return zcodeDoctorPath()
+	}
+	var root map[string]any
+	if json.Unmarshal([]byte(jsoncToJSON(string(b))), &root) != nil {
+		return zcodeDoctorPath()
+	}
+	for _, v := range doctorMCPServersBlock(root) {
+		if mcpEntryRunsDeja(v) {
+			return legacy
+		}
+	}
+	return zcodeDoctorPath()
 }
 
 // doctorFirstExisting names the host a report should talk about when a harness
