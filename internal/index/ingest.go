@@ -263,7 +263,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	// A rebuild evicts nothing, but a number left by an earlier build must not
 	// outlive it (#1861).
 	evicted.Store(0)
-	lastIngestFiles = len(files)
+	lastIngestFiles.Store(int64(len(files)))
 	parsedThisPass(files)
 	// Capture before publishNewestFirst can atomically replace the live index
 	// with a partial build. These packets are not derived index sidecars: they
@@ -472,8 +472,6 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	LastBuild = summary
 	return nil
 }
-
-func load(h string) []model.Session { return loadProgress(h, nil) }
 
 // safeLoad shields a cold rebuild from a panicking harness loader: one broken
 // store costs that harness's sessions this pass, not the whole index.
@@ -960,10 +958,6 @@ func newestSlice(newest []model.Session) int {
 	return n
 }
 
-func writeSessions(tmp, dir string, ss []model.Session, files map[string]FileState, scope string) error {
-	return writeSessionsWithSync(tmp, dir, ss, files, scope, importedState{compactions: compactionsForRebuild(dir, readTombstones())})
-}
-
 func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string]FileState, scope string, imp importedState) error {
 	ss = dropShadowedPrompts(ss, nil)
 	// The counters belong to this build. Draining them only on read made
@@ -977,7 +971,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	merged.Store(0)
 	initialBuild := !HasManifest(dir)
 	writtenMessages := 0
-	lastIngestFiles = len(files)
+	lastIngestFiles.Store(int64(len(files)))
 	parsedThisPass(files)
 	m := Manifest{Version: version, KeptDated: true, Format: onDiskFormat, SearchOnly: searchOnlyFor(dir), Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), SourcesReadAt: time.Now(), ReadZone: zoneFingerprint(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
 		ExportWatermarks: imp.watermarks, ExportBoundary: imp.boundary, ImportedRecords: imp.dedupe,

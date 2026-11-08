@@ -66,12 +66,6 @@ func IsWorkRole(role string) bool {
 	return false
 }
 
-// IsSpokenRole reports whether a message role represents conversational speech
-// rather than a tool or file-activity work record.
-func IsSpokenRole(role string) bool {
-	return !IsWorkRole(role)
-}
-
 // RoleMatches reports whether a stored message role satisfies a --role filter.
 // `--role tool` is what `deja help` documents while "tool-output" is what is
 // stored, so both spellings match.

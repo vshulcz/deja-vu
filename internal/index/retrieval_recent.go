@@ -174,41 +174,6 @@ func RecentInProject(dir, project string, n int) ([]model.Session, error) {
 	return sessionsForMetas(dir, metas)
 }
 
-// RecentProject finds sessions whose project name contains the given string —
-// a browsing helper, loose on purpose, the way `--project` is on the surfaces a
-// person types. A caller deciding on its own which sessions belong to the
-// directory it is standing in wants RecentInProject instead (#2336).
-func RecentProject(dir, project string, n int) ([]model.Session, error) {
-	if dir == "" {
-		dir = DefaultDir()
-	}
-	unlock, ok, err := tryLockDir(dir)
-	if err != nil {
-		return nil, err
-	}
-	if ok {
-		defer unlock()
-	}
-	m, err := readManifestCached(dir)
-	if err != nil {
-		return nil, err
-	}
-	project = strings.ToLower(project)
-	var metas []SessionMeta
-	for _, meta := range m.Sessions {
-		p := strings.ToLower(meta.Project)
-		if p == project || (project != "" && strings.Contains(p, project)) {
-			metas = append(metas, meta)
-		}
-	}
-	metas = metasNotIgnored(metas)
-	sort.Slice(metas, func(i, j int) bool { return newestFirstMeta(metas[i], metas[j]) })
-	if n > 0 && len(metas) > n {
-		metas = metas[:n]
-	}
-	return sessionsForMetas(dir, metas)
-}
-
 // recordServable says whether a record may be served for a query.
 //
 // Both retrieval paths have to ask this and only one of them did. Exact search
@@ -538,12 +503,6 @@ func sessionsForMetasInWindowedTail(dir string, m Manifest, metas []SessionMeta,
 		}
 	})
 	return out, err
-}
-
-// RecentProjects is RecentProject for several project names at once: one
-// manifest read and one records pass instead of names × sessions scans.
-func RecentProjects(dir string, projects []string, perName int) ([]model.Session, error) {
-	return RecentProjectsUnder(dir, projects, "", perName)
 }
 
 // RecentProjectsUnder is RecentProjects plus the sessions whose work happened

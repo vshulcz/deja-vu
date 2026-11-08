@@ -17,10 +17,3 @@ import (
 func displayProject(s model.Session) string {
 	return query.DisplayProject(s.Project, s.From)
 }
-
-// projectFilterMatches is the other half of the same rule: what the screen
-// shows has to be a string a filter accepts, or the label is a dead end
-// (#2644).
-func projectFilterMatches(project, from, want string) bool {
-	return query.ProjectMatches(project, from, want)
-}

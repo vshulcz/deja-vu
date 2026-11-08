@@ -72,6 +72,37 @@ type claudeLine struct {
 	ForkedFrom *struct {
 		SessionID string `json:"sessionId"`
 	} `json:"forkedFrom"`
+	// Origin carries peer provenance, e.g. a subagent hand-back report sent
+	// to the parent session with isMeta: true (#5985).
+	Origin *claudeOrigin `json:"origin"`
+}
+
+type claudeOrigin struct {
+	Kind         string `json:"kind"`
+	From         string `json:"from"`
+	SenderTaskID string `json:"senderTaskId"`
+	Name         string `json:"name"`
+	Body         string `json:"body"`
+}
+
+func isClaudeSubagentReport(body, msgText string) bool {
+	return strings.Contains(body, "hand-back") || strings.Contains(msgText, "hand-back")
+}
+
+// stripSubagentFrame removes the subagent hand-back envelope prefix line,
+// preserving the report content indented or unindented (#5985).
+func stripSubagentFrame(s string) string {
+	s = strings.TrimSpace(s)
+	if strings.HasPrefix(s, "[Subagent hand-back]") {
+		_, s, _ = strings.Cut(s, "\n")
+	}
+	lines := strings.Split(s, "\n")
+	for i, l := range lines {
+		if after, ok := strings.CutPrefix(l, "  "); ok {
+			lines[i] = after
+		}
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n"))
 }
 
 type claudeMessage struct {
@@ -142,7 +173,8 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 		if v.Type != "user" && v.Type != "assistant" {
 			return
 		}
-		if v.Type == "user" && v.IsMeta {
+		isPeer := v.Type == "user" && v.IsMeta && v.Origin != nil && v.Origin.Kind == "peer"
+		if v.Type == "user" && v.IsMeta && !isPeer {
 			return
 		}
 		claudeStampIdentity(&s, &v)
@@ -163,6 +195,16 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 			if toolOut {
 				role = RoleToolOutput
 			}
+		}
+		if isPeer {
+			if txt == "" {
+				txt = v.Origin.Body
+			}
+			if !isClaudeSubagentReport(v.Origin.Body, txt) {
+				return
+			}
+			role = "assistant"
+			txt = stripSubagentFrame(txt)
 		}
 		if v.Type == "user" && v.IsCompactSummary && role == "user" {
 			role = RoleSummary
@@ -342,27 +384,12 @@ func claudeTime(raw json.RawMessage) time.Time {
 	return parseTimeAny(n)
 }
 
-// claudeText joins the text a message carries. Items that are not objects, or
-// objects with neither key, are skipped rather than failing the line — a
-// transcript mixing shapes must not cost the whole message.
-func claudeText(raw json.RawMessage) string {
-	txt, _ := claudeTextKind(raw)
-	return txt
-}
-
 // RoleToolOutput marks text a tool produced. Claude Code files tool results
 // inside `user` messages, so without this the index labels 89% of its user-role
 // content as if a person had typed it — 33,027 of 37,077 messages, 77.8 MB
 // (#559). The text is worth keeping and searching; only the attribution was
 // wrong.
 const RoleToolOutput = "tool-output"
-
-// claudeTextKind joins a message's text and reports whether what it joined came
-// from tool results rather than from speech. A message mixing both counts as
-// speech: the person said something, and the tool output rode along with it.
-func claudeTextKind(raw json.RawMessage) (string, bool) {
-	return claudeTextKindIn(splitClaudeContent(raw))
-}
 
 func claudeTextKindIn(c *claudeContent) (string, bool) {
 	var sawToolResult, sawSpeech bool
@@ -618,10 +645,6 @@ func claudeCallPath(filePath, notebookPath string) string {
 	return notebookPath
 }
 
-// claudeToolPaths returns the distinct file paths a message's tool calls name,
-// one per line, or "" when it names none.
-func claudeToolPaths(raw json.RawMessage) string { return claudeToolPathsIn(splitClaudeContent(raw)) }
-
 func claudeToolPathsIn(c *claudeContent) string {
 	if !c.array {
 		return ""
@@ -674,10 +697,6 @@ func IndexEdits() bool { return os.Getenv("DEJA_INDEX_EDITS") != "0" }
 // megabyte of someone else's file into the index.
 const editSpanMax = 32 * 1024
 
-// claudeEditSpans returns "path\nreplaced bytes" for every edit in a turn,
-// including the sub-edits of a MultiEdit call.
-func claudeEditSpans(raw json.RawMessage) []string { return claudeEditSpansIn(splitClaudeContent(raw)) }
-
 func claudeEditSpansIn(c *claudeContent) []string {
 	if !c.array {
 		return nil
@@ -726,13 +745,6 @@ func claudeEditSpansIn(c *claudeContent) []string {
 		}
 	}
 	return out
-}
-
-// claudeWroteRecords returns "path\n<line hashes>" for every write in a turn:
-// the new side of an Edit, of each sub-edit of a MultiEdit, and the whole
-// content of a Write. The mirror of claudeEditSpans, which takes the old side.
-func claudeWroteRecords(raw json.RawMessage) []string {
-	return claudeWroteRecordsIn(splitClaudeContent(raw))
 }
 
 func claudeWroteRecordsIn(c *claudeContent) []string {

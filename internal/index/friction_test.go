@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -172,20 +171,6 @@ func TestFindFrictionQuietBelowThreshold(t *testing.T) {
 func TestFindFrictionOnMissingStore(t *testing.T) {
 	if _, ok := FindFriction(filepath.Join(t.TempDir(), "nope"), nil); ok {
 		t.Fatal("no store, nothing to report")
-	}
-}
-
-// Two walls hit by the same number of sessions: the one still being hit wins,
-// because a wall the machine stopped running into is history, not friction.
-func TestNewestOfBreaksTheTie(t *testing.T) {
-	old := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
-	recent := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
-	ms := []SessionMeta{{Updated: old}, {Updated: recent}, {Updated: old}}
-	if got := newestOf(ms); !got.Equal(recent) {
-		t.Fatalf("newestOf = %v, want %v", got, recent)
-	}
-	if got := newestOf(nil); !got.IsZero() {
-		t.Fatalf("no sessions, no date, got %v", got)
 	}
 }
 

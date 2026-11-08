@@ -478,12 +478,3 @@ func environmentOnce(dir string) (block string, deliver func()) {
 		stampEnvironmentServed(dir)
 	}
 }
-
-// resetEnvironmentOnce lets a test ask for a session's first block again. The
-// marker file is per store and a test's store is its own; the process flag is
-// shared, so it is reset under the same lock the server takes.
-func resetEnvironmentOnce() {
-	environmentMu.Lock()
-	environmentSpent = false
-	environmentMu.Unlock()
-}

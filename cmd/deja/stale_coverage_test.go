@@ -135,7 +135,7 @@ func TestARefreshSaysTheIndexAgeAndSize(t *testing.T) {
 	unlock := holdIndexLock(t, dir)
 	defer unlock()
 
-	at := index.LastUpdated(dir).Local().Format("2006-01-02 15:04")
+	at := index.SnapshotCoverage(dir).At.Local().Format("2006-01-02 15:04")
 	want := "answering from the index of " + at
 	text, _, _, _, err := recallTextResult(dir, "quillmarsh rollout", "", 0, 0, recallMCPBudget)
 	if err != nil {

@@ -135,15 +135,6 @@ func withoutInjectedContext(s string) string {
 	return strings.TrimSpace(s)
 }
 
-// runHookPrompt is the UserPromptSubmit hook: search the user's own prompt
-// against the index (relevance, not recency) and inject a compact hint only
-// when something genuinely matches. Empty output means stay silent — a hook
-// that talks every turn is wallpaper. It never builds or refreshes the index:
-// this path runs on every prompt and must stay ~milliseconds.
-func runHookPrompt(dir string, stdin io.Reader, stdout io.Writer) error {
-	return runHookPromptMode(dir, stdin, stdout, false)
-}
-
 // plain=true prints the bare digest for hosts that inject a hook's stdout
 // verbatim — Kimi does that and reads no JSON field for context.
 func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool) error {
@@ -807,7 +798,7 @@ func (p *promptPicker) leadTermsMeet(s model.Session) bool {
 			return search.SpeechCarriesTermsTogether(s, p.terms, 2)
 		}
 		// On a large multi-project store, two rare non-Latin domain terms spoken
-		// together in one message ("фронт" + "вена" + "впн") identify the subject
+		// together in one message ("шлюз" + "витрина" + "роутер") identify the subject
 		// when no Latin/symbol identifier was named.
 		if len(named) == 0 && p.topIDF >= 5.0 {
 			if rare := rareTerms(p.terms, p.idfOf, 3.8); len(rare) >= 2 {

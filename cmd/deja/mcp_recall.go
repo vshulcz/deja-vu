@@ -341,11 +341,6 @@ func recallListingLine(s string) string { return search.SafeLine(s) }
 // rather than reads: the spacing inside it is part of it (#2052).
 func commandListingLine(s string) string { return search.SafeCommand(s) }
 
-func recallText(dir, q, harness string, limit, budget int) (string, error) {
-	text, _, _, _, err := recallTextResult(dir, q, harness, limit, 0, budget)
-	return text, err
-}
-
 // recallCountLine introduces the sessions below it.
 //
 // It said "deja recall for <the query>" whatever the tier, so an answer whose

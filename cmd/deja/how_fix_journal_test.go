@@ -64,8 +64,8 @@ func TestHowAndFixReachTheJournal(t *testing.T) {
 	// The number `deja stats` publishes: recalls counted as memory served.
 	served := func() int {
 		t.Helper()
-		n, _, _ := usage.TodayWithInjections(dir)
-		return n
+		c := usage.StatusCounters(dir)
+		return c.Recalls + c.Injections
 	}
 
 	before := served()

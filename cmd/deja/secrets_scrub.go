@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -293,14 +292,3 @@ func sortedKindCounts(counts map[string]int) []string {
 // the marks the hooks leave (#3945). Without them the mtime window below is the
 // only signal, which is why it exists as well.
 func scrubLiveSessions(dir string) map[string]bool { return liveSessionIDs(dir) }
-
-// scrubBackupsIn is every copy this command left in one directory, for the tests
-// and for the line that tells a reader where to look.
-func scrubBackupsIn(dir string) []string {
-	matches, err := filepath.Glob(filepath.Join(dir, "*"+scrubBackupExt+"*"))
-	if err != nil {
-		return nil
-	}
-	sort.Strings(matches)
-	return matches
-}

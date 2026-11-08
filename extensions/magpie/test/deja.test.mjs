@@ -4,11 +4,12 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
+import { onRequest } from "../deja.hooks.mjs";
 import {
   maskSecrets,
-  onRequest,
   reset,
-} from "../deja.hooks.mjs";
+  resolveDeja,
+} from "../deja.lib.mjs";
 
 function makeStubDeja(scriptBody) {
   const dir = mkdtempSync(join(tmpdir(), "magpie-deja-test-"));
@@ -273,5 +274,22 @@ describe("@vshulcz/magpie-deja", () => {
     } finally {
       stub.cleanup();
     }
+  });
+
+  it("does not crash when Magpie plugin host sweeps module exports as plugin factories (#5982)", async () => {
+    const mod = await import("../deja.hooks.mjs");
+    const input = { client: {}, project: {}, directory: "/tmp", worktree: "/tmp" };
+    for (const [name, fn] of Object.entries(mod)) {
+      if (typeof fn !== "function") continue;
+      const res = await fn(input, {});
+      assert.equal(res, undefined);
+    }
+  });
+
+  it("resolveDeja safely handles non-string inputs", () => {
+    assert.doesNotThrow(() => resolveDeja({ client: {} }));
+    assert.doesNotThrow(() => resolveDeja(undefined));
+    assert.doesNotThrow(() => resolveDeja(null));
+    assert.doesNotThrow(() => resolveDeja(123));
   });
 });

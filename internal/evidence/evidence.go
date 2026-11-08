@@ -336,17 +336,6 @@ func render(r rec, toks []string) string {
 	return ""
 }
 
-// Receipts finds, for each assistant message of one session, the records of
-// its own turn that carry its facts. What the environment recorded beats
-// what a person said about it, except a person's rule or instruction, which
-// is shown first and never replaced: on the stand the rule "run genfeed.sh
-// after editing docs/" lost to the genfeed.sh command it had caused, and the
-// agent never saw it.
-func Receipts(s model.Session, clean func(string) string) map[uint64]string {
-	out, _ := receipts(s, clean)
-	return out
-}
-
 // chunked runs fn over [0, n) in parts on every core, or in one call when n
 // is small. One marathon session held most of a build's receipts phase on a
 // single core while the others had finished.

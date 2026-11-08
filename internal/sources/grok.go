@@ -386,13 +386,6 @@ var grokAgentChunk = []byte(`"agent_message_chunk"`)
 var grokToolCall = []byte(`"sessionUpdate":"tool_call"`)
 var grokToolUpdate = []byte(`"sessionUpdate":"tool_call_update"`)
 
-// Most update lines are large tool events. Filter them before JSON decoding so
-// indexing cost is dominated by reading the log rather than materializing tool
-// payloads that will be discarded.
-func scanGrokUpdates(path string, fn func(grokUpdateEvent)) error {
-	return scanGrokUpdatesFrom(path, 0, fn)
-}
-
 func scanGrokUpdatesFrom(path string, offset int64, fn func(grokUpdateEvent)) error {
 	f, err := os.Open(path)
 	if err != nil {

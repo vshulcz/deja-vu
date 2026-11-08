@@ -321,15 +321,6 @@ func runHookRefresh(dir string) {
 	_ = os.Remove(hookCachePath(dir, cwd) + ".refreshing")
 }
 
-func hookDigest(dir string) string {
-	digest, _, _, _, _, _, _ := hookDigestResult(dir)
-	return digest
-}
-
-func hookDigestResult(dir string) (string, int, int64, []string, int, []string, []string) {
-	return hookDigestResultFor(dir, "", "")
-}
-
 // hookDigestResultFor is hookDigestResult for a caller that was told which
 // project the call is about, rather than one reading it back out of the
 // environment, where a project deja itself had written stayed for every later

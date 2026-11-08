@@ -4,6 +4,7 @@ package index
 
 import (
 	"errors"
+	"sync/atomic"
 )
 
 // version 12 resharded non-ASCII tokens across buckets; 13 interned the key
@@ -875,4 +876,4 @@ var errCorruptIndex = errors.New("corrupt index")
 // rebuild will heal it.
 func IsCorrupt(err error) bool { return errors.Is(err, errCorruptIndex) }
 
-var lastIngestFiles int
+var lastIngestFiles atomic.Int64

@@ -26,13 +26,6 @@ type geminiRecord struct {
 	line []byte
 }
 
-// ReadGeminiCompaction finds the newest compaction in a Gemini CLI transcript
-// and captures the session as it stood just before it. found is false when
-// the transcript holds none.
-func ReadGeminiCompaction(path, nativeSessionID string) (CompactionTranscript, bool, error) {
-	return ReadGeminiCompactionIfNew(path, nativeSessionID, nil)
-}
-
 // ReadGeminiCompactionIfNew is ReadGeminiCompaction, but returns early before
 // parsing the transcript when seen reports the newest compaction fingerprint
 // has already been processed.

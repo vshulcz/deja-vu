@@ -29,7 +29,7 @@ func TestRememberCLIAndMCP(t *testing.T) {
 	if err = index.EnsureForSearch(index.DefaultDir(), search.Options{All: true}, false, nil); err != nil {
 		t.Fatal(err)
 	}
-	ss, err := index.Search(index.DefaultDir(), search.Options{Query: "durable", All: true})
+	ss, err := indexSearch(index.DefaultDir(), search.Options{Query: "durable", All: true})
 	if err != nil || len(ss) != 2 {
 		t.Fatalf("search=%#v err=%v", ss, err)
 	}
@@ -138,11 +138,11 @@ func TestRememberAndPromoteRepoFlagAndInboundTrustBoundary(t *testing.T) {
 
 	// Search must surface the repo-scoped notes, and MarkUserRules must NOT
 	// elevate repo-origin notes into imperative UserRules (#5812, #5813).
-	hits, err := index.Search(dir, search.Options{Query: "idempotency", All: true})
+	hits, err := indexSearch(dir, search.Options{Query: "idempotency", All: true})
 	if err != nil || len(hits) < 2 {
 		t.Fatalf("Search(idempotency) = %#v, err = %v", hits, err)
 	}
-	ruleHits, err := index.Search(dir, search.Options{Query: "evil-check", All: true})
+	ruleHits, err := indexSearch(dir, search.Options{Query: "evil-check", All: true})
 	if err != nil || len(ruleHits) != 1 {
 		t.Fatalf("Search(evil-check) = %#v, err = %v", ruleHits, err)
 	}

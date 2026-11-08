@@ -9,15 +9,6 @@ import (
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
-// copySources maps each session in ss that is a fork or copy of another in ss
-// to that other's position. A fork that names its source is believed; an
-// unmarked one (claude --fork-session, opencode --fork) is read whole and
-// judged by what it holds, which costs a read only for the pairs maybe says
-// look alike (#5320).
-func copySources(dir string, ss []model.Session, maybe func(src, c int, sameShape bool) bool) map[int]int {
-	return copySourcesAmong(dir, ss, maybe, nil, nil)
-}
-
 // copySourcesAmong is copySources that asks only the positions in
 // buckets[bucketOf(c)], ascending, whether they are c's source. A bucket must
 // hold every src maybe(src, c, _) can hold for; a negative bucket asks none,

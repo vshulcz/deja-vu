@@ -163,14 +163,14 @@ func TestSourcesReportsActiveExclusions(t *testing.T) {
 func TestUnforgetBringsTheSessionBackWithoutAFullRebuild(t *testing.T) {
 	seedTouchedIndex(t, 2, "/w/t/shared.go")
 	dir := index.DefaultDir()
-	before, err := index.Search(dir, search.Options{Query: "pool sizing", All: true})
+	before, err := indexSearch(dir, search.Options{Query: "pool sizing", All: true})
 	if err != nil || len(before) != 2 {
 		t.Fatalf("seed: %d sessions err=%v", len(before), err)
 	}
 	if _, err = captureRun(t, "forget", "--session", "t00"); err != nil {
 		t.Fatal(err)
 	}
-	gone, err := index.Search(dir, search.Options{Query: "pool sizing", All: true})
+	gone, err := indexSearch(dir, search.Options{Query: "pool sizing", All: true})
 	if err != nil || len(gone) != 1 {
 		t.Fatalf("after forget: %d sessions err=%v", len(gone), err)
 	}
@@ -182,7 +182,7 @@ func TestUnforgetBringsTheSessionBackWithoutAFullRebuild(t *testing.T) {
 		t.Errorf("unforget said %q — nothing tells the reader it worked", out)
 	}
 	// No `deja index` in between: the command has to leave the index usable.
-	back, err := index.Search(dir, search.Options{Query: "pool sizing", All: true})
+	back, err := indexSearch(dir, search.Options{Query: "pool sizing", All: true})
 	if err != nil || len(back) != 2 {
 		t.Fatalf("after unforget: %d sessions err=%v — the session did not come back", len(back), err)
 	}

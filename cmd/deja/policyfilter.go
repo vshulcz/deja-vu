@@ -35,13 +35,6 @@ func metaVisibleAllow(pol policy.Policy, allow func(string) bool, m index.Sessio
 	return allow == nil || allow(m.Project)
 }
 
-// policyFilterHits drops search hits the trust policy blocks on this
-// activation path. The default policy blocks nothing.
-func policyFilterHits(activation string, hits []search.Hit) []search.Hit {
-	kept, _ := policyFilterHitsCounted(activation, hits)
-	return kept
-}
-
 // policyFilterHitsCounted also reports how many hits the policy took away.
 //
 // Without the count, "nothing matched" and "a rule hides it on this path" are

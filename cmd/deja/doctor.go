@@ -429,22 +429,6 @@ func inDotDir(root, p string) bool {
 	return false
 }
 
-// unplacedFiles counts transcripts under root that the harness's own filter did
-// not pick up. A harness that changes its layout in a new version presents
-// exactly this way: quietly fewer sessions, no error, and a directory size that
-// still looks right (#701).
-//
-// unplacedFiles counts the transcripts under a root that deja did not read,
-// split by whether it declined them on purpose. Everything was one number
-// before, and on a machine that spawns subagents most of it is the deliberate
-// skip: this store reported "1192 not recognised here" of which 596 were
-// subagent transcripts deja is written to leave alone (#1384). A number that
-// large reads as the tool failing to understand the user's own history, which
-// is the one thing doctor exists to rule out.
-func unplacedFiles(root string, seen []string, skipped func(string) bool) (unread, byRule int) {
-	return unplacedFilesIn(root, seen, skipped, false)
-}
-
 // unplacedFilesIn is unplacedFiles with the one decision a caller can make:
 // whether a dot directory under this root is the store itself.
 func unplacedFilesIn(root string, seen []string, skipped func(string) bool, dotDirsAreTheStore bool) (unread, byRule int) {

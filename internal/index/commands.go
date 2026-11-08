@@ -205,32 +205,6 @@ func ReadCommands(dir string) []CommandUse {
 	return out
 }
 
-// CommandSettled is what the newest session that ran this command settled,
-// for the first of the given projects that has one, or "" when nothing does.
-//
-// Two map lookups where the point-of-action hook used to rank candidates and
-// then load whole sessions to ask which of them had run the command: 133 ms an
-// action against 21 ms, on the surface that fires on every action, and nothing
-// warm because almost every action is a command its session has not run before
-// (#3001, #3605). The ranking was only ever guessing at a fact the command
-// table already holds.
-//
-// allow is the trust policy's question, asked per project the way every other
-// caller of this table asks it. A project that fails it is skipped rather than
-// making the whole answer empty: a command run in an allowed project and a
-// withheld one still has a settled line the reader may see.
-func CommandSettled(dir, cmd string, projects []string, allow func(string) bool) string {
-	return CommandSettledOutside(dir, cmd, projects, allow, "")
-}
-
-// CommandSettledOutside is CommandSettled for a caller inside session self:
-// the table keeps only the newest session per project, and once self has run
-// the command and been indexed that is self, whose own words are no history to
-// it. Its project then has nothing to say (#4380).
-func CommandSettledOutside(dir, cmd string, projects []string, allow func(string) bool, self string) string {
-	return CommandSettledUsableOutside(dir, cmd, projects, allow, nil, self)
-}
-
 // CommandSettledUsableOutside is CommandSettledOutside with an optional
 // session-usability predicate (e.g. local lifecycle rejection in notes.md).
 func CommandSettledUsableOutside(dir, cmd string, projects []string, allow func(string) bool, usable func(SessionMeta) bool, self string) string {
@@ -465,11 +439,6 @@ func withoutExitStatus(s string) string {
 // returned: two spaces, the marker, the digits, end of string
 // (internal/sources/codex.go, internal/sources/opencode.go).
 const commandExitMarker = "  → exit "
-
-// CommandWithoutExitStatus is withoutExitStatus for the surfaces outside this
-// package that group commands themselves — `deja how` counts its own rows over
-// the record log and split the same command the same way.
-func CommandWithoutExitStatus(s string) string { return withoutExitStatus(s) }
 
 // BareCommand is a recorded command as a person would type it: without the
 // "$ " the record carries and the exit status a source appended. The JSON

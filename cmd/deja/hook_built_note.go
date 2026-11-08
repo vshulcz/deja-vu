@@ -11,14 +11,6 @@ import (
 	"github.com/vshulcz/deja-vu/internal/termwidth"
 )
 
-// builtNote is what the first session start after a build says about what
-// the build found: the counts, and on a second line one finding when the
-// history holds one. Someone who installed deja from a marketplace
-// never runs `deja install` and never sees the proof the CLI prints; for
-// them the index was built in silence and recall stayed invisible until it
-// happened to fire (#3073). Once per index.
-func builtNote(dir string) string { return builtNoteFor(dir, true) }
-
 // builtNoteFor is builtNote for a reader that may not be the owner alone.
 // private says the note reaches only the person at this machine: a host's own
 // UI line. `hook-context --notes` feeds plugin replies, and OpenClaw's /deja

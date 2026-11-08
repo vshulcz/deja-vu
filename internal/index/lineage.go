@@ -13,50 +13,6 @@ import (
 	"github.com/vshulcz/deja-vu/internal/redact"
 )
 
-// Lineage is ids and every session that counts as one of them when recall
-// decides what not to answer with.
-//
-// A session id names one transcript, and an agent can be writing more than one:
-// a sub-agent it spawned is its own work seen from inside, and the hooks that
-// say which session is live fire under the parent's id, so the child's id is
-// never stamped (#4547).
-//
-// The other way too: a spawned agent asking — an opencode task session runs
-// its own hooks — is its parent's work, and the parent is live and the one
-// that asked it (#4548).
-//
-// And a fork's source: the fork opens with a copy of its turns, so the source
-// handed back is the fork's own opening under another id (#4549, #4251). A
-// source the fork names is left out by the same rule as a copy it matched: when
-// the fork holds the source's last turn (#5293). Claude Code and opencode say
-// nothing, and there sessions that open on the same turn at the
-// same millisecond are copies of one conversation. Only the copy the asker
-// already holds is left out: a session whose last record the asker has too.
-// A fork that went on past what it copied holds work its source never saw, so
-// the source resumed still gets it, and so does a sibling fork. A session that
-// merely shares the project is still there.
-//
-// heads are sessions read off their own store for an asker the index does not
-// hold yet — a fork's first prompts come before any build has seen it.
-//
-// Read off the manifest, which recall has already loaded: no record is read,
-// so the cost is one pass over the sessions in memory.
-func Lineage(dir string, ids map[string]bool, heads ...model.Session) map[string]bool {
-	out, _ := lineage(dir, ids, heads, nil)
-	return out
-}
-
-// LineageWhole is Lineage with askers the index does not hold yet read off
-// their store in full rather than by their first records. A whole asker opening
-// like an indexed session leaves it out only when it holds that session's last
-// record, so a sibling fork or a source that went on stays on the page (#5129).
-// The record is matched on role and time: the text the index keeps is redacted
-// and the asker's is not.
-func LineageWhole(dir string, ids map[string]bool, wholes ...model.Session) map[string]bool {
-	out, _ := lineage(dir, ids, nil, wholes)
-	return out
-}
-
 func lineage(dir string, ids map[string]bool, heads, wholes []model.Session) (map[string]bool, map[string]time.Time) {
 	out := make(map[string]bool, len(ids))
 	for id := range ids {
@@ -78,7 +34,7 @@ func lineage(dir string, ids map[string]bool, heads, wholes []model.Session) (ma
 	// against nothing, being a fork's first prompts, before its source can
 	// have gone on.
 	parentOf := func(kind, parent string) {
-		if parent != "" && (spawnedKind(kind) || kind == model.KindFork) {
+		if parent != "" && (model.SpawnedKind(kind) || kind == model.KindFork) {
 			out[parent] = true
 		}
 	}
@@ -485,12 +441,6 @@ func spawnedFamily(m Manifest, ids, out map[string]bool, forkHolds func(SessionM
 	}
 	return own
 }
-
-// SpawnedKind reports whether a session's kind is the harness's word for an
-// agent another session spawned.
-func SpawnedKind(kind string) bool { return spawnedKind(kind) }
-
-func spawnedKind(kind string) bool { return model.SpawnedKind(kind) }
 
 // openingTextBytes is how much of the opening turn the fingerprint reads: the
 // index caps a message's text and a transcript read straight off disk does not.

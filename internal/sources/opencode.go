@@ -109,22 +109,9 @@ func withOpencodeDiffs(ss []model.Session) []model.Session {
 	return ss
 }
 
-// LoadOpencodeMatching reads the OpenCode sessions whose text contains q.
-func LoadOpencodeMatching(q string) []model.Session {
-	where := fmt.Sprintf(" and lower(p.data) like '%%%s%%' escape '\\'", sqlEscape(sqlLikeEscape(strings.ToLower(q))))
-	ss, _ := ParseOpencodeDBWhere(OpencodeDB(), where, 5000)
-	return ss
-}
-
 // LoadOpencodeRecent reads the newest OpenCode history, capped at n*20 rows.
 func LoadOpencodeRecent(n int) []model.Session {
 	ss, _ := ParseOpencodeDBWhere(OpencodeDB(), "", n*20)
-	return ss
-}
-
-// LoadOpencodeSince reads the OpenCode sessions that changed after t.
-func LoadOpencodeSince(t time.Time) []model.Session {
-	ss, _ := ParseOpencodeDBSince(OpencodeDB(), t)
 	return ss
 }
 
@@ -899,12 +886,6 @@ func sqlLikeEscape(s string) string {
 }
 
 func str(v any) string { s, _ := v.(string); return s }
-func parseNestedTime(m map[string]any, k, sub string) time.Time {
-	if x, ok := m[k].(map[string]any); ok {
-		return parseTimeAny(x[sub])
-	}
-	return time.Time{}
-}
 
 // ParseOpencodeNewest reads only the most recent session. deja doctor asks
 // one question of a store — does it parse into sessions — and answering it by

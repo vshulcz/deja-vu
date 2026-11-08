@@ -234,10 +234,6 @@ func installZCodeAuto(exe string, uninstall bool) (installResult, error) {
 	return out, nil
 }
 
-func installZCodeHooks(exe string, uninstall bool) (installResult, error) {
-	return installZCodeHooksWith(exe, uninstall, !uninstall && zcodeConfigIsLiveRuntimeConfig())
-}
-
 func installZCodeHooksWith(exe string, uninstall, alsoLiveConfig bool) (installResult, error) {
 	// The launcher, not this binary: a generated plugin is as much a
 	// config as a hooks.json, and one that names the build it was

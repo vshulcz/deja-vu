@@ -65,12 +65,6 @@ func JunieTurn(sessionID string) JunieTurnState {
 	return st
 }
 
-// ReadJunieCompaction captures a Junie session as it stood before its newest
-// compaction. found is false when it has none.
-func ReadJunieCompaction(sessionID string) (CompactionTranscript, bool, error) {
-	return ReadJunieCompactionFromTurnIfNew(sessionID, JunieTurn(sessionID), nil)
-}
-
 // ReadJunieCompactionFromTurnIfNew captures a Junie session from an already-read
 // JunieTurnState, skipping the second events.jsonl parse when seen reports the
 // compaction fingerprint has already been processed.

@@ -403,8 +403,8 @@ func TestIncrementalOnlyReingestsChangedFile(t *testing.T) {
 	if strings.Contains(log.String(), "indexing sessions") {
 		t.Fatalf("incremental path printed scary full-index line: %q", log.String())
 	}
-	if lastIngestFiles != 1 {
-		t.Fatalf("incremental ingest touched %d files, want 1", lastIngestFiles)
+	if lastIngestFiles.Load() != 1 {
+		t.Fatalf("incremental ingest touched %d files, want 1", lastIngestFiles.Load())
 	}
 	ss, err := Search(dir, search.Options{Query: "stable"})
 	if err != nil {
@@ -454,8 +454,8 @@ func TestIncrementalAppendOneFileBenchmarkStyle(t *testing.T) {
 	if err := EnsureForSearch(dir, search.Options{Query: "stable", Harness: "claude"}, false, nil); err != nil {
 		t.Fatal(err)
 	}
-	if lastIngestFiles != fileCount {
-		t.Fatalf("full ingest touched %d files, want %d", lastIngestFiles, fileCount)
+	if lastIngestFiles.Load() != int64(fileCount) {
+		t.Fatalf("full ingest touched %d files, want %d", lastIngestFiles.Load(), fileCount)
 	}
 	changed := filepath.Join(proj, "s17.jsonl")
 	f, err := os.OpenFile(changed, os.O_APPEND|os.O_WRONLY, 0)
@@ -474,8 +474,8 @@ func TestIncrementalAppendOneFileBenchmarkStyle(t *testing.T) {
 	if err = EnsureForSearch(dir, search.Options{Query: "incremental-needle", Harness: "claude"}, false, &log); err != nil {
 		t.Fatal(err)
 	}
-	if lastIngestFiles != 1 {
-		t.Fatalf("incremental ingest touched %d files, want exactly 1", lastIngestFiles)
+	if lastIngestFiles.Load() != 1 {
+		t.Fatalf("incremental ingest touched %d files, want exactly 1", lastIngestFiles.Load())
 	}
 	if got, want := log.String(), "deja: updated 1 file (12 new messages)"; !strings.Contains(got, want) {
 		t.Fatalf("incremental log = %q, want %q", got, want)

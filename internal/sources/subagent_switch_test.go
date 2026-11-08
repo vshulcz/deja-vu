@@ -240,7 +240,7 @@ func TestSubagentSwitchMeansTheSameInEveryReader(t *testing.T) {
 				t.Setenv("DEJA_INCLUDE_SUBAGENTS", mode)
 				for _, s := range parseThroughRegistry(t, c.kind, p) {
 					if s.ID == c.child {
-						if SpawnedKind(s.Kind) == c.fork {
+						if model.SpawnedKind(s.Kind) == c.fork {
 							t.Fatalf("%s read with kind %q", s.ID, s.Kind)
 						}
 						return len(s.Messages)

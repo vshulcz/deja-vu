@@ -254,7 +254,7 @@ func (p FixPair) MachineFact() bool {
 			return true
 		}
 	}
-	return false
+	return IsShellDiagnostic(p.Error)
 }
 
 // repetitionConfirms reports whether a second sighting is evidence for this

@@ -312,7 +312,7 @@ func presentableTopic(t string) bool {
 // injected already. A seam, like focusCalls below: such a session is read from
 // disk in full and then dropped on its id, and nothing in the output changes
 // either way, so only a count can hold the skip in place.
-var rankedAlreadyShown int
+var rankedAlreadyShown int //nolint:unused,nolintlint
 
 // focusCalls counts how many sessions were narrowed. A seam, like
 // rebuildInProgress above: narrowing walks every message of a session that can
@@ -320,14 +320,14 @@ var rankedAlreadyShown int
 // candidate are checked before it. Nothing else can hold that order in place —
 // the output is identical either way and only the time differs, and a test that
 // watches a clock is a test that fails on someone else's machine.
-var focusCalls int
+var focusCalls atomic.Int64
 
 // focusSession narrows a long session to the neighbourhood of the messages
 // that matched, so a haystack contributes its relevant part rather than being
 // dropped or flooding the digest. Two messages either side keeps the exchange
 // readable: a question without its answer recalls nothing useful.
 func focusSession(s model.Session, terms []string) model.Session {
-	focusCalls++
+	focusCalls.Add(1)
 	const window = 2
 	keep := map[int]bool{}
 	// Lowercase every message once and hand the result to both passes: the

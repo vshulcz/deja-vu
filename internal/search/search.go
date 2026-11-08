@@ -56,17 +56,6 @@ func ByDate(hits []Hit) {
 // QueryParts is query.QueryParts.
 func QueryParts(q string) (terms []string, phrases []string) { return query.QueryParts(q) }
 
-// IsStopWord is query.IsStopWord.
-func IsStopWord(term string) bool { return query.IsStopWord(term) }
-
-// MatchesQuery is query.MatchesQuery.
-func MatchesQuery(text, q string) bool { return query.MatchesQuery(text, q) }
-
-// MatchesParts is query.MatchesParts.
-func MatchesParts(text string, terms, phrases []string, variants map[string][]string) bool {
-	return query.MatchesParts(text, terms, phrases, variants)
-}
-
 type searchJSONEnvelope struct {
 	SchemaVersion int `json:"schema_version"`
 	// Match is the set-level tier. "relevance" means nothing matched and these

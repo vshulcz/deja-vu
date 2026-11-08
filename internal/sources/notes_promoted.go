@@ -248,14 +248,6 @@ var notesMemo struct {
 // whole seconds and a write that lands just after the memo was taken.
 const notesFreshWindow = 2 * time.Second
 
-// notesParses counts the parses that actually read the file, for the test that
-// pins the memo.
-func notesParses() int {
-	notesMemo.Lock()
-	defer notesMemo.Unlock()
-	return notesMemo.parses
-}
-
 // notesStamp identifies the file a memo was built from. A file that cannot be
 // stat'd is never memoized: the read below answers with nothing and remembering
 // that would hide the file arriving a moment later.
@@ -508,43 +500,6 @@ func looksLikeNoteFilePath(tok string) bool {
 	}
 	base := filepath.Base(tok)
 	return len(base) > len(ext)
-}
-
-// StaleCandidateNotes returns accepted notes whose cited files were touched in
-// sessions strictly newer than the note's timestamp.
-func StaleCandidateNotes(notes []PromotedNote, fileLastTouched map[string]time.Time) []StaleCandidate {
-	if len(notes) == 0 || len(fileLastTouched) == 0 {
-		return nil
-	}
-	normTouched := make(map[string]time.Time, len(fileLastTouched)*2)
-	for path, t := range fileLastTouched {
-		norm := strings.ToLower(filepath.ToSlash(path))
-		if t.After(normTouched[norm]) {
-			normTouched[norm] = t
-		}
-		base := filepath.Base(norm)
-		if t.After(normTouched[base]) {
-			normTouched[base] = t
-		}
-	}
-	var out []StaleCandidate
-	for _, n := range notes {
-		if n.State != "accepted" || n.At.IsZero() {
-			continue
-		}
-		for _, ref := range NoteFileRefs(n) {
-			key := strings.ToLower(filepath.ToSlash(ref))
-			touchedAt := normTouched[key]
-			if touchedAt.IsZero() {
-				touchedAt = normTouched[filepath.Base(key)]
-			}
-			if touchedAt.After(n.At) {
-				out = append(out, StaleCandidate{Note: n, File: ref, TouchedAt: touchedAt})
-				break
-			}
-		}
-	}
-	return out
 }
 
 // ForgetPromotedNotes deletes whole promoted lines whose note session the

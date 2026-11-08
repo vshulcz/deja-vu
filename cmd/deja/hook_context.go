@@ -157,10 +157,6 @@ func endsAValue(b []byte) bool {
 	return b[len(b)-1] == '}' || b[len(b)-1] == ']'
 }
 
-// runHookPrecompact is deliberately best effort: Claude must be able to
-// compact even when the input is incomplete or the index cannot start.
-func runHookPrecompact(dir string) { runHookPrecompactFor(dir, "") }
-
 func cmdHookPrecompact(dir string, rest []string) error {
 	runHookPrecompactFor(dir, precompactHarnessArg(rest))
 	return nil
@@ -637,13 +633,6 @@ func unwritableIndexDir(dir string) string {
 // caller of requestWarmup already tested separately.
 func indexNeedsRebuild(dir string) bool {
 	return !index.HasManifest(dir) || !index.IsCurrentVersion(dir) || index.Damaged(dir)
-}
-
-// runHookContext prints session-start context. plain=false emits the Claude
-// Code / Codex hook JSON envelope; plain=true prints the bare digest for
-// hosts that inject raw text (the opencode plugin).
-func runHookContext(dir string, plain bool) error {
-	return runHookContextMode(dir, plain, false)
 }
 
 // once forces the one-digest-per-session rule on from the command line, for a

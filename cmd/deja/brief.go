@@ -421,14 +421,6 @@ func pluralS(n int) string {
 	return "s"
 }
 
-// trimBriefTitle bounds a title for the brief and strips what a terminal would
-// act on rather than print. Titles are user-typed text arriving verbatim: a
-// carriage return rewinds the line, an escape recolours the rest of the
-// screen, a bell rings on every refresh. The `recent` lines have printed them
-// raw since they existed; this is one place for all of them (#634 set the same
-// rule for the status bar).
-func trimBriefTitle(t string) string { return trimBriefTitleTo(t, briefTitleMax) }
-
 // briefLabelColumns is the fixed prefix every line but `recent` carries: a
 // name, padded to the column the values line up on.
 const briefLabelColumns = 11

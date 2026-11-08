@@ -49,10 +49,6 @@ func childOutputLines(text string) string {
 	return b.String()
 }
 
-// SpawnedKind reports whether a session's kind is a reader's word for an
-// agent another session spawned.
-func SpawnedKind(kind string) bool { return model.SpawnedKind(kind) }
-
 // ApplySubagentSwitch is the switch applied to what a reader returned. The
 // registry runs every parse through it, so a reader only has to mark its
 // children with a spawned Kind. Cutting twice is the same as cutting once, so

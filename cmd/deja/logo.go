@@ -111,11 +111,6 @@ func logoInfoStart(info []string) (col int, stacked bool) {
 	return col, false
 }
 
-// logoLines lays the info column beside the mark, vertically centred, and
-// returns the composed lines. The live build display repaints these, so the
-// layout has to be shared with printLogo rather than reimplemented.
-func logoLines(info []string) []string { return logoLinesArt(catArt, info) }
-
 // logoLinesMood lays the same column beside a given mood, like logoLines does
 // for the ready pose. The first-build progress repaints at a fixed cadence, so
 // it passes the wagging tail instead of a static pose (#4623).
@@ -166,9 +161,6 @@ func logoLinesArt(art, info []string) []string {
 	}
 	return append(out, "")
 }
-
-// printLogo lays the info column beside the mark, vertically centred.
-func printLogo(w io.Writer, info []string) { printLogoMood(w, info, moodReady) }
 
 // printLogoMood draws the same layout with the cat in a given state. There are
 // only two moments in the whole CLI that print a banner, so only the moods those

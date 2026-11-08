@@ -325,13 +325,6 @@ func appendUnique(dst []string, values ...string) []string {
 	return dst
 }
 
-// MatchesQuery applies the text-level part of the query. Index candidates
-// use this too, so phrase verification is shared by every search frontend.
-func MatchesQuery(text, q string) bool {
-	terms, phrases := QueryParts(q)
-	return MatchesParts(text, terms, phrases, nil)
-}
-
 // MatchesParts reports whether text holds every term (or one of its variants)
 // and every phrase.
 func MatchesParts(text string, terms, phrases []string, variants map[string][]string) bool {

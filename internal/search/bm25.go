@@ -13,10 +13,6 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
-func scoreBM25(documents []bm25Document, df []int, corpusDocuments int, avgLength float64, queryTokenCount int, worn map[string]int) []Hit {
-	return scoreBM25At(documents, df, corpusDocuments, avgLength, queryTokenCount, worn, (Options{}).Clock())
-}
-
 func scoreBM25At(documents []bm25Document, df []int, corpusDocuments int, avgLength float64, queryTokenCount int, worn map[string]int, now time.Time) []Hit {
 	emptyQuery := queryTokenCount == 0
 	hits := make([]Hit, 0, len(documents))

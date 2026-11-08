@@ -72,36 +72,8 @@ func cliSkillPath() string {
 	return filepath.Join(homeDir(), ".agents", "skills", cliSkillName, "SKILL.md")
 }
 
-// cliSkillMeta is what a skill registry reads to know what the skill needs:
-// ClawHub serves skills/deja-search as vshulcz/deja-search and checks the
-// declared binary and install specs against what the skill does. It is
-// OpenClaw's nested shape, which the Agent Skills spec does not allow: there
-// metadata maps strings to strings, and Crush drops a skill whose metadata
-// does not decode that way (#4378). So only the registry copy carries it; the
-// file deja installs into ~/.agents/skills, which Crush reads, goes without.
-// OpenClaw reads that directory too and loads a skill with no metadata.openclaw
-// block as always eligible, which is right on a machine deja was installed on.
-const cliSkillMeta = `metadata:
-  openclaw:
-    homepage: https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html
-    requires:
-      bins:
-        - deja
-    install:
-      - kind: brew
-        formula: deja-vu
-        bins: [deja]
-      - kind: node
-        package: "@vshulcz/deja-vu"
-        bins: [deja]`
-
 func cliSkillFile() string {
 	return "---\nname: " + cliSkillName + "\ndescription: " + cliSkillDesc + "\n---\n\n" + cliSkillBody + "\n"
-}
-
-// cliSkillRegistryFile is the copy in the repository, the one ClawHub publishes.
-func cliSkillRegistryFile() string {
-	return "---\nname: " + cliSkillName + "\ndescription: " + cliSkillDesc + "\n" + cliSkillMeta + "\n---\n\n" + cliSkillBody + "\n"
 }
 
 // writeCLISkill puts the skill in place. Called by warmup, which is the only

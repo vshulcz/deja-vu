@@ -127,7 +127,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	handover := handsOver(changed, files, old.Files, newlyKept, sharedBy, regather)
 	if len(changed) == 0 && len(removed) == 0 && !handover {
 		sayKept(progress, kept, unseen)
-		lastIngestFiles = 0
+		lastIngestFiles.Store(0)
 		return writeQuietPass(dir, old, files, newlyKept, touched, dated)
 	}
 	takenFrom := sharedTakeovers(dir, harness, old, changed, files)

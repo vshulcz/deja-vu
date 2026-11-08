@@ -498,14 +498,16 @@ func fixPairLineFor(dir, cwd, command, output string) string {
 			}
 		}
 	}
-	// Except a program this machine does not have. `timeout` missing in one
-	// checkout is missing in all of them, and the command that worked without
-	// it was learned wherever the agent happened to be.
+	// Except a program this machine does not have, or a command line the
+	// shell itself refused (#5986). `timeout` missing or zsh refusing an
+	// unquoted `--include=*.py` in one checkout is the same in all of them,
+	// and the command that worked was learned wherever the agent happened to be.
+	isShellErr := index.IsShellDiagnostic(output)
 	elsewhere := index.FixesForCommand(dir, command, output, 4, func(project string) bool {
 		return pol.Allows(policy.ActivationAuto, project) && project != "" && !here(project)
 	})
 	for _, p := range elsewhere {
-		if !p.MachineFact() || orientSkipFixPairForHook(p) {
+		if (!p.MachineFact() && !isShellErr) || orientSkipFixPairForHook(p) {
 			continue
 		}
 		if line := fixLine(p, frictionCount(dir, p, pol)); line != "" {

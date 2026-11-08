@@ -39,7 +39,7 @@ func TestHookPromptNarrowsAMarathonItShows(t *testing.T) {
 	}
 	t.Chdir(cwd)
 
-	focusCalls = 0
+	focusCalls.Store(0)
 	var out bytes.Buffer
 	in := strings.NewReader(`{"prompt":"what did we decide about kestrel retries","session_id":"asking"}`)
 	if err := runHookPromptMode(index.DefaultDir(), in, &out, true); err != nil {
@@ -48,8 +48,8 @@ func TestHookPromptNarrowsAMarathonItShows(t *testing.T) {
 	if !strings.Contains(out.String(), "capped at four") {
 		t.Fatalf("the marathon's answer was not recalled:\n%q", out.String())
 	}
-	if focusCalls != 1 {
-		t.Errorf("narrowed %d session(s); a marathon that gets shown must be narrowed first", focusCalls)
+	if focusCalls.Load() != 1 {
+		t.Errorf("narrowed %d session(s); a marathon that gets shown must be narrowed first", focusCalls.Load())
 	}
 	// Only the quoted lines matter: the credit line names the session by its
 	// opening message, which is noise by construction here.

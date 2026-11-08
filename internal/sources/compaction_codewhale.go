@@ -22,13 +22,6 @@ import (
 // session is found by its workspace: the one there whose newest summary is
 // newest, written after since.
 
-// ReadCodeWhaleCompaction captures the CodeWhale session in workspace as it
-// stood before the newest compaction written after since. found is false when
-// there is none.
-func ReadCodeWhaleCompaction(workspace string, since time.Time) (CompactionTranscript, bool, error) {
-	return ReadCodeWhaleCompactionIfNew(workspace, since, nil)
-}
-
 // ReadCodeWhaleCompactionIfNew captures the CodeWhale session in workspace as
 // it stood before the newest compaction written after since, skipping full
 // history JSON decoding when seen reports the compaction fingerprint has

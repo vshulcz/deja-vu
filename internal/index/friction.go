@@ -833,16 +833,6 @@ func topFriction(dir string, n int, allow func(project string) bool, settled pol
 	return out
 }
 
-func newestOf(ms []SessionMeta) time.Time {
-	var out time.Time
-	for _, m := range ms {
-		if m.Updated.After(out) {
-			out = m.Updated
-		}
-	}
-	return out
-}
-
 // frictionTexts recovers what the wanted hashes stood for by reading back the
 // sessions that carry one of them, filling in every hash a session yields —
 // one session usually carries several walls, and reading it once per wall was

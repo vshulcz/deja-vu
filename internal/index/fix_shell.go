@@ -55,7 +55,54 @@ func shellComplaint(raw, line, command string) bool {
 	if prog := missingProgram(line); prog != "" && runsProgram(command, prog) {
 		return false
 	}
+	if pat := unmatchedGlob(line); pat != "" && strings.Contains(command, pat) {
+		return false
+	}
 	return true
+}
+
+func unmatchedGlob(line string) string {
+	for _, prefix := range []string{"no matches found: ", "bad pattern: "} {
+		if _, pat, ok := strings.Cut(line, prefix); ok {
+			return strings.TrimSpace(pat)
+		}
+	}
+	return ""
+}
+
+var shellDiagnosticPhrases = []string{
+	"no matches found",
+	"bad pattern",
+	"bad substitution",
+	"syntax error near",
+	"parse error near",
+	"unbound variable",
+	"command not found",
+}
+
+// IsShellDiagnostic reports whether text contains an error emitted by the
+// shell itself (glob failure, syntax/parse error, bad substitution, zsh equals
+// expansion, or missing command) (#5986).
+func IsShellDiagnostic(text string) bool {
+	for raw := range strings.SplitSeq(text, "\n") {
+		trimmed := trimEnvelopeLabel(strings.TrimSpace(raw))
+		if trimmed == "" {
+			continue
+		}
+		low := strings.ToLower(trimmed)
+		for _, p := range shellDiagnosticPhrases {
+			if strings.Contains(low, p) {
+				return true
+			}
+		}
+		if shellSpoke(trimmed) && strings.HasSuffix(low, " not found") {
+			return true
+		}
+		if norm := strings.ToLower(normalizeFriction(trimmed)); strings.HasPrefix(norm, "=") && strings.HasSuffix(norm, " not found") {
+			return true
+		}
+	}
+	return false
 }
 
 // shellSpoke reports a line that opens with a shell's name or position

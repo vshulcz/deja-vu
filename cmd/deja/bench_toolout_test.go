@@ -63,7 +63,7 @@ func TestBenchCorpusCarriesToolOutput(t *testing.T) {
 	if err = index.EnsureForSearch(dir, query.Options{All: true}, true, io.Discard); err != nil {
 		t.Fatal(err)
 	}
-	ss, err := index.Search(dir, query.Options{Query: "v41", Limit: 5})
+	ss, err := indexSearch(dir, query.Options{Query: "v41", Limit: 5})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -202,13 +202,6 @@ func askKey(terms []string) string {
 	return "ask:" + hex.EncodeToString(sum[:8])
 }
 
-// askedRecently reports whether this reader already had an answer to the same
-// question inside the window. Scanned from the end, like the cooldowns: the
-// file is append-only and the newest rows are the ones that matter.
-func askedRecently(dir, sid, key string, window time.Duration) bool {
-	return loadSeen(dir).asked(sid, key, window)
-}
-
 // isSpawnedReader reports whether this recall is for an agent the parent just
 // spawned rather than for someone typing. spawnRecall builds the id, and the
 // prefix is the only thing that separates the two readers here.

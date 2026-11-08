@@ -238,7 +238,7 @@ func TestRestoreFindsSpansInACrowdedSession(t *testing.T) {
 		t.Fatalf("wrong span: %q", spans[0].body)
 	}
 	// What stats counts and what restore hands back must be the same number.
-	total, files, err := index.SpanInventory(dir)
+	total, files, err := index.SpanInventoryWhere(dir, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -83,16 +83,6 @@ func ranBetter(a, b ranCandidate) bool {
 	return a.text < b.text
 }
 
-// fileHookRanLine is the command the sessions that touched this file ran and
-// the transcript saw finish cleanly, or "" when there is no such pattern.
-//
-// Reads one sidecar and the manifest rows the caller already has: this is on
-// the per-action path, where the file line's own history cost 133 ms before
-// #3605 moved it into the manifest.
-func fileHookRanLine(dir string, metas []index.SessionMeta) string {
-	return fileHookRanLineFor(dir, "", metas)
-}
-
 func fileHookRanLineFor(dir, path string, metas []index.SessionMeta) string {
 	if len(metas) < toolHookMinRanSessions {
 		return ""

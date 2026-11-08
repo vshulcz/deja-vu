@@ -15,12 +15,6 @@ import (
 // the session as it stood before the newest summary, the way Gemini's next
 // BeforeAgent does.
 
-// ReadCommandCodeCompaction captures the session in a Command Code transcript
-// as it stood before its newest compaction. found is false when it has none.
-func ReadCommandCodeCompaction(path, nativeSessionID string) (CompactionTranscript, bool, error) {
-	return ReadCommandCodeCompactionIfNew(path, nativeSessionID, nil)
-}
-
 // ReadCommandCodeCompactionIfNew captures the session in a Command Code
 // transcript as it stood before its newest compaction, skipping prefix assembly
 // and session parsing when seen reports the compaction fingerprint has already

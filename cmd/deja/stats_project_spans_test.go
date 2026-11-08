@@ -43,7 +43,7 @@ func TestStatsProjectFilterNarrowsSpansAndLabelsRecall(t *testing.T) {
 	if err := index.Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
-	all, _, err := index.SpanInventory(dir)
+	all, _, err := index.SpanInventoryWhere(dir, nil)
 	if err != nil || all != 2 {
 		t.Fatalf("premise: the store holds %d spans (%v), want 2", all, err)
 	}

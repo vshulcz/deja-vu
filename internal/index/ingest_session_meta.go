@@ -232,12 +232,6 @@ func eachIndexKey(text string, when time.Time, fn func(tok string)) {
 	})
 }
 
-// textKeys emits every key the text contributes, repeats included.
-func textKeys(text string, emit func(tok string)) {
-	var k keyer
-	k.textKeys(text, func(b []byte) { emit(string(b)) })
-}
-
 func addIndexKeys(buckets bucketPostings, text string, off int64, sid uint32, when time.Time, tool bool) {
 	eachIndexKey(text, when, func(tok string) {
 		b := bucket(tok)
@@ -540,28 +534,6 @@ func sessionRowTitle(s model.Session) (string, bool) {
 	return title, agentTitle
 }
 
-func mergeTouched(have, add []string) []string {
-	seen := make(map[string]bool, len(have)+len(add))
-	out := make([]string, 0, touchedFileCap)
-	keep := func(p string) bool {
-		if p == "" || seen[p] {
-			return true
-		}
-		seen[p] = true
-		out = append(out, p)
-		return len(out) < touchedFileCap
-	}
-	for i := 0; i < len(have) || i < len(add); i++ {
-		if i < len(have) && !keep(have[i]) {
-			return out
-		}
-		if i < len(add) && !keep(add[i]) {
-			return out
-		}
-	}
-	return out
-}
-
 // agentOwnedFile drops the agent's own working files. They are touched
 // constantly while a subject is being worked on, so left in they take the top
 // slots from the source that was actually being changed — measured: the six
@@ -771,12 +743,6 @@ func questionStem(text string) string {
 		return ""
 	}
 	return strings.Join(fields, " ")
-}
-
-// topTouchedFiles returns the files a session worked on most, busiest first.
-func topTouchedFiles(ms []model.Message) []string {
-	paths, _ := topTouchedCounted(ms)
-	return paths
 }
 
 // countTouchedPaths tallies the file paths in one `files` record's text, one

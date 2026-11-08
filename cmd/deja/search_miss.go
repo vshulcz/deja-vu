@@ -257,20 +257,6 @@ func termCountLine(dir, q string) string {
 	return fmt.Sprintf("deja: on their own: %s — no session has them together\n", strings.Join(parts, ", "))
 }
 
-// printNoMatches says how big the store actually is, not how many sessions the
-// query happened to load.
-//
-// On the index-backed path the loaded set is empty by definition when nothing
-// matched, so this printed "no matches in 0 indexed sessions" for a perfectly
-// healthy index — and internal/index/manifest.go reserves that exact sentence
-// as the signature of a corrupt store, on the grounds that a reader told the
-// index holds zero sessions concludes the tool is broken rather than that
-// their query missed. It fired on every ordinary miss, so the signature could
-// not be used to recognise the failure it was written for (#637).
-func printNoMatches(w io.Writer, dir, q string, regex bool) (mistypedCommand bool) {
-	return printNoMatchesHinted(w, dir, q, regex, false)
-}
-
 // printNoMatchesHinted is printNoMatches for a search whose command hint was
 // already printed before it ran, so the miss does not say it twice.
 func printNoMatchesHinted(w io.Writer, dir, q string, regex, hinted bool) (mistypedCommand bool) {

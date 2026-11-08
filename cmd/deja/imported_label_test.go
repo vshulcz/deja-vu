@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/vshulcz/deja-vu/internal/query"
 	"os"
 	"path/filepath"
 	"strings"
@@ -46,7 +47,7 @@ func TestTheProjectFilterTakesTheLabelTheListingPrints(t *testing.T) {
 		{"a local session by its own name", "alpha", "", "alpha", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := projectFilterMatches(tc.project, tc.from, tc.want); got != tc.match {
+			if got := query.ProjectMatches(tc.project, tc.from, tc.want); got != tc.match {
 				t.Fatalf("--project %q against %q from %q = %v, want %v", tc.want, tc.project, tc.from, got, tc.match)
 			}
 		})
@@ -61,7 +62,7 @@ func TestTheListingLabelAndTheFilterAgree(t *testing.T) {
 	if shown != "mini:alpha" {
 		t.Fatalf("the listing label changed: %q", shown)
 	}
-	if !projectFilterMatches(s.Project, s.From, shown) {
+	if !query.ProjectMatches(s.Project, s.From, shown) {
 		t.Fatalf("the label the listing prints does not select the session it names")
 	}
 }

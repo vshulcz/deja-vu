@@ -21,12 +21,6 @@ func ZCodeHookTranscript(path string) bool {
 	return path != "" && strings.HasPrefix(filepath.Base(filepath.Dir(path)), "zcode-claude-hook-")
 }
 
-// ReadZCodeCompaction captures a ZCode session as it stood before its newest
-// compaction summary. found is false when it has none.
-func ReadZCodeCompaction(sessionID string) (CompactionTranscript, bool, error) {
-	return ReadZCodeCompactionIfNew(sessionID, nil)
-}
-
 // ReadZCodeCompactionIfNew captures a ZCode session as it stood before its
 // newest compaction summary, skipping the full SQLite session parse when seen
 // reports the compaction fingerprint has already been processed.

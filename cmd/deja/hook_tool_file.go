@@ -23,18 +23,6 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
-func fileHookLine(dir, cwd, path string) string {
-	return fileHookLineOutsideWithEdit(dir, cwd, path, "", nil)
-}
-
-// fileHookLineOutside leaves out the sessions self reports: the one the hook
-// fires in and what counts as it. It is in the index once it has touched the
-// file, and as the newest it was counted and its own last reply quoted back as
-// the file's history (#4380).
-func fileHookLineOutside(dir, cwd, path string, self func(index.SessionMeta, string) bool) string {
-	return fileHookLineOutsideWithEdit(dir, cwd, path, "", self)
-}
-
 func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(index.SessionMeta, string) bool) string {
 	// FileSessions matches on the file's basename, so without scoping "main.go"
 	// or "README.md" collects every project's file of that name — the line then
@@ -638,18 +626,6 @@ func containsIdentifierWord(lowText, lowSym string) bool {
 
 func isIdentByte(b byte) bool {
 	return (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9') || b == '_' || b == '-' || b == '/'
-}
-
-// promotedDecisionFor returns the newest accepted promoted note belonging to one
-// of these sessions. Accepted only, for the reason projectConventions gives: a
-// decision later reversed carries a non-accepted state, and LoadPromotedNotes
-// keeps the latest state per source.
-func promotedDecisionFor(metas []index.SessionMeta) string {
-	return promotedDecisionForFile("", metas)
-}
-
-func promotedDecisionForFile(path string, metas []index.SessionMeta) string {
-	return promotedDecisionForFileIn(index.DefaultDir(), path, metas)
 }
 
 func promotedDecisionForFileIn(dir, path string, metas []index.SessionMeta) string {

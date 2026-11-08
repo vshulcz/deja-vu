@@ -38,7 +38,7 @@ func TestHookPromptDoesNotNarrowASessionItWillDiscard(t *testing.T) {
 	}
 	t.Chdir(cwd)
 
-	focusCalls = 0
+	focusCalls.Store(0)
 	var out bytes.Buffer
 	in := strings.NewReader(`{"prompt":"what did we decide about kestrel","session_id":"selflong"}`)
 	if err := runHookPromptMode(index.DefaultDir(), in, &out, true); err != nil {
@@ -47,7 +47,7 @@ func TestHookPromptDoesNotNarrowASessionItWillDiscard(t *testing.T) {
 	if strings.Contains(out.String(), "kestrel notes") {
 		t.Fatalf("the session being written was recalled to itself:\n%q", out.String())
 	}
-	if focusCalls != 0 {
-		t.Errorf("narrowed %d session(s) that were then discarded — the cheap checks must come first", focusCalls)
+	if focusCalls.Load() != 0 {
+		t.Errorf("narrowed %d session(s) that were then discarded — the cheap checks must come first", focusCalls.Load())
 	}
 }

@@ -202,27 +202,10 @@ func TestCodexDualSourceDuplicateMergeBranches(t *testing.T) {
 	}
 }
 
-// redactForIngest must attribute redaction counts to the opencode database
-// file when the source path (the session's project dir) is not itself a
-// tracked file, and skip that attribution when sourcePath already is the db
-// path; carryRedactions must skip an old file entry no longer present in the
+// carryRedactions must skip an old file entry no longer present in the
 // new Files map; Redactions("") must resolve DefaultDir.
-func TestRedactForIngestAndCarryRedactionsBranches(t *testing.T) {
-	tmp := hermeticIndexEnv(t)
-	db := os.Getenv("DEJA_OPENCODE_DB")
-
-	m := &Manifest{Files: map[string]FileState{db: {Path: db}}}
-	secret := "AKIA" + "IOSFODNN7EXAMPLE"
-	redactForIngest(m, filepath.Join(tmp, "opencode-project-dir"), "leak "+secret)
-	if m.Files[db].Redactions == 0 {
-		t.Fatalf("redaction not attributed to opencode db: %#v", m.Files[db])
-	}
-
-	m2 := &Manifest{Files: map[string]FileState{}}
-	redactForIngest(m2, filepath.Join(tmp, "some-other-source"), "leak "+secret)
-	if len(m2.Files) != 0 {
-		t.Fatalf("redaction created a phantom entry: %#v", m2.Files)
-	}
+func TestCarryRedactionsBranches(t *testing.T) {
+	_ = hermeticIndexEnv(t)
 
 	m3 := &Manifest{Files: map[string]FileState{}}
 	carryRedactions(m3, Manifest{Files: map[string]FileState{"gone": {Path: "gone", Redactions: 3}}}, map[string]bool{})

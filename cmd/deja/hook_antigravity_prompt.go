@@ -210,12 +210,6 @@ func transcriptTailSteps(path string) []transcriptStep {
 	return out
 }
 
-// latestUserRequest returns the newest user turn in an antigravity transcript,
-// or "" when the file holds none it can read.
-func latestUserRequest(path string) string {
-	return latestUserRequestFromSteps(transcriptTailSteps(path))
-}
-
 func latestUserRequestFromSteps(steps []transcriptStep) string {
 	for _, step := range steps {
 		if step.Type != "USER_INPUT" {
@@ -343,19 +337,6 @@ func workspaceFromConversation(transcriptPath, conversationID string) string {
 		}
 	}
 	return best
-}
-
-// latestToolFailure is the output of the newest tool step that ended badly, or
-// "" when the last thing the agent did was not a failure. PostToolUse gets the
-// error but its contract allows no answer at all (checked on antigravity-cli
-// 1.1.13: it must return an empty object), so the moment a command fails is
-// reachable only from the invocation that follows it.
-//
-// Only the newest tool step is read: a failure two steps back has already been
-// answered or worked around, and injecting it again would be talking about
-// something the agent has moved on from.
-func latestToolFailure(path string) string {
-	return latestToolFailureFromSteps(transcriptTailSteps(path))
 }
 
 func latestToolFailureFromSteps(steps []transcriptStep) string {

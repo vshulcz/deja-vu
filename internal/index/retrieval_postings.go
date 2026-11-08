@@ -268,11 +268,6 @@ func intersectPostings(dir string, keys []string) ([]posting, error) {
 	return out, nil
 }
 
-func intersectSubstringPostings(dir string, bare []string) ([]posting, error) {
-	posts, _, err := intersectSubstringPostingsDetailed(dir, bare)
-	return posts, err
-}
-
 // compoundQueryTokens spells a compound query token as its parts, and says how
 // the words read spelled apart.
 //
@@ -537,36 +532,6 @@ func tokens(s string) []string {
 	return out
 }
 
-// indexKeys collects what textKeys emits, in order and with its repeats. The
-// build path streams the keys instead; this is what the tests read, so they
-// read the same emitter the build does.
-//
-// Bigram keys fold Traditional to Simplified so the same word written either
-// way lands on one key and a query in one script reaches content in the other.
-// Folding only the key keeps the stored text untouched. The emitter folds runs
-// in place and dedupes folded pairs — cheaper than folding each emitted
-// bigram, and every caller collapses repeated keys anyway (#492).
-func indexKeys(s string) []string {
-	var out []string
-	textKeys(s, func(tok string) {
-		out = append(out, tok)
-	})
-	return out
-}
-
-// identifierParts is what keyer.identifierParts emits, as words.
-func identifierParts(s string) []string {
-	var out []string
-	var k keyer
-	k.identifierParts(s, func(b []byte) { out = append(out, string(b[1:])) })
-	return out
-}
-
-func splitCompound(word []rune, out *[]string) {
-	var k keyer
-	k.splitCompound(word, func(b []byte) { *out = append(*out, string(b[1:])) })
-}
-
 func retrievalKeys(keys []string) []string {
 	// Fetch postings for up to 8 tokens: a bucket read is sub-millisecond and
 	// intersectPostings sorts the fetched lists rarest-first with an early
@@ -606,14 +571,6 @@ func queryKeys(s string) []string {
 		out = append(out, "t"+cjkfold.String(tok))
 	}
 	return out
-}
-
-func recordMatchesQuery(r Record, o query.Options) bool {
-	return recordMatchesQueryVariants(r, o, nil)
-}
-
-func recordMatchesQueryVariants(r Record, o query.Options, variants map[string][]string) bool {
-	return newRecordMatcher(o, variants).matches(r)
 }
 
 // recordMatcher is the query side of the verification check, built once.

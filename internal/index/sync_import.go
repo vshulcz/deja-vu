@@ -310,7 +310,7 @@ func (imp *importer) admit(sr SyncRecord, origID, importID string) (text string,
 		imp.ignoredSkipped++
 		return "", nil, "", false
 	}
-	spawned := spawnedKind(string(sr.Kind)) || sr.Parent != ""
+	spawned := model.SpawnedKind(string(sr.Kind)) || sr.Parent != ""
 	if imp.offRoles[sr.Role] || (spawned && imp.subagentsOff) {
 		imp.switchedSkipped++
 		return "", nil, "", false
@@ -324,7 +324,7 @@ func (imp *importer) sessionMeta(sr SyncRecord, key, importID, origID, text stri
 	if meta.ID == "" {
 		meta = SessionMeta{ID: importID, Harness: sr.Harness, Project: importedProjectPrefix + sr.Project, Path: syncImportPath, OrigID: origID, From: string(sr.Origin)}
 	}
-	if spawnedKind(string(sr.Kind)) {
+	if model.SpawnedKind(string(sr.Kind)) {
 		meta.Kind = string(sr.Kind)
 	} else if sr.Parent != "" {
 		meta.Kind = "sidechain" // a run in its parent's log, from a build that sends no kind

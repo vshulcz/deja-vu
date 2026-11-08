@@ -92,7 +92,6 @@ func traeIDEUninstalling() []traeIDEEdition { return traeIDEEditions }
 // status, detection and the doctor golden.
 func traeIDEUserDir() string   { return traeIDEPresent()[0].userDir() }
 func traeIDEMCPPath() string   { return traeIDEPresent()[0].mcpPath() }
-func traeIDEHooksPath() string { return traeIDEPresent()[0].hooksPath() }
 func traeIDESkillPath() string { return traeIDEPresent()[0].skillPath() }
 
 // traeIDEHookWiring has no SessionEnd: the IDE fires no such event, and its

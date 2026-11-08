@@ -3,9 +3,9 @@
   "version": "0.24.0",
   "description": "Project-scoped session recall from your local deja-vu index for coding agents behind Magpie. Recalled excerpts are appended to the request sent to your model provider.",
   "type": "module",
-  "main": "./deja.hooks.mjs",
   "files": [
     "deja.hooks.mjs",
+    "deja.lib.mjs",
     "README.md",
     "LICENSE"
   ],
