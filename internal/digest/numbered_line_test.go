@@ -35,7 +35,7 @@ func TestANumberedDumpLineIsStillDropped(t *testing.T) {
 		"1564 nonpass=0",
 		// A rendered table row that happens to contain a sentence end. The
 		// pipe is what says it is a row.
-		"61 |            [claude] goprojects/d3fvxl · today · Summary: 1. done",
+		"61 |            [claude] goprojects/catalog-svc · today · Summary: 1. done",
 	}
 	for _, l := range dumps {
 		if !numberedDumpLine(l) {

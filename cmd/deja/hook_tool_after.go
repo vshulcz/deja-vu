@@ -5,6 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -50,7 +54,14 @@ type toolAfterInput struct {
 	// TRAE IDE's name for the same field (#4731).
 	LLMToolName string `json:"llm_tool_name"`
 	ToolInput   struct {
-		Command string `json:"command"`
+		Command       string          `json:"command"`
+		CommandLine   string          `json:"CommandLine"`
+		CmdLine       string          `json:"command_line"`
+		Cmd           string          `json:"cmd"`
+		Script        string          `json:"script"`
+		Args          any             `json:"args"`
+		ToolArgs      json.RawMessage `json:"toolArgs"`
+		ToolArgsSnake json.RawMessage `json:"tool_args"`
 	} `json:"tool_input"`
 	// Harnesses disagree about where a command's output lives, and about
 	// whether the exit code is reported at all, so every shape is read and the
@@ -72,7 +83,36 @@ type toolAfterInput struct {
 	// Grok spells the rest in camelCase and puts the result under
 	// toolResult (#4499). See hook_grok.go.
 	grokEnvelope
-	ToolResult json.RawMessage `json:"toolResult"`
+	ToolResult    json.RawMessage `json:"toolResult"`
+	ToolArgs      json.RawMessage `json:"toolArgs"`
+	ToolArgsSnake json.RawMessage `json:"tool_args"`
+}
+
+func (i *toolAfterInput) adopt() {
+	i.ToolName = adoptGrok(adoptGrok(i.ToolName, i.grokEnvelope.ToolName), i.LLMToolName)
+	i.SessionID = adoptGrok(i.SessionID, i.grokEnvelope.SessionID)
+
+	cmd := firstNonEmpty(
+		i.ToolInput.Command,
+		i.ToolInput.CommandLine,
+		i.ToolInput.CmdLine,
+		i.ToolInput.Cmd,
+		i.ToolInput.Script,
+	)
+	for _, rawArgs := range []json.RawMessage{i.ToolInput.ToolArgs, i.ToolInput.ToolArgsSnake, i.ToolArgs, i.ToolArgsSnake} {
+		if args := copilotToolArgs(rawArgs); args != nil {
+			if cmd == "" {
+				cmd = mapString(args, "command", "CommandLine", "command_line", "cmd", "script")
+			}
+			if i.ToolInput.Args == nil && args["args"] != nil {
+				i.ToolInput.Args = args["args"]
+			}
+		}
+	}
+	if cmd != "" && i.ToolInput.Args != nil {
+		cmd += sources.CommandArgs(i.ToolInput.Args)
+	}
+	i.ToolInput.Command = cmd
 }
 
 func runHookToolAfter(dir string, stdin io.Reader, stdout io.Writer) error {
@@ -86,8 +126,7 @@ func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain b
 	var input toolAfterInput
 	raw := readHookPayload(stdin, hookStdinWait)
 	_ = json.NewDecoder(bytes.NewReader(raw)).Decode(&input)
-	input.ToolName = adoptGrok(adoptGrok(input.ToolName, input.grokEnvelope.ToolName), input.LLMToolName)
-	input.SessionID = adoptGrok(input.SessionID, input.grokEnvelope.SessionID)
+	input.adopt()
 	adoptCopilotHost(raw)
 	adoptCursorHost(raw)
 	// The kill switch, before anything is read. It reached the session-start
@@ -477,7 +516,24 @@ func fixPairLineFor(dir, cwd, command, output string) string {
 	}
 	pairs := index.FixesForCommand(dir, command, output, 4, allowHere)
 	for _, p := range pairs {
-		if orientSkipFixPairForHook(p) {
+		if p.Candidate || orientSkipFixPairForHook(p) {
+			continue
+		}
+		if line := fixLine(p, frictionCount(dir, p, pol)); line != "" {
+			return line
+		}
+	}
+	if line := repoMemoryLineForFailedOutput(cwd, command, output, pol); line != "" {
+		return line
+	}
+	if line := compilerSymbolSignatureLine(cwd, output, pol); line != "" {
+		return line
+	}
+	if line := failingTestSourceLine(cwd, output, pol); line != "" {
+		return line
+	}
+	for _, p := range pairs {
+		if !p.Candidate || orientSkipFixPairForHook(p) {
 			continue
 		}
 		if line := fixLine(p, frictionCount(dir, p, pol)); line != "" {
@@ -512,6 +568,302 @@ func fixPairLineFor(dir, cwd, command, output string) string {
 		}
 		if line := fixLine(p, frictionCount(dir, p, pol)); line != "" {
 			return line
+		}
+	}
+	return ""
+}
+
+// failingTestSourceLine extracts the exact failing source line from a test file
+// cited in test failure output across Go, Python, TS/JS, and Rust so the agent
+// sees the failing assertion immediately without a Read round-trip.
+func failingTestSourceLine(cwd, output string, pol policy.Policy) string {
+	if cwd == "" || output == "" || !pol.Allows(policy.ActivationAuto, "") {
+		return ""
+	}
+	if !strings.Contains(output, "FAIL") && !strings.Contains(output, "AssertionError") && !strings.Contains(output, "panicked at ") {
+		return ""
+	}
+	targets := extractFailingTestTargets(output)
+	if len(targets) == 0 {
+		return ""
+	}
+	scanRoot := sources.RepoRoot(cwd)
+	if scanRoot == "" {
+		scanRoot = cwd
+	}
+	tree := orientRepoTree(scanRoot)
+	for _, target := range targets {
+		if line := resolveFailingTargetSnippet(scanRoot, tree, target); line != "" {
+			return line
+		}
+	}
+	return ""
+}
+
+type failingTestTarget struct {
+	filePart string
+	lineNo   int
+	testName string
+}
+
+func extractFailingTestTargets(output string) []failingTestTarget {
+	var targets []failingTestTarget
+	seen := map[string]bool{}
+	addTarget := func(filePart string, lineNo int, testName string) {
+		key := fmt.Sprintf("%s:%d", filePart, lineNo)
+		if !seen[key] {
+			seen[key] = true
+			targets = append(targets, failingTestTarget{filePart: filePart, lineNo: lineNo, testName: testName})
+		}
+	}
+	if strings.Contains(output, "panicked at ") {
+		if filePart, lineNo, testName := parseRustPanicTarget(output); filePart != "" && lineNo > 0 {
+			addTarget(filePart, lineNo, testName)
+		}
+	}
+	for tok := range strings.FieldsSeq(output) {
+		tok = strings.Trim(tok, "\"'`(),;!?[]{}<>❯")
+		if tok == "at" || tok == "" {
+			continue
+		}
+		colon1 := strings.IndexByte(tok, ':')
+		if colon1 <= 0 {
+			continue
+		}
+		filePart := tok[:colon1]
+		if !isFailingTestFileToken(filePart) {
+			continue
+		}
+		rest := tok[colon1+1:]
+		if colon2 := strings.IndexByte(rest, ':'); colon2 >= 0 {
+			rest = rest[:colon2]
+		}
+		lineNo, err := strconv.Atoi(rest)
+		if err == nil && lineNo > 0 {
+			addTarget(filePart, lineNo, "")
+		}
+	}
+	return targets
+}
+
+func parseRustPanicTarget(output string) (string, int, string) {
+	for line := range strings.SplitSeq(output, "\n") {
+		idx := strings.Index(line, "panicked at ")
+		if idx < 0 {
+			continue
+		}
+		testName := ""
+		if tStart := strings.Index(line, "thread '"); tStart >= 0 && tStart < idx {
+			tRest := line[tStart+len("thread '"):]
+			if tName, _, ok := strings.Cut(tRest, "'"); ok {
+				testName = tName
+				if colonColon := strings.LastIndex(testName, "::"); colonColon >= 0 {
+					testName = testName[colonColon+2:]
+				}
+			}
+		}
+		rest := strings.TrimSpace(line[idx+len("panicked at "):])
+		rest = strings.Trim(rest, "\"'`(),;!?[]{}<>")
+		colon1 := strings.IndexByte(rest, ':')
+		if colon1 <= 0 {
+			continue
+		}
+		filePart := rest[:colon1]
+		if !strings.HasSuffix(strings.ToLower(filePart), ".rs") {
+			continue
+		}
+		numPart := rest[colon1+1:]
+		if colon2 := strings.IndexByte(numPart, ':'); colon2 >= 0 {
+			numPart = numPart[:colon2]
+		}
+		lineNo, err := strconv.Atoi(numPart)
+		if err == nil && lineNo > 0 {
+			return filePart, lineNo, testName
+		}
+	}
+	return "", 0, ""
+}
+
+func isFailingTestFileToken(filePart string) bool {
+	lowFile := strings.ToLower(filePart)
+	if strings.HasSuffix(lowFile, "_test.go") || strings.HasSuffix(lowFile, "_test.rs") {
+		return true
+	}
+	if strings.HasSuffix(lowFile, ".py") && (strings.Contains(lowFile, "test_") || strings.Contains(lowFile, "_test.py")) {
+		return true
+	}
+	if (strings.Contains(lowFile, ".test.") || strings.Contains(lowFile, ".spec.")) &&
+		(strings.HasSuffix(lowFile, ".ts") || strings.HasSuffix(lowFile, ".tsx") || strings.HasSuffix(lowFile, ".js") || strings.HasSuffix(lowFile, ".jsx")) {
+		return true
+	}
+	return false
+}
+
+func resolveFailingTargetSnippet(scanRoot string, tree repoFileTree, target failingTestTarget) string {
+	rel := target.filePart
+	if resolved := tree.resolveRel(target.filePart); resolved != "" {
+		rel = resolved
+	}
+	diskPath := rel
+	if !filepath.IsAbs(diskPath) {
+		diskPath = filepath.Join(scanRoot, diskPath)
+	}
+	if !fileThere(diskPath) && !strings.Contains(target.filePart, "/") {
+		diskPath, rel = locateFailingFileInScanRoot(scanRoot, target.filePart, diskPath, rel)
+	}
+	raw, err := os.ReadFile(diskPath)
+	if err != nil || len(raw) > 512<<10 {
+		return ""
+	}
+	lines := strings.Split(string(raw), "\n")
+	if target.lineNo > len(lines) {
+		return ""
+	}
+	srcLine := strings.TrimSpace(lines[target.lineNo-1])
+	if srcLine == "" {
+		return ""
+	}
+	curTest := target.testName
+	if curTest == "" {
+		for i := target.lineNo - 1; i >= 0; i-- {
+			trimmed := strings.TrimSpace(lines[i])
+			if h := testHeaderName(trimmed); h != "" {
+				curTest = h
+				break
+			}
+		}
+	}
+	if curTest != "" {
+		return fmt.Sprintf("failing test line — %s:%d (%s): %s",
+			search.SafePath(rel), target.lineNo, search.SafeLine(curTest),
+			clipDecision(search.SafeText(srcLine), 140))
+	}
+	return fmt.Sprintf("failing test line — %s:%d: %s",
+		search.SafePath(rel), target.lineNo, clipDecision(search.SafeText(srcLine), 140))
+}
+
+func locateFailingFileInScanRoot(scanRoot, filePart, defaultDisk, defaultRel string) (string, string) {
+	diskPath := defaultDisk
+	rel := defaultRel
+	_ = filepath.WalkDir(scanRoot, func(p string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return nil //nolint:nilerr // skip unreadable paths
+		}
+		if d.IsDir() {
+			if p != scanRoot && strings.HasPrefix(d.Name(), ".") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if strings.EqualFold(d.Name(), filePart) {
+			diskPath = p
+			if r, rErr := filepath.Rel(scanRoot, p); rErr == nil && !strings.HasPrefix(r, "..") {
+				rel = filepath.ToSlash(r)
+			}
+			return filepath.SkipAll
+		}
+		return nil
+	})
+	return diskPath, rel
+}
+
+// compilerSymbolSignatureLine inspects compiler or test failure output for
+// symbol-mismatch errors (undefined symbol, wrong argument count/types) and
+// resolves the symbol's live declaration signature in the repository.
+func compilerSymbolSignatureLine(cwd, output string, pol policy.Policy) string {
+	if cwd == "" || output == "" || !pol.Allows(policy.ActivationAuto, "") {
+		return ""
+	}
+	markers := []string{
+		"not enough arguments in call to ",
+		"too many arguments in call to ",
+		"in argument to ",
+		"undefined: ",
+		"has no field or method ",
+		"cannot import name '",
+		"TypeError: ",
+	}
+	for line := range strings.SplitSeq(output, "\n") {
+		trimmed := strings.TrimSpace(line)
+		for _, m := range markers {
+			_, after, ok := strings.Cut(trimmed, m)
+			if !ok {
+				continue
+			}
+			cand := strings.TrimSpace(after)
+			if idx := strings.IndexAny(cand, " \t'\"():;,"); idx > 0 {
+				cand = cand[:idx]
+			}
+			if dot := strings.LastIndexByte(cand, '.'); dot >= 0 && dot+1 < len(cand) {
+				cand = cand[dot+1:]
+			}
+			sym := leadingIdent(cand)
+			if len(sym) < 4 {
+				continue
+			}
+			if rel, lineNo, sig := findSymbolDeclarationInRepo(cwd, sym); rel != "" && sig != "" {
+				return fmt.Sprintf("symbol signature in repo — %s:%d: %s",
+					search.SafePath(rel), lineNo, clipDecision(search.SafeText(sig), 160))
+			}
+		}
+	}
+	return ""
+}
+
+// repoMemoryLineForFailedOutput inspects a failed command and its output for
+// repository file references and surfaces any matching .deja/memory.jsonl
+// guardrail (rejected, gotcha, or file-bound decision) that explains the trap.
+func repoMemoryLineForFailedOutput(cwd, command, output string, pol policy.Policy) string {
+	if cwd == "" || !pol.Allows(policy.ActivationAuto, "") || !promptCarriesErrorOrTest(output) {
+		return ""
+	}
+	root := sources.RepoRoot(cwd)
+	if root == "" {
+		return ""
+	}
+	entries, _, err := readRepoMemoryAndNotes(root)
+	if err != nil || len(entries) == 0 {
+		return ""
+	}
+	tree := orientRepoTree(root)
+	combined := command + "\n" + output
+	seen := map[string]bool{}
+	var citedFiles []string
+	for tok := range strings.FieldsSeq(combined) {
+		tok = strings.Trim(tok, "\"'`(),;!?[]{}<>")
+		if idx := strings.IndexByte(tok, ':'); idx > 0 {
+			tok = tok[:idx]
+		}
+		if tok == "" || !looksLikePromptFileRef(tok) {
+			continue
+		}
+		rel := tok
+		if resolved := tree.resolveRel(tok); resolved != "" {
+			rel = resolved
+		}
+		if !seen[rel] {
+			seen[rel] = true
+			citedFiles = append(citedFiles, rel)
+		}
+	}
+	if len(citedFiles) == 0 {
+		return ""
+	}
+	for _, e := range slices.Backward(entries) {
+		for _, cf := range citedFiles {
+			if repoEntryHasFile(root, cf, e.Files) || repoEntryMentionsFile(root, cf, e.Text) {
+				files := strings.Join(e.Files, ", ")
+				if files == "" {
+					files = cf
+				}
+				kind := e.Kind
+				if kind == "" {
+					kind = "note"
+				}
+				return fmt.Sprintf("in .deja/memory.jsonl (%s): [%s] %s",
+					search.SafePath(files), search.SafeText(kind),
+					clipDecision(search.SafeText(e.Text), toolHookDecisionBudget))
+			}
 		}
 	}
 	return ""

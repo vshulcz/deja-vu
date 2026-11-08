@@ -1,6 +1,7 @@
 package index
 
 import (
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -8,6 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/query"
 )
@@ -30,7 +32,27 @@ const (
 	// an eighth of the pairs at a time for eight walks of the capped id lists,
 	// which are two orders of magnitude cheaper than the map they feed.
 	cooccurShards = 8
+	// cooccurMinNPMI filters out statistically independent token pairs on
+	// corpora with at least 10 sessions (Bouma 2009 Normalized PMI).
+	cooccurMinNPMI = 0.05
+	// cooccurTurnWeight rewards token pairs that co-occur within the same or
+	// adjacent turn window rather than merely anywhere in a marathon session.
+	cooccurTurnWeight = 0.25
+	// cooccurDiscourseKey stores the Monroe et al. (2008) Dirichlet log-odds
+	// discourse outcome markers inside cooccur.gob so carrySidecars and
+	// replacement passes preserve it atomically without an extra sidecar file.
+	cooccurDiscourseKey = "\x00discourse"
 )
+
+type tokMask struct {
+	tok  string
+	mask uint64
+}
+
+type idMask struct {
+	id   uint32
+	mask uint64
+}
 
 func cooccurPath(dir string) string { return filepath.Join(dir, cooccurFile) }
 
@@ -68,28 +90,31 @@ func buildCooccur(tmp string, ss []model.Session) {
 	// few sessions per core behind the workers. Holding every session's list
 	// until all were tokenised was 1.4 GB of a 12k-session cold build's peak.
 	var df []int
-	perSession := make([][]uint32, 0, len(ss))
-	parallelInOrder(len(ss), 4*rerankWorkers(), func(i int) []string {
-		seen := make(map[string]bool, 256)
-		var out []string
-		for _, m := range ss[i].Messages {
+	perSession := make([][]idMask, 0, len(ss))
+	parallelInOrder(len(ss), 4*rerankWorkers(), func(i int) []tokMask {
+		seen := make(map[string]int, 256)
+		var out []tokMask
+		nMsgs := len(ss[i].Messages)
+		for mIdx, m := range ss[i].Messages {
+			bit := turnWindowBit(mIdx, nMsgs)
 			for _, tok := range tokens(m.Text) {
 				if len(tok) < 4 || query.IsStopWord(tok) {
 					continue
 				}
-				if seen[tok] {
+				if idx, ok := seen[tok]; ok {
+					out[idx].mask |= bit
 					continue
 				}
-				seen[tok] = true
-				out = append(out, tok)
+				seen[tok] = len(out)
+				out = append(out, tokMask{tok: tok, mask: bit})
 			}
 		}
 		return out
-	}, func(_ int, unique []string) {
-		list := make([]uint32, 0, len(unique))
-		for _, tok := range unique {
-			v := id(tok)
-			list = append(list, v)
+	}, func(_ int, unique []tokMask) {
+		list := make([]idMask, 0, len(unique))
+		for _, tm := range unique {
+			v := id(tm.tok)
+			list = append(list, idMask{id: v, mask: tm.mask})
 			for len(df) <= int(v) {
 				df = append(df, 0)
 			}
@@ -104,19 +129,19 @@ func buildCooccur(tmp string, ss []model.Session) {
 	// ubiquitous session cannot explode the map. Computed once and kept — at
 	// most cooccurTokensPerSn ids per session — while the full token sets go, so
 	// the pair passes below walk something small.
-	keptPerSession := make([][]uint32, 0, len(ss))
+	keptPerSession := make([][]idMask, 0, len(ss))
 	for _, list := range perSession {
-		kept := make([]uint32, 0, cooccurTokensPerSn)
-		for _, v := range list {
-			if band(v) {
-				kept = append(kept, v)
+		kept := make([]idMask, 0, cooccurTokensPerSn)
+		for _, item := range list {
+			if band(item.id) {
+				kept = append(kept, item)
 			}
 		}
 		sort.Slice(kept, func(i, j int) bool {
-			if df[kept[i]] == df[kept[j]] {
-				return toks[kept[i]] < toks[kept[j]]
+			if df[kept[i].id] == df[kept[j].id] {
+				return toks[kept[i].id] < toks[kept[j].id]
 			}
-			return df[kept[i]] < df[kept[j]]
+			return df[kept[i].id] < df[kept[j].id]
 		})
 		if len(kept) > cooccurTokensPerSn {
 			kept = kept[:cooccurTokensPerSn]
@@ -126,10 +151,12 @@ func buildCooccur(tmp string, ss []model.Session) {
 	perSession = nil
 
 	type nc struct {
-		t string
-		c int
+		t     string
+		score float64
+		c     int
 	}
 	cand := map[string][]nc{}
+	totalDocs := float64(len(ss))
 	// One packed key per unordered pair, canonical by id, counted a shard at a
 	// time. Holding every pair at once was the larger half of a build's peak
 	// footprint on a store of a few thousand sessions (#1137): the map is one
@@ -140,41 +167,61 @@ func buildCooccur(tmp string, ss []model.Session) {
 	//
 	// Each canonical pair (a,b) is a neighbour of both a and b, so expanding it
 	// to both sides here rebuilds the same candidate lists the single-map
-	// version produced; the final sort is by count then token, so the order
-	// shards are visited in cannot reach the output.
+	// version produced; the final sort is by NPMI + turn-window coupling score
+	// then count then token, so the order shards are visited in cannot reach the
+	// output.
 	for shard := range uint64(cooccurShards) {
-		pairs := map[uint64]int{}
+		// Low 32 bits = session co-occurrence count; high 32 bits = local
+		// turn-window co-occurrence count (same or adjacent turn bucket).
+		pairs := map[uint64]uint64{}
 		for _, kept := range keptPerSession {
 			for i := range kept {
 				for j := i + 1; j < len(kept); j++ {
 					a, b := kept[i], kept[j]
-					if a > b {
+					if a.id > b.id {
 						a, b = b, a
 					}
-					key := uint64(a)<<32 | uint64(b)
+					key := uint64(a.id)<<32 | uint64(b.id)
 					if key%cooccurShards != shard {
 						continue
 					}
-					pairs[key]++
+					inc := uint64(1)
+					if (a.mask & (b.mask | (b.mask << 1) | (b.mask >> 1))) != 0 {
+						inc |= 1 << 32
+					}
+					pairs[key] += inc
 				}
 			}
 		}
-		for key, c := range pairs {
+		for key, packed := range pairs {
+			c := int(uint32(packed)) //nolint:gosec // low 32 bits hold session count
 			if c < cooccurMinPair {
 				continue
 			}
-			a, b := toks[uint32(key>>32)], toks[uint32(key)] //nolint:gosec // the key's halves are 32-bit token ids
-			cand[a] = append(cand[a], nc{b, c})
-			cand[b] = append(cand[b], nc{a, c})
+			turnC := int(packed >> 32)
+			aid, bid := uint32(key>>32), uint32(key) //nolint:gosec // the key's halves are 32-bit token ids
+			npmi := pairNPMI(totalDocs, df[aid], df[bid], c)
+			if len(ss) >= 10 && npmi <= cooccurMinNPMI {
+				continue
+			}
+			turnRatio := float64(turnC) / float64(c)
+			support := float64(c) / float64(c+cooccurMinPair)
+			baseScore := (npmi + cooccurTurnWeight*turnRatio) * support
+			a, b := toks[aid], toks[bid]
+			cand[a] = append(cand[a], nc{t: b, score: baseScore * float64(c) / float64(df[aid]), c: c})
+			cand[b] = append(cand[b], nc{t: a, score: baseScore * float64(c) / float64(df[bid]), c: c})
 		}
 	}
 	neighbors := map[string][]string{}
 	for tok, list := range cand {
 		sort.Slice(list, func(i, j int) bool {
-			if list[i].c == list[j].c {
-				return list[i].t < list[j].t
+			if math.Abs(list[i].score-list[j].score) > 1e-9 {
+				return list[i].score > list[j].score
 			}
-			return list[i].c > list[j].c
+			if list[i].c != list[j].c {
+				return list[i].c > list[j].c
+			}
+			return list[i].t < list[j].t
 		})
 		if len(list) > cooccurNeighbors {
 			list = list[:cooccurNeighbors]
@@ -188,7 +235,54 @@ func buildCooccur(tmp string, ss []model.Session) {
 	if len(neighbors) == 0 {
 		return
 	}
+	if dm := digest.LearnDiscourseMarkers(ss); len(dm) > 0 {
+		neighbors[cooccurDiscourseKey] = dm
+	}
 	_ = writeGob(cooccurPath(tmp), neighbors)
+}
+
+// turnWindowBit maps a message index within a session of nMsgs messages to a
+// bit in a 64-bit mask so same-turn and adjacent-turn co-occurrence can be
+// tested in O(1) bitwise instructions.
+func turnWindowBit(mIdx, nMsgs int) uint64 {
+	if nMsgs <= 0 || mIdx < 0 {
+		return 1
+	}
+	if nMsgs <= 64 {
+		return uint64(1) << mIdx
+	}
+	bucket := (mIdx * 64) / nMsgs
+	if bucket >= 64 {
+		bucket = 63
+	}
+	return uint64(1) << bucket
+}
+
+// pairNPMI computes Normalized Pointwise Mutual Information (Bouma 2009):
+//
+//	NPMI(a, b) = ln(N * c(a,b) / (df(a) * df(b))) / -ln(c(a,b) / N)
+//
+// bounded in [-1, 1], where 0 is statistical independence and 1 is complete
+// co-occurrence.
+func pairNPMI(totalDocs float64, dfA, dfB, c int) float64 {
+	if c <= 0 || dfA <= 0 || dfB <= 0 {
+		return -1
+	}
+	n := math.Max(totalDocs, float64(max(dfA, dfB))+1)
+	cf := float64(c)
+	pmi := math.Log((n * cf) / (float64(dfA) * float64(dfB)))
+	denom := -math.Log(cf / n)
+	if denom <= 1e-9 {
+		return 1
+	}
+	npmi := pmi / denom
+	if npmi > 1 {
+		return 1
+	}
+	if npmi < -1 {
+		return -1
+	}
+	return npmi
 }
 
 // dropCooccurWords takes every word drop names out of dir's neighbour map,
@@ -233,6 +327,19 @@ func writeCooccurWithout(dir string, m map[string][]string, drop func(word strin
 	}
 	if !changed {
 		return nil
+	}
+	if dm := digest.LearnedDecisionMarkers(); len(dm) > 0 {
+		var keptDM []string
+		for _, w := range dm {
+			if !drop(w) {
+				keptDM = append(keptDM, w)
+			}
+		}
+		digest.SetLearnedDecisionMarkers(keptDM)
+		if len(keptDM) > 0 {
+			m[cooccurDiscourseKey] = keptDM
+			defer delete(m, cooccurDiscourseKey)
+		}
 	}
 	// An empty map rather than no file, which a reader holding it open on
 	// Windows would refuse to let go; a read of either finds no neighbours.
@@ -316,6 +423,7 @@ func readCooccur(dir string) map[string][]string {
 	if err := readGob(p, &m); err != nil {
 		return nil
 	}
+	delete(m, cooccurDiscourseKey)
 	cooccurCache.mu.Lock()
 	cooccurCache.dir, cooccurCache.stat, cooccurCache.m = dir, fi, m
 	cooccurCache.mu.Unlock()

@@ -126,7 +126,7 @@ func hookGate() string {
 	// out — search agreed it was gone and the block went on quoting it, which
 	// is the one thing the privacy command must not do (#2537). A promotion
 	// made a moment ago has the same problem in reverse. Stat, not read.
-	return "v3|" + mode + "|" + policy.Load().Describe(policy.ActivationAuto) + "|" + notesStamp()
+	return "v5|" + mode + "|" + policy.Load().Describe(policy.ActivationAuto) + "|" + notesStamp()
 }
 
 // notesStamp identifies the notes file as it is now. A file that cannot be
@@ -210,11 +210,11 @@ func cachedHookDigestFor(dir, fromPayload string, exclude ...string) (string, in
 					// the cache off the startup path.
 					requestHookRefresh(dir, cwd)
 				}
-				return v.Digest, v.Sessions, v.Raw, v.TaskMatched, e.Withheld, v.IDs, v.Projects
+				return search.SafeText(v.Digest), v.Sessions, v.Raw, v.TaskMatched, e.Withheld, v.IDs, v.Projects
 			}
 		}
 	}
-	if !slices.ContainsFunc(exclude, func(id string) bool { return id != "" }) {
+	if !index.HasAnySession(dir, exclude...) {
 		// The digest goes out now and the resume variants come from the
 		// detached refresh: rendering one per served session here put them
 		// on the startup path of every first start in a project.

@@ -600,8 +600,9 @@ func antigravityToolCalls(v any, t time.Time) ([]model.Message, string) {
 		if args == nil {
 			continue
 		}
-		switch str(call["name"]) {
-		case "run_command", "mcp_qwen_cmd":
+		name := str(call["name"])
+		switch {
+		case name == "run_command" || (strings.HasPrefix(name, "mcp_") && (antigravityArg(args, "CommandLine") != "" || antigravityArg(args, "cmd") != "")):
 			cmd := strings.TrimSpace(antigravityArg(args, "CommandLine"))
 			if cmd == "" {
 				cmd = strings.TrimSpace(antigravityArg(args, "cmd"))
@@ -615,7 +616,7 @@ func antigravityToolCalls(v any, t time.Time) ([]model.Message, string) {
 			if cmd != "" && IndexCommands() && worthIndexing(cmd) {
 				out = append(out, model.Message{Role: RoleCommand, Text: "$ " + cmd, Time: t})
 			}
-		case "view_file", "replace_file_content", "multi_replace_file_content", "write_to_file", "read_file", "edit_file", "write_file":
+		case name == "view_file" || name == "replace_file_content" || name == "multi_replace_file_content" || name == "write_to_file" || name == "read_file" || name == "edit_file" || name == "write_file":
 			p := antigravityArg(args, "AbsolutePath")
 			if p == "" {
 				p = antigravityArg(args, "TargetFile")
@@ -631,7 +632,7 @@ func antigravityToolCalls(v any, t time.Time) ([]model.Message, string) {
 			// step without a diff block or file path ("Made N replacement(s) in
 			// <path>..." / "Created file."), so Target, Replacement, and Content
 			// in tool_calls are the only record of what changed.
-			switch str(call["name"]) {
+			switch name {
 			case "edit_file":
 				if p != "" && IndexEdits() {
 					if span := strings.TrimSpace(antigravityArg(args, "Target")); span != "" {
@@ -650,6 +651,16 @@ func antigravityToolCalls(v any, t time.Time) ([]model.Message, string) {
 				if p != "" && IndexWrites() {
 					if rec := WroteRecord(p, antigravityArg(args, "Content")); rec != "" {
 						out = append(out, model.Message{Role: RoleWrote, Text: rec, Time: t})
+					}
+				}
+			}
+		case strings.HasPrefix(name, "mcp_") && IndexToolPaths():
+			if list, ok := args["paths"].([]any); ok {
+				for _, item := range list {
+					if s, ok := item.(string); ok {
+						if p := decodeURIPath(strings.TrimPrefix(s, "file://")); p != "" {
+							out = append(out, model.Message{Role: RoleFiles, Text: p, Time: t})
+						}
 					}
 				}
 			}
@@ -674,8 +685,15 @@ func antigravityExitCode(kind, text string) (int, bool) {
 		if code, ok := statusCode(line, "The command exited with code ", "."); ok {
 			return code, true
 		}
-		if rest, ok := strings.CutPrefix(line, "[cmd direct | exit="); ok {
-			if num, _, ok := strings.Cut(rest, " "); ok {
+		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
+			if _, rest, ok := strings.Cut(line, "exit="); ok {
+				num := rest
+				for i, r := range rest {
+					if r == ' ' || r == ',' || r == '|' || r == ']' {
+						num = rest[:i]
+						break
+					}
+				}
 				if num == "-1" {
 					return 1, true
 				}
@@ -715,14 +733,21 @@ func antigravityStampExit(msgs []model.Message, running []int, asked, own int, n
 	return running
 }
 
-// antigravityRunCalls counts a planner row's run_command calls, recorded or
-// not.
+// antigravityRunCalls counts a planner row's command calls, recorded or not.
 func antigravityRunCalls(v any) int {
 	calls, _ := v.([]any)
 	n := 0
 	for _, c := range calls {
-		if call, _ := c.(map[string]any); str(call["name"]) == "run_command" || str(call["name"]) == "mcp_qwen_cmd" {
+		call, _ := c.(map[string]any)
+		name := str(call["name"])
+		if name == "run_command" {
 			n++
+			continue
+		}
+		if strings.HasPrefix(name, "mcp_") {
+			if args, _ := call["args"].(map[string]any); args != nil && (antigravityArg(args, "CommandLine") != "" || antigravityArg(args, "cmd") != "") {
+				n++
+			}
 		}
 	}
 	return n

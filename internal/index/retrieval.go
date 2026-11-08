@@ -1017,7 +1017,7 @@ func fuseFocus(scored []relevanceScored, order []int32) []int32 {
 // and was wrong about a third of them: "deja" pulled in both deja-push and
 // deja-vu, two different repositories, and a session whose project had parsed
 // as "-" matched every hyphenated project on the disk — deja-vu, pin-manifests,
-// mpc-autoscaler, telegram-mtproxy-forwarder. Recall in one project then ranks
+// node-autoscaler, webhook-event-forwarder. Recall in one project then ranks
 // against another's history, which is the one thing project scoping exists to
 // prevent.
 //
@@ -1077,7 +1077,7 @@ func endsWithSegment(p, w string) bool {
 }
 
 // ProjectEndsWithSegment reports whether project's path ends with the given
-// segment (case-insensitive), e.g. "goprojects/splitbox" ends with "splitbox".
+// segment (case-insensitive), e.g. "goprojects/netgateway" ends with "netgateway".
 func ProjectEndsWithSegment(project, segment string) bool {
 	if project == "" || segment == "" {
 		return false
@@ -1087,7 +1087,7 @@ func ProjectEndsWithSegment(project, segment string) bool {
 
 // ProjectsMatchingTerms returns the distinct recorded project names in dir
 // whose path ends with any term in terms (length >= 4). Used when an unscoped
-// prompt names a repository by its basename ("splitbox", "routepilot").
+// prompt names a repository by its basename ("edgeproxy", "netgateway").
 func ProjectsMatchingTerms(dir string, terms []string) []string {
 	if len(terms) == 0 {
 		return nil
@@ -1206,6 +1206,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 	for _, term := range terms {
 		a.addTerm(term)
 	}
+	a.addAssociativeTerms(dir, terms)
 	a.bestMessages()
 	// A query this long is a pasted document — an issue, a log, a spec — and
 	// ranking it is finding the documents most like it, so a session's score

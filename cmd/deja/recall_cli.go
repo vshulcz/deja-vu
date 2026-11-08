@@ -110,9 +110,17 @@ func runRecall(dir string, args []string, stdout io.Writer) error {
 		_, err := fmt.Fprintln(stdout, frameRecall(line))
 		return err
 	}
-	text, sessions, raw, ids, projects, err := recallTextResultIn(dir, q, harness, project, limit, offset, recallMCPBudget-recallFrameOverhead)
+	brief := liveRecallBrief(dir, howCwd(), q)
+	budget := recallMCPBudget - recallFrameOverhead
+	if brief != "" {
+		budget -= len(brief) + 2
+	}
+	text, sessions, raw, ids, projects, err := recallTextResultIn(dir, q, harness, project, limit, offset, budget)
 	if err != nil {
 		return err
+	}
+	if brief != "" {
+		text = brief + "\n\n" + text
 	}
 	text = frameRecall(text)
 	usage.RecordServedFromInto(dir, usage.KindRecall, text, "", sessions, raw, ids, projects, policy.Load().Describe(policy.ActivationMCP))

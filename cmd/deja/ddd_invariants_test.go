@@ -531,7 +531,7 @@ func TestDDDNoteFromMetaAndSyncedCommandDecision(t *testing.T) {
 	}
 }
 
-func TestDDDWave15And16HandoverRecapAndSidecarInvariants(t *testing.T) {
+func TestDDDHandoverRecapAndSidecarInvariants(t *testing.T) {
 	if isHandoverSession(model.Session{Harness: model.NotesHarness, ID: "deja-note-1"}) {
 		t.Fatalf("isHandoverSession allowed synthetic deja note")
 	}

@@ -266,6 +266,9 @@ func trivialContinuation(text string) bool {
 	if text == "" {
 		return true
 	}
+	if carriesTechnicalEntity(text) {
+		return false
+	}
 	// Punctuation between the words too: "thanks, continue" and "ага, давай" are
 	// the same turn as without the comma.
 	low := cjkfold.String(strings.ToLower(strings.Trim(text, " .,!?:;。，！？：；、…")))
@@ -286,14 +289,20 @@ func trivialContinuation(text string) bool {
 	return onlyNudges(low)
 }
 
-// continuationWords are the nudge words plus the ways of saying only "carry on"
-// that the handover picker has no use for: `nudgeWords` is shared with it, and
-// these belong to this rule alone.
+// continuationWords are the closed-class acknowledgement + continuation tokens
+// across EN, RU, ZH, and JA. Any combination of these tokens with zero
+// technical entities or content words is a pure continuation nudge.
 var continuationWords = append(append([]string{}, nudgeWords...),
 	"y", "proceed", "please", "please continue", "continue please", "please do it",
-	"and", "then", "also",
-	"и", "а", "ну", "еще", "ещё", "после чего",
-	"那", "那么")
+	"keep going", "keep moving", "looks good", "sounds good", "let's continue", "lets continue",
+	"let's go", "lets go", "awesome", "great", "nice", "cool", "perfect", "fine", "alright", "yeah", "yep",
+	"and", "then", "also", "now",
+	"делаем", "делай", "погнали", "жги", "шагаем", "шагаем дальше", "отлично", "супер", "круто", "класс", "норм",
+	"ладно", "хорошо", "понял", "принято", "продолжи", "действуй", "приступай", "вперед", "вперёд",
+	"и", "а", "ну", "же", "уже", "еще", "ещё", "тогда", "теперь", "сейчас", "после чего",
+	"太好了", "不错", "棒", "往下", "往下走", "接着弄", "继续吧", "那", "那么", "吧",
+	"はい", "ええ", "うん", "いい", "いいね", "いい感じ", "よし", "了解", "わかった", "オッケー", "ありがとう",
+	"続けて", "進めて", "進んで", "やって", "ください", "そのまま", "次", "どうぞ")
 
 // onlyNudges reports whether the turn is made of nudge words and nothing else.
 // Longest match first, so "давай дальше" is one nudge rather than "давай" plus a
@@ -301,12 +310,13 @@ var continuationWords = append(append([]string{}, nudgeWords...),
 func onlyNudges(low string) bool {
 	for low != "" {
 		best := ""
-		for _, nudge := range continuationWords {
+		for _, rawNudge := range continuationWords {
+			nudge := cjkfold.String(rawNudge)
 			if len(nudge) <= len(best) {
 				continue
 			}
 			if low == nudge || strings.HasPrefix(low, nudge+" ") ||
-				(cjkfold.HasCJK(nudge) && strings.HasPrefix(low, nudge)) {
+				(hasCJKOrKana(nudge) && strings.HasPrefix(low, nudge)) {
 				best = nudge
 			}
 		}
@@ -316,6 +326,18 @@ func onlyNudges(low string) bool {
 		low = strings.TrimSpace(strings.TrimPrefix(low, best))
 	}
 	return true
+}
+
+func hasCJKOrKana(s string) bool {
+	if cjkfold.HasCJK(s) {
+		return true
+	}
+	for _, r := range s {
+		if (r >= 0x3040 && r <= 0x30FF) || (r >= 0xAC00 && r <= 0xD7AF) {
+			return true
+		}
+	}
+	return false
 }
 
 func contextRef(s model.Session, m model.Message) model.ContextRef {

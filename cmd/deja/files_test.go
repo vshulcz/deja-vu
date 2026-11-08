@@ -36,10 +36,10 @@ func TestTopicTimesNeedsHalfTheWords(t *testing.T) {
 func TestTopicTimesSkipsFileAndCommandRecords(t *testing.T) {
 	at := time.Now()
 	ms := []model.Message{
-		{Role: "files", Text: "/repo/singbox/service.go", Time: at},
-		{Role: "command", Text: "grep singbox service", Time: at},
+		{Role: "files", Text: "/repo/envoy/service.go", Time: at},
+		{Role: "command", Text: "grep envoy service", Time: at},
 	}
-	if got := topicTimes(ms, []string{"singbox", "service"}); len(got) != 0 {
+	if got := topicTimes(ms, []string{"envoy", "service"}); len(got) != 0 {
 		t.Fatalf("a path is not someone discussing the subject, got %v", got)
 	}
 }

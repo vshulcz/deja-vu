@@ -1016,7 +1016,7 @@ Which files a piece of work touched:
 ```json
 {
   "schema_version": 2,
-  "query": "singbox",
+  "query": "envoy",
   "project": "app",
   "sessions_scanned": 34,
   "matched": 34,
@@ -1027,7 +1027,7 @@ Which files a piece of work touched:
   "ignored": 0,
   "files": [
     {
-      "path": "/srv/app/internal/singbox/render.go",
+      "path": "/srv/app/internal/envoy/render.go",
       "near": 18,
       "sessions": 6,
       "total": 21

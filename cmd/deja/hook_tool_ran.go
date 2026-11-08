@@ -2,12 +2,14 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // An agent about to edit a file is told what was decided about it, and then it
@@ -213,13 +215,9 @@ const (
 	toolHookMaxFocusedFiles = 8
 )
 
-// coChangeCompanion finds the companion or test file that sessions touching
+// coChangeCompanionIn finds the companion or test file that sessions touching
 // path almost always modified alongside it (at least 3 sessions and 2/3 of the
 // focused sessions that touched path).
-func coChangeCompanion(path string, metas []index.SessionMeta) (string, int, int) {
-	return coChangeCompanionIn("", path, metas)
-}
-
 func coChangeCompanionIn(cwd, path string, metas []index.SessionMeta) (string, int, int) {
 	targetBase := strings.ToLower(baseName(path))
 	if targetBase == "" {
@@ -266,13 +264,18 @@ func coChangeCompanionIn(cwd, path string, metas []index.SessionMeta) (string, i
 				hasTarget = true
 				continue
 			}
+			display := b
+			if isAmbiguousCoChangeBase(low) && !filepath.IsAbs(norm) && strings.Contains(filepath.ToSlash(norm), "/") {
+				display = filepath.ToSlash(norm)
+				low = strings.ToLower(display)
+			}
 			if seenInSession[low] {
 				continue
 			}
 			seenInSession[low] = true
 			companions = append(companions, low)
 			if companionDisplay[low] == "" {
-				companionDisplay[low] = b
+				companionDisplay[low] = display
 			}
 		}
 		if !hasTarget || len(companions) == 0 || len(companions)+1 > toolHookMaxFocusedFiles {
@@ -322,4 +325,379 @@ func coChangeCompanionBetter(a, b string) bool {
 		return aTest
 	}
 	return a < b
+}
+
+func isAmbiguousCoChangeBase(low string) bool {
+	switch low {
+	case "index.js", "index.ts", "index.tsx", "index.jsx", "main.go", "mod.rs", "lib.rs",
+		"init.py", "__init__.py", "route.ts", "page.tsx", "layout.tsx", "config.go",
+		"types.go", "utils.go", "helpers.go", "client.go", "server.go":
+		return true
+	}
+	return false
+}
+
+// siblingTestLineFor resolves the focused test filter for an edited symbol
+// by scanning sibling test files in the same directory across Go, Python,
+// TS/JS, and Rust when session history has no prior verification command.
+func siblingTestLineFor(cwd, path string, editSymbols []string) string {
+	if path == "" || len(editSymbols) == 0 {
+		return ""
+	}
+	diskPath := path
+	if !filepath.IsAbs(diskPath) && cwd != "" {
+		diskPath = filepath.Join(cwd, diskPath)
+	}
+	pkgDir := filepath.Dir(diskPath)
+	ext := strings.ToLower(filepath.Ext(diskPath))
+	switch ext {
+	case ".go":
+		return goSiblingTestCmd(cwd, diskPath, pkgDir, editSymbols)
+	case ".py":
+		return pySiblingTestTarget(cwd, diskPath, pkgDir, editSymbols)
+	case ".ts", ".tsx", ".js", ".jsx":
+		return tsSiblingTestTarget(cwd, diskPath, pkgDir, ext, editSymbols)
+	case ".rs":
+		return rustSiblingTestTarget(cwd, diskPath, pkgDir, editSymbols)
+	}
+	return ""
+}
+
+func goSiblingTestCmd(cwd, diskPath, pkgDir string, editSymbols []string) string {
+	if strings.HasSuffix(diskPath, "_test.go") {
+		return ""
+	}
+	entries, err := os.ReadDir(pkgDir)
+	if err != nil {
+		return ""
+	}
+	stem := strings.TrimSuffix(filepath.Base(diskPath), ".go")
+	preferred := stem + "_test.go"
+	var testFiles []string
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), "_test.go") {
+			continue
+		}
+		if e.Name() == preferred {
+			testFiles = append([]string{e.Name()}, testFiles...)
+		} else {
+			testFiles = append(testFiles, e.Name())
+		}
+	}
+	if len(testFiles) > 2500 {
+		testFiles = testFiles[:2500]
+	}
+	var matched []string
+	seen := map[string]bool{}
+	for _, tf := range testFiles {
+		raw, err := os.ReadFile(filepath.Join(pkgDir, tf))
+		if err != nil || len(raw) > 512<<10 {
+			continue
+		}
+		content := string(raw)
+		if !mentionsAnySymbol(editSymbols, content) {
+			continue
+		}
+		curTest := ""
+		for line := range strings.SplitSeq(content, "\n") {
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "func Test") {
+				rest := strings.TrimPrefix(trimmed, "func ")
+				if id := leadingIdent(rest); strings.HasPrefix(id, "Test") && len(id) > 4 {
+					curTest = id
+				}
+				continue
+			}
+			if curTest != "" && !seen[curTest] && mentionsAnySymbol(editSymbols, trimmed) {
+				seen[curTest] = true
+				matched = append(matched, curTest)
+				if len(matched) >= 3 {
+					break
+				}
+			}
+		}
+		if len(matched) >= 3 {
+			break
+		}
+	}
+	if len(matched) == 0 {
+		return ""
+	}
+	root := sources.RepoRoot(pkgDir)
+	if root == "" && cwd != "" {
+		root = sources.RepoRoot(cwd)
+	}
+	if root == "" && cwd != "" {
+		root = cwd
+	}
+	pkgTarget := "."
+	if root != "" {
+		if rel, err := filepath.Rel(root, pkgDir); err == nil && rel != "." && !strings.HasPrefix(rel, "..") {
+			pkgTarget = "./" + filepath.ToSlash(rel)
+		}
+	}
+	cmd := fmt.Sprintf("go test %s -run '^%s$'", pkgTarget, strings.Join(matched, "|"))
+	return " — test target: `" + search.SafeCommand(cmd) + "`"
+}
+
+func pySiblingTestTarget(cwd, diskPath, pkgDir string, editSymbols []string) string {
+	base := filepath.Base(diskPath)
+	if strings.HasPrefix(base, "test_") || strings.HasSuffix(base, "_test.py") {
+		return ""
+	}
+	root := repoOrWorkDir(cwd, pkgDir)
+	stem := strings.TrimSuffix(base, ".py")
+	candidates := []string{"test_" + stem + ".py", stem + "_test.py"}
+	for _, cand := range candidates {
+		candPath := filepath.Join(pkgDir, cand)
+		raw, err := os.ReadFile(candPath)
+		if err != nil || len(raw) > 512<<10 {
+			continue
+		}
+		rel := cand
+		if r, err := filepath.Rel(root, candPath); err == nil && !strings.HasPrefix(r, "..") {
+			rel = filepath.ToSlash(r)
+		}
+		return pySiblingTestCmd(rel, string(raw), editSymbols)
+	}
+	entries, err := os.ReadDir(pkgDir)
+	if err != nil {
+		return ""
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if !strings.HasPrefix(name, "test_") && !strings.HasSuffix(name, "_test.py") {
+			continue
+		}
+		candPath := filepath.Join(pkgDir, name)
+		raw, err := os.ReadFile(candPath)
+		if err != nil || len(raw) > 512<<10 {
+			continue
+		}
+		content := string(raw)
+		if !mentionsAnySymbolLen(editSymbols, content, 3) {
+			continue
+		}
+		rel := name
+		if r, err := filepath.Rel(root, candPath); err == nil && !strings.HasPrefix(r, "..") {
+			rel = filepath.ToSlash(r)
+		}
+		return pySiblingTestCmd(rel, content, editSymbols)
+	}
+	return ""
+}
+
+func pySiblingTestCmd(rel, content string, editSymbols []string) string {
+	var matched []string
+	seen := map[string]bool{}
+	curTest := ""
+	curMatched := false
+	for line := range strings.SplitSeq(content, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "def test_") {
+			rest := strings.TrimPrefix(trimmed, "def ")
+			idx := strings.IndexAny(rest, "(: \t")
+			name := rest
+			if idx > 0 {
+				name = rest[:idx]
+			}
+			curTest = name
+			curMatched = false
+			if symbolInLine(curTest, editSymbols) || symbolInLine(trimmed, editSymbols) {
+				if !seen[curTest] {
+					seen[curTest] = true
+					matched = append(matched, curTest)
+				}
+				curMatched = true
+			}
+			continue
+		}
+		if (strings.HasPrefix(trimmed, "def ") && !strings.HasPrefix(trimmed, "def test_")) || strings.HasPrefix(trimmed, "class ") {
+			curTest = ""
+			curMatched = false
+			continue
+		}
+		if curTest != "" && !curMatched && symbolInLine(trimmed, editSymbols) {
+			curMatched = true
+			if !seen[curTest] {
+				seen[curTest] = true
+				matched = append(matched, curTest)
+			}
+		}
+	}
+	if len(matched) >= 1 && len(matched) <= 4 {
+		return fmt.Sprintf(" — test target: `pytest %s -k '%s'`", search.SafePath(rel), strings.Join(matched, " or "))
+	}
+	return fmt.Sprintf(" — test target: `pytest %s`", search.SafePath(rel))
+}
+
+func tsSiblingTestTarget(cwd, diskPath, pkgDir, ext string, editSymbols []string) string {
+	base := filepath.Base(diskPath)
+	if strings.Contains(base, ".test.") || strings.Contains(base, ".spec.") {
+		return ""
+	}
+	root := repoOrWorkDir(cwd, pkgDir)
+	stem := strings.TrimSuffix(base, ext)
+	candidates := []string{
+		stem + ".test" + ext,
+		stem + ".spec" + ext,
+		stem + ".test.ts",
+		stem + ".test.tsx",
+		stem + ".test.js",
+		stem + ".test.jsx",
+	}
+	for _, cand := range candidates {
+		candPath := filepath.Join(pkgDir, cand)
+		raw, err := os.ReadFile(candPath)
+		if err != nil || len(raw) > 512<<10 {
+			continue
+		}
+		rel := cand
+		if r, err := filepath.Rel(root, candPath); err == nil && !strings.HasPrefix(r, "..") {
+			rel = filepath.ToSlash(r)
+		}
+		return tsSiblingTestCmd(rel, string(raw), editSymbols)
+	}
+	entries, err := os.ReadDir(pkgDir)
+	if err != nil {
+		return ""
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if !strings.Contains(name, ".test.") && !strings.Contains(name, ".spec.") {
+			continue
+		}
+		candPath := filepath.Join(pkgDir, name)
+		raw, err := os.ReadFile(candPath)
+		if err != nil || len(raw) > 512<<10 {
+			continue
+		}
+		content := string(raw)
+		if !mentionsAnySymbolLen(editSymbols, content, 3) {
+			continue
+		}
+		rel := name
+		if r, err := filepath.Rel(root, candPath); err == nil && !strings.HasPrefix(r, "..") {
+			rel = filepath.ToSlash(r)
+		}
+		return tsSiblingTestCmd(rel, content, editSymbols)
+	}
+	return ""
+}
+
+func tsSiblingTestCmd(rel, content string, editSymbols []string) string {
+	matchedName := ""
+	curTest := ""
+	for line := range strings.SplitSeq(content, "\n") {
+		trimmed := strings.TrimSpace(line)
+		for _, prefix := range []string{"it(", "test(", "it.only(", "it.skip(", "test.only(", "test.skip("} {
+			if rest, ok := strings.CutPrefix(trimmed, prefix); ok {
+				if len(rest) > 0 && (rest[0] == '"' || rest[0] == '\'' || rest[0] == '`') {
+					quote := rest[0]
+					rest = rest[1:]
+					if end := strings.IndexByte(rest, quote); end >= 0 {
+						curTest = rest[:end]
+					}
+				}
+				break
+			}
+		}
+		if curTest != "" && symbolInLine(trimmed, editSymbols) {
+			matchedName = curTest
+			break
+		}
+	}
+	if matchedName != "" {
+		return fmt.Sprintf(" — test target: `npx vitest run %s -t '%s'`", search.SafePath(rel), search.SafeLine(matchedName))
+	}
+	return fmt.Sprintf(" — test target: `npx vitest run %s`", search.SafePath(rel))
+}
+
+func rustSiblingTestTarget(_, diskPath, pkgDir string, editSymbols []string) string {
+	base := filepath.Base(diskPath)
+	if strings.HasSuffix(base, "_test.rs") {
+		return ""
+	}
+	stem := strings.TrimSuffix(base, ".rs")
+	stemTest := filepath.Join(pkgDir, stem+"_test.rs")
+	paths := []string{diskPath}
+	if _, err := os.Stat(stemTest); err == nil {
+		paths = append(paths, stemTest)
+	}
+	for _, p := range paths {
+		raw, err := os.ReadFile(p)
+		if err != nil || len(raw) > 512<<10 {
+			continue
+		}
+		content := string(raw)
+		inTest := false
+		curFn := ""
+		for line := range strings.SplitSeq(content, "\n") {
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "#[test]") {
+				inTest = true
+				curFn = ""
+				continue
+			}
+			if inTest && curFn == "" {
+				for _, fnPrefix := range []string{"fn ", "pub fn ", "pub(crate) fn ", "async fn "} {
+					if rest, ok := strings.CutPrefix(trimmed, fnPrefix); ok {
+						curFn = leadingIdent(rest)
+						break
+					}
+				}
+				if curFn != "" {
+					continue
+				}
+			}
+			if inTest && curFn != "" {
+				if symbolInLine(trimmed, editSymbols) {
+					return fmt.Sprintf(" — test target: `cargo test %s`", search.SafeLine(curFn))
+				}
+				if strings.HasPrefix(trimmed, "#[test]") || (strings.HasPrefix(trimmed, "fn ") && curFn != "") {
+					inTest = strings.HasPrefix(trimmed, "#[test]")
+					curFn = ""
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func repoOrWorkDir(cwd, pkgDir string) string {
+	root := sources.RepoRoot(pkgDir)
+	if root == "" && cwd != "" {
+		root = sources.RepoRoot(cwd)
+	}
+	if root == "" {
+		return pkgDir
+	}
+	return root
+}
+
+func mentionsAnySymbolLen(symbols []string, text string, minLen int) bool {
+	if len(symbols) == 0 || text == "" {
+		return false
+	}
+	low := strings.ToLower(text)
+	for _, sym := range symbols {
+		w := strings.ToLower(strings.TrimSpace(sym))
+		if len(w) < minLen {
+			continue
+		}
+		if containsIdentifierWord(low, w) {
+			return true
+		}
+	}
+	return false
+}
+
+func symbolInLine(line string, symbols []string) bool {
+	return mentionsAnySymbolLen(symbols, line, 3)
 }

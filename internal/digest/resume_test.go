@@ -116,3 +116,35 @@ func TestHandoverSkipsContinuationNudgesAndClipsChainedCommands(t *testing.T) {
 		t.Errorf("MessageText kept markdown table rows: %q", got)
 	}
 }
+
+func TestResumeTrajectorySynthesisAndEntityAwareAsks(t *testing.T) {
+	s := model.Session{
+		Harness: "claude", ID: "s-traj",
+		Messages: []model.Message{
+			// Short ask (< 20 runes) that names a concrete code file: must be kept as Asked.
+			{Role: "user", Text: "почини `auth.go`"},
+			// Mid-turn assistant preamble before exploration tool call (no word from aboutToExplain,
+			// but structurally followed by RoleFiles before any edit): must NOT become Decision.
+			{Role: "assistant", Text: "В итоге посмотрим содержимое пакета авторизации."},
+			{Role: sources.RoleFiles, Text: "internal/auth/auth.go"},
+			{Role: sources.RoleEdit, Text: "internal/auth/auth.go"},
+			{Role: sources.RoleCommand, Text: "go test ./internal/auth/... → exit 0"},
+			// Turn-final assistant synthesis after Edit + passing command, naming code entities
+			// without using any cliché phrase from decisionMarkers: must become Decision.
+			{Role: "assistant", Text: "Заменил `\\b` в `verifyTokenRE` на `(?:$|[^\\p{L}])` для корректной границы кириллических токенов."},
+			// Multilingual compositional continuation nudges: must NOT overwrite Asked.
+			{Role: "user", Text: "супер, погнали дальше"},
+			{Role: "user", Text: "sounds good, keep going"},
+			{Role: "user", Text: "太好了，继续往下走"},
+			{Role: "user", Text: "いいね、そのまま進めて"},
+		},
+	}
+	r := ResumeFrom(s, nil)
+	if r.Asked != "почини `auth.go`" {
+		t.Errorf("Asked = %q, want %q", r.Asked, "почини `auth.go`")
+	}
+	wantDec := "Заменил `\\b` в `verifyTokenRE` на `(?:$|[^\\p{L}])` для корректной границы кириллических токенов."
+	if r.Decision != wantDec {
+		t.Errorf("Decision = %q, want %q", r.Decision, wantDec)
+	}
+}

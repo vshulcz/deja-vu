@@ -2,6 +2,7 @@ package index
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"sort"
 	"strings"
@@ -19,39 +20,46 @@ func referenceCooccur(ss []model.Session) map[string][]string {
 		return nil
 	}
 	df := map[string]int{}
-	perSession := make([][]string, 0, len(ss))
+	perSession := make([][]tokMask, 0, len(ss))
 	for _, s := range ss {
-		seen := map[string]bool{}
-		for _, m := range s.Messages {
+		seen := map[string]int{}
+		var list []tokMask
+		nMsgs := len(s.Messages)
+		for mIdx, m := range s.Messages {
+			bit := turnWindowBit(mIdx, nMsgs)
 			for _, tok := range tokens(m.Text) {
-				if len(tok) < 4 || query.IsStopWord(tok) || seen[tok] {
+				if len(tok) < 4 || query.IsStopWord(tok) {
 					continue
 				}
-				seen[tok] = true
+				if idx, ok := seen[tok]; ok {
+					list[idx].mask |= bit
+					continue
+				}
+				seen[tok] = len(list)
+				list = append(list, tokMask{tok: tok, mask: bit})
 			}
 		}
-		list := make([]string, 0, len(seen))
-		for t := range seen {
-			list = append(list, t)
-			df[t]++
+		for _, tm := range list {
+			df[tm.tok]++
 		}
 		perSession = append(perSession, list)
 	}
 	maxDF := max(len(ss)/4, 8)
 	type pair struct{ a, b string }
-	pairs := map[pair]int{}
+	type pairCounts struct{ c, turnC int }
+	pairs := map[pair]pairCounts{}
 	for _, list := range perSession {
-		var kept []string
-		for _, t := range list {
-			if df[t] >= cooccurMinDF && df[t] <= maxDF {
-				kept = append(kept, t)
+		var kept []tokMask
+		for _, tm := range list {
+			if df[tm.tok] >= cooccurMinDF && df[tm.tok] <= maxDF {
+				kept = append(kept, tm)
 			}
 		}
 		sort.Slice(kept, func(i, j int) bool {
-			if df[kept[i]] == df[kept[j]] {
-				return kept[i] < kept[j]
+			if df[kept[i].tok] == df[kept[j].tok] {
+				return kept[i].tok < kept[j].tok
 			}
-			return df[kept[i]] < df[kept[j]]
+			return df[kept[i].tok] < df[kept[j].tok]
 		})
 		if len(kept) > cooccurTokensPerSn {
 			kept = kept[:cooccurTokensPerSn]
@@ -59,32 +67,49 @@ func referenceCooccur(ss []model.Session) map[string][]string {
 		for i := range kept {
 			for j := i + 1; j < len(kept); j++ {
 				a, b := kept[i], kept[j]
-				if a > b {
+				if a.tok > b.tok {
 					a, b = b, a
 				}
-				pairs[pair{a, b}]++
+				pc := pairs[pair{a.tok, b.tok}]
+				pc.c++
+				if (a.mask & (b.mask | (b.mask << 1) | (b.mask >> 1))) != 0 {
+					pc.turnC++
+				}
+				pairs[pair{a.tok, b.tok}] = pc
 			}
 		}
 	}
 	type nc struct {
-		t string
-		c int
+		t     string
+		score float64
+		c     int
 	}
 	cand := map[string][]nc{}
-	for p, c := range pairs {
-		if c < cooccurMinPair {
+	totalDocs := float64(len(ss))
+	for p, pc := range pairs {
+		if pc.c < cooccurMinPair {
 			continue
 		}
-		cand[p.a] = append(cand[p.a], nc{p.b, c})
-		cand[p.b] = append(cand[p.b], nc{p.a, c})
+		npmi := pairNPMI(totalDocs, df[p.a], df[p.b], pc.c)
+		if len(ss) >= 10 && npmi <= cooccurMinNPMI {
+			continue
+		}
+		turnRatio := float64(pc.turnC) / float64(pc.c)
+		support := float64(pc.c) / float64(pc.c+cooccurMinPair)
+		baseScore := (npmi + cooccurTurnWeight*turnRatio) * support
+		cand[p.a] = append(cand[p.a], nc{t: p.b, score: baseScore * float64(pc.c) / float64(df[p.a]), c: pc.c})
+		cand[p.b] = append(cand[p.b], nc{t: p.a, score: baseScore * float64(pc.c) / float64(df[p.b]), c: pc.c})
 	}
 	out := map[string][]string{}
 	for tok, list := range cand {
 		sort.Slice(list, func(i, j int) bool {
-			if list[i].c == list[j].c {
-				return list[i].t < list[j].t
+			if math.Abs(list[i].score-list[j].score) > 1e-9 {
+				return list[i].score > list[j].score
 			}
-			return list[i].c > list[j].c
+			if list[i].c != list[j].c {
+				return list[i].c > list[j].c
+			}
+			return list[i].t < list[j].t
 		})
 		if len(list) > cooccurNeighbors {
 			list = list[:cooccurNeighbors]

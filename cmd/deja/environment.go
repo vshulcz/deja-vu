@@ -339,7 +339,35 @@ func environmentRemedy(dir, wall string, activation string) string {
 	if cmd == "" || len(cmd) > environmentMax {
 		return ""
 	}
+	_, missingProg := missingProgramFromWall(wall)
+	if !fixes[0].Repaired && !fixes[0].Substitute && (isLowSignalEnvironmentWall(wall) || missingProg) && !sharesEnvironmentTerm(wall, cmd) {
+		return ""
+	}
 	return safeForStatusline(cmd, environmentMax)
+}
+
+func sharesEnvironmentTerm(wall, cmd string) bool {
+	if prog, ok := missingProgramFromWall(wall); ok && prog != "" {
+		return strings.Contains(strings.ToLower(cmd), strings.ToLower(prog))
+	}
+	lowCmd := strings.ToLower(cmd)
+	for tok := range strings.FieldsSeq(strings.ToLower(wall)) {
+		tok = strings.Trim(tok, "\"'`(),:;!?[]{}<>=")
+		if len(tok) < 4 {
+			continue
+		}
+		switch tok {
+		case "error", "failed", "fatal", "warning", "indexerror", "typeerror",
+			"valueerror", "keyerror", "runtimeerror", "list", "index", "range",
+			"line", "file", "most", "recent", "call", "last", "command", "found",
+			"exit", "status", "code", "cannot", "could", "with", "from", "that", "this":
+			continue
+		}
+		if strings.Contains(lowCmd, tok) {
+			return true
+		}
+	}
+	return false
 }
 
 // environmentWrapperNote is the remedy for a missing program, worded rather than

@@ -676,7 +676,7 @@ func safe(s string) string {
 //
 // Capping the contribution keeps both. Measured on a real store, a cap of 25
 // reproduces what treating each 200-message episode as a document gives —
-// pgbouncer 3.40 against 3.37, singbox 4.17 against 4.70 — while working words
+// pgbouncer 3.40 against 3.37, envoyproxy 4.17 against 4.70 — while working words
 // stay near 2: branch 2.18, suite 2.53, windows 2.15. The separation lands on
 // the strong floor that was already there.
 const dfMessageCap = 25

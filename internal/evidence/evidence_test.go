@@ -32,6 +32,25 @@ func TestReceiptIsTheCommandTheAnswerRestsOn(t *testing.T) {
 	}
 }
 
+func TestReceiptBacksMultilingualConclusionWithSingleCodeEntity(t *testing.T) {
+	for _, ans := range []string{
+		"Поправил лимит ретраев в `internal/quicksilver/retry.go`, тесты зелёные.",
+		"修复了 `internal/quicksilver/retry.go` 中的重试上限。",
+		"`internal/quicksilver/retry.go` のリトライ上限を修正しました。",
+	} {
+		s := session(
+			model.Message{Role: "user", Text: "проверь ретраи"},
+			model.Message{Role: "edit", Text: "internal/quicksilver/retry.go\nmaxRetries = 4"},
+			model.Message{Role: "assistant", Text: ans},
+		)
+		r := Receipts(s, nil)
+		got := r[Key("claude", "s1", ans)]
+		if !strings.Contains(got, "internal/quicksilver/retry.go") {
+			t.Fatalf("for %q, got receipt %q, want Edit internal/quicksilver/retry.go", ans, got)
+		}
+	}
+}
+
 func TestAQuestionBacksNothing(t *testing.T) {
 	answer := "Use payments_backoff of 250ms doubling to 4s"
 	s := session(

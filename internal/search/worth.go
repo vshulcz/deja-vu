@@ -153,10 +153,10 @@ func HasIdentifierTerm(terms []string) bool {
 		if isOpaqueID(t) {
 			continue
 		}
-		// Letters, not bytes. Counting bytes read "omoda" as filler and every
+		// Letters, not bytes. Counting bytes read "kafka" as filler and every
 		// Cyrillic word of three letters as a term of art, because Cyrillic
 		// takes two bytes a letter. Measured on a real store: "напомни, что мы
-		// уже выясняли про can шину на omoda" reduces to one term, three
+		// уже выясняли про офсеты в kafka" reduces to one term, three
 		// sessions hold it, and nothing was recalled.
 		//
 		// Russian carries its meaning in shorter words — "сеть", "порт" name

@@ -322,6 +322,9 @@ func evidenceRewrite(s model.Session, dir string, lines []string, assumeModel bo
 		switch {
 		case len(r.backed) > 0:
 			for _, b := range r.backed {
+				if isBoilerplateToolOutput(b) {
+					continue
+				}
 				add(b)
 			}
 			// Backed by the person's words alone, the record says nothing the
@@ -340,6 +343,31 @@ func evidenceRewrite(s model.Session, dir string, lines []string, assumeModel bo
 		}
 	}
 	return markUserRules(s, out)
+}
+
+func isBoilerplateToolOutput(line string) bool {
+	rest, ok := strings.CutPrefix(strings.TrimSpace(line), "Output: ")
+	if !ok {
+		return false
+	}
+	rest = strings.TrimSpace(rest)
+	if strings.HasPrefix(rest, "[") && strings.Contains(rest, " | ") && strings.Contains(rest, "ms") {
+		return true
+	}
+	for _, pfx := range []string{
+		"Showing lines ",
+		"Created file.",
+		"Made 1 replacement in ",
+		"Made ",
+	} {
+		if strings.HasPrefix(rest, pfx) {
+			if pfx == "Made " && !strings.Contains(rest, " replacement") {
+				continue
+			}
+			return true
+		}
+	}
+	return false
 }
 
 // contextBodyMaxMessages bounds the session printed record by record. The

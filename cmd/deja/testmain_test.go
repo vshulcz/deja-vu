@@ -58,6 +58,8 @@ func TestMain(m *testing.M) {
 		// Set by CodeWhale on the hooks it runs; a suite run from inside a
 		// CodeWhale session would hand them to hook-codewhale.
 		"DEEPSEEK_SESSION_ID":   "",
+		"SESSION_ID":            "",
+		"DEJA_SESSION_ID":       "",
 		"DEEPSEEK_TOOL_NAME":    "",
 		"DEEPSEEK_TOOL_ARGS":    "",
 		"DEEPSEEK_WORKSPACE":    "",

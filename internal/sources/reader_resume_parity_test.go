@@ -526,7 +526,7 @@ func TestOpenClawFailedApplyPatchAcrossAResumeKeepsNoEdit(t *testing.T) {
 
 func TestAntigravityIncrementalResumeParity(t *testing.T) {
 	home := readerEnv(t)
-	path := filepath.Join(home, ".gemini", "antigravity-cli", "brain", "0930ac06-37af-4c13-8cd9-6ff0db93da97", ".system_generated", "logs", "transcript.jsonl")
+	path := filepath.Join(home, ".gemini", "antigravity-cli", "brain", "00000000-1111-2222-3333-444444444444", ".system_generated", "logs", "transcript.jsonl")
 	lines := []string{
 		`{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-10-01T10:00:00Z","content":"<USER_REQUEST>\ninspect and update retry.go\n</USER_REQUEST>"}`,
 		`{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-10-01T10:00:05Z","thinking":"let us check retry.go","content":"Reading and updating retry.go.","tool_calls":[{"id":"c1","name":"view_file","args":{"AbsolutePath":"/workspace/app/retry.go"}},{"id":"c2","name":"write_to_file","args":{"TargetFile":"/workspace/app/new.go","CodeContent":"package app\nfunc New() {}\n"}},{"id":"c3","name":"run_command","args":{"CommandLine":"go test ./...","Cwd":"/workspace/app"}}]}`,
@@ -572,10 +572,10 @@ func TestAntigravityIncrementalResumeParity(t *testing.T) {
 
 func TestCursorTranscriptIncrementalResumeParity(t *testing.T) {
 	home := readerEnv(t)
-	path := filepath.Join(home, ".cursor", "projects", "Users-shulcz-workspace-app", "agent-transcripts", "cur-123.jsonl")
+	path := filepath.Join(home, ".cursor", "projects", "Users-alex-workspace-app", "agent-transcripts", "cur-123.jsonl")
 	lines := []string{
 		`{"role":"user","message":{"content":[{"type":"text","text":"<timestamp>2026-10-01T12:00:00Z</timestamp>\nfix bug in main.go"}]}}`,
-		`{"role":"assistant","message":{"content":[{"type":"text","text":"Checking main.go now."},{"type":"tool_use","name":"Read","input":{"path":"/Users/shulcz/workspace/app/main.go"}}]}}`,
+		`{"role":"assistant","message":{"content":[{"type":"text","text":"Checking main.go now."},{"type":"tool_use","name":"Read","input":{"path":"/Users/alex/workspace/app/main.go"}}]}}`,
 		`{"role":"user","message":{"content":[{"type":"text","text":"thanks, now add a unit test"}]}}`,
 		`{"role":"assistant","message":{"content":[{"type":"text","text":"Added unit test in main_test.go."}]}}`,
 	}

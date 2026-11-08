@@ -27,7 +27,7 @@ const (
 	// antigravityTranscriptTail bounds the read. This runs before every model
 	// call, and the newest turn is at the end of the file — a conversation's
 	// transcript grows all day and no part of this needs its beginning.
-	antigravityTranscriptTail = 128 << 10
+	antigravityTranscriptTail = 512 << 10
 	userRequestOpen           = "<USER_REQUEST>"
 	userRequestClose          = "</USER_REQUEST>"
 )

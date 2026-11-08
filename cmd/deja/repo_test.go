@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +13,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -362,7 +365,7 @@ func TestRepoRemoveAndFreshCloneSurfaces(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(orientOut, "committed in .deja/memory.jsonl:") || !strings.Contains(orientOut, "X-Signature") {
+	if !strings.Contains(orientOut, ".deja/memory.jsonl") || !strings.Contains(orientOut, "X-Signature") {
 		t.Errorf("orient on fresh clone = %q", orientOut)
 	}
 
@@ -563,5 +566,502 @@ func TestRepoCandidateTrimAndMentionedFileAttribution(t *testing.T) {
 	left, _, err := sources.ReadRepoMemory(sources.RepoMemoryPath(root))
 	if err != nil || len(left) != 1 || left[0].ID != "2222222222" {
 		t.Fatalf("remaining entries = %+v, err = %v", left, err)
+	}
+}
+
+func TestHookPrecisionAndGuardrails(t *testing.T) {
+	base := repoStandBase(t)
+	_ = repoPerson(t, base, "grace")
+	root := filepath.Join(base, "grace", "svc")
+	repoGit(t, base, "init", "-q", root)
+	guardedFile := filepath.Join(root, "internal", "auth", "token.go")
+	plainFile := filepath.Join(root, "internal", "auth", "plain.go")
+	if err := os.MkdirAll(filepath.Dir(guardedFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(guardedFile, []byte("package auth\nfunc VerifyToken() {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(plainFile, []byte("package auth\nfunc PlainHelper() {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	repoGit(t, root, "add", "internal/auth/token.go", "internal/auth/plain.go")
+	repoGit(t, root, "commit", "-qm", "add auth files")
+
+	_, err := sources.AddRepoEntries(root, []sources.RepoEntry{
+		{
+			ID:    "aaaa111122",
+			Kind:  "rejected",
+			Text:  "Never cache raw JWT strings in memory inside internal/auth/token.go; hash with SHA-256 first.",
+			Files: []string{"internal/auth/token.go"},
+			From:  "deja 2026-11-08",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dir := filepath.Join(base, "index.db")
+	// 1. PreToolUse Read on guarded file emits the .deja/memory.jsonl guardrail;
+	// PreToolUse Read on plain file stays silent.
+	inGuarded := toolHookInput{HookEventName: "PreToolUse", ToolName: "Read", CWD: root}
+	inGuarded.ToolInput.FilePath = guardedFile
+	readGuarded := fileReadGuardLine(dir, root, inGuarded)
+	if !strings.Contains(readGuarded, "in .deja/memory.jsonl:") || !strings.Contains(readGuarded, "Never cache raw JWT strings") {
+		t.Fatalf("PreToolUse Read on guarded file = %q, want .deja/memory.jsonl guardrail", readGuarded)
+	}
+	inPlain := toolHookInput{HookEventName: "PreToolUse", ToolName: "Read", CWD: root}
+	inPlain.ToolInput.FilePath = plainFile
+	readPlain := fileReadGuardLine(dir, root, inPlain)
+	if readPlain != "" {
+		t.Fatalf("PreToolUse Read on unguarded file = %q, want empty", readPlain)
+	}
+
+	// 2. PostToolUse failure citing a guarded file in compiler/test output surfaces its .deja/memory.jsonl rule.
+	failDiag := fixPairLineFor(dir, root, "go test ./internal/auth/...", "--- FAIL: TestVerify (0.01s)\n    token.go:42: raw token cached")
+	if !strings.Contains(failDiag, "in .deja/memory.jsonl (internal/auth/token.go): [rejected]") {
+		t.Fatalf("fixPairLineFor on guarded file failure = %q, want .deja/memory.jsonl diagnostic", failDiag)
+	}
+
+	// 3. sharesEnvironmentTerm filters unrelated error/remedy pairs and keeps matching ones.
+	if sharesEnvironmentTerm("IndexError: list index out of range", "gh api repos/acme/widget/commits") {
+		t.Error("sharesEnvironmentTerm accepted unrelated IndexError -> gh api pair")
+	}
+	if !sharesEnvironmentTerm("zsh:1: command not found: golangci-lint", "/Users/alex/go/bin/golangci-lint run") {
+		t.Error("sharesEnvironmentTerm rejected matching missing-program remedy")
+	}
+
+	// 4. orientSkipFixError and orientDestructiveRemedy filter branch-protection push errors and git push remedies.
+	if !orientSkipFixError("error: failed to push some refs to 'https://github.com/org/repo.git'") {
+		t.Error("orientSkipFixError did not skip git push ref rejection")
+	}
+	if !orientDestructiveRemedy("git push -u origin feat/test") {
+		t.Error("orientDestructiveRemedy did not filter git push remedy")
+	}
+
+	// 5. search.SafeLine strips Braille spinner characters without touching normal text.
+	if got := search.SafeLine("Output: ⣾ ⣽ ⣻ ⢿ ⡿ ⣟ ⣯ ⣷ build passed"); got != "Output: build passed" {
+		t.Fatalf("SafeLine spinner strip = %q, want %q", got, "Output: build passed")
+	}
+
+	// 6. Live cross-file caller guard & zero-history sibling test target resolution.
+	callerFile := filepath.Join(root, "cmd", "server", "handler.go")
+	err = os.MkdirAll(filepath.Dir(callerFile), 0o755)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.WriteFile(callerFile, []byte("package server\nimport \"svc/internal/auth\"\nfunc Handle() { auth.PlainHelper() }\n"), 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testFile := filepath.Join(root, "internal", "auth", "plain_test.go")
+	err = os.WriteFile(testFile, []byte("package auth\nimport \"testing\"\nfunc TestPlainHelperFlow(t *testing.T) {\n\tPlainHelper()\n}\n"), 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	editLine := fileHookLineOutsideWithEdit(dir, root, plainFile, "func PlainHelper(strict bool) error {\n\treturn nil\n}", nil)
+	if !strings.Contains(editLine, "callers of PlainHelper: cmd/server/handler.go:3") {
+		t.Fatalf("zero-history signature edit line = %q, want caller cmd/server/handler.go:3", editLine)
+	}
+	if !strings.Contains(editLine, "test target: `go test ./internal/auth -run '^TestPlainHelperFlow$'`") {
+		t.Fatalf("zero-history signature edit line = %q, want sibling test target", editLine)
+	}
+
+	// 7. repoMemoryBlock counts runes rather than UTF-8 bytes so non-ASCII entries do not starve the block.
+	_, err = sources.AddRepoEntries(root, []sources.RepoEntry{
+		{
+			ID:   "bbbb222233",
+			Kind: "decision",
+			Text: "Первое архитектурное правило проекта на русском языке, которое раньше занимало слишком много байт в UTF-8 и вытесняло остальные записи.",
+			From: "deja 2026-11-08",
+		},
+		{
+			ID:   "cccc333344",
+			Kind: "gotcha",
+			Text: "Второе важное правило проекта на русском языке, которое обязательно должно помещаться в стартовый блок памяти репозитория.",
+			From: "deja 2026-11-08",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	block := repoMemoryBlock(root, policy.Load())
+	if strings.Count(block, "  · [") != 3 || !strings.Contains(block, "Первое архитектурное правило") || !strings.Contains(block, "Второе важное правило") {
+		t.Fatalf("repoMemoryBlock with Cyrillic entries = %q, want all 3 rows shown", block)
+	}
+
+	// 8. Turn-0 Symbol Brief on UserPromptSubmit when prompt names a repo symbol without file path.
+	symBrief := promptDirectContext(dir, root, "sess-sym-1", "почему падает функция PlainHelper при вызове?")
+	if !strings.Contains(symBrief, "defined in internal/auth/plain.go:2: func PlainHelper()") || !strings.Contains(symBrief, "test target: `go test ./internal/auth -run '^TestPlainHelperFlow$'`") {
+		t.Fatalf("promptDirectContext symbol brief = %q, want file:line + signature + test target", symBrief)
+	}
+
+	// 9. PostToolUse compiler error resolves live symbol signature from repo.
+	compDiag := fixPairLineFor(dir, root, "go build ./...", "cmd/server/handler.go:3:18: too many arguments in call to auth.PlainHelper\n\thave (bool)\n\twant ()")
+	if !strings.Contains(compDiag, "symbol signature in repo — internal/auth/plain.go:2: func PlainHelper()") {
+		t.Fatalf("fixPairLineFor compiler signature diagnostic = %q, want live repo signature", compDiag)
+	}
+
+	// 10. Broken Test Assertion Predictor on PreToolUse Edit & Instant Failing Test Source Line on PostToolUse.
+	err = os.WriteFile(testFile, []byte("package auth\nimport \"testing\"\nfunc TestPlainHelperFlow(t *testing.T) {\n\tPlainHelper()\n\tif got := \"auth-v1-header\"; got != \"auth-v1-header\" {\n\t\tt.Fatal(got)\n\t}\n}\n"), 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertWarn := testAssertionLiteralLine(root, plainFile, "const header = \"auth-v1-header\"", "const header = \"auth-v2-header\"")
+	if !strings.Contains(assertWarn, "test assertion in plain_test.go:5 (TestPlainHelperFlow) checks \"auth-v1-header\"") {
+		t.Fatalf("testAssertionLiteralLine = %q, want plain_test.go:5 assertion warning", assertWarn)
+	}
+	failSnippet := fixPairLineFor(dir, root, "go test ./internal/auth/...", "--- FAIL: TestPlainHelperFlow (0.01s)\n    plain_test.go:4: unexpected result\nFAIL")
+	if !strings.Contains(failSnippet, "failing test line — internal/auth/plain_test.go:4 (TestPlainHelperFlow): PlainHelper()") {
+		t.Fatalf("failingTestSourceLine = %q, want plain_test.go:4 source line", failSnippet)
+	}
+
+	// 11. Polyglot Zero-History Test Target Filter on Python and TS/JS.
+	pyFile := filepath.Join(root, "internal", "auth", "login.py")
+	pyTestFile := filepath.Join(root, "internal", "auth", "test_login.py")
+	if werr := os.WriteFile(pyFile, []byte("def login_user():\n    pass\n"), 0o644); werr != nil {
+		t.Fatal(werr)
+	}
+	if werr := os.WriteFile(pyTestFile, []byte("def test_login_flow():\n    login_user()\n"), 0o644); werr != nil {
+		t.Fatal(werr)
+	}
+	pyLine := siblingTestLineFor(root, pyFile, []string{"login_user"})
+	if !strings.Contains(pyLine, "pytest internal/auth/test_login.py -k 'test_login_flow'") {
+		t.Fatalf("siblingTestLineFor python = %q, want pytest -k filter", pyLine)
+	}
+
+	tsFile := filepath.Join(root, "internal", "auth", "client.ts")
+	tsTestFile := filepath.Join(root, "internal", "auth", "client.test.ts")
+	if werr := os.WriteFile(tsFile, []byte("export function callClient() {}\n"), 0o644); werr != nil {
+		t.Fatal(werr)
+	}
+	if werr := os.WriteFile(tsTestFile, []byte("it('handles client flow', () => {\n  callClient()\n})\n"), 0o644); werr != nil {
+		t.Fatal(werr)
+	}
+	tsLine := siblingTestLineFor(root, tsFile, []string{"callClient"})
+	if !strings.Contains(tsLine, "npx vitest run internal/auth/client.test.ts -t 'handles client flow'") {
+		t.Fatalf("siblingTestLineFor ts = %q, want npx vitest run -t filter", tsLine)
+	}
+
+	// 12. Polyglot Broken Test Assertion Predictor on Python.
+	pyFoo := filepath.Join(root, "internal", "auth", "foo.py")
+	pyFooTest := filepath.Join(root, "internal", "auth", "test_foo.py")
+	if werr := os.WriteFile(pyFooTest, []byte("def test_foo():\n    assert token == \"secret-token-v1\"\n"), 0o644); werr != nil {
+		t.Fatal(werr)
+	}
+	assertPy := testAssertionLiteralLine(root, pyFoo, "token = \"secret-token-v1\"", "token = \"secret-token-v2\"")
+	if !strings.Contains(assertPy, "test assertion in test_foo.py:2 (test_foo) checks \"secret-token-v1\"") {
+		t.Fatalf("testAssertionLiteralLine python = %q, want test_foo.py:2 assertion warning", assertPy)
+	}
+
+	// 13. Polyglot Instant Failing Test Source Line on pytest and vitest.
+	pyFailSnippet := failingTestSourceLine(root, "FAILED internal/auth/test_login.py:2: in test_login_flow\nAssertionError\nFAIL", policy.Load())
+	if !strings.Contains(pyFailSnippet, "failing test line — internal/auth/test_login.py:2 (test_login_flow): login_user()") {
+		t.Fatalf("failingTestSourceLine pytest = %q, want test_login.py:2 source line", pyFailSnippet)
+	}
+	tsFailSnippet := failingTestSourceLine(root, "FAIL internal/auth/client.test.ts > handles client flow\n ❯ internal/auth/client.test.ts:2:3\n AssertionError", policy.Load())
+	if !strings.Contains(tsFailSnippet, "failing test line — internal/auth/client.test.ts:2 (handles client flow): callClient()") {
+		t.Fatalf("failingTestSourceLine vitest = %q, want client.test.ts:2 source line", tsFailSnippet)
+	}
+
+	// 14. Coupled-File git commit Guardrail.
+	_, err = sources.AddRepoEntries(root, []sources.RepoEntry{
+		{
+			ID:    "coupled-install-auto",
+			Kind:  "gotcha",
+			Text:  "Editing install_auto.go requires updating extensions/opencode/index.js alongside it",
+			Files: []string{"cmd/deja/install_auto.go", "extensions/opencode/index.js"},
+			From:  "deja 2026-11-08",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	guardWarn := coupledCommitGuardForFiles(root, []string{"cmd/deja/install_auto.go"})
+	if !strings.Contains(guardWarn, "commit touches cmd/deja/install_auto.go without coupled extensions/opencode/index.js") ||
+		!strings.Contains(guardWarn, "in .deja/memory.jsonl: [gotcha]") {
+		t.Fatalf("coupledCommitGuardForFiles = %q, want commit touches guard warning", guardWarn)
+	}
+	if okWarn := coupledCommitGuardForFiles(root, []string{"cmd/deja/install_auto.go", "extensions/opencode/index.js"}); okWarn != "" {
+		t.Fatalf("coupledCommitGuardForFiles with both coupled files = %q, want empty", okWarn)
+	}
+	if !orientSkipFixError("grep -n \"func orient\" cmd/deja/*.go") {
+		t.Error("orientSkipFixError did not skip grep exit-1 search command")
+	}
+	if isOrientActionableCorrection("The following is a <SYSTEM_MESSAGE> not actually sent by the user.") {
+		t.Error("isOrientActionableCorrection accepted <SYSTEM_MESSAGE> wrapper")
+	}
+
+	// 15. Multi-harness edit dialects (MultiEdit, Target/Replacement, oldText/newText, full-file Write).
+	var inpMulti toolHookInput
+	multiJSON := `{"tool_name":"MultiEdit","tool_input":{"file_path":"cmd/server/handler.go","edits":[{"old_string":"foo","new_string":"bar"},{"target":"alpha","replacement":"beta"}]}}`
+	err = json.Unmarshal([]byte(multiJSON), &inpMulti)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inpMulti.adopt()
+	if inpMulti.ToolInput.OldString != "foo\nalpha" || inpMulti.ToolInput.NewString != "bar\nbeta" {
+		t.Fatalf("MultiEdit adopt: got old=%q, new=%q", inpMulti.ToolInput.OldString, inpMulti.ToolInput.NewString)
+	}
+
+	var inpTarget toolHookInput
+	targetJSON := `{"tool_name":"edit_file","tool_input":{"Target":"auth-v1-header","Replacement":"auth-v2-header","path":"internal/auth/plain.go"}}`
+	err = json.Unmarshal([]byte(targetJSON), &inpTarget)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inpTarget.adopt()
+	if inpTarget.ToolInput.FilePath != "internal/auth/plain.go" || inpTarget.ToolInput.OldString != "auth-v1-header" || inpTarget.ToolInput.NewString != "auth-v2-header" {
+		t.Fatalf("Target/Replacement adopt: got path=%q old=%q new=%q", inpTarget.ToolInput.FilePath, inpTarget.ToolInput.OldString, inpTarget.ToolInput.NewString)
+	}
+
+	var inpSnake toolHookInput
+	snakeJSON := `{"tool_name":"str_replace_editor","tool_input":{"oldText":"hello","newText":"world","path":"foo.go"}}`
+	err = json.Unmarshal([]byte(snakeJSON), &inpSnake)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inpSnake.adopt()
+	if inpSnake.ToolInput.OldString != "hello" || inpSnake.ToolInput.NewString != "world" {
+		t.Fatalf("oldText/newText adopt: got old=%q new=%q", inpSnake.ToolInput.OldString, inpSnake.ToolInput.NewString)
+	}
+
+	// Full-file Write on existing file on disk: triggers testAssertionLiteralLine and crossFileCallersLine.
+	err = os.WriteFile(plainFile, []byte("package auth\nconst header = \"auth-v1-header\"\nfunc PlainHelper() {}\n"), 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var inpWrite toolHookInput
+	writeJSON := fmt.Sprintf(`{"tool_name":"write_file","tool_input":{"path":%q,"content":"package auth\nfunc PlainHelper(flag bool) error {\n\treturn nil\n}\n"}}`, plainFile)
+	err = json.Unmarshal([]byte(writeJSON), &inpWrite)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inpWrite.adopt()
+	writeHookLine := fileLineFor(dir, root, inpWrite)
+	if !strings.Contains(writeHookLine, "callers of PlainHelper: cmd/server/handler.go:3") {
+		t.Fatalf("full-file write line = %q, want callers of PlainHelper", writeHookLine)
+	}
+	if !strings.Contains(writeHookLine, "test assertion in plain_test.go:5") {
+		t.Fatalf("full-file write line = %q, want broken test assertion warning", writeHookLine)
+	}
+
+	// 16. Universal Live Repo Intelligence Recall Brief for symbol query.
+	realCWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	realRepoRoot := filepath.Dir(filepath.Dir(realCWD))
+	liveBrief := liveRecallBrief(dir, realRepoRoot, "coupledCommitGuardLine")
+	if !strings.Contains(liveBrief, "live repo brief:") ||
+		!strings.Contains(liveBrief, "defined in cmd/deja/hook_tool.go:") ||
+		!strings.Contains(liveBrief, "func coupledCommitGuardLine") ||
+		!strings.Contains(liveBrief, "callers of coupledCommitGuardLine: cmd/deja/hook_tool.go:") ||
+		!strings.Contains(liveBrief, "test target: `go test ./cmd/deja -run '^TestHookPrecisionAndGuardrails$'`") {
+		t.Fatalf("liveRecallBrief = %q, want definition + caller + test target", liveBrief)
+	}
+
+	// 17. Anti-Hallucination Package Symbol Predictor.
+	searchDir := filepath.Join(root, "internal", "search")
+	if err := os.MkdirAll(searchDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(searchDir, "snippet_format.go"), []byte("package search\n\nfunc SafeLine(s string) string {\n\treturn s\n}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	repoGit(t, root, "add", "internal/search/snippet_format.go")
+	repoGit(t, root, "commit", "-qm", "add search")
+
+	hallucinatedEdit := fmt.Sprintf(`{"tool_name":"Edit","tool_input":{"file_path":%q,"old_string":"func VerifyToken() {}","new_string":"func VerifyToken() {\n\t_ = search.CleanLine(\"jwt\")\n}"}}`, guardedFile)
+	var inpHal toolHookInput
+	if err := json.Unmarshal([]byte(hallucinatedEdit), &inpHal); err != nil {
+		t.Fatal(err)
+	}
+	inpHal.adopt()
+	halLine := fileLineFor(dir, root, inpHal)
+	if !strings.Contains(halLine, "search has no exported CleanLine") ||
+		!strings.Contains(halLine, "closest match in internal/search/snippet_format.go:3: func SafeLine(s string) string") {
+		t.Fatalf("hallucinated symbol line = %q, want CleanLine -> SafeLine closest match warning", halLine)
+	}
+
+	// 18. Live Same-Session User Rule Pinning.
+	installAutoDir := filepath.Join(root, "cmd", "deja")
+	if err := os.MkdirAll(installAutoDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(installAutoDir, "install_auto.go"), []byte("package main\n\nfunc InstallAuto() {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	repoGit(t, root, "add", "cmd/deja/install_auto.go")
+	repoGit(t, root, "commit", "-qm", "add install_auto")
+
+	userPromptJSON := fmt.Sprintf(`{"hook_event_name":"UserPromptSubmit","prompt":"never use cp in install_auto.go, always use install -m 755","cwd":%q,"session_id":"live-pin-session"}`, root)
+	var promptOut bytes.Buffer
+	if err := runHookPrompt(dir, strings.NewReader(userPromptJSON), &promptOut); err != nil {
+		t.Fatal(err)
+	}
+	var inpLive toolHookInput
+	liveEditJSON := fmt.Sprintf(`{"tool_name":"Edit","tool_input":{"file_path":"cmd/deja/install_auto.go","old_string":"func InstallAuto() {}","new_string":"func InstallAuto() { /* edit */ }"},"cwd":%q,"session_id":"live-pin-session"}`, root)
+	if err := json.Unmarshal([]byte(liveEditJSON), &inpLive); err != nil {
+		t.Fatal(err)
+	}
+	inpLive.adopt()
+	liveRuleLine := fileLineFor(dir, root, inpLive)
+	if !strings.Contains(liveRuleLine, "in .deja/memory.jsonl: [rule] never use cp in install_auto.go, always use install -m 755") {
+		t.Fatalf("live rule line = %q, want pinned rule surfaced in fileLineFor", liveRuleLine)
+	}
+
+	// 19. Relational Turn-Pair Proposal -> Refusal & Anti-Nagging Session Rule (/compact scenario).
+	stepsCompact := []transcriptStep{
+		// Newest first, as transcriptTailSteps returns:
+		{
+			Type:    "USER_INPUT",
+			Content: "<USER_REQUEST>\nдавай доработаем все дыры, а компакт я делать не буду, он итак автоматический на 262к\n</USER_REQUEST>",
+		},
+		{
+			Type:    "PLANNER_RESPONSE",
+			Content: "Прожми здесь **`/compact`** — это сразу сбросит стоимость шага с `235k` до `~20k`.",
+		},
+	}
+	syncAntigravitySessionRules(dir, "", "compact-rule-test", stepsCompact)
+	for _, tc := range []struct {
+		lang   string
+		prompt string
+	}{
+		{"RU", "ну что? как идет экономия и эффективная трата лимитов?"},
+		{"EN", "how is token quota saving and context budget going?"},
+		{"ZH", "现在的额度节省和上下文优化效果怎么样？"},
+		{"JA", "トークン節約とコンテキスト圧縮の効果はどうですか？"},
+	} {
+		antiNagOut := promptDirectContext(dir, "", "compact-rule-test", tc.prompt)
+		if !strings.Contains(antiNagOut, "User standing rule (do not violate or re-suggest): Do not suggest /compact: компакт я делать не буду, он итак автоматический на 262к") {
+			t.Fatalf("[%s] antiNagOut = %q, want standing /compact refusal surfaced", tc.lang, antiNagOut)
+		}
+	}
+	if unrelated := promptDirectContext(dir, "", "compact-rule-test", "fix typo in README.md"); strings.Contains(unrelated, "Do not suggest /compact") {
+		t.Fatalf("unrelated prompt triggered /compact rule: %q", unrelated)
+	}
+
+	// 20. Co-Occurrence Context Vector across sessions: assistant proposes `--fast-flush`
+	// for `rocksdb` / `badger`, user refuses without repeating `rocksdb` or `badger`, and a
+	// later session in the same project asks about `rocksdb` durability.
+	stepsRocks := []transcriptStep{
+		{
+			Type:    "USER_INPUT",
+			Content: "<USER_REQUEST>\nНет, падает надежность при сбое питания\n</USER_REQUEST>",
+		},
+		{
+			Type:    "PLANNER_RESPONSE",
+			Content: "Включить `--fast-flush` для `rocksdb` в `badger` ради ускорения записи?",
+		},
+	}
+	syncAntigravitySessionRules(dir, root, "rocksdb-session-1", stepsRocks)
+	crossSessionOut := promptDirectContext(dir, root, "rocksdb-session-2", "давай ускорим запись через rocksdb в этой ветке")
+	if !strings.Contains(crossSessionOut, "Do not suggest --fast-flush: Нет, падает надежность при сбое питания") {
+		t.Fatalf("crossSessionOut = %q, want --fast-flush refusal recalled via rocksdb co-occurrence context", crossSessionOut)
+	}
+
+	// 21. Polyglot sibling test discovery (Python, TypeScript, Rust), cross-file callers,
+	// Rust panic target parsing, and compiler symbol signature lookup.
+	pyDir := filepath.Join(root, "pypkg")
+	if err := os.MkdirAll(pyDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.WriteFile(filepath.Join(pyDir, "worker.py"), []byte("def process_batch(items):\n    return len(items)\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(pyDir, "test_worker.py"), []byte("def test_process_batch():\n    assert process_batch([1, 2]) == 2\n"), 0o644)
+	if got := siblingTestLineFor(root, filepath.Join(pyDir, "worker.py"), []string{"process_batch"}); !strings.Contains(got, "pytest pypkg/test_worker.py -k 'test_process_batch'") {
+		t.Fatalf("Python siblingTestLineFor = %q", got)
+	}
+
+	tsDir := filepath.Join(root, "tspkg")
+	if err := os.MkdirAll(tsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.WriteFile(filepath.Join(tsDir, "router.ts"), []byte("export function resolveRoute(p: string) { return '/api/v1/orders'; }\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(tsDir, "router.test.ts"), []byte("it('resolves route path', () => {\n  expect(resolveRoute('/api/v1/orders')).toBe('/api/v1/orders');\n});\n"), 0o644)
+	if got := siblingTestLineFor(root, filepath.Join(tsDir, "router.ts"), []string{"resolveRoute"}); !strings.Contains(got, "npx vitest run tspkg/router.test.ts -t 'resolves route path'") {
+		t.Fatalf("TS siblingTestLineFor = %q", got)
+	}
+
+	rsDir := filepath.Join(root, "rspkg")
+	if err := os.MkdirAll(rsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.WriteFile(filepath.Join(rsDir, "engine.rs"), []byte("pub fn compute_hash(x: u32) -> u32 { x + 1 }\n#[test]\nfn test_compute_hash() {\n    assert_eq!(compute_hash(1), 2);\n}\n"), 0o644)
+	if got := siblingTestLineFor(root, filepath.Join(rsDir, "engine.rs"), []string{"compute_hash"}); !strings.Contains(got, "cargo test test_compute_hash") {
+		t.Fatalf("Rust siblingTestLineFor = %q", got)
+	}
+
+	_ = os.WriteFile(filepath.Join(installAutoDir, "caller.go"), []byte("package main\n\nfunc RunCaller() {\n\tInstallAuto()\n}\n"), 0o644)
+	if got := crossFileCallersLine(root, filepath.Join(installAutoDir, "install_auto.go"), []string{"InstallAuto"}); !strings.Contains(got, "callers of InstallAuto: cmd/deja/caller.go:4") {
+		t.Fatalf("crossFileCallersLine = %q", got)
+	}
+
+	rustPanicOut := "thread 'engine::tests::test_compute_hash' panicked at rspkg/engine.rs:4:5:\nassertion `left == right` failed\n--- FAIL: TestSomething (0.01s)\nerror: build failed"
+	if fp, ln, tn := parseRustPanicTarget(rustPanicOut); fp != "rspkg/engine.rs" || ln != 4 || tn != "test_compute_hash" {
+		t.Fatalf("parseRustPanicTarget = (%q, %d, %q)", fp, ln, tn)
+	}
+	if probes := nearErrorProbesFromOutput(rustPanicOut); len(probes) < 2 {
+		t.Fatalf("nearErrorProbesFromOutput = %v", probes)
+	}
+	if line := failingTestSourceLine(root, rustPanicOut, policy.Load()); !strings.Contains(line, "rspkg/engine.rs:4") {
+		t.Fatalf("failingTestSourceLine(rustPanic) = %q", line)
+	}
+	if line := compilerSymbolSignatureLine(root, "cmd/deja/caller.go:4:2: too many arguments in call to InstallAuto\n", policy.Load()); !strings.Contains(line, "func InstallAuto()") {
+		t.Fatalf("compilerSymbolSignatureLine = %q", line)
+	}
+	if line := repoMemoryLineForFailedOutput(root, "go test ./...", "--- FAIL: TestToken (0.01s)\n    internal/auth/token.go:3: unexpected token", policy.Load()); !strings.Contains(line, "Never cache raw JWT strings") {
+		t.Fatalf("repoMemoryLineForFailedOutput = %q", line)
+	}
+	if disk, rel := locateFailingFileInScanRoot(root, "engine.rs", "", ""); !strings.HasSuffix(rel, "engine.rs") || disk == "" {
+		t.Fatalf("locateFailingFileInScanRoot = (%q, %q)", disk, rel)
+	}
+	if sbLine, _ := promptSymbolBriefLine(root, "check InstallAuto callers", nil); !strings.Contains(sbLine, "defined in cmd/deja/install_auto.go:3") {
+		t.Fatalf("promptSymbolBriefLine = %q", sbLine)
+	}
+	if litLine := testAssertionLiteralLine(root, filepath.Join(tsDir, "router.ts"), "export function resolveRoute() { return '/api/v1/orders'; }", "export function resolveRoute() { return '/api/v2/orders'; }"); !strings.Contains(litLine, "router.test.ts") {
+		t.Fatalf("testAssertionLiteralLine = %q", litLine)
+	}
+	if enc := enclosingSymbolForSnippet("func ProcessOrder() {\n\tvalidateOrderPayload := 12345\n}\n", "+ validateOrderPayload := 12345"); enc != "ProcessOrder" {
+		t.Fatalf("enclosingSymbolForSnippet = %q", enc)
+	}
+	if !coChangeCompanionBetter("foo_test.go", "foo.go") || !isAmbiguousCoChangeBase("main.go") {
+		t.Fatal("expected coChangeCompanionBetter and isAmbiguousCoChangeBase to return true")
+	}
+	authDir := filepath.Join(root, "internal", "auth")
+	if err := os.MkdirAll(authDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.WriteFile(filepath.Join(authDir, "token.go"), []byte("package auth\n\nfunc VerifyBearerToken(raw string) bool { return raw != \"\" }\n"), 0o644)
+	if halLine := hallucinatedPkgSymbolLine(root, filepath.Join(installAutoDir, "caller.go"), "", "auth.VerifyBearerTokens(\"x\")"); !strings.Contains(halLine, "VerifyBearerToken") {
+		t.Fatalf("hallucinatedPkgSymbolLine = %q", halLine)
+	}
+	if chg := changedDeclarationSymbols(root, filepath.Join(authDir, "token.go"), "func VerifyBearerToken(raw string, strict bool) bool {\n"); len(chg) != 1 || chg[0] != "VerifyBearerToken" {
+		t.Fatalf("changedDeclarationSymbols = %v", chg)
+	}
+	_ = os.WriteFile(filepath.Join(pyDir, "handler.py"), []byte("def validate_webhook_sig(x):\n    return x\n"), 0o644)
+	if got := siblingTestLineFor(root, filepath.Join(pyDir, "handler.py"), []string{"process_batch"}); !strings.Contains(got, "pytest pypkg/test_worker.py -k 'test_process_batch'") {
+		t.Fatalf("Python dir-scan siblingTestLineFor = %q", got)
+	}
+	_ = os.WriteFile(filepath.Join(tsDir, "service.ts"), []byte("export function dispatchService(p: string) { return p; }\n"), 0o644)
+	if got := siblingTestLineFor(root, filepath.Join(tsDir, "service.ts"), []string{"resolveRoute"}); !strings.Contains(got, "npx vitest run tspkg/router.test.ts -t 'resolves route path'") {
+		t.Fatalf("TS dir-scan siblingTestLineFor = %q", got)
+	}
+	syncAntigravitySessionRules("", root, "conv-sync-test", []transcriptStep{
+		{Type: "PLANNER_RESPONSE", Content: "Should I enable --unsafe-cache on token validation?"},
+		{Type: "USER_INPUT", Content: "<USER_REQUEST>\nНикогда не используй --unsafe-cache в internal/auth/token.go\n</USER_REQUEST>"},
+	})
+	maybePinLiveUserRule("", root, "conv-sync-test", "Никогда не используй --unsafe-cache в internal/auth/token.go")
+	_ = salvageFromPayload(`{"tool_response":{"stderr":"line1\n\t\"quoted\"\\path"}}`)
+	_ = salvageFromPayload(`{"error":"direct error\r\nline2"}`)
+	for _, tc := range []struct{ in, want string }{
+		{"func TestAlpha(t *testing.T) {", "TestAlpha"},
+		{"def test_beta():", "test_beta"},
+		{"fn test_gamma() {", "test_gamma"},
+		{"it('runs delta', () => {", "runs delta"},
+	} {
+		if got := testHeaderName(tc.in); got != tc.want {
+			t.Fatalf("testHeaderName(%q) = %q, want %q", tc.in, got, tc.want)
+		}
 	}
 }

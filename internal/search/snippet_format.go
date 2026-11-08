@@ -780,7 +780,13 @@ func SafeNoteTitle(s string) string {
 // digest row, a "saved <path>" confirmation. A newline there ends deja's own
 // line and starts a line of the caller's, which reads as deja's own output.
 func SafeLine(s string) string {
-	return strings.Join(strings.Fields(SafeText(s)), " ")
+	clean := strings.Map(func(r rune) rune {
+		if r >= 0x2800 && r <= 0x28FF {
+			return ' '
+		}
+		return r
+	}, SafeText(s))
+	return strings.Join(strings.Fields(clean), " ")
 }
 
 // SafePath is SafeLine for a path, which is an identifier rather than prose: it
@@ -867,6 +873,8 @@ func unsafeForTerminal(r rune) bool {
 	// black flag is cheaper than an invisible instruction.
 	switch {
 	case r == '\u00ad', r == '\u200b', r == '\u2060', r == '\ufeff':
+		return true
+	case r >= 0x2800 && r <= 0x28FF:
 		return true
 	case r >= '\U000e0000' && r <= '\U000e007f':
 		return true

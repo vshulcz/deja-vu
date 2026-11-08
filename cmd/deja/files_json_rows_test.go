@@ -58,7 +58,7 @@ func TestFilesJSONCarriesTheRankedRows(t *testing.T) {
 	// between the two rows.
 	for i, sid := range []string{"s1", "s2", "s3"} {
 		day := string(rune('1' + i))
-		body := rec(sid, "user", "the singbox renderer keeps dropping routes", "2026-10-0"+day+"T09:00:00Z")
+		body := rec(sid, "user", "the envoy renderer keeps dropping routes", "2026-10-0"+day+"T09:00:00Z")
 		body = append(body, rec(sid, "assistant", edit(render), "2026-10-0"+day+"T09:01:00Z")...)
 		if sid == "s1" {
 			body = append(body, rec(sid, "assistant", edit(routes), "2026-10-01T09:02:00Z")...)
@@ -82,7 +82,7 @@ func TestFilesJSONCarriesTheRankedRows(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := captureRun(t, "files", "--json", "singbox")
+	out, err := captureRun(t, "files", "--json", "envoy")
 	if err != nil {
 		t.Fatalf("files --json: %v\n%s", err, out)
 	}

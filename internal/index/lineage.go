@@ -13,6 +13,24 @@ import (
 	"github.com/vshulcz/deja-vu/internal/redact"
 )
 
+// HasAnySession reports whether the manifest holds any session in ids.
+func HasAnySession(dir string, ids ...string) bool {
+	if len(ids) == 0 {
+		return false
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return false
+	}
+	byID := viewsFor(m).metasByID()
+	for _, id := range ids {
+		if id != "" && len(byID[id]) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func lineage(dir string, ids map[string]bool, heads, wholes []model.Session) (map[string]bool, map[string]time.Time) {
 	out := make(map[string]bool, len(ids))
 	for id := range ids {
@@ -48,8 +66,10 @@ func lineage(dir string, ids map[string]bool, heads, wholes []model.Session) (ma
 		}
 		return out, nil
 	}
+	anyKnown := len(heads) > 0 || len(wholes) > 0 || len(wholeForks) > 0 || len(headOpenings) > 0 || len(wholeOpenings) > 0
 	for _, meta := range m.Sessions {
 		if ids[meta.ID] {
+			anyKnown = true
 			if meta.Kind == "fork" {
 				metaForks = append(metaForks, meta)
 			} else {
@@ -58,7 +78,12 @@ func lineage(dir string, ids map[string]bool, heads, wholes []model.Session) (ma
 			if meta.Opening != 0 {
 				askers[meta.Opening] = append(askers[meta.Opening], meta)
 			}
+		} else if meta.Parent != "" && ids[meta.Parent] {
+			anyKnown = true
 		}
+	}
+	if !anyKnown {
+		return out, nil
 	}
 	held := heldRecords(dir, m)
 	byID := viewsFor(m).metasByID()

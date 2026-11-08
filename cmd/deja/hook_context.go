@@ -819,7 +819,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 	}
 	var claudeMemCount int
 	digest, claudeMemCount, servedProjects = attachClaudeAutoMemory(
-		dir, input.SessionID, input.TranscriptPath, getStartingHarness(),
+		dir, input.SessionID, input.TranscriptPath, input.Harness,
 		hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots)),
 		digest, servedProjects,
 	)
@@ -1198,11 +1198,11 @@ func limitHandoffTip(dir, cwd string, self []string, starting func() string) str
 }
 
 func attachClaudeAutoMemory(dir, id, transcript, harness, cwd, digest string, projects []string) (string, int, []string) {
-	if isClaudeSessionStart(dir, id, transcript, harness) {
-		return digest, 0, projects
-	}
 	cm, n, proj := claudeAutoMemoryBlock(cwd)
 	if cm == "" {
+		return digest, 0, projects
+	}
+	if isClaudeSessionStart(dir, id, transcript, harness) {
 		return digest, 0, projects
 	}
 	if digest == "" {

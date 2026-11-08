@@ -38,21 +38,59 @@ var (
 		// "не трогай", "не запускай", "не пиши": a negated imperative. The
 		// ending is what separates it from "не работает", "не знаю", "не понял".
 		`(?:ничего\s+|никуда\s+|нигде\s+|никому\s+)?не \p{L}+(?:й|йте|ь|ьте|и|ите)(?:сь|ся)?(?:$|[^\p{L}])|` +
-		`永远不要|千万不要|绝对不要|不要|别|禁止|严禁|必须|务必|一定要|总是|始终|记住|以后|从现在起|每次都|优先使用)`)
+		`永远不要|千万不要|绝对不要|不要|别|禁止|严禁|必须|务必|一定要|总是|始终|记住|以后|从现在起|每次都|优先使用|` +
+		`絶対に|決して|必ず|常に|毎回|今後は|これからは|覚えておいて)`)
 	// Optional leading acknowledgement + conjunction ("ок, но ", "да, только ",
-	// "ok, but ", "好，但") before a standing instruction in a short user reply.
-	standingLeadAckRE = regexp.MustCompile(`(?i)^(?:(?:ок|окей|да|ладно|хорошо|ага|угу|понял|ok|okay|yes|yeah|sure|alright|got it|好|好的|可以|行|没问题)[,\s]+)*(?:(?:но|только|и|а|просто|главное|при этом|but|just|and|only|不过|但是|但|只是)[,\s]+)+`)
+	// "ok, but ", "好，但", "はい、でも") before a standing instruction in a short user reply.
+	standingLeadAckRE = regexp.MustCompile(`(?i)^(?:(?:ок|окей|да|ладно|хорошо|ага|угу|понял|ok|okay|yes|yeah|sure|alright|got it|好|好的|可以|行|没问题|はい|ええ|わかった|了解|オッケー)[,\s，、]+)*(?:(?:но|только|и|а|просто|главное|при этом|but|just|and|only|不过|但是|但|只是|でも|ただし|ただ|しかし|けど)[,\s，、]+)+`)
 	// The ones that open the same way and instruct nothing.
 	standingNotRE = regexp.MustCompile(`(?i)^(?:never mind|nevermind|don't worry|dont worry|do not worry|don't know|dont know|do not know|don't think|dont think|don't see|don't get|always has|always had|always was|always were|always been|не знаю|не помню|не понимаю|не уверен|не важно|не страшно|не надо было|не нужно было|` +
 		// "не удалось", "не нашлось": a past tense whose ending passes for an imperative.
 		`не \p{L}+(?:ось|ась|ись)(?:$|[^\p{L}])|` +
-		`不要紧|没关系|不用谢|不知道|不清楚|不确定|不重要)`)
+		`不要紧|没关系|不用谢|不知道|不清楚|不确定|不重要|` +
+		`気にしないで|気にするな|大丈夫|問題ない|問題ありません|わかりません|知りません)`)
 	// An instruction keeps its list item; the item is rewritten in full.
-	standingItemRE       = regexp.MustCompile(`^\s*(?:[-*+•]\s+|\d{1,2}[.)]\s+)`)
-	standingFenceRE      = regexp.MustCompile("(?s)```.*?```")
-	standingTagRE        = regexp.MustCompile(`(?s)<([A-Za-z][\w-]*)(?:\s[^<>]*)?>.*?</([A-Za-z][\w-]*)>`)
-	standingSentRE       = regexp.MustCompile(`([.!;]\s+|[。！；]\s*)`)
-	standingProvenanceRE = regexp.MustCompile(`\s*\[[A-Za-z0-9_-]+:[^\]]+/[A-Za-z_-]+(?:\s+@[^\]]+)?\]\s*$`)
+	standingItemRE      = regexp.MustCompile(`^\s*(?:[-*+•]\s+|\d{1,2}[.)]\s+)`)
+	standingFenceRE     = regexp.MustCompile("(?s)```.*?```")
+	standingTagRE       = regexp.MustCompile(`(?s)<([A-Za-z][\w-]*)(?:\s[^<>]*)?>.*?</([A-Za-z][\w-]*)>`)
+	standingSentRE      = regexp.MustCompile(`([.!;]\s+|[。！；]\s*)`)
+	standingClauseRE    = regexp.MustCompile(`(?i)(?:,\s*(?:а\s+вот|а|но|только|однако|зато|при\s+этом|просто|but|except|however|though)\s+|[,，；]\s*(?:不过|但是|但|只是|就是|而)|[、,，]\s*(?:ただし|ただ|でも|しかし|けれど|けど)\s*|(?:だけど|ですが|ますが)[、,，\s]+)`)
+	standingPredicateRE = regexp.MustCompile(`(?i)(?:` +
+		`(?:^|[^\p{L}])(?:` +
+		`(?:я\s+|мы\s+)?не\s+(?:буду|будем|собираюсь|стану)\s+\p{L}+|` +
+		`\p{L}+(?:ть|ти|чь|ться|тися)\s+(?:я\s+|мы\s+)?не\s+(?:буду|будем|собираюсь|стану|надо|нужно|стоит|следует|льзя)|` +
+		`\p{L}+\s+(?:я\s+|мы\s+)\p{L}+(?:ть|ти|чь|ться|тися)\s+не\s+(?:буду|будем|собираюсь|стану)|` +
+		`(?:это|этого|так)\s+(?:делать\s+)?не\s+(?:надо|нужно|стоит|следует)|` +
+		`не\s+(?:надо|нужно|стоит|следует)\s+\p{L}+(?:ть|ти|чь|ться|тися)|` +
+		`не\s+предлагай\p{L}*|хватит\s+\p{L}+|перестань\p{L}*\s+\p{L}+|не\s+забывай\p{L}*,?\s+что|` +
+		`лучше\s+на\s+\p{L}+\s+делать|` +
+		`i\s+(?:won't|will\s+not|am\s+not\s+going\s+to)\s+\w+|i'm\s+not\s+going\s+to\s+\w+|` +
+		`we\s+(?:don't|do\s+not|won't|never)\s+(?:use|run|do|need|want|touch|modify)\b|` +
+		`stop\s+(?:suggesting|recommending|asking|using|doing|running)\b|` +
+		`(?:do\s+not|don't|never)\s+(?:suggest|recommend)\b|no\s+need\s+to\s+\w+|` +
+		`(?:shouldn't|should\s+not|mustn't|must\s+not|let's\s+not|lets\s+not|please\s+don't|please\s+do\s+not|better\s+not)\s+\w+|` +
+		`(?:давай\s+без|лучше\s+не|не\s+вздумай|не\s+задевай)\s+\p{L}+` +
+		`)(?:$|[^\p{L}])|` +
+		// Chinese (Simplified & Traditional after cjkfold) clause-internal refusal/prohibition predicates:
+		`(?:我|我们)?(?:不会|不打算|不需要|不用|不必|不要|别)\s*(?:再\s*|手动\s*)?(?:做|用|使用|运行|执行|跑|改|修改|动|建议|推荐|提及|推送|提交)|` +
+		`(?:不需要|不用|不要|禁止|严禁|不能|不可以|最好不要)(?:手动|再)?(?:做|用|使用|运行|执行|修改|动|建议|推荐|推送|提交)|` +
+		`(?:切勿|请勿|千万别|严禁|禁止)\p{Han}{1,8}|` +
+		`(?:别再|不要再)(?:建议|推荐|提|用|改|问)|记住(?:不要|一定要|要|目标)|` +
+		// Japanese SOV prohibition/refusal predicates:
+		`(?:しないで|やめて|使わないで|変更しないで|触らないで|いじらないで|手を出さないで|提案しないで|実行しないで|プッシュしないで|コミットしないで)(?:ください)?|` +
+		`(?:するつもりはない|するつもりはありません|しないつもり|やりません|使いません|実行しません|しなくていい|やらなくていい|不要です|必要ありません)|` +
+		`(?:ではなく|じゃなく).*?(?:を使って|にして|で実行して)|(?:忘れないで|覚えておいて)(?:ください)?` +
+		`)`)
+	standingSymptomRE = regexp.MustCompile(`(?i)(?:` +
+		`(?:^|[^\p{L}])не\s+(?:работает|отвечает|может|хватает|открывается|собирается|проходит|дотягивает|видит|находит|помогает|успевает)(?:$|[^\p{L}])|` +
+		`(?:doesn't|does\s+not|isn't|is\s+not)\s+(?:work|working|respond|responding|compile|compiling|pass|passing)\b|` +
+		`(?:動かない|動きません|応答しない|応答しません|反応しない|通らない)` +
+		`)`)
+	standingNumRefusalRE    = regexp.MustCompile(`(?i)^\s*(\d{1,2})(?:\s*[-–—]\s*(\d{1,2}))?(?:[.)、．]|\s+иде[ияй])?\s*(?:нет|не\s+надо|не\s+буду|не\s+нужно|мимо|отбой|no|don't|won't|skip|不要|不用|不需要|不做|算了|跳过|いいえ|いや|やらない|しない|スキップ)(?:$|[^\p{L}]|[，,、：:\s])(.*)$`)
+	standingDirectRefusalRE = regexp.MustCompile(`(?i)^\s*(?:нет|не-а|не\s+надо|не\s+буду|не\s+нужно|не\s+стоит|отбой|no|nope|nah|不用|不要|不需要|算了|いいえ|いや)(?:[,，、.。:：!！\s]+)(.+)$`)
+	standingSlashCmdRE      = regexp.MustCompile(`(?:^|[\s` + "`" + `(*"«「『（])(\/[a-z][a-z0-9_-]{2,20})\b`)
+	standingBacktickRE      = regexp.MustCompile("`([^`\\n]{2,60})`")
+	standingProvenanceRE    = regexp.MustCompile(`\s*\[[A-Za-z0-9_-]+:[^\]]+/[A-Za-z_-]+(?:\s+@[^\]]+)?\]\s*$`)
 )
 
 // ExtractStandingRules returns the user's standing instructions from every
@@ -76,7 +114,14 @@ func ExtractStandingRules(s model.Session, prev []model.ContextFact) []model.Con
 		add(f)
 	}
 	scanned := 0
+	prevAssistant := ""
 	for _, m := range s.Messages {
+		if m.Role == "assistant" {
+			if strings.TrimSpace(m.Text) != "" && !IsAgentArtifact(m.Text) {
+				prevAssistant = m.Text
+			}
+			continue
+		}
 		if m.Role != "user" {
 			continue
 		}
@@ -87,7 +132,10 @@ func ExtractStandingRules(s model.Session, prev []model.ContextFact) []model.Con
 		if len(m.Text) > standingTurnMax || IsAgentArtifact(m.Text) {
 			continue
 		}
-		for _, text := range standingLines(m.Text) {
+		for _, text := range turnPairRules(prevAssistant, m.Text) {
+			add(model.ContextFact{Text: text, Provenance: contextRef(s, m)})
+		}
+		for _, text := range standingLinesWithContext(prevAssistant, m.Text) {
 			add(model.ContextFact{Text: text, Provenance: contextRef(s, m)})
 		}
 	}
@@ -184,7 +232,34 @@ func isDejaPacketItem(line string) bool {
 func standingSentences(line string) []string {
 	var out []string
 	for s := range strings.SplitSeq(standingSentRE.ReplaceAllString(line, "$1\n"), "\n") {
-		if s = strings.TrimSpace(s); s != "" {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		// If a compound conversational sentence starts with agreement ("давай
+		// доработаем все дыры, а компакт я делать не буду, он итак
+		// автоматический на 262к") rather than opening directly with a rule,
+		// split on contrastive conjunctions and keep the constraint clause
+		// together with its trailing rationale ("он итак ...", "потому что ...").
+		locs := standingClauseRE.FindAllStringIndex(s, -1)
+		if len(locs) > 0 && (!standingStartRE.MatchString(cjkfold.String(s)) || !fitsStanding(s)) {
+			addedClause := false
+			for _, loc := range locs {
+				clause := strings.TrimSpace(strings.TrimRight(s[loc[1]:], "；;。"))
+				if subIdx := strings.Index(strings.ToLower(clause), ", а вот "); subIdx > 0 {
+					clause = strings.TrimSpace(clause[:subIdx])
+				}
+				if clause != "" && standingRule(clause) && fitsStanding(clause) {
+					out = append(out, clause)
+					addedClause = true
+					break
+				}
+			}
+			if addedClause {
+				continue
+			}
+		}
+		if standingRule(s) {
 			out = append(out, s)
 		}
 	}
@@ -193,13 +268,180 @@ func standingSentences(line string) []string {
 
 func standingRule(sentence string) bool {
 	s := strings.TrimLeft(sentence, "\"'«“`(「『")
-	trimmed := strings.TrimRight(s, " \"'»”)」』")
-	if strings.HasSuffix(trimmed, "?") || strings.HasSuffix(trimmed, "？") {
+	trimmed := strings.TrimRight(s, " \"'»”)」』。")
+	if strings.HasSuffix(trimmed, "?") || strings.HasSuffix(trimmed, "？") ||
+		strings.HasSuffix(trimmed, "吗") || strings.HasSuffix(trimmed, "嗎") ||
+		strings.HasSuffix(trimmed, "ですか") || strings.HasSuffix(trimmed, "ますか") {
 		return false
 	}
 	folded := cjkfold.String(s)
 	folded = standingLeadAckRE.ReplaceAllString(folded, "")
-	return standingStartRE.MatchString(folded) && !standingNotRE.MatchString(folded)
+	if standingNotRE.MatchString(folded) || standingSymptomRE.MatchString(folded) {
+		return false
+	}
+	return standingStartRE.MatchString(folded) || standingPredicateRE.MatchString(folded)
+}
+
+func standingLinesWithContext(prevAssistant, text string) []string {
+	hits := standingLines(text)
+	if len(hits) == 0 || strings.TrimSpace(prevAssistant) == "" {
+		return hits
+	}
+	entities := proposedEntities(prevAssistant)
+	if len(entities) == 0 {
+		return hits
+	}
+	out := make([]string, 0, len(hits))
+	for _, h := range hits {
+		lowH := strings.ToLower(cjkfold.String(h))
+		for _, ent := range entities {
+			lowEnt := strings.ToLower(ent)
+			bare := strings.TrimPrefix(lowEnt, "/")
+			if !strings.HasPrefix(h, "Do not suggest ") &&
+				(strings.Contains(lowH, lowEnt) || (strings.HasPrefix(ent, "/") && (strings.Contains(lowH, bare) || (bare == "compact" &&
+					(strings.Contains(lowH, "компакт") || strings.Contains(lowH, "压缩") || strings.Contains(lowH, "コンパクト") || strings.Contains(lowH, "圧縮")))))) {
+				h = "Do not suggest " + ent + ": " + h
+				break
+			}
+		}
+		out = append(out, h)
+	}
+	return out
+}
+
+func turnPairRules(prevAssistant, userText string) []string {
+	if strings.TrimSpace(prevAssistant) == "" || strings.TrimSpace(userText) == "" {
+		return nil
+	}
+	cleanU, _ := redact.Text(userText)
+	cleanU = redact.SafeForDisplay(cleanU)
+	cleanU = standingFenceRE.ReplaceAllString(cleanU, "\n")
+	cleanU = stripTagBlocks(cleanU)
+
+	assistantItems := extractNumberedProposals(prevAssistant)
+	entities := proposedEntities(prevAssistant)
+	assistantAskedQuestion := strings.Contains(prevAssistant, "?") || strings.Contains(prevAssistant, "？")
+	var out []string
+	for rawLine := range strings.SplitSeq(cleanU, "\n") {
+		line := strings.TrimSpace(rawLine)
+		if line == "" || strings.HasSuffix(line, "?") || strings.HasSuffix(line, "？") {
+			continue
+		}
+		if m := standingNumRefusalRE.FindStringSubmatch(line); m != nil {
+			itemNum := m[1]
+			proposed := assistantItems[itemNum]
+			target := ""
+			if proposed != "" {
+				if ents := proposedEntities(proposed); len(ents) > 0 {
+					target = ents[0]
+				} else {
+					target = compactProposalSummary(proposed)
+				}
+			} else if len(entities) == 1 {
+				target = entities[0]
+			}
+			if target != "" {
+				rule := "Do not suggest " + target + ": " + line
+				if fitsStanding(rule) {
+					out = append(out, rule)
+				}
+			}
+			continue
+		}
+		// Direct unnumbered refusal to an assistant question proposing concrete
+		// technical entities (e.g. Assistant: "Should I run `docker compose down -v`?"
+		// -> User: "No, that will wipe the local database" / "Нет, там локальная база"),
+		// where the user states a declarative reason without repeating the command or
+		// using an imperative verb.
+		if assistantAskedQuestion && len(entities) > 0 && len(standingLines(line)) == 0 {
+			if standingDirectRefusalRE.MatchString(cjkfold.String(line)) {
+				target := entities[0]
+				rule := "Do not suggest " + target + ": " + line
+				if fitsStanding(rule) {
+					out = append(out, rule)
+				}
+			}
+		}
+	}
+	return out
+}
+
+func proposedEntities(text string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, cmd := range proposedSlashCommands(text) {
+		low := strings.ToLower(cmd)
+		if !seen[low] {
+			seen[low] = true
+			out = append(out, cmd)
+		}
+	}
+	for _, m := range standingBacktickRE.FindAllStringSubmatch(text, -1) {
+		tok := strings.TrimSpace(m[1])
+		if tok == "" {
+			continue
+		}
+		low := strings.ToLower(tok)
+		if !seen[low] {
+			seen[low] = true
+			out = append(out, tok)
+		}
+	}
+	return out
+}
+
+func proposedSlashCommands(text string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, m := range standingSlashCmdRE.FindAllStringSubmatch(text, -1) {
+		cmd := m[1]
+		// Exclude filesystem paths like /Users/..., /tmp/..., /etc/..., /home/..., /var/...
+		low := strings.ToLower(cmd)
+		switch low {
+		case "/users", "/tmp", "/var", "/etc", "/opt", "/usr", "/bin", "/dev", "/home", "/proc", "/sys", "/root", "/lib":
+			continue
+		}
+		if strings.Contains(text, cmd+"/") {
+			continue
+		}
+		if !seen[low] {
+			seen[low] = true
+			out = append(out, cmd)
+		}
+	}
+	return out
+}
+
+func extractNumberedProposals(text string) map[string]string {
+	out := map[string]string{}
+	for raw := range strings.SplitSeq(text, "\n") {
+		line := strings.TrimSpace(raw)
+		for i := 0; i < len(line) && i < 3; i++ {
+			if line[i] < '0' || line[i] > '9' {
+				break
+			}
+			if i+2 < len(line) && (line[i+1] == '.' || line[i+1] == ')') && line[i+2] == ' ' {
+				num := line[:i+1]
+				body := strings.TrimSpace(strings.ReplaceAll(line[i+3:], "**", ""))
+				if body != "" {
+					out[num] = body
+				}
+				break
+			}
+		}
+	}
+	return out
+}
+
+func compactProposalSummary(s string) string {
+	s = strings.TrimSpace(s)
+	if idx := strings.IndexAny(s, ".,;—:("); idx > 8 && idx <= 80 {
+		s = strings.TrimSpace(s[:idx])
+	}
+	if len(s) > 80 {
+		s = UTF8SafeCut(s, 80)
+	}
+	return s
 }
 
 func onlyStandingRules(text string) bool {

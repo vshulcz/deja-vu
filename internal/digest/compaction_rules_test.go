@@ -191,3 +191,163 @@ func TestStandingRulesScopingAndHandoffPacketExclusion(t *testing.T) {
 		t.Fatalf("got %d rules (%+v), want 3", len(rules), rules)
 	}
 }
+
+func TestStandingRulesClauseAndTurnPairRejections(t *testing.T) {
+	s := model.Session{
+		ID:      "turn-pair-fixture",
+		Harness: "antigravity",
+		Messages: []model.Message{
+			{
+				Role: "assistant",
+				Text: "Сделать эти правки в `worker.py` и на `stage-node`?",
+			},
+			{
+				Role: "user",
+				Text: "давай, но исправления лучше на бэкенде делать, клиенты менять не надо, потому что они уже хорошо и правильно работают, а вот воркер нет, соответственно требуется его улучшить. еще не забывай, что у нас цель удержать 200+ рпс от сервиса под нагрузкой",
+			},
+			{
+				Role: "assistant",
+				Text: "### Как ускорить сборку до `3–5s` прямо сейчас\n1. В активной ветке выполнить **`/reindex`** (или сбросить кэш), чтобы не пересчитывать весь граф на каждый шаг.\n2. Пока перезапускается демон, возможны разовые таймауты.",
+			},
+			{
+				Role: "user",
+				Text: "1. нет, тут другая проблема, раньше быстрее работало на большом индексе",
+			},
+			{
+				Role: "assistant",
+				Text: "Запусти здесь **`/compact`** — это сразу сбросит размер буфера с `200k` до `~20k`.",
+			},
+			{
+				Role: "user",
+				Text: "давай доработаем все места, а компакт я делать не буду, он итак автоматический по лимиту",
+			},
+			{
+				Role: "user",
+				Text: "не, сам то конфиг пусть будет локально, потестим насколько с ним лучше, а вот пушить не надо в ветку",
+			},
+		},
+	}
+	rules := ExtractStandingRules(s, nil)
+	texts := make([]string, 0, len(rules))
+	for _, r := range rules {
+		texts = append(texts, r.Text)
+	}
+	joined := strings.Join(texts, "\n")
+	for _, want := range []string{
+		"исправления лучше на бэкенде делать, клиенты менять не надо, потому что они уже хорошо и правильно работают",
+		"еще не забывай, что у нас цель удержать 200+ рпс",
+		"Do not suggest /reindex: 1. нет, тут другая проблема, раньше быстрее работало на большом индексе",
+		"Do not suggest /compact: компакт я делать не буду, он итак автоматический по лимиту",
+		"пушить не надо в ветку",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("missing expected rule %q in extracted rules:\n%s", want, joined)
+		}
+	}
+}
+
+func TestStandingRulesMultilingualENRUZHJA(t *testing.T) {
+	s := model.Session{
+		ID:      "multilingual-fixture",
+		Harness: "antigravity",
+		Messages: []model.Message{
+			// English (EN): numbered proposal -> refusal + clause-split refusal
+			{
+				Role: "assistant",
+				Text: "1. Run **`/reindex`** in open tabs to drop buffer size from `200MB` to `~20MB`.\n2. Restart `eth0`.",
+			},
+			{
+				Role: "user",
+				Text: "1. No, that's a different issue, it used to run faster on larger context",
+			},
+			{
+				Role: "user",
+				Text: "Let's fix all the memory leaks first, but I'm not going to run /reindex since it triggers automatically on startup",
+			},
+			// Chinese Simplified & Traditional (ZH): numbered proposal -> refusal + clause-split refusal
+			{
+				Role: "assistant",
+				Text: "1. 在当前窗口执行 **`/reindex`** 重建索引。\n2. 检查网关状态。",
+			},
+			{
+				Role: "user",
+				Text: "1. 不用，这是另一个问题，以前大上下文也很快",
+			},
+			{
+				Role: "user",
+				Text: "先把所有漏洞修好，但我不会手动运行 /reindex，因为启动时会自动触发；另外千萬不要修改生產環境配置",
+			},
+			// Japanese (JA): numbered proposal -> refusal + SOV sentence-final clause-split refusal & prohibition
+			{
+				Role: "assistant",
+				Text: "1. **`/reindex`** を実行してインデックスを再構築してください。\n2. ログを確認します。",
+			},
+			{
+				Role: "user",
+				Text: "1. いいえ、別の問題です。以前は大きなコンテキストでも速かったです",
+			},
+			{
+				Role: "user",
+				Text: "まずはバグを全部修正しよう、ただ起動時に自動実行されるので /reindex は実行しないつもり。あとハーネスは変更しないでください",
+			},
+		},
+	}
+	rules := ExtractStandingRules(s, nil)
+	texts := make([]string, 0, len(rules))
+	for _, r := range rules {
+		texts = append(texts, r.Text)
+	}
+	joined := strings.Join(texts, "\n")
+	for _, want := range []string{
+		"Do not suggest /reindex: 1. No, that's a different issue, it used to run faster on larger context",
+		"Do not suggest /reindex: I'm not going to run /reindex since it triggers automatically on startup",
+		"Do not suggest /reindex: 1. 不用，这是另一个问题，以前大上下文也很快",
+		"Do not suggest /reindex: 我不会手动运行 /reindex，因为启动时会自动触发",
+		"千萬不要修改生產環境配置",
+		"Do not suggest /reindex: 1. いいえ、別の問題です。以前は大きなコンテキストでも速かったです",
+		"Do not suggest /reindex: 起動時に自動実行されるので /reindex は実行しないつもり",
+		"ハーネスは変更しないでください",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("missing expected multilingual rule %q in extracted rules:\n%s", want, joined)
+		}
+	}
+
+	// General unnumbered question-proposal -> declarative refusal (without repeating entity or imperative verb)
+	sQuestionRefusal := model.Session{
+		ID:      "question-refusal-fixture",
+		Harness: "claude",
+		Messages: []model.Message{
+			{
+				Role: "assistant",
+				Text: "Should I run `docker compose down -v` to reset the environment?",
+			},
+			{
+				Role: "user",
+				Text: "No, that will wipe the local Postgres volume",
+			},
+			{
+				Role: "assistant",
+				Text: "Удалить старый `legacy_auth.go`?",
+			},
+			{
+				Role: "user",
+				Text: "Нет, на него еще завязаны внешние клиенты",
+			},
+		},
+	}
+	qRules := ExtractStandingRules(sQuestionRefusal, nil)
+	qTexts := make([]string, 0, len(qRules))
+	for _, r := range qRules {
+		qTexts = append(qTexts, r.Text)
+	}
+	qJoined := strings.Join(qTexts, "\n")
+	for _, want := range []string{
+		"Do not suggest docker compose down -v: No, that will wipe the local Postgres volume",
+		"Do not suggest legacy_auth.go: Нет, на него еще завязаны внешние клиенты",
+	} {
+		if !strings.Contains(qJoined, want) {
+			t.Errorf("missing expected question-refusal rule %q in:\n%s", want, qJoined)
+		}
+	}
+}

@@ -81,9 +81,9 @@ func termsFrom(prompt string, seen map[string]bool, add func(string) bool) bool 
 	for _, f := range fields {
 		// A word at the end of a sentence arrives with its full stop attached,
 		// and the dot then does two things at once: it marks the token as an
-		// identifier, so "score." counts as one, and it stops the token from
-		// ever matching the text, which says "score". Measured on live prompts:
-		// "quality score. с чего начать" yielded the term "score.", which
+		// identifier, so "budget." counts as one, and it stops the token from
+		// ever matching the text, which says "budget". Measured on live prompts:
+		// "retry budget. с чего начать" yielded the term "budget.", which
 		// matched nothing anywhere while still earning the recall its place.
 		//
 		// Only the edges are trimmed. A dot inside a token is what makes an IP
@@ -443,8 +443,8 @@ var cyrPromptStop = map[string]bool{
 	"что": true, "где": true, "там": true, "тут": true, "уже": true, "ещё": true,
 	// Measured on live prompts from this machine: about a third of the terms
 	// extracted from a Russian question were words like these, and in the worst
-	// case four of five — `напомни, что мы уже выясняли про can шину на omoda
-	// через adb` yielded [omoda напомни выясняли через дальше]. A filler term
+	// case four of five — `напомни, что мы уже выясняли про офсеты в kafka
+	// через cli` yielded [kafka напомни выясняли через дальше]. A filler term
 	// is not harmless: it matches a filler line, and that line then takes the
 	// slot the reader sees first.
 	//

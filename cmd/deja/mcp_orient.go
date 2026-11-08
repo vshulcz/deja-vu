@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -47,9 +48,12 @@ const (
 )
 
 func mcpOrient(dir, name string, raw json.RawMessage) (string, int, error) {
+	setActiveDejaDir(dir)
 	var a struct {
-		Project string    `json:"project"`
-		Limit   mcpNumber `json:"limit"`
+		Project   string    `json:"project"`
+		Limit     mcpNumber `json:"limit"`
+		SessionID string    `json:"session_id"`
+		CWD       string    `json:"cwd"`
 	}
 	if err := decodeToolArgs(name, raw, &a); err != nil {
 		return "", 0, err
@@ -64,11 +68,189 @@ func mcpOrient(dir, name string, raw json.RawMessage) (string, int, error) {
 	if limit <= 0 {
 		limit = orientCommandsShown
 	}
-	scope := howScope(howCwd(), a.Project, false)
+	cwd := strings.TrimSpace(a.CWD)
+	if cwd == "" {
+		cwd = howCwd()
+	}
+	sid := strings.TrimSpace(a.SessionID)
+	if sid == "" {
+		sid = os.Getenv("DEJA_SESSION_ID")
+		if sid == "" {
+			sid = os.Getenv("SESSION_ID")
+		}
+	}
+	scope := howScope(cwd, a.Project, false)
 	cmds, hidden, ignored, err := howEntries(dir, nil, scope, policy.ActivationMCP)
 	if err != nil {
 		return "", 0, err
 	}
+	cmds = filterAndSortOrientCmds(cmds)
+	if strings.TrimSpace(a.Project) != "" && !howProjectMatches(a.Project, howScope(cwd, "", false)) {
+		cwd = ""
+	}
+	files := orientFiles(dir, scope, cwd)
+	if cwd != "" {
+		if root := sources.RepoRoot(cwd); root != "" && !fileThere(sources.RepoMemoryPath(root)) {
+			autoEvolveRepoMemory(dir, cwd)
+		}
+	}
+	repoEntries := orientRepoMemory(cwd, policy.ActivationMCP)
+	where := howScopeName(scope)
+	if where == "" {
+		where = "this machine"
+	}
+	var deferredText string
+	if sid != "" || cwd != "" {
+		deferredText = takeDeferred(dir, deferredKey(sid, cwd))
+		if deferredText == "" && sid != "" && cwd != "" {
+			deferredText = takeDeferred(dir, deferredKey("", cwd))
+		}
+	}
+	var compBuf bytes.Buffer
+	if sid != "" || cwd != "" {
+		_, _ = emitCompactionRecovery(dir, sid, cwd, "SessionStart", hookToolPlain, &compBuf)
+	}
+	recoveryText := strings.TrimSpace(compBuf.String())
+
+	if len(cmds) == 0 && len(files) == 0 && len(repoEntries) == 0 {
+		if recoveryText != "" || deferredText != "" {
+			var b strings.Builder
+			if recoveryText != "" {
+				b.WriteString(recoveryText + "\n\n")
+			}
+			if deferredText != "" {
+				b.WriteString(deferredText + "\n\n")
+			}
+			return frameRecall(strings.TrimSpace(b.String())), 1, nil
+		}
+		if note := ignoredHiddenNoteFor("answer", ignored); note != "" {
+			return strings.TrimSpace(note), 0, nil
+		}
+		if note := policyHiddenNote(policy.ActivationMCP, hidden); note != "" {
+			return strings.TrimSpace(note), 0, nil
+		}
+		// Sessions with nothing to orient by are still sessions: saying none
+		// worked here sent an agent away from history recall had.
+		if n := orientSessionCount(dir, scope); n > 0 {
+			return fmt.Sprintf("%s worked in %s, but no command or file repeats across them. Recall with project %q reads what they said.", pluralSessions(n), where, where), 0, nil
+		}
+		return fmt.Sprintf("No past session on this machine worked in %s.", where) + emptyStoreNote(dir), 0, nil
+	}
+
+	coupled := orientCoChangePairs(dir, scope, cwd, files, policy.ActivationMCP)
+	fixes := orientProjectFixes(dir, scope, cwd, policy.ActivationMCP)
+	corrections := orientProjectCorrections(dir, scope, policy.ActivationMCP)
+	text, count := renderOrientSections(where, recoveryText, deferredText, repoEntries, cmds, files, limit, coupled, fixes, corrections)
+	return text, count, nil
+}
+
+func renderOrientSections(where, recoveryText, deferredText string, repoEntries []sources.RepoEntry, cmds []howEntry, files []orientFile, limit int, coupled, fixes, corrections []string) (string, int) {
+	var b strings.Builder
+	if recoveryText != "" {
+		b.WriteString(recoveryText + "\n\n")
+	}
+	if deferredText != "" {
+		b.WriteString(deferredText + "\n\n")
+	}
+	if len(cmds) > 0 || len(files) > 0 {
+		fmt.Fprintf(&b, "how work has been done in %s, from past sessions here\n", where)
+	} else {
+		fmt.Fprintf(&b, "from this repository's %s (committed by the people working on it):\n", repoFileShown)
+	}
+	if len(repoEntries) > 0 {
+		if len(cmds) > 0 || len(files) > 0 {
+			fmt.Fprintf(&b, "committed in %s:\n", repoFileShown)
+		}
+		for i, e := range repoEntries {
+			if i >= orientFilesShown {
+				break
+			}
+			fmt.Fprintf(&b, "- [%s] %s\n", e.Kind, search.SafeLine(e.Text))
+		}
+	}
+	if len(cmds) > 0 {
+		fmt.Fprintln(&b, "commands, by how many sessions ran them:")
+		for i, e := range cmds {
+			if i >= limit {
+				break
+			}
+			fmt.Fprintf(&b, "- %s · %s", orientCommand(e.Command), pluralSessions(len(e.Sessions)))
+			if e.Failures > 0 {
+				fmt.Fprintf(&b, " · failed in %d", e.Failures)
+			}
+			if !e.Last.IsZero() {
+				fmt.Fprintf(&b, " · last %s", e.Last.Format("Jan 2"))
+			}
+			fmt.Fprintln(&b)
+		}
+	}
+	if len(files) > 0 {
+		fmt.Fprintln(&b, "files those sessions opened or edited:")
+		for i, f := range files {
+			if i >= orientFilesShown {
+				break
+			}
+			fmt.Fprintf(&b, "- %s · %s\n", f.Path, pluralSessions(f.Sessions))
+		}
+	}
+	if len(coupled) > 0 {
+		fmt.Fprintln(&b, "coupled files (usually edited together):")
+		for _, pair := range coupled {
+			fmt.Fprintf(&b, "- %s\n", pair)
+		}
+	}
+	if len(fixes) > 0 {
+		fmt.Fprintln(&b, "known traps and verified fixes here:")
+		for i, fx := range fixes {
+			if i >= orientCommandsShown {
+				break
+			}
+			fmt.Fprintf(&b, "- %s\n", fx)
+		}
+	}
+	if len(corrections) > 0 {
+		fmt.Fprintln(&b, "recent user corrections here (do not repeat):")
+		for i, c := range corrections {
+			if i >= 3 {
+				break
+			}
+			fmt.Fprintf(&b, "- %s\n", c)
+		}
+	}
+	if len(cmds) > 0 || len(files) > 0 {
+		fmt.Fprint(&b, "This is what was done here before, not a rule — check a command still fits before running it.")
+	}
+	return frameRecall(strings.TrimSpace(b.String())), len(repoEntries) + len(cmds) + len(files) + len(coupled) + len(fixes) + len(corrections)
+}
+
+func orientRepoMemory(cwd, act string) []sources.RepoEntry {
+	if cwd == "" {
+		return nil
+	}
+	root := sources.RepoRoot(cwd)
+	if root == "" {
+		root = cwd
+	}
+	if !policy.Load().Allows(act, sources.RepoMemoryProject(root)) {
+		return nil
+	}
+	entries, _, err := readRepoMemoryAndNotes(root)
+	if err != nil || len(entries) == 0 {
+		return nil
+	}
+	sources.RememberRepoCheckout(root)
+	rank := map[string]int{"rule": 0, "rejected": 1, "gotcha": 2, "decision": 3}
+	sort.SliceStable(entries, func(i, j int) bool {
+		ri, rj := rank[entries[i].Kind], rank[entries[j].Kind]
+		if ri != rj {
+			return ri < rj
+		}
+		return entries[i].Date > entries[j].Date
+	})
+	return entries
+}
+
+func filterAndSortOrientCmds(cmds []howEntry) []howEntry {
 	filteredCmds := cmds[:0]
 	for _, e := range cmds {
 		if !orientEphemeralCommand(orientCommand(e.Command)) {
@@ -105,125 +287,7 @@ func mcpOrient(dir, name string, raw json.RawMessage) (string, int, error) {
 		seenCmd[clean] = true
 		dedupCmds = append(dedupCmds, e)
 	}
-	cmds = dedupCmds
-	cwd := howCwd()
-	if strings.TrimSpace(a.Project) != "" && !howProjectMatches(a.Project, howScope(cwd, "", false)) {
-		cwd = ""
-	}
-	files := orientFiles(dir, scope, cwd)
-	if cwd != "" {
-		if root := sources.RepoRoot(cwd); root != "" && !fileThere(sources.RepoMemoryPath(root)) {
-			autoEvolveRepoMemory(dir, cwd)
-		}
-	}
-	repoEntries := orientRepoMemory(cwd, policy.ActivationMCP)
-	where := howScopeName(scope)
-	if where == "" {
-		where = "this machine"
-	}
-	if len(cmds) == 0 && len(files) == 0 && len(repoEntries) == 0 {
-		if note := ignoredHiddenNoteFor("answer", ignored); note != "" {
-			return strings.TrimSpace(note), 0, nil
-		}
-		if note := policyHiddenNote(policy.ActivationMCP, hidden); note != "" {
-			return strings.TrimSpace(note), 0, nil
-		}
-		// Sessions with nothing to orient by are still sessions: saying none
-		// worked here sent an agent away from history recall had.
-		if n := orientSessionCount(dir, scope); n > 0 {
-			return fmt.Sprintf("%s worked in %s, but no command or file repeats across them. Recall with project %q reads what they said.", pluralSessions(n), where, where), 0, nil
-		}
-		return fmt.Sprintf("No past session on this machine worked in %s.", where) + emptyStoreNote(dir), 0, nil
-	}
-
-	var b strings.Builder
-	fmt.Fprintf(&b, "how work has been done in %s, from past sessions here\n", where)
-	if len(repoEntries) > 0 {
-		fmt.Fprintf(&b, "committed in %s:\n", repoFileShown)
-		for i, e := range repoEntries {
-			if i >= orientFilesShown {
-				break
-			}
-			fmt.Fprintf(&b, "- [%s] %s\n", e.Kind, search.SafeLine(e.Text))
-		}
-	}
-	if len(cmds) > 0 {
-		fmt.Fprintln(&b, "commands, by how many sessions ran them:")
-		for i, e := range cmds {
-			if i >= limit {
-				break
-			}
-			fmt.Fprintf(&b, "- %s · %s", orientCommand(e.Command), pluralSessions(len(e.Sessions)))
-			if e.Failures > 0 {
-				fmt.Fprintf(&b, " · failed in %d", e.Failures)
-			}
-			if !e.Last.IsZero() {
-				fmt.Fprintf(&b, " · last %s", e.Last.Format("Jan 2"))
-			}
-			fmt.Fprintln(&b)
-		}
-	}
-	if len(files) > 0 {
-		fmt.Fprintln(&b, "files those sessions opened or edited:")
-		for i, f := range files {
-			if i >= orientFilesShown {
-				break
-			}
-			fmt.Fprintf(&b, "- %s · %s\n", f.Path, pluralSessions(f.Sessions))
-		}
-	}
-	coupled := orientCoChangePairs(dir, scope, cwd, files, policy.ActivationMCP)
-	if len(coupled) > 0 {
-		fmt.Fprintln(&b, "coupled files (usually edited together):")
-		for _, pair := range coupled {
-			fmt.Fprintf(&b, "- %s\n", pair)
-		}
-	}
-	fixes := orientProjectFixes(dir, scope, cwd, policy.ActivationMCP)
-	if len(fixes) > 0 {
-		fmt.Fprintln(&b, "known traps and verified fixes here:")
-		for i, fx := range fixes {
-			if i >= orientCommandsShown {
-				break
-			}
-			fmt.Fprintf(&b, "- %s\n", fx)
-		}
-	}
-	corrections := orientProjectCorrections(dir, scope, policy.ActivationMCP)
-	if len(corrections) > 0 {
-		fmt.Fprintln(&b, "recent user corrections here (do not repeat):")
-		for i, c := range corrections {
-			if i >= 3 {
-				break
-			}
-			fmt.Fprintf(&b, "- %s\n", c)
-		}
-	}
-	fmt.Fprint(&b, "This is what was done here before, not a rule — check a command still fits before running it.")
-	return frameRecall(b.String()), len(repoEntries) + len(cmds) + len(files) + len(coupled) + len(fixes) + len(corrections), nil
-}
-
-func orientRepoMemory(cwd, act string) []sources.RepoEntry {
-	if cwd == "" {
-		return nil
-	}
-	root := sources.RepoRoot(cwd)
-	if root == "" || !policy.Load().Allows(act, sources.RepoMemoryProject(root)) {
-		return nil
-	}
-	entries, _, err := sources.ReadRepoMemory(sources.RepoMemoryPath(root))
-	if err != nil || len(entries) == 0 {
-		return nil
-	}
-	sources.RememberRepoCheckout(root)
-	rank := map[string]int{"rejected": 0, "gotcha": 1, "decision": 2}
-	sort.SliceStable(entries, func(i, j int) bool {
-		if rank[entries[i].Kind] != rank[entries[j].Kind] {
-			return rank[entries[i].Kind] < rank[entries[j].Kind]
-		}
-		return entries[i].Date > entries[j].Date
-	})
-	return entries
+	return dedupCmds
 }
 
 // orientCommand is the command without the way one machine reached it. Half
@@ -454,7 +518,7 @@ func orientDigestBlock(dir, cwd string, projects []string, activation string) st
 	if len(recurring) == 0 && len(files) == 0 {
 		return ""
 	}
-	coupled := orientCoChangePairs(dir, projects, cwd, files, activation)
+	coupled := orientFilterCoupledByRepoMemory(cwd, orientCoChangePairs(dir, projects, cwd, files, activation))
 	fixes := orientProjectFixes(dir, projects, cwd, activation)
 	corrections := orientProjectCorrections(dir, projects, activation)
 	var b strings.Builder
@@ -672,7 +736,7 @@ func orientCoChangePairs(dir string, projects []string, cwd string, files []orie
 				}
 			}
 		}
-		companion, both, focused := coChangeCompanion(target, touching)
+		companion, both, focused := coChangeCompanionIn(cwd, target, touching)
 		if companion == "" {
 			continue
 		}
@@ -689,6 +753,44 @@ func orientCoChangePairs(dir string, projects []string, cwd string, files []orie
 			search.SafePath(baseName(target)), companion, both, focused))
 		if len(out) >= orientCommandsShown {
 			break
+		}
+	}
+	return out
+}
+
+func orientFilterCoupledByRepoMemory(cwd string, coupled []string) []string {
+	if cwd == "" || len(coupled) == 0 {
+		return coupled
+	}
+	root := sources.RepoRoot(cwd)
+	if root == "" {
+		return coupled
+	}
+	entries, _, err := readRepoMemoryAndNotes(root)
+	if err != nil || len(entries) == 0 {
+		return coupled
+	}
+	var out []string
+	for _, pair := range coupled {
+		sides, _, _ := strings.Cut(pair, " (")
+		a, b, ok := strings.Cut(sides, " ↔ ")
+		if !ok {
+			out = append(out, pair)
+			continue
+		}
+		aBase := strings.ToLower(baseName(strings.TrimSpace(a)))
+		bBase := strings.ToLower(baseName(strings.TrimSpace(b)))
+		covered := false
+		for _, e := range entries {
+			low := strings.ToLower(e.Text)
+			if (strings.Contains(low, "requires updating") || strings.Contains(low, "edited alongside")) &&
+				strings.Contains(low, aBase) && strings.Contains(low, bBase) {
+				covered = true
+				break
+			}
+		}
+		if !covered {
+			out = append(out, pair)
 		}
 	}
 	return out
@@ -839,6 +941,11 @@ func orientProjectCorrections(dir string, projects []string, activation string) 
 
 func isOrientActionableCorrection(s string) bool {
 	if s == "" || strings.HasPrefix(s, "!") || pseudoUserRe.MatchString(s) || !isStandingCorrection(s) {
+		return false
+	}
+	if strings.Contains(s, "<SYSTEM_MESSAGE>") || strings.Contains(s, "<ADDITIONAL_METADATA>") ||
+		strings.Contains(s, "<USER_REQUEST>") || strings.Contains(s, "not actually sent by the user") ||
+		strings.ContainsRune(s, '?') {
 		return false
 	}
 	return true
@@ -992,6 +1099,10 @@ func orientSkipFixError(errLine string) bool {
 		strings.HasPrefix(low, "encountered error in step execution:") || strings.HasPrefix(low, "fatal: bad revision ") {
 		return true
 	}
+	if strings.HasPrefix(low, "grep ") || strings.HasPrefix(low, "rg ") || strings.HasPrefix(low, "git diff") ||
+		strings.HasPrefix(low, "git status") || strings.HasPrefix(low, "ls ") || strings.HasPrefix(low, "which ") {
+		return true
+	}
 	if strings.HasPrefix(low, "fail\t") && strings.HasSuffix(low, "[build failed]") {
 		return true
 	}
@@ -1001,6 +1112,7 @@ func orientSkipFixError(errLine string) bool {
 	for _, compileNoise := range []string{
 		": undefined: ", "imported and not used", "declared and not used",
 		"syntax error:", "too many errors",
+		"failed to push some refs", "protected branch", "gh006:",
 	} {
 		if strings.Contains(low, compileNoise) {
 			return true
@@ -1013,7 +1125,7 @@ func orientDestructiveRemedy(cmd string) bool {
 	low := " " + strings.ToLower(cmd) + " "
 	for _, bad := range []string{
 		" git reset ", " git checkout ", " git clean ", " git stash ",
-		" rm -rf ", " rm -f ",
+		" git push ", " rm -rf ", " rm -f ",
 	} {
 		if strings.Contains(low, bad) {
 			return true

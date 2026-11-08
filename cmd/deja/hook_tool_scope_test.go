@@ -37,9 +37,9 @@ func TestFileScopeDoesNotCrossProjectsOnABareName(t *testing.T) {
 }
 
 func TestCommandProjectCandidatesInfersFromPathWhenUnscoped(t *testing.T) {
-	got := commandProjectCandidates("", "cat /var/run/splitbox/sing-box-cluster.json")
-	if !namesInclude(got, "splitbox") {
-		t.Fatalf("expected commandProjectCandidates to infer 'splitbox', got %v", got)
+	got := commandProjectCandidates("", "cat /var/run/edgeproxy/envoy-cluster.json")
+	if !namesInclude(got, "edgeproxy") {
+		t.Fatalf("expected commandProjectCandidates to infer 'edgeproxy', got %v", got)
 	}
 	if namesInclude(got, "var") || namesInclude(got, "run") {
 		t.Fatalf("expected system path segments to be excluded, got %v", got)
@@ -47,10 +47,10 @@ func TestCommandProjectCandidatesInfersFromPathWhenUnscoped(t *testing.T) {
 }
 
 func TestProjectMatchesAnyTermMatchesRepoBasename(t *testing.T) {
-	if !projectMatchesAnyTerm("goprojects/splitbox", []string{"splitbox"}) {
+	if !projectMatchesAnyTerm("goprojects/edgeproxy", []string{"edgeproxy"}) {
 		t.Error("expected projectMatchesAnyTerm to match repo basename in parent/repo project")
 	}
-	if projectMatchesAnyTerm("goprojects/splitbox", []string{"box"}) {
+	if projectMatchesAnyTerm("goprojects/edgeproxy", []string{"proxy"}) {
 		t.Error("expected projectMatchesAnyTerm not to match partial segment")
 	}
 }
