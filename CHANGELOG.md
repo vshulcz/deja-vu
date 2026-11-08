@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Bash and PowerShell completion for `deja last` and `deja stats` no longer suggests flags while an option is waiting for its project, duration, or origin value.
+
 ## [0.24.0] - 2026-11-05
 
 Sub-50 ms hook and MCP hot path, project X-Ray and symbol decision recall,

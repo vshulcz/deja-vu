@@ -153,10 +153,13 @@ _deja_completion() {
             COMPREPLY=( $(compgen -W "$install_targets --no-guidance" -- "$cur") )
             ;;
         last)
+            # Bash reads suggestions from COMPREPLY; an empty array leaves values alone.
             if [[ "$prev" == "--harness" ]]; then
                 COMPREPLY=( $(compgen -W "$harnesses" -- "$cur") )
             elif [[ "$prev" == "--role" ]]; then
                 COMPREPLY=( $(compgen -W "%ROLES%" -- "$cur") )
+            elif [[ "$prev" == "--project" || "$prev" == "--since" || "$prev" == "--from" ]]; then
+                COMPREPLY=()
             else
                 COMPREPLY=( $(compgen -W "--json --from --harness --project --since --role" -- "$cur") )
             fi
@@ -221,6 +224,8 @@ _deja_completion() {
                 COMPREPLY=( $(compgen -W "$harnesses" -- "$cur") )
             elif [[ "$prev" == "--role" ]]; then
                 COMPREPLY=( $(compgen -W "%ROLES%" -- "$cur") )
+            elif [[ "$prev" == "--project" || "$prev" == "--since" ]]; then
+                COMPREPLY=()
             else
                 COMPREPLY=( $(compgen -W "--json --impact --year --html --redaction --card --harness --project --since --role" -- "$cur") )
             fi
@@ -786,8 +791,10 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
             'install' { $installTargets + @('--no-guidance', '--no-index', '--no-mcp', '--force') }
             'uninstall' { $installTargets + @('--no-guidance') }
             'last' {
+                # This switch emits candidates; @() emits none for an option's value.
                 if ($previous -eq '--harness') { $harnesses }
                 elseif ($previous -eq '--role') { $roles }
+                elseif ($previous -in @('--project', '--since', '--from')) { @() }
                 else { @('--json', '--from', '--harness', '--project', '--since', '--role') }
             }
             'recall' {
@@ -820,6 +827,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
             'stats' {
                 if ($previous -eq '--harness') { $harnesses }
                 elseif ($previous -eq '--role') { $roles }
+                elseif ($previous -in @('--project', '--since')) { @() }
                 else { @('--json', '--impact', '--year', '--html', '--redaction', '--card', '--harness', '--project', '--since', '--role') }
             }
             'sync' {

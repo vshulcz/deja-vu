@@ -290,6 +290,25 @@ func TestCompletionShowBlockLeavesCountsAlone(t *testing.T) {
 	}
 }
 
+// The value guards must also be present when a contributor lacks either shell.
+func TestCompletionLastAndStatsLeaveValuesAlone(t *testing.T) {
+	for _, tc := range []struct{ shell, command, valueGuard string }{
+		{"bash", "last", `elif [[ "$prev" == "--project" || "$prev" == "--since" || "$prev" == "--from" ]]; then
+                COMPREPLY=()`},
+		{"bash", "stats", `elif [[ "$prev" == "--project" || "$prev" == "--since" ]]; then
+                COMPREPLY=()`},
+		{"powershell", "last", `elseif ($previous -in @('--project', '--since', '--from')) { @() }`},
+		{"powershell", "stats", `elseif ($previous -in @('--project', '--since')) { @() }`},
+	} {
+		t.Run(tc.shell+"/"+tc.command, func(t *testing.T) {
+			block := shellCommandBlock(tc.shell, emittedCompletion(t, tc.shell), tc.command)
+			if !strings.Contains(block, tc.valueGuard) {
+				t.Errorf("%s %s completion offers flags where a value is expected:\n%s", tc.shell, tc.command, block)
+			}
+		})
+	}
+}
+
 // friction shared one case with fix and tests in every shell, so Tab never
 // offered --settle or --unsettle, which `deja help friction` documents. Its
 // case is its own now; fix keeps the two flags it takes, and the wall id after
