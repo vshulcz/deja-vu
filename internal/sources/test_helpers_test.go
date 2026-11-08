@@ -28,10 +28,17 @@ func parseClaudeGenericFromOffset(path string, offset int64) ([]model.Session, e
 		if typ != "user" && typ != "assistant" {
 			return
 		}
+		origin, _ := m["origin"].(map[string]any)
+		kind, _ := origin["kind"].(string)
+		isPeer := false
 		if meta, _ := m["isMeta"].(bool); meta && typ == "user" {
-			// The harness's own user-role record (#3267); the typed parser
-			// skips it the same way.
-			return
+			if kind == "peer" {
+				isPeer = true
+			} else {
+				// The harness's own user-role record (#3267); the typed parser
+				// skips it the same way.
+				return
+			}
 		}
 		side, _ := m["isSidechain"].(bool)
 		agent, _ := m["agentId"].(string)
@@ -58,6 +65,20 @@ func parseClaudeGenericFromOffset(path string, offset int64) ([]model.Session, e
 			if toolOut {
 				role = RoleToolOutput
 			}
+		}
+		if isPeer {
+			body, _ := origin["body"].(string)
+			body = strings.TrimSpace(body)
+			msgText := strings.TrimSpace(txt)
+			if !strings.HasPrefix(body, "[Subagent hand-back]") && !strings.Contains(body, "hand-back") &&
+				!strings.HasPrefix(msgText, "[Subagent hand-back]") && !strings.Contains(msgText, "hand-back") {
+				return
+			}
+			role = "assistant"
+			if txt == "" && body != "" {
+				txt = body
+			}
+			txt = stripSubagentFrame(txt)
 		}
 		if summary, _ := m["isCompactSummary"].(bool); summary && typ == "user" && role == "user" {
 			role = RoleSummary
