@@ -33,10 +33,22 @@ func zcodeConfigPath() string {
 	return filepath.Join(sources.ZCodeConfigDir(), "cli", "setting.json")
 }
 
-// zcodeLegacyConfigPath is where deja wrote before #4429. An uninstall clears
-// it too, or ZCode's migration could bring a removed server back.
+// zcodeLegacyConfigPath is where deja wrote before #4429, and where the 3.17+
+// desktop build reads its live config. An uninstall clears it too, or ZCode's
+// migration could bring a removed server back.
 func zcodeLegacyConfigPath() string {
 	return filepath.Join(sources.ZCodeConfigDir(), "cli", "config.json")
+}
+
+// zcodeDoctorPath names whichever of the two files exists: a 3.17+ desktop
+// machine has config.json only, an already-migrated 3.14.4 CLI has
+// setting.json. Reporting against a path that is not there made a correctly
+// wired 3.17+ install read as missing (#4429's shape, the other way round).
+func zcodeDoctorPath() string {
+	if !fileExists(zcodeConfigPath()) && fileExists(zcodeLegacyConfigPath()) {
+		return zcodeLegacyConfigPath()
+	}
+	return zcodeConfigPath()
 }
 
 // readZCodeSetting reads the file an install edits. Before ZCode's first
@@ -196,12 +208,14 @@ func zcodeHookEntry(command string, timeout int) map[string]any {
 func installZCodeAuto(exe string, uninstall bool) (installResult, error) {
 	// The server first, then the hooks: `deja install --auto` installs the
 	// -auto target alone, and hooks without the server would leave the tool
-	// half-wired with nothing saying so.
+	// half-wired with nothing saying so. Check whether config.json is the live
+	// runtime config before installZCode creates setting.json.
+	alsoLiveConfig := !uninstall && zcodeConfigIsLiveRuntimeConfig()
 	server, err := installZCode(exe, uninstall)
 	if err != nil {
 		return installResult{}, err
 	}
-	hooksRes, err := installZCodeHooks(exe, uninstall)
+	hooksRes, err := installZCodeHooksWith(exe, uninstall, alsoLiveConfig)
 	if err != nil {
 		return installResult{}, err
 	}
@@ -221,6 +235,10 @@ func installZCodeAuto(exe string, uninstall bool) (installResult, error) {
 }
 
 func installZCodeHooks(exe string, uninstall bool) (installResult, error) {
+	return installZCodeHooksWith(exe, uninstall, !uninstall && zcodeConfigIsLiveRuntimeConfig())
+}
+
+func installZCodeHooksWith(exe string, uninstall, alsoLiveConfig bool) (installResult, error) {
 	// The launcher, not this binary: a generated plugin is as much a
 	// config as a hooks.json, and one that names the build it was
 	// installed from stops working the day that build moves (#3682).
@@ -230,7 +248,56 @@ func installZCodeHooks(exe string, uninstall bool) (installResult, error) {
 	if err != nil {
 		return installResult{}, err
 	}
+	// A 3.17+ desktop build keeps reading config.json instead of the
+	// setting.json the 3.14.4 CLI runtime migrated to (#4429). Write the hooks
+	// there too, so either runtime runs them. The server stays in setting.json —
+	// putting it in config.json would bring it back through the migration.
+	if alsoLiveConfig {
+		legacyRes, lerr := edit(zcodeLegacyConfigPath(), false)
+		if lerr != nil {
+			return installResult{}, lerr
+		}
+		res = wroteAll(res, legacyRes)
+	}
 	return zcodeAlsoLegacy(res, uninstall, edit)
+}
+
+// zcodeConfigJSONSince is the first ZCode desktop release that keeps reading
+// config.json instead of the setting.json the 3.14.4 CLI runtime migrated to
+// (#4429). On 3.17.2.9661 the runtime log names config.json hundreds of times
+// and setting.json not once, and neither setting.json nor the migration marker
+// exists. Older builds keep the setting.json behaviour.
+var zcodeConfigJSONSince = [3]int{3, 17, 0}
+
+// zcodeConfigIsLiveRuntimeConfig says whether config.json is the file this
+// ZCode actually reads, not the one-off migration source of a first launch.
+// A 3.17+ desktop build reads it for good; where the version cannot be read —
+// another platform, or an app installed outside LOCALAPPDATA — the shape of
+// the file answers instead: a hooks block means the runtime maintains it,
+// while a first-launch migration source has no hooks at all.
+func zcodeConfigIsLiveRuntimeConfig() bool {
+	setting := zcodeConfigPath()
+	if fileExists(filepath.Join(filepath.Dir(setting), "migrations", "settings-v1.json")) {
+		return false
+	}
+	legacy := zcodeLegacyConfigPath()
+	b, err := readConfig(legacy)
+	if err != nil || len(b) == 0 {
+		return false
+	}
+	if fileExists(setting) {
+		return zcodeHooksRun(b)
+	}
+	if v, ok := zcodeDesktopVersion(); ok {
+		return !versionBefore(v, zcodeConfigJSONSince)
+	}
+	var root struct {
+		Hooks json.RawMessage `json:"hooks"`
+	}
+	if json.Unmarshal(b, &root) != nil {
+		return false
+	}
+	return len(root.Hooks) > 0 && string(root.Hooks) != "null"
 }
 
 func zcodeHooksAt(path, exe string, uninstall bool) (installResult, error) {
