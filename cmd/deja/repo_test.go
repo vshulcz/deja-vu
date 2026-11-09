@@ -863,10 +863,12 @@ func TestHookPrecisionAndGuardrails(t *testing.T) {
 
 	// 17. Anti-Hallucination Package Symbol Predictor.
 	searchDir := filepath.Join(root, "internal", "search")
-	if err := os.MkdirAll(searchDir, 0o755); err != nil {
+	err = os.MkdirAll(searchDir, 0o755)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(searchDir, "snippet_format.go"), []byte("package search\n\nfunc SafeLine(s string) string {\n\treturn s\n}\n"), 0o644); err != nil {
+	err = os.WriteFile(filepath.Join(searchDir, "snippet_format.go"), []byte("package search\n\nfunc SafeLine(s string) string {\n\treturn s\n}\n"), 0o644)
+	if err != nil {
 		t.Fatal(err)
 	}
 	repoGit(t, root, "add", "internal/search/snippet_format.go")
@@ -874,7 +876,8 @@ func TestHookPrecisionAndGuardrails(t *testing.T) {
 
 	hallucinatedEdit := fmt.Sprintf(`{"tool_name":"Edit","tool_input":{"file_path":%q,"old_string":"func VerifyToken() {}","new_string":"func VerifyToken() {\n\t_ = search.CleanLine(\"jwt\")\n}"}}`, guardedFile)
 	var inpHal toolHookInput
-	if err := json.Unmarshal([]byte(hallucinatedEdit), &inpHal); err != nil {
+	err = json.Unmarshal([]byte(hallucinatedEdit), &inpHal)
+	if err != nil {
 		t.Fatal(err)
 	}
 	inpHal.adopt()
@@ -886,10 +889,12 @@ func TestHookPrecisionAndGuardrails(t *testing.T) {
 
 	// 18. Live Same-Session User Rule Pinning.
 	installAutoDir := filepath.Join(root, "cmd", "deja")
-	if err := os.MkdirAll(installAutoDir, 0o755); err != nil {
+	err = os.MkdirAll(installAutoDir, 0o755)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(installAutoDir, "install_auto.go"), []byte("package main\n\nfunc InstallAuto() {}\n"), 0o644); err != nil {
+	err = os.WriteFile(filepath.Join(installAutoDir, "install_auto.go"), []byte("package main\n\nfunc InstallAuto() {}\n"), 0o644)
+	if err != nil {
 		t.Fatal(err)
 	}
 	repoGit(t, root, "add", "cmd/deja/install_auto.go")
@@ -897,12 +902,14 @@ func TestHookPrecisionAndGuardrails(t *testing.T) {
 
 	userPromptJSON := fmt.Sprintf(`{"hook_event_name":"UserPromptSubmit","prompt":"never use cp in install_auto.go, always use install -m 755","cwd":%q,"session_id":"live-pin-session"}`, root)
 	var promptOut bytes.Buffer
-	if err := runHookPrompt(dir, strings.NewReader(userPromptJSON), &promptOut); err != nil {
+	err = runHookPrompt(dir, strings.NewReader(userPromptJSON), &promptOut)
+	if err != nil {
 		t.Fatal(err)
 	}
 	var inpLive toolHookInput
 	liveEditJSON := fmt.Sprintf(`{"tool_name":"Edit","tool_input":{"file_path":"cmd/deja/install_auto.go","old_string":"func InstallAuto() {}","new_string":"func InstallAuto() { /* edit */ }"},"cwd":%q,"session_id":"live-pin-session"}`, root)
-	if err := json.Unmarshal([]byte(liveEditJSON), &inpLive); err != nil {
+	err = json.Unmarshal([]byte(liveEditJSON), &inpLive)
+	if err != nil {
 		t.Fatal(err)
 	}
 	inpLive.adopt()
@@ -964,7 +971,7 @@ func TestHookPrecisionAndGuardrails(t *testing.T) {
 	// 21. Polyglot sibling test discovery (Python, TypeScript, Rust), cross-file callers,
 	// Rust panic target parsing, and compiler symbol signature lookup.
 	pyDir := filepath.Join(root, "pypkg")
-	if err := os.MkdirAll(pyDir, 0o755); err != nil {
+	if err = os.MkdirAll(pyDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	_ = os.WriteFile(filepath.Join(pyDir, "worker.py"), []byte("def process_batch(items):\n    return len(items)\n"), 0o644)
@@ -974,7 +981,7 @@ func TestHookPrecisionAndGuardrails(t *testing.T) {
 	}
 
 	tsDir := filepath.Join(root, "tspkg")
-	if err := os.MkdirAll(tsDir, 0o755); err != nil {
+	if err = os.MkdirAll(tsDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	_ = os.WriteFile(filepath.Join(tsDir, "router.ts"), []byte("export function resolveRoute(p: string) { return '/api/v1/orders'; }\n"), 0o644)
@@ -984,7 +991,7 @@ func TestHookPrecisionAndGuardrails(t *testing.T) {
 	}
 
 	rsDir := filepath.Join(root, "rspkg")
-	if err := os.MkdirAll(rsDir, 0o755); err != nil {
+	if err = os.MkdirAll(rsDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	_ = os.WriteFile(filepath.Join(rsDir, "engine.rs"), []byte("pub fn compute_hash(x: u32) -> u32 { x + 1 }\n#[test]\nfn test_compute_hash() {\n    assert_eq!(compute_hash(1), 2);\n}\n"), 0o644)
@@ -1029,7 +1036,7 @@ func TestHookPrecisionAndGuardrails(t *testing.T) {
 		t.Fatal("expected coChangeCompanionBetter and isAmbiguousCoChangeBase to return true")
 	}
 	authDir := filepath.Join(root, "internal", "auth")
-	if err := os.MkdirAll(authDir, 0o755); err != nil {
+	if err = os.MkdirAll(authDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	_ = os.WriteFile(filepath.Join(authDir, "token.go"), []byte("package auth\n\nfunc VerifyBearerToken(raw string) bool { return raw != \"\" }\n"), 0o644)
@@ -1063,5 +1070,92 @@ func TestHookPrecisionAndGuardrails(t *testing.T) {
 		if got := testHeaderName(tc.in); got != tc.want {
 			t.Fatalf("testHeaderName(%q) = %q, want %q", tc.in, got, tc.want)
 		}
+	}
+
+	// 22. Multi-harness live turn-pair refusal & prevAssistant continuation parity:
+	// Claude/Codex/Cursor transcript_path and Cline in-memory messages in runHookPromptMode.
+	claudeTranscript := filepath.Join(t.TempDir(), "claude-session.jsonl")
+	claudeRows := strings.Join([]string{
+		`{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Try running **` + "`--skip-fsync`" + `** on ` + "`wal_writer`" + ` to speed up commits."}]}}`,
+		`{"type":"user","message":{"role":"user","content":"No, we never disable fsync on production storage"}}`,
+	}, "\n") + "\n"
+	err = os.WriteFile(claudeTranscript, []byte(claudeRows), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var claudeHookOut bytes.Buffer
+	var claudePayload []byte
+	claudePayload, err = json.Marshal(map[string]string{
+		"prompt":          "No, we never disable fsync on production storage",
+		"session_id":      "claude-live-1",
+		"transcript_path": claudeTranscript,
+		"cwd":             root,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = runHookPromptMode(dir, bytes.NewReader(claudePayload), &claudeHookOut, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Another session in the same repo mentions `wal_writer` (co-occurring term from assistant turn)
+	// or a short continuation after assistant re-proposes `--skip-fsync`:
+	var clineMsgs []byte
+	clineMsgs, err = json.Marshal([]map[string]string{
+		{"role": "assistant", "content": "Should we enable `--skip-fsync` on `wal_writer` now?"},
+		{"role": "user", "content": "давай"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var clineHookOut bytes.Buffer
+	var clinePayload []byte
+	clinePayload, err = json.Marshal(map[string]any{
+		"prompt":     "давай",
+		"session_id": "cline-live-2",
+		"cwd":        root,
+		"harness":    "cline",
+		"messages":   json.RawMessage(clineMsgs),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = runHookPromptMode(dir, bytes.NewReader(clinePayload), &clineHookOut, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(clineHookOut.String(), "Do not suggest --skip-fsync: No, we never disable fsync on production storage") {
+		t.Fatalf("cline short continuation hook output = %q, want --skip-fsync standing rule triggered by prevAssistant", clineHookOut.String())
+	}
+
+	// 23. Deferred/sidecar edit argument preservation (Antigravity, Goose, Reasonix):
+	// Verify that AntigravityEditCalls, editFileCallLines, and rxHookToolInput preserve
+	// old_string/new_string so caller and symbol-level guards fire on deferred harnesses too.
+	agySteps := []transcriptStep{
+		{
+			Type: "PLANNER_RESPONSE",
+			ToolCalls: []any{
+				map[string]any{
+					"name": "edit_file",
+					"args": map[string]any{
+						"Path":        plainFile,
+						"Target":      "func PlainHelper() error {",
+						"Replacement": "func PlainHelper(strict bool) error {",
+					},
+				},
+			},
+		},
+	}
+	agyCalls := latestEditCallsFromSteps(agySteps)
+	if len(agyCalls) != 1 || !strings.Contains(agyCalls[0].OldString, "func PlainHelper()") || !strings.Contains(agyCalls[0].NewString, "strict bool") {
+		t.Fatalf("latestEditCallsFromSteps = %+v, want OldString and NewString preserved", agyCalls)
+	}
+	agyEditLine := editFileCallLines(dir, agyCalls, "agy-caller-session", root)
+	if !strings.Contains(agyEditLine, "PlainHelper") || !strings.Contains(agyEditLine, "cmd/server/handler.go") {
+		t.Fatalf("editFileCallLines (Antigravity/Goose) = %q, want zero-history caller guard for PlainHelper", agyEditLine)
+	}
+	_, rxInput := rxHookToolInput("edit_file", `{"path":"internal/auth/plain.go","old_string":"func PlainHelper() error {","new_string":"func PlainHelper(mode int) error {"}`, root)
+	if rxInput["old_string"] == "" || rxInput["new_string"] == "" {
+		t.Fatalf("rxHookToolInput = %+v, want old_string and new_string preserved", rxInput)
 	}
 }

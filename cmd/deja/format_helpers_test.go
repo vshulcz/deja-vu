@@ -36,7 +36,7 @@ func TestStatsFormattingHelpers(t *testing.T) {
 	if got := stats.Title(model.Session{Title: "Clean title"}); got != "Clean title" {
 		t.Fatalf("stats.Title title = %q", got)
 	}
-	if got := statHarnessTag("claude", true); !strings.Contains(got, "[claude]") || !strings.Contains(got, statOrange) {
+	if got := statHarnessTag("claude", true); !strings.Contains(got, "[claude]") || !strings.Contains(got, harnesscolor.ANSI("claude")) {
 		t.Fatalf("claude tag = %q", got)
 	}
 	if got := statHarnessTag("codex", true); !strings.Contains(got, harnesscolor.ANSI("codex")) {

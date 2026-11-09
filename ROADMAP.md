@@ -26,10 +26,10 @@ the place to discuss design.
 ## Next
 
 - **Compaction recovery across the remaining hosts.** The recovery packet after
-  context compaction now reaches 34 of the 43 harnesses — either through a
-  native `PreCompact` hook or by catching up from the store's pre-summary turns
-  on the next hook that reaches the model. What remains is wiring the hosts
-  whose compaction seams are still landing upstream (`#308`).
+  context compaction now reaches 35 of the 43 harnesses (with reset and capture
+  in 36) — either through a native `PreCompact` / `PostCompaction` hook or by
+  catching up from the store's pre-summary turns on the next hook that reaches
+  the model. The remaining hosts are blocked on upstream compaction hooks (`#308`).
 - **Pre-execution plan checks.** `deja check` answers a proposed plan with what
   this machine already settled or reverted on the same files, and `hook-plan`
   delivers it before execution. Wiring it by default waits on measuring how
@@ -37,10 +37,10 @@ the place to discuss design.
 - **Query-scoped reuse.** Reuse is a global signal today: a session recalled
   for one topic receives a small lift everywhere. Recording which terms a
   recall served lets the lift apply only when the same subject returns.
-- **Point-of-action coverage.** Prior file decisions before an edit reach 31 of
-  the 43 harnesses and failure repairs reach 30. As upstream harnesses add
-  pre/post tool hooks or plugin middleware, each is wired and recorded in the
-  format registry with a reproducible stand check.
+- **Point-of-action coverage.** Prior file decisions before an edit and failure
+  repairs now reach 37 of the 43 harnesses. As the remaining 6 upstream
+  harnesses add pre/post tool hooks or plugin middleware, each is wired and
+  recorded in the format registry with a reproducible stand check.
 
 ## Later
 

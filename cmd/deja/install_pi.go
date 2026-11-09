@@ -587,7 +587,7 @@ export default function (pi: any) {
         }
         return;
       }
-      const raw = run(["hook-prompt"], JSON.stringify({ prompt: event.prompt || "", session_id: sessionID(), parent_session_id: parent }));
+      const raw = run(["hook-prompt"], JSON.stringify({ prompt: event.prompt || "", session_id: sessionID(), parent_session_id: parent, transcript_path: sessionFile, cwd: process.cwd() }));
       if (!raw) return;
       const resp = JSON.parse(raw);
       if (resp && resp.systemMessage) ctx.ui.notify(resp.systemMessage, "info");
@@ -623,7 +623,7 @@ export default function (pi: any) {
         if (!(id in repaired)) {
           repaired[id] = run(["hook-tool", "--plain"], JSON.stringify({
             tool_name: event.toolName,
-            tool_input: { file_path: path },
+            tool_input: { ...(event.input || {}), file_path: path },
             session_id: sessionID(),
             cwd: process.cwd(),
           }));

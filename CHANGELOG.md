@@ -7,9 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.1] - 2026-11-09
+
+Repository memory (`.deja/memory.jsonl` and `deja review`), zonal BM25F and
+corpus-learned collocation mining, multilingual live standing-rule and edit
+guards across all 44 harnesses, Streamable HTTP MCP transport (`--http`), and
+Devin CLI `PostCompaction` / Windsurf `deja rules sync` parity.
+
+### Added
+
+- `.deja/memory.jsonl` repository memory, `deja repo`, and `deja review` track file- and commit-linked decisions and traps. Hooks auto-seed and evolve repo memory, surfacing coupled files, caller/signature guards, test assertion predictors, and error remedies (#5964, #5981).
+- Zonal BM25F field weighting and NPMI collocation mining improve multilingual recall across EN, RU, ZH, and JA. Adds 1-hop associative query expansion, Dirichlet log-odds discourse marker learning, and trajectory-verified conclusion synthesis (#5989).
+- Live turn-pair refusal capture (`syncLiveSessionRules`) and edit-payload guards (`old_string` / `new_string`) work across all 44 harnesses. Covers plugin, sidecar, and deferred harnesses including Claude Code, Codex, OpenCode, Cursor, Antigravity, Goose, Pi, Cline, Amp, DeepSeek, OpenClaw, Hermes, Prime, and Reasonix.
+- Devin CLI `PostCompaction` capture and recovery packet delivery from `sessions.db` (`compact/prior_node_ids`), plus `deja rules sync` (with Cascade's 6,000-character cap) and status bar parity for Windsurf and Kiro IDE (`docs/registry/registry.json`).
+- Opt-in Streamable HTTP transport (`deja mcp --http`) and `DEJA_EMBED_BATCH` batching control (#5968, #5969).
+- DeepSeek Harness (`dsh`) search controls with customizable keys and a scoped `/deja` command (#5978, #5990).
+- SpecStory, Basic Memory, Mem0, and MiniMax Code guides (#5977, #5991, #5994).
+
+### Changed
+
+- `deja embed` semantic search reads only winning record offsets and calibrates the cosine floor for low-cosine models and distributions (#5979, #5980).
+- Qwen Code and Gemini CLI MCP recall blocks hand off through `PostToolUse` so the TUI stays collapsed.
+
 ### Fixed
 
-- Bash and PowerShell completion for `deja last` and `deja stats` no longer suggests flags while an option is waiting for its project, duration, or origin value.
+- Antigravity MCP config marks `deja` eager (`forceAllToolsEager` and `tools.deja.eager`), Kilo Code and Kiro `deja install` auto-allow `deja` (`alwaysAllow` / `autoApprove`), and Antigravity/Goose deferred hooks surface pre-edit file guards on `read_file` and `view_file` (#5987, #5992).
+- ZCode Desktop 3.17+ hook wiring writes to `config.json` and `deja doctor` reads the active file (#5960, #5984).
+- OpenCode session reader reads `session_v2` when the legacy table is a leftover (#5962).
+- Tightened redactor patterns, friction signatures, compaction carry, recall project scoping, and duplicate hook-check deduplication in `deja doctor` (#5968, #5973, #5974, #5982, #5985, #5986, #5988).
+- Shell completion for `deja last`, `deja stats`, and `deja show --offset`/`--limit` stops suggesting flags while an option awaits its value, `deja show` treats whitespace-only session IDs as missing, and `deja blame` refuses blank paths before and after `--` (#5955, #5961, #5983, #5993).
 
 ## [0.24.0] - 2026-11-05
 

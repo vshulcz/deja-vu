@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -33,7 +34,7 @@ const (
 
 // rulesHarnesses are the harnesses whose global rules file deja knows, in the
 // order `deja rules` lists them.
-var rulesHarnesses = []string{"claude-code", "codex", "opencode", "gemini", "qwen", "kimi", "grok", "goose", "copilot", "vscode", "cline", "kilocode", "zed", "antigravity", "cherrystudio", "hermes", "aider", "continue", "trae", "trae-ide", "pi", "omp", "senpi", "gjc", "prime", "kimchi", "codewhale", "junie", "crush", "codebuddy", "workbuddy", "commandcode", "kiro", "roo", "zcode", "amp", "cursor", "deepseek", "openclaw", "reasonix", "muse", "devin"}
+var rulesHarnesses = []string{"claude-code", "codex", "opencode", "gemini", "qwen", "kimi", "grok", "goose", "copilot", "vscode", "cline", "kilocode", "zed", "antigravity", "cherrystudio", "hermes", "aider", "continue", "trae", "trae-ide", "pi", "omp", "senpi", "gjc", "prime", "kimchi", "codewhale", "junie", "crush", "codebuddy", "workbuddy", "commandcode", "kiro", "roo", "zcode", "amp", "cursor", "windsurf", "deepseek", "openclaw", "reasonix", "muse", "devin"}
 
 // rulesPath is the file a harness reads its global rules from, or "" when deja
 // does not know one. Only paths something already showed reach the model —
@@ -54,6 +55,8 @@ type rulesFile struct {
 	path, root, header string
 	// existing is a file deja may add to but never create.
 	existing bool
+	// maxRunes is an optional character cap the host enforces on the whole file.
+	maxRunes int
 }
 
 // ready is whether deja can write f: the agent's directory is there, and so is
@@ -271,6 +274,11 @@ func rulesFileFor(harness string) rulesFile {
 		// first-run ritual, so deja adds to one that exists and never creates it.
 		ws := openclawWorkspace()
 		return rulesFile{path: filepath.Join(ws, "AGENTS.md"), root: ws, existing: true}
+	case "windsurf":
+		// Cascade includes ~/.codeium/windsurf/memories/global_rules.md in
+		// every conversation up to its 6,000-character limit
+		// (docs.devin.ai/desktop/cascade/memories).
+		return rulesFile{path: windsurfRulesPath(), root: sources.WindsurfRoot(), maxRunes: windsurfRulesCap}
 	case "muse":
 		return museRules()
 	}
@@ -581,6 +589,11 @@ func writeRulesFile(f rulesFile, body string) (string, error) {
 			return "", err
 		}
 		return "removed", nil
+	}
+	if body != "" && f.maxRunes > 0 {
+		if n := utf8.RuneCountInString(next); n > f.maxRunes {
+			return "", fmt.Errorf("%s: would be %d characters with deja's rules block, over Cascade's %d", shortHome(path), n, f.maxRunes)
+		}
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return "", err

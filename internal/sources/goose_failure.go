@@ -6,8 +6,9 @@ import "strings"
 // turn: the output of the newest shell command that failed, and the files the
 // agent's editor calls changed, newest first.
 type GooseTurnState struct {
-	Failure string
-	Edits   []string
+	Failure   string
+	Edits     []string
+	EditCalls []EditCall
 }
 
 // GooseTurn reads the session's current turn from sessions.db, one query.
@@ -67,9 +68,10 @@ func gooseTurnIn(db, q string) (GooseTurnState, bool) {
 					st.Failure = gooseToolResult(m)
 				}
 			case "toolRequest":
-				if p := gooseEditPath(m); p != "" && !seen[p] {
-					seen[p] = true
-					st.Edits = append(st.Edits, p)
+				if ec := gooseEditCall(m); ec.FilePath != "" && !seen[ec.FilePath] {
+					seen[ec.FilePath] = true
+					st.Edits = append(st.Edits, ec.FilePath)
+					st.EditCalls = append(st.EditCalls, ec)
 				}
 			case "text":
 				if str(r["role"]) == "user" && withoutGooseTurnContext(str(m["text"])) != "" {
@@ -84,10 +86,10 @@ func gooseTurnIn(db, q string) (GooseTurnState, bool) {
 	return st, found
 }
 
-// gooseEditPath is the file an editor or reader call touches: the developer
-// extension's edit, write and read, or text_editor's str_replace, insert,
-// write and view.
-func gooseEditPath(m map[string]any) string {
+// gooseEditCall is the file and old/new snippet an editor or reader call
+// touches: the developer extension's edit, write and read, or text_editor's
+// str_replace, insert, write and view.
+func gooseEditCall(m map[string]any) EditCall {
 	name, args := gooseToolCall(m)
 	switch strings.TrimPrefix(name, "developer__") {
 	case "edit", "write", "read", "read_file", "view_file":
@@ -95,13 +97,16 @@ func gooseEditPath(m map[string]any) string {
 		switch str(args["command"]) {
 		case "str_replace", "insert", "write", "view":
 		default:
-			return ""
+			return EditCall{}
 		}
 	default:
-		return ""
+		return EditCall{}
 	}
-	if p := strings.TrimSpace(str(args["path"])); p != "" {
-		return p
+	p := firstNonEmpty(str(args["path"]), str(args["file_path"]))
+	if p == "" {
+		return EditCall{}
 	}
-	return strings.TrimSpace(str(args["file_path"]))
+	oldS := firstNonEmpty(str(args["old_text"]), str(args["old_str"]), str(args["old_string"]), str(args["before"]))
+	newS := firstNonEmpty(str(args["new_text"]), str(args["new_str"]), str(args["new_string"]), str(args["file_text"]), str(args["content"]), str(args["diff"]))
+	return EditCall{FilePath: p, OldString: oldS, NewString: newS}
 }

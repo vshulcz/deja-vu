@@ -76,15 +76,15 @@ func TestCaptureCompactionCarriesTheListForward(t *testing.T) {
 		return state.Data.Carry
 	}
 
-	appendTranscript(t, transcript, claudeLines(t, workspace, 1, "u", "проверь очередь", "a", "PR #7307 ждёт мейнтейнера."))
+	appendTranscript(t, transcript, claudeLines(t, workspace, 1, "u", "проверь очередь", "a", "PR #420 ждёт мейнтейнера."))
 	if _, ok := captureCompaction(dir, input); !ok {
 		t.Fatal("first capture stored nothing")
 	}
-	if got := carry(); len(got) != 1 || got[0].Key != "#7307" || got[0].Age != 0 {
+	if got := carry(); len(got) != 1 || got[0].Key != "#420" || got[0].Age != 0 {
 		t.Fatalf("first compaction: %+v", got)
 	}
 
-	// The next segment starts after Claude's summary and never names #7307:
+	// The next segment starts after Claude's summary and never names #420:
 	// the line is carried, one compaction older, next to what is new.
 	appendTranscript(t, transcript, claudeLines(t, workspace, 2,
 		"s", "This session is being continued from a previous conversation that ran out of context.",
@@ -97,14 +97,14 @@ func TestCaptureCompactionCarriesTheListForward(t *testing.T) {
 		t.Fatalf("second compaction did not merge the carried list: %+v", got)
 	}
 	out := digest.RenderCarry(got)
-	if !strings.HasPrefix(out, "Keep until closed") || !strings.Contains(out, "- [open] PR #7307") || !strings.Contains(out, "- [verdict] Гипотеза H12") {
+	if !strings.HasPrefix(out, "Keep until closed") || !strings.Contains(out, "- [open] PR #420") || !strings.Contains(out, "- [verdict] Гипотеза H12") {
 		t.Fatalf("the carried list renders as %q", out)
 	}
 
 	// A merge command in the next segment closes it.
 	appendTranscript(t, transcript, claudeLines(t, workspace, 3,
 		"s", "This session is being continued from a previous conversation that ran out of context.",
-		"u", "мержи", "t", "gh pr merge 7307 --squash"))
+		"u", "мержи", "t", "gh pr merge 420 --squash"))
 	if _, ok := captureCompaction(dir, input); !ok {
 		t.Fatal("third capture stored nothing")
 	}

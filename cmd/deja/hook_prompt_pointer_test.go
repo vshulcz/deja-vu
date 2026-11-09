@@ -41,8 +41,8 @@ func TestThePointerNamesWhatWasAskedAbout(t *testing.T) {
 // store reaches a thousand characters: unclipped, the block went from 290 bytes
 // to 1234, which is a digest's price for a pointer's content.
 func TestThePointerStaysShort(t *testing.T) {
-	long := "Новый содержательный разбор — code-grounded review в Commonplace, где хвалят deja-vu " +
-		"как низкотрений слой операционного recall и отдельно отмечают редакцию до индексации, " +
+	long := "Подробный архитектурный разбор — post-mortem репликации в StorageEngine, где описывают " +
+		"как низкоуровневый слой операционного recall и отдельно отмечают фильтрацию до индексации, " +
 		"а ограничения формулируют через лексическое перекрытие поиска."
 	s := model.Session{
 		Harness: "claude", ID: "s1", Project: "org/app", Updated: time.Now(),
@@ -59,7 +59,7 @@ func TestThePointerStaysShort(t *testing.T) {
 		t.Errorf("a clipped topic does not say it was clipped: %q", got)
 	}
 	// Whole words, so the reader can search for what it names.
-	if strings.Contains(got, "code-groun\"") || strings.Contains(got, "Commonpl…") {
+	if strings.Contains(got, "post-mort\"") || strings.Contains(got, "StorageEng…") {
 		t.Errorf("the topic was cut mid-word: %q", got)
 	}
 }

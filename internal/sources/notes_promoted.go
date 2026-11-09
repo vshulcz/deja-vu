@@ -28,12 +28,7 @@ var NoteStates = map[string]bool{
 // AppendPromoted appends a curated note distilled from a session. Appending
 // the same session again records a correction; history is never rewritten.
 func AppendPromoted(project, title, text, session, state string, now time.Time) error {
-	return AppendPromotedTagged(project, title, text, session, state, nil, now)
-}
-
-// AppendPromotedTagged appends a promoted note with no source time.
-func AppendPromotedTagged(project, title, text, session, state string, tags []string, now time.Time) error {
-	return AppendPromotedSourced(project, title, text, session, state, tags, time.Time{}, now)
+	return AppendPromotedSourced(project, title, text, session, state, nil, time.Time{}, now)
 }
 
 // AppendPromotedSourced also records when the source transcript was last
@@ -453,14 +448,6 @@ func noteWordSet(s string) map[string]bool {
 		out[b] = true
 	}
 	return out
-}
-
-// StaleCandidate pairs an accepted promoted note with a file it cites that was
-// modified in a newer session after the note was recorded.
-type StaleCandidate struct {
-	Note      PromotedNote
-	File      string
-	TouchedAt time.Time
 }
 
 // NoteFileRefs extracts distinct file paths or filenames cited in a note's

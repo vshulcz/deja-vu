@@ -270,7 +270,7 @@ export default function (pi: any) {
         }
         return;
       }
-      const raw = run(["hook-prompt"], JSON.stringify({ prompt: event.prompt || "", session_id: sessionID() }));
+      const raw = run(["hook-prompt"], JSON.stringify({ prompt: event.prompt || "", session_id: sessionID(), transcript_path: sessionFile, cwd: process.cwd(), harness: "prime" }));
       if (!raw) return;
       const resp = JSON.parse(raw);
       if (resp && resp.systemMessage) ctx.ui.notify(resp.systemMessage, "info");

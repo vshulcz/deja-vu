@@ -218,7 +218,7 @@ insert into messages values (11,'s_cron','user','[{"type":"text","text":"cron no
 	}
 }
 
-func TestGooseEditPathIncludesReadsAndViews(t *testing.T) {
+func TestGooseEditCallIncludesReadsAndViews(t *testing.T) {
 	for _, tc := range []struct {
 		item map[string]any
 		want string
@@ -240,8 +240,8 @@ func TestGooseEditPathIncludesReadsAndViews(t *testing.T) {
 			want: "",
 		},
 	} {
-		if got := gooseEditPath(tc.item); got != tc.want {
-			t.Errorf("gooseEditPath(%v) = %q, want %q", tc.item, got, tc.want)
+		if got := gooseEditCall(tc.item).FilePath; got != tc.want {
+			t.Errorf("gooseEditCall(%v).FilePath = %q, want %q", tc.item, got, tc.want)
 		}
 	}
 }

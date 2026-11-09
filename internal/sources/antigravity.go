@@ -801,11 +801,21 @@ func antigravityTakeWrite(text string, step []model.Message, pending map[string]
 	return nil
 }
 
-// AntigravityEditPaths are the files a planner row's calls edit, create, or
-// read before an edit, in call order.
-func AntigravityEditPaths(toolCalls any) []string {
+// EditCall is a file edit or write extracted from a tool call, carrying both
+// the target path and any old/new text arguments so pre/post-edit guards can
+// inspect the actual edit payload.
+type EditCall struct {
+	FilePath  string
+	OldString string
+	NewString string
+}
+
+// AntigravityEditCalls are the files a planner row's calls edit, create, or
+// read before an edit, in call order, including target and replacement snippets
+// when present.
+func AntigravityEditCalls(toolCalls any) []EditCall {
 	calls, _ := toolCalls.([]any)
-	var out []string
+	var out []EditCall
 	for _, c := range calls {
 		call, _ := c.(map[string]any)
 		args, _ := call["args"].(map[string]any)
@@ -821,9 +831,43 @@ func AntigravityEditPaths(toolCalls any) []string {
 		if p == "" {
 			p = antigravityArg(args, "Path")
 		}
-		if p = decodeURIPath(strings.TrimPrefix(p, "file://")); p != "" {
-			out = append(out, p)
+		p = decodeURIPath(strings.TrimPrefix(p, "file://"))
+		if p == "" {
+			continue
 		}
+		oldS := firstNonEmpty(
+			antigravityArg(args, "Target"),
+			antigravityArg(args, "TargetContent"),
+			antigravityArg(args, "OldString"),
+			antigravityArg(args, "old_string"),
+		)
+		newS := firstNonEmpty(
+			antigravityArg(args, "Replacement"),
+			antigravityArg(args, "ReplacementContent"),
+			antigravityArg(args, "CodeContent"),
+			antigravityArg(args, "Content"),
+			antigravityArg(args, "NewString"),
+			antigravityArg(args, "new_string"),
+		)
+		if oldS == "" && newS == "" {
+			if rawChunks := antigravityArg(args, "ReplacementChunks"); rawChunks != "" {
+				var chunks []map[string]any
+				if json.Unmarshal([]byte(rawChunks), &chunks) == nil {
+					var olds, news []string
+					for _, ch := range chunks {
+						if o := strings.TrimSpace(str(ch["TargetContent"])); o != "" {
+							olds = append(olds, o)
+						}
+						if n := strings.TrimSpace(str(ch["ReplacementContent"])); n != "" {
+							news = append(news, n)
+						}
+					}
+					oldS = strings.Join(olds, "\n")
+					newS = strings.Join(news, "\n")
+				}
+			}
+		}
+		out = append(out, EditCall{FilePath: p, OldString: oldS, NewString: newS})
 	}
 	return out
 }

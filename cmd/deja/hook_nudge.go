@@ -62,7 +62,7 @@ func joinPromptAdvisories(parts ...string) string {
 // promptDirectContext performs live correction capture into .deja/memory.jsonl
 // and returns any high-precision repo-memory guardrail or verified error fix
 // matching the user's prompt.
-func promptDirectContext(dir, cwd, sessionID, asked string) string {
+func promptDirectContext(dir, cwd, sessionID, asked string, prevAssistant ...string) string {
 	if strings.TrimSpace(asked) == "" || digest.IsAgentArtifact(asked) {
 		return ""
 	}
@@ -70,7 +70,7 @@ func promptDirectContext(dir, cwd, sessionID, asked string) string {
 	seen := alreadyInjected(dir, sessionID)
 	var lines []string
 	var tokens []string
-	if srLine, srTok := sessionStandingRuleLine(dir, cwd, sessionID, asked, seen); srLine != "" {
+	if srLine, srTok := sessionStandingRuleLine(dir, cwd, sessionID, asked, seen, prevAssistant...); srLine != "" {
 		lines = append(lines, srLine)
 		tokens = append(tokens, srTok)
 	}

@@ -21,7 +21,7 @@ func rulesHome(t *testing.T, targets ...string) string {
 	for _, v := range []string{"CLINE_DIR", "KILO_CONFIG_DIR", "TRAE_HOME", "CONTINUE_GLOBAL_DIR", "DEJA_CONTINUE_ROOT",
 		"CRUSH_GLOBAL_CONFIG", "CODEBUDDY_CONFIG_DIR", "WORKBUDDY_CONFIG_DIR", "CODEX_HOME", "GEMINI_CLI_HOME",
 		"CLAUDE_CONFIG_DIR", "DEJA_HERMES_HOME", "PI_CODING_AGENT_DIR", "SENPI_CODING_AGENT_DIR", "GJC_CODING_AGENT_DIR",
-		"PRIME_AGENT_CODING_AGENT_DIR", "KIMCHI_CODING_AGENT_DIR", "DEJA_ZED_CONFIG"} {
+		"PRIME_AGENT_CODING_AGENT_DIR", "KIMCHI_CODING_AGENT_DIR", "DEJA_ZED_CONFIG", "DEJA_WINDSURF_ROOT"} {
 		t.Setenv(v, "")
 	}
 	home := os.Getenv("HOME")
@@ -418,5 +418,29 @@ func TestRepoRulesDriftNoteReportsDriftedInstructionFiles(t *testing.T) {
 	got := repoRulesDriftNote(repo)
 	if !strings.Contains(got, "CLAUDE.md, AGENTS.md differ") || !strings.Contains(got, "deja rules") {
 		t.Fatalf("expected drift note naming CLAUDE.md, AGENTS.md, got %q", got)
+	}
+}
+
+func TestRulesSyncWindsurfHonoursCap(t *testing.T) {
+	rulesHome(t, "windsurf")
+	root := windsurfTestRoot(t)
+	rules := filepath.Join(root, "memories", "global_rules.md")
+	writeRulesTestFile(t, rules, "# User rules\n")
+	writeRulesTestFile(t, rulesSourcePath(), "- keep commits to one line\n")
+
+	if _, err := rulesOut(t, "sync"); err != nil {
+		t.Fatalf("sync under cap: %v", err)
+	}
+	if got := readRulesTestFile(t, rules); !strings.Contains(got, "keep commits to one line") {
+		t.Fatalf("windsurf global_rules.md missing synced rule:\n%s", got)
+	}
+
+	over := strings.Repeat("x", windsurfRulesCap-10) + "\n"
+	writeRulesTestFile(t, rules, over)
+	if _, err := rulesOut(t, "sync"); err == nil || !strings.Contains(err.Error(), "over Cascade's 6000") {
+		t.Fatalf("sync over cap = %v, want Cascade 6000 refusal", err)
+	}
+	if got := readRulesTestFile(t, rules); got != over {
+		t.Fatal("windsurf global_rules.md modified past the cap")
 	}
 }

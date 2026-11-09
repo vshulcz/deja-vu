@@ -23,12 +23,10 @@ import (
 )
 
 const (
-	statReset  = "\x1b[0m"
-	statDim    = "\x1b[2m"
-	statBold   = "\x1b[1m"
-	statOrange = "\x1b[38;5;208m"
-	statGreen  = "\x1b[32m"
-	statBlue   = "\x1b[34m"
+	statReset = "\x1b[0m"
+	statDim   = "\x1b[2m"
+	statBold  = "\x1b[1m"
+	statGreen = "\x1b[32m"
 )
 
 type redactionReport struct {

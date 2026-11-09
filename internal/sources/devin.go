@@ -239,6 +239,7 @@ type devinNode struct {
 	nodeID  int64
 	parent  int64
 	hasPar  bool // parent_node_id is NULL on chain roots
+	priors  []int64
 	msgID   string
 	msg     map[string]any
 	created int64
@@ -248,7 +249,8 @@ type devinNode struct {
 func devinSessionNodes(db, sid string) ([]devinNode, error) {
 	q := `select json_object('node',node_id,'parent',parent_node_id,'mid',` +
 		`json_extract(chat_message,'$.message_id'),'msg',json_extract(chat_message,'$'),'created',created_at,` +
-		`'prefix',coalesce(json_extract(metadata,'$.is_system_prefix'),0))` +
+		`'prefix',coalesce(json_extract(metadata,'$.is_system_prefix'),0),` +
+		`'priors',json_extract(metadata,'$.extensions."compact/prior_node_ids"'))` +
 		` from message_nodes where session_id = '` + strings.ReplaceAll(sid, "'", "''") +
 		`' order by node_id`
 	out, err := sqliteOutput(db, q)
@@ -262,6 +264,7 @@ func devinSessionNodes(db, sid string) ([]devinNode, error) {
 		Msg     json.RawMessage `json:"msg"`
 		Created int64           `json:"created"`
 		Prefix  int             `json:"prefix"`
+		Priors  []int64         `json:"priors"`
 	}
 	rows, err := sqliteObjects[row](out)
 	if err != nil {
@@ -269,7 +272,7 @@ func devinSessionNodes(db, sid string) ([]devinNode, error) {
 	}
 	nodes := make([]devinNode, 0, len(rows))
 	for _, r := range rows {
-		n := devinNode{nodeID: r.Node, msgID: r.Mid, created: r.Created}
+		n := devinNode{nodeID: r.Node, msgID: r.Mid, created: r.Created, priors: r.Priors}
 		if r.Parent != nil {
 			n.parent, n.hasPar = *r.Parent, true
 		}
@@ -283,23 +286,44 @@ func devinSessionNodes(db, sid string) ([]devinNode, error) {
 }
 
 // devinChain is the nodes of one chain, oldest first, deduped by
-// message_id.
+// message_id. When a compacted chain records compact/prior_node_ids on a
+// rebuilt node whose parent stops at the new prefix root, the walk continues
+// from the newest unvisited prior node so pre-compaction turns stay in the
+// conversation.
 func devinChain(nodes map[int64]devinNode, head int64) []devinNode {
 	var rev []devinNode
 	seen := map[string]bool{}
+	visited := map[int64]bool{}
+	var priorQueue []int64
 	for id, guard := head, 0; guard < len(nodes)+1; guard++ {
 		n, ok := nodes[id]
-		if !ok {
+		if !ok || visited[id] {
 			break
+		}
+		visited[id] = true
+		if len(n.priors) > 0 {
+			priorQueue = append(priorQueue, n.priors...)
 		}
 		if n.msgID == "" || !seen[n.msgID] {
 			seen[n.msgID] = true
 			rev = append(rev, n)
 		}
-		if !n.hasPar {
+		if n.hasPar {
+			id = n.parent
+			continue
+		}
+		var next int64 = -1
+		for _, p := range priorQueue {
+			if !visited[p] {
+				if _, exists := nodes[p]; exists && p > next {
+					next = p
+				}
+			}
+		}
+		if next < 0 {
 			break
 		}
-		id = n.parent
+		id = next
 	}
 	for i, j := 0, len(rev)-1; i < j; i, j = i+1, j-1 {
 		rev[i], rev[j] = rev[j], rev[i]

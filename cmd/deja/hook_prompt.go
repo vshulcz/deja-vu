@@ -63,7 +63,9 @@ type promptHookInput struct {
 	WorkspaceRoots []string `json:"workspace_roots"`
 	// HookEventName is BeforeAgent from Gemini CLI, whose compactions are
 	// found in the transcript at the next prompt.
-	HookEventName string `json:"hook_event_name"`
+	HookEventName string          `json:"hook_event_name"`
+	Harness       string          `json:"harness"`
+	Messages      json.RawMessage `json:"messages"`
 	// Grok spells all of this in camelCase. See hook_grok.go.
 	grokEnvelope
 }
@@ -212,9 +214,9 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// export is set once per process and will not change, so reading it alone
 	// answered a second payload with the first one's project (#2182).
 	cwd := hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots))
-	maybePinLiveUserRule(dir, cwd, input.SessionID, asked)
+	prevAssistant := syncLiveSessionRules(dir, cwd, input, asked)
 	nudge := joinPromptAdvisories(
-		promptDirectContext(dir, cwd, input.SessionID, asked),
+		promptDirectContext(dir, cwd, input.SessionID, asked, prevAssistant),
 		failureNudge(dir, asked),
 	)
 	// Nobody asked. A harness delivers its own plumbing as the next user turn —
@@ -1225,6 +1227,198 @@ func maybePinLiveUserRule(dir, cwd, sessionID, prompt string) {
 	}
 }
 
+// syncLiveSessionRules pins standing rules and turn-pair refusals across all
+// harnesses (using the live transcript, in-memory messages, or harness session
+// store when available) and returns the preceding assistant message text.
+func syncLiveSessionRules(dir, cwd string, input promptHookInput, asked string) string {
+	msgs, prevRules, prevAssistant := liveSessionRecentMessages(dir, cwd, input, asked)
+	if len(msgs) == 0 && len(prevRules) == 0 {
+		maybePinLiveUserRule(dir, cwd, input.SessionID, asked)
+		return prevAssistant
+	}
+	rules := digest.ExtractStandingRules(model.Session{
+		ID:       input.SessionID,
+		Harness:  input.Harness,
+		Messages: msgs,
+	}, prevRules)
+	for _, r := range rules {
+		ctxTerms := turnPairContextTerms(msgs, r.Text)
+		pinExtractedLiveRule(dir, cwd, input.SessionID, r.Text, ctxTerms...)
+	}
+	return prevAssistant
+}
+
+func liveSessionRecentMessages(dir, cwd string, input promptHookInput, asked string) ([]model.Message, []model.ContextFact, string) {
+	var msgs []model.Message
+	var prevRules []model.ContextFact
+	ws := compactionWorkspace(cwd)
+	if input.SessionID != "" {
+		for _, candidateWS := range []string{cwd, sources.Home()} {
+			if candidateWS == "" {
+				continue
+			}
+			if state, found, err := index.Compaction(dir, input.SessionID, compactionWorkspace(candidateWS)); err == nil && found {
+				prevRules = append(prevRules, state.Data.Rules...)
+				if state.Data.Goal.Text != "" {
+					msgs = append(msgs, model.Message{Role: "user", Text: state.Data.Goal.Text})
+				}
+				if state.Data.Objective.Text != "" {
+					msgs = append(msgs, model.Message{Role: "user", Text: state.Data.Objective.Text})
+				}
+				break
+			}
+		}
+	}
+	msgs = append(msgs, readLiveHookTranscriptMessages(input, cwd, ws)...)
+	t := strings.TrimSpace(asked)
+	if t != "" {
+		if len(msgs) == 0 || msgs[len(msgs)-1].Role != "user" || strings.TrimSpace(msgs[len(msgs)-1].Text) != t {
+			msgs = append(msgs, model.Message{Role: "user", Text: t})
+		}
+	}
+	prevAssistant := ""
+	for _, m := range slices.Backward(msgs) {
+		if m.Role == "assistant" && strings.TrimSpace(m.Text) != "" {
+			prevAssistant = m.Text
+			break
+		}
+	}
+	return msgs, prevRules, prevAssistant
+}
+
+func readLiveHookTranscriptMessages(input promptHookInput, cwd, ws string) []model.Message {
+	if input.TranscriptPath == "" && len(input.Messages) == 0 && input.Harness == "" && input.SessionID == "" {
+		return nil
+	}
+	pre := precompactHookInput{
+		SessionID:      input.SessionID,
+		TranscriptPath: input.TranscriptPath,
+		CWD:            cwd,
+		Harness:        input.Harness,
+		Messages:       input.Messages,
+	}
+	tr, reason, _ := compactionSource(pre, ws)
+	if reason != "" && input.SessionID != "" && input.TranscriptPath == "" && len(input.Messages) == 0 {
+		if fallback, err := sources.ReadCompactionSession(input.Harness, input.SessionID, "", ws); err == nil {
+			tr = fallback
+			reason = ""
+		}
+	}
+	if reason == "" && len(tr.Session.Messages) > 0 {
+		tail := tr.Session.Messages
+		if len(tail) > 24 {
+			tail = tail[len(tail)-24:]
+		}
+		var out []model.Message
+		for _, m := range tail {
+			if (m.Role == "user" || m.Role == "assistant") && strings.TrimSpace(m.Text) != "" {
+				out = append(out, model.Message{Role: m.Role, Text: m.Text})
+			}
+		}
+		return out
+	}
+	var out []model.Message
+	if input.TranscriptPath != "" {
+		out = append(out, parseGenericTranscriptTail(input.TranscriptPath)...)
+	}
+	if len(input.Messages) > 0 {
+		out = append(out, parseGenericHookMessages(input.Messages)...)
+	}
+	return out
+}
+
+func parseGenericTranscriptTail(path string) []model.Message {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil
+	}
+	defer func() { _ = f.Close() }()
+	fi, err := f.Stat()
+	if err != nil || fi.IsDir() {
+		return nil
+	}
+	const maxTail = 256 << 10
+	offset := int64(0)
+	if fi.Size() > maxTail {
+		offset = fi.Size() - maxTail
+	}
+	if offset > 0 {
+		if _, seekErr := f.Seek(offset, io.SeekStart); seekErr != nil {
+			return nil
+		}
+	}
+	b, err := io.ReadAll(io.LimitReader(f, maxTail))
+	if err != nil {
+		return nil
+	}
+	var out []model.Message
+	for line := range bytes.SplitSeq(b, []byte{'\n'}) {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+		var row struct {
+			Type    string         `json:"type"`
+			Role    string         `json:"role"`
+			Content hookPromptText `json:"content"`
+			Text    string         `json:"text"`
+			Message struct {
+				Role    string         `json:"role"`
+				Content hookPromptText `json:"content"`
+				Text    string         `json:"text"`
+			} `json:"message"`
+		}
+		if json.Unmarshal(line, &row) != nil {
+			continue
+		}
+		role := firstNonEmpty(row.Message.Role, row.Role, row.Type)
+		if role != "user" && role != "assistant" {
+			continue
+		}
+		txt := firstNonEmpty(
+			strings.TrimSpace(string(row.Message.Content)),
+			strings.TrimSpace(row.Message.Text),
+			strings.TrimSpace(string(row.Content)),
+			strings.TrimSpace(row.Text),
+		)
+		if txt != "" {
+			out = append(out, model.Message{Role: role, Text: txt})
+		}
+	}
+	if len(out) > 24 {
+		out = out[len(out)-24:]
+	}
+	return out
+}
+
+func parseGenericHookMessages(raw json.RawMessage) []model.Message {
+	var rows []struct {
+		Role    string         `json:"role"`
+		Content hookPromptText `json:"content"`
+		Text    string         `json:"text"`
+	}
+	if json.Unmarshal(raw, &rows) != nil {
+		return nil
+	}
+	var out []model.Message
+	for _, r := range rows {
+		if r.Role != "user" && r.Role != "assistant" {
+			continue
+		}
+		txt := strings.TrimSpace(string(r.Content))
+		if txt == "" {
+			txt = strings.TrimSpace(r.Text)
+		}
+		if txt != "" {
+			out = append(out, model.Message{Role: r.Role, Text: txt})
+		}
+	}
+	if len(out) > 24 {
+		out = out[len(out)-24:]
+	}
+	return out
+}
+
 func pinExtractedLiveRule(dir, cwd, sessionID, ruleText string, extraSyms ...string) {
 	ruleText = strings.TrimSpace(ruleText)
 	if ruleText == "" {
@@ -1328,7 +1522,15 @@ func syncAntigravitySessionRules(dir, cwd, conversationID string, steps []transc
 // refusal did not repeat the assistant's technical vocabulary.
 func turnPairContextTerms(msgs []model.Message, ruleText string) []string {
 	body := ruleText
+	var out []string
 	if idx := strings.Index(ruleText, ": "); idx > 0 && strings.HasPrefix(ruleText, "Do not suggest ") {
+		target := strings.TrimSpace(strings.TrimPrefix(ruleText[:idx], "Do not suggest "))
+		if target != "" {
+			out = append(out, target)
+			if bare := strings.TrimLeft(target, "-/"); bare != "" && bare != target {
+				out = append(out, bare)
+			}
+		}
 		body = strings.TrimSpace(ruleText[idx+2:])
 	}
 	prevAssistant := ""
@@ -1338,13 +1540,16 @@ func turnPairContextTerms(msgs []model.Message, ruleText string) []string {
 			continue
 		}
 		if m.Role == "user" && body != "" && strings.Contains(m.Text, body) {
-			return prompt.Terms(prevAssistant + " " + m.Text)
+			_, backtickSyms := extractLiveRulePathsAndSymbols("", prevAssistant+" "+m.Text)
+			out = append(out, backtickSyms...)
+			out = append(out, prompt.Terms(prevAssistant+" "+m.Text)...)
+			return out
 		}
 	}
-	return prompt.Terms(ruleText)
+	return append(out, prompt.Terms(ruleText)...)
 }
 
-func sessionStandingRuleLine(dir, cwd, sessionID, asked string, seen map[string]bool) (string, string) {
+func sessionStandingRuleLine(dir, cwd, sessionID, asked string, seen map[string]bool, prevAssistant ...string) (string, string) {
 	effDir := dir
 	if effDir == "" {
 		effDir = index.DefaultDir()
@@ -1361,9 +1566,13 @@ func sessionStandingRuleLine(dir, cwd, sessionID, asked string, seen map[string]
 		paths = append(paths, filepath.Join(effDir, "live_rules.jsonl"))
 	}
 	askedPaths, _ := extractLiveRulePathsAndSymbols(cwd, asked)
+	prevAsst := ""
+	if len(prevAssistant) > 0 {
+		prevAsst = strings.TrimSpace(prevAssistant[0])
+	}
 	seenID := map[string]bool{}
 	for _, p := range paths {
-		for _, rec := range readLiveRuleRecords(p) {
+		for _, rec := range slices.Backward(readLiveRuleRecords(p)) {
 			e := rec.RepoEntry
 			if e.Text == "" || seenID[e.ID] {
 				continue
@@ -1377,6 +1586,10 @@ func sessionStandingRuleLine(dir, cwd, sessionID, asked string, seen map[string]
 			topicMatch := repoEntryMentionsCommand(asked, e.Text) ||
 				commandTouchesRepoEntryFiles(asked, e.Files) ||
 				mentionsAnySymbol(rec.Symbols, asked)
+			if !topicMatch && len(askedPaths) == 0 && prevAsst != "" {
+				topicMatch = repoEntryMentionsCommand(prevAsst, e.Text) ||
+					mentionsAnySymbol(rec.Symbols, prevAsst)
+			}
 			// A session-wide turn-pair refusal ("Do not suggest <X>: ...") pinned
 			// in the current session applies to any non-file-specific prompt in
 			// that session regardless of language or topic vocabulary, without
@@ -1414,6 +1627,15 @@ func extractLiveRulePathsAndSymbols(cwd, text string) ([]string, []string) {
 		if cs != "" && !seenSym[cs] {
 			seenSym[cs] = true
 			syms = append(syms, cs)
+		}
+	}
+	if idx := strings.Index(text, ": "); idx > 0 && strings.HasPrefix(text, "Do not suggest ") {
+		target := strings.TrimSpace(strings.TrimPrefix(text[:idx], "Do not suggest "))
+		if len(target) >= 2 {
+			addSym(target)
+			if bare := strings.TrimLeft(target, "-/"); len(bare) >= 2 {
+				addSym(bare)
+			}
 		}
 	}
 

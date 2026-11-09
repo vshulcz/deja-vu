@@ -19,8 +19,6 @@ const (
 	cDim    = "\x1b[2m"
 	cBold   = "\x1b[1m"
 	cOrange = "\x1b[38;5;208m"
-	cGreen  = "\x1b[32m"
-	cBlue   = "\x1b[34m"
 	cMatch  = "\x1b[48;5;236;38;5;230m"
 )
 

@@ -839,11 +839,13 @@ func stripNoToolsPrompt(text string) string {
 	}
 }
 
-func firstNonEmpty(a, b string) string {
-	if a != "" {
-		return a
+func firstNonEmpty(ss ...string) string {
+	for _, s := range ss {
+		if s != "" {
+			return s
+		}
 	}
-	return b
+	return ""
 }
 
 // pathToProjectKey converts an absolute workspace path to the dash-encoded

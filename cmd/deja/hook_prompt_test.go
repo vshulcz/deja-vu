@@ -219,7 +219,7 @@ func TestSSHSyncTipThresholdAndOnce(t *testing.T) {
 	withStatsStores(t)
 	ss := make([]model.Session, 0, 6)
 	for i := range 6 {
-		ss = append(ss, model.Session{ID: strconv.Itoa(i), Messages: []model.Message{{Role: "user", Text: "run ssh mini and check"}}})
+		ss = append(ss, model.Session{ID: strconv.Itoa(i), Messages: []model.Message{{Role: "user", Text: "run ssh devbox and check"}}})
 	}
 	tip := sshSyncTip(index.DefaultDir(), ss)
 	if !strings.Contains(tip, "deja sync ssh") {

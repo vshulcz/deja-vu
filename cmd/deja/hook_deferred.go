@@ -548,10 +548,14 @@ func gooseStopTurn(raw []byte) sources.GooseTurnState {
 // with the edit already made, the way it does on Antigravity.
 func gooseStopEditLines(dir string, raw []byte, turn sources.GooseTurnState) string {
 	var p gooseStopPayload
-	if len(turn.Edits) == 0 || json.Unmarshal(raw, &p) != nil || p.SessionID == "" {
+	if (len(turn.Edits) == 0 && len(turn.EditCalls) == 0) || json.Unmarshal(raw, &p) != nil || p.SessionID == "" {
 		return ""
 	}
-	return editFileLines(dir, turn.Edits, p.SessionID, hookCWD(adoptGrok(p.WorkingDir, p.CWD)))
+	ws := hookCWD(adoptGrok(p.WorkingDir, p.CWD))
+	if len(turn.EditCalls) > 0 {
+		return editFileCallLines(dir, turn.EditCalls, p.SessionID, ws)
+	}
+	return editFileLines(dir, turn.Edits, p.SessionID, ws)
 }
 
 // gooseStopFixPair is the fix pair for the command that failed in this turn,

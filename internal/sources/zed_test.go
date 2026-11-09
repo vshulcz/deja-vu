@@ -266,7 +266,7 @@ insert into threads (id,summary,updated_at,data_type,data) values
 func TestParseZedDBTakesTheProjectFromTheDocumentWhenTheColumnIsGone(t *testing.T) {
 	zedHome(t)
 	const withSnapshot = `{"version":"0.3.0","title":"snapshot thread","updated_at":"2026-07-19T09:00:02Z",` +
-		`"initial_project_snapshot":{"worktree_snapshots":[{"worktree_path":"/Users/x/code/marketplace-price-tracker"}]},` +
+		`"initial_project_snapshot":{"worktree_snapshots":[{"worktree_path":"/Users/x/code/catalog-service"}]},` +
 		`"messages":[{"User":{"id":"u1","content":[{"Text":"first question"}]}}]}`
 	body := zedZstdHex(t, withSnapshot)
 	sql := zedSchemaOriginal + `
@@ -279,7 +279,7 @@ insert into threads (id,summary,updated_at,data_type,data) values
 	if len(sessions) != 1 {
 		t.Fatalf("sessions = %#v, want one", sessions)
 	}
-	if got := sessions[0].Project; got != "code/marketplace-price-tracker" {
+	if got := sessions[0].Project; got != "code/catalog-service" {
 		t.Errorf("project = %q, want it read off the document's worktree path", got)
 	}
 }

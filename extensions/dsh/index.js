@@ -590,10 +590,13 @@ function sessionEnds(ctx) {
 async function toolNote(exec, result) {
   const args = exec.arguments || {};
   const base = { session_id: sessionId(exec.agent), cwd: sessionCwd(exec.agent) };
+  const editFields = {};
+  if (args.old_string || args.old_str) editFields.old_string = String(args.old_string || args.old_str);
+  if (args.new_string || args.new_str || args.content || args.file_text) editFields.new_string = String(args.new_string || args.new_str || args.content || args.file_text);
   if ((exec.name === "read" || exec.name === "edit" || exec.name === "write") && args.file_path) {
     return runAsync(["hook-tool", "--plain"], JSON.stringify({
       tool_name: exec.name,
-      tool_input: { file_path: String(args.file_path) },
+      tool_input: { file_path: String(args.file_path), ...editFields },
       ...base,
     }));
   }
@@ -601,7 +604,7 @@ async function toolNote(exec, result) {
   if (exec.name === "str_replace_editor" && args.path) {
     return runAsync(["hook-tool", "--plain"], JSON.stringify({
       tool_name: args.command === "view" ? "read" : "edit",
-      tool_input: { file_path: String(args.path) },
+      tool_input: { file_path: String(args.path), ...editFields },
       ...base,
     }));
   }

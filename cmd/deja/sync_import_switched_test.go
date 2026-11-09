@@ -19,7 +19,7 @@ func TestSyncImportSaysASwitchKeptRecordsOut(t *testing.T) {
 	}
 	t.Setenv("DEJA_INDEX_TOOL_OUTPUT", "0")
 	batch := t.TempDir()
-	line := `{"harness":"claude","session_id":"s1","project":"work/app","role":"tool-output","text":"zonkoerror: overflow","time":"2026-08-04T12:00:00Z","origin":"mini"}` + "\n"
+	line := `{"harness":"claude","session_id":"s1","project":"work/app","role":"tool-output","text":"zonkoerror: overflow","time":"2026-08-04T12:00:00Z","origin":"devbox"}` + "\n"
 	if err := os.WriteFile(filepath.Join(batch, "batch.jsonl"), []byte(line), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -49,14 +49,14 @@ func TestSwitchedOffLineNamesTheFullPullForAHost(t *testing.T) {
 	hermeticEnv(t)
 	t.Setenv("DEJA_INDEX_COMMANDS", "0")
 	batch := t.TempDir()
-	line := `{"harness":"claude","session_id":"s1","project":"work/app","role":"command","text":"go test ./...","time":"2026-08-04T12:00:00Z","origin":"mini"}` + "\n"
+	line := `{"harness":"claude","session_id":"s1","project":"work/app","role":"command","text":"go test ./...","time":"2026-08-04T12:00:00Z","origin":"devbox"}` + "\n"
 	if err := os.WriteFile(filepath.Join(batch, "batch.jsonl"), []byte(line), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := index.Import(index.DefaultDir(), batch); err != nil {
 		t.Fatal(err)
 	}
-	if got := switchedOffLine("mini"); !strings.Contains(got, "deja sync ssh mini --pull --full") {
+	if got := switchedOffLine("devbox"); !strings.Contains(got, "deja sync ssh devbox --pull --full") {
 		t.Errorf("the pull's line: %q", got)
 	}
 }

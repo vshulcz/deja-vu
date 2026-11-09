@@ -743,6 +743,23 @@ func runHookContextMode(dir string, plain, once bool) error {
 	if input.Source == "compact" && sources.IsCodeBuddyTranscript(input.TranscriptPath) {
 		return nil
 	}
+	// Devin fires hook-context on PostCompaction after rebuilding the session's
+	// chain in sessions.db; reset the seen ledger and capture the pre-compaction
+	// turns from the store before emitting the recovery packet.
+	if eventName == "PostCompaction" {
+		forgetInjected(dir, input.SessionID)
+		if input.SessionID != "" {
+			forgetInjected(dir, compactionFailureKey(input.SessionID))
+		}
+		captureCompaction(dir, precompactHookInput{
+			SessionID:      input.SessionID,
+			TranscriptPath: input.TranscriptPath,
+			CWD:            input.CWD,
+			WorkspaceRoots: input.WorkspaceRoots,
+			Harness:        "devin",
+		})
+		requestWarmup(dir)
+	}
 	// --once rides a per-prompt event beside hook-prompt, and Kimi runs the two
 	// in parallel: both found the packet undelivered and it arrived twice. The
 	// prompt hook carries it there.

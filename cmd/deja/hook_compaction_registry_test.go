@@ -2,7 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -156,4 +158,72 @@ func writeTemp(t *testing.T, text string) string {
 	path := filepath.Join(t.TempDir(), "transcript.jsonl")
 	compactionWrite(t, path, text)
 	return path
+}
+
+func TestDevinPostCompactionCapturesAndEmitsRecoveryPacket(t *testing.T) {
+	if !sources.SQLite3Available() {
+		t.Skip("sqlite3 not installed")
+	}
+	hermeticEnv(t)
+	hostsNoWarmup(t)
+	workspace := compactionGitRepo(t)
+	dir := index.DefaultDir()
+	db := filepath.Join(t.TempDir(), "cli", "sessions.db")
+	if err := os.MkdirAll(filepath.Dir(db), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_DEVIN_DB", db)
+
+	// Nodes 1-5 are the pre-compaction chain; node 6 is the rebuilt prefix root
+	// and node 7 is the compacted head pointing back via compact/prior_node_ids.
+	sql := fmt.Sprintf(`
+create table sessions (
+    id text primary key, working_directory text, backend_type text, model text,
+    agent_mode text, created_at integer, last_activity_at integer, title text,
+    main_chain_id integer, hidden integer not null default 0
+);
+create table message_nodes (
+    row_id integer primary key autoincrement, session_id text not null,
+    node_id integer not null, parent_node_id integer, chat_message text not null,
+    created_at integer, metadata text
+);
+create table subagent_heads (
+    session_id text not null, agent_id text not null, chain_node_id integer not null,
+    updated_at integer not null, primary key (session_id, agent_id)
+);
+create table prompt_history (
+    id integer primary key autoincrement, content text, timestamp integer,
+    session_id text, is_shell integer not null default 0
+);
+insert into sessions values ('devin-c1', %q, 'cli', 'swe-2', 'normal', 1785600000, 1785600090, 'fix retry', 7, 0);
+insert into message_nodes (session_id, node_id, parent_node_id, chat_message, created_at, metadata) values
+('devin-c1', 1, null, '{"message_id":"s1","role":"system","content":"<system_info>x</system_info>"}', 1785600001, '{"is_system_prefix":true}'),
+('devin-c1', 2, 1, '{"message_id":"u1","role":"user","content":"fix the retry loop in retry.go"}', 1785600002, null),
+('devin-c1', 3, 2, '{"message_id":"a1","role":"assistant","content":"editing retry.go","tool_calls":[{"id":"c1","name":"edit","arguments":{"file_path":%q,"old_string":"i < n","new_string":"i <= n"},"index":0,"kind":"function"}]}', 1785600003, null),
+('devin-c1', 4, 3, '{"message_id":"t1","role":"tool","tool_call_id":"c1","content":"ok"}', 1785600004, null),
+('devin-c1', 5, 4, '{"message_id":"a2","role":"assistant","content":"We decided to bound retry.go with i <= n so the final attempt runs."}', 1785600005, null),
+('devin-c1', 6, null, '{"message_id":"s2","role":"system","content":"<system_info>rebuilt</system_info>"}', 1785600010, '{"is_system_prefix":true}'),
+('devin-c1', 7, 6, '{"message_id":"u2","role":"user","content":"Summary of prior turns"}', 1785600011, '{"extensions":{"compact/prior_node_ids":[2,3,4,5]}}');
+`, workspace, filepath.Join(workspace, "retry.go"))
+
+	cmd := exec.CommandContext(t.Context(), "sqlite3", db)
+	cmd.Stdin = strings.NewReader(sql)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("sqlite3: %v: %s", err, out)
+	}
+
+	rememberInjectedIDs(dir, "devin-c1", "prior-session-hit")
+	payload := fmt.Sprintf(`{"hook_event_name":"PostCompaction","session_id":"devin-c1","cwd":%q}`, workspace)
+	withHookStdin(t, payload)
+	out := captureStdout(t, func() {
+		if err := runHookContext(dir, false); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if alreadyInjected(dir, "devin-c1")["prior-session-hit"] {
+		t.Fatalf("PostCompaction did not clear the seen ledger")
+	}
+	if !strings.Contains(out, `"hookEventName":"PostCompaction"`) || !strings.Contains(out, "retry.go") {
+		t.Fatalf("PostCompaction output missing event name or recovered file:\n%s", out)
+	}
 }

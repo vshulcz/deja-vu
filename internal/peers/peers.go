@@ -183,8 +183,8 @@ func mergePeers(a, b Peer) Peer {
 }
 
 // Record notes an exchange with a host: which way it went, and whether it
-// worked. A host is added the first time it is named, so `deja sync ssh mini`
-// once is all it takes for `deja sync` to know about mini afterwards.
+// worked. A host is added the first time it is named, so `deja sync ssh devbox`
+// once is all it takes for `deja sync` to know about devbox afterwards.
 func Record(host string, pulled bool, when time.Time, err error) error {
 	host = strings.TrimSpace(host)
 	if host == "" {
