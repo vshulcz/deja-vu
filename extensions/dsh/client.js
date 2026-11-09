@@ -948,7 +948,10 @@ window.__ModuleLoader__.load({
       // (session.search) keeps its title search. The magnifier click is the
       // way back to the title search for a Deja-owned opening.
       ctx.inject(["shortcuts", "uiSession", "sessions", "conversation"], (c) => {
-        try { c.effect(() => installFind(c, prefs), "dsh-deja: find in conversation"); } catch {}
+        // Registration failures must be loud: silently swallowing them is
+        // exactly how a rejected default once left both shortcuts dead on
+        // every platform. The host isolates a throwing apply, so rethrow.
+        c.effect(() => installFind(c, prefs), "dsh-deja: find in conversation");
       });
       ctx.inject(["uiWorkspace"], (c) => {
         let portal;
@@ -967,8 +970,9 @@ window.__ModuleLoader__.load({
       const takeoverEnabled = () => route.getSnapshot() === "present"
         && prefs.getSnapshot().sidebar && prefs.getSnapshot().opensDeja;
       ctx.inject(["shortcuts"], (c) => {
-        try {
-          c.effect(() => c.shortcuts.register({
+        // Same loud-failure rule as the installFind registration above: a
+        // rejected default must surface, not leave the chord silently dead.
+        c.effect(() => c.shortcuts.register({
             id: "deja.search-sessions",
             label: () => "Deja: search DSH conversations",
             aliases: ["deja search", "search conversations"],
@@ -993,7 +997,6 @@ window.__ModuleLoader__.load({
               } };
             },
           }), "dsh-deja: open sidebar search");
-        } catch {}
       });
     }
 
