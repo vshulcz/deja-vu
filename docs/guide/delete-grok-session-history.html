@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Delete Grok Build session history — deja-vu</title>
+<meta name="description" content="Grok Build keeps each session in its own directory under ~/.grok/sessions. Remove one with deja delete or by hand, and keep the rest searchable.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/delete-grok-session-history.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Delete Grok Build session history">
+<meta property="og:description" content="Grok Build keeps each session in its own directory under ~/.grok/sessions. Remove one with deja delete or by hand, and keep the rest searchable.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/delete-grok-session-history.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Delete Grok Build session history">
+<meta name="twitter:description" content="Grok Build keeps each session in its own directory under ~/.grok/sessions. Remove one with deja delete or by hand, and keep the rest searchable.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete Grok Build session history", "description": "Grok Build keeps each session in its own directory under ~/.grok/sessions. Remove one with deja delete or by hand, and keep the rest searchable.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-grok-session-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-grok-session-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-09", "dateModified": "2026-11-09"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete Grok Build session history", "item": "https://vshulcz.github.io/deja-vu/guide/delete-grok-session-history.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Where does Grok Build store its session history?", "acceptedAnswer": {"@type": "Answer", "text": "In ${GROK_HOME:-~/.grok}/sessions/<url-encoded working directory>/<session id>/, one directory per session: updates.jsonl holds the ACP conversation and summary.json the title, working directory and timestamps. The grok.db beside them belongs to grok-dev, another CLI."}}, {"@type": "Question", "name": "How do I delete one Grok Build session?", "acceptedAnswer": {"@type": "Answer", "text": "Close Grok Build and remove the session's directory under ~/.grok/sessions/. Removing only updates.jsonl leaves a summary.json that still lists the session. With deja installed, deja delete <id> --dry-run lists the same paths first."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="nav-cta" href="https://github.com/vshulcz/deja-vu"><span class="star-ic" aria-hidden="true">★</span>GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a>
+<div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<details class="grpfold"><summary>Why agents forget <span class="n">12</span></summary>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="switch-agents-without-losing-context.html">Session handoffs</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="one-rules-file.html">One rules file</a>
+<a href="token-cost.html">What memory costs</a>
+</details>
+<details class="grpfold"><summary>Session history <span class="n">12</span></summary>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="codex-history.html">Codex history</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="repo-memory.html">Repo memory</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="credentials-in-transcripts.html">Credentials in transcripts</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
+</details>
+<details class="grpfold" open><summary>Deleting sessions <span class="n">32</span></summary>
+<a href="session-files-on-disk.html">Claude Code</a>
+<a href="delete-old-claude-sessions.html">Old sessions</a>
+<a href="delete-codex-sessions.html">Codex</a>
+<a href="delete-cursor-chat-history.html">Cursor</a>
+<a href="cursor-state-vscdb-too-large.html">Cursor state.vscdb too large</a>
+<a href="delete-copilot-chat-history.html">Copilot Chat</a>
+<a href="delete-copilot-cli-session-history.html">Copilot CLI</a>
+<a href="delete-gemini-cli-history.html">Gemini CLI</a>
+<a href="delete-opencode-session-history.html">opencode</a>
+<a href="delete-cline-task-history.html">Cline</a>
+<a href="delete-roo-task-history.html">Roo Code</a>
+<a href="delete-zed-thread-history.html">Zed</a>
+<a href="delete-kilo-code-task-history.html">Kilo Code</a>
+<a href="delete-amp-thread-history.html">Amp</a>
+<a href="delete-continue-session-history.html">Continue</a>
+<a href="delete-kiro-session-history.html">Kiro</a>
+<a href="delete-kimi-code-session-history.html">Kimi Code</a>
+<a href="delete-junie-session-history.html">Junie</a>
+<a href="delete-goose-session-history.html">Goose</a>
+<a href="delete-windsurf-cascade-history.html">Windsurf</a>
+<a href="delete-qwen-code-chat-history.html">Qwen Code</a>
+<a href="delete-trae-sessions.html">TRAE CLI</a>
+<a href="delete-codebuddy-sessions.html">CodeBuddy</a>
+<a href="delete-antigravity-history.html">Antigravity</a>
+<a href="delete-pi-session-history.html">pi</a>
+<a href="delete-crush-session-history.html">Crush</a>
+<a href="delete-hermes-session-history.html">Hermes</a>
+<a href="delete-cherrystudio-session-history.html">Cherry Studio</a>
+<a href="delete-codewhale-session-history.html">CodeWhale</a>
+<a href="delete-aider-chat-history.html">aider</a>
+<a href="delete-openclaw-session-history.html">OpenClaw</a>
+<a href="delete-grok-session-history.html" aria-current="page">Grok Build</a>
+</details>
+<details class="grpfold"><summary>Per-agent guides <span class="n">42</span></summary>
+<a href="memory-for-aider.html">aider</a>
+<a href="memory-for-amp.html">Amp</a>
+<a href="memory-for-antigravity.html">Antigravity</a>
+<a href="memory-for-cherrystudio.html">Cherry Studio</a>
+<a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-codebuddy.html">CodeBuddy Code</a>
+<a href="memory-for-codewhale.html">CodeWhale</a>
+<a href="memory-for-codex.html">Codex</a>
+<a href="memory-for-commandcode.html">Command Code</a>
+<a href="memory-for-continue.html">Continue</a>
+<a href="memory-for-copilot.html">Copilot CLI</a>
+<a href="memory-for-crush.html">Crush</a>
+<a href="memory-for-cursor.html">Cursor</a>
+<a href="memory-for-devin.html">Devin CLI</a>
+<a href="memory-for-dsh.html">dsh</a>
+<a href="memory-for-gjc.html">gajae-code</a>
+<a href="memory-for-gemini.html">Gemini CLI</a>
+<a href="memory-for-goose.html">Goose</a>
+<a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-hermes.html">Hermes</a>
+<a href="memory-for-jetbrains.html">JetBrains AI Assistant</a>
+<a href="memory-for-junie.html">Junie</a>
+<a href="memory-for-kilocode.html">Kilo Code</a>
+<a href="memory-for-kimchi.html">Kimchi Coding</a>
+<a href="memory-for-kimi.html">Kimi Code</a>
+<a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-mcode.html">MiniMax Code</a>
+<a href="memory-for-omp.html">omp</a>
+<a href="memory-for-openclaw.html">OpenClaw</a>
+<a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-pi.html">pi</a>
+<a href="memory-for-prime.html">prime-agent</a>
+<a href="memory-for-qwen.html">Qwen Code</a>
+<a href="memory-for-reasonix.html">Reasonix</a>
+<a href="memory-for-roo.html">Roo Code</a>
+<a href="memory-for-senpi.html">Senpi</a>
+<a href="memory-for-trae.html">TRAE CLI</a>
+<a href="memory-for-copilot-chat.html">VS Code Copilot Chat</a>
+<a href="memory-for-windsurf.html">Windsurf</a>
+<a href="memory-for-zcode.html">ZCode</a>
+<a href="memory-for-zed.html">Zed</a>
+</details>
+<div class="grp">Evidence</div>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="claude-mem-alternative.html">claude-mem alternative</a>
+<a href="mem0-alternative.html">Mem0 alternative</a>
+<a href="specstory-alternative.html">SpecStory alternative</a>
+<a href="basic-memory-alternative.html">Basic Memory alternative</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+<h1>How to delete Grok Build session history, and what you lose</h1>
+<p class="pagelede">one directory per session, and the summary beside the transcript is what lists it<span class="mins" data-mins></span></p>
+<p>Grok Build keeps each session in its own directory: the ACP conversation stream in <code>updates.jsonl</code>, and the metadata the CLI lists the session by in <code>summary.json</code> beside it. Removing the whole directory removes both. Removing only the stream leaves a summary that still names a conversation that is gone.</p>
+
+<h2>Where the sessions are</h2>
+<pre>${GROK_HOME:-~/.grok}/sessions/&lt;encoded-cwd&gt;/&lt;session-id&gt;/
+  updates.jsonl
+  summary.json</pre>
+<p><code>updates.jsonl</code> is the conversation, one ACP session update per line. <code>summary.json</code> carries <code>info.id</code>, <code>info.cwd</code>, the generated title, and the created and updated times. <code>GROK_HOME</code> moves the whole tree, <code>config.toml</code> and the hooks included. The directory above a session is its working directory, URL-encoded; where that encoding is ambiguous deja reads the path from <code>summary.json</code> or a <code>.cwd</code> file rather than decoding the name. Grok also writes bookkeeping into the same directory — <code>chat_history.jsonl</code>, <code>events.jsonl</code>, <code>rewind_points.jsonl</code>, <code>usage.json</code>, <code>tool_definitions.json</code> — which is why the directory is what you delete, not the transcript alone.</p>
+<p>A <code>grok.db</code> beside <code>sessions</code> belongs to <code>grok-dev</code>, another CLI that shares <code>~/.grok</code> and keeps every session of the machine in one SQLite store. Nothing below touches it.</p>
+
+<h2>How to delete one session</h2>
+<p>Close Grok Build first so a running session cannot rewrite its files, then remove the session's directory:</p>
+<pre>rm -r "${GROK_HOME:-$HOME/.grok}/sessions/&lt;encoded-cwd&gt;/&lt;session-id&gt;"</pre>
+<p>Do not delete only <code>updates.jsonl</code>: the <code>summary.json</code> left behind still lists the session, now with no conversation behind it. Grok Build scopes its session list by working directory, so removing the directory is also what takes the session out of the list for that project.</p>
+<p>To clear everything, remove the <code>sessions</code> directory. That removes every session of every project; <code>config.toml</code>, the hooks in <code>hooks/</code>, the plugin wiring and <code>GROK.md</code> are not touched.</p>
+
+<h2>Delete one session with deja</h2>
+<p>If deja is installed, run <code>deja last --harness grok</code> and copy the session id. Preview the deletion, then run it from a terminal and confirm:</p>
+<pre>deja delete &lt;id&gt; --dry-run
+deja delete &lt;id&gt;</pre>
+<p>The dry run lists the paths without removing them. After confirmation, deja removes those paths and forgets its own copy of the session. This cannot be undone. It removes the whole session directory, so the conversation, the summary and the sidecars go together. deja refuses deletion if a file or directory to be removed was written in the last 5 minutes; end the session and wait before deleting it. A session that came out of <code>grok.db</code> is refused, because that database holds every session of the other CLI.</p>
+
+<h2>What you lose</h2>
+<p>The conversation, the tool calls and their results, the title and timestamps that identify the session, and the rewind points and usage figures kept beside them. Grok Build cannot bring a deleted session back, and <code>grok --resume &lt;id&gt;</code> no longer finds it.</p>
+
+<h2>Keeping it searchable instead</h2>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads Grok Build sessions, alongside the other agents' histories, into one local index. Run <code>deja index</code> before you delete: a session that leaves Grok stays in the index, so <code>deja &lt;query&gt;</code> finds it and <code>deja show &lt;id&gt;</code> prints it.</p>
+<pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja index
+deja "grok session about the migration"</pre>
+<p><code>deja resume &lt;id&gt; --write-back</code> writes <code>updates.jsonl</code> and <code>summary.json</code> back into <code>sessions/&lt;encoded-cwd&gt;/&lt;id&gt;/</code> from the index, filling the summary fields grok refuses to open a session without, so <code>grok --resume</code> reopens it. <a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget --session &lt;id&gt;</code> removes a session from the index for good. deja reads <code>GROK_HOME</code> too; <code>DEJA_GROK_ROOT</code> overrides it for deja's reads only, so set it to point deja at a copy or a backup of the tree.</p>
+
+<p><a href="where-sessions-are-stored.html">Where every agent keeps its history</a> · <a href="memory-for-grok.html">Memory for Grok Build</a> · <a href="../registry/grok.html">The Grok Build format</a></p>
+<nav class="related-guides" aria-label="Related guides"><p><b>Related guides:</b> <a href="memory-for-grok.html">Memory for Grok Build</a> · <a href="../registry/grok.html">Grok Build format</a> · <a href="getting-started.html">Getting started</a> · <a href="day-zero.html">Day zero</a> · <a href="switching-agents.html">Switching agents</a> · <a href="sync-across-machines.html">Sync across machines</a> · <a href="compare.html">Compare memory tools</a> · <a href="claude-mem-alternative.html">claude-mem alternative</a> · <a href="memory-for-claude-code.html">Claude Code</a> · <a href="memory-for-codex.html">Codex</a> · <a href="memory-for-cursor.html">Cursor</a> · <a href="memory-for-opencode.html">opencode</a> · <a href="memory-for-gemini.html">Gemini CLI</a> · <a href="agents.html">Agents &amp; MCP</a></p></nav>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

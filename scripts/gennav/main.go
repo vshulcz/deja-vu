@@ -101,6 +101,7 @@ var groups = []group{
 		{"delete-codewhale-session-history.html", "CodeWhale"},
 		{"delete-aider-chat-history.html", "aider"},
 		{"delete-openclaw-session-history.html", "OpenClaw"},
+		{"delete-grok-session-history.html", "Grok Build"},
 	}},
 	{title: "Per-agent guides", fold: true, links: []link{
 		{"memory-for-aider.html", "aider"},

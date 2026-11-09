@@ -46,6 +46,13 @@
     <summary>How to delete or purge Codex CLI sessions: codex delete &lt;id&gt;, codex archive, wiping ~/.codex/sessions and archived_sessions, and keeping history.jsonl.</summary>
   </entry>
   <entry>
+    <title>Delete Grok Build session history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-grok-session-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-grok-session-history.html"></link>
+    <updated>2026-11-09T00:00:00Z</updated>
+    <summary>Grok Build keeps each session in its own directory under ~/.grok/sessions. Remove one with deja delete or by hand, and keep the rest searchable.</summary>
+  </entry>
+  <entry>
     <title>Claude Code, Codex, Cursor and 40 more agents — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/harnesses.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/harnesses.html"></link>
@@ -282,12 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html"></link>
     <updated>2026-11-05T00:00:00Z</updated>
     <summary>四十三个编程智能体各自把会话记录写在磁盘的哪个位置、用的是什么格式，以及怎么自己读它们。表格来自 deja 解析器所依据的同一份格式登记表。</summary>
-  </entry>
-  <entry>
-    <title>What each memory tool knows the day you install it — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/day-zero.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/day-zero.html"></link>
-    <updated>2026-11-04T00:00:00Z</updated>
-    <summary>Seven tools on a machine with 19,195 sessions already on disk, asked 100 questions only that history answers: build time, first answer, hit@1.</summary>
   </entry>
 </feed>
