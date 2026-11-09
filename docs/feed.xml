@@ -6,15 +6,36 @@
   <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
   <link rel="self" type="application/atom+xml" href="https://vshulcz.github.io/deja-vu/feed.xml"></link>
   <link rel="hub" href="https://pubsubhubbub.appspot.com/"></link>
-  <updated>2026-11-06T00:00:00Z</updated>
+  <updated>2026-11-09T00:00:00Z</updated>
   <author>
     <name>vshulcz</name>
   </author>
   <entry>
+    <title>Codex resume and exec resume: Fix Errors — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html"></link>
+    <updated>2026-11-09T00:00:00Z</updated>
+    <summary>codex resume, --all, --last and codex exec resume: why a session in ~/.codex/sessions is missing from the picker, the no rollout found error, and the fix.</summary>
+  </entry>
+  <entry>
+    <title>Delete or Purge Codex CLI Sessions — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html"></link>
+    <updated>2026-11-09T00:00:00Z</updated>
+    <summary>How to delete or purge Codex CLI sessions: codex delete &lt;id&gt;, codex archive, wiping ~/.codex/sessions and archived_sessions, and keeping history.jsonl.</summary>
+  </entry>
+  <entry>
+    <title>Open-source Mem0 alternative for coding agents — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/mem0-alternative.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/mem0-alternative.html"></link>
+    <updated>2026-11-09T00:00:00Z</updated>
+    <summary>Local session memory across Claude Code, Codex, Cursor and 40 other agents from existing transcripts, with no LLM key, cloud API, or Docker stack.</summary>
+  </entry>
+  <entry>
     <title>How to Delete Claude Code Sessions (CLI, VS Code) — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html"></link>
-    <updated>2026-11-06T00:00:00Z</updated>
+    <updated>2026-11-09T00:00:00Z</updated>
     <summary>Delete one Claude Code session or purge a project (CLI, VS Code): why /clear and --resume keep old chats, what project purge wipes, and how to keep history.</summary>
   </entry>
   <entry>
@@ -268,26 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html"></link>
     <updated>2026-11-03T00:00:00Z</updated>
     <summary>Why Cursor&#39;s state.vscdb and state.vscdb.backup hit 10–125 GB, why deleting it wipes every chat, and step-by-step SQLite commands to shrink it safely.</summary>
-  </entry>
-  <entry>
-    <title>Delete aider chat history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-aider-chat-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-aider-chat-history.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>aider appends every session in a project to one .aider.chat.history.md. Cut out one session or remove the file, and keep both searchable with deja.</summary>
-  </entry>
-  <entry>
-    <title>Delete Amp thread history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-amp-thread-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-amp-thread-history.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>Amp keeps each thread as its own JSON file, so deleting a conversation is deleting one file. Where the files are, how to remove one or all, and what you lose.</summary>
-  </entry>
-  <entry>
-    <title>Delete Antigravity conversation history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-antigravity-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-antigravity-history.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>Antigravity keeps a conversation in six places under ~/.gemini/antigravity. Delete it in the app, then VACUUM the summaries database so the text is gone too.</summary>
   </entry>
 </feed>

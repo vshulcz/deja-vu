@@ -159,6 +159,7 @@
 <a href="benchmarks.html">Benchmarks</a>
 <a href="compare.html">Compare</a>
 <a href="claude-mem-alternative.html">claude-mem alternative</a>
+<a href="mem0-alternative.html">Mem0 alternative</a>
 <a href="specstory-alternative.html">SpecStory alternative</a>
 <a href="basic-memory-alternative.html">Basic Memory alternative</a>
 <a href="day-zero.html">Day zero</a>
@@ -175,7 +176,7 @@
 
 <div class="save-first"><b>Before you delete chats or move <code>state.vscdb</code> aside:</b> Cursor has no archive, so any chat removed to reclaim disk space is gone for good. Index it first with <a href="https://github.com/vshulcz/deja-vu">deja-vu</a>: it reads <code>state.vscdb</code> read-only via <code>sqlite3</code> and keeps a compact local search index of every conversation after you shrink or reset the database.<div class="save-actions"><div class="save-cmd"><span class="p">$</span><code>brew install deja-vu &amp;&amp; deja index</code><button type="button">copy</button></div><div class="save-cmd"><span class="p">$</span><code>npx @vshulcz/deja-vu index</code><button type="button">copy</button></div><a class="save-btn" href="https://github.com/vshulcz/deja-vu">deja-vu on GitHub</a><a class="save-demo" href="getting-started.html">Other ways to install &rarr;</a></div></div>
 
-<h2>Where it is</h2>
+<h2 id="where-it-is">Where it is</h2>
 <pre># macOS
 ~/Library/Application Support/Cursor/User/globalStorage/state.vscdb
 # Linux
@@ -184,7 +185,7 @@
 %APPDATA%\Cursor\User\globalStorage\state.vscdb</pre>
 <p>It is SQLite. The chats live in the <code>cursorDiskKV</code> table: <code>composerData:&lt;id&gt;</code> for each chat, <code>bubbleId:&lt;chat&gt;:&lt;bubble&gt;</code> for each message, and <code>checkpointId:</code> and <code>agentKv:</code> rows for the agent's checkpoints and blobs. The <a href="delete-cursor-chat-history.html">deletion page</a> covers the layout in more detail.</p>
 
-<h2>Find what is big, without touching Cursor</h2>
+<h2 id="find-what-is-big-without-touching-cursor">Find what is big, without touching Cursor</h2>
 <p>Quit Cursor and copy the file, or read it in place with <code>-readonly</code>. Both queries scan the whole table, so on a 50 GB database expect a few minutes.</p>
 <p>Which kind of row holds the space:</p>
 <pre>sqlite3 -readonly state.vscdb "
@@ -203,7 +204,7 @@ SELECT json_extract(value, '$.name') FROM cursorDiskKV
 WHERE key = 'composerData:&lt;chat id&gt;';"</pre>
 <p>The usual finding is a handful of long agent chats holding most of the file, not thousands of small ones.</p>
 
-<h2>Shrinking it, safest first</h2>
+<h2 id="shrinking-it-safest-first">Shrinking it, safest first</h2>
 <ul>
 <li><b>Delete <code>state.vscdb.backup</code>, if there is one.</b> Cursor stopped updating it, so it is a leftover copy, sometimes over 10 GB; with Cursor quit it can go without touching a chat (<a href="https://forum.cursor.com/t/how-can-i-reduce-the-size-of-the-state-vscdb-file-without-deleting-chats/169927">Cursor staff on the forum</a>).</li>
 <li><b>Delete the biggest chats in Cursor.</b> Export the ones you want to keep first. Deleting from the UI lets Cursor remove the rows it owns; editing the table while Cursor runs is how people lose window state along with the chat.</li>
@@ -211,7 +212,7 @@ WHERE key = 'composerData:&lt;chat id&gt;';"</pre>
 <li><b>Start over.</b> With Cursor quit, move <code>state.vscdb</code>, <code>state.vscdb-wal</code> and <code>state.vscdb-shm</code> aside, not into the trash, and start Cursor: it creates an empty database. Every chat goes from the list, and so does the other state kept there. Keep the old file until you are sure nothing in it is missed.</li>
 </ul>
 
-<h2>Keeping the chats you delete</h2>
+<h2 id="keeping-the-chats-you-delete">Keeping the chats you delete</h2>
 <p>Whichever way you shrink it, the chats in it are the record of what you worked out and what the agent ran, and Cursor keeps no archive.</p>
 <p><a href="https://github.com/vshulcz/deja-vu">deja-vu</a> indexes Cursor's chats, reading the database through <code>sqlite3</code> without writing to it, together with the history of Claude Code, Codex and the other agents on the machine. A chat that is in its index stays searchable after it leaves <code>state.vscdb</code>, including when the whole database is moved aside, so run it once before you delete anything:</p>
 <pre>deja index

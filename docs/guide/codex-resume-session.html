@@ -4,15 +4,15 @@
 <script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Codex resume session: list, find and fix errors — deja-vu</title>
-<meta name="description" content="codex resume, --all, --last and exec resume: why a session in ~/.codex/sessions is missing from the picker, the no rollout found error, and the fix.">
+<title>Codex resume and exec resume: Fix Errors — deja-vu</title>
+<meta name="description" content="codex resume, --all, --last and codex exec resume: why a session in ~/.codex/sessions is missing from the picker, the no rollout found error, and the fix.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html">
 <link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html">
 <link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/codex-resume-session.html">
 <link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Codex resume session: list, find and fix errors">
-<meta property="og:description" content="codex resume, --all, --last and exec resume: why a session in ~/.codex/sessions is missing from the picker, the no rollout found error, and the fix.">
+<meta property="og:title" content="Codex resume and exec resume: Fix Errors">
+<meta property="og:description" content="codex resume, --all, --last and codex exec resume: why a session in ~/.codex/sessions is missing from the picker, the no rollout found error, and the fix.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -27,14 +27,14 @@
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
-<meta name="twitter:title" content="Codex resume session: list, find and fix errors">
-<meta name="twitter:description" content="codex resume, --all, --last and exec resume: why a session in ~/.codex/sessions is missing from the picker, the no rollout found error, and the fix.">
+<meta name="twitter:title" content="Codex resume and exec resume: Fix Errors">
+<meta name="twitter:description" content="codex resume, --all, --last and codex exec resume: why a session in ~/.codex/sessions is missing from the picker, the no rollout found error, and the fix.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Codex resume: finding the session, and the errors when it is not there", "description": "codex resume, --all, --last and exec resume: why a session in ~/.codex/sessions is missing from the picker, the no rollout found error, and the fix.", "url": "https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-10-14", "dateModified": "2026-11-02"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Codex resume: finding the session, and the errors when it is not there", "description": "codex resume, --all, --last and codex exec resume: why a session in ~/.codex/sessions is missing from the picker, the no rollout found error, and the fix.", "url": "https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-10-14", "dateModified": "2026-11-09"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Codex resume", "item": "https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html"}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How do I resume a previous Codex CLI session?", "acceptedAnswer": {"@type": "Answer", "text": "codex resume opens a picker of the sessions started in the current directory; codex resume --all shows every directory, codex resume --last skips the picker, and codex resume <id-or-name> reopens one session. In scripts, use codex exec resume <id> \"prompt\"."}}, {"@type": "Question", "name": "Why is my Codex session missing from codex resume?", "acceptedAnswer": {"@type": "Answer", "text": "The picker shows only sessions started in the current directory (use --all), leaves out codex exec runs (use --include-non-interactive), hides archived sessions (codex unarchive <id>), and lists only sessions on this machine."}}, {"@type": "Question", "name": "What does \"no rollout found for thread id\" mean in Codex?", "acceptedAnswer": {"@type": "Answer", "text": "Codex found no session file for that id under ${CODEX_HOME:-~/.codex}/sessions. The id is wrong, the session was deleted, or CODEX_HOME points at a different tree. Rollouts older than seven days are compressed to .jsonl.zst, so search for rollout-*<id>* rather than *.jsonl."}}, {"@type": "Question", "name": "Can I resume a Codex session on another computer?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, by copying its rollout file to the same sessions/YYYY/MM/DD path under the other machine's CODEX_HOME and resuming by id. Codex does not sync sessions itself."}}]}</script>
 </head>
@@ -158,6 +158,7 @@
 <a href="benchmarks.html">Benchmarks</a>
 <a href="compare.html">Compare</a>
 <a href="claude-mem-alternative.html">claude-mem alternative</a>
+<a href="mem0-alternative.html">Mem0 alternative</a>
 <a href="specstory-alternative.html">SpecStory alternative</a>
 <a href="basic-memory-alternative.html">Basic Memory alternative</a>
 <a href="day-zero.html">Day zero</a>
@@ -174,7 +175,7 @@
 
 <div class="save-first"><b>Session gone from the picker?</b> If <a href="https://github.com/vshulcz/deja-vu">deja-vu</a> indexed it, find it by content across every directory, compressed <code>.jsonl.zst</code> rollouts and archived sessions, then write the rollout back to <code>~/.codex/sessions</code> and get the exact <code>codex resume &lt;id&gt;</code> command.<div class="save-actions"><div class="save-cmd"><span class="p">$</span><code>deja search "&lt;term&gt;"</code><button type="button">copy</button></div><div class="save-cmd"><span class="p">$</span><code>deja resume &lt;id&gt; --write-back</code><button type="button">copy</button></div><a class="save-btn" href="https://github.com/vshulcz/deja-vu">deja-vu on GitHub</a><a class="save-demo" href="getting-started.html">Other ways to install &rarr;</a></div></div>
 
-<h2>The commands</h2>
+<h2 id="the-commands">The commands</h2>
 <pre>codex resume                            # picker: sessions started in this directory
 codex resume --all                      # every directory, with a CWD column
 codex resume --last                     # the most recent one, no picker
@@ -184,7 +185,7 @@ codex fork                              # continue from a copy of an old session
 codex exec resume &lt;id&gt; "next step"      # resume without the TUI, for scripts</pre>
 <p>A UUID takes precedence over a name when the argument parses as one.</p>
 
-<h2>The session is not in the picker</h2>
+<h2 id="the-session-is-not-in-the-picker">The session is not in the picker</h2>
 <ul>
 <li><b>It ran in another directory.</b> The picker shows sessions started where you are. <code>codex resume --all</code> lists all of them. Resuming by id works from any directory: a session started in one project resumed by id from another in the test.</li>
 <li><b>It was a <code>codex exec</code> run.</b> Non-interactive sessions are left out of the picker and of <code>--last</code>. Add <code>--include-non-interactive</code>.</li>
@@ -192,7 +193,7 @@ codex exec resume &lt;id&gt; "next step"      # resume without the TUI, for scri
 <li><b>It is on another machine.</b> Sessions are local files, nothing is synced. See below.</li>
 </ul>
 
-<h2>The errors</h2>
+<h2 id="the-errors">The errors</h2>
 <p>An archived session tells you what to do:</p>
 <pre>$ codex exec resume 01a0775d-a98d-7500-b4b5-943a1f3a35e3 "go on"
 Error: thread/resume: thread/resume failed: session 01a0775d-a98d-7500-b4b5-943a1f3a35e3 is archived. Run `codex unarchive 01a0775d-a98d-7500-b4b5-943a1f3a35e3` to unarchive it first. (code -32600)</pre>
@@ -205,14 +206,14 @@ find "${CODEX_HOME:-$HOME/.codex}" -name "rollout-*&lt;id&gt;*"</pre>
 <p>The <code>find</code> pattern matters: after seven days Codex compresses a rollout to <code>rollout-….jsonl.zst</code>, so a search for <code>*.jsonl</code> misses every session older than a week. Codex resumes either form.</p>
 <p>And one that is not about the session: <code>codex resume</code> is a full-screen picker, so from a pipe, a CI job or an agent's own shell it stops with <code>Error: stdin is not a terminal</code>. Use <code>codex exec resume &lt;id&gt; "prompt"</code> there.</p>
 
-<h2>Resuming on another machine</h2>
+<h2 id="resuming-on-another-machine">Resuming on another machine</h2>
 <p>There is no sync. A rollout copied to the same path under the other machine's <code>CODEX_HOME</code> is enough to resume it by id; in the test, a fresh <code>CODEX_HOME</code> holding nothing but the copied file resumed it:</p>
 <pre>scp laptop:.codex/sessions/2026/09/06/rollout-*01a0775d-a98d-7500-b4b5-943a1f3a35e3.jsonl \
     ~/.codex/sessions/2026/09/06/
 codex resume 01a0775d-a98d-7500-b4b5-943a1f3a35e3</pre>
 <p>The rollout records the directory the session ran in, and the picker filters on it, so where the project lives at another path, use <code>--all</code> or the id.</p>
 
-<h2>Finding the id when you only remember what it was about</h2>
+<h2 id="finding-the-id-when-you-only-remember-what-it-was-about">Finding the id when you only remember what it was about</h2>
 <p>The picker shows titles and first messages; it does not search the conversations, and it knows only Codex. <a href="https://github.com/vshulcz/deja-vu">deja</a> indexes the rollouts, compressed and archived ones included, with every other agent's history on the machine, and prints the command that reopens a session:</p>
 <pre>deja --harness codex "the flaky retry in the uploader"   # ranked hits, each with its session id
 deja resume &lt;id&gt;                                        # the codex resume command that reopens it
