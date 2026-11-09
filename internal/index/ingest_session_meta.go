@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"hash/fnv"
 	"hash/maphash"
+	"maps"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -474,6 +475,8 @@ func (t sessionText) row(s model.Session) SessionMeta {
 	meta.ID, meta.Harness, meta.Project, meta.Path = s.ID, s.Harness, s.Project, s.Path
 	meta.Started, meta.Updated = s.Started, s.Updated
 	meta.Kind, meta.Parent, meta.Agent = s.Kind, s.Parent, s.Agent
+	meta.Model, meta.Tokens = s.Model.Clone(), s.Tokens.Clone()
+	meta.ToolCalls, meta.ToolErrors = maps.Clone(s.ToolCalls), s.ToolErrors
 	meta.OrigID, meta.RemoteID, meta.From = s.OrigID, s.RemoteID, s.From
 	meta.Lifecycle, meta.LifecycleNote, meta.LifecycleAt = s.Lifecycle, s.LifecycleNote, s.LifecycleAt
 	return meta
@@ -863,6 +866,7 @@ func sessionFromMeta(meta SessionMeta) model.Session {
 		GaveUp: meta.GaveUp,
 		Words:  meta.Words,
 		Kind:   meta.Kind, Parent: meta.Parent, Agent: meta.Agent,
+		Model: meta.Model.Clone(), Tokens: meta.Tokens.Clone(), ToolCalls: maps.Clone(meta.ToolCalls), ToolErrors: meta.ToolErrors,
 		OrigID: meta.OrigID, RemoteID: meta.RemoteID, From: meta.From, Lifecycle: meta.Lifecycle, LifecycleNote: meta.LifecycleNote, LifecycleAt: meta.LifecycleAt,
 	}
 }

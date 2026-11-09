@@ -2,6 +2,7 @@ package index
 
 import (
 	"hash/fnv"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -66,8 +67,10 @@ func textOf(s model.Session) sessionText {
 	// session that abandoned something partway.
 	gave := gaveUp(s.Messages) && !strings.HasPrefix(s.Project, model.RepoOriginPrefix) && s.From != model.OriginRepo
 	return sessionText{title: s.Title, meta: SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, AgentTitle: agentTitle, Started: s.Started, Updated: s.Updated, Touched: touched, TouchHits: touchHits, Counted: len(s.Messages), LastMsg: last, Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages), GaveUp: gave, Words: sessionWords(s.Messages), NoText: !holdsText(s), Settled: sessionSettled(s), RanCommand: ranCommand(s.Messages),
-		Kind: s.Kind, Parent: s.Parent, Agent: s.Agent, Opening: SessionOpening(s),
-		OrigID: s.OrigID, RemoteID: s.RemoteID, From: s.From, Lifecycle: s.Lifecycle, LifecycleNote: s.LifecycleNote, LifecycleAt: s.LifecycleAt,
+		Kind: s.Kind, Parent: s.Parent, Agent: s.Agent,
+		Model: s.Model.Clone(), Tokens: s.Tokens.Clone(), ToolCalls: maps.Clone(s.ToolCalls), ToolErrors: s.ToolErrors,
+		Opening: SessionOpening(s),
+		OrigID:  s.OrigID, RemoteID: s.RemoteID, From: s.From, Lifecycle: s.Lifecycle, LifecycleNote: s.LifecycleNote, LifecycleAt: s.LifecycleAt,
 		Rules: rules, Revokes: revokes, Planted: planted}}
 }
 

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -110,7 +111,18 @@ type claudeMessage struct {
 	Content json.RawMessage `json:"content"`
 	// ID identifies the API call a streaming snapshot belongs to, beside the
 	// line's own requestId. Used only where a store writes snapshots.
-	ID string `json:"id"`
+	ID    string       `json:"id"`
+	Model string       `json:"model"`
+	Usage *claudeUsage `json:"usage"`
+}
+
+type claudeUsage struct {
+	InputTokens          int64 `json:"input_tokens"`
+	OutputTokens         int64 `json:"output_tokens"`
+	CacheReadInputTokens int64 `json:"cache_read_input_tokens"`
+	OutputTokensDetails  struct {
+		ThinkingTokens int64 `json:"thinking_tokens"`
+	} `json:"output_tokens_details"`
 }
 
 func parseClaudeTypedFromOffset(path string, offset int64) ([]model.Session, error) {
@@ -148,6 +160,14 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 	// Where each Bash call's record landed, so the result that arrives later
 	// can stamp its outcome onto it.
 	commandAt := map[string][]int{}
+	// Claude Code writes one JSONL record per content block of an API reply and
+	// repeats the reply's usage block on each line, so token totals are keyed
+	// by API call identity before summing across the session (#5996).
+	usageByCall := map[string]model.Tokens{}
+	var usageOrder []string
+	seenTools := map[string]bool{}
+	seenToolResults := map[string]bool{}
+	lineSeq := 0
 	forkedFrom := ""
 	s := model.Session{
 		Harness: harness,
@@ -186,6 +206,25 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 		// itself, six copies of every tool output per line (#5586).
 		var content *claudeContent
 		if v.Message != nil {
+			lineSeq++
+			if v.Message.Model != "" {
+				s.SetModel("", v.Message.Model)
+			}
+			if u := v.Message.Usage; u != nil {
+				key := claudeCallIdentity(v)
+				if key == "" {
+					key = strconv.Itoa(lineSeq)
+				}
+				cur, ok := usageByCall[key]
+				if !ok {
+					usageOrder = append(usageOrder, key)
+				}
+				cur.Input = max(cur.Input, u.InputTokens)
+				cur.Output = max(cur.Output, u.OutputTokens)
+				cur.Reasoning = max(cur.Reasoning, u.OutputTokensDetails.ThinkingTokens)
+				cur.CacheRead = max(cur.CacheRead, u.CacheReadInputTokens)
+				usageByCall[key] = cur
+			}
 			content = splitClaudeContent(v.Message.Content)
 			if v.Message.Role != "" {
 				role = v.Message.Role
@@ -234,9 +273,14 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 			s.Messages = append(s.Messages, model.Message{Role: role, Text: txt, Time: t})
 		}
 		if v.Message != nil {
+			claudeCountToolsIn(&s, content, seenTools, seenToolResults)
 			claudeAppendToolRecords(&s, content, t, commandAt)
 		}
 	})
+	for _, k := range usageOrder {
+		u := usageByCall[k]
+		s.AddTokens(u.Input, u.Output, u.Reasoning, u.CacheRead)
+	}
 	if len(s.Messages) == 0 {
 		return nil, err
 	}
@@ -300,6 +344,53 @@ func claudeStampIdentity(s *model.Session, v *claudeLine) {
 		}
 	} else if v.SessionID != "" {
 		s.ID = v.SessionID
+	}
+}
+
+// claudeCountToolsIn records tool call counts by tool name and failed tool
+// results on s, deduplicating by tool_use id across snapshot runs (#5996).
+func claudeCountToolsIn(s *model.Session, c *claudeContent, seenTools, seenResults map[string]bool) {
+	if c == nil || !c.array {
+		return
+	}
+	for i, item := range c.items {
+		item = trimJSONSpace(item)
+		if len(item) == 0 || item[0] != '{' {
+			continue
+		}
+		if !c.notType(i, "tool_use") {
+			var u struct {
+				Type string `json:"type"`
+				ID   string `json:"id"`
+				Name string `json:"name"`
+			}
+			if json.Unmarshal(item, &u) == nil && u.Type == "tool_use" && u.Name != "" {
+				if u.ID != "" {
+					if seenTools[u.ID] {
+						continue
+					}
+					seenTools[u.ID] = true
+				}
+				s.AddToolCall(u.Name, false)
+				continue
+			}
+		}
+		if !c.notType(i, "tool_result") {
+			var r struct {
+				Type      string `json:"type"`
+				ToolUseID string `json:"tool_use_id"`
+				IsError   bool   `json:"is_error"`
+			}
+			if json.Unmarshal(item, &r) == nil && r.Type == "tool_result" && r.IsError {
+				if r.ToolUseID != "" {
+					if seenResults[r.ToolUseID] {
+						continue
+					}
+					seenResults[r.ToolUseID] = true
+				}
+				s.ToolErrors++
+			}
+		}
 	}
 }
 

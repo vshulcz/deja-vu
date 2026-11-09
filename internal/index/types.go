@@ -172,6 +172,13 @@ type SessionMeta struct {
 	Kind   string `json:",omitempty"`
 	Parent string `json:",omitempty"`
 	Agent  string `json:",omitempty"`
+	// Model, Tokens, ToolCalls and ToolErrors carry the session's model,
+	// accumulated token totals, per-tool call counts, and failed tool calls
+	// (#5996). Additive: an older manifest decodes with them empty.
+	Model      *model.Model   `json:",omitempty"`
+	Tokens     *model.Tokens  `json:",omitempty"`
+	ToolCalls  map[string]int `json:",omitempty"`
+	ToolErrors int            `json:",omitempty"`
 	// Opening identifies the turn the session opens with. A fork copies the
 	// turns it was forked from, times included, so a fork and its source open
 	// alike, and recall reads that to keep a fork's source off its page (#4549).

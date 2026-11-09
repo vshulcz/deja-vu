@@ -170,6 +170,7 @@ func TestEverySessionMetaFieldIsClassifiedForCarryAndKeep(t *testing.T) {
 		"Title": true, "AgentTitle": true, "Started": true, "Updated": true,
 		"Shared": true, "SharedStarted": true, "SharedUpdated": true, "Copies": true,
 		"OrigID": true, "RemoteID": true, "Kind": true, "Parent": true, "Agent": true,
+		"Model": true, "Tokens": true, "ToolCalls": true, "ToolErrors": true,
 		"From": true, "Lifecycle": true, "LifecycleNote": true, "LifecycleAt": true,
 		"Ord": true, "NoText": true, "Rules": true, "Revokes": true, "Planted": true,
 	}

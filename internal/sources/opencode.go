@@ -399,6 +399,13 @@ func parseOpencodeLayouts(harness, db, where1, where2 string, limit int, only2 s
 			}
 		}
 	}
+	if models := opencodeSessionModels(db); len(models) > 0 {
+		for i := range out {
+			if m, ok := models[out[i].ID]; ok && out[i].Model == nil {
+				out[i].SetModel(m.Provider, m.ID)
+			}
+		}
+	}
 	return out, nil
 }
 
@@ -418,7 +425,16 @@ func opencodeV1Query(harness, where string, limit int) string {
 	q := `select json_object(` +
 		`'id',cast(s.id as text),'directory',cast(s.directory as text),` +
 		`'time_created',s.time_created,'time_updated',s.time_updated,` +
+		`'mid',cast(m.id as text),` +
 		`'role',json_extract(m.data,'$.role'),` +
+		`'agent',coalesce(json_extract(m.data,'$.agent'),json_extract(m.data,'$.mode')),` +
+		`'provider',coalesce(json_extract(m.data,'$.providerID'),json_extract(m.data,'$.model.providerID'),json_extract(m.data,'$.model.provider')),` +
+		`'model',coalesce(json_extract(m.data,'$.modelID'),json_extract(m.data,'$.model.modelID'),json_extract(m.data,'$.model.id'),case when json_type(m.data,'$.model')='text' then json_extract(m.data,'$.model') end),` +
+		`'tok_in',json_extract(m.data,'$.tokens.input'),` +
+		`'tok_out',json_extract(m.data,'$.tokens.output'),` +
+		`'tok_reason',json_extract(m.data,'$.tokens.reasoning'),` +
+		`'tok_cache',coalesce(json_extract(m.data,'$.tokens.cache.read'),json_extract(m.data,'$.tokens.cache_read')),` +
+		`'tool',json_extract(p.data,'$.tool'),` +
 		`'text',substr(json_extract(p.data,'$.text'),1,262144),` +
 		// The text opencode wrote itself under the user role — "Continue if
 		// you have next steps…", "The following tool was executed by the
@@ -449,7 +465,7 @@ func opencodeV1Query(harness, where string, limit int) string {
 		`when 'text' then substr(json_extract(m.data,'$.summary'),1,8) end,` +
 		`'path',` + opencodeV1Path(harness) + `,` +
 		`'cmd',` + opencodeV1Command(harness) + `,` +
-		`'patch',json_extract(p.data,'$.state.input.patchText'),` +
+		`'patch',case when json_extract(p.data,'$.tool')='apply_patch' then json_extract(p.data,'$.state.input.patchText') end,` +
 		opencodeV1EditFields(harness) + opencodeV1CompactSummary(harness) +
 		// The output of a bash call and its exit status. Only bash: `read`
 		// output is 119 MB of file contents on this store against 49 MB of
@@ -473,23 +489,10 @@ func opencodeV1Query(harness, where string, limit int) string {
 		// writes. The exact test still decides: the cheap one only avoids
 		// parsing rows that cannot match. Measured on a 2.8 GB store: 6.9s to
 		// 5.6s, byte-identical output.
-		// Read calls join the text parts: they are where the answer to "which
-		// file was this session about" lives, and prose mentions are not a
-		// substitute — measured at 43% present and wrong more often than right.
-		// The same two-test trick applies, with `"tool":"read"` as the cheap
-		// gate. Measured on a 3 GB store: 5.79s to 6.60s for 26,466 paths.
 		`where ((instr(substr(p.data,1,120),'"type":"text"')>0 ` +
 		`and json_extract(p.data,'$.type')='text')` +
-		` or (instr(substr(p.data,1,200),'"tool":"read"')>0 ` +
-		`and json_extract(p.data,'$.tool')='read')` +
-		// bash and apply_patch are the other half of what a session did: 20,425
-		// commands and 6,021 patches on this store against 26,466 reads. Same
-		// two-test shape — the cheap substring gate first, so json_extract never
-		// parses a blob that cannot match.
-		` or (instr(substr(p.data,1,200),'"tool":"bash"')>0 ` +
-		`and json_extract(p.data,'$.tool')='bash')` +
-		` or (instr(substr(p.data,1,200),'"tool":"apply_patch"')>0 ` +
-		`and json_extract(p.data,'$.tool')='apply_patch')` + opencodeV1Tools(harness) + `)` +
+		` or (instr(substr(p.data,1,120),'"type":"tool"')>0 ` +
+		`and json_extract(p.data,'$.type')='tool'))` +
 		where + ` order by s.id,m.time_created,p.id` + lim
 	return q
 }
@@ -515,13 +518,13 @@ func opencodeV1CompactSummary(harness string) string {
 // new_string} and Write {file_path, content} (#4428).
 func opencodeV1EditFields(harness string) string {
 	path := `when json_extract(p.data,'$.tool') in ('edit','write') then json_extract(p.data,'$.state.input.filePath') `
-	old := `json_extract(p.data,'$.state.input.oldString')`
-	nw := `json_extract(p.data,'$.state.input.newString'),` +
+	old := `case when json_extract(p.data,'$.tool') in ('edit','write') then json_extract(p.data,'$.state.input.oldString') end`
+	nw := `case when json_extract(p.data,'$.tool') in ('edit','write') then json_extract(p.data,'$.state.input.newString') end,` +
 		`case when json_extract(p.data,'$.tool')='write' then json_extract(p.data,'$.state.input.content') end`
 	if harness == "zcode" {
 		path += `when json_extract(p.data,'$.tool') in ('Edit','Write') then json_extract(p.data,'$.state.input.file_path') `
-		old = `coalesce(` + old + `,json_extract(p.data,'$.state.input.old_string'))`
-		nw += `,json_extract(p.data,'$.state.input.new_string'),` +
+		old = `coalesce(` + old + `,case when json_extract(p.data,'$.tool') in ('Edit','Write') then json_extract(p.data,'$.state.input.old_string') end)`
+		nw += `,case when json_extract(p.data,'$.tool') in ('Edit','Write') then json_extract(p.data,'$.state.input.new_string') end,` +
 			`case when json_extract(p.data,'$.tool')='Write' then json_extract(p.data,'$.state.input.content') end`
 	}
 	if harness == "kilocode" {
@@ -541,36 +544,20 @@ func opencodeV1EditFields(harness string) string {
 		`'refused',case when json_extract(p.data,'$.state.status')='error' then 1 end,`
 }
 
-// opencodeV1Tools admits the edit and write parts beside read, bash and
-// apply_patch, with the same cheap gate in front of the exact test; and for
-// ZCode its Claude-named tools, so opencode's own query gains no clause for
-// them; read as opencode's were, ZCode sessions were text alone (#4428).
-func opencodeV1Tools(harness string) string {
-	names := []string{"edit", "write"}
-	if harness == "zcode" {
-		names = append(names, "Bash", "Read", "Edit", "Write")
-	}
-	if harness == "kilocode" {
-		// Kilo CLI 7.8's own tools beside opencode's (#4534).
-		names = append(names, "background_process", "notebook_edit", "notebook_read")
-	}
-	var b strings.Builder
-	for _, name := range names {
-		fmt.Fprintf(&b, ` or (instr(substr(p.data,1,200),'"tool":"%s"')>0 and json_extract(p.data,'$.tool')='%s')`, name, name)
-	}
-	return b.String()
-}
-
 // opencodeV1Command is the command a part ran. Kilo CLI's background_process
 // takes one only to start or monitor a process; its other actions name a
 // process by id (#4534).
 func opencodeV1Command(harness string) string {
-	cmd := `json_extract(p.data,'$.state.input.command')`
-	if harness != "kilocode" {
-		return cmd
+	switch harness {
+	case "kilocode":
+		return `case when json_extract(p.data,'$.tool')='bash' ` +
+			`or (json_extract(p.data,'$.tool')='background_process' and coalesce(json_extract(p.data,'$.state.input.action'),'') in ('start','monitor')) ` +
+			`then json_extract(p.data,'$.state.input.command') end`
+	case "zcode":
+		return `case when json_extract(p.data,'$.tool') in ('bash','Bash') then json_extract(p.data,'$.state.input.command') end`
+	default:
+		return `case when json_extract(p.data,'$.tool')='bash' then json_extract(p.data,'$.state.input.command') end`
 	}
-	return `case when json_extract(p.data,'$.tool')='background_process' ` +
-		`and coalesce(json_extract(p.data,'$.state.input.action'),'') not in ('start','monitor') then null else ` + cmd + ` end`
 }
 
 // opencodeV1Path is the file a read opened: `filePath` in opencode's read,
@@ -603,6 +590,7 @@ func readOpencodeRows(harness, db, q string, by map[string]*model.Session) (int,
 		return 0, err
 	}
 	rows := 0
+	seenMsg := map[string]bool{}
 	for dec.More() {
 		var r map[string]any
 		if err := dec.Decode(&r); err != nil {
@@ -639,6 +627,18 @@ func readOpencodeRows(harness, db, q string, by map[string]*model.Session) (int,
 		} else if opencodeSynthetic(r["synthetic"]) || opencodeSynthetic(r["ignored"]) {
 			continue
 		}
+		if mid := str(r["mid"]); mid != "" && !seenMsg[id+"\x00"+mid] {
+			seenMsg[id+"\x00"+mid] = true
+			if agent := str(r["agent"]); agent != "" && agent != "compaction" && !opencodeSynthetic(r["summary"]) {
+				s.Agent = agent
+			}
+			s.SetModel(str(r["provider"]), str(r["model"]))
+			s.AddTokens(int64Of(r["tok_in"]), int64Of(r["tok_out"]), int64Of(r["tok_reason"]), int64Of(r["tok_cache"]))
+		}
+		tool := str(r["tool"])
+		if tool != "" {
+			s.AddToolCall(tool, opencodeSynthetic(r["refused"]))
+		}
 		// A read call carries no text, only the file it opened. Recorded under
 		// the files role so it can answer "which files" without competing in
 		// ordinary search.
@@ -655,7 +655,7 @@ func readOpencodeRows(harness, db, q string, by map[string]*model.Session) (int,
 		if opencodeToolRow(harness, s, r) {
 			continue
 		}
-		if txt == "" {
+		if tool != "" || txt == "" {
 			continue
 		}
 		txt = capParsedMessage(txt)
@@ -710,6 +710,9 @@ func opencodeToolRow(harness string, s *model.Session, r map[string]any) bool {
 				r["exit"] = float64(code)
 				out = rest
 			}
+		}
+		if exitCode(r["exit"]) > 0 && !opencodeSynthetic(r["refused"]) {
+			s.ToolErrors++
 		}
 		if IndexCommands() && worthIndexing(cmd) {
 			// A non-zero exit rides with the command. opencode records it on
@@ -1077,26 +1080,86 @@ func patchSpans(patch string) []string {
 // 49 MB of bash output on a 1150-session store.
 func IndexToolOutput() bool { return os.Getenv("DEJA_INDEX_TOOL_OUTPUT") != "0" }
 
+// opencodeSessionModels reads the optional model column from session / session_v2
+// for stores that record the model on the session row itself.
+func opencodeSessionModels(db string) map[string]model.Model {
+	var out map[string]model.Model
+	for _, table := range opencodeSessionTables(db) {
+		cmd, stopRead := sqliteReadCmd(db, `select json_object('id',id,'model',model) from `+
+			table+` where model is not null and model <> ''`)
+		b, err := cmd.Output()
+		stopRead()
+		if err != nil || len(b) == 0 {
+			continue
+		}
+		rows, err := sqliteObjects[struct {
+			ID    string          `json:"id"`
+			Model json.RawMessage `json:"model"`
+		}](b)
+		if err != nil {
+			continue
+		}
+		if out == nil {
+			out = make(map[string]model.Model, len(rows))
+		}
+		for _, r := range rows {
+			if r.ID == "" {
+				continue
+			}
+			var s string
+			if json.Unmarshal(r.Model, &s) == nil && s != "" {
+				var obj struct {
+					Provider   string `json:"provider"`
+					ProviderID string `json:"providerID"`
+					ID         string `json:"id"`
+					ModelID    string `json:"modelID"`
+				}
+				if strings.HasPrefix(strings.TrimSpace(s), "{") && json.Unmarshal([]byte(s), &obj) == nil {
+					p, m := firstNonEmpty(obj.Provider, obj.ProviderID), firstNonEmpty(obj.ID, obj.ModelID)
+					if m != "" {
+						out[r.ID] = model.Model{Provider: p, ID: m}
+					}
+				} else {
+					out[r.ID] = model.Model{ID: s}
+				}
+			}
+		}
+	}
+	return out
+}
+
+// int64Of reads an integer off a decoded JSON value (float64, json.Number, or string).
+func int64Of(v any) int64 {
+	switch n := v.(type) {
+	case float64:
+		return int64(n)
+	case int64:
+		return n
+	case int:
+		return int64(n)
+	case json.Number:
+		if i, err := n.Int64(); err == nil {
+			return i
+		}
+		if f, err := n.Float64(); err == nil {
+			return int64(f)
+		}
+	case string:
+		if i, err := strconv.Atoi(n); err == nil {
+			return int64(i)
+		}
+	}
+	return 0
+}
+
 // exitCode reads the status opencode records for a command. sqlite3 -json
 // hands numbers back as json.Number or float64 depending on the shape.
 func exitCode(v any) int {
-	switch n := v.(type) {
-	case float64:
-		return int(n)
-	case json.Number:
-		i, err := n.Int64()
-		if err != nil {
-			return 0
-		}
-		return int(i)
-	case string:
-		i, err := strconv.Atoi(n)
-		if err != nil {
-			return 0
-		}
-		return i
+	n := int64Of(v)
+	if n < -255 || n > 255 {
+		return 1
 	}
-	return 0
+	return int(n)
 }
 
 // sqliteStderrMax bounds what a failing sqlite3 is quoted saying. Its first

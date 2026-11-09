@@ -290,6 +290,13 @@ type Session struct {
 	Kind   string `json:"kind,omitempty"`
 	Parent string `json:"parent,omitempty"`
 	Agent  string `json:"agent,omitempty"`
+	// Model, Tokens, ToolCalls and ToolErrors record the model that ran the
+	// session, token totals accumulated across its turns, tool call counts by
+	// tool name, and the number of tool calls that failed (#5996).
+	Model      *Model         `json:"model,omitempty"`
+	Tokens     *Tokens        `json:"tokens,omitempty"`
+	ToolCalls  map[string]int `json:"tool_calls,omitempty"`
+	ToolErrors int            `json:"tool_errors,omitempty"`
 	// Typed is what a person typed in this session, one entry per turn, with
 	// pasted text cut out. A parser fills it only where the transcript can
 	// tell: a turn a person typed into an interactive session, not a
@@ -315,6 +322,153 @@ type Session struct {
 type Source struct {
 	Origin   string `json:"origin"`
 	Instance string `json:"instance,omitempty"`
+}
+
+// Model identifies the model and provider that ran a session.
+type Model struct {
+	Provider string `json:"provider,omitempty"`
+	ID       string `json:"id,omitempty"`
+}
+
+// Clone returns a shallow copy of m, or nil when m is nil.
+func (m *Model) Clone() *Model {
+	if m == nil {
+		return nil
+	}
+	cp := *m
+	return &cp
+}
+
+// Merge returns next merged onto m, keeping an existing provider when next
+// carries only an id.
+func (m *Model) Merge(next *Model) *Model {
+	if next == nil {
+		return m.Clone()
+	}
+	out := next.Clone()
+	if out.Provider == "" && m != nil {
+		out.Provider = m.Provider
+	}
+	if out.ID == "" && m != nil {
+		out.ID = m.ID
+	}
+	return out
+}
+
+// Tokens holds token usage totals accumulated across a session's turns.
+type Tokens struct {
+	Input     int64 `json:"input"`
+	Output    int64 `json:"output"`
+	Reasoning int64 `json:"reasoning"`
+	CacheRead int64 `json:"cache_read"`
+}
+
+// Clone returns a shallow copy of t, or nil when t is nil.
+func (t *Tokens) Clone() *Tokens {
+	if t == nil {
+		return nil
+	}
+	cp := *t
+	return &cp
+}
+
+// Add returns the sum of t and other, or nil when both are nil or zero.
+func (t *Tokens) Add(other *Tokens) *Tokens {
+	if other == nil {
+		return t.Clone()
+	}
+	if t == nil {
+		return other.Clone()
+	}
+	return &Tokens{
+		Input:     t.Input + other.Input,
+		Output:    t.Output + other.Output,
+		Reasoning: t.Reasoning + other.Reasoning,
+		CacheRead: t.CacheRead + other.CacheRead,
+	}
+}
+
+// SetModel records the provider and model id on s when id names a real model.
+// A "provider/id" string splits into both fields when provider is empty, and
+// well-known model families fill an empty provider automatically.
+func (s *Session) SetModel(provider, id string) {
+	provider = strings.TrimSpace(provider)
+	id = strings.TrimSpace(id)
+	if id == "" || id == "<synthetic>" || id == "synthetic" {
+		if provider != "" && s.Model != nil && s.Model.Provider == "" {
+			s.Model.Provider = provider
+		}
+		return
+	}
+	if provider == "" {
+		if p, m, ok := strings.Cut(id, "/"); ok && p != "" && m != "" {
+			provider, id = p, m
+		} else {
+			provider = inferModelProvider(id)
+		}
+	}
+	if s.Model == nil {
+		s.Model = &Model{}
+	}
+	if provider != "" {
+		s.Model.Provider = provider
+	}
+	s.Model.ID = id
+}
+
+func inferModelProvider(id string) string {
+	low := strings.ToLower(id)
+	switch {
+	case strings.HasPrefix(low, "claude-"):
+		return "anthropic"
+	case strings.HasPrefix(low, "gpt-"),
+		strings.HasPrefix(low, "o1"),
+		strings.HasPrefix(low, "o3"),
+		strings.HasPrefix(low, "o4"),
+		strings.HasPrefix(low, "codex-"):
+		return "openai"
+	case strings.HasPrefix(low, "gemini-"):
+		return "google"
+	}
+	return ""
+}
+
+// AddTokens adds one turn's token usage to s.Tokens, allocating it only when at
+// least one counter is positive.
+func (s *Session) AddTokens(in, out, reasoning, cacheRead int64) {
+	if in <= 0 && out <= 0 && reasoning <= 0 && cacheRead <= 0 {
+		return
+	}
+	if s.Tokens == nil {
+		s.Tokens = &Tokens{}
+	}
+	if in > 0 {
+		s.Tokens.Input += in
+	}
+	if out > 0 {
+		s.Tokens.Output += out
+	}
+	if reasoning > 0 {
+		s.Tokens.Reasoning += reasoning
+	}
+	if cacheRead > 0 {
+		s.Tokens.CacheRead += cacheRead
+	}
+}
+
+// AddToolCall increments the call count for name on s and, when failed is true,
+// increments s.ToolErrors.
+func (s *Session) AddToolCall(name string, failed bool) {
+	name = strings.TrimSpace(name)
+	if name != "" {
+		if s.ToolCalls == nil {
+			s.ToolCalls = map[string]int{}
+		}
+		s.ToolCalls[name]++
+	}
+	if failed {
+		s.ToolErrors++
+	}
 }
 
 // Key returns the session's canonical "harness:id" composite identifier.

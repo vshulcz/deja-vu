@@ -196,21 +196,31 @@ func opencodeV2Query(sessionTable, where string, limit int, only string) string 
 		`select json_object(` +
 		`'id',cast(s.id as text),'directory',cast(s.directory as text),` +
 		`'time_created',s.time_created,'time_updated',s.time_updated,` +
+		`'mid',cast(p.mid as text),` +
 		`'role',case p.role when 'assistant' then 'assistant' else 'user' end,` +
+		`'agent',coalesce(json_extract(p.mdata,'$.agent'),json_extract(p.mdata,'$.mode')),` +
+		`'provider',coalesce(json_extract(p.mdata,'$.providerID'),json_extract(p.mdata,'$.model.providerID'),json_extract(p.mdata,'$.model.provider')),` +
+		`'model',coalesce(json_extract(p.mdata,'$.modelID'),json_extract(p.mdata,'$.model.modelID'),json_extract(p.mdata,'$.model.id'),case when json_type(p.mdata,'$.model')='text' then json_extract(p.mdata,'$.model') end),` +
+		`'tok_in',coalesce(json_extract(p.mdata,'$.tokens.input'),json_extract(p.mdata,'$.usage.inputTokens'),json_extract(p.mdata,'$.usage.input_tokens')),` +
+		`'tok_out',coalesce(json_extract(p.mdata,'$.tokens.output'),json_extract(p.mdata,'$.usage.outputTokens'),json_extract(p.mdata,'$.usage.output_tokens')),` +
+		`'tok_reason',coalesce(json_extract(p.mdata,'$.tokens.reasoning'),json_extract(p.mdata,'$.usage.reasoningTokens'),json_extract(p.mdata,'$.usage.reasoning_tokens')),` +
+		`'tok_cache',coalesce(json_extract(p.mdata,'$.tokens.cache.read'),json_extract(p.mdata,'$.tokens.cache_read'),json_extract(p.mdata,'$.usage.cachedInputTokens'),json_extract(p.mdata,'$.usage.cache_read_input_tokens')),` +
+		`'tool',coalesce(json_extract(p.data,'$.name'),json_extract(p.data,'$.tool')),` +
 		`'summary',case p.role when 'compaction' then 1 end,` +
 		`'text',json_extract(p.data,'$.text'),` +
 		`'path',case when json_extract(p.data,'$.name') in ('read') then ` +
 		`coalesce(json_extract(p.data,'$.state.input.filePath'),json_extract(p.data,'$.state.input.path')) end,` +
-		`'editpath',coalesce(json_extract(p.data,'$.state.input.filePath'),json_extract(p.data,'$.state.input.path')),` +
-		`'cmd',json_extract(p.data,'$.state.input.command'),` +
-		`'patch',json_extract(p.data,'$.state.input.patchText'),` +
+		`'editpath',case when json_extract(p.data,'$.name') in ('edit','write') then ` +
+		`coalesce(json_extract(p.data,'$.state.input.filePath'),json_extract(p.data,'$.state.input.path')) end,` +
+		`'cmd',case when json_extract(p.data,'$.name') in ('bash','shell') then json_extract(p.data,'$.state.input.command') end,` +
+		`'patch',case when json_extract(p.data,'$.name') in ('apply_patch','patch') then json_extract(p.data,'$.state.input.patchText') end,` +
 		// 2.0's main editing tool is `edit`, and it carries both sides of the
 		// change. The 1.x reader only ever saw `apply_patch`, so a store where
 		// the edits came through this tool had nothing for `deja restore`,
 		// `deja files` or blame.
-		`'old',json_extract(p.data,'$.state.input.oldString'),` +
+		`'old',case when json_extract(p.data,'$.name') in ('edit','write') then json_extract(p.data,'$.state.input.oldString') end,` +
 		// write hands over the whole file under `content` (#4495).
-		`'new',coalesce(json_extract(p.data,'$.state.input.newString'),` +
+		`'new',coalesce(case when json_extract(p.data,'$.name') in ('edit','write') then json_extract(p.data,'$.state.input.newString') end,` +
 		`case when json_extract(p.data,'$.name')='write' then json_extract(p.data,'$.state.input.content') end),` +
 		`'refused',case when json_extract(p.data,'$.state.status')='error' then 1 end,` +
 		// What a command printed moved from `$.state.output`, a string, to
@@ -226,14 +236,7 @@ func opencodeV2Query(sessionTable, where string, limit int, only string) string 
 		`'mc',p.mc) ` +
 		`from ` + sessionTable + ` s join parts p on p.sid=s.id ` +
 		`where (json_extract(p.data,'$.type')='text' ` +
-		// A tool call names itself under `$.name` now, where 1.x wrote
-		// `$.tool`. The same three are read: what was opened, what was run,
-		// what was changed.
-		`or (json_extract(p.data,'$.type')='tool' ` +
-		// 2.0 renamed two of the three: `bash` is `shell` and `apply_patch` is
-		// `patch`. Both spellings are read, because a store written before the
-		// rename keeps the old ones.
-		`and json_extract(p.data,'$.name') in ('read','bash','shell','apply_patch','patch','edit','write')))` +
+		`or json_extract(p.data,'$.type')='tool')` +
 		where + ` order by s.id,p.mc,p.ord` + lim
 }
 

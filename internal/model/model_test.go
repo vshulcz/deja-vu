@@ -168,3 +168,84 @@ func TestSessionLineageAndCompositeKeys(t *testing.T) {
 func IsSpokenRole(role string) bool {
 	return !IsWorkRole(role)
 }
+
+func TestModelTokensAndToolCallHelpers(t *testing.T) {
+	var nilModel *Model
+	if nilModel.Clone() != nil {
+		t.Fatal("nil Model.Clone should return nil")
+	}
+	base := &Model{Provider: "anthropic", ID: "claude-opus-4-6"}
+	if got := base.Merge(nil); got == nil || got == base || *got != *base {
+		t.Fatalf("base.Merge(nil) = %#v", got)
+	}
+	if got := nilModel.Merge(&Model{ID: "gpt-5"}); got == nil || got.ID != "gpt-5" || got.Provider != "" {
+		t.Fatalf("nil.Merge(id) = %#v", got)
+	}
+	if got := (&Model{Provider: "openai", ID: "gpt-4o"}).Merge(&Model{}); got.Provider != "openai" || got.ID != "gpt-4o" {
+		t.Fatalf("Merge(empty) = %#v", got)
+	}
+
+	var nilTokens *Tokens
+	if nilTokens.Clone() != nil {
+		t.Fatal("nil Tokens.Clone should return nil")
+	}
+	t1 := &Tokens{Input: 10, Output: 5, Reasoning: 2, CacheRead: 3}
+	if got := t1.Add(nil); got == nil || got == t1 || *got != *t1 {
+		t.Fatalf("t1.Add(nil) = %#v", got)
+	}
+	if got := nilTokens.Add(t1); got == nil || got == t1 || *got != *t1 {
+		t.Fatalf("nil.Add(t1) = %#v", got)
+	}
+	if got := t1.Add(&Tokens{Input: 1, Output: 2, Reasoning: 3, CacheRead: 4}); *got != (Tokens{Input: 11, Output: 7, Reasoning: 5, CacheRead: 7}) {
+		t.Fatalf("t1.Add(t2) = %#v", got)
+	}
+
+	var s Session
+	s.SetModel("", "")
+	if s.Model != nil {
+		t.Fatalf("empty SetModel allocated %#v", s.Model)
+	}
+	s.SetModel("", "openai/gpt-5")
+	if s.Model == nil || s.Model.Provider != "openai" || s.Model.ID != "gpt-5" {
+		t.Fatalf("slash SetModel = %#v", s.Model)
+	}
+	s.Model.Provider = ""
+	s.SetModel("anthropic", "<synthetic>")
+	if s.Model.Provider != "anthropic" || s.Model.ID != "gpt-5" {
+		t.Fatalf("synthetic provider backfill = %#v", s.Model)
+	}
+	for _, tc := range []struct {
+		id, wantProvider string
+	}{
+		{"claude-sonnet-4-6", "anthropic"},
+		{"gpt-5.4", "openai"},
+		{"o3-mini", "openai"},
+		{"gemini-2.5-pro", "google"},
+		{"deepseek-chat", ""},
+	} {
+		var m Session
+		m.SetModel("", tc.id)
+		if m.Model == nil || m.Model.Provider != tc.wantProvider || m.Model.ID != tc.id {
+			t.Fatalf("SetModel(%q) = %#v, want provider %q", tc.id, m.Model, tc.wantProvider)
+		}
+	}
+
+	s.AddTokens(0, 0, 0, 0)
+	if s.Tokens != nil {
+		t.Fatalf("zero AddTokens allocated %#v", s.Tokens)
+	}
+	s.AddTokens(100, 50, 20, 10)
+	if *s.Tokens != (Tokens{Input: 100, Output: 50, Reasoning: 20, CacheRead: 10}) {
+		t.Fatalf("AddTokens = %#v", s.Tokens)
+	}
+
+	s.AddToolCall("   ", true)
+	if s.ToolCalls != nil || s.ToolErrors != 1 {
+		t.Fatalf("blank failed AddToolCall: calls=%v errors=%d", s.ToolCalls, s.ToolErrors)
+	}
+	s.AddToolCall("Read", false)
+	s.AddToolCall("Read", true)
+	if s.ToolCalls["Read"] != 2 || s.ToolErrors != 2 {
+		t.Fatalf("AddToolCall(Read): calls=%v errors=%d", s.ToolCalls, s.ToolErrors)
+	}
+}
