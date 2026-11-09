@@ -332,6 +332,7 @@ func cursorToolTurn(s *model.Session, content any, results *cursorToolResults, a
 		if !ok {
 			continue
 		}
+		s.AddToolCall(name, false)
 		shell := cursorDialect.isShellTool(name)
 		cmdAt := -1
 		if shell && IndexCommands() {
@@ -347,8 +348,13 @@ func cursorToolTurn(s *model.Session, content any, results *cursorToolResults, a
 			continue
 		}
 		if shell {
-			if code, ok := cursorExitCode(out); ok && cmdAt >= 0 {
-				s.Messages[cmdAt].Text += fmt.Sprintf("  → exit %d", code)
+			if code, ok := cursorExitCode(out); ok {
+				if code != 0 {
+					s.ToolErrors++
+				}
+				if cmdAt >= 0 {
+					s.Messages[cmdAt].Text += fmt.Sprintf("  → exit %d", code)
+				}
 			}
 			out = cursorShellOutput(out)
 		}

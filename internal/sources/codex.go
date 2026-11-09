@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -453,6 +454,11 @@ func parseCodexRolloutWithScanner(s model.Session, idSettled bool, knownCWD stri
 	// the copy and writes one before the child's first turn, so that record
 	// ends it; a rollout that never writes one keeps everything, as before.
 	inheritedAt, inheritedEvents := -1, 0
+	var inheritedTokens *model.Tokens
+	var inheritedTools map[string]int
+	var inheritedToolErrs int
+	var modelProvider string
+	var lastTokenTotal int64
 	var events []model.Message
 	var trae *traeTurns
 	if s.Harness == "trae" {
@@ -475,46 +481,21 @@ func parseCodexRolloutWithScanner(s model.Session, idSettled bool, knownCWD stri
 				}
 				if id, _ := payload["id"].(string); id != "" && id != s.ID && inheritedAt < 0 {
 					inheritedAt, inheritedEvents = len(s.Messages), len(events)
+					inheritedTokens = s.Tokens.Clone()
+					inheritedTools = maps.Clone(s.ToolCalls)
+					inheritedToolErrs = s.ToolErrors
 				}
 				return
 			}
 			metaSeen = true
-			// The ThreadId, not the SessionId. One rollout file is one thread;
-			// a session groups every thread that branched from it, so keying on
-			// session_id merges the whole fork tree into a single deja session
-			// and every thread but one becomes unreachable. Measured by a
-			// contributor on a fork-heavy store: 811 rollouts, 811 ThreadIds,
-			// 74 SessionIds — 91% of threads collapsed (#635).
-			//
-			// payload.id equals the filename, so this agrees with the id
-			// derived above; it is set explicitly because agreeing by accident
-			// is not the same as agreeing on purpose.
-			if id, ok := payload["id"].(string); ok {
-				// Present and a string: the ThreadId, even if empty.
-				if id != "" {
-					s.ID = id
-				}
-			} else if _, present := payload["id"]; !present {
-				// Absent, not malformed. Rollouts written before Codex split
-				// the two carry only a SessionId, and without threads there is
-				// nothing to collapse: keeping it preserves the identity those
-				// sessions already have in existing indexes. A present-but-not-
-				// a-string id is a shape deja does not understand, and falling
-				// back to the SessionId there would silently reintroduce the
-				// collapse (#635) — the filename-derived id stands instead.
-				if id, _ := payload["session_id"].(string); id != "" {
-					s.ID = id
-				}
-			}
-			if c, _ := payload["cwd"].(string); c != "" {
-				cwd = c
-				s.Project = projectName(c)
-			}
-			s.Kind, s.Parent = codexLineage(payload)
+			codexApplySessionMeta(&s, payload, &cwd, &modelProvider)
 			return
 		}
 		if pt, _ := payload["type"].(string); pt == "thread_settings_applied" && inheritedAt >= 0 {
 			s.Messages, events = s.Messages[:inheritedAt], events[:inheritedEvents]
+			s.Tokens = inheritedTokens
+			s.ToolCalls = inheritedTools
+			s.ToolErrors = inheritedToolErrs
 			for id, i := range calls {
 				if i >= inheritedAt {
 					delete(calls, id)
@@ -527,6 +508,10 @@ func parseCodexRolloutWithScanner(s model.Session, idSettled bool, knownCWD stri
 			trae.record(&s, m, payload, cwd, t, calls)
 			return
 		}
+		if typ, _ := m["type"].(string); typ == "turn_context" {
+			codexTurnContext(&s, payload, modelProvider)
+			return
+		}
 		// A local compaction writes {"type":"compacted","payload":{"message":
 		// <summary>,"replacement_history":[…]}} (RolloutItem::Compacted, 0.149).
 		// Read as a bare message it was filed as something the person said. A
@@ -536,6 +521,12 @@ func parseCodexRolloutWithScanner(s model.Session, idSettled bool, knownCWD stri
 				s.Messages = append(s.Messages, model.Message{Role: RoleSummary, Text: msg, Time: t})
 			}
 			return
+		}
+		if typ, _ := m["type"].(string); typ == "event_msg" {
+			if pt, _ := payload["type"].(string); pt == "token_count" {
+				codexTokenCount(&s, payload, &lastTokenTotal)
+				return
+			}
 		}
 		switch pt, _ := payload["type"].(string); pt {
 		case "function_call":
@@ -618,6 +609,79 @@ func parseCodexRolloutWithScanner(s model.Session, idSettled bool, knownCWD stri
 	return []model.Session{s}, err
 }
 
+func codexApplySessionMeta(s *model.Session, payload map[string]any, cwd, modelProvider *string) {
+	// The ThreadId, not the SessionId. One rollout file is one thread;
+	// a session groups every thread that branched from it, so keying on
+	// session_id merges the whole fork tree into a single deja session
+	// and every thread but one becomes unreachable. Measured by a
+	// contributor on a fork-heavy store: 811 rollouts, 811 ThreadIds,
+	// 74 SessionIds — 91% of threads collapsed (#635).
+	if id, ok := payload["id"].(string); ok {
+		if id != "" {
+			s.ID = id
+		}
+	} else if _, present := payload["id"]; !present {
+		// Absent, not malformed. Rollouts written before Codex split the two
+		// carry only a SessionId, and without threads there is nothing to
+		// collapse (#635).
+		if id, _ := payload["session_id"].(string); id != "" {
+			s.ID = id
+		}
+	}
+	if c, _ := payload["cwd"].(string); c != "" {
+		*cwd = c
+		s.Project = projectName(c)
+	}
+	s.Kind, s.Parent = codexLineage(payload)
+	if prov, _ := payload["model_provider"].(string); prov != "" {
+		*modelProvider = prov
+		s.SetModel(prov, "")
+	}
+	if mod, _ := payload["model"].(string); mod != "" {
+		s.SetModel(*modelProvider, mod)
+	}
+}
+
+func codexTurnContext(s *model.Session, payload map[string]any, modelProvider string) {
+	if mod, _ := payload["model"].(string); mod != "" {
+		s.SetModel(modelProvider, mod)
+	}
+	cm, _ := payload["collaboration_mode"].(map[string]any)
+	if cm == nil {
+		return
+	}
+	if mode, _ := cm["mode"].(string); mode != "" {
+		s.Agent = mode
+	}
+	if settings, _ := cm["settings"].(map[string]any); settings != nil {
+		if mod, _ := settings["model"].(string); mod != "" {
+			s.SetModel(modelProvider, mod)
+		}
+	}
+}
+
+func codexTokenCount(s *model.Session, payload map[string]any, lastTokenTotal *int64) {
+	info, _ := payload["info"].(map[string]any)
+	if info == nil {
+		return
+	}
+	tot, _ := info["total_token_usage"].(map[string]any)
+	last, _ := info["last_token_usage"].(map[string]any)
+	total := int64Of(tot["total_tokens"])
+	if last == nil || (total > 0 && total == *lastTokenTotal) {
+		return
+	}
+	if total > 0 {
+		*lastTokenTotal = total
+	}
+	s.AddTokens(
+		int64Of(last["input_tokens"]),
+		int64Of(last["output_tokens"]),
+		int64Of(last["reasoning_output_tokens"]),
+		int64Of(last["cached_input_tokens"]),
+	)
+}
+
 // Codex records a shell run as a function_call named exec_command whose
 // arguments are a JSON string, and its result as a separate function_call_output
 // joined by call_id. Both were read off rollouts the Codex CLI had just
@@ -644,6 +708,9 @@ func codexCall(s *model.Session, payload map[string]any, calls map[string]int, c
 			s.Messages = append(s.Messages, model.Message{Role: "assistant", Text: in.Message, Time: t})
 		}
 		return
+	}
+	if name != "" {
+		s.AddToolCall(name, false)
 	}
 	if name != "exec_command" && name != "shell_command" {
 		return
@@ -784,10 +851,13 @@ func codexCallOutput(s *model.Session, payload map[string]any, calls map[string]
 	// call_id is not an error, and asserting it bare turns one into a panic
 	// that takes the whole parse down.
 	id, _ := payload["call_id"].(string)
-	if m := codexExit.FindStringSubmatch(out); m != nil && id != "" {
+	if m := codexExit.FindStringSubmatch(out); m != nil {
 		if code, err := strconv.Atoi(m[1]); err == nil && code > 0 {
-			if i, ok := calls[id]; ok && i < len(s.Messages) {
-				s.Messages[i].Text += fmt.Sprintf("  → exit %d", code)
+			s.ToolErrors++
+			if id != "" {
+				if i, ok := calls[id]; ok && i < len(s.Messages) {
+					s.Messages[i].Text += fmt.Sprintf("  → exit %d", code)
+				}
 			}
 		}
 	}
@@ -825,6 +895,9 @@ func codexPatch(s *model.Session, payload map[string]any, cwd string, t time.Tim
 
 func codexCustomCall(s *model.Session, payload map[string]any, calls map[string]int, cwd string, t time.Time) {
 	name, _ := payload["name"].(string)
+	if name != "" {
+		s.AddToolCall(name, false)
+	}
 	switch name {
 	case "apply_patch":
 		codexPatch(s, payload, cwd, t)

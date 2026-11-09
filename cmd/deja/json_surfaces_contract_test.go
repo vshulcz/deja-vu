@@ -39,9 +39,9 @@ var sessionSections = []string{"## `deja search --json`", sessionObjectHeading}
 
 func jsonSurfaces(sessionID string) []jsonSurface {
 	return []jsonSurface{
-		{heading: "## `deja search --json`", args: []string{"search", "shellcheck", "--json"}, shared: sessionSections},
-		{heading: "## `deja last --json`", args: []string{"last", "--json"}, shared: sessionSections},
-		{heading: "## `deja show <exact-id> --harness <name> --json`", args: []string{"show", sessionID, "--harness", "claude", "--json"}, shared: sessionSections},
+		{heading: "## `deja search --json`", args: []string{"search", "shellcheck", "--json"}, shared: sessionSections, data: []string{"tool_calls"}},
+		{heading: "## `deja last --json`", args: []string{"last", "--json"}, shared: sessionSections, data: []string{"tool_calls"}},
+		{heading: "## `deja show <exact-id> --harness <name> --json`", args: []string{"show", sessionID, "--harness", "claude", "--json"}, shared: sessionSections, data: []string{"tool_calls"}},
 		{heading: "## `deja stats --json`", args: []string{"stats", "--json"}, dynamic: []string{"harnesses", "roles", "projects", "by_harness", "records"}},
 		{heading: "## `deja doctor --json`", args: []string{"doctor", "--json", "--offline"}, dynamic: []string{"ingest_health", "ingest_files", "activations", "commands"}},
 		{heading: "## `deja friction --json`", args: []string{"friction", "--json"}},
@@ -55,7 +55,7 @@ func jsonSurfaces(sessionID string) []jsonSurface {
 		{heading: "## `deja stats --redaction --json`", args: []string{"stats", "--redaction", "--json"}, data: []string{"by_harness", "by_kind", "kinds"}},
 		{heading: "## `deja stats --year --json`", args: []string{"stats", "--year", "--json"}, dynamic: []string{"harnesses"}},
 		{heading: "## `deja log --json`", args: []string{"log", "--json"}},
-		{heading: "## `deja blame <path> --json`", args: []string{"blame", "internal/pool/pool.go", "--json", "--all-projects"}, shared: sessionSections},
+		{heading: "## `deja blame <path> --json`", args: []string{"blame", "internal/pool/pool.go", "--json", "--all-projects"}, shared: sessionSections, data: []string{"tool_calls"}},
 		{heading: "## `deja blame <path>:<line> --attribution --json`", args: []string{"blame", "internal/pool/pool.go:3", "--attribution", "--json"}},
 		{heading: "## `deja wip --json`", args: []string{"wip", "--json"}},
 		{heading: "## `deja rules candidates --json`", args: []string{"rules", "candidates", "--json"}},

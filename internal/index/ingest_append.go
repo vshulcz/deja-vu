@@ -301,6 +301,7 @@ func appendedRow(m *Manifest, key string, s model.Session, p string, of, now Fil
 	}
 	before := meta
 	named := meta.ID != ""
+	fresh := !named
 	if !named {
 		meta = metaWithOrd(metaForSession(s), nextSessionOrd(m.Sessions))
 	}
@@ -344,6 +345,7 @@ func appendedRow(m *Manifest, key string, s model.Session, p string, of, now Fil
 			prev.Started, prev.Updated = before.Started, before.Updated
 		}
 		meta = ownerRow(prev, s, metaForSession(s), prev.Ord, collided)
+		fresh = true
 		if !prev.Started.IsZero() && (meta.Started.IsZero() || prev.Started.Before(meta.Started)) {
 			meta.Started = prev.Started
 		}
@@ -374,16 +376,38 @@ func appendedRow(m *Manifest, key string, s model.Session, p string, of, now Fil
 	// flipped its GaveUp and put the loser's files in its Touched —
 	// the wrong conversation's files surfacing in blame (#1304).
 	if owns {
-		extendOwnedRow(&meta, s, p, known)
+		extendOwnedRow(&meta, s, p, known, fresh)
 	}
 	meta.Copies = withCopies(meta.Path, before.Copies, before.Path, s.Path)
 	return meta, named && (before.Shared != meta.Shared || meta.Shared && filepath.Dir(before.Path) != filepath.Dir(meta.Path))
 }
 
 // extendOwnedRow folds what s's tail says into the row it owns.
-func extendOwnedRow(meta *SessionMeta, s model.Session, p string, known bool) {
+func extendOwnedRow(meta *SessionMeta, s model.Session, p string, known, fresh bool) {
 	ran := meta.RanCommand
 	extendDerived(meta, s.Messages)
+	if !fresh {
+		if s.Kind != "" && meta.Kind == "" {
+			meta.Kind = s.Kind
+		}
+		if s.Parent != "" && meta.Parent == "" {
+			meta.Parent = s.Parent
+		}
+		if s.Agent != "" {
+			meta.Agent = s.Agent
+		}
+		meta.Model = meta.Model.Merge(s.Model)
+		meta.Tokens = meta.Tokens.Add(s.Tokens)
+		if len(s.ToolCalls) > 0 {
+			if meta.ToolCalls == nil {
+				meta.ToolCalls = make(map[string]int, len(s.ToolCalls))
+			}
+			for name, n := range s.ToolCalls {
+				meta.ToolCalls[name] += n
+			}
+		}
+		meta.ToolErrors += s.ToolErrors
+	}
 	// Folding a turn twice changes nothing, so a store that hands the whole
 	// session over again is safe here.
 	meta.Rules, meta.Revokes = foldUserRules(meta.Rules, meta.Revokes, s.Typed)

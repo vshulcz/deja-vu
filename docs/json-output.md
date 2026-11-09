@@ -210,7 +210,11 @@ when empty:
 | `lifecycle_at` | when that state was set |
 | `kind` | the harness's own word for a session it did not get from a person typing: an agent spawned it (`sidechain` from Claude, `subagent` or `subagent_fork` from Grok, `subagent` from Hermes) or a scheduler ran it (`cron` from Hermes, which session start and the prompt hook never offer unasked), and whatever a harness deja has not met yet calls it; absent for sessions a person started |
 | `parent` | the session this one was spawned from, where the harness records the edge itself — deja never infers one |
-| `agent` | name of the agent that ran a spawned session |
+| `agent` | name of the agent or mode that ran the session |
+| `model` | `{provider, id}` of the model that ran the session, where the transcript records one |
+| `tokens` | `{input, output, reasoning, cache_read}` token usage totals accumulated across the session's turns |
+| `tool_calls` | map of tool name to call count across the session |
+| `tool_errors` | number of tool calls in the session that returned an error or non-zero exit code |
 
 `messages` is likewise absent rather than empty on `last`, which never returns
 turns.
