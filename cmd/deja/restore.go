@@ -79,6 +79,12 @@ func runRestore(dir string, args []string, stdout io.Writer) error {
 			if strings.HasPrefix(args[i], "-") {
 				return unknownFlag("restore", args[i], restoreFlags)
 			}
+			// A whitespace-only token is no path at all: without this,
+			// `deja restore "   "` sailed past the missing-path refusal and a
+			// leading empty argument was silently ignored (#5937).
+			if strings.TrimSpace(args[i]) == "" {
+				return usageError("restore")
+			}
 			// A second path used to be skipped, so `deja restore main.go
 			// config.go` reported nothing for main.go and never looked at
 			// config.go (#5076). Refuse it before the index is opened.
