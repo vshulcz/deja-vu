@@ -267,7 +267,7 @@ func requestHookRefresh(dir, cwd string) {
 		return
 	}
 	stamp := time.Now().UnixNano()
-	if err := os.WriteFile(sentinel, []byte(strconv.FormatInt(stamp, 10)), 0o600); err != nil {
+	if err := atomicfile.Write(sentinel, []byte(strconv.FormatInt(stamp, 10)), 0o600); err != nil {
 		return
 	}
 	exe, err := os.Executable()
@@ -712,12 +712,12 @@ func requestWarmup(dir string) {
 	if os.Getenv("DEJA_WARMUP_SENTINEL") != "" || installBuildsIndex || index.Manual() {
 		return
 	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	if err := atomicfile.MkdirSharedAll(dir); err != nil {
 		return
 	}
 	sentinel := filepath.Join(dir, "warmup.sentinel")
 	now := time.Now()
-	f, err := os.OpenFile(sentinel, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	f, err := atomicfile.OpenSharedFile(sentinel, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		if !os.IsExist(err) {
 			return
@@ -745,7 +745,7 @@ func requestWarmup(dir string) {
 		if os.Remove(sentinel) != nil {
 			return
 		}
-		f, err = os.OpenFile(sentinel, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+		f, err = atomicfile.OpenSharedFile(sentinel, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 		if err != nil {
 			return
 		}

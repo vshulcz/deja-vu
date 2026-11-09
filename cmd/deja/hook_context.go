@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -1082,7 +1083,7 @@ func noteIsNews(p, note string) bool {
 			}
 		}
 	}
-	_ = os.WriteFile(p, []byte(sum+" "+strconv.FormatInt(time.Now().Unix(), 10)), 0o600)
+	_ = atomicfile.Write(p, []byte(sum+" "+strconv.FormatInt(time.Now().Unix(), 10)), 0o600)
 	return true
 }
 
@@ -1101,7 +1102,7 @@ func receiptIsNews(dir, digest string) bool {
 			}
 		}
 	}
-	_ = os.WriteFile(p, []byte(sum+" "+strconv.FormatInt(time.Now().Unix(), 10)), 0o600)
+	_ = atomicfile.Write(p, []byte(sum+" "+strconv.FormatInt(time.Now().Unix(), 10)), 0o600)
 	return true
 }
 

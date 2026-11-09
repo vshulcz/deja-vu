@@ -371,6 +371,7 @@ var doctorStateWords = []struct {
 	{"missing", statDim},
 	{"unsupported", statDim},
 	{"found", statGreen},
+	{"shared", statGreen},
 	{"wired", statGreen},
 	{"written", statGreen},
 	{"plugin", statGreen},

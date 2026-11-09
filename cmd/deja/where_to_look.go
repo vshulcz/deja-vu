@@ -2,6 +2,8 @@ package main
 
 import (
 	"os"
+
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 )
 
 // whereToLookLine names the documentation and the issue tracker. Most installs
@@ -30,7 +32,7 @@ func whereToLook(dir string) string {
 	if _, err := os.Stat(marker); err == nil {
 		return ""
 	}
-	if err := os.WriteFile(marker, []byte("1"), 0o600); err != nil {
+	if err := atomicfile.Write(marker, []byte("1"), 0o600); err != nil {
 		// Unwritable index directory: say it once here rather than every run.
 		return ""
 	}

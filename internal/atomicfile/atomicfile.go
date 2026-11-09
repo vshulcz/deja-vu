@@ -44,6 +44,18 @@ var sharedSidecarSuffixes = []string{
 	".warming",
 	".usage.jsonl",
 	".injections.jsonl",
+	".refreshing",
+	".weeknote",
+	".synctip",
+	".deadhooks",
+	".skills",
+	".starnote",
+	".wheretolook",
+	".builtnote",
+	".receipt",
+	".nudge",
+	".envblock",
+	".firstrecall",
 }
 
 // SharedGroup reports whether path belongs to an index configured for shared

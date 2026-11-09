@@ -12,6 +12,7 @@ import (
 	"sync"
 	"unicode/utf8"
 
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/index"
 )
 
@@ -472,8 +473,7 @@ func environmentServedRecently(dir string) bool {
 // server do not both send one.
 func stampEnvironmentServed(dir string) {
 	p := environmentMarker(dir)
-	_ = os.MkdirAll(filepath.Dir(p), 0o700)
-	_ = os.WriteFile(p, []byte(strconv.FormatInt(time.Now().Unix(), 10)), 0o600)
+	_ = atomicfile.Write(p, []byte(strconv.FormatInt(time.Now().Unix(), 10)), 0o600)
 }
 
 func environmentMarker(dir string) string {

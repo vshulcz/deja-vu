@@ -1,6 +1,10 @@
 package main
 
-import "os"
+import (
+	"os"
+
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
+)
 
 // starText is the one sentence deja says about itself, once per index: after
 // the install proof the CLI prints, or on a later session start once the built
@@ -18,7 +22,7 @@ func starLine(dir string) string {
 	if _, err := os.Stat(p); err == nil {
 		return ""
 	}
-	if err := os.WriteFile(p, []byte("1\n"), 0o600); err != nil {
+	if err := atomicfile.Write(p, []byte("1\n"), 0o600); err != nil {
 		return ""
 	}
 	return starText
