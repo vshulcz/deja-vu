@@ -58,7 +58,7 @@
     }
   },
   "dependencies": {
-    "@vshulcz/deja-vu": "^0.24.0"
+    "@vshulcz/deja-vu": "^0.24.1"
   },
   "funding": {
     "type": "github",
