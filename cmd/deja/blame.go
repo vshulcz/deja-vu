@@ -36,6 +36,9 @@ func parseBlame(args []string) (string, search.BlameOptions, blameMode, error) {
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		if afterDashDash {
+			if strings.TrimSpace(a) == "" {
+				return "", o, mode, errBlameNeedsPath
+			}
 			if path != "" {
 				return "", o, mode, errors.New("blame accepts one path")
 			}
@@ -91,6 +94,11 @@ func parseBlame(args []string) (string, search.BlameOptions, blameMode, error) {
 				}
 				return "", o, mode, fmt.Errorf("blame: unknown flag %q; a path or question that starts with a dash goes after `--`", a)
 			}
+			if strings.TrimSpace(a) == "" {
+				// A blank path names no file, and checking only after the loop
+				// let `deja blame "" main.go` swap in the next argument (#5938).
+				return "", o, mode, errBlameNeedsPath
+			}
 			if path != "" {
 				return "", o, mode, errors.New("blame accepts one path")
 			}
@@ -98,10 +106,12 @@ func parseBlame(args []string) (string, search.BlameOptions, blameMode, error) {
 		}
 	}
 	if path == "" {
-		return "", o, mode, errors.New("blame needs a path — `deja blame <file>` or `deja blame <file>:<line>`")
+		return "", o, mode, errBlameNeedsPath
 	}
 	return path, o, mode, nil
 }
+
+var errBlameNeedsPath = errors.New("blame needs a path — `deja blame <file>` or `deja blame <file>:<line>`")
 
 func runBlame(dir string, args []string) error {
 	path, o, mode, err := parseBlame(args)
