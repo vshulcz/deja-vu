@@ -74,6 +74,13 @@
     <summary>How to give MiniMax Code recall over every coding agent&#39;s sessions on the machine — the MCP server in mcp.json, and a plugin with the skill and the hooks.</summary>
   </entry>
   <entry>
+    <title>Add memory to Muse Code: every agent&#39;s sessions — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-muse.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-muse.html"></link>
+    <updated>2026-11-09T00:00:00Z</updated>
+    <summary>How to give Muse Code recall over every coding agent&#39;s sessions on the machine — the MCP server and hooks in settings.json, and the skill in ~/.agents/skills.</summary>
+  </entry>
+  <entry>
     <title>How to Delete Claude Code Sessions (CLI, VS Code) — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html"></link>
@@ -282,12 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html"></link>
     <updated>2026-11-05T00:00:00Z</updated>
     <summary>Claude Code 的会话记录在 ~/.claude/projects 下：怎么删一个、删一个项目、全删，cleanupPeriodDays 会自动删掉什么，以及删掉之后失去什么。</summary>
-  </entry>
-  <entry>
-    <title>每个编程智能体把会话历史存在哪里 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html"></link>
-    <updated>2026-11-05T00:00:00Z</updated>
-    <summary>四十三个编程智能体各自把会话记录写在磁盘的哪个位置、用的是什么格式，以及怎么自己读它们。表格来自 deja 解析器所依据的同一份格式登记表。</summary>
   </entry>
 </feed>
