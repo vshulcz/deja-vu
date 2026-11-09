@@ -46,6 +46,9 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 		if strings.HasPrefix(a, "-") && a != "-" {
 			return fmt.Errorf("resume: unknown flag %q — it takes an id-prefix, --write-back, --exec and --app", a)
 		}
+		if strings.TrimSpace(a) == "" {
+			return idPrefixNeeded(dir, "resume needs an id prefix", "resume needs an id prefix (see `deja last`)")
+		}
 		if prefix != "" {
 			return fmt.Errorf("resume takes one id-prefix — got %q and %q", prefix, a)
 		}
