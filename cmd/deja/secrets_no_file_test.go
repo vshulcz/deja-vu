@@ -10,7 +10,7 @@ import (
 )
 
 // The report closes with "the files above are yours to edit or delete", and the
-// rows from a database store have no file above. Measured on this machine, 36
+// rows from a database store have no file above. In practice, 36
 // of 83 findings were in one — nearly half the report, silently left with no
 // action and no reason (#3823).
 func TestTheSessionsWithNoFileAreAccountedFor(t *testing.T) {

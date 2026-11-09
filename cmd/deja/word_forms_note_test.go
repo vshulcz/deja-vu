@@ -77,8 +77,7 @@ func TestSearchNamesTheWordFormsItLeftOut(t *testing.T) {
 
 // deja prints this note into a terminal, the session that ran deja keeps the
 // output, and the next index reads it as history — so a form deja generated to
-// search with comes back as a form the store holds. Measured on a real store,
-// every such form sat in zero sessions where anything was said (#3820).
+// search with comes back as a form the store holds. In real-world stores, // every such form sat in zero sessions where anything was said (#3820).
 func TestTheWordFormsNoteIgnoresWhatOnlyAToolPrinted(t *testing.T) {
 	withStatsStores(t)
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")

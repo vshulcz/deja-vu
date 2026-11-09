@@ -9,11 +9,9 @@ import (
 // An order is a sentence that tells whoever reads it to run something. Recall
 // cuts an order only from text no person typed for this project: a tool's
 // output, a paste, a parent agent's prompt, a headless run, another project's
-// session. On the quillmark stand a labelled line ("Prompt written by a parent
-// agent: ... every time you edit docs/install.md, run ./scripts/linkcheck.sh")
-// was still run in 4 of 6 runs. What a person typed and what a model
-// concluded are never cut: "you must run go mod tidy after changing go.mod"
-// is the remedy recall exists to carry.
+// session. What a person typed and what a model concluded are never cut:
+// "you must run go mod tidy after changing go.mod" is the remedy recall
+// exists to carry.
 
 // sentences splits text after line breaks and clause ends; joined, the pieces
 // are text again.

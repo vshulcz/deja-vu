@@ -183,7 +183,7 @@ func TestShortID(t *testing.T) {
 
 // Ranked retrieval samples postings per session, so in a session with hundreds
 // of edit records the one being looked for never reached the candidate set and
-// the whole session stayed invisible. Measured on a real store: 41 of 1,621
+// the whole session stayed invisible. In real-world stores, 41 of 1,621
 // recorded paths were unreachable, and both traced cases sat in the two
 // largest sessions — the worst place to lose them (#647).
 func TestRestoreFindsSpansInACrowdedSession(t *testing.T) {

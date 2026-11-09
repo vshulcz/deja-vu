@@ -468,7 +468,7 @@ func copilotChatSession(path string, state map[string]any) ([]model.Session, err
 //	workspaceStorage/<ws>/chatEditingSessions/<session id>/state.json
 //
 // The transcript names a path only when the text does, so a chat that edited
-// eleven files left one `files` record. Measured on this machine: 48 of those
+// eleven files left one `files` record. In practice, 48 of those
 // state files, whose entries carry 145 resources between them (#3381).
 func appendChatEditedFiles(s *model.Session, path, id string) {
 	if !IndexToolPaths() || id == "" {

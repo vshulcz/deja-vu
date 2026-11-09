@@ -5,7 +5,7 @@ import "testing"
 // The mentions and the conclusion usually sit in one message: a paragraph that
 // names the subject while putting it off, then the sentence that settles it.
 // Picking the densest line first and asking about a conclusion afterwards hands
-// the slot to the paragraph. Measured on a real store, that was 35 of 119
+// the slot to the paragraph. In real-world stores, that was 35 of 119
 // blocks quoting a weaker line than the same session held.
 func TestDensestLinePrefersTheConclusion(t *testing.T) {
 	text := "looked at dunlin and at the dunlin retries, not touching either yet\n" +

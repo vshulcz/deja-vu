@@ -443,7 +443,7 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 	//
 	// With the agent session it went to, the way the per-prompt hook has since
 	// #1494. Without it this surface could be counted and never followed:
-	// measured on this machine, 492 point-of-action injections and not one that
+	// In practice, 492 point-of-action injections and not one that
 	// could be paired with what the agent did next — which is the pairing any
 	// judgement about whether the line helped has to start from.
 	// The text, not only the count. The injections file holds a snapshot for
@@ -1058,7 +1058,7 @@ func commandProjectCandidatesIn(dir, cwd, cmd string) []string {
 // without ever asking the next producer. So one program that is missing, named
 // once, silenced the surface for every later command that mentioned it.
 //
-// Measured on a real store over the 91 command/project pairs its own history
+// In real-world stores, over the 91 command/project pairs its own history
 // says an agent runs: the missing-program sentence was the answer 51 times, 34
 // of those had a decision waiting behind it, and across one agent session the
 // hook said three lines in ninety-one actions (#3603).
@@ -1076,7 +1076,7 @@ func commandHookLineSkipping(dir, cwd, cmd, self string, used func(string) bool)
 		return ""
 	}
 	// What this command did to this machine last time, before what it is.
-	// Measured on a real store, the "you have run this" line answers 2 of 120
+	// In real-world stores, the "you have run this" line answers 2 of 120
 	// commands an agent actually runs — everything else is a compound unique
 	// in its arguments — while a failure is keyed on the shape of the command
 	// and reaches the ones that matter (#2924). It is also the more useful of

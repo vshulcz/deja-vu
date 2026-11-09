@@ -406,7 +406,7 @@ func looksLikeSource(l string) bool {
 // `deja friction` writes a count and the error; `deja fix` writes the error
 // with the date of the session it came from and the command underneath. Both
 // came back as a fresh sighting of the error they were quoting, and the command
-// `fix` printed became a candidate remedy for it — found on a real store as the
+// `fix` printed became a candidate remedy for it — In real-world stores, as the
 // pair `command not found: python · 2026-05-18`.
 func isDejaOwnReport(l string) bool {
 	if i := strings.Index(l, " sessions  "); i > 0 {

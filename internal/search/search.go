@@ -291,7 +291,7 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 		// The index hands ranking the records that matched, not the session, so
 		// doc.length measures the size of the match. Normalising by that told
 		// BM25 that a marathon mentioning a word in three short lines is a
-		// three-line document — measured on a real store, one active session
+		// three-line document — In real-world stores, one active session
 		// took first place on five of ten unrelated queries. When the index
 		// counted the session, normalise by the session.
 		// Not the session length outright: normalising by it alone punishes a

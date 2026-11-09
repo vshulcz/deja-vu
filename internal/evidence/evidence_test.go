@@ -196,3 +196,12 @@ func TestBuildSharedGroupReceiptPermissions(t *testing.T) {
 		t.Fatalf("receipts.bin mode = %04o, want 0660", perm)
 	}
 }
+
+// Receipts finds, for each assistant message of one session, the records of
+// its own turn that carry its facts. What the environment recorded beats
+// what a person said about it, except a person's rule or instruction, which
+// is shown first and never replaced.
+func Receipts(s model.Session, clean func(string) string) map[uint64]string {
+	out, _ := receipts(s, clean)
+	return out
+}

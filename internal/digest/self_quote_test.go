@@ -4,7 +4,7 @@ import "testing"
 
 // deja asks an agent to credit the recall it used, and that sentence reports
 // what an earlier session decided — so every decision marker fires on it and
-// the line came back as a decision of its own. Found on a real store at the
+// the line came back as a decision of its own. In real-world stores, at the
 // file line: `doctor_auto.go has been worked on in 2 sessions — prior decision:
 // deja-vu recalled: …`, which is deja quoting itself quoting a session.
 func TestDejaQuotingItselfIsNotADecision(t *testing.T) {

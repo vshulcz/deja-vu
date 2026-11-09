@@ -1,6 +1,7 @@
 package redact
 
 import (
+	"sort"
 	"strings"
 	"testing"
 )
@@ -338,4 +339,14 @@ func TestGoTestRunnerLinesAreNotRedactedAsEntropy(t *testing.T) {
 	if got, c := Text(secretLine); got == secretLine || c.Total() == 0 {
 		t.Fatalf("expected pass: secret to be redacted, got %q", got)
 	}
+}
+
+// Kinds lists those rule names.
+func Kinds() []string {
+	out := make([]string, 0, len(kinds))
+	for k := range kinds {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }

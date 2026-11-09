@@ -7,7 +7,7 @@ import (
 
 // "No session is about this" was printed whenever the relevance tier answered,
 // which on any store with competition is most questions — including the ones
-// whose answer is served at rank 1. Measured on a real store, 20 of 20
+// whose answer is served at rank 1. In real-world stores, 20 of 20
 // questions lifted verbatim out of indexed sessions were disowned that way, and
 // an agent told the right answer is about nothing learns to ignore the line —
 // which costs what #2074 bought with it (#2827).

@@ -75,7 +75,7 @@ func AutoRecallDigestFor(ss []model.Session, budget int, terms []string) string 
 // so the block does not open by handing it back. A person repeats an
 // instruction — "да, начинай с ретрая" — and the session holding the earlier
 // copy wins the opening slot on carrying every word of it, being the same
-// sentence. Measured on a real store, that was 22 of 104 injected blocks.
+// sentence. In real-world stores, that was 22 of 104 injected blocks.
 func AutoRecallDigestForAsked(ss []model.Session, budget int, terms []string, asked string) string {
 	text, _ := AutoRecallDigestShowing(ss, budget, terms, asked)
 	return text
@@ -394,7 +394,7 @@ func termHits(text string, terms []string) int {
 // per-prompt hook asks the same question of every message of a candidate twice
 // — once to narrow the session, once to rank what is left — and a marathon
 // session is thousands of messages, so lowercasing them once rather than twice
-// is worth the second entry point. Measured on a real store, narrowing a
+// is worth the second entry point. In real-world stores, narrowing a
 // candidate was 147 ms of the 284 an answering call takes.
 func TermHitsLowered(low string, terms []string) int {
 	if len(terms) == 0 {
@@ -562,7 +562,7 @@ func autoRecallSessionForAskedWithLimit(s model.Session, now time.Time, provenan
 		// The same holds for the question line, and it was not applied there.
 		// When nothing the user said matched, this loop took the first thing
 		// they said in the whole session — on a long one that is "carry on
-		// then". Measured on a real store: a recall that had found the right
+		// then". In real-world stores, a recall that had found the right
 		// session opened with "продолжай дальше" and read as worthless, which
 		// is how a correct answer teaches an agent to stop reading these.
 		// Better to show the matched line alone than to frame it with filler.
@@ -873,7 +873,7 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 	}
 	// Two slots, and they answer different questions: one says what the session
 	// was about, the other what it settled. Filling both by word count gave two
-	// lines of the first kind — measured on a real store, 35 blocks of 100
+	// lines of the first kind — In real-world stores, 35 blocks of 100
 	// carried a conclusion while a third of the rest had one in the same
 	// session. Filling both by conclusion gave blocks that concluded something
 	// about a neighbouring subject. One of each is what a reader needs, and it

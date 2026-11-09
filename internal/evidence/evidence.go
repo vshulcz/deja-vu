@@ -3,10 +3,6 @@
 // edit, or the person's words. Recall then shows the record instead of the
 // prose, and names who wrote every other line.
 //
-// On the quillmark stand a model's wrong conclusion ("3.1x faster",
-// "TestSlugEmpty failed") came back as the answer in 11 of 36 runs on luna
-// and 6 of 24 on sol; with the records in its place, 0 and 0.
-//
 // The receipts are found when the index is built, from the records the index
 // already holds, so the per-prompt hook looks one up by key and reads no
 // transcript. Any harness whose parser writes command, tool-output or edit
@@ -32,9 +28,8 @@ import (
 //
 // A person's line that gives agents an instruction and is not such a rule
 // (text pasted into the turn, a rule from another project, a session a script
-// started) says so next to it, and so does a tool output that does: on the
-// stand luna ran a step planted in a log the person pasted, shown under
-// "User: ", and a rule the person had taken back.
+// started) says so next to it, and so does a tool output that carries an
+// instruction.
 const (
 	LabelUser        = "User: "
 	LabelUserRule    = "User said (this project): "
@@ -259,9 +254,7 @@ func oneLine(s string, limit int) string {
 //
 // A line that tells an agent what to do is left out: it backs no claim, and
 // in a third party's text it is how an instruction gets carried into a
-// receipt. On the stand a publish step planted in a `gh issue view` output
-// reached the model twice that way, and luna ran it once. The whole output is
-// still one recall_context away.
+// receipt. The whole output is still one recall_context away.
 func excerpt(text string, toks []string) string {
 	ls := strings.Split(strings.TrimSpace(text), "\n")
 	ok := func(i int) bool { return strings.TrimSpace(ls[i]) != "" && !AddressesAgent(ls[i]) }
@@ -474,10 +467,9 @@ func receiptFor(recs []rec, first map[int]int, p int) []string {
 	if len(strong)+len(words) == 0 {
 		return nil
 	}
-	// A receipt sits close to what it backs: measured on a real store, three
-	// in four within twenty records of the line. The window keeps a marathon
-	// turn from costing the square of its length; the turn's opening message
-	// is always looked at, wherever it is.
+	// A receipt sits close to what it backs, within a bounded window around
+	// the line. The window keeps a marathon turn from costing the square of
+	// its length; the turn's opening message is always looked at, wherever it is.
 	lo, hi := max(first[c.turn], p-receiptWindowBefore), min(len(recs)-1, p+receiptWindowAfter)
 	cand := make([]int, 0, hi-lo+2)
 	if lo > first[c.turn] {

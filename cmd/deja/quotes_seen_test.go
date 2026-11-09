@@ -7,7 +7,7 @@ import (
 
 // The block is deduped whole and its header carries the session's id and date,
 // so the same sentence from a fork or a subagent transcript passed as news.
-// Measured on a real store over eight near-identical nudges — the shape a reader
+// In real-world stores, over eight near-identical nudges — the shape a reader
 // produces when they keep saying "carry on": fifteen quoted lines, eleven
 // distinct, the worst one four times under four different ids.
 func TestASentenceIsNotNewsUnderAnotherId(t *testing.T) {

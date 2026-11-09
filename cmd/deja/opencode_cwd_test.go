@@ -7,7 +7,7 @@ import (
 
 // deja ranks by project, and the project is a directory. The plugin took the
 // server process's cwd, which is where opencode was launched rather than where
-// the work is — measured on this machine, the same question asked from the
+// the work is — In practice, the same question asked from the
 // repository, from the home directory and from /tmp returned that project's
 // sessions, another project's sessions, and nothing at all.
 //

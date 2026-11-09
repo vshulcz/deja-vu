@@ -67,7 +67,7 @@ var navigationCommands = map[string]bool{
 // The shell prompt some harnesses store with the command goes first. Left in,
 // it is the program of every command ever recorded: `$` equals `$`, so the
 // same-program test below passed for any two lines and the navigation guard
-// guarded nothing — measured on a real store, 21 of the 163 repaired pairs
+// guarded nothing — In real-world stores, 21 of the 163 repaired pairs
 // served ran a different program (`go test` answered by `rm`, `git` by `go`)
 // and three more were `cd` somewhere else.
 func commandTokens(cmd string) []string {

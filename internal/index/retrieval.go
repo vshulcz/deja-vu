@@ -760,7 +760,7 @@ func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Sessi
 
 // ProjectRelevantSkipping is ProjectRelevant without the sessions the caller
 // has already dealt with. The per-prompt hook discards a candidate it injected
-// earlier in the same agent session, and measured on a real store that is 15 of
+// earlier in the same agent session, and In real-world stores, that is 15 of
 // the 26 it ranks — every one read from disk in full first, only to be dropped
 // on its id.
 func ProjectRelevantSkipping(dir string, projects, terms []string, n int, skip map[string]bool) ([]model.Session, []int, []int, map[string]float64, error) {

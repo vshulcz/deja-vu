@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -123,9 +124,21 @@ func promptSessions(calls []fakeHookCall) map[string]string {
 	return out
 }
 
+func rxWorkspaceStore(workspace string) string {
+	root := strings.TrimSpace(workspace)
+	if abs, err := filepath.Abs(root); err == nil {
+		root = abs
+	}
+	if runtime.GOOS == "windows" {
+		root = strings.ToLower(root)
+	}
+	slug := strings.NewReplacer(string(os.PathSeparator), "-", "/", "-", `\`, "-", ":", "-").Replace(root)
+	return filepath.Join(sources.ReasonixStateRoot(), "projects", slug, "sessions-v4")
+}
+
 func writeRxSessionDir(t *testing.T, ws, dir, manifest string) {
 	t.Helper()
-	p := filepath.Join(sources.ReasonixWorkspaceStore(ws), dir, "manifest.json")
+	p := filepath.Join(rxWorkspaceStore(ws), dir, "manifest.json")
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -222,7 +235,7 @@ func TestReasonixExtTakesTheSessionFromTheEvent(t *testing.T) {
 	writeRxSessionDir(t, ws, "dir9", `{"sessionId":"FROM-MANIFEST"}`)
 	for _, tc := range []struct{ path, want string }{
 		{"abc123", "abc123"},
-		{filepath.Join(sources.ReasonixWorkspaceStore(ws), "dir9"), "FROM-MANIFEST"},
+		{filepath.Join(rxWorkspaceStore(ws), "dir9"), "FROM-MANIFEST"},
 		{filepath.Join(t.TempDir(), "sessions", "s-42.jsonl"), "s-42"},
 	} {
 		if got := reasonixSessionIDFrom(tc.path); got != tc.want {

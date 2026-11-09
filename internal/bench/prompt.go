@@ -141,7 +141,7 @@ func promptRussianTopics() []promptTopic {
 			"подожди, где именно теперь происходит индексация, объясни снова",
 			"в какой момент строится поисковый указатель после сохранения"},
 		// A compound written with a hyphen, which is how people name things in
-		// Russian as readily as in English. Measured on a real store, one direct
+		// Russian as readily as in English. In real-world stores, one direct
 		// question in seven that got no answer at all was this: the subject word
 		// never became a search term, so nothing could match it.
 		{"лог-сообщение", "лог-сообщение теперь шлём одним пакетом на всю группу",
@@ -690,7 +690,7 @@ func promptMarathonVsChains(rng *rand.Rand, base time.Time) []PromptChain {
 // end-to-end chains.
 func promptSubjectChains(base time.Time) []PromptChain {
 	chains := make([]PromptChain, 0, 9)
-	// The short subject. Measured on a real store over the questions the user
+	// The short subject. In real-world stores, over the questions the user
 	// actually typed: five of the nine that recalled nothing named their
 	// subject in two characters — "как там pr, смержился?", "ну что там v3
 	// показал". The extractor's length floor drops those, the question is left
@@ -719,7 +719,7 @@ func promptSubjectChains(base time.Time) []PromptChain {
 	}
 	// The echo. A person repeats an instruction, and the session holding the
 	// earlier copy of it wins the opening line — it carries every word of the
-	// question, being the same sentence. Measured on a real store, 22 of 104
+	// question, being the same sentence. In real-world stores, 22 of 104
 	// injected blocks opened on a near-copy of the message the agent was
 	// reading at that moment.
 	for i, d := range []promptTopic{
@@ -745,7 +745,7 @@ func promptSubjectChains(base time.Time) []PromptChain {
 	// A compound name whose parts are short. The Cyrillic floor is three
 	// letters for a single word — "кеш", "хук" — but a hyphenated word needed a
 	// part of five, so "стоп-лист" and "прод-бд" were dropped entirely and the
-	// question was left holding a verb. Measured on a real store, compound
+	// question was left holding a verb. In real-world stores, compound
 	// subjects come back on topic 68% of the time against 100% for plain ones.
 	for i, d := range []promptTopic{
 		{"стоп-лист", "в итоге решили: стоп-лист держим в редисе", "что мы решали про стоп-лист", ""},
@@ -820,7 +820,7 @@ func promptLineChains(base time.Time) []PromptChain {
 	// The subject appears in another session only in what a tool printed, and
 	// in the part of that output the index keeps: a failing job line, a
 	// dependency bump. Nobody there said anything about it, so the answer is
-	// silence. Measured on a real store, of the eight questions the hook still
+	// silence. In real-world stores, of the eight questions the hook still
 	// answers with unrelated work, six are exactly this shape — every match in
 	// the session it showed carried the role tool-output and no other.
 	for i, d := range []promptTopic{
@@ -838,22 +838,19 @@ func promptLineChains(base time.Time) []PromptChain {
 				ID: id + "-session", Harness: "claude", Project: project,
 				Started: t, Updated: t.Add(10 * time.Minute),
 				Messages: []model.Message{
-					{Role: "user", Text: "\u043f\u0440\u043e\u0433\u043e\u043d\u0438 \u043f\u0430\u0439\u043f\u043b\u0430\u0439\u043d \u0435\u0449\u0451 \u0440\u0430\u0437", Time: t},
+					{Role: "user", Text: "прогони пайплайн ещё раз", Time: t},
 					{Role: "tool-output", Text: d.fact, Time: t.Add(time.Minute)},
 					{Role: "tool-output", Text: "error: bump github.com/pion/stun/" + d.word +
 						" from 3.1.1 to 3.1.5 failed", Time: t.Add(2 * time.Minute)},
-					{Role: "assistant", Text: "\u043f\u0435\u0440\u0435\u0437\u0430\u043f\u0443\u0441\u0442\u0438\u043b, \u0434\u0430\u043b\u044c\u0448\u0435 \u0441\u043c\u043e\u0442\u0440\u044e \u043b\u043e\u0433\u0438", Time: t.Add(5 * time.Minute)},
+					{Role: "assistant", Text: "перезапустил, дальше смотрю логи", Time: t.Add(5 * time.Minute)},
 				},
 			}},
 		})
 	}
-	// The conclusion and the passing mentions sit in ONE message, which is how
-	// an agent actually writes: a paragraph that names the subject twice while
-	// putting it off, then the line that settles it. The line is picked by how
-	// many query words it holds and only then asked whether it concluded
-	// anything, so the denser mention wins and the answer is never quoted.
-	// Measured on a real store: 35 of 119 blocks quoted a weaker line than one
-	// the same session held.
+	// The conclusion and the passing mentions sit in ONE message: a paragraph
+	// that names the subject twice while putting it off, then the line that
+	// settles it. Selecting lines by query-word count alone lets the denser
+	// mention win and drops the conclusion.
 	for i, d := range []promptTopic{
 		{"dunlin", "the fix: dunlin retries are capped at four",
 			"what did we decide about dunlin",
@@ -869,7 +866,7 @@ func promptLineChains(base time.Time) []PromptChain {
 				ID: id + "-session", Harness: "claude", Project: project,
 				Started: t, Updated: t.Add(10 * time.Minute),
 				Messages: []model.Message{
-					{Role: "user", Text: "\u0447\u0442\u043e \u0441 " + d.word, Time: t},
+					{Role: "user", Text: "что с " + d.word, Time: t},
 					{Role: "assistant", Time: t.Add(5 * time.Minute), Text: "" +
 						"looked at " + d.word + " and at the " + d.word + " retries, not touching either yet\n" +
 						"still reading the " + d.word + " docs, will decide about " + d.word + " later\n" +
@@ -878,13 +875,9 @@ func promptLineChains(base time.Time) []PromptChain {
 			}},
 		})
 	}
-	// The decoy line. The session that answers also says an ordinary word the
-	// question happens to use, in a place that has nothing to do with the
-	// subject. Measured on a real store: "what did we decide about mm_status"
-	// returned that session and quoted "1. **Decide**: User settings (global) or
-	// project settings?" — the right session, the wrong line, because the
-	// digest weighs every query word alike while the ranking knows which one
-	// identified the match.
+	// The decoy line: the session that answers also uses an ordinary word from
+	// the question in an unrelated line, so excerpt selection must weight the
+	// identifying subject term rather than treating every query word alike.
 	for i, d := range []promptTopic{
 		{"quicksilver", "quicksilver retries are capped at four", "what did we decide about quicksilver", ""},
 		{"harbourmaster", "harbourmaster writes its log to stderr", "what did we decide about harbourmaster", ""},

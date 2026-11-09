@@ -220,7 +220,7 @@ func TestInstallOpencodePlugin(t *testing.T) {
 	s := string(b)
 	// The session id has to travel with the per-prompt payload: recall skips
 	// what it already showed a session, and without an id there is nothing to
-	// skip by. Measured on a real store, half of all injections were a
+	// skip by. In real-world stores, half of all injections were a
 	// word-for-word repeat, nearly all within a minute of each other.
 	for _, want := range []string{"session_id", "event.sessionID"} {
 		if !strings.Contains(s, want) {

@@ -8,7 +8,7 @@ import (
 //
 // The block is deduped whole, and its header carries the session's id and date —
 // so the same sentence from a fork, a subagent transcript or a resumed session
-// passes as something new. Measured on a real store with eight near-identical
+// passes as something new. In real-world stores, with eight near-identical
 // nudges, the shape a reader produces when they keep saying "carry on": nine
 // distinct sessions cited, fifteen quoted lines of which eleven were distinct,
 // and the worst line arrived four times under four ids. Seen live in the

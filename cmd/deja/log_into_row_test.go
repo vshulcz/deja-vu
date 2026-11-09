@@ -35,7 +35,7 @@ func TestLogRowsNameTheAgentThatGotThem(t *testing.T) {
 	// empty label.
 	hermeticEnv(t)
 	dir = index.DefaultDir()
-	usage.RecordServedSnapshot(dir, usage.KindRecall, "<deja-recall>\n  - Session: **b** `2`\n", 1, 100, []string{"b"}, "")
+	usage.RecordServedFrom(dir, usage.KindRecall, "<deja-recall>\n  - Session: **b** `2`\n", 1, 100, []string{"b"}, nil, "")
 	out.Reset()
 	if err := runLogTo(&out, dir, nil); err != nil {
 		t.Fatal(err)

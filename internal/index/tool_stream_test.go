@@ -186,8 +186,7 @@ func TestSpanInventoryOnAStoreWithNoSpans(t *testing.T) {
 
 // SpanInventory guards against a span whose first line is empty, and that
 // guard cannot be exercised through a parser: both extractors drop an edit
-// with no path, so no such record can be written. Measured on a real store:
-// 0 edit records with an empty first line, 0 with no newline at all.
+// with no path, so no such record can be written. In real-world stores, // 0 edit records with an empty first line, 0 with no newline at all.
 //
 // So this pins the invariant the guard rests on rather than the guard itself.
 // If a future parser starts recording pathless spans, the file count here

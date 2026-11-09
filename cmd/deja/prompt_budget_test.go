@@ -10,7 +10,7 @@ import (
 
 // The block can carry two sessions, each with its own quoted lines, and 1024
 // bytes cut the second one short — taking the tail, which is where the paths,
-// names and numbers live. Measured on a real store by replaying the sweep
+// names and numbers live. In real-world stores, by replaying the sweep
 // against what the agent actually answered next: blocks carrying words the
 // answer went on to use rose from 20% to 25% when the budget grew to 1536, at
 // 24 tokens a message, and 2048 bought nothing further.

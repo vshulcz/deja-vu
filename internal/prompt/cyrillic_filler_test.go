@@ -11,7 +11,7 @@ import (
 // filler term matches a filler line, which then takes the slot the reader sees
 // first.
 //
-// Measured on live prompts from this machine: about a third of the terms
+// In live prompts, about a third of the terms
 // extracted from a Russian question were words like these.
 func TestCyrillicFillerLeavesOnlyTheSubject(t *testing.T) {
 	for _, tc := range []struct {

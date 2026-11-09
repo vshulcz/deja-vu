@@ -8,7 +8,7 @@ import (
 // defaultIgnore is the one directory deja never recalls from without being
 // asked: the temp tree a background agent's own runtime makes for itself.
 //
-// Measured on a real store, 207 of the 300 most recent sessions sat under
+// In real-world stores, 207 of the 300 most recent sessions sat under
 // .claude/jobs/<id>/tmp with a median of 42 words, and one of them — a one-shot
 // transcript of a question — outranked the session that had settled that
 // question, because a repeated question matches word for word (#2050).
@@ -81,7 +81,7 @@ func matchesAnywhere(pattern, s string) bool {
 // directory whose name is the working directory with its separators replaced by
 // dashes — `-.claude-jobs-<id>-tmp-dsh-work`. A directory rule written the way
 // a person writes it cannot match that, so the tree deja is told to keep out of
-// recall stayed in: measured on a real store, 12 of the 317 rows naming a job
+// recall stayed in: In real-world stores, 12 of the 317 rows naming a job
 // tree were served, all of them from a harness that encodes this way (#3746).
 //
 // Only a segment that begins with a dash is decoded, which is what these

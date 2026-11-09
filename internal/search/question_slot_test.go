@@ -9,7 +9,7 @@ import (
 )
 
 // A shown line is cut to fit, and it used to be cut from the start. On a long
-// line that put the answer outside the excerpt: measured on a real store, a
+// line that put the answer outside the excerpt: In real-world stores, a
 // question about "hermes" recalled the session that discusses it and displayed
 // a hundred and sixty characters of something else, because the word sat
 // further along. The reader judges the block by that line.

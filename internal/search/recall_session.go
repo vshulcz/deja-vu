@@ -15,7 +15,7 @@ import (
 // a failing job line, a dependency bump or a pinned action is in the session
 // and answers nothing about that version.
 //
-// Measured on a real store, of the eight questions the per-prompt hook answered
+// In real-world stores, of the eight questions the per-prompt hook answered
 // with unrelated work, six had every match in the session it showed under the
 // role tool-output — a temp path /var/folders/v3/, an npm notice, a line of
 // someone else's source. The role is already recorded, so this needs no guess
@@ -232,12 +232,12 @@ func densestLine(text string, terms []string) (string, int) {
 // emptyMemoryPhrases are what an agent says when it had no history to work
 // from, or when it was refused the tool that would have found some. Quoting
 // such a line hands the reader a past failure of this very tool as if it were
-// the answer — measured on a real store, 3 blocks of 119 opened on one, two of
+// the answer — In real-world stores, 3 blocks of 119 opened on one, two of
 // them for the same question about a CAN bus.
 var emptyMemoryPhrases = []string{
 	// The same failure in the wordings a second reading turned up: the agent
 	// announcing it is about to look, or that it looked and found nothing, or
-	// that it may not look at all. Measured on a real store after the first
+	// that it may not look at all. In real-world stores, after the first
 	// list, 4 blocks of 114 still opened on one of these.
 	"проверю память",
 	"проверю историю прошлых",
@@ -262,12 +262,12 @@ var emptyMemoryPhrases = []string{
 // selfTestPhrases are the shape of a harness check: a message asking for an
 // exact string back, and the echo of it. They are conversations with the tool
 // rather than about the work, and quoting one tells the reader nothing.
-// Measured on a real store, 4 blocks of 119 quoted "Reply with exactly:
+// In real-world stores, 4 blocks of 119 quoted "Reply with exactly:
 // openclaw deja harness live test alpha" or its echo.
 var selfTestPhrases = []string{
 	"reply with exactly",
 	// The same check in its other shape: call the tool and answer in a fixed
-	// form. Measured on a real store, 2 blocks of 114 quoted one of these.
+	// form. In real-world stores, 2 blocks of 114 quoted one of these.
 	"answer one line",
 	"закончи ответ",
 	"ответь одной строкой",
@@ -289,7 +289,7 @@ func saysItHasNoMemory(line string) bool {
 
 // isHarnessCheck reports whether a session is a conversation with the tool
 // rather than about the work: one message asks for an exact string back and the
-// next repeats it. Measured on a real store, 11% of sessions hold one, and 4
+// next repeats it. In real-world stores, 11% of sessions hold one, and 4
 // blocks of 119 quoted one back as if it were memory.
 func isHarnessCheck(s model.Session) bool {
 	for _, m := range s.Messages {
@@ -423,7 +423,7 @@ func firstLine(s string, n int) string {
 // rather than the part that came first.
 //
 // Cutting from the start was how a line that genuinely answered the question
-// came to be shown without the answer in it: measured on a real store, a
+// came to be shown without the answer in it: In real-world stores, a
 // question about "hermes" and "mini" recalled the session that discusses both
 // and displayed "Домёржь PR и веди #1084 + A. Репо …", because the words sat
 // past the hundred-and-sixtieth character. The reader sees a line about

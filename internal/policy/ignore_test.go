@@ -3,7 +3,7 @@ package policy
 import "testing"
 
 // The default is the one directory nobody works in: the temp tree a background
-// agent's runtime makes for itself. Measured on a real store, 207 of the 300
+// agent's runtime makes for itself. In real-world stores, 207 of the 300
 // most recent sessions sat there (#2050).
 func TestTheDefaultIgnoresAnAgentsScratchTree(t *testing.T) {
 	var p Policy

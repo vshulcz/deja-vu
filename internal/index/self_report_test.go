@@ -6,7 +6,7 @@ import "testing"
 // again. `deja fix` prints the error with the date beside it and the command
 // underneath; both land in the next session's tool output, where the header
 // read as a fresh sighting and the command below it became a remedy for the
-// error it was quoting. Found on a real store as the pair
+// error it was quoting. In real-world stores, as the pair
 // `command not found: python · 2026-05-18`.
 func TestDejasOwnFixReportIsNotFriction(t *testing.T) {
 	for _, l := range []string{

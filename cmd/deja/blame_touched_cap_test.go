@@ -10,7 +10,7 @@ import (
 )
 
 // A blame row carried every file its session touched — up to the forty the
-// manifest holds. Measured on a real store, that was 3186 of an 8044-byte
+// manifest holds. In real-world stores, that was 3186 of an 8044-byte
 // answer, about files the question did not ask about, and the answer is trimmed
 // by dropping whole sessions to fit its budget: six real paths came back with 20
 // sessions and 9.9 KB of quoted history, and with the list bounded the same

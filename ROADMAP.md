@@ -26,8 +26,8 @@ the place to discuss design.
 ## Next
 
 - **Compaction recovery across the remaining hosts.** The recovery packet after
-  context compaction now reaches 35 of the 43 harnesses (with reset and capture
-  in 36) — either through a native `PreCompact` / `PostCompaction` hook or by
+  context compaction now reaches 36 of the 43 harnesses (with reset and capture
+  in 37) — either through a native `PreCompact` / `PostCompaction` hook or by
   catching up from the store's pre-summary turns on the next hook that reaches
   the model. The remaining hosts are blocked on upstream compaction hooks (`#308`).
 - **Pre-execution plan checks.** `deja check` answers a proposed plan with what

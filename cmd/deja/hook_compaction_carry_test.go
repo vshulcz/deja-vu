@@ -96,8 +96,8 @@ func TestCaptureCompactionCarriesTheListForward(t *testing.T) {
 	if len(got) != 2 || got[0].Kind != "open" || got[0].Age != 1 || got[1].Kind != "verdict" || got[1].Age != 0 {
 		t.Fatalf("second compaction did not merge the carried list: %+v", got)
 	}
-	out := digest.RenderCarry(got)
-	if !strings.HasPrefix(out, "Keep until closed") || !strings.Contains(out, "- [open] PR #420") || !strings.Contains(out, "- [verdict] Гипотеза H12") {
+	out := digest.RenderCompactionContext(model.CompactionContext{Carry: got}, 4096)
+	if !strings.Contains(out, "Keep until closed") || !strings.Contains(out, "- [open] PR #420") || !strings.Contains(out, "- [verdict] Гипотеза H12") {
 		t.Fatalf("the carried list renders as %q", out)
 	}
 

@@ -9,7 +9,7 @@ import (
 
 // VS Code keeps which files a chat edited beside the transcript, and deja read
 // none of it: a `files` record appeared only when the conversation happened to
-// type a path. Measured on this machine — 48 of these state files, their
+// type a path. In practice, 48 of these state files, their
 // entries carrying 145 resources between them (#3381).
 func TestACopilotChatNamesTheFilesItEdited(t *testing.T) {
 	ws := filepath.Join(t.TempDir(), "workspaceStorage", "abc123")

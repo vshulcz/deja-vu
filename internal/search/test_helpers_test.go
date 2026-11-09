@@ -1,12 +1,17 @@
 package search
 
 import (
+	"io"
 	"regexp"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/query"
 )
+
+func PrintSession(w io.Writer, s model.Session) {
+	PrintSessionStyled(w, s, false, 0)
+}
 
 func scoreBM25(documents []bm25Document, df []int, corpusDocuments int, avgLength float64, queryTokenCount int, worn map[string]int) []Hit {
 	return scoreBM25At(documents, df, corpusDocuments, avgLength, queryTokenCount, worn, (Options{}).Clock())

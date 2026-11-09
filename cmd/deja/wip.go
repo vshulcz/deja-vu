@@ -24,7 +24,7 @@ import (
 // Not `resume`: that name is taken by the command that reopens a session in its
 // own harness, which is a different job.
 //
-// Measured on this machine's transcripts, a cold session takes a median of 10
+// In practice, a cold session takes a median of 10
 // actions before its first edit and a session after a compaction takes 28, p75
 // 61, across 86 compactions — the largest single cost measurable in the tool.
 // Nothing is missing from the store when that happens. What is missing is the

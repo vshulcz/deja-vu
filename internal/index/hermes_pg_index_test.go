@@ -31,7 +31,9 @@ func TestHermesPostgresIsIndexedAndIncremental(t *testing.T) {
 		}
 		return []byte("[" + strings.Join(rows, ",") + "]"), nil
 	}
-	defer sources.SetHermesPGRunner(fake)()
+	prev := sources.HermesPGRunner
+	sources.HermesPGRunner = fake
+	defer func() { sources.HermesPGRunner = prev }()
 
 	if err := Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
@@ -76,11 +78,13 @@ func TestHermesPostgresSurvivesADisabledDSN(t *testing.T) {
 		}
 		return []byte(`[{"session_id":"h1","role":"user","content":"a decision about queue backpressure","timestamp":1785000000}]`), nil
 	}
-	restore := sources.SetHermesPGRunner(fake)
+	prev := sources.HermesPGRunner
+	sources.HermesPGRunner = fake
 	if err := Ensure(dir, "", true, nil); err != nil {
+		sources.HermesPGRunner = prev
 		t.Fatal(err)
 	}
-	restore()
+	sources.HermesPGRunner = prev
 
 	// DSN gone this run. The store must not be tombstoned out of the index.
 	t.Setenv("DEJA_HERMES_PG_DSN", "")

@@ -586,3 +586,31 @@ func (w *headerWriter) Write(p []byte) (int, error) {
 }
 
 func session(id string) model.Session { return model.Session{ID: id, Harness: "claude"} }
+
+// IsOllama reports whether endpoint is Ollama's /api/embed.
+func IsOllama(endpoint string) bool {
+	return strings.HasSuffix(strings.TrimRight(endpoint, "/"), "/api/embed")
+}
+
+func TestEmbedRejectsCountMismatchOnOllamaShape(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"embeddings":[[1,0],[1,0],[1,0]]}`))
+	}))
+	defer srv.Close()
+	c := &Client{URL: srv.URL, Model: "m"}
+	if _, err := c.Embed(context.Background(), []string{"one"}); err == nil {
+		t.Fatal("expected count-mismatch error for the embeddings shape")
+	}
+}
+
+func TestSemanticSearchBadQueryVector(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		// Two vectors for a single query text: len(query) != 1 downstream.
+		_, _ = w.Write([]byte(`{"data":[{"embedding":[1,0]},{"embedding":[0,1]}]}`))
+	}))
+	defer srv.Close()
+	c := &Client{URL: srv.URL, Model: "m"}
+	if _, err := SemanticSearch(context.Background(), t.TempDir(), search.Options{Query: "q"}, Sidecar{Vectors: []Vector{{Key: "k", Values: []float32{1, 0}}}}, c); err == nil {
+		t.Fatal("expected bad query vector error")
+	}
+}

@@ -68,7 +68,7 @@ func TestBlameOrdersBySpecificityBeforeRecency(t *testing.T) {
 	}
 }
 
-// Measured on a real store: counting the directories a session wrote made a
+// In real-world stores, counting the directories a session wrote made a
 // deeply nested file of the same name in another project the most specific
 // mention there is, and every session that had actually worked on the file
 // fell off the first page (#2840).

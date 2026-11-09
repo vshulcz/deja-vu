@@ -39,7 +39,7 @@ func TestTranscriptControlCharactersDoNotReachAnySurface(t *testing.T) {
 	s := ctrlProbeSession()
 
 	var show, ctxOut bytes.Buffer
-	search.PrintSession(&show, s)
+	search.PrintSessionStyled(&show, s, false, 0)
 	search.PrintContext(&ctxOut, s, "control probe")
 
 	surfaces := map[string]string{
@@ -88,7 +88,7 @@ func TestInvisibleTextDoesNotReachAnySurface(t *testing.T) {
 	}
 
 	var show, ctxOut bytes.Buffer
-	search.PrintSession(&show, s)
+	search.PrintSessionStyled(&show, s, false, 0)
 	search.PrintContext(&ctxOut, s, "deploy")
 
 	surfaces := map[string]string{

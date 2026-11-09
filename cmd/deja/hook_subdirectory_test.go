@@ -68,7 +68,7 @@ func hookDigestAt(t *testing.T, cwd string) string {
 	return captureStdout(t, func() { runHookContextPlain(t) })
 }
 
-// And only inside a checkout. Measured on a real store, standing in a home
+// And only inside a checkout. In real-world stores, standing in a home
 // directory admitted 697 of 768 sessions with touched files — every project on
 // the machine, under a line that says the sessions are from this project
 // (#2040, and #2343 for what that line promises).

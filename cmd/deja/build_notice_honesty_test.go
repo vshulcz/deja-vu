@@ -6,7 +6,7 @@ import (
 )
 
 // Every line deja shows while a build runs promised "in a few seconds".
-// Measured on this machine's 177 MB index, a full rebuild is 59 seconds — and
+// In practice, a full rebuild is 59 seconds — and
 // the progress the same line carries says so itself: 3% of the sessions read is
 // not a few seconds from done. The sentences an agent sees while waiting should
 // not claim what deja can already see is false (#2598).

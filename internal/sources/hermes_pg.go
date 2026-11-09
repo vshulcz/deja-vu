@@ -45,14 +45,6 @@ var HermesPGRunner = func(dsn, sql string) ([]byte, error) {
 	return out, nil
 }
 
-// SetHermesPGRunner swaps the runner and returns a restore func; for tests in
-// other packages that drive the Postgres path through a fake.
-func SetHermesPGRunner(f func(dsn, sql string) ([]byte, error)) func() {
-	prev := HermesPGRunner
-	HermesPGRunner = f
-	return func() { HermesPGRunner = prev }
-}
-
 // HermesPGStorePath is the stable token that stands in for the Postgres store
 // wherever the index expects a file path. The DSN can carry a password, so it
 // is hashed rather than stored: the manifest and every diagnostic see

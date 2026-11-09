@@ -114,7 +114,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 	// block prints one and tells the agent to follow up with this tool, and an
 	// id is also a searchable string: any transcript that mentions one matches
 	// it lexically, so the search answered first and the fallback below never
-	// ran. Measured on a real store, asking for the 120 most recent sessions by
+	// ran. In real-world stores, asking for the 120 most recent sessions by
 	// their own id prefix brought the right session back 24 times — the other
 	// 96 answers were a different session, stated as confidently (#3717). The
 	// CLI has had this order since #1614; this is the surface an agent uses.
