@@ -238,7 +238,7 @@ func TestInstallAntigravityMCPMarksToolsEager(t *testing.T) {
 	}
 }
 
-func TestLatestEditPathsFromStepsIncludesReadAndViewFile(t *testing.T) {
+func TestLatestEditCallsFromStepsIncludesReadAndViewFile(t *testing.T) {
 	steps := []transcriptStep{
 		{
 			Type: "PLANNER_RESPONSE",
@@ -248,8 +248,8 @@ func TestLatestEditPathsFromStepsIncludesReadAndViewFile(t *testing.T) {
 			},
 		},
 	}
-	got := latestEditPathsFromSteps(steps)
-	if len(got) != 2 || got[0] != "/repo/a.go" || got[1] != "/repo/b.go" {
-		t.Fatalf("latestEditPathsFromSteps = %v, want [/repo/a.go /repo/b.go]", got)
+	got := latestEditCallsFromSteps(steps)
+	if len(got) != 2 || got[0].FilePath != "/repo/a.go" || got[1].FilePath != "/repo/b.go" {
+		t.Fatalf("latestEditCallsFromSteps = %+v, want [/repo/a.go /repo/b.go]", got)
 	}
 }

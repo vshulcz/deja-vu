@@ -40,17 +40,17 @@ type transcriptStep struct {
 	ToolCalls any    `json:"tool_calls"`
 }
 
-// latestEditPathsFromSteps are the files the newest planner row of this turn
-// edits. By the PreInvocation that follows it the edit has run, so the line
-// arrives with its result, the way it does on opencode and Grok: PreToolUse's
-// reason never reaches the model here (hook_antigravity.go).
-func latestEditPathsFromSteps(steps []transcriptStep) []string {
+// latestEditCallsFromSteps are the files and edit snippets the newest planner
+// row of this turn edits. By the PreInvocation that follows it the edit has
+// run, so the line arrives with its result, the way it does on opencode and
+// Grok: PreToolUse's reason never reaches the model here (hook_antigravity.go).
+func latestEditCallsFromSteps(steps []transcriptStep) []sources.EditCall {
 	for _, step := range steps {
 		if step.Type == "USER_INPUT" {
 			return nil
 		}
 		if calls, ok := step.ToolCalls.([]any); ok && len(calls) > 0 {
-			return sources.AntigravityEditPaths(calls)
+			return sources.AntigravityEditCalls(calls)
 		}
 	}
 	return nil
@@ -140,17 +140,33 @@ func antigravityRepoRootFromPath(workspace, raw string) string {
 // budget hold on hosts whose pre-tool answer never reaches the model
 // (Antigravity, goose) and the line rides a later hook.
 func editFileLines(dir string, paths []string, conversationID, workspace string) string {
-	var lines []string
-	seen := make(map[string]bool, len(paths))
+	calls := make([]sources.EditCall, 0, len(paths))
 	for _, p := range paths {
+		calls = append(calls, sources.EditCall{FilePath: p})
+	}
+	return editFileCallLines(dir, calls, conversationID, workspace)
+}
+
+func editFileCallLines(dir string, calls []sources.EditCall, conversationID, workspace string) string {
+	var lines []string
+	seen := make(map[string]bool, len(calls))
+	for _, c := range calls {
+		p := c.FilePath
 		if p == "" || seen[p] {
 			continue
 		}
 		seen[p] = true
+		toolInput := map[string]string{"file_path": p}
+		if c.OldString != "" {
+			toolInput["old_string"] = c.OldString
+		}
+		if c.NewString != "" {
+			toolInput["new_string"] = c.NewString
+		}
 		payload, err := json.Marshal(map[string]any{
 			"hook_event_name": "PreToolUse",
 			"tool_name":       "Edit",
-			"tool_input":      map[string]string{"file_path": p},
+			"tool_input":      toolInput,
 			"session_id":      conversationID,
 			"cwd":             workspace,
 		})

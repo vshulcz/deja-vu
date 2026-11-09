@@ -77,14 +77,14 @@ func TestExtractCarryReferenceCases(t *testing.T) {
 			carryEv("u", "ок", "a", "Продолжаю."),
 			[]model.ContextCarry{
 				{Kind: "awaiting", Text: "Скажи, если сводить в PR сейчас."},
-				{Kind: "open", Key: "#7307", Text: "Zed | реестр расширений | PR #7307 ждёт мейнтейнера"},
+				{Kind: "open", Key: "#420", Text: "API | пул воркеров | PR #420 ждёт мейнтейнера"},
 				{Kind: "recheck", Text: "Вернусь с результатом через час."},
-				{Kind: "verdict", Text: "Гипотеза «частые релизы = рост» опровергнута нашими же числами."},
+				{Kind: "verdict", Text: "Гипотеза «утечка дескрипторов в пуле» опровергнута профилированием."},
 			},
-			[]carryWant{{"open", "Zed | реестр расширений | PR #7307 ждёт мейнтейнера"}, {"verdict", "Гипотеза «частые релизы = рост» опровергнута нашими же числами."}}},
+			[]carryWant{{"open", "API | пул воркеров | PR #420 ждёт мейнтейнера"}, {"verdict", "Гипотеза «утечка дескрипторов в пуле» опровергнута профилированием."}}},
 		{"the user says merged with the number",
-			carryEv("u", "вмержил 7307", "a", "Ок."),
-			[]model.ContextCarry{{Kind: "open", Key: "#7307", Text: "PR #7307 ждёт твоего мержа"}}, nil},
+			carryEv("u", "вмержил 420", "a", "Ок."),
+			[]model.ContextCarry{{Kind: "open", Key: "#420", Text: "PR #420 ждёт твоего мержа"}}, nil},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -126,13 +126,13 @@ func TestExtractCarryRules(t *testing.T) {
 			[]carryWant{{"open", "Осталось: #553 и #481 от внешних авторов"}}},
 		{"a carried open item ages out after two compactions",
 			carryEv("u", "go"),
-			[]model.ContextCarry{open("#7307", "PR #7307 ждёт мейнтейнера", 2)}, nil},
+			[]model.ContextCarry{open("#420", "PR #420 ждёт мейнтейнера", 2)}, nil},
 		{"waiting on CI is not carried",
 			carryEv("u", "go"),
-			[]model.ContextCarry{open("#7307", "PR #7307 ждёт зелёного CI", 0)}, nil},
+			[]model.ContextCarry{open("#420", "PR #420 ждёт зелёного CI", 0)}, nil},
 		{"a user merged without a number closes what waited on them",
 			carryEv("u", "смержил"),
-			[]model.ContextCarry{open("#7307", "PR #7307 ждёт твоего мержа", 0)}, nil},
+			[]model.ContextCarry{open("#420", "PR #420 ждёт твоего мержа", 0)}, nil},
 		{"a fresh ask on the user's merge is dropped by a later merged",
 			carryEv("u", "go", "a", "PR #3100 ждёт твоего мержа.", "u", "merged"), nil, nil},
 		{"closes #N follows the PR that carried it",
@@ -151,9 +151,9 @@ func TestExtractCarryRules(t *testing.T) {
 			carryEv("u", "go", "a", "Перепроверю через 2 дня на чистой выборке."), nil,
 			[]carryWant{{"recheck", "Перепроверю через 2 дня на чистой выборке."}}},
 		{"a fresh line naming the same #N replaces the carried one",
-			carryEv("u", "go", "a", "PR #7307 всё ещё ждёт мейнтейнера."),
-			[]model.ContextCarry{open("#7307", "PR #7307 ждёт мейнтейнера", 0)},
-			[]carryWant{{"open", "PR #7307 всё ещё ждёт мейнтейнера."}}},
+			carryEv("u", "go", "a", "PR #420 всё ещё ждёт мейнтейнера."),
+			[]model.ContextCarry{open("#420", "PR #420 ждёт мейнтейнера", 0)},
+			[]carryWant{{"open", "PR #420 всё ещё ждёт мейнтейнера."}}},
 		{"only the segment since the last compaction counts",
 			carryEv("a", "PR #9001 ждёт ревью.", "s", "This session is being continued from a previous conversation that ran out of context.", "u", "go", "a", "Продолжаю."),
 			nil, nil},
@@ -226,7 +226,7 @@ func TestRenderCompactionContextPutsCarryBeforeObjective(t *testing.T) {
 		Objective: model.ContextFact{Text: "Fix retry cancellation."},
 		Carry: []model.ContextCarry{
 			{Kind: "awaiting", Text: "Splitting the leg is your call."},
-			{Kind: "open", Key: "#7307", Text: strings.Repeat("длинное описание ", 20) + "PR #7307 ждёт мейнтейнера"},
+			{Kind: "open", Key: "#420", Text: strings.Repeat("длинное описание ", 20) + "PR #420 ждёт мейнтейнера"},
 			{Kind: "recheck", Text: "Посмотрю завтра на чистых сутках."},
 			{Kind: "verdict", Text: "H487 отвергнута."},
 		},
@@ -236,7 +236,7 @@ func TestRenderCompactionContextPutsCarryBeforeObjective(t *testing.T) {
 	if carry < 0 || objective < 0 || carry > objective {
 		t.Fatalf("carry section must precede the objective:\n%s", out)
 	}
-	for _, want := range []string{"- [awaiting you] Splitting", "- [open] #7307 длинное", "- [recheck] Посмотрю", "- [verdict] H487"} {
+	for _, want := range []string{"- [awaiting you] Splitting", "- [open] #420 длинное", "- [recheck] Посмотрю", "- [verdict] H487"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in\n%s", want, out)
 		}

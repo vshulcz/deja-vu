@@ -483,7 +483,7 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
         const fpayload = {
           hook_event_name: "PostToolUse",
           tool_name: input?.tool || "read",
-          tool_input: { file_path: fpath, patchText },
+          tool_input: { ...(input?.args || {}), file_path: fpath, patchText },
           session_id: input.sessionID || "",
           cwd,
         }

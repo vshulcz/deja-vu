@@ -28,13 +28,13 @@ func TestCyrillicFillerLeavesOnlyTheSubject(t *testing.T) {
 		},
 		{
 			name:    "an interjection and a request verb",
-			prompt:  "подожди impl1084 и покажи замер RSS",
-			want:    []string{"impl1084"},
+			prompt:  "подожди worker42 и покажи замер RSS",
+			want:    []string{"worker42"},
 			notWant: []string{"подожди", "покажи"},
 		},
 		{
-			// Straight from a live prompt: "нужно снова заняться балансировкой
-			// входящих пакетов по retry budget".
+			// Adverbs of repetition and time ("снова", "теперь", "потом", "опять")
+			// should be stripped so only the technical subject remains.
 			name:    "adverbs of repetition and time",
 			prompt:  "нужно снова заняться балансировкой envoy роутинга, теперь потом опять проверим",
 			want:    []string{"envoy"},

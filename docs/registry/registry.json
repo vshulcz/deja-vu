@@ -2519,9 +2519,9 @@
           "proof": "stand"
         },
         "statusline": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "Kiro has no status line, footer or toast a third party can write to"
+          "status": "partial",
+          "proof": "fixture",
+          "note": "the kiro-auto target adds a local extension that shows deja statusline in Kiro IDE's status bar; kiro-cli has no status line a third party can write to"
         },
         "reader": {
           "status": "yes",
@@ -2858,14 +2858,14 @@
           "note": "PostCompaction is Devin's reset event; the context hook answers it"
         },
         "compaction_capture": {
-          "status": "no",
-          "proof": "todo",
-          "note": "PostCompaction fires after the context is rebuilt; the pre-compaction turns stay in sessions.db and a catch-up there is follow-up (#4801)"
+          "status": "yes",
+          "proof": "fixture",
+          "note": "PostCompaction runs hook-context, which captures the pre-compaction turns from sessions.db (following compact/prior_node_ids across rebuilt chains) before emitting the recovery packet"
         },
         "compaction_packet": {
-          "status": "no",
-          "proof": "todo",
-          "note": "no capture to ride yet; the packet follows the sessions.db catch-up (#4801)"
+          "status": "yes",
+          "proof": "fixture",
+          "note": "PostCompaction answers with the recovery packet built from the sessions.db capture"
         },
         "mcp": {
           "status": "yes",
@@ -3279,14 +3279,14 @@
           "note": "No Cascade hook output reaches the model: exit 2 only blocks, and show_output is shown in the UI and not offered for pre_user_prompt (docs.devin.ai/desktop/cascade/hooks)"
         },
         "rules": {
-          "status": "no",
-          "proof": "todo",
-          "note": "deja install windsurf puts its guidance block in ~/.codeium/windsurf/memories/global_rules.md; deja rules does not copy into it, since Cascade caps that file at 6,000 characters shared with the user's own rules (#308)"
+          "status": "yes",
+          "proof": "fixture",
+          "note": "~/.codeium/windsurf/memories/global_rules.md, guarded by Cascade's 6,000-character cap"
         },
         "statusline": {
-          "status": "no",
-          "proof": "todo",
-          "note": "no status surface for Cascade was looked for in Devin Desktop 3.5.17 (#308)"
+          "status": "yes",
+          "proof": "fixture",
+          "note": "the windsurf target adds a local extension that shows deja statusline in Windsurf's status bar when the IDE is present"
         },
         "reader": {
           "status": "partial",

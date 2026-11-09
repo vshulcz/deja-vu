@@ -267,6 +267,19 @@ func LifecycleKeys(m map[string]Lifecycle) []string {
 	return keys
 }
 
+// AppendPromotedTagged appends a promoted note with no source time.
+func AppendPromotedTagged(project, title, text, session, state string, tags []string, now time.Time) error {
+	return AppendPromotedSourced(project, title, text, session, state, tags, time.Time{}, now)
+}
+
+// StaleCandidate pairs an accepted promoted note with a file it cites that was
+// modified in a newer session after the note was recorded.
+type StaleCandidate struct {
+	Note      PromotedNote
+	File      string
+	TouchedAt time.Time
+}
+
 // StaleCandidateNotes returns accepted notes whose cited files were touched in
 // sessions strictly newer than the note's timestamp.
 func StaleCandidateNotes(notes []PromotedNote, fileLastTouched map[string]time.Time) []StaleCandidate {

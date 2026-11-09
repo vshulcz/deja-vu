@@ -80,6 +80,11 @@ func wiredSurfaces(t *testing.T, harness string) map[string]bool {
 	if harness == "claude" {
 		auto = "claude-auto"
 	}
+	// VS Code forks write their status bar extension only when the IDE's
+	// directory is on disk, so seed it in the test home before installing.
+	if harness == "windsurf" || harness == "kiro" {
+		_ = os.MkdirAll(filepath.Join(os.Getenv("HOME"), "."+harness, "extensions"), 0o755)
+	}
 	for _, target := range []string{base, auto} {
 		if !slices.Contains(installTargetNames(), target) {
 			continue

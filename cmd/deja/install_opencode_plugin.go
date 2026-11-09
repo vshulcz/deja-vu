@@ -316,7 +316,7 @@ export default {
           const fpayload = {
             hook_event_name: "PostToolUse",
             tool_name: event.tool || "read",
-            tool_input: { file_path: fpath, patchText },
+            tool_input: { ...(event.input || {}), file_path: fpath, patchText },
             session_id: event.sessionID || "",
             cwd,
           }
@@ -748,7 +748,7 @@ func legacyPluginJSFor(target, exe string) string { //nolint:funlen // the body 
           const fpayload = {
             hook_event_name: "PostToolUse",
             tool_name: input?.tool || "read",
-            tool_input: { file_path: fpath, patchText },
+            tool_input: { ...(input?.args || {}), file_path: fpath, patchText },
             session_id: input.sessionID || "",
             cwd,
           }

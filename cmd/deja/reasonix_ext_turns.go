@@ -338,6 +338,11 @@ func rxHookToolInput(name, arguments, workspace string) (string, map[string]stri
 		Command    string `json:"command"`
 		Path       string `json:"path"`
 		SourcePath string `json:"source_path"`
+		OldString  string `json:"old_string"`
+		NewString  string `json:"new_string"`
+		OldText    string `json:"old_text"`
+		NewText    string `json:"new_text"`
+		Content    string `json:"content"`
 	}
 	_ = json.Unmarshal([]byte(arguments), &args)
 	switch {
@@ -367,7 +372,14 @@ func rxHookToolInput(name, arguments, workspace string) (string, map[string]stri
 		// what gets written (#4410).
 		tool := map[string]string{"read_file": "read", "write_file": "Write", "edit_file": "Edit", "multi_edit": "MultiEdit",
 			"notebook_edit": "NotebookEdit", "delete_range": "Edit", "delete_symbol": "Edit", "move_file": "Edit"}[name]
-		return tool, map[string]string{"file_path": p}
+		input := map[string]string{"file_path": p}
+		if oldS := firstNonEmpty(args.OldString, args.OldText); oldS != "" {
+			input["old_string"] = oldS
+		}
+		if newS := firstNonEmpty(args.NewString, args.NewText, args.Content); newS != "" {
+			input["new_string"] = newS
+		}
+		return tool, input
 	}
 	return "", nil
 }

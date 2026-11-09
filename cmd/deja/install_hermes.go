@@ -280,7 +280,7 @@ def _file_line(tool_name, args, result, session_id):
         tool, tool_input = "apply_patch", {"command": args["patch"]}
     elif isinstance(path, str) and path:
         tool = "read" if tool_name == "read_file" else "edit"
-        tool_input = {"file_path": path}
+        tool_input = {**args, "file_path": path}
     else:
         return None
     payload = json.dumps({

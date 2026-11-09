@@ -65,7 +65,7 @@ var (
 		`не\s+предлагай\p{L}*|хватит\s+\p{L}+|перестань\p{L}*\s+\p{L}+|не\s+забывай\p{L}*,?\s+что|` +
 		`лучше\s+на\s+\p{L}+\s+делать|` +
 		`i\s+(?:won't|will\s+not|am\s+not\s+going\s+to)\s+\w+|i'm\s+not\s+going\s+to\s+\w+|` +
-		`we\s+(?:don't|do\s+not|won't|never)\s+(?:use|run|do|need|want|touch|modify)\b|` +
+		`we\s+(?:don't|do\s+not|won't|never)\s+(?:use|run|do|need|want|touch|modify|disable|enable|allow|set|pass|add|drop|delete|remove|commit|push)\b|` +
 		`stop\s+(?:suggesting|recommending|asking|using|doing|running)\b|` +
 		`(?:do\s+not|don't|never)\s+(?:suggest|recommend)\b|no\s+need\s+to\s+\w+|` +
 		`(?:shouldn't|should\s+not|mustn't|must\s+not|let's\s+not|lets\s+not|please\s+don't|please\s+do\s+not|better\s+not)\s+\w+|` +
@@ -294,6 +294,7 @@ func standingLinesWithContext(prevAssistant, text string) []string {
 	out := make([]string, 0, len(hits))
 	for _, h := range hits {
 		lowH := strings.ToLower(cjkfold.String(h))
+		matchedEnt := false
 		for _, ent := range entities {
 			lowEnt := strings.ToLower(ent)
 			bare := strings.TrimPrefix(lowEnt, "/")
@@ -301,8 +302,12 @@ func standingLinesWithContext(prevAssistant, text string) []string {
 				(strings.Contains(lowH, lowEnt) || (strings.HasPrefix(ent, "/") && (strings.Contains(lowH, bare) || (bare == "compact" &&
 					(strings.Contains(lowH, "компакт") || strings.Contains(lowH, "压缩") || strings.Contains(lowH, "コンパクト") || strings.Contains(lowH, "圧縮")))))) {
 				h = "Do not suggest " + ent + ": " + h
+				matchedEnt = true
 				break
 			}
+		}
+		if !matchedEnt && !strings.HasPrefix(h, "Do not suggest ") && standingDirectRefusalRE.MatchString(cjkfold.String(h)) {
+			h = "Do not suggest " + entities[0] + ": " + h
 		}
 		out = append(out, h)
 	}
@@ -320,7 +325,6 @@ func turnPairRules(prevAssistant, userText string) []string {
 
 	assistantItems := extractNumberedProposals(prevAssistant)
 	entities := proposedEntities(prevAssistant)
-	assistantAskedQuestion := strings.Contains(prevAssistant, "?") || strings.Contains(prevAssistant, "？")
 	var out []string
 	for rawLine := range strings.SplitSeq(cleanU, "\n") {
 		line := strings.TrimSpace(rawLine)
@@ -348,12 +352,12 @@ func turnPairRules(prevAssistant, userText string) []string {
 			}
 			continue
 		}
-		// Direct unnumbered refusal to an assistant question proposing concrete
+		// Direct unnumbered refusal to an assistant proposal naming concrete
 		// technical entities (e.g. Assistant: "Should I run `docker compose down -v`?"
-		// -> User: "No, that will wipe the local database" / "Нет, там локальная база"),
-		// where the user states a declarative reason without repeating the command or
-		// using an imperative verb.
-		if assistantAskedQuestion && len(entities) > 0 && len(standingLines(line)) == 0 {
+		// or "Try running `--skip-fsync`" -> User: "No, that will wipe the local database"
+		// / "Нет, там локальная база"), where the user states a declarative reason
+		// without repeating the command or using an imperative verb.
+		if len(entities) > 0 && len(standingLines(line)) == 0 {
 			if standingDirectRefusalRE.MatchString(cjkfold.String(line)) {
 				target := entities[0]
 				rule := "Do not suggest " + target + ": " + line

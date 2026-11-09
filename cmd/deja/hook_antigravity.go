@@ -115,7 +115,7 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 		if recovery != "" {
 			steps = append(steps, antigravityInjectStep{EphemeralMessage: recovery})
 		}
-		if line := editFileLines(dir, latestEditPathsFromSteps(tailSteps), input.ConversationID, projectWorkspace); line != "" {
+		if line := editFileCallLines(dir, latestEditCallsFromSteps(tailSteps), input.ConversationID, projectWorkspace); line != "" {
 			steps = append(steps, antigravityInjectStep{EphemeralMessage: line})
 		}
 		if block != "" {

@@ -375,7 +375,7 @@ func sharesEnvironmentTerm(wall, cmd string) bool {
 //
 // The most frequent wall on this machine — `command not found: timeout`, 34
 // sessions — had no remedy line at all, because the pairs recorded for it are
-// long commands from other work (`ssh -o ConnectTimeout=10 mini-ts 'cd … && …'`)
+// long commands from other work (`ssh -o ConnectTimeout=10 build-box 'cd … && …'`)
 // and environmentRemedy drops anything past the block's width. What those pairs
 // have in common is short enough to say: the same command ran with the wrapper
 // taken out. #3487 gave the pre-tool line that sentence; this is the same fact

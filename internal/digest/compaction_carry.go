@@ -231,7 +231,7 @@ func carryFreshItems(ev []carryEvent, items []carryItem, lastU int, closedAfter 
 				}
 			}
 			if len(ns) > 0 && carryWaitMeRE.MatchString(s) && mergedAfter(j) {
-				ns = nil // "PR #7307 ждёт твоего мержа", then the user said "merged"
+				ns = nil // "PR #420 ждёт твоего мержа", then the user said "merged"
 			}
 			if len(ns) > 0 {
 				add(carryOpen, ns)

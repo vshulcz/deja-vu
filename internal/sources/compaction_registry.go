@@ -289,6 +289,8 @@ func compactionSessionWorkspace(harness, path string, s model.Session) string {
 		return ClaudeSessionDir(path)
 	case "mcode":
 		return McodeSessionWorkspace(s.ID)
+	case "devin":
+		return DevinSessionDir(path, s.ID)
 	}
 	// opencode-shaped stores keep the directory as the session's path.
 	if s.Path != "" && s.Path != path {

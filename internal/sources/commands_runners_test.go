@@ -38,7 +38,7 @@ func TestWorthIndexingKeepsTheTaskRunners(t *testing.T) {
 	// segment is neither trivial nor otherwise meaningful, so without it the
 	// word alone would carry them in.
 	for _, c := range []string{
-		"ssh mini task deploy",
+		"ssh devbox task deploy",
 		"xargs just build",
 		"time mise run lint",
 		// The one this rule kept when it was judged per pipe: a quoted

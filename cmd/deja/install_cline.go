@@ -325,7 +325,7 @@ export default {
         for (const [tool, path, patch] of fileCalls(name, ctx && ctx.input)) {
           const line = run(["hook-tool", "--plain"], JSON.stringify({
             tool_name: tool,
-            tool_input: patch ? { command: patch } : { file_path: path },
+            tool_input: patch ? { command: patch } : { ...(ctx && ctx.input ? ctx.input : {}), file_path: path },
             session_id: session,
             cwd: workspace || process.cwd(),
           }), 5000);

@@ -345,7 +345,7 @@ export default function (amp: any) {
         if (!(id in repaired)) {
           repaired[id] = run(["hook-tool", "--plain"], JSON.stringify({
             tool_name: fileTool,
-            tool_input: { file_path: path },
+            tool_input: { ...(event.input || {}), file_path: path },
             session_id: threadID(event),
             cwd: workspace,
           }))

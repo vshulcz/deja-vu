@@ -536,7 +536,7 @@ function toolLine(event, ctx) {
   if (name === "read" || name === "edit" || name === "write") {
     const path = typeof args.path === "string" ? args.path : typeof args.file_path === "string" ? args.file_path : "";
     if (!path) return "";
-    return ask(["hook-tool", "--plain"], { tool_name: name === "read" ? "read" : "edit", tool_input: { file_path: path }, session_id, cwd });
+    return ask(["hook-tool", "--plain"], { tool_name: name === "read" ? "read" : "edit", tool_input: { ...args, file_path: path }, session_id, cwd });
   }
   if (name === "apply_patch" && typeof args.input === "string") {
     return ask(["hook-tool", "--plain"], { tool_name: "apply_patch", tool_input: { command: args.input }, session_id, cwd });

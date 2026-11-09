@@ -11,6 +11,13 @@
     <name>vshulcz</name>
   </author>
   <entry>
+    <title>Basic Memory alternative for coding agents — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html"></link>
+    <updated>2026-11-09T00:00:00Z</updated>
+    <summary>Automatic session-history recall across Claude Code, Codex, Cursor and 40 other agents from existing transcripts, with no Markdown notes to maintain by hand.</summary>
+  </entry>
+  <entry>
     <title>Codex resume and exec resume: Fix Errors — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html"></link>
@@ -18,11 +25,32 @@
     <summary>codex resume, --all, --last and codex exec resume: why a session in ~/.codex/sessions is missing from the picker, the no rollout found error, and the fix.</summary>
   </entry>
   <entry>
+    <title>Memory plugins for Claude Code, Codex and Cursor, compared</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/compare.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/compare.html"></link>
+    <updated>2026-11-09T00:00:00Z</updated>
+    <summary>deja-vu next to claude-mem, agentmemory, MemPalace, Mem0, Letta, CASS, ctx and agentsview: what each captures, where it keeps it, how it scores.</summary>
+  </entry>
+  <entry>
+    <title>Cursor state.vscdb Too Large? Shrink or Clean It Safely</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html"></link>
+    <updated>2026-11-09T00:00:00Z</updated>
+    <summary>Why Cursor&#39;s state.vscdb and state.vscdb.backup hit 10–125 GB, why deleting it wipes every chat, and step-by-step SQLite commands to shrink it safely.</summary>
+  </entry>
+  <entry>
     <title>Delete or Purge Codex CLI Sessions — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html"></link>
     <updated>2026-11-09T00:00:00Z</updated>
     <summary>How to delete or purge Codex CLI sessions: codex delete &lt;id&gt;, codex archive, wiping ~/.codex/sessions and archived_sessions, and keeping history.jsonl.</summary>
+  </entry>
+  <entry>
+    <title>Claude Code, Codex, Cursor and 40 more agents — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/harnesses.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/harnesses.html"></link>
+    <updated>2026-11-09T00:00:00Z</updated>
+    <summary>The forty-three coding agents deja indexes today, where each stores its history, and how to add a new one.</summary>
   </entry>
   <entry>
     <title>Open-source Mem0 alternative for coding agents — deja-vu</title>
@@ -51,13 +79,6 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/auditing-agents.html"></link>
     <updated>2026-11-05T00:00:00Z</updated>
     <summary>How to review agent changes after the fact: the diff says what changed, the transcript says what was tried and why.</summary>
-  </entry>
-  <entry>
-    <title>Basic Memory alternative for coding agents — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html"></link>
-    <updated>2026-11-05T00:00:00Z</updated>
-    <summary>Automatic session-history recall across Claude Code, Codex, Cursor and 40 other agents from existing transcripts, with no Markdown notes to maintain by hand.</summary>
   </entry>
   <entry>
     <title>deja CLI reference: search, recall, blame, stats — deja-vu</title>
@@ -263,31 +284,10 @@
     <summary>四十三个编程智能体各自把会话记录写在磁盘的哪个位置、用的是什么格式，以及怎么自己读它们。表格来自 deja 解析器所依据的同一份格式登记表。</summary>
   </entry>
   <entry>
-    <title>Memory plugins for Claude Code, Codex and Cursor, compared</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/compare.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/compare.html"></link>
-    <updated>2026-11-04T00:00:00Z</updated>
-    <summary>deja-vu next to claude-mem, agentmemory, MemPalace, Mem0, Letta, CASS, ctx and agentsview: what each captures, where it keeps it, how it scores.</summary>
-  </entry>
-  <entry>
     <title>What each memory tool knows the day you install it — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/day-zero.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/day-zero.html"></link>
     <updated>2026-11-04T00:00:00Z</updated>
     <summary>Seven tools on a machine with 19,195 sessions already on disk, asked 100 questions only that history answers: build time, first answer, hit@1.</summary>
-  </entry>
-  <entry>
-    <title>Where Claude Code and Codex store sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html"></link>
-    <updated>2026-11-04T00:00:00Z</updated>
-    <summary>Where each coding agent keeps its conversation history file, in forty-three formats, and how to read them without the tool that wrote them.</summary>
-  </entry>
-  <entry>
-    <title>claude-mem alternative for Codex, Cursor, opencode — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>No model, worker or sign-in: deja-vu indexes the sessions Codex, Cursor, opencode and 40 other agents already keep, including those from before install.</summary>
   </entry>
 </feed>

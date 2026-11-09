@@ -87,9 +87,15 @@ test("a finished tool maps to the call the installer's plugin makes", () => {
   const at = { id: "S1", cwd: "/w" }
   assert.deepEqual(toolCall({ toolName: "read", args: { path: "a.go" } }, at), {
     args: ["hook-tool", "--plain"],
-    payload: { tool_name: "read", tool_input: { file_path: "a.go" }, session_id: "S1", cwd: "/w" },
+    payload: { tool_name: "read", tool_input: { file_path: "a.go", path: "a.go" }, session_id: "S1", cwd: "/w" },
   })
   assert.equal(toolCall({ toolName: "write", args: { file_path: "b.go" } }, at).payload.tool_name, "edit")
+  assert.deepEqual(toolCall({ toolName: "edit", args: { path: "b.go", old_string: "x", new_string: "y" } }, at).payload.tool_input, {
+    file_path: "b.go",
+    path: "b.go",
+    old_string: "x",
+    new_string: "y",
+  })
   const failed = toolCall({ toolName: "exec", args: { command: "make" }, result: { content: [{ type: "text", text: "boom" }] } }, at)
   assert.deepEqual(failed.args, ["hook-tool-after", "--plain"])
   assert.equal(failed.payload.tool_response, "boom")

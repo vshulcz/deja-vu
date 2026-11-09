@@ -156,7 +156,7 @@ export function toolCall(event, at) {
   if (name === "read" || name === "edit" || name === "write") {
     const path = typeof args.path === "string" ? args.path : typeof args.file_path === "string" ? args.file_path : ""
     if (!path) return null
-    return { args: ["hook-tool", "--plain"], payload: { tool_name: name === "read" ? "read" : "edit", tool_input: { file_path: path }, ...base } }
+    return { args: ["hook-tool", "--plain"], payload: { tool_name: name === "read" ? "read" : "edit", tool_input: { ...args, file_path: path }, ...base } }
   }
   if (name === "apply_patch" && typeof args.input === "string") {
     return { args: ["hook-tool", "--plain"], payload: { tool_name: "apply_patch", tool_input: { command: args.input }, ...base } }
