@@ -4,7 +4,13 @@
       "command": "deja",
       "args": [
         "mcp"
-      ]
+      ],
+      "forceAllToolsEager": true,
+      "tools": {
+        "deja": {
+          "eager": true
+        }
+      }
     }
   }
 }

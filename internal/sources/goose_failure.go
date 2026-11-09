@@ -84,20 +84,24 @@ func gooseTurnIn(db, q string) (GooseTurnState, bool) {
 	return st, found
 }
 
-// gooseEditPath is the file an editor call changes: the developer
-// extension's edit and write, or text_editor's str_replace, insert and write.
+// gooseEditPath is the file an editor or reader call touches: the developer
+// extension's edit, write and read, or text_editor's str_replace, insert,
+// write and view.
 func gooseEditPath(m map[string]any) string {
 	name, args := gooseToolCall(m)
 	switch strings.TrimPrefix(name, "developer__") {
-	case "edit", "write":
+	case "edit", "write", "read", "read_file", "view_file":
 	case "text_editor":
 		switch str(args["command"]) {
-		case "str_replace", "insert", "write":
+		case "str_replace", "insert", "write", "view":
 		default:
 			return ""
 		}
 	default:
 		return ""
 	}
-	return strings.TrimSpace(str(args["path"]))
+	if p := strings.TrimSpace(str(args["path"])); p != "" {
+		return p
+	}
+	return strings.TrimSpace(str(args["file_path"]))
 }

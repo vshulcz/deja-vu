@@ -204,3 +204,52 @@ func TestAntigravityMarkerIsNotRewritten(t *testing.T) {
 		t.Fatalf("an existing marker belongs to install_antigravity, got %q", got)
 	}
 }
+
+func TestInstallAntigravityMCPMarksToolsEager(t *testing.T) {
+	hermeticEnv(t)
+	if _, err := installAntigravityMCP("/bin/deja", false); err != nil {
+		t.Fatalf("installAntigravityMCP: %v", err)
+	}
+	cfgPath := filepath.Join(antigravityConfigHome(), "mcp_config.json")
+	b, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var root struct {
+		Servers map[string]struct {
+			ForceAllToolsEager bool `json:"forceAllToolsEager"`
+			Tools              map[string]struct {
+				Eager bool `json:"eager"`
+			} `json:"tools"`
+		} `json:"mcpServers"`
+	}
+	if uerr := json.Unmarshal(b, &root); uerr != nil {
+		t.Fatal(uerr)
+	}
+	srv := root.Servers["deja"]
+	if !srv.ForceAllToolsEager || !srv.Tools["deja"].Eager {
+		t.Fatalf("deja entry not marked eager: %s", b)
+	}
+	if werr := os.WriteFile(cfgPath, []byte(`{"mcpServers":{"deja":{"command":"/bin/deja","args":["mcp"]}}}`+"\n"), 0o600); werr != nil {
+		t.Fatal(werr)
+	}
+	if res, ierr := installAntigravityMCP("/bin/deja", false); ierr != nil || res.Action != "updated" {
+		t.Fatalf("upgrade antigravity mcp_config.json = %+v, %v; want Action=updated", res, ierr)
+	}
+}
+
+func TestLatestEditPathsFromStepsIncludesReadAndViewFile(t *testing.T) {
+	steps := []transcriptStep{
+		{
+			Type: "PLANNER_RESPONSE",
+			ToolCalls: []any{
+				map[string]any{"name": "read_file", "args": map[string]any{"Path": "/repo/a.go"}},
+				map[string]any{"name": "view_file", "args": map[string]any{"AbsolutePath": "/repo/b.go"}},
+			},
+		},
+	}
+	got := latestEditPathsFromSteps(steps)
+	if len(got) != 2 || got[0] != "/repo/a.go" || got[1] != "/repo/b.go" {
+		t.Fatalf("latestEditPathsFromSteps = %v, want [/repo/a.go /repo/b.go]", got)
+	}
+}

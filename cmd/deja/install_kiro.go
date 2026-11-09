@@ -108,6 +108,16 @@ func installKiro(exe string, uninstall bool) (installResult, error) {
 	if err != nil {
 		return res, err
 	}
+	if !uninstall {
+		var changed bool
+		changed, err = kiroApproveDejasTool(kiroMCPSettingsPath())
+		if err != nil {
+			return installResult{}, err
+		}
+		if changed && res.Action == "unchanged" {
+			res.Action = "updated"
+		}
+	}
 	steering, err := installTextFile(kiroSteeringPath(), kiroSteering(exe), exe, uninstall)
 	if err != nil {
 		return installResult{}, err
