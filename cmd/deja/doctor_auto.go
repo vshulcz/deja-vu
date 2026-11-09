@@ -39,7 +39,7 @@ func zcodeDoctorHooksPath() string {
 	if !zcodeConfigIsLiveRuntimeConfig() || !doctorExists(legacy) {
 		return zcodeDoctorPath()
 	}
-	b, err := os.ReadFile(legacy)
+	b, err := doctorReadConfig(legacy)
 	if err != nil || !zcodeHooksRun(b) {
 		return zcodeDoctorPath()
 	}

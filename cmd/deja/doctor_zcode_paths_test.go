@@ -102,6 +102,23 @@ func TestZCodeDoctorMCPPath(t *testing.T) {
 			wantPath:  "config",
 			wantWired: true,
 		},
+		{
+			// An unparseable setting.json beside an empty config.json: the live
+			// check falls back to zcodeDoctorPath(), and doctorZCodeWired takes
+			// its substring fallback rather than crashing on the bad JSON.
+			name:     "unparseable setting.json with an empty config.json",
+			config:   `{}`,
+			setting:  `{"mcp": {"servers": {`,
+			wantPath: "setting",
+		},
+		{
+			// The live config itself does not parse: the row must fall back to
+			// zcodeDoctorPath() instead of naming a file it cannot read.
+			name:    "unparseable live config falls back",
+			config:  `{"mcp": {"servers": {`,
+			version: [3]int{3, 17, 2}, versionOK: true,
+			wantPath: "config",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			config, setting := setupZCodeDoctorFixture(t, tc.config, tc.setting, tc.marker, tc.version, tc.versionOK)
@@ -164,6 +181,15 @@ func TestZCodeDoctorHooksPath(t *testing.T) {
 			config:  `{"mcp":{"servers":{}},"hooks":{"enabled":true,"events":{"PreToolUse":[{"hooks":[{"type":"command","command":"/tmp/mine.sh","timeout":10}]}]}}}`,
 			version: [3]int{3, 17, 2}, versionOK: true,
 			wantPath: "config",
+		},
+		{
+			// An unparseable setting.json beside an empty config.json, the same
+			// shape as the MCP row's fallback case: neither row should name a
+			// live config that carries no deja wiring.
+			name:     "unparseable setting.json with an empty config.json",
+			config:   `{}`,
+			setting:  `{"mcp": {"servers": {`,
+			wantPath: "setting",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
