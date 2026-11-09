@@ -18,7 +18,7 @@ func TestRecallWorthShowing(t *testing.T) {
 }
 
 func TestHasIdentifierTerm(t *testing.T) {
-	for _, term := range []string{"pgbouncer", "omoda", "сеть", "v11.2", "pkg/index", "bot_id", "死锁", "缓存", "数据库", "數據庫"} {
+	for _, term := range []string{"pgbouncer", "kafka", "сеть", "v11.2", "pkg/index", "bot_id", "死锁", "缓存", "数据库", "數據庫"} {
 		if !HasIdentifierTerm([]string{term}) {
 			t.Errorf("%q names something", term)
 		}

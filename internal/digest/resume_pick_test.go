@@ -32,7 +32,7 @@ func TestANudgeIsNotTheTask(t *testing.T) {
 func TestAPreambleIsNotWhatWasSettled(t *testing.T) {
 	s := model.Session{Messages: []model.Message{
 		{Role: "assistant", Text: "Decision: the retry budget stays at four."},
-		{Role: "assistant", Text: "Хорошо, отвечаю по существу — как работает routepilot."},
+		{Role: "assistant", Text: "Хорошо, отвечаю по существу — как работает pgbouncer."},
 	}}
 	r := ResumeFrom(s, nil)
 	if !strings.Contains(r.Decision, "stays at four") {

@@ -34,7 +34,7 @@ import (
 //
 // What works is proximity in time. A file counts when it was opened or edited
 // near the place the topic was discussed. On five hand-checked topics that
-// gives two exactly right ("sing-box" returns the singbox service and renderer,
+// gives two exactly right ("envoy-proxy" returns the envoy service and renderer,
 // "widgetbot" the bot's own files), one plausible, one weak, and one honest
 // refusal — a topic said in a single session with no file beside it prints that
 // rather than guessing.

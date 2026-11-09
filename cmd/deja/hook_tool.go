@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/evidence"
+	"github.com/vshulcz/deja-vu/internal/gitread"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -89,6 +91,34 @@ type toolHookInput struct {
 		NewString string `json:"new_string"`
 		OldStr    string `json:"oldStr"`
 		NewStr    string `json:"newStr"`
+
+		// Multi-harness edit field dialects
+		OldText            string `json:"oldText"`
+		NewText            string `json:"newText"`
+		OldTextSnake       string `json:"old_text"`
+		NewTextSnake       string `json:"new_text"`
+		OldStringCamel     string `json:"oldString"`
+		NewStringCamel     string `json:"newString"`
+		Target             string `json:"Target"`
+		Replacement        string `json:"Replacement"`
+		TargetLower        string `json:"target"`
+		ReplacementLower   string `json:"replacement"`
+		TargetContent      string `json:"TargetContent"`
+		ReplacementContent string `json:"ReplacementContent"`
+		Content            string `json:"content"`
+		ContentUpper       string `json:"Content"`
+		FileText           string `json:"file_text"`
+		NewSource          string `json:"new_source"`
+		Edits              []struct {
+			OldString   string `json:"old_string"`
+			NewString   string `json:"new_string"`
+			OldStr      string `json:"old_str"`
+			NewStr      string `json:"new_str"`
+			OldText     string `json:"oldText"`
+			NewText     string `json:"newText"`
+			Target      string `json:"Target"`
+			Replacement string `json:"Replacement"`
+		} `json:"edits"`
 	} `json:"tool_input"`
 	// Copilot CLI sends the tool's arguments as toolArgs: {command} for bash,
 	// {path} for edit and create (1.0.92).
@@ -102,6 +132,99 @@ type toolHookInput struct {
 	WorkspaceRoots []string `json:"workspace_roots"`
 	// Grok spells all of this in camelCase. See hook_grok.go.
 	grokEnvelope
+}
+
+// firstNonEmpty returns the first non-empty string among the provided arguments.
+func firstNonEmpty(items ...string) string {
+	for _, it := range items {
+		if strings.TrimSpace(it) != "" {
+			return it
+		}
+	}
+	return ""
+}
+
+// mapString retrieves the first non-empty string value for any of the given keys.
+func mapString(m map[string]any, keys ...string) string {
+	if m == nil {
+		return ""
+	}
+	for _, k := range keys {
+		if v, ok := m[k].(string); ok && strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// normalizeEditStrings unifies all 44 harness edit string dialects into
+// canonical OldString and NewString fields.
+func (i *toolHookInput) normalizeEditStrings() {
+	var editOlds, editNews []string
+	for _, ed := range i.ToolInput.Edits {
+		if o := firstNonEmpty(ed.OldString, ed.OldStr, ed.OldText, ed.Target); o != "" {
+			editOlds = append(editOlds, o)
+		}
+		if n := firstNonEmpty(ed.NewString, ed.NewStr, ed.NewText, ed.Replacement); n != "" {
+			editNews = append(editNews, n)
+		}
+	}
+	joinedOldEdits := strings.Join(editOlds, "\n")
+	joinedNewEdits := strings.Join(editNews, "\n")
+
+	var toolArgsOld, toolArgsNew string
+	if args := copilotToolArgs(i.ToolArgs); args != nil {
+		toolArgsOld = mapString(args, "old_string", "oldStr", "oldString", "oldText", "old_text", "Target", "target", "TargetContent")
+		toolArgsNew = mapString(args, "new_string", "newStr", "newString", "newText", "new_text", "Replacement", "replacement", "ReplacementContent", "content", "Content", "file_text", "new_source")
+		if rawEdits, ok := args["edits"].([]any); ok {
+			var aOlds, aNews []string
+			for _, rawEd := range rawEdits {
+				if edMap, ok := rawEd.(map[string]any); ok {
+					if o := mapString(edMap, "old_string", "oldStr", "oldString", "oldText", "old_text", "Target", "target"); o != "" {
+						aOlds = append(aOlds, o)
+					}
+					if n := mapString(edMap, "new_string", "newStr", "newString", "newText", "new_text", "Replacement", "replacement"); n != "" {
+						aNews = append(aNews, n)
+					}
+				}
+			}
+			if toolArgsOld == "" && len(aOlds) > 0 {
+				toolArgsOld = strings.Join(aOlds, "\n")
+			}
+			if toolArgsNew == "" && len(aNews) > 0 {
+				toolArgsNew = strings.Join(aNews, "\n")
+			}
+		}
+	}
+
+	i.ToolInput.OldString = firstNonEmpty(
+		i.ToolInput.OldString,
+		i.ToolInput.OldStr,
+		i.ToolInput.OldStringCamel,
+		i.ToolInput.OldText,
+		i.ToolInput.OldTextSnake,
+		i.ToolInput.Target,
+		i.ToolInput.TargetLower,
+		i.ToolInput.TargetContent,
+		joinedOldEdits,
+		toolArgsOld,
+	)
+	i.ToolInput.NewString = firstNonEmpty(
+		i.ToolInput.NewString,
+		i.ToolInput.NewStr,
+		i.ToolInput.NewStringCamel,
+		i.ToolInput.NewText,
+		i.ToolInput.NewTextSnake,
+		i.ToolInput.Replacement,
+		i.ToolInput.ReplacementLower,
+		i.ToolInput.ReplacementContent,
+		joinedNewEdits,
+		toolArgsNew,
+		i.ToolInput.Content,
+		i.ToolInput.ContentUpper,
+		i.ToolInput.FileText,
+		i.ToolInput.NewSource,
+	)
 }
 
 // adopt fills in what grok spells differently. Without the tool name and its
@@ -129,12 +252,13 @@ func (i *toolHookInput) adopt() {
 			i.ToolInput.Command, _ = args["command"].(string)
 		}
 		if i.ToolInput.FilePath == "" {
-			i.ToolInput.FilePath, _ = args["path"].(string)
+			i.ToolInput.FilePath = mapString(args, "path", "file_path", "filePath", "target_file")
 		}
 	}
 	if isCommandTool(i.ToolName) && strings.TrimSpace(i.ToolInput.Command) != "" {
 		i.ToolInput.Command += sources.CommandArgs(i.ToolInput.Args)
 	}
+	i.normalizeEditStrings()
 }
 
 // copilotToolArgs reads toolArgs as an object, or as the JSON string older
@@ -431,6 +555,7 @@ func toolHookLineSkipping(dir, cwd string, input toolHookInput, used func(string
 		if postToolEvent(input.HookEventName) {
 			return fileLineFor(dir, cwd, input)
 		}
+		return fileReadGuardLine(dir, cwd, input)
 	case "apply_patch":
 		// Codex, OpenCode and other OpenAI-style agents make file edits through
 		// an apply_patch tool: the patch text is in `command`, `patchText` or
@@ -452,12 +577,51 @@ func toolHookLineSkipping(dir, cwd string, input toolHookInput, used func(string
 	return ""
 }
 
+// patchOldNewStrings extracts removed lines (old) and added lines (new)
+// from unified diff and apply_patch formats for broken test assertion checks.
+func patchOldNewStrings(patch string) (string, string) {
+	var oldLines, newLines []string
+	for line := range strings.SplitSeq(patch, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "---") || strings.HasPrefix(trimmed, "+++") || strings.HasPrefix(trimmed, "***") || strings.HasPrefix(trimmed, "@@") {
+			continue
+		}
+		switch {
+		case strings.HasPrefix(line, "-"):
+			oldLines = append(oldLines, line[1:])
+		case strings.HasPrefix(line, "+"):
+			newLines = append(newLines, line[1:])
+		case strings.HasPrefix(trimmed, "-"):
+			oldLines = append(oldLines, trimmed[1:])
+		case strings.HasPrefix(trimmed, "+"):
+			newLines = append(newLines, trimmed[1:])
+		}
+	}
+	return strings.Join(oldLines, "\n"), strings.Join(newLines, "\n")
+}
+
 // applyPatchLine is the file line for the first file in a patch that has one.
 func applyPatchLine(dir, cwd, patch string, self func(index.SessionMeta, string) bool) string {
+	oldPatch, newPatch := patchOldNewStrings(patch)
 	for _, path := range applyPatchFiles(patch) {
 		// A shell `cd sub && apply_patch` edits sub/<header> (#5306).
 		path = sources.ShellPatchPath(patch, cwd, path)
-		if line := fileHookLineOutsideWithEdit(dir, cwd, path, patch, self); line != "" {
+		line := fileHookLineOutsideWithEdit(dir, cwd, path, patch, self)
+		if assertLine := testAssertionLiteralLine(cwd, path, oldPatch, newPatch); assertLine != "" {
+			if line == "" {
+				line = search.SafePath(baseName(path)) + assertLine
+			} else if len(line)+len(assertLine) <= toolHookMaxBytes {
+				line += assertLine
+			}
+		}
+		if hallucinated := hallucinatedPkgSymbolLine(cwd, path, oldPatch, newPatch); hallucinated != "" {
+			if line == "" {
+				line = search.SafePath(baseName(path)) + hallucinated
+			} else if len(line)+len(hallucinated) <= toolHookMaxBytes {
+				line += hallucinated
+			}
+		}
+		if line != "" {
 			return line
 		}
 	}
@@ -478,6 +642,7 @@ func postToolEvent(name string) bool {
 // fileLineFor is the file line for an editor or reader call, by whichever
 // field the host named the file in.
 func fileLineFor(dir, cwd string, input toolHookInput) string {
+	setActiveDejaDir(dir)
 	path := strings.TrimSpace(input.ToolInput.FilePath)
 	if path == "" {
 		// TRAE CLI sends no file_path, only {"command": "Edit <path>"}.
@@ -489,15 +654,56 @@ func fileLineFor(dir, cwd string, input toolHookInput) string {
 	if path == "" {
 		return ""
 	}
+	oldStr := input.ToolInput.OldString
+	if oldStr == "" {
+		oldStr = input.ToolInput.OldStr
+	}
+	newStr := input.ToolInput.NewString
+	if newStr == "" {
+		newStr = input.ToolInput.NewStr
+	}
+	if oldStr == "" && newStr != "" {
+		diskPath := path
+		if !filepath.IsAbs(diskPath) && cwd != "" {
+			diskPath = filepath.Join(cwd, diskPath)
+		}
+		if raw, err := os.ReadFile(diskPath); err == nil && len(raw) > 0 && len(raw) <= 256<<10 {
+			oldStr = string(raw)
+		}
+	}
 	editText := strings.Join([]string{
-		input.ToolInput.OldString,
-		input.ToolInput.NewString,
-		input.ToolInput.OldStr,
-		input.ToolInput.NewStr,
+		oldStr,
+		newStr,
 		input.ToolInput.PatchText,
 		input.ToolInput.Patch,
 	}, "\n")
-	return fileHookLineOutsideWithEdit(dir, cwd, path, editText, askerSkip(dir, input))
+	line := fileHookLineOutsideWithEdit(dir, cwd, path, editText, askerSkip(dir, input))
+	if assertLine := testAssertionLiteralLine(cwd, path, oldStr, newStr); assertLine != "" {
+		if line == "" {
+			line = search.SafePath(baseName(path)) + assertLine
+		} else if len(line)+len(assertLine) <= toolHookMaxBytes {
+			line += assertLine
+		}
+	}
+	if hallucinated := hallucinatedPkgSymbolLine(cwd, path, oldStr, newStr); hallucinated != "" {
+		if line == "" {
+			line = search.SafePath(baseName(path)) + hallucinated
+		} else if len(line)+len(hallucinated) <= toolHookMaxBytes {
+			line += hallucinated
+		}
+	}
+	return line
+}
+
+// fileReadGuardLine returns a file line on a PreToolUse Read only when the file
+// carries an explicit .deja/memory.jsonl guardrail, keeping ordinary reads
+// silent while warning before an agent designs a change to a guarded file.
+func fileReadGuardLine(dir, cwd string, input toolHookInput) string {
+	line := fileLineFor(dir, cwd, input)
+	if strings.Contains(line, repoDecisionLabel) {
+		return line
+	}
+	return ""
 }
 
 // askerSkip says which sessions are the one asking: itself, and what counts as
@@ -825,7 +1031,7 @@ func commandProjectCandidates(cwd, cmd string) []string {
 }
 
 // commandProjectCandidatesIn expands commandProjectCandidates against the
-// recorded projects in dir when cwd is unscoped (e.g. "splitbox" -> "goprojects/splitbox").
+// recorded projects in dir when cwd is unscoped (e.g. "edgeproxy" -> "goprojects/edgeproxy").
 func commandProjectCandidatesIn(dir, cwd, cmd string) []string {
 	if names := digest.ProjectNameCandidates(cwd); len(names) > 0 {
 		return names
@@ -888,6 +1094,12 @@ func commandHookLineSkipping(dir, cwd, cmd, self string, used func(string) bool)
 	// #3001 filed, so the retry asks the table and stops rather than searching
 	// — a first pass, which is almost every call, still searches (#3603).
 	skipped := false
+	if line := coupledCommitGuardLine(cwd, cmd); line != "" {
+		if !used(line) {
+			return line
+		}
+		skipped = true
+	}
 	if planIndexReady(dir) {
 		if line := missingProgramLine(dir, cmd); line != "" {
 			if !used(line) {
@@ -1035,6 +1247,11 @@ func commandDecisionLabel(cmd, text string) string {
 func promotedCommandHookLine(dir, cwd, cmd, self string, used func(string) bool) string {
 	if index.InspectionCommand(cmd) {
 		return ""
+	}
+	if line := coupledCommitGuardLine(cwd, cmd); line != "" {
+		if !used(line) {
+			return line
+		}
 	}
 	if planIndexReady(dir) {
 		if line := missingProgramLineWithRemedy(dir, cmd); line != "" {
@@ -1430,4 +1647,90 @@ func normalizedCommandText(cmd string) string {
 		out = append(out, f)
 	}
 	return strings.Join(out, " ")
+}
+
+func coupledCommitGuardLine(cwd, cmd string) string {
+	if cwd == "" || !strings.Contains(cmd, "git commit") {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	out, err := gitread.Command(ctx, "-C", cwd, "diff", "--cached", "--name-only").Output()
+	filesText := strings.TrimSpace(string(out))
+	if err == nil && filesText == "" && (strings.Contains(cmd, " -a") || strings.Contains(cmd, " -am") || strings.Contains(cmd, " -ma") || strings.Contains(cmd, " --all")) {
+		outAll, errAll := gitread.Command(ctx, "-C", cwd, "diff", "--name-only").Output()
+		if errAll == nil {
+			filesText = strings.TrimSpace(string(outAll))
+		}
+	}
+	if filesText == "" {
+		return ""
+	}
+	var files []string
+	for line := range strings.SplitSeq(filesText, "\n") {
+		if f := strings.TrimSpace(line); f != "" {
+			files = append(files, f)
+		}
+	}
+	return coupledCommitGuardForFiles(cwd, files)
+}
+
+func coupledCommitGuardForFiles(cwd string, files []string) string {
+	if cwd == "" || len(files) == 0 {
+		return ""
+	}
+	entries := readRepoMemory(cwd)
+	for _, e := range entries {
+		if len(e.Files) < 2 {
+			continue
+		}
+		var present, missing string
+		for _, p := range e.Files {
+			if repoFileInCommitFiles(p, files) {
+				if present == "" {
+					present = p
+				}
+			} else {
+				if missing == "" {
+					missing = p
+				}
+			}
+		}
+		if present != "" && missing != "" {
+			return fmt.Sprintf("commit touches %s without coupled %s — in .deja/memory.jsonl: [%s] %s",
+				search.SafePath(present), search.SafePath(missing), search.SafeLine(e.Kind), search.SafeLine(e.Text))
+		}
+	}
+	return ""
+}
+
+func readRepoMemory(cwd string) []sources.RepoEntry {
+	root := sources.RepoRoot(cwd)
+	if root == "" {
+		root = cwd
+	}
+	pol := policy.Load()
+	if !pol.Allows(policy.ActivationAuto, sources.RepoMemoryProject(root)) {
+		return nil
+	}
+	entries, _, err := readRepoMemoryAndNotes(root)
+	if err != nil {
+		return nil
+	}
+	return entries
+}
+
+func repoFileInCommitFiles(p string, files []string) bool {
+	pNorm := filepath.ToSlash(strings.TrimPrefix(strings.TrimSpace(p), "./"))
+	pBase := filepath.Base(pNorm)
+	for _, f := range files {
+		fNorm := filepath.ToSlash(strings.TrimPrefix(strings.TrimSpace(f), "./"))
+		fBase := filepath.Base(fNorm)
+		if strings.EqualFold(fNorm, pNorm) || strings.EqualFold(fBase, pBase) ||
+			strings.HasSuffix(fNorm, "/"+pNorm) || strings.HasSuffix(pNorm, "/"+fNorm) {
+			return true
+		}
+	}
+	return false
 }

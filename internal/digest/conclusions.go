@@ -62,6 +62,9 @@ var decisionMarkers = []string{
 	"决定：", "决定:", "结论：", "结论:", "原因：", "原因:", "根因：", "根因:",
 	"原因是", "根因是", "最终决定", "决定采用", "改为", "改用", "修复了", "已修复",
 	"修好了", "解决了", "已解决", "已合并", "已发布", "默认使用",
+	// Japanese decision, root-cause and outcome markers.
+	"結論：", "結論:", "原因：", "原因:", "原因は", "修正しました", "解決しました",
+	"変更しました", "切り替えました", "採用しました", "マージしました", "デフォルトで",
 }
 
 // CarriesDecision reports whether a line reads as something concluded rather
@@ -172,7 +175,7 @@ func CarriesDecisionExcept(text string, asked []string) bool {
 			return true
 		}
 	}
-	return false
+	return carriesLearnedDecision(low, text, asked)
 }
 
 // planOpeners are how a line announces what is about to happen rather than
@@ -206,10 +209,10 @@ func AnnouncesPlan(text string) bool {
 var userCorrectionMarkers = []string{
 	"причем тут", "причему тут", "при чём тут", "при чем тут",
 	"не путай", "путаешь", "перепутал",
-	"у меня впн для", "для доступа к", "это для ",
-	"проксирует", "два туннеля", "два разных", "разные впн", "разных впн",
+	"для доступа к", "это для ",
+	"два разных", "разные ", "разных ",
 	"один до ", "второй до ",
-	"don't confuse", "do not confuse", "nothing to do with",
+	"don't confuse", "do not confuse", "nothing to do with", "different from",
 }
 
 // CarriesUserCorrection reports whether a user message states a correction or
@@ -335,6 +338,10 @@ func marksLine(low, marker string) bool {
 // sessions where nothing matches keep everything — the filter only kicks in
 // when it has something better to offer.
 func selectConclusions(ms []model.Message) []model.Message {
+	return selectConclusionsWithTrajectory(ms, nil)
+}
+
+func selectConclusionsWithTrajectory(ms []model.Message, trajVerified map[string]bool) []model.Message {
 	if len(ms) <= 2 {
 		return ms
 	}
@@ -344,11 +351,13 @@ func selectConclusions(ms []model.Message) []model.Message {
 		if cjkfold.HasCJK(low) {
 			low = cjkfold.String(low)
 		}
-		marked := false
-		for _, d := range decisionMarkers {
-			if marksLine(low, d) {
-				marked = true
-				break
+		marked := trajVerified[m.Text]
+		if !marked {
+			for _, d := range decisionMarkers {
+				if marksLine(low, d) {
+					marked = true
+					break
+				}
 			}
 		}
 		if marked || strings.Contains(m.Text, "```") || i == len(ms)-1 {
@@ -408,7 +417,11 @@ func conclusions(s model.Session, budget int, limit int, substantial bool) []str
 		return nil
 	}
 	var assistants []model.Message
-	for _, m := range s.Messages {
+	trajVerified := map[string]bool{}
+	sawEditInTurn := false
+	sawPassCmdInTurn := false
+	for i, m := range s.Messages {
+		observeTrajectoryStep(m, &sawEditInTurn, &sawPassCmdInTurn)
 		if m.Role != "assistant" || noisyMessage(m.Text) || IsAgentArtifact(m.Text) {
 			continue
 		}
@@ -420,12 +433,15 @@ func conclusions(s model.Session, budget int, limit int, substantial bool) []str
 		if m.Text == "" || acknowledgement(m.Text) {
 			continue
 		}
+		if verifiedTurnSynthesis(s.Messages, i, m.Text, sawEditInTurn, sawPassCmdInTurn) {
+			trajVerified[m.Text] = true
+		}
 		assistants = append(assistants, m)
 	}
 	if len(assistants) == 0 {
 		return nil
 	}
-	picked := concludingFirst(dedupeStatus(selectConclusions(assistants)))
+	picked := concludingFirstWithTrajectory(dedupeStatus(selectConclusionsWithTrajectory(assistants, trajVerified)), trajVerified)
 	// Newest first: the last thing concluded outranks the first thing tried.
 	var out []string
 	spent := 0
@@ -494,10 +510,10 @@ func conclusions(s model.Session, budget int, limit int, substantial bool) []str
 // Order within each group is untouched, so "the last thing concluded outranks
 // the first thing tried" still holds — among the messages that concluded
 // anything, and then among the rest.
-func concludingFirst(ms []model.Message) []model.Message {
+func concludingFirstWithTrajectory(ms []model.Message, trajVerified map[string]bool) []model.Message {
 	var plain, concluding []model.Message
 	for _, m := range ms {
-		if CarriesDecision(MessageText(m.Text)) {
+		if CarriesDecision(MessageText(m.Text)) || trajVerified[m.Text] {
 			concluding = append(concluding, m)
 			continue
 		}

@@ -85,7 +85,7 @@ func TestBlameDoesNotPreferADeepUnrelatedPath(t *testing.T) {
 		Harness: "opencode", ID: "elsewhere", Project: "other", Updated: now,
 		Messages: []model.Message{{
 			Role: "user", Time: now,
-			Text: "/var/folders/jn/T/opencode/d3fvxl/apps/image2video/cmd/dfprocessing/ingest.go failed to build",
+			Text: "/var/folders/jn/T/opencode/monorepo/apps/catalog-svc/cmd/worker/ingest.go failed to build",
 		}},
 	}
 	hits := Blame([]model.Session{worked, elsewhere},

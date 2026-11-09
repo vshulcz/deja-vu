@@ -98,11 +98,11 @@ func TestOmpKeepsHeaderProjectWhenResumedPastTheHeader(t *testing.T) {
 	t.Setenv("HOME", filepath.Join(root, "home"))
 	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_OMP_ROOT", filepath.Join(root, "omp-sessions"))
-	project := filepath.Join(root, "omp-sessions", "-Code-pleasure-course")
+	project := filepath.Join(root, "omp-sessions", "-Code-demo-course")
 	if err := os.MkdirAll(project, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	head := `{"type":"session","version":3,"id":"omp-uuid","timestamp":"2026-01-02T03:04:05Z","cwd":"/Users/x/work/serpass"}` + "\n"
+	head := `{"type":"session","version":3,"id":"omp-uuid","timestamp":"2026-01-02T03:04:05Z","cwd":"/Users/x/work/authsvc"}` + "\n"
 	first := `{"type":"message","id":"u1","timestamp":"2026-01-02T03:04:10Z","message":{"role":"user","content":[{"type":"text","text":"first"}]}}` + "\n"
 	tail := `{"type":"message","id":"a1","timestamp":"2026-01-02T03:04:15Z","message":{"role":"assistant","content":[{"type":"text","text":"reply"}]}}` + "\n"
 	path := filepath.Join(project, "2026-01-02T03-04-05_omp-uuid.jsonl")
@@ -124,14 +124,14 @@ func TestOmpKeepsHeaderProjectWhenResumedPastTheHeader(t *testing.T) {
 	if resumed[0].ID != whole[0].ID {
 		t.Errorf("resumed id = %q, whole-read id = %q", resumed[0].ID, whole[0].ID)
 	}
-	// Absolute, for the same reason: the header names /Users/x/work/serpass,
-	// and the directory the file sits in says Code-pleasure-course.
+	// Absolute, for the same reason: the header names /Users/x/work/authsvc,
+	// and the directory the file sits in says Code-demo-course.
 	for _, got := range []struct {
 		read    string
 		project string
 	}{{"whole", whole[0].Project}, {"resumed", resumed[0].Project}} {
-		if !strings.Contains(got.project, "serpass") {
-			t.Errorf("%s read project = %q, want the header cwd's serpass", got.read, got.project)
+		if !strings.Contains(got.project, "authsvc") {
+			t.Errorf("%s read project = %q, want the header cwd's authsvc", got.read, got.project)
 		}
 	}
 }

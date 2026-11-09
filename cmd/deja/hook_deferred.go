@@ -178,19 +178,42 @@ func takeDeferred(dir, key string) string {
 // deferredPayload is what a deferring or delivering hook needs from the
 // payload: whose session it is and which event the host named.
 type deferredPayload struct {
-	SessionID      string `json:"session_id"`
-	SessionIDCamel string `json:"sessionId"`
-	ConversationID string `json:"conversation_id"`
-	CWD            string `json:"cwd"`
-	Event          string `json:"hook_event_name"`
-	EventCamel     string `json:"hookEventName"`
+	SessionID        string   `json:"session_id"`
+	SessionIDCamel   string   `json:"sessionId"`
+	ConversationID   string   `json:"conversation_id"`
+	CWD              string   `json:"cwd"`
+	ProjectPath      string   `json:"project_path"`
+	ProjectPathCamel string   `json:"projectPath"`
+	Workspace        string   `json:"workspace"`
+	WorkspaceRoots   []string `json:"workspace_roots"`
+	Event            string   `json:"hook_event_name"`
+	EventCamel       string   `json:"hookEventName"`
 }
 
 func readDeferredPayload(raw []byte) (key, event string) {
 	var p deferredPayload
 	_ = json.Unmarshal(raw, &p)
 	sid := adoptGrok(adoptGrok(p.SessionID, p.SessionIDCamel), p.ConversationID)
-	return deferredKey(sid, p.CWD), adoptGrok(p.Event, p.EventCamel)
+	if sid == "" {
+		sid = os.Getenv("DEJA_SESSION_ID")
+		if sid == "" {
+			sid = os.Getenv("SESSION_ID")
+		}
+	}
+	cwd := adoptGrok(adoptGrok(p.CWD, p.ProjectPath), adoptGrok(p.ProjectPathCamel, p.Workspace))
+	if cwd == "" && len(p.WorkspaceRoots) > 0 {
+		cwd = p.WorkspaceRoots[0]
+	}
+	if cwd == "" {
+		cwd = os.Getenv("DEJA_PROJECT_DIR")
+		if cwd == "" {
+			cwd = os.Getenv("PROJECT_DIR")
+		}
+	}
+	if cwd == "" {
+		cwd = howCwd()
+	}
+	return deferredKey(sid, cwd), adoptGrok(p.Event, p.EventCamel)
 }
 
 // hookOutputContext is the part of a hook's answer meant for the model.

@@ -2,7 +2,9 @@ package index
 
 import (
 	"math"
+	"strings"
 
+	"github.com/vshulcz/deja-vu/internal/query"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
@@ -37,6 +39,7 @@ type relevanceAcc struct {
 	// kept alongside so the choice between the two can be made once the whole
 	// query has been read rather than term by term.
 	identifyingTerms int
+	informativeTerms []string
 	// The rarest term the question holds; see sessionCredit.bestMatched.
 	queryBest       float64
 	queryBestUnseen int
@@ -248,6 +251,96 @@ func (a *relevanceAcc) addTerm(term string) {
 		a.termTF[p] = 0
 	}
 	a.hits = th.hits[:0]
+}
+
+const (
+	// rm3AssocLambda is the Dirichlet interpolation weight for 1-hop NPMI
+	// associative query expansion (RM3 / Personalized PageRank damping).
+	// Kept small so associative neighbors disambiguate and boost sessions that
+	// already matched at least one direct query term without overriding direct
+	// lexical matches or precision gates.
+	rm3AssocLambda = 0.18
+	// cooccurAssocTopK caps how many top NPMI neighbors per query term are
+	// activated during relevance scoring.
+	cooccurAssocTopK = 3
+)
+
+// addAssociativeTerms performs 1-hop associative activation over the corpus's
+// NPMI co-occurrence graph (RM3 / Personalized PageRank). Sessions that already
+// matched at least one query term receive damped credit when they also contain
+// the top corpus-learned collocations of the query's informative terms.
+func (a *relevanceAcc) addAssociativeTerms(dir string, terms []string) {
+	if len(a.credited) <= 1 || len(terms) == 0 {
+		return
+	}
+	neighbors := readCooccur(dir)
+	if len(neighbors) == 0 {
+		return
+	}
+	inQuery := map[string]bool{}
+	for _, t := range terms {
+		inQuery[t] = true
+		for _, tok := range tokens(t) {
+			inQuery[tok] = true
+		}
+	}
+	expand := map[string]float64{}
+	for _, t := range terms {
+		for _, tok := range tokens(t) {
+			if len(tok) < 4 || query.IsStopWord(tok) {
+				continue
+			}
+			ns := neighbors[tok]
+			limit := min(len(ns), cooccurAssocTopK)
+			for rankIdx := range limit {
+				nb := ns[rankIdx]
+				if inQuery[nb] {
+					continue
+				}
+				w := rm3AssocLambda / float64(rankIdx+1)
+				if w > expand[nb] {
+					expand[nb] = w
+				}
+			}
+		}
+	}
+	if len(expand) == 0 {
+		return
+	}
+	for nb, w := range expand {
+		posts, err := a.br.postings("t" + nb)
+		if err != nil || len(posts) == 0 {
+			continue
+		}
+		_, sessions := a.countDF(posts)
+		rank := rankIDF(len(a.m.Sessions), sessions)
+		if rank <= 0 && sessions <= 2 {
+			rank = 0.1
+		}
+		if rank <= 0 {
+			continue
+		}
+		bonus := w * rank
+		for _, pp := range posts {
+			place := a.placeOf(pp.Sid)
+			if place < 0 || a.inHit[place] {
+				continue
+			}
+			// Only boost sessions already anchored by at least one direct query
+			// term; unanchored rescue belongs to cooccurSearch.
+			if a.sess[place].any <= 0 {
+				continue
+			}
+			a.inHit[place] = true
+			a.sess[place].score += bonus
+			a.sess[place].focus += bonus
+		}
+		for _, pp := range posts {
+			if place := a.placeOf(pp.Sid); place >= 0 {
+				a.inHit[place] = false
+			}
+		}
+	}
 }
 
 // stemKeys is a single-token term's key with its stem forms as OR-variants,
@@ -535,6 +628,9 @@ func (a *relevanceAcc) scoreTerm(term string, th termHits) {
 		rank = 0.1
 	}
 	informative := idf >= dejaVuIDFFloor || minSess <= 2
+	if informative {
+		a.informativeTerms = append(a.informativeTerms, term)
+	}
 	// Identifying is the same bar read against the number the score itself
 	// uses: rare counted in whole sessions. gateIDF deliberately takes the
 	// more generous of its two verdicts so that a subject word is never
@@ -671,6 +767,10 @@ func (a *relevanceAcc) scoreSession(p int32, long bool, sumWords, nWords float64
 		}
 		sc *= 1 + marathonShare*share
 	}
+	if mult := a.zoneFieldMultiplier(meta); mult != 1.0 {
+		sc *= mult
+		s.focus *= mult
+	}
 	// Did this session match what the question is about, rather than the
 	// working word beside it. The subject is the question's rarest naming
 	// word, read over the whole store so one that lives in another project
@@ -697,4 +797,45 @@ func (a *relevanceAcc) scoreSession(p int32, long bool, sumWords, nWords float64
 		s.focus /= norm
 	}
 	return relevanceScored{p, covered, s.any, s.strong, named, sc, s.focus}
+}
+
+// zoneFieldMultiplier applies BM25F structural zone weights from the session's
+// precomputed metadata fields without additional disk reads:
+//   - Zone 1a (Settled conclusion): +15% when the session's verified conclusion
+//     carries an informative query term.
+//   - Zone 1b (Touched files): +15% when a modified file path in Touched
+//     matches an informative query term.
+//   - Zone 2 (Opening user task Title): +10% when a user-authored title carries
+//     an informative query term.
+//   - Negative trajectory (GaveUp): -10% when the session backed out/reverted.
+func (a *relevanceAcc) zoneFieldMultiplier(meta *SessionMeta) float64 {
+	if meta == nil || len(a.informativeTerms) == 0 {
+		return 1.0
+	}
+	boost := 0.0
+	if meta.Settled != "" && search.TextCarriesAnyTerm(meta.Settled, a.informativeTerms) {
+		boost += 0.15
+	}
+	if len(meta.Touched) > 0 && touchedPathsCarryAnyTerm(meta.Touched, a.informativeTerms) {
+		boost += 0.15
+	}
+	if meta.Title != "" && !meta.AgentTitle && search.TextCarriesAnyTerm(meta.Title, a.informativeTerms) {
+		boost += 0.10
+	}
+	if meta.GaveUp {
+		boost -= 0.10
+	}
+	return 1.0 + boost
+}
+
+func touchedPathsCarryAnyTerm(paths, terms []string) bool {
+	for _, p := range paths {
+		low := strings.ToLower(p)
+		for _, t := range terms {
+			if len(t) >= 4 && strings.Contains(low, strings.ToLower(t)) {
+				return true
+			}
+		}
+	}
+	return false
 }

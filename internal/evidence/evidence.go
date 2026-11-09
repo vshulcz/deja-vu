@@ -214,13 +214,34 @@ func has(low, tok string) bool {
 			return false
 		}
 		i += at
-		before := i == 0 || !wordRune(rune(low[i-1]))
+		before := true
+		if i > 0 {
+			r, _ := utf8.DecodeLastRuneInString(low[:i])
+			before = !wordRune(r)
+		}
 		end := i + len(tk)
-		after := end >= len(low) || !wordRune(rune(low[end]))
+		after := true
+		if end < len(low) {
+			r, _ := utf8.DecodeRuneInString(low[end:])
+			after = !wordRune(r)
+		}
 		if before && after {
 			return true
 		}
 		at = i + 1
+	}
+	return false
+}
+
+func isCodeIdentToken(tok string) bool {
+	if len(tok) < 4 {
+		return false
+	}
+	for i := range len(tok) {
+		c := tok[i]
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' || c == '/' {
+			return true
+		}
 	}
 	return false
 }
@@ -384,8 +405,12 @@ func receipts(s model.Session, clean func(string) string) (map[uint64]string, []
 				role = "notperson"
 			}
 			recs = append(recs, rec{role: role, text: text, turn: turn, idx: i})
-		case "assistant", "command", "edit":
-			recs = append(recs, rec{role: m.Role, text: text, turn: turn, idx: i})
+		case "assistant", "command", "edit", "wrote":
+			role := m.Role
+			if role == "wrote" {
+				role = "edit"
+			}
+			recs = append(recs, rec{role: role, text: text, turn: turn, idx: i})
 		case "tool-output":
 			t := strings.TrimSpace(text)
 			if strings.HasSuffix(t, "has been updated.") || strings.HasSuffix(t, "has been updated successfully.") {
@@ -478,10 +503,14 @@ func receiptFor(recs []rec, first map[int]int, p int) []string {
 		}
 		var toks []string
 		ns, nw := 0, 0
+		hasCodeIdent := false
 		for _, t := range strong {
 			if has(r.low, t) {
 				ns++
 				toks = append(toks, t)
+				if isCodeIdentToken(t) {
+					hasCodeIdent = true
+				}
 			}
 		}
 		for _, w := range words {
@@ -491,6 +520,12 @@ func receiptFor(recs []rec, first map[int]int, p int) []string {
 			}
 		}
 		score := 2*ns + nw
+		// When the assistant writes in RU/ZH/JA (or concise English) and names
+		// the exact code identifier/path of an edit or command in the same turn,
+		// prose words do not overlap with ASCII code/command tokens (nw == 0).
+		if hasCodeIdent && (r.role == "edit" || r.role == "command") {
+			score++
+		}
 		if (ns < 1 || score < 3) && nw < 3 {
 			continue
 		}
@@ -523,7 +558,7 @@ func receiptFor(recs []rec, first map[int]int, p int) []string {
 	return lines
 }
 
-var questionRE = regexp.MustCompile(`(?i)^\s*(?:what|why|how|which|when|where|who|whose|should|shall|can|could|does|do|did|is|are|was|were|will|would|any idea|что|почему|зачем|как|какой|какая|какие|где|когда|кто|сколько|можно ли|нужно ли|есть ли)\b`)
+var questionRE = regexp.MustCompile(`(?i)^\s*(?:what|why|how|which|when|where|who|whose|should|shall|can|could|does|do|did|is|are|was|were|will|would|any idea|что|почему|зачем|как|какой|какая|какие|где|когда|кто|сколько|можно ли|нужно ли|есть ли)\b|^\s*(?:为什么|怎么|如何|哪里|哪个|是否|能不能|要不要|なぜ|どう|どこ|どの)`)
 
 // questionLike reports a turn that asks rather than tells: it ends with a
 // question mark, or opens like a question without one. A question backs
@@ -531,7 +566,9 @@ var questionRE = regexp.MustCompile(`(?i)^\s*(?:what|why|how|which|when|where|wh
 // retry use" was replaced by the question itself.
 func questionLike(s string) bool {
 	t := strings.TrimSpace(s)
-	return strings.HasSuffix(t, "?") || questionRE.MatchString(t)
+	return strings.HasSuffix(t, "?") || strings.HasSuffix(t, "？") ||
+		strings.HasSuffix(t, "ますか") || strings.HasSuffix(t, "ですか") ||
+		questionRE.MatchString(t)
 }
 
 const (

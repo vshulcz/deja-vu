@@ -59,11 +59,15 @@ func ResumeFrom(s model.Session, readsAsFailure func(output string) bool) Resume
 	var r Resume
 	var files []string
 	awaitingOutput := false
-	for _, m := range s.Messages {
+	sawEditInTurn := false
+	sawPassingCmdInTurn := false
+	for i, m := range s.Messages {
 		text := strings.TrimSpace(m.Text)
 		switch m.Role {
 		case "user":
 			awaitingOutput = false
+			sawEditInTurn = false
+			sawPassingCmdInTurn = false
 			u := unwrapHandoffPrompt(text, false)
 			if !worthAsAsk(u) {
 				continue
@@ -73,10 +77,14 @@ func ResumeFrom(s model.Session, readsAsFailure func(output string) bool) Resume
 			if text == "" || IsAgentArtifact(text) {
 				continue
 			}
-			if worthAsDecision(text) {
+			if precedesExplorationAction(s.Messages, i, sawEditInTurn) {
+				continue
+			}
+			if worthAsDecision(text) || verifiedTurnSynthesis(s.Messages, i, text, sawEditInTurn, sawPassingCmdInTurn) {
 				r.Decision = firstSentences(text, 1)
 			}
 		case sources.RoleEdit, sources.RoleWrote:
+			sawEditInTurn = true
 			for f := range strings.FieldsSeq(firstTextLine(text)) {
 				f = sources.CollapseWorktreePath(strings.TrimRight(strings.Trim(f, " \t\n\r\"'`"), ",;:)"))
 				if looksLikeAPath(f) && !throwawayPath(f) {
@@ -94,16 +102,138 @@ func ResumeFrom(s model.Session, readsAsFailure func(output string) bool) Resume
 			if line := firstTextLine(text); line != "" {
 				r.Command, r.Failed = clipResumeCommand(line, resumeCommandMax), false
 				awaitingOutput = !strings.HasSuffix(line, "→ exit 0")
+				if !awaitingOutput {
+					sawPassingCmdInTurn = true
+				}
 			}
 		case sources.RoleToolOutput:
-			if awaitingOutput && r.Command != "" && readsAsFailure != nil && readsAsFailure(text) {
-				r.Failed = true
+			if awaitingOutput && r.Command != "" {
+				if readsAsFailure != nil && readsAsFailure(text) {
+					r.Failed = true
+				} else {
+					sawPassingCmdInTurn = true
+				}
 			}
 			awaitingOutput = false
 		}
 	}
 	r.Files = newestFirst(files)
 	return r
+}
+
+// precedesExplorationAction reports whether an assistant message at index i is
+// a short mid-turn preamble immediately followed by file/command exploration
+// before any edit has happened in the turn.
+func precedesExplorationAction(msgs []model.Message, i int, sawEditInTurn bool) bool {
+	if sawEditInTurn || i+1 >= len(msgs) {
+		return false
+	}
+	text := strings.TrimSpace(msgs[i].Text)
+	if utf8.RuneCountInString(text) > 160 || carriesTechnicalEntity(text) {
+		return false
+	}
+	nextRole := msgs[i+1].Role
+	return nextRole == sources.RoleFiles || nextRole == sources.RoleCommand
+}
+
+func observeTrajectoryStep(m model.Message, sawEdit, sawPassCmd *bool) {
+	switch m.Role {
+	case "user":
+		*sawEdit = false
+		*sawPassCmd = false
+	case sources.RoleEdit, sources.RoleWrote:
+		*sawEdit = true
+	case sources.RoleCommand:
+		if strings.HasSuffix(firstTextLine(strings.TrimSpace(m.Text)), "→ exit 0") {
+			*sawPassCmd = true
+		}
+	}
+}
+
+// verifiedTurnSynthesis recognizes an assistant conclusion by its structural
+// position in the trajectory: the final assistant synthesis of a turn in which
+// an edit or passing command occurred, anchored to concrete code entities,
+// even when the assistant did not use a cliché phrase from decisionMarkers.
+func verifiedTurnSynthesis(msgs []model.Message, i int, text string, sawEdit, sawPassCmd bool) bool {
+	if (!sawEdit && !sawPassCmd) || aboutToExplain(text) {
+		return false
+	}
+	for j := i + 1; j < len(msgs); j++ {
+		if msgs[j].Role == "user" {
+			break
+		}
+		// Another tool action or later substantive assistant reply follows in the same turn.
+		if msgs[j].Role == sources.RoleEdit || msgs[j].Role == sources.RoleWrote ||
+			msgs[j].Role == sources.RoleCommand || msgs[j].Role == sources.RoleFiles ||
+			(msgs[j].Role == "assistant" && strings.TrimSpace(msgs[j].Text) != "" && !IsAgentArtifact(msgs[j].Text)) {
+			return false
+		}
+	}
+	if strings.HasPrefix(text, "Imported from ") ||
+		strings.HasPrefix(text, "#") || strings.HasPrefix(text, "- ") ||
+		strings.HasPrefix(text, "* ") || strings.HasPrefix(text, "|") {
+		return false
+	}
+	lead := strings.TrimSpace(firstSentences(text, 2))
+	if strings.HasSuffix(lead, "?") || strings.HasSuffix(lead, "？") ||
+		strings.HasSuffix(text, "?") || strings.HasSuffix(text, "？") {
+		return false
+	}
+	if utf8.RuneCountInString(lead) < decisionMinRunes && cjkfold.CountCJK(lead) < 8 {
+		return false
+	}
+	return carriesTechnicalEntity(lead)
+}
+
+func carriesTechnicalEntity(text string) bool {
+	if strings.Contains(text, "`") {
+		return true
+	}
+	for w := range strings.FieldsSeq(text) {
+		clean := strings.Trim(w, " \t\n\r\"'.,;:()[]{}")
+		if clean == "" {
+			continue
+		}
+		if strings.HasPrefix(clean, "--") && len(clean) > 3 {
+			return true
+		}
+		if looksLikeAPath(clean) {
+			return true
+		}
+	}
+	return false
+}
+
+// TrajectoryConclusionMessages returns the set of message indices in msgs that
+// are trajectory-verified syntheses: the final assistant message of a turn in
+// which a file edit/write or a passing command (→ exit 0) occurred, anchored
+// to concrete technical entities.
+func TrajectoryConclusionMessages(msgs []model.Message) map[int]bool {
+	var out map[int]bool
+	var sawEdit, sawPassCmd bool
+	for i, m := range msgs {
+		observeTrajectoryStep(m, &sawEdit, &sawPassCmd)
+		if m.Role != "assistant" {
+			continue
+		}
+		text := strings.TrimSpace(m.Text)
+		if text == "" || IsAgentArtifact(text) || IsCompactionSummary(text) {
+			continue
+		}
+		if verifiedTurnSynthesis(msgs, i, text, sawEdit, sawPassCmd) {
+			if out == nil {
+				out = make(map[int]bool)
+			}
+			out[i] = true
+		}
+	}
+	return out
+}
+
+// HasTrajectoryConclusion reports whether s contains at least one
+// trajectory-verified assistant synthesis.
+func HasTrajectoryConclusion(s model.Session) bool {
+	return len(TrajectoryConclusionMessages(s.Messages)) > 0
 }
 
 // worthAsAsk reports whether a user turn is the work rather than a nudge.
@@ -121,11 +251,15 @@ func worthAsAsk(text string) bool {
 		return false
 	}
 	n := utf8.RuneCountInString(text)
-	if (n < askMinRunes && cjkfold.CountCJK(text) < 6) || n > askMaxRunes {
+	hasEntity := carriesTechnicalEntity(text) && len(strings.Fields(text)) >= 2
+	if (!hasEntity && n < askMinRunes && cjkfold.CountCJK(text) < 6) || n > askMaxRunes {
 		return false
 	}
 	if strings.Contains(text, `":`) && strings.Contains(text, "{") {
 		// A pasted document, not a sentence.
+		return false
+	}
+	if !hasEntity && trivialContinuation(text) {
 		return false
 	}
 	low := strings.ToLower(strings.TrimRight(text, " .!…。！，？"))
@@ -183,7 +317,7 @@ func clipResumeCommand(s string, limit int) string {
 
 // aboutToExplain reports whether the line is an agent announcing an answer
 // rather than stating one. Measured on the same 96 compactions: "Хорошо,
-// отвечаю по существу — как работает routepilot" carried a decision marker and
+// отвечаю по существу — как работает pgbouncer" carried a decision marker and
 // is a preamble to one.
 func aboutToExplain(text string) bool {
 	low := strings.ToLower(text)

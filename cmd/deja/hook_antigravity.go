@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"sort"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/policy"
@@ -68,6 +70,7 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	// failure, prompt, and edit checks.
 	tailSteps := transcriptTailSteps(input.TranscriptPath)
 	projectWorkspace := antigravityProjectWorkspace(workspace, tailSteps)
+	syncAntigravitySessionRules(dir, projectWorkspace, input.ConversationID, tailSteps)
 	// A compaction throws away the blocks this conversation was shown while the
 	// record of having sent them outlives them, so the memory it just lost is
 	// the memory recall refuses to send again.
@@ -75,7 +78,14 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	// The compaction itself, caught up from the transcript the way Gemini's is:
 	// the steps before the CHECKPOINT are still in the file, so the session is
 	// captured as it stood then and the packet rides this invocation.
-	recovery := antigravityCompactionPacket(dir, input, workspace)
+	compactionWS := projectWorkspace
+	if compactionWS == "" {
+		compactionWS = workspace
+	}
+	if compactionWS == "" {
+		compactionWS = sources.Home()
+	}
+	recovery := antigravityCompactionPacket(dir, input, compactionWS)
 	// Past the first invocation the digest is already in the transcript, and
 	// the harness has no per-prompt event of its own — so this is where the
 	// question gets answered. Silence is the usual result, and the prompt
@@ -130,7 +140,16 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	if recovery != "" {
 		steps = append(steps, antigravityInjectStep{EphemeralMessage: recovery})
 	}
-	digest, sessions, raw, _, _, ids, projects := cachedHookDigestFor(dir, projectWorkspace, "")
+	var self []string
+	if input.ConversationID != "" {
+		lineage, _ := askerLineageCut(dir, input.ConversationID, input.TranscriptPath, "")
+		for id := range lineage {
+			self = append(self, id)
+		}
+		self = append(self, antigravitySubagentIDs(input.TranscriptPath)...)
+		sort.Strings(self)
+	}
+	digest, sessions, raw, _, _, ids, projects := cachedHookDigestFor(dir, projectWorkspace, self...)
 	digest, _, projects = attachClaudeAutoMemory(dir, input.ConversationID, input.TranscriptPath, "antigravity", hookCWD(projectWorkspace), digest, projects)
 	rememberDigestInjected(dir, input.ConversationID)
 	if digest != "" {
@@ -181,6 +200,45 @@ func antigravityCompactionPacket(dir string, input antigravityHookInput, workspa
 		return ""
 	}
 	return strings.TrimSpace(out.String())
+}
+
+func antigravitySubagentIDs(transcriptPath string) []string {
+	if transcriptPath == "" {
+		return nil
+	}
+	fi, err := os.Stat(transcriptPath)
+	if err != nil || fi.Size() > 16<<20 {
+		return nil
+	}
+	data, err := os.ReadFile(transcriptPath)
+	if err != nil {
+		return nil
+	}
+	var set = map[string]bool{}
+	s := string(data)
+	for {
+		_, afterKey, ok := strings.Cut(s, "conversationId")
+		if !ok {
+			break
+		}
+		_, afterQ1, ok := strings.Cut(afterKey, "\"")
+		if !ok {
+			break
+		}
+		id, tail, ok := strings.Cut(afterQ1, "\"")
+		if !ok {
+			break
+		}
+		if len(id) >= 30 {
+			set[id] = true
+		}
+		s = tail
+	}
+	var out []string
+	for id := range set {
+		out = append(out, id)
+	}
+	return out
 }
 
 const antigravityLead = "The sessions below are from this project's recent history. If any is relevant to what the user asks next, call the deja tool in \"context\" mode (or recall_context) with the session id printed beside it — an id is exact, a phrase is a guess — to pull the full details before acting. \nIf one of these helps, open your reply with that one line and nothing more about it: déjà vu: <what it said> — reusing it (deja:<session id>). If none helps, say nothing about them.\n"

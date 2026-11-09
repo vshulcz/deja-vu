@@ -12,14 +12,14 @@ import (
 // tool that would have found some, is the worst thing a recall can quote: it
 // hands the reader a failure of this very tool as if it were the answer.
 // Measured on a real store, 3 blocks of 119 opened on one — twice for the same
-// question about a CAN bus, once on a permission refusal.
+// question about a connection pool, once on a permission refusal.
 func TestBlockDoesNotQuoteAnEmptyMemoryAdmission(t *testing.T) {
 	s := model.Session{Messages: []model.Message{
-		{Role: "user", Text: "напомни, что мы выясняли про can шину"},
-		{Role: "assistant", Text: "I don't have any previous conversation context about the can bus work"},
-		{Role: "assistant", Text: "в итоге can шину читаем через adb shell, скорость 500 кбит"},
+		{Role: "user", Text: "напомни, что мы выясняли про pgbouncer пул"},
+		{Role: "assistant", Text: "I don't have any previous conversation context about the pgbouncer pool work"},
+		{Role: "assistant", Text: "в итоге pgbouncer пул держим через transaction mode, лимит 500 коннектов"},
 	}}
-	_, lines := matchedLinesAsked(s, []string{"can", "шину"}, "напомни, что мы выясняли про can шину")
+	_, lines := matchedLinesAsked(s, []string{"pgbouncer", "пул"}, "напомни, что мы выясняли про pgbouncer пул")
 	if len(lines) == 0 {
 		t.Fatal("nothing was quoted at all")
 	}
@@ -35,11 +35,11 @@ func TestBlockDoesNotQuoteAnEmptyMemoryAdmission(t *testing.T) {
 
 func TestPermissionRefusalIsNotQuotedEither(t *testing.T) {
 	s := model.Session{Messages: []model.Message{
-		{Role: "user", Text: "что там с can шиной"},
-		{Role: "assistant", Text: "Нужно разрешение на использование инструмента recall, чтобы найти детали про can шину"},
-		{Role: "assistant", Text: "can шину в итоге читаем через adb, всё работает"},
+		{Role: "user", Text: "что там с pgbouncer пулом"},
+		{Role: "assistant", Text: "Нужно разрешение на использование инструмента recall, чтобы найти детали про pgbouncer пул"},
+		{Role: "assistant", Text: "pgbouncer пул в итоге перевели на transaction mode, всё работает"},
 	}}
-	_, lines := matchedLinesAsked(s, []string{"can", "шину"}, "что там с can шиной")
+	_, lines := matchedLinesAsked(s, []string{"pgbouncer", "пул"}, "что там с pgbouncer пулом")
 	for _, ln := range lines {
 		if strings.Contains(strings.ToLower(ln), "разрешение") {
 			t.Errorf("a permission refusal was quoted as memory: %q", ln)
@@ -61,14 +61,14 @@ func quotedAny(lines []string, want string) bool {
 // door, since it is exactly the kind of line that follows a mention.
 func TestTheReplySlotIgnoresAnEmptyMemoryAdmission(t *testing.T) {
 	s := model.Session{Messages: []model.Message{
-		{Role: "user", Text: "\u0447\u0442\u043e \u0442\u0430\u043c \u0441 can \u0448\u0438\u043d\u043e\u0439"},
-		{Role: "assistant", Text: "can \u0448\u0438\u043d\u0443 \u0441\u043c\u043e\u0442\u0440\u0435\u043b\u0438, can \u0430\u0434\u0430\u043f\u0442\u0435\u0440 \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0451\u043d"},
-		{Role: "assistant", Text: "\u0432 \u0438\u0442\u043e\u0433\u0435 I don't have any previous conversation context about this"},
-		{Role: "assistant", Text: "can \u0448\u0438\u043d\u0443 \u043f\u0440\u043e\u0432\u0435\u0440\u044f\u043b\u0438, can \u043b\u043e\u0433\u0438 \u0441\u043e\u0431\u0440\u0430\u043d\u044b"},
-		{Role: "assistant", Text: "can \u0448\u0438\u043d\u0443 \u0447\u0438\u0442\u0430\u043b\u0438, can \u0442\u0440\u0430\u0444\u0438\u043a \u0432\u0438\u0434\u0435\u043d"},
+		{Role: "user", Text: "что там с pgbouncer пулом"},
+		{Role: "assistant", Text: "pgbouncer пул смотрели, пул адаптер подключён"},
+		{Role: "assistant", Text: "в итоге I don't have any previous conversation context about this"},
+		{Role: "assistant", Text: "pgbouncer пул проверяли, pgbouncer логи собраны"},
+		{Role: "assistant", Text: "pgbouncer пул читали, pgbouncer трафик виден"},
 	}}
-	_, lines := matchedLinesAsked(s, []string{"can", "\u0448\u0438\u043d\u0443"},
-		"\u0447\u0442\u043e \u0442\u0430\u043c \u0441 can \u0448\u0438\u043d\u043e\u0439")
+	_, lines := matchedLinesAsked(s, []string{"pgbouncer", "пул"},
+		"что там с pgbouncer пулом")
 	for _, ln := range lines {
 		if strings.Contains(strings.ToLower(ln), "don't have any previous") {
 			t.Errorf("the reply slot quoted an empty-memory admission: %q", ln)
@@ -91,7 +91,7 @@ func TestAHarnessCheckIsNotRecalledAtAll(t *testing.T) {
 		},
 	}
 	if got := autoRecallSessionForAsked(s, time.Now(), true, []string{"harness"},
-		"\u0447\u0442\u043e \u0442\u0430\u043c \u0441 harness"); got != "" {
+		"что там с harness"); got != "" {
 		t.Errorf("a harness check reached the block:\n%s", got)
 	}
 }
@@ -102,21 +102,20 @@ func TestWorkAboutTheHarnessIsStillRecalled(t *testing.T) {
 		Harness: "claude", ID: "real", Project: "proj",
 		Updated: time.Now(),
 		Messages: []model.Message{
-			{Role: "user", Text: "\u0447\u0442\u043e \u0442\u0430\u043c \u0441 harness"},
-			{Role: "assistant", Text: "\u0432 \u0438\u0442\u043e\u0433\u0435 harness \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0451\u043d \u0447\u0435\u0440\u0435\u0437 \u043f\u043b\u0430\u0433\u0438\u043d"},
+			{Role: "user", Text: "что там с harness"},
+			{Role: "assistant", Text: "в итоге harness подключён через плагин"},
 		},
 	}
 	got := autoRecallSessionForAsked(s, time.Now(), true, []string{"harness"},
-		"\u0447\u0442\u043e \u0442\u0430\u043c \u0441 harness")
-	if !strings.Contains(got, "\u043f\u043b\u0430\u0433\u0438\u043d") {
-		t.Errorf("ordinary work about the harness was dropped:\n%s", got)
+		"что там с harness")
+	if !strings.Contains(got, "плагин") {
+		t.Errorf("real work mentioning the harness was dropped:\n%s", got)
 	}
 }
 
-// Each phrase carries its own weight: a check written as a search for the
-// fixture string, without the "reply with exactly" wording, is the shape the
-// live harness sweep actually leaves behind.
-func TestAHarnessCheckWrittenAsASearchIsIgnored(t *testing.T) {
+// And the second shape of the same check, where the reply is not a verbatim
+// echo.
+func TestAHarnessSearchCheckIsNotRecalled(t *testing.T) {
 	s := model.Session{
 		Harness: "claude", ID: "smoke2", Project: "proj",
 		Updated: time.Now(),
@@ -126,7 +125,7 @@ func TestAHarnessCheckWrittenAsASearchIsIgnored(t *testing.T) {
 		},
 	}
 	if got := autoRecallSessionForAsked(s, time.Now(), true, []string{"harness"},
-		"\u0447\u0442\u043e \u0442\u0430\u043c \u0441 harness"); got != "" {
+		"что там с harness"); got != "" {
 		t.Errorf("a harness check reached the block:\n%s", got)
 	}
 }
@@ -138,19 +137,19 @@ func TestAHarnessCheckWrittenAsASearchIsIgnored(t *testing.T) {
 // 114 still opened on one of these.
 func TestBlockDoesNotQuoteTheAgentAboutToLook(t *testing.T) {
 	for _, line := range []string{
-		"\u041f\u0440\u043e\u0432\u0435\u0440\u044e \u043f\u0430\u043c\u044f\u0442\u044c \u0438 \u0438\u0441\u0442\u043e\u0440\u0438\u044e \u043f\u0440\u043e\u0448\u043b\u044b\u0445 \u0441\u0435\u0441\u0441\u0438\u0439 \u043f\u043e can \u0448\u0438\u043d\u0435",
-		"\u041c\u043d\u0435 \u043d\u0443\u0436\u043d\u043e \u0440\u0430\u0437\u0440\u0435\u0448\u0435\u043d\u0438\u0435 \u043d\u0430 \u0434\u043e\u0441\u0442\u0443\u043f \u043a \u043c\u043e\u0435\u0439 \u043f\u0430\u043c\u044f\u0442\u0438 \u043f\u0440\u043e can \u0448\u0438\u043d\u0443",
-		"\u042f \u043d\u0435 \u043d\u0430\u0448\u0435\u043b \u0438\u043d\u0444\u043e\u0440\u043c\u0430\u0446\u0438\u044e \u043f\u0440\u043e can \u0448\u0438\u043d\u0443 \u0432 \u043c\u043e\u0435\u0439 \u043f\u0430\u043c\u044f\u0442\u0438",
+		"Проверю память и историю прошлых сессий по pgbouncer пулу",
+		"Мне нужно разрешение на доступ к моей памяти про pgbouncer пул",
+		"Я не нашел информацию про pgbouncer пул в моей памяти",
 	} {
 		s := model.Session{Messages: []model.Message{
-			{Role: "user", Text: "\u0447\u0442\u043e \u0442\u0430\u043c \u0441 can \u0448\u0438\u043d\u043e\u0439"},
+			{Role: "user", Text: "что там с pgbouncer пулом"},
 			{Role: "assistant", Text: line},
-			{Role: "assistant", Text: "can \u0448\u0438\u043d\u0443 \u0432 \u0438\u0442\u043e\u0433\u0435 \u0447\u0438\u0442\u0430\u0435\u043c \u0447\u0435\u0440\u0435\u0437 adb, \u0441\u043a\u043e\u0440\u043e\u0441\u0442\u044c 500"},
+			{Role: "assistant", Text: "pgbouncer пул в итоге держим через transaction mode, лимит 500"},
 		}}
-		_, lines := matchedLinesAsked(s, []string{"can", "\u0448\u0438\u043d\u0443"},
-			"\u0447\u0442\u043e \u0442\u0430\u043c \u0441 can \u0448\u0438\u043d\u043e\u0439")
+		_, lines := matchedLinesAsked(s, []string{"pgbouncer", "пул"},
+			"что там с pgbouncer пулом")
 		for _, ln := range lines {
-			if strings.Contains(ln, "\u043f\u0430\u043c\u044f\u0442") {
+			if strings.Contains(ln, "памят") {
 				t.Errorf("the block quotes the agent talking about its memory: %q", ln)
 			}
 		}
@@ -167,14 +166,14 @@ func TestBlockDoesNotQuoteTheAgentAboutToLook(t *testing.T) {
 func TestAScriptedToolCheckIsNotRecalled(t *testing.T) {
 	for _, ask := range []string{
 		"Call the deja recall MCP tool with query 'connection pool exhausted'. Answer one line: did it find anything",
-		"\u0432\u044b\u0437\u043e\u0432\u0438 deja recall \u0441 \u0437\u0430\u043f\u0440\u043e\u0441\u043e\u043c 'connection pool exhausted', \u0438 \u0437\u0430\u043a\u043e\u043d\u0447\u0438 \u043e\u0442\u0432\u0435\u0442 \u0441\u043b\u043e\u0432\u043e\u043c \u0433\u043e\u0442\u043e\u0432\u043e",
+		"вызови deja recall с запросом 'connection pool exhausted', и закончи ответ словом готово",
 	} {
 		s := model.Session{
 			Harness: "claude", ID: "scripted", Project: "proj",
 			Updated: time.Now(),
 			Messages: []model.Message{
 				{Role: "user", Text: ask},
-				{Role: "assistant", Text: "pgbouncer pool exhausted, \u0433\u043e\u0442\u043e\u0432\u043e"},
+				{Role: "assistant", Text: "pgbouncer pool exhausted, готово"},
 			},
 		}
 		if got := autoRecallSessionForAsked(s, time.Now(), true, []string{"pool"},
@@ -185,18 +184,18 @@ func TestAScriptedToolCheckIsNotRecalled(t *testing.T) {
 }
 
 // Asking the tool to check its memory is ordinary work when the question is
-// real: "проверь память deja, напомни, что мы решали про прокси" must survive.
+// real: "проверь память deja, напомни про балансировщик" must survive.
 func TestARealRequestToCheckMemorySurvives(t *testing.T) {
 	s := model.Session{
 		Harness: "claude", ID: "real2", Project: "proj",
 		Updated: time.Now(),
 		Messages: []model.Message{
-			{Role: "user", Text: "\u043f\u0440\u043e\u0432\u0435\u0440\u044c \u043f\u0430\u043c\u044f\u0442\u044c deja, \u043d\u0430\u043f\u043e\u043c\u043d\u0438 \u043f\u0440\u043e \u043f\u0440\u043e\u043a\u0441\u0438"},
-			{Role: "assistant", Text: "\u0432 \u0438\u0442\u043e\u0433\u0435 \u043f\u0440\u043e\u043a\u0441\u0438 \u0444\u0438\u043b\u044c\u0442\u0440\u0443\u0435\u043c \u043f\u043e quality score, \u043f\u043e\u0440\u043e\u0433 0.7"},
+			{Role: "user", Text: "проверь память deja, напомни про балансировщик"},
+			{Role: "assistant", Text: "в итоге балансировщик ограничиваем по retry budget, порог 0.7"},
 		},
 	}
-	got := autoRecallSessionForAsked(s, time.Now(), true, []string{"\u043f\u0440\u043e\u043a\u0441\u0438"},
-		"\u0447\u0442\u043e \u0442\u0430\u043c \u0441 \u043f\u0440\u043e\u043a\u0441\u0438")
+	got := autoRecallSessionForAsked(s, time.Now(), true, []string{"балансировщик"},
+		"что там с балансировщиком")
 	if !strings.Contains(got, "0.7") {
 		t.Errorf("a real question about the work was filtered as a tool check:\n%s", got)
 	}

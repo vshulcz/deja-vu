@@ -5,6 +5,7 @@ import (
 	"hash/fnv"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strconv"
@@ -96,11 +97,29 @@ func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(inde
 	editSymbols, fileSymbols := fileHookSymbols(cwd, path, editText)
 	allSymbols := append(slices.Clone(editSymbols), fileSymbols...)
 	repoDec := repoMemoryDecisionForFile(cwd, path, allSymbols, pol)
+	changedSyms := changedDeclarationSymbols(cwd, path, editText)
+	sigCallers := crossFileCallersLine(cwd, path, changedSyms)
+	testSyms := append(slices.Clone(editSymbols), changedSyms...)
+	if len(testSyms) == 0 {
+		testSyms = fileSymbols
+	}
+	siblingRan := siblingTestLineFor(cwd, path, testSyms)
 	if sessions < toolHookMinFileSessionsWithDecision {
+		var cold string
 		if repoDec != "" {
-			return name + repoDecisionLabel + repoDec
+			cold = name + repoDecisionLabel + repoDec
 		}
-		return ""
+		for _, tail := range []string{sigCallers, siblingRan} {
+			if tail == "" {
+				continue
+			}
+			if cold == "" {
+				cold = name + tail
+			} else if len(cold)+len(tail) <= toolHookMaxBytes {
+				cold += tail
+			}
+		}
+		return cold
 	}
 	when := ""
 	if !last.IsZero() {
@@ -138,7 +157,17 @@ func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(inde
 		}
 	}
 	ran := fileHookRanLineFor(dir, path, inScope)
+	if ran == "" {
+		ran = siblingRan
+	}
 	co := fileHookCoChangeLineIn(cwd, path, inScope)
+	if sigCallers != "" {
+		if co == "" {
+			co = sigCallers
+		} else if len(co)+len(sigCallers) <= 140 {
+			co += sigCallers
+		}
+	}
 	return assembleFileHookLine(head, dec, co, ran)
 }
 
@@ -243,7 +272,7 @@ func isGenericFileStemPart(w string) bool {
 	switch w {
 	case "file", "files", "tool", "tools", "test", "tests", "main", "util", "utils",
 		"helper", "helpers", "common", "types", "model", "models", "index", "data",
-		"base", "core", "init", "spec", "specs":
+		"base", "core", "init", "spec", "specs", "session", "sessions":
 		return true
 	}
 	return false
@@ -293,7 +322,7 @@ func repoMemoryDecisionForFile(cwd, path string, allSymbols []string, pol policy
 	if err != nil || len(entries) == 0 {
 		return ""
 	}
-	rank := map[string]int{"rejected": 0, "gotcha": 1, "decision": 2}
+	rank := map[string]int{"rule": 0, "rejected": 1, "gotcha": 2, "decision": 3}
 	sort.SliceStable(entries, func(i, j int) bool {
 		fi := repoEntryHasFile(root, path, entries[i].Files)
 		fj := repoEntryHasFile(root, path, entries[j].Files)
@@ -309,7 +338,7 @@ func repoMemoryDecisionForFile(cwd, path string, allSymbols []string, pol policy
 		return entries[i].Date > entries[j].Date
 	})
 	for _, e := range entries {
-		matched := repoEntryHasFile(root, path, e.Files) || repoEntryMentionsFile(root, path, e.Text)
+		matched := (len(e.Files) <= 2 && repoEntryHasFile(root, path, e.Files)) || repoEntryMentionsFile(root, path, e.Text)
 		if !matched && len(e.Files) == 0 {
 			matched = mentionsAnySymbol(allSymbols, e.Text)
 		}
@@ -334,7 +363,8 @@ func repoEntryHasFile(root, path string, files []string) bool {
 	base := filepath.Base(slashPath)
 	for _, f := range files {
 		f = strings.TrimPrefix(filepath.ToSlash(f), "./")
-		if strings.EqualFold(f, slashPath) || (len(base) >= 6 && !strings.Contains(slashPath, "/") && strings.EqualFold(filepath.Base(f), base)) {
+		if strings.EqualFold(f, slashPath) || (len(base) >= 6 && strings.EqualFold(filepath.Base(f), base)) ||
+			strings.HasSuffix(slashPath, "/"+f) || strings.HasSuffix(f, "/"+slashPath) {
 			return true
 		}
 	}
@@ -484,35 +514,455 @@ func declaredSymbolsInText(text string) []string {
 	}
 	var out []string
 	for line := range strings.SplitSeq(text, "\n") {
-		s := strings.TrimSpace(strings.TrimLeft(line, "+- "))
-		if s == "" || strings.HasPrefix(s, "//") || strings.HasPrefix(s, "#") || strings.HasPrefix(s, "/*") || strings.HasPrefix(s, "*") {
-			continue
-		}
-		for _, kw := range []string{
-			"func ", "type ", "async def ", "def ", "class ",
-			"export default function ", "export async function ", "export function ",
-			"export class ", "export interface ", "export type ",
-			"async function ", "function ", "interface ",
-			"pub async fn ", "pub fn ", "async fn ", "fn ",
-			"pub struct ", "struct ", "pub enum ", "enum ", "pub trait ", "trait ",
-		} {
-			if strings.HasPrefix(s, kw) {
-				rest := strings.TrimSpace(s[len(kw):])
-				if kw == "func " && strings.HasPrefix(rest, "(") {
-					if closeIdx := strings.IndexByte(rest, ')'); closeIdx >= 0 {
-						rest = strings.TrimSpace(rest[closeIdx+1:])
-					} else {
-						break
-					}
-				}
-				if id := leadingIdent(rest); len(id) >= 4 {
-					out = append(out, id)
-				}
-				break
-			}
+		if id, _ := parseDeclarationLine(line); id != "" {
+			out = append(out, id)
 		}
 	}
 	return out
+}
+
+func parseDeclarationLine(line string) (string, string) {
+	s := strings.TrimSpace(strings.TrimLeft(line, "+- "))
+	if s == "" || strings.HasPrefix(s, "//") || strings.HasPrefix(s, "#") || strings.HasPrefix(s, "/*") || strings.HasPrefix(s, "*") {
+		return "", ""
+	}
+	for _, kw := range []string{
+		"func ", "type ", "async def ", "def ", "class ",
+		"export default function ", "export async function ", "export function ",
+		"export class ", "export interface ", "export type ",
+		"async function ", "function ", "interface ",
+		"pub async fn ", "pub fn ", "async fn ", "fn ",
+		"pub struct ", "struct ", "pub enum ", "enum ", "pub trait ", "trait ",
+	} {
+		if strings.HasPrefix(s, kw) {
+			rest := strings.TrimSpace(s[len(kw):])
+			if kw == "func " && strings.HasPrefix(rest, "(") {
+				if closeIdx := strings.IndexByte(rest, ')'); closeIdx >= 0 {
+					rest = strings.TrimSpace(rest[closeIdx+1:])
+				} else {
+					break
+				}
+			}
+			if id := leadingIdent(rest); len(id) >= 4 {
+				sig := s
+				if idx := strings.IndexByte(sig, '{'); idx >= 0 {
+					sig = strings.TrimSpace(sig[:idx])
+				}
+				return id, strings.Join(strings.Fields(sig), " ")
+			}
+			break
+		}
+	}
+	return "", ""
+}
+
+// changedDeclarationSymbols returns declared symbols in editText whose
+// signature line differs from the declaration currently on disk in path.
+func changedDeclarationSymbols(cwd, path, editText string) []string {
+	if path == "" || editText == "" {
+		return nil
+	}
+	editSigs := map[string]string{}
+	var editOrder []string
+	for line := range strings.SplitSeq(editText, "\n") {
+		if id, sig := parseDeclarationLine(line); id != "" && sig != "" {
+			if _, exists := editSigs[id]; !exists {
+				editOrder = append(editOrder, id)
+			}
+			editSigs[id] = sig
+		}
+	}
+	if len(editOrder) == 0 {
+		return nil
+	}
+	diskPath := path
+	if !filepath.IsAbs(diskPath) && cwd != "" {
+		diskPath = filepath.Join(cwd, diskPath)
+	}
+	raw, err := os.ReadFile(diskPath)
+	if err != nil || len(raw) > 2<<20 {
+		return nil
+	}
+	diskSigs := map[string]string{}
+	for line := range strings.SplitSeq(string(raw), "\n") {
+		if id, sig := parseDeclarationLine(line); id != "" && sig != "" {
+			diskSigs[id] = sig
+		}
+	}
+	var changed []string
+	for _, id := range editOrder {
+		if diskSig, ok := diskSigs[id]; ok && diskSig != editSigs[id] {
+			changed = append(changed, id)
+		}
+	}
+	return changed
+}
+
+// crossFileCallersLine scans sibling and repository source files for external
+// call sites when an edit modifies an existing function or type signature.
+func crossFileCallersLine(cwd, path string, syms []string) string {
+	if path == "" || len(syms) == 0 {
+		return ""
+	}
+	diskPath := path
+	if !filepath.IsAbs(diskPath) && cwd != "" {
+		diskPath = filepath.Join(cwd, diskPath)
+	}
+	cleanTarget := filepath.Clean(diskPath)
+	ext := strings.ToLower(filepath.Ext(cleanTarget))
+	if ext == "" {
+		return ""
+	}
+	pkgDir := filepath.Dir(cleanTarget)
+	scanRoot := sources.RepoRoot(pkgDir)
+	if scanRoot == "" && cwd != "" {
+		scanRoot = sources.RepoRoot(cwd)
+	}
+	if scanRoot == "" {
+		scanRoot = cwd
+	}
+	if scanRoot == "" {
+		scanRoot = pkgDir
+	}
+
+	candidates := collectCallerCandidates(scanRoot, pkgDir, cleanTarget, ext)
+	pkgBase := strings.ToLower(filepath.Base(pkgDir))
+	for _, sym := range syms {
+		lowSym := strings.ToLower(sym)
+		if len(lowSym) < 4 {
+			continue
+		}
+		var callers []string
+		for _, cand := range candidates {
+			needle := lowSym
+			if filepath.Dir(cand) != pkgDir && ext == ".go" && pkgBase != "" && pkgBase != "." {
+				needle = pkgBase + "." + lowSym
+			}
+			lineNo := firstCallLineInFile(cand, sym, needle)
+			if lineNo <= 0 {
+				continue
+			}
+			rel := filepath.Base(cand)
+			if r, err := filepath.Rel(scanRoot, cand); err == nil && !strings.HasPrefix(r, "..") {
+				rel = filepath.ToSlash(r)
+			}
+			callers = append(callers, fmt.Sprintf("%s:%d", search.SafePath(rel), lineNo))
+			if len(callers) >= 3 {
+				break
+			}
+		}
+		if len(callers) == 0 && cleanTarget != "" {
+			lineNo := firstCallLineInFile(cleanTarget, sym, lowSym)
+			if lineNo > 0 {
+				rel := filepath.Base(cleanTarget)
+				if r, err := filepath.Rel(scanRoot, cleanTarget); err == nil && !strings.HasPrefix(r, "..") {
+					rel = filepath.ToSlash(r)
+				}
+				callers = append(callers, fmt.Sprintf("%s:%d", search.SafePath(rel), lineNo))
+			}
+		}
+		if len(callers) > 0 {
+			return fmt.Sprintf(" — callers of %s: %s", search.SafeLine(sym), strings.Join(callers, ", "))
+		}
+	}
+	return ""
+}
+
+func collectCallerCandidates(scanRoot, pkgDir, cleanTarget, ext string) []string {
+	var candidates []string
+	seenFile := map[string]bool{cleanTarget: true}
+	addCand := func(p string) {
+		cp := filepath.Clean(p)
+		if seenFile[cp] || strings.ToLower(filepath.Ext(cp)) != ext {
+			return
+		}
+		base := strings.ToLower(filepath.Base(cp))
+		if strings.HasSuffix(base, "_test.go") || strings.Contains(base, ".test.") || strings.Contains(base, ".spec.") {
+			return
+		}
+		seenFile[cp] = true
+		candidates = append(candidates, cp)
+	}
+	if entries, err := os.ReadDir(pkgDir); err == nil {
+		for _, e := range entries {
+			if !e.IsDir() {
+				addCand(filepath.Join(pkgDir, e.Name()))
+			}
+		}
+	}
+	if scanRoot != "" && len(candidates) < 150 {
+		_ = filepath.WalkDir(scanRoot, func(p string, d os.DirEntry, err error) error {
+			if err != nil {
+				return nil //nolint:nilerr // best-effort caller scan skips unreadable entries
+			}
+			if d.IsDir() {
+				name := d.Name()
+				if p != scanRoot && (strings.HasPrefix(name, ".") || name == "vendor" || name == "node_modules" || name == "dist" || name == "build" || name == "testdata") {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if len(candidates) >= 150 {
+				return filepath.SkipAll
+			}
+			addCand(p)
+			return nil
+		})
+	}
+	return candidates
+}
+
+func firstCallLineInFile(cand, sym, needle string) int {
+	raw, err := os.ReadFile(cand)
+	if err != nil || len(raw) > 256<<10 {
+		return 0
+	}
+	content := string(raw)
+	if !strings.Contains(strings.ToLower(content), needle) {
+		return 0
+	}
+	lineNo := 0
+	for line := range strings.SplitSeq(content, "\n") {
+		lineNo++
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "/*") || strings.HasPrefix(trimmed, "*") {
+			continue
+		}
+		if id, _ := parseDeclarationLine(trimmed); strings.EqualFold(id, sym) {
+			continue
+		}
+		if containsIdentifierWord(strings.ToLower(trimmed), needle) {
+			return lineNo
+		}
+	}
+	return 0
+}
+
+// findSymbolDeclarationInRepo locates the non-test source file, 1-based line
+// number, and declaration signature for sym inside the repository at cwd.
+func findSymbolDeclarationInRepo(cwd, sym string) (string, int, string) {
+	lowSym := strings.ToLower(strings.TrimSpace(sym))
+	if cwd == "" || len(lowSym) < 4 {
+		return "", 0, ""
+	}
+	scanRoot := sources.RepoRoot(cwd)
+	if scanRoot == "" {
+		scanRoot = cwd
+	}
+	var files []string
+	_ = filepath.WalkDir(scanRoot, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil //nolint:nilerr // skip unreadable paths during symbol lookup
+		}
+		if d.IsDir() {
+			name := d.Name()
+			if p != scanRoot && (strings.HasPrefix(name, ".") || name == "vendor" || name == "node_modules" || name == "dist" || name == "build" || name == "testdata") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if len(files) >= 250 {
+			return filepath.SkipAll
+		}
+		base := strings.ToLower(d.Name())
+		if strings.HasSuffix(base, "_test.go") || strings.Contains(base, ".test.") || strings.Contains(base, ".spec.") {
+			return nil
+		}
+		switch strings.ToLower(filepath.Ext(base)) {
+		case ".go", ".py", ".ts", ".tsx", ".js", ".jsx", ".rs":
+			files = append(files, p)
+		}
+		return nil
+	})
+	for _, cand := range files {
+		raw, err := os.ReadFile(cand)
+		if err != nil || len(raw) > 256<<10 {
+			continue
+		}
+		content := string(raw)
+		if !strings.Contains(strings.ToLower(content), lowSym) {
+			continue
+		}
+		lineNo := 0
+		for line := range strings.SplitSeq(content, "\n") {
+			lineNo++
+			if id, sig := parseDeclarationLine(line); strings.EqualFold(id, sym) && sig != "" {
+				rel := filepath.Base(cand)
+				if r, err := filepath.Rel(scanRoot, cand); err == nil && !strings.HasPrefix(r, "..") {
+					rel = filepath.ToSlash(r)
+				}
+				return rel, lineNo, sig
+			}
+		}
+	}
+	return "", 0, ""
+}
+
+// testAssertionLiteralLine warns when an edit replaces or removes a string
+// literal that a sibling test file asserts on.
+func testAssertionLiteralLine(cwd, path, oldStr, newStr string) string {
+	if path == "" || oldStr == "" || newStr == "" || oldStr == newStr {
+		return ""
+	}
+	if isTestFilePath(path) {
+		return ""
+	}
+	removedLits := removedStringLiterals(oldStr, newStr)
+	if len(removedLits) == 0 {
+		return ""
+	}
+	diskPath := path
+	if !filepath.IsAbs(diskPath) && cwd != "" {
+		diskPath = filepath.Join(cwd, diskPath)
+	}
+	pkgDir := filepath.Dir(diskPath)
+	entries, err := os.ReadDir(pkgDir)
+	if err != nil {
+		return ""
+	}
+	stem := strings.ToLower(strings.TrimSuffix(filepath.Base(diskPath), filepath.Ext(diskPath)))
+	var testFiles []string
+	for _, e := range entries {
+		if e.IsDir() || !isSiblingTestFileCandidate(e.Name()) {
+			continue
+		}
+		low := strings.ToLower(e.Name())
+		if strings.Contains(low, stem) {
+			testFiles = append([]string{e.Name()}, testFiles...)
+		} else {
+			testFiles = append(testFiles, e.Name())
+		}
+	}
+	if len(testFiles) > 2000 {
+		testFiles = testFiles[:2000]
+	}
+	for _, tf := range testFiles {
+		raw, err := os.ReadFile(filepath.Join(pkgDir, tf))
+		if err != nil || len(raw) > 512<<10 {
+			continue
+		}
+		content := string(raw)
+		for _, lit := range removedLits {
+			if !strings.Contains(content, lit) {
+				continue
+			}
+			curTest := ""
+			lineNo := 0
+			for line := range strings.SplitSeq(content, "\n") {
+				lineNo++
+				trimmed := strings.TrimSpace(line)
+				if h := testHeaderName(trimmed); h != "" {
+					curTest = h
+					continue
+				}
+				if curTest != "" && strings.Contains(trimmed, lit) {
+					return fmt.Sprintf(" — test assertion in %s:%d (%s) checks %s",
+						search.SafePath(tf), lineNo, search.SafeLine(curTest), search.SafeLine(lit))
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func removedStringLiterals(oldStr, newStr string) []string {
+	var removed []string
+	seen := map[string]bool{}
+	for _, quote := range []byte{'"', '\''} {
+		s := oldStr
+		for {
+			idx := strings.IndexByte(s, quote)
+			if idx < 0 {
+				break
+			}
+			rest := s[idx+1:]
+			end := strings.IndexByte(rest, quote)
+			if end < 0 {
+				break
+			}
+			inner := rest[:end]
+			s = rest[end+1:]
+			lit := string(quote) + inner + string(quote)
+			if len(inner) < 4 || len(inner) > 60 || strings.ContainsAny(inner, "\n\r\t\\") || seen[lit] {
+				continue
+			}
+			seen[lit] = true
+			if !strings.Contains(newStr, lit) && !strings.Contains(newStr, inner) {
+				removed = append(removed, lit)
+			}
+		}
+	}
+	return removed
+}
+
+// testHeaderName extracts the test identifier across Go, Python, Rust, and TS/JS.
+func testHeaderName(trimmed string) string {
+	if strings.HasPrefix(trimmed, "func Test") {
+		id := leadingIdent(strings.TrimPrefix(trimmed, "func "))
+		if strings.HasPrefix(id, "Test") {
+			return id
+		}
+	}
+	if strings.HasPrefix(trimmed, "def test_") {
+		rest := strings.TrimPrefix(trimmed, "def ")
+		idx := strings.IndexAny(rest, "(: \t")
+		if idx > 0 {
+			return rest[:idx]
+		}
+		return rest
+	}
+	for _, fnPrefix := range []string{"fn test_", "pub fn test_", "pub(crate) fn test_"} {
+		if strings.HasPrefix(trimmed, fnPrefix) {
+			if _, rest, ok := strings.Cut(trimmed, "fn "); ok {
+				ident := leadingIdent(rest)
+				if strings.HasPrefix(ident, "test_") {
+					return ident
+				}
+			}
+		}
+	}
+	for _, itPrefix := range []string{"it(", "test(", "it.only(", "it.skip(", "test.only(", "test.skip("} {
+		if rest, ok := strings.CutPrefix(trimmed, itPrefix); ok {
+			if len(rest) > 0 && (rest[0] == '"' || rest[0] == '\'' || rest[0] == '`') {
+				quote := rest[0]
+				rest = rest[1:]
+				if end := strings.IndexByte(rest, quote); end >= 0 {
+					return rest[:end]
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func isTestFilePath(path string) bool {
+	low := strings.ToLower(filepath.Base(path))
+	if strings.HasSuffix(low, "_test.go") || strings.HasSuffix(low, "_test.rs") {
+		return true
+	}
+	if strings.HasPrefix(low, "test_") || strings.HasSuffix(low, "_test.py") {
+		return true
+	}
+	if (strings.Contains(low, ".test.") || strings.Contains(low, ".spec.")) &&
+		(strings.HasSuffix(low, ".ts") || strings.HasSuffix(low, ".tsx") || strings.HasSuffix(low, ".js") || strings.HasSuffix(low, ".jsx")) {
+		return true
+	}
+	return false
+}
+
+func isSiblingTestFileCandidate(name string) bool {
+	low := strings.ToLower(name)
+	if strings.HasSuffix(low, "_test.go") || strings.HasSuffix(low, "_test.rs") {
+		return true
+	}
+	if (strings.HasPrefix(low, "test_") && strings.HasSuffix(low, ".py")) || strings.HasSuffix(low, "_test.py") {
+		return true
+	}
+	if (strings.Contains(low, ".test.") || strings.Contains(low, ".spec.")) &&
+		(strings.HasSuffix(low, ".ts") || strings.HasSuffix(low, ".tsx") || strings.HasSuffix(low, ".js") || strings.HasSuffix(low, ".jsx")) {
+		return true
+	}
+	return false
 }
 
 func enclosingSymbolForSnippet(fileContent, editText string) string {
@@ -900,4 +1350,211 @@ func toolSessionCount(n int) string {
 // with the shell noise taken off, read as a command rather than as prose.
 func toolCommandTerms(cmd string) []string {
 	return prompt.CommandTerms(normalizedCommandText(cmd))
+}
+
+var callExprRe = regexp.MustCompile(`\b([a-zA-Z0-9_]+)\.([A-Z][a-zA-Z0-9_]*)\(`)
+
+type pkgDecl struct {
+	name    string
+	relFile string
+	lineNo  int
+	sigLine string
+}
+
+func hallucinatedPkgSymbolLine(cwd, _, oldStr, newStr string) string {
+	if newStr == "" || cwd == "" {
+		return ""
+	}
+	matches := callExprRe.FindAllStringSubmatch(newStr, -1)
+	if len(matches) == 0 {
+		return ""
+	}
+	root := sources.RepoRoot(cwd)
+	if root == "" {
+		root = cwd
+	}
+	seenCall := map[string]bool{}
+	for _, m := range matches {
+		if len(m) < 3 {
+			continue
+		}
+		pkg, sym := m[1], m[2]
+		callKey := pkg + "." + sym
+		if seenCall[callKey] {
+			continue
+		}
+		seenCall[callKey] = true
+		if oldStr != "" && strings.Contains(oldStr, callKey) {
+			continue
+		}
+		pkgDir := locatePkgDir(cwd, root, pkg)
+		if pkgDir == "" {
+			continue
+		}
+		decls, hasExact := scanPkgDeclarations(pkgDir, root, cwd, sym)
+		if hasExact || len(decls) == 0 {
+			continue
+		}
+		best, found := findClosestPkgDecl(sym, decls)
+		if !found {
+			continue
+		}
+		return fmt.Sprintf(" — %s has no exported %s; closest match in %s:%d: %s",
+			search.SafePath(pkg), search.SafeLine(sym), search.SafePath(best.relFile), best.lineNo, search.SafeLine(best.sigLine))
+	}
+	return ""
+}
+
+func locatePkgDir(cwd, root, pkg string) string {
+	for _, base := range []string{cwd, root} {
+		for _, sub := range []string{"internal/" + pkg, "cmd/" + pkg, pkg} {
+			cand := filepath.Join(base, filepath.FromSlash(sub))
+			if fi, err := os.Stat(cand); err == nil && fi.IsDir() {
+				return cand
+			}
+		}
+	}
+	return ""
+}
+
+func scanPkgDeclarations(pkgDir, root, cwd, sym string) ([]pkgDecl, bool) {
+	entries, err := os.ReadDir(pkgDir)
+	if err != nil {
+		return nil, false
+	}
+	var decls []pkgDecl
+	for _, de := range entries {
+		if de.IsDir() || !strings.HasSuffix(de.Name(), ".go") || strings.HasSuffix(de.Name(), "_test.go") {
+			continue
+		}
+		fpath := filepath.Join(pkgDir, de.Name())
+		content, err := os.ReadFile(fpath)
+		if err != nil {
+			continue
+		}
+		relFile := filepath.ToSlash(fpath)
+		if rel, err := filepath.Rel(root, fpath); err == nil && !strings.HasPrefix(rel, "..") {
+			relFile = filepath.ToSlash(rel)
+		} else if rel, err := filepath.Rel(cwd, fpath); err == nil && !strings.HasPrefix(rel, "..") {
+			relFile = filepath.ToSlash(rel)
+		}
+		lines := strings.Split(string(content), "\n")
+		for lineIdx, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "//") {
+				continue
+			}
+			if strings.HasPrefix(trimmed, "func "+sym+"(") ||
+				strings.HasPrefix(trimmed, "type "+sym+" ") ||
+				strings.HasPrefix(trimmed, "var "+sym+" ") ||
+				strings.HasPrefix(trimmed, "const "+sym+" ") ||
+				strings.Contains(trimmed, ") "+sym+"(") {
+				return nil, true
+			}
+			if rest, ok := strings.CutPrefix(trimmed, "func "); ok {
+				if strings.HasPrefix(rest, "(") {
+					if closeParen := strings.Index(rest, ")"); closeParen >= 0 {
+						rest = strings.TrimSpace(rest[closeParen+1:])
+					}
+				}
+				if paren := strings.Index(rest, "("); paren > 0 {
+					fnName := strings.TrimSpace(rest[:paren])
+					if len(fnName) > 0 && unicode.IsUpper(rune(fnName[0])) {
+						sig := strings.TrimRight(trimmed, " {")
+						decls = append(decls, pkgDecl{
+							name:    fnName,
+							relFile: relFile,
+							lineNo:  lineIdx + 1,
+							sigLine: sig,
+						})
+					}
+				}
+			}
+		}
+	}
+	return decls, false
+}
+
+func findClosestPkgDecl(sym string, decls []pkgDecl) (pkgDecl, bool) {
+	type scoredMatch struct {
+		d     pkgDecl
+		lev   int
+		affix int
+	}
+	var eligible []scoredMatch
+	for _, d := range decls {
+		lev := levenshteinDistance(sym, d.name)
+		pref := commonPrefixLength(sym, d.name)
+		suff := commonSuffixLength(sym, d.name)
+		affix := pref + suff
+		if pref >= 4 || suff >= 4 || lev <= 5 {
+			eligible = append(eligible, scoredMatch{
+				d:     d,
+				lev:   lev,
+				affix: affix,
+			})
+		}
+	}
+	if len(eligible) == 0 {
+		return pkgDecl{}, false
+	}
+	sort.SliceStable(eligible, func(i, j int) bool {
+		if eligible[i].lev != eligible[j].lev {
+			return eligible[i].lev < eligible[j].lev
+		}
+		if eligible[i].affix != eligible[j].affix {
+			return eligible[i].affix > eligible[j].affix
+		}
+		return eligible[i].d.name < eligible[j].d.name
+	})
+	return eligible[0].d, true
+}
+
+func levenshteinDistance(a, b string) int {
+	la, lb := len(a), len(b)
+	if la == 0 {
+		return lb
+	}
+	if lb == 0 {
+		return la
+	}
+	dp := make([]int, lb+1)
+	for j := 0; j <= lb; j++ {
+		dp[j] = j
+	}
+	for i := 1; i <= la; i++ {
+		prev := dp[0]
+		dp[0] = i
+		for j := 1; j <= lb; j++ {
+			cost := 0
+			if a[i-1] != b[j-1] {
+				cost = 1
+			}
+			cur := min(dp[j]+1, min(dp[j-1]+1, prev+cost))
+			prev = dp[j]
+			dp[j] = cur
+		}
+	}
+	return dp[lb]
+}
+
+func commonPrefixLength(a, b string) int {
+	n := min(len(a), len(b))
+	for i := range n {
+		if a[i] != b[i] {
+			return i
+		}
+	}
+	return n
+}
+
+func commonSuffixLength(a, b string) int {
+	la, lb := len(a), len(b)
+	n := min(la, lb)
+	for i := range n {
+		if a[la-1-i] != b[lb-1-i] {
+			return i
+		}
+	}
+	return n
 }

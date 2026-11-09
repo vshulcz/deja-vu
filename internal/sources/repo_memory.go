@@ -56,7 +56,7 @@ const (
 // the same name; "decision" is what an accepted note becomes in the repo.
 // superseded and stale have no kind here: in a committed file the line is
 // deleted instead.
-var RepoKinds = map[string]bool{"decision": true, "rejected": true, "gotcha": true}
+var RepoKinds = map[string]bool{"decision": true, "rejected": true, "gotcha": true, "rule": true}
 
 // RepoEntry is one line of the file, in the key order it is written.
 type RepoEntry struct {

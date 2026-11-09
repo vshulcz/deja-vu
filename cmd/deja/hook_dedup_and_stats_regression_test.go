@@ -240,12 +240,12 @@ func TestAntigravityEmptyDigestAnswersOnFirstInvocation(t *testing.T) {
 	tmp := hermeticEnv(t)
 	claude := filepath.Join(tmp, "claude")
 	t.Setenv("DEJA_CLAUDE_ROOT", claude)
-	// Seed a session in project "splitbox" plus filler sessions so an unscoped
+	// Seed a session in project "netgateway" plus filler sessions so an unscoped
 	// home workspace ($HOME) has an empty project digest while unscoped/named
 	// recall still finds the answer.
-	seedClaude(t, claude, "splitbox", "sess-vpn",
-		"why did splitbox wireguard fail on startup",
-		"splitbox wireguard failed on startup because ZORBWAX_MTU was unset; exporting ZORBWAX_MTU=1420 fixed it")
+	seedClaude(t, claude, "netgateway", "sess-net",
+		"why did netgateway listener fail on startup",
+		"netgateway listener failed on startup because ZORBWAX_MTU was unset; exporting ZORBWAX_MTU=1420 fixed it")
 	seedClaude(t, claude, "other", "sess-f1", "routine cron cleanup", "cleaned old logs")
 	seedClaude(t, claude, "other", "sess-f2", "routine backup check", "verified snapshot")
 	dir := filepath.Join(tmp, "index.db")
@@ -255,7 +255,7 @@ func TestAntigravityEmptyDigestAnswersOnFirstInvocation(t *testing.T) {
 	}
 
 	transcript := filepath.Join(tmp, "transcript.jsonl")
-	line := `{"step_index":0,"type":"USER_INPUT","status":"DONE","content":"<USER_REQUEST>\nwhy did splitbox wireguard fail on startup\n</USER_REQUEST>\n"}`
+	line := `{"step_index":0,"type":"USER_INPUT","status":"DONE","content":"<USER_REQUEST>\nwhy did netgateway listener fail on startup\n</USER_REQUEST>\n"}`
 	if err := os.WriteFile(transcript, []byte(line+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

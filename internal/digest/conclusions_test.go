@@ -77,16 +77,39 @@ func TestAnnouncesPlanAndCarriesUserCorrection(t *testing.T) {
 	if !AnnouncesPlan("Сейчас проверю конфиг.") {
 		t.Error("expected AnnouncesPlan to match Russian check opener")
 	}
-	if AnnouncesPlan("Архитектура: sing-box 95410 -> vless -> 178.236.240.175") {
+	if AnnouncesPlan("Архитектура: envoy 95410 -> grpc -> 203.0.113.10") {
 		t.Error("expected AnnouncesPlan to reject architectural conclusion")
 	}
-	if !CarriesDecision("Архитектура: sing-box 95410 -> vless -> 178.236.240.175") {
+	if !CarriesDecision("Архитектура: envoy 95410 -> grpc -> 203.0.113.10") {
 		t.Error("expected CarriesDecision to recognize Russian architecture summary")
 	}
-	if !CarriesUserCorrection("причем тут кластер, у меня два разных впн — один до вены, второй для доступа к кластеру") {
+	if !CarriesUserCorrection("причем тут стейджинг, у меня два разных контура — один для витрины, второй для биллинга") {
 		t.Error("expected CarriesUserCorrection to recognize user disambiguation")
 	}
-	if CarriesUserCorrection("почему тормозит интернет") {
+	if CarriesUserCorrection("почему тормозит загрузка") {
 		t.Error("expected CarriesUserCorrection to be false for ordinary question")
+	}
+}
+
+func TestConclusionsPromotesTrajectoryVerifiedSynthesisWithoutMarkers(t *testing.T) {
+	s := model.Session{
+		ID:      "traj-conclusions",
+		Harness: "claude",
+		Messages: []model.Message{
+			{Role: "user", Text: "fix the race in manifest writing"},
+			{Role: "assistant", Text: "Looking into the manifest writer."},
+			{Role: "files", Text: "internal/index/sync.go"},
+			{Role: "edit", Text: "internal/index/sync.go"},
+			{Role: "command", Text: "go test ./internal/index/... → exit 0"},
+			// No word from decisionMarkers ("fixed", "because", "решили", etc.),
+			// but structurally the turn-final synthesis after Edit + passing command.
+			{Role: "assistant", Text: "Wrapped `writeManifest` in `internal/index/sync.go` with `flock` to serialize concurrent writers."},
+			{Role: "user", Text: "show me the struct"},
+			{Role: "assistant", Text: "Here is the struct:\n```go\ntype Manifest struct{}\n```"},
+		},
+	}
+	got := Conclusions(s, 300, 1)
+	if len(got) == 0 || !strings.Contains(got[0], "Wrapped `writeManifest`") {
+		t.Fatalf("Conclusions = %v, want trajectory-verified synthesis to outrank trailing code-fence turn", got)
 	}
 }

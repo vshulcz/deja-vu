@@ -197,7 +197,7 @@ func BuildAutoRecall(ss []model.Session, o AutoRecallOptions) AutoRecallResult {
 	settled := make(map[string]bool, len(candidates))
 	for _, c := range candidates {
 		lines := digest.SubstantialConclusions(c, settledProbeBudget, 1)
-		settled[c.Key()] = len(lines) > 0 && digest.CarriesDecision(lines[0])
+		settled[c.Key()] = len(lines) > 0 && (digest.CarriesDecision(lines[0]) || digest.HasTrajectoryConclusion(c))
 	}
 	sort.SliceStable(candidates, func(i, j int) bool {
 		ti := o.TaskScores[candidates[i].Key()]
@@ -265,7 +265,18 @@ func BuildAutoRecall(ss []model.Session, o AutoRecallOptions) AutoRecallResult {
 			for cut > 0 && !utf8.RuneStart(section[cut]) {
 				cut--
 			}
-			section = section[:cut]
+			if len(fingerprints) > 0 {
+				if nl := strings.LastIndexByte(section[:cut], '\n'); nl > 0 {
+					section = section[:nl+1]
+				} else {
+					section = ""
+				}
+				if strings.Count(section, "\n") < 3 {
+					section = ""
+				}
+			} else {
+				section = section[:cut]
+			}
 		}
 		if section == "" {
 			break
@@ -657,7 +668,7 @@ func autoRecallSessionForAskedWithLimit(s model.Session, now time.Time, provenan
 // sessionStartProblemForConclusions picks the user question that initiated the
 // episode `conclusions` came from. On a multi-topic marathon session, message 0
 // can be thousands of messages and several topics earlier than the concluding
-// turn at the tail ("wg будто бы упал" at the start vs a Moscow-Vienna VLESS
+// turn at the tail ("queue consumer stalled" at the start vs a replica lag
 // routing diagnosis at message 13,104), splicing two unrelated systems into one
 // digest block.
 func sessionStartProblemForConclusions(s model.Session, conclusions []string) string {
@@ -749,6 +760,7 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 	}
 	var bestUser scored
 	var assistants []scored
+	trajConcl := digest.TrajectoryConclusionMessages(s.Messages)
 	// Which messages carried a query word, so the lines just after them can be
 	// considered for the conclusion slot below.
 	matchedAt := make(map[int]bool, 8)
@@ -784,7 +796,7 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 		if digest.IsDocumentItem(m.Text, line) {
 			continue
 		}
-		if digest.CarriesDecision(line) && (hits >= 2 || TextCarriesTerm(line, terms[0])) {
+		if (digest.CarriesDecision(line) || trajConcl[i]) && (hits >= 2 || TextCarriesTerm(line, terms[0])) {
 			hits++
 		}
 		// Terms arrive most-identifying first when the caller knows the order,
@@ -843,7 +855,7 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 			// the candidate list short rather than deciding anything, so
 			// removing it changes cost and not output.
 			line, _ := densestLine(m.Text, terms)
-			if line == "" || !digest.CarriesDecision(line) || saysItHasNoMemory(line) {
+			if line == "" || (!digest.CarriesDecision(line) && !trajConcl[i]) || saysItHasNoMemory(line) {
 				continue
 			}
 			// The same two bars the loop above applies. This path reached the
@@ -873,7 +885,7 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 		rest := assistants[1:]
 		pick := -1
 		for i, a := range rest {
-			if digest.CarriesDecision(a.text) {
+			if digest.CarriesDecision(a.text) || trajConcl[a.idx] {
 				pick = i
 				break
 			}

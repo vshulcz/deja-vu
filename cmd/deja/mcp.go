@@ -528,6 +528,54 @@ func callMCPToolServed(dir, name string, raw json.RawMessage, served *int) (stri
 	return out, err
 }
 
+func callMCPRecall(dir string, raw json.RawMessage, served *int) (string, error) {
+	var a struct {
+		Query   string    `json:"query"`
+		Harness string    `json:"harness"`
+		Project string    `json:"project"`
+		Limit   mcpNumber `json:"limit"`
+		Offset  mcpNumber `json:"offset"`
+	}
+	if err := decodeToolArgs("recall", raw, &a); err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(a.Query) == "" {
+		return "", argErrorf("query required")
+	}
+	if err := checkHarness(&a.Harness); err != nil {
+		return "", asArgError(err)
+	}
+	if line := buildingNowForAgent(dir); line != "" {
+		return frameRecall(line), nil
+	}
+	env, deliverEnv := environmentOnce(dir)
+	dated := ""
+	if line := manualIndexLine(dir); line != "" {
+		dated = line + "\n\n"
+	}
+	brief := liveRecallBrief(dir, howCwd(), a.Query)
+	budget := recallMCPBudget - recallFrameOverhead - len(env) - len(dated)
+	if brief != "" {
+		budget -= len(brief) + 2
+	}
+	text, sessions, rawBytes, ids, projects, err := recallTextResultIn(dir, a.Query, a.Harness, a.Project, int(a.Limit), int(a.Offset), budget)
+	if err == nil {
+		if brief != "" {
+			text = brief + "\n\n" + text
+		}
+		if strings.TrimSpace(text) == "" {
+			env = strings.TrimLeft(env, "\n")
+		}
+		text = dated + frameRecall(text+env)
+		deliverEnv()
+		if served != nil {
+			*served = sessions
+		}
+		usage.RecordServedFromInto(dir, usage.KindRecall, text, mcpConnID(), sessions, rawBytes, ids, projects, policy.Load().Describe(policy.ActivationMCP))
+	}
+	return text, err
+}
+
 func callMCPToolRaw(dir, name string, raw json.RawMessage, served *int) (string, error) {
 	if name == "deja" {
 		var a struct {
@@ -550,52 +598,7 @@ func callMCPToolRaw(dir, name string, raw json.RawMessage, served *int) (string,
 	raw = spreadQ(name, raw)
 	switch name {
 	case "recall":
-		var a struct {
-			Query   string    `json:"query"`
-			Harness string    `json:"harness"`
-			Project string    `json:"project"`
-			Limit   mcpNumber `json:"limit"`
-			Offset  mcpNumber `json:"offset"`
-		}
-		if err := decodeToolArgs(name, raw, &a); err != nil {
-			return "", err
-		}
-		if strings.TrimSpace(a.Query) == "" {
-			return "", argErrorf("query required")
-		}
-		if err := checkHarness(&a.Harness); err != nil {
-			return "", asArgError(err)
-		}
-		if line := buildingNowForAgent(dir); line != "" {
-			return frameRecall(line), nil
-		}
-		// The block goes out once per session and has to come out of the same
-		// budget: appended afterwards it put the first recall of every session —
-		// the one an agent plans against — over the cap by its own length
-		// (#1806). It goes inside the frame, as it does at session start: it
-		// quotes transcript error lines and the commands that followed them, so
-		// after the close a planted tag in one of them read as deja's own text
-		// (#5051).
-		env, deliverEnv := environmentOnce(dir)
-		// Above the frame, as recall_context's note goes: deja's own statement
-		// of how old the index is, not recalled text (#5385).
-		dated := ""
-		if line := manualIndexLine(dir); line != "" {
-			dated = line + "\n\n"
-		}
-		text, sessions, raw, ids, projects, err := recallTextResultIn(dir, a.Query, a.Harness, a.Project, int(a.Limit), int(a.Offset), recallMCPBudget-recallFrameOverhead-len(env)-len(dated))
-		if err == nil {
-			if strings.TrimSpace(text) == "" {
-				env = strings.TrimLeft(env, "\n")
-			}
-			text = dated + frameRecall(text+env)
-			deliverEnv()
-			if served != nil {
-				*served = sessions
-			}
-			usage.RecordServedFromInto(dir, usage.KindRecall, text, mcpConnID(), sessions, raw, ids, projects, policy.Load().Describe(policy.ActivationMCP))
-		}
-		return text, err
+		return callMCPRecall(dir, raw, served)
 	case "recall_context":
 		var a struct {
 			Query   string `json:"query"`

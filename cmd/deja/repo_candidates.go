@@ -762,13 +762,17 @@ func extractMentionedRepoFiles(root, text string, knownFiles []string) []string 
 	if strings.Contains(low, ".deja/") || strings.Contains(low, " .deja ") || strings.HasSuffix(low, " .deja") {
 		out = append(out, ".deja")
 	}
+	baseCounts := map[string]int{}
+	for _, f := range knownFiles {
+		baseCounts[strings.ToLower(filepath.Base(f))]++
+	}
 	for _, f := range knownFiles {
 		if strings.Contains(low, strings.ToLower(f)) {
 			out = append(out, f)
 			continue
 		}
 		base := strings.ToLower(filepath.Base(f))
-		if len(base) >= 6 && strings.ContainsRune(base, '.') && strings.Contains(low, base) {
+		if len(base) >= 6 && baseCounts[base] == 1 && strings.ContainsRune(base, '.') && strings.Contains(low, base) {
 			out = append(out, f)
 		}
 	}
@@ -981,6 +985,22 @@ func usableRepoCandidateLine(s string) bool {
 		"i’m tracing",
 		"i'll inspect",
 		"i’ll inspect",
+		"i've sent",
+		"i’ve sent",
+		"both prs are merged",
+		"needs your ok",
+		"мои прямые тесты",
+		"мой `-inline-answer`",
+		"не шиплю блоат",
+		"откатываю неверную",
+		"откатываю всё",
+		"откатываю —",
+		"варианты: оставляем",
+		"или откатываю коммит",
+		"ревьюер прав по",
+		"пока идёт ревью",
+		"пока идет ревью",
+		"will detect it. ✓",
 		"итого за ночь",
 		"coverage-гейте",
 		"ребейз завершён",

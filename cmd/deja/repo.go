@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,7 +12,9 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -19,6 +23,23 @@ import (
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
+
+var (
+	activeDejaDirMu sync.RWMutex
+	activeDejaDir   string
+)
+
+func setActiveDejaDir(dir string) {
+	activeDejaDirMu.Lock()
+	defer activeDejaDirMu.Unlock()
+	activeDejaDir = dir
+}
+
+func getActiveDejaDir() string {
+	activeDejaDirMu.RLock()
+	defer activeDejaDirMu.RUnlock()
+	return activeDejaDir
+}
 
 // `deja repo` is project memory committed in the repository: a few picked
 // decisions, dropped approaches and traps in <root>/.deja/memory.jsonl, which
@@ -299,12 +320,11 @@ func runRepoSync(dir string, w io.Writer, sub string, args []string) error {
 		}
 		return writeRepoEntries(w, root, fresh)
 	}
-	prunedNoise := pruneFilteredRepoEntries(root)
 	added, updated, pruned, err := sources.EvolveRepoEntries(root, incoming, 50)
 	if err != nil {
 		return fmt.Errorf("repo sync: %w", err)
 	}
-	pruned += prunedNoise
+	pruned += pruneFilteredRepoEntries(root)
 	if added == 0 && updated == 0 && pruned == 0 {
 		fmt.Fprintf(w, "%s is up to date\n", repoFileShown)
 		return nil
@@ -368,8 +388,8 @@ func autoEvolveRepoMemory(dir, cwd string) {
 			break
 		}
 	}
-	_ = pruneFilteredRepoEntries(root)
 	_, _, _, _ = sources.EvolveRepoEntries(root, incoming, 50)
+	_ = pruneFilteredRepoEntries(root)
 }
 
 func pruneFilteredRepoEntries(root string) int {
@@ -378,7 +398,19 @@ func pruneFilteredRepoEntries(root string) int {
 		return 0
 	}
 	var drop []string
-	for _, e := range entries {
+	bestCoChange := map[string]int{}
+	for i, e := range entries {
+		if stem, ok := coChangeEntryStem(e.Text); ok {
+			if prev, exists := bestCoChange[stem]; !exists || e.Text > entries[prev].Text {
+				if exists {
+					drop = append(drop, entries[prev].ID)
+				}
+				bestCoChange[stem] = i
+			} else {
+				drop = append(drop, e.ID)
+			}
+			continue
+		}
 		if e.From != "" && !strings.HasPrefix(e.From, "deja") && !usableRepoCandidateLine(e.Text) {
 			drop = append(drop, e.ID)
 		}
@@ -388,6 +420,25 @@ func pruneFilteredRepoEntries(root string) int {
 	}
 	removed, _ := sources.RemoveRepoEntries(root, drop)
 	return len(removed)
+}
+
+func coChangeEntryStem(text string) (string, bool) {
+	rest, ok := strings.CutPrefix(text, "Editing ")
+	if !ok {
+		return "", false
+	}
+	a, after, ok := strings.Cut(rest, " requires updating ")
+	if !ok {
+		return "", false
+	}
+	b, _, ok := strings.Cut(after, " alongside it (")
+	if !ok || a == "" || b == "" {
+		return "", false
+	}
+	if a > b {
+		a, b = b, a
+	}
+	return a + "<->" + b, true
 }
 
 func autoSyncEligible(c repoCandidate) bool {
@@ -570,7 +621,149 @@ func readRepoMemoryAndNotes(root string) ([]sources.RepoEntry, int, error) {
 			}
 		}
 	}
+	var livePaths []string
+	if root != "" {
+		livePaths = append(livePaths,
+			filepath.Join(root, ".deja", "live_rules.jsonl"),
+			filepath.Join(root, "live_rules.jsonl"),
+		)
+	}
+	if activeDir := getActiveDejaDir(); activeDir != "" {
+		livePaths = append(livePaths, filepath.Join(activeDir, "live_rules.jsonl"))
+	}
+	seenLivePath := map[string]bool{}
+	for _, lp := range livePaths {
+		if seenLivePath[lp] {
+			continue
+		}
+		seenLivePath[lp] = true
+		for _, le := range readLiveRulesFile(lp) {
+			id := le.ID
+			if id == "" {
+				id = sources.RepoEntryID(le.Kind, le.Text)
+			}
+			if have[id] {
+				continue
+			}
+			have[id] = true
+			le.ID = id
+			entries = append(entries, le)
+		}
+	}
 	return entries, bad, nil
+}
+
+type liveRuleRecord struct {
+	sources.RepoEntry
+	Symbols []string
+}
+
+func readLiveRulesFile(p string) []sources.RepoEntry {
+	recs := readLiveRuleRecords(p)
+	out := make([]sources.RepoEntry, 0, len(recs))
+	for _, r := range recs {
+		out = append(out, r.RepoEntry)
+	}
+	return out
+}
+
+func readLiveRuleRecords(p string) []liveRuleRecord {
+	raw, err := os.ReadFile(p)
+	if err != nil {
+		return nil
+	}
+	var out []liveRuleRecord
+	sc := bufio.NewScanner(bytes.NewReader(raw))
+	for sc.Scan() {
+		line := bytes.TrimSpace(sc.Bytes())
+		if len(line) == 0 {
+			continue
+		}
+		var r struct {
+			ID      string   `json:"id"`
+			Kind    string   `json:"kind"`
+			Text    string   `json:"text"`
+			Files   []string `json:"files"`
+			Paths   []string `json:"paths"`
+			Symbols []string `json:"symbols"`
+			Date    string   `json:"date"`
+			From    string   `json:"from"`
+		}
+		if json.Unmarshal(line, &r) != nil {
+			continue
+		}
+		if r.Kind == "" {
+			r.Kind = "rule"
+		}
+		if r.Text == "" {
+			continue
+		}
+		files := r.Files
+		if len(files) == 0 {
+			files = r.Paths
+		}
+		out = append(out, liveRuleRecord{
+			RepoEntry: sources.RepoEntry{
+				ID:    r.ID,
+				Kind:  r.Kind,
+				Text:  r.Text,
+				Files: files,
+				Date:  r.Date,
+				From:  r.From,
+			},
+			Symbols: r.Symbols,
+		})
+	}
+	return out
+}
+
+func appendLiveRule(targetPath string, entry sources.RepoEntry, syms []string) {
+	if targetPath == "" || entry.Text == "" {
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
+		return
+	}
+	existing := readLiveRuleRecords(targetPath)
+	var kept []liveRuleRecord
+	for _, e := range existing {
+		if e.ID != entry.ID && !strings.EqualFold(strings.TrimSpace(e.Text), strings.TrimSpace(entry.Text)) {
+			kept = append(kept, e)
+		}
+	}
+	kept = append(kept, liveRuleRecord{RepoEntry: entry, Symbols: syms})
+	if len(kept) > 20 {
+		kept = kept[len(kept)-20:]
+	}
+	var b bytes.Buffer
+	for _, e := range kept {
+		data := struct {
+			ID      string   `json:"id"`
+			Kind    string   `json:"kind"`
+			Text    string   `json:"text"`
+			Files   []string `json:"files,omitempty"`
+			Symbols []string `json:"symbols,omitempty"`
+			Date    string   `json:"date"`
+			From    string   `json:"from,omitempty"`
+		}{
+			ID:      e.ID,
+			Kind:    e.Kind,
+			Text:    e.Text,
+			Files:   e.Files,
+			Symbols: e.Symbols,
+			Date:    e.Date,
+			From:    e.From,
+		}
+		raw, err := json.Marshal(data)
+		if err == nil {
+			b.Write(raw)
+			b.WriteByte('\n')
+		}
+	}
+	tmp := fmt.Sprintf("%s.tmp-%d-%d", targetPath, os.Getpid(), time.Now().UnixNano())
+	if err := os.WriteFile(tmp, b.Bytes(), 0o644); err == nil {
+		_ = os.Rename(tmp, targetPath)
+	}
 }
 
 // writeRepoEntries redacts each entry, refuses one that still holds a secret,
@@ -733,15 +926,22 @@ func repoMemoryBlock(cwd string, pol policy.Policy, taskFiles ...string) string 
 	var b strings.Builder
 	b.WriteString("from this repository's " + repoFileShown + " (committed by the people working on it):\n")
 	head := b.Len()
+	usedRunes := utf8.RuneCountInString(b.String())
 	for i, e := range entries {
 		if i >= maxRows {
 			break
 		}
-		row := "  · " + search.SafeLine(sources.RepoEntryBody(e)) + "\n"
-		if b.Len()+len(row) > budget {
+		shortEntry := e
+		if r := []rune(shortEntry.Text); len(r) > 180 {
+			shortEntry.Text = strings.TrimSpace(string(r[:179])) + "…"
+		}
+		row := "  · " + search.SafeLine(sources.RepoEntryBody(shortEntry)) + "\n"
+		rowRunes := utf8.RuneCountInString(row)
+		if usedRunes+rowRunes > budget && i > 0 {
 			break
 		}
 		b.WriteString(row)
+		usedRunes += rowRunes
 	}
 	if b.Len() == head {
 		return ""

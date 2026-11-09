@@ -20,7 +20,7 @@ create table message(id text, session_id text, time_created any, data text);
 create table part(id text, message_id text, data text);
 insert into session values('ses_named',NULL,'/w','Review route overlap fix (@code-reviewer subagent)','2026-01-02T03:00:00Z','2026-01-02T03:30:00Z');
 insert into message values('m1','ses_named',1767409200000,'{"role":"user"}');
-insert into part values('p1','m1','{"type":"text","text":"Read-only review of the current uncommitted RoutePilot route overlap change","time":{"start":"2026-01-02T03:00:00Z"}}');
+insert into part values('p1','m1','{"type":"text","text":"Read-only review of the current uncommitted NetGateway route overlap change","time":{"start":"2026-01-02T03:00:00Z"}}');
 insert into session values('ses_thin',NULL,'/w','done','2026-01-02T04:00:00Z','2026-01-02T04:30:00Z');
 insert into message values('m2','ses_thin',1767412800000,'{"role":"user"}');
 insert into part values('p2','m2','{"type":"text","text":"render the plots for the report","time":{"start":"2026-01-02T04:00:00Z"}}');`

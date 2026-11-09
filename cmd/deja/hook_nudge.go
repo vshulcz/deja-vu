@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
@@ -68,6 +70,10 @@ func promptDirectContext(dir, cwd, sessionID, asked string) string {
 	seen := alreadyInjected(dir, sessionID)
 	var lines []string
 	var tokens []string
+	if srLine, srTok := sessionStandingRuleLine(dir, cwd, sessionID, asked, seen); srLine != "" {
+		lines = append(lines, srLine)
+		tokens = append(tokens, srTok)
+	}
 	if rmLine, rmTok := promptRepoMemoryLine(cwd, asked, seen); rmLine != "" {
 		lines = append(lines, rmLine)
 		tokens = append(tokens, rmTok)
@@ -76,10 +82,178 @@ func promptDirectContext(dir, cwd, sessionID, asked string) string {
 		lines = append(lines, fxLine)
 		tokens = append(tokens, fxTok)
 	}
+	if fbLine, fbToks := promptFileBriefLine(dir, cwd, asked, seen); fbLine != "" {
+		lines = append(lines, fbLine)
+		tokens = append(tokens, fbToks...)
+	} else if sbLine, sbTok := promptSymbolBriefLine(cwd, asked, seen); sbLine != "" {
+		lines = append(lines, sbLine)
+		tokens = append(tokens, sbTok)
+	}
 	if sessionID != "" && len(tokens) > 0 {
 		rememberInjectedIDs(dir, sessionID, tokens...)
 	}
 	return strings.Join(lines, "\n")
+}
+
+// promptSymbolBriefLine locates a symbol declared in the repository when a
+// user prompt names a specific function, method, or type without naming its
+// file, giving the agent exact file:line, signature, and sibling test target at
+// Turn 0 without a grep/locate round-trip.
+func promptSymbolBriefLine(cwd, asked string, seen map[string]bool) (string, string) {
+	if cwd == "" || !policy.Load().Allows(policy.ActivationAuto, "") {
+		return "", ""
+	}
+	pol := policy.Load()
+	checked := map[string]bool{}
+	for _, tok := range identifierTokens(asked) {
+		low := strings.ToLower(tok)
+		if len(low) < 6 || checked[low] || !hasMixedCaseOrUnderscore(tok) || isCommonKeyword(low) {
+			continue
+		}
+		checked[low] = true
+		rel, lineNo, sig := findSymbolDeclarationInRepo(cwd, tok)
+		if rel == "" || sig == "" {
+			continue
+		}
+		line := fmt.Sprintf("defined in %s:%d: %s", search.SafePath(rel), lineNo, clipDecision(search.SafeText(sig), 140))
+		if repoDec := repoMemoryDecisionForFile(cwd, rel, []string{tok}, pol); repoDec != "" {
+			line += repoDecisionLabel + repoDec
+		}
+		if callers := crossFileCallersLine(cwd, rel, []string{tok}); callers != "" {
+			line += callers
+		}
+		if ran := siblingTestLineFor(cwd, rel, []string{tok}); ran != "" && !strings.Contains(line, ran) {
+			line += ran
+		}
+		pTok := "prompt:sb:" + shortHash(line)
+		if seen != nil && seen[pTok] {
+			continue
+		}
+		return line, pTok
+	}
+	return "", ""
+}
+
+// promptFileBriefLine checks whether the user's prompt explicitly names a file
+// in the repository and returns a compact 1-line brief with its coupled
+// companion file and verified test command so the agent has both at Turn 0.
+func promptFileBriefLine(dir, cwd, asked string, seen map[string]bool) (string, []string) {
+	if cwd == "" {
+		return "", nil
+	}
+	tree := orientRepoTree(cwd)
+	projects := sync.OnceValue(func() []string { return digest.ProjectNameCandidates(cwd) })
+	pol := policy.Load()
+	seenFiles := map[string]bool{}
+	for tok := range strings.FieldsSeq(asked) {
+		tok = strings.Trim(tok, "\"'`(),:;!?[]{}<>")
+		if idx := strings.IndexByte(tok, ':'); idx > 0 {
+			tok = tok[:idx]
+		}
+		if tok == "" || !looksLikePromptFileRef(tok) {
+			continue
+		}
+		rel := tok
+		if resolved := tree.resolveRel(tok); resolved != "" {
+			rel = resolved
+		} else if !fileThere(filepath.Join(cwd, tok)) {
+			continue
+		}
+		if seenFiles[rel] {
+			continue
+		}
+		seenFiles[rel] = true
+		var inScope []index.SessionMeta
+		if dir != "" && planIndexReady(dir) {
+			for _, meta := range index.FileSessions(dir, rel) {
+				if !pol.Allows(policy.ActivationAuto, meta.Project) {
+					continue
+				}
+				if !fileMetaInScope(meta, rel, nil) && !fileMetaInScope(meta, rel, projects()) {
+					continue
+				}
+				inScope = append(inScope, meta)
+			}
+		}
+		co := fileHookCoChangeLineIn(cwd, rel, inScope)
+		if co == "" {
+			co = coupledCommitGuardForFiles(cwd, []string{rel})
+		}
+		ran := fileHookRanLineFor(dir, rel, inScope)
+		if ran == "" {
+			ran = siblingTestLineFor(cwd, rel, nil)
+		}
+		repoDec := repoMemoryDecisionForFile(cwd, rel, nil, pol)
+		var parts []string
+		if repoDec != "" {
+			parts = append(parts, repoDecisionLabel+repoDec)
+		}
+		if co != "" {
+			parts = append(parts, co)
+		}
+		if ran != "" {
+			parts = append(parts, ran)
+		}
+		if len(parts) == 0 {
+			continue
+		}
+		line := search.SafePath(rel) + strings.Join(parts, "")
+		pTok := "prompt:fb:" + shortHash(line)
+		tTok := "tool:" + shortHash(dedupeFact(line))
+		if seen != nil && (seen[pTok] || seen[tTok]) {
+			continue
+		}
+		return line, []string{pTok, tTok}
+	}
+	return "", nil
+}
+
+// liveRecallBrief constructs a live repository intelligence brief when an agent
+// queries `deja recall` with a symbol name, file reference, compiler diagnostic,
+// or failing test output, giving all 44 agents live repo facts even with zero history.
+func liveRecallBrief(dir, cwd, query string) string {
+	if cwd == "" {
+		cwd = howCwd()
+	}
+	query = strings.TrimSpace(query)
+	if cwd == "" || query == "" {
+		return ""
+	}
+	pol := policy.Load()
+	var parts []string
+
+	if fb, _ := promptFileBriefLine(dir, cwd, query, nil); fb != "" {
+		parts = append(parts, strings.TrimSpace(fb))
+	}
+	if sb, _ := promptSymbolBriefLine(cwd, query, nil); sb != "" {
+		parts = append(parts, strings.TrimSpace(sb))
+	}
+	if comp := compilerSymbolSignatureLine(cwd, query, pol); comp != "" {
+		parts = append(parts, strings.TrimSpace(comp))
+	}
+	if fail := failingTestSourceLine(cwd, query, pol); fail != "" {
+		parts = append(parts, strings.TrimSpace(fail))
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+	return "live repo brief: " + strings.Join(parts, " — ")
+}
+
+func looksLikePromptFileRef(tok string) bool {
+	if strings.HasPrefix(tok, "http://") || strings.HasPrefix(tok, "https://") || strings.HasPrefix(tok, "-") {
+		return false
+	}
+	ext := strings.ToLower(filepath.Ext(tok))
+	switch ext {
+	case ".go", ".py", ".ts", ".tsx", ".js", ".jsx", ".rs", ".rb", ".java", ".c", ".cc", ".cpp", ".h", ".hpp",
+		".cs", ".swift", ".kt", ".scala", ".sh", ".bash", ".zsh", ".fish", ".yaml", ".yml", ".toml", ".json",
+		".jsonl", ".sql", ".proto", ".graphql", ".vue", ".svelte", ".astro", ".css", ".scss", ".html", ".md",
+		".png", ".svg", ".jpg", ".jpeg", ".webp", ".gif":
+		return len(tok) > len(ext)
+	}
+	return false
 }
 
 // autoRecordPromptCorrection captures a user's standing prohibition or correction

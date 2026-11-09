@@ -22,8 +22,8 @@ func TestCyrillicFillerLeavesOnlyTheSubject(t *testing.T) {
 	}{
 		{
 			name:    "a question with one real subject",
-			prompt:  "напомни, что мы уже выясняли про can шину на omoda через adb, и что делать дальше",
-			want:    []string{"omoda"},
+			prompt:  "напомни, что мы уже выясняли про офсеты в kafka через cli, и что делать дальше",
+			want:    []string{"kafka"},
 			notWant: []string{"напомни", "выясняли", "через", "дальше"},
 		},
 		{
@@ -33,17 +33,17 @@ func TestCyrillicFillerLeavesOnlyTheSubject(t *testing.T) {
 			notWant: []string{"подожди", "покажи"},
 		},
 		{
-			// Straight from a live prompt: "нужно снова заняться фильтрацией
-			// telegram прокси по quality score".
+			// Straight from a live prompt: "нужно снова заняться балансировкой
+			// входящих пакетов по retry budget".
 			name:    "adverbs of repetition and time",
-			prompt:  "нужно снова заняться фильтрацией telegram прокси, теперь потом опять проверим",
-			want:    []string{"telegram"},
+			prompt:  "нужно снова заняться балансировкой envoy роутинга, теперь потом опять проверим",
+			want:    []string{"envoy"},
 			notWant: []string{"снова", "теперь", "потом", "опять"},
 		},
 		{
 			name:    "attention words at the front",
-			prompt:  "погоди, смотри, а в singbox можно такой же роутинг сделать",
-			want:    []string{"singbox"},
+			prompt:  "погоди, смотри, а в envoy можно такой же роутинг сделать",
+			want:    []string{"envoy"},
 			notWant: []string{"погоди", "смотри"},
 		},
 		{
@@ -73,8 +73,8 @@ func TestCyrillicFillerLeavesOnlyTheSubject(t *testing.T) {
 // A word at the end of a sentence arrives with its full stop attached. The dot
 // then does two things at once: it marks the token as an identifier, so the
 // term counts as one, and it stops the term from ever matching the text, which
-// spells the word without it. Measured on a live prompt: "quality score. с чего
-// начать" produced the term "score.", which matched nothing anywhere while
+// spells the word without it. Measured on a live prompt: "retry budget. с чего
+// начать" produced the term "budget.", which matched nothing anywhere while
 // still earning the recall its place.
 func TestTermsTrimSentencePunctuationButKeepPaths(t *testing.T) {
 	for _, tc := range []struct {
@@ -85,9 +85,9 @@ func TestTermsTrimSentencePunctuationButKeepPaths(t *testing.T) {
 	}{
 		{
 			name:    "a full stop is not part of the word",
-			prompt:  "нужно заняться фильтрацией telegram прокси по quality score. с чего начать",
-			want:    []string{"score"},
-			notWant: []string{"score."},
+			prompt:  "нужно заняться балансировкой envoy роутинга по retry budget. с чего начать",
+			want:    []string{"budget"},
+			notWant: []string{"budget."},
 		},
 		{
 			// The dot inside is what makes these one word, and trimming the

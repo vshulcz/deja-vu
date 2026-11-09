@@ -153,7 +153,7 @@ func TestAntigravityProjectWorkspaceNarrowsHomeToActiveCheckout(t *testing.T) {
 			ToolCalls: []any{
 				map[string]any{"name": "noop"},
 				map[string]any{
-					"name": "mcp_qwen_read",
+					"name": "mcp_fs_read",
 					"args": map[string]any{
 						"Path":  `"relative/path.go"`,
 						"paths": []any{filepath.Join(home, ".gemini", "brain", "scratch.md"), "/outside/workspace/file.go", targetFile},

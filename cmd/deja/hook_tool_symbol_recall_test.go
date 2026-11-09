@@ -13,7 +13,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 )
 
-func TestWave3HookToolSymbolLevelDecisionRecallAndPriority(t *testing.T) {
+func TestHookToolSymbolLevelDecisionRecallAndPriority(t *testing.T) {
 	tmp := hermeticEnv(t)
 	indexDir := filepath.Join(tmp, "index.db")
 	t.Setenv("DEJA_INDEX_DIR", indexDir)
@@ -104,7 +104,7 @@ func ClosePool() error {
 	}
 }
 
-func TestWave3FileHookRanLinePrefersTargetedTestCommand(t *testing.T) {
+func TestFileHookRanLinePrefersTargetedTestCommand(t *testing.T) {
 	tmp := hermeticEnv(t)
 	indexDir := filepath.Join(tmp, "index.db")
 	t.Setenv("DEJA_INDEX_DIR", indexDir)
@@ -142,7 +142,7 @@ func TestWave3FileHookRanLinePrefersTargetedTestCommand(t *testing.T) {
 	}
 }
 
-func TestWave3PreFlightCommandFailureIncludesConfirmedRemedy(t *testing.T) {
+func TestPreFlightCommandFailureIncludesConfirmedRemedy(t *testing.T) {
 	tmp := hermeticEnv(t)
 	indexDir := filepath.Join(tmp, "index.db")
 	t.Setenv("DEJA_INDEX_DIR", indexDir)
@@ -179,7 +179,7 @@ func TestWave3PreFlightCommandFailureIncludesConfirmedRemedy(t *testing.T) {
 	}
 }
 
-func TestWave3LiveSessionStatuslineAndToolReceiptAttribution(t *testing.T) {
+func TestLiveSessionStatuslineAndToolReceiptAttribution(t *testing.T) {
 	seedFixPair(t, "panic: sql: database is closed", "make clean && make CGO_ENABLED=0")
 	dir := os.Getenv("DEJA_INDEX_DIR")
 
