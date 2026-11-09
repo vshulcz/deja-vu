@@ -62,6 +62,7 @@ https://vshulcz.github.io/deja-vu/guide/memory-for-codebuddy.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-junie.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-jetbrains.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-mcode.html
+https://vshulcz.github.io/deja-vu/guide/memory-for-muse.html
 https://vshulcz.github.io/deja-vu/guide/lost-context.html
 https://vshulcz.github.io/deja-vu/guide/context-window-full.html
 https://vshulcz.github.io/deja-vu/guide/resume-a-session.html

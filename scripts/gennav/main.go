@@ -132,6 +132,7 @@ var groups = []group{
 		{"memory-for-kimi.html", "Kimi Code"},
 		{"memory-for-kiro.html", "Kiro"},
 		{"memory-for-mcode.html", "MiniMax Code"},
+		{"memory-for-muse.html", "Muse Code"},
 		{"memory-for-omp.html", "omp"},
 		{"memory-for-openclaw.html", "OpenClaw"},
 		{"memory-for-opencode.html", "opencode"},
