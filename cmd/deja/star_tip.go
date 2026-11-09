@@ -4,6 +4,8 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 )
 
 func starTipLine(dir string, served int) string {
@@ -14,7 +16,7 @@ func starTipLine(dir string, served int) string {
 	if _, err := os.Stat(stamp); err == nil {
 		return ""
 	}
-	if err := os.WriteFile(stamp, []byte("1\n"), 0o600); err != nil {
+	if err := atomicfile.Write(stamp, []byte("1\n"), 0o600); err != nil {
 		return ""
 	}
 	return "  If it helps      gh repo star vshulcz/deja-vu · https://github.com/vshulcz/deja-vu"

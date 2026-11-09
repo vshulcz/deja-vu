@@ -588,6 +588,9 @@ func oneStoreDiskGone(path string) bool {
 	if !filepath.IsAbs(path) {
 		return false
 	}
+	if _, err := os.Stat(path); os.IsPermission(err) {
+		return false
+	}
 	// Two levels is not enough for every store: `~/.local/share/goose/sessions`
 	// and `~/.cline/data/sessions` lose three on a machine that never installed
 	// them. A home directory that is there means the disk is there.
@@ -596,7 +599,7 @@ func oneStoreDiskGone(path string) bool {
 	}
 	dir := filepath.Dir(path)
 	for range 2 {
-		if dirExists(dir) {
+		if _, err := os.Stat(dir); err == nil || os.IsPermission(err) {
 			return false
 		}
 		parent := filepath.Dir(dir)

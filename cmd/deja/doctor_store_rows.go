@@ -64,13 +64,22 @@ func (r *doctorStoreRows) row(name, path string, present bool, detail string) {
 // status is the row's state word, with what the inspection adds to detail.
 func (r *doctorStoreRows) status(name, path string, present bool, detail string) (string, string) {
 	status := "missing"
-	if present {
+	if present || r.inspected[name] == "denied" || r.inspected[name] == "shared" {
 		status = "found"
 		// A directory deja cannot open loses its sessions from recall
 		// without a word — the failure #802/#816 closed, but only in
 		// `doctor --json`, which has said `denied` all along while this
 		// row, the one people read, said `found` (#993).
 		switch r.inspected[name] {
+		case "shared":
+			status = "shared"
+			if detail == "0 files" {
+				detail = ""
+			}
+			if detail != "" {
+				detail += ", "
+			}
+			detail += "read by the shared indexer"
 		case "denied", "unreadable", "parsed-zero", "needs-sqlite3", "needs-zstd":
 			status = r.inspected[name]
 			if status == "denied" {

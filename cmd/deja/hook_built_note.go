@@ -5,6 +5,7 @@ import (
 	"os"
 	"sort"
 
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -32,7 +33,7 @@ func builtNoteFor(dir string, private bool) string {
 		// history rather than spending its one appearance on an empty store.
 		return ""
 	}
-	_ = os.WriteFile(marker, []byte("1"), 0o600)
+	_ = atomicfile.Write(marker, []byte("1"), 0o600)
 	// The count and what it found on one line. The sentence that used to
 	// explain what an index is for, and the docs on a line of their own, made
 	// the first session start four lines tall in every host.

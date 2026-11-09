@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -42,7 +43,7 @@ func deadHookNoticeAt(dir string, now time.Time) string {
 			return ""
 		}
 	}
-	_ = os.WriteFile(stamp, []byte(strconv.FormatInt(now.Unix(), 10)), 0o600)
+	_ = atomicfile.Write(stamp, []byte(strconv.FormatInt(now.Unix(), 10)), 0o600)
 
 	gone := map[string]bool{}
 	for _, path := range hookWiringFiles() {

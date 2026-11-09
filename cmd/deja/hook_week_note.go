@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -31,7 +32,7 @@ func weekNoteFor(dir string, now time.Time, private bool) string {
 			since = time.Unix(ts, 0)
 		}
 	} else {
-		_ = os.WriteFile(p, []byte(strconv.FormatInt(now.Unix(), 10)), 0o600)
+		_ = atomicfile.Write(p, []byte(strconv.FormatInt(now.Unix(), 10)), 0o600)
 		return ""
 	}
 	// Served and injected both are memory the agent got; the brief's own
@@ -47,10 +48,10 @@ func weekNoteFor(dir string, now time.Time, private bool) string {
 		// A quiet week is not news; the clock restarts so the next week that
 		// has something to say is the one reported. Sessions deleted under
 		// the person are, quiet week or not.
-		_ = os.WriteFile(p, []byte(strconv.FormatInt(now.Unix(), 10)), 0o600)
+		_ = atomicfile.Write(p, []byte(strconv.FormatInt(now.Unix(), 10)), 0o600)
 		return deleted
 	}
-	_ = os.WriteFile(p, []byte(strconv.FormatInt(now.Unix(), 10)), 0o600)
+	_ = atomicfile.Write(p, []byte(strconv.FormatInt(now.Unix(), 10)), 0o600)
 	line := fmt.Sprintf("deja this week: %d recall%s", recalls, pluralS(recalls))
 	if n.DejaVuWeek > 0 {
 		line += fmt.Sprintf(", %d déjà vu", n.DejaVuWeek)

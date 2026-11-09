@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/stats"
 )
@@ -97,7 +98,7 @@ func sshSyncTip(dir string, ss []model.Session) string {
 	if sshSessions < 5 {
 		return ""
 	}
-	_ = os.WriteFile(sentinel, []byte("shown"), 0o600)
+	_ = atomicfile.Write(sentinel, []byte("shown"), 0o600)
 	return fmt.Sprintf("tip: %d session%s mention ssh — if you work across machines, `deja sync ssh <host>` carries this memory along (shown once)", sshSessions, pluralS(sshSessions))
 }
 

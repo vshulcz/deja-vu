@@ -437,3 +437,14 @@ func TestDeleteRefusalOpensWithTheAgent(t *testing.T) {
 		t.Errorf("refusal repeats the program's name: %q", got)
 	}
 }
+
+func TestDeleteWhitespacePrefixTreatedAsMissing(t *testing.T) {
+	dir, _ := tuiStore(t)
+	indexed(t, dir)
+	for _, blank := range []string{"", "   ", "\t\n"} {
+		err := runDeleteIn(dir, []string{blank}, nil, &bytes.Buffer{})
+		if err == nil || !strings.Contains(err.Error(), "delete needs a session id prefix") {
+			t.Errorf("runDeleteIn(%q) = %v, want idPrefixNeeded error", blank, err)
+		}
+	}
+}

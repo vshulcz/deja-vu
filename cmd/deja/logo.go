@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/index"
 )
 
@@ -199,7 +200,7 @@ func firstRecall(dir string) bool {
 	if _, err := os.Stat(marker); err == nil {
 		return false
 	}
-	return os.WriteFile(marker, []byte("1"), 0o600) == nil
+	return atomicfile.Write(marker, []byte("1"), 0o600) == nil
 }
 
 func spaces(n int) string {

@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -50,11 +51,23 @@ func doctorHarnessStores(w io.Writer, dir string, all bool) {
 		inspected: map[string]string{}, unchecked: map[string]bool{}, partly: map[string]bool{},
 		counted: map[string]bool{},
 	}
-	for _, check := range doctorStoreChecks() {
-		store, _ := inspectDoctorStore(check)
-		rows.inspected[check.name] = store.State
-		rows.unchecked[check.name] = store.Unchecked
-		rows.partly[check.name] = store.Partial
+	checks := doctorStoreChecks()
+	storeMods := make([]time.Time, 0, len(checks))
+	stores := make([]doctorStore, 0, len(checks))
+	for _, check := range checks {
+		store, mod := inspectDoctorStore(check)
+		stores = append(stores, store)
+		storeMods = append(storeMods, mod)
+	}
+	sharedClient := sharedIndexClientReady(dir, inspectDoctorIndex(dir, storeMods))
+	for _, store := range stores {
+		state := store.State
+		if sharedClient && state == "denied" && !store.Partial {
+			state = "shared"
+		}
+		rows.inspected[store.Name] = state
+		rows.unchecked[store.Name] = store.Unchecked
+		rows.partly[store.Name] = store.Partial
 	}
 
 	claudeRoots := sources.ClaudeRoots()

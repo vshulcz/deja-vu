@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/policy"
@@ -426,7 +427,7 @@ func nudgeDue(dir string) bool {
 			return false
 		}
 	}
-	_ = os.WriteFile(p, []byte(strconv.FormatInt(time.Now().Unix(), 10)), 0o600)
+	_ = atomicfile.Write(p, []byte(strconv.FormatInt(time.Now().Unix(), 10)), 0o600)
 	return true
 }
 

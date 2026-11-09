@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/index"
 )
 
@@ -53,7 +54,7 @@ func rememberSkill(path string, content []byte) {
 		b.WriteString(p)
 		b.WriteByte('\n')
 	}
-	_ = os.WriteFile(skillMarksPath(), []byte(b.String()), 0o600)
+	_ = atomicfile.Write(skillMarksPath(), []byte(b.String()), 0o600)
 }
 
 func contentMark(b []byte) string {

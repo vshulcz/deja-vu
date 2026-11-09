@@ -388,6 +388,15 @@ func collectDoctorReport(lookup doctorVersionLookup, dir string) doctorReport {
 		storeMods = append(storeMods, mod)
 	}
 	report.Index = inspectDoctorIndex(dir, storeMods)
+	if sharedIndexClientReady(dir, report.Index) {
+		for i := range report.Stores {
+			if report.Stores[i].State == "denied" && !report.Stores[i].Partial {
+				report.Stores[i].State = "shared"
+				report.Stores[i].Note = "read by the shared indexer"
+				report.Stores[i].Denied = ""
+			}
+		}
+	}
 	report.Ingest = index.IngestHealth(dir)
 	report.IngestFiles = index.IngestFilesReport(dir)
 	report.MCP = collectDoctorMCP()
@@ -1022,6 +1031,10 @@ func inspectDoctorIndex(dir string, storeMods []time.Time) doctorIndexReport {
 		}
 	}
 	return result
+}
+
+func sharedIndexClientReady(dir string, idx doctorIndexReport) bool {
+	return index.SharedGroup(dir) && index.Manual() && idx.State == "ok"
 }
 
 // collectDoctorAutoRecall reads the same files and asks the same questions as
