@@ -149,6 +149,7 @@ var groups = []group{
 		{"benchmarks.html", "Benchmarks"},
 		{"compare.html", "Compare"},
 		{"claude-mem-alternative.html", "claude-mem alternative"},
+		{"mem0-alternative.html", "Mem0 alternative"},
 		{"specstory-alternative.html", "SpecStory alternative"},
 		{"basic-memory-alternative.html", "Basic Memory alternative"},
 		{"day-zero.html", "Day zero"},
