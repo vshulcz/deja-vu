@@ -217,3 +217,31 @@ insert into messages values (11,'s_cron','user','[{"type":"text","text":"cron no
 		}
 	}
 }
+
+func TestGooseEditPathIncludesReadsAndViews(t *testing.T) {
+	for _, tc := range []struct {
+		item map[string]any
+		want string
+	}{
+		{
+			item: map[string]any{"toolCall": map[string]any{"value": map[string]any{"name": "developer__read", "arguments": map[string]any{"path": "/w/a.go"}}}},
+			want: "/w/a.go",
+		},
+		{
+			item: map[string]any{"toolCall": map[string]any{"value": map[string]any{"name": "read_file", "arguments": map[string]any{"file_path": "/w/b.go"}}}},
+			want: "/w/b.go",
+		},
+		{
+			item: map[string]any{"toolCall": map[string]any{"value": map[string]any{"name": "developer__text_editor", "arguments": map[string]any{"command": "view", "path": "/w/c.go"}}}},
+			want: "/w/c.go",
+		},
+		{
+			item: map[string]any{"toolCall": map[string]any{"value": map[string]any{"name": "developer__text_editor", "arguments": map[string]any{"command": "undo_edit", "path": "/w/d.go"}}}},
+			want: "",
+		},
+	} {
+		if got := gooseEditPath(tc.item); got != tc.want {
+			t.Errorf("gooseEditPath(%v) = %q, want %q", tc.item, got, tc.want)
+		}
+	}
+}

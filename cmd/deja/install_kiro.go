@@ -109,7 +109,8 @@ func installKiro(exe string, uninstall bool) (installResult, error) {
 		return res, err
 	}
 	if !uninstall {
-		changed, err := kiroApproveDejasTool(kiroMCPSettingsPath())
+		var changed bool
+		changed, err = kiroApproveDejasTool(kiroMCPSettingsPath())
 		if err != nil {
 			return installResult{}, err
 		}
