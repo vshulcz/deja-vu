@@ -32,6 +32,13 @@
     <summary>Local session memory across Claude Code, Codex, Cursor and 40 other agents from existing transcripts, with no LLM key, cloud API, or Docker stack.</summary>
   </entry>
   <entry>
+    <title>Add memory to MiniMax Code: every agent&#39;s sessions — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-mcode.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-mcode.html"></link>
+    <updated>2026-11-09T00:00:00Z</updated>
+    <summary>How to give MiniMax Code recall over every coding agent&#39;s sessions on the machine — the MCP server in mcp.json, and a plugin with the skill and the hooks.</summary>
+  </entry>
+  <entry>
     <title>How to Delete Claude Code Sessions (CLI, VS Code) — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html"></link>
@@ -282,12 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html"></link>
     <updated>2026-11-03T00:00:00Z</updated>
     <summary>No model, worker or sign-in: deja-vu indexes the sessions Codex, Cursor, opencode and 40 other agents already keep, including those from before install.</summary>
-  </entry>
-  <entry>
-    <title>Cursor state.vscdb Too Large? Shrink or Clean It Safely</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html"></link>
-    <updated>2026-11-03T00:00:00Z</updated>
-    <summary>Why Cursor&#39;s state.vscdb and state.vscdb.backup hit 10–125 GB, why deleting it wipes every chat, and step-by-step SQLite commands to shrink it safely.</summary>
   </entry>
 </feed>
