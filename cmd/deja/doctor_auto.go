@@ -28,6 +28,24 @@ type autoWiring struct {
 	kind string
 }
 
+// zcodeDoctorHooksPath is where the hooks actually run on a 3.17+ desktop:
+// the runtime reads config.json, and install writes a second copy there
+// (#5960). zcodeDoctorPath() alone names setting.json as soon as that file
+// exists, which the desktop never loads — a working hook then reads as wired
+// against the wrong file, and a later edit to setting.json makes it look
+// stale. Only the live config that really carries deja's hooks earns the row.
+func zcodeDoctorHooksPath() string {
+	legacy := zcodeLegacyConfigPath()
+	if !zcodeConfigIsLiveRuntimeConfig() || !doctorExists(legacy) {
+		return zcodeDoctorPath()
+	}
+	b, err := doctorReadConfig(legacy)
+	if err != nil || !zcodeHooksRun(b) {
+		return zcodeDoctorPath()
+	}
+	return legacy
+}
+
 // autoWirings is the single list doctor and the coverage test both read.
 // Every harness deja can wire for auto-recall belongs here; a harness with an
 // -auto install target and no entry is a hole in the only report a user has
@@ -111,7 +129,7 @@ func autoWirings() []autoWiring {
 		// line deja writes ends in `--strict` — its schema discards a whole
 		// response over one key it does not know. A 3.17+ desktop build has
 		// config.json instead of setting.json, so ask for whichever is there.
-		{"zcode", zcodeDoctorPath, "hook-context", ""},
+		{"zcode", zcodeDoctorHooksPath, "hook-context", ""},
 		// Command Code keeps its hooks in the same settings.json as its
 		// permissions, and its timeout unit is seconds.
 		{"commandcode", commandCodeSettings, "hook-context", ""},
