@@ -157,12 +157,9 @@ const ContextMarathonCount = 10
 // two corpora attributable to choosing excerpts inside a session rather than
 // to ranking sessions against each other.
 //
-// Why it exists: on this machine's own store every recall page's deepest hit
-// matched between 24 and 23,278 times, and three excerpts is all a hit may
-// quote of it. No bench corpus had a session of that shape, so the whole class
-// was invisible to `deja bench` — the marathon arm of the prompt bench is the
-// only place a long session appears at all, and it measures ranking, not what
-// the page carries.
+// GenerateContextMarathon folds each chain's prior sessions into a single long
+// session with thousands of matching lines so `deja bench` measures excerpt
+// selection on deep transcripts as well as multi-session ranking.
 func GenerateContextMarathon(seed int64) ContextCorpus {
 	base := GenerateContext(seed)
 	chains := make([]ContextChain, 0, ContextMarathonCount)

@@ -501,24 +501,11 @@ func ForgetPromotedNotes(match func(noteSession string) bool) (int, error) {
 			return m, false
 		}
 		src, _ := m["session"].(string)
-		if src == "" || !match(PromotedNoteID(src)) {
+		if src == "" || !match(model.PromotedNoteID(src)) {
 			return m, false
 		}
 		return nil, true
 	})
-}
-
-// PromotedNoteID is the session id a promoted note is indexed under, so a
-// caller holding an id from the index can match the line that produced it.
-func PromotedNoteID(sourceSession string) string {
-	return model.PromotedNoteID(sourceSession)
-}
-
-// RepoPromotedNoteID is the session id a repo-scoped promoted note is indexed
-// under, keeping it distinct from a personal promoted note for the same source
-// session.
-func RepoPromotedNoteID(sourceSession string) string {
-	return model.RepoPromotedNoteID(sourceSession)
 }
 
 // ForgetPromotedTitles strips the source session's opening line from every

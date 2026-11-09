@@ -37,28 +37,6 @@ import (
 // ReasonixHome is where config.toml, plugin-packages.json and plugins/ live.
 func ReasonixHome() string { return reasonixHome() }
 
-// ReasonixWorkspaceStore is the 1.x sessions-v4 directory Reasonix keeps for
-// one workspace: the absolute path folded by WorkspaceSlug
-// (internal/config/paths.go), lower-cased on Windows. A path long enough for
-// Reasonix to hash its slug gets "", since the hash is not reproduced here.
-func ReasonixWorkspaceStore(workspace string) string {
-	root := strings.TrimSpace(workspace)
-	if root == "" {
-		return ""
-	}
-	if abs, err := filepath.Abs(root); err == nil {
-		root = abs
-	}
-	if runtime.GOOS == "windows" {
-		root = strings.ToLower(root)
-	}
-	slug := strings.NewReplacer(string(os.PathSeparator), "-", "/", "-", `\`, "-", ":", "-").Replace(root)
-	if len(slug) > 255 {
-		return ""
-	}
-	return filepath.Join(ReasonixStateRoot(), "projects", slug, "sessions-v4")
-}
-
 // reasonixHome is where config.toml lives: $REASONIX_HOME, else the OS default.
 func reasonixHome() string {
 	if v := os.Getenv("REASONIX_HOME"); v != "" {

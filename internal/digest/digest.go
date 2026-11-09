@@ -211,7 +211,7 @@ func noiseLine(line string) bool {
 //
 // The rule used to be the number alone, which dropped every sentence opening
 // with a count — "12 зелёных. Жду ревьюера перед мержем.", "505 отказов записи
-// за 16 часов". Measured on a real store: of the lines it matched in assistant
+// за 16 часов". In real-world stores, of the lines it matched in assistant
 // text, 917 were sentences and none was a listing, because a numbered listing
 // arrives inside a code fence and MessageText returns those whole.
 //
@@ -273,7 +273,7 @@ var shareStopwords = map[string]bool{
 // wrote rather than something it said about the work.
 //
 // A message can be a draft, a spec, a checklist — a text produced during the
-// session rather than a statement about it. Measured on a real store, the
+// session rather than a statement about it. In real-world stores, the
 // session-start block recalled "- Keep responses concise by default; terse
 // mode active: lite." to a later agent as a past decision; it is one bullet of
 // a 130-line specification the agent had just written. The prose around such a

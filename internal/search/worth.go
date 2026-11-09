@@ -155,7 +155,7 @@ func HasIdentifierTerm(terms []string) bool {
 		}
 		// Letters, not bytes. Counting bytes read "kafka" as filler and every
 		// Cyrillic word of three letters as a term of art, because Cyrillic
-		// takes two bytes a letter. Measured on a real store: "напомни, что мы
+		// takes two bytes a letter. In real-world stores, "напомни, что мы
 		// уже выясняли про офсеты в kafka" reduces to one term, three
 		// sessions hold it, and nothing was recalled.
 		//

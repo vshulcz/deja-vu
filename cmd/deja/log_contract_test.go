@@ -107,7 +107,7 @@ func TestLogLastJSONKeysMatchTheDocumentedContract(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(usage.Path(dir)), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	usage.SnapshotPolicy(dir, usage.KindHook, "a digest of earlier work", 2, "local-only")
+	usage.RecordDigestPolicy(dir, usage.KindHook, "a digest of earlier work", 2, 0, "local-only")
 
 	out, err := captureRun(t, "log", "--last", "--json")
 	if err != nil {

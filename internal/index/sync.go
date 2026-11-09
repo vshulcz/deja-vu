@@ -505,8 +505,8 @@ func ImportSkippedIncomplete() int { return lastImportSkippedIncomplete }
 func promotedStatesByNoteID() map[string]sources.Lifecycle {
 	out := map[string]sources.Lifecycle{}
 	for src, lc := range sources.PromotedLifecycles() {
-		out[sources.PromotedNoteID(src)] = lc
-		out[sources.RepoPromotedNoteID(src)] = lc
+		out[model.PromotedNoteID(src)] = lc
+		out[model.RepoPromotedNoteID(src)] = lc
 	}
 	return out
 }

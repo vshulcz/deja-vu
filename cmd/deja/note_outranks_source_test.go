@@ -108,7 +108,7 @@ const (
 // about the two being a distillation and its source — put the transcript back
 // on top: the rerank is half normalised BM25 and half cosine, so the transcript
 // takes its own note back whenever the cosine gap beats the lexical one.
-// Measured on a real store: four queries, the note below its own session in
+// In real-world stores, four queries, the note below its own session in
 // every one (#2083).
 func TestARerankKeepsTheNoteAboveItsSource(t *testing.T) {
 	noteAndSourceStore(t)

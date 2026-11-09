@@ -33,7 +33,7 @@ type Snapshot struct {
 	// Into is the agent session this went to, as the harness names it. Without
 	// it the log says what was injected and never to whom, so the only way to
 	// tell whether a recall was used is the sentence the block asks the agent
-	// to say — measured on a real store, that sentence appears after 22 of 1218
+	// to say — In real-world stores, that sentence appears after 22 of 1218
 	// injections, which measures reporting rather than use.
 	Into string `json:"into,omitempty"`
 	// Unreadable marks an injection whose host sent a payload deja could not
@@ -147,16 +147,9 @@ func RecordDigestPolicyInto(indexDir, kind, digest, into string, sessions int, r
 	RecordDigestPolicySessions(indexDir, kind, digest, into, sessions, raw, policyName, nil)
 }
 
-// RecordServedSnapshot writes the counting event and the digest snapshot for
-// one served answer, stamped alike. The MCP surfaces used to call the two
-// writers back to back, which took two instants for one act and left `deja
-// log` and `deja log --last` disagreeing about when it happened (#2294).
-func RecordServedSnapshot(indexDir, kind, digest string, sessions int, raw int64, ids []string, policyName string) {
-	RecordServedFrom(indexDir, kind, digest, sessions, raw, ids, nil, policyName)
-}
-
-// RecordServedFrom is RecordServedSnapshot for a caller that knows which
-// projects the digest was built from. Without them a stored digest can only be
+// RecordServedFrom writes the counting event and the digest snapshot for one
+// served answer, stamped alike, for a caller that knows which projects the
+// digest was built from. Without them a stored digest can only be
 // checked against a later rule by recognising project names inside its own
 // prose, which fails as soon as the sessions behind it leave the index (#2324).
 func RecordServedFrom(indexDir, kind, digest string, sessions int, raw int64, ids, projects []string, policyName string) {
@@ -223,11 +216,6 @@ func RecordDigestPolicySessionsUnread(indexDir, kind, digest, into string, sessi
 	at := time.Now().UTC()
 	recordFullAtUnread(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, into, at, true)
 	snapshotWriteAt(indexDir, kind, digest, into, sessions, policyName, nil, projects, at, true)
-}
-
-// SnapshotPolicy is SnapshotOnly plus the policy name for the audit trail.
-func SnapshotPolicy(indexDir, kind, digest string, sessions int, policyName string) {
-	snapshotWrite(indexDir, kind, digest, sessions, policyName)
 }
 
 func snapshotWrite(indexDir, kind, digest string, sessions int, policyName string) {

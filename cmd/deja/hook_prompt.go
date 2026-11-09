@@ -30,7 +30,7 @@ import (
 // user message, so it must be a hint, not a payload.
 //
 // 1024 cut the two quoted lines mid-sentence, and what it cut was the tail —
-// the paths, names and numbers an answer reuses. Measured on a real store by
+// the paths, names and numbers an answer reuses. In real-world stores, by
 // replaying the sweep and comparing each block against what the agent actually
 // answered next: blocks carrying words the answer went on to use rose from 20%
 // to 25%, and blocks carrying a conclusion from 55 to 57 of 100, for 24 tokens
@@ -270,7 +270,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// 26 candidates, each read from disk in full before being dropped.
 	// What this agent session was already shown, by the text of the block
 	// rather than by the session it came from. Banning the session banned
-	// everything else it holds: measured on a real store, walking one working
+	// everything else it holds: In real-world stores, walking one working
 	// session of eighty messages, the second half got three blocks where the
 	// same messages without the ban got thirty-eight, and only seven of those
 	// were word-for-word repeats. The same past session answers many questions
@@ -463,7 +463,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// And the same sentence twice under another session's id is the same
 	// wallpaper: the fingerprint above covers the block, whose header carries
 	// the id and the date, so a fork or a subagent transcript of the same work
-	// passes it every time. Measured on a real store over eight near-identical
+	// passes it every time. In real-world stores, over eight near-identical
 	// nudges: nine sessions cited, fifteen quoted lines, eleven of them
 	// distinct, and the worst line four times under four ids.
 	filtered, freshQuotes, anyFresh := withoutSeenQuotes(seen, body)
@@ -576,7 +576,7 @@ func promptDigestBody(dir, sessionID string, ss []model.Session, confident bool,
 	lead := promptHookLead
 	// After the first block of a session the two explanatory sentences are
 	// words the agent has already read, and the third repeats the line this
-	// block ends with. Measured on a real store: a session receives a median
+	// block ends with. In real-world stores, a session receives a median
 	// of 23 per-prompt blocks, the lead is 301 bytes of a 1439-byte block,
 	// so 22 of those blocks carried 6.6 KB of the same sentences.
 	//
@@ -681,7 +681,7 @@ func (p *promptPicker) pick(ranked []model.Session, matched, strong, naming []in
 		// on whether some ordinary word of the question happened to also appear
 		// in that session.
 		//
-		// Measured on a real store over sixty subjects the project holds:
+		// In real-world stores, over sixty subjects the project holds:
 		// "напомни, что мы решали про X" returned content 63% of the time and
 		// "what did we decide about X" returned it never — the same question,
 		// the same answer sitting in the same session.

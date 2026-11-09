@@ -669,7 +669,7 @@ func legacyPluginJSFor(target, exe string) string { //nolint:funlen // the body 
           // session.idle ended it (#4573).
           // The session id travels with the payload so recall can skip what
           // it already showed this session. Without it every message
-          // re-injects the same block: measured on a real store, half of all
+          // re-injects the same block: In real-world stores, half of all
           // injections were a word-for-word repeat, and all but five of those
           // came within a minute.
           const sessionID = input?.sessionID || last.sessionID

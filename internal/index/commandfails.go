@@ -33,7 +33,7 @@ const (
 	// "git status\nrm -rf /" must never be answered as "you have run this".
 	// A warning is the other direction: it recommends nothing, and the cost of
 	// being wrong is a line the reader ignores rather than a command they run.
-	// Measured on a real store, the whole-line key confirms 25 command-failure
+	// In real-world stores, the whole-line key confirms 25 command-failure
 	// pairs and the head confirms 45 (#2924).
 	commandFailHeadWords = 3
 )

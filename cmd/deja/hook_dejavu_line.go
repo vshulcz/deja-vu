@@ -104,7 +104,7 @@ func recordDejaVuLine(path, sid string, now time.Time) bool {
 // viaTerms picks the three query terms the headline will name. Terms the block
 // underneath actually carries come first: the line is the reason given for the
 // recall, and naming words the reader cannot find below it reads as a misfire.
-// Measured on a real store, the block opened on a line carrying a term the
+// In real-world stores, the block opened on a line carrying a term the
 // product used in 94 cases of 94, while the first three terms in extraction
 // order agreed with it in 71.
 func viaTerms(block string, terms []string) []string {

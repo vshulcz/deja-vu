@@ -43,7 +43,7 @@ func TestWorthIndexingKeepsTheTaskRunners(t *testing.T) {
 		"time mise run lint",
 		// The one this rule kept when it was judged per pipe: a quoted
 		// alternation is cut on its own `\|` and the fragment reads like a
-		// run. Found on a real store, one line in 119,024.
+		// run. In real-world stores, one line in 119,024.
 		`grep -n "worktree names\|task signal" cmd/deja/doctor.go`,
 	} {
 		if worthIndexing(c) {

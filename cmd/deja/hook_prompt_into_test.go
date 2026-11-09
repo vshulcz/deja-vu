@@ -15,7 +15,7 @@ import (
 
 // The injection log records what went out; without who received it, the only
 // way to tell whether a recall was used is the sentence the block asks the
-// agent to say — measured on a real store, that follows 22 of 1218 injections.
+// agent to say — In real-world stores, that follows 22 of 1218 injections.
 // The hook knows the agent session from its own payload, so it writes it down.
 func TestHookPromptRecordsTheSessionItAnswered(t *testing.T) {
 	withStatsStores(t)

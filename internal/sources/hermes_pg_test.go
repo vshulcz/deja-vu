@@ -34,6 +34,12 @@ func (f *fakePG) run(_, sql string) ([]byte, error) {
 	return []byte(f.rows), nil
 }
 
+func SetHermesPGRunner(f func(dsn, sql string) ([]byte, error)) func() {
+	prev := HermesPGRunner
+	HermesPGRunner = f
+	return func() { HermesPGRunner = prev }
+}
+
 func TestParseHermesPGReadsRowsLikeSQLite(t *testing.T) {
 	f := &fakePG{rows: `[
 		{"session_id":"s1","role":"user","content":"switch the pool to transaction mode","timestamp":1785000000},

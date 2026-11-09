@@ -19,6 +19,17 @@ func SnapshotOnly(indexDir, kind, digest string, sessions int) {
 	snapshotWrite(indexDir, kind, digest, sessions, "")
 }
 
+// SnapshotPolicy is SnapshotOnly plus the policy name for the audit trail.
+func SnapshotPolicy(indexDir, kind, digest string, sessions int, policyName string) {
+	snapshotWrite(indexDir, kind, digest, sessions, policyName)
+}
+
+// RecordServedSnapshot writes the counting event and the digest snapshot for
+// one served answer, stamped alike.
+func RecordServedSnapshot(indexDir, kind, digest string, sessions int, raw int64, ids []string, policyName string) {
+	RecordServedFrom(indexDir, kind, digest, sessions, raw, ids, nil, policyName)
+}
+
 // InjectedToday returns session-start context bytes injected since local midnight.
 func InjectedToday(indexDir string) int {
 	_, _, injected := TodayWithInjections(indexDir)

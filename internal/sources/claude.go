@@ -220,7 +220,7 @@ func UnderClaudeRoot(p string) bool {
 // keeps the launch, the agent id and a summary of what came back, while the
 // turns and the tool stream live only in the child file (#1384).
 //
-// They used to be skipped whole, for index size. Measured on a real store that
+// They used to be skipped whole, for index size. In real-world stores, that
 // was 863 files, 96,168 messages and 299 MB against a 1.4 GB index — a quarter
 // of the machine's Claude messages, holding 387 assistant turns that read like
 // a settled answer, outside recall by default (#3009). They come in now as the

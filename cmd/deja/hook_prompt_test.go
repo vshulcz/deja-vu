@@ -726,7 +726,7 @@ func TestDejaVuLineDoesNotClaimAPeersWorkAsYours(t *testing.T) {
 }
 
 // The headline names three of the query's terms as the reason. They have to be
-// terms the block underneath actually carries: measured on a real store, the
+// terms the block underneath actually carries: In real-world stores, the
 // block opened on a line carrying a term the product used in 94 cases of 94,
 // while the three words named above it agreed only 71 times.
 func TestTheHeadlineNamesTermsTheBlockCarries(t *testing.T) {

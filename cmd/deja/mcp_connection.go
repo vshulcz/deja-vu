@@ -9,7 +9,7 @@ import (
 // mcpConn names the client this server process is answering.
 //
 // Every injection deja makes through a hook records the agent session it went
-// to, and MCP recorded none: measured on this machine, 577 answers an agent
+// to, and MCP recorded none: In practice, 577 answers an agent
 // asked for — 248 blame, 174 recall, 150 recall_context — and not one that
 // could be paired with what the agent did next. So "most re-used" counted
 // events, and could not tell a memory several agents came back to from one

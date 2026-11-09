@@ -11,7 +11,7 @@ import (
 // A past session where the agent said it had no history, or was refused the
 // tool that would have found some, is the worst thing a recall can quote: it
 // hands the reader a failure of this very tool as if it were the answer.
-// Measured on a real store, 3 blocks of 119 opened on one — twice for the same
+// In real-world stores, 3 blocks of 119 opened on one — twice for the same
 // question about a connection pool, once on a permission refusal.
 func TestBlockDoesNotQuoteAnEmptyMemoryAdmission(t *testing.T) {
 	s := model.Session{Messages: []model.Message{
@@ -78,7 +78,7 @@ func TestTheReplySlotIgnoresAnEmptyMemoryAdmission(t *testing.T) {
 
 // A harness check is a conversation with the tool, not about the work: one
 // message asks for an exact string back and the next repeats it. Such a session
-// has nothing to recall, so none of it is shown — measured on a real store, 4
+// has nothing to recall, so none of it is shown — In real-world stores, 4
 // blocks of 119 quoted one, and 11% of that store's sessions hold one, because
 // the tool is developed against it.
 func TestAHarnessCheckIsNotRecalledAtAll(t *testing.T) {
@@ -160,7 +160,7 @@ func TestBlockDoesNotQuoteTheAgentAboutToLook(t *testing.T) {
 }
 
 // The other shape of a harness check: call the tool and answer in a fixed form.
-// Measured on a real store, 2 blocks of 114 quoted one, and the "answer" one of
+// In real-world stores, 2 blocks of 114 quoted one, and the "answer" one of
 // them counted as was itself a check — the question set used to score the tool
 // contains its own smoke tests.
 func TestAScriptedToolCheckIsNotRecalled(t *testing.T) {

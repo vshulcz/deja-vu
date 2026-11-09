@@ -472,8 +472,8 @@ func promotedNoteSources() map[string]string {
 		if n.Session == "" {
 			continue
 		}
-		out[sources.PromotedNoteID(n.Session)] = n.Session
-		out[sources.RepoPromotedNoteID(n.Session)] = n.Session
+		out[model.PromotedNoteID(n.Session)] = n.Session
+		out[model.RepoPromotedNoteID(n.Session)] = n.Session
 	}
 	return out
 }
@@ -485,7 +485,7 @@ func promotedNoteSources() map[string]string {
 func promotedNoteSource(noteID string) (string, string, string, bool) {
 	src, title, body, found := "", "", "", false
 	for _, n := range sources.LoadPromotedNotes() {
-		if n.Session == "" || (sources.PromotedNoteID(n.Session) != noteID && sources.RepoPromotedNoteID(n.Session) != noteID) {
+		if n.Session == "" || (model.PromotedNoteID(n.Session) != noteID && model.RepoPromotedNoteID(n.Session) != noteID) {
 			continue
 		}
 		src, found = n.Session, true

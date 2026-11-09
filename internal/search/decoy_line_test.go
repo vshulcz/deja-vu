@@ -13,7 +13,7 @@ import (
 //
 // The question slot took the best-matching user line whatever it carried, and
 // the block is printed with that slot first, so a session saying "decide" three
-// times about nothing led with it. Measured on a real store: "what did we decide
+// times about nothing led with it. In real-world stores, "what did we decide
 // about mm_status" opened on "1. **Decide**: User settings (global) or project
 // settings?" while the answer sat below.
 func TestBlockOpensOnTheLineThatAnswers(t *testing.T) {

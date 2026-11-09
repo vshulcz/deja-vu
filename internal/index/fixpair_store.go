@@ -370,7 +370,7 @@ func FixesForCommand(dir, command, text string, limit int, allow func(project st
 // after this failed: X" — deja telling an agent to run again what just failed,
 // which is a loop rather than a remedy. The two strings are not equal:
 // a stored command carries its exit status, so the comparison is on the
-// command alone. Measured on a real store: 1 of the 7 served pairs that carry
+// command alone. In real-world stores, 1 of the 7 served pairs that carry
 // a failing command (#3720).
 func remedyIsTheFailure(p FixPair) bool {
 	if p.Failed == "" || p.Command == "" {

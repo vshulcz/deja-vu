@@ -82,8 +82,7 @@ func termsFrom(prompt string, seen map[string]bool, add func(string) bool) bool 
 		// A word at the end of a sentence arrives with its full stop attached,
 		// and the dot then does two things at once: it marks the token as an
 		// identifier, so "budget." counts as one, and it stops the token from
-		// ever matching the text, which says "budget". Measured on live prompts:
-		// "retry budget. с чего начать" yielded the term "budget.", which
+		// ever matching the text, which says "budget". In live prompts, 		// "retry budget. с чего начать" yielded the term "budget.", which
 		// matched nothing anywhere while still earning the recall its place.
 		//
 		// Only the edges are trimmed. A dot inside a token is what makes an IP
@@ -279,7 +278,7 @@ func cyrPromptTerm(f string) bool {
 	// A hyphen joins two words into one name as readily in Russian as in
 	// English. Requiring every rune to be Cyrillic threw the whole compound
 	// away, and the ASCII path would not take it either, so "лог-сообщение"
-	// could not become a search term at all — measured on a real store, one
+	// could not become a search term at all — In real-world stores, one
 	// direct question in seven that got no answer was exactly this.
 	letters := 0
 	for _, r := range f {
@@ -304,7 +303,7 @@ func cyrPromptTerm(f string) bool {
 	// Three letters, the same floor a single Cyrillic word gets: "кеш" and
 	// "хук" name things, and so do the halves of "стоп-лист" and "прод-бд".
 	// Demanding five in one part dropped those compounds entirely, leaving the
-	// question holding a verb — measured on a real store, compound subjects
+	// question holding a verb — In real-world stores, compound subjects
 	// came back on topic 68% of the time against 100% for plain ones.
 	for part := range strings.SplitSeq(f, "-") {
 		if len([]rune(part)) >= 3 && !cyrPromptStop[part] {
@@ -441,7 +440,7 @@ var cyrPromptStop = map[string]bool{
 	"давай": true, "было": true, "были": true, "будет": true, "быть": true,
 	"есть": true, "нет": true, "если": true, "или": true, "как": true,
 	"что": true, "где": true, "там": true, "тут": true, "уже": true, "ещё": true,
-	// Measured on live prompts from this machine: about a third of the terms
+	// In live prompts, about a third of the terms
 	// extracted from a Russian question were words like these, and in the worst
 	// case four of five — `напомни, что мы уже выясняли про офсеты в kafka
 	// через cli` yielded [kafka напомни выясняли через дальше]. A filler term

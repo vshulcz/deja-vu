@@ -531,7 +531,7 @@ func concludingFirstWithTrajectory(ms []model.Message, trajVerified map[string]b
 // A reply is diagnosis-first, so the opening is the right default and #1336's
 // whole-sentences rule is built on it. But the head is not always where the
 // conclusion lives, and when it is not, the block quoted the diagnosis and
-// dropped the outcome — measured on a real store, 211 of 490 sessions that
+// dropped the outcome — In real-world stores, 211 of 490 sessions that
 // settled something handed over a block that no longer read as one (#2243).
 //
 // One sentence, not the head plus it: the budget is the reason the conclusion

@@ -16,8 +16,7 @@ import (
 // it was said over a query one of whose words had just been thrown away. The
 // word forms line above it announces the drop — "quasar (ignored: no session
 // matches it with the rest)" — and the strict head underneath is the AND over
-// what survived, not over what was asked. Measured on this machine's store,
-// eight invented subjects came back that way: a strict count of 1 to 5 and
+// what survived, not over what was asked. In practice, // eight invented subjects came back that way: a strict count of 1 to 5 and
 // three or four sessions tagged as holding the whole question, every one of
 // them about something the store has never held.
 func TestAnAnswerMissingAWordDoesNotClaimToHoldThemAll(t *testing.T) {

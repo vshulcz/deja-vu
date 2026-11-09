@@ -1,6 +1,9 @@
 package harnesscolor
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestNamedColoursMatchAcrossTerminalAndPage(t *testing.T) {
 	cases := map[string]string{"claude": "#ff8700", "codex": "#5fd75f", "cursor": "#5fd7d7"}
@@ -30,5 +33,21 @@ func TestUnnamedHarnessGetsAStableColourOutsideTheNamedSet(t *testing.T) {
 		if taken[a] {
 			t.Errorf("%s got a named harness's colour %d", h, a)
 		}
+	}
+}
+
+func TestPaintAndMapUseTheHarnessColour(t *testing.T) {
+	if Paint("claude", "x", false) != "x" {
+		t.Error("Paint without colour changed the text")
+	}
+	if got := Paint("claude", "x", true); !strings.HasPrefix(got, ANSI("claude")) || !strings.HasSuffix(got, "x\x1b[0m") {
+		t.Errorf("Paint = %q", got)
+	}
+	m := Map([]string{"claude", "codex"})
+	if len(m) != 2 || m["claude"] != Hex("claude") || m["codex"] != Hex("codex") {
+		t.Errorf("Map = %v", m)
+	}
+	if hex256(5) != "#bcbcbc" || hex256(240) != "#bcbcbc" {
+		t.Error("indices outside the 6x6x6 cube fall back to grey")
 	}
 }

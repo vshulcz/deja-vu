@@ -9,8 +9,7 @@ import (
 
 // The packet's objective is the first line a resuming agent reads, and the turn
 // before a compaction is as often "carry on" as it is the task. The English
-// exact-match list let every other language through: measured on a real store,
-// the objective came back as "продолжай".
+// exact-match list let every other language through: In real-world stores, // the objective came back as "продолжай".
 func TestTheObjectiveSkipsACarryOnInAnyLanguage(t *testing.T) {
 	task := "the exporter retries are hammering the server, cap them"
 	for _, nudge := range []string{

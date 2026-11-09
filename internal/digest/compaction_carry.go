@@ -417,19 +417,6 @@ func carryLine(c model.ContextCarry) string {
 	return "- [" + label + "] " + text + "\n"
 }
 
-// RenderCarry is the list alone, for a host that folds it into its own
-// compaction prompt. It is empty when nothing is carried.
-func RenderCarry(items []model.ContextCarry) string {
-	var b strings.Builder
-	for _, c := range items {
-		b.WriteString(carryLine(model.ContextCarry{Kind: c.Kind, Text: redactContextText(c.Text), Key: c.Key}))
-	}
-	if b.Len() == 0 {
-		return ""
-	}
-	return carryHeader + "\n" + b.String()
-}
-
 // carrySharePercent is the most of a rendered packet the carried list may take.
 const carrySharePercent = 40
 

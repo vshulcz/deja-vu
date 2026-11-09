@@ -11,7 +11,7 @@ import (
 // performance table, which cites where each number comes from. They disagreed —
 // the banner said "sub-millisecond lookups over 5 GB of history" while the table
 // says the benchmark's ~0.4 ms is on a synthetic corpus and a real haystack is
-// ~25 ms. Measured on this machine's 137 MB index, an exact answer is 3.4–6.2 ms
+// ~25 ms. In practice, an exact answer is 3.4–6.2 ms
 // in process and the relevance tier 215 ms (#2608).
 func TestTheReadmeBannerAgreesWithItsOwnTable(t *testing.T) {
 	b, err := os.ReadFile("../../README.md")

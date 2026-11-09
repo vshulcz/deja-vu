@@ -557,9 +557,9 @@ func ParseNotesFileFromOffset(path string, offset int64) ([]model.Session, error
 			key := "promoted\x00" + src
 			s := byDay[key]
 			if s == nil {
-				noteID := PromotedNoteID(src)
+				noteID := model.PromotedNoteID(src)
 				if fromRepo {
-					noteID = RepoPromotedNoteID(src)
+					noteID = model.RepoPromotedNoteID(src)
 				}
 				s = &model.Session{ID: noteID, Harness: "deja", Project: project, Path: path, From: from}
 				byDay[key] = s

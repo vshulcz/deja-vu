@@ -82,7 +82,7 @@ func TestAgreementLeavesTheOrderAlone(t *testing.T) {
 // The fusion constant damps how much one top place is worth. Summing 1/rank
 // rather than 1/(k+rank) lets a single first place outweigh being second on
 // both views, which is the behaviour reciprocal rank fusion exists to avoid
-// (Cormack, Clarke & Buettcher, SIGIR 2009). Measured on a real store, dropping
+// (Cormack, Clarke & Buettcher, SIGIR 2009). In real-world stores, dropping
 // the constant to zero puts the ranking back where it stood before the fusion.
 func TestFusionDampsASingleTopPlace(t *testing.T) {
 	ranked := make([]relevanceScored, 10)

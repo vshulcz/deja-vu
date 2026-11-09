@@ -364,3 +364,7 @@ func HomeRoots() []string {
 	}
 	return out
 }
+
+func PromotedNoteID(sourceSession string) string {
+	return model.PromotedNoteID(sourceSession)
+}

@@ -42,7 +42,7 @@ func staleStore(t *testing.T) string {
 
 // A version bump forces a rebuild, and during it recall used to send the agent
 // away: "deja is rebuilding its index for this version — ask again then."
-// Measured on a real store, 8 of the 56 recalls an agent actually made landed in
+// In real-world stores, 8 of the 56 recalls an agent actually made landed in
 // that sentence, and an agent does not ask again — it concludes there is no
 // history (#1733 says exactly that about the refresh case).
 //

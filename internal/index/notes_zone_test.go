@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -28,7 +29,7 @@ func TestNotesZoneDrift(t *testing.T) {
 		{"bucket grouped in this zone", SessionMeta{ID: "deja-2026-07-20-tz", Harness: "deja", Path: notes, Started: moment, Updated: moment}, false},
 		{"bucket grouped east of here", SessionMeta{ID: "deja-2026-07-21-tz", Harness: "deja", Path: notes, Started: moment, Updated: moment}, true},
 		{"same day, another machine's notes", SessionMeta{ID: "deja-2026-07-21-tz", Harness: "deja", Path: "/elsewhere/notes.jsonl", Started: moment, Updated: moment}, false},
-		{"promoted note carries no day", SessionMeta{ID: sources.PromotedNoteID("claude:abc"), Harness: "deja", Path: notes, Started: moment, Updated: moment}, false},
+		{"promoted note carries no day", SessionMeta{ID: model.PromotedNoteID("claude:abc"), Harness: "deja", Path: notes, Started: moment, Updated: moment}, false},
 		{"another harness that starts with deja-", SessionMeta{ID: "deja-2026-07-21-tz", Harness: "claude", Path: notes, Started: moment, Updated: moment}, false},
 	}
 	saved := time.Local

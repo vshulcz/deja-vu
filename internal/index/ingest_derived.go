@@ -74,7 +74,7 @@ func textOf(s model.Session) sessionText {
 // sessionSettled is what this session concluded, taken from its tail.
 //
 // The same extraction the point-of-action hook used to do per action, moved to
-// where the session is already in hand. Measured on a real store: doing it at
+// where the session is already in hand. In real-world stores, doing it at
 // the moment of the action cost 133 ms a call against 21 ms when the hook said
 // nothing, because it had to rank candidates and then load whole sessions to
 // ask which had run the command — and almost every action asks about a command

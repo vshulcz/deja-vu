@@ -3,8 +3,7 @@ package digest
 import "testing"
 
 // The rule was the number alone — `^\s*\d{1,6}\s` — so every sentence that
-// opens with a count was dropped from every digest. Measured on a real store,
-// 916 of the assistant lines it matched are sentences.
+// opens with a count was dropped from every digest. In real-world stores, // 916 of the assistant lines it matched are sentences.
 func TestASentenceThatStartsWithANumberIsKept(t *testing.T) {
 	prose := []string{
 		"12 зелёных. Жду ревьюера перед мержем.",

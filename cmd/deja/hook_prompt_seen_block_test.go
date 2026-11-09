@@ -13,7 +13,7 @@ import (
 )
 
 // What must not repeat is what the reader sees, not where it came from. Banning
-// the session banned everything else it held: measured on a real store, walking
+// the session banned everything else it held: In real-world stores, walking
 // one working session of eighty messages, the second half got three blocks
 // where the same messages without the ban got thirty-eight — and only seven of
 // those were word-for-word repeats. The same past work answers many questions

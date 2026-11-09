@@ -39,7 +39,7 @@ func offTopicQuestions() []string {
 }
 
 // absentSubjectQuestions ask about something this project has never held,
-// using words it does hold. Measured on a real store: of the blocks that opened
+// using words it does hold. In real-world stores, of the blocks that opened
 // on a line carrying none of their terms, four of five were this — a question
 // about a phone tether, a mobile hotspot, another project's tool, asked while
 // sitting in this repository's directory. The subject appears nowhere in the
@@ -86,7 +86,7 @@ func negativeQuestions() []string {
 		"open the file and read it",
 		"write the code for this",
 		// The same shape in Russian: an imperative that opens a message and
-		// names nothing. Measured on a real store, "продолжай рефактор виджет-сервиса"
+		// names nothing. In real-world stores, "продолжай рефактор виджет-сервиса"
 		// matched a session on "продолжай" and showed "продолжай и не отключай
 		// больше сборку"; five messages of 142 got a block whose only terms
 		// were words like these.
@@ -125,7 +125,7 @@ type promptReport struct {
 	Bucket promptArmReport `json:"bucket_scope"`
 	// The haystack arm: three questions answered by three small sessions, in a
 	// project that also holds one very long session mentioning all of them.
-	// Correct means the small session won. Measured on a real store, one
+	// Correct means the small session won. In real-world stores, one
 	// session of 1476 messages answered 33 of 45 live prompts — a session that
 	// touched everything matches everything, and narrowing it to the matching
 	// part keeps it winning.

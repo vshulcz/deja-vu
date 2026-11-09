@@ -162,3 +162,9 @@ func TestSessionLineageAndCompositeKeys(t *testing.T) {
 		t.Fatalf("codex subagent_fork: IsSpawned=%v InParentFile=%v", codexFork.IsSpawned(), codexFork.InParentFile())
 	}
 }
+
+// IsSpokenRole reports whether a message role represents conversational speech
+// rather than a tool or file-activity work record.
+func IsSpokenRole(role string) bool {
+	return !IsWorkRole(role)
+}

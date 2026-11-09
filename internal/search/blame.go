@@ -546,7 +546,7 @@ func dropRepeatedSnippets(hits []BlameHit) {
 // the score, where the number of mentions is.
 //
 // Said something, because naming the path and saying nothing else is not
-// working on a file: measured on a real store, a pasted absolute path and a
+// working on a file: In real-world stores, a pasted absolute path and a
 // `git diff --stat` row each took the top of the answer from the session that
 // had debugged it (#2854).
 func namedAPath(h BlameHit) bool { return h.Specificity > 1.0 }

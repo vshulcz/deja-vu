@@ -1,6 +1,9 @@
 package cjkfold
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 // The two generated tables are parallel: foldTrad[i] folds to foldSimp[i].
 // Rune() silently skips any Traditional entry past the end of foldSimp, so an
@@ -71,6 +74,58 @@ func TestHasCJK(t *testing.T) {
 	for _, s := range no {
 		if HasCJK(s) {
 			t.Errorf("HasCJK(%q) = true, want false", s)
+		}
+	}
+}
+
+func TestBigrams(t *testing.T) {
+	if got, want := Bigrams("装订计数"), []string{"装订", "订计", "计数"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("Bigrams = %q, want %q", got, want)
+	}
+	if got, want := Bigrams("我 them"), []string{"我"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("Bigrams = %q, want %q", got, want)
+	}
+	if got, want := Bigrams("装订 and 装订"), []string{"装订"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("Bigrams = %q, want %q", got, want)
+	}
+	if got := Bigrams("nothing to see here"); got != nil {
+		t.Errorf("Bigrams = %q on ASCII, want none", got)
+	}
+	if got, want := Bigrams("ログ and 日志"), []string{"ログ", "日志"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("Bigrams = %q, want %q", got, want)
+	}
+}
+
+func TestIsCJKAndCountCJK(t *testing.T) {
+	for _, r := range []rune{'漢', 'ひ', 'カ', '한'} {
+		if !IsCJK(r) {
+			t.Errorf("%q is one of the scripts this package folds", r)
+		}
+	}
+	for _, r := range []rune{'a', 'Я', '1', ' ', '。'} {
+		if IsCJK(r) {
+			t.Errorf("%q is not Han, kana or Hangul", r)
+		}
+	}
+	if got := CountCJK("路径 is /tmp/数据库"); got != 5 {
+		t.Errorf("CountCJK = %d, want 5", got)
+	}
+	if got := CountCJK("plain ascii only"); got != 0 {
+		t.Errorf("CountCJK = %d on ASCII, want 0", got)
+	}
+}
+
+func TestUnspacedAcrossTheShortcut(t *testing.T) {
+	for _, c := range []struct {
+		r    rune
+		want bool
+	}{
+		{'a', false}, {'é', false}, {'ж', false}, {0x0DFF, false},
+		{'ก', true}, {'๙', true}, {0x0E80, false},
+		{'中', true}, {'あ', true}, {'ー', true}, {'한', true},
+	} {
+		if got := Unspaced(c.r); got != c.want {
+			t.Errorf("Unspaced(%U) = %v, want %v", c.r, got, c.want)
 		}
 	}
 }

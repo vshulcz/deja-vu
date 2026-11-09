@@ -338,7 +338,7 @@ func TestProjectRelevantDottedTermNeedsAllSubTokens(t *testing.T) {
 
 // A subject word said once in each of four sessions is rarer than a working
 // word said forty times in each of three. Counting whole sessions says the
-// opposite — measured on a real store, "pgbouncer" scored 1.31 and "branch"
+// opposite — In real-world stores, "pgbouncer" scored 1.31 and "branch"
 // 1.50, because eleven marathon sessions hold 99% of everything ever said and
 // every one of them mentions the ordinary word.
 func TestRarityCountsMessagesNotWholeSessions(t *testing.T) {

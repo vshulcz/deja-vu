@@ -170,7 +170,7 @@ func TestFixPairReadsWhateverTheHarnessCallsOutput(t *testing.T) {
 
 // A remembered command that itself exited non-zero is not a remedy, and telling
 // an agent "this is what followed it" hands it something that already failed
-// here. Found on a real store: the top pair for "command not found: python" was
+// here. In real-world stores, the top pair for "command not found: python" was
 // `python3 -m pytest  → exit 1`.
 func TestFixPairRefusesACommandThatFailed(t *testing.T) {
 	for _, c := range []struct {

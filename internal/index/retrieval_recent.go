@@ -319,7 +319,7 @@ func ignoredByPolicy(ss []model.Session) []model.Session {
 //
 // For the callers that read the commands table rather than the sessions. That
 // table keys by project, and the rule matches on the session's path or its
-// project — measured on a real store under the default `*/.claude/jobs/*`, all
+// project — In real-world stores, under the default `*/.claude/jobs/*`, all
 // 305 ignored sessions matched by path and none by project, and the project
 // they sit in is called "run". So a table keyed by project cannot apply the
 // rule exactly, and the honest approximation is to drop a project the rule
@@ -627,7 +627,7 @@ func recentProjectMetas(m Manifest, projects []string, root string, perName int)
 // which no name has already claimed. Nothing when root is empty, so a caller
 // that does not know where it stands is unaffected.
 //
-// A repository, not any directory: measured on a real store, standing in a
+// A repository, not any directory: In real-world stores, standing in a
 // home directory admitted 697 of 768 sessions with touched files — every
 // project on the machine, injected under a line that says "from this project's
 // recent history" (#2343's shape). The checkout is the boundary a person means

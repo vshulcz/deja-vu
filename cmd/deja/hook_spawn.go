@@ -10,7 +10,7 @@ import (
 
 // A spawned agent starts with no memory and no way to be given one.
 //
-// Measured on this machine's store, 289 of 328 sessions that had deja
+// In practice, 289 of 328 sessions that had deja
 // available were Task subagents, and they received a recall in 1% of them and
 // called the tool in none. The reason is structural rather than a bar being
 // too high: the per-prompt hook fires on what a person types, and a subagent's

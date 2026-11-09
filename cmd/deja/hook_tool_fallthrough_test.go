@@ -81,7 +81,7 @@ func seedFallthroughStore(t *testing.T) {
 // line it was handed, found it already injected, and returned without asking
 // the next producer.
 //
-// Measured on a real store, that cost 34 decisions behind 51 sentences about
+// In real-world stores, that cost 34 decisions behind 51 sentences about
 // one absent program, and left the hook saying three lines in ninety-one
 // actions (#3603).
 func TestTheToolHookFallsThroughToTheLineBehindARepeatedFact(t *testing.T) {

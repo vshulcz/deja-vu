@@ -10,7 +10,7 @@ import (
 
 // Two agents in one checkout, and the product's whole claim: a fix found in
 // one comes back in the other. What carries it is not the project name — the
-// harnesses do not agree on that. Measured on a real store, of 170 pairs of
+// harnesses do not agree on that. In real-world stores, of 170 pairs of
 // sessions from different harnesses that edited the same absolute file, 26
 // agreed on the project name and 144 did not: one name contained the other in
 // 84 cases and one was a path where the other was a bare name in 52.

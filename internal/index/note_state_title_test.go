@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -44,7 +45,7 @@ func TestPromotedNoteTitleTracksTheCorrection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	id := sources.PromotedNoteID(src)
+	id := model.PromotedNoteID(src)
 	for _, m := range metas {
 		if m.ID != id {
 			continue

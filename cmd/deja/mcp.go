@@ -1138,7 +1138,7 @@ const blameMCPBudget = 8192
 // blameTouchedCap bounds the files a blame row names beside the one asked about.
 //
 // The manifest holds up to forty per session, ordered by how often the session
-// touched them, and the whole list was served: measured on a real store, that
+// touched them, and the whole list was served: In real-world stores, that
 // was 3186 of an 8044-byte answer — 40% of the second most-called tool's
 // payload — about files the question did not ask about. Three is what the
 // documented field says it is, "the few files this session worked on most", and
@@ -1338,7 +1338,7 @@ func buildingNowForAgent(dir string) string {
 		// A stale content version is not an unreadable store. When the layout is
 		// the one this build writes, answer from the snapshot and let the
 		// detached rebuild catch up — the same choice #1733 made for a refresh,
-		// for the same reason: measured on this machine, 8 of the 56 recalls an
+		// for the same reason: In practice, 8 of the 56 recalls an
 		// agent actually made landed in this sentence, and an agent does not ask
 		// again, it concludes there is no history. Of the last four upgrades,
 		// three changed only what deja derives from a transcript.

@@ -11,7 +11,7 @@ import (
 
 // gooseStore writes a store the way goose writes one: sessions.updated_at in
 // sqlite's CURRENT_TIMESTAMP format ("2026-07-27 15:29:47"), messages carrying
-// unix seconds for the same instant. Measured on a real store.
+// unix seconds for the same instant. In real-world stores, .
 func gooseStore(t *testing.T, db string, turns []struct {
 	Session, Role, Text string
 	At                  int64

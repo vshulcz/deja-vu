@@ -10,7 +10,7 @@ import (
 
 // The injection log said what was injected and never to whom, so the only way
 // to tell whether a recall was used was the sentence the block asks the agent
-// to say. Measured on a real store, that sentence follows 22 of 1218
+// to say. In real-world stores, that sentence follows 22 of 1218
 // injections — a measure of reporting, not of use. With the receiving session
 // recorded, a reader can pair an injection with what the agent did next.
 func TestSnapshotRecordsWhoReceivedIt(t *testing.T) {

@@ -246,9 +246,20 @@ func TestRenderCompactionContextPutsCarryBeforeObjective(t *testing.T) {
 	if !strings.Contains(tight, "- [awaiting you]") || strings.Contains(tight, "- [open]") || !strings.Contains(tight, "Omitted") {
 		t.Fatalf("tight budget:\n%s", tight)
 	}
-	if RenderCarry(nil) != "" || !strings.HasPrefix(RenderCarry(c.Carry), carryHeader+"\n- [awaiting you]") {
-		t.Fatalf("RenderCarry: %q", RenderCarry(c.Carry))
+	if renderCarry(nil) != "" || !strings.HasPrefix(renderCarry(c.Carry), carryHeader+"\n- [awaiting you]") {
+		t.Fatalf("renderCarry: %q", renderCarry(c.Carry))
 	}
+}
+
+func renderCarry(items []model.ContextCarry) string {
+	var b strings.Builder
+	for _, c := range items {
+		b.WriteString(carryLine(model.ContextCarry{Kind: c.Kind, Text: redactContextText(c.Text), Key: c.Key}))
+	}
+	if b.Len() == 0 {
+		return ""
+	}
+	return carryHeader + "\n" + b.String()
 }
 
 // Printed first, a full list would push the objective and the conclusions out

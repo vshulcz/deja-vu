@@ -40,12 +40,7 @@ func repeatedStamps(ms []model.Message) map[string]bool {
 	return repeated
 }
 
-// PrintSession writes a whole session as plain text.
-func PrintSession(w io.Writer, s model.Session) {
-	PrintSessionStyled(w, s, false, 0)
-}
-
-// PrintSessionStyled is PrintSession for a terminal: the harness in its colour,
+// PrintSessionStyled writes a whole session for a terminal: the harness in its colour,
 // timestamps dimmed and roles bold so a long session scans by turn, and every
 // message wrapped to width at spaces. color false and width 0 is the plain
 // text a pipe gets.
