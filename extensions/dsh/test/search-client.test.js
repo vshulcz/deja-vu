@@ -75,7 +75,7 @@ function shortcuts(mod, prefs) {
   return { command, ctx, state };
 }
 
-test("Ctrl+F writes a real /deja command and keeps the draft and its references", () => {
+test("Mod+F writes a real /deja command and keeps the draft and its references", () => {
   const mod = load();
   const { command, state } = shortcuts(mod, mod.preferences());
   state.projections.set("session-first", { clipboardText: "中文 query", occurrences: [] });
@@ -93,12 +93,14 @@ test("Ctrl+F writes a real /deja command and keeps the draft and its references"
   command.resolve({ modal: null }).run();
   assert.equal(state.drafts.get("session-first").text, "/deja --session first -- 中文 query");
   // The README promises these exact defaults for every platform.
+  // web:linux has no default: the browser service admits only a short
+  // allowlist there, and a rejected default throws out of register(), which
+  // would leave the command unregistered on every platform.
   const promised = {
     "desktop:windows": "KeyF:primary",
     "desktop:linux": "KeyF:primary",
     "desktop:macos": "KeyF:primary",
     "web:windows": "KeyF:primary+alt",
-    "web:linux": "KeyF:primary+alt",
     "web:macos": "KeyF:primary+alt",
   };
   for (const [profile, expected] of Object.entries(promised)) {
@@ -106,6 +108,8 @@ test("Ctrl+F writes a real /deja command and keeps the draft and its references"
     assert.equal(row && row.code + ":" + row.modifiers.join("+"), expected,
       profile + " must match the documented default");
   }
+  assert.equal(command.defaults["web:linux"], undefined,
+    "web:linux must stay unbound so register() does not throw");
 });
 
 test("a reference chip keeps its identity and moves past the command prefix", () => {
@@ -206,7 +210,7 @@ test("malformed or unavailable storage leaves both controls usable", () => {
   }
 });
 
-test("Ctrl+Alt+K opens the sidebar in Deja full-text mode and the magnifier restores the native view", () => {
+test("Mod+Shift+K opens the sidebar in Deja full-text mode and the magnifier restores the native view", () => {
   const mod = load();
   const prefs = mod.preferences();
   const anchor = sidebarAnchor(true);
@@ -219,7 +223,7 @@ test("Ctrl+Alt+K opens the sidebar in Deja full-text mode and the magnifier rest
   // prefs.requestOpen(), which notifies onOpen listeners and claims the
   // expansion. Calling attachment.claimOpen() directly would bypass it.
   prefs.requestOpen();
-  assert.deepEqual(views.map((view) => view.active), [false, true], "the Ctrl+Alt+K gesture lands in Deja mode");
+  assert.deepEqual(views.map((view) => view.active), [false, true], "the Mod+Shift+K gesture lands in Deja mode");
   assert.equal(anchor.list.hidden, true);
   assert.equal(anchor.button.getAttribute("aria-pressed"), "true");
   assert.equal(prefs.getSnapshot().opensDeja, true);
@@ -264,7 +268,7 @@ test("the claim helper only settles while the sidebar is expanding, and is relea
   attachment.dispose();
 });
 
-test("the direct Deja search shortcut keeps its own binding distinct from native Ctrl+K", () => {
+test("the direct Deja search shortcut keeps its own binding distinct from native Mod+K", () => {
   const mod = load({}, { "react-dom": { createPortal() {} } });
   const commands = new Map();
   const services = { shortcuts: { register: (command) => { commands.set(command.id, command); return () => {}; } }, uiSession: {}, sessions: {}, conversation: {}, uiWorkspace: {} };
@@ -282,24 +286,33 @@ test("the direct Deja search shortcut keeps its own binding distinct from native
   const direct = commands.get("deja.search-sessions");
   assert.ok(direct, "a discoverable direct binding is registered");
   // These are the exact bindings the README promises. Keep them in sync:
-  // primary is Ctrl on Windows/Linux and Cmd on macOS; the browser needs the
-  // extra Alt/Shift because the page's own shortcuts claim the plain forms.
+  // `primary` is the registry's logical modifier — Cmd on macOS, Ctrl
+  // elsewhere — so one declaration covers every desktop platform.
+  // web:linux stays unbound: the browser service admits only a short
+  // allowlist there, and a rejected default throws out of register(), which
+  // would leave the command unregistered on every platform.
   const promised = {
-    "desktop:windows": "KeyK:primary+alt",
-    "desktop:linux": "KeyK:primary+alt",
-    "desktop:macos": "KeyK:primary+alt",
-    "web:windows": "KeyK:primary+alt+shift",
-    "web:linux": "KeyK:primary+alt+shift",
-    "web:macos": "KeyK:primary+alt+shift",
+    "desktop:windows": "KeyK:primary+shift",
+    "desktop:linux": "KeyK:primary+shift",
+    "desktop:macos": "KeyK:primary+shift",
+    "web:windows": "KeyK:primary+shift",
+    "web:macos": "KeyK:primary+shift",
   };
   for (const [profile, expected] of Object.entries(promised)) {
     const row = direct.defaults[profile];
     assert.equal(row && row.code + ":" + row.modifiers.join("+"), expected,
       profile + " must match the documented default");
   }
+  assert.equal(direct.defaults["web:linux"], undefined,
+    "web:linux must stay unbound so register() does not throw");
+  // The chord must fire from the composer too: the dispatcher passes when the
+  // focused region is not listed, and the message input is an editable region.
+  // Compare serialized values: the command comes from the plugin's vm realm.
+  assert.equal(JSON.stringify(direct.regions), JSON.stringify(["page", "editable"]),
+    "deja.search-sessions must fire from the editable composer, like dsh-shortcuts");
   // The official session.search keeps primary+K; Deja must not collide with it.
   const keys = new Set([...commands.values()].map((command) => command.defaults["desktop:windows"]?.code + ":" + (command.defaults["desktop:windows"]?.modifiers || []).join("+")));
-  assert.equal(keys.has("KeyK:primary+alt"), true);
+  assert.equal(keys.has("KeyK:primary+shift"), true);
   assert.equal(keys.has("KeyK:primary"), false, "the native session.search binding stays untouched");
   // The command closes over installSearch's own preferences object; reaching
   // it through a second preferences() instance would read a different copy.

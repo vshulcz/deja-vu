@@ -58,26 +58,36 @@ dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
 
 ## 搜索控制
 
-打开 **设置 → Deja**，可分别控制三个默认开启的开关：
+打开 **设置 → Deja**，下面分两组，共三个默认开启的开关。本文档用 **Mod** 表示
+逻辑主修饰键：`Mod` = `Ctrl`（Windows/Linux）/ `Cmd`（macOS）。源码里的
+默认值统一写成官方注册表的 `primary` 形式，由框架按平台自动展开。
 
-- **Ctrl+F in conversations（会话内快捷搜索）**：把真正的 `/deja` 命令写进
+**会话内搜索**
+
+- **Mod+F in conversations（会话内快捷搜索）**：把真正的 `/deja` 命令写进
   消息输入框——`/deja --session <不带 session- 前缀的会话 UUID> -- <当前草稿>`，
   并聚焦输入框。发送后由 deja 只搜这一段会话，而不是变成一条普通消息；草稿里的
   引用块会保留并随前缀整体后移。不会自动发送。若草稿本身已以别的命令开头，
-  则原样不动。Windows/Linux 桌面端使用 **Ctrl+F**，macOS 桌面端使用 **Cmd+F**；
-  浏览器中 Windows 使用 **Ctrl+Alt+F**，macOS 使用 **Option+Command+F**，
-  因为 DSH 为浏览器原生查找保留了普通的 Find 快捷键。
-- **Ctrl+Alt+K 唤起 Deja 全文搜索**：这是直达跨会话搜索的快捷键。按下后打开
+  则原样不动。桌面端默认 **Mod+F**；浏览器默认 **Mod+Alt+F**（macOS 为
+  **Cmd+Option+F**），因为 DSH 为浏览器原生查找保留了普通的 Find 快捷键。
+
+**Deja 全文搜索**（两个开关）
+
+- **Mod+Shift+K 唤起 Deja 全文搜索**：这是直达跨会话搜索的快捷键。按下后打开
   DSH 侧栏搜索，并直接进入 Deja 全文模式，而不是原来的标题搜索；点放大镜可对
-  当次打开恢复原生搜索。DSH 自带的 **Ctrl+K 保持不变**——快捷键注册表不允许
-  第二个相同默认绑定，所以 Windows/Linux 桌面端用 **Ctrl+Alt+K**，macOS 桌面端
-  用 **Cmd+Option+K**，浏览器用 **Ctrl+Alt+Shift+K**（macOS 为
-  Cmd+Option+Shift+K）。关闭此开关即完全恢复官方行为。
-- **Deja search in the sidebar（侧栏 Deja 搜索）**：先打开侧栏搜索，
-  再点一次放大镜，切换到 Deja 全文搜索。输入关键词后，只检索本地索引中的
+  当次打开恢复原生搜索。DSH 自带的 **Mod+K 保持不变**——快捷键注册表不允许
+  第二个相同默认绑定，所以 Deja 桌面端与浏览器统一用 **Mod+Shift+K**
+  （macOS 为 **Cmd+Shift+K**）。关闭此开关即完全恢复官方行为。
+- **Deja search in the sidebar（侧栏 Deja 搜索）**：控制侧栏放大镜那一路。先打开
+  侧栏搜索，再点一次放大镜，切换到 Deja 全文搜索。输入关键词后，只检索本地索引中的
   **DSH 会话**，最多显示 20 条结果及匹配片段；点击结果可打开对应会话。
   再点放大镜可恢复普通侧栏结果。若还有更多匹配，请缩小查询范围。
   Deja 不可用、搜索失败或无法打开会话时，界面会显示错误信息。
+
+**Linux 浏览器**：两个快捷键都没有默认键位。浏览器快捷键服务在那里只允许
+`Mod+/`、`Mod+Shift+,`、`Mod+Shift+.` 三个组合；`Mod+/` 已归官方
+`shortcuts.open`（打开键盘设置），所以除了另外两个（`Mod+Shift+,`、
+`Mod+Shift+.`）之外的其他组合都会被拒绝。请在下方设置里从这两个中自行录制。
 
 两个偏好分别保存在当前浏览器／配置的本地存储中，互不影响，也不会同步到其他
 浏览器或设备。即使设置了 `autoRecall: false`，手动搜索仍然可用。
@@ -128,7 +138,5 @@ DSH 目前没有侧栏搜索 provider API。浏览器适配器限定在
 ## 不做什么
 
 不用大模型，不用向量嵌入。索引是本地 BM25，建立在本来就存在的文件之上，一次查询约一毫秒，除非你主动要求，否则不走网络。密钥在建立索引时被脱敏。
-
-属于 [deja-vu](https://github.com/vshulcz/deja-vu) 项目。MIT 许可。
 
 属于 [deja-vu](https://github.com/vshulcz/deja-vu) 项目。MIT 许可。觉得有用的话，欢迎在 [GitHub](https://github.com/vshulcz/deja-vu) 上给 deja-vu 点个 Star。

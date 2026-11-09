@@ -86,33 +86,47 @@ panel from these files; with both installed you get one panel.
 
 ## Search controls
 
-Open **Settings → Deja** for three independent switches, all enabled by default:
+Open **Settings → Deja** for three switches, all enabled by default and grouped
+in two sections.
 
-- **Ctrl+F in conversations** writes a real `/deja` command into the message
+**In-conversation search**
+
+- **Mod+F in conversations** writes a real `/deja` command into the message
   input — `/deja --session <bare session UUID> -- <your draft>` — and focuses
   it. Sending it runs deja against that one conversation, so the search
   actually happens instead of arriving as an ordinary message; reference
   chips in the draft are kept and move with the prefix. The shortcut does not
   send the draft; you send it when you choose. A draft that already starts
-  with another command is left untouched. Use **Ctrl+F** on Windows/Linux
-  desktop or **Cmd+F** on macOS desktop. In a browser, use **Ctrl+Alt+F** on
-  Windows or **Option+Command+F** on macOS; DSH reserves the browser's
-  ordinary Find shortcut.
-- **Ctrl+Alt+K opens Deja full-text search** is the direct cross-session
+  with another command is left untouched. The default is **Mod+F** — in this
+  document `Mod` means `Ctrl` on Windows/Linux and `Cmd` on macOS, and the
+  defaults below are written in the registry's own `primary` form, which the
+  framework expands per platform. In a browser the default is **Mod+Alt+F**
+  (on macOS, **Cmd+Option+F**), because DSH reserves the browser's ordinary
+  Find shortcut.
+
+**Deja full-text search** (two switches)
+
+- **Mod+Shift+K opens Deja full-text search** is the direct cross-session
   shortcut. It opens DSH's sidebar search and starts it in Deja full-text mode
   instead of the title search. The magnifying glass returns the native search
-  for that opening. DSH's own **Ctrl+K** is left untouched: the shortcut
+  for that opening. DSH's own **Mod+K** is left untouched: the shortcut
   registry rejects a second binding for the same key, so Deja uses
-  **Ctrl+Alt+K** on Windows/Linux desktop, **Cmd+Option+K** on macOS desktop,
-  and **Ctrl+Alt+Shift+K** in a browser (**Cmd+Option+Shift+K** on macOS).
-  Turn the switch off to restore the official behaviour completely.
-- **Deja search in the sidebar** adds a full-text mode to sidebar search.
-  Open sidebar search, then click its magnifying glass again to switch to
-  Deja. Enter a query to search the local index of **DSH conversations only**,
-  see up to 20 hits with matching snippets, and click a hit to open its session.
-  Click the magnifying glass again to return to regular sidebar results.
-  If more matches exist, narrow the query. Missing Deja, failed searches and
-  sessions that cannot be opened are shown as errors.
+  **Mod+Shift+K** (**Cmd+Shift+K** on macOS), the same default on desktop and in
+  a browser. Turn the switch off to restore the official behaviour completely.
+- **Deja search in the sidebar** controls the magnifying-glass path. It adds a
+  full-text mode to sidebar search: open sidebar search, then click its
+  magnifying glass again to switch to Deja. Enter a query to search the local
+  index of **DSH conversations only**, see up to 20 hits with matching
+  snippets, and click a hit to open its session. Click the magnifying glass
+  again to return to regular sidebar results. If more matches exist, narrow the
+  query. Missing Deja, failed searches and sessions that cannot be opened are
+  shown as errors.
+
+**Linux browsers** get no default binding for either shortcut: the browser
+service admits only `Mod+/`, `Mod+Shift+,` and `Mod+Shift+.`. `Mod+/` already
+belongs to DSH's own `shortcuts.open` (the keyboard settings), so apart from the
+other two (`Mod+Shift+,` and `Mod+Shift+.`) every combination is rejected.
+Record one of those two in the settings below.
 
 These preferences are saved separately in this browser/profile's local storage;
 changing one does not change the other, and they do not sync between browsers
@@ -201,7 +215,5 @@ errors, empty queries, disabling the feature and cleanup.
 No LLM, no embeddings. The index is a local BM25 store over files
 that already exist, so a query answers in about a millisecond, with no network
 path unless you ask for one. Secrets are redacted at index time.
-
-Part of [deja-vu](https://github.com/vshulcz/deja-vu). MIT.
 
 Part of [deja-vu](https://github.com/vshulcz/deja-vu). MIT. Found it useful? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).

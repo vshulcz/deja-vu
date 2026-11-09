@@ -136,6 +136,10 @@
     settingsRoot.render(React.createElement(mod.Settings, { prefs, route: absentStore, shortcuts }));
     await wait(() => [...document.querySelectorAll("button")].some((node) => node.textContent === "Copy install command"));
     check(document.querySelectorAll('input[role="switch"]').length === 1, "an absent route hides the sidebar switches");
+    check(![...document.querySelectorAll("h3")].some((node) => node.textContent === "Deja full-text search"),
+      "an absent route hides the full-text-search group heading");
+    check([...document.querySelectorAll("h3")].some((node) => node.textContent === "In-conversation search"),
+      "the in-conversation group heading always renders");
     check(document.querySelector(".deja-endpoint").textContent.includes("/api/deja-search"), "settings names the missing endpoint");
     check(![...document.querySelectorAll("strong")].some((node) => node.textContent === "Deja cross-session search"),
       "an absent route hides the sidebar shortcut rows");
@@ -146,6 +150,8 @@
     settingsRoot.render(React.createElement(mod.Settings, { prefs, route: presentStore, shortcuts }));
     await wait(() => document.querySelector(".deja-endpoint").textContent.includes("0.24.0"));
     check(document.querySelectorAll('input[role="switch"]').length === 3, "a live route restores the sidebar switches");
+    check([...document.querySelectorAll("h3")].some((node) => node.textContent === "Deja full-text search"),
+      "a live route shows the full-text-search group heading");
     check([...document.querySelectorAll("strong")].some((node) => node.textContent === "Deja cross-session search"),
       "a live route restores the sidebar shortcut rows");
     const unknownStore = { getSnapshot: () => "unknown", getVersion: () => "", subscribe: () => () => {} };
