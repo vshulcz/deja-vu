@@ -85,9 +85,9 @@ dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
   Deja 不可用、搜索失败或无法打开会话时，界面会显示错误信息。
 
 **Linux 浏览器**：两个快捷键都没有默认键位。浏览器快捷键服务在那里只允许
-`Mod+/`、`Mod+Shift+,`、`Mod+Shift+.` 三个组合，其中 `Mod+/` 已归官方
-`shortcuts.open`（打开键盘设置），其它组合会被直接拒绝。请在下方设置里
-自行录制。
+`Mod+/`、`Mod+Shift+,`、`Mod+Shift+.` 三个组合；`Mod+/` 已归官方
+`shortcuts.open`（打开键盘设置），所以除了另外两个（`Mod+Shift+,`、
+`Mod+Shift+.`）之外的其他组合都会被拒绝。请在下方设置里从这两个中自行录制。
 
 两个偏好分别保存在当前浏览器／配置的本地存储中，互不影响，也不会同步到其他
 浏览器或设备。即使设置了 `autoRecall: false`，手动搜索仍然可用。

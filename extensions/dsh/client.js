@@ -714,19 +714,23 @@ window.__ModuleLoader__.load({
       // do nothing for a moment. The composer draft needs no route and stays.
       const status = useSearchRoute(route || searchRoute());
       const sidebarUsable = status === "present";
+      const toggle = (key, title, hint) => h("label", { key, className: "deja-setting" },
+        h("input", { type: "checkbox", role: "switch", checked: value[key], onChange: (event) => prefs.set(key, event.target.checked) }),
+        h("span", null, h("strong", null, title), h("span", { className: "deja-setting-hint" }, hint)),
+      );
       return h("section", { className: "deja-settings", "aria-label": "Deja" },
         h("h2", null, "Deja"),
         h("p", null, "Search your conversation history with the local Deja index."),
-        ...[
-          ["conversation", "Search this conversation", "Fill the message input with a search command for the current session. Existing draft text becomes the query; nothing is sent automatically. Customize the key below."],
-          ...(sidebarUsable ? [
-            ["sidebar", "Deja search in the sidebar", "Open sidebar search, then click its magnifying glass again to search DSH conversation text with Deja. Click again to return to the regular results."],
-            ["opensDeja", "Deja cross-session shortcut", "Enable the shortcut that opens Deja full-text search for DSH conversations. Customize its key below. The magnifying glass returns the native search."],
-          ] : []),
-        ].map(([key, title, hint]) => h("label", { key, className: "deja-setting" },
-          h("input", { type: "checkbox", role: "switch", checked: value[key], onChange: (event) => prefs.set(key, event.target.checked) }),
-          h("span", null, h("strong", null, title), h("span", { className: "deja-setting-hint" }, hint)),
-        )),
+        // Two workflow groups, as dsh-shortcuts groups its commands: the
+        // composer draft stands alone, and the two sidebar features share the
+        // full-text-search heading so the docs' "two sections" is what renders.
+        h("h3", null, "In-conversation search"),
+        toggle("conversation", "Search this conversation", "Fill the message input with a search command for the current session. Existing draft text becomes the query; nothing is sent automatically. Customize the key below."),
+        ...(sidebarUsable ? [
+          h("h3", { key: "fulltext-heading" }, "Deja full-text search"),
+          toggle("sidebar", "Deja search in the sidebar", "Open sidebar search, then click its magnifying glass again to search DSH conversation text with Deja. Click again to return to the regular results."),
+          toggle("opensDeja", "Deja cross-session shortcut", "Enable the shortcut that opens Deja full-text search for DSH conversations. Customize its key below. The magnifying glass returns the native search."),
+        ] : []),
         h(EndpointStatus, { route: route || searchRoute() }),
         h("h3", null, "Customize shortcuts"),
         h("p", { className: "deja-setting-hint" }, "Click Change shortcut, press the combination you want, then release to save. These stay in sync with DSH's built-in shortcut editor."),
@@ -977,7 +981,10 @@ window.__ModuleLoader__.load({
               // it declares no default rather than making register() throw.
               ...["windows", "macos"].map((os) => ["web:" + os, { code: "KeyK", modifiers: ["primary", "shift"] }]),
             ]),
-            regions: ["page"],
+            // Fire from the composer too, like deja.search-session and every
+            // dsh-shortcuts command: a page-only region would make the chord
+            // dead whenever the message input (an editable region) has focus.
+            regions: ["page", "editable"],
             modals: [],
             resolve(context) {
               if (context.modal != null || !takeoverEnabled()) return { status: "pass" };

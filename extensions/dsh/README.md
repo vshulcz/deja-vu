@@ -123,10 +123,10 @@ in two sections.
   shown as errors.
 
 **Linux browsers** get no default binding for either shortcut: the browser
-service admits only `Mod+/`, `Mod+Shift+,` and `Mod+Shift+.`, and `Mod+/`
-already belongs to DSH's own `shortcuts.open` (the keyboard settings). Any
-other default is rejected outright, so record your own combination in the
-settings below.
+service admits only `Mod+/`, `Mod+Shift+,` and `Mod+Shift+.`. `Mod+/` already
+belongs to DSH's own `shortcuts.open` (the keyboard settings), so apart from the
+other two (`Mod+Shift+,` and `Mod+Shift+.`) every combination is rejected.
+Record one of those two in the settings below.
 
 These preferences are saved separately in this browser/profile's local storage;
 changing one does not change the other, and they do not sync between browsers

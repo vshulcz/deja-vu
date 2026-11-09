@@ -305,6 +305,11 @@ test("the direct Deja search shortcut keeps its own binding distinct from native
   }
   assert.equal(direct.defaults["web:linux"], undefined,
     "web:linux must stay unbound so register() does not throw");
+  // The chord must fire from the composer too: the dispatcher passes when the
+  // focused region is not listed, and the message input is an editable region.
+  // Compare serialized values: the command comes from the plugin's vm realm.
+  assert.equal(JSON.stringify(direct.regions), JSON.stringify(["page", "editable"]),
+    "deja.search-sessions must fire from the editable composer, like dsh-shortcuts");
   // The official session.search keeps primary+K; Deja must not collide with it.
   const keys = new Set([...commands.values()].map((command) => command.defaults["desktop:windows"]?.code + ":" + (command.defaults["desktop:windows"]?.modifiers || []).join("+")));
   assert.equal(keys.has("KeyK:primary+shift"), true);
