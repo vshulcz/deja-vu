@@ -24,6 +24,9 @@ func TestInstallKiroWritesTheGlobalSettings(t *testing.T) {
 		t.Errorf("path = %q, want %q", res.Path, want)
 	}
 	assertMCPServerEntry(t, want)
+	if mb, err := os.ReadFile(want); err != nil || !strings.Contains(string(mb), `"autoApprove"`) {
+		t.Errorf("kiro mcp.json missing autoApprove: %s (%v)", mb, err)
+	}
 	// A custom agent does not inherit global servers, and a reader who has one
 	// would otherwise find recall missing with nothing saying why.
 	if !strings.Contains(res.Note, "agents") {

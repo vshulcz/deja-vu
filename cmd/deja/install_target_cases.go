@@ -24,10 +24,8 @@ func installTargetCase(target string) (installTargetFunc, bool) {
 		"gemini": func(exe string, uninstall bool) (installResult, error) {
 			return installMCPJSON(filepath.Join(sources.GeminiHome(), "settings.json"), exe, uninstall)
 		},
-		"gemini-auto": installTargetGeminiAuto,
-		"antigravity": func(exe string, uninstall bool) (installResult, error) {
-			return installMCPJSON(filepath.Join(antigravityConfigHome(), "mcp_config.json"), exe, uninstall)
-		},
+		"gemini-auto":      installTargetGeminiAuto,
+		"antigravity":      installAntigravityMCP,
 		"antigravity-auto": installAntigravityAuto,
 		"grok":             installGrok,
 		"grok-auto":        installTargetGrokAuto,

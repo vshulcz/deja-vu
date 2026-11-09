@@ -37,8 +37,9 @@ func TestInstallKilocodeWiresTheServerAndTheSkill(t *testing.T) {
 	}
 	var cfg struct {
 		Servers map[string]struct {
-			Command string   `json:"command"`
-			Args    []string `json:"args"`
+			Command     string   `json:"command"`
+			Args        []string `json:"args"`
+			AlwaysAllow []string `json:"alwaysAllow"`
 		} `json:"mcpServers"`
 	}
 	if uerr := json.Unmarshal(b, &cfg); uerr != nil {
@@ -47,6 +48,9 @@ func TestInstallKilocodeWiresTheServerAndTheSkill(t *testing.T) {
 	srv, ok := cfg.Servers["deja"]
 	if !ok {
 		t.Fatalf("no deja server in %v", cfg.Servers)
+	}
+	if len(srv.AlwaysAllow) != 1 || srv.AlwaysAllow[0] != "deja" {
+		t.Errorf("alwaysAllow = %v, want [deja]", srv.AlwaysAllow)
 	}
 	// windows gets the `cmd /c <exe> mcp` shim, so the binary is an argument
 	// there rather than the command: what has to hold on every platform is that

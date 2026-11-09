@@ -156,6 +156,21 @@ func installRoo(exe string, uninstall bool) (installResult, error) {
 // does not name deja is the reader's own answer, and re-running install must
 // not overrule it.
 func rooAllowDejasTool(path string) (bool, error) {
+	return mcpSetEntryDefaults(path, map[string]any{"alwaysAllow": []any{"deja"}})
+}
+
+func kiroApproveDejasTool(path string) (bool, error) {
+	return mcpSetEntryDefaults(path, map[string]any{"autoApprove": []any{"deja"}})
+}
+
+func antigravityEagerDejasTool(path string) (bool, error) {
+	return mcpSetEntryDefaults(path, map[string]any{
+		"forceAllToolsEager": true,
+		"tools":              map[string]any{"deja": map[string]any{"eager": true}},
+	})
+}
+
+func mcpSetEntryDefaults(path string, defaults map[string]any) (bool, error) {
 	old, err := readConfig(path)
 	if err != nil || len(bytes.TrimSpace(old)) == 0 {
 		return false, err
@@ -175,10 +190,16 @@ func rooAllowDejasTool(path string) (bool, error) {
 	if entry == nil {
 		return false, nil
 	}
-	if _, said := entry["alwaysAllow"]; said {
+	added := false
+	for k, v := range defaults {
+		if _, said := entry[k]; !said {
+			entry[k] = v
+			added = true
+		}
+	}
+	if !added {
 		return false, nil
 	}
-	entry["alwaysAllow"] = []any{"deja"}
 	next, err := marshalConfigLike(old, root)
 	if err != nil {
 		return false, err

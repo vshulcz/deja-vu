@@ -57,6 +57,15 @@ func installKilocode(exe string, uninstall bool) (installResult, error) {
 		if err != nil {
 			return installResult{}, err
 		}
+		if !uninstall {
+			changed, err := rooAllowDejasTool(p)
+			if err != nil {
+				return installResult{}, err
+			}
+			if changed && res.Action == "unchanged" {
+				res.Action = "updated"
+			}
+		}
 		results = append(results, res)
 	}
 

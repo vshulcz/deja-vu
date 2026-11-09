@@ -776,8 +776,8 @@ func antigravityTakeWrite(text string, step []model.Message, pending map[string]
 	return nil
 }
 
-// AntigravityEditPaths are the files a planner row's calls edit or create, in
-// call order.
+// AntigravityEditPaths are the files a planner row's calls edit, create, or
+// read before an edit, in call order.
 func AntigravityEditPaths(toolCalls any) []string {
 	calls, _ := toolCalls.([]any)
 	var out []string
@@ -785,7 +785,7 @@ func AntigravityEditPaths(toolCalls any) []string {
 		call, _ := c.(map[string]any)
 		args, _ := call["args"].(map[string]any)
 		switch str(call["name"]) {
-		case "replace_file_content", "multi_replace_file_content", "write_to_file", "edit_file", "write_file":
+		case "replace_file_content", "multi_replace_file_content", "write_to_file", "edit_file", "write_file", "read_file", "view_file":
 		default:
 			continue
 		}

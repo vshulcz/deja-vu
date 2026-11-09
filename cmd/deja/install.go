@@ -682,7 +682,7 @@ func installClaudeAuto(exe string, uninstall bool) (installResult, error) {
 }
 
 func installAntigravityAuto(exe string, uninstall bool) (installResult, error) {
-	mcp, err := installMCPJSON(filepath.Join(antigravityConfigHome(), "mcp_config.json"), exe, uninstall)
+	mcp, err := installAntigravityMCP(exe, uninstall)
 	if err != nil {
 		return installResult{}, err
 	}

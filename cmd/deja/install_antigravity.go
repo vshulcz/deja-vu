@@ -26,6 +26,22 @@ import (
 // hook prints, which is how the digest gets in.
 const antigravityPluginName = "deja"
 
+func installAntigravityMCP(exe string, uninstall bool) (installResult, error) {
+	path := filepath.Join(antigravityConfigHome(), "mcp_config.json")
+	res, err := installMCPJSON(path, exe, uninstall)
+	if err != nil || uninstall {
+		return res, err
+	}
+	changed, err := antigravityEagerDejasTool(path)
+	if err != nil {
+		return installResult{}, err
+	}
+	if changed && res.Action == "unchanged" {
+		res.Action = "updated"
+	}
+	return res, nil
+}
+
 func installAntigravityPlugin(exe string, uninstall bool) (installResult, error) {
 	// The launcher, not this binary: a generated plugin is as much a
 	// config as a hooks.json, and one that names the build it was
