@@ -338,8 +338,8 @@ func doctorCursorLocation() string {
 
 func doctorAiderLocation() string {
 	loc := filepath.Join(sources.Home(), ".aider.chat.history.md")
-	if roots := os.Getenv("DEJA_AIDER_ROOTS"); roots != "" {
-		loc += string(os.PathListSeparator) + roots
+	if roots := sources.AiderRoots(); len(roots) > 0 {
+		loc += string(os.PathListSeparator) + strings.Join(roots, string(os.PathListSeparator))
 	}
 	return loc
 }

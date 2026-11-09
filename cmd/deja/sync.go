@@ -67,6 +67,9 @@ func runSync(dir string, args []string) error {
 	case "ssh":
 		return runSyncSSH(dir, args[1:])
 	case "forget":
+		if len(args) > 2 {
+			return fmt.Errorf("sync forget: unexpected argument %q — it takes one host", args[2])
+		}
 		// A machine deja knows is retried by every bare `deja sync`, and a
 		// typo'd hostname is one of those forever — at the cost of the connect
 		// timeout each time. peers.Forget did the work already and nothing
@@ -74,6 +77,9 @@ func runSync(dir string, args []string) error {
 		// Under the spelling deja stored, not the one typed: the line reports
 		// which row is gone, and "LAPTOP forgotten" names no row (#1867).
 		host := peers.Canonical(args[1])
+		if host == "" {
+			return errors.New("sync forget needs a host — `deja doctor` lists the machines deja knows")
+		}
 		found, err := peers.Forget(host)
 		if err != nil {
 			return err
@@ -120,11 +126,11 @@ func runSyncExport(dir string, args []string) error {
 		// from another machine each settle records the other still needs
 		// — and the second one silently sends almost nothing.
 		if a == "--peer" {
-			if i+1 >= len(rest) {
+			if i+1 >= len(rest) || strings.TrimSpace(rest[i+1]) == "" {
 				return errors.New("sync export: --peer needs a name")
 			}
 			i++
-			peer = rest[i]
+			peer = strings.TrimSpace(rest[i])
 			continue
 		}
 		// A dropped flag fell back to the incremental path, which on a
@@ -133,6 +139,12 @@ func runSyncExport(dir string, args []string) error {
 		// had carried their whole memory to another machine (#745).
 		if strings.HasPrefix(a, "-") {
 			return fmt.Errorf("sync export: unknown flag %q — only --full, --include-imported and --peer are accepted", a)
+		}
+		if strings.TrimSpace(a) == "" {
+			return errors.New("sync export needs a directory: deja sync export <dir>")
+		}
+		if out != "" {
+			return fmt.Errorf("sync export: unexpected argument %q — it takes one directory", a)
 		}
 		out = a
 	}
@@ -236,6 +248,9 @@ func runSyncExport(dir string, args []string) error {
 func runSyncImport(dir string, args []string) error {
 	for _, a := range args[2:] {
 		return fmt.Errorf("sync import: unexpected argument %q — it takes one directory", a)
+	}
+	if strings.TrimSpace(args[1]) == "" {
+		return errors.New("sync import needs a directory: deja sync import <dir>")
 	}
 	sessionsBefore := importedSessionTotal(dir)
 	n, err := index.Import(dir, args[1])

@@ -69,7 +69,10 @@ var probeURLs = []string{"http://localhost:11434/api/embed", "http://localhost:1
 // local model answers differently from one that is not — a test suite that
 // asserts "no endpoint" goes red on a developer's machine and stays green on
 // CI, which is the worst way round for a contributor to meet it.
-func Off() bool { return os.Getenv("DEJA_EMBED_OFF") == "1" }
+func Off() bool {
+	return os.Getenv("DEJA_EMBED_OFF") == "1" ||
+		strings.EqualFold(strings.TrimSpace(os.Getenv("DEJA_EMBED")), "off")
+}
 
 // New builds a client from the DEJA_EMBED_* environment.
 func New() (*Client, error) {

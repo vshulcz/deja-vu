@@ -22,6 +22,17 @@ import (
 
 const aiderHistoryName = ".aider.chat.history.md"
 
+// AiderRoots returns the extra project roots searched for .aider.chat.history.md.
+func AiderRoots() []string {
+	var out []string
+	for _, root := range filepath.SplitList(os.Getenv("DEJA_AIDER_ROOTS")) {
+		if r := strings.TrimSpace(root); r != "" {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
 // AiderFiles returns history files to index: $HOME, every project `deja aider`
 // has started aider in, plus any directories listed in DEJA_AIDER_ROOTS
 // (colon-separated, scanned two levels deep — scanning all of $HOME would make
@@ -60,10 +71,7 @@ func AiderFiles() []string {
 	for _, dir := range aiderProjects() {
 		add(filepath.Join(dir, aiderHistoryName))
 	}
-	for _, root := range filepath.SplitList(os.Getenv("DEJA_AIDER_ROOTS")) {
-		if root == "" {
-			continue
-		}
+	for _, root := range AiderRoots() {
 		add(filepath.Join(root, aiderHistoryName))
 		entries, err := os.ReadDir(root)
 		if err != nil {

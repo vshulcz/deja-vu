@@ -42,4 +42,9 @@ func TestOnlyOneSwitchesItOff(t *testing.T) {
 	if !Off() {
 		t.Error(`DEJA_EMBED_OFF="1" did not switch embedding off`)
 	}
+	t.Setenv("DEJA_EMBED_OFF", "")
+	t.Setenv("DEJA_EMBED", " off ")
+	if !Off() {
+		t.Error(`DEJA_EMBED=" off " did not switch embedding off`)
+	}
 }

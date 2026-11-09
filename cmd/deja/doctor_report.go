@@ -539,7 +539,7 @@ func collectDoctorEmbed(dir string) *doctorEmbedReport {
 const ampServerSideNote = "Amp since 2026-03-31 keeps threads on ampcode.com, not on disk"
 
 func doctorStoreChecks() []doctorStoreCheck {
-	aiderPaths := append([]string{sources.Home()}, filepath.SplitList(os.Getenv("DEJA_AIDER_ROOTS"))...)
+	aiderPaths := append([]string{sources.Home()}, sources.AiderRoots()...)
 	// The file lists are read only for a store that is read: listing an
 	// excluded one walked it on every `deja index` and doctor (#5394).
 	checks := []struct {

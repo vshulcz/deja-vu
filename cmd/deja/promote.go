@@ -61,7 +61,7 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 			if strings.HasPrefix(args[i], "-") {
 				return unknownFlag("promote", args[i], promoteFlags)
 			}
-			if strings.TrimSpace(args[i]) == "" {
+			if strings.TrimSpace(index.PastedSelector(args[i])) == "" {
 				return idPrefixNeeded(dir, "promote needs a session id prefix", "promote needs a session id prefix (see `deja last`)")
 			}
 			if prefix != "" {
@@ -70,7 +70,7 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 			prefix = args[i]
 		}
 	}
-	if strings.TrimSpace(prefix) == "" {
+	if strings.TrimSpace(index.PastedSelector(prefix)) == "" {
 		return idPrefixNeeded(dir, "promote needs a session id prefix", "promote needs a session id prefix (see `deja last`)")
 	}
 	if !sources.NoteStates[state] {

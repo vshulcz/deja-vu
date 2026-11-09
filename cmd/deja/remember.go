@@ -86,6 +86,9 @@ func runRemember(dir string, args []string) error {
 		if text != "" {
 			return errors.New("remember: expected one text argument — quote the note: deja remember \"the whole note\"")
 		}
+		if strings.TrimSpace(args[i]) == "" {
+			return errors.New("remember: text required — deja remember \"the note\"")
+		}
 		text = args[i]
 	}
 	if strings.TrimSpace(text) == "" {

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/redact"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -37,7 +38,7 @@ func runShare(dir string, args []string, w io.Writer) error {
 	// "$ID"` with the variable unset printed a shareable digest of a session
 	// nobody chose (#2259). The lookup refuses one now; this says which
 	// argument was missing rather than reporting a session that does not exist.
-	if strings.TrimSpace(args[0]) == "" {
+	if strings.TrimSpace(index.PastedSelector(args[0])) == "" {
 		return idPrefixNeeded(dir, "share needs an id prefix", "share needs an id prefix (see `deja last`)")
 	}
 	s, ok, err := findByPrefix(dir, args[0])

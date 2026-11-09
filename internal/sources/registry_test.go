@@ -452,3 +452,56 @@ func validateRegistrySessions(t *testing.T, id string, sessions []model.Session)
 		}
 	}
 }
+
+func TestEveryRegisteredHarnessKindHandlesHostileInputs(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	payloads := []struct {
+		name string
+		ext  string
+		data []byte
+	}{
+		{"empty", ".jsonl", nil},
+		{"whitespace", ".jsonl", []byte("   \n\t\r\n  ")},
+		{"truncated_json", ".json", []byte("\x00\xff{\"broken\": [1, 2,")},
+		{"null_fields", ".jsonl", []byte("{}\n{\"id\":null,\"messages\":null,\"role\":null,\"content\":null,\"timestamp\":null}\n[]\n")},
+		{"corrupt_sqlite", ".db", []byte("SQLite format 3\x00corrupt-database-pages-here")},
+	}
+
+	dir := t.TempDir()
+	paths := make([]string, 0, len(payloads))
+	for _, p := range payloads {
+		fp := filepath.Join(dir, p.name+p.ext)
+		if err := os.WriteFile(fp, p.data, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		paths = append(paths, fp)
+	}
+
+	for _, h := range Registry() {
+		for _, k := range h.Kinds {
+			for _, fp := range paths {
+				_ = k.Match(fp)
+				sessions, _ := k.Parse(fp, 0)
+				for _, s := range sessions {
+					if s.Harness == "" || s.ID == "" {
+						t.Fatalf("harness %s kind %s returned session with empty Harness/ID on %s: %#v", h.Name, k.Name, fp, s)
+					}
+				}
+				if k.ParseFrom != nil {
+					_, _ = k.ParseFrom(fp, 0, 0)
+					_, _ = k.ParseFrom(fp, 2, 1700000000000000000)
+				}
+				if k.Resumes != nil {
+					_ = k.Resumes(fp, 0)
+					_ = k.Resumes(fp, 2)
+				}
+				if k.Sidecar != nil {
+					_, _ = k.Sidecar(fp)
+				}
+			}
+		}
+	}
+}

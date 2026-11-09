@@ -71,6 +71,9 @@ func parseReview(args []string) (reviewOptions, error) {
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		if afterDashDash {
+			if strings.TrimSpace(a) == "" {
+				return o, errors.New("review: revision cannot be empty")
+			}
 			if o.Rev != "" {
 				return o, errors.New("review accepts one revision or range")
 			}
@@ -112,6 +115,9 @@ func parseReview(args []string) (reviewOptions, error) {
 		default:
 			if strings.HasPrefix(a, "-") {
 				return o, fmt.Errorf("review: unknown flag %q; a revision that starts with a dash goes after `--`", a)
+			}
+			if strings.TrimSpace(a) == "" {
+				return o, errors.New("review: revision cannot be empty")
 			}
 			if o.Rev != "" {
 				return o, errors.New("review accepts one revision or range")

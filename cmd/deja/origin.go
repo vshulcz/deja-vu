@@ -118,6 +118,9 @@ func parseOrigin(args []string) (originOptions, error) {
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		if afterDashDash {
+			if strings.TrimSpace(a) == "" {
+				return o, errors.New("origin: revision cannot be empty")
+			}
 			if o.Rev != "" {
 				return o, errors.New("origin accepts one revision or range")
 			}
@@ -159,6 +162,9 @@ func parseOrigin(args []string) (originOptions, error) {
 		default:
 			if strings.HasPrefix(a, "-") {
 				return o, fmt.Errorf("origin: unknown flag %q; a revision that starts with a dash goes after `--`", a)
+			}
+			if strings.TrimSpace(a) == "" {
+				return o, errors.New("origin: revision cannot be empty")
 			}
 			if o.Rev != "" {
 				return o, errors.New("origin accepts one revision or range")

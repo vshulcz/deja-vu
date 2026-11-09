@@ -73,6 +73,9 @@ func runSyncSSH(dir string, args []string) error {
 			if strings.HasPrefix(a, "-") {
 				return unknownFlag("sync ssh", a, syncSSHFlags)
 			}
+			if strings.TrimSpace(a) == "" {
+				return errors.New("sync ssh needs a host (an ssh alias or user@host)")
+			}
 			if host != "" {
 				return errors.New("sync ssh takes one host")
 			}

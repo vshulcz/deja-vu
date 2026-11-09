@@ -67,9 +67,9 @@ func runRepo(dir string, args []string) error {
 		case "init", "sync":
 			return runRepoSync(dir, os.Stdout, args[0], args[1:])
 		case "off", "disable":
-			return runRepoToggle(os.Stdout, true)
+			return runRepoToggle(os.Stdout, args[0], args[1:], true)
 		case "on", "enable":
-			return runRepoToggle(os.Stdout, false)
+			return runRepoToggle(os.Stdout, args[0], args[1:], false)
 		case "rm", "remove", "delete":
 			return runRepoRemove(os.Stdout, args[1:])
 		}
@@ -77,7 +77,10 @@ func runRepo(dir string, args []string) error {
 	return runRepoList(dir, os.Stdout, args)
 }
 
-func runRepoToggle(w io.Writer, off bool) error {
+func runRepoToggle(w io.Writer, sub string, args []string, off bool) error {
+	if len(args) > 0 {
+		return fmt.Errorf("repo %s takes no arguments — got %q", sub, args[0])
+	}
 	root, err := repoCheckout()
 	if err != nil {
 		return err
@@ -218,13 +221,17 @@ func runRepoAdd(dir string, w io.Writer, args []string) error {
 	for i := 0; i < len(args); i++ {
 		switch a := args[i]; {
 		case a == "--kind":
-			if i+1 >= len(args) {
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 				return errors.New("repo add: --kind needs decision, rejected or gotcha")
 			}
 			i++
-			kind = strings.ToLower(args[i])
+			kind = strings.ToLower(strings.TrimSpace(args[i]))
 		case strings.HasPrefix(a, "--kind="):
-			kind = strings.ToLower(strings.TrimPrefix(a, "--kind="))
+			val := strings.TrimSpace(strings.TrimPrefix(a, "--kind="))
+			if val == "" {
+				return errors.New("repo add: --kind needs decision, rejected or gotcha")
+			}
+			kind = strings.ToLower(val)
 		case a == "--":
 			words = append(words, args[i+1:]...)
 			i = len(args)
@@ -234,7 +241,10 @@ func runRepoAdd(dir string, w io.Writer, args []string) error {
 			words = append(words, a)
 		}
 	}
-	if len(words) == 0 {
+	if kind != "" && !sources.RepoKinds[kind] {
+		return fmt.Errorf("repo add: --kind is decision, rejected or gotcha, got %q", kind)
+	}
+	if len(words) == 0 || strings.TrimSpace(strings.Join(words, " ")) == "" {
 		return errors.New(`repo add: name candidate numbers or ids from ` + "`deja repo candidates`" + `, or write one: deja repo add "the text"`)
 	}
 	root, err := repoCheckout()
@@ -244,9 +254,6 @@ func runRepoAdd(dir string, w io.Writer, args []string) error {
 	var entries []sources.RepoEntry
 	switch {
 	case kind != "":
-		if !sources.RepoKinds[kind] {
-			return fmt.Errorf("repo add: --kind is decision, rejected or gotcha, got %q", kind)
-		}
 		entries = append(entries, sources.RepoEntry{Kind: kind, Text: strings.Join(words, " ")})
 	case allRepoCandidateSelectors(words):
 		picked, err := pickRepoCandidates(dir, root, words)
@@ -453,6 +460,9 @@ func runRepoRemove(w io.Writer, args []string) error {
 	for _, a := range args {
 		if strings.HasPrefix(a, "-") {
 			return unknownFlag("repo rm", a, repoRmFlags)
+		}
+		if strings.TrimSpace(a) == "" {
+			return errors.New("repo rm: name one or more entry numbers or ids from `deja repo`")
 		}
 		ids = append(ids, a)
 	}
