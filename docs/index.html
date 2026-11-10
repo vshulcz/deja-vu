@@ -474,16 +474,15 @@ footer a:hover{color:var(--ink)}
 <section class="reveal">
   <h2>How it works <span class="fig">3 steps</span></h2>
   <div class="steps">
-    <div class="step"><span class="n">01</span><h3>It reads what is already there</h3>
-      <p>Every coding agent writes its sessions to disk. deja parses those stores in place —
-        nothing is uploaded.</p></div>
-    <div class="step"><span class="n">02</span><h3>It builds a local index</h3>
-      <p>Credentials are stripped on the way in. Tens of seconds for a couple of gigabytes,
-        and the index is about a tenth of the corpus.</p></div>
-    <div class="step"><span class="n">03</span><h3>Your agents recall from it</h3>
-      <p>An MCP tool every agent can call, and hooks where the agent has them: at session
-        start, before a file is edited or a command runs, after one fails, and on the way
-        back from a compaction.</p></div>
+    <div class="step"><span class="n">01</span><h3>Reads existing stores in place</h3>
+      <p>Every coding agent writes its sessions to disk (JSONL or SQLite). deja parses those stores directly —
+        zero capture step, nothing is uploaded.</p></div>
+    <div class="step"><span class="n">02</span><h3>Builds a compact incremental index</h3>
+      <p>Credentials are stripped on the way in. Append-only records plus per-file watermarks mean repeat passes
+        take ~50 ms, with a ~4% index footprint on multi-gigabyte corpora.</p></div>
+    <div class="step"><span class="n">03</span><h3>Recalls, hands off &amp; restores</h3>
+      <p>0.7 ms in-process lookup via MCP and hooks (at session start, before edits/commands, after failures,
+        and across compaction), plus <code>deja handoff</code> and <code>deja restore</code>.</p></div>
   </div>
 </section>
 
@@ -595,7 +594,7 @@ footer a:hover{color:var(--ink)}
   <p>ten seconds to install, about ten to index — then the next session already knows</p>
   <div class="cmdline">
     <span class="p">$</span>
-    <code id="i2">curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</code>
+    <code id="i2">curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh &amp;&amp; deja install --auto</code>
     <button class="copy" data-copy="i2">copy</button>
   </div>
   <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
@@ -669,7 +668,7 @@ if(/Win/i.test(navigator.platform||navigator.userAgent||'')){
   var winTab=document.querySelector('.itab[data-cmd^="winget"]');
   if(winTab)winTab.click();
   var i2=document.getElementById('i2');
-  if(i2)i2.textContent='winget install vshulcz.deja-vu';
+  if(i2)i2.textContent='winget install vshulcz.deja-vu && deja install --auto';
 }
 
 /* ── the cat reacts ───────────────────────────────────────────────────────
