@@ -138,6 +138,7 @@ https://vshulcz.github.io/deja-vu/guide/delete-codewhale-session-history.html
 https://vshulcz.github.io/deja-vu/guide/delete-aider-chat-history.html
 https://vshulcz.github.io/deja-vu/guide/delete-openclaw-session-history.html
 https://vshulcz.github.io/deja-vu/guide/delete-grok-session-history.html
+https://vshulcz.github.io/deja-vu/guide/delete-senpi-session-history.html
 https://vshulcz.github.io/deja-vu/guide/credentials-in-transcripts.html
 https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html
 https://vshulcz.github.io/deja-vu/registry/kilocode.html
