@@ -76,7 +76,7 @@ opencode、DeepSeek Harness、Zed、Kimi Code、Codex CLI、Grok Build、OpenCla
 可以直接用：
 
 ```sh
-opencode plugin opencode-deja
+opencode plugin add opencode-deja
 dsh plugin --profile web add dsh-deja
 # Zed：擴充面板裡搜 deja
 # Kimi Code：/plugins install https://github.com/vshulcz/deja-vu
@@ -231,7 +231,7 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsur
 
 | 代理 | 套件 | 安裝 |
 | --- | --- | --- |
-| opencode | npm `opencode-deja` | `opencode plugin opencode-deja` |
+| opencode | npm `opencode-deja` | `opencode plugin add opencode-deja` |
 | DeepSeek Harness | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | 外掛 `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |

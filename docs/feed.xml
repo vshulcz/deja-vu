@@ -32,6 +32,13 @@
     <summary>Senpi stores each session in a JSONL file under ~/.senpi/agent/sessions. Find it, delete one session or all, or use deja delete with dry-run preview.</summary>
   </entry>
   <entry>
+    <title>Install deja and index your agent history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/getting-started.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/getting-started.html"></link>
+    <updated>2026-11-10T00:00:00Z</updated>
+    <summary>Install deja and index your coding-agent history in one command, then search it and wire it into your agents over MCP.</summary>
+  </entry>
+  <entry>
     <title>Recover files overwritten by an AI agent — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html"></link>
@@ -282,12 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/no-conversation-found-claude-code.html"></link>
     <updated>2026-11-05T00:00:00Z</updated>
     <summary>claude --resume 在 ~/.claude/projects 下没找到会话文件。五种原因，在 2.1.295 上复现，怎么找到那个文件，以及怎么把会话找回来。</summary>
-  </entry>
-  <entry>
-    <title>隐私：索引什么、脱敏什么、什么都不外传 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/privacy.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/privacy.html"></link>
-    <updated>2026-11-05T00:00:00Z</updated>
-    <summary>deja 索引的是可能含有凭据的会话历史：索引和检索都在本地，凭据在写入前就被脱敏，排除、遗忘与信任范围决定留下什么。</summary>
   </entry>
 </feed>

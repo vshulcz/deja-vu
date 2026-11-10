@@ -78,7 +78,7 @@ opencode, DeepSeek Harness, Zed, Kimi Code, Codex CLI, Grok Build, OpenClaw, pi 
 paquete, para quien está acostumbrado a instalar extensiones desde ahí:
 
 ```sh
-opencode plugin opencode-deja
+opencode plugin add opencode-deja
 dsh plugin --profile web add dsh-deja
 # Zed: busca deja en el panel de extensiones
 # Kimi Code: /plugins install https://github.com/vshulcz/deja-vu
@@ -252,7 +252,7 @@ tiene un paquete en su propio ecosistema, para quien instala extensiones desde a
 
 | Agente | Paquete | Instalación |
 | --- | --- | --- |
-| opencode | npm `opencode-deja` | `opencode plugin opencode-deja` |
+| opencode | npm `opencode-deja` | `opencode plugin add opencode-deja` |
 | DeepSeek Harness | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | plugin `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |

@@ -78,7 +78,7 @@ opencode, DeepSeek Harness, Zed, Kimi Code, Codex CLI, Grok Build, OpenClaw, pi 
 im eigenen Ökosystem, für alle, die Erweiterungen von dort installieren:
 
 ```sh
-opencode plugin opencode-deja
+opencode plugin add opencode-deja
 dsh plugin --profile web add dsh-deja
 # Zed: im Erweiterungs-Panel nach deja suchen
 # Kimi Code: /plugins install https://github.com/vshulcz/deja-vu
@@ -255,7 +255,7 @@ hat jeder ein Paket im eigenen Ökosystem, praktisch für alle, die Erweiterunge
 
 | Agent | Paket | Installation |
 | --- | --- | --- |
-| opencode | npm `opencode-deja` | `opencode plugin opencode-deja` |
+| opencode | npm `opencode-deja` | `opencode plugin add opencode-deja` |
 | DeepSeek Harness | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | Plugin `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
