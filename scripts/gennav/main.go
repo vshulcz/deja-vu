@@ -95,6 +95,7 @@ var groups = []group{
 		{"delete-codebuddy-sessions.html", "CodeBuddy"},
 		{"delete-antigravity-history.html", "Antigravity"},
 		{"delete-pi-session-history.html", "pi"},
+		{"delete-senpi-session-history.html", "Senpi"},
 		{"delete-crush-session-history.html", "Crush"},
 		{"delete-hermes-session-history.html", "Hermes"},
 		{"delete-cherrystudio-session-history.html", "Cherry Studio"},
