@@ -344,33 +344,39 @@ func roleWanted(roles map[string]bool, role string) bool {
 	return roles["*"]
 }
 
-// decodeRecordStubRole decodes a record's key, source path, role, and 8-byte
-// timestamp without reading or allocating its text body.
-func decodeRecordStubRole(b []byte, t *recordTables) (Record, error) {
+func decodeRecordHeader(b []byte, t *recordTables) (Record, byte, []byte, error) {
 	var rec Record
 	kid, n := binary.Uvarint(b)
 	if n <= 0 {
-		return rec, errShortRecord
+		return rec, 0, nil, errShortRecord
 	}
 	b = b[n:]
 	pid, n := binary.Uvarint(b)
 	if n <= 0 {
-		return rec, errShortRecord
+		return rec, 0, nil, errShortRecord
 	}
 	b = b[n:]
 	rid, n := binary.Uvarint(b)
 	if n <= 0 {
-		return rec, errShortRecord
+		return rec, 0, nil, errShortRecord
 	}
 	b = b[n:]
 	rec.Key = t.lookup(kid)
 	rec.SourcePath = t.lookup(pid)
 	rec.Role = t.lookup(rid)
 	if len(b) < 1 {
-		return rec, errShortRecord
+		return rec, 0, nil, errShortRecord
 	}
-	flag := b[0]
-	b = b[1:]
+	return rec, b[0], b[1:], nil
+}
+
+// decodeRecordStubRole decodes a record's key, source path, role, and 8-byte
+// timestamp without reading or allocating its text body.
+func decodeRecordStubRole(b []byte, t *recordTables) (Record, error) {
+	rec, flag, b, err := decodeRecordHeader(b, t)
+	if err != nil {
+		return rec, err
+	}
 	var ts [8]byte
 	switch flag {
 	case recordDeflated:
@@ -414,7 +420,6 @@ func eachRecordInRolesWhere(path string, t *recordTables, want map[string]bool, 
 	}
 	defer func() { _ = f.Close() }()
 	w := newLogWalk(f, t, 0)
-	stubTool := want != nil && want[RoleStubToolOutput]
 	for {
 		_, payload, err := w.nextInRoles(t, want, keepKey)
 		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
@@ -422,16 +427,6 @@ func eachRecordInRolesWhere(path string, t *recordTables, want map[string]bool, 
 		}
 		if err != nil {
 			return err
-		}
-		if stubTool {
-			if _, role, ok := recordRoleIn(payload, t); ok && (role == roleToolOutput || role == "tool") {
-				rec, derr := decodeRecordStubRole(payload, t)
-				if derr != nil {
-					return derr
-				}
-				fn(rec)
-				continue
-			}
 		}
 		rec, err := decodeRecord(payload, t)
 		if err != nil {
@@ -785,31 +780,11 @@ func appendField(b []byte, s string) []byte {
 var errShortRecord = fmt.Errorf("%w: a record ends before its fields do", errCorruptIndex)
 
 func decodeRecord(b []byte, t *recordTables) (Record, error) {
-	var rec Record
+	rec, flag, b, err := decodeRecordHeader(b, t)
+	if err != nil {
+		return rec, err
+	}
 	var ok bool
-	kid, n := binary.Uvarint(b)
-	if n <= 0 {
-		return rec, errShortRecord
-	}
-	b = b[n:]
-	pid, n := binary.Uvarint(b)
-	if n <= 0 {
-		return rec, errShortRecord
-	}
-	b = b[n:]
-	rid, n := binary.Uvarint(b)
-	if n <= 0 {
-		return rec, errShortRecord
-	}
-	b = b[n:]
-	rec.Key = t.lookup(kid)
-	rec.SourcePath = t.lookup(pid)
-	rec.Role = t.lookup(rid)
-	if len(b) < 1 {
-		return rec, errShortRecord
-	}
-	flag := b[0]
-	b = b[1:]
 	if flag == recordDeflated {
 		zr := inflateReaders.Get().(io.ReadCloser)                                 //nolint:forcetypeassert // the pool holds only flate readers
 		if err := zr.(flate.Resetter).Reset(bytes.NewReader(b), nil); err != nil { //nolint:forcetypeassert // a flate reader is a Resetter
