@@ -29,34 +29,35 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 	exportPath := ""
 	toRepo := false
 	var tags []string
+	args = splitKnownValueFlags(args, "--state", "--note", "--to", "--tag")
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--repo":
 			toRepo = true
 		case "--state":
-			if i+1 >= len(args) {
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 				return errors.New("promote: --state needs a value")
 			}
 			i++
-			state = strings.ToLower(args[i]) //nolint:gosec // G602: i+1 < len(args) checked above
+			state = strings.ToLower(args[i])
 		case "--note":
-			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" { //nolint:gosec // G602: i+1 < len(args) checked by left operand
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 				return errors.New("promote: --note needs text")
 			}
 			i++
-			noteText = args[i] //nolint:gosec // G602: i+1 < len(args) checked above
+			noteText = args[i]
 		case "--to":
-			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" { //nolint:gosec // G602: i+1 < len(args) checked by left operand
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 				return errors.New("promote: --to needs a path")
 			}
 			i++
-			exportPath = args[i] //nolint:gosec // G602: i+1 < len(args) checked above
+			exportPath = args[i]
 		case "--tag":
-			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" { //nolint:gosec // G602: i+1 < len(args) checked by left operand
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 				return errors.New("promote: --tag needs a value")
 			}
 			i++
-			tags = append(tags, args[i]) //nolint:gosec // G602: i+1 < len(args) checked above
+			tags = append(tags, args[i])
 		default:
 			if strings.HasPrefix(args[i], "-") {
 				return unknownFlag("promote", args[i], promoteFlags)
@@ -67,7 +68,7 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 			if prefix != "" {
 				return fmt.Errorf("promote takes one id-prefix — got %q and %q", prefix, args[i])
 			}
-			prefix = args[i]
+			prefix = index.PastedSelector(args[i])
 		}
 	}
 	if strings.TrimSpace(index.PastedSelector(prefix)) == "" {

@@ -87,6 +87,7 @@ func runRulesCandidates(dir string, w io.Writer, args []string) error {
 	var since time.Duration
 	var project string
 	toRepo := false
+	args = splitKnownValueFlags(args, "--project", "--limit", "--since")
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--json":
@@ -100,7 +101,7 @@ func runRulesCandidates(dir string, w io.Writer, args []string) error {
 			i++
 			project = strings.TrimSpace(args[i])
 		case "--limit":
-			if i+1 >= len(args) {
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 				return errors.New("rules candidates: --limit needs value")
 			}
 			i++
@@ -110,7 +111,7 @@ func runRulesCandidates(dir string, w io.Writer, args []string) error {
 			}
 			limit = n
 		case "--since":
-			if i+1 >= len(args) {
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 				return errors.New("rules candidates: --since needs value")
 			}
 			i++

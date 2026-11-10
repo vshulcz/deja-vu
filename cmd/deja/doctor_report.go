@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/embed"
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -1243,7 +1244,11 @@ func boundedStoreError(msg string) string {
 		msg = strings.TrimSpace(msg[:i])
 	}
 	if len(msg) > storeErrorMax {
-		msg = strings.TrimSpace(msg[:storeErrorMax]) + "…"
+		cut := storeErrorMax
+		for cut > 0 && !utf8.ValidString(msg[:cut]) {
+			cut--
+		}
+		msg = strings.TrimSpace(msg[:cut]) + "…"
 	}
 	return msg
 }

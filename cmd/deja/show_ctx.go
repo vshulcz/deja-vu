@@ -282,6 +282,7 @@ const showLargeSession = 1000
 
 func parseShow(args []string) (showOptions, error) {
 	o := showOptions{limit: 50}
+	args = splitKnownValueFlags(args, "--harness", "--offset", "--limit")
 	for i := 0; i < len(args); i++ {
 		switch a := args[i]; a {
 		case "--json":
@@ -291,15 +292,15 @@ func parseShow(args []string) (showOptions, error) {
 				return o, fmt.Errorf("%s needs value", a)
 			}
 			i++
-			if strings.TrimSpace(args[i]) == "" { //nolint:gosec // bounds checked before i++
+			if strings.TrimSpace(args[i]) == "" {
 				// Empty is how "no filter" is spelled inside deja (#1612).
 				return o, fmt.Errorf("%s needs value", a)
 			}
 			if a == "--harness" {
-				o.harness = args[i] //nolint:gosec // bounds checked before i++
+				o.harness = args[i]
 				continue
 			}
-			v := args[i] //nolint:gosec // bounds checked before i++
+			v := args[i]
 			n, e := strconv.Atoi(v)
 			// 0 is where a session starts, so the two flags have different
 			// floors; the words recall uses for the same flags (#5650).
@@ -408,6 +409,9 @@ func cmdCtx(dir string, rest []string) error {
 		}
 	}
 	q := strings.Join(rest, " ")
+	if !strings.Contains(q, " ") {
+		q = index.PastedSelector(q)
+	}
 	// Blank is not a query: it matched nothing and the search handed back the
 	// first session in the store, so `deja ctx "$TOPIC"` with the variable
 	// unset printed a transcript nobody asked for (#2259).

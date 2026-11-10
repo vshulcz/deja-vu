@@ -38,18 +38,19 @@ func runShare(dir string, args []string, w io.Writer) error {
 	// "$ID"` with the variable unset printed a shareable digest of a session
 	// nobody chose (#2259). The lookup refuses one now; this says which
 	// argument was missing rather than reporting a session that does not exist.
-	if strings.TrimSpace(index.PastedSelector(args[0])) == "" {
+	id := index.PastedSelector(args[0])
+	if strings.TrimSpace(id) == "" {
 		return idPrefixNeeded(dir, "share needs an id prefix", "share needs an id prefix (see `deja last`)")
 	}
-	s, ok, err := findByPrefix(dir, args[0])
-	noteAmbiguousPrefix(dir, args[0], "sharing")
+	s, ok, err := findByPrefix(dir, id)
+	noteAmbiguousPrefix(dir, id, "sharing")
 	if err != nil {
 		return err
 	}
 	if !ok {
-		return noSessionMatches(dir, args[0])
+		return noSessionMatches(dir, id)
 	}
-	if err := denyPolicyHidden(args[0], s, os.Stderr); err != nil {
+	if err := denyPolicyHidden(id, s, os.Stderr); err != nil {
 		return err
 	}
 	// The exclude list is a privacy control, and share is the command whose

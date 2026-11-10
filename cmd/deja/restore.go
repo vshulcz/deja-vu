@@ -50,6 +50,7 @@ func runRestore(dir string, args []string, stdout io.Writer) error {
 	want := 0
 	out := ""
 	force, all := false, false
+	args = splitKnownValueFlags(args, "--span", "-o", "--out")
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--force":
@@ -60,21 +61,21 @@ func runRestore(dir string, args []string, stdout io.Writer) error {
 			// A missing value used to be ignored, which for -o meant the file
 			// went to stdout while the reader believed it had been written
 			// (#2253).
-			if i+1 >= len(args) {
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 				return errors.New("restore: --span needs value")
 			}
 			i++
-			n, err := strconv.Atoi(args[i]) //nolint:gosec // G602: i+1 < len(args) checked above
+			n, err := strconv.Atoi(args[i])
 			if err != nil || n <= 0 {
-				return fmt.Errorf("restore: --span wants a positive number, got %q", args[i]) //nolint:gosec // G602: i+1 < len(args) checked above
+				return fmt.Errorf("restore: --span wants a positive number, got %q", args[i])
 			}
 			want = n
 		case "-o", "--out":
-			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" { //nolint:gosec // G602: i+1 < len(args) checked by left operand
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 				return errors.New("restore: -o needs value")
 			}
 			i++
-			out = args[i] //nolint:gosec // G602: i+1 < len(args) checked above
+			out = args[i]
 		default:
 			if strings.HasPrefix(args[i], "-") {
 				return unknownFlag("restore", args[i], restoreFlags)

@@ -101,15 +101,15 @@ func parseSearch(args []string) (search.Options, error) {
 			// A flag deja takes elsewhere is not a typo and is nowhere near a
 			// search flag by edit distance, so it went into the query and the
 			// search that would have found everything reported nothing (#2249).
-			if cmd := flagsOfOtherCommands[a]; cmd != "" {
-				return o, fmt.Errorf("%s is a flag of `deja %s`, not of search — put it after `--` to search for the text", a, cmd)
+			if cmd := flagsOfOtherCommands[flagName(a)]; cmd != "" {
+				return o, fmt.Errorf("%s is a flag of `deja %s`, not of search — put it after `--` to search for the text", flagName(a), cmd)
 			}
 			// A --word after the query is a flag deja does not have. Taken as
 			// a query term it turned `deja goroutines --bogus` into a search
 			// for both words that found nothing, where the word alone had 40
 			// hits. A query that starts with one (`--retry budget`), a phrase
 			// with a dash inside, or a single dash is still a query.
-			if len(q) > 0 && flagShaped(a) {
+			if len(q) > 0 && flagShaped(flagName(a)) {
 				return o, fmt.Errorf("search: unknown flag %q — `deja search --help` lists its flags; put it after `--` to search for the text", a)
 			}
 			q = append(q, a)
@@ -153,6 +153,7 @@ var flagsOfOtherCommands = map[string]string{
 	"--out":              "restore",
 	"--force":            "restore",
 	"--tag":              "remember",
+	"--repo":             "remember",
 	"--deep":             "doctor",
 	"--offline":          "doctor",
 	"--dry-run":          "forget",
@@ -176,6 +177,24 @@ var flagsOfOtherCommands = map[string]string{
 	"--from":             "last",
 	"--last":             "log",
 	"--seed":             "bench",
+	"--settle":           "friction",
+	"--unsettle":         "friction",
+	"--state":            "promote",
+	"--note":             "promote",
+	"--html":             "stats",
+	"--redaction":        "stats",
+	"--impact":           "stats",
+	"--card":             "stats",
+	"--year":             "stats",
+	"--attribution":      "blame",
+	"--git-note":         "blame",
+	"--all-projects":     "how",
+	"--scrub":            "secrets",
+	"--kind":             "repo add",
+	"--yes":              "delete",
+	"--quiet":            "index",
+	"--context-search":   "mcp",
+	"--http":             "mcp",
 }
 
 // searchFlags is every flag the bare search form accepts, for the typo check.
@@ -812,7 +831,11 @@ var searchValueFlags = map[string]bool{
 
 func splitEqualsForms(args []string) []string {
 	out := make([]string, 0, len(args))
-	for _, a := range args {
+	for i, a := range args {
+		if a == "--" {
+			out = append(out, args[i:]...)
+			break
+		}
 		name, value, found := strings.Cut(a, "=")
 		if found && searchValueFlags[name] {
 			out = append(out, name, value)

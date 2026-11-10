@@ -42,6 +42,7 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 	limit := 3
 	asJSON := false
 	var parts []string
+	args = splitKnownValueFlags(args, "--limit")
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--json":
@@ -50,13 +51,13 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 			// command's mind since without ever being answered (#1932).
 			asJSON = true
 		case "--limit":
-			if i+1 >= len(args) {
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 				return errors.New("fix: --limit wants a number")
 			}
 			i++
-			n, err := strconv.Atoi(args[i]) //nolint:gosec // the bound is checked above
+			n, err := strconv.Atoi(args[i])
 			if err != nil || n <= 0 {
-				return fmt.Errorf("fix: --limit wants a positive number, got %q", args[i]) //nolint:gosec // the bound is checked above
+				return fmt.Errorf("fix: --limit wants a positive number, got %q", args[i])
 			}
 			limit = n
 		case "--":

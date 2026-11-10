@@ -26,13 +26,36 @@ import (
 // has to be within a prefix or two edits of a real one — a dropped letter, a
 // doubled one, a transposition.
 func nearestKnownFlag(a string, known []string) string {
-	if !strings.HasPrefix(a, "--") || len([]rune(a)) < 4 {
+	name := flagName(a)
+	if !strings.HasPrefix(name, "--") || len([]rune(name)) < 4 {
 		return ""
 	}
 	if slices.Contains(known, a) {
 		return ""
 	}
-	return nearestTarget(a, known)
+	if slices.Contains(known, name) {
+		return name
+	}
+	return nearestTarget(name, known)
+}
+
+// splitKnownValueFlags splits `--flag=value` (and `-o=value`) into two
+// arguments before `--` for the flags a command accepts with a value.
+func splitKnownValueFlags(args []string, valueFlags ...string) []string {
+	out := make([]string, 0, len(args))
+	for i, a := range args {
+		if a == "--" {
+			out = append(out, args[i:]...)
+			break
+		}
+		name, val, ok := strings.Cut(a, "=")
+		if ok && slices.Contains(valueFlags, name) {
+			out = append(out, name, val)
+			continue
+		}
+		out = append(out, a)
+	}
+	return out
 }
 
 // unknownFlag is how a command refuses a flag it does not take: named by the

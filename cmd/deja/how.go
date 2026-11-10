@@ -105,6 +105,7 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 	allProjects := false
 	asJSON := false
 	var terms []string
+	args = splitKnownValueFlags(args, "--project", "--limit")
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--json":
@@ -113,21 +114,21 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 			// What was typed has to do something: a flag with nothing after it,
 			// an unknown flag and an empty argument all used to pass through in
 			// silence, the same holes files had (#1630, #1628).
-			if i+1 >= len(args) {
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 				return errors.New("how: --limit needs value")
 			}
 			i++
-			n, err := strconv.Atoi(args[i]) //nolint:gosec // i+1 < len(args) is checked above
+			n, err := strconv.Atoi(args[i])
 			if err != nil || n <= 0 {
-				return fmt.Errorf("how: --limit wants a positive number, got %q", args[i]) //nolint:gosec // i+1 < len(args) is checked above
+				return fmt.Errorf("how: --limit wants a positive number, got %q", args[i])
 			}
 			limit = n
 		case "--project":
-			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" { //nolint:gosec // the left operand checks the bound
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 				return errors.New("how: --project needs value")
 			}
 			i++
-			project = args[i] //nolint:gosec // i+1 < len(args) is checked above
+			project = args[i]
 		case "--all-projects":
 			// The answer is scoped to this project by default (#3705); this
 			// asks the machine instead.

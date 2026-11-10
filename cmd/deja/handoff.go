@@ -35,6 +35,7 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 	target := ""
 	prefix := ""
 	doExec := false
+	args = splitKnownValueFlags(args, "--to")
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--to":
@@ -42,13 +43,13 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 			// `target != ""` gate below and printed the paste-only handoff, so
 			// a scripted `--to "$AGENT"` with the variable unset read like a
 			// handoff to an agent (#1647).
-			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" { //nolint:gosec // the bound is checked first
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 				// Named targets, like the refusal below: the reader who typed
 				// an empty --to needs the same list as the one who typed a
 				// wrong name.
 				return fmt.Errorf("handoff: --to needs an agent name: %s", strings.Join(handoffTargets(), ", "))
 			}
-			target = args[i+1] //nolint:gosec // the bound is checked above
+			target = args[i+1]
 			i++
 		case "--exec":
 			doExec = true
@@ -65,7 +66,7 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 			if prefix != "" {
 				return fmt.Errorf("handoff takes one id-prefix — got %q and %q", prefix, args[i])
 			}
-			prefix = args[i]
+			prefix = index.PastedSelector(args[i])
 		}
 	}
 	if canon, ok := handoffAlias[target]; ok {

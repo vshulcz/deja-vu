@@ -47,6 +47,7 @@ func runRemember(dir string, args []string) error {
 	var tags []string
 	toRepo := false
 	afterDashDash := false
+	args = splitKnownValueFlags(args, "--project", "--tag")
 	for i := 0; i < len(args); i++ {
 		if !afterDashDash {
 			if args[i] == "--repo" {
@@ -54,18 +55,18 @@ func runRemember(dir string, args []string) error {
 				continue
 			}
 			if args[i] == "--project" {
-				if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" { //nolint:gosec // G602: i+1 < len(args) checked by left operand
+				if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 					return errors.New("remember: --project needs value")
 				}
-				project = args[i+1] //nolint:gosec // G602: i+1 < len(args) checked above
+				project = args[i+1]
 				i++
 				continue
 			}
 			if args[i] == "--tag" {
-				if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" { //nolint:gosec // G602: i+1 < len(args) checked by left operand
+				if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 					return errors.New("remember: --tag needs value")
 				}
-				tags = append(tags, args[i+1]) //nolint:gosec // G602: i+1 < len(args) checked above
+				tags = append(tags, args[i+1])
 				i++
 				continue
 			}

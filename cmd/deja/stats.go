@@ -59,6 +59,7 @@ func parseStatsArgs(args []string) (statsArgs, error) {
 	// "deja" filter to someone who passed `--harness notes` names a flag they
 	// did not pass, the same reason `last` keeps these (#2191).
 	sinceRaw, harnessRaw := "", ""
+	args = splitKnownValueFlags(args, "--harness", "--project", "--since", "--role")
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--json":

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestParsePrimitivesInt64AndExitCode(t *testing.T) {
@@ -54,5 +55,12 @@ func TestWithStderrBoundsAndPreservesWrappedError(t *testing.T) {
 	}
 	if !strings.Contains(wrapped.Error(), "…") {
 		t.Fatalf("expected ellipsis truncation in %q", wrapped.Error())
+	}
+	for pad := sqliteStderrMax - 5; pad <= sqliteStderrMax+5; pad++ {
+		multi := strings.Repeat("a", pad) + "ошибка чтения таблицы"
+		got := withStderr(baseErr, bytes.NewBufferString(multi)).Error()
+		if !utf8.ValidString(got) {
+			t.Fatalf("withStderr produced invalid UTF-8 at pad=%d: %q", pad, got)
+		}
 	}
 }

@@ -85,6 +85,10 @@ func TestEachFlagListNamesEveryFlagItsParserTakes(t *testing.T) {
 					t.Errorf("%s lists %s, which %s does not accept — a near miss could suggest a rejected flag",
 						listName, flag, fn.Name.Name)
 				}
+				if cmdName != "search" && !contains(searchFlags, flag) && flagsOfOtherCommands[flag] == "" && nearestSearchFlag(flag) == "" {
+					t.Errorf("%s (%s) is not in searchFlags or flagsOfOtherCommands — `deja search %s <query>` would silently swallow it into the query",
+						flag, listName, flag)
+				}
 			}
 			if cmdName == "search" {
 				for _, row := range searchFlagRows {

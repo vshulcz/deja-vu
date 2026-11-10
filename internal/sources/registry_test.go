@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -500,6 +501,60 @@ func TestEveryRegisteredHarnessKindHandlesHostileInputs(t *testing.T) {
 				}
 				if k.Sidecar != nil {
 					_, _ = k.Sidecar(fp)
+				}
+			}
+		}
+	}
+
+	// Real-fixture torn-write & mid-offset slicing across all registered JSON/JSONL/MD/XML/YAML fixtures.
+	root := filepath.Clean(filepath.Join("..", ".."))
+	reg := readFormatRegistry(t, filepath.Join(root, "docs", "registry", "registry.json"))
+	kindByHarness := map[string][]FileKind{}
+	for _, h := range Registry() {
+		kindByHarness[h.Name] = h.Kinds
+	}
+	for _, entry := range reg.Harnesses {
+		kinds := kindByHarness[entry.ID]
+		if len(kinds) == 0 {
+			continue
+		}
+		for _, rel := range entry.FixturePaths {
+			srcPath := filepath.Join(root, filepath.FromSlash(rel))
+			fi, err := os.Stat(srcPath)
+			if err != nil || fi.IsDir() || strings.HasSuffix(srcPath, ".db") || strings.HasSuffix(srcPath, ".vscdb") || strings.HasSuffix(srcPath, ".sqlite") {
+				continue
+			}
+			raw, err := os.ReadFile(srcPath)
+			if err != nil || len(raw) < 8 {
+				continue
+			}
+			ext := filepath.Ext(srcPath)
+			for _, cut := range []int{1, len(raw) / 4, len(raw) / 2, (3 * len(raw)) / 4, len(raw) - 1} {
+				tornPath := filepath.Join(dir, entry.ID+"-torn"+ext)
+				if err := os.WriteFile(tornPath, raw[:cut], 0o600); err != nil {
+					t.Fatal(err)
+				}
+				for _, k := range kinds {
+					sessions, _ := k.Parse(tornPath, 0)
+					for _, s := range sessions {
+						if s.Harness == "" || s.ID == "" {
+							t.Fatalf("%s (%s) torn at %d/%d returned empty Harness/ID: %#v", entry.ID, k.Name, cut, len(raw), s)
+						}
+						if !utf8.ValidString(s.Title) || !utf8.ValidString(s.Project) {
+							t.Fatalf("%s (%s) torn at %d/%d returned invalid UTF-8 metadata: %#v", entry.ID, k.Name, cut, len(raw), s)
+						}
+						for _, m := range s.Messages {
+							if !utf8.ValidString(m.Text) {
+								t.Fatalf("%s (%s) torn at %d/%d returned invalid UTF-8 message: %#v", entry.ID, k.Name, cut, len(raw), m)
+							}
+						}
+					}
+					if k.ParseFrom != nil {
+						_, _ = k.ParseFrom(tornPath, int64(cut/2), 0)
+					}
+					if k.Resumes != nil {
+						_ = k.Resumes(tornPath, int64(cut/2))
+					}
 				}
 			}
 		}

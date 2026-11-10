@@ -946,6 +946,22 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 			if meta.Kind == "" {
 				meta.Kind = old.Kind
 			}
+			if meta.Parent == "" {
+				meta.Parent = old.Parent
+			}
+			if meta.Agent == "" {
+				meta.Agent = old.Agent
+			}
+			meta.Model = old.Model.Merge(meta.Model)
+			if meta.Tokens == nil {
+				meta.Tokens = old.Tokens
+			}
+			if len(meta.ToolCalls) == 0 {
+				meta.ToolCalls = old.ToolCalls
+			}
+			if meta.ToolErrors == 0 {
+				meta.ToolErrors = old.ToolErrors
+			}
 			if old.Started.Before(meta.Started) || meta.Started.IsZero() {
 				meta.Started = old.Started
 			}

@@ -59,18 +59,19 @@ const testsJSONKind = "deja.tests"
 func runTests(dir string, args []string, stdout io.Writer) error {
 	asJSON := false
 	limit := testsDefaultLimit
+	args = splitKnownValueFlags(args, "--limit")
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--json":
 			asJSON = true
 		case "--limit":
-			if i+1 >= len(args) {
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 				return errors.New("tests: --limit needs value")
 			}
 			i++
-			n, err := strconv.Atoi(args[i]) //nolint:gosec // i+1 < len(args) is checked above
+			n, err := strconv.Atoi(args[i])
 			if err != nil || n < 0 {
-				return fmt.Errorf("tests: --limit wants a number from 0 up, got %q", args[i]) //nolint:gosec // i+1 < len(args) is checked above
+				return fmt.Errorf("tests: --limit wants a number from 0 up, got %q", args[i])
 			}
 			limit = n
 		default:
@@ -87,10 +88,14 @@ func runTests(dir string, args []string, stdout io.Writer) error {
 	if asJSON {
 		enc := json.NewEncoder(stdout)
 		enc.SetIndent("", "  ")
+		repeats := h.Repeats
+		if limit > 0 && len(repeats) > limit {
+			repeats = repeats[:limit]
+		}
 		out := testsJSON{
 			Kind: testsJSONKind, Schema: jsonout.Version,
 			Runs: h.Runs, Failed: h.Failed, Passed: h.Passed, NoVerdict: h.NoVerdict,
-			Days: h.Days, Tools: h.Tools, Weeks: h.Weeks, Repeats: h.Repeats,
+			Days: h.Days, Tools: h.Tools, Weeks: h.Weeks, Repeats: repeats,
 			Withheld: h.Withheld,
 		}
 		if out.Weeks == nil {

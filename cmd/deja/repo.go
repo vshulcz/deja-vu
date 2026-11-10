@@ -273,10 +273,11 @@ func runRepoSync(dir string, w io.Writer, sub string, args []string) error {
 	if sub == "init" {
 		limit = 5
 	}
+	args = splitKnownValueFlags(args, "--limit")
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--limit":
-			if i+1 >= len(args) {
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 				return fmt.Errorf("repo %s: --limit needs value", sub)
 			}
 			i++

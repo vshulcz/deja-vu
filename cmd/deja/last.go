@@ -25,6 +25,7 @@ import (
 // resolve the same way and still picked in silence — promote records a state
 // against whichever session it chose (#872).
 func noteAmbiguousPrefix(dir, id, action string) {
+	id = index.PastedSelector(id)
 	// Counted under the rule the reader is searching by: a session the policy
 	// withholds is not one they can reach with a longer prefix (#2401).
 	pol := policy.Load()
@@ -62,6 +63,7 @@ func noteAmbiguousPrefix(dir, id, action string) {
 // ambiguousJSONPrefix refuses a --json read whose prefix names more than one
 // session, and says what separates them.
 func ambiguousJSONPrefix(dir, id string) error {
+	id = index.PastedSelector(id)
 	pol := policy.Load()
 	n := index.PrefixMatchesAllowed(dir, id, func(project string) bool {
 		return pol.Allows(policy.ActivationSearch, project)
@@ -107,6 +109,7 @@ func noteAmbiguousPrefixIn(dir, id, harness, action string) {
 var pickedOnScreen *model.Session
 
 func findByPrefix(dir, p string) (model.Session, bool, error) { //nolint:unparam // handoff.go and coverage_extra_test.go read the error
+	p = index.PastedSelector(p)
 	if s := pickedOnScreen; s != nil && p == s.ID {
 		if full, ok, err := index.FindByIdentity(dir, s.Harness, s.ID); err == nil && ok {
 			return full, true, nil
@@ -132,6 +135,7 @@ func findByPrefix(dir, p string) (model.Session, bool, error) { //nolint:unparam
 // across every harness and then refusing it said no session matches while one
 // in the named harness started with the prefix.
 func findByPrefixHarness(dir, p, harness string) (model.Session, bool) {
+	p = index.PastedSelector(p)
 	if err := ensureForCLIRead(dir); err == nil {
 		if s, ok, err := lookupUnlessNew(dir, func() (model.Session, bool, error) { return index.FindByPrefixIn(dir, p, harness) }); err == nil {
 			if ok {
@@ -230,6 +234,7 @@ func parseLast(args []string) (int, search.Options, string, error) {
 	n := 10
 	seenN := false
 	o := search.Options{}
+	args = splitKnownValueFlags(args, "--harness", "--project", "--since", "--role", "--from")
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch a {
@@ -240,7 +245,7 @@ func parseLast(args []string) (int, search.Options, string, error) {
 				return n, o, sinceRaw, fmt.Errorf("%s needs value", a)
 			}
 			i++
-			v := args[i] //nolint:gosec // bounds checked before i++
+			v := args[i]
 			// Empty is how "no filter" is spelled inside deja, so an empty
 			// argument reached the search as no filter at all and a scripted
 			// `--project "$PROJECT"` with the variable unset quietly returned

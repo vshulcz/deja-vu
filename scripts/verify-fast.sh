@@ -29,12 +29,13 @@ if echo "$cov_out" | grep -v '100.0% of statements' | grep -q 'coverage:'; then
 fi
 
 echo "==> Running structural contract tests..."
-go test ./internal/embed ./internal/sources -run '^TestOnlyOneSwitchesItOff|TestParsePrimitivesInt64AndExitCode|TestWithStderrBoundsAndPreservesWrappedError|TestEveryRegisteredHarnessKindHandlesHostileInputs$'
-go test ./cmd/deja -run '^TestEveryCLICommandRejectsBlankInputsBeforeIndexing|TestDoctorAndRuntimeShareEnvResolvers|TestEveryJSONSurfaceMatchesItsSection$'
+go test ./internal/embed ./internal/sources ./internal/index -run '^TestOnlyOneSwitchesItOff|TestParsePrimitivesInt64AndExitCode|TestWithStderrBoundsAndPreservesWrappedError|TestEveryRegisteredHarnessKindHandlesHostileInputs|TestSessionStatsSurviveFullBuildAndIncrementalAppend$'
+go test ./cmd/deja -run '^TestEveryCLICommandRejectsBlankInputsBeforeIndexing|TestEveryCLICommandAcceptsFlagEqualsValueAndRejectsEmptyEquals|TestEverySessionSelectorCommandUnwrapsPastedQuotes|TestTestsJSONAndTextRespectLimitParity|TestDoctorBoundedStoreErrorPreservesValidUTF8|TestDoctorAndRuntimeShareEnvResolvers|TestEveryJSONSurfaceMatchesItsSection|TestEachFlagListNamesEveryFlagItsParserTakes$'
 
 if command -v golangci-lint >/dev/null 2>&1; then
 	echo "==> Running golangci-lint..."
-	golangci-lint run ./internal/embed/... ./internal/sources/... ./cmd/deja/...
+	golangci-lint run ./internal/embed/... ./internal/sources/... ./internal/index/...
+	golangci-lint run ./cmd/deja/...
 fi
 
 echo "==> All fast quality gates passed."

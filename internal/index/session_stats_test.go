@@ -74,4 +74,33 @@ func TestSessionStatsSurviveFullBuildAndIncrementalAppend(t *testing.T) {
 	if got.ToolErrors != 1 {
 		t.Errorf("got.ToolErrors = %d, want 1", got.ToolErrors)
 	}
+
+	// Re-delivering already-counted messages (empty newMessages tail) must be
+	// idempotent and never double Tokens, ToolCalls, or ToolErrors; and a full
+	// rebuild (`Ensure(..., true)`) must match the incremental SessionMeta.
+	meta := textOf(got).meta
+	extendOwnedRow(&meta, got, transcript, true, false)
+	if !reflect.DeepEqual(meta.Tokens, wantTokens) {
+		t.Fatalf("duplicate delivery doubled Tokens: got %+v, want %+v", meta.Tokens, wantTokens)
+	}
+	if !reflect.DeepEqual(meta.ToolCalls, wantTools) {
+		t.Fatalf("duplicate delivery doubled ToolCalls: got %+v, want %+v", meta.ToolCalls, wantTools)
+	}
+	if meta.ToolErrors != 1 {
+		t.Fatalf("duplicate delivery doubled ToolErrors: got %d, want 1", meta.ToolErrors)
+	}
+
+	if err = Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	rebuilt, err := Recent(dir, 10)
+	if err != nil || len(rebuilt) != 1 {
+		t.Fatalf("Recent after full rebuild = %+v, %v", rebuilt, err)
+	}
+	if !reflect.DeepEqual(rebuilt[0].Tokens, got.Tokens) ||
+		!reflect.DeepEqual(rebuilt[0].ToolCalls, got.ToolCalls) ||
+		rebuilt[0].ToolErrors != got.ToolErrors ||
+		!reflect.DeepEqual(rebuilt[0].Model, got.Model) {
+		t.Fatalf("incremental vs full rebuild drift:\nincremental: %+v\nrebuilt:     %+v", got, rebuilt[0])
+	}
 }

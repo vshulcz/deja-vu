@@ -105,6 +105,7 @@ func runSyncExport(dir string, args []string) error {
 	rest := args[1:]
 	out := ""
 	peer := ""
+	rest = splitKnownValueFlags(rest, "--peer")
 	for i := 0; i < len(rest); i++ {
 		a := rest[i]
 		if a == "--full" {

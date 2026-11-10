@@ -62,7 +62,7 @@ func withStderr(err error, buf *bytes.Buffer) error {
 		msg = strings.TrimSpace(msg[:i])
 	}
 	if len(msg) > sqliteStderrMax {
-		msg = strings.TrimSpace(msg[:sqliteStderrMax]) + "…"
+		msg = strings.TrimSpace(truncateRunes(msg, sqliteStderrMax)) + "…"
 	}
 	return fmt.Errorf("%s (%w)", msg, err)
 }

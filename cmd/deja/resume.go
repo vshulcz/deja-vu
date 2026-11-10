@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -46,13 +47,13 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 		if strings.HasPrefix(a, "-") && a != "-" {
 			return fmt.Errorf("resume: unknown flag %q — it takes an id-prefix, --write-back, --exec and --app", a)
 		}
-		if strings.TrimSpace(a) == "" {
+		if strings.TrimSpace(index.PastedSelector(a)) == "" {
 			return idPrefixNeeded(dir, "resume needs an id prefix", "resume needs an id prefix (see `deja last`)")
 		}
 		if prefix != "" {
 			return fmt.Errorf("resume takes one id-prefix — got %q and %q", prefix, a)
 		}
-		prefix = a
+		prefix = index.PastedSelector(a)
 	}
 	if prefix == "" {
 		return idPrefixNeeded(dir, "resume needs an id prefix", "resume needs an id prefix (see `deja last`)")
