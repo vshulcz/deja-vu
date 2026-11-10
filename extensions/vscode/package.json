@@ -1,7 +1,7 @@
 {
   "name": "deja-status",
   "displayName": "deja-vu — Claude Code, Cursor, Codex & OpenCode Memory",
-  "description": "Local cross-agent memory status bar for VS Code, Cursor, Windsurf, Antigravity, Trae and Kiro. Indexes sessions from 44 coding agents with one Go binary and no LLM.",
+  "description": "Local cross-agent memory status bar for VS Code, Cursor, Windsurf, Antigravity, Trae and Kiro. Indexes sessions from 43 coding agents with one Go binary and no LLM.",
   "publisher": "vshulcz",
   "version": "0.24.1",
   "license": "MIT",

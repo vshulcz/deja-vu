@@ -16,6 +16,11 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-senpi-session-history.html"></link>
     <updated>2026-11-10T00:00:00Z</updated>
     <summary>Senpi stores each session in a JSONL file under ~/.senpi/agent/sessions. Find it, delete one session or all, or use deja delete with dry-run preview.</summary>
+    <title>deja-vu: memory for Claude Code, Codex, Cursor &amp; 40 more</title>
+    <id>https://vshulcz.github.io/deja-vu/</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
+    <updated>2026-11-10T00:00:00Z</updated>
+    <summary>Coding agent memory for Claude Code, Codex and 41 more agents. A local index of the session history already on your disk that every agent can recall.</summary>
   </entry>
   <entry>
     <title>Basic Memory alternative for coding agents — deja-vu</title>

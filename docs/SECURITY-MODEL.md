@@ -78,7 +78,7 @@ Privacy control files in `~/.config/deja` are primary data, not cache data:
 
 - **Tombstones (`~/.config/deja/tombstones`):** prevents `deja forget` sessions from being re-ingested. A full `forget` rebuild replaces the index atomically before the tombstone list is used by the next index pass.
 - **Project exclusions (`~/.config/deja/exclude` / `DEJA_EXCLUDE_PROJECTS`):** skips matching projects at ingest, `sync export` and `sync import`. Sessions indexed before a pattern was added stay searchable locally until `deja index --rebuild`.
-- **Store exclusions (`harness:<name>` / `DEJA_EXCLUDE_HARNESSES`):** an exact store name from the forty-four `deja sources` prints (e.g. `harness:opencode`) skips that store at ingest, `sync export` and `sync import`; `deja doctor` and `deja sources` report it as `excluded`.
+- **Store exclusions (`harness:<name>` / `DEJA_EXCLUDE_HARNESSES`):** an exact store name from the forty-three `deja sources` prints (e.g. `harness:opencode`) skips that store at ingest, `sync export` and `sync import`; `deja doctor` and `deja sources` report it as `excluded`.
 
 Usage events are appended to the sibling file `<index-dir>.usage.jsonl`. This
 sidecar records the kind and time of local search, recall, context, and hook

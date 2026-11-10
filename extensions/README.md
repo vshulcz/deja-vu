@@ -30,8 +30,8 @@ commands that are already out.
 ## Publishing
 
 The release publishes the four npm packages (opencode, dsh, openclaw, pi) at
-the release's own version, so `opencode-deja@0.22.0` and `dsh-deja@0.22.0` are
-the ones built against `deja 0.22.0` — `scripts/release-npm.mjs` sets the
+the release's own version, so `opencode-deja@0.24.1` and `dsh-deja@0.24.1` are
+the ones built against `deja 0.24.1` — `scripts/release-npm.mjs` sets the
 version and the `@vshulcz/deja-vu` dependency together, and the release
 workflow publishes the OpenClaw package and the deja-search skill to ClawHub at
 the same version. Each
