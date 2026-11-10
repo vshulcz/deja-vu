@@ -595,7 +595,27 @@ func printContextChunks(w io.Writer, s model.Session, budget int, include func(m
 	if best > 0 && start > 0 && span+len(chunks[start-1].text) <= budget {
 		start--
 	}
-	written, end, cutLeft := 0, start, 0
+	written, headShown := 0, 0
+	if parts == 0 && total > budget && len(chunks) > 1 && len(chunks[0].text) <= budget/2 {
+		fmt.Fprint(w, chunks[0].text)
+		written += len(chunks[0].text)
+		headShown = 1
+		tailBytes := 0
+		start = len(chunks) - 1
+		for k := len(chunks) - 1; k >= 1; k-- {
+			if written+40+tailBytes+len(chunks[k].text) > budget {
+				break
+			}
+			tailBytes += len(chunks[k].text)
+			start = k
+		}
+		if start > 1 {
+			note := fmt.Sprintf("\n[%d earlier turns omitted]\n", start-1)
+			fmt.Fprint(w, note)
+			written += len(note)
+		}
+	}
+	end, cutLeft := start, 0
 	for i, c := range chunks[start:] {
 		if written >= budget {
 			break
@@ -624,8 +644,8 @@ func printContextChunks(w io.Writer, s model.Session, budget int, include func(m
 		fmt.Fprint(w, note)
 		written += len(note)
 	}
-	shown := end - start
-	if left := start + len(chunks) - end + skipped; left > 0 || cutLeft > 0 {
+	shown := headShown + end - start
+	if left := (start - headShown) + len(chunks) - end + skipped; left > 0 || cutLeft > 0 {
 		lastShown := chunks[end-1].msg == last
 		final := ""
 		switch {

@@ -206,13 +206,12 @@ func contextObjective(s model.Session, window []model.Message) model.ContextFact
 	// the task being resumed.
 	scanned := 0
 	for _, m := range slices.Backward(s.Messages) {
-
+		if m.Role != "user" || IsAgentArtifact(m.Text) || IsCompactionSummary(strings.TrimSpace(m.Text)) {
+			continue
+		}
 		scanned += len(m.Text)
 		if scanned > maxContextScanBytes {
 			break
-		}
-		if m.Role != "user" || IsAgentArtifact(m.Text) || IsCompactionSummary(strings.TrimSpace(m.Text)) {
-			continue
 		}
 		raw := unwrapHandoffPrompt(m.Text, false)
 		text := contextProse(raw, contextObjectiveBytes)
@@ -232,7 +231,7 @@ func contextObjective(s model.Session, window []model.Message) model.ContextFact
 	// The first user record after a host compaction is its summary, not a
 	// statement from the user. Its bounded primary intent is still the only
 	// honest objective when the retained tail contains only "continue".
-	for _, m := range s.Messages {
+	for _, m := range slices.Backward(s.Messages) {
 		if !isHostSummary(m) {
 			continue
 		}
@@ -537,8 +536,10 @@ func extractModifiedFiles(s model.Session, maxItems int) []model.ContextFact {
 func isVerificationCommand(command string) bool {
 	low := strings.ToLower(command)
 	for _, marker := range []string{
-		"go test", "go vet", "pytest", "cargo test", "swift test", "npm test", "pnpm test", "yarn test",
+		"go test", "go vet", "pytest", "cargo test", "cargo check", "swift test",
+		"npm test", "pnpm test", "yarn test", "npm run check", "pnpm check", "yarn check",
 		"vitest", "jest", "rspec", "mvn test", "gradlew test", "make test", "make check",
+		"golangci-lint", "verify-fast", "./scripts/verify", "scripts/verify",
 	} {
 		if strings.Contains(low, marker) {
 			return true

@@ -363,3 +363,37 @@ func TestRenderCompactionContextKeepsItsByteContractAtTinyBudgets(t *testing.T) 
 		}
 	}
 }
+
+func TestContextObjectivesurvivesHeavyAssistantOutputAndPrefersNewestCompactionSummary(t *testing.T) {
+	at := time.Date(2026, 9, 10, 14, 0, 0, 0, time.UTC)
+	heavyAssistant := strings.Repeat("a", maxContextScanBytes+1024)
+	s := model.Session{
+		ID: "session-heavy-scan", Harness: "codex",
+		Messages: []model.Message{
+			{Role: "user", Text: "Ship the incremental manifest compaction fix without dropping tail state.", Time: at},
+			{Role: "assistant", Text: heavyAssistant, Time: at.Add(time.Minute)},
+			{Role: sources.RoleCommand, Text: "$ ./scripts/verify-fast.sh → exit 0", Time: at.Add(2 * time.Minute)},
+			{Role: "user", Text: "continue", Time: at.Add(3 * time.Minute)},
+		},
+	}
+	c := ExtractCompactionContext(s, ExtractOptions{})
+	if !strings.Contains(c.Objective.Text, "incremental manifest compaction fix") {
+		t.Fatalf("objective lost behind heavy assistant output: %#v", c.Objective)
+	}
+	if len(c.Tests) != 1 || c.Tests[0].Outcome != "passed" || !strings.Contains(c.Tests[0].Command, "verify-fast.sh") {
+		t.Fatalf("expected ./scripts/verify-fast.sh to be recorded as passed verification test, got %#v", c.Tests)
+	}
+
+	s2 := model.Session{
+		ID: "session-multi-summary", Harness: "claude",
+		Messages: []model.Message{
+			{Role: "user", Text: "Summary:\n1. Primary Request and Intent:\n  Old stale task from first checkpoint.\n2. Key Technical Concepts:\n  old", Time: at},
+			{Role: "user", Text: "Summary:\n1. Primary Request and Intent:\n  Newest active task from latest checkpoint.\n2. Key Technical Concepts:\n  new", Time: at.Add(time.Minute)},
+			{Role: "user", Text: "continue", Time: at.Add(2 * time.Minute)},
+		},
+	}
+	c2 := ExtractCompactionContext(s2, ExtractOptions{})
+	if !strings.Contains(c2.Objective.Text, "Newest active task") {
+		t.Fatalf("expected newest compaction summary intent, got %#v", c2.Objective)
+	}
+}

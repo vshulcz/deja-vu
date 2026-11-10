@@ -250,11 +250,24 @@ func orientRepoMemory(cwd, act string) []sources.RepoEntry {
 	return entries
 }
 
+const orientRecentCommandWindow = 30 * 24 * time.Hour
+
+func orientRecentCommand(last, newest time.Time) bool {
+	if newest.IsZero() || last.IsZero() {
+		return true
+	}
+	return newest.Sub(last) <= orientRecentCommandWindow
+}
+
 func filterAndSortOrientCmds(cmds []howEntry) []howEntry {
 	filteredCmds := cmds[:0]
+	var newestLast time.Time
 	for _, e := range cmds {
 		if !orientEphemeralCommand(orientCommand(e.Command)) {
 			filteredCmds = append(filteredCmds, e)
+			if e.Last.After(newestLast) {
+				newestLast = e.Last
+			}
 		}
 	}
 	cmds = filteredCmds
@@ -271,6 +284,10 @@ func filterAndSortOrientCmds(cmds []howEntry) []howEntry {
 		ii, ij := index.InspectionCommand(ci), index.InspectionCommand(cj)
 		if ii != ij {
 			return !ii
+		}
+		ri, rj := orientRecentCommand(cmds[i].Last, newestLast), orientRecentCommand(cmds[j].Last, newestLast)
+		if ri != rj {
+			return ri
 		}
 		if len(cmds[i].Sessions) != len(cmds[j].Sessions) {
 			return len(cmds[i].Sessions) > len(cmds[j].Sessions)
@@ -615,6 +632,12 @@ func orientRecurringCommands(dir string, projects []string, activation string) [
 			Inspect:     index.InspectionCommand(clean),
 		})
 	}
+	var newestLast time.Time
+	for _, c := range out {
+		if c.Last.After(newestLast) {
+			newestLast = c.Last
+		}
+	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].SuiteVerify != out[j].SuiteVerify {
 			return out[i].SuiteVerify
@@ -624,6 +647,10 @@ func orientRecurringCommands(dir string, projects []string, activation string) [
 		}
 		if out[i].Inspect != out[j].Inspect {
 			return !out[i].Inspect
+		}
+		ri, rj := orientRecentCommand(out[i].Last, newestLast), orientRecentCommand(out[j].Last, newestLast)
+		if ri != rj {
+			return ri
 		}
 		if out[i].Sessions != out[j].Sessions {
 			return out[i].Sessions > out[j].Sessions
