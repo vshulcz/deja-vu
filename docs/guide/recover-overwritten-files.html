@@ -4,14 +4,14 @@
 <script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Recover uncommitted files overwritten or deleted by Claude Code, Cursor, or Codex — deja-vu</title>
-<meta name="description" content="When an AI coding agent overwrites or deletes an uncommitted file before git commit, every replaced edit span is still recorded in the local session transcript on disk. How to recover it with jq or deja restore.">
+<title>Recover files overwritten by an AI agent — deja-vu</title>
+<meta name="description" content="When Claude Code, Cursor, or Codex overwrites an uncommitted file before git commit, recover the replaced edit spans from local session transcripts on disk.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html">
 <link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html">
 <link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Recover uncommitted files overwritten or deleted by Claude Code, Cursor, or Codex">
-<meta property="og:description" content="When an AI coding agent overwrites or deletes an uncommitted file before git commit, every replaced edit span is still recorded in the local session transcript on disk. How to recover it with jq or deja restore.">
+<meta property="og:title" content="Recover files overwritten by an AI agent">
+<meta property="og:description" content="When Claude Code, Cursor, or Codex overwrites an uncommitted file before git commit, recover the replaced edit spans from local session transcripts on disk.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -30,7 +30,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Recover uncommitted files overwritten or deleted by Claude Code, Cursor, or Codex", "description": "When an AI coding agent overwrites or deletes an uncommitted file before git commit, every replaced edit span is still recorded in the local session transcript on disk. How to recover it with jq or deja restore.", "url": "https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-10", "dateModified": "2026-11-10"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Recover files overwritten by an AI agent", "description": "When Claude Code, Cursor, or Codex overwrites an uncommitted file before git commit, recover the replaced edit spans from local session transcripts on disk.", "url": "https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-10", "dateModified": "2026-11-10"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Recover overwritten files","item":"https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html"}]}</script>
 </head>
 <body>
@@ -75,7 +75,7 @@
 <a href="recover-overwritten-files.html" aria-current="page">Recover overwritten files</a>
 <a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
-<details class="grpfold"><summary>Deleting sessions <span class="n">32</span></summary>
+<details class="grpfold"><summary>Deleting sessions <span class="n">33</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
 <a href="delete-old-claude-sessions.html">Old sessions</a>
 <a href="delete-codex-sessions.html">Codex</a>
@@ -101,6 +101,7 @@
 <a href="delete-codebuddy-sessions.html">CodeBuddy</a>
 <a href="delete-antigravity-history.html">Antigravity</a>
 <a href="delete-pi-session-history.html">pi</a>
+<a href="delete-senpi-session-history.html">Senpi</a>
 <a href="delete-crush-session-history.html">Crush</a>
 <a href="delete-hermes-session-history.html">Hermes</a>
 <a href="delete-cherrystudio-session-history.html">Cherry Studio</a>
