@@ -419,8 +419,17 @@ func pruneFilteredRepoEntries(root string) int {
 			}
 			continue
 		}
-		if e.From != "" && !strings.HasPrefix(e.From, "deja") && !usableRepoCandidateLine(e.Text) {
-			drop = append(drop, e.ID)
+		if e.From != "" && !strings.HasPrefix(e.From, "deja") {
+			if !usableRepoCandidateLine(e.Text) {
+				drop = append(drop, e.ID)
+				continue
+			}
+			if e.Kind == "rejected" {
+				if _, ok := index.GiveUpLine(e.Text); !ok {
+					drop = append(drop, e.ID)
+					continue
+				}
+			}
 		}
 	}
 	if len(drop) == 0 {

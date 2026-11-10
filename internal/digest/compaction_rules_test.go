@@ -225,6 +225,14 @@ func TestStandingRulesClauseAndTurnPairRejections(t *testing.T) {
 				Role: "user",
 				Text: "не, сам то конфиг пусть будет локально, потестим насколько с ним лучше, а вот пушить не надо в ветку",
 			},
+			{
+				Role: "assistant",
+				Text: "2. Обновить `cmd/deja/star_tip.go`\n3. Запустить `deja restore`",
+			},
+			{
+				Role: "user",
+				Text: "2. нет\n3. no",
+			},
 		},
 	}
 	rules := ExtractStandingRules(s, nil)
@@ -242,6 +250,14 @@ func TestStandingRulesClauseAndTurnPairRejections(t *testing.T) {
 	} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("missing expected rule %q in extracted rules:\n%s", want, joined)
+		}
+	}
+	for _, unwanted := range []string{
+		"2. нет",
+		"3. no",
+	} {
+		if strings.Contains(joined, unwanted) {
+			t.Errorf("unexpected bare numbered refusal %q in extracted rules:\n%s", unwanted, joined)
 		}
 	}
 }

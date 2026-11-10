@@ -86,7 +86,7 @@ var (
 		`(?:doesn't|does\s+not|isn't|is\s+not)\s+(?:work|working|respond|responding|compile|compiling|pass|passing)\b|` +
 		`(?:動かない|動きません|応答しない|応答しません|反応しない|通らない)` +
 		`)`)
-	standingNumRefusalRE    = regexp.MustCompile(`(?i)^\s*(\d{1,2})(?:\s*[-–—]\s*(\d{1,2}))?(?:[.)、．]|\s+иде[ияй])?\s*(?:нет|не\s+надо|не\s+буду|не\s+нужно|мимо|отбой|no|don't|won't|skip|不要|不用|不需要|不做|算了|跳过|いいえ|いや|やらない|しない|スキップ)(?:$|[^\p{L}]|[，,、：:\s])(.*)$`)
+	standingNumRefusalRE    = regexp.MustCompile(`(?i)^\s*(\d{1,2})(?:\s*[-–—]\s*(\d{1,2}))?(?:[.)、．]|\s+иде[ияй])?\s*(?:нет|не\s+надо|не\s+буду|не\s+нужно|мимо|отбой|no|don't|won't|skip|不要|不用|不需要|不做|算了|跳过|いいえ|いや|やらない|しない|スキップ)(?:[,，、.。:：!！\s]+)(\S.+)$`)
 	standingDirectRefusalRE = regexp.MustCompile(`(?i)^\s*(?:нет|не-а|не\s+надо|не\s+буду|не\s+нужно|не\s+стоит|отбой|no|nope|nah|不用|不要|不需要|算了|いいえ|いや)(?:[,，、.。:：!！\s]+)(.+)$`)
 	standingSlashCmdRE      = regexp.MustCompile(`(?:^|[\s` + "`" + `(*"«「『（])(\/[a-z][a-z0-9_-]{2,20})\b`)
 	standingBacktickRE      = regexp.MustCompile("`([^`\\n]{2,60})`")

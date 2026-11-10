@@ -262,3 +262,44 @@ func TestFilterAndSortOrientCmdsPrefersRecentVerifyCommandsOverStaleOnes(t *test
 		t.Errorf("got[0].Command = %q, want ./scripts/verify-fast.sh ahead of stale command", got[0].Command)
 	}
 }
+
+func TestOrientTrapAndRepoCandidateNoiseFilters(t *testing.T) {
+	if orientTestRemedyMatchesFail("--- FAIL: TestDecodeRecordStub", "gofmt -w internal/index/store_io.go && go test ./internal/index") {
+		t.Error("chained gofmt && go test after a unit test failure is ordinary TDD, not a project trap")
+	}
+	if !orientTestRemedyMatchesFail("--- FAIL: TestSQLite", "make clean && make CGO_ENABLED=0") {
+		t.Error("build/env remedy after a test failure should still be accepted")
+	}
+	if !orientDestructiveRemedy("npm view @vshulcz/deja-vu@0.24.1 version") {
+		t.Error("read-only npm view probe must not be reported as an error remedy")
+	}
+	if !isLowSignalEnvironmentWall("[COMMAND TIMED OUT AFTER 35s — do NOT retry this exact command]") {
+		t.Error("agent tool-wrapper timeout must not be reported as a machine environment wall")
+	}
+	if !isLowSignalEnvironmentWall("Encountered error in tool execution: tool call denied by pre-tool hook: STOP") {
+		t.Error("pre-tool hook denial must not be reported as a machine environment wall")
+	}
+	for _, ephemeral := range []string{
+		"Статус всех PR (`#6011`–`#6018`) - #6013 — MERGED (`a506650a2`).",
+		"Починил тест `TestCaptureCompactionCarriesTheListForward` в PR `#6007` и пушу обновлённую ветку — сейчас переключимся на фикс.",
+		"Зональное ранжирование BM25F <truncated 3840 bytes> в `internal/evidence/evidence.go`.",
+		"Обрезанная ссылка на файл [store_io.go](file:///tmp/store_io.go",
+		"Обрезанный нумерованный список в конце строки 1.",
+		"PR #5955 is open (`fix/opencode-plugin-v2`) with auto-merge enabled.",
+		"Я уже перегенерировал docs/feed.xml и проверил тесты — осталось запушить коммит в ветку.",
+	} {
+		if usableRepoCandidateLine(ephemeral) {
+			t.Errorf("ephemeral status or truncated line accepted as repo candidate: %q", ephemeral)
+		}
+	}
+	root := t.TempDir()
+	_, _, _, _ = sources.EvolveRepoEntries(root, []sources.RepoEntry{{
+		ID:   "quoted-rev",
+		Kind: "rejected",
+		Text: "P2 из ревью: markdown-буллеты `* reverted…` в сводках ассистента терялись.",
+		From: "claude 2026-08-09",
+	}}, 50)
+	if n := pruneFilteredRepoEntries(root); n != 1 {
+		t.Errorf("pruneFilteredRepoEntries pruned %d entries, want 1", n)
+	}
+}

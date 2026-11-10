@@ -89,31 +89,63 @@ func GiveUpLine(l string) (string, bool) {
 	}
 	low := strings.ToLower(l)
 	for _, p := range giveUpPhrases {
-		i := strings.Index(low, p)
-		if i < 0 {
-			continue
+		for offset := 0; offset < len(low); {
+			rel := strings.Index(low[offset:], p)
+			if rel < 0 {
+				break
+			}
+			i := offset + rel
+			offset = i + len(p)
+			// A phrase inside inline code (`* reverted…`), guillemets
+			// («reverted», «пробовали X, откатили»), or quotes ("reverted")
+			// talks about the marker/word itself rather than reporting a
+			// reversal.
+			if phraseQuotedOrCode(low, i, len(p)) {
+				continue
+			}
+			// A reflexive Russian verb is a thing rolling by itself, not someone
+			// rolling a change back: "откатил" is a substring of "откатился" ("the
+			// ball rolled under the couch"). The reflexive particle "-ся"/"-сь"
+			// comes after the gender/number vowel — откатил·ся, откатил·а·сь,
+			// откатил·о·сь, откатил·и·сь — so check for it with the vowel optional.
+			if reflexiveSuffix(low[i+len(p):]) {
+				continue
+			}
+			clause := reversalClause(low, i, len(p))
+			// A reversal that did not happen is not a report. Negation ("we
+			// haven't reverted", "never gave up on", "не откатывать"), a
+			// conditional or future ("if it fails we roll it back", "I'll be
+			// reverting tomorrow"), and a bare question ("should we have reverted
+			// this?") all describe a reversal that was considered, refused, or is
+			// still ahead — not one that was done.
+			if clauseNegatesOrDefers(clause, p) {
+				continue
+			}
+			return l, true
 		}
-		// A reflexive Russian verb is a thing rolling by itself, not someone
-		// rolling a change back: "откатил" is a substring of "откатился" ("the
-		// ball rolled under the couch"). The reflexive particle "-ся"/"-сь"
-		// comes after the gender/number vowel — откатил·ся, откатил·а·сь,
-		// откатил·о·сь, откатил·и·сь — so check for it with the vowel optional.
-		if reflexiveSuffix(low[i+len(p):]) {
-			continue
-		}
-		clause := reversalClause(low, i, len(p))
-		// A reversal that did not happen is not a report. Negation ("we
-		// haven't reverted", "never gave up on", "не откатывать"), a
-		// conditional or future ("if it fails we roll it back", "I'll be
-		// reverting tomorrow"), and a bare question ("should we have reverted
-		// this?") all describe a reversal that was considered, refused, or is
-		// still ahead — not one that was done.
-		if clauseNegatesOrDefers(clause, p) {
-			continue
-		}
-		return l, true
 	}
 	return l, false
+}
+
+// phraseQuotedOrCode reports whether low[at:at+n] sits inside an inline-code
+// span (`...`), guillemets («...»), curly quotes (“...”), or ASCII double
+// quotes ("...").
+func phraseQuotedOrCode(low string, at, n int) bool {
+	before := low[:at]
+	after := low[at+n:]
+	if strings.Count(before, "`")%2 == 1 && strings.Contains(after, "`") {
+		return true
+	}
+	if strings.Count(before, `"`)%2 == 1 && strings.Contains(after, `"`) {
+		return true
+	}
+	if strings.LastIndex(before, "«") > strings.LastIndex(before, "»") && strings.Contains(after, "»") {
+		return true
+	}
+	if strings.LastIndex(before, "“") > strings.LastIndex(before, "”") && strings.Contains(after, "”") {
+		return true
+	}
+	return false
 }
 
 // reversalClause returns the sentence the phrase sits in, lowercased: from the

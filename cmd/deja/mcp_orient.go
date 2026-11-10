@@ -1153,6 +1153,8 @@ func orientDestructiveRemedy(cmd string) bool {
 	for _, bad := range []string{
 		" git reset ", " git checkout ", " git clean ", " git stash ",
 		" git push ", " rm -rf ", " rm -f ",
+		" npm view ", " npm info ", " gh pr view ", " gh pr checks ",
+		" gh run view ", " gh issue view ",
 	} {
 		if strings.Contains(low, bad) {
 			return true
@@ -1165,11 +1167,19 @@ func orientTestRemedyMatchesFail(errLine, cmd string) bool {
 	if !strings.HasPrefix(strings.TrimSpace(errLine), "--- FAIL:") {
 		return true
 	}
-	lowCmd := strings.ToLower(strings.TrimSpace(cmd))
-	if strings.HasPrefix(lowCmd, "go test ") || lowCmd == "go test" {
-		return false
+	for seg := range strings.SplitSeq(cmd, "&&") {
+		lowCmd := strings.ToLower(strings.TrimSpace(seg))
+		if lowCmd == "" || strings.HasSuffix(lowCmd, "…") {
+			continue
+		}
+		if strings.HasPrefix(lowCmd, "go test ") || lowCmd == "go test" ||
+			strings.HasPrefix(lowCmd, "gofmt ") || strings.HasPrefix(lowCmd, "golangci-lint ") ||
+			strings.HasPrefix(lowCmd, "git ") || strings.HasPrefix(lowCmd, "echo ") {
+			continue
+		}
+		return true
 	}
-	return true
+	return false
 }
 
 func orientTautologicalEdit(errLine, relEdit string) bool {

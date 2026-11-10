@@ -114,6 +114,12 @@ func TestGiveUpLineRejectsUnrealisedReversals(t *testing.T) {
 		"was that rolled back",
 		"is that reverted yet",
 		"were those changes reverted",
+		// Mentioning a reversal word inside backticks, guillemets, or quotes is
+		// metalinguistic discussion of a marker/label, not a rollback report.
+		"P2 из ревью: markdown-буллеты `* reverted…` в сводках ассистента терялись.",
+		"маркер «reverted» остаётся — «пробовали X, откатили» полезно, просто вторым",
+		"the \u201creverted\u201d badge in the UI was missing",
+		`the "reverted" badge was missing from the session header`,
 	}
 	for _, l := range notReports {
 		if _, ok := GiveUpLine(l); ok {
@@ -124,6 +130,7 @@ func TestGiveUpLineRejectsUnrealisedReversals(t *testing.T) {
 	// separate follow-up question.
 	reports := []string{
 		"reverted the retry cap, it made the queue worse",
+		"маркер `reverted` оставили, но сам коммит откатили из-за гонки",
 		"откатили, но не помогло, что дальше?",
 		"we backed out the migration and went with the view instead",
 		"* reverted the caching layer, it broke ordering",

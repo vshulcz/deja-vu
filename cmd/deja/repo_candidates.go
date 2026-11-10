@@ -944,11 +944,23 @@ func usableRepoCandidateLine(s string) bool {
 	if len([]rune(s)) < 45 {
 		return false
 	}
-	if strings.HasSuffix(s, "?") || strings.HasSuffix(s, ":") || strings.Contains(s, " | ") || strings.HasPrefix(s, "|") || strings.HasPrefix(s, "#") || strings.Contains(s, "```") || strings.Contains(s, " ### ") || strings.Contains(s, " ## ") || strings.Count(s, " - ") >= 2 {
+	if strings.HasSuffix(s, "?") || strings.HasSuffix(s, ":") || strings.HasSuffix(s, " 1.") || strings.HasSuffix(s, " 2.") || strings.Contains(s, " | ") || strings.HasPrefix(s, "|") || strings.HasPrefix(s, "#") || strings.Contains(s, "```") || strings.Contains(s, " ### ") || strings.Contains(s, " ## ") || strings.Count(s, " - ") >= 2 {
 		return false
 	}
 	low := strings.ToLower(s)
 	for _, noise := range []string{
+		"<truncated ",
+		"](file://",
+		"](http://",
+		"](https://",
+		"auto-merge",
+		"— merged",
+		" closes #",
+		"в рамках pr #",
+		"пушу обновлённую",
+		"пушу обновленную",
+		"переключимся на",
+		"merged за последние",
 		"о чем речь",
 		"откатывать ли ",
 		"откатывать нечего",
@@ -989,6 +1001,10 @@ func usableRepoCandidateLine(s string) bool {
 		"i've sent",
 		"i’ve sent",
 		"both prs are merged",
+		"is open (`fix/",
+		"is open (`feat/",
+		"is open (fix/",
+		"is open (feat/",
 		"needs your ok",
 		"мои прямые тесты",
 		"мой `-inline-answer`",
@@ -1022,6 +1038,9 @@ func usableRepoCandidateLine(s string) bool {
 		"сначала коммичу",
 		"один ревьюер",
 		"осталось на ",
+		"осталось запушить",
+		"смёрджен (",
+		"смерджен (",
 		"опубликован ответ",
 		"вмержены в main",
 		"смержены в main",
@@ -1071,8 +1090,11 @@ func usableRepoCandidateLine(s string) bool {
 		"no benchmarks were ",
 		"before the fix, ",
 		"i would first ",
-		"починил (",
-		"починил сразу",
+		"починил ",
+		"статус pr",
+		"статус всех pr",
+		"уже влито",
+		"новые гайды и pr ",
 		"поправку оставил в ",
 		"релиз 0.",
 		"завёл ",

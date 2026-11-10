@@ -432,7 +432,10 @@ func isLowSignalEnvironmentWall(s string) bool {
 	if (strings.HasPrefix(low, "fail\t") || strings.HasPrefix(low, "fail ")) && strings.HasSuffix(low, "[build failed]") {
 		return true
 	}
-	if strings.Contains(low, "[redacted:") {
+	if strings.Contains(low, "[redacted:") ||
+		strings.Contains(low, "[command timed out") ||
+		strings.HasPrefix(low, "encountered error in step execution:") ||
+		strings.Contains(low, "tool call denied by pre-tool hook:") {
 		return true
 	}
 	return false
