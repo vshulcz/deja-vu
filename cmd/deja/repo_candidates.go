@@ -53,12 +53,13 @@ func runRepoCandidates(dir string, w io.Writer, args []string) error {
 	asJSON := false
 	limit := 30
 	var since time.Duration
+	args = splitKnownValueFlags(args, "--limit", "--since")
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--json":
 			asJSON = true
 		case "--limit":
-			if i+1 >= len(args) {
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 				return errors.New("repo candidates: --limit needs value")
 			}
 			i++
@@ -68,7 +69,7 @@ func runRepoCandidates(dir string, w io.Writer, args []string) error {
 			}
 			limit = n
 		case "--since":
-			if i+1 >= len(args) {
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 				return errors.New("repo candidates: --since needs value")
 			}
 			i++

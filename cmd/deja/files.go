@@ -65,6 +65,7 @@ func parseFilesArgs(args []string) (filesOptions, error) {
 	project := ""
 	allProjects := false
 	asJSON := false
+	args = splitKnownValueFlags(args, "--project", "--limit")
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--json":
@@ -73,7 +74,7 @@ func parseFilesArgs(args []string) (filesOptions, error) {
 			// A flag typed with nothing after it used to be dropped in silence,
 			// and so did an unknown one and an empty --project: the answer came
 			// back looking like an answer to what was asked (#1628).
-			if i+1 >= len(args) {
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 				return filesOptions{}, errors.New("files: --limit needs value")
 			}
 			i++

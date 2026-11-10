@@ -28,6 +28,7 @@ func parseForgetArgs(args []string) (forgetArgs, error) {
 	allMatches := false
 	unforget, unforgetGiven := "", false
 	given := map[string]bool{}
+	args = splitKnownValueFlags(args, "--session", "--project", "--before", "--unforget")
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--list":

@@ -33,6 +33,7 @@ func parseBlame(args []string) (string, search.BlameOptions, blameMode, error) {
 	mode := blameMode{}
 	var path string
 	afterDashDash := false
+	args = splitKnownValueFlags(args, "--harness", "--project", "--since")
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		if afterDashDash {
@@ -70,17 +71,17 @@ func parseBlame(args []string) (string, search.BlameOptions, blameMode, error) {
 				return "", o, mode, fmt.Errorf("%s needs value", a)
 			}
 			i++
-			if strings.TrimSpace(args[i]) == "" { //nolint:gosec // bounds checked before i++
+			if strings.TrimSpace(args[i]) == "" {
 				// Empty is how "no filter" is spelled inside deja (#1612).
 				return "", o, mode, fmt.Errorf("%s needs value", a)
 			}
 			switch a {
 			case "--harness":
-				o.Harness = args[i] //nolint:gosec // bounds checked before i++
+				o.Harness = args[i]
 			case "--project":
-				o.Project = args[i] //nolint:gosec // bounds checked before i++
+				o.Project = args[i]
 			case "--since":
-				d, err := parseDur(args[i]) //nolint:gosec // bounds checked before i++
+				d, err := parseDur(args[i])
 				if err != nil {
 					return "", o, mode, err
 				}

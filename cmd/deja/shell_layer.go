@@ -68,7 +68,7 @@ func runShell(dir string, args []string, stdout, stderr io.Writer) error {
 		case "--json", "-json":
 			jsonOut = true
 		case "-c":
-			if len(rest) < 2 {
+			if len(rest) < 2 || strings.TrimSpace(rest[1]) == "" {
 				return errors.New("shell -c requires a command string")
 			}
 			cmdFlag = true
@@ -77,6 +77,9 @@ func runShell(dir string, args []string, stdout, stderr io.Writer) error {
 		default:
 			if strings.HasPrefix(a, "-") {
 				return fmt.Errorf("unknown flag for shell: %s (try: deja shell bash|zsh|fish, deja shell -c <cmd>, or deja shell --verify)", a)
+			}
+			if strings.TrimSpace(a) == "" {
+				return errors.New("usage: deja shell bash|zsh|fish, deja shell -c <cmd>, or deja shell --verify [--json]")
 			}
 			if shellArg != "" {
 				return fmt.Errorf("shell takes one shell name — got %q after %q", a, shellArg)

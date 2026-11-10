@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/embed"
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -539,7 +540,7 @@ func collectDoctorEmbed(dir string) *doctorEmbedReport {
 const ampServerSideNote = "Amp since 2026-03-31 keeps threads on ampcode.com, not on disk"
 
 func doctorStoreChecks() []doctorStoreCheck {
-	aiderPaths := append([]string{sources.Home()}, filepath.SplitList(os.Getenv("DEJA_AIDER_ROOTS"))...)
+	aiderPaths := append([]string{sources.Home()}, sources.AiderRoots()...)
 	// The file lists are read only for a store that is read: listing an
 	// excluded one walked it on every `deja index` and doctor (#5394).
 	checks := []struct {
@@ -1243,7 +1244,11 @@ func boundedStoreError(msg string) string {
 		msg = strings.TrimSpace(msg[:i])
 	}
 	if len(msg) > storeErrorMax {
-		msg = strings.TrimSpace(msg[:storeErrorMax]) + "…"
+		cut := storeErrorMax
+		for cut > 0 && !utf8.ValidString(msg[:cut]) {
+			cut--
+		}
+		msg = strings.TrimSpace(msg[:cut]) + "…"
 	}
 	return msg
 }

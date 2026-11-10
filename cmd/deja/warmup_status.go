@@ -206,7 +206,10 @@ func withWarmupStatus(dir string, fn func() error) error {
 // otherwise. Hosts whose plugins cannot read the hook envelope — opencode
 // pushes its hook output into the model's context, not the UI — call this to
 // find out whether to tell the user memory is still coming.
-func cmdWarmupStatus(dir string, _ []string) error {
+func cmdWarmupStatus(dir string, rest []string) error {
+	if len(rest) > 0 {
+		return fmt.Errorf("warmup-status takes no arguments — got %q", rest[0])
+	}
 	if st := readWarmupStatus(dir); st != nil {
 		fmt.Fprintln(os.Stdout, st.line())
 	}

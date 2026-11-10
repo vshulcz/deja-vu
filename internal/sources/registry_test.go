@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -448,6 +449,113 @@ func validateRegistrySessions(t *testing.T, id string, sessions []model.Session)
 			if (role != "user" && role != "assistant" && role != "tool-output" && role != RoleSummary && !work) ||
 				strings.TrimSpace(message.Text) == "" || message.Time.IsZero() {
 				t.Fatalf("%s fixture produced invalid message: %#v", id, message)
+			}
+		}
+	}
+}
+
+func TestEveryRegisteredHarnessKindHandlesHostileInputs(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	payloads := []struct {
+		name string
+		ext  string
+		data []byte
+	}{
+		{"empty", ".jsonl", nil},
+		{"whitespace", ".jsonl", []byte("   \n\t\r\n  ")},
+		{"truncated_json", ".json", []byte("\x00\xff{\"broken\": [1, 2,")},
+		{"null_fields", ".jsonl", []byte("{}\n{\"id\":null,\"messages\":null,\"role\":null,\"content\":null,\"timestamp\":null}\n[]\n")},
+		{"corrupt_sqlite", ".db", []byte("SQLite format 3\x00corrupt-database-pages-here")},
+	}
+
+	dir := t.TempDir()
+	paths := make([]string, 0, len(payloads))
+	for _, p := range payloads {
+		fp := filepath.Join(dir, p.name+p.ext)
+		if err := os.WriteFile(fp, p.data, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		paths = append(paths, fp)
+	}
+
+	for _, h := range Registry() {
+		for _, k := range h.Kinds {
+			for _, fp := range paths {
+				_ = k.Match(fp)
+				sessions, _ := k.Parse(fp, 0)
+				for _, s := range sessions {
+					if s.Harness == "" || s.ID == "" {
+						t.Fatalf("harness %s kind %s returned session with empty Harness/ID on %s: %#v", h.Name, k.Name, fp, s)
+					}
+				}
+				if k.ParseFrom != nil {
+					_, _ = k.ParseFrom(fp, 0, 0)
+					_, _ = k.ParseFrom(fp, 2, 1700000000000000000)
+				}
+				if k.Resumes != nil {
+					_ = k.Resumes(fp, 0)
+					_ = k.Resumes(fp, 2)
+				}
+				if k.Sidecar != nil {
+					_, _ = k.Sidecar(fp)
+				}
+			}
+		}
+	}
+
+	// Real-fixture torn-write & mid-offset slicing across all registered JSON/JSONL/MD/XML/YAML fixtures.
+	root := filepath.Clean(filepath.Join("..", ".."))
+	reg := readFormatRegistry(t, filepath.Join(root, "docs", "registry", "registry.json"))
+	kindByHarness := map[string][]FileKind{}
+	for _, h := range Registry() {
+		kindByHarness[h.Name] = h.Kinds
+	}
+	for _, entry := range reg.Harnesses {
+		kinds := kindByHarness[entry.ID]
+		if len(kinds) == 0 {
+			continue
+		}
+		for _, rel := range entry.FixturePaths {
+			srcPath := filepath.Join(root, filepath.FromSlash(rel))
+			fi, err := os.Stat(srcPath)
+			if err != nil || fi.IsDir() || strings.HasSuffix(srcPath, ".db") || strings.HasSuffix(srcPath, ".vscdb") || strings.HasSuffix(srcPath, ".sqlite") {
+				continue
+			}
+			raw, err := os.ReadFile(srcPath)
+			if err != nil || len(raw) < 8 {
+				continue
+			}
+			ext := filepath.Ext(srcPath)
+			for _, cut := range []int{1, len(raw) / 4, len(raw) / 2, (3 * len(raw)) / 4, len(raw) - 1} {
+				tornPath := filepath.Join(dir, entry.ID+"-torn"+ext)
+				if err := os.WriteFile(tornPath, raw[:cut], 0o600); err != nil {
+					t.Fatal(err)
+				}
+				for _, k := range kinds {
+					sessions, _ := k.Parse(tornPath, 0)
+					for _, s := range sessions {
+						if s.Harness == "" || s.ID == "" {
+							t.Fatalf("%s (%s) torn at %d/%d returned empty Harness/ID: %#v", entry.ID, k.Name, cut, len(raw), s)
+						}
+						if !utf8.ValidString(s.Title) || !utf8.ValidString(s.Project) {
+							t.Fatalf("%s (%s) torn at %d/%d returned invalid UTF-8 metadata: %#v", entry.ID, k.Name, cut, len(raw), s)
+						}
+						for _, m := range s.Messages {
+							if !utf8.ValidString(m.Text) {
+								t.Fatalf("%s (%s) torn at %d/%d returned invalid UTF-8 message: %#v", entry.ID, k.Name, cut, len(raw), m)
+							}
+						}
+					}
+					if k.ParseFrom != nil {
+						_, _ = k.ParseFrom(tornPath, int64(cut/2), 0)
+					}
+					if k.Resumes != nil {
+						_ = k.Resumes(tornPath, int64(cut/2))
+					}
+				}
 			}
 		}
 	}

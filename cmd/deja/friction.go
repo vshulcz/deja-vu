@@ -59,16 +59,17 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 	limit := 10
 	asJSON := false
 	settle, unsettle := "", ""
+	args = splitKnownValueFlags(args, "--limit", "--settle", "--unsettle")
 	for i := 0; i < len(args); i++ {
 		if args[i] == "--json" {
 			asJSON = true
 			continue
 		}
 		if args[i] == "--settle" || args[i] == "--unsettle" {
-			if i+1 >= len(args) {
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 				return fmt.Errorf("friction: %s needs the id `deja friction` prints for the wall", args[i])
 			}
-			raw := args[i+1] //nolint:gosec // the bound is checked above
+			raw := args[i+1]
 			id := strings.ToLower(strings.TrimSpace(raw))
 			if !validWallID(id) {
 				return fmt.Errorf("friction: %q is not a wall id — `deja friction` prints one under each wall, eight characters like 3f9a01c2", raw)
@@ -88,13 +89,13 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 		if args[i] != "--limit" {
 			return unknownFlag("friction", args[i], frictionFlags)
 		}
-		if i+1 >= len(args) {
+		if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 			return errors.New("friction: --limit needs value")
 		}
 		i++
-		n, err := strconv.Atoi(args[i]) //nolint:gosec // the bound is checked above
+		n, err := strconv.Atoi(args[i])
 		if err != nil || n <= 0 {
-			return fmt.Errorf("friction: --limit wants a positive number, got %q", args[i]) //nolint:gosec // the bound is checked above
+			return fmt.Errorf("friction: --limit wants a positive number, got %q", args[i])
 		}
 		limit = n
 	}

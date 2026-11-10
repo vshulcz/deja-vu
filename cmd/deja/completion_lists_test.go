@@ -322,7 +322,7 @@ func TestCompletionHasAFrictionBlock(t *testing.T) {
 		{"bash", "\n        friction)\n", "\n        fix|tests)\n", "\n            ;;\n",
 			[]string{`"$prev" == "--settle" || "$prev" == "--unsettle" ]]; then` + "\n                COMPREPLY=()"}},
 		{"zsh", "\n    friction)\n", "\n    fix|tests)\n", "\n      ;;\n",
-			[]string{"'--settle[mark a wall fixed by the id its row prints]:wall id:'", "'--unsettle[take a --settle back]:wall id:'"}},
+			[]string{"'--settle=[mark a wall fixed by the id its row prints]:wall id:'", "'--unsettle=[take a --settle back]:wall id:'"}},
 		{"fish", "", "", "",
 			[]string{"-l settle -x", "-l unsettle -x"}},
 		{"powershell", "\n            'friction' {\n", "\n            { $_ -in @('fix', 'tests') } {\n", "\n            }\n",
@@ -523,6 +523,108 @@ func TestEveryHelpEntryFlagIsOfferedByCompletion(t *testing.T) {
 					t.Errorf("%s completion for %q does not offer %s (documented in %q):\n%s",
 						shell, entry.name, flag, usageText, block)
 				}
+			}
+		}
+	}
+}
+
+func TestEveryValueFlagIsGuardedInEveryShell(t *testing.T) {
+	scripts := map[string]string{}
+	for _, shell := range completionTestShells {
+		scripts[shell] = emittedCompletion(t, shell)
+	}
+
+	valueFlagsByCmd := []struct {
+		cmd   string
+		flags []string
+	}{
+		{"blame", []string{"--harness", "--project", "--since"}},
+		{"origin", []string{"--harness", "--project", "--limit"}},
+		{"review", []string{"--harness", "--project", "--limit"}},
+		{"bench", []string{"--seed"}},
+		{"shell", []string{"-c"}},
+		{"forget", []string{"--session", "--project", "--before", "--unforget"}},
+		{"handoff", []string{"--to"}},
+		{"last", []string{"--from", "--harness", "--project", "--since", "--role"}},
+		{"recall", []string{"--project", "--harness", "--limit", "--offset"}},
+		{"remember", []string{"--project", "--tag"}},
+		{"repo", []string{"--limit", "--since", "--kind"}},
+		{"rules", []string{"--limit", "--since", "--project"}},
+		{"restore", []string{"--span", "-o", "--out"}},
+		{"secrets", []string{"--limit"}},
+		{"stats", []string{"--html", "--card", "--harness", "--project", "--since", "--role"}},
+		{"sync", []string{"--peer"}},
+		{"show", []string{"--harness", "--offset", "--limit"}},
+		{"view", []string{"--out"}},
+		{"recap", []string{"--since", "--limit"}},
+		{"files", []string{"--project", "--limit"}},
+		{"how", []string{"--project", "--limit"}},
+		{"promote", []string{"--state", "--note", "--tag", "--to"}},
+		{"friction", []string{"--limit", "--settle", "--unsettle"}},
+		{"fix", []string{"--limit"}},
+		{"tests", []string{"--limit"}},
+		{"mcp", []string{"--http"}},
+		{"search", []string{"--harness", "--project", "--since", "--role", "--session", "--limit", "--sort"}},
+	}
+
+	for _, tc := range valueFlagsByCmd {
+		for _, shell := range completionTestShells {
+			block := shellCommandBlock(shell, scripts[shell], tc.cmd)
+			for _, flag := range tc.flags {
+				switch shell {
+				case "bash":
+					// Value-taking flags must either be guarded in a `$prev` branch or,
+					// for stats --html/--card, remain guarded by _arguments in zsh/fish.
+					if tc.cmd == "stats" && (flag == "--html" || flag == "--card") {
+						continue
+					}
+					if !strings.Contains(block, `"`+flag+`"`) {
+						t.Errorf("bash %s block does not guard value flag %s in $prev check:\n%s", tc.cmd, flag, block)
+					}
+				case "powershell":
+					if tc.cmd == "stats" && (flag == "--html" || flag == "--card") {
+						continue
+					}
+					if !strings.Contains(block, "$previous") || !strings.Contains(block, "'"+flag+"'") {
+						t.Errorf("powershell %s block does not guard value flag %s in $previous check:\n%s", tc.cmd, flag, block)
+					}
+				case "zsh":
+					want := flag + "="
+					if flag == "-c" {
+						want = "-c["
+					}
+					if !strings.Contains(block, want) {
+						t.Errorf("zsh %s block does not declare value spec %s:\n%s", tc.cmd, want, block)
+					}
+				case "fish":
+					raw := fishLinesFor(scripts["fish"], tc.cmd)
+					fishFlag := "-l " + strings.TrimPrefix(flag, "--")
+					switch flag {
+					case "-c":
+						fishFlag = "-s c"
+					case "-o":
+						fishFlag = "-s o"
+					}
+					var matched bool
+					for line := range strings.SplitSeq(raw, "\n") {
+						if strings.Contains(line, fishFlag) && (strings.Contains(line, " -r") || strings.Contains(line, " -x")) {
+							matched = true
+							break
+						}
+					}
+					if !matched {
+						t.Errorf("fish %s block does not mark %s with -r or -x:\n%s", tc.cmd, flag, raw)
+					}
+				}
+			}
+		}
+	}
+
+	for _, shell := range completionTestShells {
+		block := shellCommandBlock(shell, scripts[shell], "repo")
+		for _, sub := range []string{"candidates", "add", "rm", "init", "sync", "on", "off"} {
+			if !strings.Contains(block, sub) {
+				t.Errorf("%s repo block does not offer subcommand %q:\n%s", shell, sub, block)
 			}
 		}
 	}

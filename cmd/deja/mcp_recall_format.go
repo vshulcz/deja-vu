@@ -602,7 +602,7 @@ func recallRankFrom(dir, q string, o search.Options, result index.SearchResult) 
 	hits, policyHidden := policyFilterHitsCounted(policy.ActivationMCP, hits)
 	policyHidden += unreadWithheld(result)
 	o.Activation = policy.ActivationMCP
-	if os.Getenv("DEJA_EMBED") != "off" {
+	if !embedOff() {
 		hits = maybeRerank(dir, hits, o, os.Stderr)
 	}
 	var semantic bool

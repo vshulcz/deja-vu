@@ -60,28 +60,29 @@ func runRecap(dir string, args []string, stdout io.Writer) error {
 	limit := recapDefaultSessions
 	asJSON := false
 	sinceText := "7d"
+	args = splitKnownValueFlags(args, "--since", "--limit")
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--json":
 			asJSON = true
 		case "--since":
-			if i+1 >= len(args) {
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 				return errors.New("recap: --since needs value")
 			}
 			i++
-			d, err := parseDur(args[i]) //nolint:gosec // G602: i+1 < len(args) checked above
+			d, err := parseDur(args[i])
 			if err != nil {
 				return err
 			}
-			since, sinceText = d, args[i] //nolint:gosec // G602: i+1 < len(args) checked above
+			since, sinceText = d, args[i]
 		case "--limit":
-			if i+1 >= len(args) {
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 				return errors.New("recap: --limit needs value")
 			}
 			i++
-			n, err := strconv.Atoi(args[i]) //nolint:gosec // G602: i+1 < len(args) checked above
+			n, err := strconv.Atoi(args[i])
 			if err != nil || n < 0 {
-				return fmt.Errorf("recap: --limit wants a number from 0 up, got %q", args[i]) //nolint:gosec // G602: i+1 < len(args) checked above
+				return fmt.Errorf("recap: --limit wants a number from 0 up, got %q", args[i])
 			}
 			limit = n
 		default:

@@ -107,14 +107,15 @@ type viewPage struct {
 func runView(dir string, args []string) error {
 	out := ""
 	openBrowser := true
+	args = splitKnownValueFlags(args, "--out")
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--out":
-			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" { //nolint:gosec // i+1 < len(args) checked by left operand
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 				return errors.New("view: --out needs a path")
 			}
 			i++
-			out = args[i] //nolint:gosec // i+1 < len(args) checked above
+			out = args[i]
 		case "--no-open":
 			openBrowser = false
 		default:

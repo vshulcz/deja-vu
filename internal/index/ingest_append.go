@@ -385,6 +385,7 @@ func appendedRow(m *Manifest, key string, s model.Session, p string, of, now Fil
 // extendOwnedRow folds what s's tail says into the row it owns.
 func extendOwnedRow(meta *SessionMeta, s model.Session, p string, known, fresh bool) {
 	ran := meta.RanCommand
+	hadNew := len(newMessages(meta, s.Messages)) > 0
 	extendDerived(meta, s.Messages)
 	if !fresh {
 		if s.Kind != "" && meta.Kind == "" {
@@ -397,16 +398,18 @@ func extendOwnedRow(meta *SessionMeta, s model.Session, p string, known, fresh b
 			meta.Agent = s.Agent
 		}
 		meta.Model = meta.Model.Merge(s.Model)
-		meta.Tokens = meta.Tokens.Add(s.Tokens)
-		if len(s.ToolCalls) > 0 {
-			if meta.ToolCalls == nil {
-				meta.ToolCalls = make(map[string]int, len(s.ToolCalls))
+		if hadNew {
+			meta.Tokens = meta.Tokens.Add(s.Tokens)
+			if len(s.ToolCalls) > 0 {
+				if meta.ToolCalls == nil {
+					meta.ToolCalls = make(map[string]int, len(s.ToolCalls))
+				}
+				for name, n := range s.ToolCalls {
+					meta.ToolCalls[name] += n
+				}
 			}
-			for name, n := range s.ToolCalls {
-				meta.ToolCalls[name] += n
-			}
+			meta.ToolErrors += s.ToolErrors
 		}
-		meta.ToolErrors += s.ToolErrors
 	}
 	// Folding a turn twice changes nothing, so a store that hands the whole
 	// session over again is safe here.

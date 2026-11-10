@@ -285,7 +285,7 @@ func searchAfterPrint(dir string, o search.Options, found int, bare, hinted, mis
 // rejected ones were moved down.
 func searchAfterRank(dir string, hits []search.Hit, o *search.Options) ([]search.Hit, int) {
 	// A rerank reorders by meaning, which date order throws away again.
-	if !o.Regex && !o.NoEmbed && os.Getenv("DEJA_EMBED") != "off" && o.Sort != search.SortDate {
+	if !o.Regex && !o.NoEmbed && !embedOff() && o.Sort != search.SortDate {
 		hits = maybeRerank(dir, hits, *o, os.Stderr)
 	}
 	var semantic bool

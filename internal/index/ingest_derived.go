@@ -21,6 +21,18 @@ import (
 // recomputes them from the records.
 func withKeptRow(row, kept SessionMeta, sameVersion bool) SessionMeta {
 	row.Counted, row.Words, row.LastMsg, row.Opening = kept.Counted, kept.Words, kept.LastMsg, kept.Opening
+	if row.Kind == "" {
+		row.Kind = kept.Kind
+	}
+	if row.Parent == "" {
+		row.Parent = kept.Parent
+	}
+	if row.Agent == "" {
+		row.Agent = kept.Agent
+	}
+	row.Model = kept.Model.Merge(row.Model)
+	row.Tokens = kept.Tokens.Clone()
+	row.ToolCalls, row.ToolErrors = maps.Clone(kept.ToolCalls), kept.ToolErrors
 	if sameVersion {
 		row.Settled, row.RanCommand, row.Asked, row.Hit, row.GaveUp = kept.Settled, kept.RanCommand, kept.Asked, kept.Hit, kept.GaveUp
 		row.Touched, row.TouchHits = kept.Touched, kept.TouchHits
@@ -35,6 +47,27 @@ func carryAccumulatedFrom(dst *SessionMeta, old SessionMeta) {
 	dst.Counted, dst.Words, dst.LastMsg, dst.Opening = old.Counted, old.Words, old.LastMsg, old.Opening
 	dst.Asked, dst.Hit, dst.GaveUp, dst.NoText = old.Asked, old.Hit, old.GaveUp, old.NoText
 	dst.Touched, dst.TouchHits, dst.Settled, dst.RanCommand = old.Touched, old.TouchHits, old.Settled, old.RanCommand
+	if dst.Kind == "" {
+		dst.Kind = old.Kind
+	}
+	if dst.Parent == "" {
+		dst.Parent = old.Parent
+	}
+	if dst.Agent == "" {
+		dst.Agent = old.Agent
+	}
+	dst.Model = old.Model.Merge(dst.Model)
+	dst.Tokens = old.Tokens.Add(dst.Tokens)
+	if len(old.ToolCalls) > 0 {
+		if dst.ToolCalls == nil {
+			dst.ToolCalls = maps.Clone(old.ToolCalls)
+		} else {
+			for name, n := range old.ToolCalls {
+				dst.ToolCalls[name] += n
+			}
+		}
+	}
+	dst.ToolErrors += old.ToolErrors
 }
 
 // resetAccumulated zeroes the watermark and accumulated message-derived fields

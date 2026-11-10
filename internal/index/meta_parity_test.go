@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/model"
 )
 
 // The same corpus, reached two ways: built in one go, or grown a session at a
@@ -18,16 +20,17 @@ import (
 func TestSessionMetadataIsTheSameWhicheverWayTheIndexGotThere(t *testing.T) {
 	type sess struct{ name, ts, body, tail string }
 	corpus := []sess{
-		{name: "alpha", ts: "2026-01-02T03:04:05Z", body: `{"type":"user","sessionId":"alpha","cwd":"/w/app","timestamp":"TS","message":{"role":"user","content":"the quokkasprocket deadlock in scheduler.go hangs every deploy"}}
-{"type":"assistant","sessionId":"alpha","cwd":"/w/app","timestamp":"TS","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/w/app/scheduler.go","old_string":"mu.Lock()"}}]}}
-{"type":"assistant","sessionId":"alpha","cwd":"/w/app","timestamp":"TS","message":{"role":"assistant","content":"took the queue lock before the worker lock"}}
+		{name: "alpha", ts: "2026-01-02T03:04:05Z", body: `{"type":"user","sessionId":"alpha","cwd":"/w/app","timestamp":"TS","isSidechain":true,"parentUuid":"root","agentId":"worker-1","message":{"role":"user","content":"the quokkasprocket deadlock in scheduler.go hangs every deploy"}}
+{"type":"assistant","sessionId":"alpha","cwd":"/w/app","timestamp":"TS","message":{"model":"claude-sonnet-4-5-20250929","usage":{"input_tokens":120,"output_tokens":45},"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/w/app/scheduler.go","old_string":"mu.Lock()"}}]}}
+{"type":"assistant","sessionId":"alpha","cwd":"/w/app","timestamp":"TS","message":{"model":"claude-sonnet-4-5-20250929","usage":{"input_tokens":80,"output_tokens":30},"role":"assistant","content":"took the queue lock before the worker lock"}}
 `},
 		{name: "beta", ts: "2026-01-03T03:04:05Z", body: `{"type":"user","sessionId":"beta","cwd":"/w/app","timestamp":"TS","message":{"role":"user","content":"build broken again"}}
-{"type":"user","sessionId":"beta","cwd":"/w/app","timestamp":"TS","message":{"role":"user","content":[{"type":"tool_result","content":[{"type":"text","text":"undefined: renderInvoice in vendor/billing/api.go"}]}]}}
-{"type":"assistant","sessionId":"beta","cwd":"/w/app","timestamp":"TS","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"go mod vendor && go build ./..."}}]}}
-{"type":"assistant","sessionId":"beta","cwd":"/w/app","timestamp":"TS","message":{"role":"assistant","content":"vendoring fixed it"}}
-`, tail: `{"type":"user","sessionId":"beta","cwd":"/w/app","timestamp":"TS","message":{"role":"user","content":[{"type":"tool_result","content":[{"type":"text","text":"connection refused: cache-a1:6379 for sk-live-ZZTOPSECRET1234567890abcd"}]}]}}
-{"type":"assistant","sessionId":"beta","cwd":"/w/app","timestamp":"TS","message":{"role":"assistant","content":"restarted the cache too"}}
+{"type":"user","sessionId":"beta","cwd":"/w/app","timestamp":"TS","message":{"role":"user","content":[{"type":"tool_result","is_error":true,"content":[{"type":"text","text":"undefined: renderInvoice in vendor/billing/api.go"}]}]}}
+{"type":"assistant","sessionId":"beta","cwd":"/w/app","timestamp":"TS","message":{"model":"claude-sonnet-4-5-20250929","usage":{"input_tokens":200,"output_tokens":60,"cache_read_input_tokens":500},"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"go mod vendor && go build ./..."}}]}}
+{"type":"assistant","sessionId":"beta","cwd":"/w/app","timestamp":"TS","message":{"model":"claude-sonnet-4-5-20250929","usage":{"input_tokens":90,"output_tokens":25},"role":"assistant","content":"vendoring fixed it"}}
+`, tail: `{"type":"user","sessionId":"beta","cwd":"/w/app","timestamp":"TS","message":{"role":"user","content":[{"type":"tool_result","is_error":true,"content":[{"type":"text","text":"connection refused: cache-a1:6379 for sk-live-ZZTOPSECRET1234567890abcd"}]}]}}
+{"type":"assistant","sessionId":"beta","cwd":"/w/app","timestamp":"TS","message":{"model":"claude-opus-4-1-20250805","usage":{"input_tokens":150,"output_tokens":40},"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"systemctl restart redis"}}]}}
+{"type":"assistant","sessionId":"beta","cwd":"/w/app","timestamp":"TS","message":{"model":"claude-opus-4-1-20250805","usage":{"input_tokens":60,"output_tokens":20},"role":"assistant","content":"restarted the cache too"}}
 `},
 		// One whose text redaction rewrites. Without it the two paths agree even
 		// when one of them skips redaction entirely, because raw and scrubbed are
@@ -156,6 +159,8 @@ func TestSessionMetadataIsTheSameWhicheverWayTheIndexGotThere(t *testing.T) {
 func TestEverySessionMetaFieldIsClassifiedForCarryAndKeep(t *testing.T) {
 	watermarkFields := map[string]bool{
 		"Counted": true, "Words": true, "LastMsg": true, "Opening": true,
+		"Kind": true, "Parent": true, "Agent": true,
+		"Model": true, "Tokens": true, "ToolCalls": true, "ToolErrors": true,
 	}
 	keptSameVersionOnly := map[string]bool{
 		"Settled": true, "RanCommand": true, "Asked": true, "Hit": true, "GaveUp": true,
@@ -165,12 +170,16 @@ func TestEverySessionMetaFieldIsClassifiedForCarryAndKeep(t *testing.T) {
 		"Asked": true, "Hit": true, "GaveUp": true, "NoText": true,
 		"Touched": true, "TouchHits": true, "Settled": true, "RanCommand": true,
 	}
+	resetZeroed := map[string]bool{
+		"Counted": true, "Words": true, "LastMsg": true, "Opening": true,
+		"Asked": true, "Hit": true, "GaveUp": true, "NoText": true,
+		"Touched": true, "TouchHits": true, "Settled": true, "RanCommand": true,
+	}
 	identityOrSpan := map[string]bool{
 		"ID": true, "Harness": true, "Project": true, "Path": true,
 		"Title": true, "AgentTitle": true, "Started": true, "Updated": true,
 		"Shared": true, "SharedStarted": true, "SharedUpdated": true, "Copies": true,
-		"OrigID": true, "RemoteID": true, "Kind": true, "Parent": true, "Agent": true,
-		"Model": true, "Tokens": true, "ToolCalls": true, "ToolErrors": true,
+		"OrigID": true, "RemoteID": true,
 		"From": true, "Lifecycle": true, "LifecycleNote": true, "LifecycleAt": true,
 		"Ord": true, "NoText": true, "Rules": true, "Revokes": true, "Planted": true,
 	}
@@ -185,7 +194,12 @@ func TestEverySessionMetaFieldIsClassifiedForCarryAndKeep(t *testing.T) {
 
 	full := SessionMeta{
 		Counted: 7, Words: 42, LastMsg: 99, Opening: 123,
-		Settled: "fixed", RanCommand: true, Asked: []uint64{1}, Hit: []uint64{2}, GaveUp: true,
+		Kind: "subagent", Parent: "root-1", Agent: "worker",
+		Model:      &model.Model{Provider: "openai", ID: "gpt-5.4"},
+		Tokens:     &model.Tokens{Input: 100, Output: 50},
+		ToolCalls:  map[string]int{"Bash": 2},
+		ToolErrors: 1,
+		Settled:    "fixed", RanCommand: true, Asked: []uint64{1}, Hit: []uint64{2}, GaveUp: true,
 		Touched: []string{"a.go"}, TouchHits: []int{3}, NoText: true,
 		Rules: []string{"make test"}, Revokes: []string{"go test"}, Planted: []string{"plan"},
 	}
@@ -228,7 +242,7 @@ func TestEverySessionMetaFieldIsClassifiedForCarryAndKeep(t *testing.T) {
 	vReset := reflect.ValueOf(carried)
 	for i := range rt.NumField() {
 		name := rt.Field(i).Name
-		if watermarkFields[name] || syncCarryExtra[name] {
+		if resetZeroed[name] {
 			if !vReset.Field(i).IsZero() {
 				t.Errorf("resetAccumulated did not zero SessionMeta.%s", name)
 			}

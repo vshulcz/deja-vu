@@ -376,13 +376,13 @@ func runDeleteIn(dir string, args []string, in io.Reader, w io.Writer) error {
 			if strings.HasPrefix(a, "-") {
 				return unknownFlag("delete", a, deleteFlags)
 			}
-			if strings.TrimSpace(a) == "" {
+			if strings.TrimSpace(index.PastedSelector(a)) == "" {
 				return idPrefixNeeded(dir, "delete needs a session id prefix", "delete needs a session id prefix (see `deja last`)")
 			}
 			if prefix != "" {
 				return fmt.Errorf("delete takes one session id; got %q and %q", prefix, a)
 			}
-			prefix = a
+			prefix = index.PastedSelector(a)
 		}
 	}
 	if prefix == "" {

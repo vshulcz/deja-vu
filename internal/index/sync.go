@@ -941,11 +941,6 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 		old := m.Sessions[key]
 		if old.ID != "" {
 			meta.Ord = old.Ord
-			// A batch from a build that does not send the kind keeps the
-			// one an earlier batch named.
-			if meta.Kind == "" {
-				meta.Kind = old.Kind
-			}
 			if old.Started.Before(meta.Started) || meta.Started.IsZero() {
 				meta.Started = old.Started
 			}
