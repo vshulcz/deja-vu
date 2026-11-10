@@ -11,11 +11,32 @@
     <name>vshulcz</name>
   </author>
   <entry>
+    <title>deja-vu: memory for Claude Code, Codex, Cursor &amp; 40 more</title>
+    <id>https://vshulcz.github.io/deja-vu/</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
+    <updated>2026-11-10T00:00:00Z</updated>
+    <summary>Coding agent memory for Claude Code, Codex and 41 more agents. A local index of the session history already on your disk that every agent can recall.</summary>
+  </entry>
+  <entry>
+    <title>Claude Code usage limit mid-task handoff — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/claude-code-usage-limit-handoff.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/claude-code-usage-limit-handoff.html"></link>
+    <updated>2026-11-10T00:00:00Z</updated>
+    <summary>When Claude Code hits its 5-hour cap or weekly limit mid-task, hand the active session&#39;s state, tried commands, and diff straight to Codex, Cursor, or Gemini.</summary>
+  </entry>
+  <entry>
     <title>Delete Senpi session history — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/delete-senpi-session-history.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-senpi-session-history.html"></link>
     <updated>2026-11-10T00:00:00Z</updated>
     <summary>Senpi stores each session in a JSONL file under ~/.senpi/agent/sessions. Find it, delete one session or all, or use deja delete with dry-run preview.</summary>
+  </entry>
+  <entry>
+    <title>Recover files overwritten by an AI agent — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html"></link>
+    <updated>2026-11-10T00:00:00Z</updated>
+    <summary>When Claude Code, Cursor, or Codex overwrites an uncommitted file before git commit, recover the replaced edit spans from local session transcripts on disk.</summary>
   </entry>
   <entry>
     <title>Basic Memory alternative for coding agents — deja-vu</title>
@@ -268,26 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/privacy.html"></link>
     <updated>2026-11-05T00:00:00Z</updated>
     <summary>deja 索引的是可能含有凭据的会话历史：索引和检索都在本地，凭据在写入前就被脱敏，排除、遗忘与信任范围决定留下什么。</summary>
-  </entry>
-  <entry>
-    <title>怎么找回被删掉的 Claude Code 会话 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/recover-a-deleted-session.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/recover-a-deleted-session.html"></link>
-    <updated>2026-11-05T00:00:00Z</updated>
-    <summary>claude --resume 里找不到那次会话：文件去了哪里，四种原因里有三种并不是删除，以及真正还能找回的是什么。</summary>
-  </entry>
-  <entry>
-    <title>把项目记忆提交进代码仓库（.deja/memory.jsonl） — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/repo-memory.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/repo-memory.html"></link>
-    <updated>2026-11-05T00:00:00Z</updated>
-    <summary>把经过验证的架构决定、踩坑教训和被否掉的方案写进 .deja/memory.jsonl，让克隆仓库的每位协作者在自己的编程智能体里直接召回。</summary>
-  </entry>
-  <entry>
-    <title>接着昨天的 Claude Code 或 Codex 会话继续 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/resume-a-session.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/resume-a-session.html"></link>
-    <updated>2026-11-05T00:00:00Z</updated>
-    <summary>先在整台机器的所有智能体里找到那次会话，再在它所属的工具里重新打开——或者只取摘要，不要整段对话。</summary>
   </entry>
 </feed>

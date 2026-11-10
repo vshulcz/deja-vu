@@ -9,7 +9,10 @@ machine, then answer from what you find.
 Call the deja tool in `recall` mode with the user's words as the query — the
 most specific tokens win (an exact error string, a function name, a file path,
 a flag). If a result looks right but is too short to act on, follow up with
-`context` mode using a term from it.
+`context` mode using a term from it. You can also use `blame` (for a file path),
+`fix` (for failing command output), `how` / `orient` (for project commands and
+recent work), `handoff` (to continue another agent's session), or `remember` (to
+save a settled decision).
 
 If the deja MCP tool is unavailable, fall back to the CLI:
 

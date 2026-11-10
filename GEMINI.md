@@ -26,6 +26,13 @@ One tool, `deja`, with a `mode`:
   string, a function name, a file path, a flag.
 - `context` — the full digest of the best-matching session, once a hit looks
   right and the reasoning behind it matters.
+- `blame` — which session wrote or deleted a file or line (`path` or `path:line`),
+  before you edit or delete it.
+- `fix` — what this machine ran after the same failing command output.
+- `how` — the command and flags this user really runs in this project.
+- `orient` — recent commands and files worked in for this project.
+- `remember` — store one settled decision for later sessions.
+- `handoff` — continue another session's work by id or harness name.
 
 If recalled history genuinely helped, say so in one line: what was recalled and
 how you used it. Say nothing about recalls that did not help.

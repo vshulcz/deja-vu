@@ -5,11 +5,10 @@
   </picture>
 </p>
 
-<p align="center"><b>आपके कोडिंग एजेंट्स अब वह दोबारा डीबग नहीं करेंगे जो आप पहले ही ठीक कर चुके हैं।</b></p>
+<p align="center"><b>43 कोडिंग एजेंट्स के लिए साझा लोकल मेमोरी, एजेंट हैंडऑफ़ और कोड रिकवरी।</b></p>
 
-<p align="center">Claude Code, Codex, Cursor और इस मशीन के बाकी एजेंट्स हर सेशन पहले से डिस्क पर सेव करते हैं।
-deja महीनों पुराने समेत सब कुछ इंडेक्स करता है और काम का हिस्सा
-उस एजेंट को देता है जो अभी काम कर रहा है।</p>
+<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes और 36 अन्य एजेंट्स हर सेशन पहले से डिस्क पर सेव करते हैं।<br>
+deja सब कुछ लोकल रूप से इंडेक्स करता है ताकि आपके एजेंट्स <code>/compact</code> के बाद भी कॉन्टेक्स्ट बनाए रखें, <code>deja handoff</code> से काम आगे बढ़ाएँ और <code>deja restore</code> से ओवरराइट हुआ कोड वापस पाएँ — बिना LLM, एक अकेली Go बाइनरी।</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | हिन्दी</p>
 
@@ -19,9 +18,10 @@ deja महीनों पुराने समेत सब कुछ इं�
 
 <p align="center">
   <a href="https://github.com/vshulcz/deja-vu/stargazers"><img src="https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&color=f59e0b" alt="GitHub Stars"></a>
-  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/badges/.badges/main/coverage.svg" alt="coverage">
+  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI"></a>
+  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/coverage-88%25-brightgreen" alt="Coverage"></a>
   <a href="https://github.com/vshulcz/deja-vu/releases/latest"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
+  <a href="https://mcptoplist.com/server/io.github.vshulcz%2Fdeja-vu"><img src="https://mcptoplist.com/badge/io.github.vshulcz%2Fdeja-vu.svg" alt="MCP Toplist"></a>
   <a href="https://www.npmjs.com/package/@vshulcz/deja-vu"><img src="https://img.shields.io/npm/v/%40vshulcz%2Fdeja-vu" alt="npm"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
@@ -131,7 +131,7 @@ skill आपके इंस्टॉल किए हुए `deja` बाइन
 
 ## इससे क्या मिलता है
 
-**Codex में हल हुआ, Claude को याद है।** इकतालीस कोडिंग एजेंट हर बातचीत को लोकल फ़ाइलों में लिखते हैं, और deja उन
+**Codex में हल हुआ, Claude को याद है।** तैंतालीस कोडिंग एजेंट हर बातचीत को लोकल फ़ाइलों में लिखते हैं, और deja उन
 फ़ाइलों को एक ऐसी मेमोरी परत में बदल देता है जिसे वे सब पढ़ सकते हैं।
 
 | | |

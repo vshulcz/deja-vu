@@ -50,6 +50,7 @@ var groups = []group{
 		{"repeated-mistakes.html", "Repeated mistakes"},
 		{"switching-agents.html", "Switching agents"},
 		{"switch-agents-without-losing-context.html", "Session handoffs"},
+		{"claude-code-usage-limit-handoff.html", "When usage limits hit"},
 		{"parallel-sessions.html", "Parallel sessions"},
 		{"rules-files.html", "When CLAUDE.md grows"},
 		{"one-rules-file.html", "One rules file"},
@@ -67,6 +68,7 @@ var groups = []group{
 		{"auditing-agents.html", "Auditing an agent"},
 		{"credentials-in-transcripts.html", "Credentials in transcripts"},
 		{"recover-a-deleted-session.html", "Recover a deleted session"},
+		{"recover-overwritten-files.html", "Recover overwritten files"},
 		{"no-conversation-found-claude-code.html", "No conversation found"},
 	}},
 	{title: "Deleting sessions", fold: true, links: []link{
