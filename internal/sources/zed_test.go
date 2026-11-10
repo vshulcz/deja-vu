@@ -163,6 +163,9 @@ insert into threads (id,summary,updated_at,data_type,data,folder_paths,created_a
 	if len(sessions) != 1 || sessions[0].ID != "ok" {
 		t.Fatalf("sessions = %#v, want only the readable thread", sessions)
 	}
+	if newest, err := ParseZedNewest(zedTestDB(t, sql)); err != nil || len(newest) != 1 {
+		t.Fatalf("ParseZedNewest = %v, %#v", err, newest)
+	}
 }
 
 // The regression this guards is silent: comparing Zed's "+00:00" timestamps

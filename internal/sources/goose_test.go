@@ -137,6 +137,12 @@ insert into messages values (2,'20250724_2','assistant','[{"type":"text","text":
 	if len(ss) != 1 || ss[0].ID != "20250724_2" || len(ss[0].Messages) != 2 {
 		t.Fatalf("db sessions = %#v, %v", ss, err)
 	}
+	if newest, err := ParseGooseNewest(db); err != nil || len(newest) != 1 {
+		t.Fatalf("ParseGooseNewest = %v, %#v", err, newest)
+	}
+	if GooseStoreLacks(db, "20250724_2") || !GooseStoreLacks(db, "missing") {
+		t.Fatalf("GooseStoreLacks unexpected result")
+	}
 }
 
 // GOOSE_PATH_ROOT relocates config, data and state together. Ignoring it

@@ -1,6 +1,7 @@
 package index
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -225,6 +226,11 @@ var defaultServableRoles = map[string]bool{
 // prefix before flate decompression.
 func servableRoles(o query.Options) map[string]bool {
 	if o.Role == "" {
+		if o.StubToolOutput {
+			m := maps.Clone(defaultServableRoles)
+			m[RoleStubToolOutput] = true
+			return m
+		}
 		return defaultServableRoles
 	}
 	if o.Role == roleWrote {

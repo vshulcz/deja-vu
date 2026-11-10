@@ -158,6 +158,40 @@ func ParseCursorDB(db string) ([]model.Session, error) {
 	return parseCursorDB(db, time.Time{})
 }
 
+// ParseCursorDBNewest reads a small sample of bubbles and their composers from
+// state.vscdb so doctor can verify the store parses without dumping every row.
+func ParseCursorDBNewest(db string) ([]model.Session, error) {
+	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
+		return nil, nil //nolint:nilerr // a missing or empty store holds no sessions
+	}
+	const bubbleSelect = `select json_object('key',cast(key as text),` +
+		`'type',json_extract(value,'$.type'),` +
+		`'text',coalesce(json_extract(value,'$.text'), json_extract(value,'$.rawText')),` +
+		`'ts',json_extract(value,'$.timestamp'),` +
+		`'wsdir',json_extract(value,'$.workspaceProjectDir')) ` +
+		`from cursorDiskKV where key >= 'bubbleId:' and key < 'bubbleId;' and value is not null limit 32`
+	composerSelect := `select json_object('key',cast(key as text),` +
+		`'cid',json_extract(value,'$.composerId'),` +
+		`'name',json_extract(value,'$.name'),` +
+		`'created',json_extract(value,'$.createdAt'),` +
+		`'updated',json_extract(value,'$.lastUpdatedAt')) ` +
+		`from cursorDiskKV where key >= 'composerData:' and key < 'composerData;' and value is not null`
+	bubbles, err := cursorQuery(db, bubbleSelect)
+	if err != nil {
+		return nil, err
+	}
+	if keys := cursorComposerKeyList(bubbles); keys != "" {
+		composerSelect += " and key in (" + keys + ")"
+	} else {
+		composerSelect += " limit 32"
+	}
+	composers, err := cursorQuery(db, composerSelect)
+	if err != nil {
+		return nil, err
+	}
+	return cursorSessions(db, composers, bubbles), nil
+}
+
 // cursorComposerListMax is how many composers a pass will name one by one. The
 // query goes to sqlite3 as a single argument, so a list long enough stops being
 // a query at all; past this the caller asks for every composer instead, which

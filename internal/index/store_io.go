@@ -141,7 +141,7 @@ func (w *logWalk) nextInRoles(t *recordTables, want map[string]bool, keepKey fun
 			if !ok {
 				return 0, nil, errShortRecord
 			}
-			if !want[role] || (keepKey != nil && !keepKey(key)) {
+			if !roleWanted(want, role) || (keepKey != nil && !keepKey(key)) {
 				if _, err := w.r.Discard(int(n)); err != nil {
 					return 0, nil, err
 				}
@@ -329,6 +329,11 @@ func recordRoleIn(b []byte, t *recordTables) (key, role string, ok bool) {
 // exact message slice indices without inflating unwanted record payloads.
 const RoleStubOthers = "\x00stub"
 
+// RoleStubToolOutput instructs record scans and loaders to decode only the
+// header and 8-byte timestamp of tool-output records without inflating or
+// allocating the message text.
+const RoleStubToolOutput = "\x00stub-tool-output"
+
 func roleWanted(roles map[string]bool, role string) bool {
 	if roles == nil || role == "" {
 		return true
@@ -337,6 +342,62 @@ func roleWanted(roles map[string]bool, role string) bool {
 		return v
 	}
 	return roles["*"]
+}
+
+// decodeRecordStubRole decodes a record's key, source path, role, and 8-byte
+// timestamp without reading or allocating its text body.
+func decodeRecordStubRole(b []byte, t *recordTables) (Record, error) {
+	var rec Record
+	kid, n := binary.Uvarint(b)
+	if n <= 0 {
+		return rec, errShortRecord
+	}
+	b = b[n:]
+	pid, n := binary.Uvarint(b)
+	if n <= 0 {
+		return rec, errShortRecord
+	}
+	b = b[n:]
+	rid, n := binary.Uvarint(b)
+	if n <= 0 {
+		return rec, errShortRecord
+	}
+	b = b[n:]
+	rec.Key = t.lookup(kid)
+	rec.SourcePath = t.lookup(pid)
+	rec.Role = t.lookup(rid)
+	if len(b) < 1 {
+		return rec, errShortRecord
+	}
+	flag := b[0]
+	b = b[1:]
+	var ts [8]byte
+	switch flag {
+	case recordDeflated:
+		zr := inflateReaders.Get().(io.ReadCloser)                                 //nolint:forcetypeassert // the pool holds only flate readers
+		if err := zr.(flate.Resetter).Reset(bytes.NewReader(b), nil); err != nil { //nolint:forcetypeassert // a flate reader is a Resetter
+			inflateReaders.Put(zr)
+			return rec, err
+		}
+		_, err := io.ReadFull(zr, ts[:])
+		inflateReaders.Put(zr)
+		if err != nil {
+			return rec, err
+		}
+	case recordRaw:
+		if len(b) < 8 {
+			return rec, errShortRecord
+		}
+		copy(ts[:], b[:8])
+	default:
+		return rec, fmt.Errorf("%w: unknown record encoding %d", errCorruptIndex, flag)
+	}
+	if n := int64(binary.LittleEndian.Uint64(ts[:])); n == zeroTimeUnixNano { //nolint:gosec // a signed time's bits, written as uint64
+		rec.Time = time.Time{}
+	} else {
+		rec.Time = time.Unix(0, n)
+	}
+	return rec, nil
 }
 
 // eachRecordInRoles streams the records whose role is wanted, reading the
@@ -353,6 +414,7 @@ func eachRecordInRolesWhere(path string, t *recordTables, want map[string]bool, 
 	}
 	defer func() { _ = f.Close() }()
 	w := newLogWalk(f, t, 0)
+	stubTool := want != nil && want[RoleStubToolOutput]
 	for {
 		_, payload, err := w.nextInRoles(t, want, keepKey)
 		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
@@ -360,6 +422,16 @@ func eachRecordInRolesWhere(path string, t *recordTables, want map[string]bool, 
 		}
 		if err != nil {
 			return err
+		}
+		if stubTool {
+			if _, role, ok := recordRoleIn(payload, t); ok && (role == roleToolOutput || role == "tool") {
+				rec, derr := decodeRecordStubRole(payload, t)
+				if derr != nil {
+					return derr
+				}
+				fn(rec)
+				continue
+			}
 		}
 		rec, err := decodeRecord(payload, t)
 		if err != nil {
@@ -411,8 +483,10 @@ func eachRecordForKeysInRolesWindowedTail(path string, t *recordTables, want, ro
 // table, from wherever r stands, which is offset from, to the end of the log.
 func walkRecordsForKeys(r *bufio.Reader, from int64, t *recordTables, want, roles map[string]bool, fn func(Record)) error {
 	var hdr [4]byte
+	var buf []byte
 	dead := t.deadFrom(from)
 	off := from
+	stubTool := roles != nil && roles[RoleStubToolOutput]
 	for {
 		if _, err := io.ReadFull(r, hdr[:]); err != nil {
 			if err == io.EOF || err == io.ErrUnexpectedEOF {
@@ -443,14 +517,18 @@ func walkRecordsForKeys(r *bufio.Reader, from int64, t *recordTables, want, role
 		off += 4 + int64(n)
 		skip := !want[t.lookup(kid)] || dead.at(at)
 		var stubRole string
-		if !skip && roles != nil {
+		var recRole string
+		if !skip && (roles != nil || stubTool) {
 			// Key, source and role lead the payload; the body after them is
 			// only read for a role the caller wants.
 			if head, _ := r.Peek(min(int(n), 3*binary.MaxVarintLen64)); len(head) > 0 {
-				if _, role, ok := recordRoleIn(head, t); ok && !roleWanted(roles, role) {
-					skip = true
-					if roles[RoleStubOthers] {
-						stubRole = role
+				if _, role, ok := recordRoleIn(head, t); ok {
+					recRole = role
+					if !roleWanted(roles, role) {
+						skip = true
+						if roles[RoleStubOthers] {
+							stubRole = role
+						}
 					}
 				}
 			}
@@ -467,14 +545,23 @@ func walkRecordsForKeys(r *bufio.Reader, from int64, t *recordTables, want, role
 			}
 			continue
 		}
-		b := make([]byte, n)
+		if cap(buf) < int(n) {
+			buf = make([]byte, n)
+		}
+		b := buf[:n]
 		if _, err := io.ReadFull(r, b); err != nil {
 			if err == io.EOF || err == io.ErrUnexpectedEOF {
 				return nil
 			}
 			return err
 		}
-		rec, derr := decodeRecord(b, t)
+		var rec Record
+		var derr error
+		if stubTool && (recRole == roleToolOutput || recRole == "tool") {
+			rec, derr = decodeRecordStubRole(b, t)
+		} else {
+			rec, derr = decodeRecord(b, t)
+		}
 		if derr != nil {
 			// The record was fully framed (a valid length prefix, n bytes read),
 			// so a payload that will not decode is real corruption in the middle
@@ -1057,10 +1144,7 @@ func SpanInventoryWhere(dir string, keep func(SessionMeta) bool) (spans, files i
 	seen := map[string]bool{}
 	pol := policy.Load()
 	excluded := excludedHarnesses()
-	err = eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
-		if r.Role != roleEdit {
-			return
-		}
+	err = eachRecordInRoles(filepath.Join(dir, "records.bin"), tablesFromManifest(m), map[string]bool{roleEdit: true}, func(r Record) {
 		// What this machine could hand back, not what the log happens to hold:
 		// `restore` refuses a span from a tree the ignore rule covers (#2630),
 		// so counting it here promised something the command would decline

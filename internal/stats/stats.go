@@ -3,11 +3,13 @@
 package stats
 
 import (
+	"fmt"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/cjkfold"
 	"github.com/vshulcz/deja-vu/internal/jsonout"
@@ -177,15 +179,16 @@ func Filter(ss []model.Session, o search.Options) []model.Session {
 func Build(ss []model.Session, now time.Time) Report {
 	byHarness := map[string]*HarnessStats{}
 	byProject := map[string]int{}
-	byDay := map[string]int{}
+	byDayInt := map[int]int{}
+	loc := now.Location()
 	monthStart := firstMonth(now).AddDate(0, -11, 0)
 	months := make([]MonthStats, 12)
-	monthIndex := map[string]int{}
+	monthIndexInt := map[int]int{}
 	for i := range months {
 		m := monthStart.AddDate(0, i, 0)
 		label := m.Format("2006-01")
 		months[i] = MonthStats{Month: label}
-		monthIndex[label] = i
+		monthIndexInt[m.Year()*100+int(m.Month())] = i
 	}
 
 	out := Report{SchemaVersion: jsonout.Version}
@@ -223,14 +226,18 @@ func Build(ss []model.Session, now time.Time) Report {
 				// calendar date in UTC put it on the wrong day here while the
 				// brief — which renders locally since #767 — put it on the
 				// right one. Two screens of one tool disagreed by a day (#849).
-				t = t.In(now.Location())
-				day := t.Format("2006-01-02")
-				byDay[day]++
-				if i, ok := monthIndex[firstMonth(t).Format("2006-01")]; ok {
+				y, mo, d := t.In(loc).Date()
+				ym := y*100 + int(mo)
+				byDayInt[ym*100+d]++
+				if i, ok := monthIndexInt[ym]; ok {
 					months[i].Messages++
 				}
 			}
 		}
+	}
+	byDay := make(map[string]int, len(byDayInt))
+	for ymd, count := range byDayInt {
+		byDay[fmt.Sprintf("%04d-%02d-%02d", ymd/10000, (ymd/100)%100, ymd%100)] = count
 	}
 	out.Harnesses = make([]HarnessStats, 0, len(byHarness))
 	for _, hs := range byHarness {
@@ -426,7 +433,7 @@ func TrimRunes(s string, n int) string {
 // screens reporting the same claim under different rules is worse than either.
 func AskedByAPerson(text string) bool {
 	t := strings.TrimSpace(text)
-	if Noise(t) || len([]rune(t)) > askedMaxRunes {
+	if len(t) > askedMaxRunes*4 || Noise(t) || utf8.RuneCountInString(t) > askedMaxRunes {
 		return false
 	}
 	for _, p := range []string{
@@ -658,7 +665,7 @@ func UsedNotCredited(ss []model.Session, now time.Time) (total, week int) {
 	weekCut := usage.WeekCut(now)
 	for _, s := range ss {
 		for _, msg := range s.Messages {
-			if msg.Role != "assistant" || CreditedAloud(msg.Text) {
+			if msg.Role != "assistant" || !strings.Contains(msg.Text, "deja:") || CreditedAloud(msg.Text) {
 				continue
 			}
 			if !dejaSessionRef.MatchString(msg.Text) {

@@ -25,7 +25,7 @@ func runStatsImpact(w io.Writer, dir string, jsonOut bool) error {
 	// transcript, and that lives in the index, not in the usage log (#1062).
 	// Only pay for the session scan when there is activity to explain.
 	if impactHasActivity(r) {
-		if ss, err := index.SearchWithRecovery(dir, search.Options{All: true}, io.Discard); err == nil {
+		if ss, err := index.SearchWithRecovery(dir, search.Options{All: true, Role: "assistant"}, io.Discard); err == nil {
 			// Filtered like `deja stats` filters its own report: this count is
 			// derived from session text, and every other surface that reads
 			// sessions consults the policy first. The lines above it come from

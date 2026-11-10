@@ -67,7 +67,7 @@ func TestANothingPageListsEachLeadOnOneLine(t *testing.T) {
 	hermeticEnv(t)
 	dir, _ := nothingCorpus(t)
 	text := recallPageText(t, dir, "kestrel retention shard glacier")
-	if !strings.Contains(text, nothingIsAboutThis) || !strings.Contains(text, "treat them as leads") {
+	if !strings.Contains(text, nothingIsAboutThis) || !strings.Contains(text, "nearest sessions by wording below") {
 		t.Fatalf("the page is not one no session is about, so this measures nothing:\n%s", text)
 	}
 	leads := regexp.MustCompile(`(?m)^\d+\. \[claude\] \S+ · \d{4}-\d{2}-\d{2} · has [a-z, ]+ · l\d\d$`).FindAllString(text, -1)

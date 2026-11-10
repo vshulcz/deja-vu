@@ -196,26 +196,31 @@ func OpencodeStoreLacks(harness, id string) bool {
 	if harness == "kilocode" {
 		db = KiloDB()
 	}
-	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
-		return false
-	}
-	query := func(q string) (string, bool) {
-		cmd, stop := sqliteReadCmd(db, q)
-		defer stop()
-		b, err := cmd.Output()
-		return strings.TrimSpace(string(b)), err == nil
-	}
-	names, ok := query(`select name from sqlite_master where type='table' and name in ('session','session_v2')`)
-	if !ok || names == "" {
-		return false
-	}
-	for table := range strings.FieldsSeq(names) {
-		n, ok := query(fmt.Sprintf(`select count(*) from %s where id='%s'`, table, sqlEscape(id)))
-		if !ok || n != "0" {
-			return false
+	return sqliteStoreLacks(db, id, func(db string) (map[string]bool, bool) {
+		query := func(q string) (string, bool) {
+			cmd, stop := sqliteReadCmd(db, q)
+			defer stop()
+			b, err := cmd.Output()
+			return strings.TrimSpace(string(b)), err == nil
 		}
-	}
-	return true
+		names, ok := query(`select name from sqlite_master where type='table' and name in ('session','session_v2')`)
+		if !ok || names == "" {
+			return nil, false
+		}
+		ids := map[string]bool{}
+		for table := range strings.FieldsSeq(names) {
+			out, ok := query("select id from " + table)
+			if !ok {
+				return nil, false
+			}
+			for ln := range strings.SplitSeq(out, "\n") {
+				if ln = strings.TrimSpace(ln); ln != "" {
+					ids[ln] = true
+				}
+			}
+		}
+		return ids, true
+	})
 }
 
 // ParseOpencodeDB reads every session in the OpenCode store at db.

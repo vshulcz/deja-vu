@@ -324,7 +324,7 @@ func printInstallProof(dir string) {
 	// step of the install, and the last thing on the screen rather than the
 	// first.
 	if line := starLine(dir); line != "" {
-		fmt.Fprintln(os.Stderr, "\n  ★ "+line)
+		fmt.Fprintln(os.Stderr, "\n  ★ "+line+"  (gh repo star vshulcz/deja-vu)")
 	}
 }
 

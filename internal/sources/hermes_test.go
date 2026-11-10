@@ -161,6 +161,12 @@ func TestHermesFindsTheRootStore(t *testing.T) {
 	if len(ss) != 2 {
 		t.Fatalf("sessions = %d, want one from each store", len(ss))
 	}
+	if newest, err := ParseHermesNewest(got[0]); err != nil || len(newest) != 1 {
+		t.Fatalf("ParseHermesNewest = %v, %#v", err, newest)
+	}
+	if HermesStoreLacks(got[0], "flat") || !HermesStoreLacks(got[0], "missing") {
+		t.Fatalf("HermesStoreLacks unexpected result")
+	}
 	// The root store has no profile directory to be named after.
 	names := make([]string, 0, len(ss))
 	for _, s := range ss {
