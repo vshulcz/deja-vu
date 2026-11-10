@@ -432,7 +432,8 @@ func pruneFilteredRepoEntries(root string, cands ...repoCandidate) int {
 		} else if hasCands && e.Kind == "decision" && e.From != "" && !strings.HasPrefix(e.From, "deja") {
 			effSessions = 1
 		}
-		if e.From != "" && !strings.HasPrefix(e.From, "deja") && ((e.Kind == "decision" && effSessions < 2) || !usableRepoCandidateLine(e.Text)) {
+		_, okRejected := index.GiveUpLine(e.Text)
+		if e.From != "" && !strings.HasPrefix(e.From, "deja") && ((e.Kind == "decision" && effSessions < 2) || (e.Kind == "rejected" && !okRejected) || !usableRepoCandidateLine(e.Text)) {
 			drop = append(drop, e.ID)
 		}
 	}
@@ -729,6 +730,16 @@ func readLiveRuleRecords(p string) []liveRuleRecord {
 		if len(files) == 0 {
 			files = r.Paths
 		}
+		var cleanSyms []string
+		for _, s := range r.Symbols {
+			s = strings.TrimSpace(s)
+			if isTechnicalRuleSymbol(s) || (len(s) >= 3 && !isCommonKeyword(strings.ToLower(s)) && latinWord(s)) {
+				cleanSyms = append(cleanSyms, s)
+			}
+		}
+		if len(files) == 0 && len(cleanSyms) == 0 {
+			continue
+		}
 		out = append(out, liveRuleRecord{
 			RepoEntry: sources.RepoEntry{
 				ID:    r.ID,
@@ -738,7 +749,7 @@ func readLiveRuleRecords(p string) []liveRuleRecord {
 				Date:  r.Date,
 				From:  r.From,
 			},
-			Symbols: r.Symbols,
+			Symbols: cleanSyms,
 		})
 	}
 	return out

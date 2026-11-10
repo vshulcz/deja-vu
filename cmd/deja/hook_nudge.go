@@ -334,7 +334,7 @@ func promptRepoMemoryLine(cwd, asked string, seen map[string]bool) (string, stri
 				}
 			}
 		}
-		if !matched {
+		if !matched && len(e.Files) == 0 {
 			matched = repoEntryMentionsCommand(asked, e.Text)
 		}
 		if !matched {

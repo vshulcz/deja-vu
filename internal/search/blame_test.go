@@ -172,4 +172,16 @@ func TestBlameConclusionSnippetFallback(t *testing.T) {
 	if !strings.Contains(hits[0].Snippets[0], "cap max idle connections at 32") {
 		t.Fatalf("expected session conclusion as first snippet when only command/files mention the path, got %v", hits[0].Snippets)
 	}
+
+	dumpSess := []model.Session{{
+		Harness: "claude", ID: "s2", Project: "/repo", Updated: day,
+		Messages: []model.Message{
+			{Role: "assistant", Text: `[L7 step=888 2026-06-28] | tools: edit_file({"Path":"/repo/internal/pool/pool.go","Target":"old","Replacement":"new"})`, Time: day},
+			{Role: "assistant", Text: "Fixed pool.go race by locking the idle slice before eviction.", Time: day},
+		},
+	}}
+	dumpHits := Blame(dumpSess, target, BlameOptions{All: true})
+	if len(dumpHits) != 1 || len(dumpHits[0].Snippets) == 0 || strings.Contains(dumpHits[0].Snippets[0], "tools: edit_file") {
+		t.Fatalf("subagent tool dump leaked into blame snippet: %+v", dumpHits)
+	}
 }

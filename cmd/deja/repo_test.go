@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -1178,5 +1179,35 @@ func TestHookPrecisionAndGuardrails(t *testing.T) {
 	}
 	if orientTestRemedyMatchesFail("--- FAIL: TestPlainHelper (0.01s)", "gofmt -w internal/auth/plain.go && go test ./internal/auth/...") {
 		t.Fatal("orientTestRemedyMatchesFail should reject compound gofmt && go test command on --- FAIL:")
+	}
+	if orientCommand("$ go test ./... 2>&1 | tail -50") != "go test ./..." {
+		t.Fatalf("orientCommand pipe stripping = %q, want %q", orientCommand("$ go test ./... 2>&1 | tail -50"), "go test ./...")
+	}
+	if !orientDestructiveRemedy("git rebase --abort") {
+		t.Fatal("orientDestructiveRemedy should reject git rebase --abort as a trap remedy")
+	}
+	if stripViewerPipe("$ golangci-lint run | head -40") != "$ golangci-lint run" {
+		t.Fatalf("stripViewerPipe = %q, want %q", stripViewerPipe("$ golangci-lint run | head -40"), "$ golangci-lint run")
+	}
+	pinExtractedLiveRule(dir, root, "chat-refusal-sess", "Do not suggest restore: не закрывай, там попросили изменения")
+	entries24b, _, _ := readRepoMemoryAndNotes(root)
+	for _, e := range entries24b {
+		if strings.Contains(e.Text, "Do not suggest restore") {
+			t.Fatalf("conversational 'Do not suggest restore' without code symbol/path was pinned: %+v", e)
+		}
+	}
+	pkMulti := promptPicker{
+		leadTerms: []string{"ranking", "blame", "json", "parse"},
+		idfOf:     map[string]float64{"ranking": 4.5, "blame": 5.2, "json": 3.1, "parse": 2.8},
+	}
+	sessTwoNamed := model.Session{
+		ID:      "two-named",
+		Project: "deja-vu",
+		Messages: []model.Message{
+			{Role: "user", Text: "how does blame ranking order sessions?"},
+		},
+	}
+	if !pkMulti.leadTermsMeet(sessTwoNamed) {
+		t.Fatal("leadTermsMeet should accept session carrying top-2 highest-IDF named lead terms (blame + ranking)")
 	}
 }

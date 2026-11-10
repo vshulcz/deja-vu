@@ -56,6 +56,29 @@ func howScreenCommand(s string) string {
 	return string(r[:80]) + "…"
 }
 
+// stripViewerPipe drops trailing output-slicing pipes (`| head ...`, `| tail ...`,
+// `2>&1 | tail ...`) that agents append to cap stdout, so `go test ./... 2>&1 | tail -50`
+// and `golangci-lint run | head -40` group with the canonical command.
+func stripViewerPipe(cmd string) string {
+	idx := strings.LastIndex(cmd, "|")
+	if idx <= 0 || strings.Contains(cmd[idx:], "||") {
+		return cmd
+	}
+	rhs := strings.ToLower(strings.TrimSpace(cmd[idx+1:]))
+	if !strings.HasPrefix(rhs, "head ") && rhs != "head" && !strings.HasPrefix(rhs, "tail ") && rhs != "tail" {
+		return cmd
+	}
+	if strings.ContainsAny(rhs, "|;&><") {
+		return cmd
+	}
+	lhs := strings.TrimSpace(cmd[:idx])
+	lhs = strings.TrimSpace(strings.TrimSuffix(lhs, "2>&1"))
+	if lhs == "" || strings.TrimSpace(lhs) == "$" {
+		return cmd
+	}
+	return lhs
+}
+
 type howEntry struct {
 	Command  string
 	Runs     int
@@ -395,6 +418,7 @@ func howEntriesWithFallback(dir string, terms []string, projects []string, widen
 		// one command on two rows of this screen (#2590).
 		line := strings.TrimSpace(firstCommandLine(r.Text))
 		cmd, code, hasExit := index.CommandExitOutcome(line)
+		cmd = stripViewerPipe(cmd)
 		// Measured on the form the screen prints, as it always was: the whole
 		// command is what the row groups and the JSON hands over, and a long
 		// one-liner is still a row.

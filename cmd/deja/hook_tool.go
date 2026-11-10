@@ -1435,16 +1435,16 @@ func repoEntryMentionsCommand(cmd, text string) bool {
 			continue
 		}
 		prog := strings.ToLower(filepath.Base(strings.Trim(fields[0], "\"'`")))
-		if len(prog) >= 4 && !genericCommandMultiplexers[prog] && containsIdentifierWord(low, prog) {
+		if len(prog) >= 4 && latinWord(prog) && !genericCommandMultiplexers[prog] && containsIdentifierWord(low, prog) {
 			return true
 		}
 		if len(fields) >= 2 {
 			subBase := strings.ToLower(filepath.Base(strings.Trim(fields[1], "\"'`")))
-			if len(subBase) >= 5 && strings.Contains(subBase, ".") && containsIdentifierWord(low, subBase) {
+			if len(subBase) >= 5 && latinWord(subBase) && strings.Contains(subBase, ".") && containsIdentifierWord(low, subBase) {
 				return true
 			}
 			sub := strings.ToLower(strings.Trim(fields[1], "-"))
-			if len(prog) >= 2 && len(sub) >= 3 && !strings.ContainsAny(sub, "/$\"'`(){}<>=") {
+			if len(prog) >= 2 && len(sub) >= 3 && latinWord(prog) && latinWord(sub) && !strings.ContainsAny(sub, "/$\"'`(){}<>=") {
 				if strings.Contains(low, prog+" "+sub) {
 					return true
 				}
@@ -1453,7 +1453,7 @@ func repoEntryMentionsCommand(cmd, text string) bool {
 	}
 	for _, prog := range commandPrograms(cmd) {
 		prog = strings.ToLower(prog)
-		if len(prog) < 4 || genericCommandMultiplexers[prog] {
+		if len(prog) < 4 || !latinWord(prog) || genericCommandMultiplexers[prog] {
 			continue
 		}
 		if containsIdentifierWord(low, prog) {

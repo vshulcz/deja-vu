@@ -27,12 +27,14 @@ func mcpHandoff(dir, name string, raw json.RawMessage) (string, int, error) {
 	var a struct {
 		Session string `json:"session"`
 		Harness string `json:"harness"`
+		Project string `json:"project"`
 	}
 	if err := decodeToolArgs(name, raw, &a); err != nil {
 		return "", 0, err
 	}
 	sel := strings.TrimSpace(a.Session)
 	harness := strings.TrimSpace(a.Harness)
+	project := strings.TrimSpace(a.Project)
 	// "continue the claude session" names a harness, not an id.
 	if harness == "" && sel != "" && !strings.ContainsAny(sel, " \t\n") && sources.IsKnownHarness(strings.ToLower(sel)) {
 		harness, sel = strings.ToLower(sel), ""
@@ -43,7 +45,7 @@ func mcpHandoff(dir, name string, raw json.RawMessage) (string, int, error) {
 	if line := buildingNowForAgent(dir); line != "" {
 		return frameRecall(line), 0, nil
 	}
-	s, why := handoffTargetForAgent(dir, sel, harness)
+	s, why := handoffTargetForAgent(dir, sel, harness, project)
 	if s.ID == "" {
 		return "deja: " + why, 0, nil
 	}
@@ -59,7 +61,11 @@ func mcpHandoff(dir, name string, raw json.RawMessage) (string, int, error) {
 // handoffTargetForAgent resolves what an agent asked to continue. It never
 // blocks on the index lock, the way every MCP read does, and it applies the
 // MCP trust policy rather than the CLI's search one.
-func handoffTargetForAgent(dir, sel, harness string) (model.Session, string) {
+func handoffTargetForAgent(dir, sel, harness string, projects ...string) (model.Session, string) {
+	project := ""
+	if len(projects) > 0 {
+		project = strings.TrimSpace(projects[0])
+	}
 	if sel != "" {
 		s, ok, err := index.FindByPrefixIn(dir, sel, harness)
 		if err != nil || !ok {
@@ -75,7 +81,7 @@ func handoffTargetForAgent(dir, sel, harness string) (model.Session, string) {
 		return kept[0], ""
 	}
 	cwd, err := os.Getwd()
-	if err != nil {
+	if err != nil && project == "" {
 		return model.Session{}, "no working directory to find this project's sessions from"
 	}
 	// The caller's own session is being written right now, and the newest one
@@ -89,9 +95,14 @@ func handoffTargetForAgent(dir, sel, harness string) (model.Session, string) {
 	pol := policy.Load()
 	metas, _ := index.AllMetaShared(dir)
 	var newestMeta index.SessionMeta
-	for _, name := range digest.ProjectNameCandidates(cwd) {
+	names := digest.ProjectNameCandidates(cwd)
+	if project != "" {
+		names = []string{project}
+	}
+	for _, name := range names {
 		for _, m := range metas {
-			if !isHandoverMeta(m) || !index.ProjectInScopeStrict(m.Project, name) || live[m.ID] {
+			inScope := index.ProjectInScopeStrict(m.Project, name) || (project != "" && howProjectMatches(m.Project, []string{name}))
+			if !isHandoverMeta(m) || !inScope || live[m.ID] {
 				continue
 			}
 			if harness != "" && m.Harness != harness {

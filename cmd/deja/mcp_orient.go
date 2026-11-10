@@ -324,6 +324,7 @@ func orientCommand(cmd string) string {
 		}
 		cmd = strings.TrimSpace(strings.TrimLeft(cmd[i+1:], "&; "))
 	}
+	cmd = stripViewerPipe(cmd)
 	if len(cmd) > orientCommandMax {
 		cmd = strings.TrimSpace(truncateToolLine(cmd, orientCommandMax)) + "…"
 	}
@@ -1154,6 +1155,7 @@ func orientDestructiveRemedy(cmd string) bool {
 		" git reset ", " git checkout ", " git clean ", " git stash ",
 		" git push ", " rm -rf ", " rm -f ",
 		" npm view ", " gh pr ", " gh issue ",
+		" --abort ",
 	} {
 		if strings.Contains(low, bad) {
 			return true
