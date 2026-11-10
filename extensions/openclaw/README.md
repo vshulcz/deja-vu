@@ -24,7 +24,7 @@ openclaw plugins install clawhub:@vshulcz/openclaw-deja
 The deja binary comes with the package; a deja you installed yourself
 (`brew install deja-vu`) always wins — see [Which binary](#which-binary).
 
-`deja install openclaw-auto` wires OpenClaw too, and is the shorter path if you
+`deja install openclaw-auto` (or `deja install --auto` for every supported agent on the machine) wires OpenClaw too, and is the shorter path if you
 have the CLI: it adds deja's MCP server and writes a plugin of its own. Having
 both is fine: this package reads what the installer wrote and contributes only
 what is missing.

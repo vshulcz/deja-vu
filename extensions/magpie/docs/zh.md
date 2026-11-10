@@ -4,7 +4,9 @@
 
 [![GitHub Repo stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat-square&logo=github&label=deja-vu)](https://github.com/vshulcz/deja-vu)
 
-> 属于 [**vshulcz/deja-vu**](https://github.com/vshulcz/deja-vu) —— 面向 Claude Code、Codex、Cursor、Gemini CLI、OpenClaw、Hermes 等本地编程智能体的跨工具会话记忆索引（零大模型依赖、单 Go 二进制）。
+属于 **[deja-vu](https://github.com/vshulcz/deja-vu)** 项目（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · Token 用量仅为 agentmemory 的**一半**）· [官网与在线搜索](https://vshulcz.github.io/deja-vu/) · [浏览器在线演示](https://vshulcz.github.io/deja-vu/view/) · **[★ 在 GitHub 上给 deja-vu 点 Star](https://github.com/vshulcz/deja-vu)**
+
+> 面向 Claude Code、Codex、Cursor、Gemini CLI、OpenClaw、Hermes 等本地编程智能体的跨工具会话记忆索引（零大模型依赖、单 Go 二进制）。
 
 在 [Magpie](https://github.com/yetone/magpie) 本地 API 网关的 `onRequest` 阶段从本机 `deja` 索引召回当前项目的历史会话决定，支持 OpenAI（`chat`、`responses`）、Anthropic（`anthropic`）与 Gemini（`gemini`）协议。
 
@@ -14,7 +16,12 @@
 magpie plugin add @vshulcz/magpie-deja
 ```
 
-`@vshulcz/magpie-deja` 依赖 `@vshulcz/deja-vu`，若本机 `PATH` 中尚未安装 `deja`，安装插件时会自动拉取对应平台的二进制。首次使用前可执行一次 `deja index` 建立本地会话索引。
+`@vshulcz/magpie-deja` 依赖 `@vshulcz/deja-vu`，若本机 `PATH` 中尚未安装 `deja`，安装插件时会自动拉取对应平台的二进制。首次使用前可执行一次 `deja index` 建立本地会话索引，或直接安装 CLI 并一键接入本机全部 43 款智能体：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto
+```
 
 ## 工作原理与数据边界
 

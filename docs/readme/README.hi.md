@@ -26,7 +26,7 @@ deja सब कुछ लोकल रूप से इंडेक्स कर
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">दस्तावेज़</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">बेंचमार्क</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">तुलना</a></p>
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/"><b>वेबसाइट और इंटरैक्टिव खोज</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>ब्राउज़र में लाइव डेमो</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">बेंचमार्क</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">तुलना</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="एक ही सवाल एक ही एजेंट से दो बार: मेमोरी के बिना उसे कुछ याद नहीं, deja के साथ वह आठ महीने पुराने नतीजे से जवाब देता है"></p>
 
@@ -34,6 +34,8 @@ deja सब कुछ लोकल रूप से इंडेक्स कर
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja install --auto
 ```
+
+<p align="center"><sub>या Homebrew से: <code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Claude Code प्लगइन: <code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills: <code>npx skills add vshulcz/deja-vu</code><br><a href="#इंस्टॉल">Windows (Scoop / winget), Codex, OpenCode, OpenClaw और अन्य</a> &middot; बिना इंस्टॉल किए आज़माएँ: <code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">लाइव डेमो →</a></sub></p>
 
 <table align="center">
 <tr>

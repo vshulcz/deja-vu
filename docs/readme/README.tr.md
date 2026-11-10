@@ -26,7 +26,7 @@ deja tüm geçmişi yerel olarak indeksler; böylece ajanlarınız <code>/compac
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">Belgeler</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Ölçümler</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Karşılaştırma</a></p>
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/"><b>Web sitesi ve etkileşimli arama</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>Tarayıcıda canlı demo</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Ölçümler</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Karşılaştırma</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="aynı soru aynı ajana iki kez: bellek yokken hiçbir şey hatırlamıyor, deja varken sekiz ay önceki sonuçla yanıtlıyor"></p>
 
@@ -34,6 +34,8 @@ deja tüm geçmişi yerel olarak indeksler; böylece ajanlarınız <code>/compac
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja install --auto
 ```
+
+<p align="center"><sub>Veya Homebrew ile: <code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Claude Code eklentisi: <code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills: <code>npx skills add vshulcz/deja-vu</code><br><a href="#kurulum">Windows (Scoop / winget), Codex, OpenCode, OpenClaw ve daha fazlası</a> &middot; Kurmadan deneyin: <code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">Canlı demo →</a></sub></p>
 
 <table align="center">
 <tr>

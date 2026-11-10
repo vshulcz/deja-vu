@@ -26,7 +26,7 @@ deja 在本地索引全部歷史，讓代理跨 <code>/compact</code> 保住上�
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">文件</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">評測</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">與同類比較</a></p>
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/"><b>官網與互動搜尋</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>瀏覽器線上展示</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">評測</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">與同類比較</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="同一個問題問同一個代理兩次：沒有記憶時它毫無印象，有 deja 時它用八個月前的結論作答"></p>
 
@@ -34,6 +34,8 @@ deja 在本地索引全部歷史，讓代理跨 <code>/compact</code> 保住上�
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja install --auto
 ```
+
+<p align="center"><sub>或用 Homebrew：<code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Claude Code 外掛：<code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills：<code>npx skills add vshulcz/deja-vu</code><br><a href="#安裝">Windows（Scoop / winget）、Codex、OpenCode、OpenClaw 等</a> &middot; 免安裝唯讀檢查本機會話：<code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">瀏覽器線上展示 →</a></sub></p>
 
 <table align="center">
 <tr>

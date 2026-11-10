@@ -18,7 +18,7 @@ pi install npm:@vshulcz/pi-deja
 
 deja 可执行文件随包一起提供；你自己装的 deja（`brew install deja-vu`）永远优先——见[用哪个可执行文件](#用哪个可执行文件)。
 
-装了 CLI 的话，`deja install pi-auto` 也会把 pi 接好，那条路更短：它写入 deja 的 MCP 服务端，并自己写一个扩展。那个扩展存在时，这个包会主动让位，所以两边都装也不会注入两次——omp 同理，安装器把它的扩展写在别处。
+装了 CLI 的话，`deja install pi-auto`（或者 `deja install --auto` 一次性接好机器上所有支持的智能体）也会把 pi 接好，那条路更短：它写入 deja 的 MCP 服务端，并自己写一个扩展。那个扩展存在时，这个包会主动让位，所以两边都装也不会注入两次——omp 同理，安装器把它的扩展写在别处。
 
 omp 读取 `pi.extensions` 清单，并发出同样的 `before_agent_start` 事件，所以 `pi install` 在 omp 那边的对应命令同样能装上这个包。
 

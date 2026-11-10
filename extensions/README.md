@@ -1,9 +1,18 @@
 # extensions/
 
+Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on LongMemEval-S · **13.6 s** to index 19,195 sessions · **half the tokens** of agentmemory) · [Website & live search](https://vshulcz.github.io/deja-vu/) · [Browser demo](https://vshulcz.github.io/deja-vu/view/) · **[★ Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)**
+
 deja in the shape each harness expects: its own package, under that
 ecosystem's naming, installable the way that ecosystem installs things. The
 code is thin — every one of these shells out to the same `deja` binary and the
 same local index.
+
+To install the `deja` CLI and wire every supported agent on this machine in one step:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto
+```
 
 | Directory | Published as | Installed with |
 |---|---|---|

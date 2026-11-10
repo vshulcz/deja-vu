@@ -4,7 +4,9 @@ English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions
 
 [![GitHub Repo stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat-square&logo=github&label=deja-vu)](https://github.com/vshulcz/deja-vu)
 
-> Part of [**vshulcz/deja-vu**](https://github.com/vshulcz/deja-vu) — local cross-agent session memory for Claude Code, Codex, Cursor, Gemini CLI, OpenClaw, Hermes, and 37+ more agents.
+Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on LongMemEval-S · **13.6 s** to index 19,195 sessions · **half the tokens** of agentmemory) · [Website & live search](https://vshulcz.github.io/deja-vu/) · [Browser demo](https://vshulcz.github.io/deja-vu/view/) · **[★ Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)**
+
+> Local cross-agent session memory for Claude Code, Codex, Cursor, Gemini CLI, OpenClaw, Hermes, and 37+ more agents.
 
 Recalls relevant coding session history from your local `deja` index into [Magpie](https://github.com/yetone/magpie) gateway requests across OpenAI (`chat`, `responses`), Anthropic (`anthropic`), and Gemini (`gemini`) protocols.
 
@@ -14,7 +16,12 @@ Recalls relevant coding session history from your local `deja` index into [Magpi
 magpie plugin add @vshulcz/magpie-deja
 ```
 
-`@vshulcz/magpie-deja` depends on `@vshulcz/deja-vu`, so installing the plugin brings the `deja` binary with it if you do not already have `deja` on `PATH` (via `brew install deja-vu` or `install.sh`). Run `deja index` once to index existing transcripts on disk.
+`@vshulcz/magpie-deja` depends on `@vshulcz/deja-vu`, so installing the plugin brings the `deja` binary with it if you do not already have `deja` on `PATH` (via `brew install deja-vu` or `install.sh`). Run `deja index` once to index existing transcripts on disk, or install the CLI and wire all 43 agents on this machine:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto
+```
 
 ## How It Works & Data Boundary
 

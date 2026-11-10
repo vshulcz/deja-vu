@@ -4,7 +4,7 @@
 
 [![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
 
-属于 **[deja-vu](https://github.com/vshulcz/deja-vu)** 项目（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · Token 用量仅为 agentmemory 的**一半**）· [官网与在线搜索](https://vshulcz.github.io/deja-vu/) · [浏览器在线演示](https://vshulcz.github.io/deja-vu/view/) · **[★ 在 GitHub 上给 deja-vu 点 Star](https://github.com/vshulcz/deja-vu)**
+属于 **[deja-vu](https://github.com/vshulcz/deja-vu)** 项目（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · Token 用量仅为 agentmemory 的**一半**）· [完整中文文档](../../../docs/readme/README.zh.md) · [官网与在线搜索](https://vshulcz.github.io/deja-vu/) · [浏览器在线演示](https://vshulcz.github.io/deja-vu/view/) · **[★ 在 GitHub 上给 deja-vu 点 Star](https://github.com/vshulcz/deja-vu)**
 
 DeepSeek Harness 自带的 `session-query` 已经可以检索它自己的会话。这个插件回答的是另一个问题：你在这台机器上**其他**智能体里做过什么。
 
@@ -24,7 +24,14 @@ dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
 
 插件调用 `deja` 可执行文件。它作为依赖随插件一起安装；如果 `PATH` 上已有 `deja` 就直接使用，`DEJA_BIN` 可覆盖两者。
 
-装了 CLI 的话，`deja install --auto` 也会把 dsh 接好——写入 deja 的 MCP 服务端和 `/deja` 命令——那条路更短。
+如果直接安装 CLI，`deja install --auto` 会一步把 **dsh 以及本机其他所有编程智能体**（Claude Code、Codex、Cursor、opencode、Kimi、Cline、Zed 等）全部接好——写入 deja 的 MCP 服务端和 `/deja` 命令——那条路更短：
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto
+```
+
+或者用 Homebrew：`brew install deja-vu && deja install --auto` · 国内 npm 镜像：`npm i -g @vshulcz/deja-vu --registry=https://registry.npmmirror.com && deja install --auto` · 免安装只读检查本机会话：`npx @vshulcz/deja-vu sources`。
 两边都装也没问题：插件会检查 `$DSH_HOME/plugins/deja/` 下安装器写了什么，只补缺的部分，工具和命令不会注册两次。
 
 ## 提供的能力

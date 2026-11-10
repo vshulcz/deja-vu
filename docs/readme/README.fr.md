@@ -26,7 +26,7 @@ deja indexe tout localement pour que vos agents gardent le contexte après <code
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">Documentation</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Comparaison</a></p>
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/"><b>Site et recherche interactive</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>Démo interactive dans le navigateur</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Comparaison</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="la même question au même agent deux fois : sans mémoire il ne se souvient de rien, avec deja il répond avec une conclusion vieille de huit mois"></p>
 
@@ -34,6 +34,8 @@ deja indexe tout localement pour que vos agents gardent le contexte après <code
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja install --auto
 ```
+
+<p align="center"><sub>Ou avec Homebrew : <code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Plugin Claude Code : <code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills : <code>npx skills add vshulcz/deja-vu</code><br><a href="#installation">Windows (Scoop / winget), Codex, OpenCode, OpenClaw et plus</a> &middot; Essayer sans installer : <code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">Démo en direct →</a></sub></p>
 
 <table align="center">
 <tr>

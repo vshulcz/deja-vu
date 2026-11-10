@@ -35,7 +35,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 deja install --auto
 ```
 
-<p align="center"><sub>macOS 与 Linux &middot; <a href="#安装">Windows、Homebrew、npm 与插件市场</a> &middot; 免安装只读检查本机已有哪些会话：<code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">浏览器在线演示 →</a></sub></p>
+<p align="center"><sub>或用 Homebrew：<code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Claude Code 插件：<code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills：<code>npx skills add vshulcz/deja-vu</code><br><a href="#安装">Windows（Scoop / winget）、国内 npm 镜像、Codex、OpenCode、OpenClaw 等</a> &middot; 免安装只读检查本机会话：<code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">浏览器在线演示 →</a></sub></p>
 
 <table align="center">
 <tr>

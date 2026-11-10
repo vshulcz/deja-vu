@@ -26,7 +26,7 @@ deja는 그 기록을 로컬에서 색인해 <code>/compact</code> 이후에도 
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">문서</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">벤치마크</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">비교</a></p>
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/"><b>문서 및 대화형 검색</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>브라우저 라이브 데모</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">벤치마크</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">비교</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="같은 에이전트에게 같은 질문을 두 번: 기억이 없을 때는 아무것도 모르고, deja가 있으면 8개월 전 결론으로 답한다"></p>
 
@@ -34,6 +34,8 @@ deja는 그 기록을 로컬에서 색인해 <code>/compact</code> 이후에도 
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja install --auto
 ```
+
+<p align="center"><sub>또는 Homebrew: <code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Claude Code 플러그인: <code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills: <code>npx skills add vshulcz/deja-vu</code><br><a href="#설치">Windows (Scoop / winget), Codex, OpenCode, OpenClaw 등</a> &middot; 설치 없이 세션 확인: <code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">라이브 데모 →</a></sub></p>
 
 <table align="center">
 <tr>

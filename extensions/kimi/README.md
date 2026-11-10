@@ -24,10 +24,11 @@ Kimi's update check reads. There is also a `kimi-deja.zip` release asset — abo
 10 KB instead of the whole repository — for a marketplace entry or an install
 that should not pull the whole project.
 
-Install the binary if you do not have it:
+Install the binary if you do not have it (and optionally wire the other agents on this machine):
 
 ```
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto
 ```
 
 Plugins load from the managed copy, so run `/reload` or `/new` after installing.

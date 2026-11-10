@@ -35,6 +35,8 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 deja install --auto
 ```
 
+<p align="center"><sub>または Homebrew：<code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Claude Code プラグイン：<code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills：<code>npx skills add vshulcz/deja-vu</code><br><a href="#インストール">Windows（Scoop / winget）、Codex、OpenCode、OpenClaw など</a> &middot; インストール不要でセッションを確認：<code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">ブラウザデモ →</a></sub></p>
+
 <table align="center">
 <tr>
 <td align="center" width="33%">再現率<br>LongMemEval-S で <b>97.2% R@5</b><br><sub>全 500 問 · MemPalace 96.6%、agentmemory 95.2%<br>同じ 19,195 セッションで 1 位正解 19/100、次点は 14</sub></td>

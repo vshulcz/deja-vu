@@ -18,7 +18,7 @@ openclaw plugins install clawhub:@vshulcz/openclaw-deja
 
 deja 可执行文件随包一起提供；你自己装的 deja（`brew install deja-vu`）永远优先——见[用哪个可执行文件](#用哪个可执行文件)。
 
-装了 CLI 的话，`deja install openclaw-auto` 也会把 OpenClaw 接好，那条路更短：它写入 deja 的 MCP 服务端，并自己写一个插件。两边都装也没问题：这个包会读取安装器写下的内容，只补缺的部分。
+装了 CLI 的话，`deja install openclaw-auto`（或者 `deja install --auto` 一次性接好机器上所有支持的智能体）也会把 OpenClaw 接好，那条路更短：它写入 deja 的 MCP 服务端，并自己写一个插件。两边都装也没问题：这个包会读取安装器写下的内容，只补缺的部分。
 
 ## 做什么
 
