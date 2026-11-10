@@ -17,10 +17,11 @@
 
 这种写法会锁定最新的发布版并记录来源，而这正是 Kimi 的更新检查所读取的内容。还有一个 `kimi-deja.zip` 发布资源——约 10 KB，而不是整个仓库——适合市场条目，或者不希望拉下整个项目的安装方式。
 
-如果还没有可执行文件，装一下：
+如果还没有可执行文件，装一下（也可以顺便把这台机器上的其他智能体接好）：
 
 ```
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto
 ```
 
 插件从托管副本加载，所以装完之后请执行 `/reload` 或 `/new`。

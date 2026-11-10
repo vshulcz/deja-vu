@@ -18,6 +18,7 @@
 brew install deja-vu
 # 或者
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto
 ```
 
 然后在 Spec Kit 项目里：

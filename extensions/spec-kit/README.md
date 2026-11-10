@@ -23,6 +23,7 @@ Install deja first:
 brew install deja-vu
 # or
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto
 ```
 
 Then, in a Spec Kit project:

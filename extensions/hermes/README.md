@@ -17,7 +17,8 @@ key, no server. The history is indexed locally by
 deja has to be on PATH first:
 
 ```bash
-brew install deja-vu        # or: go install github.com/vshulcz/deja-vu/cmd/deja@latest
+brew install deja-vu        # or: curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto         # wires Hermes and every other supported agent on this machine
 hermes plugins install deja-memory   # or from GitHub: hermes plugins install vshulcz/deja-vu/extensions/hermes
 hermes config set memory.provider deja-memory
 ```

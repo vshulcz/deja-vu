@@ -4,7 +4,7 @@ English | [中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/d
 
 [![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
 
-Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on LongMemEval-S · **13.6 s** to index 19,195 sessions · **half the tokens** of agentmemory) · [Website & live search](https://vshulcz.github.io/deja-vu/) · [Browser demo](https://vshulcz.github.io/deja-vu/view/) · **[★ Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)**
+Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on LongMemEval-S · **13.6 s** to index 19,195 sessions · **half the tokens** of agentmemory) · [Full documentation](../../README.md) · [Website & live search](https://vshulcz.github.io/deja-vu/) · [Browser demo](https://vshulcz.github.io/deja-vu/view/) · **[★ Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)**
 
 DeepSeek Harness can already search its own sessions — that is what the built-in
 `session-query` subsystem does. This plugin answers the other question: what you
@@ -33,8 +33,14 @@ The plugin runs the `deja` binary. It is pulled in as a dependency, so npm
 installs it with the plugin; a `deja` already on `PATH` is used as-is, and
 `DEJA_BIN` overrides both.
 
-If you have the CLI, `deja install --auto` wires dsh too — it adds deja's MCP
-server and a `/deja` command to your profile — and that is the shorter path.
+If you have the CLI, `deja install --auto` wires dsh **and every other coding agent on this machine** (Claude Code, Codex, Cursor, opencode, Kimi, Cline, Zed and more) in one step — it adds deja's MCP server and a `/deja` command to your profile — and that is the shorter path:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto
+```
+
+Or with Homebrew: `brew install deja-vu && deja install --auto` · Try without installing: `npx @vshulcz/deja-vu sources`.
 Having both is fine: this plugin looks for what the installer wrote in
 `$DSH_HOME/plugins/deja/` and contributes only what is missing, so the tools and
 the command are never registered twice.

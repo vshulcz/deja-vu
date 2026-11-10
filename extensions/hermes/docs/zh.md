@@ -13,7 +13,8 @@
 先让 deja 出现在 PATH 里：
 
 ```bash
-brew install deja-vu        # 或者：go install github.com/vshulcz/deja-vu/cmd/deja@latest
+brew install deja-vu        # 或者：curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto         # 同时接入 Hermes 与这台机器上其他受支持的智能体
 hermes plugins install deja-memory   # 或直接从 GitHub：hermes plugins install vshulcz/deja-vu/extensions/hermes
 hermes config set memory.provider deja-memory
 ```

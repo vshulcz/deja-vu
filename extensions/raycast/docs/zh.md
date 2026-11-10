@@ -4,6 +4,8 @@
 [![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
 [English](../README.md) | 简体中文
 
+属于 **[deja-vu](https://github.com/vshulcz/deja-vu)** 项目（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · Token 用量仅为 agentmemory 的**一半**）· [官网与在线搜索](https://vshulcz.github.io/deja-vu/) · [浏览器在线演示](https://vshulcz.github.io/deja-vu/view/) · **[★ 在 GitHub 上给 deja-vu 点 Star](https://github.com/vshulcz/deja-vu)**
+
 在 Raycast 中全文搜索并恢复 Claude Code、Codex、Cursor、OpenCode、Gemini CLI 等全部四十三款编程智能体的本地历史会话。每一个智能体本来就会把完整的对话、执行的命令和修改过的文件记录在你的电脑磁盘上，deja 在本地建立统一索引，让你随时在 Raycast 里按关键词找回之前解决过的报错、配置决策或讨论过程，而不需要连接任何外部模型服务或后台守护进程。
 
 ## 前置条件

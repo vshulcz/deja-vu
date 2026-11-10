@@ -24,7 +24,7 @@ pi install npm:@vshulcz/pi-deja
 The deja binary comes with the package; a deja you installed yourself
 (`brew install deja-vu`) always wins — see [Which binary](#which-binary).
 
-`deja install pi-auto` wires pi too, and is the shorter path if you have the
+`deja install pi-auto` (or `deja install --auto` for every supported agent on the machine) wires pi too, and is the shorter path if you have the
 CLI: it adds deja's MCP server and writes an extension of its own. When that
 extension is present this package stands down, so having both never injects
 twice — and the same for omp, whose extension the installer writes elsewhere.
