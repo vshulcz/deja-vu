@@ -14,6 +14,8 @@ func TestOnlyACommandThatChecksTheWorkCountsAsVerifying(t *testing.T) {
 		"golangci-lint run ./...",
 		"python3 -m pytest tests/",
 		"go build ./... && go vet ./...",
+		"./scripts/verify-fast.sh",
+		"scripts/verify.sh",
 	} {
 		if !VerifyCommand(cmd) {
 			t.Errorf("a command that checks the work reads as one that does not: %q", cmd)

@@ -39,6 +39,9 @@ func verifyProgram(part string) bool {
 		return false
 	}
 	prog := strings.ToLower(filepath.Base(f[0]))
+	if base := strings.TrimSuffix(prog, ".sh"); base == "verify" || strings.HasPrefix(base, "verify-") || strings.HasPrefix(base, "verify_") {
+		return true
+	}
 	switch prog {
 	case "make", "just", "task", "mage", "bazel", "buck", "ninja", "cmake", "ctest",
 		"cargo", "gradle", "gradlew", "mvn", "dotnet", "swift", "zig", "rustc",

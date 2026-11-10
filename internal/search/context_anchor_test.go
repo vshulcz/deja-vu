@@ -63,3 +63,18 @@ func TestContextCarriesAnEarlyExchangeOverALaterMention(t *testing.T) {
 		t.Errorf("the turn that answers the query is missing from %d bytes of context", len(out))
 	}
 }
+
+func TestContextWithNoQueryIncludesTailOfLongSession(t *testing.T) {
+	var b bytes.Buffer
+	PrintContext(&b, longSessionAround(60), "")
+	out := b.String()
+	if !strings.Contains(out, "before we start, remind me about retries later") {
+		t.Errorf("opening turn missing from empty-query overview:\n%s", out)
+	}
+	if !strings.Contains(out, "cap retries at 3") {
+		t.Errorf("tail resolution missing from empty-query overview:\n%s", out)
+	}
+	if !strings.Contains(out, "earlier turns omitted]") {
+		t.Errorf("expected omission marker between head and tail in empty-query overview:\n%s", out)
+	}
+}

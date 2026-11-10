@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -235,5 +236,29 @@ func TestNearErrorProbesAndStandingCorrectionFilter(t *testing.T) {
 	}
 	if isStandingCorrection("ок, без просьбы процитировать (это пока не надо нам)") {
 		t.Error("situational 'пока не надо' remark must not be promoted to standing repo memory")
+	}
+}
+
+func TestFilterAndSortOrientCmdsPrefersRecentVerifyCommandsOverStaleOnes(t *testing.T) {
+	now := time.Date(2026, 11, 10, 12, 0, 0, 0, time.UTC)
+	stale := now.Add(-60 * 24 * time.Hour)
+	cmds := []howEntry{
+		{
+			Command:  "go test -race ./...",
+			Sessions: map[string]bool{"s1": true, "s2": true, "s3": true, "s4": true, "s5": true},
+			Last:     stale,
+		},
+		{
+			Command:  "./scripts/verify-fast.sh",
+			Sessions: map[string]bool{"s6": true, "s7": true},
+			Last:     now,
+		},
+	}
+	got := filterAndSortOrientCmds(cmds)
+	if len(got) != 2 {
+		t.Fatalf("len(got) = %d, want 2", len(got))
+	}
+	if got[0].Command != "./scripts/verify-fast.sh" {
+		t.Errorf("got[0].Command = %q, want ./scripts/verify-fast.sh ahead of stale command", got[0].Command)
 	}
 }
