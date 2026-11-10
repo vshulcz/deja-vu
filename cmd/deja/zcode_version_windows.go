@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 // zcodeDesktopVersion is the installed ZCode desktop version, indirected so a
@@ -38,7 +39,7 @@ func zcodeCandidatePaths() []string {
 			return
 		}
 		for _, existing := range paths {
-			if existing == p {
+			if strings.EqualFold(filepath.Clean(existing), filepath.Clean(p)) {
 				return
 			}
 		}

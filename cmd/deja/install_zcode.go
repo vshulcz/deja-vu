@@ -276,6 +276,9 @@ func zcodeConfigIsLiveRuntimeConfig() bool {
 	if fileExists(filepath.Join(filepath.Dir(setting), "migrations", "settings-v1.json")) {
 		return false
 	}
+	if v, ok := zcodeDesktopVersion(); ok {
+		return !versionBefore(v, zcodeConfigJSONSince)
+	}
 	legacy := zcodeLegacyConfigPath()
 	b, err := readConfig(legacy)
 	if err != nil || len(b) == 0 {
@@ -283,9 +286,6 @@ func zcodeConfigIsLiveRuntimeConfig() bool {
 	}
 	if fileExists(setting) {
 		return zcodeHooksRun(b)
-	}
-	if v, ok := zcodeDesktopVersion(); ok {
-		return !versionBefore(v, zcodeConfigJSONSince)
 	}
 	var root struct {
 		Hooks json.RawMessage `json:"hooks"`

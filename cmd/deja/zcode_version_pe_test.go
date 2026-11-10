@@ -72,12 +72,12 @@ func TestZCodeCandidatePaths(t *testing.T) {
 
 	t.Setenv("LOCALAPPDATA", `C:\Users\tester\AppData\Local`)
 	t.Setenv("ProgramFiles", `C:\Program Files`)
-	t.Setenv("ProgramFiles(x86)", `C:\Program Files (x86)`)
-	t.Setenv("ProgramW6432", `C:\Program Files`)
+	t.Setenv("ProgramFiles(x86)", `c:\program files (x86)`)
+	t.Setenv("ProgramW6432", `C:/Program Files`)
 
 	zcodeLookPath = func(file string) (string, error) {
 		if file == "ZCode.exe" {
-			return `D:\Tools\ZCode.exe`, nil
+			return `c:\users\tester\appdata\local\programs\zcode\zcode.exe`, nil
 		}
 		return "", os.ErrNotExist
 	}
@@ -85,9 +85,8 @@ func TestZCodeCandidatePaths(t *testing.T) {
 	got := zcodeCandidatePaths()
 	want := []string{
 		`C:\Users\tester\AppData\Local\Programs\ZCode\ZCode.exe`,
-		`D:\Tools\ZCode.exe`,
 		`C:\Program Files\ZCode\ZCode.exe`,
-		`C:\Program Files (x86)\ZCode\ZCode.exe`,
+		`c:\program files (x86)\ZCode\ZCode.exe`,
 	}
 	if len(got) != len(want) {
 		t.Fatalf("zcodeCandidatePaths() = %v, want %v", got, want)
