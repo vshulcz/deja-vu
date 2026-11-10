@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recover uncommitted files overwritten or deleted by Claude Code, Cursor, or Codex — deja-vu</title>
+<meta name="description" content="When an AI coding agent overwrites or deletes an uncommitted file before git commit, every replaced edit span is still recorded in the local session transcript on disk. How to recover it with jq or deja restore.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html">
+<link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html">
+<link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Recover uncommitted files overwritten or deleted by Claude Code, Cursor, or Codex">
+<meta property="og:description" content="When an AI coding agent overwrites or deletes an uncommitted file before git commit, every replaced edit span is still recorded in the local session transcript on disk. How to recover it with jq or deja restore.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Recover uncommitted files overwritten or deleted by Claude Code, Cursor, or Codex", "description": "When an AI coding agent overwrites or deletes an uncommitted file before git commit, every replaced edit span is still recorded in the local session transcript on disk. How to recover it with jq or deja restore.", "url": "https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-10", "dateModified": "2026-11-10"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Recover overwritten files","item":"https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html"}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="nav-cta" href="https://github.com/vshulcz/deja-vu"><span class="star-ic" aria-hidden="true">★</span>GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a>
+<div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<details class="grpfold"><summary>Why agents forget <span class="n">13</span></summary>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="switch-agents-without-losing-context.html">Session handoffs</a>
+<a href="claude-code-usage-limit-handoff.html">When usage limits hit</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="one-rules-file.html">One rules file</a>
+<a href="token-cost.html">What memory costs</a>
+</details>
+<details class="grpfold" open><summary>Session history <span class="n">13</span></summary>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="codex-history.html">Codex history</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="repo-memory.html">Repo memory</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="credentials-in-transcripts.html">Credentials in transcripts</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="recover-overwritten-files.html" aria-current="page">Recover overwritten files</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
+</details>
+<details class="grpfold"><summary>Deleting sessions <span class="n">32</span></summary>
+<a href="session-files-on-disk.html">Claude Code</a>
+<a href="delete-old-claude-sessions.html">Old sessions</a>
+<a href="delete-codex-sessions.html">Codex</a>
+<a href="delete-cursor-chat-history.html">Cursor</a>
+<a href="cursor-state-vscdb-too-large.html">Cursor state.vscdb too large</a>
+<a href="delete-copilot-chat-history.html">Copilot Chat</a>
+<a href="delete-copilot-cli-session-history.html">Copilot CLI</a>
+<a href="delete-gemini-cli-history.html">Gemini CLI</a>
+<a href="delete-opencode-session-history.html">opencode</a>
+<a href="delete-cline-task-history.html">Cline</a>
+<a href="delete-roo-task-history.html">Roo Code</a>
+<a href="delete-zed-thread-history.html">Zed</a>
+<a href="delete-kilo-code-task-history.html">Kilo Code</a>
+<a href="delete-amp-thread-history.html">Amp</a>
+<a href="delete-continue-session-history.html">Continue</a>
+<a href="delete-kiro-session-history.html">Kiro</a>
+<a href="delete-kimi-code-session-history.html">Kimi Code</a>
+<a href="delete-junie-session-history.html">Junie</a>
+<a href="delete-goose-session-history.html">Goose</a>
+<a href="delete-windsurf-cascade-history.html">Windsurf</a>
+<a href="delete-qwen-code-chat-history.html">Qwen Code</a>
+<a href="delete-trae-sessions.html">TRAE CLI</a>
+<a href="delete-codebuddy-sessions.html">CodeBuddy</a>
+<a href="delete-antigravity-history.html">Antigravity</a>
+<a href="delete-pi-session-history.html">pi</a>
+<a href="delete-crush-session-history.html">Crush</a>
+<a href="delete-hermes-session-history.html">Hermes</a>
+<a href="delete-cherrystudio-session-history.html">Cherry Studio</a>
+<a href="delete-codewhale-session-history.html">CodeWhale</a>
+<a href="delete-aider-chat-history.html">aider</a>
+<a href="delete-openclaw-session-history.html">OpenClaw</a>
+<a href="delete-grok-session-history.html">Grok Build</a>
+</details>
+<details class="grpfold"><summary>Per-agent guides <span class="n">43</span></summary>
+<a href="memory-for-aider.html">aider</a>
+<a href="memory-for-amp.html">Amp</a>
+<a href="memory-for-antigravity.html">Antigravity</a>
+<a href="memory-for-cherrystudio.html">Cherry Studio</a>
+<a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-codebuddy.html">CodeBuddy Code</a>
+<a href="memory-for-codewhale.html">CodeWhale</a>
+<a href="memory-for-codex.html">Codex</a>
+<a href="memory-for-commandcode.html">Command Code</a>
+<a href="memory-for-continue.html">Continue</a>
+<a href="memory-for-copilot.html">Copilot CLI</a>
+<a href="memory-for-crush.html">Crush</a>
+<a href="memory-for-cursor.html">Cursor</a>
+<a href="memory-for-devin.html">Devin CLI</a>
+<a href="memory-for-dsh.html">dsh</a>
+<a href="memory-for-gjc.html">gajae-code</a>
+<a href="memory-for-gemini.html">Gemini CLI</a>
+<a href="memory-for-goose.html">Goose</a>
+<a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-hermes.html">Hermes</a>
+<a href="memory-for-jetbrains.html">JetBrains AI Assistant</a>
+<a href="memory-for-junie.html">Junie</a>
+<a href="memory-for-kilocode.html">Kilo Code</a>
+<a href="memory-for-kimchi.html">Kimchi Coding</a>
+<a href="memory-for-kimi.html">Kimi Code</a>
+<a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-mcode.html">MiniMax Code</a>
+<a href="memory-for-muse.html">Muse Code</a>
+<a href="memory-for-omp.html">omp</a>
+<a href="memory-for-openclaw.html">OpenClaw</a>
+<a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-pi.html">pi</a>
+<a href="memory-for-prime.html">prime-agent</a>
+<a href="memory-for-qwen.html">Qwen Code</a>
+<a href="memory-for-reasonix.html">Reasonix</a>
+<a href="memory-for-roo.html">Roo Code</a>
+<a href="memory-for-senpi.html">Senpi</a>
+<a href="memory-for-trae.html">TRAE CLI</a>
+<a href="memory-for-copilot-chat.html">VS Code Copilot Chat</a>
+<a href="memory-for-windsurf.html">Windsurf</a>
+<a href="memory-for-zcode.html">ZCode</a>
+<a href="memory-for-zed.html">Zed</a>
+</details>
+<div class="grp">Evidence</div>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="claude-mem-alternative.html">claude-mem alternative</a>
+<a href="mem0-alternative.html">Mem0 alternative</a>
+<a href="specstory-alternative.html">SpecStory alternative</a>
+<a href="basic-memory-alternative.html">Basic Memory alternative</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+<h1>Recover uncommitted files overwritten or deleted by a coding agent</h1>
+<p class="lead">When Claude Code, Cursor, Codex, or another agent runs <code>git checkout -- .</code>, <code>git clean -fd</code>, or rewrites a file you had not yet staged or committed, <code>git reflog</code> has nothing to restore. If the agent read, edited, or wrote that file earlier in the session, the text is still sitting in the local session transcript on disk.</p>
+
+<h2>Why <code>git reflog</code> cannot help here</h2>
+<p>Git only stores blobs when you run <code>git add</code> or <code>git commit</code>. Working-tree edits made during a long debugging session exist in two places before your first commit:</p>
+<ol>
+<li>The working tree file on disk (which the agent just overwrote or removed).</li>
+<li>The append-only JSONL or SQLite transcript that your coding agent writes locally for every tool call (<code>Read</code>, <code>Edit</code>, <code>Write</code>, <code>MultiEdit</code>, <code>apply_patch</code>).</li>
+</ol>
+<p>Do not delete or clear the agent session yet. Every tool call input and output that touched the file is still in the transcript directory.</p>
+
+<h2>Option 1: Recover with <code>deja restore</code> (across 43 agents)</h2>
+<p>Because <a href="day-zero.html"><code>deja</code> indexes existing local transcripts on disk</a> the moment you install it, you can install it after the accident and still pull the spans out of the session that overwrote your file:</p>
+<pre><code>brew install deja-vu
+deja restore internal/store/pool.go</code></pre>
+<p>With no flags, <code>deja restore &lt;path&gt;</code> scans every indexed session that recorded an edit on that file path (or basename) and prints the recorded before/after spans in newest-first order:</p>
+<pre><code>SPAN  WHEN              HARNESS   SESSION   SIZE    PREVIEW
+1     2026-11-10 13:14  claude    8b2a19d0  2.4 KB  func (p *Pool) Acquire(ctx context.Context) (*Conn, error) {
+2     2026-11-10 12:58  claude    8b2a19d0  1.9 KB  func (p *Pool) releaseLocked(c *Conn) {
+3     2026-11-10 11:40  cursor    41f0c82a  4.1 KB  type PoolConfig struct { MaxIdle int; IdleTimeout time.Duration }</code></pre>
+<p>To inspect or write a specific span to a recovery file without clobbering your working tree:</p>
+<pre><code># Print span 1 to stdout
+deja restore internal/store/pool.go --span 1
+
+# Write span 1 to a separate file (refuses to overwrite the source file itself)
+deja restore internal/store/pool.go --span 1 -o pool.recovered.go
+
+# Dump all recorded edit spans for the file in chronological order
+deja restore internal/store/pool.go --all &gt; pool.all-spans.txt</code></pre>
+<p>By design, <code>deja restore</code> never writes directly back over the original path even if you pass <code>-o internal/store/pool.go</code>; it writes to a separate file so you can diff and splice what you need.</p>
+
+<h2>Option 2: Extract directly from raw JSONL with <code>jq</code></h2>
+<p>If you only want a one-liner against Claude Code's raw JSONL files in <code>~/.claude/projects/</code> without installing anything:</p>
+<pre><code># List every Edit / Write tool call that touched pool.go in the current project
+jq -r '
+  .message.content[]?
+  | select(.type == "tool_use" and (.name == "Edit" or .name == "Write" or .name == "MultiEdit"))
+  | select(.input.file_path? | tostring | endswith("pool.go"))
+  | "=== " + .name + " " + .input.file_path + " ===\n"
+    + (.input.old_string // .input.content // "")
+' ~/.claude/projects/*/*.jsonl</code></pre>
+<p>And if the agent only <em>read</em> the file before deleting it (for example via <code>rm</code> or <code>git checkout</code>), the file contents are in the <code>tool_result</code> entries rather than <code>tool_use</code>:</p>
+<pre><code>grep -l "pool.go" ~/.claude/projects/*/*.jsonl | xargs jq -r '
+  .message.content[]?
+  | select(.type == "tool_result")
+  | (.content | if type == "string" then . else (.[0].text // "") end)
+  | select(contains("func (p *Pool)"))
+'</code></pre>
+<p>For Codex CLI, run the same search against <code>~/.codex/sessions/*/*/*.jsonl</code>; for other agents, see <a href="where-sessions-are-stored.html">Where session history lives on disk</a>.</p>
+
+<h2>Tracing which session changed a surviving line: <code>deja blame</code></h2>
+<p>Sometimes the file is still there, but an agent rewrote a function three hours ago and you want the reasoning or the version right before that edit:</p>
+<pre><code>deja blame internal/store/pool.go:42</code></pre>
+<p>Unlike <code>git blame</code>, which only sees committed history, <code>deja blame</code> matches the surviving lines against the edit spans recorded by your coding agents and prints the session ID, harness, timestamp, and user prompt that produced the change. From there, <code>deja show &lt;session-id&gt;</code> prints the full transcript.</p>
+
+<div class="see-also">
+<div class="see-also-t">See also</div>
+<ul>
+<li><a href="recover-a-deleted-session.html">Recover a deleted session</a> — what remains when the session file itself was removed or compacted.</li>
+<li><a href="where-sessions-are-stored.html">Where session history lives on disk</a> — exact paths for all 43 supported harnesses.</li>
+<li><a href="auditing-agents.html">Auditing what an agent did</a> — inspecting every file read, edit, and shell command after a session finishes.</li>
+<li><a href="commands.html">CLI reference</a> — full flag reference for <code>deja restore</code> and <code>deja blame</code>.</li>
+</ul>
+</div>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>
