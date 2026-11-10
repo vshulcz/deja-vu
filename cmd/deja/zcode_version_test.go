@@ -39,6 +39,15 @@ func TestZCodeDesktopVersionSelectsTheLiveConfig(t *testing.T) {
 		t.Errorf("config.json gained a server, which the migration would carry back: %s", b)
 	}
 
+	// A fresh 3.17+ install before config.json even exists must also recognise
+	// config.json as the live runtime config.
+	homeFresh := t.TempDir()
+	t.Setenv("HOME", homeFresh)
+	t.Setenv("USERPROFILE", homeFresh)
+	if !zcodeConfigIsLiveRuntimeConfig() {
+		t.Error("3.17+ without config.json was not recognised as live runtime config")
+	}
+
 	// An older runtime keeps the setting.json behaviour: config.json is a
 	// first-launch migration source and must stay byte for byte.
 	home2 := t.TempDir()

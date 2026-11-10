@@ -6,23 +6,60 @@ import (
 	"debug/pe"
 	"encoding/binary"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 // zcodeDesktopVersion is the installed ZCode desktop version, indirected so a
 // test can say which build is there, the way claudeVersion does. The desktop
-// build is not on PATH and its CLI config carries no version, so the
+// build is not on PATH by default and its CLI config carries no version, so the
 // executable's own PE version resource is the only version deja can ask
 // without starting the app. Where it cannot be read, the caller falls back to
 // probing the config files themselves.
 var zcodeDesktopVersion = zcodeDesktopVersionReal
+var zcodeLookPath = exec.LookPath
 
 func zcodeDesktopVersionReal() (v [3]int, ok bool) {
-	root := os.Getenv("LOCALAPPDATA")
-	if root == "" {
-		return v, false
+	for _, p := range zcodeCandidatePaths() {
+		if v, ok := zcodeExeVersion(p); ok {
+			return v, true
+		}
 	}
-	return zcodeExeVersion(filepath.Join(root, "Programs", "ZCode", "ZCode.exe"))
+	return v, false
+}
+
+// zcodeCandidatePaths returns candidate locations for ZCode.exe on Windows.
+// Per-user install under LOCALAPPDATA is probed first, followed by PATH and
+// system-wide ProgramFiles locations (#6016).
+func zcodeCandidatePaths() []string {
+	var paths []string
+	add := func(p string) {
+		if p == "" {
+			return
+		}
+		for _, existing := range paths {
+			if strings.EqualFold(filepath.Clean(existing), filepath.Clean(p)) {
+				return
+			}
+		}
+		paths = append(paths, p)
+	}
+
+	if local := os.Getenv("LOCALAPPDATA"); local != "" {
+		add(filepath.Join(local, "Programs", "ZCode", "ZCode.exe"))
+	}
+	for _, name := range []string{"ZCode.exe", "zcode.exe"} {
+		if p, err := zcodeLookPath(name); err == nil {
+			add(p)
+		}
+	}
+	for _, env := range []string{"ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"} {
+		if root := os.Getenv(env); root != "" {
+			add(filepath.Join(root, "ZCode", "ZCode.exe"))
+		}
+	}
+	return paths
 }
 
 // zcodeExeVersion reads one PE file's fixed file version.

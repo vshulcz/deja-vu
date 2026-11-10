@@ -4,6 +4,7 @@ package main
 
 import (
 	"encoding/binary"
+	"os"
 	"testing"
 )
 
@@ -62,5 +63,37 @@ func TestZCodeVersionFromRSRC(t *testing.T) {
 	}
 	if !versionBefore([3]int{3, 16, 9}, zcodeConfigJSONSince) {
 		t.Error("3.16.9 should be before the threshold")
+	}
+}
+
+func TestZCodeCandidatePaths(t *testing.T) {
+	origLook := zcodeLookPath
+	defer func() { zcodeLookPath = origLook }()
+
+	t.Setenv("LOCALAPPDATA", `C:\Users\tester\AppData\Local`)
+	t.Setenv("ProgramFiles", `C:\Program Files`)
+	t.Setenv("ProgramFiles(x86)", `c:\program files (x86)`)
+	t.Setenv("ProgramW6432", `C:/Program Files`)
+
+	zcodeLookPath = func(file string) (string, error) {
+		if file == "ZCode.exe" {
+			return `c:\users\tester\appdata\local\programs\zcode\zcode.exe`, nil
+		}
+		return "", os.ErrNotExist
+	}
+
+	got := zcodeCandidatePaths()
+	want := []string{
+		`C:\Users\tester\AppData\Local\Programs\ZCode\ZCode.exe`,
+		`C:\Program Files\ZCode\ZCode.exe`,
+		`c:\program files (x86)\ZCode\ZCode.exe`,
+	}
+	if len(got) != len(want) {
+		t.Fatalf("zcodeCandidatePaths() = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("candidate[%d] = %q, want %q", i, got[i], want[i])
+		}
 	}
 }
