@@ -81,4 +81,11 @@ func TestTheHandoffModeHandsOverAnotherSession(t *testing.T) {
 	if got := call(`{"mode":"handoff","q":"zzzz9999"}`); !strings.Contains(got, "no session matches") {
 		t.Errorf("an id that names nothing was not said so:\n%s", got)
 	}
+
+	// Calling handoff from an unscoped directory (such as $HOME) with explicit
+	// "project" still finds that project's session.
+	t.Chdir(tmp)
+	if got := call(`{"mode":"handoff","project":"work/api"}`); !strings.Contains(got, "reconcile job holds a lock") {
+		t.Errorf("handoff with explicit project from unscoped cwd failed:\n%s", got)
+	}
 }

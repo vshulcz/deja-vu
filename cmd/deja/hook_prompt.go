@@ -768,6 +768,12 @@ func (p *promptPicker) pick(ranked []model.Session, matched, strong, naming []in
 // measured too: it emptied 2 of 5 blocks that answered the prompt.
 func (p *promptPicker) leadTermsMeet(s model.Session) bool {
 	if fixedNamed := namedLeadTerms(p.leadTerms, p.idfOf, 1e9); len(fixedNamed) >= 2 {
+		sort.SliceStable(fixedNamed, func(i, j int) bool {
+			return p.idfOf[fixedNamed[i]] > p.idfOf[fixedNamed[j]]
+		})
+		if len(fixedNamed) > 2 {
+			fixedNamed = fixedNamed[:2]
+		}
 		for _, t := range fixedNamed {
 			if !search.SpeechCarriesAnyTerm(s, []string{t}) && !projectMatchesAnyTerm(s.Project, []string{t}) {
 				return false
@@ -1425,6 +1431,9 @@ func pinExtractedLiveRule(dir, cwd, sessionID, ruleText string, extraSyms ...str
 		return
 	}
 	paths, syms := extractLiveRulePathsAndSymbols(cwd, ruleText)
+	if len(paths) == 0 && len(syms) == 0 {
+		return
+	}
 	seenSym := map[string]bool{}
 	for _, s := range syms {
 		seenSym[strings.ToLower(s)] = true
@@ -1525,9 +1534,9 @@ func turnPairContextTerms(msgs []model.Message, ruleText string) []string {
 	var out []string
 	if idx := strings.Index(ruleText, ": "); idx > 0 && strings.HasPrefix(ruleText, "Do not suggest ") {
 		target := strings.TrimSpace(strings.TrimPrefix(ruleText[:idx], "Do not suggest "))
-		if target != "" {
+		if isTechnicalRuleSymbol(target) {
 			out = append(out, target)
-			if bare := strings.TrimLeft(target, "-/"); bare != "" && bare != target {
+			if bare := strings.TrimLeft(target, "-/"); bare != "" && bare != target && isTechnicalRuleSymbol(bare) {
 				out = append(out, bare)
 			}
 		}
@@ -1542,11 +1551,24 @@ func turnPairContextTerms(msgs []model.Message, ruleText string) []string {
 		if m.Role == "user" && body != "" && strings.Contains(m.Text, body) {
 			_, backtickSyms := extractLiveRulePathsAndSymbols("", prevAssistant+" "+m.Text)
 			out = append(out, backtickSyms...)
-			out = append(out, prompt.Terms(prevAssistant+" "+m.Text)...)
 			return out
 		}
 	}
-	return append(out, prompt.Terms(ruleText)...)
+	return out
+}
+
+func isTechnicalRuleSymbol(tok string) bool {
+	tok = strings.TrimSpace(tok)
+	if len(tok) < 2 || strings.ContainsAny(tok, " \t\n") {
+		return false
+	}
+	low := strings.ToLower(tok)
+	if isCommonKeyword(low) {
+		return false
+	}
+	return strings.HasPrefix(tok, "-") ||
+		strings.ContainsAny(tok, "/._:") ||
+		hasMixedCaseOrUnderscore(tok)
 }
 
 func sessionStandingRuleLine(dir, cwd, sessionID, asked string, seen map[string]bool, prevAssistant ...string) (string, string) {
@@ -1631,9 +1653,9 @@ func extractLiveRulePathsAndSymbols(cwd, text string) ([]string, []string) {
 	}
 	if idx := strings.Index(text, ": "); idx > 0 && strings.HasPrefix(text, "Do not suggest ") {
 		target := strings.TrimSpace(strings.TrimPrefix(text[:idx], "Do not suggest "))
-		if len(target) >= 2 {
+		if isTechnicalRuleSymbol(target) {
 			addSym(target)
-			if bare := strings.TrimLeft(target, "-/"); len(bare) >= 2 {
+			if bare := strings.TrimLeft(target, "-/"); len(bare) >= 2 && isTechnicalRuleSymbol(bare) {
 				addSym(bare)
 			}
 		}

@@ -337,12 +337,13 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 			if message.Role == sources.RoleToolOutput && digest.IsAgentArtifact(text) {
 				continue
 			}
-			// Nor is a data dump: a JSON document or a long file listing names
+			// Nor is a data dump or subagent tool-call log: a JSON document, a
+			// long file listing, or a serialized subagent tool-call trace names
 			// the file as one entry among many, and every entry counted as a
 			// mention. On a real store the top row for a busy file was a
 			// session with 1113 of them, quoted as raw JSON from deja's own
 			// --json output (#4776).
-			if message.Role == sources.RoleToolOutput && isDataDump(text) {
+			if (message.Role != sources.RoleCommand && isDataDump(text)) || isSubagentToolDump(text) {
 				continue
 			}
 			count, level := mentionScore(text, base, forms)
@@ -1097,6 +1098,15 @@ func isDataDump(text string) bool {
 		}
 	}
 	return len(seen) >= dumpListingPaths && pathLines*10 >= lines*6
+}
+
+// isSubagentToolDump reports whether a message is a serialized subagent step
+// trace (`[L7 step=888 ...] | tools: edit_file({"Path":...`) or raw JSON edit
+// payload pasted into an assistant/user message.
+func isSubagentToolDump(text string) bool {
+	return strings.Contains(text, "] | tools: ") ||
+		(strings.Contains(text, `"Target":`) && strings.Contains(text, `"Replacement":`)) ||
+		(strings.Contains(text, `"old_string":`) && strings.Contains(text, `"new_string":`))
 }
 
 // startsJSON reports whether s opens a JSON object or array of values.

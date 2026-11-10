@@ -350,4 +350,24 @@ func TestStandingRulesMultilingualENRUZHJA(t *testing.T) {
 			t.Errorf("missing expected question-refusal rule %q in:\n%s", want, qJoined)
 		}
 	}
+
+	// Bare numbered replies ("2. нет") or numbered items without technical entities
+	// must not turn unrelated flags from another paragraph into standing rules.
+	sNoFalseNumRefusal := model.Session{
+		ID:      "num-refusal-precision",
+		Harness: "claude",
+		Messages: []model.Message{
+			{
+				Role: "assistant",
+				Text: "We checked `--verbose` earlier.\n1. Merge the branch now\n2. Close the issue without changes",
+			},
+			{
+				Role: "user",
+				Text: "2. нет",
+			},
+		},
+	}
+	if got := ExtractStandingRules(sNoFalseNumRefusal, nil); len(got) != 0 {
+		t.Errorf("expected no standing rules from bare numbered reply without entity in item 2, got %+v", got)
+	}
 }

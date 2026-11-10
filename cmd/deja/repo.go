@@ -332,7 +332,7 @@ func runRepoSync(dir string, w io.Writer, sub string, args []string) error {
 	if err != nil {
 		return fmt.Errorf("repo sync: %w", err)
 	}
-	pruned += pruneFilteredRepoEntries(root)
+	pruned += pruneFilteredRepoEntries(root, cands...)
 	if added == 0 && updated == 0 && pruned == 0 {
 		fmt.Fprintf(w, "%s is up to date\n", repoFileShown)
 		return nil
@@ -397,14 +397,21 @@ func autoEvolveRepoMemory(dir, cwd string) {
 		}
 	}
 	_, _, _, _ = sources.EvolveRepoEntries(root, incoming, 50)
-	_ = pruneFilteredRepoEntries(root)
+	_ = pruneFilteredRepoEntries(root, cands...)
 }
 
-func pruneFilteredRepoEntries(root string) int {
+func pruneFilteredRepoEntries(root string, cands ...repoCandidate) int {
 	entries, bad, err := sources.ReadRepoMemory(sources.RepoMemoryPath(root))
 	if err != nil || bad > 0 {
 		return 0
 	}
+	candSessions := map[string]int{}
+	for _, c := range cands {
+		if c.ID != "" {
+			candSessions[c.ID] = c.Sessions
+		}
+	}
+	hasCands := len(cands) > 0
 	var drop []string
 	bestCoChange := map[string]int{}
 	for i, e := range entries {
@@ -419,7 +426,14 @@ func pruneFilteredRepoEntries(root string) int {
 			}
 			continue
 		}
-		if e.From != "" && !strings.HasPrefix(e.From, "deja") && !usableRepoCandidateLine(e.Text) {
+		effSessions := e.Sessions
+		if s, ok := candSessions[e.ID]; ok {
+			effSessions = s
+		} else if hasCands && e.Kind == "decision" && e.From != "" && !strings.HasPrefix(e.From, "deja") {
+			effSessions = 1
+		}
+		_, okRejected := index.GiveUpLine(e.Text)
+		if e.From != "" && !strings.HasPrefix(e.From, "deja") && ((e.Kind == "decision" && effSessions < 2) || (e.Kind == "rejected" && !okRejected) || !usableRepoCandidateLine(e.Text)) {
 			drop = append(drop, e.ID)
 		}
 	}
@@ -452,6 +466,9 @@ func coChangeEntryStem(text string) (string, bool) {
 func autoSyncEligible(c repoCandidate) bool {
 	if c.tier == 0 {
 		return true
+	}
+	if c.Kind == "decision" && c.Sessions < 2 {
+		return false
 	}
 	return len(c.Files) > 0
 }
@@ -713,6 +730,16 @@ func readLiveRuleRecords(p string) []liveRuleRecord {
 		if len(files) == 0 {
 			files = r.Paths
 		}
+		var cleanSyms []string
+		for _, s := range r.Symbols {
+			s = strings.TrimSpace(s)
+			if isTechnicalRuleSymbol(s) || (len(s) >= 3 && !isCommonKeyword(strings.ToLower(s)) && latinWord(s)) {
+				cleanSyms = append(cleanSyms, s)
+			}
+		}
+		if len(files) == 0 && len(cleanSyms) == 0 {
+			continue
+		}
 		out = append(out, liveRuleRecord{
 			RepoEntry: sources.RepoEntry{
 				ID:    r.ID,
@@ -722,7 +749,7 @@ func readLiveRuleRecords(p string) []liveRuleRecord {
 				Date:  r.Date,
 				From:  r.From,
 			},
-			Symbols: r.Symbols,
+			Symbols: cleanSyms,
 		})
 	}
 	return out
