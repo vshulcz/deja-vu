@@ -80,7 +80,7 @@ deja install --auto
 собственных экосистемах — для тех, кто привык ставить расширения оттуда:
 
 ```sh
-opencode plugin opencode-deja
+opencode plugin add opencode-deja
 dsh plugin --profile web add dsh-deja
 # Zed: найдите deja в панели расширений
 # Kimi Code: /plugins install https://github.com/vshulcz/deja-vu
@@ -250,7 +250,7 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsur
 
 | Агент | Пакет | Установка |
 | --- | --- | --- |
-| opencode | npm `opencode-deja` | `opencode plugin opencode-deja` |
+| opencode | npm `opencode-deja` | `opencode plugin add opencode-deja` |
 | DeepSeek Harness | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | плагин `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |

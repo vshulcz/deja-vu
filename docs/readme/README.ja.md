@@ -380,7 +380,7 @@ TRAE IDE は接続はしますが、読み取りはしません。チャット�
 
 | ハーネス | パッケージ | インストール |
 | --- | --- | --- |
-| opencode | npm `opencode-deja` | `opencode plugin opencode-deja` |
+| opencode | npm `opencode-deja` | `opencode plugin add opencode-deja` |
 | DeepSeek Harness | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | プラグイン `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |

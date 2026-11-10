@@ -7,7 +7,7 @@ same local index.
 
 | Directory | Published as | Installed with |
 |---|---|---|
-| [`opencode/`](opencode) | npm `opencode-deja` | `opencode plugin opencode-deja` |
+| [`opencode/`](opencode) | npm `opencode-deja` | `opencode plugin add opencode-deja` |
 | [`dsh/`](dsh) | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | [`openclaw/`](openclaw) | ClawHub and npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | [`pi/`](pi) | npm `@vshulcz/pi-deja` (`pi-package`, also read by omp) | `pi install npm:@vshulcz/pi-deja` |

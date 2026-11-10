@@ -39,6 +39,13 @@
     <summary>Senpi stores each session in a JSONL file under ~/.senpi/agent/sessions. Find it, delete one session or all, or use deja delete with dry-run preview.</summary>
   </entry>
   <entry>
+    <title>Install deja and index your agent history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/getting-started.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/getting-started.html"></link>
+    <updated>2026-11-10T00:00:00Z</updated>
+    <summary>Install deja and index your coding-agent history in one command, then search it and wire it into your agents over MCP.</summary>
+  </entry>
+  <entry>
     <title>Recover files overwritten by an AI agent — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html"></link>

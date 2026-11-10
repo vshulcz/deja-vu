@@ -78,7 +78,7 @@ opencode, DeepSeek Harness, Zed, Kimi Code, Codex CLI, Grok Build, OpenClaw, pi 
 इकोसिस्टम में पैकेज भी हैं, उन लोगों के लिए जो एक्सटेंशन वहीं से लगाते हैं:
 
 ```sh
-opencode plugin opencode-deja
+opencode plugin add opencode-deja
 dsh plugin --profile web add dsh-deja
 # Zed: एक्सटेंशन पैनल में deja खोजिए
 # Kimi Code: /plugins install https://github.com/vshulcz/deja-vu
@@ -247,7 +247,7 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsur
 
 | एजेंट | पैकेज | इंस्टॉल |
 | --- | --- | --- |
-| opencode | npm `opencode-deja` | `opencode plugin opencode-deja` |
+| opencode | npm `opencode-deja` | `opencode plugin add opencode-deja` |
 | DeepSeek Harness | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | प्लगइन `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |

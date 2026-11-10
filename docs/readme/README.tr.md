@@ -78,7 +78,7 @@ opencode, DeepSeek Harness, Zed, Kimi Code, Codex CLI, Grok Build, OpenClaw, pi 
 birer paket de var; eklentilerini oradan kurmaya alışkın olanlar için:
 
 ```sh
-opencode plugin opencode-deja
+opencode plugin add opencode-deja
 dsh plugin --profile web add dsh-deja
 # Zed: eklenti panelinde deja'yı arayın
 # Kimi Code: /plugins install https://github.com/vshulcz/deja-vu
@@ -250,7 +250,7 @@ kendi ekosisteminde bir paketi var; eklentilerini oradan kuranlar için:
 
 | Ajan | Paket | Kurulum |
 | --- | --- | --- |
-| opencode | npm `opencode-deja` | `opencode plugin opencode-deja` |
+| opencode | npm `opencode-deja` | `opencode plugin add opencode-deja` |
 | DeepSeek Harness | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | eklenti `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
