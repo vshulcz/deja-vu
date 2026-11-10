@@ -25,6 +25,13 @@
     <summary>When Claude Code hits its 5-hour cap or weekly limit mid-task, hand the active session&#39;s state, tried commands, and diff straight to Codex, Cursor, or Gemini.</summary>
   </entry>
   <entry>
+    <title>Delete Command Code session history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-commandcode-session-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-commandcode-session-history.html"></link>
+    <updated>2026-11-10T00:00:00Z</updated>
+    <summary>Command Code keeps each session as one JSONL file per project. Remove one session or a project folder, and run deja index first to keep it searchable.</summary>
+  </entry>
+  <entry>
     <title>Delete Senpi session history — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/delete-senpi-session-history.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-senpi-session-history.html"></link>
@@ -282,12 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/no-conversation-found-claude-code.html"></link>
     <updated>2026-11-05T00:00:00Z</updated>
     <summary>claude --resume 在 ~/.claude/projects 下没找到会话文件。五种原因，在 2.1.295 上复现，怎么找到那个文件，以及怎么把会话找回来。</summary>
-  </entry>
-  <entry>
-    <title>隐私：索引什么、脱敏什么、什么都不外传 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/privacy.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/privacy.html"></link>
-    <updated>2026-11-05T00:00:00Z</updated>
-    <summary>deja 索引的是可能含有凭据的会话历史：索引和检索都在本地，凭据在写入前就被脱敏，排除、遗忘与信任范围决定留下什么。</summary>
   </entry>
 </feed>
