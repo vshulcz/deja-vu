@@ -1425,6 +1425,9 @@ func pinExtractedLiveRule(dir, cwd, sessionID, ruleText string, extraSyms ...str
 		return
 	}
 	paths, syms := extractLiveRulePathsAndSymbols(cwd, ruleText)
+	if len(paths) == 0 && len(syms) == 0 {
+		return
+	}
 	seenSym := map[string]bool{}
 	for _, s := range syms {
 		seenSym[strings.ToLower(s)] = true

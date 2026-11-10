@@ -864,7 +864,7 @@ func orientProjectFixes(dir string, projects []string, cwd, activation string) [
 		switch {
 		case ok && cmd != "":
 			cleanCmd := orientCommand(cmd)
-			if orientEphemeralCommand(cleanCmd) || orientDestructiveRemedy(cleanCmd) || !orientTestRemedyMatchesFail(rawErr, cleanCmd) {
+			if index.InspectionCommand(cleanCmd) || orientEphemeralCommand(cleanCmd) || orientDestructiveRemedy(cleanCmd) || !orientTestRemedyMatchesFail(rawErr, cleanCmd) {
 				continue
 			}
 			remedy = "`" + cleanCmd + "`"
@@ -1153,6 +1153,7 @@ func orientDestructiveRemedy(cmd string) bool {
 	for _, bad := range []string{
 		" git reset ", " git checkout ", " git clean ", " git stash ",
 		" git push ", " rm -rf ", " rm -f ",
+		" npm view ", " gh pr ", " gh issue ",
 	} {
 		if strings.Contains(low, bad) {
 			return true
@@ -1165,9 +1166,14 @@ func orientTestRemedyMatchesFail(errLine, cmd string) bool {
 	if !strings.HasPrefix(strings.TrimSpace(errLine), "--- FAIL:") {
 		return true
 	}
-	lowCmd := strings.ToLower(strings.TrimSpace(cmd))
-	if strings.HasPrefix(lowCmd, "go test ") || lowCmd == "go test" {
+	if index.VerifyCommand(cmd) {
 		return false
+	}
+	lowCmd := strings.ToLower(strings.TrimSpace(cmd))
+	for _, runner := range []string{"go test", "pytest", "cargo test", "npm test", "vitest"} {
+		if strings.Contains(lowCmd, runner) {
+			return false
+		}
 	}
 	return true
 }

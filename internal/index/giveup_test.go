@@ -114,6 +114,9 @@ func TestGiveUpLineRejectsUnrealisedReversals(t *testing.T) {
 		"was that rolled back",
 		"is that reverted yet",
 		"were those changes reverted",
+		// Metalinguistic mentions of reversal tokens in backticks or quotes.
+		"the filter checks for `reverted` or «откатили» in assistant turns",
+		`do not match "rolled back" when quoted as a literal token`,
 	}
 	for _, l := range notReports {
 		if _, ok := GiveUpLine(l); ok {

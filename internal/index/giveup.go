@@ -101,6 +101,9 @@ func GiveUpLine(l string) (string, bool) {
 		if reflexiveSuffix(low[i+len(p):]) {
 			continue
 		}
+		if phraseQuotedOrCode(low, i, len(p)) {
+			continue
+		}
 		clause := reversalClause(low, i, len(p))
 		// A reversal that did not happen is not a report. Negation ("we
 		// haven't reverted", "never gave up on", "не откатывать"), a
@@ -144,6 +147,28 @@ func reversalClause(low string, phraseAt, phraseLen int) string {
 func reflexiveSuffix(rest string) bool {
 	for _, s := range []string{"ся", "сь", "ась", "ось", "ись", "лся", "лась", "лось", "лись"} {
 		if strings.HasPrefix(rest, s) {
+			return true
+		}
+	}
+	return false
+}
+
+// phraseQuotedOrCode reports whether the matched reversal phrase is enclosed in
+// backticks or quotation marks as a metalinguistic token rather than used as a
+// statement of action.
+func phraseQuotedOrCode(low string, phraseAt, phraseLen int) bool {
+	if phraseAt <= 0 {
+		return false
+	}
+	before := low[:phraseAt]
+	after := low[phraseAt+phraseLen:]
+	for _, q := range []string{"`", `"`, "'", "«", "“"} {
+		if strings.HasSuffix(before, q) {
+			return true
+		}
+	}
+	for _, q := range []string{"`", `"`, "'", "»", "”"} {
+		if strings.HasPrefix(after, q) {
 			return true
 		}
 	}

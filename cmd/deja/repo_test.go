@@ -1158,4 +1158,25 @@ func TestHookPrecisionAndGuardrails(t *testing.T) {
 	if rxInput["old_string"] == "" || rxInput["new_string"] == "" {
 		t.Fatalf("rxHookToolInput = %+v, want old_string and new_string preserved", rxInput)
 	}
+
+	// 24. Structural memory discipline:
+	// - Conversational replies without paths/symbols are not pinned to live_rules.jsonl.
+	// - Single-session auto-mined decisions (Sessions < 2) are not auto-synced and are pruned.
+	// - orientTestRemedyMatchesFail rejects compound verify commands ("gofmt -w ... && go test ...").
+	pinExtractedLiveRule(dir, root, "chat-only-sess", "не закрывай, там попросили изменения")
+	entries24, _, _ := readRepoMemoryAndNotes(root)
+	for _, e := range entries24 {
+		if strings.Contains(e.Text, "не закрывай") {
+			t.Fatalf("conversational reply without path/symbol was pinned to live_rules.jsonl: %+v", e)
+		}
+	}
+	if autoSyncEligible(repoCandidate{Kind: "decision", tier: 1, Sessions: 1, Files: []string{"internal/auth/plain.go"}}) {
+		t.Fatal("single-session decision candidate should not be autoSyncEligible")
+	}
+	if !autoSyncEligible(repoCandidate{Kind: "decision", tier: 1, Sessions: 2, Files: []string{"internal/auth/plain.go"}}) {
+		t.Fatal("multi-session decision candidate (Sessions >= 2) should be autoSyncEligible")
+	}
+	if orientTestRemedyMatchesFail("--- FAIL: TestPlainHelper (0.01s)", "gofmt -w internal/auth/plain.go && go test ./internal/auth/...") {
+		t.Fatal("orientTestRemedyMatchesFail should reject compound gofmt && go test command on --- FAIL:")
+	}
 }

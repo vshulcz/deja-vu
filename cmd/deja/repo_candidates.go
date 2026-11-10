@@ -354,6 +354,7 @@ func sessionRepoCandidates(dir, root string, inScope func(string) bool, allowed 
 		}
 	}
 	recentBudget := 25
+	signalBudget := 150
 	for _, m := range metas {
 		if m.Harness == "deja" || !inScope(m.Project) || !allowed(m.Path, m.Project) {
 			continue
@@ -373,11 +374,15 @@ func sessionRepoCandidates(dir, root string, inScope func(string) bool, allowed 
 		if len(touchedInRepo) <= 4 {
 			metaFiles[key] = touchedInRepo
 		}
-		hasSignal := m.GaveUp || len(m.Rules) > 0 || strings.TrimSpace(m.Settled) != ""
+		hasSignal := m.GaveUp || len(m.Rules) > 0 || (strings.TrimSpace(m.Settled) != "" && signalBudget > 0)
 		if hasSignal || recentBudget > 0 {
 			pick[key] = m
-			if !hasSignal {
-				recentBudget--
+			if !m.GaveUp && len(m.Rules) == 0 {
+				if strings.TrimSpace(m.Settled) != "" && signalBudget > 0 {
+					signalBudget--
+				} else {
+					recentBudget--
+				}
 			}
 		}
 	}
@@ -739,14 +744,16 @@ func enrichRepoCandidateFilesAndCommits(dir, root string, cands []repoCandidate)
 			}
 		}
 		cands[i].Files = sources.CleanRepoFiles(append(resolved, extractMentionedRepoFiles(root, cands[i].Text, knownFiles)...))
-		maxSess := cands[i].Sessions
-		for _, f := range cands[i].Files {
-			if n := fileSessions[f]; n > maxSess {
-				maxSess = n
+		if cands[i].tier == 0 {
+			maxSess := cands[i].Sessions
+			for _, f := range cands[i].Files {
+				if n := fileSessions[f]; n > maxSess {
+					maxSess = n
+				}
 			}
-		}
-		if maxSess > 0 {
-			cands[i].Sessions = maxSess
+			if maxSess > 0 {
+				cands[i].Sessions = maxSess
+			}
 		}
 		if cands[i].Commit == "" && len(cands[i].Files) > 0 && len(commits) > 0 {
 			cands[i].Commit = matchRepoCommit(cands[i].Files, cands[i].at, commits)

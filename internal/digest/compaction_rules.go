@@ -332,6 +332,9 @@ func turnPairRules(prevAssistant, userText string) []string {
 			continue
 		}
 		if m := standingNumRefusalRE.FindStringSubmatch(line); m != nil {
+			if utf8.RuneCountInString(line) < 12 {
+				continue
+			}
 			itemNum := m[1]
 			proposed := assistantItems[itemNum]
 			target := ""
@@ -341,7 +344,7 @@ func turnPairRules(prevAssistant, userText string) []string {
 				} else {
 					target = compactProposalSummary(proposed)
 				}
-			} else if len(entities) == 1 {
+			} else if len(assistantItems) == 0 && len(entities) == 1 {
 				target = entities[0]
 			}
 			if target != "" {
