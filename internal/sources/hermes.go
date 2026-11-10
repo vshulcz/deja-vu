@@ -92,6 +92,11 @@ func ParseHermesDB(db string) ([]model.Session, error) {
 	return parseHermesDBWhere(db, "")
 }
 
+// ParseHermesNewest reads only the most recent session in the Hermes store at db.
+func ParseHermesNewest(db string) ([]model.Session, error) {
+	return parseHermesDBWhere(db, " and session_id = (select session_id from messages where role in ('user','assistant') and content is not null and content <> '' order by id desc limit 1)")
+}
+
 // ParseHermesDBSince reads only what changed, so a re-index of an unchanged
 // profile costs one query instead of the whole history. timestamp is REAL
 // seconds since the epoch in Hermes' schema.
@@ -630,23 +635,34 @@ func samePath(a, b string) bool {
 // table is what resume looks the id up in; a store from before it is asked
 // through its messages.
 func HermesStoreLacks(db, id string) bool {
-	if IsHermesPGStore(db) || !nonEmptyFile(db) {
+	if IsHermesPGStore(db) {
 		return false
 	}
-	query := func(q string) (string, bool) {
-		cmd, stop := sqliteReadCmd(db, q)
-		defer stop()
-		b, err := cmd.Output()
-		return strings.TrimSpace(string(b)), err == nil
-	}
-	names, ok := query(`select name from sqlite_master where type='table' and name in ('sessions','messages')`)
-	if !ok || names == "" {
-		return false
-	}
-	q := fmt.Sprintf(`select count(*) from messages where session_id='%s'`, sqlEscape(id))
-	if strings.Contains(" "+strings.Join(strings.Fields(names), " ")+" ", " sessions ") {
-		q = fmt.Sprintf(`select count(*) from sessions where id='%s'`, sqlEscape(id))
-	}
-	n, ok := query(q)
-	return ok && n == "0"
+	return sqliteStoreLacks(db, id, func(db string) (map[string]bool, bool) {
+		query := func(q string) (string, bool) {
+			cmd, stop := sqliteReadCmd(db, q)
+			defer stop()
+			b, err := cmd.Output()
+			return strings.TrimSpace(string(b)), err == nil
+		}
+		names, ok := query(`select name from sqlite_master where type='table' and name in ('sessions','messages')`)
+		if !ok || names == "" {
+			return nil, false
+		}
+		q := `select distinct session_id from messages`
+		if strings.Contains(" "+strings.Join(strings.Fields(names), " ")+" ", " sessions ") {
+			q = `select id from sessions`
+		}
+		rows, ok := query(q)
+		if !ok {
+			return nil, false
+		}
+		ids := map[string]bool{}
+		for ln := range strings.SplitSeq(rows, "\n") {
+			if ln = strings.TrimSpace(ln); ln != "" {
+				ids[ln] = true
+			}
+		}
+		return ids, true
+	})
 }

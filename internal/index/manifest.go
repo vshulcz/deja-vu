@@ -79,7 +79,7 @@ func FormatDirection(dir string) int {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	m, err := readManifest(dir)
+	m, err := readManifestCached(dir)
 	if err != nil {
 		return 0
 	}
@@ -154,7 +154,7 @@ func ImportedSessionCounts(dir string) map[string]int {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	m, err := readManifest(dir)
+	m, err := readManifestCached(dir)
 	if err != nil {
 		return nil
 	}
@@ -174,7 +174,7 @@ func ImportedByMachine(dir string) map[string]int {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	m, err := readManifest(dir)
+	m, err := readManifestCached(dir)
 	if err != nil {
 		return nil
 	}
@@ -214,7 +214,7 @@ func ManifestBuiltAt(dir string) time.Time {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	m, err := readManifest(dir)
+	m, err := readManifestCached(dir)
 	if err == nil && !m.BuiltAt.IsZero() {
 		return m.BuiltAt
 	}
@@ -234,7 +234,7 @@ func ManifestSourcesReadAt(dir string) time.Time {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	m, err := readManifest(dir)
+	m, err := readManifestCached(dir)
 	if err == nil && !m.SourcesReadAt.IsZero() {
 		return m.SourcesReadAt
 	}
@@ -261,7 +261,7 @@ func HarnessSessionCounts(dir string) map[string]int {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	m, err := readManifest(dir)
+	m, err := readManifestCached(dir)
 	if err != nil {
 		return nil
 	}
@@ -281,7 +281,7 @@ func IndexedSessionKeys(dir string) map[string]bool {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	m, err := readManifest(dir)
+	m, err := readManifestCached(dir)
 	if err != nil {
 		return nil
 	}
@@ -309,16 +309,26 @@ func IndexedSessionKeys(dir string) map[string]bool {
 // pass, and replacement only happens on a search, a recall or `deja index`. A
 // machine driven by hooks alone never takes that path.
 func HarnessUnreadCounts(dir string) map[string]int {
+	byHarness := map[string][]string{}
+	for _, h := range sources.StoresToRead() {
+		byHarness[h.Name] = h.Files()
+	}
+	return HarnessUnreadCountsFor(dir, byHarness)
+}
+
+// HarnessUnreadCountsFor is HarnessUnreadCounts using already-listed store file
+// paths per harness so callers like doctor do not walk the filesystem twice.
+func HarnessUnreadCountsFor(dir string, byHarness map[string][]string) map[string]int {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	m, err := readManifest(dir)
+	m, err := readManifestCached(dir)
 	if err != nil {
 		return nil
 	}
 	out := map[string]int{}
-	for _, h := range sources.StoresToRead() {
-		for _, p := range h.Files() {
+	for name, files := range byHarness {
+		for _, p := range files {
 			if _, ok := m.Files[p]; ok {
 				continue
 			}
@@ -327,7 +337,7 @@ func HarnessUnreadCounts(dir string) map[string]int {
 			if fi, err := os.Lstat(p); err != nil || fi.IsDir() || fi.Mode()&os.ModeSymlink != 0 {
 				continue
 			}
-			out[h.Name]++
+			out[name]++
 		}
 	}
 	return out
@@ -341,7 +351,7 @@ func HarnessSharedCounts(dir string) map[string]int {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	m, err := readManifest(dir)
+	m, err := readManifestCached(dir)
 	if err != nil {
 		return nil
 	}
@@ -363,7 +373,7 @@ func HarnessKeptCounts(dir string) map[string]int {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	m, err := readManifest(dir)
+	m, err := readManifestCached(dir)
 	if err != nil {
 		return nil
 	}
@@ -394,7 +404,7 @@ func Redactions(dir string) (RedactionStats, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	m, err := readManifest(dir)
+	m, err := readManifestCached(dir)
 	if err != nil {
 		return RedactionStats{}, err
 	}
@@ -966,7 +976,7 @@ func overview(dir string, servable bool) (OverviewStats, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	m, err := readManifest(dir)
+	m, err := readManifestCached(dir)
 	if err != nil {
 		return OverviewStats{}, err
 	}

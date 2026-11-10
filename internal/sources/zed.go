@@ -164,6 +164,28 @@ func ParseZedDB(db string) ([]model.Session, error) {
 	return ParseZedDBSince(db, time.Time{})
 }
 
+// ParseZedNewest reads the most recent non-empty thread in the Zed store at db,
+// so doctor can verify the store parses without decompressing every thread.
+func ParseZedNewest(db string) ([]model.Session, error) {
+	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
+		return nil, nil //nolint:nilerr // a missing or empty store holds no sessions
+	}
+	rows, err := zedRows(db, zedFullCols, " order by updated_at desc limit 5 --")
+	if err != nil {
+		var baseErr error
+		rows, baseErr = zedRows(db, zedBaseCols, " order by updated_at desc limit 5 --")
+		if baseErr != nil {
+			return nil, err
+		}
+	}
+	for _, r := range rows {
+		if s, ok := zedSession(db, r); ok {
+			return []model.Session{s}, nil
+		}
+	}
+	return nil, nil
+}
+
 // zedCols keeps one row shape across both schema generations. parent_id,
 // folder_paths, folder_paths_order and created_at were added by ALTER TABLE
 // statements Zed runs at startup, so a store written by an older Zed that a

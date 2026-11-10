@@ -148,6 +148,10 @@ type Options struct {
 	// three exact terms and stops at an empty page. `deja search` keeps the
 	// silence, since a person sees the empty page and retypes.
 	LoneWord bool `json:"-"`
+	// StubToolOutput decodes only the timestamp of tool-output records when All
+	// is set, leaving their text empty for callers like `deja stats` that count
+	// turns by date without inspecting tool output text.
+	StubToolOutput bool `json:"-"`
 }
 
 // Clock returns Now when set, the timestamp in DEJA_NOW when valid (RFC3339,

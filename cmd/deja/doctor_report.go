@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/embed"
@@ -374,19 +375,32 @@ type doctorStoreCheck struct {
 
 func collectDoctorReport(lookup doctorVersionLookup, dir string) doctorReport {
 	stores := doctorStoreChecks()
-	report := doctorReport{SchemaVersion: jsonout.Version, Stores: make([]doctorStore, 0, len(stores))}
-	storeMods := make([]time.Time, 0, len(stores))
+	report := doctorReport{SchemaVersion: jsonout.Version, Stores: make([]doctorStore, len(stores))}
+	storeMods := make([]time.Time, len(stores))
 	indexed := index.HarnessSessionCounts(dir)
 	fromElsewhere := index.ImportedSessionCounts(dir)
-	neverRead := index.HarnessUnreadCounts(dir)
-	for _, check := range stores {
-		store, mod := inspectDoctorStore(check)
-		store.IndexedSessions = indexed[check.name]
-		store.Imported = fromElsewhere[check.name]
-		store.NeverRead = neverRead[check.name]
-		report.Stores = append(report.Stores, store)
-		storeMods = append(storeMods, mod)
+	filesByHarness := make(map[string][]string, len(stores))
+	for _, c := range stores {
+		filesByHarness[c.name] = c.files
 	}
+	neverRead := index.HarnessUnreadCountsFor(dir, filesByHarness)
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 8)
+	for i, check := range stores {
+		wg.Add(1)
+		go func(i int, check doctorStoreCheck) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			store, mod := inspectDoctorStore(check)
+			store.IndexedSessions = indexed[check.name]
+			store.Imported = fromElsewhere[check.name]
+			store.NeverRead = neverRead[check.name]
+			report.Stores[i] = store
+			storeMods[i] = mod
+		}(i, check)
+	}
+	wg.Wait()
 	report.Index = inspectDoctorIndex(dir, storeMods)
 	if sharedIndexClientReady(dir, report.Index) {
 		for i := range report.Stores {
@@ -541,7 +555,7 @@ func doctorStoreChecks() []doctorStoreCheck {
 		{"aider", aiderPaths, sources.AiderFiles, sources.ParseAiderFile},
 		{"gemini", []string{sources.GeminiRoot()}, sources.GeminiChatFiles, sources.ParseGeminiFile},
 		{"cursor", []string{sources.CursorUserRoot(), sources.CursorCLIRoot()}, func() []string { return append(sources.CursorTranscripts(), sources.CursorDBs()...) }, parseDoctorCursor},
-		{"antigravity", sources.AntigravityRoots(), sources.AntigravityTranscripts, sources.ParseAntigravityFile},
+		{"antigravity", sources.AntigravityRoots(), sources.AntigravityTranscripts, sources.ParseAntigravityNewest},
 		{"grok", []string{filepath.Join(sources.GrokRoot(), "sessions")}, sources.GrokSessionFiles, sources.ParseGrokFile},
 		{"hermes", []string{sources.HermesHome(), sources.HermesProfilesRoot()}, sources.HermesSessionFiles, parseDoctorHermes},
 		{"qwen", []string{filepath.Join(sources.QwenRoot(), "projects")}, sources.QwenSessionFiles, sources.ParseQwenFile},
@@ -600,17 +614,35 @@ func doctorStoreChecks() []doctorStoreCheck {
 	// not unreadable, and saying any of those about a store nobody asked deja to
 	// read is the noise this variable exists to remove.
 	out := make([]doctorStoreCheck, 0, len(checks))
+	var fns []func() []string
 	for _, c := range checks {
 		if sources.StoreSilenced(c.name) {
 			continue
 		}
 		check := doctorStoreCheck{name: c.name, paths: c.paths, parse: c.parse}
+		var fn func() []string
 		// An excluded store keeps its row, which says `excluded`.
 		if !sources.HarnessExcluded(c.name) {
-			check.files = c.files()
+			fn = c.files
 		}
 		out = append(out, check)
+		fns = append(fns, fn)
 	}
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 8)
+	for i, fn := range fns {
+		if fn == nil {
+			continue
+		}
+		wg.Add(1)
+		go func(i int, fn func() []string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			out[i].files = fn()
+		}(i, fn)
+	}
+	wg.Wait()
 	return out
 }
 
@@ -632,14 +664,14 @@ func doctorProbeKiro(path string) ([]model.Session, error) {
 // else as the extension task or transcript it is.
 func doctorProbeKilo(path string) ([]model.Session, error) {
 	if path == sources.KiloDB() {
-		return sources.ParseKiloDB(path)
+		return sources.ParseOpencodeNewest(path)
 	}
 	return sources.ParseKiloTask(path)
 }
 
 func doctorProbeZCode(path string) ([]model.Session, error) {
 	if path == sources.ZCodeDB() {
-		return sources.ParseZCodeDB(path)
+		return sources.ParseOpencodeNewest(path)
 	}
 	if sources.ZCodeLegacyUnderRoot(path) {
 		return sources.ParseZCodeLegacyFile(path)
@@ -647,10 +679,10 @@ func doctorProbeZCode(path string) ([]model.Session, error) {
 	return sources.ParseZCodeFile(path)
 }
 
-// doctorProbeZed reads the thread store the way the indexer does, so the row
-// says what a real read would find rather than that the file exists.
+// doctorProbeZed reads the newest thread in the store the way the indexer does,
+// so the row says what a real read would find rather than that the file exists.
 func doctorProbeZed(path string) ([]model.Session, error) {
-	return sources.ParseZedDB(path)
+	return sources.ParseZedNewest(path)
 }
 
 // doctorProbeDevin reads one of Devin's two store names with the same parser
@@ -739,14 +771,14 @@ func parseDoctorOpenClaw(path string) ([]model.Session, error) {
 
 func parseDoctorCursor(path string) ([]model.Session, error) {
 	if filepath.Base(path) == "state.vscdb" {
-		return sources.ParseCursorDB(path)
+		return sources.ParseCursorDBNewest(path)
 	}
 	return sources.ParseCursorTranscript(path)
 }
 
 func parseDoctorGoose(path string) ([]model.Session, error) {
 	if filepath.Base(path) == "sessions.db" {
-		return sources.ParseGooseDB(path)
+		return sources.ParseGooseNewest(path)
 	}
 	return sources.ParseGooseFile(path)
 }
@@ -758,7 +790,7 @@ func parseDoctorHermes(path string) ([]model.Session, error) {
 	if sources.IsHermesPGStore(path) {
 		return sources.ParseHermesPG(sources.HermesPGDSN(), 0)
 	}
-	return sources.ParseHermesDB(path)
+	return sources.ParseHermesNewest(path)
 }
 
 func inspectDoctorStore(check doctorStoreCheck) (doctorStore, time.Time) {

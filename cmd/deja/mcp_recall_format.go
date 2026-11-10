@@ -196,7 +196,7 @@ func writeRecallLead(b *strings.Builder, result index.SearchResult, hits []searc
 		// were matched, not ranked, and the relevance label they arrive
 		// under is what a thin strict answer gets once the ranking is hung
 		// underneath it (#3815).
-		fmt.Fprintf(b, "%s below %s every word of the query; the rest are ranked by wording. Check that one describes what is happening now before acting on it.\n",
+		fmt.Fprintf(b, "%s below %s every word of the query; the rest are ranked by wording. Verify a match fits the current task before acting.\n",
 			pluralSessions(strictShown), holdOrHolds(strictShown))
 	case namesTheAsked:
 		// The same reading recall_context got in #2831: the tier says the
@@ -204,7 +204,7 @@ func writeRecallLead(b *strings.Builder, result index.SearchResult, hits []searc
 		// with competition an ordinary question rarely survives the exact AND,
 		// so the sentence below disowned pages whose first session was the
 		// right one (#2827).
-		fmt.Fprintln(b, "No session matched every word, so these were ranked — the first one names what you asked about. Check that it describes what is happening now before acting on it.")
+		fmt.Fprintln(b, "No session matched every word, so these were ranked — the first one names what you asked about. Verify it fits the current task before acting.")
 	case result.Tier == search.TierRelevance:
 		// Not "ranked by relevance", which reads as "here is what I found
 		// about it". Nothing matched: these are the nearest sessions by
@@ -224,12 +224,12 @@ func writeRecallLead(b *strings.Builder, result index.SearchResult, hits []searc
 		// the idf map is keyed by what the reader typed.
 		asked, _ := query.QueryParts(q)
 		if !absent && relevanceHitsAreAboutIt(hits, asked, result.TermIDF) {
-			fmt.Fprintln(b, "No exact match; the sessions below are ranked by relevance — check that one describes what is happening now before acting on it.")
+			fmt.Fprintln(b, "No exact match; the sessions below are ranked by relevance — verify a match fits the current task before acting.")
 			// The count line follows the lead; it said "none about it"
 			// under this one.
 			namesTheAsked = true
 		} else {
-			fmt.Fprintln(b, nothingIsAboutThis+" so the sessions below are the nearest by wording — treat them as leads to check, not as a record, and say plainly if none of them answers.")
+			fmt.Fprintln(b, nothingIsAboutThis+" — nearest sessions by wording below; use only if relevant.")
 			saidNothing = true
 		}
 	}
@@ -240,7 +240,7 @@ func writeRecallLead(b *strings.Builder, result index.SearchResult, hits []searc
 			// The tier below relevance already says which word it dropped; this
 			// says what dropping it means, in the words the relevance tier uses
 			// for the same situation.
-			fmt.Fprintln(b, nothingIsAboutThis+" so the sessions below are the nearest by wording — treat them as leads to check, not as a record, and say plainly if none of them answers.")
+			fmt.Fprintln(b, nothingIsAboutThis+" — nearest sessions by wording below; use only if relevant.")
 			saidNothing = true
 		}
 	}

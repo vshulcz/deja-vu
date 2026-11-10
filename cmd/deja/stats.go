@@ -221,7 +221,7 @@ func runStats(dir string, args []string) error {
 	// the index withholds command, files and edit records from a caller that
 	// did not ask for them, so `deja stats --role command` filtered a set those
 	// records had already been dropped from and reported an empty store (#3592).
-	ss, err := index.SearchWithRecovery(dir, search.Options{All: true, Role: options.Role}, progress)
+	ss, err := index.SearchWithRecovery(dir, search.Options{All: true, Role: options.Role, StubToolOutput: options.Role == ""}, progress)
 	if err != nil {
 		// `mkdir …/idx.tmp: permission denied` names a path nobody chose and a
 		// syscall nobody can act on. index and search have worded this since

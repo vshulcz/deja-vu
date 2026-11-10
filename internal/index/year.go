@@ -50,12 +50,12 @@ func ScanYearWork(dir string, from time.Time) (YearWork, error) {
 	files := map[string]bool{}
 	commands := map[string]bool{}
 	spanFiles := map[string]bool{}
-	err = eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
-		switch r.Role {
-		case roleFiles, roleCommand, roleEdit, roleWrote:
-		default:
-			return
-		}
+	err = eachRecordInRoles(filepath.Join(dir, "records.bin"), tablesFromManifest(m), map[string]bool{
+		roleFiles:   true,
+		roleCommand: true,
+		roleEdit:    true,
+		roleWrote:   true,
+	}, func(r Record) {
 		meta, ok := m.Sessions[r.Key]
 		if !ok || metaIgnoredOrExcluded(pol, excluded, meta) {
 			return

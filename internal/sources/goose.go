@@ -586,6 +586,11 @@ func ParseGooseDB(db string) ([]model.Session, error) {
 	return parseGooseDBWhere(db, "")
 }
 
+// ParseGooseNewest reads only the most recent session in the goose database at db.
+func ParseGooseNewest(db string) ([]model.Session, error) {
+	return parseGooseDBWhere(db, " and m.session_id = (select session_id from messages where role in ('user','assistant') order by id desc limit 1)")
+}
+
 // ParseGooseDBSince reads the sessions in the goose database at db that changed after t.
 func ParseGooseDBSince(db string, t time.Time) ([]model.Session, error) {
 	if t.IsZero() {
@@ -742,18 +747,26 @@ func parseGooseDBWhere(db, where string) ([]model.Session, error) {
 // answering "no such session exists" (#4271). False whenever that cannot be
 // told: no file, no sessions table, or a read that fails.
 func GooseStoreLacks(db, id string) bool {
-	if !nonEmptyFile(db) {
-		return false
-	}
-	query := func(q string) (string, bool) {
-		cmd, stop := sqliteReadCmd(db, q)
-		defer stop()
-		b, err := cmd.Output()
-		return strings.TrimSpace(string(b)), err == nil
-	}
-	if names, ok := query(`select name from sqlite_master where type='table' and name='sessions'`); !ok || names == "" {
-		return false
-	}
-	n, ok := query(fmt.Sprintf(`select count(*) from sessions where id='%s'`, sqlEscape(id)))
-	return ok && n == "0"
+	return sqliteStoreLacks(db, id, func(db string) (map[string]bool, bool) {
+		query := func(q string) (string, bool) {
+			cmd, stop := sqliteReadCmd(db, q)
+			defer stop()
+			b, err := cmd.Output()
+			return strings.TrimSpace(string(b)), err == nil
+		}
+		if names, ok := query(`select name from sqlite_master where type='table' and name='sessions'`); !ok || names == "" {
+			return nil, false
+		}
+		rows, ok := query(`select id from sessions`)
+		if !ok {
+			return nil, false
+		}
+		ids := map[string]bool{}
+		for ln := range strings.SplitSeq(rows, "\n") {
+			if ln = strings.TrimSpace(ln); ln != "" {
+				ids[ln] = true
+			}
+		}
+		return ids, true
+	})
 }

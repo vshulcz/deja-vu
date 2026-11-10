@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -295,4 +296,46 @@ func (b *cappedBuffer) Write(p []byte) (int, error) {
 		b.Buffer.Write(p[:min(len(p), room)])
 	}
 	return len(p), nil
+}
+
+type sqliteIDCacheEntry struct {
+	stamp string
+	ids   map[string]bool
+	valid bool
+}
+
+var sqliteIDCache sync.Map
+
+func sqliteFileStamp(db string) (string, bool) {
+	fi, err := os.Stat(db)
+	if err != nil || fi.Size() == 0 {
+		return "", false
+	}
+	f, err := os.Open(db)
+	if err != nil {
+		return "", false
+	}
+	var hdr [100]byte
+	n, _ := f.Read(hdr[:])
+	_ = f.Close()
+	var walMod, walSize int64
+	if wfi, err := os.Stat(db + "-wal"); err == nil {
+		walMod, walSize = wfi.ModTime().UnixNano(), wfi.Size()
+	}
+	return fmt.Sprintf("%s|%d|%d|%x|%d|%d|%s", db, fi.ModTime().UnixNano(), fi.Size(), hdr[:n], walMod, walSize, os.Getenv("PATH")), true
+}
+
+func sqliteStoreLacks(db, id string, load func(string) (map[string]bool, bool)) bool {
+	stamp, ok := sqliteFileStamp(db)
+	if !ok {
+		return false
+	}
+	if v, ok := sqliteIDCache.Load(db); ok {
+		if e, ok := v.(sqliteIDCacheEntry); ok && e.stamp == stamp {
+			return e.valid && !e.ids[id]
+		}
+	}
+	ids, valid := load(db)
+	sqliteIDCache.Store(db, sqliteIDCacheEntry{stamp: stamp, ids: ids, valid: valid})
+	return valid && !ids[id]
 }

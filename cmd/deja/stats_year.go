@@ -156,7 +156,7 @@ func runStatsYear(w io.Writer, dir string, asJSON bool) error {
 
 func buildYearReport(dir string, from, now time.Time) (yearReport, error) {
 	r := yearReport{from: from, to: now, masked: map[string]int{}}
-	ss, err := index.SearchWithRecovery(dir, search.Options{All: true}, io.Discard)
+	ss, err := index.SearchWithRecovery(dir, search.Options{All: true, StubToolOutput: true}, io.Discard)
 	if err != nil {
 		return r, err
 	}

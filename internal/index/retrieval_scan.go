@@ -180,7 +180,33 @@ func scanRecordsTextMisses(dir string, m Manifest, o query.Options, offsets []in
 			return nil, 0, err
 		}
 	} else {
-		if err := eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
+		pol := policy.Load()
+		excluded := excludedHarnesses()
+		keepKey := func(k string) bool {
+			meta, ok := m.Sessions[k]
+			if !ok || metaIgnoredOrExcluded(pol, excluded, meta) || o.ExcludeSessions[meta.ID] {
+				return false
+			}
+			if o.Harness != "" && !harnessMatches(meta.Harness, o.Harness) {
+				return false
+			}
+			if !query.ProjectAnyMatches(meta.Project, meta.From, o.ProjectWants()) {
+				return false
+			}
+			if !fromMatches(meta.From, o.From) {
+				return false
+			}
+			if o.Since > 0 && meta.Updated.Before(o.Clock().Add(-o.Since)) {
+				return false
+			}
+			return true
+		}
+		roles := servableRoles(o)
+		if wholeLogScanned != nil {
+			roles = nil
+			keepKey = nil
+		}
+		if err := eachRecordInRolesWhere(filepath.Join(dir, "records.bin"), tablesFromManifest(m), roles, keepKey, func(r Record) {
 			if wholeLogScanned != nil {
 				wholeLogScanned()
 			}

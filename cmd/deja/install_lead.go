@@ -15,10 +15,23 @@ import (
 
 // installLead is what the install says under "deja already knows this
 // machine:" before the listing — the questions this machine has asked more
-// than once, then the error it keeps hitting, plus a settled constraint from
-// the current project when running inside one (#3064, #2967, #5774).
+// than once, then the error it keeps hitting, recoverable code spans, plus a
+// settled constraint from the current project when running inside one (#3064,
+// #2967, #5774).
 func installLead(dir string) string {
-	return joinNotesWith("\n  ", repeatQuestionsLine(dir), recurringErrorLine(dir), currentProjectRecallLine(dir))
+	return joinNotesWith("\n  ", repeatQuestionsLine(dir), recurringErrorLine(dir), recoverableSpansLine(dir), currentProjectRecallLine(dir))
+}
+
+func recoverableSpansLine(dir string) string {
+	if !index.HasManifest(dir) {
+		return ""
+	}
+	spans, files, err := index.SpanInventoryWhere(dir, nil)
+	if err != nil || spans == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%s replaced code span%s across %s file%s recoverable via `deja restore <file>`",
+		grouped(spans), pluralS(spans), grouped(files), pluralS(files))
 }
 
 func currentProjectRecallLine(dir string) string {
@@ -33,7 +46,7 @@ func currentProjectRecallLine(dir string) string {
 		return ""
 	}
 	for _, cand := range digest.ProjectNameCandidates(cwd) {
-		ss, err := index.SearchWithRecovery(dir, search.Options{Project: cand, All: true}, io.Discard)
+		ss, err := index.SearchWithRecovery(dir, search.Options{Project: cand, All: true, StubToolOutput: true}, io.Discard)
 		if err != nil || len(ss) == 0 {
 			continue
 		}
@@ -69,7 +82,7 @@ func repeatQuestionsLine(dir string) string {
 	if !index.HasManifest(dir) {
 		return ""
 	}
-	ss, err := index.SearchWithRecovery(dir, search.Options{All: true}, io.Discard)
+	ss, err := index.SearchWithRecovery(dir, search.Options{All: true, StubToolOutput: true}, io.Discard)
 	if err != nil {
 		return ""
 	}

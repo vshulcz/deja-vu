@@ -515,6 +515,11 @@ func recordInSpan(b []byte, rel int, t *recordTables, want, roles map[string]boo
 				}
 				return Record{}, false, true, nil
 			}
+			if roles[RoleStubToolOutput] && (role == roleToolOutput || role == "tool") {
+				if stubRec, derr := decodeRecordStubRole(b[rel+4:end], t); derr == nil {
+					return stubRec, true, true, nil
+				}
+			}
 		}
 	}
 	if rel+4+size > len(b) {
@@ -531,7 +536,12 @@ func recordInSpan(b []byte, rel int, t *recordTables, want, roles map[string]boo
 		}
 		return Record{}, false, true, nil
 	}
-	rec, derr := decodeRecord(payload, t)
+	var derr error
+	if roles != nil && roles[RoleStubToolOutput] && (role == roleToolOutput || role == "tool") {
+		rec, derr = decodeRecordStubRole(payload, t)
+	} else {
+		rec, derr = decodeRecord(payload, t)
+	}
 	if derr != nil {
 		return Record{}, false, true, fmt.Errorf("%w: %w", errCorruptIndex, derr)
 	}
@@ -566,6 +576,11 @@ func readRecordAtInRoles(f *os.File, off int64, t *recordTables, want, roles map
 		}
 		return Record{}, false, nil
 	}
+	if roles != nil && roles[RoleStubToolOutput] && (role == roleToolOutput || role == "tool") {
+		if rec, derr := decodeRecordStubRole(head[:min(size, len(head))], t); derr == nil {
+			return rec, true, nil
+		}
+	}
 	var payload []byte
 	if size <= len(head) {
 		payload = head[:size]
@@ -579,7 +594,12 @@ func readRecordAtInRoles(f *os.File, off int64, t *recordTables, want, roles map
 			return Record{}, false, errOffsetsMismatch
 		}
 	}
-	rec, err := decodeRecord(payload, t)
+	var rec Record
+	if roles != nil && roles[RoleStubToolOutput] && (role == roleToolOutput || role == "tool") {
+		rec, err = decodeRecordStubRole(payload, t)
+	} else {
+		rec, err = decodeRecord(payload, t)
+	}
 	if err != nil {
 		return Record{}, false, fmt.Errorf("%w: %w", errCorruptIndex, err)
 	}

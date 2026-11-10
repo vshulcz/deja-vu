@@ -3,6 +3,7 @@ package sources
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"net/url"
@@ -135,6 +136,43 @@ func AntigravityTranscripts() []string {
 	return out
 }
 
+type antigravitySubagentMapEntry struct {
+	at   time.Time
+	byID map[string]string
+}
+
+var antigravitySubagentMapCache sync.Map
+
+func antigravitySubagentDescriptor(root, id string) string {
+	cacheable := flag.Lookup("test.v") == nil
+	if cacheable {
+		if v, ok := antigravitySubagentMapCache.Load(root); ok {
+			if e, ok := v.(antigravitySubagentMapEntry); ok && time.Since(e.at) < 2*time.Second {
+				return e.byID[id]
+			}
+		}
+	}
+	matches, err := filepath.Glob(filepath.Join(root, "brain", "*", ".system_generated", "subagents", "*.json"))
+	if err != nil {
+		return ""
+	}
+	byID := make(map[string]string, len(matches))
+	for _, m := range matches {
+		cid := strings.TrimSuffix(filepath.Base(m), ".json")
+		p := filepath.Base(filepath.Dir(filepath.Dir(filepath.Dir(m))))
+		if cid == "" || p == "" || p == "." || p == cid {
+			continue
+		}
+		if _, exists := byID[cid]; !exists {
+			byID[cid] = m
+		}
+	}
+	if cacheable {
+		antigravitySubagentMapCache.Store(root, antigravitySubagentMapEntry{at: time.Now(), byID: byID})
+	}
+	return byID[id]
+}
+
 // antigravitySubagentInfo reads the parent conversation ID, descriptor name and
 // workspace fallback from `<root>/brain/<parent>/.system_generated/subagents/<id>.json`.
 func antigravitySubagentInfo(path string) (parent, agent, workspace string) {
@@ -143,43 +181,36 @@ func antigravitySubagentInfo(path string) (parent, agent, workspace string) {
 		return "", "", ""
 	}
 	root := filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(path)))))
-	matches, err := filepath.Glob(filepath.Join(root, "brain", "*", ".system_generated", "subagents", id+".json"))
-	if err != nil {
+	m := antigravitySubagentDescriptor(root, id)
+	if m == "" {
 		return "", "", ""
 	}
-	for _, m := range matches {
-		p := filepath.Base(filepath.Dir(filepath.Dir(filepath.Dir(m))))
-		if p == "" || p == "." || p == id {
-			continue
-		}
-		parent = p
-		b, readErr := os.ReadFile(m)
-		if readErr != nil {
-			return parent, "", ""
-		}
-		var desc struct {
-			SubagentDescriptor struct {
-				TypeName string `json:"typeName"`
-				Role     string `json:"role"`
-			} `json:"subagentDescriptor"`
-			WorkspaceURIs []string `json:"workspaceUris"`
-		}
-		if json.Unmarshal(b, &desc) != nil {
-			return parent, "", ""
-		}
-		agent = strings.TrimSpace(desc.SubagentDescriptor.Role)
-		if agent == "" {
-			agent = strings.TrimSpace(desc.SubagentDescriptor.TypeName)
-		}
-		for _, uri := range desc.WorkspaceURIs {
-			if w, ok := fileURIPath(uri); ok {
-				workspace = w
-				break
-			}
-		}
-		return parent, agent, workspace
+	parent = filepath.Base(filepath.Dir(filepath.Dir(filepath.Dir(m))))
+	b, readErr := os.ReadFile(m)
+	if readErr != nil {
+		return parent, "", ""
 	}
-	return "", "", ""
+	var desc struct {
+		SubagentDescriptor struct {
+			TypeName string `json:"typeName"`
+			Role     string `json:"role"`
+		} `json:"subagentDescriptor"`
+		WorkspaceURIs []string `json:"workspaceUris"`
+	}
+	if json.Unmarshal(b, &desc) != nil {
+		return parent, "", ""
+	}
+	agent = strings.TrimSpace(desc.SubagentDescriptor.Role)
+	if agent == "" {
+		agent = strings.TrimSpace(desc.SubagentDescriptor.TypeName)
+	}
+	for _, uri := range desc.WorkspaceURIs {
+		if w, ok := fileURIPath(uri); ok {
+			workspace = w
+			break
+		}
+	}
+	return parent, agent, workspace
 }
 
 // LoadAntigravity reads every Antigravity session on this machine.
@@ -190,6 +221,54 @@ func LoadAntigravity() []model.Session {
 // ParseAntigravityFile reads one Antigravity transcript.
 func ParseAntigravityFile(path string) ([]model.Session, error) {
 	return ParseAntigravityFileFromOffset(path, 0)
+}
+
+// ParseAntigravityNewest probes an Antigravity transcript for doctor, stopping
+// once the first conversational message is parsed so a multi-megabyte active
+// session or subagent does not re-parse the whole file and its parent.
+func ParseAntigravityNewest(path string) ([]model.Session, error) {
+	id := antigravitySessionID(path)
+	if id == "" || id == "." || id == string(filepath.Separator) {
+		return nil, nil
+	}
+	s := model.Session{Harness: "antigravity", ID: id, Path: path}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+	err = scanJSONLReader("antigravity", f, func(m map[string]any) {
+		if len(s.Messages) > 0 {
+			return
+		}
+		switch str(m["source"]) {
+		case "USER_EXPLICIT":
+			if text := strings.TrimSpace(cleanAntigravityUserContent(str(m["content"]))); text != "" {
+				s.Messages = append(s.Messages, model.Message{Role: "user", Text: text})
+			}
+		case "MODEL":
+			calls, _ := antigravityToolCalls(m["tool_calls"], time.Time{})
+			if len(calls) > 0 {
+				s.Messages = append(s.Messages, calls[0])
+				return
+			}
+			if text := strings.TrimSpace(str(m["content"])); text != "" {
+				if step := antigravityStep(str(m["type"]), capParsedMessage(text), time.Time{}); len(step) > 0 {
+					s.Messages = append(s.Messages, step[0])
+				}
+			}
+		case "SYSTEM":
+			if str(m["type"]) == "CHECKPOINT" {
+				if text := antigravityCheckpointSummary(str(m["content"])); text != "" {
+					s.Messages = append(s.Messages, model.Message{Role: RoleSummary, Text: capParsedMessage(text)})
+				}
+			}
+		}
+	})
+	if len(s.Messages) == 0 {
+		return nil, err
+	}
+	return []model.Session{s}, err
 }
 
 // ParseAntigravityFileFromOffset reads an Antigravity transcript from offset on.

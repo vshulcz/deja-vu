@@ -46,6 +46,9 @@ insert into cursorDiskKV values
 	if s.Messages[0].Time.UnixMilli() != 1752600001000 {
 		t.Fatalf("timestamp wrong: %v", s.Messages[0].Time)
 	}
+	if newest, err := ParseCursorDBNewest(db); err != nil || len(newest) != 1 {
+		t.Fatalf("ParseCursorDBNewest = %v, %#v", err, newest)
+	}
 }
 
 func TestParseCursorTranscript(t *testing.T) {

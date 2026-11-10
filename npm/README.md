@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-<p align="center"><strong>Your coding agents stop re-debugging what you already fixed.</strong></p>
+<p align="center"><strong>Shared local memory, cross-agent handoff, and code recovery across 43 coding agents.</strong></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="deja-vu cross-agent coding session memory"></p>
 

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -62,8 +63,15 @@ func transcriptGone(s model.Session) bool {
 	// Codex moves its own rollouts: `codex archive` into archived_sessions,
 	// and a background pass compresses one a week old to .jsonl.zst. Either
 	// way `codex resume` still finds it.
-	if s.Harness == "codex" && codexRolloutExists(s.ID) {
-		return false
+	if s.Harness == "codex" {
+		if strings.HasSuffix(strings.ToLower(s.Path), ".jsonl") {
+			if _, err := os.Stat(s.Path + ".zst"); err == nil {
+				return false
+			}
+		}
+		if codexRolloutExists(s.ID) {
+			return false
+		}
 	}
 	return true
 }
@@ -77,16 +85,49 @@ func isTranscriptFile(p string) bool {
 	return false
 }
 
+type codexRolloutCacheEntry struct {
+	stamp string
+	names []string
+}
+
+var codexRolloutCache sync.Map
+
+func codexRolloutsInRoot(root string) []string {
+	var parts []string
+	for _, sub := range []string{"sessions", "archived_sessions"} {
+		if fi, err := os.Stat(filepath.Join(root, sub)); err == nil {
+			parts = append(parts, fi.ModTime().UTC().String())
+		}
+	}
+	stamp := strings.Join(parts, "|")
+	if v, ok := codexRolloutCache.Load(root); ok {
+		if e, ok := v.(codexRolloutCacheEntry); ok && e.stamp == stamp {
+			return e.names
+		}
+	}
+	var names []string
+	for _, pattern := range []string{
+		filepath.Join(root, "sessions", "*", "*", "*", "rollout-*.jsonl*"),
+		filepath.Join(root, "archived_sessions", "rollout-*.jsonl*"),
+	} {
+		if m, _ := filepath.Glob(pattern); len(m) > 0 {
+			for _, p := range m {
+				names = append(names, filepath.Base(p))
+			}
+		}
+	}
+	codexRolloutCache.Store(root, codexRolloutCacheEntry{stamp: stamp, names: names})
+	return names
+}
+
 func codexRolloutExists(id string) bool {
 	if id == "" || strings.ContainsAny(id, `*?[\/`) {
 		return false
 	}
+	needle := id + ".jsonl"
 	for _, root := range sources.CodexRoots() {
-		for _, pattern := range []string{
-			filepath.Join(root, "sessions", "*", "*", "*", "rollout-*"+id+".jsonl*"),
-			filepath.Join(root, "archived_sessions", "rollout-*"+id+".jsonl*"),
-		} {
-			if m, _ := filepath.Glob(pattern); len(m) > 0 {
+		for _, base := range codexRolloutsInRoot(root) {
+			if strings.Contains(base, needle) {
 				return true
 			}
 		}

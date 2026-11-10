@@ -128,7 +128,7 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup, dir strin
 
 // printDoctorText is the report as every row prints it.
 func printDoctorText(w io.Writer, report doctorReport, deepReport *index.DeepReport, dir string, all, offline bool) {
-	doctorHarnessStores(w, dir, all)
+	doctorHarnessStoresReport(w, dir, all, &report)
 	printDoctorStoreWarnings(w, report.Stores)
 	// The third cause of a files-to-sessions gap, after a parse failure (#861)
 	// and an id collision (#1101): the reader forgot them. `last` and `stats`

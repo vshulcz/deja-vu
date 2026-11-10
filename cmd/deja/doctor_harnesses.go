@@ -20,6 +20,10 @@ import (
 // "not here" folds; anything found, unreadable, excluded, unplugged, holding
 // indexed sessions or carrying advice keeps its row.
 func doctorHarnessStores(w io.Writer, dir string, all bool) {
+	doctorHarnessStoresReport(w, dir, all, nil)
+}
+
+func doctorHarnessStoresReport(w io.Writer, dir string, all bool, rep *doctorReport) {
 	fmt.Fprintln(w, "Harness stores:")
 	// Say the selection out loud. Without this line a narrowed run looks like
 	// a machine that has thirty-four stores missing, and the variable is set by
@@ -41,7 +45,17 @@ func doctorHarnessStores(w io.Writer, dir string, all bool) {
 	// ten of them had never been read — five written eight weeks earlier — and
 	// nothing on any surface said so, because a store's session count reads as
 	// "nothing written yet" rather than "files never opened" (#3747).
-	neverRead := index.HarnessUnreadCounts(dir)
+	var neverRead map[string]int
+	if rep != nil && len(rep.Stores) > 0 {
+		neverRead = make(map[string]int, len(rep.Stores))
+		for _, s := range rep.Stores {
+			if s.NeverRead > 0 {
+				neverRead[s.Name] = s.NeverRead
+			}
+		}
+	} else {
+		neverRead = index.HarnessUnreadCounts(dir)
+	}
 
 	// The same inspection the JSON form reports, so one command does not give
 	// two answers about one store: `found` here and `unreadable` there (#999).
@@ -51,15 +65,22 @@ func doctorHarnessStores(w io.Writer, dir string, all bool) {
 		inspected: map[string]string{}, unchecked: map[string]bool{}, partly: map[string]bool{},
 		counted: map[string]bool{},
 	}
-	checks := doctorStoreChecks()
-	storeMods := make([]time.Time, 0, len(checks))
-	stores := make([]doctorStore, 0, len(checks))
-	for _, check := range checks {
-		store, mod := inspectDoctorStore(check)
-		stores = append(stores, store)
-		storeMods = append(storeMods, mod)
+	var stores []doctorStore
+	var sharedClient bool
+	if rep != nil && len(rep.Stores) > 0 {
+		stores = rep.Stores
+		sharedClient = sharedIndexClientReady(dir, rep.Index)
+	} else {
+		checks := doctorStoreChecks()
+		storeMods := make([]time.Time, 0, len(checks))
+		stores = make([]doctorStore, 0, len(checks))
+		for _, check := range checks {
+			store, mod := inspectDoctorStore(check)
+			stores = append(stores, store)
+			storeMods = append(storeMods, mod)
+		}
+		sharedClient = sharedIndexClientReady(dir, inspectDoctorIndex(dir, storeMods))
 	}
-	sharedClient := sharedIndexClientReady(dir, inspectDoctorIndex(dir, storeMods))
 	for _, store := range stores {
 		state := store.State
 		if sharedClient && state == "denied" && !store.Partial {

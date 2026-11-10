@@ -247,4 +247,24 @@ func TestAntigravitySubagentLineageAndWorkspaceFallback(t *testing.T) {
 	if got := AntigravityTranscripts(); len(got) != 0 {
 		t.Fatalf("DEJA_INCLUDE_SUBAGENTS=0 kept subagent transcript: %v", got)
 	}
+	newest, err := ParseAntigravityNewest(childPath)
+	if err != nil || len(newest) != 1 {
+		t.Fatalf("ParseAntigravityNewest = %v, %#v", err, newest)
+	}
+	toolOnly := filepath.Join(childLogs, "tool.jsonl")
+	toolRow := `{"source":"MODEL","type":"PLANNER_RESPONSE","created_at":"2026-10-31T12:01:00Z","content":" Done. ","tool_calls":[{"name":"run_command","arguments":{"CommandLine":"ls"}}]}` + "\n"
+	if err := os.WriteFile(toolOnly, []byte(toolRow), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if newest, err := ParseAntigravityNewest(toolOnly); err != nil || len(newest) != 1 {
+		t.Fatalf("ParseAntigravityNewest(toolOnly) = %v, %#v", err, newest)
+	}
+	proseOnly := filepath.Join(childLogs, "prose.jsonl")
+	proseRow := `{"source":"MODEL","type":"PLANNER_RESPONSE","created_at":"2026-10-31T12:01:00Z","content":"Only prose"}` + "\n"
+	if err := os.WriteFile(proseOnly, []byte(proseRow), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if newest, err := ParseAntigravityNewest(proseOnly); err != nil || len(newest) != 1 {
+		t.Fatalf("ParseAntigravityNewest(proseOnly) = %v, %#v", err, newest)
+	}
 }

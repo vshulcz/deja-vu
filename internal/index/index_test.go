@@ -950,3 +950,72 @@ func TestRedactsSecretsAtIngest(t *testing.T) {
 		t.Fatalf("Redactions()=%#v manifest=%#v", stats, m.Files[p])
 	}
 }
+
+func TestDecodeRecordStubRoleAndStubToolOutputAll(t *testing.T) {
+	tab := newRecordTables()
+	now := time.Date(2026, 11, 10, 12, 0, 0, 0, time.UTC)
+	for _, tc := range []struct {
+		text string
+		ts   time.Time
+	}{
+		{text: "short tool output", ts: now},
+		{text: strings.Repeat("compressible tool output line\n", 40), ts: now},
+		{text: "unstamped output", ts: time.Time{}},
+	} {
+		enc := encodeRecord(Record{
+			Key:        "claude:s1",
+			SourcePath: "/tmp/s1.jsonl",
+			Role:       roleToolOutput,
+			Time:       tc.ts,
+			Text:       tc.text,
+		}, tab)
+		rec, err := decodeRecordStubRole(enc, tab)
+		if err != nil {
+			t.Fatalf("decodeRecordStubRole: %v", err)
+		}
+		if rec.Key != "claude:s1" || rec.Role != roleToolOutput || rec.Text != "" || !rec.Time.Equal(tc.ts) {
+			t.Fatalf("unexpected stub record: %+v", rec)
+		}
+	}
+
+	tmp := t.TempDir()
+	claudeRoot := filepath.Join(tmp, "claude")
+	proj := filepath.Join(claudeRoot, "-Users-me-deja-vu")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	s1Path := filepath.Join(proj, "s1.jsonl")
+	data := `{"type":"user","sessionId":"s1","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"` + strings.Repeat("tool output line ", 30) + `"}]}}` + "\n" +
+		`{"type":"assistant","sessionId":"s1","timestamp":"2026-01-02T03:05:05Z","message":{"role":"assistant","content":"answer text"}}` + "\n"
+	if err := os.WriteFile(s1Path, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	setHome(t, filepath.Join(tmp, "home"))
+	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	dir := filepath.Join(tmp, "index.db")
+	var out bytes.Buffer
+	if err := Ensure(dir, "claude", false, &out); err != nil {
+		t.Fatal(err)
+	}
+	ss, err := RecentMatching(dir, 2, search.Options{Harness: "claude", StubToolOutput: true})
+	if err != nil || len(ss) != 1 {
+		t.Fatalf("RecentMatching(StubToolOutput): len=%d err=%v", len(ss), err)
+	}
+	s2Path := filepath.Join(proj, "s2.jsonl")
+	if err := os.WriteFile(s2Path, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if unread := HarnessUnreadCountsFor(dir, map[string][]string{"claude": {s1Path, s2Path}}); unread["claude"] != 1 {
+		t.Fatalf("HarnessUnreadCountsFor = %v, want 1", unread)
+	}
+	if err := EachRecordOfRoleWhere(dir, "user", func(m SessionMeta) bool { return m.Harness == "claude" }, func(SessionMeta, Record) {}); err != nil {
+		t.Fatalf("EachRecordOfRoleWhere: %v", err)
+	}
+	if _, _, err := SpanInventoryWhere(dir, func(m SessionMeta) bool { return m.Harness == "claude" }); err != nil {
+		t.Fatalf("SpanInventoryWhere: %v", err)
+	}
+	_ = os.Remove(filepath.Join(dir, "recordoffsets.bin"))
+	if ss2, err := RecentMatching(dir, 2, search.Options{Harness: "claude", StubToolOutput: true}); err != nil || len(ss2) != 1 {
+		t.Fatalf("RecentMatching(StubToolOutput walk): len=%d err=%v", len(ss2), err)
+	}
+}
