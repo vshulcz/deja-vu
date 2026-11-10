@@ -131,14 +131,15 @@ func TestEveryCLICommandAcceptsFlagEqualsValueAndRejectsEmptyEquals(t *testing.T
 	t.Setenv("DEJA_INDEX_DIR", idxDir)
 
 	// 1. parseSearch must preserve literal `--flag=value` after `--`, reject
-	// typos like `--harnses=claude`, reject cross-command flags like
+	// typos like `--harnses=codex`, reject cross-command flags like
 	// `--before=30d`, and reject trailing `--bogus=1`.
 	o, err := parseSearch([]string{"--", "--limit=5"})
 	if err != nil || o.Query != "--limit=5" {
 		t.Fatalf("parseSearch(-- --limit=5) = (%#v, %v), want Query='--limit=5'", o, err)
 	}
 	for _, bad := range [][]string{
-		{"--harnses=claude", "retry"},
+		{"--harnses=codex", "retry"},
+		{"--harnses=gemini", "retry"},
 		{"--before=30d", "retry"},
 		{"--settle=3f9a01c2", "retry"},
 		{"goroutines", "--bogus=1"},
@@ -149,26 +150,28 @@ func TestEveryCLICommandAcceptsFlagEqualsValueAndRejectsEmptyEquals(t *testing.T
 	}
 
 	// 2. Unit-testable flag parsers must produce identical options for
-	// `--flag=value` and `--flag value`.
-	s1, err := parseShow([]string{"--harness=claude", "--offset=2", "--limit=10", "019fa282"})
-	if err != nil || s1.harness != "claude" || s1.offset != 2 || s1.limit != 10 || s1.id != "019fa282" {
-		t.Fatalf("parseShow(--flag=value) = (%#v, %v)", s1, err)
-	}
-	n1, l1, sr1, err := parseLast([]string{"--harness=claude", "--project=app", "--since=7d", "--role=user", "--from=local", "5"})
-	if err != nil || n1 != 5 || l1.Harness != "claude" || l1.Project != "app" || sr1 != "7d" || l1.Role != "user" || l1.From != "local" {
-		t.Fatalf("parseLast(--flag=value) = (%d, %#v, %q, %v)", n1, l1, sr1, err)
-	}
-	bp, bo, _, err := parseBlame([]string{"--harness=claude", "--project=app", "--since=7d", "main.go"})
-	if err != nil || bp != "main.go" || bo.Harness != "claude" || bo.Project != "app" || bo.Since == 0 {
-		t.Fatalf("parseBlame(--flag=value) = (%q, %#v, %v)", bp, bo, err)
+	// `--flag=value` and `--flag value` across multiple harnesses.
+	for _, h := range []string{"codex", "gemini", "qwen", "opencode", "claude"} {
+		s1, perr := parseShow([]string{"--harness=" + h, "--offset=2", "--limit=10", "019fa282"})
+		if perr != nil || s1.harness != h || s1.offset != 2 || s1.limit != 10 || s1.id != "019fa282" {
+			t.Fatalf("parseShow(--harness=%s) = (%#v, %v)", h, s1, perr)
+		}
+		n1, l1, sr1, perr := parseLast([]string{"--harness=" + h, "--project=app", "--since=7d", "--role=user", "--from=local", "5"})
+		if perr != nil || n1 != 5 || l1.Harness != h || l1.Project != "app" || sr1 != "7d" || l1.Role != "user" || l1.From != "local" {
+			t.Fatalf("parseLast(--harness=%s) = (%d, %#v, %q, %v)", h, n1, l1, sr1, perr)
+		}
+		bp, bo, _, perr := parseBlame([]string{"--harness=" + h, "--project=app", "--since=7d", "main.go"})
+		if perr != nil || bp != "main.go" || bo.Harness != h || bo.Project != "app" || bo.Since == 0 {
+			t.Fatalf("parseBlame(--harness=%s) = (%q, %#v, %v)", h, bp, bo, perr)
+		}
+		st, perr := parseStatsArgs([]string{"--harness=" + h, "--project=app", "--since=7d", "--role=user"})
+		if perr != nil || st.options.Harness != h || st.options.Project != "app" || st.sinceRaw != "7d" || st.options.Role != "user" {
+			t.Fatalf("parseStatsArgs(--harness=%s) = (%#v, %v)", h, st, perr)
+		}
 	}
 	fo, err := parseFilesArgs([]string{"--project=app", "--limit=4", "auth"})
 	if err != nil || fo.project != "app" || fo.limit != 4 || len(fo.terms) != 1 || fo.terms[0] != "auth" {
 		t.Fatalf("parseFilesArgs(--flag=value) = (%#v, %v)", fo, err)
-	}
-	st, err := parseStatsArgs([]string{"--harness=claude", "--project=app", "--since=7d", "--role=user"})
-	if err != nil || st.options.Harness != "claude" || st.options.Project != "app" || st.sinceRaw != "7d" || st.options.Role != "user" {
-		t.Fatalf("parseStatsArgs(--flag=value) = (%#v, %v)", st, err)
 	}
 	fg, err := parseForgetArgs([]string{"--session='019fa282'", "--project=app"})
 	if err != nil || fg.o.Session != "019fa282" || fg.o.Project != "app" {
@@ -315,8 +318,8 @@ func TestDoctorAndRuntimeShareEnvResolvers(t *testing.T) {
 	t.Setenv("DEJA_EMBED_URL", "")
 	t.Setenv("DEJA_EMBED_OFF", "")
 	t.Setenv("DEJA_EMBED", " OFF ")
-	if !embed.Off() || !embedOff() {
-		t.Fatal("DEJA_EMBED=' OFF ' must switch off both embed.Off() and embedOff()")
+	if !embed.Disabled() || !embed.Off() || !embedOff() {
+		t.Fatal("DEJA_EMBED=' OFF ' must switch off embed.Disabled(), embed.Off(), and embedOff()")
 	}
 	if rep := collectDoctorEmbed(idxDir); rep != nil {
 		t.Fatalf("collectDoctorEmbed = %#v with DEJA_EMBED=' OFF ', want nil", rep)

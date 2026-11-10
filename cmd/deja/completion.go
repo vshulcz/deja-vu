@@ -87,6 +87,8 @@ _deja_completion() {
         blame)
             if [[ "$prev" == "--harness" ]]; then
                 COMPREPLY=( $(compgen -W "$harnesses" -- "$cur") )
+            elif [[ "$prev" == "--project" || "$prev" == "--since" ]]; then
+                COMPREPLY=()
             elif [[ "$cur" == -* ]]; then
                 COMPREPLY=( $(compgen -W "--all --all-projects --json --harness --project --since --attribution --git-note" -- "$cur") )
             else
@@ -105,6 +107,8 @@ _deja_completion() {
         bench)
             if (( COMP_CWORD == 2 )); then
                 COMPREPLY=( $(compgen -W "recall context prompt block ingest read" -- "$cur") )
+            elif [[ "$prev" == "--seed" ]]; then
+                COMPREPLY=()
             elif [[ "$action" == "recall" || "$action" == "context" || "$action" == "prompt"|| "$action" == "block" || "$action" == "ingest" || "$action" == "read" ]]; then
                 COMPREPLY=( $(compgen -W "--json --seed" -- "$cur") )
             fi
@@ -113,7 +117,11 @@ _deja_completion() {
             COMPREPLY=( $(compgen -W "bash zsh fish powershell pwsh" -- "$cur") )
             ;;
         shell)
-            COMPREPLY=( $(compgen -W "bash zsh fish -c --verify --json" -- "$cur") )
+            if [[ "$prev" == "-c" ]]; then
+                COMPREPLY=()
+            else
+                COMPREPLY=( $(compgen -W "bash zsh fish -c --verify --json" -- "$cur") )
+            fi
             ;;
         doctor)
             COMPREPLY=( $(compgen -W "--json --offline --deep --all" -- "$cur") )
@@ -122,7 +130,11 @@ _deja_completion() {
             COMPREPLY=( $(compgen -W "--dry-run --yes" -- "$cur") )
             ;;
         forget)
-            COMPREPLY=( $(compgen -W "--list --dry-run --session --project --before --unforget --all-matches" -- "$cur") )
+            if [[ "$prev" == "--session" || "$prev" == "--project" || "$prev" == "--before" || "$prev" == "--unforget" ]]; then
+                COMPREPLY=()
+            else
+                COMPREPLY=( $(compgen -W "--list --dry-run --session --project --before --unforget --all-matches" -- "$cur") )
+            fi
             ;;
         handoff)
             if [[ "$prev" == "--to" ]]; then
@@ -174,13 +186,19 @@ _deja_completion() {
             fi
             ;;
         remember)
-            COMPREPLY=( $(compgen -W "--project --tag --repo" -- "$cur") )
+            if [[ "$prev" == "--project" || "$prev" == "--tag" ]]; then
+                COMPREPLY=()
+            else
+                COMPREPLY=( $(compgen -W "--project --tag --repo" -- "$cur") )
+            fi
             ;;
         repo)
             if (( COMP_CWORD == 2 )); then
-                COMPREPLY=( $(compgen -W "candidates add sync on off --json" -- "$cur") )
+                COMPREPLY=( $(compgen -W "candidates add rm init sync on off --json" -- "$cur") )
             elif [[ "$action" == "candidates" && "$prev" != "--limit" && "$prev" != "--since" ]]; then
                 COMPREPLY=( $(compgen -W "--json --limit --since" -- "$cur") )
+            elif [[ ( "$action" == "init" || "$action" == "sync" ) && "$prev" != "--limit" ]]; then
+                COMPREPLY=( $(compgen -W "--limit" -- "$cur") )
             elif [[ "$action" == "add" && "$prev" == "--kind" ]]; then
                 COMPREPLY=( $(compgen -W "decision rejected gotcha" -- "$cur") )
             elif [[ "$action" == "add" ]]; then
@@ -328,6 +346,8 @@ _deja_completion() {
                 COMPREPLY=( $(compgen -W "%ROLES%" -- "$cur") )
             elif [[ "$prev" == "--sort" ]]; then
                 COMPREPLY=( $(compgen -W "relevance date" -- "$cur") )
+            elif [[ "$prev" == "--project" || "$prev" == "--since" || "$prev" == "--session" || "$prev" == "--limit" ]]; then
+                COMPREPLY=()
             else
                 COMPREPLY=( $(compgen -W "--json --re --all --no-embed --harness --project --since --role --session --rebuild --limit --sort" -- "$cur") )
             fi
@@ -463,9 +483,11 @@ _deja() {
       ;;
     repo)
       if (( CURRENT == 3 )); then
-        _values 'repo action' candidates add sync on off
+        _values 'repo action' candidates add rm init sync on off
       elif [[ "$words[3]" == "candidates" ]]; then
         _arguments '--json[print JSON]' '--limit=[maximum candidates]:count:' '--since=[filter by age]:duration:'
+      elif [[ "$words[3]" == "init" || "$words[3]" == "sync" ]]; then
+        _arguments '--limit=[maximum candidates]:count:'
       elif [[ "$words[3]" == "add" ]]; then
         _arguments '--kind=[write your own entry]:kind:(decision rejected gotcha)'
       fi
@@ -481,7 +503,7 @@ _deja() {
       _arguments '--exec[launch the native harness]' '--write-back[write a deleted transcript back from the index]' '--app[open a Codex session in the ChatGPT app]' '1:session ID prefix:'
       ;;
     restore)
-      _arguments '--span[which recorded span to restore]:number:' '(--out)-o[write the span to a file]:file:_files' '(-o)--out[write the span to a file]:file:_files' '--force[overwrite an existing -o file]' '--all[list every recorded span]' '1:path:_files'
+      _arguments '--span=[which recorded span to restore]:number:' '(--out)-o=[write the span to a file]:file:_files' '(-o)--out=[write the span to a file]:file:_files' '--force[overwrite an existing -o file]' '--all[list every recorded span]' '1:path:_files'
       ;;
     secrets)
       _arguments '--limit=[maximum findings]:count:' '--json[print JSON]' '--scrub[rewrite files to remove secrets]' '--dry-run[show what --scrub would change]'
@@ -515,26 +537,26 @@ _deja() {
       _arguments '--last[print the most recent injected digest]' '--json[print JSON]' '1:count:'
       ;;
     view)
-      _arguments '--out[write the page to a file]:file:_files' '--no-open[do not open the browser]'
+      _arguments '--out=[write the page to a file]:file:_files' '--no-open[do not open the browser]'
       ;;
     recap)
-      _arguments '--since[how far back, a duration like 30d (default 7d)]:duration:' '--limit[maximum sessions]:count:' '--json[print JSON]'
+      _arguments '--since=[how far back, a duration like 30d (default 7d)]:duration:' '--limit=[maximum sessions]:count:' '--json[print JSON]'
       ;;
     files|how)
-      _arguments '--project[project name]:project:' '--all-projects[search every project, not just this one]' '--limit[maximum results]:count:' '--json[print JSON]' '*:topic:'
+      _arguments '--project=[project name]:project:' '--all-projects[search every project, not just this one]' '--limit=[maximum results]:count:' '--json[print JSON]' '*:topic:'
       ;;
     promote)
       if [[ "$words[CURRENT-1]" == "--state" ]]; then
         _values 'state' %NOTE_STATES%
       else
-        _arguments '--state[mark the note]:state:(%NOTE_STATES%)' '--note[the note text]:text:' '*--tag[tag the note, repeatable]:tag:' '--to[also append the note to a Markdown file]:file:_files' '--repo[write to .deja/notes.jsonl in the repository]' '1:session ID prefix:'
+        _arguments '--state=[mark the note]:state:(%NOTE_STATES%)' '--note=[the note text]:text:' '*--tag=[tag the note, repeatable]:tag:' '--to=[also append the note to a Markdown file]:file:_files' '--repo[write to .deja/notes.jsonl in the repository]' '1:session ID prefix:'
       fi
       ;;
     friction)
-      _arguments '--limit[max results]:count:' '--json[print JSON]' '--settle[mark a wall fixed by the id its row prints]:wall id:' '--unsettle[take a --settle back]:wall id:'
+      _arguments '--limit=[max results]:count:' '--json[print JSON]' '--settle=[mark a wall fixed by the id its row prints]:wall id:' '--unsettle=[take a --settle back]:wall id:'
       ;;
     fix|tests)
-      _arguments '--limit[max results]:count:' '--json[print JSON]'
+      _arguments '--limit=[max results]:count:' '--json[print JSON]'
       ;;
     mcp)
       _arguments '--context-search[serve only context_search]' '--http=[listen on Streamable HTTP address]:address:'
@@ -657,11 +679,12 @@ complete -c deja -n '__fish_seen_subcommand_from recall; and not __fish_seen_sub
 complete -c deja -n '__fish_seen_subcommand_from remember' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from remember' -l tag -r
 complete -c deja -n '__fish_seen_subcommand_from remember' -l repo -d 'Write to .deja/notes.jsonl in the repository'
-complete -c deja -n '__fish_seen_subcommand_from repo; and not __fish_seen_subcommand_from candidates add sync on off' -f -a 'candidates add sync on off'
-complete -c deja -n '__fish_seen_subcommand_from repo; and not __fish_seen_subcommand_from candidates add sync on off' -l json
+complete -c deja -n '__fish_seen_subcommand_from repo; and not __fish_seen_subcommand_from candidates add rm init sync on off' -f -a 'candidates add rm init sync on off'
+complete -c deja -n '__fish_seen_subcommand_from repo; and not __fish_seen_subcommand_from candidates add rm init sync on off' -l json
 complete -c deja -n '__fish_seen_subcommand_from repo; and __fish_seen_subcommand_from candidates' -l json
 complete -c deja -n '__fish_seen_subcommand_from repo; and __fish_seen_subcommand_from candidates' -l limit -r
 complete -c deja -n '__fish_seen_subcommand_from repo; and __fish_seen_subcommand_from candidates' -l since -r
+complete -c deja -n '__fish_seen_subcommand_from repo; and __fish_seen_subcommand_from init sync' -l limit -r
 complete -c deja -n '__fish_seen_subcommand_from repo; and __fish_seen_subcommand_from add' -l kind -r -a 'decision rejected gotcha'
 complete -c deja -n '__fish_seen_subcommand_from rules; and not __fish_seen_subcommand_from sync status candidates' -f -a 'sync status candidates'
 complete -c deja -n '__fish_seen_subcommand_from rules; and __fish_seen_subcommand_from candidates' -l json
@@ -763,6 +786,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
         $candidates = switch ($command) {
             'blame' {
                 if ($previous -eq '--harness') { $harnesses }
+                elseif ($previous -in @('--project', '--since')) { @() }
                 else { @('--all', '--all-projects', '--json', '--harness', '--project', '--since', '--attribution', '--git-note') }
             }
             { $_ -in @('origin', 'review') } {
@@ -772,13 +796,20 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
             }
             'bench' {
                 if ($argumentPosition -eq 1) { @('recall', 'context', 'prompt', 'block', 'ingest', 'read') }
+                elseif ($previous -eq '--seed') { @() }
                 else { @('--json', '--seed') }
             }
             'completion' { @('bash', 'zsh', 'fish', 'powershell', 'pwsh') }
-            'shell' { @('bash', 'zsh', 'fish', '-c', '--verify', '--json') }
+            'shell' {
+                if ($previous -eq '-c') { @() }
+                else { @('bash', 'zsh', 'fish', '-c', '--verify', '--json') }
+            }
             'doctor' { @('--json', '--offline', '--deep', '--all') }
             'delete' { @('--dry-run', '--yes') }
-            'forget' { @('--list', '--dry-run', '--session', '--project', '--before', '--unforget', '--all-matches') }
+            'forget' {
+                if ($previous -in @('--session', '--project', '--before', '--unforget')) { @() }
+                else { @('--list', '--dry-run', '--session', '--project', '--before', '--unforget', '--all-matches') }
+            }
             'handoff' {
                 if ($previous -eq '--to') { $handoffTargets }
                 else { @('--to', '--exec') }
@@ -802,10 +833,14 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 elseif ($previous -in @('--project', '--limit', '--offset')) { @() }
                 else { @('--project', '--harness', '--limit', '--offset') }
             }
-            'remember' { @('--project', '--tag', '--repo') }
+            'remember' {
+                if ($previous -in @('--project', '--tag')) { @() }
+                else { @('--project', '--tag', '--repo') }
+            }
             'repo' {
-                if ($argumentPosition -eq 1) { @('candidates', 'add', 'sync', 'on', 'off', '--json') }
+                if ($argumentPosition -eq 1) { @('candidates', 'add', 'rm', 'init', 'sync', 'on', 'off', '--json') }
                 elseif ($action -eq 'candidates' -and $previous -notin @('--limit', '--since')) { @('--json', '--limit', '--since') }
+                elseif ($action -in @('init', 'sync') -and $previous -ne '--limit') { @('--limit') }
                 elseif ($action -eq 'add' -and $previous -eq '--kind') { @('decision', 'rejected', 'gotcha') }
                 elseif ($action -eq 'add') { @('--kind') }
                 else { @() }
@@ -874,7 +909,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 else { @('--context-search', '--http') }
             }
             { $_ -in @('brief', 'check', 'ctx', 'embed', 'hook-precompact', 'share', 'sources', 'statusline', 'version', 'warmup') } { @() }
-            default { if ($previous -eq '--harness') { $harnesses } elseif ($previous -eq '--role') { $roles } elseif ($previous -eq '--sort') { @('relevance', 'date') } else { $defaultOptions } }
+            default { if ($previous -eq '--harness') { $harnesses } elseif ($previous -eq '--role') { $roles } elseif ($previous -eq '--sort') { @('relevance', 'date') } elseif ($previous -in @('--project', '--since', '--session', '--limit')) { @() } else { $defaultOptions } }
         }
     }
 

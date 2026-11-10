@@ -119,7 +119,7 @@ func staleSidecarNote() string {
 // trims the result (#4976).
 const rerankPool = 64
 
-func embedOff() bool { return embed.Off() }
+func embedOff() bool { return embed.Disabled() }
 
 func rerankCandidateLimit(dir string, o search.Options) int {
 	if o.All || o.Regex || o.NoEmbed || embedOff() || o.Sort == search.SortDate {

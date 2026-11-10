@@ -64,18 +64,26 @@ func (c *Client) storedModel() string {
 
 var probeURLs = []string{"http://localhost:11434/api/embed", "http://localhost:1234/v1/embeddings"}
 
-// Off reports whether embedding is switched off for this process. The probe
-// below reaches localhost, so without a way to say no, a machine running a
-// local model answers differently from one that is not — a test suite that
-// asserts "no endpoint" goes red on a developer's machine and stays green on
-// CI, which is the worst way round for a contributor to meet it.
+// Disabled reports whether semantic search and embedding are explicitly turned
+// off via DEJA_EMBED=off.
+func Disabled() bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("DEJA_EMBED")), "off")
+}
+
+// Off reports whether the localhost embedding probe is switched off for this
+// process. The probe below reaches localhost, so without a way to say no, a
+// machine running a local model answers differently from one that is not — a
+// test suite that asserts "no endpoint" goes red on a developer's machine and
+// stays green on CI, which is the worst way round for a contributor to meet it.
 func Off() bool {
-	return os.Getenv("DEJA_EMBED_OFF") == "1" ||
-		strings.EqualFold(strings.TrimSpace(os.Getenv("DEJA_EMBED")), "off")
+	return os.Getenv("DEJA_EMBED_OFF") == "1" || Disabled()
 }
 
 // New builds a client from the DEJA_EMBED_* environment.
 func New() (*Client, error) {
+	if Disabled() {
+		return nil, errNoEmbedEndpoint
+	}
 	model := os.Getenv("DEJA_EMBED_MODEL")
 	if model == "" {
 		model = "nomic-embed-text"
