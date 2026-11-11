@@ -134,6 +134,25 @@ jobs:
             npx --yes @vscode/vsce publish --packagePath "$GITHUB_WORKSPACE/dist/deja-status.vsix" -p "$VSCE_PAT"
           fi
 
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Build and publish JetBrains plugin
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          JETBRAINS_TOKEN: ${{ secrets.JETBRAINS_TOKEN }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          cd extensions/jetbrains
+          ./gradlew buildPlugin -PpluginVersion="$version" --no-daemon
+          cp build/distributions/deja-jetbrains-*.zip "$GITHUB_WORKSPACE/dist/deja-jetbrains.zip"
+          gh release upload "${GITHUB_REF_NAME}" "$GITHUB_WORKSPACE/dist/deja-jetbrains.zip" --clobber
+          if [ -n "${JETBRAINS_TOKEN:-}" ]; then
+            ./gradlew publishPlugin -PpluginVersion="$version" --no-daemon
+          fi
+
       - name: Attach the manifests to the release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
