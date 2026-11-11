@@ -13,7 +13,7 @@ kotlin {
 
 dependencies {
     intellijPlatform {
-        intellijIdeaCommunity("2025.1")
+        intellijIdea("2026.2.3")
     }
 }
 
