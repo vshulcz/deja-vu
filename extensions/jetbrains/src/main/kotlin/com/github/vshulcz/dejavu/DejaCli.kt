@@ -7,7 +7,6 @@ import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.configurations.PathEnvironmentVariableUtil
 import com.intellij.execution.util.ExecUtil
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.SystemInfo
 import java.io.File
 import java.nio.charset.StandardCharsets
 
@@ -36,6 +35,7 @@ data class DejaRunResult(
 
 object DejaCli {
     private val ansiRegex = Regex("\u001B\\[[0-9;]*[A-Za-z]")
+    private val isWindows = System.getProperty("os.name", "").lowercase().contains("win")
 
     fun findBinary(): String? {
         val envBin = System.getenv("DEJA_BIN")?.trim()
@@ -44,21 +44,21 @@ object DejaCli {
         }
 
         val home = System.getProperty("user.home") ?: ""
-        val ext = if (SystemInfo.isWindows) ".exe" else ""
+        val ext = if (isWindows) ".exe" else ""
         val candidates = buildList {
             if (home.isNotEmpty()) {
                 add(File(home, ".config/deja/bin/deja-hook$ext"))
                 add(File(home, ".local/bin/deja$ext"))
                 add(File(home, "go/bin/deja$ext"))
                 add(File(home, ".cargo/bin/deja$ext"))
-                if (SystemInfo.isWindows) {
+                if (isWindows) {
                     val localAppData = System.getenv("LOCALAPPDATA")
                     if (!localAppData.isNullOrEmpty()) {
                         add(File(localAppData, "Programs/deja/deja.exe"))
                     }
                 }
             }
-            if (!SystemInfo.isWindows) {
+            if (!isWindows) {
                 add(File("/opt/homebrew/bin/deja"))
                 add(File("/usr/local/bin/deja"))
                 add(File("/home/linuxbrew/.linuxbrew/bin/deja"))
@@ -151,7 +151,16 @@ object DejaCli {
             val rawUpdated = s.stringField("updated")
             val updated = if (rawUpdated.length >= 16) rawUpdated.substring(0, 16).replace('T', ' ') else rawUpdated
             val title = s.stringField("title").ifEmpty { id.take(12) }
-            val snippet = s.stringField("snippet").ifEmpty { firstMessageSnippet(s) }.replace(Regex("\\s+"), " ").take(140)
+            val hitSnippet = if (rawObj.has("snippets") && rawObj.get("snippets").isJsonArray) {
+                rawObj.getAsJsonArray("snippets").firstOrNull()?.asStringOrNull().orEmpty()
+            } else {
+                rawObj.stringField("snippet")
+            }
+            val snippet = hitSnippet
+                .ifEmpty { s.stringField("snippet") }
+                .ifEmpty { firstMessageSnippet(s) }
+                .replace(Regex("\\s+"), " ")
+                .take(140)
             items.add(
                 DejaSessionItem(
                     id = id,

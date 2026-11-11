@@ -1,8 +1,8 @@
 package com.github.vshulcz.dejavu
 
+import com.intellij.ide.DataManager
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.DefaultActionGroup
-import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
@@ -12,9 +12,11 @@ import com.intellij.openapi.wm.StatusBar
 import com.intellij.openapi.wm.StatusBarWidget
 import com.intellij.openapi.wm.StatusBarWidgetFactory
 import com.intellij.ui.awt.RelativePoint
-import com.intellij.util.Alarm
 import com.intellij.util.Consumer
+import com.intellij.util.concurrency.AppExecutorUtil
 import java.awt.event.MouseEvent
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.TimeUnit
 
 class DejaStatusBarWidgetFactory : StatusBarWidgetFactory {
     override fun getId(): String = WIDGET_ID
@@ -29,7 +31,12 @@ class DejaStatusBarWidgetFactory : StatusBarWidgetFactory {
 
 class DejaStatusBarWidget(private val project: Project) : StatusBarWidget, StatusBarWidget.TextPresentation {
     private var statusBar: StatusBar? = null
-    private val alarm = Alarm(Alarm.ThreadToUse.POOLED_THREAD, this)
+
+    @Volatile
+    private var refreshFuture: ScheduledFuture<*>? = null
+
+    @Volatile
+    private var disposed = false
 
     @Volatile
     private var currentText: String = "deja"
@@ -54,11 +61,11 @@ class DejaStatusBarWidget(private val project: Project) : StatusBarWidget, Statu
         scheduleRefresh(100)
     }
 
-    private fun scheduleRefresh(delayMs: Int) {
-        if (project.isDisposed) return
-        alarm.cancelAllRequests()
-        alarm.addRequest({
-            if (project.isDisposed) return@addRequest
+    private fun scheduleRefresh(delayMs: Long) {
+        if (disposed || project.isDisposed) return
+        refreshFuture?.cancel(false)
+        refreshFuture = AppExecutorUtil.getAppScheduledExecutorService().schedule({
+            if (disposed || project.isDisposed) return@schedule
             val bin = DejaCli.findBinary()
             if (bin == null) {
                 currentText = "deja: install"
@@ -69,12 +76,14 @@ class DejaStatusBarWidget(private val project: Project) : StatusBarWidget, Statu
                 currentTooltip = "deja-vu — click to search AI sessions, blame line, or copy handoff"
             }
             ApplicationManager.getApplication().invokeLater {
-                statusBar?.updateWidget(ID())
+                if (!disposed && !project.isDisposed) {
+                    statusBar?.updateWidget(ID())
+                }
             }
-            if (!project.isDisposed) {
+            if (!disposed && !project.isDisposed) {
                 scheduleRefresh(15_000)
             }
-        }, delayMs)
+        }, delayMs, TimeUnit.MILLISECONDS)
     }
 
     override fun getText(): String = currentText
@@ -92,7 +101,7 @@ class DejaStatusBarWidget(private val project: Project) : StatusBarWidget, Statu
             am.getAction("DejaVu.BlameLine")?.let { add(it) }
             am.getAction("DejaVu.CopyHandoff")?.let { add(it) }
         }
-        val dataContext = SimpleDataContext.getProjectContext(project)
+        val dataContext = DataManager.getInstance().getDataContext(event.component)
         val popup = JBPopupFactory.getInstance().createActionGroupPopup(
             "deja-vu",
             group,
@@ -104,7 +113,9 @@ class DejaStatusBarWidget(private val project: Project) : StatusBarWidget, Statu
     }
 
     override fun dispose() {
-        alarm.cancelAllRequests()
+        disposed = true
+        refreshFuture?.cancel(false)
+        refreshFuture = null
         statusBar = null
     }
 }

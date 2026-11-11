@@ -12,7 +12,7 @@
             <li><b>AI Blame Current Line</b>: Find which AI coding session wrote or touched the file and line under the caret.</li>
             <li><b>Copy Cross-Agent Handoff</b>: Generate a compact handoff digest for the current project and copy it to the clipboard.</li>
         </ul>
-        <p>Requires the <a href="https://github.com/vshulcz/deja-vu">deja</a> binary on your machine (<code>brew install vshulcz/tap/deja-vu</code> or <code>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</code>).</p>
+        <p>Requires the <a href="https://github.com/vshulcz/deja-vu">deja</a> binary on your machine (<code>brew install deja-vu</code> or <code>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</code>).</p>
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
