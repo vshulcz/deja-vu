@@ -8,10 +8,16 @@ on:
     branches: [main]
     paths:
       - 'extensions/**'
+      - 'lua/**'
+      - 'plugin/**'
+      - 'doc/deja.txt'
       - '.github/workflows/extensions.yml'
   pull_request:
     paths:
       - 'extensions/**'
+      - 'lua/**'
+      - 'plugin/**'
+      - 'doc/deja.txt'
       - '.github/workflows/extensions.yml'
   schedule:
     - cron: '17 6 * * 1'
@@ -451,3 +457,22 @@ jobs:
             }
             process.exit(bad ? 1 : 0);
           '
+
+  nvim:
+    name: deja.nvim
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Install Neovim
+        run: |
+          curl -fsSL https://github.com/neovim/neovim-releases/releases/download/v0.10.4/nvim-linux-x86_64.tar.gz | sudo tar -xz -C /opt
+          sudo ln -sf /opt/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim
+      - name: Verify Lua modules, commands, and help tags
+        run: |
+          nvim --headless -u NONE --cmd "set rtp+=." \
+            -c "runtime plugin/deja.lua" \
+            -c 'lua local d = require("deja").setup({keymaps = true}); local cmds = vim.api.nvim_get_commands({}); for _, k in ipairs({"DejaRecall","DejaLast","DejaBlame","DejaShow","DejaHandoff","DejaFix"}) do assert(cmds[k], "missing " .. k) end; local items = d.parse_search({hits = {{strict = true, session = {id = "0123456789abcdef", harness = "claude", project = "demo", title = "Test", messages = {{role = "assistant", text = "ok"}}}}}}); assert(#items == 1 and items[1].short_id == "01234567")' \
+            -c "qa!"
+          nvim --headless -u NONE -c "helptags doc" -c "qa!"
+          rm -f doc/tags

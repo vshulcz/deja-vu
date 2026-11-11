@@ -1,0 +1,70 @@
+*deja.txt*  Local session recall, AI blame, and handoff across 43 coding agents
+
+==============================================================================
+1. INTRODUCTION                                                         *deja*
+
+`deja-vu` indexes existing on-disk transcripts across forty-three coding agents
+(Claude Code, Codex CLI, Cursor, opencode, Gemini CLI, aider, Goose, Kiro, and
+more) in SQLite FTS5 with < 1 ms lookup. This runtime plugin exposes session
+search, line-level AI session blame, diagnostic fix recall, and cross-agent
+handoff directly inside Neovim.
+
+Prerequisite: install the `deja` CLI (`brew install deja-vu` or `install.sh`).
+
+==============================================================================
+2. SETUP                                                          *deja-setup*
+
+With `lazy.nvim`: >lua
+  {
+    "vshulcz/deja-vu",
+    opts = {
+      picker = "auto",        -- "auto" | "snacks" | "telescope" | "fzf" | "select"
+      limit = 40,
+      project_scoped = false,
+      keymaps = true,         -- binds <leader>dr, <leader>dl, <leader>db, <leader>dh, <leader>df
+    },
+  }
+<
+
+==============================================================================
+3. COMMANDS                                                    *deja-commands*
+
+                                                                 *:DejaRecall*
+:DejaRecall [query]
+    Search past sessions across all indexed coding agents (`deja search --json`).
+    When invoked on a visual selection without arguments, searches the selected
+    text. Opens in `snacks.picker`, `telescope.nvim`, `fzf-lua`, or
+    `vim.ui.select`.
+
+                                                                   *:DejaLast*
+:DejaLast [count]
+    Browse the most recent sessions (`deja last [count] --json`).
+
+                                                                  *:DejaBlame*
+:DejaBlame[!]
+    Find which AI coding session wrote or edited the current cursor line
+    (`deja blame file:line --json`). With `!`, queries the entire file.
+
+                                                                   *:DejaShow*
+:DejaShow {id}
+    Open the sanitized transcript for session `{id}` in a floating Markdown
+    window (`q` to close, `y` to yank session ID, `H` for handoff, `R` to
+    resume in a Neovim terminal split).
+
+                                                                *:DejaHandoff*
+:DejaHandoff [id]
+    Build a cross-agent handoff digest (`deja handoff`), copy it to the `+`
+    clipboard register, and display it in a floating window.
+
+                                                                    *:DejaFix*
+:DejaFix [error]
+    Recall what command or edit resolved a matching error in past sessions
+    (`deja fix`), pre-filling from the current line's LSP diagnostic when
+    invoked with no arguments.
+
+==============================================================================
+4. HEALTH                                                        *deja-health*
+
+Run `:checkhealth deja` to verify the `deja` binary and picker backends.
+
+vim:tw=78:ts=8:ft=help:norl:
