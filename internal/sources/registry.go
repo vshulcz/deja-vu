@@ -451,6 +451,20 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 			}},
 		},
 		{
+			// Qoder CLI (Alibaba's AI IDE/CLI) writes Claude Code-shaped
+			// transcripts under ~/.qoder/projects; the Claude decoder reads
+			// them and only the harness attribution differs.
+			Name: "qoder", Load: LoadQoder, Files: QoderSessionFiles,
+			Kinds: []FileKind{{
+				Name: "qoder",
+				Match: func(p string) bool {
+					return strings.HasSuffix(p, ".jsonl") && QoderUnderRoot(p)
+				},
+				Parse:     fullParse(ParseQoderFile),
+				ParseFrom: offsetParse(ParseQoderFileFromOffset),
+			}},
+		},
+		{
 			Name: "kimi", Load: LoadKimi, Files: KimiSessionFiles,
 			Kinds: []FileKind{{
 				Name: "kimi",

@@ -216,7 +216,7 @@ ls ~/.codeium/windsurf/cascade/&lt;id&gt;*</pre>
 <p>A conversation you remove no longer appears in the Sessions window (<code>devin-desktop --sessions</code>) and cannot be continued. There is no trash: <code>rm</code> is permanent. Files Cascade edited in your project are not affected.</p>
 
 <h2>Keeping it searchable instead</h2>
-<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads Cascade's files, along with the other forty-two agents' histories on the machine, into one local index. It is searchable from the shell and readable by the agents themselves over MCP:</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads Cascade's files, along with the other forty-three agents' histories on the machine, into one local index. It is searchable from the shell and readable by the agents themselves over MCP:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "Cascade conversation about the migration"</pre>
 <p>Nothing to switch on first: the files are already on disk, including the months before deja was installed. <a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> drops a session from the index for good. That also means deleting the <code>.pb</code> file does not remove the conversation from deja: if you want it gone everywhere, run <code>deja forget --session &lt;id&gt;</code> too. A conversation whose file you deleted stays readable under the Deleted tab of the screen bare <code>deja</code> opens, and <code>o</code> carries its context into another agent; deja does not write Cascade conversations back.</p>

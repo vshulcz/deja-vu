@@ -5,7 +5,7 @@ English | [中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/openc
 Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** · [Documentation](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [Live demo](https://vshulcz.github.io/deja-vu/view/) · [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
 OpenClaw remembers its own sessions. This plugin answers the other question:
-what was done in the forty-two other coding agents on this machine — Claude
+what was done in the forty-three other coding agents on this machine — Claude
 Code, Codex, Cursor, Gemini and Zed among them — including the months before
 OpenClaw was installed.
 

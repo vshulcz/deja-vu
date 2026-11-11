@@ -447,7 +447,7 @@ var handoffAlias = map[string]string{
 // capability drift test keeps the two in sync.
 // Roo, Zed, Cherry Studio, JetBrains AI Assistant and Windsurf run the agent
 // inside the app, so there is no command line to hand a prompt to.
-var handoffPasteOnly = map[string]bool{"roo": true, "cherrystudio": true, "zed": true, "jetbrains": true, "windsurf": true}
+var handoffPasteOnly = map[string]bool{"roo": true, "cherrystudio": true, "zed": true, "jetbrains": true, "windsurf": true, "qoder": true}
 
 // pasteOnlyFooter ends a handoff printed for pasting. It named all of
 // handoffTargets inline, a four-line wall at 80 columns; the agents a reader

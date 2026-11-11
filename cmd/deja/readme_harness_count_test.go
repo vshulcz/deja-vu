@@ -19,7 +19,7 @@ var countWords = map[int]string{
 	28: "twenty-eight", 29: "twenty-nine", 30: "thirty", 31: "thirty-one", 32: "thirty-two",
 	33: "thirty-three", 34: "thirty-four", 35: "thirty-five", 36: "thirty-six",
 	37: "thirty-seven", 38: "thirty-eight", 39: "thirty-nine", 40: "forty",
-	41: "forty-one", 42: "forty-two", 43: "forty-three", 44: "forty-four",
+	41: "forty-one", 42: "forty-two", 43: "forty-three", 44: "forty-four", 45: "forty-five",
 }
 
 // countWord is the word for a count, or a failure naming what to add.
@@ -274,7 +274,7 @@ func TestNpmReadmeLeadsWithWhatTheMainOneLeadsWith(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, line := range []string{
-		"Shared local memory, cross-agent handoff, and code recovery across 43 coding agents.",
+		"Shared local memory, cross-agent handoff, and code recovery across 44 coding agents.",
 	} {
 		if !strings.Contains(string(main), line) {
 			t.Fatalf("the main README no longer says %q — update this test with it", line)
@@ -331,7 +331,7 @@ func harnessCountWords(t *testing.T, root string, offset int) (string, map[int]s
 		28: "twenty-eight", 29: "twenty-nine", 30: "thirty", 31: "thirty-one", 32: "thirty-two",
 		33: "thirty-three", 34: "thirty-four", 35: "thirty-five", 36: "thirty-six",
 		37: "thirty-seven", 38: "thirty-eight", 39: "thirty-nine", 40: "forty",
-		41: "forty-one", 42: "forty-two", 43: "forty-three", 44: "forty-four",
+		41: "forty-one", 42: "forty-two", 43: "forty-three", 44: "forty-four", 45: "forty-five",
 	}
 	want, ok := words[n]
 	if !ok {

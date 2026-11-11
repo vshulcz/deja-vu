@@ -105,6 +105,15 @@
       "indexed_sessions": 0
     },
     {
+      "name": "qoder",
+      "state": "missing",
+      "paths": [
+        "<tmp>/qoder/projects"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
       "name": "codebuddy",
       "state": "missing",
       "paths": [

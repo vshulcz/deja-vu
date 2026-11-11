@@ -175,7 +175,7 @@
 <h1>Adding memory to CodeBuddy Code</h1>
 <p class="pagelede">the CLI and WorkBuddy desktop share the same session layout and Claude-shape hooks<span class="mins" data-mins></span></p>
 
-<p>CodeBuddy Code (<code>@tencent-ai/codebuddy-code</code>) writes every conversation to disk and starts the next session blank. Its desktop counterpart, WorkBuddy, runs the same agent under its own configuration directory. Both stores sit on disk alongside whatever the other forty-two coding agents on the machine wrote.</p>
+<p>CodeBuddy Code (<code>@tencent-ai/codebuddy-code</code>) writes every conversation to disk and starts the next session blank. Its desktop counterpart, WorkBuddy, runs the same agent under its own configuration directory. Both stores sit on disk alongside whatever the other forty-three coding agents on the machine wrote.</p>
 
 <h2>What CodeBuddy already has</h2>
 <p>Sessions live under <code>${CODEBUDDY_CONFIG_DIR:-~/.codebuddy}/projects/&lt;mangled-cwd&gt;/&lt;session-id&gt;.jsonl</code>, one JSONL file per conversation, with sub-agent runs under <code>&lt;session-id&gt;/subagents/agent-&lt;id&gt;.jsonl</code>. WorkBuddy writes the same layout under <code>~/.workbuddy/projects</code> (workbuddy.cn), <code>~/.workbuddy-ai/projects</code> (workbuddy.ai), or <code>$WORKBUDDY_CONFIG_DIR/projects</code>.</p>
@@ -201,7 +201,7 @@
 <p><code>codebuddy -r &lt;id&gt;</code> looks for the session only under the folder of the current working directory, and <code>-r</code> by itself drops the <code>SessionStart</code> hook context. Passing <code>-c</code> alongside <code>-r</code> keeps the <code>SessionStart</code> context while still selecting the session id, so <code>deja resume &lt;id&gt;</code> runs <code>codebuddy -c -r &lt;id&gt;</code> in the project directory.</p>
 
 <h2>The part that is not about this harness</h2>
-<p>The index covers every agent's transcripts on the machine — forty-three of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Claude Code or Qwen Code answers a question asked in CodeBuddy. Indexing and search stay local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+<p>The index covers every agent's transcripts on the machine — forty-four of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Claude Code or Qwen Code answers a question asked in CodeBuddy. Indexing and search stay local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
 
 <p><a href="getting-started.html">Getting started</a> · <a href="delete-codebuddy-sessions.html">Deleting CodeBuddy sessions</a> · <a href="../registry/codebuddy.html">How CodeBuddy's store is read</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>

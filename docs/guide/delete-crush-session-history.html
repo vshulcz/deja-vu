@@ -203,7 +203,7 @@ ${XDG_DATA_HOME:-~/.local/share}/crush/projects.json</pre>
 <p>The prompts, the shell commands and their exit codes, and the exact old and new lines of every <code>edit</code>, <code>multiedit</code>, <code>write</code> and <code>lsp_replace_symbol</code> call. Once removed, <code>crush --session &lt;uuid&gt;</code> in that project can no longer resume the conversation.</p>
 
 <h2>Keeping it searchable instead</h2>
-<p><a href="https://github.com/vshulcz/deja-vu">deja</a> follows <code>projects.json</code> and reads each project's <code>crush.db</code> — along with the other forty-two agents' histories on the machine — into one local index, searchable from the shell and readable by Crush itself over MCP:</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> follows <code>projects.json</code> and reads each project's <code>crush.db</code> — along with the other forty-three agents' histories on the machine — into one local index, searchable from the shell and readable by Crush itself over MCP:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "crush session about the symbol rename"</pre>
 <p>Nothing to configure first: the per-project databases are already on disk. <a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> removes a session from the index when you want it gone. A session whose <code>crush.db</code> was later deleted stays readable with <code>deja show</code> and under the Deleted tab of bare <code>deja</code>, while deja never writes rows back into <code>crush.db</code>. Set <code>DEJA_CRUSH_ROOT</code> to point deja at a backup of the data directory holding <code>projects.json</code>.</p>

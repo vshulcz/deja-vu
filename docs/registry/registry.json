@@ -1414,19 +1414,64 @@
       },
       "gaps": {},
       "surfaces": {
-        "digest": {"status": "yes", "proof": "stand", "note": "the plugin's own agent:bootstrap hook puts it in the Project Context once per session, local and gateway, with or without allowConversationAccess; the gateway's hook pack asks under the same session id (stand on 2026.9.8)"},
-        "prompt": {"status": "yes", "proof": "stand", "note": "OpenClaw 2026.8.1+ runs the plugin's prompt hooks only with plugins.entries.deja.hooks.allowConversationAccess, which install sets (stand on 2026.9.8, local and gateway); the ClawHub package cannot grant it to itself, so it names the key and the openclaw config set command in the gateway log and in /deja (stand on 2026.9.9)"},
-        "pre_tool": {"status": "yes", "proof": "stand"},
-        "failure": {"status": "yes", "proof": "stand"},
-        "compaction_reset": {"status": "yes", "proof": "stand", "note": "the packet rides the prompt hook, so it needs the same allowConversationAccess grant on 2026.8.1+"},
-        "compaction_capture": {"status": "yes", "proof": "stand"},
-        "compaction_packet": {"status": "yes", "proof": "stand"},
-        "mcp": {"status": "yes", "proof": "fixture"},
-        "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
-        "session_end": {"status": "yes", "proof": "stand"},
-        "rules": {"status": "yes", "proof": "stand", "note": "the agent workspace's AGENTS.md, added to when it exists (2026.9.8)"},
-        "statusline": {"status": "partial", "proof": "stand", "note": "a deja tab in the Control UI sidebar shows the line (gateway-auth route, no Labs switch; 2026.9.8); the TUI footer takes nothing from plugins (formatTuiFooter), and an always-visible session header item needs the Custom plugin UI lab"},
-        "reader": {"status": "yes", "proof": "fixture"}
+        "digest": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "the plugin's own agent:bootstrap hook puts it in the Project Context once per session, local and gateway, with or without allowConversationAccess; the gateway's hook pack asks under the same session id (stand on 2026.9.8)"
+        },
+        "prompt": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "OpenClaw 2026.8.1+ runs the plugin's prompt hooks only with plugins.entries.deja.hooks.allowConversationAccess, which install sets (stand on 2026.9.8, local and gateway); the ClawHub package cannot grant it to itself, so it names the key and the openclaw config set command in the gateway log and in /deja (stand on 2026.9.9)"
+        },
+        "pre_tool": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "failure": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "compaction_reset": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "the packet rides the prompt hook, so it needs the same allowConversationAccess grant on 2026.8.1+"
+        },
+        "compaction_capture": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "compaction_packet": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "handoff": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "deja handoff --exec opens it with the packet as the first prompt"
+        },
+        "session_end": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "rules": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "the agent workspace's AGENTS.md, added to when it exists (2026.9.8)"
+        },
+        "statusline": {
+          "status": "partial",
+          "proof": "stand",
+          "note": "a deja tab in the Control UI sidebar shows the line (gateway-auth route, no Labs switch; 2026.9.8); the TUI footer takes nothing from plugins (formatTuiFooter), and an always-visible session header item needs the Custom plugin UI lab"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture"
+        }
       }
     },
     {
@@ -1842,6 +1887,121 @@
         "statusline": {
           "status": "yes",
           "proof": "fixture"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture"
+        }
+      }
+    },
+    {
+      "id": "qoder",
+      "store_paths": [
+        "${DEJA_QODER_ROOT:-~/.qoder}/projects/*/*.jsonl"
+      ],
+      "format_kind": "jsonl",
+      "fixture_paths": [
+        "fixtures/registry/qoder/projects/-workspace-registry-demo/registry-qoder.jsonl"
+      ],
+      "parser_source": "internal/sources/qoder.go",
+      "last_verified": "2026-11-10",
+      "display_name": "Qoder",
+      "capabilities": {
+        "mcp": false,
+        "auto": false,
+        "skill": false,
+        "command": false,
+        "resume": false,
+        "handoff": "paste",
+        "prereq": "none"
+      },
+      "gaps": {
+        "mcp": {
+          "state": "unknown",
+          "why": "The Qoder CLI ships an MCP client but deja has no install target for it yet, so recall reaches Qoder only once history has been indexed by this reader; the settings file and its server key have not been verified.",
+          "source": "https://docs.qoder.com/"
+        },
+        "auto": {
+          "state": "unknown",
+          "why": "Qoder CLI hook events (session start, prompt submit, tool use) have not been verified, so deja installs no auto-recall wiring and the reader alone is what reaches Qoder today.",
+          "source": "https://docs.qoder.com/"
+        },
+        "skill": {
+          "state": "unknown",
+          "why": "Whether the Qoder CLI loads named skills from a directory has not been verified, so deja does not write its history skill there; nothing is installed and no command is claimed.",
+          "source": "https://docs.qoder.com/"
+        },
+        "command": {
+          "state": "unknown",
+          "why": "The Qoder CLI slash-command surface has not been verified, so deja installs no /deja command for it and recall is reachable only through the indexed reader.",
+          "source": "https://docs.qoder.com/"
+        },
+        "resume": {
+          "state": "unknown",
+          "why": "No Qoder CLI command that reopens a session by id has been verified, so deja cannot hand a session back and handoff falls back to paste.",
+          "source": "https://docs.qoder.com/"
+        }
+      },
+      "surfaces": {
+        "digest": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "reader-only in this change; no deja hook/MCP wiring for Qoder verified yet"
+        },
+        "prompt": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "reader-only in this change; no deja hook/MCP wiring for Qoder verified yet"
+        },
+        "pre_tool": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "reader-only in this change; no deja hook/MCP wiring for Qoder verified yet"
+        },
+        "failure": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "reader-only in this change; no deja hook/MCP wiring for Qoder verified yet"
+        },
+        "compaction_reset": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "reader-only in this change; no deja hook/MCP wiring for Qoder verified yet"
+        },
+        "compaction_capture": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "reader-only in this change; no deja hook/MCP wiring for Qoder verified yet"
+        },
+        "compaction_packet": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "reader-only in this change; no deja hook/MCP wiring for Qoder verified yet"
+        },
+        "mcp": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "reader-only in this change; no deja hook/MCP wiring for Qoder verified yet"
+        },
+        "handoff": {
+          "status": "partial",
+          "proof": "stand",
+          "note": "paste-only: no Qoder command reopens a session by id, so a handoff lands as text the user pastes in"
+        },
+        "session_end": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "reader-only in this change; no deja hook/MCP wiring for Qoder verified yet"
+        },
+        "rules": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "reader-only in this change; no deja hook/MCP wiring for Qoder verified yet"
+        },
+        "statusline": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "reader-only in this change; no deja hook/MCP wiring for Qoder verified yet"
         },
         "reader": {
           "status": "yes",
@@ -3409,19 +3569,62 @@
       },
       "gaps": {},
       "surfaces": {
-        "digest": {"status": "yes", "proof": "stand"},
-        "prompt": {"status": "yes", "proof": "stand"},
-        "pre_tool": {"status": "yes", "proof": "fixture"},
-        "failure": {"status": "yes", "proof": "fixture"},
-        "compaction_reset": {"status": "yes", "proof": "stand"},
-        "compaction_capture": {"status": "yes", "proof": "stand"},
-        "compaction_packet": {"status": "yes", "proof": "fixture", "note": "the packet goes into the summarizer's instructions and is held for the turn after, where the next input.receive carries it"},
-        "mcp": {"status": "yes", "proof": "fixture"},
-        "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
-        "session_end": {"status": "yes", "proof": "fixture"},
-        "rules": {"status": "yes", "proof": "stand", "note": "AGENTS.md in the Reasonix home (2.30.0)"},
-        "statusline": {"status": "yes", "proof": "fixture", "note": "host/ui/publish"},
-        "reader": {"status": "yes", "proof": "fixture"}
+        "digest": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "prompt": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "pre_tool": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "failure": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_reset": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "compaction_capture": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "compaction_packet": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "the packet goes into the summarizer's instructions and is held for the turn after, where the next input.receive carries it"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "handoff": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "deja handoff --exec opens it with the packet as the first prompt"
+        },
+        "session_end": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "rules": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "AGENTS.md in the Reasonix home (2.30.0)"
+        },
+        "statusline": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "host/ui/publish"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture"
+        }
       }
     },
     {

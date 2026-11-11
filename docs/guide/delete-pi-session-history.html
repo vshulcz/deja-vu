@@ -191,7 +191,7 @@ deja delete &lt;id&gt;</pre>
 <p>The JSONL transcript holds the complete record of the session: the conversation messages, model switches, thinking adjustments, and tool calls (file reads, writes, edits, and shell commands) along with their results. Once removed, <code>pi --session &lt;id&gt;</code> cannot reopen the session, and pi cannot recover deleted transcripts without a separate backup.</p>
 
 <h2>Keeping it searchable instead</h2>
-<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads pi transcripts, along with sessions from forty-two other coding agents on your machine, into a single searchable local index:</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads pi transcripts, along with sessions from forty-three other coding agents on your machine, into a single searchable local index:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "pi session about the parser fix"</pre>
 <p>Indexing and search stay entirely on your disk, credentials are automatically stripped, and <code>deja forget</code> removes a session from the index when you want it forgotten without deleting the source file. deja honors <code>PI_CODING_AGENT_DIR</code> and <code>PI_CODING_AGENT_SESSION_DIR</code>; you can also set <code>DEJA_PI_ROOT</code> to point deja at an archived copy or backup of your transcripts.</p>

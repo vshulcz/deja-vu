@@ -132,7 +132,7 @@ skill 调用的是上面装好的 `deja` 二进制，自己不带。
 
 ## 能得到什么
 
-**在 Codex 里解决，Claude 记得。** 四十三个编程智能体把每一次对话都写进本地文件，
+**在 Codex 里解决，Claude 记得。** 四十四个编程智能体把每一次对话都写进本地文件，
 deja 把这些文件变成一层它们都能读的记忆。
 
 | | |
@@ -214,7 +214,7 @@ $ deja "jwt refresh token"
 细节见[压缩后自动恢复](../../docs/compaction.md)。
 
 Claude Code · Cline · Codex CLI · opencode · aider · Gemini CLI · Cursor · Antigravity ·
-Grok Build · Hermes · Goose · Qwen Code · Kimi Code · pi · omp (Oh My Pi) · OpenClaw ·
+Grok Build · Hermes · Goose · Qwen Code · Qoder · Kimi Code · pi · omp (Oh My Pi) · OpenClaw ·
 Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Roo Code ·
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
 Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·

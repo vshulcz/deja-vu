@@ -6,7 +6,7 @@
 <script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
 <title>deja-vu: memory for Claude Code, Codex, Cursor &amp; 40 more</title>
 <meta name="theme-color" content="#0b0f10">
-<meta name="description" content="Coding agent memory for Claude Code, Codex and 41 more agents. A local index of the session history already on your disk that every agent can recall.">
+<meta name="description" content="Coding agent memory for Claude Code, Codex and 42 more agents. A local index of the session history already on your disk that every agent can recall.">
 <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
@@ -351,7 +351,7 @@ footer a:hover{color:var(--ink)}
     <p id="recall-line" hidden></p>
     <h1>Your agent is about to re-debug something you fixed in <em>March</em>.</h1>
     <p class="lede">Fix it in Codex, and Claude Code remembers. deja indexes the sessions all
-      43 of your coding agents already wrote to disk — months of history from before you
+      44 of your coding agents already wrote to disk — months of history from before you
       installed it — so agents keep context across <code>/compact</code>, hand off mid-task via
       <code>deja handoff</code>, and recover overwritten code via <code>deja restore</code>. No LLM, one Go binary.</p>
     <div class="install-tabs" role="tablist" aria-label="install method">
@@ -425,7 +425,7 @@ footer a:hover{color:var(--ink)}
         <tr><th>Approach</th><th>History before install</th><th>Agents shared</th><th>Runtime &amp; LLM</th><th>LongMemEval-S R@5</th><th>19,195 sessions</th></tr>
       </thead>
       <tbody>
-        <tr class="us"><td>deja-vu</td><td>Yes — indexes existing transcripts</td><td>43 agents</td><td>1 Go binary, 0 LLMs</td><td>97.2%</td><td>13.6 s</td></tr>
+        <tr class="us"><td>deja-vu</td><td>Yes — indexes existing transcripts</td><td>44 agents</td><td>1 Go binary, 0 LLMs</td><td>97.2%</td><td>13.6 s</td></tr>
         <tr><td>CLAUDE.md / rules</td><td>Only what you hand-write</td><td>Per-file / manual</td><td>Loaded every turn</td><td>—</td><td>—</td></tr>
         <tr><td>MemPalace</td><td>Claude Code, Codex, Cursor</td><td>3 (CLI)</td><td>Python + 300 MB model</td><td>96.6%</td><td>72 s</td></tr>
         <tr><td>agentmemory</td><td>Claude Code import (<code>import-jsonl</code>)</td><td>12 (MCP)</td><td>Node daemon (2 ports)</td><td>95.2%</td><td>95 s</td></tr>
@@ -487,13 +487,13 @@ footer a:hover{color:var(--ink)}
 </section>
 
 <section class="reveal" id="harnesses">
-  <h2>Works with <span class="fig">43</span></h2>
+  <h2>Works with <span class="fig">44</span></h2>
   <div class="split">
     <div><p class="big" style="margin:0">Solve it in Codex. <em>Claude remembers.</em></p></div>
     <div class="right"><div class="agents" style="margin:0">
     <span><a href="registry/claude-code.html">Claude Code</a></span><span><a href="registry/codex.html">Codex CLI</a></span><span><a href="registry/cursor.html">Cursor</a></span><span><a href="registry/opencode.html">opencode</a></span>
     <span><a href="registry/gemini.html">Gemini CLI</a></span><span><a href="registry/cline.html">Cline</a></span><span><a href="registry/copilot.html">Copilot CLI</a></span><span><a href="registry/roo.html">Roo Code</a></span>
-    <span><a href="registry/aider.html">aider</a></span><span><a href="registry/goose.html">Goose</a></span><span><a href="registry/qwen.html">Qwen Code</a></span><span><a href="registry/kimi.html">Kimi Code</a></span><span><a href="registry/kilocode.html">Kilo Code</a></span><span><a href="registry/cherrystudio.html">Cherry Studio</a></span><span><a href="registry/kiro.html">Kiro</a></span>
+    <span><a href="registry/aider.html">aider</a></span><span><a href="registry/goose.html">Goose</a></span><span><a href="registry/qoder.html">Qoder</a></span><span><a href="registry/qwen.html">Qwen Code</a></span><span><a href="registry/kimi.html">Kimi Code</a></span><span><a href="registry/kilocode.html">Kilo Code</a></span><span><a href="registry/cherrystudio.html">Cherry Studio</a></span><span><a href="registry/kiro.html">Kiro</a></span>
     <span><a href="registry/antigravity.html">Antigravity</a></span><span><a href="registry/grok.html">Grok Build</a></span><span><a href="registry/openclaw.html">OpenClaw</a></span><span><a href="registry/pi.html">pi</a></span>
     <span><a href="registry/omp.html">omp</a></span><span><a href="registry/deepseek.html">DeepSeek Harness</a></span><span><a href="registry/hermes.html">Hermes</a></span><span><a href="registry/zed.html">Zed</a></span>
     <span><a href="registry/amp.html">Amp</a></span><span><a href="registry/continue.html">Continue</a></span><span><a href="registry/copilot-chat.html">Copilot Chat</a></span><span><a href="registry/prime.html">prime-agent</a></span>
@@ -778,7 +778,7 @@ document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
   }
   var COMMANDS={
     'help':'<p class="none">this input is a tiny deja: type words to search 16 demo sessions.\ncommands: <span class="t">sources</span> · <span class="t">stats</span> · <span class="t">version</span> · <span class="t">clear</span>\nthe real CLI does far more — see <a href="guide/commands.html">cli reference</a></p>',
-    'sources':'<p class="none">claude&nbsp;&nbsp;codex&nbsp;&nbsp;opencode&nbsp;&nbsp;cursor&nbsp;&nbsp;gemini&nbsp;&nbsp;aider&nbsp;&nbsp;antigravity&nbsp;&nbsp;grok&nbsp;&nbsp;qwen&nbsp;&nbsp;kimi&nbsp;&nbsp;cline&nbsp;&nbsp;roo&nbsp;&nbsp;kilocode&nbsp;&nbsp;cherrystudio&nbsp;&nbsp;kiro&nbsp;&nbsp;pi&nbsp;&nbsp;omp&nbsp;&nbsp;openclaw&nbsp;&nbsp;goose&nbsp;&nbsp;copilot&nbsp;&nbsp;copilot-chat&nbsp;&nbsp;deepseek&nbsp;&nbsp;crush&nbsp;&nbsp;zed&nbsp;&nbsp;hermes&nbsp;&nbsp;prime&nbsp;&nbsp;amp&nbsp;&nbsp;continue&nbsp;&nbsp;senpi&nbsp;&nbsp;kimchi&nbsp;&nbsp;commandcode&nbsp;&nbsp;zcode&nbsp;&nbsp;gjc&nbsp;&nbsp;codewhale&nbsp;&nbsp;reasonix&nbsp;&nbsp;codebuddy&nbsp;&nbsp;trae&nbsp;&nbsp;muse&nbsp;&nbsp;junie&nbsp;&nbsp;jetbrains&nbsp;&nbsp;devin&nbsp;&nbsp;windsurf&nbsp;&nbsp;mcode\n43 harnesses, one index — real paths in the <a href="guide/harnesses.html">harness table</a></p>',
+    'sources':'<p class="none">claude&nbsp;&nbsp;codex&nbsp;&nbsp;opencode&nbsp;&nbsp;cursor&nbsp;&nbsp;gemini&nbsp;&nbsp;aider&nbsp;&nbsp;antigravity&nbsp;&nbsp;grok&nbsp;&nbsp;qoder&nbsp;&nbsp;qwen&nbsp;&nbsp;kimi&nbsp;&nbsp;cline&nbsp;&nbsp;roo&nbsp;&nbsp;kilocode&nbsp;&nbsp;cherrystudio&nbsp;&nbsp;kiro&nbsp;&nbsp;pi&nbsp;&nbsp;omp&nbsp;&nbsp;openclaw&nbsp;&nbsp;goose&nbsp;&nbsp;copilot&nbsp;&nbsp;copilot-chat&nbsp;&nbsp;deepseek&nbsp;&nbsp;crush&nbsp;&nbsp;zed&nbsp;&nbsp;hermes&nbsp;&nbsp;prime&nbsp;&nbsp;amp&nbsp;&nbsp;continue&nbsp;&nbsp;senpi&nbsp;&nbsp;kimchi&nbsp;&nbsp;commandcode&nbsp;&nbsp;zcode&nbsp;&nbsp;gjc&nbsp;&nbsp;codewhale&nbsp;&nbsp;reasonix&nbsp;&nbsp;codebuddy&nbsp;&nbsp;trae&nbsp;&nbsp;muse&nbsp;&nbsp;junie&nbsp;&nbsp;jetbrains&nbsp;&nbsp;devin&nbsp;&nbsp;windsurf&nbsp;&nbsp;mcode\n44 harnesses, one index — real paths in the <a href="guide/harnesses.html">harness table</a></p>',
     'stats':'<p class="none">sessions 16 · messages 412 · top project api-gateway\nlast 12 months&nbsp;&nbsp;▁▁▂▃▂▅▆▄▇█▆▇\n(demo numbers — <span class="t">deja stats</span> wraps your real year)</p>',
     'version':'<p class="none">deja 0.24.1</p>',
     'clear':''

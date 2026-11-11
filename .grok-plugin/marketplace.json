@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "deja",
-      "description": "Recall the sessions your other coding agents already wrote — Claude Code, Codex, Cursor, opencode and thirty-nine more, including work from before deja was installed.",
+      "description": "Recall the sessions your other coding agents already wrote — Claude Code, Codex, Cursor, opencode and forty more, including work from before deja was installed.",
       "category": "development",
       "source": {
         "type": "local",
