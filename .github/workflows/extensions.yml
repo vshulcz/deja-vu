@@ -499,6 +499,11 @@ jobs:
               with zipfile.ZipFile(zf.open(jars[0])) as jf:
                   assert "META-INF/plugin.xml" in jf.namelist(), f"missing plugin.xml in {jf.namelist()}"
           '
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: deja-jetbrains
+          path: extensions/jetbrains/build/distributions/deja-jetbrains-*.zip
+          if-no-files-found: error
 
   nvim:
     name: deja.nvim
