@@ -149,6 +149,11 @@ func doctorHarnessStoresReport(w io.Writer, dir string, all bool, rep *doctorRep
 	rows.filesSkippingIn("qwen", qwenRoot, []string{qwenRoot}, doctorExists(qwenRoot),
 		sources.QwenSessionFiles(), sources.QwenSubagentFile, sources.QwenSidecarFiles()...)
 
+	qoderRoot := filepath.Join(sources.QoderRoot(), "projects")
+	// Qoder has no sidecar shape of its own today: the transcripts are the
+	// store, and sub-agent turns are flagged inside them.
+	rows.filesBeside("qoder", qoderRoot, doctorExists(qoderRoot), sources.QoderSessionFiles())
+
 	// CodeBuddy's tree is Claude Code's: sub-agents under the session that
 	// spawned them, a meta file per session and a memory/ directory beside.
 	cbRoots := sources.CodeBuddyRoots()
