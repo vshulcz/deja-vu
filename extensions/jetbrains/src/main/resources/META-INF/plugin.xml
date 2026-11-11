@@ -1,6 +1,6 @@
 <idea-plugin url="https://github.com/vshulcz/deja-vu/tree/main/extensions/jetbrains">
     <id>com.github.vshulcz.deja-vu</id>
-    <name>deja-vu — Cross-Agent AI Session Memory</name>
+    <name>deja-vu: Cross-Agent AI Session Memory</name>
     <vendor url="https://github.com/vshulcz/deja-vu">vshulcz</vendor>
     <description><![CDATA[
         <p>Local cross-agent session recall, AI line blame, and handoff for IntelliJ IDEA, GoLand, PyCharm, WebStorm, RustRover, CLion, PhpStorm, and Rider.</p>
