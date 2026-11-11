@@ -125,3 +125,49 @@ func TestRecentSpokenAssistantTurnsForTermsSkipsToolsAndHonoursAllowedKeys(t *te
 		t.Errorf("expected newest-first [claude:s2, claude:s1], got %+v", turnsBoth)
 	}
 }
+
+func TestGiveUpRecordsForKeysIndexesUserAndAssistantReversalsOnly(t *testing.T) {
+	h := newTwoWayEnv(t)
+	s1 := hPrompt("ledger", "s1", 2, 0, "try batching outbox") +
+		hBash("ledger", "s1", 2, 1, "t1", "git status", "reverted in tool output only", false) +
+		hSay("ledger", "s1", 2, 2, "Routine progress note without any rollback.") +
+		hSay("ledger", "s1", 2, 3, "We reverted batchFlushOutbox because holding the lock across network I/O caused deadlocks.")
+	s2 := hPrompt("ledger", "s2", 3, 0, "Откатили локальный кеш в dispatcher.go, потому что он ломал порядок доставки.") +
+		hSay("ledger", "s2", 3, 1, "Записал, оставляем прямую запись.")
+	s3 := hPrompt("ledger", "s3", 4, 0, "checkテスト") +
+		hSay("ledger", "s3", 4, 1, "Each new test failed with its fix reverted.")
+
+	h.put("ledger", "s1", s1)
+	h.put("ledger", "s2", s2)
+	h.put("ledger", "s3", s3)
+
+	dir := filepath.Join(h.tmp, "idx.db")
+	if err := Ensure(dir, "claude", false, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	recs, err := GiveUpRecordsForKeys(dir, map[string]bool{
+		"claude:s1": true,
+		"claude:s2": true,
+		"claude:s3": true,
+	})
+	if err != nil {
+		t.Fatalf("GiveUpRecordsForKeys: %v", err)
+	}
+	if len(recs) != 2 {
+		t.Fatalf("expected 2 spoken reversal records (assistant s1 + user s2, excluding tool output and s3 test-soundness rollback), got %d: %+v", len(recs), recs)
+	}
+	seen := map[string]string{}
+	for _, r := range recs {
+		seen[r.Key] = r.Role + ":" + r.Text
+	}
+	if !strings.Contains(seen["claude:s1"], "assistant:") || !strings.Contains(seen["claude:s1"], "batchFlushOutbox") {
+		t.Errorf("missing or wrong s1 assistant reversal: %q", seen["claude:s1"])
+	}
+	if !strings.Contains(seen["claude:s2"], "user:") || !strings.Contains(seen["claude:s2"], "dispatcher.go") {
+		t.Errorf("missing or wrong s2 user reversal: %q", seen["claude:s2"])
+	}
+	if _, bad := seen["claude:s3"]; bad {
+		t.Errorf("test-soundness rollback s3 must not be indexed as GiveUp: %q", seen["claude:s3"])
+	}
+}

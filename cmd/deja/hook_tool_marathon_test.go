@@ -261,3 +261,101 @@ func TestCrossModelCausalBreakageTransfersToHooksAndFix(t *testing.T) {
 		t.Fatalf("fix --json missing symbol/why:\n%s", jsonOut)
 	}
 }
+
+func TestToolHookSurfacesVerifiedRevertedApproachAndBlocksRollbackNoise(t *testing.T) {
+	tmp := hermeticEnv(t)
+	dir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", dir)
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+
+	proj := filepath.Join(tmp, "work", "gateway")
+	if err := os.MkdirAll(filepath.Join(proj, "internal", "postings"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(proj, "go.mod"), []byte("module example.com/gateway\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// 1) Short filename ("rpc.go") declaring a specific mixedCase symbol (`marshalBatchPayload`).
+	rpcFile := filepath.Join(proj, "rpc.go")
+	if err := os.WriteFile(rpcFile, []byte("package gateway\n\nfunc marshalBatchPayload() ([]byte, error) { return nil, nil }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// 2) Cold/split file (<2 direct sessions) declaring a >=16-char distinctive symbol.
+	splitFile := filepath.Join(proj, "internal", "postings", "postings_merge.go")
+	if err := os.WriteFile(splitFile, []byte("package postings\n\nfunc intersectSubstringPostingsDetailed() []int { return nil }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// 3) Negative-control file touched only by bare git rollback + test-soundness hunk rollback.
+	cleanFile := filepath.Join(proj, "codec.go")
+	if err := os.WriteFile(cleanFile, []byte("package gateway\n\nfunc decodeFrameHeader() error { return nil }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Older decision on rpc.go (s1), superseded by a newer dead-end reversal in a >300-rune paragraph (s2).
+	longReversal := "Confirmed: `marshalBatchPayload` returns a raw JSON array across all transport handlers and downstream clients rely on that exact wire envelope in production. " +
+		"Wrapping `marshalBatchPayload` in a text framing header would break that contract for strict decoders. " +
+		"My framing attempt on `marshalBatchPayload` was wrong — reverted."
+	writeClaudeFixture(t, filepath.Join(root, "gateway", "s1.jsonl"), "s1", []string{
+		fmt.Sprintf(`{"type":"user","sessionId":"s1","cwd":%q,"timestamp":"2026-03-01T10:00:00Z","message":{"role":"user","content":"update rpc.go"}}`, proj),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"s1","cwd":%q,"timestamp":"2026-03-01T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"e1","name":"Edit","input":{"file_path":%q,"old_string":"return nil, nil","new_string":"return nil, nil"}}]}}`, proj, rpcFile),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"s1","cwd":%q,"timestamp":"2026-03-01T10:02:00Z","message":{"role":"assistant","content":"We decided to keep rpc.go buffer pooling enabled because allocations spiked under load."}}`, proj),
+	})
+	writeClaudeFixture(t, filepath.Join(root, "gateway", "s2.jsonl"), "s2", []string{
+		fmt.Sprintf(`{"type":"user","sessionId":"s2","cwd":%q,"timestamp":"2026-03-02T10:00:00Z","message":{"role":"user","content":"try framing marshalBatchPayload"}}`, proj),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"s2","cwd":%q,"timestamp":"2026-03-02T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"e2","name":"Edit","input":{"file_path":%q,"old_string":"return nil, nil","new_string":"return nil, nil"}}]}}`, proj, rpcFile),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"s2","cwd":%q,"timestamp":"2026-03-02T10:03:00Z","message":{"role":"assistant","content":%q}}`, proj, longReversal),
+	})
+	// Review/subagent session (Touched == nil) naming distinctive symbol in splitFile.
+	writeClaudeFixture(t, filepath.Join(root, "gateway", "s3.jsonl"), "s3", []string{
+		fmt.Sprintf(`{"type":"user","sessionId":"s3","cwd":%q,"timestamp":"2026-03-03T10:00:00Z","message":{"role":"user","content":"review postings tier changes"}}`, proj),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"s3","cwd":%q,"timestamp":"2026-03-03T10:02:00Z","message":{"role":"assistant","content":"An earlier attempt widened intersectSubstringPostingsDetailed instead; it broke three tier-labelling tests by pre-empting the stem tier, and was reverted."}}`, proj),
+	})
+	// Negative controls on codec.go: bare rollback without rationale + test-soundness hunk rollback.
+	writeClaudeFixture(t, filepath.Join(root, "gateway", "s4.jsonl"), "s4", []string{
+		fmt.Sprintf(`{"type":"user","sessionId":"s4","cwd":%q,"timestamp":"2026-03-04T10:00:00Z","message":{"role":"user","content":"check codec.go"}}`, proj),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"s4","cwd":%q,"timestamp":"2026-03-04T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"e4","name":"Edit","input":{"file_path":%q,"old_string":"return nil","new_string":"return nil"}}]}}`, proj, cleanFile),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"s4","cwd":%q,"timestamp":"2026-03-04T10:02:00Z","message":{"role":"assistant","content":"Reverted codec.go to HEAD."}}`, proj),
+	})
+	writeClaudeFixture(t, filepath.Join(root, "gateway", "s5.jsonl"), "s5", []string{
+		fmt.Sprintf(`{"type":"user","sessionId":"s5","cwd":%q,"timestamp":"2026-03-05T10:00:00Z","message":{"role":"user","content":"verify codec.go test soundness"}}`, proj),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"s5","cwd":%q,"timestamp":"2026-03-05T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"e5","name":"Edit","input":{"file_path":%q,"old_string":"return nil","new_string":"return nil"}}]}}`, proj, cleanFile),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"s5","cwd":%q,"timestamp":"2026-03-05T10:02:00Z","message":{"role":"assistant","content":"Verified: with the codec.go hunk reverted, TestDecodeFrameHeader fails because the length check is missing."}}`, proj),
+	})
+
+	if _, err := captureRun(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLAUDE_PROJECT_DIR", proj)
+
+	// Case 1: rpc.go surfaces the newer dead-end reversal via symbol match from a >300-rune paragraph.
+	rpcOut := toolHookRun(t, fmt.Sprintf(`{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":%q,"old_string":"return nil, nil","new_string":"return nil, nil"},"session_id":"agent-now","cwd":%q}`, rpcFile, proj))
+	if !strings.Contains(rpcOut, "reverted approach here:") || !strings.Contains(rpcOut, "reverted") {
+		t.Fatalf("expected rpc.go to surface reverted approach warning, got:\n%s", rpcOut)
+	}
+
+	// Case 2: Cold/split file (<2 direct sessions) surfaces un-touched review session reversal via >=16-char distinctive symbol.
+	splitOut := toolHookRun(t, fmt.Sprintf(`{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":%q,"old_string":"return nil","new_string":"return nil"},"session_id":"agent-now","cwd":%q}`, splitFile, proj))
+	if !strings.Contains(splitOut, "reverted approach here:") || !strings.Contains(splitOut, "intersectSubstringPostingsDetailed") {
+		t.Fatalf("expected split file postings_merge.go to surface distinctive-symbol reversal, got:\n%s", splitOut)
+	}
+
+	// Case 3: Negative controls on codec.go must NOT emit reverted approach here.
+	cleanOut := toolHookRun(t, fmt.Sprintf(`{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":%q,"old_string":"return nil","new_string":"return nil"},"session_id":"agent-now","cwd":%q}`, cleanFile, proj))
+	if strings.Contains(cleanOut, "reverted approach here:") {
+		t.Fatalf("expected negative-control rollbacks on codec.go to stay silent on reverted approach, got:\n%s", cleanOut)
+	}
+
+	// Case 4: Once a newer settled decision lands on rpc.go (s6), it supersedes the older reversal.
+	writeClaudeFixture(t, filepath.Join(root, "gateway", "s6.jsonl"), "s6", []string{
+		fmt.Sprintf(`{"type":"user","sessionId":"s6","cwd":%q,"timestamp":"2026-03-06T10:00:00Z","message":{"role":"user","content":"settle rpc.go envelope"}}`, proj),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"s6","cwd":%q,"timestamp":"2026-03-06T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"e6","name":"Edit","input":{"file_path":%q,"old_string":"return nil, nil","new_string":"return nil, nil"}}]}}`, proj, rpcFile),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"s6","cwd":%q,"timestamp":"2026-03-06T10:02:00Z","message":{"role":"assistant","content":"We decided to version marshalBatchPayload via an optional v2 query flag so existing JSON array callers stay untouched."}}`, proj),
+	})
+	if _, err := captureRun(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+	supersededOut := toolHookRun(t, fmt.Sprintf(`{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":%q,"old_string":"return nil, nil","new_string":"return nil, nil"},"session_id":"agent-now","cwd":%q}`, rpcFile, proj))
+	if strings.Contains(supersededOut, "reverted approach here:") || !strings.Contains(supersededOut, "version marshalBatchPayload") {
+		t.Fatalf("expected newer settled decision on rpc.go to supersede older reversal, got:\n%s", supersededOut)
+	}
+}

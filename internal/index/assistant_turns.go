@@ -128,3 +128,110 @@ func RecentSpokenAssistantTurnsForTerms(dir string, terms []string, allowedKeys 
 	slices.Reverse(out)
 	return out, nil
 }
+
+// giveUpSearchWords lists one guaranteed anchor word per reversal phrase in
+// giveUpPhrases so GiveUpRecordsForKeys can locate every reversal turn via
+// bucket postings without scanning records.bin.
+var giveUpSearchWords = []string{
+	"reverted", "reverting", "rolled", "rolling", "roll",
+	"backed", "back", "gave", "giving", "abandoned",
+	"dropped", "scrap", "undid", "undo",
+	"откатил", "откатили", "откатываю", "откатывать",
+	"вернул", "вернули", "отказались", "отказался",
+	"отбросили", "отбросил", "отменил",
+}
+
+func (v *metaViews) giveUpRecordsByKey(dir string, m Manifest) map[string][]Record {
+	v.giveUpOnce.Do(func() {
+		gaveOrds := map[uint32]bool{}
+		for _, meta := range v.sessions {
+			if meta.GaveUp {
+				gaveOrds[meta.Ord] = true
+			}
+		}
+		if len(gaveOrds) == 0 {
+			v.giveUpRecs = map[string][]Record{}
+			return
+		}
+		seenOff := map[int64]bool{}
+		var offs []int64
+		for _, raw := range giveUpSearchWords {
+			var tokBuf [1 + tokenHitCap]byte
+			var tok string
+			eachWord(raw, &tokBuf, func(b []byte) {
+				if tok == "" {
+					tok = string(b)
+				}
+			})
+			if tok == "" {
+				continue
+			}
+			posts, err := postingsFor(dir, tok)
+			if err != nil || len(posts) == 0 {
+				continue
+			}
+			for _, p := range posts {
+				if p.Tool || !gaveOrds[p.Sid] || seenOff[p.Off] {
+					continue
+				}
+				seenOff[p.Off] = true
+				offs = append(offs, p.Off)
+			}
+		}
+		if len(offs) == 0 {
+			v.giveUpRecs = map[string][]Record{}
+			return
+		}
+		slices.Sort(offs)
+		f, tbl, err := openRecordLog(dir)
+		if err != nil {
+			v.giveUpRecs = map[string][]Record{}
+			return
+		}
+		defer func() { _ = f.Close() }()
+		if tbl == nil {
+			tbl = tablesFromManifest(m)
+		}
+		byKey := make(map[string][]Record, len(gaveOrds))
+		_ = eachOffsetRecordAtInRoles(f, offs, tbl, map[string]bool{"user": true, "assistant": true}, func(_ int64, r Record) {
+			if r.Key == "" {
+				return
+			}
+			if len(GiveUpExcerpts(r.Text)) == 0 {
+				return
+			}
+			byKey[r.Key] = append(byKey[r.Key], r)
+		})
+		v.giveUpRecs = byKey
+	})
+	return v.giveUpRecs
+}
+
+// GiveUpRecordsForKeys returns spoken ("user" and "assistant") records that
+// carry at least one GiveUpExcerpts match for the given session keys, using
+// bucket postings + pread rather than scanning records.bin.
+func GiveUpRecordsForKeys(dir string, allowedKeys map[string]bool) ([]Record, error) {
+	if len(allowedKeys) == 0 {
+		return nil, nil
+	}
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return nil, err
+	}
+	pol := policy.Load()
+	excluded := excludedHarnesses()
+	byKey := viewsFor(m).giveUpRecordsByKey(dir, m)
+	var out []Record
+	for key := range allowedKeys {
+		meta, ok := m.Sessions[key]
+		if !ok || metaIgnoredOrExcluded(pol, excluded, meta) {
+			continue
+		}
+		out = append(out, byKey[key]...)
+	}
+	return out, nil
+}
+

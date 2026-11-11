@@ -108,6 +108,10 @@ func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(inde
 		var cold string
 		if repoDec != "" {
 			cold = name + repoDecisionLabel + repoDec
+		} else if !isTestFilePath(path) {
+			if rev, _ := fileReversalLineForWithTime(dir, cwd, path, editSymbols, fileSymbols, inScope, projects, pol, self); rev != "" {
+				cold = name + revertedLabel + rev
+			}
 		}
 		for _, tail := range []string{sigCallers, siblingRan} {
 			if tail == "" {
@@ -147,21 +151,31 @@ func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(inde
 		dec = standingLabel + promoted
 	} else if repoDec != "" {
 		dec = repoDecisionLabel + repoDec
-	} else if d := fileDecisionLineWithSymbols(dir, path, editSymbols, fileSymbols, inScope); d != "" && digest.CarriesDecision(d) && (mentionsFile(path, d) || mentionsAnySymbol(allSymbols, d)) {
-		// When the scanned decision sentence is the same root-cause explanation
-		// mined for a named test breakage on this file, emit the breakage line so
-		// the agent receives both the failing test name and the causal reason.
-		if brk := fileBreakageLineFor(dir, cwd, path, editSymbols, inScope, pol); decisionDuplicatesBreakageWhy(d, brk) {
-			dec = breakageLabel + brk
-		} else if promoted == d {
-			dec = decisionLabel + d
-		} else {
-			dec = modelLabel(decisionLabel, d) + d
+	} else {
+		d, decAt := fileDecisionLineWithSymbolsAndTime(dir, path, editSymbols, fileSymbols, inScope)
+		if d != "" && (!digest.CarriesDecision(d) || (!mentionsFile(path, d) && !mentionsAnySymbol(allSymbols, d))) {
+			d = ""
 		}
-	} else if rev := fileReversalLineFor(dir, path, editSymbols, fileSymbols, inScope); rev != "" {
-		dec = revertedLabel + rev
-	} else if brk := fileBreakageLineFor(dir, cwd, path, editSymbols, inScope, pol); brk != "" {
-		dec = breakageLabel + brk
+		rev, revAt := fileReversalLineForWithTime(dir, cwd, path, editSymbols, fileSymbols, inScope, projects, pol, self)
+		preferRev := rev != "" && (d == "" ||
+			(len(editSymbols) > 0 && mentionsAnySymbol(editSymbols, rev) && !mentionsAnySymbol(editSymbols, d)) ||
+			(!revAt.IsZero() && (decAt.IsZero() || revAt.After(decAt))))
+		if preferRev {
+			dec = revertedLabel + rev
+		} else if d != "" {
+			// When the scanned decision sentence is the same root-cause explanation
+			// mined for a named test breakage on this file, emit the breakage line so
+			// the agent receives both the failing test name and the causal reason.
+			if brk := fileBreakageLineFor(dir, cwd, path, editSymbols, inScope, pol); decisionDuplicatesBreakageWhy(d, brk) {
+				dec = breakageLabel + brk
+			} else if promoted == d {
+				dec = decisionLabel + d
+			} else {
+				dec = modelLabel(decisionLabel, d) + d
+			}
+		} else if brk := fileBreakageLineFor(dir, cwd, path, editSymbols, inScope, pol); brk != "" {
+			dec = breakageLabel + brk
+		}
 	}
 	ran := fileHookRanLineFor(dir, path, inScope)
 	if ran == "" {
@@ -443,6 +457,11 @@ func repoEntryMentionsFile(root, path, text string) bool {
 // and was not later taken back — the same decision-carrying line the SessionStart
 // digest surfaces, but delivered at the moment the file is about to change.
 func fileDecisionLineWithSymbols(dir, path string, editSymbols, fileSymbols []string, metas []index.SessionMeta) string {
+	line, _ := fileDecisionLineWithSymbolsAndTime(dir, path, editSymbols, fileSymbols, metas)
+	return line
+}
+
+func fileDecisionLineWithSymbolsAndTime(dir, path string, editSymbols, fileSymbols []string, metas []index.SessionMeta) (string, time.Time) {
 	sort.Slice(metas, func(i, j int) bool { return metas[i].Updated.After(metas[j].Updated) })
 	// A promoted note first. It is the user's own statement about this work,
 	// which is why the session-start block leads with it and calls it standing;
@@ -450,10 +469,11 @@ func fileDecisionLineWithSymbols(dir, path string, editSymbols, fileSymbols []st
 	// happened to end with — "looked at retry.go again (5)" in front of "the
 	// retry budget stays at 5" (#2495).
 	if line := promotedDecisionForFileIn(dir, path, metas); line != "" {
-		return line
+		return line, time.Now()
 	}
 	r := newLifecycleResolver(dir)
 	var fallback string
+	var fallbackAt time.Time
 	for i, meta := range metas {
 		if i >= toolHookDecisionScan {
 			break
@@ -470,7 +490,7 @@ func fileDecisionLineWithSymbols(dir, path string, editSymbols, fileSymbols []st
 		}
 		if path == "" {
 			if cs := digest.Conclusions(s, toolHookDecisionBudget, 1); len(cs) > 0 {
-				return trimTrailingFragment(search.SafeText(strings.TrimSpace(cs[0])))
+				return trimTrailingFragment(search.SafeText(strings.TrimSpace(cs[0]))), meta.Updated
 			}
 			continue
 		}
@@ -486,18 +506,19 @@ func fileDecisionLineWithSymbols(dir, path string, editSymbols, fileSymbols []st
 				continue
 			}
 			if len(editSymbols) > 0 && mentionsAnySymbol(editSymbols, line) {
-				return line
+				return line, meta.Updated
 			}
 			if fallback == "" && (mentionsFile(path, line) || mentionsAnySymbol(fileSymbols, line)) {
 				fallback = line
+				fallbackAt = meta.Updated
 				if len(editSymbols) == 0 {
-					return line
+					return line, meta.Updated
 				}
 			}
 		}
 	}
 	if fallback != "" || path == "" {
-		return fallback
+		return fallback, fallbackAt
 	}
 	return fileEpisodeDecisionLine(dir, path, editSymbols, fileSymbols, metas, r)
 }
@@ -506,15 +527,18 @@ func fileDecisionLineWithSymbols(dir, path string, editSymbols, fileSymbols []st
 // mention this file's stem or specific symbols via the bucket posting list.
 // In long multi-file sessions, a decision about an edited file sits at the
 // episode where the file was changed rather than in the session's final tail.
-func fileEpisodeDecisionLine(dir, path string, editSymbols, fileSymbols []string, metas []index.SessionMeta, r *lifecycleResolver) string {
+func fileEpisodeDecisionLine(dir, path string, editSymbols, fileSymbols []string, metas []index.SessionMeta, r *lifecycleResolver) (string, time.Time) {
 	allowedKeys := make(map[string]bool, len(metas))
+	metaByKey := make(map[string]time.Time, len(metas))
 	for _, meta := range metas {
 		if decisionUsable(metaSession(meta), r) {
-			allowedKeys[meta.Key()] = true
+			k := meta.Key()
+			allowedKeys[k] = true
+			metaByKey[k] = meta.Updated
 		}
 	}
 	if len(allowedKeys) == 0 {
-		return ""
+		return "", time.Time{}
 	}
 	var lookupTerms []string
 	seenTerm := map[string]bool{}
@@ -540,30 +564,36 @@ func fileEpisodeDecisionLine(dir, path string, editSymbols, fileSymbols []string
 		}
 	}
 	if len(lookupTerms) == 0 {
-		return ""
+		return "", time.Time{}
 	}
 	turns, err := index.RecentSpokenAssistantTurnsForTerms(dir, lookupTerms, allowedKeys, 32)
 	if err != nil || len(turns) == 0 {
-		return ""
+		return "", time.Time{}
 	}
 	var fallback string
+	var fallbackAt time.Time
 	for _, turn := range turns {
 		if !mentionsFile(path, turn.Text) && !mentionsSpecificSymbol(fileSymbols, turn.Text) && !mentionsAnySymbol(editSymbols, turn.Text) {
 			continue
 		}
 		if line := extractEpisodeDecisionFromTurn(turn.Text, path, editSymbols, fileSymbols); line != "" {
+			at := turn.Time
+			if at.IsZero() {
+				at = metaByKey[turn.Key]
+			}
 			if len(editSymbols) > 0 && mentionsAnySymbol(editSymbols, line) {
-				return line
+				return line, at
 			}
 			if fallback == "" {
 				fallback = line
+				fallbackAt = at
 				if len(editSymbols) == 0 {
-					return fallback
+					return fallback, fallbackAt
 				}
 			}
 		}
 	}
-	return fallback
+	return fallback, fallbackAt
 }
 
 func extractEpisodeDecisionFromTurn(turnText, path string, editSymbols, fileSymbols []string) string {
@@ -661,81 +691,295 @@ func lacksProseWordsOutsideCode(s string) bool {
 // symbols and states why an approach was backed out warns the agent against
 // repeating the dead end.
 func fileReversalLineFor(dir, path string, editSymbols, fileSymbols []string, metas []index.SessionMeta) string {
-	if path == "" || len(metas) == 0 {
-		return ""
+	line, _ := fileReversalLineForWithTime(dir, "", path, editSymbols, fileSymbols, metas, nil, policy.Load(), nil)
+	return line
+}
+
+func fileReversalLineForWithTime(
+	dir, cwd, path string,
+	editSymbols, fileSymbols []string,
+	metas []index.SessionMeta,
+	projects func() []string,
+	pol policy.Policy,
+	self func(index.SessionMeta, string) bool,
+) (string, time.Time) {
+	if path == "" {
+		return "", time.Time{}
 	}
-	r := newLifecycleResolver(dir)
+	sorted := slices.Clone(metas)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Updated.After(sorted[j].Updated) })
+	var r *lifecycleResolver
+	resolver := func() *lifecycleResolver {
+		if r == nil {
+			r = newLifecycleResolver(dir)
+		}
+		return r
+	}
 	gaveKeys := map[string]bool{}
-	for _, meta := range metas {
+	touchedKey := map[string]bool{}
+	metaAt := map[string]time.Time{}
+	for _, meta := range sorted {
 		if !meta.GaveUp {
 			continue
 		}
-		if state, _, _, _, ok := r.resolve(metaSession(meta)); ok && state == model.LifecycleAccepted {
+		if state, _, _, _, ok := resolver().resolve(metaSession(meta)); ok && state == model.LifecycleAccepted {
 			continue
 		}
-		gaveKeys[meta.Key()] = true
+		k := meta.Key()
+		gaveKeys[k] = true
+		touchedKey[k] = true
+		metaAt[k] = meta.Updated
+	}
+	if projects != nil {
+		names := projects()
+		if len(names) > 0 {
+			if allMetas, err := index.AllMeta(dir); err == nil {
+				for _, meta := range allMetas {
+					if !meta.GaveUp || len(meta.Touched) > 0 {
+						continue
+					}
+					if !pol.Allows(policy.ActivationAuto, meta.Project) || !fileMetaInScope(meta, path, names) {
+						continue
+					}
+					if self != nil && self(meta, path) {
+						continue
+					}
+					if state, _, _, _, ok := resolver().resolve(metaSession(meta)); ok && state == model.LifecycleAccepted {
+						continue
+					}
+					k := meta.Key()
+					if !gaveKeys[k] {
+						gaveKeys[k] = true
+						metaAt[k] = meta.Updated
+					}
+				}
+			}
+		}
 	}
 	if len(gaveKeys) == 0 {
-		return ""
+		return "", time.Time{}
 	}
-	var lookupTerms []string
-	seenTerm := map[string]bool{}
-	addTerm := func(s string) {
-		low := strings.ToLower(strings.TrimSpace(s))
-		if len(low) < 4 || seenTerm[low] || isGenericFileStemPart(low) || isCommonKeyword(low) {
-			return
-		}
-		seenTerm[low] = true
-		lookupTerms = append(lookupTerms, low)
-	}
-	stem := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	addTerm(stem)
-	for _, part := range strings.FieldsFunc(stem, func(ch rune) bool { return ch == '_' || ch == '-' || ch == '.' }) {
-		addTerm(part)
-	}
-	for _, sym := range append(slices.Clone(editSymbols), fileSymbols...) {
-		if len(sym) >= 6 && hasMixedCaseOrUnderscore(sym) {
-			addTerm(sym)
-			if len(lookupTerms) >= 6 {
-				break
-			}
-		}
-	}
-	if len(lookupTerms) == 0 {
-		return ""
-	}
-	turns, err := index.RecentSpokenAssistantTurnsForTerms(dir, lookupTerms, gaveKeys, 12)
+	turns, err := index.GiveUpRecordsForKeys(dir, gaveKeys)
 	if err != nil || len(turns) == 0 {
-		return ""
+		return "", time.Time{}
 	}
-	slices.Reverse(turns)
+	// Order records newest-session-first, and within a session newest-turn-first.
+	slices.SortStableFunc(turns, func(a, b index.Record) int {
+		at, bt := a.Time, b.Time
+		if at.IsZero() {
+			at = metaAt[a.Key]
+		}
+		if bt.IsZero() {
+			bt = metaAt[b.Key]
+		}
+		return bt.Compare(at)
+	})
 	var fallback string
+	var fallbackAt time.Time
 	for _, turn := range turns {
-		for rawLine := range strings.SplitSeq(turn.Text, "\n") {
-			l, ok := index.GiveUpLine(rawLine)
-			if !ok {
-				continue
-			}
+		for _, l := range index.GiveUpExcerpts(turn.Text) {
 			clean := cleanRepoCandidateLine(l)
-			if clean == "" || len([]rune(clean)) < 32 || !usableRepoCandidateLine(clean) || isEphemeralCompletionReport(clean) {
+			if clean == "" || len([]rune(clean)) < 35 || !usableReversalLine(clean) || isEphemeralCompletionReport(clean) || !hasReversalRationale(clean) {
 				continue
 			}
-			if !mentionsFile(path, clean) && !mentionsSpecificSymbol(fileSymbols, clean) && !mentionsSpecificSymbol(editSymbols, clean) {
+			if touchedKey[turn.Key] {
+				if !mentionsFileStrictForReversal(path, clean) && !mentionsSpecificSymbol(fileSymbols, clean) && !mentionsSpecificSymbol(editSymbols, clean) {
+					continue
+				}
+			} else if !mentionsExplicitFilePathForReversal(cwd, path, clean) && !mentionsDistinctiveSymbolForReversal(fileSymbols, clean) && !mentionsDistinctiveSymbolForReversal(editSymbols, clean) {
 				continue
 			}
-			clipped := trimTrailingFragment(search.SafeText(clipDecision(clean, toolHookDecisionBudget)))
+			clipped := clipReversalDecision(clean, toolHookDecisionBudget)
 			if clipped == "" {
 				continue
 			}
-			if len(editSymbols) > 0 && mentionsAnySymbol(editSymbols, clipped) {
-				return clipped
+			at := turn.Time
+			if at.IsZero() {
+				at = metaAt[turn.Key]
+			}
+			if len(editSymbols) > 0 && mentionsAnySymbol(editSymbols, clean) {
+				return clipped, at
 			}
 			if fallback == "" {
 				fallback = clipped
+				fallbackAt = at
 			}
 		}
 	}
-	return fallback
+	return fallback, fallbackAt
+}
+
+func mentionsExplicitFilePathForReversal(cwd, path, text string) bool {
+	low := strings.ToLower(text)
+	slashPath := strings.TrimPrefix(filepath.ToSlash(path), "./")
+	if cwd != "" && filepath.IsAbs(path) {
+		if rel, err := filepath.Rel(cwd, path); err == nil && !strings.HasPrefix(rel, "..") {
+			slashPath = filepath.ToSlash(rel)
+		}
+	}
+	lowRel := strings.ToLower(slashPath)
+	if strings.ContainsRune(lowRel, '/') && strings.Contains(low, lowRel) {
+		return true
+	}
+	fullBase := strings.ToLower(filepath.Base(slashPath))
+	if len(fullBase) >= 10 && strings.ContainsRune(fullBase, '.') && !strings.HasSuffix(fullBase, "_test.go") {
+		if strings.Contains(low, fullBase) && !strings.Contains(low, fullBase+":") {
+			return true
+		}
+	}
+	return false
+}
+
+func mentionsDistinctiveSymbolForReversal(symbols []string, text string) bool {
+	if len(symbols) == 0 || text == "" {
+		return false
+	}
+	var distinctive []string
+	for _, sym := range symbols {
+		s := strings.TrimSpace(sym)
+		if len(s) >= 16 && hasMixedCaseOrUnderscore(s) {
+			distinctive = append(distinctive, s)
+		}
+	}
+	return mentionsAnySymbol(distinctive, text)
+}
+
+func clipReversalDecision(clean string, budget int) string {
+	trimmed := strings.TrimSpace(clean)
+	for _, pfx := range []string{"Confirmed: ", "confirmed: "} {
+		if strings.HasPrefix(trimmed, pfx) {
+			trimmed = strings.TrimSpace(trimmed[len(pfx):])
+			break
+		}
+	}
+	clipped := trimTrailingFragment(search.SafeText(clipDecision(trimmed, budget)))
+	if clipped == "" {
+		return ""
+	}
+	if _, ok := index.GiveUpLine(clipped); ok {
+		return clipped
+	}
+	// Right-side truncation cut off the reversal clause in the second sentence;
+	// keep the tail up to budget starting at a clean word/clause boundary.
+	if len(trimmed) > budget {
+		start := len(trimmed) - budget
+		for start < len(trimmed) && !utf8.ValidString(trimmed[start:]) {
+			start++
+		}
+		if sp := strings.IndexAny(trimmed[start:], " ;—"); sp > 0 && start+sp+1 < len(trimmed) {
+			tail := strings.TrimLeft(trimmed[start+sp+1:], " —;-")
+			if cand := trimTrailingFragment(search.SafeText(tail)); cand != "" {
+				if _, ok := index.GiveUpLine(cand); ok {
+					return cand
+				}
+			}
+		}
+	}
+	return clipped
+}
+
+// mentionsFileStrictForReversal matches explicit basename or non-generic file
+// stem tokens (>=5 chars) without falling back to the parent directory name,
+// so a rollback remark about a package ("search", "index") never fans out onto
+// unrelated sibling files in that package.
+func mentionsFileStrictForReversal(path, text string) bool {
+	low := strings.ToLower(text)
+	fullBase := strings.ToLower(filepath.Base(path))
+	if len(fullBase) >= 5 && strings.ContainsRune(fullBase, '.') && strings.Contains(low, fullBase) {
+		return true
+	}
+	base := fullBase
+	if i := strings.LastIndex(base, "."); i > 0 {
+		base = base[:i]
+	}
+	if len(base) >= 5 && !isGenericFileStemPart(base) && containsIdentifierWord(low, base) {
+		return true
+	}
+	for _, w := range strings.FieldsFunc(base, func(r rune) bool { return r == '_' || r == '-' || r == '.' }) {
+		if len(w) < 5 || isGenericFileStemPart(w) {
+			continue
+		}
+		if containsIdentifierWord(low, w) {
+			return true
+		}
+		if strings.HasSuffix(w, "s") && len(w) >= 6 && containsIdentifierWord(low, strings.TrimSuffix(w, "s")) {
+			return true
+		}
+	}
+	return false
+}
+
+func usableReversalLine(line string) bool {
+	low := strings.ToLower(strings.TrimSpace(line))
+	for _, metaNoise := range []string{
+		"hunk reverted",
+		"fix reverted",
+		"fix is reverted",
+		"reverting the fix",
+		"reverting the line",
+		"reverted copy",
+		"reverted tree",
+		"reverted to commit",
+		"reverted probes",
+		"scratch copy",
+		"scratchpad",
+		"verified: with ",
+		"verified with ",
+		"would still be",
+		"telling the agent",
+		"tell the agent",
+		"test is sound",
+		"fail-before confirmed",
+		"necessity confirmed",
+		"expected-accept",
+		"expected-reject",
+		"notreports",
+		"reverted_approach",
+		"revertedlabel",
+		"giveupline",
+		"gaveup",
+		"giveup.go:",
+		"in session ",
+	} {
+		if strings.Contains(low, metaNoise) {
+			return false
+		}
+	}
+	// usableRepoCandidateLine drops bare status lines starting with "откатил ",
+	// "откатил:", "откатил." for repo-wide standing rule mining. For dead-end
+	// warnings, a first-person Russian rollback ("Откатил X, потому что Y") is
+	// valid when hasReversalRationale confirms causal substance; validate the
+	// body past that leading verb with usableRepoCandidateLine.
+	check := line
+	for _, pfx := range []string{"откатил ", "откатил:"} {
+		if strings.HasPrefix(low, pfx) {
+			check = "Мы " + line
+			break
+		}
+	}
+	return usableRepoCandidateLine(check)
+}
+
+// hasReversalRationale requires explicit causal or empirical outcome substance
+// explaining why the approach was backed out, blocking bare git/status chatter
+// ("reverted foo.go to origin/main", "откатил изменения в файле").
+func hasReversalRationale(line string) bool {
+	low := strings.ToLower(line)
+	for _, marker := range []string{
+		"because ", "since ", "as it ", "which ", "broke", "break", "deadlock",
+		"corrupt", "worse", "regress", "contract", "cycle", "cyclic", "slower",
+		"latency", "timeout", "race", "panic", "leak", "shadow", "cut ", "cuts ",
+		"instead", "rather than", "fail", "wrong", "noise", "bloat", "duplicate",
+		"потому что", "так как", "из-за", "поскольку", "лома", "слома",
+		"хуже", "падает", "уронил", "просел", "не изменился", "не помогло",
+		"замолкает", "не отдаются", "цикл", "привязало", "не срабатыва",
+		"дублир", "шум", "гонк", "дедлок", "зависа", "контракт", "таймаут",
+	} {
+		if strings.Contains(low, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 // fileBreakageLineFor mines FixPair.Edit entries for path in in-scope sessions

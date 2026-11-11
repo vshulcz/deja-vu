@@ -210,6 +210,11 @@ func classifyLiveHookLine(report *liveBenchReport, line string) {
 	case strings.Contains(line, revertedLabel):
 		report.RevertedApproach++
 		actionable = true
+		if body := extractLiveDecisionBody(line); body != "" {
+			if (len([]rune(body)) >= 45 && !usableReversalLine(body)) || isEphemeralCompletionReport(body) || !hasReversalRationale(body) {
+				report.EphemeralNoise++
+			}
+		}
 	case strings.Contains(line, breakageLabel):
 		report.PastBreakage++
 		actionable = true
