@@ -12,6 +12,13 @@ import (
 	"github.com/vshulcz/deja-vu/internal/policy"
 )
 
+const fixRawVersion = 2
+
+type fixRawDisk struct {
+	Version int
+	Pairs   []FixPair
+}
+
 var fixesCache struct {
 	mu    sync.Mutex
 	dir   string
@@ -39,8 +46,12 @@ func writeFixTables(dir string, raw []FixPair) {
 		_ = os.Remove(fixesPath(dir))
 		return
 	}
-	_ = writeGobAtomic(fixRawPath(dir), raw)
-	_ = writeGobAtomic(fixesPath(dir), judgeFixes(raw))
+	_ = writeGobAtomic(fixRawPath(dir), fixRawDisk{Version: fixRawVersion, Pairs: raw})
+	if kept := judgeFixes(raw); len(kept) > 0 {
+		_ = writeGobAtomic(fixesPath(dir), kept)
+	} else {
+		_ = os.Remove(fixesPath(dir))
+	}
 }
 
 // wholeSessionsForFixes returns the sessions in tails whose pairs can have
@@ -138,8 +149,12 @@ func fixSessionsForPass(tmp string, old, m Manifest, replacements []model.Sessio
 // served table, whose rows stand in for them: one sighting each, which is all
 // the incremental path ever counted. ok is false when neither can be read.
 func readFixRaw(dir string) (pairs []FixPair, ok bool) {
-	if err := readGob(fixRawPath(dir), &pairs); err == nil {
-		return pairs, true
+	var disk fixRawDisk
+	if err := readGob(fixRawPath(dir), &disk); err == nil {
+		if disk.Version == fixRawVersion {
+			return disk.Pairs, true
+		}
+		return nil, false
 	}
 	if _, err := os.Stat(fixRawPath(dir)); err == nil {
 		return nil, false

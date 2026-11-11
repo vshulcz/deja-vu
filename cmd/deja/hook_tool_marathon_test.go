@@ -201,3 +201,63 @@ func TestIsEphemeralCompletionReportRejectsPRMergeAndCodeLists(t *testing.T) {
 		t.Errorf("expected durable prose decision %q not to be rejected", durable)
 	}
 }
+
+func TestCrossModelCausalBreakageTransfersToHooksAndFix(t *testing.T) {
+	tmp := hermeticEnv(t)
+	dir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", dir)
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+
+	proj := filepath.Join(tmp, "work", "ledger")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(proj, "go.mod"), []byte("module example.com/ledger\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(proj, "outbox_relay.go")
+	if err := os.WriteFile(target, []byte("package ledger\n\nfunc RelayOutboxBatch() error { return nil }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	writeClaudeFixture(t, filepath.Join(root, "ledger", "s1.jsonl"), "s1", []string{
+		fmt.Sprintf(`{"type":"user","sessionId":"s1","cwd":%q,"timestamp":"2026-03-01T10:00:00Z","message":{"role":"user","content":"fix TestRelayOutboxBatchIdempotency"}}`, proj),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"s1","cwd":%q,"timestamp":"2026-03-01T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"b1","name":"Bash","input":{"command":"go test ./..."}}]}}`, proj),
+		fmt.Sprintf(`{"type":"user","sessionId":"s1","cwd":%q,"timestamp":"2026-03-01T10:01:05Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"b1","content":"--- FAIL: TestRelayOutboxBatchIdempotency (0.02s)\nFAIL\texample.com/ledger\t0.03s"}]}}`, proj),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"s1","cwd":%q,"timestamp":"2026-03-01T10:01:30Z","message":{"role":"assistant","content":"Root cause: RelayOutboxBatch duplicated rows because markDispatched ran outside the transaction."}}`, proj),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"s1","cwd":%q,"timestamp":"2026-03-01T10:02:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"e1","name":"Edit","input":{"file_path":%q,"old_string":"func RelayOutboxBatch() error {\n\tmarkDispatched()","new_string":"func RelayOutboxBatch() error {\n\ttx.markDispatched()"}}]}}`, proj, target),
+	})
+	writeClaudeFixture(t, filepath.Join(root, "ledger", "s2.jsonl"), "s2", []string{
+		fmt.Sprintf(`{"type":"user","sessionId":"s2","cwd":%q,"timestamp":"2026-03-02T10:00:00Z","message":{"role":"user","content":"re-verify outbox relay"}}`, proj),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"s2","cwd":%q,"timestamp":"2026-03-02T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"b2","name":"Bash","input":{"command":"go test ./..."}}]}}`, proj),
+		fmt.Sprintf(`{"type":"user","sessionId":"s2","cwd":%q,"timestamp":"2026-03-02T10:01:05Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"b2","content":"--- FAIL: TestRelayOutboxBatchIdempotency (0.02s)\nFAIL\texample.com/ledger\t0.03s"}]}}`, proj),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"s2","cwd":%q,"timestamp":"2026-03-02T10:02:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"e2","name":"Edit","input":{"file_path":%q,"old_string":"return nil","new_string":"return nil"}}]}}`, proj, target),
+	})
+
+	if _, err := captureRun(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLAUDE_PROJECT_DIR", proj)
+
+	// 1. PreToolUse (hook-tool): surfaces broken test + causal Why when editing the file.
+	prePayload := fmt.Sprintf(`{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":%q,"old_string":"return nil","new_string":"return nil"},"session_id":"fast-agent","cwd":%q}`, target, proj)
+	preOut := toolHookRun(t, prePayload)
+	if !strings.Contains(preOut, "TestRelayOutboxBatchIdempotency broke") || !strings.Contains(preOut, "markDispatched ran outside the transaction") {
+		t.Fatalf("PreToolUse hook missing causal breakage context, got:\n%s", preOut)
+	}
+
+	// 2. PostToolUse (hook-tool-after): hands file + symbol + causal Why right on test failure.
+	afterLine := fixPairLine(dir, proj, "--- FAIL: TestRelayOutboxBatchIdempotency (0.02s)")
+	if !strings.Contains(afterLine, "changed next: outbox_relay.go (RelayOutboxBatch)") || !strings.Contains(afterLine, "markDispatched ran outside the transaction") {
+		t.Fatalf("PostToolUse fixPairLine missing symbol or causal why, got:\n%s", afterLine)
+	}
+
+	// 3. CLI fix --json: carries structured symbol and why fields.
+	jsonOut, err := captureRun(t, "fix", "--json", "--", "--- FAIL: TestRelayOutboxBatchIdempotency")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(jsonOut, `"symbol": "RelayOutboxBatch"`) || !strings.Contains(jsonOut, `"why": "RelayOutboxBatch duplicated rows because markDispatched ran outside the transaction."`) {
+		t.Fatalf("fix --json missing symbol/why:\n%s", jsonOut)
+	}
+}

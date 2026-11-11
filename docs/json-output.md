@@ -919,14 +919,18 @@ holding, so it is a field rather than a wording difference.
 
 When what followed the error was a change to a file rather than a command — the
 usual answer to a failing test — the row carries `edit` (the file's path) and an
-empty `command`; the prose renders it as *"changed next"*. `edit` is omitted
-when the remedy was a command.
+empty `command`; the prose renders it as *"changed next"*. When the session's
+edit hunk or surrounding diagnosis named the symbol touched or the root cause,
+`symbol` and `why` carry them too. `edit`, `symbol` and `why` are omitted when
+absent or when the remedy was a command.
 
 ```json
 {
   "error": "--- FAIL: TestPoolDrainsOnClose",
   "command": "",
   "edit": "/tmp/app/internal/pool/pool.go",
+  "symbol": "Pool.drain",
+  "why": "Pool.drain closed the work channel before in-flight workers exited.",
   "candidate": false,
   "when": "2026-08-29T18:02:44Z"
 }

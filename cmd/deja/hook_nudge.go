@@ -373,8 +373,9 @@ func promptErrorFixLine(dir, cwd, asked string, seen map[string]bool) (string, s
 		}
 		if idx := strings.Index(line, "changed next: "); idx >= 0 {
 			editPart := strings.TrimSpace(line[idx+len("changed next: "):])
-			if norm := orientPath(editPart, cwd); norm != "" {
-				line = line[:idx+len("changed next: ")] + norm
+			pathOnly, rest := splitEditTargetAndDetail(editPart)
+			if norm := orientPath(pathOnly, cwd); norm != "" {
+				line = line[:idx+len("changed next: ")] + norm + rest
 			}
 		}
 		tok := "prompt:fx:" + shortHash(line)
@@ -447,4 +448,17 @@ func emitNudgeOnly(stdout io.Writer, plain bool, nudge string) error {
 	resp.HookSpecificOutput.AdditionalContext = out
 	writePromptResponse(stdout, resp)
 	return nil
+}
+
+func splitEditTargetAndDetail(editPart string) (pathOnly, rest string) {
+	cut := -1
+	for _, sep := range []string{" (", " — "} {
+		if idx := strings.Index(editPart, sep); idx >= 0 && (cut < 0 || idx < cut) {
+			cut = idx
+		}
+	}
+	if cut < 0 {
+		return editPart, ""
+	}
+	return editPart[:cut], editPart[cut:]
 }

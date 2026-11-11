@@ -82,3 +82,43 @@ func TestALineOfSourceIsNotAnEditRemedy(t *testing.T) {
 		t.Errorf("a line of source was stored as the file that was changed: %+v", pairs)
 	}
 }
+
+func TestEditRemedyMinesSymbolAndCausalWhy(t *testing.T) {
+	now := time.Now()
+	s1 := fixPairsIn([]model.Message{
+		{Role: "tool-output", Text: "--- FAIL: TestPoolDrainsOnClose (0.09s)", Time: now},
+		{Role: "assistant", Text: "**Root cause:** `Pool.drain` closed the work channel because workers were still reading in-flight items.", Time: now.Add(10 * time.Second)},
+		{Role: "edit", Text: "internal/pool/pool.go\nfunc (p *Pool) drain() {\n-\tclose(p.work)\n+\tp.wg.Wait()\n+\tclose(p.work)", Time: now.Add(20 * time.Second)},
+		{Role: "tool-output", Text: "ok  \tinternal/pool\t0.2s", Time: now.Add(30 * time.Second)},
+	}, "claude:s1", "app")
+	if len(s1) != 1 {
+		t.Fatalf("got %d pairs, want 1: %+v", len(s1), s1)
+	}
+	if s1[0].Symbol != "Pool.drain" {
+		t.Errorf("Symbol = %q, want %q", s1[0].Symbol, "Pool.drain")
+	}
+	if s1[0].Why != "`Pool.drain` closed the work channel because workers were still reading in-flight items." {
+		t.Errorf("Why = %q", s1[0].Why)
+	}
+
+	// Second session confirms the edit with only stdlib calls in the hunk and no
+	// explanation; judgeFixes must keep the first sighting's Symbol and Why and
+	// must not mistake strings.TrimSpace for a domain symbol.
+	s2 := fixPairsIn([]model.Message{
+		{Role: "tool-output", Text: "--- FAIL: TestPoolDrainsOnClose (0.09s)", Time: now.Add(time.Hour)},
+		{Role: "edit", Text: "internal/pool/pool.go\n\tname := strings.TrimSpace(raw)\n-\tclose(p.work)\n+\tp.wg.Wait()", Time: now.Add(time.Hour + time.Minute)},
+	}, "claude:s2", "app")
+	if len(s2) != 1 {
+		t.Fatalf("s2 got %d pairs", len(s2))
+	}
+	if s2[0].Symbol != "" {
+		t.Errorf("stdlib call should not be mined as Symbol, got %q", s2[0].Symbol)
+	}
+	judged := judgeFixes(append(s1, s2...))
+	if len(judged) != 1 || judged[0].Candidate {
+		t.Fatalf("expected 1 confirmed pair, got %+v", judged)
+	}
+	if judged[0].Symbol != "Pool.drain" || judged[0].Why == "" {
+		t.Errorf("judgeFixes lost causal metadata from earlier sighting: %+v", judged[0])
+	}
+}

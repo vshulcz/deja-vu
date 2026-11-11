@@ -432,6 +432,11 @@ func handsOver(changed, files, oldFiles map[string]FileState, newlyKept map[stri
 
 // writeQuietPass records what a pass with nothing to read still has to.
 func writeQuietPass(dir string, old Manifest, files map[string]FileState, newlyKept, touched map[string]bool, dated bool) error {
+	if !old.SearchOnly {
+		if _, ok := readFixRaw(dir); !ok {
+			remineFixes(dir)
+		}
+	}
 	// Nothing to read, but the kept mark has to land, or the next run
 	// takes the same file for a fresh deletion.
 	if len(newlyKept) > 0 || !dated || len(touched) > 0 || !unreadableCurrent(old, files) {

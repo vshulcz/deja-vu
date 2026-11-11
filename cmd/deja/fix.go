@@ -187,6 +187,7 @@ func printFixPairsFrom(dir string, stdout io.Writer, pairs []index.FixPair) erro
 				edit = orientPath(edit, cwd)
 			}
 			fmt.Fprintf(stdout, "  %s: %s\n", changed, search.SafePath(edit))
+			writeEditContextLine(stdout, p)
 			for _, dl := range fixEditDiffLines(dir, p) {
 				fmt.Fprintf(stdout, "    %s\n", dl)
 			}
@@ -258,6 +259,10 @@ type fixRowJSON struct {
 	// omitted when the remedy was a command. It reached the prose only, and a
 	// script read an empty command (#3261).
 	Edit string `json:"edit,omitempty"`
+	// Symbol and Why carry the edited function/type and the causal explanation
+	// mined beside an edit remedy when present.
+	Symbol string `json:"symbol,omitempty"`
+	Why    string `json:"why,omitempty"`
 	// Failed is the command that produced the error, present when the remedy
 	// is that command corrected. The prose shows it as "after this failed",
 	// and a script wanting to apply the correction needs the same two halves.
@@ -278,6 +283,8 @@ func writeFixJSON(stdout io.Writer, pairs []index.FixPair) error {
 			Error:     search.SafeLine(p.Error),
 			Command:   search.SafeCommand(index.BareCommand(p.Command)),
 			Edit:      search.SafePath(p.Edit),
+			Symbol:    search.SafeLine(p.Symbol),
+			Why:       search.SafeLine(p.Why),
 			Failed:    search.SafeCommand(index.BareCommand(p.Failed)),
 			Candidate: p.Candidate,
 		}
@@ -306,4 +313,17 @@ func fixHintCommand(line string) string {
 		return "deja fix -- " + pasteSafe(line)
 	}
 	return "deja fix " + pasteSafe(line)
+}
+
+func writeEditContextLine(w io.Writer, p index.FixPair) {
+	sym := search.SafeLine(strings.TrimSpace(p.Symbol))
+	why := search.SafeLine(strings.TrimSpace(p.Why))
+	switch {
+	case sym != "" && why != "":
+		fmt.Fprintf(w, "    in %s: %s\n", sym, why)
+	case sym != "":
+		fmt.Fprintf(w, "    in %s\n", sym)
+	case why != "":
+		fmt.Fprintf(w, "    why: %s\n", why)
+	}
 }

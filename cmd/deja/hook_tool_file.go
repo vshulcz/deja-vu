@@ -148,16 +148,19 @@ func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(inde
 	} else if repoDec != "" {
 		dec = repoDecisionLabel + repoDec
 	} else if d := fileDecisionLineWithSymbols(dir, path, editSymbols, fileSymbols, inScope); d != "" && digest.CarriesDecision(d) && (mentionsFile(path, d) || mentionsAnySymbol(allSymbols, d)) {
-		// A scanned line is a decision about the file only when it reads as one and
-		// names the file or a symbol declared in it.
-		if promoted == d {
+		// When the scanned decision sentence is the same root-cause explanation
+		// mined for a named test breakage on this file, emit the breakage line so
+		// the agent receives both the failing test name and the causal reason.
+		if brk := fileBreakageLineFor(dir, cwd, path, editSymbols, inScope, pol); decisionDuplicatesBreakageWhy(d, brk) {
+			dec = breakageLabel + brk
+		} else if promoted == d {
 			dec = decisionLabel + d
 		} else {
 			dec = modelLabel(decisionLabel, d) + d
 		}
 	} else if rev := fileReversalLineFor(dir, path, editSymbols, fileSymbols, inScope); rev != "" {
 		dec = revertedLabel + rev
-	} else if brk := fileBreakageLineFor(dir, cwd, path, inScope, pol); brk != "" {
+	} else if brk := fileBreakageLineFor(dir, cwd, path, editSymbols, inScope, pol); brk != "" {
 		dec = breakageLabel + brk
 	}
 	ran := fileHookRanLineFor(dir, path, inScope)
@@ -738,7 +741,7 @@ func fileReversalLineFor(dir, path string, editSymbols, fileSymbols []string, me
 // fileBreakageLineFor mines FixPair.Edit entries for path in in-scope sessions
 // to surface named tests or panics that previously broke here and required
 // editing this file to repair.
-func fileBreakageLineFor(dir, cwd, path string, metas []index.SessionMeta, pol policy.Policy) string {
+func fileBreakageLineFor(dir, cwd, path string, editSymbols []string, metas []index.SessionMeta, pol policy.Policy) string {
 	if path == "" || len(metas) == 0 || isTestFilePath(path) {
 		return ""
 	}
@@ -759,7 +762,9 @@ func fileBreakageLineFor(dir, cwd, path string, metas []index.SessionMeta, pol p
 	}
 	var brokenTests []string
 	seenTest := map[string]bool{}
-	var panicLine string
+	var bestTest, bestSym, bestWhy string
+	bestRank := 0
+	var panicLine, panicSym, panicWhy string
 	for _, p := range pairs {
 		if p.Edit == "" || p.Error == "" {
 			continue
@@ -780,21 +785,98 @@ func fileBreakageLineFor(dir, cwd, path string, metas []index.SessionMeta, pol p
 				seenTest[tn] = true
 				brokenTests = append(brokenTests, tn)
 			}
+			rank := breakageContextRank(p, editSymbols)
+			if rank > bestRank {
+				bestRank = rank
+				bestTest = tn
+				bestSym = p.Symbol
+				bestWhy = p.Why
+			}
 			continue
 		}
-		if panicLine == "" && isSpecificBreakageError(p.Error) {
-			panicLine = truncateToolLine(search.SafeLine(strings.TrimSpace(p.Error)), 120)
+		if isSpecificBreakageError(p.Error) {
+			if panicLine == "" || (panicWhy == "" && p.Why != "") {
+				panicLine = truncateToolLine(search.SafeLine(strings.TrimSpace(p.Error)), 120)
+				panicSym = p.Symbol
+				panicWhy = p.Why
+			}
 		}
 	}
 	if len(brokenTests) > 0 {
+		if bestWhy != "" {
+			label := bestTest
+			if label == "" {
+				label = brokenTests[0]
+			}
+			if len(brokenTests) > 1 {
+				label += fmt.Sprintf(" (+%d more)", len(brokenTests)-1)
+			}
+			why := search.SafeLine(bestWhy)
+			sym := search.SafeLine(bestSym)
+			if sym != "" && !whyMentionsSymbol(why, sym) {
+				return truncateToolLine(label+" broke in "+sym+" — "+why, toolHookDecisionBudget)
+			}
+			return truncateToolLine(label+" broke here — "+why, toolHookDecisionBudget)
+		}
 		limit := min(len(brokenTests), 3)
 		shown := strings.Join(brokenTests[:limit], ", ")
 		if len(brokenTests) > limit {
 			shown += fmt.Sprintf(" (+%d more)", len(brokenTests)-limit)
 		}
+		if bestSym != "" {
+			return truncateToolLine(shown+" failed and required editing "+search.SafeLine(bestSym)+" in this file", toolHookDecisionBudget)
+		}
 		return shown + " failed and required editing this file"
 	}
+	if panicLine != "" {
+		if panicWhy != "" {
+			return truncateToolLine(truncateToolLine(panicLine, 80)+" — "+search.SafeLine(panicWhy), toolHookDecisionBudget)
+		}
+		if panicSym != "" {
+			return truncateToolLine(panicLine+" (in "+search.SafeLine(panicSym)+")", toolHookDecisionBudget)
+		}
+	}
 	return panicLine
+}
+
+func breakageContextRank(p index.FixPair, editSymbols []string) int {
+	if p.Symbol == "" && p.Why == "" {
+		return 0
+	}
+	rank := 1
+	if p.Why != "" {
+		rank = 3
+		if !p.Candidate {
+			rank = 4
+		}
+	} else if !p.Candidate {
+		rank = 2
+	}
+	if p.Symbol != "" && len(editSymbols) > 0 && mentionsAnySymbol(editSymbols, p.Symbol) {
+		rank += 4
+	}
+	return rank
+}
+
+func whyMentionsSymbol(why, sym string) bool {
+	short := sym
+	if _, m, ok := strings.Cut(sym, "."); ok {
+		short = m
+	}
+	return short != "" && strings.Contains(strings.ToLower(why), strings.ToLower(short))
+}
+
+func decisionDuplicatesBreakageWhy(decision, brk string) bool {
+	_, why, ok := strings.Cut(brk, " — ")
+	if !ok || len(why) < 25 {
+		return false
+	}
+	normDec := strings.ToLower(strings.TrimSuffix(strings.TrimSpace(decision), "…"))
+	normWhy := strings.ToLower(strings.TrimSuffix(strings.TrimSpace(why), "…"))
+	for _, prefix := range []string{"root cause:", "cause:", "why:", "bug:"} {
+		normDec = strings.TrimSpace(strings.TrimPrefix(normDec, prefix))
+	}
+	return normWhy != "" && (strings.Contains(normDec, normWhy) || strings.Contains(normWhy, normDec))
 }
 
 func extractBrokenTestName(errLine string) string {

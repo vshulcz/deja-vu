@@ -83,6 +83,13 @@ type FixPair struct {
 	// Command, never beside it: an edit is evidence of what was changed, not
 	// something a reader can run.
 	Edit string `json:",omitempty"`
+	// Symbol is the declaration or call identifier extracted from the Edit span
+	// when the remedy was a file edit, pointing the reader at the exact symbol
+	// inside Edit rather than the whole file.
+	Symbol string `json:",omitempty"`
+	// Why is a single causal sentence spoken by the assistant around the Edit
+	// that explains why the failure happened or how the change settled it.
+	Why string `json:",omitempty"`
 	// Repaired marks the remedy as the failing command corrected — same
 	// program, most of the same words. That is evidence on its own, and of a
 	// different kind than the word rules: the pair is not a command that
@@ -155,9 +162,9 @@ func buildFixes(tmp string, ss []model.Session, keyOf func(model.Session) string
 	if len(all) == 0 {
 		return
 	}
-	_ = writeGob(fixRawPath(tmp), all)
+	_ = writeGobAtomic(fixRawPath(tmp), fixRawDisk{Version: fixRawVersion, Pairs: all})
 	if kept := judgeFixes(all); len(kept) > 0 {
-		_ = writeGob(fixesPath(tmp), kept)
+		_ = writeGobAtomic(fixesPath(tmp), kept)
 	}
 }
 
@@ -186,6 +193,7 @@ func judgeFixes(all []FixPair) []FixPair {
 		repeats[fixKey(p)]++
 	}
 	out := all[:0]
+	byKeyMeta := map[string]FixPair{}
 	for _, p := range all {
 		// Not a pair, and not nothing: the second kind of evidence accumulates
 		// across sessions, and sessions arrive one at a time. Dropping a
@@ -193,6 +201,18 @@ func judgeFixes(all []FixPair) []FixPair {
 		// nothing to confirm, so a full build reached pairs the same corpus
 		// grown one session at a time never did (#1301).
 		p.Candidate = !selfEvidentPair(p) && (!repetitionConfirms(p) || repeats[fixKey(p)] < 2)
+		k := fixKey(p)
+		if prev, ok := byKeyMeta[k]; !ok {
+			byKeyMeta[k] = p
+		} else {
+			if prev.Symbol == "" && p.Symbol != "" {
+				prev.Symbol = p.Symbol
+			}
+			if prev.Why == "" && p.Why != "" {
+				prev.Why = p.Why
+			}
+			byKeyMeta[k] = prev
+		}
 		out = append(out, p)
 	}
 	// One command per (error, command) is enough — the rest are the same fix
@@ -220,6 +240,14 @@ func judgeFixes(all []FixPair) []FixPair {
 			continue
 		}
 		seen[k] = true
+		if meta, ok := byKeyMeta[k]; ok {
+			if p.Symbol == "" {
+				p.Symbol = meta.Symbol
+			}
+			if p.Why == "" {
+				p.Why = meta.Why
+			}
+		}
 		kept = append(kept, p)
 		// Candidates have their own budget above, so the pair cap is what it
 		// was and this one bounds the file as a whole.
@@ -485,6 +513,7 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 		// The first file the session changed after the error, kept in case the
 		// window holds no command that answers it.
 		edited := ""
+		editIdx := -1
 		paired := false
 		for j := i + 1; j < len(ms) && j <= i+fixLookAhead; j++ {
 			if ms[j].Role == roleEdit {
@@ -492,6 +521,7 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 				// session going back to its work.
 				if edited == "" && !env {
 					edited = strings.TrimSpace(firstLineOf(ms[j].Text))
+					editIdx = j
 				}
 				continue
 			}
@@ -579,7 +609,11 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 		// remedy for a failing test, which is what the command window can
 		// never hold.
 		if !paired && edited != "" && looksLikeEditedPath(edited) {
-			out = append(out, FixPair{Sig: sig, Error: line, Edit: edited, Key: key, When: m.Time, Project: project, Also: also})
+			sym, why := mineEditContext(ms, i, editIdx, edited, line)
+			out = append(out, FixPair{
+				Sig: sig, Error: line, Edit: edited, Symbol: sym, Why: why,
+				Key: key, When: m.Time, Project: project, Also: also,
+			})
 		}
 	}
 	return out
@@ -739,6 +773,9 @@ func mergeFixes(dir, tmp string, live map[string]bool, replacements []model.Sess
 		if f, counts := redact.Text(p.Failed); len(counts) > 0 {
 			p.Failed, changed = f, true
 		}
+		if w, counts := redact.Text(p.Why); len(counts) > 0 {
+			p.Why, changed = w, true
+		}
 		kept = append(kept, p)
 	}
 	for _, s := range replacements {
@@ -752,7 +789,7 @@ func mergeFixes(dir, tmp string, live map[string]bool, replacements []model.Sess
 }
 
 func leaksCredential(p FixPair) bool {
-	for _, t := range []string{p.Error, p.Command, p.Failed} {
+	for _, t := range []string{p.Error, p.Command, p.Failed, p.Why} {
 		if _, counts := redact.Text(t); len(counts) > 0 {
 			return true
 		}
