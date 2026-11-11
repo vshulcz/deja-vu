@@ -489,7 +489,16 @@ jobs:
         run: |
           ./gradlew buildPlugin --no-daemon
           ls -lh build/distributions/*.zip
-          unzip -l build/distributions/*.zip | grep -q META-INF/plugin.xml
+          python3 -c '
+          import glob, zipfile
+          zips = glob.glob("build/distributions/*.zip")
+          assert len(zips) == 1, f"expected 1 zip, got {zips}"
+          with zipfile.ZipFile(zips[0]) as zf:
+              jars = [n for n in zf.namelist() if n.endswith(".jar")]
+              assert jars, f"no jars in {zf.namelist()}"
+              with zipfile.ZipFile(zf.open(jars[0])) as jf:
+                  assert "META-INF/plugin.xml" in jf.namelist(), f"missing plugin.xml in {jf.namelist()}"
+          '
 
   nvim:
     name: deja.nvim
