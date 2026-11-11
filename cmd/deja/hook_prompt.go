@@ -549,12 +549,13 @@ func promptDigestBody(dir, sessionID string, ss []model.Session, confident bool,
 }
 
 func promptDigestBodyIn(dir, cwd, sessionID string, ss []model.Session, confident bool, terms []string, idfOf map[string]float64, asked, nudge, rejectedWarning string, ranked []model.Session, matched, strong []int, skip map[string]bool) (string, bool) {
+	cwdProjects := digest.ProjectNameCandidates(cwd)
 	// Hand the digest the query's words most-identifying first. It has no
 	// way of its own to tell "mm_status" from "decide", and the session
 	// that answers often says both — measured live, ten of the answers
 	// this hook newly returns open on the ordinary word.
-	digest, shown := search.AutoRecallDigestShowing(ss, digestBudget(confident), byIdentifying(terms, idfOf), asked)
-	if strings.TrimSpace(digest) == "" {
+	digestText, shown := search.AutoRecallDigestShowing(ss, digestBudget(confident), byIdentifying(terms, idfOf), asked)
+	if strings.TrimSpace(digestText) == "" {
 		return "", false
 	}
 	// The sessions passed on where their words were said, but the block is
@@ -566,16 +567,19 @@ func promptDigestBodyIn(dir, cwd, sessionID string, ss []model.Session, confiden
 	// session that only ever heard of one.
 	named := namedLeadTerms(terms, idfOf, index.TopIDF(dir))
 	shownMatchesNamedProject := len(shown) > 0 && projectMatchesAnyTerm(shown[0].Project, terms)
+	if shownMatchesNamedProject && len(cwdProjects) > 0 && slices.Contains(cwdProjects, shown[0].Project) {
+		shownMatchesNamedProject = false
+	}
 	switch {
 	case shownMatchesNamedProject:
-		if !search.QuoteCarriesTerms(digest, terms, 1) {
+		if !search.QuoteCarriesTerms(digestText, terms, 1) {
 			return "", false
 		}
 	case len(named) == 1:
-		if !search.QuoteCarriesTerms(digest, named, 1) && !search.QuoteCarriesTerms(digest, terms, min(2, len(terms))) {
+		if !search.QuoteCarriesTerms(digestText, named, 1) && !search.QuoteCarriesTerms(digestText, terms, min(2, len(terms))) {
 			return "", false
 		}
-	case !search.QuoteCarriesTerms(digest, terms, min(2, len(terms))):
+	case !search.QuoteCarriesTerms(digestText, terms, min(2, len(terms))):
 		return "", false
 	}
 	// The line the agent is asked to say names a session; it has to be one
@@ -591,13 +595,13 @@ func promptDigestBodyIn(dir, cwd, sessionID string, ss []model.Session, confiden
 	}
 	actionLine := ""
 	if !strings.Contains(nudge, "likely target:") {
-		al := sessionActionMapLine(dir, cwd, actionSources, skip)
+		al := sessionActionMapLineForPrompt(dir, cwd, asked, actionSources, skip)
 		if al == "" {
 			al, _ = rankedTouchedConsensusLine(dir, cwd, ranked, matched, strong, nil, skip)
 		}
 		if al != "" {
-			if !strings.HasSuffix(digest, "\n") {
-				digest += "\n"
+			if !strings.HasSuffix(digestText, "\n") {
+				digestText += "\n"
 			}
 			actionLine = al + "\n"
 		}
@@ -640,7 +644,7 @@ func promptDigestBodyIn(dir, cwd, sessionID string, ss []model.Session, confiden
 			tail += "\n" + nudge
 		}
 	}
-	return lead + rejectedWarning + digest + actionLine + tail, true
+	return lead + rejectedWarning + digestText + actionLine + tail, true
 }
 
 // promptPicker chooses the sessions the prompt hook injects, at most two,

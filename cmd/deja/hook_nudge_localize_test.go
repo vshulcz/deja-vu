@@ -144,3 +144,103 @@ func TestSessionActionMapAndWeakPointerSurfaceEditedFiles(t *testing.T) {
 		t.Fatalf("expected weakRecallPointerIn to carry concrete edited files, got %q", ptr)
 	}
 }
+
+func TestTurn0MultilingualFixPairBridgeAndSelfProjectNoiseGuard(t *testing.T) {
+	tmp := hermeticEnv(t)
+	idxDir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", idxDir)
+	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
+
+	proj := filepath.Join(tmp, "work", "payments")
+	if err := os.MkdirAll(filepath.Join(proj, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(proj, "go.mod"), []byte("module example.com/payments\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	storeFile := filepath.Join(proj, "store_codec.go")
+	if err := os.WriteFile(storeFile, []byte("package payments\n\nfunc DecodeFrameHeader(buf []byte) error { return nil }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	loopFile := filepath.Join(proj, "worker_lease.go")
+	if err := os.WriteFile(loopFile, []byte("package payments\n\nfunc RenewWorkerLease() error { return nil }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var sweepFiles []string
+	for i := range 10 {
+		p := filepath.Join(proj, fmt.Sprintf("extra_%02d.go", i))
+		if err := os.WriteFile(p, []byte(fmt.Sprintf("package payments\n\nfunc ExtraHandler%02d() {}\n", i)), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		sweepFiles = append(sweepFiles, p)
+	}
+
+	// s1: confirmed self-corrected FixPair on store_codec.go ("makeslice: len out of range").
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "payments", "s1.jsonl"), "s1", []string{
+		fmt.Sprintf(`{"type":"user","sessionId":"s1","cwd":%q,"timestamp":"2026-03-01T10:00:00Z","message":{"role":"user","content":"investigate corrupt frame decode crash"}}`, proj),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"s1","cwd":%q,"timestamp":"2026-03-01T10:00:30Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"e0","name":"Edit","input":{"file_path":%q,"old_string":"return nil","new_string":"return nil"}}]}}`, proj, storeFile),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"s1","cwd":%q,"timestamp":"2026-03-01T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"b0","name":"Bash","input":{"command":"go test ./..."}}]}}`, proj),
+		fmt.Sprintf(`{"type":"user","sessionId":"s1","cwd":%q,"timestamp":"2026-03-01T10:01:05Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"b0","is_error":true,"content":"panic: runtime error: makeslice: len out of range\nFAIL\texample.com/payments\t0.02s"}]}}`, proj),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"s1","cwd":%q,"timestamp":"2026-03-01T10:01:30Z","message":{"role":"assistant","content":"The panic happened because untrusted frame length overflowed makeslice bounds."}}`, proj),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"s1","cwd":%q,"timestamp":"2026-03-01T10:01:45Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"e1","name":"Edit","input":{"file_path":%q,"old_string":"return nil","new_string":"return nil"}}]}}`, proj, storeFile),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"s1","cwd":%q,"timestamp":"2026-03-01T10:02:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"b1","name":"Bash","input":{"command":"go test ./..."}}]}}`, proj),
+		fmt.Sprintf(`{"type":"user","sessionId":"s1","cwd":%q,"timestamp":"2026-03-01T10:02:05Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"b1","content":"ok  \texample.com/payments\t0.01s"}]}}`, proj),
+	})
+
+	// s2 & s3: Cyrillic sessions editing worker_lease.go with inflected domain words.
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "payments", "s2.jsonl"), "s2", []string{
+		fmt.Sprintf(`{"type":"user","sessionId":"s2","cwd":%q,"timestamp":"2026-03-02T10:00:00Z","message":{"role":"user","content":"воркер зацикливается при потере аренды очереди"}}`, proj),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"s2","cwd":%q,"timestamp":"2026-03-02T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"e2","name":"Edit","input":{"file_path":%q,"old_string":"return nil","new_string":"return nil"}}]}}`, proj, loopFile),
+	})
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "payments", "s3.jsonl"), "s3", []string{
+		fmt.Sprintf(`{"type":"user","sessionId":"s3","cwd":%q,"timestamp":"2026-03-03T10:00:00Z","message":{"role":"user","content":"убрать повторное зацикливание аренды очереди"}}`, proj),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"s3","cwd":%q,"timestamp":"2026-03-03T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"e3","name":"Edit","input":{"file_path":%q,"old_string":"return nil","new_string":"return nil"}}]}}`, proj, loopFile),
+	})
+
+	// s4: broad 10-file marathon sweep mentioning the project's own name ("payments").
+	var s4Lines []string
+	s4Lines = append(s4Lines, fmt.Sprintf(`{"type":"user","sessionId":"s4","cwd":%q,"timestamp":"2026-03-04T10:00:00Z","message":{"role":"user","content":"wide cleanup across payments handlers"}}`, proj))
+	for i, sf := range sweepFiles {
+		s4Lines = append(s4Lines, fmt.Sprintf(`{"type":"assistant","sessionId":"s4","cwd":%q,"timestamp":"2026-03-04T10:01:%02dZ","message":{"role":"assistant","content":[{"type":"tool_use","id":"es%d","name":"Edit","input":{"file_path":%q,"old_string":"{}","new_string":"{}"}}]}}`, proj, i, i, sf))
+	}
+	s4Lines = append(s4Lines, fmt.Sprintf(`{"type":"assistant","sessionId":"s4","cwd":%q,"timestamp":"2026-03-04T10:05:00Z","message":{"role":"assistant","content":"Completed wide cleanup across payments."}}`, proj))
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "payments", "s4.jsonl"), "s4", s4Lines)
+
+	if _, err := captureRun(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. FixPair memory bridges "makeslice panic" in natural prose -> store_codec.go without pasted stderr.
+	fxLoc, _ := promptTaskTargetsLine(idxDir, proj, "harden makeslice panic bounds in payments", nil, nil)
+	if !strings.Contains(fxLoc, "store_codec.go") {
+		t.Fatalf("expected FixPair bridge to localize store_codec.go, got %q", fxLoc)
+	}
+
+	// 2. Pure Cyrillic prompt with inflected stem ("зацикливания" vs "зацикливается") localizes worker_lease.go.
+	cyrLoc, _ := promptTaskTargetsLine(idxDir, proj, "проверить защиту от зацикливания аренды очереди", nil, nil)
+	if !strings.Contains(cyrLoc, "worker_lease.go") {
+		t.Fatalf("expected Cyrillic stem bridge to localize worker_lease.go, got %q", cyrLoc)
+	}
+
+	// 3. Broad >8-file sweep session s4 is suppressed in sessionActionMapLine (zero sweep noise).
+	sweepSess := []model.Session{{Harness: "claude", ID: "s4", Project: "work/payments", Title: "wide cleanup"}}
+	if got := sessionActionMapLineForPrompt(idxDir, proj, "check payments status", sweepSess, nil); got != "" {
+		t.Fatalf("expected >8-file sweep session to stay silent in sessionActionMapLineForPrompt, got %q", got)
+	}
+
+	// 4. Self-project name ("payments") inside cwd must NOT bypass the 2-term quote gate in promptDigestBodyIn.
+	sweepFull := []model.Session{{
+		Harness: "claude",
+		ID:      "s4",
+		Project: "work/payments",
+		Title:   "wide cleanup",
+		Messages: []model.Message{
+			{Role: "user", Text: "wide cleanup across payments handlers"},
+			{Role: "assistant", Text: "Completed wide cleanup across payments."},
+		},
+	}}
+	idf := map[string]float64{"payments": 1.2, "unseen_xyz_token": 4.8}
+	if body, ok := promptDigestBodyIn(idxDir, proj, "live", sweepFull, true, []string{"payments", "unseen_xyz_token"}, idf, "check payments unseen_xyz_token", "", "", nil, nil, nil, nil); ok {
+		t.Fatalf("expected self-project name not to relax 2-term quote gate inside cwd, got:\n%s", body)
+	}
+}

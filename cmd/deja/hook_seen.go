@@ -535,7 +535,7 @@ func weakRecallPointerIn(dir, cwd string, ss []model.Session, terms []string, sk
 	}
 	out := fmt.Sprintf("deja: this project has history on %q from %s%s — call deja in \"recall\" mode (or recall) with a specific token if it matters here.\n",
 		search.SafeLine(topic), when, more)
-	if actionLine := sessionActionMapLine(dir, cwd, ss, skip); actionLine != "" {
+	if actionLine := sessionActionMapLineForPrompt(dir, cwd, strings.Join(terms, " "), ss, skip); actionLine != "" {
 		out += actionLine + "\n"
 	}
 	return out

@@ -331,19 +331,22 @@ func promptTaskTargetsLine(dir, cwd, asked string, seen, skip map[string]bool) (
 		}
 	}
 
-	// 2. Score files by separate structural (stem/declaration) DF, rare body DF, and historical Title/Settled->Touched vote.
+	// 2. Score files by separate structural (stem/declaration) DF, rare body DF,
+	// confirmed FixPair remedies, and historical Title/Settled->Touched vote.
 	if len(matchedFiles) == 0 {
 		histBoost, histSessions := historicalTitleTouchedBoost(dir, cwd, asked, skip)
+		fixBoost, fixHits := fixPairTargetBoost(dir, cwd, asked, skip)
 		structRareCap := max(10, idx.numFiles/22)
 		structVeryRareCap := max(5, idx.numFiles/55)
 		bodyRareCap := max(6, idx.numFiles/45)
+		projSelf := selfProjectWordSet(cwd)
 		qWords := map[string]bool{}
 		for _, w := range words {
-			if len(w) < 4 || localizeStopWords[w] {
+			if len(w) < 4 || localizeStopWords[w] || projSelf[w] {
 				continue
 			}
 			for _, sub := range splitIdentifierWords(w) {
-				if len(sub) >= 4 && !localizeStopWords[sub] {
+				if len(sub) >= 4 && !localizeStopWords[sub] && !projSelf[sub] {
 					qWords[sub] = true
 				}
 			}
@@ -402,9 +405,19 @@ func promptTaskTargetsLine(dir, cwd, asked string, seen, skip map[string]bool) (
 					}
 				}
 			}
+			if fb := fixBoost[f.rel]; fb > 0 {
+				score += fb
+				if fixHits[f.rel] >= 2 {
+					rareHits += 2
+					anchorHit = true
+				} else if rareHits >= 1 {
+					rareHits++
+					anchorHit = true
+				}
+			}
 			if hb := histBoost[f.rel]; hb > 0 {
 				score += hb
-				if histSessions[f.rel] >= 2 {
+				if histSessions[f.rel] >= 2 || hb >= 5.2 {
 					rareHits += 2
 					anchorHit = true
 				} else if rareHits >= 1 {
@@ -456,6 +469,172 @@ func promptTaskTargetsLine(dir, cwd, asked string, seen, skip map[string]bool) (
 	return line, tok
 }
 
+func selfProjectWordSet(cwd string) map[string]bool {
+	out := map[string]bool{
+		"github": true, "gitlab": true, "bitbucket": true,
+		"origin": true, "upstream": true, "master": true,
+	}
+	for _, p := range digest.ProjectNameCandidates(cwd) {
+		low := strings.ToLower(p)
+		out[low] = true
+		for _, tok := range extractPromptASCIIWords(low) {
+			if len(tok) >= 3 {
+				out[tok] = true
+			}
+		}
+		for part := range strings.FieldsFuncSeq(low, func(r rune) bool {
+			return r == '/' || r == '.'
+		}) {
+			if len(part) >= 3 {
+				out[part] = true
+			}
+		}
+	}
+	return out
+}
+
+func extractHistoricalQueryTerms(asked string, projSelf map[string]bool) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(t string) {
+		t = strings.Trim(strings.ToLower(t), "._-/")
+		if len([]rune(t)) < 4 || localizeStopWords[t] || projSelf[t] || seen[t] {
+			return
+		}
+		allDigits := true
+		for _, r := range t {
+			if r < '0' || r > '9' {
+				allDigits = false
+				break
+			}
+		}
+		if allDigits {
+			return
+		}
+		seen[t] = true
+		out = append(out, t)
+	}
+	for _, t := range prompt.Terms(asked) {
+		if !projSelf[strings.ToLower(t)] {
+			add(t)
+		}
+	}
+	for _, w := range extractPromptASCIIWords(asked) {
+		add(w)
+		for _, sub := range splitIdentifierWords(w) {
+			add(sub)
+		}
+	}
+	// Non-ASCII words (e.g. Cyrillic/European inflected nouns/verbs) beyond the 6-term prompt cap.
+	var cur []rune
+	flushNonASCII := func() {
+		if len(cur) >= 4 {
+			add(string(cur))
+		}
+		cur = cur[:0]
+	}
+	for _, r := range asked {
+		if r > 127 && unicode.IsLetter(r) {
+			cur = append(cur, unicode.ToLower(r))
+		} else {
+			flushNonASCII()
+		}
+	}
+	flushNonASCII()
+	if len(out) > 16 {
+		out = out[:16]
+	}
+	return out
+}
+
+func hayMatchesHistTerm(hay, qt string) bool {
+	if strings.Contains(hay, qt) {
+		return true
+	}
+	runes := []rune(qt)
+	if len(runes) >= 6 {
+		nonASCII := false
+		for _, r := range runes {
+			if r > 127 {
+				nonASCII = true
+				break
+			}
+		}
+		if nonASCII {
+			stemLen := len(runes) - 2
+			if len(runes) >= 8 {
+				stemLen = len(runes) - 3
+			}
+			if stemLen >= 5 {
+				return strings.Contains(hay, string(runes[:stemLen]))
+			}
+		}
+	}
+	return false
+}
+
+// fixPairTargetBoost consults in-scope FixPair edit remedies in RAM so prompts
+// naming an error family, panic kind, or causal failure vocabulary inherit the
+// exact repository file that previously settled it, even without pasted stderr.
+func fixPairTargetBoost(dir, cwd, asked string, skip map[string]bool) (map[string]float64, map[string]int) {
+	if dir == "" || cwd == "" || !planIndexReady(dir) {
+		return nil, nil
+	}
+	projSelf := selfProjectWordSet(cwd)
+	qTerms := extractHistoricalQueryTerms(asked, projSelf)
+	if len(qTerms) < 2 {
+		return nil, nil
+	}
+	pairs := index.ReadFixes(dir)
+	if len(pairs) == 0 {
+		return nil, nil
+	}
+	pol := policy.Load()
+	projNames := digest.ProjectNameCandidates(cwd)
+	boost := map[string]float64{}
+	hits := map[string]int{}
+	for _, p := range pairs {
+		if p.Edit == "" || p.Candidate {
+			continue
+		}
+		if p.Key != "" && skip != nil {
+			if _, id, ok := strings.Cut(p.Key, ":"); ok && skip[id] {
+				continue
+			}
+		}
+		if p.Project != "" {
+			if !pol.Allows(policy.ActivationAuto, p.Project) {
+				continue
+			}
+			if len(projNames) > 0 && !slices.Contains(projNames, p.Project) {
+				continue
+			}
+		}
+		targets := resolveRepoTouchedTargets(cwd, []string{p.Edit})
+		if len(targets) == 0 {
+			continue
+		}
+		rel := targets[0]
+		hay := strings.ToLower(p.Error + " " + p.Symbol + " " + p.Why)
+		matched := 0
+		for _, qt := range qTerms {
+			if hayMatchesHistTerm(hay, qt) {
+				matched++
+			}
+		}
+		if matched >= 2 {
+			w := 3.6 + 1.4*float64(min(matched-2, 2))
+			if w > boost[rel] {
+				boost[rel] = w
+			}
+			if matched > hits[rel] {
+				hits[rel] = matched
+			}
+		}
+	}
+	return boost, hits
+}
+
 // historicalTitleTouchedBoost scans cached SessionMeta rows of the current
 // project in RAM (0 disk reads) to transfer domain/multilingual prompt terms
 // from prior coding sessions onto the live files those sessions edited.
@@ -463,14 +642,8 @@ func historicalTitleTouchedBoost(dir, cwd, asked string, skip map[string]bool) (
 	if dir == "" || cwd == "" || !planIndexReady(dir) {
 		return nil, nil
 	}
-	terms := prompt.Terms(asked)
-	var qTerms []string
-	for _, t := range terms {
-		low := strings.ToLower(t)
-		if len([]rune(low)) >= 4 && !localizeStopWords[low] {
-			qTerms = append(qTerms, low)
-		}
-	}
+	projSelf := selfProjectWordSet(cwd)
+	qTerms := extractHistoricalQueryTerms(asked, projSelf)
 	if len(qTerms) < 2 {
 		return nil, nil
 	}
@@ -501,7 +674,7 @@ func historicalTitleTouchedBoost(dir, cwd, asked string, skip map[string]bool) (
 		hay := strings.ToLower(m.Title + " " + m.Settled)
 		var hits []string
 		for _, qt := range qTerms {
-			if strings.Contains(hay, qt) {
+			if hayMatchesHistTerm(hay, qt) {
 				hits = append(hits, qt)
 				df[qt]++
 			}
@@ -551,8 +724,39 @@ func historicalTitleTouchedBoost(dir, cwd, asked string, skip map[string]bool) (
 // recalled sessions (plus any verified test command) so Turn-0 recall hands
 // the agent exact edit targets instead of conversational prose alone.
 func sessionActionMapLine(dir, cwd string, ss []model.Session, skip map[string]bool) string {
+	return sessionActionMapLineForPrompt(dir, cwd, "", ss, skip)
+}
+
+func sessionActionMapLineForPrompt(dir, cwd, asked string, ss []model.Session, skip map[string]bool) string {
 	if dir == "" || cwd == "" || len(ss) == 0 {
 		return ""
+	}
+	var qWords map[string]bool
+	var idx repoSymbolMap
+	if strings.TrimSpace(asked) != "" {
+		projSelf := selfProjectWordSet(cwd)
+		qWords = map[string]bool{}
+		for _, w := range extractPromptASCIIWords(asked) {
+			if len(w) < 4 || localizeStopWords[w] || projSelf[w] {
+				continue
+			}
+			qWords[w] = true
+			for _, sub := range splitIdentifierWords(w) {
+				if len(sub) >= 4 && !localizeStopWords[sub] && !projSelf[sub] {
+					qWords[sub] = true
+				}
+			}
+		}
+		if len(qWords) > 0 {
+			idx = loadRepoSymbolMap(cwd)
+		}
+	}
+	var byRel map[string]repoFileEntry
+	if idx.numFiles > 0 {
+		byRel = make(map[string]repoFileEntry, len(idx.files))
+		for _, f := range idx.files {
+			byRel[f.rel] = f
+		}
 	}
 	var targets []string
 	for _, s := range ss {
@@ -560,7 +764,49 @@ func sessionActionMapLine(dir, cwd string, ss []model.Session, skip map[string]b
 		if !ok || len(meta.Touched) == 0 {
 			continue
 		}
-		for _, rel := range resolveRepoTouchedTargets(cwd, meta.Touched) {
+		resolved := resolveRepoTouchedTargets(cwd, meta.Touched)
+		if len(resolved) == 0 || len(resolved) > 8 {
+			continue
+		}
+		if len(resolved) > 1 && len(qWords) > 0 && len(byRel) > 0 {
+			type scoredRel struct {
+				rel   string
+				pos   int
+				score float64
+			}
+			scored := make([]scoredRel, len(resolved))
+			for pos, rel := range resolved {
+				var sc float64
+				if f, ok := byRel[rel]; ok {
+					for qw := range qWords {
+						switch {
+						case f.stemWords[qw] || f.stem == qw:
+							sc += 3.0
+						case f.declExact[qw] || f.declWords[qw]:
+							sc += 2.0
+						case f.pkg == qw:
+							sc += 1.0
+						case f.bodyWords[qw] > 0 && len(qw) >= 5:
+							sc += 0.5
+						}
+					}
+				}
+				scored[pos] = scoredRel{rel: rel, pos: pos, score: sc}
+			}
+			slices.SortFunc(scored, func(a, b scoredRel) int {
+				if a.score != b.score {
+					if a.score > b.score {
+						return -1
+					}
+					return 1
+				}
+				return a.pos - b.pos
+			})
+			for i, sr := range scored {
+				resolved[i] = sr.rel
+			}
+		}
+		for _, rel := range resolved {
 			targets = appendUniqueRel(targets, rel)
 			if len(targets) >= 3 {
 				break

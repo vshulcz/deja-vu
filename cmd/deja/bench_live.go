@@ -401,7 +401,7 @@ func measureLiveLocalization(indexDir, root string, projNames []string, pol poli
 			continue
 		}
 		asked := strings.TrimSpace(meta.Title)
-		if len([]rune(asked)) < 20 || digest.IsAgentArtifact(asked) {
+		if len([]rune(asked)) < 20 || index.TitleIsBorrowed(asked) || digest.IsAgentArtifact(asked) {
 			continue
 		}
 		targets := liveExistingEditedTargets(root, meta.Touched)
