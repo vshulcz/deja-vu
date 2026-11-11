@@ -498,6 +498,9 @@ jobs:
               assert jars, f"no jars in {zf.namelist()}"
               with zipfile.ZipFile(zf.open(jars[0])) as jf:
                   assert "META-INF/plugin.xml" in jf.namelist(), f"missing plugin.xml in {jf.namelist()}"
+                  import re, xml.etree.ElementTree as ET
+                  name = ET.fromstring(jf.read("META-INF/plugin.xml")).findtext("name") or ""
+                  assert re.fullmatch(r"[A-Za-z0-9 .,+_\-/:()#\x27&\[\]|]+", name), f"invalid Marketplace <name>: {name!r}"
           '
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
