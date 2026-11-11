@@ -242,6 +242,7 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsur
 | Hermes | 记忆提供者 `deja-memory`，在 Hermes 插件目录里 | `hermes plugins install deja-memory`，或从 GitHub：`hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 | Magpie | npm `@vshulcz/magpie-deja` | `magpie plugin add @vshulcz/magpie-deja` |
 | VS Code / Cursor / Windsurf | 状态栏扩展 `vshulcz.deja-status` | `code --install-extension vshulcz.deja-status` |
+| JetBrains 全家桶 | IntelliJ、GoLand、PyCharm、WebStorm 与 RustRover 插件（[`extensions/jetbrains/`](../../extensions/jetbrains/docs/zh.md)） | `idea installPlugins com.github.vshulcz.deja-vu` |
 | Neovim | `lazy.nvim` 与 CodeCompanion 插件（[`extensions/nvim/`](../../extensions/nvim/docs/zh.md)） | `{ "vshulcz/deja-vu", opts = {} }` |
 | tmux | [TPM](https://github.com/tmux-plugins/tpm) 弹窗（`prefix + D`）与状态栏 `#{deja_status}`（`deja.tmux`） | `set -g @plugin 'vshulcz/deja-vu'` |
 | Raycast | Raycast 扩展 `deja-vu` | `cd extensions/raycast && npm install && npx ray develop` |

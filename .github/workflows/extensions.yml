@@ -459,7 +459,45 @@ jobs:
               console.error("extensions/zed: no LICENSE where Zed looks for it");
               bad++;
             }
+            if (!fs.existsSync("extensions/jetbrains/LICENSE")) {
+              console.error("extensions/jetbrains: no LICENSE in the published directory");
+              bad++;
+            }
+            const pluginXml = fs.readFileSync("extensions/jetbrains/src/main/resources/META-INF/plugin.xml", "utf8");
+            if (!pluginXml.includes("vshulcz/deja-vu")) {
+              console.error("extensions/jetbrains: plugin.xml does not point at vshulcz/deja-vu");
+              bad++;
+            }
             process.exit(bad ? 1 : 0);
+          '
+
+  jetbrains:
+    name: deja-jetbrains
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: extensions/jetbrains
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: Build IntelliJ Platform plugin zip
+        run: |
+          ./gradlew buildPlugin --no-daemon
+          ls -lh build/distributions/*.zip
+          python3 -c '
+          import glob, zipfile
+          zips = glob.glob("build/distributions/*.zip")
+          assert len(zips) == 1, f"expected 1 zip, got {zips}"
+          with zipfile.ZipFile(zips[0]) as zf:
+              jars = [n for n in zf.namelist() if n.endswith(".jar")]
+              assert jars, f"no jars in {zf.namelist()}"
+              with zipfile.ZipFile(zf.open(jars[0])) as jf:
+                  assert "META-INF/plugin.xml" in jf.namelist(), f"missing plugin.xml in {jf.namelist()}"
           '
 
   nvim:

@@ -1,0 +1,53 @@
+<idea-plugin url="https://github.com/vshulcz/deja-vu/tree/main/extensions/jetbrains">
+    <id>com.github.vshulcz.deja-vu</id>
+    <name>deja-vu — Cross-Agent AI Session Memory</name>
+    <vendor url="https://github.com/vshulcz/deja-vu">vshulcz</vendor>
+    <description><![CDATA[
+        <p>Local cross-agent session recall, AI line blame, and handoff for IntelliJ IDEA, GoLand, PyCharm, WebStorm, RustRover, CLion, PhpStorm, and Rider.</p>
+        <p>Reads the local <code>deja</code> SQLite FTS5 index across 43 coding agents (Claude Code, Codex, OpenCode, Cursor, Gemini CLI, Junie, GitHub Copilot, Aider, Windsurf, and more) with secrets redacted before output and zero cloud dependencies.</p>
+        <ul>
+            <li><b>Status Bar Widget</b>: Live recall status for the open project; click to open the deja-vu action menu.</li>
+            <li><b>Search AI Sessions</b>: Query past sessions across all agents on your machine and open transcripts in a read-only Markdown tab.</li>
+            <li><b>Recent AI Sessions</b>: Browse the 50 most recent sessions across harnesses.</li>
+            <li><b>AI Blame Current Line</b>: Find which AI coding session wrote or touched the file and line under the caret.</li>
+            <li><b>Copy Cross-Agent Handoff</b>: Generate a compact handoff digest for the current project and copy it to the clipboard.</li>
+        </ul>
+        <p>Requires the <a href="https://github.com/vshulcz/deja-vu">deja</a> binary on your machine (<code>brew install vshulcz/tap/deja-vu</code> or <code>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</code>).</p>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <statusBarWidgetFactory
+                id="com.github.vshulcz.dejavu.statusBar"
+                implementation="com.github.vshulcz.dejavu.DejaStatusBarWidgetFactory"
+                order="after Position"/>
+        <notificationGroup
+                id="deja-vu"
+                displayType="BALLOON"/>
+    </extensions>
+
+    <actions>
+        <group id="DejaVu.Menu" text="deja-vu" description="Cross-agent AI session recall and handoff" popup="true">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <action id="DejaVu.SearchSessions"
+                    class="com.github.vshulcz.dejavu.DejaSearchAction"
+                    text="Search AI Sessions..."
+                    description="Search past AI coding sessions across 43 harnesses"/>
+            <action id="DejaVu.RecentSessions"
+                    class="com.github.vshulcz.dejavu.DejaLastAction"
+                    text="Recent AI Sessions"
+                    description="Browse recent AI coding sessions across 43 harnesses"/>
+            <action id="DejaVu.BlameLine"
+                    class="com.github.vshulcz.dejavu.DejaBlameLineAction"
+                    text="AI Blame Current Line"
+                    description="Find which AI coding session touched the current line">
+                <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            </action>
+            <action id="DejaVu.CopyHandoff"
+                    class="com.github.vshulcz.dejavu.DejaHandoffAction"
+                    text="Copy Cross-Agent Handoff"
+                    description="Copy a cross-agent handoff digest for this project to the clipboard"/>
+        </group>
+    </actions>
+</idea-plugin>
