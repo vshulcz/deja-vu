@@ -64,11 +64,20 @@ func joinPromptAdvisories(parts ...string) string {
 // and returns any high-precision repo-memory guardrail or verified error fix
 // matching the user's prompt.
 func promptDirectContext(dir, cwd, sessionID, asked string, prevAssistant ...string) string {
+	return promptDirectContextIn(dir, cwd, sessionID, asked, false, nil, prevAssistant...)
+}
+
+func promptDirectContextIn(dir, cwd, sessionID, asked string, readOnly bool, skip map[string]bool, prevAssistant ...string) string {
 	if strings.TrimSpace(asked) == "" || digest.IsAgentArtifact(asked) {
 		return ""
 	}
-	autoRecordPromptCorrection(cwd, sessionID, asked)
-	seen := alreadyInjected(dir, sessionID)
+	if !readOnly {
+		autoRecordPromptCorrection(cwd, sessionID, asked)
+	}
+	var seen map[string]bool
+	if !readOnly {
+		seen = alreadyInjected(dir, sessionID)
+	}
 	var lines []string
 	var tokens []string
 	if srLine, srTok := sessionStandingRuleLine(dir, cwd, sessionID, asked, seen, prevAssistant...); srLine != "" {
@@ -83,14 +92,28 @@ func promptDirectContext(dir, cwd, sessionID, asked string, prevAssistant ...str
 		lines = append(lines, fxLine)
 		tokens = append(tokens, fxTok)
 	}
-	if fbLine, fbToks := promptFileBriefLine(dir, cwd, asked, seen); fbLine != "" {
+	namedSourceFile := false
+	if fbLine, fbToks := promptFileBriefLineIn(dir, cwd, asked, seen, skip); fbLine != "" {
 		lines = append(lines, fbLine)
 		tokens = append(tokens, fbToks...)
-	} else if sbLine, sbTok := promptSymbolBriefLine(cwd, asked, seen); sbLine != "" {
-		lines = append(lines, sbLine)
-		tokens = append(tokens, sbTok)
+		if head, _, _ := strings.Cut(fbLine, " — "); isLocalizableSourcePath(head, filepath.Base(head)) {
+			namedSourceFile = true
+		}
 	}
-	if sessionID != "" && len(tokens) > 0 {
+	if !namedSourceFile {
+		sbLine, sbTok := promptSymbolBriefLine(cwd, asked, seen)
+		if sbLine != "" {
+			lines = append(lines, sbLine)
+			tokens = append(tokens, sbTok)
+		}
+		if locLine, locTok := promptTaskTargetsLine(dir, cwd, asked, seen, skip); locLine != "" {
+			if sbLine == "" || !symbolBriefAlreadyCoversTarget(sbLine, locLine) {
+				lines = append(lines, locLine)
+				tokens = append(tokens, locTok)
+			}
+		}
+	}
+	if !readOnly && sessionID != "" && len(tokens) > 0 {
 		rememberInjectedIDs(dir, sessionID, tokens...)
 	}
 	return strings.Join(lines, "\n")
@@ -139,6 +162,10 @@ func promptSymbolBriefLine(cwd, asked string, seen map[string]bool) (string, str
 // in the repository and returns a compact 1-line brief with its coupled
 // companion file and verified test command so the agent has both at Turn 0.
 func promptFileBriefLine(dir, cwd, asked string, seen map[string]bool) (string, []string) {
+	return promptFileBriefLineIn(dir, cwd, asked, seen, nil)
+}
+
+func promptFileBriefLineIn(dir, cwd, asked string, seen, skip map[string]bool) (string, []string) {
 	if cwd == "" {
 		return "", nil
 	}
@@ -167,6 +194,9 @@ func promptFileBriefLine(dir, cwd, asked string, seen map[string]bool) (string, 
 		var inScope []index.SessionMeta
 		if dir != "" && planIndexReady(dir) {
 			for _, meta := range index.FileSessions(dir, rel) {
+				if skip != nil && skip[meta.ID] {
+					continue
+				}
 				if !pol.Allows(policy.ActivationAuto, meta.Project) {
 					continue
 				}
@@ -182,7 +212,8 @@ func promptFileBriefLine(dir, cwd, asked string, seen map[string]bool) (string, 
 		}
 		ran := fileHookRanLineFor(dir, rel, inScope)
 		if ran == "" {
-			ran = siblingTestLineFor(cwd, rel, nil)
+			_, fileSyms := fileHookSymbols(cwd, rel, "")
+			ran = siblingTestLineFor(cwd, rel, fileSyms)
 		}
 		repoDec := repoMemoryDecisionForFile(cwd, rel, nil, pol)
 		var parts []string
@@ -228,6 +259,11 @@ func liveRecallBrief(dir, cwd, query string) string {
 	}
 	if sb, _ := promptSymbolBriefLine(cwd, query, nil); sb != "" {
 		parts = append(parts, strings.TrimSpace(sb))
+	}
+	if len(parts) == 0 {
+		if loc, _ := promptTaskTargetsLine(dir, cwd, query, nil, nil); loc != "" {
+			parts = append(parts, strings.TrimSpace(loc))
+		}
 	}
 	if comp := compilerSymbolSignatureLine(cwd, query, pol); comp != "" {
 		parts = append(parts, strings.TrimSpace(comp))

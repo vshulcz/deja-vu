@@ -14,12 +14,32 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/prompt"
+	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
-const liveBenchMaxFiles = 1200
+const (
+	liveBenchMaxFiles = 1200
+	liveBenchMaxTasks = 60
+)
+
+// liveLocalizationAudit measures temporal Turn-0 task localization replay on real sessions.
+type liveLocalizationAudit struct {
+	Tasks             int     `json:"tasks"`
+	Localized         int     `json:"localized"`
+	LocalizedRate     float64 `json:"localized_rate"`
+	ImplicitTasks     int     `json:"implicit_tasks"`
+	ImplicitLocalized int     `json:"implicit_localized"`
+	ImplicitRate      float64 `json:"implicit_rate"`
+	WithTestCmd       int     `json:"with_test_cmd"`
+	MedianBytes       int     `json:"median_bytes"`
+	P50MS             float64 `json:"p50_ms"`
+	P95MS             float64 `json:"p95_ms"`
+}
 
 // liveInjectionAudit summarizes historical snapshots recorded in .injections.jsonl.
 type liveInjectionAudit struct {
@@ -47,10 +67,11 @@ type liveBenchReport struct {
 	TestTargetOnly   int                `json:"test_target_only"`
 	Silent           int                `json:"silent"`
 	EphemeralNoise   int                `json:"ephemeral_noise"`
-	P50MS            float64            `json:"p50_ms"`
-	P95MS            float64            `json:"p95_ms"`
-	WallMS           float64            `json:"wall_ms"`
-	Injections       liveInjectionAudit `json:"injections"`
+	P50MS            float64               `json:"p50_ms"`
+	P95MS            float64               `json:"p95_ms"`
+	WallMS           float64               `json:"wall_ms"`
+	Localization     liveLocalizationAudit `json:"localization"`
+	Injections       liveInjectionAudit    `json:"injections"`
 }
 
 // runBenchLive evaluates hook-tool recall on the current repository against the live index.
@@ -146,6 +167,9 @@ func measureLiveRepo(indexDir, cwd string) (liveBenchReport, error) {
 	slices.Sort(durations)
 	report.P50MS = percentileMS(durations, 0.50)
 	report.P95MS = percentileMS(durations, 0.95)
+	if ready {
+		report.Localization = measureLiveLocalization(indexDir, root, projNames, pol)
+	}
 	report.WallMS = roundMS(time.Since(start))
 	return report, nil
 }
@@ -190,7 +214,7 @@ func classifyLiveHookLine(report *liveBenchReport, line string) {
 		report.PastBreakage++
 		actionable = true
 	}
-	if strings.Contains(line, " — verified here: ") {
+	if strings.Contains(line, ranLabel) || strings.Contains(line, failLabel) || strings.Contains(line, " — verified here: ") {
 		report.VerifiedCommand++
 		actionable = true
 	}
@@ -213,7 +237,7 @@ func extractLiveDecisionBody(line string) string {
 		if !ok {
 			continue
 		}
-		for _, tail := range []string{" — edited alongside ", " — callers in ", " — verified here: ", " — test target: "} {
+		for _, tail := range []string{" — usually edited alongside ", " — edited alongside ", " — callers in ", ranLabel, failLabel, " — verified here: ", " — test target: "} {
 			if before, _, cut := strings.Cut(rest, tail); cut {
 				rest = before
 			}
@@ -339,9 +363,233 @@ func printLiveBenchReport(w io.Writer, r liveBenchReport) {
 	_, _ = fmt.Fprintf(w, "  test target only:   %d\n", r.TestTargetOnly)
 	_, _ = fmt.Fprintf(w, "  silent:             %d\n", r.Silent)
 	_, _ = fmt.Fprintf(w, "latency: p50 %.2f ms  p95 %.2f ms  wall %.0f ms\n", r.P50MS, r.P95MS, r.WallMS)
+	if r.Localization.Tasks > 0 {
+		_, _ = fmt.Fprintf(w, "turn-0 localization: %d/%d tasks (%.1f%%)  implicit: %d/%d (%.1f%%)  with test cmd: %d  median %d B  p50 %.2f ms\n",
+			r.Localization.Localized, r.Localization.Tasks, r.Localization.LocalizedRate*100,
+			r.Localization.ImplicitLocalized, r.Localization.ImplicitTasks, r.Localization.ImplicitRate*100,
+			r.Localization.WithTestCmd, r.Localization.MedianBytes, r.Localization.P50MS)
+	}
 	if r.Injections.Total > 0 {
 		_, _ = fmt.Fprintf(w, "injections log: %d recent (tool %d, dejavu %d, context %d)  median %d B  tool noise %d\n",
 			r.Injections.Total, r.Injections.Tool, r.Injections.DejaVu, r.Injections.Context,
 			r.Injections.MedianBytes, r.Injections.ToolNoise)
 	}
+}
+
+// measureLiveLocalization replays real opening user task prompts from past
+// repository sessions against strictly-older index state and checks whether
+// Turn-0 prompt context names at least one file the session ended up editing.
+func measureLiveLocalization(indexDir, root string, projNames []string, pol policy.Policy) liveLocalizationAudit {
+	metas, err := index.AllMeta(indexDir)
+	if err != nil || len(metas) == 0 {
+		return liveLocalizationAudit{}
+	}
+	slices.SortFunc(metas, func(a, b index.SessionMeta) int {
+		return b.Updated.Compare(a.Updated)
+	})
+	var audit liveLocalizationAudit
+	var durations []float64
+	var byteSizes []int
+	for _, meta := range metas {
+		if audit.Tasks >= liveBenchMaxTasks {
+			break
+		}
+		if meta.AgentTitle || meta.Started.IsZero() || !pol.Allows(policy.ActivationAuto, meta.Project) {
+			continue
+		}
+		if !slices.Contains(projNames, meta.Project) {
+			continue
+		}
+		asked := strings.TrimSpace(meta.Title)
+		if len([]rune(asked)) < 20 || digest.IsAgentArtifact(asked) {
+			continue
+		}
+		targets := liveExistingEditedTargets(root, meta.Touched)
+		if len(targets) == 0 || len(targets) > 8 {
+			continue
+		}
+		skip := make(map[string]bool, 32)
+		skip[meta.ID] = true
+		for _, other := range metas {
+			if other.ID == meta.ID || !other.Started.Before(meta.Started) || other.Updated.After(meta.Started) {
+				skip[other.ID] = true
+			}
+		}
+		implicit := !livePromptNamesAnyTarget(asked, targets)
+		audit.Tasks++
+		if implicit {
+			audit.ImplicitTasks++
+		}
+		t0 := time.Now()
+		out := evalPromptTurn0ReadOnly(indexDir, root, asked, projNames, skip)
+		durations = append(durations, float64(time.Since(t0).Microseconds())/1000.0)
+		if strings.TrimSpace(out) != "" {
+			byteSizes = append(byteSizes, len(out))
+		}
+		if liveOutputNamesAnyTarget(out, targets) {
+			audit.Localized++
+			if implicit {
+				audit.ImplicitLocalized++
+			}
+			if liveOutputHasTestRecipe(out) {
+				audit.WithTestCmd++
+			}
+		}
+	}
+	if audit.Tasks > 0 {
+		audit.LocalizedRate = math.Round((float64(audit.Localized)/float64(audit.Tasks))*1000) / 1000
+	}
+	if audit.ImplicitTasks > 0 {
+		audit.ImplicitRate = math.Round((float64(audit.ImplicitLocalized)/float64(audit.ImplicitTasks))*1000) / 1000
+	}
+	slices.Sort(durations)
+	audit.P50MS = percentileMS(durations, 0.50)
+	audit.P95MS = percentileMS(durations, 0.95)
+	if len(byteSizes) > 0 {
+		slices.Sort(byteSizes)
+		audit.MedianBytes = byteSizes[len(byteSizes)/2]
+	}
+	return audit
+}
+
+func liveExistingEditedTargets(root string, touched []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, raw := range touched {
+		rel := orientPath(raw, root)
+		if rel == "" || filepath.IsAbs(rel) || strings.HasPrefix(rel, "..") {
+			continue
+		}
+		abs := filepath.Join(root, rel)
+		if !isLiveBenchSourceFile(abs, filepath.Base(abs)) || !fileThere(abs) {
+			continue
+		}
+		if !seen[rel] {
+			seen[rel] = true
+			out = append(out, rel)
+		}
+	}
+	return out
+}
+
+func livePromptNamesAnyTarget(asked string, targets []string) bool {
+	low := strings.ToLower(asked)
+	for _, rel := range targets {
+		base := strings.ToLower(filepath.Base(rel))
+		if base != "" && strings.Contains(low, base) {
+			return true
+		}
+	}
+	return false
+}
+
+func liveOutputNamesAnyTarget(out string, targets []string) bool {
+	if strings.TrimSpace(out) == "" {
+		return false
+	}
+	low := strings.ToLower(out)
+	for _, rel := range targets {
+		if strings.Contains(low, strings.ToLower(rel)) {
+			return true
+		}
+		base := strings.ToLower(filepath.Base(rel))
+		if len(base) >= 9 && strings.Contains(low, base) {
+			return true
+		}
+	}
+	return false
+}
+
+func liveOutputHasTestRecipe(out string) bool {
+	for _, marker := range []string{"go test", "pytest", "cargo test", "npm test", "test target:", "verified"} {
+		if strings.Contains(out, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+// evalPromptTurn0ReadOnly executes the Turn-0 prompt recall pipeline without
+// writing to .seen, .injections.jsonl, or .deja/memory.jsonl.
+func evalPromptTurn0ReadOnly(dir, cwd, asked string, names []string, skip map[string]bool) string {
+	nudge := promptDirectContextIn(dir, cwd, "", asked, true, skip)
+	terms := prompt.Terms(asked)
+	if !promptTermsWorthAsking(terms) {
+		return nudge
+	}
+	promptStart := time.Now()
+	const promptSoftBudget = 1500 * time.Millisecond
+	ranked, matched, strong, naming, idfOf, err := index.ProjectRelevantNamingCut(dir, names, terms, prompt.Candidates, skip, nil)
+	if err != nil || len(ranked) == 0 {
+		return nudge
+	}
+	search.LiftNoteSessionsAboveTheirSource(ranked)
+	leadTerms := terms
+	ordered := byIdentifying(terms, idfOf)
+	if len(ordered) > 0 {
+		leadTerms = ordered[:min(len(ordered), leadTermsKept)]
+	}
+	pk := &promptPicker{
+		pol:          policy.Load(),
+		terms:        terms,
+		orderedTerms: ordered,
+		asked:        asked,
+		idfOf:        idfOf,
+		topIDF:       index.TopIDF(dir),
+		self:         skip,
+		leadTerms:    leadTerms,
+		unscoped:     len(names) == 0,
+		cwdPlain:     sources.PlainProjectName(cwd),
+		deadline:     promptStart.Add(promptSoftBudget),
+		ss:           make([]model.Session, 0, 2),
+	}
+	pk.pick(ranked, matched, strong, naming)
+	if len(pk.ss) < 2 && pk.crowdedOut > 0 && time.Since(promptStart) < promptSoftBudget {
+		widerSkip := make(map[string]bool, len(skip)+len(ranked))
+		for id := range skip {
+			widerSkip[id] = true
+		}
+		for _, s := range ranked {
+			widerSkip[s.ID] = true
+		}
+		wider, wmatched, wstrong, wnaming, _, werr := index.ProjectRelevantNamingCut(
+			dir, names, terms, prompt.Candidates*widerWindow, widerSkip, nil)
+		if werr == nil {
+			pk.pick(wider, wmatched, wstrong, wnaming)
+		}
+	}
+	ss, confident, worthDigest := pk.ss, pk.confident, pk.worthDigest
+	if len(ss) == 0 {
+		if rcLine, _ := rankedTouchedConsensusLine(dir, cwd, ranked, matched, strong, nil, skip); rcLine != "" && !strings.Contains(nudge, "likely target:") {
+			nudge = joinPromptAdvisories(nudge, rcLine)
+		}
+		return nudge
+	}
+	if len(names) > 0 || !projectMatchesAnyTerm(ss[0].Project, terms) {
+		ss = search.LeadWithConclusion(ss, terms)
+	}
+	for i := range ss {
+		index.MarkUserRules(dir, &ss[i], names)
+	}
+	ss, rejectedWarning := orderForInjection(ss)
+	if worthDigest {
+		if full, ok := promptDigestBodyIn(dir, cwd, "", ss, confident, terms, idfOf, asked, nudge, rejectedWarning, ranked, matched, strong, skip); ok {
+			return full
+		}
+		if rcLine, _ := rankedTouchedConsensusLine(dir, cwd, ranked, matched, strong, nil, skip); rcLine != "" && !strings.Contains(nudge, "likely target:") {
+			nudge = joinPromptAdvisories(nudge, rcLine)
+		}
+		return nudge
+	}
+	ptr := weakRecallPointerIn(dir, cwd, ss, terms, skip)
+	if !strings.Contains(ptr, "files edited ") && !strings.Contains(nudge, "likely target:") {
+		if rcLine, _ := rankedTouchedConsensusLine(dir, cwd, ranked, matched, strong, nil, skip); rcLine != "" {
+			ptr += rcLine + "\n"
+		}
+	}
+	body := ptr + shownInjectionWarning(ss, ss[:1])
+	if nudge != "" {
+		body += "\n" + nudge
+	}
+	return body
 }

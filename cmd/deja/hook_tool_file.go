@@ -1205,7 +1205,7 @@ func findSymbolDeclarationInRepo(cwd, sym string) (string, int, string) {
 			}
 			return nil
 		}
-		if len(files) >= 250 {
+		if len(files) >= 2000 {
 			return filepath.SkipAll
 		}
 		base := strings.ToLower(d.Name())

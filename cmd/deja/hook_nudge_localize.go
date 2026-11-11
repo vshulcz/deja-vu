@@ -1,0 +1,786 @@
+package main
+
+import (
+	"io/fs"
+	"math"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"sync"
+	"time"
+	"unicode"
+
+	"github.com/vshulcz/deja-vu/internal/digest"
+	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/prompt"
+	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/sources"
+)
+
+type repoFileEntry struct {
+	rel       string
+	stem      string
+	pkg       string
+	stemWords map[string]bool
+	declExact map[string]bool
+	declWords map[string]bool
+	bodyWords map[string]int
+}
+
+type repoSymbolMap struct {
+	at       time.Time
+	files    []repoFileEntry
+	byStem   map[string][]string
+	stemDF   map[string]int
+	declDF   map[string]int
+	structDF map[string]int
+	bodyDF   map[string]int
+	numFiles int
+}
+
+var repoSymbolMapCache sync.Map
+
+func loadRepoSymbolMap(cwd string) repoSymbolMap {
+	if cwd == "" {
+		return repoSymbolMap{}
+	}
+	scanRoot := sources.RepoRoot(cwd)
+	if scanRoot == "" {
+		scanRoot = cwd
+	}
+	if v, ok := repoSymbolMapCache.Load(scanRoot); ok {
+		if cached, ok := v.(repoSymbolMap); ok && time.Since(cached.at) < 2*time.Second {
+			return cached
+		}
+	}
+	fi, err := os.Stat(scanRoot)
+	if err != nil || !fi.IsDir() {
+		return repoSymbolMap{}
+	}
+	idx := repoSymbolMap{
+		at:       time.Now(),
+		byStem:   map[string][]string{},
+		stemDF:   map[string]int{},
+		declDF:   map[string]int{},
+		structDF: map[string]int{},
+		bodyDF:   map[string]int{},
+	}
+	_ = filepath.WalkDir(scanRoot, func(p string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return nil //nolint:nilerr // unreadable paths skipped during best-effort walk
+		}
+		if d.IsDir() {
+			name := d.Name()
+			if p != scanRoot && (strings.HasPrefix(name, ".") || name == "vendor" || name == "node_modules" || name == "dist" || name == "build" || name == "target" || name == "testdata") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if len(idx.files) >= 2000 {
+			return filepath.SkipAll
+		}
+		if !isLocalizableSourcePath(p, d.Name()) {
+			return nil
+		}
+		rel, err := filepath.Rel(cwd, p)
+		if err != nil || strings.HasPrefix(rel, "..") {
+			if r2, err2 := filepath.Rel(scanRoot, p); err2 == nil && !strings.HasPrefix(r2, "..") {
+				rel = r2
+			} else {
+				return nil
+			}
+		}
+		rel = filepath.ToSlash(rel)
+		ext := filepath.Ext(d.Name())
+		stem := strings.ToLower(strings.TrimSuffix(d.Name(), ext))
+		pkg := strings.ToLower(filepath.Base(filepath.Dir(rel)))
+		if pkg == "." {
+			pkg = ""
+		}
+		entry := repoFileEntry{
+			rel:       rel,
+			stem:      stem,
+			pkg:       pkg,
+			stemWords: map[string]bool{},
+			declExact: map[string]bool{},
+			declWords: map[string]bool{},
+			bodyWords: map[string]int{},
+		}
+		seenStruct := map[string]bool{}
+		seenBody := map[string]bool{}
+		for _, w := range splitIdentifierWords(stem) {
+			if len(w) >= 3 && !localizeStopWords[w] {
+				entry.stemWords[w] = true
+				seenStruct[w] = true
+			}
+		}
+		if len(pkg) >= 4 && !localizeStopWords[pkg] {
+			seenStruct[pkg] = true
+		}
+		if raw, err := os.ReadFile(p); err == nil && len(raw) <= 256<<10 {
+			content := string(raw)
+			for line := range strings.SplitSeq(content, "\n") {
+				if id, sig := parseDeclarationLine(line); id != "" && sig != "" {
+					lowID := strings.ToLower(id)
+					entry.declExact[lowID] = true
+					seenStruct[lowID] = true
+					for _, w := range splitIdentifierWords(id) {
+						if len(w) >= 4 && !localizeStopWords[w] {
+							entry.declWords[w] = true
+							seenStruct[w] = true
+						}
+					}
+				}
+			}
+			indexFileBodyWords(content, entry.bodyWords, seenBody)
+		}
+		idx.files = append(idx.files, entry)
+		idx.byStem[stem] = append(idx.byStem[stem], rel)
+		idx.stemDF[stem]++
+		for dName := range entry.declExact {
+			idx.declDF[dName]++
+		}
+		for w := range seenStruct {
+			idx.structDF[w]++
+		}
+		for w := range seenBody {
+			idx.bodyDF[w]++
+		}
+		return nil
+	})
+	idx.numFiles = len(idx.files)
+	repoSymbolMapCache.Store(scanRoot, idx)
+	return idx
+}
+
+func indexFileBodyWords(content string, bodyWords map[string]int, seenBody map[string]bool) {
+	var cur []rune
+	flush := func() {
+		if len(cur) < 5 || len(cur) > 48 {
+			cur = cur[:0]
+			return
+		}
+		tok := string(cur)
+		cur = cur[:0]
+		low := strings.ToLower(tok)
+		if !localizeStopWords[low] && bodyWords[low] < 8 {
+			bodyWords[low]++
+			seenBody[low] = true
+		}
+		if hasMixedCaseOrUnderscore(tok) {
+			for _, sub := range splitIdentifierWords(tok) {
+				if len(sub) >= 5 && !localizeStopWords[sub] && bodyWords[sub] < 8 {
+					bodyWords[sub]++
+					seenBody[sub] = true
+				}
+			}
+		}
+	}
+	for _, r := range content {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' {
+			cur = append(cur, r)
+		} else {
+			flush()
+		}
+	}
+	flush()
+}
+
+func symbolBriefAlreadyCoversTarget(sbLine, locLine string) bool {
+	rest, ok := strings.CutPrefix(locLine, "likely target: ")
+	if !ok {
+		return false
+	}
+	head, _, _ := strings.Cut(rest, " — ")
+	firstTarget, _, _ := strings.Cut(head, ", ")
+	firstTarget = strings.TrimSpace(firstTarget)
+	return firstTarget != "" && strings.Contains(sbLine, firstTarget)
+}
+
+func isLocalizableSourcePath(path, base string) bool {
+	low := strings.ToLower(base)
+	if strings.HasPrefix(low, ".") || isTestFilePath(path) {
+		return false
+	}
+	if strings.HasSuffix(low, ".pb.go") || strings.HasSuffix(low, ".gen.go") || strings.HasSuffix(low, ".min.js") || strings.HasSuffix(low, ".d.ts") {
+		return false
+	}
+	switch strings.ToLower(filepath.Ext(low)) {
+	case ".go", ".py", ".ts", ".tsx", ".js", ".jsx", ".rs":
+		return true
+	}
+	return false
+}
+
+func splitIdentifierWords(s string) []string {
+	var out []string
+	var cur []rune
+	flush := func() {
+		if len(cur) > 0 {
+			out = append(out, strings.ToLower(string(cur)))
+			cur = cur[:0]
+		}
+	}
+	runes := []rune(s)
+	for i, r := range runes {
+		if r == '_' || r == '-' || r == '.' || r == '/' {
+			flush()
+			continue
+		}
+		if unicode.IsUpper(r) && len(cur) > 0 {
+			prevLower := unicode.IsLower(runes[i-1])
+			nextLower := i+1 < len(runes) && unicode.IsLower(runes[i+1])
+			if prevLower || (unicode.IsUpper(runes[i-1]) && nextLower) {
+				flush()
+			}
+		}
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			cur = append(cur, r)
+		} else {
+			flush()
+		}
+	}
+	flush()
+	return out
+}
+
+var localizeStopWords = map[string]bool{
+	"the": true, "and": true, "for": true, "with": true, "from": true, "into": true,
+	"this": true, "that": true, "what": true, "when": true, "where": true, "which": true,
+	"have": true, "has": true, "had": true, "been": true, "were": true, "will": true,
+	"would": true, "should": true, "could": true, "about": true, "after": true, "before": true,
+	"under": true, "over": true, "between": true, "without": true, "also": true, "only": true,
+	"make": true, "made": true, "keep": true, "take": true, "give": true, "look": true,
+	"looks": true, "good": true, "thanks": true, "thank": true, "please": true, "need": true,
+	"needs": true, "want": true, "check": true, "checks": true, "work": true, "works": true,
+	"test": true, "tests": true, "testing": true, "file": true, "files": true, "code": true,
+	"line": true, "lines": true, "string": true, "strings": true, "error": true, "errors": true,
+	"data": true, "type": true, "types": true, "func": true, "function": true, "method": true,
+	"value": true, "values": true, "time": true, "main": true, "init": true, "util": true,
+	"utils": true, "helper": true, "helpers": true, "common": true, "base": true, "core": true,
+	"read": true, "write": true, "open": true, "close": true, "start": true, "stop": true,
+	"build": true, "run": true, "runs": true, "pass": true, "fail": true, "fix": true, "bug": true,
+	"commit": true, "push": true, "pull": true, "merge": true, "branch": true, "rebase": true,
+	"status": true, "diff": true, "review": true, "issue": true, "issues": true, "release": true,
+	"change": true, "changes": true, "update": true, "updated": true, "using": true, "used": true,
+	"first": true, "last": true, "next": true, "same": true, "some": true, "more": true, "most": true,
+	"each": true, "every": true, "other": true, "there": true, "their": true, "these": true, "those": true,
+}
+
+func extractPromptASCIIWords(asked string) []string {
+	var words []string
+	var cur []rune
+	flush := func() {
+		if len(cur) >= 3 {
+			words = append(words, strings.ToLower(string(cur)))
+		}
+		cur = cur[:0]
+	}
+	for _, r := range asked {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			cur = append(cur, r)
+		} else {
+			flush()
+		}
+	}
+	flush()
+	return words
+}
+
+// promptTaskTargetsLine maps natural-language module phrases, rare repository
+// identifiers, and historical prompt-to-edit correlations onto live repository
+// source files and their verified test recipes at Turn 0.
+func promptTaskTargetsLine(dir, cwd, asked string, seen, skip map[string]bool) (string, string) {
+	if cwd == "" || !policy.Load().Allows(policy.ActivationAuto, "") {
+		return "", ""
+	}
+	idx := loadRepoSymbolMap(cwd)
+	if idx.numFiles == 0 {
+		return "", ""
+	}
+	words := extractPromptASCIIWords(asked)
+	var matchedFiles []string
+
+	// 1. Check adjacent 3-word and 2-word phrases matching exact file stems or declared symbols.
+	for i := 0; i < len(words); i++ {
+		if localizeStopWords[words[i]] {
+			continue
+		}
+		if i+2 < len(words) && !localizeStopWords[words[i+1]] && !localizeStopWords[words[i+2]] {
+			s3 := words[i] + "_" + words[i+1] + "_" + words[i+2]
+			if len(s3) >= 10 && len(idx.byStem[s3]) > 0 && len(idx.byStem[s3]) <= 2 {
+				matchedFiles = appendUniqueRel(matchedFiles, idx.byStem[s3]...)
+			}
+		}
+		if i+1 < len(words) && !localizeStopWords[words[i+1]] {
+			s2 := words[i] + "_" + words[i+1]
+			if len(s2) >= 8 && len(idx.byStem[s2]) > 0 && len(idx.byStem[s2]) <= 2 {
+				matchedFiles = appendUniqueRel(matchedFiles, idx.byStem[s2]...)
+			}
+			comp := words[i] + words[i+1]
+			if len(comp) >= 10 && idx.declDF[comp] > 0 && idx.declDF[comp] <= 2 {
+				for _, f := range idx.files {
+					if f.declExact[comp] {
+						matchedFiles = appendUniqueRel(matchedFiles, f.rel)
+					}
+				}
+			}
+		}
+	}
+
+	// 2. Score files by separate structural (stem/declaration) DF, rare body DF, and historical Title/Settled->Touched vote.
+	if len(matchedFiles) == 0 {
+		histBoost, histSessions := historicalTitleTouchedBoost(dir, cwd, asked, skip)
+		structRareCap := max(10, idx.numFiles/22)
+		structVeryRareCap := max(5, idx.numFiles/55)
+		bodyRareCap := max(6, idx.numFiles/45)
+		qWords := map[string]bool{}
+		for _, w := range words {
+			if len(w) < 4 || localizeStopWords[w] {
+				continue
+			}
+			for _, sub := range splitIdentifierWords(w) {
+				if len(sub) >= 4 && !localizeStopWords[sub] {
+					qWords[sub] = true
+				}
+			}
+			qWords[w] = true
+		}
+		type cand struct {
+			rel   string
+			score float64
+		}
+		var cands []cand
+		effectiveN := max(idx.numFiles, 24)
+		for _, f := range idx.files {
+			var score float64
+			rareHits := 0
+			anchorHit := false
+			if len(f.stem) >= 7 && qWords[f.stem] && idx.stemDF[f.stem] == 1 && idx.structDF[f.stem] <= structVeryRareCap {
+				score += 7.5
+				rareHits += 2
+				anchorHit = true
+			}
+			for qw := range qWords {
+				sDF := idx.structDF[qw]
+				inStem := f.stemWords[qw]
+				inDecl := f.declWords[qw] || f.declExact[qw]
+				if (inStem || inDecl || f.pkg == qw) && sDF > 0 && sDF <= structRareCap {
+					idf := math.Log(1.0 + float64(effectiveN)/float64(sDF))
+					rareHits++
+					switch {
+					case inStem:
+						score += idf * 1.75
+						if sDF <= structVeryRareCap {
+							anchorHit = true
+						}
+					case f.declExact[qw] && len(qw) >= 7 && idx.declDF[qw] <= 2:
+						score += idf * 2.0
+						anchorHit = true
+					case inDecl:
+						score += idf * 1.25
+						if sDF <= structVeryRareCap {
+							anchorHit = true
+						}
+					default:
+						score += idf * 0.75
+					}
+					continue
+				}
+				bDF := idx.bodyDF[qw]
+				bodyTF := f.bodyWords[qw]
+				if bodyTF > 0 && bDF > 0 && bDF <= bodyRareCap && len(qw) >= 5 {
+					idf := math.Log(1.0 + float64(effectiveN)/float64(bDF))
+					tfBoost := 1.0 + 0.15*math.Min(float64(bodyTF-1), 4)
+					score += idf * 0.80 * tfBoost
+					rareHits++
+					if bDF <= max(3, idx.numFiles/90) && bodyTF >= 2 {
+						anchorHit = true
+					}
+				}
+			}
+			if hb := histBoost[f.rel]; hb > 0 {
+				score += hb
+				if histSessions[f.rel] >= 2 {
+					rareHits += 2
+					anchorHit = true
+				} else if rareHits >= 1 {
+					rareHits++
+					anchorHit = true
+				}
+			}
+			if rareHits >= 2 && anchorHit && score >= 6.4 {
+				cands = append(cands, cand{rel: f.rel, score: score})
+			}
+		}
+		slices.SortFunc(cands, func(a, b cand) int {
+			if a.score != b.score {
+				if a.score > b.score {
+					return -1
+				}
+				return 1
+			}
+			return strings.Compare(a.rel, b.rel)
+		})
+		if len(cands) > 0 {
+			maxSpecificCands := max(12, idx.numFiles/35)
+			if len(cands) <= maxSpecificCands || cands[0].score >= cands[maxSpecificCands-1].score*1.28 {
+				matchedFiles = appendUniqueRel(matchedFiles, cands[0].rel)
+				if len(cands) > 1 && cands[1].score >= cands[0].score*0.75 {
+					matchedFiles = appendUniqueRel(matchedFiles, cands[1].rel)
+				}
+				if len(cands) > 2 && cands[2].score >= cands[0].score*0.82 {
+					matchedFiles = appendUniqueRel(matchedFiles, cands[2].rel)
+				}
+			}
+		}
+	}
+
+	if len(matchedFiles) == 0 {
+		return "", ""
+	}
+	if len(matchedFiles) > 3 {
+		matchedFiles = matchedFiles[:3]
+	}
+	line := formatLocalizedTargetsLine(dir, cwd, "likely target: ", matchedFiles, skip)
+	if line == "" {
+		return "", ""
+	}
+	tok := "prompt:loc:" + shortHash(line)
+	if seen != nil && seen[tok] {
+		return "", ""
+	}
+	return line, tok
+}
+
+// historicalTitleTouchedBoost scans cached SessionMeta rows of the current
+// project in RAM (0 disk reads) to transfer domain/multilingual prompt terms
+// from prior coding sessions onto the live files those sessions edited.
+func historicalTitleTouchedBoost(dir, cwd, asked string, skip map[string]bool) (map[string]float64, map[string]int) {
+	if dir == "" || cwd == "" || !planIndexReady(dir) {
+		return nil, nil
+	}
+	terms := prompt.Terms(asked)
+	var qTerms []string
+	for _, t := range terms {
+		low := strings.ToLower(t)
+		if len([]rune(low)) >= 4 && !localizeStopWords[low] {
+			qTerms = append(qTerms, low)
+		}
+	}
+	if len(qTerms) < 2 {
+		return nil, nil
+	}
+	metas, err := index.AllMetaShared(dir)
+	if err != nil || len(metas) == 0 {
+		return nil, nil
+	}
+	pol := policy.Load()
+	projNames := digest.ProjectNameCandidates(cwd)
+	type doc struct {
+		touched []string
+		matched []string
+	}
+	var projDocs []doc
+	df := map[string]int{}
+	totalProj := 0
+	for _, m := range metas {
+		if skip != nil && skip[m.ID] {
+			continue
+		}
+		if len(m.Touched) == 0 || !pol.Allows(policy.ActivationAuto, m.Project) {
+			continue
+		}
+		if len(projNames) > 0 && !slices.Contains(projNames, m.Project) {
+			continue
+		}
+		totalProj++
+		hay := strings.ToLower(m.Title + " " + m.Settled)
+		var hits []string
+		for _, qt := range qTerms {
+			if strings.Contains(hay, qt) {
+				hits = append(hits, qt)
+				df[qt]++
+			}
+		}
+		if len(hits) > 0 {
+			projDocs = append(projDocs, doc{touched: m.Touched, matched: hits})
+		}
+	}
+	if totalProj < 3 || len(projDocs) == 0 {
+		return nil, nil
+	}
+	rareSessionCap := max(5, totalProj/10)
+	boost := map[string]float64{}
+	sessCount := map[string]int{}
+	for _, d := range projDocs {
+		rareHits := 0
+		var docScore float64
+		for _, qt := range d.matched {
+			if df[qt] <= rareSessionCap {
+				rareHits++
+				docScore += math.Log(1.0 + float64(totalProj)/float64(df[qt]))
+			}
+		}
+		if rareHits < 2 && (rareHits < 1 || len(d.matched) < 3) {
+			continue
+		}
+		targets := resolveRepoTouchedTargets(cwd, d.touched)
+		if len(targets) == 0 || len(targets) > 6 {
+			continue
+		}
+		for pos, rel := range targets {
+			if pos >= 3 {
+				break
+			}
+			w := docScore * 0.85
+			if pos == 0 {
+				w *= 1.35
+			}
+			boost[rel] += w
+			sessCount[rel]++
+		}
+	}
+	return boost, sessCount
+}
+
+// sessionActionMapLine extracts the concrete repository source files edited in
+// recalled sessions (plus any verified test command) so Turn-0 recall hands
+// the agent exact edit targets instead of conversational prose alone.
+func sessionActionMapLine(dir, cwd string, ss []model.Session, skip map[string]bool) string {
+	if dir == "" || cwd == "" || len(ss) == 0 {
+		return ""
+	}
+	var targets []string
+	for _, s := range ss {
+		meta, ok := index.MetaForKey(dir, s.Key())
+		if !ok || len(meta.Touched) == 0 {
+			continue
+		}
+		for _, rel := range resolveRepoTouchedTargets(cwd, meta.Touched) {
+			targets = appendUniqueRel(targets, rel)
+			if len(targets) >= 3 {
+				break
+			}
+		}
+		if len(targets) >= 2 {
+			break
+		}
+	}
+	if len(targets) == 0 {
+		return ""
+	}
+	if len(targets) > 3 {
+		targets = targets[:3]
+	}
+	return formatLocalizedTargetsLine(dir, cwd, "files edited there: ", targets, skip)
+}
+
+// rankedTouchedConsensusLine checks whether >=2 strongly matching past sessions
+// of the project independently converged on editing the same live repository
+// source file, recovering localization even when conversational prose was too
+// terse to quote or written in another human language.
+func rankedTouchedConsensusLine(dir, cwd string, ranked []model.Session, matched, strong []int, seen, skip map[string]bool) (string, string) {
+	if dir == "" || cwd == "" || len(ranked) == 0 {
+		return "", ""
+	}
+	fi, err := os.Stat(cwd)
+	if err != nil || !fi.IsDir() {
+		return "", ""
+	}
+	pol := policy.Load()
+	type tally struct {
+		sessions int
+		weight   float64
+	}
+	counts := map[string]*tally{}
+	contributingSessions := 0
+	for i := 0; i < len(ranked) && contributingSessions < 10; i++ {
+		s := ranked[i]
+		if skip != nil && skip[s.ID] {
+			continue
+		}
+		if s.Kind == "cron" || !pol.Allows(policy.ActivationAuto, s.Project) {
+			continue
+		}
+		mCount, sCount := 0, 0
+		if i < len(matched) {
+			mCount = matched[i]
+		}
+		if i < len(strong) {
+			sCount = strong[i]
+		}
+		if mCount < 2 && sCount < 1 {
+			continue
+		}
+		meta, ok := index.MetaForKey(dir, s.Key())
+		if !ok || len(meta.Touched) == 0 {
+			continue
+		}
+		touched := resolveRepoTouchedTargets(cwd, meta.Touched)
+		if len(touched) == 0 || len(touched) > 8 {
+			continue
+		}
+		contributingSessions++
+		baseW := float64(mCount + 2*sCount)
+		if i < 3 {
+			baseW *= 1.25
+		}
+		for pos, rel := range touched {
+			if pos >= 4 {
+				break
+			}
+			t := counts[rel]
+			if t == nil {
+				t = &tally{}
+				counts[rel] = t
+			}
+			t.sessions++
+			w := baseW
+			if pos == 0 {
+				w *= 1.4
+			}
+			t.weight += w
+		}
+	}
+	if contributingSessions < 2 {
+		return "", ""
+	}
+	type cand struct {
+		rel      string
+		sessions int
+		weight   float64
+	}
+	var cands []cand
+	for rel, t := range counts {
+		if t.sessions < 2 {
+			continue
+		}
+		if float64(t.sessions)/float64(contributingSessions) < 0.28 {
+			continue
+		}
+		cands = append(cands, cand{rel: rel, sessions: t.sessions, weight: t.weight})
+	}
+	if len(cands) == 0 {
+		return "", ""
+	}
+	slices.SortFunc(cands, func(a, b cand) int {
+		if a.weight != b.weight {
+			if a.weight > b.weight {
+				return -1
+			}
+			return 1
+		}
+		return strings.Compare(a.rel, b.rel)
+	})
+	targets := []string{cands[0].rel}
+	if len(cands) > 1 && cands[1].weight >= cands[0].weight*0.70 {
+		targets = append(targets, cands[1].rel)
+	}
+	if len(cands) > 2 && cands[2].weight >= cands[0].weight*0.80 {
+		targets = append(targets, cands[2].rel)
+	}
+	line := formatLocalizedTargetsLine(dir, cwd, "files edited in related sessions: ", targets, skip)
+	if line == "" {
+		return "", ""
+	}
+	tok := "prompt:rc:" + shortHash(line)
+	if seen != nil && seen[tok] {
+		return "", ""
+	}
+	return line, tok
+}
+
+func resolveRepoTouchedTargets(cwd string, touched []string) []string {
+	var primary, tests []string
+	seen := map[string]bool{}
+	for _, raw := range touched {
+		rel := orientPath(raw, cwd)
+		if rel == "" || filepath.IsAbs(rel) || strings.HasPrefix(rel, "..") {
+			continue
+		}
+		rel = filepath.ToSlash(rel)
+		if seen[rel] {
+			continue
+		}
+		base := filepath.Base(rel)
+		if strings.HasPrefix(base, ".") {
+			continue
+		}
+		abs := filepath.Join(cwd, filepath.FromSlash(rel))
+		if !fileThere(abs) {
+			continue
+		}
+		seen[rel] = true
+		if isLocalizableSourcePath(abs, base) {
+			primary = append(primary, rel)
+		} else if isTestFilePath(abs) {
+			tests = append(tests, rel)
+		}
+	}
+	if len(primary) > 0 {
+		return primary
+	}
+	return tests
+}
+
+func formatLocalizedTargetsLine(dir, cwd, prefix string, targets []string, skip map[string]bool) string {
+	if len(targets) == 0 {
+		return ""
+	}
+	safePaths := make([]string, 0, len(targets))
+	for _, rel := range targets {
+		safePaths = append(safePaths, search.SafePath(rel))
+	}
+	primary := targets[0]
+	inScope := scopedFileSessionsForPrompt(dir, cwd, primary, skip)
+	var extra string
+	if len(targets) == 1 {
+		co := fileHookCoChangeLineIn(cwd, primary, inScope)
+		if co == "" {
+			co = coupledCommitGuardForFiles(cwd, []string{primary})
+		}
+		extra += co
+	}
+	ran := fileHookRanLineFor(dir, primary, inScope)
+	if ran == "" {
+		_, fileSyms := fileHookSymbols(cwd, primary, "")
+		ran = siblingTestLineFor(cwd, primary, fileSyms)
+	}
+	extra += ran
+	return prefix + strings.Join(safePaths, ", ") + extra
+}
+
+func scopedFileSessionsForPrompt(dir, cwd, rel string, skip map[string]bool) []index.SessionMeta {
+	if dir == "" || !planIndexReady(dir) {
+		return nil
+	}
+	pol := policy.Load()
+	projects := digest.ProjectNameCandidates(cwd)
+	var inScope []index.SessionMeta
+	for _, meta := range index.FileSessions(dir, rel) {
+		if skip != nil && skip[meta.ID] {
+			continue
+		}
+		if !pol.Allows(policy.ActivationAuto, meta.Project) {
+			continue
+		}
+		if !fileMetaInScope(meta, rel, nil) && !fileMetaInScope(meta, rel, projects) {
+			continue
+		}
+		inScope = append(inScope, meta)
+	}
+	return inScope
+}
+
+func appendUniqueRel(list []string, items ...string) []string {
+	for _, it := range items {
+		if it != "" && !slices.Contains(list, it) {
+			list = append(list, it)
+		}
+	}
+	return list
+}

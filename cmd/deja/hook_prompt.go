@@ -389,6 +389,10 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	pickUnscopedNamedProjects(dir, pk, names, terms, skip, cut, promptStart, promptSoftBudget)
 	ss, confident, worthDigest := pk.ss, pk.confident, pk.worthDigest
 	if len(ss) == 0 {
+		if rcLine, rcTok := rankedTouchedConsensusLine(dir, cwd, ranked, matched, strong, seen, skip); rcLine != "" && !strings.Contains(nudge, "likely target:") {
+			nudge = joinPromptAdvisories(nudge, rcLine)
+			rememberInjectedIDs(dir, input.SessionID, rcTok)
+		}
 		return emitNudgeOnly(stdout, plain, nudge)
 	}
 	// Of the two candidates, lead with the one that settled something about the
@@ -439,13 +443,23 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	}
 	fullDigest := worthDigest
 	if worthDigest {
-		full, ok := promptDigestBody(dir, input.SessionID, ss, confident, terms, idfOf, asked, nudge, rejectedWarning)
+		full, ok := promptDigestBodyIn(dir, cwd, input.SessionID, ss, confident, terms, idfOf, asked, nudge, rejectedWarning, ranked, matched, strong, skip)
 		if !ok {
+			if rcLine, rcTok := rankedTouchedConsensusLine(dir, cwd, ranked, matched, strong, seen, skip); rcLine != "" && !strings.Contains(nudge, "likely target:") {
+				nudge = joinPromptAdvisories(nudge, rcLine)
+				rememberInjectedIDs(dir, input.SessionID, rcTok)
+			}
 			return emitNudgeOnly(stdout, plain, nudge)
 		}
 		body = full
 	} else {
-		body = weakRecallPointer(ss, terms) + shownInjectionWarning(ss, ss[:1])
+		ptr := weakRecallPointerIn(dir, cwd, ss, terms, skip)
+		if !strings.Contains(ptr, "files edited ") && !strings.Contains(nudge, "likely target:") {
+			if rcLine, _ := rankedTouchedConsensusLine(dir, cwd, ranked, matched, strong, seen, skip); rcLine != "" {
+				ptr += rcLine + "\n"
+			}
+		}
+		body = ptr + shownInjectionWarning(ss, ss[:1])
 		if nudge != "" {
 			body += "\n" + nudge
 		}
@@ -531,6 +545,10 @@ func emitPromptBlock(stdout io.Writer, dir, sessionID, out string, ss []model.Se
 // reports false when the digest came out empty or quotes nothing that holds
 // the question.
 func promptDigestBody(dir, sessionID string, ss []model.Session, confident bool, terms []string, idfOf map[string]float64, asked, nudge, rejectedWarning string) (string, bool) {
+	return promptDigestBodyIn(dir, "", sessionID, ss, confident, terms, idfOf, asked, nudge, rejectedWarning, nil, nil, nil, nil)
+}
+
+func promptDigestBodyIn(dir, cwd, sessionID string, ss []model.Session, confident bool, terms []string, idfOf map[string]float64, asked, nudge, rejectedWarning string, ranked []model.Session, matched, strong []int, skip map[string]bool) (string, bool) {
 	// Hand the digest the query's words most-identifying first. It has no
 	// way of its own to tell "mm_status" from "decide", and the session
 	// that answers often says both — measured live, ten of the answers
@@ -565,9 +583,24 @@ func promptDigestBody(dir, sessionID string, ss []model.Session, confident bool,
 	// nothing quotable, and the opener then credited a session that was
 	// not in the block.
 	cite := ss[0]
+	actionSources := ss
 	if len(shown) > 0 {
 		cite = shown[0]
+		actionSources = shown
 		rejectedWarning = shownInjectionWarning(ss, shown)
+	}
+	actionLine := ""
+	if !strings.Contains(nudge, "likely target:") {
+		al := sessionActionMapLine(dir, cwd, actionSources, skip)
+		if al == "" {
+			al, _ = rankedTouchedConsensusLine(dir, cwd, ranked, matched, strong, nil, skip)
+		}
+		if al != "" {
+			if !strings.HasSuffix(digest, "\n") {
+				digest += "\n"
+			}
+			actionLine = al + "\n"
+		}
 	}
 	tail := openerLine(cite, byIdentifying(terms, idfOf))
 	if nudge != "" {
@@ -607,7 +640,7 @@ func promptDigestBody(dir, sessionID string, ss []model.Session, confident bool,
 			tail += "\n" + nudge
 		}
 	}
-	return lead + rejectedWarning + digest + tail, true
+	return lead + rejectedWarning + digest + actionLine + tail, true
 }
 
 // promptPicker chooses the sessions the prompt hook injects, at most two,

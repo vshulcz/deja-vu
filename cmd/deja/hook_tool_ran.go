@@ -405,6 +405,13 @@ func goSiblingTestCmd(cwd, diskPath, pkgDir string, editSymbols []string) string
 				rest := strings.TrimPrefix(trimmed, "func ")
 				if id := leadingIdent(rest); strings.HasPrefix(id, "Test") && len(id) > 4 {
 					curTest = id
+					if bodyIdx := strings.IndexByte(trimmed, '{'); bodyIdx >= 0 && !seen[curTest] && mentionsAnySymbol(editSymbols, trimmed[bodyIdx:]) {
+						seen[curTest] = true
+						matched = append(matched, curTest)
+						if len(matched) >= 3 {
+							break
+						}
+					}
 				}
 				continue
 			}

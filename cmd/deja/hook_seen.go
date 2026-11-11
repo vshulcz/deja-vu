@@ -499,6 +499,10 @@ func digestBudget(confident bool) int {
 // digest on a hint is where most of deja's unprompted context cost went.
 // Naming the topic and the date is what makes the pointer worth following.
 func weakRecallPointer(ss []model.Session, terms []string) string {
+	return weakRecallPointerIn("", "", ss, terms, nil)
+}
+
+func weakRecallPointerIn(dir, cwd string, ss []model.Session, terms []string, skip map[string]bool) string {
 	if len(ss) == 0 {
 		return ""
 	}
@@ -529,8 +533,12 @@ func weakRecallPointer(ss []model.Session, terms []string) string {
 	if len(ss) > 1 {
 		more = fmt.Sprintf(" (+%d more)", len(ss)-1)
 	}
-	return fmt.Sprintf("deja: this project has history on %q from %s%s — call deja in \"recall\" mode (or recall) with a specific token if it matters here.\n",
+	out := fmt.Sprintf("deja: this project has history on %q from %s%s — call deja in \"recall\" mode (or recall) with a specific token if it matters here.\n",
 		search.SafeLine(topic), when, more)
+	if actionLine := sessionActionMapLine(dir, cwd, ss, skip); actionLine != "" {
+		out += actionLine + "\n"
+	}
+	return out
 }
 
 // pointerTopicRunes is how much of the matched line the pointer names. Sixty is
