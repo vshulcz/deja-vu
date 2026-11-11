@@ -1465,3 +1465,37 @@ the whole one; `project` is omitted when the session has none. `correction` is
 the user's turn and `agent_before` what the agent said or did just before it,
 both on one line and cut to a bounded length. Text from the transcript is
 filtered the way every other surface filters it.
+
+## `deja audit --json`
+
+Read-only inventory of local agent stores, Claude Code transcript retention
+risk, indexed recoverable edits, and wiring state:
+
+```json
+{
+  "schema_version": 2,
+  "stores": [
+    {"name": "claude", "files": 14, "bytes": 482910}
+  ],
+  "total_files": 14,
+  "total_bytes": 482910,
+  "claude_retention": {
+    "cleanup_period_days": 30,
+    "explicit": false,
+    "total_files": 14,
+    "expiring_in_7_days": 2,
+    "past_period": 1,
+    "preserved_deleted": 0
+  },
+  "claude_mem_db_present": false,
+  "indexed_sessions": 14,
+  "recoverable_files": 9,
+  "wired_targets": ["claude-code"]
+}
+```
+
+`claude_mem_db_bytes` is omitted unless `~/.claude-mem/claude-mem.db` is present
+and non-empty. `next_command` is omitted when at least one agent target is
+wired; when none are wired, it holds the `install --auto` command to wire
+recall.
+

@@ -126,6 +126,9 @@ _deja_completion() {
         doctor)
             COMPREPLY=( $(compgen -W "--json --offline --deep --all" -- "$cur") )
             ;;
+        audit)
+            COMPREPLY=( $(compgen -W "--json" -- "$cur") )
+            ;;
         delete)
             COMPREPLY=( $(compgen -W "--dry-run --yes" -- "$cur") )
             ;;
@@ -380,6 +383,7 @@ _deja() {
     'how:commands this machine actually ran for a thing'
     'delete:erase a session from its agent and from deja'
     'doctor:diagnose local stores and wiring'
+    'audit:check local stores, retention risk, and wiring'
     'promote:distill a session into a curated note'
     'rules:copy your rules file into every agent, or list your corrections'
     'repo:project memory committed in the repository'
@@ -441,6 +445,9 @@ _deja() {
       ;;
     doctor)
       _arguments '--json[print JSON]' '--offline[skip version check]' '--deep[verify index against sources]' '--all[list every store, missing ones included]'
+      ;;
+    audit)
+      _arguments '--json[print JSON]'
       ;;
     delete)
       _arguments '--dry-run[list the files, remove nothing]' '--yes[do not ask]' '1:session ID prefix:'
@@ -627,6 +634,7 @@ complete -c deja -n '__fish_seen_subcommand_from doctor' -l json
 complete -c deja -n '__fish_seen_subcommand_from doctor' -l offline
 complete -c deja -n '__fish_seen_subcommand_from doctor' -l deep
 complete -c deja -n '__fish_seen_subcommand_from doctor' -l all
+complete -c deja -n '__fish_seen_subcommand_from audit' -l json
 complete -c deja -n '__fish_seen_subcommand_from delete' -l dry-run -d 'List the files, remove nothing'
 complete -c deja -n '__fish_seen_subcommand_from delete' -l yes -d 'Do not ask'
 complete -c deja -n '__fish_seen_subcommand_from mcp' -l context-search -d 'Serve only context_search'
@@ -805,6 +813,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 else { @('bash', 'zsh', 'fish', '-c', '--verify', '--json') }
             }
             'doctor' { @('--json', '--offline', '--deep', '--all') }
+            'audit' { @('--json') }
             'delete' { @('--dry-run', '--yes') }
             'forget' {
                 if ($previous -in @('--session', '--project', '--before', '--unforget')) { @() }
@@ -937,7 +946,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
 // added to one and not the other.
 func completionCommands() []string {
 	return []string{
-		"bench", "blame", "brief", "check", "completion", "ctx", "delete", "doctor", "embed",
+		"audit", "bench", "blame", "brief", "check", "completion", "ctx", "delete", "doctor", "embed",
 		"files", "fix", "forget", "friction", "handoff", "help", "how", "index",
 		"install", "last", "log", "mcp", "origin", "promote", "recall", "recap", "remember", "repo", "restore",
 		"resume", "review", "rules", "search", "secrets", "share", "shell", "show", "sources", "stats",

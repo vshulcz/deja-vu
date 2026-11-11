@@ -402,6 +402,28 @@ func underTempDir(p string) bool {
 			return true
 		}
 	}
+	return underEphemeralRunner(p)
+}
+
+// underEphemeralRunner reports whether p sits inside a package runner's
+// one-shot cache (`npx`, `pnpm dlx`, `yarn dlx`, `bunx`). Those directories are
+// evicted without consulting deja, so a hook or MCP entry pointing into one
+// stops working silently while a running npx binary must never overwrite a
+// permanent install's wiring.
+func underEphemeralRunner(p string) bool {
+	if p == "" {
+		return false
+	}
+	slashed := strings.ToLower(filepath.ToSlash(filepath.Clean(p)))
+	if strings.Contains(slashed, "/_npx/") || strings.Contains(slashed, "/pnpm/dlx/") {
+		return true
+	}
+	for seg := range strings.SplitSeq(filepath.ToSlash(filepath.Dir(p)), "/") {
+		s := strings.ToLower(seg)
+		if strings.HasPrefix(s, "dlx-") || strings.HasPrefix(s, "bunx-") {
+			return true
+		}
+	}
 	return false
 }
 

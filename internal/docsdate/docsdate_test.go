@@ -15,12 +15,12 @@ import (
 // A new harness changes the count in about a hundred page bodies and nothing
 // else in them. A changed benchmark figure is still a change.
 func TestAHarnessCountChangeDoesNotDateThePage(t *testing.T) {
-	before := []byte("<article><p>the transcripts of forty-two agents, 四十二个工具, and 41 others. 97.2% R@5</p></article>")
-	after := []byte("<article><p>the transcripts of forty-three agents, 四十三个工具, and 42 others. 97.2% R@5</p></article>")
+	before := []byte(`<article><p>the transcripts of forty-two agents, 四十二个工具, 42 agent stores, <span class="fig">42</span>, and 41 others / 39 more. 97.2% R@5</p></article>`)
+	after := []byte(`<article><p>the transcripts of forty-three agents, 四十三个工具, 43 agent stores, <span class="fig">43</span>, and 42 others / 40 more. 97.2% R@5</p></article>`)
 	if !bytes.Equal(Content(before), Content(after)) {
 		t.Errorf("a count-only change reads as new content:\n%s\n%s", Content(before), Content(after))
 	}
-	bench := []byte("<article><p>the transcripts of forty-three agents, 四十三个工具, and 42 others. 97.4% R@5</p></article>")
+	bench := []byte(`<article><p>the transcripts of forty-three agents, 四十三个工具, 43 agent stores, <span class="fig">43</span>, and 42 others / 40 more. 97.4% R@5</p></article>`)
 	if bytes.Equal(Content(bench), Content(after)) {
 		t.Error("a changed benchmark figure reads as no change")
 	}

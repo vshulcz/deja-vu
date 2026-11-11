@@ -110,6 +110,11 @@ func runInstall(dir string, args []string, uninstall bool) error {
 		return err
 	}
 	exe, _ = filepath.Abs(exe)
+	if !uninstall && underEphemeralRunner(exe) {
+		if staged, stageErr := stageEphemeralExe(exe); stageErr == nil && staged != "" {
+			exe = staged
+		}
+	}
 	// Remembered so a later upgrade can refresh exactly these and nothing
 	// else: the generators change, the files on disk do not.
 	if uninstall {

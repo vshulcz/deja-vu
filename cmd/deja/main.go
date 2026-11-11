@@ -305,6 +305,7 @@ var commands = map[string]command{
 	"wip":             func(dir string, args []string) error { return runWIP(dir, args, os.Stdout) },
 	"hook-refresh":    func(dir string, _ []string) error { runHookRefresh(dir); return nil },
 	"view":            runView,
+	"audit":           func(dir string, rest []string) error { return runAudit(dir, rest, os.Stdout) },
 	"install":         func(dir string, rest []string) error { return runInstall(dir, rest, false) },
 	"uninstall":       func(dir string, rest []string) error { return runInstall(dir, rest, true) },
 	"update":          func(_ string, rest []string) error { return runUpdate(rest, os.Stdout) },

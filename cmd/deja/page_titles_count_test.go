@@ -24,7 +24,7 @@ func TestPageTitlesCountTheRestOfTheHarnesses(t *testing.T) {
 		named int    // harnesses named in the phrase itself
 		shape string // %d is the rest
 	}{
-		{"docs/index.html", 2, "Claude Code, Codex and %d more agents"},
+		{"docs/index.html", 6, "Claude Code, Codex, Cursor, OpenCode, Gemini CLI, OpenClaw and %d more agents"},
 		{"docs/guide/harnesses.html", 3, "Claude Code, Codex, Cursor and %d more agents"},
 	} {
 		b, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(c.file)))

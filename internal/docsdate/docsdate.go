@@ -175,12 +175,14 @@ func body(page []byte) []byte {
 var (
 	numberWord = regexp.MustCompile(`(?i)\b(?:(?:twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:-(?:one|two|three|four|five|six|seven|eight|nine))?|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|zero|one|two|three|four|five|six|seven|eight|nine)\b`)
 	zhCount    = regexp.MustCompile(`[零一二两三四五六七八九十百]+个`)
-	digitCount = regexp.MustCompile(`\b\d+((?: more| other)? (?:coding agents|agents|harnesses|others|tools)\b)`)
+	digitCount = regexp.MustCompile(`\b\d+((?: more| other)? (?:(?:coding |agent )?(?:agents|harnesses|others|tools|stores))\b| (?:more|other)\b)`)
+	figCount   = regexp.MustCompile(`(<span class="fig">)\d+(</span>)`)
 )
 
 func counts(b []byte) []byte {
 	b = numberWord.ReplaceAll(b, []byte("#"))
 	b = zhCount.ReplaceAll(b, []byte("#个"))
+	b = figCount.ReplaceAll(b, []byte("${1}#${2}"))
 	return digitCount.ReplaceAll(b, []byte("#$1"))
 }
 

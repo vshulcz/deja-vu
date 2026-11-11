@@ -59,6 +59,7 @@ func jsonSurfaces(sessionID string) []jsonSurface {
 		{heading: "## `deja blame <path>:<line> --attribution --json`", args: []string{"blame", "internal/pool/pool.go:3", "--attribution", "--json"}},
 		{heading: "## `deja wip --json`", args: []string{"wip", "--json"}},
 		{heading: "## `deja rules candidates --json`", args: []string{"rules", "candidates", "--json"}},
+		{heading: "## `deja audit --json`", args: []string{"audit", "--json"}},
 	}
 }
 
