@@ -12,7 +12,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/policy"
 )
 
-const fixRawVersion = 2
+const fixRawVersion = 4
 
 type fixRawDisk struct {
 	Version int

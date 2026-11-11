@@ -197,15 +197,18 @@ func extractEditWhy(ms []model.Message, errIdx, editIdx int, editedPath, symbol,
 	}
 	errTerms := significantErrorTerms(errLine)
 
-	start := max(errIdx, editIdx-2)
-	end := min(len(ms)-1, editIdx+6)
+	start := max(errIdx, editIdx-3)
+	end := min(len(ms)-1, editIdx+14)
 	var fallback string
 	for k := start; k <= end; k++ {
+		if k > editIdx && ms[k].Role == "user" {
+			break
+		}
 		if ms[k].Role != "assistant" {
 			continue
 		}
-		for rawLine := range strings.SplitSeq(ms[k].Text, "\n") {
-			sent := cleanCausalSentence(rawLine)
+		for _, cand := range splitCausalCandidates(ms[k].Text) {
+			sent := cleanCausalSentence(cand)
 			if sent == "" {
 				continue
 			}
@@ -234,6 +237,43 @@ func extractEditWhy(ms []model.Message, errIdx, editIdx int, editedPath, symbol,
 		}
 	}
 	return fallback
+}
+
+func splitCausalCandidates(text string) []string {
+	var out []string
+	inFence := false
+	for rawLine := range strings.SplitSeq(text, "\n") {
+		trimmed := strings.TrimSpace(rawLine)
+		if strings.HasPrefix(trimmed, "```") {
+			inFence = !inFence
+			continue
+		}
+		if inFence || trimmed == "" {
+			continue
+		}
+		inTick := false
+		start := 0
+		for i := 0; i < len(trimmed); i++ {
+			if trimmed[i] == '`' {
+				inTick = !inTick
+				continue
+			}
+			if inTick {
+				continue
+			}
+			if (trimmed[i] == '.' || trimmed[i] == '!' || trimmed[i] == ';') && i+1 < len(trimmed) && trimmed[i+1] == ' ' {
+				seg := strings.TrimSpace(trimmed[start : i+1])
+				if seg != "" {
+					out = append(out, seg)
+				}
+				start = i + 2
+			}
+		}
+		if tail := strings.TrimSpace(trimmed[start:]); tail != "" {
+			out = append(out, tail)
+		}
+	}
+	return out
 }
 
 func significantErrorTerms(errLine string) []string {
@@ -268,17 +308,14 @@ func cleanCausalSentence(raw string) string {
 		return ""
 	}
 	s = strings.ReplaceAll(s, "**", "")
-	for _, prefix := range []string{"Root cause:", "root cause:", "Cause:", "Why:", "Bug:"} {
+	for _, prefix := range []string{"Root cause:", "root cause:", "Cause:", "Why:", "Bug:", "Fix:", "Fixed:"} {
 		if after, ok := strings.CutPrefix(s, prefix); ok {
 			s = strings.TrimSpace(after)
 			break
 		}
 	}
-	if idx := strings.Index(s, ". "); idx >= 35 && idx <= 200 {
-		s = s[:idx+1]
-	}
 	n := utf8.RuneCountInString(s)
-	if n < 35 || n > 260 {
+	if n < 30 {
 		return ""
 	}
 	return s
@@ -292,9 +329,12 @@ func carriesCausalMarker(s string) bool {
 		"off-by-one", "underflow", "overflow", "stale ", "without holding", "without locking",
 		"before closing", "after closing", "instead of ", "so that ", "otherwise ",
 		"prevent ", "prevents ", "avoid ", "avoids ", "broke when", "broke because",
-		"failed because", "fails when", "failed when", "panicked", "missing ", "dropped ",
-		"leaked ", "swallowed ", "overwrote ", "truncated ", "mismatch", "must hold", "must be ",
-		"потому что ", "из-за ", "причина", "иначе ", "чтобы не ", "гонка", "паника",
+		"failed because", "fails because", "fails when", "failed when", "panicked",
+		"missing ", "dropped ", "leaked ", "swallowed ", "overwrote ", "truncated ",
+		"mismatch", "must hold", "must be ", "must pass", "was returning", "returned empty",
+		"skipped ", "ignored ", "needed to ", "did not ", "didn't ", "never ", "forgot to ",
+		"потому что ", "из-за ", "так как ", "причина", "иначе ", "чтобы не ",
+		"гонка", "паника", "возвращал", "пропускал", "перезаписывал", "не учитывал", "нужно передавать",
 	} {
 		if strings.Contains(low, m) {
 			return true

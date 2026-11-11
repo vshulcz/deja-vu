@@ -290,7 +290,7 @@ var helpEntries = []helpEntry{
 			"deja bench recall|context|prompt|block|ingest|read [--json] [--seed n]",
 			"deja bench live [--json]",
 		},
-		desc:     "reproducible benchmarks of recall, indexing, and live repository coverage",
+		desc:     "benchmarks of recall, indexing, and live coverage",
 		examples: []string{"deja bench recall", "deja bench live", "deja bench ingest --json"}},
 	{name: "aider", group: groupSetup, toolHelp: true,
 		usage:    []string{"deja aider [aider flags]"},

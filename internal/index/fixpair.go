@@ -37,6 +37,10 @@ const (
 	// fixLookAhead is how far past the error a command still counts as an
 	// answer to it. Beyond that the session has moved on to something else.
 	fixLookAhead = 10
+	// fixEditLookAhead extends the edit+verification scan across multi-step
+	// tool-use loops (read file -> inspect -> edit -> run suite) when no shell
+	// command remedy settled the error within fixLookAhead.
+	fixEditLookAhead = 18
 	// The quiet check runs to the end of the session rather than over a window.
 	// Six records was long enough to miss the session hitting the same error
 	// again a little later, which is the transcript saying the command did not
@@ -90,6 +94,11 @@ type FixPair struct {
 	// Why is a single causal sentence spoken by the assistant around the Edit
 	// that explains why the failure happened or how the change settled it.
 	Why string `json:",omitempty"`
+	// SelfCorrected marks an edit remedy where the same session edited the file,
+	// hit the failure, edited the same file again, and passed a verification
+	// command without the error recurring. That closed causal loop proves the
+	// edit settled the failure without waiting for a second session to repeat it.
+	SelfCorrected bool `json:",omitempty"`
 	// Repaired marks the remedy as the failing command corrected — same
 	// program, most of the same words. That is evidence on its own, and of a
 	// different kind than the word rules: the pair is not a command that
@@ -189,19 +198,27 @@ func judgeFixes(all []FixPair) []FixPair {
 	// the error named, or the same remedy followed the same error in another
 	// session. That takes 356 pairs down to the ones worth handing an agent.
 	repeats := map[string]int{}
+	selfCorrectedKeys := map[string]bool{}
 	for _, p := range all {
-		repeats[fixKey(p)]++
+		k := fixKey(p)
+		repeats[k]++
+		if p.SelfCorrected {
+			selfCorrectedKeys[k] = true
+		}
 	}
 	out := all[:0]
 	byKeyMeta := map[string]FixPair{}
 	for _, p := range all {
+		k := fixKey(p)
+		if selfCorrectedKeys[k] {
+			p.SelfCorrected = true
+		}
 		// Not a pair, and not nothing: the second kind of evidence accumulates
 		// across sessions, and sessions arrive one at a time. Dropping a
 		// sighting here meant the session that would have confirmed it found
 		// nothing to confirm, so a full build reached pairs the same corpus
 		// grown one session at a time never did (#1301).
-		p.Candidate = !selfEvidentPair(p) && (!repetitionConfirms(p) || repeats[fixKey(p)] < 2)
-		k := fixKey(p)
+		p.Candidate = !selfEvidentPair(p) && (!repetitionConfirms(p) || repeats[k] < 2)
 		if prev, ok := byKeyMeta[k]; !ok {
 			byKeyMeta[k] = p
 		} else {
@@ -210,6 +227,9 @@ func judgeFixes(all []FixPair) []FixPair {
 			}
 			if prev.Why == "" && p.Why != "" {
 				prev.Why = p.Why
+			}
+			if !prev.SelfCorrected && p.SelfCorrected {
+				prev.SelfCorrected = true
 			}
 			byKeyMeta[k] = prev
 		}
@@ -247,6 +267,9 @@ func judgeFixes(all []FixPair) []FixPair {
 			if p.Why == "" {
 				p.Why = meta.Why
 			}
+			if !p.SelfCorrected && meta.SelfCorrected {
+				p.SelfCorrected = true
+			}
 		}
 		kept = append(kept, p)
 		// Candidates have their own budget above, so the pair cap is what it
@@ -264,9 +287,15 @@ func judgeFixes(all []FixPair) []FixPair {
 // file, and nothing ties them but a second session doing the same thing.
 func selfEvidentPair(p FixPair) bool {
 	if p.Edit != "" {
+		return p.SelfCorrected
+	}
+	if p.Repaired || p.Substitute {
+		return true
+	}
+	if namedTestFailure(p.Error) && VerifyCommand(p.Command) {
 		return false
 	}
-	return p.Repaired || p.Substitute || sharesTerm(p.Error, p.Command)
+	return sharesTerm(p.Error, p.Command)
 }
 
 // MachineFact reports whether the pair answers a program or module missing
@@ -514,14 +543,24 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 		// window holds no command that answers it.
 		edited := ""
 		editIdx := -1
+		editVerified := false
 		paired := false
-		for j := i + 1; j < len(ms) && j <= i+fixLookAhead; j++ {
+		for j := i + 1; j < len(ms) && j <= i+fixEditLookAhead; j++ {
+			if j > i+fixLookAhead && ms[j].Role == "user" {
+				break
+			}
 			if ms[j].Role == roleEdit {
 				// No file edit answers a line the shell refused; it is the
 				// session going back to its work.
-				if edited == "" && !env {
-					edited = strings.TrimSpace(firstLineOf(ms[j].Text))
-					editIdx = j
+				if !env {
+					cand := strings.TrimSpace(firstLineOf(ms[j].Text))
+					if looksLikeEditedPath(cand) && lastSeen[sig] <= j {
+						if edited == "" || (!isTestFileEditPath(cand)) || isTestFileEditPath(edited) {
+							edited = cand
+							editIdx = j
+							editVerified = false
+						}
+					}
 				}
 				continue
 			}
@@ -541,6 +580,9 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 				continue
 			}
 			if lastSeen[sig] > j {
+				if !env && j <= i+fixEditLookAhead {
+					continue
+				}
 				break
 			}
 			// A command that failed is not a remedy for anything, and handing
@@ -551,6 +593,13 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 			// session that tried something and failed usually tries again,
 			// and the retry is the pair worth having.
 			if commandFailed(ms[j].Text) || outputFailed(ms, j) {
+				continue
+			}
+			if j > i+fixLookAhead {
+				if !env && edited != "" && looksLikeEditedPath(edited) && !namesAnEphemeralPath(cmd) && VerifyCommand(cmd) {
+					editVerified = true
+					break
+				}
 				continue
 			}
 			// Reading something is not fixing it. The rule that keeps a pair —
@@ -580,6 +629,15 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 					continue
 				}
 			}
+			// When the session changed a source file after a non-shell failure and
+			// then ran a passing build/test verification command, the verification
+			// command proves the edit settled the error — it is not a command remedy
+			// that replaces the edit. Check before investigationCommand, which marks
+			// `go test` / `go vet` as investigation to keep them out of Command pairs.
+			if !env && edited != "" && looksLikeEditedPath(edited) && !namesAnEphemeralPath(cmd) && VerifyCommand(cmd) {
+				editVerified = true
+				break
+			}
 			if !repaired && !substituted && investigationCommand(cmd) {
 				continue
 			}
@@ -608,15 +666,53 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 		// No command answered it, and the session changed a file: that is the
 		// remedy for a failing test, which is what the command window can
 		// never hold.
-		if !paired && edited != "" && looksLikeEditedPath(edited) {
+		if !paired && edited != "" && looksLikeEditedPath(edited) && lastSeen[sig] <= editIdx {
 			sym, why := mineEditContext(ms, i, editIdx, edited, line)
+			selfCorr := editVerified && hadPriorSameFileEdit(ms, i, edited)
 			out = append(out, FixPair{
 				Sig: sig, Error: line, Edit: edited, Symbol: sym, Why: why,
+				SelfCorrected: selfCorr,
 				Key: key, When: m.Time, Project: project, Also: also,
 			})
 		}
 	}
 	return out
+}
+
+func isTestFileEditPath(p string) bool {
+	low := strings.ToLower(filepath.Base(p))
+	return strings.HasSuffix(low, "_test.go") ||
+		strings.HasPrefix(low, "test_") ||
+		strings.HasSuffix(low, "_test.py") ||
+		strings.Contains(low, ".test.") ||
+		strings.Contains(low, ".spec.")
+}
+
+func hadPriorSameFileEdit(ms []model.Message, errIdx int, edited string) bool {
+	target := normalizeEditedRef(edited)
+	if target == "" {
+		return false
+	}
+	start := max(0, errIdx-32)
+	for k := errIdx - 1; k >= start; k-- {
+		if ms[k].Role != roleEdit {
+			continue
+		}
+		prev := normalizeEditedRef(firstLineOf(ms[k].Text))
+		if prev == "" {
+			continue
+		}
+		if prev == target || strings.HasSuffix(prev, "/"+target) || strings.HasSuffix(target, "/"+prev) {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeEditedRef(p string) string {
+	p = strings.TrimSpace(filepath.ToSlash(p))
+	p = strings.TrimPrefix(p, "./")
+	return strings.ToLower(p)
 }
 
 // ephemeralPathRE matches a path under a directory whose contents do not
