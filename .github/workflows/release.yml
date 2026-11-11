@@ -274,7 +274,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       # ClawHub trusted publishing: the CLI trades the workflow's OIDC token for
       # a one-package, one-version publish token, so no secret is stored. The
       # package's trusted-publisher config names this repo and release.yml.
@@ -400,4 +400,24 @@ jobs:
           fi
           if [ -n "${VSCE_PAT:-}" ]; then
             npx --yes @vscode/vsce publish --packagePath "$RUNNER_TEMP/deja-status.vsix" -p "$VSCE_PAT" || true
+          fi
+
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Build, attach, and publish the JetBrains plugin
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          JETBRAINS_TOKEN: ${{ secrets.JETBRAINS_TOKEN }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          cd extensions/jetbrains
+          ./gradlew buildPlugin -PpluginVersion="$version" --no-daemon
+          cp build/distributions/deja-jetbrains-*.zip "$RUNNER_TEMP/deja-jetbrains.zip"
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" "$RUNNER_TEMP/deja-jetbrains.zip" --clobber
+          if [ -n "${JETBRAINS_TOKEN:-}" ]; then
+            ./gradlew publishPlugin -PpluginVersion="$version" --no-daemon || true
           fi
