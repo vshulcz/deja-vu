@@ -490,6 +490,21 @@ var cyrPromptStop = map[string]bool{
 	"его": true, "чем": true, "чём": true, "том": true, "тем": true,
 	"так": true, "нас": true, "вас": true, "все": true, "всё": true,
 	"два": true, "три": true, "оба": true, "иначе": true,
+	// Conversational process framing and workflow verbs observed in live
+	// Russian prompts ("сначала проверим что происходит в проекте", "посмотрим
+	// последние коммиты и разберемся что сломалось", "ничего не пушить пока я
+	// сам не посмотрю изменения", "выводы делай короткими без лишней воды").
+	// None of these name a technical subject; left in, they match unrelated
+	// sessions that happened to use the same conversational preamble.
+	"сначала": true, "проверим": true, "проверить": true, "происходит": true,
+	"проекте": true, "проект": true, "посмотрим": true, "посмотрю": true,
+	"последние": true, "последний": true, "разберемся": true,
+	"разберёмся": true, "сломалось": true, "сломался": true, "забыли": true,
+	"перед": true, "пока": true, "сам": true, "сама": true, "сами": true,
+	"ничего": true, "пушить": true, "пуш": true, "коммиты": true, "коммит": true,
+	"коммитом": true, "файлы": true, "файл": true, "изменения": true,
+	"выводы": true, "вывод": true, "делай": true,
+	"короткими": true, "коротко": true, "лишней": true, "воды": true,
 }
 
 // Candidates is how many ranked sessions the hook asks for before

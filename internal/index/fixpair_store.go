@@ -6,10 +6,25 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 )
+
+var fixesCache struct {
+	mu    sync.Mutex
+	dir   string
+	fi    os.FileInfo
+	pairs []FixPair
+	ok    bool
+}
+
+func invalidateFixesCache() {
+	fixesCache.mu.Lock()
+	fixesCache.ok = false
+	fixesCache.mu.Unlock()
+}
 
 // writeFixTables writes the raw pairs and the table judged from them, and
 // removes both when there are none, as a full build would not write them.
@@ -18,6 +33,7 @@ import (
 // truncating write that failed partway would ship an undecodable file, which
 // ReadFixes reports as no pairs at all — silence until the next full rebuild.
 func writeFixTables(dir string, raw []FixPair) {
+	invalidateFixesCache()
 	if len(raw) == 0 {
 		_ = os.Remove(fixRawPath(dir))
 		_ = os.Remove(fixesPath(dir))
@@ -183,17 +199,39 @@ func remineFixes(dir string) {
 	}
 	_ = os.Remove(fixesPath(dir))
 	_ = os.Remove(fixRawPath(dir))
+	invalidateFixesCache()
 	buildFixes(dir, ss, func(s model.Session) string { return s.Key() })
 }
 
 // ReadFixes loads the mined pairs. An index built before they existed simply
 // has none.
 func ReadFixes(dir string) []FixPair {
-	var out []FixPair
-	if err := readGob(fixesPath(dir), &out); err != nil {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	p := fixesPath(dir)
+	fi, err := os.Stat(p)
+	if err != nil {
 		return nil
 	}
-	return out
+	fixesCache.mu.Lock()
+	if fixesCache.ok && fixesCache.dir == dir && sameGeneration(fixesCache.fi, fi) {
+		cached := slices.Clone(fixesCache.pairs)
+		fixesCache.mu.Unlock()
+		return cached
+	}
+	fixesCache.mu.Unlock()
+	var out []FixPair
+	if err := readGob(p, &out); err != nil {
+		return nil
+	}
+	fixesCache.mu.Lock()
+	fixesCache.dir = dir
+	fixesCache.fi = fi
+	fixesCache.pairs = out
+	fixesCache.ok = true
+	fixesCache.mu.Unlock()
+	return slices.Clone(out)
 }
 
 // fixSignaturesFor is the set of error signatures the text asks about.

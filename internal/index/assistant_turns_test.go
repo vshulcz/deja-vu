@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 )
@@ -77,5 +78,50 @@ func TestEachAssistantTurnSinceReportsAMissingStore(t *testing.T) {
 	setHome(t, t.TempDir())
 	if err := EachAssistantTurnSince(filepath.Join(t.TempDir(), "none.db"), time.Time{}, nil, func(SessionMeta, string, time.Time) {}); err == nil {
 		t.Fatal("a store that does not exist must be an error, not an empty week")
+	}
+}
+
+func TestRecentSpokenAssistantTurnsForTermsSkipsToolsAndHonoursAllowedKeys(t *testing.T) {
+	h := newTwoWayEnv(t)
+	s1 := hPrompt("ledger", "s1", 2, 0, "update throttle.go") +
+		hBash("ledger", "s1", 2, 1, "t1", "cat throttle.go", "package ledger // throttle.go in tool output only", false) +
+		hSay("ledger", "s1", 2, 2, "We settled on token bucket in throttle.go because leaky bucket starved bursts.")
+	s2 := hPrompt("ledger", "s2", 3, 0, "check throttle.go") +
+		hSay("ledger", "s2", 3, 1, "In s2 we kept throttle.go burst capacity at 64.")
+	s3 := hPrompt("ledger", "s3", 4, 0, "inspect throttle.go") +
+		hBash("ledger", "s3", 4, 1, "t2", "grep bucket throttle.go", "throttle.go token bucket", false) +
+		hSay("ledger", "s3", 4, 2, "All checks completed.")
+
+	h.put("ledger", "s1", s1)
+	h.put("ledger", "s2", s2)
+	h.put("ledger", "s3", s3)
+
+	dir := filepath.Join(h.tmp, "idx.db")
+	if err := Ensure(dir, "claude", false, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	allowed := map[string]bool{
+		"claude:s1": true,
+		"claude:s3": true, // s3 only mentions throttle in tool output, not spoken assistant text
+	}
+	turns, err := RecentSpokenAssistantTurnsForTerms(dir, []string{"throttle"}, allowed, 10)
+	if err != nil {
+		t.Fatalf("RecentSpokenAssistantTurnsForTerms: %v", err)
+	}
+	if len(turns) != 1 {
+		t.Fatalf("expected 1 spoken assistant turn from allowed sessions, got %d: %+v", len(turns), turns)
+	}
+	if turns[0].Key != "claude:s1" || !strings.Contains(turns[0].Text, "starved bursts") {
+		t.Errorf("unexpected turn returned: %+v", turns[0])
+	}
+
+	allowed["claude:s2"] = true
+	turnsBoth, err := RecentSpokenAssistantTurnsForTerms(dir, []string{"throttle"}, allowed, 10)
+	if err != nil {
+		t.Fatalf("RecentSpokenAssistantTurnsForTerms with s2: %v", err)
+	}
+	if len(turnsBoth) != 2 || turnsBoth[0].Key != "claude:s2" || turnsBoth[1].Key != "claude:s1" {
+		t.Errorf("expected newest-first [claude:s2, claude:s1], got %+v", turnsBoth)
 	}
 }

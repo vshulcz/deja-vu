@@ -370,4 +370,34 @@ func TestStandingRulesMultilingualENRUZHJA(t *testing.T) {
 	if got := ExtractStandingRules(sNoFalseNumRefusal, nil); len(got) != 0 {
 		t.Errorf("expected no standing rules from bare numbered reply without entity in item 2, got %+v", got)
 	}
+
+	// Multi-entity assistant turns must not misattribute an unnumbered refusal or
+	// multi-entity numbered item to the first backticked token.
+	sMultiEntityNoMisattr := model.Session{
+		ID:      "multi-entity-no-misattr",
+		Harness: "claude",
+		Messages: []model.Message{
+			{
+				Role: "assistant",
+				Text: "I updated `pkg/ledger/entry.go` and `pkg/ledger/balance.go`. Should we also prune `pkg/ledger/archive.go`?",
+			},
+			{
+				Role: "user",
+				Text: "Нет, там еще старые миграции завязаны",
+			},
+			{
+				Role: "assistant",
+				Text: "Options:\n1. Keep `pkg/ledger/entry.go` untouched\n2. Move both `pkg/ledger/entry.go` and `pkg/ledger/balance.go` into `internal/archive`",
+			},
+			{
+				Role: "user",
+				Text: "2. нет, оставляем пакеты на месте",
+			},
+		},
+	}
+	for _, r := range ExtractStandingRules(sMultiEntityNoMisattr, nil) {
+		if strings.HasPrefix(r.Text, "Do not suggest pkg/ledger/entry.go:") {
+			t.Errorf("misattributed multi-entity refusal to first entity: %q", r.Text)
+		}
+	}
 }

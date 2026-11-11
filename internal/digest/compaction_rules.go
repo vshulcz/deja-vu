@@ -307,7 +307,9 @@ func standingLinesWithContext(prevAssistant, text string) []string {
 			}
 		}
 		if !matchedEnt && !strings.HasPrefix(h, "Do not suggest ") && standingDirectRefusalRE.MatchString(cjkfold.String(h)) {
-			h = "Do not suggest " + entities[0] + ": " + h
+			if target := unambiguousProposalTarget(prevAssistant, entities); target != "" {
+				h = "Do not suggest " + target + ": " + h
+			}
 		}
 		out = append(out, h)
 	}
@@ -339,13 +341,13 @@ func turnPairRules(prevAssistant, userText string) []string {
 			proposed := assistantItems[itemNum]
 			target := ""
 			if proposed != "" {
-				if ents := proposedEntities(proposed); len(ents) > 0 {
-					target = ents[0]
+				if t := unambiguousProposalTarget(proposed, proposedEntities(proposed)); t != "" {
+					target = t
 				} else {
 					target = compactProposalSummary(proposed)
 				}
-			} else if len(assistantItems) == 0 && len(entities) == 1 {
-				target = entities[0]
+			} else if len(assistantItems) == 0 {
+				target = unambiguousProposalTarget(prevAssistant, entities)
 			}
 			if target != "" {
 				rule := "Do not suggest " + target + ": " + line
@@ -360,9 +362,8 @@ func turnPairRules(prevAssistant, userText string) []string {
 		// or "Try running `--skip-fsync`" -> User: "No, that will wipe the local database"
 		// / "Нет, там локальная база"), where the user states a declarative reason
 		// without repeating the command or using an imperative verb.
-		if len(entities) > 0 && len(standingLines(line)) == 0 {
-			if standingDirectRefusalRE.MatchString(cjkfold.String(line)) {
-				target := entities[0]
+		if len(assistantItems) == 0 && len(standingLines(line)) == 0 {
+			if target := unambiguousProposalTarget(prevAssistant, entities); target != "" && standingDirectRefusalRE.MatchString(cjkfold.String(line)) {
 				rule := "Do not suggest " + target + ": " + line
 				if fitsStanding(rule) {
 					out = append(out, rule)
@@ -371,6 +372,34 @@ func turnPairRules(prevAssistant, userText string) []string {
 		}
 	}
 	return out
+}
+
+func unambiguousProposalTarget(text string, entities []string) string {
+	if cmds := proposedSlashCommands(text); len(cmds) == 1 {
+		return cmds[0]
+	}
+	var flags []string
+	for _, e := range entities {
+		if strings.HasPrefix(e, "-") && len(e) >= 3 {
+			flags = append(flags, e)
+		}
+	}
+	if len(flags) == 1 {
+		return flags[0]
+	}
+	if len(entities) == 1 {
+		return entities[0]
+	}
+	if idx := strings.LastIndexAny(text, "?？"); idx >= 0 {
+		qClause := text[:idx+1]
+		if cut := strings.LastIndexAny(qClause, ".!\n。！"); cut >= 0 && cut < idx {
+			qClause = qClause[cut+1:]
+		}
+		if qEnts := proposedEntities(qClause); len(qEnts) == 1 {
+			return qEnts[0]
+		}
+	}
+	return ""
 }
 
 func proposedEntities(text string) []string {

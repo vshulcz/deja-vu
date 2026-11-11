@@ -139,6 +139,7 @@ func fixesPath(dir string) string { return filepath.Join(dir, fixesFile) }
 // project's directory was mined with the row's copy there and on its own here,
 // so the pass paired one file's error with the other's remedy (#5504).
 func buildFixes(tmp string, ss []model.Session, keyOf func(model.Session) string) {
+	invalidateFixesCache()
 	// Mining is per session and reads nothing shared, and it was 9.4 s of a
 	// 51 s build on a real store — the longest of the four sidecars, with the
 	// rest of the machine idle. judgeFixes sorts before it judges, so what

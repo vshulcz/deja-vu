@@ -155,6 +155,10 @@ func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(inde
 		} else {
 			dec = modelLabel(decisionLabel, d) + d
 		}
+	} else if rev := fileReversalLineFor(dir, path, editSymbols, fileSymbols, inScope); rev != "" {
+		dec = revertedLabel + rev
+	} else if brk := fileBreakageLineFor(dir, cwd, path, inScope, pol); brk != "" {
+		dec = breakageLabel + brk
 	}
 	ran := fileHookRanLineFor(dir, path, inScope)
 	if ran == "" {
@@ -175,10 +179,14 @@ func assembleFileHookLine(head, dec, co, ran string) string {
 	if dec != "" && (strings.Contains(dec, "requires updating ") || strings.Contains(dec, "edited alongside ")) {
 		co = ""
 	}
-	if dec != "" && co != "" && ran != "" && len(head)+len(dec)+len(co)+len(ran) > toolHookMaxBytes {
-		for _, label := range []string{standingLabel, repoDecisionLabel, decisionLabel} {
+	if dec != "" && ran != "" && len(head)+len(dec)+len(co)+len(ran) > toolHookMaxBytes {
+		for _, label := range []string{standingLabel, repoDecisionLabel, decisionLabel, modelOrderLabel, revertedLabel, breakageLabel} {
 			if strings.HasPrefix(dec, label) {
 				avail := toolHookMaxBytes - len(head) - len(co) - len(ran) - len(label)
+				if avail < 90 && strings.HasPrefix(ran, " — test target: ") {
+					ran = ""
+					avail = toolHookMaxBytes - len(head) - len(co) - len(label)
+				}
 				if avail >= 90 {
 					clipped := trimTrailingFragment(search.SafeText(clipDecision(strings.TrimPrefix(dec, label), avail)))
 					if clipped != "" {
@@ -197,6 +205,14 @@ func assembleFileHookLine(head, dec, co, ran string) string {
 			body += co
 			co = ""
 		}
+		if ran != "" && len(head)+len(body)+len(ran) <= toolHookMaxBytes {
+			body += ran
+		}
+	case dec != "" && strings.HasPrefix(ran, " — test target: "):
+		// A static sibling-test target is synthetically reproducible at any time;
+		// a file-specific prior decision from session history outranks it when
+		// both do not fit.
+		body = dec
 		if ran != "" && len(head)+len(body)+len(ran) <= toolHookMaxBytes {
 			body += ran
 		}
@@ -224,6 +240,8 @@ func assembleFileHookLine(head, dec, co, ran string) string {
 }
 
 const decisionLabel = " — prior decision: "
+const revertedLabel = " — reverted approach here: "
+const breakageLabel = " — past breakage here: "
 
 // mentionsFile reports whether the text names the file or the directory it sits
 // in. Stems count: a decision about `render.go` says "renderer", and one about
@@ -272,7 +290,8 @@ func isGenericFileStemPart(w string) bool {
 	switch w {
 	case "file", "files", "tool", "tools", "test", "tests", "main", "util", "utils",
 		"helper", "helpers", "common", "types", "model", "models", "index", "data",
-		"base", "core", "init", "spec", "specs", "session", "sessions":
+		"base", "core", "init", "spec", "specs", "session", "sessions",
+		"hook", "hooks", "install", "compaction", "command", "commands":
 		return true
 	}
 	return false
@@ -338,9 +357,10 @@ func repoMemoryDecisionForFile(cwd, path string, allSymbols []string, pol policy
 		return entries[i].Date > entries[j].Date
 	})
 	for _, e := range entries {
-		matched := (len(e.Files) <= 2 && repoEntryHasFile(root, path, e.Files)) || repoEntryMentionsFile(root, path, e.Text)
+		matched := repoEntryHasFile(root, path, e.Files) ||
+			(len(e.Files) == 0 && repoEntryMentionsFile(root, path, e.Text))
 		if !matched && len(e.Files) == 0 {
-			matched = mentionsAnySymbol(allSymbols, e.Text)
+			matched = mentionsSpecificSymbol(allSymbols, e.Text)
 		}
 		if matched {
 			body := "[" + e.Kind + "] " + e.Text
@@ -348,6 +368,20 @@ func repoMemoryDecisionForFile(cwd, path string, allSymbols []string, pol policy
 		}
 	}
 	return ""
+}
+
+func mentionsSpecificSymbol(symbols []string, text string) bool {
+	if len(symbols) == 0 || text == "" {
+		return false
+	}
+	var specific []string
+	for _, sym := range symbols {
+		s := strings.TrimSpace(sym)
+		if len(s) >= 8 && hasMixedCaseOrUnderscore(s) {
+			specific = append(specific, s)
+		}
+	}
+	return mentionsAnySymbol(specific, text)
 }
 
 func repoEntryHasFile(root, path string, files []string) bool {
@@ -363,7 +397,8 @@ func repoEntryHasFile(root, path string, files []string) bool {
 	base := filepath.Base(slashPath)
 	for _, f := range files {
 		f = strings.TrimPrefix(filepath.ToSlash(f), "./")
-		if strings.EqualFold(f, slashPath) || (len(base) >= 6 && strings.EqualFold(filepath.Base(f), base)) ||
+		fHasDir := strings.ContainsRune(f, '/')
+		if strings.EqualFold(f, slashPath) || (!fHasDir && len(base) >= 6 && strings.EqualFold(f, base)) ||
 			strings.HasSuffix(slashPath, "/"+f) || strings.HasSuffix(f, "/"+slashPath) {
 			return true
 		}
@@ -444,6 +479,9 @@ func fileDecisionLineWithSymbols(dir, path string, editSymbols, fileSymbols []st
 			if len([]rune(line)) >= 45 && !usableRepoCandidateLine(line) {
 				continue
 			}
+			if isEphemeralCompletionReport(line) {
+				continue
+			}
 			if len(editSymbols) > 0 && mentionsAnySymbol(editSymbols, line) {
 				return line
 			}
@@ -455,7 +493,331 @@ func fileDecisionLineWithSymbols(dir, path string, editSymbols, fileSymbols []st
 			}
 		}
 	}
+	if fallback != "" || path == "" {
+		return fallback
+	}
+	return fileEpisodeDecisionLine(dir, path, editSymbols, fileSymbols, metas, r)
+}
+
+// fileEpisodeDecisionLine looks up recent spoken assistant turns that directly
+// mention this file's stem or specific symbols via the bucket posting list.
+// In long multi-file sessions, a decision about an edited file sits at the
+// episode where the file was changed rather than in the session's final tail.
+func fileEpisodeDecisionLine(dir, path string, editSymbols, fileSymbols []string, metas []index.SessionMeta, r *lifecycleResolver) string {
+	allowedKeys := make(map[string]bool, len(metas))
+	for _, meta := range metas {
+		if decisionUsable(metaSession(meta), r) {
+			allowedKeys[meta.Key()] = true
+		}
+	}
+	if len(allowedKeys) == 0 {
+		return ""
+	}
+	var lookupTerms []string
+	seenTerm := map[string]bool{}
+	addTerm := func(s string) {
+		low := strings.ToLower(strings.TrimSpace(s))
+		if len(low) < 4 || seenTerm[low] || isGenericFileStemPart(low) || isCommonKeyword(low) {
+			return
+		}
+		seenTerm[low] = true
+		lookupTerms = append(lookupTerms, low)
+	}
+	stem := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	addTerm(stem)
+	for _, part := range strings.FieldsFunc(stem, func(ch rune) bool { return ch == '_' || ch == '-' || ch == '.' }) {
+		addTerm(part)
+	}
+	for _, sym := range editSymbols {
+		if len(sym) >= 6 && hasMixedCaseOrUnderscore(sym) {
+			addTerm(sym)
+			if len(lookupTerms) >= 5 {
+				break
+			}
+		}
+	}
+	if len(lookupTerms) == 0 {
+		return ""
+	}
+	turns, err := index.RecentSpokenAssistantTurnsForTerms(dir, lookupTerms, allowedKeys, 32)
+	if err != nil || len(turns) == 0 {
+		return ""
+	}
+	var fallback string
+	for _, turn := range turns {
+		if !mentionsFile(path, turn.Text) && !mentionsSpecificSymbol(fileSymbols, turn.Text) && !mentionsAnySymbol(editSymbols, turn.Text) {
+			continue
+		}
+		if line := extractEpisodeDecisionFromTurn(turn.Text, path, editSymbols, fileSymbols); line != "" {
+			if len(editSymbols) > 0 && mentionsAnySymbol(editSymbols, line) {
+				return line
+			}
+			if fallback == "" {
+				fallback = line
+				if len(editSymbols) == 0 {
+					return fallback
+				}
+			}
+		}
+	}
 	return fallback
+}
+
+func extractEpisodeDecisionFromTurn(turnText, path string, editSymbols, fileSymbols []string) string {
+	var fallback string
+	s := model.Session{Messages: []model.Message{{Role: "assistant", Text: turnText}}}
+	candidates := digest.Conclusions(s, toolHookDecisionBudget*4, 6)
+	for rawLine := range strings.SplitSeq(turnText, "\n") {
+		candidates = append(candidates, rawLine)
+	}
+	for _, c := range candidates {
+		line := cleanRepoCandidateLine(strings.TrimSpace(c))
+		line = trimTrailingFragment(search.SafeText(strings.TrimSpace(line)))
+		if line == "" || len([]rune(line)) < 35 || !digest.CarriesDecision(line) {
+			continue
+		}
+		if len([]rune(line)) >= 45 && !usableRepoCandidateLine(line) {
+			continue
+		}
+		if isEphemeralCompletionReport(line) {
+			continue
+		}
+		if len(editSymbols) > 0 && mentionsAnySymbol(editSymbols, line) {
+			return trimTrailingFragment(search.SafeText(clipDecision(line, toolHookDecisionBudget)))
+		}
+		if fallback == "" && (mentionsFile(path, line) || mentionsSpecificSymbol(fileSymbols, line)) {
+			fallback = trimTrailingFragment(search.SafeText(clipDecision(line, toolHookDecisionBudget)))
+		}
+	}
+	return fallback
+}
+
+func isEphemeralCompletionReport(s string) bool {
+	trimmed := strings.TrimSpace(s)
+	low := strings.ToLower(trimmed)
+	for _, p := range []string{
+		"i fixed the ", "i fixed all ", "i fixed every ", "i fixed ",
+		"i added a ", "i updated ", "i removed ", "tests: ",
+		"the first ci run failed", "current audit:", "task: ",
+		"the fix is in:", "заодно поправил ", "я исправил ",
+		"the command failed because gemini cli did not clone",
+		"`#", "#",
+	} {
+		if strings.HasPrefix(low, p) {
+			return true
+		}
+	}
+	for _, sub := range []string{
+		"ci checks pass", "non-windows checks pass", "pr is open",
+		"in worktree `.claude/worktrees/", "in worktree .claude/worktrees/",
+		"fix/hunt-", "ci is green, not merged", "(merged)", "(closed)",
+	} {
+		if strings.Contains(low, sub) {
+			return true
+		}
+	}
+	return lacksProseWordsOutsideCode(trimmed)
+}
+
+func lacksProseWordsOutsideCode(s string) bool {
+	var out strings.Builder
+	inTick := false
+	for _, r := range s {
+		if r == '`' {
+			inTick = !inTick
+			out.WriteByte(' ')
+			continue
+		}
+		if !inTick {
+			out.WriteRune(r)
+		}
+	}
+	proseWords := 0
+	for w := range strings.FieldsSeq(out.String()) {
+		w = strings.Trim(w, ".,:;!?()[]{}\"'—-")
+		if len([]rune(w)) >= 2 {
+			hasLetter := false
+			for _, r := range w {
+				if unicode.IsLetter(r) {
+					hasLetter = true
+					break
+				}
+			}
+			if hasLetter {
+				proseWords++
+			}
+		}
+	}
+	return proseWords < 3
+}
+
+// fileReversalLineFor extracts a concrete reverted-approach warning for path
+// from in-scope sessions marked GaveUp. Unlike positive decisions (which
+// decisionUsable drops on GaveUp so a reverted choice is never presented as
+// standing), a line that explicitly names this file or one of its specific
+// symbols and states why an approach was backed out warns the agent against
+// repeating the dead end.
+func fileReversalLineFor(dir, path string, editSymbols, fileSymbols []string, metas []index.SessionMeta) string {
+	if path == "" || len(metas) == 0 {
+		return ""
+	}
+	r := newLifecycleResolver(dir)
+	gaveKeys := map[string]bool{}
+	for _, meta := range metas {
+		if !meta.GaveUp {
+			continue
+		}
+		if state, _, _, _, ok := r.resolve(metaSession(meta)); ok && state == model.LifecycleAccepted {
+			continue
+		}
+		gaveKeys[meta.Key()] = true
+	}
+	if len(gaveKeys) == 0 {
+		return ""
+	}
+	var lookupTerms []string
+	seenTerm := map[string]bool{}
+	addTerm := func(s string) {
+		low := strings.ToLower(strings.TrimSpace(s))
+		if len(low) < 4 || seenTerm[low] || isGenericFileStemPart(low) || isCommonKeyword(low) {
+			return
+		}
+		seenTerm[low] = true
+		lookupTerms = append(lookupTerms, low)
+	}
+	stem := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	addTerm(stem)
+	for _, part := range strings.FieldsFunc(stem, func(ch rune) bool { return ch == '_' || ch == '-' || ch == '.' }) {
+		addTerm(part)
+	}
+	for _, sym := range append(slices.Clone(editSymbols), fileSymbols...) {
+		if len(sym) >= 6 && hasMixedCaseOrUnderscore(sym) {
+			addTerm(sym)
+			if len(lookupTerms) >= 6 {
+				break
+			}
+		}
+	}
+	if len(lookupTerms) == 0 {
+		return ""
+	}
+	turns, err := index.RecentSpokenAssistantTurnsForTerms(dir, lookupTerms, gaveKeys, 12)
+	if err != nil || len(turns) == 0 {
+		return ""
+	}
+	slices.Reverse(turns)
+	var fallback string
+	for _, turn := range turns {
+		for rawLine := range strings.SplitSeq(turn.Text, "\n") {
+			l, ok := index.GiveUpLine(rawLine)
+			if !ok {
+				continue
+			}
+			clean := cleanRepoCandidateLine(l)
+			if clean == "" || len([]rune(clean)) < 32 || !usableRepoCandidateLine(clean) || isEphemeralCompletionReport(clean) {
+				continue
+			}
+			if !mentionsFile(path, clean) && !mentionsSpecificSymbol(fileSymbols, clean) && !mentionsSpecificSymbol(editSymbols, clean) {
+				continue
+			}
+			clipped := trimTrailingFragment(search.SafeText(clipDecision(clean, toolHookDecisionBudget)))
+			if clipped == "" {
+				continue
+			}
+			if len(editSymbols) > 0 && mentionsAnySymbol(editSymbols, clipped) {
+				return clipped
+			}
+			if fallback == "" {
+				fallback = clipped
+			}
+		}
+	}
+	return fallback
+}
+
+// fileBreakageLineFor mines FixPair.Edit entries for path in in-scope sessions
+// to surface named tests or panics that previously broke here and required
+// editing this file to repair.
+func fileBreakageLineFor(dir, cwd, path string, metas []index.SessionMeta, pol policy.Policy) string {
+	if path == "" || len(metas) == 0 || isTestFilePath(path) {
+		return ""
+	}
+	if dir == "" {
+		dir = index.DefaultDir()
+	}
+	inScopeKeys := make(map[string]bool, len(metas))
+	for _, meta := range metas {
+		inScopeKeys[meta.Key()] = true
+	}
+	root := sources.RepoRoot(cwd)
+	if root == "" {
+		root = cwd
+	}
+	pairs := index.ReadFixes(dir)
+	if len(pairs) == 0 {
+		return ""
+	}
+	var brokenTests []string
+	seenTest := map[string]bool{}
+	var panicLine string
+	for _, p := range pairs {
+		if p.Edit == "" || p.Error == "" {
+			continue
+		}
+		if !inScopeKeys[p.Key] {
+			if p.Project == "" || !pol.Allows(policy.ActivationAuto, p.Project) || !hookProjectIs(cwd, p.Project) {
+				continue
+			}
+		}
+		if !repoEntryHasFile(root, path, []string{p.Edit}) {
+			continue
+		}
+		if pol.Ignored(p.Edit, p.Project) {
+			continue
+		}
+		if tn := extractBrokenTestName(p.Error); tn != "" {
+			if !seenTest[tn] {
+				seenTest[tn] = true
+				brokenTests = append(brokenTests, tn)
+			}
+			continue
+		}
+		if panicLine == "" && isSpecificBreakageError(p.Error) {
+			panicLine = truncateToolLine(search.SafeLine(strings.TrimSpace(p.Error)), 120)
+		}
+	}
+	if len(brokenTests) > 0 {
+		limit := min(len(brokenTests), 3)
+		shown := strings.Join(brokenTests[:limit], ", ")
+		if len(brokenTests) > limit {
+			shown += fmt.Sprintf(" (+%d more)", len(brokenTests)-limit)
+		}
+		return shown + " failed and required editing this file"
+	}
+	return panicLine
+}
+
+func extractBrokenTestName(errLine string) string {
+	s := strings.TrimSpace(errLine)
+	for _, prefix := range []string{"--- FAIL: ", "FAIL: "} {
+		if rest, ok := strings.CutPrefix(s, prefix); ok {
+			rest = strings.TrimSpace(rest)
+			name := leadingIdent(rest)
+			if len(name) >= 6 && (strings.HasPrefix(name, "Test") || strings.HasPrefix(name, "test_")) {
+				return name
+			}
+		}
+	}
+	return ""
+}
+
+func isSpecificBreakageError(errLine string) bool {
+	s := strings.TrimSpace(errLine)
+	low := strings.ToLower(s)
+	if strings.HasPrefix(s, "- ") || strings.HasPrefix(s, "* ") || strings.Contains(low, "timed out") || strings.Contains(low, "[build failed]") {
+		return false
+	}
+	return strings.HasPrefix(low, "panic: ") || strings.HasPrefix(low, "fatal error: ")
 }
 
 // fileHookSymbols extracts candidate symbol names from the edit text and from
