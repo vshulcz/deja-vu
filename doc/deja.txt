@@ -63,7 +63,18 @@ With `lazy.nvim`: >lua
     invoked with no arguments.
 
 ==============================================================================
-4. HEALTH                                                        *deja-health*
+4. CODECOMPANION                                          *deja-codecompanion*
+
+When used alongside `olimorris/codecompanion.nvim`, enable the `deja`
+extension to register `/deja` (pick and attach a session digest to the chat
+buffer) and `#{deja}` / `#{deja:query}` editor context: >lua
+  require("codecompanion").setup({
+    extensions = { deja = { enabled = true } },
+  })
+<
+
+==============================================================================
+5. HEALTH                                                        *deja-health*
 
 Run `:checkhealth deja` to verify the `deja` binary and picker backends.
 

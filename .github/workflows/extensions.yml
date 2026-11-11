@@ -11,6 +11,8 @@ on:
       - 'lua/**'
       - 'plugin/**'
       - 'doc/deja.txt'
+      - 'deja.tmux'
+      - 'scripts/tmux-*.sh'
       - '.github/workflows/extensions.yml'
   pull_request:
     paths:
@@ -18,6 +20,8 @@ on:
       - 'lua/**'
       - 'plugin/**'
       - 'doc/deja.txt'
+      - 'deja.tmux'
+      - 'scripts/tmux-*.sh'
       - '.github/workflows/extensions.yml'
   schedule:
     - cron: '17 6 * * 1'
@@ -472,7 +476,20 @@ jobs:
         run: |
           nvim --headless -u NONE --cmd "set rtp+=." \
             -c "runtime plugin/deja.lua" \
-            -c 'lua local d = require("deja").setup({keymaps = true}); local cmds = vim.api.nvim_get_commands({}); for _, k in ipairs({"DejaRecall","DejaLast","DejaBlame","DejaShow","DejaHandoff","DejaFix"}) do assert(cmds[k], "missing " .. k) end; local items = d.parse_search({hits = {{strict = true, session = {id = "0123456789abcdef", harness = "claude", project = "demo", title = "Test", messages = {{role = "assistant", text = "ok"}}}}}}); assert(#items == 1 and items[1].short_id == "01234567")' \
+            -c 'lua local d = require("deja").setup({keymaps = true}); local cmds = vim.api.nvim_get_commands({}); for _, k in ipairs({"DejaRecall","DejaLast","DejaBlame","DejaShow","DejaHandoff","DejaFix"}) do assert(cmds[k], "missing " .. k) end; local items = d.parse_search({hits = {{strict = true, session = {id = "0123456789abcdef", harness = "claude", project = "demo", title = "Test", messages = {{role = "assistant", text = "ok"}}}}}}); assert(#items == 1 and items[1].short_id == "01234567"); package.loaded["codecompanion.config"] = { config = { interactions = { chat = { slash_commands = {} }, shared = { editor_context = {} } } } }; local cc = require("codecompanion._extensions.deja"); cc.setup({}); assert(package.loaded["codecompanion.config"].config.interactions.chat.slash_commands.deja, "missing /deja"); assert(package.loaded["codecompanion.config"].config.interactions.shared.editor_context.deja, "missing #{deja}")' \
             -c "qa!"
           nvim --headless -u NONE -c "helptags doc" -c "qa!"
           rm -f doc/tags
+
+  tmux:
+    name: deja.tmux
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Verify shell syntax and executable bits
+        run: |
+          test -x deja.tmux
+          test -x scripts/tmux-popup.sh
+          test -x scripts/tmux-status.sh
+          bash -n deja.tmux scripts/tmux-popup.sh scripts/tmux-status.sh

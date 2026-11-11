@@ -54,6 +54,22 @@ sections = {
 }
 ```
 
+## CodeCompanion (`codecompanion.nvim`)
+
+`vshulcz/deja-vu` also ships `lua/codecompanion/_extensions/deja/init.lua`, registering the `/deja` slash command (interactive session picker that attaches a handoff digest to the chat buffer) and `#{deja}` / `#{deja:query}` editor context:
+
+```lua
+{
+  "olimorris/codecompanion.nvim",
+  dependencies = { "vshulcz/deja-vu" },
+  opts = {
+    extensions = {
+      deja = { enabled = true },
+    },
+  },
+}
+```
+
 Run `:checkhealth deja` inside Neovim to verify binary discovery and active picker backend.
 
 Part of [deja-vu](https://github.com/vshulcz/deja-vu). MIT.

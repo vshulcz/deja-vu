@@ -42,6 +42,16 @@ brew install deja-vu && deja install --auto
 - **`:DejaFix [error]`**（`<leader>df`）：自动读取当前行的 LSP 诊断信息，在历史会话中回查对应的修复方案（`deja fix`）。
 - **`:DejaShow <id>`**：在浮动 Markdown 窗口中查看脱敏后的对话全文（按 `y` 复制会话 ID，按 `H` 生成交接摘要，按 `R` 在分屏终端恢复原会话）。
 
+## CodeCompanion 集成（`codecompanion.nvim`）
+
+内置 `codecompanion._extensions.deja` 扩展，为聊天缓冲区注册 `/deja` 斜杠命令与 `#{deja}` / `#{deja:query}` 上下文变量：
+
+```lua
+require("codecompanion").setup({
+  extensions = { deja = { enabled = true } },
+})
+```
+
 可在 Neovim 中执行 `:checkhealth deja` 检查可执行文件路径与选择器后端状态。
 
 属于 [deja-vu](https://github.com/vshulcz/deja-vu) 项目，采用 MIT 许可。
