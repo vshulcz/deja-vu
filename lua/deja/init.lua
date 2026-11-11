@@ -311,7 +311,10 @@ function M.resume(id, harness)
   vim.cmd("startinsert")
 end
 
-local function pick_items(items, title)
+local function pick_items(items, title, on_choice)
+  local choose = on_choice or function(it)
+    M.show(it.id, it.harness)
+  end
   if #items == 0 then
     vim.notify("deja: no matching sessions", vim.log.levels.INFO)
     return
@@ -353,7 +356,7 @@ local function pick_items(items, title)
       confirm = function(picker, selected)
         picker:close()
         if selected and selected.item then
-          M.show(selected.item.id, selected.item.harness)
+          choose(selected.item)
         end
       end,
     })
@@ -397,7 +400,7 @@ local function pick_items(items, title)
             actions.close(prompt_bufnr)
             local sel = action_state.get_selected_entry()
             if sel and sel.value then
-              M.show(sel.value.id, sel.value.harness)
+              choose(sel.value)
             end
           end)
           return true
@@ -422,8 +425,7 @@ local function pick_items(items, title)
         actions = {
           ["default"] = function(selected)
             if selected and selected[1] and map[selected[1]] then
-              local it = map[selected[1]]
-              M.show(it.id, it.harness)
+              choose(map[selected[1]])
             end
           end,
         },
@@ -437,9 +439,39 @@ local function pick_items(items, title)
     format_item = M.format_item,
   }, function(choice)
     if choice then
-      M.show(choice.id, choice.harness)
+      choose(choice)
     end
   end)
+end
+
+function M.pick(opts)
+  opts = opts or {}
+  local on_choice = opts.on_choice
+  local q = opts.query and vim.trim(opts.query) or ""
+  if q == "" then
+    local count = tostring(tonumber(opts.limit) or M.config.limit or 40)
+    local decoded, err = M.run_json({ "last", count, "--json" })
+    if not decoded then
+      vim.notify("deja last: " .. err, vim.log.levels.ERROR)
+      return
+    end
+    pick_items(M.parse_last(decoded), opts.title or "deja recent sessions", on_choice)
+    return
+  end
+  local args = { "search", "--json", "--limit", tostring(tonumber(opts.limit) or M.config.limit or 40) }
+  if M.config.project_scoped then
+    local cwd_name = vim.fn.fnamemodify(vim.fn.getcwd(), ":t")
+    if cwd_name ~= "" then
+      vim.list_extend(args, { "--project", cwd_name })
+    end
+  end
+  vim.list_extend(args, { "--", q })
+  local decoded, err = M.run_json(args)
+  if not decoded then
+    vim.notify("deja search: " .. err, vim.log.levels.ERROR)
+    return
+  end
+  pick_items(M.parse_search(decoded), opts.title or ("deja recall: " .. q), on_choice)
 end
 
 function M.recall(query)
