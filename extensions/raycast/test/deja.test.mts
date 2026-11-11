@@ -3,7 +3,40 @@ import test from "node:test";
 import { parseLastJSON, parseResumeOutput, parseSearchJSON, parseShowJSON, quoteConversationMarkdown } from "../src/lib/deja.ts";
 import { expandTilde, locateDeja } from "../src/lib/locate.ts";
 
-test("parseSearchJSON separates strict hits from relevance fallback", () => {
+test("parseSearchJSON unwraps schema_version 2 nested session and snippets", () => {
+  const env = parseSearchJSON(
+    JSON.stringify({
+      schema_version: 2,
+      tier: "relevance",
+      strict: 1,
+      hits: [
+        {
+          session: { harness: "claude", id: "s1", project: "myapp", title: "Fix auth token" },
+          snippets: ["rotated JWT signing key"],
+          score: 1.5,
+          strict: true,
+        },
+        {
+          session: { harness: "codex", id: "s2", project: "myapp" },
+          snippets: ["nearest fallback match"],
+          score: 0.7,
+        },
+      ],
+    }),
+  );
+  assert.equal(env.tier, "relevance");
+  assert.equal(env.strictHits.length, 1);
+  assert.equal(env.strictHits[0].id, "s1");
+  assert.equal(env.strictHits[0].harness, "claude");
+  assert.equal(env.strictHits[0].project, "myapp");
+  assert.equal(env.strictHits[0].title, "Fix auth token");
+  assert.equal(env.strictHits[0].snippet, "rotated JWT signing key");
+  assert.equal(env.nearestHits.length, 1);
+  assert.equal(env.nearestHits[0].id, "s2");
+  assert.equal(env.nearestHits[0].snippet, "nearest fallback match");
+});
+
+test("parseSearchJSON separates strict hits from legacy flat relevance fallback", () => {
   const env = parseSearchJSON(
     JSON.stringify({
       schema_version: 2,
@@ -50,10 +83,17 @@ test("parseShowJSON and quoteConversationMarkdown escape embedded fences safely"
   assert.ok(md.includes("> # Heading"));
 });
 
-test("parseResumeOutput extracts POSIX-quoted cd directory", () => {
+test("parseResumeOutput extracts POSIX-quoted cd directory including apostrophes", () => {
   const got = parseResumeOutput("deja: wrote session back\ncd '/Users/me/my project' && claude --resume abc-123\n");
   assert.equal(got.command, "cd '/Users/me/my project' && claude --resume abc-123");
   assert.equal(got.cwd, "/Users/me/my project");
+
+  const withQuote = parseResumeOutput("cd '/tmp/bob'\"'\"'s dir' && claude --resume 019f\n");
+  assert.equal(withQuote.cwd, "/tmp/bob's dir");
+
+  const empty = parseResumeOutput("deja: session cannot be resumed\n");
+  assert.equal(empty.command, "");
+  assert.equal(empty.cwd, undefined);
 });
 
 test("locateDeja checks preference first, then PATH and standard locations", () => {

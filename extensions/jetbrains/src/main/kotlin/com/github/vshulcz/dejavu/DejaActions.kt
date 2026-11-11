@@ -2,10 +2,10 @@ package com.github.vshulcz.dejavu
 
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
-import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.ide.CopyPasteManager
@@ -13,7 +13,6 @@ import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.popup.JBPopupFactory
-import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.testFramework.LightVirtualFile
 import java.awt.datatransfer.StringSelection
 import java.io.File
@@ -30,7 +29,7 @@ object DejaUi {
         if (DejaCli.findBinary() != null) return true
         notify(
             project,
-            "deja binary not found. Install via `brew install vshulcz/tap/deja-vu` or https://github.com/vshulcz/deja-vu",
+            "deja binary not found. Install via `brew install deja-vu` or https://github.com/vshulcz/deja-vu",
             NotificationType.WARNING,
         )
         return false
@@ -142,8 +141,9 @@ class DejaLastAction : DumbAwareAction() {
 class DejaBlameLineAction : DumbAwareAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        val editor = e.getData(CommonDataKeys.EDITOR)
+        val editor = e.getData(CommonDataKeys.EDITOR) ?: FileEditorManager.getInstance(project).selectedTextEditor
         val vFile = e.getData(CommonDataKeys.VIRTUAL_FILE)
+            ?: editor?.document?.let { FileDocumentManager.getInstance().getFile(it) }
         if (editor == null || vFile == null) {
             DejaUi.notify(project, "Open a file in the editor to run AI Blame.", NotificationType.WARNING)
             return
@@ -152,7 +152,7 @@ class DejaBlameLineAction : DumbAwareAction() {
 
         val line = editor.caretModel.logicalPosition.line + 1
         val baseDir = project.basePath?.let { File(it) }
-        val fileIo = VfsUtilCore.virtualToIoFile(vFile)
+        val fileIo = runCatching { vFile.toNioPath().toFile() }.getOrElse { File(vFile.path) }
         val relPath = if (baseDir != null && fileIo.absolutePath.startsWith(baseDir.absolutePath + File.separator)) {
             fileIo.relativeTo(baseDir).invariantSeparatorsPath
         } else {

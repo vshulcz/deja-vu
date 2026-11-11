@@ -22,11 +22,15 @@ function SessionDetail({ bin, hit }: { bin: string; hit: DejaSessionHit }) {
 }
 
 export function SessionActions({ bin, hit }: { bin: string; hit: DejaSessionHit }) {
-  const resolveResume = async () => {
+  const resolveResume = async (): Promise<{ command: string; cwd?: string }> => {
     const args = ["resume", hit.id];
     if (hit.harness) args.push("--harness", hit.harness);
     const out = await runDeja(bin, args);
-    return parseResumeOutput(out);
+    const parsed = parseResumeOutput(out);
+    if (!parsed.command) {
+      throw new Error(out.trim() || `No resume command for ${hit.id}`);
+    }
+    return parsed;
   };
   return (
     <ActionPanel>
@@ -37,7 +41,6 @@ export function SessionActions({ bin, hit }: { bin: string; hit: DejaSessionHit 
         onAction={async () => {
           try {
             const { command } = await resolveResume();
-            if (!command) throw new Error("No resume command available for this harness");
             runInTerminalApp(command);
           } catch (e) {
             await showToast({ style: Toast.Style.Failure, title: "Cannot resume session", message: String(e) });
@@ -49,10 +52,12 @@ export function SessionActions({ bin, hit }: { bin: string; hit: DejaSessionHit 
         title="Copy Resume Command"
         icon={Icon.Clipboard}
         onAction={async () => {
-          const { command } = await resolveResume();
-          if (command) {
+          try {
+            const { command } = await resolveResume();
             execFile("/usr/bin/pbcopy", []).stdin?.end(command);
             await showToast({ style: Toast.Style.Success, title: "Copied resume command" });
+          } catch (e) {
+            await showToast({ style: Toast.Style.Failure, title: "Cannot copy resume command", message: String(e) });
           }
         }}
       />
@@ -60,8 +65,13 @@ export function SessionActions({ bin, hit }: { bin: string; hit: DejaSessionHit 
         title="Open Project Folder"
         icon={Icon.Folder}
         onAction={async () => {
-          const { cwd } = await resolveResume();
-          if (cwd) execFile("/usr/bin/open", [cwd]);
+          try {
+            const { cwd } = await resolveResume();
+            if (!cwd) throw new Error("No project folder path available for this session");
+            execFile("/usr/bin/open", [cwd]);
+          } catch (e) {
+            await showToast({ style: Toast.Style.Failure, title: "Cannot open project folder", message: String(e) });
+          }
         }}
       />
     </ActionPanel>
