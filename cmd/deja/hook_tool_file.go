@@ -492,7 +492,7 @@ func repoEntryHasFile(root, path string, files []string) bool {
 	}
 	base := filepath.Base(slashPath)
 	for _, f := range files {
-		f = strings.TrimPrefix(filepath.ToSlash(f), "./")
+		f = strings.TrimPrefix(strings.ReplaceAll(filepath.ToSlash(f), "\\", "/"), "./")
 		fHasDir := strings.ContainsRune(f, '/')
 		if strings.EqualFold(f, slashPath) || (!fHasDir && len(base) >= 6 && strings.EqualFold(f, base)) ||
 			strings.HasSuffix(slashPath, "/"+f) || strings.HasSuffix(f, "/"+slashPath) {
@@ -1103,7 +1103,7 @@ func fileBreakageLineForSkipping(dir, cwd, path string, editSymbols []string, me
 			continue
 		}
 		if skip != nil {
-			if _, sid, ok := strings.Cut(p.Key, "\x00"); ok && skip[sid] {
+			if _, sid, ok := strings.Cut(p.Key, ":"); ok && skip[sid] {
 				continue
 			}
 			if skip[p.Key] {

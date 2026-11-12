@@ -145,6 +145,12 @@ func TestAssistantTurnsEdgeCases(t *testing.T) {
 	if !isTestFileEditPath("pkg/relay_test.go") || !isTestFileEditPath("tests/test_worker.py") || isTestFileEditPath("pkg/relay.go") {
 		t.Errorf("unexpected isTestFileEditPath behavior")
 	}
+	if !looksLikeEditedPath(`C:\Users\runneradmin\work\project\retry.go`) || !looksLikeEditedPath(`c:/Users/runneradmin/work/project/retry.go`) {
+		t.Errorf("expected looksLikeEditedPath to accept Windows paths with drive letter")
+	}
+	if looksLikeEditedPath(`C:\Users\runneradmin\.claude\projects\s1.jsonl`) || looksLikeEditedPath("bad:path:with:colons") {
+		t.Errorf("expected looksLikeEditedPath to reject claude project paths and non-drive colons")
+	}
 	if !preferEditRemedyCandidate("pkg/relay_test.go", "pkg/relay.go", 1, 2, false) || preferEditRemedyCandidate("pkg/relay.go", "pkg/relay_test.go", 1, 2, false) {
 		t.Errorf("unexpected preferEditRemedyCandidate behavior")
 	}

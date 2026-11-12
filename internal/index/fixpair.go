@@ -720,7 +720,7 @@ func hadPriorSameFileEdit(ms []model.Message, errIdx int, edited string) bool {
 }
 
 func normalizeEditedRef(p string) string {
-	p = strings.TrimSpace(filepath.ToSlash(p))
+	p = strings.ReplaceAll(strings.TrimSpace(p), "\\", "/")
 	p = strings.TrimPrefix(p, "./")
 	return strings.ToLower(p)
 }
@@ -746,12 +746,22 @@ func looksLikeEditedPath(p string) bool {
 	// written in. "Makefile" is a path and "\tif err != nil {" is not;
 	// requiring a dot or a slash would have refused the first, which is a real
 	// file at the top of a repository.
-	if p == "" || len(p) > 200 ||
-		strings.Contains(p, "/.claude/projects/") || strings.Contains(p, "/.claude/jobs/") ||
-		strings.Contains(p, "/.cache/") {
+	if p == "" || len(p) > 200 {
 		return false
 	}
-	return !strings.ContainsAny(p, " \t\"'`$(){}[]=;:,*")
+	slash := strings.ReplaceAll(p, "\\", "/")
+	if strings.Contains(slash, "/.claude/projects/") || strings.Contains(slash, "/.claude/jobs/") ||
+		strings.Contains(slash, "/.cache/") {
+		return false
+	}
+	return !strings.ContainsAny(stripWindowsDrive(p), " \t\"'`$(){}[]=;:,*")
+}
+
+func stripWindowsDrive(p string) string {
+	if len(p) >= 3 && ((p[0] >= 'a' && p[0] <= 'z') || (p[0] >= 'A' && p[0] <= 'Z')) && p[1] == ':' && (p[2] == '/' || p[2] == '\\') {
+		return p[2:]
+	}
+	return p
 }
 
 // opensMoreInput reports whether a command's first line is only the start of

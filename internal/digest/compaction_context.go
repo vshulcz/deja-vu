@@ -521,7 +521,7 @@ func extractModifiedFiles(s model.Session, maxItems int) []model.ContextFact {
 		}
 		path, _, _ := strings.Cut(m.Text, "\n")
 		path = strings.TrimSpace(path)
-		if path == "" || len(path) > 200 || strings.ContainsAny(path, " \t\"'`$(){}[]=;:,*") || hasFact(rev, path) {
+		if path == "" || len(path) > 200 || strings.ContainsAny(stripDriveLetterPrefix(path), " \t\"'`$(){}[]=;:,*") || hasFact(rev, path) {
 			continue
 		}
 		rev = append(rev, model.ContextFact{Text: path, Provenance: contextRef(s, m)})
@@ -531,6 +531,13 @@ func extractModifiedFiles(s model.Session, maxItems int) []model.ContextFact {
 	}
 	reverseFacts(rev)
 	return rev
+}
+
+func stripDriveLetterPrefix(p string) string {
+	if len(p) >= 3 && ((p[0] >= 'a' && p[0] <= 'z') || (p[0] >= 'A' && p[0] <= 'Z')) && p[1] == ':' && (p[2] == '/' || p[2] == '\\') {
+		return p[2:]
+	}
+	return p
 }
 
 func isVerificationCommand(command string) bool {

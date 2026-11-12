@@ -473,9 +473,10 @@ func liveExistingEditedTargets(root string, touched []string) []string {
 		if !isLiveBenchSourceFile(abs, filepath.Base(abs)) || !fileThere(abs) {
 			continue
 		}
-		if !seen[rel] {
-			seen[rel] = true
-			out = append(out, rel)
+		slashRel := filepath.ToSlash(rel)
+		if !seen[slashRel] {
+			seen[slashRel] = true
+			out = append(out, slashRel)
 		}
 	}
 	return out
@@ -498,10 +499,11 @@ func liveOutputNamesAnyTarget(out string, targets []string) bool {
 	}
 	low := strings.ToLower(out)
 	for _, rel := range targets {
-		if strings.Contains(low, strings.ToLower(rel)) {
+		slashRel := strings.ToLower(filepath.ToSlash(rel))
+		if slashRel != "" && strings.Contains(low, slashRel) {
 			return true
 		}
-		base := strings.ToLower(filepath.Base(rel))
+		base := strings.ToLower(filepath.Base(slashRel))
 		if len(base) >= 9 && strings.Contains(low, base) {
 			return true
 		}
