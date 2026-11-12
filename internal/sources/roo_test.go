@@ -118,3 +118,68 @@ func TestStripJSONCHandlesCommentsAndCommas(t *testing.T) {
 		t.Fatalf("a = %v", got["a"])
 	}
 }
+
+// Zoo Code (zoocodeorganization.zoo-code) continues Roo Code with the same
+// task layout under its own globalStorage directory (#6044). Tasks there must
+// be discovered alongside legacy rooveterinaryinc.roo-cline tasks and claimed
+// by "roo" rather than "cline".
+func TestRooRootsDiscoversZooCodeAndDedupsCustomStoragePath(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("DEJA_ROO_ROOTS", "")
+	t.Setenv("DEJA_CLINE_ROOTS", "")
+	t.Setenv("DEJA_ROO_CLI_ROOT", filepath.Join(home, "absent"))
+
+	rooRoot := filepath.Join(vsCodeUserDir("Code"), "globalStorage", RooExtensionID)
+	zooRoot := filepath.Join(vsCodeUserDir("Cursor"), "globalStorage", ZooExtensionID)
+	rooTask := filepath.Join(rooRoot, "tasks", "1767225700001", "api_conversation_history.json")
+	zooTask := filepath.Join(zooRoot, "tasks", "1767225700002", "api_conversation_history.json")
+	for _, p := range []string{rooTask, zooTask} {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(`[{"role":"user","content":[{"type":"text","text":"zoo check"}]}]`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Both extensions pointing customStoragePath at the same directory must
+	// surface that root once, not twice.
+	sharedCustom := filepath.Join(home, "shared-custom")
+	if err := os.MkdirAll(filepath.Join(sharedCustom, "tasks"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	settingsPath := vsCodeUserSettingsPaths()[0]
+	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	settings := "{\n  \"roo-cline.customStoragePath\": " + strconv.Quote(sharedCustom) + ",\n" +
+		"  \"zoo-code.customStoragePath\": " + strconv.Quote(sharedCustom) + ",\n}\n"
+	if err := os.WriteFile(settingsPath, []byte(settings), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	roots := RooRoots()
+	counts := map[string]int{}
+	for _, r := range roots {
+		counts[r]++
+	}
+	if counts[rooRoot] != 1 {
+		t.Fatalf("rooRoot count = %d in %v", counts[rooRoot], roots)
+	}
+	if counts[zooRoot] != 1 {
+		t.Fatalf("zooRoot count = %d in %v", counts[zooRoot], roots)
+	}
+	if counts[sharedCustom] != 1 {
+		t.Fatalf("sharedCustom count = %d in %v (want 1 deduplicated)", counts[sharedCustom], roots)
+	}
+	if got := KindForPath(zooTask); got != "roo" {
+		t.Fatalf("KindForPath(%s) = %q, want roo", zooTask, got)
+	}
+	if ss := LoadRoo(); len(ss) != 2 {
+		t.Fatalf("LoadRoo() = %d sessions, want 2", len(ss))
+	}
+}
