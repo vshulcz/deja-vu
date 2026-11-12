@@ -192,6 +192,65 @@ func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(inde
 	return assembleFileHookLine(head, dec, co, ran)
 }
 
+// turn0FileGuardrail returns the highest-priority verified guardrail clause for
+// path (standing rule, repo memory decision, dead-end reversal, prior file
+// decision, or verified test breakage) so Turn-0 localization and file briefs
+// surface architectural constraints before planning begins.
+func turn0FileGuardrail(dir, cwd, path string, inScope []index.SessionMeta, skip map[string]bool) string {
+	if path == "" {
+		return ""
+	}
+	pol := policy.Load()
+	_, fileSymbols := fileHookSymbols(cwd, path, "")
+	repoDec := repoMemoryDecisionForFile(cwd, path, fileSymbols, pol)
+	projects := func() []string { return digest.ProjectNameCandidates(cwd) }
+	self := func(m index.SessionMeta, _ string) bool {
+		return skip != nil && skip[m.ID]
+	}
+	if len(inScope) < toolHookMinFileSessionsWithDecision {
+		if repoDec != "" {
+			return repoDecisionLabel + repoDec
+		}
+		if !isTestFilePath(path) {
+			if rev, _ := fileReversalLineForWithTime(dir, cwd, path, nil, fileSymbols, inScope, projects, pol, self); rev != "" {
+				return revertedLabel + rev
+			}
+		}
+		return ""
+	}
+	promoted := promotedDecisionForFileIn(dir, path, inScope)
+	if promoted != "" && (mentionsFile(path, promoted) || mentionsAnySymbol(fileSymbols, promoted)) {
+		return standingLabel + promoted
+	}
+	if repoDec != "" {
+		return repoDecisionLabel + repoDec
+	}
+	if isTestFilePath(path) {
+		return ""
+	}
+	d, decAt := fileDecisionLineWithSymbolsAndTime(dir, path, nil, fileSymbols, inScope)
+	if d != "" && (!digest.CarriesDecision(d) || (!mentionsFile(path, d) && !mentionsAnySymbol(fileSymbols, d))) {
+		d = ""
+	}
+	rev, revAt := fileReversalLineForWithTime(dir, cwd, path, nil, fileSymbols, inScope, projects, pol, self)
+	preferRev := rev != "" && (d == "" || (!revAt.IsZero() && (decAt.IsZero() || revAt.After(decAt))))
+	if preferRev {
+		return revertedLabel + rev
+	}
+	if d != "" {
+		if brk := fileBreakageLineForSkipping(dir, cwd, path, nil, inScope, pol, skip); decisionDuplicatesBreakageWhy(d, brk) {
+			return breakageLabel + brk
+		} else if promoted == d {
+			return decisionLabel + d
+		}
+		return modelLabel(decisionLabel, d) + d
+	}
+	if brk := fileBreakageLineForSkipping(dir, cwd, path, nil, inScope, pol, skip); brk != "" {
+		return breakageLabel + brk
+	}
+	return ""
+}
+
 func assembleFileHookLine(head, dec, co, ran string) string {
 	if dec != "" && (strings.Contains(dec, "requires updating ") || strings.Contains(dec, "edited alongside ")) {
 		co = ""
@@ -986,6 +1045,10 @@ func hasReversalRationale(line string) bool {
 // to surface named tests or panics that previously broke here and required
 // editing this file to repair.
 func fileBreakageLineFor(dir, cwd, path string, editSymbols []string, metas []index.SessionMeta, pol policy.Policy) string {
+	return fileBreakageLineForSkipping(dir, cwd, path, editSymbols, metas, pol, nil)
+}
+
+func fileBreakageLineForSkipping(dir, cwd, path string, editSymbols []string, metas []index.SessionMeta, pol policy.Policy, skip map[string]bool) string {
 	if path == "" || len(metas) == 0 || isTestFilePath(path) {
 		return ""
 	}
@@ -1012,6 +1075,14 @@ func fileBreakageLineFor(dir, cwd, path string, editSymbols []string, metas []in
 	for _, p := range pairs {
 		if p.Edit == "" || p.Error == "" {
 			continue
+		}
+		if skip != nil {
+			if _, sid, ok := strings.Cut(p.Key, "\x00"); ok && skip[sid] {
+				continue
+			}
+			if skip[p.Key] {
+				continue
+			}
 		}
 		if !inScopeKeys[p.Key] {
 			if p.Project == "" || !pol.Allows(policy.ActivationAuto, p.Project) || !hookProjectIs(cwd, p.Project) {
@@ -1710,6 +1781,29 @@ func hasMixedCaseOrUnderscore(s string) bool {
 		}
 	}
 	return false
+}
+
+func isSymbolLikeCaseOrUnderscore(s string) bool {
+	if len(s) < 5 {
+		return false
+	}
+	if strings.ContainsRune(s, '_') {
+		return true
+	}
+	seenLower, internalUpper, upperCount := false, false, 0
+	for _, r := range s {
+		if unicode.IsUpper(r) {
+			upperCount++
+			if seenLower {
+				internalUpper = true
+			}
+		} else if unicode.IsLower(r) {
+			seenLower = true
+		}
+	}
+	// Accept camelCase (parseLine), PascalCase (ParseLine), or ACRONYMPrefix (MCPServer),
+	// while rejecting plain Titlecase English sentence starters ("Change", "Corpus", "Report").
+	return seenLower && (internalUpper || upperCount >= 2)
 }
 
 func isCommonKeyword(low string) bool {

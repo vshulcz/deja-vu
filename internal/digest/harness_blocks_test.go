@@ -47,3 +47,19 @@ func TestPasteWrapperIsUnwrappedNotStripped(t *testing.T) {
 		t.Errorf("StripHarnessBlocks = %q, want %q", got, want)
 	}
 }
+
+func TestForkBoilerplateStripsEnvelopeAndKeepsDirective(t *testing.T) {
+	forked := "Fork started — processing in background\n<fork-boilerplate>\nYou are a worker fork in an isolated workspace. Do not touch parent branch.\n</fork-boilerplate>\n\nYour directive: fix snapshot manifest checksum mismatch in archive_writer.go\n<system-reminder>\nhost reminder\n</system-reminder>"
+	const want = "fix snapshot manifest checksum mismatch in archive_writer.go"
+	if got := StripHarnessBlocks(forked); got != want {
+		t.Errorf("StripHarnessBlocks(forked) = %q, want %q", got, want)
+	}
+	if got := BeforeHarnessBlock(forked); got != want {
+		t.Errorf("BeforeHarnessBlock(forked) = %q, want %q", got, want)
+	}
+	// Mentioning the tag name in prose without a closing tag stays untouched.
+	prose := "why did <fork-boilerplate> appear in raw jsonl?"
+	if got := StripHarnessBlocks(prose); got != prose {
+		t.Errorf("StripHarnessBlocks(prose) = %q, want %q", got, prose)
+	}
+}

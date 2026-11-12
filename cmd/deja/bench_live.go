@@ -35,6 +35,7 @@ type liveLocalizationAudit struct {
 	ImplicitTasks     int     `json:"implicit_tasks"`
 	ImplicitLocalized int     `json:"implicit_localized"`
 	ImplicitRate      float64 `json:"implicit_rate"`
+	WithGuardrail     int     `json:"with_guardrail"`
 	WithTestCmd       int     `json:"with_test_cmd"`
 	MedianBytes       int     `json:"median_bytes"`
 	P50MS             float64 `json:"p50_ms"`
@@ -369,10 +370,10 @@ func printLiveBenchReport(w io.Writer, r liveBenchReport) {
 	_, _ = fmt.Fprintf(w, "  silent:             %d\n", r.Silent)
 	_, _ = fmt.Fprintf(w, "latency: p50 %.2f ms  p95 %.2f ms  wall %.0f ms\n", r.P50MS, r.P95MS, r.WallMS)
 	if r.Localization.Tasks > 0 {
-		_, _ = fmt.Fprintf(w, "turn-0 localization: %d/%d tasks (%.1f%%)  implicit: %d/%d (%.1f%%)  with test cmd: %d  median %d B  p50 %.2f ms\n",
+		_, _ = fmt.Fprintf(w, "turn-0 localization: %d/%d tasks (%.1f%%)  implicit: %d/%d (%.1f%%)  with guardrail: %d  with test cmd: %d  median %d B  p50 %.2f ms\n",
 			r.Localization.Localized, r.Localization.Tasks, r.Localization.LocalizedRate*100,
 			r.Localization.ImplicitLocalized, r.Localization.ImplicitTasks, r.Localization.ImplicitRate*100,
-			r.Localization.WithTestCmd, r.Localization.MedianBytes, r.Localization.P50MS)
+			r.Localization.WithGuardrail, r.Localization.WithTestCmd, r.Localization.MedianBytes, r.Localization.P50MS)
 	}
 	if r.Injections.Total > 0 {
 		_, _ = fmt.Fprintf(w, "injections log: %d recent (tool %d, dejavu %d, context %d)  median %d B  tool noise %d\n",
@@ -435,6 +436,9 @@ func measureLiveLocalization(indexDir, root string, projNames []string, pol poli
 			audit.Localized++
 			if implicit {
 				audit.ImplicitLocalized++
+			}
+			if liveOutputHasGuardrail(out) {
+				audit.WithGuardrail++
 			}
 			if liveOutputHasTestRecipe(out) {
 				audit.WithTestCmd++
@@ -505,6 +509,15 @@ func liveOutputNamesAnyTarget(out string, targets []string) bool {
 	return false
 }
 
+func liveOutputHasGuardrail(out string) bool {
+	for _, marker := range []string{standingLabel, repoDecisionLabel, decisionLabel, modelOrderLabel, revertedLabel, breakageLabel} {
+		if strings.Contains(out, marker) {
+			return true
+		}
+	}
+	return false
+}
+
 func liveOutputHasTestRecipe(out string) bool {
 	for _, marker := range []string{"go test", "pytest", "cargo test", "npm test", "test target:", "verified"} {
 		if strings.Contains(out, marker) {
@@ -517,6 +530,7 @@ func liveOutputHasTestRecipe(out string) bool {
 // evalPromptTurn0ReadOnly executes the Turn-0 prompt recall pipeline without
 // writing to .seen, .injections.jsonl, or .deja/memory.jsonl.
 func evalPromptTurn0ReadOnly(dir, cwd, asked string, names []string, skip map[string]bool) string {
+	asked = prompt.Unwrap(digest.StripHarnessBlocks(asked))
 	nudge := promptDirectContextIn(dir, cwd, "", asked, true, skip)
 	terms := prompt.Terms(asked)
 	if !promptTermsWorthAsking(terms) {

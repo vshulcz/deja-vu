@@ -106,10 +106,10 @@ func promptDirectContextIn(dir, cwd, sessionID, asked string, readOnly bool, ski
 			lines = append(lines, sbLine)
 			tokens = append(tokens, sbTok)
 		}
-		if locLine, locTok := promptTaskTargetsLine(dir, cwd, asked, seen, skip); locLine != "" {
+		if locLine, locToks := promptTaskTargetsLine(dir, cwd, asked, seen, skip); locLine != "" {
 			if sbLine == "" || !symbolBriefAlreadyCoversTarget(sbLine, locLine) {
 				lines = append(lines, locLine)
-				tokens = append(tokens, locTok)
+				tokens = append(tokens, locToks...)
 			}
 		}
 	}
@@ -131,7 +131,7 @@ func promptSymbolBriefLine(cwd, asked string, seen map[string]bool) (string, str
 	checked := map[string]bool{}
 	for _, tok := range identifierTokens(asked) {
 		low := strings.ToLower(tok)
-		if len(low) < 6 || checked[low] || !hasMixedCaseOrUnderscore(tok) || isCommonKeyword(low) {
+		if len(low) < 6 || checked[low] || !isSymbolLikeCaseOrUnderscore(tok) || isCommonKeyword(low) {
 			continue
 		}
 		checked[low] = true
@@ -173,6 +173,8 @@ func promptFileBriefLineIn(dir, cwd, asked string, seen, skip map[string]bool) (
 	projects := sync.OnceValue(func() []string { return digest.ProjectNameCandidates(cwd) })
 	pol := policy.Load()
 	seenFiles := map[string]bool{}
+	var docFallbackLine string
+	var docFallbackToks []string
 	for tok := range strings.FieldsSeq(asked) {
 		tok = strings.Trim(tok, "\"'`(),:;!?[]{}<>")
 		if idx := strings.IndexByte(tok, ':'); idx > 0 {
@@ -215,29 +217,26 @@ func promptFileBriefLineIn(dir, cwd, asked string, seen, skip map[string]bool) (
 			_, fileSyms := fileHookSymbols(cwd, rel, "")
 			ran = siblingTestLineFor(cwd, rel, fileSyms)
 		}
-		repoDec := repoMemoryDecisionForFile(cwd, rel, nil, pol)
-		var parts []string
-		if repoDec != "" {
-			parts = append(parts, repoDecisionLabel+repoDec)
-		}
-		if co != "" {
-			parts = append(parts, co)
-		}
-		if ran != "" {
-			parts = append(parts, ran)
-		}
-		if len(parts) == 0 {
+		dec := turn0FileGuardrail(dir, cwd, rel, inScope, skip)
+		line := assembleFileHookLine(search.SafePath(rel), dec, co, ran)
+		if line == "" {
 			continue
 		}
-		line := search.SafePath(rel) + strings.Join(parts, "")
 		pTok := "prompt:fb:" + shortHash(line)
 		tTok := "tool:" + shortHash(dedupeFact(line))
 		if seen != nil && (seen[pTok] || seen[tTok]) {
 			continue
 		}
+		if !isLocalizableSourcePath(rel, filepath.Base(rel)) {
+			if docFallbackLine == "" {
+				docFallbackLine = line
+				docFallbackToks = []string{pTok, tTok}
+			}
+			continue
+		}
 		return line, []string{pTok, tTok}
 	}
-	return "", nil
+	return docFallbackLine, docFallbackToks
 }
 
 // liveRecallBrief constructs a live repository intelligence brief when an agent

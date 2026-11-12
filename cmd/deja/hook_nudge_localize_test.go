@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -44,7 +45,7 @@ func TestTurn0PromptTaskLocalizationAndRecallBrief(t *testing.T) {
 	if !strings.Contains(line, "TestDispatchSettlementBatch") {
 		t.Fatalf("expected sibling test recipe in localization line, got %q", line)
 	}
-	if tok == "" {
+	if len(tok) == 0 {
 		t.Fatalf("expected non-empty dedup token")
 	}
 
@@ -242,5 +243,115 @@ func TestTurn0MultilingualFixPairBridgeAndSelfProjectNoiseGuard(t *testing.T) {
 	idf := map[string]float64{"payments": 1.2, "unseen_xyz_token": 4.8}
 	if body, ok := promptDigestBodyIn(idxDir, proj, "live", sweepFull, true, []string{"payments", "unseen_xyz_token"}, idf, "check payments unseen_xyz_token", "", "", nil, nil, nil, nil); ok {
 		t.Fatalf("expected self-project name not to relax 2-term quote gate inside cwd, got:\n%s", body)
+	}
+}
+
+func TestTurn0StructuredPromptDiagnosticGuardrailAndDedup(t *testing.T) {
+	tmp := hermeticEnv(t)
+	idxDir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", idxDir)
+
+	proj := filepath.Join(tmp, "work", "archiver")
+	if err := os.MkdirAll(filepath.Join(proj, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(proj, "go.mod"), []byte("module example.com/archiver\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	manifestPath := filepath.Join(proj, "manifest_verifier.go")
+	quorumPath := filepath.Join(proj, "quorum_fencing.go")
+	readmePath := filepath.Join(proj, "CHANGELOG.md")
+	files := map[string]string{
+		manifestPath: "package archiver\n\nimport \"errors\"\n\nfunc VerifyManifestDigest(raw []byte) error {\n\tif len(raw) == 0 {\n\t\treturn errors.New(\"snapshot manifest checksum mismatch\")\n\t}\n\treturn nil\n}\n",
+		filepath.Join(proj, "manifest_verifier_test.go"): "package archiver\n\nimport \"testing\"\n\nfunc TestVerifyManifestDigest(t *testing.T) { _ = VerifyManifestDigest([]byte(\"ok\")) }\n",
+		quorumPath: "package archiver\n\ntype Change struct{ Epoch int }\n\nfunc AcquireQuorumEpoch(epoch int) error { return nil }\n",
+		readmePath: "# Changelog\n\nInitial release.\n",
+	}
+	for p, body := range files {
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	claudeRoot := filepath.Join(tmp, "claude")
+	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+
+	// Past sessions on manifest_verifier.go: two sessions touching it, including a
+	// verified FixPair breakage so Turn 0 has a concrete guardrail to attach.
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "archiver", "m1.jsonl"), "m1", []string{
+		fmt.Sprintf(`{"type":"user","sessionId":"m1","cwd":%q,"timestamp":"2026-03-01T10:00:00Z","message":{"role":"user","content":"verify manifest digest handling"}}`, proj),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"m1","cwd":%q,"timestamp":"2026-03-01T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"em1","name":"Edit","input":{"file_path":%q,"old_string":"return nil","new_string":"return nil"}}]}}`, proj, manifestPath),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"m1","cwd":%q,"timestamp":"2026-03-01T10:02:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"bm1","name":"Bash","input":{"command":"go test ./..."}}]}}`, proj),
+		fmt.Sprintf(`{"type":"user","sessionId":"m1","cwd":%q,"timestamp":"2026-03-01T10:02:05Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"bm1","is_error":true,"content":"--- FAIL: TestVerifyManifestDigest (0.01s)\n    manifest_verifier_test.go:6: empty trailer header\nFAIL\tarchiver\t0.02s"}]}}`, proj),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"m1","cwd":%q,"timestamp":"2026-03-01T10:03:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"em2","name":"Edit","input":{"file_path":%q,"old_string":"len(raw) == 0","new_string":"len(raw) < 4"}}]}}`, proj, manifestPath),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"m1","cwd":%q,"timestamp":"2026-03-01T10:04:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"bm2","name":"Bash","input":{"command":"go test ./..."}}]}}`, proj),
+		fmt.Sprintf(`{"type":"user","sessionId":"m1","cwd":%q,"timestamp":"2026-03-01T10:04:05Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"bm2","content":"ok  \texample.com/archiver\t0.01s"}]}}`, proj),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"m1","cwd":%q,"timestamp":"2026-03-01T10:04:30Z","message":{"role":"assistant","content":"Fixed TestVerifyManifestDigest in manifest_verifier.go because empty trailer headers were not rejected before slicing."}}`, proj),
+	})
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "archiver", "m2.jsonl"), "m2", []string{
+		fmt.Sprintf(`{"type":"user","sessionId":"m2","cwd":%q,"timestamp":"2026-03-02T10:00:00Z","message":{"role":"user","content":"tighten manifest verifier bounds"}}`, proj),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"m2","cwd":%q,"timestamp":"2026-03-02T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"em3","name":"Edit","input":{"file_path":%q,"old_string":"return nil","new_string":"return nil"}}]}}`, proj, manifestPath),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"m2","cwd":%q,"timestamp":"2026-03-02T10:02:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"bm3","name":"Bash","input":{"command":"go test ./..."}}]}}`, proj),
+		fmt.Sprintf(`{"type":"user","sessionId":"m2","cwd":%q,"timestamp":"2026-03-02T10:02:05Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"bm3","content":"ok  \texample.com/archiver\t0.01s"}]}}`, proj),
+	})
+
+	// Past sessions bridging external domain vocabulary ("splitbrain", "heartbeat")
+	// onto rare repo stem "quorum" / "fencing" via cooccur.gob.
+	for i := 1; i <= 3; i++ {
+		sid := fmt.Sprintf("q%d", i)
+		writeClaudeFixture(t, filepath.Join(claudeRoot, "archiver", sid+".jsonl"), sid, []string{
+			fmt.Sprintf(`{"type":"user","sessionId":%q,"cwd":%q,"timestamp":"2026-03-0%dT11:00:00Z","message":{"role":"user","content":"investigate splitbrain stalledleasedetector during quorum fencing"}}`, sid, proj, i+2),
+			fmt.Sprintf(`{"type":"assistant","sessionId":%q,"cwd":%q,"timestamp":"2026-03-0%dT11:01:00Z","message":{"role":"assistant","content":"Updated quorum fencing AcquireQuorumEpoch to fence splitbrain stalledleasedetector."}}`, sid, proj, i+2),
+		})
+	}
+
+	if _, err := captureRun(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. Multi-paragraph structured spec with fork boilerplate, doc mention (CHANGELOG.md),
+	// sentence-initial Titlecase word ("Change"), quoted diagnostic error string, and
+	// closing git/PR workflow instructions localizes manifest_verifier.go + guardrail!
+	structuredPrompt := "Fork started — processing in background\n<fork-boilerplate>\nWorker fork instructions.\n</fork-boilerplate>\n\nYour directive: Change in example.com/archiver (also note CHANGELOG.md).\nUsers see \"snapshot manifest checksum mismatch\" when restoring empty archives.\n\nWork in your own worktree from origin/main (`git fetch origin`).\nDo NOT push or open a PR.\nReport: branch + commit SHA, root cause, and `go test ./...` output."
+
+	turn0 := promptDirectContextIn(idxDir, proj, "live-sess-1", structuredPrompt, false, nil)
+	if !strings.Contains(turn0, "likely target: manifest_verifier.go") {
+		t.Fatalf("expected structured prompt + diagnostic literal to localize manifest_verifier.go, got:\n%s", turn0)
+	}
+	if strings.Contains(turn0, "defined in quorum_fencing.go") {
+		t.Fatalf("expected sentence-initial Titlecase 'Change' not to trigger symbol brief hijack, got:\n%s", turn0)
+	}
+	if !strings.Contains(turn0, "past breakage here:") && !strings.Contains(turn0, "prior decision:") {
+		t.Fatalf("expected Turn-0 localization to attach verified guardrail for manifest_verifier.go, got:\n%s", turn0)
+	}
+
+	// 2. Temporal skip: skipping m1 hides m1's FixPair breakage from Turn-0 guardrail.
+	skipped := promptDirectContextIn(idxDir, proj, "", structuredPrompt, true, map[string]bool{"m1": true})
+	if strings.Contains(skipped, "TestVerifyManifestDigest") && strings.Contains(skipped, "past breakage here:") {
+		t.Fatalf("expected skip[m1] to suppress m1 FixPair guardrail (zero future leakage), got:\n%s", skipped)
+	}
+
+	// 3. Cross-surface .seen deduplication: after live-sess-1 already saw the
+	// guardrail at Turn 0, PreToolUse on manifest_verifier.go must not re-inject the same guardrail.
+	toolPayload := fmt.Sprintf(`{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":%q},"cwd":%q,"session_id":"live-sess-1"}`, manifestPath, proj)
+	var toolOut bytes.Buffer
+	if err := runHookTool(idxDir, strings.NewReader(toolPayload), &toolOut); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(toolOut.String(), "past breakage here:") {
+		t.Fatalf("expected .seen deduplication to suppress duplicate PreToolUse guardrail in same session, got:\n%s", toolOut.String())
+	}
+
+	// 4. Co-occurrence bridge: domain words ("splitbrain", "stalledleasedetector") absent from
+	// source files bridge via cooccur.gob onto quorum_fencing.go, while vague prompts stay silent.
+	if len(index.CooccurNeighbors(idxDir, "splitbrain")) > 0 {
+		coLoc, _ := promptTaskTargetsLine(idxDir, proj, "prevent splitbrain stalledleasedetector regression", nil, nil)
+		if !strings.Contains(coLoc, "quorum_fencing.go") {
+			t.Fatalf("expected cooccur.gob bridge to localize quorum_fencing.go, got %q", coLoc)
+		}
+	}
+	if negLoc, _ := promptTaskTargetsLine(idxDir, proj, "please clean up comments and formatting", nil, nil); negLoc != "" {
+		t.Fatalf("expected vague negative prompt to stay silent, got %q", negLoc)
 	}
 }

@@ -163,6 +163,7 @@ var harnessBlockOpenRe = func() *regexp.Regexp {
 // in the person's turn can be followed by more of the host, and a rule read
 // out of that is the host's, not the person's.
 func BeforeHarnessBlock(text string) string {
+	text = stripForkBoilerplate(text)
 	if loc := harnessBlockOpenRe.FindStringIndex(text); loc != nil {
 		text = text[:loc[0]]
 	}
@@ -183,6 +184,7 @@ func BeforeHarnessBlock(text string) string {
 // envelope's field names as the identifying terms (#3156) — and once the block
 // was gone, about the host's own paragraph above it.
 func StripHarnessBlocks(prompt string) string {
+	prompt = stripForkBoilerplate(prompt)
 	if strings.Contains(prompt, checkpointOpen) {
 		prompt = checkpointTurn(prompt)
 	}
@@ -202,6 +204,47 @@ func StripHarnessBlocks(prompt string) string {
 		prompt = stripHookStatusLines(prompt)
 	}
 	return strings.TrimSpace(prompt)
+}
+
+const (
+	forkOpen  = "<fork-boilerplate>"
+	forkClose = "</fork-boilerplate>"
+)
+
+// stripForkBoilerplate removes Claude Code's /fork preamble banner and
+// <fork-boilerplate>...</fork-boilerplate> envelope while preserving the user's
+// directive underneath it.
+func stripForkBoilerplate(text string) string {
+	low := strings.ToLower(text)
+	start := strings.Index(low, forkOpen)
+	if start < 0 {
+		return text
+	}
+	relEnd := strings.Index(low[start+len(forkOpen):], forkClose)
+	if relEnd < 0 {
+		return text
+	}
+	end := start + len(forkOpen) + relEnd + len(forkClose)
+	before := strings.TrimSpace(text[:start])
+	if before != "" {
+		bLines := strings.Split(before, "\n")
+		last := strings.ToLower(strings.TrimSpace(bLines[len(bLines)-1]))
+		if strings.HasPrefix(last, "fork started") && strings.Contains(last, "processing in background") {
+			bLines = bLines[:len(bLines)-1]
+			before = strings.TrimSpace(strings.Join(bLines, "\n"))
+		}
+	}
+	after := strings.TrimSpace(text[end:])
+	if len(after) >= len("your directive:") && strings.EqualFold(after[:len("your directive:")], "your directive:") {
+		after = strings.TrimSpace(after[len("your directive:"):])
+	}
+	if before == "" {
+		return after
+	}
+	if after == "" {
+		return before
+	}
+	return before + "\n" + after
 }
 
 const (

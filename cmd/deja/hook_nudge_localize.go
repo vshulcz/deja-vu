@@ -293,15 +293,20 @@ func extractPromptASCIIWords(asked string) []string {
 // promptTaskTargetsLine maps natural-language module phrases, rare repository
 // identifiers, and historical prompt-to-edit correlations onto live repository
 // source files and their verified test recipes at Turn 0.
-func promptTaskTargetsLine(dir, cwd, asked string, seen, skip map[string]bool) (string, string) {
+func promptTaskTargetsLine(dir, cwd, asked string, seen, skip map[string]bool) (string, []string) {
 	if cwd == "" || !policy.Load().Allows(policy.ActivationAuto, "") {
-		return "", ""
+		return "", nil
 	}
 	idx := loadRepoSymbolMap(cwd)
 	if idx.numFiles == 0 {
-		return "", ""
+		return "", nil
 	}
-	words := extractPromptASCIIWords(asked)
+	asked = strings.TrimSpace(digest.StripHarnessBlocks(asked))
+	if asked == "" {
+		return "", nil
+	}
+	focused, codeSpans, quotedPhrases := focusTaskPrompt(asked)
+	words := extractPromptASCIIWords(focused)
 	var matchedFiles []string
 
 	// 1. Check adjacent 3-word and 2-word phrases matching exact file stems or declared symbols.
@@ -332,7 +337,8 @@ func promptTaskTargetsLine(dir, cwd, asked string, seen, skip map[string]bool) (
 	}
 
 	// 2. Score files by separate structural (stem/declaration) DF, rare body DF,
-	// confirmed FixPair remedies, and historical Title/Settled->Touched vote.
+	// literal diagnostic strings, NPMI co-occurrence neighbors, confirmed FixPairs,
+	// and historical Title/Settled->Touched consensus.
 	if len(matchedFiles) == 0 {
 		histBoost, histSessions := historicalTitleTouchedBoost(dir, cwd, asked, skip)
 		fixBoost, fixHits := fixPairTargetBoost(dir, cwd, asked, skip)
@@ -340,17 +346,30 @@ func promptTaskTargetsLine(dir, cwd, asked string, seen, skip map[string]bool) (
 		structVeryRareCap := max(5, idx.numFiles/55)
 		bodyRareCap := max(6, idx.numFiles/45)
 		projSelf := selfProjectWordSet(cwd)
-		qWords := map[string]bool{}
-		for _, w := range words {
-			if len(w) < 4 || localizeStopWords[w] || projSelf[w] {
-				continue
-			}
-			for _, sub := range splitIdentifierWords(w) {
-				if len(sub) >= 4 && !localizeStopWords[sub] && !projSelf[sub] {
-					qWords[sub] = true
+		qWords, boostWords := selectPrioritizedTaskWords(focused, codeSpans, quotedPhrases, projSelf, 28)
+		diagBoost := matchDiagnosticPhraseFiles(cwd, &idx, quotedPhrases, projSelf)
+		cooccurVotes := map[string]int{}
+		if dir != "" && planIndexReady(dir) {
+			for _, qt := range extractHistoricalQueryTerms(asked, projSelf) {
+				if idx.structDF[qt] > 0 || idx.bodyDF[qt] > 0 {
+					continue
+				}
+				nbs := index.CooccurNeighbors(dir, qt)
+				if len(nbs) > 5 {
+					nbs = nbs[:5]
+				}
+				seenNB := map[string]bool{}
+				for _, nb := range nbs {
+					nb = strings.Trim(strings.ToLower(nb), "._-/")
+					if len(nb) < 4 || seenNB[nb] || qWords[nb] || localizeStopWords[nb] || projSelf[nb] {
+						continue
+					}
+					if idx.structDF[nb] > 0 && idx.structDF[nb] <= structVeryRareCap {
+						seenNB[nb] = true
+						cooccurVotes[nb]++
+					}
 				}
 			}
-			qWords[w] = true
 		}
 		type cand struct {
 			rel   string
@@ -367,12 +386,21 @@ func promptTaskTargetsLine(dir, cwd, asked string, seen, skip map[string]bool) (
 				rareHits += 2
 				anchorHit = true
 			}
+			if db := diagBoost[f.rel]; db > 0 {
+				score += db
+				rareHits += 2
+				anchorHit = true
+			}
 			for qw := range qWords {
+				mult := 1.0
+				if boostWords[qw] {
+					mult = 1.20
+				}
 				sDF := idx.structDF[qw]
 				inStem := f.stemWords[qw]
 				inDecl := f.declWords[qw] || f.declExact[qw]
 				if (inStem || inDecl || f.pkg == qw) && sDF > 0 && sDF <= structRareCap {
-					idf := math.Log(1.0 + float64(effectiveN)/float64(sDF))
+					idf := math.Log(1.0+float64(effectiveN)/float64(sDF)) * mult
 					rareHits++
 					switch {
 					case inStem:
@@ -396,7 +424,7 @@ func promptTaskTargetsLine(dir, cwd, asked string, seen, skip map[string]bool) (
 				bDF := idx.bodyDF[qw]
 				bodyTF := f.bodyWords[qw]
 				if bodyTF > 0 && bDF > 0 && bDF <= bodyRareCap && len(qw) >= 5 {
-					idf := math.Log(1.0 + float64(effectiveN)/float64(bDF))
+					idf := math.Log(1.0+float64(effectiveN)/float64(bDF)) * mult
 					tfBoost := 1.0 + 0.15*math.Min(float64(bodyTF-1), 4)
 					score += idf * 0.80 * tfBoost
 					rareHits++
@@ -425,6 +453,20 @@ func promptTaskTargetsLine(dir, cwd, asked string, seen, skip map[string]bool) (
 					anchorHit = true
 				}
 			}
+			for nb, votes := range cooccurVotes {
+				if !f.stemWords[nb] && !f.declWords[nb] && !f.declExact[nb] {
+					continue
+				}
+				idf := math.Log(1.0 + float64(effectiveN)/float64(idx.structDF[nb]))
+				if votes >= 2 {
+					score += idf * 1.15
+					rareHits++
+					anchorHit = true
+				} else if rareHits >= 1 {
+					score += idf * 0.55
+					rareHits++
+				}
+			}
 			if rareHits >= 2 && anchorHit && score >= 6.4 {
 				cands = append(cands, cand{rel: f.rel, score: score})
 			}
@@ -440,7 +482,10 @@ func promptTaskTargetsLine(dir, cwd, asked string, seen, skip map[string]bool) (
 		})
 		if len(cands) > 0 {
 			maxSpecificCands := max(12, idx.numFiles/35)
-			if len(cands) <= maxSpecificCands || cands[0].score >= cands[maxSpecificCands-1].score*1.28 {
+			concentrated := len(cands) <= maxSpecificCands ||
+				cands[0].score >= cands[maxSpecificCands-1].score*1.28 ||
+				(cands[0].score >= 11.0 && len(cands) > 5 && cands[0].score >= cands[5].score*1.35)
+			if concentrated {
 				matchedFiles = appendUniqueRel(matchedFiles, cands[0].rel)
 				if len(cands) > 1 && cands[1].score >= cands[0].score*0.75 {
 					matchedFiles = appendUniqueRel(matchedFiles, cands[1].rel)
@@ -453,20 +498,26 @@ func promptTaskTargetsLine(dir, cwd, asked string, seen, skip map[string]bool) (
 	}
 
 	if len(matchedFiles) == 0 {
-		return "", ""
+		return "", nil
 	}
 	if len(matchedFiles) > 3 {
 		matchedFiles = matchedFiles[:3]
 	}
 	line := formatLocalizedTargetsLine(dir, cwd, "likely target: ", matchedFiles, skip)
 	if line == "" {
-		return "", ""
+		return "", nil
 	}
-	tok := "prompt:loc:" + shortHash(line)
-	if seen != nil && seen[tok] {
-		return "", ""
+	pTok := "prompt:loc:" + shortHash(line)
+	toks := []string{pTok}
+	var tTok string
+	if fact := dedupeFact(line); fact != line {
+		tTok = "tool:" + shortHash(fact)
+		toks = append(toks, tTok)
 	}
-	return line, tok
+	if seen != nil && (seen[pTok] || (tTok != "" && seen[tTok])) {
+		return "", nil
+	}
+	return line, toks
 }
 
 func selfProjectWordSet(cwd string) map[string]bool {
@@ -494,11 +545,12 @@ func selfProjectWordSet(cwd string) map[string]bool {
 }
 
 func extractHistoricalQueryTerms(asked string, projSelf map[string]bool) []string {
+	focused, codeSpans, quotedPhrases := focusTaskPrompt(asked)
 	seen := map[string]bool{}
 	var out []string
 	add := func(t string) {
 		t = strings.Trim(strings.ToLower(t), "._-/")
-		if len([]rune(t)) < 4 || localizeStopWords[t] || projSelf[t] || seen[t] {
+		if len([]rune(t)) < 4 || localizeStopWords[t] || workflowMetaWords[t] || projSelf[t] || seen[t] {
 			return
 		}
 		allDigits := true
@@ -514,17 +566,33 @@ func extractHistoricalQueryTerms(asked string, projSelf map[string]bool) []strin
 		seen[t] = true
 		out = append(out, t)
 	}
-	for _, t := range prompt.Terms(asked) {
+	addWords := func(s string) {
+		for _, w := range extractPromptASCIIWords(s) {
+			add(w)
+			for _, sub := range splitIdentifierWords(w) {
+				add(sub)
+			}
+		}
+	}
+	for _, span := range codeSpans {
+		addWords(span)
+	}
+	for _, qp := range quotedPhrases {
+		addWords(qp)
+	}
+	for _, t := range prompt.Terms(focused) {
 		if !projSelf[strings.ToLower(t)] {
 			add(t)
 		}
 	}
-	for _, w := range extractPromptASCIIWords(asked) {
-		add(w)
-		for _, sub := range splitIdentifierWords(w) {
-			add(sub)
+	// Prioritize the opening problem statement before trailing instructions.
+	for i, line := range strings.Split(focused, "\n") {
+		if i >= 3 {
+			break
 		}
+		addWords(line)
 	}
+	addWords(focused)
 	// Non-ASCII words (e.g. Cyrillic/European inflected nouns/verbs) beyond the 6-term prompt cap.
 	var cur []rune
 	flushNonASCII := func() {
@@ -533,7 +601,7 @@ func extractHistoricalQueryTerms(asked string, projSelf map[string]bool) []strin
 		}
 		cur = cur[:0]
 	}
-	for _, r := range asked {
+	for _, r := range focused {
 		if r > 127 && unicode.IsLetter(r) {
 			cur = append(cur, unicode.ToLower(r))
 		} else {
@@ -543,6 +611,228 @@ func extractHistoricalQueryTerms(asked string, projSelf map[string]bool) []strin
 	flushNonASCII()
 	if len(out) > 16 {
 		out = out[:16]
+	}
+	return out
+}
+
+var workflowMetaWords = map[string]bool{
+	"worktree": true, "worktrees": true, "branched": true, "commits": true,
+	"committed": true, "pushed": true, "pushing": true, "merged": true,
+	"merging": true, "deliverables": true, "contributor": true,
+	"blanket": true,
+}
+
+var workflowClausePrefixes = []string{
+	"report:", "report pr ", "report branch", "deliverables:", "output format:",
+	"do not push", "don't push", "do not post ", "do not merge", "never push",
+	"work in your own worktree", "work from current origin/", "branch from origin/",
+	"create branch ", "blanket ok to ", "house rule:", "keep disk low",
+	"this is a read-only review", "post nothing to github",
+}
+
+func isWorkflowMetaSpan(span string) bool {
+	low := strings.ToLower(strings.TrimSpace(span))
+	for _, pfx := range []string{
+		"gh issue ", "gh pr ", "gh run ", "gh api ",
+		"git fetch", "git checkout", "git switch", "git branch", "git worktree",
+		"git status", "git diff", "git log", "git show", "git rev-parse",
+		"go test ", "pytest ", "cargo test", "npm test", "pnpm test",
+	} {
+		if strings.HasPrefix(low, pfx) {
+			return true
+		}
+	}
+	return false
+}
+
+// focusTaskPrompt isolates the technical problem description, non-boilerplate
+// backticked code/CLI spans, and quoted error diagnostics from multi-paragraph
+// task specifications while stripping git/PR/reporting workflow instructions.
+func focusTaskPrompt(asked string) (focused string, codeSpans []string, quotedPhrases []string) {
+	cleaned := asked
+	var keptSpans []string
+	for rest := asked; ; {
+		i := strings.IndexByte(rest, '`')
+		if i < 0 {
+			break
+		}
+		j := strings.IndexByte(rest[i+1:], '`')
+		if j < 0 {
+			break
+		}
+		span := strings.TrimSpace(rest[i+1 : i+1+j])
+		full := rest[i : i+2+j]
+		rest = rest[i+2+j:]
+		if span == "" || len(span) > 140 || strings.Contains(span, "\n") {
+			continue
+		}
+		if isWorkflowMetaSpan(span) {
+			cleaned = strings.ReplaceAll(cleaned, full, " ")
+			continue
+		}
+		keptSpans = append(keptSpans, span)
+	}
+	for rest := cleaned; ; {
+		i := strings.IndexByte(rest, '"')
+		if i < 0 {
+			break
+		}
+		j := strings.IndexByte(rest[i+1:], '"')
+		if j < 0 {
+			break
+		}
+		phrase := strings.TrimSpace(rest[i+1 : i+1+j])
+		rest = rest[i+2+j:]
+		if len(phrase) >= 14 && len(phrase) <= 120 && !strings.ContainsAny(phrase, "\n`") && strings.Contains(phrase, " ") {
+			quotedPhrases = append(quotedPhrases, phrase)
+		}
+	}
+	var keptLines []string
+	for rawLine := range strings.SplitSeq(cleaned, "\n") {
+		line := strings.TrimSpace(rawLine)
+		if line == "" {
+			continue
+		}
+		lowLine := strings.ToLower(line)
+		skipLine := false
+		for _, pfx := range workflowClausePrefixes {
+			if strings.HasPrefix(lowLine, pfx) {
+				skipLine = true
+				break
+			}
+		}
+		if skipLine {
+			continue
+		}
+		var keptClauses []string
+		for _, sent := range strings.Split(line, ". ") {
+			sTrim := strings.TrimSpace(sent)
+			if sTrim == "" {
+				continue
+			}
+			lowSent := strings.ToLower(sTrim)
+			dropSent := false
+			for _, pfx := range workflowClausePrefixes {
+				if strings.HasPrefix(lowSent, pfx) {
+					dropSent = true
+					break
+				}
+			}
+			if !dropSent {
+				keptClauses = append(keptClauses, sTrim)
+			}
+		}
+		if len(keptClauses) > 0 {
+			keptLines = append(keptLines, strings.Join(keptClauses, ". "))
+		}
+	}
+	focused = strings.TrimSpace(strings.Join(keptLines, "\n"))
+	if focused == "" {
+		focused = asked
+	}
+	return focused, keptSpans, quotedPhrases
+}
+
+func selectPrioritizedTaskWords(focused string, codeSpans, quotedPhrases []string, projSelf map[string]bool, maxWords int) (qWords, boostWords map[string]bool) {
+	qWords = map[string]bool{}
+	boostWords = map[string]bool{}
+	addToken := func(w string, boost bool) {
+		if len(qWords) >= maxWords {
+			return
+		}
+		if len(w) < 4 || localizeStopWords[w] || workflowMetaWords[w] || projSelf[w] {
+			return
+		}
+		qWords[w] = true
+		if boost {
+			boostWords[w] = true
+		}
+	}
+	addText := func(s string, boost bool) {
+		for _, w := range extractPromptASCIIWords(s) {
+			for _, sub := range splitIdentifierWords(w) {
+				addToken(sub, boost)
+			}
+			addToken(w, boost)
+		}
+	}
+	for _, span := range codeSpans {
+		addText(span, true)
+	}
+	for _, qp := range quotedPhrases {
+		addText(qp, true)
+	}
+	lines := strings.Split(focused, "\n")
+	multiLine := len(lines) > 2
+	for i, line := range lines {
+		addText(line, multiLine && i < 2)
+		if len(qWords) >= maxWords {
+			break
+		}
+	}
+	return qWords, boostWords
+}
+
+func matchDiagnosticPhraseFiles(cwd string, idx *repoSymbolMap, phrases []string, projSelf map[string]bool) map[string]float64 {
+	if len(phrases) == 0 || idx == nil || idx.numFiles == 0 {
+		return nil
+	}
+	scanRoot := sources.RepoRoot(cwd)
+	if scanRoot == "" {
+		scanRoot = cwd
+	}
+	var out map[string]float64
+	for _, ph := range phrases {
+		lowPh := strings.ToLower(strings.TrimSpace(ph))
+		if len(lowPh) < 16 {
+			continue
+		}
+		var reqWords []string
+		for _, w := range extractPromptASCIIWords(lowPh) {
+			if len(w) >= 5 && !localizeStopWords[w] && !projSelf[w] {
+				reqWords = append(reqWords, w)
+			}
+		}
+		if len(reqWords) == 0 {
+			continue
+		}
+		var prefiltered []string
+		for _, f := range idx.files {
+			ok := true
+			for _, rw := range reqWords {
+				if f.bodyWords[rw] == 0 {
+					ok = false
+					break
+				}
+			}
+			if ok {
+				prefiltered = append(prefiltered, f.rel)
+			}
+		}
+		if len(prefiltered) == 0 || len(prefiltered) > 48 {
+			continue
+		}
+		var hits []string
+		for _, rel := range prefiltered {
+			raw, err := os.ReadFile(filepath.Join(scanRoot, rel))
+			if err != nil || len(raw) > 256<<10 {
+				continue
+			}
+			if strings.Contains(strings.ToLower(string(raw)), lowPh) {
+				hits = append(hits, rel)
+				if len(hits) > 3 {
+					break
+				}
+			}
+		}
+		if len(hits) >= 1 && len(hits) <= 3 {
+			if out == nil {
+				out = map[string]float64{}
+			}
+			for _, rel := range hits {
+				out[rel] = max(out[rel], 10.5)
+			}
+		}
 	}
 	return out
 }
@@ -687,6 +977,27 @@ func historicalTitleTouchedBoost(dir, cwd, asked string, skip map[string]bool) (
 		return nil, nil
 	}
 	rareSessionCap := max(5, totalProj/10)
+	fileSessionDF := map[string]int{}
+	for _, m := range metas {
+		if skip != nil && skip[m.ID] {
+			continue
+		}
+		if len(m.Touched) == 0 || !pol.Allows(policy.ActivationAuto, m.Project) {
+			continue
+		}
+		if len(projNames) > 0 && !slices.Contains(projNames, m.Project) {
+			continue
+		}
+		seenRel := map[string]bool{}
+		for _, raw := range m.Touched {
+			rel := filepath.ToSlash(orientPath(raw, cwd))
+			if rel != "" && !seenRel[rel] {
+				seenRel[rel] = true
+				fileSessionDF[rel]++
+			}
+		}
+	}
+	hubFileCap := max(8, totalProj/8)
 	boost := map[string]float64{}
 	sessCount := map[string]int{}
 	for _, d := range projDocs {
@@ -712,6 +1023,9 @@ func historicalTitleTouchedBoost(dir, cwd, asked string, skip map[string]bool) (
 			w := docScore * 0.85
 			if pos == 0 {
 				w *= 1.35
+			}
+			if fdf := fileSessionDF[rel]; fdf > hubFileCap {
+				w *= float64(hubFileCap) / float64(fdf)
 			}
 			boost[rel] += w
 			sessCount[rel]++
@@ -981,23 +1295,29 @@ func formatLocalizedTargetsLine(dir, cwd, prefix string, targets []string, skip 
 	for _, rel := range targets {
 		safePaths = append(safePaths, search.SafePath(rel))
 	}
+	head := prefix + strings.Join(safePaths, ", ")
 	primary := targets[0]
 	inScope := scopedFileSessionsForPrompt(dir, cwd, primary, skip)
-	var extra string
+	dec := turn0FileGuardrail(dir, cwd, primary, inScope, skip)
+	var co string
 	if len(targets) == 1 {
-		co := fileHookCoChangeLineIn(cwd, primary, inScope)
+		co = fileHookCoChangeLineIn(cwd, primary, inScope)
 		if co == "" {
 			co = coupledCommitGuardForFiles(cwd, []string{primary})
 		}
-		extra += co
 	}
 	ran := fileHookRanLineFor(dir, primary, inScope)
 	if ran == "" {
 		_, fileSyms := fileHookSymbols(cwd, primary, "")
 		ran = siblingTestLineFor(cwd, primary, fileSyms)
 	}
-	extra += ran
-	return prefix + strings.Join(safePaths, ", ") + extra
+	if dec == "" && co == "" && ran == "" {
+		return head
+	}
+	if assembled := assembleFileHookLine(head, dec, co, ran); assembled != "" {
+		return assembled
+	}
+	return head
 }
 
 func scopedFileSessionsForPrompt(dir, cwd, rel string, skip map[string]bool) []index.SessionMeta {
