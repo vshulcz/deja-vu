@@ -32,6 +32,13 @@
     <summary>Why Cursor&#39;s state.vscdb and state.vscdb.backup hit 10–125 GB, why deleting it wipes every chat, and step-by-step SQLite commands to shrink it safely.</summary>
   </entry>
   <entry>
+    <title>Delete Devin CLI session history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-devin-session-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-devin-session-history.html"></link>
+    <updated>2026-11-12T00:00:00Z</updated>
+    <summary>Devin CLI keeps sessions in one SQLite database plus a summaries folder. Where they live, what removing them deletes, and how to index first.</summary>
+  </entry>
+  <entry>
     <title>Delete DeepSeek Harness session history — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/delete-dsh-session-history.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-dsh-session-history.html"></link>
@@ -282,12 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-codex.html"></link>
     <updated>2026-11-05T00:00:00Z</updated>
     <summary>如何让 Codex CLI 查到这台机器上每个编程智能体的会话：MCP 服务器、需要你批准的钩子，以及插件市场。</summary>
-  </entry>
-  <entry>
-    <title>给 Cursor 加记忆：召回这台机器上所有智能体的历史会话 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-cursor.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-cursor.html"></link>
-    <updated>2026-11-05T00:00:00Z</updated>
-    <summary>如何让 Cursor 查到这台机器上每个编程智能体的会话：它的 SQLite 聊天记录存在哪，以及 deja install cursor-auto 写入了什么。</summary>
   </entry>
 </feed>
