@@ -4,26 +4,26 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
-<title>deja-vu: memory for Claude Code, Codex, Cursor &amp; 40 more</title>
+<title>deja-vu: local memory, session search &amp; handoff across 43 coding agents</title>
 <meta name="theme-color" content="#0b0f10">
-<meta name="description" content="Coding agent memory for Claude Code, Codex and 41 more agents. A local index of the session history already on your disk that every agent can recall.">
+<meta name="description" content="Shared local memory, session history search, cross-agent handoff, and uncommitted code recovery across 43 coding agents (Claude Code, Codex, Cursor, OpenCode, Gemini CLI, OpenClaw and 37 more agents). One Go binary, zero LLM calls.">
 <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
 <link rel="alternate" type="application/atom+xml" title="deja-vu docs" href="https://vshulcz.github.io/deja-vu/feed.xml">
 <meta property="og:type" content="website">
-<meta property="og:title" content="deja-vu: memory for Claude Code, Codex, Cursor &amp; 40 more">
-<meta property="og:description" content="Coding agent memory for Claude Code, Codex and 41 more agents. A local index of the session history already on your disk that every agent can recall.">
+<meta property="og:title" content="deja-vu: local memory, session search &amp; handoff across 43 coding agents">
+<meta property="og:description" content="Shared local memory, session history search, cross-agent handoff, and uncommitted code recovery across 43 coding agents (Claude Code, Codex, Cursor, OpenCode, Gemini CLI, OpenClaw and 37 more agents). One Go binary, zero LLM calls.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="deja-vu: memory for Claude Code, Codex, Cursor &amp; 40 more">
-<meta name="twitter:description" content="Coding agent memory for Claude Code, Codex and 41 more agents. A local index of the session history already on your disk that every agent can recall.">
+<meta name="twitter:title" content="deja-vu: local memory, session search &amp; handoff across 43 coding agents">
+<meta name="twitter:description" content="Shared local memory, session history search, cross-agent handoff, and uncommitted code recovery across 43 coding agents (Claude Code, Codex, Cursor, OpenCode, Gemini CLI, OpenClaw and 37 more agents). One Go binary, zero LLM calls.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="theme-color" content="#0b0f10">
 <link rel="icon" type="image/svg+xml" sizes="16x16" href="assets/favicon.svg">
 <link rel="icon" type="image/svg+xml" sizes="any" href="assets/icon.svg">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://vshulcz.github.io/deja-vu/#website", "name": "deja-vu", "alternateName": "deja", "url": "https://vshulcz.github.io/deja-vu/", "description": "deja-vu (vshulcz/deja-vu) is a local memory tool for coding agents: it indexes the session transcripts Claude Code, Codex, Cursor and 40 other agents already wrote to disk and hands relevant history back over MCP and hooks. No LLM, one Go binary.", "inLanguage": "en", "about": {"@id": "https://vshulcz.github.io/deja-vu/#software"}, "publisher": {"@type": "Person", "name": "vshulcz", "url": "https://github.com/vshulcz"}}, {"@type": "SoftwareApplication", "@id": "https://vshulcz.github.io/deja-vu/#software", "name": "deja-vu", "alternateName": "deja", "operatingSystem": "macOS, Linux, Windows", "applicationCategory": "DeveloperApplication", "programmingLanguage": "Go", "description": "deja-vu (vshulcz/deja-vu) is a local memory tool for coding agents: it indexes the session transcripts Claude Code, Codex, Cursor and 40 other agents already wrote to disk and hands relevant history back over MCP and hooks. No LLM, one Go binary.", "url": "https://vshulcz.github.io/deja-vu/", "sameAs": ["https://github.com/vshulcz/deja-vu", "https://www.npmjs.com/package/@vshulcz/deja-vu", "https://formulae.brew.sh/formula/deja-vu", "https://mcpmarket.com/server/deja-vu", "https://alternativeto.net/software/deja-vu-1/"], "downloadUrl": "https://github.com/vshulcz/deja-vu/releases", "license": "https://github.com/vshulcz/deja-vu/blob/main/LICENSE", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "author": {"@type": "Person", "name": "Vladislav Shulcz", "url": "https://github.com/vshulcz"}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://vshulcz.github.io/deja-vu/#website", "name": "deja-vu", "alternateName": "deja", "url": "https://vshulcz.github.io/deja-vu/", "description": "deja-vu (vshulcz/deja-vu) is a local memory, session history search, cross-agent handoff, and uncommitted code recovery tool across 43 coding agents: it indexes the session transcripts Claude Code, Codex, Cursor, OpenCode, Gemini CLI, OpenClaw and 37 other agents already wrote to disk and serves recall over CLI, MCP, and hooks. No LLM, one Go binary.", "inLanguage": "en", "about": {"@id": "https://vshulcz.github.io/deja-vu/#software"}, "publisher": {"@type": "Person", "name": "vshulcz", "url": "https://github.com/vshulcz"}}, {"@type": "SoftwareApplication", "@id": "https://vshulcz.github.io/deja-vu/#software", "name": "deja-vu", "alternateName": "deja", "softwareVersion": "0.24.1", "operatingSystem": "macOS, Linux, Windows", "applicationCategory": "DeveloperApplication", "programmingLanguage": "Go", "featureList": ["Cross-agent session history search across 43 coding agents", "Shared local memory over MCP and hooks", "Cross-agent task handoff (deja handoff)", "Uncommitted file restore and line blame (deja restore, deja blame)", "Store retention and health audit (deja audit)"], "description": "deja-vu (vshulcz/deja-vu) is a local memory, session history search, cross-agent handoff, and uncommitted code recovery tool across 43 coding agents: it indexes the session transcripts Claude Code, Codex, Cursor, OpenCode, Gemini CLI, OpenClaw and 37 other agents already wrote to disk and serves recall over CLI, MCP, and hooks. No LLM, one Go binary.", "url": "https://vshulcz.github.io/deja-vu/", "sameAs": ["https://github.com/vshulcz/deja-vu", "https://www.npmjs.com/package/@vshulcz/deja-vu", "https://formulae.brew.sh/formula/deja-vu", "https://mcpmarket.com/server/deja-vu", "https://alternativeto.net/software/deja-vu-1/"], "downloadUrl": "https://github.com/vshulcz/deja-vu/releases", "license": "https://github.com/vshulcz/deja-vu/blob/main/LICENSE", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "author": {"@type": "Person", "name": "Vladislav Shulcz", "url": "https://github.com/vshulcz"}}]}</script>
 <link rel="icon" type="image/svg+xml" sizes="16x16" href="assets/favicon.svg">
 <link rel="icon" type="image/svg+xml" sizes="any" href="assets/icon.svg">
 <link rel="apple-touch-icon" href="assets/icon.svg">
@@ -337,6 +337,7 @@ footer a:hover{color:var(--ink)}
   <span class="sp"></span>
   <a class="lnk" href="view/">Demo</a>
   <a class="lnk" href="guide/getting-started.html">Docs</a>
+  <a class="lnk" href="registry/README.html">Agents</a>
   <a class="lnk" href="guide/benchmarks.html">Benchmarks</a>
   <a class="lnk" href="guide/compare.html">Compare</a>
   <a class="lnk" href="zh/guide/getting-started.html">中文</a>
@@ -355,22 +356,21 @@ footer a:hover{color:var(--ink)}
       installed it — so agents keep context across <code>/compact</code>, hand off mid-task via
       <code>deja handoff</code>, and recover overwritten code via <code>deja restore</code>. No LLM, one Go binary.</p>
     <div class="install-tabs" role="tablist" aria-label="install method">
-      <button type="button" class="itab on" role="tab" aria-selected="true" data-cmd="curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh">macOS / Linux</button>
+      <button type="button" class="itab on" role="tab" aria-selected="true" data-cmd="npx @vshulcz/deja-vu install --auto" data-under="stages <b>~/.local/bin/deja</b> and wires MCP recall &amp; hooks into every installed agent">npx (1-step)</button>
+      <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh">macOS / Linux</button>
       <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="brew install deja-vu">Homebrew</button>
-      <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="npm i -g @vshulcz/deja-vu">npm</button>
       <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="winget install vshulcz.deja-vu">Windows</button>
-      <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="npx @vshulcz/deja-vu sources" data-under="<b>read-only check</b> — lists every agent and session count already on your disk without installing anything">Try (no install)</button>
+      <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="npx @vshulcz/deja-vu audit" data-under="<b>read-only check</b> — inspects local stores, retention risk, and recoverable files across detected agents without installing">Try (no install)</button>
       <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="claude plugin marketplace add vshulcz/deja-vu && claude plugin install deja-vu@deja-vu" data-under="wires MCP recall and hooks into Claude Code — then run <b>deja index</b>">Claude Code</button>
       <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="codex plugin marketplace add https://github.com/vshulcz/deja-vu && codex plugin add deja-vu@deja-vu" data-under="wires MCP recall and skill into Codex CLI — then run <b>deja index</b>">Codex</button>
       <button type="button" class="itab" role="tab" aria-selected="false" data-cmd="go install github.com/vshulcz/deja-vu/cmd/deja@latest">Go</button>
     </div>
     <div class="cmdline">
       <span class="p">$</span>
-      <code id="i1">curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</code>
+      <code id="i1">npx @vshulcz/deja-vu install --auto</code>
       <button class="copy" data-copy="i1">copy</button>
     </div>
-    <p class="under" id="under">then <b>deja install --auto</b> — ten seconds to install, ten to index,
-      and the next session already knows</p>
+    <p class="under" id="under">stages <b>~/.local/bin/deja</b> and wires MCP recall &amp; hooks into every installed agent</p>
     <div class="hero-actions">
       <a class="hero-btn primary" href="https://github.com/vshulcz/deja-vu"><span aria-hidden="true">★</span> Star on GitHub</a>
       <a class="hero-btn" href="view/">Live browser demo →</a>
@@ -534,17 +534,22 @@ footer a:hover{color:var(--ink)}
   <h2>When this is what happened</h2>
   <div class="steps">
     <div class="step"><span class="n">01</span><h3>Something is gone</h3>
-      <p><a href="guide/does-my-agent-remember.html">Does my agent remember previous conversations?</a> ·
+      <p><a href="guide/recover-overwritten-files.html">Recovering overwritten uncommitted files</a> ·
+        <a href="guide/recover-a-deleted-session.html">Recovering a deleted Claude Code session</a> ·
+        <a href="guide/no-conversation-found-claude-code.html">No conversation found with session ID</a> ·
+        <a href="guide/does-my-agent-remember.html">Does my agent remember previous conversations?</a> ·
         <a href="guide/forgetting.html">Why it forgets</a> ·
         <a href="guide/lost-context.html">It lost the context you had</a> ·
         <a href="guide/context-window-full.html">The context window is full</a> ·
         <a href="guide/after-compaction.html">What compaction dropped</a> ·
         <a href="guide/repeated-mistakes.html">It repeats a mistake you fixed</a></p></div>
     <div class="step"><span class="n">02</span><h3>Finding it again</h3>
-      <p><a href="guide/find-a-session.html">Finding a session</a> ·
+      <p><a href="guide/claude-code-usage-limit-handoff.html">Claude Code usage-limit handoff</a> ·
+        <a href="guide/find-a-session.html">Finding a session</a> ·
         <a href="guide/resume-a-session.html">Resuming yesterday's session</a> ·
         <a href="guide/where-sessions-are-stored.html">Where each agent keeps its history</a> ·
         <a href="guide/session-files-on-disk.html">Session files on disk</a> ·
+        <a href="guide/cursor-state-vscdb-too-large.html">Cursor state.vscdb too large</a> ·
         <a href="guide/export-conversations.html">Exporting a conversation</a> ·
         <a href="guide/switching-agents.html">Switching agents</a> ·
         <a href="guide/parallel-sessions.html">Parallel sessions</a> ·
@@ -556,6 +561,10 @@ footer a:hover{color:var(--ink)}
         <a href="guide/privacy.html">Privacy</a> ·
         <a href="guide/benchmarks.html">Benchmarks</a> ·
         <a href="guide/compare.html">How it compares</a> ·
+        <a href="guide/claude-mem-alternative.html">claude-mem alternative</a> ·
+        <a href="guide/mem0-alternative.html">Mem0 alternative</a> ·
+        <a href="guide/specstory-alternative.html">SpecStory alternative</a> ·
+        <a href="guide/basic-memory-alternative.html">Basic Memory alternative</a> ·
         <a href="guide/day-zero.html">Day zero: eight tools, one machine with 19,195 sessions already on disk</a></p></div>
   </div>
   <details style="margin-top:18px">

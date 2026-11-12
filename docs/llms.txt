@@ -4,13 +4,17 @@
 
 Two things distinguish it from memory tools that record forward: it starts full, because the history is already on disk, and recall arrives without being asked — at session start, on each prompt, before an edit or a command, after a command fails, and on the way back from a compaction, where deja keeps the task, files and commands the summary drops. Over MCP, a single `deja` tool exposes eight modes (`recall`, `context`, `blame`, `fix`, `how`, `orient`, `remember`, `handoff`); from the CLI, `deja handoff` passes a live task to another agent, `deja blame <file>:<line>` traces which session wrote a line, and `deja restore <path>` recovers uncommitted code an agent overwrote. Credentials are stripped as the index is built.
 
-Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh`, or `brew install deja-vu`), followed by `deja install --auto` to wire the agents found on the machine.
+Install is one command (`npx @vshulcz/deja-vu install --auto`, `curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto`, or `brew install deja-vu && deja install --auto`); `npx @vshulcz/deja-vu audit` checks local stores, retention risk, and recoverable files across detected agents without installing.
 
 Run `deja` with no arguments in a terminal and it opens a full-screen search over every agent's history: results as you type, the session read at the match, then `r` to resume it in its own agent or `o` to continue it in another with what it asked, decided and left open. The box takes filters (`codex:`, `yesterday`, `in:<project>`), `/` finds a word inside an open session, and a Deleted tab holds sessions their agent deleted that deja still has, and puts one back where the agent can reopen it. With `DEJA_TUI=0` or `TERM=dumb` a bare `deja` prints a text brief instead, and `deja <query>` searches from the shell.
 
 ## Start here
 
 - [Getting started](https://vshulcz.github.io/deja-vu/guide/getting-started.html): install, wire an agent, and the first query
+- [Recover overwritten files](https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html): restore uncommitted code an agent replaced before git commit via deja restore
+- [Recover a deleted Claude Code session](https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html): reopen or keep searchable a session Claude Code purged under cleanupPeriodDays
+- [Claude Code: No conversation found with session ID](https://vshulcz.github.io/deja-vu/guide/no-conversation-found-claude-code.html): why --resume fails across directories or after 30-day cleanup, and how to recover the transcript
+- [Claude Code usage limit handoff](https://vshulcz.github.io/deja-vu/guide/claude-code-usage-limit-handoff.html): continue an active Claude Code task in Codex, Cursor, or opencode when a rate limit hits
 - [Why agents forget](https://vshulcz.github.io/deja-vu/guide/forgetting.html): what ends with a session and what survives on disk
 - [Does my agent remember previous conversations](https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html): what Claude Code, Codex and Cursor keep between sessions, and what they do not
 - [Where history lives](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html): the conversation history file each of the forty-three agents writes, and its format

@@ -1,7 +1,7 @@
 {
   "name": "@vshulcz/deja-vu",
   "version": "0.0.0",
-  "description": "deja-vu: memory for coding agents from the sessions they already wrote to disk — Claude Code, Codex, Cursor and the rest — local, from the CLI or over MCP.",
+  "description": "Shared local memory, session history search, cross-agent handoff, and uncommitted code recovery across 43 coding agents — Claude Code, Codex, Cursor, OpenCode, Gemini CLI, OpenClaw & more (CLI & MCP).",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -29,6 +29,15 @@
     "mcp-server",
     "session-history",
     "session-search",
+    "session-recovery",
+    "context-engineering",
+    "compaction",
+    "handoff",
+    "bm25",
+    "windsurf",
+    "aider",
+    "cline",
+    "roo-code",
     "recall",
     "local-first"
   ],

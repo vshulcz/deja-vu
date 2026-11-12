@@ -224,3 +224,60 @@ func launcherCandidates(exe string) []string {
 	}
 	return out
 }
+
+// stageEphemeralExe copies an ephemeral package-runner binary (`npx`,
+// `pnpm dlx`, `bunx`) to `~/.local/bin/deja` (`.exe` on Windows) so
+// `npx @vshulcz/deja-vu install --auto` leaves a permanent binary behind for
+// hooks and MCP servers after the runner evicts its cache. If a non-ephemeral
+// install is already at `~/.local/bin/deja`, it uses that path as-is without
+// overwriting a binary another installer owns.
+func stageEphemeralExe(exe string) (string, error) {
+	home := sources.Home()
+	if home == "" {
+		return exe, nil
+	}
+	name := "deja"
+	if runtime.GOOS == "windows" {
+		name = "deja.exe"
+	}
+	binDir := filepath.Join(home, ".local", "bin")
+	dst := filepath.Join(binDir, name)
+	if filepath.Clean(dst) == filepath.Clean(exe) {
+		return exe, nil
+	}
+	if fi, statErr := os.Stat(dst); statErr == nil && !fi.IsDir() {
+		return dst, nil
+	}
+	data, err := os.ReadFile(exe)
+	if err != nil {
+		return "", err
+	}
+	if mkErr := os.MkdirAll(binDir, 0o755); mkErr != nil {
+		return "", mkErr
+	}
+	f, err := os.CreateTemp(binDir, ".deja-stage-*")
+	if err != nil {
+		return "", err
+	}
+	tmp := f.Name()
+	cleanup := func() { _ = os.Remove(tmp) }
+	if _, wErr := f.Write(data); wErr != nil {
+		_ = f.Close()
+		cleanup()
+		return "", wErr
+	}
+	if chErr := f.Chmod(0o755); chErr != nil {
+		_ = f.Close()
+		cleanup()
+		return "", chErr
+	}
+	if clErr := f.Close(); clErr != nil {
+		cleanup()
+		return "", clErr
+	}
+	if rnErr := os.Rename(tmp, dst); rnErr != nil {
+		cleanup()
+		return "", rnErr
+	}
+	return dst, nil
+}

@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-<p align="center"><strong>Shared local memory, cross-agent handoff, and code recovery across 43 coding agents.</strong></p>
+<p align="center"><strong>Shared local memory, session history search, cross-agent handoff, and code recovery across 43 coding agents.</strong></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="deja-vu cross-agent coding session memory"></p>
 
@@ -15,8 +15,9 @@ One Go binary. No LLM, no embeddings, no API key. The network is used only by co
 **58% fewer tokens** on a task this machine had already solved (53,558 against 126,222 with nothing wired, and 52,815 against 103,443 on a later build with the arms run alternately, eleven runs an arm each time). **97.2% R@5** on LongMemEval-S (**88.9% hit@1** on the 470-question cleaned set), **half the tokens** of agentmemory, and **13.6 s** to index 19,195 sessions across gigabytes of history.
 
 ```sh
-npx @vshulcz/deja-vu "connection pool exhausted"   # search, no install
-npm install -g @vshulcz/deja-vu                    # then: deja install --auto
+npx @vshulcz/deja-vu audit                         # inspect local stores, retention risk & recoverable files, no install
+npx @vshulcz/deja-vu "connection pool exhausted"   # search existing sessions, no install
+npx @vshulcz/deja-vu install --auto                # stage ~/.local/bin/deja & wire every installed agent
 ```
 
 `deja install --auto` wires MCP recall into every coding agent it finds on the
