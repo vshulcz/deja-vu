@@ -575,6 +575,9 @@ func measureCompactionRecovery(dir string, input toolHookInput) {
 		path = state.TranscriptPath
 	}
 	current, err := sources.ReadCompactionTranscript(path, input.SessionID)
+	if err == nil && current.Workspace == "" && state.Harness == "antigravity" {
+		current.Workspace = state.Workspace
+	}
 	if err != nil {
 		sourceTag := ""
 		if strings.TrimSpace(path) != "" {

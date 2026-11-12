@@ -190,6 +190,22 @@ func ReadCompactionTranscript(path, nativeSessionID string) (CompactionTranscrip
 	if session.ID != nativeSessionID {
 		return CompactionTranscript{}, compactionStage("verify_identity", fmt.Errorf("%w: got %q, want %q", ErrTranscriptIdentity, session.ID, nativeSessionID))
 	}
+	headerFP := hashCompactionBytes(header)
+	if harness == "antigravity" || harness == "gemini" {
+		headerLine := header
+		if len(headerLine) == 0 {
+			headerLine = tail
+		}
+		if i := bytes.IndexByte(headerLine, '\n'); i >= 0 {
+			headerLine = bytes.TrimSpace(headerLine[:i])
+		} else {
+			headerLine = bytes.TrimSpace(headerLine)
+		}
+		headerFP = hashCompactionBytes(headerLine)
+	}
+	if workspace == "" && harness == "gemini" {
+		workspace = GeminiProjectDir(path)
+	}
 	result := CompactionTranscript{
 		Session:             session,
 		Harness:             harness,
@@ -197,7 +213,7 @@ func ReadCompactionTranscript(path, nativeSessionID string) (CompactionTranscrip
 		Workspace:           workspace,
 		Path:                path,
 		Fingerprint:         compactionFingerprint(beforeSize, beforeMTime, header, tail),
-		HeaderFingerprint:   hashCompactionBytes(header),
+		HeaderFingerprint:   headerFP,
 		BoundaryFingerprint: compactionBoundaryFingerprint(tail, tailOffset, beforeSize),
 		SourceSize:          beforeSize,
 		SourceMTime:         beforeMTime,
@@ -320,14 +336,18 @@ func compactionHarness(header, tail []byte) (string, error) {
 			line, rest := bytes.TrimSpace(part[:i]), part[end:]
 			part = rest
 			var record struct {
-				Type      string `json:"type"`
-				SessionID string `json:"sessionId"`
-				Message   *struct {
+				Type        string `json:"type"`
+				SessionID   string `json:"sessionId"`
+				ProjectHash string `json:"projectHash"`
+				Message     *struct {
 					Parts json.RawMessage `json:"parts"`
 				} `json:"message"`
 			}
 			if json.Unmarshal(line, &record) != nil {
 				continue
+			}
+			if record.SessionID != "" && record.ProjectHash != "" {
+				return "gemini", nil
 			}
 			// Qwen Code kept Claude's sessionId and record types but writes a
 			// turn as Gemini parts. Read as Claude it came out empty; its own
@@ -342,6 +362,8 @@ func compactionHarness(header, tail []byte) (string, error) {
 				if record.SessionID != "" {
 					return "codebuddy", nil
 				}
+			case "USER_INPUT", "PLANNER_RESPONSE", "CHECKPOINT":
+				return "antigravity", nil
 			}
 			// Codex writes session_meta first. Recognize it before generic
 			// session-shaped records, while Claude's file-history/progress
@@ -385,6 +407,10 @@ func parseCompactionSession(originalPath, harness, workspace string, data []byte
 		sessions = own
 	case "qwen":
 		sessions, err = parseQwenScan(originalPath, compactionMapScanner(originalPath, data))
+	case "antigravity":
+		sessions, err = parseAntigravityWith(originalPath, compactionMapScanner(originalPath, data))
+	case "gemini":
+		sessions, err = parseGeminiJSONLWith(originalPath, compactionMapScanner(originalPath, data))
 	default:
 		return model.Session{}, ErrUnsupportedCompactionTranscript
 	}
@@ -510,6 +536,10 @@ func scanCompactionToolLines(harness string, data []byte, base int64, nativeSess
 			got, declaredWorkspace, err = codexCompactionToolCalls(line, start, end, nativeSessionID)
 		case "codebuddy":
 			got, declaredWorkspace, err = codeBuddyCompactionToolCalls(line, start, end, nativeSessionID)
+		case "antigravity":
+			got, declaredWorkspace = antigravityCompactionToolCalls(line, start, end)
+		case "gemini":
+			got, err = geminiCompactionToolCalls(line, start, end, nativeSessionID)
 		}
 		if err != nil {
 			return nil, "", false, err
@@ -638,6 +668,105 @@ func codexCompactionToolCalls(line []byte, start, end int64, nativeSessionID str
 	return []TranscriptToolCall{{ID: id, Name: record.Payload.Name, At: parseTimeAny(rawJSONTime(record.Timestamp)), StartOffset: start, EndOffset: end}}, "", nil
 }
 
+func antigravityCompactionToolCalls(line []byte, start, end int64) ([]TranscriptToolCall, string) {
+	var record struct {
+		Type      string          `json:"type"`
+		CreatedAt json.RawMessage `json:"created_at"`
+		ToolCalls []struct {
+			ID   string         `json:"id"`
+			Name string         `json:"name"`
+			Args map[string]any `json:"args"`
+		} `json:"tool_calls"`
+	}
+	if json.Unmarshal(line, &record) != nil {
+		return nil, ""
+	}
+	if record.Type != "PLANNER_RESPONSE" || len(record.ToolCalls) == 0 {
+		return nil, ""
+	}
+	at := parseTimeAny(rawJSONTime(record.CreatedAt))
+	var out []TranscriptToolCall
+	declared := ""
+	for n, tc := range record.ToolCalls {
+		if tc.Name == "" {
+			continue
+		}
+		id := tc.ID
+		if id == "" {
+			id = fmt.Sprintf("@%d:%d", start, n)
+		}
+		if declared == "" && tc.Args != nil {
+			for _, k := range []string{"TargetFile", "AbsolutePath", "Path", "cwd", "Cwd", "where"} {
+				p := decodeURIPath(strings.TrimPrefix(antigravityArg(tc.Args, k), "file://"))
+				if p == "" {
+					continue
+				}
+				if repo := RepoRoot(filepath.Dir(p)); repo != "" {
+					declared = repo
+					break
+				}
+			}
+		}
+		out = append(out, TranscriptToolCall{ID: id, Name: tc.Name, At: at, StartOffset: start, EndOffset: end})
+	}
+	return out, declared
+}
+
+func geminiCompactionToolCalls(line []byte, start, end int64, nativeSessionID string) ([]TranscriptToolCall, error) {
+	var record struct {
+		SessionID string          `json:"sessionId"`
+		Type      string          `json:"type"`
+		Timestamp json.RawMessage `json:"timestamp"`
+		ToolCalls []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"toolCalls"`
+		Content json.RawMessage `json:"content"`
+	}
+	if json.Unmarshal(line, &record) != nil {
+		return nil, nil //nolint:nilerr // a line that does not decode carries no calls
+	}
+	if record.SessionID != "" && record.SessionID != nativeSessionID {
+		return nil, ErrTranscriptIdentity
+	}
+	if record.Type != "gemini" {
+		return nil, nil
+	}
+	at := parseTimeAny(rawJSONTime(record.Timestamp))
+	var out []TranscriptToolCall
+	for n, tc := range record.ToolCalls {
+		if tc.Name == "" {
+			continue
+		}
+		id := tc.ID
+		if id == "" {
+			id = fmt.Sprintf("@%d:%d", start, n)
+		}
+		out = append(out, TranscriptToolCall{ID: id, Name: tc.Name, At: at, StartOffset: start, EndOffset: end})
+	}
+	if len(out) == 0 && len(record.Content) > 0 {
+		var parts []struct {
+			FunctionCall *struct {
+				ID   string `json:"id"`
+				Name string `json:"name"`
+			} `json:"functionCall"`
+		}
+		if json.Unmarshal(record.Content, &parts) == nil {
+			for n, p := range parts {
+				if p.FunctionCall == nil || p.FunctionCall.Name == "" {
+					continue
+				}
+				id := p.FunctionCall.ID
+				if id == "" {
+					id = fmt.Sprintf("@%d:%d", start, n)
+				}
+				out = append(out, TranscriptToolCall{ID: id, Name: p.FunctionCall.Name, At: at, StartOffset: start, EndOffset: end})
+			}
+		}
+	}
+	return out, nil
+}
+
 func rawJSONTime(raw json.RawMessage) any {
 	var value any
 	if json.Unmarshal(raw, &value) != nil {
@@ -735,7 +864,7 @@ func IsCompactionEditTool(name string) bool {
 		name = name[i+1:]
 	}
 	switch name {
-	case "edit", "write", "multiedit", "notebookedit", "apply_patch", "applypatch", "search_replace", "strreplace", "replace", "replace_in_file", "write_file":
+	case "edit", "write", "multiedit", "notebookedit", "apply_patch", "applypatch", "search_replace", "strreplace", "replace", "replace_in_file", "write_file", "edit_file", "write_to_file", "replace_file_content", "multi_replace_file_content":
 		return true
 	default:
 		return false

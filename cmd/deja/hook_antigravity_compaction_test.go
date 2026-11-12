@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
 // Antigravity has no compaction event. It writes a CHECKPOINT step and keeps
@@ -64,5 +65,16 @@ func TestAntigravityCompactionIsCaughtUpAtTheNextInvocation(t *testing.T) {
 	}
 	if again := invoke(); strings.Contains(again, "Compaction context") {
 		t.Fatalf("the same compaction was handed back twice: %s", again)
+	}
+	editPath := filepath.ToSlash(filepath.Join(workspace, "parser", "parse.go"))
+	write(
+		`{"source":"SYSTEM","type":"CHECKPOINT","created_at":"2026-10-07T10:05:00Z","content":"summary of the work so far"}`,
+		`{"source":"MODEL","type":"PLANNER_RESPONSE","created_at":"2026-10-07T10:05:01Z","content":"reading file","tool_calls":[{"name":"read_file","args":{"Path":"`+editPath+`"}}]}`,
+		`{"source":"MODEL","type":"PLANNER_RESPONSE","created_at":"2026-10-07T10:05:02Z","content":"fixing file","tool_calls":[{"name":"edit_file","args":{"Path":"`+editPath+`","Target":"a","Replacement":"b"}}]}`,
+	)
+	_ = invoke()
+	sum := usage.CompactionRecoverySummary(dir)
+	if sum == nil || sum.Measured != 1 || sum.MedianActions != 1 {
+		t.Fatalf("expected 1 measured Antigravity compaction recovery with 1 action before edit, got %+v", sum)
 	}
 }

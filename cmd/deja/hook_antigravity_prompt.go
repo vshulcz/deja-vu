@@ -163,9 +163,13 @@ func editFileCallLines(dir string, calls []sources.EditCall, conversationID, wor
 		if c.NewString != "" {
 			toolInput["new_string"] = c.NewString
 		}
+		toolName := "Edit"
+		if c.ToolName != "" && !sources.IsCompactionEditTool(c.ToolName) {
+			toolName = "read_file"
+		}
 		payload, err := json.Marshal(map[string]any{
 			"hook_event_name": "PreToolUse",
-			"tool_name":       "Edit",
+			"tool_name":       toolName,
 			"tool_input":      toolInput,
 			"session_id":      conversationID,
 			"cwd":             workspace,

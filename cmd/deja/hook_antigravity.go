@@ -115,7 +115,19 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 		if recovery != "" {
 			steps = append(steps, antigravityInjectStep{EphemeralMessage: recovery})
 		}
-		if line := editFileCallLines(dir, latestEditCallsFromSteps(tailSteps), input.ConversationID, projectWorkspace); line != "" {
+		editCalls := latestEditCallsFromSteps(tailSteps)
+		for _, c := range editCalls {
+			if sources.IsCompactionEditTool(c.ToolName) {
+				measureCompactionRecovery(dir, toolHookInput{
+					SessionID:      input.ConversationID,
+					TranscriptPath: input.TranscriptPath,
+					CWD:            compactionWS,
+					ToolName:       c.ToolName,
+				})
+				break
+			}
+		}
+		if line := editFileCallLines(dir, editCalls, input.ConversationID, projectWorkspace); line != "" {
 			steps = append(steps, antigravityInjectStep{EphemeralMessage: line})
 		}
 		if block != "" {

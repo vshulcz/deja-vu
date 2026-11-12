@@ -424,6 +424,16 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 	// The walk is told what has already gone out rather than being filtered
 	// after the fact: it returns one line, and dropping that line used to end
 	// the call, so a repeated fact took the line behind it with it (#3603).
+	if strings.TrimSpace(input.SessionID) == "" {
+		switch {
+		case strings.TrimSpace(input.TranscriptPath) != "":
+			input.SessionID = "anon-tool:" + shortHash(filepath.Clean(input.TranscriptPath))
+		case strings.TrimSpace(hookProjectPath(input.CWD, input.WorkspaceRoots)) != "":
+			input.SessionID = "anon-tool:" + shortHash(filepath.Clean(hookProjectPath(input.CWD, input.WorkspaceRoots)))
+		default:
+			input.SessionID = "anon-tool:default"
+		}
+	}
 	injected := alreadyInjected(dir, input.SessionID)
 	used := func(line string) bool { return injected["tool:"+shortHash(dedupeFact(line))] }
 	line := toolHookLineSkipping(dir, hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots)), input, used)
