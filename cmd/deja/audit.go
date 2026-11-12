@@ -70,6 +70,11 @@ func runAudit(dir string, args []string, stdout io.Writer) error {
 		return enc.Encode(rep)
 	}
 	printAuditReport(stdout, rep)
+	if rep.TotalFiles >= 50 {
+		if tip := maybeStarTip(dir, 15); tip != "" {
+			fmt.Fprintln(os.Stderr, "\n"+strings.TrimSpace(tip))
+		}
+	}
 	return nil
 }
 

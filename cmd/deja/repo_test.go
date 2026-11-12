@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -474,6 +475,23 @@ func TestRepoAutoSyncAndToggle(t *testing.T) {
 	writeClaudeFixture(t, filepath.Join(folder, "s1.jsonl"), "s1", lines)
 	t.Chdir(root)
 	dir := os.Getenv("DEJA_INDEX_DIR")
+	if err := index.Ensure(dir, "", true, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Zero-footprint default (#6037): background evolution and `deja repo` do
+	// not create .deja/memory.jsonl in an untouched repository unless opted in.
+	autoEvolveRepoMemory(dir, root)
+	if _, statErr := os.Stat(sources.RepoMemoryPath(root)); !os.IsNotExist(statErr) {
+		t.Fatalf("untouched repo created .deja/memory.jsonl without opt-in: err=%v", statErr)
+	}
+	listOut, err := captureRun(t, "repo")
+	if err != nil || !strings.Contains(listOut, "no .deja/memory.jsonl") {
+		t.Fatalf("repo list on untouched repo: %q, %v", listOut, err)
+	}
+	if _, statErr := os.Stat(filepath.Join(root, ".deja")); !os.IsNotExist(statErr) {
+		t.Fatalf("deja repo created .deja/ on untouched repo: err=%v", statErr)
+	}
 
 	syncOut, err := captureRun(t, "repo", "sync")
 	if err != nil || !strings.Contains(syncOut, "synced .deja/memory.jsonl") {
