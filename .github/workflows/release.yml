@@ -111,11 +111,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "${GITHUB_REF_NAME}" dist/deja-spec-kit.zip --clobber
 
-      - name: Pack and publish VS Code extension
+      - name: Build and attach VS Code extension
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OVSX_PAT: ${{ secrets.OVSX_PAT }}
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
           cd extensions/vscode
           node -e '
@@ -126,32 +124,21 @@ jobs:
           '
           npx --yes @vscode/vsce package --no-dependencies -o "$GITHUB_WORKSPACE/dist/deja-status.vsix"
           gh release upload "${GITHUB_REF_NAME}" "$GITHUB_WORKSPACE/dist/deja-status.vsix" --clobber
-          if [ -n "${OVSX_PAT:-}" ]; then
-            npx --yes ovsx create-namespace vshulcz -p "$OVSX_PAT" || true
-            npx --yes ovsx publish "$GITHUB_WORKSPACE/dist/deja-status.vsix" -p "$OVSX_PAT"
-          fi
-          if [ -n "${VSCE_PAT:-}" ]; then
-            npx --yes @vscode/vsce publish --packagePath "$GITHUB_WORKSPACE/dist/deja-status.vsix" -p "$VSCE_PAT"
-          fi
 
       - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
           java-version: 21
 
-      - name: Build and publish JetBrains plugin
+      - name: Build and attach JetBrains plugin
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          JETBRAINS_TOKEN: ${{ secrets.JETBRAINS_TOKEN }}
         run: |
           version="${GITHUB_REF_NAME#v}"
           cd extensions/jetbrains
           ./gradlew buildPlugin -PpluginVersion="$version" --no-daemon
           cp build/distributions/deja-jetbrains-*.zip "$GITHUB_WORKSPACE/dist/deja-jetbrains.zip"
           gh release upload "${GITHUB_REF_NAME}" "$GITHUB_WORKSPACE/dist/deja-jetbrains.zip" --clobber
-          if [ -n "${JETBRAINS_TOKEN:-}" ]; then
-            ./gradlew publishPlugin -PpluginVersion="$version" --no-daemon
-          fi
 
       - name: Attach the manifests to the release
         env:
@@ -395,29 +382,36 @@ jobs:
               echo "vshulcz.deja-status $version is already on OpenVSX"
             else
               npx --yes ovsx create-namespace vshulcz -p "$OVSX_PAT" || true
-              npx --yes ovsx publish "$RUNNER_TEMP/deja-status.vsix" -p "$OVSX_PAT" || true
+              if ! out="$(npx --yes ovsx publish "$RUNNER_TEMP/deja-status.vsix" -p "$OVSX_PAT" 2>&1)"; then
+                echo "$out"
+                echo "::warning::OpenVSX publish did not activate $version (ensure Open VSX Publisher Agreement is signed at https://open-vsx.org/user-settings/profile)"
+              else
+                echo "$out"
+              fi
             fi
           fi
           if [ -n "${VSCE_PAT:-}" ]; then
-            npx --yes @vscode/vsce publish --packagePath "$RUNNER_TEMP/deja-status.vsix" -p "$VSCE_PAT" || true
+            npx --yes @vscode/vsce publish --packagePath "$RUNNER_TEMP/deja-status.vsix" -p "$VSCE_PAT"
+          else
+            echo "::notice::VSCE_PAT is not set; skipping Visual Studio Marketplace publish"
           fi
 
       - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        if: ${{ secrets.JETBRAINS_TOKEN != '' }}
         with:
           distribution: temurin
           java-version: 21
 
-      - name: Build, attach, and publish the JetBrains plugin
+      - name: Publish the JetBrains plugin
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           JETBRAINS_TOKEN: ${{ secrets.JETBRAINS_TOKEN }}
         run: |
           set -euo pipefail
           version="${TAG#v}"
-          cd extensions/jetbrains
-          ./gradlew buildPlugin -PpluginVersion="$version" --no-daemon
-          cp build/distributions/deja-jetbrains-*.zip "$RUNNER_TEMP/deja-jetbrains.zip"
-          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" "$RUNNER_TEMP/deja-jetbrains.zip" --clobber
           if [ -n "${JETBRAINS_TOKEN:-}" ]; then
-            ./gradlew publishPlugin -PpluginVersion="$version" --no-daemon || true
+            cd extensions/jetbrains
+            ./gradlew publishPlugin -PpluginVersion="$version" --no-daemon
+          else
+            echo "::notice::JETBRAINS_TOKEN is not set; skipping JetBrains Marketplace publish"
           fi

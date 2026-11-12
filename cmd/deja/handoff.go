@@ -135,6 +135,9 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 			fmt.Fprintf(os.Stderr, "\nhand it off:\n  %s \"$(deja handoff --to %s%s)\"\nor run it now: deja handoff --to %s%s --exec\n",
 				strings.Join(head, " "), target, prefixArg(prefix), target, prefixArg(prefix))
 		}
+		if tip := maybeStarTip(dir, 15); tip != "" {
+			fmt.Fprintln(os.Stderr, strings.TrimSpace(tip))
+		}
 		return nil
 	}
 	argv, _ := handoffArgv(target, digest)

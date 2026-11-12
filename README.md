@@ -377,7 +377,7 @@ for people who install extensions there rather than from a CLI:
 | Hermes | memory provider `deja-memory`, in the Hermes plugin catalog | `hermes plugins install deja-memory`, or from GitHub: `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 | Magpie | npm `@vshulcz/magpie-deja` | `magpie plugin add @vshulcz/magpie-deja` |
 | VS Code / Cursor / Windsurf | status bar extension `vshulcz.deja-status` | `code --install-extension vshulcz.deja-status` |
-| JetBrains IDEs | IntelliJ, GoLand, PyCharm, WebStorm &amp; RustRover plugin ([`extensions/jetbrains/`](extensions/jetbrains/)) | `idea installPlugins com.github.vshulcz.deja-vu` |
+| JetBrains IDEs | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/35998-deja-vu-cross-agent-ai-session-memory) (`com.github.vshulcz.deja-vu`) | `idea installPlugins com.github.vshulcz.deja-vu` |
 | Neovim | `lazy.nvim` &amp; CodeCompanion plugin ([`extensions/nvim/`](extensions/nvim/)) | `{ "vshulcz/deja-vu", opts = {} }` |
 | tmux | [TPM](https://github.com/tmux-plugins/tpm) popup (`prefix + D`) &amp; `#{deja_status}` (`deja.tmux`) | `set -g @plugin 'vshulcz/deja-vu'` |
 | Raycast | Raycast extension `deja-vu` | `cd extensions/raycast && npm install && npx ray develop` |

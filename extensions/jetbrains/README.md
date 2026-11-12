@@ -27,9 +27,10 @@ brew install deja-vu && deja install --auto
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 ```
 
-2. Install the JetBrains plugin (`com.github.vshulcz.deja-vu`):
+2. Install the JetBrains plugin ([`com.github.vshulcz.deja-vu` on JetBrains Marketplace](https://plugins.jetbrains.com/plugin/35998-deja-vu-cross-agent-ai-session-memory)):
 
-- **From the IDE**: **Settings → Plugins → Marketplace** → search `deja-vu`, or **Settings → Plugins → ⚙️ → Install Plugin from Disk...** using `deja-jetbrains.zip` from [GitHub Releases](https://github.com/vshulcz/deja-vu/releases/latest).
+- **From JetBrains Marketplace**: [Install directly from plugins.jetbrains.com](https://plugins.jetbrains.com/plugin/35998-deja-vu-cross-agent-ai-session-memory), or open **Settings → Plugins → Marketplace** → search `deja-vu`.
+- **From Disk**: **Settings → Plugins → ⚙️ → Install Plugin from Disk...** using `deja-jetbrains.zip` from [GitHub Releases](https://github.com/vshulcz/deja-vu/releases/latest).
 - **From the CLI**:
 
 ```sh

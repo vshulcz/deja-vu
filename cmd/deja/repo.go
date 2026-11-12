@@ -89,9 +89,17 @@ func runRepoToggle(w io.Writer, sub string, args []string, off bool) error {
 		return err
 	}
 	if off {
-		fmt.Fprintf(w, "automatic %s updates are off for %s — `deja repo on` turns them back on\n", repoFileShown, search.SafeLine(sources.ClaudeProjectName(root)))
+		if fileThere(sources.RepoMemoryPath(root)) {
+			fmt.Fprintf(w, "automatic %s updates are off for %s — `deja repo on` turns them back on (`rm -rf .deja` removes the local folder)\n", repoFileShown, search.SafeLine(sources.ClaudeProjectName(root)))
+		} else {
+			fmt.Fprintf(w, "automatic %s updates are off for %s\n", repoFileShown, search.SafeLine(sources.ClaudeProjectName(root)))
+		}
 	} else {
-		fmt.Fprintf(w, "automatic %s updates are on for %s\n", repoFileShown, search.SafeLine(sources.ClaudeProjectName(root)))
+		if !fileThere(sources.RepoMemoryPath(root)) {
+			fmt.Fprintf(w, "automatic %s updates are allowed for %s — run `deja repo sync` or `deja repo add` to create %s\n", repoFileShown, search.SafeLine(sources.ClaudeProjectName(root)), repoFileShown)
+		} else {
+			fmt.Fprintf(w, "automatic %s updates are on for %s\n", repoFileShown, search.SafeLine(sources.ClaudeProjectName(root)))
+		}
 	}
 	return nil
 }
@@ -358,10 +366,11 @@ func repoEntryFromCandidate(c repoCandidate) sources.RepoEntry {
 	}
 }
 
-// autoEvolveRepoMemory quietly evolves .deja/memory.jsonl from the local index
-// unless disabled via `deja repo off`, DEJA_REPO=off, or policy. Under `go test`
-// binaries it only evolves when .deja/memory.jsonl already exists (or when
-// DEJA_REPO=on is explicitly set).
+// autoEvolveRepoMemory quietly evolves an existing .deja/memory.jsonl from the
+// local index unless disabled via `deja repo off`, DEJA_REPO=off, or policy.
+// It never creates .deja/ in an untouched repository unless DEJA_REPO=on is
+// explicitly set; `deja repo sync`, `deja repo init`, or `deja repo add` opts
+// a repository in by creating the file (#6037).
 func autoEvolveRepoMemory(dir, cwd string) {
 	if redact.Disabled() {
 		return
@@ -373,11 +382,8 @@ func autoEvolveRepoMemory(dir, cwd string) {
 	if !policy.Load().Allows(policy.ActivationAuto, sources.RepoMemoryProject(root)) {
 		return
 	}
-	inTestBinary := strings.HasSuffix(strings.TrimSuffix(os.Args[0], ".exe"), ".test")
-	if inTestBinary && strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_REPO"))) != "on" {
-		if !fileThere(sources.RepoMemoryPath(root)) {
-			return
-		}
+	if strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_REPO"))) != "on" && !fileThere(sources.RepoMemoryPath(root)) {
+		return
 	}
 	if !index.HasManifest(dir) || !index.IsCurrentVersion(dir) || index.Damaged(dir) {
 		return

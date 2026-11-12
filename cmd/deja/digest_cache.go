@@ -196,9 +196,6 @@ func cachedHookDigestFor(dir, fromPayload string, exclude ...string) (string, in
 	if !index.HasManifest(dir) || !index.IsCurrentVersion(dir) || index.Damaged(dir) {
 		requestWarmup(dir)
 	}
-	if root := sources.RepoRoot(cwd); root != "" && !fileThere(sources.RepoMemoryPath(root)) && !sources.RepoAutoDisabled(root) {
-		requestHookRefresh(dir, cwd)
-	}
 	gate := hookGate() + repoMemoryStamp(cwd)
 	p := hookCachePath(dir, cwd)
 	if b, err := os.ReadFile(p); err == nil {

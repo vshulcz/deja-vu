@@ -90,7 +90,7 @@ func mcpOrient(dir, name string, raw json.RawMessage) (string, int, error) {
 	}
 	files := orientFiles(dir, scope, cwd)
 	if cwd != "" {
-		if root := sources.RepoRoot(cwd); root != "" && !fileThere(sources.RepoMemoryPath(root)) {
+		if root := sources.RepoRoot(cwd); root != "" && fileThere(sources.RepoMemoryPath(root)) {
 			autoEvolveRepoMemory(dir, cwd)
 		}
 	}

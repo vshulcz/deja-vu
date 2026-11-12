@@ -8,8 +8,22 @@ import (
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
 )
 
+func starTipTTY(f *os.File) bool {
+	if f == nil {
+		return false
+	}
+	if os.Getenv("CI") != "" || os.Getenv("TERM") == "dumb" {
+		return false
+	}
+	fi, err := f.Stat()
+	if err != nil {
+		return false
+	}
+	return fi.Mode()&os.ModeCharDevice != 0
+}
+
 func starTipLine(dir string, served int) string {
-	if served < 25 || dir == "" {
+	if served < 15 || dir == "" {
 		return ""
 	}
 	stamp := filepath.Join(dir, "star-tip-shown")
@@ -23,7 +37,7 @@ func starTipLine(dir string, served int) string {
 }
 
 func maybeStarTip(dir string, served int) string {
-	if flag.Lookup("test.v") != nil {
+	if flag.Lookup("test.v") != nil || !starTipTTY(os.Stderr) {
 		return ""
 	}
 	return starTipLine(dir, served)

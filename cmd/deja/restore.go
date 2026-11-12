@@ -172,6 +172,9 @@ func runRestore(dir string, args []string, stdout io.Writer) error {
 	}
 	fmt.Fprintf(stdout, "wrote %d B to %s — this is what the agent recorded, not the file%s\n",
 		len(span.body), out, redactionNote(span.body))
+	if tip := maybeStarTip(dir, 15); tip != "" {
+		fmt.Fprintln(os.Stderr, strings.TrimSpace(tip))
+	}
 	return nil
 }
 
