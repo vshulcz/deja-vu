@@ -396,8 +396,17 @@ jobs:
             echo "::notice::VSCE_PAT is not set; skipping Visual Studio Marketplace publish"
           fi
 
+      - name: Check JetBrains token
+        id: jb
+        env:
+          JETBRAINS_TOKEN: ${{ secrets.JETBRAINS_TOKEN }}
+        run: |
+          if [ -n "${JETBRAINS_TOKEN:-}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
-        if: ${{ secrets.JETBRAINS_TOKEN != '' }}
+        if: steps.jb.outputs.enabled == 'true'
         with:
           distribution: temurin
           java-version: 21

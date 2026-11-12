@@ -25,6 +25,41 @@
     <summary>Every deja subcommand: search, ctx, blame, fix, how, secrets, remember, forget, stats, last, sources, install, embed, sync, doctor, bench and update.</summary>
   </entry>
   <entry>
+    <title>Cursor state.vscdb Too Large? Shrink or Clean It Safely</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html"></link>
+    <updated>2026-11-12T00:00:00Z</updated>
+    <summary>Why Cursor&#39;s state.vscdb and state.vscdb.backup hit 10–125 GB, why deleting it wipes every chat, and step-by-step SQLite commands to shrink it safely.</summary>
+  </entry>
+  <entry>
+    <title>Recover a deleted Claude Code CLI session — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html"></link>
+    <updated>2026-11-12T00:00:00Z</updated>
+    <summary>A Claude Code CLI session (not a claude.ai chat) missing from --resume: where its ~/.claude/projects file went, and how to write it back from an index.</summary>
+  </entry>
+  <entry>
+    <title>Project memory committed in the repository — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/repo-memory.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/repo-memory.html"></link>
+    <updated>2026-11-12T00:00:00Z</updated>
+    <summary>Commit picked decisions and dropped approaches into .deja/memory.jsonl, so whoever clones the repository gets them in their own agent&#39;s recall.</summary>
+  </entry>
+  <entry>
+    <title>How to Delete Claude Code Sessions (CLI, VS Code) — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html"></link>
+    <updated>2026-11-12T00:00:00Z</updated>
+    <summary>Delete one Claude Code session or purge a project (CLI, VS Code): why /clear and --resume keep old chats, what project purge wipes, and how to keep history.</summary>
+  </entry>
+  <entry>
+    <title>Where Claude Code and Codex store sessions — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html"></link>
+    <updated>2026-11-12T00:00:00Z</updated>
+    <summary>Where each coding agent keeps its conversation history file, in forty-three formats, and how to read them without the tool that wrote them.</summary>
+  </entry>
+  <entry>
     <title>Install deja and index your agent history — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/getting-started.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/getting-started.html"></link>
@@ -81,13 +116,6 @@
     <summary>deja-vu next to claude-mem, agentmemory, MemPalace, Mem0, Letta, CASS, ctx and agentsview: what each captures, where it keeps it, how it scores.</summary>
   </entry>
   <entry>
-    <title>Cursor state.vscdb Too Large? Shrink or Clean It Safely</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html"></link>
-    <updated>2026-11-09T00:00:00Z</updated>
-    <summary>Why Cursor&#39;s state.vscdb and state.vscdb.backup hit 10–125 GB, why deleting it wipes every chat, and step-by-step SQLite commands to shrink it safely.</summary>
-  </entry>
-  <entry>
     <title>Delete or Purge Codex CLI Sessions — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html"></link>
@@ -130,13 +158,6 @@
     <summary>How to give Muse Code recall over every coding agent&#39;s sessions on the machine — the MCP server and hooks in settings.json, and the skill in ~/.agents/skills.</summary>
   </entry>
   <entry>
-    <title>How to Delete Claude Code Sessions (CLI, VS Code) — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html"></link>
-    <updated>2026-11-09T00:00:00Z</updated>
-    <summary>Delete one Claude Code session or purge a project (CLI, VS Code): why /clear and --resume keep old chats, what project purge wipes, and how to keep history.</summary>
-  </entry>
-  <entry>
     <title>Auditing what a coding agent actually did — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/auditing-agents.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/auditing-agents.html"></link>
@@ -149,13 +170,6 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/find-a-session.html"></link>
     <updated>2026-11-05T00:00:00Z</updated>
     <summary>Search past chat history across Claude Code, Codex, Cursor and 40 other agents by the error string, function name, file path or flag you remember.</summary>
-  </entry>
-  <entry>
-    <title>Project memory committed in the repository — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/repo-memory.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/repo-memory.html"></link>
-    <updated>2026-11-05T00:00:00Z</updated>
-    <summary>Commit picked decisions and dropped approaches into .deja/memory.jsonl, so whoever clones the repository gets them in their own agent&#39;s recall.</summary>
   </entry>
   <entry>
     <title>SpecStory alternative for CLI &amp; 43 agents — deja-vu</title>
@@ -275,19 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-dsh.html"></link>
     <updated>2026-11-05T00:00:00Z</updated>
     <summary>如何让 dsh 能查到这台机器上每个编程智能体已经写下的会话记录：插件怎么装、装完多了哪些工具，以及它和 CLI 安装并存时的行为。</summary>
-  </entry>
-  <entry>
-    <title>给 Kimi Code 加记忆：召回这台机器上所有智能体的历史会话 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-kimi.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-kimi.html"></link>
-    <updated>2026-11-05T00:00:00Z</updated>
-    <summary>如何让 Kimi Code 查到这台机器上每个编程智能体的会话：插件怎么装、每次提问都会触发的那个钩子，以及走 CLI 的那条路。</summary>
-  </entry>
-  <entry>
-    <title>给 Qwen Code 加记忆：召回这台机器上所有智能体的历史会话 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-qwen.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-qwen.html"></link>
-    <updated>2026-11-05T00:00:00Z</updated>
-    <summary>如何让 Qwen Code 查到这台机器上每个编程智能体的会话：走 Gemini 扩展格式，也走 Claude 格式的插件市场。</summary>
   </entry>
 </feed>

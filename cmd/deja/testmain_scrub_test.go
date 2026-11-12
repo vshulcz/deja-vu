@@ -13,7 +13,7 @@ import (
 )
 
 // harmless are variables the code reads that cannot point it at a store.
-var harmless = map[string]bool{"COLUMNS": true, "NO_COLOR": true, "TERM": true}
+var harmless = map[string]bool{"CI": true, "COLUMNS": true, "NO_COLOR": true, "TERM": true}
 
 // TestScrubHelperProcess runs only as the child of the test below: it reports
 // every variable that reached it with the value the parent planted.
