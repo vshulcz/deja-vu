@@ -17,6 +17,7 @@ Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes and 36 more a
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/coverage-88%25-brightgreen" alt="Coverage"></a>
   <a href="https://github.com/vshulcz/deja-vu/releases"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
+  <a href="https://github.com/NipunaRanasinghe/awesome-ai-agents"><img src="https://img.shields.io/badge/Featured_in-Awesome_AI_Agents-2ea44f" alt="Featured in Awesome AI Agents"></a>
   &middot;
   <a href="https://vshulcz.github.io/deja-vu/"><b>Website</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>Live demo</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/getting-started.html">Docs</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Compare</a> &middot; <a href="docs/ARCHITECTURE.md">Architecture</a>
 </p>
