@@ -32,6 +32,13 @@
     <summary>Why Cursor&#39;s state.vscdb and state.vscdb.backup hit 10–125 GB, why deleting it wipes every chat, and step-by-step SQLite commands to shrink it safely.</summary>
   </entry>
   <entry>
+    <title>Delete DeepSeek Harness session history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-dsh-session-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-dsh-session-history.html"></link>
+    <updated>2026-11-12T00:00:00Z</updated>
+    <summary>DeepSeek Harness (dsh) keeps each session in its own directory. Find it, remove one session or all, and what deja does not touch.</summary>
+  </entry>
+  <entry>
     <title>Recover a deleted Claude Code CLI session — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html"></link>
@@ -282,12 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-cursor.html"></link>
     <updated>2026-11-05T00:00:00Z</updated>
     <summary>如何让 Cursor 查到这台机器上每个编程智能体的会话：它的 SQLite 聊天记录存在哪，以及 deja install cursor-auto 写入了什么。</summary>
-  </entry>
-  <entry>
-    <title>给 DeepSeek Harness 加记忆：召回这台机器上所有智能体的历史会话 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-dsh.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-dsh.html"></link>
-    <updated>2026-11-05T00:00:00Z</updated>
-    <summary>如何让 dsh 能查到这台机器上每个编程智能体已经写下的会话记录：插件怎么装、装完多了哪些工具，以及它和 CLI 安装并存时的行为。</summary>
   </entry>
 </feed>
