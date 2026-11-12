@@ -8,7 +8,7 @@ Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on Long
 
 [deja](https://github.com/vshulcz/deja-vu) indexes the session files that
 coding agents already write to disk — Claude Code, Codex, Cursor, opencode and
-thirty-nine more — and answers from them. This extension serves that index to Zed's
+forty-two more — and answers from them. This extension serves that index to Zed's
 agent panel as a context server, so a thread can search what you did before,
 including work from before deja was installed.
 

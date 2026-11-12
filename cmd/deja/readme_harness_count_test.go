@@ -20,6 +20,8 @@ var countWords = map[int]string{
 	33: "thirty-three", 34: "thirty-four", 35: "thirty-five", 36: "thirty-six",
 	37: "thirty-seven", 38: "thirty-eight", 39: "thirty-nine", 40: "forty",
 	41: "forty-one", 42: "forty-two", 43: "forty-three", 44: "forty-four",
+	45: "forty-five", 46: "forty-six", 47: "forty-seven", 48: "forty-eight",
+	49: "forty-nine", 50: "fifty",
 }
 
 // countWord is the word for a count, or a failure naming what to add.
@@ -189,7 +191,7 @@ func TestPagesCountHarnessesInDigitsCorrectly(t *testing.T) {
 		}
 		for _, m := range claim.FindAllStringSubmatch(string(b), -1) {
 			got, err := strconv.Atoi(m[1])
-			if err != nil || got < 10 || got > 40 {
+			if err != nil || got < 10 || got > 50 {
 				// Not a claim about how many harnesses there are: "3 agents"
 				// in a sentence about someone else's tool, a version, a count
 				// of something entirely different.
@@ -274,7 +276,7 @@ func TestNpmReadmeLeadsWithWhatTheMainOneLeadsWith(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, line := range []string{
-		"Shared local memory, session history search, cross-agent handoff, and code recovery across 43 coding agents.",
+		"Shared local memory, session history search, cross-agent handoff, and code recovery across 46 coding agents.",
 	} {
 		if !strings.Contains(string(main), line) {
 			t.Fatalf("the main README no longer says %q — update this test with it", line)
@@ -324,20 +326,11 @@ func TestPluginPagesCountTheOtherHarnesses(t *testing.T) {
 func harnessCountWords(t *testing.T, root string, offset int) (string, map[int]string) {
 	t.Helper()
 	n := registryHarnessCount(t, root) + offset
-	words := map[int]string{
-		15: "fifteen", 16: "sixteen", 17: "seventeen", 18: "eighteen",
-		19: "nineteen", 20: "twenty", 21: "twenty-one", 22: "twenty-two",
-		23: "twenty-three", 24: "twenty-four", 25: "twenty-five", 26: "twenty-six", 27: "twenty-seven",
-		28: "twenty-eight", 29: "twenty-nine", 30: "thirty", 31: "thirty-one", 32: "thirty-two",
-		33: "thirty-three", 34: "thirty-four", 35: "thirty-five", 36: "thirty-six",
-		37: "thirty-seven", 38: "thirty-eight", 39: "thirty-nine", 40: "forty",
-		41: "forty-one", 42: "forty-two", 43: "forty-three", 44: "forty-four",
-	}
-	want, ok := words[n]
+	want, ok := countWords[n]
 	if !ok {
 		t.Fatalf("the count is %d and this test has no word for it; add one", n)
 	}
-	return want, words
+	return want, countWords
 }
 
 // The per-harness pages say it a third way — "twenty of them today" — and ten

@@ -493,7 +493,7 @@ func doctorSQLite3() doctorComponent {
 // storeNeedsSQLite3 names the harnesses deja reads through the sqlite3 CLI.
 func storeNeedsSQLite3(name string) bool {
 	switch name {
-	case "opencode", "cursor", "grok", "hermes", "goose", "zed", "kilocode", "zcode":
+	case "opencode", "cursor", "grok", "hermes", "goose", "zed", "kilocode", "zcode", "mimo", "omnigent", "orca":
 		return true
 	}
 	return false
@@ -609,6 +609,9 @@ func doctorStoreChecks() []doctorStoreCheck {
 		// Devin keeps one SQLite store too, beside which a second file can be
 		// the store: the legacy name the pre-rename builds wrote.
 		{"devin", []string{sources.DevinSessionsDB(), sources.DevinLegacySessionsDB()}, sources.DevinFiles, doctorProbeDevin},
+		{"mimo", []string{sources.MimoDB()}, func() []string { return presentDoctorFile(sources.MimoDB()) }, doctorProbeMimo},
+		{"omnigent", []string{sources.OmnigentDB()}, func() []string { return presentDoctorFile(sources.OmnigentDB()) }, sources.ParseOmnigentDB},
+		{"orca", []string{sources.OrcaDB()}, func() []string { return presentDoctorFile(sources.OrcaDB()) }, sources.ParseOrcaDB},
 		{"deja", []string{sources.NotesFile()}, func() []string { return presentDoctorFile(sources.NotesFile()) }, sources.ParseNotesFile},
 	}
 	// A store DEJA_STORES silences has no row: it is not missing, not empty and
@@ -691,6 +694,10 @@ func doctorProbeZed(path string) ([]model.Session, error) {
 // format.
 func doctorProbeDevin(path string) ([]model.Session, error) {
 	return sources.ParseDevinDB(path)
+}
+
+func doctorProbeMimo(path string) ([]model.Session, error) {
+	return sources.ParseOpencodeNewest(path)
 }
 
 // anotherFileOpens reports whether any file besides one already known to be

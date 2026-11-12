@@ -219,6 +219,9 @@ func TestDoctorJSONGolden(t *testing.T) {
 	// under %APPDATA%\devin; both normalise to the posix homes the golden keeps.
 	got = strings.ReplaceAll(got, "<tmp>/home/AppData/Local/devin", "<tmp>/home/.local/share/devin")
 	got = strings.ReplaceAll(got, "<tmp>/home/AppData/Roaming/devin", "<tmp>/home/.config/devin")
+	// Orca's userData directory on macOS and Windows normalises to ~/.config/orca.
+	got = strings.ReplaceAll(got, "<tmp>/home/Library/Application Support/orca", "<tmp>/home/.config/orca")
+	got = strings.ReplaceAll(got, "<tmp>/home/AppData/Roaming/orca", "<tmp>/home/.config/orca")
 	wantRaw, err := os.ReadFile(filepath.Join("testdata", "doctor.json"))
 	if err != nil {
 		t.Fatal(err)

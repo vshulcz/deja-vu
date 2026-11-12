@@ -344,7 +344,7 @@ func sessionFiles(s model.Session, others []model.Session) ([]string, error) {
 // and Hermes and Zed are left to their own tools.
 type cliStore struct{ bin string }
 
-var cliStores = map[string]cliStore{"opencode": {"opencode"}}
+var cliStores = map[string]cliStore{"opencode": {"opencode"}, "mimo": {"mimo"}}
 
 func (c cliStore) run(args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(context.Background(), c.bin, args...)

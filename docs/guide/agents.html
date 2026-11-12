@@ -32,7 +32,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Agents & MCP", "description": "How deja gives your coding agents a searchable memory over MCP: one deja tool with recall, context, blame, fix, how, orient, remember and handoff modes, plus session-start auto-recall.", "url": "https://vshulcz.github.io/deja-vu/guide/agents.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/agents.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-07-19", "dateModified": "2026-10-28"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Agents & MCP", "description": "How deja gives your coding agents a searchable memory over MCP: one deja tool with recall, context, blame, fix, how, orient, remember and handoff modes, plus session-start auto-recall.", "url": "https://vshulcz.github.io/deja-vu/guide/agents.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/agents.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-07-19", "dateModified": "2026-11-12"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Agents & MCP","item":"https://vshulcz.github.io/deja-vu/guide/agents.html"}]}</script>
 </head>
 <body>
@@ -77,7 +77,7 @@
 <a href="recover-overwritten-files.html">Recover overwritten files</a>
 <a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
-<details class="grpfold"><summary>Deleting sessions <span class="n">36</span></summary>
+<details class="grpfold"><summary>Deleting sessions <span class="n">39</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
 <a href="delete-old-claude-sessions.html">Old sessions</a>
 <a href="delete-codex-sessions.html">Codex</a>
@@ -114,8 +114,11 @@
 <a href="delete-openclaw-session-history.html">OpenClaw</a>
 <a href="delete-grok-session-history.html">Grok Build</a>
 <a href="delete-devin-session-history.html">Devin CLI</a>
+<a href="delete-mimo-session-history.html">MiMo-Code</a>
+<a href="delete-omnigent-session-history.html">Omnigent</a>
+<a href="delete-orca-session-history.html">Orca</a>
 </details>
-<details class="grpfold"><summary>Per-agent guides <span class="n">43</span></summary>
+<details class="grpfold"><summary>Per-agent guides <span class="n">46</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
@@ -143,11 +146,14 @@
 <a href="memory-for-kimchi.html">Kimchi Coding</a>
 <a href="memory-for-kimi.html">Kimi Code</a>
 <a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-mimo.html">MiMo-Code</a>
 <a href="memory-for-mcode.html">MiniMax Code</a>
 <a href="memory-for-muse.html">Muse Code</a>
 <a href="memory-for-omp.html">omp</a>
+<a href="memory-for-omnigent.html">Omnigent</a>
 <a href="memory-for-openclaw.html">OpenClaw</a>
 <a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-orca.html">Orca</a>
 <a href="memory-for-pi.html">pi</a>
 <a href="memory-for-prime.html">prime-agent</a>
 <a href="memory-for-qwen.html">Qwen Code</a>
@@ -193,8 +199,8 @@
 <p><code>deja install --auto</code> wires recall into the moments an agent works, not only when it thinks to ask. Where a harness supports each hook, memory arrives on its own at five points:</p>
 <ul>
 <li><b>At session start</b> — relevant project memory before you type, ranked by the files your repo is touching, and led by the decisions you promoted <em>accepted</em> for this project, so the agent sees what was settled instead of re-deciding it. Read-only, capped at 2&nbsp;KB, and framed as reference data, not instructions: the agent names a decision that applies and asks before it changes a command, a file write or a config. The one exception is a check or build rule you typed yourself in an interactive Claude Code session of this project, marked <code>User said (this project)</code>, which the agent follows.</li>
-<li><b>On each prompt</b> — deja searches your history for what the prompt is actually about. The block is added only when the prompt names something the history holds (two of its lead words said in one message, or a path, a symbol or a rare word), and when it matches work already answered deja says so out loud, naming the agent it came from: <code>deja-vu — from Codex CLI, 4 months ago: "…"</code>. Wired wherever the harness hands a hook the prompt: in 33 of the 43 harnesses deja reads, and in part in 5 more, harness by harness in the per-prompt column under <a href="harnesses.html#hook-surfaces">hook surfaces</a>. Goose gets it under <code>deja goose</code>. The rest get the session-start half only, which is memory chosen before you typed. Grok Build runs the hook but discards what it prints.</li>
-<li><b>Before an edit or a command</b> — a PreToolUse hook names that exact file's or command's prior decision, the fix that held, the invocation that worked, or a program this machine does not have, so the agent acts on what was settled rather than re-deriving it. A decision stands from the second session; a bare count of sessions needs five, because a count is a number an agent can do nothing with. A missing program is not named while it is on the hook's <code>PATH</code>. Wired in 32 of the 43 harnesses, and in part in 5 more, listed in the pre-tool column under <a href="harnesses.html#hook-surfaces">hook surfaces</a>; opencode, pi, omp and Reasonix have no seam before an edit that reaches the model, so there the same line arrives with the tool's result.</li>
+<li><b>On each prompt</b> — deja searches your history for what the prompt is actually about. The block is added only when the prompt names something the history holds (two of its lead words said in one message, or a path, a symbol or a rare word), and when it matches work already answered deja says so out loud, naming the agent it came from: <code>deja-vu — from Codex CLI, 4 months ago: "…"</code>. Wired wherever the harness hands a hook the prompt: in 36 of the 46 harnesses deja reads, and in part in 5 more, harness by harness in the per-prompt column under <a href="harnesses.html#hook-surfaces">hook surfaces</a>. Goose gets it under <code>deja goose</code>. The rest get the session-start half only, which is memory chosen before you typed. Grok Build runs the hook but discards what it prints.</li>
+<li><b>Before an edit or a command</b> — a PreToolUse hook names that exact file's or command's prior decision, the fix that held, the invocation that worked, or a program this machine does not have, so the agent acts on what was settled rather than re-deriving it. A decision stands from the second session; a bare count of sessions needs five, because a count is a number an agent can do nothing with. A missing program is not named while it is on the hook's <code>PATH</code>. Wired in 35 of the 46 harnesses, and in part in 5 more, listed in the pre-tool column under <a href="harnesses.html#hook-surfaces">hook surfaces</a>; opencode, pi, omp and Reasonix have no seam before an edit that reaches the model, so there the same line arrives with the tool's result.</li>
 <li><b>When a command fails</b> — a PostToolUse hook reads the error and, if this machine has run something after that same error before without it coming back, says what that was. Measured over eighteen opportunities, an agent asked for that pair by tool exactly zero times: it does not occur to a model to check. Delivered at the failure it lands every time. A remedy that itself exited non-zero is not offered, nor one from another project, nor a merge, a force push or a deletion.</li>
 <li><b>Before a context compaction</b> (Claude Code, Codex, TRAE CLI, CodeBuddy, WorkBuddy, Muse Code, opencode, Kilo CLI, Cline CLI, Copilot CLI, VS Code Copilot Chat, Qwen Code, Kimi Code, Grok Build, Cursor CLI, pi, omp, Senpi, gajae-code, prime-agent, OpenClaw and DeepSeek Harness, Hermes through its memory provider, and Gemini CLI on the next prompt; Reasonix gets the same record added to its summarizer's instructions) — deja reads the transcript as the compaction starts and keeps the task, the conclusions, each command with whether it passed or failed, and what a turn said was still open; the open lines are carried until something closes them, for up to two compactions. The next hook for the same session and workspace hands that back once, in 4&nbsp;KB, with a line saying whether the repository moved since. See <a href="after-compaction.html">after compaction</a>.</li>
 </ul>

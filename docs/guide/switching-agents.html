@@ -78,7 +78,7 @@
 <a href="recover-overwritten-files.html">Recover overwritten files</a>
 <a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
-<details class="grpfold"><summary>Deleting sessions <span class="n">36</span></summary>
+<details class="grpfold"><summary>Deleting sessions <span class="n">39</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
 <a href="delete-old-claude-sessions.html">Old sessions</a>
 <a href="delete-codex-sessions.html">Codex</a>
@@ -115,8 +115,11 @@
 <a href="delete-openclaw-session-history.html">OpenClaw</a>
 <a href="delete-grok-session-history.html">Grok Build</a>
 <a href="delete-devin-session-history.html">Devin CLI</a>
+<a href="delete-mimo-session-history.html">MiMo-Code</a>
+<a href="delete-omnigent-session-history.html">Omnigent</a>
+<a href="delete-orca-session-history.html">Orca</a>
 </details>
-<details class="grpfold"><summary>Per-agent guides <span class="n">43</span></summary>
+<details class="grpfold"><summary>Per-agent guides <span class="n">46</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
@@ -144,11 +147,14 @@
 <a href="memory-for-kimchi.html">Kimchi Coding</a>
 <a href="memory-for-kimi.html">Kimi Code</a>
 <a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-mimo.html">MiMo-Code</a>
 <a href="memory-for-mcode.html">MiniMax Code</a>
 <a href="memory-for-muse.html">Muse Code</a>
 <a href="memory-for-omp.html">omp</a>
+<a href="memory-for-omnigent.html">Omnigent</a>
 <a href="memory-for-openclaw.html">OpenClaw</a>
 <a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-orca.html">Orca</a>
 <a href="memory-for-pi.html">pi</a>
 <a href="memory-for-prime.html">prime-agent</a>
 <a href="memory-for-qwen.html">Qwen Code</a>
@@ -203,7 +209,7 @@
 <h2>What it takes</h2>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja install --auto</pre>
-<p>The second command wires recall into every agent it finds on the machine and builds the index over all of their stores at once — <a href="where-sessions-are-stored.html">forty-three of them today</a>, including the sessions that predate the install. Nothing is copied between tools and no history is moved: one local index, read by whichever agent is asking.</p>
+<p>The second command wires recall into every agent it finds on the machine and builds the index over all of their stores at once — <a href="where-sessions-are-stored.html">forty-six of them today</a>, including the sessions that predate the install. Nothing is copied between tools and no history is moved: one local index, read by whichever agent is asking.</p>
 <p>Across machines rather than tools, <code>deja sync ssh &lt;host&gt;</code> moves the index itself, append-only and with no service in the middle.</p>
 
 <p><a href="forgetting.html">Why agents forget</a> · <a href="repeated-mistakes.html">When the same wall comes back</a> · <a href="agents.html">Which agent supports what</a></p>

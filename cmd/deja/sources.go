@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -240,6 +241,9 @@ func printSourcesTo(w io.Writer, dir string) {
 		{"deepseek", sources.DeepSeekRoot(), []string{sources.DeepSeekRoot()}, sources.DeepSeekSessionFiles, sources.LoadDeepSeek},
 		{"zed", sources.ZedDB(), []string{sources.ZedDB()}, func() []string { return presentFiles(sources.ZedDB()) }, sources.LoadZed},
 		{"devin", filepath.Dir(sources.DevinSessionsDB()), []string{filepath.Dir(sources.DevinSessionsDB())}, sources.DevinFiles, sources.LoadDevin},
+		{"mimo", sources.MimoDB(), []string{sources.MimoDB()}, func() []string { return presentFiles(sources.MimoDB()) }, sources.LoadMimo},
+		{"omnigent", sources.OmnigentDB(), []string{sources.OmnigentDB()}, func() []string { return presentFiles(sources.OmnigentDB()) }, sources.LoadOmnigent},
+		{"orca", sources.OrcaDB(), []string{sources.OrcaDB()}, func() []string { return presentFiles(sources.OrcaDB()) }, sources.LoadOrca},
 		// The location is the registry, not a store: Crush keeps one store per
 		// project, under the project, and the registry is the only thing that
 		// says where they are.
@@ -247,7 +251,10 @@ func printSourcesTo(w io.Writer, dir string) {
 		{"deja", sources.NotesFile(), []string{sources.NotesFile()}, func() []string { return presentFiles(sources.NotesFile()) }, sources.LoadNotes},
 	}
 	skipStore := sources.ExcludedHarnesses()
-	for _, it := range items {
+	rows := make([]string, len(items))
+	sem := make(chan struct{}, 8)
+	var wg sync.WaitGroup
+	for i, it := range items {
 		// A store DEJA_STORES leaves out has no row, as in doctor: it is not
 		// read, so it has no count to report.
 		if sources.StoreSilenced(it.name) {
@@ -258,59 +265,73 @@ func printSourcesTo(w io.Writer, dir string) {
 		// just been told never to open, which is the opposite of what this
 		// screen is for (#3499).
 		if skipStore[it.name] {
-			fmt.Fprintf(w, "%s\t%s\t%s\n", it.name, it.location, harnessExclusionReason(it.name))
+			rows[i] = fmt.Sprintf("%s\t%s\t%s\n", it.name, it.location, harnessExclusionReason(it.name))
 			continue
 		}
-		redacted := 0
-		for _, root := range it.roots {
-			redacted += redactionsUnder(redactions, root)
-		}
-		// Only paths that are files on this machine: a discovery rule can name
-		// something that is not one — hermes returns a token for a Postgres
-		// store — and neither a size nor a directory can be read off that.
-		read := presentFiles(it.files()...)
-		size := filesSize(read)
-		location := it.location
-		if where := commonDir(read); where != "" {
-			location = where
-		}
-		raw := it.load()
-		ss := sources.FilterSessions(raw)
-		excluded := len(raw) - len(ss)
-		msg := sources.CountMessages(ss)
-		note := ""
-		// `deja sources` is where the empty-machine advice sends people, and a
-		// store deja is not allowed to read looked exactly like one nobody has
-		// used: `sessions=0 messages=0 size=0 B` (#1000).
-		if denied, whole := firstDeniedDir(it.roots); denied != "" {
-			note = "\t(cannot be read — permission denied on " + denied + ")"
-		} else if !whole {
-			note = "\t(permissions not fully checked — too many directories to walk)"
-		}
-		if it.name == "cursor" && len(sources.CursorDBs()) > 0 && !sources.SQLite3Available() {
-			note = "\t(" + sources.SQLite3Problem() + " — Cursor IDE sessions unavailable)"
-		}
-		// Zed needs zstd as well as sqlite3: sqlite3 alone opens the store and
-		// reads nothing out of it, since every thread body is a compressed
-		// frame. SkipReason already words which of the two is missing.
-		if it.name == "zed" {
-			if reason := sources.SkipReason("zed"); reason != "" {
-				note = "\t(" + reason + " — Zed threads unavailable)"
+		wg.Go(func() {
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			redacted := 0
+			for _, root := range it.roots {
+				redacted += redactionsUnder(redactions, root)
 			}
-		}
-		if it.name == "windsurf" {
-			if reason := sources.SkipReason("windsurf"); reason != "" {
-				note = "\t(" + reason + " — those conversations unavailable)"
+			// Only paths that are files on this machine: a discovery rule can name
+			// something that is not one — hermes returns a token for a Postgres
+			// store — and neither a size nor a directory can be read off that.
+			allFiles := it.files()
+			read := presentFiles(allFiles...)
+			size := filesSize(read)
+			location := it.location
+			if where := commonDir(read); where != "" {
+				location = where
 			}
+			var raw []model.Session
+			if len(allFiles) > 0 {
+				raw = it.load()
+			}
+			ss := sources.FilterSessions(raw)
+			excluded := len(raw) - len(ss)
+			msg := sources.CountMessages(ss)
+			note := ""
+			// `deja sources` is where the empty-machine advice sends people, and a
+			// store deja is not allowed to read looked exactly like one nobody has
+			// used: `sessions=0 messages=0 size=0 B` (#1000).
+			if denied, whole := firstDeniedDir(it.roots); denied != "" {
+				note = "\t(cannot be read — permission denied on " + denied + ")"
+			} else if !whole {
+				note = "\t(permissions not fully checked — too many directories to walk)"
+			}
+			if it.name == "cursor" && len(sources.CursorDBs()) > 0 && !sources.SQLite3Available() {
+				note = "\t(" + sources.SQLite3Problem() + " — Cursor IDE sessions unavailable)"
+			}
+			// Zed needs zstd as well as sqlite3: sqlite3 alone opens the store and
+			// reads nothing out of it, since every thread body is a compressed
+			// frame. SkipReason already words which of the two is missing.
+			if it.name == "zed" {
+				if reason := sources.SkipReason("zed"); reason != "" {
+					note = "\t(" + reason + " — Zed threads unavailable)"
+				}
+			}
+			if it.name == "windsurf" {
+				if reason := sources.SkipReason("windsurf"); reason != "" {
+					note = "\t(" + reason + " — those conversations unavailable)"
+				}
+			}
+			if n := projectExcludePatterns(); n > 0 {
+				note += fmt.Sprintf("\texcluded-patterns=%d", n)
+			}
+			if excluded > 0 {
+				note += fmt.Sprintf("\texcluded-sessions=%d", excluded)
+			}
+			note += unreadNote(it.name)
+			rows[i] = fmt.Sprintf("%s\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", it.name, location, sources.CountSessions(ss), msg, humanBytes(size), redacted, note)
+		})
+	}
+	wg.Wait()
+	for _, row := range rows {
+		if row != "" {
+			_, _ = io.WriteString(w, row)
 		}
-		if n := projectExcludePatterns(); n > 0 {
-			note += fmt.Sprintf("\texcluded-patterns=%d", n)
-		}
-		if excluded > 0 {
-			note += fmt.Sprintf("\texcluded-sessions=%d", excluded)
-		}
-		note += unreadNote(it.name)
-		fmt.Fprintf(w, "%s\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", it.name, location, sources.CountSessions(ss), msg, humanBytes(size), redacted, note)
 	}
 	// The two rows below are written by hand rather than driven by the table
 	// above, and the exclusion has to reach them too: the store #3499 named is

@@ -33,7 +33,7 @@
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Open-source Mem0 alternative for coding agents", "description": "Local session memory across Claude Code, Codex, Cursor and 40 other agents from existing transcripts, with no LLM key, cloud API, or Docker stack.", "url": "https://vshulcz.github.io/deja-vu/guide/mem0-alternative.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/mem0-alternative.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-09", "dateModified": "2026-11-09"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Mem0 alternative", "item": "https://vshulcz.github.io/deja-vu/guide/mem0-alternative.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How does deja-vu differ from Mem0 and OpenMemory for coding agents?", "acceptedAnswer": {"@type": "Answer", "text": "Mem0 is an application memory SDK and platform whose coding-agent plugins capture sessions from install onward and call an LLM (or the Mem0 Platform API) to extract facts. deja-vu is a single 20 MB Go binary that indexes the session transcripts 43 coding agents already write to disk — including months of history before install — and recalls verbatim commands, error strings, and file edits with no LLM key or background service."}}, {"@type": "Question", "name": "Does deja-vu require an OpenAI API key, Mem0 Platform key, or Docker?", "acceptedAnswer": {"@type": "Answer", "text": "No. deja-vu runs locally as a single static binary backed by SQLite FTS5. It requires no LLM extraction key, no vector database container, and no background daemon."}}, {"@type": "Question", "name": "Can deja-vu share memory between Claude Code, Codex, and Cursor?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. deja-vu indexes the native transcript stores of 43 coding agents into one local index and wires into each agent via MCP and lifecycle hooks with deja install --auto."}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How does deja-vu differ from Mem0 and OpenMemory for coding agents?", "acceptedAnswer": {"@type": "Answer", "text": "Mem0 is an application memory SDK and platform whose coding-agent plugins capture sessions from install onward and call an LLM (or the Mem0 Platform API) to extract facts. deja-vu is a single 20 MB Go binary that indexes the session transcripts 46 coding agents already write to disk — including months of history before install — and recalls verbatim commands, error strings, and file edits with no LLM key or background service."}}, {"@type": "Question", "name": "Does deja-vu require an OpenAI API key, Mem0 Platform key, or Docker?", "acceptedAnswer": {"@type": "Answer", "text": "No. deja-vu runs locally as a single static binary backed by SQLite FTS5. It requires no LLM extraction key, no vector database container, and no background daemon."}}, {"@type": "Question", "name": "Can deja-vu share memory between Claude Code, Codex, and Cursor?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. deja-vu indexes the native transcript stores of 46 coding agents into one local index and wires into each agent via MCP and lifecycle hooks with deja install --auto."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -77,7 +77,7 @@
 <a href="recover-overwritten-files.html">Recover overwritten files</a>
 <a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
-<details class="grpfold"><summary>Deleting sessions <span class="n">36</span></summary>
+<details class="grpfold"><summary>Deleting sessions <span class="n">39</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
 <a href="delete-old-claude-sessions.html">Old sessions</a>
 <a href="delete-codex-sessions.html">Codex</a>
@@ -114,8 +114,11 @@
 <a href="delete-openclaw-session-history.html">OpenClaw</a>
 <a href="delete-grok-session-history.html">Grok Build</a>
 <a href="delete-devin-session-history.html">Devin CLI</a>
+<a href="delete-mimo-session-history.html">MiMo-Code</a>
+<a href="delete-omnigent-session-history.html">Omnigent</a>
+<a href="delete-orca-session-history.html">Orca</a>
 </details>
-<details class="grpfold"><summary>Per-agent guides <span class="n">43</span></summary>
+<details class="grpfold"><summary>Per-agent guides <span class="n">46</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
@@ -143,11 +146,14 @@
 <a href="memory-for-kimchi.html">Kimchi Coding</a>
 <a href="memory-for-kimi.html">Kimi Code</a>
 <a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-mimo.html">MiMo-Code</a>
 <a href="memory-for-mcode.html">MiniMax Code</a>
 <a href="memory-for-muse.html">Muse Code</a>
 <a href="memory-for-omp.html">omp</a>
+<a href="memory-for-omnigent.html">Omnigent</a>
 <a href="memory-for-openclaw.html">OpenClaw</a>
 <a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-orca.html">Orca</a>
 <a href="memory-for-pi.html">pi</a>
 <a href="memory-for-prime.html">prime-agent</a>
 <a href="memory-for-qwen.html">Qwen Code</a>
@@ -175,7 +181,7 @@
 <article>
 
 <h1>An open-source Mem0 alternative for coding agents</h1>
-<p class="pagelede">retroactive recall over 43 coding agents on disk, with no LLM extraction key, cloud account, or Docker stack<span class="mins" data-mins></span></p>
+<p class="pagelede">retroactive recall over 46 coding agents on disk, with no LLM extraction key, cloud account, or Docker stack<span class="mins" data-mins></span></p>
 
 <p>Mem0 (and its OpenMemory MCP layer) is a general-purpose memory platform for AI applications: your code or a plugin sends conversation turns to it, and a model extracts facts into a vector and graph store. For coding agents, Mem0 ships plugins that capture sessions from install onward through lifecycle hooks and send them to the Mem0 Platform API or a self-hosted extraction pipeline.</p>
 <p><a href="https://github.com/vshulcz/deja-vu">deja-vu</a> solves the coding-agent problem from the other end. Claude Code, Codex CLI, Cursor, OpenCode, Gemini CLI, Windsurf and thirty-seven other coding agents already write full session transcripts to local disk. deja indexes those existing files into a local SQLite FTS5 store in seconds and hands relevant fixes, file history, and past decisions back to your agents over MCP and hooks — with no model call and no background service.</p>
@@ -186,12 +192,12 @@
 <table>
 <tr><th></th><th>deja-vu</th><th>Mem0 / OpenMemory</th></tr>
 <tr><td>Primary design target</td><td>coding agents on a developer's machine (CLI, TUI, MCP server, lifecycle hooks)</td><td>memory SDK and hosted/self-hosted service for LLM applications, plus coding-agent plugins</td></tr>
-<tr><td>Where memory comes from</td><td>the JSONL and SQLite transcripts 43 coding agents already write to disk, plus optional <code>deja remember</code> and <a href="repo-memory.html"><code>.deja/memory.jsonl</code></a></td><td>turns sent via <code>memory.add()</code>, OpenMemory MCP calls, or forward-capture hooks after plugin install</td></tr>
+<tr><td>Where memory comes from</td><td>the JSONL and SQLite transcripts 46 coding agents already write to disk, plus optional <code>deja remember</code> and <a href="repo-memory.html"><code>.deja/memory.jsonl</code></a></td><td>turns sent via <code>memory.add()</code>, OpenMemory MCP calls, or forward-capture hooks after plugin install</td></tr>
 <tr><td>First-day recall (<a href="day-zero.html">day zero</a>)</td><td>months of prior sessions are searchable immediately after <code>deja index</code></td><td>starts empty on install until new sessions are captured and extracted</td></tr>
 <tr><td>What is stored</td><td>verbatim commands, compiler/test error output, file edits, and session turns (with credentials redacted)</td><td>LLM-extracted facts and user-profile memories</td></tr>
 <tr><td>Requires an LLM or API key</td><td>no (BM25 lexical + code-identifier ranking out of the box; embeddings via <code>deja embed</code> are opt-in)</td><td>yes: Mem0 Platform API key for the hosted plugin, or an LLM + embedding key when self-hosted (<code>gpt-5-mini</code> by default)</td></tr>
 <tr><td>Infrastructure</td><td>single 20 MB Go binary and one local SQLite file</td><td>hosted cloud service, or Python/Node SDK + vector store / Docker stack</td></tr>
-<tr><td>Coding agents covered</td><td>43 harnesses (<a href="harnesses.html">full list</a>)</td><td>plugins for Claude Code, Cursor, Codex, Kimi, opencode, Antigravity, OpenClaw; OpenMemory MCP for Cursor, VS Code and Claude</td></tr>
+<tr><td>Coding agents covered</td><td>46 harnesses (<a href="harnesses.html">full list</a>)</td><td>plugins for Claude Code, Cursor, Codex, Kimi, opencode, Antigravity, OpenClaw; OpenMemory MCP for Cursor, VS Code and Claude</td></tr>
 <tr><td>License</td><td>MIT</td><td>Apache-2.0</td></tr>
 </table>
 

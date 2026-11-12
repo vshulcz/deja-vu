@@ -77,7 +77,7 @@
 <a href="recover-overwritten-files.html">Recover overwritten files</a>
 <a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
-<details class="grpfold" open><summary>Deleting sessions <span class="n">36</span></summary>
+<details class="grpfold" open><summary>Deleting sessions <span class="n">39</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
 <a href="delete-old-claude-sessions.html">Old sessions</a>
 <a href="delete-codex-sessions.html">Codex</a>
@@ -114,8 +114,11 @@
 <a href="delete-openclaw-session-history.html">OpenClaw</a>
 <a href="delete-grok-session-history.html">Grok Build</a>
 <a href="delete-devin-session-history.html">Devin CLI</a>
+<a href="delete-mimo-session-history.html">MiMo-Code</a>
+<a href="delete-omnigent-session-history.html">Omnigent</a>
+<a href="delete-orca-session-history.html">Orca</a>
 </details>
-<details class="grpfold"><summary>Per-agent guides <span class="n">43</span></summary>
+<details class="grpfold"><summary>Per-agent guides <span class="n">46</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
@@ -143,11 +146,14 @@
 <a href="memory-for-kimchi.html">Kimchi Coding</a>
 <a href="memory-for-kimi.html">Kimi Code</a>
 <a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-mimo.html">MiMo-Code</a>
 <a href="memory-for-mcode.html">MiniMax Code</a>
 <a href="memory-for-muse.html">Muse Code</a>
 <a href="memory-for-omp.html">omp</a>
+<a href="memory-for-omnigent.html">Omnigent</a>
 <a href="memory-for-openclaw.html">OpenClaw</a>
 <a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-orca.html">Orca</a>
 <a href="memory-for-pi.html">pi</a>
 <a href="memory-for-prime.html">prime-agent</a>
 <a href="memory-for-qwen.html">Qwen Code</a>
@@ -206,7 +212,7 @@ rm -f state.db state.db-wal state.db-shm</pre>
 <p>The conversation turns, the <code>terminal</code> commands and their exit codes, the <code>patch</code> and <code>write_file</code> diffs, and the pre-compaction turns archived in <code>messages</code>. Once deleted, <code>hermes --resume &lt;id&gt;</code> can no longer reopen the session, and Hermes's own in-agent session search will no longer find it.</p>
 
 <h2>Keeping it searchable instead</h2>
-<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads <code>state.db</code> across your default home and every profile — along with the other forty-two agents' histories on the machine — into one local index:</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads <code>state.db</code> across your default home and every profile — along with the other forty-five agents' histories on the machine — into one local index:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "hermes session about the migration"</pre>
 <p><a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> removes a session from the index for good. A session you removed in Hermes stays readable with <code>deja show</code> and under the Deleted tab of bare <code>deja</code>; <code>deja resume</code> refuses a deleted session with a pointer to <code>deja show</code> rather than handing back a <code>hermes --resume</code> command that Hermes will reject, and deja never writes rows back into <code>state.db</code>. <code>DEJA_HERMES_HOME</code>, <code>DEJA_HERMES_PROFILES_ROOT</code>, <code>DEJA_HERMES_DB</code> and <code>DEJA_HERMES_PG_DSN</code> let you point deja at a backup database or a Postgres store without moving Hermes.</p>

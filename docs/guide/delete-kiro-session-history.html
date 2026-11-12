@@ -77,7 +77,7 @@
 <a href="recover-overwritten-files.html">Recover overwritten files</a>
 <a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
-<details class="grpfold" open><summary>Deleting sessions <span class="n">36</span></summary>
+<details class="grpfold" open><summary>Deleting sessions <span class="n">39</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
 <a href="delete-old-claude-sessions.html">Old sessions</a>
 <a href="delete-codex-sessions.html">Codex</a>
@@ -114,8 +114,11 @@
 <a href="delete-openclaw-session-history.html">OpenClaw</a>
 <a href="delete-grok-session-history.html">Grok Build</a>
 <a href="delete-devin-session-history.html">Devin CLI</a>
+<a href="delete-mimo-session-history.html">MiMo-Code</a>
+<a href="delete-omnigent-session-history.html">Omnigent</a>
+<a href="delete-orca-session-history.html">Orca</a>
 </details>
-<details class="grpfold"><summary>Per-agent guides <span class="n">43</span></summary>
+<details class="grpfold"><summary>Per-agent guides <span class="n">46</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
@@ -143,11 +146,14 @@
 <a href="memory-for-kimchi.html">Kimchi Coding</a>
 <a href="memory-for-kimi.html">Kimi Code</a>
 <a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-mimo.html">MiMo-Code</a>
 <a href="memory-for-mcode.html">MiniMax Code</a>
 <a href="memory-for-muse.html">Muse Code</a>
 <a href="memory-for-omp.html">omp</a>
+<a href="memory-for-omnigent.html">Omnigent</a>
 <a href="memory-for-openclaw.html">OpenClaw</a>
 <a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-orca.html">Orca</a>
 <a href="memory-for-pi.html">pi</a>
 <a href="memory-for-prime.html">prime-agent</a>
 <a href="memory-for-qwen.html">Qwen Code</a>
@@ -199,7 +205,7 @@
 <p>The sessions are the record of what was tried and what worked. A CLI session you remove can no longer be reopened with <code>kiro-cli chat --resume-id</code>. There is no archive: a removed session is gone, not moved.</p>
 
 <h2>Keeping it searchable instead</h2>
-<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads both Kiro trees, along with the other forty-two agents' histories on the machine, into one local index. It is searchable from the shell and readable by the agents themselves over MCP:</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads both Kiro trees, along with the other forty-five agents' histories on the machine, into one local index. It is searchable from the shell and readable by the agents themselves over MCP:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "Kiro session about the migration"</pre>
 <p>Nothing to switch on first: the sessions are already on disk, including the months before deja was installed. <a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> drops a session from the index for good. A CLI session you deleted stays under the Deleted tab of the screen bare <code>deja</code> opens, and <code>R</code> writes its conversation back so <code>kiro-cli</code> can resume it, including a <code>kiro-cli --v3</code> session listed in its session index; Kiro IDE sessions are not written back.</p>

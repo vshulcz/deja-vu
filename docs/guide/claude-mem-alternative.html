@@ -36,7 +36,7 @@
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "claude-mem alternative for Codex, Cursor, opencode", "description": "No model, worker or sign-in: deja-vu indexes the sessions Codex, Cursor, opencode and 40 other agents already keep, including those from before install.", "url": "https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-29", "dateModified": "2026-11-03"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "claude-mem alternative", "item": "https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "What is a claude-mem alternative that works without an API key?", "acceptedAnswer": {"@type": "Answer", "text": "deja-vu indexes the session files Claude Code, Codex, Cursor, opencode and 39 other agents already write, verbatim and with secrets redacted, and serves them back over MCP and session-start hooks. No model writes the memory, so it needs no key, no sign-in and no background worker."}}, {"@type": "Question", "name": "What is a lightweight alternative to claude-mem that does not require Bun, Node.js, or background workers?", "acceptedAnswer": {"@type": "Answer", "text": "deja-vu ships as a single 20 MB Go binary with no Bun, Node.js, Python or background daemon. It indexes local transcripts on demand and serves recall over stdio MCP and short-lived CLI hooks."}}, {"@type": "Question", "name": "Does claude-mem remember sessions from before it was installed?", "acceptedAnswer": {"@type": "Answer", "text": "No. It records through hooks from install on, so on the first day it has nothing to answer from. deja-vu reads the transcripts already on disk, so older sessions are searchable right after the first index."}}, {"@type": "Question", "name": "Does deja-vu work across Codex, Cursor, Gemini CLI, and OpenCode in addition to Claude Code?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. deja-vu natively parses 43 coding agents — including Claude Code, Codex, Cursor, Gemini CLI, OpenCode, Windsurf, Cline, Roo Code and Zed — into one shared local index, so context from one agent is searchable in any other."}}, {"@type": "Question", "name": "Can I run deja-vu and claude-mem together?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. deja-vu reads ~/.claude-mem/claude-mem.db read-only and never modifies it. Both add context at session start; deja install --all wires deja without its session-start recall if two blocks is too much."}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "What is a claude-mem alternative that works without an API key?", "acceptedAnswer": {"@type": "Answer", "text": "deja-vu indexes the session files Claude Code, Codex, Cursor, opencode and 39 other agents already write, verbatim and with secrets redacted, and serves them back over MCP and session-start hooks. No model writes the memory, so it needs no key, no sign-in and no background worker."}}, {"@type": "Question", "name": "What is a lightweight alternative to claude-mem that does not require Bun, Node.js, or background workers?", "acceptedAnswer": {"@type": "Answer", "text": "deja-vu ships as a single 20 MB Go binary with no Bun, Node.js, Python or background daemon. It indexes local transcripts on demand and serves recall over stdio MCP and short-lived CLI hooks."}}, {"@type": "Question", "name": "Does claude-mem remember sessions from before it was installed?", "acceptedAnswer": {"@type": "Answer", "text": "No. It records through hooks from install on, so on the first day it has nothing to answer from. deja-vu reads the transcripts already on disk, so older sessions are searchable right after the first index."}}, {"@type": "Question", "name": "Does deja-vu work across Codex, Cursor, Gemini CLI, and OpenCode in addition to Claude Code?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. deja-vu natively parses 46 coding agents — including Claude Code, Codex, Cursor, Gemini CLI, OpenCode, Windsurf, Cline, Roo Code and Zed — into one shared local index, so context from one agent is searchable in any other."}}, {"@type": "Question", "name": "Can I run deja-vu and claude-mem together?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. deja-vu reads ~/.claude-mem/claude-mem.db read-only and never modifies it. Both add context at session start; deja install --all wires deja without its session-start recall if two blocks is too much."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -80,7 +80,7 @@
 <a href="recover-overwritten-files.html">Recover overwritten files</a>
 <a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
-<details class="grpfold"><summary>Deleting sessions <span class="n">36</span></summary>
+<details class="grpfold"><summary>Deleting sessions <span class="n">39</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
 <a href="delete-old-claude-sessions.html">Old sessions</a>
 <a href="delete-codex-sessions.html">Codex</a>
@@ -117,8 +117,11 @@
 <a href="delete-openclaw-session-history.html">OpenClaw</a>
 <a href="delete-grok-session-history.html">Grok Build</a>
 <a href="delete-devin-session-history.html">Devin CLI</a>
+<a href="delete-mimo-session-history.html">MiMo-Code</a>
+<a href="delete-omnigent-session-history.html">Omnigent</a>
+<a href="delete-orca-session-history.html">Orca</a>
 </details>
-<details class="grpfold"><summary>Per-agent guides <span class="n">43</span></summary>
+<details class="grpfold"><summary>Per-agent guides <span class="n">46</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
@@ -146,11 +149,14 @@
 <a href="memory-for-kimchi.html">Kimchi Coding</a>
 <a href="memory-for-kimi.html">Kimi Code</a>
 <a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-mimo.html">MiMo-Code</a>
 <a href="memory-for-mcode.html">MiniMax Code</a>
 <a href="memory-for-muse.html">Muse Code</a>
 <a href="memory-for-omp.html">omp</a>
+<a href="memory-for-omnigent.html">Omnigent</a>
 <a href="memory-for-openclaw.html">OpenClaw</a>
 <a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-orca.html">Orca</a>
 <a href="memory-for-pi.html">pi</a>
 <a href="memory-for-prime.html">prime-agent</a>
 <a href="memory-for-qwen.html">Qwen Code</a>
@@ -225,7 +231,7 @@ deja install --auto</pre>
 <h3 id="search-sessions-before-install">Can deja-vu search sessions from before it was installed?</h3>
 <p>Yes. Because coding agents already write their transcripts to disk, <code>deja index</code> indexes months of existing Claude Code, Codex and Cursor sessions on the first run.</p>
 <h3 id="cross-agent-support">Does deja-vu work across Codex, Cursor, Gemini CLI, and OpenCode in addition to Claude Code?</h3>
-<p>Yes. deja-vu natively parses 43 coding agents — including <a href="memory-for-claude-code.html">Claude Code</a>, <a href="memory-for-codex.html">Codex</a>, <a href="memory-for-cursor.html">Cursor</a>, <a href="memory-for-gemini.html">Gemini CLI</a> and <a href="memory-for-opencode.html">opencode</a> — into one shared local index, so a fix or decision in one agent is recalled in the others (<a href="switching-agents.html">switching agents</a>).</p>
+<p>Yes. deja-vu natively parses 46 coding agents — including <a href="memory-for-claude-code.html">Claude Code</a>, <a href="memory-for-codex.html">Codex</a>, <a href="memory-for-cursor.html">Cursor</a>, <a href="memory-for-gemini.html">Gemini CLI</a> and <a href="memory-for-opencode.html">opencode</a> — into one shared local index, so a fix or decision in one agent is recalled in the others (<a href="switching-agents.html">switching agents</a>).</p>
 
 <p><a href="compare.html">Every memory tool, compared</a> · <a href="day-zero.html">Day zero</a> · <a href="token-cost.html">What memory costs</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>

@@ -3685,6 +3685,249 @@
           "note": "a compaction rewrites the transcript in place and the summary that takes the cut turns' place is indexed under the summary role, so the turns it replaced stay findable"
         }
       }
+    },
+    {
+      "id": "mimo",
+      "store_paths": [
+        "~/.local/share/mimocode/mimocode.db",
+        "${XDG_DATA_HOME}/mimocode/mimocode.db",
+        "${MIMOCODE_HOME}/mimocode.db",
+        "${MIMOCODE_DB}",
+        "${DEJA_MIMO_DB}"
+      ],
+      "format_kind": "sqlite",
+      "fixture_paths": [
+        "fixtures/registry/mimo/mimo.sql"
+      ],
+      "parser_source": "internal/sources/mimo.go",
+      "last_verified": "2026-11-12",
+      "display_name": "MiMo-Code",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": true,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": "sqlite3"
+      },
+      "gaps": {},
+      "surfaces": {
+        "digest": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "prompt": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "pre_tool": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "failure": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_reset": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_capture": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_packet": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "handoff": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "deja handoff --exec opens it with the packet as the first prompt"
+        },
+        "session_end": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "rules": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "statusline": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "the mimo-auto target installs the opencode 1.x TUI status plugin in ~/.config/mimocode/plugins/deja-status.tsx"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture"
+        }
+      }
+    },
+    {
+      "id": "omnigent",
+      "store_paths": [
+        "${OMNIGENT_DATA_DIR:-~/.omnigent}/chat.db",
+        "${DEJA_OMNIGENT_ROOT}/chat.db",
+        "${DEJA_OMNIGENT_DB}"
+      ],
+      "format_kind": "sqlite",
+      "fixture_paths": [
+        "fixtures/registry/omnigent/omnigent.sql"
+      ],
+      "parser_source": "internal/sources/omnigent.go",
+      "last_verified": "2026-11-12",
+      "display_name": "Omnigent",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": true,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": "sqlite3"
+      },
+      "gaps": {},
+      "surfaces": {
+        "digest": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "prompt": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "pre_tool": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "failure": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_reset": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_capture": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_packet": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "handoff": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "session_end": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "rules": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "statusline": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture"
+        }
+      }
+    },
+    {
+      "id": "orca",
+      "store_paths": [
+        "~/Library/Application Support/Orca/agent-session-journal.db",
+        "${XDG_CONFIG_HOME:-~/.config}/Orca/agent-session-journal.db",
+        "%APPDATA%/Orca/agent-session-journal.db",
+        "${DEJA_ORCA_ROOT}/agent-session-journal.db",
+        "${DEJA_ORCA_DB}"
+      ],
+      "format_kind": "sqlite",
+      "fixture_paths": [
+        "fixtures/registry/orca/orca.sql"
+      ],
+      "parser_source": "internal/sources/orca.go",
+      "last_verified": "2026-11-12",
+      "display_name": "Orca",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": true,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": "sqlite3"
+      },
+      "gaps": {},
+      "surfaces": {
+        "digest": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "prompt": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "pre_tool": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "failure": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_reset": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_capture": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_packet": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "handoff": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "session_end": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "rules": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "statusline": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture"
+        }
+      }
     }
   ]
 }

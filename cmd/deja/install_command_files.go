@@ -98,6 +98,12 @@ func commandFilePath(harness string) string {
 		// config home the way it does for every other tool that keeps its
 		// directory there.
 		return filepath.Join(opencodeConfigHome(), "kilo", "commands", "deja.md")
+	case "mimo":
+		return filepath.Join(sources.MimoConfigDir(), "commands", "deja.md")
+	case "omnigent":
+		return filepath.Join(sources.OmnigentRoot(), "commands", "deja.md")
+	case "orca":
+		return filepath.Join(sources.OrcaRoot(), "commands", "deja.md")
 	case "gjc":
 		// Evidence for the directory is its own plugin marketplace's
 		// verification script (devswha/oh-my-gjc INSTALLATION.md), which after

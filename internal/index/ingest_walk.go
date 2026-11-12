@@ -164,6 +164,8 @@ func setDatabaseStoreWatermarks(files map[string]FileState, sessions map[string]
 	if cm := sources.ClaudeMemDBPath(); cm != "" {
 		setStoreLastUpdated(files, sessions, "claude", cm)
 	}
+	setStoreLastUpdated(files, sessions, "omnigent", sources.OmnigentDB())
+	setStoreLastUpdated(files, sessions, "orca", sources.OrcaDB())
 }
 
 // sessionInStore reports whether a row came from the store being stamped.

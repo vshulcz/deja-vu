@@ -93,7 +93,7 @@ func doctorCommandFiles() []doctorCommandFile {
 	}
 	// The shared table, in the order `deja install --all` walks it.
 	for _, name := range []string{
-		"opencode", "cursor", "roo", "kilocode", "crush",
+		"opencode", "cursor", "roo", "kilocode", "mimo", "omnigent", "orca", "crush",
 		"omp", "gjc", "commandcode", "codebuddy", "workbuddy", "zcode", "junie", "kiro", "codewhale", "windsurf",
 	} {
 		if p := commandFilePath(name); p != "" {

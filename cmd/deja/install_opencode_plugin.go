@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -422,6 +424,40 @@ function settleRecall(tail, extra) {
 }
 `
 
+var (
+	opencodeSemverRe     = regexp.MustCompile(`(\d+)\.\d+\.\d+`)
+	opencodeVersionCache sync.Map
+)
+
+func opencodeVersionFromPath(exe string) int {
+	resolved, err := filepath.EvalSymlinks(exe)
+	if err != nil || resolved == "" {
+		resolved = exe
+	}
+	if m := opencodeSemverRe.FindStringSubmatch(resolved); m != nil {
+		if n, convErr := strconv.Atoi(m[1]); convErr == nil && n > 0 {
+			return n
+		}
+	}
+	for _, rel := range []string{"package.json", filepath.Join("..", "package.json")} {
+		b, readErr := os.ReadFile(filepath.Join(filepath.Dir(resolved), rel))
+		if readErr != nil {
+			continue
+		}
+		var pkg struct {
+			Version string `json:"version"`
+		}
+		if json.Unmarshal(b, &pkg) == nil {
+			if m := opencodeSemverRe.FindStringSubmatch(pkg.Version); m != nil {
+				if n, convErr := strconv.Atoi(m[1]); convErr == nil && n > 0 {
+					return n
+				}
+			}
+		}
+	}
+	return 0
+}
+
 // opencodeVersionMajorReal is the major version of the opencode on PATH, or 0
 // when there is no opencode to ask.
 var opencodeVersionMajorReal = func() int {
@@ -439,20 +475,35 @@ var opencodeVersionMajorReal = func() int {
 	if err != nil {
 		return 0
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	if n := opencodeVersionFromPath(exe); n > 0 {
+		return n
+	}
+	key := exe
+	if fi, statErr := os.Stat(exe); statErr == nil {
+		key = fmt.Sprintf("%s|%d|%d", exe, fi.Size(), fi.ModTime().UnixNano())
+	}
+	if v, ok := opencodeVersionCache.Load(key); ok {
+		n, _ := v.(int)
+		return n
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, exe, "--version").Output()
 	if err != nil {
+		opencodeVersionCache.Store(key, 0)
 		return 0
 	}
-	m := regexp.MustCompile(`(\d+)\.\d+\.\d+`).FindSubmatch(out)
+	m := opencodeSemverRe.FindSubmatch(out)
 	if m == nil {
+		opencodeVersionCache.Store(key, 0)
 		return 0
 	}
 	n, err := strconv.Atoi(string(m[1]))
 	if err != nil {
+		opencodeVersionCache.Store(key, 0)
 		return 0
 	}
+	opencodeVersionCache.Store(key, n)
 	return n
 }
 

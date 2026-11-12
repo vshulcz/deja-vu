@@ -7,7 +7,7 @@ English | [中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/grok/
 Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on LongMemEval-S · **13.6 s** to index 19,195 sessions · **half the tokens** of agentmemory) · [Website & live search](https://vshulcz.github.io/deja-vu/) · [Browser demo](https://vshulcz.github.io/deja-vu/view/) · **[★ Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)**
 
 Grok remembers its own sessions. This plugin answers the other question: what
-you did in Claude Code, Codex, Cursor, opencode, Zed and thirty-eight more agents on
+you did in Claude Code, Codex, Cursor, opencode, Zed and forty-one more agents on
 this machine — including the months before you installed anything.
 
 It runs [deja](https://github.com/vshulcz/deja-vu), a local Go binary that

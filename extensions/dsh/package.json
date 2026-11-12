@@ -1,7 +1,7 @@
 {
   "name": "dsh-deja",
   "version": "0.24.2",
-  "description": "deja-vu memory for DeepSeek Harness: the session history of forty-two other coding agents, searchable and recalled before each step — a local index, no LLM.",
+  "description": "deja-vu memory for DeepSeek Harness and DSH Desktop: the session history of forty-five other coding agents, searchable and recalled before each step — a local index, no LLM.",
   "type": "module",
   "main": "index.js",
   "exports": {
@@ -31,6 +31,7 @@
   },
   "keywords": [
     "dsh",
+    "dsh-desktop",
     "dsh-plugin",
     "deepseek-harness",
     "memory",

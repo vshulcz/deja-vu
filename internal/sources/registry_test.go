@@ -52,6 +52,9 @@ func TestFormatRegistryConformance(t *testing.T) {
 		"DEJA_NOTES_FILE",
 		"DEJA_JUNIE_ROOT", "JUNIE_HOME", "DEJA_JETBRAINS_ROOT",
 		"DEJA_WINDSURF_ROOT", "DEJA_MCODE_ROOT",
+		"DEJA_MIMO_DB", "DEJA_MIMO_CONFIG_DIR", "MIMOCODE_HOME", "MIMOCODE_CONFIG_DIR", "MIMOCODE_DB",
+		"DEJA_OMNIGENT_ROOT", "DEJA_OMNIGENT_DB", "OMNIGENT_DATA_DIR",
+		"DEJA_ORCA_ROOT", "DEJA_ORCA_DB",
 	} {
 		t.Setenv(key, "")
 	}
@@ -404,6 +407,51 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 		sessions, err = ParseJetBrainsFile(path)
 	case "windsurf":
 		sessions, err = ParseWindsurfFile(path)
+	case "mimo":
+		if !SQLite3Available() {
+			t.Skip("sqlite3 not installed")
+		}
+		sql, readErr := os.ReadFile(path)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		db := filepath.Join(work, "mimocode.db")
+		build := exec.CommandContext(t.Context(), "sqlite3", db)
+		build.Stdin = strings.NewReader(string(sql))
+		if out, runErr := build.CombinedOutput(); runErr != nil {
+			t.Fatalf("create sqlite fixture: %v: %s", runErr, out)
+		}
+		sessions, err = ParseMimoDB(db)
+	case "omnigent":
+		if !SQLite3Available() {
+			t.Skip("sqlite3 not installed")
+		}
+		sql, readErr := os.ReadFile(path)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		db := filepath.Join(work, "chat.db")
+		build := exec.CommandContext(t.Context(), "sqlite3", db)
+		build.Stdin = strings.NewReader(string(sql))
+		if out, runErr := build.CombinedOutput(); runErr != nil {
+			t.Fatalf("create sqlite fixture: %v: %s", runErr, out)
+		}
+		sessions, err = ParseOmnigentDB(db)
+	case "orca":
+		if !SQLite3Available() {
+			t.Skip("sqlite3 not installed")
+		}
+		sql, readErr := os.ReadFile(path)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		db := filepath.Join(work, "agent-session-journal.db")
+		build := exec.CommandContext(t.Context(), "sqlite3", db)
+		build.Stdin = strings.NewReader(string(sql))
+		if out, runErr := build.CombinedOutput(); runErr != nil {
+			t.Fatalf("create sqlite fixture: %v: %s", runErr, out)
+		}
+		sessions, err = ParseOrcaDB(db)
 	case "deepseek":
 		// The fixture is stored raw: the harness writes zstd frames by default,
 		// and a registry fixture that needs an external tool to read cannot be
@@ -420,7 +468,7 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 
 // registryFixturesWithCalls are the registry fixtures whose tool calls are
 // read into work records.
-var registryFixturesWithCalls = map[string]bool{"deepseek": true, "continue": true, "trae": true, "muse": true, "codebuddy": true, "devin": true, "junie": true, "jetbrains": true, "kimi": true, "mcode": true, "gemini": true}
+var registryFixturesWithCalls = map[string]bool{"deepseek": true, "continue": true, "trae": true, "muse": true, "codebuddy": true, "devin": true, "junie": true, "jetbrains": true, "kimi": true, "mcode": true, "gemini": true, "omnigent": true, "orca": true}
 
 func validateRegistrySessions(t *testing.T, id string, sessions []model.Session) {
 	t.Helper()

@@ -120,10 +120,13 @@ func clientMCPDenied(name string) string {
 				return mcpOffNote(name, "`tools.deny` holds "+s, openclawFileFor("tools", "deny"))
 			}
 		}
-	case "opencode":
+	case "opencode", "mimo":
 		// Tool names are server_tool, a key is a `*`/`?` pattern over them,
 		// and the last key in the file that matches decides.
 		p := doctorOpencodeConfigPath()
+		if name == "mimo" {
+			p = mimoConfigPath()
+		}
 		b, err := readConfig(p)
 		if err != nil {
 			return ""

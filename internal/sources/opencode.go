@@ -192,8 +192,11 @@ func opencodeIDs(db, set string) ([]string, bool) {
 // nothing to read from and takes seconds on a long one.
 func OpencodeStoreLacks(harness, id string) bool {
 	db := OpencodeDB()
-	if harness == "kilocode" {
+	switch harness {
+	case "kilocode":
 		db = KiloDB()
+	case "mimo":
+		db = MimoDB()
 	}
 	return sqliteStoreLacks(db, id, func(db string) (map[string]bool, bool) {
 		query := func(q string) (string, bool) {
@@ -253,13 +256,41 @@ func parseOpencodeSchemaDBSince(harness, db string, t time.Time) ([]model.Sessio
 		// The changed sessions are named before the projection runs: an
 		// outer s.id in (...) was not pushed into the 2.x branches, and every
 		// pass decoded the whole store (#4951).
-		return parseOpencodeSet(harness, db, opencodeSinceWhere(db, t), opencodeV2SinceSet(db, t))
+		where1 := ""
+		if opencodeSchemaOf(db).legacy {
+			if ids1, ok := opencodeIDs(db, opencodeTouchedSet("session", t, opencodeV1Touched(db, t))); ok {
+				if len(ids1) > 0 {
+					quoted := make([]string, len(ids1))
+					for i, id := range ids1 {
+						quoted[i] = "'" + sqlEscape(id) + "'"
+					}
+					where1 = " and s.id in (" + strings.Join(quoted, ",") + ")"
+				}
+			} else {
+				where1 = opencodeSinceWhere(db, t)
+			}
+		}
+		return parseOpencodeSet(harness, db, where1, opencodeV2SinceSet(db, t))
 	}
 	return parseOpencodeLayouts(harness, db, opencodeSinceWhere(db, t), opencodeV2SinceWhere(db, t), 0, "")
 }
 
 // opencodeSinceSlack is how far before the watermark a since read starts.
 const opencodeSinceSlack = 5 * time.Second
+
+// opencodeCandidateWindow bounds turn-table scans on multi-GB stores to
+// sessions whose own row moved within 30 days of the watermark (plus the 64
+// most recently updated sessions unconditionally, so small stores and fixtures
+// are covered regardless of synthetic timestamps).
+const opencodeCandidateWindow = 30 * 24 * time.Hour
+
+func opencodeCandidateSessions(table string, t time.Time) string {
+	win := t.Add(-opencodeCandidateWindow)
+	rfc := sqlEscape(win.UTC().Format(time.RFC3339Nano))
+	return fmt.Sprintf("select id from (select id from %s order by time_updated desc limit 64) "+
+		"union select id from %s where %s or time_updated > '%s'",
+		table, table, newerThanEpoch("time_updated", win), rfc)
+}
 
 // opencodeSinceWhere picks the sessions touched after the watermark and reads
 // each of them whole. Shared with the other stores in this schema — Kilo's CLI
@@ -277,12 +308,13 @@ func opencodeSinceWhere(db string, t time.Time) string {
 
 // opencodeV1Touched names the sessions with a message or part stamped after t.
 func opencodeV1Touched(db string, t time.Time) string {
-	// Each a column of its own, so the subquery reads row headers and never a
-	// blob: 3–5 s on a 3.8 GB store, against 9 s for the row-level clause.
-	touched := fmt.Sprintf("select session_id from message where %s or %s union "+
-		"select session_id from part where %s",
-		newerThanEpoch("time_created", t), newerThanEpoch("time_updated", t),
-		newerThanEpoch("time_updated", t))
+	// Bound by candidate session_id first so SQLite uses message_session_time_created_id_idx
+	// and part_session_idx instead of full-scanning multi-GB message/part tables.
+	cand := opencodeCandidateSessions("session", t)
+	touched := fmt.Sprintf("select session_id from message where session_id in (%s) and (%s or %s) union "+
+		"select session_id from part where session_id in (%s) and (%s)",
+		cand, newerThanEpoch("time_created", t), newerThanEpoch("time_updated", t),
+		cand, newerThanEpoch("time_updated", t))
 	if !opencodeSchemaOf(db).rowsStamped {
 		// A store from before the columns: the stamps a row is created with.
 		rfc := sqlEscape(t.UTC().Format(time.RFC3339Nano))

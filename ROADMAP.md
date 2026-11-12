@@ -26,7 +26,7 @@ the place to discuss design.
 ## Next
 
 - **Compaction recovery across the remaining hosts.** The recovery packet after
-  context compaction now reaches 36 of the 43 harnesses (with reset and capture
+  context compaction now reaches 36 of the 46 harnesses (with reset and capture
   in 37) — either through a native `PreCompact` / `PostCompaction` hook or by
   catching up from the store's pre-summary turns on the next hook that reaches
   the model. The remaining hosts are blocked on upstream compaction hooks (`#308`).
@@ -38,7 +38,7 @@ the place to discuss design.
   for one topic receives a small lift everywhere. Recording which terms a
   recall served lets the lift apply only when the same subject returns.
 - **Point-of-action coverage.** Prior file decisions before an edit and failure
-  repairs now reach 37 of the 43 harnesses. As the remaining 6 upstream
+  repairs now reach 37 of the 46 harnesses. As the remaining 6 upstream
   harnesses add pre/post tool hooks or plugin middleware, each is wired and
   recorded in the format registry with a reproducible stand check.
 

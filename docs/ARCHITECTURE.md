@@ -5,7 +5,7 @@ This document is for people changing `deja` internals.
 ## Source parsers
 
 Parsers live in `internal/sources` and return `[]model.Session`. The table is
-what the loader registers: the forty-three coding agents plus deja's own notes,
+what the loader registers: the forty-six coding agents plus deja's own notes,
 which is what `deja sources` prints. `docs/registry/` describes each store's
 layout in detail, and `internal/sources/registry_test.go` checks that index
 against the loader list.
@@ -60,6 +60,9 @@ keeping real links inside a store out of the walk.
 | Senpi | `senpi.go` | JSONL under `~/.senpi/agent/sessions` |
 | Kimchi Coding | `senpi.go` | JSONL under the harness directory's `sessions`, one directory per encoded cwd |
 | Hermes | `hermes.go`, `hermes_pg.go` | SQLite `state.db` under the Hermes home and per profile, plus Postgres when `DEJA_HERMES_PG_DSN` is set |
+| MiMo-Code | `mimo.go`, `opencode.go`, `opencode_v2.go` | OpenCode-schema SQLite database at `${MIMO_DATA_DIR:-${XDG_DATA_HOME:-~/.local/share}/mimo}/mimo.db` (and `opencode.db`), plus `storage/session_diff/*.json` beside it |
+| Omnigent | `omnigent.go` | SQLite store at `${OMNIGENT_HOME:-~/.omnigent}/omnigent.db` (`sessions`, `messages`, `message_items`) |
+| Orca | `orca.go` | SQLite journal store at `~/Library/Application Support/orca-app/orca.db` (`~/.config/orca-app/orca.db` on Linux, `%APPDATA%\orca-app\orca.db` on Windows) |
 | deja notes | `notes.go` | `deja remember` entries in `notes.jsonl` |
 
 File-based sources are parsed with a worker pool sized to `runtime.NumCPU()`. Results are collected by input file index and then appended in sorted path order, so parsing can be parallel while index writes stay deterministic.

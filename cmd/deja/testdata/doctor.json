@@ -391,6 +391,33 @@
       "indexed_sessions": 0
     },
     {
+      "name": "mimo",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.local/share/mimocode/mimocode.db"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
+      "name": "omnigent",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.omnigent/chat.db"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
+      "name": "orca",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.config/orca/agent-session-journal.db"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
       "name": "deja",
       "state": "missing",
       "paths": [
@@ -558,6 +585,21 @@
       "path": "<tmp>/home/.config/Code/User/globalStorage/kilocode.kilo-code/settings/mcp_settings.json"
     },
     {
+      "name": "mimo",
+      "state": "config-missing",
+      "path": "<tmp>/home/.config/mimocode/mimocode.jsonc"
+    },
+    {
+      "name": "omnigent",
+      "state": "config-missing",
+      "path": "<tmp>/home/.omnigent/mcp.json"
+    },
+    {
+      "name": "orca",
+      "state": "config-missing",
+      "path": "<tmp>/home/.config/orca/mcp.json"
+    },
+    {
       "name": "kiro",
       "state": "config-missing",
       "path": "<tmp>/home/.kiro/settings/mcp.json"
@@ -648,6 +690,21 @@
       "name": "kilocode",
       "state": "missing",
       "path": "<tmp>/home/.config/kilo/plugins/deja.js"
+    },
+    {
+      "name": "mimo",
+      "state": "missing",
+      "path": "<tmp>/home/.config/mimocode/plugins/deja.js"
+    },
+    {
+      "name": "omnigent",
+      "state": "missing",
+      "path": "<tmp>/home/.omnigent/settings.json"
+    },
+    {
+      "name": "orca",
+      "state": "missing",
+      "path": "<tmp>/home/.config/orca/settings.json"
     },
     {
       "name": "cursor",
@@ -860,6 +917,21 @@
       "name": "kilocode",
       "state": "missing",
       "path": "<tmp>/home/.config/kilo/commands/deja.md"
+    },
+    {
+      "name": "mimo",
+      "state": "missing",
+      "path": "<tmp>/home/.config/mimocode/commands/deja.md"
+    },
+    {
+      "name": "omnigent",
+      "state": "missing",
+      "path": "<tmp>/home/.omnigent/commands/deja.md"
+    },
+    {
+      "name": "orca",
+      "state": "missing",
+      "path": "<tmp>/home/.config/orca/commands/deja.md"
     },
     {
       "name": "crush",

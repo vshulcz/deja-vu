@@ -81,7 +81,7 @@
 <a href="recover-overwritten-files.html">Recover overwritten files</a>
 <a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
-<details class="grpfold"><summary>Deleting sessions <span class="n">36</span></summary>
+<details class="grpfold"><summary>Deleting sessions <span class="n">39</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
 <a href="delete-old-claude-sessions.html">Old sessions</a>
 <a href="delete-codex-sessions.html">Codex</a>
@@ -118,8 +118,11 @@
 <a href="delete-openclaw-session-history.html">OpenClaw</a>
 <a href="delete-grok-session-history.html">Grok Build</a>
 <a href="delete-devin-session-history.html">Devin CLI</a>
+<a href="delete-mimo-session-history.html">MiMo-Code</a>
+<a href="delete-omnigent-session-history.html">Omnigent</a>
+<a href="delete-orca-session-history.html">Orca</a>
 </details>
-<details class="grpfold"><summary>Per-agent guides <span class="n">43</span></summary>
+<details class="grpfold"><summary>Per-agent guides <span class="n">46</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
@@ -147,11 +150,14 @@
 <a href="memory-for-kimchi.html">Kimchi Coding</a>
 <a href="memory-for-kimi.html">Kimi Code</a>
 <a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-mimo.html">MiMo-Code</a>
 <a href="memory-for-mcode.html">MiniMax Code</a>
 <a href="memory-for-muse.html">Muse Code</a>
 <a href="memory-for-omp.html">omp</a>
+<a href="memory-for-omnigent.html">Omnigent</a>
 <a href="memory-for-openclaw.html">OpenClaw</a>
 <a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-orca.html">Orca</a>
 <a href="memory-for-pi.html">pi</a>
 <a href="memory-for-prime.html">prime-agent</a>
 <a href="memory-for-qwen.html">Qwen Code</a>
@@ -184,7 +190,7 @@
 <p>You solved something in March. In August the same agent, in the same repository, proposes the approach you already tried and backed out of. Nothing is broken — the session that held the answer ended, and its context window went with it.</p>
 
 <h2>What actually happens at the end of a session</h2>
-<p>An agent's memory during a session is its context window. When the session ends the window is discarded. What survives is a transcript file, written by the harness itself: Claude Code keeps JSONL under <code>~/.claude/projects</code>, Codex under <code>~/.codex</code>, opencode in a local database, Cursor, Gemini CLI, Zed and thirty-seven more agents each in their own format. The <a href="../registry/README.html">session format registry</a> documents where each one writes and what its records look like.</p>
+<p>An agent's memory during a session is its context window. When the session ends the window is discarded. What survives is a transcript file, written by the harness itself: Claude Code keeps JSONL under <code>~/.claude/projects</code>, Codex under <code>~/.codex</code>, opencode in a local database, Cursor, Gemini CLI, Zed and forty more agents each in their own format. The <a href="../registry/README.html">session format registry</a> documents where each one writes and what its records look like.</p>
 <p>So the work is not lost. It is unread. Nothing in the default setup opens yesterday's transcript when you ask today's question.</p>
 
 <h2>Compaction is not memory</h2>

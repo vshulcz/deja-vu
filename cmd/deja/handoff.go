@@ -360,6 +360,12 @@ func handoffCommand(target, prompt string) ([]string, bool) {
 	case "kilocode":
 		// The TUI's own option, "prompt to use" (kilo 7.8.8 --help).
 		return []string{"kilo", "--prompt", prompt}, true
+	case "mimo":
+		return []string{"mimo", "--prompt", prompt}, true
+	case "omnigent":
+		return []string{"omnigent", "run", "--prompt", prompt}, true
+	case "orca":
+		return []string{"orca", prompt}, true
 	case "continue":
 		// `cn [options] [command] [prompt]` starts an interactive session with
 		// the prompt (1.5.47).
@@ -441,7 +447,7 @@ func handoffCommand(target, prompt string) ([]string, bool) {
 
 // handoffAlias lets a target be spelled the way its own CLI is invoked.
 var handoffAlias = map[string]string{
-	"agy": "antigravity", "kilo": "kilocode", "cn": "continue", "cmd": "commandcode",
+	"agy": "antigravity", "kilo": "kilocode", "mimocode": "mimo", "cn": "continue", "cmd": "commandcode",
 	"cmdc": "commandcode", "traex": "trae", "traecli": "trae", "kiro-cli": "kiro",
 	"dsh": "deepseek", "code": "copilot-chat", "vscode": "copilot-chat",
 }
@@ -494,6 +500,6 @@ func pasteOnlyFooter(prefix string) string {
 
 func handoffTargets() []string {
 	return []string{"claude", "codex", "opencode", "cursor", "copilot", "copilot-chat", "gemini", "qwen", "antigravity", "aider", "pi", "senpi", "omp", "amp", "prime", "grok", "cline", "goose", "kimi", "crush",
-		"kilocode", "continue", "commandcode", "codebuddy", "trae", "muse", "kiro", "gjc", "kimchi", "codewhale", "junie", "hermes", "openclaw", "deepseek", "reasonix", "zcode", "devin",
+		"kilocode", "mimo", "omnigent", "orca", "continue", "commandcode", "codebuddy", "trae", "muse", "kiro", "gjc", "kimchi", "codewhale", "junie", "hermes", "openclaw", "deepseek", "reasonix", "zcode", "devin",
 		"mcode"}
 }

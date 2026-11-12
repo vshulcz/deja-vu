@@ -393,6 +393,12 @@ func (r *doctorStoreRows) laterStores(sqlite bool) {
 		devinDetail = doctorSQLiteDetail(legacy, sqlite)
 	}
 	r.row("devin", devinLoc, doctorFilePresent(devinDB) || doctorFilePresent(sources.DevinLegacySessionsDB()), devinDetail)
+	mimoDB := sources.MimoDB()
+	r.row("mimo", mimoDB, doctorFilePresent(mimoDB), doctorSQLiteDetail(mimoDB, sqlite))
+	omnigentDB := sources.OmnigentDB()
+	r.row("omnigent", omnigentDB, doctorFilePresent(omnigentDB), doctorSQLiteDetail(omnigentDB, sqlite))
+	orcaDB := sources.OrcaDB()
+	r.row("orca", orcaDB, doctorFilePresent(orcaDB), doctorSQLiteDetail(orcaDB, sqlite))
 	// One store per project rather than one per machine, so the registry is
 	// what makes them findable at all. Name it even when it lists nothing:
 	// "the registry is empty" is the answer for someone whose crush sessions

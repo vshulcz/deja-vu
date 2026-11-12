@@ -1,7 +1,7 @@
 // Command genregistry renders the session-format registry into pages a search
 // engine can read.
 //
-// The registry documents where forty-three coding agents keep their history and
+// The registry documents where forty-six coding agents keep their history and
 // what is in those files. That is the one question people put to a search
 // engine in their own words — "where does Claude Code store conversations" —
 // and the answer sat in docs/registry as raw .md, which GitHub Pages serves as
@@ -256,7 +256,9 @@ func countWord(n int) string {
 		"twenty-three", "twenty-four", "twenty-five", "twenty-six", "twenty-seven",
 		"twenty-eight", "twenty-nine", "thirty", "thirty-one", "thirty-two",
 		"thirty-three", "thirty-four", "thirty-five", "thirty-six", "thirty-seven",
-		"thirty-eight", "thirty-nine", "forty"}
+		"thirty-eight", "thirty-nine", "forty", "forty-one", "forty-two",
+		"forty-three", "forty-four", "forty-five", "forty-six", "forty-seven",
+		"forty-eight", "forty-nine", "fifty"}
 	if n < 0 || n >= len(words) {
 		return strconv.Itoa(n)
 	}

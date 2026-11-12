@@ -82,7 +82,10 @@ func TestHandoffCommandTable(t *testing.T) {
 		// Devin CLI's one-shot print mode: -p answers once and exits.
 		"devin": {"devin", "-p", "P"},
 		// The MiniMax Code CLI takes the prompt as its argument.
-		"mcode": {"mcode", "P"},
+		"mcode":    {"mcode", "P"},
+		"mimo":     {"mimo", "--prompt", "P"},
+		"omnigent": {"omnigent", "run", "--prompt", "P"},
+		"orca":     {"orca", "P"},
 	}
 	for target, want := range cases {
 		argv, ok := handoffCommand(target, "P")
