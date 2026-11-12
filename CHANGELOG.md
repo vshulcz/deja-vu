@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.2] - 2026-11-12
+
+Turn-0 file localization and verified target guardrails, dead-end reversal and
+root-cause `FixPair` recall across marathon episodes, `deja bench live` and
+`deja audit`, ephemeral `npx` launcher staging, and native IntelliJ Platform,
+Neovim, CodeCompanion, and Tmux plugins.
+
+### Added
+
+- `UserPromptSubmit` localizes likely target files and verified test recipes at Turn 0 before the first file read. Strips `<fork-boilerplate>` envelopes and git/PR workflow footers on structured specs, matches quoted diagnostic strings and `cooccur.gob` neighbors, and attaches verified file guardrails (`standing`, `repo decision`, `reverted approach`, `prior decision`, `past breakage`) with cross-surface `.seen` deduplication.
+- `PreToolUse` surfaces verified dead-end reversals with causal rationale, extracts edited symbols and root-cause explanations (`Why`) from self-corrected `FixPair` edit-test loops, and scans full episode history in 200+ message marathon sessions while blocking broad multi-file sweeps.
+- `deja bench live [--json]` measures read-only `PreToolUse` actionable recall, dead-end reversals, ephemeral noise rate, and temporal Turn-0 localization replay across a repository without mutating `.hookseen` or injection logs.
+- `deja audit [--json]` inspects detected agent stores for transcript counts and sizes, retention deletion risk (`cleanupPeriodDays`), preserved deleted sessions, recoverable edit paths, and wiring state, while `deja install` stages ephemeral `npx`/`bunx` binaries into persistent user storage so hooks keep working after cache eviction (#6036).
+- IntelliJ Platform / JetBrains IDE plugin, native Neovim runtime plugin (`:Deja`, AI blame), CodeCompanion extension, and Tmux Plugin Manager (TPM) plugin (#6029, #6030, #6031, #6032).
+- `deja sessions` records model, token usage, and tool-call counts per session (#6010).
+- Memory guide for Muse Code and session-deletion guides for Grok Build, Senpi, and Command Code (#5995, #6009, #6013, #6015).
+
+### Changed
+
+- `deja stats` and `deja doctor` run faster on large stores, and README / translated README install instructions use OpenCode 2.x `plugin add` (#6012, #6014, #6017, #6022, #6026).
+- `RecentSpokenAssistantTurnsForTerms` filters postings to spoken assistant records before applying `maxRecords`, and `UserPromptSubmit` shares candidate selection with `deja bench live`.
+
+### Fixed
+
+- Auto-synced `.deja/memory.jsonl` project decisions require multi-session confirmation (#6025).
+- `PostCompaction` recovery preserves tail context and recent verification commands across compactions (#6019).
+- JetBrains plugin drops deprecated platform APIs and passes Marketplace XML validation, and the Raycast extension unwraps v2 search hits (#6033, #6034).
+- Windows ZCode detection checks `PATH` and `ProgramFiles` fallbacks for `ZCode.exe` (#6016, #6018).
+- Enforced CLI boundary, environment, and parser contracts, respected shared-index modes/clients in `deja doctor`, and rejected whitespace-only paths and blank `delete` / `resume` prefixes (#5997, #5999, #6007, #6008, #6011).
+
 ## [0.24.1] - 2026-11-09
 
 Repository memory (`.deja/memory.jsonl` and `deja review`), zonal BM25F and
@@ -2788,7 +2818,10 @@ See the release notes: Antigravity harness, share redaction hardening.
 - Stdio MCP memory server with `recall` and `recall_context` tools.
 - Idempotent installers for claude-code, codex, and opencode MCP config.
 
-[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.23.4...HEAD
+[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.24.2...HEAD
+[0.24.2]: https://github.com/vshulcz/deja-vu/compare/v0.24.1...v0.24.2
+[0.24.1]: https://github.com/vshulcz/deja-vu/compare/v0.24.0...v0.24.1
+[0.24.0]: https://github.com/vshulcz/deja-vu/compare/v0.23.4...v0.24.0
 [0.23.4]: https://github.com/vshulcz/deja-vu/compare/v0.23.3...v0.23.4
 [0.23.3]: https://github.com/vshulcz/deja-vu/compare/v0.23.2...v0.23.3
 [0.23.2]: https://github.com/vshulcz/deja-vu/compare/v0.23.1...v0.23.2
