@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -14,7 +15,6 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
-	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/prompt"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -54,20 +54,20 @@ type liveInjectionAudit struct {
 
 // liveBenchReport summarizes read-only point-of-action recall across the current repository.
 type liveBenchReport struct {
-	Repo             string             `json:"repo"`
-	SourceFiles      int                `json:"source_files"`
-	WorkedFiles      int                `json:"worked_files"`
-	ActionableFiles  int                `json:"actionable_files"`
-	ActionableRate   float64            `json:"actionable_rate"`
-	Standing         int                `json:"standing"`
-	RepoMemory       int                `json:"repo_memory"`
-	PriorDecision    int                `json:"prior_decision"`
-	RevertedApproach int                `json:"reverted_approach"`
-	PastBreakage     int                `json:"past_breakage"`
-	VerifiedCommand  int                `json:"verified_command"`
-	TestTargetOnly   int                `json:"test_target_only"`
-	Silent           int                `json:"silent"`
-	EphemeralNoise   int                `json:"ephemeral_noise"`
+	Repo             string                `json:"repo"`
+	SourceFiles      int                   `json:"source_files"`
+	WorkedFiles      int                   `json:"worked_files"`
+	ActionableFiles  int                   `json:"actionable_files"`
+	ActionableRate   float64               `json:"actionable_rate"`
+	Standing         int                   `json:"standing"`
+	RepoMemory       int                   `json:"repo_memory"`
+	PriorDecision    int                   `json:"prior_decision"`
+	RevertedApproach int                   `json:"reverted_approach"`
+	PastBreakage     int                   `json:"past_breakage"`
+	VerifiedCommand  int                   `json:"verified_command"`
+	TestTargetOnly   int                   `json:"test_target_only"`
+	Silent           int                   `json:"silent"`
+	EphemeralNoise   int                   `json:"ephemeral_noise"`
 	P50MS            float64               `json:"p50_ms"`
 	P95MS            float64               `json:"p95_ms"`
 	WallMS           float64               `json:"wall_ms"`
@@ -104,7 +104,7 @@ func parseBenchLiveArgs(args []string) (bool, error) {
 		case "--json":
 			jsonOutput = true
 		default:
-			return false, fmt.Errorf("bench: usage: bench live [--json]")
+			return false, errors.New("bench: usage: bench live [--json]")
 		}
 	}
 	return jsonOutput, nil
@@ -122,7 +122,7 @@ func measureLiveRepo(indexDir, cwd string) (liveBenchReport, error) {
 		return liveBenchReport{}, err
 	}
 	pol := policy.Load()
-	projNames := liveBenchProjectNames(indexDir, root)
+	projNames := liveBenchProjectNames(root)
 	ready := planIndexReady(indexDir)
 
 	report := liveBenchReport{
@@ -176,7 +176,7 @@ func measureLiveRepo(indexDir, cwd string) (liveBenchReport, error) {
 }
 
 // liveBenchProjectNames resolves project identifiers matching root without mutating index state.
-func liveBenchProjectNames(indexDir, root string) []string {
+func liveBenchProjectNames(root string) []string {
 	names := digest.ProjectNameCandidates(root)
 	if len(names) == 0 {
 		if plain := sources.PlainProjectName(root); plain != "" {
@@ -258,7 +258,7 @@ func collectLiveBenchFiles(root string, limit int) ([]string, error) {
 	var out []string
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
-			return nil
+			return nil //nolint:nilerr // unreadable entries skipped during best-effort walk
 		}
 		name := d.Name()
 		if d.IsDir() {
@@ -536,54 +536,14 @@ func evalPromptTurn0ReadOnly(dir, cwd, asked string, names []string, skip map[st
 	if !promptTermsWorthAsking(terms) {
 		return nudge
 	}
-	promptStart := time.Now()
-	const promptSoftBudget = 1500 * time.Millisecond
-	ranked, matched, strong, naming, idfOf, err := index.ProjectRelevantNamingCut(dir, names, terms, prompt.Candidates, skip, nil)
-	if err != nil || len(ranked) == 0 {
+	sel := selectPromptRankedCandidates(dir, cwd, asked, names, terms, skip, skip, nil, false)
+	if len(sel.ranked) == 0 {
 		return nudge
 	}
-	search.LiftNoteSessionsAboveTheirSource(ranked)
-	leadTerms := terms
-	ordered := byIdentifying(terms, idfOf)
-	if len(ordered) > 0 {
-		leadTerms = ordered[:min(len(ordered), leadTermsKept)]
+	if len(sel.ss) == 0 {
+		return attachRankedConsensusFallback(dir, cwd, "", nudge, sel.ranked, sel.matched, sel.strong, nil, skip, true)
 	}
-	pk := &promptPicker{
-		pol:          policy.Load(),
-		terms:        terms,
-		orderedTerms: ordered,
-		asked:        asked,
-		idfOf:        idfOf,
-		topIDF:       index.TopIDF(dir),
-		self:         skip,
-		leadTerms:    leadTerms,
-		unscoped:     len(names) == 0,
-		cwdPlain:     sources.PlainProjectName(cwd),
-		deadline:     promptStart.Add(promptSoftBudget),
-		ss:           make([]model.Session, 0, 2),
-	}
-	pk.pick(ranked, matched, strong, naming)
-	if len(pk.ss) < 2 && pk.crowdedOut > 0 && time.Since(promptStart) < promptSoftBudget {
-		widerSkip := make(map[string]bool, len(skip)+len(ranked))
-		for id := range skip {
-			widerSkip[id] = true
-		}
-		for _, s := range ranked {
-			widerSkip[s.ID] = true
-		}
-		wider, wmatched, wstrong, wnaming, _, werr := index.ProjectRelevantNamingCut(
-			dir, names, terms, prompt.Candidates*widerWindow, widerSkip, nil)
-		if werr == nil {
-			pk.pick(wider, wmatched, wstrong, wnaming)
-		}
-	}
-	ss, confident, worthDigest := pk.ss, pk.confident, pk.worthDigest
-	if len(ss) == 0 {
-		if rcLine, _ := rankedTouchedConsensusLine(dir, cwd, ranked, matched, strong, nil, skip); rcLine != "" && !strings.Contains(nudge, "likely target:") {
-			nudge = joinPromptAdvisories(nudge, rcLine)
-		}
-		return nudge
-	}
+	ss := sel.ss
 	if len(names) > 0 || !projectMatchesAnyTerm(ss[0].Project, terms) {
 		ss = search.LeadWithConclusion(ss, terms)
 	}
@@ -591,24 +551,11 @@ func evalPromptTurn0ReadOnly(dir, cwd, asked string, names []string, skip map[st
 		index.MarkUserRules(dir, &ss[i], names)
 	}
 	ss, rejectedWarning := orderForInjection(ss)
-	if worthDigest {
-		if full, ok := promptDigestBodyIn(dir, cwd, "", ss, confident, terms, idfOf, asked, nudge, rejectedWarning, ranked, matched, strong, skip); ok {
+	if sel.worthDigest {
+		if full, ok := promptDigestBodyIn(dir, cwd, "", ss, sel.confident, terms, sel.idfOf, asked, nudge, rejectedWarning, sel.ranked, sel.matched, sel.strong, skip); ok {
 			return full
 		}
-		if rcLine, _ := rankedTouchedConsensusLine(dir, cwd, ranked, matched, strong, nil, skip); rcLine != "" && !strings.Contains(nudge, "likely target:") {
-			nudge = joinPromptAdvisories(nudge, rcLine)
-		}
-		return nudge
+		return attachRankedConsensusFallback(dir, cwd, "", nudge, sel.ranked, sel.matched, sel.strong, nil, skip, true)
 	}
-	ptr := weakRecallPointerIn(dir, cwd, ss, terms, skip)
-	if !strings.Contains(ptr, "files edited ") && !strings.Contains(nudge, "likely target:") {
-		if rcLine, _ := rankedTouchedConsensusLine(dir, cwd, ranked, matched, strong, nil, skip); rcLine != "" {
-			ptr += rcLine + "\n"
-		}
-	}
-	body := ptr + shownInjectionWarning(ss, ss[:1])
-	if nudge != "" {
-		body += "\n" + nudge
-	}
-	return body
+	return buildWeakPromptPointerBody(dir, cwd, ss, terms, nudge, sel.ranked, sel.matched, sel.strong, nil, skip)
 }

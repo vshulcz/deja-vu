@@ -523,22 +523,8 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 		also := otherFrictionSigs(m.Text, sig)
 		// The command that produced this error, for the remedy that is that
 		// same command corrected.
-		failedCmd := commandBefore(ms, i)
-		// The shell could not run the line at all: the answer is that line in a
-		// form that runs, or nothing.
 		env := commandLevelFailure(m.Text, line)
-		if env {
-			// An error that names the missing program names the line it came
-			// from. The record before the error is not always that line:
-			// Hermes runs a turn's calls together and stores every output after
-			// all of the commands, and a script fails on its ninth line, not
-			// its first.
-			if ran := commandRunningBefore(ms, i, missingProgram(line)); ran != "" {
-				failedCmd = ran
-			} else if failedCmd == "" {
-				failedCmd = commandRunningBefore(ms, i, "")
-			}
-		}
+		failedCmd := resolveFailedCommand(ms, i, line, env)
 		// The first file the session changed after the error, kept in case the
 		// window holds no command that answers it.
 		edited := ""
@@ -552,15 +538,11 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 			if ms[j].Role == roleEdit {
 				// No file edit answers a line the shell refused; it is the
 				// session going back to its work.
-				if !env {
-					cand := strings.TrimSpace(firstLineOf(ms[j].Text))
-					if looksLikeEditedPath(cand) && lastSeen[sig] <= j {
-						if edited == "" || (!isTestFileEditPath(cand)) || isTestFileEditPath(edited) {
-							edited = cand
-							editIdx = j
-							editVerified = false
-						}
-					}
+				cand := strings.TrimSpace(firstLineOf(ms[j].Text))
+				if preferEditRemedyCandidate(edited, cand, lastSeen[sig], j, env) {
+					edited = cand
+					editIdx = j
+					editVerified = false
 				}
 				continue
 			}
@@ -596,7 +578,7 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 				continue
 			}
 			if j > i+fixLookAhead {
-				if !env && edited != "" && looksLikeEditedPath(edited) && !namesAnEphemeralPath(cmd) && VerifyCommand(cmd) {
+				if editVerifiedByCommand(env, edited, cmd) {
 					editVerified = true
 					break
 				}
@@ -634,7 +616,7 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 			// command proves the edit settled the error — it is not a command remedy
 			// that replaces the edit. Check before investigationCommand, which marks
 			// `go test` / `go vet` as investigation to keep them out of Command pairs.
-			if !env && edited != "" && looksLikeEditedPath(edited) && !namesAnEphemeralPath(cmd) && VerifyCommand(cmd) {
+			if editVerifiedByCommand(env, edited, cmd) {
 				editVerified = true
 				break
 			}
@@ -672,11 +654,39 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 			out = append(out, FixPair{
 				Sig: sig, Error: line, Edit: edited, Symbol: sym, Why: why,
 				SelfCorrected: selfCorr,
-				Key: key, When: m.Time, Project: project, Also: also,
+				Key:           key, When: m.Time, Project: project, Also: also,
 			})
 		}
 	}
 	return out
+}
+
+func resolveFailedCommand(ms []model.Message, i int, line string, env bool) string {
+	failedCmd := commandBefore(ms, i)
+	if !env {
+		return failedCmd
+	}
+	// An error that names the missing program names the line it came from.
+	// Hermes runs a turn's calls together and stores every output after all
+	// commands, and a script fails on its ninth line, not its first.
+	if ran := commandRunningBefore(ms, i, missingProgram(line)); ran != "" {
+		return ran
+	}
+	if failedCmd == "" {
+		return commandRunningBefore(ms, i, "")
+	}
+	return failedCmd
+}
+
+func preferEditRemedyCandidate(edited, cand string, lastSigIdx, j int, env bool) bool {
+	if env || !looksLikeEditedPath(cand) || lastSigIdx > j {
+		return false
+	}
+	return edited == "" || !isTestFileEditPath(cand) || isTestFileEditPath(edited)
+}
+
+func editVerifiedByCommand(env bool, edited, cmd string) bool {
+	return !env && edited != "" && looksLikeEditedPath(edited) && !namesAnEphemeralPath(cmd) && VerifyCommand(cmd)
 }
 
 func isTestFileEditPath(p string) bool {

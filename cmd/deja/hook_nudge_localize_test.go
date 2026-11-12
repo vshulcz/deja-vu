@@ -26,10 +26,10 @@ func TestTurn0PromptTaskLocalizationAndRecallBrief(t *testing.T) {
 	}
 
 	files := map[string]string{
-		"settlement_relay.go":  "package payments\n\nfunc DispatchSettlementBatch(batchID string) error { return nil }\n",
+		"settlement_relay.go":      "package payments\n\nfunc DispatchSettlementBatch(batchID string) error { return nil }\n",
 		"settlement_relay_test.go": "package payments\n\nimport \"testing\"\n\nfunc TestDispatchSettlementBatch(t *testing.T) { _ = DispatchSettlementBatch(\"b1\") }\n",
-		"backoff_jitter.go":    "package payments\n\nfunc ComputeExponentialJitter(attempt int) int { return attempt }\n",
-		"ledger_reconcile.go":  "package payments\n\nfunc ReconcileLedgerSnapshot(epoch int64) error { return nil }\n",
+		"backoff_jitter.go":        "package payments\n\nfunc ComputeExponentialJitter(attempt int) int { return attempt }\n",
+		"ledger_reconcile.go":      "package payments\n\nfunc ReconcileLedgerSnapshot(epoch int64) error { return nil }\n",
 	}
 	for name, body := range files {
 		if err := os.WriteFile(filepath.Join(proj, name), []byte(body), 0o644); err != nil {
@@ -132,7 +132,7 @@ func TestSessionActionMapAndWeakPointerSurfaceEditedFiles(t *testing.T) {
 		Title:   metas[0].Title,
 	}}
 
-	actLine := sessionActionMapLine(idxDir, proj, ss, nil)
+	actLine := sessionActionMapLineForPrompt(idxDir, proj, "", ss, nil)
 	if !strings.Contains(actLine, "files edited there: relay.go") {
 		t.Fatalf("expected relay.go in sessionActionMapLine, got %q", actLine)
 	}
@@ -167,7 +167,7 @@ func TestTurn0MultilingualFixPairBridgeAndSelfProjectNoiseGuard(t *testing.T) {
 	if err := os.WriteFile(loopFile, []byte("package payments\n\nfunc RenewWorkerLease() error { return nil }\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	var sweepFiles []string
+	sweepFiles := make([]string, 0, 10)
 	for i := range 10 {
 		p := filepath.Join(proj, fmt.Sprintf("extra_%02d.go", i))
 		if err := os.WriteFile(p, []byte(fmt.Sprintf("package payments\n\nfunc ExtraHandler%02d() {}\n", i)), 0o644); err != nil {
@@ -199,7 +199,7 @@ func TestTurn0MultilingualFixPairBridgeAndSelfProjectNoiseGuard(t *testing.T) {
 	})
 
 	// s4: broad 10-file marathon sweep mentioning the project's own name ("payments").
-	var s4Lines []string
+	s4Lines := make([]string, 0, len(sweepFiles)+2)
 	s4Lines = append(s4Lines, fmt.Sprintf(`{"type":"user","sessionId":"s4","cwd":%q,"timestamp":"2026-03-04T10:00:00Z","message":{"role":"user","content":"wide cleanup across payments handlers"}}`, proj))
 	for i, sf := range sweepFiles {
 		s4Lines = append(s4Lines, fmt.Sprintf(`{"type":"assistant","sessionId":"s4","cwd":%q,"timestamp":"2026-03-04T10:01:%02dZ","message":{"role":"assistant","content":[{"type":"tool_use","id":"es%d","name":"Edit","input":{"file_path":%q,"old_string":"{}","new_string":"{}"}}]}}`, proj, i, i, sf))
@@ -243,6 +243,21 @@ func TestTurn0MultilingualFixPairBridgeAndSelfProjectNoiseGuard(t *testing.T) {
 	idf := map[string]float64{"payments": 1.2, "unseen_xyz_token": 4.8}
 	if body, ok := promptDigestBodyIn(idxDir, proj, "live", sweepFull, true, []string{"payments", "unseen_xyz_token"}, idf, "check payments unseen_xyz_token", "", "", nil, nil, nil, nil); ok {
 		t.Fatalf("expected self-project name not to relax 2-term quote gate inside cwd, got:\n%s", body)
+	}
+
+	// 5. Ranked touched consensus recovers worker_lease.go when >=2 strongly matching sessions edited it.
+	ranked := []model.Session{
+		{Harness: "claude", ID: "s2", Project: "work/payments"},
+		{Harness: "claude", ID: "s3", Project: "work/payments"},
+		{Harness: "claude", ID: "s4", Project: "work/payments"},
+		{Harness: "claude", ID: "skip1", Project: "work/payments"},
+	}
+	rcLine, rcTok := rankedTouchedConsensusLine(idxDir, proj, ranked, []int{2, 2, 2, 2}, []int{1, 1, 1, 1}, nil, map[string]bool{"skip1": true})
+	if !strings.Contains(rcLine, "files edited in related sessions: worker_lease.go") || rcTok == "" {
+		t.Fatalf("expected rankedTouchedConsensusLine to recover worker_lease.go, got line=%q tok=%q", rcLine, rcTok)
+	}
+	if seenLine, _ := rankedTouchedConsensusLine(idxDir, proj, ranked, []int{2, 2}, []int{1, 1}, map[string]bool{rcTok: true}, nil); seenLine != "" {
+		t.Fatalf("expected seen token to suppress duplicate consensus line, got %q", seenLine)
 	}
 }
 
@@ -353,5 +368,39 @@ func TestTurn0StructuredPromptDiagnosticGuardrailAndDedup(t *testing.T) {
 	}
 	if negLoc, _ := promptTaskTargetsLine(idxDir, proj, "please clean up comments and formatting", nil, nil); negLoc != "" {
 		t.Fatalf("expected vague negative prompt to stay silent, got %q", negLoc)
+	}
+
+	// 5. Direct helper coverage for reversal clipping, breakage ranking, and workflow meta spans.
+	if !isWorkflowMetaSpan("git fetch origin main") || isWorkflowMetaSpan("AcquireQuorumEpoch") {
+		t.Errorf("unexpected isWorkflowMetaSpan behavior")
+	}
+	if !usableReversalLine("Откатил кэширование сокета, потому что оно ломало переподключение") || usableReversalLine("Verified: with the hunk reverted, test fails") {
+		t.Errorf("unexpected usableReversalLine behavior")
+	}
+	longRev := "Confirmed: First we inspected the pool stats in detail across several worker Goroutines; abandoned per-request mutex locking in LeaseStore because it deadlocked under retry storms."
+	if clipped := clipReversalDecision(longRev, 120); !strings.Contains(clipped, "abandoned") {
+		t.Errorf("expected clipReversalDecision to preserve reversal tail, got %q", clipped)
+	}
+	if !mentionsFileStrictForReversal("internal/lease_workers.go", "reverted worker retry loop") || mentionsFileStrictForReversal("internal/search/query.go", "search package cleanup") {
+		t.Errorf("unexpected mentionsFileStrictForReversal behavior")
+	}
+	if !mentionsDistinctiveSymbolForReversal([]string{"AcquireQuorumEpoch"}, "reverted AcquireQuorumEpoch lock") || mentionsDistinctiveSymbolForReversal([]string{"short"}, "reverted short") {
+		t.Errorf("unexpected mentionsDistinctiveSymbolForReversal behavior")
+	}
+	if !repoEntryMentionsFile(proj, filepath.Join(proj, "quorum_fencing.go"), "always check quorum_fencing invariants") || repoEntryMentionsFile(proj, filepath.Join(proj, "io.go"), "unrelated note") {
+		t.Errorf("unexpected repoEntryMentionsFile behavior")
+	}
+	if !isGenericDirPart("internal") || isGenericDirPart("quorum") {
+		t.Errorf("unexpected isGenericDirPart behavior")
+	}
+	fp := index.FixPair{Symbol: "LeaseStore.RenewQuorum", Why: "RenewQuorum skipped epoch check", Candidate: false}
+	if breakageContextRank(fp, []string{"RenewQuorum"}) < 7 || !whyMentionsSymbol(fp.Why, fp.Symbol) {
+		t.Errorf("unexpected breakageContextRank / whyMentionsSymbol")
+	}
+	if !decisionDuplicatesBreakageWhy("Root cause: RenewQuorum skipped epoch check during failover", "TestRenew — RenewQuorum skipped epoch check during failover") {
+		t.Errorf("expected decisionDuplicatesBreakageWhy = true")
+	}
+	if extractBrokenTestName("--- FAIL: TestVerifyManifestDigest (0.01s)") != "TestVerifyManifestDigest" || !isSpecificBreakageError("panic: nil pointer dereference") || isSpecificBreakageError("- bullet item") {
+		t.Errorf("unexpected breakage error classification")
 	}
 }

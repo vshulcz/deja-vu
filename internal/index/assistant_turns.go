@@ -96,7 +96,8 @@ func RecentSpokenAssistantTurnsForTerms(dir string, terms []string, allowedKeys 
 		if pErr != nil || len(posts) == 0 {
 			continue
 		}
-		for i := len(posts) - 1; i >= 0 && len(offs) < maxRecords*2; i-- {
+		rawCap := max(8, maxRecords*4)
+		for i := len(posts) - 1; i >= 0 && len(offs) < rawCap; i-- {
 			p := posts[i]
 			if p.Tool || !allowedOrds[p.Sid] || seenOff[p.Off] {
 				continue
@@ -109,15 +110,15 @@ func RecentSpokenAssistantTurnsForTerms(dir string, terms []string, allowedKeys 
 		return nil, nil
 	}
 	slices.Sort(offs)
-	if len(offs) > maxRecords {
-		offs = offs[len(offs)-maxRecords:]
+	if rawCap := max(8, maxRecords*4); len(offs) > rawCap {
+		offs = offs[len(offs)-rawCap:]
 	}
 	f, tbl, err := openRecordLog(dir)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = f.Close() }()
-	out := make([]Record, 0, len(offs))
+	out := make([]Record, 0, min(len(offs), maxRecords))
 	if err := eachOffsetRecordAtInRoles(f, offs, tbl, map[string]bool{"assistant": true}, func(_ int64, r Record) {
 		if r.Key != "" && allowedKeys[r.Key] {
 			out = append(out, r)
@@ -126,6 +127,9 @@ func RecentSpokenAssistantTurnsForTerms(dir string, terms []string, allowedKeys 
 		return nil, err
 	}
 	slices.Reverse(out)
+	if len(out) > maxRecords {
+		out = out[:maxRecords]
+	}
 	return out, nil
 }
 
@@ -234,4 +238,3 @@ func GiveUpRecordsForKeys(dir string, allowedKeys map[string]bool) ([]Record, er
 	}
 	return out, nil
 }
-

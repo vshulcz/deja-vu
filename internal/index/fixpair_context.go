@@ -14,12 +14,12 @@ import (
 const fixWhyMaxRunes = 160
 
 var (
-	goMethodDeclRE = regexp.MustCompile(`(?m)^\s*(?:[+-]\s*)?func\s*\(\s*(?:[A-Za-z_][A-Za-z0-9_]*\s+)?\*?([A-Za-z_][A-Za-z0-9_]*)(?:\[[^\]]*\])?\s*\)\s*([A-Za-z_][A-Za-z0-9_]*)\s*[\(\[]`)
-	goFuncDeclRE   = regexp.MustCompile(`(?m)^\s*(?:[+-]\s*)?func\s+([A-Za-z_][A-Za-z0-9_]*)\s*[\(\[]`)
-	goTypeDeclRE   = regexp.MustCompile(`(?m)^\s*(?:[+-]\s*)?type\s+([A-Za-z_][A-Za-z0-9_]*)\s+(?:struct|interface)\b`)
-	pyDefDeclRE    = regexp.MustCompile(`(?m)^\s*(?:[+-]\s*)?(?:async\s+)?(?:def|class)\s+([A-Za-z_][A-Za-z0-9_]*)\s*[\(:]`)
-	rsFnDeclRE     = regexp.MustCompile(`(?m)^\s*(?:[+-]\s*)?(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?(?:fn|struct|enum)\s+([A-Za-z_][A-Za-z0-9_]*)\s*[<\(\{]`)
-	tsFuncDeclRE   = regexp.MustCompile(`(?m)^\s*(?:[+-]\s*)?(?:export\s+)?(?:async\s+)?(?:function|class)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*[<\(\{]`)
+	goMethodDeclRE  = regexp.MustCompile(`(?m)^\s*(?:[+-]\s*)?func\s*\(\s*(?:[A-Za-z_][A-Za-z0-9_]*\s+)?\*?([A-Za-z_][A-Za-z0-9_]*)(?:\[[^\]]*\])?\s*\)\s*([A-Za-z_][A-Za-z0-9_]*)\s*[\(\[]`)
+	goFuncDeclRE    = regexp.MustCompile(`(?m)^\s*(?:[+-]\s*)?func\s+([A-Za-z_][A-Za-z0-9_]*)\s*[\(\[]`)
+	goTypeDeclRE    = regexp.MustCompile(`(?m)^\s*(?:[+-]\s*)?type\s+([A-Za-z_][A-Za-z0-9_]*)\s+(?:struct|interface)\b`)
+	pyDefDeclRE     = regexp.MustCompile(`(?m)^\s*(?:[+-]\s*)?(?:async\s+)?(?:def|class)\s+([A-Za-z_][A-Za-z0-9_]*)\s*[\(:]`)
+	rsFnDeclRE      = regexp.MustCompile(`(?m)^\s*(?:[+-]\s*)?(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?(?:fn|struct|enum)\s+([A-Za-z_][A-Za-z0-9_]*)\s*[<\(\{]`)
+	tsFuncDeclRE    = regexp.MustCompile(`(?m)^\s*(?:[+-]\s*)?(?:export\s+)?(?:async\s+)?(?:function|class)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*[<\(\{]`)
 	qualifiedCallRE = regexp.MustCompile(`(?:([A-Za-z_][A-Za-z0-9_]*)\.)?([A-Za-z_][A-Za-z0-9_]{5,})\s*\(`)
 	backtickSymRE   = regexp.MustCompile("`([A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)?)(?:\\(\\))?`")
 )
@@ -253,7 +253,7 @@ func splitCausalCandidates(text string) []string {
 		}
 		inTick := false
 		start := 0
-		for i := 0; i < len(trimmed); i++ {
+		for i := range len(trimmed) {
 			if trimmed[i] == '`' {
 				inTick = !inTick
 				continue
@@ -359,10 +359,7 @@ func isNoisyStatusSentence(s string) bool {
 			return true
 		}
 	}
-	if strings.HasSuffix(strings.TrimSpace(s), "?") {
-		return true
-	}
-	return false
+	return strings.HasSuffix(strings.TrimSpace(s), "?")
 }
 
 func clipCausalSentence(s string, maxRunes int) string {

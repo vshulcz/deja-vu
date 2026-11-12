@@ -124,6 +124,24 @@ func TestRecentSpokenAssistantTurnsForTermsSkipsToolsAndHonoursAllowedKeys(t *te
 	if len(turnsBoth) != 2 || turnsBoth[0].Key != "claude:s2" || turnsBoth[1].Key != "claude:s1" {
 		t.Errorf("expected newest-first [claude:s2, claude:s1], got %+v", turnsBoth)
 	}
+
+	// Cap truncation (maxRecords = 1), unmatched term, and unknown session key branches.
+	capped, err := RecentSpokenAssistantTurnsForTerms(dir, []string{"ab", "missingtermxyz", "throttle"}, allowed, 1)
+	if err != nil || len(capped) != 1 || capped[0].Key != "claude:s2" {
+		t.Errorf("expected newest 1 capped turn claude:s2, got %+v (err=%v)", capped, err)
+	}
+	noneByTerm, err := RecentSpokenAssistantTurnsForTerms(dir, []string{"missingtermxyz"}, allowed, 5)
+	if err != nil || len(noneByTerm) != 0 {
+		t.Errorf("expected 0 turns for unmatched term, got %+v (err=%v)", noneByTerm, err)
+	}
+	noneByKey, err := RecentSpokenAssistantTurnsForTerms(dir, []string{"throttle"}, map[string]bool{"claude:unknown": true}, 5)
+	if err != nil || len(noneByKey) != 0 {
+		t.Errorf("expected 0 turns for unknown key, got %+v (err=%v)", noneByKey, err)
+	}
+	noGiveUps, err := GiveUpRecordsForKeys(dir, allowed)
+	if err != nil || len(noGiveUps) != 0 {
+		t.Errorf("expected 0 give-up records when store has no GaveUp sessions, got %+v (err=%v)", noGiveUps, err)
+	}
 }
 
 func TestGiveUpRecordsForKeysIndexesUserAndAssistantReversalsOnly(t *testing.T) {

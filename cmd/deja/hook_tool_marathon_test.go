@@ -46,7 +46,7 @@ func TestRelayOutboxBatchHonoursAdvisoryLockTimeoutWhenDraining(t *testing.T) { 
 
 	// Session 2 is a 220-message marathon: the decision on outbox_relay.go is at message 3,
 	// followed by 215 unrelated messages that push it completely outside FindTailByIdentity(..., 150).
-	var marathon []string
+	marathon := make([]string, 0, 223)
 	marathon = append(marathon,
 		fmt.Sprintf(`{"type":"user","sessionId":"s2","cwd":%q,"timestamp":"2026-03-02T10:00:00Z","message":{"role":"user","content":"fix duplicate sends in outbox_relay.go"}}`, proj),
 		fmt.Sprintf(`{"type":"assistant","sessionId":"s2","cwd":%q,"timestamp":"2026-03-02T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"e2","name":"Edit","input":{"file_path":%q,"old_string":"nil","new_string":"nil"}}]}}`, proj, filepath.Join(proj, "outbox_relay.go")),
@@ -91,19 +91,19 @@ func TestRepoMemoryDecisionPrecisionAndMultiFileMatch(t *testing.T) {
 
 	pol := policy.Policy{}
 	// 1) A 3-file entry must match all 3 listed files (no artificial <=2 cap).
-	gotIngest := repoMemoryDecisionForFile(tmp, filepath.Join(tmp, "internal/index/ingest.go"), []string{"IngestSession"}, pol)
+	gotIngest := repoMemoryDecisionForFile(tmp, filepath.Join(tmp, "internal", "index", "ingest.go"), []string{"IngestSession"}, pol)
 	if !strings.Contains(gotIngest, "Editing writeback.go requires updating ingest.go") {
 		t.Errorf("expected 3-file repo memory match for internal/index/ingest.go, got %q", gotIngest)
 	}
 
 	// 2) Short generic symbols ("files", "status") must not cross-wire global fileless rules onto unrelated files.
-	gotUnrelated := repoMemoryDecisionForFile(tmp, filepath.Join(tmp, "cmd/app/store_rows.go"), []string{"files", "status", "rows"}, pol)
+	gotUnrelated := repoMemoryDecisionForFile(tmp, filepath.Join(tmp, "cmd", "app", "store_rows.go"), []string{"files", "status", "rows"}, pol)
 	if gotUnrelated != "" {
 		t.Errorf("expected no repo memory match for generic short symbols on unrelated file, got %q", gotUnrelated)
 	}
 
 	// 3) Directory-qualified entry internal/index/sync.go must not match cmd/app/sync.go.
-	gotWrongDir := repoMemoryDecisionForFile(tmp, filepath.Join(tmp, "cmd/app/sync.go"), []string{"runSync"}, pol)
+	gotWrongDir := repoMemoryDecisionForFile(tmp, filepath.Join(tmp, "cmd", "app", "sync.go"), []string{"runSync"}, pol)
 	if gotWrongDir != "" {
 		t.Errorf("expected directory-qualified internal/index/sync.go not to match cmd/app/sync.go, got %q", gotWrongDir)
 	}

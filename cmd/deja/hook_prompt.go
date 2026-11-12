@@ -313,86 +313,14 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	for id := range self {
 		skip[id] = true
 	}
-	promptStart := time.Now()
-	const promptSoftBudget = 1500 * time.Millisecond
-	ranked, matched, strong, naming, idfOf, err := index.ProjectRelevantNamingCut(dir, names, terms, prompt.Candidates, skip, cut)
-	// The rule every other surface applies: a promoted note goes in front of
-	// the transcript it was distilled from. This hook ranks sessions and never
-	// builds a search.Hit, so it had no note-over-source rule at all and the
-	// two slots below could go to the transcript while its own note waited
-	// behind it (#2803).
-	search.LiftNoteSessionsAboveTheirSource(ranked)
-	rankedAlreadyShown = 0
-	for _, s := range ranked {
-		if skip[s.ID] {
-			rankedAlreadyShown++
-		}
-	}
-	if err != nil || len(ranked) == 0 {
+	sel := selectPromptRankedCandidates(dir, cwd, asked, names, terms, self, skip, cut, true)
+	ranked, matched, strong, idfOf := sel.ranked, sel.matched, sel.strong, sel.idfOf
+	if len(ranked) == 0 {
 		return emitNudgeOnly(stdout, plain, nudge)
 	}
-	// The one word of the question that identifies something, kept apart for
-	// the test below: asking whether any term was spoken lets "показал" answer
-	// for "v11", and nearly every session says a word like that.
-	// The words of the question that identify something, kept apart for the
-	// test below: asking whether ANY term was spoken lets "показал" answer for
-	// "v11", and nearly every session says a word like that.
-	//
-	// One word was too few. Rareness is measured against this corpus, and in a
-	// small or homogeneous one it crowns whichever ordinary noun happens to be
-	// uncommon: on a seeded store the question "the orders service runs out of
-	// db connections" led on "service", so the session that settled it — which
-	// says "orders worker" and never "service" — was dropped at this gate
-	// while a neighbour about the reporting service was served in its place.
-	// The ranking had already put the right one first with two strong terms.
-	leadTerms := terms
-	ordered := byIdentifying(terms, idfOf)
-	if len(ordered) > 0 {
-		leadTerms = ordered[:min(len(ordered), leadTermsKept)]
-	}
-	pol := policy.Load()
-	pk := &promptPicker{
-		pol:          pol,
-		terms:        terms,
-		orderedTerms: ordered,
-		asked:        asked,
-		idfOf:        idfOf,
-		topIDF:       index.TopIDF(dir),
-		self:         self,
-		leadTerms:    leadTerms,
-		unscoped:     len(names) == 0,
-		cwdPlain:     sources.PlainProjectName(cwd),
-		deadline:     promptStart.Add(promptSoftBudget),
-		ss:           make([]model.Session, 0, 2),
-	}
-	pk.pick(ranked, matched, strong, naming)
-	// One slot left and duplicates took the window: ask for a wider one. The
-	// second pass costs a ranking read and happens only when the store said
-	// the same thing several times, which is exactly when the answer is
-	// further down than the window reached. Skip the wider retry when the soft
-	// latency budget is already exhausted, and exclude the candidates already
-	// examined in the first pass (#5901).
-	if len(pk.ss) < 2 && pk.crowdedOut > 0 && time.Since(promptStart) < promptSoftBudget {
-		widerSkip := make(map[string]bool, len(skip)+len(ranked))
-		for id := range skip {
-			widerSkip[id] = true
-		}
-		for _, s := range ranked {
-			widerSkip[s.ID] = true
-		}
-		wider, wmatched, wstrong, wnaming, _, werr := index.ProjectRelevantNamingCut(
-			dir, names, terms, prompt.Candidates*widerWindow, widerSkip, cut)
-		if werr == nil {
-			pk.pick(wider, wmatched, wstrong, wnaming)
-		}
-	}
-	pickUnscopedNamedProjects(dir, pk, names, terms, skip, cut, promptStart, promptSoftBudget)
-	ss, confident, worthDigest := pk.ss, pk.confident, pk.worthDigest
+	ss, confident, worthDigest := sel.ss, sel.confident, sel.worthDigest
 	if len(ss) == 0 {
-		if rcLine, rcTok := rankedTouchedConsensusLine(dir, cwd, ranked, matched, strong, seen, skip); rcLine != "" && !strings.Contains(nudge, "likely target:") {
-			nudge = joinPromptAdvisories(nudge, rcLine)
-			rememberInjectedIDs(dir, input.SessionID, rcTok)
-		}
+		nudge = attachRankedConsensusFallback(dir, cwd, input.SessionID, nudge, ranked, matched, strong, seen, skip, false)
 		return emitNudgeOnly(stdout, plain, nudge)
 	}
 	// Of the two candidates, lead with the one that settled something about the
@@ -445,24 +373,12 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	if worthDigest {
 		full, ok := promptDigestBodyIn(dir, cwd, input.SessionID, ss, confident, terms, idfOf, asked, nudge, rejectedWarning, ranked, matched, strong, skip)
 		if !ok {
-			if rcLine, rcTok := rankedTouchedConsensusLine(dir, cwd, ranked, matched, strong, seen, skip); rcLine != "" && !strings.Contains(nudge, "likely target:") {
-				nudge = joinPromptAdvisories(nudge, rcLine)
-				rememberInjectedIDs(dir, input.SessionID, rcTok)
-			}
+			nudge = attachRankedConsensusFallback(dir, cwd, input.SessionID, nudge, ranked, matched, strong, seen, skip, false)
 			return emitNudgeOnly(stdout, plain, nudge)
 		}
 		body = full
 	} else {
-		ptr := weakRecallPointerIn(dir, cwd, ss, terms, skip)
-		if !strings.Contains(ptr, "files edited ") && !strings.Contains(nudge, "likely target:") {
-			if rcLine, _ := rankedTouchedConsensusLine(dir, cwd, ranked, matched, strong, seen, skip); rcLine != "" {
-				ptr += rcLine + "\n"
-			}
-		}
-		body = ptr + shownInjectionWarning(ss, ss[:1])
-		if nudge != "" {
-			body += "\n" + nudge
-		}
+		body = buildWeakPromptPointerBody(dir, cwd, ss, terms, nudge, ranked, matched, strong, seen, skip)
 	}
 	// The same block twice is wallpaper, and the reader stops looking. Judged
 	// on what would be shown, so a session whose other lines answer the next
@@ -501,6 +417,133 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	rememberInjectedIDsFor(dir, input.SessionID, "", []string{askKey(terms)})
 	rememberInjectedFor(dir, input.SessionID, projectKey, ss)
 	return emitPromptBlock(stdout, dir, input.SessionID, out, ss, terms, unreadable, plain, showLine)
+}
+
+type promptRankSelection struct {
+	ranked          []model.Session
+	matched, strong []int
+	idfOf           map[string]float64
+	ss              []model.Session
+	confident       bool
+	worthDigest     bool
+}
+
+func selectPromptRankedCandidates(
+	dir, cwd, asked string,
+	names, terms []string,
+	self, skip map[string]bool,
+	cut map[string]time.Time,
+	includeUnscopedNamed bool,
+) promptRankSelection {
+	promptStart := time.Now()
+	const promptSoftBudget = 1500 * time.Millisecond
+	ranked, matched, strong, naming, idfOf, err := index.ProjectRelevantNamingCut(dir, names, terms, prompt.Candidates, skip, cut)
+	// The rule every other surface applies: a promoted note goes in front of
+	// the transcript it was distilled from. This hook ranks sessions and never
+	// builds a search.Hit, so it had no note-over-source rule at all and the
+	// two slots below could go to the transcript while its own note waited
+	// behind it (#2803).
+	search.LiftNoteSessionsAboveTheirSource(ranked)
+	rankedAlreadyShown = 0
+	for _, s := range ranked {
+		if skip[s.ID] {
+			rankedAlreadyShown++
+		}
+	}
+	if err != nil || len(ranked) == 0 {
+		return promptRankSelection{ranked: ranked, matched: matched, strong: strong, idfOf: idfOf}
+	}
+	leadTerms := terms
+	ordered := byIdentifying(terms, idfOf)
+	if len(ordered) > 0 {
+		leadTerms = ordered[:min(len(ordered), leadTermsKept)]
+	}
+	pk := &promptPicker{
+		pol:          policy.Load(),
+		terms:        terms,
+		orderedTerms: ordered,
+		asked:        asked,
+		idfOf:        idfOf,
+		topIDF:       index.TopIDF(dir),
+		self:         self,
+		leadTerms:    leadTerms,
+		unscoped:     len(names) == 0,
+		cwdPlain:     sources.PlainProjectName(cwd),
+		deadline:     promptStart.Add(promptSoftBudget),
+		ss:           make([]model.Session, 0, 2),
+	}
+	pk.pick(ranked, matched, strong, naming)
+	// One slot left and duplicates took the window: ask for a wider one. Skip
+	// the wider retry when the soft latency budget is already exhausted, and
+	// exclude the candidates already examined in the first pass (#5901).
+	if len(pk.ss) < 2 && pk.crowdedOut > 0 && time.Since(promptStart) < promptSoftBudget {
+		widerSkip := make(map[string]bool, len(skip)+len(ranked))
+		for id := range skip {
+			widerSkip[id] = true
+		}
+		for _, s := range ranked {
+			widerSkip[s.ID] = true
+		}
+		wider, wmatched, wstrong, wnaming, _, werr := index.ProjectRelevantNamingCut(
+			dir, names, terms, prompt.Candidates*widerWindow, widerSkip, cut)
+		if werr == nil {
+			pk.pick(wider, wmatched, wstrong, wnaming)
+		}
+	}
+	if includeUnscopedNamed {
+		pickUnscopedNamedProjects(dir, pk, names, terms, skip, cut, promptStart, promptSoftBudget)
+	}
+	return promptRankSelection{
+		ranked:      ranked,
+		matched:     matched,
+		strong:      strong,
+		idfOf:       idfOf,
+		ss:          pk.ss,
+		confident:   pk.confident,
+		worthDigest: pk.worthDigest,
+	}
+}
+
+func attachRankedConsensusFallback(
+	dir, cwd, sessionID, nudge string,
+	ranked []model.Session,
+	matched, strong []int,
+	seen, skip map[string]bool,
+	dryRun bool,
+) string {
+	if strings.Contains(nudge, "likely target:") {
+		return nudge
+	}
+	rcLine, rcTok := rankedTouchedConsensusLine(dir, cwd, ranked, matched, strong, seen, skip)
+	if rcLine == "" {
+		return nudge
+	}
+	if !dryRun {
+		rememberInjectedIDs(dir, sessionID, rcTok)
+	}
+	return joinPromptAdvisories(nudge, rcLine)
+}
+
+func buildWeakPromptPointerBody(
+	dir, cwd string,
+	ss []model.Session,
+	terms []string,
+	nudge string,
+	ranked []model.Session,
+	matched, strong []int,
+	seen, skip map[string]bool,
+) string {
+	ptr := weakRecallPointerIn(dir, cwd, ss, terms, skip)
+	if !strings.Contains(ptr, "files edited ") && !strings.Contains(nudge, "likely target:") {
+		if rcLine, _ := rankedTouchedConsensusLine(dir, cwd, ranked, matched, strong, seen, skip); rcLine != "" {
+			ptr += rcLine + "\n"
+		}
+	}
+	body := ptr + shownInjectionWarning(ss, ss[:1])
+	if nudge != "" {
+		body += "\n" + nudge
+	}
+	return body
 }
 
 // promptHookSkipSet is the sessions shown a moment ago, to this reader or in

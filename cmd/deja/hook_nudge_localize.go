@@ -120,7 +120,7 @@ func loadRepoSymbolMap(cwd string) repoSymbolMap {
 		if len(pkg) >= 4 && !localizeStopWords[pkg] {
 			seenStruct[pkg] = true
 		}
-		if raw, err := os.ReadFile(p); err == nil && len(raw) <= 256<<10 {
+		if raw, err := os.ReadFile(p); err == nil && len(raw) <= 256<<10 { //nolint:gosec // G122: local repo source indexing under user cwd
 			content := string(raw)
 			for line := range strings.SplitSeq(content, "\n") {
 				if id, sig := parseDeclarationLine(line); id != "" && sig != "" {
@@ -310,7 +310,41 @@ func promptTaskTargetsLine(dir, cwd, asked string, seen, skip map[string]bool) (
 	var matchedFiles []string
 
 	// 1. Check adjacent 3-word and 2-word phrases matching exact file stems or declared symbols.
-	for i := 0; i < len(words); i++ {
+	matchedFiles = matchAdjacentStemPhrases(&idx, words)
+
+	// 2. Score files by separate structural (stem/declaration) DF, rare body DF,
+	// literal diagnostic strings, NPMI co-occurrence neighbors, confirmed FixPairs,
+	// and historical Title/Settled->Touched consensus.
+	if len(matchedFiles) == 0 {
+		matchedFiles = scoreTaskTargetCandidates(dir, cwd, asked, focused, codeSpans, quotedPhrases, &idx, skip)
+	}
+
+	if len(matchedFiles) == 0 {
+		return "", nil
+	}
+	if len(matchedFiles) > 3 {
+		matchedFiles = matchedFiles[:3]
+	}
+	line := formatLocalizedTargetsLine(dir, cwd, "likely target: ", matchedFiles, skip)
+	if line == "" {
+		return "", nil
+	}
+	pTok := "prompt:loc:" + shortHash(line)
+	toks := []string{pTok}
+	var tTok string
+	if fact := dedupeFact(line); fact != line {
+		tTok = "tool:" + shortHash(fact)
+		toks = append(toks, tTok)
+	}
+	if seen != nil && (seen[pTok] || (tTok != "" && seen[tTok])) {
+		return "", nil
+	}
+	return line, toks
+}
+
+func matchAdjacentStemPhrases(idx *repoSymbolMap, words []string) []string {
+	var matchedFiles []string
+	for i := range words {
 		if localizeStopWords[words[i]] {
 			continue
 		}
@@ -335,189 +369,208 @@ func promptTaskTargetsLine(dir, cwd, asked string, seen, skip map[string]bool) (
 			}
 		}
 	}
+	return matchedFiles
+}
 
-	// 2. Score files by separate structural (stem/declaration) DF, rare body DF,
-	// literal diagnostic strings, NPMI co-occurrence neighbors, confirmed FixPairs,
-	// and historical Title/Settled->Touched consensus.
-	if len(matchedFiles) == 0 {
-		histBoost, histSessions := historicalTitleTouchedBoost(dir, cwd, asked, skip)
-		fixBoost, fixHits := fixPairTargetBoost(dir, cwd, asked, skip)
-		structRareCap := max(10, idx.numFiles/22)
-		structVeryRareCap := max(5, idx.numFiles/55)
-		bodyRareCap := max(6, idx.numFiles/45)
-		projSelf := selfProjectWordSet(cwd)
-		qWords, boostWords := selectPrioritizedTaskWords(focused, codeSpans, quotedPhrases, projSelf, 28)
-		diagBoost := matchDiagnosticPhraseFiles(cwd, &idx, quotedPhrases, projSelf)
-		cooccurVotes := map[string]int{}
-		if dir != "" && planIndexReady(dir) {
-			for _, qt := range extractHistoricalQueryTerms(asked, projSelf) {
-				if idx.structDF[qt] > 0 || idx.bodyDF[qt] > 0 {
-					continue
-				}
-				nbs := index.CooccurNeighbors(dir, qt)
-				if len(nbs) > 5 {
-					nbs = nbs[:5]
-				}
-				seenNB := map[string]bool{}
-				for _, nb := range nbs {
-					nb = strings.Trim(strings.ToLower(nb), "._-/")
-					if len(nb) < 4 || seenNB[nb] || qWords[nb] || localizeStopWords[nb] || projSelf[nb] {
-						continue
-					}
-					if idx.structDF[nb] > 0 && idx.structDF[nb] <= structVeryRareCap {
-						seenNB[nb] = true
-						cooccurVotes[nb]++
-					}
-				}
+type taskScoreParams struct {
+	idx               *repoSymbolMap
+	qWords            map[string]bool
+	boostWords        map[string]bool
+	diagBoost         map[string]float64
+	fixBoost          map[string]float64
+	fixHits           map[string]int
+	histBoost         map[string]float64
+	histSessions      map[string]int
+	cooccurVotes      map[string]int
+	effectiveN        int
+	structRareCap     int
+	structVeryRareCap int
+	bodyRareCap       int
+}
+
+func collectCooccurNeighborVotes(dir, asked string, idx *repoSymbolMap, qWords, projSelf map[string]bool, structVeryRareCap int) map[string]int {
+	votes := map[string]int{}
+	if dir == "" || !planIndexReady(dir) {
+		return votes
+	}
+	for _, qt := range extractHistoricalQueryTerms(asked, projSelf) {
+		if idx.structDF[qt] > 0 || idx.bodyDF[qt] > 0 {
+			continue
+		}
+		nbs := index.CooccurNeighbors(dir, qt)
+		if len(nbs) > 5 {
+			nbs = nbs[:5]
+		}
+		seenNB := map[string]bool{}
+		for _, nb := range nbs {
+			nb = strings.Trim(strings.ToLower(nb), "._-/")
+			if len(nb) < 4 || seenNB[nb] || qWords[nb] || localizeStopWords[nb] || projSelf[nb] {
+				continue
+			}
+			if idx.structDF[nb] > 0 && idx.structDF[nb] <= structVeryRareCap {
+				seenNB[nb] = true
+				votes[nb]++
 			}
 		}
-		type cand struct {
-			rel   string
-			score float64
+	}
+	return votes
+}
+
+func scoreSingleRepoFile(f repoFileEntry, p *taskScoreParams) (float64, bool) {
+	var score float64
+	rareHits := 0
+	anchorHit := false
+	idx := p.idx
+	if len(f.stem) >= 7 && p.qWords[f.stem] && idx.stemDF[f.stem] == 1 && idx.structDF[f.stem] <= p.structVeryRareCap {
+		score += 7.5
+		rareHits += 2
+		anchorHit = true
+	}
+	if db := p.diagBoost[f.rel]; db > 0 {
+		score += db
+		rareHits += 2
+		anchorHit = true
+	}
+	for qw := range p.qWords {
+		mult := 1.0
+		if p.boostWords[qw] {
+			mult = 1.20
 		}
-		var cands []cand
-		effectiveN := max(idx.numFiles, 24)
-		for _, f := range idx.files {
-			var score float64
-			rareHits := 0
-			anchorHit := false
-			if len(f.stem) >= 7 && qWords[f.stem] && idx.stemDF[f.stem] == 1 && idx.structDF[f.stem] <= structVeryRareCap {
-				score += 7.5
-				rareHits += 2
+		sDF := idx.structDF[qw]
+		inStem := f.stemWords[qw]
+		inDecl := f.declWords[qw] || f.declExact[qw]
+		if (inStem || inDecl || f.pkg == qw) && sDF > 0 && sDF <= p.structRareCap {
+			idf := math.Log(1.0+float64(p.effectiveN)/float64(sDF)) * mult
+			rareHits++
+			switch {
+			case inStem:
+				score += idf * 1.75
+				if sDF <= p.structVeryRareCap {
+					anchorHit = true
+				}
+			case f.declExact[qw] && len(qw) >= 7 && idx.declDF[qw] <= 2:
+				score += idf * 2.0
+				anchorHit = true
+			case inDecl:
+				score += idf * 1.25
+				if sDF <= p.structVeryRareCap {
+					anchorHit = true
+				}
+			default:
+				score += idf * 0.75
+			}
+			continue
+		}
+		bDF := idx.bodyDF[qw]
+		bodyTF := f.bodyWords[qw]
+		if bodyTF > 0 && bDF > 0 && bDF <= p.bodyRareCap && len(qw) >= 5 {
+			idf := math.Log(1.0+float64(p.effectiveN)/float64(bDF)) * mult
+			tfBoost := 1.0 + 0.15*math.Min(float64(bodyTF-1), 4)
+			score += idf * 0.80 * tfBoost
+			rareHits++
+			if bDF <= max(3, idx.numFiles/90) && bodyTF >= 2 {
 				anchorHit = true
 			}
-			if db := diagBoost[f.rel]; db > 0 {
-				score += db
-				rareHits += 2
-				anchorHit = true
-			}
-			for qw := range qWords {
-				mult := 1.0
-				if boostWords[qw] {
-					mult = 1.20
-				}
-				sDF := idx.structDF[qw]
-				inStem := f.stemWords[qw]
-				inDecl := f.declWords[qw] || f.declExact[qw]
-				if (inStem || inDecl || f.pkg == qw) && sDF > 0 && sDF <= structRareCap {
-					idf := math.Log(1.0+float64(effectiveN)/float64(sDF)) * mult
-					rareHits++
-					switch {
-					case inStem:
-						score += idf * 1.75
-						if sDF <= structVeryRareCap {
-							anchorHit = true
-						}
-					case f.declExact[qw] && len(qw) >= 7 && idx.declDF[qw] <= 2:
-						score += idf * 2.0
-						anchorHit = true
-					case inDecl:
-						score += idf * 1.25
-						if sDF <= structVeryRareCap {
-							anchorHit = true
-						}
-					default:
-						score += idf * 0.75
-					}
-					continue
-				}
-				bDF := idx.bodyDF[qw]
-				bodyTF := f.bodyWords[qw]
-				if bodyTF > 0 && bDF > 0 && bDF <= bodyRareCap && len(qw) >= 5 {
-					idf := math.Log(1.0+float64(effectiveN)/float64(bDF)) * mult
-					tfBoost := 1.0 + 0.15*math.Min(float64(bodyTF-1), 4)
-					score += idf * 0.80 * tfBoost
-					rareHits++
-					if bDF <= max(3, idx.numFiles/90) && bodyTF >= 2 {
-						anchorHit = true
-					}
-				}
-			}
-			if fb := fixBoost[f.rel]; fb > 0 {
-				score += fb
-				if fixHits[f.rel] >= 2 {
-					rareHits += 2
-					anchorHit = true
-				} else if rareHits >= 1 {
-					rareHits++
-					anchorHit = true
-				}
-			}
-			if hb := histBoost[f.rel]; hb > 0 {
-				score += hb
-				if histSessions[f.rel] >= 2 || hb >= 5.2 {
-					rareHits += 2
-					anchorHit = true
-				} else if rareHits >= 1 {
-					rareHits++
-					anchorHit = true
-				}
-			}
-			for nb, votes := range cooccurVotes {
-				if !f.stemWords[nb] && !f.declWords[nb] && !f.declExact[nb] {
-					continue
-				}
-				idf := math.Log(1.0 + float64(effectiveN)/float64(idx.structDF[nb]))
-				if votes >= 2 {
-					score += idf * 1.15
-					rareHits++
-					anchorHit = true
-				} else if rareHits >= 1 {
-					score += idf * 0.55
-					rareHits++
-				}
-			}
-			if rareHits >= 2 && anchorHit && score >= 6.4 {
-				cands = append(cands, cand{rel: f.rel, score: score})
-			}
-		}
-		slices.SortFunc(cands, func(a, b cand) int {
-			if a.score != b.score {
-				if a.score > b.score {
-					return -1
-				}
-				return 1
-			}
-			return strings.Compare(a.rel, b.rel)
-		})
-		if len(cands) > 0 {
-			maxSpecificCands := max(12, idx.numFiles/35)
-			concentrated := len(cands) <= maxSpecificCands ||
-				cands[0].score >= cands[maxSpecificCands-1].score*1.28 ||
-				(cands[0].score >= 11.0 && len(cands) > 5 && cands[0].score >= cands[5].score*1.35)
-			if concentrated {
-				matchedFiles = appendUniqueRel(matchedFiles, cands[0].rel)
-				if len(cands) > 1 && cands[1].score >= cands[0].score*0.75 {
-					matchedFiles = appendUniqueRel(matchedFiles, cands[1].rel)
-				}
-				if len(cands) > 2 && cands[2].score >= cands[0].score*0.82 {
-					matchedFiles = appendUniqueRel(matchedFiles, cands[2].rel)
-				}
-			}
 		}
 	}
+	if fb := p.fixBoost[f.rel]; fb > 0 {
+		score += fb
+		if p.fixHits[f.rel] >= 2 {
+			rareHits += 2
+			anchorHit = true
+		} else if rareHits >= 1 {
+			rareHits++
+			anchorHit = true
+		}
+	}
+	if hb := p.histBoost[f.rel]; hb > 0 {
+		score += hb
+		if p.histSessions[f.rel] >= 2 || hb >= 5.2 {
+			rareHits += 2
+			anchorHit = true
+		} else if rareHits >= 1 {
+			rareHits++
+			anchorHit = true
+		}
+	}
+	for nb, votes := range p.cooccurVotes {
+		if !f.stemWords[nb] && !f.declWords[nb] && !f.declExact[nb] {
+			continue
+		}
+		idf := math.Log(1.0 + float64(p.effectiveN)/float64(idx.structDF[nb]))
+		if votes >= 2 {
+			score += idf * 1.15
+			rareHits++
+			anchorHit = true
+		} else if rareHits >= 1 {
+			score += idf * 0.55
+			rareHits++
+		}
+	}
+	return score, rareHits >= 2 && anchorHit && score >= 6.4
+}
 
-	if len(matchedFiles) == 0 {
-		return "", nil
+func scoreTaskTargetCandidates(dir, cwd, asked, focused string, codeSpans, quotedPhrases []string, idx *repoSymbolMap, skip map[string]bool) []string {
+	histBoost, histSessions := historicalTitleTouchedBoost(dir, cwd, asked, skip)
+	fixBoost, fixHits := fixPairTargetBoost(dir, cwd, asked, skip)
+	structRareCap := max(10, idx.numFiles/22)
+	structVeryRareCap := max(5, idx.numFiles/55)
+	bodyRareCap := max(6, idx.numFiles/45)
+	projSelf := selfProjectWordSet(cwd)
+	qWords, boostWords := selectPrioritizedTaskWords(focused, codeSpans, quotedPhrases, projSelf, 28)
+	params := taskScoreParams{
+		idx:               idx,
+		qWords:            qWords,
+		boostWords:        boostWords,
+		diagBoost:         matchDiagnosticPhraseFiles(cwd, idx, quotedPhrases, projSelf),
+		fixBoost:          fixBoost,
+		fixHits:           fixHits,
+		histBoost:         histBoost,
+		histSessions:      histSessions,
+		cooccurVotes:      collectCooccurNeighborVotes(dir, asked, idx, qWords, projSelf, structVeryRareCap),
+		effectiveN:        max(idx.numFiles, 24),
+		structRareCap:     structRareCap,
+		structVeryRareCap: structVeryRareCap,
+		bodyRareCap:       bodyRareCap,
 	}
-	if len(matchedFiles) > 3 {
-		matchedFiles = matchedFiles[:3]
+	type cand struct {
+		rel   string
+		score float64
 	}
-	line := formatLocalizedTargetsLine(dir, cwd, "likely target: ", matchedFiles, skip)
-	if line == "" {
-		return "", nil
+	var cands []cand
+	for _, f := range idx.files {
+		if score, ok := scoreSingleRepoFile(f, &params); ok {
+			cands = append(cands, cand{rel: f.rel, score: score})
+		}
 	}
-	pTok := "prompt:loc:" + shortHash(line)
-	toks := []string{pTok}
-	var tTok string
-	if fact := dedupeFact(line); fact != line {
-		tTok = "tool:" + shortHash(fact)
-		toks = append(toks, tTok)
+	if len(cands) == 0 {
+		return nil
 	}
-	if seen != nil && (seen[pTok] || (tTok != "" && seen[tTok])) {
-		return "", nil
+	slices.SortFunc(cands, func(a, b cand) int {
+		if a.score != b.score {
+			if a.score > b.score {
+				return -1
+			}
+			return 1
+		}
+		return strings.Compare(a.rel, b.rel)
+	})
+	maxSpecificCands := max(12, idx.numFiles/35)
+	concentrated := len(cands) <= maxSpecificCands ||
+		cands[0].score >= cands[maxSpecificCands-1].score*1.28 ||
+		(cands[0].score >= 11.0 && len(cands) > 5 && cands[0].score >= cands[5].score*1.35)
+	if !concentrated {
+		return nil
 	}
-	return line, toks
+	var matchedFiles []string
+	matchedFiles = appendUniqueRel(matchedFiles, cands[0].rel)
+	if len(cands) > 1 && cands[1].score >= cands[0].score*0.75 {
+		matchedFiles = appendUniqueRel(matchedFiles, cands[1].rel)
+	}
+	if len(cands) > 2 && cands[2].score >= cands[0].score*0.82 {
+		matchedFiles = appendUniqueRel(matchedFiles, cands[2].rel)
+	}
+	return matchedFiles
 }
 
 func selfProjectWordSet(cwd string) map[string]bool {
@@ -705,7 +758,7 @@ func focusTaskPrompt(asked string) (focused string, codeSpans []string, quotedPh
 			continue
 		}
 		var keptClauses []string
-		for _, sent := range strings.Split(line, ". ") {
+		for sent := range strings.SplitSeq(line, ". ") {
 			sTrim := strings.TrimSpace(sent)
 			if sTrim == "" {
 				continue
@@ -1032,13 +1085,6 @@ func historicalTitleTouchedBoost(dir, cwd, asked string, skip map[string]bool) (
 		}
 	}
 	return boost, sessCount
-}
-
-// sessionActionMapLine extracts the concrete repository source files edited in
-// recalled sessions (plus any verified test command) so Turn-0 recall hands
-// the agent exact edit targets instead of conversational prose alone.
-func sessionActionMapLine(dir, cwd string, ss []model.Session, skip map[string]bool) string {
-	return sessionActionMapLineForPrompt(dir, cwd, "", ss, skip)
 }
 
 func sessionActionMapLineForPrompt(dir, cwd, asked string, ss []model.Session, skip map[string]bool) string {
