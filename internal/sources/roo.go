@@ -28,8 +28,15 @@ import (
 // the same envelope unwrapping applies.
 
 // RooExtensionID is the publisher and name of the VS Code extension, which is
-// also the directory its settings live in.
-const RooExtensionID = "rooveterinaryinc.roo-cline"
+// also the directory its settings live in. ZooExtensionID is the community
+// continuation under ZooCodeOrganization, which keeps the same task and
+// settings layout under its own globalStorage directory.
+const (
+	RooExtensionID = "rooveterinaryinc.roo-cline"
+	ZooExtensionID = "zoocodeorganization.zoo-code"
+)
+
+var rooExtensionIDs = []string{RooExtensionID, ZooExtensionID}
 
 // RooDefaultRoot is the extension's globalStorage directory in VS Code, for a
 // report to name on a machine where Roo is not installed yet.
@@ -37,7 +44,7 @@ func RooDefaultRoot() string {
 	return filepath.Join(vsCodeUserDir("Code"), "globalStorage", RooExtensionID)
 }
 
-// RooRoots lists the VS Code globalStorage dirs of the Roo extension.
+// RooRoots lists the VS Code globalStorage dirs of the Roo and Zoo Code extensions.
 func RooRoots() []string {
 	if list := os.Getenv("DEJA_ROO_ROOTS"); list != "" {
 		var out []string
@@ -48,28 +55,25 @@ func RooRoots() []string {
 		}
 		return out
 	}
-	var bases []string
+	var app string
 	switch runtime.GOOS {
 	case "darwin":
-		app := filepath.Join(Home(), "Library", "Application Support")
-		for _, host := range []string{"Code", "Code - Insiders", "VSCodium", "Cursor", "Windsurf"} {
-			bases = append(bases, filepath.Join(app, host, "User", "globalStorage", RooExtensionID))
-		}
+		app = filepath.Join(Home(), "Library", "Application Support")
 	case "windows":
-		app := os.Getenv("APPDATA")
+		app = os.Getenv("APPDATA")
 		if app == "" {
 			app = filepath.Join(Home(), "AppData", "Roaming")
 		}
-		for _, host := range []string{"Code", "Code - Insiders", "VSCodium", "Cursor", "Windsurf"} {
-			bases = append(bases, filepath.Join(app, host, "User", "globalStorage", RooExtensionID))
-		}
 	default:
-		cfg := os.Getenv("XDG_CONFIG_HOME")
-		if cfg == "" {
-			cfg = filepath.Join(Home(), ".config")
+		app = os.Getenv("XDG_CONFIG_HOME")
+		if app == "" {
+			app = filepath.Join(Home(), ".config")
 		}
-		for _, host := range []string{"Code", "Code - Insiders", "VSCodium", "Cursor", "Windsurf"} {
-			bases = append(bases, filepath.Join(cfg, host, "User", "globalStorage", RooExtensionID))
+	}
+	var bases []string
+	for _, host := range []string{"Code", "Code - Insiders", "VSCodium", "Cursor", "Windsurf"} {
+		for _, ext := range rooExtensionIDs {
+			bases = append(bases, filepath.Join(app, host, "User", "globalStorage", ext))
 		}
 	}
 	// The roo CLI runs the same extension against a VS Code shim, so its
@@ -77,19 +81,26 @@ func RooRoots() []string {
 	// layout, so the parser needs nothing new — only the path.
 	bases = append(bases, RooCLIRoot())
 	bases = append(bases, rooCustomStorageRoots()...)
+	seen := make(map[string]bool, len(bases))
 	var out []string
 	for _, b := range bases {
+		clean := filepath.Clean(b)
+		if seen[clean] {
+			continue
+		}
 		if fi, err := os.Stat(b); err == nil && fi.IsDir() {
+			seen[clean] = true
 			out = append(out, b)
 		}
 	}
 	return out
 }
 
-// rooCustomStorageRoots reads the `roo-cline.customStoragePath` setting each
-// VS Code host may carry. Roo writes it with ConfigurationTarget.Global, so it
-// lives in the host's User/settings.json, and when it is set the tasks are
-// there and nowhere else — deja would otherwise index none of that history.
+// rooCustomStorageRoots reads the `roo-cline.customStoragePath` and
+// `zoo-code.customStoragePath` settings each VS Code host may carry. Both
+// extensions write it with ConfigurationTarget.Global, so it lives in the
+// host's User/settings.json, and when it is set the tasks are there and
+// nowhere else — deja would otherwise index none of that history.
 func rooCustomStorageRoots() []string {
 	var out []string
 	for _, settings := range vsCodeUserSettingsPaths() {
@@ -103,8 +114,10 @@ func rooCustomStorageRoots() []string {
 		if json.Unmarshal(stripJSONCComments(b), &cfg) != nil {
 			continue
 		}
-		if p, _ := cfg["roo-cline.customStoragePath"].(string); strings.TrimSpace(p) != "" {
-			out = append(out, expandTilde(strings.TrimSpace(p)))
+		for _, key := range []string{"roo-cline.customStoragePath", "zoo-code.customStoragePath"} {
+			if p, _ := cfg[key].(string); strings.TrimSpace(p) != "" {
+				out = append(out, expandTilde(strings.TrimSpace(p)))
+			}
 		}
 	}
 	return out
