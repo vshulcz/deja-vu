@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 )
@@ -77,5 +78,114 @@ func TestEachAssistantTurnSinceReportsAMissingStore(t *testing.T) {
 	setHome(t, t.TempDir())
 	if err := EachAssistantTurnSince(filepath.Join(t.TempDir(), "none.db"), time.Time{}, nil, func(SessionMeta, string, time.Time) {}); err == nil {
 		t.Fatal("a store that does not exist must be an error, not an empty week")
+	}
+}
+
+func TestRecentSpokenAssistantTurnsForTermsSkipsToolsAndHonoursAllowedKeys(t *testing.T) {
+	h := newTwoWayEnv(t)
+	s1 := hPrompt("ledger", "s1", 2, 0, "update throttle.go") +
+		hBash("ledger", "s1", 2, 1, "t1", "cat throttle.go", "package ledger // throttle.go in tool output only", false) +
+		hSay("ledger", "s1", 2, 2, "We settled on token bucket in throttle.go because leaky bucket starved bursts.")
+	s2 := hPrompt("ledger", "s2", 3, 0, "check throttle.go") +
+		hSay("ledger", "s2", 3, 1, "In s2 we kept throttle.go burst capacity at 64.")
+	s3 := hPrompt("ledger", "s3", 4, 0, "inspect throttle.go") +
+		hBash("ledger", "s3", 4, 1, "t2", "grep bucket throttle.go", "throttle.go token bucket", false) +
+		hSay("ledger", "s3", 4, 2, "All checks completed.")
+
+	h.put("ledger", "s1", s1)
+	h.put("ledger", "s2", s2)
+	h.put("ledger", "s3", s3)
+
+	dir := filepath.Join(h.tmp, "idx.db")
+	if err := Ensure(dir, "claude", false, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	allowed := map[string]bool{
+		"claude:s1": true,
+		"claude:s3": true, // s3 only mentions throttle in tool output, not spoken assistant text
+	}
+	turns, err := RecentSpokenAssistantTurnsForTerms(dir, []string{"throttle"}, allowed, 10)
+	if err != nil {
+		t.Fatalf("RecentSpokenAssistantTurnsForTerms: %v", err)
+	}
+	if len(turns) != 1 {
+		t.Fatalf("expected 1 spoken assistant turn from allowed sessions, got %d: %+v", len(turns), turns)
+	}
+	if turns[0].Key != "claude:s1" || !strings.Contains(turns[0].Text, "starved bursts") {
+		t.Errorf("unexpected turn returned: %+v", turns[0])
+	}
+
+	allowed["claude:s2"] = true
+	turnsBoth, err := RecentSpokenAssistantTurnsForTerms(dir, []string{"throttle"}, allowed, 10)
+	if err != nil {
+		t.Fatalf("RecentSpokenAssistantTurnsForTerms with s2: %v", err)
+	}
+	if len(turnsBoth) != 2 || turnsBoth[0].Key != "claude:s2" || turnsBoth[1].Key != "claude:s1" {
+		t.Errorf("expected newest-first [claude:s2, claude:s1], got %+v", turnsBoth)
+	}
+
+	// Cap truncation (maxRecords = 1), unmatched term, and unknown session key branches.
+	capped, err := RecentSpokenAssistantTurnsForTerms(dir, []string{"ab", "missingtermxyz", "throttle"}, allowed, 1)
+	if err != nil || len(capped) != 1 || capped[0].Key != "claude:s2" {
+		t.Errorf("expected newest 1 capped turn claude:s2, got %+v (err=%v)", capped, err)
+	}
+	noneByTerm, err := RecentSpokenAssistantTurnsForTerms(dir, []string{"missingtermxyz"}, allowed, 5)
+	if err != nil || len(noneByTerm) != 0 {
+		t.Errorf("expected 0 turns for unmatched term, got %+v (err=%v)", noneByTerm, err)
+	}
+	noneByKey, err := RecentSpokenAssistantTurnsForTerms(dir, []string{"throttle"}, map[string]bool{"claude:unknown": true}, 5)
+	if err != nil || len(noneByKey) != 0 {
+		t.Errorf("expected 0 turns for unknown key, got %+v (err=%v)", noneByKey, err)
+	}
+	noGiveUps, err := GiveUpRecordsForKeys(dir, allowed)
+	if err != nil || len(noGiveUps) != 0 {
+		t.Errorf("expected 0 give-up records when store has no GaveUp sessions, got %+v (err=%v)", noGiveUps, err)
+	}
+}
+
+func TestGiveUpRecordsForKeysIndexesUserAndAssistantReversalsOnly(t *testing.T) {
+	h := newTwoWayEnv(t)
+	s1 := hPrompt("ledger", "s1", 2, 0, "try batching outbox") +
+		hBash("ledger", "s1", 2, 1, "t1", "git status", "reverted in tool output only", false) +
+		hSay("ledger", "s1", 2, 2, "Routine progress note without any rollback.") +
+		hSay("ledger", "s1", 2, 3, "We reverted batchFlushOutbox because holding the lock across network I/O caused deadlocks.")
+	s2 := hPrompt("ledger", "s2", 3, 0, "Откатили локальный кеш в dispatcher.go, потому что он ломал порядок доставки.") +
+		hSay("ledger", "s2", 3, 1, "Записал, оставляем прямую запись.")
+	s3 := hPrompt("ledger", "s3", 4, 0, "checkテスト") +
+		hSay("ledger", "s3", 4, 1, "Each new test failed with its fix reverted.")
+
+	h.put("ledger", "s1", s1)
+	h.put("ledger", "s2", s2)
+	h.put("ledger", "s3", s3)
+
+	dir := filepath.Join(h.tmp, "idx.db")
+	if err := Ensure(dir, "claude", false, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	recs, err := GiveUpRecordsForKeys(dir, map[string]bool{
+		"claude:s1": true,
+		"claude:s2": true,
+		"claude:s3": true,
+	})
+	if err != nil {
+		t.Fatalf("GiveUpRecordsForKeys: %v", err)
+	}
+	if len(recs) != 2 {
+		t.Fatalf("expected 2 spoken reversal records (assistant s1 + user s2, excluding tool output and s3 test-soundness rollback), got %d: %+v", len(recs), recs)
+	}
+	seen := map[string]string{}
+	for _, r := range recs {
+		seen[r.Key] = r.Role + ":" + r.Text
+	}
+	if !strings.Contains(seen["claude:s1"], "assistant:") || !strings.Contains(seen["claude:s1"], "batchFlushOutbox") {
+		t.Errorf("missing or wrong s1 assistant reversal: %q", seen["claude:s1"])
+	}
+	if !strings.Contains(seen["claude:s2"], "user:") || !strings.Contains(seen["claude:s2"], "dispatcher.go") {
+		t.Errorf("missing or wrong s2 user reversal: %q", seen["claude:s2"])
+	}
+	if _, bad := seen["claude:s3"]; bad {
+		t.Errorf("test-soundness rollback s3 must not be indexed as GiveUp: %q", seen["claude:s3"])
 	}
 }

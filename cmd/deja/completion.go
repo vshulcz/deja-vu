@@ -106,9 +106,11 @@ _deja_completion() {
             ;;
         bench)
             if (( COMP_CWORD == 2 )); then
-                COMPREPLY=( $(compgen -W "recall context prompt block ingest read" -- "$cur") )
+                COMPREPLY=( $(compgen -W "recall context prompt block ingest read live" -- "$cur") )
             elif [[ "$prev" == "--seed" ]]; then
                 COMPREPLY=()
+            elif [[ "$action" == "live" ]]; then
+                COMPREPLY=( $(compgen -W "--json" -- "$cur") )
             elif [[ "$action" == "recall" || "$action" == "context" || "$action" == "prompt"|| "$action" == "block" || "$action" == "ingest" || "$action" == "read" ]]; then
                 COMPREPLY=( $(compgen -W "--json --seed" -- "$cur") )
             fi
@@ -432,7 +434,9 @@ _deja() {
       ;;
     bench)
       if (( CURRENT == 3 )); then
-        _values 'benchmark' recall context prompt block ingest read
+        _values 'benchmark' recall context prompt block ingest read live
+      elif [[ "$words[3]" == "live" ]]; then
+        _arguments '--json[print JSON]'
       else
         _arguments '--json[print JSON]' '--seed=[benchmark seed]:seed:'
       fi
@@ -627,8 +631,8 @@ complete -c deja -n '__fish_seen_subcommand_from origin review' -l json
 complete -c deja -n '__fish_seen_subcommand_from origin review' -l harness -r -a '%HARNESSES%'
 complete -c deja -n '__fish_seen_subcommand_from origin review' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from origin review' -l limit -r
-complete -c deja -n '__fish_seen_subcommand_from bench; and not __fish_seen_subcommand_from recall context prompt block ingest read' -a 'recall context prompt block ingest read'
-complete -c deja -n '__fish_seen_subcommand_from bench; and __fish_seen_subcommand_from recall context prompt block ingest read' -l json
+complete -c deja -n '__fish_seen_subcommand_from bench; and not __fish_seen_subcommand_from recall context prompt block ingest read live' -a 'recall context prompt block ingest read live'
+complete -c deja -n '__fish_seen_subcommand_from bench; and __fish_seen_subcommand_from recall context prompt block ingest read live' -l json
 complete -c deja -n '__fish_seen_subcommand_from bench; and __fish_seen_subcommand_from recall context prompt block ingest read' -l seed -r
 complete -c deja -n '__fish_seen_subcommand_from doctor' -l json
 complete -c deja -n '__fish_seen_subcommand_from doctor' -l offline
@@ -803,8 +807,9 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 else { @('--json', '--harness', '--project', '--limit') }
             }
             'bench' {
-                if ($argumentPosition -eq 1) { @('recall', 'context', 'prompt', 'block', 'ingest', 'read') }
+                if ($argumentPosition -eq 1) { @('recall', 'context', 'prompt', 'block', 'ingest', 'read', 'live') }
                 elseif ($previous -eq '--seed') { @() }
+                elseif ($action -eq 'live') { @('--json') }
                 else { @('--json', '--seed') }
             }
             'completion' { @('bash', 'zsh', 'fish', 'powershell', 'pwsh') }

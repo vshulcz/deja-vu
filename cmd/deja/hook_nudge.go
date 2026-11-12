@@ -64,11 +64,20 @@ func joinPromptAdvisories(parts ...string) string {
 // and returns any high-precision repo-memory guardrail or verified error fix
 // matching the user's prompt.
 func promptDirectContext(dir, cwd, sessionID, asked string, prevAssistant ...string) string {
+	return promptDirectContextIn(dir, cwd, sessionID, asked, false, nil, prevAssistant...)
+}
+
+func promptDirectContextIn(dir, cwd, sessionID, asked string, readOnly bool, skip map[string]bool, prevAssistant ...string) string {
 	if strings.TrimSpace(asked) == "" || digest.IsAgentArtifact(asked) {
 		return ""
 	}
-	autoRecordPromptCorrection(cwd, sessionID, asked)
-	seen := alreadyInjected(dir, sessionID)
+	if !readOnly {
+		autoRecordPromptCorrection(cwd, sessionID, asked)
+	}
+	var seen map[string]bool
+	if !readOnly {
+		seen = alreadyInjected(dir, sessionID)
+	}
 	var lines []string
 	var tokens []string
 	if srLine, srTok := sessionStandingRuleLine(dir, cwd, sessionID, asked, seen, prevAssistant...); srLine != "" {
@@ -83,14 +92,28 @@ func promptDirectContext(dir, cwd, sessionID, asked string, prevAssistant ...str
 		lines = append(lines, fxLine)
 		tokens = append(tokens, fxTok)
 	}
-	if fbLine, fbToks := promptFileBriefLine(dir, cwd, asked, seen); fbLine != "" {
+	namedSourceFile := false
+	if fbLine, fbToks := promptFileBriefLineIn(dir, cwd, asked, seen, skip); fbLine != "" {
 		lines = append(lines, fbLine)
 		tokens = append(tokens, fbToks...)
-	} else if sbLine, sbTok := promptSymbolBriefLine(cwd, asked, seen); sbLine != "" {
-		lines = append(lines, sbLine)
-		tokens = append(tokens, sbTok)
+		if head, _, _ := strings.Cut(fbLine, " — "); isLocalizableSourcePath(head, filepath.Base(head)) {
+			namedSourceFile = true
+		}
 	}
-	if sessionID != "" && len(tokens) > 0 {
+	if !namedSourceFile {
+		sbLine, sbTok := promptSymbolBriefLine(cwd, asked, seen)
+		if sbLine != "" {
+			lines = append(lines, sbLine)
+			tokens = append(tokens, sbTok)
+		}
+		if locLine, locToks := promptTaskTargetsLine(dir, cwd, asked, seen, skip); locLine != "" {
+			if sbLine == "" || !symbolBriefAlreadyCoversTarget(sbLine, locLine) {
+				lines = append(lines, locLine)
+				tokens = append(tokens, locToks...)
+			}
+		}
+	}
+	if !readOnly && sessionID != "" && len(tokens) > 0 {
 		rememberInjectedIDs(dir, sessionID, tokens...)
 	}
 	return strings.Join(lines, "\n")
@@ -108,7 +131,7 @@ func promptSymbolBriefLine(cwd, asked string, seen map[string]bool) (string, str
 	checked := map[string]bool{}
 	for _, tok := range identifierTokens(asked) {
 		low := strings.ToLower(tok)
-		if len(low) < 6 || checked[low] || !hasMixedCaseOrUnderscore(tok) || isCommonKeyword(low) {
+		if len(low) < 6 || checked[low] || !isSymbolLikeCaseOrUnderscore(tok) || isCommonKeyword(low) {
 			continue
 		}
 		checked[low] = true
@@ -139,6 +162,10 @@ func promptSymbolBriefLine(cwd, asked string, seen map[string]bool) (string, str
 // in the repository and returns a compact 1-line brief with its coupled
 // companion file and verified test command so the agent has both at Turn 0.
 func promptFileBriefLine(dir, cwd, asked string, seen map[string]bool) (string, []string) {
+	return promptFileBriefLineIn(dir, cwd, asked, seen, nil)
+}
+
+func promptFileBriefLineIn(dir, cwd, asked string, seen, skip map[string]bool) (string, []string) {
 	if cwd == "" {
 		return "", nil
 	}
@@ -146,6 +173,8 @@ func promptFileBriefLine(dir, cwd, asked string, seen map[string]bool) (string, 
 	projects := sync.OnceValue(func() []string { return digest.ProjectNameCandidates(cwd) })
 	pol := policy.Load()
 	seenFiles := map[string]bool{}
+	var docFallbackLine string
+	var docFallbackToks []string
 	for tok := range strings.FieldsSeq(asked) {
 		tok = strings.Trim(tok, "\"'`(),:;!?[]{}<>")
 		if idx := strings.IndexByte(tok, ':'); idx > 0 {
@@ -167,6 +196,9 @@ func promptFileBriefLine(dir, cwd, asked string, seen map[string]bool) (string, 
 		var inScope []index.SessionMeta
 		if dir != "" && planIndexReady(dir) {
 			for _, meta := range index.FileSessions(dir, rel) {
+				if skip != nil && skip[meta.ID] {
+					continue
+				}
 				if !pol.Allows(policy.ActivationAuto, meta.Project) {
 					continue
 				}
@@ -182,31 +214,29 @@ func promptFileBriefLine(dir, cwd, asked string, seen map[string]bool) (string, 
 		}
 		ran := fileHookRanLineFor(dir, rel, inScope)
 		if ran == "" {
-			ran = siblingTestLineFor(cwd, rel, nil)
+			_, fileSyms := fileHookSymbols(cwd, rel, "")
+			ran = siblingTestLineFor(cwd, rel, fileSyms)
 		}
-		repoDec := repoMemoryDecisionForFile(cwd, rel, nil, pol)
-		var parts []string
-		if repoDec != "" {
-			parts = append(parts, repoDecisionLabel+repoDec)
-		}
-		if co != "" {
-			parts = append(parts, co)
-		}
-		if ran != "" {
-			parts = append(parts, ran)
-		}
-		if len(parts) == 0 {
+		dec := turn0FileGuardrail(dir, cwd, rel, inScope, skip)
+		line := assembleFileHookLine(search.SafePath(rel), dec, co, ran)
+		if line == "" {
 			continue
 		}
-		line := search.SafePath(rel) + strings.Join(parts, "")
 		pTok := "prompt:fb:" + shortHash(line)
 		tTok := "tool:" + shortHash(dedupeFact(line))
 		if seen != nil && (seen[pTok] || seen[tTok]) {
 			continue
 		}
+		if !isLocalizableSourcePath(rel, filepath.Base(rel)) {
+			if docFallbackLine == "" {
+				docFallbackLine = line
+				docFallbackToks = []string{pTok, tTok}
+			}
+			continue
+		}
 		return line, []string{pTok, tTok}
 	}
-	return "", nil
+	return docFallbackLine, docFallbackToks
 }
 
 // liveRecallBrief constructs a live repository intelligence brief when an agent
@@ -228,6 +258,11 @@ func liveRecallBrief(dir, cwd, query string) string {
 	}
 	if sb, _ := promptSymbolBriefLine(cwd, query, nil); sb != "" {
 		parts = append(parts, strings.TrimSpace(sb))
+	}
+	if len(parts) == 0 {
+		if loc, _ := promptTaskTargetsLine(dir, cwd, query, nil, nil); loc != "" {
+			parts = append(parts, strings.TrimSpace(loc))
+		}
 	}
 	if comp := compilerSymbolSignatureLine(cwd, query, pol); comp != "" {
 		parts = append(parts, strings.TrimSpace(comp))
@@ -373,8 +408,9 @@ func promptErrorFixLine(dir, cwd, asked string, seen map[string]bool) (string, s
 		}
 		if idx := strings.Index(line, "changed next: "); idx >= 0 {
 			editPart := strings.TrimSpace(line[idx+len("changed next: "):])
-			if norm := orientPath(editPart, cwd); norm != "" {
-				line = line[:idx+len("changed next: ")] + norm
+			pathOnly, rest := splitEditTargetAndDetail(editPart)
+			if norm := orientPath(pathOnly, cwd); norm != "" {
+				line = line[:idx+len("changed next: ")] + norm + rest
 			}
 		}
 		tok := "prompt:fx:" + shortHash(line)
@@ -447,4 +483,17 @@ func emitNudgeOnly(stdout io.Writer, plain bool, nudge string) error {
 	resp.HookSpecificOutput.AdditionalContext = out
 	writePromptResponse(stdout, resp)
 	return nil
+}
+
+func splitEditTargetAndDetail(editPart string) (pathOnly, rest string) {
+	cut := -1
+	for _, sep := range []string{" (", " — "} {
+		if idx := strings.Index(editPart, sep); idx >= 0 && (cut < 0 || idx < cut) {
+			cut = idx
+		}
+	}
+	if cut < 0 {
+		return editPart, ""
+	}
+	return editPart[:cut], editPart[cut:]
 }

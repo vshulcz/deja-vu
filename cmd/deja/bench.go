@@ -65,8 +65,11 @@ func runBench(args []string) error {
 	if len(args) > 0 && args[0] == "read" {
 		return runBenchRead(args[1:])
 	}
+	if len(args) > 0 && args[0] == "live" {
+		return runBenchLive(args[1:])
+	}
 	if len(args) < 1 || args[0] != "recall" {
-		return errors.New("bench: usage: bench recall|context|prompt|block|ingest|read [--json] [--seed N]")
+		return errors.New("bench: usage: bench recall|context|prompt|block|ingest|read|live [--json] [--seed N]")
 	}
 	jsonOutput, seed, err := parseBenchArgs("recall", args[1:])
 	if err != nil {

@@ -53,6 +53,7 @@ func mustFriction(t *testing.T, line string) string { //nolint:unparam // the ca
 
 func writeFixesForTest(t *testing.T, dir string, pairs []FixPair) {
 	t.Helper()
+	invalidateFixesCache()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}

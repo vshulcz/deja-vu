@@ -143,3 +143,50 @@ func TestGiveUpLineRejectsUnrealisedReversals(t *testing.T) {
 		}
 	}
 }
+
+func TestGiveUpRejectsParserProseAndTestSoundnessRollbacks(t *testing.T) {
+	rejects := []string{
+		// Algorithmic parser prose ("отбросил интервал") is not an engineering rollback.
+		"Старый extractLineRanges отбросил интервал L10-L20 из-за пустой строки",
+		// Temporary test-soundness and scratchpad rollbacks must not fire dead-end warnings.
+		"Each new test failed with its fix reverted before passing.",
+		"Verified by temporarily reverting the mcp.go hunk there: TestBlame fails.",
+		"Against the reverted tree all four assertions fail.",
+		"Test is sound. Reverting the fix fails TestRelayOutboxBatch.",
+		"Fail-before confirmed on the reverted copy in /tmp/scratch.",
+	}
+	for _, s := range rejects {
+		if got := GiveUpExcerpts(s); len(got) > 0 {
+			t.Errorf("expected non-dead-end prose %q to be rejected, got %v", s, got)
+		}
+	}
+
+	accepts := []string{
+		"Отбросили этот вариант кеширования, потому что он ломает порядок событий.",
+		"Отбросил подход с глобальным мьютексом из-за дедлока в воркере.",
+	}
+	for _, s := range accepts {
+		if got := GiveUpExcerpts(s); len(got) == 0 {
+			t.Errorf("expected genuine Russian dead-end %q to be accepted", s)
+		}
+	}
+}
+
+func TestGiveUpExcerptsExtractsTwoSentenceWindowFromLongParagraph(t *testing.T) {
+	// Over giveUpLineMax (300 runes), with the target symbol in the opening
+	// sentence and the rollback + causal reason in later sentences.
+	longPara := "Confirmed: `blameTextResult` returns JSON via `mustMarshalBlame` because the protocol requires a structured array shape across all callers in the workspace and downstream clients depend on exact field names in every response payload. " +
+		"Wrapping `blameTextResult` in markdown prose would break that contract for strict JSON consumers. " +
+		"My framing attempt was wrong — reverted."
+	got := GiveUpExcerpts(longPara)
+	if len(got) == 0 {
+		t.Fatalf("expected GiveUpExcerpts to extract a 2-sentence window from >300-rune paragraph")
+	}
+	joined := got[0]
+	if _, ok := GiveUpLine(joined); !ok {
+		t.Errorf("extracted window %q did not pass GiveUpLine", joined)
+	}
+	if len(got[0]) < 40 {
+		t.Errorf("extracted window unexpectedly short: %q", joined)
+	}
+}

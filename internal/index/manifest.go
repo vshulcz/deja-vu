@@ -1072,3 +1072,16 @@ func SessionCount(dir string) (int, error) {
 	}
 	return len(m.Sessions), nil
 }
+
+// MetaForKey returns the manifest row for key without reading records.
+func MetaForKey(dir, key string) (SessionMeta, bool) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return SessionMeta{}, false
+	}
+	meta, ok := m.Sessions[key]
+	return meta, ok
+}

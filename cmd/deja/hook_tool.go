@@ -325,7 +325,7 @@ func runHookTool(dir string, stdin io.Reader, stdout io.Writer) error {
 // to 154 different files, which is a line on every edit saying the same thing.
 // What repeats is the decision, not the sentence built around it.
 func dedupeFact(line string) string {
-	for _, label := range []string{standingLabel, decisionLabel, modelOrderLabel, ranLabel, failLabel} {
+	for _, label := range []string{standingLabel, repoDecisionLabel, decisionLabel, modelOrderLabel, revertedLabel, breakageLabel, ranLabel, failLabel} {
 		if i := strings.Index(line, label); i >= 0 {
 			return line[i:]
 		}

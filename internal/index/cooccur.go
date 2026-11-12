@@ -430,6 +430,20 @@ func readCooccur(dir string) map[string][]string {
 	return m
 }
 
+// CooccurNeighbors returns the corpus-mined NPMI co-occurrence neighbors for
+// term from cooccur.gob, ordered strongest first, or nil when none are stored.
+// Callers must treat the returned slice as read-only.
+func CooccurNeighbors(dir, term string) []string {
+	if dir == "" || term == "" {
+		return nil
+	}
+	m := readCooccur(dir)
+	if len(m) == 0 {
+		return nil
+	}
+	return m[strings.ToLower(term)]
+}
+
 // cooccurSearch is the last lexical resort: every stem/fuzzy avenue came up
 // empty, so try replacing exactly one query token with a corpus-proven
 // neighbor. The swap is narrated through the variants channel and results

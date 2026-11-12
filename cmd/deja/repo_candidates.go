@@ -1092,6 +1092,7 @@ func usableRepoCandidateLine(s string) bool {
 		"opened issue ",
 		"открыл issue ",
 		"открыл pr ",
+		"pr `",
 		"сразу закрываем",
 		"сначала:",
 		"а теперь —",
@@ -1100,6 +1101,11 @@ func usableRepoCandidateLine(s string) bool {
 		"теперь добавлю ",
 		"возвращаюсь,",
 		"промах — я уже",
+		"стало:",
+		"было:",
+		"исправлено (",
+		"исправлено:",
+		"чистая проверка ",
 	} {
 		if strings.HasPrefix(low, prefix) {
 			return false

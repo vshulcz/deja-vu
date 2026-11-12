@@ -581,7 +581,14 @@ func recallErrorFixesBlock(dir, q string) (string, int) {
 			continue
 		}
 		if p.Edit != "" {
-			fmt.Fprintf(&b, "  changed next: %s\n", search.SafePath(p.Edit))
+			line := search.SafePath(p.Edit)
+			if p.Symbol != "" {
+				line += " (" + search.SafeLine(p.Symbol) + ")"
+			}
+			if p.Why != "" {
+				line += " — " + truncateToolLine(search.SafeLine(p.Why), 130)
+			}
+			fmt.Fprintf(&b, "  changed next: %s\n", line)
 			shown++
 		} else if p.Command != "" {
 			fmt.Fprintf(&b, "  ran next: %s\n", commandListingLine(p.Command))

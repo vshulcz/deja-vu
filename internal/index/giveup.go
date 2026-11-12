@@ -43,7 +43,7 @@ var giveUpPhrases = []string{
 	// Russian — reversals only.
 	"откатил", "откатили", "откатываю", "откатывать",
 	"вернул как было", "вернули как было", "вернул обратно", "вернули обратно",
-	"отказались от", "отказался от", "отбросил", "отменил изменен",
+	"отказались от", "отказался от", "отбросили", "отбросил подход", "отбросил вариант", "отбросил идею", "отменил изменен",
 }
 
 // GiveUpLine reports whether a line says an approach was tried and dropped.
@@ -88,6 +88,9 @@ func GiveUpLine(l string) (string, bool) {
 		}
 	}
 	low := strings.ToLower(l)
+	if isTestVerificationOrHypotheticalReversal(low) {
+		return l, false
+	}
 	for _, p := range giveUpPhrases {
 		i := strings.Index(low, p)
 		if i < 0 {
@@ -215,6 +218,98 @@ func clauseNegatesOrDefers(clause, phrase string) bool {
 	return strings.HasSuffix(c, "?")
 }
 
+// isTestVerificationOrHypotheticalReversal rejects temporary scratch/hunk
+// rollbacks done solely to prove a regression test fails ("with the hunk
+// reverted, TestX fails") and hypothetical/meta discussions of reversals.
+func isTestVerificationOrHypotheticalReversal(low string) bool {
+	for _, pat := range []string{
+		"hunk reverted",
+		"fix reverted",
+		"fix is reverted",
+		"reverting the fix",
+		"reverting the line",
+		"reverted copy",
+		"reverted tree",
+		"reverted to commit",
+		"reverted probes",
+		"scratch copy",
+		"scratchpad copy",
+		"scratchpad",
+		"verified: with ",
+		"verified with ",
+		"would still be",
+		"telling the agent",
+		"tell the agent",
+		"test is sound",
+		"fail-before confirmed",
+		"necessity confirmed",
+		"откатывать внутри копии",
+		"откатывать хуже",
+	} {
+		if strings.Contains(low, pat) {
+			return true
+		}
+	}
+	if h := strings.Index(low, "reverting the "); h >= 0 && strings.Contains(low[h:], " hunk") {
+		return true
+	}
+	if w := strings.Index(low, "with "); w >= 0 {
+		rest := low[w:]
+		if r := strings.Index(rest, " reverted"); r >= 0 && (strings.Contains(rest[r:], " fail") || strings.Contains(rest[r:], " fails")) {
+			return true
+		}
+	}
+	return false
+}
+
+// GiveUpExcerpts returns reversal-bearing prose excerpts from text. Lines
+// within giveUpLineMax runes are checked directly via GiveUpLine; longer
+// paragraphs are split into backtick-safe sentences and checked as adjacent
+// 2-sentence windows (preserving the target subject + causal reason alongside
+// the rollback statement) before falling back to individual sentences.
+func GiveUpExcerpts(text string) []string {
+	var out []string
+	inFence := false
+	for rawLine := range strings.SplitSeq(text, "\n") {
+		trimmed := strings.TrimSpace(rawLine)
+		if strings.HasPrefix(trimmed, "```") {
+			inFence = !inFence
+			continue
+		}
+		if inFence || trimmed == "" {
+			continue
+		}
+		if l, ok := GiveUpLine(trimmed); ok {
+			out = append(out, l)
+			continue
+		}
+		if utf8.RuneCountInString(trimmed) <= giveUpLineMax {
+			continue
+		}
+		sents := splitCausalCandidates(trimmed)
+		for i := range sents {
+			if i > 0 {
+				pair := sents[i-1] + " " + sents[i]
+				if l, ok := GiveUpLine(pair); ok {
+					out = append(out, l)
+					continue
+				}
+			}
+			if i+1 < len(sents) {
+				pair := sents[i] + " " + sents[i+1]
+				if l, ok := GiveUpLine(pair); ok {
+					out = append(out, l)
+					continue
+				}
+			}
+			if l, ok := GiveUpLine(sents[i]); ok {
+				out = append(out, l)
+			}
+		}
+	}
+	return out
+}
+
 // gaveUp reports whether a session says, somewhere in what was actually said,
 // that something was tried and dropped. Only speech counts: tool output is
 // full of the word "reverted" from git itself, and a command someone ran is
@@ -224,10 +319,8 @@ func gaveUp(ms []model.Message) bool {
 		if m.Role != "user" && m.Role != "assistant" {
 			continue
 		}
-		for line := range strings.SplitSeq(m.Text, "\n") {
-			if _, ok := GiveUpLine(line); ok {
-				return true
-			}
+		if len(GiveUpExcerpts(m.Text)) > 0 {
+			return true
 		}
 	}
 	return false

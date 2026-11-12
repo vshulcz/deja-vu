@@ -82,3 +82,98 @@ func TestALineOfSourceIsNotAnEditRemedy(t *testing.T) {
 		t.Errorf("a line of source was stored as the file that was changed: %+v", pairs)
 	}
 }
+
+func TestEditRemedyMinesSymbolAndCausalWhy(t *testing.T) {
+	now := time.Now()
+	s1 := fixPairsIn([]model.Message{
+		{Role: "tool-output", Text: "--- FAIL: TestPoolDrainsOnClose (0.09s)", Time: now},
+		{Role: "assistant", Text: "**Root cause:** `Pool.drain` closed the work channel because workers were still reading in-flight items.", Time: now.Add(10 * time.Second)},
+		{Role: "edit", Text: "internal/pool/pool.go\nfunc (p *Pool) drain() {\n-\tclose(p.work)\n+\tp.wg.Wait()\n+\tclose(p.work)", Time: now.Add(20 * time.Second)},
+		{Role: "tool-output", Text: "ok  \tinternal/pool\t0.2s", Time: now.Add(30 * time.Second)},
+	}, "claude:s1", "app")
+	if len(s1) != 1 {
+		t.Fatalf("got %d pairs, want 1: %+v", len(s1), s1)
+	}
+	if s1[0].Symbol != "Pool.drain" {
+		t.Errorf("Symbol = %q, want %q", s1[0].Symbol, "Pool.drain")
+	}
+	if s1[0].Why != "`Pool.drain` closed the work channel because workers were still reading in-flight items." {
+		t.Errorf("Why = %q", s1[0].Why)
+	}
+
+	// Second session confirms the edit with only stdlib calls in the hunk and no
+	// explanation; judgeFixes must keep the first sighting's Symbol and Why and
+	// must not mistake strings.TrimSpace for a domain symbol.
+	s2 := fixPairsIn([]model.Message{
+		{Role: "tool-output", Text: "--- FAIL: TestPoolDrainsOnClose (0.09s)", Time: now.Add(time.Hour)},
+		{Role: "edit", Text: "internal/pool/pool.go\n\tname := strings.TrimSpace(raw)\n-\tclose(p.work)\n+\tp.wg.Wait()", Time: now.Add(time.Hour + time.Minute)},
+	}, "claude:s2", "app")
+	if len(s2) != 1 {
+		t.Fatalf("s2 got %d pairs", len(s2))
+	}
+	if s2[0].Symbol != "" {
+		t.Errorf("stdlib call should not be mined as Symbol, got %q", s2[0].Symbol)
+	}
+	judged := judgeFixes(append(s1, s2...))
+	if len(judged) != 1 || judged[0].Candidate {
+		t.Fatalf("expected 1 confirmed pair, got %+v", judged)
+	}
+	if judged[0].Symbol != "Pool.drain" || judged[0].Why == "" {
+		t.Errorf("judgeFixes lost causal metadata from earlier sighting: %+v", judged[0])
+	}
+}
+
+func TestPassingVerifyCommandKeepsEditRemedyInsteadOfOverwritingWithTestRunner(t *testing.T) {
+	now := time.Now()
+	pairs := fixPairsIn([]model.Message{
+		{Role: "command", Text: "go test -run TestPoolDrainsOnClose ./internal/pool", Time: now},
+		{Role: "tool-output", Text: "--- FAIL: TestPoolDrainsOnClose (0.09s)", Time: now.Add(5 * time.Second)},
+		{Role: "edit", Text: "internal/pool/pool.go\nfunc (p *Pool) drain() {\n-\tclose(p.work)\n+\tp.wg.Wait()\n+\tclose(p.work)", Time: now.Add(15 * time.Second)},
+		{Role: "command", Text: "go test -run TestPoolDrainsOnClose ./internal/pool", Time: now.Add(25 * time.Second)},
+		{Role: "tool-output", Text: "ok  \tinternal/pool\t0.18s", Time: now.Add(30 * time.Second)},
+	}, "claude:s1", "app")
+	if len(pairs) != 1 {
+		t.Fatalf("got %d pairs, want 1: %+v", len(pairs), pairs)
+	}
+	if pairs[0].Edit != "internal/pool/pool.go" || pairs[0].Command != "" {
+		t.Fatalf("expected Edit remedy instead of VerifyCommand runner, got %+v", pairs[0])
+	}
+	// Without a prior edit to pool.go before the failure, a single sighting remains a candidate.
+	judged := judgeFixes(pairs)
+	if len(judged) != 1 || !judged[0].Candidate {
+		t.Fatalf("single unintroduced edit should stay Candidate until repeated, got %+v", judged)
+	}
+}
+
+func TestSelfCorrectedEditLoopConfirmsInSingleSessionAndSplitsMultiSentenceWhy(t *testing.T) {
+	now := time.Now()
+	pairs := fixPairsIn([]model.Message{
+		{Role: "edit", Text: "./internal/pool/pool.go\nfunc (p *Pool) drain() {\n+\tclose(p.work)", Time: now},
+		{Role: "command", Text: "go test ./internal/pool", Time: now.Add(10 * time.Second)},
+		{Role: "tool-output", Text: "--- FAIL: TestPoolDrainsOnClose (0.09s)\n    pool_test.go:42: send on closed channel", Time: now.Add(15 * time.Second)},
+		{Role: "edit", Text: "internal/pool/pool_test.go\n+// regression guard", Time: now.Add(20 * time.Second)},
+		{Role: "edit", Text: "internal/pool/pool.go\nfunc (p *Pool) drain() {\n-\tclose(p.work)\n+\tp.wg.Wait()\n+\tclose(p.work)", Time: now.Add(25 * time.Second)},
+		{Role: "command", Text: "go test ./internal/pool", Time: now.Add(35 * time.Second)},
+		{Role: "tool-output", Text: "ok  \tinternal/pool\t0.14s", Time: now.Add(40 * time.Second)},
+		{Role: "assistant", Text: "Found it. `Pool.drain` panicked because closing the work channel before `wg.Wait()` raced with active senders. All package tests now pass and the build is clean.", Time: now.Add(45 * time.Second)},
+	}, "claude:s1", "app")
+	if len(pairs) != 1 {
+		t.Fatalf("got %d pairs, want 1: %+v", len(pairs), pairs)
+	}
+	if pairs[0].Edit != "internal/pool/pool.go" {
+		t.Fatalf("expected implementation file pool.go to win over _test.go edit, got %+v", pairs[0])
+	}
+	if !pairs[0].SelfCorrected {
+		t.Fatalf("expected SelfCorrected=true on Edit1 -> FAIL -> Edit2 -> VerifyCommand PASS loop, got %+v", pairs[0])
+	}
+	if pairs[0].Symbol != "Pool.drain" {
+		t.Errorf("Symbol = %q, want Pool.drain", pairs[0].Symbol)
+	}
+	if pairs[0].Why != "`Pool.drain` panicked because closing the work channel before `wg.Wait()` raced with active senders." {
+		t.Errorf("Why = %q", pairs[0].Why)
+	}
+	judged := judgeFixes(pairs)
+	if len(judged) != 1 || judged[0].Candidate {
+		t.Fatalf("expected SelfCorrected edit pair to be confirmed in single session, got %+v", judged)
+	}
+}

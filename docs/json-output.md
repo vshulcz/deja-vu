@@ -27,7 +27,7 @@ a `schema_version` field so consumers can detect breaking changes.
   would be written into every line of that file. And the surface answers `null`
   when no digest has been recorded: a shape that is sometimes absent cannot be
   relied on to carry a version.
-- **`deja bench recall|context|prompt|block|ingest|read --json`** are object-shaped and carry no
+- **`deja bench recall|context|prompt|block|ingest|read|live --json`** are object-shaped and carry no
   `schema_version` either. They report a benchmark run to whoever asked for it,
   not a contract anything downstream parses on a schedule.
 
@@ -919,14 +919,18 @@ holding, so it is a field rather than a wording difference.
 
 When what followed the error was a change to a file rather than a command — the
 usual answer to a failing test — the row carries `edit` (the file's path) and an
-empty `command`; the prose renders it as *"changed next"*. `edit` is omitted
-when the remedy was a command.
+empty `command`; the prose renders it as *"changed next"*. When the session's
+edit hunk or surrounding diagnosis named the symbol touched or the root cause,
+`symbol` and `why` carry them too. `edit`, `symbol` and `why` are omitted when
+absent or when the remedy was a command.
 
 ```json
 {
   "error": "--- FAIL: TestPoolDrainsOnClose",
   "command": "",
   "edit": "/tmp/app/internal/pool/pool.go",
+  "symbol": "Pool.drain",
+  "why": "Pool.drain closed the work channel before in-flight workers exited.",
   "candidate": false,
   "when": "2026-08-29T18:02:44Z"
 }

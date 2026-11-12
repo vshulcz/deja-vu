@@ -519,7 +519,7 @@ func fixPairLineFor(dir, cwd, command, output string) string {
 		if p.Candidate || orientSkipFixPairForHook(p) {
 			continue
 		}
-		if line := fixLine(p, frictionCount(dir, p, pol)); line != "" {
+		if line := fixLineIn(p, frictionCount(dir, p, pol), cwd); line != "" {
 			return line
 		}
 	}
@@ -536,7 +536,7 @@ func fixPairLineFor(dir, cwd, command, output string) string {
 		if !p.Candidate || orientSkipFixPairForHook(p) {
 			continue
 		}
-		if line := fixLine(p, frictionCount(dir, p, pol)); line != "" {
+		if line := fixLineIn(p, frictionCount(dir, p, pol), cwd); line != "" {
 			return line
 		}
 	}
@@ -549,7 +549,7 @@ func fixPairLineFor(dir, cwd, command, output string) string {
 			if orientSkipFixPairForHook(p) {
 				continue
 			}
-			if line := fixLine(p, frictionCount(dir, p, pol)); line != "" {
+			if line := fixLineIn(p, frictionCount(dir, p, pol), cwd); line != "" {
 				return line
 			}
 		}
@@ -566,7 +566,7 @@ func fixPairLineFor(dir, cwd, command, output string) string {
 		if (!p.MachineFact() && !isShellErr) || orientSkipFixPairForHook(p) {
 			continue
 		}
-		if line := fixLine(p, frictionCount(dir, p, pol)); line != "" {
+		if line := fixLineIn(p, frictionCount(dir, p, pol), cwd); line != "" {
 			return line
 		}
 	}
@@ -932,6 +932,10 @@ func frictionCount(dir string, p index.FixPair, pol policy.Policy) int {
 }
 
 func fixLine(p index.FixPair, sessions int) string {
+	return fixLineIn(p, sessions, howCwd())
+}
+
+func fixLineIn(p index.FixPair, sessions int, cwd string) string {
 	// Some harnesses store the command with the prompt they printed it after;
 	// the line reads as an instruction, so it should not start with a shell
 	// prompt the reader would have to mentally strip.
@@ -973,16 +977,26 @@ func fixLine(p index.FixPair, sessions int) string {
 	// one session did, and an agent handed it at the moment it is stuck has to
 	// be told which of the two it is holding.
 	if edit != "" && (!ok || cmd == "") {
-		if cwd := howCwd(); cwd != "" {
+		if cwd == "" {
+			cwd = howCwd()
+		}
+		if cwd != "" {
 			edit = search.SafePath(orientPath(edit, cwd))
+		}
+		detail := ""
+		if p.Symbol != "" {
+			detail += " (" + search.SafeLine(p.Symbol) + ")"
+		}
+		if p.Why != "" {
+			detail += " — " + truncateToolLine(search.SafeLine(p.Why), 130)
 		}
 		// Not something to run, so not offered as one: the file, in the words
 		// `deja fix` uses for the same pair.
 		if p.Candidate {
 			return "this error came up" + how + " " + where + " before" + when +
-				" — this file was changed after it, and nothing confirms that worked: " + edit
+				" — this file was changed after it, and nothing confirms that worked: " + edit + detail
 		}
-		return "this error came up" + how + " " + where + " before" + when + " — changed next: " + edit
+		return "this error came up" + how + " " + where + " before" + when + " — changed next: " + edit + detail
 	}
 	if p.Candidate {
 		return "this error came up" + how + " " + where + " before" + when +

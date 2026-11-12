@@ -110,6 +110,17 @@ func TestTermsTrimSentencePunctuationButKeepPaths(t *testing.T) {
 			prompt: "посмотри cmd/deja/hook_prompt.go и main.go, там баг",
 			want:   []string{"cmd/deja/hook_prompt.go", "main.go"},
 		},
+		{
+			name:    "workflow preamble without technical subject yields no terms",
+			prompt:  "сначала проверим что происходит в проекте, посмотрим последние коммиты и разберемся что сломалось, ничего не пушить",
+			notWant: []string{"сначала", "проверим", "происходит", "проекте", "посмотрим", "последние", "коммиты", "разберемся", "сломалось", "ничего", "пушить"},
+		},
+		{
+			name:    "workflow preamble preserves real technical subject",
+			prompt:  "сначала посмотрим последние изменения в pgbouncer и разберемся что сломалось",
+			want:    []string{"pgbouncer"},
+			notWant: []string{"сначала", "посмотрим", "последние", "изменения", "разберемся", "сломалось"},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got := Terms(tc.prompt)

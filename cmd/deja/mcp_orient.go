@@ -881,6 +881,12 @@ func orientProjectFixes(dir string, projects []string, cwd, activation string) [
 				continue
 			}
 			remedy = "edit " + relEdit
+			if p.Symbol != "" {
+				remedy += " (" + search.SafeLine(p.Symbol) + ")"
+			}
+			if p.Why != "" {
+				remedy += " — " + truncateToolLine(search.SafeLine(p.Why), 100)
+			}
 		default:
 			continue
 		}
