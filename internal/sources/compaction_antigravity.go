@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -69,14 +70,31 @@ func ReadAntigravityCompactionIfNew(path, conversationID, workspace string, seen
 	if len(ss) != 1 || ss[0].ID != conversationID {
 		return CompactionTranscript{}, false, fmt.Errorf("%w: no parseable antigravity conversation", ErrUnsupportedCompactionTranscript)
 	}
-	return CompactionTranscript{
+	var calls []TranscriptToolCall
+	metricComplete := !truncated
+	for _, r := range records[:cut] {
+		got, _ := antigravityCompactionToolCalls(r.line, r.off, r.off+int64(len(r.line))+1)
+		calls = append(calls, got...)
+	}
+	calls = dedupeCompactionToolCalls(calls)
+	headerLine := bytes.TrimSpace(records[0].line)
+	result := CompactionTranscript{
 		Session: ss[0], Harness: "antigravity", NativeSessionID: conversationID,
 		Workspace: workspace, Path: path,
 		// The checkpoint, not the file: later steps append to the file, and
 		// the same compaction found again must keep its revision.
-		Fingerprint:       fp,
-		HeaderFingerprint: hashCompactionBytes(records[0].line),
-		SourceSize:        boundary.off, SourceMTime: mtime,
-		TailOffset: tailOffset, Truncated: truncated,
-	}, true, nil
+		Fingerprint:         fp,
+		HeaderFingerprint:   hashCompactionBytes(headerLine),
+		BoundaryFingerprint: compactionBoundaryFingerprint(tail, tailOffset, boundary.off),
+		SourceSize:          boundary.off, SourceMTime: mtime,
+		TailOffset:     tailOffset,
+		Truncated:      truncated,
+		MetricComplete: metricComplete,
+		ToolCalls:      calls,
+		tail:           append([]byte(nil), tail...),
+	}
+	if len(calls) > 0 {
+		result.LastToolID = calls[len(calls)-1].ID
+	}
+	return result, true, nil
 }

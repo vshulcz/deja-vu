@@ -884,6 +884,7 @@ func antigravityTakeWrite(text string, step []model.Message, pending map[string]
 // the target path and any old/new text arguments so pre/post-edit guards can
 // inspect the actual edit payload.
 type EditCall struct {
+	ToolName  string
 	FilePath  string
 	OldString string
 	NewString string
@@ -946,7 +947,7 @@ func AntigravityEditCalls(toolCalls any) []EditCall {
 				}
 			}
 		}
-		out = append(out, EditCall{FilePath: p, OldString: oldS, NewString: newS})
+		out = append(out, EditCall{ToolName: str(call["name"]), FilePath: p, OldString: oldS, NewString: newS})
 	}
 	return out
 }

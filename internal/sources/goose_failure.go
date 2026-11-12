@@ -108,5 +108,5 @@ func gooseEditCall(m map[string]any) EditCall {
 	}
 	oldS := firstNonEmpty(str(args["old_text"]), str(args["old_str"]), str(args["old_string"]), str(args["before"]))
 	newS := firstNonEmpty(str(args["new_text"]), str(args["new_str"]), str(args["new_string"]), str(args["file_text"]), str(args["content"]), str(args["diff"]))
-	return EditCall{FilePath: p, OldString: oldS, NewString: newS}
+	return EditCall{ToolName: strings.TrimPrefix(name, "developer__"), FilePath: p, OldString: oldS, NewString: newS}
 }

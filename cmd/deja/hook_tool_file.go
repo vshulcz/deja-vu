@@ -66,7 +66,7 @@ func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(inde
 	changedSyms := changedDeclarationSymbols(cwd, path, editText)
 	sigCallers := crossFileCallersLine(cwd, path, changedSyms)
 	testSyms := append(slices.Clone(editSymbols), changedSyms...)
-	if len(testSyms) == 0 {
+	if len(testSyms) == 0 && strings.TrimSpace(editText) != "" {
 		testSyms = fileSymbols
 	}
 	siblingRan := siblingTestLineFor(cwd, path, testSyms)
@@ -1992,6 +1992,9 @@ func decisionLineOf(notes []sources.PromotedNote, budget int) string {
 		}
 		text = trimTrailingFragment(search.SafeText(clipDecision(text, budget)))
 		if text == "" || seen[strings.ToLower(text)] {
+			continue
+		}
+		if isEphemeralCompletionReport(text) || (len([]rune(text)) >= 45 && !usableRepoCandidateLine(text)) {
 			continue
 		}
 		seen[strings.ToLower(text)] = true

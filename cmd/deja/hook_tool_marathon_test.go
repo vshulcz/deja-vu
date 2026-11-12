@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 func TestToolHookFindsEpisodeDecisionInMarathonSessionAndOutranksSiblingTestTarget(t *testing.T) {
@@ -357,5 +358,57 @@ func TestToolHookSurfacesVerifiedRevertedApproachAndBlocksRollbackNoise(t *testi
 	supersededOut := toolHookRun(t, fmt.Sprintf(`{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":%q,"old_string":"return nil, nil","new_string":"return nil, nil"},"session_id":"agent-now","cwd":%q}`, rpcFile, proj))
 	if strings.Contains(supersededOut, "reverted approach here:") || !strings.Contains(supersededOut, "version marshalBatchPayload") {
 		t.Fatalf("expected newer settled decision on rpc.go to supersede older reversal, got:\n%s", supersededOut)
+	}
+}
+
+func TestToolHookReadVsEditSiblingTestTargetAndAnonDedup(t *testing.T) {
+	tmp := hermeticEnv(t)
+	dir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", dir)
+
+	proj := filepath.Join(tmp, "work", "svc")
+	if err := os.MkdirAll(filepath.Join(proj, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(proj, "go.mod"), []byte("module example.com/svc\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	srcFile := filepath.Join(proj, "token_signer.go")
+	testFile := filepath.Join(proj, "token_signer_test.go")
+	if err := os.WriteFile(srcFile, []byte("package svc\n\nfunc SignAccessToken(id string) string { return id }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(testFile, []byte("package svc\n\nimport \"testing\"\n\nfunc TestSignAccessToken(t *testing.T) { _ = SignAccessToken(\"u1\") }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLAUDE_PROJECT_DIR", proj)
+
+	// 1. Read-only call on a cold file with no guardrail stays silent (no bare test target noise).
+	readPayload := fmt.Sprintf(`{"hook_event_name":"AfterTool","tool_name":"read_file","tool_input":{"file_path":%q},"session_id":"s-read","cwd":%q}`, srcFile, proj)
+	if got := toolHookRun(t, readPayload); got != "" {
+		t.Fatalf("expected read-only call without guardrail to stay silent, got:\n%s", got)
+	}
+
+	// 2. Edit call with empty session_id surfaces the sibling test target once and deduplicates repeat calls.
+	editAnon := fmt.Sprintf(`{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":%q,"old_string":"return id","new_string":"return id + \"!\""},"cwd":%q}`, srcFile, proj)
+	first := toolHookRun(t, editAnon)
+	if !strings.Contains(first, "test target:") || !strings.Contains(first, "TestSignAccessToken") {
+		t.Fatalf("expected Edit call to surface sibling test target, got:\n%s", first)
+	}
+	if second := toolHookRun(t, editAnon); second != "" {
+		t.Fatalf("expected repeat anonymous Edit call in same workspace to deduplicate, got:\n%s", second)
+	}
+
+	// 3. decisionLineOf filters ephemeral Task:/prompt echoes from promoted notes.
+	notes := []sources.PromotedNote{
+		{State: "accepted", Text: "Task: confirm that opencode reads XDG_DATA_HOME on macOS."},
+		{State: "accepted", Text: "Keep `SignAccessToken` deterministic in `token_signer.go` so replay tests stay stable."},
+	}
+	dec := decisionLineOf(notes, toolHookDecisionBudget)
+	if strings.Contains(dec, "Task: confirm") || !strings.Contains(dec, "SignAccessToken") {
+		t.Fatalf("expected decisionLineOf to filter Task: echo and keep real decision, got %q", dec)
 	}
 }

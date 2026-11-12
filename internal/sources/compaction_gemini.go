@@ -75,16 +75,35 @@ func ReadGeminiCompactionIfNew(path, nativeSessionID string, seen func(fingerpri
 	if len(ss) != 1 || ss[0].ID != nativeSessionID {
 		return CompactionTranscript{}, false, fmt.Errorf("%w: no parseable gemini session", ErrUnsupportedCompactionTranscript)
 	}
-	return CompactionTranscript{
+	var calls []TranscriptToolCall
+	for _, r := range records[:cut] {
+		got, err := geminiCompactionToolCalls(r.line, r.off, r.off+int64(len(r.line))+1, nativeSessionID)
+		if err != nil {
+			return CompactionTranscript{}, false, err
+		}
+		calls = append(calls, got...)
+	}
+	calls = dedupeCompactionToolCalls(calls)
+	headerLine := bytes.TrimSpace(records[0].line)
+	result := CompactionTranscript{
 		Session: ss[0], Harness: "gemini", NativeSessionID: nativeSessionID,
 		Workspace: GeminiProjectDir(path), Path: path,
 		// The compaction, not the file: later turns append to the file, and
 		// the same compaction found again must keep its revision.
-		Fingerprint:       fp,
-		HeaderFingerprint: hashCompactionBytes(records[0].line),
-		SourceSize:        records[cut].off, SourceMTime: mtime,
-		TailOffset: tailOffset, Truncated: truncated,
-	}, true, nil
+		Fingerprint:         fp,
+		HeaderFingerprint:   hashCompactionBytes(headerLine),
+		BoundaryFingerprint: compactionBoundaryFingerprint(tail, tailOffset, records[cut].off),
+		SourceSize:          records[cut].off, SourceMTime: mtime,
+		TailOffset:     tailOffset,
+		Truncated:      truncated,
+		MetricComplete: !truncated,
+		ToolCalls:      calls,
+		tail:           append([]byte(nil), tail...),
+	}
+	if len(calls) > 0 {
+		result.LastToolID = calls[len(calls)-1].ID
+	}
+	return result, true, nil
 }
 
 func splitGeminiRecords(out []geminiRecord, data []byte, base int64) []geminiRecord {
